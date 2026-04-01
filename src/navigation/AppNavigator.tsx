@@ -15,6 +15,7 @@ import RegisterPage from '../features/auth/RegisterPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage';
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage';
+import ConsultationPage from '../features/consultation/ConsultationPage';
 import PortalPage from '../features/portal/PortalPage';
 import ProfilePage from '../features/profile/ProfilePage';
 
@@ -74,6 +75,7 @@ export default function AppNavigator() {
 					<>
 						<Stack.Screen name="MainTabs" component={MainTabNavigator} />
                         <Stack.Screen name="DoctorDetail" component={DoctorDetailPage} />
+                        <Stack.Screen name="Consultation" component={ConsultationPage} />
 					</>
 				)}
 			</Stack.Navigator>

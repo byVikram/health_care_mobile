@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { Text, Card, useTheme, Button } from 'react-native-paper';
 import { useAuth, UserRole } from '../../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 interface StatsProps {
     label: string;
@@ -19,6 +20,7 @@ const StatBox = ({ label, value }: StatsProps) => (
 export default function PortalPage() {
     const { role, user } = useAuth();
     const theme = useTheme();
+    const navigation = useNavigation<any>();
 
     return (
         <ScrollView style={styles.container}>
@@ -63,17 +65,21 @@ export default function PortalPage() {
                 </View>
 
                 {/* Mock Appointment Card */}
-                <Card style={styles.appointmentCard}>
-                    <Card.Content>
-                        <Text variant="labelMedium" style={{ color: theme.colors.primary, marginBottom: 4 }}>Tomorrow, 10:30 AM</Text>
-                        <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>Dental Checkup</Text>
-                        <Text variant="bodySmall" style={{ color: '#666', marginTop: 4 }}>Dr. Simran Kaur - City Hospital</Text>
-                    </Card.Content>
-                    <Card.Actions style={{ borderTopWidth: 1, borderTopColor: '#f0f0f0', marginTop: 12 }}>
-                        <Button mode="text" textColor="#d32f2f">Cancel</Button>
-                        <Button mode="contained">Reschedule</Button>
-                    </Card.Actions>
-                </Card>
+                <TouchableOpacity onPress={() => navigation.navigate('Consultation')} activeOpacity={0.8}>
+                    <Card style={styles.appointmentCard}>
+                        <Card.Content>
+                            <Text variant="labelMedium" style={{ color: theme.colors.primary, marginBottom: 4 }}>Tomorrow, 10:30 AM</Text>
+                            <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>Dental Checkup</Text>
+                            <Text variant="bodySmall" style={{ color: '#666', marginTop: 4 }}>Dr. Simran Kaur - City Hospital</Text>
+                        </Card.Content>
+                        <Card.Actions style={{ borderTopWidth: 1, borderTopColor: '#f0f0f0', marginTop: 12 }}>
+                            <Button mode="text" textColor="#d32f2f">Cancel</Button>
+                            <Button mode="contained" onPress={() => navigation.navigate('Consultation')}>
+                                Join Call
+                            </Button>
+                        </Card.Actions>
+                    </Card>
+                </TouchableOpacity>
 
                 {/* Mock Empty State for others */}
                 <View style={styles.emptyState}>
