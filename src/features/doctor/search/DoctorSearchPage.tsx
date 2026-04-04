@@ -1,52 +1,91 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, FlatList } from 'react-native';
-import { Text, TextInput, useTheme, Chip } from 'react-native-paper';
-import DoctorSearchCard from './components/DoctorSearchCard';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, FlatList, RefreshControl } from 'react-native';
+import { useTheme, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
-const mockDoctors = [
-    { id: '1', fullName: 'Dr. Arjun Sharma', speciality: 'Cardiologist', experience: '15 Years', rating: 4.8, consultationFee: 1500 },
-    { id: '2', fullName: 'Dr. Neha Gupta', speciality: 'Dermatologist', experience: '8 Years', rating: 4.5, consultationFee: 800 },
-    { id: '3', fullName: 'Dr. Rajesh Kumar', speciality: 'Pediatrician', experience: '20 Years', rating: 4.9, consultationFee: 1200 },
-    { id: '4', fullName: 'Dr. Priya Singh', speciality: 'Orthopedist', experience: '12 Years', rating: 4.6, consultationFee: 1000 },
-    { id: '5', fullName: 'Dr. Suresh Reddy', speciality: 'Neurologist', experience: '18 Years', rating: 4.7, consultationFee: 2000 },
-];
-
-const mockSpecialities = [
-    { id: 'all', label: 'All', icon: 'format-list-bulleted' },
-    { id: 'cardio', label: 'Cardiology', icon: 'heart-pulse' },
-    { id: 'derma', label: 'Dermatology', icon: 'face-man-shimmer' },
-    { id: 'pedia', label: 'Pediatrics', icon: 'baby-carriage' },
-    { id: 'ortho', label: 'Orthopedics', icon: 'bone' },
-];
+import DoctorSearchCard from './components/DoctorSearchCard';
+import { AppTypography, AppInput, AppSkeleton } from '../../../components/common';
+import { getDoctors, getSpecialities } from '../doctorService';
+import { DoctorSearchItem } from '../../../types/doctor-search';
 
 export default function DoctorSearchPage() {
     const theme = useTheme();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeSpec, setActiveSpec] = useState('all');
+    
+    const [doctors, setDoctors] = useState<DoctorSearchItem[]>([]);
+    const [specialities, setSpecialities] = useState<{ id: string; label: string; icon?: string }[]>([
+        { id: 'all', label: 'All', icon: 'format-list-bulleted' }
+    ]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const fetchSpecialities = async () => {
+        try {
+            const res = await getSpecialities();
+            if (res.success && res.data) {
+                const specMap = res.data.map(s => ({ id: s.id, label: s.label, icon: 'medical-bag' }));
+                setSpecialities([{ id: 'all', label: 'All', icon: 'format-list-bulleted' }, ...specMap]);
+            }
+        } catch (error) {
+            console.error('Error fetching specialities:', error);
+        }
+    };
+
+    const fetchDoctorsList = async (isRefetch = false) => {
+        if (!isRefetch) setLoading(true);
+        try {
+            const res = await getDoctors({
+                search: searchQuery,
+                speciality_id: activeSpec === 'all' ? undefined : activeSpec,
+                limit: 50
+            });
+            if (res.success && res.data) {
+                setDoctors(res.data);
+            }
+        } catch (error) {
+            console.error('Error fetching doctors:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchSpecialities();
+    }, []);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchDoctorsList();
+        }, 500); // debounce search
+        
+        return () => clearTimeout(timer);
+    }, [searchQuery, activeSpec]);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchDoctorsList(true);
+    }, [searchQuery, activeSpec]);
 
     return (
         <View style={styles.container}>
             {/* Header / Search */}
             <View style={[styles.header, { backgroundColor: theme.colors.primaryContainer }]}>
-                <Text variant="headlineSmall" style={{ color: theme.colors.onPrimary, marginBottom: 16 }}>
+                <AppTypography variant="h3" style={{ color: theme.colors.onPrimary, marginBottom: 16 }}>
                     Find Doctors
-                </Text>
-                <TextInput
-                    mode="outlined"
+                </AppTypography>
+                <AppInput
                     placeholder="Search by name, specialist..."
                     value={searchQuery}
                     onChangeText={setSearchQuery}
-                    left={<TextInput.Icon icon="magnify" />}
                     style={styles.searchInput}
-                    outlineStyle={{ borderRadius: 12 }}
                 />
             </View>
 
             {/* Speciality Filters */}
             <View style={styles.filterSection}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-                    {mockSpecialities.map(spec => (
+                    {specialities.map(spec => (
                         <Chip
                             key={spec.id}
                             selected={activeSpec === spec.id}
@@ -67,18 +106,34 @@ export default function DoctorSearchPage() {
 
             {/* Results Title */}
             <View style={styles.resultsHeader}>
-                <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
-                    {mockDoctors.length} Doctors Found
-                </Text>
+                <AppTypography variant="h4">
+                    {loading ? 'Finding Doctors...' : `${doctors.length} Doctors Found`}
+                </AppTypography>
             </View>
 
             {/* List */}
-            <FlatList
-                data={mockDoctors}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => <DoctorSearchCard doctor={item} />}
-                contentContainerStyle={{ paddingBottom: 24 }}
-            />
+            {loading && !refreshing ? (
+                <View style={{ paddingHorizontal: 16 }}>
+                    <AppSkeleton height={140} style={{ marginBottom: 16 }} />
+                    <AppSkeleton height={140} style={{ marginBottom: 16 }} />
+                    <AppSkeleton height={140} style={{ marginBottom: 16 }} />
+                </View>
+            ) : (
+                <FlatList
+                    data={doctors}
+                    keyExtractor={(item) => item.id}
+                    numColumns={2}
+                    columnWrapperStyle={{ paddingHorizontal: 8, justifyContent: 'space-between' }}
+                    renderItem={({ item }) => <DoctorSearchCard doctor={item} />}
+                    contentContainerStyle={{ paddingBottom: 24 }}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    ListEmptyComponent={
+                        <View style={{ flex: 1, alignItems: 'center', marginTop: 40 }}>
+                            <AppTypography>No doctors found matching criteria.</AppTypography>
+                        </View>
+                    }
+                />
+            )}
         </View>
     );
 }

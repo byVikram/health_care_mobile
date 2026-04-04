@@ -1,0 +1,65 @@
+﻿// src/types/doctor-profile-api.ts
+// Matches the /api/doctors/details API response shape
+
+export interface DoctorProfileApiSpeciality {
+	id: string
+	label: string
+}
+
+export interface DoctorProfileApiHospital {
+	id: string
+	is_primary: boolean
+	video_consultation_fee: string
+	offline_consultation_fee: string
+	available_days: string[]
+	working_hours: string
+	hospital: {
+		id: string
+		name: string
+		address: string
+		contact_number: string
+		distance: string
+		latitude: number
+		longitude: number
+	}
+}
+
+export interface DoctorProfileApiAvailability {
+	day_of_week: number
+	slot_time: string
+	is_active: boolean
+	hospital_id: string
+	hospital_name: string
+}
+
+export interface DoctorProfileApiData {
+	personal_details: {
+		name: string
+		email: string
+		is_verified: boolean
+		avatar_s3_key: string | null
+		gender: string
+		date_of_birth: string
+		location: string
+		languages: string[]
+	}
+	professional_details: {
+		experience_years: number
+		degree: string
+		college: string
+		year_of_passing: string
+		qualification_proof_s3_key: string | null
+		registration_number: string
+		registration_proof_s3_key: string | null
+		about: string
+		specialities: DoctorProfileApiSpeciality[]
+	}
+	hospitals: DoctorProfileApiHospital[]
+	availability: DoctorProfileApiAvailability[]
+}
+
+export interface DoctorProfileApiResponse {
+	success: boolean
+	message: string
+	data: DoctorProfileApiData
+}

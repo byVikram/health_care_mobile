@@ -30,8 +30,8 @@ axiosInstance.interceptors.response.use(
 			// Clear storage. The UI should react by observing the token missing in the next load,
 			// or we can emit an event here to force the UI to log out immediately.
 			await clearAuthStorage();
-            // In a real robust app, you might emit a global event here.
-            Alert.alert('Session Expired', 'Please log in again.');
+			// In a real robust app, you might emit a global event here.
+			Alert.alert('Session Expired', 'Please log in again.');
 		} else {
 			// Replace react-toastify with Alert in RN
 			Alert.alert('API Error', message);

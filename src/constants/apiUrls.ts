@@ -1,7 +1,16 @@
 // src/constants/apiUrls.ts
 
+import { Platform } from 'react-native';
+
 // Replace Vite's import.meta.env with Expo's process.env.EXPO_PUBLIC_
-export const BASE_URL = process.env.EXPO_PUBLIC_API_ENDPOINT || 'http://localhost:3000';
+// If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000' 
+// to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
+const getBaseUrl = () => {
+	if (process.env.EXPO_PUBLIC_API_ENDPOINT) return process.env.EXPO_PUBLIC_API_ENDPOINT;
+	return Platform.OS === 'android' ? 'http://172.19.116.49:8000' : 'http://172.19.116.49:8000';
+};
+
+export const BASE_URL = getBaseUrl();
 
 export const API_ENDPOINTS = {
 	AUTH: {
@@ -33,4 +42,4 @@ export const API_ENDPOINTS = {
 		GET_BY_ID: (id: number) => `${BASE_URL}/api/appointments/${id}`,
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 	},
-};
+}

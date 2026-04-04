@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
-import { Text, Button, ActivityIndicator, useTheme } from 'react-native-paper';
+import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput } from 'react-native';
+import { useTheme } from 'react-native-paper';
+import { AppButton, AppTypography } from '../../../components/common';
 import { useAuth } from '../../../context/AuthContext';
-// import { verifyOtp } from '../authService'; // We will mock this
+import { verifyOtp, sendOtp } from '../authService';
 
 interface OtpFormProps {
     contactNumber: string;
@@ -17,7 +18,7 @@ export default function OtpForm({ contactNumber, onVerify }: OtpFormProps) {
     const theme = useTheme();
     const { setAuth } = useAuth();
     
-    const inputRef = useRef<TextInput>(null);
+    const inputRef = useRef<RNTextInput>(null);
 
     useEffect(() => {
         if (timer <= 0) return;
@@ -34,29 +35,43 @@ export default function OtpForm({ contactNumber, onVerify }: OtpFormProps) {
         setLoading(true);
 
         try {
-            // Mock API verification
-            await setAuth('patient', { name: "Mock User" }, "mock-access-token", "mock-refresh");
-            onVerify();
-        } catch (err) {
-            setError('Invalid OTP. Please try again.');
+            const response = await verifyOtp(contactNumber, otp);
+            if (response.success && response.data) {
+                await setAuth(
+                    response.data.user.role, 
+                    response.data.user, 
+                    response.data.access_token, 
+                    response.data.refresh_token
+                );
+                onVerify();
+            } else {
+                setError(response.message || 'Invalid OTP. Please try again.');
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Invalid OTP. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleResend = () => {
+    const handleResend = async () => {
         if (timer > 0) return;
         setTimer(180);
         setOtp('');
         setError('');
+        try {
+            await sendOtp(contactNumber);
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Failed to resend OTP');
+        }
     };
 
     return (
         <View style={styles.container}>
-            <Text variant="headlineMedium" style={styles.title}>OTP Verification</Text>
-            <Text variant="bodyMedium" style={styles.subtitle}>
+            <AppTypography variant="h2" style={styles.title}>OTP Verification</AppTypography>
+            <AppTypography variant="subtitle" style={styles.subtitle}>
                 Enter the OTP received on +91 {contactNumber}
-            </Text>
+            </AppTypography>
 
             <TouchableOpacity 
                 activeOpacity={1} 
@@ -70,13 +85,13 @@ export default function OtpForm({ contactNumber, onVerify }: OtpFormProps) {
                             styles.otpBox, 
                             { borderColor: error ? theme.colors.error : (digit ? theme.colors.primary : '#ccc') }
                         ]}>
-                            <Text style={styles.otpText}>{digit}</Text>
+                            <AppTypography style={styles.otpText}>{digit}</AppTypography>
                         </View>
                     );
                 })}
             </TouchableOpacity>
 
-            <TextInput
+            <RNTextInput
                 ref={inputRef}
                 value={otp}
                 onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, '').slice(0, 6))}
@@ -86,26 +101,27 @@ export default function OtpForm({ contactNumber, onVerify }: OtpFormProps) {
                 autoFocus
             />
 
-            {error ? <Text style={{ color: theme.colors.error, marginBottom: 8, fontSize: 12 }}>{error}</Text> : null}
+            {error ? <AppTypography variant="caption" color={theme.colors.error} style={{ marginBottom: 8 }}>{error}</AppTypography> : null}
 
             <View style={styles.resendContainer}>
-                <Text>Didn't receive the OTP? </Text>
+                <AppTypography>Didn't receive the OTP? </AppTypography>
                 <TouchableOpacity onPress={handleResend} disabled={timer > 0}>
-                    <Text style={{ color: timer > 0 ? '#999' : theme.colors.primary, fontWeight: 'bold' }}>Resend</Text>
+                    <AppTypography color={timer > 0 ? '#999' : theme.colors.primary} style={{ fontWeight: 'bold' }}>Resend</AppTypography>
                 </TouchableOpacity>
-                {timer > 0 && <Text style={{ color: theme.colors.primary, marginLeft: 'auto' }}>
+                {timer > 0 && <AppTypography color={theme.colors.primary} style={{ marginLeft: 'auto' }}>
                     00:{timer < 10 ? `0${timer}` : timer}
-                </Text>}
+                </AppTypography>}
             </View>
 
-            <Button 
-                mode="contained" 
+            <AppButton 
+                variant="primary" 
                 onPress={handleVerify} 
                 style={styles.button}
                 disabled={loading}
+                loading={loading}
             >
                 {loading ? "Verifying..." : "Verify"}
-            </Button>
+            </AppButton>
         </View>
     );
 }
@@ -115,11 +131,9 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     title: {
-        fontWeight: 'bold',
         marginBottom: 8,
     },
     subtitle: {
-        color: '#666',
         marginBottom: 24,
     },
     otpContainer: {

@@ -1,99 +1,175 @@
 import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
-import { Text, Card, Button, useTheme, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
+import { DoctorSearchItem } from '../../../../types/doctor-search';
+import { AppButton, AppTypography } from '../../../../components/common';
+
 interface DoctorProps {
-    doctor: {
-        id: string;
-        fullName: string;
-        speciality: string;
-        experience: string;
-        rating: number;
-        consultationFee: number;
-    }
+    doctor: DoctorSearchItem;
 }
 
 export default function DoctorSearchCard({ doctor }: DoctorProps) {
-    const theme = useTheme();
     const navigation = useNavigation<any>();
 
+    // Using placeholder data matching the mockup where API doesn't provide it yet
+    const avatarUrl = doctor.avatar_s3_key || 'https://via.placeholder.com/400x200'; // fallback
+    const rating = '0';
+    const location = doctor.location || 'Bangalore';
+    const distance = '<0 km';
+    const earliestSlot = 'Earliest available slot (Today 2:00 PM)';
+
     return (
-        <Card style={styles.card}>
-            <Card.Content style={styles.content}>
-                <View style={styles.avatarBox}>
-                    <MaterialCommunityIcons name="doctor" size={40} color={theme.colors.primary} />
+        <View style={styles.card}>
+            {/* Top Half - Image */}
+            <View style={styles.imageContainer}>
+                <Image 
+                    source={{ uri: avatarUrl }} 
+                    style={styles.image} 
+                    resizeMode="cover"
+                />
+                <View style={styles.badge}>
+                    <MaterialCommunityIcons name="thumb-up" size={14} color="#fff" style={{ marginRight: 4 }} />
+                    <AppTypography variant="caption" style={styles.badgeText}>People Recommended</AppTypography>
                 </View>
-                <View style={styles.details}>
-                    <Text variant="titleMedium" style={styles.name}>{doctor.fullName}</Text>
-                    <Text variant="bodySmall" style={styles.speciality}>{doctor.speciality}</Text>
-                    <View style={styles.infoRow}>
-                        <MaterialCommunityIcons name="briefcase" size={14} color="#666" />
-                        <Text variant="bodySmall" style={styles.infoText}>{doctor.experience} Exp</Text>
-                        <MaterialCommunityIcons name="star" size={14} color="#f57c00" style={{ marginLeft: 8 }} />
-                        <Text variant="bodySmall" style={styles.infoText}>{doctor.rating}</Text>
+            </View>
+
+            {/* Bottom Half - Content */}
+            <View style={styles.content}>
+                <AppTypography style={styles.name} numberOfLines={1}>{doctor.name}</AppTypography>
+                <AppTypography variant="caption" style={styles.speciality} numberOfLines={1}>
+                    {doctor.specialities && doctor.specialities.length > 0 ? doctor.specialities.join(', ') : 'Cardiology'}
+                </AppTypography>
+                
+                <AppTypography variant="caption" style={styles.slotText} numberOfLines={1}>Next: Today 2:00 PM</AppTypography>
+
+                <View style={styles.infoRow}>
+                    <View style={styles.infoLeft}>
+                        <MaterialCommunityIcons name="briefcase" size={12} color="#5b7282" />
+                        <AppTypography variant="caption" style={styles.infoText}>{doctor.experience_years}y</AppTypography>
+                    </View>
+                    <View style={styles.infoRight}>
+                        <AppTypography variant="caption" style={styles.infoTextBold}>{rating}</AppTypography>
+                        <MaterialCommunityIcons name="star" size={12} color="#f5a623" style={{ marginLeft: 2 }} />
                     </View>
                 </View>
-            </Card.Content>
-            <Card.Actions style={styles.actions}>
-                <View>
-                    <Text variant="labelSmall" style={{ color: '#666' }}>Consultation Fee</Text>
-                    <Text variant="titleMedium" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
-                        ₹{doctor.consultationFee}
-                    </Text>
+
+                <View style={[styles.infoRow, { marginBottom: 8 }]}>
+                    <View style={styles.infoLeft}>
+                        <MaterialCommunityIcons name="map-marker" size={12} color="#5b7282" />
+                        <AppTypography variant="caption" style={styles.infoText}>{location}</AppTypography>
+                    </View>
+                    <View style={styles.infoRight}>
+                        <AppTypography variant="caption" style={styles.infoTextBoldTeal}>{distance}</AppTypography>
+                    </View>
                 </View>
-                <Button mode="contained" onPress={() => navigation.navigate('DoctorDetail', { id: doctor.id })}>
-                    Book Now
-                </Button>
-            </Card.Actions>
-        </Card>
+
+                <AppButton 
+                    variant="primary" 
+                    onPress={() => navigation.navigate('DoctorDetail', { id: doctor.id })}
+                    style={styles.bookButton}
+                    labelStyle={{ fontSize: 12, marginHorizontal: 0 }}
+                >
+                    Book
+                </AppButton>
+            </View>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     card: {
-        marginHorizontal: 16,
+        flex: 1,
+        marginHorizontal: 8,
         marginBottom: 16,
         backgroundColor: '#fff',
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e8edf0',
+        elevation: 2, 
+        shadowColor: '#000', 
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+    },
+    imageContainer: {
+        height: 120, // Reduced for 2-column
+        backgroundColor: '#f0f4f8',
+        position: 'relative',
+    },
+    image: {
+        width: '100%',
+        height: '100%',
+    },
+    badge: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        backgroundColor: '#00a82d', // vibrant green
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    badgeText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 9,
     },
     content: {
-        flexDirection: 'row',
-        paddingBottom: 16,
-    },
-    avatarBox: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#f0f4f8',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 16,
-    },
-    details: {
-        flex: 1,
+        padding: 10,
     },
     name: {
+        color: '#082b45',
         fontWeight: 'bold',
+        fontSize: 14,
+        marginBottom: 2,
     },
     speciality: {
-        color: '#666',
-        marginBottom: 4,
+        color: '#5b7282',
+        marginBottom: 6,
+    },
+    slotText: {
+        color: '#5b7282',
+        marginBottom: 8,
     },
     infoRow: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: 8,
+    },
+    infoLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
     },
     infoText: {
-        color: '#666',
+        color: '#5b7282',
         marginLeft: 4,
+        fontSize: 10,
     },
-    actions: {
-        justifyContent: 'space-between',
-        borderTopWidth: 1,
-        borderTopColor: '#f0f0f0',
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 16,
+    infoRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    infoTextBold: {
+        color: '#082b45',
+        fontWeight: 'bold',
+        fontSize: 11,
+    },
+    infoTextBoldTeal: {
+        color: '#287474',
+        fontWeight: 'bold',
+        fontSize: 11,
+    },
+    bookButton: {
+        marginTop: 4,
+        backgroundColor: '#2b7571', 
+        borderRadius: 8,
+        paddingVertical: 2,
     }
 });

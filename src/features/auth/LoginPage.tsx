@@ -1,17 +1,34 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, TextInput, Button, useTheme } from 'react-native-paper';
+import { useTheme } from 'react-native-paper';
+import { AppButton, AppInput, AppTypography } from '../../components/common';
 import OtpForm from './components/OtpForm';
 import { useAuth } from '../../context/AuthContext';
+import { sendOtp } from './authService';
 
 export default function LoginPage({ navigation }: any) {
     const [step, setStep] = useState<'login' | 'otp'>('login');
     const [contactNumber, setContactNumber] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
     const theme = useTheme();
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
         if (contactNumber.length > 0) {
-            setStep('otp');
+            setLoading(true);
+            setError('');
+            try {
+                const res = await sendOtp(contactNumber);
+                if (res.success !== false) {
+                    setStep('otp');
+                } else {
+                    setError(res.message || 'Failed to send OTP');
+                }
+            } catch (err: any) {
+                setError(err.response?.data?.message || 'Failed to send OTP');
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -22,25 +39,25 @@ export default function LoginPage({ navigation }: any) {
         >
             {step === 'login' ? (
                 <View style={{ width: '100%' }}>
-                    <Text variant="headlineMedium" style={styles.title}>Login</Text>
-                    <Text variant="bodyMedium" style={styles.subtitle}>Welcome back to HealthCare</Text>
+                    <AppTypography variant="h2" align="center" style={styles.title}>Login</AppTypography>
+                    <AppTypography variant="subtitle" align="center" style={styles.subtitle}>Welcome back to HealthCare</AppTypography>
 
-                    <TextInput
+                    <AppInput
                         label="Contact Number"
                         value={contactNumber}
                         onChangeText={setContactNumber}
                         keyboardType="phone-pad"
-                        mode="outlined"
                         style={styles.input}
+                        errorText={error}
                     />
 
-                    <Button mode="contained" onPress={handleContinue} style={styles.button}>
-                        Continue
-                    </Button>
+                    <AppButton variant="primary" onPress={handleContinue} loading={loading} disabled={loading} style={styles.button}>
+                        {loading ? 'Sending OTP...' : 'Continue'}
+                    </AppButton>
                     
-                    <Button mode="text" onPress={() => navigation.navigate('Register')} style={styles.link}>
+                    <AppButton variant="text" onPress={() => navigation.navigate('Register')} style={styles.link}>
                         Don't have an account? Register
-                    </Button>
+                    </AppButton>
                 </View>
             ) : (
                 <OtpForm 
@@ -62,14 +79,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff'
     },
     title: {
-        fontWeight: 'bold',
         marginBottom: 8,
-        textAlign: 'center'
     },
     subtitle: {
-        textAlign: 'center',
         marginBottom: 32,
-        color: '#666'
     },
     input: {
         marginBottom: 16
