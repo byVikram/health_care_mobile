@@ -1,4 +1,4 @@
-// src/features/doctor/doctorService.ts
+﻿// src/features/doctor/doctorService.ts
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { AppointmentsResponse } from '../../types/appointment'
