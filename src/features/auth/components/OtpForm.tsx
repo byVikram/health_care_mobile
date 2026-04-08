@@ -10,20 +10,25 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from 'react-native'
+import { verifyOtp } from '../authService'
+import { useAuth, UserRole } from '../../../context/AuthContext'
 
 interface Props {
     contactNumber: string
     onVerify: () => void
-    onBack: () => void
+    onBack?: () => void
+    backLabel?: string
 }
 
 const OTP_LENGTH = 6
+const TEAL = '#0d9488'
 
-export default function OtpForm({ contactNumber, onVerify, onBack }: Props) {
+export default function OtpForm({ contactNumber, onVerify, onBack, backLabel = 'Back' }: Props) {
     const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''))
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const inputs = useRef<(TextInput | null)[]>([])
+    const { setAuth } = useAuth()
 
     const handleChange = (val: string, idx: number) => {
         const digit = val.replace(/\D/g, '').slice(-1)
@@ -31,14 +36,12 @@ export default function OtpForm({ contactNumber, onVerify, onBack }: Props) {
         next[idx] = digit
         setOtp(next)
         setError('')
-        // Auto-move to next box
         if (digit && idx < OTP_LENGTH - 1) {
             inputs.current[idx + 1]?.focus()
         }
     }
 
     const handleKeyPress = (e: any, idx: number) => {
-        // Move back on backspace if current box is empty
         if (e.nativeEvent.key === 'Backspace' && !otp[idx] && idx > 0) {
             inputs.current[idx - 1]?.focus()
         }
@@ -50,14 +53,33 @@ export default function OtpForm({ contactNumber, onVerify, onBack }: Props) {
             setError('Please enter the complete 6-digit OTP')
             return
         }
+
         setLoading(true)
+        setError('')
+
         try {
-            // TODO: Replace with your real OTP verify API call:
-            // await verifyOtp({ contact_number: contactNumber, otp: code })
-            await new Promise((r) => setTimeout(r, 1000)) // simulated
+            const response = await verifyOtp(contactNumber, code)
+            if (response.success === false || !response.data?.access_token || !response.data?.refresh_token) {
+                throw new Error(response.message || 'OTP verification failed')
+            }
+
+            const normalizedRole = String(response.data.user?.role || '').toLowerCase()
+            const role: UserRole = normalizedRole === 'doctor' ? 'doctor' : 'patient'
+
+            await setAuth(
+                role,
+                {
+                    id: response.data.user?.id,
+                    name: response.data.user?.name || '',
+                    email: response.data.user?.email,
+                },
+                response.data.access_token,
+                response.data.refresh_token
+            )
+
             onVerify()
         } catch (err: any) {
-            setError(err?.response?.data?.message || 'Invalid OTP. Please try again.')
+            setError(err?.response?.data?.message || err?.message || 'Invalid OTP. Please try again.')
         } finally {
             setLoading(false)
         }
@@ -67,7 +89,7 @@ export default function OtpForm({ contactNumber, onVerify, onBack }: Props) {
         setOtp(Array(OTP_LENGTH).fill(''))
         setError('')
         inputs.current[0]?.focus()
-        // TODO: call your resend OTP API here
+        // TODO: call resend OTP API here
     }
 
     return (
@@ -83,7 +105,6 @@ export default function OtpForm({ contactNumber, onVerify, onBack }: Props) {
                     <Text style={styles.phone}>+91 {contactNumber}</Text>
                 </Text>
 
-                {/* OTP Boxes */}
                 <View style={styles.otpRow}>
                     {otp.map((digit, idx) => (
                         <TextInput
@@ -107,7 +128,6 @@ export default function OtpForm({ contactNumber, onVerify, onBack }: Props) {
 
                 {!!error && <Text style={styles.errorText}>{error}</Text>}
 
-                {/* Verify Button */}
                 <TouchableOpacity
                     style={[styles.button, loading && styles.buttonDisabled]}
                     onPress={handleVerify}
@@ -120,7 +140,6 @@ export default function OtpForm({ contactNumber, onVerify, onBack }: Props) {
                     }
                 </TouchableOpacity>
 
-                {/* Resend */}
                 <Text style={styles.resendText}>
                     Didn't receive a code?{' '}
                     <Text style={styles.tealUnderline} onPress={handleResend}>
@@ -128,16 +147,15 @@ export default function OtpForm({ contactNumber, onVerify, onBack }: Props) {
                     </Text>
                 </Text>
 
-                {/* Back */}
-                <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-                    <Text style={styles.backText}>← Back to Register</Text>
-                </TouchableOpacity>
+                {onBack ? (
+                    <TouchableOpacity style={styles.backBtn} onPress={onBack}>
+                        <Text style={styles.backText}>{`<- ${backLabel}`}</Text>
+                    </TouchableOpacity>
+                ) : null}
             </View>
         </KeyboardAvoidingView>
     )
 }
-
-const TEAL = '#0d9488'
 
 const styles = StyleSheet.create({
     container: {

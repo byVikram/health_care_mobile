@@ -39,7 +39,7 @@ export default function RegisterForm({ onSubmit, onSwitchToLogin }: RegisterForm
     useEffect(() => {
         const fetchRoles = async () => {
             try {
-                debugger
+                
                 setLoading(true)
                 const res = await getRoles()
                 const rawData = res?.data || res?.data || []
@@ -118,7 +118,6 @@ export default function RegisterForm({ onSubmit, onSwitchToLogin }: RegisterForm
                 placeholder="Select a role"
                 // disabled={loading}
                 onSelect={(val: string) => {
-                    debugger
                     setRegisterAs(val)
                     if (roleError) setRoleError('')
                     if (formError) setFormError('')

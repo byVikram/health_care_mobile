@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { useTheme } from 'react-native-paper';
 import { AppButton, AppInput, AppTypography } from '../../components/common';
 import OtpForm from './components/OtpForm';
-import { useAuth } from '../../context/AuthContext';
 import { sendOtp } from './authService';
 
 export default function LoginPage({ navigation }: any) {
@@ -11,7 +9,6 @@ export default function LoginPage({ navigation }: any) {
     const [contactNumber, setContactNumber] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const theme = useTheme();
 
     const handleContinue = async () => {
         if (contactNumber.length > 0) {
@@ -65,6 +62,8 @@ export default function LoginPage({ navigation }: any) {
                     onVerify={() => {
                         // The AuthContext will handle the Navigation switch to Dashboard automatically!
                     }}
+                    onBack={() => setStep('login')}
+                    backLabel="Back to Login"
                 />
             )}
         </KeyboardAvoidingView>

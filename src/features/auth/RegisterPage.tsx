@@ -27,8 +27,11 @@ export default function RegisterPage({ navigation }: any) {
             {step === 'otp' && (
                 <OtpForm
                     contactNumber={contactNumber}
-                    onVerify={() => setStep('success')}
+                    onVerify={() => {
+                        // AppNavigator will switch to authenticated stack after setAuth in OtpForm
+                    }}
                     onBack={() => setStep('register')}
+                    backLabel="Back to Register"
                 />
             )}
 
