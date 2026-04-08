@@ -8,6 +8,19 @@ import { SpecialitiesResponse } from '../../types/speciality'
 import { DoctorProfileApiResponse, DoctorProfileApiData } from '../../types/doctor-profile-api'
 import { DoctorProfile } from '../../types/doctor-profile'
 
+export interface TimeSlot {
+	id: string | number
+	start_time: string
+	end_time: string
+	status: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE'
+}
+
+export interface SlotGroup {
+	label: string
+	period: string
+	slots: TimeSlot[]
+}
+
 export interface AppointmentParams {
 	page?: number
 	limit?: number
@@ -59,6 +72,22 @@ export const getDoctors = async (params?: DoctorSearchParams): Promise<DoctorSea
 	const res = await ApiService.getWithParams<DoctorSearchResponse>(
 		API_ENDPOINTS.DOCTORS.SEARCH,
 		(params ?? {}) as Record<string, unknown>
+	)
+	return res.data
+}
+
+export interface AvailabilityResponse {
+	data?: SlotGroup[]
+}
+
+export const getDoctorAvailability = async (params: {
+	doctor_id?: string
+	hospital_id: number | string
+	date: string
+}): Promise<SlotGroup[] | AvailabilityResponse> => {
+	const res = await ApiService.getWithParams<SlotGroup[] | AvailabilityResponse>(
+		API_ENDPOINTS.DOCTORS.AVAILABILITY,
+		params as Record<string, unknown>
 	)
 	return res.data
 }

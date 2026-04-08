@@ -54,3 +54,12 @@ export interface DoctorDetailResponse {
 	message: string
 	data: DoctorDetailData
 }
+
+
+export interface AppointmentType {
+	id: "clinic" | "video"
+	label: string
+	description: string
+	price: number
+	duration: number
+}

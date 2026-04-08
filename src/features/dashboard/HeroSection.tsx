@@ -100,7 +100,7 @@ export default function HeroSection() {
 
 const styles = StyleSheet.create({
 	container: {
-		paddingTop: 40, // accommodate safe area top since header is gone
+		paddingTop: 16,
 		paddingHorizontal: 16,
 		paddingBottom: 16,
 	},
