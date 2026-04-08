@@ -14,6 +14,16 @@ export interface TimeSlot {
 	end_time: string
 	status: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE'
 }
+// Add this to doctorService.ts
+export interface Appointment {
+    id: string;
+    appointment_date: string;
+    doctor_name?: string;
+    patient_name?: string;
+    status?: string;
+    time?: string;
+    notes?: string;
+}
 
 export interface SlotGroup {
 	label: string
