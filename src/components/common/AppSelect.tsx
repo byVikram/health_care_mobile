@@ -17,7 +17,7 @@ interface AppSelectProps {
     errorText?: string;
 }
 
-export const Select = ({ 
+export const AppSelect = ({ 
     options, 
     value, 
     onSelect, 
