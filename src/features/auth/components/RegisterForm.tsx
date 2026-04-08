@@ -39,6 +39,7 @@ export default function RegisterForm({ onSubmit, onSwitchToLogin }: RegisterForm
     useEffect(() => {
         const fetchRoles = async () => {
             try {
+                debugger
                 setLoading(true)
                 const res = await getRoles()
                 const rawData = res?.data || res?.data || []
@@ -110,8 +111,8 @@ export default function RegisterForm({ onSubmit, onSwitchToLogin }: RegisterForm
             <Text style={styles.title}>Register</Text>
 
             {/* Role — rendered first, matches web order */}
-            <AppSelect
-                label="Role"
+            <AppSelect 
+                // label="Role"
                 value={registerAs}
                 options={roles}
                 placeholder="Select a role"
@@ -122,6 +123,7 @@ export default function RegisterForm({ onSubmit, onSwitchToLogin }: RegisterForm
                     if (roleError) setRoleError('')
                     if (formError) setFormError('')
                 }}
+            
                 // error={!!roleError}
                 // helperText={roleError}
             />
@@ -201,6 +203,7 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         justifyContent: 'center',
     },
+    
     title: {
         fontSize: 26,
         fontWeight: '600',
