@@ -1,274 +1,492 @@
-import React from 'react';
+import React from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+	View,
+	Text,
+	ScrollView,
+	StyleSheet,
+	TouchableOpacity,
+} from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { AppSkeleton } from "../../components/common";
 
 const actionButtons: {
-  label: string;
-  bg: string;
-  color: string;
-  action: string;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+	label: string;
+	bg: string;
+	color: string;
+	action: string;
+	icon: keyof typeof MaterialCommunityIcons.glyphMap;
 }[] = [
-  { label: 'Confirm',    bg: '#e8f5e9', color: '#4caf50', action: 'confirm',    icon: 'check'         },
-  { label: 'Reject',     bg: '#ffeeee', color: '#e53935', action: 'reject',     icon: 'close'         },
-  { label: 'Reschedule', bg: '#fff8e8', color: '#f59e0b', action: 'reschedule', icon: 'refresh'       },
-  { label: 'Refer',      bg: '#e8f4f8', color: '#0c7c7c', action: 'refer',      icon: 'account-group' },
+	{
+		label: "Confirm",
+		bg: "#d6eed8",
+		color: "#2e8b57",
+		action: "confirm",
+		icon: "check",
+	},
+	{
+		label: "Reject",
+		bg: "#f8dddd",
+		color: "#d84545",
+		action: "reject",
+		icon: "close",
+	},
+	{
+		label: "Reschedule",
+		bg: "#f8e8c6",
+		color: "#d08a0a",
+		action: "reschedule",
+		icon: "refresh",
+	},
+	{
+		label: "Refer",
+		bg: "#dbe2f5",
+		color: "#4d6bb1",
+		action: "refer",
+		icon: "account-multiple-outline",
+	},
 ];
 
 export default function DoctorAppointments({
-  selectedDate,
-  setSelectedDate,
-  appointments,
-  apptLoading,
-  apptError,
-  weekDays,
-  selectedDateObj,
+	selectedDate,
+	setSelectedDate,
+	appointments,
+	apptLoading,
+	apptError,
+	weekDays,
+	selectedDateObj,
 }: any) {
+	const getStatusLabel = (status: any) =>
+		typeof status === "string" ? status : (status?.label ?? "pending");
 
-  const getStatusLabel = (status: any) =>
-    typeof status === 'string' ? status : status?.label ?? 'pending';
+	const formatStatus = (status: string) =>
+		status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 
-  const handleAction = (action: string, id: string) => {
-    if (action === 'confirm') alert('Confirmed');
-    if (action === 'reject') alert('Rejected');
-    if (action === 'reschedule') alert('Reschedule coming soon');
-    if (action === 'refer') alert('Refer coming soon');
-  };
+	const getPatientAge = (apt: any) => apt?.patient?.age ?? apt?.age ?? "--";
 
-  return (
-    <View style={styles.container}>
+	const getPatientGender = (apt: any) =>
+		apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? "--";
 
-      {/* 🔍 Search */}
-      <Text style={styles.title}>Search Patient</Text>
-      <TextInput
-        placeholder="Search Patient ID, Name..."
-        style={styles.input}
-      />
+	const getPatientPid = (apt: any) =>
+		apt?.patient?.pid ??
+		apt?.patient?.patient_id ??
+		apt?.patient?.id ??
+		apt?.patient_id ??
+		apt?.id;
 
-      {/* 📅 Header */}
-      <View style={styles.header}>
-        <Text style={styles.heading}>Today's Appointments</Text>
-        <Text style={styles.month}>
-          {selectedDateObj?.toLocaleDateString('en-US', {
-            month: 'long',
-            year: 'numeric',
-          })}
-        </Text>
-      </View>
+	const getTimeRange = (apt: any) => {
+		const start = apt?.appointment_time;
+		const end = apt?.appointment_end_time ?? apt?.end_time;
+		if (start && end) return `${start} - ${end}`;
+		return start ?? "--";
+	};
 
-      {/* 📆 Week Days */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weekContainer}>
-        {weekDays.map((d: any, i: number) => (
-          <TouchableOpacity
-            key={i}
-            onPress={() => setSelectedDate(i)}
-            style={[
-              styles.dayBox,
-              selectedDate === i && styles.selectedDay,
-            ]}
-          >
-            <Text style={[styles.dayText, selectedDate === i && styles.selectedText]}>
-              {d.day}
-            </Text>
-            <Text
-              style={[
-                styles.dateText,
-                selectedDate === i && styles.selectedText,
-                d.red && { color: 'red' },
-              ]}
-            >
-              {d.date}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+	const handleAction = (action: string, id: string) => {
+		if (action === "confirm") alert("Confirmed");
+		if (action === "reject") alert("Rejected");
+		if (action === "reschedule") alert("Reschedule coming soon");
+		if (action === "refer") alert("Refer coming soon");
+	};
 
-      {/* 📋 List */}
-      <ScrollView style={{ marginTop: 10 }}>
-        {apptLoading && <Text>Loading...</Text>}
+	const renderAppointmentSkeleton = () =>
+		Array.from({ length: 3 }).map((_, index) => (
+			<View key={`appt-skeleton-${index}`} style={styles.card}>
+				<View style={styles.skeletonMainRow}>
+					<View style={styles.halfColumn}>
+						<View style={styles.skeletonNameRow}>
+							<AppSkeleton width={24} height={24} borderRadius={6} />
+							<AppSkeleton width={100} height={18} borderRadius={6} />
+							<AppSkeleton width={84} height={18} borderRadius={999} />
+						</View>
+						<View style={styles.skeletonMetaRow}>
+							<AppSkeleton width={14} height={14} borderRadius={7} />
+							<AppSkeleton width="84%" height={14} borderRadius={6} />
+						</View>
+					</View>
+					<View style={styles.halfColumn}>
+						<View style={styles.skeletonActionsRow}>
+							<AppSkeleton width={48} height={44} borderRadius={6} style={styles.skeletonActionItem} />
+							<AppSkeleton width={48} height={44} borderRadius={6} style={styles.skeletonActionItem} />
+							<AppSkeleton width={48} height={44} borderRadius={6} style={styles.skeletonActionItem} />
+							<AppSkeleton width={48} height={44} borderRadius={6} style={styles.skeletonActionItem} />
+						</View>
+					</View>
+				</View>
+			</View>
+		));
 
-        {apptError ? <Text style={styles.error}>{apptError}</Text> : null}
+	return (
+		<View style={styles.container}>
+			<View style={styles.header}>
+				<Text style={styles.heading}>Doctor Appointments</Text>
+				<Text style={styles.month}>
+					{selectedDateObj?.toLocaleDateString("en-US", {
+						month: "long",
+						year: "numeric",
+					})}
+				</Text>
+			</View>
 
-        {!apptLoading && appointments.length === 0 && (
-          <Text style={styles.empty}>No appointments</Text>
-        )}
+			<ScrollView
+				horizontal
+				showsHorizontalScrollIndicator={false}
+				style={styles.weekContainer}
+			>
+				{weekDays.map((d: any, i: number) => (
+					<TouchableOpacity
+						key={i}
+						onPress={() => setSelectedDate(i)}
+						style={[
+							styles.dayBox,
+							d.red && styles.weekendDayBox,
+							selectedDate === i && styles.selectedDay,
+						]}
+					>
+						<Text
+							style={[
+								styles.dayText,
+								d.red && styles.weekendText,
+								selectedDate === i && styles.selectedText,
+							]}
+						>
+							{d.day}
+						</Text>
+						<Text
+							style={[
+								styles.dateText,
+								d.red && styles.weekendText,
+								selectedDate === i && styles.selectedText,
+							]}
+						>
+							{d.date}
+						</Text>
+					</TouchableOpacity>
+				))}
+			</ScrollView>
 
-        {appointments.map((apt: any) => {
-          const status = getStatusLabel(apt.status);
-          const isCancelled = status === 'cancelled';
+			<View style={styles.listContainer}>
+				{apptLoading ? renderAppointmentSkeleton() : null}
 
-          return (
-            <View
-              key={apt.id}
-              style={[
-                styles.card,
-                isCancelled && { backgroundColor: '#fff5f5' },
-              ]}
-            >
-              {/* Patient Name */}
-              <Text style={styles.name}>
-                {apt?.patient?.name || 'Unknown Patient'}
-              </Text>
+				{apptError ? (
+					<Text style={styles.error}>{apptError}</Text>
+				) : null}
 
-              {/* Details */}
-              <Text style={styles.subText}>
-                {apt.appointment_mode || 'offline'} | {apt.appointment_time || '--'}
-              </Text>
+				{!apptLoading && appointments.length === 0 && (
+					<Text style={styles.empty}>No appointments</Text>
+				)}
 
-              {/* Cancelled */}
-              {isCancelled ? (
-                <Text style={styles.cancelled}>
-                  Patient has canceled the appointment
-                </Text>
-              ) : (
-                <View style={styles.actions}>
-  {actionButtons.map((btn, i) => (
-    <TouchableOpacity
-      key={i}
-      onPress={() => handleAction(btn.action, apt.id)}
-      style={[styles.btn, { backgroundColor: btn.bg }]}
-    >
-      <MaterialCommunityIcons name={btn.icon} size={20} color={btn.color} />
-      <Text style={[styles.btnLabel, { color: btn.color }]}>
-        {btn.label}
-      </Text>
-    </TouchableOpacity>
-  ))}
-</View>
-              )}
-            </View>
-          );
-        })}
-      </ScrollView>
+				{!apptLoading && appointments.map((apt: any) => {
+					const status = getStatusLabel(apt.status);
+					const isCancelled = status === "cancelled";
 
-    </View>
-  );
+					return (
+						<View
+							key={apt.id}
+							style={[
+								styles.card,
+								isCancelled && styles.cancelledCard,
+							]}
+						>
+							<View style={styles.cardTopRow}>
+								<View style={styles.patientWrap}>
+									<View style={styles.halfColumn}>
+										<View style={styles.patientNameRow}>
+											<View style={styles.patientIconBox}>
+												<MaterialCommunityIcons
+													name="home-heart"
+													size={28}
+													color="#2e7d32"
+												/>
+											</View>
+											<Text style={styles.name}>
+												{apt?.patient?.name ||
+													"Unknown Patient"}
+											</Text>
+
+											<View style={styles.topRightWrap}>
+												<View style={styles.statusPill}>
+													<Text
+														style={
+															styles.statusText
+														}
+													>
+														{formatStatus(status)}
+													</Text>
+												</View>
+											</View>
+										</View>
+
+										<View style={styles.metaRow}>
+											<MaterialCommunityIcons
+												name="clock-time-three-outline"
+												size={15}
+												color="#5f6973"
+											/>
+											<Text style={styles.subText}>
+												{getPatientAge(apt)} years /{" "}
+												{getPatientGender(apt)} |{" "}
+												{getTimeRange(apt)}
+											</Text>
+										</View>
+									</View>
+
+									<View style={styles.halfColumn}>
+										{isCancelled ? (
+											<Text style={styles.cancelled}>
+												Patient has canceled the
+												appointment
+											</Text>
+										) : (
+											<View style={styles.actions}>
+												{actionButtons.map((btn, i) => (
+													<TouchableOpacity
+														key={i}
+														onPress={() =>
+															handleAction(
+																btn.action,
+																apt.id,
+															)
+														}
+														style={[
+															styles.btn,
+															{
+																backgroundColor:
+																	btn.bg,
+															},
+														]}
+													>
+														<MaterialCommunityIcons
+															name={btn.icon}
+															size={16}
+															color={btn.color}
+														/>
+														<Text
+															style={[
+																styles.btnLabel,
+																{
+																	color: btn.color,
+																},
+															]}
+														>
+															{btn.label}
+														</Text>
+													</TouchableOpacity>
+												))}
+												<TouchableOpacity
+													style={styles.chevronBtn}
+												>
+													<MaterialCommunityIcons
+														name="chevron-right"
+														size={26}
+														color="#2a7f84"
+													/>
+												</TouchableOpacity>
+											</View>
+										)}
+									</View>
+								</View>
+							</View>
+						</View>
+					);
+				})}
+			</View>
+		</View>
+	);
 }
 
-  const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 16,
-  },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  heading: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-
-  month: {
-    color: '#0c7c7c',
-    fontWeight: '600',
-  },
-
-  weekContainer: {
-    marginTop: 10,
-  },
-
-  dayBox: {
-    padding: 10,
-    borderRadius: 10,
-    marginRight: 6,
-    alignItems: 'center',
-  },
-
-  selectedDay: {
-    backgroundColor: '#0c7c7c',
-  },
-
-  dayText: {
-    fontSize: 10,
-    color: '#777',
-  },
-
-  dateText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  selectedText: {
-    color: '#fff',
-  },
-
-  card: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    marginBottom: 10,
-  },
-
-  name: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  subText: {
-    fontSize: 12,
-    color: '#666',
-    marginVertical: 4,
-  },
-
- 
-   actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    gap: 8,
-  },
- btn: {
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 12,
-  paddingVertical: 6,      // 👈 reduced vertical padding
-  paddingHorizontal: 8,    // 👈 reduced horizontal padding
-  width: 75,               // 👈 fixed width instead of flex:1
-  gap: 4,
-},
-btnLabel: {
-  fontSize: 11,
-  fontWeight: '500',
-  textAlign: 'center',
-},
-
-  cancelled: {
-    color: 'red',
-    fontSize: 12,
-    marginTop: 6,
-  },
-
-  error: {
-    color: 'red',
-  },
-
-  empty: {
-    color: '#999',
-  },
+const styles = StyleSheet.create({
+	container: {
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		backgroundColor: "#fff",
+		borderRadius: 12,
+	},
+	header: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginBottom: 8,
+	},
+	heading: {
+		fontSize: 18,
+		fontWeight: "700",
+		color: "#253136",
+	},
+	month: {
+		color: "#0c7c7c",
+		fontWeight: "600",
+		fontSize: 13,
+	},
+	weekContainer: {
+		marginBottom: 12,
+	},
+	dayBox: {
+		width: 64,
+		height: 64,
+		borderRadius: 8,
+		marginRight: 10,
+		alignItems: "center",
+		justifyContent: "center",
+		borderWidth: 1,
+		borderColor: "#b8bec3",
+		// backgroundColor: "#eef0f2",
+	},
+	weekendDayBox: {
+		borderColor: "#efb2b2",
+		backgroundColor: "#fff9f9",
+	},
+	selectedDay: {
+		backgroundColor: "#2d7679",
+		borderColor: "#2d7679",
+	},
+	dayText: {
+		fontSize: 12,
+		color: "#6f7680",
+		marginBottom: 2,
+	},
+	dateText: {
+		fontSize: 16,
+		fontWeight: "700",
+		color: "#2c3136",
+		lineHeight: 32,
+	},
+	selectedText: {
+		color: "#fff",
+	},
+	weekendText: {
+		color: "#e25555",
+	},
+	listContainer: {
+		marginTop: 2,
+	},
+	skeletonMainRow: {
+		flexDirection: "row",
+		flex: 1,
+		gap: 12,
+	},
+	skeletonNameRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 8,
+	},
+	skeletonMetaRow: {
+		marginTop: 10,
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 6,
+	},
+	skeletonActionsRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginTop: 18,
+	},
+	skeletonActionItem: {
+		marginRight: 8,
+	},
+	card: {
+		padding: 12,
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: "#d6dbde",
+		marginBottom: 10,
+	},
+	cardTopRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+	},
+	patientWrap: {
+		flexDirection: "row",
+		flex: 1,
+		paddingRight: 8,
+		gap: 12,
+	},
+	halfColumn: {
+		width: "50%",
+	},
+	patientNameRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap:8
+	},
+	patientIconBox: {
+		height: 24,
+		width: 24,
+		borderRadius: 6,
+		backgroundColor: "#e8f4ea",
+		alignItems: "center",
+		justifyContent: "center",
+		marginRight: 6,
+	},
+	name: {
+		fontSize: 18,
+		fontWeight: "600",
+		color: "#2a2f34",
+		maxWidth: "55%",
+	},
+	topRightWrap: {
+		alignItems: "flex-end",
+	},
+	statusPill: {
+		paddingHorizontal: 12,
+		paddingVertical: 5,
+		borderRadius: 999,
+		backgroundColor: "#f8df8d",
+		minWidth: 92,
+		alignItems: "center",
+	},
+	statusText: {
+		color: "#c48508",
+		fontSize: 13,
+		fontWeight: "600",
+	},
+	metaRow: {
+		marginTop: 6,
+		flexDirection: "row",
+		alignItems: "center",
+	},
+	subText: {
+		fontSize: 15,
+		color: "#5f6973",
+		fontWeight: "500",
+		marginLeft: 4,
+	},
+	cancelledCard: {
+		backgroundColor: "#fff5f5",
+	},
+	actions: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginTop: 10,
+		overflow:'scroll'
+	},
+	btn: {
+		alignItems: "center",
+		justifyContent: "center",
+		borderRadius: 6,
+		paddingVertical: 6,
+		marginRight: 8,
+		width: 52,
+	},
+	btnLabel: {
+		fontSize: 10,
+		fontWeight: "500",
+		textAlign: "center",
+		marginTop: 4,
+		color: "#61707a",
+	},
+	chevronBtn: {
+		marginLeft: "auto",
+		paddingLeft: 8,
+	},
+	cancelled: {
+		color: "red",
+		fontSize: 12,
+		marginTop: 8,
+	},
+	error: {
+		color: "red",
+	},
+	empty: {
+		color: "#999",
+	},
 });

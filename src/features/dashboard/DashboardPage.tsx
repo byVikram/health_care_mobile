@@ -1,158 +1,160 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
-import { useTheme } from 'react-native-paper'; // ✅ FIXED
+import React, { useEffect, useState } from "react";
+import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { useTheme } from "react-native-paper"; 
 
-import HeroSection from './HeroSection';
-import SpecialitySection from './SpecialitySection';
-import ConsultSection from './ConsultSection';
-import CommunityBlogsSection from './CommunityBlogsSection';
+import HeroSection from "./HeroSection";
+import SpecialitySection from "./SpecialitySection";
+import ConsultSection from "./ConsultSection";
+import CommunityBlogsSection from "./CommunityBlogsSection";
 
-// ❗ FIX PATH (check folder structure)
-// import  DoctorAppointments  from '../doctor/DoctorAppointments'
-// import PatientAppointments from '../appointments/PatientAppointments';
-import DoctorAppointments from '../doctor/DoctorAppointments';
-// ❗ IMPORT API FUNCTIONS (adjust path)
-import { getAppointments,Appointment } from '../doctor/doctorService'; // 👈 add Appointment
-// import { getAppointments } from '../doctor/doctorService';
-// import { formatDateForApi } from '../../utils/date';
+import DoctorAppointments from "../doctor/DoctorAppointments";
+import { getAppointments, Appointment } from "../doctor/doctorService";
 
-
-// import { getAppointments } from '../doctor/doctorService';
-import { formatDateForApi } from '../../utils/date';
-import { USER_ROLES } from '../../constants/constants';
+import { formatDateForApi } from "../../utils/date";
+import { USER_ROLES } from "../../constants/constants";
+import { useAuth } from "../../context/AuthContext";
 
 export default function DashboardPage() {
+	const { width } = useWindowDimensions();
+	const isTablet = width >= 768;
+	const { role } = useAuth();
+	const isDoctor = role === USER_ROLES.DOCTOR;
+
 	const [appointments, setAppointments] = useState<Appointment[]>([]);
-const [apptLoading, setApptLoading] = useState(false);
-const [apptError, setApptError] = useState('');
+	const [apptLoading, setApptLoading] = useState(false);
+	const [apptError, setApptError] = useState("");
 
-const [selectedDate, setSelectedDate] = useState(0);
-type WeekDay = {
-    dateObj: Date;
-};
-const buildWeekDays = () => {
-	const today = new Date()
-	const days = []
-	for (let i = 0; i < 7; i += 1) {
-		const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i)
-		const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' })
-		const isWeekend = d.getDay() === 0 || d.getDay() === 6
-		days.push({
-			day: dayLabel,
-			date: String(d.getDate()),
-			red: isWeekend,
-			dateObj: d,
-		})
-	}
-	return days
-}
-const [weekDays] = useState(() => buildWeekDays())
-
-
+	const [selectedDate, setSelectedDate] = useState(0);
+	type WeekDay = {
+		dateObj: Date;
+	};
+	const buildWeekDays = () => {
+		const today = new Date();
+		const days = [];
+		for (let i = 0; i < 7; i += 1) {
+			const d = new Date(
+				today.getFullYear(),
+				today.getMonth(),
+				today.getDate() + i,
+			);
+			const dayLabel = d.toLocaleDateString("en-US", {
+				weekday: "short",
+			});
+			const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+			days.push({
+				day: dayLabel,
+				date: String(d.getDate()),
+				red: isWeekend,
+				dateObj: d,
+			});
+		}
+		return days;
+	};
+	const [weekDays] = useState(() => buildWeekDays());
 
 	const theme = useTheme();
 
 	useEffect(() => {
-    if (!weekDays.length) return;
+		if (!isDoctor || !weekDays.length) return;
 
-    const fetchAppointments = async () => {
-        try {
-            setApptLoading(true);
-            setApptError('');
+		const fetchAppointments = async () => {
+			try {
+				setApptLoading(true);
+				setApptError("");
 
-            const dateStr = formatDateForApi(
-                weekDays[selectedDate]?.dateObj ?? new Date()
-            );
+				const dateStr = formatDateForApi(
+					weekDays[selectedDate]?.dateObj ?? new Date(),
+				);
 
-            const res = await getAppointments({
-                appointment_date: dateStr,
-            });
+				const res = await getAppointments({
+					appointment_date: dateStr,
+				});
 
-            if (res.success) {
-                const items = Array.isArray(res.data) ? res.data : [];
-                setAppointments(items);
-            } else {
-                setApptError(res.message ?? 'Failed to load appointments');
-            }
-        } catch {
-            setApptError('Failed to load appointments');
-        } finally {
-            setApptLoading(false);
-        }
-    };
+				if (res.success) {
+					const items = Array.isArray(res.data) ? res.data : [];
+					setAppointments(items);
+				} else {
+					setApptError(res.message ?? "Failed to load appointments");
+				}
+			} catch {
+				setApptError("Failed to load appointments");
+			} finally {
+				setApptLoading(false);
+			}
+		};
 
-    fetchAppointments();
-}, [selectedDate, weekDays]);
+		fetchAppointments();
+	}, [isDoctor, selectedDate, weekDays]);
 
-const renderDashboard = () => {
+	const renderDashboard = () => {
 
-    // 👨‍⚕️ DOCTOR
-    // if (role === USER_ROLES.DOCTOR) {
-    //     return (
-    //         <>
-    //             <HeroSection />
+		return (
+			<>
+				{isTablet ? (
+					<View style={styles.tabletTopRow}>
+						<View style={styles.tabletColumn}>
+							<HeroSection />
+						</View>
 
-    //             <DoctorAppointments
-    //                 selectedDate={selectedDate}
-    //                 setSelectedDate={setSelectedDate}
-    //                 appointments={appointments}
-    //                 apptLoading={apptLoading}
-    //                 apptError={apptError}
-    //                 weekDays={weekDays}
-    //                 selectedDateObj={weekDays[selectedDate]?.dateObj}
-    //             />
+						{isDoctor ? (
+							<View style={[styles.tabletColumn, styles.tabletColumnRight]}>
+								<DoctorAppointments
+									selectedDate={selectedDate}
+									setSelectedDate={setSelectedDate}
+									appointments={appointments}
+									apptLoading={apptLoading}
+									apptError={apptError}
+									weekDays={weekDays}
+									selectedDateObj={weekDays[selectedDate]?.dateObj}
+								/>
+							</View>
+						) : null}
+					</View>
+				) : (
+					<>
+						<HeroSection />
 
-    //             <ConsultSection />
-    //             <CommunityBlogsSection />
-    //         </>
-    //     );
-    // }
-	return (
+						{isDoctor ? (
+							<DoctorAppointments
+								selectedDate={selectedDate}
+								setSelectedDate={setSelectedDate}
+								appointments={appointments}
+								apptLoading={apptLoading}
+								apptError={apptError}
+								weekDays={weekDays}
+								selectedDateObj={weekDays[selectedDate]?.dateObj}
+							/>
+						) : null}
+					</>
+				)}
 
-	<>
-	 <HeroSection />
+				<ConsultSection />
+				<CommunityBlogsSection />
+			</>
+		);
 
-                <DoctorAppointments
-                    selectedDate={selectedDate}
-                    setSelectedDate={setSelectedDate}
-                    appointments={appointments}
-                    apptLoading={apptLoading}
-                    apptError={apptError}
-                    weekDays={weekDays}
-                    selectedDateObj={weekDays[selectedDate]?.dateObj}
-                />
-
-                <ConsultSection />
-                <CommunityBlogsSection />
-				</>
-	)
-    // 🧑‍🤝‍🧑 PATIENT
-    // if (role === USER_ROLES.PATIENT) {
-    //     return (
-    //         <>
-    //             <HeroSection />
-
-    //             <SpecialitySection />
-    //             <ConsultSection />
-    //             <CommunityBlogsSection />
-    //         </>
-    //     );
-    // }
-
-    // return null;
-};
+	};
 
 	return (
-    <ScrollView style={styles.container}>
-        {renderDashboard()}
-    </ScrollView>
-);
+		<ScrollView style={styles.container}>{renderDashboard()}</ScrollView>
+	);
 }
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: "#f5f5f5",
+	},
+	tabletTopRow: {
+		flexDirection: "row",
+		alignItems: "flex-start",
+		paddingHorizontal: 8,
+	},
+	tabletColumn: {
+		flex: 1,
+	},
+	tabletColumnRight: {
+		marginLeft: 8,
 	},
 	card: {
 		marginHorizontal: 16,

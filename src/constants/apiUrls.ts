@@ -7,7 +7,7 @@ import { Platform } from 'react-native';
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
 	if (process.env.EXPO_PUBLIC_API_ENDPOINT) return process.env.EXPO_PUBLIC_API_ENDPOINT;
-	return Platform.OS === 'android' ? 'http://192.168.4.115:8000' : 'http://192.168.4.115:8000';
+	return Platform.OS === 'android' ? 'http://127.0.0.1:8000' : 'http://127.0.0.1:8000';
 };
 
 export const BASE_URL = getBaseUrl();

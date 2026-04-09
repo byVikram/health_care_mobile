@@ -117,6 +117,7 @@ const styles = StyleSheet.create({
 		overflow: 'hidden',
 		width: '100%',
 		aspectRatio: 1,
+		maxHeight:280
 	},
 	videoImage: {
 		width: '100%',
