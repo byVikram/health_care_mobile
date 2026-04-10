@@ -295,13 +295,17 @@ export default function DoctorSearchPage() {
 				data={doctors}
 				keyExtractor={(item) => item.id}
 				numColumns={numColumns}
-				columnWrapperStyle={{
-					paddingHorizontal: 8,
-					justifyContent: "space-between",
-				}}
+				columnWrapperStyle={
+					numColumns > 1
+						? {
+								paddingHorizontal: 12,
+								justifyContent: "space-between",
+							}
+						: undefined
+				}
 				renderItem={({ item }) => {
 					// const itemWidth = `${100 / numColumns }%`;
-					const itemWidth: DimensionValue = `${100 / numColumns}%`;
+					const itemWidth: DimensionValue = `${100 / numColumns }%`;
 
 					return (
 						<View style={{ width: itemWidth }}>

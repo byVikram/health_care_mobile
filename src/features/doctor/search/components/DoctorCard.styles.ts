@@ -18,7 +18,7 @@ export const doctorCardStyles = StyleSheet.create({
     },
 
     imageContainer: {
-        height: 120,
+        height: 200,
         backgroundColor: '#f0f4f8',
         position: 'relative',
     },

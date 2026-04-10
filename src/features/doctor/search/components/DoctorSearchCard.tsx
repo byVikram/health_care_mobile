@@ -16,7 +16,7 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
     const navigation = useNavigation<any>();
 
     // Using placeholder data matching the mockup where API doesn't provide it yet
-    const avatarUrl = doctor.avatar_s3_key || 'https://via.placeholder.com/400x200'; // fallback
+    const avatarUrl = doctor.avatar_s3_key || 'https://tse4.mm.bing.net/th/id/OIP.JD5a5owVBjuj0w_D6PUYMwHaHJ?pid=Api&P=0&h=180'; // fallback
     const rating = '0';
     const location = doctor.location || 'Bangalore';
     const distance = '<0 km';
