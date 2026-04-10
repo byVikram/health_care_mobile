@@ -52,7 +52,7 @@ Follow these steps to set up the project locally.
 
 1. Clone the repository and navigate to the project directory:
    ```bash
-   cd gemini-mobile-app
+   cd Karola Health
    ```
 
 2. Install dependencies:
