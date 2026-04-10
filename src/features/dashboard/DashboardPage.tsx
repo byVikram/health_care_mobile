@@ -6,6 +6,7 @@ import HeroSection from "./HeroSection";
 import SpecialitySection from "./SpecialitySection";
 import ConsultSection from "./ConsultSection";
 import CommunityBlogsSection from "./CommunityBlogsSection";
+import PatientQuestionsSection from "./PatientQuestionsSection"; // ← NEW
 
 import DoctorAppointments from "../doctor/DoctorAppointments";
 import { getAppointments, Appointment } from "../doctor/doctorService";
@@ -87,7 +88,6 @@ export default function DashboardPage() {
 	}, [isDoctor, selectedDate, weekDays]);
 
 	const renderDashboard = () => {
-
 		return (
 			<>
 				{isTablet ? (
@@ -115,6 +115,7 @@ export default function DashboardPage() {
 						<HeroSection />
 
 						{isDoctor ? (
+							
 							<DoctorAppointments
 								selectedDate={selectedDate}
 								setSelectedDate={setSelectedDate}
@@ -128,11 +129,21 @@ export default function DashboardPage() {
 					</>
 				)}
 
+				{/* Patient Questions — only visible to doctors */}
+				<SpecialitySection />
+
 				<ConsultSection />
 				<CommunityBlogsSection />
+				{isDoctor ? (
+					<PatientQuestionsSection
+						// Pass real questions + handler once you wire up the API:
+						// questions={patientQuestions}
+						// loading={questionsLoading}
+						// onSubmitAnswer={handleSubmitAnswer}
+					/>
+				) : null}
 			</>
 		);
-
 	};
 
 	return (

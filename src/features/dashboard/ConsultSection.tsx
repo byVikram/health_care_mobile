@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity,useWindowDimensions, } from 'react-native';
 import { Text, Button, useTheme } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 
@@ -55,13 +55,21 @@ const consults = [
 
 export default function ConsultSection() {
     const theme = useTheme();
+    const { width } = useWindowDimensions();
     const navigation = useNavigation<any>();
+      const isTablet     = width >= 768;
+  const isMiniTablet = width >= 600 && width < 768;
+  const isWide       = isTablet || isMiniTablet;
+
+  const availableWidth = width - 32 - 8 * 5;
+  const CARD_WIDTH = isWide ? availableWidth / 6 : 110;
+  const BOX_SIZE   = isWide ? Math.min(Math.floor(CARD_WIDTH) - 10, 120) : 100;
     
     return (
-        <View style={styles.sectionContainer}>
+        <View style={styles.sectionContainer }>
             <View style={styles.headerRow}>
                 <View style={[styles.titleBorder, { borderLeftColor: theme.colors.primary }]}>
-                    <Text variant="titleMedium" style={styles.mainTitle}>Book an appointment</Text>
+                    <Text variant="titleMedium" style={[styles.mainTitle , isTablet && styles.mainTablet]}>Book an appointment</Text>
                     <Text variant="bodySmall">Find experienced doctors across all specialties</Text>
                 </View>
                 <Button 
@@ -109,6 +117,9 @@ const styles = StyleSheet.create({
     mainTitle: {
         fontWeight: 'bold',
         marginBottom: 2,
+    },
+    mainTablet:{
+
     },
     viewAllBtn: {
         borderRadius: 20,

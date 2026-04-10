@@ -428,10 +428,10 @@ const styles = StyleSheet.create({
 	},
 	statusPill: {
 		paddingHorizontal: 12,
-		paddingVertical: 5,
+		paddingVertical: 2,
 		borderRadius: 999,
 		backgroundColor: "#f8df8d",
-		minWidth: 92,
+		minWidth: 72,
 		alignItems: "center",
 	},
 	statusText: {
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 		borderRadius: 6,
-		paddingVertical: 6,
+		paddingVertical: 3,
 		marginRight: 8,
 		width: 52,
 	},
