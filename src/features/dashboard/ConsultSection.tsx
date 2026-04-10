@@ -14,6 +14,7 @@ interface ConsultCardProps {
 	image: any;
 	title: string;
 	description: string;
+	cardWidth?: number;
 	onConsult?: () => void;
 }
 
@@ -144,8 +145,6 @@ export default function ConsultSection() {
 const styles = StyleSheet.create({
 	sectionContainer: {
 		marginVertical: 16,
-		paddingVertical: 16,
-		// paddingHorizontal: 0,
 	},
 	headerRow: {
 		flexDirection: "row",
@@ -174,16 +173,15 @@ const styles = StyleSheet.create({
 	cardContainer: {
 		width: 160,
 		marginHorizontal: 8,
+        marginBottom:16,
 		backgroundColor: "#fff",
 		borderRadius: 16,
-        marginVertical:16,
 		overflow: "hidden",
 		elevation: 2, // shadow for android
 		shadowColor: "#000", // shadow for iOS
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.1,
 		shadowRadius: 4,
-    
 	},
 	cardImage: {
 		width: "100%",
