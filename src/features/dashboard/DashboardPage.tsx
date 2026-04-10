@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
-import { useTheme } from "react-native-paper"; 
+import {
+	ScrollView,
+	StyleSheet,
+	View,
+	useWindowDimensions,
+} from "react-native";
+import { useTheme } from "react-native-paper";
 
 import HeroSection from "./HeroSection";
 import SpecialitySection from "./SpecialitySection";
@@ -97,7 +102,12 @@ export default function DashboardPage() {
 						</View>
 
 						{isDoctor ? (
-							<View style={[styles.tabletColumn, styles.tabletColumnRight]}>
+							<View
+								style={[
+									styles.tabletColumn,
+									styles.tabletColumnRight,
+								]}
+							>
 								<DoctorAppointments
 									selectedDate={selectedDate}
 									setSelectedDate={setSelectedDate}
@@ -105,17 +115,25 @@ export default function DashboardPage() {
 									apptLoading={apptLoading}
 									apptError={apptError}
 									weekDays={weekDays}
-									selectedDateObj={weekDays[selectedDate]?.dateObj}
+									selectedDateObj={
+										weekDays[selectedDate]?.dateObj
+									}
 								/>
 							</View>
-						) : null}
+						) : (
+							<>
+								<SpecialitySection />
+
+								<ConsultSection />
+								<CommunityBlogsSection />
+							</>
+						)}
 					</View>
 				) : (
 					<>
 						<HeroSection />
 
 						{isDoctor ? (
-							
 							<DoctorAppointments
 								selectedDate={selectedDate}
 								setSelectedDate={setSelectedDate}
@@ -123,25 +141,28 @@ export default function DashboardPage() {
 								apptLoading={apptLoading}
 								apptError={apptError}
 								weekDays={weekDays}
-								selectedDateObj={weekDays[selectedDate]?.dateObj}
+								selectedDateObj={
+									weekDays[selectedDate]?.dateObj
+								}
 							/>
-						) : null}
+						) : (
+							<>
+								<SpecialitySection />
+								<ConsultSection />								
+							</>
+						)}
 					</>
 				)}
 
 				{/* Patient Questions — only visible to doctors */}
-				<SpecialitySection />
-
-				<ConsultSection />
 				<CommunityBlogsSection />
-				{isDoctor ? (
-					<PatientQuestionsSection
-						// Pass real questions + handler once you wire up the API:
-						// questions={patientQuestions}
-						// loading={questionsLoading}
-						// onSubmitAnswer={handleSubmitAnswer}
+
+				<PatientQuestionsSection
+					// Pass real questions + handler once you wire up the API:
+					// questions={patientQuestions}
+					// loading={questionsLoading}
+					// onSubmitAnswer={handleSubmitAnswer}
 					/>
-				) : null}
 			</>
 		);
 	};

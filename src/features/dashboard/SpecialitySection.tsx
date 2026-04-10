@@ -16,6 +16,7 @@ import performanceImage from "../../assets/specialties/performance.svg";
 import coughImage from "../../assets/specialties/cough.svg";
 import childImage from "../../assets/specialties/child.svg";
 import depressionImage from "../../assets/specialties/depression.svg";
+import { Button } from "react-native-paper";
 
 const TEAL = "#0c7c7c";
 
@@ -109,16 +110,14 @@ export default function SpecialitySection() {
 						Find experienced doctors across all specialties
 					</Text>
 				</View>
-				<TouchableOpacity style={styles.viewAllButton}>
-					<Text
-						style={[
-							styles.viewAllText,
-							isTablet && styles.viewAllTextTablet,
-						]}
-					>
-						View All Specialities
-					</Text>
-				</TouchableOpacity>
+				<Button
+					mode="outlined"
+					style={styles.viewAllBtn}
+					labelStyle={{ fontSize: 12 }}
+					onPress={() => navigation.navigate("Search")}
+				>
+					View All
+				</Button>
 			</View>
 
 			{isWide ? (
@@ -183,21 +182,8 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		lineHeight: 20,
 	},
-	viewAllButton: {
-		borderWidth: 1.5,
-		borderColor: TEAL,
-		borderRadius: 30,
-		paddingHorizontal: 14,
-		paddingVertical: 7,
-		alignSelf: "center",
-	},
-	viewAllText: {
-		fontSize: 12,
-		color: TEAL,
-		fontWeight: "600",
-	},
-	viewAllTextTablet: {
-		fontSize: 14,
+	viewAllBtn: {
+		borderRadius: 20,
 	},
 	tabletGrid: {
 		flexDirection: "row",
