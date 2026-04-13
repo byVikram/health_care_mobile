@@ -1,208 +1,183 @@
 import React, { useEffect, useRef } from "react";
 import {
-	Animated,
-	Modal,
-	Pressable,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+  Animated,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuth } from "../../context/AuthContext";
 
 export interface AppSidebarItem {
-	id: string;
-	label: string;
-	icon: keyof typeof MaterialCommunityIcons.glyphMap;
-	onPress: () => void;
+  id: string;
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap | React.ReactNode;
+  onPress: () => void;
 }
 
 interface AppSidebarProps {
-	visible: boolean;
-	userName?: string;
-	profileCompletion?: number;
-	onClose: () => void;
-	onLogout: () => void;
-	menuItems: AppSidebarItem[];
+  visible: boolean;
+  profileCompletion?: number;
+  onClose: () => void;
+  onLogout: () => void;
+  onEditProfile?: () => void;
+  menuItems: AppSidebarItem[];
 }
 
 const SIDEBAR_WIDTH = 290;
+const FALLBACK_IMAGE = require("../../assets/Banner/doctor.png");
 
 export default function AppSidebar({
-	visible,
-	userName = "User",
-	profileCompletion,
-	onClose,
-	onLogout,
-	menuItems,
+  visible,
+  profileCompletion = 22,
+  onClose,
+  onLogout,
+  onEditProfile,
+  menuItems,
 }: AppSidebarProps) {
-	const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
-	const insets = useSafeAreaInsets();
+  const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
-	useEffect(() => {
-		Animated.timing(translateX, {
-			toValue: visible ? 0 : -SIDEBAR_WIDTH,
-			duration: 220,
-			useNativeDriver: true,
-		}).start();
-	}, [translateX, visible]);
+  const userName = user?.name ?? user?.full_name ?? user?.username ?? "User";
+  const profileImageUrl = user?.profile_image ?? user?.photo ?? user?.avatar ?? null;
+  const imageSource = profileImageUrl ? { uri: profileImageUrl } : FALLBACK_IMAGE;
 
-	return (
-		<Modal
-			visible={visible}
-			transparent
-			animationType="none"
-			onRequestClose={onClose}
-		>
-			<View style={styles.modalRoot}>
-				<Pressable style={styles.backdrop} onPress={onClose} />
+  const progress =
+    typeof profileCompletion === "number"
+      ? Math.min(100, Math.max(0, profileCompletion))
+      : null;
 
-				<Animated.View
-					style={[
-						styles.sidebar,
-						{
-							paddingTop: insets.top + 8,
-							transform: [{ translateX }],
-						},
-					]}
-				>
-					<View style={styles.profileSection}>
-						<MaterialCommunityIcons
-							name="account-circle-outline"
-							size={52}
-							color="#1f5f68"
-						/>
-						<View style={{ flex: 1 }}>
-							<Text style={styles.nameText}>{userName}</Text>
-							<Text style={styles.profileLink}>
-								View and edit profile
-							</Text>
-							{typeof profileCompletion === "number" ? (
-								<Text style={styles.profileCompletion}>
-									{profileCompletion}% Profile completed
-								</Text>
-							) : null}
-						</View>
-					</View>
+  useEffect(() => {
+    Animated.timing(translateX, {
+      toValue: visible ? 0 : -SIDEBAR_WIDTH,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [visible]);
 
-					<View style={styles.separator} />
+  const handleEditProfile = () => {
+    onClose();
+    onEditProfile?.();
+  };
 
-					<View style={styles.menuSection}>
-						{menuItems.map((item) => (
-							<TouchableOpacity
-								key={item.id}
-								style={styles.menuItem}
-								onPress={() => {
-									item.onPress();
-									onClose();
-								}}
-								activeOpacity={0.7}
-							>
-								<MaterialCommunityIcons
-									name={item.icon}
-									size={20}
-									color="#41565c"
-								/>
-								<Text style={styles.menuLabel}>
-									{item.label}
-								</Text>
-								<MaterialCommunityIcons
-									name="chevron-right"
-									size={18}
-									color="#9aa4a8"
-								/>
-							</TouchableOpacity>
-						))}
-					</View>
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
 
-					<TouchableOpacity
-						style={styles.logoutItem}
-						onPress={onLogout}
-					>
-						<MaterialCommunityIcons
-							name="logout"
-							size={20}
-							color="#c63e3e"
-						/>
-						<Text style={styles.logoutText}>Log out</Text>
-					</TouchableOpacity>
-				</Animated.View>
-			</View>
-		</Modal>
-	);
+        <Animated.View
+          style={[
+            styles.sidebar,
+            { paddingTop: insets.top + 8, transform: [{ translateX }] },
+          ]}
+        >
+          {/* ── Profile Section ── */}
+          <View style={styles.profileSection}>
+            <View style={styles.avatarWrapper}>
+              <Image source={imageSource} style={styles.avatarImage} resizeMode="cover" />
+            </View>
+
+            <View style={styles.profileInfo}>
+              <Text style={styles.nameText}>{userName}</Text>
+
+              {/* "View and Edit profile" navigates to HealthProfile */}
+              <TouchableOpacity onPress={handleEditProfile} activeOpacity={0.7}>
+                <Text style={styles.profileLink}>View and Edit profile</Text>
+              </TouchableOpacity>
+
+              {progress !== null && (
+                <>
+                  <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, { width: `${progress}%` as any }]} />
+                  </View>
+                  <Text style={styles.profileCompletion}>{progress}% Profile completed</Text>
+                </>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.separator} />
+
+          {/* ── Menu Items ── */}
+          <ScrollView style={styles.menuSection} showsVerticalScrollIndicator={false}>
+            {menuItems.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.menuItem}
+                onPress={() => {
+                  item.onPress();
+                  onClose();
+                }}
+                activeOpacity={0.7}
+              >
+                {typeof item.icon === "string" ? (
+                  <MaterialCommunityIcons
+                    name={item.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                    size={20}
+                    color="#41565c"
+                  />
+                ) : (
+                  item.icon
+                )}
+                <Text style={styles.menuLabel}>{item.label}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#9aa4a8" />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* ── Logout ── */}
+          <TouchableOpacity style={styles.logoutItem} onPress={onLogout}>
+            <MaterialCommunityIcons name="logout" size={20} color="#c63e3e" />
+            <Text style={styles.logoutText}>Log out</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
 }
 
 const styles = StyleSheet.create({
-	modalRoot: {
-		flex: 1,
-		flexDirection: "row",
-	},
-	backdrop: {
-		...StyleSheet.absoluteFillObject,
-		backgroundColor: "rgba(0,0,0,0.35)",
-	},
-	sidebar: {
-		width: SIDEBAR_WIDTH,
-		backgroundColor: "#ffffff",
-		borderTopRightRadius: 18,
-		borderBottomRightRadius: 18,
-		paddingHorizontal: 14,
-		paddingBottom: 20,
-	},
-	profileSection: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
-		paddingVertical: 12,
-	},
-	nameText: {
-		fontSize: 16,
-		fontWeight: "700",
-		color: "#142b30",
-	},
-	profileLink: {
-		fontSize: 12,
-		color: "#5d6f75",
-		marginTop: 2,
-	},
-	profileCompletion: {
-		fontSize: 12,
-		color: "#2f8c58",
-		marginTop: 2,
-	},
-	separator: {
-		height: 1,
-		backgroundColor: "#e9eef0",
-	},
-	menuSection: {
-		paddingTop: 10,
-		flex: 1,
-	},
-	menuItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f3f4",
-	},
-	menuLabel: {
-		flex: 1,
-		fontSize: 14,
-		color: "#24373d",
-	},
-	logoutItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
-		paddingVertical: 14,
-		borderTopWidth: 1,
-		borderTopColor: "#e9eef0",
-	},
-	logoutText: {
-		color: "#c63e3e",
-		fontWeight: "700",
-		fontSize: 14,
-	},
+  modalRoot: { flex: 1, flexDirection: "row" },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.35)" },
+  sidebar: {
+    width: SIDEBAR_WIDTH,
+    backgroundColor: "#ffffff",
+    borderTopRightRadius: 18,
+    borderBottomRightRadius: 18,
+    paddingHorizontal: 14,
+    paddingBottom: 20,
+  },
+  profileSection: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14 },
+  avatarWrapper: { width: 70, height: 80, borderRadius: 12, overflow: "hidden", backgroundColor: "#e8f0f2" },
+  avatarImage: { width: "100%", height: "100%" },
+  profileInfo: { flex: 1 },
+  nameText: { fontSize: 16, fontWeight: "700", color: "#142b30", marginBottom: 2 },
+  profileLink: { fontSize: 12, color: "#1f8c9e", marginTop: 2, textDecorationLine: "underline" },
+  progressBarBg: { marginTop: 6, height: 4, borderRadius: 2, backgroundColor: "#e0ecee", overflow: "hidden" },
+  progressBarFill: { height: "100%", borderRadius: 2, backgroundColor: "#2f8c58" },
+  profileCompletion: { fontSize: 11, color: "#2f8c58", marginTop: 3 },
+  separator: { height: 1, backgroundColor: "#e9eef0" },
+  menuSection: { flex: 1, paddingTop: 10 },
+  menuItem: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f0f3f4",
+  },
+  menuLabel: { flex: 1, fontSize: 14, color: "#24373d" },
+  logoutItem: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingVertical: 14, borderTopWidth: 1, borderTopColor: "#e9eef0",
+  },
+  logoutText: { color: "#c63e3e", fontWeight: "700", fontSize: 14 },
 });

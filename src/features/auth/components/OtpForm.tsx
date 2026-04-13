@@ -1,170 +1,247 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput } from 'react-native';
-import { useTheme } from 'react-native-paper';
-import { AppButton, AppTypography } from '../../../components/common';
-import { useAuth } from '../../../context/AuthContext';
-import { verifyOtp, sendOtp } from '../authService';
+// features/auth/components/OtpForm.tsx
+import React, { useRef, useState } from 'react'
+import {
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    StyleSheet,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+} from 'react-native'
+import { verifyOtp } from '../authService'
+import { useAuth, UserRole } from '../../../context/AuthContext'
 
-interface OtpFormProps {
-    contactNumber: string;
-    onVerify: () => void;
+interface Props {
+    contactNumber: string
+    onVerify: () => void
+    onBack?: () => void
+    backLabel?: string
 }
 
-export default function OtpForm({ contactNumber, onVerify }: OtpFormProps) {
-    const [otp, setOtp] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [timer, setTimer] = useState(29);
-    const theme = useTheme();
-    const { setAuth } = useAuth();
-    
-    const inputRef = useRef<RNTextInput>(null);
+const OTP_LENGTH = 6
+const TEAL = '#0d9488'
 
-    useEffect(() => {
-        if (timer <= 0) return;
-        const interval = setInterval(() => setTimer(t => t - 1), 1000);
-        return () => clearInterval(interval);
-    }, [timer]);
+export default function OtpForm({ contactNumber, onVerify, onBack, backLabel = 'Back' }: Props) {
+    const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''))
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState('')
+    const inputs = useRef<(TextInput | null)[]>([])
+    const { setAuth } = useAuth()
+
+    const handleChange = (val: string, idx: number) => {
+        const digit = val.replace(/\D/g, '').slice(-1)
+        const next = [...otp]
+        next[idx] = digit
+        setOtp(next)
+        setError('')
+        if (digit && idx < OTP_LENGTH - 1) {
+            inputs.current[idx + 1]?.focus()
+        }
+    }
+
+    const handleKeyPress = (e: any, idx: number) => {
+        if (e.nativeEvent.key === 'Backspace' && !otp[idx] && idx > 0) {
+            inputs.current[idx - 1]?.focus()
+        }
+    }
 
     const handleVerify = async () => {
-        if (otp.length < 6) {
-            setError('Please enter the 6-digit OTP');
-            return;
+        const code = otp.join('')
+        if (code.length < OTP_LENGTH) {
+            setError('Please enter the complete 6-digit OTP')
+            return
         }
-        setError('');
-        setLoading(true);
+
+        setLoading(true)
+        setError('')
 
         try {
-            const response = await verifyOtp(contactNumber, otp);
-            if (response.success && response.data) {
-                await setAuth(
-                    response.data.user.role, 
-                    response.data.user, 
-                    response.data.access_token, 
-                    response.data.refresh_token
-                );
-                onVerify();
-            } else {
-                setError(response.message || 'Invalid OTP. Please try again.');
+            const response = await verifyOtp(contactNumber, code)
+            if (response.success === false || !response.data?.access_token || !response.data?.refresh_token) {
+                throw new Error(response.message || 'OTP verification failed')
             }
+
+            const normalizedRole = String(response.data.user?.role || '').toLowerCase()
+            const role: UserRole = normalizedRole === 'doctor' ? 'doctor' : 'patient'
+
+            await setAuth(
+                role,
+                {
+                    id: response.data.user?.id,
+                    name: response.data.user?.name || '',
+                    email: response.data.user?.email,
+                },
+                response.data.access_token,
+                response.data.refresh_token
+            )
+
+            onVerify()
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Invalid OTP. Please try again.');
+            setError(err?.response?.data?.message || err?.message || 'Invalid OTP. Please try again.')
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }
 
     const handleResend = async () => {
-        if (timer > 0) return;
-        setTimer(180);
-        setOtp('');
-        setError('');
-        try {
-            await sendOtp(contactNumber);
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to resend OTP');
-        }
-    };
+        setOtp(Array(OTP_LENGTH).fill(''))
+        setError('')
+        inputs.current[0]?.focus()
+        // TODO: call resend OTP API here
+    }
 
     return (
-        <View style={styles.container}>
-            <AppTypography variant="h2" style={styles.title}>OTP Verification</AppTypography>
-            <AppTypography variant="subtitle" style={styles.subtitle}>
-                Enter the OTP received on +91 {contactNumber}
-            </AppTypography>
+        <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+            <View style={styles.container}>
+                <Text style={styles.title}>Verify OTP</Text>
 
-            <TouchableOpacity 
-                activeOpacity={1} 
-                onPress={() => inputRef.current?.focus()}
-                style={styles.otpContainer}
-            >
-                {[0, 1, 2, 3, 4, 5].map((index) => {
-                    const digit = otp[index] || '';
-                    return (
-                        <View key={index} style={[
-                            styles.otpBox, 
-                            { borderColor: error ? theme.colors.error : (digit ? theme.colors.primary : '#ccc') }
-                        ]}>
-                            <AppTypography style={styles.otpText}>{digit}</AppTypography>
-                        </View>
-                    );
-                })}
-            </TouchableOpacity>
+                <Text style={styles.subtitle}>
+                    Enter the 6-digit code sent to{'\n'}
+                    <Text style={styles.phone}>+91 {contactNumber}</Text>
+                </Text>
 
-            <RNTextInput
-                ref={inputRef}
-                value={otp}
-                onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, '').slice(0, 6))}
-                keyboardType="number-pad"
-                maxLength={6}
-                style={styles.hiddenInput}
-                autoFocus
-            />
+                <View style={styles.otpRow}>
+                    {otp.map((digit, idx) => (
+                        <TextInput
+                            key={idx}
+                            ref={(el) => { inputs.current[idx] = el }}
+                            style={[
+                                styles.otpBox,
+                                digit ? styles.otpBoxFilled : null,
+                                !!error ? styles.otpBoxError : null,
+                            ]}
+                            value={digit}
+                            onChangeText={(val) => handleChange(val, idx)}
+                            onKeyPress={(e) => handleKeyPress(e, idx)}
+                            keyboardType="number-pad"
+                            maxLength={1}
+                            textAlign="center"
+                            selectionColor={TEAL}
+                        />
+                    ))}
+                </View>
 
-            {error ? <AppTypography variant="caption" color={theme.colors.error} style={{ marginBottom: 8 }}>{error}</AppTypography> : null}
+                {!!error && <Text style={styles.errorText}>{error}</Text>}
 
-            <View style={styles.resendContainer}>
-                <AppTypography>Didn't receive the OTP? </AppTypography>
-                <TouchableOpacity onPress={handleResend} disabled={timer > 0}>
-                    <AppTypography color={timer > 0 ? '#999' : theme.colors.primary} style={{ fontWeight: 'bold' }}>Resend</AppTypography>
+                <TouchableOpacity
+                    style={[styles.button, loading && styles.buttonDisabled]}
+                    onPress={handleVerify}
+                    disabled={loading}
+                    activeOpacity={0.85}
+                >
+                    {loading
+                        ? <ActivityIndicator color="#fff" />
+                        : <Text style={styles.buttonText}>Verify OTP</Text>
+                    }
                 </TouchableOpacity>
-                {timer > 0 && <AppTypography color={theme.colors.primary} style={{ marginLeft: 'auto' }}>
-                    00:{timer < 10 ? `0${timer}` : timer}
-                </AppTypography>}
-            </View>
 
-            <AppButton 
-                variant="primary" 
-                onPress={handleVerify} 
-                style={styles.button}
-                disabled={loading}
-                loading={loading}
-            >
-                {loading ? "Verifying..." : "Verify"}
-            </AppButton>
-        </View>
-    );
+                <Text style={styles.resendText}>
+                    Didn't receive a code?{' '}
+                    <Text style={styles.tealUnderline} onPress={handleResend}>
+                        Resend OTP
+                    </Text>
+                </Text>
+
+                {onBack ? (
+                    <TouchableOpacity style={styles.backBtn} onPress={onBack}>
+                        <Text style={styles.backText}>{`<- ${backLabel}`}</Text>
+                    </TouchableOpacity>
+                ) : null}
+            </View>
+        </KeyboardAvoidingView>
+    )
 }
 
 const styles = StyleSheet.create({
     container: {
-        width: '100%',
+        flex: 1,
+        backgroundColor: '#fff',
+        padding: 28,
+        justifyContent: 'center',
     },
     title: {
-        marginBottom: 8,
+        fontSize: 28,
+        fontWeight: '600',
+        color: '#111',
+        marginBottom: 10,
     },
     subtitle: {
-        marginBottom: 24,
+        color: '#666',
+        fontSize: 15,
+        marginBottom: 32,
+        lineHeight: 24,
     },
-    otpContainer: {
+    phone: {
+        color: '#111',
+        fontWeight: '600',
+    },
+    otpRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
+        gap: 10,
         marginBottom: 16,
     },
     otpBox: {
-        width: 45,
-        height: 50,
+        width: 46,
+        height: 54,
         borderWidth: 1.5,
+        borderColor: '#d1d5db',
         borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
+        fontSize: 22,
+        fontWeight: '600',
+        color: '#111',
+        backgroundColor: '#f9fafb',
     },
-    otpText: {
-        fontSize: 20,
-        fontWeight: 'bold',
+    otpBoxFilled: {
+        borderColor: TEAL,
+        backgroundColor: '#f0fdfa',
     },
-    hiddenInput: {
-        position: 'absolute',
-        width: 1,
-        height: 1,
-        opacity: 0,
+    otpBoxError: {
+        borderColor: '#dc2626',
     },
-    resendContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 24,
+    errorText: {
+        color: '#dc2626',
+        fontSize: 13,
+        marginBottom: 12,
+        textAlign: 'center',
     },
     button: {
-        paddingVertical: 6,
-    }
-});
+        backgroundColor: TEAL,
+        paddingVertical: 14,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    buttonDisabled: {
+        opacity: 0.7,
+    },
+    buttonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 16,
+    },
+    resendText: {
+        color: '#666',
+        fontSize: 14,
+        textAlign: 'center',
+        marginTop: 20,
+    },
+    tealUnderline: {
+        color: TEAL,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
+    },
+    backBtn: {
+        marginTop: 16,
+        alignItems: 'center',
+    },
+    backText: {
+        color: '#666',
+        fontSize: 14,
+    },
+})
