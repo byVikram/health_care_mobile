@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "gemini-mobile-app",
     "slug": "gemini-mobile-app",
@@ -29,7 +29,8 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-asset"
+      "expo-asset",
+      "@react-native-community/datetimepicker"
     ],
     "assetBundlePatterns": [
       "**/*"

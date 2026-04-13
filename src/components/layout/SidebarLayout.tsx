@@ -12,7 +12,6 @@ import AncillaryIcon from "../../assets/icons/ancillary.svg";
 import TreatmentIcon from "../../assets/icons/treatment.svg";
 import RemindersIcon from "../../assets/icons/reminders.svg";
 import PaymentsIcon from "../../assets/icons/payments.svg";
-import BlogsIcon from "../../assets/icons/blogs.svg";
 import HelpCenterIcon from "../../assets/icons/help-center.svg";
 import SettingsIcon from "../../assets/icons/settings.svg";
 
@@ -25,81 +24,79 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   const navigation = useNavigation<any>();
   const { clearAuth, user } = useAuth();
 
+  const handleEditProfile = () => {
+    setIsSidebarOpen(false);
+    navigation.navigate("HealthProfile");
+  };
+
   const menuItems = useMemo<AppSidebarItem[]>(
     () => [
       {
-  id: "appointments",
-  label: "My Appointments",
-  icon: <AppointmentsIcon width={24} height={24} />,
-  onPress: () => navigation.navigate("MainTabs", { screen: "Portal" }),
-},
-     {
-      id: "pharmacy",
-      label: "Pharmacy",
-      icon: <PharmacyIcon width={20} height={20} />,
-      onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
-    },
-    {
-      id: "lab",
-      label: "Lab",
-      icon: <LabIcon width={20} height={20} />,
-      onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
-    },
-    {
-      id: "radiology",
-      label: "Radiology",
-      icon: <RadiologyIcon width={20} height={20} />,
-      onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
-    },
-    {
-      id: "ancillary",
-      label: "Ancillary",
-      icon: <AncillaryIcon width={20} height={20} />,
-      onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
-    },
-    {
-      id: "treatment-history",
-      label: "Treatment History",
-      icon: <TreatmentIcon width={20} height={20} />,
-      onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
-    },
-    {
-      id: "reminders",
-      label: "Reminders",
-      icon: <RemindersIcon width={20} height={20} />,
-      onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
-    },
-    {
-      id: "payments",
-      label: "Payments",
-      icon: <PaymentsIcon width={20} height={20} />,
-      onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
-    },
+        id: "appointments",
+        label: "My Appointments",
+        icon: <AppointmentsIcon width={24} height={24} />,
+        onPress: () => navigation.navigate("MainTabs", { screen: "Portal" }),
+      },
+      {
+        id: "pharmacy",
+        label: "Pharmacy",
+        icon: <PharmacyIcon width={20} height={20} />,
+        onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
+      },
+      {
+        id: "lab",
+        label: "Lab",
+        icon: <LabIcon width={20} height={20} />,
+        onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
+      },
+      {
+        id: "radiology",
+        label: "Radiology",
+        icon: <RadiologyIcon width={20} height={20} />,
+        onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
+      },
+      {
+        id: "ancillary",
+        label: "Ancillary",
+        icon: <AncillaryIcon width={20} height={20} />,
+        onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
+      },
+      {
+        id: "treatment-history",
+        label: "Treatment History",
+        icon: <TreatmentIcon width={20} height={20} />,
+        onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
+      },
+      {
+        id: "reminders",
+        label: "Reminders",
+        icon: <RemindersIcon width={20} height={20} />,
+        onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
+      },
+      {
+        id: "payments",
+        label: "Payments",
+        icon: <PaymentsIcon width={20} height={20} />,
+        onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
+      },
       {
         id: "blogs",
         label: "Blogs",
         icon: "newspaper-variant-outline",
         onPress: () => navigation.navigate("MainTabs", { screen: "Home" }),
       },
-      
-{
-  id: "help",
-  label: "Help Center",
-  icon: <HelpCenterIcon width={20} height={20} />,
-  onPress: () => navigation.navigate("MainTabs", { screen: "Profile" }),
-},
-{
-  id: "settings",
-  label: "Settings",
-  icon: <SettingsIcon width={20} height={20} />,
-  onPress: () => navigation.navigate("MainTabs", { screen: "Profile" }),
-},
-    //   {
-    //     id: "settings",
-    //     label: "Settings",
-    //     icon: "cog-outline",
-    //     onPress: () => navigation.navigate("MainTabs", { screen: "Profile" }),
-    //   },
+      {
+        id: "help",
+        label: "Help Center",
+        icon: <HelpCenterIcon width={20} height={20} />,
+        onPress: () => navigation.navigate("MainTabs", { screen: "Profile" }),
+      },
+      {
+        id: "settings",
+        label: "Settings",
+        icon: <SettingsIcon width={20} height={20} />,
+        onPress: () => navigation.navigate("MainTabs", { screen: "Profile" }),
+      },
     ],
     [navigation],
   );
@@ -108,10 +105,10 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
     <View style={styles.container}>
       <AppSidebar
         visible={isSidebarOpen}
-        userName={user?.name || "Nitin"}
         profileCompletion={user?.profileCompletion}
         onClose={() => setIsSidebarOpen(false)}
         onLogout={clearAuth}
+        onEditProfile={handleEditProfile}
         menuItems={menuItems}
       />
 
