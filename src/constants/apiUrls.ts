@@ -44,4 +44,10 @@ export const API_ENDPOINTS = {
 		GET_BY_ID: (id: number) => `${BASE_URL}/api/appointments/${id}`,
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 	},
+	PATIENT_PROFILE:{
+		DETAILS:`${BASE_URL}/api/patients/me `,
+		GET:`${BASE_URL}/api/patients/me/details`,
+		PATCH:`${BASE_URL}/api/patients/me/details`,
+
+	},
 }
