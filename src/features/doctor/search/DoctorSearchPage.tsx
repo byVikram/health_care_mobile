@@ -257,7 +257,7 @@ export default function DoctorSearchPage() {
 
 					return (
 						<View style={{ width: itemWidth }}>
-							{!loading && !refreshing ? <DoctorCardSkeleton /> : <DoctorSearchCard doctor={item} />}
+							{loading && !refreshing ? <DoctorCardSkeleton /> : <DoctorSearchCard doctor={item} />}
 						</View>
 					)
 				}}
