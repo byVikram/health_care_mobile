@@ -3,10 +3,11 @@ import { View, StyleSheet, ScrollView } from "react-native";
 import { Text, Card, Button } from "react-native-paper";
 import Blog1 from "../../assets/blog-and-community/blog-1.svg";
 import Blog2 from "../../assets/blog-and-community/blog-2.svg";
+import Community1 from "../../assets/blog-and-community/community-1.svg"
 
 const communities = [
-  { id: 1, name: "Diabatics Associations", location: "Rajajinagar, Bengaluru" },
-  { id: 2, name: "Lions Health Club", location: "Koramangala, Bengaluru" },
+  { id: 1, name: "Diabatics Associations", location: "Rajajinagar, Bengaluru",image: Community1 },
+  { id: 2, name: "Lions Health Club", location: "Koramangala, Bengaluru" ,image: Community1},
 ];
 
 const blogs = [
@@ -42,7 +43,9 @@ export default function CommunityBlogsSection() {
 
       {communities.map((c) => (
         <View key={c.id} style={styles.communityRow}>
-          <View style={styles.communityAvatar} />
+          <View style={styles.communityAvatar}>
+            <c.image width="100%" height ="100%" />
+          </View>  
           <View style={styles.communityInfo}>
             <Text variant="titleSmall">{c.name}</Text>
             <Text variant="labelSmall" style={{ color: "#666" }}>
@@ -123,6 +126,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "#f0f4f8",
     marginRight: 12,
+    // overflow: "hidden",
   },
   communityInfo: {
     flex: 1,
