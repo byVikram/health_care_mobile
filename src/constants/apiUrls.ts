@@ -47,7 +47,7 @@ export const API_ENDPOINTS = {
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
 
 	PATIENT: {
-		ME: '/api/patients/me',
-		DETAILS: '/api/patients/me/details',
+		ME: `${BASE_URL}/api/patients/me`,
+		DETAILS: `${BASE_URL}/api/patients/me/details`,
 	},
 }

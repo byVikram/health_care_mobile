@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
 	// select modal
 	modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
 	bottomSheet: {
-		backgroundColor: '#ad1b1b',
+		backgroundColor: '#fff',
 		borderTopLeftRadius: 20,
 		borderTopRightRadius: 20,
 		paddingBottom: 32,
