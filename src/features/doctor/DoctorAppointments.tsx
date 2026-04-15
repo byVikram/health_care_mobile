@@ -1,519 +1,761 @@
 import React, { useState } from "react";
 import {
-	View,
-	Text,
-	ScrollView,
-	StyleSheet,
-	TouchableOpacity,
-	useWindowDimensions,
-	Modal,
-	Alert,
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  useWindowDimensions,
+  Modal,
+  Alert,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { AppSkeleton } from "../../components/common";
+import { updateAppointmentsStatus } from "./doctorService";
 
+type Appointment = {
+  id: string;
+  patient: {
+    name: string;
+    age: number;
+    gender: string;
+    sex?: string;
+  };
+  age?: number;
+  gender?: string;
+  sex?: string;
+  status: string | { label: string };
+  appointment_time: string;
+  appointment_end_time?: string;
+  end_time?: string;
+};
 const actionButtons: {
-	label: string;
-	bg: string;
-	color: string;
-	action: string;
-	icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  bg: string;
+  color: string;
+  action: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
 }[] = [
-	{ label: "Confirm",    bg: "#d6eed8", color: "#2e8b57", action: "confirm",    icon: "check" },
-	{ label: "Reject",     bg: "#f8dddd", color: "#d84545", action: "reject",     icon: "close" },
-	{ label: "Reschedule", bg: "#f8e8c6", color: "#d08a0a", action: "reschedule", icon: "refresh" },
-	{ label: "Refer",      bg: "#dbe2f5", color: "#4d6bb1", action: "refer",      icon: "account-multiple-outline" },
+  {
+    label: "Confirm",
+    bg: "#d6eed8",
+    color: "#2e8b57",
+    action: "confirm",
+    icon: "check",
+  },
+  {
+    label: "Reject",
+    bg: "#f8dddd",
+    color: "#d84545",
+    action: "reject",
+    icon: "close",
+  },
+  {
+    label: "Reschedule",
+    bg: "#f8e8c6",
+    color: "#d08a0a",
+    action: "reschedule",
+    icon: "refresh",
+  },
+  {
+    label: "Refer",
+    bg: "#dbe2f5",
+    color: "#4d6bb1",
+    action: "refer",
+    icon: "account-multiple-outline",
+  },
 ];
+const showSuccess = (message: string) => {
+  Toast.show({
+    type: "success",
+    text1: "Success",
+    text2: message,
+  });
+};
+const showError = (message: string) => {
+  Toast.show({
+    type: "error",
+    text1: "Error",
+    text2: message,
+  });
+};
+type DoctorAppointmentsProps = {
+  selectedDate: number;
+  setSelectedDate: (i: number) => void;
+  appointments: Appointment[];
+  apptLoading: boolean;
+  apptError: string;
+  weekDays: { day: string; date: string; red: boolean; dateObj: Date }[];
+  selectedDateObj: Date;
+};
 
 const TEAL = "#1a8c8c";
 
 export default function DoctorAppointments({
-	selectedDate,
-	setSelectedDate,
-	appointments,
-	apptLoading,
-	apptError,
-	weekDays,
-	selectedDateObj,
-}: any) {
-	const { width } = useWindowDimensions();
-	const isTablet = width >= 768;
-	const navigation = useNavigation<any>();
+  selectedDate,
+  setSelectedDate,
+  appointments,
+  apptLoading,
+  apptError,
+  weekDays,
+  selectedDateObj,
+}: DoctorAppointmentsProps) {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+  const navigation = useNavigation<any>();
 
-	// ── QR Scanner state ──────────────────────────────────────────────────────
-	const [scannerVisible, setScannerVisible] = useState(false);
-	const [scannedPatient, setScannedPatient] = useState<any>(null);
-	const [scanned, setScanned]               = useState(false);
-	const [permission, requestPermission]     = useCameraPermissions();
+  // ── QR Scanner state ──────────────────────────────────────────────────────
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [scannedPatient, setScannedPatient] = useState<any>(null);
+  const [scanned, setScanned] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
-	// ── Helpers ───────────────────────────────────────────────────────────────
-	const getStatusLabel  = (status: any) =>
-		typeof status === "string" ? status : (status?.label ?? "pending");
-	const formatStatus    = (s: string) =>
-		s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-	const getPatientAge   = (apt: any) => apt?.patient?.age ?? apt?.age ?? "--";
-	const getPatientGender = (apt: any) =>
-		apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? "--";
-	const getTimeRange = (apt: any) => {
-		const start = apt?.appointment_time;
-		const end   = apt?.appointment_end_time ?? apt?.end_time;
-		if (start && end) return `${start} - ${end}`;
-		return start ?? "--";
-	};
+  const [localStatuses, setLocalStatuses] = useState<Record<string, string>>(
+    {},
+  );
+  const [rescheduleAppt, setRescheduleAppt] = useState<any>(null);
+  const [rescheduleDate, setRescheduleDate] = useState<Date | null>(null);
+  const [rescheduleTime, setRescheduleTime] = useState<string>("");
+  const [rescheduleSlots, setRescheduleSlots] = useState<any[]>([]);
+  const [rescheduleOpen, setRescheduleOpen] = useState<boolean>(false);
 
-	const handleAction = (action: string, id: string) => {
-		if (action === "confirm")    Alert.alert("Confirmed");
-		if (action === "reject")     Alert.alert("Rejected");
-		if (action === "reschedule") Alert.alert("Reschedule coming soon");
-		if (action === "refer")      Alert.alert("Refer coming soon");
-	};
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const getStatusLabel = (status: any) =>
+    typeof status === "string" ? status : (status?.label ?? "pending");
+  const formatStatus = (s: string) =>
+    s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  const getPatientAge = (apt: any) => apt?.patient?.age ?? apt?.age ?? "--";
+  const getPatientGender = (apt: any) =>
+    apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? "--";
+  const getTimeRange = (apt: any) => {
+    const start = apt?.appointment_time;
+    const end = apt?.appointment_end_time ?? apt?.end_time;
+    if (start && end) return `${start} - ${end}`;
+    return start ?? "--";
+  };
 
-	// ── Card press → open QR scanner ─────────────────────────────────────────
-	const handleCardPress = async (apt: any) => {
-		if (!permission?.granted) {
-			const { granted } = await requestPermission();
-			if (!granted) {
-				Alert.alert(
-					"Camera Permission Required",
-					"Please allow camera access to scan patient QR codes.",
-				);
-				return;
-			}
-		}
-		setScannedPatient(apt);
-		setScanned(false);
-		setScannerVisible(true);
-	};
+  const handleAction = async (action: string, appointmentId: string) => {
+    try {
+      if (action === "confirm") {
+        const res = await updateAppointmentsStatus(
+          appointmentId,
+          APPOINTMENT_STATUS.CONFIRM,
+        );
+        if (res.success) {
+          showSuccess(res.message);
+          // setLocalStatuses((prev) => ({ ...prev, [appointmentId]: 'confirmed' }))
+        }
+      }
+      if (action === "reject") {
+        const res = await updateAppointmentsStatus(
+          appointmentId,
+          APPOINTMENT_STATUS.REJECT,
+        );
+        if (res.success) {
+          showSuccess(res.message);
+          // setLocalStatuses((prev) => ({ ...prev, [appointmentId]: 'cancelled' }))
+        }
+      }
+      if (action === "reschedule") {
+        const apt = appointments.find((a: any) => a.id === appointmentId);
+        setRescheduleAppt(apt);
+        setRescheduleDate(new Date());
+        setRescheduleTime("");
+        setRescheduleSlots([]);
+        setRescheduleOpen(true);
+      }
+      if (action === "refer") {
+        alert("Refer coming soon!");
+      }
+    } catch {
+      showError("Something went wrong");
+    }
+  };
+  // ── Card press → open QR scanner ─────────────────────────────────────────
+  const handleCardPress = async (apt: any) => {
+    if (!permission?.granted) {
+      const { granted } = await requestPermission();
+      if (!granted) {
+        Alert.alert(
+          "Camera Permission Required",
+          "Please allow camera access to scan patient QR codes.",
+        );
+        return;
+      }
+    }
+    setScannedPatient(apt);
+    setScanned(false);
+    setScannerVisible(true);
+  };
 
-	// ── QR scanned successfully ───────────────────────────────────────────────
-	const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
-		if (scanned) return;
-		setScanned(true);
-		setScannerVisible(false);
-		navigation.navigate("AppointmentDetail", {
-			appointmentId: scannedPatient?.id,
-			qrData: data,
-		});
-	};
+  // ── QR scanned successfully ───────────────────────────────────────────────
+  const handleBarCodeScanned = ({
+    type,
+    data,
+  }: {
+    type: string;
+    data: string;
+  }) => {
+    if (scanned) return;
+    setScanned(true);
+    setScannerVisible(false);
+    navigation.navigate("AppointmentDetail", {
+      appointmentId: scannedPatient?.id,
+      qrData: data,
+    });
+  };
 
-	// ── Skeleton ──────────────────────────────────────────────────────────────
-	const renderSkeleton = () =>
-		Array.from({ length: 3 }).map((_, i) => (
-			<View key={`sk-${i}`} style={styles.card}>
-				<View style={isTablet ? styles.tabletCardInner : undefined}>
-					<View style={styles.skeletonNameRow}>
-						<AppSkeleton width={24} height={24} borderRadius={6} />
-						<AppSkeleton width={110} height={16} borderRadius={6} />
-						<AppSkeleton width={72} height={16} borderRadius={999} />
-					</View>
-					<View style={[styles.skeletonMetaRow, { marginTop: 8 }]}>
-						<AppSkeleton width={14} height={14} borderRadius={7} />
-						<AppSkeleton width="80%" height={13} borderRadius={6} />
-					</View>
-					{isTablet && (
-						<View style={styles.skeletonActionsRow}>
-							{[0, 1, 2, 3].map((j) => (
-								<AppSkeleton key={j} width={52} height={44} borderRadius={6} style={{ marginRight: 8 }} />
-							))}
-						</View>
-					)}
-				</View>
-			</View>
-		));
+  // ── Skeleton ──────────────────────────────────────────────────────────────
+  const renderSkeleton = () =>
+    Array.from({ length: 3 }).map((_, i) => (
+      <View key={`sk-${i}`} style={styles.card}>
+        <View style={isTablet ? styles.tabletCardInner : undefined}>
+          <View style={styles.skeletonNameRow}>
+            <AppSkeleton width={24} height={24} borderRadius={6} />
+            <AppSkeleton width={110} height={16} borderRadius={6} />
+            <AppSkeleton width={72} height={16} borderRadius={999} />
+          </View>
+          <View style={[styles.skeletonMetaRow, { marginTop: 8 }]}>
+            <AppSkeleton width={14} height={14} borderRadius={7} />
+            <AppSkeleton width="80%" height={13} borderRadius={6} />
+          </View>
+          {isTablet && (
+            <View style={styles.skeletonActionsRow}>
+              {[0, 1, 2, 3].map((j) => (
+                <AppSkeleton
+                  key={j}
+                  width={52}
+                  height={44}
+                  borderRadius={6}
+                  style={{ marginRight: 8 }}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+    ));
 
-	// ── Action buttons ────────────────────────────────────────────────────────
-	const renderActions = (apt: any) => (
-		<View style={[styles.actions, isTablet && styles.actionsTablet]}>
-			{actionButtons.map((btn, i) => (
-				<TouchableOpacity
-					key={i}
-					onPress={(e) => {
-						e.stopPropagation?.();
-						handleAction(btn.action, apt.id);
-					}}
-					style={[styles.btn, { backgroundColor: btn.bg }]}
-					activeOpacity={0.75}
-				>
-					<MaterialCommunityIcons name={btn.icon} size={16} color={btn.color} />
-					<Text style={[styles.btnLabel, { color: btn.color }]}>{btn.label}</Text>
-				</TouchableOpacity>
-			))}
-			<TouchableOpacity
-				style={styles.chevronBtn}
-				activeOpacity={0.7}
-				onPress={() => handleCardPress(apt)}
-			>
-				<MaterialCommunityIcons name="chevron-right" size={26} color={TEAL} />
-			</TouchableOpacity>
-		</View>
-	);
+  // ── Action buttons ────────────────────────────────────────────────────────
+  const renderActions = (apt: any) => (
+    <View style={[styles.actions, isTablet && styles.actionsTablet]}>
+      {actionButtons.map((btn, i) => (
+        <TouchableOpacity
+          key={i}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            handleAction(btn.action, apt.id);
+          }}
+          style={[styles.btn, { backgroundColor: btn.bg }]}
+          activeOpacity={0.75}
+        >
+          <MaterialCommunityIcons name={btn.icon} size={16} color={btn.color} />
+          <Text style={[styles.btnLabel, { color: btn.color }]}>
+            {btn.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+      <TouchableOpacity
+        style={styles.chevronBtn}
+        activeOpacity={0.7}
+        onPress={() => handleCardPress(apt)}
+      >
+        <MaterialCommunityIcons name="chevron-right" size={26} color={TEAL} />
+      </TouchableOpacity>
+    </View>
+  );
 
-	// ── Card ──────────────────────────────────────────────────────────────────
-	const renderCard = (apt: any) => {
-		const status      = getStatusLabel(apt.status);
-		const isCancelled = status === "cancelled";
+  // ── Card ──────────────────────────────────────────────────────────────────
+  const renderCard = (apt: any) => {
+    const status = getStatusLabel(apt.status);
+    const isCancelled = status === "cancelled";
 
-		const statusStyle =
-			status === "confirmed" ? styles.pillConfirmed :
-			status === "cancelled" ? styles.pillCancelled :
-			styles.pillPending;
+    const statusStyle =
+      status === "confirmed"
+        ? styles.pillConfirmed
+        : status === "cancelled"
+          ? styles.pillCancelled
+          : styles.pillPending;
 
-		const statusTextStyle =
-			status === "confirmed" ? styles.pillTextConfirmed :
-			status === "cancelled" ? styles.pillTextCancelled :
-			styles.pillTextPending;
+    const statusTextStyle =
+      status === "confirmed"
+        ? styles.pillTextConfirmed
+        : status === "cancelled"
+          ? styles.pillTextCancelled
+          : styles.pillTextPending;
 
-		if (isTablet) {
-			return (
-				<TouchableOpacity
-					key={apt.id}
-					activeOpacity={0.85}
-					onPress={() => handleCardPress(apt)}
-					style={[styles.card, isCancelled && styles.cancelledCard]}
-				>
-					<View style={styles.tabletCardInner}>
-						<View style={styles.tabletLeft}>
-							<View style={styles.patientNameRow}>
-								<View style={styles.patientIconBox}>
-									<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
-								</View>
-								<Text style={styles.name} numberOfLines={1}>
-									{apt?.patient?.name || "Unknown Patient"}
-								</Text>
-								<View style={[styles.pill, statusStyle]}>
-									<Text style={[styles.pillText, statusTextStyle]}>
-										{formatStatus(status)}
-									</Text>
-								</View>
-							</View>
-							<View style={styles.metaRow}>
-								<MaterialCommunityIcons name="clock-time-three-outline" size={14} color="#5f6973" />
-								<Text style={styles.subText}>
-									{getPatientAge(apt)} yrs / {getPatientGender(apt)} | {getTimeRange(apt)}
-								</Text>
-							</View>
-							{isCancelled && (
-								<Text style={styles.cancelledMsg}>Patient has canceled the appointment</Text>
-							)}
-						</View>
-						{!isCancelled && (
-							<View style={styles.tabletRight}>{renderActions(apt)}</View>
-						)}
-					</View>
-				</TouchableOpacity>
-			);
-		}
+    if (isTablet) {
+      return (
+        <TouchableOpacity
+          key={apt.id}
+          activeOpacity={0.85}
+          onPress={() => handleCardPress(apt)}
+          style={[styles.card, isCancelled && styles.cancelledCard]}
+        >
+          <View style={styles.tabletCardInner}>
+            <View style={styles.tabletLeft}>
+              <View style={styles.patientNameRow}>
+                <View style={styles.patientIconBox}>
+                  <MaterialCommunityIcons
+                    name="home-heart"
+                    size={20}
+                    color="#2e7d32"
+                  />
+                </View>
+                <Text style={styles.name} numberOfLines={1}>
+                  {apt?.patient?.name || "Unknown Patient"}
+                </Text>
+                <View style={[styles.pill, statusStyle]}>
+                  <Text style={[styles.pillText, statusTextStyle]}>
+                    {formatStatus(status)}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.metaRow}>
+                <MaterialCommunityIcons
+                  name="clock-time-three-outline"
+                  size={14}
+                  color="#5f6973"
+                />
+                <Text style={styles.subText}>
+                  {getPatientAge(apt)} yrs / {getPatientGender(apt)} |{" "}
+                  {getTimeRange(apt)}
+                </Text>
+              </View>
+              {isCancelled && (
+                <Text style={styles.cancelledMsg}>
+                  Patient has canceled the appointment
+                </Text>
+              )}
+            </View>
+            {!isCancelled && (
+              <View style={styles.tabletRight}>{renderActions(apt)}</View>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
+    }
 
-		return (
-			<TouchableOpacity
-				key={apt.id}
-				activeOpacity={0.85}
-				onPress={() => handleCardPress(apt)}
-				style={[styles.card, isCancelled && styles.cancelledCard]}
-			>
-				<View style={styles.patientNameRow}>
-					<View style={styles.patientIconBox}>
-						<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
-					</View>
-					<Text style={styles.name} numberOfLines={1}>
-						{apt?.patient?.name || "Unknown Patient"}
-					</Text>
-					<View style={[styles.pill, statusStyle]}>
-						<Text style={[styles.pillText, statusTextStyle]}>
-							{formatStatus(status)}
-						</Text>
-					</View>
-				</View>
-				<View style={styles.metaRow}>
-					<MaterialCommunityIcons name="clock-time-three-outline" size={14} color="#5f6973" />
-					<Text style={styles.subText}>
-						{getPatientAge(apt)} yrs / {getPatientGender(apt)} | {getTimeRange(apt)}
-					</Text>
-				</View>
-				{isCancelled
-					? <Text style={styles.cancelledMsg}>Patient has canceled the appointment</Text>
-					: renderActions(apt)
-				}
-			</TouchableOpacity>
-		);
-	};
+    return (
+      <TouchableOpacity
+        key={apt.id}
+        activeOpacity={0.85}
+        onPress={() => handleCardPress(apt)}
+        style={[styles.card, isCancelled && styles.cancelledCard]}
+      >
+        <View style={styles.patientNameRow}>
+          <View style={styles.patientIconBox}>
+            <MaterialCommunityIcons
+              name="home-heart"
+              size={20}
+              color="#2e7d32"
+            />
+          </View>
+          <Text style={styles.name} numberOfLines={1}>
+            {apt?.patient?.name || "Unknown Patient"}
+          </Text>
+          <View style={[styles.pill, statusStyle]}>
+            <Text style={[styles.pillText, statusTextStyle]}>
+              {formatStatus(status)}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.metaRow}>
+          <MaterialCommunityIcons
+            name="clock-time-three-outline"
+            size={14}
+            color="#5f6973"
+          />
+          <Text style={styles.subText}>
+            {getPatientAge(apt)} yrs / {getPatientGender(apt)} |{" "}
+            {getTimeRange(apt)}
+          </Text>
+        </View>
+        {isCancelled ? (
+          <Text style={styles.cancelledMsg}>
+            Patient has canceled the appointment
+          </Text>
+        ) : (
+          renderActions(apt)
+        )}
+      </TouchableOpacity>
+    );
+  };
 
-	// ── QR Scanner Modal ──────────────────────────────────────────────────────
-	const renderScanner = () => (
-		<Modal
-			visible={scannerVisible}
-			animationType="slide"
-			onRequestClose={() => setScannerVisible(false)}
-		>
-			<View style={styles.scannerContainer}>
+  // ── QR Scanner Modal ──────────────────────────────────────────────────────
+  const renderScanner = () => (
+    <Modal
+      visible={scannerVisible}
+      animationType="slide"
+      onRequestClose={() => setScannerVisible(false)}
+    >
+      <View style={styles.scannerContainer}>
+        {/* Header */}
+        <View style={styles.scannerHeader}>
+          <TouchableOpacity
+            onPress={() => setScannerVisible(false)}
+            style={styles.scannerCloseBtn}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="chevron-left"
+              size={24}
+              color={TEAL}
+            />
+            <Text style={styles.scannerBackTxt}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.scannerTitle}>Scan Patient QR</Text>
+          <View style={{ width: 60 }} />
+        </View>
 
-				{/* Header */}
-				<View style={styles.scannerHeader}>
-					<TouchableOpacity
-						onPress={() => setScannerVisible(false)}
-						style={styles.scannerCloseBtn}
-						activeOpacity={0.7}
-					>
-						<MaterialCommunityIcons name="chevron-left" size={24} color={TEAL} />
-						<Text style={styles.scannerBackTxt}>Back</Text>
-					</TouchableOpacity>
-					<Text style={styles.scannerTitle}>Scan Patient QR</Text>
-					<View style={{ width: 60 }} />
-				</View>
+        {/* Patient info strip */}
+        {scannedPatient && (
+          <View style={styles.patientStrip}>
+            <View style={styles.patientIconBox}>
+              <MaterialCommunityIcons
+                name="home-heart"
+                size={18}
+                color="#2e7d32"
+              />
+            </View>
+            <View>
+              <Text style={styles.stripName}>
+                {scannedPatient?.patient?.name || "Unknown Patient"}
+              </Text>
+              <Text style={styles.stripMeta}>
+                {getPatientAge(scannedPatient)} yrs /{" "}
+                {getPatientGender(scannedPatient)} ·{" "}
+                {getTimeRange(scannedPatient)}
+              </Text>
+            </View>
+          </View>
+        )}
 
-				{/* Patient info strip */}
-				{scannedPatient && (
-					<View style={styles.patientStrip}>
-						<View style={styles.patientIconBox}>
-							<MaterialCommunityIcons name="home-heart" size={18} color="#2e7d32" />
-						</View>
-						<View>
-							<Text style={styles.stripName}>
-								{scannedPatient?.patient?.name || "Unknown Patient"}
-							</Text>
-							<Text style={styles.stripMeta}>
-								{getPatientAge(scannedPatient)} yrs / {getPatientGender(scannedPatient)} · {getTimeRange(scannedPatient)}
-							</Text>
-						</View>
-					</View>
-				)}
+        {/* Camera */}
+        <View style={styles.cameraWrapper}>
+          <CameraView
+            style={styles.camera}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          />
 
-				{/* Camera */}
-				<View style={styles.cameraWrapper}>
-					<CameraView
-						style={styles.camera}
-						facing="back"
-						barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-						onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-					/>
+          {/* Dark overlay with QR frame cutout */}
+          <View style={styles.overlay}>
+            <View style={styles.overlayTop} />
+            <View style={styles.overlayMiddle}>
+              <View style={styles.overlaySide} />
+              <View style={styles.qrFrame}>
+                <View style={[styles.corner, styles.cornerTL]} />
+                <View style={[styles.corner, styles.cornerTR]} />
+                <View style={[styles.corner, styles.cornerBL]} />
+                <View style={[styles.corner, styles.cornerBR]} />
+              </View>
+              <View style={styles.overlaySide} />
+            </View>
+            <View style={styles.overlayBottom} />
+          </View>
+        </View>
 
-					{/* Dark overlay with QR frame cutout */}
-					<View style={styles.overlay}>
-						<View style={styles.overlayTop} />
-						<View style={styles.overlayMiddle}>
-							<View style={styles.overlaySide} />
-							<View style={styles.qrFrame}>
-								<View style={[styles.corner, styles.cornerTL]} />
-								<View style={[styles.corner, styles.cornerTR]} />
-								<View style={[styles.corner, styles.cornerBL]} />
-								<View style={[styles.corner, styles.cornerBR]} />
-							</View>
-							<View style={styles.overlaySide} />
-						</View>
-						<View style={styles.overlayBottom} />
-					</View>
-				</View>
+        {/* Hint */}
+        <View style={styles.scannerFooter}>
+          <MaterialCommunityIcons name="qrcode-scan" size={18} color={TEAL} />
+          <Text style={styles.scanHint}>
+            Align the patient's QR code within the frame
+          </Text>
+        </View>
 
-				{/* Hint */}
-				<View style={styles.scannerFooter}>
-					<MaterialCommunityIcons name="qrcode-scan" size={18} color={TEAL} />
-					<Text style={styles.scanHint}>
-						Align the patient's QR code within the frame
-					</Text>
-				</View>
+        {/* Scan again button */}
+        {scanned && (
+          <TouchableOpacity
+            style={styles.rescanBtn}
+            onPress={() => setScanned(false)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.rescanTxt}>Tap to Scan Again</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </Modal>
+  );
 
-				{/* Scan again button */}
-				{scanned && (
-					<TouchableOpacity
-						style={styles.rescanBtn}
-						onPress={() => setScanned(false)}
-						activeOpacity={0.8}
-					>
-						<Text style={styles.rescanTxt}>Tap to Scan Again</Text>
-					</TouchableOpacity>
-				)}
-			</View>
-		</Modal>
-	);
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.heading}>Doctor Appointments</Text>
+        <Text style={styles.month}>
+          {selectedDateObj?.toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+          })}
+        </Text>
+      </View>
 
-	return (
-		<View style={styles.container}>
-			{/* Header */}
-			<View style={styles.header}>
-				<Text style={styles.heading}>Doctor Appointments</Text>
-				<Text style={styles.month}>
-					{selectedDateObj?.toLocaleDateString("en-US", {
-						month: "long",
-						year: "numeric",
-					})}
-				</Text>
-			</View>
+      {/* Week strip */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.weekContainer}
+      >
+        {weekDays.map((d: any, i: number) => (
+          <TouchableOpacity
+            key={i}
+            onPress={() => setSelectedDate(i)}
+            style={[
+              styles.dayBox,
+              d.red && styles.weekendDayBox,
+              selectedDate === i && styles.selectedDay,
+            ]}
+          >
+            <Text
+              style={[
+                styles.dayText,
+                d.red && styles.weekendText,
+                selectedDate === i && styles.selectedText,
+              ]}
+            >
+              {d.day}
+            </Text>
+            <Text
+              style={[
+                styles.dateText,
+                d.red && styles.weekendText,
+                selectedDate === i && styles.selectedText,
+              ]}
+            >
+              {d.date}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-			{/* Week strip */}
-			<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weekContainer}>
-				{weekDays.map((d: any, i: number) => (
-					<TouchableOpacity
-						key={i}
-						onPress={() => setSelectedDate(i)}
-						style={[
-							styles.dayBox,
-							d.red && styles.weekendDayBox,
-							selectedDate === i && styles.selectedDay,
-						]}
-					>
-						<Text style={[styles.dayText, d.red && styles.weekendText, selectedDate === i && styles.selectedText]}>
-							{d.day}
-						</Text>
-						<Text style={[styles.dateText, d.red && styles.weekendText, selectedDate === i && styles.selectedText]}>
-							{d.date}
-						</Text>
-					</TouchableOpacity>
-				))}
-			</ScrollView>
+      {/* List */}
+      <View style={styles.listContainer}>
+        {apptLoading ? renderSkeleton() : null}
+        {apptError ? <Text style={styles.error}>{apptError}</Text> : null}
+        {!apptLoading && appointments.length === 0 && (
+          <Text style={styles.empty}>No appointments</Text>
+        )}
+        {!apptLoading && appointments.map(renderCard)}
+      </View>
 
-			{/* List */}
-			<View style={styles.listContainer}>
-				{apptLoading ? renderSkeleton() : null}
-				{apptError ? <Text style={styles.error}>{apptError}</Text> : null}
-				{!apptLoading && appointments.length === 0 && (
-					<Text style={styles.empty}>No appointments</Text>
-				)}
-				{!apptLoading && appointments.map(renderCard)}
-			</View>
-
-			{/* QR Scanner Modal */}
-			{renderScanner()}
-		</View>
-	);
+      {/* QR Scanner Modal */}
+      {renderScanner()}
+    </View>
+  );
 }
 
-const CORNER_SIZE      = 22;
+const CORNER_SIZE = 22;
 const CORNER_THICKNESS = 3;
 
 const styles = StyleSheet.create({
-	container: {
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: "#fff",
-		borderRadius: 12,
-	},
-	header: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 8,
-	},
-	heading: { fontSize: 18, fontWeight: "700", color: "#253136" },
-	month:   { color: "#0c7c7c", fontWeight: "600", fontSize: 13 },
-	weekContainer: { marginBottom: 12 },
-	dayBox: {
-		width: 64, height: 64, borderRadius: 8, marginRight: 10,
-		alignItems: "center", justifyContent: "center",
-		borderWidth: 1, borderColor: "#b8bec3",
-	},
-	weekendDayBox: { borderColor: "#efb2b2", backgroundColor: "#fff9f9" },
-	selectedDay:   { backgroundColor: "#2d7679", borderColor: "#2d7679" },
-	dayText:       { fontSize: 12, color: "#6f7680", marginBottom: 2 },
-	dateText:      { fontSize: 16, fontWeight: "700", color: "#2c3136", lineHeight: 32 },
-	selectedText:  { color: "#fff" },
-	weekendText:   { color: "#e25555" },
-	listContainer: { marginTop: 2 },
-	card: {
-		padding: 12,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: "#d6dbde",
-		marginBottom: 10,
-		backgroundColor: "#fff",
-	},
-	cancelledCard:   { backgroundColor: "#fff5f5" },
-	tabletCardInner: { flexDirection: "row", alignItems: "center", gap: 12 },
-	tabletLeft:      { flex: 1, minWidth: 0 },
-	tabletRight:     { flexShrink: 0 },
-	patientNameRow:  { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
-	patientIconBox: {
-		width: 28, height: 28, borderRadius: 6,
-		backgroundColor: "#e8f4ea",
-		alignItems: "center", justifyContent: "center",
-	},
-	name:              { fontSize: 15, fontWeight: "600", color: "#2a2f34", flex: 1 },
-	pill:              { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 999, minWidth: 68, alignItems: "center" },
-	pillPending:       { backgroundColor: "#f8df8d" },
-	pillConfirmed:     { backgroundColor: "#d6eed8" },
-	pillCancelled:     { backgroundColor: "#f8dddd" },
-	pillText:          { fontSize: 12, fontWeight: "600" },
-	pillTextPending:   { color: "#c48508" },
-	pillTextConfirmed: { color: "#2e7d32" },
-	pillTextCancelled: { color: "#d84545" },
-	metaRow:           { flexDirection: "row", alignItems: "center", gap: 4 },
-	subText:           { fontSize: 13, color: "#5f6973", fontWeight: "500" },
-	cancelledMsg:      { color: "#d84545", fontSize: 12, marginTop: 4 },
-	actions:           { flexDirection: "row", alignItems: "center", marginTop: 10, flexWrap: "wrap", gap: 6 },
-	actionsTablet:     { flexWrap: "nowrap", marginTop: 0 },
-	btn: {
-		alignItems: "center", justifyContent: "center",
-		borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8,
-		minWidth: 52,
-	},
-	btnLabel:           { fontSize: 10, fontWeight: "500", textAlign: "center", marginTop: 3 },
-	chevronBtn:         { marginLeft: "auto", paddingLeft: 4 },
-	skeletonNameRow:    { flexDirection: "row", alignItems: "center", gap: 8 },
-	skeletonMetaRow:    { flexDirection: "row", alignItems: "center", gap: 6 },
-	skeletonActionsRow: { flexDirection: "row", alignItems: "center", marginTop: 10 },
-	error: { color: "red", fontSize: 13 },
-	empty: { color: "#999", fontSize: 13 },
+  container: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  heading: { fontSize: 18, fontWeight: "700", color: "#253136" },
+  month: { color: "#0c7c7c", fontWeight: "600", fontSize: 13 },
+  weekContainer: { marginBottom: 12 },
+  dayBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    marginRight: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#b8bec3",
+  },
+  weekendDayBox: { borderColor: "#efb2b2", backgroundColor: "#fff9f9" },
+  selectedDay: { backgroundColor: "#2d7679", borderColor: "#2d7679" },
+  dayText: { fontSize: 12, color: "#6f7680", marginBottom: 2 },
+  dateText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2c3136",
+    lineHeight: 32,
+  },
+  selectedText: { color: "#fff" },
+  weekendText: { color: "#e25555" },
+  listContainer: { marginTop: 2 },
+  card: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#d6dbde",
+    marginBottom: 10,
+    backgroundColor: "#fff",
+  },
+  cancelledCard: { backgroundColor: "#fff5f5" },
+  tabletCardInner: { flexDirection: "row", alignItems: "center", gap: 12 },
+  tabletLeft: { flex: 1, minWidth: 0 },
+  tabletRight: { flexShrink: 0 },
+  patientNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  patientIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: "#e8f4ea",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  name: { fontSize: 15, fontWeight: "600", color: "#2a2f34", flex: 1 },
+  pill: {
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 999,
+    minWidth: 68,
+    alignItems: "center",
+  },
+  pillPending: { backgroundColor: "#f8df8d" },
+  pillConfirmed: { backgroundColor: "#d6eed8" },
+  pillCancelled: { backgroundColor: "#f8dddd" },
+  pillText: { fontSize: 12, fontWeight: "600" },
+  pillTextPending: { color: "#c48508" },
+  pillTextConfirmed: { color: "#2e7d32" },
+  pillTextCancelled: { color: "#d84545" },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  subText: { fontSize: 13, color: "#5f6973", fontWeight: "500" },
+  cancelledMsg: { color: "#d84545", fontSize: 12, marginTop: 4 },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  actionsTablet: { flexWrap: "nowrap", marginTop: 0 },
+  btn: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    minWidth: 52,
+  },
+  btnLabel: {
+    fontSize: 10,
+    fontWeight: "500",
+    textAlign: "center",
+    marginTop: 3,
+  },
+  chevronBtn: { marginLeft: "auto", paddingLeft: 4 },
+  skeletonNameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  skeletonMetaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  skeletonActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  error: { color: "red", fontSize: 13 },
+  empty: { color: "#999", fontSize: 13 },
 
-	// ── Scanner ───────────────────────────────────────────────────────────────
-	scannerContainer: { flex: 1, backgroundColor: "#000" },
-	scannerHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 16,
-		paddingVertical: 14,
-		backgroundColor: "#fff",
-	},
-	scannerCloseBtn: { flexDirection: "row", alignItems: "center", gap: 2, width: 60 },
-	scannerBackTxt:  { fontSize: 14, color: TEAL, fontWeight: "600" },
-	scannerTitle:    { fontSize: 15, fontWeight: "700", color: "#1a2226" },
+  // ── Scanner ───────────────────────────────────────────────────────────────
+  scannerContainer: { flex: 1, backgroundColor: "#000" },
+  scannerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#fff",
+  },
+  scannerCloseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    width: 60,
+  },
+  scannerBackTxt: { fontSize: 14, color: TEAL, fontWeight: "600" },
+  scannerTitle: { fontSize: 15, fontWeight: "700", color: "#1a2226" },
 
-	patientStrip: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
-		backgroundColor: "#fff",
-		paddingHorizontal: 16,
-		paddingVertical: 10,
-		borderTopWidth: 0.5,
-		borderTopColor: "#e8ecee",
-	},
-	stripName: { fontSize: 14, fontWeight: "600", color: "#1a2226" },
-	stripMeta: { fontSize: 12, color: "#5f6973", marginTop: 1 },
+  patientStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 0.5,
+    borderTopColor: "#e8ecee",
+  },
+  stripName: { fontSize: 14, fontWeight: "600", color: "#1a2226" },
+  stripMeta: { fontSize: 12, color: "#5f6973", marginTop: 1 },
 
-	cameraWrapper: { flex: 1, position: "relative" },
-	camera:        { flex: 1 },
+  cameraWrapper: { flex: 1, position: "relative" },
+  camera: { flex: 1 },
 
-	overlay:       { ...StyleSheet.absoluteFillObject, flexDirection: "column" },
-	overlayTop:    { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
-	overlayBottom: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
-	overlayMiddle: { flexDirection: "row", height: 220 },
-	overlaySide:   { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
-	qrFrame:       { width: 220, height: 220, position: "relative" },
+  overlay: { ...StyleSheet.absoluteFillObject, flexDirection: "column" },
+  overlayTop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
+  overlayBottom: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
+  overlayMiddle: { flexDirection: "row", height: 220 },
+  overlaySide: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
+  qrFrame: { width: 220, height: 220, position: "relative" },
 
-	corner:   { position: "absolute", width: CORNER_SIZE, height: CORNER_SIZE, borderColor: TEAL },
-	cornerTL: { top: 0,    left: 0,  borderTopWidth: CORNER_THICKNESS, borderLeftWidth:  CORNER_THICKNESS },
-	cornerTR: { top: 0,    right: 0, borderTopWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS },
-	cornerBL: { bottom: 0, left: 0,  borderBottomWidth: CORNER_THICKNESS, borderLeftWidth:  CORNER_THICKNESS },
-	cornerBR: { bottom: 0, right: 0, borderBottomWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS },
+  corner: {
+    position: "absolute",
+    width: CORNER_SIZE,
+    height: CORNER_SIZE,
+    borderColor: TEAL,
+  },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderTopWidth: CORNER_THICKNESS,
+    borderLeftWidth: CORNER_THICKNESS,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderTopWidth: CORNER_THICKNESS,
+    borderRightWidth: CORNER_THICKNESS,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: CORNER_THICKNESS,
+    borderLeftWidth: CORNER_THICKNESS,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: CORNER_THICKNESS,
+    borderRightWidth: CORNER_THICKNESS,
+  },
 
-	scannerFooter: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		gap: 8,
-		paddingVertical: 18,
-		backgroundColor: "#fff",
-	},
-	scanHint:  { fontSize: 13, color: "#5f6973" },
-	rescanBtn: {
-		marginHorizontal: 24,
-		marginBottom: 20,
-		backgroundColor: TEAL,
-		borderRadius: 24,
-		paddingVertical: 13,
-		alignItems: "center",
-	},
-	rescanTxt: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  scannerFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 18,
+    backgroundColor: "#fff",
+  },
+  scanHint: { fontSize: 13, color: "#5f6973" },
+  rescanBtn: {
+    marginHorizontal: 24,
+    marginBottom: 20,
+    backgroundColor: TEAL,
+    borderRadius: 24,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  rescanTxt: { color: "#fff", fontSize: 15, fontWeight: "600" },
 });

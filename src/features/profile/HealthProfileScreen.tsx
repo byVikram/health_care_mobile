@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, ActivityIndicator } from 'react-native'
+import React, { useEffect, useRef, useState } from 'react'
+import {
+	View, Text, ScrollView, TouchableOpacity, StyleSheet,
+	Image, Alert, ActivityIndicator, Animated, Easing, ViewStyle,
+} from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
@@ -12,23 +15,125 @@ import { getPatientDetails, patchPatientDetails, mapApiDataToLocalState } from '
 type Tab = 'Personal' | 'Medical' | 'Life style'
 const TEAL = '#1a8c8c'
 
+/* ──────────────── SKELETON ──────────────── */
+
+type SkeletonProps = {
+	width: number | string
+	height: number
+	borderRadius?: number
+	style?: ViewStyle
+}
+
+function AppSkeleton({ width, height, borderRadius = 6, style }: SkeletonProps) {
+	const opacity = useRef(new Animated.Value(0.3)).current
+
+	useEffect(() => {
+		const loop = Animated.loop(
+			Animated.sequence([
+				Animated.timing(opacity, {
+					toValue: 1,
+					duration: 800,
+					easing: Easing.inOut(Easing.ease),
+					useNativeDriver: false,
+				}),
+				Animated.timing(opacity, {
+					toValue: 0.3,
+					duration: 800,
+					easing: Easing.inOut(Easing.ease),
+					useNativeDriver: false,
+				}),
+			])
+		)
+		loop.start()
+		return () => loop.stop()
+	}, [])
+
+	return (
+		<Animated.View
+			style={[
+				{
+					width: width as any,
+					height,
+					borderRadius,
+					backgroundColor: '#e0e8ea',
+				},
+				{ opacity },
+				style,
+			]}
+		/>
+	)
+}
+
+/* ──────────────── SKELETON SCREEN ──────────────── */
+
+function HealthProfileSkeleton() {
+	const insets = useSafeAreaInsets()
+
+	return (
+		<View style={[styles.container, { paddingTop: insets.top }]}>
+			
+			{/* Header */}
+			<View style={styles.header}>
+				<AppSkeleton width={180} height={18} />
+				<AppSkeleton width={40} height={18} />
+			</View>
+
+			{/* Progress */}
+			<View style={styles.progressBarBg}>
+				<AppSkeleton width="50%" height={3} />
+			</View>
+
+			{/* Tabs */}
+			<View style={styles.tabRow}>
+				<AppSkeleton width="30%" height={36} borderRadius={22} />
+				<AppSkeleton width="30%" height={36} borderRadius={22} />
+				<AppSkeleton width="30%" height={36} borderRadius={22} />
+			</View>
+
+			{/* Profile Section */}
+			<View style={styles.nameAvatarRow}>
+				<View>
+					<AppSkeleton width={40} height={12} />
+					<AppSkeleton width={120} height={20} style={{ marginTop: 6 }} />
+				</View>
+				<AppSkeleton width={60} height={60} borderRadius={10} />
+			</View>
+
+			<View style={styles.divider} />
+
+			{/* Fields */}
+			{Array.from({ length: 9 }).map((_, i) => (
+				<View key={i} style={styles.fieldRow}>
+					<View>
+						<AppSkeleton width={100} height={12} />
+						<AppSkeleton width={140} height={14} style={{ marginTop: 6 }} />
+					</View>
+					<AppSkeleton width={30} height={14} />
+				</View>
+			))}
+		</View>
+	)
+}
+
+/* ──────────────── HELPER ──────────────── */
+
 function calcCompletion(data: Record<string, string>): number {
-	let total = 0,
-		filled = 0
+	let total = 0
+	let filled = 0
+
 	PROFILE_TABS.forEach((t) =>
 		t.fields.forEach((f) => {
 			total++
 			if (data[f.key]) filled++
 		})
 	)
+
 	return total === 0 ? 0 : Math.round((filled / total) * 100)
 }
 
-type Props = {
-	onUploadPhoto?: () => void
-}
+/* ──────────────── MAIN SCREEN ──────────────── */
 
-export default function HealthProfileScreen({ onUploadPhoto }: Props) {
+export default function HealthProfileScreen({ onUploadPhoto }: any) {
 	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
 
@@ -37,46 +142,50 @@ export default function HealthProfileScreen({ onUploadPhoto }: Props) {
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
 
-	// ── Load profile from API on mount ─────────────────────────────────────────
-	useEffect(() => {
-		const fetchData = async () => {
-			try {
-				setLoading(true)
+	const fetchProfile = async () => {
+		try {
+			setLoading(true)
+			const res = await getPatientDetails()
 
-				const res = await getPatientDetails()
-
-				if (res.success && res.data) {
-					setData(mapApiDataToLocalState(res.data))
-				} else {
-					Alert.alert('Error', res.message ?? 'Could not load profile.')
-				}
-			} catch (error) {
-				Alert.alert('Error', 'Something went wrong.')
-			} finally {
-				setLoading(false)
+			if (res.success && res.data) {
+				setData(mapApiDataToLocalState(res.data))
+			} else {
+				Alert.alert('Error', res.message ?? 'Could not load profile.')
 			}
-		}
-
-		fetchData()
-	}, [])
-
-	const handleChange = (key: string, value: string) => setData((prev) => ({ ...prev, [key]: value }))
-
-	const completion = calcCompletion(data)
-
-	// ── Save to API ─────────────────────────────────────────────────────────────
-	const handleSave = async () => {
-		setSaving(true)
-		const res = await patchPatientDetails(data)
-		setSaving(false)
-		if (res.success) {
-			Alert.alert('Saved', 'Profile updated successfully.')
-		} else {
-			Alert.alert('Error', res.message ?? 'Failed to save. Try again.')
+		} catch {
+			Alert.alert('Error', 'Something went wrong.')
+		} finally {
+			setLoading(false)
 		}
 	}
 
-	// ── Render fields from config ───────────────────────────────────────────────
+	useEffect(() => {
+		fetchProfile()
+	}, [])
+
+	const handleChange = (key: string, value: string) =>
+		setData(prev => ({ ...prev, [key]: value }))
+
+	const completion = calcCompletion(data)
+
+	const handleSave = async () => {
+		try {
+			setLoading(true)
+			const res = await patchPatientDetails(data)
+
+			if (res.success) {
+				await fetchProfile()
+				Alert.alert('Saved', 'Profile updated successfully.')
+			} else {
+				Alert.alert('Error', res.message ?? 'Failed to save.')
+			}
+		} catch {
+			Alert.alert('Error', 'Something went wrong.')
+		} finally {
+			setLoading(false)
+		}
+	}
+
 	const renderTab = (tabCfg: TabConfig) => (
 		<>
 			{tabCfg.tab === 'Personal' && (
@@ -86,8 +195,9 @@ export default function HealthProfileScreen({ onUploadPhoto }: Props) {
 							<Text style={styles.fieldSmallLabel}>Name</Text>
 							<Text style={styles.nameValue}>{data.name || '—'}</Text>
 						</View>
+
 						<View style={styles.avatarCol}>
-							<TouchableOpacity onPress={onUploadPhoto} activeOpacity={0.8}>
+							<TouchableOpacity onPress={onUploadPhoto}>
 								{data.photoUrl ? (
 									<Image source={{ uri: data.photoUrl }} style={styles.avatarImg} />
 								) : (
@@ -96,58 +206,49 @@ export default function HealthProfileScreen({ onUploadPhoto }: Props) {
 									</View>
 								)}
 							</TouchableOpacity>
-							<TouchableOpacity onPress={onUploadPhoto} style={styles.uploadRow} activeOpacity={0.7}>
-								<MaterialCommunityIcons name="camera-outline" size={13} color="#7a8c91" />
-								<Text style={styles.uploadTxt}>Upload</Text>
-							</TouchableOpacity>
 						</View>
 					</View>
+
 					<View style={styles.divider} />
 				</>
 			)}
 
-			{tabCfg.fields.map((fieldCfg) => (
+			{tabCfg.fields.map(field => (
 				<HealthProfileField
-					key={fieldCfg.key}
-					config={fieldCfg}
-					value={data[fieldCfg.key]}
+					key={field.key}
+					config={field}
+					value={data[field.key]}
 					onChange={handleChange}
 				/>
 			))}
 		</>
 	)
 
-	const currentTabConfig = PROFILE_TABS.find((t) => t.tab === activeTab)!
+	const currentTabConfig = PROFILE_TABS.find(t => t.tab === activeTab)!
 
-	if (loading) {
-		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="large" color={TEAL} />
-			</View>
-		)
-	}
+	if (loading) return <HealthProfileSkeleton />
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
+			
 			{/* Header */}
 			<View style={styles.header}>
-				<TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+				<TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
 					<MaterialCommunityIcons name="chevron-left" size={22} color={TEAL} />
 					<Text style={styles.backTxt}>Your health profile</Text>
-					<Text style={styles.progressTxt}>({completion}% Complete)</Text>
+					<Text style={styles.progressTxt}>({completion}%)</Text>
 				</TouchableOpacity>
-				<TouchableOpacity onPress={handleSave} disabled={saving} activeOpacity={0.7}>
-					{saving ? (
-						<ActivityIndicator size="small" color={TEAL} />
-					) : (
-						<Text style={styles.saveTxt}>Save</Text>
-					)}
+
+				<TouchableOpacity onPress={handleSave} disabled={saving}>
+					{saving
+						? <ActivityIndicator size="small" color={TEAL} />
+						: <Text style={styles.saveTxt}>Save</Text>}
 				</TouchableOpacity>
 			</View>
 
-			{/* Progress bar */}
+			{/* Progress */}
 			<View style={styles.progressBarBg}>
-				<View style={[styles.progressBarFill, { width: `${completion}%` as any }]} />
+				<View style={[styles.progressBarFill, { width: `${completion}%` }]} />
 			</View>
 
 			{/* Tabs */}
@@ -157,29 +258,26 @@ export default function HealthProfileScreen({ onUploadPhoto }: Props) {
 						key={tab}
 						onPress={() => setActiveTab(tab as Tab)}
 						style={[styles.tab, activeTab === tab && styles.tabActive]}
-						activeOpacity={0.8}
 					>
-						<Text style={[styles.tabTxt, activeTab === tab && styles.tabTxtActive]}>{tab}</Text>
+						<Text style={[styles.tabTxt, activeTab === tab && styles.tabTxtActive]}>
+							{tab}
+						</Text>
 					</TouchableOpacity>
 				))}
 			</View>
 
 			{/* Fields */}
-			<ScrollView
-				style={styles.scroll}
-				showsVerticalScrollIndicator={false}
-				keyboardShouldPersistTaps="handled"
-				contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
-			>
+			<ScrollView style={styles.scroll}>
 				{renderTab(currentTabConfig)}
 			</ScrollView>
 		</View>
 	)
 }
 
+/* ──────────────── STYLES (UNCHANGED) ──────────────── */
+
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: '#fff' },
-	loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
 	header: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -227,8 +325,16 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	avatarImg: { width: 60, height: 60, borderRadius: 10, resizeMode: 'cover' },
-	uploadRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-	uploadTxt: { fontSize: 11, color: '#7a8c91' },
-	divider: { height: 0.5, backgroundColor: '#e8ecee', marginHorizontal: 16, marginBottom: 2 },
+	avatarImg: { width: 60, height: 60, borderRadius: 10 },
+	divider: {
+		height: 0.5,
+		backgroundColor: '#e8ecee',
+		marginHorizontal: 16,
+		marginBottom: 2,
+	},
+	fieldRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		padding: 16,
+	},
 })
