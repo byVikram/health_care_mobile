@@ -1,16 +1,16 @@
 // src/constants/apiUrls.ts
 
-import { Platform } from 'react-native';
+import { Platform } from 'react-native'
 
 // Replace Vite's import.meta.env with Expo's process.env.EXPO_PUBLIC_
-// If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000' 
+// If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	if (process.env.EXPO_PUBLIC_API_ENDPOINT) return process.env.EXPO_PUBLIC_API_ENDPOINT;
-	return Platform.OS === 'android' ? 'http://192.168.4.25:8000' : 'http://192.168.4.25:8000';
+	if (process.env.EXPO_PUBLIC_API_ENDPOINT) return process.env.EXPO_PUBLIC_API_ENDPOINT
+	return Platform.OS === 'android' ? 'http://192.168.4.25:8000' : 'http://192.168.4.25:8000'
 };
 
-export const BASE_URL = getBaseUrl();
+export const BASE_URL = getBaseUrl()
 
 export const API_ENDPOINTS = {
 	AUTH: {
@@ -43,5 +43,11 @@ export const API_ENDPOINTS = {
 		CREATE: `${BASE_URL}/api/appointments`,
 		GET_BY_ID: (id: number) => `${BASE_URL}/api/appointments/${id}`,
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
+	},
+	// constants/apiUrls.ts  — add inside API_ENDPOINTS
+
+	PATIENT: {
+		ME: `${BASE_URL}/api/patients/me`,
+		DETAILS: `${BASE_URL}/api/patients/me/details`,
 	},
 }

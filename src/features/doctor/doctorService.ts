@@ -63,6 +63,22 @@ export interface CreateAppointmentResponse {
 	data?: unknown
 }
 
+
+export interface AppointmentResponse {
+    success: boolean
+    message: string
+    // data: Appointment
+}
+
+
+export const updateAppointmentsStatus = async (appointmentId: string, statusId: string): Promise<AppointmentResponse> => {
+    const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
+        appointment_id: appointmentId,
+        status_id:statusId
+    })
+    return res.data
+}
+
 export const getAppointments = async (params?: AppointmentParams): Promise<AppointmentsResponse> => {
 	const res = await ApiService.getWithParams<AppointmentsResponse>(
 		API_ENDPOINTS.APPOINTMENTS.GET,

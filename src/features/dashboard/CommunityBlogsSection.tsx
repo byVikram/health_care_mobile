@@ -3,7 +3,9 @@ import { View, StyleSheet, ScrollView } from "react-native";
 import { Text, Card, Button } from "react-native-paper";
 import Blog1 from "../../assets/blog-and-community/blog-1.svg";
 import Blog2 from "../../assets/blog-and-community/blog-2.svg";
-import Community1 from "../../assets/blog-and-community/community-1.svg"
+import Community1 from "../../assets/blog-and-community/community-1.svg";
+
+// import Community1 from "../../assets/blog-and-community/community-1.svg"
 
 const communities = [
   { id: 1, name: "Diabatics Associations", location: "Rajajinagar, Bengaluru",image: Community1 },
@@ -33,6 +35,7 @@ const blogs = [
 
 const CARD_WIDTH = 240;
 const IMAGE_HEIGHT = 120;
+const COMMUNITY_AVATAR_SIZE = 44;
 
 export default function CommunityBlogsSection() {
   return (
@@ -48,11 +51,12 @@ export default function CommunityBlogsSection() {
           </View>  
           <View style={styles.communityInfo}>
             <Text variant="titleSmall">{c.name}</Text>
-            <Text variant="labelSmall" style={{ color: "#666" }}>
+            <Text variant="labelSmall" style={styles.locationText}>
               {c.location}
             </Text>
           </View>
-          <Button mode="outlined" compact labelStyle={{ fontSize: 10 }}>
+
+          <Button mode="outlined" compact labelStyle={styles.viewBtnLabel}>
             View
           </Button>
         </View>
@@ -65,8 +69,6 @@ export default function CommunityBlogsSection() {
       >
         {blogs.map((b) => (
           <Card key={b.id} style={styles.blogCard}>
-
-            {/* ✅ Use StyleSheet position trick to stretch SVG */}
             <View style={styles.blogImageContainer}>
               <View style={StyleSheet.absoluteFillObject}>
                 <b.ImageComponent
@@ -85,10 +87,10 @@ export default function CommunityBlogsSection() {
                 {b.description}
               </Text>
               <View style={styles.blogFooter}>
-                <Text variant="labelSmall" style={{ color: "#666" }}>
+                <Text variant="labelSmall" style={styles.locationText}>
                   {b.author}
                 </Text>
-                <Text variant="labelSmall" style={{ color: "#666" }}>
+                <Text variant="labelSmall" style={styles.locationText}>
                   {b.date}
                 </Text>
               </View>
@@ -121,15 +123,21 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   communityAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: COMMUNITY_AVATAR_SIZE,
+    height: COMMUNITY_AVATAR_SIZE,
+    borderRadius: COMMUNITY_AVATAR_SIZE / 2,
     backgroundColor: "#f0f4f8",
     marginRight: 12,
     // overflow: "hidden",
   },
   communityInfo: {
     flex: 1,
+  },
+  locationText: {
+    color: "#666",
+  },
+  viewBtnLabel: {
+    fontSize: 10,
   },
   blogScroll: {
     paddingHorizontal: 8,
@@ -147,7 +155,7 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
     height: IMAGE_HEIGHT,
     overflow: "hidden",
-    backgroundColor: "#f0f4f8", // ← shows if SVG still fails to load
+    backgroundColor: "#f0f4f8",
   },
   blogContent: {
     padding: 12,
