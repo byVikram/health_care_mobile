@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,16 +7,21 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   Alert,
+  Modal,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { AppSkeleton } from "../../components/common";
-import { updateAppointmentsStatus } from "./doctorService";
+import { getDoctorAvailability, updateAppointmentsStatus } from "./doctorService";
 import { APPOINTMENT_STATUS } from "../../constants/constants";
 
 type Appointment = {
   id: string;
+  doctor?: { id?: string };
+  doctor_id?: string;
+  hospital?: { id?: string };
+  hospital_id?: string;
   patient: {
     id: string;
     name: string;
@@ -111,6 +116,14 @@ export default function DoctorAppointments({
   const isTablet = width >= 768;
   const useCompactCancelledLayout = width < 640;
   const navigation = useNavigation<any>();
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleAppt, setRescheduleAppt] = useState<Appointment | null>(
+    null,
+  );
+  const [rescheduleDateIndex, setRescheduleDateIndex] = useState(0);
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const [rescheduleSlots, setRescheduleSlots] = useState<string[]>([]);
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getStatusLabel = (status: any) =>
@@ -122,11 +135,106 @@ export default function DoctorAppointments({
     apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? "--";
   const getTimeRange = (apt: any) => {
 
-    const start = apt?.appointment_time;
-    const end = apt?.appointment_end_time ?? apt?.end_time;
+    const start = apt?.start_time;
+    const end = apt?.end_time ?? apt?.end_time;
     if (start && end) return `${start} - ${end}`;
     return start ?? "--";
   };
+  const buildRescheduleSlots = (apt: any) => {
+    const current = getTimeRange(apt);
+    const fallback = [
+      "09:00 - 09:30",
+      "10:00 - 10:30",
+      "11:00 - 11:30",
+      "04:00 - 04:30",
+      "05:00 - 05:30",
+    ];
+    return Array.from(new Set([current, ...fallback].filter(Boolean)));
+  };
+  const handleOpenReschedule = (apt: Appointment) => {
+    setRescheduleAppt(apt);
+    setRescheduleDateIndex(selectedDate);
+    setRescheduleSlots([]);
+    setSelectedSlot("");
+    setRescheduleOpen(true);
+  };
+  const handleConfirmReschedule = () => {
+    if (!selectedSlot) {
+      Alert.alert("Select time", "Please select a slot to reschedule.");
+      return;
+    }
+    showSuccess("Reschedule request submitted");
+    setRescheduleOpen(false);
+  };
+
+  useEffect(() => {
+    if (!rescheduleOpen || !rescheduleAppt) return;
+
+    const doctorId =
+      rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id;
+    const hospitalId =
+      rescheduleAppt?.hospital?.id ?? (rescheduleAppt as any)?.hospital_id;
+    const dateStr = weekDays[rescheduleDateIndex]?.dateObj
+      ?.toISOString()
+      .split("T")[0];
+
+    if (!doctorId || !hospitalId || !dateStr) {
+      console.log({ rescheduleOpen, rescheduleAppt, doctorId, hospitalId, dateStr })
+      const fallbackSlots = buildRescheduleSlots(rescheduleAppt);
+      setRescheduleSlots(fallbackSlots);
+      setSelectedSlot(fallbackSlots[0] ?? "");
+      return;
+    }
+
+    const fetchSlots = async () => {
+      try {
+        debugger
+        setRescheduleSlotsLoading(true);
+        setRescheduleSlots([]);
+        setSelectedSlot("");
+
+        const responseData = await getDoctorAvailability({
+          doctor_id: doctorId,
+          hospital_id: hospitalId,
+          date: dateStr,
+        });
+
+        const groups = Array.isArray(responseData)
+          ? responseData
+          : Array.isArray((responseData as any)?.data)
+            ? (responseData as any).data
+            : [];
+
+        const slots = groups.flatMap((group: any) =>
+          (group?.slots ?? [])
+            .filter((slot: any) => slot?.status === "AVAILABLE")
+            .map((slot: any) =>
+              slot?.end_time
+                ? `${slot.start_time} - ${slot.end_time}`
+                : slot.start_time,
+            ),
+        );
+
+        const uniqueSlots = Array.from(new Set(slots.filter(Boolean)));
+        if (uniqueSlots.length > 0) {
+          setRescheduleSlots(uniqueSlots);
+          setSelectedSlot(uniqueSlots[0]);
+        } else {
+          const fallbackSlots = buildRescheduleSlots(rescheduleAppt);
+          setRescheduleSlots(fallbackSlots);
+          setSelectedSlot(fallbackSlots[0] ?? "");
+        }
+      } catch {
+        const fallbackSlots = buildRescheduleSlots(rescheduleAppt);
+        setRescheduleSlots(fallbackSlots);
+        setSelectedSlot(fallbackSlots[0] ?? "");
+      } finally {
+        setRescheduleSlotsLoading(false);
+      }
+    };
+
+    fetchSlots();
+  }, [rescheduleOpen, rescheduleAppt, rescheduleDateIndex, weekDays]);
 
   const handleAction = async (action: string, appointmentId: string) => {
     try {
@@ -150,7 +258,7 @@ export default function DoctorAppointments({
       }
       if (action === "reschedule") {
         const apt = appointments.find((a: any) => a.id === appointmentId);
-        console.log("Reschedule appointment:", apt);
+        if (apt) handleOpenReschedule(apt);
       }
       if (action === "refer") {
         alert("Refer coming soon!");
@@ -251,6 +359,129 @@ export default function DoctorAppointments({
         Patient has cancelled the appointment
       </Text>
     </View>
+  );
+
+  const renderRescheduleDrawer = () => (
+    <Modal
+      visible={rescheduleOpen}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setRescheduleOpen(false)}
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        style={styles.drawerBackdrop}
+        onPress={() => setRescheduleOpen(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.drawerSheet}
+          onPress={() => {}}
+        >
+          <View style={styles.drawerHeader}>
+            <View>
+              <Text style={styles.drawerTitle}>Reschedule Appointment</Text>
+              <Text style={styles.drawerSubtitle}>
+                {rescheduleAppt?.patient?.name ?? "Patient"}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.drawerCloseBtn}
+              onPress={() => setRescheduleOpen(false)}
+            >
+              <MaterialCommunityIcons name="close" size={18} color="#7a848d" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.drawerBody}
+            contentContainerStyle={styles.drawerBodyContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.drawerSectionTitle}>Select Date</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.drawerDateRow}
+            >
+              {weekDays.map((d, i) => (
+                <TouchableOpacity
+                  key={`${d.day}-${d.date}-${i}`}
+                  style={[
+                    styles.drawerDateChip,
+                    rescheduleDateIndex === i && styles.drawerDateChipActive,
+                  ]}
+                  onPress={() => setRescheduleDateIndex(i)}
+                >
+                  <Text
+                    style={[
+                      styles.drawerDateChipDay,
+                      rescheduleDateIndex === i &&
+                        styles.drawerDateChipTextActive,
+                    ]}
+                  >
+                    {d.day}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.drawerDateChipDate,
+                      rescheduleDateIndex === i &&
+                        styles.drawerDateChipTextActive,
+                    ]}
+                  >
+                    {d.date}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.drawerSectionTitle}>Select Time Slot</Text>
+            {rescheduleSlotsLoading ? (
+              <Text style={styles.drawerInfoText}>Loading slots...</Text>
+            ) : null}
+            <View style={styles.drawerSlotsRow}>
+              {rescheduleSlots.map((slot) => (
+                <TouchableOpacity
+                  key={slot}
+                  style={[
+                    styles.drawerSlotChip,
+                    selectedSlot === slot && styles.drawerSlotChipActive,
+                  ]}
+                  onPress={() => setSelectedSlot(slot)}
+                >
+                  <Text
+                    style={[
+                      styles.drawerSlotText,
+                      selectedSlot === slot && styles.drawerSlotTextActive,
+                    ]}
+                  >
+                    {slot}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {!rescheduleSlotsLoading && rescheduleSlots.length === 0 ? (
+              <Text style={styles.drawerInfoText}>No slots available</Text>
+            ) : null}
+          </ScrollView>
+
+          <View style={styles.drawerActions}>
+            <TouchableOpacity
+              style={styles.drawerCancelBtn}
+              onPress={() => setRescheduleOpen(false)}
+            >
+              <Text style={styles.drawerCancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.drawerConfirmBtn}
+              onPress={handleConfirmReschedule}
+            >
+              <Text style={styles.drawerConfirmBtnText}>Confirm</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
   );
 
   // ── Card ──────────────────────────────────────────────────────────────────
@@ -490,6 +721,7 @@ export default function DoctorAppointments({
         )}
         {!apptLoading && appointments.map(renderCard)}
       </View>
+      {renderRescheduleDrawer()}
     </View>
   );
 }
@@ -555,7 +787,7 @@ const styles = StyleSheet.create({
   },
   cancelledCardLeft: { flex: 1, minWidth: 0, paddingRight: 12 },
   cancelledCardLeftCompact: { paddingRight: 0 },
-  cancelledCardRight: { width: 340, paddingLeft: 12 },
+  cancelledCardRight: { width: 250, paddingLeft: 12 },
   cancelledCardRightCompact: { width: "100%", paddingLeft: 0 },
   patientNameRow: {
     flexDirection: "row",
@@ -666,4 +898,121 @@ const styles = StyleSheet.create({
   },
   error: { color: "red", fontSize: 13 },
   empty: { color: "#999", fontSize: 13 },
+  drawerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "flex-end",
+    padding: 12,
+  },
+  drawerSheet: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    maxHeight: "80%",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#edf1f3",
+  },
+  drawerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5eaee",
+  },
+  drawerCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f3f6f8",
+  },
+  drawerBody: {
+    flex: 1,
+  },
+  drawerBodyContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  drawerTitle: { fontSize: 16, fontWeight: "700", color: "#233238" },
+  drawerSubtitle: { fontSize: 12, color: "#62707a", marginTop: 2 },
+  drawerSectionTitle: {
+    fontSize: 14,
+    color: "#2b3a40",
+    fontWeight: "600",
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  drawerDateRow: { paddingRight: 12, gap: 8 },
+  drawerDateChip: {
+    borderWidth: 1,
+    borderColor: "#d7dfe4",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 60,
+    alignItems: "center",
+  },
+  drawerDateChipActive: {
+    borderColor: "#3d7b7b",
+    backgroundColor: "rgba(79, 209, 197, 0.08)",
+  },
+  drawerDateChipDay: { fontSize: 12, color: "#6d7881", fontWeight: "500" },
+  drawerDateChipDate: {
+    fontSize: 14,
+    color: "#2c3136",
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  drawerDateChipTextActive: { color: "#3d7b7b" },
+  drawerSlotsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  drawerSlotChip: {
+    borderWidth: 1,
+    borderColor: "#dde3e8",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginBottom: 8,
+  },
+  drawerSlotChipActive: {
+    borderColor: "#3d7b7b",
+    backgroundColor: "rgba(79, 209, 197, 0.08)",
+  },
+  drawerSlotText: { fontSize: 13, color: "#42525d", fontWeight: "500" },
+  drawerSlotTextActive: { color: "#3d7b7b", fontWeight: "700" },
+  drawerInfoText: {
+    fontSize: 13,
+    color: "#73818a",
+    marginBottom: 8,
+  },
+  drawerActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#e5eaee",
+  },
+  drawerCancelBtn: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#d5dde2",
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    flex: 1,
+    alignItems: "center",
+  },
+  drawerCancelBtnText: { color: "#60717d", fontWeight: "600", fontSize: 14 },
+  drawerConfirmBtn: {
+    borderRadius: 20,
+    backgroundColor: "#3d7b7b",
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    flex: 1,
+    alignItems: "center",
+  },
+  drawerConfirmBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 });
