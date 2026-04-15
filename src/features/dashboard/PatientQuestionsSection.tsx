@@ -1,8 +1,4 @@
 import React, { useState } from "react";
-import type { SvgProps } from "react-native-svg";
-
-import TeamsIcon from '../../assets/PatientQuestions/teams.svg';
-import QuestionIcon from '../../assets/PatientQuestions/QuestionIcon.svg';
 
 import {
 	View,
@@ -12,6 +8,7 @@ import {
 	ScrollView,
 	StyleSheet,
 	Image,
+	ImageSourcePropType,
 	ActivityIndicator,
 	Alert,
 } from "react-native";
@@ -25,7 +22,8 @@ export type PatientQuestion = {
 	title: string;
 	body: string;
 	answerCount: number;
-	avatarUrl?: string | React.FC<SvgProps>;
+	avatarUrl?: string;
+	avatarImage?: ImageSourcePropType;
 };
 
 type Props = {
@@ -38,7 +36,7 @@ const MOCK_QUESTIONS: PatientQuestion[] = [
 	{
 		id: "1",
 		askedFor: "Female",
-		avatarUrl:QuestionIcon,
+		avatarImage: { uri: "https://i.pravatar.cc/100?img=47" },
 		age: 30,
 		location: "Bengaluru",
 		timeAgo: "1d ago",
@@ -49,6 +47,7 @@ const MOCK_QUESTIONS: PatientQuestion[] = [
 	{
 		id: "2",
 		askedFor: "Female",
+		avatarImage: { uri: "https://i.pravatar.cc/100?img=32" },
 		age: 30,
 		location: "Bengaluru",
 		timeAgo: "1d ago",
@@ -59,6 +58,7 @@ const MOCK_QUESTIONS: PatientQuestion[] = [
 	{
 		id: "3",
 		askedFor: "Female",
+		avatarImage: { uri: "https://i.pravatar.cc/100?img=48" },
 		age: 30,
 		location: "Bengaluru",
 		timeAgo: "1d ago",
@@ -69,6 +69,7 @@ const MOCK_QUESTIONS: PatientQuestion[] = [
 	{
 		id: "4",
 		askedFor: "Male",
+		avatarImage: { uri: "https://i.pravatar.cc/100?img=12" },
 		age: 30,
 		location: "Bengaluru",
 		timeAgo: "1d ago",
@@ -130,15 +131,13 @@ export default function PatientQuestionsSection({
 								<View style={styles.questionContent}>
 									<View style={styles.cardHeader}>
 										<View style={styles.avatarPlaceholder}>
-											{q.avatarUrl ? (
-												typeof q.avatarUrl === "string" ? (
+											{q.avatarImage ? (
+												<Image source={q.avatarImage} style={styles.avatar} />
+											) : q.avatarUrl ? (
 												<Image
 													source={{ uri: q.avatarUrl }}
 													style={styles.avatar}
 												/>
-												) : (
-													<q.avatarUrl width={30} height={30} />
-												)
 											) : (
 												<Text style={styles.avatarText}>
 													{q.askedFor[0]}
@@ -170,14 +169,17 @@ export default function PatientQuestionsSection({
 										</Text>
 									</View>
 									<View style={styles.doctorAvatarRow}>
-										{/* <View style={[styles.miniAvatar, styles.miniAvatarTop]} />
-										<View
-											style={[styles.miniAvatar, styles.miniAvatarOverlap]}
-										/> */}
-										<TeamsIcon width={50} />
-										{/* <View style={styles.plusBadge}>
+										<Image
+											source={{ uri: "https://i.pravatar.cc/60?img=14" }}
+											style={[styles.doctorAvatarImage, styles.miniAvatarTop]}
+										/>
+										<Image
+											source={{ uri: "https://i.pravatar.cc/60?img=22" }}
+											style={[styles.doctorAvatarImage, styles.miniAvatarOverlap]}
+										/>
+										<View style={styles.plusBadge}>
 											<Text style={styles.plusText}>6+</Text>
-										</View> */}
+										</View>
 									</View>
 								</View>
 							</View>
@@ -316,11 +318,10 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		marginLeft: 10,
 	},
-	miniAvatar: {
+	doctorAvatarImage: {
 		width: 22,
 		height: 22,
 		borderRadius: 11,
-		backgroundColor: "#AAD8DF",
 		borderWidth: 1,
 		borderColor: "#fff",
 	},

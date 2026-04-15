@@ -8,7 +8,7 @@ import { Platform } from 'react-native'
 const getBaseUrl = () => {
 	if (process.env.EXPO_PUBLIC_API_ENDPOINT) return process.env.EXPO_PUBLIC_API_ENDPOINT
 	return Platform.OS === 'android' ? 'http://192.168.4.25:8000' : 'http://192.168.4.25:8000'
-}
+};
 
 export const BASE_URL = getBaseUrl()
 

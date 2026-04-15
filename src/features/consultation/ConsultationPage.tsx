@@ -2,12 +2,22 @@
 import { View, StyleSheet, ScrollView, TouchableOpacity, TextInput as NativeInput, Modal } from 'react-native';
 import { Text, Card, Avatar, Button, useTheme, IconButton, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import type { SvgProps } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import DicomViewer from './components/DicomViewer';
+import Prescription from '../../assets/icons/consultation/prescription.svg';
+import LaboratoryIcon from '../../assets/icons/consultation/lab.svg';
+import RadiologyTabIcon from '../../assets/icons/consultation/radiology.svg';
+import AncillaryIcon from '../../assets/icons/consultation/ancillary.svg';
 
 const SAMPLE_DICOM_MODULE = require('../../assets/dicon/sample-dicon.dcm');
+
+type TabItem = {
+    id: string;
+    Icon: React.FC<SvgProps>;
+};
 
 
 const MOCK_PATIENT = {
@@ -67,11 +77,11 @@ function PastMedicalHistory() {
     const [dicomError, setDicomError] = useState<string | null>(null);
     const [isDicomExpanded, setIsDicomExpanded] = useState(false);
 
-    const tabs = [
-        { id: 'Prescription', icon: 'pill' },
-        { id: 'Laboratory', icon: 'flask-outline' },
-        { id: 'Radiology', icon: 'radioactive' },
-        { id: 'Ancillary', icon: 'bed-outline' },
+    const tabs: TabItem[] = [
+        { id: 'Prescription', Icon: Prescription },
+        { id: 'Laboratory', Icon: LaboratoryIcon },
+        { id: 'Radiology', Icon: RadiologyTabIcon },
+        { id: 'Ancillary', Icon: AncillaryIcon },
     ];
 
     // Load the DICOM file as Base64 when the Radiology tab is first activated
@@ -114,9 +124,11 @@ function PastMedicalHistory() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-around', borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 8 }}>
                     {tabs.map(tab => {
                         const isActive = activeTab === tab.id;
+                        const TabIcon = tab.Icon;
+                        const iconSize = tab.id === 'Prescription' ? 36 : 42;
                         return (
                             <TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1 }}>
-                                <MaterialCommunityIcons name={tab.icon as any} size={24} color={isActive ? theme.colors.primary : '#999'} />
+                                <TabIcon width={42} height={42} />
                                 <Text style={{ fontSize: 10, color: isActive ? theme.colors.primary : '#999', marginTop: 4, fontWeight: isActive ? 'bold' : 'normal' }}>
                                     {tab.id}
                                 </Text>
@@ -210,11 +222,11 @@ function PastMedicalHistory() {
 function ShareWith() {
     const theme = useTheme();
     const [activeTab, setActiveTab] = useState('Laboratory');
-    const tabs = [
-        { id: 'Pharmacy', icon: 'pharmacy' },
-        { id: 'Laboratory', icon: 'flask-outline' },
-        { id: 'Radiology', icon: 'radioactive' },
-        { id: 'Ancillary', icon: 'bed-outline' },
+    const tabs: TabItem[] = [
+        { id: 'Pharmacy', Icon: Prescription },
+        { id: 'Laboratory', Icon: LaboratoryIcon },
+        { id: 'Radiology', Icon: RadiologyTabIcon },
+        { id: 'Ancillary', Icon: AncillaryIcon },
     ];
 
     const MOCK_PLACES = [
@@ -231,9 +243,11 @@ function ShareWith() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-around', borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 8, marginBottom: 16 }}>
                     {tabs.map(tab => {
                         const isActive = activeTab === tab.id;
+                        const TabIcon = tab.Icon;
+                        const iconSize = tab.id === 'Pharmacy' ? 38 : 34;
                         return (
                             <TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1 }}>
-                                <MaterialCommunityIcons name={tab.icon as any} size={24} color={isActive ? theme.colors.primary : '#999'} />
+                                <TabIcon width={42} height={42} />
                                 <Text style={{ fontSize: 10, color: isActive ? theme.colors.primary : '#999', marginTop: 4, fontWeight: isActive ? 'bold' : 'normal' }}>
                                     {tab.id}
                                 </Text>
