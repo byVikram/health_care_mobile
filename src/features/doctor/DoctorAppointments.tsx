@@ -165,9 +165,11 @@ export default function DoctorAppointments({
       apt.patient?.patient_id ||
       apt.patient?.public_id ||
       apt.patient_public_id;
+      const doctorId = apt.doctor?.id; 
 
     console.log("Appointment data:", apt);
     console.log("Patient ID found:", patientId);
+    console.log("Doctor ID found:", doctorId);
 
     if (!patientId) {
       Alert.alert("Error", "Patient ID not found for this appointment");
@@ -179,6 +181,7 @@ export default function DoctorAppointments({
       patient_id: patientId,
       appointmentId: apt.id,
       patient: apt.patient,
+      doctor_id: apt.doctorId,
     });
   };
 

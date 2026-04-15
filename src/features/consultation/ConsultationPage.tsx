@@ -28,7 +28,7 @@ import Prescription from "../../assets/icons/consultation/prescription.svg";
 import LaboratoryIcon from "../../assets/icons/consultation/lab.svg";
 import RadiologyTabIcon from "../../assets/icons/consultation/radiology.svg";
 import AncillaryIcon from "../../assets/icons/consultation/ancillary.svg";
-import { patientService, PatientDetails } from "./ConsultationService";
+import { patientService, PatientDetails , doctorService,DocterDetails} from "./ConsultationService";
 
 const SAMPLE_DICOM_MODULE = require("../../assets/dicon/sample-dicon.dcm");
 
@@ -73,29 +73,26 @@ const MOCK_DOCTOR = {
   clinicAddress: "1 main, KR Market, Bengaluru - 580036",
 };
 
-function RowItem({ label, value }: { label: string; value?: string | number }) {
+function RowItem({ label, value, numberOfLines, ellipsizeMode }: { 
+  label: string; 
+  value: string; 
+  numberOfLines?: number; 
+  ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
+}) {
   const theme = useTheme();
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        marginVertical: 2,
-        flexWrap: "wrap",
-      }}
-    >
-      <Text
-        style={{ fontSize: 11, color: theme.colors.primary, marginRight: 4 }}
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 2 }}>
+      <Text style={{ fontSize: 11, color: theme.colors.primary, marginRight: 4 }}>{label}</Text>
+      <Text 
+        style={{ fontSize: 11, fontWeight: '500', color: '#333', flex: 1 }} 
+        numberOfLines={numberOfLines || 1} 
+        ellipsizeMode={ellipsizeMode || 'tail'}
       >
-        {label}
-      </Text>
-      <Text style={{ fontSize: 11, fontWeight: "500", color: "#333" }}>
-        {value || "--"}
+        {value || '--'}
       </Text>
     </View>
   );
 }
-
 function resolveAvatar(patient: PatientDetails | null): string | undefined {
   if (!patient) return undefined;
   const key = patient.avatar ?? patient.avatar_s3_key;
@@ -517,6 +514,7 @@ export default function ConsultationPage() {
   const route = useRoute<any>();
 
   const [patient, setPatient] = useState<PatientDetails | null>(null);
+  const [doctor, setDoctor] = useState<DocterDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
   const [notes, setNotes] = useState("");
@@ -526,8 +524,13 @@ export default function ConsultationPage() {
     patient_id,
     patientId: patientIdParam,
     appointmentId,
+    doctor_id,
+    doctorID:
+ doctorIdParam,
   } = route.params as any;
   const patientId: string = patient_id ?? patientIdParam;
+  const doctorID: string = doctor_id ?? doctorIdParam;
+  console.log("ConsultationPage received patientId:", appointmentId, patientId,doctorID);
 
   useEffect(() => {
     if (patientId) {
@@ -549,7 +552,33 @@ export default function ConsultationPage() {
       setLoading(false);
     }
   };
+  useEffect(() => {
+    
+    if(doctorID){
+      fetchDoctorDetails();
 
+    } 
+    else{
+      setLoading(false);
+      Alert.alert("Error", "Doctor ID is missing");
+    }
+    return;
+    
+  }, [doctorID]);	
+	const fetchDoctorDetails = async () => {
+	  try {
+		setLoading(true);
+		const data = await doctorService.getDoctorDetails(doctorID);
+		setDoctor(data);
+	  } catch (err: any) {
+		Alert.alert("Error", err?.message ?? "Failed to load doctor details");
+	  } finally {
+		setLoading(false);
+	  }	
+	};
+	
+  
+  
   const handleSaveNotes = async () => {
     if (!notes.trim()) {
       Alert.alert("Info", "Please add some consultation notes");
@@ -718,7 +747,12 @@ export default function ConsultationPage() {
                   <View style={{ flex: 1, flexDirection: "row" }}>
                     <View style={{ flex: 1 }}>
                       <RowItem label="Name:" value={patient.name} />
-                      <RowItem label="Patient ID:" value={patient.id} />
+                      <RowItem 
+    label="Patient ID:" 
+    value={patient.id} 
+    numberOfLines={1} 
+    ellipsizeMode="tail" 
+  />
                       <RowItem
                         label="Age:"
                         value={patient.age ? `${patient.age} years` : "-"}
@@ -879,10 +913,10 @@ export default function ConsultationPage() {
                       fontSize: 12,
                     }}
                   >
-                    {MOCK_DOCTOR.name}, {MOCK_DOCTOR.degree}
+                    {doctor?.name}, {doctor?.degree}
                   </Text>
                   <Text style={{ color: theme.colors.primary, fontSize: 10 }}>
-                    {MOCK_DOCTOR.specialization}
+                    {doctor?.specialization}
                   </Text>
                 </View>
                 <View style={{ flex: 1, alignItems: "flex-end" }}>
@@ -893,10 +927,10 @@ export default function ConsultationPage() {
                       fontSize: 12,
                     }}
                   >
-                    {MOCK_DOCTOR.clinicName}
+                    {doctor?.clinicName}
                   </Text>
                   <Text style={{ color: theme.colors.primary, fontSize: 10 }}>
-                    {MOCK_DOCTOR.clinicAddress}
+                    {doctor?.clinicAddress}
                   </Text>
                 </View>
               </View>
