@@ -6,19 +6,19 @@ import {
   StyleSheet,
   TouchableOpacity,
   useWindowDimensions,
-  Modal,
   Alert,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import { AppSkeleton } from "../../components/common";
 import { updateAppointmentsStatus } from "./doctorService";
+import { APPOINTMENT_STATUS } from "../../constants/constants";
 
 type Appointment = {
   id: string;
   patient: {
+    id: string;
     name: string;
     age: number;
     gender: string;
@@ -32,6 +32,7 @@ type Appointment = {
   appointment_end_time?: string;
   end_time?: string;
 };
+
 const actionButtons: {
   label: string;
   bg: string;
@@ -68,6 +69,7 @@ const actionButtons: {
     icon: "account-multiple-outline",
   },
 ];
+
 const showSuccess = (message: string) => {
   Toast.show({
     type: "success",
@@ -75,6 +77,7 @@ const showSuccess = (message: string) => {
     text2: message,
   });
 };
+
 const showError = (message: string) => {
   Toast.show({
     type: "error",
@@ -82,6 +85,7 @@ const showError = (message: string) => {
     text2: message,
   });
 };
+
 type DoctorAppointmentsProps = {
   selectedDate: number;
   setSelectedDate: (i: number) => void;
@@ -107,21 +111,6 @@ export default function DoctorAppointments({
   const isTablet = width >= 768;
   const navigation = useNavigation<any>();
 
-  // ── QR Scanner state ──────────────────────────────────────────────────────
-  const [scannerVisible, setScannerVisible] = useState(false);
-  const [scannedPatient, setScannedPatient] = useState<any>(null);
-  const [scanned, setScanned] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
-
-  const [localStatuses, setLocalStatuses] = useState<Record<string, string>>(
-    {},
-  );
-  const [rescheduleAppt, setRescheduleAppt] = useState<any>(null);
-  const [rescheduleDate, setRescheduleDate] = useState<Date | null>(null);
-  const [rescheduleTime, setRescheduleTime] = useState<string>("");
-  const [rescheduleSlots, setRescheduleSlots] = useState<any[]>([]);
-  const [rescheduleOpen, setRescheduleOpen] = useState<boolean>(false);
-
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getStatusLabel = (status: any) =>
     typeof status === "string" ? status : (status?.label ?? "pending");
@@ -146,7 +135,6 @@ export default function DoctorAppointments({
         );
         if (res.success) {
           showSuccess(res.message);
-          // setLocalStatuses((prev) => ({ ...prev, [appointmentId]: 'confirmed' }))
         }
       }
       if (action === "reject") {
@@ -156,16 +144,11 @@ export default function DoctorAppointments({
         );
         if (res.success) {
           showSuccess(res.message);
-          // setLocalStatuses((prev) => ({ ...prev, [appointmentId]: 'cancelled' }))
         }
       }
       if (action === "reschedule") {
         const apt = appointments.find((a: any) => a.id === appointmentId);
-        setRescheduleAppt(apt);
-        setRescheduleDate(new Date());
-        setRescheduleTime("");
-        setRescheduleSlots([]);
-        setRescheduleOpen(true);
+        console.log("Reschedule appointment:", apt);
       }
       if (action === "refer") {
         alert("Refer coming soon!");
@@ -174,37 +157,28 @@ export default function DoctorAppointments({
       showError("Something went wrong");
     }
   };
-  // ── Card press → open QR scanner ─────────────────────────────────────────
-  const handleCardPress = async (apt: any) => {
-    if (!permission?.granted) {
-      const { granted } = await requestPermission();
-      if (!granted) {
-        Alert.alert(
-          "Camera Permission Required",
-          "Please allow camera access to scan patient QR codes.",
-        );
-        return;
-      }
-    }
-    setScannedPatient(apt);
-    setScanned(false);
-    setScannerVisible(true);
-  };
 
-  // ── QR scanned successfully ───────────────────────────────────────────────
-  const handleBarCodeScanned = ({
-    type,
-    data,
-  }: {
-    type: string;
-    data: string;
-  }) => {
-    if (scanned) return;
-    setScanned(true);
-    setScannerVisible(false);
-    navigation.navigate("AppointmentDetail", {
-      appointmentId: scannedPatient?.id,
-      qrData: data,
+  // ── Card press navigation ────────────────────────────────────────────────
+  const handleCardPress = (apt: any) => {
+    const patientId =
+      apt.patient?.id ||
+      apt.patient?.patient_id ||
+      apt.patient?.public_id ||
+      apt.patient_public_id;
+
+    console.log("Appointment data:", apt);
+    console.log("Patient ID found:", patientId);
+
+    if (!patientId) {
+      Alert.alert("Error", "Patient ID not found for this appointment");
+      return;
+    }
+
+    // Pass the full patient object from the appointment
+    navigation.navigate("Consultation", {
+      patient_id: patientId,
+      appointmentId: apt.id,
+      patient: apt.patient,
     });
   };
 
@@ -385,103 +359,6 @@ export default function DoctorAppointments({
     );
   };
 
-  // ── QR Scanner Modal ──────────────────────────────────────────────────────
-  const renderScanner = () => (
-    <Modal
-      visible={scannerVisible}
-      animationType="slide"
-      onRequestClose={() => setScannerVisible(false)}
-    >
-      <View style={styles.scannerContainer}>
-        {/* Header */}
-        <View style={styles.scannerHeader}>
-          <TouchableOpacity
-            onPress={() => setScannerVisible(false)}
-            style={styles.scannerCloseBtn}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons
-              name="chevron-left"
-              size={24}
-              color={TEAL}
-            />
-            <Text style={styles.scannerBackTxt}>Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.scannerTitle}>Scan Patient QR</Text>
-          <View style={{ width: 60 }} />
-        </View>
-
-        {/* Patient info strip */}
-        {scannedPatient && (
-          <View style={styles.patientStrip}>
-            <View style={styles.patientIconBox}>
-              <MaterialCommunityIcons
-                name="home-heart"
-                size={18}
-                color="#2e7d32"
-              />
-            </View>
-            <View>
-              <Text style={styles.stripName}>
-                {scannedPatient?.patient?.name || "Unknown Patient"}
-              </Text>
-              <Text style={styles.stripMeta}>
-                {getPatientAge(scannedPatient)} yrs /{" "}
-                {getPatientGender(scannedPatient)} ·{" "}
-                {getTimeRange(scannedPatient)}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Camera */}
-        <View style={styles.cameraWrapper}>
-          <CameraView
-            style={styles.camera}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-          />
-
-          {/* Dark overlay with QR frame cutout */}
-          <View style={styles.overlay}>
-            <View style={styles.overlayTop} />
-            <View style={styles.overlayMiddle}>
-              <View style={styles.overlaySide} />
-              <View style={styles.qrFrame}>
-                <View style={[styles.corner, styles.cornerTL]} />
-                <View style={[styles.corner, styles.cornerTR]} />
-                <View style={[styles.corner, styles.cornerBL]} />
-                <View style={[styles.corner, styles.cornerBR]} />
-              </View>
-              <View style={styles.overlaySide} />
-            </View>
-            <View style={styles.overlayBottom} />
-          </View>
-        </View>
-
-        {/* Hint */}
-        <View style={styles.scannerFooter}>
-          <MaterialCommunityIcons name="qrcode-scan" size={18} color={TEAL} />
-          <Text style={styles.scanHint}>
-            Align the patient's QR code within the frame
-          </Text>
-        </View>
-
-        {/* Scan again button */}
-        {scanned && (
-          <TouchableOpacity
-            style={styles.rescanBtn}
-            onPress={() => setScanned(false)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.rescanTxt}>Tap to Scan Again</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </Modal>
-  );
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -542,15 +419,9 @@ export default function DoctorAppointments({
         )}
         {!apptLoading && appointments.map(renderCard)}
       </View>
-
-      {/* QR Scanner Modal */}
-      {renderScanner()}
     </View>
   );
 }
-
-const CORNER_SIZE = 22;
-const CORNER_THICKNESS = 3;
 
 const styles = StyleSheet.create({
   container: {
@@ -666,96 +537,4 @@ const styles = StyleSheet.create({
   },
   error: { color: "red", fontSize: 13 },
   empty: { color: "#999", fontSize: 13 },
-
-  // ── Scanner ───────────────────────────────────────────────────────────────
-  scannerContainer: { flex: 1, backgroundColor: "#000" },
-  scannerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: "#fff",
-  },
-  scannerCloseBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    width: 60,
-  },
-  scannerBackTxt: { fontSize: 14, color: TEAL, fontWeight: "600" },
-  scannerTitle: { fontSize: 15, fontWeight: "700", color: "#1a2226" },
-
-  patientStrip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderTopWidth: 0.5,
-    borderTopColor: "#e8ecee",
-  },
-  stripName: { fontSize: 14, fontWeight: "600", color: "#1a2226" },
-  stripMeta: { fontSize: 12, color: "#5f6973", marginTop: 1 },
-
-  cameraWrapper: { flex: 1, position: "relative" },
-  camera: { flex: 1 },
-
-  overlay: { ...StyleSheet.absoluteFillObject, flexDirection: "column" },
-  overlayTop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
-  overlayBottom: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
-  overlayMiddle: { flexDirection: "row", height: 220 },
-  overlaySide: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
-  qrFrame: { width: 220, height: 220, position: "relative" },
-
-  corner: {
-    position: "absolute",
-    width: CORNER_SIZE,
-    height: CORNER_SIZE,
-    borderColor: TEAL,
-  },
-  cornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: CORNER_THICKNESS,
-    borderLeftWidth: CORNER_THICKNESS,
-  },
-  cornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: CORNER_THICKNESS,
-    borderRightWidth: CORNER_THICKNESS,
-  },
-  cornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: CORNER_THICKNESS,
-    borderLeftWidth: CORNER_THICKNESS,
-  },
-  cornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: CORNER_THICKNESS,
-    borderRightWidth: CORNER_THICKNESS,
-  },
-
-  scannerFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 18,
-    backgroundColor: "#fff",
-  },
-  scanHint: { fontSize: 13, color: "#5f6973" },
-  rescanBtn: {
-    marginHorizontal: 24,
-    marginBottom: 20,
-    backgroundColor: TEAL,
-    borderRadius: 24,
-    paddingVertical: 13,
-    alignItems: "center",
-  },
-  rescanTxt: { color: "#fff", fontSize: 15, fontWeight: "600" },
 });
