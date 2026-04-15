@@ -15,6 +15,7 @@ import { useNavigation } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { AppSkeleton } from "../../components/common";
 import { updateAppointmentsStatus } from "./doctorService";
+import { APPOINTMENT_STATUS } from "../../constants/constants";
 
 type Appointment = {
   id: string;
@@ -105,6 +106,7 @@ export default function DoctorAppointments({
 }: DoctorAppointmentsProps) {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const useCompactCancelledLayout = width < 640;
   const navigation = useNavigation<any>();
 
   // ── QR Scanner state ──────────────────────────────────────────────────────
@@ -131,6 +133,7 @@ export default function DoctorAppointments({
   const getPatientGender = (apt: any) =>
     apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? "--";
   const getTimeRange = (apt: any) => {
+
     const start = apt?.appointment_time;
     const end = apt?.appointment_end_time ?? apt?.end_time;
     if (start && end) return `${start} - ${end}`;
@@ -236,7 +239,7 @@ export default function DoctorAppointments({
             </View>
           )}
         </View>
-      </View>
+      </View> 
     ));
 
   // ── Action buttons ────────────────────────────────────────────────────────
@@ -268,6 +271,15 @@ export default function DoctorAppointments({
     </View>
   );
 
+  const renderCancelledNotice = () => (
+    <View style={styles.cancelNoticeBox}>
+      <MaterialCommunityIcons name="close-thick" size={34} color="#df4a4a" />
+      <Text style={styles.cancelNoticeText}>
+        Patient has cancelled the appointment
+      </Text>
+    </View>
+  );
+
   // ── Card ──────────────────────────────────────────────────────────────────
   const renderCard = (apt: any) => {
     const status = getStatusLabel(apt.status);
@@ -287,13 +299,86 @@ export default function DoctorAppointments({
           ? styles.pillTextCancelled
           : styles.pillTextPending;
 
-    if (isTablet) {
+    if (isCancelled) {
       return (
         <TouchableOpacity
           key={apt.id}
           activeOpacity={0.85}
           onPress={() => handleCardPress(apt)}
-          style={[styles.card, isCancelled && styles.cancelledCard]}
+          style={styles.card}
+        >
+          <View
+            style={[
+              styles.cancelledCardInner,
+              useCompactCancelledLayout && styles.cancelledCardInnerCompact,
+            ]}
+          >
+            <View
+              style={[
+                styles.cancelledCardLeft,
+                useCompactCancelledLayout && styles.cancelledCardLeftCompact,
+              ]}
+            >
+              <View style={styles.patientNameRow}>
+                <View style={styles.patientIconBox}>
+                  <MaterialCommunityIcons
+                    name="home-heart"
+                    size={20}
+                    color="#2e7d32"
+                  />
+                </View>
+                <Text style={styles.name} numberOfLines={1}>
+                  {apt?.patient?.name || "Unknown Patient"}
+                </Text>
+                <View style={[styles.pill, statusStyle]}>
+                  <Text style={[styles.pillText, statusTextStyle]}>
+                    {formatStatus(status)}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.cancelledMetaRow}>
+                <Text style={styles.subText}>
+                  {getPatientAge(apt)} years / {getPatientGender(apt)}
+                </Text>
+                <View style={styles.metaDot} />
+                <MaterialCommunityIcons
+                  name="clock-time-three-outline"
+                  size={16}
+                  color="#9ea5ac"
+                />
+                <Text style={styles.subText}>{getTimeRange(apt)}</Text>
+              </View>
+            </View>
+            <View
+              style={[
+                styles.cancelDivider,
+                useCompactCancelledLayout && styles.cancelDividerCompact,
+              ]}
+            />
+            <View
+              style={[
+                styles.cancelledCardRight,
+                !useCompactCancelledLayout && !isTablet && {
+                  width: Math.max(230, Math.floor(width * 0.52)),
+                },
+                useCompactCancelledLayout && styles.cancelledCardRightCompact,
+              ]}
+            >
+              {renderCancelledNotice()}
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    if (isTablet) {
+
+      return (
+        <TouchableOpacity
+          key={apt.id}
+          activeOpacity={0.85}
+          onPress={() => handleCardPress(apt)}
+          style={styles.card}
         >
           <View style={styles.tabletCardInner}>
             <View style={styles.tabletLeft}>
@@ -325,15 +410,8 @@ export default function DoctorAppointments({
                   {getTimeRange(apt)}
                 </Text>
               </View>
-              {isCancelled && (
-                <Text style={styles.cancelledMsg}>
-                  Patient has canceled the appointment
-                </Text>
-              )}
             </View>
-            {!isCancelled && (
-              <View style={styles.tabletRight}>{renderActions(apt)}</View>
-            )}
+            <View style={styles.tabletRight}>{renderActions(apt)}</View>
           </View>
         </TouchableOpacity>
       );
@@ -344,7 +422,7 @@ export default function DoctorAppointments({
         key={apt.id}
         activeOpacity={0.85}
         onPress={() => handleCardPress(apt)}
-        style={[styles.card, isCancelled && styles.cancelledCard]}
+        style={styles.card}
       >
         <View style={styles.patientNameRow}>
           <View style={styles.patientIconBox}>
@@ -374,13 +452,7 @@ export default function DoctorAppointments({
             {getTimeRange(apt)}
           </Text>
         </View>
-        {isCancelled ? (
-          <Text style={styles.cancelledMsg}>
-            Patient has canceled the appointment
-          </Text>
-        ) : (
-          renderActions(apt)
-        )}
+        {renderActions(apt)}
       </TouchableOpacity>
     );
   };
@@ -598,10 +670,23 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: "#fff",
   },
-  cancelledCard: { backgroundColor: "#fff5f5" },
   tabletCardInner: { flexDirection: "row", alignItems: "center", gap: 12 },
   tabletLeft: { flex: 1, minWidth: 0 },
   tabletRight: { flexShrink: 0 },
+  cancelledCardInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  cancelledCardInnerCompact: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    justifyContent: "flex-start",
+  },
+  cancelledCardLeft: { flex: 1, minWidth: 0, paddingRight: 12 },
+  cancelledCardLeftCompact: { paddingRight: 0 },
+  cancelledCardRight: { width: 340, paddingLeft: 12 },
+  cancelledCardRightCompact: { width: "100%", paddingLeft: 0 },
   patientNameRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -632,8 +717,53 @@ const styles = StyleSheet.create({
   pillTextConfirmed: { color: "#2e7d32" },
   pillTextCancelled: { color: "#d84545" },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  cancelledMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+    flexWrap: "wrap",
+  },
+  metaDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#cfd5d9",
+  },
   subText: { fontSize: 13, color: "#5f6973", fontWeight: "500" },
-  cancelledMsg: { color: "#d84545", fontSize: 12, marginTop: 4 },
+  cancelDivider: {
+    width: 1,
+    alignSelf: "stretch",
+    backgroundColor: "#eceff2",
+    marginHorizontal: 4,
+  },
+  cancelDividerCompact: {
+    width: "100%",
+    height: 1,
+    alignSelf: "auto",
+    marginHorizontal: 0,
+    marginVertical: 10,
+  },
+  cancelNoticeBox: {
+    borderWidth: 1,
+    borderColor: "#f08d8d",
+    backgroundColor: "#fbeaea",
+    borderRadius: 10,
+    minHeight: 64,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  cancelNoticeText: {
+    color: "#df4a4a",
+    fontSize: 15,
+    fontWeight: "500",
+    lineHeight: 20,
+    flex: 1,
+    flexShrink: 1,
+  },
   actions: {
     flexDirection: "row",
     alignItems: "center",
