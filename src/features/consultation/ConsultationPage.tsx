@@ -125,9 +125,10 @@ function PastMedicalHistory() {
                     {tabs.map(tab => {
                         const isActive = activeTab === tab.id;
                         const TabIcon = tab.Icon;
+                        const iconSize = tab.id === 'Prescription' ? 36 : 42;
                         return (
                             <TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1 }}>
-                                <TabIcon width={24} height={24} />
+                                <TabIcon width={42} height={42} />
                                 <Text style={{ fontSize: 10, color: isActive ? theme.colors.primary : '#999', marginTop: 4, fontWeight: isActive ? 'bold' : 'normal' }}>
                                     {tab.id}
                                 </Text>
@@ -243,9 +244,10 @@ function ShareWith() {
                     {tabs.map(tab => {
                         const isActive = activeTab === tab.id;
                         const TabIcon = tab.Icon;
+                        const iconSize = tab.id === 'Pharmacy' ? 38 : 34;
                         return (
                             <TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1 }}>
-                                <TabIcon width={24} height={24} />
+                                <TabIcon width={42} height={42} />
                                 <Text style={{ fontSize: 10, color: isActive ? theme.colors.primary : '#999', marginTop: 4, fontWeight: isActive ? 'bold' : 'normal' }}>
                                     {tab.id}
                                 </Text>
