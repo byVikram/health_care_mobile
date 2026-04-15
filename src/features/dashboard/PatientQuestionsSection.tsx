@@ -1,4 +1,9 @@
 import React, { useState } from "react";
+import type { SvgProps } from "react-native-svg";
+
+import TeamsIcon from '../../assets/PatientQuestions/teams.svg';
+import QuestionIcon from '../../assets/PatientQuestions/QuestionIcon.svg';
+
 import {
 	View,
 	Text,
@@ -20,7 +25,7 @@ export type PatientQuestion = {
 	title: string;
 	body: string;
 	answerCount: number;
-	avatarUrl?: string;
+	avatarUrl?: string | React.FC<SvgProps>;
 };
 
 type Props = {
@@ -33,6 +38,7 @@ const MOCK_QUESTIONS: PatientQuestion[] = [
 	{
 		id: "1",
 		askedFor: "Female",
+		avatarUrl:QuestionIcon,
 		age: 30,
 		location: "Bengaluru",
 		timeAgo: "1d ago",
@@ -62,7 +68,7 @@ const MOCK_QUESTIONS: PatientQuestion[] = [
 	},
 	{
 		id: "4",
-		askedFor: "Female",
+		askedFor: "Male",
 		age: 30,
 		location: "Bengaluru",
 		timeAgo: "1d ago",
@@ -73,7 +79,8 @@ const MOCK_QUESTIONS: PatientQuestion[] = [
 ];
 
 const TEAL = "#2E8B8B";
-const TEAL_LIGHT = "#E6F4F4";
+const CARD_BORDER = "#D0D5D8";
+const FOOTER_BG = "#DCE5E6";
 
 export default function PatientQuestionsSection({
 	questions = MOCK_QUESTIONS,
@@ -119,48 +126,41 @@ export default function PatientQuestionsSection({
 				>
 					{questions.map((q) => (
 						<View key={q.id} style={styles.card}>
-							{/* Card Header */}
-							<View style={styles.cardHeader}>
-								<View style={styles.avatarPlaceholder}>
-									{q.avatarUrl ? (
-										<Image
-											source={{ uri: q.avatarUrl }}
-											style={styles.avatar}
-										/>
-									) : (
-										<Text style={styles.avatarText}>
-											{q.askedFor[0]}
-										</Text>
-									)}
-								</View>
-								<View style={styles.headerInfo}>
-									<Text style={styles.askedFor}>
-										Asked for {q.askedFor},{"\n"}
-										{q.age} Years, {q.location}
-									</Text>
-								</View>
-								<Text style={styles.timeAgo}>{q.timeAgo}</Text>
-							</View>
-
-							{/* Question Content */}
-							<Text style={styles.questionTitle}>{q.title}</Text>
-							<Text style={styles.questionBody}>{q.body}</Text>
-
-							{/* Answer Count Badge */}
-							<View style={styles.answerCountRow}>
-								<View style={styles.answerCountBadge}>
-									<View style={styles.doctorAvatarRow}>
-										<View style={[styles.miniAvatar, { zIndex: 2 }]} />
-										<View
-											style={[
-												styles.miniAvatar,
-												{ zIndex: 1, marginLeft: -8 },
-											]}
-										/>
-										<View style={styles.plusBadge}>
-											<Text style={styles.plusText}>6+</Text>
+							<View style={styles.questionCard}>
+								<View style={styles.questionContent}>
+									<View style={styles.cardHeader}>
+										<View style={styles.avatarPlaceholder}>
+											{q.avatarUrl ? (
+												typeof q.avatarUrl === "string" ? (
+												<Image
+													source={{ uri: q.avatarUrl }}
+													style={styles.avatar}
+												/>
+												) : (
+													<q.avatarUrl width={30} height={30} />
+												)
+											) : (
+												<Text style={styles.avatarText}>
+													{q.askedFor[0]}
+												</Text>
+											)}
 										</View>
+										<View style={styles.headerInfo}>
+											<Text style={styles.askedForPrimary}>
+												Asked for {q.askedFor},
+											</Text>
+											<Text style={styles.askedForSecondary}>
+												{q.age} Years, {q.location}
+											</Text>
+										</View>
+										<Text style={styles.timeAgo}>{q.timeAgo}</Text>
 									</View>
+
+									<Text style={styles.questionTitle}>{q.title}</Text>
+									<Text style={styles.questionBody}>{q.body}</Text>
+								</View>
+
+								<View style={styles.answerCountBar}>
 									<View>
 										<Text style={styles.answerCountText}>
 											{q.answerCount} answers
@@ -169,14 +169,23 @@ export default function PatientQuestionsSection({
 											from other doctors
 										</Text>
 									</View>
+									<View style={styles.doctorAvatarRow}>
+										{/* <View style={[styles.miniAvatar, styles.miniAvatarTop]} />
+										<View
+											style={[styles.miniAvatar, styles.miniAvatarOverlap]}
+										/> */}
+										<TeamsIcon width={50} />
+										{/* <View style={styles.plusBadge}>
+											<Text style={styles.plusText}>6+</Text>
+										</View> */}
+									</View>
 								</View>
 							</View>
 
-							{/* Answer Input */}
 							<TextInput
 								style={styles.answerInput}
 								placeholder="Answer now:"
-								placeholderTextColor="#aaa"
+								placeholderTextColor="#BFC5CC"
 								multiline
 								value={answers[q.id] ?? ""}
 								onChangeText={(text) =>
@@ -184,7 +193,6 @@ export default function PatientQuestionsSection({
 								}
 							/>
 
-							{/* Submit Button */}
 							<TouchableOpacity
 								style={[
 									styles.submitButton,
@@ -221,139 +229,161 @@ const styles = StyleSheet.create({
 		marginBottom: 12,
 	},
 	scrollContent: {
-		paddingHorizontal: 12,
+		paddingHorizontal: 14,
 		paddingBottom: 8,
 	},
 	card: {
-		width: 240,
-		backgroundColor: "#fff",
-		borderRadius: 14,
+		width: 234,
 		marginHorizontal: 6,
-		padding: 14,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.07,
-		shadowRadius: 6,
-		elevation: 3,
+	},
+	questionCard: {
+		backgroundColor: "#FFFFFF",
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: CARD_BORDER,
+		overflow: "hidden",
+	},
+	questionContent: {
+		paddingHorizontal: 12,
+		paddingTop: 12,
+		paddingBottom: 10,
 	},
 	cardHeader: {
 		flexDirection: "row",
-		alignItems: "flex-start",
+		alignItems: "center",
 		marginBottom: 10,
 	},
 	avatarPlaceholder: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		backgroundColor: TEAL_LIGHT,
+		width: 30,
+		height: 30,
+		borderRadius: 15,
+		backgroundColor: "#DBE8EB",
 		alignItems: "center",
 		justifyContent: "center",
 		marginRight: 8,
+		overflow: "hidden",
 	},
 	avatar: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
+		width: 30,
+		height: 30,
+		borderRadius: 15,
 	},
 	avatarText: {
 		color: TEAL,
 		fontWeight: "700",
-		fontSize: 14,
+		fontSize: 12,
 	},
 	headerInfo: {
 		flex: 1,
+		paddingRight: 6,
 	},
-	askedFor: {
+	askedForPrimary: {
 		fontSize: 11,
-		color: "#555",
-		lineHeight: 15,
+		color: "#000",
+		lineHeight: 13,
+	},
+	askedForSecondary: {
+		fontSize: 11,
+		color: "#6B6B6B",
+		lineHeight: 13,
 	},
 	timeAgo: {
 		fontSize: 11,
-		color: "#999",
+		color: "#797888",
 	},
 	questionTitle: {
-		fontSize: 14,
-		fontWeight: "700",
-		color: "#111",
-		marginBottom: 6,
+		fontSize: 20,
+		fontWeight: "500",
+		color: "#000",
+		lineHeight: 18,
+		marginBottom: 18,
 	},
 	questionBody: {
-		fontSize: 12,
-		color: "#555",
-		lineHeight: 18,
-		marginBottom: 12,
+		fontSize: 15,
+		color: "#000",
+		lineHeight: 29.94,
 	},
-	answerCountRow: {
-		marginBottom: 10,
-	},
-	answerCountBadge: {
+	answerCountBar: {
 		flexDirection: "row",
 		alignItems: "center",
-		backgroundColor: TEAL_LIGHT,
-		borderRadius: 8,
-		padding: 8,
-		gap: 10,
+		justifyContent: "space-between",
+		backgroundColor: FOOTER_BG,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
 	},
 	doctorAvatarRow: {
 		flexDirection: "row",
 		alignItems: "center",
+		marginLeft: 10,
 	},
 	miniAvatar: {
 		width: 22,
 		height: 22,
 		borderRadius: 11,
-		backgroundColor: "#b2d8d8",
-		borderWidth: 1.5,
+		backgroundColor: "#AAD8DF",
+		borderWidth: 1,
 		borderColor: "#fff",
+	},
+	miniAvatarTop: {
+		zIndex: 2,
+	},
+	miniAvatarOverlap: {
+		marginLeft: -7,
+		backgroundColor: "#8BC8D2",
+		zIndex: 1,
 	},
 	plusBadge: {
 		width: 22,
 		height: 22,
 		borderRadius: 11,
-		backgroundColor: TEAL,
+		backgroundColor: "#D9DDE0",
 		alignItems: "center",
 		justifyContent: "center",
-		marginLeft: -8,
+		marginLeft: -7,
 		zIndex: 3,
+		borderWidth: 1,
+		borderColor: "#fff",
 	},
 	plusText: {
-		color: "#fff",
+		color: "#5F666D",
 		fontSize: 9,
 		fontWeight: "700",
 	},
 	answerCountText: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#333",
+		fontSize: 15,
+		fontWeight: "500",
+		color: "#797888",
+		lineHeight: 18,
 	},
 	fromDoctorsText: {
-		fontSize: 10,
-		color: "#777",
+		fontSize: 15,
+		color: "#737B83",
+		lineHeight: 18,
 	},
 	answerInput: {
 		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
+		borderColor: "#3D9395",
+		borderRadius: 4,
 		padding: 10,
-		fontSize: 13,
-		color: "#333",
-		minHeight: 80,
+		fontSize: 14,
+		color: "#C7C9d9",
+		minHeight: 108,
 		textAlignVertical: "top",
-		marginBottom: 10,
+		marginTop: 10,
 	},
 	submitButton: {
-		backgroundColor: TEAL,
-		borderRadius: 24,
-		paddingVertical: 11,
+		backgroundColor: "#2E7E80",
+		borderRadius: 18,
+		paddingVertical: 8,
 		alignItems: "center",
+		marginTop: 12,
 	},
 	submitButtonDisabled: {
 		opacity: 0.6,
 	},
 	submitText: {
 		color: "#fff",
-		fontWeight: "600",
-		fontSize: 14,
+		fontWeight: "500",
+		fontSize: 12,
 	},
 });

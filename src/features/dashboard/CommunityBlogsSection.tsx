@@ -5,20 +5,11 @@ import Blog1 from "../../assets/blog-and-community/blog-1.svg";
 import Blog2 from "../../assets/blog-and-community/blog-2.svg";
 import Community1 from "../../assets/blog-and-community/community-1.svg";
 
+// import Community1 from "../../assets/blog-and-community/community-1.svg"
 
 const communities = [
-  {
-    id: 1,
-    name: "Diabatics Associations",
-    location: "Rajajinagar, Bengaluru",
-    ImageComponent: Community1,
-  },
-  {
-    id: 2,
-    name: "Lions Health Club",
-    location: "Koramangala, Bengaluru",
-    ImageComponent:  Community1,
-  },
+  { id: 1, name: "Diabatics Associations", location: "Rajajinagar, Bengaluru",image: Community1 },
+  { id: 2, name: "Lions Health Club", location: "Koramangala, Bengaluru" ,image: Community1},
 ];
 
 const blogs = [
@@ -55,14 +46,9 @@ export default function CommunityBlogsSection() {
 
       {communities.map((c) => (
         <View key={c.id} style={styles.communityRow}>
-          {/* SVG avatar */}
           <View style={styles.communityAvatar}>
-            <c.ImageComponent
-              width={COMMUNITY_AVATAR_SIZE}
-              height={COMMUNITY_AVATAR_SIZE}
-            />
-          </View>
-
+            <c.image width="100%" height ="100%" />
+          </View>  
           <View style={styles.communityInfo}>
             <Text variant="titleSmall">{c.name}</Text>
             <Text variant="labelSmall" style={styles.locationText}>
@@ -142,9 +128,7 @@ const styles = StyleSheet.create({
     borderRadius: COMMUNITY_AVATAR_SIZE / 2,
     backgroundColor: "#f0f4f8",
     marginRight: 12,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
+    // overflow: "hidden",
   },
   communityInfo: {
     flex: 1,
