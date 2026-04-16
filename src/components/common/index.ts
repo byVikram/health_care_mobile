@@ -7,3 +7,5 @@ export * from './AppSkeleton';
 export { default as AppHeader } from './AppHeader';
 export { default as AppSidebar } from './AppSidebar';
 export type { AppSidebarItem } from './AppSidebar';
+export { default as DateSlotPicker } from './DateSlotPicker';
+export type { PickProps as DateSlotPickerProps } from './DateSlotPicker';

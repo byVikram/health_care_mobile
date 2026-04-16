@@ -15,6 +15,7 @@ import {
 	AppButton,
 	AppTypography,
 	AppSkeleton,
+	DateSlotPicker,
 } from "../../../components/common";
 import {
 	getDoctorById,
@@ -649,169 +650,17 @@ export default function DoctorDetailPage() {
 					})}
 				</View>
 
-				{/* Select Date */}
-				<View style={styles.section}>
-					<View
-						style={{
-							flexDirection: "row",
-							justifyContent: "space-between",
-							alignItems: "center",
-							marginBottom: 12,
-						}}
-					>
-						<AppTypography variant="h4" style={styles.sectionTitle}>
-							Select Date
-						</AppTypography>
-						<View
-							style={{
-								flexDirection: "row",
-								alignItems: "center",
-							}}
-						>
-							<MaterialCommunityIcons
-								name="chevron-left"
-								size={20}
-								color="#2b7571"
-							/>
-							<AppTypography
-								variant="body"
-								style={{
-									color: "#333",
-									fontWeight: "bold",
-									marginHorizontal: 8,
-								}}
-							>
-								Feb 2025
-							</AppTypography>
-							<MaterialCommunityIcons
-								name="chevron-right"
-								size={20}
-								color="#2b7571"
-							/>
-						</View>
-					</View>
-					<ScrollView
-						horizontal
-						showsHorizontalScrollIndicator={false}
-						contentContainerStyle={{ paddingVertical: 4 }}
-					>
-						{dates.map((d) => {
-							const isSelected =
-								selectedDate.toDateString() ===
-								d.dateObj.toDateString();
-							return (
-								<TouchableOpacity
-									key={d.id}
-									style={[
-										styles.dateBox,
-										isSelected && styles.dateBoxSelected,
-									]}
-									onPress={() => setSelectedDate(d.dateObj)}
-								>
-									<AppTypography
-										variant="caption"
-										style={[
-											styles.dayName,
-											isSelected && { color: "#fff" },
-										]}
-									>
-										{d.dayName}
-									</AppTypography>
-									<AppTypography
-										variant="body"
-										style={[
-											styles.dateNum,
-											isSelected && { color: "#fff" },
-										]}
-									>
-										{d.dateNum}
-									</AppTypography>
-								</TouchableOpacity>
-							);
-						})}
-					</ScrollView>
-				</View>
-
-				{/* Select Time */}
-				<View style={[styles.section, { paddingBottom: 32 }]}>
-					<AppTypography variant="h4" style={styles.sectionTitle}>
-						Select Time
-					</AppTypography>
-					{slotsLoading ? (
-						<AppSkeleton height={100} style={{ marginTop: 8 }} />
-					) : availableSlotGroups.length === 0 ? (
-						<AppTypography
-							variant="caption"
-							style={styles.greyText}
-						>
-							No slots available for this date.
-						</AppTypography>
-					) : (
-						<View style={styles.timeGrid}>
-							{availableSlotGroups.map((group, groupIdx) => (
-								<View
-									key={`group-${groupIdx}`}
-									style={styles.timeGroupContainer}
-								>
-									{/* Group Label */}
-									<AppTypography
-										variant="subtitle"
-										style={styles.timeGroupLabel}
-									>
-										{group.label}
-									</AppTypography>
-
-									{/* Slots Grid */}
-									<View style={styles.slotsGrid}>
-										{group.slots.map((slot, idx) => {
-											const isSelected =
-												selectedTime ===
-												slot.start_time;
-											const isAvailable =
-												slot.status === "AVAILABLE";
-
-											return (
-												<TouchableOpacity
-													key={`${slot.start_time}-${idx}`}
-													style={[
-														styles.timeBox,
-														isSelected &&
-															styles.timeBoxSelected,
-														!isAvailable &&
-															styles.timeBoxDisabled,
-													]}
-													onPress={() =>
-														isAvailable &&
-														setSelectedTime(
-															slot.start_time,
-														)
-													}
-													activeOpacity={
-														isAvailable ? 0.6 : 1
-													}
-													disabled={!isAvailable}
-												>
-													<AppTypography
-														variant="caption"
-														style={[
-															styles.timeText,
-															isSelected &&
-																styles.timeTextSelected,
-															!isAvailable &&
-																styles.timeTextDisabled,
-														]}
-													>
-														{slot.start_time}
-													</AppTypography>
-												</TouchableOpacity>
-											);
-										})}
-									</View>
-								</View>
-							))}
-						</View>
-					)}
-				</View>
+				<DateSlotPicker
+					selectedDate={selectedDate}
+					onDateChange={(date) => {
+						setSelectedDate(date);
+						setSelectedTime("");
+					}}
+					selectedTime={selectedTime}
+					onTimeChange={setSelectedTime}
+					availableSlots={availableSlotGroups}
+					loading={slotsLoading}
+				/>
 			</ScrollView>
 
 			{/* Bottom Sticky Button */}
