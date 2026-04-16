@@ -1,4 +1,4 @@
-﻿// src/features/doctor/doctorService.ts
+// src/features/doctor/doctorService.ts
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { AppointmentsResponse } from '../../types/appointment'
@@ -77,6 +77,22 @@ export const updateAppointmentsStatus = async (appointmentId: string, statusId: 
         status_id:statusId
     })
     return res.data
+}
+
+export interface RescheduleAppointmentPayload {
+	appointment_id: string
+	appointment_date: string
+	start_time: string
+	end_time: string | null
+	hospital_id?: string
+	reason?: string
+}
+
+export const rescheduleAppointment = async (
+	payload: RescheduleAppointmentPayload
+): Promise<AppointmentResponse> => {
+	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, payload)
+	return res.data
 }
 
 export const getAppointments = async (params?: AppointmentParams): Promise<AppointmentsResponse> => {
