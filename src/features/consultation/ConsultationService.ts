@@ -140,25 +140,23 @@ export const patientService = {
 };
 
 export const doctorService = {
-  getDoctorDetails: async (
-    doctorId: string,
-  ): Promise<DocterDetails> => {
+  getDoctorDetails: async (doctorId: string): Promise<DocterDetails> => {
     try {
+      // Use the doctorId parameter in the API call
       const response = await ApiService.get(
-        API_ENDPOINTS.DOCTOR_PROFILE.DETAILS,
+        `${API_ENDPOINTS.DOCTOR_PROFILE.DETAILS}/${doctorId}` // Pass doctorId to the endpoint
       );  
-      return (response as any).data.data; // Assuming API returns { data: { data: DocterDetails } }
+      return (response as any).data.data;
     } catch (err: any) {
       console.error("[doctorService] error:", err);
       throw err;
     }
-    
   },
 
   updateDoctorProfile: async (profileData: any) => {
     try {
       const response = await ApiService.put(
-        API_ENDPOINTS.DOCTOR_PROFILE.UPDATE,
+        `${API_ENDPOINTS.DOCTOR_PROFILE.DETAILS}`, // Use DETAILS or add UPDATE to constants
         profileData,
       );
       return response.data;

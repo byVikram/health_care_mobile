@@ -160,31 +160,37 @@ export default function DoctorAppointments({
 
   // ── Card press navigation ────────────────────────────────────────────────
   const handleCardPress = (apt: any) => {
-    const patientId =
-      apt.patient?.id ||
-      apt.patient?.patient_id ||
-      apt.patient?.public_id ||
-      apt.patient_public_id;
-      const doctorId = apt.doctor?.id; 
+  const patientId = apt.patient?.id || apt.patient?.patient_id || apt.patient?.public_id || apt.patient_public_id;
+  const doctorId = apt.doctor?.id || apt.doctor_id; // Get doctor ID from appointment
+  
+  // Also get the full doctor object if available
+  const doctorData = apt.doctor; // This should contain doctor details
 
-    console.log("Appointment data:", apt);
-    console.log("Patient ID found:", patientId);
-    console.log("Doctor ID found:", doctorId);
+  console.log("Appointment data:", apt);
+  console.log("Patient ID found:", patientId);
+  console.log("Doctor ID found:", doctorId);
+  console.log("Doctor data:", doctorData);
 
-    if (!patientId) {
-      Alert.alert("Error", "Patient ID not found for this appointment");
-      return;
-    }
+  if (!patientId) {
+    Alert.alert("Error", "Patient ID not found for this appointment");
+    return;
+  }
 
-    // Pass the full patient object from the appointment
-    navigation.navigate("Consultation", {
-      patient_id: patientId,
-      appointmentId: apt.id,
-      patient: apt.patient,
-      doctor_id: apt.doctorId,
-    });
-  };
+  if (!doctorId) {
+    Alert.alert("Error", "Doctor ID not found for this appointment");
+    return;
+  }
 
+  // Navigate with all necessary data
+  navigation.navigate('Consultation', {
+    appointmentId: apt.id,
+    patientId: patientId,
+    patient: apt.patient,  // Pass full patient object
+    doctorID: doctorId,    // Pass doctor ID
+    doctor: doctorData,    // Pass full doctor object if available
+    appointment: apt       // Pass full appointment data
+  });
+};
   // ── Skeleton ──────────────────────────────────────────────────────────────
   const renderSkeleton = () =>
     Array.from({ length: 3 }).map((_, i) => (
