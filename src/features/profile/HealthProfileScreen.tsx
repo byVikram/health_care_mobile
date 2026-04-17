@@ -11,7 +11,7 @@ import HealthProfileField from './HealthProfileField'
 import { PROFILE_TABS } from './profileFieldsConfig'
 import type { TabConfig } from './profileFieldsConfig'
 import { getPatientDetails, patchPatientDetails, mapApiDataToLocalState } from './ProfileService'
-
+import PatientQR from "../../assets/icons/PatientQR.svg";
 type Tab = 'Personal' | 'Medical' | 'Life style'
 const TEAL = '#1a8c8c'
 
@@ -187,33 +187,38 @@ export default function HealthProfileScreen({ onUploadPhoto }: any) {
 	}
 
 	const renderTab = (tabCfg: TabConfig) => (
+		
 		<>
+		
 			{tabCfg.tab === 'Personal' && (
 				<>
 					<View style={styles.nameAvatarRow}>
-						<View>
-							<Text style={styles.fieldSmallLabel}>Name</Text>
-							<Text style={styles.nameValue}>{data.name || '—'}</Text>
-						</View>
+  <View>
+    <Text style={styles.fieldSmallLabel}>Name</Text>
+    <Text style={styles.nameValue}>{data.name || '—'}</Text>
+  </View>
 
-						<View style={styles.avatarCol}>
-							<TouchableOpacity onPress={onUploadPhoto}>
-								{data.photoUrl ? (
-									<Image source={{ uri: data.photoUrl }} style={styles.avatarImg} />
-								) : (
-									<View style={styles.avatarPlaceholder}>
-										<MaterialCommunityIcons name="account" size={32} color="#9aabb0" />
-									</View>
-								)}
-							</TouchableOpacity>
-						</View>
-					</View>
+  <View style={styles.avatarCol}>
+    <TouchableOpacity onPress={onUploadPhoto}>
+      {data.photoUrl ? (
+        <Image source={{ uri: data.photoUrl }} style={styles.avatarImg} />
+      ) : (
+        <View style={styles.avatarPlaceholder}>
+          <MaterialCommunityIcons name="account" size={32} color="#9aabb0" />
+        </View>
+      )}
+    </TouchableOpacity>
+
+   
+  </View>
+</View>
 
 					<View style={styles.divider} />
 				</>
 			)}
 
 			{tabCfg.fields.map(field => (
+				
 				<HealthProfileField
 					key={field.key}
 					config={field}
@@ -302,6 +307,10 @@ const styles = StyleSheet.create({
 		borderColor: '#c5d0d3',
 		alignItems: 'center',
 	},
+	qrContainer: {
+  marginTop: 10,
+  alignItems: "center",
+},
 	tabActive: { backgroundColor: '#1a6e6e', borderColor: '#1a6e6e' },
 	tabTxt: { fontSize: 13, fontWeight: '500', color: '#5a6c72' },
 	tabTxtActive: { color: '#fff' },
