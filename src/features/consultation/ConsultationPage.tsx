@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TextInput as NativeInput,
   Modal,
+  Platform,
 } from "react-native";
 import {
   useTheme,
@@ -17,18 +18,29 @@ import {
   IconButton,
   Divider,
   Text,
+  Snackbar,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { SvgProps } from "react-native-svg";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Asset } from "expo-asset";
 import * as FileSystem from "expo-file-system/legacy";
+// import * as SpeechRecognition from 'expo-speech-recognition';
+import Voice from '@react-native-voice/voice';
+import { Audio } from 'expo-av';
 import DicomViewer from "./components/DicomViewer";
 import Prescription from "../../assets/icons/consultation/prescription.svg";
 import LaboratoryIcon from "../../assets/icons/consultation/lab.svg";
 import RadiologyTabIcon from "../../assets/icons/consultation/radiology.svg";
 import AncillaryIcon from "../../assets/icons/consultation/ancillary.svg";
-import { patientService, PatientDetails } from "./ConsultationService";
+import {
+  patientService,
+  PatientDetails,
+  doctorService,
+  DocterDetails,
+} from "./ConsultationService";
+import ApiService from "../../services/apiService";
+import { API_ENDPOINTS } from "../../constants/apiUrls";
 
 const SAMPLE_DICOM_MODULE = require("../../assets/dicon/sample-dicon.dcm");
 
@@ -36,60 +48,28 @@ type TabItem = { id: string; Icon: React.FC<SvgProps> };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const MOCK_PATIENT = {
-  id: "p001",
-  patientId: "PID1120",
-  name: "Nitin S H",
-  age: 31,
-  gender: "Male",
-  phone: "+91 9871236540",
-  email: "nitin@gmail.com",
-  avatar: "https://i.pravatar.cc/150?img=11",
-  dateOfBirth: "06 April 1994",
-  maritalStatus: "Single",
-  weight: "78kg",
-  height: "5 feet 5 inch",
-  bloodGroup: "A+",
-  address:
-    "#201 1st floor beside colive pg near jeevika hospital bengaluru karnataka-560056",
-  occupation: "IT Profession",
-  emergencyContact: {
-    name: "Sachin S H",
-    relation: "Brother",
-    number: "9876543210",
-  },
-  chronicDiseases: ["Diabetes", "Hypertension", "Asthma"],
-  allergies: ["Pet allergy", "Egg", "Milk"],
-  smokingStatus: "Non-smoker",
-  alcoholConsumption: "Non-drinker",
-  dietType: "Vegetarian",
-};
-
-const MOCK_DOCTOR = {
-  name: "Dr. Ashika Rao",
-  degree: "MBBS MD",
-  specialization: "Dentist Consultation",
-  clinicName: "Arogya Clinic",
-  clinicAddress: "1 main, KR Market, Bengaluru - 580036",
-};
-
-function RowItem({ label, value }: { label: string; value?: string | number }) {
+function RowItem({
+  label,
+  value,
+  numberOfLines,
+  ellipsizeMode,
+}: {
+  label: string;
+  value: string;
+  numberOfLines?: number;
+  ellipsizeMode?: "head" | "middle" | "tail" | "clip";
+}) {
   const theme = useTheme();
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        marginVertical: 2,
-        flexWrap: "wrap",
-      }}
-    >
-      <Text
-        style={{ fontSize: 11, color: theme.colors.primary, marginRight: 4 }}
-      >
+    <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 2 }}>
+      <Text style={{ fontSize: 11, color: theme.colors.primary, marginRight: 4 }}>
         {label}
       </Text>
-      <Text style={{ fontSize: 11, fontWeight: "500", color: "#333" }}>
+      <Text
+        style={{ fontSize: 11, fontWeight: "500", color: "#333", flex: 1 }}
+        numberOfLines={numberOfLines ?? 1}
+        ellipsizeMode={ellipsizeMode ?? "tail"}
+      >
         {value || "--"}
       </Text>
     </View>
@@ -113,7 +93,6 @@ function PastMedicalHistory() {
   const [dicomLoading, setDicomLoading] = useState(false);
   const [dicomError, setDicomError] = useState<string | null>(null);
   const [isDicomExpanded, setIsDicomExpanded] = useState(false);
-
   const tabs: TabItem[] = [
     { id: "Prescription", Icon: Prescription },
     { id: "Laboratory", Icon: LaboratoryIcon },
@@ -149,11 +128,7 @@ function PastMedicalHistory() {
       <Card.Content>
         <Text
           variant="titleMedium"
-          style={{
-            color: theme.colors.primary,
-            fontWeight: "bold",
-            marginBottom: 16,
-          }}
+          style={{ color: theme.colors.primary, fontWeight: "bold", marginBottom: 16 }}
         >
           Past medical history
         </Text>
@@ -201,6 +176,7 @@ function PastMedicalHistory() {
             );
           })}
         </View>
+
         <View style={{ marginTop: 16 }}>
           <Text style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>
             Select date
@@ -214,6 +190,7 @@ function PastMedicalHistory() {
             All
           </Button>
         </View>
+
         {activeTab === "Radiology" ? (
           <View style={{ marginTop: 16 }}>
             {dicomLoading ? (
@@ -244,11 +221,7 @@ function PastMedicalHistory() {
             ) : (
               <>
                 <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginBottom: 10,
-                  }}
+                  style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}
                 >
                   <MaterialCommunityIcons
                     name="radioactive"
@@ -267,11 +240,7 @@ function PastMedicalHistory() {
                   </Text>
                 </View>
                 <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "flex-end",
-                    marginBottom: 8,
-                  }}
+                  style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 8 }}
                 >
                   <Button
                     mode="outlined"
@@ -291,25 +260,21 @@ function PastMedicalHistory() {
                     textAlign: "center",
                   }}
                 >
-                  Drag to adjust Window/Level · Pinch or +/- to zoom · ⊙ resets
-                  view · ☀ inverts
+                  Drag to adjust Window/Level · Pinch or +/- to zoom · ⊙ resets view · ☀ inverts
                 </Text>
               </>
             )}
           </View>
         ) : (
           <View style={{ alignItems: "center", paddingVertical: 24 }}>
-            <MaterialCommunityIcons
-              name="emoticon-sad-outline"
-              size={48}
-              color="#ccc"
-            />
+            <MaterialCommunityIcons name="emoticon-sad-outline" size={48} color="#ccc" />
             <Text style={{ color: "#666", marginTop: 8, fontWeight: "500" }}>
               No past {activeTab.toLowerCase()} history!
             </Text>
           </View>
         )}
       </Card.Content>
+
       <Modal
         visible={isDicomExpanded}
         animationType="slide"
@@ -360,16 +325,13 @@ function ShareWith() {
       distance: "1.2km away",
     },
   ];
+
   return (
     <Card style={styles.card}>
       <Card.Content>
         <Text
           variant="titleMedium"
-          style={{
-            color: theme.colors.primary,
-            fontWeight: "bold",
-            marginBottom: 16,
-          }}
+          style={{ color: theme.colors.primary, fontWeight: "bold", marginBottom: 16 }}
         >
           Share with:
         </Text>
@@ -418,9 +380,8 @@ function ShareWith() {
             );
           })}
         </View>
-        <Text style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>
-          Select address
-        </Text>
+
+        <Text style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>Select address</Text>
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
           <Button
             mode="outlined"
@@ -447,6 +408,7 @@ function ShareWith() {
             Locality ▼
           </Button>
         </View>
+
         {MOCK_PLACES.map((place, i) => (
           <View
             key={place.id}
@@ -457,9 +419,7 @@ function ShareWith() {
               marginBottom: 12,
             }}
           >
-            <Text style={{ fontWeight: "bold", fontSize: 13 }}>
-              {place.name}
-            </Text>
+            <Text style={{ fontWeight: "bold", fontSize: 13 }}>{place.name}</Text>
             <Text style={{ color: "#666", fontSize: 11, marginVertical: 4 }}>
               {place.address}
             </Text>
@@ -486,9 +446,7 @@ function ShareWith() {
                 >
                   {place.phone}
                 </Text>
-                <Text style={{ fontSize: 11, color: "#ccc", marginRight: 8 }}>
-                  |
-                </Text>
+                <Text style={{ fontSize: 11, color: "#ccc", marginRight: 8 }}>|</Text>
                 <MaterialCommunityIcons
                   name="map-marker-outline"
                   size={12}
@@ -517,39 +475,181 @@ export default function ConsultationPage() {
   const route = useRoute<any>();
 
   const [patient, setPatient] = useState<PatientDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [doctor, setDoctor] = useState<DocterDetails | null>(null);
+  const [appointment, setAppointment] = useState<any>(null);
+  const [patientLoading, setPatientLoading] = useState(false);
+  const [doctorLoading, setDoctorLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [finalText, setFinalText] = useState("");   // confirmed text
+  const [liveText, setLiveText] = useState("");     // current speaking text
+  
+  // Voice recognition states
+  const [isListening, setIsListening] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
 
-  const {
-    patient_id,
-    patientId: patientIdParam,
-    appointmentId,
-  } = route.params as any;
-  const patientId: string = patient_id ?? patientIdParam;
+  const params = route.params as any;
+  
+  // Try to get IDs from params first
+  const appointmentId = params?.appointmentId ?? params?.appointment_id ?? params?.id ?? "";
+  const patientId = params?.patient_id ?? params?.patientId ?? params?.patient?.id ?? "";
+  const doctorID = params?.doctor_id ?? params?.doctorID ?? params?.doctor?.id ?? "";
 
-  useEffect(() => {
-    if (patientId) {
-      fetchPatientDetails();
-    } else {
-      setLoading(false);
-      Alert.alert("Error", "Patient ID is missing");
+  console.log("Full params:", JSON.stringify(params, null, 2));
+  console.log("Extracted - appointmentId:", appointmentId, "patientId:", patientId, "doctorID:", doctorID);
+
+  // Request microphone permissions on component mount
+ useEffect(() => {
+  Voice.onSpeechStart = () => {
+    console.log("Started listening");
+  };
+
+  // 🎤 LIVE text (updates while speaking)
+  Voice.onSpeechPartialResults = (event) => {
+    if (event.value?.length) {
+      setLiveText(event.value[0]);
     }
-  }, [patientId]);
+  };
 
-  const fetchPatientDetails = async () => {
+  // ✅ FINAL text (append when speech chunk ends)
+  Voice.onSpeechResults = (event) => {
+    if (event.value?.length) {
+      setFinalText((prev) => prev + " " + event.value[0]);
+      setLiveText(""); // clear live
+    }
+  };
+
+  // ❗ KEEP LISTENING after pause
+  Voice.onSpeechEnd = async () => {
+    console.log("Speech ended → restarting...");
+    if (isListening) {
+      try {
+        await Voice.start("en-US"); // 🔥 restart automatically
+      } catch (e) {
+        console.log("Restart error:", e);
+      }
+    }
+  };
+
+  Voice.onSpeechError = (e) => {
+    console.log("Error:", e);
+  };
+
+  return () => {
+    Voice.destroy().then(Voice.removeAllListeners);
+  };
+}, [isListening]);
+  // Set doctor directly from params without API call
+  useEffect(() => {
+    // Get doctor data from params (passed from DoctorAppointments)
+    const doctorFromParams = params?.doctor;
+    const hospitalFromParams = params?.appointment?.hospital || params?.hospital;
+    
+    if (doctorFromParams) {
+      console.log("Setting doctor from params:", doctorFromParams);
+      const doctorData: DocterDetails = {
+        name: doctorFromParams.name,
+        degree: "", // If not available, keep empty
+        specialization: "", // If not available, keep empty
+        clinicName: hospitalFromParams?.name || "",
+        clinicAddress: hospitalFromParams?.address || ""
+      };
+      setDoctor(doctorData);
+      setDoctorLoading(false);
+    }
+  }, []);
+
+  const fetchPatientData = async (id: string) => {
+    setPatientLoading(true);
     try {
-      setLoading(true);
-      const data = await patientService.getPatientDetails(patientId);
+      const data = await patientService.getPatientDetails(id);
       setPatient(data);
     } catch (err: any) {
       Alert.alert("Error", err?.message ?? "Failed to load patient details");
     } finally {
-      setLoading(false);
+      setPatientLoading(false);
     }
   };
 
+  // Fetch appointment details to get complete data
+  useEffect(() => {
+    const fetchAppointmentDetails = async () => {
+      if (appointmentId && !appointment) {
+        try {
+          console.log("Fetching appointment details for ID:", appointmentId);
+          const response = await ApiService.get(
+            API_ENDPOINTS.APPOINTMENTS.GET_BY_ID(appointmentId)
+          ) as any;
+          
+          const appointmentData = response?.data?.data || response?.data || response;
+          console.log("Parsed appointment data:", appointmentData);
+          
+          setAppointment(appointmentData);
+          
+          // Set patient if not already set
+          if (!patient && appointmentData?.patient?.id) {
+            fetchPatientData(appointmentData.patient.id);
+          }
+          
+          // Set doctor from appointment data if not already set from params
+          if (!doctor && appointmentData?.doctor) {
+            const doctorData: DocterDetails = {
+              name: appointmentData.doctor.name,
+              degree: "", // Will be empty if not in API response
+              specialization: "", // Will be empty if not in API response
+              clinicName: appointmentData.hospital?.name,
+              clinicAddress: appointmentData.hospital?.address
+            };
+            console.log("Setting doctor from appointment API:", doctorData);
+            setDoctor(doctorData);
+            setDoctorLoading(false);
+          }
+          
+        } catch (err) {
+          console.error("Failed to fetch appointment details:", err);
+        }
+      }
+    };
+    
+    fetchAppointmentDetails();
+  }, [appointmentId]);
+
+  // Fetch patient using patientId from params
+  useEffect(() => {
+    if (patientId && !patient) {
+      fetchPatientData(patientId);
+    }
+  }, [patientId]);
+
+ const startListening = async () => {
+  try {
+    setIsListening(true);
+    await Voice.start("en-US");
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const stopListening = async () => {
+  try {
+    setIsListening(false);
+    await Voice.stop();
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+ const toggleVoiceInput = async () => {
+  if (isListening) {
+    await stopListening();
+  } else {
+    await startListening();
+  }
+};  
+  // ── Save notes ──────────────────────────────────────────────────────────────
   const handleSaveNotes = async () => {
     if (!notes.trim()) {
       Alert.alert("Info", "Please add some consultation notes");
@@ -566,13 +666,14 @@ export default function ConsultationPage() {
     }
   };
 
+  // ── Loading / error states ──────────────────────────────────────────────────
+  const loading = patientLoading;
+
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={{ marginTop: 16, color: "#666" }}>
-          Loading patient details…
-        </Text>
+        <Text style={{ marginTop: 16, color: "#666" }}>Loading details…</Text>
       </View>
     );
   }
@@ -603,7 +704,7 @@ export default function ConsultationPage() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* ── Header ── */}
       <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.headerTop}>
           <IconButton
@@ -611,11 +712,19 @@ export default function ConsultationPage() {
             onPress={() => navigation.goBack()}
             style={{ margin: 0, padding: 0 }}
           />
-          <Avatar.Image
-            size={42}
-            source={{ uri: patient.avatar }}
-            style={{ marginHorizontal: 12 }}
-          />
+          {avatarUri ? (
+            <Avatar.Image
+              size={42}
+              source={{ uri: avatarUri }}
+              style={{ marginHorizontal: 12 }}
+            />
+          ) : (
+            <Avatar.Text
+              size={42}
+              label={patient.name?.slice(0, 2).toUpperCase() ?? "?"}
+              style={{ marginHorizontal: 12 }}
+            />
+          )}
           <View style={{ flex: 1 }}>
             <Text variant="titleMedium" style={{ fontWeight: "bold" }}>
               {patient.name}
@@ -642,58 +751,39 @@ export default function ConsultationPage() {
 
         {/* Tabs */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 0 && {
-                borderBottomColor: theme.colors.primary,
-                borderBottomWidth: 2,
-              },
-            ]}
-            onPress={() => setActiveTab(0)}
-          >
-            <Text
+          {["Info & Timeline", "Vitals"].map((label, idx) => (
+            <TouchableOpacity
+              key={label}
               style={[
-                styles.tabText,
-                activeTab === 0 && {
-                  color: theme.colors.primary,
-                  fontWeight: "bold",
+                styles.tab,
+                activeTab === idx && {
+                  borderBottomColor: theme.colors.primary,
+                  borderBottomWidth: 2,
                 },
               ]}
+              onPress={() => setActiveTab(idx)}
             >
-              Info & Timeline
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 1 && {
-                borderBottomColor: theme.colors.primary,
-                borderBottomWidth: 2,
-              },
-            ]}
-            onPress={() => setActiveTab(1)}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 1 && {
-                  color: theme.colors.primary,
-                  fontWeight: "bold",
-                },
-              ]}
-            >
-              Vitals
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === idx && {
+                    color: theme.colors.primary,
+                    fontWeight: "bold",
+                  },
+                ]}
+              >
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
-      {/* Content Container */}
+      {/* ── Content ── */}
       <ScrollView contentContainerStyle={styles.content}>
         {activeTab === 0 && (
           <View>
-            {/* Patient Details EXACT Mapping */}
+            {/* Patient Details */}
             <Card style={styles.card}>
               <Card.Content>
                 <Text
@@ -709,16 +799,29 @@ export default function ConsultationPage() {
 
                 <View style={{ flexDirection: "row", marginBottom: 12 }}>
                   <View style={{ marginRight: 16 }}>
+                  {avatarUri ? (
                     <Avatar.Image
                       size={70}
-                      source={{ uri: patient.avatar }}
+                      source={{ uri: avatarUri }}
                       style={{ borderRadius: 8 }}
                     />
+                  ) : (
+                    <Avatar.Text
+                      size={70}
+                      label={patient.name?.slice(0, 2).toUpperCase() ?? "?"}
+                      style={{ borderRadius: 8 }}
+                    />
+                  )}
                   </View>
                   <View style={{ flex: 1, flexDirection: "row" }}>
                     <View style={{ flex: 1 }}>
                       <RowItem label="Name:" value={patient.name} />
-                      <RowItem label="Patient ID:" value={patient.id} />
+                      <RowItem
+                        label="Patient ID:"
+                        value={patient.id}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      />
                       <RowItem
                         label="Age:"
                         value={patient.age ? `${patient.age} years` : "-"}
@@ -739,13 +842,7 @@ export default function ConsultationPage() {
                         >
                           Phone:
                         </Text>
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            fontWeight: "500",
-                            color: "#333",
-                          }}
-                        >
+                        <Text style={{ fontSize: 11, fontWeight: "500", color: "#333" }}>
                           {patient.phone}
                         </Text>
                         <MaterialCommunityIcons
@@ -756,6 +853,7 @@ export default function ConsultationPage() {
                         />
                       </View>
                     </View>
+
                     <View
                       style={{
                         width: 1,
@@ -763,6 +861,7 @@ export default function ConsultationPage() {
                         marginHorizontal: 8,
                       }}
                     />
+
                     <View style={{ flex: 1 }}>
                       <RowItem label="Gender:" value={patient.gender} />
                       <RowItem label="Blood:" value={patient.blood_group} />
@@ -807,16 +906,13 @@ export default function ConsultationPage() {
                       Emergency Contact:
                     </Text>
                     <Text style={{ fontSize: 11, fontWeight: "bold" }}>
-                      {patient.emergency_contact.name}
+                      {patient.emergency_contact?.name ?? "--"}
                     </Text>
-                    {/* <Text style={{ fontSize: 10, color: '#666' }}>({patient.emergency_contact.relation})</Text> */}
                     <Text style={{ fontSize: 10, color: "#666" }}>
-                      {patient.emergency_contact.relation
-                        ? `${patient.emergency_contact.relation} years`
-                        : "-"}
+                      {patient.emergency_contact?.relation ?? "--"}
                     </Text>
                     <Text style={{ fontSize: 10, color: "#d32f2f" }}>
-                      {patient.emergency_contact.number}
+                      {patient.emergency_contact?.number ?? "--"}
                     </Text>
                   </View>
                 </View>
@@ -828,7 +924,7 @@ export default function ConsultationPage() {
                     <Text style={{ fontSize: 11, color: theme.colors.primary }}>
                       Chronic diseases:
                     </Text>
-                    {patient.chronic_diseases.map((d, i) => (
+                    {(patient.chronic_diseases ?? []).map((d, i) => (
                       <Text key={i} style={{ fontSize: 10 }}>
                         {" "}
                         {d}
@@ -838,17 +934,14 @@ export default function ConsultationPage() {
                   <View style={{ flex: 1.5 }}>
                     <RowItem label="Occupation:" value={patient.occupation} />
                     <RowItem label="Smoking:" value={patient.smoking_status} />
-                    <RowItem
-                      label="Alcohol:"
-                      value={patient.alcohol_consumption}
-                    />
+                    <RowItem label="Alcohol:" value={patient.alcohol_consumption} />
                     <RowItem label="Diet:" value={patient.diet_type} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 11, color: theme.colors.primary }}>
                       Allergies:
                     </Text>
-                    {patient.allergies.map((a, i) => (
+                    {(patient.allergies ?? []).map((a, i) => (
                       <Text key={i} style={{ fontSize: 10 }}>
                         {" "}
                         {a}
@@ -859,17 +952,16 @@ export default function ConsultationPage() {
               </Card.Content>
             </Card>
 
-            {/* NEW: Past Medical History Component */}
+            {/* Past Medical History */}
             <PastMedicalHistory />
 
-            {/* Consultation Notes Emulator */}
+            {/* Consultation Notes */}
             <Card
               style={[
                 styles.card,
                 { borderColor: theme.colors.primary, borderWidth: 1 },
               ]}
             >
-              {/* Doctor Header Banner inside notes */}
               <View style={styles.notesHeader}>
                 <View style={{ flex: 1 }}>
                   <Text
@@ -879,10 +971,11 @@ export default function ConsultationPage() {
                       fontSize: 12,
                     }}
                   >
-                    {MOCK_DOCTOR.name}, {MOCK_DOCTOR.degree}
+                    {doctor?.name ?? "--"}
+                    {doctor?.degree ? `, ${doctor.degree}` : ""}
                   </Text>
                   <Text style={{ color: theme.colors.primary, fontSize: 10 }}>
-                    {MOCK_DOCTOR.specialization}
+                    {doctor?.specialization ?? ""}
                   </Text>
                 </View>
                 <View style={{ flex: 1, alignItems: "flex-end" }}>
@@ -893,57 +986,54 @@ export default function ConsultationPage() {
                       fontSize: 12,
                     }}
                   >
-                    {MOCK_DOCTOR.clinicName}
+                    {doctor?.clinicName ?? ""}
                   </Text>
                   <Text style={{ color: theme.colors.primary, fontSize: 10 }}>
-                    {MOCK_DOCTOR.clinicAddress}
+                    {doctor?.clinicAddress ?? ""}
                   </Text>
                 </View>
               </View>
               <Divider />
-              {/* Editor Toolbar Mock */}
               <View style={styles.editorToolbar}>
-                <MaterialCommunityIcons
-                  name="undo"
-                  size={18}
-                  color="#666"
-                  style={{ marginHorizontal: 6 }}
-                />
-                <MaterialCommunityIcons
-                  name="redo"
-                  size={18}
-                  color="#666"
-                  style={{ marginHorizontal: 6 }}
-                />
-                <MaterialCommunityIcons
-                  name="format-text"
-                  size={18}
-                  color="#666"
-                  style={{ marginHorizontal: 6 }}
-                />
-                <MaterialCommunityIcons
-                  name="camera-outline"
-                  size={18}
-                  color="#666"
-                  style={{ marginHorizontal: 6 }}
-                />
-                <MaterialCommunityIcons
-                  name="microphone-outline"
-                  size={18}
-                  color="#666"
-                  style={{ marginHorizontal: 6 }}
-                />
-                <MaterialCommunityIcons
-                  name="format-list-bulleted"
-                  size={18}
-                  color="#666"
-                  style={{ marginHorizontal: 6 }}
-                />
+                {(
+                  [
+                    "undo",
+                    "redo",
+                    "format-text",
+                    "camera-outline",
+                    "format-list-bulleted",
+                  ] as const
+                ).map((icon) => (
+                  <MaterialCommunityIcons
+                    key={icon}
+                    name={icon}
+                    size={18}
+                    color="#666"
+                    style={{ marginHorizontal: 6 }}
+                  />
+                ))}
+                
+                {/* Microphone button with voice recording state */}
+                <TouchableOpacity onPress={toggleVoiceInput}>
+                  <MaterialCommunityIcons
+                    name={isListening ? "microphone" : "microphone-outline"}
+                    size={18}
+                    color={isListening ? "#e53935" : "#666"}
+                    style={{ marginHorizontal: 6 }}
+                  />
+                </TouchableOpacity>
+                
+                {/* Recording indicator */}
+                {isListening && (
+                  <View style={styles.recordingIndicator}>
+                    <View style={styles.recordingDot} />
+                    <Text style={styles.recordingText}>Recording...</Text>
+                  </View>
+                )}
               </View>
               <Divider />
-              {/* Multiline TextInput substituting Canvas */}
               <NativeInput
-                placeholder="Type or draw consultation notes here..."
+                placeholder="Type or tap the microphone to speak your consultation notes..."
                 multiline
                 textAlignVertical="top"
                 value={notes}
@@ -952,14 +1042,16 @@ export default function ConsultationPage() {
               />
             </Card>
 
-            {/* NEW: Share With Component */}
+            {/* Share With */}
             <ShareWith />
 
             <Button
               mode="contained"
+              loading={saving}
+              onPress={handleSaveNotes}
               style={{ marginHorizontal: 16, marginBottom: 32 }}
             >
-              Save & Confirm Session
+              Save 
             </Button>
           </View>
         )}
@@ -973,60 +1065,57 @@ export default function ConsultationPage() {
               >
                 Vitals History
               </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  paddingVertical: 8,
-                  borderBottomWidth: 1,
-                  borderBottomColor: "#f0f0f0",
-                }}
-              >
-                <Text style={{ color: "#666", fontWeight: "500" }}>
-                  Heart Rate
-                </Text>
-                <Text style={{ fontWeight: "bold" }}>72 bpm</Text>
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  paddingVertical: 8,
-                  borderBottomWidth: 1,
-                  borderBottomColor: "#f0f0f0",
-                }}
-              >
-                <Text style={{ color: "#666", fontWeight: "500" }}>
-                  Blood Pressure
-                </Text>
-                <Text style={{ fontWeight: "bold", color: "#d32f2f" }}>
-                  140/90 mmHg
-                </Text>
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  paddingVertical: 8,
-                }}
-              >
-                <Text style={{ color: "#666", fontWeight: "500" }}>
-                  Temperature
-                </Text>
-                <Text style={{ fontWeight: "bold" }}>98.6 Â°F</Text>
-              </View>
+              {[
+                { label: "Heart Rate", value: "72 bpm", color: "#333" },
+                { label: "Blood Pressure", value: "140/90 mmHg", color: "#d32f2f" },
+                { label: "Temperature", value: "98.6 °F", color: "#333" },
+              ].map((vital, i, arr) => (
+                <View
+                  key={vital.label}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    paddingVertical: 8,
+                    borderBottomWidth: i < arr.length - 1 ? 1 : 0,
+                    borderBottomColor: "#f0f0f0",
+                  }}
+                >
+                  <Text style={{ color: "#666", fontWeight: "500" }}>{vital.label}</Text>
+                  <Text style={{ fontWeight: "bold", color: vital.color }}>{vital.value}</Text>
+                </View>
+              ))}
             </Card.Content>
           </Card>
         )}
       </ScrollView>
+      
+      {/* Snackbar for feedback messages */}
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+        action={{
+          label: 'OK',
+          onPress: () => setSnackbarVisible(false),
+        }}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </View>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f7fa",
+  },
+  centerContent: {
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
   },
   header: {
     paddingTop: 48,
@@ -1074,6 +1163,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: 8,
     backgroundColor: "#fafafa",
+    alignItems: "center",
   },
   textArea: {
     height: 160,
@@ -1101,5 +1191,21 @@ const styles = StyleSheet.create({
   },
   dicomModalBody: {
     flex: 1,
+  },
+  recordingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#e53935",
+    marginRight: 4,
+  },
+  recordingText: {
+    fontSize: 10,
+    color: "#e53935",
   },
 });
