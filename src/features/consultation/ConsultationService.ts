@@ -36,6 +36,14 @@ export interface PatientDetails {
   family_history?: string;
 }
 
+export interface DocterDetails {
+  
+  name: string;
+  degree: string;
+  specialization: string;
+  clinicName: string;
+  clinicAddress: string;
+}
 /**
  * API response shape:
  * {
@@ -126,6 +134,34 @@ export const patientService = {
       return patient;
     } catch (err: any) {
       console.error("[patientService] error:", err);
+      throw err;
+    }
+  },
+};
+
+export const doctorService = {
+  getDoctorDetails: async (doctorId: string): Promise<DocterDetails> => {
+    try {
+      // Use the doctorId parameter in the API call
+      const response = await ApiService.get(
+        `${API_ENDPOINTS.DOCTOR_PROFILE.DETAILS}/${doctorId}` // Pass doctorId to the endpoint
+      );  
+      return (response as any).data.data;
+    } catch (err: any) {
+      console.error("[doctorService] error:", err);
+      throw err;
+    }
+  },
+
+  updateDoctorProfile: async (profileData: any) => {
+    try {
+      const response = await ApiService.put(
+        `${API_ENDPOINTS.DOCTOR_PROFILE.DETAILS}`, // Use DETAILS or add UPDATE to constants
+        profileData,
+      );
+      return response.data;
+    } catch (err: any) {
+      console.error("[doctorService] error:", err);
       throw err;
     }
   },

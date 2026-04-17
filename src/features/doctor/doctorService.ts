@@ -188,6 +188,7 @@ export const mapDoctorProfileApi = (data: DoctorProfileApiData): DoctorProfile =
 	const hospitals: DoctorProfile['hospitals'] = data.hospitals.map((h) => ({
 		id: h.id,
 		name: h.hospital.name,
+		
 		location: h.hospital.address,
 		fullAddress: h.hospital.address,
 		isPrimary: h.is_primary,

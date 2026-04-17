@@ -41,13 +41,19 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string | number) => `${BASE_URL}/api/users/${id}`,
     DELETE: (id: string | number) => `${BASE_URL}/api/users/${id}`,
   },
-  APPOINTMENTS: {
-    GET: `${BASE_URL}/api/appointments`,
-    CREATE: `${BASE_URL}/api/appointments`,
-    GET_BY_ID: (id: number) => `${BASE_URL}/api/appointments/${id}`,
+  // APPOINTMENTS: {
+  //   GET: `${BASE_URL}/api/appointments`,
+  //   CREATE: `${BASE_URL}/api/appointments`,
+  //   GET_BY_ID: (id: number) => `${BASE_URL}/api/appointments/${id}`,
 
-    UPDATE: `${BASE_URL}/api/appointments/update-status`,
-  },
+  //   UPDATE: `${BASE_URL}/api/appointments/update-status`,
+  // },
+  APPOINTMENTS: {
+  GET: `${BASE_URL}/api/appointments`,
+  CREATE: `${BASE_URL}/api/appointments`,
+  GET_BY_ID: (id: string) => `${BASE_URL}/api/appointments/${id}`,  // Add this
+  UPDATE: `${BASE_URL}/api/appointments/update-status`,
+},
   // constants/apiUrls.ts  — add inside API_ENDPOINTS
 
   PATIENT: {
@@ -56,4 +62,5 @@ export const API_ENDPOINTS = {
     GET_BY_PUBLIC_ID: (publicId: string) =>
       `${BASE_URL}/api/patients/${publicId}/details`,
   },
+  
 };
