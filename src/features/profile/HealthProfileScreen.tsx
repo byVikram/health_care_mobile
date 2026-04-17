@@ -6,6 +6,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
+import * as ImagePicker from "expo-image-picker";
 
 import HealthProfileField from './HealthProfileField'
 import { PROFILE_TABS } from './profileFieldsConfig'
@@ -133,7 +134,7 @@ function calcCompletion(data: Record<string, string>): number {
 
 /* ──────────────── MAIN SCREEN ──────────────── */
 
-export default function HealthProfileScreen({ onUploadPhoto }: any) {
+export default function HealthProfileScreen() {
 	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
 
@@ -200,14 +201,14 @@ export default function HealthProfileScreen({ onUploadPhoto }: any) {
 
   <View style={styles.avatarCol}>
     <TouchableOpacity onPress={onUploadPhoto}>
-      {data.photoUrl ? (
-        <Image source={{ uri: data.photoUrl }} style={styles.avatarImg} />
-      ) : (
-        <View style={styles.avatarPlaceholder}>
-          <MaterialCommunityIcons name="account" size={32} color="#9aabb0" />
-        </View>
-      )}
-    </TouchableOpacity>
+  {data.photoUrl ? (
+    <Image source={{ uri: data.photoUrl }} style={styles.avatarImg} />
+  ) : (
+    <View style={styles.avatarPlaceholder}>
+      <MaterialCommunityIcons name="account" size={32} color="#9aabb0" />
+    </View>
+  )}
+</TouchableOpacity>
 
    
   </View>
@@ -232,6 +233,58 @@ export default function HealthProfileScreen({ onUploadPhoto }: any) {
 	const currentTabConfig = PROFILE_TABS.find(t => t.tab === activeTab)!
 
 	if (loading) return <HealthProfileSkeleton />
+	const onUploadPhoto = () => {
+  Alert.alert("Upload Photo", "Choose an option", [
+    { text: "Camera", onPress: openCamera },
+    { text: "Gallery", onPress: openGallery },
+    { text: "Cancel", style: "cancel" },
+  ]);
+};
+
+const openCamera = async () => {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+  if (!permission.granted) {
+    Alert.alert("Permission required", "Camera access is needed");
+    return;
+  }
+
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.7,
+  });
+
+  if (!result.canceled) {
+    handleImage(result.assets[0].uri);
+  }
+};
+
+const openGallery = async () => {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (!permission.granted) {
+    Alert.alert("Permission required", "Gallery access is needed");
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.7,
+  });
+
+  if (!result.canceled) {
+    handleImage(result.assets[0].uri);
+  }
+};
+
+const handleImage = (uri: string) => {
+  setData((prev) => ({
+    ...prev,
+    photoUrl: uri,
+  }));
+
+  // 🔥 Optional: call API here to upload image
+};
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
