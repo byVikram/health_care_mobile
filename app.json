@@ -1,17 +1,17 @@
 {
 	"expo": {
-		"name": "Karola Health",
-		"slug": "Karola Health",
+		"name": "KarolaHealth",
+		"slug": "karola-health",
 		"version": "1.0.0",
 		"orientation": "default",
 		"icon": "./assets/icon.png",
 		"userInterfaceStyle": "light",
 		"newArchEnabled": true,
-		"scheme": "Karola Health",
+		"scheme": "karola-health",
 		"splash": {
 			"image": "./assets/splash-icon.png",
 			"resizeMode": "contain",
-			"backgroundColor": "#e3f2fd"
+			"backgroundColor": "#2B6F71"
 		},
 		"updates": {
 			"enabled": true,
@@ -27,12 +27,7 @@
 			},
 			"edgeToEdgeEnabled": true,
 			"predictiveBackGestureEnabled": false,
-			"permissions": [
-				"android.permission.CAMERA",
-				"android.permission.RECORD_AUDIO",
-				"android.permission.CAMERA",
-				"android.permission.RECORD_AUDIO"
-			],
+			"permissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"],
 			"package": "com.anonymous.KarolaHealth"
 		},
 		"web": {
@@ -49,6 +44,11 @@
 				}
 			]
 		],
-		"assetBundlePatterns": ["**/*"]
+		"assetBundlePatterns": ["**/*"],
+		"extra": {
+			"eas": {
+				"projectId": "be30adb0-6145-4e61-8230-850c35795970"
+			}
+		}
 	}
 }
