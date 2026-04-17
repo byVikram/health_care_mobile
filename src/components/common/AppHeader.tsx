@@ -7,6 +7,7 @@ import {
 	TextInput,
 	View,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -24,6 +25,7 @@ export default function AppHeader({
 	onAvatarPress,
 }: AppHeaderProps) {
 	const insets = useSafeAreaInsets();
+	const navigation = useNavigation<any>();
 
 	return (
 		<View style={[styles.wrapper, { paddingTop: insets.top + 16 }]}>
@@ -62,7 +64,10 @@ export default function AppHeader({
 				</Pressable>
 
 				<View style={styles.actionsRow}>
-					<Pressable style={styles.actionButton}>
+					<Pressable
+						style={styles.actionButton}
+						onPress={() => navigation.navigate("Notification")}
+					>
 						<MaterialCommunityIcons
 							name="bell-outline"
 							size={22}
@@ -70,7 +75,10 @@ export default function AppHeader({
 						/>
 						<View style={styles.notificationDot} />
 					</Pressable>
-					<Pressable style={styles.actionButton}>
+					<Pressable
+						style={styles.actionButton}
+						onPress={() => navigation.navigate("FavouriteDoctor")}
+					>
 						<MaterialCommunityIcons
 							name="heart-outline"
 							size={22}
