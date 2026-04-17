@@ -18,6 +18,8 @@ import OnboardingPage from '../features/onboarding/OnboardingPage'
 import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
 import HealthProfileScreen from '../features/profile/HealthProfileScreen' // ← NEW
+import MyDoctorPage from '../features/patient/MyDoctorPage'
+import NotificationPage from '../features/notification/NotificationPage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 
 const Stack = createNativeStackNavigator()
@@ -98,6 +100,8 @@ export default function AppNavigator() {
 					<>
 						<Stack.Screen name="MainTabs" component={MainTabNavigator} />
 						<Stack.Screen name="DoctorDetail" component={DoctorDetailPage} />
+						<Stack.Screen name="FavouriteDoctor" component={MyDoctorPage} />
+						<Stack.Screen name="Notification" component={NotificationPage} />
 						<Stack.Screen name="Consultation" component={ConsultationPage} />
 						<Stack.Screen name="HealthProfile" component={HealthProfileScreen} />
 					</>
