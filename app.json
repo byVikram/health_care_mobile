@@ -6,7 +6,7 @@
 		"orientation": "default",
 		"icon": "./assets/icon.png",
 		"userInterfaceStyle": "light",
-		"newArchEnabled": true,
+		"newArchEnabled": false,
 		"scheme": "karola-health",
 		"splash": {
 			"image": "./assets/splash-icon.png",
@@ -18,12 +18,12 @@
 			"fallbackToCacheTimeout": 0
 		},
 		"ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
-        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes."
-      }
-    },
+			"supportsTablet": true,
+			"infoPlist": {
+				"NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
+				"NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes."
+			}
+		},
 		"android": {
 			"adaptiveIcon": {
 				"foregroundImage": "./assets/adaptive-icon.png",
@@ -39,22 +39,15 @@
 			"bundler": "metro"
 		},
 		"plugins": [
-      "expo-asset",
-      "@react-native-community/datetimepicker",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow access to scan patient QR codes."
-        }
-      ],
-      [
-        "expo-speech-transcriber",
-        {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
-          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes."
-        }
-      ]
-    ],
+			"expo-asset",
+			"@react-native-community/datetimepicker",
+			[
+				"expo-camera",
+				{
+					"cameraPermission": "Allow access to scan patient QR codes."
+				}
+			]
+		],
 		"assetBundlePatterns": ["**/*"],
 		"extra": {
 			"eas": {
