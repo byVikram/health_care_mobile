@@ -13,28 +13,26 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.anonymous.KarolaHealth"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes."
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "plugins": [
       "expo-asset",
       "@react-native-community/datetimepicker",
@@ -43,10 +41,14 @@
         {
           "cameraPermission": "Allow access to scan patient QR codes."
         }
+      ],
+      [
+        "expo-speech-transcriber",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
+          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes."
+        }
       ]
-    ],
-    "assetBundlePatterns": [
-      "**/*"
     ]
   }
 }
