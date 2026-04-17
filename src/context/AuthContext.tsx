@@ -88,7 +88,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 	const handleClearAuth = async () => {
 		try {
-			await AsyncStorage.multiRemove(['role', 'user', 'access_token', 'refresh_token'])
+			await AsyncStorage.multiRemove([
+				'role',
+				'user',
+				'access_token',
+				'refresh_token',
+			])
 			setRole(null)
 			setUser(null)
 			setAccessToken(null)
@@ -120,10 +125,15 @@ export const useAuth = () => useContext(AuthContext)
 // Utility function to clear auth from outside React components
 // (e.g. from axios interceptor)
 export const clearAuthStorage = async () => {
-	await AsyncStorage.multiRemove(['role', 'user', 'access_token', 'refresh_token'])
+	await AsyncStorage.multiRemove([
+		'role',
+		'user',
+		'access_token',
+		'refresh_token',
+	])
 	// Navigate to login screen
 	if (navigationRef.current) {
-		navigationRef.current.navigate('Login')
+		navigationRef.current.navigate('Onboarding')
 	}
 	// To actually update state, you'd trigger a global event or the app will just
 	// rely on the AuthStack handling unauthenticated requests when the token is missing.

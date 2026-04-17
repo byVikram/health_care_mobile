@@ -14,6 +14,7 @@ import DashboardPage from '../features/dashboard/DashboardPage'
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
 import ConsultationPage from '../features/consultation/ConsultationPage'
+import OnboardingPage from '../features/onboarding/OnboardingPage'
 import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
 import HealthProfileScreen from '../features/profile/HealthProfileScreen' // ← NEW
@@ -62,6 +63,7 @@ function HomeWithSidebar() {
 export default function AppNavigator() {
 	const { accessToken, isLoading } = useAuth()
 	const theme = useTheme()
+	const navigatorKey = accessToken == null ? 'guest-onboarding' : 'authenticated'
 
 	if (isLoading) {
 		return (
@@ -72,11 +74,24 @@ export default function AppNavigator() {
 	}
 
 	return (
-		<NavigationContainer ref={navigationRef}>
-			<Stack.Navigator screenOptions={{ headerShown: false }}>
+		<NavigationContainer key={navigatorKey} ref={navigationRef}>
+			<Stack.Navigator
+				key={navigatorKey}
+				screenOptions={{ headerShown: false }}
+				initialRouteName={accessToken == null ? 'Onboarding' : 'MainTabs'}
+			>
 				{accessToken == null ? (
 					<>
-						<Stack.Screen name="Login" component={LoginPage} />
+						<Stack.Screen
+							name="Onboarding"
+							component={OnboardingPage}
+							options={{ animation: 'none' }}
+						/>
+						<Stack.Screen
+							name="Login"
+							component={LoginPage}
+							options={{ animation: 'none' }}
+						/>
 						<Stack.Screen name="Register" component={RegisterPage} />
 					</>
 				) : (

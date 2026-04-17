@@ -97,7 +97,7 @@ function usePingPongScroll(
   length: number,
   intervalMs: number,
   enabled: boolean,
-  flatListRef: React.RefObject<FlatList>,
+  flatListRef: React.RefObject<FlatList | null>,
   setActiveIndex: React.Dispatch<React.SetStateAction<number>>,
 ) {
   const directionRef = useRef<1 | -1>(1); // 1 = forward, -1 = backward

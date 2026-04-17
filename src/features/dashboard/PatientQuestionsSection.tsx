@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
 	questionBody: {
 		fontSize: 15,
 		color: "#000",
-		lineHeight: 29.94,
+		lineHeight: 20,
 	},
 	answerCountBar: {
 		flexDirection: "row",
