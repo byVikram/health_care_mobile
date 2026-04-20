@@ -6,12 +6,13 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
+import * as ImagePicker from "expo-image-picker";
 
 import HealthProfileField from './HealthProfileField'
 import { PROFILE_TABS } from './profileFieldsConfig'
 import type { TabConfig } from './profileFieldsConfig'
 import { getPatientDetails, patchPatientDetails, mapApiDataToLocalState } from './ProfileService'
-
+import PatientQR from "../../assets/icons/PatientQR.svg";
 type Tab = 'Personal' | 'Medical' | 'Life style'
 const TEAL = '#1a8c8c'
 
@@ -133,7 +134,7 @@ function calcCompletion(data: Record<string, string>): number {
 
 /* ──────────────── MAIN SCREEN ──────────────── */
 
-export default function HealthProfileScreen({ onUploadPhoto }: any) {
+export default function HealthProfileScreen() {
 	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
 
@@ -187,33 +188,38 @@ export default function HealthProfileScreen({ onUploadPhoto }: any) {
 	}
 
 	const renderTab = (tabCfg: TabConfig) => (
+		
 		<>
+		
 			{tabCfg.tab === 'Personal' && (
 				<>
 					<View style={styles.nameAvatarRow}>
-						<View>
-							<Text style={styles.fieldSmallLabel}>Name</Text>
-							<Text style={styles.nameValue}>{data.name || '—'}</Text>
-						</View>
+  <View>
+    <Text style={styles.fieldSmallLabel}>Name</Text>
+    <Text style={styles.nameValue}>{data.name || '—'}</Text>
+  </View>
 
-						<View style={styles.avatarCol}>
-							<TouchableOpacity onPress={onUploadPhoto}>
-								{data.photoUrl ? (
-									<Image source={{ uri: data.photoUrl }} style={styles.avatarImg} />
-								) : (
-									<View style={styles.avatarPlaceholder}>
-										<MaterialCommunityIcons name="account" size={32} color="#9aabb0" />
-									</View>
-								)}
-							</TouchableOpacity>
-						</View>
-					</View>
+  <View style={styles.avatarCol}>
+    <TouchableOpacity onPress={onUploadPhoto}>
+  {data.photoUrl ? (
+    <Image source={{ uri: data.photoUrl }} style={styles.avatarImg} />
+  ) : (
+    <View style={styles.avatarPlaceholder}>
+      <MaterialCommunityIcons name="account" size={32} color="#9aabb0" />
+    </View>
+  )}
+</TouchableOpacity>
+
+   
+  </View>
+</View>
 
 					<View style={styles.divider} />
 				</>
 			)}
 
 			{tabCfg.fields.map(field => (
+				
 				<HealthProfileField
 					key={field.key}
 					config={field}
@@ -227,6 +233,58 @@ export default function HealthProfileScreen({ onUploadPhoto }: any) {
 	const currentTabConfig = PROFILE_TABS.find(t => t.tab === activeTab)!
 
 	if (loading) return <HealthProfileSkeleton />
+	const onUploadPhoto = () => {
+  Alert.alert("Upload Photo", "Choose an option", [
+    { text: "Camera", onPress: openCamera },
+    { text: "Gallery", onPress: openGallery },
+    { text: "Cancel", style: "cancel" },
+  ]);
+};
+
+const openCamera = async () => {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+  if (!permission.granted) {
+    Alert.alert("Permission required", "Camera access is needed");
+    return;
+  }
+
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.7,
+  });
+
+  if (!result.canceled) {
+    handleImage(result.assets[0].uri);
+  }
+};
+
+const openGallery = async () => {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (!permission.granted) {
+    Alert.alert("Permission required", "Gallery access is needed");
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.7,
+  });
+
+  if (!result.canceled) {
+    handleImage(result.assets[0].uri);
+  }
+};
+
+const handleImage = (uri: string) => {
+  setData((prev) => ({
+    ...prev,
+    photoUrl: uri,
+  }));
+
+  // 🔥 Optional: call API here to upload image
+};
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
@@ -302,6 +360,10 @@ const styles = StyleSheet.create({
 		borderColor: '#c5d0d3',
 		alignItems: 'center',
 	},
+	qrContainer: {
+  marginTop: 10,
+  alignItems: "center",
+},
 	tabActive: { backgroundColor: '#1a6e6e', borderColor: '#1a6e6e' },
 	tabTxt: { fontSize: 13, fontWeight: '500', color: '#5a6c72' },
 	tabTxtActive: { color: '#fff' },
