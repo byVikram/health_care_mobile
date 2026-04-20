@@ -72,7 +72,7 @@ function HealthProfileSkeleton() {
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
-			
+
 			{/* Header */}
 			<View style={styles.header}>
 				<AppSkeleton width={180} height={18} />
@@ -188,38 +188,38 @@ export default function HealthProfileScreen() {
 	}
 
 	const renderTab = (tabCfg: TabConfig) => (
-		
+
 		<>
-		
+
 			{tabCfg.tab === 'Personal' && (
 				<>
 					<View style={styles.nameAvatarRow}>
-  <View>
-    <Text style={styles.fieldSmallLabel}>Name</Text>
-    <Text style={styles.nameValue}>{data.name || '—'}</Text>
-  </View>
+						<View>
+							<Text style={styles.fieldSmallLabel}>Name</Text>
+							<Text style={styles.nameValue}>{data.name || '—'}</Text>
+						</View>
 
-  <View style={styles.avatarCol}>
-    <TouchableOpacity onPress={onUploadPhoto}>
-  {data.photoUrl ? (
-    <Image source={{ uri: data.photoUrl }} style={styles.avatarImg} />
-  ) : (
-    <View style={styles.avatarPlaceholder}>
-      <MaterialCommunityIcons name="account" size={32} color="#9aabb0" />
-    </View>
-  )}
-</TouchableOpacity>
+						<View style={styles.avatarCol}>
+							<TouchableOpacity onPress={onUploadPhoto}>
+								{data.photoUrl ? (
+									<Image source={{ uri: data.photoUrl }} style={styles.avatarImg} />
+								) : (
+									<View style={styles.avatarPlaceholder}>
+										<MaterialCommunityIcons name="account" size={32} color="#9aabb0" />
+									</View>
+								)}
+							</TouchableOpacity>
 
-   
-  </View>
-</View>
+
+						</View>
+					</View>
 
 					<View style={styles.divider} />
 				</>
 			)}
 
 			{tabCfg.fields.map(field => (
-				
+
 				<HealthProfileField
 					key={field.key}
 					config={field}
@@ -234,61 +234,61 @@ export default function HealthProfileScreen() {
 
 	if (loading) return <HealthProfileSkeleton />
 	const onUploadPhoto = () => {
-  Alert.alert("Upload Photo", "Choose an option", [
-    { text: "Camera", onPress: openCamera },
-    { text: "Gallery", onPress: openGallery },
-    { text: "Cancel", style: "cancel" },
-  ]);
-};
+		Alert.alert("Upload Photo", "Choose an option", [
+			{ text: "Camera", onPress: openCamera },
+			{ text: "Gallery", onPress: openGallery },
+			{ text: "Cancel", style: "cancel" },
+		]);
+	};
 
-const openCamera = async () => {
-  const permission = await ImagePicker.requestCameraPermissionsAsync();
+	const openCamera = async () => {
+		const permission = await ImagePicker.requestCameraPermissionsAsync();
 
-  if (!permission.granted) {
-    Alert.alert("Permission required", "Camera access is needed");
-    return;
-  }
+		if (!permission.granted) {
+			Alert.alert("Permission required", "Camera access is needed");
+			return;
+		}
 
-  const result = await ImagePicker.launchCameraAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    quality: 0.7,
-  });
+		const result = await ImagePicker.launchCameraAsync({
+			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			quality: 0.7,
+		});
 
-  if (!result.canceled) {
-    handleImage(result.assets[0].uri);
-  }
-};
+		if (!result.canceled) {
+			handleImage(result.assets[0].uri);
+		}
+	};
 
-const openGallery = async () => {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+	const openGallery = async () => {
+		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-  if (!permission.granted) {
-    Alert.alert("Permission required", "Gallery access is needed");
-    return;
-  }
+		if (!permission.granted) {
+			Alert.alert("Permission required", "Gallery access is needed");
+			return;
+		}
 
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    quality: 0.7,
-  });
+		const result = await ImagePicker.launchImageLibraryAsync({
+			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			quality: 0.7,
+		});
 
-  if (!result.canceled) {
-    handleImage(result.assets[0].uri);
-  }
-};
+		if (!result.canceled) {
+			handleImage(result.assets[0].uri);
+		}
+	};
 
-const handleImage = (uri: string) => {
-  setData((prev) => ({
-    ...prev,
-    photoUrl: uri,
-  }));
+	const handleImage = (uri: string) => {
+		setData((prev) => ({
+			...prev,
+			photoUrl: uri,
+		}));
 
-  // 🔥 Optional: call API here to upload image
-};
+		// 🔥 Optional: call API here to upload image
+	};
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
-			
+
 			{/* Header */}
 			<View style={styles.header}>
 				<TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -361,9 +361,9 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	qrContainer: {
-  marginTop: 10,
-  alignItems: "center",
-},
+		marginTop: 10,
+		alignItems: "center",
+	},
 	tabActive: { backgroundColor: '#1a6e6e', borderColor: '#1a6e6e' },
 	tabTxt: { fontSize: 13, fontWeight: '500', color: '#5a6c72' },
 	tabTxtActive: { color: '#fff' },
