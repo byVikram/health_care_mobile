@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { View, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from './AppTypography'
 import { AppSkeleton } from './AppSkeleton'
@@ -7,7 +7,6 @@ import { SlotGroup } from '../../features/doctor/doctorService'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
 function getWeekDates(start: Date) {
 	return Array.from({ length: 7 }, (_, i) => {
 		const d = new Date(start)
@@ -42,10 +41,9 @@ export default function DateSlotPicker(props: PickProps) {
 	const today = new Date()
 	const [weekStart, setWeekStart] = useState(() => {
 		const d = new Date(selectedDate || today)
-		d.setDate(d.getDate() - d.getDay()) // Start of current week (Sunday)
+		d.setDate(d.getDate() - d.getDay())
 		return d
 	})
-
 	const weekDates = getWeekDates(weekStart)
 	const monthLabel = `${MONTHS[weekDates[0].getMonth()]} ${weekDates[0].getFullYear()}`
 
@@ -92,47 +90,54 @@ export default function DateSlotPicker(props: PickProps) {
 			</View>
 
 			{/* Date Strip */}
-			<View style={styles.dateStrip}>
-				{weekDates.map((date) => {
-					const isSelected = selectedDate ? isSameDay(date, selectedDate) : false
-					const past = isPast(date)
-					const isSat = date.getDay() === 6
+			<ScrollView
+				horizontal
+				showsHorizontalScrollIndicator={false}
+				contentContainerStyle={styles.dateStripContent}
+			>
+				<View style={styles.dateStrip}>
+					{weekDates.map((date) => {
+						const isSelected = selectedDate ? isSameDay(date, selectedDate) : false
+						const past = isPast(date)
+						const isSat = date.getDay() === 6
 
-					return (
-						<TouchableOpacity
-							key={date.toISOString()}
-							style={[
-								styles.dateBox,
-								isSelected && styles.dateBoxSelected,
-								past && styles.dateBoxDisabled,
-							]}
-							onPress={() => !past && onDateChange(date)}
-							activeOpacity={past ? 1 : 0.7}
-						>
-							<AppTypography
-								variant="caption"
-								style={[styles.dayName, isSelected && styles.textWhite, past && styles.textDisabled]}
-							>
-								{DAYS[date.getDay()]}
-							</AppTypography>
-							<AppTypography
-								variant="body"
+						return (
+							<TouchableOpacity
+								key={date.toISOString()}
 								style={[
-									styles.dateNum,
-									isSelected && styles.textWhite,
-									past && styles.textDisabled,
-									!past && !isSelected && isSat && styles.textRed,
+									styles.dateBox,
+									styles.dateBoxSpacingRight,
+									isSelected && styles.dateBoxSelected,
+									past && styles.dateBoxDisabled,
 								]}
+								onPress={() => !past && onDateChange(date)}
+								activeOpacity={past ? 1 : 0.7}
 							>
-								{date.getDate()}
-							</AppTypography>
-						</TouchableOpacity>
-					)
-				})}
-			</View>
+								<AppTypography
+									variant="caption"
+									style={[styles.dayName, isSelected && styles.textWhite, past && styles.textDisabled]}
+								>
+									{DAYS[date.getDay()]}
+								</AppTypography>
+								<AppTypography
+									variant="body"
+									style={[
+										styles.dateNum,
+										isSelected && styles.textWhite,
+										past && styles.textDisabled,
+										!past && !isSelected && isSat && styles.textRed,
+									]}
+								>
+									{date.getDate()}
+								</AppTypography>
+							</TouchableOpacity>
+						)
+					})}
+				</View>
+			</ScrollView>
 
 			{/* Time Header */}
-			<AppTypography variant="h4" style={[styles.sectionTitle, { marginTop: 16 }]}>
+			<AppTypography variant="h4" style={styles.timeSectionTitle}>
 				Select Time
 			</AppTypography>
 
@@ -152,14 +157,16 @@ export default function DateSlotPicker(props: PickProps) {
 							<View style={styles.slotsGridFlex}>
 								{group.slots.map((slot, idx) => {
 									const isSelected = selectedTime === slot.start_time
-									const isAvailable = slot.status === 'AVAILABLE' || slot.status === ('' as any) // fallback if blank
+									const isAvailable = slot.status === 'AVAILABLE' || slot.status === ('' as any)
+									const isEndOfRow = (idx + 1) % timeSlotColumns === 0
 
 									return (
 										<TouchableOpacity
 											key={`${slot.start_time}-${idx}`}
 											style={[
 												styles.timeBox,
-												{ width: `${100 / timeSlotColumns - 2}%` },
+												{ flexBasis: `${100 / timeSlotColumns - 3}%` },
+												!isEndOfRow && styles.timeBoxSpacingRight,
 												isSelected && styles.timeBoxSelected,
 												!isAvailable && styles.timeBoxDisabled,
 											]}
@@ -192,17 +199,25 @@ export default function DateSlotPicker(props: PickProps) {
 const styles = StyleSheet.create({
 	container: {
 		paddingVertical: 8,
+		paddingHorizontal: 16,
 	},
 	dateHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		marginBottom: 12,
+		marginBottom: 10,
 	},
 	sectionTitle: {
 		fontWeight: 'bold',
 		color: '#233238',
 		fontSize: 14,
+	},
+	timeSectionTitle: {
+		fontWeight: 'bold',
+		color: '#233238',
+		fontSize: 14,
+		marginTop: 18,
+		marginBottom: 10,
 	},
 	monthNav: {
 		flexDirection: 'row',
@@ -219,23 +234,30 @@ const styles = StyleSheet.create({
 	},
 	dateStrip: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
-		gap: 4,
+		justifyContent: 'flex-start',
+	},
+	dateStripContent: {
+		paddingHorizontal: 0,
 	},
 	dateBox: {
-		flex: 1,
+		width: 55,
 		height: 60,
 		borderRadius: 10,
+		paddingVertical: 10,
+		paddingHorizontal: 6,
 		backgroundColor: 'transparent',
 		justifyContent: 'center',
 		alignItems: 'center',
 		borderWidth: 1,
 		borderColor: 'rgba(51, 51, 51, 0.4)',
-		maxWidth: 60,
+	},
+	dateBoxSpacingRight: {
+		marginRight: 10,
 	},
 	dateBoxSelected: {
 		backgroundColor: '#0c7c7c',
 		borderColor: '#0c7c7c',
+		paddingVertical: 12,
 	},
 	dateBoxDisabled: {
 		opacity: 0.5,
@@ -243,12 +265,12 @@ const styles = StyleSheet.create({
 	dayName: {
 		fontSize: 11,
 		color: '#6f7680',
-		marginBottom: 2,
+		marginBottom: 4,
 	},
 	dateNum: {
 		fontWeight: 'bold',
 		color: '#2c3136',
-		fontSize: 15,
+		fontSize: 16,
 	},
 	textWhite: {
 		color: '#fff',
@@ -265,30 +287,36 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 	},
 	timeGridContainer: {
-		marginTop: 12,
+		marginTop: 0,
 	},
 	timeGroupContainer: {
-		marginBottom: 16,
+		marginTop: 18,
 	},
 	timeGroupLabel: {
 		fontWeight: 'bold',
 		color: '#62707a',
-		marginBottom: 8,
+		marginBottom: 10,
 		fontSize: 13,
 	},
 	slotsGridFlex: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		gap: 8,
+		justifyContent: 'flex-start',
 	},
 	timeBox: {
 		borderWidth: 1.5,
 		borderColor: '#dde3e8',
 		borderRadius: 8,
-		paddingVertical: 6,
+		paddingVertical: 10,
+		paddingHorizontal: 16,
+		marginBottom: 10,
+		minWidth: 70,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#fff',
+	},
+	timeBoxSpacingRight: {
+		marginRight: 10,
 	},
 	timeBoxSelected: {
 		borderColor: '#0c7c7c',

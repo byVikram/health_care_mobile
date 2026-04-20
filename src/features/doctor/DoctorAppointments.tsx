@@ -634,7 +634,12 @@ export default function DoctorAppointments({
 			</View>
 
 			{/* Week strip */}
-			<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weekContainer}>
+			<ScrollView
+				horizontal
+				showsHorizontalScrollIndicator={false}
+				style={styles.weekContainer}
+				contentContainerStyle={styles.weekContent}
+			>
 				{weekDays.map((d: any, i: number) => (
 					<TouchableOpacity
 						key={i}
@@ -677,8 +682,9 @@ export default function DoctorAppointments({
 
 const styles = StyleSheet.create({
 	container: {
-		paddingHorizontal: 16,
-		paddingVertical: 12,
+		paddingHorizontal: 18,
+		paddingTop: 16,
+		paddingBottom: 18,
 		backgroundColor: '#fff',
 		borderRadius: 12,
 	},
@@ -686,11 +692,12 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		marginBottom: 8,
+		marginBottom: 14,
 	},
 	heading: { fontSize: 18, fontWeight: '700', color: '#253136' },
 	month: { color: '#0c7c7c', fontWeight: '600', fontSize: 13 },
-	weekContainer: { marginBottom: 12 },
+	weekContainer: { marginBottom: 16 },
+	weekContent: { paddingRight: 8 },
 	dayBox: {
 		width: 64,
 		height: 64,
@@ -712,13 +719,13 @@ const styles = StyleSheet.create({
 	},
 	selectedText: { color: '#fff' },
 	weekendText: { color: '#e25555' },
-	listContainer: { marginTop: 2 },
+	listContainer: { marginTop: 6, paddingBottom: 4 },
 	card: {
-		padding: 12,
+		padding: 14,
 		borderRadius: 10,
 		borderWidth: 1,
 		borderColor: '#d6dbde',
-		marginBottom: 10,
+		marginBottom: 12,
 		backgroundColor: '#fff',
 	},
 	tabletCardInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -818,7 +825,7 @@ const styles = StyleSheet.create({
 	actions: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginTop: 10,
+		marginTop: 12,
 		flexWrap: 'wrap',
 		gap: 6,
 	},
@@ -845,8 +852,8 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		marginTop: 10,
 	},
-	error: { color: 'red', fontSize: 13 },
-	empty: { color: '#999', fontSize: 13 },
+	error: { color: 'red', fontSize: 13, paddingVertical: 12 },
+	empty: { color: '#999', fontSize: 13, paddingVertical: 16 },
 	drawerBackdrop: {
 		flex: 1,
 		backgroundColor: 'rgba(0,0,0,0.35)',
@@ -969,7 +976,8 @@ const styles = StyleSheet.create({
 		borderWidth: 1.5,
 		borderColor: '#dde3e8',
 		borderRadius: 8,
-		paddingVertical: 6,
+		paddingVertical: 10,
+		paddingHorizontal: 6,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#fff',
@@ -977,6 +985,7 @@ const styles = StyleSheet.create({
 	slotItemActive: {
 		borderColor: '#0c7c7c',
 		backgroundColor: '#0c7c7c',
+		paddingVertical: 30,
 	},
 	slotItemText: {
 		fontSize: 12,
