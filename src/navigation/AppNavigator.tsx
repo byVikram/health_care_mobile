@@ -19,7 +19,7 @@ import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
 import ConsultationPage from '../features/consultation/ConsultationPage'
 import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
-import HealthProfileScreen from '../features/profile/HealthProfileScreen'
+import PatientProfileLayout from '../features/profile/patient/PatientProfileLayout'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
 import SidebarLayout from '../components/layout/SidebarLayout'
@@ -117,7 +117,7 @@ export default function AppNavigator() {
             <Stack.Screen name="FavouriteDoctor" component={MyDoctorPage} />
             <Stack.Screen name="Notification" component={NotificationPage} />
             <Stack.Screen name="Consultation" component={ConsultationPage} />
-            <Stack.Screen name="HealthProfile" component={HealthProfileScreen} />
+            <Stack.Screen name="HealthProfile" component={PatientProfileLayout} />
             <Stack.Screen name="SettingPage" component={SettingPage} />
 
 

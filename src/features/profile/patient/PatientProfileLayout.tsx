@@ -1,18 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
-	View, Text, ScrollView, TouchableOpacity, StyleSheet,
-	Image, Alert, ActivityIndicator, Animated, Easing, ViewStyle,
+	View,
+	Text,
+	ScrollView,
+	TouchableOpacity,
+	StyleSheet,
+	Image,
+	Alert,
+	ActivityIndicator,
+	Animated,
+	Easing,
+	ViewStyle,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
-import * as ImagePicker from "expo-image-picker";
+import * as ImagePicker from 'expo-image-picker'
 
 import HealthProfileField from './HealthProfileField'
 import { PROFILE_TABS } from './profileFieldsConfig'
 import type { TabConfig } from './profileFieldsConfig'
 import { getPatientDetails, patchPatientDetails, mapApiDataToLocalState } from './ProfileService'
-import PatientQR from "../../assets/icons/PatientQR.svg";
+import PatientQR from '../../../assets/icons/PatientQR.svg'
 type Tab = 'Personal' | 'Medical' | 'Life style'
 const TEAL = '#1a8c8c'
 
@@ -67,12 +76,11 @@ function AppSkeleton({ width, height, borderRadius = 6, style }: SkeletonProps) 
 
 /* ──────────────── SKELETON SCREEN ──────────────── */
 
-function HealthProfileSkeleton() {
+function PatientProfileLayoutSkeleton() {
 	const insets = useSafeAreaInsets()
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
-
 			{/* Header */}
 			<View style={styles.header}>
 				<AppSkeleton width={180} height={18} />
@@ -134,7 +142,7 @@ function calcCompletion(data: Record<string, string>): number {
 
 /* ──────────────── MAIN SCREEN ──────────────── */
 
-export default function HealthProfileScreen() {
+export default function PatientProfileLayout() {
 	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
 
@@ -164,8 +172,7 @@ export default function HealthProfileScreen() {
 		fetchProfile()
 	}, [])
 
-	const handleChange = (key: string, value: string) =>
-		setData(prev => ({ ...prev, [key]: value }))
+	const handleChange = (key: string, value: string) => setData((prev) => ({ ...prev, [key]: value }))
 
 	const completion = calcCompletion(data)
 
@@ -188,9 +195,7 @@ export default function HealthProfileScreen() {
 	}
 
 	const renderTab = (tabCfg: TabConfig) => (
-
 		<>
-
 			{tabCfg.tab === 'Personal' && (
 				<>
 					<View style={styles.nameAvatarRow}>
@@ -209,8 +214,6 @@ export default function HealthProfileScreen() {
 									</View>
 								)}
 							</TouchableOpacity>
-
-
 						</View>
 					</View>
 
@@ -218,77 +221,70 @@ export default function HealthProfileScreen() {
 				</>
 			)}
 
-			{tabCfg.fields.map(field => (
-
-				<HealthProfileField
-					key={field.key}
-					config={field}
-					value={data[field.key]}
-					onChange={handleChange}
-				/>
+			{tabCfg.fields.map((field) => (
+				<HealthProfileField key={field.key} config={field} value={data[field.key]} onChange={handleChange} />
 			))}
 		</>
 	)
 
-	const currentTabConfig = PROFILE_TABS.find(t => t.tab === activeTab)!
+	const currentTabConfig = PROFILE_TABS.find((t) => t.tab === activeTab)!
 
-	if (loading) return <HealthProfileSkeleton />
+	if (loading) return <PatientProfileLayoutSkeleton />
 	const onUploadPhoto = () => {
-		Alert.alert("Upload Photo", "Choose an option", [
-			{ text: "Camera", onPress: openCamera },
-			{ text: "Gallery", onPress: openGallery },
-			{ text: "Cancel", style: "cancel" },
-		]);
-	};
+		Alert.alert('Upload Photo', 'Choose an option', [
+			{ text: 'Camera', onPress: openCamera },
+			{ text: 'Gallery', onPress: openGallery },
+			{ text: 'Cancel', style: 'cancel' },
+		])
+	}
 
 	const openCamera = async () => {
-		const permission = await ImagePicker.requestCameraPermissionsAsync();
+		const permission = await ImagePicker.requestCameraPermissionsAsync()
 
 		if (!permission.granted) {
-			Alert.alert("Permission required", "Camera access is needed");
-			return;
+			Alert.alert('Permission required', 'Camera access is needed')
+			return
 		}
 
 		const result = await ImagePicker.launchCameraAsync({
 			mediaTypes: ImagePicker.MediaTypeOptions.Images,
 			quality: 0.7,
-		});
+		})
 
 		if (!result.canceled) {
-			handleImage(result.assets[0].uri);
+			handleImage(result.assets[0].uri)
 		}
-	};
+	}
 
 	const openGallery = async () => {
-		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
 
 		if (!permission.granted) {
-			Alert.alert("Permission required", "Gallery access is needed");
-			return;
+			Alert.alert('Permission required', 'Gallery access is needed')
+			return
 		}
 
 		const result = await ImagePicker.launchImageLibraryAsync({
 			mediaTypes: ImagePicker.MediaTypeOptions.Images,
 			quality: 0.7,
-		});
+		})
 
 		if (!result.canceled) {
-			handleImage(result.assets[0].uri);
+			handleImage(result.assets[0].uri)
 		}
-	};
+	}
 
 	const handleImage = (uri: string) => {
 		setData((prev) => ({
 			...prev,
 			photoUrl: uri,
-		}));
+		}))
 
 		// 🔥 Optional: call API here to upload image
-	};
+	}
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
-
 			{/* Header */}
 			<View style={styles.header}>
 				<TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -298,9 +294,11 @@ export default function HealthProfileScreen() {
 				</TouchableOpacity>
 
 				<TouchableOpacity onPress={handleSave} disabled={saving}>
-					{saving
-						? <ActivityIndicator size="small" color={TEAL} />
-						: <Text style={styles.saveTxt}>Save</Text>}
+					{saving ? (
+						<ActivityIndicator size="small" color={TEAL} />
+					) : (
+						<Text style={styles.saveTxt}>Save</Text>
+					)}
 				</TouchableOpacity>
 			</View>
 
@@ -317,17 +315,13 @@ export default function HealthProfileScreen() {
 						onPress={() => setActiveTab(tab as Tab)}
 						style={[styles.tab, activeTab === tab && styles.tabActive]}
 					>
-						<Text style={[styles.tabTxt, activeTab === tab && styles.tabTxtActive]}>
-							{tab}
-						</Text>
+						<Text style={[styles.tabTxt, activeTab === tab && styles.tabTxtActive]}>{tab}</Text>
 					</TouchableOpacity>
 				))}
 			</View>
 
 			{/* Fields */}
-			<ScrollView style={styles.scroll}>
-				{renderTab(currentTabConfig)}
-			</ScrollView>
+			<ScrollView style={styles.scroll}>{renderTab(currentTabConfig)}</ScrollView>
 		</View>
 	)
 }
@@ -362,7 +356,7 @@ const styles = StyleSheet.create({
 	},
 	qrContainer: {
 		marginTop: 10,
-		alignItems: "center",
+		alignItems: 'center',
 	},
 	tabActive: { backgroundColor: '#1a6e6e', borderColor: '#1a6e6e' },
 	tabTxt: { fontSize: 13, fontWeight: '500', color: '#5a6c72' },

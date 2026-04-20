@@ -11,13 +11,13 @@ import {
 	KeyboardAvoidingView,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import CloseCircle from '../../assets/icons/cross_icon.svg'
-import EditIcon from '../../assets/icons/edit_icon.svg'
+import CloseCircle from '../../../assets/icons/cross_icon.svg'
+import EditIcon from '../../../assets/icons/edit_icon.svg'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import type { ProfileFieldConfig } from './profileFieldsConfig'
 import { getMultiValues, setMultiValues } from './profileFieldsConfig'
 
-import { theme } from '../../config/theme'
+import { theme } from '../../../config/theme'
 
 const TEAL = '#1a8c8c'
 
