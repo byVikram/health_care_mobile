@@ -92,11 +92,11 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
         onPress: () => navigation.navigate("MainTabs", { screen: "Profile" }),
       },
       {
-        id: "settings",
-        label: "Settings",
-        icon: <SettingsIcon width={20} height={20} />,
-        onPress: () => navigation.navigate("MainTabs", { screen: "Profile" }),
-      },
+  id: "settings",
+  label: "Settings",
+  icon: <SettingsIcon width={20} height={20} />,
+  onPress: () => navigation.navigate("SettingPage", { screen: "Settings" }),
+}
     ],
     [navigation],
   );

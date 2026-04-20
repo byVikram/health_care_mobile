@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { ActivityIndicator, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useTheme } from 'react-native-paper'
+import SettingPage from '../features/setting/SettingPage'
 
 // Screens
 import LoginPage from '../features/auth/LoginPage'
@@ -82,6 +83,7 @@ export default function AppNavigator() {
 				screenOptions={{ headerShown: false }}
 				initialRouteName={accessToken == null ? 'Onboarding' : 'MainTabs'}
 			>
+				
 				{accessToken == null ? (
 					<>
 						<Stack.Screen
@@ -104,6 +106,7 @@ export default function AppNavigator() {
 						<Stack.Screen name="Notification" component={NotificationPage} />
 						<Stack.Screen name="Consultation" component={ConsultationPage} />
 						<Stack.Screen name="HealthProfile" component={HealthProfileScreen} />
+						<Stack.Screen name="SettingPage" component={SettingPage} /> 
 					</>
 				)}
 			</Stack.Navigator>
