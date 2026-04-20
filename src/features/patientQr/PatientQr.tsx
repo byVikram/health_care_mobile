@@ -143,10 +143,10 @@ const styles = StyleSheet.create({
     color: "#888",
   },
   qrImage: {
-  width: 140,
-  height: 140,
-  resizeMode: "contain",
-},
+    width: 140,
+    height: 140,
+    resizeMode: "contain",
+  },
 
   value: {
     fontSize: 14,

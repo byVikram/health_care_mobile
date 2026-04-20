@@ -9,8 +9,8 @@ const getBaseUrl = () => {
   if (process.env.EXPO_PUBLIC_API_ENDPOINT)
     return process.env.EXPO_PUBLIC_API_ENDPOINT;
   return Platform.OS === "android"
-    ? "http://192.168.4.25:8000"
-    : "http://192.168.4.25:8000";
+    ? "http://192.168.4.93:8000"
+    : "http://192.168.4.93:8000";
 };
 
 export const BASE_URL = getBaseUrl();
@@ -62,5 +62,10 @@ export const API_ENDPOINTS = {
     GET_BY_PUBLIC_ID: (publicId: string) =>
       `${BASE_URL}/api/patients/${publicId}/details`,
   },
+  // Add inside API_ENDPOINTS in apiUrls.ts
+LOCATIONS: {
+  LIST: `${BASE_URL}/api/locations`,
+},
+
   
 };
