@@ -8,30 +8,33 @@ import * as SplashScreen from 'expo-splash-screen'
 import { SplashScreen as SplashScreenComponent } from './src/components/common'
 
 export default function App() {
-	const [isSplashVisible, setIsSplashVisible] = useState(true)
+  const [isSplashVisible, setIsSplashVisible] = useState(true)
 
-	useEffect(() => {
-		const prepareSplash = async () => {
-			await SplashScreen.preventAutoHideAsync()
-		}
-		prepareSplash()
-	}, [])
+  useEffect(() => {
+    const prepareSplash = async () => {
+      await SplashScreen.preventAutoHideAsync()
+    }
+    prepareSplash()
+  }, [])
 
-	const onSplashFinish = () => {
-		setIsSplashVisible(false)
-	}
+  const onSplashFinish = async () => {
+    setIsSplashVisible(false)
+    await SplashScreen.hideAsync()
+  }
 
-	if (isSplashVisible) {
-		return <SplashScreenComponent onFinish={onSplashFinish} />
-	}
+  return (
+    <SafeAreaProvider>
+      <PaperProvider theme={theme}>
+        <AuthProvider>
 
-	return (
-		<SafeAreaProvider>
-			<PaperProvider theme={theme}>
-				<AuthProvider>
-					<AppNavigator />
-				</AuthProvider>
-			</PaperProvider>
-		</SafeAreaProvider>
-	)
+          {isSplashVisible ? (
+            <SplashScreenComponent onFinish={onSplashFinish} />
+          ) : (
+            <AppNavigator />
+          )}
+
+        </AuthProvider>
+      </PaperProvider>
+    </SafeAreaProvider>
+  )
 }

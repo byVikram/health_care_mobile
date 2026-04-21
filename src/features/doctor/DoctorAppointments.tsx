@@ -31,8 +31,11 @@ type Appointment = {
 	gender?: string
 	sex?: string
 	status: string | { label: string }
-	appointment_time: string
-	appointment_end_time?: string
+	// start_time: string
+	// appointment_end_time?: string
+	// end_time?: string
+	appointment_date: string
+	start_time: string
 	end_time?: string
 }
 
