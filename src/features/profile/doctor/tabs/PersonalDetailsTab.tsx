@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import {
 	FlatList,
+	Image,
+	ImageSourcePropType,
 	Modal,
 	Platform,
 	Pressable,
@@ -17,6 +19,7 @@ import { useAuth } from '../../../../context/AuthContext'
 
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say']
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Marathi', 'Bengali']
+const DEFAULT_DOCTOR_IMAGE = require('../../../../assets/Banner/doctor.png')
 
 type InputFieldProps = {
 	label: string
@@ -40,6 +43,15 @@ type SelectDropdownProps = {
 	options: string[]
 	onSelect: (value: string) => void
 	isMobile: boolean
+}
+
+type ProfileHeaderProps = {
+	name: string
+	subtitle: string
+	completionText: string
+	imageSource: ImageSourcePropType
+	imageSize: number
+	onCameraPress: () => void
 }
 
 function FormRow({
@@ -175,6 +187,59 @@ function SelectDropdown({ label, value, placeholder, options, onSelect, isMobile
 	)
 }
 
+function ProfileHeader({
+	name,
+	subtitle,
+	completionText,
+	imageSource,
+	imageSize,
+	onCameraPress,
+}: ProfileHeaderProps) {
+	return (
+		<View style={styles.profileHeader}>
+			<View
+				style={[
+					styles.profileImageFrame,
+					{
+						width: imageSize,
+						height: imageSize,
+						borderRadius: imageSize / 2,
+					},
+				]}
+			>
+				<Image source={imageSource} style={styles.profileImage} resizeMode="cover" />
+				<TouchableOpacity
+					style={[
+						styles.cameraButton,
+						{
+							width: Math.max(34, imageSize * 0.28),
+							height: Math.max(34, imageSize * 0.28),
+							borderRadius: Math.max(17, imageSize * 0.14),
+						},
+					]}
+					activeOpacity={0.85}
+					onPress={onCameraPress}
+				>
+					<MaterialCommunityIcons name="camera-outline" size={Math.max(16, imageSize * 0.14)} color="#ffffff" />
+				</TouchableOpacity>
+			</View>
+
+			<View style={styles.completionBadge}>
+				<AppTypography variant="caption" style={styles.completionText}>
+					{completionText}
+				</AppTypography>
+			</View>
+
+			<AppTypography variant="h3" style={styles.profileName}>
+				{name}
+			</AppTypography>
+			<AppTypography variant="body" style={styles.profileSubtitle}>
+				{subtitle}
+			</AppTypography>
+		</View>
+	)
+}
+
 const formatDateInput = (rawValue: string) => {
 	const digits = rawValue.replace(/\D/g, '').slice(0, 8)
 
@@ -211,9 +276,17 @@ export default function PersonalDetailsTab() {
 		return 640
 	}, [isTablet, width])
 
+	const profileImageSize = useMemo(() => {
+		if (width >= 1280) return 132
+		if (width >= 1024) return 124
+		if (isTablet) return 112
+		return 96
+	}, [isTablet, width])
+
 	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
 	const rowSpacing = isMobile ? 16 : isTablet ? 18 : 20
 	const titleBottom = isMobile ? 18 : 22
+	const profileImageSource = user?.avatar ? { uri: user.avatar } : DEFAULT_DOCTOR_IMAGE
 
 	return (
 		<ScrollView
@@ -223,6 +296,15 @@ export default function PersonalDetailsTab() {
 			showsVerticalScrollIndicator={false}
 		>
 			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+				<ProfileHeader
+					name="Dr. Ashika Rao"
+					subtitle="Dentist Consultation"
+					completionText="48% Profile completed"
+					imageSource={profileImageSource}
+					imageSize={profileImageSize}
+					onCameraPress={() => setFocusedField('profilePhoto')}
+				/>
+
 				<AppTypography variant="h3" style={[styles.title, { marginBottom: titleBottom }]}>
 					Personal Details
 				</AppTypography>
@@ -342,6 +424,59 @@ const styles = StyleSheet.create({
 	},
 	contentShell: {
 		width: '100%',
+	},
+	profileHeader: {
+		alignItems: 'center',
+		paddingTop: 4,
+		marginBottom: 24,
+	},
+	profileImageFrame: {
+		position: 'relative',
+		borderWidth: 3,
+		borderColor: '#2c7b80',
+		overflow: 'hidden',
+		backgroundColor: '#e7f1f3',
+	},
+	profileImage: {
+		width: '100%',
+		height: '100%',
+	},
+	cameraButton: {
+		position: 'absolute',
+		right: 4,
+		bottom: 4,
+		backgroundColor: '#2c7b80',
+		borderWidth: 2,
+		borderColor: '#ffffff',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	completionBadge: {
+		marginTop: 16,
+		paddingHorizontal: 14,
+		paddingVertical: 7,
+		borderRadius: 999,
+		backgroundColor: '#e8f7ea',
+	},
+	completionText: {
+		color: '#2f9e44',
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '600',
+	},
+	profileName: {
+		marginTop: 12,
+		color: '#223036',
+		fontSize: 22,
+		fontWeight: '700',
+		textAlign: 'center',
+	},
+	profileSubtitle: {
+		marginTop: 4,
+		color: '#6f8086',
+		fontSize: 15,
+		lineHeight: 22,
+		textAlign: 'center',
 	},
 	title: {
 		color: '#343434',
