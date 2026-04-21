@@ -11,6 +11,7 @@ import { useTheme } from 'react-native-paper'
 import LoginPage from '../features/auth/LoginPage'
 import RegisterPage from '../features/auth/RegisterPage'
 import OnboardingPage from '../features/onboarding/OnboardingPage'
+import SplashPage from '../features/onboarding/SplashPage'
 import WelcomePage from '../features/auth/WelcomePage'
 import AccountPage from '../features/auth/AccountPage'
 import DashboardPage from '../features/dashboard/DashboardPage'
@@ -79,24 +80,25 @@ export default function AppNavigator() {
   return (
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
+        initialRouteName="Splash"
         screenOptions={{ headerShown: false }}
       >
+        <Stack.Screen
+          name="Splash"
+          component={SplashPage}
+          options={{ animation: 'none' }}
+        />
+        <Stack.Screen
+          name="Onboarding"
+          component={OnboardingPage}
+        />
         {accessToken == null ? (
           // ─── UNAUTHENTICATED STACK ───────────────────────────
           <>
-            {/* 1. First screen: app intro */}
-            <Stack.Screen
-              name="Onboarding"
-              component={OnboardingPage}
-              options={{ animation: 'none' }}
-            />
-            {/* 2. Login screen */}
             <Stack.Screen
               name="Login"
               component={LoginPage}
-              options={{ animation: 'none' }}
             />
-            {/* 3. Register screen */}
             <Stack.Screen name="Register" component={RegisterPage} />
           </>
         ) : (

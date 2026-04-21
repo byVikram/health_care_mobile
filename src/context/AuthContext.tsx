@@ -133,7 +133,7 @@ export const clearAuthStorage = async () => {
 	])
 	// Navigate to login screen
 	if (navigationRef.current) {
-		navigationRef.current.navigate('Onboarding')
+		navigationRef.current.navigate('Splash')
 	}
 	// To actually update state, you'd trigger a global event or the app will just
 	// rely on the AuthStack handling unauthenticated requests when the token is missing.
