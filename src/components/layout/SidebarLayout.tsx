@@ -26,7 +26,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
   const handleEditProfile = () => {
     setIsSidebarOpen(false);
-    navigation.navigate("HealthProfile");
+    navigation.navigate("MainTabs", { screen: "Profile" });
   };
 
   const menuItems = useMemo<AppSidebarItem[]>(

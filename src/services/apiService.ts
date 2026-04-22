@@ -2,7 +2,7 @@
 import axios, { AxiosResponse } from 'axios'
 import { Alert } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { clearAuthStorage } from '../context/AuthContext'
+import { navigate } from '../navigation/navigationService'
 
 const axiosInstance = axios.create()
 
@@ -27,10 +27,10 @@ axiosInstance.interceptors.response.use(
 		const message = error.response?.data?.message || 'Something went wrong'
 
 		if (status === 401 || status === 403) {
-			// Clear storage. The UI should react by observing the token missing in the next load,
-			// or we can emit an event here to force the UI to log out immediately.
-			await clearAuthStorage()
-			// In a real robust app, you might emit a global event here.
+			// Clear storage locally to avoid circular dependencies
+			await AsyncStorage.multiRemove(['role', 'user', 'access_token', 'refresh_token'])
+			// Navigate to onboarding
+			navigate('Onboarding')
 			Alert.alert('Session Expired', 'Please log in again.')
 		} else {
 			// Replace react-toastify with Alert in RN

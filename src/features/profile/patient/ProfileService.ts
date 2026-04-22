@@ -1,7 +1,7 @@
 // src/features/profile/patientProfileService.ts
 
-import ApiService from '../../services/apiService'
-import { API_ENDPOINTS } from '../../constants/apiUrls'
+import ApiService from '../../../services/apiService'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { buildApiPayload } from './profileFieldsConfig'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ export const patchPatientDetails = async (localData: Record<string, string>): Pr
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: API response  →  local state Record<string,string>
-// Use to pre-fill HealthProfileScreen after a GET
+// Use to pre-fill PatientProfileLayout after a GET
 // ─────────────────────────────────────────────────────────────────────────────
 export const mapApiDataToLocalState = (apiData: any): Record<string, string> => {
 	const { personal, medical, lifestyle } = apiData

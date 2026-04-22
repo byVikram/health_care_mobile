@@ -1,25 +1,15 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Button } from 'react-native-paper';
-import { useAuth } from '../../context/AuthContext';
+import React from 'react'
+import { useAuth } from '../../context/AuthContext'
+import DoctorProfileLayout from './doctor/DoctorProfileLayout'
+import PatientProfileLayout from './patient/PatientProfileLayout'
 
 export default function ProfilePage() {
-    const { clearAuth, user } = useAuth();
-    
-    return (
-        <View style={styles.container}>
-            <Text variant="headlineMedium">Profile</Text>
-            <Text variant="bodyMedium" style={{ marginBottom: 20 }}>{user?.name}</Text>
-            <Button mode="contained" onPress={clearAuth}>Logout</Button>
-        </View>
-    );
-}
+	const { role } = useAuth()
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-    }
-});
+	if (role === 'doctor') {
+		return <DoctorProfileLayout />
+	}
+
+	// Patient Profile acts as default fallback
+	return <PatientProfileLayout />
+}

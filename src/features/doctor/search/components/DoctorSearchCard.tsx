@@ -1,83 +1,97 @@
-import React from 'react';
-import { View, StyleSheet, Image } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import React from 'react'
+import { View, StyleSheet, Image, Pressable } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { useNavigation } from '@react-navigation/native'
 
-import { DoctorSearchItem } from '../../../../types/doctor-search';
-import { AppButton, AppTypography } from '../../../../components/common';
+import { DoctorSearchItem } from '../../../../types/doctor-search'
+import { AppButton, AppTypography } from '../../../../components/common'
 
-import { doctorCardStyles as styles } from './DoctorCard.styles';
+import { doctorCardStyles as styles } from './DoctorCard.styles'
 
 interface DoctorProps {
-    doctor: DoctorSearchItem;
+	doctor: DoctorSearchItem
 }
 
 export default function DoctorSearchCard({ doctor }: DoctorProps) {
-    const navigation = useNavigation<any>();
+	const navigation = useNavigation<any>()
 
-    // Using placeholder data matching the mockup where API doesn't provide it yet
-    const avatarUrl = doctor.avatar_s3_key || 'https://tse4.mm.bing.net/th/id/OIP.JD5a5owVBjuj0w_D6PUYMwHaHJ?pid=Api&P=0&h=180'; // fallback
-    const rating = '0';
-    const location = doctor.location || 'Bangalore';
-    const distance = '<0 km';
-    const earliestSlot = 'Earliest available slot (Today 2:00 PM)';
+	// Using placeholder data matching the mockup where API doesn't provide it yet
+	const avatarUrl =
+		doctor.avatar_s3_key || 'https://tse4.mm.bing.net/th/id/OIP.JD5a5owVBjuj0w_D6PUYMwHaHJ?pid=Api&P=0&h=180' // fallback
+	const rating = '0'
+	const location = doctor.location || 'Bangalore'
+	const distance = '<0 km'
+	const earliestSlot = 'Earliest available slot (Today 2:00 PM)'
 
-    return (
-        <View style={styles.card}>
-            {/* Top Half - Image */}
-            <View style={styles.imageContainer}>
-                <Image 
-                    source={{ uri: avatarUrl }} 
-                    style={styles.image} 
-                    resizeMode="cover"
-                />
-                {/* <View style={styles.badge}>
+	return (
+		// <View style={styles.card}
+		//  onPress={() => navigation.navigate('DoctorDetail', { id: doctor.id })}>
+
+		<Pressable style={styles.card} onPress={() => navigation.navigate('DoctorDetail', { id: doctor.id })}>
+			{/* Top Half - Image */}
+			<View style={styles.imageContainer}>
+				<Image source={{ uri: avatarUrl }} style={styles.image} resizeMode="cover" />
+				{/* <View style={styles.badge}>
                     <MaterialCommunityIcons name="thumb-up" size={14} color="#fff" style={{ marginRight: 4 }} />
                     <AppTypography variant="caption" style={styles.badgeText}>People Recommended</AppTypography>
                 </View> */}
-            </View>
+			</View>
 
-            {/* Bottom Half - Content */}
-            <View style={styles.content}>
-                <AppTypography style={styles.name} numberOfLines={1}>{doctor.name}</AppTypography>
-                <AppTypography variant="caption" style={styles.speciality} numberOfLines={1}>
-                    {doctor.specialities && doctor.specialities.length > 0 ? doctor.specialities.join(', ') : 'Cardiology'}
-                </AppTypography>
-                
-                <AppTypography variant="caption" style={styles.slotText} numberOfLines={1}>Next: Today 2:00 PM</AppTypography>
+			{/* Bottom Half - Content */}
+			<View style={styles.content}>
+				<AppTypography style={styles.name} numberOfLines={1}>
+					{doctor.name}
+				</AppTypography>
+				<AppTypography variant="caption" style={styles.speciality} numberOfLines={1}>
+					{doctor.specialities && doctor.specialities.length > 0
+						? doctor.specialities.join(', ')
+						: 'Cardiology'}
+				</AppTypography>
 
-                <View style={styles.infoRow}>
-                    <View style={styles.infoLeft}>
-                        <MaterialCommunityIcons name="briefcase" size={12} color="#5b7282" />
-                        <AppTypography variant="caption" style={styles.infoText}>{doctor.experience_years}y</AppTypography>
-                    </View>
-                    <View style={styles.infoRight}>
-                        <AppTypography variant="caption" style={styles.infoTextBold}>{rating}</AppTypography>
-                        <MaterialCommunityIcons name="star" size={12} color="#f5a623" style={{ marginLeft: 2 }} />
-                    </View>
-                </View>
+				<AppTypography variant="caption" style={styles.slotText} numberOfLines={1}>
+					Next: Today 2:00 PM
+				</AppTypography>
 
-                <View style={[styles.infoRow, { marginBottom: 8 }]}>
-                    <View style={styles.infoLeft}>
-                        <MaterialCommunityIcons name="map-marker" size={12} color="#5b7282" />
-                        <AppTypography variant="caption" style={styles.infoText}>{location}</AppTypography>
-                    </View>
-                    <View style={styles.infoRight}>
-                        <AppTypography variant="caption" style={styles.infoTextBoldTeal}>{distance}</AppTypography>
-                    </View>
-                </View>
+				<View style={styles.infoRow}>
+					<View style={styles.infoLeft}>
+						<MaterialCommunityIcons name="briefcase" size={12} color="#5b7282" />
+						<AppTypography variant="caption" style={styles.infoText}>
+							{doctor.experience_years}y
+						</AppTypography>
+					</View>
+					<View style={styles.infoRight}>
+						<AppTypography variant="caption" style={styles.infoTextBold}>
+							{rating}
+						</AppTypography>
+						<MaterialCommunityIcons name="star" size={12} color="#f5a623" style={{ marginLeft: 2 }} />
+					</View>
+				</View>
 
-                <AppButton 
-                    variant="primary" 
-                    onPress={() => navigation.navigate('DoctorDetail', { id: doctor.id })}
-                    style={styles.bookButton}
-                    labelStyle={{ fontSize: 12, marginHorizontal: 0 }}
-                >
-                    Book
-                </AppButton>
-            </View>
-        </View>
-    );
+				<View style={[styles.infoRow, { marginBottom: 8 }]}>
+					<View style={styles.infoLeft}>
+						<MaterialCommunityIcons name="map-marker" size={12} color="#5b7282" />
+						<AppTypography variant="caption" style={styles.infoText}>
+							{location}
+						</AppTypography>
+					</View>
+					<View style={styles.infoRight}>
+						<AppTypography variant="caption" style={styles.infoTextBoldTeal}>
+							{distance}
+						</AppTypography>
+					</View>
+				</View>
+
+				<AppButton
+					variant="primary"
+					onPress={() => navigation.navigate('DoctorDetail', { id: doctor.id })}
+					style={styles.bookButton}
+					labelStyle={{ fontSize: 12, marginHorizontal: 0 }}
+				>
+					Book
+				</AppButton>
+			</View>
+		</Pressable>
+	)
 }
 
 // const styles = StyleSheet.create({
@@ -90,8 +104,8 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 //         overflow: 'hidden',
 //         borderWidth: 1,
 //         borderColor: '#e8edf0',
-//         elevation: 2, 
-//         shadowColor: '#000', 
+//         elevation: 2,
+//         shadowColor: '#000',
 //         shadowOffset: { width: 0, height: 2 },
 //         shadowOpacity: 0.05,
 //         shadowRadius: 4,
@@ -170,7 +184,7 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 //     },
 //     bookButton: {
 //         marginTop: 4,
-//         backgroundColor: '#2b7571', 
+//         backgroundColor: '#2b7571',
 //         borderRadius: 8,
 //         paddingVertical: 2,
 //     }
