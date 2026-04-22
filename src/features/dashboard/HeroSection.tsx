@@ -183,12 +183,12 @@ export default function HeroSection() {
     setActiveAdIndex,
   );
 
-  const verticalServices = [
-    { title: 'Emergency',  Component: EmergencyIcon },
-    { title: 'Ambulance',  Component: AmbulanceIcon },
-    { title: 'Blood Bank', Component: BloodBankIcon },
-    { title: 'ICU',        Component: IcuIcon },
-  ];
+  // const verticalServices = [
+  //   { title: 'Emergency',  Component: EmergencyIcon },
+  //   { title: 'Ambulance',  Component: AmbulanceIcon },
+  //   { title: 'Blood Bank', Component: BloodBankIcon },
+  //   { title: 'ICU',        Component: IcuIcon },
+  // ];
 
   const horizontalServices = [
     { title: 'Appointment', Component: AppointmentsIcon },
@@ -200,6 +200,16 @@ export default function HeroSection() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.horizontalServicesRow}>
+        {horizontalServices.map((s) => (
+          <TouchableOpacity key={s.title} style={styles.hServiceCard}>
+            <s.Component width={30} height={30} />
+            <AppTypography style={styles.hServiceTitle} numberOfLines={1}>
+              {s.title}
+            </AppTypography>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       {/* ── Top Section ─────────────────────────────────────────────────────── */}
       <View style={styles.topRow}>
@@ -243,7 +253,7 @@ export default function HeroSection() {
           )}
         </View>
 
-        <View style={styles.verticalServicesBox}>
+        {/* <View style={styles.verticalServicesBox}>
           {verticalServices.map((s, idx) => (
             <TouchableOpacity
               key={s.title}
@@ -256,20 +266,8 @@ export default function HeroSection() {
               <AppTypography style={styles.vServiceTitle}>{s.title}</AppTypography>
             </TouchableOpacity>
           ))}
-        </View>
+        </View> */}
 
-      </View>
-
-      {/* ── Horizontal Services ──────────────────────────────────────────────── */}
-      <View style={styles.horizontalServicesRow}>
-        {horizontalServices.map((s) => (
-          <TouchableOpacity key={s.title} style={styles.hServiceCard}>
-            <s.Component width={30} height={30} />
-            <AppTypography style={styles.hServiceTitle} numberOfLines={1}>
-              {s.title}
-            </AppTypography>
-          </TouchableOpacity>
-        ))}
       </View>
 
       {/* ── Ad Section ───────────────────────────────────────────────────────── */}
@@ -399,6 +397,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingTop: 16,
+    paddingBottom: 16,
   },
   hServiceCard: {
     alignItems: 'center',
