@@ -1,81 +1,60 @@
-import React from "react";
-import {
-	View,
-	Text,
-	TouchableOpacity,
-	ScrollView,
-	StyleSheet,
-	useWindowDimensions,
-	Image,
-} from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import React from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, Image } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
 
-import pregnancyImage from "../../assets/specialties/pregnancy.svg";
-import acneImage from "../../assets/specialties/acne.svg";
-import performanceImage from "../../assets/specialties/performance.svg";
-import coughImage from "../../assets/specialties/cough.svg";
-import childImage from "../../assets/specialties/child.svg";
-import depressionImage from "../../assets/specialties/depression.svg";
-import { Button } from "react-native-paper";
+import pregnancyImage from '../../assets/specialties/pregnancy.svg'
+import acneImage from '../../assets/specialties/acne.svg'
+import performanceImage from '../../assets/specialties/performance.svg'
+import coughImage from '../../assets/specialties/cough.svg'
+import childImage from '../../assets/specialties/child.svg'
+import depressionImage from '../../assets/specialties/depression.svg'
+import { Button } from 'react-native-paper'
 
-const TEAL = "#0c7c7c";
+const TEAL = '#0c7c7c'
 
 const specialities = [
-	{ id: 1, title: "Pregnancy or\nPeriod doubts", icon: pregnancyImage },
-	{ id: 2, title: "Acne, pimple\nor Skin Issues", icon: acneImage },
-	{ id: 3, title: "Performance\nissues in bed", icon: performanceImage },
-	{ id: 4, title: "Cold, cough\nor fever", icon: coughImage },
-	{ id: 5, title: "Child not feeling\nwell", icon: childImage },
-	{ id: 6, title: "Depression or\nanxiety", icon: depressionImage },
-];
+	{ id: 1, title: 'Pregnancy or\nPeriod doubts', icon: pregnancyImage },
+	{ id: 2, title: 'Acne, pimple\nor Skin Issues', icon: acneImage },
+	{ id: 3, title: 'Performance\nissues in bed', icon: performanceImage },
+	{ id: 4, title: 'Cold, cough\nor fever', icon: coughImage },
+	{ id: 5, title: 'Child not feeling\nwell', icon: childImage },
+	{ id: 6, title: 'Depression or\nanxiety', icon: depressionImage },
+]
 
 export default function SpecialitySection() {
-	const navigation = useNavigation<any>();
-	const { width } = useWindowDimensions();
+	const navigation = useNavigation<any>()
+	const { width } = useWindowDimensions()
 
-	const isTablet = width >= 768;
-	const isMiniTablet = width >= 600 && width < 768;
-	const isWide = isTablet || isMiniTablet;
+	const isTablet = width >= 768
+	const isMiniTablet = width >= 600 && width < 768
+	const isWide = isTablet || isMiniTablet
 
-	const availableWidth = width - 32 - 8 * 5;
-	const CARD_WIDTH = isWide ? availableWidth / 6 : 110;
-	const BOX_SIZE = isWide ? Math.min(Math.floor(CARD_WIDTH) - 10, 120) : 100;
+	const availableWidth = width - 32 - 8 * 5
+	const CARD_WIDTH = isWide ? availableWidth / 6 : 110
+	const BOX_SIZE = isWide ? Math.min(Math.floor(CARD_WIDTH) - 10, 120) : 100
 
 	const handleConsult = () => {
-		navigation.navigate("Search", {
-			speciality_id: "3c7b1e9d-8a2f-4d6c-b5a1-7f0e2d9a8c55",
-		});
-	};
+		navigation.navigate('Search', {
+			speciality_id: '3c7b1e9d-8a2f-4d6c-b5a1-7f0e2d9a8c55',
+		})
+	}
 
 	// ✅ Single card component using Image
-	const renderCard = (
-		s: (typeof specialities)[0],
-		cardWidth: number,
-		boxSize: number,
-		isTab: boolean,
-	) => (
+	const renderCard = (s: (typeof specialities)[0], cardWidth: number, boxSize: number, isTab: boolean) => (
 		<TouchableOpacity key={s.id} onPress={handleConsult}>
-			<View style={{ width: cardWidth, alignItems: "center", gap: 6 }}>
+			<View style={{ width: cardWidth, alignItems: 'center', gap: 6 }}>
 				{/* ✅ PNG Image fills box with cover */}
 
-				<View
-					style={[
-						styles.iconBox,
-						{ width: boxSize, height: boxSize },
-					]}
-				>
+				<View style={[styles.iconBox, { width: boxSize, height: boxSize }]}>
 					{/* <Image
           source={s.icon}
           style={{ width: boxSize, height: boxSize }}
           resizeMode="cover"
         /> */}
-					<s.icon width={"100%"} height={"100%"} />
+					<s.icon width={'100%'} height={'100%'} />
 				</View>
 
-				<Text
-					style={[styles.cardTitle, isTab && styles.cardTitleTablet]}
-					numberOfLines={2}
-				>
+				<Text style={[styles.cardTitle, isTab && styles.cardTitleTablet]} numberOfLines={2}>
 					{s.title}
 				</Text>
 
@@ -86,27 +65,17 @@ export default function SpecialitySection() {
       </TouchableOpacity> */}
 			</View>
 		</TouchableOpacity>
-	);
+	)
 
 	return (
 		<View style={styles.container}>
 			{/* ── Header ── */}
 			<View style={styles.headerRow}>
 				<View style={styles.headerLeft}>
-					<Text
-						style={[
-							styles.heading,
-							isTablet && styles.headingTablet,
-						]}
-					>
-						Consult top doctors online for any health concern
+					<Text style={[styles.heading, isTablet && styles.headingTablet]}>
+						{/* Consult top doctors online for any health concern */}
 					</Text>
-					<Text
-						style={[
-							styles.subHeading,
-							isTablet && styles.subHeadingTablet,
-						]}
-					>
+					<Text style={[styles.subHeading, isTablet && styles.subHeadingTablet]}>
 						Find experienced doctors across all specialties
 					</Text>
 				</View>
@@ -114,7 +83,7 @@ export default function SpecialitySection() {
 					mode="outlined"
 					style={styles.viewAllBtn}
 					labelStyle={{ fontSize: 12 }}
-					onPress={() => navigation.navigate("Search")}
+					onPress={() => navigation.navigate('Search')}
 				>
 					View All
 				</Button>
@@ -123,9 +92,7 @@ export default function SpecialitySection() {
 			{isWide ? (
 				// TABLET / MINI-TABLET — all 6 in one row
 				<View style={styles.tabletGrid}>
-					{specialities.map((s) =>
-						renderCard(s, CARD_WIDTH, BOX_SIZE, isTablet),
-					)}
+					{specialities.map((s) => renderCard(s, CARD_WIDTH, BOX_SIZE, isTablet))}
 				</View>
 			) : (
 				// MOBILE — horizontal scroll
@@ -134,24 +101,22 @@ export default function SpecialitySection() {
 					showsHorizontalScrollIndicator={false}
 					contentContainerStyle={styles.scrollContent}
 				>
-					{specialities.map((s) =>
-						renderCard(s, CARD_WIDTH, BOX_SIZE, false),
-					)}
+					{specialities.map((s) => renderCard(s, CARD_WIDTH, BOX_SIZE, false))}
 				</ScrollView>
 			)}
 		</View>
-	);
+	)
 }
 
 const styles = StyleSheet.create({
 	container: {
 		paddingVertical: 16,
-		backgroundColor: "#fff",
+		backgroundColor: '#fff',
 	},
 	headerRow: {
-		flexDirection: "row",
-		alignItems: "flex-start",
-		justifyContent: "space-between",
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		justifyContent: 'space-between',
 		paddingHorizontal: 16,
 		marginBottom: 20,
 		gap: 12,
@@ -164,8 +129,8 @@ const styles = StyleSheet.create({
 	},
 	heading: {
 		fontSize: 15,
-		fontWeight: "700",
-		color: "#111",
+		fontWeight: '700',
+		color: '#111',
 		lineHeight: 21,
 		marginBottom: 3,
 	},
@@ -175,7 +140,7 @@ const styles = StyleSheet.create({
 	},
 	subHeading: {
 		fontSize: 12,
-		color: "#777",
+		color: '#777',
 		lineHeight: 17,
 	},
 	subHeadingTablet: {
@@ -186,10 +151,10 @@ const styles = StyleSheet.create({
 		borderRadius: 20,
 	},
 	tabletGrid: {
-		flexDirection: "row",
+		flexDirection: 'row',
 		paddingHorizontal: 16,
 		gap: 8,
-		alignItems: "flex-start",
+		alignItems: 'flex-start',
 	},
 	scrollContent: {
 		paddingHorizontal: 16,
@@ -198,13 +163,13 @@ const styles = StyleSheet.create({
 	},
 	iconBox: {
 		borderRadius: 16,
-		overflow: "hidden",
+		overflow: 'hidden',
 	},
 	cardTitle: {
 		fontSize: 12,
-		fontWeight: "500",
-		color: "#222",
-		textAlign: "center",
+		fontWeight: '500',
+		color: '#222',
+		textAlign: 'center',
 		lineHeight: 17,
 	},
 	cardTitleTablet: {
@@ -214,9 +179,9 @@ const styles = StyleSheet.create({
 	consultText: {
 		fontSize: 13,
 		color: TEAL,
-		fontWeight: "600",
+		fontWeight: '600',
 	},
 	consultTextTablet: {
 		fontSize: 14,
 	},
-});
+})

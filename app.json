@@ -21,7 +21,8 @@
 			"supportsTablet": true,
 			"infoPlist": {
 				"NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
-				"NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes."
+				"NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes.",
+				"NSLocationWhenInUseUsageDescription": "Allow access to your location to find nearby services."
 			}
 		},
 		"android": {
@@ -32,7 +33,11 @@
 			},
 			"edgeToEdgeEnabled": true,
 			"predictiveBackGestureEnabled": false,
-			"permissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"],
+			"permissions": [
+				"android.permission.CAMERA",
+				"android.permission.RECORD_AUDIO",
+				"android.permission.ACCESS_FINE_LOCATION"
+			],
 			"package": "com.anonymous.KarolaHealth"
 		},
 		"web": {
@@ -47,13 +52,14 @@
 				{
 					"cameraPermission": "Allow access to scan patient QR codes."
 				}
+			],
+			[
+				"expo-location",
+				{
+					"locationWhenInUsePermission": "Allow KarolaHealth to access your location to help patients find you."
+				}
 			]
 		],
-		"assetBundlePatterns": ["**/*"],
-		"extra": {
-			"eas": {
-				"projectId": "be30adb0-6145-4e61-8230-850c35795970"
-			}
-		}
+		"assetBundlePatterns": ["**/*"]
 	}
 }
