@@ -83,14 +83,14 @@ export default function AppNavigator() {
   return (
     <NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
       <Stack.Navigator
-        initialRouteName="Splash"
+        // initialRouteName="Splash"
         screenOptions={{ headerShown: false }}
       >
-        <Stack.Screen
+        {/* <Stack.Screen
           name="Splash"
           component={SplashPage}
           options={{ animation: 'none' }}
-        />
+        /> */}
         <Stack.Screen
           name="Onboarding"
           component={OnboardingPage}
