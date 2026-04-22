@@ -6,13 +6,11 @@ import { useAuth } from '../context/AuthContext'
 import { ActivityIndicator, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useTheme } from 'react-native-paper'
-import { navigationRef } from './navigationService'
 
 // Screens
 import LoginPage from '../features/auth/LoginPage'
 import RegisterPage from '../features/auth/RegisterPage'
 import OnboardingPage from '../features/onboarding/OnboardingPage'
-import SplashPage from '../features/onboarding/SplashPage'
 import WelcomePage from '../features/auth/WelcomePage'
 import AccountPage from '../features/auth/AccountPage'
 import DashboardPage from '../features/dashboard/DashboardPage'
@@ -29,6 +27,8 @@ import SettingPage from '../features/setting/SettingPage'
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
+
+export const navigationRef = React.createRef<any>()
 
 function HomeWithSidebar() {
 	return (
@@ -76,46 +76,24 @@ export default function AppNavigator() {
 		)
 	}
 
-	const onNavigationReady = () => {
-		console.log('Navigation is ready')
-	}
-
-  return (
-    <NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
-      <Stack.Navigator
-        initialRouteName="Splash"
-        screenOptions={{ headerShown: false }}
-      >
-        <Stack.Screen
-          name="Splash"
-          component={SplashPage}
-          options={{ animation: 'none' }}
-        />
-        <Stack.Screen
-          name="Onboarding"
-          component={OnboardingPage}
-        />
-        {accessToken == null ? (
-          // ─── UNAUTHENTICATED STACK ───────────────────────────
-          <>
-            <Stack.Screen
-              name="Login"
-              component={LoginPage}
-            />
-            <Stack.Screen name="Register" component={RegisterPage} />
-          </>
-        ) : (
-          // ─── AUTHENTICATED STACK ─────────────────────────────
-          <>
-           
-
-            {/* 3. Main app with bottom tabs */}
-            <Stack.Screen
-              name="MainTabs"
-              component={MainTabNavigator}
-              options={{ animation: 'none' }}
-            />
-
+	return (
+		<NavigationContainer ref={navigationRef}>
+			<Stack.Navigator screenOptions={{ headerShown: false }}>
+				{accessToken == null ? (
+					// ─── UNAUTHENTICATED STACK ───────────────────────────
+					<>
+						{/* 1. First screen: app intro */}
+						<Stack.Screen name="Onboarding" component={OnboardingPage} options={{ animation: 'none' }} />
+						{/* 2. Login screen */}
+						<Stack.Screen name="Login" component={LoginPage} options={{ animation: 'none' }} />
+						{/* 3. Register screen */}
+						<Stack.Screen name="Register" component={RegisterPage} />
+					</>
+				) : (
+					// ─── AUTHENTICATED STACK ─────────────────────────────
+					<>
+						{/* 3. Main app with bottom tabs */}
+						<Stack.Screen name="MainTabs" component={MainTabNavigator} options={{ animation: 'none' }} />
 
 						{/* ─── Screens accessible from MainTabs ─── */}
 						<Stack.Screen name="DoctorDetail" component={DoctorDetailPage} />

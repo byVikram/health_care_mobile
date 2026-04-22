@@ -89,16 +89,6 @@ export default function DashboardPage() {
 		fetchAppointments()
 	}, [isDoctor, selectedDate, weekDays])
 
-	const renderTreatmentHistoryCard = () => (
-		<TouchableOpacity activeOpacity={0.85} style={styles.treatmentHistoryCard}>
-			<View style={styles.treatmentHistoryLeft}>
-				<TreatmentHistoryIcon width={52} height={52} />
-				<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
-			</View>
-			<TreatmentHistoryArrowIcon width={26} height={26} />
-		</TouchableOpacity>
-	)
-
 	const renderDashboard = () => {
 		return (
 			<>
@@ -122,7 +112,13 @@ export default function DashboardPage() {
 							</View>
 						) : (
 							<>
-								{renderTreatmentHistoryCard()}
+								<TouchableOpacity activeOpacity={0.85} style={styles.treatmentHistoryCard}>
+									<View style={styles.treatmentHistoryLeft}>
+										<TreatmentHistoryIcon width={52} height={52} />
+										<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
+									</View>
+									<TreatmentHistoryArrowIcon width={26} height={26} />
+								</TouchableOpacity>
 								<SpecialitySection />
 								<ConsultSection />
 								<CommunityBlogsSection />
@@ -145,7 +141,13 @@ export default function DashboardPage() {
 							/>
 						) : (
 							<>
-								{renderTreatmentHistoryCard()}
+								<TouchableOpacity activeOpacity={0.85} style={styles.treatmentHistoryCard}>
+									<View style={styles.treatmentHistoryLeft}>
+										<TreatmentHistoryIcon width={52} height={52} />
+										<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
+									</View>
+									<TreatmentHistoryArrowIcon width={26} height={26} />
+								</TouchableOpacity>
 								<SpecialitySection />
 								<ConsultSection />
 							</>
