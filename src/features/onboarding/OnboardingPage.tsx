@@ -12,6 +12,7 @@ import {
 	View,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useAuth } from '../../context/AuthContext'
 
 import Onboarding1 from '../../assets/Onboarding/onboarding-1.svg'
 import Onboarding2 from '../../assets/Onboarding/onboarding-2.svg'
@@ -54,6 +55,7 @@ const slides: Slide[] = [
 ]
 
 export default function OnboardingPage({ navigation }: OnboardingPageProps) {
+	const { accessToken } = useAuth()
 	const { width } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
 	const flatListRef = useRef<FlatList<Slide>>(null)
@@ -63,8 +65,8 @@ export default function OnboardingPage({ navigation }: OnboardingPageProps) {
 	const illustrationSize = useMemo(() => Math.min(cardWidth * 0.62, 250), [cardWidth])
 
 	const finishOnboarding = useCallback(() => {
-		navigation.replace('Login')
-	}, [navigation])
+		navigation.replace(accessToken ? 'MainTabs' : 'Login')
+	}, [accessToken, navigation])
 
 	const scrollToIndex = useCallback(
 		(index: number) => {
