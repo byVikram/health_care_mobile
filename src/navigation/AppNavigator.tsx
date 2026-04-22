@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { ActivityIndicator, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useTheme } from 'react-native-paper'
+import { navigationRef } from './navigationService'
 
 // Screens
 import LoginPage from '../features/auth/LoginPage'
@@ -28,110 +29,90 @@ import SettingPage from '../features/setting/SettingPage'
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
 
-export const navigationRef = React.createRef<any>()
-
 function HomeWithSidebar() {
-  return (
-    <SidebarLayout>
-      <DashboardPage />
-    </SidebarLayout>
-  )
+	return (
+		<SidebarLayout>
+			<DashboardPage />
+		</SidebarLayout>
+	)
 }
 
 function MainTabNavigator() {
-  const theme = useTheme()
-  return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: 'gray',
-        tabBarIcon: ({ color, size }) => {
-          let iconName: keyof typeof MaterialCommunityIcons.glyphMap = 'home'
-          if (route.name === 'Home') iconName = 'home'
-          else if (route.name === 'Search') iconName = 'magnify'
-          else if (route.name === 'Portal') iconName = 'calendar-clock'
-          else if (route.name === 'Profile') iconName = 'account'
-          return <MaterialCommunityIcons name={iconName} size={size} color={color} />
-        },
-      })}
-    >
-      <Tab.Screen name="Home" component={HomeWithSidebar} />
-      <Tab.Screen name="Search" component={DoctorSearchPage} />
-      <Tab.Screen name="Portal" component={PortalPage} />
-      <Tab.Screen name="Profile" component={ProfilePage} />
-    </Tab.Navigator>
-  )
+	const theme = useTheme()
+	return (
+		<Tab.Navigator
+			screenOptions={({ route }) => ({
+				headerShown: false,
+				tabBarActiveTintColor: theme.colors.primary,
+				tabBarInactiveTintColor: 'gray',
+				tabBarIcon: ({ color, size }) => {
+					let iconName: keyof typeof MaterialCommunityIcons.glyphMap = 'home'
+					if (route.name === 'Home') iconName = 'home'
+					else if (route.name === 'Search') iconName = 'magnify'
+					else if (route.name === 'Portal') iconName = 'calendar-clock'
+					else if (route.name === 'Profile') iconName = 'account'
+					return <MaterialCommunityIcons name={iconName} size={size} color={color} />
+				},
+			})}
+		>
+			<Tab.Screen name="Home" component={HomeWithSidebar} />
+			<Tab.Screen name="Search" component={DoctorSearchPage} />
+			<Tab.Screen name="Portal" component={PortalPage} />
+			<Tab.Screen name="Profile" component={ProfilePage} />
+		</Tab.Navigator>
+	)
 }
 
 export default function AppNavigator() {
-  const { accessToken, isLoading } = useAuth()
-  const theme = useTheme()
+	const { accessToken, isLoading } = useAuth()
+	const theme = useTheme()
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    )
-  }
+	if (isLoading) {
+		return (
+			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+				<ActivityIndicator size="large" color={theme.colors.primary} />
+			</View>
+		)
+	}
 
-  return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator
-        screenOptions={{ headerShown: false }}
-      >
-        {accessToken == null ? (
-          // ─── UNAUTHENTICATED STACK ───────────────────────────
-          <>
-            {/* 1. First screen: app intro */}
-            <Stack.Screen
-              name="Onboarding"
-              component={OnboardingPage}
-              options={{ animation: 'none' }}
-            />
-            {/* 2. Login screen */}
-            <Stack.Screen
-              name="Login"
-              component={LoginPage}
-              options={{ animation: 'none' }}
-            />
-            {/* 3. Register screen */}
-            <Stack.Screen name="Register" component={RegisterPage} />
-          </>
-        ) : (
-          // ─── AUTHENTICATED STACK ─────────────────────────────
-          <>
-           
+	const onNavigationReady = () => {
+		console.log('Navigation is ready')
+	}
 
-            {/* 3. Main app with bottom tabs */}
-            <Stack.Screen
-              name="MainTabs"
-              component={MainTabNavigator}
-              options={{ animation: 'none' }}
-            />
+	return (
+		<NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
+			<Stack.Navigator screenOptions={{ headerShown: false }}>
+				{accessToken == null ? (
+					// ─── UNAUTHENTICATED STACK ───────────────────────────
+					<>
+						{/* 1. First screen: app intro */}
+						<Stack.Screen name="Onboarding" component={OnboardingPage} options={{ animation: 'none' }} />
+						{/* 2. Login screen */}
+						<Stack.Screen name="Login" component={LoginPage} options={{ animation: 'none' }} />
+						{/* 3. Register screen */}
+						<Stack.Screen name="Register" component={RegisterPage} />
+					</>
+				) : (
+					// ─── AUTHENTICATED STACK ─────────────────────────────
+					<>
+						{/* 3. Main app with bottom tabs */}
+						<Stack.Screen name="MainTabs" component={MainTabNavigator} options={{ animation: 'none' }} />
 
+						{/* ─── Screens accessible from MainTabs ─── */}
+						<Stack.Screen name="DoctorDetail" component={DoctorDetailPage} />
+						<Stack.Screen name="FavouriteDoctor" component={MyDoctorPage} />
+						<Stack.Screen name="Notification" component={NotificationPage} />
+						<Stack.Screen name="Consultation" component={ConsultationPage} />
+						<Stack.Screen name="HealthProfile" component={PatientProfileLayout} />
+						<Stack.Screen name="SettingPage" component={SettingPage} />
 
-            {/* ─── Screens accessible from MainTabs ─── */}
-            <Stack.Screen name="DoctorDetail" component={DoctorDetailPage} />
-            <Stack.Screen name="FavouriteDoctor" component={MyDoctorPage} />
-            <Stack.Screen name="Notification" component={NotificationPage} />
-            <Stack.Screen name="Consultation" component={ConsultationPage} />
-            <Stack.Screen name="HealthProfile" component={PatientProfileLayout} />
-            <Stack.Screen name="SettingPage" component={SettingPage} />
-
-
-			 {/* 1. First screen after login: Doctor onboarding welcome */}
-            <Stack.Screen
-              name="DoctorWelcome"
-              component={WelcomePage}
-              options={{ animation: 'none' }}
-            />
-            {/* 2. Account details form (Location + Speciality) */}
-            <Stack.Screen name="AccountPage" component={AccountPage} />
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
-  )
+						{/* 1. First screen after login: Doctor onboarding welcome */}
+						<Stack.Screen name="DoctorWelcome" component={WelcomePage} options={{ animation: 'none' }} />
+						{/* 2. Account details form (Location + Speciality) */}
+						<Stack.Screen name="AccountPage" component={AccountPage} />
+					</>
+				)}
+			</Stack.Navigator>
+		</NavigationContainer>
+	)
 }
