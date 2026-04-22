@@ -94,9 +94,7 @@ export default function SplashPage({ navigation }: SplashPageProps) {
 					</View>
 				</View>
 
-				<Text style={styles.footer}>
-					{'\u00A9 2025 Whisper ai. All rights reserved.'}
-				</Text>
+			
 			</View>
 		</SafeAreaView>
 	)
@@ -170,11 +168,4 @@ const styles = StyleSheet.create({
 		color: '#2a2a2a',
 	},
 
-	footer: {
-		textAlign: 'center',
-		fontSize: 12,
-		color: 'rgba(255,255,255,0.65)',
-		letterSpacing: 0.2,
-		paddingBottom: 4,
-	},
 })
