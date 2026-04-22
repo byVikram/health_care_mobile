@@ -12,7 +12,7 @@ export interface TimeSlot {
 	id: string | number
 	start_time: string
 	end_time: string
-	status: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE'
+	status_id: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE'
 }
 // Add this to doctorService.ts
 export interface Appointment {
@@ -72,14 +72,28 @@ export interface AppointmentResponse {
 }
 
 
-export const updateAppointmentsStatus = async (appointmentId: string, statusId: string): Promise<AppointmentResponse> => {
-	const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
-		appointment_id: appointmentId,
-		status_id: statusId
-	})
-	return res.data
-}
+export const updateAppointmentsStatus = async (
+  appointmentId: string,
+  statusId: string
+): Promise<AppointmentResponse> => {
 
+  console.log("PAYLOAD 👉", {
+    appointment_id: appointmentId,
+    status_id: statusId,
+  });
+
+  const res = await ApiService.patch(
+    API_ENDPOINTS.APPOINTMENTS.UPDATE,
+    {
+      appointment_id: appointmentId,
+      status_id: statusId,
+    }
+  );
+
+  console.log("RESPONSE 👉", res.data);
+
+  return res.data;
+};
 export interface RescheduleAppointmentPayload {
 	appointment_id: string
 	appointment_date: string

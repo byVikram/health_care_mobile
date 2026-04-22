@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, Alert, Modal } from 'react-native'
+import {
+	View,
+	Text,
+	ScrollView,
+	StyleSheet,
+	TouchableOpacity,
+	useWindowDimensions,
+	Alert,
+	Modal,
+} from 'react-native'
 import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
@@ -31,65 +40,17 @@ type Appointment = {
 	gender?: string
 	sex?: string
 	status: string | { label: string }
-	// start_time: string
-	// appointment_end_time?: string
-	// end_time?: string
 	appointment_date: string
 	start_time: string
 	end_time?: string
 }
 
-const actionButtons: {
-	label: string
-	bg: string
-	color: string
-	action: string
-	icon: keyof typeof MaterialCommunityIcons.glyphMap
-}[] = [
-	{
-		label: 'Confirm',
-		bg: '#d6eed8',
-		color: '#2e8b57',
-		action: 'confirm',
-		icon: 'check',
-	},
-	{
-		label: 'Reject',
-		bg: '#f8dddd',
-		color: '#d84545',
-		action: 'reject',
-		icon: 'close',
-	},
-	{
-		label: 'Reschedule',
-		bg: '#f8e8c6',
-		color: '#d08a0a',
-		action: 'reschedule',
-		icon: 'refresh',
-	},
-	{
-		label: 'Refer',
-		bg: '#dbe2f5',
-		color: '#4d6bb1',
-		action: 'refer',
-		icon: 'account-multiple-outline',
-	},
-]
-
 const showSuccess = (message: string) => {
-	Toast.show({
-		type: 'success',
-		text1: 'Success',
-		text2: message,
-	})
+	Toast.show({ type: 'success', text1: 'Success', text2: message })
 }
 
 const showError = (message: string) => {
-	Toast.show({
-		type: 'error',
-		text1: 'Error',
-		text2: message,
-	})
+	Toast.show({ type: 'error', text1: 'Error', text2: message })
 }
 
 type DoctorAppointmentsProps = {
@@ -117,6 +78,8 @@ export default function DoctorAppointments({
 	const isTablet = width >= 768
 	const useCompactCancelledLayout = width < 640
 	const navigation = useNavigation<any>()
+
+	// ── Reschedule state ──────────────────────────────────────────────────────
 	const [rescheduleOpen, setRescheduleOpen] = useState(false)
 	const [rescheduleAppt, setRescheduleAppt] = useState<Appointment | null>(null)
 	const [rescheduleDate, setRescheduleDate] = useState<Date>(new Date())
@@ -126,23 +89,39 @@ export default function DoctorAppointments({
 	const [rescheduleHospitals, setRescheduleHospitals] = useState<any[]>([])
 	const [rescheduleHospitalId, setRescheduleHospitalId] = useState<string>('')
 
+	// ── Reject modal: stores the appointment id pending rejection ─────────────
+	const [rejectModalId, setRejectModalId] = useState<string | null>(null)
+
+	// ── confirmedIds: tracks which appointments had Confirm pressed ───────────
+	const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set())
+	
+	// ── rejectedIds: local set to mark appointments rejected by doctor ─────────
+	const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set())
+
 	// ── Helpers ───────────────────────────────────────────────────────────────
-	const getStatusLabel = (status: any) => (typeof status === 'string' ? status : (status?.label ?? 'pending'))
-	const formatStatus = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+	const getStatusLabel = (status: any) =>
+		typeof status === 'string' ? status : (status?.label ?? 'pending')
+	const formatStatus = (s: string) =>
+		s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 	const getPatientAge = (apt: any) => apt?.patient?.age ?? apt?.age ?? '--'
-	const getPatientGender = (apt: any) => apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? '--'
+	const getPatientGender = (apt: any) =>
+		apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? '--'
 	const getTimeRange = (apt: any) => {
 		const start = apt?.start_time
-		const end = apt?.end_time ?? apt?.end_time
+		const end = apt?.end_time
 		if (start && end) return `${start} - ${end}`
 		return start ?? '--'
 	}
-	const buildRescheduleSlots = (apt: any) => {
-		const current = getTimeRange(apt)
-		const fallback = ['09:00 - 09:30', '10:00 - 10:30', '11:00 - 11:30', '04:00 - 04:30', '05:00 - 05:30']
-		return Array.from(new Set([current, ...fallback].filter(Boolean)))
-	}
+
+	// ── Reschedule helpers ────────────────────────────────────────────────────
 	const handleOpenReschedule = (apt: Appointment) => {
+		// Don't allow reschedule if appointment is already rejected (locally or via status)
+		const isLocallyRejected = rejectedIds.has(apt.id)
+		const statusFromProp = getStatusLabel(apt.status)
+		if (isLocallyRejected || statusFromProp === 'cancelled' || statusFromProp === 'rejected') {
+			showError('Cannot reschedule a rejected or cancelled appointment.')
+			return
+		}
 		setRescheduleAppt(apt)
 		setRescheduleDate(new Date())
 		setRescheduleSlots([])
@@ -151,17 +130,17 @@ export default function DoctorAppointments({
 		setRescheduleHospitals([])
 		setRescheduleOpen(true)
 	}
+
 	const handleConfirmReschedule = async () => {
 		if (!selectedSlot) {
 			Alert.alert('Select time', 'Please select a slot to reschedule.')
 			return
 		}
-
 		if (!rescheduleAppt || !rescheduleDate) return
 
-		const doctorId = rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id
 		const hospitalId =
-			rescheduleHospitalId || (rescheduleAppt?.hospital?.id ?? (rescheduleAppt as any)?.hospital_id)
+			rescheduleHospitalId ||
+			(rescheduleAppt?.hospital?.id ?? (rescheduleAppt as any)?.hospital_id)
 		const dateStr = rescheduleDate.toISOString().split('T')[0]
 
 		if (!hospitalId || !dateStr) {
@@ -171,18 +150,14 @@ export default function DoctorAppointments({
 
 		setRescheduleSlotsLoading(true)
 		try {
-			const start_time = selectedSlot
-			const end_time = null
-
 			const res = await rescheduleAppointment({
 				appointment_id: rescheduleAppt.id,
 				appointment_date: dateStr,
-				start_time,
-				end_time,
+				start_time: selectedSlot,
+				end_time: null,
 				hospital_id: hospitalId,
 				reason: 'Doctor unavailable',
 			})
-
 			if (res.success) {
 				showSuccess(res.message || 'Reschedule request submitted')
 				setRescheduleOpen(false)
@@ -198,29 +173,22 @@ export default function DoctorAppointments({
 
 	useEffect(() => {
 		if (!rescheduleAppt || !rescheduleOpen) return
-
 		const doctorId = rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id
 
 		const fetchHospitals = async () => {
 			try {
-				let hData = []
+				let hData: any[] = []
 				if (doctorId) {
 					const res = await getDoctorById(doctorId)
-					if (res.success && res.data) {
-						hData = res.data.hospitals || []
-					}
+					if (res.success && res.data) hData = res.data.hospitals || []
 				} else {
 					const res = await getDoctorProfile()
-					if (res.success && res.data) {
-						hData = res.data.hospitals || []
-					}
+					if (res.success && res.data) hData = res.data.hospitals || []
 				}
-
 				setRescheduleHospitals(hData)
-				if (!rescheduleHospitalId && hData.length > 0) {
+				if (!rescheduleHospitalId && hData.length > 0)
 					setRescheduleHospitalId(hData[0].hospital.id)
-				}
-			} catch (e) {
+			} catch {
 				console.log('Failed to fetch doctor hospitals')
 			}
 		}
@@ -232,7 +200,8 @@ export default function DoctorAppointments({
 
 		const doctorId = rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id
 		const hospitalId =
-			rescheduleHospitalId || (rescheduleAppt?.hospital?.id ?? (rescheduleAppt as any)?.hospital_id)
+			rescheduleHospitalId ||
+			(rescheduleAppt?.hospital?.id ?? (rescheduleAppt as any)?.hospital_id)
 		const dateStr = rescheduleDate.toISOString().split('T')[0]
 
 		if (!hospitalId || !dateStr) {
@@ -246,19 +215,16 @@ export default function DoctorAppointments({
 				setRescheduleSlotsLoading(true)
 				setRescheduleSlots([])
 				setSelectedSlot('')
-
 				const responseData = await getDoctorAvailability({
 					doctor_id: doctorId,
 					hospital_id: hospitalId,
 					date: dateStr,
 				})
-
 				const groups = Array.isArray(responseData)
 					? responseData
 					: Array.isArray((responseData as any)?.data)
 						? (responseData as any).data
 						: []
-
 				setRescheduleSlots(groups)
 			} catch {
 				setRescheduleSlots([])
@@ -267,120 +233,208 @@ export default function DoctorAppointments({
 				setRescheduleSlotsLoading(false)
 			}
 		}
-
 		fetchSlots()
 	}, [rescheduleOpen, rescheduleAppt, rescheduleDate, weekDays, rescheduleHospitalId])
 
-	const handleAction = async (action: string, appointmentId: string) => {
+	// ── Confirm ───────────────────────────────────────────────────────────────
+	const handleConfirmAppointment = async (appointmentId: string) => {
+  try {
+    const res = await updateAppointmentsStatus(
+      appointmentId,
+      APPOINTMENT_STATUS.CONFIRM
+    )
+
+    console.log("CONFIRM RESPONSE 👉", res)
+
+    if (res.success) {
+  showSuccess(res.message)
+
+  // optional UI update
+  setConfirmedIds((prev) => new Set(prev).add(appointmentId))
+
+  // 🔥 IMPORTANT: refresh data from backend
+ 
+}
+	
+	else {
+      showError(res.message || 'Failed to confirm')
+    }
+  } catch (err: any) {
+    console.log("ERROR 👉", err?.response?.data)
+    showError('Something went wrong')
+  }
+}
+
+	// ── Reject (after modal OK) with optimistic UI update ─────────────────────
+	const handleConfirmReject = async () => {
+		if (!rejectModalId) return
 		try {
-			if (action === 'confirm') {
-				const res = await updateAppointmentsStatus(appointmentId, APPOINTMENT_STATUS.CONFIRM)
-				if (res.success) {
-					showSuccess(res.message)
+			const res = await updateAppointmentsStatus(rejectModalId, APPOINTMENT_STATUS.REJECT)
+			if (res.success) {
+				showSuccess(res.message)
+				// Optimistically mark as rejected locally
+				setRejectedIds((prev) => new Set(prev).add(rejectModalId))
+				// Also remove from confirmed set if it was previously confirmed
+				if (confirmedIds.has(rejectModalId)) {
+					setConfirmedIds((prev) => {
+						const next = new Set(prev)
+						next.delete(rejectModalId)
+						return next
+					})
 				}
-			}
-			if (action === 'reject') {
-				const res = await updateAppointmentsStatus(appointmentId, APPOINTMENT_STATUS.REJECT)
-				if (res.success) {
-					showSuccess(res.message)
-				}
-			}
-			if (action === 'reschedule') {
-				const apt = appointments.find((a: any) => a.id === appointmentId)
-				if (apt) handleOpenReschedule(apt)
-			}
-			if (action === 'refer') {
-				alert('Refer coming soon!')
+			} else {
+				showError(res.message || 'Failed to reject appointment.')
 			}
 		} catch {
 			showError('Something went wrong')
+		} finally {
+			setRejectModalId(null)
 		}
 	}
 
-  // ── Card press navigation ────────────────────────────────────────────────
-  const handleCardPress = (apt: any) => {
-  const patientId = apt.patient?.id || apt.patient?.patient_id || apt.patient?.public_id || apt.patient_public_id;
-  const doctorId = apt.doctor?.id || apt.doctor_id; // Get doctor ID from appointment
-  
-  // Also get the full doctor object if available
-  const doctorData = apt.doctor; // This should contain doctor details
+	// ── Navigation ────────────────────────────────────────────────────────────
+	const handleCardPress = (apt: any) => {
+		const patientId =
+			apt.patient?.id ||
+			apt.patient?.patient_id ||
+			apt.patient?.public_id ||
+			apt.patient_public_id
+		const doctorId = apt.doctor?.id || apt.doctor_id
 
-  console.log("Appointment data:", apt);
-  console.log("Patient ID found:", patientId);
-  console.log("Doctor ID found:", doctorId);
-  console.log("Doctor data:", doctorData);
+		if (!patientId) {
+			Alert.alert('Error', 'Patient ID not found for this appointment')
+			return
+		}
+		if (!doctorId) {
+			Alert.alert('Error', 'Doctor ID not found for this appointment')
+			return
+		}
 
-  if (!patientId) {
-    Alert.alert("Error", "Patient ID not found for this appointment");
-    return;
-  }
+		navigation.navigate('Consultation', {
+			appointmentId: apt.id,
+			patientId,
+			patient: apt.patient,
+			doctorID: doctorId,
+			doctor: apt.doctor,
+			appointment: apt,
+		})
+	}
 
-  if (!doctorId) {
-    Alert.alert("Error", "Doctor ID not found for this appointment");
-    return;
-  }
+	// ── Skeleton ──────────────────────────────────────────────────────────────
+	const renderSkeleton = () =>
+		Array.from({ length: 3 }).map((_, i) => (
+			<View key={`sk-${i}`} style={styles.card}>
+				<View style={isTablet ? styles.tabletCardInner : undefined}>
+					<View style={styles.skeletonNameRow}>
+						<AppSkeleton width={24} height={24} borderRadius={6} />
+						<AppSkeleton width={110} height={16} borderRadius={6} />
+						<AppSkeleton width={72} height={16} borderRadius={999} />
+					</View>
+					<View style={[styles.skeletonMetaRow, { marginTop: 8 }]}>
+						<AppSkeleton width={14} height={14} borderRadius={7} />
+						<AppSkeleton width="80%" height={13} borderRadius={6} />
+					</View>
+					{isTablet && (
+						<View style={styles.skeletonActionsRow}>
+							{[0, 1, 2, 3].map((j) => (
+								<AppSkeleton
+									key={j}
+									width={52}
+									height={44}
+									borderRadius={6}
+									style={{ marginRight: 8 }}
+								/>
+							))}
+						</View>
+					)}
+				</View>
+			</View>
+		))
 
-  // Navigate with all necessary data
-  navigation.navigate('Consultation', {
-    appointmentId: apt.id,
-    patientId: patientId,
-    patient: apt.patient,  // Pass full patient object
-    doctorID: doctorId,    // Pass doctor ID
-    doctor: doctorData,    // Pass full doctor object if available
-    appointment: apt       // Pass full appointment data
-  });
-};
-  // ── Skeleton ──────────────────────────────────────────────────────────────
-  const renderSkeleton = () =>
-    Array.from({ length: 3 }).map((_, i) => (
-      <View key={`sk-${i}`} style={styles.card}>
-        <View style={isTablet ? styles.tabletCardInner : undefined}>
-          <View style={styles.skeletonNameRow}>
-            <AppSkeleton width={24} height={24} borderRadius={6} />
-            <AppSkeleton width={110} height={16} borderRadius={6} />
-            <AppSkeleton width={72} height={16} borderRadius={999} />
-          </View>
-          <View style={[styles.skeletonMetaRow, { marginTop: 8 }]}>
-            <AppSkeleton width={14} height={14} borderRadius={7} />
-            <AppSkeleton width="80%" height={13} borderRadius={6} />
-          </View>
-          {isTablet && (
-            <View style={styles.skeletonActionsRow}>
-              {[0, 1, 2, 3].map((j) => (
-                <AppSkeleton
-                  key={j}
-                  width={52}
-                  height={44}
-                  borderRadius={6}
-                  style={{ marginRight: 8 }}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-      </View>
-    ));
+	// ── Action buttons (only for active, non-rejected appointments) ──────────
+	const renderActions = (apt: any) => {
+		const rawStatus = getStatusLabel(apt.status)
+const isConfirmed = rawStatus === 'confirmed'
+		const isRejectedLocally = rejectedIds.has(apt.id)
+		const statusFromProp = getStatusLabel(apt.status)
+		const isRejected = isRejectedLocally || statusFromProp === 'rejected' || statusFromProp === 'cancelled'
+		
+		// If appointment is rejected, don't show any action buttons
+		if (isRejected) return null
 
-	// ── Action buttons ────────────────────────────────────────────────────────
-	const renderActions = (apt: any) => (
-		<View style={[styles.actions, isTablet && styles.actionsTablet]}>
-			{actionButtons.map((btn, i) => (
+		return (
+			<View style={[styles.actions, isTablet && styles.actionsTablet]}>
+
+				{/* ── Confirm button OR confirmed mini-badge ── */}
+				{!isConfirmed && (
+	<TouchableOpacity
+		onPress={(e) => {
+			e.stopPropagation?.()
+			handleConfirmAppointment(apt.id)
+		}}
+		style={[styles.btn, { backgroundColor: '#d6eed8' }]}
+		activeOpacity={0.75}
+	>
+		<MaterialCommunityIcons name="check" size={16} color="#2e8b57" />
+		<Text style={[styles.btnLabel, { color: '#2e8b57' }]}>Confirm</Text>
+	</TouchableOpacity>
+)}
+
+				{/* ── Reject — always visible for active appointments, opens centered modal ── */}
 				<TouchableOpacity
-					key={i}
 					onPress={(e) => {
 						e.stopPropagation?.()
-						handleAction(btn.action, apt.id)
+						setRejectModalId(apt.id)
 					}}
-					style={[styles.btn, { backgroundColor: btn.bg }]}
+					style={[styles.btn, { backgroundColor: '#f8dddd' }]}
 					activeOpacity={0.75}
 				>
-					<MaterialCommunityIcons name={btn.icon} size={16} color={btn.color} />
-					<Text style={[styles.btnLabel, { color: btn.color }]}>{btn.label}</Text>
+					<MaterialCommunityIcons name="close" size={16} color="#d84545" />
+					<Text style={[styles.btnLabel, { color: '#d84545' }]}>Reject</Text>
 				</TouchableOpacity>
-			))}
-			<TouchableOpacity style={styles.chevronBtn} activeOpacity={0.7} onPress={() => handleCardPress(apt)}>
-				<MaterialCommunityIcons name="chevron-right" size={26} color={TEAL} />
-			</TouchableOpacity>
+
+				{/* ── Reschedule — always visible for active appointments ── */}
+				<TouchableOpacity
+					onPress={(e) => {
+						e.stopPropagation?.()
+						handleOpenReschedule(apt)
+					}}
+					style={[styles.btn, { backgroundColor: '#f8e8c6' }]}
+					activeOpacity={0.75}
+				>
+					<MaterialCommunityIcons name="refresh" size={16} color="#d08a0a" />
+					<Text style={[styles.btnLabel, { color: '#d08a0a' }]}>Reschedule</Text>
+				</TouchableOpacity>
+
+				{/* ── Refer — always visible for active appointments ── */}
+				<TouchableOpacity
+					onPress={(e) => {
+						e.stopPropagation?.()
+						alert('Refer coming soon!')
+					}}
+					style={[styles.btn, { backgroundColor: '#dbe2f5' }]}
+					activeOpacity={0.75}
+				>
+					<MaterialCommunityIcons name="account-multiple-outline" size={16} color="#4d6bb1" />
+					<Text style={[styles.btnLabel, { color: '#4d6bb1' }]}>Refer</Text>
+				</TouchableOpacity>
+
+				{/* ── Chevron ── */}
+				<TouchableOpacity
+					style={styles.chevronBtn}
+					activeOpacity={0.7}
+					onPress={() => handleCardPress(apt)}
+				>
+					<MaterialCommunityIcons name="chevron-right" size={26} color={TEAL} />
+				</TouchableOpacity>
+			</View>
+		)
+	}
+
+	const renderRejectedNotice = () => (
+		<View style={styles.cancelNoticeBox}>
+			<MaterialCommunityIcons name="close-circle-outline" size={34} color="#d84545" />
+			<Text style={styles.cancelNoticeText}>Appointment rejected by doctor</Text>
 		</View>
 	)
 
@@ -391,6 +445,45 @@ export default function DoctorAppointments({
 		</View>
 	)
 
+	// ── Reject confirmation modal (exactly as per screenshot) ─────────────────
+	const renderRejectModal = () => (
+		<Modal
+			visible={rejectModalId !== null}
+			transparent
+			animationType="fade"
+			onRequestClose={() => setRejectModalId(null)}
+		>
+			<TouchableOpacity
+				activeOpacity={1}
+				style={styles.rejectBackdrop}
+				onPress={() => setRejectModalId(null)}
+			>
+				<TouchableOpacity activeOpacity={1} style={styles.rejectCard} onPress={() => { }}>
+					<View style={styles.rejectIconCircle}>
+						<MaterialCommunityIcons name="close" size={28} color="#d84545" />
+					</View>
+					<Text style={styles.rejectTitle}>Are you sure?</Text>
+					<Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
+					<View style={styles.rejectBtnRow}>
+						<TouchableOpacity
+							style={styles.rejectCancelBtn}
+							onPress={() => setRejectModalId(null)}
+						>
+							<Text style={styles.rejectCancelText}>Cancel</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.rejectConfirmBtn}
+							onPress={handleConfirmReject}
+						>
+							<Text style={styles.rejectConfirmText}>Yes, Reject</Text>
+						</TouchableOpacity>
+					</View>
+				</TouchableOpacity>
+			</TouchableOpacity>
+		</Modal>
+	)
+
+	// ── Reschedule bottom-sheet ───────────────────────────────────────────────
 	const renderRescheduleDrawer = () => (
 		<Modal
 			visible={rescheduleOpen}
@@ -398,14 +491,23 @@ export default function DoctorAppointments({
 			animationType="slide"
 			onRequestClose={() => setRescheduleOpen(false)}
 		>
-			<TouchableOpacity activeOpacity={1} style={styles.drawerBackdrop} onPress={() => setRescheduleOpen(false)}>
-				<TouchableOpacity activeOpacity={1} style={styles.drawerSheet} onPress={() => {}}>
+			<TouchableOpacity
+				activeOpacity={1}
+				style={styles.drawerBackdrop}
+				onPress={() => setRescheduleOpen(false)}
+			>
+				<TouchableOpacity activeOpacity={1} style={styles.drawerSheet} onPress={() => { }}>
 					<View style={styles.drawerHeader}>
 						<View>
 							<Text style={styles.drawerTitle}>Reschedule Appointment</Text>
-							<Text style={styles.drawerSubtitle}>{rescheduleAppt?.patient?.name ?? 'Patient'}</Text>
+							<Text style={styles.drawerSubtitle}>
+								{rescheduleAppt?.patient?.name ?? 'Patient'}
+							</Text>
 						</View>
-						<TouchableOpacity style={styles.drawerCloseBtn} onPress={() => setRescheduleOpen(false)}>
+						<TouchableOpacity
+							style={styles.drawerCloseBtn}
+							onPress={() => setRescheduleOpen(false)}
+						>
 							<MaterialCommunityIcons name="close" size={18} color="#7a848d" />
 						</TouchableOpacity>
 					</View>
@@ -427,11 +529,17 @@ export default function DoctorAppointments({
 									return (
 										<TouchableOpacity
 											key={h.id}
-											style={[styles.hospitalItem, isSelected && styles.hospitalItemActive]}
+											style={[
+												styles.hospitalItem,
+												isSelected && styles.hospitalItemActive,
+											]}
 											onPress={() => setRescheduleHospitalId(h.id)}
 										>
 											<View
-												style={[styles.hospitalIcon, isSelected && styles.hospitalIconActive]}
+												style={[
+													styles.hospitalIcon,
+													isSelected && styles.hospitalIconActive,
+												]}
 											>
 												<Text style={styles.hospitalIconText}>{index + 1}</Text>
 											</View>
@@ -454,7 +562,6 @@ export default function DoctorAppointments({
 							</View>
 						)}
 
-						{/* Shared Date & Time Slot Picker */}
 						<DateSlotPicker
 							selectedDate={rescheduleDate}
 							onDateChange={(date) => {
@@ -469,10 +576,16 @@ export default function DoctorAppointments({
 					</ScrollView>
 
 					<View style={styles.drawerActions}>
-						<TouchableOpacity style={styles.drawerCancelBtn} onPress={() => setRescheduleOpen(false)}>
+						<TouchableOpacity
+							style={styles.drawerCancelBtn}
+							onPress={() => setRescheduleOpen(false)}
+						>
 							<Text style={styles.drawerCancelBtnText}>Cancel</Text>
 						</TouchableOpacity>
-						<TouchableOpacity style={styles.drawerConfirmBtn} onPress={handleConfirmReschedule}>
+						<TouchableOpacity
+							style={styles.drawerConfirmBtn}
+							onPress={handleConfirmReschedule}
+						>
 							<Text style={styles.drawerConfirmBtnText}>Confirm</Text>
 						</TouchableOpacity>
 					</View>
@@ -483,24 +596,37 @@ export default function DoctorAppointments({
 
 	// ── Card ──────────────────────────────────────────────────────────────────
 	const renderCard = (apt: any) => {
-		const status = getStatusLabel(apt.status)
-		const isCancelled = status === 'cancelled'
+		const rawStatus = getStatusLabel(apt.status)
+		// Determine final status: confirmed (optimistic), rejected (optimistic or from prop), cancelled
+		const statusFromProp = getStatusLabel(apt.status)
+const isConfirmed = statusFromProp === 'confirmed'
+		const isRejectedLocally = rejectedIds.has(apt.id)
+		const isRejectedFromProp = rawStatus === 'rejected' || rawStatus === 'cancelled'
+		const isRejected = isRejectedLocally || isRejectedFromProp
+		
+		let status = rawStatus
+
+// optional optimistic UI
+if (confirmedIds.has(apt.id)) status = 'confirmed'
+if (rejectedIds.has(apt.id)) status = 'rejected'
 
 		const statusStyle =
 			status === 'confirmed'
 				? styles.pillConfirmed
-				: status === 'cancelled'
+				: status === 'rejected'
 					? styles.pillCancelled
 					: styles.pillPending
 
 		const statusTextStyle =
 			status === 'confirmed'
 				? styles.pillTextConfirmed
-				: status === 'cancelled'
+				: status === 'rejected'
 					? styles.pillTextCancelled
 					: styles.pillTextPending
 
-		if (isCancelled) {
+		// ── Rejected / Cancelled card ──
+		if (isRejected) {
+			const isPatientCancelled = rawStatus === 'cancelled' && !isRejectedLocally
 			return (
 				<TouchableOpacity
 					key={apt.id}
@@ -528,7 +654,9 @@ export default function DoctorAppointments({
 									{apt?.patient?.name || 'Unknown Patient'}
 								</Text>
 								<View style={[styles.pill, statusStyle]}>
-									<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
+									<Text style={[styles.pillText, statusTextStyle]}>
+										{formatStatus(status)}
+									</Text>
 								</View>
 							</View>
 							<View style={styles.cancelledMetaRow}>
@@ -536,30 +664,38 @@ export default function DoctorAppointments({
 									{getPatientAge(apt)} years / {getPatientGender(apt)}
 								</Text>
 								<View style={styles.metaDot} />
-								<MaterialCommunityIcons name="clock-time-three-outline" size={16} color="#9ea5ac" />
+								<MaterialCommunityIcons
+									name="clock-time-three-outline"
+									size={16}
+									color="#9ea5ac"
+								/>
 								<Text style={styles.subText}>{getTimeRange(apt)}</Text>
 							</View>
 						</View>
 						<View
-							style={[styles.cancelDivider, useCompactCancelledLayout && styles.cancelDividerCompact]}
+							style={[
+								styles.cancelDivider,
+								useCompactCancelledLayout && styles.cancelDividerCompact,
+							]}
 						/>
 						<View
 							style={[
 								styles.cancelledCardRight,
 								!useCompactCancelledLayout &&
-									!isTablet && {
-										width: Math.max(230, Math.floor(width * 0.52)),
-									},
+								!isTablet && {
+									width: Math.max(230, Math.floor(width * 0.52)),
+								},
 								useCompactCancelledLayout && styles.cancelledCardRightCompact,
 							]}
 						>
-							{renderCancelledNotice()}
+							{isPatientCancelled ? renderCancelledNotice() : renderRejectedNotice()}
 						</View>
 					</View>
 				</TouchableOpacity>
 			)
 		}
 
+		// ── Tablet ──
 		if (isTablet) {
 			return (
 				<TouchableOpacity
@@ -578,13 +714,20 @@ export default function DoctorAppointments({
 									{apt?.patient?.name || 'Unknown Patient'}
 								</Text>
 								<View style={[styles.pill, statusStyle]}>
-									<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
+									<Text style={[styles.pillText, statusTextStyle]}>
+										{formatStatus(status)}
+									</Text>
 								</View>
 							</View>
 							<View style={styles.metaRow}>
-								<MaterialCommunityIcons name="clock-time-three-outline" size={14} color="#5f6973" />
+								<MaterialCommunityIcons
+									name="clock-time-three-outline"
+									size={14}
+									color="#5f6973"
+								/>
 								<Text style={styles.subText}>
-									{getPatientAge(apt)} yrs / {getPatientGender(apt)} | {getTimeRange(apt)}
+									{getPatientAge(apt)} yrs / {getPatientGender(apt)} |{' '}
+									{getTimeRange(apt)}
 								</Text>
 							</View>
 						</View>
@@ -594,6 +737,7 @@ export default function DoctorAppointments({
 			)
 		}
 
+		// ── Mobile ──
 		return (
 			<TouchableOpacity
 				key={apt.id}
@@ -623,6 +767,7 @@ export default function DoctorAppointments({
 		)
 	}
 
+	// ── Root ──────────────────────────────────────────────────────────────────
 	return (
 		<View style={styles.container}>
 			{/* Header */}
@@ -647,7 +792,11 @@ export default function DoctorAppointments({
 					<TouchableOpacity
 						key={i}
 						onPress={() => setSelectedDate(i)}
-						style={[styles.dayBox, d.red && styles.weekendDayBox, selectedDate === i && styles.selectedDay]}
+						style={[
+							styles.dayBox,
+							d.red && styles.weekendDayBox,
+							selectedDate === i && styles.selectedDay,
+						]}
 					>
 						<Text
 							style={[
@@ -671,13 +820,18 @@ export default function DoctorAppointments({
 				))}
 			</ScrollView>
 
-			{/* List */}
+			{/* Appointment list */}
 			<View style={styles.listContainer}>
 				{apptLoading ? renderSkeleton() : null}
 				{apptError ? <Text style={styles.error}>{apptError}</Text> : null}
-				{!apptLoading && appointments.length === 0 && <Text style={styles.empty}>No appointments</Text>}
+				{!apptLoading && appointments.length === 0 && (
+					<Text style={styles.empty}>No appointments</Text>
+				)}
 				{!apptLoading && appointments.map(renderCard)}
 			</View>
+
+			{/* Modals — at root level */}
+			{renderRejectModal()}
 			{renderRescheduleDrawer()}
 		</View>
 	)
@@ -714,12 +868,7 @@ const styles = StyleSheet.create({
 	weekendDayBox: { borderColor: '#efb2b2', backgroundColor: '#fff9f9' },
 	selectedDay: { backgroundColor: '#2d7679', borderColor: '#2d7679' },
 	dayText: { fontSize: 12, color: '#6f7680', marginBottom: 2 },
-	dateText: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#2c3136',
-		lineHeight: 32,
-	},
+	dateText: { fontSize: 16, fontWeight: '700', color: '#2c3136', lineHeight: 32 },
 	selectedText: { color: '#fff' },
 	weekendText: { color: '#e25555' },
 	listContainer: { marginTop: 6, paddingBottom: 4 },
@@ -785,12 +934,7 @@ const styles = StyleSheet.create({
 		marginTop: 2,
 		flexWrap: 'wrap',
 	},
-	metaDot: {
-		width: 5,
-		height: 5,
-		borderRadius: 999,
-		backgroundColor: '#cfd5d9',
-	},
+	metaDot: { width: 5, height: 5, borderRadius: 999, backgroundColor: '#cfd5d9' },
 	subText: { fontSize: 13, color: '#5f6973', fontWeight: '500' },
 	cancelDivider: {
 		width: 1,
@@ -825,6 +969,8 @@ const styles = StyleSheet.create({
 		flex: 1,
 		flexShrink: 1,
 	},
+
+	// ── Action row ────────────────────────────────────────────────────────────
 	actions: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -841,22 +987,89 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 8,
 		minWidth: 52,
 	},
-	btnLabel: {
-		fontSize: 10,
-		fontWeight: '500',
-		textAlign: 'center',
-		marginTop: 3,
-	},
+	btnLabel: { fontSize: 10, fontWeight: '500', textAlign: 'center', marginTop: 3 },
 	chevronBtn: { marginLeft: 'auto', paddingLeft: 4 },
-	skeletonNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-	skeletonMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-	skeletonActionsRow: {
+
+	// Confirmed mini badge
+	confirmedMiniBadge: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginTop: 10,
+		gap: 4,
+		backgroundColor: '#eaf7ec',
+		borderWidth: 1,
+		borderColor: '#b6debb',
+		borderRadius: 6,
+		paddingHorizontal: 8,
+		paddingVertical: 6,
+		minWidth: 52,
 	},
-	error: { color: 'red', fontSize: 13, paddingVertical: 12 },
-	empty: { color: '#999', fontSize: 13, paddingVertical: 16 },
+	confirmedMiniText: { fontSize: 10, fontWeight: '600', color: '#2e8b57' },
+
+	// ── Reject centered modal (exactly as per screenshot) ────────────────────
+	rejectBackdrop: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.45)',
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 32,
+	},
+	rejectCard: {
+		backgroundColor: '#fff',
+		borderRadius: 16,
+		paddingHorizontal: 24,
+		paddingTop: 28,
+		paddingBottom: 20,
+		width: '100%',
+		alignItems: 'center',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.18,
+		shadowRadius: 20,
+		elevation: 10,
+	},
+	rejectIconCircle: {
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		backgroundColor: '#fbeaea',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: 14,
+	},
+	rejectTitle: {
+		fontSize: 17,
+		fontWeight: '700',
+		color: '#1a2429',
+		textAlign: 'center',
+		marginBottom: 6,
+	},
+	rejectSubtitle: {
+		fontSize: 14,
+		color: '#5f6973',
+		textAlign: 'center',
+		marginBottom: 22,
+		lineHeight: 20,
+	},
+	rejectBtnRow: { flexDirection: 'row', gap: 10, width: '100%' },
+	rejectCancelBtn: {
+		flex: 1,
+		borderRadius: 24,
+		borderWidth: 1.5,
+		borderColor: '#0c7c7c',
+		paddingVertical: 11,
+		alignItems: 'center',
+	},
+	rejectCancelText: { color: '#0c7c7c', fontWeight: '600', fontSize: 14 },
+	rejectConfirmBtn: {
+		flex: 1,
+		borderRadius: 24,
+		backgroundColor: '#d84545',
+		paddingVertical: 11,
+		alignItems: 'center',
+	},
+	rejectConfirmText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+	// ── Reschedule bottom-sheet ───────────────────────────────────────────────
 	drawerBackdrop: {
 		flex: 1,
 		backgroundColor: 'rgba(0,0,0,0.35)',
@@ -890,13 +1103,8 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		backgroundColor: '#f3f6f8',
 	},
-	drawerBody: {
-		flexShrink: 1,
-	},
-	drawerBodyContent: {
-		paddingHorizontal: 16,
-		paddingVertical: 14,
-	},
+	drawerBody: { flexShrink: 1 },
+	drawerBodyContent: { paddingHorizontal: 16, paddingVertical: 14 },
 	drawerTitle: { fontSize: 16, fontWeight: '700', color: '#233238' },
 	drawerSubtitle: { fontSize: 12, color: '#62707a', marginTop: 2 },
 	drawerSectionTitle: {
@@ -906,29 +1114,7 @@ const styles = StyleSheet.create({
 		marginTop: 10,
 		marginBottom: 10,
 	},
-	drawerDateRow: { paddingRight: 12, gap: 8 },
-	drawerDateChip: {
-		borderWidth: 1,
-		borderColor: '#d7dfe4',
-		borderRadius: 8,
-		paddingVertical: 8,
-		paddingHorizontal: 12,
-		minWidth: 60,
-		alignItems: 'center',
-	},
-	drawerDateChipActive: {
-		borderColor: '#3d7b7b',
-		backgroundColor: 'rgba(79, 209, 197, 0.08)',
-	},
-	drawerDateChipDay: { fontSize: 12, color: '#6d7881', fontWeight: '500' },
-	drawerDateChipDate: {
-		fontSize: 14,
-		color: '#2c3136',
-		fontWeight: '700',
-		marginTop: 2,
-	},
-	drawerDateChipTextActive: { color: '#3d7b7b' },
-	drawerDateChipTextActive: { color: '#3d7b7b' },
+	drawerInfoText: { fontSize: 13, color: '#73818a', marginBottom: 8 },
 	hospitalList: { flexDirection: 'column', gap: 8 },
 	hospitalItem: {
 		flexDirection: 'row',
@@ -956,9 +1142,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	hospitalIconActive: {
-		backgroundColor: '#3d7b7b',
-	},
+	hospitalIconActive: { backgroundColor: '#3d7b7b' },
 	hospitalIconText: {
 		color: '#fff',
 		fontSize: 12,
@@ -968,42 +1152,6 @@ const styles = StyleSheet.create({
 	hospitalTextCol: { flex: 1 },
 	hospitalName: { fontSize: 14, fontWeight: '600', color: '#233238' },
 	hospitalAddress: { fontSize: 11, color: '#62707a', marginTop: 2 },
-
-	slotsGrid: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 8,
-	},
-	slotItem: {
-		width: '23%',
-		borderWidth: 1.5,
-		borderColor: '#dde3e8',
-		borderRadius: 8,
-		paddingVertical: 10,
-		paddingHorizontal: 6,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#fff',
-	},
-	slotItemActive: {
-		borderColor: '#0c7c7c',
-		backgroundColor: '#0c7c7c',
-		paddingVertical: 30,
-	},
-	slotItemText: {
-		fontSize: 12,
-		fontWeight: '500',
-		color: '#42525d',
-	},
-	slotItemTextActive: {
-		color: '#fff',
-		fontWeight: '600',
-	},
-	drawerInfoText: {
-		fontSize: 13,
-		color: '#73818a',
-		marginBottom: 8,
-	},
 	drawerActions: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
@@ -1032,4 +1180,9 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	drawerConfirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+	skeletonNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+	skeletonMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+	skeletonActionsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
+	error: { color: 'red', fontSize: 13, paddingVertical: 12 },
+	empty: { color: '#999', fontSize: 13, paddingVertical: 16 },
 })
