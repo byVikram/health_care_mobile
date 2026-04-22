@@ -16,13 +16,13 @@ export interface TimeSlot {
 }
 // Add this to doctorService.ts
 export interface Appointment {
-    id: string;
-    appointment_date: string;
-    doctor_name?: string;
-    patient_name?: string;
-    status?: string;
-    time?: string;
-    notes?: string;
+	id: string;
+	appointment_date: string;
+	doctor_name?: string;
+	patient_name?: string;
+	status?: string;
+	time?: string;
+	notes?: string;
 }
 
 export interface SlotGroup {
@@ -54,7 +54,8 @@ export interface CreateAppointmentPayload {
 	hospital_id?: string
 	appointment_mode: 'offline' | 'online'
 	appointment_date: string
-	appointment_time: string
+	start_time: string
+	end_time?: string
 }
 
 export interface CreateAppointmentResponse {
@@ -65,18 +66,18 @@ export interface CreateAppointmentResponse {
 
 
 export interface AppointmentResponse {
-    success: boolean
-    message: string
-    // data: Appointment
+	success: boolean
+	message: string
+	// data: Appointment
 }
 
 
 export const updateAppointmentsStatus = async (appointmentId: string, statusId: string): Promise<AppointmentResponse> => {
-    const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
-        appointment_id: appointmentId,
-        status_id:statusId
-    })
-    return res.data
+	const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
+		appointment_id: appointmentId,
+		status_id: statusId
+	})
+	return res.data
 }
 
 export interface RescheduleAppointmentPayload {
@@ -106,10 +107,12 @@ export const getAppointments = async (params?: AppointmentParams): Promise<Appoi
 export const createAppointment = async (
 	payload: CreateAppointmentPayload
 ): Promise<CreateAppointmentResponse> => {
-	const res = await ApiService.post<CreateAppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.CREATE, payload)
+	const res = await ApiService.post<CreateAppointmentResponse>(
+		API_ENDPOINTS.APPOINTMENTS.CREATE,
+		payload
+	)
 	return res.data
 }
-
 export const getDoctors = async (params?: DoctorSearchParams): Promise<DoctorSearchResponse> => {
 	const res = await ApiService.getWithParams<DoctorSearchResponse>(
 		API_ENDPOINTS.DOCTORS.SEARCH,
@@ -188,7 +191,7 @@ export const mapDoctorProfileApi = (data: DoctorProfileApiData): DoctorProfile =
 	const hospitals: DoctorProfile['hospitals'] = data.hospitals.map((h) => ({
 		id: h.id,
 		name: h.hospital.name,
-		
+
 		location: h.hospital.address,
 		fullAddress: h.hospital.address,
 		isPrimary: h.is_primary,

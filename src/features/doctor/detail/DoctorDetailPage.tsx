@@ -684,8 +684,7 @@ export default function DoctorDetailPage() {
 										: "online",
 								appointment_date:
 									formatDateForApi(selectedDate),
-								appointment_time:
-									formatTimeForApi(selectedTime),
+								start_time: formatTimeForApi(selectedTime),
 							});
 							if (res.success) {
 								Alert.alert(

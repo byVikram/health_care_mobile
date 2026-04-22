@@ -68,8 +68,7 @@ function resolveAvatar(patient: PatientDetails | null): string | undefined {
 	return `https://your-cdn.example.com/${key}`
 }
 
-// ─── Past Medical History ─────────────────────────────────────────────────────
-
+// ---------- PastMedicalHistory (complete) ----------
 function PastMedicalHistory() {
 	const theme = useTheme()
 	const [activeTab, setActiveTab] = useState('Laboratory')
@@ -257,8 +256,7 @@ function PastMedicalHistory() {
 	)
 }
 
-// ─── Share With ───────────────────────────────────────────────────────────────
-
+// ---------- ShareWith (complete) ----------
 function ShareWith() {
 	const theme = useTheme()
 	const [activeTab, setActiveTab] = useState('Laboratory')
@@ -414,8 +412,7 @@ function ShareWith() {
 	)
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
+// ---------- Main ConsultationPage ----------
 export default function ConsultationPage() {
 	const theme = useTheme()
 	const navigation = useNavigation<any>()
@@ -1042,8 +1039,7 @@ export default function ConsultationPage() {
 	)
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
+// ---------- Styles ----------
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
