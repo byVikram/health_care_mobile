@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
-import { View, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from './AppTypography'
 import { AppSkeleton } from './AppSkeleton'
 import { SlotGroup } from '../../features/doctor/doctorService'
+
+// import { View, , TouchableOpacity, StyleSheet } from "react-native";
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -33,6 +35,8 @@ export type PickProps = {
 }
 
 export default function DateSlotPicker(props: PickProps) {
+	const [visitType, setVisitType] = useState('online')
+
 	const {
 		selectedDate,
 		onDateChange,
@@ -141,7 +145,11 @@ export default function DateSlotPicker(props: PickProps) {
 							>
 								<AppTypography
 									variant="caption"
-									style={[styles.dayName, isSelected && styles.textWhite, past && styles.textDisabled]}
+									style={[
+										styles.dayName,
+										isSelected && styles.textWhite,
+										past && styles.textDisabled,
+									]}
 								>
 									{DAYS[date.getDay()]}
 								</AppTypography>
@@ -195,6 +203,31 @@ export default function DateSlotPicker(props: PickProps) {
 				</AppTypography>
 			) : (
 				<View style={styles.timeGridContainer}>
+					{/* Toggle */}
+					<View style={styles.toggleContainer}>
+						<Text style={styles.toggleTitle}>Select Visit Type</Text>
+
+						<View style={styles.toggleGroup}>
+							<TouchableOpacity
+								style={[styles.toggleOption, visitType === 'online' && styles.toggleSelectedOption]}
+								onPress={() => setVisitType('online')}
+							>
+								<Text style={[styles.toggleText, visitType === 'online' && styles.toggleSelectedText]}>
+									Online Visit
+								</Text>
+							</TouchableOpacity>
+
+							<TouchableOpacity
+								style={[styles.toggleOption, visitType === 'clinic' && styles.toggleSelectedOption]}
+								onPress={() => setVisitType('clinic')}
+							>
+								<Text style={[styles.toggleText, visitType === 'clinic' && styles.toggleSelectedText]}>
+									Clinic Visit
+								</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+					{/* Toggle */}
 					{availableSlots.map((group, groupIdx) => (
 						<View key={`group-${groupIdx}`} style={styles.timeGroupContainer}>
 							<AppTypography variant="subtitle" style={styles.timeGroupLabel}>
@@ -207,7 +240,8 @@ export default function DateSlotPicker(props: PickProps) {
 									const isBlocked = slot.status === 'BLOCKED'
 									const isBooked = slot.status === 'BOOKED' || slot.status === 'UNAVAILABLE'
 									const canSelect =
-										slot.can_toggle !== false && (isAvailable || isBlocked || !disableBookedSlots || !isBooked)
+										slot.can_toggle !== false &&
+										(isAvailable || isBlocked || !disableBookedSlots || !isBooked)
 									const isEndOfRow = (idx + 1) % timeSlotColumns === 0
 
 									return (
@@ -320,8 +354,8 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 0,
 	},
 	dateBox: {
-		width: 55,
-		height: 60,
+		width: 50,
+		height: 55,
 		borderRadius: 10,
 		paddingVertical: 10,
 		paddingHorizontal: 6,
@@ -387,7 +421,7 @@ const styles = StyleSheet.create({
 		borderWidth: 1.5,
 		borderColor: '#dde3e8',
 		borderRadius: 8,
-		paddingVertical: 10,
+		paddingVertical: 8,
 		paddingHorizontal: 16,
 		marginBottom: 10,
 		minWidth: 70,
@@ -424,5 +458,43 @@ const styles = StyleSheet.create({
 	},
 	timeTextBlocked: {
 		color: '#7b8790',
+	},
+
+	// Toggle
+	toggleContainer: {
+		padding: 16,
+	},
+
+	toggleTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+		marginBottom: 12,
+	},
+
+	toggleGroup: {
+		flexDirection: 'row',
+		backgroundColor: '#eee',
+		borderRadius: 25,
+		padding: 4,
+	},
+
+	toggleOption: {
+		flex: 1,
+		paddingVertical: 10,
+		borderRadius: 25,
+		alignItems: 'center',
+	},
+
+	toggleSelectedOption: {
+		backgroundColor: '#0c7c7c',
+	},
+
+	toggleText: {
+		color: '#333',
+		fontWeight: '500',
+	},
+
+	toggleSelectedText: {
+		color: '#fff',
 	},
 })

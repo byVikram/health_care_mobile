@@ -340,7 +340,12 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 									activeOpacity={0.8}
 								>
 									<View style={[styles.hospitalIndex, isSelected && styles.hospitalIndexSelected]}>
-										<Text style={[styles.hospitalIndexText, isSelected && styles.hospitalIndexTextSelected]}>
+										<Text
+											style={[
+												styles.hospitalIndexText,
+												isSelected && styles.hospitalIndexTextSelected,
+											]}
+										>
 											{index + 1}
 										</Text>
 									</View>
@@ -365,8 +370,8 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 					onDateChange={setSelectedDate}
 					selectedTime={selectedSlots}
 					onTimeChange={handleTimeChange}
-					dateLabel="Select follow up date"
-					timeLabel="Select Follow up time"
+					dateLabel="Select date"
+					timeLabel="Select time"
 					timeSlotColumns={timeSlotColumns}
 					disableBookedSlots={false}
 					availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
@@ -415,8 +420,8 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f8fafc',
 	},
 	screenContent: {
-		padding: 16,
-		paddingBottom: 32,
+		padding: 0,
+		// paddingBottom: 32,
 	},
 	loadingContainer: {
 		flex: 1,
@@ -429,10 +434,10 @@ const styles = StyleSheet.create({
 		maxWidth: 980,
 		alignSelf: 'center',
 		backgroundColor: '#fff',
-		borderRadius: 14,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#edf1f3',
+		// borderRadius: 14,
+		padding: 18,
+		// borderWidth: 1,
+		// borderColor: '#edf1f3',
 	},
 	headerRow: {
 		flexDirection: 'row',
