@@ -85,7 +85,7 @@ export const updateAppointmentsStatus = async (
 		status_id: statusId,
 	});
 
-	const res = await ApiService.patch(
+	const res = await ApiService.patch<AppointmentResponse>(
 		API_ENDPOINTS.APPOINTMENTS.UPDATE,
 		{
 			appointment_id: appointmentId,

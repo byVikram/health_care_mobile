@@ -22,7 +22,6 @@ import {
 	getDoctorAvailability,
 	createAppointment,
 	SlotGroup,
-	TimeSlot,
 } from "../doctorService";
 import {
 	AppointmentType,
@@ -198,6 +197,10 @@ export default function DoctorDetailPage() {
 	const { details, specialities, hospitals } = doctor;
 	const avatarUrl =
 		details?.avatar_s3_key || "https://via.placeholder.com/150";
+	const availabilityLabel = "Available";
+	const availabilityColor = "#19a55a";
+	const availabilityIcon = "calendar-check";
+	const profileHospitals = hospitals.slice(0, 2);
 
 	return (
 		<View style={styles.container}>
@@ -294,61 +297,56 @@ export default function DoctorDetailPage() {
 											"Dentist Consultation"}
 									</AppTypography>
 								</View>
-								<View style={styles.idPill}>
-									<AppTypography
-										variant="caption"
-										style={{
-											color: "#fff",
-											fontWeight: "bold",
-											fontSize: 10,
-										}}
-									>
-										ID: 143285
-									</AppTypography>
-								</View>
 							</View>
 
 							<View style={{ marginTop: 8 }}>
-								<View style={styles.locationRow}>
-									<MaterialCommunityIcons
-										name="map-marker"
-										size={12}
-										color="#2b7571"
-									/>
-									<AppTypography
-										variant="caption"
-										style={styles.locationText}
-										numberOfLines={1}
-									>
-										Arogya Clinic XR Market.
-									</AppTypography>
-									<AppTypography
-										variant="caption"
-										style={styles.distanceText}
-									>
-										&lt;1km
-									</AppTypography>
-								</View>
-								<View style={styles.locationRow}>
-									<MaterialCommunityIcons
-										name="map-marker"
-										size={12}
-										color="#2b7571"
-									/>
-									<AppTypography
-										variant="caption"
-										style={styles.locationText}
-										numberOfLines={1}
-									>
-										Dhanavantri Clinic, marathalli.
-									</AppTypography>
-									<AppTypography
-										variant="caption"
-										style={styles.distanceText}
-									>
-										&lt;5km
-									</AppTypography>
-								</View>
+								{profileHospitals.length > 0 ? (
+									profileHospitals.map((entry) => (
+										<View
+											key={entry.hospital.id}
+											style={styles.locationRow}
+										>
+											<MaterialCommunityIcons
+												name="map-marker"
+												size={12}
+												color="#2b7571"
+											/>
+											<AppTypography
+												variant="caption"
+												style={styles.locationText}
+												numberOfLines={1}
+											>
+												{entry.hospital.name}
+												{entry.hospital.address
+													? `, ${entry.hospital.address}`
+													: ""}
+											</AppTypography>
+											{entry.hospital.distance ? (
+												<AppTypography
+													variant="caption"
+													style={styles.distanceText}
+												>
+													{entry.hospital.distance}
+												</AppTypography>
+											) : null}
+										</View>
+									))
+								) : (
+									<View style={styles.locationRow}>
+										<MaterialCommunityIcons
+											name="map-marker"
+											size={12}
+											color="#2b7571"
+										/>
+										<AppTypography
+											variant="caption"
+											style={styles.locationText}
+											numberOfLines={1}
+										>
+											{details?.location || "Location not available"}
+										</AppTypography>
+									</View>
+								)}
 							</View>
 						</View>
 					</View>
@@ -357,34 +355,17 @@ export default function DoctorDetailPage() {
 					<View style={styles.statsRow}>
 						<View style={styles.statBox}>
 							<MaterialCommunityIcons
-								name="account-group"
-								size={24}
-								color="#2b7571"
-							/>
-							<AppTypography
-								variant="caption"
-								style={styles.statVal}
-							>
-								7,500+
-							</AppTypography>
-							<AppTypography
-								variant="caption"
-								style={styles.statLabel}
-							>
-								Patients
-							</AppTypography>
-						</View>
-						<View style={styles.statBox}>
-							<MaterialCommunityIcons
 								name="briefcase-outline"
-								size={24}
+								size={22}
 								color="#2b7571"
 							/>
 							<AppTypography
 								variant="caption"
 								style={styles.statVal}
 							>
-								{details?.experience_years || 10}+
+								{details?.experience_years
+									? `${details.experience_years}+`
+									: "--"}
 							</AppTypography>
 							<AppTypography
 								variant="caption"
@@ -393,42 +374,37 @@ export default function DoctorDetailPage() {
 								Experience
 							</AppTypography>
 						</View>
+
+						<View style={styles.statsDivider} />
+
 						<View style={styles.statBox}>
 							<MaterialCommunityIcons
-								name="star"
-								size={24}
-								color="#2b7571"
+								name={availabilityIcon}
+								size={22}
+								color={availabilityColor}
 							/>
-							<AppTypography
-								variant="caption"
-								style={styles.statVal}
-							>
-								4.9+
-							</AppTypography>
+							<View style={styles.availabilityValueRow}>
+								<View
+									style={[
+										styles.availabilityDot,
+										{ backgroundColor: availabilityColor },
+									]}
+								/>
+								<AppTypography
+									variant="caption"
+									style={[
+										styles.statVal,
+										{ color: availabilityColor },
+									]}
+								>
+									{availabilityLabel}
+								</AppTypography>
+							</View>
 							<AppTypography
 								variant="caption"
 								style={styles.statLabel}
 							>
-								Ratings
-							</AppTypography>
-						</View>
-						<View style={styles.statBox}>
-							<MaterialCommunityIcons
-								name="comment-text-outline"
-								size={24}
-								color="#2b7571"
-							/>
-							<AppTypography
-								variant="caption"
-								style={styles.statVal}
-							>
-								4,908
-							</AppTypography>
-							<AppTypography
-								variant="caption"
-								style={styles.statLabel}
-							>
-								Reviews
+								Availability
 							</AppTypography>
 						</View>
 					</View>
@@ -526,7 +502,7 @@ export default function DoctorDetailPage() {
 											variant="caption"
 											style={styles.greyText}
 										>
-											{index === 0 ? "<1 km" : "<5 km"}
+											{h.hospital.distance || ""}
 										</AppTypography>
 										<MaterialCommunityIcons
 											name={
@@ -790,13 +766,6 @@ const styles = StyleSheet.create({
 		color: "#888",
 		marginTop: 2,
 	},
-	idPill: {
-		backgroundColor: "#2b7571",
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 4,
-		marginLeft: 8,
-	},
 	locationRow: {
 		flexDirection: "row",
 		alignItems: "center",
@@ -813,14 +782,22 @@ const styles = StyleSheet.create({
 	},
 	statsRow: {
 		flexDirection: "row",
-		justifyContent: "space-between",
+		alignItems: "stretch",
 		borderTopWidth: 1,
 		borderTopColor: "#f0f0f0",
 		paddingTop: 16,
 	},
 	statBox: {
 		alignItems: "center",
+		justifyContent: "center",
 		flex: 1,
+		minHeight: 72,
+		paddingHorizontal: 10,
+	},
+	statsDivider: {
+		width: 1,
+		backgroundColor: "#edf1f1",
+		marginHorizontal: 8,
 	},
 	statVal: {
 		fontWeight: "bold",
@@ -831,6 +808,18 @@ const styles = StyleSheet.create({
 	statLabel: {
 		color: "#888",
 		fontSize: 9,
+	},
+	availabilityValueRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		marginTop: 4,
+	},
+	availabilityDot: {
+		width: 7,
+		height: 7,
+		borderRadius: 4,
+		marginRight: 5,
 	},
 	section: {
 		paddingHorizontal: 16,
