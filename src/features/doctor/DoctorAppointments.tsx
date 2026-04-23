@@ -94,7 +94,7 @@ export default function DoctorAppointments({
 
 	// ── confirmedIds: tracks which appointments had Confirm pressed ───────────
 	const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set())
-	
+
 	// ── rejectedIds: local set to mark appointments rejected by doctor ─────────
 	const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set())
 
@@ -157,6 +157,9 @@ export default function DoctorAppointments({
 				end_time: null,
 				hospital_id: hospitalId,
 				reason: 'Doctor unavailable',
+
+				// 👇 ADD THIS LINE
+				status_id: APPOINTMENT_STATUS.CONFIRM
 			})
 			if (res.success) {
 				showSuccess(res.message || 'Reschedule request submitted')
@@ -238,32 +241,32 @@ export default function DoctorAppointments({
 
 	// ── Confirm ───────────────────────────────────────────────────────────────
 	const handleConfirmAppointment = async (appointmentId: string) => {
-  try {
-    const res = await updateAppointmentsStatus(
-      appointmentId,
-      APPOINTMENT_STATUS.CONFIRM
-    )
+		try {
+			const res = await updateAppointmentsStatus(
+				appointmentId,
+				APPOINTMENT_STATUS.CONFIRM
+			)
 
-    console.log("CONFIRM RESPONSE 👉", res)
+			console.log("CONFIRM RESPONSE 👉", res)
 
-    if (res.success) {
-  showSuccess(res.message)
+			if (res.success) {
+				showSuccess(res.message)
 
-  // optional UI update
-  setConfirmedIds((prev) => new Set(prev).add(appointmentId))
+				// optional UI update
+				setConfirmedIds((prev) => new Set(prev).add(appointmentId))
 
-  // 🔥 IMPORTANT: refresh data from backend
- 
-}
-	
-	else {
-      showError(res.message || 'Failed to confirm')
-    }
-  } catch (err: any) {
-    console.log("ERROR 👉", err?.response?.data)
-    showError('Something went wrong')
-  }
-}
+				// 🔥 IMPORTANT: refresh data from backend
+
+			}
+
+			else {
+				showError(res.message || 'Failed to confirm')
+			}
+		} catch (err: any) {
+			console.log("ERROR 👉", err?.response?.data)
+			showError('Something went wrong')
+		}
+	}
 
 	// ── Reject (after modal OK) with optimistic UI update ─────────────────────
 	const handleConfirmReject = async () => {
@@ -320,6 +323,18 @@ export default function DoctorAppointments({
 		})
 	}
 
+	const getTypeIcon = (type?: string) => {
+		switch (type) {
+			case 'video':
+				return { name: 'video', color: '#4d6bb1' }
+			case 'clinic':
+				return { name: 'hospital-building', color: '#2e7d32' }
+			case 'home':
+				return { name: 'home-heart', color: '#e67e22' }
+			default:
+				return { name: 'calendar', color: '#999' }
+		}
+	}
 	// ── Skeleton ──────────────────────────────────────────────────────────────
 	const renderSkeleton = () =>
 		Array.from({ length: 3 }).map((_, i) => (
@@ -354,11 +369,11 @@ export default function DoctorAppointments({
 	// ── Action buttons (only for active, non-rejected appointments) ──────────
 	const renderActions = (apt: any) => {
 		const rawStatus = getStatusLabel(apt.status)
-const isConfirmed = rawStatus === 'confirmed'
+		const isConfirmed = rawStatus === 'confirmed'
 		const isRejectedLocally = rejectedIds.has(apt.id)
 		const statusFromProp = getStatusLabel(apt.status)
 		const isRejected = isRejectedLocally || statusFromProp === 'rejected' || statusFromProp === 'cancelled'
-		
+
 		// If appointment is rejected, don't show any action buttons
 		if (isRejected) return null
 
@@ -367,18 +382,18 @@ const isConfirmed = rawStatus === 'confirmed'
 
 				{/* ── Confirm button OR confirmed mini-badge ── */}
 				{!isConfirmed && (
-	<TouchableOpacity
-		onPress={(e) => {
-			e.stopPropagation?.()
-			handleConfirmAppointment(apt.id)
-		}}
-		style={[styles.btn, { backgroundColor: '#d6eed8' }]}
-		activeOpacity={0.75}
-	>
-		<MaterialCommunityIcons name="check" size={16} color="#2e8b57" />
-		<Text style={[styles.btnLabel, { color: '#2e8b57' }]}>Confirm</Text>
-	</TouchableOpacity>
-)}
+					<TouchableOpacity
+						onPress={(e) => {
+							e.stopPropagation?.()
+							handleConfirmAppointment(apt.id)
+						}}
+						style={[styles.btn, { backgroundColor: '#d6eed8' }]}
+						activeOpacity={0.75}
+					>
+						<MaterialCommunityIcons name="check" size={16} color="#2e8b57" />
+						<Text style={[styles.btnLabel, { color: '#2e8b57' }]}>Confirm</Text>
+					</TouchableOpacity>
+				)}
 
 				{/* ── Reject — always visible for active appointments, opens centered modal ── */}
 				<TouchableOpacity
@@ -599,16 +614,16 @@ const isConfirmed = rawStatus === 'confirmed'
 		const rawStatus = getStatusLabel(apt.status)
 		// Determine final status: confirmed (optimistic), rejected (optimistic or from prop), cancelled
 		const statusFromProp = getStatusLabel(apt.status)
-const isConfirmed = statusFromProp === 'confirmed'
+		const isConfirmed = statusFromProp === 'confirmed'
 		const isRejectedLocally = rejectedIds.has(apt.id)
 		const isRejectedFromProp = rawStatus === 'rejected' || rawStatus === 'cancelled'
 		const isRejected = isRejectedLocally || isRejectedFromProp
-		
+		const typeIcon = getTypeIcon(apt?.appointment_type)
 		let status = rawStatus
 
-// optional optimistic UI
-if (confirmedIds.has(apt.id)) status = 'confirmed'
-if (rejectedIds.has(apt.id)) status = 'rejected'
+		// optional optimistic UI
+		if (confirmedIds.has(apt.id)) status = 'confirmed'
+		if (rejectedIds.has(apt.id)) status = 'rejected'
 
 		const statusStyle =
 			status === 'confirmed'
