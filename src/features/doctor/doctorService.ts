@@ -75,14 +75,28 @@ export interface AppointmentResponse {
 }
 
 
-export const updateAppointmentsStatus = async (appointmentId: string, statusId: string): Promise<AppointmentResponse> => {
-	const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
-		appointment_id: appointmentId,
-		status_id: statusId
-	})
-	return res.data
-}
+export const updateAppointmentsStatus = async (
+	appointmentId: string,
+	statusId: string
+): Promise<AppointmentResponse> => {
 
+	console.log("PAYLOAD 👉", {
+		appointment_id: appointmentId,
+		status_id: statusId,
+	});
+
+	const res = await ApiService.patch(
+		API_ENDPOINTS.APPOINTMENTS.UPDATE,
+		{
+			appointment_id: appointmentId,
+			status_id: statusId,
+		}
+	);
+
+	console.log("RESPONSE 👉", res.data);
+
+	return res.data;
+};
 export interface RescheduleAppointmentPayload {
 	appointment_id: string
 	appointment_date: string
@@ -90,6 +104,8 @@ export interface RescheduleAppointmentPayload {
 	end_time: string | null
 	hospital_id?: string
 	reason?: string
+
+	status_id?: string // 👈 ADD THIS
 }
 
 export const rescheduleAppointment = async (

@@ -558,7 +558,9 @@ export default function DoctorDetailPage() {
 					</AppTypography>
 
 					{appointmentTypes.map((type) => {
-						const isSelected = apptType === type.id;
+						const isSelected =
+							(apptType === "offline" && type.id === "clinic") ||
+							(apptType === "video" && type.id === "video");
 
 						return (
 							<TouchableOpacity
@@ -568,6 +570,9 @@ export default function DoctorDetailPage() {
 									isSelected && styles.radioCardSelected,
 								]}
 								// onPress={() => setApptType(type.id)}
+								onPress={() =>
+									setApptType(type.id === "clinic" ? "offline" : "video")
+								}
 								activeOpacity={0.7}
 							>
 								{/* Icon */}
@@ -696,7 +701,7 @@ export default function DoctorDetailPage() {
 								Alert.alert(
 									"Error",
 									"Failed to book appointment: " +
-										(res.message || "Unknown error"),
+									(res.message || "Unknown error"),
 								);
 							}
 						} catch (err: any) {
