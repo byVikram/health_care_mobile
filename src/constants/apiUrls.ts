@@ -55,6 +55,7 @@ export const API_ENDPOINTS = {
 		CREATE: `${BASE_URL}/api/appointments`,
 		GET_BY_ID: (id: string) => `${BASE_URL}/api/appointments/${id}`, // Add this
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
+		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
 	},
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
 
