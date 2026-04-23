@@ -16,12 +16,16 @@ import { formatDateForApi } from '../../utils/date'
 import { USER_ROLES } from '../../constants/constants'
 import { useAuth } from '../../context/AuthContext'
 import StatusModal from '../../components/common/StatusModal'
+
 import TreatmentHistoryIcon from '../../assets/icons/treatmenthistory.svg'
 import TreatmentHistoryArrowIcon from '../../assets/icons/treatmenthistory-icon.svg'
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
+	// const isTablet = width >= 768
 	const isTablet = width >= 768
+	const isLandscape = width > 1024
+
 	const { role } = useAuth()
 	const isDoctor = role === USER_ROLES.DOCTOR
 	const navigation = useNavigation<NavigationProp<any>>()
@@ -30,37 +34,30 @@ export default function DashboardPage() {
 	const [apptLoading, setApptLoading] = useState(false)
 	const [apptError, setApptError] = useState('')
 	const [modalType, setModalType] = useState<'success' | 'error' | null>(null)
-	// useEffect(() => {
-	// 	setModalType("success");
-	// }, []);
+
 	const [selectedDate, setSelectedDate] = useState(0)
-	type WeekDay = {
-		dateObj: Date
-	}
+
 	const buildWeekDays = () => {
 		const today = new Date()
 		const days = []
-		for (let i = 0; i < 7; i += 1) {
+
+		for (let i = 0; i < 7; i++) {
 			const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i)
-			const dayLabel = d.toLocaleDateString('en-US', {
-				weekday: 'short',
-			})
-			const isWeekend = d.getDay() === 0 || d.getDay() === 6
+
 			days.push({
-				day: dayLabel,
+				day: d.toLocaleDateString('en-US', { weekday: 'short' }),
 				date: String(d.getDate()),
-				red: isWeekend,
+				red: d.getDay() === 0 || d.getDay() === 6,
 				dateObj: d,
 			})
 		}
 		return days
 	}
+
 	const [weekDays] = useState(() => buildWeekDays())
 
-	const theme = useTheme()
-
 	useEffect(() => {
-		if (!isDoctor || !weekDays.length) return
+		if (!isDoctor) return
 
 		const fetchAppointments = async () => {
 			try {
@@ -74,8 +71,7 @@ export default function DashboardPage() {
 				})
 
 				if (res.success) {
-					const items = Array.isArray(res.data) ? res.data : []
-					setAppointments(items)
+					setAppointments(Array.isArray(res.data) ? res.data : [])
 				} else {
 					setApptError(res.message ?? 'Failed to load appointments')
 				}
@@ -89,91 +85,69 @@ export default function DashboardPage() {
 		fetchAppointments()
 	}, [isDoctor, selectedDate, weekDays])
 
-	const renderDashboard = () => {
-		return (
-			<>
-				{isTablet ? (
-					<View style={styles.tabletTopRow}>
-						<View style={styles.tabletColumn}>
-							<HeroSection />
-						</View>
-
-						{isDoctor ? (
-							<View style={[styles.tabletColumn, styles.tabletColumnRight]}>
-								<DoctorAppointments
-									selectedDate={selectedDate}
-									setSelectedDate={setSelectedDate}
-									appointments={appointments}
-									apptLoading={apptLoading}
-									apptError={apptError}
-									weekDays={weekDays}
-									selectedDateObj={weekDays[selectedDate]?.dateObj}
-								/>
-							</View>
-						) : (
-							<>
-								<TouchableOpacity activeOpacity={0.85} style={styles.treatmentHistoryCard}>
-									<View style={styles.treatmentHistoryLeft}>
-										<TreatmentHistoryIcon width={52} height={52} />
-										<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
-									</View>
-									<TreatmentHistoryArrowIcon width={26} height={26} />
-								</TouchableOpacity>
-								<SpecialitySection />
-								<ConsultSection />
-								<CommunityBlogsSection />
-							</>
-						)}
-					</View>
-				) : (
-					<>
-						<HeroSection />
-
-						{isDoctor ? (
-							<DoctorAppointments
-								selectedDate={selectedDate}
-								setSelectedDate={setSelectedDate}
-								appointments={appointments}
-								apptLoading={apptLoading}
-								apptError={apptError}
-								weekDays={weekDays}
-								selectedDateObj={weekDays[selectedDate]?.dateObj}
-							/>
-						) : (
-							<>
-								<TouchableOpacity activeOpacity={0.85} style={styles.treatmentHistoryCard}>
-									<View style={styles.treatmentHistoryLeft}>
-										<TreatmentHistoryIcon width={52} height={52} />
-										<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
-									</View>
-									<TreatmentHistoryArrowIcon width={26} height={26} />
-								</TouchableOpacity>
-								<SpecialitySection />
-								<ConsultSection />
-							</>
-						)}
-					</>
-				)}
-
-				<CommunityBlogsSection />
-
-				<PatientQuestionsSection
-				// Pass real questions + handler once you wire up the API:
-				// questions={patientQuestions}
-				// loading={questionsLoading}
-				// onSubmitAnswer={handleSubmitAnswer}
-				/>
-			</>
-		)
+	function handleRetry() {
+		setModalType(null)
 	}
 
-	function handleRetry(): void {
-		throw new Error('Function not implemented.')
-	}
+	const renderDoctorPanel = () => (
+		<DoctorAppointments
+			selectedDate={selectedDate}
+			setSelectedDate={setSelectedDate}
+			appointments={appointments}
+			apptLoading={apptLoading}
+			apptError={apptError}
+			weekDays={weekDays}
+			selectedDateObj={weekDays[selectedDate]?.dateObj}
+		/>
+	)
+
+	const renderUserPanel = () => (
+		<>
+			<TouchableOpacity activeOpacity={0.85} style={styles.treatmentHistoryCard}>
+				<View style={styles.treatmentHistoryLeft}>
+					<TreatmentHistoryIcon width={52} height={52} />
+					<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
+				</View>
+				<TreatmentHistoryArrowIcon width={26} height={26} />
+			</TouchableOpacity>
+
+			<SpecialitySection />
+			<ConsultSection />
+		</>
+	)
 
 	return (
 		<>
-			<ScrollView style={styles.container}>{renderDashboard()}</ScrollView>
+			<ScrollView
+				style={styles.container}
+				contentContainerStyle={styles.content}
+				showsVerticalScrollIndicator={false}
+			>
+				{/* MAIN RESPONSIVE LAYOUT */}
+				{isTablet ? (
+					<View style={styles.tabletRow}>
+						{/* HERO SECTION - Left Column */}
+						<View style={[styles.heroColumn, isLandscape && styles.heroColumnHalf]}>
+							<HeroSection />
+						</View>
+
+						{/* RIGHT SIDE - Appointments/Treatment History */}
+						<View style={[styles.column, isLandscape && styles.rightColumnHalf]}>
+							{isDoctor ? renderDoctorPanel() : renderUserPanel()}
+						</View>
+					</View>
+				) : (
+					<>
+						{/* Mobile View - Hero then panels stacked */}
+						<HeroSection />
+						{isDoctor ? renderDoctorPanel() : renderUserPanel()}
+					</>
+				)}
+
+				{/* COMMON SECTIONS */}
+				<CommunityBlogsSection />
+				<PatientQuestionsSection />
+			</ScrollView>
 
 			<StatusModal
 				visible={modalType !== null}
@@ -208,17 +182,27 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#f5f5f5',
 	},
-	tabletTopRow: {
+
+	content: {
+		flexGrow: 1,
+		maxWidth: 1200,
+		alignSelf: 'center',
+		width: '100%',
+		paddingBottom: 24,
+	},
+
+	tabletRow: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
-		paddingHorizontal: 8,
+		gap: 16,
+		paddingHorizontal: 12,
+		marginTop: 8,
 	},
-	tabletColumn: {
+
+	column: {
 		flex: 1,
 	},
-	tabletColumnRight: {
-		marginLeft: 8,
-	},
+
 	treatmentHistoryCard: {
 		marginHorizontal: 16,
 		marginTop: 8,
@@ -232,37 +216,29 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		shadowOpacity: 0,
-		elevation: 0,
 	},
+
 	treatmentHistoryLeft: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 12,
 	},
+
 	treatmentHistoryTitle: {
 		fontSize: 16,
 		fontWeight: '500',
 		color: '#30353A',
 	},
-	card: {
-		marginHorizontal: 16,
-		marginBottom: 24,
+
+	heroColumn: {
+		flex: 1,
 	},
-	sectionTitle: {
-		marginHorizontal: 16,
-		marginBottom: 12,
-		fontWeight: 'bold',
+
+	heroColumnHalf: {
+		flex: 0.5, // Adjust ratio as needed
 	},
-	grid: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		paddingHorizontal: 8,
-	},
-	gridItem: {
-		width: '45%',
-		margin: '2.5%',
-		justifyContent: 'center',
-		height: 100,
+
+	rightColumnHalf: {
+		flex: 0.5, // Adjust ratio as needed
 	},
 })
