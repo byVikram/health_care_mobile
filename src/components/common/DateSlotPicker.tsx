@@ -18,12 +18,18 @@ function getWeekDates(start: Date) {
 export type PickProps = {
 	selectedDate: Date | null
 	onDateChange: (date: Date) => void
-	selectedTime: string | null
-	onTimeChange: (time: string) => void
+	selectedTime: string | string[] | null
+	onTimeChange: (time: any) => void
 	availableSlots?: SlotGroup[]
 	loading?: boolean
 	timeSlotColumns?: number
 	disablePast?: boolean
+	multiSelect?: boolean
+	dateLabel?: string
+	timeLabel?: string
+	disableBookedSlots?: boolean
+	onSelectAll?: () => void
+	onUnselectAll?: () => void
 }
 
 export default function DateSlotPicker(props: PickProps) {
@@ -36,6 +42,12 @@ export default function DateSlotPicker(props: PickProps) {
 		loading = false,
 		timeSlotColumns = 4,
 		disablePast = true,
+		multiSelect = false,
+		dateLabel = 'Select Date',
+		timeLabel = 'Select Time',
+		disableBookedSlots = true,
+		onSelectAll,
+		onUnselectAll,
 	} = props
 
 	const today = new Date()
@@ -69,12 +81,26 @@ export default function DateSlotPicker(props: PickProps) {
 		setWeekStart(d)
 	}
 
+	const selectedTimes = Array.isArray(selectedTime) ? selectedTime : selectedTime ? [selectedTime] : []
+
+	const handleTimePress = (time: string) => {
+		if (!multiSelect) {
+			onTimeChange(time)
+			return
+		}
+
+		const next = selectedTimes.includes(time)
+			? selectedTimes.filter((selected) => selected !== time)
+			: [...selectedTimes, time]
+		onTimeChange(next)
+	}
+
 	return (
 		<View style={styles.container}>
 			{/* Date Header */}
 			<View style={styles.dateHeader}>
 				<AppTypography variant="h4" style={styles.sectionTitle}>
-					Select Date
+					{dateLabel}
 				</AppTypography>
 				<View style={styles.monthNav}>
 					<TouchableOpacity onPress={handlePrevWeek} style={styles.chevron}>
@@ -137,9 +163,29 @@ export default function DateSlotPicker(props: PickProps) {
 			</ScrollView>
 
 			{/* Time Header */}
-			<AppTypography variant="h4" style={styles.timeSectionTitle}>
-				Select Time
-			</AppTypography>
+			<View style={styles.timeHeader}>
+				<AppTypography variant="h4" style={styles.timeSectionTitle}>
+					{timeLabel}
+				</AppTypography>
+				{multiSelect && (onSelectAll || onUnselectAll) ? (
+					<View style={styles.bulkActions}>
+						{onSelectAll ? (
+							<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
+								<AppTypography variant="caption" style={styles.bulkButtonText}>
+									Select All
+								</AppTypography>
+							</TouchableOpacity>
+						) : null}
+						{onUnselectAll ? (
+							<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
+								<AppTypography variant="caption" style={styles.bulkButtonText}>
+									Unselect All
+								</AppTypography>
+							</TouchableOpacity>
+						) : null}
+					</View>
+				) : null}
+			</View>
 
 			{loading ? (
 				<AppSkeleton height={100} style={{ marginTop: 8 }} />
@@ -156,8 +202,12 @@ export default function DateSlotPicker(props: PickProps) {
 							</AppTypography>
 							<View style={styles.slotsGridFlex}>
 								{group.slots.map((slot, idx) => {
-									const isSelected = selectedTime === slot.start_time
+									const isSelected = selectedTimes.includes(slot.start_time)
 									const isAvailable = slot.status === 'AVAILABLE' || slot.status === ('' as any)
+									const isBlocked = slot.status === 'BLOCKED'
+									const isBooked = slot.status === 'BOOKED' || slot.status === 'UNAVAILABLE'
+									const canSelect =
+										slot.can_toggle !== false && (isAvailable || isBlocked || !disableBookedSlots || !isBooked)
 									const isEndOfRow = (idx + 1) % timeSlotColumns === 0
 
 									return (
@@ -168,18 +218,20 @@ export default function DateSlotPicker(props: PickProps) {
 												{ flexBasis: `${100 / timeSlotColumns - 3}%` },
 												!isEndOfRow && styles.timeBoxSpacingRight,
 												isSelected && styles.timeBoxSelected,
-												!isAvailable && styles.timeBoxDisabled,
+												!isSelected && isBlocked && styles.timeBoxBlocked,
+												!canSelect && styles.timeBoxDisabled,
 											]}
-											onPress={() => isAvailable && onTimeChange(slot.start_time)}
-											activeOpacity={isAvailable ? 0.6 : 1}
-											disabled={!isAvailable}
+											onPress={() => canSelect && handleTimePress(slot.start_time)}
+											activeOpacity={canSelect ? 0.6 : 1}
+											disabled={!canSelect}
 										>
 											<AppTypography
 												variant="caption"
 												style={[
 													styles.timeText,
 													isSelected && styles.timeTextSelected,
-													!isAvailable && styles.timeTextDisabled,
+													!isSelected && isBlocked && styles.timeTextBlocked,
+													!canSelect && styles.timeTextDisabled,
 												]}
 											>
 												{slot.start_time}
@@ -216,8 +268,36 @@ const styles = StyleSheet.create({
 		fontWeight: 'bold',
 		color: '#233238',
 		fontSize: 14,
+		flexShrink: 1,
+	},
+	timeHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		gap: 10,
 		marginTop: 18,
 		marginBottom: 10,
+	},
+	bulkActions: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		flexWrap: 'wrap',
+		justifyContent: 'flex-end',
+		flexShrink: 1,
+	},
+	bulkButton: {
+		borderWidth: 1,
+		borderColor: '#0c7c7c',
+		borderRadius: 8,
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		backgroundColor: '#fff',
+	},
+	bulkButtonText: {
+		color: '#0c7c7c',
+		fontSize: 11,
+		fontWeight: '600',
 	},
 	monthNav: {
 		flexDirection: 'row',
@@ -326,6 +406,10 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(0,0,0,0.06)',
 		borderColor: '#eee',
 	},
+	timeBoxBlocked: {
+		backgroundColor: '#f1f4f5',
+		borderColor: '#cfd8dc',
+	},
 	timeText: {
 		fontSize: 12,
 		fontWeight: '500',
@@ -337,5 +421,8 @@ const styles = StyleSheet.create({
 	},
 	timeTextDisabled: {
 		color: '#aaa',
+	},
+	timeTextBlocked: {
+		color: '#7b8790',
 	},
 })

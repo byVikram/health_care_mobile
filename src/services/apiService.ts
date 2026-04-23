@@ -1,5 +1,5 @@
 // src/services/apiService.ts
-import axios, { AxiosResponse } from 'axios'
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { Alert } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { navigate } from '../navigation/navigationService'
@@ -42,8 +42,8 @@ axiosInstance.interceptors.response.use(
 )
 
 const ApiService = {
-	get<T = unknown>(url: string): Promise<AxiosResponse<T>> {
-		return axiosInstance.get<T>(url)
+	get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+		return axiosInstance.get<T>(url, config)
 	},
 	getWithParams<T = unknown>(url: string, params: Record<string, unknown>): Promise<AxiosResponse<T>> {
 		return axiosInstance.get<T>(url, { params })
