@@ -8,7 +8,9 @@ import {
 	useWindowDimensions,
 } from "react-native";
 import { Text, Button, useTheme } from "react-native-paper";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, type NavigationProp } from "@react-navigation/native";
+import { ROUTES } from "../../navigation/routes";
+import type { MainTabParamList } from "../../navigation/types";
 
 interface ConsultCardProps {
 	image: any;
@@ -82,7 +84,7 @@ const consults = [
 export default function ConsultSection() {
 	const theme = useTheme();
 	const { width } = useWindowDimensions();
-	const navigation = useNavigation<any>();
+	const navigation = useNavigation<NavigationProp<MainTabParamList>>();
 	const isTablet = width >= 768;
 	const isMiniTablet = width >= 600 && width < 768;
 	const isWide = isTablet || isMiniTablet;
@@ -117,7 +119,7 @@ export default function ConsultSection() {
 					mode="outlined"
 					style={styles.viewAllBtn}
 					labelStyle={{ fontSize: 12 }}
-					onPress={() => navigation.navigate("Search")}
+					onPress={() => navigation.navigate(ROUTES.MAIN.SEARCH)}
 				>
 					View All
 				</Button>
@@ -134,7 +136,7 @@ export default function ConsultSection() {
 						title={s.title}
 						description={s.description}
 						image={s.image}
-						onConsult={() => navigation.navigate("Search")}
+						onConsult={() => navigation.navigate(ROUTES.MAIN.SEARCH)}
 					/>
 				))}
 			</ScrollView>

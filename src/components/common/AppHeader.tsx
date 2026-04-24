@@ -1,8 +1,10 @@
 import React from 'react'
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { ROUTES } from '../../navigation/routes'
+import type { AppStackParamList } from '../../navigation/types'
 
 interface AppHeaderProps {
 	userName?: string
@@ -32,7 +34,7 @@ export default function AppHeader({
 	onSearchPress,
 }: AppHeaderProps) {
 	const insets = useSafeAreaInsets()
-	const navigation = useNavigation<any>()
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
 	return (
 		<View style={[styles.wrapper, { paddingTop: insets.top + 16 }]}>
@@ -65,14 +67,14 @@ export default function AppHeader({
 					<View style={styles.actionsRow}>
 						<Pressable
 							style={styles.actionButton}
-							onPress={() => navigation.navigate('Notification')}
+							onPress={() => navigation.navigate(ROUTES.STACK.NOTIFICATION)}
 						>
 							<MaterialCommunityIcons name="bell-outline" size={22} color="#1b5f66" />
 							<View style={styles.notificationDot} />
 						</Pressable>
 						<Pressable
 							style={styles.actionButton}
-							onPress={() => navigation.navigate('FavouriteDoctor')}
+							onPress={() => navigation.navigate(ROUTES.STACK.FAVOURITE_DOCTOR)}
 						>
 							<MaterialCommunityIcons name="heart-outline" size={22} color="#1b5f66" />
 						</Pressable>

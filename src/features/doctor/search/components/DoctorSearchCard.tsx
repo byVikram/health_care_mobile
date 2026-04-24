@@ -1,10 +1,12 @@
 import React from 'react'
 import { View, StyleSheet, Image, Pressable } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import { DoctorSearchItem } from '../../../../types/doctor-search'
 import { AppButton, AppTypography } from '../../../../components/common'
+import { ROUTES } from '../../../../navigation/routes'
+import type { AppStackParamList } from '../../../../navigation/types'
 
 import { doctorCardStyles as styles } from './DoctorCard.styles'
 
@@ -13,7 +15,7 @@ interface DoctorProps {
 }
 
 export default function DoctorSearchCard({ doctor }: DoctorProps) {
-	const navigation = useNavigation<any>()
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
 	// Using placeholder data matching the mockup where API doesn't provide it yet
 	const avatarUrl =
@@ -24,10 +26,7 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 	const earliestSlot = 'Earliest available slot (Today 2:00 PM)'
 
 	return (
-		// <View style={styles.card}
-		//  onPress={() => navigation.navigate('DoctorDetail', { id: doctor.id })}>
-
-		<Pressable style={styles.card} onPress={() => navigation.navigate('DoctorDetail', { id: doctor.id })}>
+		<Pressable style={styles.card} onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })}>
 			{/* Top Half - Image */}
 			<View style={styles.imageContainer}>
 				<Image source={{ uri: avatarUrl }} style={styles.image} resizeMode="cover" />
@@ -83,7 +82,7 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 
 				<AppButton
 					variant="primary"
-					onPress={() => navigation.navigate('DoctorDetail', { id: doctor.id })}
+					onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })}
 					style={styles.bookButton}
 					labelStyle={{ fontSize: 12, marginHorizontal: 0 }}
 				>

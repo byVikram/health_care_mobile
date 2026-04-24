@@ -11,8 +11,12 @@ import {
 	useWindowDimensions,
 	View,
 } from 'react-native'
+import type { RouteProp } from '@react-navigation/native'
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '../../context/AuthContext'
+import type { AppNavigationParamList, AuthStackParamList } from '../../navigation/types'
+import { ROUTES } from '../../navigation/routes'
 
 import Onboarding1 from '../../assets/Onboarding/onboarding-1.svg'
 import Onboarding2 from '../../assets/Onboarding/onboarding-2.svg'
@@ -20,15 +24,8 @@ import Onboarding3 from '../../assets/Onboarding/onboarding-3.svg'
 import Onboarding4 from '../../assets/Onboarding/onboarding-4.svg'
 
 type OnboardingPageProps = {
-	navigation: {
-		replace: (screen: string, params?: any) => void
-	}
-	route: {
-		params?: {
-			roleId: string
-			roleLabel: string
-		}
-	}
+	navigation: NativeStackNavigationProp<AppNavigationParamList, typeof ROUTES.AUTH.ONBOARDING>
+	route: RouteProp<AuthStackParamList, typeof ROUTES.AUTH.ONBOARDING>
 }
 
 type Slide = {
@@ -74,10 +71,12 @@ export default function OnboardingPage({
 	const [activeIndex, setActiveIndex] = useState(0)
 
 	const { roleId, roleLabel } = route.params || {}
+	const resolvedRoleId = roleId ?? ''
+	const resolvedRoleLabel = roleLabel ?? ''
 
 	useEffect(() => {
 		if (!accessToken && !roleId) {
-			navigation.replace('RoleSelection')
+			navigation.replace(ROUTES.AUTH.ROLE_SELECTION)
 		}
 	}, [accessToken, roleId, navigation])
 
@@ -89,14 +88,14 @@ export default function OnboardingPage({
 
 	const finishOnboarding = useCallback(() => {
 		if (accessToken) {
-			navigation.replace('MainTabs')
+			navigation.replace(ROUTES.MAIN.TABS)
 		} else {
-			navigation.replace('Register', {
-				roleId,
-				roleLabel,
+			navigation.replace(ROUTES.AUTH.REGISTER, {
+				roleId: resolvedRoleId,
+				roleLabel: resolvedRoleLabel,
 			})
 		}
-	}, [accessToken, navigation, roleId, roleLabel])
+	}, [accessToken, navigation, resolvedRoleId, resolvedRoleLabel])
 
 	const scrollToIndex = useCallback((index: number) => {
 		flatListRef.current?.scrollToIndex({ index, animated: true })

@@ -2,20 +2,26 @@ import React, { useState, useEffect } from 'react'
 import { View, StyleSheet } from 'react-native'
 import RegisterForm from './components/RegisterForm'
 import OtpForm from './components/OtpForm'
+import { ROUTES } from '../../navigation/routes'
+import type { AuthScreenProps } from '../../navigation/types'
 
 type Step = 'register' | 'otp'
 
-export default function RegisterPage({ navigation, route }: any) {
+export default function RegisterPage({
+  navigation,
+  route,
+}: AuthScreenProps<typeof ROUTES.AUTH.REGISTER>) {
   const [step, setStep] = useState<Step>('register')
   const [contactNumber, setContactNumber] = useState('')
 
-  const { roleId, roleLabel } = route.params || {}
+  const roleId = route.params?.roleId ?? ''
+  const roleLabel = route.params?.roleLabel ?? ''
 
   useEffect(() => {
     if (!roleId) {
-      navigation.replace('RoleSelection')
+      navigation.replace(ROUTES.AUTH.ROLE_SELECTION)
     }
-  }, [roleId])
+  }, [roleId, navigation])
 
   return (
     <View style={styles.container}>

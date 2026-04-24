@@ -10,21 +10,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { getRoles } from '../auth/authService' // adjust path
+import type { AuthScreenProps } from '../../navigation/types'
+import { ROUTES } from '../../navigation/routes'
 
 type Role = {
 	id: string
 	label: string
 }
 
-type RoleSelectionProps = {
-	navigation: {
-		navigate: (screen: string, params?: any) => void
-	}
-}
+type RoleSelectionProps = AuthScreenProps<typeof ROUTES.AUTH.ROLE_SELECTION>
 
-export default function RoleSelectionScreen({
-	navigation,
-}: RoleSelectionProps) {
+export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) {
 	const [roles, setRoles] = useState<Role[]>([])
 	const [loading, setLoading] = useState(true)
 
@@ -47,7 +43,7 @@ export default function RoleSelectionScreen({
 	}
 
 	const handleRoleSelect = (role: Role) => {
-		navigation.navigate('Onboarding', {
+		navigation.navigate(ROUTES.AUTH.ONBOARDING, {
 			roleId: role.id,
 			roleLabel: role.label,
 		})

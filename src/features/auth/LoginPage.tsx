@@ -3,11 +3,15 @@ import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { AppButton, AppInput, AppTypography } from '../../components/common';
 import OtpForm from './components/OtpForm';
 import { sendOtp } from './authService';
+import { ROUTES } from '../../navigation/routes';
+import type { AuthScreenProps } from '../../navigation/types';
 
 // ✅ Import SVG
 import OnboardingImage from '../../assets/Onboarding/onboarding-4.svg';
 
-export default function LoginPage({ navigation }: any) {
+export default function LoginPage({
+    navigation,
+}: AuthScreenProps<typeof ROUTES.AUTH.LOGIN>) {
     const [step, setStep] = useState<'login' | 'otp'>('login');
     const [contactNumber, setContactNumber] = useState('');
     const [loading, setLoading] = useState(false);
@@ -78,7 +82,7 @@ export default function LoginPage({ navigation }: any) {
                         {/* 🔹 Register Link */}
                         <AppButton
                             variant="text"
-                           onPress={() => navigation.navigate('RoleSelection')}
+                           onPress={() => navigation.navigate(ROUTES.AUTH.ROLE_SELECTION)}
                             style={styles.link}
                         >
                             Don't have an account? Register

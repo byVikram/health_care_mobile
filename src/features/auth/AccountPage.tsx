@@ -12,6 +12,8 @@ import {
 import { API_ENDPOINTS } from "../../constants/apiUrls";
 // import { AppSelect, AppSelectOption } from "../../components/AppSelect";
 import { AppSelect, AppSelectOption } from "../../components/common/AppSelect";
+import { ROUTES } from "../../navigation/routes";
+import type { AppStackScreenProps } from "../../navigation/types";
 
 type Speciality = {
   id: string;
@@ -34,7 +36,9 @@ const MOCK_LOCATIONS: AppSelectOption[] = [
   { label: "Chandigarh", value: "chandigarh" },
 ];
 
-export default function AccountPage({ navigation }: any) {
+export default function AccountPage({
+  navigation,
+}: AppStackScreenProps<typeof ROUTES.STACK.ACCOUNT>) {
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedSpeciality, setSelectedSpeciality] = useState<string>("");
 
@@ -94,7 +98,7 @@ export default function AccountPage({ navigation }: any) {
       //     speciality_id: selectedSpeciality,
       //   }),
       // });
-      navigation.navigate("MainTabs");
+      navigation.navigate(ROUTES.MAIN.TABS);
     } catch (err) {
       console.error("Continue error:", err);
     } finally {

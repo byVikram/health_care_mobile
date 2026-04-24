@@ -11,8 +11,12 @@ import {
 import ProfileIcon from "../../assets/Register/profile.svg";
 import ConsultIcon from "../../assets/Register/Consult.svg";
 import FeedbackIcon from "../../assets/Register/Feedback.svg";
+import { ROUTES } from "../../navigation/routes";
+import type { AppStackScreenProps } from "../../navigation/types";
 
-export default function DoctorWelcomeScreen({ navigation }: any) {
+export default function DoctorWelcomeScreen({
+  navigation,
+}: AppStackScreenProps<typeof ROUTES.STACK.DOCTOR_WELCOME>) {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
@@ -79,7 +83,7 @@ export default function DoctorWelcomeScreen({ navigation }: any) {
         <TouchableOpacity
           style={styles.button}
           activeOpacity={0.85}
-          onPress={() => navigation.navigate("AccountPage")}
+          onPress={() => navigation.navigate(ROUTES.STACK.ACCOUNT)}
         >
           <Text style={styles.buttonText}>Create free profile</Text>
         </TouchableOpacity>

@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react'
 import { ScrollView, StyleSheet, TouchableOpacity, Text, View, useWindowDimensions } from 'react-native'
 import { useTheme } from 'react-native-paper'
-import { useNavigation, NavigationProp } from '@react-navigation/native'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import HeroSection from './HeroSection'
 import SpecialitySection from './SpecialitySection'
@@ -20,6 +20,8 @@ import StatusModal from '../../components/common/StatusModal'
 
 import TreatmentHistoryIcon from '../../assets/icons/treatmenthistory.svg'
 import TreatmentHistoryArrowIcon from '../../assets/icons/treatmenthistory-icon.svg'
+import { ROUTES } from '../../navigation/routes'
+import type { AppNavigationParamList } from '../../navigation/types'
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
@@ -29,7 +31,7 @@ export default function DashboardPage() {
 
 	const { role } = useAuth()
 	const isDoctor = role === USER_ROLES.DOCTOR
-	const navigation = useNavigation<NavigationProp<any>>()
+	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
 
 	const [appointments, setAppointments] = useState<Appointment[]>([])
 	const [apptLoading, setApptLoading] = useState(false)
@@ -114,17 +116,17 @@ export default function DashboardPage() {
 
 			<PatientUpcomingAppointments
 				onJoin={(appointment) =>
-					navigation.navigate('VideoConsultation', {
+					navigation.navigate(ROUTES.STACK.VIDEO_CONSULTATION, {
 						appointmentId: appointment.id,
 					})
 				}
 				onReschedule={(appointment) =>
-					navigation.navigate('RescheduleAppointment', {
+					navigation.navigate(ROUTES.STACK.RESCHEDULE_APPOINTMENT, {
 						appointmentId: appointment.id,
 					})
 				}
 				onCancel={(appointment) =>
-					navigation.navigate('CancelAppointment', {
+					navigation.navigate(ROUTES.STACK.CANCEL_APPOINTMENT, {
 						appointmentId: appointment.id,
 					})
 				}
@@ -182,14 +184,14 @@ export default function DashboardPage() {
 				onSubmit={() => {
 					if (modalType === 'success') {
 						setModalType(null)
-						navigation.navigate('Home')
+						navigation.navigate(ROUTES.MAIN.HOME)
 					} else {
 						handleRetry()
 					}
 				}}
 				onCancel={() => {
 					setModalType(null)
-					navigation.navigate('Home')
+					navigation.navigate(ROUTES.MAIN.HOME)
 				}}
 			/>
 		</>
