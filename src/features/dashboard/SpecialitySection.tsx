@@ -1,6 +1,8 @@
 import React from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, Image } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
+import { ROUTES } from '../../navigation/routes'
+import type { MainTabParamList } from '../../navigation/types'
 
 import pregnancyImage from '../../assets/specialties/pregnancy.svg'
 import acneImage from '../../assets/specialties/acne.svg'
@@ -22,7 +24,7 @@ const specialities = [
 ]
 
 export default function SpecialitySection() {
-	const navigation = useNavigation<any>()
+	const navigation = useNavigation<NavigationProp<MainTabParamList>>()
 	const { width } = useWindowDimensions()
 
 	const isTablet = width >= 768
@@ -34,9 +36,7 @@ export default function SpecialitySection() {
 	const BOX_SIZE = isWide ? Math.min(Math.floor(CARD_WIDTH) - 10, 120) : 100
 
 	const handleConsult = () => {
-		navigation.navigate('Search', {
-			speciality_id: '3c7b1e9d-8a2f-4d6c-b5a1-7f0e2d9a8c55',
-		})
+		navigation.navigate(ROUTES.MAIN.SEARCH)
 	}
 
 	// ✅ Single card component using Image
@@ -83,7 +83,7 @@ export default function SpecialitySection() {
 					mode="outlined"
 					style={styles.viewAllBtn}
 					labelStyle={{ fontSize: 12 }}
-					onPress={() => navigation.navigate('Search')}
+					onPress={() => navigation.navigate(ROUTES.MAIN.SEARCH)}
 				>
 					View All
 				</Button>

@@ -11,6 +11,7 @@ import {
 import { useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import type { NavigationProp, RouteProp } from "@react-navigation/native";
 import {
 	AppButton,
 	AppTypography,
@@ -27,11 +28,13 @@ import {
 	AppointmentType,
 	DoctorDetailData,
 } from "../../../types/doctor-detail";
+import { ROUTES } from "../../../navigation/routes";
+import type { AppStackParamList } from "../../../navigation/types";
 
 export default function DoctorDetailPage() {
 	const theme = useTheme();
-	const navigation = useNavigation<any>();
-	const route = useRoute<any>();
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>();
+	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_DETAIL>>();
 
 	const [doctor, setDoctor] = useState<DoctorDetailData | null>(null);
 	const [loading, setLoading] = useState(true);

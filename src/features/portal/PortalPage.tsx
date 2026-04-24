@@ -3,7 +3,9 @@ import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-nat
 import { Text, Card, useTheme, Button } from 'react-native-paper';
 import { useAuth, UserRole } from '../../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, type NavigationProp } from '@react-navigation/native';
+import { ROUTES } from '../../navigation/routes';
+import type { AppStackParamList } from '../../navigation/types';
 
 interface StatsProps {
     label: string;
@@ -20,7 +22,7 @@ const StatBox = ({ label, value }: StatsProps) => (
 export default function PortalPage() {
     const { role, user } = useAuth();
     const theme = useTheme();
-    const navigation = useNavigation<any>();
+    const navigation = useNavigation<NavigationProp<AppStackParamList>>();
 
     return (
         <ScrollView style={styles.container}>
@@ -65,7 +67,7 @@ export default function PortalPage() {
                 </View>
 
                 {/* Mock Appointment Card */}
-                <TouchableOpacity onPress={() => navigation.navigate('Consultation')} activeOpacity={0.8}>
+                <TouchableOpacity onPress={() => navigation.navigate(ROUTES.STACK.CONSULTATION)} activeOpacity={0.8}>
                     <Card style={styles.appointmentCard}>
                         <Card.Content>
                             <Text variant="labelMedium" style={{ color: theme.colors.primary, marginBottom: 4 }}>Tomorrow, 10:30 AM</Text>
@@ -74,7 +76,7 @@ export default function PortalPage() {
                         </Card.Content>
                         <Card.Actions style={{ borderTopWidth: 1, borderTopColor: '#f0f0f0', marginTop: 12 }}>
                             <Button mode="text" textColor="#d32f2f">Cancel</Button>
-                            <Button mode="contained" onPress={() => navigation.navigate('Consultation')}>
+                            <Button mode="contained" onPress={() => navigation.navigate(ROUTES.STACK.CONSULTATION)}>
                                 Join Call
                             </Button>
                         </Card.Actions>

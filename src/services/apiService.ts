@@ -3,6 +3,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { Alert } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { navigate } from '../navigation/navigationService'
+import { ROUTES } from '../navigation/routes'
 
 const axiosInstance = axios.create()
 
@@ -30,7 +31,7 @@ axiosInstance.interceptors.response.use(
 			// Clear storage locally to avoid circular dependencies
 			await AsyncStorage.multiRemove(['role', 'user', 'access_token', 'refresh_token'])
 			// Navigate to onboarding
-			navigate('Onboarding')
+			navigate(ROUTES.AUTH.ONBOARDING)
 			Alert.alert('Session Expired', 'Please log in again.')
 		} else {
 			// Replace react-toastify with Alert in RN

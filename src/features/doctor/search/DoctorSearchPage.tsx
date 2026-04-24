@@ -18,6 +18,9 @@ import { getDoctors, getSpecialities } from '../doctorService'
 import { DoctorSearchItem } from '../../../types/doctor-search'
 import AppHeader from '../../../components/common/AppHeader'
 import { doctorCardStyles } from './components/DoctorCard.styles'
+import type { RouteProp } from '@react-navigation/native'
+import type { AppStackParamList } from '../../../navigation/types'
+import { ROUTES } from '../../../navigation/routes'
 
 const SPECIALITY_ICON_MAP: Record<string, string> = {
 	all: 'format-list-bulleted',
@@ -104,7 +107,7 @@ function DoctorCardSkeleton() {
 
 // ─── Main Component ───────────────────────────────────────────────────────
 export default function DoctorSearchPage() {
-	const route = useRoute<any>()
+	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
 	const theme = useTheme()
 	const { width } = useWindowDimensions()
 

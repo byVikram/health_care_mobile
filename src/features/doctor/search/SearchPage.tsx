@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import { StyleSheet, View, Text } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import AppHeader from "../../../components/common/AppHeader";
+import { ROUTES } from "../../../navigation/routes";
+import type { NavigationProp } from "@react-navigation/native";
+import type { AppStackParamList } from "../../../navigation/types";
 
 /**
  * SearchPage
@@ -13,13 +16,13 @@ import AppHeader from "../../../components/common/AppHeader";
  * Flow:  Home → SearchPage (type here) → DoctorSearchPage (results)
  */
 export default function SearchPage() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleSearchSubmit = () => {
     const trimmed = searchQuery.trim();
     if (!trimmed) return;
-    navigation.navigate("DoctorSearchPage", { query: trimmed });
+    navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, { query: trimmed });
   };
 
   return (

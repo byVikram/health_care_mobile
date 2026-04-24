@@ -1,17 +1,20 @@
-import React from 'react'
+import { createNavigationContainerRef } from '@react-navigation/native'
+import type { RootStackParamList } from './types'
 
-// Create navigationRef in a separate file to avoid circular dependencies
-export const navigationRef = React.createRef<any>()
+export const navigationRef = createNavigationContainerRef<RootStackParamList>()
 
-export const navigate = (name: string, params?: any) => {
-	if (navigationRef.current) {
-		navigationRef.current.navigate(name, params)
+export function navigate<RouteName extends keyof RootStackParamList>(
+	name: RouteName,
+	params?: RootStackParamList[RouteName],
+) {
+	if (navigationRef.isReady()) {
+		;(navigationRef as any).navigate(name, params)
 	}
 }
 
-export const reset = (name: string) => {
-	if (navigationRef.current) {
-		navigationRef.current.reset({
+export function reset<RouteName extends keyof RootStackParamList>(name: RouteName) {
+	if (navigationRef.isReady()) {
+		navigationRef.reset({
 			index: 0,
 			routes: [{ name }],
 		})

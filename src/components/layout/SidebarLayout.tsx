@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
 import { AppSidebar } from '../common'
 import AppHeader from '../common/AppHeader'
 import type { AppSidebarItem } from '../common'
@@ -15,8 +15,9 @@ import RemindersIcon from '../../assets/icons/reminders.svg'
 import PaymentsIcon from '../../assets/icons/payments.svg'
 import HelpCenterIcon from '../../assets/icons/help-center.svg'
 import SettingsIcon from '../../assets/icons/settings.svg'
+import { ROUTES } from '../../navigation/routes'
+import type { AppStackParamList } from '../../navigation/types'
 
-// ─── Mock fallback user ───────────────────────────────────────────────────────
 const MOCK_USER = {
 	name: 'Nitin',
 	avatar: undefined as string | undefined,
@@ -29,7 +30,7 @@ interface SidebarLayoutProps {
 
 export default function SidebarLayout({ children }: SidebarLayoutProps) {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-	const navigation = useNavigation<any>()
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 	const { clearAuth, user: authUser } = useAuth()
 
 	const user = {
@@ -40,15 +41,11 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
 	const handleEditProfile = () => {
 		setIsSidebarOpen(false)
-		navigation.navigate('MainTabs', { screen: 'Profile' })
+		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PROFILE })
 	}
 
-	// ── Navigate to the SearchPage STACK screen (not the tab) ─────────────────
-	// Using push ensures a fresh back-navigable screen even if SearchPage is
-	// already the active tab. navigate('SearchPage') resolves to the stack screen
-	// registered in AppNavigator's authenticated stack.
 	const handleSearchPress = () => {
-		navigation.navigate('SearchPage')
+		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH })
 	}
 
 	const menuItems = useMemo<AppSidebarItem[]>(
@@ -57,67 +54,67 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				id: 'appointments',
 				label: 'My Appointments',
 				icon: <AppointmentsIcon width={24} height={24} />,
-				onPress: () => navigation.navigate('MainTabs', { screen: 'Portal' }),
+				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL }),
 			},
 			{
 				id: 'pharmacy',
 				label: 'Pharmacy',
 				icon: <PharmacyIcon width={20} height={20} />,
-				onPress: () => navigation.navigate('MainTabs', { screen: 'Home' }),
+				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
 			},
 			{
 				id: 'lab',
 				label: 'Lab',
 				icon: <LabIcon width={20} height={20} />,
-				onPress: () => navigation.navigate('MainTabs', { screen: 'Home' }),
+				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
 			},
 			{
 				id: 'radiology',
 				label: 'Radiology',
 				icon: <RadiologyIcon width={20} height={20} />,
-				onPress: () => navigation.navigate('MainTabs', { screen: 'Home' }),
+				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
 			},
 			{
 				id: 'ancillary',
 				label: 'Ancillary',
 				icon: <AncillaryIcon width={20} height={20} />,
-				onPress: () => navigation.navigate('MainTabs', { screen: 'Home' }),
+				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
 			},
 			{
 				id: 'treatment-history',
 				label: 'Treatment History',
 				icon: <TreatmentIcon width={20} height={20} />,
-				onPress: () => navigation.navigate('MainTabs', { screen: 'Home' }),
+				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
 			},
 			{
 				id: 'reminders',
 				label: 'Reminders',
 				icon: <RemindersIcon width={20} height={20} />,
-				onPress: () => navigation.navigate('MainTabs', { screen: 'Home' }),
+				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
 			},
 			{
 				id: 'payments',
 				label: 'Payments',
 				icon: <PaymentsIcon width={20} height={20} />,
-				onPress: () => navigation.navigate('MainTabs', { screen: 'Home' }),
+				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
 			},
 			{
 				id: 'blogs',
 				label: 'Blogs',
 				icon: 'newspaper-variant-outline',
-				onPress: () => navigation.navigate('MainTabs', { screen: 'Home' }),
+				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
 			},
 			{
 				id: 'help',
 				label: 'Help Center',
 				icon: <HelpCenterIcon width={20} height={20} />,
-				onPress: () => navigation.navigate('MainTabs', { screen: 'Profile' }),
+				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PROFILE }),
 			},
 			{
 				id: 'settings',
 				label: 'Settings',
 				icon: <SettingsIcon width={20} height={20} />,
-				onPress: () => navigation.navigate('SettingPage', { screen: 'Settings' }),
+				onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
 			},
 		],
 		[navigation],
@@ -134,10 +131,6 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				menuItems={menuItems}
 			/>
 
-			{/*
-				THE single AppHeader for the Home screen.
-				DashboardPage must NOT render its own AppHeader.
-			*/}
 			<AppHeader
 				variant="home"
 				userName={user.name}
@@ -159,4 +152,3 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f5f5f5',
 	},
 })
-

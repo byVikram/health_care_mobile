@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
 import { AppSkeleton } from '../../components/common'
 import {
 	getDoctorAvailability,
@@ -22,6 +22,8 @@ import {
 } from './doctorService'
 import { DateSlotPicker } from '../../components/common'
 import { APPOINTMENT_STATUS } from '../../constants/constants'
+import { ROUTES } from '../../navigation/routes'
+import type { AppStackParamList } from '../../navigation/types'
 
 type Appointment = {
 	id: string
@@ -77,7 +79,7 @@ export default function DoctorAppointments({
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
 	const useCompactCancelledLayout = width < 640
-	const navigation = useNavigation<any>()
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
 	// ── Reschedule state ──────────────────────────────────────────────────────
 	const [rescheduleOpen, setRescheduleOpen] = useState(false)
@@ -313,7 +315,7 @@ export default function DoctorAppointments({
 			return
 		}
 
-		navigation.navigate('Consultation', {
+		navigation.navigate(ROUTES.STACK.CONSULTATION, {
 			appointmentId: apt.id,
 			patientId,
 			patient: apt.patient,
