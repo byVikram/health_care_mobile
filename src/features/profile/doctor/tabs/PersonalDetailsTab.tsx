@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react'
-import { Image } from 'react-native'
+import React, { useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Alert } from 'react-native'
 import {
 	FlatList,
 	Modal,
@@ -15,6 +15,8 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
+import { getDoctorProfile, mapDoctorProfileApi } from '../../../doctor/doctorService'
+import { doctorService } from '../../../consultation/ConsultationService'
 
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say']
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Marathi', 'Bengali']
@@ -187,6 +189,29 @@ const formatDateInput = (rawValue: string) => {
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 const isValidPhone = (value: string) => value.replace(/\D/g, '').length >= 10
 
+type PersonalDetailsFormData = {
+	name: string
+	email: string
+	mobile: string
+	gender: string
+	dob: string
+	experience: string
+	languages: string[]
+	location: string
+}
+
+const formatDobForDisplay = (value?: string) => {
+	if (!value) return ''
+	if (/^\d{2}-\d{2}-\d{4}$/.test(value)) return value
+	const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+	return match ? `${match[3]}-${match[2]}-${match[1]}` : value
+}
+
+const formatDobForApi = (value: string) => {
+	const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+	return match ? `${match[3]}-${match[2]}-${match[1]}` : value
+}
+
 export default function PersonalDetailsTab() {
 	const { user } = useAuth()
 	const { width } = useWindowDimensions()
@@ -195,15 +220,76 @@ export default function PersonalDetailsTab() {
 	const isMobile = width < 768
 	const useTwoColumns = width >= 768
 
-	const [fullName, setFullName] = useState(user?.name || 'Ashika Rao')
-	const [location, setLocation] = useState('KR Puram, Bengaluru')
-	const [mobileNumber, setMobileNumber] = useState('9876543210')
-	const [email, setEmail] = useState(user?.email || 'ashikarao@gmail.com')
-	const [gender, setGender] = useState('')
-	const [dob, setDob] = useState('')
-	const [experience, setExperience] = useState('')
-	const [language, setLanguage] = useState('')
+	const [formData, setFormData] = useState<PersonalDetailsFormData>({
+		name: user?.name || '',
+		email: user?.email || '',
+		mobile: '',
+		gender: '',
+		dob: '',
+		experience: '',
+		languages: [],
+		location: '',
+	})
 	const [focusedField, setFocusedField] = useState('')
+	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
+	const [isSaving, setIsSaving] = useState(false)
+
+	const updateFormData = <K extends keyof PersonalDetailsFormData>(key: K, value: PersonalDetailsFormData[K]) => {
+		setFormData((prev) => ({
+			...prev,
+			[key]: value,
+		}))
+	}
+
+	useEffect(() => {
+		const loadDoctorProfile = async () => {
+			try {
+				setIsLoadingProfile(true)
+				const response = await getDoctorProfile()
+
+				if (!response?.success || !response.data) return
+
+				const profile = mapDoctorProfileApi(response.data)
+				setFormData({
+					name: profile.personal.name || user?.name || '',
+					email: profile.personal.email || user?.email || '',
+					mobile: response.data.personal_details?.contact_number || '',
+					gender: profile.personal.gender || '',
+					dob: formatDobForDisplay(profile.personal.dateOfBirth),
+					experience: profile.personal.experience || '',
+					languages: profile.personal.languages || [],
+					location: profile.personal.location || '',
+				})
+			} catch (error) {
+				console.error('[PersonalDetailsTab] failed to load doctor profile:', error)
+			} finally {
+				setIsLoadingProfile(false)
+			}
+		}
+
+		loadDoctorProfile()
+	}, [user?.email, user?.name])
+
+	const handleSave = async () => {
+		try {
+			setIsSaving(true)
+
+			const payload = {
+				...formData,
+				contact_number: formData.mobile,
+				date_of_birth: formatDobForApi(formData.dob),
+				experience_years: formData.experience ? Number(formData.experience) : 0,
+			}
+
+			await doctorService.updateDoctorProfile(payload)
+			Alert.alert('Success', 'Personal details saved successfully.')
+		} catch (err) {
+			console.error('[PersonalDetailsTab] save error:', err)
+			Alert.alert('Error', 'Unable to save personal details right now.')
+		} finally {
+			setIsSaving(false)
+		}
+	}
 
 	const contentWidth = useMemo(() => {
 		if (width >= 1280) return 980
@@ -215,6 +301,14 @@ export default function PersonalDetailsTab() {
 	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
 	const rowSpacing = isMobile ? 16 : isTablet ? 18 : 20
 	const titleBottom = isMobile ? 18 : 22
+
+	if (isLoadingProfile) {
+		return (
+			<View style={styles.loadingContainer}>
+				<ActivityIndicator size="small" color="#0c7c7c" />
+			</View>
+		)
+	}
 
 	return (
 		<ScrollView
@@ -232,8 +326,8 @@ export default function PersonalDetailsTab() {
 				<View style={{ marginBottom: rowSpacing }}>
 					<InputField
 						label="Full name"
-						value={fullName}
-						onChangeText={setFullName}
+						value={formData.name}
+						onChangeText={(value) => updateFormData('name', value)}
 						placeholder="Enter full name"
 						autoCapitalize="words"
 						rightIcon="pencil-outline"
@@ -245,8 +339,8 @@ export default function PersonalDetailsTab() {
 				<View style={{ marginBottom: rowSpacing }}>
 					<InputField
 						label="Location"
-						value={location}
-						onChangeText={setLocation}
+						value={formData.location}
+						onChangeText={(value) => updateFormData('location', value)}
 						placeholder="Enter location"
 						autoCapitalize="words"
 						rightIcon="pencil-outline"
@@ -259,24 +353,24 @@ export default function PersonalDetailsTab() {
 					<FormRow stacked={!useTwoColumns} compact={isTablet}>
 						<InputField
 							label="Mobile Number"
-							value={mobileNumber}
-							onChangeText={setMobileNumber}
+							value={formData.mobile}
+							onChangeText={(value) => updateFormData('mobile', value.replace(/\D/g, ''))}
 							placeholder="Enter mobile number"
 							keyboardType="phone-pad"
 							leftText="+91"
-							rightIcon={isValidPhone(mobileNumber) ? 'check-circle' : undefined}
+							rightIcon={isValidPhone(formData.mobile) ? 'check-circle' : undefined}
 							rightIconColor="#24a148"
 							onFocus={() => setFocusedField('mobileNumber')}
 							onBlur={() => setFocusedField('')}
 						/>
 						<InputField
 							label="Email ID"
-							value={email}
-							onChangeText={setEmail}
+							value={formData.email}
+							onChangeText={(value) => updateFormData('email', value)}
 							placeholder="Enter email"
 							keyboardType="email-address"
 							autoCapitalize="none"
-							rightIcon={isValidEmail(email) ? 'check-circle' : undefined}
+							rightIcon={isValidEmail(formData.email) ? 'check-circle' : undefined}
 							rightIconColor="#24a148"
 							onFocus={() => setFocusedField('email')}
 							onBlur={() => setFocusedField('')}
@@ -288,16 +382,16 @@ export default function PersonalDetailsTab() {
 					<FormRow stacked={!useTwoColumns} compact={isTablet}>
 						<SelectDropdown
 							label="Gender"
-							value={gender}
+							value={formData.gender}
 							placeholder="Select your gender"
 							options={GENDER_OPTIONS}
-							onSelect={setGender}
+							onSelect={(value) => updateFormData('gender', value)}
 							isMobile={isMobile}
 						/>
 						<InputField
 							label="DOB"
-							value={dob}
-							onChangeText={(value) => setDob(formatDateInput(value))}
+							value={formData.dob}
+							onChangeText={(value) => updateFormData('dob', formatDateInput(value))}
 							placeholder="DD-MM-YYYY"
 							keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
 							maxLength={10}
@@ -311,8 +405,8 @@ export default function PersonalDetailsTab() {
 				<View style={{ marginBottom: rowSpacing }}>
 					<InputField
 						label="Total year of experience"
-						value={experience}
-						onChangeText={setExperience}
+						value={formData.experience}
+						onChangeText={(value) => updateFormData('experience', value.replace(/[^\d.]/g, ''))}
 						placeholder="Enter years of experience"
 						keyboardType="numeric"
 						rightIcon={focusedField === 'experience' ? 'pencil-outline' : undefined}
@@ -323,12 +417,27 @@ export default function PersonalDetailsTab() {
 
 				<SelectDropdown
 					label="Languages Known"
-					value={language}
+					value={formData.languages.join(', ')}
 					placeholder="Select Language"
 					options={LANGUAGE_OPTIONS}
-					onSelect={setLanguage}
+					onSelect={(value) => updateFormData('languages', [value])}
 					isMobile={isMobile}
 				/>
+
+				<TouchableOpacity
+					style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+					onPress={handleSave}
+					disabled={isSaving}
+					activeOpacity={0.85}
+				>
+					{isSaving ? (
+						<ActivityIndicator size="small" color="#ffffff" />
+					) : (
+						<AppTypography variant="body" style={styles.saveButtonText}>
+							Save / Continue
+						</AppTypography>
+					)}
+				</TouchableOpacity>
 			</View>
 		</ScrollView>
 	)
@@ -337,6 +446,12 @@ export default function PersonalDetailsTab() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+		backgroundColor: '#ffffff',
+	},
+	loadingContainer: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
 		backgroundColor: '#ffffff',
 	},
 	contentContainer: {
@@ -470,6 +585,24 @@ const styles = StyleSheet.create({
 	},
 	optionTextSelected: {
 		color: '#1d6d71',
+		fontWeight: '600',
+	},
+	saveButton: {
+		marginTop: 24,
+		alignSelf: 'flex-start',
+		minWidth: 160,
+		paddingHorizontal: 20,
+		paddingVertical: 12,
+		borderRadius: 10,
+		backgroundColor: '#0c7c7c',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	saveButtonDisabled: {
+		opacity: 0.7,
+	},
+	saveButtonText: {
+		color: '#ffffff',
 		fontWeight: '600',
 	},
 })

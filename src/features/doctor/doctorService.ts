@@ -261,10 +261,12 @@ export const mapDoctorProfileApi = (data: DoctorProfileApiData): DoctorProfile =
 	const hospitals: DoctorProfile['hospitals'] = (data.hospitals ?? []).map((h) => ({
 		id: h.id,
 		name: h.hospital?.name ?? '',
-
 		location: h.hospital?.address ?? '',
 		fullAddress: h.hospital?.address ?? '',
 		isPrimary: h.is_primary ?? false,
+		phone_number: h.hospital?.contact_number ?? '',
+		video_consultation_fee: h.video_consultation_fee ?? '',
+		offline_consultation_fee: h.offline_consultation_fee ?? '',
 	}))
 
 	const pd = data.personal_details
