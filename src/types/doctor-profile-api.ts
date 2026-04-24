@@ -36,6 +36,7 @@ export interface DoctorProfileApiData {
 	personal_details: {
 		name: string
 		email: string
+		contact_number: string
 		is_verified: boolean
 		avatar_s3_key: string | null
 		gender: string

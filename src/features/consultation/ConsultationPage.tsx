@@ -160,12 +160,12 @@ function PastMedicalHistory() {
 				</View>
 
 				<View style={{ marginTop: 16 }}>
-					<Text style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>Select date</Text>
+					<Text style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>Select date</Text>
 					<Button
 						mode="outlined"
 						style={{ alignSelf: 'flex-start', borderRadius: 8 }}
-						contentStyle={{ height: 32 }}
-						labelStyle={{ fontSize: 12 }}
+						contentStyle={{ height: 36 }}
+						labelStyle={{ fontSize: 11 }}
 					>
 						All
 					</Button>
@@ -339,31 +339,32 @@ function ShareWith() {
 				</View>
 
 				<Text style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>Select address</Text>
-				<View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+				<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 ,}}>
 					<Button
 						mode="outlined"
-						style={{ flex: 1, borderRadius: 8 }}
-						contentStyle={{ height: 32 }}
-						labelStyle={{ fontSize: 10 }}
+						style={{ width: '48%', borderRadius: 8 }}
+						contentStyle={{ height: 36 }}
+						labelStyle={{ fontSize: 11 }}
 					>
 						City ▼
 					</Button>
 					<Button
 						mode="outlined"
-						style={{ flex: 1, borderRadius: 8 }}
-						contentStyle={{ height: 32 }}
-						labelStyle={{ fontSize: 10 }}
+						style={{ width: '48%', borderRadius: 8 }}
+						contentStyle={{ height: 36 }}
+						labelStyle={{ fontSize: 11 }}
 					>
 						Area ▼
 					</Button>
-					<Button
+					
+					{/* <Button
 						mode="outlined"
 						style={{ flex: 1, borderRadius: 8 }}
 						contentStyle={{ height: 32 }}
 						labelStyle={{ fontSize: 10 }}
 					>
 						Locality ▼
-					</Button>
+					</Button> */}
 				</View>
 
 				{MOCK_PLACES.map((place, i) => (

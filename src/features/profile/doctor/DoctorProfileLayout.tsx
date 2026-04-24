@@ -1,9 +1,12 @@
-import React, { useState } from 'react'
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { ActivityIndicator, View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { AppTypography } from '../../../components/common'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { getDoctorProfile, mapDoctorProfileApi } from '../../doctor/doctorService'
+import { BASE_URL } from '../../../constants/apiUrls'
+import { DoctorAvailability, DoctorHospital } from '../../../types/doctor-profile'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import MyHospitalsTab from './tabs/MyHospitalsTab'
@@ -24,8 +27,87 @@ export default function DoctorProfileLayout() {
 	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
 	const [activeTab, setActiveTab] = useState('personal')
+	const [profileLoading, setProfileLoading] = useState(false)
+	const [hospitals, setHospitals] = useState<DoctorHospital[]>([])
+	const [availability, setAvailability] = useState<DoctorAvailability>({
+		monday: [],
+		tuesday: [],
+		wednesday: [],
+		thursday: [],
+		friday: [],
+		saturday: [],
+		sunday: [],
+	})
 
 	const ActiveComponent = TABS.find((t) => t.key === activeTab)?.Component || PersonalDetailsTab
+
+	useEffect(() => {
+		const fetchDoctorProfile = async () => {
+			try {
+				setProfileLoading(true)
+				console.log('[DoctorProfileLayout] fetching doctor profile:', {
+					url: `${BASE_URL}/api/doctors/details`,
+				})
+				const response = await getDoctorProfile()
+				console.log('[DoctorProfileLayout] getDoctorProfile response:', response)
+
+				if (response.success && response.data) {
+					const profile = mapDoctorProfileApi(response.data)
+					const normalizedHospitals = profile.hospitals.map((hospital) => ({
+						id: String(hospital.id),
+						name: hospital.name ?? '',
+						fullAddress: hospital.fullAddress ?? hospital.location ?? '',
+						location: hospital.location ?? hospital.fullAddress ?? '',
+						isPrimary: Boolean(hospital.isPrimary),
+					}))
+
+					console.log('[DoctorProfileLayout] mapped availability props:', {
+						hospitals: normalizedHospitals.map((hospital) => ({
+							id: hospital.id,
+							name: hospital.name,
+							fullAddress: hospital.fullAddress,
+							isPrimary: hospital.isPrimary,
+						})),
+					})
+
+					setHospitals(normalizedHospitals)
+					setAvailability(profile.availability)
+				} else {
+					console.log('[DoctorProfileLayout] doctor profile API returned no usable data:', {
+						success: response?.success,
+						message: response?.message,
+					})
+				}
+			} catch (error) {
+				console.log('[DoctorProfileLayout] failed to fetch doctor profile:', error)
+			} finally {
+				setProfileLoading(false)
+			}
+		}
+
+		fetchDoctorProfile()
+	}, [])
+
+	const renderActiveTab = () => {
+		if (activeTab === 'hospitals') {
+			return <MyHospitalsTab hospitals={hospitals} onHospitalsChange={setHospitals} />
+		}
+
+		if (activeTab === 'availability') {
+			console.log('[DoctorProfileLayout] hospitals before passing to AvailabilityTab:', hospitals)
+			if (profileLoading) {
+				return (
+					<View style={styles.loadingContainer}>
+						<ActivityIndicator color="#0c7c7c" />
+					</View>
+				)
+			}
+
+			return <AvailabilityTab hospitals={hospitals} availability={availability} onChange={setAvailability} />
+		}
+
+		return <ActiveComponent />
+	}
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top + 16 }]}>
@@ -66,7 +148,7 @@ export default function DoctorProfileLayout() {
 			</View>
 
 			<View style={styles.contentContainer}>
-				<ActiveComponent />
+				{renderActiveTab()}
 			</View>
 		</View>
 	)
@@ -121,6 +203,12 @@ const styles = StyleSheet.create({
 	},
 	contentContainer: {
 		flex: 1,
+		backgroundColor: '#f8fafc',
+	},
+	loadingContainer: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
 		backgroundColor: '#f8fafc',
 	},
 })
