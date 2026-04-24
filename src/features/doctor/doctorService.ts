@@ -85,7 +85,7 @@ export const updateAppointmentsStatus = async (
 		status_id: statusId,
 	});
 
-	const res = await ApiService.patch(
+	const res = await ApiService.patch<AppointmentResponse>(
 		API_ENDPOINTS.APPOINTMENTS.UPDATE,
 		{
 			appointment_id: appointmentId,
@@ -198,6 +198,21 @@ export const getSpecialities = async (): Promise<SpecialitiesResponse> => {
 	return res.data
 }
 
+export const createHospital = async (data: Record<string, unknown>) => {
+	const res = await ApiService.post(API_ENDPOINTS.DOCTOR_PROFILE.HOSPITALS, data)
+	return res.data
+}
+
+export const updateHospital = async (hospitalId: string, data: Record<string, unknown>) => {
+	const res = await ApiService.patch(`${API_ENDPOINTS.DOCTOR_PROFILE.HOSPITALS}/${hospitalId}`, data)
+	return res.data
+}
+
+export const deleteHospital = async (hospitalId: string) => {
+	const res = await ApiService.delete(`${API_ENDPOINTS.DOCTOR_PROFILE.HOSPITALS}/${hospitalId}`)
+	return res.data
+}
+
 // -- Doctor profile -------------------------------------------------------------
 export const getDoctorProfile = async (): Promise<DoctorProfileApiResponse> => {
 	const token = await AsyncStorage.getItem('access_token')
@@ -261,10 +276,12 @@ export const mapDoctorProfileApi = (data: DoctorProfileApiData): DoctorProfile =
 	const hospitals: DoctorProfile['hospitals'] = (data.hospitals ?? []).map((h) => ({
 		id: h.id,
 		name: h.hospital?.name ?? '',
-
 		location: h.hospital?.address ?? '',
 		fullAddress: h.hospital?.address ?? '',
 		isPrimary: h.is_primary ?? false,
+		phone_number: h.hospital?.contact_number ?? '',
+		video_consultation_fee: h.video_consultation_fee ?? '',
+		offline_consultation_fee: h.offline_consultation_fee ?? '',
 	}))
 
 	const pd = data.personal_details

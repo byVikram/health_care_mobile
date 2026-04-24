@@ -476,6 +476,8 @@ const styles = StyleSheet.create({
 		backgroundColor: '#eee',
 		borderRadius: 25,
 		padding: 4,
+		maxWidth: 400,
+		margin: 'auto',
 	},
 
 	toggleOption: {
