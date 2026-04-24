@@ -129,13 +129,18 @@ export const createAppointment = async (
 	)
 	return res.data
 }
-export const getDoctors = async (params?: DoctorSearchParams): Promise<DoctorSearchResponse> => {
-	const res = await ApiService.getWithParams<DoctorSearchResponse>(
-		API_ENDPOINTS.DOCTORS.SEARCH,
-		(params ?? {}) as Record<string, unknown>
-	)
-	return res.data
-}
+export const getDoctors = async (
+  params?: DoctorSearchParams
+): Promise<DoctorSearchResponse> => {
+  const res = await ApiService.getWithParams(
+    API_ENDPOINTS.DOCTORS.SEARCH,
+    (params ?? {}) as Record<string, unknown>
+  );
+
+  console.log("DOCTORS RESPONSE:", JSON.stringify(res.data, null, 2));
+
+  return res.data;
+};
 
 export interface AvailabilityResponse {
 	data?: SlotGroup[]
