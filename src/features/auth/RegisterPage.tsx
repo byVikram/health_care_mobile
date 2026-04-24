@@ -1,102 +1,58 @@
-import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { useTheme } from 'react-native-paper';
-import { AppButton, AppInput, AppTypography } from '../../components/common';
-import { createUser } from './authService';
+// features/auth/RegisterPage.tsx
+import React, { useState } from 'react'
+import { View, StyleSheet } from 'react-native'
+import RegisterForm from "./components/RegisterForm";
+import OtpForm from './components/OtpForm'
+// import AccountSuccess from './components/AccountSuccess'
+// import WelcomePage from './WelcomePage'
+
+type Step = 'register' | 'otp' | 'success' | 'welcome'
 
 export default function RegisterPage({ navigation }: any) {
-    const [name, setName] = useState('');
-    const [contact, setContact] = useState('');
-    const [email, setEmail] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const theme = useTheme();
-
-    const handleRegister = async () => {
-        if (!name || !contact || !email) {
-            setError('Please fill all fields');
-            return;
-        }
-        setLoading(true);
-        setError('');
-        try {
-            const res = await createUser({
-                name,
-                contact_number: contact,
-                email,
-                role_id: 'patient' // default role id for signup
-            });
-            if (res.success !== false) {
-                navigation.navigate('Login');
-            } else {
-                setError(res.message || 'Failed to register');
-            }
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to register');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const [step, setStep] = useState<Step>('register')
+    const [contactNumber, setContactNumber] = useState('')
 
     return (
         <View style={styles.container}>
-            <AppTypography variant="h2" align="center" style={styles.title}>Register</AppTypography>
-            
-            <AppInput
-                label="Full Name"
-                value={name}
-                onChangeText={setName}
-                style={styles.input}
-            />
+            {step === 'register' && (
+                <RegisterForm
+                    onSubmit={(mobile: string) => {
+                        setContactNumber(mobile)
+                        setStep('otp')
+                    }}
+                    onSwitchToLogin={() => navigation.navigate('Login')}
+                />
+            )}
 
-            <AppInput
-                label="Email Address"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={styles.input}
-                errorText={error}
-            />
+            {step === 'otp' && (
+                <OtpForm
+                    contactNumber={contactNumber}
+                    onVerify={() => {
+                        // AppNavigator will switch to authenticated stack after setAuth in OtpForm
+                    }}
+                    onBack={() => setStep('register')}
+                    backLabel="Back to Register"
+                />
+            )}
 
-            <AppInput
-                label="Contact Number"
-                value={contact}
-                onChangeText={setContact}
-                keyboardType="phone-pad"
-                style={styles.input}
-                errorText={error}
-            />
+            {/* {step === 'success' && (
+                <AccountSuccess
+                    onContinue={() => setStep('welcome')}
+                />
+            )}
 
-            <AppButton variant="primary" onPress={handleRegister} loading={loading} disabled={loading} style={styles.button}>
-                {loading ? 'Signing Up...' : 'Sign Up'}
-            </AppButton>
-            
-            <AppButton variant="text" onPress={() => navigation.navigate('Login')} style={styles.link}>
-                Already have an account? Login
-            </AppButton>
+            {step === 'welcome' && (
+                <WelcomePage
+                    onContinue={() => navigation.navigate('Login')}
+                />
+            )} */}
         </View>
-    );
+    )
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 24,
-        justifyContent: 'center',
-        backgroundColor: '#fff'
+        backgroundColor: '#fff',
     },
-    title: {
-        marginBottom: 32,
-    },
-    input: {
-        // marginBottom removed since input handles it internally or we adjust spacing
-    },
-    button: {
-        marginTop: 8,
-        paddingVertical: 6,
-    },
-    link: {
-        marginTop: 16
-    }
-});
+})

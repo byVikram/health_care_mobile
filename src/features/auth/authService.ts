@@ -1,6 +1,9 @@
 ﻿// src/features/auth/authService.ts
+
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
+
+
 
 export interface SendOtpResponse {
 	success: boolean
@@ -33,7 +36,7 @@ export interface VerifyRolesResponse {
 	data: {
 		id: string
 		label: string
-	}
+	}[]   // ✅ FIXED (array)
 }
 
 export interface CreateUserRequest {
