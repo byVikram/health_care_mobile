@@ -1,58 +1,50 @@
-// features/auth/RegisterPage.tsx
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { View, StyleSheet } from 'react-native'
-import RegisterForm from "./components/RegisterForm";
+import RegisterForm from './components/RegisterForm'
 import OtpForm from './components/OtpForm'
-// import AccountSuccess from './components/AccountSuccess'
-// import WelcomePage from './WelcomePage'
 
-type Step = 'register' | 'otp' | 'success' | 'welcome'
+type Step = 'register' | 'otp'
 
-export default function RegisterPage({ navigation }: any) {
-    const [step, setStep] = useState<Step>('register')
-    const [contactNumber, setContactNumber] = useState('')
+export default function RegisterPage({ navigation, route }: any) {
+  const [step, setStep] = useState<Step>('register')
+  const [contactNumber, setContactNumber] = useState('')
 
-    return (
-        <View style={styles.container}>
-            {step === 'register' && (
-                <RegisterForm
-                    onSubmit={(mobile: string) => {
-                        setContactNumber(mobile)
-                        setStep('otp')
-                    }}
-                    onSwitchToLogin={() => navigation.navigate('Login')}
-                />
-            )}
+  const { roleId, roleLabel } = route.params || {}
 
-            {step === 'otp' && (
-                <OtpForm
-                    contactNumber={contactNumber}
-                    onVerify={() => {
-                        // AppNavigator will switch to authenticated stack after setAuth in OtpForm
-                    }}
-                    onBack={() => setStep('register')}
-                    backLabel="Back to Register"
-                />
-            )}
+  useEffect(() => {
+    if (!roleId) {
+      navigation.replace('RoleSelection')
+    }
+  }, [roleId])
 
-            {/* {step === 'success' && (
-                <AccountSuccess
-                    onContinue={() => setStep('welcome')}
-                />
-            )}
+  return (
+    <View style={styles.container}>
+      {step === 'register' && (
+        <RegisterForm
+          roleId={roleId}
+          roleLabel={roleLabel}
+          onSubmit={(mobile: string) => {
+            setContactNumber(mobile)
+            setStep('otp')
+          }}
+        />
+      )}
 
-            {step === 'welcome' && (
-                <WelcomePage
-                    onContinue={() => navigation.navigate('Login')}
-                />
-            )} */}
-        </View>
-    )
+      {step === 'otp' && (
+        <OtpForm
+          contactNumber={contactNumber}
+          onVerify={() => {}}
+          onBack={() => setStep('register')}
+          backLabel="Back to Register"
+        />
+      )}
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
 })

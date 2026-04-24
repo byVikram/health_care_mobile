@@ -8,6 +8,7 @@ import SpecialitySection from './SpecialitySection'
 import ConsultSection from './ConsultSection'
 import CommunityBlogsSection from './CommunityBlogsSection'
 import PatientQuestionsSection from './PatientQuestionsSection'
+import  PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments';
 
 import DoctorAppointments from '../doctor/DoctorAppointments'
 import { getAppointments, Appointment } from '../doctor/doctorService'
@@ -148,6 +149,24 @@ export default function DashboardPage() {
 									</View>
 									<TreatmentHistoryArrowIcon width={26} height={26} />
 								</TouchableOpacity>
+								<PatientUpcomingAppointments
+                  onJoin={(appointment) =>
+                    navigation.navigate('VideoConsultation', {
+                      appointmentId: appointment.id,
+                    })
+                  }
+                  onReschedule={(appointment) =>
+                    navigation.navigate('RescheduleAppointment', {
+                      appointmentId: appointment.id,
+                    })
+                  }
+                  onCancel={(appointment) =>
+                    navigation.navigate('CancelAppointment', {
+                      appointmentId: appointment.id,
+                    })
+                  }
+                />
+
 								<SpecialitySection />
 								<ConsultSection />
 							</>

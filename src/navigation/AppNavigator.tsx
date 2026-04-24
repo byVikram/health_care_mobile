@@ -9,6 +9,7 @@ import { useTheme } from 'react-native-paper'
 
 // Screens
 import LoginPage from '../features/auth/LoginPage'
+import RoleSelectionScreen from '../features/onboarding/RoleSelectionScreen'
 import RegisterPage from '../features/auth/RegisterPage'
 import OnboardingPage from '../features/onboarding/OnboardingPage'
 import WelcomePage from '../features/auth/WelcomePage'
@@ -91,8 +92,10 @@ export default function AppNavigator() {
 				{accessToken == null ? (
 					// ─── UNAUTHENTICATED ──────────────────────────────────
 					<>
-						<Stack.Screen name="Onboarding" component={OnboardingPage} options={{ animation: 'none' }} />
+						
 						<Stack.Screen name="Login" component={LoginPage} options={{ animation: 'none' }} />
+						<Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />
+						<Stack.Screen name="Onboarding" component={OnboardingPage} options={{ animation: 'none' }} />
 						<Stack.Screen name="Register" component={RegisterPage} />
 					</>
 				) : (

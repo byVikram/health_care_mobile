@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import {
 	FlatList,
 	NativeScrollEvent,
@@ -21,14 +21,23 @@ import Onboarding4 from '../../assets/Onboarding/onboarding-4.svg'
 
 type OnboardingPageProps = {
 	navigation: {
-		replace: (screen: string) => void
+		replace: (screen: string, params?: any) => void
+	}
+	route: {
+		params?: {
+			roleId: string
+			roleLabel: string
+		}
 	}
 }
 
 type Slide = {
 	key: string
 	description: string
-	Illustration: React.ComponentType<{ width?: number | string; height?: number | string }>
+	Illustration: React.ComponentType<{
+		width?: number | string
+		height?: number | string
+	}>
 }
 
 const slides: Slide[] = [
@@ -49,32 +58,50 @@ const slides: Slide[] = [
 	},
 	{
 		key: 'screen-4',
-		description: '10 million indians connect with doctors every year on Whisper AI.',
+		description: '10 million Indians connect with doctors every year on Whisper AI.',
 		Illustration: Onboarding4,
 	},
 ]
 
-export default function OnboardingPage({ navigation }: OnboardingPageProps) {
+export default function OnboardingPage({
+	navigation,
+	route,
+}: OnboardingPageProps) {
 	const { accessToken } = useAuth()
 	const { width } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
 	const flatListRef = useRef<FlatList<Slide>>(null)
 	const [activeIndex, setActiveIndex] = useState(0)
 
+	const { roleId, roleLabel } = route.params || {}
+
+	useEffect(() => {
+		if (!accessToken && !roleId) {
+			navigation.replace('RoleSelection')
+		}
+	}, [accessToken, roleId, navigation])
+
 	const cardWidth = useMemo(() => Math.max(width, 320), [width])
-	const illustrationSize = useMemo(() => Math.min(cardWidth * 0.62, 250), [cardWidth])
+	const illustrationSize = useMemo(
+		() => Math.min(cardWidth * 0.62, 250),
+		[cardWidth],
+	)
 
 	const finishOnboarding = useCallback(() => {
-		navigation.replace(accessToken ? 'MainTabs' : 'Login')
-	}, [accessToken, navigation])
+		if (accessToken) {
+			navigation.replace('MainTabs')
+		} else {
+			navigation.replace('Register', {
+				roleId,
+				roleLabel,
+			})
+		}
+	}, [accessToken, navigation, roleId, roleLabel])
 
-	const scrollToIndex = useCallback(
-		(index: number) => {
-			flatListRef.current?.scrollToIndex({ index, animated: true })
-			setActiveIndex(index)
-		},
-		[],
-	)
+	const scrollToIndex = useCallback((index: number) => {
+		flatListRef.current?.scrollToIndex({ index, animated: true })
+		setActiveIndex(index)
+	}, [])
 
 	const handleNext = useCallback(() => {
 		if (activeIndex === slides.length - 1) {
@@ -96,7 +123,10 @@ export default function OnboardingPage({ navigation }: OnboardingPageProps) {
 
 	const handleMomentumScrollEnd = useCallback(
 		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth)
+			const nextIndex = Math.round(
+				event.nativeEvent.contentOffset.x / cardWidth,
+			)
+
 			if (nextIndex !== activeIndex) {
 				setActiveIndex(nextIndex)
 			}
@@ -111,37 +141,37 @@ export default function OnboardingPage({ navigation }: OnboardingPageProps) {
 			return (
 				<View style={[styles.slide, { width: cardWidth }]}>
 					<View style={styles.illustrationArea}>
-						<Illustration width={illustrationSize} height={illustrationSize} />
+						<Illustration
+							width={illustrationSize}
+							height={illustrationSize}
+						/>
 					</View>
 
 					<TextLabel text={item.description} style={styles.description} />
+
+					{roleLabel ? (
+						<Text style={styles.roleBadge}>
+							Registering as: {roleLabel}
+						</Text>
+					) : null}
 				</View>
 			)
 		},
-		[cardWidth, illustrationSize],
+		[cardWidth, illustrationSize, roleLabel],
 	)
 
 	return (
 		<SafeAreaView style={styles.safeArea}>
 			<StatusBar barStyle="light-content" />
-			<View style={styles.backgroundLayer}>
-				<View style={styles.topLeftBlobOuter} />
-				<View style={styles.topLeftBlobMiddle} />
-				<View style={styles.topLeftBlobInner} />
-				<View style={styles.topRightBlobOuter} />
-				<View style={styles.topRightBlobInner} />
-				<View style={styles.bottomRightBlobOuter} />
-				<View style={styles.bottomRightBlobMiddle} />
-				<View style={styles.bottomRightBlobInner} />
-			</View>
 
 			<View style={styles.container}>
 				<View style={styles.topBar}>
 					<Pressable
-						accessibilityRole="button"
 						onPress={handleSkip}
-						hitSlop={12}
-						style={[styles.skipButton, { marginTop: Math.max(insets.top, 8) + 4 }]}
+						style={[
+							styles.skipButton,
+							{ marginTop: Math.max(insets.top, 8) + 4 },
+						]}
 					>
 						<View style={styles.skipWrapper}>
 							<TextLabel text="Skip" style={styles.skipText} />
@@ -160,9 +190,11 @@ export default function OnboardingPage({ navigation }: OnboardingPageProps) {
 					showsHorizontalScrollIndicator={false}
 					bounces={false}
 					onMomentumScrollEnd={handleMomentumScrollEnd}
-					getItemLayout={(_, index) => ({ index, length: cardWidth, offset: cardWidth * index })}
-					style={styles.carousel}
-					contentContainerStyle={styles.carouselContent}
+					getItemLayout={(_, index) => ({
+						index,
+						length: cardWidth,
+						offset: cardWidth * index,
+					})}
 				/>
 
 				<View style={styles.footer}>
@@ -172,13 +204,15 @@ export default function OnboardingPage({ navigation }: OnboardingPageProps) {
 								key={slide.key}
 								style={[
 									styles.dot,
-									index === activeIndex ? styles.dotActive : styles.dotInactive,
+									index === activeIndex
+										? styles.dotActive
+										: styles.dotInactive,
 								]}
 							/>
 						))}
 					</View>
 
-					<Pressable accessibilityRole="button" onPress={handleNext} style={styles.nextButton}>
+					<Pressable onPress={handleNext} style={styles.nextButton}>
 						<TextLabel text="Next" style={styles.nextText} />
 					</Pressable>
 				</View>
@@ -187,7 +221,13 @@ export default function OnboardingPage({ navigation }: OnboardingPageProps) {
 	)
 }
 
-function TextLabel({ text, style }: { text: string; style: TextStyle }) {
+function TextLabel({
+	text,
+	style,
+}: {
+	text: string
+	style: TextStyle
+}) {
 	return <Text style={style}>{text}</Text>
 }
 
@@ -199,125 +239,10 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 	},
-	slide: {
-		flex: 1,
-		paddingHorizontal: 20,
-		justifyContent: 'center',
-	},
-	backgroundLayer: {
-		...StyleSheet.absoluteFillObject,
-		pointerEvents: 'none',
-	},
-	topLeftBlobOuter: {
-		position: 'absolute',
-		top: -26,
-		left: -30,
-		width: 250,
-		height: 132,
-		borderBottomRightRadius: 170,
-		borderTopRightRadius: 88,
-		borderBottomLeftRadius: 88,
-		borderTopLeftRadius: 34,
-		backgroundColor: '#4a8384',
-		opacity: 0.18,
-	},
-	topLeftBlobMiddle: {
-		position: 'absolute',
-		top: -6,
-		left: -12,
-		width: 214,
-		height: 110,
-		borderBottomRightRadius: 148,
-		borderTopRightRadius: 80,
-		borderBottomLeftRadius: 76,
-		borderTopLeftRadius: 30,
-		backgroundColor: '#3f7779',
-		opacity: 0.2,
-	},
-	topLeftBlobInner: {
-		position: 'absolute',
-		top: 16,
-		left: 4,
-		width: 172,
-		height: 84,
-		borderBottomRightRadius: 124,
-		borderTopRightRadius: 72,
-		borderBottomLeftRadius: 62,
-		borderTopLeftRadius: 28,
-		backgroundColor: '#356d70',
-		opacity: 0.24,
-	},
-	topRightBlobOuter: {
-		position: 'absolute',
-		top: -30,
-		right: -26,
-		width: 126,
-		height: 86,
-		borderBottomLeftRadius: 84,
-		borderTopLeftRadius: 52,
-		borderBottomRightRadius: 34,
-		borderTopRightRadius: 30,
-		backgroundColor: '#4f8788',
-		opacity: 0.08,
-	},
-	topRightBlobInner: {
-		position: 'absolute',
-		top: 8,
-		right: 10,
-		width: 82,
-		height: 38,
-		borderBottomLeftRadius: 46,
-		borderTopLeftRadius: 30,
-		borderBottomRightRadius: 18,
-		borderTopRightRadius: 16,
-		backgroundColor: '#6a9797',
-		opacity: 0.06,
-	},
-	bottomRightBlobOuter: {
-		position: 'absolute',
-		right: -34,
-		bottom: -24,
-		width: 202,
-		height: 118,
-		borderTopLeftRadius: 154,
-		borderBottomLeftRadius: 52,
-		borderTopRightRadius: 54,
-		borderBottomRightRadius: 18,
-		backgroundColor: '#4c8284',
-		opacity: 0.13,
-	},
-	bottomRightBlobMiddle: {
-		position: 'absolute',
-		right: -4,
-		bottom: 4,
-		width: 168,
-		height: 92,
-		borderTopLeftRadius: 132,
-		borderBottomLeftRadius: 42,
-		borderTopRightRadius: 40,
-		borderBottomRightRadius: 16,
-		backgroundColor: '#3f7578',
-		opacity: 0.18,
-	},
-	bottomRightBlobInner: {
-		position: 'absolute',
-		right: 24,
-		bottom: 22,
-		width: 134,
-		height: 70,
-		borderTopLeftRadius: 108,
-		borderBottomLeftRadius: 32,
-		borderTopRightRadius: 30,
-		borderBottomRightRadius: 14,
-		backgroundColor: '#346a6e',
-		opacity: 0.22,
-	},
 	topBar: {
 		alignItems: 'flex-end',
 		paddingHorizontal: 20,
 		paddingBottom: 6,
-		zIndex: 5,
-		elevation: 5,
 	},
 	skipButton: {
 		paddingVertical: 6,
@@ -330,34 +255,30 @@ const styles = StyleSheet.create({
 	skipText: {
 		color: '#FFFFFF',
 		fontSize: 16,
-		fontWeight: '500',
 	},
 	skipArrow: {
 		color: '#FFFFFF',
 		fontSize: 16,
-		fontWeight: '500',
-		letterSpacing: -1,
+	},
+	slide: {
+		justifyContent: 'center',
+		paddingHorizontal: 20,
 	},
 	illustrationArea: {
 		alignItems: 'center',
-		justifyContent: 'center',
-		marginTop: 40,
 		marginBottom: 20,
-		paddingTop: 12,
 	},
 	description: {
 		color: '#ffffff90',
 		fontSize: 18,
-		lineHeight: 24,
 		textAlign: 'center',
-		paddingHorizontal: 18,
-		marginBottom: 50,
+		marginBottom: 20,
 	},
-	carousel: {
-		flex: 1,
-	},
-	carouselContent: {
-		flexGrow: 1,
+	roleBadge: {
+		textAlign: 'center',
+		color: '#fff',
+		fontSize: 15,
+		fontWeight: '600',
 	},
 	footer: {
 		paddingHorizontal: 20,
@@ -365,9 +286,8 @@ const styles = StyleSheet.create({
 	},
 	pagination: {
 		flexDirection: 'row',
-		alignItems: 'center',
 		justifyContent: 'center',
-		marginBottom: 40,
+		marginBottom: 30,
 		gap: 10,
 	},
 	dot: {

@@ -78,7 +78,7 @@ export default function LoginPage({ navigation }: any) {
                         {/* 🔹 Register Link */}
                         <AppButton
                             variant="text"
-                            onPress={() => navigation.navigate('Register')}
+                           onPress={() => navigation.navigate('RoleSelection')}
                             style={styles.link}
                         >
                             Don't have an account? Register
