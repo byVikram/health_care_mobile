@@ -112,6 +112,24 @@ export default function DashboardPage() {
 				<TreatmentHistoryArrowIcon width={26} height={26} />
 			</TouchableOpacity>
 
+			<PatientUpcomingAppointments
+				onJoin={(appointment) =>
+					navigation.navigate('VideoConsultation', {
+						appointmentId: appointment.id,
+					})
+				}
+				onReschedule={(appointment) =>
+					navigation.navigate('RescheduleAppointment', {
+						appointmentId: appointment.id,
+					})
+				}
+				onCancel={(appointment) =>
+					navigation.navigate('CancelAppointment', {
+						appointmentId: appointment.id,
+					})
+				}
+			/>
+
 			<SpecialitySection />
 			<ConsultSection />
 		</>
