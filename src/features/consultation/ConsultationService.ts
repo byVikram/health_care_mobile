@@ -155,8 +155,8 @@ export const doctorService = {
 
   updateDoctorProfile: async (profileData: any) => {
     try {
-      const response = await ApiService.put(
-        `${API_ENDPOINTS.DOCTOR_PROFILE.DETAILS}`, // Use DETAILS or add UPDATE to constants
+      const response = await ApiService.patch(
+        `${API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS}`,
         profileData,
       );
       return response.data;

@@ -198,6 +198,21 @@ export const getSpecialities = async (): Promise<SpecialitiesResponse> => {
 	return res.data
 }
 
+export const createHospital = async (data: Record<string, unknown>) => {
+	const res = await ApiService.post(API_ENDPOINTS.DOCTOR_PROFILE.HOSPITALS, data)
+	return res.data
+}
+
+export const updateHospital = async (hospitalId: string, data: Record<string, unknown>) => {
+	const res = await ApiService.patch(`${API_ENDPOINTS.DOCTOR_PROFILE.HOSPITALS}/${hospitalId}`, data)
+	return res.data
+}
+
+export const deleteHospital = async (hospitalId: string) => {
+	const res = await ApiService.delete(`${API_ENDPOINTS.DOCTOR_PROFILE.HOSPITALS}/${hospitalId}`)
+	return res.data
+}
+
 // -- Doctor profile -------------------------------------------------------------
 export const getDoctorProfile = async (): Promise<DoctorProfileApiResponse> => {
 	const token = await AsyncStorage.getItem('access_token')

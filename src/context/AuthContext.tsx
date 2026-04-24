@@ -22,6 +22,7 @@ export interface AuthState {
 	refreshToken: string | null
 	isLoading: boolean
 	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string) => Promise<void>
+	updateUser: (user: Partial<AuthUser>) => Promise<void>
 	clearAuth: () => Promise<void>
 }
 
@@ -32,6 +33,7 @@ const AuthContext = createContext<AuthState>({
 	refreshToken: null,
 	isLoading: true,
 	setAuth: async () => {},
+	updateUser: async () => {},
 	clearAuth: async () => {},
 })
 
@@ -98,6 +100,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		}
 	}
 
+	const handleUpdateUser = async (updatedUser: Partial<AuthUser>) => {
+		try {
+			setUser((prevUser) => {
+				if (!prevUser) return prevUser
+
+				const nextUser = {
+					...prevUser,
+					...updatedUser,
+				}
+
+				AsyncStorage.setItem('user', JSON.stringify(nextUser)).catch((error) => {
+					console.error('Failed to persist updated user data', error)
+				})
+
+				return nextUser
+			})
+		} catch (error) {
+			console.error('Failed to update user data', error)
+		}
+	}
+
 	return (
 		<AuthContext.Provider
 			value={{
@@ -107,6 +130,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 				refreshToken,
 				isLoading,
 				setAuth: handleSetAuth,
+				updateUser: handleUpdateUser,
 				clearAuth: handleClearAuth,
 			}}
 		>

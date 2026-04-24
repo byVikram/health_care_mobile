@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
 	Alert,
@@ -13,8 +13,9 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../../../../components/common'
-import { getDoctorProfile, mapDoctorProfileApi } from '../../../doctor/doctorService'
+import { createHospital, deleteHospital, getDoctorProfile, mapDoctorProfileApi } from '../../../doctor/doctorService'
 import { doctorService } from '../../../consultation/ConsultationService'
+import { DoctorHospital } from '../../../../types/doctor-profile'
 
 type HospitalFormData = {
 	name: string
@@ -43,6 +44,33 @@ function FieldLabel({ label }: { label: string }) {
 		<AppTypography variant="caption" style={styles.fieldLabel}>
 			{label}
 		</AppTypography>
+	)
+}
+
+function FormRow({
+	children,
+	stacked,
+}: {
+	children: React.ReactNode
+	stacked: boolean
+}) {
+	return (
+		<View style={[styles.formRow, stacked && styles.formRowStacked]}>
+			{React.Children.map(children, (child, index) => (
+				<View
+					style={[
+						styles.formCell,
+						stacked
+							? [styles.formCellStacked, index === 0 && styles.formCellStackedFirst]
+							: index === 0
+								? styles.formCellLeft
+								: styles.formCellRight,
+					]}
+				>
+					{child}
+				</View>
+			))}
+		</View>
 	)
 }
 
@@ -103,11 +131,28 @@ const normalizeHospitals = (rawHospitals: ReturnType<typeof mapDoctorProfileApi>
 		offline_consultation_fee: hospital.offline_consultation_fee ?? '',
 	}))
 
-export default function MyHospitalsTab() {
-	const { width } = useWindowDimensions()
-	const isTablet = width >= 768 && width < 1024
+const toDoctorHospital = (hospital: HospitalItem): DoctorHospital => ({
+	id: String(hospital.id),
+	name: hospital.name ?? '',
+	fullAddress: hospital.fullAddress ?? hospital.location ?? '',
+	location: hospital.location ?? hospital.fullAddress ?? '',
+	isPrimary: Boolean(hospital.isPrimary),
+	phone_number: hospital.phone_number ?? '',
+	video_consultation_fee: hospital.video_consultation_fee ?? '',
+	offline_consultation_fee: hospital.offline_consultation_fee ?? '',
+})
+
+interface MyHospitalsTabProps {
+	hospitals?: DoctorHospital[]
+	onHospitalsChange?: (hospitals: DoctorHospital[]) => void
+}
+
+export default function MyHospitalsTab({ hospitals: externalHospitals, onHospitalsChange }: MyHospitalsTabProps) {
+	const { width, height } = useWindowDimensions()
+	const isTablet = width >= 768
+	const isLandscape = width > height
 	const isMobile = width < 768
-	const isLandscape = width > 900
+	const useTwoColumns = width >= 768
 
 	const [showForm, setShowForm] = useState(false)
 	const [form, setForm] = useState<HospitalFormData>(EMPTY_FORM)
@@ -116,33 +161,55 @@ export default function MyHospitalsTab() {
 	const [menuVisibleId, setMenuVisibleId] = useState<string | null>(null)
 	const [isLoading, setIsLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
+	const [isSavingAddress, setIsSavingAddress] = useState(false)
+	const hospitalsRef = useRef<HospitalItem[]>([])
+
+	const updateHospitalsState = (nextHospitals: HospitalItem[] | ((prev: HospitalItem[]) => HospitalItem[])) => {
+		const resolvedHospitals =
+			typeof nextHospitals === 'function' ? nextHospitals(hospitalsRef.current) : nextHospitals
+		hospitalsRef.current = resolvedHospitals
+		setHospitals(resolvedHospitals)
+		onHospitalsChange?.(resolvedHospitals.map(toDoctorHospital))
+	}
 
 	useEffect(() => {
-		const loadProfile = async () => {
-			try {
-				setIsLoading(true)
-				const response = await getDoctorProfile()
+		hospitalsRef.current = hospitals
+	}, [hospitals])
 
-				if (!response?.success || !response.data) return
+	const loadHospitals = async (showLoader = false) => {
+		try {
+			if (showLoader) setIsLoading(true)
+			const response = await getDoctorProfile()
 
-				const profile = mapDoctorProfileApi(response.data)
-				setHospitals(normalizeHospitals(profile.hospitals))
-			} catch (error) {
-				console.log('[MyHospitalsTab] failed to load hospitals:', error)
-			} finally {
-				setIsLoading(false)
-			}
+			if (!response?.success || !response.data) return
+
+			const profile = mapDoctorProfileApi(response.data)
+			updateHospitalsState(normalizeHospitals(profile.hospitals))
+		} catch (error) {
+			console.log('[MyHospitalsTab] failed to load hospitals:', error)
+		} finally {
+			if (showLoader) setIsLoading(false)
 		}
+	}
 
-		loadProfile()
+	useEffect(() => {
+		loadHospitals(true)
 	}, [])
+
+	useEffect(() => {
+		if (externalHospitals) {
+			const normalized = normalizeHospitals(externalHospitals)
+			hospitalsRef.current = normalized
+			setHospitals(normalized)
+		}
+	}, [externalHospitals])
 
 	const contentWidth = useMemo(() => {
 		if (width >= 1280) return 980
 		if (width >= 1024) return 920
-		if (isTablet) return 820
+		if (width >= 768) return 820
 		return 640
-	}, [isTablet, width])
+	}, [width])
 
 	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
 	const cardDirection = isMobile ? 'column' : 'row'
@@ -155,7 +222,7 @@ export default function MyHospitalsTab() {
 	}
 
 	const handleSetPrimary = (id: string) => {
-		setHospitals((prev) => prev.map((hospital) => ({ ...hospital, isPrimary: hospital.id === id })))
+		updateHospitalsState((prev) => prev.map((hospital) => ({ ...hospital, isPrimary: hospital.id === id })))
 		setMenuVisibleId(null)
 	}
 
@@ -172,20 +239,32 @@ export default function MyHospitalsTab() {
 		setShowForm(true)
 	}
 
-	const handleDelete = (id: string) => {
-		setHospitals((prev) => {
-			const updated = prev.filter((hospital) => hospital.id !== id)
-			if (updated.length > 0 && !updated.some((hospital) => hospital.isPrimary)) {
-				updated[0] = { ...updated[0], isPrimary: true }
-			}
-			return updated
-		})
-		setMenuVisibleId(null)
+	const confirmDelete = (id: string) => {
+		Alert.alert('Delete hospital', 'Are you sure you want to delete this hospital?', [
+			{ text: 'Cancel', style: 'cancel' },
+			{
+				text: 'Delete',
+				style: 'destructive',
+				onPress: async () => {
+					try {
+						await deleteHospital(id)
+						await loadHospitals()
+						setMenuVisibleId(null)
+					} catch (error) {
+						console.log('[MyHospitalsTab] delete hospital error:', error)
+						Alert.alert('Error', 'Unable to delete hospital right now.')
+					}
+				},
+			},
+		])
 	}
 
 	const handleSaveAddress = () => {
 		const trimmedName = form.name.trim()
 		const trimmedAddress = form.fullAddress.trim()
+		const trimmedPhone = form.phone_number.trim()
+		const trimmedVideoFee = form.video_consultation_fee.trim()
+		const trimmedOfflineFee = form.offline_consultation_fee.trim()
 
 		if (!trimmedName) {
 			Alert.alert('Validation', 'Hospital name is required.')
@@ -197,34 +276,78 @@ export default function MyHospitalsTab() {
 			return
 		}
 
-		if (editingId) {
-			setHospitals((prev) =>
-				prev.map((hospital) =>
-					hospital.id === editingId
-						? {
-								...hospital,
-								...form,
-								location: form.fullAddress.trim(),
-							}
-						: hospital
+		const saveAddress = async () => {
+			try {
+				setIsSavingAddress(true)
+
+				if (editingId) {
+					const updatedHospitals = hospitalsRef.current.map((hospital) =>
+						hospital.id === editingId
+							? {
+									...hospital,
+									name: trimmedName,
+									fullAddress: trimmedAddress,
+									location: trimmedAddress,
+									phone_number: trimmedPhone,
+									video_consultation_fee: trimmedVideoFee,
+									offline_consultation_fee: trimmedOfflineFee,
+								}
+							: hospital
+					)
+
+					updateHospitalsState(updatedHospitals)
+
+					const hasPrimary = updatedHospitals.some((hospital) => hospital.isPrimary)
+					const payload = {
+						hospitals: updatedHospitals
+							.filter((hospital) => hospital.name.trim() && hospital.fullAddress.trim())
+							.map((hospital, index) => ({
+								id: hospital.id,
+								name: hospital.name.trim(),
+								full_address: hospital.fullAddress.trim(),
+								location: hospital.fullAddress.trim(),
+								phone_number: (hospital.phone_number ?? '').trim(),
+								video_consultation_fee: (hospital.video_consultation_fee ?? '').trim(),
+								offline_consultation_fee: (hospital.offline_consultation_fee ?? '').trim(),
+								is_primary: hospital.isPrimary || (!hasPrimary && index === 0),
+							})),
+					}
+
+					console.log('[MyHospitalsTab] saving hospitals after edit:', payload)
+					const res = await doctorService.updateDoctorProfile(payload)
+					console.log('[MyHospitalsTab] edit save success:', res)
+				} else {
+					await createHospital({
+						name: trimmedName,
+						phone_number: trimmedPhone,
+						full_address: trimmedAddress,
+						is_primary: hospitals.length === 0,
+						video_consultation_fee: trimmedVideoFee,
+						offline_consultation_fee: trimmedOfflineFee,
+					})
+
+					await loadHospitals()
+				}
+
+				resetForm()
+			} catch (error) {
+				console.log('[MyHospitalsTab] save address error:', error)
+				Alert.alert(
+					'Error',
+					(error as any)?.response?.data?.message || (error as any)?.message || 'Failed to save hospital'
 				)
-			)
-		} else {
-			const newHospital: HospitalItem = {
-				id: `${Date.now()}`,
-				...form,
-				location: form.fullAddress.trim(),
-				isPrimary: hospitals.length === 0,
+			} finally {
+				setIsSavingAddress(false)
 			}
-			setHospitals((prev) => [...prev, newHospital])
 		}
 
-		resetForm()
+		void saveAddress()
 	}
 
 	const handleSave = async () => {
 		try {
 			setIsSaving(true)
+			const hasPrimary = hospitals.some((hospital) => hospital.isPrimary)
 			const normalizedHospitals = hospitals.map((hospital, index) => ({
 				id: hospital.id,
 				name: hospital.name.trim(),
@@ -234,7 +357,7 @@ export default function MyHospitalsTab() {
 				phone_number: hospital.phone_number.trim(),
 				video_consultation_fee: hospital.video_consultation_fee.trim(),
 				offline_consultation_fee: hospital.offline_consultation_fee.trim(),
-				is_primary: hospital.isPrimary || (!hospitals.some((item) => item.isPrimary) && index === 0),
+				is_primary: hospital.isPrimary || (!hasPrimary && index === 0),
 			}))
 
 			await doctorService.updateDoctorProfile({ hospitals: normalizedHospitals })
@@ -265,11 +388,7 @@ export default function MyHospitalsTab() {
 			>
 				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
 					<View style={styles.formHeader}>
-						<TouchableOpacity
-							onPress={resetForm}
-							style={styles.backButton}
-							activeOpacity={0.8}
-						>
+						<TouchableOpacity onPress={resetForm} style={styles.backButton} activeOpacity={0.8}>
 							<MaterialCommunityIcons name="chevron-left" size={20} color="#5f6b73" />
 						</TouchableOpacity>
 						<AppTypography variant="h4" style={styles.formTitle}>
@@ -284,13 +403,39 @@ export default function MyHospitalsTab() {
 							onChangeText={(value) => setForm((prev) => ({ ...prev, name: value }))}
 							placeholder="e.g. Arogya Clinic"
 						/>
-						<InputField
-							label="Phone number"
-							value={form.phone_number}
-							onChangeText={(value) => setForm((prev) => ({ ...prev, phone_number: value }))}
-							placeholder="e.g. +91 98765 43210"
-							keyboardType="phone-pad"
-						/>
+
+						<FormRow stacked={!useTwoColumns}>
+							<InputField
+								label="Phone number"
+								value={form.phone_number}
+								onChangeText={(value) => setForm((prev) => ({ ...prev, phone_number: value }))}
+								placeholder="e.g. +91 98765 43210"
+								keyboardType="phone-pad"
+							/>
+							<InputField
+								label="Video consultation fee"
+								value={form.video_consultation_fee}
+								onChangeText={(value) =>
+									setForm((prev) => ({ ...prev, video_consultation_fee: value.replace(/[^\d.]/g, '') }))
+								}
+								placeholder="e.g. 500"
+								keyboardType="numeric"
+							/>
+						</FormRow>
+
+						<FormRow stacked={!useTwoColumns}>
+							<InputField
+								label="Offline consultation fee"
+								value={form.offline_consultation_fee}
+								onChangeText={(value) =>
+									setForm((prev) => ({ ...prev, offline_consultation_fee: value.replace(/[^\d.]/g, '') }))
+								}
+								placeholder="e.g. 300"
+								keyboardType="numeric"
+							/>
+							<View />
+						</FormRow>
+
 						<InputField
 							label="Enter Full address"
 							value={form.fullAddress}
@@ -298,27 +443,22 @@ export default function MyHospitalsTab() {
 							placeholder="Enter complete address"
 							multiline
 						/>
-						<InputField
-							label="Video consultation fee"
-							value={form.video_consultation_fee}
-							onChangeText={(value) => setForm((prev) => ({ ...prev, video_consultation_fee: value.replace(/[^\d.]/g, '') }))}
-							placeholder="e.g. 500"
-							keyboardType="numeric"
-						/>
-						<InputField
-							label="Offline consultation fee"
-							value={form.offline_consultation_fee}
-							onChangeText={(value) => setForm((prev) => ({ ...prev, offline_consultation_fee: value.replace(/[^\d.]/g, '') }))}
-							placeholder="e.g. 300"
-							keyboardType="numeric"
-						/>
 					</View>
 
 					<View style={styles.formActions}>
-						<TouchableOpacity style={styles.primaryButton} onPress={handleSaveAddress} activeOpacity={0.85}>
-							<AppTypography variant="body" style={styles.primaryButtonText}>
-								Save Address
-							</AppTypography>
+						<TouchableOpacity
+							style={[styles.primaryButton, isSavingAddress && styles.primaryButtonDisabled]}
+							onPress={handleSaveAddress}
+							activeOpacity={0.85}
+							disabled={isSavingAddress}
+						>
+							{isSavingAddress ? (
+								<ActivityIndicator size="small" color="#ffffff" />
+							) : (
+								<AppTypography variant="body" style={styles.primaryButtonText}>
+									Save Address
+								</AppTypography>
+							)}
 						</TouchableOpacity>
 					</View>
 				</View>
@@ -431,7 +571,7 @@ export default function MyHospitalsTab() {
 																	Edit
 																</AppTypography>
 															</TouchableOpacity>
-															<TouchableOpacity style={styles.menuItem} onPress={() => handleDelete(hospital.id)}>
+															<TouchableOpacity style={styles.menuItem} onPress={() => confirmDelete(hospital.id)}>
 																<AppTypography variant="body" style={styles.menuItemDelete}>
 																	Delete
 																</AppTypography>
@@ -708,6 +848,32 @@ const styles = StyleSheet.create({
 	},
 	formBody: {
 		gap: 18,
+	},
+	formRow: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		marginHorizontal: -10,
+	},
+	formRowStacked: {
+		flexDirection: 'column',
+		marginHorizontal: 0,
+	},
+	formCell: {
+		flex: 1,
+		minWidth: 0,
+	},
+	formCellLeft: {
+		paddingHorizontal: 10,
+	},
+	formCellRight: {
+		paddingHorizontal: 10,
+	},
+	formCellStacked: {
+		width: '100%',
+		marginTop: 16,
+	},
+	formCellStackedFirst: {
+		marginTop: 0,
 	},
 	fieldGroup: {
 		width: '100%',

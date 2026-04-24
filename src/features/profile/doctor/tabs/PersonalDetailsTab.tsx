@@ -213,7 +213,7 @@ const formatDobForApi = (value: string) => {
 }
 
 export default function PersonalDetailsTab() {
-	const { user } = useAuth()
+	const { user, updateUser } = useAuth()
 	const { width } = useWindowDimensions()
 
 	const isTablet = width >= 768 && width < 1024
@@ -268,21 +268,69 @@ export default function PersonalDetailsTab() {
 		}
 
 		loadDoctorProfile()
-	}, [user?.email, user?.name])
+	}, [])
 
 	const handleSave = async () => {
+		debugger
+		console.log('Saving personal details with formData:', formData)
+		const trimmedName = formData.name.trim()
+		const trimmedEmail = formData.email.trim()
+		const trimmedLocation = formData.location.trim()
+		const formattedDob = formatDobForApi(formData.dob.trim())
+		const experienceYears = formData.experience ? Number(formData.experience) : 0
+		const normalizedMobile = formData.mobile.replace(/\D/g, '')
+		const normalizedLanguages = formData.languages.map((language) => language.trim()).filter(Boolean)
+
+		if (!trimmedName) {
+			Alert.alert('Validation', 'Full name is required.')
+			return
+		}
+
+		if (trimmedEmail && !isValidEmail(trimmedEmail)) {
+			Alert.alert('Validation', 'Please enter a valid email address.')
+			return
+		}
+
+		if (normalizedMobile && !isValidPhone(normalizedMobile)) {
+			Alert.alert('Validation', 'Please enter a valid mobile number.')
+			return
+		}
+
+		if (formData.dob.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(formattedDob)) {
+			Alert.alert('Validation', 'Please enter DOB in DD-MM-YYYY format.')
+			return
+		}
+
 		try {
 			setIsSaving(true)
 
 			const payload = {
-				...formData,
-				contact_number: formData.mobile,
-				date_of_birth: formatDobForApi(formData.dob),
-				experience_years: formData.experience ? Number(formData.experience) : 0,
+				name: trimmedName,
+				email: trimmedEmail,
+				location: trimmedLocation,
+				gender: formData.gender.trim(),
+				languages: normalizedLanguages,
+				contact_number: normalizedMobile,
+				date_of_birth: formattedDob,
+				experience_years: Number.isFinite(experienceYears) ? experienceYears : 0,
 			}
 
 			await doctorService.updateDoctorProfile(payload)
-			Alert.alert('Success', 'Personal details saved successfully.')
+			await updateUser({
+				name: trimmedName,
+				email: trimmedEmail || user?.email,
+			})
+			setFormData((prev) => ({
+				...prev,
+				name: trimmedName,
+				email: trimmedEmail,
+				location: trimmedLocation,
+				mobile: normalizedMobile,
+				dob: formData.dob.trim(),
+				languages: normalizedLanguages,
+				experience: String(Number.isFinite(experienceYears) ? experienceYears : 0),
+			}))
+			Alert.alert('Success', 'Personal details saved successfully/.')
 		} catch (err) {
 			console.error('[PersonalDetailsTab] save error:', err)
 			Alert.alert('Error', 'Unable to save personal details right now.')

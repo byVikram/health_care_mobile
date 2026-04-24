@@ -89,6 +89,10 @@ export default function DoctorProfileLayout() {
 	}, [])
 
 	const renderActiveTab = () => {
+		if (activeTab === 'hospitals') {
+			return <MyHospitalsTab hospitals={hospitals} onHospitalsChange={setHospitals} />
+		}
+
 		if (activeTab === 'availability') {
 			console.log('[DoctorProfileLayout] hospitals before passing to AvailabilityTab:', hospitals)
 			if (profileLoading) {

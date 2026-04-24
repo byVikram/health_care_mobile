@@ -16,6 +16,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { AppTypography } from '../../../../components/common'
+import { useAuth } from '../../../../context/AuthContext'
 import { getDoctorProfile, getSpecialities, mapDoctorProfileApi } from '../../../doctor/doctorService'
 import { doctorService } from '../../../consultation/ConsultationService'
 
@@ -270,6 +271,7 @@ function UploadBox({ label, required, description, fileName, onUpload, stacked }
 }
 
 export default function ProfessionalDetailsTab() {
+	const { user, updateUser } = useAuth()
 	const { width } = useWindowDimensions()
 
 	const isTablet = width >= 768 && width < 1024
@@ -347,6 +349,35 @@ export default function ProfessionalDetailsTab() {
 		loadDoctorProfile()
 	}, [])
 
+	const syncProfileAfterSave = async () => {
+		try {
+			const response = await getDoctorProfile()
+
+			if (!response?.success || !response.data) return
+
+			const profile = mapDoctorProfileApi(response.data)
+			setFormData({
+				specialization_id: profile.professional.specialization_id || '',
+				specialization_label: profile.professional.specialization_label || '',
+				degree: normalizeOptionValue(profile.professional.degree || '', DEGREE_OPTIONS),
+				college: normalizeOptionValue(profile.professional.college || '', COLLEGE_OPTIONS),
+				yearOfPassing: profile.professional.yearOfPassing || '',
+				qualificationProof: profile.professional.qualificationProof || '',
+				registrationNumber: profile.professional.registrationNumber || '',
+				registrationProof: profile.professional.registrationProof || '',
+				about: profile.professional.about || '',
+			})
+
+			await updateUser({
+				name: profile.personal.name || user?.name || '',
+				email: profile.personal.email || user?.email || '',
+				avatar: profile.personal.avatar || user?.avatar,
+			})
+		} catch (error) {
+			console.log('[ProfessionalDetailsTab] failed to sync saved profile:', error)
+		}
+	}
+
 	const handleUpload = async (field: 'qualificationProof' | 'registrationProof') => {
 		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
 
@@ -380,19 +411,44 @@ export default function ProfessionalDetailsTab() {
 	}
 
 	const handleSave = async () => {
+		const payload = {
+			speciality_id: formData.specialization_id,
+			specialization_id: formData.specialization_id,
+			specialization: formData.specialization_id,
+			degree: formData.degree.trim(),
+			college: formData.college.trim(),
+			year_of_passing: formData.yearOfPassing.trim(),
+			qualification_proof_s3_key: formData.qualificationProof.trim(),
+			registration_number: formData.registrationNumber.trim(),
+			registration_proof_s3_key: formData.registrationProof.trim(),
+			about: formData.about.trim(),
+		}
+
+		if (!payload.speciality_id) {
+			Alert.alert('Validation', 'Please select your specialization.')
+			return
+		}
+
+		if (!payload.degree) {
+			Alert.alert('Validation', 'Please select your degree.')
+			return
+		}
+
+		if (!payload.college) {
+			Alert.alert('Validation', 'Please select your college or university.')
+			return
+		}
+
+		if (payload.year_of_passing && !/^\d{4}$/.test(payload.year_of_passing)) {
+			Alert.alert('Validation', 'Please enter a valid 4-digit year of passing.')
+			return
+		}
+
 		try {
 			setIsSaving(true)
-			const payload = {
-				...formData,
-				speciality_id: formData.specialization_id,
-				specialization: formData.specialization_id,
-				year_of_passing: formData.yearOfPassing,
-				qualification_proof_s3_key: formData.qualificationProof,
-				registration_number: formData.registrationNumber,
-				registration_proof_s3_key: formData.registrationProof,
-			}
 
 			await doctorService.updateDoctorProfile(payload)
+			await syncProfileAfterSave()
 			Alert.alert('Success', 'Professional details saved successfully.')
 		} catch (error) {
 			console.log('[ProfessionalDetailsTab] save error:', error)
