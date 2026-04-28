@@ -25,5 +25,6 @@ export const ROUTES = {
 		VIDEO_CONSULTATION: 'VideoConsultation',
 		RESCHEDULE_APPOINTMENT: 'RescheduleAppointment',
 		CANCEL_APPOINTMENT: 'CancelAppointment',
+		PATIENT_PAYMENT: 'PatientPayment',
 	},
 } as const

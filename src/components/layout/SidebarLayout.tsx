@@ -93,11 +93,11 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
 			},
 			{
-				id: 'payments',
-				label: 'Payments',
-				icon: <PaymentsIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
-			},
+  id: 'payments',
+  label: 'Payments',
+  icon: <PaymentsIcon width={20} height={20} />,
+ onPress: () => navigation.navigate(ROUTES.STACK.PATIENT_PAYMENT),
+},
 			{
 				id: 'blogs',
 				label: 'Blogs',

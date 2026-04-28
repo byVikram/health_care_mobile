@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { getRoles } from '../auth/authService' // adjust path
 import type { AuthScreenProps } from '../../navigation/types'
 import { ROUTES } from '../../navigation/routes'
+import { USER_ROLES } from '../../constants/constants'
 
 type Role = {
 	id: string
@@ -43,12 +44,24 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 	}
 
 	const handleRoleSelect = (role: Role) => {
-		navigation.navigate(ROUTES.AUTH.ONBOARDING, {
-			roleId: role.id,
-			roleLabel: role.label,
-		})
+	let mappedRole: string | null = null
+
+	if (role.label.toLowerCase() === 'doctor') {
+		mappedRole = USER_ROLES.DOCTOR
+	} else if (role.label.toLowerCase() === 'patient') {
+		mappedRole = USER_ROLES.PATIENT
 	}
 
+	if (!mappedRole) {
+		console.warn('Unknown role:', role)
+		return
+	}
+
+	navigation.navigate(ROUTES.AUTH.ONBOARDING, {
+		roleId: mappedRole,   // ✅ THIS IS THE FIX
+		roleLabel: role.label,
+	})
+}
 	return (
 		<SafeAreaView style={styles.safeArea}>
 			<StatusBar barStyle="light-content" />

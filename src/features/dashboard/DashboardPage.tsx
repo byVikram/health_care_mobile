@@ -22,6 +22,7 @@ import TreatmentHistoryIcon from '../../assets/icons/treatmenthistory.svg'
 import TreatmentHistoryArrowIcon from '../../assets/icons/treatmenthistory-icon.svg'
 import { ROUTES } from '../../navigation/routes'
 import type { AppNavigationParamList } from '../../navigation/types'
+import AppPayment from '../../components/common/AppPayment'
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
@@ -134,6 +135,7 @@ export default function DashboardPage() {
 
 			<SpecialitySection />
 			<ConsultSection />
+			<AppPayment />
 		</>
 	)
 

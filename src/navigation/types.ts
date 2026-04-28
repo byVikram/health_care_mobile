@@ -49,6 +49,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.VIDEO_CONSULTATION]: { appointmentId: string }
 	[ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
+	[ROUTES.STACK.PATIENT_PAYMENT]: undefined
 }
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList

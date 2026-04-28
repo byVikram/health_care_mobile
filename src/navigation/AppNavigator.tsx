@@ -20,8 +20,10 @@ import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/setting/SettingPage'
 import WelcomePage from '../features/auth/WelcomePage'
 import AccountPage from '../features/auth/AccountPage'
-
+import PatientPayment from '../features/patientPayment/PatientPayment'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
+
+const PaymentStack = createNativeStackNavigator()
 
 function AuthenticatedNavigator() {
 	return (
@@ -40,10 +42,11 @@ function AuthenticatedNavigator() {
 				options={{ animation: 'none' }}
 			/>
 			<AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
+
+			<AppStack.Screen name="PatientPayment" component={PatientPayment} />
 		</AppStack.Navigator>
 	)
 }
-
 export default function AppNavigator() {
 	const { accessToken, isLoading } = useAuth()
 	const theme = useTheme()
