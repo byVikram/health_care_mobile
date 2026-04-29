@@ -13,8 +13,13 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../../../../components/common'
-import { createHospital, deleteHospital, getDoctorProfile, mapDoctorProfileApi } from '../../../doctor/doctorService'
-import { doctorService } from '../../../consultation/ConsultationService'
+import {
+	createHospital,
+	deleteHospital,
+	getDoctorProfile,
+	mapDoctorProfileApi,
+	updateHospital,
+} from '../../../doctor/doctorService'
 import { DoctorHospital } from '../../../../types/doctor-profile'
 
 type HospitalFormData = {
@@ -38,6 +43,50 @@ const EMPTY_FORM: HospitalFormData = {
 	video_consultation_fee: '',
 	offline_consultation_fee: '',
 }
+
+const TEAL = '#0c7c7c'
+
+const getSuccessMessage = (response: unknown, fallback = 'Hospital saved successfully') => {
+	if (
+		typeof response === 'object' &&
+		response !== null &&
+		'message' in response &&
+		typeof response.message === 'string'
+	) {
+		return response.message
+	}
+
+	return fallback
+}
+
+const makeTimeOptions = (startHour: number, endHour: number) => {
+	const options: { value: string; label: string }[] = []
+	for (let hour = startHour; hour <= endHour; hour += 1) {
+		for (const minute of ['00', '30']) {
+			if (hour === endHour && minute === '30') break
+			const value = `${String(hour).padStart(2, '0')}:${minute}`
+			const period = hour < 12 ? 'AM' : 'PM'
+			const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+			options.push({ value, label: `${hour12}:${minute} ${period}` })
+		}
+	}
+	return options
+}
+
+const morningOptions = makeTimeOptions(8, 12)
+const afternoonOptions = makeTimeOptions(12, 17)
+const eveningOptions = makeTimeOptions(17, 21)
+const durationOptions = [10, 15, 20, 25, 30]
+
+const buildHospitalPayload = (hospital: HospitalItem, isPrimary = hospital.isPrimary) => ({
+	name: hospital.name.trim(),
+	phone_number: hospital.phone_number.trim(),
+	full_address: hospital.fullAddress.trim(),
+	location: hospital.fullAddress.trim(),
+	is_primary: isPrimary,
+	video_consultation_fee: hospital.video_consultation_fee.trim(),
+	offline_consultation_fee: hospital.offline_consultation_fee.trim(),
+})
 
 function FieldLabel({ label }: { label: string }) {
 	return (
@@ -108,6 +157,216 @@ function InputField({
 	)
 }
 
+function DropdownSelect({
+	label,
+	value,
+	options,
+	onChange,
+	compact = false,
+}: {
+	label: string
+	value: string | number
+	options: { value: string | number; label: string }[]
+	onChange: (value: string | number) => void
+	compact?: boolean
+}) {
+	const [isOpen, setIsOpen] = useState(false)
+	const selectedOption = options.find((option) => option.value === value)
+
+	return (
+		<View style={[styles.dropdownGroup, compact && styles.dropdownGroupCompact]}>
+			<AppTypography variant="caption" style={styles.dropdownFloatingLabel}>
+				{label}
+			</AppTypography>
+			<TouchableOpacity
+				style={[styles.dropdownTrigger, compact && styles.dropdownTriggerCompact]}
+				onPress={() => setIsOpen(true)}
+				activeOpacity={0.85}
+			>
+				<AppTypography variant="body" style={[styles.dropdownValue, compact && styles.dropdownValueCompact]}>
+					{selectedOption?.label ?? 'Select'}
+				</AppTypography>
+				<MaterialCommunityIcons name="menu-down" size={26} color="#7c7c7c" />
+			</TouchableOpacity>
+
+			<Modal visible={isOpen} transparent animationType="fade" onRequestClose={() => setIsOpen(false)}>
+				<Pressable style={styles.dropdownOverlay} onPress={() => setIsOpen(false)}>
+					<Pressable style={styles.dropdownMenu}>
+						<AppTypography variant="caption" style={styles.dropdownTitle}>
+							{label}
+						</AppTypography>
+						<ScrollView style={styles.dropdownList} showsVerticalScrollIndicator={false}>
+							{options.map((option) => {
+								const isSelected = option.value === value
+								return (
+									<TouchableOpacity
+										key={String(option.value)}
+										style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
+										onPress={() => {
+											onChange(option.value)
+											setIsOpen(false)
+										}}
+										activeOpacity={0.85}
+									>
+										<AppTypography
+											variant="body"
+											style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}
+										>
+											{option.label}
+										</AppTypography>
+										{isSelected ? (
+											<MaterialCommunityIcons name="check" size={18} color={TEAL} />
+										) : null}
+									</TouchableOpacity>
+								)
+							})}
+						</ScrollView>
+					</Pressable>
+				</Pressable>
+			</Modal>
+		</View>
+	)
+}
+
+function WorkingHoursRow({
+	children,
+	stacked,
+}: {
+	children: React.ReactNode
+	stacked: boolean
+}) {
+	return (
+		<View style={[styles.workingRow, stacked && styles.workingRowStacked]}>
+			{React.Children.map(children, (child) => (
+				<View style={[styles.workingCell, stacked && styles.workingCellStacked]}>{child}</View>
+			))}
+		</View>
+	)
+}
+
+function WorkingHoursSection({
+	morningStart,
+	morningEnd,
+	afternoonStart,
+	afternoonEnd,
+	eveningStart,
+	eveningEnd,
+	slotDuration,
+	onMorningStartChange,
+	onMorningEndChange,
+	onAfternoonStartChange,
+	onAfternoonEndChange,
+	onEveningStartChange,
+	onEveningEndChange,
+	onSlotDurationChange,
+	stacked,
+}: {
+	morningStart: string
+	morningEnd: string
+	afternoonStart: string
+	afternoonEnd: string
+	eveningStart: string
+	eveningEnd: string
+	slotDuration: number
+	onMorningStartChange: (value: string) => void
+	onMorningEndChange: (value: string) => void
+	onAfternoonStartChange: (value: string) => void
+	onAfternoonEndChange: (value: string) => void
+	onEveningStartChange: (value: string) => void
+	onEveningEndChange: (value: string) => void
+	onSlotDurationChange: (value: number) => void
+	stacked: boolean
+}) {
+	return (
+		<View style={styles.workingHours}>
+			<AppTypography variant="body" style={styles.workingTitle}>
+				Working Hours
+			</AppTypography>
+
+			<View style={styles.shiftBlock}>
+				<AppTypography variant="caption" style={styles.shiftTitle}>
+					Morning
+				</AppTypography>
+				<WorkingHoursRow stacked={stacked}>
+					<DropdownSelect
+						label="Start Time"
+						value={morningStart}
+						options={morningOptions}
+						onChange={(value) => onMorningStartChange(String(value))}
+						compact
+					/>
+					<DropdownSelect
+						label="End Time"
+						value={morningEnd}
+						options={morningOptions}
+						onChange={(value) => onMorningEndChange(String(value))}
+						compact
+					/>
+				</WorkingHoursRow>
+			</View>
+
+			<View style={styles.shiftBlock}>
+				<AppTypography variant="caption" style={styles.shiftTitle}>
+					Afternoon
+				</AppTypography>
+				<WorkingHoursRow stacked={stacked}>
+					<DropdownSelect
+						label="Start Time"
+						value={afternoonStart}
+						options={afternoonOptions}
+						onChange={(value) => onAfternoonStartChange(String(value))}
+						compact
+					/>
+					<DropdownSelect
+						label="End Time"
+						value={afternoonEnd}
+						options={afternoonOptions}
+						onChange={(value) => onAfternoonEndChange(String(value))}
+						compact
+					/>
+				</WorkingHoursRow>
+			</View>
+
+			<View style={styles.shiftBlock}>
+				<AppTypography variant="caption" style={styles.shiftTitle}>
+					Evening
+				</AppTypography>
+				<WorkingHoursRow stacked={stacked}>
+					<DropdownSelect
+						label="Start Time"
+						value={eveningStart}
+						options={eveningOptions}
+						onChange={(value) => onEveningStartChange(String(value))}
+						compact
+					/>
+					<DropdownSelect
+						label="End Time"
+						value={eveningEnd}
+						options={eveningOptions}
+						onChange={(value) => onEveningEndChange(String(value))}
+						compact
+					/>
+				</WorkingHoursRow>
+			</View>
+
+			<View style={styles.slotDurationBlock}>
+				<AppTypography variant="caption" style={styles.shiftTitle}>
+					Slot Duration
+				</AppTypography>
+				<View style={styles.slotDurationField}>
+					<DropdownSelect
+						label="Duration"
+						value={slotDuration}
+						options={durationOptions.map((duration) => ({ value: duration, label: `${duration} mins` }))}
+						onChange={(value) => onSlotDurationChange(Number(value))}
+						compact
+					/>
+				</View>
+			</View>
+		</View>
+	)
+}
+
 const getHospitalAddressText = (hospital: HospitalItem) => {
 	const fullAddress = hospital.fullAddress.trim()
 	const location = hospital.location.trim()
@@ -162,7 +421,15 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const [isLoading, setIsLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [isSavingAddress, setIsSavingAddress] = useState(false)
+	const [morningStart, setMorningStart] = useState('08:00')
+	const [morningEnd, setMorningEnd] = useState('12:00')
+	const [afternoonStart, setAfternoonStart] = useState('12:00')
+	const [afternoonEnd, setAfternoonEnd] = useState('17:00')
+	const [eveningStart, setEveningStart] = useState('17:00')
+	const [eveningEnd, setEveningEnd] = useState('21:00')
+	const [slotDuration, setSlotDuration] = useState(15)
 	const hospitalsRef = useRef<HospitalItem[]>([])
+	const hasLoadedHospitalsRef = useRef(false)
 
 	const updateHospitalsState = (nextHospitals: HospitalItem[] | ((prev: HospitalItem[]) => HospitalItem[])) => {
 		const resolvedHospitals =
@@ -181,12 +448,24 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			if (showLoader) setIsLoading(true)
 			const response = await getDoctorProfile()
 
-			if (!response?.success || !response.data) return
+			if (!response?.success || !response.data) {
+				console.log('[MyHospitalsTab] doctor profile API returned no hospital data:', {
+					success: response?.success,
+					message: response?.message,
+				})
+				return
+			}
 
 			const profile = mapDoctorProfileApi(response.data)
-			updateHospitalsState(normalizeHospitals(profile.hospitals))
+			const normalizedHospitals = normalizeHospitals(profile.hospitals)
+			hasLoadedHospitalsRef.current = true
+			updateHospitalsState(normalizedHospitals)
 		} catch (error) {
 			console.log('[MyHospitalsTab] failed to load hospitals:', error)
+			Alert.alert(
+				'Error',
+				(error as any)?.response?.data?.message || (error as any)?.message || 'Unable to load hospitals right now.'
+			)
 		} finally {
 			if (showLoader) setIsLoading(false)
 		}
@@ -197,8 +476,10 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}, [])
 
 	useEffect(() => {
-		if (externalHospitals) {
-			const normalized = normalizeHospitals(externalHospitals)
+		if (!externalHospitals) return
+
+		const normalized = normalizeHospitals(externalHospitals)
+		if (normalized.length > 0 || !hasLoadedHospitalsRef.current) {
 			hospitalsRef.current = normalized
 			setHospitals(normalized)
 		}
@@ -221,9 +502,26 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		setShowForm(false)
 	}
 
-	const handleSetPrimary = (id: string) => {
+	const handleSetPrimary = async (id: string) => {
+		const selectedHospital = hospitalsRef.current.find((hospital) => hospital.id === id)
+		if (!selectedHospital || selectedHospital.isPrimary) {
+			setMenuVisibleId(null)
+			return
+		}
+
+		const previousHospitals = hospitalsRef.current
 		updateHospitalsState((prev) => prev.map((hospital) => ({ ...hospital, isPrimary: hospital.id === id })))
-		setMenuVisibleId(null)
+
+		try {
+			await updateHospital(id, buildHospitalPayload(selectedHospital, true))
+			await loadHospitals()
+		} catch (error) {
+			console.log('[MyHospitalsTab] set primary error:', error)
+			updateHospitalsState(previousHospitals)
+			Alert.alert('Error', 'Unable to update primary hospital right now.')
+		} finally {
+			setMenuVisibleId(null)
+		}
 	}
 
 	const handleEdit = (hospital: HospitalItem) => {
@@ -281,43 +579,26 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 				setIsSavingAddress(true)
 
 				if (editingId) {
-					const updatedHospitals = hospitalsRef.current.map((hospital) =>
-						hospital.id === editingId
-							? {
-									...hospital,
-									name: trimmedName,
-									fullAddress: trimmedAddress,
-									location: trimmedAddress,
-									phone_number: trimmedPhone,
-									video_consultation_fee: trimmedVideoFee,
-									offline_consultation_fee: trimmedOfflineFee,
-								}
-							: hospital
-					)
-
-					updateHospitalsState(updatedHospitals)
-
-					const hasPrimary = updatedHospitals.some((hospital) => hospital.isPrimary)
-					const payload = {
-						hospitals: updatedHospitals
-							.filter((hospital) => hospital.name.trim() && hospital.fullAddress.trim())
-							.map((hospital, index) => ({
-								id: hospital.id,
-								name: hospital.name.trim(),
-								full_address: hospital.fullAddress.trim(),
-								location: hospital.fullAddress.trim(),
-								phone_number: (hospital.phone_number ?? '').trim(),
-								video_consultation_fee: (hospital.video_consultation_fee ?? '').trim(),
-								offline_consultation_fee: (hospital.offline_consultation_fee ?? '').trim(),
-								is_primary: hospital.isPrimary || (!hasPrimary && index === 0),
-							})),
+					const existingHospital = hospitalsRef.current.find((hospital) => hospital.id === editingId)
+					if (!existingHospital) {
+						throw new Error('Hospital not found')
 					}
 
-					console.log('[MyHospitalsTab] saving hospitals after edit:', payload)
-					const res = await doctorService.updateDoctorProfile(payload)
-					console.log('[MyHospitalsTab] edit save success:', res)
+					const updatedHospital: HospitalItem = {
+						...existingHospital,
+						name: trimmedName,
+						fullAddress: trimmedAddress,
+						location: trimmedAddress,
+						phone_number: trimmedPhone,
+						video_consultation_fee: trimmedVideoFee,
+						offline_consultation_fee: trimmedOfflineFee,
+					}
+
+					const response = await updateHospital(editingId, buildHospitalPayload(updatedHospital))
+					Alert.alert('Success', getSuccessMessage(response, 'Hospital updated successfully'))
+					await loadHospitals()
 				} else {
-					await createHospital({
+					const response = await createHospital({
 						name: trimmedName,
 						phone_number: trimmedPhone,
 						full_address: trimmedAddress,
@@ -326,6 +607,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						offline_consultation_fee: trimmedOfflineFee,
 					})
 
+					Alert.alert('Success', getSuccessMessage(response))
 					await loadHospitals()
 				}
 
@@ -348,19 +630,12 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		try {
 			setIsSaving(true)
 			const hasPrimary = hospitals.some((hospital) => hospital.isPrimary)
-			const normalizedHospitals = hospitals.map((hospital, index) => ({
-				id: hospital.id,
-				name: hospital.name.trim(),
-				full_address: hospital.fullAddress.trim(),
-				fullAddress: hospital.fullAddress.trim(),
-				location: hospital.fullAddress.trim(),
-				phone_number: hospital.phone_number.trim(),
-				video_consultation_fee: hospital.video_consultation_fee.trim(),
-				offline_consultation_fee: hospital.offline_consultation_fee.trim(),
-				is_primary: hospital.isPrimary || (!hasPrimary && index === 0),
-			}))
-
-			await doctorService.updateDoctorProfile({ hospitals: normalizedHospitals })
+			await Promise.all(
+				hospitals.map((hospital, index) =>
+					updateHospital(hospital.id, buildHospitalPayload(hospital, hospital.isPrimary || (!hasPrimary && index === 0)))
+				)
+			)
+			await loadHospitals()
 			Alert.alert('Success', 'Hospitals saved successfully.')
 		} catch (error) {
 			console.log('[MyHospitalsTab] save error:', error)
@@ -392,7 +667,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 							<MaterialCommunityIcons name="chevron-left" size={20} color="#5f6b73" />
 						</TouchableOpacity>
 						<AppTypography variant="h4" style={styles.formTitle}>
-							{editingId ? 'Edit address' : 'Add new address'}
+							{editingId ? 'Edit Hospital Details' : 'Add new Hospital Details'}
 						</AppTypography>
 					</View>
 
@@ -442,6 +717,24 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 							onChangeText={(value) => setForm((prev) => ({ ...prev, fullAddress: value }))}
 							placeholder="Enter complete address"
 							multiline
+						/>
+
+						<WorkingHoursSection
+							morningStart={morningStart}
+							morningEnd={morningEnd}
+							afternoonStart={afternoonStart}
+							afternoonEnd={afternoonEnd}
+							eveningStart={eveningStart}
+							eveningEnd={eveningEnd}
+							slotDuration={slotDuration}
+							onMorningStartChange={setMorningStart}
+							onMorningEndChange={setMorningEnd}
+							onAfternoonStartChange={setAfternoonStart}
+							onAfternoonEndChange={setAfternoonEnd}
+							onEveningStartChange={setEveningStart}
+							onEveningEndChange={setEveningEnd}
+							onSlotDurationChange={setSlotDuration}
+							stacked={false}
 						/>
 					</View>
 
@@ -907,6 +1200,142 @@ const styles = StyleSheet.create({
 	textInputMultiline: {
 		minHeight: 72,
 		paddingVertical: 0,
+	},
+	workingHours: {
+		width: '100%',
+		maxWidth: 520,
+		marginTop: 4,
+		paddingTop: 2,
+		alignSelf: 'flex-start',
+	},
+	workingTitle: {
+		color: '#001b3d',
+		fontSize: 18,
+		fontWeight: '700',
+		marginBottom: 20,
+	},
+	shiftBlock: {
+		marginBottom: 22,
+	},
+	shiftTitle: {
+		color: '#496a80',
+		fontSize: 16,
+		fontWeight: '400',
+		marginBottom: 20,
+	},
+	workingRow: {
+		flexDirection: 'row',
+		gap: 24,
+	},
+	workingRowStacked: {
+		flexDirection: 'column',
+		gap: 16,
+	},
+	workingCell: {
+		flex: 1,
+		minWidth: 0,
+	},
+	workingCellStacked: {
+		width: '100%',
+	},
+	slotDurationBlock: {
+		marginTop: 2,
+	},
+	slotDurationField: {
+		width: 225,
+		maxWidth: '100%',
+	},
+	dropdownGroup: {
+		width: '100%',
+		position: 'relative',
+	},
+	dropdownGroupCompact: {
+		paddingTop: 0,
+	},
+	dropdownFloatingLabel: {
+		position: 'absolute',
+		top: -11,
+		left: 17,
+		zIndex: 2,
+		paddingHorizontal: 7,
+		backgroundColor: '#ffffff',
+		color: '#496a80',
+		fontSize: 14,
+		fontWeight: '400',
+		lineHeight: 18,
+	},
+	dropdownTrigger: {
+		minHeight: 48,
+		borderRadius: 14,
+		borderWidth: 1,
+		borderColor: '#c4c4c4',
+		backgroundColor: '#ffffff',
+		paddingHorizontal: 20,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	dropdownTriggerCompact: {
+		minHeight: 52,
+	},
+	dropdownValue: {
+		color: '#182b3d',
+		fontSize: 18,
+		fontWeight: '400',
+	},
+	dropdownValueCompact: {
+		color: '#24384a',
+		fontSize: 14,
+		fontWeight: '400',
+	},
+	dropdownOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(18, 28, 33, 0.18)',
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: 20,
+	},
+	dropdownMenu: {
+		width: '100%',
+		maxWidth: 360,
+		maxHeight: '70%',
+		borderRadius: 14,
+		backgroundColor: '#ffffff',
+		paddingVertical: 10,
+		shadowColor: '#000000',
+		shadowOpacity: 0.14,
+		shadowRadius: 14,
+		shadowOffset: { width: 0, height: 8 },
+		elevation: 10,
+	},
+	dropdownTitle: {
+		color: '#66757f',
+		fontSize: 13,
+		fontWeight: '700',
+		paddingHorizontal: 16,
+		paddingBottom: 8,
+	},
+	dropdownList: {
+		maxHeight: 320,
+	},
+	dropdownItem: {
+		minHeight: 46,
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	dropdownItemActive: {
+		backgroundColor: 'rgba(12,124,124,0.06)',
+	},
+	dropdownItemText: {
+		color: '#2f2f2f',
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	dropdownItemTextActive: {
+		color: TEAL,
 	},
 	formActions: {
 		alignItems: 'flex-end',

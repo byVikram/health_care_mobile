@@ -59,6 +59,9 @@ export default function DoctorProfileLayout() {
 						fullAddress: hospital.fullAddress ?? hospital.location ?? '',
 						location: hospital.location ?? hospital.fullAddress ?? '',
 						isPrimary: Boolean(hospital.isPrimary),
+						phone_number: hospital.phone_number ?? '',
+						video_consultation_fee: hospital.video_consultation_fee ?? '',
+						offline_consultation_fee: hospital.offline_consultation_fee ?? '',
 					}))
 
 					console.log('[DoctorProfileLayout] mapped availability props:', {

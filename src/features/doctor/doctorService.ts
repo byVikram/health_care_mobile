@@ -135,7 +135,7 @@ export const createAppointment = async (
 export const getDoctors = async (
   params?: DoctorSearchParams
 ): Promise<DoctorSearchResponse> => {
-  const res = await ApiService.getWithParams(
+  const res = await ApiService.getWithParams<DoctorSearchResponse>(
     API_ENDPOINTS.DOCTORS.SEARCH,
     (params ?? {}) as Record<string, unknown>
   );
