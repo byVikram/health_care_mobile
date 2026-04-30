@@ -20,6 +20,7 @@ import * as FileSystem from 'expo-file-system/legacy'
 import Voice from '@react-native-voice/voice'
 import { Audio } from 'expo-av'
 import DicomViewer from './components/DicomViewer'
+import VitalsTab from './components/VitalsTab'
 import Prescription from '../../assets/icons/consultation/prescription.svg'
 import LaboratoryIcon from '../../assets/icons/consultation/lab.svg'
 import RadiologyTabIcon from '../../assets/icons/consultation/radiology.svg'
@@ -738,8 +739,8 @@ export default function ConsultationPage() {
 			</View>
 
 			{/* ── Content ── */}
-			<ScrollView contentContainerStyle={styles.content}>
-				{activeTab === 0 && (
+			{activeTab === 0 ? (
+				<ScrollView contentContainerStyle={styles.content}>
 					<View>
 						{/* Patient Details */}
 						<Card style={styles.card}>
@@ -992,37 +993,12 @@ export default function ConsultationPage() {
 							Save
 						</Button>
 					</View>
-				)}
-
-				{activeTab === 1 && (
-					<Card style={styles.card}>
-						<Card.Content>
-							<Text variant="titleMedium" style={{ fontWeight: 'bold', marginBottom: 16 }}>
-								Vitals History
-							</Text>
-							{[
-								{ label: 'Heart Rate', value: '72 bpm', color: '#333' },
-								{ label: 'Blood Pressure', value: '140/90 mmHg', color: '#d32f2f' },
-								{ label: 'Temperature', value: '98.6 °F', color: '#333' },
-							].map((vital, i, arr) => (
-								<View
-									key={vital.label}
-									style={{
-										flexDirection: 'row',
-										justifyContent: 'space-between',
-										paddingVertical: 8,
-										borderBottomWidth: i < arr.length - 1 ? 1 : 0,
-										borderBottomColor: '#f0f0f0',
-									}}
-								>
-									<Text style={{ color: '#666', fontWeight: '500' }}>{vital.label}</Text>
-									<Text style={{ fontWeight: 'bold', color: vital.color }}>{vital.value}</Text>
-								</View>
-							))}
-						</Card.Content>
-					</Card>
-				)}
-			</ScrollView>
+				</ScrollView>
+			) : (
+				<View style={styles.vitalsContent}>
+					<VitalsTab patientId={patient?.id || patientId} />
+				</View>
+			)}
 
 			{/* Snackbar for feedback messages */}
 			<Snackbar
@@ -1050,6 +1026,9 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 		padding: 24,
+	},
+	vitalsContent: {
+		flex: 1,
 	},
 	header: {
 		paddingTop: 48,
