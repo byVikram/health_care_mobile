@@ -13,6 +13,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppSelect, AppTypography } from '../../../components/common'
 import { VitalHistoryRow, VitalStat } from '../../../types/consultation'
 import { vitalsService } from '../VitalsService'
+import AddVitalsModal from './AddVitalsModal'
 
 interface TabColumn {
 	key: string
@@ -432,6 +433,7 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 	const [errorMessage, setErrorMessage] = useState('')
+	const [addVitalsVisible, setAddVitalsVisible] = useState(false)
 
 	const activeTab = useMemo(
 		() => tabConfigs.find((tab) => tab.id === activeTabId) ?? tabConfigs[0],
@@ -439,7 +441,7 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 	)
 
 	const statCardWidth = useMemo(() => {
-		const horizontalPadding = 32 // 16px on each side
+		const horizontalPadding = 32
 		const gap = 10
 		const columns = isTablet && isLandscape ? 3 : 2
 		return (width - horizontalPadding - gap * (columns - 1)) / columns
@@ -497,7 +499,7 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 
 	return (
 		<View style={styles.container}>
-			{/* Vital stat cards — flex wrap grid instead of horizontal scroll */}
+			{/* Vital stat cards — flex wrap grid */}
 			<View style={styles.statGrid}>
 				{stats.map((stat) => (
 					<VitalStatCard key={stat.id} stat={stat} width={statCardWidth} />
@@ -558,7 +560,6 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 						/>
 					</View>
 				</View>
-
 			</View>
 
 			<ScrollView
@@ -613,9 +614,23 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 				</View>
 			</ScrollView>
 
-			<TouchableOpacity style={styles.fab} activeOpacity={0.86}>
+			{/* FAB — opens Add Vitals modal */}
+			<TouchableOpacity
+				style={styles.fab}
+				activeOpacity={0.86}
+				onPress={() => setAddVitalsVisible(true)}
+			>
 				<MaterialCommunityIcons name="plus" size={26} color="#ffffff" />
 			</TouchableOpacity>
+
+			<AddVitalsModal
+				visible={addVitalsVisible}
+				onClose={() => setAddVitalsVisible(false)}
+				onSave={(data) => {
+					console.log('[VitalsTab] new vitals submitted:', data)
+					// TODO: call API to persist the new vitals entry
+				}}
+			/>
 		</View>
 	)
 }
@@ -625,7 +640,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		position: 'relative',
 	},
-	// Replaced statScroller + statSlider with a flex-wrap grid
 	statGrid: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
