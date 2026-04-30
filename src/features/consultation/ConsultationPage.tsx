@@ -29,6 +29,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import Voice from '@react-native-voice/voice';
 import { Audio } from 'expo-av';
 import DicomViewer from "./components/DicomViewer";
+import VitalsTab from './components/VitalsTab'
 import Prescription from "../../assets/icons/consultation/prescription.svg";
 import LaboratoryIcon from "../../assets/icons/consultation/lab.svg";
 import RadiologyTabIcon from "../../assets/icons/consultation/radiology.svg";
@@ -1122,6 +1123,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 24,
   },
+	vitalsContent: {
+		flex: 1,
+	},
   header: {
     paddingTop: 48,
     elevation: 4,
