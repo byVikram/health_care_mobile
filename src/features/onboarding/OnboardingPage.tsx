@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
+import React, {
+	useCallback,
+	useMemo,
+	useRef,
+	useState,
+	useEffect,
+} from 'react'
 import {
 	FlatList,
 	NativeScrollEvent,
@@ -14,18 +20,26 @@ import {
 import type { RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+
 import { useAuth } from '../../context/AuthContext'
-import type { AppNavigationParamList, AuthStackParamList } from '../../navigation/types'
+import type {
+	AppNavigationParamList,
+	AuthStackParamList,
+} from '../../navigation/types'
 import { ROUTES } from '../../navigation/routes'
 
-import Onboarding1 from '../../assets/Onboarding/onboarding-1.svg'
-import Onboarding2 from '../../assets/Onboarding/onboarding-2.svg'
-import Onboarding3 from '../../assets/Onboarding/onboarding-3.svg'
-import Onboarding4 from '../../assets/Onboarding/onboarding-4.svg'
+import { onboardingData } from '../../constants/onboardingData'
+import type { UserRole } from '../../constants/constants'
 
 type OnboardingPageProps = {
-	navigation: NativeStackNavigationProp<AppNavigationParamList, typeof ROUTES.AUTH.ONBOARDING>
-	route: RouteProp<AuthStackParamList, typeof ROUTES.AUTH.ONBOARDING>
+	navigation: NativeStackNavigationProp<
+		AppNavigationParamList,
+		typeof ROUTES.AUTH.ONBOARDING
+	>
+	route: RouteProp<
+		AuthStackParamList,
+		typeof ROUTES.AUTH.ONBOARDING
+	>
 }
 
 type Slide = {
@@ -37,29 +51,6 @@ type Slide = {
 	}>
 }
 
-const slides: Slide[] = [
-	{
-		key: 'screen-1',
-		description: 'Book an appointment for an\nin Clinic consultation',
-		Illustration: Onboarding1,
-	},
-	{
-		key: 'screen-2',
-		description: 'Book an appointment to consult\n top doctors from your phone.',
-		Illustration: Onboarding2,
-	},
-	{
-		key: 'screen-3',
-		description: 'Get upto 25% off on medicines,\n health and wellness products.',
-		Illustration: Onboarding3,
-	},
-	{
-		key: 'screen-4',
-		description: '10 million Indians connect with doctors every year on Whisper AI.',
-		Illustration: Onboarding4,
-	},
-]
-
 export default function OnboardingPage({
 	navigation,
 	route,
@@ -67,20 +58,43 @@ export default function OnboardingPage({
 	const { accessToken } = useAuth()
 	const { width } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
+
 	const flatListRef = useRef<FlatList<Slide>>(null)
 	const [activeIndex, setActiveIndex] = useState(0)
 
 	const { roleId, roleLabel } = route.params || {}
+
 	const resolvedRoleId = roleId ?? ''
 	const resolvedRoleLabel = roleLabel ?? ''
 
+	// 🚨 Redirect if no role
 	useEffect(() => {
 		if (!accessToken && !roleId) {
 			navigation.replace(ROUTES.AUTH.ROLE_SELECTION)
 		}
 	}, [accessToken, roleId, navigation])
 
+	// ✅ Dynamic slides based on role
+	const slides: Slide[] = useMemo(() => {
+		if (!resolvedRoleId) return []
+
+		const roleKey = resolvedRoleId as UserRole
+		const roleData = onboardingData[roleKey]
+
+		if (!roleData) return []
+
+		return roleData.screens.map((screen, index) => ({
+			key: `${roleKey}-${index}`,
+			description: screen.description,
+			Illustration: screen.Illustration,
+		}))
+	}, [resolvedRoleId])
+
+	// 🚨 Prevent crash if no slides
+	if (!slides.length) return null
+
 	const cardWidth = useMemo(() => Math.max(width, 320), [width])
+
 	const illustrationSize = useMemo(
 		() => Math.min(cardWidth * 0.62, 250),
 		[cardWidth],
@@ -98,7 +112,10 @@ export default function OnboardingPage({
 	}, [accessToken, navigation, resolvedRoleId, resolvedRoleLabel])
 
 	const scrollToIndex = useCallback((index: number) => {
-		flatListRef.current?.scrollToIndex({ index, animated: true })
+		flatListRef.current?.scrollToIndex({
+			index,
+			animated: true,
+		})
 		setActiveIndex(index)
 	}, [])
 
@@ -109,7 +126,7 @@ export default function OnboardingPage({
 		}
 
 		scrollToIndex(activeIndex + 1)
-	}, [activeIndex, finishOnboarding, scrollToIndex])
+	}, [activeIndex, slides.length, finishOnboarding, scrollToIndex])
 
 	const handleSkip = useCallback(() => {
 		if (activeIndex === slides.length - 1) {
@@ -118,7 +135,7 @@ export default function OnboardingPage({
 		}
 
 		scrollToIndex(slides.length - 1)
-	}, [activeIndex, finishOnboarding, scrollToIndex])
+	}, [activeIndex, slides.length, finishOnboarding, scrollToIndex])
 
 	const handleMomentumScrollEnd = useCallback(
 		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -146,7 +163,10 @@ export default function OnboardingPage({
 						/>
 					</View>
 
-					<TextLabel text={item.description} style={styles.description} />
+					<TextLabel
+						text={item.description}
+						style={styles.description}
+					/>
 
 					{roleLabel ? (
 						<Text style={styles.roleBadge}>
@@ -169,7 +189,10 @@ export default function OnboardingPage({
 						onPress={handleSkip}
 						style={[
 							styles.skipButton,
-							{ marginTop: Math.max(insets.top, 8) + 4 },
+							{
+								marginTop:
+									Math.max(insets.top, 8) + 4,
+							},
 						]}
 					>
 						<View style={styles.skipWrapper}>
@@ -211,8 +234,18 @@ export default function OnboardingPage({
 						))}
 					</View>
 
-					<Pressable onPress={handleNext} style={styles.nextButton}>
-						<TextLabel text="Next" style={styles.nextText} />
+					<Pressable
+						onPress={handleNext}
+						style={styles.nextButton}
+					>
+						<TextLabel
+							text={
+								activeIndex === slides.length - 1
+									? 'Get Started'
+									: 'Next'
+							}
+							style={styles.nextText}
+						/>
 					</Pressable>
 				</View>
 			</View>
