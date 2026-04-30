@@ -1,10 +1,13 @@
+// SidebarLayout.tsx
 import React, { useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
+
 import { AppSidebar } from '../common'
 import AppHeader from '../common/AppHeader'
 import type { AppSidebarItem } from '../common'
 import { useAuth } from '../../context/AuthContext'
+
 import AppointmentsIcon from '../../assets/quick-services/appointments.svg'
 import PharmacyIcon from '../../assets/icons/pharmacy.svg'
 import LabIcon from '../../assets/icons/lab.svg'
@@ -15,6 +18,7 @@ import RemindersIcon from '../../assets/icons/reminders.svg'
 import PaymentsIcon from '../../assets/icons/payments.svg'
 import HelpCenterIcon from '../../assets/icons/help-center.svg'
 import SettingsIcon from '../../assets/icons/settings.svg'
+
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 
@@ -28,24 +32,36 @@ interface SidebarLayoutProps {
 	children: React.ReactNode
 }
 
-export default function SidebarLayout({ children }: SidebarLayoutProps) {
+export default function SidebarLayout({
+	children,
+}: SidebarLayoutProps) {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
+
+	const navigation =
+		useNavigation<NavigationProp<AppStackParamList>>()
+
 	const { clearAuth, user: authUser } = useAuth()
 
 	const user = {
 		name: authUser?.name ?? MOCK_USER.name,
 		avatar: authUser?.avatar ?? MOCK_USER.avatar,
-		profileCompletion: authUser?.profileCompletion ?? MOCK_USER.profileCompletion,
+		profileCompletion:
+			authUser?.profileCompletion ??
+			MOCK_USER.profileCompletion,
 	}
 
 	const handleEditProfile = () => {
 		setIsSidebarOpen(false)
-		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PROFILE })
+
+		navigation.navigate(ROUTES.MAIN.TABS, {
+			screen: ROUTES.MAIN.PROFILE,
+		})
 	}
 
 	const handleSearchPress = () => {
-		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH })
+		navigation.navigate(ROUTES.MAIN.TABS, {
+			screen: ROUTES.MAIN.SEARCH,
+		})
 	}
 
 	const menuItems = useMemo<AppSidebarItem[]>(
@@ -53,68 +69,98 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 			{
 				id: 'appointments',
 				label: 'My Appointments',
-				icon: <AppointmentsIcon width={24} height={24} />,
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL }),
+				icon: (
+					<AppointmentsIcon width={24} height={24} />
+				),
+				onPress: () =>
+					navigation.navigate(ROUTES.MAIN.TABS, {
+						screen: ROUTES.MAIN.PORTAL,
+					}),
 			},
 			{
 				id: 'pharmacy',
 				label: 'Pharmacy',
 				icon: <PharmacyIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
+				onPress: () =>
+					navigation.navigate(ROUTES.MAIN.TABS, {
+						screen: ROUTES.MAIN.HOME,
+					}),
 			},
 			{
 				id: 'lab',
 				label: 'Lab',
 				icon: <LabIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
+				onPress: () =>
+					navigation.navigate(ROUTES.MAIN.TABS, {
+						screen: ROUTES.MAIN.HOME,
+					}),
 			},
 			{
 				id: 'radiology',
 				label: 'Radiology',
 				icon: <RadiologyIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
+				onPress: () =>
+					navigation.navigate(ROUTES.MAIN.TABS, {
+						screen: ROUTES.MAIN.HOME,
+					}),
 			},
 			{
 				id: 'ancillary',
 				label: 'Ancillary',
 				icon: <AncillaryIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
+				onPress: () =>
+					navigation.navigate(ROUTES.MAIN.TABS, {
+						screen: ROUTES.MAIN.HOME,
+					}),
 			},
 			{
 				id: 'treatment-history',
 				label: 'Treatment History',
 				icon: <TreatmentIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
+				onPress: () =>
+					navigation.navigate(ROUTES.MAIN.TABS, {
+						screen: ROUTES.MAIN.HOME,
+					}),
 			},
 			{
 				id: 'reminders',
 				label: 'Reminders',
-				icon: <RemindersIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
+				icon: (
+					<RemindersIcon width={20} height={20} />
+				),
+				onPress: () =>
+					navigation.navigate(ROUTES.MAIN.TABS, {
+						screen: ROUTES.MAIN.HOME,
+					}),
 			},
 			{
-  id: 'payments',
-  label: 'Payments',
-  icon: <PaymentsIcon width={20} height={20} />,
- onPress: () => navigation.navigate(ROUTES.STACK.PATIENT_PAYMENT),
-},
-			{
-				id: 'blogs',
-				label: 'Blogs',
-				icon: 'newspaper-variant-outline',
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
+				id: 'payments',
+				label: 'Payments',
+				icon: <PaymentsIcon width={20} height={20} />,
+				onPress: () =>
+					navigation.navigate(
+						ROUTES.STACK.PATIENT_PAYMENT,
+					),
 			},
 			{
 				id: 'help',
 				label: 'Help Center',
-				icon: <HelpCenterIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PROFILE }),
+				icon: (
+					<HelpCenterIcon width={20} height={20} />
+				),
+				onPress: () =>
+					navigation.navigate(ROUTES.MAIN.TABS, {
+						screen: ROUTES.MAIN.PROFILE,
+					}),
 			},
 			{
 				id: 'settings',
 				label: 'Settings',
 				icon: <SettingsIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
+				onPress: () =>
+					navigation.navigate(
+						ROUTES.STACK.SETTINGS,
+					),
 			},
 		],
 		[navigation],
@@ -134,14 +180,15 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 			<AppHeader
 				variant="home"
 				userName={user.name}
-				location="KR Market"
 				avatarUri={user.avatar}
-				onAvatarPress={() => setIsSidebarOpen(true)}
+				onAvatarPress={() =>
+					setIsSidebarOpen(true)
+				}
 				isSearchEditable={false}
 				onSearchPress={handleSearchPress}
 			/>
 
-			{children}
+			<View style={styles.content}>{children}</View>
 		</View>
 	)
 }
@@ -150,5 +197,8 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: '#f5f5f5',
+	},
+	content: {
+		flex: 1,
 	},
 })

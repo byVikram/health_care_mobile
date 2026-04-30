@@ -24,6 +24,7 @@ import { DateSlotPicker } from '../../components/common'
 import { APPOINTMENT_STATUS } from '../../constants/constants'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
+import DoctorHospitalDropdown from '../../components/common/DoctorHospitalDropdown'
 
 type Appointment = {
 	id: string
@@ -55,26 +56,49 @@ const showError = (message: string) => {
 	Toast.show({ type: 'error', text1: 'Error', text2: message })
 }
 
+// type DoctorAppointmentsProps = {
+// 	selectedDate: number
+// 	setSelectedDate: (i: number) => void
+// 	appointments: Appointment[]
+// 	apptLoading: boolean
+// 	apptError: string
+// 	weekDays: { day: string; date: string; red: boolean; dateObj: Date }[]
+// 	selectedDateObj: Date
+// }
+function getAptHospitalId(apt: any): string {
+  const raw =
+    apt?.hospital?.id ??
+    apt?.hospital_id ??
+    apt?.hospital?.hospital_id ??
+    apt?.pivot?.hospital_id ??
+    ''
+  return raw ? String(raw) : ''
+}
 type DoctorAppointmentsProps = {
-	selectedDate: number
-	setSelectedDate: (i: number) => void
-	appointments: Appointment[]
-	apptLoading: boolean
-	apptError: string
-	weekDays: { day: string; date: string; red: boolean; dateObj: Date }[]
-	selectedDateObj: Date
+  selectedDate: number
+  setSelectedDate: (i: number) => void
+  appointments: Appointment[]
+  apptLoading: boolean
+  apptError: string
+  weekDays: { day: string; date: string; red: boolean; dateObj: Date }[]
+  selectedDateObj: Date
+  // NEW props
+  hospitals: { id: string; label: string; address?: string }[]
+  selectedHospitalId: string | null   // null = show all
 }
 
 const TEAL = '#1a8c8c'
 
 export default function DoctorAppointments({
-	selectedDate,
-	setSelectedDate,
-	appointments,
-	apptLoading,
-	apptError,
-	weekDays,
-	selectedDateObj,
+  selectedDate,
+  setSelectedDate,
+  appointments,
+  apptLoading,
+  apptError,
+  weekDays,
+  selectedDateObj,
+  hospitals,
+  selectedHospitalId,
 }: DoctorAppointmentsProps) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
@@ -534,7 +558,7 @@ export default function DoctorAppointments({
 						contentContainerStyle={styles.drawerBodyContent}
 						showsVerticalScrollIndicator={false}
 					>
-						<Text style={styles.drawerSectionTitle}>Select Hospital</Text>
+						{/* <Text style={styles.drawerSectionTitle}>Select Hospital</Text>
 						{rescheduleHospitals.length === 0 ? (
 							<Text style={styles.drawerInfoText}>Loading hospitals...</Text>
 						) : (
@@ -577,8 +601,8 @@ export default function DoctorAppointments({
 									)
 								})}
 							</View>
-						)}
-
+						)} */}
+						<DoctorHospitalDropdown />
 						<DateSlotPicker
 							selectedDate={rescheduleDate}
 							onDateChange={(date) => {
