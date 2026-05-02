@@ -6,6 +6,7 @@ import { Platform } from 'react-native'
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
+	// const url ='http://192.168.4.24:8000'
 	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
 
 	if (!url) {
@@ -34,6 +35,9 @@ export const API_ENDPOINTS = {
 	},
 	DOCTOR_PROFILE: {
 		DETAILS: `${BASE_URL}/api/doctors/details`,
+		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
+		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
+		DELETE_ACCOUNT: `${BASE_URL}/api/doctors/profile`,
 	},
 	SPECIALITIES: {
 		LIST: `${BASE_URL}/api/specialities`,

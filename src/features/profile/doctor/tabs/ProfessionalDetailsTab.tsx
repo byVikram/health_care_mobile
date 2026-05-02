@@ -227,7 +227,6 @@ function SelectDropdown({
 											<AppTypography variant="body" style={[styles.optionText, isSelected && styles.optionTextSelected]}>
 												{item.label}
 											</AppTypography>
-											{isSelected ? <MaterialCommunityIcons name="check-circle" size={20} color="#24a148" /> : null}
 										</TouchableOpacity>
 									)
 								}}
