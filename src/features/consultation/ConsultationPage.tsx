@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import {
 	View,
 	StyleSheet,
@@ -6,7 +6,6 @@ import {
 	TouchableOpacity,
 	Alert,
 	ActivityIndicator,
-	TextInput as NativeInput,
 	Modal,
 	Platform,
 } from 'react-native'
@@ -16,11 +15,9 @@ import type { SvgProps } from 'react-native-svg'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Asset } from 'expo-asset'
 import * as FileSystem from 'expo-file-system/legacy'
-// import * as SpeechRecognition from 'expo-speech-recognition';
-import Voice from '@react-native-voice/voice'
-import { Audio } from 'expo-av'
 import DicomViewer from './components/DicomViewer'
 import VitalsTab from './components/VitalsTab'
+import ScribbleNoteEditor from './components/ScribbleNoteEditor'
 import Prescription from '../../assets/icons/consultation/prescription.svg'
 import LaboratoryIcon from '../../assets/icons/consultation/lab.svg'
 import RadiologyTabIcon from '../../assets/icons/consultation/radiology.svg'
@@ -340,7 +337,7 @@ function ShareWith() {
 				</View>
 
 				<Text style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>Select address</Text>
-				<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 ,}}>
+				<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
 					<Button
 						mode="outlined"
 						style={{ width: '48%', borderRadius: 8 }}
@@ -357,15 +354,6 @@ function ShareWith() {
 					>
 						Area ▼
 					</Button>
-					
-					{/* <Button
-						mode="outlined"
-						style={{ flex: 1, borderRadius: 8 }}
-						contentStyle={{ height: 32 }}
-						labelStyle={{ fontSize: 10 }}
-					>
-						Locality ▼
-					</Button> */}
 				</View>
 
 				{MOCK_PLACES.map((place, i) => (
@@ -426,20 +414,12 @@ export default function ConsultationPage() {
 	const [patientLoading, setPatientLoading] = useState(false)
 	const [doctorLoading, setDoctorLoading] = useState(false)
 	const [activeTab, setActiveTab] = useState(0)
-	const [notes, setNotes] = useState('')
+	// Stores the base64 PNG snapshot from the scribble canvas
+	const [noteCanvasData, setNoteCanvasData] = useState<string>('')
 	const [saving, setSaving] = useState(false)
-	const [finalText, setFinalText] = useState('') // confirmed text
-	const [liveText, setLiveText] = useState('') // current speaking text
-
-	// Voice recognition states
-	const [isListening, setIsListening] = useState(false)
-	const [snackbarVisible, setSnackbarVisible] = useState(false)
-	const [snackbarMessage, setSnackbarMessage] = useState('')
-	const [permissionsGranted, setPermissionsGranted] = useState(false)
 
 	const params = route.params as any
 
-	// Try to get IDs from params first
 	const appointmentId = params?.appointmentId ?? params?.appointment_id ?? params?.id ?? ''
 	const patientId = params?.patient_id ?? params?.patientId ?? params?.patient?.id ?? ''
 	const doctorID = params?.doctor_id ?? params?.doctorID ?? params?.doctor?.id ?? ''
@@ -447,78 +427,16 @@ export default function ConsultationPage() {
 	console.log('Full params:', JSON.stringify(params, null, 2))
 	console.log('Extracted - appointmentId:', appointmentId, 'patientId:', patientId, 'doctorID:', doctorID)
 
-	// Request microphone permissions on component mount
-	useEffect(() => {
-		try {
-			if (!Voice) {
-				console.warn('Voice module not available')
-				return
-			}
-
-			Voice.onSpeechStart = () => {
-				console.log('Started listening')
-			}
-
-			// 🎤 LIVE text (updates while speaking)
-			Voice.onSpeechPartialResults = (event) => {
-				if (event?.value?.length) {
-					setLiveText(event.value[0])
-				}
-			}
-
-			// ✅ FINAL text (append when speech chunk ends)
-			Voice.onSpeechResults = (event) => {
-				if (event?.value?.length) {
-					setFinalText((prev) => prev + ' ' + event.value[0])
-					setLiveText('') // clear live
-				}
-			}
-
-			// ❗ KEEP LISTENING after pause
-			Voice.onSpeechEnd = async () => {
-				console.log('Speech ended → restarting...')
-				if (isListening) {
-					try {
-						await Voice.start('en-US') // 🔥 restart automatically
-					} catch (e) {
-						console.log('Restart error:', e)
-					}
-				}
-			}
-
-			Voice.onSpeechError = (e) => {
-				console.log('Voice error:', e)
-			}
-
-			return () => {
-				try {
-					if (Voice?.destroy) {
-						Voice.destroy().catch((e) => console.log('Destroy error:', e))
-					}
-					if (Voice?.removeAllListeners) {
-						Voice.removeAllListeners()
-					}
-				} catch (e) {
-					console.log('Cleanup error:', e)
-				}
-			}
-		} catch (e) {
-			console.log('Voice setup error:', e)
-			return () => {}
-		}
-	}, [isListening])
 	// Set doctor directly from params without API call
 	useEffect(() => {
-		// Get doctor data from params (passed from DoctorAppointments)
 		const doctorFromParams = params?.doctor
 		const hospitalFromParams = params?.appointment?.hospital || params?.hospital
 
 		if (doctorFromParams) {
-			console.log('Setting doctor from params:', doctorFromParams)
 			const doctorData: DocterDetails = {
 				name: doctorFromParams.name,
-				degree: '', // If not available, keep empty
-				specialization: '', // If not available, keep empty
+				degree: '',
+				specialization: '',
 				clinicName: hospitalFromParams?.name || '',
 				clinicAddress: hospitalFromParams?.address || '',
 			}
@@ -539,34 +457,27 @@ export default function ConsultationPage() {
 		}
 	}
 
-	// Fetch appointment details to get complete data
+	// Fetch appointment details
 	useEffect(() => {
 		const fetchAppointmentDetails = async () => {
 			if (appointmentId && !appointment) {
 				try {
-					console.log('Fetching appointment details for ID:', appointmentId)
 					const response = (await ApiService.get(API_ENDPOINTS.APPOINTMENTS.GET_BY_ID(appointmentId))) as any
-
 					const appointmentData = response?.data?.data || response?.data || response
-					console.log('Parsed appointment data:', appointmentData)
-
 					setAppointment(appointmentData)
 
-					// Set patient if not already set
 					if (!patient && appointmentData?.patient?.id) {
 						fetchPatientData(appointmentData.patient.id)
 					}
 
-					// Set doctor from appointment data if not already set from params
 					if (!doctor && appointmentData?.doctor) {
 						const doctorData: DocterDetails = {
 							name: appointmentData.doctor.name,
-							degree: '', // Will be empty if not in API response
-							specialization: '', // Will be empty if not in API response
+							degree: '',
+							specialization: '',
 							clinicName: appointmentData.hospital?.name,
 							clinicAddress: appointmentData.hospital?.address,
 						}
-						console.log('Setting doctor from appointment API:', doctorData)
 						setDoctor(doctorData)
 						setDoctorLoading(false)
 					}
@@ -575,7 +486,6 @@ export default function ConsultationPage() {
 				}
 			}
 		}
-
 		fetchAppointmentDetails()
 	}, [appointmentId])
 
@@ -586,50 +496,15 @@ export default function ConsultationPage() {
 		}
 	}, [patientId])
 
-	const startListening = async () => {
-		try {
-			if (!Voice?.start) {
-				console.warn('Voice.start not available')
-				return
-			}
-			setIsListening(true)
-			await Voice.start('en-US')
-		} catch (e) {
-			console.log('Start listening error:', e)
-			setIsListening(false)
-		}
-	}
-
-	const stopListening = async () => {
-		try {
-			if (!Voice?.stop) {
-				console.warn('Voice.stop not available')
-				setIsListening(false)
-				return
-			}
-			setIsListening(false)
-			await Voice.stop()
-		} catch (e) {
-			console.log('Stop listening error:', e)
-			setIsListening(false)
-		}
-	}
-
-	const toggleVoiceInput = async () => {
-		if (isListening) {
-			await stopListening()
-		} else {
-			await startListening()
-		}
-	}
 	// ── Save notes ──────────────────────────────────────────────────────────────
 	const handleSaveNotes = async () => {
-		if (!notes.trim()) {
-			Alert.alert('Info', 'Please add some consultation notes')
+		if (!noteCanvasData) {
+			Alert.alert('Info', 'Please add some consultation notes by drawing or speaking')
 			return
 		}
 		setSaving(true)
 		try {
+			// noteCanvasData is a base64 PNG – send to your API here
 			Alert.alert('Success', 'Consultation notes saved successfully')
 			navigation.goBack()
 		} catch {
@@ -640,9 +515,7 @@ export default function ConsultationPage() {
 	}
 
 	// ── Loading / error states ──────────────────────────────────────────────────
-	const loading = patientLoading
-
-	if (loading) {
+	if (patientLoading) {
 		return (
 			<View style={[styles.container, styles.centerContent]}>
 				<ActivityIndicator size="large" color={theme.colors.primary} />
@@ -905,17 +778,12 @@ export default function ConsultationPage() {
 						{/* Past Medical History */}
 						<PastMedicalHistory />
 
-						{/* Consultation Notes */}
+						{/* ── Consultation Notes (Scribble + Speech) ── */}
 						<Card style={[styles.card, { borderColor: theme.colors.primary, borderWidth: 1 }]}>
+							{/* Doctor letterhead */}
 							<View style={styles.notesHeader}>
 								<View style={{ flex: 1 }}>
-									<Text
-										style={{
-											color: theme.colors.primary,
-											fontWeight: 'bold',
-											fontSize: 12,
-										}}
-									>
+									<Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 12 }}>
 										{doctor?.name ?? '--'}
 										{doctor?.degree ? `, ${doctor.degree}` : ''}
 									</Text>
@@ -924,13 +792,7 @@ export default function ConsultationPage() {
 									</Text>
 								</View>
 								<View style={{ flex: 1, alignItems: 'flex-end' }}>
-									<Text
-										style={{
-											color: theme.colors.primary,
-											fontWeight: 'bold',
-											fontSize: 12,
-										}}
-									>
+									<Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 12 }}>
 										{doctor?.clinicName ?? ''}
 									</Text>
 									<Text style={{ color: theme.colors.primary, fontSize: 10 }}>
@@ -938,46 +800,13 @@ export default function ConsultationPage() {
 									</Text>
 								</View>
 							</View>
-							<Divider />
-							<View style={styles.editorToolbar}>
-								{(
-									['undo', 'redo', 'format-text', 'camera-outline', 'format-list-bulleted'] as const
-								).map((icon) => (
-									<MaterialCommunityIcons
-										key={icon}
-										name={icon}
-										size={18}
-										color="#666"
-										style={{ marginHorizontal: 6 }}
-									/>
-								))}
 
-								{/* Microphone button with voice recording state */}
-								<TouchableOpacity onPress={toggleVoiceInput}>
-									<MaterialCommunityIcons
-										name={isListening ? 'microphone' : 'microphone-outline'}
-										size={18}
-										color={isListening ? '#e53935' : '#666'}
-										style={{ marginHorizontal: 6 }}
-									/>
-								</TouchableOpacity>
-
-								{/* Recording indicator */}
-								{isListening && (
-									<View style={styles.recordingIndicator}>
-										<View style={styles.recordingDot} />
-										<Text style={styles.recordingText}>Recording...</Text>
-									</View>
-								)}
-							</View>
 							<Divider />
-							<NativeInput
-								placeholder="Type or tap the microphone to speak your consultation notes..."
-								multiline
-								textAlignVertical="top"
-								value={notes}
-								onChangeText={setNotes}
-								style={styles.textArea}
+
+							{/* Scribble + Speech editor – replaces the old NativeInput */}
+							<ScribbleNoteEditor
+								accentColor={theme.colors.primary}
+								onChange={(base64) => setNoteCanvasData(base64)}
 							/>
 						</Card>
 
@@ -999,19 +828,6 @@ export default function ConsultationPage() {
 					<VitalsTab patientId={patient?.id || patientId} />
 				</View>
 			)}
-
-			{/* Snackbar for feedback messages */}
-			<Snackbar
-				visible={snackbarVisible}
-				onDismiss={() => setSnackbarVisible(false)}
-				duration={3000}
-				action={{
-					label: 'OK',
-					onPress: () => setSnackbarVisible(false),
-				}}
-			>
-				{snackbarMessage}
-			</Snackbar>
 		</View>
 	)
 }
@@ -1064,7 +880,7 @@ const styles = StyleSheet.create({
 		marginHorizontal: 16,
 		marginBottom: 16,
 		backgroundColor: '#fff',
-     borderRadius: 12,
+		borderRadius: 12,
 	},
 	notesHeader: {
 		backgroundColor: '#e0f2f1',
@@ -1072,18 +888,6 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		borderTopLeftRadius: 10,
 		borderTopRightRadius: 10,
-	},
-	editorToolbar: {
-		flexDirection: 'row',
-		padding: 8,
-		backgroundColor: '#fafafa',
-		alignItems: 'center',
-	},
-	textArea: {
-		height: 160,
-		padding: 12,
-		fontSize: 14,
-		color: '#333',
 	},
 	dicomModalContainer: {
 		flex: 1,
@@ -1105,21 +909,5 @@ const styles = StyleSheet.create({
 	},
 	dicomModalBody: {
 		flex: 1,
-	},
-	recordingIndicator: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginLeft: 8,
-	},
-	recordingDot: {
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-		backgroundColor: '#e53935',
-		marginRight: 4,
-	},
-	recordingText: {
-		fontSize: 10,
-		color: '#e53935',
 	},
 })

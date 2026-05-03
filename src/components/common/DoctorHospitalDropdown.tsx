@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   },
 
   dropdownBox: {
-    position: 'absolute', // 🔥 IMPORTANT
+    position: 'absolute', 
     backgroundColor: '#fff',
     borderRadius: 12,
     maxHeight: 300,
