@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import {
 	View,
 	StyleSheet,
@@ -28,10 +28,28 @@ import AncillaryIcon from '../../assets/icons/consultation/ancillary.svg'
 import { patientService, PatientDetails, doctorService, DocterDetails } from './ConsultationService'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
+import { DateSlotPicker } from '../../components/common'
+import DoctorHospitalDropdown from '../../components/common/DoctorHospitalDropdown'
+import {
+	getDoctorAvailability,
+	rescheduleAppointment,
+	getDoctorById,
+	getDoctorProfile,
+} from '../doctor/doctorService'
+import { APPOINTMENT_STATUS } from '../../constants/constants'
+import Toast from 'react-native-toast-message'
 
 const SAMPLE_DICOM_MODULE = require('../../assets/dicon/sample-dicon.dcm')
 
 type TabItem = { id: string; Icon: React.FC<SvgProps> }
+
+const showSuccess = (message: string) => {
+	Toast.show({ type: 'success', text1: 'Success', text2: message })
+}
+
+const showError = (message: string) => {
+	Toast.show({ type: 'error', text1: 'Error', text2: message })
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -437,6 +455,15 @@ export default function ConsultationPage() {
 	const [snackbarMessage, setSnackbarMessage] = useState('')
 	const [permissionsGranted, setPermissionsGranted] = useState(false)
 
+	// ── Follow Up drawer state ────────────────────────────────────────────────
+	const [followUpOpen, setFollowUpOpen] = useState(false)
+	const [followUpDate, setFollowUpDate] = useState<Date>(new Date())
+	const [followUpSelectedSlot, setFollowUpSelectedSlot] = useState('')
+	const [followUpSlots, setFollowUpSlots] = useState<any[]>([])
+	const [followUpSlotsLoading, setFollowUpSlotsLoading] = useState(false)
+	const [followUpHospitals, setFollowUpHospitals] = useState<any[]>([])
+	const [followUpHospitalId, setFollowUpHospitalId] = useState<string>('')
+
 	const params = route.params as any
 
 	// Try to get IDs from params first
@@ -586,6 +613,180 @@ export default function ConsultationPage() {
 		}
 	}, [patientId])
 
+	// ── Follow Up: fetch hospitals when drawer opens ───────────────────────────
+	useEffect(() => {
+		if (!followUpOpen) return
+
+		const fetchHospitals = async () => {
+			try {
+				let hData: any[] = []
+				if (doctorID) {
+					const res = await getDoctorById(doctorID)
+					if (res.success && res.data) hData = res.data.hospitals || []
+				} else {
+					const res = await getDoctorProfile()
+					if (res.success && res.data) hData = res.data.hospitals || []
+				}
+				setFollowUpHospitals(hData)
+				if (!followUpHospitalId && hData.length > 0)
+					setFollowUpHospitalId(hData[0].hospital.id)
+			} catch {
+				console.log('Failed to fetch doctor hospitals for follow up')
+			}
+		}
+		fetchHospitals()
+	}, [followUpOpen])
+
+	// ── Follow Up: fetch slots when date/hospital changes ────────────────────
+	useEffect(() => {
+		if (!followUpOpen) return
+
+		const hospitalId =
+			followUpHospitalId ||
+			(params?.appointment?.hospital?.id ?? params?.appointment?.hospital_id)
+		const dateStr = followUpDate.toISOString().split('T')[0]
+
+		if (!hospitalId || !dateStr) {
+			setFollowUpSlots([])
+			setFollowUpSelectedSlot('')
+			return
+		}
+
+		const fetchSlots = async () => {
+			try {
+				setFollowUpSlotsLoading(true)
+				setFollowUpSlots([])
+				setFollowUpSelectedSlot('')
+				const responseData = await getDoctorAvailability({
+					doctor_id: doctorID,
+					hospital_id: hospitalId,
+					date: dateStr,
+				})
+				const groups = Array.isArray(responseData)
+					? responseData
+					: Array.isArray((responseData as any)?.data)
+						? (responseData as any).data
+						: []
+				setFollowUpSlots(groups)
+			} catch {
+				setFollowUpSlots([])
+				setFollowUpSelectedSlot('')
+			} finally {
+				setFollowUpSlotsLoading(false)
+			}
+		}
+		fetchSlots()
+	}, [followUpOpen, followUpDate, followUpHospitalId])
+
+	// ── Follow Up: confirm handler ─────────────────────────────────────────────
+	const handleConfirmFollowUp = async () => {
+		if (!followUpSelectedSlot) {
+			Alert.alert('Select time', 'Please select a slot to schedule the follow up.')
+			return
+		}
+		if (!appointmentId || !followUpDate) return
+
+		const hospitalId =
+			followUpHospitalId ||
+			(params?.appointment?.hospital?.id ?? params?.appointment?.hospital_id)
+		const dateStr = followUpDate.toISOString().split('T')[0]
+
+		if (!hospitalId || !dateStr) {
+			showError('Missing appointment details for follow up.')
+			return
+		}
+
+		setFollowUpSlotsLoading(true)
+		try {
+			const res = await rescheduleAppointment({
+				appointment_id: appointmentId,
+				appointment_date: dateStr,
+				start_time: followUpSelectedSlot,
+				end_time: null,
+				hospital_id: hospitalId,
+				reason: 'Doctor unavailable',
+				status_id: APPOINTMENT_STATUS.CONFIRM,
+			})
+			if (res.success) {
+				showSuccess(res.message || 'Follow up appointment scheduled')
+				setFollowUpOpen(false)
+			} else {
+				showError(res.message || 'Follow up failed. Please try again.')
+			}
+		} catch {
+			showError('Something went wrong. Please try again.')
+		} finally {
+			setFollowUpSlotsLoading(false)
+		}
+	}
+
+	// ── Follow Up drawer renderer ──────────────────────────────────────────────
+	const renderFollowUpDrawer = () => (
+		<Modal
+			visible={followUpOpen}
+			transparent
+			animationType="slide"
+			onRequestClose={() => setFollowUpOpen(false)}
+		>
+			<TouchableOpacity
+				activeOpacity={1}
+				style={styles.drawerBackdrop}
+				onPress={() => setFollowUpOpen(false)}
+			>
+				<TouchableOpacity activeOpacity={1} style={styles.drawerSheet} onPress={() => {}}>
+					<View style={styles.drawerHeader}>
+						<View>
+							<Text style={styles.drawerTitle}>Follow Up Appointment</Text>
+							<Text style={styles.drawerSubtitle}>
+								{patient?.name ?? 'Patient'}
+							</Text>
+						</View>
+						<TouchableOpacity
+							style={styles.drawerCloseBtn}
+							onPress={() => setFollowUpOpen(false)}
+						>
+							<MaterialCommunityIcons name="close" size={18} color="#7a848d" />
+						</TouchableOpacity>
+					</View>
+
+					<ScrollView
+						style={styles.drawerBody}
+						contentContainerStyle={styles.drawerBodyContent}
+						showsVerticalScrollIndicator={false}
+					>
+						<DoctorHospitalDropdown />
+						<DateSlotPicker
+							selectedDate={followUpDate}
+							onDateChange={(date) => {
+								setFollowUpDate(date)
+								setFollowUpSelectedSlot('')
+							}}
+							selectedTime={followUpSelectedSlot}
+							onTimeChange={setFollowUpSelectedSlot}
+							availableSlots={followUpSlots}
+							loading={followUpSlotsLoading}
+						/>
+					</ScrollView>
+
+					<View style={styles.drawerActions}>
+						<TouchableOpacity
+							style={styles.drawerCancelBtn}
+							onPress={() => setFollowUpOpen(false)}
+						>
+							<Text style={styles.drawerCancelBtnText}>Cancel</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.drawerConfirmBtn}
+							onPress={handleConfirmFollowUp}
+						>
+							<Text style={styles.drawerConfirmBtnText}>Confirm</Text>
+						</TouchableOpacity>
+					</View>
+				</TouchableOpacity>
+			</TouchableOpacity>
+		</Modal>
+	)
+
 	const startListening = async () => {
 		try {
 			if (!Voice?.start) {
@@ -703,7 +904,19 @@ export default function ConsultationPage() {
 							</Text>
 						</View>
 					</View>
-					<Button mode="contained" compact style={{ borderRadius: 20 }}>
+					<Button
+						mode="contained"
+						compact
+						style={{ borderRadius: 20 }}
+						onPress={() => {
+							setFollowUpDate(new Date())
+							setFollowUpSlots([])
+							setFollowUpSelectedSlot('')
+							setFollowUpHospitalId('')
+							setFollowUpHospitals([])
+							setFollowUpOpen(true)
+						}}
+					>
 						+ Follow up
 					</Button>
 				</View>
@@ -1000,6 +1213,9 @@ export default function ConsultationPage() {
 				</View>
 			)}
 
+			{/* Follow Up drawer — at root level */}
+			{renderFollowUpDrawer()}
+
 			{/* Snackbar for feedback messages */}
 			<Snackbar
 				visible={snackbarVisible}
@@ -1122,4 +1338,70 @@ const styles = StyleSheet.create({
 		fontSize: 10,
 		color: '#e53935',
 	},
+	// ── Follow Up bottom-sheet ────────────────────────────────────────────────
+	drawerBackdrop: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.35)',
+		justifyContent: 'flex-end',
+		padding: 12,
+	},
+	drawerSheet: {
+		backgroundColor: '#fff',
+		borderRadius: 16,
+		maxHeight: '80%',
+		overflow: 'hidden',
+		borderWidth: 1,
+		borderColor: '#edf1f3',
+		width: '100%',
+		flexShrink: 1,
+	},
+	drawerHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: 16,
+		paddingVertical: 14,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e5eaee',
+	},
+	drawerCloseBtn: {
+		width: 28,
+		height: 28,
+		borderRadius: 14,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#f3f6f8',
+	},
+	drawerBody: { flexShrink: 1 },
+	drawerBodyContent: { paddingHorizontal: 16, paddingVertical: 14 },
+	drawerTitle: { fontSize: 16, fontWeight: '700', color: '#233238' },
+	drawerSubtitle: { fontSize: 12, color: '#62707a', marginTop: 2 },
+	drawerActions: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		gap: 10,
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#e5eaee',
+	},
+	drawerCancelBtn: {
+		borderRadius: 20,
+		borderWidth: 1,
+		borderColor: '#d5dde2',
+		paddingHorizontal: 22,
+		paddingVertical: 10,
+		flex: 1,
+		alignItems: 'center',
+	},
+	drawerCancelBtnText: { color: '#60717d', fontWeight: '600', fontSize: 14 },
+	drawerConfirmBtn: {
+		borderRadius: 20,
+		backgroundColor: '#3d7b7b',
+		paddingHorizontal: 22,
+		paddingVertical: 10,
+		flex: 1,
+		alignItems: 'center',
+	},
+	drawerConfirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 })
