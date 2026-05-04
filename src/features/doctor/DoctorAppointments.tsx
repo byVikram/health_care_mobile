@@ -25,6 +25,11 @@ import { APPOINTMENT_STATUS } from '../../constants/constants'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import DoctorHospitalDropdown from '../../components/common/DoctorHospitalDropdown'
+import { useAuth } from '../../context/AuthContext'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
 type Appointment = {
 	id: string
@@ -48,62 +53,74 @@ type Appointment = {
 	end_time?: string
 }
 
-const showSuccess = (message: string) => {
-	Toast.show({ type: 'success', text1: 'Success', text2: message })
-}
-
-const showError = (message: string) => {
-	Toast.show({ type: 'error', text1: 'Error', text2: message })
-}
-
-// type DoctorAppointmentsProps = {
-// 	selectedDate: number
-// 	setSelectedDate: (i: number) => void
-// 	appointments: Appointment[]
-// 	apptLoading: boolean
-// 	apptError: string
-// 	weekDays: { day: string; date: string; red: boolean; dateObj: Date }[]
-// 	selectedDateObj: Date
-// }
-function getAptHospitalId(apt: any): string {
-  const raw =
-    apt?.hospital?.id ??
-    apt?.hospital_id ??
-    apt?.hospital?.hospital_id ??
-    apt?.pivot?.hospital_id ??
-    ''
-  return raw ? String(raw) : ''
-}
 type DoctorAppointmentsProps = {
-  selectedDate: number
-  setSelectedDate: (i: number) => void
-  appointments: Appointment[]
-  apptLoading: boolean
-  apptError: string
-  weekDays: { day: string; date: string; red: boolean; dateObj: Date }[]
-  selectedDateObj: Date
-  // NEW props
-  hospitals: { id: string; label: string; address?: string }[]
-  selectedHospitalId: string | null   // null = show all
+	selectedDate: number
+	setSelectedDate: (i: number) => void
+	appointments: Appointment[]
+	apptLoading: boolean
+	apptError: string
+	weekDays: { day: string; date: string; red: boolean; dateObj: Date }[]
+	selectedDateObj: Date
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 const TEAL = '#1a8c8c'
 
+const showSuccess = (message: string) =>
+	Toast.show({ type: 'success', text1: 'Success', text2: message })
+
+const showError = (message: string) =>
+	Toast.show({ type: 'error', text1: 'Error', text2: message })
+
+/**
+ * Extracts the hospital id from an appointment, handling every possible shape
+ * that different API endpoints return.
+ */
+function getAptHospitalId(apt: any): string {
+	const raw =
+		apt?.hospital?.id ??
+		apt?.hospital_id ??
+		apt?.hospital?.hospital_id ??
+		apt?.pivot?.hospital_id ??
+		''
+	return raw ? String(raw) : ''
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function DoctorAppointments({
-  selectedDate,
-  setSelectedDate,
-  appointments,
-  apptLoading,
-  apptError,
-  weekDays,
-  selectedDateObj,
-  hospitals,
-  selectedHospitalId,
+	selectedDate,
+	setSelectedDate,
+	appointments,
+	apptLoading,
+	apptError,
+	weekDays,
+	selectedDateObj,
 }: DoctorAppointmentsProps) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
 	const useCompactCancelledLayout = width < 640
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
+
+	// ── Read the globally selected hospital ID from AuthContext ───────────────
+	//    DoctorHospitalDropdown (in the header) writes both:
+	//      • selectedHospital   → display name
+	//      • selectedHospitalId → numeric/string id used for filtering & API calls
+	const { selectedHospitalId: contextHospitalId } = useAuth() as any
+
+	// ── Filter appointments by selected hospital ──────────────────────────────
+	//    contextHospitalId === null | undefined | '' → show ALL appointments
+	const filteredAppointments =
+		contextHospitalId
+			? appointments.filter(
+					(apt) => getAptHospitalId(apt) === String(contextHospitalId)
+				)
+			: appointments
 
 	// ── Reschedule state ──────────────────────────────────────────────────────
 	const [rescheduleOpen, setRescheduleOpen] = useState(false)
@@ -112,26 +129,29 @@ export default function DoctorAppointments({
 	const [selectedSlot, setSelectedSlot] = useState('')
 	const [rescheduleSlots, setRescheduleSlots] = useState<any[]>([])
 	const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
-	const [rescheduleHospitals, setRescheduleHospitals] = useState<any[]>([])
-	const [rescheduleHospitalId, setRescheduleHospitalId] = useState<string>('')
 
-	// ── Reject modal: stores the appointment id pending rejection ─────────────
-	const [rejectModalId, setRejectModalId] = useState<string | null>(null)
-
-	// ── confirmedIds: tracks which appointments had Confirm pressed ───────────
+	// ── Optimistic UI sets ────────────────────────────────────────────────────
 	const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set())
-
-	// ── rejectedIds: local set to mark appointments rejected by doctor ─────────
 	const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set())
 
-	// ── Helpers ───────────────────────────────────────────────────────────────
+	// ── Reject modal ──────────────────────────────────────────────────────────
+	const [rejectModalId, setRejectModalId] = useState<string | null>(null)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Small helpers
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const getStatusLabel = (status: any) =>
 		typeof status === 'string' ? status : (status?.label ?? 'pending')
+
 	const formatStatus = (s: string) =>
 		s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+
 	const getPatientAge = (apt: any) => apt?.patient?.age ?? apt?.age ?? '--'
+
 	const getPatientGender = (apt: any) =>
 		apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? '--'
+
 	const getTimeRange = (apt: any) => {
 		const start = apt?.start_time
 		const end = apt?.end_time
@@ -139,12 +159,23 @@ export default function DoctorAppointments({
 		return start ?? '--'
 	}
 
-	// ── Reschedule helpers ────────────────────────────────────────────────────
+	const getTypeIcon = (type?: string) => {
+		switch (type) {
+			case 'video':   return { name: 'video',                    color: '#4d6bb1' }
+			case 'clinic':  return { name: 'hospital-building',        color: '#2e7d32' }
+			case 'home':    return { name: 'home-heart',               color: '#e67e22' }
+			default:        return { name: 'calendar',                 color: '#999'    }
+		}
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Reschedule
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const handleOpenReschedule = (apt: Appointment) => {
-		// Don't allow reschedule if appointment is already rejected (locally or via status)
 		const isLocallyRejected = rejectedIds.has(apt.id)
-		const statusFromProp = getStatusLabel(apt.status)
-		if (isLocallyRejected || statusFromProp === 'cancelled' || statusFromProp === 'rejected') {
+		const status = getStatusLabel(apt.status)
+		if (isLocallyRejected || status === 'cancelled' || status === 'rejected') {
 			showError('Cannot reschedule a rejected or cancelled appointment.')
 			return
 		}
@@ -152,25 +183,29 @@ export default function DoctorAppointments({
 		setRescheduleDate(new Date())
 		setRescheduleSlots([])
 		setSelectedSlot('')
-		setRescheduleHospitalId(apt?.hospital?.id ?? (apt as any)?.hospital_id ?? '')
-		setRescheduleHospitals([])
 		setRescheduleOpen(true)
+	}
+
+	// ── Resolve the hospital id to use for the reschedule API call ───────────
+	//    Priority: context selection (what the dropdown shows) → appointment's own hospital
+	const resolveRescheduleHospitalId = (): string => {
+		if (contextHospitalId) return String(contextHospitalId)
+		if (!rescheduleAppt) return ''
+		return getAptHospitalId(rescheduleAppt)
 	}
 
 	const handleConfirmReschedule = async () => {
 		if (!selectedSlot) {
-			Alert.alert('Select time', 'Please select a slot to reschedule.')
+			Alert.alert('Select time', 'Please select a time slot to reschedule.')
 			return
 		}
-		if (!rescheduleAppt || !rescheduleDate) return
+		if (!rescheduleAppt) return
 
-		const hospitalId =
-			rescheduleHospitalId ||
-			(rescheduleAppt?.hospital?.id ?? (rescheduleAppt as any)?.hospital_id)
+		const hospitalId = resolveRescheduleHospitalId()
 		const dateStr = rescheduleDate.toISOString().split('T')[0]
 
-		if (!hospitalId || !dateStr) {
-			showError('Missing appointment details for reschedule.')
+		if (!hospitalId) {
+			showError('Please select a hospital before rescheduling.')
 			return
 		}
 
@@ -183,9 +218,7 @@ export default function DoctorAppointments({
 				end_time: null,
 				hospital_id: hospitalId,
 				reason: 'Doctor unavailable',
-
-				// 👇 ADD THIS LINE
-				status_id: APPOINTMENT_STATUS.CONFIRM
+				status_id: APPOINTMENT_STATUS.CONFIRM,
 			})
 			if (res.success) {
 				showSuccess(res.message || 'Reschedule request submitted')
@@ -200,40 +233,17 @@ export default function DoctorAppointments({
 		}
 	}
 
-	useEffect(() => {
-		if (!rescheduleAppt || !rescheduleOpen) return
-		const doctorId = rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id
-
-		const fetchHospitals = async () => {
-			try {
-				let hData: any[] = []
-				if (doctorId) {
-					const res = await getDoctorById(doctorId)
-					if (res.success && res.data) hData = res.data.hospitals || []
-				} else {
-					const res = await getDoctorProfile()
-					if (res.success && res.data) hData = res.data.hospitals || []
-				}
-				setRescheduleHospitals(hData)
-				if (!rescheduleHospitalId && hData.length > 0)
-					setRescheduleHospitalId(hData[0].hospital.id)
-			} catch {
-				console.log('Failed to fetch doctor hospitals')
-			}
-		}
-		fetchHospitals()
-	}, [rescheduleAppt, rescheduleOpen])
-
+	// ── Fetch available slots whenever the hospital or date changes ───────────
+	//    Uses contextHospitalId so it stays in sync with the dropdown inside the drawer.
 	useEffect(() => {
 		if (!rescheduleOpen || !rescheduleAppt) return
 
-		const doctorId = rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id
-		const hospitalId =
-			rescheduleHospitalId ||
-			(rescheduleAppt?.hospital?.id ?? (rescheduleAppt as any)?.hospital_id)
+		const doctorId =
+			rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id
+		const hospitalId = resolveRescheduleHospitalId()
 		const dateStr = rescheduleDate.toISOString().split('T')[0]
 
-		if (!hospitalId || !dateStr) {
+		if (!hospitalId) {
 			setRescheduleSlots([])
 			setSelectedSlot('')
 			return
@@ -244,16 +254,19 @@ export default function DoctorAppointments({
 				setRescheduleSlotsLoading(true)
 				setRescheduleSlots([])
 				setSelectedSlot('')
+
 				const responseData = await getDoctorAvailability({
 					doctor_id: doctorId,
 					hospital_id: hospitalId,
 					date: dateStr,
 				})
+
 				const groups = Array.isArray(responseData)
 					? responseData
 					: Array.isArray((responseData as any)?.data)
 						? (responseData as any).data
 						: []
+
 				setRescheduleSlots(groups)
 			} catch {
 				setRescheduleSlots([])
@@ -262,55 +275,43 @@ export default function DoctorAppointments({
 				setRescheduleSlotsLoading(false)
 			}
 		}
-		fetchSlots()
-	}, [rescheduleOpen, rescheduleAppt, rescheduleDate, weekDays, rescheduleHospitalId])
 
-	// ── Confirm ───────────────────────────────────────────────────────────────
+		fetchSlots()
+		// Re-run whenever: drawer opens, appointment changes, date changes, or the
+		// globally selected hospital changes (user switches via the in-drawer dropdown).
+	}, [rescheduleOpen, rescheduleAppt, rescheduleDate, contextHospitalId])
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Confirm / Reject
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const handleConfirmAppointment = async (appointmentId: string) => {
 		try {
-			const res = await updateAppointmentsStatus(
-				appointmentId,
-				APPOINTMENT_STATUS.CONFIRM
-			)
-
-			console.log("CONFIRM RESPONSE 👉", res)
-
+			const res = await updateAppointmentsStatus(appointmentId, APPOINTMENT_STATUS.CONFIRM)
 			if (res.success) {
 				showSuccess(res.message)
-
-				// optional UI update
 				setConfirmedIds((prev) => new Set(prev).add(appointmentId))
-
-				// 🔥 IMPORTANT: refresh data from backend
-
-			}
-
-			else {
+			} else {
 				showError(res.message || 'Failed to confirm')
 			}
 		} catch (err: any) {
-			console.log("ERROR 👉", err?.response?.data)
+			console.log('CONFIRM ERROR 👉', err?.response?.data)
 			showError('Something went wrong')
 		}
 	}
 
-	// ── Reject (after modal OK) with optimistic UI update ─────────────────────
 	const handleConfirmReject = async () => {
 		if (!rejectModalId) return
 		try {
 			const res = await updateAppointmentsStatus(rejectModalId, APPOINTMENT_STATUS.REJECT)
 			if (res.success) {
 				showSuccess(res.message)
-				// Optimistically mark as rejected locally
 				setRejectedIds((prev) => new Set(prev).add(rejectModalId))
-				// Also remove from confirmed set if it was previously confirmed
-				if (confirmedIds.has(rejectModalId)) {
-					setConfirmedIds((prev) => {
-						const next = new Set(prev)
-						next.delete(rejectModalId)
-						return next
-					})
-				}
+				setConfirmedIds((prev) => {
+					const next = new Set(prev)
+					next.delete(rejectModalId!)
+					return next
+				})
 			} else {
 				showError(res.message || 'Failed to reject appointment.')
 			}
@@ -321,7 +322,10 @@ export default function DoctorAppointments({
 		}
 	}
 
-	// ── Navigation ────────────────────────────────────────────────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Navigation
+	//───────────────────────────────────────────────────────────────────
+
 	const handleCardPress = (apt: any) => {
 		const patientId =
 			apt.patient?.id ||
@@ -349,19 +353,10 @@ export default function DoctorAppointments({
 		})
 	}
 
-	const getTypeIcon = (type?: string) => {
-		switch (type) {
-			case 'video':
-				return { name: 'video', color: '#4d6bb1' }
-			case 'clinic':
-				return { name: 'hospital-building', color: '#2e7d32' }
-			case 'home':
-				return { name: 'home-heart', color: '#e67e22' }
-			default:
-				return { name: 'calendar', color: '#999' }
-		}
-	}
-	// ── Skeleton ──────────────────────────────────────────────────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Skeleton
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const renderSkeleton = () =>
 		Array.from({ length: 3 }).map((_, i) => (
 			<View key={`sk-${i}`} style={styles.card}>
@@ -378,13 +373,7 @@ export default function DoctorAppointments({
 					{isTablet && (
 						<View style={styles.skeletonActionsRow}>
 							{[0, 1, 2, 3].map((j) => (
-								<AppSkeleton
-									key={j}
-									width={52}
-									height={44}
-									borderRadius={6}
-									style={{ marginRight: 8 }}
-								/>
+								<AppSkeleton key={j} width={52} height={44} borderRadius={6} style={{ marginRight: 8 }} />
 							))}
 						</View>
 					)}
@@ -392,27 +381,25 @@ export default function DoctorAppointments({
 			</View>
 		))
 
-	// ── Action buttons (only for active, non-rejected appointments) ──────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Action buttons
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const renderActions = (apt: any) => {
 		const rawStatus = getStatusLabel(apt.status)
-		const isConfirmed = rawStatus === 'confirmed'
-		const isRejectedLocally = rejectedIds.has(apt.id)
-		const statusFromProp = getStatusLabel(apt.status)
-		const isRejected = isRejectedLocally || statusFromProp === 'rejected' || statusFromProp === 'cancelled'
+		const isConfirmed = confirmedIds.has(apt.id) || rawStatus === 'confirmed'
+		const isRejected =
+			rejectedIds.has(apt.id) ||
+			rawStatus === 'rejected' ||
+			rawStatus === 'cancelled'
 
-		// If appointment is rejected, don't show any action buttons
 		if (isRejected) return null
 
 		return (
 			<View style={[styles.actions, isTablet && styles.actionsTablet]}>
-
-				{/* ── Confirm button OR confirmed mini-badge ── */}
 				{!isConfirmed && (
 					<TouchableOpacity
-						onPress={(e) => {
-							e.stopPropagation?.()
-							handleConfirmAppointment(apt.id)
-						}}
+						onPress={(e) => { e.stopPropagation?.(); handleConfirmAppointment(apt.id) }}
 						style={[styles.btn, { backgroundColor: '#d6eed8' }]}
 						activeOpacity={0.75}
 					>
@@ -421,12 +408,8 @@ export default function DoctorAppointments({
 					</TouchableOpacity>
 				)}
 
-				{/* ── Reject — always visible for active appointments, opens centered modal ── */}
 				<TouchableOpacity
-					onPress={(e) => {
-						e.stopPropagation?.()
-						setRejectModalId(apt.id)
-					}}
+					onPress={(e) => { e.stopPropagation?.(); setRejectModalId(apt.id) }}
 					style={[styles.btn, { backgroundColor: '#f8dddd' }]}
 					activeOpacity={0.75}
 				>
@@ -434,12 +417,8 @@ export default function DoctorAppointments({
 					<Text style={[styles.btnLabel, { color: '#d84545' }]}>Reject</Text>
 				</TouchableOpacity>
 
-				{/* ── Reschedule — always visible for active appointments ── */}
 				<TouchableOpacity
-					onPress={(e) => {
-						e.stopPropagation?.()
-						handleOpenReschedule(apt)
-					}}
+					onPress={(e) => { e.stopPropagation?.(); handleOpenReschedule(apt) }}
 					style={[styles.btn, { backgroundColor: '#f8e8c6' }]}
 					activeOpacity={0.75}
 				>
@@ -447,12 +426,8 @@ export default function DoctorAppointments({
 					<Text style={[styles.btnLabel, { color: '#d08a0a' }]}>Reschedule</Text>
 				</TouchableOpacity>
 
-				{/* ── Refer — always visible for active appointments ── */}
 				<TouchableOpacity
-					onPress={(e) => {
-						e.stopPropagation?.()
-						alert('Refer coming soon!')
-					}}
+					onPress={(e) => { e.stopPropagation?.(); alert('Refer coming soon!') }}
 					style={[styles.btn, { backgroundColor: '#dbe2f5' }]}
 					activeOpacity={0.75}
 				>
@@ -460,7 +435,6 @@ export default function DoctorAppointments({
 					<Text style={[styles.btnLabel, { color: '#4d6bb1' }]}>Refer</Text>
 				</TouchableOpacity>
 
-				{/* ── Chevron ── */}
 				<TouchableOpacity
 					style={styles.chevronBtn}
 					activeOpacity={0.7}
@@ -471,6 +445,10 @@ export default function DoctorAppointments({
 			</View>
 		)
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Notice banners
+	// ─────────────────────────────────────────────────────────────────────────
 
 	const renderRejectedNotice = () => (
 		<View style={styles.cancelNoticeBox}>
@@ -486,7 +464,10 @@ export default function DoctorAppointments({
 		</View>
 	)
 
-	// ── Reject confirmation modal (exactly as per screenshot) ─────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Reject modal
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const renderRejectModal = () => (
 		<Modal
 			visible={rejectModalId !== null}
@@ -499,23 +480,17 @@ export default function DoctorAppointments({
 				style={styles.rejectBackdrop}
 				onPress={() => setRejectModalId(null)}
 			>
-				<TouchableOpacity activeOpacity={1} style={styles.rejectCard} onPress={() => { }}>
+				<TouchableOpacity activeOpacity={1} style={styles.rejectCard} onPress={() => {}}>
 					<View style={styles.rejectIconCircle}>
 						<MaterialCommunityIcons name="close" size={28} color="#d84545" />
 					</View>
 					<Text style={styles.rejectTitle}>Are you sure?</Text>
 					<Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
 					<View style={styles.rejectBtnRow}>
-						<TouchableOpacity
-							style={styles.rejectCancelBtn}
-							onPress={() => setRejectModalId(null)}
-						>
+						<TouchableOpacity style={styles.rejectCancelBtn} onPress={() => setRejectModalId(null)}>
 							<Text style={styles.rejectCancelText}>Cancel</Text>
 						</TouchableOpacity>
-						<TouchableOpacity
-							style={styles.rejectConfirmBtn}
-							onPress={handleConfirmReject}
-						>
+						<TouchableOpacity style={styles.rejectConfirmBtn} onPress={handleConfirmReject}>
 							<Text style={styles.rejectConfirmText}>Yes, Reject</Text>
 						</TouchableOpacity>
 					</View>
@@ -524,7 +499,10 @@ export default function DoctorAppointments({
 		</Modal>
 	)
 
-	// ── Reschedule bottom-sheet ───────────────────────────────────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Reschedule drawer
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const renderRescheduleDrawer = () => (
 		<Modal
 			visible={rescheduleOpen}
@@ -537,7 +515,9 @@ export default function DoctorAppointments({
 				style={styles.drawerBackdrop}
 				onPress={() => setRescheduleOpen(false)}
 			>
-				<TouchableOpacity activeOpacity={1} style={styles.drawerSheet} onPress={() => { }}>
+				<TouchableOpacity activeOpacity={1} style={styles.drawerSheet} onPress={() => {}}>
+
+					{/* Header */}
 					<View style={styles.drawerHeader}>
 						<View>
 							<Text style={styles.drawerTitle}>Reschedule Appointment</Text>
@@ -545,64 +525,27 @@ export default function DoctorAppointments({
 								{rescheduleAppt?.patient?.name ?? 'Patient'}
 							</Text>
 						</View>
-						<TouchableOpacity
-							style={styles.drawerCloseBtn}
-							onPress={() => setRescheduleOpen(false)}
-						>
+						<TouchableOpacity style={styles.drawerCloseBtn} onPress={() => setRescheduleOpen(false)}>
 							<MaterialCommunityIcons name="close" size={18} color="#7a848d" />
 						</TouchableOpacity>
 					</View>
 
+					{/* Body */}
 					<ScrollView
 						style={styles.drawerBody}
 						contentContainerStyle={styles.drawerBodyContent}
 						showsVerticalScrollIndicator={false}
 					>
-						{/* <Text style={styles.drawerSectionTitle}>Select Hospital</Text>
-						{rescheduleHospitals.length === 0 ? (
-							<Text style={styles.drawerInfoText}>Loading hospitals...</Text>
-						) : (
-							<View style={styles.hospitalList}>
-								{rescheduleHospitals.map((hParam, index) => {
-									const h = hParam?.hospital
-									if (!h) return null
-									const isSelected = rescheduleHospitalId === h.id
-									return (
-										<TouchableOpacity
-											key={h.id}
-											style={[
-												styles.hospitalItem,
-												isSelected && styles.hospitalItemActive,
-											]}
-											onPress={() => setRescheduleHospitalId(h.id)}
-										>
-											<View
-												style={[
-													styles.hospitalIcon,
-													isSelected && styles.hospitalIconActive,
-												]}
-											>
-												<Text style={styles.hospitalIconText}>{index + 1}</Text>
-											</View>
-											<View style={styles.hospitalTextCol}>
-												<Text style={styles.hospitalName} numberOfLines={1}>
-													{h.name}
-												</Text>
-												<Text style={styles.hospitalAddress} numberOfLines={2}>
-													{h.address}
-												</Text>
-											</View>
-											<MaterialCommunityIcons
-												name={isSelected ? 'radiobox-marked' : 'radiobox-blank'}
-												size={20}
-												color={isSelected ? '#3d7b7b' : '#c1c7ce'}
-											/>
-										</TouchableOpacity>
-									)
-								})}
-							</View>
-						)} */}
+						{/* ── Hospital selector ─────────────────────────────────────────────
+						    Same DoctorHospitalDropdown used in the header.
+						    When the user picks a hospital here it writes to AuthContext
+						    (setSelectedHospitalId), which triggers the slot-fetch useEffect above.
+						    This means the appointment list AND the reschedule drawer always stay
+						    in sync with the same selected hospital. ── */}
+						<Text style={styles.drawerSectionTitle}>Select Hospital</Text>
 						<DoctorHospitalDropdown />
+
+						{/* ── Date + time slots ─────────────────────────────────────────── */}
 						<DateSlotPicker
 							selectedDate={rescheduleDate}
 							onDateChange={(date) => {
@@ -616,56 +559,46 @@ export default function DoctorAppointments({
 						/>
 					</ScrollView>
 
+					{/* Footer actions */}
 					<View style={styles.drawerActions}>
-						<TouchableOpacity
-							style={styles.drawerCancelBtn}
-							onPress={() => setRescheduleOpen(false)}
-						>
+						<TouchableOpacity style={styles.drawerCancelBtn} onPress={() => setRescheduleOpen(false)}>
 							<Text style={styles.drawerCancelBtnText}>Cancel</Text>
 						</TouchableOpacity>
-						<TouchableOpacity
-							style={styles.drawerConfirmBtn}
-							onPress={handleConfirmReschedule}
-						>
+						<TouchableOpacity style={styles.drawerConfirmBtn} onPress={handleConfirmReschedule}>
 							<Text style={styles.drawerConfirmBtnText}>Confirm</Text>
 						</TouchableOpacity>
 					</View>
+
 				</TouchableOpacity>
 			</TouchableOpacity>
 		</Modal>
 	)
 
-	// ── Card ──────────────────────────────────────────────────────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Card renderer
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const renderCard = (apt: any) => {
 		const rawStatus = getStatusLabel(apt.status)
-		// Determine final status: confirmed (optimistic), rejected (optimistic or from prop), cancelled
-		const statusFromProp = getStatusLabel(apt.status)
-		const isConfirmed = statusFromProp === 'confirmed'
 		const isRejectedLocally = rejectedIds.has(apt.id)
 		const isRejectedFromProp = rawStatus === 'rejected' || rawStatus === 'cancelled'
 		const isRejected = isRejectedLocally || isRejectedFromProp
-		const typeIcon = getTypeIcon(apt?.appointment_type)
-		let status = rawStatus
 
-		// optional optimistic UI
+		let status = rawStatus
 		if (confirmedIds.has(apt.id)) status = 'confirmed'
 		if (rejectedIds.has(apt.id)) status = 'rejected'
 
 		const statusStyle =
-			status === 'confirmed'
-				? styles.pillConfirmed
-				: status === 'rejected'
-					? styles.pillCancelled
-					: styles.pillPending
+			status === 'confirmed' ? styles.pillConfirmed :
+			status === 'rejected'  ? styles.pillCancelled :
+			                         styles.pillPending
 
 		const statusTextStyle =
-			status === 'confirmed'
-				? styles.pillTextConfirmed
-				: status === 'rejected'
-					? styles.pillTextCancelled
-					: styles.pillTextPending
+			status === 'confirmed' ? styles.pillTextConfirmed :
+			status === 'rejected'  ? styles.pillTextCancelled :
+			                         styles.pillTextPending
 
-		// ── Rejected / Cancelled card ──
+		// ── Rejected / Cancelled card ─────────────────────────────────────────
 		if (isRejected) {
 			const isPatientCancelled = rawStatus === 'cancelled' && !isRejectedLocally
 			return (
@@ -675,18 +608,8 @@ export default function DoctorAppointments({
 					onPress={() => handleCardPress(apt)}
 					style={styles.card}
 				>
-					<View
-						style={[
-							styles.cancelledCardInner,
-							useCompactCancelledLayout && styles.cancelledCardInnerCompact,
-						]}
-					>
-						<View
-							style={[
-								styles.cancelledCardLeft,
-								useCompactCancelledLayout && styles.cancelledCardLeftCompact,
-							]}
-						>
+					<View style={[styles.cancelledCardInner, useCompactCancelledLayout && styles.cancelledCardInnerCompact]}>
+						<View style={[styles.cancelledCardLeft, useCompactCancelledLayout && styles.cancelledCardLeftCompact]}>
 							<View style={styles.patientNameRow}>
 								<View style={styles.patientIconBox}>
 									<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
@@ -695,9 +618,7 @@ export default function DoctorAppointments({
 									{apt?.patient?.name || 'Unknown Patient'}
 								</Text>
 								<View style={[styles.pill, statusStyle]}>
-									<Text style={[styles.pillText, statusTextStyle]}>
-										{formatStatus(status)}
-									</Text>
+									<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
 								</View>
 							</View>
 							<View style={styles.cancelledMetaRow}>
@@ -705,27 +626,15 @@ export default function DoctorAppointments({
 									{getPatientAge(apt)} years / {getPatientGender(apt)}
 								</Text>
 								<View style={styles.metaDot} />
-								<MaterialCommunityIcons
-									name="clock-time-three-outline"
-									size={16}
-									color="#9ea5ac"
-								/>
+								<MaterialCommunityIcons name="clock-time-three-outline" size={16} color="#9ea5ac" />
 								<Text style={styles.subText}>{getTimeRange(apt)}</Text>
 							</View>
 						</View>
-						<View
-							style={[
-								styles.cancelDivider,
-								useCompactCancelledLayout && styles.cancelDividerCompact,
-							]}
-						/>
+						<View style={[styles.cancelDivider, useCompactCancelledLayout && styles.cancelDividerCompact]} />
 						<View
 							style={[
 								styles.cancelledCardRight,
-								!useCompactCancelledLayout &&
-								!isTablet && {
-									width: Math.max(230, Math.floor(width * 0.52)),
-								},
+								!useCompactCancelledLayout && !isTablet && { width: Math.max(230, Math.floor(width * 0.52)) },
 								useCompactCancelledLayout && styles.cancelledCardRightCompact,
 							]}
 						>
@@ -736,15 +645,10 @@ export default function DoctorAppointments({
 			)
 		}
 
-		// ── Tablet ──
+		// ── Tablet card ───────────────────────────────────────────────────────
 		if (isTablet) {
 			return (
-				<TouchableOpacity
-					key={apt.id}
-					activeOpacity={0.85}
-					onPress={() => handleCardPress(apt)}
-					style={styles.card}
-				>
+				<TouchableOpacity key={apt.id} activeOpacity={0.85} onPress={() => handleCardPress(apt)} style={styles.card}>
 					<View style={styles.tabletCardInner}>
 						<View style={styles.tabletLeft}>
 							<View style={styles.patientNameRow}>
@@ -755,20 +659,13 @@ export default function DoctorAppointments({
 									{apt?.patient?.name || 'Unknown Patient'}
 								</Text>
 								<View style={[styles.pill, statusStyle]}>
-									<Text style={[styles.pillText, statusTextStyle]}>
-										{formatStatus(status)}
-									</Text>
+									<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
 								</View>
 							</View>
 							<View style={styles.metaRow}>
-								<MaterialCommunityIcons
-									name="clock-time-three-outline"
-									size={14}
-									color="#5f6973"
-								/>
+								<MaterialCommunityIcons name="clock-time-three-outline" size={14} color="#5f6973" />
 								<Text style={styles.subText}>
-									{getPatientAge(apt)} yrs / {getPatientGender(apt)} |{' '}
-									{getTimeRange(apt)}
+									{getPatientAge(apt)} yrs / {getPatientGender(apt)} | {getTimeRange(apt)}
 								</Text>
 							</View>
 						</View>
@@ -778,14 +675,9 @@ export default function DoctorAppointments({
 			)
 		}
 
-		// ── Mobile ──
+		// ── Mobile card ───────────────────────────────────────────────────────
 		return (
-			<TouchableOpacity
-				key={apt.id}
-				activeOpacity={0.85}
-				onPress={() => handleCardPress(apt)}
-				style={styles.card}
-			>
+			<TouchableOpacity key={apt.id} activeOpacity={0.85} onPress={() => handleCardPress(apt)} style={styles.card}>
 				<View style={styles.patientNameRow}>
 					<View style={styles.patientIconBox}>
 						<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
@@ -808,17 +700,17 @@ export default function DoctorAppointments({
 		)
 	}
 
-	// ── Root ──────────────────────────────────────────────────────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Root render
+	// ─────────────────────────────────────────────────────────────────────────
+
 	return (
 		<View style={styles.container}>
 			{/* Header */}
 			<View style={styles.header}>
 				<Text style={styles.heading}>Doctor Appointments</Text>
 				<Text style={styles.month}>
-					{selectedDateObj?.toLocaleDateString('en-US', {
-						month: 'long',
-						year: 'numeric',
-					})}
+					{selectedDateObj?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
 				</Text>
 			</View>
 
@@ -839,44 +731,40 @@ export default function DoctorAppointments({
 							selectedDate === i && styles.selectedDay,
 						]}
 					>
-						<Text
-							style={[
-								styles.dayText,
-								d.red && styles.weekendText,
-								selectedDate === i && styles.selectedText,
-							]}
-						>
+						<Text style={[styles.dayText, d.red && styles.weekendText, selectedDate === i && styles.selectedText]}>
 							{d.day}
 						</Text>
-						<Text
-							style={[
-								styles.dateText,
-								d.red && styles.weekendText,
-								selectedDate === i && styles.selectedText,
-							]}
-						>
+						<Text style={[styles.dateText, d.red && styles.weekendText, selectedDate === i && styles.selectedText]}>
 							{d.date}
 						</Text>
 					</TouchableOpacity>
 				))}
 			</ScrollView>
 
-			{/* Appointment list */}
+			{/* Appointment list — uses filteredAppointments, not raw appointments */}
 			<View style={styles.listContainer}>
 				{apptLoading ? renderSkeleton() : null}
 				{apptError ? <Text style={styles.error}>{apptError}</Text> : null}
-				{!apptLoading && appointments.length === 0 && (
-					<Text style={styles.empty}>No appointments</Text>
+				{!apptLoading && filteredAppointments.length === 0 && (
+					<Text style={styles.empty}>
+						{contextHospitalId
+							? 'No appointments for the selected hospital'
+							: 'No appointments'}
+					</Text>
 				)}
-				{!apptLoading && appointments.map(renderCard)}
+				{!apptLoading && filteredAppointments.map(renderCard)}
 			</View>
 
-			{/* Modals — at root level */}
+			{/* Modals */}
 			{renderRejectModal()}
 			{renderRescheduleDrawer()}
 		</View>
 	)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles  (unchanged from original)
+// ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
 	container: {
@@ -960,14 +848,14 @@ const styles = StyleSheet.create({
 		minWidth: 68,
 		alignItems: 'center',
 	},
-	pillPending: { backgroundColor: '#f8df8d' },
-	pillConfirmed: { backgroundColor: '#d6eed8' },
-	pillCancelled: { backgroundColor: '#f8dddd' },
-	pillText: { fontSize: 12, fontWeight: '600' },
-	pillTextPending: { color: '#c48508' },
-	pillTextConfirmed: { color: '#2e7d32' },
-	pillTextCancelled: { color: '#d84545' },
-	metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+	pillPending:          { backgroundColor: '#f8df8d' },
+	pillConfirmed:        { backgroundColor: '#d6eed8' },
+	pillCancelled:        { backgroundColor: '#f8dddd' },
+	pillText:             { fontSize: 12, fontWeight: '600' },
+	pillTextPending:      { color: '#c48508' },
+	pillTextConfirmed:    { color: '#2e7d32' },
+	pillTextCancelled:    { color: '#d84545' },
+	metaRow:              { flexDirection: 'row', alignItems: 'center', gap: 4 },
 	cancelledMetaRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1010,8 +898,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		flexShrink: 1,
 	},
-
-	// ── Action row ────────────────────────────────────────────────────────────
 	actions: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1030,8 +916,6 @@ const styles = StyleSheet.create({
 	},
 	btnLabel: { fontSize: 10, fontWeight: '500', textAlign: 'center', marginTop: 3 },
 	chevronBtn: { marginLeft: 'auto', paddingLeft: 4 },
-
-	// Confirmed mini badge
 	confirmedMiniBadge: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1045,8 +929,6 @@ const styles = StyleSheet.create({
 		minWidth: 52,
 	},
 	confirmedMiniText: { fontSize: 10, fontWeight: '600', color: '#2e8b57' },
-
-	// ── Reject centered modal (exactly as per screenshot) ────────────────────
 	rejectBackdrop: {
 		flex: 1,
 		backgroundColor: 'rgba(0,0,0,0.45)',
@@ -1109,8 +991,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	rejectConfirmText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-
-	// ── Reschedule bottom-sheet ───────────────────────────────────────────────
 	drawerBackdrop: {
 		flex: 1,
 		backgroundColor: 'rgba(0,0,0,0.35)',
