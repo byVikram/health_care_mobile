@@ -13,7 +13,7 @@ import MainTabNavigator from './MainTabNavigator'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
-import ConsultationPage from '../features/consultation/ConsultationPage'
+// import ConsultationPage from '../features/consultation/ConsultationPage'
 import PatientProfileLayout from '../features/profile/patient/PatientProfileLayout'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
@@ -33,7 +33,7 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen name={ROUTES.STACK.DOCTOR_DETAIL} component={DoctorDetailPage} />
 			<AppStack.Screen name={ROUTES.STACK.FAVOURITE_DOCTOR} component={MyDoctorPage} />
 			<AppStack.Screen name={ROUTES.STACK.NOTIFICATION} component={NotificationPage} />
-			<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
+			{/* <AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} /> */}
 			<AppStack.Screen name={ROUTES.STACK.HEALTH_PROFILE} component={PatientProfileLayout} />
 			<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
 			<AppStack.Screen
