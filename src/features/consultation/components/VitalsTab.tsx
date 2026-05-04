@@ -42,6 +42,7 @@ const VITAL_STATS: VitalStat[] = [
 	{ id: 'bp', label: 'Blood Pressure', value: '180/80', unit: 'mm/Hg', date: '17/04/25' },
 	{ id: 'glucose', label: 'Blood Glucose Level', value: '85', unit: 'mg/dL', date: '17/04/2025' },
 	{ id: 'weight', label: 'Weight', value: '45', unit: 'Kg', date: '17/04/2025' },
+	{ id: 'heightBmi', label: 'Height', value: '165', unit: 'cm', date: '17/04/2025', bmiValue: '16.5', bmiCategory: 'Underweight' },
 	{ id: 'spo2', label: 'Oxygen Saturation (spO2)', value: '79', unit: '%', date: '17/04/2025' },
 ]
 
@@ -339,8 +340,52 @@ const normalizeHistoryWithDefaults = (apiHistory: Record<string, VitalHistoryRow
 		rows: apiHistory[tab.id]?.length ? apiHistory[tab.id] : tab.rows,
 	}))
 
+const withHeightBmiCard = (stats: VitalStat[]) => {
+	const heightBmiCard = VITAL_STATS.find((stat) => stat.id === 'heightBmi')
+	if (!heightBmiCard || stats.some((stat) => stat.id === 'heightBmi')) return stats
+	return [...stats, heightBmiCard]
+}
+
 function VitalStatCard({ stat, width }: { stat: VitalStat; width: number }) {
 	const icon = VITAL_ICONS[stat.id] ?? { name: 'chart-line', color: TEAL }
+
+	if (stat.id === 'heightBmi') {
+		return (
+			<View style={[styles.statCard, styles.heightBmiCard, { width }]}>
+				<View style={styles.statIconWrap} />
+				<View style={styles.heightBmiContent}>
+					<View style={styles.heightBmiMetric}>
+						<View style={styles.statValueRow}>
+							<AppTypography variant="body" style={styles.heightBmiValue}>
+								{stat.value}
+							</AppTypography>
+							<AppTypography variant="caption" style={styles.heightBmiUnit}>
+								{stat.unit}
+							</AppTypography>
+						</View>
+						<AppTypography variant="caption" style={styles.heightBmiLabel}>
+							Height
+						</AppTypography>
+					</View>
+					<View style={styles.heightBmiDivider} />
+					<View style={[styles.heightBmiMetric, styles.bmiMetric]}>
+						<AppTypography variant="body" style={[styles.heightBmiValue, styles.bmiValue]}>
+							{stat.bmiValue ?? '-'}
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.heightBmiLabel}>
+							BMI
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.bmiCategory}>
+							{stat.bmiCategory ?? '-'}
+						</AppTypography>
+					</View>
+				</View>
+				<AppTypography variant="caption" style={[styles.statDate, styles.heightBmiDate]}>
+					{stat.date}
+				</AppTypography>
+			</View>
+		)
+	}
 
 	return (
 		<View style={[styles.statCard, { width }]}>
@@ -474,7 +519,7 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 				if (showLoader) setLoading(true)
 				const payload = await vitalsService.getPatientVitals(patientId, period)
 
-				if (payload.stats.length > 0) setStats(payload.stats)
+				if (payload.stats.length > 0) setStats(withHeightBmiCard(payload.stats))
 				setTabConfigs(normalizeHistoryWithDefaults(payload.history))
 				setErrorMessage('')
 			} catch (error: any) {
@@ -662,6 +707,73 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.06,
 		shadowRadius: 8,
 		elevation: 2,
+	},
+	heightBmiCard: {
+		alignItems: 'stretch',
+		justifyContent: 'space-between',
+		position: 'relative',
+	},
+	heightBmiContent: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingRight: 4,
+		paddingTop: 10,
+	},
+	heightBmiMetric: {
+		flex: 1,
+		minWidth: 0,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	heightBmiDivider: {
+		width: 1,
+		alignSelf: 'stretch',
+		backgroundColor: '#edf1f2',
+		marginHorizontal: 4,
+	},
+	bmiMetric: {
+	flex: 1.25,
+	justifyContent: 'flex-end',   
+	paddingBottom: 4,            
+},
+	heightBmiValue: {
+		color: '#263238',
+		fontSize: 14,
+		fontWeight: '700',
+		lineHeight: 18,
+		textAlign: 'center',
+	},
+	heightBmiUnit: {
+		color: '#71808a',
+		fontSize: 13,
+		lineHeight: 16,
+	},
+	heightBmiLabel: {
+		color: '#71808a',
+		fontSize: 13,
+		lineHeight: 16,
+		marginTop: 2,
+		textAlign: 'center',
+	},
+	bmiValue: {
+		color: '#fb8500',
+		fontSize: 12,
+		marginTop: 3,
+	},
+	bmiCategory: {
+		color: '#fb8500',
+		fontSize: 9,
+		fontWeight: '700',
+		lineHeight: 12,
+		marginTop: 1,
+		textAlign: 'center',
+	},
+	heightBmiDate: {
+		position: 'absolute',
+		top: 9,
+		right: 9,
+		marginLeft: 0,
 	},
 	statIconWrap: {
 		width: 28,

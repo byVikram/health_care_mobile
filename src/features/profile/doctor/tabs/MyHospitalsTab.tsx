@@ -12,7 +12,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../../components/common'
+import { AppTypography, DateSlotPicker } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -34,6 +34,18 @@ type HospitalItem = HospitalFormData & {
 	id: string
 	location: string
 	isPrimary: boolean
+}
+
+type AppointmentType = 'clinic' | 'video'
+type TimeSlot = { start: string; end: string }
+type SectionSlots = {
+	morning: TimeSlot[]
+	afternoon: TimeSlot[]
+	evening: TimeSlot[]
+}
+type WorkingHoursState = {
+	sections: SectionSlots
+	slotDuration: number
 }
 
 const EMPTY_FORM: HospitalFormData = {
@@ -59,24 +71,89 @@ const getSuccessMessage = (response: unknown, fallback = 'Hospital saved success
 	return fallback
 }
 
-const makeTimeOptions = (startHour: number, endHour: number) => {
+const makeTimeOptions = (startHour: number, endHour: number, stepMins = 30) => {
 	const options: { value: string; label: string }[] = []
-	for (let hour = startHour; hour <= endHour; hour += 1) {
-		for (const minute of ['00', '30']) {
-			if (hour === endHour && minute === '30') break
-			const value = `${String(hour).padStart(2, '0')}:${minute}`
-			const period = hour < 12 ? 'AM' : 'PM'
-			const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
-			options.push({ value, label: `${hour12}:${minute} ${period}` })
-		}
+	const totalStartMins = startHour * 60
+	const totalEndMins = endHour * 60
+
+	for (let mins = totalStartMins; mins < totalEndMins; mins += stepMins) {
+		const hour = Math.floor(mins / 60)
+		const minute = mins % 60
+		const value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+		const period = hour < 12 ? 'AM' : 'PM'
+		const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+		options.push({ value, label: `${hour12}:${String(minute).padStart(2, '0')} ${period}` })
 	}
+
 	return options
 }
 
-const morningOptions = makeTimeOptions(8, 12)
-const afternoonOptions = makeTimeOptions(12, 17)
-const eveningOptions = makeTimeOptions(17, 21)
+const snapToStep = (time: string, stepMins: number) => {
+	const [hour, minute] = time.split(':').map(Number)
+	const totalMins = hour * 60 + minute
+	const snapped = Math.round(totalMins / stepMins) * stepMins
+	const snappedHour = Math.floor(snapped / 60)
+	const snappedMinute = snapped % 60
+
+	return `${String(snappedHour).padStart(2, '0')}:${String(snappedMinute).padStart(2, '0')}`
+}
+
 const durationOptions = [10, 15, 20, 25, 30]
+const followUpOptions = [
+	{ value: 0, label: 'No Follow-up' },
+	{ value: 3, label: '3 Days' },
+	{ value: 5, label: '5 Days' },
+	{ value: 7, label: '7 Days' },
+	{ value: 10, label: '10 Days' },
+	{ value: 15, label: '15 Days' },
+]
+const rescheduleCutoffOptions = [
+	{ value: 1, label: '1 Hour Before' },
+	{ value: 2, label: '2 Hours Before' },
+	{ value: 3, label: '3 Hours Before' },
+	{ value: 4, label: '4 Hours Before' },
+	{ value: 6, label: '6 Hours Before' },
+	{ value: 12, label: '12 Hours Before' },
+	{ value: 24, label: '1 Day Before' },
+]
+const SECTION_META = [
+	{
+		key: 'morning' as const,
+		label: 'Morning',
+		startHour: 8,
+		endHour: 12,
+	},
+	{
+		key: 'afternoon' as const,
+		label: 'Afternoon',
+		startHour: 12,
+		endHour: 17,
+	},
+	{
+		key: 'evening' as const,
+		label: 'Evening',
+		startHour: 17,
+		endHour: 21,
+	},
+]
+const INITIAL_WORKING_HOURS: Record<AppointmentType, WorkingHoursState> = {
+	clinic: {
+		sections: {
+			morning: [{ start: '08:00', end: '10:00' }],
+			afternoon: [{ start: '12:00', end: '14:00' }],
+			evening: [{ start: '17:00', end: '19:00' }],
+		},
+		slotDuration: 15,
+	},
+	video: {
+		sections: {
+			morning: [{ start: '08:00', end: '10:00' }],
+			afternoon: [{ start: '12:00', end: '14:00' }],
+			evening: [{ start: '17:00', end: '19:00' }],
+		},
+		slotDuration: 15,
+	},
+}
 
 const buildHospitalPayload = (hospital: HospitalItem, isPrimary = hospital.isPrimary) => ({
 	name: hospital.name.trim(),
@@ -163,21 +240,25 @@ function DropdownSelect({
 	options,
 	onChange,
 	compact = false,
+	showFloatingLabel = true,
 }: {
 	label: string
 	value: string | number
 	options: { value: string | number; label: string }[]
 	onChange: (value: string | number) => void
 	compact?: boolean
+	showFloatingLabel?: boolean
 }) {
 	const [isOpen, setIsOpen] = useState(false)
 	const selectedOption = options.find((option) => option.value === value)
 
 	return (
 		<View style={[styles.dropdownGroup, compact && styles.dropdownGroupCompact]}>
-			<AppTypography variant="caption" style={styles.dropdownFloatingLabel}>
-				{label}
-			</AppTypography>
+			{showFloatingLabel ? (
+				<AppTypography variant="caption" style={styles.dropdownFloatingLabel}>
+					{label}
+				</AppTypography>
+			) : null}
 			<TouchableOpacity
 				style={[styles.dropdownTrigger, compact && styles.dropdownTriggerCompact]}
 				onPress={() => setIsOpen(true)}
@@ -245,35 +326,25 @@ function WorkingHoursRow({
 }
 
 function WorkingHoursSection({
-	morningStart,
-	morningEnd,
-	afternoonStart,
-	afternoonEnd,
-	eveningStart,
-	eveningEnd,
-	slotDuration,
-	onMorningStartChange,
-	onMorningEndChange,
-	onAfternoonStartChange,
-	onAfternoonEndChange,
-	onEveningStartChange,
-	onEveningEndChange,
+	selectedDate,
+	onDateChange,
+	selectedAppointmentType,
+	onAppointmentTypeChange,
+	selectedWorkingHours,
+	onAddSlot,
+	onRemoveSlot,
+	onUpdateSlotTime,
 	onSlotDurationChange,
 	stacked,
 }: {
-	morningStart: string
-	morningEnd: string
-	afternoonStart: string
-	afternoonEnd: string
-	eveningStart: string
-	eveningEnd: string
-	slotDuration: number
-	onMorningStartChange: (value: string) => void
-	onMorningEndChange: (value: string) => void
-	onAfternoonStartChange: (value: string) => void
-	onAfternoonEndChange: (value: string) => void
-	onEveningStartChange: (value: string) => void
-	onEveningEndChange: (value: string) => void
+	selectedDate: Date
+	onDateChange: (date: Date) => void
+	selectedAppointmentType: AppointmentType
+	onAppointmentTypeChange: (type: AppointmentType) => void
+	selectedWorkingHours: WorkingHoursState
+	onAddSlot: (sectionKey: keyof SectionSlots) => void
+	onRemoveSlot: (sectionKey: keyof SectionSlots, slotIndex: number) => void
+	onUpdateSlotTime: (sectionKey: keyof SectionSlots, slotIndex: number, field: 'start' | 'end', value: string) => void
 	onSlotDurationChange: (value: number) => void
 	stacked: boolean
 }) {
@@ -283,84 +354,133 @@ function WorkingHoursSection({
 				Working Hours
 			</AppTypography>
 
-			<View style={styles.shiftBlock}>
-				<AppTypography variant="caption" style={styles.shiftTitle}>
-					Morning
-				</AppTypography>
-				<WorkingHoursRow stacked={stacked}>
-					<DropdownSelect
-						label="Start Time"
-						value={morningStart}
-						options={morningOptions}
-						onChange={(value) => onMorningStartChange(String(value))}
-						compact
-					/>
-					<DropdownSelect
-						label="End Time"
-						value={morningEnd}
-						options={morningOptions}
-						onChange={(value) => onMorningEndChange(String(value))}
-						compact
-					/>
-				</WorkingHoursRow>
+			<View style={styles.datePickerWrap}>
+				<DateSlotPicker
+					selectedDate={selectedDate}
+					onDateChange={onDateChange}
+					selectedTime={null}
+					onTimeChange={() => undefined}
+					availableSlots={[]}
+					dateLabel="Select Date"
+					showTimeSlots={false}
+				/>
 			</View>
 
-			<View style={styles.shiftBlock}>
-				<AppTypography variant="caption" style={styles.shiftTitle}>
-					Afternoon
+			<View style={styles.appointmentTypeBlock}>
+				<AppTypography variant="caption" style={styles.appointmentTypeLabel}>
+					Type of Appointment
 				</AppTypography>
-				<WorkingHoursRow stacked={stacked}>
-					<DropdownSelect
-						label="Start Time"
-						value={afternoonStart}
-						options={afternoonOptions}
-						onChange={(value) => onAfternoonStartChange(String(value))}
-						compact
-					/>
-					<DropdownSelect
-						label="End Time"
-						value={afternoonEnd}
-						options={afternoonOptions}
-						onChange={(value) => onAfternoonEndChange(String(value))}
-						compact
-					/>
-				</WorkingHoursRow>
+				<View style={styles.segmentedControl}>
+					<TouchableOpacity
+						style={[styles.segmentedOption, selectedAppointmentType === 'clinic' && styles.segmentedOptionActive]}
+						onPress={() => onAppointmentTypeChange('clinic')}
+						activeOpacity={0.85}
+					>
+						<AppTypography
+							variant="caption"
+							style={[styles.segmentedText, selectedAppointmentType === 'clinic' && styles.segmentedTextActive]}
+						>
+							Clinic Visit
+						</AppTypography>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={[styles.segmentedOption, selectedAppointmentType === 'video' && styles.segmentedOptionActive]}
+						onPress={() => onAppointmentTypeChange('video')}
+						activeOpacity={0.85}
+					>
+						<AppTypography
+							variant="caption"
+							style={[styles.segmentedText, selectedAppointmentType === 'video' && styles.segmentedTextActive]}
+						>
+							Video Call
+						</AppTypography>
+					</TouchableOpacity>
+				</View>
 			</View>
 
-			<View style={styles.shiftBlock}>
-				<AppTypography variant="caption" style={styles.shiftTitle}>
-					Evening
-				</AppTypography>
-				<WorkingHoursRow stacked={stacked}>
-					<DropdownSelect
-						label="Start Time"
-						value={eveningStart}
-						options={eveningOptions}
-						onChange={(value) => onEveningStartChange(String(value))}
-						compact
-					/>
-					<DropdownSelect
-						label="End Time"
-						value={eveningEnd}
-						options={eveningOptions}
-						onChange={(value) => onEveningEndChange(String(value))}
-						compact
-					/>
-				</WorkingHoursRow>
-			</View>
+			<View key={selectedAppointmentType}>
+				{SECTION_META.map((section) => {
+					const slots = selectedWorkingHours.sections[section.key]
+					const canAdd = slots.length < 3
 
-			<View style={styles.slotDurationBlock}>
-				<AppTypography variant="caption" style={styles.shiftTitle}>
-					Slot Duration
-				</AppTypography>
-				<View style={styles.slotDurationField}>
-					<DropdownSelect
-						label="Duration"
-						value={slotDuration}
-						options={durationOptions.map((duration) => ({ value: duration, label: `${duration} mins` }))}
-						onChange={(value) => onSlotDurationChange(Number(value))}
-						compact
-					/>
+					return (
+						<View key={section.key} style={styles.shiftBlock}>
+							<AppTypography variant="caption" style={styles.shiftTitle}>
+								{section.label}
+							</AppTypography>
+
+							<View style={styles.slotsWrap}>
+								{slots.map((slot, slotIndex) => {
+									const stepMins = selectedWorkingHours.slotDuration
+									const allOptions = makeTimeOptions(section.startHour, section.endHour, stepMins)
+									const startOptions =
+										slotIndex === 0 ? allOptions : allOptions.filter((option) => option.value >= slots[slotIndex - 1].end)
+									const endOptions = allOptions.filter((option) => option.value > slot.start)
+									const showAdd = slotIndex === slots.length - 1 && canAdd
+
+									return (
+										<View key={`${section.key}-${slotIndex}`} style={[styles.slotEditor, stacked && styles.slotEditorStacked]}>
+											<View style={[styles.slotSelects, stacked && styles.slotSelectsStacked]}>
+												<View style={styles.slotSelectCell}>
+													<DropdownSelect
+														label="Start Time"
+														value={slot.start}
+														options={startOptions}
+														onChange={(value) => onUpdateSlotTime(section.key, slotIndex, 'start', String(value))}
+														compact
+													/>
+												</View>
+												<View style={styles.slotSelectCell}>
+													<DropdownSelect
+														label="End Time"
+														value={slot.end}
+														options={endOptions}
+														onChange={(value) => onUpdateSlotTime(section.key, slotIndex, 'end', String(value))}
+														compact
+													/>
+												</View>
+											</View>
+
+											{showAdd ? (
+												<TouchableOpacity
+													style={styles.addSlotButton}
+													onPress={() => onAddSlot(section.key)}
+													activeOpacity={0.8}
+												>
+													<MaterialCommunityIcons name="plus" size={18} color={TEAL} />
+												</TouchableOpacity>
+											) : null}
+
+											{slotIndex > 0 ? (
+												<TouchableOpacity
+													style={styles.iconAction}
+													onPress={() => onRemoveSlot(section.key, slotIndex)}
+													activeOpacity={0.8}
+												>
+													<MaterialCommunityIcons name="close" size={16} color="#62707a" />
+												</TouchableOpacity>
+											) : null}
+										</View>
+									)
+								})}
+							</View>
+						</View>
+					)
+				})}
+
+				<View style={styles.slotDurationBlock}>
+					<AppTypography variant="caption" style={styles.shiftTitle}>
+						Slot Duration
+					</AppTypography>
+					<View style={styles.slotDurationField}>
+						<DropdownSelect
+							label="Duration"
+							value={selectedWorkingHours.slotDuration}
+							options={durationOptions.map((duration) => ({ value: duration, label: `${duration} mins` }))}
+							onChange={(value) => onSlotDurationChange(Number(value))}
+							compact
+						/>
+					</View>
 				</View>
 			</View>
 		</View>
@@ -421,13 +541,13 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const [isLoading, setIsLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [isSavingAddress, setIsSavingAddress] = useState(false)
-	const [morningStart, setMorningStart] = useState('08:00')
-	const [morningEnd, setMorningEnd] = useState('12:00')
-	const [afternoonStart, setAfternoonStart] = useState('12:00')
-	const [afternoonEnd, setAfternoonEnd] = useState('17:00')
-	const [eveningStart, setEveningStart] = useState('17:00')
-	const [eveningEnd, setEveningEnd] = useState('21:00')
-	const [slotDuration, setSlotDuration] = useState(15)
+	const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentType>('clinic')
+	const [workingHoursByType, setWorkingHoursByType] = useState<Record<AppointmentType, WorkingHoursState>>(
+		INITIAL_WORKING_HOURS
+	)
+	const [followUpDays, setFollowUpDays] = useState(7)
+	const [rescheduleCutoff, setRescheduleCutoff] = useState(2)
 	const hospitalsRef = useRef<HospitalItem[]>([])
 	const hasLoadedHospitalsRef = useRef(false)
 
@@ -495,11 +615,103 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
 	const cardDirection = isMobile ? 'column' : 'row'
 	const actionStacked = isMobile || (isTablet && !isLandscape)
+	const selectedWorkingHours = workingHoursByType[selectedAppointmentType]
 
 	const resetForm = () => {
 		setForm(EMPTY_FORM)
 		setEditingId(null)
 		setShowForm(false)
+	}
+
+	const addSlot = (sectionKey: keyof SectionSlots) => {
+		setWorkingHoursByType((prev) => {
+			const current = prev[selectedAppointmentType]
+			const slots = current.sections[sectionKey]
+			if (slots.length >= 3) return prev
+
+			const previousEnd = slots[slots.length - 1].end
+			const [endHour, endMinute] = previousEnd.split(':').map(Number)
+			const newEndMins = endHour * 60 + endMinute + current.slotDuration
+			const section = SECTION_META.find((item) => item.key === sectionKey)!
+			const clampedMins = Math.min(newEndMins, section.endHour * 60)
+			const newEnd = `${String(Math.floor(clampedMins / 60)).padStart(2, '0')}:${String(clampedMins % 60).padStart(2, '0')}`
+
+			return {
+				...prev,
+				[selectedAppointmentType]: {
+					...current,
+					sections: {
+						...current.sections,
+						[sectionKey]: [...slots, { start: previousEnd, end: newEnd }],
+					},
+				},
+			}
+		})
+	}
+
+	const removeSlot = (sectionKey: keyof SectionSlots, slotIndex: number) => {
+		setWorkingHoursByType((prev) => {
+			const current = prev[selectedAppointmentType]
+			if (slotIndex === 0) return prev
+
+			return {
+				...prev,
+				[selectedAppointmentType]: {
+					...current,
+					sections: {
+						...current.sections,
+						[sectionKey]: current.sections[sectionKey].filter((_, index) => index !== slotIndex),
+					},
+				},
+			}
+		})
+	}
+
+	const updateSlotTime = (
+		sectionKey: keyof SectionSlots,
+		slotIndex: number,
+		field: 'start' | 'end',
+		value: string
+	) => {
+		setWorkingHoursByType((prev) => {
+			const current = prev[selectedAppointmentType]
+
+			return {
+				...prev,
+				[selectedAppointmentType]: {
+					...current,
+					sections: {
+						...current.sections,
+						[sectionKey]: current.sections[sectionKey].map((slot, index) =>
+							index === slotIndex ? { ...slot, [field]: value } : slot
+						),
+					},
+				},
+			}
+		})
+	}
+
+	const updateSlotDuration = (value: number) => {
+		setWorkingHoursByType((prev) => {
+			const current = prev[selectedAppointmentType]
+			const snappedSections = Object.fromEntries(
+				Object.entries(current.sections).map(([sectionKey, slots]) => [
+					sectionKey,
+					(slots as TimeSlot[]).map((slot) => ({
+						start: snapToStep(slot.start, value),
+						end: snapToStep(slot.end, value),
+					})),
+				])
+			) as SectionSlots
+
+			return {
+				...prev,
+				[selectedAppointmentType]: {
+					sections: snappedSections,
+					slotDuration: value,
+				},
+			}
+		})
 	}
 
 	const handleSetPrimary = async (id: string) => {
@@ -679,37 +891,13 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 							placeholder="e.g. Arogya Clinic"
 						/>
 
-						<FormRow stacked={!useTwoColumns}>
-							<InputField
-								label="Phone number"
-								value={form.phone_number}
-								onChangeText={(value) => setForm((prev) => ({ ...prev, phone_number: value }))}
-								placeholder="e.g. +91 98765 43210"
-								keyboardType="phone-pad"
-							/>
-							<InputField
-								label="Video consultation fee"
-								value={form.video_consultation_fee}
-								onChangeText={(value) =>
-									setForm((prev) => ({ ...prev, video_consultation_fee: value.replace(/[^\d.]/g, '') }))
-								}
-								placeholder="e.g. 500"
-								keyboardType="numeric"
-							/>
-						</FormRow>
-
-						<FormRow stacked={!useTwoColumns}>
-							<InputField
-								label="Offline consultation fee"
-								value={form.offline_consultation_fee}
-								onChangeText={(value) =>
-									setForm((prev) => ({ ...prev, offline_consultation_fee: value.replace(/[^\d.]/g, '') }))
-								}
-								placeholder="e.g. 300"
-								keyboardType="numeric"
-							/>
-							<View />
-						</FormRow>
+						<InputField
+							label="Phone number"
+							value={form.phone_number}
+							onChangeText={(value) => setForm((prev) => ({ ...prev, phone_number: value }))}
+							placeholder="e.g. +91 98765 43210"
+							keyboardType="phone-pad"
+						/>
 
 						<InputField
 							label="Enter Full address"
@@ -719,23 +907,76 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 							multiline
 						/>
 
-						<WorkingHoursSection
-							morningStart={morningStart}
-							morningEnd={morningEnd}
-							afternoonStart={afternoonStart}
-							afternoonEnd={afternoonEnd}
-							eveningStart={eveningStart}
-							eveningEnd={eveningEnd}
-							slotDuration={slotDuration}
-							onMorningStartChange={setMorningStart}
-							onMorningEndChange={setMorningEnd}
-							onAfternoonStartChange={setAfternoonStart}
-							onAfternoonEndChange={setAfternoonEnd}
-							onEveningStartChange={setEveningStart}
-							onEveningEndChange={setEveningEnd}
-							onSlotDurationChange={setSlotDuration}
-							stacked={false}
+						<InputField
+							label="Video consultation fee"
+							value={form.video_consultation_fee}
+							onChangeText={(value) =>
+								setForm((prev) => ({ ...prev, video_consultation_fee: value.replace(/[^\d.]/g, '') }))
+							}
+							placeholder="e.g. 500"
+							keyboardType="numeric"
 						/>
+
+						<InputField
+							label="Offline consultation fee"
+							value={form.offline_consultation_fee}
+							onChangeText={(value) =>
+								setForm((prev) => ({ ...prev, offline_consultation_fee: value.replace(/[^\d.]/g, '') }))
+							}
+							placeholder="e.g. 300"
+							keyboardType="numeric"
+						/>
+
+						<WorkingHoursSection
+							selectedDate={selectedDate}
+							onDateChange={setSelectedDate}
+							selectedAppointmentType={selectedAppointmentType}
+							onAppointmentTypeChange={setSelectedAppointmentType}
+							selectedWorkingHours={selectedWorkingHours}
+							onAddSlot={addSlot}
+							onRemoveSlot={removeSlot}
+							onUpdateSlotTime={updateSlotTime}
+							onSlotDurationChange={updateSlotDuration}
+							stacked={!useTwoColumns}
+						/>
+
+						<View style={styles.appointmentRules}>
+							<AppTypography variant="body" style={styles.workingTitle}>
+								Appointment Rules
+							</AppTypography>
+
+							<View style={styles.ruleBlock}>
+								<AppTypography variant="caption" style={styles.shiftTitle}>
+									Free Follow-up Validity
+								</AppTypography>
+								<View style={styles.ruleField}>
+									<DropdownSelect
+										label="Free Follow-up Validity"
+										value={followUpDays}
+										options={followUpOptions}
+										onChange={(value) => setFollowUpDays(Number(value))}
+										compact
+										showFloatingLabel={false}
+									/>
+								</View>
+							</View>
+
+							<View style={styles.ruleBlock}>
+								<AppTypography variant="caption" style={styles.shiftTitle}>
+									Reschedule Allowed Until
+								</AppTypography>
+								<View style={styles.ruleField}>
+									<DropdownSelect
+										label="Reschedule Allowed Until"
+										value={rescheduleCutoff}
+										options={rescheduleCutoffOptions}
+										onChange={(value) => setRescheduleCutoff(Number(value))}
+										compact
+										showFloatingLabel={false}
+									/>
+								</View>
+							</View>
+						</View>
 					</View>
 
 					<View style={styles.formActions}>
@@ -749,7 +990,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 								<ActivityIndicator size="small" color="#ffffff" />
 							) : (
 								<AppTypography variant="body" style={styles.primaryButtonText}>
-									Save Address
+									Save Details
 								</AppTypography>
 							)}
 						</TouchableOpacity>
@@ -1203,7 +1444,7 @@ const styles = StyleSheet.create({
 	},
 	workingHours: {
 		width: '100%',
-		maxWidth: 520,
+		maxWidth: '100%',
 		marginTop: 4,
 		paddingTop: 2,
 		alignSelf: 'flex-start',
@@ -1237,6 +1478,99 @@ const styles = StyleSheet.create({
 	},
 	workingCellStacked: {
 		width: '100%',
+	},
+	datePickerWrap: {
+		marginHorizontal: -16,
+		marginBottom: 24,
+	},
+	appointmentTypeBlock: {
+		marginBottom: 24,
+	},
+	appointmentTypeLabel: {
+		color: '#5f6b76',
+		fontSize: 14,
+		fontWeight: '500',
+		marginBottom: 12,
+	},
+	segmentedControl: {
+		alignSelf: 'flex-start',
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: TEAL,
+		borderRadius: 999,
+		padding: 3,
+		gap: 3,
+	},
+	segmentedOption: {
+		borderRadius: 999,
+		paddingHorizontal: 18,
+		paddingVertical: 7,
+	},
+	segmentedOptionActive: {
+		backgroundColor: '#ffffff',
+	},
+	segmentedText: {
+		color: '#ffffff',
+		fontSize: 13,
+		fontWeight: '600',
+	},
+	segmentedTextActive: {
+		color: '#111111',
+	},
+	slotsWrap: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flexWrap: 'wrap',
+		gap: 12,
+	},
+	slotEditor: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		marginBottom: 10,
+		overflow: 'visible',
+		flexWrap: 'nowrap',
+	},
+	slotEditorStacked: {
+		width: '100%',
+		alignItems: 'center',
+	},
+	slotSelects: {
+		flexDirection: 'row',
+		gap: 8,
+		width: 232,
+		maxWidth: '72%',
+		flexShrink: 1,
+	},
+	slotSelectsStacked: {
+		width: 222,
+		maxWidth: '68%',
+		marginBottom: 0,
+	},
+	slotSelectCell: {
+		flex: 1,
+		minWidth: 0,
+	},
+	iconAction: {
+		width: 30,
+		height: 30,
+		borderRadius: 15,
+		alignItems: 'center',
+		justifyContent: 'center',
+		flexShrink: 0,
+	},
+	addSlotButton: {
+		width: 32,
+		height: 32,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: TEAL,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#f7fcfc',
+		flexShrink: 0,
+		zIndex: 2,
+		elevation: 2,
 	},
 	slotDurationBlock: {
 		marginTop: 2,
@@ -1276,7 +1610,8 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 	},
 	dropdownTriggerCompact: {
-		minHeight: 52,
+		minHeight: 48,
+		paddingHorizontal: 12,
 	},
 	dropdownValue: {
 		color: '#182b3d',
@@ -1336,6 +1671,17 @@ const styles = StyleSheet.create({
 	},
 	dropdownItemTextActive: {
 		color: TEAL,
+	},
+	appointmentRules: {
+		marginTop: 24,
+		gap: 18,
+	},
+	ruleBlock: {
+		width: '100%',
+	},
+	ruleField: {
+		width: 225,
+		maxWidth: '100%',
 	},
 	formActions: {
 		alignItems: 'flex-end',

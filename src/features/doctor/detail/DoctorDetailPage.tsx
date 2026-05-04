@@ -30,6 +30,7 @@ import {
 } from "../../../types/doctor-detail";
 import { ROUTES } from "../../../navigation/routes";
 import type { AppStackParamList } from "../../../navigation/types";
+import ConsentModal from "../components/ConsentForm";
 
 export default function DoctorDetailPage() {
 	const theme = useTheme();
@@ -54,6 +55,7 @@ export default function DoctorDetailPage() {
 	);
 	const [slotsLoading, setSlotsLoading] = useState(false);
 	const [booking, setBooking] = useState(false);
+	const [consentOpen, setConsentOpen] = useState(false);
 
 	// Generate 7 days loosely for UI
 	const dates = Array.from({ length: 7 }, (_, i) => {
@@ -167,6 +169,48 @@ export default function DoctorDetailPage() {
 			duration: 30,
 		},
 	];
+
+	const handleBookAppointment = async () => {
+		if (!doctor || !selectedTime || !selectedHospital) return;
+
+		setConsentOpen(false);
+		setBooking(true);
+		try {
+			const res = await createAppointment({
+				doctor_id: doctor.id,
+				hospital_id: selectedHospital,
+				appointment_mode:
+					apptType === "offline"
+						? "offline"
+						: "online",
+				appointment_date:
+					formatDateForApi(selectedDate),
+				start_time: formatTimeForApi(selectedTime),
+			});
+			if (res.success) {
+				Alert.alert(
+					"Success",
+					`Appointment booked with ${doctor.name} on ${selectedDate.toDateString()} at ${selectedTime}`,
+				);
+				navigation.goBack();
+			} else {
+				Alert.alert(
+					"Error",
+					"Failed to book appointment: " +
+					(res.message || "Unknown error"),
+				);
+			}
+		} catch (err: any) {
+			console.error(err);
+			Alert.alert(
+				"Error",
+				"An error occurred while booking. Please try again.",
+			);
+		} finally {
+			setBooking(false);
+			setSelectedTime(null);
+		}
+	};
 
 	if (loading) {
 		return (
@@ -654,52 +698,19 @@ export default function DoctorDetailPage() {
 					style={styles.bookButton}
 					loading={booking}
 					disabled={!selectedTime || !selectedHospital}
-					onPress={async () => {
-						if (!doctor || !selectedTime || !selectedHospital)
-							return;
-						setBooking(true);
-						try {
-							const res = await createAppointment({
-								doctor_id: doctor.id,
-								hospital_id: selectedHospital,
-								appointment_mode:
-									apptType === "offline"
-										? "offline"
-										: "online",
-								appointment_date:
-									formatDateForApi(selectedDate),
-								start_time: formatTimeForApi(selectedTime),
-							});
-							if (res.success) {
-								Alert.alert(
-									"Success",
-									`Appointment booked with ${doctor.name} on ${selectedDate.toDateString()} at ${selectedTime}`,
-								);
-								navigation.goBack();
-							} else {
-								Alert.alert(
-									"Error",
-									"Failed to book appointment: " +
-									(res.message || "Unknown error"),
-								);
-							}
-						} catch (err: any) {
-							console.error(err);
-							Alert.alert(
-								"Error",
-								"An error occurred while booking. Please try again.",
-							);
-						} finally {
-							setBooking(false);
-							setSelectedTime(null);
-						}
-					}}
+					onPress={() => setConsentOpen(true)}
 				>
 					{selectedTime
 						? `Book at ${selectedTime}`
 						: "Select a Time Slot"}
 				</AppButton>
 			</View>
+
+			<ConsentModal
+				open={consentOpen}
+				onClose={() => setConsentOpen(false)}
+				onAgree={handleBookAppointment}
+			/>
 		</View>
 	);
 }
