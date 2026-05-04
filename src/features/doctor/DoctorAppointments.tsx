@@ -129,7 +129,8 @@ export default function DoctorAppointments({
 	const [selectedSlot, setSelectedSlot] = useState('')
 	const [rescheduleSlots, setRescheduleSlots] = useState<any[]>([])
 	const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
-
+const [successModalVisible, setSuccessModalVisible] = useState(false)
+const [successMessage, setSuccessMessage] = useState('')
 	// ── Optimistic UI sets ────────────────────────────────────────────────────
 	const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set())
 	const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set())
@@ -221,9 +222,11 @@ export default function DoctorAppointments({
 				status_id: APPOINTMENT_STATUS.CONFIRM,
 			})
 			if (res.success) {
-				showSuccess(res.message || 'Reschedule request submitted')
-				setRescheduleOpen(false)
-			} else {
+	setRescheduleOpen(false)
+
+	setSuccessMessage(res.message || 'Appointment rescheduled successfully')
+	setSuccessModalVisible(true)
+}else {
 				showError(res.message || 'Reschedule failed. Please try again.')
 			}
 		} catch {
@@ -233,6 +236,39 @@ export default function DoctorAppointments({
 		}
 	}
 
+	const renderSuccessModal = () => (
+	<Modal
+		visible={successModalVisible}
+		transparent
+		animationType="fade"
+		onRequestClose={() => setSuccessModalVisible(false)}
+	>
+		<View style={styles.successBackdrop}>
+			<View style={styles.successCard}>
+
+				<MaterialCommunityIcons
+					name="check-circle"
+					size={60}
+					color="#2e8b57"
+				/>
+
+				<Text style={styles.successTitle}>Success</Text>
+
+				<Text style={styles.successMessage}>
+					{successMessage}
+				</Text>
+
+				<TouchableOpacity
+					style={styles.successBtn}
+					onPress={() => setSuccessModalVisible(false)}
+				>
+					<Text style={styles.successBtnText}>Done</Text>
+				</TouchableOpacity>
+
+			</View>
+		</View>
+	</Modal>
+)
 	// ── Fetch available slots whenever the hospital or date changes ───────────
 	//    Uses contextHospitalId so it stays in sync with the dropdown inside the drawer.
 	useEffect(() => {
@@ -756,8 +792,10 @@ export default function DoctorAppointments({
 			</View>
 
 			{/* Modals */}
-			{renderRejectModal()}
-			{renderRescheduleDrawer()}
+			
+{renderRejectModal()}
+{renderRescheduleDrawer()}
+{renderSuccessModal()}
 		</View>
 	)
 }
@@ -1106,4 +1144,45 @@ const styles = StyleSheet.create({
 	skeletonActionsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
 	error: { color: 'red', fontSize: 13, paddingVertical: 12 },
 	empty: { color: '#999', fontSize: 13, paddingVertical: 16 },
+	successBackdrop: {
+	flex: 1,
+	backgroundColor: 'rgba(0,0,0,0.5)',
+	justifyContent: 'center',
+	alignItems: 'center',
+},
+
+successCard: {
+	width: 280,
+	backgroundColor: '#fff',
+	borderRadius: 14,
+	padding: 20,
+	alignItems: 'center',
+},
+
+successTitle: {
+	fontSize: 18,
+	fontWeight: '700',
+	color: '#1a1a1a',
+	marginTop: 10,
+},
+
+successMessage: {
+	fontSize: 14,
+	color: '#555',
+	textAlign: 'center',
+	marginTop: 8,
+	marginBottom: 20,
+},
+
+successBtn: {
+	backgroundColor: '#2e8b57',
+	paddingHorizontal: 20,
+	paddingVertical: 10,
+	borderRadius: 8,
+},
+
+successBtnText: {
+	color: '#fff',
+	fontWeight: '600',
+},
 })

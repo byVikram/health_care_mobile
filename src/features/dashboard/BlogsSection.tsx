@@ -25,6 +25,9 @@ const blogs = [
   },
 ];
 
+const CARD_WIDTH = 240;
+const IMAGE_HEIGHT = 120;
+
 export default function BlogsSection() {
   return (
     <View style={styles.container}>
@@ -32,15 +35,28 @@ export default function BlogsSection() {
         Blogs
       </Text>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+      >
         {blogs.map((b) => (
           <Card key={b.id} style={styles.card}>
-            <View style={styles.imageBox}>
-              <b.ImageComponent width="100%" height="100%" />
+            
+            {/* IMAGE SECTION (full cover style) */}
+            <View style={styles.imageContainer}>
+              <View style={StyleSheet.absoluteFillObject}>
+                <b.ImageComponent
+                  width="100%"
+                  height="100%"
+                  preserveAspectRatio="xMidYMid slice"
+                />
+              </View>
             </View>
 
-            <Card.Content>
-              <Text numberOfLines={2} style={styles.blogTitle}>
+            {/* CONTENT */}
+            <Card.Content style={styles.content}>
+              <Text numberOfLines={2} style={styles.titleText}>
                 {b.title}
               </Text>
 
@@ -53,6 +69,7 @@ export default function BlogsSection() {
                 <Text style={styles.meta}>{b.date}</Text>
               </View>
             </Card.Content>
+
           </Card>
         ))}
       </ScrollView>
@@ -62,36 +79,58 @@ export default function BlogsSection() {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 12,
+    marginVertical: 16,
   },
+
   title: {
     textAlign: "center",
     fontWeight: "bold",
-    marginBottom: 10,
+    marginBottom: 12,
   },
+
+  scroll: {
+    paddingHorizontal: 8,
+    paddingBottom: 20,
+  },
+
   card: {
-    width: 240,
+    width: CARD_WIDTH,
     marginHorizontal: 8,
     borderRadius: 12,
     overflow: "hidden",
+    backgroundColor: "#fff",
   },
-  imageBox: {
-    height: 120,
-    backgroundColor: "#eee",
+
+  imageContainer: {
+    width: CARD_WIDTH,
+    height: IMAGE_HEIGHT,
+    backgroundColor: "#f0f4f8",
+    overflow: "hidden",
   },
-  blogTitle: {
+
+  content: {
+    padding: 12,
+    justifyContent: "space-between",
+  },
+
+  titleText: {
     fontWeight: "bold",
-    marginTop: 6,
+    fontSize: 14,
+    marginBottom: 4,
   },
+
   desc: {
     color: "#666",
-    marginTop: 4,
+    fontSize: 12,
+    marginBottom: 12,
   },
+
   footer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 10,
+    marginTop: "auto",
   },
+
   meta: {
     fontSize: 10,
     color: "#777",
