@@ -36,6 +36,12 @@ const normalizeStat = (raw: unknown, index: number): VitalStat | null => {
 		value: asString(value),
 		unit: asString(raw.unit ?? raw.units),
 		date: asString(raw.date ?? raw.recorded_at ?? raw.created_at),
+		bmiValue: raw.bmiValue !== undefined || raw.bmi_value !== undefined || raw.bmi !== undefined
+			? asString(raw.bmiValue ?? raw.bmi_value ?? raw.bmi)
+			: undefined,
+		bmiCategory: raw.bmiCategory !== undefined || raw.bmi_category !== undefined || raw.category !== undefined
+			? asString(raw.bmiCategory ?? raw.bmi_category ?? raw.category)
+			: undefined,
 	}
 }
 

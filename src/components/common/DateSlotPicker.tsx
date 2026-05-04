@@ -32,6 +32,7 @@ export type PickProps = {
 	disableBookedSlots?: boolean
 	onSelectAll?: () => void
 	onUnselectAll?: () => void
+	showTimeSlots?: boolean
 }
 
 export default function DateSlotPicker(props: PickProps) {
@@ -52,6 +53,7 @@ export default function DateSlotPicker(props: PickProps) {
 		disableBookedSlots = true,
 		onSelectAll,
 		onUnselectAll,
+		showTimeSlots = true,
 	} = props
 
 	const today = new Date()
@@ -170,39 +172,41 @@ export default function DateSlotPicker(props: PickProps) {
 				</View>
 			</ScrollView>
 
-			{/* Time Header */}
-			<View style={styles.timeHeader}>
-				<AppTypography variant="h4" style={styles.timeSectionTitle}>
-					{timeLabel}
-				</AppTypography>
-				{multiSelect && (onSelectAll || onUnselectAll) ? (
-					<View style={styles.bulkActions}>
-						{onSelectAll ? (
-							<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
-								<AppTypography variant="caption" style={styles.bulkButtonText}>
-									Select All
-								</AppTypography>
-							</TouchableOpacity>
-						) : null}
-						{onUnselectAll ? (
-							<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
-								<AppTypography variant="caption" style={styles.bulkButtonText}>
-									Unselect All
-								</AppTypography>
-							</TouchableOpacity>
+			{showTimeSlots ? (
+				<>
+					{/* Time Header */}
+					<View style={styles.timeHeader}>
+						<AppTypography variant="h4" style={styles.timeSectionTitle}>
+							{timeLabel}
+						</AppTypography>
+						{multiSelect && (onSelectAll || onUnselectAll) ? (
+							<View style={styles.bulkActions}>
+								{onSelectAll ? (
+									<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
+										<AppTypography variant="caption" style={styles.bulkButtonText}>
+											Select All
+										</AppTypography>
+									</TouchableOpacity>
+								) : null}
+								{onUnselectAll ? (
+									<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
+										<AppTypography variant="caption" style={styles.bulkButtonText}>
+											Unselect All
+										</AppTypography>
+									</TouchableOpacity>
+								) : null}
+							</View>
 						) : null}
 					</View>
-				) : null}
-			</View>
 
-			{loading ? (
-				<AppSkeleton height={100} style={{ marginTop: 8 }} />
-			) : availableSlots.length === 0 ? (
-				<AppTypography variant="caption" style={styles.greyText}>
-					No slots available for this date.
-				</AppTypography>
-			) : (
-				<View style={styles.timeGridContainer}>
+					{loading ? (
+						<AppSkeleton height={100} style={{ marginTop: 8 }} />
+					) : availableSlots.length === 0 ? (
+						<AppTypography variant="caption" style={styles.greyText}>
+							No slots available for this date.
+						</AppTypography>
+					) : (
+						<View style={styles.timeGridContainer}>
 					{/* Toggle */}
 					<View style={styles.toggleContainer}>
 						<Text style={styles.toggleTitle}>Select Visit Type</Text>
@@ -276,8 +280,10 @@ export default function DateSlotPicker(props: PickProps) {
 							</View>
 						</View>
 					))}
-				</View>
-			)}
+						</View>
+					)}
+				</>
+			) : null}
 		</View>
 	)
 }
