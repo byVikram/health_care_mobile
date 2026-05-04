@@ -3,6 +3,7 @@ import {
     Image,
     ImageSourcePropType,
     StyleSheet,
+    TouchableOpacity,
     View,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -16,7 +17,10 @@ export type DoctorCardItem = {
     experience: string;
 };
 
-type MyDoctorCardProps = DoctorCardItem;
+type MyDoctorCardProps = DoctorCardItem & {
+    saved?: boolean;
+    onToggleSaved?: () => void;
+};
 
 const FALLBACK_DOCTOR_IMAGE = require('../../../assets/Banner/doctor.png');
 
@@ -25,6 +29,8 @@ export default function MyDoctorCard({
     name,
     speciality,
     experience,
+    saved = false,
+    onToggleSaved,
 }: MyDoctorCardProps) {
     const imageSource =
         typeof image === 'string' ? { uri: image } : image || FALLBACK_DOCTOR_IMAGE;
@@ -60,6 +66,18 @@ export default function MyDoctorCard({
                     </AppTypography>
                 </View>
             </View>
+
+            <TouchableOpacity
+                style={styles.bookmarkButton}
+                onPress={onToggleSaved}
+                activeOpacity={0.75}
+            >
+                <MaterialCommunityIcons
+                    name={saved ? 'bookmark' : 'bookmark-outline'}
+                    size={24}
+                    color={saved ? '#245f67' : '#8ca0a9'}
+                />
+            </TouchableOpacity>
         </View>
     );
 }
@@ -73,7 +91,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#d9e6eb',
         padding: 12,
-        marginBottom: 14,
         shadowColor: '#12343b',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
@@ -95,6 +112,7 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         justifyContent: 'center',
+        paddingRight: 10,
     },
     name: {
         fontSize: 17,
@@ -116,5 +134,13 @@ const styles = StyleSheet.create({
         marginLeft: 5,
         color: '#7f98a3',
         fontSize: 11,
+    },
+    bookmarkButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f2f7f8',
     },
 });

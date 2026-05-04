@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { Menu, useTheme, TouchableRipple } from "react-native-paper";
+import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import { Menu, TouchableRipple, useTheme } from "react-native-paper";
 import { AppTypography } from "./AppTypography";
 
 export interface AppSelectOption {
@@ -15,8 +15,11 @@ interface AppSelectProps {
   placeholder?: string;
   label?: string;
   errorText?: string;
-  borderRadius?: number; // 👈 optional custom border radius
-  borderColor?: string; // 👈 optional custom border color
+  borderRadius?: number;
+  borderColor?: string;
+  size?: "small" | "medium";
+  style?: StyleProp<ViewStyle>;
+  customCardStyle?: StyleProp<ViewStyle>;
 }
 
 export const AppSelect = ({
@@ -26,8 +29,11 @@ export const AppSelect = ({
   placeholder = "Select an option",
   label,
   errorText,
-  borderRadius = 12, // 👈 default border radius
-  borderColor = "#ccc", // 👈 default border color
+  borderRadius = 8,
+  borderColor = "#ccc",
+  size = "medium",
+  style,
+  customCardStyle,
 }: AppSelectProps) => {
   const [visible, setVisible] = useState(false);
   const [fieldWidth, setFieldWidth] = useState(0);
@@ -46,22 +52,24 @@ export const AppSelect = ({
   };
 
   const selectedOption = options.find((opt) => opt.value === value);
-
-  // resolve border color: error > custom > default
   const resolvedBorderColor = errorText ? theme.colors.error : borderColor;
 
   return (
-    <View style={styles.container}>
-      {label && (
+    <View style={[styles.container, style]}>
+      {label ? (
         <AppTypography variant="caption" style={styles.label}>
           {label}
         </AppTypography>
-      )}
+      ) : null}
 
       <Menu
         visible={visible}
         onDismiss={closeMenu}
-        contentStyle={{ width: fieldWidth, borderRadius: 8, backgroundColor:'#fff' }} // 👈 menu corners
+        contentStyle={{
+          width: fieldWidth,
+          borderRadius: 8,
+          backgroundColor: "#fff",
+        }}
         anchor={anchor}
       >
         {options.map((option) => (
@@ -72,12 +80,7 @@ export const AppSelect = ({
               closeMenu();
             }}
             title={option.label}
-            style={{
-              width: fieldWidth,
-            //   color: selectedOption
-            //     ? theme.colors.primary
-            //     : theme.colors.onSurfaceVariant, // ✅ YOUR PLACEHOLDER COLOR
-            }}
+            style={{ width: fieldWidth }}
           />
         ))}
       </Menu>
@@ -88,34 +91,34 @@ export const AppSelect = ({
         borderless={false}
         style={[
           styles.dropdown,
+          size === "small" && styles.dropdownSmall,
           {
-            borderColor: errorText ? theme.colors.error : theme.colors.outline, // ✅ EXACT match
-            borderRadius: 8, // 👈 dynamic border radius
+            borderColor: resolvedBorderColor,
+            borderRadius,
           },
+          customCardStyle,
         ]}
       >
-        <View style={styles.dropdownContent}>
+        <View style={[styles.dropdownContent, size === "small" && styles.dropdownContentSmall]}>
           <AppTypography
             variant="body"
-            style={{
-              fontSize: 16,
-              color: selectedOption ? theme.colors.onSurfaceVariant : "", // ✅ YOUR PLACEHOLDER COLOR
-            }}
+            style={[
+              styles.dropdownText,
+              size === "small" && styles.dropdownTextSmall,
+              { color: selectedOption ? theme.colors.onSurfaceVariant : "#7c878d" },
+            ]}
+            numberOfLines={1}
           >
             {selectedOption ? selectedOption.label : placeholder}
           </AppTypography>
-          <AppTypography variant="body" color={theme.colors.outline}>
+          <AppTypography variant="body" color={theme.colors.outline} style={styles.chevron}>
             ▼
           </AppTypography>
         </View>
       </TouchableRipple>
 
       {errorText ? (
-        <AppTypography
-          variant="caption"
-          color={theme.colors.error}
-          style={styles.errorText}
-        >
+        <AppTypography variant="caption" color={theme.colors.error} style={styles.errorText}>
           {errorText}
         </AppTypography>
       ) : null}
@@ -131,16 +134,17 @@ const styles = StyleSheet.create({
   label: {
     marginBottom: 4,
     marginLeft: 4,
-    // color: theme.colors.onSurface,
   },
   dropdown: {
     borderWidth: 1,
-    borderRadius: 4, // ✅ SAME as TextInput
-    borderColor: "#C4C4C4", // ❌ remove later (see below)
+    borderColor: "#C4C4C4",
     backgroundColor: "#fff",
-    height: 56, // ✅ SAME height
+    height: 56,
     justifyContent: "center",
     overflow: "hidden",
+  },
+  dropdownSmall: {
+    height: 32,
   },
   dropdownContent: {
     flexDirection: "row",
@@ -148,6 +152,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     width: "100%",
+  },
+  dropdownContentSmall: {
+    paddingHorizontal: 10,
+  },
+  dropdownText: {
+    flex: 1,
+    fontSize: 16,
+  },
+  dropdownTextSmall: {
+    fontSize: 12,
+  },
+  chevron: {
+    marginLeft: 8,
   },
   errorText: {
     marginTop: 4,

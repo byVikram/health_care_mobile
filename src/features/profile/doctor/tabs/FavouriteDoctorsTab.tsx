@@ -1,14 +1,6 @@
 import React from 'react'
-import { View, StyleSheet, Text } from 'react-native'
+import MyDoctorPage from '../../../patient/MyDoctorPage'
 
 export default function FavouriteDoctorsTab() {
-	return (
-		<View style={styles.container}>
-			<Text>Favourite Doctors Placeholder</Text>
-		</View>
-	)
+	return <MyDoctorPage />
 }
-
-const styles = StyleSheet.create({
-	container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-})
