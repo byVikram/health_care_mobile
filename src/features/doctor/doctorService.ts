@@ -195,6 +195,7 @@ export const getDoctorAvailability = async (params: {
 	doctor_id?: string
 	hospital_id: number | string
 	date: string
+	location?: string
 }): Promise<SlotGroup[] | AvailabilityResponse> => {
 	const res = await ApiService.getWithParams<SlotGroup[] | AvailabilityResponse>(
 		API_ENDPOINTS.DOCTORS.AVAILABILITY,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+﻿import React, { useEffect, useState, useRef } from 'react'
 import {
 	View,
 	StyleSheet,
@@ -1241,6 +1241,7 @@ export default function ConsultationPage() {
 						</Button>
 					</View>
 				</ScrollView>
+				
 				<View style={[styles.tabPage, styles.vitalsContent, { width: pageWidth }]}>
 					<VitalsTab patientId={patient?.id || patientId} />
 				</View>
