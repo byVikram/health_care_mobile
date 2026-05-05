@@ -6,10 +6,11 @@ import {
 	Pressable,
 	StatusBar,
 	ActivityIndicator,
+	Image, // ✅ added
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { getRoles } from '../auth/authService' // adjust path
+import { getRoles } from '../auth/authService'
 import type { AuthScreenProps } from '../../navigation/types'
 import { ROUTES } from '../../navigation/routes'
 import { USER_ROLES } from '../../constants/constants'
@@ -44,24 +45,33 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 	}
 
 	const handleRoleSelect = (role: Role) => {
-	let mappedRole: string | null = null
+		let mappedRole: string | null = null
 
-	if (role.label.toLowerCase() === 'doctor') {
-		mappedRole = USER_ROLES.DOCTOR
-	} else if (role.label.toLowerCase() === 'patient') {
-		mappedRole = USER_ROLES.PATIENT
+		if (role.label.toLowerCase() === 'doctor') {
+			mappedRole = USER_ROLES.DOCTOR
+		} else if (role.label.toLowerCase() === 'patient') {
+			mappedRole = USER_ROLES.PATIENT
+		}
+
+		if (!mappedRole) {
+			console.warn('Unknown role:', role)
+			return
+		}
+
+		navigation.navigate(ROUTES.AUTH.ONBOARDING, {
+			roleId: mappedRole,
+			roleLabel: role.label,
+		})
 	}
 
-	if (!mappedRole) {
-		console.warn('Unknown role:', role)
-		return
+	// ✅ Image mapping
+	const roleImages: Record<string, any> = {
+		ancillary: require('../../assets/splash/ancillary.png'),
+		laboratory: require('../../assets/splash/laboratory.png'),
+		pharmacy: require('../../assets/splash/pharmacy.png'),
+		radiology: require('../../assets/splash/radiology.png'),
 	}
 
-	navigation.navigate(ROUTES.AUTH.ONBOARDING, {
-		roleId: mappedRole,   // ✅ THIS IS THE FIX
-		roleLabel: role.label,
-	})
-}
 	return (
 		<SafeAreaView style={styles.safeArea}>
 			<StatusBar barStyle="light-content" />
@@ -83,14 +93,13 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 								style={styles.card}
 							>
 								<View style={styles.iconCircle}>
-									<Ionicons
-										name={
-											role.label.toLowerCase() === 'doctor'
-												? 'medkit-outline'
-												: 'person-outline'
+									<Image
+										source={
+											roleImages[role.label.toLowerCase()] ||
+											require('../../assets/splash/ancillary.png')
 										}
-										size={28}
-										color="#134149"
+										style={styles.image}
+										resizeMode="contain"
 									/>
 								</View>
 
@@ -164,6 +173,11 @@ const styles = StyleSheet.create({
 		backgroundColor: '#e8f0f0',
 		alignItems: 'center',
 		justifyContent: 'center',
+	},
+
+	image: {
+		width: 28,
+		height: 28,
 	},
 
 	textWrap: {

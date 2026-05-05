@@ -1,149 +1,120 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useState, useEffect, useContext } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { navigationRef } from '../navigation/navigationService'
 
 export type UserRole = 'doctor' | 'patient'
 
 export interface AuthUser {
-	id?: string
-	name: string
-	email?: string
-	avatar?: string
-	profileCompletion?: number
-	profilePath?: string
-	showQr?: boolean
+  id?: string
+  name: string
+  email?: string
+  avatar?: string
 }
 
 export interface AuthState {
-	role: UserRole | null
-	user: AuthUser | null
-	accessToken: string | null
-	refreshToken: string | null
-	isLoading: boolean
-	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string) => Promise<void>
-	updateUser: (user: Partial<AuthUser>) => Promise<void>
-	clearAuth: () => Promise<void>
+  role: UserRole | null
+  user: AuthUser | null
+  accessToken: string | null
+  refreshToken: string | null
+  isLoading: boolean
+
+  selectedHospital: string | null
+  setSelectedHospital: (hospital: string) => void
+
+  // ✅ NEW — hospital ID used for filtering appointments & fetching slots
+  selectedHospitalId: string | null
+  setSelectedHospitalId: (id: string | null) => void
+
+  setAuth: (
+    role: UserRole,
+    user: AuthUser,
+    accessToken: string,
+    refreshToken: string
+  ) => Promise<void>
+
+  clearAuth: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthState>({
-	role: null,
-	user: null,
-	accessToken: null,
-	refreshToken: null,
-	isLoading: true,
-	setAuth: async () => {},
-	updateUser: async () => {},
-	clearAuth: async () => {},
-})
+const AuthContext = createContext<AuthState>({} as AuthState)
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-	const [role, setRole] = useState<UserRole | null>(null)
-	const [user, setUser] = useState<AuthUser | null>(null)
-	const [accessToken, setAccessToken] = useState<string | null>(null)
-	const [refreshToken, setRefreshToken] = useState<string | null>(null)
-	const [isLoading, setIsLoading] = useState(true)
+  const [role, setRole] = useState<UserRole | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [refreshToken, setRefreshToken] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-	useEffect(() => {
-		const loadAuthData = async () => {
-			try {
-				const storedRole = (await AsyncStorage.getItem('role')) as UserRole | null
-				const rawUser = await AsyncStorage.getItem('user')
-				const storedUser = rawUser ? JSON.parse(rawUser) : null
-				const storedAccessToken = await AsyncStorage.getItem('access_token')
-				const storedRefreshToken = await AsyncStorage.getItem('refresh_token')
+  const [selectedHospital, setSelectedHospitalState] = useState<string | null>(null)
+  const [selectedHospitalId, setSelectedHospitalIdState] = useState<string | null>(null) // ✅ NEW
 
-				setRole(storedRole)
-				setUser(storedUser)
-				setAccessToken(storedAccessToken)
-				setRefreshToken(storedRefreshToken)
-			} catch (error) {
-				console.error('Failed to load auth data', error)
-			} finally {
-				setIsLoading(false)
-			}
-		}
+  const setSelectedHospital = (hospital: string) => {
+    setSelectedHospitalState(hospital)
+  }
 
-		loadAuthData()
-	}, [])
+  // ✅ NEW
+  const setSelectedHospitalId = (id: string | null) => {
+    setSelectedHospitalIdState(id)
+  }
 
-	const handleSetAuth = async (
-		newRole: UserRole,
-		newUser: AuthUser,
-		newAccessToken: string,
-		newRefreshToken: string
-	) => {
-		try {
-			await AsyncStorage.setItem('role', newRole)
-			await AsyncStorage.setItem('user', JSON.stringify(newUser))
-			await AsyncStorage.setItem('access_token', newAccessToken)
-			await AsyncStorage.setItem('refresh_token', newRefreshToken)
+  useEffect(() => {
+    const load = async () => {
+      const role = await AsyncStorage.getItem('role')
+      const user = await AsyncStorage.getItem('user')
+      const token = await AsyncStorage.getItem('access_token')
 
-			setRole(newRole)
-			setUser(newUser)
-			setAccessToken(newAccessToken)
-			setRefreshToken(newRefreshToken)
-		} catch (error) {
-			console.error('Failed to set auth data', error)
-		}
-	}
+      setRole(role as UserRole)
+      setUser(user ? JSON.parse(user) : null)
+      setAccessToken(token)
 
-	const handleClearAuth = async () => {
-		try {
-			await AsyncStorage.multiRemove(['role', 'user', 'access_token', 'refresh_token'])
-			setRole(null)
-			setUser(null)
-			setAccessToken(null)
-			setRefreshToken(null)
-		} catch (error) {
-			console.error('Failed to clear auth data', error)
-		}
-	}
+      setIsLoading(false)
+    }
+    load()
+  }, [])
 
-	const handleUpdateUser = async (updatedUser: Partial<AuthUser>) => {
-		try {
-			setUser((prevUser) => {
-				if (!prevUser) return prevUser
+  const setAuth = async (
+    role: UserRole,
+    user: AuthUser,
+    accessToken: string,
+    refreshToken: string
+  ) => {
+    await AsyncStorage.setItem('role', role)
+    await AsyncStorage.setItem('user', JSON.stringify(user))
+    await AsyncStorage.setItem('access_token', accessToken)
 
-				const nextUser = {
-					...prevUser,
-					...updatedUser,
-				}
+    setRole(role)
+    setUser(user)
+    setAccessToken(accessToken)
+    setRefreshToken(refreshToken)
+  }
 
-				AsyncStorage.setItem('user', JSON.stringify(nextUser)).catch((error) => {
-					console.error('Failed to persist updated user data', error)
-				})
+  const clearAuth = async () => {
+    await AsyncStorage.clear()
+    setRole(null)
+    setUser(null)
+    setAccessToken(null)
+    setSelectedHospitalState(null)      // reset on logout
+    setSelectedHospitalIdState(null)    // ✅ reset on logout
+  }
 
-				return nextUser
-			})
-		} catch (error) {
-			console.error('Failed to update user data', error)
-		}
-	}
-
-	return (
-		<AuthContext.Provider
-			value={{
-				role,
-				user,
-				accessToken,
-				refreshToken,
-				isLoading,
-				setAuth: handleSetAuth,
-				updateUser: handleUpdateUser,
-				clearAuth: handleClearAuth,
-			}}
-		>
-			{children}
-		</AuthContext.Provider>
-	)
+  return (
+    <AuthContext.Provider
+      value={{
+        role,
+        user,
+        accessToken,
+        refreshToken,
+        isLoading,
+        selectedHospital,
+        setSelectedHospital,
+        selectedHospitalId,           // ✅ NEW
+        setSelectedHospitalId,        // ✅ NEW
+        setAuth,
+        clearAuth,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export const useAuth = () => useContext(AuthContext)
-
-// Utility function to clear auth from outside React components
-// (e.g. from axios interceptor)
-export const clearAuthStorage = async () => {
-	await AsyncStorage.multiRemove(['role', 'user', 'access_token', 'refresh_token'])
-	// Navigate to login screen - navigation handled by apiService or manual navigation call
-}
