@@ -11,14 +11,17 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { AppTypography } from '../../../components/common';
 
 export type DoctorCardItem = {
+    id?: string;
     image: ImageSourcePropType | string;
     name: string;
     speciality: string;
     experience: string;
+    location?: string;
 };
 
 type MyDoctorCardProps = DoctorCardItem & {
     saved?: boolean;
+    disabled?: boolean;
     onToggleSaved?: () => void;
 };
 
@@ -29,7 +32,9 @@ export default function MyDoctorCard({
     name,
     speciality,
     experience,
+    location,
     saved = false,
+    disabled = false,
     onToggleSaved,
 }: MyDoctorCardProps) {
     const imageSource =
@@ -65,11 +70,25 @@ export default function MyDoctorCard({
                         {experience}
                     </AppTypography>
                 </View>
+
+                {!!location && (
+                    <View style={[styles.metaRow, styles.locationRow]}>
+                        <MaterialCommunityIcons
+                            name="map-marker-outline"
+                            size={14}
+                            color="#7f98a3"
+                        />
+                        <AppTypography variant="caption" style={styles.metaText} numberOfLines={1}>
+                            {location}
+                        </AppTypography>
+                    </View>
+                )}
             </View>
 
             <TouchableOpacity
-                style={styles.bookmarkButton}
+                style={[styles.bookmarkButton, disabled && styles.bookmarkButtonDisabled]}
                 onPress={onToggleSaved}
+                disabled={disabled}
                 activeOpacity={0.75}
             >
                 <MaterialCommunityIcons
@@ -135,6 +154,9 @@ const styles = StyleSheet.create({
         color: '#7f98a3',
         fontSize: 11,
     },
+    locationRow: {
+        marginTop: 3,
+    },
     bookmarkButton: {
         width: 38,
         height: 38,
@@ -142,5 +164,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#f2f7f8',
+    },
+    bookmarkButtonDisabled: {
+        opacity: 0.55,
     },
 });

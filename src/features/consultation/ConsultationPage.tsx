@@ -9,7 +9,9 @@ import {
 	TextInput as NativeInput,
 	Modal,
 	Platform,
+	useWindowDimensions,
 } from 'react-native'
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import { useTheme, Card, Avatar, Button, IconButton, Divider, Text, Snackbar } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import type { SvgProps } from 'react-native-svg'
@@ -437,6 +439,8 @@ export default function ConsultationPage() {
 	const theme = useTheme()
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
+	const { width: pageWidth } = useWindowDimensions()
+	const pagerRef = useRef<ScrollView>(null)
 
 	const [patient, setPatient] = useState<PatientDetails | null>(null)
 	const [doctor, setDoctor] = useState<DocterDetails | null>(null)
@@ -465,6 +469,11 @@ export default function ConsultationPage() {
 	const [followUpHospitalId, setFollowUpHospitalId] = useState<string>('')
 
 	const params = route.params as any
+
+	useEffect(() => {
+		if (pageWidth <= 0) return
+		pagerRef.current?.scrollTo({ x: pageWidth * activeTab, animated: false })
+	}, [pageWidth])
 
 	// Try to get IDs from params first
 	const appointmentId = params?.appointmentId ?? params?.appointment_id ?? params?.id ?? ''
@@ -865,6 +874,20 @@ export default function ConsultationPage() {
 	}
 
 	const avatarUri = resolveAvatar(patient)
+	const tabLabels = ['Info & Timeline', 'Vitals']
+
+	const handleTabPress = (idx: number) => {
+		setActiveTab(idx)
+		pagerRef.current?.scrollTo({ x: pageWidth * idx, animated: true })
+	}
+
+	const handlePagerMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+		const nextTab = Math.min(
+			Math.max(Math.round(event.nativeEvent.contentOffset.x / pageWidth), 0),
+			tabLabels.length - 1
+		)
+		if (nextTab !== activeTab) setActiveTab(nextTab)
+	}
 
 	return (
 		<View style={styles.container}>
@@ -923,7 +946,7 @@ export default function ConsultationPage() {
 
 				{/* Tabs */}
 				<View style={styles.tabContainer}>
-					{['Info & Timeline', 'Vitals'].map((label, idx) => (
+					{tabLabels.map((label, idx) => (
 						<TouchableOpacity
 							key={label}
 							style={[
@@ -933,7 +956,7 @@ export default function ConsultationPage() {
 									borderBottomWidth: 2,
 								},
 							]}
-							onPress={() => setActiveTab(idx)}
+							onPress={() => handleTabPress(idx)}
 						>
 							<Text
 								style={[
@@ -952,8 +975,19 @@ export default function ConsultationPage() {
 			</View>
 
 			{/* ── Content ── */}
-			{activeTab === 0 ? (
-				<ScrollView contentContainerStyle={styles.content}>
+			<ScrollView
+				ref={pagerRef}
+				style={styles.pager}
+				horizontal
+				pagingEnabled
+				showsHorizontalScrollIndicator={false}
+				onMomentumScrollEnd={handlePagerMomentumEnd}
+				scrollEventThrottle={16}
+			>
+				<ScrollView
+					style={[styles.tabPage, { width: pageWidth }]}
+					contentContainerStyle={styles.content}
+				>
 					<View>
 						{/* Patient Details */}
 						<Card style={styles.card}>
@@ -1207,11 +1241,10 @@ export default function ConsultationPage() {
 						</Button>
 					</View>
 				</ScrollView>
-			) : (
-				<View style={styles.vitalsContent}>
+				<View style={[styles.tabPage, styles.vitalsContent, { width: pageWidth }]}>
 					<VitalsTab patientId={patient?.id || patientId} />
 				</View>
-			)}
+			</ScrollView>
 
 			{/* Follow Up drawer — at root level */}
 			{renderFollowUpDrawer()}
@@ -1244,6 +1277,12 @@ const styles = StyleSheet.create({
 		padding: 24,
 	},
 	vitalsContent: {
+		flex: 1,
+	},
+	pager: {
+		flex: 1,
+	},
+	tabPage: {
 		flex: 1,
 	},
 	header: {
