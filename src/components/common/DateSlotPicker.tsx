@@ -96,7 +96,8 @@ export default function DateSlotPicker(props: PickProps) {
 	}
 
 	const selectedTimes = Array.isArray(selectedTime) ? selectedTime : selectedTime ? [selectedTime] : []
-	const resolvedVisitType = (selectedAppointmentType === 'video' ? 'video' : selectedAppointmentType === 'clinic' ? 'clinic' : visitType)
+	const resolvedVisitType =
+		selectedAppointmentType === 'video' ? 'video' : selectedAppointmentType === 'clinic' ? 'clinic' : visitType
 	const dateBoxWidth = isTablet ? 62 : 50
 	const slotBasis = `${100 / timeSlotColumns - (isTablet ? 1.8 : 2.8)}%`
 
@@ -124,17 +125,19 @@ export default function DateSlotPicker(props: PickProps) {
 				<AppTypography variant="h4" style={styles.sectionTitle}>
 					{dateLabel}
 				</AppTypography>
-				{hideNavigation ? null : <View style={styles.monthNav}>
-					<TouchableOpacity onPress={handlePrevWeek} style={styles.chevron}>
-						<MaterialCommunityIcons name="chevron-left" size={20} color="#0c7c7c" />
-					</TouchableOpacity>
-					<AppTypography variant="body" style={styles.monthLabel}>
-						{monthLabel}
-					</AppTypography>
-					<TouchableOpacity onPress={handleNextWeek} style={styles.chevron}>
-						<MaterialCommunityIcons name="chevron-right" size={20} color="#0c7c7c" />
-					</TouchableOpacity>
-				</View>}
+				{hideNavigation ? null : (
+					<View style={styles.monthNav}>
+						<TouchableOpacity onPress={handlePrevWeek} style={styles.chevron}>
+							<MaterialCommunityIcons name="chevron-left" size={20} color="#0c7c7c" />
+						</TouchableOpacity>
+						<AppTypography variant="body" style={styles.monthLabel}>
+							{monthLabel}
+						</AppTypography>
+						<TouchableOpacity onPress={handleNextWeek} style={styles.chevron}>
+							<MaterialCommunityIcons name="chevron-right" size={20} color="#0c7c7c" />
+						</TouchableOpacity>
+					</View>
+				)}
 			</View>
 
 			{/* Date Strip */}
@@ -197,19 +200,35 @@ export default function DateSlotPicker(props: PickProps) {
 
 						<View style={[styles.toggleGroup, isTablet && styles.toggleGroupTablet]}>
 							<TouchableOpacity
-								style={[styles.toggleOption, resolvedVisitType === 'clinic' && styles.toggleSelectedOption]}
+								style={[
+									styles.toggleOption,
+									resolvedVisitType === 'clinic' && styles.toggleSelectedOption,
+								]}
 								onPress={() => handleVisitTypeChange('clinic')}
 							>
-								<Text style={[styles.toggleText, resolvedVisitType === 'clinic' && styles.toggleSelectedText]}>
+								<Text
+									style={[
+										styles.toggleText,
+										resolvedVisitType === 'clinic' && styles.toggleSelectedText,
+									]}
+								>
 									Clinic
 								</Text>
 							</TouchableOpacity>
 
 							<TouchableOpacity
-								style={[styles.toggleOption, resolvedVisitType === 'video' && styles.toggleSelectedOption]}
+								style={[
+									styles.toggleOption,
+									resolvedVisitType === 'video' && styles.toggleSelectedOption,
+								]}
 								onPress={() => handleVisitTypeChange('video')}
 							>
-								<Text style={[styles.toggleText, resolvedVisitType === 'video' && styles.toggleSelectedText]}>
+								<Text
+									style={[
+										styles.toggleText,
+										resolvedVisitType === 'video' && styles.toggleSelectedText,
+									]}
+								>
 									Video
 								</Text>
 							</TouchableOpacity>
@@ -256,7 +275,8 @@ export default function DateSlotPicker(props: PickProps) {
 									<View style={styles.slotsGridFlex}>
 										{group.slots.map((slot, idx) => {
 											const isSelected = selectedTimes.includes(slot.start_time)
-											const isAvailable = slot.status === 'AVAILABLE' || slot.status === ('' as any)
+											const isAvailable =
+												slot.status === 'AVAILABLE' || slot.status === ('' as any)
 											const isBlocked = slot.status === 'BLOCKED'
 											const isBooked = slot.status === 'BOOKED' || slot.status === 'UNAVAILABLE'
 											const canSelect =

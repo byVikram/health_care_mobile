@@ -19,7 +19,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { Asset } from 'expo-asset'
 import * as FileSystem from 'expo-file-system/legacy'
 // import * as SpeechRecognition from 'expo-speech-recognition';
-import Voice from '@react-native-voice/voice'
+// import Voice from '@react-native-voice/voice'
 import { Audio } from 'expo-av'
 import DicomViewer from './components/DicomViewer'
 import VitalsTab from './components/VitalsTab'
