@@ -12,7 +12,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography, DateSlotPicker } from '../../../../components/common'
+import { AppTypography } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -37,6 +37,7 @@ type HospitalItem = HospitalFormData & {
 }
 
 type AppointmentType = 'clinic' | 'video'
+type WorkingDayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
 type TimeSlot = { start: string; end: string }
 type SectionSlots = {
 	morning: TimeSlot[]
@@ -57,6 +58,16 @@ const EMPTY_FORM: HospitalFormData = {
 }
 
 const TEAL = '#0c7c7c'
+
+const WORKING_DAYS: { key: WorkingDayKey; label: string }[] = [
+	{ key: 'sunday', label: 'Sun' },
+	{ key: 'monday', label: 'Mon' },
+	{ key: 'tuesday', label: 'Tue' },
+	{ key: 'wednesday', label: 'Wed' },
+	{ key: 'thursday', label: 'Thu' },
+	{ key: 'friday', label: 'Fri' },
+	{ key: 'saturday', label: 'Sat' },
+]
 
 const getSuccessMessage = (response: unknown, fallback = 'Hospital saved successfully') => {
 	if (
@@ -136,24 +147,29 @@ const SECTION_META = [
 		endHour: 21,
 	},
 ]
-const INITIAL_WORKING_HOURS: Record<AppointmentType, WorkingHoursState> = {
-	clinic: {
-		sections: {
-			morning: [{ start: '08:00', end: '10:00' }],
-			afternoon: [{ start: '12:00', end: '14:00' }],
-			evening: [{ start: '17:00', end: '19:00' }],
-		},
-		slotDuration: 15,
+const createWorkingHoursState = (): WorkingHoursState => ({
+	sections: {
+		morning: [{ start: '08:00', end: '10:00' }],
+		afternoon: [{ start: '12:00', end: '14:00' }],
+		evening: [{ start: '17:00', end: '19:00' }],
 	},
-	video: {
-		sections: {
-			morning: [{ start: '08:00', end: '10:00' }],
-			afternoon: [{ start: '12:00', end: '14:00' }],
-			evening: [{ start: '17:00', end: '19:00' }],
-		},
-		slotDuration: 15,
-	},
-}
+	slotDuration: 15,
+})
+
+const createWorkingHoursByType = (): Record<AppointmentType, WorkingHoursState> => ({
+	clinic: createWorkingHoursState(),
+	video: createWorkingHoursState(),
+})
+
+const createWeeklyWorkingHours = (): Record<WorkingDayKey, Record<AppointmentType, WorkingHoursState>> => ({
+	monday: createWorkingHoursByType(),
+	tuesday: createWorkingHoursByType(),
+	wednesday: createWorkingHoursByType(),
+	thursday: createWorkingHoursByType(),
+	friday: createWorkingHoursByType(),
+	saturday: createWorkingHoursByType(),
+	sunday: createWorkingHoursByType(),
+})
 
 const buildHospitalPayload = (hospital: HospitalItem, isPrimary = hospital.isPrimary) => ({
 	name: hospital.name.trim(),
@@ -326,8 +342,8 @@ function WorkingHoursRow({
 }
 
 function WorkingHoursSection({
-	selectedDate,
-	onDateChange,
+	selectedWorkingDay,
+	onWorkingDayChange,
 	selectedAppointmentType,
 	onAppointmentTypeChange,
 	selectedWorkingHours,
@@ -337,8 +353,8 @@ function WorkingHoursSection({
 	onSlotDurationChange,
 	stacked,
 }: {
-	selectedDate: Date
-	onDateChange: (date: Date) => void
+	selectedWorkingDay: WorkingDayKey
+	onWorkingDayChange: (day: WorkingDayKey) => void
 	selectedAppointmentType: AppointmentType
 	onAppointmentTypeChange: (type: AppointmentType) => void
 	selectedWorkingHours: WorkingHoursState
@@ -354,17 +370,31 @@ function WorkingHoursSection({
 				Working Hours
 			</AppTypography>
 
-			<View style={styles.datePickerWrap}>
-				<DateSlotPicker
-					selectedDate={selectedDate}
-					onDateChange={onDateChange}
-					selectedTime={null}
-					onTimeChange={() => undefined}
-					availableSlots={[]}
-					dateLabel="Select Date"
-					showTimeSlots={false}
-				/>
-			</View>
+			<ScrollView
+				horizontal={stacked}
+				showsHorizontalScrollIndicator={false}
+				style={stacked ? styles.daysScroll : undefined}
+				contentContainerStyle={[styles.daysWrap, stacked && styles.daysWrapCompact]}
+			>
+				{WORKING_DAYS.map((day) => {
+					const isSelected = selectedWorkingDay === day.key
+					return (
+						<TouchableOpacity
+							key={day.key}
+							style={[styles.dayChip, stacked && styles.dayChipCompact, isSelected && styles.dayChipActive]}
+							onPress={() => onWorkingDayChange(day.key)}
+							activeOpacity={0.85}
+						>
+							<AppTypography
+								variant="body"
+								style={[styles.dayChipText, stacked && styles.dayChipTextCompact, isSelected && styles.dayChipTextActive]}
+							>
+								{day.label}
+							</AppTypography>
+						</TouchableOpacity>
+					)
+				})}
+			</ScrollView>
 
 			<View style={styles.appointmentTypeBlock}>
 				<AppTypography variant="caption" style={styles.appointmentTypeLabel}>
@@ -532,6 +562,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const isLandscape = width > height
 	const isMobile = width < 768
 	const useTwoColumns = width >= 768
+	const useWideHospitalRows = isLandscape && width >= 1024
 
 	const [showForm, setShowForm] = useState(false)
 	const [form, setForm] = useState<HospitalFormData>(EMPTY_FORM)
@@ -541,11 +572,9 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const [isLoading, setIsLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [isSavingAddress, setIsSavingAddress] = useState(false)
-	const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+	const [selectedWorkingDay, setSelectedWorkingDay] = useState<WorkingDayKey>('monday')
 	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentType>('clinic')
-	const [workingHoursByType, setWorkingHoursByType] = useState<Record<AppointmentType, WorkingHoursState>>(
-		INITIAL_WORKING_HOURS
-	)
+	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState(createWeeklyWorkingHours)
 	const [followUpDays, setFollowUpDays] = useState(7)
 	const [rescheduleCutoff, setRescheduleCutoff] = useState(2)
 	const hospitalsRef = useRef<HospitalItem[]>([])
@@ -606,16 +635,17 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}, [externalHospitals])
 
 	const contentWidth = useMemo(() => {
-		if (width >= 1280) return 980
-		if (width >= 1024) return 920
-		if (width >= 768) return 820
+		if (width >= 1366) return 1120
+		if (width >= 1180) return 1040
+		if (width >= 1024) return 960
+		if (width >= 768) return Math.min(width - 48, 860)
 		return 640
 	}, [width])
 
-	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
-	const cardDirection = isMobile ? 'column' : 'row'
-	const actionStacked = isMobile || (isTablet && !isLandscape)
-	const selectedWorkingHours = workingHoursByType[selectedAppointmentType]
+	const sectionPadding = isMobile ? 16 : isTablet ? 24 : 28
+	const cardDirection = useWideHospitalRows ? 'row' : 'column'
+	const actionStacked = !useWideHospitalRows
+	const selectedWorkingHours = weeklyWorkingHours[selectedWorkingDay][selectedAppointmentType]
 
 	const resetForm = () => {
 		setForm(EMPTY_FORM)
@@ -624,8 +654,8 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}
 
 	const addSlot = (sectionKey: keyof SectionSlots) => {
-		setWorkingHoursByType((prev) => {
-			const current = prev[selectedAppointmentType]
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
 			const slots = current.sections[sectionKey]
 			if (slots.length >= 3) return prev
 
@@ -638,11 +668,14 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 
 			return {
 				...prev,
-				[selectedAppointmentType]: {
-					...current,
-					sections: {
-						...current.sections,
-						[sectionKey]: [...slots, { start: previousEnd, end: newEnd }],
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						...current,
+						sections: {
+							...current.sections,
+							[sectionKey]: [...slots, { start: previousEnd, end: newEnd }],
+						},
 					},
 				},
 			}
@@ -650,17 +683,20 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}
 
 	const removeSlot = (sectionKey: keyof SectionSlots, slotIndex: number) => {
-		setWorkingHoursByType((prev) => {
-			const current = prev[selectedAppointmentType]
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
 			if (slotIndex === 0) return prev
 
 			return {
 				...prev,
-				[selectedAppointmentType]: {
-					...current,
-					sections: {
-						...current.sections,
-						[sectionKey]: current.sections[sectionKey].filter((_, index) => index !== slotIndex),
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						...current,
+						sections: {
+							...current.sections,
+							[sectionKey]: current.sections[sectionKey].filter((_, index) => index !== slotIndex),
+						},
 					},
 				},
 			}
@@ -673,18 +709,21 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		field: 'start' | 'end',
 		value: string
 	) => {
-		setWorkingHoursByType((prev) => {
-			const current = prev[selectedAppointmentType]
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
 
 			return {
 				...prev,
-				[selectedAppointmentType]: {
-					...current,
-					sections: {
-						...current.sections,
-						[sectionKey]: current.sections[sectionKey].map((slot, index) =>
-							index === slotIndex ? { ...slot, [field]: value } : slot
-						),
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						...current,
+						sections: {
+							...current.sections,
+							[sectionKey]: current.sections[sectionKey].map((slot, index) =>
+								index === slotIndex ? { ...slot, [field]: value } : slot
+							),
+						},
 					},
 				},
 			}
@@ -692,8 +731,8 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}
 
 	const updateSlotDuration = (value: number) => {
-		setWorkingHoursByType((prev) => {
-			const current = prev[selectedAppointmentType]
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
 			const snappedSections = Object.fromEntries(
 				Object.entries(current.sections).map(([sectionKey, slots]) => [
 					sectionKey,
@@ -706,9 +745,12 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 
 			return {
 				...prev,
-				[selectedAppointmentType]: {
-					sections: snappedSections,
-					slotDuration: value,
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						sections: snappedSections,
+						slotDuration: value,
+					},
 				},
 			}
 		})
@@ -928,8 +970,8 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						/>
 
 						<WorkingHoursSection
-							selectedDate={selectedDate}
-							onDateChange={setSelectedDate}
+							selectedWorkingDay={selectedWorkingDay}
+							onWorkingDayChange={setSelectedWorkingDay}
 							selectedAppointmentType={selectedAppointmentType}
 							onAppointmentTypeChange={setSelectedAppointmentType}
 							selectedWorkingHours={selectedWorkingHours}
@@ -1222,6 +1264,7 @@ const styles = StyleSheet.create({
 	},
 	cardMain: {
 		flex: 1,
+		minWidth: 0,
 		borderWidth: 1,
 		borderColor: '#d7e2e5',
 		borderRadius: 10,
@@ -1268,6 +1311,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'stretch',
 		gap: 10,
+		flexShrink: 0,
 	},
 	actionGroupStacked: {
 		width: '100%',
@@ -1317,6 +1361,7 @@ const styles = StyleSheet.create({
 	},
 	menuWrapper: {
 		position: 'relative',
+		flexShrink: 0,
 	},
 	menuButton: {
 		width: 46,
@@ -1479,9 +1524,59 @@ const styles = StyleSheet.create({
 	workingCellStacked: {
 		width: '100%',
 	},
-	datePickerWrap: {
-		marginHorizontal: -16,
+	daysWrap: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		justifyContent: 'space-between',
+		columnGap: 8,
+		rowGap: 10,
 		marginBottom: 24,
+	},
+	daysScroll: {
+		marginHorizontal: -2,
+		marginBottom: 24,
+	},
+	daysWrapCompact: {
+		flexWrap: 'nowrap',
+		justifyContent: 'flex-start',
+		columnGap: 8,
+		rowGap: 0,
+		marginBottom: 0,
+		paddingHorizontal: 2,
+	},
+	dayChip: {
+		width: 68,
+		height: 58,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#d8d8d8',
+		backgroundColor: '#ffffff',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	dayChipCompact: {
+		width: 42,
+		height: 40,
+		borderRadius: 10,
+	},
+	dayChipActive: {
+		borderColor: TEAL,
+		backgroundColor: TEAL,
+	},
+	dayChipText: {
+		color: '#526173',
+		fontSize: 16,
+		lineHeight: 22,
+		fontWeight: '500',
+	},
+	dayChipTextCompact: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '600',
+	},
+	dayChipTextActive: {
+		color: '#ffffff',
+		fontWeight: '700',
 	},
 	appointmentTypeBlock: {
 		marginBottom: 24,
@@ -1519,32 +1614,35 @@ const styles = StyleSheet.create({
 	},
 	slotsWrap: {
 		flexDirection: 'row',
-		alignItems: 'center',
+		alignItems: 'flex-start',
 		flexWrap: 'wrap',
-		gap: 12,
+		gap: 14,
 	},
 	slotEditor: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 6,
-		marginBottom: 10,
+		gap: 8,
+		width: 342,
+		maxWidth: '100%',
+		marginBottom: 12,
 		overflow: 'visible',
 		flexWrap: 'nowrap',
 	},
 	slotEditorStacked: {
 		width: '100%',
-		alignItems: 'center',
+		alignItems: 'flex-start',
+		flexWrap: 'wrap',
 	},
 	slotSelects: {
 		flexDirection: 'row',
 		gap: 8,
-		width: 232,
-		maxWidth: '72%',
+		flex: 1,
+		minWidth: 0,
 		flexShrink: 1,
 	},
 	slotSelectsStacked: {
-		width: 222,
-		maxWidth: '68%',
+		width: '100%',
+		maxWidth: '100%',
 		marginBottom: 0,
 	},
 	slotSelectCell: {
