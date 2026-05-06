@@ -20,14 +20,14 @@ export default function SettingsTab() {
 			{/* TITLE */}
 			<Text style={styles.title}>Account Settings</Text>
 
-			{/* PASSWORD SECTION */}
+			{/* PASSWORD SECTION
 			<Text style={styles.label}>Set Password</Text>
 
 			<TouchableOpacity style={styles.inputBox}>
 				<Text style={styles.placeholder}>Type to set password</Text>
 
 				<Ionicons name="chevron-forward" size={18} color="#7aaeb0" />
-			</TouchableOpacity>
+			</TouchableOpacity> */}
 
 			{/* DELETE BUTTON */}
 			<TouchableOpacity
