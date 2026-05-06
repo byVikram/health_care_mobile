@@ -1,74 +1,70 @@
 {
-  "expo": {
-    "name": "KarolaHealth",
-    "slug": "karola-health",
-    "version": "1.0.0",
-    "orientation": "default",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "scheme": "karola-health",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#2B6F71"
-    },
-    "updates": {
-      "enabled": true,
-      "fallbackToCacheTimeout": 0
-    },
-    "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
-        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes.",
-        "NSLocationWhenInUseUsageDescription": "Allow access to your location to find nearby services."
-      }
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.ACCESS_FINE_LOCATION"
-      ],
-      "package": "com.anonymous.KarolaHealth"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
-    },
-    "plugins": [
-      "expo-asset",
-      [
-        "expo-speech-recognition",
-        {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
-          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes."
-        }
-      ],
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow access to scan patient QR codes."
-        }
-      ],
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "Allow KarolaHealth to access your location to help patients find you."
-        }
-      ]
-    ],
-    "assetBundlePatterns": [
-      "**/*"
-    ]
-  }
+	"expo": {
+		"name": "KarolaHealth",
+		"slug": "karola-health",
+		"version": "1.0.0",
+		"orientation": "default",
+		"icon": "./assets/icon.png",
+		"userInterfaceStyle": "light",
+		"newArchEnabled": true,
+		"scheme": "karola-health",
+		"splash": {
+			"image": "./assets/splash-icon.png",
+			"resizeMode": "contain",
+			"backgroundColor": "#2B6F71"
+		},
+		"updates": {
+			"enabled": true,
+			"fallbackToCacheTimeout": 0
+		},
+		"ios": {
+			"supportsTablet": true,
+			"infoPlist": {
+				"NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
+				"NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes.",
+				"NSLocationWhenInUseUsageDescription": "Allow access to your location to find nearby services."
+			}
+		},
+		"android": {
+			"adaptiveIcon": {
+				"foregroundImage": "./assets/adaptive-icon.png",
+				"backgroundColor": "#ffffff"
+			},
+			"edgeToEdgeEnabled": true,
+			"predictiveBackGestureEnabled": false,
+			"permissions": [
+				"android.permission.CAMERA",
+				"android.permission.RECORD_AUDIO",
+				"android.permission.ACCESS_FINE_LOCATION"
+			],
+			"package": "com.anonymous.KarolaHealth"
+		},
+		"web": {
+			"favicon": "./assets/favicon.png",
+			"bundler": "metro"
+		},
+		"plugins": [
+			"expo-asset",
+			[
+				"expo-speech-recognition",
+				{
+					"microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
+					"speechRecognitionPermission": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes."
+				}
+			],
+			[
+				"expo-camera",
+				{
+					"cameraPermission": "Allow access to scan patient QR codes."
+				}
+			],
+			[
+				"expo-location",
+				{
+					"locationWhenInUsePermission": "Allow KarolaHealth to access your location to help patients find you."
+				}
+			]
+		],
+		"assetBundlePatterns": ["**/*"]
+	}
 }
-
-
