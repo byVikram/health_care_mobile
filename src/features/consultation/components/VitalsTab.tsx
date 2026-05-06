@@ -36,12 +36,14 @@ interface VitalsTabProps {
 }
 
 const TEAL = '#2b6f71'
+const BMI_YELLOW = '#FF9D00'
 
 const VITAL_STATS: VitalStat[] = [
 	{ id: 'temp', label: 'Body Temperature', value: '98.6', unit: 'F', date: '17/04/25' },
 	{ id: 'bp', label: 'Blood Pressure', value: '180/80', unit: 'mm/Hg', date: '17/04/25' },
 	{ id: 'glucose', label: 'Blood Glucose Level', value: '85', unit: 'mg/dL', date: '17/04/2025' },
 	{ id: 'weight', label: 'Weight', value: '45', unit: 'Kg', date: '17/04/2025' },
+	{ id: 'heightBmi', label: 'Height', value: '165', unit: 'cm', date: '17/04/2025', bmiValue: '16.5', bmiCategory: 'Underweight' },
 	{ id: 'spo2', label: 'Oxygen Saturation (spO2)', value: '79', unit: '%', date: '17/04/2025' },
 ]
 
@@ -339,8 +341,54 @@ const normalizeHistoryWithDefaults = (apiHistory: Record<string, VitalHistoryRow
 		rows: apiHistory[tab.id]?.length ? apiHistory[tab.id] : tab.rows,
 	}))
 
+const withHeightBmiCard = (stats: VitalStat[]) => {
+	const heightBmiCard = VITAL_STATS.find((stat) => stat.id === 'heightBmi')
+	if (!heightBmiCard || stats.some((stat) => stat.id === 'heightBmi')) return stats
+	return [...stats, heightBmiCard]
+}
+
 function VitalStatCard({ stat, width }: { stat: VitalStat; width: number }) {
 	const icon = VITAL_ICONS[stat.id] ?? { name: 'chart-line', color: TEAL }
+
+	if (stat.id === 'heightBmi') {
+		return (
+			<View style={[styles.statCard, styles.heightBmiCard, { width }]}>
+				<View style={[styles.statIconWrap, styles.heightBmiIconWrap]}>
+					<MaterialCommunityIcons name="human-male-height" size={22} color={TEAL} />
+				</View>
+				<View style={styles.heightBmiContent}>
+					<View style={styles.heightBmiMetric}>
+						<View style={styles.statValueRow}>
+							<AppTypography variant="body" style={styles.statValue}>
+								{stat.value}
+							</AppTypography>
+							<AppTypography variant="caption" style={styles.statUnit}>
+								{stat.unit}
+							</AppTypography>
+						</View>
+						<AppTypography variant="caption" style={styles.statLabel} numberOfLines={1}>
+							Height
+						</AppTypography>
+					</View>
+					<View style={styles.heightBmiDivider} />
+					<View style={[styles.heightBmiMetric, styles.bmiMetric]}>
+						<AppTypography variant="body" style={[styles.statValue, styles.bmiValue]}>
+							{stat.bmiValue ?? '-'}
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.statLabel}>
+							BMI
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.bmiCategory}>
+							{stat.bmiCategory ?? '-'}
+						</AppTypography>
+					</View>
+				</View>
+				<AppTypography variant="caption" style={[styles.statDate, styles.heightBmiDate]}>
+					{stat.date}
+				</AppTypography>
+			</View>
+		)
+	}
 
 	return (
 		<View style={[styles.statCard, { width }]}>
@@ -474,7 +522,7 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 				if (showLoader) setLoading(true)
 				const payload = await vitalsService.getPatientVitals(patientId, period)
 
-				if (payload.stats.length > 0) setStats(payload.stats)
+				if (payload.stats.length > 0) setStats(withHeightBmiCard(payload.stats))
 				setTabConfigs(normalizeHistoryWithDefaults(payload.history))
 				setErrorMessage('')
 			} catch (error: any) {
@@ -560,59 +608,60 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 						/>
 					</View>
 				</View>
-			</View>
 
-			<ScrollView
-				style={styles.tableScroller}
-				horizontal
-				showsHorizontalScrollIndicator={activeTab.columns.length > 2}
-				contentContainerStyle={styles.tableScrollerContent}
-			>
-				<View style={[styles.tableContent, { width: tableMetrics.tableWidth }]}>
-					<View style={styles.tableHeader}>
-						<View style={[styles.dateHeader, { width: tableMetrics.dateWidth }]}>
-							<AppTypography variant="caption" style={styles.tableHeaderText}>
-								Date
-							</AppTypography>
-							<MaterialCommunityIcons name="arrow-up" size={13} color="#33444d" />
+				<ScrollView
+					style={styles.tableScroller}
+					horizontal
+					showsHorizontalScrollIndicator={activeTab.columns.length > 2}
+					contentContainerStyle={styles.tableScrollerContent}
+				>
+					<View style={[styles.tableContent, { width: tableMetrics.tableWidth }]}>
+						<View style={styles.tableHeader}>
+							<View style={[styles.dateHeader, { width: tableMetrics.dateWidth }]}>
+								<AppTypography variant="caption" style={styles.tableHeaderText}>
+									Date
+								</AppTypography>
+								<MaterialCommunityIcons name="arrow-up" size={13} color="#33444d" />
+							</View>
+							{activeTab.columns.map((column) => (
+								<View key={column.key} style={[styles.columnHeaderCell, { width: tableMetrics.columnWidth }]}>
+									<AppTypography variant="caption" style={styles.tableHeaderText} numberOfLines={2}>
+										{column.label}
+									</AppTypography>
+								</View>
+							))}
+							<View style={{ width: tableMetrics.actionWidth }} />
 						</View>
-						{activeTab.columns.map((column) => (
-							<View key={column.key} style={[styles.columnHeaderCell, { width: tableMetrics.columnWidth }]}>
-								<AppTypography variant="caption" style={styles.tableHeaderText} numberOfLines={2}>
-									{column.label}
-								</AppTypography>
-							</View>
-						))}
-						<View style={{ width: tableMetrics.actionWidth }} />
-					</View>
 
-					<FlatList
-						data={activeTab.rows}
-						keyExtractor={(item) => item.id}
-						style={styles.historyList}
-						contentContainerStyle={styles.historyListContent}
-						showsVerticalScrollIndicator={false}
-						refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={TEAL} />}
-						renderItem={({ item }) => (
-							<HistoryRow
-								row={item}
-								columns={activeTab.columns}
-								showDownload={activeTab.showDownload}
-								dateWidth={tableMetrics.dateWidth}
-								columnWidth={tableMetrics.columnWidth}
-								actionWidth={tableMetrics.actionWidth}
-							/>
-						)}
-						ListEmptyComponent={
-							<View style={styles.emptyState}>
-								<AppTypography variant="body" style={styles.emptyText}>
-									No data available
-								</AppTypography>
-							</View>
-						}
-					/>
-				</View>
-			</ScrollView>
+						<FlatList
+							data={activeTab.rows}
+							keyExtractor={(item) => item.id}
+							style={styles.historyList}
+							contentContainerStyle={styles.historyListContent}
+							showsVerticalScrollIndicator={false}
+							scrollEnabled={false}
+							refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={TEAL} />}
+							renderItem={({ item }) => (
+								<HistoryRow
+									row={item}
+									columns={activeTab.columns}
+									showDownload={activeTab.showDownload}
+									dateWidth={tableMetrics.dateWidth}
+									columnWidth={tableMetrics.columnWidth}
+									actionWidth={tableMetrics.actionWidth}
+								/>
+							)}
+							ListEmptyComponent={
+								<View style={styles.emptyState}>
+									<AppTypography variant="body" style={styles.emptyText}>
+										No data available
+									</AppTypography>
+								</View>
+							}
+						/>
+					</View>
+				</ScrollView>
+			</View>
 
 			{/* FAB — opens Add Vitals modal */}
 			<TouchableOpacity
@@ -663,9 +712,60 @@ const styles = StyleSheet.create({
 		shadowRadius: 8,
 		elevation: 2,
 	},
+	heightBmiCard: {
+		alignItems: 'stretch',
+		justifyContent: 'space-between',
+		position: 'relative',
+	},
+	heightBmiContent: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingRight: 4,
+	},
+	heightBmiMetric: {
+		flex: 1,
+		minWidth: 0,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	heightBmiDivider: {
+		width: 1,
+		alignSelf: 'stretch',
+		backgroundColor: '#edf1f2',
+		marginHorizontal: 4,
+	},
+	bmiMetric: {
+		flex: 1.25,
+		justifyContent: 'center',
+		paddingTop: 3,
+	},
+	bmiValue: {
+		color: BMI_YELLOW,
+		marginTop: 13,
+		lineHeight: 16,
+
+	},
+	bmiCategory: {
+		color: BMI_YELLOW,
+		fontSize: 9,
+		fontWeight: '500',
+		lineHeight: 12,
+		marginTop: 1,
+		textAlign: 'center',
+	},
+	heightBmiDate: {
+		position: 'absolute',
+		top: 9,
+		right: 9,
+		marginLeft: 0,
+	},
 	statIconWrap: {
 		width: 28,
 		alignItems: 'flex-start',
+	},
+	heightBmiIconWrap: {
+		justifyContent: 'center',
 	},
 	statCopy: {
 		flex: 1,
@@ -700,17 +800,17 @@ const styles = StyleSheet.create({
 	},
 	historyCard: {
 		marginHorizontal: 16,
-		borderTopLeftRadius: 10,
-		borderTopRightRadius: 10,
+		height: 360,
+		borderRadius: 10,
 		backgroundColor: '#ffffff',
 		borderWidth: 1,
 		borderColor: '#edf1f2',
 		overflow: 'hidden',
 	},
 	historyHeader: {
-		paddingHorizontal: 16,
-		paddingTop: 12,
-		paddingBottom: 6,
+		paddingHorizontal: 12,
+		paddingTop: 8,
+		paddingBottom: 3,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
@@ -737,9 +837,9 @@ const styles = StyleSheet.create({
 		fontSize: 11,
 	},
 	filterRow: {
-		paddingHorizontal: 16,
-		paddingBottom: 10,
-		gap: 10,
+		paddingHorizontal: 10,
+		paddingBottom: 5,
+		gap: 6,
 	},
 	filterRowTablet: {
 		flexDirection: 'row',
@@ -748,23 +848,23 @@ const styles = StyleSheet.create({
 	},
 	tabSlider: {
 		alignItems: 'center',
-		paddingRight: 8,
+		paddingRight: 4,
 	},
 	tabItemWrap: {
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
 	tabPill: {
-		borderRadius: 7,
-		paddingHorizontal: 12,
-		paddingVertical: 7,
+		borderRadius: 6,
+		paddingHorizontal: 9,
+		paddingVertical: 4,
 	},
 	tabPillActive: {
 		backgroundColor: TEAL,
 	},
 	tabText: {
 		color: '#69777f',
-		fontSize: 12,
+		fontSize: 11,
 		fontWeight: '500',
 	},
 	tabTextActive: {
@@ -773,17 +873,17 @@ const styles = StyleSheet.create({
 	},
 	tabSeparator: {
 		color: '#c1c9cd',
-		marginHorizontal: 4,
+		marginHorizontal: 2,
 	},
 	periodSelectWrap: {
-		width: 150,
+		width: 136,
 		maxWidth: '100%',
 	},
 	periodSelectContainer: {
 		marginBottom: 0,
 	},
 	periodSelect: {
-		minHeight: 36,
+		minHeight: 30,
 	},
 	tableHeader: {
 		backgroundColor: 'rgba(43,111,113,0.06)',
@@ -796,28 +896,24 @@ const styles = StyleSheet.create({
 	dateHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingHorizontal: 12,
-		paddingVertical: 9,
+		paddingHorizontal: 8,
+		paddingVertical: 5,
 		gap: 4,
 	},
 	columnHeaderCell: {
 		justifyContent: 'center',
-		paddingHorizontal: 10,
-		paddingVertical: 9,
+		paddingHorizontal: 8,
+		paddingVertical: 5,
 		borderLeftWidth: 1,
 		borderLeftColor: '#edf1f2',
 	},
 	tableHeaderText: {
 		color: '#33444d',
-		fontSize: 12,
+		fontSize: 11,
 		fontWeight: '700',
 	},
 	tableScroller: {
 		flex: 1,
-		marginHorizontal: 16,
-		borderLeftWidth: 1,
-		borderRightWidth: 1,
-		borderColor: '#edf1f2',
 		backgroundColor: '#ffffff',
 	},
 	tableScrollerContent: {
@@ -832,31 +928,31 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 	},
 	historyListContent: {
-		paddingBottom: 84,
+		paddingBottom: 0,
 	},
 	historyRow: {
 		flexDirection: 'row',
 		alignItems: 'stretch',
-		minHeight: 42,
+		minHeight: 34,
 		borderBottomWidth: 1,
 		borderColor: '#edf1f2',
 	},
 	historyDateCell: {
 		justifyContent: 'center',
-		paddingHorizontal: 12,
-		paddingVertical: 9,
+		paddingHorizontal: 8,
+		paddingVertical: 4,
 	},
 	historyValueCell: {
 		justifyContent: 'center',
-		paddingHorizontal: 10,
-		paddingVertical: 9,
+		paddingHorizontal: 8,
+		paddingVertical: 4,
 		borderLeftWidth: 1,
 		borderLeftColor: '#edf1f2',
 	},
 	rowDate: {
 		color: '#667780',
-		fontSize: 11,
-		lineHeight: 15,
+		fontSize: 10,
+		lineHeight: 13,
 	},
 	valueContent: {
 		flexDirection: 'row',
@@ -867,24 +963,24 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		gap: 3,
-		paddingHorizontal: 6,
+		gap: 2,
+		paddingHorizontal: 4,
 		borderLeftWidth: 1,
 		borderLeftColor: '#edf1f2',
 	},
 	iconButton: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
+		width: 22,
+		height: 22,
+		borderRadius: 11,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#f6f8f8',
 	},
 	cellValue: {
 		color: '#263238',
-		fontSize: 12,
+		fontSize: 11,
 		fontWeight: '600',
-		lineHeight: 16,
+		lineHeight: 14,
 		flexShrink: 1,
 	},
 	statusDot: {

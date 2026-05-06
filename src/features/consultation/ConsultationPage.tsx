@@ -1,14 +1,5 @@
 ﻿import React, { useEffect, useState, useRef } from 'react'
-import {
-	View,
-	StyleSheet,
-	ScrollView,
-	TouchableOpacity,
-	Alert,
-	ActivityIndicator,
-	Modal,
-	Platform,
-} from 'react-native'
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Modal, Platform } from 'react-native'
 import { useTheme, Card, Avatar, Button, IconButton, Divider, Text, Snackbar } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import type { SvgProps } from 'react-native-svg'

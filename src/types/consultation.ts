@@ -43,6 +43,8 @@ export interface VitalStat {
 	value: string
 	unit: string
 	date: string
+	bmiValue?: string
+	bmiCategory?: string
 }
 
 export interface VitalReading {

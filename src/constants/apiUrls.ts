@@ -6,8 +6,7 @@ import { Platform } from 'react-native'
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	const url ='http://10.217.143.49:8000'
-	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
 
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
@@ -32,6 +31,10 @@ export const API_ENDPOINTS = {
 		AVAILABILITY: `${BASE_URL}/api/doctors/availability`,
 		OVERRIDES: `${BASE_URL}/api/doctors/availability/overrides`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
+	},
+	DOCTORS_FAVOURITES: {
+		GET: `${BASE_URL}/api/doctors/favourites`,
+		TOGGLE: (publicId: string) => `${BASE_URL}/api/doctors/favourites/${publicId}`,
 	},
 	DOCTOR_PROFILE: {
 		DETAILS: `${BASE_URL}/api/doctors/details`,
@@ -74,3 +77,4 @@ export const API_ENDPOINTS = {
 		LIST: `${BASE_URL}/api/locations`,
 	},
 }
+

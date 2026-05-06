@@ -10,8 +10,8 @@ import {
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import Toast from 'react-native-toast-message'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
 
+import { AppSelect } from '../../../../components/common'
 import DateSlotPicker from '../../../../components/common/DateSlotPicker'
 import {
 	createSlotOverrideBatch,
@@ -20,7 +20,7 @@ import {
 	SlotOverrideBatchPayload,
 	SlotOverridePayload,
 	TimeSlot,
-} from '../../../../features/doctor/doctorService'
+} from '../../../doctor/doctorService'
 import { DoctorAvailability, DoctorHospital } from '../../../../types/doctor-profile'
 
 interface AvailabilityTabProps {
@@ -47,8 +47,7 @@ const TEAL = '#0c7c7c'
 export default function AvailabilityTab({ hospitals, availability, onChange }: AvailabilityTabProps) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
-	const isLandscapeTablet = width >= 900
-	const timeSlotColumns = isLandscapeTablet ? 5 : isTablet ? 4 : 3
+	const timeSlotColumns = width >= 900 ? 5 : width >= 768 ? 4 : 3
 
 	const [localAvailability, setLocalAvailability] = useState<DoctorAvailability>(availability ?? EMPTY_AVAILABILITY)
 	const resolvedHospitals = hospitals ?? []
@@ -62,6 +61,8 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	const [pendingOverrides, setPendingOverrides] = useState<SlotOverridePayload[]>([])
 	const [saveLoading, setSaveLoading] = useState(false)
 	const [pendingSaveToast, setPendingSaveToast] = useState<string | null>(null)
+	const [selectedAppointmentType, setSelectedAppointmentType] = useState<'clinic' | 'video'>('clinic')
+	const [toggleRefreshing, setToggleRefreshing] = useState(false)
 
 	const formatDateForApi = (date: Date) => {
 		const year = date.getFullYear()
@@ -98,21 +99,24 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	}
 
 	useEffect(() => {
-		if (availability) {
-			setLocalAvailability(availability)
-		}
+		if (availability) setLocalAvailability(availability)
 	}, [availability])
 
 	useEffect(() => {
-		const preferredHospitalId = resolvedHospitals.find((h) => h.isPrimary)?.id ?? resolvedHospitals[0]?.id ?? ''
-		setSelectedHospitalId((current) => current || preferredHospitalId)
+		const preferredHospitalId = resolvedHospitals.find((hospital) => hospital.isPrimary)?.id ?? resolvedHospitals[0]?.id ?? ''
+		setSelectedHospitalId((current) => {
+			if (current && resolvedHospitals.some((hospital) => hospital.id === current)) return current
+			return preferredHospitalId
+		})
 	}, [resolvedHospitals])
 
 	useEffect(() => {
 		const loadBlockedSlots = async () => {
-			const stored = await AsyncStorage.getItem(STORAGE_KEY)
-			if (stored) {
-				setUnselectedSlotsByDate(JSON.parse(stored))
+			try {
+				const stored = await AsyncStorage.getItem(STORAGE_KEY)
+				if (stored) setUnselectedSlotsByDate(JSON.parse(stored))
+			} catch (error) {
+				console.log('[AvailabilityTab] failed to load stored blocked slots:', error)
 			}
 		}
 
@@ -127,16 +131,18 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 				hospital_id: selectedHospitalId,
 				date: formatDateForApi(selectedDate),
 			})
+
 			let processedData: SlotGroup[] = []
 			if (Array.isArray(res)) {
 				processedData = res as SlotGroup[]
 			} else if (res && Array.isArray(res.data)) {
 				processedData = res.data as SlotGroup[]
 			}
+
 			setAvailableSlotGroups(processedData)
 			setPendingOverrides([])
-		} catch (err) {
-			console.log(err)
+		} catch (error) {
+			console.log('[AvailabilityTab] failed to fetch availability:', error)
 			setAvailableSlotGroups([])
 		} finally {
 			setSlotsLoading(false)
@@ -209,7 +215,6 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	const stageSlotSelection = async (slots: string[]) => {
 		const newlyBlocked = selectedSlots.filter((slot) => !slots.includes(slot))
 		const newlyUnblocked = todayUnselected.filter((slot) => slots.includes(slot))
-
 		const updatedUnselected = [...todayUnselected.filter((slot) => !newlyUnblocked.includes(slot)), ...newlyBlocked]
 		const updated: UnselectedSlotsByDate = { ...unselectedSlotsByDate, [selectedDateKey]: updatedUnselected }
 
@@ -259,11 +264,11 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	}
 
 	const handleSaveAvailability = async () => {
-		console.log('pendingOverrides:', pendingOverrides)
 		if (pendingOverrides.length === 0) {
 			setPendingSaveToast(null)
 			return
 		}
+
 		setSaveLoading(true)
 		try {
 			let backendMessage = ''
@@ -287,29 +292,18 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 				{}
 			)
 
-			const batchPayloads = Object.values(overridesByHospitalAndDate)
-			for (const payload of batchPayloads) {
+			for (const payload of Object.values(overridesByHospitalAndDate)) {
 				const response = await createSlotOverrideBatch(payload)
-				console.log('API response:', response)
-				if (response?.message) {
-					backendMessage = response.message
-				}
+				if (response?.message) backendMessage = response.message
 			}
 
 			setPendingOverrides([])
-			Toast.show({
-				type: 'success',
-				text1: backendMessage || pendingSaveToast || 'Saved successfully',
-			})
+			Toast.show({ type: 'success', text1: backendMessage || pendingSaveToast || 'Saved successfully' })
 			await fetchAvailability()
 			setPendingSaveToast(null)
-		} catch (err) {
-			console.error('Save availability error:', err)
-			Toast.show({
-				type: 'error',
-				text1: 'Unable to save availability',
-				text2: 'Please try again.',
-			})
+		} catch (error) {
+			console.error('[AvailabilityTab] save availability error:', error)
+			Toast.show({ type: 'error', text1: 'Unable to save availability', text2: 'Please try again.' })
 		} finally {
 			setSaveLoading(false)
 		}
@@ -317,51 +311,32 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 
 	return (
 		<ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
-			<View style={styles.card}>
-				<View style={styles.headerRow}>
-					<Text style={styles.title}>Availability</Text>
-					<TouchableOpacity style={styles.todayButton} onPress={() => setSelectedDate(new Date())}>
-						<Text style={styles.todayButtonText}>Today</Text>
-					</TouchableOpacity>
-				</View>
+			<View style={[styles.card, isTablet && styles.cardTablet]}>
+				<Text style={styles.title}>Availability</Text>
 
-				<Text style={styles.sectionLabel}>Choose Hospital</Text>
-				<View style={styles.hospitalList}>
+				<View style={styles.fieldGroup}>
+					<Text style={styles.sectionLabel}>Choose Hospital</Text>
 					{resolvedHospitals.length === 0 ? (
 						<Text style={styles.emptyText}>No hospitals added. Please add a hospital first.</Text>
 					) : (
-						resolvedHospitals.map((hospital, index) => {
-							const isSelected = selectedHospitalId === hospital.id
-							return (
-								<TouchableOpacity
-									key={hospital.id}
-									style={[styles.hospitalItem, isSelected && styles.hospitalItemSelected]}
-									onPress={() => setSelectedHospitalId(hospital.id)}
-									activeOpacity={0.8}
-								>
-									<View style={[styles.hospitalIndex, isSelected && styles.hospitalIndexSelected]}>
-										<Text
-											style={[
-												styles.hospitalIndexText,
-												isSelected && styles.hospitalIndexTextSelected,
-											]}
-										>
-											{index + 1}
-										</Text>
-									</View>
-									<View style={styles.hospitalContent}>
-										<Text style={styles.hospitalName}>{hospital.name}</Text>
-										<Text style={styles.hospitalAddress}>{hospital.fullAddress}</Text>
-									</View>
-									<MaterialCommunityIcons
-										name={isSelected ? 'radiobox-marked' : 'radiobox-blank'}
-										size={22}
-										color={isSelected ? TEAL : '#b7c0c7'}
-									/>
-								</TouchableOpacity>
-							)
-						})
+						<AppSelect
+							value={selectedHospitalId}
+							onSelect={(value) => {
+								setSelectedHospitalId(value)
+								setPendingOverrides([])
+							}}
+							options={resolvedHospitals.map((hospital) => ({ value: hospital.id, label: hospital.name }))}
+							size="small"
+							borderRadius={10}
+							customCardStyle={styles.selectCard}
+						/>
 					)}
+				</View>
+
+				<View style={[styles.todayRow, isTablet && styles.todayRowTablet]}>
+					<TouchableOpacity style={styles.todayButton} onPress={() => setSelectedDate(new Date())}>
+						<Text style={styles.todayButtonText}>Today</Text>
+					</TouchableOpacity>
 				</View>
 
 				<DateSlotPicker
@@ -370,12 +345,12 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 					onDateChange={setSelectedDate}
 					selectedTime={selectedSlots}
 					onTimeChange={handleTimeChange}
-					dateLabel="Select date"
-					timeLabel="Select time"
+					dateLabel="Select follow up date"
+					hideNavigation
 					timeSlotColumns={timeSlotColumns}
 					disableBookedSlots={false}
 					availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
-					loading={slotsLoading}
+					loading={slotsLoading || toggleRefreshing}
 					onSelectAll={() => {
 						stageSlotSelection(allSelectableSlots)
 						setPendingSaveToast('Selected All Successfully')
@@ -383,6 +358,12 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 					onUnselectAll={() => {
 						stageSlotSelection([])
 						setPendingSaveToast('Unselected All Successfully')
+					}}
+					selectedAppointmentType={selectedAppointmentType}
+					onAppointmentTypeChange={(type) => {
+						setToggleRefreshing(true)
+						setSelectedAppointmentType(type)
+						setTimeout(() => setToggleRefreshing(false), 300)
 					}}
 				/>
 
@@ -421,35 +402,45 @@ const styles = StyleSheet.create({
 	},
 	screenContent: {
 		padding: 0,
-		// paddingBottom: 32,
-	},
-	loadingContainer: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#f8fafc',
+		paddingBottom: 24,
 	},
 	card: {
 		width: '100%',
 		maxWidth: 980,
 		alignSelf: 'center',
 		backgroundColor: '#fff',
-		// borderRadius: 14,
 		padding: 18,
-		// borderWidth: 1,
-		// borderColor: '#edf1f3',
 	},
-	headerRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		gap: 12,
-		marginBottom: 22,
+	cardTablet: {
+		paddingHorizontal: 24,
+		paddingVertical: 22,
 	},
 	title: {
 		fontSize: 22,
 		fontWeight: '700',
 		color: '#233238',
+		marginBottom: 22,
+	},
+	fieldGroup: {
+		marginBottom: 14,
+	},
+	sectionLabel: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#62707a',
+		marginBottom: 8,
+	},
+	selectCard: {
+		borderRadius: 10,
+	},
+	todayRow: {
+		alignItems: 'flex-end',
+		marginTop: 4,
+		marginBottom: -30,
+		zIndex: 1,
+	},
+	todayRowTablet: {
+		marginBottom: -34,
 	},
 	todayButton: {
 		borderRadius: 10,
@@ -464,76 +455,19 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 		fontWeight: '600',
 	},
-	sectionLabel: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: '#62707a',
-		marginBottom: 10,
-	},
-	hospitalList: {
-		gap: 10,
-		marginBottom: 18,
-	},
-	hospitalItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		borderWidth: 1,
-		borderColor: '#dde4e8',
-		borderRadius: 12,
-		paddingHorizontal: 14,
-		paddingVertical: 12,
-		backgroundColor: '#fff',
-	},
-	hospitalItemSelected: {
-		borderColor: TEAL,
-		backgroundColor: 'rgba(12, 124, 124, 0.04)',
-	},
-	hospitalIndex: {
-		width: 28,
-		height: 28,
-		borderRadius: 14,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: 'rgba(12, 124, 124, 0.1)',
-	},
-	hospitalIndexSelected: {
-		backgroundColor: TEAL,
-	},
-	hospitalIndexText: {
-		fontSize: 12,
-		fontWeight: '700',
-		color: TEAL,
-	},
-	hospitalIndexTextSelected: {
-		color: '#fff',
-	},
-	hospitalContent: {
-		flex: 1,
-		minWidth: 0,
-	},
-	hospitalName: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#233238',
-		marginBottom: 3,
-	},
-	hospitalAddress: {
-		fontSize: 12,
-		color: '#62707a',
-		lineHeight: 17,
-	},
 	emptyText: {
 		color: '#9aa5ad',
-		fontSize: 13,
+		fontSize: 12,
+		marginBottom: 18,
 	},
 	actions: {
 		flexDirection: 'column',
 		gap: 12,
-		marginTop: 24,
+		marginTop: 34,
 	},
 	actionsTablet: {
 		flexDirection: 'row',
+		gap: 16,
 	},
 	actionButton: {
 		flex: 1,

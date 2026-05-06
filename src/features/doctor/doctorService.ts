@@ -145,6 +145,48 @@ export const getDoctors = async (
   return res.data;
 };
 
+export interface FavouriteDoctor {
+	id: string
+	name: string
+	is_verified: boolean
+	avatar_s3_key: string | null
+	location: string | null
+	experience_years: number | null
+	specialities: string[]
+}
+
+export interface FavouritesResponse {
+	success: boolean
+	message: string
+	data: {
+		favourites: FavouriteDoctor[]
+		favourite_ids: string[]
+	}
+}
+
+export interface ToggleFavouriteResponse {
+	success?: boolean
+	message?: string
+	data?: {
+		action?: 'added' | 'removed'
+		favourite_ids?: string[]
+		favourites?: FavouriteDoctor[]
+	}
+}
+
+export const getFavouriteDoctors = async (): Promise<FavouritesResponse> => {
+	const res = await ApiService.get<FavouritesResponse>(API_ENDPOINTS.DOCTORS_FAVOURITES.GET)
+	return res.data
+}
+
+export const toggleFavouriteDoctor = async (publicId: string): Promise<ToggleFavouriteResponse> => {
+	const res = await ApiService.post<ToggleFavouriteResponse>(
+		API_ENDPOINTS.DOCTORS_FAVOURITES.TOGGLE(publicId),
+		{}
+	)
+	return res.data
+}
+
 export interface AvailabilityResponse {
 	data?: SlotGroup[]
 }
@@ -153,6 +195,7 @@ export const getDoctorAvailability = async (params: {
 	doctor_id?: string
 	hospital_id: number | string
 	date: string
+	location?: string
 }): Promise<SlotGroup[] | AvailabilityResponse> => {
 	const res = await ApiService.getWithParams<SlotGroup[] | AvailabilityResponse>(
 		API_ENDPOINTS.DOCTORS.AVAILABILITY,
