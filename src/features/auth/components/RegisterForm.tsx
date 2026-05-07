@@ -28,6 +28,8 @@ export default function RegisterForm({
   const [formError, setFormError] = useState('')
 
   const handleRegister = async () => {
+    debugger
+    console.log('Registering with:', { roleId, name, email, mobile })
     setFormError('')
 
     if (!roleId) {

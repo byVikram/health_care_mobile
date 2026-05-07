@@ -33,6 +33,7 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 	const fetchRoles = async () => {
 		try {
 			const res = await getRoles()
+			console.log(res)
 
 			if (res.success && Array.isArray(res.data)) {
 				setRoles(res.data)
@@ -45,12 +46,16 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 	}
 
 	const handleRoleSelect = (role: Role) => {
+		console.log('Selected role:', role) // Debug log
 		let mappedRole: string | null = null
+		let mappedRoleId: string | null = "a1b2c3d4-0001-0001-0001-000000000001"
 
 		if (role.label.toLowerCase() === 'doctor') {
 			mappedRole = USER_ROLES.DOCTOR
+			mappedRoleId = role.id
 		} else if (role.label.toLowerCase() === 'patient') {
 			mappedRole = USER_ROLES.PATIENT
+			mappedRoleId = role.id
 		}
 
 		if (!mappedRole) {
@@ -59,8 +64,8 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 		}
 
 		navigation.navigate(ROUTES.AUTH.ONBOARDING, {
-			roleId: mappedRole,
 			roleLabel: role.label,
+			roleId: mappedRoleId,
 		})
 	}
 

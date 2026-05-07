@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { navigationRef } from './navigationService'
 import { ROUTES } from './routes'
 import type { AppStackParamList } from './types'
+import type { UserRole } from '../context/AuthContext'
 import AuthNavigator from './AuthNavigator'
 import MainTabNavigator from './MainTabNavigator'
 
@@ -18,17 +19,20 @@ import PatientProfileLayout from '../features/profile/patient/PatientProfileLayo
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/setting/SettingPage'
-import WelcomePage from '../features/auth/WelcomePage'
 import AccountPage from '../features/auth/AccountPage'
 import PatientPayment from '../features/patientPayment/PatientPayment'
 import SearchPage from '../features/doctor/search/SearchPage'
+import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
-const PaymentStack = createNativeStackNavigator()
+function AuthenticatedNavigator({ role }: { role: UserRole | null }) {
+  const isDoctor = role === 'doctor'
 
-function AuthenticatedNavigator() {
   return (
-    <AppStack.Navigator screenOptions={{ headerShown: false }}>
+    <AppStack.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName={isDoctor ? ROUTES.STACK.DOCTOR_WELCOME : ROUTES.MAIN.TABS}
+    >
       
       <AppStack.Screen
         name={ROUTES.MAIN.TABS}
@@ -79,7 +83,7 @@ function AuthenticatedNavigator() {
 
       <AppStack.Screen
         name={ROUTES.STACK.DOCTOR_WELCOME}
-        component={WelcomePage}
+        component={WelcomeDoctorPage}
         options={{ animation: 'none' }}
       />
 
@@ -96,7 +100,7 @@ function AuthenticatedNavigator() {
   )
 }
 export default function AppNavigator() {
-	const { accessToken, isLoading } = useAuth()
+	const { accessToken, role, isLoading } = useAuth()
 	const theme = useTheme()
 
 	if (isLoading) {
@@ -107,5 +111,9 @@ export default function AppNavigator() {
 		)
 	}
 
-	return <NavigationContainer ref={navigationRef}>{accessToken == null ? <AuthNavigator /> : <AuthenticatedNavigator />}</NavigationContainer>
+	return (
+		<NavigationContainer ref={navigationRef}>
+			{accessToken == null ? <AuthNavigator /> : <AuthenticatedNavigator role={role} />}
+		</NavigationContainer>
+	)
 }
