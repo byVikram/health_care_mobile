@@ -911,7 +911,14 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		return (
 			<ScrollView
 				style={styles.container}
-				contentContainerStyle={[styles.contentContainer, { paddingHorizontal: sectionPadding, paddingVertical: sectionPadding }]}
+				contentContainerStyle={[
+					styles.contentContainer,
+					{
+						paddingHorizontal: sectionPadding,
+						paddingTop: sectionPadding,
+						paddingBottom: 0,
+					},
+				]}
 				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
 			>
@@ -1045,7 +1052,16 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	return (
 		<Pressable style={styles.container} onPress={() => setMenuVisibleId(null)}>
 			<ScrollView
-				contentContainerStyle={[styles.contentContainer, { paddingHorizontal: sectionPadding, paddingVertical: sectionPadding }]}
+				style={styles.container}
+				contentContainerStyle={[
+					styles.contentContainer,
+					{
+						paddingHorizontal: sectionPadding,
+						paddingTop: sectionPadding,
+						paddingBottom: 0,
+					},
+				]}
+				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
 			>
 				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
@@ -1195,6 +1211,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 	},
 	contentContainer: {
+		flexGrow: 1,
 		alignItems: 'center',
 	},
 	contentShell: {

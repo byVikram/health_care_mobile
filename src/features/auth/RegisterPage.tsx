@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native'
 import RegisterForm from './components/RegisterForm'
 import OtpForm from './components/OtpForm'
 import { ROUTES } from '../../navigation/routes'
+import { reset as resetNavigation } from '../../navigation/navigationService'
 import type { AuthScreenProps } from '../../navigation/types'
 
 type Step = 'register' | 'otp'
@@ -16,6 +17,7 @@ export default function RegisterPage({
 
   const roleId = route.params?.roleId ?? ''
   const roleLabel = route.params?.roleLabel ?? ''
+  const isDoctorRegistration = roleLabel.toLowerCase() === 'doctor' || roleId.toLowerCase() === 'doctor'
 
   useEffect(() => {
     if (!roleId) {
@@ -39,7 +41,13 @@ export default function RegisterPage({
       {step === 'otp' && (
         <OtpForm
           contactNumber={contactNumber}
-          onVerify={() => {}}
+          onVerify={() => {
+            if (isDoctorRegistration) {
+              setTimeout(() => {
+                resetNavigation(ROUTES.STACK.DOCTOR_WELCOME)
+              }, 0)
+            }
+          }}
           onBack={() => setStep('register')}
           backLabel="Back to Register"
         />

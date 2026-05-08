@@ -45,6 +45,15 @@ type SelectDropdownProps = {
 	isMobile: boolean
 }
 
+type MultiSelectDropdownProps = {
+	label: string
+	values: string[]
+	placeholder: string
+	options: string[]
+	onChange: (values: string[]) => void
+	isMobile: boolean
+}
+
 function FormRow({
 	children,
 	stacked,
@@ -178,6 +187,79 @@ function SelectDropdown({ label, value, placeholder, options, onSelect, isMobile
 	)
 }
 
+function MultiSelectDropdown({ label, values, placeholder, options, onChange, isMobile }: MultiSelectDropdownProps) {
+	const [visible, setVisible] = useState(false)
+	const selectedValues = useMemo(() => normalizeLanguageValues(values), [values])
+	const selectedValueSet = useMemo(() => new Set(selectedValues), [selectedValues])
+	const displayValue = selectedValues.join(', ')
+
+	const toggleValue = (item: string) => {
+		if (selectedValueSet.has(item)) {
+			onChange(selectedValues.filter((value) => value !== item))
+			return
+		}
+
+		onChange([...selectedValues, item])
+	}
+
+	return (
+		<View style={styles.fieldGroup}>
+			<FieldLabel label={label} />
+			<>
+				<Pressable style={styles.inputShell} onPress={() => setVisible(true)}>
+					<AppTypography variant="body" style={[styles.selectText, !displayValue && styles.placeholderText]} numberOfLines={1}>
+						{displayValue || placeholder}
+					</AppTypography>
+					<MaterialCommunityIcons name="chevron-down" size={20} color="#2c7b80" />
+				</Pressable>
+				<Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
+					<Pressable style={styles.modalOverlay} onPress={() => setVisible(false)}>
+						<Pressable style={[styles.modalCard, isMobile && styles.modalCardMobile]} onPress={(event) => event.stopPropagation()}>
+							<View style={styles.modalHeader}>
+								<AppTypography variant="h4" style={styles.modalTitle}>
+									{label}
+								</AppTypography>
+								<TouchableOpacity onPress={() => setVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+									<MaterialCommunityIcons name="close" size={22} color="#45636d" />
+								</TouchableOpacity>
+							</View>
+							<FlatList
+								data={options}
+								keyExtractor={(item) => item}
+								renderItem={({ item }) => {
+									const isSelected = selectedValueSet.has(item)
+									return (
+										<TouchableOpacity
+											style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+											onPress={() => toggleValue(item)}
+										>
+											<AppTypography variant="body" style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+												{item}
+											</AppTypography>
+											<MaterialCommunityIcons
+												name={isSelected ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
+												size={20}
+												color={isSelected ? '#24a148' : '#9ca3af'}
+											/>
+										</TouchableOpacity>
+									)
+								}}
+							/>
+							<View style={styles.modalActions}>
+								<TouchableOpacity style={styles.doneButton} onPress={() => setVisible(false)}>
+									<AppTypography variant="body" style={styles.doneButtonText}>
+										Done
+									</AppTypography>
+								</TouchableOpacity>
+							</View>
+						</Pressable>
+					</Pressable>
+				</Modal>
+			</>
+		</View>
+	)
+}
+
 const formatDateInput = (rawValue: string) => {
 	const digits = rawValue.replace(/\D/g, '').slice(0, 8)
 
@@ -188,6 +270,16 @@ const formatDateInput = (rawValue: string) => {
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 const isValidPhone = (value: string) => value.replace(/\D/g, '').length >= 10
+const matchOptionValue = (value: string, options: string[]) => {
+	const normalizedValue = value.trim().toLowerCase()
+	return options.find((option) => option.toLowerCase() === normalizedValue) ?? value.trim()
+}
+
+const normalizeGenderValue = (value?: string) => (value ? matchOptionValue(value, GENDER_OPTIONS) : '')
+const normalizeLanguageValues = (value?: string[] | string | null) => {
+	const languages = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : []
+	return Array.from(new Set(languages.map((language) => matchOptionValue(language, LANGUAGE_OPTIONS)).filter(Boolean)))
+}
 
 type PersonalDetailsFormData = {
 	name: string
@@ -196,6 +288,7 @@ type PersonalDetailsFormData = {
 	gender: string
 	dob: string
 	experience: string
+	registrationNumber: string
 	languages: string[]
 	location: string
 }
@@ -227,6 +320,7 @@ export default function PersonalDetailsTab() {
 		gender: '',
 		dob: '',
 		experience: '',
+		registrationNumber: '',
 		languages: [],
 		location: '',
 	})
@@ -254,10 +348,11 @@ export default function PersonalDetailsTab() {
 					name: profile.personal.name || user?.name || '',
 					email: profile.personal.email || user?.email || '',
 					mobile: response.data.personal_details?.contact_number || '',
-					gender: profile.personal.gender || '',
+					gender: normalizeGenderValue(profile.personal.gender),
 					dob: formatDobForDisplay(profile.personal.dateOfBirth),
 					experience: profile.personal.experience || '',
-					languages: profile.personal.languages || [],
+					registrationNumber: profile.professional.registrationNumber || '',
+					languages: normalizeLanguageValues(profile.personal.languages),
 					location: profile.personal.location || '',
 				})
 			} catch (error) {
@@ -279,7 +374,9 @@ export default function PersonalDetailsTab() {
 		const formattedDob = formatDobForApi(formData.dob.trim())
 		const experienceYears = formData.experience ? Number(formData.experience) : 0
 		const normalizedMobile = formData.mobile.replace(/\D/g, '')
-		const normalizedLanguages = formData.languages.map((language) => language.trim()).filter(Boolean)
+		const normalizedGender = normalizeGenderValue(formData.gender)
+		const normalizedLanguages = normalizeLanguageValues(formData.languages)
+		const trimmedRegistrationNumber = formData.registrationNumber.trim()
 
 		if (!trimmedName) {
 			Alert.alert('Validation', 'Full name is required.')
@@ -308,11 +405,12 @@ export default function PersonalDetailsTab() {
 				name: trimmedName,
 				email: trimmedEmail,
 				location: trimmedLocation,
-				gender: formData.gender.trim(),
+				gender: normalizedGender,
 				languages: normalizedLanguages,
 				contact_number: normalizedMobile,
 				date_of_birth: formattedDob,
 				experience_years: Number.isFinite(experienceYears) ? experienceYears : 0,
+				registration_number: trimmedRegistrationNumber,
 			}
 
 			await doctorService.updateDoctorProfile(payload)
@@ -326,9 +424,11 @@ export default function PersonalDetailsTab() {
 				email: trimmedEmail,
 				location: trimmedLocation,
 				mobile: normalizedMobile,
+				gender: normalizedGender,
 				dob: formData.dob.trim(),
 				languages: normalizedLanguages,
 				experience: String(Number.isFinite(experienceYears) ? experienceYears : 0),
+				registrationNumber: trimmedRegistrationNumber,
 			}))
 			Alert.alert('Success', 'Personal details saved successfully/.')
 		} catch (err) {
@@ -361,7 +461,14 @@ export default function PersonalDetailsTab() {
 	return (
 		<ScrollView
 			style={styles.container}
-			contentContainerStyle={[styles.contentContainer, { paddingHorizontal: sectionPadding, paddingVertical: sectionPadding }]}
+			contentContainerStyle={[
+				styles.contentContainer,
+				{
+					paddingHorizontal: sectionPadding,
+					paddingTop: sectionPadding,
+					paddingBottom: 0,
+				},
+			]}
 			keyboardShouldPersistTaps="handled"
 			showsVerticalScrollIndicator={false}
 		>	
@@ -380,6 +487,19 @@ export default function PersonalDetailsTab() {
 						autoCapitalize="words"
 						rightIcon="pencil-outline"
 						onFocus={() => setFocusedField('fullName')}
+						onBlur={() => setFocusedField('')}
+					/>
+				</View>
+
+				<View style={{ marginBottom: rowSpacing }}>
+					<InputField
+						label="Registration Number"
+						value={formData.registrationNumber}
+						onChangeText={(value) => updateFormData('registrationNumber', value)}
+						placeholder="Enter registration number"
+						autoCapitalize="characters"
+						rightIcon={focusedField === 'registrationNumber' ? 'pencil-outline' : undefined}
+						onFocus={() => setFocusedField('registrationNumber')}
 						onBlur={() => setFocusedField('')}
 					/>
 				</View>
@@ -463,14 +583,16 @@ export default function PersonalDetailsTab() {
 					/>
 				</View>
 
-				<SelectDropdown
-					label="Languages Known"
-					value={formData.languages.join(', ')}
-					placeholder="Select Language"
-					options={LANGUAGE_OPTIONS}
-					onSelect={(value) => updateFormData('languages', [value])}
-					isMobile={isMobile}
-				/>
+				<View style={{ marginBottom: rowSpacing }}>
+					<MultiSelectDropdown
+						label="Languages Known"
+						values={formData.languages}
+						placeholder="Select languages"
+						options={LANGUAGE_OPTIONS}
+						onChange={(values) => updateFormData('languages', values)}
+						isMobile={isMobile}
+					/>
+				</View>
 
 				<TouchableOpacity
 					style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
@@ -503,6 +625,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 	},
 	contentContainer: {
+		flexGrow: 1,
 		alignItems: 'center',
 	},
 	contentShell: {
@@ -633,6 +756,25 @@ const styles = StyleSheet.create({
 	},
 	optionTextSelected: {
 		color: '#1d6d71',
+		fontWeight: '600',
+	},
+	modalActions: {
+		paddingHorizontal: 18,
+		paddingVertical: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#eef4f5',
+		alignItems: 'flex-end',
+	},
+	doneButton: {
+		minWidth: 96,
+		borderRadius: 8,
+		backgroundColor: '#0c7c7c',
+		paddingHorizontal: 16,
+		paddingVertical: 10,
+		alignItems: 'center',
+	},
+	doneButtonText: {
+		color: '#ffffff',
 		fontWeight: '600',
 	},
 	saveButton: {

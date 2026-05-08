@@ -32,6 +32,8 @@ export interface AuthState {
     refreshToken: string
   ) => Promise<void>
 
+  updateUser: (updates: Partial<AuthUser>) => Promise<void>
+
   clearAuth: () => Promise<void>
 }
 
@@ -87,6 +89,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setRefreshToken(refreshToken)
   }
 
+  const updateUser = async (updates: Partial<AuthUser>) => {
+    const nextUser = {
+      ...(user ?? { name: '' }),
+      ...updates,
+    }
+
+    await AsyncStorage.setItem('user', JSON.stringify(nextUser))
+    setUser(nextUser)
+  }
+
   const clearAuth = async () => {
     await AsyncStorage.clear()
     setRole(null)
@@ -109,6 +121,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         selectedHospitalId,           // ✅ NEW
         setSelectedHospitalId,        // ✅ NEW
         setAuth,
+        updateUser,
         clearAuth,
       }}
     >

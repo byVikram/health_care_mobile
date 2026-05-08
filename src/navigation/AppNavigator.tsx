@@ -8,7 +8,6 @@ import { useAuth } from '../context/AuthContext'
 import { navigationRef } from './navigationService'
 import { ROUTES } from './routes'
 import type { AppStackParamList } from './types'
-import type { UserRole } from '../context/AuthContext'
 import AuthNavigator from './AuthNavigator'
 import MainTabNavigator from './MainTabNavigator'
 
@@ -25,13 +24,11 @@ import SearchPage from '../features/doctor/search/SearchPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
-function AuthenticatedNavigator({ role }: { role: UserRole | null }) {
-  const isDoctor = role === 'doctor'
-
+function AuthenticatedNavigator() {
   return (
     <AppStack.Navigator
       screenOptions={{ headerShown: false }}
-      initialRouteName={isDoctor ? ROUTES.STACK.DOCTOR_WELCOME : ROUTES.MAIN.TABS}
+      initialRouteName={ROUTES.MAIN.TABS}
     >
       
       <AppStack.Screen
@@ -100,7 +97,7 @@ function AuthenticatedNavigator({ role }: { role: UserRole | null }) {
   )
 }
 export default function AppNavigator() {
-	const { accessToken, role, isLoading } = useAuth()
+	const { accessToken, isLoading } = useAuth()
 	const theme = useTheme()
 
 	if (isLoading) {
@@ -113,7 +110,7 @@ export default function AppNavigator() {
 
 	return (
 		<NavigationContainer ref={navigationRef}>
-			{accessToken == null ? <AuthNavigator /> : <AuthenticatedNavigator role={role} />}
+			{accessToken == null ? <AuthNavigator /> : <AuthenticatedNavigator />}
 		</NavigationContainer>
 	)
 }

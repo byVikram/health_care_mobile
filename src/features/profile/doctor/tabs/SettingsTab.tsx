@@ -3,6 +3,7 @@ import {
 	View,
 	Text,
 	StyleSheet,
+	ScrollView,
 	TouchableOpacity,
 	Modal,
 	Pressable,
@@ -15,8 +16,12 @@ export default function SettingsTab() {
 	const { width } = useWindowDimensions()
 
 	return (
-		<View style={styles.container}>
-
+		<ScrollView
+			style={styles.container}
+			contentContainerStyle={styles.contentContainer}
+			keyboardShouldPersistTaps="handled"
+			showsVerticalScrollIndicator={false}
+		>
 			{/* TITLE */}
 			<Text style={styles.title}>Account Settings</Text>
 
@@ -81,15 +86,19 @@ export default function SettingsTab() {
 					</Pressable>
 				</Pressable>
 			</Modal>
-		</View>
+		</ScrollView>
 	)
 }
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		padding: 16,
 		backgroundColor: '#f5f7f7',
+	},
+	contentContainer: {
+		flexGrow: 1,
+		padding: 16,
+		paddingBottom: 0,
 	},
 
 	title: {
