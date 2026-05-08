@@ -115,6 +115,18 @@ export const rescheduleAppointment = async (
 	return res.data
 }
 
+export interface ReferAppointmentPayload {
+	appointment_id: string
+	doctor_id: string
+}
+
+export const referAppointment = async (
+	payload: ReferAppointmentPayload
+): Promise<AppointmentResponse> => {
+	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.REFER, payload)
+	return res.data
+}
+
 export const getAppointments = async (params?: AppointmentParams): Promise<AppointmentsResponse> => {
 	const res = await ApiService.getWithParams<AppointmentsResponse>(
 		API_ENDPOINTS.APPOINTMENTS.GET,
