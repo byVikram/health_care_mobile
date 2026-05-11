@@ -53,6 +53,10 @@ export interface DoctorProfileApiData {
 		registration_number: string
 		registration_proof_s3_key: string | null
 		about: string
+		instagram_url?: string | null
+		facebook_url?: string | null
+		instagram?: string | null
+		facebook?: string | null
 		specialities: DoctorProfileApiSpeciality[]
 	}
 	hospitals: DoctorProfileApiHospital[]

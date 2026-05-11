@@ -371,10 +371,13 @@ function WorkingHoursSection({
 			</AppTypography>
 
 			<ScrollView
-				horizontal={stacked}
+				horizontal
+				nestedScrollEnabled
+				directionalLockEnabled
 				showsHorizontalScrollIndicator={false}
-				style={stacked ? styles.daysScroll : undefined}
-				contentContainerStyle={[styles.daysWrap, stacked && styles.daysWrapCompact]}
+				style={styles.daysScroll}
+				contentContainerStyle={[styles.daysWrap, styles.daysWrapScrollable, stacked && styles.daysWrapCompact]}
+				onMoveShouldSetResponderCapture={() => true}
 			>
 				{WORKING_DAYS.map((day) => {
 					const isSelected = selectedWorkingDay === day.key
@@ -471,25 +474,27 @@ function WorkingHoursSection({
 												</View>
 											</View>
 
-											{showAdd ? (
-												<TouchableOpacity
-													style={styles.addSlotButton}
-													onPress={() => onAddSlot(section.key)}
-													activeOpacity={0.8}
-												>
-													<MaterialCommunityIcons name="plus" size={18} color={TEAL} />
-												</TouchableOpacity>
-											) : null}
+											<View style={styles.slotActions}>
+												{showAdd ? (
+													<TouchableOpacity
+														style={styles.addSlotButton}
+														onPress={() => onAddSlot(section.key)}
+														activeOpacity={0.8}
+													>
+														<MaterialCommunityIcons name="plus" size={18} color={TEAL} />
+													</TouchableOpacity>
+												) : null}
 
-											{slotIndex > 0 ? (
-												<TouchableOpacity
-													style={styles.iconAction}
-													onPress={() => onRemoveSlot(section.key, slotIndex)}
-													activeOpacity={0.8}
-												>
-													<MaterialCommunityIcons name="close" size={16} color="#62707a" />
-												</TouchableOpacity>
-											) : null}
+												{slotIndex > 0 ? (
+													<TouchableOpacity
+														style={styles.iconAction}
+														onPress={() => onRemoveSlot(section.key, slotIndex)}
+														activeOpacity={0.8}
+													>
+														<MaterialCommunityIcons name="close" size={16} color="#62707a" />
+													</TouchableOpacity>
+												) : null}
+											</View>
 										</View>
 									)
 								})}
@@ -1549,6 +1554,11 @@ const styles = StyleSheet.create({
 		rowGap: 10,
 		marginBottom: 24,
 	},
+	daysWrapScrollable: {
+		flexWrap: 'nowrap',
+		justifyContent: 'flex-start',
+		paddingHorizontal: 2,
+	},
 	daysScroll: {
 		marginHorizontal: -2,
 		marginBottom: 24,
@@ -1562,9 +1572,9 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 2,
 	},
 	dayChip: {
-		width: 68,
-		height: 58,
-		borderRadius: 12,
+		width: 96,
+		height: 78,
+		borderRadius: 14,
 		borderWidth: 1,
 		borderColor: '#d8d8d8',
 		backgroundColor: '#ffffff',
@@ -1572,8 +1582,8 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	dayChipCompact: {
-		width: 42,
-		height: 40,
+		width: 50,
+		height: 46,
 		borderRadius: 10,
 	},
 	dayChipActive: {
@@ -1582,7 +1592,7 @@ const styles = StyleSheet.create({
 	},
 	dayChipText: {
 		color: '#526173',
-		fontSize: 16,
+		fontSize: 50,
 		lineHeight: 22,
 		fontWeight: '500',
 	},
@@ -1665,6 +1675,14 @@ const styles = StyleSheet.create({
 	slotSelectCell: {
 		flex: 1,
 		minWidth: 0,
+	},
+	slotActions: {
+		width: 70,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'flex-start',
+		gap: 8,
+		flexShrink: 0,
 	},
 	iconAction: {
 		width: 30,

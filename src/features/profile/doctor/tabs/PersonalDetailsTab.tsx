@@ -34,6 +34,7 @@ type InputFieldProps = {
 	onFocus?: () => void
 	onBlur?: () => void
 	leftText?: string
+	errorText?: string
 }
 
 type SelectDropdownProps = {
@@ -104,11 +105,12 @@ function InputField({
 	onFocus,
 	onBlur,
 	leftText,
+	errorText,
 }: InputFieldProps) {
 	return (
 		<View style={styles.fieldGroup}>
 			<FieldLabel label={label} />
-			<View style={styles.inputShell}>
+			<View style={[styles.inputShell, errorText && styles.inputShellError]}>
 				{leftText ? (
 					<View style={styles.leftPrefix}>
 						<AppTypography variant="body" style={styles.leftPrefixText}>
@@ -130,6 +132,11 @@ function InputField({
 				/>
 				{rightIcon ? <MaterialCommunityIcons name={rightIcon} size={20} color={rightIconColor} /> : null}
 			</View>
+			{errorText ? (
+				<AppTypography variant="caption" style={styles.errorText}>
+					{errorText}
+				</AppTypography>
+			) : null}
 		</View>
 	)
 }
@@ -270,6 +277,25 @@ const formatDateInput = (rawValue: string) => {
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 const isValidPhone = (value: string) => value.replace(/\D/g, '').length >= 10
+const isValidProfileUrl = (value: string, allowedHosts: string[]) => {
+	const trimmedValue = value.trim()
+	if (!trimmedValue) return true
+
+	try {
+		const url = new URL(trimmedValue)
+		const host = url.hostname.toLowerCase()
+		const pathSegments = url.pathname.split('/').filter(Boolean)
+		return (
+			(url.protocol === 'https:' || url.protocol === 'http:') &&
+			allowedHosts.includes(host) &&
+			pathSegments.length === 1
+		)
+	} catch {
+		return false
+	}
+}
+const isValidInstagramUrl = (value: string) => isValidProfileUrl(value, ['instagram.com', 'www.instagram.com'])
+const isValidFacebookUrl = (value: string) => isValidProfileUrl(value, ['facebook.com', 'www.facebook.com'])
 const matchOptionValue = (value: string, options: string[]) => {
 	const normalizedValue = value.trim().toLowerCase()
 	return options.find((option) => option.toLowerCase() === normalizedValue) ?? value.trim()
@@ -279,6 +305,21 @@ const normalizeGenderValue = (value?: string) => (value ? matchOptionValue(value
 const normalizeLanguageValues = (value?: string[] | string | null) => {
 	const languages = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : []
 	return Array.from(new Set(languages.map((language) => matchOptionValue(language, LANGUAGE_OPTIONS)).filter(Boolean)))
+}
+
+const validateSocialUrl = (field: keyof SocialErrors, value: string) => {
+	const trimmedValue = value.trim()
+	if (!trimmedValue) return ''
+
+	if (field === 'instagram' && !isValidInstagramUrl(trimmedValue)) {
+		return 'Enter a valid Instagram profile URL.'
+	}
+
+	if (field === 'facebook' && !isValidFacebookUrl(trimmedValue)) {
+		return 'Enter a valid Facebook profile URL.'
+	}
+
+	return ''
 }
 
 type PersonalDetailsFormData = {
@@ -291,6 +332,13 @@ type PersonalDetailsFormData = {
 	registrationNumber: string
 	languages: string[]
 	location: string
+	instagram: string
+	facebook: string
+}
+
+type SocialErrors = {
+	instagram?: string
+	facebook?: string
 }
 
 const formatDobForDisplay = (value?: string) => {
@@ -323,8 +371,11 @@ export default function PersonalDetailsTab() {
 		registrationNumber: '',
 		languages: [],
 		location: '',
+		instagram: '',
+		facebook: '',
 	})
 	const [focusedField, setFocusedField] = useState('')
+	const [socialErrors, setSocialErrors] = useState<SocialErrors>({})
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 
@@ -332,6 +383,25 @@ export default function PersonalDetailsTab() {
 		setFormData((prev) => ({
 			...prev,
 			[key]: value,
+		}))
+	}
+
+	const updateSocialField = (field: keyof SocialErrors, value: string) => {
+		updateFormData(field, value)
+		if (socialErrors[field]) {
+			setSocialErrors((prev) => ({
+				...prev,
+				[field]: undefined,
+			}))
+		}
+	}
+
+	const handleSocialBlur = (field: keyof SocialErrors) => {
+		const trimmedValue = formData[field].trim()
+		updateFormData(field, trimmedValue)
+		setSocialErrors((prev) => ({
+			...prev,
+			[field]: validateSocialUrl(field, trimmedValue) || undefined,
 		}))
 	}
 
@@ -354,6 +424,14 @@ export default function PersonalDetailsTab() {
 					registrationNumber: profile.professional.registrationNumber || '',
 					languages: normalizeLanguageValues(profile.personal.languages),
 					location: profile.personal.location || '',
+					instagram:
+						response.data.professional_details?.instagram_url ||
+						response.data.professional_details?.instagram ||
+						'',
+					facebook:
+						response.data.professional_details?.facebook_url ||
+						response.data.professional_details?.facebook ||
+						'',
 				})
 			} catch (error) {
 				console.error('[PersonalDetailsTab] failed to load doctor profile:', error)
@@ -377,6 +455,9 @@ export default function PersonalDetailsTab() {
 		const normalizedGender = normalizeGenderValue(formData.gender)
 		const normalizedLanguages = normalizeLanguageValues(formData.languages)
 		const trimmedRegistrationNumber = formData.registrationNumber.trim()
+		const trimmedInstagram = formData.instagram.trim()
+		const trimmedFacebook = formData.facebook.trim()
+		const nextSocialErrors: SocialErrors = {}
 
 		if (!trimmedName) {
 			Alert.alert('Validation', 'Full name is required.')
@@ -398,6 +479,19 @@ export default function PersonalDetailsTab() {
 			return
 		}
 
+		if (trimmedInstagram && !isValidInstagramUrl(trimmedInstagram)) {
+			nextSocialErrors.instagram = 'Enter a valid Instagram profile URL.'
+		}
+
+		if (trimmedFacebook && !isValidFacebookUrl(trimmedFacebook)) {
+			nextSocialErrors.facebook = 'Enter a valid Facebook profile URL.'
+		}
+
+		setSocialErrors(nextSocialErrors)
+		if (Object.keys(nextSocialErrors).length > 0) {
+			return
+		}
+
 		try {
 			setIsSaving(true)
 
@@ -411,6 +505,8 @@ export default function PersonalDetailsTab() {
 				date_of_birth: formattedDob,
 				experience_years: Number.isFinite(experienceYears) ? experienceYears : 0,
 				registration_number: trimmedRegistrationNumber,
+				instagram_url: trimmedInstagram,
+				facebook_url: trimmedFacebook,
 			}
 
 			await doctorService.updateDoctorProfile(payload)
@@ -429,6 +525,8 @@ export default function PersonalDetailsTab() {
 				languages: normalizedLanguages,
 				experience: String(Number.isFinite(experienceYears) ? experienceYears : 0),
 				registrationNumber: trimmedRegistrationNumber,
+				instagram: trimmedInstagram,
+				facebook: trimmedFacebook,
 			}))
 			Alert.alert('Success', 'Personal details saved successfully/.')
 		} catch (err) {
@@ -594,6 +692,44 @@ export default function PersonalDetailsTab() {
 					/>
 				</View>
 
+				<View style={[styles.socialSection, { marginBottom: rowSpacing }]}>
+					<AppTypography variant="h4" style={styles.sectionTitle}>
+						Social Media
+					</AppTypography>
+					<FormRow stacked={!useTwoColumns} compact={isTablet}>
+						<InputField
+							label="Instagram"
+							value={formData.instagram}
+							onChangeText={(value) => updateSocialField('instagram', value)}
+							placeholder="https://instagram.com/username"
+							keyboardType="url"
+							autoCapitalize="none"
+							rightIcon="instagram"
+							errorText={socialErrors.instagram}
+							onFocus={() => setFocusedField('instagram')}
+							onBlur={() => {
+								setFocusedField('')
+								handleSocialBlur('instagram')
+							}}
+						/>
+						<InputField
+							label="Facebook"
+							value={formData.facebook}
+							onChangeText={(value) => updateSocialField('facebook', value)}
+							placeholder="https://www.facebook.com/profile"
+							keyboardType="url"
+							autoCapitalize="none"
+							rightIcon="facebook"
+							errorText={socialErrors.facebook}
+							onFocus={() => setFocusedField('facebook')}
+							onBlur={() => {
+								setFocusedField('')
+								handleSocialBlur('facebook')
+							}}
+						/>
+					</FormRow>
+				</View>
+
 				<TouchableOpacity
 					style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
 					onPress={handleSave}
@@ -635,6 +771,14 @@ const styles = StyleSheet.create({
 		color: '#343434',
 		fontSize: 22,
 		fontWeight: '600',
+	},
+	sectionTitle: {
+		color: '#343434',
+		fontWeight: '600',
+		marginBottom: 14,
+	},
+	socialSection: {
+		width: '100%',
 	},
 	formRow: {
 		flexDirection: 'row',
@@ -685,6 +829,9 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
+	inputShellError: {
+		borderColor: '#d84545',
+	},
 	leftPrefix: {
 		marginRight: 4,
 	},
@@ -694,6 +841,7 @@ const styles = StyleSheet.create({
 	},
 	textInput: {
 		flex: 1,
+		minWidth: 0,
 		paddingVertical: Platform.OS === 'web' ? 12 : 10,
 		paddingHorizontal: 0,
 		fontSize: 14,
@@ -708,6 +856,12 @@ const styles = StyleSheet.create({
 	},
 	placeholderText: {
 		color: '#9a9a9a',
+	},
+	errorText: {
+		color: '#d84545',
+		fontSize: 12,
+		lineHeight: 16,
+		marginTop: 6,
 	},
 	modalOverlay: {
 		flex: 1,
