@@ -6,6 +6,7 @@ import {
 	Pressable,
 	StatusBar,
 	ActivityIndicator,
+	useWindowDimensions,
 	Image, // ✅ added
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -25,6 +26,14 @@ type RoleSelectionProps = AuthScreenProps<typeof ROUTES.AUTH.ROLE_SELECTION>
 export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) {
 	const [roles, setRoles] = useState<Role[]>([])
 	const [loading, setLoading] = useState(true)
+	const { width, height } = useWindowDimensions()
+	const isTablet = width >= 768
+	const isLandscape = width > height
+	const horizontalPadding = isTablet ? 40 : 20
+	const contentMaxWidth = isTablet ? 560 : 420
+	const cardHeight = isTablet ? 88 : 78
+	const iconSize = isTablet ? 58 : 52
+	const imageSize = isTablet ? 32 : 28
 
 	useEffect(() => {
 		fetchRoles()
@@ -69,6 +78,10 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 		})
 	}
 
+	const handleClose = () => {
+		navigation.navigate(ROUTES.AUTH.LOGIN)
+	}
+
 	// ✅ Image mapping
 	const roleImages: Record<string, any> = {
 		ancillary: require('../../assets/splash/ancillary.png'),
@@ -81,46 +94,67 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 		<SafeAreaView style={styles.safeArea}>
 			<StatusBar barStyle="light-content" />
 
-			<View style={styles.container}>
-				<Text style={styles.heading}>Choose Your Role</Text>
-				<Text style={styles.subheading}>
-					Select how you want to continue
-				</Text>
+			<Pressable
+				style={[styles.closeButton, isTablet && styles.closeButtonTablet]}
+				onPress={handleClose}
+				accessibilityRole="button"
+				accessibilityLabel="Go to login"
+				hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+			>
+				<Ionicons name="close" size={isTablet ? 30 : 26} color="#ffffff" />
+			</Pressable>
 
-				{loading ? (
-					<ActivityIndicator size="large" color="#ffffff" />
-				) : (
-					<View style={styles.cardsWrapper}>
-						{roles.map((role) => (
-							<Pressable
-								key={role.id}
-								onPress={() => handleRoleSelect(role)}
-								style={styles.card}
-							>
-								<View style={styles.iconCircle}>
-									<Image
-										source={
-											roleImages[role.label.toLowerCase()] ||
-											require('../../assets/splash/ancillary.png')
-										}
-										style={styles.image}
-										resizeMode="contain"
+			<View
+				style={[
+					styles.container,
+					{
+						paddingHorizontal: horizontalPadding,
+						justifyContent: isLandscape && !isTablet ? 'flex-start' : 'center',
+						paddingTop: isLandscape && !isTablet ? 32 : 0,
+					},
+				]}
+			>
+				<View style={[styles.content, { maxWidth: contentMaxWidth }]}>
+					<Text style={[styles.heading, isTablet && styles.headingTablet]}>Choose Your Role</Text>
+					<Text style={[styles.subheading, isTablet && styles.subheadingTablet]}>
+						Select how you want to continue
+					</Text>
+
+					{loading ? (
+						<ActivityIndicator size="large" color="#ffffff" />
+					) : (
+						<View style={styles.cardsWrapper}>
+							{roles.map((role) => (
+								<Pressable
+									key={role.id}
+									onPress={() => handleRoleSelect(role)}
+									style={[styles.card, { height: cardHeight }]}
+								>
+									<View style={[styles.iconCircle, { width: iconSize, height: iconSize, borderRadius: iconSize / 2 }]}>
+										<Image
+											source={
+												roleImages[role.label.toLowerCase()] ||
+												require('../../assets/splash/ancillary.png')
+											}
+											style={{ width: imageSize, height: imageSize }}
+											resizeMode="contain"
+										/>
+									</View>
+
+									<View style={styles.textWrap}>
+										<Text style={[styles.title, isTablet && styles.titleTablet]}>{role.label}</Text>
+									</View>
+
+									<Ionicons
+										name="chevron-forward"
+										size={isTablet ? 24 : 20}
+										color="#134149"
 									/>
-								</View>
-
-								<View style={styles.textWrap}>
-									<Text style={styles.title}>{role.label}</Text>
-								</View>
-
-								<Ionicons
-									name="chevron-forward"
-									size={20}
-									color="#134149"
-								/>
-							</Pressable>
-						))}
-					</View>
-				)}
+								</Pressable>
+							))}
+						</View>
+					)}
+				</View>
 			</View>
 		</SafeAreaView>
 	)
@@ -134,8 +168,32 @@ const styles = StyleSheet.create({
 
 	container: {
 		flex: 1,
-		paddingHorizontal: 20,
+		alignItems: 'center',
+	},
+
+	content: {
+		width: '100%',
+	},
+
+	closeButton: {
+		position: 'absolute',
+		top: 14,
+		right: 16,
+		zIndex: 10,
+		width: 42,
+		height: 42,
+		borderRadius: 21,
+		alignItems: 'center',
 		justifyContent: 'center',
+		backgroundColor: 'rgba(255,255,255,0.14)',
+	},
+
+	closeButtonTablet: {
+		top: 22,
+		right: 28,
+		width: 48,
+		height: 48,
+		borderRadius: 24,
 	},
 
 	heading: {
@@ -146,6 +204,10 @@ const styles = StyleSheet.create({
 		marginBottom: 8,
 	},
 
+	headingTablet: {
+		fontSize: 34,
+	},
+
 	subheading: {
 		fontSize: 15,
 		color: '#d7e7e8',
@@ -153,12 +215,16 @@ const styles = StyleSheet.create({
 		marginBottom: 30,
 	},
 
+	subheadingTablet: {
+		fontSize: 17,
+		marginBottom: 36,
+	},
+
 	cardsWrapper: {
 		gap: 16,
 	},
 
 	card: {
-		height: 78,
 		borderRadius: 16,
 		backgroundColor: '#ffffff',
 		paddingHorizontal: 16,
@@ -180,11 +246,6 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 
-	image: {
-		width: 28,
-		height: 28,
-	},
-
 	textWrap: {
 		flex: 1,
 		paddingLeft: 14,
@@ -194,5 +255,9 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		fontWeight: '600',
 		color: '#1d1d1d',
+	},
+
+	titleTablet: {
+		fontSize: 20,
 	},
 })
