@@ -435,9 +435,10 @@ function WorkingHoursSection({
 				{SECTION_META.map((section) => {
 					const slots = selectedWorkingHours.sections[section.key]
 					const canAdd = slots.length < 3
+					const isLastSection = section.key === SECTION_META[SECTION_META.length - 1].key
 
 					return (
-						<View key={section.key} style={styles.shiftBlock}>
+						<View key={section.key} style={[styles.shiftBlock, isLastSection && styles.shiftBlockLast]}>
 							<AppTypography variant="caption" style={styles.shiftTitle}>
 								{section.label}
 							</AppTypography>
@@ -452,7 +453,14 @@ function WorkingHoursSection({
 									const showAdd = slotIndex === slots.length - 1 && canAdd
 
 									return (
-										<View key={`${section.key}-${slotIndex}`} style={[styles.slotEditor, stacked && styles.slotEditorStacked]}>
+										<View
+											key={`${section.key}-${slotIndex}`}
+											style={[
+												styles.slotEditor,
+												slotIndex < slots.length - 1 && styles.slotEditorSpaced,
+												stacked && styles.slotEditorStacked,
+											]}
+										>
 											<View style={[styles.slotSelects, stacked && styles.slotSelectsStacked]}>
 												<View style={styles.slotSelectCell}>
 													<DropdownSelect
@@ -481,7 +489,7 @@ function WorkingHoursSection({
 														onPress={() => onAddSlot(section.key)}
 														activeOpacity={0.8}
 													>
-														<MaterialCommunityIcons name="plus" size={18} color={TEAL} />
+														<MaterialCommunityIcons name="plus" size={21} color={TEAL} style={styles.slotActionIcon} />
 													</TouchableOpacity>
 												) : null}
 
@@ -491,7 +499,7 @@ function WorkingHoursSection({
 														onPress={() => onRemoveSlot(section.key, slotIndex)}
 														activeOpacity={0.8}
 													>
-														<MaterialCommunityIcons name="close" size={16} color="#62707a" />
+														<MaterialCommunityIcons name="close" size={21} color="#62707a" style={styles.slotActionIcon} />
 													</TouchableOpacity>
 												) : null}
 											</View>
@@ -995,7 +1003,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						/>
 
 						<View style={styles.appointmentRules}>
-							<AppTypography variant="body" style={styles.workingTitle}>
+							<AppTypography variant="body" style={[styles.workingTitle, styles.appointmentRulesTitle]}>
 								Appointment Rules
 							</AppTypography>
 
@@ -1517,19 +1525,24 @@ const styles = StyleSheet.create({
 		alignSelf: 'flex-start',
 	},
 	workingTitle: {
-		color: '#001b3d',
-		fontSize: 18,
+		color: '#1f2b33',
+		fontSize: 16,
+		lineHeight: 22,
 		fontWeight: '700',
-		marginBottom: 20,
+		marginBottom: 16,
 	},
 	shiftBlock: {
-		marginBottom: 22,
+		marginBottom: 20,
+	},
+	shiftBlockLast: {
+		marginBottom: 14,
 	},
 	shiftTitle: {
-		color: '#496a80',
-		fontSize: 16,
-		fontWeight: '400',
-		marginBottom: 20,
+		color: '#7b8790',
+		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '500',
+		marginBottom: 16,
 	},
 	workingRow: {
 		flexDirection: 'row',
@@ -1561,7 +1574,7 @@ const styles = StyleSheet.create({
 	},
 	daysScroll: {
 		marginHorizontal: -2,
-		marginBottom: 24,
+		marginBottom: 18,
 	},
 	daysWrapCompact: {
 		flexWrap: 'nowrap',
@@ -1591,10 +1604,10 @@ const styles = StyleSheet.create({
 		backgroundColor: TEAL,
 	},
 	dayChipText: {
-		color: '#526173',
-		fontSize: 50,
-		lineHeight: 22,
-		fontWeight: '500',
+		color: '#5f6b76',
+		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '600',
 	},
 	dayChipTextCompact: {
 		fontSize: 12,
@@ -1606,13 +1619,14 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 	},
 	appointmentTypeBlock: {
-		marginBottom: 24,
+		marginBottom: 18,
 	},
 	appointmentTypeLabel: {
-		color: '#5f6b76',
+		color: '#7b8790',
 		fontSize: 14,
+		lineHeight: 20,
 		fontWeight: '500',
-		marginBottom: 12,
+		marginBottom: 10,
 	},
 	segmentedControl: {
 		alignSelf: 'flex-start',
@@ -1633,17 +1647,17 @@ const styles = StyleSheet.create({
 	},
 	segmentedText: {
 		color: '#ffffff',
-		fontSize: 13,
+		fontSize: 14,
+		lineHeight: 18,
 		fontWeight: '600',
 	},
 	segmentedTextActive: {
 		color: '#111111',
 	},
 	slotsWrap: {
-		flexDirection: 'row',
+		flexDirection: 'column',
 		alignItems: 'flex-start',
-		flexWrap: 'wrap',
-		gap: 14,
+		width: '100%',
 	},
 	slotEditor: {
 		flexDirection: 'row',
@@ -1651,9 +1665,12 @@ const styles = StyleSheet.create({
 		gap: 8,
 		width: 342,
 		maxWidth: '100%',
-		marginBottom: 12,
+		marginBottom: 0,
 		overflow: 'visible',
 		flexWrap: 'nowrap',
+	},
+	slotEditorSpaced: {
+		marginBottom: 25,
 	},
 	slotEditorStacked: {
 		width: '100%',
@@ -1677,7 +1694,7 @@ const styles = StyleSheet.create({
 		minWidth: 0,
 	},
 	slotActions: {
-		width: 70,
+		width: 72,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'flex-start',
@@ -1685,28 +1702,36 @@ const styles = StyleSheet.create({
 		flexShrink: 0,
 	},
 	iconAction: {
-		width: 30,
-		height: 30,
-		borderRadius: 15,
+		width: 32,
+		height: 48,
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: '#a7d3db',
 		alignItems: 'center',
 		justifyContent: 'center',
+		backgroundColor: '#ffffff',
 		flexShrink: 0,
 	},
 	addSlotButton: {
 		width: 32,
-		height: 32,
-		borderRadius: 8,
+		height: 48,
+		borderRadius: 10,
 		borderWidth: 1,
-		borderColor: TEAL,
+		borderColor: '#a7d3db',
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#f7fcfc',
+		backgroundColor: '#ffffff',
 		flexShrink: 0,
 		zIndex: 2,
 		elevation: 2,
 	},
+	slotActionIcon: {
+		textAlign: 'center',
+		textAlignVertical: 'center',
+	},
 	slotDurationBlock: {
-		marginTop: 2,
+		marginTop: 0,
+		marginBottom: 0,
 	},
 	slotDurationField: {
 		width: 225,
@@ -1726,16 +1751,16 @@ const styles = StyleSheet.create({
 		zIndex: 2,
 		paddingHorizontal: 7,
 		backgroundColor: '#ffffff',
-		color: '#496a80',
+		color: '#7b8790',
 		fontSize: 14,
-		fontWeight: '400',
+		fontWeight: '500',
 		lineHeight: 18,
 	},
 	dropdownTrigger: {
 		minHeight: 48,
-		borderRadius: 14,
+		borderRadius: 10,
 		borderWidth: 1,
-		borderColor: '#c4c4c4',
+		borderColor: '#a7d3db',
 		backgroundColor: '#ffffff',
 		paddingHorizontal: 20,
 		flexDirection: 'row',
@@ -1747,13 +1772,15 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 12,
 	},
 	dropdownValue: {
-		color: '#182b3d',
-		fontSize: 18,
+		color: '#2f2f2f',
+		fontSize: 14,
+		lineHeight: 20,
 		fontWeight: '400',
 	},
 	dropdownValueCompact: {
-		color: '#24384a',
+		color: '#2f2f2f',
 		fontSize: 14,
+		lineHeight: 20,
 		fontWeight: '400',
 	},
 	dropdownOverlay: {
@@ -1806,8 +1833,11 @@ const styles = StyleSheet.create({
 		color: TEAL,
 	},
 	appointmentRules: {
-		marginTop: 24,
-		gap: 18,
+		marginTop: 14,
+		gap: 14,
+	},
+	appointmentRulesTitle: {
+		marginBottom: 0,
 	},
 	ruleBlock: {
 		width: '100%',

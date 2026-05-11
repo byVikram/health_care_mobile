@@ -9,7 +9,7 @@ import {
 	useWindowDimensions,
 	Image, // ✅ added
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { getRoles } from '../auth/authService'
 import type { AuthScreenProps } from '../../navigation/types'
@@ -27,8 +27,10 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 	const [roles, setRoles] = useState<Role[]>([])
 	const [loading, setLoading] = useState(true)
 	const { width, height } = useWindowDimensions()
+	const insets = useSafeAreaInsets()
 	const isTablet = width >= 768
 	const isLandscape = width > height
+	const backButtonOffset = insets.top + (isTablet ? 24 : isLandscape ? 18 : 16)
 	const horizontalPadding = isTablet ? 40 : 20
 	const contentMaxWidth = isTablet ? 560 : 420
 	const cardHeight = isTablet ? 88 : 78
@@ -95,13 +97,17 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 			<StatusBar barStyle="light-content" />
 
 			<Pressable
-				style={[styles.closeButton, isTablet && styles.closeButtonTablet]}
+				style={[
+					styles.backButton,
+					{ top: backButtonOffset },
+					isTablet && styles.backButtonTablet,
+				]}
 				onPress={handleClose}
 				accessibilityRole="button"
 				accessibilityLabel="Go to login"
 				hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
 			>
-				<Ionicons name="close" size={isTablet ? 30 : 26} color="#ffffff" />
+				<Ionicons name="chevron-back" size={isTablet ? 34 : 30} color="#ffffff" />
 			</Pressable>
 
 			<View
@@ -175,32 +181,30 @@ const styles = StyleSheet.create({
 		width: '100%',
 	},
 
-	closeButton: {
+	backButton: {
 		position: 'absolute',
-		top: 14,
-		right: 16,
+		left: 14,
 		zIndex: 10,
-		width: 42,
-		height: 42,
-		borderRadius: 21,
+		width: 44,
+		height: 44,
+		borderRadius: 22,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: 'rgba(255,255,255,0.14)',
+		backgroundColor: 'rgba(255,255,255,0.10)',
 	},
 
-	closeButtonTablet: {
-		top: 22,
-		right: 28,
-		width: 48,
-		height: 48,
-		borderRadius: 24,
+	backButtonTablet: {
+		left: 24,
+		width: 52,
+		height: 52,
+		borderRadius: 26,
 	},
 
 	heading: {
 		fontSize: 28,
 		fontWeight: '700',
 		color: '#fff',
-		textAlign: 'center',
+		textAlign: 'left',
 		marginBottom: 8,
 	},
 
@@ -211,7 +215,7 @@ const styles = StyleSheet.create({
 	subheading: {
 		fontSize: 15,
 		color: '#d7e7e8',
-		textAlign: 'center',
+		textAlign: 'left',
 		marginBottom: 30,
 	},
 

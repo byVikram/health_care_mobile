@@ -57,6 +57,8 @@ export interface DoctorProfileApiData {
 		facebook_url?: string | null
 		instagram?: string | null
 		facebook?: string | null
+		twitter_url?: string | null
+		twitter?: string | null
 		specialities: DoctorProfileApiSpeciality[]
 	}
 	hospitals: DoctorProfileApiHospital[]

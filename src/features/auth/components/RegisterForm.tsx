@@ -1,23 +1,49 @@
 import React, { useState } from 'react'
-import { Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, View, useWindowDimensions } from 'react-native'
 import axios from 'axios'
 import { createUser } from '../authService'
 import { AppInput } from '../../../components/common'
 
+type RegisterFormData = {
+	name: string
+	email: string
+	mobile: string
+}
+
 interface RegisterFormProps {
 	roleId: string
 	roleLabel?: string
+	formData: RegisterFormData
+	onFormDataChange: React.Dispatch<React.SetStateAction<RegisterFormData>>
+	autoFocusMobile?: boolean
 	onSubmit: (mobile: string) => void
 }
 
-export default function RegisterForm({ roleId, roleLabel, onSubmit }: RegisterFormProps) {
-	const [name, setName] = useState('')
-	const [email, setEmail] = useState('')
-	const [mobile, setMobile] = useState('')
+export default function RegisterForm({
+	roleId,
+	roleLabel,
+	formData,
+	onFormDataChange,
+	autoFocusMobile = false,
+	onSubmit,
+}: RegisterFormProps) {
 	const [loading, setLoading] = useState(false)
 	const [formError, setFormError] = useState('')
+	const { width, height } = useWindowDimensions()
+	const isTablet = width >= 768
+	const isLandscape = width > height
+	const contentMaxWidth = isTablet ? 520 : 420
+	const updateField = (field: keyof RegisterFormData, value: string) => {
+		onFormDataChange((prev) => ({
+			...prev,
+			[field]: value,
+		}))
+	}
 
 	const handleRegister = async () => {
+		const name = formData.name.trim()
+		const email = formData.email.trim()
+		const mobile = formData.mobile
 		console.log('Registering with:', { roleId, name, email, mobile })
 		setFormError('')
 
@@ -56,7 +82,8 @@ export default function RegisterForm({ roleId, roleLabel, onSubmit }: RegisterFo
 				contact_number: mobile,
 			})
 
-			if (res?.success || res?.data) {
+			const hasResponseData = typeof res === 'object' && res !== null && 'data' in res
+			if (res?.success || hasResponseData) {
 				onSubmit(mobile)
 			} else {
 				setFormError(res?.message || 'Registration failed')
@@ -75,52 +102,70 @@ export default function RegisterForm({ roleId, roleLabel, onSubmit }: RegisterFo
 	}
 
 	return (
-		<ScrollView contentContainerStyle={styles.container}>
-			<Text style={styles.title}>Register</Text>
+		<ScrollView
+			keyboardShouldPersistTaps="handled"
+			contentContainerStyle={[
+				styles.container,
+				{
+					paddingHorizontal: isTablet ? 40 : 24,
+					justifyContent: isLandscape && !isTablet ? 'flex-start' : 'center',
+					paddingTop: isLandscape && !isTablet ? 64 : 24,
+				},
+			]}
+		>
+			<View style={[styles.content, { maxWidth: contentMaxWidth }]}>
+				<Text style={[styles.title, isTablet && styles.titleTablet]}>Register</Text>
 
-			{/* {roleLabel ? (
-        <Text style={styles.roleText}>Role: {roleLabel}</Text>
-      ) : null} */}
+				{/* {roleLabel ? (
+	        <Text style={styles.roleText}>Role: {roleLabel}</Text>
+	      ) : null} */}
 
-			<AppInput placeholder="Name" value={name} onChangeText={setName} style={styles.input} />
+				<AppInput placeholder="Name" value={formData.name} onChangeText={(value) => updateField('name', value)} style={styles.input} />
 
-			<AppInput
-				placeholder="Email"
-				value={email}
-				onChangeText={setEmail}
-				keyboardType="email-address"
-				autoCapitalize="none"
-				style={styles.input}
-			/>
+				<AppInput
+					placeholder="Email"
+					value={formData.email}
+					onChangeText={(value) => updateField('email', value)}
+					keyboardType="email-address"
+					autoCapitalize="none"
+					style={styles.input}
+				/>
 
-			<AppInput
-				placeholder="Mobile Number"
-				value={mobile}
-				onChangeText={(t) => setMobile(t.replace(/\D/g, '').slice(0, 10))}
-				keyboardType="phone-pad"
-				maxLength={10}
-				style={styles.input}
-			/>
+				<AppInput
+					placeholder="Mobile Number"
+					value={formData.mobile}
+					onChangeText={(t) => updateField('mobile', t.replace(/\D/g, '').slice(0, 10))}
+					keyboardType="phone-pad"
+					maxLength={10}
+					autoFocus={autoFocusMobile}
+					style={styles.input}
+				/>
 
-			<TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-				{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register</Text>}
-			</TouchableOpacity>
+				<TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+					{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register</Text>}
+				</TouchableOpacity>
 
-			{!!formError && <Text style={styles.error}>{formError}</Text>}
+				{!!formError && <Text style={styles.error}>{formError}</Text>}
+			</View>
 		</ScrollView>
 	)
 }
 
 const styles = StyleSheet.create({
 	container: {
-		padding: 24,
 		flexGrow: 1,
-		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	content: {
+		width: '100%',
 	},
 	title: {
 		fontSize: 26,
 		fontWeight: '600',
 		marginBottom: 12,
+	},
+	titleTablet: {
+		fontSize: 30,
 	},
 	roleText: {
 		fontSize: 15,

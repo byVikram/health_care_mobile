@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 
 import ProfileIcon from "../../assets/Register/profile.svg";
@@ -16,8 +17,11 @@ import ConsultIcon from "../../assets/Register/Consult.svg";
 import FeedbackIcon from "../../assets/Register/Feedback.svg";
 import DoctorTabletImage from "../../assets/Register/Welcome.svg";
 
-import { API_ENDPOINTS } from "../../constants/apiUrls";
 import { AppSelect, AppSelectOption, AppTypography } from "../../components/common";
+import { ROUTES } from "../../navigation/routes";
+import type { AppStackScreenProps } from "../../navigation/types";
+import { getSpecialities } from "../doctor/doctorService";
+import { doctorService } from "../consultation/ConsultationService";
 
 type Speciality = {
   id: string;
@@ -26,26 +30,29 @@ type Speciality = {
 };
 
 const MOCK_LOCATIONS: AppSelectOption[] = [
-  { label: "Bangalore", value: "bangalore" },
-  { label: "Mumbai", value: "mumbai" },
-  { label: "Delhi", value: "delhi" },
-  { label: "Chennai", value: "chennai" },
-  { label: "Hyderabad", value: "hyderabad" },
-  { label: "Pune", value: "pune" },
-  { label: "Kolkata", value: "kolkata" },
-  { label: "Ahmedabad", value: "ahmedabad" },
-  { label: "Jaipur", value: "jaipur" },
-  { label: "Surat", value: "surat" },
-  { label: "Kochi", value: "kochi" },
-  { label: "Chandigarh", value: "chandigarh" },
+  { label: "Bangalore", value: "Bangalore" },
+  { label: "Mumbai", value: "Mumbai" },
+  { label: "Delhi", value: "Delhi" },
+  { label: "Chennai", value: "Chennai" },
+  { label: "Hyderabad", value: "Hyderabad" },
+  { label: "Pune", value: "Pune" },
+  { label: "Kolkata", value: "Kolkata" },
+  { label: "Ahmedabad", value: "Ahmedabad" },
+  { label: "Jaipur", value: "Jaipur" },
+  { label: "Surat", value: "Surat" },
+  { label: "Kochi", value: "Kochi" },
+  { label: "Chandigarh", value: "Chandigarh" },
 ];
 
-export default function WelcomeDoctorPage() {
+export default function WelcomeDoctorPage({
+  navigation,
+}: AppStackScreenProps<typeof ROUTES.STACK.DOCTOR_WELCOME>) {
   const [showAccountDetails, setShowAccountDetails] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedSpeciality, setSelectedSpeciality] = useState("");
   const [specialityOptions, setSpecialityOptions] = useState<AppSelectOption[]>([]);
   const [loadingSpecialities, setLoadingSpecialities] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [specialityError, setSpecialityError] = useState("");
   const { width, height } = useWindowDimensions();
@@ -71,12 +78,14 @@ export default function WelcomeDoctorPage() {
   const accountDropdownHeight = isSmallPhone || isCompactHeight ? 180 : 220;
   const accountDropdownBottomOffset = isTablet ? 40 : 96;
   const accountTopPadding = isTablet ? 40 : isCompactHeight ? 34 : 44;
-  const canContinue = Boolean(selectedLocation && selectedSpeciality);
+  const canContinue = Boolean(selectedLocation && selectedSpeciality) && !loadingSpecialities && !isSaving;
 
   useEffect(() => {
-    fetch(API_ENDPOINTS.SPECIALITIES.LIST)
-      .then((res) => res.json())
-      .then((json) => {
+    const fetchSpecialities = async () => {
+      try {
+        setLoadingSpecialities(true);
+        const json = await getSpecialities();
+
         if (json.success && Array.isArray(json.data)) {
           const options: AppSelectOption[] = json.data.map((speciality: Speciality) => ({
             label: speciality.label,
@@ -84,12 +93,17 @@ export default function WelcomeDoctorPage() {
           }));
           setSpecialityOptions(options);
         }
-      })
-      .catch((error) => console.error("Specialities fetch error:", error))
-      .finally(() => setLoadingSpecialities(false));
+      } catch (error) {
+        console.error("Specialities fetch error:", error);
+      } finally {
+        setLoadingSpecialities(false);
+      }
+    };
+
+    fetchSpecialities();
   }, []);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     let hasError = false;
 
     if (!selectedLocation) {
@@ -107,6 +121,31 @@ export default function WelcomeDoctorPage() {
     }
 
     if (hasError) return;
+
+    try {
+      setIsSaving(true);
+      await doctorService.updateDoctorProfile({
+        location: selectedLocation,
+        speciality_id: selectedSpeciality,
+        specialization_id: selectedSpeciality,
+        specialization: selectedSpeciality,
+      });
+
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: ROUTES.MAIN.TABS,
+            params: { screen: ROUTES.MAIN.PROFILE },
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("Doctor welcome profile save error:", error);
+      Alert.alert("Error", "Unable to save your account details right now.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (showAccountDetails) {
@@ -211,10 +250,15 @@ export default function WelcomeDoctorPage() {
                 style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}
                 activeOpacity={0.85}
                 onPress={handleContinue}
+                disabled={!canContinue}
               >
-                <AppTypography variant="body" style={styles.continueButtonText}>
-                  Continue
-                </AppTypography>
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <AppTypography variant="body" style={styles.continueButtonText}>
+                    Continue
+                  </AppTypography>
+                )}
               </TouchableOpacity>
             </View>
 
@@ -482,13 +526,14 @@ const styles = StyleSheet.create({
   continueButton: {
     minHeight: 42,
     borderRadius: 4,
-    backgroundColor: "#9bbfc0",
+    backgroundColor: "#2e7d74",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 4,
   },
   continueButtonDisabled: {
     backgroundColor: "#9bbfc0",
+    opacity: 0.65,
   },
   continueButtonText: {
     color: "#ffffff",
