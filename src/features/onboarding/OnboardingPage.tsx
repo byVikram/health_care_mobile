@@ -1,10 +1,4 @@
-import React, {
-	useCallback,
-	useMemo,
-	useRef,
-	useState,
-	useEffect,
-} from 'react'
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import {
 	FlatList,
 	NativeScrollEvent,
@@ -22,24 +16,15 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAuth } from '../../context/AuthContext'
-import type {
-	AppNavigationParamList,
-	AuthStackParamList,
-} from '../../navigation/types'
+import type { AppNavigationParamList, AuthStackParamList } from '../../navigation/types'
 import { ROUTES } from '../../navigation/routes'
 
 import { onboardingData } from '../../constants/onboardingData'
 import type { UserRole } from '../../constants/constants'
 
 type OnboardingPageProps = {
-	navigation: NativeStackNavigationProp<
-		AppNavigationParamList,
-		typeof ROUTES.AUTH.ONBOARDING
-	>
-	route: RouteProp<
-		AuthStackParamList,
-		typeof ROUTES.AUTH.ONBOARDING
-	>
+	navigation: NativeStackNavigationProp<AppNavigationParamList, typeof ROUTES.AUTH.ONBOARDING>
+	route: RouteProp<AuthStackParamList, typeof ROUTES.AUTH.ONBOARDING>
 }
 
 type Slide = {
@@ -51,10 +36,7 @@ type Slide = {
 	}>
 }
 
-export default function OnboardingPage({
-	navigation,
-	route,
-}: OnboardingPageProps) {
+export default function OnboardingPage({ navigation, route }: OnboardingPageProps) {
 	const { accessToken } = useAuth()
 	const { width } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
@@ -95,10 +77,7 @@ export default function OnboardingPage({
 
 	const cardWidth = useMemo(() => Math.max(width, 320), [width])
 
-	const illustrationSize = useMemo(
-		() => Math.min(cardWidth * 0.62, 250),
-		[cardWidth],
-	)
+	const illustrationSize = useMemo(() => Math.min(cardWidth * 0.62, 250), [cardWidth])
 
 	const finishOnboarding = useCallback(() => {
 		if (accessToken) {
@@ -139,15 +118,13 @@ export default function OnboardingPage({
 
 	const handleMomentumScrollEnd = useCallback(
 		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-			const nextIndex = Math.round(
-				event.nativeEvent.contentOffset.x / cardWidth,
-			)
+			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth)
 
 			if (nextIndex !== activeIndex) {
 				setActiveIndex(nextIndex)
 			}
 		},
-		[activeIndex, cardWidth],
+		[activeIndex, cardWidth]
 	)
 
 	const renderItem = useCallback(
@@ -157,26 +134,20 @@ export default function OnboardingPage({
 			return (
 				<View style={[styles.slide, { width: cardWidth }]}>
 					<View style={styles.illustrationArea}>
-						<Illustration
-							width={illustrationSize}
-							height={illustrationSize}
-						/>
+						<Illustration width={illustrationSize} height={illustrationSize} />
 					</View>
 
-					<TextLabel
-						text={item.description}
-						style={styles.description}
-					/>
+					<TextLabel text={item.description} style={styles.description} />
 
-					{roleLabel ? (
+					{/* {roleLabel ? (
 						<Text style={styles.roleBadge}>
 							Registering as: {roleLabel}
 						</Text>
-					) : null}
+					) : null} */}
 				</View>
 			)
 		},
-		[cardWidth, illustrationSize, roleLabel],
+		[cardWidth, illustrationSize, roleLabel]
 	)
 
 	return (
@@ -190,8 +161,7 @@ export default function OnboardingPage({
 						style={[
 							styles.skipButton,
 							{
-								marginTop:
-									Math.max(insets.top, 8) + 4,
+								marginTop: Math.max(insets.top, 8) + 4,
 							},
 						]}
 					>
@@ -224,26 +194,14 @@ export default function OnboardingPage({
 						{slides.map((slide, index) => (
 							<View
 								key={slide.key}
-								style={[
-									styles.dot,
-									index === activeIndex
-										? styles.dotActive
-										: styles.dotInactive,
-								]}
+								style={[styles.dot, index === activeIndex ? styles.dotActive : styles.dotInactive]}
 							/>
 						))}
 					</View>
 
-					<Pressable
-						onPress={handleNext}
-						style={styles.nextButton}
-					>
+					<Pressable onPress={handleNext} style={styles.nextButton}>
 						<TextLabel
-							text={
-								activeIndex === slides.length - 1
-									? 'Get Started'
-									: 'Next'
-							}
+							text={activeIndex === slides.length - 1 ? 'Get Started' : 'Next'}
 							style={styles.nextText}
 						/>
 					</Pressable>
@@ -253,13 +211,7 @@ export default function OnboardingPage({
 	)
 }
 
-function TextLabel({
-	text,
-	style,
-}: {
-	text: string
-	style: TextStyle
-}) {
+function TextLabel({ text, style }: { text: string; style: TextStyle }) {
 	return <Text style={style}>{text}</Text>
 }
 
