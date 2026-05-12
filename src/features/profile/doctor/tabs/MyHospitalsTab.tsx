@@ -6,6 +6,7 @@ import {
 	Pressable,
 	ScrollView,
 	StyleSheet,
+	Switch,
 	TextInput,
 	TouchableOpacity,
 	View,
@@ -21,6 +22,8 @@ import {
 	updateHospital,
 } from '../../../doctor/doctorService'
 import { DoctorHospital } from '../../../../types/doctor-profile'
+import App from '../../../../../App'
+import { all } from 'axios'
 
 type HospitalFormData = {
 	name: string
@@ -590,6 +593,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState(createWeeklyWorkingHours)
 	const [followUpDays, setFollowUpDays] = useState(7)
 	const [rescheduleCutoff, setRescheduleCutoff] = useState(2)
+	const [allowPayLater, setAllowPayLater] = useState(false)
 	const hospitalsRef = useRef<HospitalItem[]>([])
 	const hasLoadedHospitalsRef = useRef(false)
 
@@ -1036,6 +1040,26 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 										compact
 										showFloatingLabel={false}
 									/>
+								</View>
+							</View>
+
+							<View style={styles.ruleBlock}>
+								<AppTypography variant="caption" style={styles.shiftTitle}>
+									Allow Pay Later
+								</AppTypography>
+
+								<View style={{width:225,maxWidth:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderWidth:1,borderColor:'#a7d3db',borderRadius:10,paddingHorizontal:14,paddingVertical:10,backgroundColor:'#ffffff',minHeight:48}}>
+									<AppTypography variant="caption" style={{color:'#2f2f2f',fontSize:14}}>
+										{allowPayLater ? 'Yes' : 'No'}
+									</AppTypography>	
+
+									<Switch
+										value={allowPayLater}
+										onValueChange={setAllowPayLater}
+										trackColor={{ false: '#cbd5e1', true: TEAL }}
+										thumbColor="#ffffff"
+									/>
+									
 								</View>
 							</View>
 						</View>
