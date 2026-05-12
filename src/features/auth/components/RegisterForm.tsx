@@ -1,8 +1,18 @@
 import React, { useState } from 'react'
-import { Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, View, useWindowDimensions } from 'react-native'
+import {
+	Text,
+	StyleSheet,
+	ScrollView,
+	TouchableOpacity,
+	ActivityIndicator,
+	View,
+	useWindowDimensions,
+	Pressable,
+} from 'react-native'
 import axios from 'axios'
 import { createUser } from '../authService'
 import { AppInput } from '../../../components/common'
+import { ROUTES } from '../../../navigation/routes'
 
 type RegisterFormData = {
 	name: string
@@ -17,6 +27,7 @@ interface RegisterFormProps {
 	onFormDataChange: React.Dispatch<React.SetStateAction<RegisterFormData>>
 	autoFocusMobile?: boolean
 	onSubmit: (mobile: string) => void
+	navigation: any
 }
 
 export default function RegisterForm({
@@ -26,13 +37,18 @@ export default function RegisterForm({
 	onFormDataChange,
 	autoFocusMobile = false,
 	onSubmit,
+	navigation,
 }: RegisterFormProps) {
 	const [loading, setLoading] = useState(false)
 	const [formError, setFormError] = useState('')
+
 	const { width, height } = useWindowDimensions()
+
 	const isTablet = width >= 768
 	const isLandscape = width > height
+
 	const contentMaxWidth = isTablet ? 520 : 420
+
 	const updateField = (field: keyof RegisterFormData, value: string) => {
 		onFormDataChange((prev) => ({
 			...prev,
@@ -44,7 +60,14 @@ export default function RegisterForm({
 		const name = formData.name.trim()
 		const email = formData.email.trim()
 		const mobile = formData.mobile
-		console.log('Registering with:', { roleId, name, email, mobile })
+
+		console.log('Registering with:', {
+			roleId,
+			name,
+			email,
+			mobile,
+		})
+
 		setFormError('')
 
 		if (!roleId) {
@@ -83,6 +106,7 @@ export default function RegisterForm({
 			})
 
 			const hasResponseData = typeof res === 'object' && res !== null && 'data' in res
+
 			if (res?.success || hasResponseData) {
 				onSubmit(mobile)
 			} else {
@@ -120,7 +144,12 @@ export default function RegisterForm({
 	        <Text style={styles.roleText}>Role: {roleLabel}</Text>
 	      ) : null} */}
 
-				<AppInput placeholder="Name" value={formData.name} onChangeText={(value) => updateField('name', value)} style={styles.input} />
+				<AppInput
+					placeholder="Name"
+					value={formData.name}
+					onChangeText={(value) => updateField('name', value)}
+					style={styles.input}
+				/>
 
 				<AppInput
 					placeholder="Email"
@@ -145,6 +174,14 @@ export default function RegisterForm({
 					{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register</Text>}
 				</TouchableOpacity>
 
+				<View style={styles.loginContainer}>
+					<Text style={styles.accountText}>Have an account?</Text>
+
+					<Pressable onPress={() => navigation.replace(ROUTES.AUTH.LOGIN)}>
+						<Text style={styles.loginText}>Login</Text>
+					</Pressable>
+				</View>
+
 				{!!formError && <Text style={styles.error}>{formError}</Text>}
 			</View>
 		</ScrollView>
@@ -156,25 +193,31 @@ const styles = StyleSheet.create({
 		flexGrow: 1,
 		alignItems: 'center',
 	},
+
 	content: {
 		width: '100%',
 	},
+
 	title: {
 		fontSize: 26,
 		fontWeight: '600',
 		marginBottom: 12,
 	},
+
 	titleTablet: {
 		fontSize: 30,
 	},
+
 	roleText: {
 		fontSize: 15,
 		color: '#0d9488',
 		marginBottom: 16,
 	},
+
 	input: {
 		marginTop: 12,
 	},
+
 	button: {
 		backgroundColor: '#0d9488',
 		padding: 14,
@@ -182,11 +225,32 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		marginTop: 20,
 	},
+
 	buttonText: {
 		color: '#fff',
 		fontWeight: '600',
 		fontSize: 16,
 	},
+
+	loginContainer: {
+		flexDirection: 'row',
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginTop: 16,
+	},
+
+	accountText: {
+		fontSize: 15,
+		color: '#666',
+	},
+
+	loginText: {
+		fontSize: 15,
+		fontWeight: '600',
+		color: '#0d9488',
+		marginLeft: 4,
+	},
+
 	error: {
 		color: 'red',
 		marginTop: 12,

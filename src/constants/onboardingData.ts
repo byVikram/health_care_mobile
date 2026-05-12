@@ -34,7 +34,7 @@ const commonScreens: OnboardingScreen[] = [
 ]
 
 export const onboardingData: OnboardingConfig = {
-   "a1b2c3d4-0001-0001-0001-000000000001": {
+   "123e4567-e89b-12d3-a456-426614174000": {
     screens: [
       {
         Illustration: Onboarding1,
@@ -49,7 +49,7 @@ export const onboardingData: OnboardingConfig = {
     ],
   },
 
-   "a1b2c3d4-0002-0002-0002-000000000002": {
+   "550e8400-e29b-41d4-a716-446655440000": {
     screens: [
       {
         Illustration: Onboarding1,

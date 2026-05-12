@@ -14,11 +14,13 @@ import {
 import { Ionicons, MaterialIcons } from '@expo/vector-icons'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
+import { APPOINTMENT_STATUS } from '../../constants/constants'
 import DateSlotPicker from './DateSlotPicker'
 import {
 	getAppointments,
 	getDoctorAvailability,
 	getDoctorById,
+	rescheduleAppointment,
 	type SlotGroup,
 } from '../../features/doctor/doctorService'
 import type { Appointment, AppointmentStatus } from '../../types/appointment'
@@ -137,6 +139,7 @@ export default function PatientUpcomingAppointments({
 	const [loading, setLoading] = useState(shouldFetchAppointments)
 	const [error, setError] = useState('')
 	const [localStatuses, setLocalStatuses] = useState<Record<string, string>>({})
+	const [localReschedules, setLocalReschedules] = useState<Record<string, Partial<PatientAppointmentItem>>>({})
 	const [cancelledStatusId, setCancelledStatusId] = useState('')
 
 	const [cancelOpen, setCancelOpen] = useState(false)
@@ -260,12 +263,19 @@ export default function PatientUpcomingAppointments({
 				.map((appointment) => ({
 					...appointment,
 					status: localStatuses[appointment.id] || appointment.status,
+					...(localReschedules[appointment.id] || {}),
 				}))
 				.filter((appointment) => appointment.status !== 'cancelled')
 		}
 
-		return apiAppointments.map((appointment) => mapApiAppointment(appointment, localStatuses))
-	}, [apiAppointments, appointments, localStatuses])
+		return apiAppointments.map((appointment) => {
+			const mappedAppointment = mapApiAppointment(appointment, localStatuses)
+			return {
+				...mappedAppointment,
+				...(localReschedules[mappedAppointment.id] || {}),
+			}
+		})
+	}, [apiAppointments, appointments, localStatuses, localReschedules])
 
 	const openReschedule = (appointment: PatientAppointmentItem) => {
 		setRescheduleAppt(appointment)
@@ -279,36 +289,88 @@ export default function PatientUpcomingAppointments({
 		setRescheduleOpen(true)
 	}
 
+	const handleRescheduleDateChange = (date: Date) => {
+		setRescheduleDate(date)
+		setRescheduleTime('')
+		setRescheduleSlots([])
+	}
+
+	const resolveRescheduleHospitalId = () =>
+		rescheduleHospitalId || rescheduleAppt?.hospitalId || rescheduleAppt?.raw?.hospital?.id || ''
+
+	const getSelectedRescheduleSlot = () =>
+		rescheduleSlots.flatMap((group) => group.slots).find((slot) => slot.start_time === rescheduleTime)
+
 	const handleRescheduleConfirm = async () => {
 		if (!rescheduleAppt || !rescheduleTime) {
 			Alert.alert('Select time', 'Please select a time slot before confirming.')
 			return
 		}
 
+		const hospitalId = resolveRescheduleHospitalId()
+		const dateStr = toApiDate(rescheduleDate)
+		const selectedSlot = getSelectedRescheduleSlot()
+		const selectedHospital = rescheduleHospitals.find((hospital) => hospital.id === hospitalId)
+
+		if (!hospitalId) {
+			Alert.alert('Select hospital', 'Please select a hospital before confirming.')
+			return
+		}
+
 		setRescheduleSubmitting(true)
 		try {
-			const res = await ApiService.post<{ success: boolean; message: string }>(
-				API_ENDPOINTS.APPOINTMENTS.RESCHEDULE,
-				{
-					appointment_id: rescheduleAppt.id,
-					appointment_date: toApiDate(rescheduleDate),
-					start_time: rescheduleTime,
-					end_time: null,
-					hospital_id:
-						rescheduleHospitalId || rescheduleAppt.hospitalId || rescheduleAppt.raw?.hospital?.id,
-					reason: 'Patient requested reschedule',
-				}
-			)
+			const res = await rescheduleAppointment({
+				appointment_id: rescheduleAppt.id,
+				appointment_date: dateStr,
+				start_time: rescheduleTime,
+				end_time: selectedSlot?.end_time ?? null,
+				hospital_id: hospitalId,
+				reason: 'Patient requested reschedule',
+				status_id: APPOINTMENT_STATUS.CONFIRM,
+			})
 
-			if (res.data?.success) {
-				Alert.alert('Success', res.data.message || 'Appointment rescheduled!')
+			if (res.success) {
+				Alert.alert('Success', res.message || 'Appointment rescheduled!')
+				const nextHospitalName = selectedHospital?.label || rescheduleAppt.hospitalName
+				const nextDetails: Partial<PatientAppointmentItem> = {
+					appointmentDate: dateStr,
+					startTime: rescheduleTime,
+					dateLabel: formatDate(dateStr),
+					timeLabel: formatTime(rescheduleTime),
+					hospitalId,
+					hospitalName: nextHospitalName,
+					status: 'rescheduled',
+				}
+
+				setApiAppointments((prev) =>
+					prev.map((appointment) =>
+						appointment.id === rescheduleAppt.id
+							? {
+									...appointment,
+									appointment_date: dateStr,
+									appointment_time: rescheduleTime,
+									start_time: rescheduleTime,
+									end_time: selectedSlot?.end_time ?? appointment.end_time,
+									hospital: appointment.hospital
+										? {
+												...appointment.hospital,
+												id: hospitalId,
+												name: nextHospitalName,
+											}
+										: appointment.hospital,
+								}
+							: appointment
+					)
+				)
 				setLocalStatuses((prev) => ({ ...prev, [rescheduleAppt.id]: 'rescheduled' }))
+				setLocalReschedules((prev) => ({ ...prev, [rescheduleAppt.id]: nextDetails }))
 				setHospitalDropdownOpen(false)
 				setRescheduleOpen(false)
 			} else {
-				Alert.alert('Error', res.data?.message || 'Reschedule failed. Please try again.')
+				Alert.alert('Error', res.message || 'Reschedule failed. Please try again.')
 			}
-		} catch {
+		} catch (err: any) {
+			console.log('RESCHEDULE ERROR', err?.response?.data || err?.message || err)
 			Alert.alert('Error', 'Something went wrong. Please try again.')
 		} finally {
 			setRescheduleSubmitting(false)
@@ -352,6 +414,14 @@ export default function PatientUpcomingAppointments({
 	}
 
 	const rescheduleColumns = isTablet || isLandscape ? 4 : 3
+	const canConfirmReschedule = Boolean(
+		rescheduleAppt &&
+			rescheduleDate &&
+			rescheduleTime &&
+			resolveRescheduleHospitalId() &&
+			!rescheduleSlotsLoading &&
+			!rescheduleSubmitting
+	)
 	const selectedHospitalLabel =
 		rescheduleHospitals.find((hospital) => hospital.id === rescheduleHospitalId)?.label || 'Choose Hospital'
 
@@ -476,12 +546,25 @@ export default function PatientUpcomingAppointments({
 					})
 				: null}
 
-			<Modal visible={rescheduleOpen} transparent animationType="slide" onRequestClose={() => setRescheduleOpen(false)}>
+			<Modal
+				visible={rescheduleOpen}
+				transparent
+				animationType="slide"
+				onRequestClose={() => {
+					if (!rescheduleSubmitting) setRescheduleOpen(false)
+				}}
+			>
 				<View style={styles.modalOverlay}>
 					<View style={[styles.modalCard, isTablet && styles.modalCardTablet]}>
 						<View style={styles.modalHeader}>
 							<Text style={styles.modalTitle}>Reschedule Appointment</Text>
-							<TouchableOpacity onPress={() => setRescheduleOpen(false)} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+							<TouchableOpacity
+								onPress={() => {
+									if (!rescheduleSubmitting) setRescheduleOpen(false)
+								}}
+								disabled={rescheduleSubmitting}
+								hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+							>
 								<Ionicons name="close" size={22} color="#526173" />
 							</TouchableOpacity>
 						</View>
@@ -521,6 +604,8 @@ export default function PatientUpcomingAppointments({
 															style={[styles.hospitalDropdownItem, selected && styles.hospitalDropdownItemSelected]}
 															onPress={() => {
 																setRescheduleHospitalId(hospital.id)
+																setRescheduleTime('')
+																setRescheduleSlots([])
 																setHospitalDropdownOpen(false)
 															}}
 														>
@@ -545,7 +630,7 @@ export default function PatientUpcomingAppointments({
 
 							<DateSlotPicker
 								selectedDate={rescheduleDate}
-								onDateChange={setRescheduleDate}
+								onDateChange={handleRescheduleDateChange}
 								selectedTime={rescheduleTime}
 								onTimeChange={setRescheduleTime}
 								availableSlots={rescheduleSlots}
@@ -561,13 +646,17 @@ export default function PatientUpcomingAppointments({
 						</ScrollView>
 
 						<View style={styles.modalActions}>
-							<TouchableOpacity style={styles.modalSecondaryButton} onPress={() => setRescheduleOpen(false)}>
+							<TouchableOpacity
+								style={[styles.modalSecondaryButton, rescheduleSubmitting && styles.buttonDisabled]}
+								onPress={() => setRescheduleOpen(false)}
+								disabled={rescheduleSubmitting}
+							>
 								<Text style={styles.modalSecondaryButtonText}>Cancel</Text>
 							</TouchableOpacity>
 							<TouchableOpacity
-								style={[styles.modalPrimaryButton, (!rescheduleTime || rescheduleSubmitting) && styles.buttonDisabled]}
+								style={[styles.modalPrimaryButton, !canConfirmReschedule && styles.buttonDisabled]}
 								onPress={handleRescheduleConfirm}
-								disabled={!rescheduleTime || rescheduleSubmitting}
+								disabled={!canConfirmReschedule}
 							>
 								{rescheduleSubmitting ? (
 									<ActivityIndicator size="small" color="#ffffff" />
