@@ -34,7 +34,7 @@ const commonScreens: OnboardingScreen[] = [
 ]
 
 export const onboardingData: OnboardingConfig = {
-  [USER_ROLES.PATIENT]: {
+   "a1b2c3d4-0001-0001-0001-000000000001": {
     screens: [
       {
         Illustration: Onboarding1,
@@ -49,7 +49,7 @@ export const onboardingData: OnboardingConfig = {
     ],
   },
 
-  [USER_ROLES.DOCTOR]: {
+   "a1b2c3d4-0002-0002-0002-000000000002": {
     screens: [
       {
         Illustration: Onboarding1,

@@ -2,12 +2,15 @@ import React, { useEffect, useState } from 'react'
 import {
 	View,
 	Text,
+	TextInput,
 	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
 	useWindowDimensions,
 	Alert,
 	Modal,
+	ActivityIndicator,
+	Image,
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -17,14 +20,23 @@ import {
 	getDoctorAvailability,
 	updateAppointmentsStatus,
 	rescheduleAppointment,
+	referAppointment,
+	getFavouriteDoctors,
+	getDoctors,
 	getDoctorById,
 	getDoctorProfile,
+	type FavouriteDoctor,
 } from './doctorService'
 import { DateSlotPicker } from '../../components/common'
 import { APPOINTMENT_STATUS } from '../../constants/constants'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import DoctorHospitalDropdown from '../../components/common/DoctorHospitalDropdown'
+import { useAuth } from '../../context/AuthContext'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
 type Appointment = {
 	id: string
@@ -48,62 +60,85 @@ type Appointment = {
 	end_time?: string
 }
 
-const showSuccess = (message: string) => {
-	Toast.show({ type: 'success', text1: 'Success', text2: message })
+type ReferDoctor = {
+	id: string
+	name: string
+	avatar_s3_key: string | null
+	location: string | null
+	experience_years: number | null
+	specialities: string[]
+	is_verified?: boolean
 }
 
-const showError = (message: string) => {
-	Toast.show({ type: 'error', text1: 'Error', text2: message })
-}
-
-// type DoctorAppointmentsProps = {
-// 	selectedDate: number
-// 	setSelectedDate: (i: number) => void
-// 	appointments: Appointment[]
-// 	apptLoading: boolean
-// 	apptError: string
-// 	weekDays: { day: string; date: string; red: boolean; dateObj: Date }[]
-// 	selectedDateObj: Date
-// }
-function getAptHospitalId(apt: any): string {
-  const raw =
-    apt?.hospital?.id ??
-    apt?.hospital_id ??
-    apt?.hospital?.hospital_id ??
-    apt?.pivot?.hospital_id ??
-    ''
-  return raw ? String(raw) : ''
-}
 type DoctorAppointmentsProps = {
-  selectedDate: number
-  setSelectedDate: (i: number) => void
-  appointments: Appointment[]
-  apptLoading: boolean
-  apptError: string
-  weekDays: { day: string; date: string; red: boolean; dateObj: Date }[]
-  selectedDateObj: Date
-  // NEW props
-  hospitals: { id: string; label: string; address?: string }[]
-  selectedHospitalId: string | null   // null = show all
+	selectedDate: number
+	setSelectedDate: (i: number) => void
+	appointments: Appointment[]
+	apptLoading: boolean
+	apptError: string
+	weekDays: { day: string; date: string; red: boolean; dateObj: Date }[]
+	selectedDateObj: Date
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 const TEAL = '#1a8c8c'
+const DOCTOR_IMAGE_PLACEHOLDER = require('../../assets/Banner/doctor.png')
+
+const showSuccess = (message: string) =>
+	Toast.show({ type: 'success', text1: 'Success', text2: message })
+
+const showError = (message: string) =>
+	Toast.show({ type: 'error', text1: 'Error', text2: message })
+
+/**
+ * Extracts the hospital id from an appointment, handling every possible shape
+ * that different API endpoints return.
+ */
+function getAptHospitalId(apt: any): string {
+	const raw =
+		apt?.hospital?.id ??
+		apt?.hospital_id ??
+		apt?.hospital?.hospital_id ??
+		apt?.pivot?.hospital_id ??
+		''
+	return raw ? String(raw) : ''
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function DoctorAppointments({
-  selectedDate,
-  setSelectedDate,
-  appointments,
-  apptLoading,
-  apptError,
-  weekDays,
-  selectedDateObj,
-  hospitals,
-  selectedHospitalId,
+	selectedDate,
+	setSelectedDate,
+	appointments,
+	apptLoading,
+	apptError,
+	weekDays,
+	selectedDateObj,
 }: DoctorAppointmentsProps) {
-	const { width } = useWindowDimensions()
+	const { width, height } = useWindowDimensions()
 	const isTablet = width >= 768
 	const useCompactCancelledLayout = width < 640
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
+
+	// ── Read the globally selected hospital ID from AuthContext ───────────────
+	//    DoctorHospitalDropdown (in the header) writes both:
+	//      • selectedHospital   → display name
+	//      • selectedHospitalId → numeric/string id used for filtering & API calls
+	const { selectedHospitalId: contextHospitalId } = useAuth() as any
+
+	// ── Filter appointments by selected hospital ──────────────────────────────
+	//    contextHospitalId === null | undefined | '' → show ALL appointments
+	const filteredAppointments =
+		contextHospitalId
+			? appointments.filter(
+					(apt) => getAptHospitalId(apt) === String(contextHospitalId)
+				)
+			: appointments
 
 	// ── Reschedule state ──────────────────────────────────────────────────────
 	const [rescheduleOpen, setRescheduleOpen] = useState(false)
@@ -112,26 +147,40 @@ export default function DoctorAppointments({
 	const [selectedSlot, setSelectedSlot] = useState('')
 	const [rescheduleSlots, setRescheduleSlots] = useState<any[]>([])
 	const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
-	const [rescheduleHospitals, setRescheduleHospitals] = useState<any[]>([])
-	const [rescheduleHospitalId, setRescheduleHospitalId] = useState<string>('')
-
-	// ── Reject modal: stores the appointment id pending rejection ─────────────
-	const [rejectModalId, setRejectModalId] = useState<string | null>(null)
-
-	// ── confirmedIds: tracks which appointments had Confirm pressed ───────────
+const [successModalVisible, setSuccessModalVisible] = useState(false)
+const [successMessage, setSuccessMessage] = useState('')
+	// ── Optimistic UI sets ────────────────────────────────────────────────────
 	const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set())
-
-	// ── rejectedIds: local set to mark appointments rejected by doctor ─────────
 	const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set())
 
-	// ── Helpers ───────────────────────────────────────────────────────────────
+	// ── Reject modal ──────────────────────────────────────────────────────────
+	const [rejectModalId, setRejectModalId] = useState<string | null>(null)
+
+	// ── Refer modal ───────────────────────────────────────────────────────────
+	const [referOpen, setReferOpen] = useState(false)
+	const [referAppt, setReferAppt] = useState<Appointment | null>(null)
+	const [referQuery, setReferQuery] = useState('')
+	const [favouriteDoctors, setFavouriteDoctors] = useState<ReferDoctor[]>([])
+	const [referSearchResults, setReferSearchResults] = useState<ReferDoctor[]>([])
+	const [referLoading, setReferLoading] = useState(false)
+	const [referSearchLoading, setReferSearchLoading] = useState(false)
+	const [referringIds, setReferringIds] = useState<Set<string>>(new Set())
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Small helpers
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const getStatusLabel = (status: any) =>
 		typeof status === 'string' ? status : (status?.label ?? 'pending')
+
 	const formatStatus = (s: string) =>
 		s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+
 	const getPatientAge = (apt: any) => apt?.patient?.age ?? apt?.age ?? '--'
+
 	const getPatientGender = (apt: any) =>
 		apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? '--'
+
 	const getTimeRange = (apt: any) => {
 		const start = apt?.start_time
 		const end = apt?.end_time
@@ -139,12 +188,33 @@ export default function DoctorAppointments({
 		return start ?? '--'
 	}
 
-	// ── Reschedule helpers ────────────────────────────────────────────────────
+	const getTypeIcon = (type?: string) => {
+		switch (type) {
+			case 'video':   return { name: 'video',                    color: '#4d6bb1' }
+			case 'clinic':  return { name: 'hospital-building',        color: '#2e7d32' }
+			case 'home':    return { name: 'home-heart',               color: '#e67e22' }
+			default:        return { name: 'calendar',                 color: '#999'    }
+		}
+	}
+
+	const mapReferDoctor = (doctor: FavouriteDoctor | ReferDoctor): ReferDoctor => ({
+		id: doctor.id,
+		name: doctor.name,
+		avatar_s3_key: doctor.avatar_s3_key ?? null,
+		location: doctor.location ?? '',
+		experience_years: doctor.experience_years ?? null,
+		specialities: doctor.specialities ?? [],
+		is_verified: doctor.is_verified,
+	})
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Reschedule
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const handleOpenReschedule = (apt: Appointment) => {
-		// Don't allow reschedule if appointment is already rejected (locally or via status)
 		const isLocallyRejected = rejectedIds.has(apt.id)
-		const statusFromProp = getStatusLabel(apt.status)
-		if (isLocallyRejected || statusFromProp === 'cancelled' || statusFromProp === 'rejected') {
+		const status = getStatusLabel(apt.status)
+		if (isLocallyRejected || status === 'cancelled' || status === 'rejected') {
 			showError('Cannot reschedule a rejected or cancelled appointment.')
 			return
 		}
@@ -152,25 +222,29 @@ export default function DoctorAppointments({
 		setRescheduleDate(new Date())
 		setRescheduleSlots([])
 		setSelectedSlot('')
-		setRescheduleHospitalId(apt?.hospital?.id ?? (apt as any)?.hospital_id ?? '')
-		setRescheduleHospitals([])
 		setRescheduleOpen(true)
+	}
+
+	// ── Resolve the hospital id to use for the reschedule API call ───────────
+	//    Priority: context selection (what the dropdown shows) → appointment's own hospital
+	const resolveRescheduleHospitalId = (): string => {
+		if (contextHospitalId) return String(contextHospitalId)
+		if (!rescheduleAppt) return ''
+		return getAptHospitalId(rescheduleAppt)
 	}
 
 	const handleConfirmReschedule = async () => {
 		if (!selectedSlot) {
-			Alert.alert('Select time', 'Please select a slot to reschedule.')
+			Alert.alert('Select time', 'Please select a time slot to reschedule.')
 			return
 		}
-		if (!rescheduleAppt || !rescheduleDate) return
+		if (!rescheduleAppt) return
 
-		const hospitalId =
-			rescheduleHospitalId ||
-			(rescheduleAppt?.hospital?.id ?? (rescheduleAppt as any)?.hospital_id)
+		const hospitalId = resolveRescheduleHospitalId()
 		const dateStr = rescheduleDate.toISOString().split('T')[0]
 
-		if (!hospitalId || !dateStr) {
-			showError('Missing appointment details for reschedule.')
+		if (!hospitalId) {
+			showError('Please select a hospital before rescheduling.')
 			return
 		}
 
@@ -183,14 +257,14 @@ export default function DoctorAppointments({
 				end_time: null,
 				hospital_id: hospitalId,
 				reason: 'Doctor unavailable',
-
-				// 👇 ADD THIS LINE
-				status_id: APPOINTMENT_STATUS.CONFIRM
+				status_id: APPOINTMENT_STATUS.CONFIRM,
 			})
 			if (res.success) {
-				showSuccess(res.message || 'Reschedule request submitted')
-				setRescheduleOpen(false)
-			} else {
+	setRescheduleOpen(false)
+
+	setSuccessMessage(res.message || 'Appointment rescheduled successfully')
+	setSuccessModalVisible(true)
+}else {
 				showError(res.message || 'Reschedule failed. Please try again.')
 			}
 		} catch {
@@ -200,40 +274,50 @@ export default function DoctorAppointments({
 		}
 	}
 
-	useEffect(() => {
-		if (!rescheduleAppt || !rescheduleOpen) return
-		const doctorId = rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id
+	const renderSuccessModal = () => (
+	<Modal
+		visible={successModalVisible}
+		transparent
+		animationType="fade"
+		onRequestClose={() => setSuccessModalVisible(false)}
+	>
+		<View style={styles.successBackdrop}>
+			<View style={styles.successCard}>
 
-		const fetchHospitals = async () => {
-			try {
-				let hData: any[] = []
-				if (doctorId) {
-					const res = await getDoctorById(doctorId)
-					if (res.success && res.data) hData = res.data.hospitals || []
-				} else {
-					const res = await getDoctorProfile()
-					if (res.success && res.data) hData = res.data.hospitals || []
-				}
-				setRescheduleHospitals(hData)
-				if (!rescheduleHospitalId && hData.length > 0)
-					setRescheduleHospitalId(hData[0].hospital.id)
-			} catch {
-				console.log('Failed to fetch doctor hospitals')
-			}
-		}
-		fetchHospitals()
-	}, [rescheduleAppt, rescheduleOpen])
+				<MaterialCommunityIcons
+					name="check-circle"
+					size={60}
+					color="#2e8b57"
+				/>
 
+				<Text style={styles.successTitle}>Success</Text>
+
+				<Text style={styles.successMessage}>
+					{successMessage}
+				</Text>
+
+				<TouchableOpacity
+					style={styles.successBtn}
+					onPress={() => setSuccessModalVisible(false)}
+				>
+					<Text style={styles.successBtnText}>Done</Text>
+				</TouchableOpacity>
+
+			</View>
+		</View>
+	</Modal>
+)
+	// ── Fetch available slots whenever the hospital or date changes ───────────
+	//    Uses contextHospitalId so it stays in sync with the dropdown inside the drawer.
 	useEffect(() => {
 		if (!rescheduleOpen || !rescheduleAppt) return
 
-		const doctorId = rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id
-		const hospitalId =
-			rescheduleHospitalId ||
-			(rescheduleAppt?.hospital?.id ?? (rescheduleAppt as any)?.hospital_id)
+		const doctorId =
+			rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id
+		const hospitalId = resolveRescheduleHospitalId()
 		const dateStr = rescheduleDate.toISOString().split('T')[0]
 
-		if (!hospitalId || !dateStr) {
+		if (!hospitalId) {
 			setRescheduleSlots([])
 			setSelectedSlot('')
 			return
@@ -244,16 +328,19 @@ export default function DoctorAppointments({
 				setRescheduleSlotsLoading(true)
 				setRescheduleSlots([])
 				setSelectedSlot('')
+
 				const responseData = await getDoctorAvailability({
 					doctor_id: doctorId,
 					hospital_id: hospitalId,
 					date: dateStr,
 				})
+
 				const groups = Array.isArray(responseData)
 					? responseData
 					: Array.isArray((responseData as any)?.data)
 						? (responseData as any).data
 						: []
+
 				setRescheduleSlots(groups)
 			} catch {
 				setRescheduleSlots([])
@@ -262,55 +349,43 @@ export default function DoctorAppointments({
 				setRescheduleSlotsLoading(false)
 			}
 		}
-		fetchSlots()
-	}, [rescheduleOpen, rescheduleAppt, rescheduleDate, weekDays, rescheduleHospitalId])
 
-	// ── Confirm ───────────────────────────────────────────────────────────────
+		fetchSlots()
+		// Re-run whenever: drawer opens, appointment changes, date changes, or the
+		// globally selected hospital changes (user switches via the in-drawer dropdown).
+	}, [rescheduleOpen, rescheduleAppt, rescheduleDate, contextHospitalId])
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Confirm / Reject
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const handleConfirmAppointment = async (appointmentId: string) => {
 		try {
-			const res = await updateAppointmentsStatus(
-				appointmentId,
-				APPOINTMENT_STATUS.CONFIRM
-			)
-
-			console.log("CONFIRM RESPONSE 👉", res)
-
+			const res = await updateAppointmentsStatus(appointmentId, APPOINTMENT_STATUS.CONFIRM)
 			if (res.success) {
 				showSuccess(res.message)
-
-				// optional UI update
 				setConfirmedIds((prev) => new Set(prev).add(appointmentId))
-
-				// 🔥 IMPORTANT: refresh data from backend
-
-			}
-
-			else {
+			} else {
 				showError(res.message || 'Failed to confirm')
 			}
 		} catch (err: any) {
-			console.log("ERROR 👉", err?.response?.data)
+			console.log('CONFIRM ERROR 👉', err?.response?.data)
 			showError('Something went wrong')
 		}
 	}
 
-	// ── Reject (after modal OK) with optimistic UI update ─────────────────────
 	const handleConfirmReject = async () => {
 		if (!rejectModalId) return
 		try {
 			const res = await updateAppointmentsStatus(rejectModalId, APPOINTMENT_STATUS.REJECT)
 			if (res.success) {
 				showSuccess(res.message)
-				// Optimistically mark as rejected locally
 				setRejectedIds((prev) => new Set(prev).add(rejectModalId))
-				// Also remove from confirmed set if it was previously confirmed
-				if (confirmedIds.has(rejectModalId)) {
-					setConfirmedIds((prev) => {
-						const next = new Set(prev)
-						next.delete(rejectModalId)
-						return next
-					})
-				}
+				setConfirmedIds((prev) => {
+					const next = new Set(prev)
+					next.delete(rejectModalId!)
+					return next
+				})
 			} else {
 				showError(res.message || 'Failed to reject appointment.')
 			}
@@ -321,7 +396,109 @@ export default function DoctorAppointments({
 		}
 	}
 
-	// ── Navigation ────────────────────────────────────────────────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Refer
+	// ─────────────────────────────────────────────────────────────────────────
+
+	const handleOpenRefer = (apt: Appointment) => {
+		setReferAppt(apt)
+		setReferQuery('')
+		setReferSearchResults([])
+		setReferOpen(true)
+	}
+
+	const handleCloseRefer = () => {
+		setReferOpen(false)
+		setReferAppt(null)
+		setReferQuery('')
+		setReferSearchResults([])
+		setReferringIds(new Set())
+	}
+
+	useEffect(() => {
+		if (!referOpen) return
+
+		const fetchFavouriteDoctors = async () => {
+			try {
+				setReferLoading(true)
+				const res = await getFavouriteDoctors()
+				if (res.success) {
+					setFavouriteDoctors((res.data?.favourites ?? []).map(mapReferDoctor))
+				} else {
+					showError(res.message || 'Failed to load doctors')
+				}
+			} catch {
+				showError('Failed to load doctors')
+			} finally {
+				setReferLoading(false)
+			}
+		}
+
+		fetchFavouriteDoctors()
+	}, [referOpen])
+
+	useEffect(() => {
+		if (!referOpen) return
+
+		const query = referQuery.trim()
+		if (query.length < 2) {
+			setReferSearchResults([])
+			setReferSearchLoading(false)
+			return
+		}
+
+		let cancelled = false
+		const timer = setTimeout(async () => {
+			try {
+				setReferSearchLoading(true)
+				const res = await getDoctors({ search: query, limit: 20 })
+				if (!cancelled && res.success) {
+					setReferSearchResults((res.data ?? []).map(mapReferDoctor))
+				}
+			} catch {
+				if (!cancelled) showError('Search failed')
+			} finally {
+				if (!cancelled) setReferSearchLoading(false)
+			}
+		}, 350)
+
+		return () => {
+			cancelled = true
+			clearTimeout(timer)
+		}
+	}, [referOpen, referQuery])
+
+	const handleReferDoctor = async (doctor: ReferDoctor) => {
+		if (!referAppt || referringIds.has(doctor.id)) return
+
+		setReferringIds((prev) => new Set(prev).add(doctor.id))
+		try {
+			const res = await referAppointment({
+				appointment_id: referAppt.id,
+				doctor_id: doctor.id,
+			})
+
+			if (res.success) {
+				showSuccess(res.message || 'Appointment referred successfully')
+				handleCloseRefer()
+			} else {
+				showError(res.message || 'Failed to refer appointment')
+			}
+		} catch {
+			showError('Failed to refer appointment')
+		} finally {
+			setReferringIds((prev) => {
+				const next = new Set(prev)
+				next.delete(doctor.id)
+				return next
+			})
+		}
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Navigation
+	//───────────────────────────────────────────────────────────────────
+
 	const handleCardPress = (apt: any) => {
 		const patientId =
 			apt.patient?.id ||
@@ -349,19 +526,10 @@ export default function DoctorAppointments({
 		})
 	}
 
-	const getTypeIcon = (type?: string) => {
-		switch (type) {
-			case 'video':
-				return { name: 'video', color: '#4d6bb1' }
-			case 'clinic':
-				return { name: 'hospital-building', color: '#2e7d32' }
-			case 'home':
-				return { name: 'home-heart', color: '#e67e22' }
-			default:
-				return { name: 'calendar', color: '#999' }
-		}
-	}
-	// ── Skeleton ──────────────────────────────────────────────────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Skeleton
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const renderSkeleton = () =>
 		Array.from({ length: 3 }).map((_, i) => (
 			<View key={`sk-${i}`} style={styles.card}>
@@ -378,13 +546,7 @@ export default function DoctorAppointments({
 					{isTablet && (
 						<View style={styles.skeletonActionsRow}>
 							{[0, 1, 2, 3].map((j) => (
-								<AppSkeleton
-									key={j}
-									width={52}
-									height={44}
-									borderRadius={6}
-									style={{ marginRight: 8 }}
-								/>
+								<AppSkeleton key={j} width={52} height={44} borderRadius={6} style={{ marginRight: 8 }} />
 							))}
 						</View>
 					)}
@@ -392,27 +554,25 @@ export default function DoctorAppointments({
 			</View>
 		))
 
-	// ── Action buttons (only for active, non-rejected appointments) ──────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Action buttons
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const renderActions = (apt: any) => {
 		const rawStatus = getStatusLabel(apt.status)
-		const isConfirmed = rawStatus === 'confirmed'
-		const isRejectedLocally = rejectedIds.has(apt.id)
-		const statusFromProp = getStatusLabel(apt.status)
-		const isRejected = isRejectedLocally || statusFromProp === 'rejected' || statusFromProp === 'cancelled'
+		const isConfirmed = confirmedIds.has(apt.id) || rawStatus === 'confirmed'
+		const isRejected =
+			rejectedIds.has(apt.id) ||
+			rawStatus === 'rejected' ||
+			rawStatus === 'cancelled'
 
-		// If appointment is rejected, don't show any action buttons
 		if (isRejected) return null
 
 		return (
 			<View style={[styles.actions, isTablet && styles.actionsTablet]}>
-
-				{/* ── Confirm button OR confirmed mini-badge ── */}
 				{!isConfirmed && (
 					<TouchableOpacity
-						onPress={(e) => {
-							e.stopPropagation?.()
-							handleConfirmAppointment(apt.id)
-						}}
+						onPress={(e) => { e.stopPropagation?.(); handleConfirmAppointment(apt.id) }}
 						style={[styles.btn, { backgroundColor: '#d6eed8' }]}
 						activeOpacity={0.75}
 					>
@@ -421,12 +581,8 @@ export default function DoctorAppointments({
 					</TouchableOpacity>
 				)}
 
-				{/* ── Reject — always visible for active appointments, opens centered modal ── */}
 				<TouchableOpacity
-					onPress={(e) => {
-						e.stopPropagation?.()
-						setRejectModalId(apt.id)
-					}}
+					onPress={(e) => { e.stopPropagation?.(); setRejectModalId(apt.id) }}
 					style={[styles.btn, { backgroundColor: '#f8dddd' }]}
 					activeOpacity={0.75}
 				>
@@ -434,12 +590,8 @@ export default function DoctorAppointments({
 					<Text style={[styles.btnLabel, { color: '#d84545' }]}>Reject</Text>
 				</TouchableOpacity>
 
-				{/* ── Reschedule — always visible for active appointments ── */}
 				<TouchableOpacity
-					onPress={(e) => {
-						e.stopPropagation?.()
-						handleOpenReschedule(apt)
-					}}
+					onPress={(e) => { e.stopPropagation?.(); handleOpenReschedule(apt) }}
 					style={[styles.btn, { backgroundColor: '#f8e8c6' }]}
 					activeOpacity={0.75}
 				>
@@ -447,12 +599,8 @@ export default function DoctorAppointments({
 					<Text style={[styles.btnLabel, { color: '#d08a0a' }]}>Reschedule</Text>
 				</TouchableOpacity>
 
-				{/* ── Refer — always visible for active appointments ── */}
 				<TouchableOpacity
-					onPress={(e) => {
-						e.stopPropagation?.()
-						alert('Refer coming soon!')
-					}}
+					onPress={(e) => { e.stopPropagation?.(); handleOpenRefer(apt) }}
 					style={[styles.btn, { backgroundColor: '#dbe2f5' }]}
 					activeOpacity={0.75}
 				>
@@ -460,7 +608,6 @@ export default function DoctorAppointments({
 					<Text style={[styles.btnLabel, { color: '#4d6bb1' }]}>Refer</Text>
 				</TouchableOpacity>
 
-				{/* ── Chevron ── */}
 				<TouchableOpacity
 					style={styles.chevronBtn}
 					activeOpacity={0.7}
@@ -471,6 +618,10 @@ export default function DoctorAppointments({
 			</View>
 		)
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Notice banners
+	// ─────────────────────────────────────────────────────────────────────────
 
 	const renderRejectedNotice = () => (
 		<View style={styles.cancelNoticeBox}>
@@ -486,7 +637,10 @@ export default function DoctorAppointments({
 		</View>
 	)
 
-	// ── Reject confirmation modal (exactly as per screenshot) ─────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Reject modal
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const renderRejectModal = () => (
 		<Modal
 			visible={rejectModalId !== null}
@@ -499,23 +653,17 @@ export default function DoctorAppointments({
 				style={styles.rejectBackdrop}
 				onPress={() => setRejectModalId(null)}
 			>
-				<TouchableOpacity activeOpacity={1} style={styles.rejectCard} onPress={() => { }}>
+				<TouchableOpacity activeOpacity={1} style={styles.rejectCard} onPress={() => {}}>
 					<View style={styles.rejectIconCircle}>
 						<MaterialCommunityIcons name="close" size={28} color="#d84545" />
 					</View>
 					<Text style={styles.rejectTitle}>Are you sure?</Text>
 					<Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
 					<View style={styles.rejectBtnRow}>
-						<TouchableOpacity
-							style={styles.rejectCancelBtn}
-							onPress={() => setRejectModalId(null)}
-						>
+						<TouchableOpacity style={styles.rejectCancelBtn} onPress={() => setRejectModalId(null)}>
 							<Text style={styles.rejectCancelText}>Cancel</Text>
 						</TouchableOpacity>
-						<TouchableOpacity
-							style={styles.rejectConfirmBtn}
-							onPress={handleConfirmReject}
-						>
+						<TouchableOpacity style={styles.rejectConfirmBtn} onPress={handleConfirmReject}>
 							<Text style={styles.rejectConfirmText}>Yes, Reject</Text>
 						</TouchableOpacity>
 					</View>
@@ -524,7 +672,150 @@ export default function DoctorAppointments({
 		</Modal>
 	)
 
-	// ── Reschedule bottom-sheet ───────────────────────────────────────────────
+	const renderReferDoctorRow = (doctor: ReferDoctor) => {
+		const isSubmitting = referringIds.has(doctor.id)
+		const isCompactRefer = width < 520
+		const speciality = doctor.specialities?.[0] || 'General Physician'
+		const experience =
+			doctor.experience_years != null ? `${doctor.experience_years} yrs exp` : 'Experience not available'
+		const location = doctor.location || 'Bangalore'
+		const imageSource = doctor.avatar_s3_key
+			? { uri: doctor.avatar_s3_key }
+			: DOCTOR_IMAGE_PLACEHOLDER
+
+		return (
+			<View key={doctor.id} style={[styles.referDoctorRow, isCompactRefer && styles.referDoctorRowCompact]}>
+				<Image
+					source={imageSource}
+					style={[styles.referDoctorImage, isCompactRefer && styles.referDoctorImageCompact]}
+					resizeMode="cover"
+				/>
+				<View style={styles.referDoctorInfo}>
+					<Text style={[styles.referDoctorName, isCompactRefer && styles.referDoctorNameCompact]} numberOfLines={1}>
+						{doctor.name}
+					</Text>
+					<Text style={[styles.referDoctorSpeciality, isCompactRefer && styles.referDoctorSpecialityCompact]} numberOfLines={1}>
+						{speciality}
+					</Text>
+					<View style={styles.referDoctorMetaRow}>
+						<MaterialCommunityIcons name="briefcase-outline" size={isCompactRefer ? 12 : 15} color="#969696" />
+						<Text style={[styles.referDoctorMetaText, isCompactRefer && styles.referDoctorMetaTextCompact]}>
+							{experience}
+						</Text>
+						<MaterialCommunityIcons name="map-marker-outline" size={isCompactRefer ? 12 : 15} color="#969696" />
+						<Text style={[styles.referDoctorMetaText, isCompactRefer && styles.referDoctorMetaTextCompact]} numberOfLines={1}>
+							{location}
+						</Text>
+					</View>
+				</View>
+				<TouchableOpacity
+					style={[
+						styles.referShareBtn,
+						isCompactRefer && styles.referShareBtnCompact,
+						isSubmitting && styles.referShareBtnDisabled,
+					]}
+					activeOpacity={0.8}
+					disabled={isSubmitting}
+					onPress={() => handleReferDoctor(doctor)}
+				>
+					{isSubmitting ? (
+						<ActivityIndicator size="small" color="#fff" />
+					) : (
+						<Text style={[styles.referShareText, isCompactRefer && styles.referShareTextCompact]}>Share</Text>
+					)}
+				</TouchableOpacity>
+			</View>
+		)
+	}
+
+	const renderReferModal = () => {
+		const searchText = referQuery.trim()
+		const currentDoctorId = referAppt?.doctor?.id ?? (referAppt as any)?.doctor_id
+		const doctors = (searchText.length >= 2 ? referSearchResults : favouriteDoctors).filter(
+			(doctor) => doctor.id !== currentDoctorId
+		)
+		const isSearching = searchText.length >= 2
+		const showLoading = isSearching ? referSearchLoading : referLoading
+		const isCompactRefer = width < 520
+		const referBodyMaxHeight = Math.max(220, Math.floor(height * (isCompactRefer ? 0.58 : 0.62)))
+
+		return (
+			<Modal
+				visible={referOpen}
+				transparent
+				animationType="fade"
+				onRequestClose={handleCloseRefer}
+			>
+				<TouchableOpacity
+					activeOpacity={1}
+					style={styles.referBackdrop}
+					onPress={handleCloseRefer}
+				>
+					<TouchableOpacity
+						activeOpacity={1}
+						style={[
+							styles.referCard,
+							isCompactRefer && styles.referCardCompact,
+							{ width: Math.min(width - 28, 900) },
+						]}
+						onPress={() => {}}
+					>
+						<View style={[styles.referHeader, isCompactRefer && styles.referHeaderCompact]}>
+							<Text style={[styles.referTitle, isCompactRefer && styles.referTitleCompact]}>Refer a doctor</Text>
+						</View>
+
+						<ScrollView
+							style={[styles.referBody, { maxHeight: referBodyMaxHeight }]}
+							contentContainerStyle={[
+								styles.referBodyContent,
+								isCompactRefer && styles.referBodyContentCompact,
+							]}
+							showsVerticalScrollIndicator
+							persistentScrollbar
+							scrollIndicatorInsets={{ right: 2 }}
+							nestedScrollEnabled
+							keyboardShouldPersistTaps="handled"
+						>
+							<View style={[styles.referSearchBox, isCompactRefer && styles.referSearchBoxCompact]}>
+								<MaterialCommunityIcons name="magnify" size={isCompactRefer ? 20 : 28} color="#9b9b9b" />
+								<TextInput
+									value={referQuery}
+									onChangeText={setReferQuery}
+									placeholder="Search doctor..."
+									placeholderTextColor="#98a1aa"
+									style={[styles.referSearchInput, isCompactRefer && styles.referSearchInputCompact]}
+									autoCorrect={false}
+									returnKeyType="search"
+								/>
+								<MaterialCommunityIcons name="microphone-outline" size={isCompactRefer ? 20 : 28} color="#9b9b9b" />
+							</View>
+
+							<Text style={[styles.referSectionTitle, isCompactRefer && styles.referSectionTitleCompact]}>
+								{isSearching ? 'SEARCH RESULTS' : 'FAVOURITE DOCTORS'}
+							</Text>
+
+							{showLoading ? (
+								<View style={styles.referLoadingBox}>
+									<ActivityIndicator size="small" color={TEAL} />
+								</View>
+							) : doctors.length === 0 ? (
+								<Text style={styles.referEmptyText}>
+									{isSearching ? 'No doctors found' : 'No favourite doctors found'}
+								</Text>
+							) : (
+								doctors.map(renderReferDoctorRow)
+							)}
+						</ScrollView>
+					</TouchableOpacity>
+				</TouchableOpacity>
+			</Modal>
+		)
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Reschedule drawer
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const renderRescheduleDrawer = () => (
 		<Modal
 			visible={rescheduleOpen}
@@ -537,7 +828,9 @@ export default function DoctorAppointments({
 				style={styles.drawerBackdrop}
 				onPress={() => setRescheduleOpen(false)}
 			>
-				<TouchableOpacity activeOpacity={1} style={styles.drawerSheet} onPress={() => { }}>
+				<TouchableOpacity activeOpacity={1} style={styles.drawerSheet} onPress={() => {}}>
+
+					{/* Header */}
 					<View style={styles.drawerHeader}>
 						<View>
 							<Text style={styles.drawerTitle}>Reschedule Appointment</Text>
@@ -545,64 +838,27 @@ export default function DoctorAppointments({
 								{rescheduleAppt?.patient?.name ?? 'Patient'}
 							</Text>
 						</View>
-						<TouchableOpacity
-							style={styles.drawerCloseBtn}
-							onPress={() => setRescheduleOpen(false)}
-						>
+						<TouchableOpacity style={styles.drawerCloseBtn} onPress={() => setRescheduleOpen(false)}>
 							<MaterialCommunityIcons name="close" size={18} color="#7a848d" />
 						</TouchableOpacity>
 					</View>
 
+					{/* Body */}
 					<ScrollView
 						style={styles.drawerBody}
 						contentContainerStyle={styles.drawerBodyContent}
 						showsVerticalScrollIndicator={false}
 					>
-						{/* <Text style={styles.drawerSectionTitle}>Select Hospital</Text>
-						{rescheduleHospitals.length === 0 ? (
-							<Text style={styles.drawerInfoText}>Loading hospitals...</Text>
-						) : (
-							<View style={styles.hospitalList}>
-								{rescheduleHospitals.map((hParam, index) => {
-									const h = hParam?.hospital
-									if (!h) return null
-									const isSelected = rescheduleHospitalId === h.id
-									return (
-										<TouchableOpacity
-											key={h.id}
-											style={[
-												styles.hospitalItem,
-												isSelected && styles.hospitalItemActive,
-											]}
-											onPress={() => setRescheduleHospitalId(h.id)}
-										>
-											<View
-												style={[
-													styles.hospitalIcon,
-													isSelected && styles.hospitalIconActive,
-												]}
-											>
-												<Text style={styles.hospitalIconText}>{index + 1}</Text>
-											</View>
-											<View style={styles.hospitalTextCol}>
-												<Text style={styles.hospitalName} numberOfLines={1}>
-													{h.name}
-												</Text>
-												<Text style={styles.hospitalAddress} numberOfLines={2}>
-													{h.address}
-												</Text>
-											</View>
-											<MaterialCommunityIcons
-												name={isSelected ? 'radiobox-marked' : 'radiobox-blank'}
-												size={20}
-												color={isSelected ? '#3d7b7b' : '#c1c7ce'}
-											/>
-										</TouchableOpacity>
-									)
-								})}
-							</View>
-						)} */}
+						{/* ── Hospital selector ─────────────────────────────────────────────
+						    Same DoctorHospitalDropdown used in the header.
+						    When the user picks a hospital here it writes to AuthContext
+						    (setSelectedHospitalId), which triggers the slot-fetch useEffect above.
+						    This means the appointment list AND the reschedule drawer always stay
+						    in sync with the same selected hospital. ── */}
+						<Text style={styles.drawerSectionTitle}>Select Hospital</Text>
 						<DoctorHospitalDropdown />
+
+						{/* ── Date + time slots ─────────────────────────────────────────── */}
 						<DateSlotPicker
 							selectedDate={rescheduleDate}
 							onDateChange={(date) => {
@@ -616,56 +872,46 @@ export default function DoctorAppointments({
 						/>
 					</ScrollView>
 
+					{/* Footer actions */}
 					<View style={styles.drawerActions}>
-						<TouchableOpacity
-							style={styles.drawerCancelBtn}
-							onPress={() => setRescheduleOpen(false)}
-						>
+						<TouchableOpacity style={styles.drawerCancelBtn} onPress={() => setRescheduleOpen(false)}>
 							<Text style={styles.drawerCancelBtnText}>Cancel</Text>
 						</TouchableOpacity>
-						<TouchableOpacity
-							style={styles.drawerConfirmBtn}
-							onPress={handleConfirmReschedule}
-						>
+						<TouchableOpacity style={styles.drawerConfirmBtn} onPress={handleConfirmReschedule}>
 							<Text style={styles.drawerConfirmBtnText}>Confirm</Text>
 						</TouchableOpacity>
 					</View>
+
 				</TouchableOpacity>
 			</TouchableOpacity>
 		</Modal>
 	)
 
-	// ── Card ──────────────────────────────────────────────────────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Card renderer
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const renderCard = (apt: any) => {
 		const rawStatus = getStatusLabel(apt.status)
-		// Determine final status: confirmed (optimistic), rejected (optimistic or from prop), cancelled
-		const statusFromProp = getStatusLabel(apt.status)
-		const isConfirmed = statusFromProp === 'confirmed'
 		const isRejectedLocally = rejectedIds.has(apt.id)
 		const isRejectedFromProp = rawStatus === 'rejected' || rawStatus === 'cancelled'
 		const isRejected = isRejectedLocally || isRejectedFromProp
-		const typeIcon = getTypeIcon(apt?.appointment_type)
-		let status = rawStatus
 
-		// optional optimistic UI
+		let status = rawStatus
 		if (confirmedIds.has(apt.id)) status = 'confirmed'
 		if (rejectedIds.has(apt.id)) status = 'rejected'
 
 		const statusStyle =
-			status === 'confirmed'
-				? styles.pillConfirmed
-				: status === 'rejected'
-					? styles.pillCancelled
-					: styles.pillPending
+			status === 'confirmed' ? styles.pillConfirmed :
+			status === 'rejected'  ? styles.pillCancelled :
+			                         styles.pillPending
 
 		const statusTextStyle =
-			status === 'confirmed'
-				? styles.pillTextConfirmed
-				: status === 'rejected'
-					? styles.pillTextCancelled
-					: styles.pillTextPending
+			status === 'confirmed' ? styles.pillTextConfirmed :
+			status === 'rejected'  ? styles.pillTextCancelled :
+			                         styles.pillTextPending
 
-		// ── Rejected / Cancelled card ──
+		// ── Rejected / Cancelled card ─────────────────────────────────────────
 		if (isRejected) {
 			const isPatientCancelled = rawStatus === 'cancelled' && !isRejectedLocally
 			return (
@@ -675,18 +921,8 @@ export default function DoctorAppointments({
 					onPress={() => handleCardPress(apt)}
 					style={styles.card}
 				>
-					<View
-						style={[
-							styles.cancelledCardInner,
-							useCompactCancelledLayout && styles.cancelledCardInnerCompact,
-						]}
-					>
-						<View
-							style={[
-								styles.cancelledCardLeft,
-								useCompactCancelledLayout && styles.cancelledCardLeftCompact,
-							]}
-						>
+					<View style={[styles.cancelledCardInner, useCompactCancelledLayout && styles.cancelledCardInnerCompact]}>
+						<View style={[styles.cancelledCardLeft, useCompactCancelledLayout && styles.cancelledCardLeftCompact]}>
 							<View style={styles.patientNameRow}>
 								<View style={styles.patientIconBox}>
 									<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
@@ -695,9 +931,7 @@ export default function DoctorAppointments({
 									{apt?.patient?.name || 'Unknown Patient'}
 								</Text>
 								<View style={[styles.pill, statusStyle]}>
-									<Text style={[styles.pillText, statusTextStyle]}>
-										{formatStatus(status)}
-									</Text>
+									<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
 								</View>
 							</View>
 							<View style={styles.cancelledMetaRow}>
@@ -705,27 +939,15 @@ export default function DoctorAppointments({
 									{getPatientAge(apt)} years / {getPatientGender(apt)}
 								</Text>
 								<View style={styles.metaDot} />
-								<MaterialCommunityIcons
-									name="clock-time-three-outline"
-									size={16}
-									color="#9ea5ac"
-								/>
+								<MaterialCommunityIcons name="clock-time-three-outline" size={16} color="#9ea5ac" />
 								<Text style={styles.subText}>{getTimeRange(apt)}</Text>
 							</View>
 						</View>
-						<View
-							style={[
-								styles.cancelDivider,
-								useCompactCancelledLayout && styles.cancelDividerCompact,
-							]}
-						/>
+						<View style={[styles.cancelDivider, useCompactCancelledLayout && styles.cancelDividerCompact]} />
 						<View
 							style={[
 								styles.cancelledCardRight,
-								!useCompactCancelledLayout &&
-								!isTablet && {
-									width: Math.max(230, Math.floor(width * 0.52)),
-								},
+								!useCompactCancelledLayout && !isTablet && { width: Math.max(230, Math.floor(width * 0.52)) },
 								useCompactCancelledLayout && styles.cancelledCardRightCompact,
 							]}
 						>
@@ -736,15 +958,10 @@ export default function DoctorAppointments({
 			)
 		}
 
-		// ── Tablet ──
+		// ── Tablet card ───────────────────────────────────────────────────────
 		if (isTablet) {
 			return (
-				<TouchableOpacity
-					key={apt.id}
-					activeOpacity={0.85}
-					onPress={() => handleCardPress(apt)}
-					style={styles.card}
-				>
+				<TouchableOpacity key={apt.id} activeOpacity={0.85} onPress={() => handleCardPress(apt)} style={styles.card}>
 					<View style={styles.tabletCardInner}>
 						<View style={styles.tabletLeft}>
 							<View style={styles.patientNameRow}>
@@ -755,20 +972,13 @@ export default function DoctorAppointments({
 									{apt?.patient?.name || 'Unknown Patient'}
 								</Text>
 								<View style={[styles.pill, statusStyle]}>
-									<Text style={[styles.pillText, statusTextStyle]}>
-										{formatStatus(status)}
-									</Text>
+									<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
 								</View>
 							</View>
 							<View style={styles.metaRow}>
-								<MaterialCommunityIcons
-									name="clock-time-three-outline"
-									size={14}
-									color="#5f6973"
-								/>
+								<MaterialCommunityIcons name="clock-time-three-outline" size={14} color="#5f6973" />
 								<Text style={styles.subText}>
-									{getPatientAge(apt)} yrs / {getPatientGender(apt)} |{' '}
-									{getTimeRange(apt)}
+									{getPatientAge(apt)} yrs / {getPatientGender(apt)} | {getTimeRange(apt)}
 								</Text>
 							</View>
 						</View>
@@ -778,14 +988,9 @@ export default function DoctorAppointments({
 			)
 		}
 
-		// ── Mobile ──
+		// ── Mobile card ───────────────────────────────────────────────────────
 		return (
-			<TouchableOpacity
-				key={apt.id}
-				activeOpacity={0.85}
-				onPress={() => handleCardPress(apt)}
-				style={styles.card}
-			>
+			<TouchableOpacity key={apt.id} activeOpacity={0.85} onPress={() => handleCardPress(apt)} style={styles.card}>
 				<View style={styles.patientNameRow}>
 					<View style={styles.patientIconBox}>
 						<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
@@ -808,17 +1013,17 @@ export default function DoctorAppointments({
 		)
 	}
 
-	// ── Root ──────────────────────────────────────────────────────────────────
+	// ─────────────────────────────────────────────────────────────────────────
+	// Root render
+	// ─────────────────────────────────────────────────────────────────────────
+
 	return (
 		<View style={styles.container}>
 			{/* Header */}
 			<View style={styles.header}>
 				<Text style={styles.heading}>Doctor Appointments</Text>
 				<Text style={styles.month}>
-					{selectedDateObj?.toLocaleDateString('en-US', {
-						month: 'long',
-						year: 'numeric',
-					})}
+					{selectedDateObj?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
 				</Text>
 			</View>
 
@@ -839,44 +1044,43 @@ export default function DoctorAppointments({
 							selectedDate === i && styles.selectedDay,
 						]}
 					>
-						<Text
-							style={[
-								styles.dayText,
-								d.red && styles.weekendText,
-								selectedDate === i && styles.selectedText,
-							]}
-						>
+						<Text style={[styles.dayText, d.red && styles.weekendText, selectedDate === i && styles.selectedText]}>
 							{d.day}
 						</Text>
-						<Text
-							style={[
-								styles.dateText,
-								d.red && styles.weekendText,
-								selectedDate === i && styles.selectedText,
-							]}
-						>
+						<Text style={[styles.dateText, d.red && styles.weekendText, selectedDate === i && styles.selectedText]}>
 							{d.date}
 						</Text>
 					</TouchableOpacity>
 				))}
 			</ScrollView>
 
-			{/* Appointment list */}
+			{/* Appointment list — uses filteredAppointments, not raw appointments */}
 			<View style={styles.listContainer}>
 				{apptLoading ? renderSkeleton() : null}
 				{apptError ? <Text style={styles.error}>{apptError}</Text> : null}
-				{!apptLoading && appointments.length === 0 && (
-					<Text style={styles.empty}>No appointments</Text>
+				{!apptLoading && filteredAppointments.length === 0 && (
+					<Text style={styles.empty}>
+						{contextHospitalId
+							? 'No appointments for the selected hospital'
+							: 'No appointments'}
+					</Text>
 				)}
-				{!apptLoading && appointments.map(renderCard)}
+				{!apptLoading && filteredAppointments.map(renderCard)}
 			</View>
 
-			{/* Modals — at root level */}
-			{renderRejectModal()}
-			{renderRescheduleDrawer()}
+			{/* Modals */}
+			
+{renderRejectModal()}
+{renderReferModal()}
+{renderRescheduleDrawer()}
+{renderSuccessModal()}
 		</View>
 	)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles  (unchanged from original)
+// ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
 	container: {
@@ -960,14 +1164,14 @@ const styles = StyleSheet.create({
 		minWidth: 68,
 		alignItems: 'center',
 	},
-	pillPending: { backgroundColor: '#f8df8d' },
-	pillConfirmed: { backgroundColor: '#d6eed8' },
-	pillCancelled: { backgroundColor: '#f8dddd' },
-	pillText: { fontSize: 12, fontWeight: '600' },
-	pillTextPending: { color: '#c48508' },
-	pillTextConfirmed: { color: '#2e7d32' },
-	pillTextCancelled: { color: '#d84545' },
-	metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+	pillPending:          { backgroundColor: '#f8df8d' },
+	pillConfirmed:        { backgroundColor: '#d6eed8' },
+	pillCancelled:        { backgroundColor: '#f8dddd' },
+	pillText:             { fontSize: 12, fontWeight: '600' },
+	pillTextPending:      { color: '#c48508' },
+	pillTextConfirmed:    { color: '#2e7d32' },
+	pillTextCancelled:    { color: '#d84545' },
+	metaRow:              { flexDirection: 'row', alignItems: 'center', gap: 4 },
 	cancelledMetaRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1010,8 +1214,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		flexShrink: 1,
 	},
-
-	// ── Action row ────────────────────────────────────────────────────────────
 	actions: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1030,8 +1232,6 @@ const styles = StyleSheet.create({
 	},
 	btnLabel: { fontSize: 10, fontWeight: '500', textAlign: 'center', marginTop: 3 },
 	chevronBtn: { marginLeft: 'auto', paddingLeft: 4 },
-
-	// Confirmed mini badge
 	confirmedMiniBadge: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1045,8 +1245,6 @@ const styles = StyleSheet.create({
 		minWidth: 52,
 	},
 	confirmedMiniText: { fontSize: 10, fontWeight: '600', color: '#2e8b57' },
-
-	// ── Reject centered modal (exactly as per screenshot) ────────────────────
 	rejectBackdrop: {
 		flex: 1,
 		backgroundColor: 'rgba(0,0,0,0.45)',
@@ -1109,8 +1307,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	rejectConfirmText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-
-	// ── Reschedule bottom-sheet ───────────────────────────────────────────────
 	drawerBackdrop: {
 		flex: 1,
 		backgroundColor: 'rgba(0,0,0,0.35)',
@@ -1226,4 +1422,226 @@ const styles = StyleSheet.create({
 	skeletonActionsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
 	error: { color: 'red', fontSize: 13, paddingVertical: 12 },
 	empty: { color: '#999', fontSize: 13, paddingVertical: 16 },
+	referBackdrop: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.5)',
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 14,
+	},
+	referCard: {
+		backgroundColor: '#fff',
+		borderRadius: 26,
+		maxHeight: '90%',
+		overflow: 'hidden',
+		shadowColor: '#000',
+		shadowOffset: { width: 8, height: 0 },
+		shadowOpacity: 0.18,
+		shadowRadius: 0,
+		elevation: 12,
+	},
+	referCardCompact: {
+		borderRadius: 18,
+		maxHeight: '86%',
+	},
+	referHeader: {
+		paddingHorizontal: 36,
+		paddingVertical: 36,
+		borderBottomWidth: 1,
+		borderBottomColor: '#dfe7ec',
+	},
+	referHeaderCompact: {
+		paddingHorizontal: 18,
+		paddingVertical: 18,
+	},
+	referTitle: {
+		fontSize: 23,
+		fontWeight: '500',
+		color: '#172838',
+	},
+	referTitleCompact: { fontSize: 20 },
+	referBody: { flexShrink: 1 },
+	referBodyContent: {
+		paddingHorizontal: 36,
+		paddingTop: 24,
+		paddingBottom: 34,
+	},
+	referBodyContentCompact: {
+		paddingHorizontal: 16,
+		paddingTop: 16,
+		paddingBottom: 22,
+	},
+	referSearchBox: {
+		height: 54,
+		borderRadius: 18,
+		borderWidth: 3,
+		borderColor: '#2e7b7d',
+		backgroundColor: '#f8fbff',
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 18,
+		marginBottom: 64,
+	},
+	referSearchBoxCompact: {
+		height: 44,
+		borderRadius: 14,
+		borderWidth: 2,
+		paddingHorizontal: 12,
+		marginBottom: 28,
+	},
+	referSearchInput: {
+		flex: 1,
+		height: 50,
+		paddingHorizontal: 12,
+		fontSize: 17,
+		color: '#1b2d3c',
+	},
+	referSearchInputCompact: {
+		height: 42,
+		paddingHorizontal: 8,
+		fontSize: 15,
+	},
+	referSectionTitle: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#526b7a',
+		letterSpacing: 0,
+		marginBottom: 30,
+	},
+	referSectionTitleCompact: {
+		fontSize: 13,
+		marginBottom: 18,
+	},
+	referDoctorRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 38,
+	},
+	referDoctorRowCompact: { marginBottom: 22 },
+	referDoctorImage: {
+		width: 78,
+		height: 78,
+		borderRadius: 39,
+		backgroundColor: '#eef3f5',
+		marginLeft: 24,
+		marginRight: 24,
+	},
+	referDoctorImageCompact: {
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+		marginLeft: 0,
+		marginRight: 12,
+	},
+	referDoctorInfo: {
+		flex: 1,
+		minWidth: 0,
+	},
+	referDoctorName: {
+		fontSize: 20,
+		fontWeight: '700',
+		color: '#172838',
+		marginBottom: 8,
+	},
+	referDoctorNameCompact: {
+		fontSize: 15,
+		marginBottom: 4,
+	},
+	referDoctorSpeciality: {
+		fontSize: 16,
+		color: '#526b7a',
+		marginBottom: 14,
+	},
+	referDoctorSpecialityCompact: {
+		fontSize: 13,
+		marginBottom: 6,
+	},
+	referDoctorMetaRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		flexWrap: 'wrap',
+	},
+	referDoctorMetaText: {
+		fontSize: 15,
+		color: '#969696',
+		marginRight: 16,
+	},
+	referDoctorMetaTextCompact: {
+		fontSize: 11,
+		marginRight: 8,
+	},
+	referShareBtn: {
+		minWidth: 124,
+		height: 48,
+		borderRadius: 24,
+		backgroundColor: '#0d8585',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginLeft: 16,
+	},
+	referShareBtnCompact: {
+		minWidth: 70,
+		height: 36,
+		borderRadius: 18,
+		marginLeft: 8,
+	},
+	referShareBtnDisabled: { opacity: 0.65 },
+	referShareText: {
+		color: '#fff',
+		fontSize: 16,
+		fontWeight: '700',
+	},
+	referShareTextCompact: { fontSize: 13 },
+	referLoadingBox: {
+		paddingVertical: 30,
+		alignItems: 'center',
+	},
+	referEmptyText: {
+		color: '#8a969d',
+		fontSize: 15,
+		paddingVertical: 22,
+		textAlign: 'center',
+	},
+	successBackdrop: {
+	flex: 1,
+	backgroundColor: 'rgba(0,0,0,0.5)',
+	justifyContent: 'center',
+	alignItems: 'center',
+},
+
+successCard: {
+	width: 280,
+	backgroundColor: '#fff',
+	borderRadius: 14,
+	padding: 20,
+	alignItems: 'center',
+},
+
+successTitle: {
+	fontSize: 18,
+	fontWeight: '700',
+	color: '#1a1a1a',
+	marginTop: 10,
+},
+
+successMessage: {
+	fontSize: 14,
+	color: '#555',
+	textAlign: 'center',
+	marginTop: 8,
+	marginBottom: 20,
+},
+
+successBtn: {
+	backgroundColor: '#2e8b57',
+	paddingHorizontal: 20,
+	paddingVertical: 10,
+	borderRadius: 8,
+},
+
+successBtnText: {
+	color: '#fff',
+	fontWeight: '600',
+},
 })

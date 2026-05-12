@@ -480,7 +480,14 @@ export default function ProfessionalDetailsTab() {
 	return (
 		<ScrollView
 			style={styles.container}
-			contentContainerStyle={[styles.contentContainer, { paddingHorizontal: sectionPadding, paddingVertical: sectionPadding }]}
+			contentContainerStyle={[
+				styles.contentContainer,
+				{
+					paddingHorizontal: sectionPadding,
+					paddingTop: sectionPadding,
+					paddingBottom: 0,
+				},
+			]}
 			keyboardShouldPersistTaps="handled"
 			showsVerticalScrollIndicator={false}
 		>
@@ -628,6 +635,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 	},
 	contentContainer: {
+		flexGrow: 1,
 		alignItems: 'center',
 	},
 	contentShell: {

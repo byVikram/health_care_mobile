@@ -1,105 +1,507 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     FlatList,
-    Pressable,
     StyleSheet,
+    TextInput,
+    TouchableOpacity,
     View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import Toast from 'react-native-toast-message';
 
 import { AppTypography } from '../../components/common';
-import { DOCTORS } from '../../constants/mockdata';
-import MyDoctorCard from './components/MyDoctorCard';
+import {
+    FavouriteDoctor,
+    getDoctors,
+    getFavouriteDoctors,
+    toggleFavouriteDoctor,
+} from '../doctor/doctorService';
+import { DoctorSearchItem } from '../../types/doctor-search';
+import MyDoctorCard, { DoctorCardItem } from './components/MyDoctorCard';
 
-export default function MyDoctorPage({ navigation }: any) {
+type DoctorRow = DoctorCardItem & {
+    id: string;
+    isVerified?: boolean;
+};
+
+type HeaderProps = {
+    searchQuery: string;
+    searchLoading: boolean;
+    isSearching: boolean;
+    filteredSearchResults: DoctorRow[];
+    favouriteIds: Set<string>;
+    favouritesCount: number;
+    favLoading: boolean;
+    hasFavourites: boolean;
+    togglingIds: Set<string>;
+    onSearchChange: (value: string) => void;
+    onToggleSaved: (doctor: DoctorRow) => void;
+};
+
+function mapDoctorToRow(doctor: FavouriteDoctor | DoctorSearchItem): DoctorRow {
+    const experienceYears = doctor.experience_years;
+
+    return {
+        id: doctor.id,
+        image: doctor.avatar_s3_key || '',
+        name: doctor.name,
+        speciality: doctor.specialities?.[0] || 'General Physician',
+        experience:
+            experienceYears != null ? `${experienceYears} yrs exp` : 'Experience not available',
+        location: doctor.location || '',
+        isVerified: doctor.is_verified,
+    };
+}
+
+const DoctorsListHeader = React.memo(function DoctorsListHeader({
+    searchQuery,
+    searchLoading,
+    isSearching,
+    filteredSearchResults,
+    favouriteIds,
+    favouritesCount,
+    favLoading,
+    hasFavourites,
+    togglingIds,
+    onSearchChange,
+    onToggleSaved,
+}: HeaderProps) {
     return (
-        <SafeAreaView edges={['top']} style={styles.safeArea}>
-            <View style={styles.header}>
-                <View style={styles.headerOverlayOne} />
-                <View style={styles.headerOverlayTwo} />
-
-                <View style={styles.headerRow}>
-                    <Pressable
-                        onPress={() => navigation?.goBack?.()}
-                        hitSlop={10}
-                        style={styles.backButton}
-                    >
+        <View style={styles.headerContent}>
+            <View style={styles.searchSection}>
+                <View style={styles.searchBar}>
+                    <MaterialCommunityIcons name="magnify" size={22} color="#7d8b94" />
+                    <TextInput
+                        value={searchQuery}
+                        onChangeText={onSearchChange}
+                        placeholder="Search doctor by name"
+                        placeholderTextColor="#8b9aa2"
+                        style={styles.searchInput}
+                        autoCorrect={false}
+                        returnKeyType="search"
+                    />
+                    <TouchableOpacity style={styles.micButton} activeOpacity={0.75}>
                         <MaterialCommunityIcons
-                            name="chevron-left"
-                            size={24}
-                            color="#ffffff"
+                            name="microphone-outline"
+                            size={22}
+                            color="#245f67"
                         />
-                    </Pressable>
+                    </TouchableOpacity>
+                </View>
+            </View>
 
-                    <AppTypography variant="h4" style={styles.headerTitle}>
-                        My Doctor
+            {isSearching && (
+                <View style={styles.resultsSection}>
+                    <AppTypography variant="caption" style={styles.sectionTitle}>
+                        SEARCH RESULTS
+                    </AppTypography>
+
+                    {searchLoading ? (
+                        <View style={styles.loadingBlock}>
+                            <ActivityIndicator size="small" color="#245f67" />
+                        </View>
+                    ) : filteredSearchResults.length === 0 ? (
+                        <AppTypography variant="caption" style={styles.emptyText}>
+                            No doctors found
+                        </AppTypography>
+                    ) : (
+                        <View style={styles.inlineList}>
+                            {filteredSearchResults.map((doctor, index) => (
+                                <View key={doctor.id}>
+                                    <MyDoctorCard
+                                        {...doctor}
+                                        saved={favouriteIds.has(doctor.id)}
+                                        disabled={togglingIds.has(doctor.id)}
+                                        onToggleSaved={() => onToggleSaved(doctor)}
+                                    />
+                                    {index < filteredSearchResults.length - 1 && (
+                                        <View style={styles.cardGap} />
+                                    )}
+                                </View>
+                            ))}
+                        </View>
+                    )}
+                </View>
+            )}
+
+            <View style={styles.savedHeader}>
+                <AppTypography variant="caption" style={styles.sectionTitle}>
+                    SAVED
+                </AppTypography>
+                <View style={styles.savedBadge}>
+                    <AppTypography variant="caption" style={styles.savedBadgeText}>
+                        {favouritesCount}
                     </AppTypography>
                 </View>
             </View>
 
+            {favLoading && (
+                <View style={styles.loadingBlock}>
+                    <ActivityIndicator size="small" color="#245f67" />
+                </View>
+            )}
+
+            {!favLoading && !hasFavourites && (
+                <View style={styles.emptyBlock}>
+                    <MaterialCommunityIcons
+                        name="bookmark-outline"
+                        size={38}
+                        color="#8ca0a9"
+                    />
+                    <AppTypography variant="caption" style={styles.emptyText}>
+                        No favourite doctors yet
+                    </AppTypography>
+                    <AppTypography variant="caption" style={styles.emptySubText}>
+                        Use the search bar above to find and save doctors
+                    </AppTypography>
+                </View>
+            )}
+        </View>
+    );
+});
+
+export default function MyDoctorPage() {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<DoctorRow[]>([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [favouriteIds, setFavouriteIds] = useState<Set<string>>(new Set());
+    const [favourites, setFavourites] = useState<DoctorRow[]>([]);
+    const [favLoading, setFavLoading] = useState(true);
+    const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const togglingIdsRef = useRef<Set<string>>(new Set());
+
+    const trimmedSearch = searchQuery.trim();
+    const isSearching = trimmedSearch.length >= 3;
+
+    useEffect(() => {
+        getFavouriteDoctors()
+            .then((res) => {
+                if (res.success) {
+                    setFavouriteIds(new Set(res.data.favourite_ids));
+                    setFavourites(res.data.favourites.map(mapDoctorToRow));
+                }
+            })
+            .catch(() => {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: 'Failed to load favourites',
+                });
+            })
+            .finally(() => setFavLoading(false));
+    }, []);
+
+    useEffect(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+
+        if (!isSearching) {
+            setSearchResults([]);
+            setSearchLoading(false);
+            return;
+        }
+
+        setSearchLoading(true);
+        debounceRef.current = setTimeout(async () => {
+            try {
+                const res = await getDoctors({
+                    search: trimmedSearch || undefined,
+                    limit: 20,
+                });
+
+                if (res.success) {
+                    setSearchResults(res.data.map(mapDoctorToRow));
+                }
+            } catch {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: 'Search failed',
+                });
+            } finally {
+                setSearchLoading(false);
+            }
+        }, 400);
+
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, [isSearching, trimmedSearch]);
+
+    const handleToggleSaved = useCallback(
+        async (doctor: DoctorRow) => {
+            const doctorId = doctor.id;
+
+            if (togglingIdsRef.current.has(doctorId)) return;
+
+            togglingIdsRef.current = new Set(togglingIdsRef.current).add(doctorId);
+            setTogglingIds(new Set(togglingIdsRef.current));
+
+            const wasFavourite = favouriteIds.has(doctorId);
+
+            setFavouriteIds((current) => {
+                const next = new Set(current);
+                if (wasFavourite) {
+                    next.delete(doctorId);
+                } else {
+                    next.add(doctorId);
+                }
+                return next;
+            });
+
+            setFavourites((current) => {
+                if (wasFavourite) {
+                    return current.filter((item) => item.id !== doctorId);
+                }
+
+                return current.some((item) => item.id === doctorId)
+                    ? current
+                    : [...current, doctor];
+            });
+
+            try {
+                const res = await toggleFavouriteDoctor(doctorId);
+
+                if (res.success === false) {
+                    throw new Error(res.message || 'Failed to update favourites');
+                }
+
+                const isFavourite = res.data?.action
+                    ? res.data.action === 'added'
+                    : !wasFavourite;
+                const nextIds = new Set(res.data?.favourite_ids ?? []);
+
+                setFavouriteIds((current) => {
+                    if (nextIds.size > 0 || res.data?.favourite_ids) {
+                        return nextIds;
+                    }
+
+                    const next = new Set(current);
+                    if (isFavourite) {
+                        next.add(doctorId);
+                    } else {
+                        next.delete(doctorId);
+                    }
+                    return next;
+                });
+                setFavourites((current) => {
+                    if (res.data?.favourites) {
+                        return res.data.favourites.map(mapDoctorToRow);
+                    }
+
+                    if (!isFavourite) {
+                        return current.filter((item) => item.id !== doctorId);
+                    }
+
+                    return current.some((item) => item.id === doctorId)
+                        ? current
+                        : [...current, doctor];
+                });
+
+                Toast.show({
+                    type: 'success',
+                    text1: 'Success',
+                    text2: isFavourite ? 'Added to favourites' : 'Removed from favourites',
+                });
+            } catch {
+                setFavouriteIds((current) => {
+                    const next = new Set(current);
+                    if (wasFavourite) {
+                        next.add(doctorId);
+                    } else {
+                        next.delete(doctorId);
+                    }
+                    return next;
+                });
+
+                setFavourites((current) => {
+                    if (wasFavourite) {
+                        return current.some((item) => item.id === doctorId)
+                            ? current
+                            : [...current, doctor];
+                    }
+
+                    return current.filter((item) => item.id !== doctorId);
+                });
+
+                Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: 'Failed to update favourites',
+                });
+            } finally {
+                const nextTogglingIds = new Set(togglingIdsRef.current);
+                nextTogglingIds.delete(doctorId);
+                togglingIdsRef.current = nextTogglingIds;
+                setTogglingIds(nextTogglingIds);
+            }
+        },
+        [favouriteIds]
+    );
+
+    const filteredSearchResults = useMemo(
+        () => searchResults.filter((doctor) => !favouriteIds.has(doctor.id)),
+        [favouriteIds, searchResults]
+    );
+
+    const renderDoctorCard = useCallback(({ item }: { item: DoctorRow }) => (
+        <MyDoctorCard
+            {...item}
+            saved={favouriteIds.has(item.id)}
+            disabled={togglingIds.has(item.id)}
+            onToggleSaved={() => handleToggleSaved(item)}
+        />
+    ), [favouriteIds, handleToggleSaved, togglingIds]);
+
+    const listHeader = useMemo(
+        () => (
+            <DoctorsListHeader
+                searchQuery={searchQuery}
+                searchLoading={searchLoading}
+                isSearching={isSearching}
+                filteredSearchResults={filteredSearchResults}
+                favouriteIds={favouriteIds}
+                favouritesCount={favourites.length}
+                favLoading={favLoading}
+                hasFavourites={favourites.length > 0}
+                togglingIds={togglingIds}
+                onSearchChange={setSearchQuery}
+                onToggleSaved={handleToggleSaved}
+            />
+        ),
+        [
+            searchQuery,
+            searchLoading,
+            isSearching,
+            filteredSearchResults,
+            favouriteIds,
+            favourites.length,
+            favLoading,
+            togglingIds,
+            handleToggleSaved,
+        ]
+    );
+
+    return (
+        <View style={styles.container}>
             <FlatList
-                data={DOCTORS}
+                data={favLoading ? [] : favourites}
                 keyExtractor={(item) => item.id}
-                renderItem={({ item }) => <MyDoctorCard {...item} />}
+                renderItem={renderDoctorCard}
+                ListHeaderComponent={listHeader}
+                ItemSeparatorComponent={() => <View style={styles.cardGap} />}
                 contentContainerStyle={styles.listContent}
+                keyboardShouldPersistTaps="always"
                 showsVerticalScrollIndicator={false}
             />
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
+    container: {
         flex: 1,
         backgroundColor: '#f5f9fa',
     },
-    header: {
-        backgroundColor: '#245f67',
-        paddingHorizontal: 16,
-        paddingTop: 10,
-        paddingBottom: 18,
-        overflow: 'hidden',
-    },
-    headerOverlayOne: {
-        position: 'absolute',
-        width: 320,
-        height: 150,
-        borderRadius: 110,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        top: -58,
-        left: -90,
-        transform: [{ rotate: '-5deg' }],
-    },
-    headerOverlayTwo: {
-        position: 'absolute',
-        width: 320,
-        height: 150,
-        borderRadius: 110,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        top: -30,
-        left: -45,
-        transform: [{ rotate: '-5deg' }],
-    },
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        width: 28,
-        height: 28,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 4,
-    },
-    headerTitle: {
-        color: '#ffffff',
-        fontSize: 20,
-        fontWeight: '500',
-    },
     listContent: {
         paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 24,
+        paddingTop: 8,
+        paddingBottom: 0,
+    },
+    headerContent: {
+        paddingBottom: 0,
+    },
+    searchSection: {
+        paddingBottom: 12,
+        backgroundColor: '#f5f9fa',
+    },
+    searchBar: {
+        minHeight: 48,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#d9e6eb',
+        backgroundColor: '#ffffff',
+        paddingLeft: 14,
+        paddingRight: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        shadowColor: '#12343b',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    searchInput: {
+        flex: 1,
+        minHeight: 48,
+        paddingHorizontal: 10,
+        color: '#22343d',
+        fontSize: 14,
+    },
+    micButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    resultsSection: {
+        paddingTop: 4,
+        paddingBottom: 16,
+    },
+    savedHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+        marginBottom: 12,
+    },
+    sectionTitle: {
+        color: '#4e6670',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0,
+    },
+    savedBadge: {
+        minWidth: 24,
+        height: 22,
+        borderRadius: 11,
+        paddingHorizontal: 7,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#dcecee',
+        marginLeft: 8,
+    },
+    savedBadgeText: {
+        color: '#245f67',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    inlineList: {
+        marginTop: 12,
+    },
+    cardGap: {
+        height: 14,
+    },
+    loadingBlock: {
+        paddingVertical: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyBlock: {
+        alignItems: 'center',
+        paddingVertical: 30,
+    },
+    emptyText: {
+        color: '#7f98a3',
+        fontSize: 12,
+        textAlign: 'center',
+        marginTop: 8,
+    },
+    emptySubText: {
+        color: '#8b9aa2',
+        fontSize: 11,
+        textAlign: 'center',
+        marginTop: 4,
     },
 });

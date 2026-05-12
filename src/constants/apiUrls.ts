@@ -6,7 +6,6 @@ import { Platform } from 'react-native'
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	// const url ='http://192.168.4.24:8000'
 	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
 
 	if (!url) {
@@ -32,6 +31,10 @@ export const API_ENDPOINTS = {
 		AVAILABILITY: `${BASE_URL}/api/doctors/availability`,
 		OVERRIDES: `${BASE_URL}/api/doctors/availability/overrides`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
+	},
+	DOCTORS_FAVOURITES: {
+		GET: `${BASE_URL}/api/doctors/favourites`,
+		TOGGLE: (publicId: string) => `${BASE_URL}/api/doctors/favourites/${publicId}`,
 	},
 	DOCTOR_PROFILE: {
 		DETAILS: `${BASE_URL}/api/doctors/details`,
@@ -61,6 +64,8 @@ export const API_ENDPOINTS = {
 		GET_BY_ID: (id: string) => `${BASE_URL}/api/appointments/${id}`, // Add this
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
+		STATUSES: `${BASE_URL}/api/appointments/statuses`,
+		REFER: `${BASE_URL}/api/appointments/refer`,
 	},
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
 
@@ -74,3 +79,4 @@ export const API_ENDPOINTS = {
 		LIST: `${BASE_URL}/api/locations`,
 	},
 }
+

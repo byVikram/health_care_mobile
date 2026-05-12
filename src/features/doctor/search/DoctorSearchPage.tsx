@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
 	View,
 	StyleSheet,
@@ -36,6 +36,8 @@ type Speciality = {
 	label: string
 	icon: string
 }
+
+const normalizeText = (value?: string | null) => (value ?? '').trim().toLowerCase()
 
 // ─── Speciality Chip ──────────────────────────────────────────────────────
 function SpecialityChip({ spec, selected, onPress }: {
@@ -145,24 +147,15 @@ export default function DoctorSearchPage() {
 		loadSpecialities()
 	}, [])
 
-	// Fetch doctors with correct parameter mapping
+	// Fetch the base doctor list. Search and speciality tabs are applied locally.
 	const fetchDoctorsList = async (isRefresh = false) => {
 		if (!isRefresh) setLoading(true)
 		try {
 			// 🔁 ADJUST THIS MAPPING TO MATCH YOUR BACKEND
 			// Option 1: if backend expects 'q' instead of 'search'
 			// Option 2: if backend expects 'speciality' instead of 'speciality_id'
-			const params: any = {
+			const params = {
 				limit: 50,
-			}
-			// Example: map search to 'q' (uncomment if needed)
-			if (searchQuery.trim()) {
-				params.q = searchQuery.trim()   // <-- change 'q' to whatever backend uses
-				// params.search = searchQuery.trim() // use this if backend uses 'search'
-			}
-			if (activeSpec !== 'all') {
-				params.speciality = activeSpec    // <-- change to 'speciality_id' if needed
-				// params.speciality_id = activeSpec
 			}
 
 			console.log('📤 Sending params:', JSON.stringify(params, null, 2))
@@ -184,23 +177,37 @@ export default function DoctorSearchPage() {
 		}
 	}
 
-	// Debounced search (500ms)
 	useEffect(() => {
-		const timer = setTimeout(() => {
-			fetchDoctorsList()
-		}, 500)
-		return () => clearTimeout(timer)
-	}, [searchQuery, activeSpec])
+		fetchDoctorsList()
+	}, [])
 
 	const onRefresh = useCallback(() => {
 		setRefreshing(true)
 		fetchDoctorsList(true)
-	}, [searchQuery, activeSpec])
+	}, [])
 
-	// Immediate search when user presses Enter on keyboard
 	const handleSearchSubmit = () => {
-		fetchDoctorsList()
+		// The visible list is controlled by speciality tabs only on this page.
 	}
+
+	const selectedSpeciality = useMemo(
+		() => specialities.find((spec) => spec.id === activeSpec),
+		[specialities, activeSpec]
+	)
+
+	const displayedDoctors = useMemo(() => {
+		const selectedLabel = normalizeText(selectedSpeciality?.label)
+
+		return doctors.filter((doctor) => {
+			if (activeSpec === 'all') return true
+
+			return (
+				(doctor.specialities ?? []).some(
+					(speciality) => normalizeText(speciality) === selectedLabel
+				)
+			)
+		})
+	}, [doctors, activeSpec, selectedSpeciality])
 
 	// Render item for FlatList
 	const renderItem = useCallback(({ item }: { item: DoctorSearchItem }) => {
@@ -213,7 +220,7 @@ export default function DoctorSearchPage() {
 	}, [numColumns])
 
 	// Skeleton placeholder list when loading
-	const listData = loading && !refreshing ? Array(6).fill({}) : doctors
+	const listData = loading && !refreshing ? Array(6).fill({}) : displayedDoctors
 	const keyExtractor = (item: any, index: number) =>
 		item.id ? String(item.id) : `skeleton-${index}`
 
@@ -252,7 +259,7 @@ export default function DoctorSearchPage() {
 			</View>
 
 			{/* Results or empty state */}
-			{!loading && doctors.length === 0 ? (
+			{!loading && displayedDoctors.length === 0 ? (
 				<View style={styles.emptyContainer}>
 					<MaterialCommunityIcons name="magnify-close" size={48} color="#ccc" />
 					<AppTypography variant="body" style={styles.emptyText}>

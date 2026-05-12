@@ -13,6 +13,7 @@ export const ROUTES = {
 		PROFILE: 'Profile',
 	},
 	STACK: {
+		SEARCH: 'SearchPage',
 		DOCTOR_SEARCH: 'DoctorSearch',
 		DOCTOR_DETAIL: 'DoctorDetail',
 		FAVOURITE_DOCTOR: 'FavouriteDoctor',

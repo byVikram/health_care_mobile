@@ -6,10 +6,11 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native'
 import HeroSection from './HeroSection'
 import SpecialitySection from './SpecialitySection'
 import ConsultSection from './ConsultSection'
-import CommunityBlogsSection from './CommunityBlogsSection'
+// import CommunityBlogsSection from './CommunityBlogsSection'
 import PatientQuestionsSection from './PatientQuestionsSection'
 import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
-
+import CommunitySection from './CommunitySection'
+import BlogsSection from './BlogsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
 import { getAppointments, Appointment } from '../doctor/doctorService'
 
@@ -22,7 +23,7 @@ import TreatmentHistoryIcon from '../../assets/icons/treatmenthistory.svg'
 import TreatmentHistoryArrowIcon from '../../assets/icons/treatmenthistory-icon.svg'
 import { ROUTES } from '../../navigation/routes'
 import type { AppNavigationParamList } from '../../navigation/types'
-import AppPayment from '../../components/common/AppPayment'
+// import AppPayment from '../../components/common/AppPayment'
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
@@ -135,7 +136,7 @@ export default function DashboardPage() {
 
 			<SpecialitySection />
 			<ConsultSection />
-			<AppPayment />
+			{/* <AppPayment /> */}
 		</>
 	)
 
@@ -168,7 +169,8 @@ export default function DashboardPage() {
 				)}
 
 				{/* COMMON SECTIONS */}
-				<CommunityBlogsSection />
+				<CommunitySection />
+                <BlogsSection />
 				<PatientQuestionsSection />
 			</ScrollView>
 

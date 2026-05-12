@@ -36,6 +36,7 @@ interface VitalsTabProps {
 }
 
 const TEAL = '#2b6f71'
+const BMI_YELLOW = '#FF9D00'
 
 const VITAL_STATS: VitalStat[] = [
 	{ id: 'temp', label: 'Body Temperature', value: '98.6', unit: 'F', date: '17/04/25' },
@@ -352,27 +353,29 @@ function VitalStatCard({ stat, width }: { stat: VitalStat; width: number }) {
 	if (stat.id === 'heightBmi') {
 		return (
 			<View style={[styles.statCard, styles.heightBmiCard, { width }]}>
-				<View style={styles.statIconWrap} />
+				<View style={[styles.statIconWrap, styles.heightBmiIconWrap]}>
+					<MaterialCommunityIcons name="human-male-height" size={22} color={TEAL} />
+				</View>
 				<View style={styles.heightBmiContent}>
 					<View style={styles.heightBmiMetric}>
 						<View style={styles.statValueRow}>
-							<AppTypography variant="body" style={styles.heightBmiValue}>
+							<AppTypography variant="body" style={styles.statValue}>
 								{stat.value}
 							</AppTypography>
-							<AppTypography variant="caption" style={styles.heightBmiUnit}>
+							<AppTypography variant="caption" style={styles.statUnit}>
 								{stat.unit}
 							</AppTypography>
 						</View>
-						<AppTypography variant="caption" style={styles.heightBmiLabel}>
+						<AppTypography variant="caption" style={styles.statLabel} numberOfLines={1}>
 							Height
 						</AppTypography>
 					</View>
 					<View style={styles.heightBmiDivider} />
 					<View style={[styles.heightBmiMetric, styles.bmiMetric]}>
-						<AppTypography variant="body" style={[styles.heightBmiValue, styles.bmiValue]}>
+						<AppTypography variant="body" style={[styles.statValue, styles.bmiValue]}>
 							{stat.bmiValue ?? '-'}
 						</AppTypography>
-						<AppTypography variant="caption" style={styles.heightBmiLabel}>
+						<AppTypography variant="caption" style={styles.statLabel}>
 							BMI
 						</AppTypography>
 						<AppTypography variant="caption" style={styles.bmiCategory}>
@@ -605,59 +608,60 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 						/>
 					</View>
 				</View>
-			</View>
 
-			<ScrollView
-				style={styles.tableScroller}
-				horizontal
-				showsHorizontalScrollIndicator={activeTab.columns.length > 2}
-				contentContainerStyle={styles.tableScrollerContent}
-			>
-				<View style={[styles.tableContent, { width: tableMetrics.tableWidth }]}>
-					<View style={styles.tableHeader}>
-						<View style={[styles.dateHeader, { width: tableMetrics.dateWidth }]}>
-							<AppTypography variant="caption" style={styles.tableHeaderText}>
-								Date
-							</AppTypography>
-							<MaterialCommunityIcons name="arrow-up" size={13} color="#33444d" />
+				<ScrollView
+					style={styles.tableScroller}
+					horizontal
+					showsHorizontalScrollIndicator={activeTab.columns.length > 2}
+					contentContainerStyle={styles.tableScrollerContent}
+				>
+					<View style={[styles.tableContent, { width: tableMetrics.tableWidth }]}>
+						<View style={styles.tableHeader}>
+							<View style={[styles.dateHeader, { width: tableMetrics.dateWidth }]}>
+								<AppTypography variant="caption" style={styles.tableHeaderText}>
+									Date
+								</AppTypography>
+								<MaterialCommunityIcons name="arrow-up" size={13} color="#33444d" />
+							</View>
+							{activeTab.columns.map((column) => (
+								<View key={column.key} style={[styles.columnHeaderCell, { width: tableMetrics.columnWidth }]}>
+									<AppTypography variant="caption" style={styles.tableHeaderText} numberOfLines={2}>
+										{column.label}
+									</AppTypography>
+								</View>
+							))}
+							<View style={{ width: tableMetrics.actionWidth }} />
 						</View>
-						{activeTab.columns.map((column) => (
-							<View key={column.key} style={[styles.columnHeaderCell, { width: tableMetrics.columnWidth }]}>
-								<AppTypography variant="caption" style={styles.tableHeaderText} numberOfLines={2}>
-									{column.label}
-								</AppTypography>
-							</View>
-						))}
-						<View style={{ width: tableMetrics.actionWidth }} />
-					</View>
 
-					<FlatList
-						data={activeTab.rows}
-						keyExtractor={(item) => item.id}
-						style={styles.historyList}
-						contentContainerStyle={styles.historyListContent}
-						showsVerticalScrollIndicator={false}
-						refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={TEAL} />}
-						renderItem={({ item }) => (
-							<HistoryRow
-								row={item}
-								columns={activeTab.columns}
-								showDownload={activeTab.showDownload}
-								dateWidth={tableMetrics.dateWidth}
-								columnWidth={tableMetrics.columnWidth}
-								actionWidth={tableMetrics.actionWidth}
-							/>
-						)}
-						ListEmptyComponent={
-							<View style={styles.emptyState}>
-								<AppTypography variant="body" style={styles.emptyText}>
-									No data available
-								</AppTypography>
-							</View>
-						}
-					/>
-				</View>
-			</ScrollView>
+						<FlatList
+							data={activeTab.rows}
+							keyExtractor={(item) => item.id}
+							style={styles.historyList}
+							contentContainerStyle={styles.historyListContent}
+							showsVerticalScrollIndicator={false}
+							scrollEnabled={false}
+							refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={TEAL} />}
+							renderItem={({ item }) => (
+								<HistoryRow
+									row={item}
+									columns={activeTab.columns}
+									showDownload={activeTab.showDownload}
+									dateWidth={tableMetrics.dateWidth}
+									columnWidth={tableMetrics.columnWidth}
+									actionWidth={tableMetrics.actionWidth}
+								/>
+							)}
+							ListEmptyComponent={
+								<View style={styles.emptyState}>
+									<AppTypography variant="body" style={styles.emptyText}>
+										No data available
+									</AppTypography>
+								</View>
+							}
+						/>
+					</View>
+				</ScrollView>
+			</View>
 
 			{/* FAB — opens Add Vitals modal */}
 			<TouchableOpacity
@@ -718,7 +722,6 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		paddingRight: 4,
-		paddingTop: 10,
 	},
 	heightBmiMetric: {
 		flex: 1,
@@ -733,38 +736,20 @@ const styles = StyleSheet.create({
 		marginHorizontal: 4,
 	},
 	bmiMetric: {
-	flex: 1.25,
-	justifyContent: 'flex-end',   
-	paddingBottom: 4,            
-},
-	heightBmiValue: {
-		color: '#263238',
-		fontSize: 14,
-		fontWeight: '700',
-		lineHeight: 18,
-		textAlign: 'center',
-	},
-	heightBmiUnit: {
-		color: '#71808a',
-		fontSize: 13,
-		lineHeight: 16,
-	},
-	heightBmiLabel: {
-		color: '#71808a',
-		fontSize: 13,
-		lineHeight: 16,
-		marginTop: 2,
-		textAlign: 'center',
+		flex: 1.25,
+		justifyContent: 'center',
+		paddingTop: 3,
 	},
 	bmiValue: {
-		color: '#fb8500',
-		fontSize: 12,
-		marginTop: 3,
+		color: BMI_YELLOW,
+		marginTop: 13,
+		lineHeight: 16,
+
 	},
 	bmiCategory: {
-		color: '#fb8500',
+		color: BMI_YELLOW,
 		fontSize: 9,
-		fontWeight: '700',
+		fontWeight: '500',
 		lineHeight: 12,
 		marginTop: 1,
 		textAlign: 'center',
@@ -778,6 +763,9 @@ const styles = StyleSheet.create({
 	statIconWrap: {
 		width: 28,
 		alignItems: 'flex-start',
+	},
+	heightBmiIconWrap: {
+		justifyContent: 'center',
 	},
 	statCopy: {
 		flex: 1,
@@ -812,17 +800,17 @@ const styles = StyleSheet.create({
 	},
 	historyCard: {
 		marginHorizontal: 16,
-		borderTopLeftRadius: 10,
-		borderTopRightRadius: 10,
+		height: 360,
+		borderRadius: 10,
 		backgroundColor: '#ffffff',
 		borderWidth: 1,
 		borderColor: '#edf1f2',
 		overflow: 'hidden',
 	},
 	historyHeader: {
-		paddingHorizontal: 16,
-		paddingTop: 12,
-		paddingBottom: 6,
+		paddingHorizontal: 12,
+		paddingTop: 8,
+		paddingBottom: 3,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
@@ -849,9 +837,9 @@ const styles = StyleSheet.create({
 		fontSize: 11,
 	},
 	filterRow: {
-		paddingHorizontal: 16,
-		paddingBottom: 10,
-		gap: 10,
+		paddingHorizontal: 10,
+		paddingBottom: 5,
+		gap: 6,
 	},
 	filterRowTablet: {
 		flexDirection: 'row',
@@ -860,23 +848,23 @@ const styles = StyleSheet.create({
 	},
 	tabSlider: {
 		alignItems: 'center',
-		paddingRight: 8,
+		paddingRight: 4,
 	},
 	tabItemWrap: {
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
 	tabPill: {
-		borderRadius: 7,
-		paddingHorizontal: 12,
-		paddingVertical: 7,
+		borderRadius: 6,
+		paddingHorizontal: 9,
+		paddingVertical: 4,
 	},
 	tabPillActive: {
 		backgroundColor: TEAL,
 	},
 	tabText: {
 		color: '#69777f',
-		fontSize: 12,
+		fontSize: 11,
 		fontWeight: '500',
 	},
 	tabTextActive: {
@@ -885,17 +873,17 @@ const styles = StyleSheet.create({
 	},
 	tabSeparator: {
 		color: '#c1c9cd',
-		marginHorizontal: 4,
+		marginHorizontal: 2,
 	},
 	periodSelectWrap: {
-		width: 150,
+		width: 136,
 		maxWidth: '100%',
 	},
 	periodSelectContainer: {
 		marginBottom: 0,
 	},
 	periodSelect: {
-		minHeight: 36,
+		minHeight: 30,
 	},
 	tableHeader: {
 		backgroundColor: 'rgba(43,111,113,0.06)',
@@ -908,28 +896,24 @@ const styles = StyleSheet.create({
 	dateHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingHorizontal: 12,
-		paddingVertical: 9,
+		paddingHorizontal: 8,
+		paddingVertical: 5,
 		gap: 4,
 	},
 	columnHeaderCell: {
 		justifyContent: 'center',
-		paddingHorizontal: 10,
-		paddingVertical: 9,
+		paddingHorizontal: 8,
+		paddingVertical: 5,
 		borderLeftWidth: 1,
 		borderLeftColor: '#edf1f2',
 	},
 	tableHeaderText: {
 		color: '#33444d',
-		fontSize: 12,
+		fontSize: 11,
 		fontWeight: '700',
 	},
 	tableScroller: {
 		flex: 1,
-		marginHorizontal: 16,
-		borderLeftWidth: 1,
-		borderRightWidth: 1,
-		borderColor: '#edf1f2',
 		backgroundColor: '#ffffff',
 	},
 	tableScrollerContent: {
@@ -944,31 +928,31 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 	},
 	historyListContent: {
-		paddingBottom: 84,
+		paddingBottom: 0,
 	},
 	historyRow: {
 		flexDirection: 'row',
 		alignItems: 'stretch',
-		minHeight: 42,
+		minHeight: 34,
 		borderBottomWidth: 1,
 		borderColor: '#edf1f2',
 	},
 	historyDateCell: {
 		justifyContent: 'center',
-		paddingHorizontal: 12,
-		paddingVertical: 9,
+		paddingHorizontal: 8,
+		paddingVertical: 4,
 	},
 	historyValueCell: {
 		justifyContent: 'center',
-		paddingHorizontal: 10,
-		paddingVertical: 9,
+		paddingHorizontal: 8,
+		paddingVertical: 4,
 		borderLeftWidth: 1,
 		borderLeftColor: '#edf1f2',
 	},
 	rowDate: {
 		color: '#667780',
-		fontSize: 11,
-		lineHeight: 15,
+		fontSize: 10,
+		lineHeight: 13,
 	},
 	valueContent: {
 		flexDirection: 'row',
@@ -979,24 +963,24 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		gap: 3,
-		paddingHorizontal: 6,
+		gap: 2,
+		paddingHorizontal: 4,
 		borderLeftWidth: 1,
 		borderLeftColor: '#edf1f2',
 	},
 	iconButton: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
+		width: 22,
+		height: 22,
+		borderRadius: 11,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#f6f8f8',
 	},
 	cellValue: {
 		color: '#263238',
-		fontSize: 12,
+		fontSize: 11,
 		fontWeight: '600',
-		lineHeight: 16,
+		lineHeight: 14,
 		flexShrink: 1,
 	},
 	statusDot: {
