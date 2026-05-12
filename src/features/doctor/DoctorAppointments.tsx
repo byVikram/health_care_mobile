@@ -2,12 +2,15 @@ import React, { useEffect, useState } from 'react'
 import {
 	View,
 	Text,
+	TextInput,
 	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
 	useWindowDimensions,
 	Alert,
 	Modal,
+	ActivityIndicator,
+	Image,
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -17,8 +20,12 @@ import {
 	getDoctorAvailability,
 	updateAppointmentsStatus,
 	rescheduleAppointment,
+	referAppointment,
+	getFavouriteDoctors,
+	getDoctors,
 	getDoctorById,
 	getDoctorProfile,
+	type FavouriteDoctor,
 } from './doctorService'
 import { DateSlotPicker } from '../../components/common'
 import { APPOINTMENT_STATUS } from '../../constants/constants'
@@ -53,6 +60,16 @@ type Appointment = {
 	end_time?: string
 }
 
+type ReferDoctor = {
+	id: string
+	name: string
+	avatar_s3_key: string | null
+	location: string | null
+	experience_years: number | null
+	specialities: string[]
+	is_verified?: boolean
+}
+
 type DoctorAppointmentsProps = {
 	selectedDate: number
 	setSelectedDate: (i: number) => void
@@ -68,6 +85,7 @@ type DoctorAppointmentsProps = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TEAL = '#1a8c8c'
+const DOCTOR_IMAGE_PLACEHOLDER = require('../../assets/Banner/doctor.png')
 
 const showSuccess = (message: string) =>
 	Toast.show({ type: 'success', text1: 'Success', text2: message })
@@ -102,7 +120,7 @@ export default function DoctorAppointments({
 	weekDays,
 	selectedDateObj,
 }: DoctorAppointmentsProps) {
-	const { width } = useWindowDimensions()
+	const { width, height } = useWindowDimensions()
 	const isTablet = width >= 768
 	const useCompactCancelledLayout = width < 640
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
@@ -138,6 +156,16 @@ const [successMessage, setSuccessMessage] = useState('')
 	// ── Reject modal ──────────────────────────────────────────────────────────
 	const [rejectModalId, setRejectModalId] = useState<string | null>(null)
 
+	// ── Refer modal ───────────────────────────────────────────────────────────
+	const [referOpen, setReferOpen] = useState(false)
+	const [referAppt, setReferAppt] = useState<Appointment | null>(null)
+	const [referQuery, setReferQuery] = useState('')
+	const [favouriteDoctors, setFavouriteDoctors] = useState<ReferDoctor[]>([])
+	const [referSearchResults, setReferSearchResults] = useState<ReferDoctor[]>([])
+	const [referLoading, setReferLoading] = useState(false)
+	const [referSearchLoading, setReferSearchLoading] = useState(false)
+	const [referringIds, setReferringIds] = useState<Set<string>>(new Set())
+
 	// ─────────────────────────────────────────────────────────────────────────
 	// Small helpers
 	// ─────────────────────────────────────────────────────────────────────────
@@ -168,6 +196,16 @@ const [successMessage, setSuccessMessage] = useState('')
 			default:        return { name: 'calendar',                 color: '#999'    }
 		}
 	}
+
+	const mapReferDoctor = (doctor: FavouriteDoctor | ReferDoctor): ReferDoctor => ({
+		id: doctor.id,
+		name: doctor.name,
+		avatar_s3_key: doctor.avatar_s3_key ?? null,
+		location: doctor.location ?? '',
+		experience_years: doctor.experience_years ?? null,
+		specialities: doctor.specialities ?? [],
+		is_verified: doctor.is_verified,
+	})
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Reschedule
@@ -359,6 +397,105 @@ const [successMessage, setSuccessMessage] = useState('')
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
+	// Refer
+	// ─────────────────────────────────────────────────────────────────────────
+
+	const handleOpenRefer = (apt: Appointment) => {
+		setReferAppt(apt)
+		setReferQuery('')
+		setReferSearchResults([])
+		setReferOpen(true)
+	}
+
+	const handleCloseRefer = () => {
+		setReferOpen(false)
+		setReferAppt(null)
+		setReferQuery('')
+		setReferSearchResults([])
+		setReferringIds(new Set())
+	}
+
+	useEffect(() => {
+		if (!referOpen) return
+
+		const fetchFavouriteDoctors = async () => {
+			try {
+				setReferLoading(true)
+				const res = await getFavouriteDoctors()
+				if (res.success) {
+					setFavouriteDoctors((res.data?.favourites ?? []).map(mapReferDoctor))
+				} else {
+					showError(res.message || 'Failed to load doctors')
+				}
+			} catch {
+				showError('Failed to load doctors')
+			} finally {
+				setReferLoading(false)
+			}
+		}
+
+		fetchFavouriteDoctors()
+	}, [referOpen])
+
+	useEffect(() => {
+		if (!referOpen) return
+
+		const query = referQuery.trim()
+		if (query.length < 2) {
+			setReferSearchResults([])
+			setReferSearchLoading(false)
+			return
+		}
+
+		let cancelled = false
+		const timer = setTimeout(async () => {
+			try {
+				setReferSearchLoading(true)
+				const res = await getDoctors({ search: query, limit: 20 })
+				if (!cancelled && res.success) {
+					setReferSearchResults((res.data ?? []).map(mapReferDoctor))
+				}
+			} catch {
+				if (!cancelled) showError('Search failed')
+			} finally {
+				if (!cancelled) setReferSearchLoading(false)
+			}
+		}, 350)
+
+		return () => {
+			cancelled = true
+			clearTimeout(timer)
+		}
+	}, [referOpen, referQuery])
+
+	const handleReferDoctor = async (doctor: ReferDoctor) => {
+		if (!referAppt || referringIds.has(doctor.id)) return
+
+		setReferringIds((prev) => new Set(prev).add(doctor.id))
+		try {
+			const res = await referAppointment({
+				appointment_id: referAppt.id,
+				doctor_id: doctor.id,
+			})
+
+			if (res.success) {
+				showSuccess(res.message || 'Appointment referred successfully')
+				handleCloseRefer()
+			} else {
+				showError(res.message || 'Failed to refer appointment')
+			}
+		} catch {
+			showError('Failed to refer appointment')
+		} finally {
+			setReferringIds((prev) => {
+				const next = new Set(prev)
+				next.delete(doctor.id)
+				return next
+			})
+		}
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
 	// Navigation
 	//───────────────────────────────────────────────────────────────────
 
@@ -463,7 +600,7 @@ const [successMessage, setSuccessMessage] = useState('')
 				</TouchableOpacity>
 
 				<TouchableOpacity
-					onPress={(e) => { e.stopPropagation?.(); alert('Refer coming soon!') }}
+					onPress={(e) => { e.stopPropagation?.(); handleOpenRefer(apt) }}
 					style={[styles.btn, { backgroundColor: '#dbe2f5' }]}
 					activeOpacity={0.75}
 				>
@@ -534,6 +671,146 @@ const [successMessage, setSuccessMessage] = useState('')
 			</TouchableOpacity>
 		</Modal>
 	)
+
+	const renderReferDoctorRow = (doctor: ReferDoctor) => {
+		const isSubmitting = referringIds.has(doctor.id)
+		const isCompactRefer = width < 520
+		const speciality = doctor.specialities?.[0] || 'General Physician'
+		const experience =
+			doctor.experience_years != null ? `${doctor.experience_years} yrs exp` : 'Experience not available'
+		const location = doctor.location || 'Bangalore'
+		const imageSource = doctor.avatar_s3_key
+			? { uri: doctor.avatar_s3_key }
+			: DOCTOR_IMAGE_PLACEHOLDER
+
+		return (
+			<View key={doctor.id} style={[styles.referDoctorRow, isCompactRefer && styles.referDoctorRowCompact]}>
+				<Image
+					source={imageSource}
+					style={[styles.referDoctorImage, isCompactRefer && styles.referDoctorImageCompact]}
+					resizeMode="cover"
+				/>
+				<View style={styles.referDoctorInfo}>
+					<Text style={[styles.referDoctorName, isCompactRefer && styles.referDoctorNameCompact]} numberOfLines={1}>
+						{doctor.name}
+					</Text>
+					<Text style={[styles.referDoctorSpeciality, isCompactRefer && styles.referDoctorSpecialityCompact]} numberOfLines={1}>
+						{speciality}
+					</Text>
+					<View style={styles.referDoctorMetaRow}>
+						<MaterialCommunityIcons name="briefcase-outline" size={isCompactRefer ? 12 : 15} color="#969696" />
+						<Text style={[styles.referDoctorMetaText, isCompactRefer && styles.referDoctorMetaTextCompact]}>
+							{experience}
+						</Text>
+						<MaterialCommunityIcons name="map-marker-outline" size={isCompactRefer ? 12 : 15} color="#969696" />
+						<Text style={[styles.referDoctorMetaText, isCompactRefer && styles.referDoctorMetaTextCompact]} numberOfLines={1}>
+							{location}
+						</Text>
+					</View>
+				</View>
+				<TouchableOpacity
+					style={[
+						styles.referShareBtn,
+						isCompactRefer && styles.referShareBtnCompact,
+						isSubmitting && styles.referShareBtnDisabled,
+					]}
+					activeOpacity={0.8}
+					disabled={isSubmitting}
+					onPress={() => handleReferDoctor(doctor)}
+				>
+					{isSubmitting ? (
+						<ActivityIndicator size="small" color="#fff" />
+					) : (
+						<Text style={[styles.referShareText, isCompactRefer && styles.referShareTextCompact]}>Share</Text>
+					)}
+				</TouchableOpacity>
+			</View>
+		)
+	}
+
+	const renderReferModal = () => {
+		const searchText = referQuery.trim()
+		const currentDoctorId = referAppt?.doctor?.id ?? (referAppt as any)?.doctor_id
+		const doctors = (searchText.length >= 2 ? referSearchResults : favouriteDoctors).filter(
+			(doctor) => doctor.id !== currentDoctorId
+		)
+		const isSearching = searchText.length >= 2
+		const showLoading = isSearching ? referSearchLoading : referLoading
+		const isCompactRefer = width < 520
+		const referBodyMaxHeight = Math.max(220, Math.floor(height * (isCompactRefer ? 0.58 : 0.62)))
+
+		return (
+			<Modal
+				visible={referOpen}
+				transparent
+				animationType="fade"
+				onRequestClose={handleCloseRefer}
+			>
+				<TouchableOpacity
+					activeOpacity={1}
+					style={styles.referBackdrop}
+					onPress={handleCloseRefer}
+				>
+					<TouchableOpacity
+						activeOpacity={1}
+						style={[
+							styles.referCard,
+							isCompactRefer && styles.referCardCompact,
+							{ width: Math.min(width - 28, 900) },
+						]}
+						onPress={() => {}}
+					>
+						<View style={[styles.referHeader, isCompactRefer && styles.referHeaderCompact]}>
+							<Text style={[styles.referTitle, isCompactRefer && styles.referTitleCompact]}>Refer a doctor</Text>
+						</View>
+
+						<ScrollView
+							style={[styles.referBody, { maxHeight: referBodyMaxHeight }]}
+							contentContainerStyle={[
+								styles.referBodyContent,
+								isCompactRefer && styles.referBodyContentCompact,
+							]}
+							showsVerticalScrollIndicator
+							persistentScrollbar
+							scrollIndicatorInsets={{ right: 2 }}
+							nestedScrollEnabled
+							keyboardShouldPersistTaps="handled"
+						>
+							<View style={[styles.referSearchBox, isCompactRefer && styles.referSearchBoxCompact]}>
+								<MaterialCommunityIcons name="magnify" size={isCompactRefer ? 20 : 28} color="#9b9b9b" />
+								<TextInput
+									value={referQuery}
+									onChangeText={setReferQuery}
+									placeholder="Search doctor..."
+									placeholderTextColor="#98a1aa"
+									style={[styles.referSearchInput, isCompactRefer && styles.referSearchInputCompact]}
+									autoCorrect={false}
+									returnKeyType="search"
+								/>
+								<MaterialCommunityIcons name="microphone-outline" size={isCompactRefer ? 20 : 28} color="#9b9b9b" />
+							</View>
+
+							<Text style={[styles.referSectionTitle, isCompactRefer && styles.referSectionTitleCompact]}>
+								{isSearching ? 'SEARCH RESULTS' : 'FAVOURITE DOCTORS'}
+							</Text>
+
+							{showLoading ? (
+								<View style={styles.referLoadingBox}>
+									<ActivityIndicator size="small" color={TEAL} />
+								</View>
+							) : doctors.length === 0 ? (
+								<Text style={styles.referEmptyText}>
+									{isSearching ? 'No doctors found' : 'No favourite doctors found'}
+								</Text>
+							) : (
+								doctors.map(renderReferDoctorRow)
+							)}
+						</ScrollView>
+					</TouchableOpacity>
+				</TouchableOpacity>
+			</Modal>
+		)
+	}
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Reschedule drawer
@@ -794,6 +1071,7 @@ const [successMessage, setSuccessMessage] = useState('')
 			{/* Modals */}
 			
 {renderRejectModal()}
+{renderReferModal()}
 {renderRescheduleDrawer()}
 {renderSuccessModal()}
 		</View>
@@ -1144,6 +1422,187 @@ const styles = StyleSheet.create({
 	skeletonActionsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
 	error: { color: 'red', fontSize: 13, paddingVertical: 12 },
 	empty: { color: '#999', fontSize: 13, paddingVertical: 16 },
+	referBackdrop: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.5)',
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 14,
+	},
+	referCard: {
+		backgroundColor: '#fff',
+		borderRadius: 26,
+		maxHeight: '90%',
+		overflow: 'hidden',
+		shadowColor: '#000',
+		shadowOffset: { width: 8, height: 0 },
+		shadowOpacity: 0.18,
+		shadowRadius: 0,
+		elevation: 12,
+	},
+	referCardCompact: {
+		borderRadius: 18,
+		maxHeight: '86%',
+	},
+	referHeader: {
+		paddingHorizontal: 36,
+		paddingVertical: 36,
+		borderBottomWidth: 1,
+		borderBottomColor: '#dfe7ec',
+	},
+	referHeaderCompact: {
+		paddingHorizontal: 18,
+		paddingVertical: 18,
+	},
+	referTitle: {
+		fontSize: 23,
+		fontWeight: '500',
+		color: '#172838',
+	},
+	referTitleCompact: { fontSize: 20 },
+	referBody: { flexShrink: 1 },
+	referBodyContent: {
+		paddingHorizontal: 36,
+		paddingTop: 24,
+		paddingBottom: 34,
+	},
+	referBodyContentCompact: {
+		paddingHorizontal: 16,
+		paddingTop: 16,
+		paddingBottom: 22,
+	},
+	referSearchBox: {
+		height: 54,
+		borderRadius: 18,
+		borderWidth: 3,
+		borderColor: '#2e7b7d',
+		backgroundColor: '#f8fbff',
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 18,
+		marginBottom: 64,
+	},
+	referSearchBoxCompact: {
+		height: 44,
+		borderRadius: 14,
+		borderWidth: 2,
+		paddingHorizontal: 12,
+		marginBottom: 28,
+	},
+	referSearchInput: {
+		flex: 1,
+		height: 50,
+		paddingHorizontal: 12,
+		fontSize: 17,
+		color: '#1b2d3c',
+	},
+	referSearchInputCompact: {
+		height: 42,
+		paddingHorizontal: 8,
+		fontSize: 15,
+	},
+	referSectionTitle: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#526b7a',
+		letterSpacing: 0,
+		marginBottom: 30,
+	},
+	referSectionTitleCompact: {
+		fontSize: 13,
+		marginBottom: 18,
+	},
+	referDoctorRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 38,
+	},
+	referDoctorRowCompact: { marginBottom: 22 },
+	referDoctorImage: {
+		width: 78,
+		height: 78,
+		borderRadius: 39,
+		backgroundColor: '#eef3f5',
+		marginLeft: 24,
+		marginRight: 24,
+	},
+	referDoctorImageCompact: {
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+		marginLeft: 0,
+		marginRight: 12,
+	},
+	referDoctorInfo: {
+		flex: 1,
+		minWidth: 0,
+	},
+	referDoctorName: {
+		fontSize: 20,
+		fontWeight: '700',
+		color: '#172838',
+		marginBottom: 8,
+	},
+	referDoctorNameCompact: {
+		fontSize: 15,
+		marginBottom: 4,
+	},
+	referDoctorSpeciality: {
+		fontSize: 16,
+		color: '#526b7a',
+		marginBottom: 14,
+	},
+	referDoctorSpecialityCompact: {
+		fontSize: 13,
+		marginBottom: 6,
+	},
+	referDoctorMetaRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		flexWrap: 'wrap',
+	},
+	referDoctorMetaText: {
+		fontSize: 15,
+		color: '#969696',
+		marginRight: 16,
+	},
+	referDoctorMetaTextCompact: {
+		fontSize: 11,
+		marginRight: 8,
+	},
+	referShareBtn: {
+		minWidth: 124,
+		height: 48,
+		borderRadius: 24,
+		backgroundColor: '#0d8585',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginLeft: 16,
+	},
+	referShareBtnCompact: {
+		minWidth: 70,
+		height: 36,
+		borderRadius: 18,
+		marginLeft: 8,
+	},
+	referShareBtnDisabled: { opacity: 0.65 },
+	referShareText: {
+		color: '#fff',
+		fontSize: 16,
+		fontWeight: '700',
+	},
+	referShareTextCompact: { fontSize: 13 },
+	referLoadingBox: {
+		paddingVertical: 30,
+		alignItems: 'center',
+	},
+	referEmptyText: {
+		color: '#8a969d',
+		fontSize: 15,
+		paddingVertical: 22,
+		textAlign: 'center',
+	},
 	successBackdrop: {
 	flex: 1,
 	backgroundColor: 'rgba(0,0,0,0.5)',

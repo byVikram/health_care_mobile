@@ -310,7 +310,12 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
+		<ScrollView
+			style={styles.screen}
+			contentContainerStyle={styles.screenContent}
+			keyboardShouldPersistTaps="handled"
+			showsVerticalScrollIndicator={false}
+		>
 			<View style={[styles.card, isTablet && styles.cardTablet]}>
 				<Text style={styles.title}>Availability</Text>
 
@@ -401,8 +406,8 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f8fafc',
 	},
 	screenContent: {
+		flexGrow: 1,
 		padding: 0,
-		paddingBottom: 24,
 	},
 	card: {
 		width: '100%',

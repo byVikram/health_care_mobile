@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert } from 'react-native'
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import {
 	FlatList,
 	Modal,
@@ -34,6 +35,8 @@ type InputFieldProps = {
 	onFocus?: () => void
 	onBlur?: () => void
 	leftText?: string
+	errorText?: string
+	required?: boolean
 }
 
 type SelectDropdownProps = {
@@ -43,6 +46,26 @@ type SelectDropdownProps = {
 	options: string[]
 	onSelect: (value: string) => void
 	isMobile: boolean
+	required?: boolean
+}
+
+type MultiSelectDropdownProps = {
+	label: string
+	values: string[]
+	placeholder: string
+	options: string[]
+	onChange: (values: string[]) => void
+	isMobile: boolean
+	required?: boolean
+}
+
+type DobPickerFieldProps = {
+	label: string
+	value: string
+	onChange: (value: string) => void
+	placeholder: string
+	isMobile: boolean
+	required?: boolean
 }
 
 function FormRow({
@@ -74,10 +97,11 @@ function FormRow({
 	)
 }
 
-function FieldLabel({ label }: { label: string }) {
+function FieldLabel({ label, required = false }: { label: string; required?: boolean }) {
 	return (
 		<AppTypography variant="caption" style={styles.fieldLabel}>
 			{label}
+			{required ? <AppTypography variant="caption" style={styles.requiredMark}> *</AppTypography> : null}
 		</AppTypography>
 	)
 }
@@ -95,11 +119,13 @@ function InputField({
 	onFocus,
 	onBlur,
 	leftText,
+	errorText,
+	required = false,
 }: InputFieldProps) {
 	return (
 		<View style={styles.fieldGroup}>
-			<FieldLabel label={label} />
-			<View style={styles.inputShell}>
+			<FieldLabel label={label} required={required} />
+			<View style={[styles.inputShell, errorText && styles.inputShellError]}>
 				{leftText ? (
 					<View style={styles.leftPrefix}>
 						<AppTypography variant="body" style={styles.leftPrefixText}>
@@ -121,16 +147,21 @@ function InputField({
 				/>
 				{rightIcon ? <MaterialCommunityIcons name={rightIcon} size={20} color={rightIconColor} /> : null}
 			</View>
+			{errorText ? (
+				<AppTypography variant="caption" style={styles.errorText}>
+					{errorText}
+				</AppTypography>
+			) : null}
 		</View>
 	)
 }
 
-function SelectDropdown({ label, value, placeholder, options, onSelect, isMobile }: SelectDropdownProps) {
+function SelectDropdown({ label, value, placeholder, options, onSelect, isMobile, required = false }: SelectDropdownProps) {
 	const [visible, setVisible] = useState(false)
 
 	return (
 		<View style={styles.fieldGroup}>
-			<FieldLabel label={label} />
+			<FieldLabel label={label} required={required} />
 			<>
 				<Pressable style={styles.inputShell} onPress={() => setVisible(true)}>
 					<AppTypography variant="body" style={[styles.selectText, !value && styles.placeholderText]}>
@@ -178,16 +209,240 @@ function SelectDropdown({ label, value, placeholder, options, onSelect, isMobile
 	)
 }
 
-const formatDateInput = (rawValue: string) => {
-	const digits = rawValue.replace(/\D/g, '').slice(0, 8)
+function MultiSelectDropdown({ label, values, placeholder, options, onChange, isMobile, required = false }: MultiSelectDropdownProps) {
+	const [visible, setVisible] = useState(false)
+	const selectedValues = useMemo(() => normalizeLanguageValues(values), [values])
+	const selectedValueSet = useMemo(() => new Set(selectedValues), [selectedValues])
+	const displayValue = selectedValues.join(', ')
 
-	if (digits.length <= 2) return digits
-	if (digits.length <= 4) return `${digits.slice(0, 2)}-${digits.slice(2)}`
-	return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`
+	const toggleValue = (item: string) => {
+		if (selectedValueSet.has(item)) {
+			onChange(selectedValues.filter((value) => value !== item))
+			return
+		}
+
+		onChange([...selectedValues, item])
+	}
+
+	return (
+		<View style={styles.fieldGroup}>
+			<FieldLabel label={label} required={required} />
+			<>
+				<Pressable style={styles.inputShell} onPress={() => setVisible(true)}>
+					<AppTypography variant="body" style={[styles.selectText, !displayValue && styles.placeholderText]} numberOfLines={1}>
+						{displayValue || placeholder}
+					</AppTypography>
+					<MaterialCommunityIcons name="chevron-down" size={20} color="#2c7b80" />
+				</Pressable>
+				<Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
+					<Pressable style={styles.modalOverlay} onPress={() => setVisible(false)}>
+						<Pressable style={[styles.modalCard, isMobile && styles.modalCardMobile]} onPress={(event) => event.stopPropagation()}>
+							<View style={styles.modalHeader}>
+								<AppTypography variant="h4" style={styles.modalTitle}>
+									{label}
+								</AppTypography>
+								<TouchableOpacity onPress={() => setVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+									<MaterialCommunityIcons name="close" size={22} color="#45636d" />
+								</TouchableOpacity>
+							</View>
+							<FlatList
+								data={options}
+								keyExtractor={(item) => item}
+								renderItem={({ item }) => {
+									const isSelected = selectedValueSet.has(item)
+									return (
+										<TouchableOpacity
+											style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+											onPress={() => toggleValue(item)}
+										>
+											<AppTypography variant="body" style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+												{item}
+											</AppTypography>
+											<MaterialCommunityIcons
+												name={isSelected ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
+												size={20}
+												color={isSelected ? '#24a148' : '#9ca3af'}
+											/>
+										</TouchableOpacity>
+									)
+								}}
+							/>
+							<View style={styles.modalActions}>
+								<TouchableOpacity style={styles.doneButton} onPress={() => setVisible(false)}>
+									<AppTypography variant="body" style={styles.doneButtonText}>
+										Done
+									</AppTypography>
+								</TouchableOpacity>
+							</View>
+						</Pressable>
+					</Pressable>
+				</Modal>
+			</>
+		</View>
+	)
+}
+
+const today = () => {
+	const date = new Date()
+	date.setHours(23, 59, 59, 999)
+	return date
+}
+
+const defaultDobDate = () => {
+	const date = new Date()
+	date.setFullYear(date.getFullYear() - 25)
+	date.setHours(12, 0, 0, 0)
+	return date
+}
+
+const getDateFromDisplayValue = (value: string) => {
+	const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+	if (!match) return null
+
+	const day = Number(match[1])
+	const month = Number(match[2]) - 1
+	const year = Number(match[3])
+	const date = new Date(year, month, day, 12, 0, 0, 0)
+
+	if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null
+	if (date > today()) return null
+
+	return date
+}
+
+const formatDobDisplayValue = (date: Date) =>
+	`${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`
+
+function DobPickerField({ label, value, onChange, placeholder, isMobile, required = false }: DobPickerFieldProps) {
+	const [showPicker, setShowPicker] = useState(false)
+	const [pickerDate, setPickerDate] = useState(() => getDateFromDisplayValue(value) ?? defaultDobDate())
+	const maximumDate = useMemo(() => today(), [])
+	const displayValue = value || placeholder
+
+	const openPicker = () => {
+		setPickerDate(getDateFromDisplayValue(value) ?? defaultDobDate())
+		setShowPicker(true)
+	}
+
+	const closePicker = () => setShowPicker(false)
+
+	const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+		if (Platform.OS === 'android') {
+			setShowPicker(false)
+		}
+
+		if (event.type === 'dismissed' || !selectedDate) return
+
+		const normalizedDate = new Date(selectedDate)
+		normalizedDate.setHours(12, 0, 0, 0)
+		const nextDate = normalizedDate > maximumDate ? maximumDate : normalizedDate
+
+		setPickerDate(nextDate)
+		onChange(formatDobDisplayValue(nextDate))
+	}
+
+	const picker = (
+		<DateTimePicker
+			value={pickerDate}
+			mode="date"
+			display={Platform.OS === 'ios' ? 'inline' : Platform.OS === 'android' ? 'calendar' : 'default'}
+			maximumDate={maximumDate}
+			onChange={handleDateChange}
+		/>
+	)
+
+	return (
+		<View style={styles.fieldGroup}>
+			<FieldLabel label={label} required={required} />
+			<Pressable style={styles.inputShell} onPress={openPicker}>
+				<AppTypography variant="body" style={[styles.selectText, !value && styles.placeholderText]}>
+					{displayValue}
+				</AppTypography>
+				<MaterialCommunityIcons name="calendar-month-outline" size={20} color="#2c7b80" />
+			</Pressable>
+			{showPicker && Platform.OS === 'android' ? picker : null}
+			{Platform.OS !== 'android' ? (
+				<Modal visible={showPicker} transparent animationType="fade" onRequestClose={closePicker}>
+					<Pressable style={styles.modalOverlay} onPress={closePicker}>
+						<Pressable
+							style={[styles.dobModalCard, isMobile && styles.modalCardMobile]}
+							onPress={(event) => event.stopPropagation()}
+						>
+							<View style={styles.modalHeader}>
+								<AppTypography variant="h4" style={styles.modalTitle}>
+									Select DOB
+								</AppTypography>
+								<TouchableOpacity onPress={closePicker} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+									<MaterialCommunityIcons name="close" size={22} color="#45636d" />
+								</TouchableOpacity>
+							</View>
+							<View style={styles.dobPickerBody}>{picker}</View>
+							<View style={styles.modalActions}>
+								<TouchableOpacity style={styles.doneButton} onPress={closePicker}>
+									<AppTypography variant="body" style={styles.doneButtonText}>
+										Done
+									</AppTypography>
+								</TouchableOpacity>
+							</View>
+						</Pressable>
+					</Pressable>
+				</Modal>
+			) : null}
+		</View>
+	)
 }
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 const isValidPhone = (value: string) => value.replace(/\D/g, '').length >= 10
+const isValidProfileUrl = (value: string, allowedHosts: string[]) => {
+	const trimmedValue = value.trim()
+	if (!trimmedValue) return true
+
+	try {
+		const url = new URL(trimmedValue)
+		const host = url.hostname.toLowerCase()
+		const pathSegments = url.pathname.split('/').filter(Boolean)
+		return (
+			(url.protocol === 'https:' || url.protocol === 'http:') &&
+			allowedHosts.includes(host) &&
+			pathSegments.length === 1
+		)
+	} catch {
+		return false
+	}
+}
+const isValidInstagramUrl = (value: string) => isValidProfileUrl(value, ['instagram.com', 'www.instagram.com'])
+const isValidFacebookUrl = (value: string) => isValidProfileUrl(value, ['facebook.com', 'www.facebook.com'])
+const isValidTwitterUrl = (value: string) => isValidProfileUrl(value, ['twitter.com', 'www.twitter.com', 'x.com', 'www.x.com'])
+const matchOptionValue = (value: string, options: string[]) => {
+	const normalizedValue = value.trim().toLowerCase()
+	return options.find((option) => option.toLowerCase() === normalizedValue) ?? value.trim()
+}
+
+const normalizeGenderValue = (value?: string) => (value ? matchOptionValue(value, GENDER_OPTIONS) : '')
+const normalizeLanguageValues = (value?: string[] | string | null) => {
+	const languages = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : []
+	return Array.from(new Set(languages.map((language) => matchOptionValue(language, LANGUAGE_OPTIONS)).filter(Boolean)))
+}
+
+const validateSocialUrl = (field: keyof SocialErrors, value: string) => {
+	const trimmedValue = value.trim()
+	if (!trimmedValue) return ''
+
+	if (field === 'instagram' && !isValidInstagramUrl(trimmedValue)) {
+		return 'Enter a valid Instagram profile URL.'
+	}
+
+	if (field === 'facebook' && !isValidFacebookUrl(trimmedValue)) {
+		return 'Enter a valid Facebook profile URL.'
+	}
+
+	if (field === 'twitter' && !isValidTwitterUrl(trimmedValue)) {
+		return 'Enter a valid Twitter profile URL.'
+	}
+
+	return ''
+}
 
 type PersonalDetailsFormData = {
 	name: string
@@ -196,8 +451,18 @@ type PersonalDetailsFormData = {
 	gender: string
 	dob: string
 	experience: string
+	registrationNumber: string
 	languages: string[]
 	location: string
+	instagram: string
+	facebook: string
+	twitter: string
+}
+
+type SocialErrors = {
+	instagram?: string
+	facebook?: string
+	twitter?: string
 }
 
 const formatDobForDisplay = (value?: string) => {
@@ -227,10 +492,15 @@ export default function PersonalDetailsTab() {
 		gender: '',
 		dob: '',
 		experience: '',
+		registrationNumber: '',
 		languages: [],
 		location: '',
+		instagram: '',
+		facebook: '',
+		twitter: '',
 	})
 	const [focusedField, setFocusedField] = useState('')
+	const [socialErrors, setSocialErrors] = useState<SocialErrors>({})
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 
@@ -238,6 +508,25 @@ export default function PersonalDetailsTab() {
 		setFormData((prev) => ({
 			...prev,
 			[key]: value,
+		}))
+	}
+
+	const updateSocialField = (field: keyof SocialErrors, value: string) => {
+		updateFormData(field, value)
+		if (socialErrors[field]) {
+			setSocialErrors((prev) => ({
+				...prev,
+				[field]: undefined,
+			}))
+		}
+	}
+
+	const handleSocialBlur = (field: keyof SocialErrors) => {
+		const trimmedValue = formData[field].trim()
+		updateFormData(field, trimmedValue)
+		setSocialErrors((prev) => ({
+			...prev,
+			[field]: validateSocialUrl(field, trimmedValue) || undefined,
 		}))
 	}
 
@@ -254,11 +543,24 @@ export default function PersonalDetailsTab() {
 					name: profile.personal.name || user?.name || '',
 					email: profile.personal.email || user?.email || '',
 					mobile: response.data.personal_details?.contact_number || '',
-					gender: profile.personal.gender || '',
+					gender: normalizeGenderValue(profile.personal.gender),
 					dob: formatDobForDisplay(profile.personal.dateOfBirth),
 					experience: profile.personal.experience || '',
-					languages: profile.personal.languages || [],
+					registrationNumber: profile.professional.registrationNumber || '',
+					languages: normalizeLanguageValues(profile.personal.languages),
 					location: profile.personal.location || '',
+					instagram:
+						response.data.professional_details?.instagram_url ||
+						response.data.professional_details?.instagram ||
+						'',
+					facebook:
+						response.data.professional_details?.facebook_url ||
+						response.data.professional_details?.facebook ||
+						'',
+					twitter:
+						response.data.professional_details?.twitter_url ||
+						response.data.professional_details?.twitter ||
+						'',
 				})
 			} catch (error) {
 				console.error('[PersonalDetailsTab] failed to load doctor profile:', error)
@@ -279,7 +581,13 @@ export default function PersonalDetailsTab() {
 		const formattedDob = formatDobForApi(formData.dob.trim())
 		const experienceYears = formData.experience ? Number(formData.experience) : 0
 		const normalizedMobile = formData.mobile.replace(/\D/g, '')
-		const normalizedLanguages = formData.languages.map((language) => language.trim()).filter(Boolean)
+		const normalizedGender = normalizeGenderValue(formData.gender)
+		const normalizedLanguages = normalizeLanguageValues(formData.languages)
+		const trimmedRegistrationNumber = formData.registrationNumber.trim()
+		const trimmedInstagram = formData.instagram.trim()
+		const trimmedFacebook = formData.facebook.trim()
+		const trimmedTwitter = formData.twitter.trim()
+		const nextSocialErrors: SocialErrors = {}
 
 		if (!trimmedName) {
 			Alert.alert('Validation', 'Full name is required.')
@@ -301,6 +609,23 @@ export default function PersonalDetailsTab() {
 			return
 		}
 
+		if (trimmedInstagram && !isValidInstagramUrl(trimmedInstagram)) {
+			nextSocialErrors.instagram = 'Enter a valid Instagram profile URL.'
+		}
+
+		if (trimmedFacebook && !isValidFacebookUrl(trimmedFacebook)) {
+			nextSocialErrors.facebook = 'Enter a valid Facebook profile URL.'
+		}
+
+		if (trimmedTwitter && !isValidTwitterUrl(trimmedTwitter)) {
+			nextSocialErrors.twitter = 'Enter a valid Twitter profile URL.'
+		}
+
+		setSocialErrors(nextSocialErrors)
+		if (Object.keys(nextSocialErrors).length > 0) {
+			return
+		}
+
 		try {
 			setIsSaving(true)
 
@@ -308,11 +633,15 @@ export default function PersonalDetailsTab() {
 				name: trimmedName,
 				email: trimmedEmail,
 				location: trimmedLocation,
-				gender: formData.gender.trim(),
+				gender: normalizedGender,
 				languages: normalizedLanguages,
 				contact_number: normalizedMobile,
 				date_of_birth: formattedDob,
 				experience_years: Number.isFinite(experienceYears) ? experienceYears : 0,
+				registration_number: trimmedRegistrationNumber,
+				instagram_url: trimmedInstagram,
+				facebook_url: trimmedFacebook,
+				twitter_url: trimmedTwitter,
 			}
 
 			await doctorService.updateDoctorProfile(payload)
@@ -326,9 +655,14 @@ export default function PersonalDetailsTab() {
 				email: trimmedEmail,
 				location: trimmedLocation,
 				mobile: normalizedMobile,
+				gender: normalizedGender,
 				dob: formData.dob.trim(),
 				languages: normalizedLanguages,
 				experience: String(Number.isFinite(experienceYears) ? experienceYears : 0),
+				registrationNumber: trimmedRegistrationNumber,
+				instagram: trimmedInstagram,
+				facebook: trimmedFacebook,
+				twitter: trimmedTwitter,
 			}))
 			Alert.alert('Success', 'Personal details saved successfully/.')
 		} catch (err) {
@@ -361,7 +695,14 @@ export default function PersonalDetailsTab() {
 	return (
 		<ScrollView
 			style={styles.container}
-			contentContainerStyle={[styles.contentContainer, { paddingHorizontal: sectionPadding, paddingVertical: sectionPadding }]}
+			contentContainerStyle={[
+				styles.contentContainer,
+				{
+					paddingHorizontal: sectionPadding,
+					paddingTop: sectionPadding,
+					paddingBottom: 0,
+				},
+			]}
 			keyboardShouldPersistTaps="handled"
 			showsVerticalScrollIndicator={false}
 		>	
@@ -381,6 +722,21 @@ export default function PersonalDetailsTab() {
 						rightIcon="pencil-outline"
 						onFocus={() => setFocusedField('fullName')}
 						onBlur={() => setFocusedField('')}
+						required
+					/>
+				</View>
+
+				<View style={{ marginBottom: rowSpacing }}>
+					<InputField
+						label="Registration Number"
+						value={formData.registrationNumber}
+						onChangeText={(value) => updateFormData('registrationNumber', value)}
+						placeholder="Enter registration number"
+						autoCapitalize="characters"
+						rightIcon={focusedField === 'registrationNumber' ? 'pencil-outline' : undefined}
+						onFocus={() => setFocusedField('registrationNumber')}
+						onBlur={() => setFocusedField('')}
+						required
 					/>
 				</View>
 
@@ -394,6 +750,7 @@ export default function PersonalDetailsTab() {
 						rightIcon="pencil-outline"
 						onFocus={() => setFocusedField('location')}
 						onBlur={() => setFocusedField('')}
+						required
 					/>
 				</View>
 
@@ -410,6 +767,7 @@ export default function PersonalDetailsTab() {
 							rightIconColor="#24a148"
 							onFocus={() => setFocusedField('mobileNumber')}
 							onBlur={() => setFocusedField('')}
+							required
 						/>
 						<InputField
 							label="Email ID"
@@ -422,6 +780,7 @@ export default function PersonalDetailsTab() {
 							rightIconColor="#24a148"
 							onFocus={() => setFocusedField('email')}
 							onBlur={() => setFocusedField('')}
+							required
 						/>
 					</FormRow>
 				</View>
@@ -435,17 +794,15 @@ export default function PersonalDetailsTab() {
 							options={GENDER_OPTIONS}
 							onSelect={(value) => updateFormData('gender', value)}
 							isMobile={isMobile}
+							required
 						/>
-						<InputField
+						<DobPickerField
 							label="DOB"
 							value={formData.dob}
-							onChangeText={(value) => updateFormData('dob', formatDateInput(value))}
+							onChange={(value) => updateFormData('dob', value)}
 							placeholder="DD-MM-YYYY"
-							keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
-							maxLength={10}
-							rightIcon="pencil-outline"
-							onFocus={() => setFocusedField('dob')}
-							onBlur={() => setFocusedField('')}
+							isMobile={isMobile}
+							required
 						/>
 					</FormRow>
 				</View>
@@ -460,17 +817,74 @@ export default function PersonalDetailsTab() {
 						rightIcon={focusedField === 'experience' ? 'pencil-outline' : undefined}
 						onFocus={() => setFocusedField('experience')}
 						onBlur={() => setFocusedField('')}
+						required
 					/>
 				</View>
 
-				<SelectDropdown
-					label="Languages Known"
-					value={formData.languages.join(', ')}
-					placeholder="Select Language"
-					options={LANGUAGE_OPTIONS}
-					onSelect={(value) => updateFormData('languages', [value])}
-					isMobile={isMobile}
-				/>
+				<View style={{ marginBottom: rowSpacing }}>
+					<MultiSelectDropdown
+						label="Languages Known"
+						values={formData.languages}
+						placeholder="Select languages"
+						options={LANGUAGE_OPTIONS}
+						onChange={(values) => updateFormData('languages', values)}
+						isMobile={isMobile}
+						required
+					/>
+				</View>
+
+				<View style={[styles.socialSection, { marginBottom: rowSpacing }]}>
+					<AppTypography variant="h4" style={styles.sectionTitle}>
+						Social Media
+					</AppTypography>
+					<FormRow stacked={!useTwoColumns} compact={isTablet}>
+						<InputField
+							label="Instagram"
+							value={formData.instagram}
+							onChangeText={(value) => updateSocialField('instagram', value)}
+							placeholder="https://instagram.com/username"
+							keyboardType="url"
+							autoCapitalize="none"
+							rightIcon="instagram"
+							errorText={socialErrors.instagram}
+							onFocus={() => setFocusedField('instagram')}
+							onBlur={() => {
+								setFocusedField('')
+								handleSocialBlur('instagram')
+							}}
+						/>
+						<InputField
+							label="Facebook"
+							value={formData.facebook}
+							onChangeText={(value) => updateSocialField('facebook', value)}
+							placeholder="https://www.facebook.com/profile"
+							keyboardType="url"
+							autoCapitalize="none"
+							rightIcon="facebook"
+							errorText={socialErrors.facebook}
+							onFocus={() => setFocusedField('facebook')}
+							onBlur={() => {
+								setFocusedField('')
+								handleSocialBlur('facebook')
+							}}
+						/>
+						<InputField
+							label="Twitter"
+							value={formData.twitter}
+							onChangeText={(value) => updateSocialField('twitter', value)}
+							placeholder="https://twitter.com/username"
+							keyboardType="url"
+							autoCapitalize="none"
+							rightIcon="twitter"
+							errorText={socialErrors.twitter}
+							onFocus={() => setFocusedField('twitter')}
+							onBlur={() => {
+								setFocusedField('')
+								handleSocialBlur('twitter')
+							}}
+						/>
+					</FormRow>
+				</View>
 
 				<TouchableOpacity
 					style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
@@ -503,6 +917,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 	},
 	contentContainer: {
+		flexGrow: 1,
 		alignItems: 'center',
 	},
 	contentShell: {
@@ -512,6 +927,14 @@ const styles = StyleSheet.create({
 		color: '#343434',
 		fontSize: 22,
 		fontWeight: '600',
+	},
+	sectionTitle: {
+		color: '#343434',
+		fontWeight: '600',
+		marginBottom: 14,
+	},
+	socialSection: {
+		width: '100%',
 	},
 	formRow: {
 		flexDirection: 'row',
@@ -552,6 +975,13 @@ const styles = StyleSheet.create({
 		color: '#8f8f8f',
 		fontWeight: '500',
 	},
+	requiredMark: {
+		color: '#d84545',
+		fontSize: 12,
+		lineHeight: 14,
+		fontWeight: '700',
+		textAlignVertical: 'top',
+	},
 	inputShell: {
 		minHeight: 42,
 		borderWidth: 1,
@@ -562,6 +992,9 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
+	inputShellError: {
+		borderColor: '#d84545',
+	},
 	leftPrefix: {
 		marginRight: 4,
 	},
@@ -571,6 +1004,7 @@ const styles = StyleSheet.create({
 	},
 	textInput: {
 		flex: 1,
+		minWidth: 0,
 		paddingVertical: Platform.OS === 'web' ? 12 : 10,
 		paddingHorizontal: 0,
 		fontSize: 14,
@@ -585,6 +1019,12 @@ const styles = StyleSheet.create({
 	},
 	placeholderText: {
 		color: '#9a9a9a',
+	},
+	errorText: {
+		color: '#d84545',
+		fontSize: 12,
+		lineHeight: 16,
+		marginTop: 6,
 	},
 	modalOverlay: {
 		flex: 1,
@@ -604,6 +1044,15 @@ const styles = StyleSheet.create({
 	modalCardMobile: {
 		maxWidth: '100%',
 	},
+	dobModalCard: {
+		width: '100%',
+		maxWidth: 420,
+		alignSelf: 'center',
+		backgroundColor: '#ffffff',
+		borderRadius: 16,
+		paddingVertical: 8,
+		maxHeight: '78%',
+	},
 	modalHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -614,6 +1063,10 @@ const styles = StyleSheet.create({
 	},
 	modalTitle: {
 		color: '#343434',
+	},
+	dobPickerBody: {
+		paddingHorizontal: 12,
+		paddingBottom: 12,
 	},
 	optionRow: {
 		minHeight: 48,
@@ -633,6 +1086,25 @@ const styles = StyleSheet.create({
 	},
 	optionTextSelected: {
 		color: '#1d6d71',
+		fontWeight: '600',
+	},
+	modalActions: {
+		paddingHorizontal: 18,
+		paddingVertical: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#eef4f5',
+		alignItems: 'flex-end',
+	},
+	doneButton: {
+		minWidth: 96,
+		borderRadius: 8,
+		backgroundColor: '#0c7c7c',
+		paddingHorizontal: 16,
+		paddingVertical: 10,
+		alignItems: 'center',
+	},
+	doneButtonText: {
+		color: '#ffffff',
 		fontWeight: '600',
 	},
 	saveButton: {

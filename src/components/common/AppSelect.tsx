@@ -1,6 +1,17 @@
 import React, { useRef, useState } from "react";
-import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
-import { Menu, TouchableRipple, useTheme } from "react-native-paper";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  ViewStyle,
+} from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { TouchableRipple, useTheme } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppTypography } from "./AppTypography";
 
 export interface AppSelectOption {
@@ -20,7 +31,13 @@ interface AppSelectProps {
   size?: "small" | "medium";
   style?: StyleProp<ViewStyle>;
   customCardStyle?: StyleProp<ViewStyle>;
+  dropdownPosition?: "top" | "bottom";
+  maxDropdownHeight?: number;
+  bottomOffset?: number;
 }
+
+const DROPDOWN_GAP = 4;
+const DEFAULT_DROPDOWN_HEIGHT = 220;
 
 export const AppSelect = ({
   options,
@@ -34,25 +51,38 @@ export const AppSelect = ({
   size = "medium",
   style,
   customCardStyle,
+  dropdownPosition = "bottom",
+  maxDropdownHeight,
+  bottomOffset = 24,
 }: AppSelectProps) => {
   const [visible, setVisible] = useState(false);
-  const [fieldWidth, setFieldWidth] = useState(0);
-  const [anchor, setAnchor] = useState({ x: 0, y: 0 });
+  const [anchorLayout, setAnchorLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const anchorRef = useRef<View>(null);
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const touchableRef = useRef<View>(null);
 
   const closeMenu = () => setVisible(false);
-
   const openMenu = () => {
-    touchableRef.current?.measure((fx, fy, width, height, px, py) => {
-      setFieldWidth(width);
-      setAnchor({ x: px, y: py + height });
+    anchorRef.current?.measureInWindow((x, y, width, height) => {
+      setAnchorLayout({ x, y, width, height });
       setVisible(true);
     });
   };
 
   const selectedOption = options.find((opt) => opt.value === value);
   const resolvedBorderColor = errorText ? theme.colors.error : borderColor;
+  const requestedDropdownHeight = maxDropdownHeight ?? DEFAULT_DROPDOWN_HEIGHT;
+  const reservedBottomSpace = Math.max(bottomOffset, insets.bottom + bottomOffset);
+  const dropdownTop =
+    dropdownPosition === "top"
+      ? Math.max(insets.top + DROPDOWN_GAP, anchorLayout.y - requestedDropdownHeight - DROPDOWN_GAP)
+      : anchorLayout.y + anchorLayout.height + DROPDOWN_GAP;
+  const availableDropdownHeight =
+    dropdownPosition === "top"
+      ? anchorLayout.y - insets.top - DROPDOWN_GAP * 2
+      : windowHeight - dropdownTop - reservedBottomSpace;
+  const dropdownHeight = Math.min(requestedDropdownHeight, Math.max(0, availableDropdownHeight));
 
   return (
     <View style={[styles.container, style]}>
@@ -62,60 +92,88 @@ export const AppSelect = ({
         </AppTypography>
       ) : null}
 
-      <Menu
-        visible={visible}
-        onDismiss={closeMenu}
-        contentStyle={{
-          width: fieldWidth,
-          borderRadius: 8,
-          backgroundColor: "#fff",
-        }}
-        anchor={anchor}
-      >
-        {options.map((option) => (
-          <Menu.Item
-            key={option.value}
-            onPress={() => {
-              onSelect(option.value);
-              closeMenu();
-            }}
-            title={option.label}
-            style={{ width: fieldWidth }}
-          />
-        ))}
-      </Menu>
+      <View ref={anchorRef} collapsable={false}>
+        <TouchableRipple
+          onPress={openMenu}
+          borderless={false}
+          style={[
+            styles.dropdown,
+            size === "small" && styles.dropdownSmall,
+            {
+              borderColor: resolvedBorderColor,
+              borderRadius,
+            },
+            customCardStyle,
+          ]}
+        >
+          <View style={[styles.dropdownContent, size === "small" && styles.dropdownContentSmall]}>
+            <AppTypography
+              variant="body"
+              style={[
+                styles.dropdownText,
+                size === "small" && styles.dropdownTextSmall,
+                { color: selectedOption ? theme.colors.onSurfaceVariant : "#7c878d" },
+              ]}
+              numberOfLines={1}
+            >
+              {selectedOption ? selectedOption.label : placeholder}
+            </AppTypography>
+            <MaterialCommunityIcons
+              name={visible ? "chevron-up" : "chevron-down"}
+              size={20}
+              color={theme.colors.outline}
+              style={styles.chevron}
+            />
+          </View>
+        </TouchableRipple>
+      </View>
 
-      <TouchableRipple
-        ref={touchableRef}
-        onPress={openMenu}
-        borderless={false}
-        style={[
-          styles.dropdown,
-          size === "small" && styles.dropdownSmall,
-          {
-            borderColor: resolvedBorderColor,
-            borderRadius,
-          },
-          customCardStyle,
-        ]}
-      >
-        <View style={[styles.dropdownContent, size === "small" && styles.dropdownContentSmall]}>
-          <AppTypography
-            variant="body"
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={closeMenu}>
+        <Pressable style={styles.modalOverlay} onPress={closeMenu}>
+          <Pressable
+            onPress={(event) => event.stopPropagation()}
             style={[
-              styles.dropdownText,
-              size === "small" && styles.dropdownTextSmall,
-              { color: selectedOption ? theme.colors.onSurfaceVariant : "#7c878d" },
+              styles.dropdownMenu,
+              {
+                top: dropdownTop,
+                left: anchorLayout.x,
+                width: anchorLayout.width,
+                maxHeight: dropdownHeight,
+              },
             ]}
-            numberOfLines={1}
           >
-            {selectedOption ? selectedOption.label : placeholder}
-          </AppTypography>
-          <AppTypography variant="body" color={theme.colors.outline} style={styles.chevron}>
-            ▼
-          </AppTypography>
-        </View>
-      </TouchableRipple>
+            <ScrollView
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+              style={styles.optionsList}
+            >
+              {options.map((option) => {
+                const isSelected = option.value === value;
+
+                return (
+                  <Pressable
+                    key={option.value}
+                    style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+                    onPress={() => {
+                      onSelect(option.value);
+                      closeMenu();
+                    }}
+                  >
+                    <AppTypography
+                      variant="body"
+                      style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                      numberOfLines={1}
+                    >
+                      {option.label}
+                    </AppTypography>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {errorText ? (
         <AppTypography variant="caption" color={theme.colors.error} style={styles.errorText}>
@@ -169,5 +227,42 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 4,
     marginLeft: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+  },
+  dropdownMenu: {
+    position: "absolute",
+    overflow: "hidden",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#d8e5e5",
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+  },
+  optionsList: {
+    width: "100%",
+  },
+  optionRow: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+  },
+  optionRowSelected: {
+    backgroundColor: "#eef8f7",
+  },
+  optionText: {
+    color: "#1f2a2d",
+    fontSize: 14,
+  },
+  optionTextSelected: {
+    color: "#2e7d74",
+    fontWeight: "700",
   },
 });

@@ -18,17 +18,18 @@ import PatientProfileLayout from '../features/profile/patient/PatientProfileLayo
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/setting/SettingPage'
-import WelcomePage from '../features/auth/WelcomePage'
 import AccountPage from '../features/auth/AccountPage'
 import PatientPayment from '../features/patientPayment/PatientPayment'
 import SearchPage from '../features/doctor/search/SearchPage'
+import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
-
-const PaymentStack = createNativeStackNavigator()
 
 function AuthenticatedNavigator() {
   return (
-    <AppStack.Navigator screenOptions={{ headerShown: false }}>
+    <AppStack.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName={ROUTES.MAIN.TABS}
+    >
       
       <AppStack.Screen
         name={ROUTES.MAIN.TABS}
@@ -79,7 +80,7 @@ function AuthenticatedNavigator() {
 
       <AppStack.Screen
         name={ROUTES.STACK.DOCTOR_WELCOME}
-        component={WelcomePage}
+        component={WelcomeDoctorPage}
         options={{ animation: 'none' }}
       />
 
@@ -107,5 +108,9 @@ export default function AppNavigator() {
 		)
 	}
 
-	return <NavigationContainer ref={navigationRef}>{accessToken == null ? <AuthNavigator /> : <AuthenticatedNavigator />}</NavigationContainer>
+	return (
+		<NavigationContainer ref={navigationRef}>
+			{accessToken == null ? <AuthNavigator /> : <AuthenticatedNavigator />}
+		</NavigationContainer>
+	)
 }

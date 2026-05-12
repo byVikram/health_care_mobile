@@ -12,7 +12,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography, DateSlotPicker } from '../../../../components/common'
+import { AppTypography } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -37,6 +37,7 @@ type HospitalItem = HospitalFormData & {
 }
 
 type AppointmentType = 'clinic' | 'video'
+type WorkingDayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
 type TimeSlot = { start: string; end: string }
 type SectionSlots = {
 	morning: TimeSlot[]
@@ -57,6 +58,16 @@ const EMPTY_FORM: HospitalFormData = {
 }
 
 const TEAL = '#0c7c7c'
+
+const WORKING_DAYS: { key: WorkingDayKey; label: string }[] = [
+	{ key: 'sunday', label: 'Sun' },
+	{ key: 'monday', label: 'Mon' },
+	{ key: 'tuesday', label: 'Tue' },
+	{ key: 'wednesday', label: 'Wed' },
+	{ key: 'thursday', label: 'Thu' },
+	{ key: 'friday', label: 'Fri' },
+	{ key: 'saturday', label: 'Sat' },
+]
 
 const getSuccessMessage = (response: unknown, fallback = 'Hospital saved successfully') => {
 	if (
@@ -136,24 +147,29 @@ const SECTION_META = [
 		endHour: 21,
 	},
 ]
-const INITIAL_WORKING_HOURS: Record<AppointmentType, WorkingHoursState> = {
-	clinic: {
-		sections: {
-			morning: [{ start: '08:00', end: '10:00' }],
-			afternoon: [{ start: '12:00', end: '14:00' }],
-			evening: [{ start: '17:00', end: '19:00' }],
-		},
-		slotDuration: 15,
+const createWorkingHoursState = (): WorkingHoursState => ({
+	sections: {
+		morning: [{ start: '08:00', end: '10:00' }],
+		afternoon: [{ start: '12:00', end: '14:00' }],
+		evening: [{ start: '17:00', end: '19:00' }],
 	},
-	video: {
-		sections: {
-			morning: [{ start: '08:00', end: '10:00' }],
-			afternoon: [{ start: '12:00', end: '14:00' }],
-			evening: [{ start: '17:00', end: '19:00' }],
-		},
-		slotDuration: 15,
-	},
-}
+	slotDuration: 15,
+})
+
+const createWorkingHoursByType = (): Record<AppointmentType, WorkingHoursState> => ({
+	clinic: createWorkingHoursState(),
+	video: createWorkingHoursState(),
+})
+
+const createWeeklyWorkingHours = (): Record<WorkingDayKey, Record<AppointmentType, WorkingHoursState>> => ({
+	monday: createWorkingHoursByType(),
+	tuesday: createWorkingHoursByType(),
+	wednesday: createWorkingHoursByType(),
+	thursday: createWorkingHoursByType(),
+	friday: createWorkingHoursByType(),
+	saturday: createWorkingHoursByType(),
+	sunday: createWorkingHoursByType(),
+})
 
 const buildHospitalPayload = (hospital: HospitalItem, isPrimary = hospital.isPrimary) => ({
 	name: hospital.name.trim(),
@@ -326,8 +342,8 @@ function WorkingHoursRow({
 }
 
 function WorkingHoursSection({
-	selectedDate,
-	onDateChange,
+	selectedWorkingDay,
+	onWorkingDayChange,
 	selectedAppointmentType,
 	onAppointmentTypeChange,
 	selectedWorkingHours,
@@ -337,8 +353,8 @@ function WorkingHoursSection({
 	onSlotDurationChange,
 	stacked,
 }: {
-	selectedDate: Date
-	onDateChange: (date: Date) => void
+	selectedWorkingDay: WorkingDayKey
+	onWorkingDayChange: (day: WorkingDayKey) => void
 	selectedAppointmentType: AppointmentType
 	onAppointmentTypeChange: (type: AppointmentType) => void
 	selectedWorkingHours: WorkingHoursState
@@ -354,17 +370,34 @@ function WorkingHoursSection({
 				Working Hours
 			</AppTypography>
 
-			<View style={styles.datePickerWrap}>
-				<DateSlotPicker
-					selectedDate={selectedDate}
-					onDateChange={onDateChange}
-					selectedTime={null}
-					onTimeChange={() => undefined}
-					availableSlots={[]}
-					dateLabel="Select Date"
-					showTimeSlots={false}
-				/>
-			</View>
+			<ScrollView
+				horizontal
+				nestedScrollEnabled
+				directionalLockEnabled
+				showsHorizontalScrollIndicator={false}
+				style={styles.daysScroll}
+				contentContainerStyle={[styles.daysWrap, styles.daysWrapScrollable, stacked && styles.daysWrapCompact]}
+				onMoveShouldSetResponderCapture={() => true}
+			>
+				{WORKING_DAYS.map((day) => {
+					const isSelected = selectedWorkingDay === day.key
+					return (
+						<TouchableOpacity
+							key={day.key}
+							style={[styles.dayChip, stacked && styles.dayChipCompact, isSelected && styles.dayChipActive]}
+							onPress={() => onWorkingDayChange(day.key)}
+							activeOpacity={0.85}
+						>
+							<AppTypography
+								variant="body"
+								style={[styles.dayChipText, stacked && styles.dayChipTextCompact, isSelected && styles.dayChipTextActive]}
+							>
+								{day.label}
+							</AppTypography>
+						</TouchableOpacity>
+					)
+				})}
+			</ScrollView>
 
 			<View style={styles.appointmentTypeBlock}>
 				<AppTypography variant="caption" style={styles.appointmentTypeLabel}>
@@ -402,9 +435,10 @@ function WorkingHoursSection({
 				{SECTION_META.map((section) => {
 					const slots = selectedWorkingHours.sections[section.key]
 					const canAdd = slots.length < 3
+					const isLastSection = section.key === SECTION_META[SECTION_META.length - 1].key
 
 					return (
-						<View key={section.key} style={styles.shiftBlock}>
+						<View key={section.key} style={[styles.shiftBlock, isLastSection && styles.shiftBlockLast]}>
 							<AppTypography variant="caption" style={styles.shiftTitle}>
 								{section.label}
 							</AppTypography>
@@ -419,7 +453,14 @@ function WorkingHoursSection({
 									const showAdd = slotIndex === slots.length - 1 && canAdd
 
 									return (
-										<View key={`${section.key}-${slotIndex}`} style={[styles.slotEditor, stacked && styles.slotEditorStacked]}>
+										<View
+											key={`${section.key}-${slotIndex}`}
+											style={[
+												styles.slotEditor,
+												slotIndex < slots.length - 1 && styles.slotEditorSpaced,
+												stacked && styles.slotEditorStacked,
+											]}
+										>
 											<View style={[styles.slotSelects, stacked && styles.slotSelectsStacked]}>
 												<View style={styles.slotSelectCell}>
 													<DropdownSelect
@@ -441,25 +482,27 @@ function WorkingHoursSection({
 												</View>
 											</View>
 
-											{showAdd ? (
-												<TouchableOpacity
-													style={styles.addSlotButton}
-													onPress={() => onAddSlot(section.key)}
-													activeOpacity={0.8}
-												>
-													<MaterialCommunityIcons name="plus" size={18} color={TEAL} />
-												</TouchableOpacity>
-											) : null}
+											<View style={styles.slotActions}>
+												{showAdd ? (
+													<TouchableOpacity
+														style={styles.addSlotButton}
+														onPress={() => onAddSlot(section.key)}
+														activeOpacity={0.8}
+													>
+														<MaterialCommunityIcons name="plus" size={21} color={TEAL} style={styles.slotActionIcon} />
+													</TouchableOpacity>
+												) : null}
 
-											{slotIndex > 0 ? (
-												<TouchableOpacity
-													style={styles.iconAction}
-													onPress={() => onRemoveSlot(section.key, slotIndex)}
-													activeOpacity={0.8}
-												>
-													<MaterialCommunityIcons name="close" size={16} color="#62707a" />
-												</TouchableOpacity>
-											) : null}
+												{slotIndex > 0 ? (
+													<TouchableOpacity
+														style={styles.iconAction}
+														onPress={() => onRemoveSlot(section.key, slotIndex)}
+														activeOpacity={0.8}
+													>
+														<MaterialCommunityIcons name="close" size={21} color="#62707a" style={styles.slotActionIcon} />
+													</TouchableOpacity>
+												) : null}
+											</View>
 										</View>
 									)
 								})}
@@ -532,6 +575,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const isLandscape = width > height
 	const isMobile = width < 768
 	const useTwoColumns = width >= 768
+	const useWideHospitalRows = isLandscape && width >= 1024
 
 	const [showForm, setShowForm] = useState(false)
 	const [form, setForm] = useState<HospitalFormData>(EMPTY_FORM)
@@ -541,11 +585,9 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const [isLoading, setIsLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [isSavingAddress, setIsSavingAddress] = useState(false)
-	const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+	const [selectedWorkingDay, setSelectedWorkingDay] = useState<WorkingDayKey>('monday')
 	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentType>('clinic')
-	const [workingHoursByType, setWorkingHoursByType] = useState<Record<AppointmentType, WorkingHoursState>>(
-		INITIAL_WORKING_HOURS
-	)
+	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState(createWeeklyWorkingHours)
 	const [followUpDays, setFollowUpDays] = useState(7)
 	const [rescheduleCutoff, setRescheduleCutoff] = useState(2)
 	const hospitalsRef = useRef<HospitalItem[]>([])
@@ -606,16 +648,17 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}, [externalHospitals])
 
 	const contentWidth = useMemo(() => {
-		if (width >= 1280) return 980
-		if (width >= 1024) return 920
-		if (width >= 768) return 820
+		if (width >= 1366) return 1120
+		if (width >= 1180) return 1040
+		if (width >= 1024) return 960
+		if (width >= 768) return Math.min(width - 48, 860)
 		return 640
 	}, [width])
 
-	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
-	const cardDirection = isMobile ? 'column' : 'row'
-	const actionStacked = isMobile || (isTablet && !isLandscape)
-	const selectedWorkingHours = workingHoursByType[selectedAppointmentType]
+	const sectionPadding = isMobile ? 16 : isTablet ? 24 : 28
+	const cardDirection = useWideHospitalRows ? 'row' : 'column'
+	const actionStacked = !useWideHospitalRows
+	const selectedWorkingHours = weeklyWorkingHours[selectedWorkingDay][selectedAppointmentType]
 
 	const resetForm = () => {
 		setForm(EMPTY_FORM)
@@ -624,8 +667,8 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}
 
 	const addSlot = (sectionKey: keyof SectionSlots) => {
-		setWorkingHoursByType((prev) => {
-			const current = prev[selectedAppointmentType]
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
 			const slots = current.sections[sectionKey]
 			if (slots.length >= 3) return prev
 
@@ -638,11 +681,14 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 
 			return {
 				...prev,
-				[selectedAppointmentType]: {
-					...current,
-					sections: {
-						...current.sections,
-						[sectionKey]: [...slots, { start: previousEnd, end: newEnd }],
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						...current,
+						sections: {
+							...current.sections,
+							[sectionKey]: [...slots, { start: previousEnd, end: newEnd }],
+						},
 					},
 				},
 			}
@@ -650,17 +696,20 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}
 
 	const removeSlot = (sectionKey: keyof SectionSlots, slotIndex: number) => {
-		setWorkingHoursByType((prev) => {
-			const current = prev[selectedAppointmentType]
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
 			if (slotIndex === 0) return prev
 
 			return {
 				...prev,
-				[selectedAppointmentType]: {
-					...current,
-					sections: {
-						...current.sections,
-						[sectionKey]: current.sections[sectionKey].filter((_, index) => index !== slotIndex),
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						...current,
+						sections: {
+							...current.sections,
+							[sectionKey]: current.sections[sectionKey].filter((_, index) => index !== slotIndex),
+						},
 					},
 				},
 			}
@@ -673,18 +722,21 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		field: 'start' | 'end',
 		value: string
 	) => {
-		setWorkingHoursByType((prev) => {
-			const current = prev[selectedAppointmentType]
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
 
 			return {
 				...prev,
-				[selectedAppointmentType]: {
-					...current,
-					sections: {
-						...current.sections,
-						[sectionKey]: current.sections[sectionKey].map((slot, index) =>
-							index === slotIndex ? { ...slot, [field]: value } : slot
-						),
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						...current,
+						sections: {
+							...current.sections,
+							[sectionKey]: current.sections[sectionKey].map((slot, index) =>
+								index === slotIndex ? { ...slot, [field]: value } : slot
+							),
+						},
 					},
 				},
 			}
@@ -692,8 +744,8 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}
 
 	const updateSlotDuration = (value: number) => {
-		setWorkingHoursByType((prev) => {
-			const current = prev[selectedAppointmentType]
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
 			const snappedSections = Object.fromEntries(
 				Object.entries(current.sections).map(([sectionKey, slots]) => [
 					sectionKey,
@@ -706,9 +758,12 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 
 			return {
 				...prev,
-				[selectedAppointmentType]: {
-					sections: snappedSections,
-					slotDuration: value,
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						sections: snappedSections,
+						slotDuration: value,
+					},
 				},
 			}
 		})
@@ -869,7 +924,14 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		return (
 			<ScrollView
 				style={styles.container}
-				contentContainerStyle={[styles.contentContainer, { paddingHorizontal: sectionPadding, paddingVertical: sectionPadding }]}
+				contentContainerStyle={[
+					styles.contentContainer,
+					{
+						paddingHorizontal: sectionPadding,
+						paddingTop: sectionPadding,
+						paddingBottom: 0,
+					},
+				]}
 				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
 			>
@@ -928,8 +990,8 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						/>
 
 						<WorkingHoursSection
-							selectedDate={selectedDate}
-							onDateChange={setSelectedDate}
+							selectedWorkingDay={selectedWorkingDay}
+							onWorkingDayChange={setSelectedWorkingDay}
 							selectedAppointmentType={selectedAppointmentType}
 							onAppointmentTypeChange={setSelectedAppointmentType}
 							selectedWorkingHours={selectedWorkingHours}
@@ -941,7 +1003,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						/>
 
 						<View style={styles.appointmentRules}>
-							<AppTypography variant="body" style={styles.workingTitle}>
+							<AppTypography variant="body" style={[styles.workingTitle, styles.appointmentRulesTitle]}>
 								Appointment Rules
 							</AppTypography>
 
@@ -1003,7 +1065,16 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	return (
 		<Pressable style={styles.container} onPress={() => setMenuVisibleId(null)}>
 			<ScrollView
-				contentContainerStyle={[styles.contentContainer, { paddingHorizontal: sectionPadding, paddingVertical: sectionPadding }]}
+				style={styles.container}
+				contentContainerStyle={[
+					styles.contentContainer,
+					{
+						paddingHorizontal: sectionPadding,
+						paddingTop: sectionPadding,
+						paddingBottom: 0,
+					},
+				]}
+				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
 			>
 				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
@@ -1153,6 +1224,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 	},
 	contentContainer: {
+		flexGrow: 1,
 		alignItems: 'center',
 	},
 	contentShell: {
@@ -1222,6 +1294,7 @@ const styles = StyleSheet.create({
 	},
 	cardMain: {
 		flex: 1,
+		minWidth: 0,
 		borderWidth: 1,
 		borderColor: '#d7e2e5',
 		borderRadius: 10,
@@ -1268,6 +1341,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'stretch',
 		gap: 10,
+		flexShrink: 0,
 	},
 	actionGroupStacked: {
 		width: '100%',
@@ -1317,6 +1391,7 @@ const styles = StyleSheet.create({
 	},
 	menuWrapper: {
 		position: 'relative',
+		flexShrink: 0,
 	},
 	menuButton: {
 		width: 46,
@@ -1450,19 +1525,24 @@ const styles = StyleSheet.create({
 		alignSelf: 'flex-start',
 	},
 	workingTitle: {
-		color: '#001b3d',
-		fontSize: 18,
+		color: '#1f2b33',
+		fontSize: 16,
+		lineHeight: 22,
 		fontWeight: '700',
-		marginBottom: 20,
+		marginBottom: 16,
 	},
 	shiftBlock: {
-		marginBottom: 22,
+		marginBottom: 20,
+	},
+	shiftBlockLast: {
+		marginBottom: 14,
 	},
 	shiftTitle: {
-		color: '#496a80',
-		fontSize: 16,
-		fontWeight: '400',
-		marginBottom: 20,
+		color: '#7b8790',
+		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '500',
+		marginBottom: 16,
 	},
 	workingRow: {
 		flexDirection: 'row',
@@ -1479,18 +1559,74 @@ const styles = StyleSheet.create({
 	workingCellStacked: {
 		width: '100%',
 	},
-	datePickerWrap: {
-		marginHorizontal: -16,
+	daysWrap: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		justifyContent: 'space-between',
+		columnGap: 8,
+		rowGap: 10,
 		marginBottom: 24,
 	},
-	appointmentTypeBlock: {
-		marginBottom: 24,
+	daysWrapScrollable: {
+		flexWrap: 'nowrap',
+		justifyContent: 'flex-start',
+		paddingHorizontal: 2,
 	},
-	appointmentTypeLabel: {
+	daysScroll: {
+		marginHorizontal: -2,
+		marginBottom: 18,
+	},
+	daysWrapCompact: {
+		flexWrap: 'nowrap',
+		justifyContent: 'flex-start',
+		columnGap: 8,
+		rowGap: 0,
+		marginBottom: 0,
+		paddingHorizontal: 2,
+	},
+	dayChip: {
+		width: 96,
+		height: 78,
+		borderRadius: 14,
+		borderWidth: 1,
+		borderColor: '#d8d8d8',
+		backgroundColor: '#ffffff',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	dayChipCompact: {
+		width: 50,
+		height: 46,
+		borderRadius: 10,
+	},
+	dayChipActive: {
+		borderColor: TEAL,
+		backgroundColor: TEAL,
+	},
+	dayChipText: {
 		color: '#5f6b76',
 		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '600',
+	},
+	dayChipTextCompact: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '600',
+	},
+	dayChipTextActive: {
+		color: '#ffffff',
+		fontWeight: '700',
+	},
+	appointmentTypeBlock: {
+		marginBottom: 18,
+	},
+	appointmentTypeLabel: {
+		color: '#7b8790',
+		fontSize: 14,
+		lineHeight: 20,
 		fontWeight: '500',
-		marginBottom: 12,
+		marginBottom: 10,
 	},
 	segmentedControl: {
 		alignSelf: 'flex-start',
@@ -1511,69 +1647,91 @@ const styles = StyleSheet.create({
 	},
 	segmentedText: {
 		color: '#ffffff',
-		fontSize: 13,
+		fontSize: 14,
+		lineHeight: 18,
 		fontWeight: '600',
 	},
 	segmentedTextActive: {
 		color: '#111111',
 	},
 	slotsWrap: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		flexWrap: 'wrap',
-		gap: 12,
+		flexDirection: 'column',
+		alignItems: 'flex-start',
+		width: '100%',
 	},
 	slotEditor: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 6,
-		marginBottom: 10,
+		gap: 8,
+		width: 342,
+		maxWidth: '100%',
+		marginBottom: 0,
 		overflow: 'visible',
 		flexWrap: 'nowrap',
 	},
+	slotEditorSpaced: {
+		marginBottom: 25,
+	},
 	slotEditorStacked: {
 		width: '100%',
-		alignItems: 'center',
+		alignItems: 'flex-start',
+		flexWrap: 'wrap',
 	},
 	slotSelects: {
 		flexDirection: 'row',
 		gap: 8,
-		width: 232,
-		maxWidth: '72%',
+		flex: 1,
+		minWidth: 0,
 		flexShrink: 1,
 	},
 	slotSelectsStacked: {
-		width: 222,
-		maxWidth: '68%',
+		width: '100%',
+		maxWidth: '100%',
 		marginBottom: 0,
 	},
 	slotSelectCell: {
 		flex: 1,
 		minWidth: 0,
 	},
+	slotActions: {
+		width: 72,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'flex-start',
+		gap: 8,
+		flexShrink: 0,
+	},
 	iconAction: {
-		width: 30,
-		height: 30,
-		borderRadius: 15,
+		width: 32,
+		height: 48,
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: '#a7d3db',
 		alignItems: 'center',
 		justifyContent: 'center',
+		backgroundColor: '#ffffff',
 		flexShrink: 0,
 	},
 	addSlotButton: {
 		width: 32,
-		height: 32,
-		borderRadius: 8,
+		height: 48,
+		borderRadius: 10,
 		borderWidth: 1,
-		borderColor: TEAL,
+		borderColor: '#a7d3db',
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#f7fcfc',
+		backgroundColor: '#ffffff',
 		flexShrink: 0,
 		zIndex: 2,
 		elevation: 2,
 	},
+	slotActionIcon: {
+		textAlign: 'center',
+		textAlignVertical: 'center',
+	},
 	slotDurationBlock: {
-		marginTop: 2,
+		marginTop: 0,
+		marginBottom: 0,
 	},
 	slotDurationField: {
 		width: 225,
@@ -1593,16 +1751,16 @@ const styles = StyleSheet.create({
 		zIndex: 2,
 		paddingHorizontal: 7,
 		backgroundColor: '#ffffff',
-		color: '#496a80',
+		color: '#7b8790',
 		fontSize: 14,
-		fontWeight: '400',
+		fontWeight: '500',
 		lineHeight: 18,
 	},
 	dropdownTrigger: {
 		minHeight: 48,
-		borderRadius: 14,
+		borderRadius: 10,
 		borderWidth: 1,
-		borderColor: '#c4c4c4',
+		borderColor: '#a7d3db',
 		backgroundColor: '#ffffff',
 		paddingHorizontal: 20,
 		flexDirection: 'row',
@@ -1614,13 +1772,15 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 12,
 	},
 	dropdownValue: {
-		color: '#182b3d',
-		fontSize: 18,
+		color: '#2f2f2f',
+		fontSize: 14,
+		lineHeight: 20,
 		fontWeight: '400',
 	},
 	dropdownValueCompact: {
-		color: '#24384a',
+		color: '#2f2f2f',
 		fontSize: 14,
+		lineHeight: 20,
 		fontWeight: '400',
 	},
 	dropdownOverlay: {
@@ -1673,8 +1833,11 @@ const styles = StyleSheet.create({
 		color: TEAL,
 	},
 	appointmentRules: {
-		marginTop: 24,
-		gap: 18,
+		marginTop: 14,
+		gap: 14,
+	},
+	appointmentRulesTitle: {
+		marginBottom: 0,
 	},
 	ruleBlock: {
 		width: '100%',
