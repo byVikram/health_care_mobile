@@ -13,7 +13,7 @@ import MainTabNavigator from './MainTabNavigator'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
-import ConsultationPage from '../features/consultation/ConsultationPage'
+// import ConsultationPage from '../features/consultation/ConsultationPage'
 import PatientProfileLayout from '../features/profile/patient/PatientProfileLayout'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
@@ -63,10 +63,10 @@ function AuthenticatedNavigator() {
         component={NotificationPage}
       />
 
-      <AppStack.Screen
+      {/* <AppStack.Screen
         name={ROUTES.STACK.CONSULTATION}
         component={ConsultationPage}
-      />
+      /> */}
 
       <AppStack.Screen
         name={ROUTES.STACK.HEALTH_PROFILE}
@@ -110,7 +110,11 @@ export default function AppNavigator() {
 
 	return (
 		<NavigationContainer ref={navigationRef}>
-			{accessToken == null ? <AuthNavigator /> : <AuthenticatedNavigator />}
+			{!accessToken ? (
+				<AuthNavigator />
+			) : (
+				<AuthenticatedNavigator />
+			)}
 		</NavigationContainer>
 	)
 }

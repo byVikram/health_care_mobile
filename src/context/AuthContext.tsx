@@ -2,7 +2,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-export type UserRole = 'doctor' | 'patient'
+export type UserRole = 'doctor' | 'patient' | 'pharmacy'
 
 export interface AuthUser {
   id?: string
@@ -39,7 +39,7 @@ export interface AuthState {
 
 const AuthContext = createContext<AuthState>({} as AuthState)
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {  
   const [role, setRole] = useState<UserRole | null>(null)
   const [user, setUser] = useState<AuthUser | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)

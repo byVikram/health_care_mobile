@@ -34,7 +34,7 @@ const commonScreens: OnboardingScreen[] = [
 ]
 
 export const onboardingData: OnboardingConfig = {
-   "a1b2c3d4-0001-0001-0001-000000000001": {
+   "550e8400-e29b-41d4-a716-446655440000": {
     screens: [
       {
         Illustration: Onboarding1,
@@ -49,7 +49,7 @@ export const onboardingData: OnboardingConfig = {
     ],
   },
 
-   "a1b2c3d4-0002-0002-0002-000000000002": {
+   "123e4567-e89b-12d3-a456-426614174000": {
     screens: [
       {
         Illustration: Onboarding1,
@@ -64,4 +64,49 @@ export const onboardingData: OnboardingConfig = {
       ...commonScreens,
     ],
   },
-}
+  "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
+      screens: [
+        {
+          Illustration: Onboarding1,
+          description:  'Get lab tests directly from doctors and deliver it for patients instantly',
+        },
+        {
+          Illustration: Onboarding2,
+          description:
+            'Get lab tests directly from patients and deliver it for them instantly',
+        },
+        ...commonScreens,
+      ],
+    },
+  "9f8c7b6a-1234-4abc-89de-1234567890ab": {
+    screens: [
+      {
+        Illustration: Onboarding1,
+        description:  'Get orders directly from doctors and pack it for patients instantly',
+      },
+      {
+        Illustration: Onboarding2,
+        description:
+          'Get orders directly from patients and pack it for them instantly',
+      },  
+      ...commonScreens,
+    ],
+    },
+    
+    "7d444840-9dc0-11d1-b245-5ffdce74fad2": {
+      screens: [
+        {
+				Illustration: Onboarding1,
+				description:
+					'Manage radiology scan appointments and schedules efficiently',
+			},
+			{
+				Illustration: Onboarding2,
+				description:
+					'Upload scan reports and imaging results securely',
+			},
+        ...commonScreens,
+      ],
+    },
+  }
+

@@ -71,8 +71,13 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
             }
 
             const normalizedRole = String(response.data.user?.role || '').toLowerCase()
-            const role: UserRole = normalizedRole === 'doctor' ? 'doctor' : 'patient'
-
+            
+const role: UserRole =
+    normalizedRole === 'doctor'
+        ? 'doctor'
+        : normalizedRole === 'pharmacy'
+        ? 'pharmacy'
+        : 'patient'
             await setAuth(
                 role,
                 {

@@ -44,16 +44,36 @@ export default function AppHeader({
 
   const isDoctor = role === 'doctor'
   const isPatient = role === 'patient'
+  const isPharmacy = role === 'pharmacy'
 
-  const displayName = user?.name || 'User'
+  // ── Display name ──────────────────────────────────────────────────────────
+  // FIX: user.name is "" (empty string) for pharmacy — must check trim().length
+  // so we fall through to the email prefix instead of rendering blank.
+  const u = user as any
+  let displayName = 'User'
+  if (u?.name && u.name.trim().length > 0) {
+    displayName = u.name.trim()
+  } else if (u?.pharmacy_name && u.pharmacy_name.trim().length > 0) {
+    displayName = u.pharmacy_name.trim()
+  } else if (u?.business_name && u.business_name.trim().length > 0) {
+    displayName = u.business_name.trim()
+  } else if (u?.email) {
+    displayName = u.email.split('@')[0]
+  }
+
+  // Location for pharmacy
+  const pharmacyLocation = u?.location || selectedHospital || 'Select Location'
+
+  const handlePharmacyLocationPress = () => {
+    console.log('Open pharmacy location selector')
+  }
 
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top + 16 }]}>
 
-      {/* TOP */}
+      {/* TOP ROW: Avatar + Greeting + Notification (pharmacy only) */}
       <View style={styles.topRow}>
         <Pressable onPress={onAvatarPress} style={styles.profileRow}>
-
           <Image
             source={
               avatarUri
@@ -69,9 +89,13 @@ export default function AppHeader({
               {displayName}
             </Text>
 
-            {/* ROLE BASED LOCATION DISPLAY */}
+            {/* Role-specific subtext */}
             {isDoctor ? (
               <DoctorHospitalDropdown />
+            ) : isPharmacy ? (
+              <Pressable onPress={handlePharmacyLocationPress}>
+                <Text style={styles.subText}>{pharmacyLocation}</Text>
+              </Pressable>
             ) : (
               <Text style={styles.subText}>
                 {selectedHospital || 'K R Market' || 'Select Location'}
@@ -79,10 +103,21 @@ export default function AppHeader({
             )}
           </View>
         </Pressable>
+
+        {/* Notification Icon – only for pharmacy */}
+        {isPharmacy && (
+          <Pressable
+            onPress={() => navigation.navigate(ROUTES.STACK.NOTIFICATION)}
+            style={styles.notificationIcon}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialCommunityIcons name="bell-outline" size={24} color="#6fe3e8" />
+          </Pressable>
+        )}
       </View>
 
-      {/* SEARCH ONLY FOR PATIENT */}
-      {isPatient ? (
+      {/* SEARCH BAR – role based */}
+      {isPatient && (
         variant === 'home' ? (
           <Pressable
             style={styles.searchContainer}
@@ -96,7 +131,6 @@ export default function AppHeader({
         ) : (
           <View style={styles.searchContainer}>
             <MaterialCommunityIcons name="magnify" size={22} color="#26727a" />
-
             <TextInput
               style={styles.searchInput}
               placeholder="Search Doctors / Symptoms"
@@ -107,7 +141,21 @@ export default function AppHeader({
             />
           </View>
         )
-      ) : null}
+      )}
+
+      {isPharmacy && (
+        <View style={styles.searchContainer}>
+          <MaterialCommunityIcons name="magnify" size={22} color="#26727a" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search order ID"
+            value={searchValue}
+            onChangeText={onSearchChange}
+            onSubmitEditing={onSearchSubmit}
+            editable={isSearchEditable}
+          />
+        </View>
+      )}
 
     </View>
   )
@@ -125,6 +173,7 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
 
   profileRow: {
@@ -154,6 +203,11 @@ const styles = StyleSheet.create({
     color: '#d7e7e8',
     fontSize: 13,
     marginTop: 2,
+  },
+
+  notificationIcon: {
+    marginLeft: 12,
+    padding: 4,
   },
 
   searchContainer: {

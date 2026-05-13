@@ -1,12 +1,17 @@
 ﻿import React, { useEffect, useState } from 'react'
-import { ScrollView, StyleSheet, TouchableOpacity, Text, View, useWindowDimensions } from 'react-native'
-import { useTheme } from 'react-native-paper'
+import {
+	ScrollView,
+	StyleSheet,
+	TouchableOpacity,
+	Text,
+	View,
+	useWindowDimensions,
+} from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import HeroSection from './HeroSection'
 import SpecialitySection from './SpecialitySection'
 import ConsultSection from './ConsultSection'
-// import CommunityBlogsSection from './CommunityBlogsSection'
 import PatientQuestionsSection from './PatientQuestionsSection'
 import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
 import CommunitySection from './CommunitySection'
@@ -23,16 +28,13 @@ import TreatmentHistoryIcon from '../../assets/icons/treatmenthistory.svg'
 import TreatmentHistoryArrowIcon from '../../assets/icons/treatmenthistory-icon.svg'
 import { ROUTES } from '../../navigation/routes'
 import type { AppNavigationParamList } from '../../navigation/types'
-// import AppPayment from '../../components/common/AppPayment'
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
-	// const isTablet = width >= 768
 	const isTablet = width >= 768
 	const isLandscape = width > 1024
 
 	const { role } = useAuth()
-	const isDoctor = role === USER_ROLES.DOCTOR
 	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
 
 	const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -42,6 +44,7 @@ export default function DashboardPage() {
 
 	const [selectedDate, setSelectedDate] = useState(0)
 
+	// ---------------- WEEK DAYS ----------------
 	const buildWeekDays = () => {
 		const today = new Date()
 		const days = []
@@ -61,15 +64,18 @@ export default function DashboardPage() {
 
 	const [weekDays] = useState(() => buildWeekDays())
 
+	// ---------------- DOCTOR API ----------------
 	useEffect(() => {
-		if (!isDoctor) return
+		if (role !== USER_ROLES.DOCTOR) return
 
 		const fetchAppointments = async () => {
 			try {
 				setApptLoading(true)
 				setApptError('')
 
-				const dateStr = formatDateForApi(weekDays[selectedDate]?.dateObj ?? new Date())
+				const dateStr = formatDateForApi(
+					weekDays[selectedDate]?.dateObj ?? new Date()
+				)
 
 				const res = await getAppointments({
 					appointment_date: dateStr,
@@ -88,12 +94,9 @@ export default function DashboardPage() {
 		}
 
 		fetchAppointments()
-	}, [isDoctor, selectedDate, weekDays])
+	}, [role, selectedDate, weekDays])
 
-	function handleRetry() {
-		setModalType(null)
-	}
-
+	// ---------------- DOCTOR PANEL ----------------
 	const renderDoctorPanel = () => (
 		<DoctorAppointments
 			selectedDate={selectedDate}
@@ -106,12 +109,15 @@ export default function DashboardPage() {
 		/>
 	)
 
+	// ---------------- PATIENT PANEL ----------------
 	const renderUserPanel = () => (
 		<>
-			<TouchableOpacity activeOpacity={0.85} style={styles.treatmentHistoryCard}>
+			<TouchableOpacity style={styles.treatmentHistoryCard}>
 				<View style={styles.treatmentHistoryLeft}>
 					<TreatmentHistoryIcon width={52} height={52} />
-					<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
+					<Text style={styles.treatmentHistoryTitle}>
+						Treatment History
+					</Text>
 				</View>
 				<TreatmentHistoryArrowIcon width={26} height={26} />
 			</TouchableOpacity>
@@ -136,9 +142,46 @@ export default function DashboardPage() {
 
 			<SpecialitySection />
 			<ConsultSection />
-			{/* <AppPayment /> */}
 		</>
 	)
+
+	// ---------------- PHARMACY PANEL ----------------
+	const renderPharmacyPanel = () => (
+		<>
+			<TouchableOpacity style={styles.treatmentHistoryCard}>
+				<Text style={styles.treatmentHistoryTitle}>
+					📦 Inventory Management
+				</Text>
+			</TouchableOpacity>
+
+			<TouchableOpacity style={styles.treatmentHistoryCard}>
+				<Text style={styles.treatmentHistoryTitle}>
+					🧾 Orders
+				</Text>
+			</TouchableOpacity>
+
+			<TouchableOpacity style={styles.treatmentHistoryCard}>
+				<Text style={styles.treatmentHistoryTitle}>
+					💊 Upload Medicines
+				</Text>
+			</TouchableOpacity>
+		</>
+	)
+
+	// ---------------- CONDITIONAL HERO SECTION ----------------
+	const shouldShowHero = role !== USER_ROLES.PHARMACY
+
+	// ---------------- ROLE-BASED RIGHT PANEL ----------------
+	const renderRoleBasedPanel = () => {
+		switch (role) {
+			case USER_ROLES.DOCTOR:
+				return renderDoctorPanel()
+			case USER_ROLES.PHARMACY:
+				return renderPharmacyPanel()
+			default:
+				return renderUserPanel()
+		}
+	}
 
 	return (
 		<>
@@ -150,53 +193,54 @@ export default function DashboardPage() {
 				{/* MAIN RESPONSIVE LAYOUT */}
 				{isTablet ? (
 					<View style={styles.tabletRow}>
-						{/* HERO SECTION - Left Column */}
-						<View style={[styles.heroColumn, isLandscape && styles.heroColumnHalf]}>
-							<HeroSection />
-						</View>
+						{/* HERO SECTION (hidden for pharmacy) */}
+						{shouldShowHero && (
+							<View
+								style={[
+									styles.heroColumn,
+									isLandscape && styles.heroColumnHalf,
+								]}
+							>
+								<HeroSection />
+							</View>
+						)}
 
-						{/* RIGHT SIDE - Appointments/Treatment History */}
-						<View style={[styles.column, isLandscape && styles.rightColumnHalf]}>
-							{isDoctor ? renderDoctorPanel() : renderUserPanel()}
+						{/* RIGHT PANEL (appointments / pharmacy cards) */}
+						<View
+							style={[
+								styles.column,
+								isLandscape && styles.rightColumnHalf,
+								!shouldShowHero && styles.fullColumn,
+							]}
+						>
+							{renderRoleBasedPanel()}
 						</View>
 					</View>
 				) : (
 					<>
-						{/* Mobile View - Hero then panels stacked */}
-						<HeroSection />
-						{isDoctor ? renderDoctorPanel() : renderUserPanel()}
+						{/* Mobile: Hero only if not pharmacy */}
+						{shouldShowHero && <HeroSection />}
+						{renderRoleBasedPanel()}
 					</>
 				)}
 
-				{/* COMMON SECTIONS */}
+				{/* COMMON SECTIONS - always visible */}
 				<CommunitySection />
-                <BlogsSection />
+				<BlogsSection />
 				<PatientQuestionsSection />
 			</ScrollView>
 
 			<StatusModal
 				visible={modalType !== null}
 				status={modalType === 'success' ? 'success' : 'error'}
-				title={modalType === 'success' ? 'Your appointment is successfully booked' : 'Booking Failed'}
+				title={modalType === 'success' ? 'Success' : 'Booking Failed'}
 				description={
 					modalType === 'success'
-						? 'The update will appear in your profile.'
-						: 'Something went wrong. Please try again.'
+						? 'Updated successfully'
+						: 'Something went wrong'
 				}
 				submitText={modalType === 'success' ? 'Go Home' : 'Try Again'}
-				cancelText={modalType === 'error' ? 'Go Home' : undefined}
-				onSubmit={() => {
-					if (modalType === 'success') {
-						setModalType(null)
-						navigation.navigate(ROUTES.MAIN.HOME)
-					} else {
-						handleRetry()
-					}
-				}}
-				onCancel={() => {
-					setModalType(null)
-					navigation.navigate(ROUTES.MAIN.HOME)
-				}}
+				onSubmit={() => setModalType(null)}
 			/>
 		</>
 	)
@@ -228,19 +272,30 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 
+	heroColumn: {
+		flex: 1,
+	},
+
+	heroColumnHalf: {
+		flex: 0.5,
+	},
+
+	rightColumnHalf: {
+		flex: 0.5,
+	},
+
+	fullColumn: {
+		flex: 1,
+	},
+
 	treatmentHistoryCard: {
 		marginHorizontal: 16,
 		marginTop: 8,
-		marginBottom: 12,
-		minHeight: 64,
-		paddingHorizontal: 12,
+		padding: 14,
 		borderWidth: 1,
 		borderColor: '#CFDBDD',
 		borderRadius: 10,
 		backgroundColor: '#fff',
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
 	},
 
 	treatmentHistoryLeft: {
@@ -253,17 +308,5 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '500',
 		color: '#30353A',
-	},
-
-	heroColumn: {
-		flex: 1,
-	},
-
-	heroColumnHalf: {
-		flex: 0.5, // Adjust ratio as needed
-	},
-
-	rightColumnHalf: {
-		flex: 0.5, // Adjust ratio as needed
 	},
 })
