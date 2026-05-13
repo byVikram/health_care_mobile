@@ -20,7 +20,7 @@ import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import MyHospitalsTab from './tabs/MyHospitalsTab'
 import AvailabilityTab from './tabs/AvailabilityTab'
-import AchievementsTab from './tabs/AchievementsTab'
+// import AchievementsTab from './tabs/AchievementsTab'
 import FavouriteDoctorsTab from './tabs/FavouriteDoctorsTab'
 import SettingsTab from './tabs/SettingsTab'
 
@@ -29,7 +29,7 @@ const TABS = [
 	{ key: 'professional', label: 'Professional details', Component: ProfessionalDetailsTab },
 	{ key: 'hospitals', label: 'My hospitals', Component: MyHospitalsTab },
 	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
-	{ key: 'achievements', label: 'Achievements', Component: AchievementsTab },
+	// { key: 'achievements', label: 'Achievements', Component: AchievementsTab },
 	{ key: 'favourites', label: 'Favourite doctors', Component: FavouriteDoctorsTab },
 	{ key: 'settings', label: 'Settings', Component: SettingsTab },
 ]

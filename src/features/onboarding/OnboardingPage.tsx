@@ -49,8 +49,8 @@ export default function OnboardingPage({ navigation, route }: OnboardingPageProp
 
 	const { roleId, roleLabel } = route.params || {}
 
-	const resolvedRoleId = roleId ?? ''
-	const resolvedRoleLabel = roleLabel ?? ''
+const resolvedRoleId = roleId?.toLowerCase() ?? ''
+const resolvedRoleLabel = roleLabel ?? ''
 
 	// 🚨 Redirect if no role
 	useEffect(() => {

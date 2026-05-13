@@ -1,36 +1,150 @@
-import React, { useState } from "react";
-import { StyleSheet, View, Text } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useTheme } from "react-native-paper";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import AppHeader from "../../../components/common/AppHeader";
+import { AppTypography } from "../../../components/common";
+import { getSpecialities } from "../doctorService";
 import { ROUTES } from "../../../navigation/routes";
 import type { NavigationProp } from "@react-navigation/native";
 import type { AppStackParamList } from "../../../navigation/types";
 
-/**
- * SearchPage
- *
- * Shown after tapping the search bar on the Home screen.
- * The user types their query here and presses the keyboard's Search key
- * (or taps submit) to navigate to DoctorSearchPage with the query.
- *
- * Flow:  Home → SearchPage (type here) → DoctorSearchPage (results)
- */
+// ─── Icon map (extend as needed) ─────────────────────────────────────────────
+const SPECIALITY_ICON_MAP: Record<string, string> = {
+  all: "format-list-bulleted",
+  dentistry: "tooth-outline",
+  cardiology: "heart-multiple-outline",
+  orthopedic: "bone",
+  neurology: "brain",
+  kidney: "kidney",
+};
+
+type Speciality = {
+  id: string;
+  label: string;
+  icon: string;
+};
+
+// ─── Speciality Chip ──────────────────────────────────────────────────────────
+function SpecialityChip({
+  spec,
+  selected,
+  onPress,
+}: {
+  spec: Speciality;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <TouchableOpacity
+      style={styles.chipWrapper}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <View
+        style={[
+          styles.chipIconBox,
+          selected
+            ? { backgroundColor: theme.colors.primary }
+            : { backgroundColor: "#e8eef2" },
+        ]}
+      >
+        <MaterialCommunityIcons
+          name={spec.icon}
+          size={28}
+          color={selected ? "#ffffff" : theme.colors.primary}
+        />
+      </View>
+      <AppTypography
+        variant="caption"
+        style={[
+          styles.chipLabel,
+          { color: selected ? theme.colors.primary : "#888" },
+        ]}
+      >
+        {spec.label}
+      </AppTypography>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function SearchPage() {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
+  const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeSpec, setActiveSpec] = useState("all");
+  const [specialities, setSpecialities] = useState<Speciality[]>([
+    { id: "all", label: "All", icon: "format-list-bulleted" },
+  ]);
+  const [loadingSpecs, setLoadingSpecs] = useState(true);
 
+  // ── Fetch specialities on mount ──────────────────────────────────────────
+  useEffect(() => {
+    const loadSpecialities = async () => {
+      try {
+        const res = await getSpecialities();
+        if (res.success && res.data) {
+          const specMap: Speciality[] = res.data.map((s) => {
+            const label = s.label.toLowerCase().trim();
+            const icon =
+              SPECIALITY_ICON_MAP[label] ??
+              (label.includes("dent") ? "tooth-outline" : "medical-bag");
+            return { id: s.id, label: s.label, icon };
+          });
+          setSpecialities([
+            { id: "all", label: "All", icon: "format-list-bulleted" },
+            ...specMap,
+          ]);
+        }
+      } catch (error) {
+        console.error("Error fetching specialities:", error);
+      } finally {
+        setLoadingSpecs(false);
+      }
+    };
+    loadSpecialities();
+  }, []);
+
+  // ── Navigate to results ──────────────────────────────────────────────────
+  // Called when user presses Search keyboard key
   const handleSearchSubmit = () => {
     const trimmed = searchQuery.trim();
     if (!trimmed) return;
-    navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, { query: trimmed });
+    navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
+      query: trimmed,
+      // pass chosen speciality so DoctorSearchPage can pre-select it
+      specialityId: activeSpec !== "all" ? activeSpec : undefined,
+    });
+  };
+
+  // Called when user taps a speciality chip
+  const handleSpecialityPress = (specId: string) => {
+    setActiveSpec(specId);
+    // Navigate immediately when a non-"All" chip is tapped
+    if (specId !== "all") {
+      navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
+        query: searchQuery.trim() || "",
+        specialityId: specId,
+      });
+    }
   };
 
   return (
     <View style={styles.container}>
       {/*
-        variant="search" → shows only location row + editable search bar.
-        autoFocus={true} (via isSearchEditable) opens keyboard immediately.
-        onSearchSubmit fires when the user presses the Search key.
+        variant="search" → shows location row + editable search bar.
+        Keyboard opens automatically because isSearchEditable=true.
       */}
       <AppHeader
         variant="search"
@@ -42,33 +156,111 @@ export default function SearchPage() {
         onSearchSubmit={handleSearchSubmit}
       />
 
-      {/* Empty state hint */}
+      {/* ── Specialities section ─────────────────────────────────────────── */}
+      <View style={styles.filterSection}>
+        <AppTypography variant="h4" style={styles.filterTitle}>
+          Search by Specialities
+        </AppTypography>
+
+        {loadingSpecs ? (
+          // Skeleton row while API loads
+          <View style={styles.loadingRow}>
+            {Array(5)
+              .fill(null)
+              .map((_, i) => (
+                <View key={i} style={styles.chipSkeletonWrapper}>
+                  <View
+                    style={[
+                      styles.chipIconBox,
+                      { backgroundColor: "#e8eef2" },
+                    ]}
+                  />
+                  <View style={styles.chipLabelSkeleton} />
+                </View>
+              ))}
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScroll}
+          >
+            {specialities.map((spec) => (
+              <SpecialityChip
+                key={spec.id}
+                spec={spec}
+                selected={activeSpec === spec.id}
+                onPress={() => handleSpecialityPress(spec.id)}
+              />
+            ))}
+          </ScrollView>
+        )}
+      </View>
+
+      {/* ── Empty-state hint ─────────────────────────────────────────────── */}
       <View style={styles.hintContainer}>
+        <MaterialCommunityIcons name="magnify" size={48} color="#d1d5db" />
+        <Text style={styles.hintTitle}>Find a doctor</Text>
         <Text style={styles.hintText}>
-          Type a doctor name, symptom, or speciality and press Search
+          Type a doctor name, symptom, or speciality and press Search — or tap
+          a speciality chip above to browse instantly.
         </Text>
       </View>
     </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f7fa",
+  container: { flex: 1, backgroundColor: "#f5f7fa" },
+
+  // Speciality filter
+  filterSection: { paddingTop: 20, paddingBottom: 8 },
+  filterTitle: { paddingHorizontal: 16, marginBottom: 14 },
+  filterScroll: { paddingHorizontal: 16, gap: 14 },
+
+  // Chip
+  chipWrapper: { alignItems: "center", gap: 8, width: 72 },
+  chipIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  chipLabel: { fontSize: 11, textAlign: "center" },
+
+  // Skeleton placeholders
+  loadingRow: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 14,
+  },
+  chipSkeletonWrapper: { alignItems: "center", gap: 8, width: 72 },
+  chipLabelSkeleton: {
+    height: 10,
+    width: 48,
+    borderRadius: 4,
+    backgroundColor: "#e8eef2",
+  },
+
+  // Hint
   hintContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 32,
+    gap: 10,
+  },
+  hintTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#6b7280",
   },
   hintText: {
-    fontSize: 15,
+    fontSize: 14,
     color: "#9ca3af",
     textAlign: "center",
     lineHeight: 22,
   },
 });
-
-

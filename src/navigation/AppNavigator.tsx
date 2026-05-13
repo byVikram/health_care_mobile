@@ -13,7 +13,7 @@ import MainTabNavigator from './MainTabNavigator'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
-import ConsultationPage from '../features/consultation/ConsultationPage'
+// import ConsultationPage from '../features/consultation/ConsultationPage'
 import PatientProfileLayout from '../features/profile/patient/PatientProfileLayout'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
@@ -22,6 +22,7 @@ import AccountPage from '../features/auth/AccountPage'
 import PatientPayment from '../features/patientPayment/PatientPayment'
 import SearchPage from '../features/doctor/search/SearchPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
+import ConsultationPage from '../features/consultation/ConsultationPage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -72,7 +73,11 @@ export default function AppNavigator() {
 
 	return (
 		<NavigationContainer ref={navigationRef}>
-			{accessToken == null ? <AuthNavigator /> : <AuthenticatedNavigator />}
+			{!accessToken ? (
+				<AuthNavigator />
+			) : (
+				<AuthenticatedNavigator />
+			)}
 		</NavigationContainer>
 	)
 }

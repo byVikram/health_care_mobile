@@ -55,31 +55,14 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 			setLoading(false)
 		}
 	}
+const handleRoleSelect = (role: Role) => {
+	console.log('Selected role:', role)
 
-	const handleRoleSelect = (role: Role) => {
-		console.log('Selected role:', role) // Debug log
-		let mappedRole: string | null = null
-		let mappedRoleId: string | null = "123e4567-e89b-12d3-a456-426614174000"
-
-		if (role.label.toLowerCase() === 'doctor') {
-			mappedRole = USER_ROLES.DOCTOR
-			mappedRoleId = role.id
-		} else if (role.label.toLowerCase() === 'patient') {
-			mappedRole = USER_ROLES.PATIENT
-			mappedRoleId = role.id
-		}
-
-		if (!mappedRole) {
-			console.warn('Unknown role:', role)
-			return
-		}
-
-		navigation.navigate(ROUTES.AUTH.ONBOARDING, {
-			roleLabel: role.label,
-			roleId: mappedRoleId,
-		})
-	}
-
+	navigation.navigate(ROUTES.AUTH.ONBOARDING, {
+		roleLabel: role.label,
+		roleId: role.id,
+	})
+}
 	const handleClose = () => {
 		navigation.navigate(ROUTES.AUTH.LOGIN)
 	}
