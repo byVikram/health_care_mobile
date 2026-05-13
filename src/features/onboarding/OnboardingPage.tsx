@@ -11,6 +11,7 @@ import {
 	useWindowDimensions,
 	View,
 } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import type { RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -40,6 +41,8 @@ export default function OnboardingPage({ navigation, route }: OnboardingPageProp
 	const { accessToken } = useAuth()
 	const { width } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
+	const isTablet = width >= 768
+	const backButtonOffset = insets.top + 22
 
 	const flatListRef = useRef<FlatList<Slide>>(null)
 	const [activeIndex, setActiveIndex] = useState(0)
@@ -116,6 +119,14 @@ export default function OnboardingPage({ navigation, route }: OnboardingPageProp
 		scrollToIndex(slides.length - 1)
 	}, [activeIndex, slides.length, finishOnboarding, scrollToIndex])
 
+	const handleBack = useCallback(() => {
+		if (navigation.canGoBack()) {
+			navigation.goBack()
+		} else {
+			navigation.replace(ROUTES.AUTH.ROLE_SELECTION)
+		}
+	}, [navigation])
+
 	const handleMomentumScrollEnd = useCallback(
 		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
 			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth)
@@ -153,6 +164,19 @@ export default function OnboardingPage({ navigation, route }: OnboardingPageProp
 	return (
 		<SafeAreaView style={styles.safeArea}>
 			<StatusBar barStyle="light-content" />
+			<Pressable
+				style={[
+					styles.backButton,
+					{ top: backButtonOffset },
+					isTablet && styles.backButtonTablet,
+				]}
+				onPress={handleBack}
+				accessibilityRole="button"
+				accessibilityLabel="Go back"
+				hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+			>
+				<Ionicons name="chevron-back" size={24} color="#ffffff" />
+			</Pressable>
 
 			<View style={styles.container}>
 				<View style={styles.topBar}>
@@ -227,6 +251,23 @@ const styles = StyleSheet.create({
 		alignItems: 'flex-end',
 		paddingHorizontal: 20,
 		paddingBottom: 6,
+	},
+	backButton: {
+		position: 'absolute',
+		left: 14,
+		zIndex: 10,
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: 'rgba(255,255,255,0.10)',
+	},
+	backButtonTablet: {
+		left: 24,
+		width: 42,
+		height: 42,
+		borderRadius: 21,
 	},
 	skipButton: {
 		paddingVertical: 6,

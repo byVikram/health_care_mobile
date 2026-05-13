@@ -12,7 +12,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../../components/common'
+import { AppToggle, AppTypography } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -21,6 +21,8 @@ import {
 	updateHospital,
 } from '../../../doctor/doctorService'
 import { DoctorHospital } from '../../../../types/doctor-profile'
+import App from '../../../../../App'
+import { all } from 'axios'
 
 type HospitalFormData = {
 	name: string
@@ -590,6 +592,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState(createWeeklyWorkingHours)
 	const [followUpDays, setFollowUpDays] = useState(7)
 	const [rescheduleCutoff, setRescheduleCutoff] = useState(2)
+	const [allowPayLater, setAllowPayLater] = useState(false)
 	const hospitalsRef = useRef<HospitalItem[]>([])
 	const hasLoadedHospitalsRef = useRef(false)
 
@@ -1037,6 +1040,20 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 										showFloatingLabel={false}
 									/>
 								</View>
+							</View>
+
+							<View style={styles.ruleBlock}>
+								<AppTypography variant="caption" style={styles.shiftTitle}>
+									Allow Pay Later
+								</AppTypography>
+
+								<AppToggle
+									value={allowPayLater}
+									onValueChange={setAllowPayLater}
+									showStatusText={false}
+									accessibilityLabel="Allow Pay Later"
+									style={styles.payLaterControl}
+								/>
 							</View>
 						</View>
 					</View>
@@ -1845,6 +1862,12 @@ const styles = StyleSheet.create({
 	ruleField: {
 		width: 225,
 		maxWidth: '100%',
+	},
+	payLaterControl: {
+		width: 225,
+		maxWidth: '100%',
+		minHeight: 32,
+		justifyContent: 'center',
 	},
 	formActions: {
 		alignItems: 'flex-end',
