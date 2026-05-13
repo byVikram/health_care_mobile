@@ -74,6 +74,10 @@ export const API_ENDPOINTS = {
 		DETAILS: `${BASE_URL}/api/patients/me/details`,
 		GET_BY_PUBLIC_ID: (publicId: string) => `${BASE_URL}/api/patients/${publicId}/details`,
 	},
+	PHARMACY: {
+		ME: `${BASE_URL}/api/pharmacies/me`,
+		DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
+	},
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {
 		LIST: `${BASE_URL}/api/locations`,
