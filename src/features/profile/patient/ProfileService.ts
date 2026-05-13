@@ -78,6 +78,8 @@ export const patchPatientDetails = async (localData: Record<string, string>): Pr
 	return res.data
 }
 
+export const updatePatientProfile = patchPatientDetails
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: API response  →  local state Record<string,string>
 // Use to pre-fill PatientProfileLayout after a GET

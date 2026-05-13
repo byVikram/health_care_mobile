@@ -4,6 +4,8 @@ export * from "./AppTypography";
 export * from "./AppModal";
 export * from "./AppSelect";
 export * from "./AppSkeleton";
+export { default as AppToggle } from "./AppToggle";
+export type { AppToggleProps } from "./AppToggle";
 export { default as AppHeader } from "./AppHeader";
 export { default as AppSidebar } from "./AppSidebar";
 export type { AppSidebarItem } from "./AppSidebar";

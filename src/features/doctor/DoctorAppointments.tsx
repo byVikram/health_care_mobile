@@ -6,6 +6,7 @@ import {
 	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
+	Pressable,
 	useWindowDimensions,
 	Alert,
 	Modal,
@@ -58,6 +59,11 @@ type Appointment = {
 	appointment_date: string
 	start_time: string
 	end_time?: string
+	symptoms?: string | string[]
+	symptom?: string
+	symptom_description?: string
+	chief_complaint?: string
+	complaint?: string
 }
 
 type ReferDoctor = {
@@ -149,6 +155,12 @@ export default function DoctorAppointments({
 	const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
 const [successModalVisible, setSuccessModalVisible] = useState(false)
 const [successMessage, setSuccessMessage] = useState('')
+	const [symptomsPopover, setSymptomsPopover] = useState({
+		visible: false,
+		message: '',
+		x: 0,
+		y: 0,
+	})
 	// ── Optimistic UI sets ────────────────────────────────────────────────────
 	const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set())
 	const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set())
@@ -180,6 +192,47 @@ const [successMessage, setSuccessMessage] = useState('')
 
 	const getPatientGender = (apt: any) =>
 		apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? '--'
+
+	const normalizeSymptoms = (value: any): string => {
+		if (Array.isArray(value)) {
+			return value
+				.map((item) =>
+					typeof item === 'string'
+						? item.trim()
+						: String(item?.label ?? item?.name ?? item?.symptom ?? item?.description ?? '').trim()
+				)
+				.filter(Boolean)
+				.join(', ')
+		}
+		return typeof value === 'string' ? value.trim() : ''
+	}
+
+	const getPatientSymptoms = (apt: any) => {
+		const symptoms =
+			normalizeSymptoms(apt?.symptoms) ||
+			normalizeSymptoms(apt?.patient?.symptoms) ||
+			normalizeSymptoms(apt?.symptom) ||
+			normalizeSymptoms(apt?.patient?.symptom) ||
+			normalizeSymptoms(apt?.symptom_description) ||
+			normalizeSymptoms(apt?.patient?.symptom_description) ||
+			normalizeSymptoms(apt?.chief_complaint) ||
+			normalizeSymptoms(apt?.patient?.chief_complaint) ||
+			normalizeSymptoms(apt?.complaint) ||
+			normalizeSymptoms(apt?.patient?.complaint)
+
+		return symptoms || 'No symptoms entered by patient.'
+	}
+
+	const openSymptomsPopover = (apt: any, event: any) => {
+		event?.stopPropagation?.()
+		const { pageX = width / 2, pageY = height / 2 } = event?.nativeEvent ?? {}
+		setSymptomsPopover({
+			visible: true,
+			message: getPatientSymptoms(apt),
+			x: pageX,
+			y: pageY,
+		})
+	}
 
 	const getTimeRange = (apt: any) => {
 		const start = apt?.start_time
@@ -891,6 +944,78 @@ const [successMessage, setSuccessMessage] = useState('')
 	// Card renderer
 	// ─────────────────────────────────────────────────────────────────────────
 
+	const renderPatientNameRow = (apt: any, status: string, statusStyle: any, statusTextStyle: any) => (
+		<View style={styles.patientNameRow}>
+			<View style={styles.patientIconBox}>
+				<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
+			</View>
+			<View style={styles.patientNameWithInfo}>
+				<Text style={styles.name} numberOfLines={1}>
+					{apt?.patient?.name || 'Unknown Patient'}
+				</Text>
+				<TouchableOpacity
+					activeOpacity={0.75}
+					style={styles.symptomsInfoButton}
+					onPress={(event) => openSymptomsPopover(apt, event)}
+					hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+				>
+					<MaterialCommunityIcons name="information-outline" size={17} color={TEAL} />
+				</TouchableOpacity>
+			</View>
+			<View style={[styles.pill, statusStyle]}>
+				<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
+			</View>
+		</View>
+	)
+
+	const renderSymptomsPopover = () => {
+		if (!symptomsPopover.visible) return null
+
+		const popoverWidth = Math.min(width - 32, isTablet ? 330 : 300)
+		const popoverLeft = Math.max(16, Math.min(symptomsPopover.x - 32, width - popoverWidth - 16))
+		const verticalLift = isTablet ? 24 : 18
+		const shouldOpenAbove = symptomsPopover.y + 160 > height
+		const popoverTop = shouldOpenAbove
+			? Math.max(16, symptomsPopover.y - 150 - verticalLift)
+			: Math.max(16, symptomsPopover.y + 16 - verticalLift)
+
+		return (
+			<Modal
+				visible={symptomsPopover.visible}
+				transparent
+				animationType="fade"
+				onRequestClose={() => setSymptomsPopover((prev) => ({ ...prev, visible: false }))}
+			>
+				<Pressable
+					style={styles.symptomsModalOverlay}
+					onPress={() => setSymptomsPopover((prev) => ({ ...prev, visible: false }))}
+				>
+					<Pressable
+						style={[
+							styles.symptomsPopover,
+							{
+								width: popoverWidth,
+								left: popoverLeft,
+								top: popoverTop,
+							},
+						]}
+						onPress={(event) => event.stopPropagation()}
+					>
+						<Text style={styles.symptomsPopoverTitle}>Patient Symptoms</Text>
+						<Text
+							style={[
+								styles.symptomsPopoverMessage,
+								symptomsPopover.message === 'No symptoms entered by patient.' && styles.symptomsPopoverEmpty,
+							]}
+						>
+							{symptomsPopover.message}
+						</Text>
+					</Pressable>
+				</Pressable>
+			</Modal>
+		)
+	}
+
 	const renderCard = (apt: any) => {
 		const rawStatus = getStatusLabel(apt.status)
 		const isRejectedLocally = rejectedIds.has(apt.id)
@@ -923,17 +1048,7 @@ const [successMessage, setSuccessMessage] = useState('')
 				>
 					<View style={[styles.cancelledCardInner, useCompactCancelledLayout && styles.cancelledCardInnerCompact]}>
 						<View style={[styles.cancelledCardLeft, useCompactCancelledLayout && styles.cancelledCardLeftCompact]}>
-							<View style={styles.patientNameRow}>
-								<View style={styles.patientIconBox}>
-									<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
-								</View>
-								<Text style={styles.name} numberOfLines={1}>
-									{apt?.patient?.name || 'Unknown Patient'}
-								</Text>
-								<View style={[styles.pill, statusStyle]}>
-									<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
-								</View>
-							</View>
+							{renderPatientNameRow(apt, status, statusStyle, statusTextStyle)}
 							<View style={styles.cancelledMetaRow}>
 								<Text style={styles.subText}>
 									{getPatientAge(apt)} years / {getPatientGender(apt)}
@@ -964,17 +1079,7 @@ const [successMessage, setSuccessMessage] = useState('')
 				<TouchableOpacity key={apt.id} activeOpacity={0.85} onPress={() => handleCardPress(apt)} style={styles.card}>
 					<View style={styles.tabletCardInner}>
 						<View style={styles.tabletLeft}>
-							<View style={styles.patientNameRow}>
-								<View style={styles.patientIconBox}>
-									<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
-								</View>
-								<Text style={styles.name} numberOfLines={1}>
-									{apt?.patient?.name || 'Unknown Patient'}
-								</Text>
-								<View style={[styles.pill, statusStyle]}>
-									<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
-								</View>
-							</View>
+							{renderPatientNameRow(apt, status, statusStyle, statusTextStyle)}
 							<View style={styles.metaRow}>
 								<MaterialCommunityIcons name="clock-time-three-outline" size={14} color="#5f6973" />
 								<Text style={styles.subText}>
@@ -991,17 +1096,7 @@ const [successMessage, setSuccessMessage] = useState('')
 		// ── Mobile card ───────────────────────────────────────────────────────
 		return (
 			<TouchableOpacity key={apt.id} activeOpacity={0.85} onPress={() => handleCardPress(apt)} style={styles.card}>
-				<View style={styles.patientNameRow}>
-					<View style={styles.patientIconBox}>
-						<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
-					</View>
-					<Text style={styles.name} numberOfLines={1}>
-						{apt?.patient?.name || 'Unknown Patient'}
-					</Text>
-					<View style={[styles.pill, statusStyle]}>
-						<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
-					</View>
-				</View>
+				{renderPatientNameRow(apt, status, statusStyle, statusTextStyle)}
 				<View style={styles.metaRow}>
 					<MaterialCommunityIcons name="clock-time-three-outline" size={14} color="#5f6973" />
 					<Text style={styles.subText}>
@@ -1074,6 +1169,7 @@ const [successMessage, setSuccessMessage] = useState('')
 {renderReferModal()}
 {renderRescheduleDrawer()}
 {renderSuccessModal()}
+{renderSymptomsPopover()}
 		</View>
 	)
 }
@@ -1156,7 +1252,54 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	name: { fontSize: 15, fontWeight: '600', color: '#2a2f34', flex: 1 },
+	patientNameWithInfo: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+		minWidth: 0,
+		gap: 4,
+	},
+	name: { fontSize: 15, fontWeight: '600', color: '#2a2f34', flexShrink: 1, minWidth: 0 },
+	symptomsInfoButton: {
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		alignItems: 'center',
+		justifyContent: 'center',
+		flexShrink: 0,
+	},
+	symptomsModalOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.01)',
+	},
+	symptomsPopover: {
+		position: 'absolute',
+		borderRadius: 14,
+		backgroundColor: '#fff',
+		paddingHorizontal: 22,
+		paddingVertical: 20,
+		borderWidth: 1,
+		borderColor: '#e5edf2',
+		shadowColor: '#172838',
+		shadowOffset: { width: 0, height: 12 },
+		shadowOpacity: 0.16,
+		shadowRadius: 24,
+		elevation: 12,
+	},
+	symptomsPopoverTitle: {
+		fontSize: 17,
+		fontWeight: '700',
+		color: '#1f2d3d',
+		marginBottom: 18,
+	},
+	symptomsPopoverMessage: {
+		fontSize: 15,
+		lineHeight: 22,
+		color: '#526b7a',
+	},
+	symptomsPopoverEmpty: {
+		fontStyle: 'italic',
+	},
 	pill: {
 		paddingHorizontal: 10,
 		paddingVertical: 2,

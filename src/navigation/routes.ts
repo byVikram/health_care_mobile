@@ -12,6 +12,9 @@ export const ROUTES = {
 		PORTAL: 'Portal',
 		PROFILE: 'Profile',
 	},
+	PORTAL: {
+		PROFILE: 'Profile',
+	},
 	STACK: {
 		SEARCH: 'SearchPage',
 		DOCTOR_SEARCH: 'DoctorSearch',

@@ -30,12 +30,12 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 	const insets = useSafeAreaInsets()
 	const isTablet = width >= 768
 	const isLandscape = width > height
-	const backButtonOffset = insets.top + (isTablet ? 24 : isLandscape ? 18 : 16)
+	const backButtonOffset = insets.top + (isTablet ? 44 : isLandscape ? 24 : 22)
 	const horizontalPadding = isTablet ? 40 : 20
 	const contentMaxWidth = isTablet ? 560 : 420
 	const cardHeight = isTablet ? 88 : 78
 	const iconSize = isTablet ? 58 : 52
-	const imageSize = isTablet ? 32 : 28
+	const imageSize = isTablet ? 54 : 48
 
 	useEffect(() => {
 		fetchRoles()
@@ -59,7 +59,7 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 	const handleRoleSelect = (role: Role) => {
 		console.log('Selected role:', role) // Debug log
 		let mappedRole: string | null = null
-		let mappedRoleId: string | null = "a1b2c3d4-0001-0001-0001-000000000001"
+		let mappedRoleId: string | null = "123e4567-e89b-12d3-a456-426614174000"
 
 		if (role.label.toLowerCase() === 'doctor') {
 			mappedRole = USER_ROLES.DOCTOR
@@ -107,7 +107,7 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 				accessibilityLabel="Go to login"
 				hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
 			>
-				<Ionicons name="chevron-back" size={isTablet ? 34 : 30} color="#ffffff" />
+				<Ionicons name="chevron-back" size={isTablet ? 28 : 24} color="#ffffff" />
 			</Pressable>
 
 			<View
@@ -136,13 +136,13 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 									onPress={() => handleRoleSelect(role)}
 									style={[styles.card, { height: cardHeight }]}
 								>
-									<View style={[styles.iconCircle, { width: iconSize, height: iconSize, borderRadius: iconSize / 2 }]}>
+									<View style={[styles.iconBox, { width: iconSize, height: iconSize }]}>
 										<Image
 											source={
 												roleImages[role.label.toLowerCase()] ||
 												require('../../assets/splash/ancillary.png')
 											}
-											style={{ width: imageSize, height: imageSize }}
+											style={[styles.roleImage, { width: imageSize, height: imageSize }]}
 											resizeMode="contain"
 										/>
 									</View>
@@ -185,9 +185,9 @@ const styles = StyleSheet.create({
 		position: 'absolute',
 		left: 14,
 		zIndex: 10,
-		width: 44,
-		height: 44,
-		borderRadius: 22,
+		width: 36,
+		height: 36,
+		borderRadius: 18,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: 'rgba(255,255,255,0.10)',
@@ -195,9 +195,9 @@ const styles = StyleSheet.create({
 
 	backButtonTablet: {
 		left: 24,
-		width: 52,
-		height: 52,
-		borderRadius: 26,
+		width: 42,
+		height: 42,
+		borderRadius: 21,
 	},
 
 	heading: {
@@ -241,13 +241,18 @@ const styles = StyleSheet.create({
 		elevation: 4,
 	},
 
-	iconCircle: {
+	iconBox: {
 		width: 52,
 		height: 52,
-		borderRadius: 26,
-		backgroundColor: '#e8f0f0',
+		borderRadius: 14,
+		backgroundColor: 'transparent',
 		alignItems: 'center',
 		justifyContent: 'center',
+	},
+
+	roleImage: {
+		maxWidth: '100%',
+		maxHeight: '100%',
 	},
 
 	textWrap: {

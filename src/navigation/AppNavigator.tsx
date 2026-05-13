@@ -25,76 +25,38 @@ import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
-  return (
-    <AppStack.Navigator
-      screenOptions={{ headerShown: false }}
-      initialRouteName={ROUTES.MAIN.TABS}
-    >
-      
-      <AppStack.Screen
-        name={ROUTES.MAIN.TABS}
-        component={MainTabNavigator}
-        options={{ animation: 'none' }}
-      />
+	return (
+		<AppStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={ROUTES.MAIN.TABS}>
+			<AppStack.Screen name={ROUTES.MAIN.TABS} component={MainTabNavigator} options={{ animation: 'none' }} />
 
-      {/* ✅ ADD THIS SCREEN */}
-      <AppStack.Screen
-        name={ROUTES.STACK.SEARCH}
-        component={SearchPage}
-      />
+			{/* ✅ ADD THIS SCREEN */}
+			<AppStack.Screen name={ROUTES.STACK.SEARCH} component={SearchPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.DOCTOR_SEARCH}
-        component={DoctorSearchPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.DOCTOR_SEARCH} component={DoctorSearchPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.DOCTOR_DETAIL}
-        component={DoctorDetailPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.DOCTOR_DETAIL} component={DoctorDetailPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.FAVOURITE_DOCTOR}
-        component={MyDoctorPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.FAVOURITE_DOCTOR} component={MyDoctorPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.NOTIFICATION}
-        component={NotificationPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.NOTIFICATION} component={NotificationPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.CONSULTATION}
-        component={ConsultationPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.HEALTH_PROFILE}
-        component={PatientProfileLayout}
-      />
+			<AppStack.Screen name={ROUTES.STACK.HEALTH_PROFILE} component={PatientProfileLayout} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.SETTINGS}
-        component={SettingPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.DOCTOR_WELCOME}
-        component={WelcomeDoctorPage}
-        options={{ animation: 'none' }}
-      />
+			<AppStack.Screen
+				name={ROUTES.STACK.DOCTOR_WELCOME}
+				component={WelcomeDoctorPage}
+				options={{ animation: 'none' }}
+			/>
 
-      <AppStack.Screen
-        name={ROUTES.STACK.ACCOUNT}
-        component={AccountPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
 
-      <AppStack.Screen
-        name="PatientPayment"
-        component={PatientPayment}
-      />
-    </AppStack.Navigator>
-  )
+			<AppStack.Screen name="PatientPayment" component={PatientPayment} />
+		</AppStack.Navigator>
+	)
 }
 export default function AppNavigator() {
 	const { accessToken, isLoading } = useAuth()
