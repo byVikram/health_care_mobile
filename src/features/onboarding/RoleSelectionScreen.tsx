@@ -35,7 +35,7 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 	const contentMaxWidth = isTablet ? 560 : 420
 	const cardHeight = isTablet ? 88 : 78
 	const iconSize = isTablet ? 58 : 52
-	const imageSize = isTablet ? 32 : 28
+	const imageSize = isTablet ? 54 : 48
 
 	useEffect(() => {
 		fetchRoles()
@@ -136,13 +136,13 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 									onPress={() => handleRoleSelect(role)}
 									style={[styles.card, { height: cardHeight }]}
 								>
-									<View style={[styles.iconCircle, { width: iconSize, height: iconSize, borderRadius: iconSize / 2 }]}>
+									<View style={[styles.iconBox, { width: iconSize, height: iconSize }]}>
 										<Image
 											source={
 												roleImages[role.label.toLowerCase()] ||
 												require('../../assets/splash/ancillary.png')
 											}
-											style={{ width: imageSize, height: imageSize }}
+											style={[styles.roleImage, { width: imageSize, height: imageSize }]}
 											resizeMode="contain"
 										/>
 									</View>
@@ -241,13 +241,18 @@ const styles = StyleSheet.create({
 		elevation: 4,
 	},
 
-	iconCircle: {
+	iconBox: {
 		width: 52,
 		height: 52,
-		borderRadius: 26,
-		backgroundColor: '#e8f0f0',
+		borderRadius: 14,
+		backgroundColor: 'transparent',
 		alignItems: 'center',
 		justifyContent: 'center',
+	},
+
+	roleImage: {
+		maxWidth: '100%',
+		maxHeight: '100%',
 	},
 
 	textWrap: {

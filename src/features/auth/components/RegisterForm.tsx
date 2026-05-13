@@ -175,7 +175,7 @@ export default function RegisterForm({
 				</TouchableOpacity>
 
 				<View style={styles.loginContainer}>
-					<Text style={styles.accountText}>Have an account?</Text>
+					<Text style={styles.accountText}>Already have an account?</Text>
 
 					<Pressable onPress={() => navigation.replace(ROUTES.AUTH.LOGIN)}>
 						<Text style={styles.loginText}>Login</Text>

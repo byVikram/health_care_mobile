@@ -1,5 +1,5 @@
 import React from 'react'
-import { View, StyleSheet, Image, Pressable } from 'react-native'
+import { View, Image, Pressable } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
@@ -12,23 +12,26 @@ import { doctorCardStyles as styles } from './DoctorCard.styles'
 
 interface DoctorProps {
 	doctor: DoctorSearchItem
+	mobile?: boolean
 }
 
-export default function DoctorSearchCard({ doctor }: DoctorProps) {
+export default function DoctorSearchCard({ doctor, mobile = false }: DoctorProps) {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
 	// Using placeholder data matching the mockup where API doesn't provide it yet
 	const avatarUrl =
 		doctor.avatar_s3_key || 'https://tse4.mm.bing.net/th/id/OIP.JD5a5owVBjuj0w_D6PUYMwHaHJ?pid=Api&P=0&h=180' // fallback
-	const rating = '0'
 	const location = doctor.location || 'Bangalore'
 	const distance = '<0 km'
 	const earliestSlot = 'Earliest available slot (Today 2:00 PM)'
 
 	return (
-		<Pressable style={styles.card} onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })}>
+		<Pressable
+			style={[styles.card, mobile && styles.mobileCard]}
+			onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })}
+		>
 			{/* Top Half - Image */}
-			<View style={styles.imageContainer}>
+			<View style={[styles.imageContainer, mobile && styles.mobileImageContainer]}>
 				<Image source={{ uri: avatarUrl }} style={styles.image} resizeMode="cover" />
 				{/* <View style={styles.badge}>
                     <MaterialCommunityIcons name="thumb-up" size={14} color="#fff" style={{ marginRight: 4 }} />
@@ -37,44 +40,38 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 			</View>
 
 			{/* Bottom Half - Content */}
-			<View style={styles.content}>
-				<AppTypography style={styles.name} numberOfLines={1}>
+			<View style={[styles.content, mobile && styles.mobileContent]}>
+				<AppTypography style={[styles.name, mobile && styles.mobileName]} numberOfLines={mobile ? 2 : 1}>
 					{doctor.name}
 				</AppTypography>
-				<AppTypography variant="caption" style={styles.speciality} numberOfLines={1}>
+				<AppTypography variant="caption" style={[styles.speciality, mobile && styles.mobileSpeciality]} numberOfLines={1}>
 					{doctor.specialities && doctor.specialities.length > 0
 						? doctor.specialities.join(', ')
 						: 'Cardiology'}
 				</AppTypography>
 
-				<AppTypography variant="caption" style={styles.slotText} numberOfLines={1}>
+				<AppTypography variant="caption" style={[styles.slotText, mobile && styles.mobileSlotText]} numberOfLines={1}>
 					Next: Today 2:00 PM
 				</AppTypography>
 
-				<View style={styles.infoRow}>
+				<View style={[styles.infoRow, mobile && styles.mobileInfoRow]}>
 					<View style={styles.infoLeft}>
 						<MaterialCommunityIcons name="briefcase" size={12} color="#5b7282" />
-						<AppTypography variant="caption" style={styles.infoText}>
+						<AppTypography variant="caption" style={[styles.infoText, mobile && styles.mobileInfoText]}>
 							{doctor.experience_years}y
 						</AppTypography>
 					</View>
-					<View style={styles.infoRight}>
-						<AppTypography variant="caption" style={styles.infoTextBold}>
-							{rating}
-						</AppTypography>
-						<MaterialCommunityIcons name="star" size={12} color="#f5a623" style={{ marginLeft: 2 }} />
-					</View>
 				</View>
 
-				<View style={[styles.infoRow, { marginBottom: 8 }]}>
+				<View style={[styles.infoRow, mobile && styles.mobileInfoRow, !mobile && { marginBottom: 8 }]}>
 					<View style={styles.infoLeft}>
 						<MaterialCommunityIcons name="map-marker" size={12} color="#5b7282" />
-						<AppTypography variant="caption" style={styles.infoText}>
+						<AppTypography variant="caption" style={[styles.infoText, mobile && styles.mobileInfoText]}>
 							{location}
 						</AppTypography>
 					</View>
 					<View style={styles.infoRight}>
-						<AppTypography variant="caption" style={styles.infoTextBoldTeal}>
+						<AppTypography variant="caption" style={[styles.infoTextBoldTeal, mobile && styles.mobileInfoText]}>
 							{distance}
 						</AppTypography>
 					</View>
@@ -83,8 +80,12 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 				<AppButton
 					variant="primary"
 					onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })}
-					style={styles.bookButton}
-					labelStyle={{ fontSize: 12, marginHorizontal: 0 }}
+					style={mobile ? [styles.bookButton, styles.mobileBookButton] : styles.bookButton}
+					labelStyle={
+						mobile
+							? [{ fontSize: 12, marginHorizontal: 0 }, styles.mobileBookButtonLabel]
+							: { fontSize: 12, marginHorizontal: 0 }
+					}
 				>
 					Book
 				</AppButton>

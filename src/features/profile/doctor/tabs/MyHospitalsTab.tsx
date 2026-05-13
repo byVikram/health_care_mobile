@@ -6,14 +6,13 @@ import {
 	Pressable,
 	ScrollView,
 	StyleSheet,
-	Switch,
 	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../../components/common'
+import { AppToggle, AppTypography } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -1048,19 +1047,13 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 									Allow Pay Later
 								</AppTypography>
 
-								<View style={{width:225,maxWidth:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderWidth:1,borderColor:'#a7d3db',borderRadius:10,paddingHorizontal:14,paddingVertical:10,backgroundColor:'#ffffff',minHeight:48}}>
-									<AppTypography variant="caption" style={{color:'#2f2f2f',fontSize:14}}>
-										{allowPayLater ? 'Yes' : 'No'}
-									</AppTypography>	
-
-									<Switch
-										value={allowPayLater}
-										onValueChange={setAllowPayLater}
-										trackColor={{ false: '#cbd5e1', true: TEAL }}
-										thumbColor="#ffffff"
-									/>
-									
-								</View>
+								<AppToggle
+									value={allowPayLater}
+									onValueChange={setAllowPayLater}
+									showStatusText={false}
+									accessibilityLabel="Allow Pay Later"
+									style={styles.payLaterControl}
+								/>
 							</View>
 						</View>
 					</View>
@@ -1869,6 +1862,12 @@ const styles = StyleSheet.create({
 	ruleField: {
 		width: 225,
 		maxWidth: '100%',
+	},
+	payLaterControl: {
+		width: 225,
+		maxWidth: '100%',
+		minHeight: 32,
+		justifyContent: 'center',
 	},
 	formActions: {
 		alignItems: 'flex-end',

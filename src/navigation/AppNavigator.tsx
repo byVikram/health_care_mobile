@@ -21,7 +21,7 @@ import SettingPage from '../features/setting/SettingPage'
 import AccountPage from '../features/auth/AccountPage'
 import PatientPayment from '../features/patientPayment/PatientPayment'
 import SearchPage from '../features/doctor/search/SearchPage'
-import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
+import WelcomePage from '../features/auth/WelcomePage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -80,7 +80,7 @@ function AuthenticatedNavigator() {
 
       <AppStack.Screen
         name={ROUTES.STACK.DOCTOR_WELCOME}
-        component={WelcomeDoctorPage}
+        component={WelcomePage}
         options={{ animation: 'none' }}
       />
 

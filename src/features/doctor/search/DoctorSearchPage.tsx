@@ -1,20 +1,17 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
 	View,
 	StyleSheet,
-	ScrollView,
 	FlatList,
 	RefreshControl,
-	TouchableOpacity,
 	useWindowDimensions,
 	DimensionValue,
 } from 'react-native'
-import { useTheme } from 'react-native-paper'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import { useRoute } from '@react-navigation/native'
 import DoctorSearchCard from './components/DoctorSearchCard'
 import { AppTypography, AppSkeleton } from '../../../components/common'
-import { getDoctors, getSpecialities } from '../doctorService'
+import { getDoctors } from '../doctorService'
 import { DoctorSearchItem } from '../../../types/doctor-search'
 import AppHeader from '../../../components/common/AppHeader'
 import { doctorCardStyles } from './components/DoctorCard.styles'
@@ -22,63 +19,14 @@ import type { RouteProp } from '@react-navigation/native'
 import type { AppStackParamList } from '../../../navigation/types'
 import { ROUTES } from '../../../navigation/routes'
 
-const SPECIALITY_ICON_MAP: Record<string, string> = {
-	all: 'format-list-bulleted',
-	dentistry: 'tooth-outline',
-	cardiology: 'heart-multiple-outline',
-	orthopedic: 'bone',
-	neurology: 'brain',
-	kidney: 'kidney',
-}
-
-type Speciality = {
-	id: string
-	label: string
-	icon: string
-}
-
-const normalizeText = (value?: string | null) => (value ?? '').trim().toLowerCase()
-
-// ─── Speciality Chip ──────────────────────────────────────────────────────
-function SpecialityChip({ spec, selected, onPress }: {
-	spec: Speciality
-	selected: boolean
-	onPress: () => void
-}) {
-	const theme = useTheme()
-
-	return (
-		<TouchableOpacity style={styles.chipWrapper} onPress={onPress} activeOpacity={0.75}>
-			<View
-				style={[
-					styles.chipIconBox,
-					selected ? { backgroundColor: theme.colors.primary } : { backgroundColor: '#e8eef2' },
-				]}
-			>
-				<MaterialCommunityIcons
-					name={spec.icon}
-					size={28}
-					color={selected ? '#ffffff' : theme.colors.primary}
-				/>
-			</View>
-			<AppTypography
-				variant="caption"
-				style={[styles.chipLabel, { color: selected ? theme.colors.primary : '#888' }]}
-			>
-				{spec.label}
-			</AppTypography>
-		</TouchableOpacity>
-	)
-}
-
 // ─── Doctor Card Skeleton ─────────────────────────────────────────────────
-function DoctorCardSkeleton() {
+function DoctorCardSkeleton({ mobile = false }: { mobile?: boolean }) {
 	return (
-		<View style={doctorCardStyles.card}>
-			<View style={doctorCardStyles.imageContainer}>
+		<View style={[doctorCardStyles.card, mobile && doctorCardStyles.mobileCard]}>
+			<View style={[doctorCardStyles.imageContainer, mobile && doctorCardStyles.mobileImageContainer]}>
 				<AppSkeleton height="100%" width="100%" />
 			</View>
-			<View style={doctorCardStyles.content}>
+			<View style={[doctorCardStyles.content, mobile && doctorCardStyles.mobileContent]}>
 				<AppSkeleton height={12} width="80%" style={{ marginBottom: 4 }} />
 				<AppSkeleton height={10} width="60%" style={{ marginBottom: 6 }} />
 				<AppSkeleton height={10} width="70%" style={{ marginBottom: 8 }} />
@@ -110,42 +58,19 @@ function DoctorCardSkeleton() {
 // ─── Main Component ───────────────────────────────────────────────────────
 export default function DoctorSearchPage() {
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
-	const theme = useTheme()
 	const { width } = useWindowDimensions()
 
-	const numColumns = width >= 900 ? 4 : width >= 600 ? 3 : 2
+	const isMobile = width < 600
+	const numColumns = isMobile ? 1 : width >= 900 ? 4 : 3
+	const mobileListPadding = width < 360 ? 12 : 20
 
 	// Read initial search query from navigation params (passed from SearchPage)
 	const initialQuery = route.params?.query || ''
 
 	const [searchQuery, setSearchQuery] = useState(initialQuery)
-	const [activeSpec, setActiveSpec] = useState('all')
 	const [doctors, setDoctors] = useState<DoctorSearchItem[]>([])
-	const [specialities, setSpecialities] = useState<Speciality[]>([
-		{ id: 'all', label: 'All', icon: 'format-list-bulleted' },
-	])
 	const [loading, setLoading] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
-
-	// Fetch specialities on mount
-	useEffect(() => {
-		const loadSpecialities = async () => {
-			try {
-				const res = await getSpecialities()
-				if (res.success && res.data) {
-					const specMap: Speciality[] = res.data.map((s) => {
-						const label = s.label.toLowerCase().trim()
-						let icon = SPECIALITY_ICON_MAP[label] ?? (label.includes('dent') ? 'tooth-outline' : 'medical-bag')
-						return { id: s.id, label: s.label, icon }
-					})
-					setSpecialities([{ id: 'all', label: 'All', icon: 'format-list-bulleted' }, ...specMap])
-				}
-			} catch (error) {
-				console.error('Error fetching specialities:', error)
-			}
-		}
-		loadSpecialities()
-	}, [])
 
 	// Fetch the base doctor list. Search and speciality tabs are applied locally.
 	const fetchDoctorsList = async (isRefresh = false) => {
@@ -190,34 +115,18 @@ export default function DoctorSearchPage() {
 		// The visible list is controlled by speciality tabs only on this page.
 	}
 
-	const selectedSpeciality = useMemo(
-		() => specialities.find((spec) => spec.id === activeSpec),
-		[specialities, activeSpec]
-	)
-
-	const displayedDoctors = useMemo(() => {
-		const selectedLabel = normalizeText(selectedSpeciality?.label)
-
-		return doctors.filter((doctor) => {
-			if (activeSpec === 'all') return true
-
-			return (
-				(doctor.specialities ?? []).some(
-					(speciality) => normalizeText(speciality) === selectedLabel
-				)
-			)
-		})
-	}, [doctors, activeSpec, selectedSpeciality])
+	// Speciality filtering is temporarily disabled while the speciality section is hidden.
+	const displayedDoctors = doctors
 
 	// Render item for FlatList
 	const renderItem = useCallback(({ item }: { item: DoctorSearchItem }) => {
 		const itemWidth: DimensionValue = `${100 / numColumns}%`
 		return (
-			<View style={{ width: itemWidth, padding: 4 }}>
-				<DoctorSearchCard doctor={item} />
+			<View style={[styles.cardListItem, isMobile && styles.cardListItemMobile, { width: itemWidth }]}>
+				<DoctorSearchCard doctor={item} mobile={isMobile} />
 			</View>
 		)
-	}, [numColumns])
+	}, [isMobile, numColumns])
 
 	// Skeleton placeholder list when loading
 	const listData = loading && !refreshing ? Array(6).fill({}) : displayedDoctors
@@ -237,15 +146,15 @@ export default function DoctorSearchPage() {
 				onSearchSubmit={handleSearchSubmit}
 			/>
 
-			{/* Specialities chips */}
-			<View style={styles.filterSection}>
-				<AppTypography variant="h4" style={styles.filterTitle}>
+			{/* Specialities chips temporarily hidden.
+			<View style={[styles.filterSection, isMobile && styles.filterSectionMobile]}>
+				<AppTypography variant="h4" style={[styles.filterTitle, isMobile && styles.filterTitleMobile]}>
 					Search by Specialities
 				</AppTypography>
 				<ScrollView
 					horizontal
 					showsHorizontalScrollIndicator={false}
-					contentContainerStyle={styles.filterScroll}
+					contentContainerStyle={[styles.filterScroll, isMobile && styles.filterScrollMobile]}
 				>
 					{specialities.map((spec) => (
 						<SpecialityChip
@@ -256,7 +165,7 @@ export default function DoctorSearchPage() {
 						/>
 					))}
 				</ScrollView>
-			</View>
+			</View> */}
 
 			{/* Results or empty state */}
 			{!loading && displayedDoctors.length === 0 ? (
@@ -271,7 +180,7 @@ export default function DoctorSearchPage() {
 				</View>
 			) : (
 				<FlatList
-					key={numColumns}
+					key={isMobile ? 'mobile-list' : `grid-${numColumns}`}
 					data={listData}
 					keyExtractor={keyExtractor}
 					numColumns={numColumns}
@@ -282,14 +191,24 @@ export default function DoctorSearchPage() {
 					}
 					renderItem={({ item }) =>
 						loading && !refreshing && !item.id ? (
-							<View style={{ width: `${100 / numColumns}%`, padding: 4 }}>
-								<DoctorCardSkeleton />
+							<View
+								style={[
+									styles.cardListItem,
+									isMobile && styles.cardListItemMobile,
+									{ width: `${100 / numColumns}%` },
+								]}
+							>
+								<DoctorCardSkeleton mobile={isMobile} />
 							</View>
 						) : (
 							renderItem({ item: item as DoctorSearchItem })
 						)
 					}
-					contentContainerStyle={{ paddingBottom: 24 }}
+					contentContainerStyle={[
+						styles.resultsList,
+						isMobile && styles.resultsListMobile,
+						isMobile && { paddingHorizontal: mobileListPadding },
+					]}
 					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
 					removeClippedSubviews={true}
 					maxToRenderPerBatch={6}
@@ -303,9 +222,16 @@ export default function DoctorSearchPage() {
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: '#f5f7fa' },
 	filterSection: { paddingTop: 20, paddingBottom: 8 },
+	filterSectionMobile: { paddingTop: 16, paddingBottom: 6 },
 	filterTitle: { paddingHorizontal: 16, marginBottom: 14 },
+	filterTitleMobile: { marginBottom: 12 },
 	filterScroll: { paddingHorizontal: 16, gap: 14 },
+	filterScrollMobile: { gap: 10 },
 	chipWrapper: { alignItems: 'center', gap: 8, width: 72 },
+	chipWrapperMobile: {
+		width: 64,
+		gap: 6,
+	},
 	chipIconBox: {
 		width: 64,
 		height: 64,
@@ -313,7 +239,27 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
+	chipIconBoxMobile: {
+		width: 56,
+		height: 56,
+		borderRadius: 14,
+	},
 	chipLabel: { fontSize: 11, textAlign: 'center' },
+	chipLabelMobile: {
+		fontSize: 10,
+		lineHeight: 14,
+	},
+	resultsList: { paddingBottom: 24 },
+	resultsListMobile: {
+		paddingTop: 20,
+	},
+	cardListItem: {
+		padding: 4,
+	},
+	cardListItemMobile: {
+		paddingHorizontal: 0,
+		paddingVertical: 0,
+	},
 	emptyContainer: {
 		flex: 1,
 		alignItems: 'center',

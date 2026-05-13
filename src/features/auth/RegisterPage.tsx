@@ -34,8 +34,6 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 	const roleId = route.params?.roleId ?? ''
 	const roleLabel = route.params?.roleLabel ?? ''
 
-	const isDoctorRegistration = roleLabel.toLowerCase() === 'doctor' || roleId.toLowerCase() === 'doctor'
-
 	useEffect(() => {
 		if (!roleId) {
 			navigation.replace(ROUTES.AUTH.ROLE_SELECTION)
@@ -64,11 +62,9 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 				<OtpForm
 					contactNumber={contactNumber}
 					onVerify={() => {
-						if (isDoctorRegistration) {
-							setTimeout(() => {
-								resetNavigation(ROUTES.STACK.DOCTOR_WELCOME)
-							}, 0)
-						}
+						setTimeout(() => {
+							resetNavigation(ROUTES.STACK.DOCTOR_WELCOME)
+						}, 0)
 					}}
 					onEditContact={() => {
 						setFocusMobileOnRegister(true)
