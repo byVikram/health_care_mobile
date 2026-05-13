@@ -14,7 +14,7 @@ export interface ProfileFieldConfig {
 }
 
 export interface TabConfig {
-	tab: 'Personal' | 'Medical' | 'Life style'
+	tab: 'Personal' | 'Medical' | 'Lifestyle'
 	fields: ProfileFieldConfig[]
 }
 
@@ -112,7 +112,7 @@ export const PROFILE_TABS: TabConfig[] = [
 		],
 	},
 	{
-		tab: 'Life style',
+		tab: 'Lifestyle',
 		fields: [
 			{
 				key: 'smoking',
