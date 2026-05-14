@@ -9,6 +9,8 @@ export type { AppToggleProps } from "./AppToggle";
 export { default as AppHeader } from "./AppHeader";
 export { default as AppSidebar } from "./AppSidebar";
 export type { AppSidebarItem } from "./AppSidebar";
+export { default as AppTable } from "./AppTable";
+export type { AppTableColumn, AppTableColumnOption, AppTableProps } from "./AppTable";
 export { default as SplashScreen } from "./SplashScreen";
 export { default as DateSlotPicker } from './DateSlotPicker';
 export type { PickProps as DateSlotPickerProps } from './DateSlotPicker';

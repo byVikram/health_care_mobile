@@ -40,6 +40,7 @@ export const API_ENDPOINTS = {
 		DETAILS: `${BASE_URL}/api/doctors/details`,
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
+		ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
 		DELETE_ACCOUNT: `${BASE_URL}/api/doctors/profile`,
 	},
 	SPECIALITIES: {
@@ -73,6 +74,10 @@ export const API_ENDPOINTS = {
 		ME: `${BASE_URL}/api/patients/me`,
 		DETAILS: `${BASE_URL}/api/patients/me/details`,
 		GET_BY_PUBLIC_ID: (publicId: string) => `${BASE_URL}/api/patients/${publicId}/details`,
+	},
+	PHARMACY: {
+		ME: `${BASE_URL}/api/pharmacies/me`,
+		DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
 	},
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {
