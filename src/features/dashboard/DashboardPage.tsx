@@ -13,8 +13,11 @@ import HeroSection from './HeroSection'
 import SpecialitySection from './SpecialitySection'
 import ConsultSection from './ConsultSection'
 import PatientQuestionsSection from './PatientQuestionsSection'
+import PharmacyOrder from './PharmacyOrder'
 import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
 import CommunitySection from './CommunitySection'
+import LocationScreen from '../../components/common/LocationScreen'
+import { GPSLocationCard } from '../../components/common/GPSLocationCard'
 import BlogsSection from './BlogsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
 import { getAppointments, Appointment } from '../doctor/doctorService'
@@ -148,39 +151,59 @@ export default function DashboardPage() {
 	// ---------------- PHARMACY PANEL ----------------
 	const renderPharmacyPanel = () => (
 		<>
-			<TouchableOpacity style={styles.treatmentHistoryCard}>
-				<Text style={styles.treatmentHistoryTitle}>
-					📦 Inventory Management
-				</Text>
-			</TouchableOpacity>
-
-			<TouchableOpacity style={styles.treatmentHistoryCard}>
-				<Text style={styles.treatmentHistoryTitle}>
-					🧾 Orders
-				</Text>
-			</TouchableOpacity>
-
-			<TouchableOpacity style={styles.treatmentHistoryCard}>
-				<Text style={styles.treatmentHistoryTitle}>
-					💊 Upload Medicines
-				</Text>
-			</TouchableOpacity>
+			 <LocationScreen /> 
+			 <GPSLocationCard />
 		</>
 	)
 
-	// ---------------- CONDITIONAL HERO SECTION ----------------
-	const shouldShowHero = role !== USER_ROLES.PHARMACY
-
-	// ---------------- ROLE-BASED RIGHT PANEL ----------------
+	// ---------------- ROLE SWITCH ----------------
 	const renderRoleBasedPanel = () => {
 		switch (role) {
 			case USER_ROLES.DOCTOR:
 				return renderDoctorPanel()
+
 			case USER_ROLES.PHARMACY:
 				return renderPharmacyPanel()
+
 			default:
 				return renderUserPanel()
 		}
+	}
+
+	// ---- Helper: main content (hero + role panel) ----
+	const renderMainContent = () => {
+		if (isTablet) {
+			return (
+				<View style={styles.tabletRow}>
+					{/* HERO */}
+					<View
+						style={[
+							styles.heroColumn,
+							isLandscape && styles.heroColumnHalf,
+						]}
+					>
+						<HeroSection role={role} />
+					</View>
+
+					{/* ROLE PANEL */}
+					<View
+						style={[
+							styles.column,
+							isLandscape && styles.rightColumnHalf,
+						]}
+					>
+						{renderRoleBasedPanel()}
+					</View>
+				</View>
+			)
+		}
+		// Mobile: stack vertically
+		return (
+			<>
+				<HeroSection role={role} />
+				{renderRoleBasedPanel()}
+			</>
+		)
 	}
 
 	return (
@@ -190,50 +213,27 @@ export default function DashboardPage() {
 				contentContainerStyle={styles.content}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* MAIN RESPONSIVE LAYOUT */}
-				{isTablet ? (
-					<View style={styles.tabletRow}>
-						{/* HERO SECTION (hidden for pharmacy) */}
-						{shouldShowHero && (
-							<View
-								style={[
-									styles.heroColumn,
-									isLandscape && styles.heroColumnHalf,
-								]}
-							>
-								<HeroSection />
-							</View>
-						)}
+				{/* For PHARMACY role: show PharmacyOrder at the top (before HeroSection) */}
+				{role === USER_ROLES.PHARMACY && <PharmacyOrder />}
 
-						{/* RIGHT PANEL (appointments / pharmacy cards) */}
-						<View
-							style={[
-								styles.column,
-								isLandscape && styles.rightColumnHalf,
-								!shouldShowHero && styles.fullColumn,
-							]}
-						>
-							{renderRoleBasedPanel()}
-						</View>
-					</View>
-				) : (
-					<>
-						{/* Mobile: Hero only if not pharmacy */}
-						{shouldShowHero && <HeroSection />}
-						{renderRoleBasedPanel()}
-					</>
-				)}
+				{renderMainContent()}
 
-				{/* COMMON SECTIONS - always visible */}
+				{/* Common sections for all roles */}
 				<CommunitySection />
 				<BlogsSection />
-				<PatientQuestionsSection />
+
+				{/* PatientQuestionsSection is NOT rendered for Pharmacy */}
+				{role !== USER_ROLES.PHARMACY && <PatientQuestionsSection />}
 			</ScrollView>
 
 			<StatusModal
 				visible={modalType !== null}
 				status={modalType === 'success' ? 'success' : 'error'}
-				title={modalType === 'success' ? 'Success' : 'Booking Failed'}
+				title={
+					modalType === 'success'
+						? 'Success'
+						: 'Booking Failed'
+				}
 				description={
 					modalType === 'success'
 						? 'Updated successfully'
@@ -282,10 +282,6 @@ const styles = StyleSheet.create({
 
 	rightColumnHalf: {
 		flex: 0.5,
-	},
-
-	fullColumn: {
-		flex: 1,
 	},
 
 	treatmentHistoryCard: {

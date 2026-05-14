@@ -29,6 +29,12 @@ const VIDEO_SOURCE = require('../../assets/blog-and-community/video.mp4');
 const AD_IMAGE = require('../../assets/blog-and-community/ad-image.png');
 
 // ─────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────
+
+type Role = 'doctor' | 'patient' | 'pharmacy';
+
+// ─────────────────────────────────────────────────────────────
 // Video Slide
 // ─────────────────────────────────────────────────────────────
 
@@ -42,20 +48,17 @@ function VideoSlide({
   onVideoFinish?: () => void;
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
-
   const videoRef = useRef<any>(null);
 
   const handlePlay = async () => {
     setIsPlaying(true);
     onPlayStateChange?.(true);
-
     await videoRef.current?.playAsync();
   };
 
   const handlePause = async () => {
     setIsPlaying(false);
     onPlayStateChange?.(false);
-
     await videoRef.current?.pauseAsync();
   };
 
@@ -82,10 +85,7 @@ function VideoSlide({
       />
 
       {!isPlaying && (
-        <TouchableOpacity
-          style={styles.playButtonOverlay}
-          onPress={handlePlay}
-        >
+        <TouchableOpacity style={styles.playButtonOverlay} onPress={handlePlay}>
           <View style={styles.playCircle}>
             <View style={styles.playTriangle} />
           </View>
@@ -144,11 +144,7 @@ function usePingPongScroll(
           next = 1;
         }
 
-        flatListRef.current?.scrollToIndex({
-          index: next,
-          animated: true,
-        });
-
+        flatListRef.current?.scrollToIndex({ index: next, animated: true });
         return next;
       });
     }, intervalMs);
@@ -161,84 +157,47 @@ function usePingPongScroll(
 // Main Component
 // ─────────────────────────────────────────────────────────────
 
-export default function HeroSection() {
+export default function HeroSection({ role }: { role: Role }) {
+  const isPharmacy = role === 'pharmacy';
+
   // ───────────────────────────────────────────────────────────
-  // Video Carousel
+  // Video Carousel (doctor & patient only)
   // ───────────────────────────────────────────────────────────
 
   const [activeIndex, setActiveIndex] = useState(0);
-
   const [boxWidth, setBoxWidth] = useState(0);
-
   const flatListRef = useRef<FlatList>(null);
-
   const videos = [1, 2, 3, 4, 5];
-
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   // ───────────────────────────────────────────────────────────
-  // Others Popup
+  // Others Popup (doctor & patient only)
   // ───────────────────────────────────────────────────────────
 
   const [showOthersModal, setShowOthersModal] = useState(false);
-
   const popupScale = useRef(new Animated.Value(0.7)).current;
-
   const popupOpacity = useRef(new Animated.Value(0)).current;
-
   const popupTranslateY = useRef(new Animated.Value(25)).current;
 
   const openOthersModal = () => {
     setShowOthersModal(true);
-
     popupScale.setValue(0.7);
     popupOpacity.setValue(0);
     popupTranslateY.setValue(25);
 
     Animated.parallel([
-      Animated.spring(popupScale, {
-        toValue: 1,
-        friction: 6,
-        tension: 80,
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(popupOpacity, {
-        toValue: 1,
-        duration: 220,
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(popupTranslateY, {
-        toValue: 0,
-        duration: 220,
-        useNativeDriver: true,
-      }),
+      Animated.spring(popupScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+      Animated.timing(popupOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.timing(popupTranslateY, { toValue: 0, duration: 220, useNativeDriver: true }),
     ]).start();
   };
 
   const closeOthersModal = () => {
     Animated.parallel([
-      Animated.timing(popupScale, {
-        toValue: 0.7,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(popupOpacity, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(popupTranslateY, {
-        toValue: 25,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowOthersModal(false);
-    });
+      Animated.timing(popupScale, { toValue: 0.7, duration: 180, useNativeDriver: true }),
+      Animated.timing(popupOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(popupTranslateY, { toValue: 25, duration: 180, useNativeDriver: true }),
+    ]).start(() => setShowOthersModal(false));
   };
 
   // ───────────────────────────────────────────────────────────
@@ -246,28 +205,20 @@ export default function HeroSection() {
   // ───────────────────────────────────────────────────────────
 
   const onViewRef = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) {
-      setActiveIndex(viewableItems[0].index ?? 0);
-    }
+    if (viewableItems.length > 0) setActiveIndex(viewableItems[0].index ?? 0);
   });
 
-  const viewConfigRef = useRef({
-    viewAreaCoveragePercentThreshold: 50,
-  });
+  const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
 
   const handleDotPress = (index: number) => {
     setActiveIndex(index);
-
-    flatListRef.current?.scrollToIndex({
-      index,
-      animated: true,
-    });
+    flatListRef.current?.scrollToIndex({ index, animated: true });
   };
 
   usePingPongScroll(
     videos.length,
     4000,
-    boxWidth > 0 && !isVideoPlaying,
+    !isPharmacy && boxWidth > 0 && !isVideoPlaying,
     flatListRef,
     setActiveIndex
   );
@@ -277,39 +228,22 @@ export default function HeroSection() {
   // ───────────────────────────────────────────────────────────
 
   const [activeAdIndex, setActiveAdIndex] = useState(0);
-
   const [adBoxWidth, setAdBoxWidth] = useState(0);
-
   const adFlatListRef = useRef<FlatList>(null);
-
   const ads = [1, 2, 3];
 
   const onAdViewRef = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) {
-      setActiveAdIndex(viewableItems[0].index ?? 0);
-    }
+    if (viewableItems.length > 0) setActiveAdIndex(viewableItems[0].index ?? 0);
   });
 
-  const adViewConfigRef = useRef({
-    viewAreaCoveragePercentThreshold: 50,
-  });
+  const adViewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
 
   const handleAdDotPress = (index: number) => {
     setActiveAdIndex(index);
-
-    adFlatListRef.current?.scrollToIndex({
-      index,
-      animated: true,
-    });
+    adFlatListRef.current?.scrollToIndex({ index, animated: true });
   };
 
-  usePingPongScroll(
-    ads.length,
-    3000,
-    adBoxWidth > 0,
-    adFlatListRef,
-    setActiveAdIndex
-  );
+  usePingPongScroll(ads.length, 3000, adBoxWidth > 0, adFlatListRef, setActiveAdIndex);
 
   // ───────────────────────────────────────────────────────────
   // Services
@@ -333,201 +267,142 @@ export default function HeroSection() {
 
   return (
     <View style={styles.container}>
-      {/* ───────────────────────────────────────────── */}
-      {/* Quick Services */}
-      {/* ───────────────────────────────────────────── */}
 
-      <View style={styles.horizontalServicesRow}>
-        {horizontalServices.map((s) =>
-          s.title === 'Others' ? (
-            <TouchableOpacity
-              key={s.title}
-              style={styles.hServiceCard}
-              activeOpacity={0.8}
-              onPress={openOthersModal}
-            >
-              <View style={styles.othersIconContainer}>
-                <View
-                  style={[
-                    styles.othersSquare,
-                    { backgroundColor: '#0c7c7c' },
-                  ]}
-                />
+      {/* ─────────────────────────────────────────────
+          Quick Services — doctor & patient only
+      ───────────────────────────────────────────── */}
 
-                <View
-                  style={[
-                    styles.othersSquare,
-                    { backgroundColor: '#4264D0' },
-                  ]}
-                />
-
-                <View
-                  style={[
-                    styles.othersSquare,
-                    { backgroundColor: '#EA7F06' },
-                  ]}
-                />
-
-                <View
-                  style={[
-                    styles.othersSquare,
-                    { backgroundColor: '#DE3B40' },
-                  ]}
-                />
-              </View>
-
-              <AppTypography style={styles.hServiceTitle}>
-                Others
-              </AppTypography>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              key={s.title}
-              style={styles.hServiceCard}
-              activeOpacity={0.8}
-            >
-              <s.Component width={30} height={30} />
-
-              <AppTypography style={styles.hServiceTitle}>
-                {s.title}
-              </AppTypography>
-            </TouchableOpacity>
-          )
-        )}
-      </View>
-
-      {/* ───────────────────────────────────────────── */}
-      {/* Others Popup */}
-      {/* ───────────────────────────────────────────── */}
-
-      <Modal
-        visible={showOthersModal}
-        transparent
-        animationType="none"
-        onRequestClose={closeOthersModal}
-      >
-        <Pressable
-          style={styles.overlay}
-          onPress={closeOthersModal}
-        >
-          {/* Blur Background */}
-
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFillObject,
-              {
-                opacity: popupOpacity,
-              },
-            ]}
-          >
-            <BlurView
-              intensity={35}
-              tint="dark"
-              style={StyleSheet.absoluteFillObject}
-            />
-          </Animated.View>
-
-          {/* Popup */}
-
-          <Animated.View
-            style={[
-              styles.popupMenu,
-              {
-                opacity: popupOpacity,
-
-                transform: [
-                  { scale: popupScale },
-                  { translateY: popupTranslateY },
-                ],
-              },
-            ]}
-          >
-            <Pressable onPress={() => {}}>
-              <View style={styles.popupRow}>
-                {othersPopupItems.map((item) => (
-                  <TouchableOpacity
-                    key={item.title}
-                    style={styles.popupItem}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      closeOthersModal();
-                    }}
-                  >
-                    <View style={styles.popupIconCircle}>
-                      <item.Component width={30} height={30} />
-                    </View>
-
-                    <AppTypography style={styles.popupText}>
-                      {item.title}
-                    </AppTypography>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Modal>
-
-      {/* ───────────────────────────────────────────── */}
-      {/* Video Section */}
-      {/* ───────────────────────────────────────────── */}
-
-      <View style={styles.topRow}>
-        <View
-          style={styles.videoBox}
-          onLayout={(e) => setBoxWidth(e.nativeEvent.layout.width)}
-        >
-          {boxWidth > 0 && (
-            <>
-              <FlatList
-                ref={flatListRef}
-                data={videos}
-                keyExtractor={(_, i) => String(i)}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onViewableItemsChanged={onViewRef.current}
-                viewabilityConfig={viewConfigRef.current}
-                getItemLayout={(_, index) => ({
-                  length: boxWidth,
-                  offset: boxWidth * index,
-                  index,
-                })}
-                renderItem={() => (
-                  <VideoSlide
-                    width={boxWidth}
-                    onPlayStateChange={setIsVideoPlaying}
-                    onVideoFinish={() => setIsVideoPlaying(false)}
-                  />
-                )}
-              />
-
-              <View style={styles.dotsRow}>
-                {videos.map((_, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    onPress={() => handleDotPress(i)}
-                  >
-                    <View
-                      style={[
-                        styles.dot,
-                        i === activeIndex && styles.dotActive,
-                      ]}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
+      {!isPharmacy && (
+        <View style={styles.horizontalServicesRow}>
+          {horizontalServices.map((s) =>
+            s.title === 'Others' ? (
+              <TouchableOpacity
+                key={s.title}
+                style={styles.hServiceCard}
+                activeOpacity={0.8}
+                onPress={openOthersModal}
+              >
+                <View style={styles.othersIconContainer}>
+                  <View style={[styles.othersSquare, { backgroundColor: '#0c7c7c' }]} />
+                  <View style={[styles.othersSquare, { backgroundColor: '#4264D0' }]} />
+                  <View style={[styles.othersSquare, { backgroundColor: '#EA7F06' }]} />
+                  <View style={[styles.othersSquare, { backgroundColor: '#DE3B40' }]} />
+                </View>
+                <AppTypography style={styles.hServiceTitle}>Others</AppTypography>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity key={s.title} style={styles.hServiceCard} activeOpacity={0.8}>
+                <s.Component width={30} height={30} />
+                <AppTypography style={styles.hServiceTitle}>{s.title}</AppTypography>
+              </TouchableOpacity>
+            )
           )}
         </View>
-      </View>
+      )}
 
-      {/* ───────────────────────────────────────────── */}
-      {/* Ad Section */}
-      {/* ───────────────────────────────────────────── */}
+      {/* ─────────────────────────────────────────────
+          Others Popup — doctor & patient only
+      ───────────────────────────────────────────── */}
+
+      {!isPharmacy && (
+        <Modal
+          visible={showOthersModal}
+          transparent
+          animationType="none"
+          onRequestClose={closeOthersModal}
+        >
+          <Pressable style={styles.overlay} onPress={closeOthersModal}>
+            <Animated.View
+              style={[StyleSheet.absoluteFillObject, { opacity: popupOpacity }]}
+            >
+              <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFillObject} />
+            </Animated.View>
+
+            <Animated.View
+              style={[
+                styles.popupMenu,
+                {
+                  opacity: popupOpacity,
+                  transform: [{ scale: popupScale }, { translateY: popupTranslateY }],
+                },
+              ]}
+            >
+              <Pressable onPress={() => {}}>
+                <View style={styles.popupRow}>
+                  {othersPopupItems.map((item) => (
+                    <TouchableOpacity
+                      key={item.title}
+                      style={styles.popupItem}
+                      activeOpacity={0.8}
+                      onPress={closeOthersModal}
+                    >
+                      <View style={styles.popupIconCircle}>
+                        <item.Component width={30} height={30} />
+                      </View>
+                      <AppTypography style={styles.popupText}>{item.title}</AppTypography>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </Pressable>
+            </Animated.View>
+          </Pressable>
+        </Modal>
+      )}
+
+      {/* ─────────────────────────────────────────────
+          Video Section — doctor & patient only
+      ───────────────────────────────────────────── */}
+
+      {!isPharmacy && (
+        <View style={styles.topRow}>
+          <View
+            style={styles.videoBox}
+            onLayout={(e) => setBoxWidth(e.nativeEvent.layout.width)}
+          >
+            {boxWidth > 0 && (
+              <>
+                <FlatList
+                  ref={flatListRef}
+                  data={videos}
+                  keyExtractor={(_, i) => String(i)}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onViewableItemsChanged={onViewRef.current}
+                  viewabilityConfig={viewConfigRef.current}
+                  getItemLayout={(_, index) => ({
+                    length: boxWidth,
+                    offset: boxWidth * index,
+                    index,
+                  })}
+                  renderItem={() => (
+                    <VideoSlide
+                      width={boxWidth}
+                      onPlayStateChange={setIsVideoPlaying}
+                      onVideoFinish={() => setIsVideoPlaying(false)}
+                    />
+                  )}
+                />
+
+                <View style={styles.dotsRow}>
+                  {videos.map((_, i) => (
+                    <TouchableOpacity key={i} onPress={() => handleDotPress(i)}>
+                      <View style={[styles.dot, i === activeIndex && styles.dotActive]} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* ─────────────────────────────────────────────
+          Ad Section — all roles
+      ───────────────────────────────────────────── */}
 
       <View
-        style={styles.adBox}
+        style={[styles.adBox, !isPharmacy && styles.adBoxMargin]}
         onLayout={(e) => setAdBoxWidth(e.nativeEvent.layout.width)}
       >
         {adBoxWidth > 0 && (
@@ -551,22 +426,15 @@ export default function HeroSection() {
 
             <View style={styles.adDotsRow}>
               {ads.map((_, i) => (
-                <TouchableOpacity
-                  key={i}
-                  onPress={() => handleAdDotPress(i)}
-                >
-                  <View
-                    style={[
-                      styles.adDot,
-                      i === activeAdIndex && styles.adDotActive,
-                    ]}
-                  />
+                <TouchableOpacity key={i} onPress={() => handleAdDotPress(i)}>
+                  <View style={[styles.adDot, i === activeAdIndex && styles.adDotActive]} />
                 </TouchableOpacity>
               ))}
             </View>
           </>
         )}
       </View>
+
     </View>
   );
 }
@@ -606,10 +474,7 @@ const styles = StyleSheet.create({
 
   playButtonOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -693,30 +558,22 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 
-overlay: {
-	flex: 1,
-	justifyContent: 'flex-start',
-	alignItems: 'center',
-	paddingTop: 200, // adjust this value
-},
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 200,
+  },
+
   popupMenu: {
     backgroundColor: '#fff',
-
     borderRadius: 18,
-
     paddingVertical: 22,
     paddingHorizontal: 6,
-
     shadowColor: '#000',
-
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.16,
     shadowRadius: 14,
-
     elevation: 12,
   },
 
@@ -736,9 +593,7 @@ overlay: {
     width: 48,
     height: 48,
     borderRadius: 12,
-
     backgroundColor: '#f5f7fb',
-
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -755,6 +610,10 @@ overlay: {
     backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',
+  },
+
+  // Applied only when video section is above
+  adBoxMargin: {
     marginTop: 24,
   },
 

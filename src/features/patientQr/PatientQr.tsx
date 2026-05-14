@@ -8,7 +8,9 @@ import {
   Image,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import QRCodeImg from "../../assets/icons/QrCode.png";
+
+// ✅ FIXED IMAGE IMPORT
+const QRCodeImg = require("../../assets/icons/QrCode.png");
 
 type Props = {
   visible: boolean;
@@ -36,29 +38,36 @@ export default function PatientQrModal({
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
 
-        {/* Close Button */}
+        {/* CLOSE BUTTON */}
         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-          <MaterialCommunityIcons name="close" size={22} color="#333" />
+          <MaterialCommunityIcons name="close" size={24} color="#333" />
         </TouchableOpacity>
 
-        {/* Card */}
+        {/* CARD */}
         <View style={styles.container}>
 
-          {/* Avatar */}
+          {/* PROFILE IMAGE */}
           <View style={styles.avatarWrapper}>
             <Image source={image} style={styles.avatar} />
           </View>
 
-          {/* Name */}
+          {/* NAME */}
           <Text style={styles.name}>{name}</Text>
-          <Text style={styles.patientId}>({patientId})</Text>
 
-          {/* QR */}
+          <Text style={styles.patientId}>
+            ({patientId})
+          </Text>
+
+          {/* QR CODE */}
           <View style={styles.qrCard}>
-            <Image source={QRCodeImg} style={styles.qrImage} />
+            <Image
+              source={QRCodeImg}
+              style={styles.qrImage}
+              resizeMode="contain"
+            />
           </View>
 
-          {/* Info */}
+          {/* INFO */}
           <View style={styles.infoCard}>
             <Text style={styles.label}>Phone</Text>
             <Text style={styles.value}>{phone}</Text>
@@ -79,6 +88,7 @@ export default function PatientQrModal({
     </Modal>
   );
 }
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -92,6 +102,10 @@ const styles = StyleSheet.create({
     top: 50,
     right: 20,
     zIndex: 10,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 6,
+    elevation: 4,
   },
 
   container: {
@@ -102,9 +116,10 @@ const styles = StyleSheet.create({
   avatarWrapper: {
     width: 120,
     height: 120,
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: "hidden",
     marginBottom: 10,
+    backgroundColor: "#ddd",
   },
 
   avatar: {
@@ -113,8 +128,9 @@ const styles = StyleSheet.create({
   },
 
   name: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#222",
   },
 
   patientId: {
@@ -125,27 +141,29 @@ const styles = StyleSheet.create({
 
   qrCard: {
     backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 14,
-    elevation: 4,
+    padding: 18,
+    borderRadius: 18,
+    elevation: 5,
     marginBottom: 20,
+  },
+
+  qrImage: {
+    width: 160,
+    height: 160,
   },
 
   infoCard: {
     width: "85%",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 14,
+    padding: 16,
+    elevation: 3,
   },
 
   label: {
     fontSize: 12,
     color: "#888",
-  },
-  qrImage: {
-    width: 140,
-    height: 140,
-    resizeMode: "contain",
+    marginBottom: 2,
   },
 
   value: {
@@ -157,6 +175,6 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: "#eee",
-    marginVertical: 6,
+    marginVertical: 8,
   },
 });

@@ -30,5 +30,6 @@ export const ROUTES = {
 		RESCHEDULE_APPOINTMENT: 'RescheduleAppointment',
 		CANCEL_APPOINTMENT: 'CancelAppointment',
 		PATIENT_PAYMENT: 'PatientPayment',
+		PHARMACY_SEARCH: 'PharmacySearch',   // ✅ Added for pharmacy role
 	},
 } as const

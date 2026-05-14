@@ -16,6 +16,7 @@ import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
 // import ConsultationPage from '../features/consultation/ConsultationPage'
 import PatientProfileLayout from '../features/profile/patient/PatientProfileLayout'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
+
 import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/setting/SettingPage'
 import AccountPage from '../features/auth/AccountPage'
@@ -23,61 +24,92 @@ import PatientPayment from '../features/patientPayment/PatientPayment'
 import SearchPage from '../features/doctor/search/SearchPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 import ConsultationPage from '../features/consultation/ConsultationPage'
+
+import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
+import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
-	return (
-		<AppStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={ROUTES.MAIN.TABS}>
-			<AppStack.Screen name={ROUTES.MAIN.TABS} component={MainTabNavigator} options={{ animation: 'none' }} />
+  return (
+    <AppStack.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName={ROUTES.MAIN.TABS}
+    >
+      <AppStack.Screen
+        name={ROUTES.MAIN.TABS}
+        component={MainTabNavigator}
+        options={{ animation: 'none' }}
+      />
 
-			{/* ✅ ADD THIS SCREEN */}
-			<AppStack.Screen name={ROUTES.STACK.SEARCH} component={SearchPage} />
+      {/* General Search (for patients / doctors) */}
+      <AppStack.Screen name={ROUTES.STACK.SEARCH} component={SearchPage} />
 
-			<AppStack.Screen name={ROUTES.STACK.DOCTOR_SEARCH} component={DoctorSearchPage} />
+      {/* ✅ Pharmacy Search (for pharmacy role) */}
+      <AppStack.Screen
+        name={ROUTES.STACK.PHARMACY_SEARCH}
+        component={PharmacySearchPage}
+      />
+      <AppStack.Screen name="OrderDetails" component={OrderDetailsScreen} />
+      <AppStack.Screen
+        name={ROUTES.STACK.DOCTOR_SEARCH}
+        component={DoctorSearchPage}
+      />
 
-			<AppStack.Screen name={ROUTES.STACK.DOCTOR_DETAIL} component={DoctorDetailPage} />
+      <AppStack.Screen
+        name={ROUTES.STACK.DOCTOR_DETAIL}
+        component={DoctorDetailPage}
+      />
 
-			<AppStack.Screen name={ROUTES.STACK.FAVOURITE_DOCTOR} component={MyDoctorPage} />
+      <AppStack.Screen
+        name={ROUTES.STACK.FAVOURITE_DOCTOR}
+        component={MyDoctorPage}
+      />
 
-			<AppStack.Screen name={ROUTES.STACK.NOTIFICATION} component={NotificationPage} />
+      <AppStack.Screen
+        name={ROUTES.STACK.NOTIFICATION}
+        component={NotificationPage}
+      />
 
-			<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
+      {/* <AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} /> */}
 
-			<AppStack.Screen name={ROUTES.STACK.HEALTH_PROFILE} component={PatientProfileLayout} />
+      <AppStack.Screen
+        name={ROUTES.STACK.HEALTH_PROFILE}
+        component={PatientProfileLayout}
+      />
 
-			<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
+      <AppStack.Screen
+        name={ROUTES.STACK.SETTINGS}
+        component={SettingPage}
+      />
 
-			<AppStack.Screen
-				name={ROUTES.STACK.DOCTOR_WELCOME}
-				component={WelcomeDoctorPage}
-				options={{ animation: 'none' }}
-			/>
+      <AppStack.Screen
+        name={ROUTES.STACK.DOCTOR_WELCOME}
+        component={WelcomeDoctorPage}
+        options={{ animation: 'none' }}
+      />
 
-			<AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
+      <AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
 
-			<AppStack.Screen name="PatientPayment" component={PatientPayment} />
-		</AppStack.Navigator>
-	)
+      <AppStack.Screen name="PatientPayment" component={PatientPayment} />
+    </AppStack.Navigator>
+  )
 }
+
 export default function AppNavigator() {
-	const { accessToken, isLoading } = useAuth()
-	const theme = useTheme()
+  const { accessToken, isLoading } = useAuth()
+  const theme = useTheme()
 
-	if (isLoading) {
-		return (
-			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-				<ActivityIndicator size="large" color={theme.colors.primary} />
-			</View>
-		)
-	}
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    )
+  }
 
-	return (
-		<NavigationContainer ref={navigationRef}>
-			{!accessToken ? (
-				<AuthNavigator />
-			) : (
-				<AuthenticatedNavigator />
-			)}
-		</NavigationContainer>
-	)
+  return (
+    <NavigationContainer ref={navigationRef}>
+      {!accessToken ? <AuthNavigator /> : <AuthenticatedNavigator />}
+    </NavigationContainer>
+  )
 }
