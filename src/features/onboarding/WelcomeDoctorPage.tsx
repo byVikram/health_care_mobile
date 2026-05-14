@@ -18,6 +18,7 @@ import FeedbackIcon from "../../assets/Register/Feedback.svg";
 import DoctorTabletImage from "../../assets/Register/Welcome.svg";
 
 import { AppSelect, AppSelectOption, AppTypography } from "../../components/common";
+import { useAuth } from "../../context/AuthContext";
 import { ROUTES } from "../../navigation/routes";
 import type { AppStackScreenProps } from "../../navigation/types";
 import { getSpecialities } from "../doctor/doctorService";
@@ -44,9 +45,12 @@ const MOCK_LOCATIONS: AppSelectOption[] = [
   { label: "Chandigarh", value: "Chandigarh" },
 ];
 
+const pharmacistImage = require("../../assets/Banner/pharmacy.png");
+
 export default function WelcomeDoctorPage({
   navigation,
 }: AppStackScreenProps<typeof ROUTES.STACK.DOCTOR_WELCOME>) {
+  const { role } = useAuth();
   const [showAccountDetails, setShowAccountDetails] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedSpeciality, setSelectedSpeciality] = useState("");
@@ -79,6 +83,57 @@ export default function WelcomeDoctorPage({
   const accountDropdownBottomOffset = isTablet ? 40 : 96;
   const accountTopPadding = isTablet ? 40 : isCompactHeight ? 34 : 44;
   const canContinue = Boolean(selectedLocation && selectedSpeciality) && !loadingSpecialities && !isSaving;
+  const isPharmacist = role === "pharmacy";
+
+  const welcomeConfig = isPharmacist
+    ? {
+        title: "Welcome Pharmacist👋",
+        subtitle: "Let's get your pharmacy listed and ready to serve patients.",
+        buttonLabel: "Set Up Pharmacy Profile",
+        features: [
+          {
+            Icon: ProfileIcon,
+            title: "Profile",
+            description: "Get discovered by patients looking for pharmacies on Whisper ai",
+          },
+          {
+            Icon: ConsultIcon,
+            title: "Inventory",
+            description: "Manage your medicine inventory and keep availability up to date",
+          },
+          {
+            Icon: FeedbackIcon,
+            title: "Orders",
+            description: "Receive and fulfil prescription orders from patients directly",
+          },
+        ],
+      }
+    : {
+        title: "Welcome Doctor! \uD83D\uDC4B\uD83C\uDFFB",
+        subtitle: "Let's help you get started on Whisper ai by making your Doctor Profile.",
+        buttonLabel: "Create free profile",
+        features: [
+          {
+            Icon: ProfileIcon,
+            title: "Profile",
+            description: "Makes you visible to the hundreds of patients searching on Whisper ai.com",
+          },
+          {
+            Icon: ConsultIcon,
+            title: "Consult",
+            description: "Online consultations are convenient and a great way to maximise your earnings",
+          },
+          {
+            Icon: FeedbackIcon,
+            title: "Feedback",
+            description: "You can view and reply to patients' feedback here",
+          },
+        ],
+      };
+  const welcomeTitleSize = isPharmacist && isTablet ? 44 : titleSize;
+  const welcomeSubtitleSize = isPharmacist && isTablet ? 18 : subtitleSize;
+  const welcomeBodySize = isPharmacist && isTablet ? 17 : bodySize;
+  const welcomeButtonWidth = isPharmacist && useSplitLayout ? 430 : useSplitLayout ? 360 : 420;
 
   useEffect(() => {
     const fetchSpecialities = async () => {
@@ -146,6 +201,23 @@ export default function WelcomeDoctorPage({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleWelcomeCta = () => {
+    if (isPharmacist) {
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: ROUTES.MAIN.TABS,
+            params: { screen: ROUTES.PORTAL.PROFILE },
+          },
+        ],
+      });
+      return;
+    }
+
+    setShowAccountDetails(true);
   };
 
   if (showAccountDetails) {
@@ -274,8 +346,8 @@ export default function WelcomeDoctorPage({
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
+    <SafeAreaView style={[styles.safe, isPharmacist && styles.pharmacistSafe]}>
+      <StatusBar barStyle="dark-content" backgroundColor={isPharmacist ? "#ffffff" : "#f5f7fa"} />
 
       <ScrollView
         style={styles.scroll}
@@ -329,11 +401,11 @@ export default function WelcomeDoctorPage({
               variant="h1"
               style={[
                 styles.title,
-                { fontSize: titleSize, marginBottom: isCompactHeight ? 8 : 12 },
+                { fontSize: welcomeTitleSize, marginBottom: isCompactHeight ? 8 : 12 },
                 !useSplitLayout && styles.centerText,
               ]}
             >
-              {`Welcome Doctor! \uD83D\uDC4B\uD83C\uDFFB`}
+              {welcomeConfig.title}
             </AppTypography>
             
             <AppTypography
@@ -341,46 +413,28 @@ export default function WelcomeDoctorPage({
               style={[
                 styles.subtitle,
                 {
-                  fontSize: subtitleSize,
-                  lineHeight: isTablet ? 25 : 20,
+                  fontSize: welcomeSubtitleSize,
+                  lineHeight: isTablet ? 27 : 20,
                   marginBottom: isCompactHeight ? 22 : 32,
                 },
                 !useSplitLayout && styles.centerText,
               ]}
             >
-              Let's help you get started on Whisper ai by making your Doctor Profile.
+              {welcomeConfig.subtitle}
             </AppTypography>
 
             <View style={[styles.section, { gap: isCompactHeight ? 18 : 24 }]}>
-              <View style={styles.row}>
-                <View style={[styles.iconWrapper, { width: iconSize + 4, height: iconSize + 4 }]}>
-                  <ProfileIcon width={iconSize} height={iconSize} />
+              {welcomeConfig.features.map(({ Icon, title, description }) => (
+                <View key={title} style={styles.row}>
+                  <View style={[styles.iconWrapper, { width: iconSize + 4, height: iconSize + 4 }]}>
+                    <Icon width={iconSize} height={iconSize} />
+                  </View>
+                  <AppTypography variant="body" style={[styles.text, { fontSize: welcomeBodySize, lineHeight: isTablet ? 26 : 20 }]}>
+                    <AppTypography variant="body" style={[styles.bold, { fontSize: welcomeBodySize, lineHeight: isTablet ? 26 : 20 }]}>{title} - </AppTypography>
+                    {description}
+                  </AppTypography>
                 </View>
-                <AppTypography variant="body" style={[styles.text, { fontSize: bodySize, lineHeight: isTablet ? 23 : 20 }]}>
-                  <AppTypography variant="body" style={[styles.bold, { fontSize: bodySize, lineHeight: isTablet ? 23 : 20 }]}>Profile - </AppTypography>
-                  Makes you visible to the hundreds of patients searching on Whisper ai.com
-                </AppTypography>
-              </View>
-
-              <View style={styles.row}>
-                <View style={[styles.iconWrapper, { width: iconSize + 4, height: iconSize + 4 }]}>
-                  <ConsultIcon width={iconSize} height={iconSize} />
-                </View>
-                <AppTypography variant="body" style={[styles.text, { fontSize: bodySize, lineHeight: isTablet ? 23 : 20 }]}>
-                  <AppTypography variant="body" style={[styles.bold, { fontSize: bodySize, lineHeight: isTablet ? 23 : 20 }]}>Consult - </AppTypography>
-                  Online consultations are convenient and a great way to maximise your earnings
-                </AppTypography>
-              </View>
-
-              <View style={styles.row}>
-                <View style={[styles.iconWrapper, { width: iconSize + 4, height: iconSize + 4 }]}>
-                  <FeedbackIcon width={iconSize} height={iconSize} />
-                </View>
-                <AppTypography variant="body" style={[styles.text, { fontSize: bodySize, lineHeight: isTablet ? 23 : 20 }]}>
-                  <AppTypography variant="body" style={[styles.bold, { fontSize: bodySize, lineHeight: isTablet ? 23 : 20 }]}>Feedback - </AppTypography>
-                  You can view and reply to patients' feedback here
-                </AppTypography>
-              </View>
+              ))}
             </View>
 
             <TouchableOpacity
@@ -388,21 +442,35 @@ export default function WelcomeDoctorPage({
                 styles.button,
                 {
                   marginTop: isCompactHeight ? 24 : 34,
-                  maxWidth: useSplitLayout ? 360 : 420,
+                  maxWidth: welcomeButtonWidth,
                   alignSelf: useSplitLayout ? "flex-start" : "center",
                   paddingVertical: isTablet ? 17 : 15,
                 },
               ]}
               activeOpacity={0.85}
-              onPress={() => setShowAccountDetails(true)}
+              onPress={handleWelcomeCta}
             >
-              <AppTypography variant="body" style={styles.buttonText}>Create free profile</AppTypography>
+              <AppTypography variant="body" style={styles.buttonText}>{welcomeConfig.buttonLabel}</AppTypography>
             </TouchableOpacity>
           </View>
 
           {showIllustration ? (
             <View style={styles.imageSection}>
-              <DoctorTabletImage width={illustrationSize} height={illustrationSize} />
+              {isPharmacist ? (
+                <Image
+                  source={pharmacistImage}
+                  style={[
+                    styles.pharmacistImage,
+                    {
+                      width: illustrationSize,
+                      height: illustrationSize,
+                    },
+                  ]}
+                  resizeMode="contain"
+                />
+              ) : (
+                <DoctorTabletImage width={illustrationSize} height={illustrationSize} />
+              )}
             </View>
           ) : null}
         </View>
@@ -415,6 +483,9 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: "#f5f7fa",
+  },
+  pharmacistSafe: {
+    backgroundColor: "#ffffff",
   },
   scroll: {
     flex: 1,
@@ -461,6 +532,9 @@ const styles = StyleSheet.create({
     minWidth: 300,
     justifyContent: "center",
     alignItems: "center",
+  },
+  pharmacistImage: {
+    borderRadius: 18,
   },
   accountContainer: {
     flexGrow: 1,

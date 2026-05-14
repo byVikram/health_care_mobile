@@ -273,6 +273,55 @@ export const deleteHospital = async (hospitalId: string) => {
 	return res.data
 }
 
+export interface DoctorAchievementPayload {
+	title: string
+	category: string
+	description: string
+	organization: string
+	date_awarded: string
+	image?: string | null
+	document_url?: string | null
+	is_public: boolean
+}
+
+export interface DoctorAchievement {
+	id: string
+	title: string
+	category: string
+	description: string
+	organization: string
+	date: string
+	image: string | null
+	isPublic: boolean
+}
+
+export const mapDoctorAchievementApi = (item: any): DoctorAchievement => ({
+	id: String(item?.id ?? item?.achievement_id ?? Date.now()),
+	title: item?.title ?? '',
+	category: item?.category ?? '',
+	description: item?.description ?? '',
+	organization: item?.organization ?? item?.issuing_organization ?? item?.hospital ?? '',
+	date: item?.date_awarded ?? item?.awarded_on ?? item?.date ?? '',
+	image: item?.image ?? item?.image_url ?? item?.document_url ?? item?.verification_document_s3_key ?? null,
+	isPublic: item?.is_public ?? item?.isPublic ?? true,
+})
+
+export const getDoctorAchievements = async (): Promise<DoctorAchievement[]> => {
+	const res = await ApiService.get<any>(API_ENDPOINTS.DOCTOR_PROFILE.ACHIEVEMENTS)
+	const raw = res.data?.data?.achievements ?? res.data?.data ?? res.data?.achievements ?? []
+	return Array.isArray(raw) ? raw.map(mapDoctorAchievementApi) : []
+}
+
+export const createDoctorAchievement = async (data: DoctorAchievementPayload) => {
+	const res = await ApiService.post(API_ENDPOINTS.DOCTOR_PROFILE.ACHIEVEMENTS, data)
+	return res.data
+}
+
+export const updateDoctorAchievement = async (achievementId: string, data: DoctorAchievementPayload) => {
+	const res = await ApiService.patch(`${API_ENDPOINTS.DOCTOR_PROFILE.ACHIEVEMENTS}/${achievementId}`, data)
+	return res.data
+}
+
 // -- Doctor profile -------------------------------------------------------------
 export const getDoctorProfile = async (): Promise<DoctorProfileApiResponse> => {
 	const token = await AsyncStorage.getItem('access_token')

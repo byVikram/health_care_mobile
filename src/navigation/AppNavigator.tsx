@@ -23,7 +23,8 @@ import AccountPage from '../features/auth/AccountPage'
 import PatientPayment from '../features/patientPayment/PatientPayment'
 import SearchPage from '../features/doctor/search/SearchPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
-import ConsultationPage from '../features/consultation/ConsultationPage'
+import AllAppointmentList from '../features/appointment/AllAppointmentList'
+// import ConsultationPage from '../features/consultation/ConsultationPage'
 
 import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
 import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
@@ -89,6 +90,8 @@ function AuthenticatedNavigator() {
       />
 
       <AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
+
+			<AppStack.Screen name={ROUTES.STACK.APPOINTMENTS} component={AllAppointmentList} />
 
       <AppStack.Screen name="PatientPayment" component={PatientPayment} />
     </AppStack.Navigator>
