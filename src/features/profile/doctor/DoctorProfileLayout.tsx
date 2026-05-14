@@ -16,11 +16,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { getDoctorProfile, mapDoctorProfileApi } from '../../doctor/doctorService'
 import { BASE_URL } from '../../../constants/apiUrls'
 import { DoctorAvailability, DoctorHospital } from '../../../types/doctor-profile'
+import { ROUTES } from '../../../navigation/routes'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import MyHospitalsTab from './tabs/MyHospitalsTab'
 import AvailabilityTab from './tabs/AvailabilityTab'
-// import AchievementsTab from './tabs/AchievementsTab'
+import AchievementsTab from './tabs/AchievementsTab'
 import FavouriteDoctorsTab from './tabs/FavouriteDoctorsTab'
 import SettingsTab from './tabs/SettingsTab'
 
@@ -29,7 +30,7 @@ const TABS = [
 	{ key: 'professional', label: 'Professional details', Component: ProfessionalDetailsTab },
 	{ key: 'hospitals', label: 'My hospitals', Component: MyHospitalsTab },
 	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
-	// { key: 'achievements', label: 'Achievements', Component: AchievementsTab },
+	{ key: 'achievements', label: 'Achievements', Component: AchievementsTab },
 	{ key: 'favourites', label: 'Favourite doctors', Component: FavouriteDoctorsTab },
 	{ key: 'settings', label: 'Settings', Component: SettingsTab },
 ]
@@ -127,6 +128,15 @@ export default function DoctorProfileLayout() {
 		pagerRef.current?.scrollTo({ x: nextIndex * width, animated })
 	}, [width])
 
+	const handleHeaderBack = useCallback(() => {
+		if (navigation.canGoBack()) {
+			navigation.goBack()
+			return
+		}
+
+		navigation.navigate(ROUTES.MAIN.HOME)
+	}, [navigation])
+
 	const handlePagerMomentumEnd = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
 		const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
 		const clampedIndex = Math.max(0, Math.min(TABS.length - 1, nextIndex))
@@ -159,7 +169,7 @@ export default function DoctorProfileLayout() {
 		<View style={[styles.container, { paddingTop: insets.top + 16 }]}>
 			{/* Back Button Header */}
 			<View style={styles.header}>
-				<TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.8}>
+				<TouchableOpacity onPress={handleHeaderBack} style={styles.backBtn} activeOpacity={0.8}>
 					<MaterialCommunityIcons name="chevron-left" size={28} color="#0c7c7c" />
 					<AppTypography variant="h3" style={styles.headerTitle}>
 						Profile

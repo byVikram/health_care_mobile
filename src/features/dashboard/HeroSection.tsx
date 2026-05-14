@@ -12,8 +12,10 @@ import {
 
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
+import { useNavigation } from '@react-navigation/native';
 
 import { AppTypography } from '../../components/common';
+import { ROUTES } from '../../navigation/routes';
 
 import EmergencyIcon from '../../assets/quick-services/emergency.svg';
 import AmbulanceIcon from '../../assets/quick-services/ambulance.svg';
@@ -162,6 +164,8 @@ function usePingPongScroll(
 // ─────────────────────────────────────────────────────────────
 
 export default function HeroSection() {
+  const navigation = useNavigation<any>();
+
   // ───────────────────────────────────────────────────────────
   // Video Carousel
   // ───────────────────────────────────────────────────────────
@@ -331,6 +335,12 @@ export default function HeroSection() {
     { title: 'Emergency', Component: EmergencyIcon },
   ];
 
+  const handleServicePress = (title: string) => {
+    if (title === 'Appointment') {
+      navigation.navigate(ROUTES.STACK.APPOINTMENTS);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* ───────────────────────────────────────────── */}
@@ -380,19 +390,24 @@ export default function HeroSection() {
                 Others
               </AppTypography>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              key={s.title}
-              style={styles.hServiceCard}
-              activeOpacity={0.8}
-            >
-              <s.Component width={30} height={30} />
+          ) : (() => {
+            const Icon = s.Component;
 
-              <AppTypography style={styles.hServiceTitle}>
-                {s.title}
-              </AppTypography>
-            </TouchableOpacity>
-          )
+            return (
+              <TouchableOpacity
+                key={s.title}
+                style={styles.hServiceCard}
+                activeOpacity={0.8}
+                onPress={() => handleServicePress(s.title)}
+              >
+                {Icon && <Icon width={30} height={30} />}
+
+                <AppTypography style={styles.hServiceTitle}>
+                  {s.title}
+                </AppTypography>
+              </TouchableOpacity>
+            );
+          })()
         )}
       </View>
 

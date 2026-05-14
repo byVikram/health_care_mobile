@@ -32,6 +32,25 @@ export interface DoctorProfileApiAvailability {
 	hospital_name: string
 }
 
+export interface DoctorProfileApiAchievement {
+	id: string | number
+	title?: string | null
+	category?: string | null
+	description?: string | null
+	organization?: string | null
+	issuing_organization?: string | null
+	hospital?: string | null
+	date?: string | null
+	date_awarded?: string | null
+	awarded_on?: string | null
+	image?: string | null
+	image_url?: string | null
+	document_url?: string | null
+	verification_document_s3_key?: string | null
+	is_public?: boolean | null
+	isPublic?: boolean | null
+}
+
 export interface DoctorProfileApiData {
 	personal_details: {
 		name: string
@@ -63,6 +82,7 @@ export interface DoctorProfileApiData {
 	}
 	hospitals: DoctorProfileApiHospital[]
 	availability: DoctorProfileApiAvailability[]
+	achievements?: DoctorProfileApiAchievement[]
 }
 
 export interface DoctorProfileApiResponse {
