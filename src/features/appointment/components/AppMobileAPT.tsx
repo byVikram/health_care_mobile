@@ -13,6 +13,8 @@ export type MobileAppointmentRow = {
 	id: string
 	patientName: string
 	patientAvatar: string
+	doctorName?: string
+	doctorAvatar?: string
 	appointmentDate: string
 	startTime: string
 	endTime: string | null
@@ -23,6 +25,7 @@ export type MobileAppointmentRow = {
 
 type AppMobileAPTProps = {
 	row: MobileAppointmentRow
+	displayRole?: 'doctor' | 'patient'
 }
 
 const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || 'P'
@@ -58,20 +61,23 @@ const statusColors = (status: string) => {
 	return { color: TEAL, backgroundColor: '#edfafa' }
 }
 
-function PersonCell({ row }: AppMobileAPTProps) {
+function PersonCell({ row, displayRole = 'doctor' }: AppMobileAPTProps) {
+	const name = displayRole === 'patient' ? row.doctorName || 'Unknown doctor' : row.patientName
+	const avatar = displayRole === 'patient' ? row.doctorAvatar : row.patientAvatar
+
 	return (
 		<View style={styles.personCell}>
-			{row.patientAvatar ? (
-				<Image source={{ uri: row.patientAvatar }} style={styles.avatar} />
+			{avatar ? (
+				<Image source={{ uri: avatar }} style={styles.avatar} />
 			) : (
 				<View style={styles.avatarFallback}>
-					<AppTypography style={styles.avatarText}>{getInitial(row.patientName)}</AppTypography>
+					<AppTypography style={styles.avatarText}>{getInitial(name)}</AppTypography>
 				</View>
 			)}
 
 			<View style={styles.personTextWrap}>
 				<AppTypography style={styles.personName} numberOfLines={1}>
-					{row.patientName}
+					{name}
 				</AppTypography>
 			</View>
 		</View>
@@ -89,11 +95,11 @@ function StatusPill({ status }: { status: string }) {
 	)
 }
 
-export default function AppMobileAPT({ row }: AppMobileAPTProps) {
+export default function AppMobileAPT({ row, displayRole = 'doctor' }: AppMobileAPTProps) {
 	return (
 		<View style={styles.mobileCard}>
 			<View style={styles.mobileCardTop}>
-				<PersonCell row={row} />
+				<PersonCell row={row} displayRole={displayRole} />
 				<StatusPill status={row.status} />
 			</View>
 

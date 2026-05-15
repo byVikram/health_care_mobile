@@ -19,16 +19,22 @@ import { BlurView } from 'expo-blur'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { AppSelect, AppSelectOption, AppTable, AppTableColumn, AppTypography } from '../../components/common'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { useAuth } from '../../context/AuthContext'
+import PaginationBar from '../../components/common/AppPagination'
 import AppMobileAPT from './components/AppMobileAPT'
 
 type AppointmentRow = Record<string, unknown> & {
 	id: string
+	patientId: string
+	patientIds: string[]
 	patientName: string
 	patientAvatar: string
+	doctorId: string
+	doctorIds: string[]
 	appointmentDate: string
 	startTime: string
 	endTime: string | null
@@ -36,6 +42,8 @@ type AppointmentRow = Record<string, unknown> & {
 	status: string
 	doctorName: string
 	doctorAvatar: string
+	hospitalId: string
+	hospitalIds: string[]
 	hospitalName: string | null
 	hospitalAddress: string | null
 }
@@ -71,15 +79,43 @@ type ApiHospitalsResponse = {
 
 type ApiAppointment = {
 	id: string
+	appointment_id?: string | number
+	patient_id?: string | number
+	patient_profile_id?: string | number
+	doctor_id?: string | number
+	hospital_id?: string | number
+	public_id?: string | number
+	user_id?: string | number
 	appointment_mode?: string
 	appointment_date?: string
 	appointment_time?: string
 	start_time?: string
 	end_time?: string | null
 	status?: string | { label?: string }
-	doctor?: { id?: string; name?: string; avatar_s3_key?: string | null }
-	patient?: { id?: string; name?: string; avatar_s3_key?: string | null }
-	hospital?: { id?: string; name?: string; address?: string } | null
+	doctor?: {
+		id?: string | number
+		doctor_id?: string | number
+		public_id?: string | number
+		user_id?: string | number
+		name?: string
+		avatar_s3_key?: string | null
+	}
+	patient?: {
+		id?: string | number
+		patient_id?: string | number
+		patient_profile_id?: string | number
+		public_id?: string | number
+		user_id?: string | number
+		name?: string
+		avatar_s3_key?: string | null
+	}
+	user?: {
+		id?: string | number
+		public_id?: string | number
+		user_id?: string | number
+		role?: string
+	}
+	hospital?: { id?: string | number; hospital_id?: string | number; name?: string; address?: string } | null
 }
 
 type ApiAppointmentsResponse = {
@@ -95,7 +131,8 @@ type ApiAppointmentsResponse = {
 }
 
 const PAGE_SIZE = 10
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+const MOBILE_PAGE_SIZE_OPTIONS = [10, 20, 50]
 const MODE_OPTIONS: AppSelectOption[] = [
 	{ label: 'All', value: 'all' },
 	{ label: 'Online', value: 'online' },
@@ -130,10 +167,24 @@ const getStatusLabel = (status: ApiAppointment['status']) => {
 
 const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || 'P'
 
+const parseDateOnly = (value: string) => {
+	if (!value) return null
+	const dateOnly = value.split('T')[0]
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnly)
+
+	if (match) {
+		const [, year, month, day] = match
+		return new Date(Number(year), Number(month) - 1, Number(day))
+	}
+
+	const parsed = new Date(value)
+	return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 const formatDate = (value: string) => {
 	if (!value) return '-'
-	const parsed = new Date(value)
-	if (Number.isNaN(parsed.getTime())) return value
+	const parsed = parseDateOnly(value)
+	if (!parsed) return value
 
 	return parsed.toLocaleDateString(undefined, {
 		month: 'short',
@@ -145,6 +196,22 @@ const formatDate = (value: string) => {
 const formatMode = (value: string) => {
 	if (!value) return '-'
 	return value.replace(/_/g, ' ').toLowerCase()
+}
+
+const normalizeModeValue = (value: string) => {
+	const normalized = value.replace(/[-\s]/g, '_').toLowerCase()
+	if (['online', 'video', 'virtual', 'teleconsultation'].includes(normalized)) return 'online'
+	if (['offline', 'clinic', 'in_person', 'inperson'].includes(normalized)) return 'offline'
+	return normalized
+}
+
+const normalizeStatusValue = (value: string) => {
+	const normalized = value.replace(/[-\s]/g, '_').toLowerCase()
+	if (normalized.includes('confirm')) return 'confirmed'
+	if (normalized.includes('cancel') || normalized.includes('reject')) return 'cancelled'
+	if (normalized.includes('reschedule')) return 'rescheduled'
+	if (normalized.includes('pending')) return 'pending'
+	return normalized
 }
 
 const formatApiDate = (date: Date) => {
@@ -182,6 +249,40 @@ const applyDateFilterParams = (params: Record<string, unknown>, filter: string) 
 	params.date_filter = filter
 }
 
+const getDateRangeForFilter = (filter: string) => {
+	if (filter === 'all') return null
+
+	const today = new Date()
+	today.setHours(0, 0, 0, 0)
+
+	if (filter === 'today') {
+		return { start: today, end: today }
+	}
+
+	if (filter === 'yesterday') {
+		const yesterday = new Date(today)
+		yesterday.setDate(today.getDate() - 1)
+		return { start: yesterday, end: yesterday }
+	}
+
+	const days = filter === 'last_30_days' ? 30 : 7
+	const start = new Date(today)
+	start.setDate(today.getDate() - (days - 1))
+	return { start, end: today }
+}
+
+const isDateInFilter = (value: string, filter: string) => {
+	const range = getDateRangeForFilter(filter)
+	if (!range) return true
+	if (!value) return false
+
+	const parsed = parseDateOnly(value)
+	if (!parsed) return false
+	parsed.setHours(0, 0, 0, 0)
+
+	return parsed >= range.start && parsed <= range.end
+}
+
 const statusColors = (status: string) => {
 	const normalized = status.toLowerCase()
 	if (normalized.includes('confirm') || normalized.includes('complete')) {
@@ -196,21 +297,76 @@ const statusColors = (status: string) => {
 	return { color: TEAL, backgroundColor: '#edfafa' }
 }
 
+const getAppointmentId = (appt: ApiAppointment) => String(appt.appointment_id ?? appt.id ?? '')
+const uniqueStrings = (values: Array<string | number | null | undefined>) =>
+	Array.from(
+		new Set(
+			values
+				.map((value) => String(value ?? '').trim())
+				.filter(Boolean)
+		)
+	)
+const getPatientIds = (appt: ApiAppointment) =>
+	uniqueStrings([
+		appt.patient?.id,
+		appt.patient?.patient_id,
+		appt.patient?.patient_profile_id,
+		appt.patient?.public_id,
+		appt.patient?.user_id,
+		appt.patient_id,
+		appt.patient_profile_id,
+		appt.user?.id,
+		appt.user?.public_id,
+		appt.user?.user_id,
+		appt.public_id,
+		appt.user_id,
+	])
+const getDoctorIds = (appt: ApiAppointment) =>
+	uniqueStrings([appt.doctor?.id, appt.doctor?.doctor_id, appt.doctor?.public_id, appt.doctor?.user_id, appt.doctor_id])
+const getHospitalIds = (appt: ApiAppointment) =>
+	uniqueStrings([appt.hospital?.id, appt.hospital?.hospital_id, appt.hospital_id])
+const getPatientId = (appt: ApiAppointment) => getPatientIds(appt)[0] ?? ''
+const getDoctorId = (appt: ApiAppointment) => getDoctorIds(appt)[0] ?? ''
+const getHospitalId = (appt: ApiAppointment) => getHospitalIds(appt)[0] ?? ''
+const normalizeId = (value: string | number | null | undefined) => String(value ?? '').trim().toLowerCase()
+const idsInclude = (rowIds: string[], authIds: string[]) => {
+	const normalizedRowIds = new Set(rowIds.map(normalizeId).filter(Boolean))
+	return authIds.some((id) => normalizedRowIds.has(normalizeId(id)))
+}
+const compactParams = (params: Record<string, unknown>) =>
+	Object.fromEntries(
+		Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+	)
+const maskToken = (token: string | null) =>
+	token ? `${token.slice(0, 12)}...${token.slice(-6)}` : null
+
 const normalizeRows = (appointments: ApiAppointment[]): AppointmentRow[] =>
-	appointments.map((appt) => ({
-		id: String(appt.id),
-		patientName: appt.patient?.name || 'Unknown patient',
-		patientAvatar: appt.patient?.avatar_s3_key || '',
-		appointmentDate: appt.appointment_date || '',
-		startTime: appt.start_time || appt.appointment_time || '',
-		endTime: appt.end_time ?? null,
-		appointmentMode: appt.appointment_mode || '',
-		status: getStatusLabel(appt.status),
-		doctorName: appt.doctor?.name || '',
-		doctorAvatar: appt.doctor?.avatar_s3_key || '',
-		hospitalName: appt.hospital?.name || null,
-		hospitalAddress: appt.hospital?.address || null,
-	}))
+	appointments.map((appt, index) => {
+		const patientIds = getPatientIds(appt)
+		const doctorIds = getDoctorIds(appt)
+		const hospitalIds = getHospitalIds(appt)
+
+		return {
+			id: getAppointmentId(appt) || `appointment-${index}`,
+			patientId: patientIds[0] ?? '',
+			patientIds,
+			patientName: appt.patient?.name || 'Unknown patient',
+			patientAvatar: appt.patient?.avatar_s3_key || '',
+			doctorId: doctorIds[0] ?? '',
+			doctorIds,
+			appointmentDate: appt.appointment_date || '',
+			startTime: appt.start_time || appt.appointment_time || '',
+			endTime: appt.end_time ?? null,
+			appointmentMode: appt.appointment_mode || '',
+			status: getStatusLabel(appt.status),
+			doctorName: appt.doctor?.name || 'Unknown doctor',
+			doctorAvatar: appt.doctor?.avatar_s3_key || '',
+			hospitalName: appt.hospital?.name || null,
+			hospitalAddress: appt.hospital?.address || null,
+			hospitalId: hospitalIds[0] ?? '',
+			hospitalIds,
+		}
+	})
 
 const normalizeHospitals = (response: ApiHospitalsResponse): HospitalOption[] => {
 	const nestedData = typeof response.data === 'object' && !Array.isArray(response.data)
@@ -252,6 +408,14 @@ const unpackAppointments = (response: ApiAppointmentsResponse) => {
 			: Array.isArray(response.appointments)
 				? response.appointments
 				: []
+
+	console.log('[AllAppointmentList][debug] raw appointments response shape:', {
+		dataIsArray: Array.isArray(response.data),
+		nestedDataIsArray: Array.isArray(nestedData),
+		appointmentsIsArray: Array.isArray(response.appointments),
+		rowsLength: rows.length,
+		firstRawAppointment: rows[0] ?? null,
+	})
 
 	const metaSource = response.meta ?? {}
 	const total = metaSource.total ?? response.total ?? rows.length
@@ -299,12 +463,12 @@ function StatusPill({ status }: { status: string }) {
 export default function AllAppointmentList() {
 	const navigation = useNavigation<any>()
 	const insets = useSafeAreaInsets()
-	const { role, selectedHospital, selectedHospitalId } = useAuth()
+	const { role, user, selectedHospital, isLoading: authLoading } = useAuth()
 	const { width, height } = useWindowDimensions()
 	const isTablet = width >= 768
 	const isLandscape = width > height
 	const useTable = isTablet || isLandscape
-	const filtersInline = width >= 720
+	const useInlineFilters = isTablet
 	const contentWidth = useMemo(() => {
 		if (width >= 1180) return 1120
 		if (width >= 900) return width - 56
@@ -314,8 +478,7 @@ export default function AllAppointmentList() {
 	const [search, setSearch] = useState('')
 	const [page, setPage] = useState(1)
 	const [pageSize, setPageSize] = useState(PAGE_SIZE)
-	const [rows, setRows] = useState<AppointmentRow[]>([])
-	const [meta, setMeta] = useState<AppointmentMeta>({ total: 0, page: 1, limit: PAGE_SIZE, pages: 0 })
+	const [allRows, setAllRows] = useState<AppointmentRow[]>([])
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 	const [modeFilter, setModeFilter] = useState('all')
@@ -325,8 +488,8 @@ export default function AllAppointmentList() {
 	const [draftDateFilter, setDraftDateFilter] = useState('all')
 	const [draftStatusFilter, setDraftStatusFilter] = useState('all')
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
-	const [hospitals, setHospitals] = useState<HospitalOption[]>([])
-	const [selectedHospitalValue, setSelectedHospitalValue] = useState(selectedHospitalId || '')
+	const [hospitals, setHospitals] = useState<HospitalOption[]>([{ label: 'All', value: 'all' }])
+	const [selectedHospitalValue, setSelectedHospitalValue] = useState('all')
 	const [hospitalsLoading, setHospitalsLoading] = useState(false)
 	const filterSheetAnim = useRef(new Animated.Value(0)).current
 	const filterBackdropAnim = useRef(new Animated.Value(0)).current
@@ -335,19 +498,60 @@ export default function AllAppointmentList() {
 		() => hospitals.find((hospital) => hospital.value === selectedHospitalValue),
 		[hospitals, selectedHospitalValue]
 	)
-	const selectedHospitalName = selectedHospitalOption?.label || selectedHospital || 'selected hospital'
-	const pageSizeOptions = useMemo(
-		() => PAGE_SIZE_OPTIONS.map((option) => ({ label: String(option), value: String(option) })),
-		[]
-	)
+	const selectedHospitalName = selectedHospitalValue === 'all'
+		? 'all hospitals'
+		: selectedHospitalOption?.label || selectedHospital || 'selected hospital'
+	const isPatientView = role === 'patient'
+	const currentUserIds = useMemo(() => {
+		const authUser = user as (typeof user & Record<string, unknown>) | null
+		const roleSpecificId = role === 'doctor'
+			? authUser?.doctor_id ?? authUser?.doctorId
+			: authUser?.patient_id ?? authUser?.patientId ?? authUser?.patient_profile_id ?? authUser?.patientProfileId
+		const nestedRole = role === 'doctor'
+			? (authUser?.doctor as Record<string, unknown> | undefined)
+			: (authUser?.patient as Record<string, unknown> | undefined)
+
+		return uniqueStrings([
+			authUser?.id as string | number | undefined,
+			authUser?.public_id as string | number | undefined,
+			authUser?.publicId as string | number | undefined,
+			authUser?.user_id as string | number | undefined,
+			authUser?.userId as string | number | undefined,
+			authUser?.patient_profile_id as string | number | undefined,
+			authUser?.patientProfileId as string | number | undefined,
+			roleSpecificId as string | number | undefined,
+			nestedRole?.id as string | number | undefined,
+			nestedRole?.patient_id as string | number | undefined,
+			nestedRole?.patient_profile_id as string | number | undefined,
+			nestedRole?.public_id as string | number | undefined,
+			nestedRole?.user_id as string | number | undefined,
+		])
+	}, [role, user])
+
+	useEffect(() => {
+		console.log('[AllAppointmentList][debug] auth state:', {
+			authLoading,
+			role,
+			user,
+			currentUserIds,
+		})
+	}, [authLoading, currentUserIds, role, user])
 
 	const columns = useMemo<AppTableColumn<AppointmentRow>[]>(() => [
 		{
-			id: 'patientName',
-			label: 'Patient name',
+			id: isPatientView ? 'doctorName' : 'patientName',
+			label: isPatientView ? 'Doctor name' : 'Patient name',
 			sortable: true,
 			width: 220,
-			format: (_value, row) => <PersonCell row={row} />,
+			format: (_value, row) => isPatientView ? (
+				<PersonCell
+					row={{
+						...row,
+						patientName: row.doctorName || 'Unknown doctor',
+						patientAvatar: row.doctorAvatar,
+					}}
+				/>
+			) : <PersonCell row={row} />,
 		},
 		{
 			id: 'appointmentDate',
@@ -391,7 +595,7 @@ export default function AllAppointmentList() {
 			width: 130,
 			format: (_value, row) => <StatusPill status={row.status} />,
 		},
-	], [])
+	], [isPatientView])
 
 	const goBack = () => {
 		if (navigation.canGoBack()) {
@@ -402,28 +606,70 @@ export default function AllAppointmentList() {
 	}
 
 	const fetchAppointments = useCallback(async (showLoader = true) => {
-		if (role !== 'doctor') return
+		if (role !== 'doctor' && role !== 'patient') return
+
+		const requestUrl = API_ENDPOINTS.APPOINTMENTS.GET
+		const disabledParams = compactParams({
+			page: 1,
+			limit: 10000,
+			role,
+			search: search.trim() || undefined,
+			hospital_id: selectedHospitalValue !== 'all' ? selectedHospitalValue : undefined,
+			appointment_mode: modeFilter !== 'all' ? modeFilter : undefined,
+			status: statusFilter !== 'all' ? statusFilter : undefined,
+		})
+		applyDateFilterParams(disabledParams, dateFilter)
 
 		try {
 			if (showLoader) setLoading(true)
-			const params: Record<string, unknown> = {
-				page,
-				limit: pageSize,
-			}
-			if (search.trim()) params.search = search.trim()
-			if (selectedHospitalValue) params.hospital_id = selectedHospitalValue
-			if (modeFilter !== 'all') params.appointment_mode = modeFilter
-			if (statusFilter !== 'all') params.status = statusFilter
-			applyDateFilterParams(params, dateFilter)
+			const token = await AsyncStorage.getItem('access_token')
+			console.log('[AllAppointmentList][debug] appointments fetch request:', {
+				url: requestUrl,
+				method: 'GET',
+				queryParams: {},
+				requestPayload: null,
+				authToken: maskToken(token),
+				disabledParamsForDebug: disabledParams,
+				note: 'Temporary debug fetch is intentionally calling appointments without filters or pagination params.',
+			})
 
-			const res = await ApiService.getWithParams<ApiAppointmentsResponse>(
-				API_ENDPOINTS.APPOINTMENTS.GET,
-				params
-			)
+			const res = await ApiService.get<ApiAppointmentsResponse>(requestUrl)
+			console.log('[AllAppointmentList][debug] appointments fetch response:', {
+				status: res.status,
+				url: requestUrl,
+				queryParams: {},
+				dataPreview: Array.isArray(res.data?.data)
+					? { dataLength: res.data.data.length, firstRow: res.data.data[0] ?? null }
+					: res.data,
+			})
 			const next = unpackAppointments(res.data)
-			setRows(next.rows)
-			setMeta(next.meta)
+			console.log('[AllAppointmentList][debug] mapped appointment IDs:', {
+				mappedRowsLength: next.rows.length,
+				sampleMappedRows: next.rows.slice(0, 5).map((row) => ({
+					id: row.id,
+					patientId: row.patientId,
+					patientIds: row.patientIds,
+					doctorId: row.doctorId,
+					doctorIds: row.doctorIds,
+					hospitalId: row.hospitalId,
+					hospitalIds: row.hospitalIds,
+					patientName: row.patientName,
+					doctorName: row.doctorName,
+				})),
+			})
+			setAllRows(next.rows)
 		} catch (error) {
+			const err = error as any
+			console.log('[AllAppointmentList][debug] appointments fetch error:', {
+				url: requestUrl,
+				method: 'GET',
+				queryParams: {},
+				requestPayload: null,
+				disabledParamsForDebug: disabledParams,
+				status: err?.response?.status,
+				responseData: err?.response?.data,
+				message: err?.message,
+			})
 			console.log('[AllAppointmentList] fetch appointments error:', error)
 			Alert.alert(
 				'Error',
@@ -433,7 +679,7 @@ export default function AllAppointmentList() {
 			setLoading(false)
 			setRefreshing(false)
 		}
-	}, [dateFilter, modeFilter, page, pageSize, role, search, selectedHospitalValue, statusFilter])
+	}, [dateFilter, modeFilter, role, search, selectedHospitalValue, statusFilter])
 
 	const fetchHospitals = useCallback(async () => {
 		if (role !== 'doctor') return
@@ -442,13 +688,10 @@ export default function AllAppointmentList() {
 			setHospitalsLoading(true)
 			const res = await ApiService.get<ApiHospitalsResponse>(API_ENDPOINTS.DOCTORS.HOSPITALS)
 			const nextHospitals = normalizeHospitals(res.data)
-			setHospitals(nextHospitals)
+			setHospitals([{ label: 'All', value: 'all' }, ...nextHospitals])
 			setSelectedHospitalValue((current) => {
-				if (current && nextHospitals.some((hospital) => hospital.value === current)) return current
-				if (selectedHospitalId && nextHospitals.some((hospital) => hospital.value === selectedHospitalId)) {
-					return selectedHospitalId
-				}
-				return nextHospitals[0]?.value || ''
+				if (current && (current === 'all' || nextHospitals.some((hospital) => hospital.value === current))) return current
+				return 'all'
 			})
 		} catch (error) {
 			console.log('[AllAppointmentList] fetch hospitals error:', error)
@@ -459,7 +702,7 @@ export default function AllAppointmentList() {
 		} finally {
 			setHospitalsLoading(false)
 		}
-	}, [role, selectedHospitalId])
+	}, [role])
 
 	useEffect(() => {
 		const timer = setTimeout(() => {
@@ -472,6 +715,130 @@ export default function AllAppointmentList() {
 	useEffect(() => {
 		void fetchHospitals()
 	}, [fetchHospitals])
+
+	useEffect(() => {
+		if (useTable || MOBILE_PAGE_SIZE_OPTIONS.includes(pageSize)) return
+
+		setPageSize(MOBILE_PAGE_SIZE_OPTIONS[0])
+		setPage(1)
+	}, [pageSize, useTable])
+
+	const roleRows = useMemo(() => {
+		if (role !== 'doctor' && role !== 'patient') return []
+		if (currentUserIds.length === 0) return []
+
+		return allRows.filter((row) =>
+			role === 'doctor'
+				? idsInclude(row.doctorIds, currentUserIds)
+				: idsInclude(row.patientIds, currentUserIds)
+		)
+	}, [allRows, currentUserIds, role])
+
+	useEffect(() => {
+		console.log('[AllAppointmentList][debug] role filter result:', {
+			authLoading,
+			role,
+			loggedInUserIds: currentUserIds,
+			allRowsLength: allRows.length,
+			roleFilteredRowsLength: roleRows.length,
+		})
+
+		if (role === 'patient' && !authLoading && allRows.length > 0 && roleRows.length === 0) {
+			console.log('[AllAppointmentList][debug] patient role filter empty; mapped row dump:', allRows.map((row) => ({
+				id: row.id,
+				patientId: row.patientId,
+				patientIds: row.patientIds,
+				doctorId: row.doctorId,
+				doctorIds: row.doctorIds,
+				hospitalId: row.hospitalId,
+				hospitalIds: row.hospitalIds,
+				patientName: row.patientName,
+				doctorName: row.doctorName,
+				appointmentDate: row.appointmentDate,
+				status: row.status,
+			})))
+		}
+	}, [allRows, authLoading, currentUserIds, role, roleRows])
+
+	useEffect(() => {
+		if (role !== 'patient') return
+
+		const derivedHospitals = Array.from(
+			new Map(
+				roleRows
+					.filter((row) => row.hospitalId && row.hospitalName)
+					.map((row) => [row.hospitalId, { value: row.hospitalId, label: row.hospitalName || 'Hospital' }])
+			).values()
+		)
+		setHospitals([{ label: 'All', value: 'all' }, ...derivedHospitals])
+		setSelectedHospitalValue((current) => {
+			if (current === 'all' || derivedHospitals.some((hospital) => hospital.value === current)) return current
+			return 'all'
+		})
+	}, [role, roleRows])
+
+	const filteredRows = useMemo(() => {
+		const query = search.trim().toLowerCase()
+
+		return roleRows.filter((row) => {
+			if (selectedHospitalValue !== 'all' && !idsInclude(row.hospitalIds, [selectedHospitalValue])) return false
+			if (modeFilter !== 'all' && normalizeModeValue(row.appointmentMode) !== modeFilter) return false
+			if (statusFilter !== 'all' && normalizeStatusValue(row.status) !== statusFilter) return false
+			if (!isDateInFilter(row.appointmentDate, dateFilter)) return false
+
+			if (query) {
+				const searchable = [
+					row.id,
+					row.patientId,
+					...row.patientIds,
+					row.doctorId,
+					...row.doctorIds,
+					row.patientName,
+					row.doctorName,
+					row.hospitalName ?? '',
+				].join(' ').toLowerCase()
+				if (!searchable.includes(query)) return false
+			}
+
+			return true
+		})
+	}, [dateFilter, modeFilter, roleRows, search, selectedHospitalValue, statusFilter])
+
+	useEffect(() => {
+		setPage(1)
+	}, [dateFilter, modeFilter, search, selectedHospitalValue, statusFilter])
+
+	const meta = useMemo<AppointmentMeta>(() => {
+		const total = filteredRows.length
+		const pages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)))
+		const boundedPage = Math.min(Math.max(1, page), pages)
+
+		return {
+			total,
+			page: boundedPage,
+			limit: pageSize,
+			pages,
+		}
+	}, [filteredRows.length, page, pageSize])
+
+	const rows = useMemo(() => {
+		const start = (meta.page - 1) * pageSize
+		return filteredRows.slice(start, start + pageSize)
+	}, [filteredRows, meta.page, pageSize])
+
+	useEffect(() => {
+		if (meta.page !== page) setPage(meta.page)
+	}, [meta.page, page])
+
+	const handlePageChange = (nextPage: number) => {
+		const boundedPage = Math.min(Math.max(1, nextPage), meta.pages)
+		setPage(boundedPage)
+	}
+
+	const handlePageSizeChange = (nextPageSize: number) => {
+		setPageSize(nextPageSize)
+		setPage(1)
+	}
 
 	const onRefresh = () => {
 		setRefreshing(true)
@@ -531,67 +898,26 @@ export default function AllAppointmentList() {
 		setModeFilter('all')
 		setDateFilter('all')
 		setStatusFilter('all')
+		setSelectedHospitalValue('all')
+		setSearch('')
 		setPage(1)
 	}
 
-	const renderPagination = () => {
-		if (rows.length === 0) return null
-
+	if (authLoading) {
 		return (
-			<View style={styles.pagination}>
-				<View style={styles.paginationSummary}>
-					<AppTypography style={styles.paginationText}>
-						Page {meta.page} of {Math.max(meta.pages, 1)}
-					</AppTypography>
-					<AppTypography style={styles.paginationSubText}>
-						{meta.total} total - {pageSize} per page
-					</AppTypography>
-				</View>
-
-				<View style={styles.paginationActions}>
-					<AppSelect
-						options={pageSizeOptions}
-						value={String(pageSize)}
-						onSelect={(value) => {
-							setPageSize(Number(value))
-							setPage(1)
-						}}
-						placeholder="Count"
-						size="small"
-						style={styles.bottomCountSelectWrap}
-						customCardStyle={styles.bottomCountSelect}
-						borderColor={BORDER}
-						maxDropdownHeight={190}
-						dropdownPosition="top"
-						bottomOffset={12}
-					/>
-
-					<TouchableOpacity
-						style={[styles.pageButton, page <= 1 && styles.pageButtonDisabled]}
-						disabled={page <= 1}
-						onPress={() => setPage((current) => Math.max(1, current - 1))}
-					>
-						<MaterialCommunityIcons name="chevron-left" size={20} color={page <= 1 ? '#aab3bb' : TEAL} />
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={[styles.pageButton, page >= meta.pages && styles.pageButtonDisabled]}
-						disabled={page >= meta.pages}
-						onPress={() => setPage((current) => Math.min(meta.pages, current + 1))}
-					>
-						<MaterialCommunityIcons name="chevron-right" size={20} color={page >= meta.pages ? '#aab3bb' : TEAL} />
-					</TouchableOpacity>
-				</View>
+			<View style={[styles.loadingWrap, styles.authLoadingScreen, { paddingTop: insets.top + 20 }]}>
+				<ActivityIndicator size="small" color={TEAL} />
 			</View>
 		)
 	}
 
-	if (role !== 'doctor') {
+	if (role !== 'doctor' && role !== 'patient') {
 		return (
 			<View style={[styles.gatedScreen, { paddingTop: insets.top + 20 }]}>
 				<MaterialCommunityIcons name="lock-outline" size={38} color={MUTED} />
-				<AppTypography style={styles.gatedTitle}>Doctor access only</AppTypography>
+				<AppTypography style={styles.gatedTitle}>Appointment access unavailable</AppTypography>
 				<AppTypography style={styles.gatedText}>
-					Appointments list is available only from the doctor portal.
+					Appointments list is available only from doctor or patient accounts.
 				</AppTypography>
 				<TouchableOpacity style={styles.gatedButton} onPress={goBack}>
 					<AppTypography style={styles.gatedButtonText}>Go back</AppTypography>
@@ -602,28 +928,97 @@ export default function AllAppointmentList() {
 
 	const hasActiveFilters = modeFilter !== 'all' || dateFilter !== 'all' || statusFilter !== 'all'
 
-	const filterControls = (
-		<>
-			<AppSelect
-				label="Hospital"
-				options={hospitals}
-				value={selectedHospitalValue}
-				onSelect={(value) => {
-					setSelectedHospitalValue(value)
-					setPage(1)
-				}}
-				placeholder={hospitalsLoading ? 'Loading hospitals...' : 'Select hospital'}
-				size="small"
-				style={[styles.filterSelectWrap, filtersInline && styles.hospitalSelectWide]}
-				customCardStyle={styles.filterSelect}
-				borderColor={BORDER}
-				maxDropdownHeight={240}
-			/>
-		</>
+	const renderInlineFilter = (label: string, child: React.ReactNode, style?: any) => (
+		<View style={[styles.outlinedFilterWrap, !useInlineFilters && styles.outlinedFilterWrapMobile, style]}>
+			<View
+				pointerEvents="none"
+				style={[styles.outlinedFilterLabel, !useInlineFilters && styles.outlinedFilterLabelMobile]}
+			>
+				<AppTypography style={styles.outlinedFilterLabelText}>{label}</AppTypography>
+			</View>
+			{child}
+		</View>
+	)
+
+	const hospitalSelect = renderInlineFilter(
+		'Hospital',
+		<AppSelect
+			options={hospitals}
+			value={selectedHospitalValue}
+			onSelect={(value) => {
+				setSelectedHospitalValue(value)
+				setPage(1)
+			}}
+			placeholder={hospitalsLoading ? 'Loading hospitals...' : 'Select hospital'}
+			size={useInlineFilters ? 'small' : 'medium'}
+			borderRadius={useInlineFilters ? 8 : 10}
+			customCardStyle={[styles.inlineFilterSelect, !useInlineFilters && styles.mobileHospitalSelectCard]}
+			borderColor={useInlineFilters ? '#c8ced6' : BORDER}
+			maxDropdownHeight={240}
+			style={styles.inlineSelectFill}
+		/>,
+		useInlineFilters ? styles.hospitalSelectWide : styles.mobileHospitalSelect
+	)
+
+	const modeSelect = renderInlineFilter(
+		'Mode',
+		<AppSelect
+			options={MODE_OPTIONS}
+			value={modeFilter}
+			onSelect={(value) => {
+				setModeFilter(value)
+				setPage(1)
+			}}
+			placeholder="Mode"
+			size="small"
+			style={styles.inlineSelectFill}
+			customCardStyle={styles.inlineFilterSelect}
+			borderColor="#c8ced6"
+			maxDropdownHeight={220}
+		/>,
+		styles.compactFilterSelectWrap
+	)
+
+	const dateSelect = renderInlineFilter(
+		'Date',
+		<AppSelect
+			options={DATE_OPTIONS}
+			value={dateFilter}
+			onSelect={(value) => {
+				setDateFilter(value)
+				setPage(1)
+			}}
+			placeholder="Date"
+			size="small"
+			style={styles.inlineSelectFill}
+			customCardStyle={styles.inlineFilterSelect}
+			borderColor="#c8ced6"
+			maxDropdownHeight={220}
+		/>,
+		styles.compactFilterSelectWrap
+	)
+
+	const statusSelect = renderInlineFilter(
+		'Status',
+		<AppSelect
+			options={STATUS_OPTIONS}
+			value={statusFilter}
+			onSelect={(value) => {
+				setStatusFilter(value)
+				setPage(1)
+			}}
+			placeholder="Status"
+			size="small"
+			style={styles.inlineSelectFill}
+			customCardStyle={styles.inlineFilterSelect}
+			borderColor="#c8ced6"
+			maxDropdownHeight={220}
+		/>,
+		styles.compactFilterSelectWrap
 	)
 
 	const searchInput = (
-		<View style={[styles.searchBox, !filtersInline && styles.searchBoxMobile, filtersInline && styles.searchBoxWide]}>
+		<View style={[styles.searchBox, !useInlineFilters && styles.searchBoxMobile, useInlineFilters && styles.searchBoxWide]}>
 			<MaterialCommunityIcons name="magnify" size={21} color="#9aa0a6" />
 			<TextInput
 				value={search}
@@ -648,7 +1043,7 @@ export default function AllAppointmentList() {
 			onPress={openFilterModal}
 			activeOpacity={0.84}
 		>
-			<MaterialCommunityIcons name="filter-variant" size={24} color={hasActiveFilters ? '#ffffff' : TEAL} />
+			<MaterialCommunityIcons name="tune" size={23} color={TEAL} />
 		</TouchableOpacity>
 	)
 
@@ -768,23 +1163,19 @@ export default function AllAppointmentList() {
 				</View>
 
 				<View style={styles.filtersSection}>
-					{filtersInline ? (
-						<ScrollView
-							horizontal
-							showsHorizontalScrollIndicator={false}
-							keyboardShouldPersistTaps="handled"
-							contentContainerStyle={styles.filterScrollContent}
-						>
-							<View style={styles.filterRowWide}>
-								{filterControls}
-								{searchInput}
-							</View>
-						</ScrollView>
+					{useInlineFilters ? (
+						<View style={styles.filterRowWide}>
+							{hospitalSelect}
+							{modeSelect}
+							{dateSelect}
+							{statusSelect}
+							{searchInput}
+						</View>
 					) : (
 						<View style={styles.filterGridMobile}>
-							{filterControls}
+							{searchInput}
 							<View style={styles.mobileSearchRow}>
-								{searchInput}
+								{hospitalSelect}
 								{mobileFilterButton}
 							</View>
 						</View>
@@ -801,30 +1192,41 @@ export default function AllAppointmentList() {
 						<ActivityIndicator size="small" color={TEAL} />
 					</View>
 				) : useTable ? (
-					<AppTable<AppointmentRow>
-						columns={columns}
-						data={rows}
-						totalRows={meta.total}
-						loading={loading || refreshing}
-						defaultPage={meta.page}
-						defaultPageSize={meta.limit}
-						pageSizeOptions={PAGE_SIZE_OPTIONS}
-						defaultSortBy="patientName"
-						defaultSortDirection="asc"
-						emptyMessage="No appointments found"
-						rowPadding="10px 14px"
-						onRefresh={onRefresh}
-						showPagination={false}
-						onPageChange={(nextPage, nextPageSize) => {
-							setPage(nextPage)
-							setPageSize(nextPageSize)
-						}}
-					/>
+					<>
+						<AppTable<AppointmentRow>
+							columns={columns}
+							data={rows}
+							totalRows={meta.total}
+							loading={loading || refreshing}
+							defaultPage={page}
+							defaultPageSize={pageSize}
+							pageSizeOptions={PAGE_SIZE_OPTIONS}
+							defaultSortBy={isPatientView ? 'doctorName' : 'patientName'}
+							defaultSortDirection="asc"
+							emptyMessage="No appointments found"
+							rowPadding="10px 14px"
+							onRefresh={onRefresh}
+							showPagination={false}
+						/>
+						{rows.length > 0 ? (
+							<View style={styles.paginationWrap}>
+								<PaginationBar
+									page={meta.page}
+									pageSize={pageSize}
+									totalRows={meta.total}
+									pageSizeOptions={PAGE_SIZE_OPTIONS}
+									onPageChange={handlePageChange}
+									onPageSizeChange={handlePageSizeChange}
+								/>
+							</View>
+						) : null}
+					</>
 				) : (
 					<FlatList
 						data={rows}
 						keyExtractor={(item) => item.id}
-						renderItem={({ item }) => <AppMobileAPT row={item} />}
+						renderItem={({ item }) => <AppMobileAPT row={item} displayRole={isPatientView ? 'patient' : 'doctor'} />}
+						style={styles.mobileList}
 						contentContainerStyle={rows.length === 0 ? styles.emptyListContent : styles.listContent}
 						showsVerticalScrollIndicator={false}
 						ListEmptyComponent={<EmptyState />}
@@ -832,8 +1234,20 @@ export default function AllAppointmentList() {
 					/>
 				)}
 
-				{renderPagination()}
-				{renderFilterModal()}
+				{!useTable && rows.length > 0 ? (
+					<View style={[styles.paginationWrap, styles.mobilePaginationWrap, { paddingBottom: Math.max(insets.bottom + 8, 16) }]}>
+						<PaginationBar
+							page={meta.page}
+							pageSize={pageSize}
+							totalRows={meta.total}
+							pageSizeOptions={MOBILE_PAGE_SIZE_OPTIONS}
+							onPageChange={handlePageChange}
+							onPageSizeChange={handlePageSizeChange}
+						/>
+					</View>
+				) : null}
+
+				{!useInlineFilters && renderFilterModal()}
 		</>
 	)
 
@@ -943,9 +1357,10 @@ const styles = StyleSheet.create({
 	},
 	filterRowWide: {
 		flexDirection: 'row',
-		alignItems: 'flex-end',
-		gap: 20,
-		minWidth: '100%',
+		alignItems: 'center',
+		flexWrap: 'nowrap',
+		gap: 12,
+		width: '100%',
 	},
 	filterGridMobile: {
 		gap: 10,
@@ -953,7 +1368,7 @@ const styles = StyleSheet.create({
 	mobileSearchRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 10,
+		gap: 8,
 	},
 	searchBox: {
 		height: 48,
@@ -967,12 +1382,16 @@ const styles = StyleSheet.create({
 		width: '100%',
 	},
 	searchBoxWide: {
-		width: 596,
-		maxWidth: 596,
+		height: 50,
+		flexGrow: 2.2,
+		flexShrink: 1,
+		flexBasis: 190,
+		minWidth: 170,
+		borderColor: '#d8dee6',
+		borderRadius: 8,
 	},
 	searchBoxMobile: {
-		flex: 1,
-		width: 'auto',
+		width: '100%',
 	},
 	searchInput: {
 		flex: 1,
@@ -989,22 +1408,77 @@ const styles = StyleSheet.create({
 		height: 48,
 		borderRadius: 8,
 	},
+	outlinedFilterWrap: {
+		height: 56,
+		justifyContent: 'center',
+		position: 'relative',
+		flexShrink: 1,
+	},
+	outlinedFilterWrapMobile: {
+		height: 48,
+	},
+	outlinedFilterLabel: {
+		position: 'absolute',
+		top: -1,
+		left: 14,
+		zIndex: 2,
+		backgroundColor: BACKGROUND,
+		paddingHorizontal: 5,
+	},
+	outlinedFilterLabelMobile: {
+		top: -2,
+		left: 13,
+		paddingHorizontal: 4,
+	},
+	outlinedFilterLabelText: {
+		fontSize: 12,
+		lineHeight: 16,
+		color: '#46627d',
+	},
+	inlineSelectFill: {
+		width: '100%',
+		marginBottom: 0,
+	},
+	inlineFilterSelect: {
+		height: 50,
+		borderRadius: 8,
+		backgroundColor: SURFACE,
+	},
+	mobileHospitalSelectCard: {
+		height: 46,
+		borderRadius: 10,
+	},
 	hospitalSelectWide: {
-		width: 290,
+		flexGrow: 1.1,
+		flexShrink: 1,
+		flexBasis: 150,
+		minWidth: 136,
+	},
+	mobileHospitalSelect: {
+		flex: 1,
+		width: 'auto',
+		minWidth: 0,
+	},
+	compactFilterSelectWrap: {
+		flexGrow: 1,
+		flexShrink: 1,
+		flexBasis: 112,
+		minWidth: 104,
 	},
 	filterIconButton: {
-		width: 48,
+		width: 52,
 		height: 48,
-		borderRadius: 8,
+		borderRadius: 10,
 		borderWidth: 1,
-		borderColor: BORDER,
+		borderColor: '#e5eaef',
 		backgroundColor: SURFACE,
 		alignItems: 'center',
 		justifyContent: 'center',
 		flexShrink: 0,
+		padding: 0,
 	},
 	filterIconButtonActive: {
-		backgroundColor: TEAL,
+		backgroundColor: '#e9f8f7',
 		borderColor: TEAL,
 	},
 	filterModalRoot: {
@@ -1278,7 +1752,17 @@ const styles = StyleSheet.create({
 		textTransform: 'capitalize',
 	},
 	listContent: {
-		paddingBottom: 12,
+		paddingBottom: 8,
+	},
+	mobileList: {
+		flex: 1,
+	},
+	paginationWrap: {
+		width: '100%',
+		marginTop: 8,
+	},
+	mobilePaginationWrap: {
+		paddingTop: 4,
 	},
 	emptyListContent: {
 		flexGrow: 1,
@@ -1308,55 +1792,6 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		marginTop: 4,
 		maxWidth: 300,
-	},
-	pagination: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingVertical: 12,
-		gap: 12,
-	},
-	paginationSummary: {
-		flex: 1,
-		minWidth: 0,
-	},
-	paginationText: {
-		fontSize: 12,
-		lineHeight: 17,
-		color: MUTED,
-	},
-	paginationSubText: {
-		fontSize: 11,
-		lineHeight: 15,
-		color: MUTED,
-		marginTop: 2,
-	},
-	paginationActions: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		flexShrink: 0,
-		gap: 8,
-	},
-	bottomCountSelectWrap: {
-		width: 104,
-		marginBottom: 0,
-	},
-	bottomCountSelect: {
-		height: 36,
-		borderRadius: 18,
-	},
-	pageButton: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		borderWidth: 1,
-		borderColor: BORDER,
-		backgroundColor: SURFACE,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	pageButtonDisabled: {
-		backgroundColor: '#f3f5f7',
 	},
 	gatedScreen: {
 		flex: 1,
@@ -1393,5 +1828,8 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 		fontWeight: '700',
 		color: '#ffffff',
+	},
+	authLoadingScreen: {
+		backgroundColor: BACKGROUND,
 	},
 })
