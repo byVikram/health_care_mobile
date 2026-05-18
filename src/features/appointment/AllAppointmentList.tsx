@@ -3,9 +3,9 @@ import {
 	ActivityIndicator,
 	Alert,
 	Animated,
-	FlatList,
 	Image,
 	Modal,
+	Platform,
 	Pressable,
 	RefreshControl,
 	ScrollView,
@@ -15,6 +15,7 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { BlurView } from 'expo-blur'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
@@ -140,10 +141,12 @@ const MODE_OPTIONS: AppSelectOption[] = [
 ]
 const DATE_OPTIONS: AppSelectOption[] = [
 	{ label: 'All', value: 'all' },
-	{ label: 'Today', value: 'today' },
 	{ label: 'Yesterday', value: 'yesterday' },
+	{ label: 'Today', value: 'today' },
+	{ label: 'Tomorrow', value: 'tomorrow' },
 	{ label: 'Last 7 Days', value: 'last_7_days' },
 	{ label: 'Last 30 Days', value: 'last_30_days' },
+	{ label: 'Custom', value: 'custom' },
 ]
 const STATUS_OPTIONS: AppSelectOption[] = [
 	{ label: 'All', value: 'all' },
@@ -221,8 +224,20 @@ const formatApiDate = (date: Date) => {
 	return `${year}-${month}-${day}`
 }
 
-const applyDateFilterParams = (params: Record<string, unknown>, filter: string) => {
+const applyDateFilterParams = (
+	params: Record<string, unknown>,
+	filter: string,
+	customFromDate?: string,
+	customToDate?: string
+) => {
 	if (filter === 'all') return
+
+	if (filter === 'custom') {
+		if (customFromDate) params.from_date = customFromDate
+		if (customToDate) params.to_date = customToDate
+		params.date_filter = filter
+		return
+	}
 
 	const today = new Date()
 	const endDate = formatApiDate(today)
@@ -241,6 +256,14 @@ const applyDateFilterParams = (params: Record<string, unknown>, filter: string) 
 		return
 	}
 
+	if (filter === 'tomorrow') {
+		const tomorrow = new Date(today)
+		tomorrow.setDate(today.getDate() + 1)
+		params.appointment_date = formatApiDate(tomorrow)
+		params.date_filter = filter
+		return
+	}
+
 	const days = filter === 'last_30_days' ? 30 : 7
 	const startDate = new Date(today)
 	startDate.setDate(today.getDate() - (days - 1))
@@ -249,8 +272,20 @@ const applyDateFilterParams = (params: Record<string, unknown>, filter: string) 
 	params.date_filter = filter
 }
 
-const getDateRangeForFilter = (filter: string) => {
+const getDateRangeForFilter = (filter: string, customFromDate?: string, customToDate?: string) => {
 	if (filter === 'all') return null
+
+	if (filter === 'custom') {
+		const start = customFromDate ? parseDateOnly(customFromDate) : null
+		const end = customToDate ? parseDateOnly(customToDate) : null
+		if (start) start.setHours(0, 0, 0, 0)
+		if (end) end.setHours(0, 0, 0, 0)
+		if (!start && !end) return null
+		return {
+			start: start ?? new Date(0),
+			end: end ?? new Date(8640000000000000),
+		}
+	}
 
 	const today = new Date()
 	today.setHours(0, 0, 0, 0)
@@ -265,14 +300,20 @@ const getDateRangeForFilter = (filter: string) => {
 		return { start: yesterday, end: yesterday }
 	}
 
+	if (filter === 'tomorrow') {
+		const tomorrow = new Date(today)
+		tomorrow.setDate(today.getDate() + 1)
+		return { start: tomorrow, end: tomorrow }
+	}
+
 	const days = filter === 'last_30_days' ? 30 : 7
 	const start = new Date(today)
 	start.setDate(today.getDate() - (days - 1))
 	return { start, end: today }
 }
 
-const isDateInFilter = (value: string, filter: string) => {
-	const range = getDateRangeForFilter(filter)
+const isDateInFilter = (value: string, filter: string, customFromDate?: string, customToDate?: string) => {
+	const range = getDateRangeForFilter(filter, customFromDate, customToDate)
 	if (!range) return true
 	if (!value) return false
 
@@ -463,7 +504,7 @@ function StatusPill({ status }: { status: string }) {
 export default function AllAppointmentList() {
 	const navigation = useNavigation<any>()
 	const insets = useSafeAreaInsets()
-	const { role, user, selectedHospital, isLoading: authLoading } = useAuth()
+	const { role, user, isLoading: authLoading } = useAuth()
 	const { width, height } = useWindowDimensions()
 	const isTablet = width >= 768
 	const isLandscape = width > height
@@ -479,28 +520,48 @@ export default function AllAppointmentList() {
 	const [page, setPage] = useState(1)
 	const [pageSize, setPageSize] = useState(PAGE_SIZE)
 	const [allRows, setAllRows] = useState<AppointmentRow[]>([])
+	const [apiMeta, setApiMeta] = useState<AppointmentMeta | null>(null)
+	const [usingApiPagination, setUsingApiPagination] = useState(false)
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 	const [modeFilter, setModeFilter] = useState('all')
 	const [dateFilter, setDateFilter] = useState('all')
 	const [statusFilter, setStatusFilter] = useState('all')
+	const [fromDateFilter, setFromDateFilter] = useState('')
+	const [toDateFilter, setToDateFilter] = useState('')
 	const [draftModeFilter, setDraftModeFilter] = useState('all')
 	const [draftDateFilter, setDraftDateFilter] = useState('all')
 	const [draftStatusFilter, setDraftStatusFilter] = useState('all')
+	const [draftFromDateFilter, setDraftFromDateFilter] = useState('')
+	const [draftToDateFilter, setDraftToDateFilter] = useState('')
+	const [activeDatePicker, setActiveDatePicker] = useState<'from' | 'to' | null>(null)
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
 	const [hospitals, setHospitals] = useState<HospitalOption[]>([{ label: 'All', value: 'all' }])
 	const [selectedHospitalValue, setSelectedHospitalValue] = useState('all')
 	const [hospitalsLoading, setHospitalsLoading] = useState(false)
 	const filterSheetAnim = useRef(new Animated.Value(0)).current
 	const filterBackdropAnim = useRef(new Animated.Value(0)).current
+	const skipNextFilterFetchRef = useRef(false)
+	const listScrollY = useRef(new Animated.Value(0)).current
 
-	const selectedHospitalOption = useMemo(
-		() => hospitals.find((hospital) => hospital.value === selectedHospitalValue),
-		[hospitals, selectedHospitalValue]
-	)
-	const selectedHospitalName = selectedHospitalValue === 'all'
-		? 'all hospitals'
-		: selectedHospitalOption?.label || selectedHospital || 'selected hospital'
+	const headerCollapseStyle = useMemo(() => ({
+		opacity: listScrollY.interpolate({
+			inputRange: [0, 28, 56],
+			outputRange: [1, 0.35, 0],
+			extrapolate: 'clamp',
+		}),
+		maxHeight: listScrollY.interpolate({
+			inputRange: [0, 56],
+			outputRange: [64, 0],
+			extrapolate: 'clamp',
+		}),
+		marginBottom: listScrollY.interpolate({
+			inputRange: [0, 56],
+			outputRange: [16, 0],
+			extrapolate: 'clamp',
+		}),
+	}), [listScrollY])
+
 	const isPatientView = role === 'patient'
 	const currentUserIds = useMemo(() => {
 		const authUser = user as (typeof user & Record<string, unknown>) | null
@@ -605,20 +666,30 @@ export default function AllAppointmentList() {
 		navigation.navigate('MainTabs', { screen: 'Portal' })
 	}
 
-	const fetchAppointments = useCallback(async (showLoader = true) => {
+	const fetchAppointments = useCallback(async (
+		showLoader = true,
+		overrides?: Partial<{
+			page: number
+			pageSize: number
+			dateFilter: string
+			fromDateFilter: string
+			toDateFilter: string
+		}>
+	) => {
 		if (role !== 'doctor' && role !== 'patient') return
 
 		const requestUrl = API_ENDPOINTS.APPOINTMENTS.GET
-		const disabledParams = compactParams({
-			page: 1,
-			limit: 10000,
-			role,
-			search: search.trim() || undefined,
-			hospital_id: selectedHospitalValue !== 'all' ? selectedHospitalValue : undefined,
-			appointment_mode: modeFilter !== 'all' ? modeFilter : undefined,
-			status: statusFilter !== 'all' ? statusFilter : undefined,
+		const effectivePage = overrides?.page ?? page
+		const effectivePageSize = overrides?.pageSize ?? pageSize
+		const effectiveDateFilter = overrides?.dateFilter ?? dateFilter
+		const effectiveFromDateFilter = overrides?.fromDateFilter ?? fromDateFilter
+		const effectiveToDateFilter = overrides?.toDateFilter ?? toDateFilter
+
+		const queryParams = compactParams({
+			page: effectivePage,
+			limit: effectivePageSize,
 		})
-		applyDateFilterParams(disabledParams, dateFilter)
+		applyDateFilterParams(queryParams, effectiveDateFilter, effectiveFromDateFilter, effectiveToDateFilter)
 
 		try {
 			if (showLoader) setLoading(true)
@@ -626,23 +697,27 @@ export default function AllAppointmentList() {
 			console.log('[AllAppointmentList][debug] appointments fetch request:', {
 				url: requestUrl,
 				method: 'GET',
-				queryParams: {},
+				queryParams,
 				requestPayload: null,
 				authToken: maskToken(token),
-				disabledParamsForDebug: disabledParams,
-				note: 'Temporary debug fetch is intentionally calling appointments without filters or pagination params.',
 			})
 
-			const res = await ApiService.get<ApiAppointmentsResponse>(requestUrl)
+			const hasQueryParams = Object.keys(queryParams).length > 0
+			const res = await ApiService.get<ApiAppointmentsResponse>(
+				requestUrl,
+				hasQueryParams ? { params: queryParams } : undefined
+			)
 			console.log('[AllAppointmentList][debug] appointments fetch response:', {
 				status: res.status,
 				url: requestUrl,
-				queryParams: {},
+				queryParams,
 				dataPreview: Array.isArray(res.data?.data)
 					? { dataLength: res.data.data.length, firstRow: res.data.data[0] ?? null }
 					: res.data,
 			})
 			const next = unpackAppointments(res.data)
+			setApiMeta(next.meta)
+			setUsingApiPagination(true)
 			console.log('[AllAppointmentList][debug] mapped appointment IDs:', {
 				mappedRowsLength: next.rows.length,
 				sampleMappedRows: next.rows.slice(0, 5).map((row) => ({
@@ -663,13 +738,27 @@ export default function AllAppointmentList() {
 			console.log('[AllAppointmentList][debug] appointments fetch error:', {
 				url: requestUrl,
 				method: 'GET',
-				queryParams: {},
+				queryParams,
 				requestPayload: null,
-				disabledParamsForDebug: disabledParams,
 				status: err?.response?.status,
 				responseData: err?.response?.data,
 				message: err?.message,
 			})
+
+			if (err?.response?.status === 422 && Object.keys(queryParams).length > 0) {
+				try {
+					console.log('[AllAppointmentList][debug] retrying appointments fetch without query params after validation error')
+					const fallbackRes = await ApiService.get<ApiAppointmentsResponse>(requestUrl)
+					const fallbackNext = unpackAppointments(fallbackRes.data)
+					setApiMeta(null)
+					setUsingApiPagination(false)
+					setAllRows(fallbackNext.rows)
+					return
+				} catch (fallbackError) {
+					console.log('[AllAppointmentList][debug] appointments fallback fetch error:', fallbackError)
+				}
+			}
+
 			console.log('[AllAppointmentList] fetch appointments error:', error)
 			Alert.alert(
 				'Error',
@@ -679,7 +768,7 @@ export default function AllAppointmentList() {
 			setLoading(false)
 			setRefreshing(false)
 		}
-	}, [dateFilter, modeFilter, role, search, selectedHospitalValue, statusFilter])
+	}, [dateFilter, fromDateFilter, page, pageSize, role, toDateFilter])
 
 	const fetchHospitals = useCallback(async () => {
 		if (role !== 'doctor') return
@@ -705,6 +794,11 @@ export default function AllAppointmentList() {
 	}, [role])
 
 	useEffect(() => {
+		if (skipNextFilterFetchRef.current) {
+			skipNextFilterFetchRef.current = false
+			return
+		}
+
 		const timer = setTimeout(() => {
 			void fetchAppointments(true)
 		}, 300)
@@ -784,7 +878,7 @@ export default function AllAppointmentList() {
 			if (selectedHospitalValue !== 'all' && !idsInclude(row.hospitalIds, [selectedHospitalValue])) return false
 			if (modeFilter !== 'all' && normalizeModeValue(row.appointmentMode) !== modeFilter) return false
 			if (statusFilter !== 'all' && normalizeStatusValue(row.status) !== statusFilter) return false
-			if (!isDateInFilter(row.appointmentDate, dateFilter)) return false
+			if (!isDateInFilter(row.appointmentDate, dateFilter, fromDateFilter, toDateFilter)) return false
 
 			if (query) {
 				const searchable = [
@@ -802,13 +896,27 @@ export default function AllAppointmentList() {
 
 			return true
 		})
-	}, [dateFilter, modeFilter, roleRows, search, selectedHospitalValue, statusFilter])
+	}, [dateFilter, fromDateFilter, modeFilter, roleRows, search, selectedHospitalValue, statusFilter, toDateFilter])
 
 	useEffect(() => {
 		setPage(1)
-	}, [dateFilter, modeFilter, search, selectedHospitalValue, statusFilter])
+	}, [dateFilter, fromDateFilter, modeFilter, search, selectedHospitalValue, statusFilter, toDateFilter])
 
 	const meta = useMemo<AppointmentMeta>(() => {
+		if (usingApiPagination && apiMeta) {
+			const total = apiMeta.total
+			const limit = pageSize || apiMeta.limit || PAGE_SIZE
+			const pages = apiMeta.pages || Math.max(1, Math.ceil(total / Math.max(1, limit)))
+			const boundedPage = Math.min(Math.max(1, page), pages)
+
+			return {
+				total,
+				page: boundedPage,
+				limit,
+				pages,
+			}
+		}
+
 		const total = filteredRows.length
 		const pages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)))
 		const boundedPage = Math.min(Math.max(1, page), pages)
@@ -819,12 +927,14 @@ export default function AllAppointmentList() {
 			limit: pageSize,
 			pages,
 		}
-	}, [filteredRows.length, page, pageSize])
+	}, [apiMeta, filteredRows.length, page, pageSize, usingApiPagination])
 
 	const rows = useMemo(() => {
+		if (usingApiPagination) return filteredRows
+
 		const start = (meta.page - 1) * pageSize
 		return filteredRows.slice(start, start + pageSize)
-	}, [filteredRows, meta.page, pageSize])
+	}, [filteredRows, meta.page, pageSize, usingApiPagination])
 
 	useEffect(() => {
 		if (meta.page !== page) setPage(meta.page)
@@ -849,6 +959,8 @@ export default function AllAppointmentList() {
 		setDraftModeFilter(modeFilter)
 		setDraftDateFilter(dateFilter)
 		setDraftStatusFilter(statusFilter)
+		setDraftFromDateFilter(fromDateFilter)
+		setDraftToDateFilter(toDateFilter)
 		setFilterModalVisible(true)
 		filterSheetAnim.setValue(0)
 		filterBackdropAnim.setValue(0)
@@ -867,6 +979,7 @@ export default function AllAppointmentList() {
 	}
 
 	const closeFilterModal = () => {
+		setActiveDatePicker(null)
 		Animated.parallel([
 			Animated.timing(filterSheetAnim, {
 				toValue: 0,
@@ -884,10 +997,32 @@ export default function AllAppointmentList() {
 	}
 
 	const applyFilters = () => {
+		if (draftDateFilter === 'custom' && draftFromDateFilter && draftToDateFilter) {
+			const fromDate = parseDateOnly(draftFromDateFilter)
+			const toDate = parseDateOnly(draftToDateFilter)
+			if (fromDate && toDate && fromDate > toDate) {
+				Alert.alert('Invalid date range', 'From Date cannot be later than To Date.')
+				return
+			}
+		}
+
+		const nextFromDateFilter = draftDateFilter === 'custom' ? draftFromDateFilter : ''
+		const nextToDateFilter = draftDateFilter === 'custom' ? draftToDateFilter : ''
+
+		skipNextFilterFetchRef.current = true
 		setModeFilter(draftModeFilter)
 		setDateFilter(draftDateFilter)
 		setStatusFilter(draftStatusFilter)
+		setFromDateFilter(nextFromDateFilter)
+		setToDateFilter(nextToDateFilter)
 		setPage(1)
+		void fetchAppointments(true, {
+			page: 1,
+			pageSize,
+			dateFilter: draftDateFilter,
+			fromDateFilter: nextFromDateFilter,
+			toDateFilter: nextToDateFilter,
+		})
 		closeFilterModal()
 	}
 
@@ -895,9 +1030,14 @@ export default function AllAppointmentList() {
 		setDraftModeFilter('all')
 		setDraftDateFilter('all')
 		setDraftStatusFilter('all')
+		setDraftFromDateFilter('')
+		setDraftToDateFilter('')
+		setActiveDatePicker(null)
 		setModeFilter('all')
 		setDateFilter('all')
 		setStatusFilter('all')
+		setFromDateFilter('')
+		setToDateFilter('')
 		setSelectedHospitalValue('all')
 		setSearch('')
 		setPage(1)
@@ -926,7 +1066,7 @@ export default function AllAppointmentList() {
 		)
 	}
 
-	const hasActiveFilters = modeFilter !== 'all' || dateFilter !== 'all' || statusFilter !== 'all'
+	const hasActiveFilters = modeFilter !== 'all' || dateFilter !== 'all' || statusFilter !== 'all' || Boolean(fromDateFilter || toDateFilter)
 
 	const renderInlineFilter = (label: string, child: React.ReactNode, style?: any) => (
 		<View style={[styles.outlinedFilterWrap, !useInlineFilters && styles.outlinedFilterWrapMobile, style]}>
@@ -1047,12 +1187,35 @@ export default function AllAppointmentList() {
 		</TouchableOpacity>
 	)
 
+	const pickerDate = activeDatePicker === 'from'
+		? parseDateOnly(draftFromDateFilter) ?? new Date()
+		: parseDateOnly(draftToDateFilter) ?? parseDateOnly(draftFromDateFilter) ?? new Date()
+
+	const handleDateRangeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+		if (Platform.OS === 'android') setActiveDatePicker(null)
+		if (event.type === 'dismissed' || !selectedDate || !activeDatePicker) return
+
+		const nextValue = formatApiDate(selectedDate)
+		if (activeDatePicker === 'from') {
+			setDraftFromDateFilter(nextValue)
+		} else {
+			setDraftToDateFilter(nextValue)
+		}
+		setDraftDateFilter('custom')
+	}
+
 	const renderFilterChips = (
 		options: AppSelectOption[],
 		value: string,
 		onChange: (nextValue: string) => void
 	) => (
-		<View style={styles.filterChipRow}>
+		<ScrollView
+			horizontal
+			showsHorizontalScrollIndicator={false}
+			style={styles.filterChipScroller}
+			contentContainerStyle={styles.filterChipRow}
+			keyboardShouldPersistTaps="handled"
+		>
 			{options.map((option) => {
 				const selected = option.value === value
 
@@ -1069,6 +1232,40 @@ export default function AllAppointmentList() {
 					</TouchableOpacity>
 				)
 			})}
+		</ScrollView>
+	)
+
+	const renderDateField = (label: string, value: string, picker: 'from' | 'to') => (
+		<TouchableOpacity
+			style={styles.dateRangeField}
+			onPress={() => setActiveDatePicker(picker)}
+			activeOpacity={0.82}
+		>
+			<AppTypography style={[styles.dateRangeText, !value && styles.dateRangePlaceholder]} numberOfLines={1}>
+				{value ? formatDate(value) : label}
+			</AppTypography>
+			<MaterialCommunityIcons name="calendar-month-outline" size={20} color={TEAL} />
+		</TouchableOpacity>
+	)
+
+	const renderDateRangePicker = () => (
+		<View style={styles.dateRangeWrap}>
+			<AppTypography style={styles.filterGroupLabel}>Date Range</AppTypography>
+			<View style={styles.dateRangeRow}>
+				{renderDateField('From Date', draftFromDateFilter, 'from')}
+				<View style={styles.dateRangeDivider} />
+				{renderDateField('To Date', draftToDateFilter, 'to')}
+			</View>
+			{activeDatePicker ? (
+				<View style={styles.datePickerWrap}>
+					<DateTimePicker
+						value={pickerDate}
+						mode="date"
+						display={Platform.OS === 'ios' ? 'inline' : Platform.OS === 'android' ? 'calendar' : 'default'}
+						onChange={handleDateRangeChange}
+					/>
+				</View>
+			) : null}
 		</View>
 	)
 
@@ -1123,7 +1320,11 @@ export default function AllAppointmentList() {
 						>
 							<View style={styles.filterGroup}>
 								<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
-								{renderFilterChips(DATE_OPTIONS, draftDateFilter, setDraftDateFilter)}
+								{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
+									setDraftDateFilter(value)
+									if (value !== 'custom') setActiveDatePicker(null)
+								})}
+								{renderDateRangePicker()}
 							</View>
 
 							<View style={styles.filterGroup}>
@@ -1153,14 +1354,14 @@ export default function AllAppointmentList() {
 
 	const content = (
 		<>
-				<View style={styles.header}>
+				<Animated.View style={[styles.header, !useTable && headerCollapseStyle]}>
 					<TouchableOpacity style={styles.backButton} onPress={goBack} activeOpacity={0.8}>
 						<MaterialCommunityIcons name="chevron-left" size={28} color={TEAL} />
 					</TouchableOpacity>
 					<View style={styles.headerText}>
 						<AppTypography style={styles.title}>Appointments</AppTypography>
 					</View>
-				</View>
+				</Animated.View>
 
 				<View style={styles.filtersSection}>
 					{useInlineFilters ? (
@@ -1180,11 +1381,6 @@ export default function AllAppointmentList() {
 							</View>
 						</View>
 					)}
-
-					<AppTypography style={styles.subtitle}>
-						Showing all patients listed under{' '}
-						<AppTypography style={styles.subtitleStrong}>{selectedHospitalName}</AppTypography>
-					</AppTypography>
 				</View>
 
 				{loading && !useTable ? (
@@ -1222,13 +1418,18 @@ export default function AllAppointmentList() {
 						) : null}
 					</>
 				) : (
-					<FlatList
+					<Animated.FlatList
 						data={rows}
 						keyExtractor={(item) => item.id}
 						renderItem={({ item }) => <AppMobileAPT row={item} displayRole={isPatientView ? 'patient' : 'doctor'} />}
 						style={styles.mobileList}
 						contentContainerStyle={rows.length === 0 ? styles.emptyListContent : styles.listContent}
 						showsVerticalScrollIndicator={false}
+						scrollEventThrottle={16}
+						onScroll={Animated.event(
+							[{ nativeEvent: { contentOffset: { y: listScrollY } } }],
+							{ useNativeDriver: false }
+						)}
 						ListEmptyComponent={<EmptyState />}
 						refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
 					/>
@@ -1315,6 +1516,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'flex-start',
 		marginBottom: 16,
+		overflow: 'hidden',
 	},
 	backButton: {
 		width: 42,
@@ -1337,20 +1539,8 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: TEXT,
 	},
-	subtitle: {
-		fontSize: 13,
-		lineHeight: 19,
-		color: MUTED,
-		marginTop: 4,
-	},
-	subtitleStrong: {
-		fontSize: 13,
-		lineHeight: 19,
-		fontWeight: '700',
-		color: TEXT,
-	},
 	filtersSection: {
-		marginBottom: 14,
+		marginBottom: 10,
 	},
 	filterScrollContent: {
 		paddingBottom: 6,
@@ -1363,12 +1553,12 @@ const styles = StyleSheet.create({
 		width: '100%',
 	},
 	filterGridMobile: {
-		gap: 10,
+		gap: 8,
 	},
 	mobileSearchRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
+		gap: 6,
 	},
 	searchBox: {
 		height: 48,
@@ -1391,7 +1581,10 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 	},
 	searchBoxMobile: {
+		height: 44,
 		width: '100%',
+		borderRadius: 8,
+		paddingHorizontal: 12,
 	},
 	searchInput: {
 		flex: 1,
@@ -1415,7 +1608,7 @@ const styles = StyleSheet.create({
 		flexShrink: 1,
 	},
 	outlinedFilterWrapMobile: {
-		height: 48,
+		height: 44,
 	},
 	outlinedFilterLabel: {
 		position: 'absolute',
@@ -1445,8 +1638,8 @@ const styles = StyleSheet.create({
 		backgroundColor: SURFACE,
 	},
 	mobileHospitalSelectCard: {
-		height: 46,
-		borderRadius: 10,
+		height: 42,
+		borderRadius: 8,
 	},
 	hospitalSelectWide: {
 		flexGrow: 1.1,
@@ -1466,9 +1659,9 @@ const styles = StyleSheet.create({
 		minWidth: 104,
 	},
 	filterIconButton: {
-		width: 52,
-		height: 48,
-		borderRadius: 10,
+		width: 48,
+		height: 44,
+		borderRadius: 8,
 		borderWidth: 1,
 		borderColor: '#e5eaef',
 		backgroundColor: SURFACE,
@@ -1552,10 +1745,15 @@ const styles = StyleSheet.create({
 		color: MUTED,
 		textTransform: 'uppercase',
 	},
+	filterChipScroller: {
+		marginHorizontal: -2,
+	},
 	filterChipRow: {
 		flexDirection: 'row',
-		flexWrap: 'wrap',
+		flexWrap: 'nowrap',
 		gap: 10,
+		paddingHorizontal: 2,
+		paddingVertical: 1,
 	},
 	filterChip: {
 		minHeight: 38,
@@ -1565,6 +1763,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#f2f6fb',
+		flexShrink: 0,
 	},
 	filterChipActive: {
 		backgroundColor: TEAL,
@@ -1577,6 +1776,54 @@ const styles = StyleSheet.create({
 	},
 	filterChipTextActive: {
 		color: '#ffffff',
+	},
+	dateRangeWrap: {
+		gap: 10,
+		marginTop: 10,
+	},
+	dateRangeRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+	},
+	dateRangeField: {
+		flex: 1,
+		minWidth: 0,
+		height: 52,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#d8dee6',
+		backgroundColor: '#f8fafc',
+		paddingHorizontal: 14,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 8,
+	},
+	dateRangeText: {
+		flex: 1,
+		minWidth: 0,
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '600',
+		color: TEXT,
+	},
+	dateRangePlaceholder: {
+		color: MUTED,
+	},
+	dateRangeDivider: {
+		width: 12,
+		height: 1,
+		borderRadius: 1,
+		backgroundColor: '#aab3bb',
+		flexShrink: 0,
+	},
+	datePickerWrap: {
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: BORDER,
+		backgroundColor: SURFACE,
+		overflow: 'hidden',
 	},
 	filterSheetActions: {
 		flexDirection: 'row',
