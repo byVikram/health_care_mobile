@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react";
 import {
   Image,
   Pressable,
@@ -6,228 +6,312 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useNavigation, NavigationProp } from '@react-navigation/native'
+  Alert,
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import { ROUTES } from '../../navigation/routes'
-import { useAuth } from '../../context/AuthContext'
-import DoctorHospitalDropdown from './DoctorHospitalDropdown'
+import DoctorHospitalDropdown from "./DoctorHospitalDropdown";
+import { useAuth } from "../../context/AuthContext";
+import { ROUTES } from "../../navigation/routes";
 
 interface AppHeaderProps {
-  variant?: 'home' | 'search'
-  avatarUri?: string
-  onAvatarPress: () => void
+  variant?: "home" | "search";   // home → pressable; search → editable input
+  userName?: string;
+  location?: string;
+  avatarUri?: string;
+  onAvatarPress: () => void;
 
-  searchValue?: string
-  onSearchChange?: (text: string) => void
-  onSearchSubmit?: () => void
-  isSearchEditable?: boolean
-  location?: string
+  // For search variant
+  searchValue?: string;
+  onSearchChange?: (text: string) => void;
+  onSearchSubmit?: () => void;
+  isSearchEditable?: boolean;
 }
 
 export default function AppHeader({
-  variant = 'home',
+  variant = "home",
+  userName = "Nitin",
+  location = "KR Market",
   avatarUri,
   onAvatarPress,
-  searchValue = '',
+  searchValue,
   onSearchChange,
   onSearchSubmit,
-  isSearchEditable = false,
-  location,
+  isSearchEditable = true,
 }: AppHeaderProps) {
-  const insets = useSafeAreaInsets()
-  const navigation = useNavigation<NavigationProp<any>>()
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
+  const { user, role } = useAuth();
 
-  const { role, user, selectedHospital } = useAuth()
+  const isDoctor = role === "doctor";
+  const isPharmacy = role === "pharmacy";
+  const isPatient = !isDoctor && !isPharmacy;
 
-  const isDoctor = role === 'doctor'
-  const isPatient = role === 'patient'
-  const isPharmacy = role === 'pharmacy'
-
-  // ── Display name ──────────────────────────────────────────────────────────
-  // FIX: user.name is "" (empty string) for pharmacy — must check trim().length
-  // so we fall through to the email prefix instead of rendering blank.
-  const u = user as any
-  let displayName = 'User'
-  if (u?.name && u.name.trim().length > 0) {
-    displayName = u.name.trim()
-  } else if (u?.pharmacy_name && u.pharmacy_name.trim().length > 0) {
-    displayName = u.pharmacy_name.trim()
-  } else if (u?.business_name && u.business_name.trim().length > 0) {
-    displayName = u.business_name.trim()
-  } else if (u?.email) {
-    displayName = u.email.split('@')[0]
+  // ── Display name (pharmacy fallback) ─────────────────────────────────────
+  let displayName = "User";
+  if (user) {
+    if (isPharmacy) {
+      displayName =
+        (user as any).pharmacy_name ||
+        (user as any).business_name ||
+        (user as any).store_name ||
+        (user as any).pharmacyName ||
+        (user as any).businessName ||
+        (user as any).full_name ||
+        user.name;
+      if (!displayName && user.email) {
+        displayName = user.email.split("@")[0];
+      }
+      if (!displayName) displayName = "Pharmacy";
+    } else {
+      displayName = user.name || (user as any).full_name || userName;
+    }
+  } else {
+    displayName = userName;
   }
 
-  // Location for pharmacy
-  const pharmacyLocation = u?.location || selectedHospital || 'Select Location'
+  const searchPlaceholder = isPharmacy
+    ? "Search order ID"
+    : "Search Doctors/Symptoms";
 
-  const handlePharmacyLocationPress = () => {
-    console.log('Open pharmacy location selector')
-  }
+  // ── Handlers ─────────────────────────────────────────────────────────────
+  const handleSearchPress = () => {
+    console.log("Search pressed");
+    // For pharmacy role, navigate to pharmacy search page; otherwise general search
+    if (isPharmacy) {
+      if (navigation && ROUTES.STACK.PHARMACY_SEARCH) {
+        navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH);
+      } else {
+        Alert.alert("Error", "Pharmacy search page not available");
+      }
+    } else {
+      if (navigation && ROUTES.STACK.SEARCH) {
+        navigation.navigate(ROUTES.STACK.SEARCH);
+      } else {
+        Alert.alert("Error", "Search page not available");
+      }
+    }
+  };
+
+  const renderSearchBar = () => {
+    if (variant === "search") {
+      // Editable TextInput for SearchPage
+      return (
+        <View style={styles.searchContainer}>
+          <MaterialCommunityIcons name="magnify" size={24} color="#26727a" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={searchPlaceholder}
+            placeholderTextColor="#8b8e94"
+            value={searchValue}
+            onChangeText={onSearchChange}
+            onSubmitEditing={onSearchSubmit}
+            editable={isSearchEditable}
+            returnKeyType="search"
+            autoFocus={isSearchEditable}
+          />
+          <MaterialCommunityIcons name="microphone-outline" size={24} color="#26727a" />
+        </View>
+      );
+    } else {
+      // Pressable for dashboard (navigates to appropriate search page)
+      return (
+        <Pressable style={styles.searchContainer} onPress={handleSearchPress}>
+          <MaterialCommunityIcons name="magnify" size={28} color="#26727a" />
+          <Text style={styles.searchPlaceholder}>{searchPlaceholder}</Text>
+          <MaterialCommunityIcons name="microphone-outline" size={24} color="#26727a" />
+        </Pressable>
+      );
+    }
+  };
 
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top + 16 }]}>
+      {/* Background Waves */}
+      <View style={styles.waveOne} />
+      <View style={styles.waveTwo} />
 
-      {/* TOP ROW: Avatar + Greeting + Notification (pharmacy only) */}
+      {/* Top Row */}
       <View style={styles.topRow}>
         <Pressable onPress={onAvatarPress} style={styles.profileRow}>
           <Image
             source={
               avatarUri
                 ? { uri: avatarUri }
-                : require('../../assets/Banner/patient.png')
+                : require("../../assets/Banner/patient.png")
             }
             style={styles.avatar}
           />
-
-          <View style={{ flex: 1 }}>
+          <View>
             <Text style={styles.helloText}>
               <Text style={styles.helloAccent}>Hello, </Text>
               {displayName}
             </Text>
 
-            {/* Role-specific subtext */}
             {isDoctor ? (
               <DoctorHospitalDropdown />
-            ) : isPharmacy ? (
-              <Pressable onPress={handlePharmacyLocationPress}>
-                <Text style={styles.subText}>{pharmacyLocation}</Text>
-              </Pressable>
             ) : (
-              <Text style={styles.subText}>
-                {selectedHospital || 'K R Market' || 'Select Location'}
-              </Text>
+              <View style={styles.locationRow}>
+                <MaterialCommunityIcons
+                  name="map-marker-outline"
+                  size={16}
+                  color="#f2f4f4"
+                />
+                <Text style={styles.locationText}>{location}</Text>
+                <MaterialCommunityIcons
+                  name="chevron-down"
+                  size={16}
+                  color="#f2f4f4"
+                />
+              </View>
             )}
           </View>
         </Pressable>
 
-        {/* Notification Icon – only for pharmacy */}
-        {isPharmacy && (
+        {/* Action Buttons (all roles) */}
+        <View style={styles.actionsRow}>
           <Pressable
-            onPress={() => navigation.navigate(ROUTES.STACK.NOTIFICATION)}
-            style={styles.notificationIcon}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={styles.actionButton}
+            onPress={() => navigation.navigate("Notification")}
           >
-            <MaterialCommunityIcons name="bell-outline" size={24} color="#6fe3e8" />
+            <MaterialCommunityIcons
+              name="bell-outline"
+              size={22}
+              color="#1b5f66"
+            />
+            <View style={styles.notificationDot} />
           </Pressable>
-        )}
+          <Pressable
+            style={styles.actionButton}
+            onPress={() =>
+              navigation.navigate(ROUTES.STACK.FAVOURITE_DOCTOR)
+            }
+          >
+            <MaterialCommunityIcons
+              name="heart-outline"
+              size={22}
+              color="#1b5f66"
+            />
+          </Pressable>
+        </View>
       </View>
 
-      {/* SEARCH BAR – role based */}
-      {isPatient && (
-        variant === 'home' ? (
-          <Pressable
-            style={styles.searchContainer}
-            onPress={() => navigation.navigate(ROUTES.STACK.SEARCH)}
-          >
-            <MaterialCommunityIcons name="magnify" size={22} color="#26727a" />
-            <Text style={styles.searchPlaceholder}>
-              Search Doctors / Symptoms
-            </Text>
-          </Pressable>
-        ) : (
-          <View style={styles.searchContainer}>
-            <MaterialCommunityIcons name="magnify" size={22} color="#26727a" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search Doctors / Symptoms"
-              value={searchValue}
-              onChangeText={onSearchChange}
-              onSubmitEditing={onSearchSubmit}
-              editable={isSearchEditable}
-            />
-          </View>
-        )
-      )}
-
-      {isPharmacy && (
-        <View style={styles.searchContainer}>
-          <MaterialCommunityIcons name="magnify" size={22} color="#26727a" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search order ID"
-            value={searchValue}
-            onChangeText={onSearchChange}
-            onSubmitEditing={onSearchSubmit}
-            editable={isSearchEditable}
-          />
-        </View>
-      )}
-
+      {/* Search Bar – hidden for doctor */}
+      {!isDoctor && renderSearchBar()}
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    backgroundColor: '#155a61',
+    backgroundColor: "#1f5f68",
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    overflow: "hidden",
   },
-
+  waveOne: {
+    position: "absolute",
+    width: 420,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    left: -140,
+    top: -70,
+    transform: [{ rotate: "-4deg" }],
+  },
+  waveTwo: {
+    position: "absolute",
+    width: 430,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    left: -95,
+    top: -22,
+    transform: [{ rotate: "-4deg" }],
+  },
   topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-
   profileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     flex: 1,
   },
-
   avatar: {
     width: 52,
     height: 52,
-    borderRadius: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
+    backgroundColor: "#fff",
   },
-
   helloText: {
-    color: '#fff',
+    color: "#ffffff",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "500",
   },
-
   helloAccent: {
-    color: '#6fe3e8',
+    color: "#5dd0d7",
+    fontWeight: "400",
   },
-
-  subText: {
-    color: '#d7e7e8',
-    fontSize: 13,
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 2,
   },
-
-  notificationIcon: {
-    marginLeft: 12,
-    padding: 4,
+  locationText: {
+    color: "#f2f4f4",
+    fontSize: 12,
+    marginHorizontal: 4,
   },
-
-  searchContainer: {
-    marginTop: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
+  actionsRow: {
+    flexDirection: "row",
     gap: 8,
   },
-
-  searchPlaceholder: {
-    color: '#999',
-    fontSize: 14,
+  actionButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: "#f1f1f1",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
-
+  notificationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#2fa748",
+    position: "absolute",
+    top: 10,
+    right: 10,
+  },
+  searchContainer: {
+    marginTop: 16,
+    backgroundColor: "#f3f3f3",
+    borderRadius: 10,
+    height: 46,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchPlaceholder: {
+    flex: 1,
+    fontSize: 16,
+    color: "#8b8e94",
+  },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
+    color: "#333",
+    paddingVertical: 8,
   },
-})
+});
