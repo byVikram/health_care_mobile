@@ -5,7 +5,7 @@ import { ROUTES } from './routes'
 
 // Import the DoctorDetailData type from your doctor feature
 // Adjust the path as needed.
-import type { DoctorDetailData } from '../../features/doctor/types/doctor-detail'
+import type { DoctorDetailData } from '../types/doctor-detail'
 
 export type RoleParams = {
   roleId: string
@@ -55,6 +55,8 @@ export type AppStackParamList = {
   [ROUTES.STACK.VIDEO_CONSULTATION]: { appointmentId: string }
   [ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
   [ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
+  [ROUTES.STACK.PHARMACY_SEARCH]: undefined
+  [ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
   // ✅ Updated: now receives booking data
   [ROUTES.STACK.PATIENT_PAYMENT]: {
     doctor: DoctorDetailData

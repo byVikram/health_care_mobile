@@ -13,7 +13,7 @@ import MainTabNavigator from './MainTabNavigator'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
-// import ConsultationPage from '../features/consultation/ConsultationPage'
+import ConsultationPage from '../features/consultation/ConsultationPage'
 import PatientProfileLayout from '../features/profile/patient/PatientProfileLayout'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 
@@ -24,7 +24,6 @@ import PatientPayment from '../features/patientPayment/PatientPayment'
 import SearchPage from '../features/doctor/search/SearchPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 import AllAppointmentList from '../features/appointment/AllAppointmentList'
-// import ConsultationPage from '../features/consultation/ConsultationPage'
 
 import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
 import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
@@ -50,7 +49,7 @@ function AuthenticatedNavigator() {
         name={ROUTES.STACK.PHARMACY_SEARCH}
         component={PharmacySearchPage}
       />
-      <AppStack.Screen name="OrderDetails" component={OrderDetailsScreen} />
+      <AppStack.Screen name={ROUTES.STACK.ORDER_DETAILS} component={OrderDetailsScreen} />
       <AppStack.Screen
         name={ROUTES.STACK.DOCTOR_SEARCH}
         component={DoctorSearchPage}
@@ -71,7 +70,7 @@ function AuthenticatedNavigator() {
         component={NotificationPage}
       />
 
-      {/* <AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} /> */}
+      <AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
 
       <AppStack.Screen
         name={ROUTES.STACK.HEALTH_PROFILE}
@@ -93,7 +92,7 @@ function AuthenticatedNavigator() {
 
 			<AppStack.Screen name={ROUTES.STACK.APPOINTMENTS} component={AllAppointmentList} />
 
-      <AppStack.Screen name="PatientPayment" component={PatientPayment} />
+      <AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
     </AppStack.Navigator>
   )
 }

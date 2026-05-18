@@ -32,6 +32,7 @@ import { DateSlotPicker } from '../../components/common'
 import { APPOINTMENT_STATUS } from '../../constants/constants'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
+import { navigate as navigateRoot } from '../../navigation/navigationService'
 import DoctorHospitalDropdown from '../../components/common/DoctorHospitalDropdown'
 import { useAuth } from '../../context/AuthContext'
 
@@ -553,6 +554,7 @@ const [successMessage, setSuccessMessage] = useState('')
 	//───────────────────────────────────────────────────────────────────
 
 	const handleCardPress = (apt: any) => {
+		const appointmentId = apt.id || apt.appointment_id
 		const patientId =
 			apt.patient?.id ||
 			apt.patient?.patient_id ||
@@ -568,15 +570,21 @@ const [successMessage, setSuccessMessage] = useState('')
 			Alert.alert('Error', 'Doctor ID not found for this appointment')
 			return
 		}
+		if (!appointmentId) {
+			Alert.alert('Error', 'Appointment ID not found for this appointment')
+			return
+		}
 
-		navigation.navigate(ROUTES.STACK.CONSULTATION, {
-			appointmentId: apt.id,
+		const consultationParams = {
+			appointmentId,
 			patientId,
 			patient: apt.patient,
 			doctorID: doctorId,
 			doctor: apt.doctor,
 			appointment: apt,
-		})
+		}
+
+		navigateRoot(ROUTES.STACK.CONSULTATION, consultationParams)
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────

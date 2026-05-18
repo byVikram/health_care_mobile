@@ -12,10 +12,9 @@ import {
 
 import { BlurView } from 'expo-blur';
 import { Video, ResizeMode } from 'expo-av';
-import { useNavigation } from '@react-navigation/native';
-
 import { AppTypography } from '../../components/common';
 import { ROUTES } from '../../navigation/routes';
+import { navigate as navigateRoot } from '../../navigation/navigationService';
 
 import EmergencyIcon from '../../assets/quick-services/emergency.svg';
 import AmbulanceIcon from '../../assets/quick-services/ambulance.svg';
@@ -162,8 +161,6 @@ function usePingPongScroll(
 export default function HeroSection({ role }: { role: Role }) {
   const isPharmacy = role === 'pharmacy';
 
-  const navigation = useNavigation<any>();
-
   // ───────────────────────────────────────────────────────────
   // Video Carousel (doctor & patient only)
   // ───────────────────────────────────────────────────────────
@@ -271,7 +268,7 @@ export default function HeroSection({ role }: { role: Role }) {
 
   const handleServicePress = (title: string) => {
     if (title === 'Appointment') {
-      navigation.navigate(ROUTES.STACK.APPOINTMENTS);
+      navigateRoot(ROUTES.STACK.APPOINTMENTS);
     }
   };
 
@@ -301,7 +298,12 @@ export default function HeroSection({ role }: { role: Role }) {
                 <AppTypography style={styles.hServiceTitle}>Others</AppTypography>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity key={s.title} style={styles.hServiceCard} activeOpacity={0.8}>
+              <TouchableOpacity
+                key={s.title}
+                style={styles.hServiceCard}
+                activeOpacity={0.8}
+                onPress={() => handleServicePress(s.title)}
+              >
                 <s.Component width={30} height={30} />
                 <AppTypography style={styles.hServiceTitle}>{s.title}</AppTypography>
               </TouchableOpacity>
