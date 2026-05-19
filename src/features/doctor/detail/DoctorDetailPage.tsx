@@ -50,7 +50,102 @@ interface DoctorHospitalDropdownProps {
   loading?: boolean;
 }
 
+type AppointmentModeKey = "clinic" | "video";
+
+type AvailabilityAppointmentMode = "clinic_visit" | "video_call" | "offline" | "online";
+
+interface AvailabilityApiSlot {
+  start_time: string;
+  end_time: string;
+  status?: "AVAILABLE" | "BOOKED" | "UNAVAILABLE" | "BLOCKED" | "OCCUPIED" | "";
+  is_enabled?: boolean;
+  is_booked?: boolean;
+  can_toggle?: boolean;
+}
+
+interface AvailabilityApiSession {
+  label?: string;
+  range?: string;
+  period?: string;
+  slots?: AvailabilityApiSlot[];
+}
+
+interface AvailabilityApiModeGroup {
+  appointment_mode?: AvailabilityAppointmentMode;
+  sessions?: AvailabilityApiSession[];
+  label?: string;
+  period?: string;
+  range?: string;
+  slots?: AvailabilityApiSlot[];
+}
+
 const PRIMARY = "#2B6F71";
+
+const emptyAvailabilityByMode: Record<AppointmentModeKey, SlotGroup[]> = {
+  clinic: [],
+  video: [],
+};
+
+const getModeKey = (mode?: string): AppointmentModeKey => {
+  if (mode === "video_call" || mode === "online" || mode === "video") {
+    return "video";
+  }
+  return "clinic";
+};
+
+const normalizeSlotStatus = (slot: AvailabilityApiSlot) => {
+  if (slot.is_booked) return "BOOKED";
+  if (slot.is_enabled === false) return "UNAVAILABLE";
+  if (slot.status === "OCCUPIED") return "BOOKED";
+  return slot.status || "AVAILABLE";
+};
+
+const normalizeAvailabilityByMode = (
+  response: unknown
+): Record<AppointmentModeKey, SlotGroup[]> => {
+  const rawData = Array.isArray(response)
+    ? response
+    : Array.isArray((response as { data?: unknown })?.data)
+      ? ((response as { data: AvailabilityApiModeGroup[] }).data)
+      : [];
+
+  const grouped: Record<AppointmentModeKey, SlotGroup[]> = {
+    clinic: [],
+    video: [],
+  };
+
+  rawData.forEach((item: AvailabilityApiModeGroup) => {
+    const modeKey = getModeKey(item.appointment_mode);
+    const sessions =
+      Array.isArray(item.sessions) && item.sessions.length > 0
+        ? item.sessions
+        : [{ label: item.label, range: item.range, period: item.period, slots: item.slots }];
+
+    const normalizedSessions = sessions
+      .map((session, sessionIndex): SlotGroup => {
+        const range = session.range || session.period || "";
+        const label = session.label || `Session ${sessionIndex + 1}`;
+
+        return {
+          label: range ? `${label} (${range})` : label,
+          period: range,
+          slots: (session.slots || []).map((slot, slotIndex) => ({
+            id: `${modeKey}-${label}-${slot.start_time}-${slotIndex}`,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            status: normalizeSlotStatus(slot),
+            is_enabled: slot.is_enabled,
+            can_toggle: slot.can_toggle,
+          })),
+        };
+      })
+      .filter((session) => session.slots.length > 0);
+
+    grouped[modeKey] = [...grouped[modeKey], ...normalizedSessions];
+  });
+
+  return grouped;
+};
 
 function DoctorHospitalDropdown({
   hospitals,
@@ -150,7 +245,8 @@ export default function DoctorDetailPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
-  const [availableSlotGroups, setAvailableSlotGroups] = useState<SlotGroup[]>([]);
+  const [availableSlotsByMode, setAvailableSlotsByMode] =
+    useState<Record<AppointmentModeKey, SlotGroup[]>>(emptyAvailabilityByMode);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [booking, setBooking] = useState(false);
 
@@ -206,17 +302,11 @@ export default function DoctorDetailPage() {
           date: formatDateForApi(selectedDate),
         });
         if (!active) return;
-        let processedData: SlotGroup[] = [];
-        if (Array.isArray(res)) {
-          processedData = res;
-        } else if (res && Array.isArray(res.data)) {
-          processedData = res.data;
-        }
-        setAvailableSlotGroups(processedData);
+        setAvailableSlotsByMode(normalizeAvailabilityByMode(res));
       } catch (err) {
         console.log(err);
         if (!active) return;
-        setAvailableSlotGroups([]);
+        setAvailableSlotsByMode(emptyAvailabilityByMode);
       } finally {
         if (active) {
           setSlotsLoading(false);
@@ -254,6 +344,16 @@ export default function DoctorDetailPage() {
       duration: 30,
     },
   ];
+
+  const selectedAppointmentType: AppointmentModeKey =
+    apptType === "video" ? "video" : "clinic";
+
+  const visibleSlotGroups = availableSlotsByMode[selectedAppointmentType] || [];
+
+  const handleAppointmentTypeChange = (type: AppointmentModeKey) => {
+    setApptType(type === "clinic" ? "offline" : "video");
+    setSelectedTime(null);
+  };
 
   const getSelectedFee = () => {
     if (apptType === "offline") {
@@ -458,7 +558,10 @@ export default function DoctorDetailPage() {
             <DoctorHospitalDropdown
               hospitals={dropdownHospitals}
               selectedHospitalId={selectedHospital}
-              onSelectHospital={setSelectedHospital}
+              onSelectHospital={(hospitalId) => {
+                setSelectedHospital(hospitalId);
+                setSelectedTime(null);
+              }}
               loading={loading}
             />
           ) : (
@@ -490,7 +593,7 @@ export default function DoctorDetailPage() {
               <TouchableOpacity
                 key={type.id}
                 style={[styles.radioCard, isSelected && styles.radioCardSelected]}
-                onPress={() => setApptType(type.id === "clinic" ? "offline" : "video")}
+                onPress={() => handleAppointmentTypeChange(type.id)}
                 activeOpacity={0.7}
               >
                 <View
@@ -539,12 +642,14 @@ export default function DoctorDetailPage() {
           selectedDate={selectedDate}
           onDateChange={(date) => {
             setSelectedDate(date);
-            setSelectedTime("");
+            setSelectedTime(null);
           }}
           selectedTime={selectedTime}
           onTimeChange={setSelectedTime}
-          availableSlots={availableSlotGroups}
+          availableSlots={visibleSlotGroups}
           loading={slotsLoading}
+          selectedAppointmentType={selectedAppointmentType}
+          onAppointmentTypeChange={handleAppointmentTypeChange}
         />
       </ScrollView>
 
@@ -565,7 +670,8 @@ export default function DoctorDetailPage() {
             const formattedDate = formatDateForApi(selectedDate);
             const formattedTime = formatTimeForApi(selectedTime);
 
-            navigation.navigate(ROUTES.STACK.PATIENT_PAYMENT, {
+            navigation.navigate(ROUTES.STACK.CONSENT_FORM, {
+              paymentParams: {
               doctor: doctor,
               hospitalId: selectedHospital,
               hospitalName: selectedHospitalEntry?.hospital.name || "",
@@ -576,6 +682,7 @@ export default function DoctorDetailPage() {
               appointmentMode: apptType === "offline" ? "offline" : "online",
               consultationTypeLabel: apptType === "offline" ? "Clinic Visit" : "Video Call",
               fee: fee,
+              },
             });
           }}
         >

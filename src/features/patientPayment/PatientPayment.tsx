@@ -10,10 +10,16 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Modal,
+  Pressable,
+  TextInput,
+  useWindowDimensions,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NavigationProp, RouteProp } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import PhonePeSvg from "../../assets/Payment/phonepe.svg";
 import GooglePaySvg from "../../assets/Payment/googlepay.svg";
@@ -37,6 +43,49 @@ type PaymentIconProps = {
   bordered?: boolean;
 };
 
+type BookedAppointmentMode = "clinic_visit" | "video_call";
+
+type BookedAppointmentStatus = "pending" | string;
+
+type BookedAppointmentDoctor = {
+  id: string;
+  name: string;
+};
+
+type BookedAppointmentPatient = {
+  id: string;
+  name: string;
+  avatar_s3_key: string | null;
+  gender: string;
+  age: number;
+};
+
+type BookedAppointmentHospital = {
+  id: string;
+  name: string;
+  address: string;
+};
+
+type BookedAppointment = {
+  id: string;
+  appointment_mode: BookedAppointmentMode;
+  appointment_date: string;
+  start_time: string;
+  end_time: string;
+  fees: number;
+  created_at: string;
+  status: BookedAppointmentStatus;
+  doctor: BookedAppointmentDoctor;
+  patient: BookedAppointmentPatient;
+  hospital: BookedAppointmentHospital;
+};
+
+type BookAppointmentResponse = {
+  success: boolean;
+  message: string;
+  data: BookedAppointment;
+};
+
 const PaymentIcon = ({ SvgComponent, bordered = false }: PaymentIconProps) => (
   <View style={[styles.iconWrapper, bordered && styles.iconBordered]}>
     <SvgComponent width={24} height={24} />
@@ -44,6 +93,57 @@ const PaymentIcon = ({ SvgComponent, bordered = false }: PaymentIconProps) => (
 );
 
 const doctorImagePlaceholder = require("../../assets/Banner/doctor.png");
+
+const normalizeBookedAppointmentMode = (mode: unknown): BookedAppointmentMode =>
+  mode === "video_call" ? "video_call" : "clinic_visit";
+
+const mapBookAppointmentResponse = (response: unknown): BookAppointmentResponse => {
+  const raw = response as {
+    success?: boolean;
+    message?: string;
+    data?: Partial<BookedAppointment>;
+  };
+  const data = raw.data || {};
+
+  return {
+    success: raw.success === true,
+    message: raw.message || "",
+    data: {
+      id: String(data.id || ""),
+      appointment_mode: normalizeBookedAppointmentMode(data.appointment_mode),
+      appointment_date: String(data.appointment_date || ""),
+      start_time: String(data.start_time || ""),
+      end_time: String(data.end_time || ""),
+      fees: Number(data.fees || 0),
+      created_at: String(data.created_at || ""),
+      status: String(data.status || "pending"),
+      doctor: {
+        id: String(data.doctor?.id || ""),
+        name: String(data.doctor?.name || ""),
+      },
+      patient: {
+        id: String(data.patient?.id || ""),
+        name: String(data.patient?.name || ""),
+        avatar_s3_key: data.patient?.avatar_s3_key || null,
+        gender: String(data.patient?.gender || ""),
+        age: Number(data.patient?.age || 0),
+      },
+      hospital: {
+        id: String(data.hospital?.id || ""),
+        name: String(data.hospital?.name || ""),
+        address: String(data.hospital?.address || ""),
+      },
+    },
+  };
+};
+
+const formatAppointmentMode = (mode: string) =>
+  mode === "video_call" ? "Video Call" : "Clinic Visit";
+
+const formatTimeRange = (start?: string, end?: string) => {
+  if (start && end) return `${start} - ${end}`;
+  return start || "";
+};
 
 const paymentMethods = [
   { id: "phonepe", name: "Phone Pe", Svg: PhonePeSvg, bordered: false },
@@ -54,8 +154,97 @@ const paymentMethods = [
   { id: "cash", name: "Cash On Visit", Svg: CashSvg, bordered: false },
 ];
 
+const getPatientToken = async () => {
+  const entries = await AsyncStorage.multiGet([
+    "patient_token",
+    "access_token",
+    "role",
+    "user",
+  ]);
+  const [source, token] =
+    entries
+      .filter(([key]) => key === "patient_token" || key === "access_token")
+      .find(([, value]) => Boolean(value)) || [null, null];
+  const storedRole = entries.find(([key]) => key === "role")?.[1] || null;
+  const storedUser = entries.find(([key]) => key === "user")?.[1] || null;
+
+  console.log("[PatientPayment] AsyncStorage token values", {
+    patient_token: entries.find(([key]) => key === "patient_token")?.[1] || null,
+    access_token: entries.find(([key]) => key === "access_token")?.[1] || null,
+    role: storedRole,
+    user: storedUser,
+    selectedSource: source,
+    selectedToken: token,
+  });
+
+  return { source, token, storedRole, storedUser };
+};
+
+const decodeBase64Url = (value: string) => {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    "="
+  );
+  let output = "";
+
+  for (let block = 0, charCode = 0, idx = 0, map = chars; padded.charAt(idx | 0);) {
+    const currentChar = padded.charAt(idx++);
+    const currentValue = map.indexOf(currentChar);
+    if (currentValue < 0) continue;
+    charCode = block % 4 ? charCode * 64 + currentValue : currentValue;
+    if (block++ % 4) {
+      output += String.fromCharCode(255 & (charCode >> ((-2 * block) & 6)));
+    }
+  }
+
+  return decodeURIComponent(
+    output
+      .split("")
+      .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+      .join("")
+  );
+};
+
+const decodeJwtPayload = (token: string) => {
+  try {
+    const payload = token.split(".")[1];
+    return payload ? JSON.parse(decodeBase64Url(payload)) : null;
+  } catch (error) {
+    console.log("[PatientPayment] Failed to decode JWT payload", error);
+    return null;
+  }
+};
+
+const getTokenDiagnostics = (token: string) => {
+  const payload = decodeJwtPayload(token);
+  const exp = typeof payload?.exp === "number" ? payload.exp : null;
+  const expiresAt = exp ? new Date(exp * 1000).toISOString() : null;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const role =
+    payload?.role ||
+    payload?.user?.role ||
+    payload?.user_role ||
+    payload?.account_type ||
+    null;
+
+  return {
+    payload,
+    exp,
+    expiresAt,
+    now: new Date().toISOString(),
+    isExpired: exp ? exp <= nowSeconds : null,
+    role,
+    isPatientRole: typeof role === "string" ? role.toLowerCase() === "patient" : null,
+  };
+};
+
 export default function BookingDetailsScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const route =
     useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.PATIENT_PAYMENT>>();
@@ -77,8 +266,29 @@ export default function BookingDetailsScreen() {
   const [selectedMethod, setSelectedMethod] = useState("phonepe");
   const [whatsappNotify, setWhatsappNotify] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
+  const [bookedAppointment, setBookedAppointment] =
+    useState<BookedAppointment | null>(null);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [symptomsOpen, setSymptomsOpen] = useState(false);
+  const [symptoms, setSymptoms] = useState("");
+  const [duration, setDuration] = useState("");
+  const [severity, setSeverity] = useState<"mild" | "moderate" | "severe" | "">("");
 
-  const totalPayable = fee; // assuming no extra tax/fee
+  const bookingDoctorName = bookedAppointment?.doctor.name || doctor?.name || "";
+  const bookingHospitalName =
+    bookedAppointment?.hospital.name || hospitalName || "";
+  const bookingHospitalAddress = bookedAppointment?.hospital.address || "";
+  const bookingDate =
+    bookedAppointment?.appointment_date || appointmentDateDisplay || appointmentDate;
+  const bookingTime = bookedAppointment
+    ? formatTimeRange(bookedAppointment.start_time, bookedAppointment.end_time)
+    : startTimeDisplay;
+  const bookingType = bookedAppointment
+    ? formatAppointmentMode(bookedAppointment.appointment_mode)
+    : consultationTypeLabel;
+  const bookingFee = bookedAppointment?.fees ?? fee;
+  const bookingStatus = bookedAppointment?.status || "";
+  const totalPayable = bookingFee; // assuming no extra tax/fee
 
   const handleConfirm = async () => {
     if (!doctor || !hospitalId || !appointmentDate || !startTime) {
@@ -88,34 +298,106 @@ export default function BookingDetailsScreen() {
 
     setIsBooking(true);
     try {
-      const res = await createAppointment({
+      const patientTokenInfo = await getPatientToken();
+      const patientToken = patientTokenInfo.token;
+
+      if (!patientToken) {
+        Alert.alert("Error", "Patient session expired. Please log in again.");
+        return;
+      }
+
+      const authorizationHeader = `Bearer ${patientToken}`;
+      console.log("[PatientPayment] token diagnostics", {
+        source: patientTokenInfo.source,
+        token: patientToken,
+        authorizationHeader,
+        diagnostics: getTokenDiagnostics(patientToken),
+        asyncStorageRole: patientTokenInfo.storedRole,
+        asyncStorageUser: patientTokenInfo.storedUser,
+        asyncStorageRoleIsPatient:
+          patientTokenInfo.storedRole?.toLowerCase() === "patient",
+      });
+
+      console.log("BOOKING PAYLOAD =>", {
         doctor_id: doctor.id,
         hospital_id: hospitalId,
-        appointment_mode: appointmentMode === "offline" ? "offline" : "online",
+        appointment_mode:
+          appointmentMode === "offline"
+            ? "clinic_visit"
+            : "video_call",
         appointment_date: appointmentDate,
         start_time: startTime,
       });
 
-      if (res.success) {
-        Alert.alert(
-          "Success",
-          `Appointment booked with ${doctor.name} on ${appointmentDateDisplay} at ${startTimeDisplay}`,
-          [
-            {
-              text: "OK",
-              onPress: () => navigation.navigate(ROUTES.MAIN.TABS),
-            },
-          ]
-        );
+      console.log("[PatientPayment] Authorization header before API call", {
+        Authorization: authorizationHeader,
+        webComparison:
+          "React web booking expected header is the same shape: Authorization: Bearer <localStorage access_token>.",
+      });
+
+      const res = await createAppointment({
+        doctor_id: doctor.id,
+        hospital_id: hospitalId,
+        appointment_mode: appointmentMode === "offline" ? "clinic_visit" : "video_call",
+        appointment_date: appointmentDate,
+        start_time: startTime,
+      }, patientToken);
+      console.log("[PatientPayment] booking API response", res);
+      const bookingResponse = mapBookAppointmentResponse(res);
+
+      if (bookingResponse.success) {
+        const appointment = bookingResponse.data;
+        setBookedAppointment(appointment);
+        setSuccessOpen(true);
       } else {
-        Alert.alert("Error", res.message || "Failed to book appointment");
+        Alert.alert(
+          "Error",
+          bookingResponse.message || "Failed to book appointment"
+        );
       }
     } catch (error: any) {
+      console.log(
+        "BOOKING ERROR =>",
+        error?.response?.status,
+        error?.response?.data
+      );
+
+      console.log("[PatientPayment] booking API error details", {
+        message: error?.message,
+        responseStatus: error?.response?.status,
+        responseData: error?.response?.data,
+        requestHeaders: error?.config?.headers || error?.response?.config?.headers,
+      });
+
       console.error(error);
-      Alert.alert("Error", "An error occurred while booking. Please try again.");
+
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message ||
+          "An error occurred while booking. Please try again."
+      );
     } finally {
       setIsBooking(false);
     }
+  };
+
+  const openSymptomsForm = () => {
+    setSuccessOpen(false);
+    setSymptomsOpen(true);
+  };
+
+  const closeSymptomsForm = () => {
+    setSymptomsOpen(false);
+    navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id });
+  };
+
+  const handleSubmitSymptoms = async () => {
+    const storageKey = `symptoms_${doctor.id}_${appointmentDate}_${startTime}`;
+    await AsyncStorage.setItem(
+      storageKey,
+      JSON.stringify({ symptoms, duration, severity })
+    );
+    closeSymptomsForm();
   };
 
   // If params are missing (user directly opened this screen), show error
@@ -162,7 +444,7 @@ export default function BookingDetailsScreen() {
               defaultSource={doctorImagePlaceholder}
             />
             <View style={{ marginLeft: 12 }}>
-              <Text style={styles.doctorName}>{doctor.name}</Text>
+              <Text style={styles.doctorName}>{bookingDoctorName}</Text>
               <Text style={styles.speciality}>
                 {doctor.specialities?.[0] || "Consultation"}
               </Text>
@@ -174,7 +456,7 @@ export default function BookingDetailsScreen() {
               <DateSvg width={14} height={14} />
               <Text style={styles.infoLabel}> Date :</Text>
             </View>
-            <Text style={styles.infoValue}>{appointmentDateDisplay}</Text>
+            <Text style={styles.infoValue}>{bookingDate}</Text>
           </View>
 
           <View style={styles.infoRow}>
@@ -182,7 +464,7 @@ export default function BookingDetailsScreen() {
               <ClockSvg width={14} height={14} />
               <Text style={styles.infoLabel}> Time :</Text>
             </View>
-            <Text style={styles.infoValue}>{startTimeDisplay}</Text>
+            <Text style={styles.infoValue}>{bookingTime}</Text>
           </View>
 
           <View style={styles.infoRow}>
@@ -190,8 +472,32 @@ export default function BookingDetailsScreen() {
               <HomeSvg width={14} height={14} />
               <Text style={styles.infoLabel}> Type :</Text>
             </View>
-            <Text style={styles.infoValue}>{consultationTypeLabel}</Text>
+            <Text style={styles.infoValue}>{bookingType}</Text>
           </View>
+
+          {bookedAppointment ? (
+            <>
+              <View style={styles.infoRow}>
+                <View style={styles.infoLeft}>
+                  <ClockSvg width={14} height={14} />
+                  <Text style={styles.infoLabel}> Status :</Text>
+                </View>
+                <Text style={[styles.infoValue, styles.statusText]}>
+                  {bookingStatus}
+                </Text>
+              </View>
+
+              <View style={styles.infoRow}>
+                <View style={styles.infoLeft}>
+                  <ClockSvg width={14} height={14} />
+                  <Text style={styles.infoLabel}> Booking ID :</Text>
+                </View>
+                <Text style={styles.infoValue} numberOfLines={1}>
+                  {bookedAppointment.id}
+                </Text>
+              </View>
+            </>
+          ) : null}
 
           <View style={styles.infoRow}>
             <View style={styles.infoLeft}>
@@ -199,7 +505,11 @@ export default function BookingDetailsScreen() {
               <Text style={styles.infoLabel}> Location :</Text>
             </View>
             <View style={styles.divider} />
-            <Text style={styles.infoValue}>{hospitalName}</Text>
+            <Text style={styles.infoValue}>
+              {bookingHospitalAddress
+                ? `${bookingHospitalName}, ${bookingHospitalAddress}`
+                : bookingHospitalName}
+            </Text>
           </View>
 
           <Text style={styles.sectionTitle}>Bill Details</Text>
@@ -207,7 +517,7 @@ export default function BookingDetailsScreen() {
           <View style={styles.billRow}>
             <Text style={styles.billText}>Consultation fee :</Text>
             <View style={styles.divider} />
-            <Text style={styles.billText}>₹ {fee}</Text>
+            <Text style={styles.billText}>₹ {bookingFee}</Text>
           </View>
 
           <View style={styles.billRow}>
@@ -342,13 +652,167 @@ export default function BookingDetailsScreen() {
           {isBooking ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.confirmText}>Confirm Clinic Visit</Text>
+            <Text style={styles.confirmText}>Confirm {bookingType}</Text>
           )}
         </TouchableOpacity>
       </View>
+
+      <Modal
+        transparent
+        visible={successOpen}
+        animationType="fade"
+        onRequestClose={openSymptomsForm}
+      >
+        <Pressable style={styles.modalOverlay} onPress={openSymptomsForm}>
+          <Pressable
+            style={[styles.successCard, isTablet && styles.successCardTablet]}
+          >
+            <View style={styles.successIconCircle}>
+              <MaterialCommunityIcons
+                name="check-circle-outline"
+                size={34}
+                color="#fff"
+              />
+            </View>
+
+            <Text style={styles.successTitle}>
+              Your appointment is successfully booked
+            </Text>
+            <Text style={styles.successDescription}>
+              The update will appear in your profile.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.successDoneButton}
+              onPress={openSymptomsForm}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.successDoneText}>Done</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        transparent
+        visible={symptomsOpen}
+        animationType="fade"
+        onRequestClose={closeSymptomsForm}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.symptomsCard, isTablet && styles.symptomsCardTablet]}>
+            <View style={styles.symptomsHeader}>
+              <Text style={styles.symptomsTitle}>
+                Share Symptoms Before Your Appointment
+              </Text>
+              <Text style={styles.symptomsSubtitle}>
+                Help your doctor understand your condition better by adding
+                symptoms or concerns before the consultation.
+              </Text>
+            </View>
+
+            <View style={styles.symptomsBody}>
+              <View>
+                <Text style={styles.fieldLabel}>Symptoms / Reason for Visit</Text>
+                <TextInput
+                  value={symptoms}
+                  onChangeText={setSymptoms}
+                  placeholder="Describe your symptoms or reason for visit..."
+                  placeholderTextColor="#9aa5ad"
+                  style={[styles.textInput, styles.symptomsInput]}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View>
+                <Text style={styles.fieldLabel}>Duration of Symptoms</Text>
+                <TextInput
+                  value={duration}
+                  onChangeText={setDuration}
+                  placeholder="e.g. 2 days, 1 week, 3 months"
+                  placeholderTextColor="#9aa5ad"
+                  style={styles.textInput}
+                />
+              </View>
+
+              <View>
+                <Text style={styles.fieldLabel}>Severity Level</Text>
+                <View style={styles.severityRow}>
+                  {(["mild", "moderate", "severe"] as const).map((item) => {
+                    const selected = severity === item;
+                    const severityStyle = severityStyles[item];
+
+                    return (
+                      <TouchableOpacity
+                        key={item}
+                        style={[
+                          styles.severityChip,
+                          {
+                            borderColor: selected
+                              ? severityStyle.border
+                              : "#d7dfe5",
+                            backgroundColor: selected
+                              ? severityStyle.bg
+                              : "transparent",
+                          },
+                        ]}
+                        onPress={() => setSeverity(item)}
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={[
+                            styles.severityText,
+                            {
+                              color: selected
+                                ? severityStyle.text
+                                : "#6b7280",
+                              fontWeight: selected ? "700" : "400",
+                            },
+                          ]}
+                        >
+                          {item.charAt(0).toUpperCase() + item.slice(1)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.symptomsActions}>
+                <TouchableOpacity
+                  style={styles.skipButton}
+                  onPress={closeSymptomsForm}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.skipButtonText}>Skip for Now</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.submitSymptomsButton,
+                    !symptoms.trim() && !severity && styles.submitSymptomsDisabled,
+                  ]}
+                  disabled={!symptoms.trim() && !severity}
+                  onPress={handleSubmitSymptoms}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.submitSymptomsText}>Submit Details</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const severityStyles = {
+  mild: { bg: "#e8f5e9", border: "#4caf50", text: "#2e7d32" },
+  moderate: { bg: "#fff8e1", border: "#ffa726", text: "#e65100" },
+  severe: { bg: "#ffebee", border: "#ef5350", text: "#c62828" },
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -409,6 +873,13 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 13,
     color: "#222",
+    flexShrink: 1,
+    marginLeft: 12,
+    textAlign: "right",
+  },
+  statusText: {
+    color: "#B26A00",
+    fontWeight: "700",
   },
   sectionTitle: {
     fontSize: 16,
@@ -586,5 +1057,181 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#2B7A78",
     textDecorationLine: "underline",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  successCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    paddingHorizontal: 32,
+    paddingTop: 36,
+    paddingBottom: 32,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
+  },
+  successCardTablet: {
+    maxWidth: 420,
+    paddingHorizontal: 40,
+  },
+  successIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "#2B6F71",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+    shadowColor: "#2B6F71",
+    shadowOpacity: 0.34,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  successTitle: {
+    color: "#222",
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  successDescription: {
+    color: "#667085",
+    fontSize: 14,
+    lineHeight: 23,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  successDoneButton: {
+    width: "100%",
+    maxWidth: 280,
+    minHeight: 46,
+    borderRadius: 10,
+    backgroundColor: "#2B7A78",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  successDoneText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  symptomsCard: {
+    width: "100%",
+    maxWidth: 560,
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
+  },
+  symptomsCardTablet: {
+    maxWidth: 600,
+  },
+  symptomsHeader: {
+    backgroundColor: "#2B7A78",
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
+  symptomsTitle: {
+    color: "#fff",
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "700",
+  },
+  symptomsSubtitle: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+  },
+  symptomsBody: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    gap: 20,
+  },
+  fieldLabel: {
+    color: "#222",
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  textInput: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: "#d7dfe5",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: "#222",
+    fontSize: 13,
+    backgroundColor: "#fff",
+  },
+  symptomsInput: {
+    minHeight: 92,
+  },
+  severityRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  severityChip: {
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  severityText: {
+    fontSize: 13,
+  },
+  symptomsActions: {
+    flexDirection: "row",
+    gap: 12,
+    paddingTop: 4,
+  },
+  skipButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2B7A78",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  skipButtonText: {
+    color: "#2B7A78",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  submitSymptomsButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 10,
+    backgroundColor: "#2B7A78",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitSymptomsDisabled: {
+    opacity: 0.5,
+  },
+  submitSymptomsText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

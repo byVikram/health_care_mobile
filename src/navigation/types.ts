@@ -39,6 +39,19 @@ export type ConsultationParams = {
   appointment?: Record<string, unknown>
 }
 
+export type PatientPaymentParams = {
+  doctor: DoctorDetailData
+  hospitalId: string
+  hospitalName: string
+  appointmentDate: string
+  appointmentDateDisplay: string
+  startTime: string
+  startTimeDisplay: string
+  appointmentMode: 'offline' | 'online'
+  consultationTypeLabel: string
+  fee: number
+}
+
 export type AppStackParamList = {
   [ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
   [ROUTES.STACK.SEARCH]: undefined
@@ -55,6 +68,7 @@ export type AppStackParamList = {
   [ROUTES.STACK.VIDEO_CONSULTATION]: { appointmentId: string }
   [ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
   [ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
+  [ROUTES.STACK.CONSENT_FORM]: { paymentParams: PatientPaymentParams }
   [ROUTES.STACK.PHARMACY_SEARCH]: undefined
   [ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
   // ✅ Updated: now receives booking data

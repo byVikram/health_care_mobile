@@ -28,6 +28,7 @@ export interface DoctorProfileProfessional {
 
 export interface DoctorHospital {
 	id: string
+	hospital_id?: string
 	name: string
 	location: string
 	fullAddress: string

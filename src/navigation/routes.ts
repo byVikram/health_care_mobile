@@ -30,6 +30,7 @@ export const ROUTES = {
 		VIDEO_CONSULTATION: 'VideoConsultation',
 		RESCHEDULE_APPOINTMENT: 'RescheduleAppointment',
 		CANCEL_APPOINTMENT: 'CancelAppointment',
+		CONSENT_FORM: 'ConsentForm',
 		PATIENT_PAYMENT: 'PatientPayment',
 		PHARMACY_SEARCH: 'PharmacySearch',
 		ORDER_DETAILS: 'OrderDetails',

@@ -34,6 +34,7 @@ type HospitalFormData = {
 
 type HospitalItem = HospitalFormData & {
 	id: string
+	hospital_id?: string
 	location: string
 	isPrimary: boolean
 }
@@ -546,6 +547,7 @@ const getHospitalAddressText = (hospital: HospitalItem) => {
 const normalizeHospitals = (rawHospitals: ReturnType<typeof mapDoctorProfileApi>['hospitals']): HospitalItem[] =>
 	rawHospitals.map((hospital, index) => ({
 		id: hospital.id || `${Date.now()}-${index}`,
+		hospital_id: hospital.hospital_id,
 		name: hospital.name ?? '',
 		fullAddress: hospital.fullAddress ?? hospital.location ?? '',
 		location: hospital.location ?? hospital.fullAddress ?? '',
@@ -557,6 +559,7 @@ const normalizeHospitals = (rawHospitals: ReturnType<typeof mapDoctorProfileApi>
 
 const toDoctorHospital = (hospital: HospitalItem): DoctorHospital => ({
 	id: String(hospital.id),
+	hospital_id: hospital.hospital_id ? String(hospital.hospital_id) : undefined,
 	name: hospital.name ?? '',
 	fullAddress: hospital.fullAddress ?? hospital.location ?? '',
 	location: hospital.location ?? hospital.fullAddress ?? '',
