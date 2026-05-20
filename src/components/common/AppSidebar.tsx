@@ -26,6 +26,12 @@ export interface AppSidebarItem {
   onPress: () => void;
 }
 
+export interface AppSidebarProfile {
+  id: string;
+  label: string;
+  variant?: "smile" | "mom" | "dad" | "add";
+}
+
 interface AppSidebarProps {
   visible: boolean;
   profileCompletion?: number;
@@ -33,6 +39,7 @@ interface AppSidebarProps {
   onLogout: () => void;
   onEditProfile?: () => void;
   menuItems: AppSidebarItem[];
+  profiles?: AppSidebarProfile[];
 }
 
 const SIDEBAR_WIDTH = 290;
@@ -45,6 +52,7 @@ export default function AppSidebar({
   onLogout,
   onEditProfile,
   menuItems,
+  profiles = [],
 }: AppSidebarProps) {
   const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const insets = useSafeAreaInsets();
@@ -125,6 +133,53 @@ const profileImageUrl = user?.avatar ?? null;
           </View>
 
           <View style={styles.separator} />
+
+          {profiles.length > 0 && (
+            <>
+              <View style={styles.profilesSection}>
+                <Text style={styles.profilesTitle}>Profiles</Text>
+                <View style={styles.profilesRow}>
+                  {profiles.map((profile) => {
+                    const isAdd = profile.variant === "add";
+
+                    return (
+                      <TouchableOpacity
+                        key={profile.id}
+                        style={styles.profileOption}
+                        activeOpacity={0.75}
+                      >
+                        <View
+                          style={[
+                            styles.profileCircle,
+                            isAdd && styles.profileCircleAdd,
+                          ]}
+                        >
+                          {isAdd ? (
+                            <MaterialCommunityIcons name="plus" size={34} color="#ffffff" />
+                          ) : profile.variant === "smile" ? (
+                            <MaterialCommunityIcons
+                              name="emoticon-happy-outline"
+                              size={34}
+                              color="#ffffff"
+                            />
+                          ) : (
+                            <Text style={styles.profileInitials}>
+                              {profile.variant === "mom" ? "AM" : "AD"}
+                            </Text>
+                          )}
+                        </View>
+                        <Text style={styles.profileOptionLabel} numberOfLines={1}>
+                          {profile.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.separator} />
+            </>
+          )}
 
           {/* ── Menu Items ── */}
           <ScrollView
@@ -234,6 +289,50 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   separator: { height: 1, backgroundColor: "#e9eef0" },
+  profilesSection: {
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  profilesTitle: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#142b30",
+    marginBottom: 14,
+  },
+  profilesRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  profileOption: {
+    width: 58,
+    alignItems: "center",
+  },
+  profileCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    overflow: "hidden",
+    backgroundColor:'#d1cacad8',
+    borderColor:'#474646',
+    borderWidth:0.8,
+  },
+  profileCircleAdd: {
+    backgroundColor: "#252525",
+  },
+  profileInitials: {
+    color: "#161515",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  profileOptionLabel: {
+    fontSize: 12,
+    color: "#142b30",
+    textAlign: "center",
+  },
   menuSection: { flex: 1, paddingTop: 10 },
   menuItem: {
     flexDirection: "row",

@@ -5,7 +5,7 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import { AppSidebar } from '../common'
 import AppHeader from '../common/AppHeader'
-import type { AppSidebarItem } from '../common'
+import type { AppSidebarItem, AppSidebarProfile } from '../common'
 import { useAuth } from '../../context/AuthContext'
 
 import AppointmentsIcon from '../../assets/quick-services/appointments.svg'
@@ -27,6 +27,13 @@ const MOCK_USER = {
 	avatar: undefined as string | undefined,
 	profileCompletion: 72,
 }
+
+const PROFILES: AppSidebarProfile[] = [
+	{ id: 'anjali', label: 'Anjali', variant: 'smile' },
+	{ id: 'anjali-mom', label: 'Anjali Mom', variant: 'mom' },
+	{ id: 'anjali-dad', label: 'Anjali’s Dad', variant: 'dad' },
+	{ id: 'add', label: 'Add', variant: 'add' },
+]
 
 interface SidebarLayoutProps {
 	children: React.ReactNode
@@ -175,6 +182,7 @@ export default function SidebarLayout({
 				onLogout={clearAuth}
 				onEditProfile={handleEditProfile}
 				menuItems={menuItems}
+				profiles={PROFILES}
 			/>
 
 			<AppHeader
