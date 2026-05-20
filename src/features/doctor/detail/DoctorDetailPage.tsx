@@ -301,6 +301,7 @@ export default function DoctorDetailPage() {
           hospital_id: selectedHospital,
           date: formatDateForApi(selectedDate),
         });
+        console.log("Raw availability response:", res);
         if (!active) return;
         setAvailableSlotsByMode(normalizeAvailabilityByMode(res));
       } catch (err) {

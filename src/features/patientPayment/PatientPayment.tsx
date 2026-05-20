@@ -23,7 +23,6 @@ import GooglePaySvg from "../../assets/Payment/googlepay.svg";
 import PaytmSvg from "../../assets/Payment/paytm.svg";
 import AmazonPaySvg from "../../assets/Payment/amazonpay.svg";
 import CreditCardSvg from "../../assets/Payment/creditcard.svg";
-import CashSvg from "../../assets/Payment/cash.svg";
 import WhatsappSvg from "../../assets/Payment/whatsapp.svg";
 import DateSvg from "../../assets/Payment/date.svg";
 import ClockSvg from "../../assets/Payment/clock.svg";
@@ -152,7 +151,6 @@ const paymentMethods = [
   { id: "paytm", name: "Paytm", Svg: PaytmSvg, bordered: false },
   { id: "amazon", name: "Amazon Pay", Svg: AmazonPaySvg, bordered: false },
   { id: "card", name: "Credit Card", Svg: CreditCardSvg, bordered: false },
-  { id: "cash", name: "Cash On Visit", Svg: CashSvg, bordered: false },
 ];
 
 const getPatientToken = async () => {
@@ -262,6 +260,7 @@ export default function BookingDetailsScreen() {
   const appointmentMode = params?.appointmentMode || "offline";
   const consultationTypeLabel = params?.consultationTypeLabel || "Clinic Visit";
   const fee = params?.fee || 0;
+  const isPayLaterDisabled = appointmentMode === "online";
 
   const [paymentType, setPaymentType] = useState<"now" | "later">("now");
   const [selectedMethod, setSelectedMethod] = useState("phonepe");
@@ -545,14 +544,31 @@ export default function BookingDetailsScreen() {
 
           {/* Pay Later */}
           <TouchableOpacity
-            style={styles.paymentRow}
+            style={[
+              styles.paymentRow,
+              isPayLaterDisabled && styles.paymentRowDisabled,
+            ]}
             onPress={() => {
+              if (isPayLaterDisabled) return;
               setPaymentType("later");
               setSelectedMethod("");
             }}
+            disabled={isPayLaterDisabled}
           >
-            <Text style={styles.paymentText}>Pay Later</Text>
-            <View style={styles.radioOuter}>
+            <Text
+              style={[
+                styles.paymentText,
+                isPayLaterDisabled && styles.paymentTextDisabled,
+              ]}
+            >
+              Pay Later
+            </Text>
+            <View
+              style={[
+                styles.radioOuter,
+                isPayLaterDisabled && styles.radioOuterDisabled,
+              ]}
+            >
               {paymentType === "later" && <View style={styles.radioInner} />}
             </View>
           </TouchableOpacity>
@@ -820,6 +836,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
   },
+  paymentRowDisabled: {
+    opacity: 0.45,
+  },
   paymentLeft: {
     flexDirection: "row",
     alignItems: "center",
@@ -828,6 +847,9 @@ const styles = StyleSheet.create({
   paymentText: {
     fontSize: 15,
     color: "#333",
+  },
+  paymentTextDisabled: {
+    color: "#8b949e",
   },
   iconWrapper: {
     width: 28,
@@ -848,6 +870,9 @@ const styles = StyleSheet.create({
     borderColor: "#2B7A78",
     justifyContent: "center",
     alignItems: "center",
+  },
+  radioOuterDisabled: {
+    borderColor: "#9aa5ad",
   },
   radioInner: {
     width: 12,
