@@ -35,6 +35,7 @@ export type PickProps = {
 	showTimeSlots?: boolean
 	hideNavigation?: boolean
 	use12HourTime?: boolean
+	showSlotStatusLabels?: boolean
 	selectedAppointmentType?: 'clinic' | 'video' | string
 	onAppointmentTypeChange?: (type: 'clinic' | 'video') => void
 }
@@ -62,6 +63,7 @@ export default function DateSlotPicker(props: PickProps) {
 		showTimeSlots = true,
 		hideNavigation = false,
 		use12HourTime = false,
+		showSlotStatusLabels = true,
 		selectedAppointmentType,
 		onAppointmentTypeChange,
 	} = props
@@ -323,6 +325,7 @@ export default function DateSlotPicker(props: PickProps) {
 														!isSelected && isBlocked && styles.timeBoxBlocked,
 														!isSelected && isBooked && styles.timeBoxBooked,
 														!canSelect && styles.timeBoxDisabled,
+														!showSlotStatusLabels && styles.timeBoxSingleLine,
 													]}
 													onPress={() => canSelect && handleTimePress(slot.start_time)}
 													activeOpacity={canSelect ? 0.6 : 1}
@@ -339,7 +342,7 @@ export default function DateSlotPicker(props: PickProps) {
 													>
 														{formatTimeLabel(slot.start_time)}
 													</AppTypography>
-													{statusLabel ? (
+													{showSlotStatusLabels && statusLabel ? (
 														<AppTypography
 															variant="caption"
 															style={[
@@ -518,6 +521,10 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#fff',
+	},
+	timeBoxSingleLine: {
+		height: 44,
+		paddingVertical: 0,
 	},
 	timeBoxSpacingRight: {
 		marginRight: 10,

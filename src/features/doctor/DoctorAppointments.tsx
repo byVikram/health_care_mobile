@@ -11,7 +11,6 @@ import {
 	Alert,
 	Modal,
 	ActivityIndicator,
-	Image,
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -23,10 +22,12 @@ import {
 	rescheduleAppointment,
 	referAppointment,
 	getFavouriteDoctors,
+	toggleFavouriteDoctor,
 	getDoctors,
 	getDoctorById,
 	getDoctorProfile,
 	type FavouriteDoctor,
+	type SlotGroup,
 } from './doctorService'
 import { DateSlotPicker } from '../../components/common'
 import { APPOINTMENT_STATUS } from '../../constants/constants'
@@ -35,6 +36,7 @@ import type { AppStackParamList } from '../../navigation/types'
 import { navigate as navigateRoot } from '../../navigation/navigationService'
 import DoctorHospitalDropdown from '../../components/common/DoctorHospitalDropdown'
 import { useAuth } from '../../context/AuthContext'
+import FavouriteDoctorList from './search/components/FavouriteDoctorList'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -58,6 +60,9 @@ type Appointment = {
 	sex?: string
 	status: string | { label: string }
 	appointment_date: string
+	appointment_mode?: string
+	mode?: string
+	type?: string
 	start_time: string
 	end_time?: string
 	symptoms?: string | string[]
@@ -87,6 +92,35 @@ type DoctorAppointmentsProps = {
 	selectedDateObj: Date
 }
 
+type AppointmentModeKey = 'clinic' | 'video'
+
+type AvailabilityAppointmentMode = 'clinic_visit' | 'video_call' | 'offline' | 'online' | 'clinic' | 'video' | string
+
+type AvailabilityApiSlot = {
+	start_time?: string
+	end_time?: string
+	status?: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE' | 'BLOCKED' | 'OCCUPIED' | ''
+	is_enabled?: boolean
+	is_booked?: boolean
+	can_toggle?: boolean
+}
+
+type AvailabilityApiSession = {
+	label?: string
+	range?: string
+	period?: string
+	slots?: AvailabilityApiSlot[]
+}
+
+type AvailabilityApiModeGroup = {
+	appointment_mode?: AvailabilityAppointmentMode
+	sessions?: AvailabilityApiSession[]
+	label?: string
+	range?: string
+	period?: string
+	slots?: AvailabilityApiSlot[]
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,6 +146,85 @@ function getAptHospitalId(apt: any): string {
 		apt?.pivot?.hospital_id ??
 		''
 	return raw ? String(raw) : ''
+}
+
+const getModeKey = (mode?: string | null): AppointmentModeKey => {
+	const normalized = String(mode || '').toLowerCase()
+	if (normalized === 'video_call' || normalized === 'online' || normalized === 'video') {
+		return 'video'
+	}
+	return 'clinic'
+}
+
+const getAppointmentModeKey = (appointment?: Appointment | null): AppointmentModeKey => {
+	const rawMode =
+		appointment?.appointment_mode ||
+		appointment?.mode ||
+		appointment?.type ||
+		(appointment as any)?.appointment_type ||
+		(appointment as any)?.consultation_type
+
+	return getModeKey(rawMode)
+}
+
+const normalizeSlotStatus = (slot: AvailabilityApiSlot): SlotGroup['slots'][number]['status'] => {
+	if (slot.is_booked || slot.status === 'OCCUPIED') return 'OCCUPIED'
+	if (slot.is_enabled === false) return 'UNAVAILABLE'
+	return slot.status || 'AVAILABLE'
+}
+
+const normalizeAvailabilityByMode = (
+	response: unknown
+): Record<AppointmentModeKey, SlotGroup[]> => {
+	const rawData = Array.isArray(response)
+		? response
+		: Array.isArray((response as { data?: unknown })?.data)
+			? ((response as { data: AvailabilityApiModeGroup[] }).data)
+			: []
+
+	const grouped: Record<AppointmentModeKey, SlotGroup[]> = {
+		clinic: [],
+		video: [],
+	}
+
+	rawData.forEach((item: AvailabilityApiModeGroup, itemIndex) => {
+		const hasModeStructure =
+			Boolean(item.appointment_mode) || Array.isArray(item.sessions)
+		const modeKey = hasModeStructure ? getModeKey(item.appointment_mode) : 'clinic'
+		const sessions =
+			Array.isArray(item.sessions) && item.sessions.length > 0
+				? item.sessions
+				: [{ label: item.label, range: item.range, period: item.period, slots: item.slots }]
+
+		const normalizedSessions = sessions
+			.map((session, sessionIndex): SlotGroup => {
+				const range = session.range || session.period || ''
+				const label = session.label || `Session ${sessionIndex + 1}`
+				const groupLabel = range ? `${label} (${range})` : label
+
+				return {
+					label: groupLabel,
+					period: range,
+					range,
+					slots: (session.slots || [])
+						.filter((slot) => slot.start_time)
+						.map((slot, slotIndex) => ({
+							id: `${modeKey}-${itemIndex}-${sessionIndex}-${slot.start_time}-${slotIndex}`,
+							start_time: String(slot.start_time || ''),
+							end_time: String(slot.end_time || ''),
+							status: normalizeSlotStatus(slot),
+							is_enabled: slot.is_enabled,
+							is_booked: slot.is_booked,
+							can_toggle: slot.can_toggle,
+						})),
+				}
+			})
+			.filter((session) => session.slots.length > 0)
+
+		grouped[modeKey] = [...grouped[modeKey], ...normalizedSessions]
+	})
+
+	return grouped
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -174,10 +287,12 @@ const [successMessage, setSuccessMessage] = useState('')
 	const [referAppt, setReferAppt] = useState<Appointment | null>(null)
 	const [referQuery, setReferQuery] = useState('')
 	const [favouriteDoctors, setFavouriteDoctors] = useState<ReferDoctor[]>([])
+	const [favouriteDoctorIds, setFavouriteDoctorIds] = useState<Set<string>>(new Set())
 	const [referSearchResults, setReferSearchResults] = useState<ReferDoctor[]>([])
 	const [referLoading, setReferLoading] = useState(false)
 	const [referSearchLoading, setReferSearchLoading] = useState(false)
 	const [referringIds, setReferringIds] = useState<Set<string>>(new Set())
+	const [bookmarkingIds, setBookmarkingIds] = useState<Set<string>>(new Set())
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Small helpers
@@ -266,6 +381,7 @@ const [successMessage, setSuccessMessage] = useState('')
 	// ─────────────────────────────────────────────────────────────────────────
 
 	const handleOpenReschedule = (apt: Appointment) => {
+		debugger
 		const isLocallyRejected = rejectedIds.has(apt.id)
 		const status = getStatusLabel(apt.status)
 		if (isLocallyRejected || status === 'cancelled' || status === 'rejected') {
@@ -389,13 +505,10 @@ const [successMessage, setSuccessMessage] = useState('')
 					date: dateStr,
 				})
 
-				const groups = Array.isArray(responseData)
-					? responseData
-					: Array.isArray((responseData as any)?.data)
-						? (responseData as any).data
-						: []
+				const availabilityByMode = normalizeAvailabilityByMode(responseData)
+				const appointmentMode = getAppointmentModeKey(rescheduleAppt)
 
-				setRescheduleSlots(groups)
+				setRescheduleSlots(availabilityByMode[appointmentMode])
 			} catch {
 				setRescheduleSlots([])
 				setSelectedSlot('')
@@ -467,6 +580,7 @@ const [successMessage, setSuccessMessage] = useState('')
 		setReferQuery('')
 		setReferSearchResults([])
 		setReferringIds(new Set())
+		setBookmarkingIds(new Set())
 	}
 
 	useEffect(() => {
@@ -478,6 +592,7 @@ const [successMessage, setSuccessMessage] = useState('')
 				const res = await getFavouriteDoctors()
 				if (res.success) {
 					setFavouriteDoctors((res.data?.favourites ?? []).map(mapReferDoctor))
+					setFavouriteDoctorIds(new Set(res.data?.favourite_ids ?? []))
 				} else {
 					showError(res.message || 'Failed to load doctors')
 				}
@@ -542,6 +657,78 @@ const [successMessage, setSuccessMessage] = useState('')
 			showError('Failed to refer appointment')
 		} finally {
 			setReferringIds((prev) => {
+				const next = new Set(prev)
+				next.delete(doctor.id)
+				return next
+			})
+		}
+	}
+
+	const handleToggleBookmark = async (doctor: ReferDoctor) => {
+		if (bookmarkingIds.has(doctor.id)) return
+
+		const wasFavourite = favouriteDoctorIds.has(doctor.id)
+
+		setBookmarkingIds((prev) => new Set(prev).add(doctor.id))
+		setFavouriteDoctorIds((prev) => {
+			const next = new Set(prev)
+			if (wasFavourite) next.delete(doctor.id)
+			else next.add(doctor.id)
+			return next
+		})
+		setFavouriteDoctors((prev) => {
+			if (wasFavourite) return prev.filter((item) => item.id !== doctor.id)
+			return prev.some((item) => item.id === doctor.id) ? prev : [...prev, doctor]
+		})
+
+		try {
+			const res = await toggleFavouriteDoctor(doctor.id)
+
+			if (res.success === false) {
+				throw new Error(res.message || 'Failed to update favourites')
+			}
+
+			const isFavourite = res.data?.action
+				? res.data.action === 'added'
+				: !wasFavourite
+
+			if (res.data?.favourite_ids) {
+				setFavouriteDoctorIds(new Set(res.data.favourite_ids))
+			} else {
+				setFavouriteDoctorIds((prev) => {
+					const next = new Set(prev)
+					if (isFavourite) next.add(doctor.id)
+					else next.delete(doctor.id)
+					return next
+				})
+			}
+
+			if (res.data?.favourites) {
+				setFavouriteDoctors(res.data.favourites.map(mapReferDoctor))
+			} else {
+				setFavouriteDoctors((prev) => {
+					if (!isFavourite) return prev.filter((item) => item.id !== doctor.id)
+					return prev.some((item) => item.id === doctor.id) ? prev : [...prev, doctor]
+				})
+			}
+
+			showSuccess(isFavourite ? 'Added to favourites' : 'Removed from favourites')
+		} catch {
+			setFavouriteDoctorIds((prev) => {
+				const next = new Set(prev)
+				if (wasFavourite) next.add(doctor.id)
+				else next.delete(doctor.id)
+				return next
+			})
+			setFavouriteDoctors((prev) => {
+				if (wasFavourite) {
+					return prev.some((item) => item.id === doctor.id) ? prev : [...prev, doctor]
+				}
+				return prev.filter((item) => item.id !== doctor.id)
+			})
+			showError('Failed to update favourites')
+		} finally {
+			setBookmarkingIds((prev) => {
 				const next = new Set(prev)
 				next.delete(doctor.id)
 				return next
@@ -735,57 +922,23 @@ const [successMessage, setSuccessMessage] = useState('')
 
 	const renderReferDoctorRow = (doctor: ReferDoctor) => {
 		const isSubmitting = referringIds.has(doctor.id)
+		const isBookmarking = bookmarkingIds.has(doctor.id)
+		const isBookmarked = favouriteDoctorIds.has(doctor.id)
 		const isCompactRefer = width < 520
-		const speciality = doctor.specialities?.[0] || 'General Physician'
-		const experience =
-			doctor.experience_years != null ? `${doctor.experience_years} yrs exp` : 'Experience not available'
-		const location = doctor.location || 'Bangalore'
-		const imageSource = doctor.avatar_s3_key
-			? { uri: doctor.avatar_s3_key }
-			: DOCTOR_IMAGE_PLACEHOLDER
 
 		return (
-			<View key={doctor.id} style={[styles.referDoctorRow, isCompactRefer && styles.referDoctorRowCompact]}>
-				<Image
-					source={imageSource}
-					style={[styles.referDoctorImage, isCompactRefer && styles.referDoctorImageCompact]}
-					resizeMode="cover"
-				/>
-				<View style={styles.referDoctorInfo}>
-					<Text style={[styles.referDoctorName, isCompactRefer && styles.referDoctorNameCompact]} numberOfLines={1}>
-						{doctor.name}
-					</Text>
-					<Text style={[styles.referDoctorSpeciality, isCompactRefer && styles.referDoctorSpecialityCompact]} numberOfLines={1}>
-						{speciality}
-					</Text>
-					<View style={styles.referDoctorMetaRow}>
-						<MaterialCommunityIcons name="briefcase-outline" size={isCompactRefer ? 12 : 15} color="#969696" />
-						<Text style={[styles.referDoctorMetaText, isCompactRefer && styles.referDoctorMetaTextCompact]}>
-							{experience}
-						</Text>
-						<MaterialCommunityIcons name="map-marker-outline" size={isCompactRefer ? 12 : 15} color="#969696" />
-						<Text style={[styles.referDoctorMetaText, isCompactRefer && styles.referDoctorMetaTextCompact]} numberOfLines={1}>
-							{location}
-						</Text>
-					</View>
-				</View>
-				<TouchableOpacity
-					style={[
-						styles.referShareBtn,
-						isCompactRefer && styles.referShareBtnCompact,
-						isSubmitting && styles.referShareBtnDisabled,
-					]}
-					activeOpacity={0.8}
-					disabled={isSubmitting}
-					onPress={() => handleReferDoctor(doctor)}
-				>
-					{isSubmitting ? (
-						<ActivityIndicator size="small" color="#fff" />
-					) : (
-						<Text style={[styles.referShareText, isCompactRefer && styles.referShareTextCompact]}>Share</Text>
-					)}
-				</TouchableOpacity>
-			</View>
+			<FavouriteDoctorList
+				key={doctor.id}
+				doctor={doctor}
+				isCompact={isCompactRefer}
+				isSubmitting={isSubmitting}
+				isBookmarking={isBookmarking}
+				isBookmarked={isBookmarked}
+				onShare={handleReferDoctor}
+				onToggleBookmark={handleToggleBookmark}
+				placeholderImage={DOCTOR_IMAGE_PLACEHOLDER}
+				primaryColor={TEAL}
+			/>
 		)
 	}
 
@@ -930,6 +1083,8 @@ const [successMessage, setSuccessMessage] = useState('')
 							onTimeChange={setSelectedSlot}
 							availableSlots={rescheduleSlots}
 							loading={rescheduleSlotsLoading}
+							selectedAppointmentType={getAppointmentModeKey(rescheduleAppt)}
+							showSlotStatusLabels={false}
 						/>
 					</ScrollView>
 
@@ -1663,87 +1818,6 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 		marginBottom: 18,
 	},
-	referDoctorRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 38,
-	},
-	referDoctorRowCompact: { marginBottom: 22 },
-	referDoctorImage: {
-		width: 78,
-		height: 78,
-		borderRadius: 39,
-		backgroundColor: '#eef3f5',
-		marginLeft: 24,
-		marginRight: 24,
-	},
-	referDoctorImageCompact: {
-		width: 52,
-		height: 52,
-		borderRadius: 26,
-		marginLeft: 0,
-		marginRight: 12,
-	},
-	referDoctorInfo: {
-		flex: 1,
-		minWidth: 0,
-	},
-	referDoctorName: {
-		fontSize: 20,
-		fontWeight: '700',
-		color: '#172838',
-		marginBottom: 8,
-	},
-	referDoctorNameCompact: {
-		fontSize: 15,
-		marginBottom: 4,
-	},
-	referDoctorSpeciality: {
-		fontSize: 16,
-		color: '#526b7a',
-		marginBottom: 14,
-	},
-	referDoctorSpecialityCompact: {
-		fontSize: 13,
-		marginBottom: 6,
-	},
-	referDoctorMetaRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		flexWrap: 'wrap',
-	},
-	referDoctorMetaText: {
-		fontSize: 15,
-		color: '#969696',
-		marginRight: 16,
-	},
-	referDoctorMetaTextCompact: {
-		fontSize: 11,
-		marginRight: 8,
-	},
-	referShareBtn: {
-		minWidth: 124,
-		height: 48,
-		borderRadius: 24,
-		backgroundColor: '#0d8585',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginLeft: 16,
-	},
-	referShareBtnCompact: {
-		minWidth: 70,
-		height: 36,
-		borderRadius: 18,
-		marginLeft: 8,
-	},
-	referShareBtnDisabled: { opacity: 0.65 },
-	referShareText: {
-		color: '#fff',
-		fontSize: 16,
-		fontWeight: '700',
-	},
-	referShareTextCompact: { fontSize: 13 },
 	referLoadingBox: {
 		paddingVertical: 30,
 		alignItems: 'center',
