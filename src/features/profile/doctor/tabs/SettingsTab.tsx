@@ -151,7 +151,7 @@ export default function SettingsTab() {
 				style={styles.deleteBtn}
 				onPress={() => setShowModal(true)}
 			>
-				<AppTypography variant="body" style={styles.deleteText}>Delete Account</AppTypography>
+				<AppTypography variant="body" style={styles.deleteText}>Deactivate the Account</AppTypography>
 				<Ionicons name="trash-outline" size={18} color="#fff" />
 			</TouchableOpacity>
 
@@ -176,11 +176,11 @@ export default function SettingsTab() {
 						onPress={(e) => e.stopPropagation()}
 					>
 						<AppTypography variant="body" style={styles.modalTitle}>
-							Delete Account?
+							Deactivate Account?
 						</AppTypography>
 
 						<AppTypography variant="body" style={styles.modalText}>
-							All your data will be permanently deleted.
+							All your data will be permanently deactivated.
 						</AppTypography>
 
 						<View style={styles.modalActions}>
@@ -192,7 +192,7 @@ export default function SettingsTab() {
 							</TouchableOpacity>
 
 							<TouchableOpacity style={styles.confirmBtn}>
-								<AppTypography variant="body" style={styles.confirmText}>Delete</AppTypography>
+								<AppTypography variant="body" style={styles.confirmText}>Deactivate</AppTypography>
 							</TouchableOpacity>
 						</View>
 					</Pressable>

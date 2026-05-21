@@ -34,6 +34,8 @@ export type PickProps = {
 	onUnselectAll?: () => void
 	showTimeSlots?: boolean
 	hideNavigation?: boolean
+	use12HourTime?: boolean
+	showSlotStatusLabels?: boolean
 	selectedAppointmentType?: 'clinic' | 'video' | string
 	onAppointmentTypeChange?: (type: 'clinic' | 'video') => void
 }
@@ -60,6 +62,8 @@ export default function DateSlotPicker(props: PickProps) {
 		onUnselectAll,
 		showTimeSlots = true,
 		hideNavigation = false,
+		use12HourTime = false,
+		showSlotStatusLabels = true,
 		selectedAppointmentType,
 		onAppointmentTypeChange,
 	} = props
@@ -99,7 +103,7 @@ export default function DateSlotPicker(props: PickProps) {
 	const resolvedVisitType =
 		selectedAppointmentType === 'video' ? 'video' : selectedAppointmentType === 'clinic' ? 'clinic' : visitType
 	const dateBoxWidth = isTablet ? 62 : 50
-	const slotBasis = `${100 / timeSlotColumns - (isTablet ? 1.8 : 2.8)}%`
+	const slotBasis = `${100 / timeSlotColumns - (isTablet ? 1.8 : 2.8)}%` as `${number}%`
 
 	const handleVisitTypeChange = (type: 'clinic' | 'video') => {
 		setVisitType(type)
@@ -116,6 +120,21 @@ export default function DateSlotPicker(props: PickProps) {
 			? selectedTimes.filter((selected) => selected !== time)
 			: [...selectedTimes, time]
 		onTimeChange(next)
+	}
+
+	const formatTimeLabel = (time: string) => {
+		if (!use12HourTime) return time
+
+		const [hourText, minuteText] = time.split(':')
+		const hour = Number(hourText)
+		const minute = Number(minuteText)
+
+		if (!Number.isFinite(hour) || !Number.isFinite(minute)) return time
+
+		const period = hour >= 12 ? 'PM' : 'AM'
+		const hour12 = hour % 12 || 12
+
+		return `${hour12}:${String(minute).padStart(2, '0')} ${period}`
 	}
 
 	return (
@@ -278,10 +297,23 @@ export default function DateSlotPicker(props: PickProps) {
 											const isAvailable =
 												slot.status === 'AVAILABLE' || slot.status === ('' as any)
 											const isBlocked = slot.status === 'BLOCKED'
-											const isBooked = slot.status === 'BOOKED' || slot.status === 'UNAVAILABLE'
+											const isBooked =
+												slot.is_booked ||
+												slot.status === 'BOOKED' ||
+												slot.status === 'OCCUPIED' ||
+												slot.status === 'UNAVAILABLE'
 											const canSelect =
 												slot.can_toggle !== false &&
+												!slot.is_booked &&
 												(isAvailable || isBlocked || !disableBookedSlots || !isBooked)
+											const statusLabel =
+												slot.status === 'OCCUPIED' || slot.is_booked
+													? 'Occupied'
+													: slot.status === 'UNAVAILABLE'
+														? 'Unavailable'
+														: isBlocked
+															? 'Blocked'
+															: ''
 
 											return (
 												<TouchableOpacity
@@ -291,7 +323,9 @@ export default function DateSlotPicker(props: PickProps) {
 														{ flexBasis: slotBasis },
 														isSelected && styles.timeBoxSelected,
 														!isSelected && isBlocked && styles.timeBoxBlocked,
+														!isSelected && isBooked && styles.timeBoxBooked,
 														!canSelect && styles.timeBoxDisabled,
+														!showSlotStatusLabels && styles.timeBoxSingleLine,
 													]}
 													onPress={() => canSelect && handleTimePress(slot.start_time)}
 													activeOpacity={canSelect ? 0.6 : 1}
@@ -306,8 +340,22 @@ export default function DateSlotPicker(props: PickProps) {
 															!canSelect && styles.timeTextDisabled,
 														]}
 													>
-														{slot.start_time}
+														{formatTimeLabel(slot.start_time)}
 													</AppTypography>
+													{showSlotStatusLabels && statusLabel ? (
+														<AppTypography
+															variant="caption"
+															style={[
+																styles.slotStatusText,
+																isSelected && styles.timeTextSelected,
+																!isSelected && isBlocked && styles.timeTextBlocked,
+																!isSelected && isBooked && styles.timeTextBooked,
+																!canSelect && styles.timeTextDisabled,
+															]}
+														>
+															{statusLabel}
+														</AppTypography>
+													) : null}
 												</TouchableOpacity>
 											)
 										})}
@@ -474,6 +522,10 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		backgroundColor: '#fff',
 	},
+	timeBoxSingleLine: {
+		height: 44,
+		paddingVertical: 0,
+	},
 	timeBoxSpacingRight: {
 		marginRight: 10,
 	},
@@ -484,6 +536,10 @@ const styles = StyleSheet.create({
 	timeBoxDisabled: {
 		backgroundColor: 'rgba(0,0,0,0.06)',
 		borderColor: '#eee',
+	},
+	timeBoxBooked: {
+		backgroundColor: '#fff3f0',
+		borderColor: '#f0c7bd',
 	},
 	timeBoxBlocked: {
 		backgroundColor: '#f1f4f5',
@@ -503,6 +559,14 @@ const styles = StyleSheet.create({
 	},
 	timeTextBlocked: {
 		color: '#7b8790',
+	},
+	timeTextBooked: {
+		color: '#b15a43',
+	},
+	slotStatusText: {
+		marginTop: 2,
+		fontSize: 10,
+		fontWeight: '600',
 	},
 
 	// Toggle

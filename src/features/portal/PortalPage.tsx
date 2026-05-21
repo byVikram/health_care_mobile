@@ -3,9 +3,8 @@ import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-nat
 import { Text, Card, useTheme, Button } from 'react-native-paper';
 import { useAuth, UserRole } from '../../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { ROUTES } from '../../navigation/routes';
-import type { AppStackParamList } from '../../navigation/types';
+import { navigate as navigateRoot } from '../../navigation/navigationService';
 
 interface StatsProps {
     label: string;
@@ -22,14 +21,14 @@ const StatBox = ({ label, value }: StatsProps) => (
 export default function PortalPage() {
     const { role, user } = useAuth();
     const theme = useTheme();
-    const navigation = useNavigation<NavigationProp<AppStackParamList>>();
+
     const openAppointments = () => {
         if (role === 'doctor') {
-            navigation.navigate(ROUTES.STACK.APPOINTMENTS);
+            navigateRoot(ROUTES.STACK.APPOINTMENTS);
             return;
         }
 
-        navigation.navigate(ROUTES.STACK.CONSULTATION);
+        navigateRoot(ROUTES.STACK.CONSULTATION);
     };
 
     return (

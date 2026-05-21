@@ -10,12 +10,13 @@ import { DoctorProfileApiResponse, DoctorProfileApiData } from '../../types/doct
 import { DoctorProfile } from '../../types/doctor-profile'
 
 export interface TimeSlot {
-	id: string | number
+	id?: string | number
 	start_time: string
 	end_time: string
-	status: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE' | 'BLOCKED' | ''
+	status: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE' | 'BLOCKED' | 'OCCUPIED' | ''
 	can_toggle?: boolean
 	is_enabled?: boolean
+	is_booked?: boolean
 }
 // Add this to doctorService.ts
 export interface Appointment {
@@ -30,7 +31,8 @@ export interface Appointment {
 
 export interface SlotGroup {
 	label: string
-	period: string
+	period?: string
+	range?: string
 	slots: TimeSlot[]
 }
 
@@ -55,7 +57,7 @@ export interface DoctorSearchParams {
 export interface CreateAppointmentPayload {
 	doctor_id: string
 	hospital_id?: string
-	appointment_mode: 'offline' | 'online'
+	appointment_mode: 'offline' | 'online' | 'clinic_visit' | 'video_call'
 	appointment_date: string
 	start_time: string
 	end_time?: string
@@ -136,12 +138,38 @@ export const getAppointments = async (params?: AppointmentParams): Promise<Appoi
 }
 
 export const createAppointment = async (
-	payload: CreateAppointmentPayload
+	payload: CreateAppointmentPayload,
+	token?: string | null
 ): Promise<CreateAppointmentResponse> => {
+	const config = token
+		? {
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			}
+		: undefined
+
+	console.log('[createAppointment][RN] request', {
+		url: API_ENDPOINTS.APPOINTMENTS.CREATE,
+		payload,
+		token,
+		headers: config?.headers,
+		webComparison:
+			'React web booking uses axios interceptor with localStorage access_token and sends Authorization: Bearer <access_token>.',
+	})
+
 	const res = await ApiService.post<CreateAppointmentResponse>(
 		API_ENDPOINTS.APPOINTMENTS.CREATE,
-		payload
+		payload,
+		config
 	)
+
+	console.log('[createAppointment][RN] response', {
+		status: res.status,
+		requestHeaders: res.config?.headers,
+		data: res.data,
+	})
+
 	return res.data
 }
 export const getDoctors = async (
@@ -200,7 +228,9 @@ export const toggleFavouriteDoctor = async (publicId: string): Promise<ToggleFav
 }
 
 export interface AvailabilityResponse {
-	data?: SlotGroup[]
+	success?: boolean
+	message?: string
+	data?: any[]
 }
 
 export const getDoctorAvailability = async (params: {
@@ -384,6 +414,7 @@ export const mapDoctorProfileApi = (data: DoctorProfileApiData): DoctorProfile =
 	// Build hospitals
 	const hospitals: DoctorProfile['hospitals'] = (data.hospitals ?? []).map((h) => ({
 		id: h.id,
+		hospital_id: h.hospital?.id ?? h.id,
 		name: h.hospital?.name ?? '',
 		location: h.hospital?.address ?? '',
 		fullAddress: h.hospital?.address ?? '',

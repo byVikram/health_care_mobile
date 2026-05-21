@@ -10,9 +10,16 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppSelect, AppTypography } from '../../../components/common'
+import { AppTypography } from '../../../components/common'
 import { VitalHistoryRow, VitalStat } from '../../../types/consultation'
-import { vitalsService } from '../VitalsService'
+import {
+	getLatestVitals,
+	getPatientReports,
+	getVitalsHistory,
+	mapLatestVitalsToStats,
+	mapVitalToRow,
+	type ReportRecord,
+} from '../VitalsService'
 import AddVitalsModal from './AddVitalsModal'
 
 interface TabColumn {
@@ -48,11 +55,32 @@ const VITAL_STATS: VitalStat[] = [
 ]
 
 const PERIOD_OPTIONS = [
+	{ value: 'all', label: 'All' },
+	{ value: 'today', label: 'Today' },
+	{ value: 'yesterday', label: 'Yesterday' },
 	{ value: '7days', label: 'Last 7 Days' },
 	{ value: '30days', label: 'Last 30 Days' },
-	{ value: '3months', label: 'Last 3 Months' },
-	{ value: '1year', label: 'Last 1 Year' },
+	{ value: '90days', label: 'Last 90 Days' },
+	{ value: 'custom', label: 'Custom' },
 ]
+
+const TAB_VITAL_TYPE: Record<string, string> = {
+	bp: 'blood_pressure',
+	glucose: 'glucose_level',
+	weight: 'weight',
+	others: 'others',
+	ecg: 'ecg',
+}
+
+const PERIOD_DAYS: Record<string, number | undefined> = {
+	all: undefined,
+	today: 1,
+	yesterday: 2,
+	'7days': 7,
+	'30days': 30,
+	'90days': 90,
+	custom: undefined,
+}
 
 const DEFAULT_TAB_CONFIGS: TabConfig[] = [
 	{
@@ -242,86 +270,41 @@ const DEFAULT_TAB_CONFIGS: TabConfig[] = [
 		id: 'ecg',
 		label: 'ECG',
 		showDownload: true,
+		// ECG matches the web report-history view rather than raw vital readings.
 		columns: [
-			{ key: 'heartRate', label: 'Heart Rate' },
-			{ key: 'prInterval', label: 'PR Interval' },
-			{ key: 'pDuration', label: 'P Duration' },
-			{ key: 'qrsDuration', label: 'QRS Duration' },
-			{ key: 'tDuration', label: 'T Duration' },
-			{ key: 'qtQtc', label: 'QT/QTc' },
-			{ key: 'pqrsAxis', label: 'P/QRS/T axis' },
-			{ key: 'rvSv', label: 'R(v5) / S(v1)' },
+			{ key: 'reportType', label: 'Report Type' },
+			{ key: 'notes', label: 'Notes' },
 		],
 		rows: [
 			{
 				id: '1',
 				date: '17/04/2025 10:00AM',
-				cells: {
-					heartRate: '120 bpm',
-					prInterval: '60 ms',
-					pDuration: '87 ms',
-					qrsDuration: '84 ms',
-					tDuration: '9 ms',
-					qtQtc: '70 ms',
-					pqrsAxis: '77 dgv',
-					rvSv: '91 mv',
-				},
+				cells: { reportType: 'ecg', notes: '-' },
+				hasDownload: true,
 			},
 			{
 				id: '2',
 				date: '03/01/2025 10:00AM',
-				cells: {
-					heartRate: '120 bpm',
-					prInterval: '60 ms',
-					pDuration: '87 ms',
-					qrsDuration: '84 ms',
-					tDuration: '9 ms',
-					qtQtc: '70 ms',
-					pqrsAxis: '77 dgv',
-					rvSv: '91 mv',
-				},
+				cells: { reportType: 'ecg', notes: '-' },
+				hasDownload: true,
 			},
 			{
 				id: '3',
 				date: '15/12/2024 10:00AM',
-				cells: {
-					heartRate: '120 bpm',
-					prInterval: '60 ms',
-					pDuration: '87 ms',
-					qrsDuration: '84 ms',
-					tDuration: '9 ms',
-					qtQtc: '70 ms',
-					pqrsAxis: '77 dgv',
-					rvSv: '91 mv',
-				},
+				cells: { reportType: 'ecg', notes: '-' },
+				hasDownload: true,
 			},
 			{
 				id: '4',
 				date: '17/12/2024 10:00AM',
-				cells: {
-					heartRate: '120 bpm',
-					prInterval: '60 ms',
-					pDuration: '87 ms',
-					qrsDuration: '84 ms',
-					tDuration: '9 ms',
-					qtQtc: '70 ms',
-					pqrsAxis: '77 dgv',
-					rvSv: '91 mv',
-				},
+				cells: { reportType: 'ecg', notes: '-' },
+				hasDownload: true,
 			},
 			{
 				id: '5',
 				date: '5/8/2024 10:00AM',
-				cells: {
-					heartRate: '120 bpm',
-					prInterval: '60 ms',
-					pDuration: '87 ms',
-					qrsDuration: '84 ms',
-					tDuration: '9 ms',
-					qtQtc: '70 ms',
-					pqrsAxis: '77 dgv',
-					rvSv: '91 mv',
-				},
+				cells: { reportType: 'ecg', notes: '-' },
+				hasDownload: true,
 			},
 		],
 	},
@@ -335,17 +318,24 @@ const VITAL_ICONS: Record<string, { name: React.ComponentProps<typeof MaterialCo
 	spo2: { name: 'weather-windy', color: '#29b6f6' },
 }
 
-const normalizeHistoryWithDefaults = (apiHistory: Record<string, VitalHistoryRow[]>) =>
-	DEFAULT_TAB_CONFIGS.map((tab) => ({
-		...tab,
-		rows: apiHistory[tab.id]?.length ? apiHistory[tab.id] : tab.rows,
-	}))
-
 const withHeightBmiCard = (stats: VitalStat[]) => {
 	const heightBmiCard = VITAL_STATS.find((stat) => stat.id === 'heightBmi')
 	if (!heightBmiCard || stats.some((stat) => stat.id === 'heightBmi')) return stats
 	return [...stats, heightBmiCard]
 }
+
+const updateTabRows = (tabs: TabConfig[], tabId: string, rows: VitalHistoryRow[]) =>
+	tabs.map((tab) => (tab.id === tabId ? { ...tab, rows } : tab))
+
+const mapReportToRow = (report: ReportRecord, index: number): VitalHistoryRow => ({
+	id: String(report.id ?? index),
+	date: report.report_date ? new Date(report.report_date).toLocaleDateString('en-GB') : '',
+	cells: {
+		reportType: report.report_type ?? '-',
+		notes: report.notes ?? '-',
+	},
+	hasDownload: Boolean(report.file_s3_key),
+})
 
 function VitalStatCard({ stat, width }: { stat: VitalStat; width: number }) {
 	const icon = VITAL_ICONS[stat.id] ?? { name: 'chart-line', color: TEAL }
@@ -422,6 +412,7 @@ function HistoryRow({
 	dateWidth,
 	columnWidth,
 	actionWidth,
+	rowWidth,
 }: {
 	row: VitalHistoryRow
 	columns: TabColumn[]
@@ -429,9 +420,10 @@ function HistoryRow({
 	dateWidth: number
 	columnWidth: number
 	actionWidth: number
+	rowWidth: number
 }) {
 	return (
-		<View style={styles.historyRow}>
+		<View style={[styles.historyRow, { width: rowWidth }]}>
 			<View style={[styles.historyDateCell, { width: dateWidth }]}>
 				<AppTypography variant="caption" style={styles.rowDate} numberOfLines={2}>
 					{row.date || '-'}
@@ -457,14 +449,27 @@ function HistoryRow({
 			))}
 
 			<View style={[styles.rowActions, { width: actionWidth }]}>
-				<TouchableOpacity style={styles.iconButton} activeOpacity={0.8}>
-					<MaterialCommunityIcons name="pencil-outline" size={16} color="#7a878e" />
-				</TouchableOpacity>
-				{showDownload || row.hasDownload ? (
+				{showDownload ? (
+					<>
+						<TouchableOpacity style={styles.iconButton} activeOpacity={0.8}>
+							<MaterialCommunityIcons name="eye-outline" size={16} color="#7a878e" />
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.iconButton} activeOpacity={0.8} disabled={!row.hasDownload}>
+							<MaterialCommunityIcons
+								name="download-outline"
+								size={16}
+								color={row.hasDownload ? '#7a878e' : '#c6cdd1'}
+							/>
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.iconButton} activeOpacity={0.8}>
+							<MaterialCommunityIcons name="auto-fix" size={16} color="#7a878e" />
+						</TouchableOpacity>
+					</>
+				) : (
 					<TouchableOpacity style={styles.iconButton} activeOpacity={0.8}>
-						<MaterialCommunityIcons name="download-outline" size={16} color="#7a878e" />
+						<MaterialCommunityIcons name="pencil-outline" size={16} color="#7a878e" />
 					</TouchableOpacity>
-				) : null}
+				)}
 			</View>
 		</View>
 	)
@@ -497,52 +502,111 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 
 	const tableMetrics = useMemo(() => {
 		const tableAvailableWidth = Math.max(width - 32, 320)
-		const dateWidth = isTablet ? 136 : 116
-		const actionWidth = activeTab.showDownload ? 72 : 48
-		const baseColumnWidth = isTablet ? 132 : 116
+		const dateWidth = isTablet ? 150 : 124
+		const actionWidth = activeTab.showDownload ? (isTablet ? 116 : 104) : isTablet ? 56 : 48
+		const baseColumnWidth =
+			activeTab.id === 'ecg'
+				? isTablet
+					? 220
+					: 172
+				: activeTab.id === 'others'
+					? isTablet
+						? 148
+						: 126
+					: isTablet
+						? 150
+						: 126
 		const fillColumnWidth = (tableAvailableWidth - dateWidth - actionWidth) / Math.max(activeTab.columns.length, 1)
 		const columnWidth = Math.max(baseColumnWidth, fillColumnWidth)
+		const contentWidth = dateWidth + actionWidth + columnWidth * activeTab.columns.length
 
 		return {
 			actionWidth,
 			columnWidth,
 			dateWidth,
-			tableWidth: dateWidth + actionWidth + columnWidth * activeTab.columns.length,
+			tableWidth: Math.max(tableAvailableWidth + 1, contentWidth),
 		}
-	}, [activeTab.columns.length, activeTab.showDownload, isTablet, width])
+	}, [activeTab.columns.length, activeTab.id, activeTab.showDownload, isTablet, width])
 
-	const loadVitals = useCallback(
-		async (showLoader = true) => {
-			if (!patientId) {
-				setErrorMessage('')
-				return
-			}
+	const fetchLatestVitals = useCallback(async () => {
+		if (!patientId) return
 
-			try {
-				if (showLoader) setLoading(true)
-				const payload = await vitalsService.getPatientVitals(patientId, period)
+		try {
+			setLoading(true)
+			const data = await getLatestVitals(patientId)
+			const nextStats = mapLatestVitalsToStats(data)
+			if (nextStats.length > 0) setStats(withHeightBmiCard(nextStats))
+			setErrorMessage('')
+		} catch (error: any) {
+			console.log('[VitalsTab] failed to load latest vitals:', error)
+			setErrorMessage(error?.response?.data?.message || error?.message || 'Unable to load vitals right now.')
+		} finally {
+			setLoading(false)
+			setRefreshing(false)
+		}
+	}, [patientId])
 
-				if (payload.stats.length > 0) setStats(withHeightBmiCard(payload.stats))
-				setTabConfigs(normalizeHistoryWithDefaults(payload.history))
-				setErrorMessage('')
-			} catch (error: any) {
-				console.log('[VitalsTab] failed to load vitals:', error)
-				setErrorMessage(error?.response?.data?.message || error?.message || 'Unable to load vitals right now.')
-			} finally {
-				setLoading(false)
-				setRefreshing(false)
-			}
-		},
-		[patientId, period]
-	)
+	const fetchHistory = useCallback(async () => {
+		if (!patientId || activeTabId === 'ecg') return
+
+		try {
+			setLoading(true)
+			const vitalType = TAB_VITAL_TYPE[activeTabId]
+			const days = PERIOD_DAYS[period]
+			const data = await getVitalsHistory(patientId, {
+				vital_type: vitalType,
+				...(days !== undefined ? { days } : {}),
+			})
+			const rows = data.map((vital, index) => mapVitalToRow(vital, activeTabId, index))
+
+			setTabConfigs((prev) => updateTabRows(prev, activeTabId, rows))
+			setErrorMessage('')
+		} catch (error: any) {
+			console.log('[VitalsTab] failed to load vitals history:', error)
+			setErrorMessage(error?.response?.data?.message || error?.message || 'Unable to load vitals history right now.')
+		} finally {
+			setLoading(false)
+			setRefreshing(false)
+		}
+	}, [activeTabId, patientId, period])
+
+	const fetchReports = useCallback(async () => {
+		if (!patientId || activeTabId !== 'ecg') return
+
+		try {
+			setLoading(true)
+			const data = await getPatientReports(patientId)
+			setTabConfigs((prev) => updateTabRows(prev, 'ecg', data.map(mapReportToRow)))
+			setErrorMessage('')
+		} catch (error: any) {
+			console.log('[VitalsTab] failed to load ECG reports:', error)
+			setErrorMessage(error?.response?.data?.message || error?.message || 'Unable to load ECG reports right now.')
+		} finally {
+			setLoading(false)
+			setRefreshing(false)
+		}
+	}, [activeTabId, patientId])
 
 	useEffect(() => {
-		void loadVitals(true)
-	}, [loadVitals])
+		void fetchLatestVitals()
+	}, [fetchLatestVitals])
+
+	useEffect(() => {
+		void fetchHistory()
+	}, [fetchHistory])
+
+	useEffect(() => {
+		void fetchReports()
+	}, [fetchReports])
 
 	const handleRefresh = () => {
 		setRefreshing(true)
-		void loadVitals(false)
+		void fetchLatestVitals()
+		if (activeTabId === 'ecg') {
+			void fetchReports()
+		} else {
+			void fetchHistory()
+		}
 	}
 
 	return (
@@ -571,8 +635,18 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 					</View>
 				) : null}
 
-				<View style={[styles.filterRow, isTablet && styles.filterRowTablet]}>
-					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabSlider}>
+				<View style={styles.filterRow}>
+					<ScrollView
+						horizontal={true}
+						showsHorizontalScrollIndicator={false}
+						bounces
+						alwaysBounceHorizontal
+						decelerationRate="fast"
+						nestedScrollEnabled
+						keyboardShouldPersistTaps="handled"
+						style={styles.tabScroll}
+						contentContainerStyle={styles.tabSlider}
+					>
 						{tabConfigs.map((tab, index) => {
 							const isActive = activeTabId === tab.id
 							return (
@@ -596,27 +670,54 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 						})}
 					</ScrollView>
 
-					<View style={styles.periodSelectWrap}>
-						<AppSelect
-							value={period}
-							options={PERIOD_OPTIONS}
-							onSelect={(value) => setPeriod(String(value))}
-							placeholder="Select period"
-							size="small"
-							style={styles.periodSelectContainer}
-							customCardStyle={styles.periodSelect}
-						/>
+					<View style={styles.periodFilterRow}>
+						<ScrollView
+							horizontal={true}
+							showsHorizontalScrollIndicator={false}
+							bounces
+							alwaysBounceHorizontal
+							decelerationRate="fast"
+							nestedScrollEnabled
+							keyboardShouldPersistTaps="handled"
+							style={styles.periodChipScroll}
+							contentContainerStyle={styles.periodChipScroller}
+						>
+							{PERIOD_OPTIONS.map((option) => {
+								const isSelected = period === option.value
+								return (
+									<TouchableOpacity
+										key={option.value}
+										activeOpacity={0.82}
+										style={[styles.periodChip, isSelected && styles.periodChipActive]}
+										onPress={() => setPeriod(option.value)}
+									>
+										<AppTypography
+											variant="caption"
+											style={[styles.periodChipText, isSelected && styles.periodChipTextActive]}
+											numberOfLines={1}
+										>
+											{option.label}
+										</AppTypography>
+									</TouchableOpacity>
+								)
+							})}
+						</ScrollView>
 					</View>
 				</View>
 
 				<ScrollView
 					style={styles.tableScroller}
-					horizontal
-					showsHorizontalScrollIndicator={activeTab.columns.length > 2}
-					contentContainerStyle={styles.tableScrollerContent}
+					horizontal={true}
+					showsHorizontalScrollIndicator
+					bounces
+					alwaysBounceHorizontal
+					decelerationRate="fast"
+					nestedScrollEnabled
+					keyboardShouldPersistTaps="handled"
+					contentContainerStyle={[styles.tableScrollerContent, { width: tableMetrics.tableWidth }]}
 				>
 					<View style={[styles.tableContent, { width: tableMetrics.tableWidth }]}>
-						<View style={styles.tableHeader}>
+						<View style={[styles.tableHeader, { width: tableMetrics.tableWidth }]}>
 							<View style={[styles.dateHeader, { width: tableMetrics.dateWidth }]}>
 								<AppTypography variant="caption" style={styles.tableHeaderText}>
 									Date
@@ -649,6 +750,7 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 									dateWidth={tableMetrics.dateWidth}
 									columnWidth={tableMetrics.columnWidth}
 									actionWidth={tableMetrics.actionWidth}
+									rowWidth={tableMetrics.tableWidth}
 								/>
 							)}
 							ListEmptyComponent={
@@ -841,23 +943,27 @@ const styles = StyleSheet.create({
 		paddingBottom: 5,
 		gap: 6,
 	},
-	filterRowTablet: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
+	tabScroll: {
+		width: '100%',
+		flexGrow: 0,
+		flexShrink: 0,
 	},
 	tabSlider: {
 		alignItems: 'center',
-		paddingRight: 4,
+		flexDirection: 'row',
+		flexWrap: 'nowrap',
+		paddingRight: 12,
 	},
 	tabItemWrap: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		flexShrink: 0,
 	},
 	tabPill: {
 		borderRadius: 6,
 		paddingHorizontal: 9,
 		paddingVertical: 4,
+		flexShrink: 0,
 	},
 	tabPillActive: {
 		backgroundColor: TEAL,
@@ -875,15 +981,51 @@ const styles = StyleSheet.create({
 		color: '#c1c9cd',
 		marginHorizontal: 2,
 	},
-	periodSelectWrap: {
-		width: 136,
-		maxWidth: '100%',
+	periodFilterRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 8,
+		marginTop: 5,
+		width: '100%',
+		minHeight: 32,
 	},
-	periodSelectContainer: {
-		marginBottom: 0,
+	periodChipScroll: {
+		width: '100%',
+		flexGrow: 0,
+		flexShrink: 0,
 	},
-	periodSelect: {
-		minHeight: 30,
+	periodChipScroller: {
+		alignItems: 'center',
+		flexDirection: 'row',
+		flexWrap: 'nowrap',
+		gap: 8,
+		paddingRight: 16,
+	},
+	periodChip: {
+		minHeight: 28,
+		borderRadius: 999,
+		borderWidth: 1,
+		borderColor: '#EAECF0',
+		backgroundColor: '#F3F4F6',
+		paddingHorizontal: 12,
+		paddingVertical: 5,
+		alignItems: 'center',
+		justifyContent: 'center',
+		flexShrink: 0,
+	},
+	periodChipActive: {
+		backgroundColor: TEAL,
+		borderColor: TEAL,
+	},
+	periodChipText: {
+		color: '#69777f',
+		fontSize: 11,
+		fontWeight: '500',
+	},
+	periodChipTextActive: {
+		color: '#ffffff',
+		fontWeight: '700',
 	},
 	tableHeader: {
 		backgroundColor: 'rgba(43,111,113,0.06)',
@@ -915,12 +1057,12 @@ const styles = StyleSheet.create({
 	tableScroller: {
 		flex: 1,
 		backgroundColor: '#ffffff',
+		width: '100%',
 	},
 	tableScrollerContent: {
-		flexGrow: 1,
+		paddingRight: 1,
 	},
 	tableContent: {
-		flex: 1,
 		backgroundColor: '#ffffff',
 	},
 	historyList: {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
 	ActivityIndicator,
 	ScrollView,
@@ -9,6 +9,7 @@ import {
 	ViewStyle,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import PaginationBar from './AppPagination'
 
 type SortDirection = 'asc' | 'desc'
 type Align = 'left' | 'center' | 'right' | 'justify' | 'inherit'
@@ -146,6 +147,14 @@ function AppTable<T extends Record<string, unknown> & { id: string | number }>(
 		[columns, isAction]
 	)
 
+	useEffect(() => {
+		setPage(defaultPage)
+	}, [defaultPage])
+
+	useEffect(() => {
+		setRowsPerPage(defaultPageSize)
+	}, [defaultPageSize])
+
 	const handleSort = (property: keyof T, direction: SortDirection) => {
 		setOrder(direction)
 		setOrderBy(property)
@@ -158,12 +167,10 @@ function AppTable<T extends Record<string, unknown> & { id: string | number }>(
 		onPageChange?.(boundedPage, rowsPerPage)
 	}
 
-	const handlePageSizeChange = () => {
-		const currentIndex = pageSizeOptions.findIndex((option) => option === rowsPerPage)
-		const nextSize = pageSizeOptions[(currentIndex + 1) % pageSizeOptions.length] ?? rowsPerPage
-		setRowsPerPage(nextSize)
+	const handlePageSizeChange = (nextPageSize: number) => {
+		setRowsPerPage(nextPageSize)
 		setPage(1)
-		onPageChange?.(1, nextSize)
+		onPageChange?.(1, nextPageSize)
 	}
 
 	const isRowHighlighted = (row: T) => {
@@ -346,39 +353,15 @@ function AppTable<T extends Record<string, unknown> & { id: string | number }>(
 			</ScrollView>
 
 			{showPagination && (
-				<View style={styles.pagination}>
-					<View>
-						<Text style={[styles.paginationText, smallFont && styles.smallText]}>
-							Page {page} of {totalPages}
-						</Text>
-						<Text style={[styles.paginationSubText, smallFont && styles.smallText]}>
-							{totalRows} rows · {rowsPerPage} per page
-						</Text>
-					</View>
-
-					<View style={styles.paginationActions}>
-						<TouchableOpacity style={styles.pageSizeButton} onPress={handlePageSizeChange}>
-							<Text style={styles.pageSizeText}>{rowsPerPage}</Text>
-							<MaterialCommunityIcons name="chevron-down" size={16} color={TEAL} />
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={[styles.pageButton, page <= 1 && styles.pageButtonDisabled]}
-							disabled={page <= 1}
-							onPress={() => handlePageChange(page - 1)}
-						>
-							<MaterialCommunityIcons name="chevron-left" size={20} color={page <= 1 ? '#9aa4af' : TEAL} />
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={[styles.pageButton, page >= totalPages && styles.pageButtonDisabled]}
-							disabled={page >= totalPages}
-							onPress={() => handlePageChange(page + 1)}
-						>
-							<MaterialCommunityIcons name="chevron-right" size={20} color={page >= totalPages ? '#9aa4af' : TEAL} />
-						</TouchableOpacity>
-					</View>
-				</View>
+				<PaginationBar
+					page={page}
+					pageSize={rowsPerPage}
+					totalRows={totalRows}
+					pageSizeOptions={pageSizeOptions}
+					smallFont={smallFont}
+					onPageChange={handlePageChange}
+					onPageSizeChange={handlePageSizeChange}
+				/>
 			)}
 		</View>
 	)
@@ -479,58 +462,6 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		lineHeight: 18,
 		color: '#64707d',
-	},
-	pagination: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingVertical: 12,
-	},
-	paginationText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		color: '#1f2937',
-	},
-	paginationSubText: {
-		fontSize: 11,
-		lineHeight: 15,
-		color: '#64707d',
-		marginTop: 2,
-	},
-	paginationActions: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	pageSizeButton: {
-		height: 34,
-		borderRadius: 17,
-		borderWidth: 1,
-		borderColor: '#d9e2e2',
-		backgroundColor: '#ffffff',
-		paddingHorizontal: 10,
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	pageSizeText: {
-		fontSize: 12,
-		fontWeight: '700',
-		color: TEAL,
-		marginRight: 2,
-	},
-	pageButton: {
-		width: 34,
-		height: 34,
-		borderRadius: 17,
-		borderWidth: 1,
-		borderColor: '#d9e2e2',
-		backgroundColor: '#ffffff',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	pageButtonDisabled: {
-		backgroundColor: '#f4f6f8',
 	},
 })
 
