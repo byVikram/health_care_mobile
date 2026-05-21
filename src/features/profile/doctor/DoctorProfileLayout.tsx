@@ -73,6 +73,7 @@ export default function DoctorProfileLayout() {
 					const profile = mapDoctorProfileApi(response.data)
 					const normalizedHospitals = profile.hospitals.map((hospital) => ({
 						id: String(hospital.id),
+						hospital_id: String(hospital.hospital_id ?? hospital.id),
 						name: hospital.name ?? '',
 						fullAddress: hospital.fullAddress ?? hospital.location ?? '',
 						location: hospital.location ?? hospital.fullAddress ?? '',

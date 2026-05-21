@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
+  type ImageSourcePropType,
   Modal,
   Pressable,
   ScrollView,
@@ -26,6 +27,19 @@ export interface AppSidebarItem {
   onPress: () => void;
 }
 
+export interface AppSidebarProfile {
+  id: string;
+  label: string;
+  variant?: "smile" | "mom" | "dad" | "add";
+  avatar?: ImageSourcePropType;
+  avatarUrl?: string;
+}
+
+type ProfileAvatarVariant = Exclude<
+  NonNullable<AppSidebarProfile["variant"]>,
+  "add"
+>;
+
 interface AppSidebarProps {
   visible: boolean;
   profileCompletion?: number;
@@ -33,10 +47,19 @@ interface AppSidebarProps {
   onLogout: () => void;
   onEditProfile?: () => void;
   menuItems: AppSidebarItem[];
+  profiles?: AppSidebarProfile[];
 }
 
 const SIDEBAR_WIDTH = 290;
 const FALLBACK_IMAGE = require("../../assets/Banner/doctor.png");
+const PROFILE_AVATAR_FALLBACKS: Record<
+  ProfileAvatarVariant,
+  ImageSourcePropType
+> = {
+  smile: require("../../assets/Banner/patient.png"),
+  mom: require("../../assets/Banner/doctor.png"),
+  dad: require("../../assets/Banner/welcome-doctor.png"),
+};
 
 export default function AppSidebar({
   visible,
@@ -45,6 +68,7 @@ export default function AppSidebar({
   onLogout,
   onEditProfile,
   menuItems,
+  profiles = [],
 }: AppSidebarProps) {
   const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const insets = useSafeAreaInsets();
@@ -125,6 +149,56 @@ const profileImageUrl = user?.avatar ?? null;
           </View>
 
           <View style={styles.separator} />
+
+          {isPatient && profiles.length > 0 && (
+            <>
+              <View style={styles.profilesSection}>
+                <Text style={styles.profilesTitle}>Profiles</Text>
+                <View style={styles.profilesRow}>
+                  {profiles.map((profile) => {
+                    const isAdd = profile.variant === "add";
+                    const profileAvatarVariant: ProfileAvatarVariant =
+                      profile.variant && profile.variant !== "add"
+                        ? profile.variant
+                        : "smile";
+                    const profileAvatarSource =
+                      profile.avatar ??
+                      (profile.avatarUrl ? { uri: profile.avatarUrl } : null) ??
+                      PROFILE_AVATAR_FALLBACKS[profileAvatarVariant];
+
+                    return (
+                      <TouchableOpacity
+                        key={profile.id}
+                        style={styles.profileOption}
+                        activeOpacity={0.75}
+                      >
+                        <View
+                          style={[
+                            styles.profileCircle,
+                            isAdd && styles.profileCircleAdd,
+                          ]}
+                        >
+                          {isAdd ? (
+                            <MaterialCommunityIcons name="plus" size={34} color="#ffffff" />
+                          ) : (
+                            <Image
+                              source={profileAvatarSource}
+                              style={styles.profileCircleImage}
+                            />
+                          )}
+                        </View>
+                        <Text style={styles.profileOptionLabel} numberOfLines={1}>
+                          {profile.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.separator} />
+            </>
+          )}
 
           {/* ── Menu Items ── */}
           <ScrollView
@@ -234,6 +308,49 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   separator: { height: 1, backgroundColor: "#e9eef0" },
+  profilesSection: {
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  profilesTitle: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#142b30",
+    marginBottom: 14,
+  },
+  profilesRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  profileOption: {
+    width: 58,
+    alignItems: "center",
+  },
+  profileCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    overflow: "hidden",
+    backgroundColor:'#d1cacad8',
+    borderColor:'#474646',
+    borderWidth:0.8,
+  },
+  profileCircleAdd: {
+    backgroundColor: "#252525",
+  },
+  profileCircleImage: {
+    width: "100%",
+    height: "100%",
+  },
+  profileOptionLabel: {
+    fontSize: 12,
+    color: "#142b30",
+    textAlign: "center",
+  },
   menuSection: { flex: 1, paddingTop: 10 },
   menuItem: {
     flexDirection: "row",

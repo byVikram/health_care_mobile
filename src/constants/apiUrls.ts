@@ -74,6 +74,12 @@ export const API_ENDPOINTS = {
 		ME: `${BASE_URL}/api/patients/me`,
 		DETAILS: `${BASE_URL}/api/patients/me/details`,
 		GET_BY_PUBLIC_ID: (publicId: string) => `${BASE_URL}/api/patients/${publicId}/details`,
+		GET_BY_ID: (id: string) => `${BASE_URL}/api/patients/${id}/details`,
+		VITALS_CREATE: `${BASE_URL}/api/patients/vitals`,
+		VITALS_LATEST: (id: string) => `${BASE_URL}/api/patients/${id}/vitals/latest`,
+		VITALS_HISTORY: (id: string) => `${BASE_URL}/api/patients/${id}/vitals`,
+		REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/reports`,
+		REPORTS_CREATE: `${BASE_URL}/api/patients/reports`,
 	},
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,

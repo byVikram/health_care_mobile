@@ -16,6 +16,8 @@ import DateSlotPicker from '../../../../components/common/DateSlotPicker'
 import {
 	createSlotOverrideBatch,
 	getDoctorAvailability,
+	getDoctorProfile,
+	mapDoctorProfileApi,
 	SlotGroup,
 	SlotOverrideBatchPayload,
 	SlotOverridePayload,
@@ -30,6 +32,33 @@ interface AvailabilityTabProps {
 }
 
 type UnselectedSlotsByDate = Record<string, string[]>
+type AppointmentTypeKey = 'clinic' | 'video'
+type AvailabilityAppointmentMode = 'clinic_visit' | 'video_call'
+
+interface AvailabilityApiSlot {
+	start_time?: string
+	end_time?: string
+	status?: TimeSlot['status']
+	is_enabled?: boolean
+	is_booked?: boolean
+	can_toggle?: boolean
+}
+
+interface AvailabilityApiSession {
+	label?: string
+	range?: string
+	period?: string
+	slots?: AvailabilityApiSlot[]
+}
+
+interface AvailabilityApiModeGroup {
+	appointment_mode?: string
+	sessions?: AvailabilityApiSession[]
+	label?: string
+	range?: string
+	period?: string
+	slots?: AvailabilityApiSlot[]
+}
 
 const EMPTY_AVAILABILITY: DoctorAvailability = {
 	monday: [],
@@ -44,13 +73,94 @@ const EMPTY_AVAILABILITY: DoctorAvailability = {
 const STORAGE_KEY = 'doctorBlockedSlots'
 const TEAL = '#0c7c7c'
 
+const APPOINTMENT_MODE_BY_TYPE: Record<AppointmentTypeKey, AvailabilityAppointmentMode> = {
+	clinic: 'clinic_visit',
+	video: 'video_call',
+}
+
+const getModeKey = (mode?: string): AppointmentTypeKey => {
+	if (mode === 'video_call' || mode === 'online' || mode === 'video') return 'video'
+	return 'clinic'
+}
+
+const getAvailabilityHospitalId = (hospital: DoctorHospital) => String(hospital.hospital_id ?? hospital.id)
+
+const normalizeProfileHospitals = (rawHospitals: DoctorHospital[]): DoctorHospital[] =>
+	rawHospitals.map((hospital) => ({
+		id: String(hospital.id),
+		hospital_id: String(hospital.hospital_id ?? hospital.id),
+		name: hospital.name ?? '',
+		fullAddress: hospital.fullAddress ?? hospital.location ?? '',
+		location: hospital.location ?? hospital.fullAddress ?? '',
+		isPrimary: Boolean(hospital.isPrimary),
+		phone_number: hospital.phone_number ?? '',
+		video_consultation_fee: hospital.video_consultation_fee ?? '',
+		offline_consultation_fee: hospital.offline_consultation_fee ?? '',
+	}))
+
+const normalizeSlotStatus = (slot: AvailabilityApiSlot): TimeSlot['status'] => {
+	if (slot.is_booked || slot.status === 'OCCUPIED') return 'OCCUPIED'
+	if (slot.is_enabled === false || slot.status === 'BLOCKED') return 'BLOCKED'
+	return slot.status || 'AVAILABLE'
+}
+
+const normalizeAvailabilityGroups = (response: unknown, selectedAppointmentType: AppointmentTypeKey): SlotGroup[] => {
+	const rawData = Array.isArray(response)
+		? response
+		: Array.isArray((response as { data?: unknown })?.data)
+			? ((response as { data: AvailabilityApiModeGroup[] }).data)
+			: []
+	const selectedMode = APPOINTMENT_MODE_BY_TYPE[selectedAppointmentType]
+
+	const matchingModeData = rawData.filter((item: AvailabilityApiModeGroup) => {
+		if (!item?.appointment_mode) return selectedAppointmentType === 'clinic'
+		return item.appointment_mode === selectedMode || getModeKey(item.appointment_mode) === selectedAppointmentType
+	})
+
+	return matchingModeData.flatMap((item: AvailabilityApiModeGroup) => {
+		const sessions =
+			Array.isArray(item.sessions) && item.sessions.length > 0
+				? item.sessions
+				: [{ label: item.label, range: item.range, period: item.period, slots: item.slots }]
+
+		return sessions
+			.map((session, sessionIndex): SlotGroup => {
+				const period = session.period || session.range || ''
+				const label = session.label || `Session ${sessionIndex + 1}`
+
+				return {
+					label: period ? `${label} (${period})` : label,
+					period,
+					range: period,
+					slots: (session.slots ?? [])
+						.filter((slot) => Boolean(slot.start_time && slot.end_time))
+						.map((slot, slotIndex) => ({
+							id: `${selectedAppointmentType}-${label}-${slot.start_time}-${slotIndex}`,
+							start_time: slot.start_time as string,
+							end_time: slot.end_time as string,
+							status: normalizeSlotStatus(slot),
+							is_enabled: slot.is_enabled,
+							is_booked: slot.is_booked,
+							can_toggle: slot.can_toggle,
+						})),
+				}
+			})
+			.filter((session) => session.slots.length > 0)
+	})
+}
+
 export default function AvailabilityTab({ hospitals, availability, onChange }: AvailabilityTabProps) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
 	const timeSlotColumns = width >= 900 ? 5 : width >= 768 ? 4 : 3
 
 	const [localAvailability, setLocalAvailability] = useState<DoctorAvailability>(availability ?? EMPTY_AVAILABILITY)
-	const resolvedHospitals = hospitals ?? []
+	const [apiHospitals, setApiHospitals] = useState<DoctorHospital[]>([])
+	const [hospitalsLoading, setHospitalsLoading] = useState(false)
+	const resolvedHospitals = useMemo(
+		() => (hospitals?.length ? normalizeProfileHospitals(hospitals) : apiHospitals),
+		[hospitals, apiHospitals]
+	)
 	const resolvedAvailability = availability ?? localAvailability
 
 	const [selectedHospitalId, setSelectedHospitalId] = useState('')
@@ -61,7 +171,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	const [pendingOverrides, setPendingOverrides] = useState<SlotOverridePayload[]>([])
 	const [saveLoading, setSaveLoading] = useState(false)
 	const [pendingSaveToast, setPendingSaveToast] = useState<string | null>(null)
-	const [selectedAppointmentType, setSelectedAppointmentType] = useState<'clinic' | 'video'>('clinic')
+	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentTypeKey>('clinic')
 	const [toggleRefreshing, setToggleRefreshing] = useState(false)
 
 	const formatDateForApi = (date: Date) => {
@@ -103,12 +213,47 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	}, [availability])
 
 	useEffect(() => {
-		const preferredHospitalId = resolvedHospitals.find((hospital) => hospital.isPrimary)?.id ?? resolvedHospitals[0]?.id ?? ''
+		const preferredHospital = resolvedHospitals.find((hospital) => hospital.isPrimary) ?? resolvedHospitals[0]
+		const preferredHospitalId = preferredHospital ? getAvailabilityHospitalId(preferredHospital) : ''
 		setSelectedHospitalId((current) => {
-			if (current && resolvedHospitals.some((hospital) => hospital.id === current)) return current
+			if (current && resolvedHospitals.some((hospital) => getAvailabilityHospitalId(hospital) === current)) {
+				return current
+			}
 			return preferredHospitalId
 		})
 	}, [resolvedHospitals])
+
+	useEffect(() => {
+		if (hospitals?.length) return
+
+		let active = true
+
+		const fetchHospitals = async () => {
+			try {
+				setHospitalsLoading(true)
+				const response = await getDoctorProfile()
+				if (!active) return
+
+				if (response?.success && response.data) {
+					const profile = mapDoctorProfileApi(response.data)
+					setApiHospitals(normalizeProfileHospitals(profile.hospitals))
+				} else {
+					setApiHospitals([])
+				}
+			} catch (error) {
+				console.log('[AvailabilityTab] failed to fetch profile hospitals:', error)
+				if (active) setApiHospitals([])
+			} finally {
+				if (active) setHospitalsLoading(false)
+			}
+		}
+
+		fetchHospitals()
+
+		return () => {
+			active = false
+		}
+	}, [hospitals])
 
 	useEffect(() => {
 		const loadBlockedSlots = async () => {
@@ -125,21 +270,16 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 
 	const fetchAvailability = useCallback(async () => {
 		if (!selectedHospitalId || !selectedDate) return
+
 		try {
 			setSlotsLoading(true)
+
 			const res = await getDoctorAvailability({
 				hospital_id: selectedHospitalId,
 				date: formatDateForApi(selectedDate),
 			})
 
-			let processedData: SlotGroup[] = []
-			if (Array.isArray(res)) {
-				processedData = res as SlotGroup[]
-			} else if (res && Array.isArray(res.data)) {
-				processedData = res.data as SlotGroup[]
-			}
-
-			setAvailableSlotGroups(processedData)
+			setAvailableSlotGroups(normalizeAvailabilityGroups(res, selectedAppointmentType))
 			setPendingOverrides([])
 		} catch (error) {
 			console.log('[AvailabilityTab] failed to fetch availability:', error)
@@ -147,7 +287,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 		} finally {
 			setSlotsLoading(false)
 		}
-	}, [selectedHospitalId, selectedDate])
+	}, [selectedHospitalId, selectedDate, selectedAppointmentType])
 
 	useEffect(() => {
 		fetchAvailability()
@@ -155,6 +295,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 
 	const dayKey = getDayKey(selectedDate)
 	const selectedDateKey = formatDateForApi(selectedDate)
+	const selectedStorageKey = `${selectedHospitalId || 'no-hospital'}:${selectedDateKey}:${selectedAppointmentType}`
 
 	const allSelectableSlots = useMemo(
 		() =>
@@ -162,7 +303,15 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 				new Set(
 					availableSlotGroups.flatMap((group) =>
 						(group.slots ?? [])
-							.filter((slot: TimeSlot) => Boolean(slot.start_time) && slot.can_toggle !== false)
+							.filter(
+								(slot: TimeSlot) =>
+									Boolean(slot.start_time) &&
+									slot.can_toggle !== false &&
+									!slot.is_booked &&
+									slot.status !== 'OCCUPIED' &&
+									slot.status !== 'BOOKED' &&
+									slot.status !== 'UNAVAILABLE'
+							)
 							.map((slot: TimeSlot) => slot.start_time)
 					)
 				)
@@ -178,7 +327,9 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 						(group.slots ?? [])
 							.filter(
 								(slot: TimeSlot) =>
-									Boolean(slot.start_time) && slot.can_toggle !== false && slot.status === 'BLOCKED'
+									Boolean(slot.start_time) &&
+									slot.can_toggle !== false &&
+									(slot.status === 'BLOCKED' || slot.is_enabled === false)
 							)
 							.map((slot: TimeSlot) => slot.start_time)
 					)
@@ -187,7 +338,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 		[availableSlotGroups]
 	)
 
-	const todayUnselected: string[] = unselectedSlotsByDate[selectedDateKey] ?? apiBlockedSlots
+	const todayUnselected: string[] = unselectedSlotsByDate[selectedStorageKey] ?? apiBlockedSlots
 	const selectedSlots: string[] = allSelectableSlots.filter((slot) => !todayUnselected.includes(slot))
 
 	const slotGroupsForPicker: SlotGroup[] = availableSlotGroups.map((group) => ({
@@ -195,7 +346,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 		slots: group.slots.map((slot) => {
 			if (slot.can_toggle === false) return slot
 			if (todayUnselected.includes(slot.start_time)) {
-				return { ...slot, status: 'BLOCKED', is_enabled: true }
+				return { ...slot, status: 'BLOCKED', is_enabled: false, is_booked: false }
 			}
 			if (slot.status === 'BLOCKED') {
 				return { ...slot, status: 'AVAILABLE', is_enabled: true }
@@ -216,7 +367,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 		const newlyBlocked = selectedSlots.filter((slot) => !slots.includes(slot))
 		const newlyUnblocked = todayUnselected.filter((slot) => slots.includes(slot))
 		const updatedUnselected = [...todayUnselected.filter((slot) => !newlyUnblocked.includes(slot)), ...newlyBlocked]
-		const updated: UnselectedSlotsByDate = { ...unselectedSlotsByDate, [selectedDateKey]: updatedUnselected }
+		const updated: UnselectedSlotsByDate = { ...unselectedSlotsByDate, [selectedStorageKey]: updatedUnselected }
 
 		setUnselectedSlotsByDate(updated)
 		await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
@@ -322,7 +473,9 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 				<View style={styles.fieldGroup}>
 					<Text style={styles.sectionLabel}>Choose Hospital</Text>
 					{resolvedHospitals.length === 0 ? (
-						<Text style={styles.emptyText}>No hospitals added. Please add a hospital first.</Text>
+						<Text style={styles.emptyText}>
+							{hospitalsLoading ? 'Loading hospitals...' : 'No hospitals added. Please add a hospital first.'}
+						</Text>
 					) : (
 						<AppSelect
 							value={selectedHospitalId}
@@ -330,7 +483,10 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 								setSelectedHospitalId(value)
 								setPendingOverrides([])
 							}}
-							options={resolvedHospitals.map((hospital) => ({ value: hospital.id, label: hospital.name }))}
+							options={resolvedHospitals.map((hospital) => ({
+								value: getAvailabilityHospitalId(hospital),
+								label: hospital.name,
+							}))}
 							size="small"
 							borderRadius={10}
 							customCardStyle={styles.selectCard}
@@ -354,6 +510,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 					hideNavigation
 					timeSlotColumns={timeSlotColumns}
 					disableBookedSlots={false}
+					use12HourTime
 					availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
 					loading={slotsLoading || toggleRefreshing}
 					onSelectAll={() => {

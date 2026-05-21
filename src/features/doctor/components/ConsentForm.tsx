@@ -9,11 +9,15 @@ import {
   useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { StackActions, useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { ROUTES } from '../../../navigation/routes'
+import type { AppStackParamList } from '../../../navigation/types'
 
 interface Props {
-  open: boolean
-  onClose: () => void
-  onAgree: () => void
+  open?: boolean
+  onClose?: () => void
+  onAgree?: () => void
 }
 
 const appointmentRules = [
@@ -36,24 +40,40 @@ const consentPoints = [
 export default function ConsentModal({ open, onClose, onAgree }: Props) {
   const [checked, setChecked] = useState(false)
   const { width, height } = useWindowDimensions()
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>()
+  const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.CONSENT_FORM>>()
 
   const isTablet = width >= 768
+  const isScreenMode = open === undefined
+  const visible = open ?? true
 
   const handleClose = () => {
     setChecked(false)
-    onClose()
+    if (onClose) {
+      onClose()
+      return
+    }
+    navigation.goBack()
   }
 
   const handleAgree = () => {
     setChecked(false)
-    onAgree()
+    if (onAgree) {
+      onAgree()
+      return
+    }
+
+    const paymentParams = route.params?.paymentParams
+    if (paymentParams) {
+      navigation.dispatch(StackActions.replace(ROUTES.STACK.PATIENT_PAYMENT, paymentParams))
+    }
   }
 
   return (
     <Modal
-      visible={open}
+      visible={visible}
       transparent
-      animationType="fade"
+      animationType={isScreenMode ? 'slide' : 'fade'}
       onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
@@ -86,7 +106,7 @@ export default function ConsentModal({ open, onClose, onAgree }: Props) {
 
             <Text style={styles.sectionTitle}>Consent</Text>
             <Text style={styles.smallText}>
-              By clicking "Agree & Continue", you confirm that:
+              By clicking "Agree and Continue", you confirm that:
             </Text>
 
             {consentPoints.map((point, index) => (
@@ -129,7 +149,7 @@ export default function ConsentModal({ open, onClose, onAgree }: Props) {
               disabled={!checked}
               onPress={handleAgree}
             >
-              <Text style={styles.primaryText}>Agree & Continue</Text>
+              <Text style={styles.primaryText}>Agree and Continue</Text>
             </TouchableOpacity>
           </View>
         </View>
