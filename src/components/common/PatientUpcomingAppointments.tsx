@@ -22,6 +22,7 @@ import {
 	getDoctorById,
 	rescheduleAppointment,
 	type SlotGroup,
+	type TimeSlot,
 } from '../../features/doctor/doctorService'
 import type { Appointment, AppointmentStatus } from '../../types/appointment'
 
@@ -38,6 +39,33 @@ type ApiAppointment = Appointment & {
 type LookupHospital = {
 	id: string
 	label: string
+}
+
+type RescheduleAppointmentMode = 'clinic' | 'video'
+
+type AvailabilityApiSlot = {
+	start_time?: string
+	end_time?: string
+	status?: TimeSlot['status'] | string
+	is_enabled?: boolean
+	is_booked?: boolean
+	can_toggle?: boolean
+}
+
+type AvailabilityApiSession = {
+	label?: string
+	range?: string
+	period?: string
+	slots?: AvailabilityApiSlot[]
+}
+
+type AvailabilityApiModeGroup = {
+	appointment_mode?: string
+	sessions?: AvailabilityApiSession[]
+	label?: string
+	range?: string
+	period?: string
+	slots?: AvailabilityApiSlot[]
 }
 
 export type PatientAppointmentItem = {
@@ -101,9 +129,69 @@ const getStatusValue = (status: ApiAppointment['status'] | PatientAppointmentSta
 const getStartTime = (appointment: ApiAppointment) =>
 	appointment.start_time || appointment.appointment_time || ''
 
+const getRescheduleModeKey = (appointmentType: RescheduleAppointmentMode) =>
+	appointmentType === 'video' ? 'video_call' : 'clinic_visit'
+
+const getSlotStatus = (slot: AvailabilityApiSlot): TimeSlot['status'] => {
+	const status = typeof slot.status === 'string' ? slot.status.toUpperCase() : ''
+
+	if (slot.is_booked || status === 'OCCUPIED') return 'OCCUPIED'
+	if (slot.is_enabled === false || status === 'UNAVAILABLE') return 'UNAVAILABLE'
+	if (status === 'BLOCKED') return 'BLOCKED'
+	if (status === 'BOOKED') return 'BOOKED'
+	return 'AVAILABLE'
+}
+
+const normalizeAvailabilitySlots = (
+	response: SlotGroup[] | { data?: AvailabilityApiModeGroup[] } | null | undefined,
+	appointmentType: RescheduleAppointmentMode
+): SlotGroup[] => {
+	const rawData = (
+		Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : []
+	) as AvailabilityApiModeGroup[]
+	const modeKey = getRescheduleModeKey(appointmentType)
+
+	return rawData
+		.filter((item) => !item.appointment_mode || item.appointment_mode.toLowerCase() === modeKey)
+		.flatMap((item, itemIndex) => {
+			const sessions =
+				Array.isArray(item.sessions) && item.sessions.length > 0
+					? item.sessions
+					: [{ label: item.label, range: item.range, period: item.period, slots: item.slots }]
+
+			return sessions
+				.map((session, sessionIndex): SlotGroup => {
+					const label = session.label || `Session ${sessionIndex + 1}`
+
+					return {
+						label,
+						range: session.range,
+						period: session.period || session.range,
+						slots: (session.slots ?? [])
+							.filter((slot) => Boolean(slot.start_time && slot.end_time))
+							.map((slot, slotIndex): TimeSlot => {
+								const status = getSlotStatus(slot)
+
+								return {
+									id: `${modeKey}-${itemIndex}-${label}-${slot.start_time}-${slotIndex}`,
+									start_time: slot.start_time as string,
+									end_time: slot.end_time as string,
+									status,
+									is_enabled: slot.is_enabled,
+									is_booked: slot.is_booked,
+									can_toggle: slot.is_enabled === false ? false : slot.can_toggle,
+								}
+							}),
+					}
+				})
+				.filter((session) => session.slots.length > 0)
+		})
+}
+
 const mapApiAppointment = (appointment: ApiAppointment, localStatuses: Record<string, string>): PatientAppointmentItem => {
 	const status = localStatuses[appointment.id] || getStatusValue(appointment.status)
-	const isVirtual = appointment.appointment_mode === 'online'
+	const appointmentMode = appointment.appointment_mode?.toLowerCase()
+	const isVirtual = appointmentMode === 'online' || appointmentMode === 'video_call'
 	const hospitalAddress = appointment.hospital?.address ?? ''
 
 	return {
@@ -157,7 +245,7 @@ export default function PatientUpcomingAppointments({
 	const [rescheduleHospitals, setRescheduleHospitals] = useState<LookupHospital[]>([])
 	const [rescheduleHospitalId, setRescheduleHospitalId] = useState('')
 	const [hospitalDropdownOpen, setHospitalDropdownOpen] = useState(false)
-	const [appointmentType, setAppointmentType] = useState<'clinic' | 'video'>('clinic')
+	const [appointmentType, setAppointmentType] = useState<RescheduleAppointmentMode>('clinic')
 
 	useEffect(() => {
 		let mounted = true
@@ -240,13 +328,7 @@ export default function PatientUpcomingAppointments({
 					hospital_id: hospitalId,
 					date: toApiDate(rescheduleDate),
 				})
-				let processedData: SlotGroup[] = []
-				if (Array.isArray(responseData)) {
-					processedData = responseData
-				} else if (responseData && Array.isArray(responseData.data)) {
-					processedData = responseData.data
-				}
-				setRescheduleSlots(processedData)
+				setRescheduleSlots(normalizeAvailabilitySlots(responseData, appointmentType))
 			} catch {
 				Alert.alert('Error', 'Could not load available slots.')
 			} finally {
@@ -255,7 +337,7 @@ export default function PatientUpcomingAppointments({
 		}
 
 		fetchSlots()
-	}, [rescheduleDate, rescheduleOpen, rescheduleAppt, rescheduleHospitalId])
+	}, [rescheduleDate, rescheduleOpen, rescheduleAppt, rescheduleHospitalId, appointmentType])
 
 	const displayedAppointments = useMemo(() => {
 		if (appointments) {

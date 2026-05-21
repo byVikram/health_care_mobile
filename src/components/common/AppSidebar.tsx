@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
+  type ImageSourcePropType,
   Modal,
   Pressable,
   ScrollView,
@@ -30,7 +31,14 @@ export interface AppSidebarProfile {
   id: string;
   label: string;
   variant?: "smile" | "mom" | "dad" | "add";
+  avatar?: ImageSourcePropType;
+  avatarUrl?: string;
 }
+
+type ProfileAvatarVariant = Exclude<
+  NonNullable<AppSidebarProfile["variant"]>,
+  "add"
+>;
 
 interface AppSidebarProps {
   visible: boolean;
@@ -44,6 +52,14 @@ interface AppSidebarProps {
 
 const SIDEBAR_WIDTH = 290;
 const FALLBACK_IMAGE = require("../../assets/Banner/doctor.png");
+const PROFILE_AVATAR_FALLBACKS: Record<
+  ProfileAvatarVariant,
+  ImageSourcePropType
+> = {
+  smile: require("../../assets/Banner/patient.png"),
+  mom: require("../../assets/Banner/doctor.png"),
+  dad: require("../../assets/Banner/welcome-doctor.png"),
+};
 
 export default function AppSidebar({
   visible,
@@ -134,13 +150,21 @@ const profileImageUrl = user?.avatar ?? null;
 
           <View style={styles.separator} />
 
-          {profiles.length > 0 && (
+          {isPatient && profiles.length > 0 && (
             <>
               <View style={styles.profilesSection}>
                 <Text style={styles.profilesTitle}>Profiles</Text>
                 <View style={styles.profilesRow}>
                   {profiles.map((profile) => {
                     const isAdd = profile.variant === "add";
+                    const profileAvatarVariant: ProfileAvatarVariant =
+                      profile.variant && profile.variant !== "add"
+                        ? profile.variant
+                        : "smile";
+                    const profileAvatarSource =
+                      profile.avatar ??
+                      (profile.avatarUrl ? { uri: profile.avatarUrl } : null) ??
+                      PROFILE_AVATAR_FALLBACKS[profileAvatarVariant];
 
                     return (
                       <TouchableOpacity
@@ -156,16 +180,11 @@ const profileImageUrl = user?.avatar ?? null;
                         >
                           {isAdd ? (
                             <MaterialCommunityIcons name="plus" size={34} color="#ffffff" />
-                          ) : profile.variant === "smile" ? (
-                            <MaterialCommunityIcons
-                              name="emoticon-happy-outline"
-                              size={34}
-                              color="#ffffff"
-                            />
                           ) : (
-                            <Text style={styles.profileInitials}>
-                              {profile.variant === "mom" ? "AM" : "AD"}
-                            </Text>
+                            <Image
+                              source={profileAvatarSource}
+                              style={styles.profileCircleImage}
+                            />
                           )}
                         </View>
                         <Text style={styles.profileOptionLabel} numberOfLines={1}>
@@ -323,10 +342,9 @@ const styles = StyleSheet.create({
   profileCircleAdd: {
     backgroundColor: "#252525",
   },
-  profileInitials: {
-    color: "#161515",
-    fontSize: 16,
-    fontWeight: "800",
+  profileCircleImage: {
+    width: "100%",
+    height: "100%",
   },
   profileOptionLabel: {
     fontSize: 12,

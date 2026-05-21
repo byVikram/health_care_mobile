@@ -29,9 +29,24 @@ const MOCK_USER = {
 }
 
 const PROFILES: AppSidebarProfile[] = [
-	{ id: 'anjali', label: 'Anjali', variant: 'smile' },
-	{ id: 'anjali-mom', label: 'Anjali Mom', variant: 'mom' },
-	{ id: 'anjali-dad', label: 'Anjali’s Dad', variant: 'dad' },
+	{
+		id: 'anjali',
+		label: 'Anjali',
+		variant: 'smile',
+		avatar: require('../../assets/Banner/patient.png'),
+	},
+	{
+		id: 'anjali-mom',
+		label: 'Anjali Mom',
+		variant: 'mom',
+		avatar: require('../../assets/Banner/doctor.png'),
+	},
+	{
+		id: 'anjali-dad',
+		label: 'Anjali’s Dad',
+		variant: 'dad',
+		avatar: require('../../assets/Banner/welcome-doctor.png'),
+	},
 	{ id: 'add', label: 'Add', variant: 'add' },
 ]
 
