@@ -692,9 +692,9 @@ export default function BookingDetailsScreen() {
           <Text style={styles.successTitle}>
             Your appointment is successfully booked
           </Text>
-          <Text style={styles.successDescription}>
+          {/* <Text style={styles.successDescription}>
             The update will appear in your profile.
-          </Text>
+          </Text> */}
 
           <TouchableOpacity
             style={styles.successDoneButton}
@@ -1004,13 +1004,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 12,
   },
-  successDescription: {
-    color: "#667085",
-    fontSize: 14,
-    lineHeight: 23,
-    textAlign: "center",
-    marginBottom: 24,
-  },
+  // successDescription: {
+  //   color: "#667085",
+  //   fontSize: 14,
+  //   lineHeight: 23,
+  //   textAlign: "center",
+  //   marginBottom: 24,
+  // },
   successDoneButton: {
     width: "100%",
     maxWidth: 280,

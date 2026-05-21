@@ -11,10 +11,11 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
-import { Ionicons, MaterialIcons } from '@expo/vector-icons'
+import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { APPOINTMENT_STATUS } from '../../constants/constants'
+import { AppModal } from './AppModal'
 import DateSlotPicker from './DateSlotPicker'
 import {
 	getAppointments,
@@ -92,6 +93,8 @@ type PatientUpcomingAppointmentsProps = {
 	onJoin?: (appointment: PatientAppointmentItem) => void
 	onReschedule?: (appointment: PatientAppointmentItem) => void
 	onCancel?: (appointment: PatientAppointmentItem) => void
+	refreshToken?: number
+	onRefreshComplete?: () => void
 }
 
 const STATUS_STYLES: Record<string, { color: string; bgColor: string; text: string }> = {
@@ -217,6 +220,8 @@ const mapApiAppointment = (appointment: ApiAppointment, localStatuses: Record<st
 export default function PatientUpcomingAppointments({
 	appointments,
 	onJoin,
+	refreshToken,
+	onRefreshComplete,
 }: PatientUpcomingAppointmentsProps) {
 	const { width, height } = useWindowDimensions()
 	const isTablet = width >= 768
@@ -246,6 +251,7 @@ export default function PatientUpcomingAppointments({
 	const [rescheduleHospitalId, setRescheduleHospitalId] = useState('')
 	const [hospitalDropdownOpen, setHospitalDropdownOpen] = useState(false)
 	const [appointmentType, setAppointmentType] = useState<RescheduleAppointmentMode>('clinic')
+	const [rescheduleSuccessOpen, setRescheduleSuccessOpen] = useState(false)
 
 	useEffect(() => {
 		let mounted = true
@@ -274,7 +280,10 @@ export default function PatientUpcomingAppointments({
 			} catch {
 				if (mounted && shouldFetchAppointments) setError('Failed to load appointments')
 			} finally {
-				if (mounted) setLoading(false)
+				if (mounted) {
+					setLoading(false)
+					onRefreshComplete?.()
+				}
 			}
 		}
 
@@ -283,7 +292,7 @@ export default function PatientUpcomingAppointments({
 		return () => {
 			mounted = false
 		}
-	}, [shouldFetchAppointments])
+	}, [shouldFetchAppointments, refreshToken])
 
 	useEffect(() => {
 		if (!rescheduleAppt || !rescheduleOpen) return
@@ -412,7 +421,6 @@ export default function PatientUpcomingAppointments({
 			})
 
 			if (res.success) {
-				Alert.alert('Success', res.message || 'Appointment rescheduled!')
 				const nextHospitalName = selectedHospital?.label || rescheduleAppt.hospitalName
 				const nextDetails: Partial<PatientAppointmentItem> = {
 					appointmentDate: dateStr,
@@ -448,6 +456,7 @@ export default function PatientUpcomingAppointments({
 				setLocalReschedules((prev) => ({ ...prev, [rescheduleAppt.id]: nextDetails }))
 				setHospitalDropdownOpen(false)
 				setRescheduleOpen(false)
+				setRescheduleSuccessOpen(true)
 			} else {
 				Alert.alert('Error', res.message || 'Reschedule failed. Please try again.')
 			}
@@ -795,6 +804,35 @@ export default function PatientUpcomingAppointments({
 					</View>
 				</View>
 			</Modal>
+
+			<AppModal
+				visible={rescheduleSuccessOpen}
+				onDismiss={() => setRescheduleSuccessOpen(false)}
+			>
+				<View
+					style={[styles.successContent, isTablet && styles.successContentTablet]}
+				>
+					<View style={styles.successIconCircle}>
+						<MaterialCommunityIcons
+							name="check-circle-outline"
+							size={34}
+							color="#fff"
+						/>
+					</View>
+
+					<Text style={styles.successTitle}>
+						Your appointment has been rescheduled successfully.
+					</Text>
+
+					<TouchableOpacity
+						style={styles.successDoneButton}
+						onPress={() => setRescheduleSuccessOpen(false)}
+						activeOpacity={0.85}
+					>
+						<Text style={styles.successDoneText}>Done</Text>
+					</TouchableOpacity>
+				</View>
+			</AppModal>
 		</View>
 	)
 }
@@ -1191,5 +1229,49 @@ const styles = StyleSheet.create({
 		color: '#1D2B36',
 		fontSize: 14,
 		lineHeight: 20,
+	},
+	successContent: {
+		width: '100%',
+		maxWidth: 360,
+		alignItems: 'center',
+	},
+	successContentTablet: {
+		maxWidth: 420,
+	},
+	successIconCircle: {
+		width: 68,
+		height: 68,
+		borderRadius: 34,
+		backgroundColor: '#2B6F71',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: 20,
+		shadowColor: '#2B6F71',
+		shadowOpacity: 0.34,
+		shadowRadius: 16,
+		shadowOffset: { width: 0, height: 8 },
+		elevation: 8,
+	},
+	successTitle: {
+		color: '#222',
+		fontSize: 20,
+		lineHeight: 26,
+		fontWeight: '700',
+		textAlign: 'center',
+		marginBottom: 12,
+	},
+	successDoneButton: {
+		width: '100%',
+		maxWidth: 280,
+		minHeight: 46,
+		borderRadius: 10,
+		backgroundColor: '#2B7A78',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	successDoneText: {
+		color: '#fff',
+		fontSize: 15,
+		fontWeight: '700',
 	},
 })
