@@ -89,7 +89,7 @@ type AvailabilityApiModeGroup = {
 	slots?: AvailabilityApiSlot[]
 }
 
-type AppMobileAPTProps<TAppointment extends MobileAppointmentRow = MobileAppointmentRow> = {
+type MobileAppointmentCardProps<TAppointment extends MobileAppointmentRow = MobileAppointmentRow> = {
 	row: TAppointment
 	horizontalInset?: number
 }
@@ -241,10 +241,10 @@ const isAppointmentUpcoming = (row: MobileAppointmentRow) => {
 	return date.getTime() > Date.now()
 }
 
-export default function AppMobileAPT<TAppointment extends MobileAppointmentRow = MobileAppointmentRow>({
+export default function MobileAppointmentCard<TAppointment extends MobileAppointmentRow = MobileAppointmentRow>({
 	row,
 	horizontalInset = 0,
-}: AppMobileAPTProps<TAppointment>) {
+}: MobileAppointmentCardProps<TAppointment>) {
 	const { role } = useAuth()
 	const { width, height } = useWindowDimensions()
 	const isTablet = width >= 768
@@ -291,7 +291,7 @@ export default function AppMobileAPT<TAppointment extends MobileAppointmentRow =
 					setRescheduleHospitalId((current) => current || localRow.hospitalId || localRow.raw?.hospital?.id || hospitals[0]?.id || '')
 				}
 			} catch (error) {
-				console.log('[AppMobileAPT] fetch doctor hospitals error:', error)
+				console.log('[MobileAppointmentCard] fetch doctor hospitals error:', error)
 			}
 		}
 
@@ -329,7 +329,7 @@ export default function AppMobileAPT<TAppointment extends MobileAppointmentRow =
 				})
 				if (mounted) setRescheduleSlots(normalizeAvailabilitySlots(responseData, appointmentType))
 			} catch (error) {
-				console.log('[AppMobileAPT] fetch reschedule slots error:', error)
+				console.log('[MobileAppointmentCard] fetch reschedule slots error:', error)
 				if (mounted) Alert.alert('Error', 'Could not load available slots.')
 			} finally {
 				if (mounted) setRescheduleSlotsLoading(false)
@@ -440,7 +440,7 @@ export default function AppMobileAPT<TAppointment extends MobileAppointmentRow =
 				Alert.alert('Error', res.message || 'Reschedule failed. Please try again.')
 			}
 		} catch (error: any) {
-			console.log('[AppMobileAPT] reschedule appointment error:', error?.response?.data || error?.message || error)
+			console.log('[MobileAppointmentCard] reschedule appointment error:', error?.response?.data || error?.message || error)
 			Alert.alert('Error', 'Something went wrong. Please try again.')
 		} finally {
 			setRescheduleSubmitting(false)
@@ -460,7 +460,7 @@ export default function AppMobileAPT<TAppointment extends MobileAppointmentRow =
 			const cancelledStatus = res.data?.data?.find((status) => status.label?.toLowerCase() === 'cancelled')
 			if (cancelledStatus) setCancelledStatusId(cancelledStatus.id)
 		} catch (error) {
-			console.log('[AppMobileAPT] fetch appointment statuses error:', error)
+			console.log('[MobileAppointmentCard] fetch appointment statuses error:', error)
 		}
 	}
 
@@ -490,7 +490,7 @@ export default function AppMobileAPT<TAppointment extends MobileAppointmentRow =
 				Alert.alert('Error', res.data?.message || 'Failed to cancel appointment.')
 			}
 		} catch (error: any) {
-			console.log('[AppMobileAPT] cancel appointment error:', error?.response?.data || error?.message || error)
+			console.log('[MobileAppointmentCard] cancel appointment error:', error?.response?.data || error?.message || error)
 			Alert.alert('Error', 'Something went wrong. Please try again.')
 		} finally {
 			setCancelSubmitting(false)

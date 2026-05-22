@@ -26,7 +26,7 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { useAuth } from '../../context/AuthContext'
 import PaginationBar from '../../components/common/AppPagination'
-import AppMobileAPT from './components/AppMobileAPT'
+import MobileAppointmentCard from './components/MobileAppointmentCard'
 
 type AppointmentRow = Record<string, unknown> & {
 	id: string
@@ -1422,7 +1422,7 @@ export default function AllAppointmentList() {
 						data={rows}
 						keyExtractor={(item) => item.id}
 						renderItem={({ item }) => (
-							<AppMobileAPT row={item} />
+							<MobileAppointmentCard row={item} />
 						)}
 						style={styles.mobileList}
 						contentContainerStyle={rows.length === 0 ? styles.emptyListContent : styles.listContent}

@@ -7,7 +7,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { getAppointments } from '../../features/doctor/doctorService'
-import AppMobileAPT from '../../features/appointment/components/AppMobileAPT'
+import MobileAppointmentCard from '../../features/appointment/components/MobileAppointmentCard'
 import type { Appointment } from '../../types/appointment'
 
 export type PatientAppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'rescheduled' | string
@@ -177,7 +177,7 @@ export default function PatientUpcomingAppointments({
 
 			{!loading && !error
 				? displayedAppointments.map((appointment) => (
-						<AppMobileAPT key={appointment.id} row={appointment} horizontalInset={16} />
+						<MobileAppointmentCard key={appointment.id} row={appointment} horizontalInset={16} />
 					))
 				: null}
 		</View>
