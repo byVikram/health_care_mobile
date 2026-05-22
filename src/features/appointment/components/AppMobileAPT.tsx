@@ -17,6 +17,7 @@ import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { APPOINTMENT_STATUS } from '../../../constants/constants'
 import { useAuth } from '../../../context/AuthContext'
 import DateSlotPicker from '../../../components/common/DateSlotPicker'
+import { AppModal } from '../../../components/common/AppModal'
 import {
 	getDoctorAvailability,
 	getDoctorById,
@@ -254,6 +255,7 @@ export default function AppMobileAPT<TAppointment extends MobileAppointmentRow =
 	const [cancelOpen, setCancelOpen] = useState(false)
 	const [cancelReason, setCancelReason] = useState('')
 	const [cancelSubmitting, setCancelSubmitting] = useState(false)
+	const [cancelSuccessOpen, setCancelSuccessOpen] = useState(false)
 	const [rescheduleOpen, setRescheduleOpen] = useState(false)
 	const [rescheduleDate, setRescheduleDate] = useState(new Date())
 	const [rescheduleTime, setRescheduleTime] = useState('')
@@ -483,7 +485,7 @@ export default function AppMobileAPT<TAppointment extends MobileAppointmentRow =
 				setLocalRow((prev) => ({ ...prev, status: 'cancelled' }))
 				setCancelOpen(false)
 				setCancelReason('')
-				Alert.alert('Success', 'Appointment cancelled successfully.')
+				setCancelSuccessOpen(true)
 			} else {
 				Alert.alert('Error', res.data?.message || 'Failed to cancel appointment.')
 			}
@@ -727,6 +729,24 @@ export default function AppMobileAPT<TAppointment extends MobileAppointmentRow =
 					</View>
 				</View>
 			</Modal>
+
+			<AppModal visible={cancelSuccessOpen} onDismiss={() => setCancelSuccessOpen(false)}>
+				<View style={[styles.successContent, isTablet && styles.successContentTablet]}>
+					<View style={styles.cancelSuccessIconCircle}>
+						<Ionicons name="close" size={34} color="#ffffff" />
+					</View>
+
+					<Text style={styles.successTitle}>You have successfully cancelled the appointment.</Text>
+
+					<TouchableOpacity
+						style={styles.successDoneButton}
+						onPress={() => setCancelSuccessOpen(false)}
+						activeOpacity={0.85}
+					>
+						<Text style={styles.successDoneText}>Done</Text>
+					</TouchableOpacity>
+				</View>
+			</AppModal>
 		</View>
 	)
 }
@@ -1045,5 +1065,45 @@ const styles = StyleSheet.create({
 		color: '#1D2B36',
 		fontSize: 14,
 		lineHeight: 20,
+	},
+	successContent: {
+		width: '100%',
+		alignItems: 'center',
+		paddingHorizontal: 4,
+		paddingVertical: 8,
+	},
+	successContentTablet: {
+		minWidth: 320,
+	},
+	cancelSuccessIconCircle: {
+		width: 64,
+		height: 64,
+		borderRadius: 32,
+		backgroundColor: '#FF3B30',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: 14,
+	},
+	successTitle: {
+		color: '#1D2B36',
+		fontSize: 18,
+		fontWeight: '700',
+		textAlign: 'center',
+		lineHeight: 24,
+		marginBottom: 20,
+	},
+	successDoneButton: {
+		minWidth: 120,
+		minHeight: 44,
+		borderRadius: 12,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#0c7c7c',
+		paddingHorizontal: 22,
+	},
+	successDoneText: {
+		color: '#ffffff',
+		fontSize: 14,
+		fontWeight: '700',
 	},
 })
