@@ -122,7 +122,7 @@ export default function PatientUpcomingAppointments({
 				setLoading(true)
 				setError('')
 
-				const apptRes = await getAppointments({ limit: 10 })
+				const apptRes = await getAppointments({ limit: 10, variant: 'upcoming' })
 
 				if (!mounted) return
 
