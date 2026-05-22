@@ -770,7 +770,7 @@ export default function AllAppointmentList() {
 		}
 	}, [dateFilter, fromDateFilter, page, pageSize, role, toDateFilter])
 
-	const fetchHospitals = useCallback(async () => {
+	const  fetchHospitals = useCallback(async () => {
 		if (role !== 'doctor') return
 
 		try {
@@ -1421,7 +1421,9 @@ export default function AllAppointmentList() {
 					<Animated.FlatList
 						data={rows}
 						keyExtractor={(item) => item.id}
-						renderItem={({ item }) => <AppMobileAPT row={item} displayRole={isPatientView ? 'patient' : 'doctor'} />}
+						renderItem={({ item }) => (
+							<AppMobileAPT row={item} />
+						)}
 						style={styles.mobileList}
 						contentContainerStyle={rows.length === 0 ? styles.emptyListContent : styles.listContent}
 						showsVerticalScrollIndicator={false}

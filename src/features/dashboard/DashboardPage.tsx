@@ -172,16 +172,6 @@ export default function DashboardPage() {
 						appointmentId: appointment.id,
 					})
 				}
-				onReschedule={(appointment) =>
-					navigation.navigate(ROUTES.STACK.RESCHEDULE_APPOINTMENT, {
-						appointmentId: appointment.id,
-					})
-				}
-				onCancel={(appointment) =>
-					navigation.navigate(ROUTES.STACK.CANCEL_APPOINTMENT, {
-						appointmentId: appointment.id,
-					})
-				}
 			/>
 
 			<SpecialitySection />
