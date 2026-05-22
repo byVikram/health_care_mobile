@@ -306,14 +306,14 @@ export default function DateSlotPicker(props: PickProps) {
 												slot.can_toggle !== false &&
 												!slot.is_booked &&
 												(isAvailable || isBlocked || !disableBookedSlots || !isBooked)
-											const statusLabel =
-												slot.status === 'OCCUPIED' || slot.is_booked
-													? 'Occupied'
-													: slot.status === 'UNAVAILABLE'
-														? 'Unavailable'
-														: isBlocked
-															? 'Blocked'
-															: ''
+											// const statusLabel =
+												// slot.status === 'OCCUPIED' || slot.is_booked
+												// 	? 'Occupied'
+												// 	: slot.status === 'UNAVAILABLE'
+												// 		? 'Unavailable'
+												// 		: isBlocked
+												// 			? 'Blocked'
+												// 			: ''
 
 											return (
 												<TouchableOpacity
@@ -342,7 +342,7 @@ export default function DateSlotPicker(props: PickProps) {
 													>
 														{formatTimeLabel(slot.start_time)}
 													</AppTypography>
-													{showSlotStatusLabels && statusLabel ? (
+													{/* {showSlotStatusLabels && statusLabel ? (
 														<AppTypography
 															variant="caption"
 															style={[
@@ -355,7 +355,7 @@ export default function DateSlotPicker(props: PickProps) {
 														>
 															{statusLabel}
 														</AppTypography>
-													) : null}
+													) : null} */}
 												</TouchableOpacity>
 											)
 										})}
@@ -517,7 +517,8 @@ const styles = StyleSheet.create({
 		paddingVertical: 10,
 		paddingHorizontal: 10,
 		marginBottom: 10,
-		minHeight: 40,
+		height: 44,
+		minHeight: 44,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#fff',

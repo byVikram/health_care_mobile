@@ -24,7 +24,7 @@ import PatientPayment from '../features/patientPayment/PatientPayment'
 import ConsentForm from '../features/doctor/components/ConsentForm'
 import SearchPage from '../features/doctor/search/SearchPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
-import AllAppointmentList from '../features/appointment/AllAppointmentList'
+import AppointmentList from '../features/appointment/AppointmentList'
 
 import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
 import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
@@ -91,7 +91,7 @@ function AuthenticatedNavigator() {
 
       <AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
 
-			<AppStack.Screen name={ROUTES.STACK.APPOINTMENTS} component={AllAppointmentList} />
+			<AppStack.Screen name={ROUTES.STACK.APPOINTMENTS} component={AppointmentList} />
 
       <AppStack.Screen
         name={ROUTES.STACK.CONSENT_FORM}

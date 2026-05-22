@@ -41,6 +41,7 @@ export interface AppointmentParams {
 	limit?: number
 	appointment_date?: string
 	status?: string
+	variant?: 'upcoming' | 'all'
 }
 
 export interface DoctorSearchParams {

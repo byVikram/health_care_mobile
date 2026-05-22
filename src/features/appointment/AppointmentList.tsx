@@ -26,7 +26,7 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { useAuth } from '../../context/AuthContext'
 import PaginationBar from '../../components/common/AppPagination'
-import AppMobileAPT from './components/AppMobileAPT'
+import MobileAppointmentCard from './components/MobileAppointmentCard'
 
 type AppointmentRow = Record<string, unknown> & {
 	id: string
@@ -450,7 +450,7 @@ const unpackAppointments = (response: ApiAppointmentsResponse) => {
 				? response.appointments
 				: []
 
-	console.log('[AllAppointmentList][debug] raw appointments response shape:', {
+	console.log('[AppointmentList][debug] raw appointments response shape:', {
 		dataIsArray: Array.isArray(response.data),
 		nestedDataIsArray: Array.isArray(nestedData),
 		appointmentsIsArray: Array.isArray(response.appointments),
@@ -501,7 +501,7 @@ function StatusPill({ status }: { status: string }) {
 	)
 }
 
-export default function AllAppointmentList() {
+export default function AppointmentList() {
 	const navigation = useNavigation<any>()
 	const insets = useSafeAreaInsets()
 	const { role, user, isLoading: authLoading } = useAuth()
@@ -590,7 +590,7 @@ export default function AllAppointmentList() {
 	}, [role, user])
 
 	useEffect(() => {
-		console.log('[AllAppointmentList][debug] auth state:', {
+		console.log('[AppointmentList][debug] auth state:', {
 			authLoading,
 			role,
 			user,
@@ -694,7 +694,7 @@ export default function AllAppointmentList() {
 		try {
 			if (showLoader) setLoading(true)
 			const token = await AsyncStorage.getItem('access_token')
-			console.log('[AllAppointmentList][debug] appointments fetch request:', {
+			console.log('[AppointmentList][debug] appointments fetch request:', {
 				url: requestUrl,
 				method: 'GET',
 				queryParams,
@@ -707,7 +707,7 @@ export default function AllAppointmentList() {
 				requestUrl,
 				hasQueryParams ? { params: queryParams } : undefined
 			)
-			console.log('[AllAppointmentList][debug] appointments fetch response:', {
+			console.log('[AppointmentList][debug] appointments fetch response:', {
 				status: res.status,
 				url: requestUrl,
 				queryParams,
@@ -718,7 +718,7 @@ export default function AllAppointmentList() {
 			const next = unpackAppointments(res.data)
 			setApiMeta(next.meta)
 			setUsingApiPagination(true)
-			console.log('[AllAppointmentList][debug] mapped appointment IDs:', {
+			console.log('[AppointmentList][debug] mapped appointment IDs:', {
 				mappedRowsLength: next.rows.length,
 				sampleMappedRows: next.rows.slice(0, 5).map((row) => ({
 					id: row.id,
@@ -735,7 +735,7 @@ export default function AllAppointmentList() {
 			setAllRows(next.rows)
 		} catch (error) {
 			const err = error as any
-			console.log('[AllAppointmentList][debug] appointments fetch error:', {
+			console.log('[AppointmentList][debug] appointments fetch error:', {
 				url: requestUrl,
 				method: 'GET',
 				queryParams,
@@ -747,7 +747,7 @@ export default function AllAppointmentList() {
 
 			if (err?.response?.status === 422 && Object.keys(queryParams).length > 0) {
 				try {
-					console.log('[AllAppointmentList][debug] retrying appointments fetch without query params after validation error')
+					console.log('[AppointmentList][debug] retrying appointments fetch without query params after validation error')
 					const fallbackRes = await ApiService.get<ApiAppointmentsResponse>(requestUrl)
 					const fallbackNext = unpackAppointments(fallbackRes.data)
 					setApiMeta(null)
@@ -755,11 +755,11 @@ export default function AllAppointmentList() {
 					setAllRows(fallbackNext.rows)
 					return
 				} catch (fallbackError) {
-					console.log('[AllAppointmentList][debug] appointments fallback fetch error:', fallbackError)
+					console.log('[AppointmentList][debug] appointments fallback fetch error:', fallbackError)
 				}
 			}
 
-			console.log('[AllAppointmentList] fetch appointments error:', error)
+			console.log('[AppointmentList] fetch appointments error:', error)
 			Alert.alert(
 				'Error',
 				(error as any)?.response?.data?.message || (error as any)?.message || 'Unable to load appointments right now.'
@@ -770,7 +770,7 @@ export default function AllAppointmentList() {
 		}
 	}, [dateFilter, fromDateFilter, page, pageSize, role, toDateFilter])
 
-	const fetchHospitals = useCallback(async () => {
+	const  fetchHospitals = useCallback(async () => {
 		if (role !== 'doctor') return
 
 		try {
@@ -783,7 +783,7 @@ export default function AllAppointmentList() {
 				return 'all'
 			})
 		} catch (error) {
-			console.log('[AllAppointmentList] fetch hospitals error:', error)
+			console.log('[AppointmentList] fetch hospitals error:', error)
 			Alert.alert(
 				'Error',
 				(error as any)?.response?.data?.message || (error as any)?.message || 'Unable to load hospitals right now.'
@@ -829,7 +829,7 @@ export default function AllAppointmentList() {
 	}, [allRows, currentUserIds, role])
 
 	useEffect(() => {
-		console.log('[AllAppointmentList][debug] role filter result:', {
+		console.log('[AppointmentList][debug] role filter result:', {
 			authLoading,
 			role,
 			loggedInUserIds: currentUserIds,
@@ -838,7 +838,7 @@ export default function AllAppointmentList() {
 		})
 
 		if (role === 'patient' && !authLoading && allRows.length > 0 && roleRows.length === 0) {
-			console.log('[AllAppointmentList][debug] patient role filter empty; mapped row dump:', allRows.map((row) => ({
+			console.log('[AppointmentList][debug] patient role filter empty; mapped row dump:', allRows.map((row) => ({
 				id: row.id,
 				patientId: row.patientId,
 				patientIds: row.patientIds,
@@ -1421,7 +1421,9 @@ export default function AllAppointmentList() {
 					<Animated.FlatList
 						data={rows}
 						keyExtractor={(item) => item.id}
-						renderItem={({ item }) => <AppMobileAPT row={item} displayRole={isPatientView ? 'patient' : 'doctor'} />}
+						renderItem={({ item }) => (
+							<MobileAppointmentCard row={item} />
+						)}
 						style={styles.mobileList}
 						contentContainerStyle={rows.length === 0 ? styles.emptyListContent : styles.listContent}
 						showsVerticalScrollIndicator={false}
