@@ -3,12 +3,16 @@ import {
 	ActivityIndicator,
 	StyleSheet,
 	Text,
+	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
 import { getAppointments } from '../../features/doctor/doctorService'
 import MobileAppointmentCard from '../../features/appointment/components/MobileAppointmentCard'
 import type { Appointment } from '../../types/appointment'
+import { ROUTES } from '../../navigation/routes'
+import type { RootStackParamList } from '../../navigation/types'
 
 export type PatientAppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'rescheduled' | string
 export type PatientAppointmentMode = 'in-person' | 'virtual'
@@ -101,6 +105,7 @@ export default function PatientUpcomingAppointments({
 	refreshToken,
 	onRefreshComplete,
 }: PatientUpcomingAppointmentsProps) {
+	const navigation = useNavigation<NavigationProp<RootStackParamList>>()
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
 	const shouldFetchAppointments = appointments === undefined
@@ -153,12 +158,21 @@ export default function PatientUpcomingAppointments({
 		return apiAppointments.map(mapApiAppointment)
 	}, [apiAppointments, appointments])
 
+	const handleSeeAll = () => {
+		navigation.navigate(ROUTES.STACK.APPOINTMENTS)
+	}
+
 	return (
 		<View style={[styles.section, isTablet && styles.sectionTablet]}>
 			<View style={styles.sectionHeader}>
 				<Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-				<View style={styles.countBadge}>
-					<Text style={styles.countBadgeText}>{displayedAppointments.length}</Text>
+				<View style={styles.headerActions}>
+					<View style={styles.countBadge}>
+						<Text style={styles.countBadgeText}>{displayedAppointments.length}</Text>
+					</View>
+					<TouchableOpacity onPress={handleSeeAll} activeOpacity={0.75} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+						<Text style={styles.seeAllText}>See All</Text>
+					</TouchableOpacity>
 				</View>
 			</View>
 			<Text style={styles.sectionSubtitle}>Manage your upcoming healthcare visits</Text>
@@ -202,9 +216,16 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 	},
 	sectionTitle: {
+		flex: 1,
 		fontSize: 18,
 		fontWeight: '700',
 		color: '#1D2B36',
+	},
+	headerActions: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginLeft: 12,
+		gap: 10,
 	},
 	sectionSubtitle: {
 		marginHorizontal: 16,
@@ -224,6 +245,11 @@ const styles = StyleSheet.create({
 	countBadgeText: {
 		color: '#ffffff',
 		fontSize: 12,
+		fontWeight: '700',
+	},
+	seeAllText: {
+		color: '#0c7c7c',
+		fontSize: 13,
 		fontWeight: '700',
 	},
 	loadingBox: {

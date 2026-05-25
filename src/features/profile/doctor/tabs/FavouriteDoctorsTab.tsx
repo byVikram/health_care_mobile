@@ -4,7 +4,6 @@ import {
 	FlatList,
 	StyleSheet,
 	Text,
-	TextInput,
 	useWindowDimensions,
 	View,
 } from 'react-native'
@@ -17,6 +16,7 @@ import {
 	getFavouriteDoctors,
 	toggleFavouriteDoctor,
 } from '../../../doctor/doctorService'
+import { AppInput } from '../../../../components/common'
 import FavouriteDoctorList, {
 	type FavouriteDoctorListItem,
 } from '../../../doctor/search/components/FavouriteDoctorList'
@@ -214,30 +214,24 @@ export default function FavouriteDoctorsTab() {
 				]}
 				ListHeaderComponent={
 					<View style={styles.headerContent}>
-						<View style={[styles.searchBox, isCompact && styles.searchBoxCompact]}>
-							<MaterialCommunityIcons
-								name="magnify"
-								size={isCompact ? 20 : 28}
-								color="#9b9b9b"
-							/>
-							<TextInput
-								value={searchQuery}
-								onChangeText={setSearchQuery}
-								placeholder="Search doctor..."
-								placeholderTextColor="#98a1aa"
-								style={[
-									styles.searchInput,
-									isCompact && styles.searchInputCompact,
-								]}
-								autoCorrect={false}
-								returnKeyType="search"
-							/>
-							<MaterialCommunityIcons
-								name="microphone-outline"
-								size={isCompact ? 20 : 28}
-								color="#9b9b9b"
-							/>
-						</View>
+						<AppInput
+							value={searchQuery}
+							onChangeText={setSearchQuery}
+							placeholder="Search doctor..."
+							placeholderTextColor="#98a1aa"
+							containerStyle={[styles.searchInputContainer, isCompact && styles.searchInputContainerCompact]}
+							style={[styles.searchInput, isCompact && styles.searchInputCompact]}
+							contentStyle={[styles.searchInputContent, isCompact && styles.searchInputContentCompact]}
+							outlineStyle={[styles.searchInputOutline, isCompact && styles.searchInputOutlineCompact]}
+							outlineColor="#2e7b7d"
+							activeOutlineColor="#2e7b7d"
+							textColor="#1b2d3c"
+							left={<AppInput.Icon icon="magnify" size={isCompact ? 20 : 28} color="#9b9b9b" />}
+							right={<AppInput.Icon icon="microphone-outline" size={isCompact ? 20 : 28} color="#9b9b9b" />}
+							autoCorrect={false}
+							returnKeyType="search"
+							noMargin
+						/>
 
 						<Text style={[styles.sectionTitle, isCompact && styles.sectionTitleCompact]}>
 							{isSearching ? 'SEARCH RESULTS' : 'FAVOURITE DOCTORS'}
@@ -297,35 +291,36 @@ const styles = StyleSheet.create({
 	headerContent: {
 		paddingBottom: 2,
 	},
-	searchBox: {
-		height: 54,
-		borderRadius: 18,
-		borderWidth: 3,
-		borderColor: '#2e7b7d',
-		backgroundColor: '#f8fbff',
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: 18,
+	searchInputContainer: {
 		marginBottom: 28,
 	},
-	searchBoxCompact: {
-		height: 44,
-		borderRadius: 14,
-		borderWidth: 2,
-		paddingHorizontal: 12,
+	searchInputContainerCompact: {
 		marginBottom: 18,
 	},
 	searchInput: {
-		flex: 1,
-		height: 50,
-		paddingHorizontal: 12,
-		fontSize: 17,
-		color: '#1b2d3c',
+		height: 54,
+		backgroundColor: '#f8fbff',
 	},
 	searchInputCompact: {
-		height: 42,
-		paddingHorizontal: 8,
+		height: 44,
+	},
+	searchInputContent: {
+		height: 54,
+		paddingHorizontal: 0,
+		paddingVertical: 0,
+		fontSize: 17,
+	},
+	searchInputContentCompact: {
+		height: 44,
 		fontSize: 15,
+	},
+	searchInputOutline: {
+		borderRadius: 18,
+		borderWidth: 3,
+	},
+	searchInputOutlineCompact: {
+		borderRadius: 14,
+		borderWidth: 2,
 	},
 	sectionTitle: {
 		fontSize: 15,

@@ -137,15 +137,6 @@ export default function SettingsTab() {
 				))}
 			</View>
 
-			{/* PASSWORD SECTION
-			<AppTypography variant="caption" style={styles.label}>Set Password</AppTypography>
-
-			<TouchableOpacity style={styles.inputBox}>
-				<AppTypography variant="body" style={styles.placeholder}>Type to set password</AppTypography>
-
-				<Ionicons name="chevron-forward" size={18} color="#7aaeb0" />
-			</TouchableOpacity> */}
-
 			{/* DELETE BUTTON */}
 			<TouchableOpacity
 				style={styles.deleteBtn}
@@ -278,28 +269,6 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 		lineHeight: 21,
 		fontWeight: '400',
-	},
-
-	label: {
-		color: '#777',
-		marginBottom: 6,
-		fontSize: 13,
-	},
-
-	inputBox: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#7aaeb0',
-		backgroundColor: '#e6f1f2',
-		padding: 12,
-		borderRadius: 8,
-		marginBottom: 20,
-	},
-
-	placeholder: {
-		color: '#666',
 	},
 
 	deleteBtn: {

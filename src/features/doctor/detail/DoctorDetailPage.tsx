@@ -80,6 +80,12 @@ interface AvailabilityApiModeGroup {
 }
 
 const PRIMARY = "#2B6F71";
+const STAT_LOGOS = {
+  experience: { uri: "https://img.icons8.com/ios-filled/50/2b7571/briefcase.png" },
+  instagram: { uri: "https://img.icons8.com/ios-filled/50/2b7571/instagram-new.png" },
+  facebook: { uri: "https://img.icons8.com/ios-filled/50/2b7571/facebook-new.png" },
+  twitter: { uri: "https://img.icons8.com/ios-filled/50/2b7571/twitter.png" },
+};
 
 const emptyAvailabilityByMode: Record<AppointmentModeKey, SlotGroup[]> = {
   clinic: [],
@@ -145,6 +151,20 @@ const normalizeAvailabilityByMode = (
   });
 
   return grouped;
+};
+
+const formatSocialHandle = (value?: unknown, fallback = "", prefix = "@") => {
+  const rawValue = typeof value === "string" ? value.trim() : "";
+  if (!rawValue) return fallback;
+
+  try {
+    const url = new URL(rawValue);
+    const username = url.pathname.split("/").filter(Boolean)[0];
+    return username ? `${prefix}${username}` : fallback;
+  } catch {
+    const username = rawValue.replace(/^[@/]+/, "").split("/").filter(Boolean)[0];
+    return username ? `${prefix}${username}` : fallback;
+  }
 };
 
 function DoctorHospitalDropdown({
@@ -400,10 +420,37 @@ export default function DoctorDetailPage() {
 
   const { details, specialities, hospitals } = doctor;
   const avatarUrl = details?.avatar_s3_key || "https://via.placeholder.com/150";
-  const availabilityLabel = "Available";
-  const availabilityColor = "#19a55a";
-  const availabilityIcon = "calendar-check";
   const profileHospitals = hospitals.slice(0, 2);
+  const socialDetails = (details || {}) as Record<string, unknown>;
+  const doctorFirstName = doctor.name.replace(/^dr\.?\s*/i, "").trim().split(/\s+/)[0]?.toLowerCase() || "doctor";
+  const defaultAtHandle = `@dr.${doctorFirstName}`;
+  const defaultSlashHandle = `/dr.${doctorFirstName}`;
+  const statItems = [
+    {
+      key: "experience",
+      logo: STAT_LOGOS.experience,
+      title: details?.experience_years ? `${details.experience_years}+` : "--",
+      subtitle: "Experience",
+    },
+    {
+      key: "instagram",
+      logo: STAT_LOGOS.instagram,
+      title: "Instagram",
+      subtitle: formatSocialHandle(socialDetails.instagram_url || socialDetails.instagram, defaultAtHandle),
+    },
+    {
+      key: "facebook",
+      logo: STAT_LOGOS.facebook,
+      title: "Facebook",
+      subtitle: formatSocialHandle(socialDetails.facebook_url || socialDetails.facebook, defaultSlashHandle, "/"),
+    },
+    {
+      key: "twitter",
+      logo: STAT_LOGOS.twitter,
+      title: "Twitter",
+      subtitle: formatSocialHandle(socialDetails.twitter_url || socialDetails.twitter, defaultAtHandle),
+    },
+  ];
 
   return (
     <View style={styles.container}>
@@ -494,30 +541,20 @@ export default function DoctorDetailPage() {
 
           {/* Stats Metrics Row */}
           <View style={styles.statsRow}>
-            <View style={styles.statBox}>
-              <MaterialCommunityIcons name="briefcase-outline" size={22} color="#2b7571" />
-              <AppTypography variant="caption" style={styles.statVal}>
-                {details?.experience_years ? `${details.experience_years}+` : "--"}
-              </AppTypography>
-              <AppTypography variant="caption" style={styles.statLabel}>
-                Experience
-              </AppTypography>
-            </View>
-
-            <View style={styles.statsDivider} />
-
-            <View style={styles.statBox}>
-              <MaterialCommunityIcons name={availabilityIcon} size={22} color={availabilityColor} />
-              <View style={styles.availabilityValueRow}>
-                <View style={[styles.availabilityDot, { backgroundColor: availabilityColor }]} />
-                <AppTypography variant="caption" style={[styles.statVal, { color: availabilityColor }]}>
-                  {availabilityLabel}
-                </AppTypography>
-              </View>
-              <AppTypography variant="caption" style={styles.statLabel}>
-                Availability
-              </AppTypography>
-            </View>
+            {statItems.map((item, index) => (
+              <React.Fragment key={item.key}>
+                {index > 0 ? <View style={styles.statsDivider} /> : null}
+                <View style={styles.statBox}>
+                  <Image source={item.logo} style={styles.statLogo} resizeMode="contain" />
+                  <AppTypography variant="caption" style={styles.statTitle} numberOfLines={1}>
+                    {item.title}
+                  </AppTypography>
+                  <AppTypography variant="caption" style={styles.statSubtitle} numberOfLines={1}>
+                    {item.subtitle}
+                  </AppTypography>
+                </View>
+              </React.Fragment>
+            ))}
           </View>
         </View>
 
@@ -736,13 +773,39 @@ const styles = StyleSheet.create({
   locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
   locationText: { color: "#888", marginLeft: 4, flex: 1 },
   distanceText: { color: "#2b7571", fontWeight: "bold" },
-  statsRow: { flexDirection: "row", alignItems: "stretch", borderTopWidth: 1, borderTopColor: "#f0f0f0", paddingTop: 16 },
-  statBox: { alignItems: "center", justifyContent: "center", flex: 1, minHeight: 72, paddingHorizontal: 10 },
-  statsDivider: { width: 1, backgroundColor: "#edf1f1", marginHorizontal: 8 },
-  statVal: { fontWeight: "bold", color: "#333", marginTop: 4, fontSize: 11 },
-  statLabel: { color: "#888", fontSize: 9 },
-  availabilityValueRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 4 },
-  availabilityDot: { width: 7, height: 7, borderRadius: 4, marginRight: 5 },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    paddingTop: 16,
+  },
+  statBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    minWidth: 0,
+    minHeight: 72,
+    paddingHorizontal: 4,
+  },
+  statsDivider: { width: 1, backgroundColor: "#edf1f1", marginHorizontal: 6 },
+  statLogo: { width: 22, height: 22, marginBottom: 8 },
+  statTitle: {
+    maxWidth: "100%",
+    fontWeight: "700",
+    color: "#111111",
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: "center",
+  },
+  statSubtitle: {
+    maxWidth: "100%",
+    color: "#7a7a7a",
+    fontSize: 10,
+    lineHeight: 14,
+    textAlign: "center",
+    marginTop: 2,
+  },
   section: { paddingHorizontal: 16, paddingVertical: 12 },
   sectionTitle: { color: "#333", fontWeight: "bold", marginBottom: 8 },
   aboutText: { color: "#666", lineHeight: 18 },
