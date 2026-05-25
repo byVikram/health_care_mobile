@@ -28,9 +28,11 @@ interface AppSelectProps {
   errorText?: string;
   borderRadius?: number;
   borderColor?: string;
-  size?: "small" | "medium";
+  size?: "small" | "medium" | "compact" | "form";
   style?: StyleProp<ViewStyle>;
   customCardStyle?: StyleProp<ViewStyle>;
+  noMargin?: boolean;
+  floatingLabel?: boolean;
   dropdownPosition?: "top" | "bottom";
   maxDropdownHeight?: number;
   bottomOffset?: number;
@@ -38,6 +40,24 @@ interface AppSelectProps {
 
 const DROPDOWN_GAP = 4;
 const DEFAULT_DROPDOWN_HEIGHT = 220;
+const SELECT_HEIGHTS = {
+  small: 32,
+  compact: 42,
+  form: 48,
+  medium: 56,
+};
+const SELECT_HORIZONTAL_PADDING = {
+  small: 10,
+  compact: 14,
+  form: 14,
+  medium: 16,
+};
+const SELECT_TEXT_SIZE = {
+  small: 12,
+  compact: 14,
+  form: 14,
+  medium: 16,
+};
 
 export const AppSelect = ({
   options,
@@ -47,10 +67,12 @@ export const AppSelect = ({
   label,
   errorText,
   borderRadius = 8,
-  borderColor = "#ccc",
+  borderColor,
   size = "medium",
   style,
   customCardStyle,
+  noMargin = false,
+  floatingLabel = false,
   dropdownPosition = "bottom",
   maxDropdownHeight,
   bottomOffset = 24,
@@ -71,7 +93,10 @@ export const AppSelect = ({
   };
 
   const selectedOption = options.find((opt) => opt.value === value);
-  const resolvedBorderColor = errorText ? theme.colors.error : borderColor;
+  const resolvedBorderColor = errorText ? theme.colors.error : borderColor ?? (size === "medium" ? "#ccc" : "#a7d3db");
+  const selectHeight = SELECT_HEIGHTS[size];
+  const horizontalPadding = SELECT_HORIZONTAL_PADDING[size];
+  const textSize = SELECT_TEXT_SIZE[size];
   const requestedDropdownHeight = maxDropdownHeight ?? DEFAULT_DROPDOWN_HEIGHT;
   const reservedBottomSpace = Math.max(bottomOffset, insets.bottom + bottomOffset);
   const dropdownTop =
@@ -85,9 +110,9 @@ export const AppSelect = ({
   const dropdownHeight = Math.min(requestedDropdownHeight, Math.max(0, availableDropdownHeight));
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, noMargin && styles.containerNoMargin, floatingLabel && styles.containerFloatingLabel, style]}>
       {label ? (
-        <AppTypography variant="caption" style={styles.label}>
+        <AppTypography variant="caption" style={[styles.label, floatingLabel && styles.floatingLabel]}>
           {label}
         </AppTypography>
       ) : null}
@@ -98,20 +123,21 @@ export const AppSelect = ({
           borderless={false}
           style={[
             styles.dropdown,
-            size === "small" && styles.dropdownSmall,
             {
               borderColor: resolvedBorderColor,
               borderRadius,
+              height: selectHeight,
+              minHeight: selectHeight,
             },
             customCardStyle,
           ]}
         >
-          <View style={[styles.dropdownContent, size === "small" && styles.dropdownContentSmall]}>
+          <View style={[styles.dropdownContent, { paddingHorizontal: horizontalPadding }]}>
             <AppTypography
               variant="body"
               style={[
                 styles.dropdownText,
-                size === "small" && styles.dropdownTextSmall,
+                { fontSize: textSize },
                 { color: selectedOption ? theme.colors.onSurfaceVariant : "#7c878d" },
               ]}
               numberOfLines={1}
@@ -189,37 +215,45 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     width: "100%",
   },
+  containerNoMargin: {
+    marginBottom: 0,
+  },
+  containerFloatingLabel: {
+    paddingTop: 0,
+  },
   label: {
     marginBottom: 4,
     marginLeft: 4,
+  },
+  floatingLabel: {
+    position: "absolute",
+    top: -11,
+    left: 17,
+    zIndex: 2,
+    paddingHorizontal: 7,
+    backgroundColor: "#fff",
+    color: "#7b8790",
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 18,
+    marginBottom: 0,
+    marginLeft: 0,
   },
   dropdown: {
     borderWidth: 1,
     borderColor: "#C4C4C4",
     backgroundColor: "#fff",
-    height: 56,
     justifyContent: "center",
     overflow: "hidden",
-  },
-  dropdownSmall: {
-    height: 32,
   },
   dropdownContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
     width: "100%",
-  },
-  dropdownContentSmall: {
-    paddingHorizontal: 10,
   },
   dropdownText: {
     flex: 1,
-    fontSize: 16,
-  },
-  dropdownTextSmall: {
-    fontSize: 12,
   },
   chevron: {
     marginLeft: 8,

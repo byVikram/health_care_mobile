@@ -2,20 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
 	ActivityIndicator,
 	Alert,
-	FlatList,
-	Modal,
 	Platform,
-	Pressable,
 	ScrollView,
 	StyleSheet,
-	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { AppTypography } from '../../../../components/common'
+import { AppInput, AppSelect, AppSelectOption, AppTypography } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import { getDoctorProfile, getSpecialities, mapDoctorProfileApi } from '../../../doctor/doctorService'
 import { doctorService } from '../../../consultation/ConsultationService'
@@ -41,17 +37,14 @@ const COLLEGE_OPTIONS = [
 	{ value: 'other', label: 'Other' },
 ]
 
-type Option = {
-	value: string
-	label: string
-}
+type Option = AppSelectOption
 
 type InputFieldProps = {
 	label: string
 	value: string
 	onChangeText: (value: string) => void
 	placeholder: string
-	keyboardType?: React.ComponentProps<typeof TextInput>['keyboardType']
+	keyboardType?: React.ComponentProps<typeof AppInput>['keyboardType']
 	maxLength?: number
 	required?: boolean
 }
@@ -62,7 +55,6 @@ type SelectDropdownProps = {
 	placeholder: string
 	options: Option[]
 	onSelect: (value: string) => void
-	isMobile: boolean
 	required?: boolean
 }
 
@@ -158,83 +150,43 @@ function InputField({
 	maxLength,
 	required = false,
 }: InputFieldProps) {
+	const isAboutField = label === 'About / Bio'
+
 	return (
 		<View style={styles.fieldGroup}>
 			{label ? <FieldLabel label={label} required={required} /> : null}
-			<View style={styles.inputShell}>
-				<TextInput
-					value={value}
-					onChangeText={onChangeText}
-					placeholder={placeholder}
-					placeholderTextColor="#9a9a9a"
-					style={styles.textInput}
-					keyboardType={keyboardType}
-					maxLength={maxLength}
-					multiline={label === 'About / Bio'}
-					textAlignVertical={label === 'About / Bio' ? 'top' : 'center'}
-				/>
-			</View>
+			<AppInput
+				value={value}
+				onChangeText={onChangeText}
+				placeholder={placeholder}
+				placeholderTextColor="#9a9a9a"
+				style={isAboutField && styles.aboutInput}
+				contentStyle={isAboutField && styles.aboutInputContent}
+				keyboardType={keyboardType}
+				maxLength={maxLength}
+				multiline={isAboutField}
+				textAlignVertical={isAboutField ? 'top' : 'center'}
+				fieldSize="form"
+				noMargin
+				dense
+			/>
 		</View>
 	)
 }
 
-function SelectDropdown({
-	label,
-	value,
-	placeholder,
-	options,
-	onSelect,
-	isMobile,
-	required = false,
-}: SelectDropdownProps) {
-	const [visible, setVisible] = useState(false)
-	const selectedOption = options.find((item) => item.value === value)
-
+function SelectDropdown({ label, value, placeholder, options, onSelect, required = false }: SelectDropdownProps) {
 	return (
 		<View style={styles.fieldGroup}>
 			{label ? <FieldLabel label={label} required={required} /> : null}
-			<>
-				<Pressable style={styles.inputShell} onPress={() => setVisible(true)}>
-					<AppTypography variant="body" style={[styles.selectText, !selectedOption?.label && styles.placeholderText]}>
-						{selectedOption?.label || placeholder}
-					</AppTypography>
-					<MaterialCommunityIcons name="chevron-down" size={20} color="#2c7b80" />
-				</Pressable>
-				<Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
-					<Pressable style={styles.modalOverlay} onPress={() => setVisible(false)}>
-						<Pressable style={[styles.modalCard, isMobile && styles.modalCardMobile]} onPress={(event) => event.stopPropagation()}>
-							<View style={styles.modalHeader}>
-								<AppTypography variant="h4" style={styles.modalTitle}>
-									{label || 'Select'}
-								</AppTypography>
-								<TouchableOpacity onPress={() => setVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-									<MaterialCommunityIcons name="close" size={22} color="#45636d" />
-								</TouchableOpacity>
-							</View>
-							<FlatList
-								data={options}
-								keyExtractor={(item) => item.value}
-								renderItem={({ item }) => {
-									const isSelected = item.value === value
-									return (
-										<TouchableOpacity
-											style={[styles.optionRow, isSelected && styles.optionRowSelected]}
-											onPress={() => {
-												onSelect(item.value)
-												setVisible(false)
-											}}
-										>
-											<AppTypography variant="body" style={[styles.optionText, isSelected && styles.optionTextSelected]}>
-												{item.label}
-											</AppTypography>
-										</TouchableOpacity>
-									)
-								}}
-							/>
-						</Pressable>
-					</Pressable>
-				</Modal>
-			</>
+			<AppSelect
+				value={value}
+				placeholder={placeholder}
+				options={options}
+				onSelect={onSelect}
+				borderRadius={10}
+				size="form"
+				noMargin
+			/>
 		</View>
 	)
 }
@@ -509,7 +461,6 @@ export default function ProfessionalDetailsTab() {
 							placeholder="Select your specialization"
 							options={specialities}
 							onSelect={handleSpecialitySelect}
-							isMobile={isMobile}
 						/>
 					)}
 				</View>
@@ -525,7 +476,6 @@ export default function ProfessionalDetailsTab() {
 							placeholder="Select your degree"
 							options={DEGREE_OPTIONS}
 							onSelect={(value) => updateFormData('degree', value)}
-							isMobile={isMobile}
 							required
 						/>
 
@@ -536,7 +486,6 @@ export default function ProfessionalDetailsTab() {
 								placeholder="Select college or university"
 								options={COLLEGE_OPTIONS}
 								onSelect={(value) => updateFormData('college', value)}
-								isMobile={isMobile}
 								required
 							/>
 							<InputField
@@ -706,33 +655,15 @@ const styles = StyleSheet.create({
 		lineHeight: 20,
 		fontWeight: '600',
 	},
-	inputShell: {
-		minHeight: 48,
-		borderWidth: 1,
-		borderColor: '#a7d3db',
-		borderRadius: 10,
-		paddingHorizontal: 14,
-		backgroundColor: '#ffffff',
-		flexDirection: 'row',
-		alignItems: 'center',
+	aboutInput: {
+		minHeight: 120,
+		height: 120,
 	},
-	textInput: {
-		flex: 1,
-		minHeight: 48,
-		paddingVertical: Platform.OS === 'web' ? 13 : 11,
-		paddingHorizontal: 0,
-		fontSize: 14,
-		lineHeight: 20,
-		color: '#2f2f2f',
-	},
-	selectText: {
-		flex: 1,
-		fontSize: 14,
-		lineHeight: 20,
-		color: '#2f2f2f',
-	},
-	placeholderText: {
-		color: '#9a9a9a',
+	aboutInputContent: {
+		minHeight: 100,
+		height: 100,
+		paddingTop: 12,
+		paddingBottom: 12,
 	},
 	uploadSection: {
 		flexDirection: 'row',
@@ -810,55 +741,6 @@ const styles = StyleSheet.create({
 		minHeight: 56,
 		alignItems: 'center',
 		justifyContent: 'center',
-	},
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: 'rgba(18, 28, 33, 0.28)',
-		justifyContent: 'center',
-		paddingHorizontal: 20,
-	},
-	modalCard: {
-		width: '100%',
-		maxWidth: 420,
-		alignSelf: 'center',
-		backgroundColor: '#ffffff',
-		borderRadius: 16,
-		paddingVertical: 8,
-		maxHeight: '70%',
-	},
-	modalCardMobile: {
-		maxWidth: '100%',
-	},
-	modalHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 18,
-		paddingTop: 10,
-		paddingBottom: 8,
-	},
-	modalTitle: {
-		color: '#343434',
-	},
-	optionRow: {
-		minHeight: 48,
-		paddingHorizontal: 18,
-		paddingVertical: 12,
-		borderTopWidth: 1,
-		borderTopColor: '#eef4f5',
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	optionRowSelected: {
-		backgroundColor: '#f5fbfb',
-	},
-	optionText: {
-		color: '#2f2f2f',
-	},
-	optionTextSelected: {
-		color: '#1d6d71',
-		fontWeight: '600',
 	},
 	saveButton: {
 		marginTop: 28,

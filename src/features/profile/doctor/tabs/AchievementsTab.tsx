@@ -8,7 +8,6 @@ import {
 	ScrollView,
 	StyleSheet,
 	Switch,
-	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
@@ -16,7 +15,7 @@ import {
 import * as ImagePicker from 'expo-image-picker'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
-import { AppTypography } from '../../../../components/common'
+import { AppInput, AppTypography } from '../../../../components/common'
 import {
 	createDoctorAchievement,
 	DoctorAchievement,
@@ -492,12 +491,19 @@ function AddAchievementForm({
 					Achievement Title
 				</AppTypography>
 
-				<TextInput
+				<AppInput
 					value={title}
 					onChangeText={setTitle}
 					placeholder="e.g. Outstanding Contribution to Cardiology 2024"
 					placeholderTextColor="#98A4AA"
 					style={styles.input}
+					contentStyle={styles.inputContent}
+					outlineStyle={styles.inputOutline}
+					outlineColor="#d9e2e2"
+					activeOutlineColor={TEAL}
+					textColor={TEXT}
+					noMargin
+					dense
 				/>
 
 				<View
@@ -549,21 +555,21 @@ function AddAchievementForm({
 							Date Awarded
 						</AppTypography>
 
-						<View style={styles.dateInput}>
-							<TextInput
-								value={date}
-								onChangeText={setDate}
-								placeholder="YYYY-MM-DD"
-								placeholderTextColor="#98A4AA"
-								style={{ flex: 1 }}
-							/>
-
-							<MaterialCommunityIcons
-								name="calendar-month-outline"
-								size={20}
-								color={TEAL}
-							/>
-						</View>
+						<AppInput
+							value={date}
+							onChangeText={setDate}
+							placeholder="YYYY-MM-DD"
+							placeholderTextColor="#98A4AA"
+							style={styles.input}
+							contentStyle={styles.inputContent}
+							outlineStyle={styles.inputOutline}
+							outlineColor="#d9e2e2"
+							activeOutlineColor={TEAL}
+							textColor={TEXT}
+							right={<AppInput.Icon icon="calendar-month-outline" color={TEAL} />}
+							noMargin
+							dense
+						/>
 					</View>
 				</View>
 
@@ -571,19 +577,26 @@ function AddAchievementForm({
 					Issuing Organization / Hospital
 				</AppTypography>
 
-				<TextInput
+				<AppInput
 					value={organization}
 					onChangeText={setOrganization}
 					placeholder="e.g. Royal College of Surgeons"
 					placeholderTextColor="#98A4AA"
 					style={styles.input}
+					contentStyle={styles.inputContent}
+					outlineStyle={styles.inputOutline}
+					outlineColor="#d9e2e2"
+					activeOutlineColor={TEAL}
+					textColor={TEXT}
+					noMargin
+					dense
 				/>
 
 				<AppTypography style={styles.inputLabel}>
 					Description
 				</AppTypography>
 
-				<TextInput
+				<AppInput
 					value={description}
 					onChangeText={setDescription}
 					multiline
@@ -591,6 +604,13 @@ function AddAchievementForm({
 					placeholder="Describe the significance of this achievement..."
 					placeholderTextColor="#98A4AA"
 					style={styles.textArea}
+					contentStyle={styles.textAreaContent}
+					outlineStyle={styles.inputOutline}
+					outlineColor="#d9e2e2"
+					activeOutlineColor={TEAL}
+					textColor={TEXT}
+					noMargin
+					dense
 				/>
 
 				<AppTypography style={styles.inputLabel}>
@@ -1176,21 +1196,26 @@ const styles = StyleSheet.create({
 
 	input: {
 		height: 50,
-		borderWidth: 1,
-		borderColor: '#d9e2e2',
-		borderRadius: 12,
-		paddingHorizontal: 14,
 		backgroundColor: '#fafcfc',
+	},
+	inputContent: {
+		height: 50,
+		paddingVertical: 0,
+		fontSize: 14,
+	},
+	inputOutline: {
+		borderRadius: 12,
 	},
 
 	textArea: {
 		height: 130,
-		borderWidth: 1,
-		borderColor: '#d9e2e2',
-		borderRadius: 12,
-		paddingHorizontal: 14,
-		paddingTop: 14,
 		backgroundColor: '#fafcfc',
+	},
+	textAreaContent: {
+		height: 130,
+		paddingTop: 14,
+		paddingBottom: 14,
+		fontSize: 14,
 	},
 
 	responsiveRow: {
@@ -1210,17 +1235,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		marginTop: 10,
 		minWidth: 0,
-	},
-
-	dateInput: {
-		height: 50,
-		borderWidth: 1,
-		borderColor: '#d9e2e2',
-		borderRadius: 12,
-		paddingHorizontal: 14,
-		backgroundColor: '#fafcfc',
-		flexDirection: 'row',
-		alignItems: 'center',
 	},
 
 	categoryGrid: {

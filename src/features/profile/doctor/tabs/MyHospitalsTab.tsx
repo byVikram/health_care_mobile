@@ -6,13 +6,12 @@ import {
 	Pressable,
 	ScrollView,
 	StyleSheet,
-	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppToggle, AppTypography } from '../../../../components/common'
+import { AppInput, AppSelect, AppToggle, AppTypography } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -21,8 +20,6 @@ import {
 	updateHospital,
 } from '../../../doctor/doctorService'
 import { DoctorHospital } from '../../../../types/doctor-profile'
-import App from '../../../../../App'
-import { all } from 'axios'
 
 type HospitalFormData = {
 	name: string
@@ -232,23 +229,25 @@ function InputField({
 	onChangeText: (value: string) => void
 	placeholder: string
 	multiline?: boolean
-	keyboardType?: React.ComponentProps<typeof TextInput>['keyboardType']
+	keyboardType?: React.ComponentProps<typeof AppInput>['keyboardType']
 }) {
 	return (
 		<View style={styles.fieldGroup}>
 			<FieldLabel label={label} />
-			<View style={[styles.inputShell, multiline && styles.inputShellMultiline]}>
-				<TextInput
-					value={value}
-					onChangeText={onChangeText}
-					placeholder={placeholder}
-					placeholderTextColor="#9a9a9a"
-					style={[styles.textInput, multiline && styles.textInputMultiline]}
-					multiline={multiline}
-					keyboardType={keyboardType}
-					textAlignVertical={multiline ? 'top' : 'center'}
-				/>
-			</View>
+			<AppInput
+				value={value}
+				onChangeText={onChangeText}
+				placeholder={placeholder}
+				placeholderTextColor="#9a9a9a"
+				style={multiline && styles.multilineInput}
+				contentStyle={multiline && styles.multilineInputContent}
+				multiline={multiline}
+				keyboardType={keyboardType}
+				textAlignVertical={multiline ? 'top' : 'center'}
+				fieldSize="form"
+				noMargin
+				dense
+			/>
 		</View>
 	)
 }
@@ -268,62 +267,27 @@ function DropdownSelect({
 	compact?: boolean
 	showFloatingLabel?: boolean
 }) {
-	const [isOpen, setIsOpen] = useState(false)
-	const selectedOption = options.find((option) => option.value === value)
+	const normalizedOptions = options.map((option) => ({
+		value: String(option.value),
+		label: option.label,
+	}))
 
 	return (
 		<View style={[styles.dropdownGroup, compact && styles.dropdownGroupCompact]}>
-			{showFloatingLabel ? (
-				<AppTypography variant="caption" style={styles.dropdownFloatingLabel}>
-					{label}
-				</AppTypography>
-			) : null}
-			<TouchableOpacity
-				style={[styles.dropdownTrigger, compact && styles.dropdownTriggerCompact]}
-				onPress={() => setIsOpen(true)}
-				activeOpacity={0.85}
-			>
-				<AppTypography variant="body" style={[styles.dropdownValue, compact && styles.dropdownValueCompact]}>
-					{selectedOption?.label ?? 'Select'}
-				</AppTypography>
-				<MaterialCommunityIcons name="menu-down" size={26} color="#7c7c7c" />
-			</TouchableOpacity>
-
-			<Modal visible={isOpen} transparent animationType="fade" onRequestClose={() => setIsOpen(false)}>
-				<Pressable style={styles.dropdownOverlay} onPress={() => setIsOpen(false)}>
-					<Pressable style={styles.dropdownMenu}>
-						<AppTypography variant="caption" style={styles.dropdownTitle}>
-							{label}
-						</AppTypography>
-						<ScrollView style={styles.dropdownList} showsVerticalScrollIndicator={false}>
-							{options.map((option) => {
-								const isSelected = option.value === value
-								return (
-									<TouchableOpacity
-										key={String(option.value)}
-										style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
-										onPress={() => {
-											onChange(option.value)
-											setIsOpen(false)
-										}}
-										activeOpacity={0.85}
-									>
-										<AppTypography
-											variant="body"
-											style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}
-										>
-											{option.label}
-										</AppTypography>
-										{isSelected ? (
-											<MaterialCommunityIcons name="check" size={18} color={TEAL} />
-										) : null}
-									</TouchableOpacity>
-								)
-							})}
-						</ScrollView>
-					</Pressable>
-				</Pressable>
-			</Modal>
+			<AppSelect
+				label={showFloatingLabel ? label : undefined}
+				value={String(value)}
+				options={normalizedOptions}
+				onSelect={(selectedValue) => {
+					const selectedOption = options.find((option) => String(option.value) === selectedValue)
+					if (selectedOption) onChange(selectedOption.value)
+				}}
+				placeholder="Select"
+				size="form"
+				borderRadius={10}
+				floatingLabel={showFloatingLabel}
+				noMargin
+			/>
 		</View>
 	)
 }
@@ -1514,28 +1478,13 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		lineHeight: 20,
 	},
-	inputShell: {
-		minHeight: 48,
-		borderWidth: 1,
-		borderColor: '#a7d3db',
-		borderRadius: 10,
-		paddingHorizontal: 14,
-		backgroundColor: '#ffffff',
-	},
-	inputShellMultiline: {
+	multilineInput: {
 		minHeight: 96,
-		paddingVertical: 12,
 	},
-	textInput: {
-		minHeight: 48,
-		fontSize: 14,
-		lineHeight: 20,
-		color: '#2f2f2f',
-		paddingVertical: 12,
-	},
-	textInputMultiline: {
-		minHeight: 72,
-		paddingVertical: 0,
+	multilineInputContent: {
+		minHeight: 96,
+		paddingTop: 12,
+		paddingBottom: 12,
 	},
 	workingHours: {
 		width: '100%',
@@ -1763,94 +1712,6 @@ const styles = StyleSheet.create({
 	},
 	dropdownGroupCompact: {
 		paddingTop: 0,
-	},
-	dropdownFloatingLabel: {
-		position: 'absolute',
-		top: -11,
-		left: 17,
-		zIndex: 2,
-		paddingHorizontal: 7,
-		backgroundColor: '#ffffff',
-		color: '#7b8790',
-		fontSize: 14,
-		fontWeight: '500',
-		lineHeight: 18,
-	},
-	dropdownTrigger: {
-		minHeight: 48,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: '#a7d3db',
-		backgroundColor: '#ffffff',
-		paddingHorizontal: 20,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	dropdownTriggerCompact: {
-		minHeight: 48,
-		paddingHorizontal: 12,
-	},
-	dropdownValue: {
-		color: '#2f2f2f',
-		fontSize: 14,
-		lineHeight: 20,
-		fontWeight: '400',
-	},
-	dropdownValueCompact: {
-		color: '#2f2f2f',
-		fontSize: 14,
-		lineHeight: 20,
-		fontWeight: '400',
-	},
-	dropdownOverlay: {
-		flex: 1,
-		backgroundColor: 'rgba(18, 28, 33, 0.18)',
-		alignItems: 'center',
-		justifyContent: 'center',
-		padding: 20,
-	},
-	dropdownMenu: {
-		width: '100%',
-		maxWidth: 360,
-		maxHeight: '70%',
-		borderRadius: 14,
-		backgroundColor: '#ffffff',
-		paddingVertical: 10,
-		shadowColor: '#000000',
-		shadowOpacity: 0.14,
-		shadowRadius: 14,
-		shadowOffset: { width: 0, height: 8 },
-		elevation: 10,
-	},
-	dropdownTitle: {
-		color: '#66757f',
-		fontSize: 13,
-		fontWeight: '700',
-		paddingHorizontal: 16,
-		paddingBottom: 8,
-	},
-	dropdownList: {
-		maxHeight: 320,
-	},
-	dropdownItem: {
-		minHeight: 46,
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	dropdownItemActive: {
-		backgroundColor: 'rgba(12,124,124,0.06)',
-	},
-	dropdownItemText: {
-		color: '#2f2f2f',
-		fontSize: 14,
-		fontWeight: '600',
-	},
-	dropdownItemTextActive: {
-		color: TEAL,
 	},
 	appointmentRules: {
 		marginTop: 14,

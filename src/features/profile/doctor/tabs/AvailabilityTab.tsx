@@ -489,7 +489,6 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 							}))}
 							size="small"
 							borderRadius={10}
-							customCardStyle={styles.selectCard}
 						/>
 					)}
 				</View>
@@ -591,9 +590,6 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#62707a',
 		marginBottom: 8,
-	},
-	selectCard: {
-		borderRadius: 10,
 	},
 	todayRow: {
 		alignItems: 'flex-end',

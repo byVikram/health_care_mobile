@@ -8,27 +8,28 @@ import {
 	Pressable,
 	ScrollView,
 	StyleSheet,
-	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../../components/common'
+import { TextInput as PaperTextInput } from 'react-native-paper'
+import { AppInput, AppSelect, AppSelectOption, AppTypography } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import { getDoctorProfile, mapDoctorProfileApi } from '../../../doctor/doctorService'
 import { doctorService } from '../../../consultation/ConsultationService'
 
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say']
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Marathi', 'Bengali']
+const GENDER_SELECT_OPTIONS: AppSelectOption[] = GENDER_OPTIONS.map((option) => ({ label: option, value: option }))
 
 type InputFieldProps = {
 	label: string
 	value: string
 	onChangeText: (value: string) => void
 	placeholder: string
-	keyboardType?: React.ComponentProps<typeof TextInput>['keyboardType']
-	autoCapitalize?: React.ComponentProps<typeof TextInput>['autoCapitalize']
+	keyboardType?: React.ComponentProps<typeof AppInput>['keyboardType']
+	autoCapitalize?: React.ComponentProps<typeof AppInput>['autoCapitalize']
 	maxLength?: number
 	rightIcon?: React.ComponentProps<typeof MaterialCommunityIcons>['name']
 	rightIconColor?: string
@@ -43,9 +44,8 @@ type SelectDropdownProps = {
 	label: string
 	value?: string
 	placeholder: string
-	options: string[]
+	options: AppSelectOption[]
 	onSelect: (value: string) => void
-	isMobile: boolean
 	required?: boolean
 }
 
@@ -125,86 +125,40 @@ function InputField({
 	return (
 		<View style={styles.fieldGroup}>
 			<FieldLabel label={label} required={required} />
-			<View style={[styles.inputShell, errorText && styles.inputShellError]}>
-				{leftText ? (
-					<View style={styles.leftPrefix}>
-						<AppTypography variant="body" style={styles.leftPrefixText}>
-							{leftText}
-						</AppTypography>
-					</View>
-				) : null}
-				<TextInput
-					value={value}
-					onChangeText={onChangeText}
-					placeholder={placeholder}
-					placeholderTextColor="#9a9a9a"
-					style={styles.textInput}
-					keyboardType={keyboardType}
-					autoCapitalize={autoCapitalize}
-					maxLength={maxLength}
-					onFocus={onFocus}
-					onBlur={onBlur}
-				/>
-				{rightIcon ? <MaterialCommunityIcons name={rightIcon} size={20} color={rightIconColor} /> : null}
-			</View>
-			{errorText ? (
-				<AppTypography variant="caption" style={styles.errorText}>
-					{errorText}
-				</AppTypography>
-			) : null}
+			<AppInput
+				value={value}
+				onChangeText={onChangeText}
+				placeholder={placeholder}
+				placeholderTextColor="#9a9a9a"
+				keyboardType={keyboardType}
+				autoCapitalize={autoCapitalize}
+				maxLength={maxLength}
+				onFocus={onFocus}
+				onBlur={onBlur}
+				errorText={errorText}
+				fieldSize="compact"
+				noMargin
+				dense
+				left={leftText ? <PaperTextInput.Affix text={leftText} textStyle={styles.leftPrefixText} /> : undefined}
+				right={rightIcon ? <AppInput.Icon icon={rightIcon} color={rightIconColor} /> : undefined}
+			/>
 		</View>
 	)
 }
 
-function SelectDropdown({ label, value, placeholder, options, onSelect, isMobile, required = false }: SelectDropdownProps) {
-	const [visible, setVisible] = useState(false)
-
+function SelectDropdown({ label, value, placeholder, options, onSelect, required = false }: SelectDropdownProps) {
 	return (
 		<View style={styles.fieldGroup}>
 			<FieldLabel label={label} required={required} />
-			<>
-				<Pressable style={styles.inputShell} onPress={() => setVisible(true)}>
-					<AppTypography variant="body" style={[styles.selectText, !value && styles.placeholderText]}>
-						{value || placeholder}
-					</AppTypography>
-					<MaterialCommunityIcons name="chevron-down" size={20} color="#2c7b80" />
-				</Pressable>
-				<Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
-					<Pressable style={styles.modalOverlay} onPress={() => setVisible(false)}>
-						<Pressable style={[styles.modalCard, isMobile && styles.modalCardMobile]} onPress={(event) => event.stopPropagation()}>
-							<View style={styles.modalHeader}>
-								<AppTypography variant="h4" style={styles.modalTitle}>
-									{label}
-								</AppTypography>
-								<TouchableOpacity onPress={() => setVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-									<MaterialCommunityIcons name="close" size={22} color="#45636d" />
-								</TouchableOpacity>
-							</View>
-							<FlatList
-								data={options}
-								keyExtractor={(item) => item}
-								renderItem={({ item }) => {
-									const isSelected = item === value
-									return (
-										<TouchableOpacity
-											style={[styles.optionRow, isSelected && styles.optionRowSelected]}
-											onPress={() => {
-												onSelect(item)
-												setVisible(false)
-											}}
-										>
-											<AppTypography variant="body" style={[styles.optionText, isSelected && styles.optionTextSelected]}>
-												{item}
-											</AppTypography>
-											{isSelected ? <MaterialCommunityIcons name="check-circle" size={20} color="#24a148" /> : null}
-										</TouchableOpacity>
-									)
-								}}
-							/>
-						</Pressable>
-					</Pressable>
-				</Modal>
-			</>
+			<AppSelect
+				value={value}
+				placeholder={placeholder}
+				options={options}
+				onSelect={onSelect}
+				borderRadius={8}
+				size="compact"
+				noMargin
+			/>
 		</View>
 	)
 }
@@ -791,9 +745,8 @@ export default function PersonalDetailsTab() {
 							label="Gender"
 							value={formData.gender}
 							placeholder="Select your gender"
-							options={GENDER_OPTIONS}
+							options={GENDER_SELECT_OPTIONS}
 							onSelect={(value) => updateFormData('gender', value)}
-							isMobile={isMobile}
 							required
 						/>
 						<DobPickerField
@@ -992,24 +945,9 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
-	inputShellError: {
-		borderColor: '#d84545',
-	},
-	leftPrefix: {
-		marginRight: 4,
-	},
 	leftPrefixText: {
 		color: '#303030',
 		fontSize: 14,
-	},
-	textInput: {
-		flex: 1,
-		minWidth: 0,
-		paddingVertical: Platform.OS === 'web' ? 12 : 10,
-		paddingHorizontal: 0,
-		fontSize: 14,
-		lineHeight: 20,
-		color: '#2f2f2f',
 	},
 	selectText: {
 		flex: 1,
@@ -1019,12 +957,6 @@ const styles = StyleSheet.create({
 	},
 	placeholderText: {
 		color: '#9a9a9a',
-	},
-	errorText: {
-		color: '#d84545',
-		fontSize: 12,
-		lineHeight: 16,
-		marginTop: 6,
 	},
 	modalOverlay: {
 		flex: 1,
