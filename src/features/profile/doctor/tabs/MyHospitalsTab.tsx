@@ -12,10 +12,17 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../../components/common'
-import { createHospital, deleteHospital, getDoctorProfile, mapDoctorProfileApi } from '../../../doctor/doctorService'
-import { doctorService } from '../../../consultation/ConsultationService'
+import { AppToggle, AppTypography } from '../../../../components/common'
+import {
+	createHospital,
+	deleteHospital,
+	getDoctorProfile,
+	mapDoctorProfileApi,
+	updateHospital,
+} from '../../../doctor/doctorService'
 import { DoctorHospital } from '../../../../types/doctor-profile'
+import App from '../../../../../App'
+import { all } from 'axios'
 
 type HospitalFormData = {
 	name: string
@@ -27,8 +34,22 @@ type HospitalFormData = {
 
 type HospitalItem = HospitalFormData & {
 	id: string
+	hospital_id?: string
 	location: string
 	isPrimary: boolean
+}
+
+type AppointmentType = 'clinic' | 'video'
+type WorkingDayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+type TimeSlot = { start: string; end: string }
+type SectionSlots = {
+	morning: TimeSlot[]
+	afternoon: TimeSlot[]
+	evening: TimeSlot[]
+}
+type WorkingHoursState = {
+	sections: SectionSlots
+	slotDuration: number
 }
 
 const EMPTY_FORM: HospitalFormData = {
@@ -38,6 +59,130 @@ const EMPTY_FORM: HospitalFormData = {
 	video_consultation_fee: '',
 	offline_consultation_fee: '',
 }
+
+const TEAL = '#0c7c7c'
+
+const WORKING_DAYS: { key: WorkingDayKey; label: string }[] = [
+	{ key: 'sunday', label: 'Sun' },
+	{ key: 'monday', label: 'Mon' },
+	{ key: 'tuesday', label: 'Tue' },
+	{ key: 'wednesday', label: 'Wed' },
+	{ key: 'thursday', label: 'Thu' },
+	{ key: 'friday', label: 'Fri' },
+	{ key: 'saturday', label: 'Sat' },
+]
+
+const getSuccessMessage = (response: unknown, fallback = 'Hospital saved successfully') => {
+	if (
+		typeof response === 'object' &&
+		response !== null &&
+		'message' in response &&
+		typeof response.message === 'string'
+	) {
+		return response.message
+	}
+
+	return fallback
+}
+
+const makeTimeOptions = (startHour: number, endHour: number, stepMins = 30) => {
+	const options: { value: string; label: string }[] = []
+	const totalStartMins = startHour * 60
+	const totalEndMins = endHour * 60
+
+	for (let mins = totalStartMins; mins < totalEndMins; mins += stepMins) {
+		const hour = Math.floor(mins / 60)
+		const minute = mins % 60
+		const value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+		const period = hour < 12 ? 'AM' : 'PM'
+		const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+		options.push({ value, label: `${hour12}:${String(minute).padStart(2, '0')} ${period}` })
+	}
+
+	return options
+}
+
+const snapToStep = (time: string, stepMins: number) => {
+	const [hour, minute] = time.split(':').map(Number)
+	const totalMins = hour * 60 + minute
+	const snapped = Math.round(totalMins / stepMins) * stepMins
+	const snappedHour = Math.floor(snapped / 60)
+	const snappedMinute = snapped % 60
+
+	return `${String(snappedHour).padStart(2, '0')}:${String(snappedMinute).padStart(2, '0')}`
+}
+
+const durationOptions = [10, 15, 20, 25, 30]
+const followUpOptions = [
+	{ value: 0, label: 'No Follow-up' },
+	{ value: 3, label: '3 Days' },
+	{ value: 5, label: '5 Days' },
+	{ value: 7, label: '7 Days' },
+	{ value: 10, label: '10 Days' },
+	{ value: 15, label: '15 Days' },
+]
+const rescheduleCutoffOptions = [
+	{ value: 1, label: '1 Hour Before' },
+	{ value: 2, label: '2 Hours Before' },
+	{ value: 3, label: '3 Hours Before' },
+	{ value: 4, label: '4 Hours Before' },
+	{ value: 6, label: '6 Hours Before' },
+	{ value: 12, label: '12 Hours Before' },
+	{ value: 24, label: '1 Day Before' },
+]
+const SECTION_META = [
+	{
+		key: 'morning' as const,
+		label: 'Morning',
+		startHour: 8,
+		endHour: 12,
+	},
+	{
+		key: 'afternoon' as const,
+		label: 'Afternoon',
+		startHour: 12,
+		endHour: 17,
+	},
+	{
+		key: 'evening' as const,
+		label: 'Evening',
+		startHour: 17,
+		endHour: 21,
+	},
+]
+const createWorkingHoursState = (): WorkingHoursState => ({
+	sections: {
+		morning: [{ start: '08:00', end: '10:00' }],
+		afternoon: [{ start: '12:00', end: '14:00' }],
+		evening: [{ start: '17:00', end: '19:00' }],
+	},
+	slotDuration: 15,
+})
+
+const createWorkingHoursByType = (): Record<AppointmentType, WorkingHoursState> => ({
+	clinic: createWorkingHoursState(),
+	video: createWorkingHoursState(),
+})
+
+const createWeeklyWorkingHours = (): Record<WorkingDayKey, Record<AppointmentType, WorkingHoursState>> => ({
+	monday: createWorkingHoursByType(),
+	tuesday: createWorkingHoursByType(),
+	wednesday: createWorkingHoursByType(),
+	thursday: createWorkingHoursByType(),
+	friday: createWorkingHoursByType(),
+	saturday: createWorkingHoursByType(),
+	sunday: createWorkingHoursByType(),
+})
+
+const buildHospitalPayload = (hospital: HospitalItem, isPrimary = hospital.isPrimary) => ({
+	name: hospital.name.trim(),
+	phone_number: hospital.phone_number.trim(),
+	full_address: hospital.fullAddress.trim(),
+	location: hospital.fullAddress.trim(),
+	is_primary: isPrimary,
+	video_consultation_fee: hospital.video_consultation_fee.trim(),
+	offline_consultation_fee: hospital.offline_consultation_fee.trim(),
+})
 
 function FieldLabel({ label }: { label: string }) {
 	return (
@@ -108,6 +253,286 @@ function InputField({
 	)
 }
 
+function DropdownSelect({
+	label,
+	value,
+	options,
+	onChange,
+	compact = false,
+	showFloatingLabel = true,
+}: {
+	label: string
+	value: string | number
+	options: { value: string | number; label: string }[]
+	onChange: (value: string | number) => void
+	compact?: boolean
+	showFloatingLabel?: boolean
+}) {
+	const [isOpen, setIsOpen] = useState(false)
+	const selectedOption = options.find((option) => option.value === value)
+
+	return (
+		<View style={[styles.dropdownGroup, compact && styles.dropdownGroupCompact]}>
+			{showFloatingLabel ? (
+				<AppTypography variant="caption" style={styles.dropdownFloatingLabel}>
+					{label}
+				</AppTypography>
+			) : null}
+			<TouchableOpacity
+				style={[styles.dropdownTrigger, compact && styles.dropdownTriggerCompact]}
+				onPress={() => setIsOpen(true)}
+				activeOpacity={0.85}
+			>
+				<AppTypography variant="body" style={[styles.dropdownValue, compact && styles.dropdownValueCompact]}>
+					{selectedOption?.label ?? 'Select'}
+				</AppTypography>
+				<MaterialCommunityIcons name="menu-down" size={26} color="#7c7c7c" />
+			</TouchableOpacity>
+
+			<Modal visible={isOpen} transparent animationType="fade" onRequestClose={() => setIsOpen(false)}>
+				<Pressable style={styles.dropdownOverlay} onPress={() => setIsOpen(false)}>
+					<Pressable style={styles.dropdownMenu}>
+						<AppTypography variant="caption" style={styles.dropdownTitle}>
+							{label}
+						</AppTypography>
+						<ScrollView style={styles.dropdownList} showsVerticalScrollIndicator={false}>
+							{options.map((option) => {
+								const isSelected = option.value === value
+								return (
+									<TouchableOpacity
+										key={String(option.value)}
+										style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
+										onPress={() => {
+											onChange(option.value)
+											setIsOpen(false)
+										}}
+										activeOpacity={0.85}
+									>
+										<AppTypography
+											variant="body"
+											style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}
+										>
+											{option.label}
+										</AppTypography>
+										{isSelected ? (
+											<MaterialCommunityIcons name="check" size={18} color={TEAL} />
+										) : null}
+									</TouchableOpacity>
+								)
+							})}
+						</ScrollView>
+					</Pressable>
+				</Pressable>
+			</Modal>
+		</View>
+	)
+}
+
+function WorkingHoursRow({
+	children,
+	stacked,
+}: {
+	children: React.ReactNode
+	stacked: boolean
+}) {
+	return (
+		<View style={[styles.workingRow, stacked && styles.workingRowStacked]}>
+			{React.Children.map(children, (child) => (
+				<View style={[styles.workingCell, stacked && styles.workingCellStacked]}>{child}</View>
+			))}
+		</View>
+	)
+}
+
+function WorkingHoursSection({
+	selectedWorkingDay,
+	onWorkingDayChange,
+	selectedAppointmentType,
+	onAppointmentTypeChange,
+	selectedWorkingHours,
+	onAddSlot,
+	onRemoveSlot,
+	onUpdateSlotTime,
+	onSlotDurationChange,
+	stacked,
+}: {
+	selectedWorkingDay: WorkingDayKey
+	onWorkingDayChange: (day: WorkingDayKey) => void
+	selectedAppointmentType: AppointmentType
+	onAppointmentTypeChange: (type: AppointmentType) => void
+	selectedWorkingHours: WorkingHoursState
+	onAddSlot: (sectionKey: keyof SectionSlots) => void
+	onRemoveSlot: (sectionKey: keyof SectionSlots, slotIndex: number) => void
+	onUpdateSlotTime: (sectionKey: keyof SectionSlots, slotIndex: number, field: 'start' | 'end', value: string) => void
+	onSlotDurationChange: (value: number) => void
+	stacked: boolean
+}) {
+	return (
+		<View style={styles.workingHours}>
+			<AppTypography variant="body" style={styles.workingTitle}>
+				Working Hours
+			</AppTypography>
+
+			<ScrollView
+				horizontal
+				nestedScrollEnabled
+				directionalLockEnabled
+				showsHorizontalScrollIndicator={false}
+				style={styles.daysScroll}
+				contentContainerStyle={[styles.daysWrap, styles.daysWrapScrollable, stacked && styles.daysWrapCompact]}
+				onMoveShouldSetResponderCapture={() => true}
+			>
+				{WORKING_DAYS.map((day) => {
+					const isSelected = selectedWorkingDay === day.key
+					return (
+						<TouchableOpacity
+							key={day.key}
+							style={[styles.dayChip, stacked && styles.dayChipCompact, isSelected && styles.dayChipActive]}
+							onPress={() => onWorkingDayChange(day.key)}
+							activeOpacity={0.85}
+						>
+							<AppTypography
+								variant="body"
+								style={[styles.dayChipText, stacked && styles.dayChipTextCompact, isSelected && styles.dayChipTextActive]}
+							>
+								{day.label}
+							</AppTypography>
+						</TouchableOpacity>
+					)
+				})}
+			</ScrollView>
+
+			<View style={styles.appointmentTypeBlock}>
+				<AppTypography variant="caption" style={styles.appointmentTypeLabel}>
+					Type of Appointment
+				</AppTypography>
+				<View style={styles.segmentedControl}>
+					<TouchableOpacity
+						style={[styles.segmentedOption, selectedAppointmentType === 'clinic' && styles.segmentedOptionActive]}
+						onPress={() => onAppointmentTypeChange('clinic')}
+						activeOpacity={0.85}
+					>
+						<AppTypography
+							variant="caption"
+							style={[styles.segmentedText, selectedAppointmentType === 'clinic' && styles.segmentedTextActive]}
+						>
+							Clinic Visit
+						</AppTypography>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={[styles.segmentedOption, selectedAppointmentType === 'video' && styles.segmentedOptionActive]}
+						onPress={() => onAppointmentTypeChange('video')}
+						activeOpacity={0.85}
+					>
+						<AppTypography
+							variant="caption"
+							style={[styles.segmentedText, selectedAppointmentType === 'video' && styles.segmentedTextActive]}
+						>
+							Video Call
+						</AppTypography>
+					</TouchableOpacity>
+				</View>
+			</View>
+
+			<View key={selectedAppointmentType}>
+				{SECTION_META.map((section) => {
+					const slots = selectedWorkingHours.sections[section.key]
+					const canAdd = slots.length < 3
+					const isLastSection = section.key === SECTION_META[SECTION_META.length - 1].key
+
+					return (
+						<View key={section.key} style={[styles.shiftBlock, isLastSection && styles.shiftBlockLast]}>
+							<AppTypography variant="caption" style={styles.shiftTitle}>
+								{section.label}
+							</AppTypography>
+
+							<View style={styles.slotsWrap}>
+								{slots.map((slot, slotIndex) => {
+									const stepMins = selectedWorkingHours.slotDuration
+									const allOptions = makeTimeOptions(section.startHour, section.endHour, stepMins)
+									const startOptions =
+										slotIndex === 0 ? allOptions : allOptions.filter((option) => option.value >= slots[slotIndex - 1].end)
+									const endOptions = allOptions.filter((option) => option.value > slot.start)
+									const showAdd = slotIndex === slots.length - 1 && canAdd
+
+									return (
+										<View
+											key={`${section.key}-${slotIndex}`}
+											style={[
+												styles.slotEditor,
+												slotIndex < slots.length - 1 && styles.slotEditorSpaced,
+												stacked && styles.slotEditorStacked,
+											]}
+										>
+											<View style={[styles.slotSelects, stacked && styles.slotSelectsStacked]}>
+												<View style={styles.slotSelectCell}>
+													<DropdownSelect
+														label="Start Time"
+														value={slot.start}
+														options={startOptions}
+														onChange={(value) => onUpdateSlotTime(section.key, slotIndex, 'start', String(value))}
+														compact
+													/>
+												</View>
+												<View style={styles.slotSelectCell}>
+													<DropdownSelect
+														label="End Time"
+														value={slot.end}
+														options={endOptions}
+														onChange={(value) => onUpdateSlotTime(section.key, slotIndex, 'end', String(value))}
+														compact
+													/>
+												</View>
+											</View>
+
+											<View style={styles.slotActions}>
+												{showAdd ? (
+													<TouchableOpacity
+														style={styles.addSlotButton}
+														onPress={() => onAddSlot(section.key)}
+														activeOpacity={0.8}
+													>
+														<MaterialCommunityIcons name="plus" size={21} color={TEAL} style={styles.slotActionIcon} />
+													</TouchableOpacity>
+												) : null}
+
+												{slotIndex > 0 ? (
+													<TouchableOpacity
+														style={styles.iconAction}
+														onPress={() => onRemoveSlot(section.key, slotIndex)}
+														activeOpacity={0.8}
+													>
+														<MaterialCommunityIcons name="close" size={21} color="#62707a" style={styles.slotActionIcon} />
+													</TouchableOpacity>
+												) : null}
+											</View>
+										</View>
+									)
+								})}
+							</View>
+						</View>
+					)
+				})}
+
+				<View style={styles.slotDurationBlock}>
+					<AppTypography variant="caption" style={styles.shiftTitle}>
+						Slot Duration
+					</AppTypography>
+					<View style={styles.slotDurationField}>
+						<DropdownSelect
+							label="Duration"
+							value={selectedWorkingHours.slotDuration}
+							options={durationOptions.map((duration) => ({ value: duration, label: `${duration} mins` }))}
+							onChange={(value) => onSlotDurationChange(Number(value))}
+							compact
+						/>
+					</View>
+				</View>
+			</View>
+		</View>
+	)
+}
+
 const getHospitalAddressText = (hospital: HospitalItem) => {
 	const fullAddress = hospital.fullAddress.trim()
 	const location = hospital.location.trim()
@@ -122,6 +547,7 @@ const getHospitalAddressText = (hospital: HospitalItem) => {
 const normalizeHospitals = (rawHospitals: ReturnType<typeof mapDoctorProfileApi>['hospitals']): HospitalItem[] =>
 	rawHospitals.map((hospital, index) => ({
 		id: hospital.id || `${Date.now()}-${index}`,
+		hospital_id: hospital.hospital_id,
 		name: hospital.name ?? '',
 		fullAddress: hospital.fullAddress ?? hospital.location ?? '',
 		location: hospital.location ?? hospital.fullAddress ?? '',
@@ -133,6 +559,7 @@ const normalizeHospitals = (rawHospitals: ReturnType<typeof mapDoctorProfileApi>
 
 const toDoctorHospital = (hospital: HospitalItem): DoctorHospital => ({
 	id: String(hospital.id),
+	hospital_id: hospital.hospital_id ? String(hospital.hospital_id) : undefined,
 	name: hospital.name ?? '',
 	fullAddress: hospital.fullAddress ?? hospital.location ?? '',
 	location: hospital.location ?? hospital.fullAddress ?? '',
@@ -153,6 +580,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const isLandscape = width > height
 	const isMobile = width < 768
 	const useTwoColumns = width >= 768
+	const useWideHospitalRows = isLandscape && width >= 1024
 
 	const [showForm, setShowForm] = useState(false)
 	const [form, setForm] = useState<HospitalFormData>(EMPTY_FORM)
@@ -162,7 +590,14 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const [isLoading, setIsLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [isSavingAddress, setIsSavingAddress] = useState(false)
+	const [selectedWorkingDay, setSelectedWorkingDay] = useState<WorkingDayKey>('monday')
+	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentType>('clinic')
+	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState(createWeeklyWorkingHours)
+	const [followUpDays, setFollowUpDays] = useState(7)
+	const [rescheduleCutoff, setRescheduleCutoff] = useState(2)
+	const [allowPayLater, setAllowPayLater] = useState(false)
 	const hospitalsRef = useRef<HospitalItem[]>([])
+	const hasLoadedHospitalsRef = useRef(false)
 
 	const updateHospitalsState = (nextHospitals: HospitalItem[] | ((prev: HospitalItem[]) => HospitalItem[])) => {
 		const resolvedHospitals =
@@ -181,12 +616,24 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			if (showLoader) setIsLoading(true)
 			const response = await getDoctorProfile()
 
-			if (!response?.success || !response.data) return
+			if (!response?.success || !response.data) {
+				console.log('[MyHospitalsTab] doctor profile API returned no hospital data:', {
+					success: response?.success,
+					message: response?.message,
+				})
+				return
+			}
 
 			const profile = mapDoctorProfileApi(response.data)
-			updateHospitalsState(normalizeHospitals(profile.hospitals))
+			const normalizedHospitals = normalizeHospitals(profile.hospitals)
+			hasLoadedHospitalsRef.current = true
+			updateHospitalsState(normalizedHospitals)
 		} catch (error) {
 			console.log('[MyHospitalsTab] failed to load hospitals:', error)
+			Alert.alert(
+				'Error',
+				(error as any)?.response?.data?.message || (error as any)?.message || 'Unable to load hospitals right now.'
+			)
 		} finally {
 			if (showLoader) setIsLoading(false)
 		}
@@ -197,23 +644,27 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}, [])
 
 	useEffect(() => {
-		if (externalHospitals) {
-			const normalized = normalizeHospitals(externalHospitals)
+		if (!externalHospitals) return
+
+		const normalized = normalizeHospitals(externalHospitals)
+		if (normalized.length > 0 || !hasLoadedHospitalsRef.current) {
 			hospitalsRef.current = normalized
 			setHospitals(normalized)
 		}
 	}, [externalHospitals])
 
 	const contentWidth = useMemo(() => {
-		if (width >= 1280) return 980
-		if (width >= 1024) return 920
-		if (width >= 768) return 820
+		if (width >= 1366) return 1120
+		if (width >= 1180) return 1040
+		if (width >= 1024) return 960
+		if (width >= 768) return Math.min(width - 48, 860)
 		return 640
 	}, [width])
 
-	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
-	const cardDirection = isMobile ? 'column' : 'row'
-	const actionStacked = isMobile || (isTablet && !isLandscape)
+	const sectionPadding = isMobile ? 16 : isTablet ? 24 : 28
+	const cardDirection = useWideHospitalRows ? 'row' : 'column'
+	const actionStacked = !useWideHospitalRows
+	const selectedWorkingHours = weeklyWorkingHours[selectedWorkingDay][selectedAppointmentType]
 
 	const resetForm = () => {
 		setForm(EMPTY_FORM)
@@ -221,9 +672,129 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		setShowForm(false)
 	}
 
-	const handleSetPrimary = (id: string) => {
+	const addSlot = (sectionKey: keyof SectionSlots) => {
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
+			const slots = current.sections[sectionKey]
+			if (slots.length >= 3) return prev
+
+			const previousEnd = slots[slots.length - 1].end
+			const [endHour, endMinute] = previousEnd.split(':').map(Number)
+			const newEndMins = endHour * 60 + endMinute + current.slotDuration
+			const section = SECTION_META.find((item) => item.key === sectionKey)!
+			const clampedMins = Math.min(newEndMins, section.endHour * 60)
+			const newEnd = `${String(Math.floor(clampedMins / 60)).padStart(2, '0')}:${String(clampedMins % 60).padStart(2, '0')}`
+
+			return {
+				...prev,
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						...current,
+						sections: {
+							...current.sections,
+							[sectionKey]: [...slots, { start: previousEnd, end: newEnd }],
+						},
+					},
+				},
+			}
+		})
+	}
+
+	const removeSlot = (sectionKey: keyof SectionSlots, slotIndex: number) => {
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
+			if (slotIndex === 0) return prev
+
+			return {
+				...prev,
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						...current,
+						sections: {
+							...current.sections,
+							[sectionKey]: current.sections[sectionKey].filter((_, index) => index !== slotIndex),
+						},
+					},
+				},
+			}
+		})
+	}
+
+	const updateSlotTime = (
+		sectionKey: keyof SectionSlots,
+		slotIndex: number,
+		field: 'start' | 'end',
+		value: string
+	) => {
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
+
+			return {
+				...prev,
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						...current,
+						sections: {
+							...current.sections,
+							[sectionKey]: current.sections[sectionKey].map((slot, index) =>
+								index === slotIndex ? { ...slot, [field]: value } : slot
+							),
+						},
+					},
+				},
+			}
+		})
+	}
+
+	const updateSlotDuration = (value: number) => {
+		setWeeklyWorkingHours((prev) => {
+			const current = prev[selectedWorkingDay][selectedAppointmentType]
+			const snappedSections = Object.fromEntries(
+				Object.entries(current.sections).map(([sectionKey, slots]) => [
+					sectionKey,
+					(slots as TimeSlot[]).map((slot) => ({
+						start: snapToStep(slot.start, value),
+						end: snapToStep(slot.end, value),
+					})),
+				])
+			) as SectionSlots
+
+			return {
+				...prev,
+				[selectedWorkingDay]: {
+					...prev[selectedWorkingDay],
+					[selectedAppointmentType]: {
+						sections: snappedSections,
+						slotDuration: value,
+					},
+				},
+			}
+		})
+	}
+
+	const handleSetPrimary = async (id: string) => {
+		const selectedHospital = hospitalsRef.current.find((hospital) => hospital.id === id)
+		if (!selectedHospital || selectedHospital.isPrimary) {
+			setMenuVisibleId(null)
+			return
+		}
+
+		const previousHospitals = hospitalsRef.current
 		updateHospitalsState((prev) => prev.map((hospital) => ({ ...hospital, isPrimary: hospital.id === id })))
-		setMenuVisibleId(null)
+
+		try {
+			await updateHospital(id, buildHospitalPayload(selectedHospital, true))
+			await loadHospitals()
+		} catch (error) {
+			console.log('[MyHospitalsTab] set primary error:', error)
+			updateHospitalsState(previousHospitals)
+			Alert.alert('Error', 'Unable to update primary hospital right now.')
+		} finally {
+			setMenuVisibleId(null)
+		}
 	}
 
 	const handleEdit = (hospital: HospitalItem) => {
@@ -281,43 +852,26 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 				setIsSavingAddress(true)
 
 				if (editingId) {
-					const updatedHospitals = hospitalsRef.current.map((hospital) =>
-						hospital.id === editingId
-							? {
-									...hospital,
-									name: trimmedName,
-									fullAddress: trimmedAddress,
-									location: trimmedAddress,
-									phone_number: trimmedPhone,
-									video_consultation_fee: trimmedVideoFee,
-									offline_consultation_fee: trimmedOfflineFee,
-								}
-							: hospital
-					)
-
-					updateHospitalsState(updatedHospitals)
-
-					const hasPrimary = updatedHospitals.some((hospital) => hospital.isPrimary)
-					const payload = {
-						hospitals: updatedHospitals
-							.filter((hospital) => hospital.name.trim() && hospital.fullAddress.trim())
-							.map((hospital, index) => ({
-								id: hospital.id,
-								name: hospital.name.trim(),
-								full_address: hospital.fullAddress.trim(),
-								location: hospital.fullAddress.trim(),
-								phone_number: (hospital.phone_number ?? '').trim(),
-								video_consultation_fee: (hospital.video_consultation_fee ?? '').trim(),
-								offline_consultation_fee: (hospital.offline_consultation_fee ?? '').trim(),
-								is_primary: hospital.isPrimary || (!hasPrimary && index === 0),
-							})),
+					const existingHospital = hospitalsRef.current.find((hospital) => hospital.id === editingId)
+					if (!existingHospital) {
+						throw new Error('Hospital not found')
 					}
 
-					console.log('[MyHospitalsTab] saving hospitals after edit:', payload)
-					const res = await doctorService.updateDoctorProfile(payload)
-					console.log('[MyHospitalsTab] edit save success:', res)
+					const updatedHospital: HospitalItem = {
+						...existingHospital,
+						name: trimmedName,
+						fullAddress: trimmedAddress,
+						location: trimmedAddress,
+						phone_number: trimmedPhone,
+						video_consultation_fee: trimmedVideoFee,
+						offline_consultation_fee: trimmedOfflineFee,
+					}
+
+					const response = await updateHospital(editingId, buildHospitalPayload(updatedHospital))
+					Alert.alert('Success', getSuccessMessage(response, 'Hospital updated successfully'))
+					await loadHospitals()
 				} else {
-					await createHospital({
+					const response = await createHospital({
 						name: trimmedName,
 						phone_number: trimmedPhone,
 						full_address: trimmedAddress,
@@ -326,6 +880,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						offline_consultation_fee: trimmedOfflineFee,
 					})
 
+					Alert.alert('Success', getSuccessMessage(response))
 					await loadHospitals()
 				}
 
@@ -348,19 +903,12 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		try {
 			setIsSaving(true)
 			const hasPrimary = hospitals.some((hospital) => hospital.isPrimary)
-			const normalizedHospitals = hospitals.map((hospital, index) => ({
-				id: hospital.id,
-				name: hospital.name.trim(),
-				full_address: hospital.fullAddress.trim(),
-				fullAddress: hospital.fullAddress.trim(),
-				location: hospital.fullAddress.trim(),
-				phone_number: hospital.phone_number.trim(),
-				video_consultation_fee: hospital.video_consultation_fee.trim(),
-				offline_consultation_fee: hospital.offline_consultation_fee.trim(),
-				is_primary: hospital.isPrimary || (!hasPrimary && index === 0),
-			}))
-
-			await doctorService.updateDoctorProfile({ hospitals: normalizedHospitals })
+			await Promise.all(
+				hospitals.map((hospital, index) =>
+					updateHospital(hospital.id, buildHospitalPayload(hospital, hospital.isPrimary || (!hasPrimary && index === 0)))
+				)
+			)
+			await loadHospitals()
 			Alert.alert('Success', 'Hospitals saved successfully.')
 		} catch (error) {
 			console.log('[MyHospitalsTab] save error:', error)
@@ -382,7 +930,14 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		return (
 			<ScrollView
 				style={styles.container}
-				contentContainerStyle={[styles.contentContainer, { paddingHorizontal: sectionPadding, paddingVertical: sectionPadding }]}
+				contentContainerStyle={[
+					styles.contentContainer,
+					{
+						paddingHorizontal: sectionPadding,
+						paddingTop: sectionPadding,
+						paddingBottom: 0,
+					},
+				]}
 				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
 			>
@@ -392,7 +947,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 							<MaterialCommunityIcons name="chevron-left" size={20} color="#5f6b73" />
 						</TouchableOpacity>
 						<AppTypography variant="h4" style={styles.formTitle}>
-							{editingId ? 'Edit address' : 'Add new address'}
+							{editingId ? 'Edit Hospital Details' : 'Add new Hospital Details'}
 						</AppTypography>
 					</View>
 
@@ -404,37 +959,13 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 							placeholder="e.g. Arogya Clinic"
 						/>
 
-						<FormRow stacked={!useTwoColumns}>
-							<InputField
-								label="Phone number"
-								value={form.phone_number}
-								onChangeText={(value) => setForm((prev) => ({ ...prev, phone_number: value }))}
-								placeholder="e.g. +91 98765 43210"
-								keyboardType="phone-pad"
-							/>
-							<InputField
-								label="Video consultation fee"
-								value={form.video_consultation_fee}
-								onChangeText={(value) =>
-									setForm((prev) => ({ ...prev, video_consultation_fee: value.replace(/[^\d.]/g, '') }))
-								}
-								placeholder="e.g. 500"
-								keyboardType="numeric"
-							/>
-						</FormRow>
-
-						<FormRow stacked={!useTwoColumns}>
-							<InputField
-								label="Offline consultation fee"
-								value={form.offline_consultation_fee}
-								onChangeText={(value) =>
-									setForm((prev) => ({ ...prev, offline_consultation_fee: value.replace(/[^\d.]/g, '') }))
-								}
-								placeholder="e.g. 300"
-								keyboardType="numeric"
-							/>
-							<View />
-						</FormRow>
+						<InputField
+							label="Phone number"
+							value={form.phone_number}
+							onChangeText={(value) => setForm((prev) => ({ ...prev, phone_number: value }))}
+							placeholder="e.g. +91 98765 43210"
+							keyboardType="phone-pad"
+						/>
 
 						<InputField
 							label="Enter Full address"
@@ -443,6 +974,91 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 							placeholder="Enter complete address"
 							multiline
 						/>
+
+						<InputField
+							label="Video consultation fee"
+							value={form.video_consultation_fee}
+							onChangeText={(value) =>
+								setForm((prev) => ({ ...prev, video_consultation_fee: value.replace(/[^\d.]/g, '') }))
+							}
+							placeholder="e.g. 500"
+							keyboardType="numeric"
+						/>
+
+						<InputField
+							label="Offline consultation fee"
+							value={form.offline_consultation_fee}
+							onChangeText={(value) =>
+								setForm((prev) => ({ ...prev, offline_consultation_fee: value.replace(/[^\d.]/g, '') }))
+							}
+							placeholder="e.g. 300"
+							keyboardType="numeric"
+						/>
+
+						<WorkingHoursSection
+							selectedWorkingDay={selectedWorkingDay}
+							onWorkingDayChange={setSelectedWorkingDay}
+							selectedAppointmentType={selectedAppointmentType}
+							onAppointmentTypeChange={setSelectedAppointmentType}
+							selectedWorkingHours={selectedWorkingHours}
+							onAddSlot={addSlot}
+							onRemoveSlot={removeSlot}
+							onUpdateSlotTime={updateSlotTime}
+							onSlotDurationChange={updateSlotDuration}
+							stacked={!useTwoColumns}
+						/>
+
+						<View style={styles.appointmentRules}>
+							<AppTypography variant="body" style={[styles.workingTitle, styles.appointmentRulesTitle]}>
+								Appointment Rules
+							</AppTypography>
+
+							<View style={styles.ruleBlock}>
+								<AppTypography variant="caption" style={styles.shiftTitle}>
+									Free Follow-up Validity
+								</AppTypography>
+								<View style={styles.ruleField}>
+									<DropdownSelect
+										label="Free Follow-up Validity"
+										value={followUpDays}
+										options={followUpOptions}
+										onChange={(value) => setFollowUpDays(Number(value))}
+										compact
+										showFloatingLabel={false}
+									/>
+								</View>
+							</View>
+
+							<View style={styles.ruleBlock}>
+								<AppTypography variant="caption" style={styles.shiftTitle}>
+									Reschedule Allowed Until
+								</AppTypography>
+								<View style={styles.ruleField}>
+									<DropdownSelect
+										label="Reschedule Allowed Until"
+										value={rescheduleCutoff}
+										options={rescheduleCutoffOptions}
+										onChange={(value) => setRescheduleCutoff(Number(value))}
+										compact
+										showFloatingLabel={false}
+									/>
+								</View>
+							</View>
+
+							<View style={styles.ruleBlock}>
+								<AppTypography variant="caption" style={styles.shiftTitle}>
+									Allow Pay Later
+								</AppTypography>
+
+								<AppToggle
+									value={allowPayLater}
+									onValueChange={setAllowPayLater}
+									showStatusText={false}
+									accessibilityLabel="Allow Pay Later"
+									style={styles.payLaterControl}
+								/>
+							</View>
+						</View>
 					</View>
 
 					<View style={styles.formActions}>
@@ -456,7 +1072,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 								<ActivityIndicator size="small" color="#ffffff" />
 							) : (
 								<AppTypography variant="body" style={styles.primaryButtonText}>
-									Save Address
+									Save Details
 								</AppTypography>
 							)}
 						</TouchableOpacity>
@@ -469,7 +1085,16 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	return (
 		<Pressable style={styles.container} onPress={() => setMenuVisibleId(null)}>
 			<ScrollView
-				contentContainerStyle={[styles.contentContainer, { paddingHorizontal: sectionPadding, paddingVertical: sectionPadding }]}
+				style={styles.container}
+				contentContainerStyle={[
+					styles.contentContainer,
+					{
+						paddingHorizontal: sectionPadding,
+						paddingTop: sectionPadding,
+						paddingBottom: 0,
+					},
+				]}
+				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
 			>
 				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
@@ -619,6 +1244,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 	},
 	contentContainer: {
+		flexGrow: 1,
 		alignItems: 'center',
 	},
 	contentShell: {
@@ -688,6 +1314,7 @@ const styles = StyleSheet.create({
 	},
 	cardMain: {
 		flex: 1,
+		minWidth: 0,
 		borderWidth: 1,
 		borderColor: '#d7e2e5',
 		borderRadius: 10,
@@ -734,6 +1361,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'stretch',
 		gap: 10,
+		flexShrink: 0,
 	},
 	actionGroupStacked: {
 		width: '100%',
@@ -783,6 +1411,7 @@ const styles = StyleSheet.create({
 	},
 	menuWrapper: {
 		position: 'relative',
+		flexShrink: 0,
 	},
 	menuButton: {
 		width: 46,
@@ -907,6 +1536,341 @@ const styles = StyleSheet.create({
 	textInputMultiline: {
 		minHeight: 72,
 		paddingVertical: 0,
+	},
+	workingHours: {
+		width: '100%',
+		maxWidth: '100%',
+		marginTop: 4,
+		paddingTop: 2,
+		alignSelf: 'flex-start',
+	},
+	workingTitle: {
+		color: '#1f2b33',
+		fontSize: 16,
+		lineHeight: 22,
+		fontWeight: '700',
+		marginBottom: 16,
+	},
+	shiftBlock: {
+		marginBottom: 20,
+	},
+	shiftBlockLast: {
+		marginBottom: 14,
+	},
+	shiftTitle: {
+		color: '#7b8790',
+		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '500',
+		marginBottom: 16,
+	},
+	workingRow: {
+		flexDirection: 'row',
+		gap: 24,
+	},
+	workingRowStacked: {
+		flexDirection: 'column',
+		gap: 16,
+	},
+	workingCell: {
+		flex: 1,
+		minWidth: 0,
+	},
+	workingCellStacked: {
+		width: '100%',
+	},
+	daysWrap: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		justifyContent: 'space-between',
+		columnGap: 8,
+		rowGap: 10,
+		marginBottom: 24,
+	},
+	daysWrapScrollable: {
+		flexWrap: 'nowrap',
+		justifyContent: 'flex-start',
+		paddingHorizontal: 2,
+	},
+	daysScroll: {
+		marginHorizontal: -2,
+		marginBottom: 18,
+	},
+	daysWrapCompact: {
+		flexWrap: 'nowrap',
+		justifyContent: 'flex-start',
+		columnGap: 8,
+		rowGap: 0,
+		marginBottom: 0,
+		paddingHorizontal: 2,
+	},
+	dayChip: {
+		width: 96,
+		height: 78,
+		borderRadius: 14,
+		borderWidth: 1,
+		borderColor: '#d8d8d8',
+		backgroundColor: '#ffffff',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	dayChipCompact: {
+		width: 50,
+		height: 46,
+		borderRadius: 10,
+	},
+	dayChipActive: {
+		borderColor: TEAL,
+		backgroundColor: TEAL,
+	},
+	dayChipText: {
+		color: '#5f6b76',
+		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '600',
+	},
+	dayChipTextCompact: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '600',
+	},
+	dayChipTextActive: {
+		color: '#ffffff',
+		fontWeight: '700',
+	},
+	appointmentTypeBlock: {
+		marginBottom: 18,
+	},
+	appointmentTypeLabel: {
+		color: '#7b8790',
+		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '500',
+		marginBottom: 10,
+	},
+	segmentedControl: {
+		alignSelf: 'flex-start',
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: TEAL,
+		borderRadius: 999,
+		padding: 3,
+		gap: 3,
+	},
+	segmentedOption: {
+		borderRadius: 999,
+		paddingHorizontal: 18,
+		paddingVertical: 7,
+	},
+	segmentedOptionActive: {
+		backgroundColor: '#ffffff',
+	},
+	segmentedText: {
+		color: '#ffffff',
+		fontSize: 14,
+		lineHeight: 18,
+		fontWeight: '600',
+	},
+	segmentedTextActive: {
+		color: '#111111',
+	},
+	slotsWrap: {
+		flexDirection: 'column',
+		alignItems: 'flex-start',
+		width: '100%',
+	},
+	slotEditor: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		width: 342,
+		maxWidth: '100%',
+		marginBottom: 0,
+		overflow: 'visible',
+		flexWrap: 'nowrap',
+	},
+	slotEditorSpaced: {
+		marginBottom: 25,
+	},
+	slotEditorStacked: {
+		width: '100%',
+		alignItems: 'flex-start',
+		flexWrap: 'wrap',
+	},
+	slotSelects: {
+		flexDirection: 'row',
+		gap: 8,
+		flex: 1,
+		minWidth: 0,
+		flexShrink: 1,
+	},
+	slotSelectsStacked: {
+		width: '100%',
+		maxWidth: '100%',
+		marginBottom: 0,
+	},
+	slotSelectCell: {
+		flex: 1,
+		minWidth: 0,
+	},
+	slotActions: {
+		width: 72,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'flex-start',
+		gap: 8,
+		flexShrink: 0,
+	},
+	iconAction: {
+		width: 32,
+		height: 48,
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: '#a7d3db',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#ffffff',
+		flexShrink: 0,
+	},
+	addSlotButton: {
+		width: 32,
+		height: 48,
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: '#a7d3db',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#ffffff',
+		flexShrink: 0,
+		zIndex: 2,
+		elevation: 2,
+	},
+	slotActionIcon: {
+		textAlign: 'center',
+		textAlignVertical: 'center',
+	},
+	slotDurationBlock: {
+		marginTop: 0,
+		marginBottom: 0,
+	},
+	slotDurationField: {
+		width: 225,
+		maxWidth: '100%',
+	},
+	dropdownGroup: {
+		width: '100%',
+		position: 'relative',
+	},
+	dropdownGroupCompact: {
+		paddingTop: 0,
+	},
+	dropdownFloatingLabel: {
+		position: 'absolute',
+		top: -11,
+		left: 17,
+		zIndex: 2,
+		paddingHorizontal: 7,
+		backgroundColor: '#ffffff',
+		color: '#7b8790',
+		fontSize: 14,
+		fontWeight: '500',
+		lineHeight: 18,
+	},
+	dropdownTrigger: {
+		minHeight: 48,
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: '#a7d3db',
+		backgroundColor: '#ffffff',
+		paddingHorizontal: 20,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	dropdownTriggerCompact: {
+		minHeight: 48,
+		paddingHorizontal: 12,
+	},
+	dropdownValue: {
+		color: '#2f2f2f',
+		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '400',
+	},
+	dropdownValueCompact: {
+		color: '#2f2f2f',
+		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '400',
+	},
+	dropdownOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(18, 28, 33, 0.18)',
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: 20,
+	},
+	dropdownMenu: {
+		width: '100%',
+		maxWidth: 360,
+		maxHeight: '70%',
+		borderRadius: 14,
+		backgroundColor: '#ffffff',
+		paddingVertical: 10,
+		shadowColor: '#000000',
+		shadowOpacity: 0.14,
+		shadowRadius: 14,
+		shadowOffset: { width: 0, height: 8 },
+		elevation: 10,
+	},
+	dropdownTitle: {
+		color: '#66757f',
+		fontSize: 13,
+		fontWeight: '700',
+		paddingHorizontal: 16,
+		paddingBottom: 8,
+	},
+	dropdownList: {
+		maxHeight: 320,
+	},
+	dropdownItem: {
+		minHeight: 46,
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	dropdownItemActive: {
+		backgroundColor: 'rgba(12,124,124,0.06)',
+	},
+	dropdownItemText: {
+		color: '#2f2f2f',
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	dropdownItemTextActive: {
+		color: TEAL,
+	},
+	appointmentRules: {
+		marginTop: 14,
+		gap: 14,
+	},
+	appointmentRulesTitle: {
+		marginBottom: 0,
+	},
+	ruleBlock: {
+		width: '100%',
+	},
+	ruleField: {
+		width: 225,
+		maxWidth: '100%',
+	},
+	payLaterControl: {
+		width: 225,
+		maxWidth: '100%',
+		minHeight: 32,
+		justifyContent: 'center',
 	},
 	formActions: {
 		alignItems: 'flex-end',

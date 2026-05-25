@@ -3,15 +3,20 @@ import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { AppButton, AppInput, AppTypography } from '../../components/common';
 import OtpForm from './components/OtpForm';
 import { sendOtp } from './authService';
+import { ROUTES } from '../../navigation/routes';
+import type { AuthScreenProps } from '../../navigation/types';
 
 // ✅ Import SVG
 import OnboardingImage from '../../assets/Onboarding/onboarding-4.svg';
 
-export default function LoginPage({ navigation }: any) {
+export default function LoginPage({
+    navigation,
+}: AuthScreenProps<typeof ROUTES.AUTH.LOGIN>) {
     const [step, setStep] = useState<'login' | 'otp'>('login');
     const [contactNumber, setContactNumber] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [focusContactOnLogin, setFocusContactOnLogin] = useState(false);
 
     const handleContinue = async () => {
         if (contactNumber.length > 0) {
@@ -20,6 +25,7 @@ export default function LoginPage({ navigation }: any) {
             try {
                 const res = await sendOtp(contactNumber);
                 if (res.success !== false) {
+                    setFocusContactOnLogin(false);
                     setStep('otp');
                 } else {
                     setError(res.message || 'Failed to send OTP');
@@ -60,6 +66,7 @@ export default function LoginPage({ navigation }: any) {
                             value={contactNumber}
                             onChangeText={setContactNumber}
                             keyboardType="phone-pad"
+                            autoFocus={focusContactOnLogin}
                             style={styles.input}
                             errorText={error}
                         />
@@ -78,7 +85,7 @@ export default function LoginPage({ navigation }: any) {
                         {/* 🔹 Register Link */}
                         <AppButton
                             variant="text"
-                            onPress={() => navigation.navigate('Register')}
+                           onPress={() => navigation.navigate(ROUTES.AUTH.ROLE_SELECTION)}
                             style={styles.link}
                         >
                             Don't have an account? Register
@@ -91,7 +98,14 @@ export default function LoginPage({ navigation }: any) {
                         onVerify={() => {
                             // handled by AuthContext
                         }}
-                        onBack={() => setStep('login')}
+                        onEditContact={() => {
+                            setFocusContactOnLogin(true);
+                            setStep('login');
+                        }}
+                        onBack={() => {
+                            setFocusContactOnLogin(false);
+                            setStep('login');
+                        }}
                         backLabel="Back to Login"
                     />
                 )}

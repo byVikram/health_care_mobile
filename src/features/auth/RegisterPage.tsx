@@ -1,58 +1,89 @@
-// features/auth/RegisterPage.tsx
-import React, { useState } from 'react'
-import { View, StyleSheet } from 'react-native'
-import RegisterForm from "./components/RegisterForm";
+import React, { useState, useEffect } from 'react'
+import { StyleSheet, View, useWindowDimensions } from 'react-native'
+import RegisterForm from './components/RegisterForm'
 import OtpForm from './components/OtpForm'
-// import AccountSuccess from './components/AccountSuccess'
-// import WelcomePage from './WelcomePage'
+import { ROUTES } from '../../navigation/routes'
+import { reset as resetNavigation } from '../../navigation/navigationService'
+import type { AuthScreenProps } from '../../navigation/types'
 
-type Step = 'register' | 'otp' | 'success' | 'welcome'
+type Step = 'register' | 'otp'
 
-export default function RegisterPage({ navigation }: any) {
-    const [step, setStep] = useState<Step>('register')
-    const [contactNumber, setContactNumber] = useState('')
+type RegisterDraft = {
+	name: string
+	email: string
+	mobile: string
+}
 
-    return (
-        <View style={styles.container}>
-            {step === 'register' && (
-                <RegisterForm
-                    onSubmit={(mobile: string) => {
-                        setContactNumber(mobile)
-                        setStep('otp')
-                    }}
-                    onSwitchToLogin={() => navigation.navigate('Login')}
-                />
-            )}
+export default function RegisterPage({ navigation, route }: AuthScreenProps<typeof ROUTES.AUTH.REGISTER>) {
+	const [step, setStep] = useState<Step>('register')
+	const [contactNumber, setContactNumber] = useState('')
 
-            {step === 'otp' && (
-                <OtpForm
-                    contactNumber={contactNumber}
-                    onVerify={() => {
-                        // AppNavigator will switch to authenticated stack after setAuth in OtpForm
-                    }}
-                    onBack={() => setStep('register')}
-                    backLabel="Back to Register"
-                />
-            )}
+	const [registerDraft, setRegisterDraft] = useState<RegisterDraft>({
+		name: '',
+		email: '',
+		mobile: '',
+	})
 
-            {/* {step === 'success' && (
-                <AccountSuccess
-                    onContinue={() => setStep('welcome')}
-                />
-            )}
+	const [focusMobileOnRegister, setFocusMobileOnRegister] = useState(false)
 
-            {step === 'welcome' && (
-                <WelcomePage
-                    onContinue={() => navigation.navigate('Login')}
-                />
-            )} */}
-        </View>
-    )
+	const { width, height } = useWindowDimensions()
+
+	const isTablet = width >= 768
+	const isLandscape = width > height
+
+	const roleId = route.params?.roleId ?? ''
+	const roleLabel = route.params?.roleLabel ?? ''
+
+	useEffect(() => {
+		if (!roleId) {
+			navigation.replace(ROUTES.AUTH.ROLE_SELECTION)
+		}
+	}, [roleId, navigation])
+
+	return (
+		<View style={styles.container}>
+			{step === 'register' && (
+				<RegisterForm
+					roleId={roleId}
+					roleLabel={roleLabel}
+					formData={registerDraft}
+					onFormDataChange={setRegisterDraft}
+					autoFocusMobile={focusMobileOnRegister}
+					navigation={navigation}
+					onSubmit={(mobile: string) => {
+						setContactNumber(mobile)
+						setFocusMobileOnRegister(false)
+						setStep('otp')
+					}}
+				/>
+			)}
+
+			{step === 'otp' && (
+				<OtpForm
+					contactNumber={contactNumber}
+					onVerify={() => {
+						setTimeout(() => {
+							resetNavigation(ROUTES.STACK.DOCTOR_WELCOME)
+						}, 0)
+					}}
+					onEditContact={() => {
+						setFocusMobileOnRegister(true)
+						setStep('register')
+					}}
+					onBack={() => {
+						setFocusMobileOnRegister(false)
+						setStep('register')
+					}}
+					backLabel="Back to Register"
+				/>
+			)}
+		</View>
+	)
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
+	container: {
+		flex: 1,
+		backgroundColor: '#fff',
+	},
 })

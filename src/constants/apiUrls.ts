@@ -6,7 +6,6 @@ import { Platform } from 'react-native'
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	// const url = 'http://192.168.4.21:8000'
 	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
 
 	if (!url) {
@@ -31,9 +30,18 @@ export const API_ENDPOINTS = {
 		DETAIL: (id: string) => `${BASE_URL}/api/doctors/${id}`,
 		AVAILABILITY: `${BASE_URL}/api/doctors/availability`,
 		OVERRIDES: `${BASE_URL}/api/doctors/availability/overrides`,
+		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
+	},
+	DOCTORS_FAVOURITES: {
+		GET: `${BASE_URL}/api/doctors/favourites`,
+		TOGGLE: (publicId: string) => `${BASE_URL}/api/doctors/favourites/${publicId}`,
 	},
 	DOCTOR_PROFILE: {
 		DETAILS: `${BASE_URL}/api/doctors/details`,
+		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
+		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
+		ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
+		DELETE_ACCOUNT: `${BASE_URL}/api/doctors/profile`,
 	},
 	SPECIALITIES: {
 		LIST: `${BASE_URL}/api/specialities`,
@@ -57,6 +65,8 @@ export const API_ENDPOINTS = {
 		GET_BY_ID: (id: string) => `${BASE_URL}/api/appointments/${id}`, // Add this
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
+		STATUSES: `${BASE_URL}/api/appointments/statuses`,
+		REFER: `${BASE_URL}/api/appointments/refer`,
 	},
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
 
@@ -64,9 +74,20 @@ export const API_ENDPOINTS = {
 		ME: `${BASE_URL}/api/patients/me`,
 		DETAILS: `${BASE_URL}/api/patients/me/details`,
 		GET_BY_PUBLIC_ID: (publicId: string) => `${BASE_URL}/api/patients/${publicId}/details`,
+		GET_BY_ID: (id: string) => `${BASE_URL}/api/patients/${id}/details`,
+		VITALS_CREATE: `${BASE_URL}/api/patients/vitals`,
+		VITALS_LATEST: (id: string) => `${BASE_URL}/api/patients/${id}/vitals/latest`,
+		VITALS_HISTORY: (id: string) => `${BASE_URL}/api/patients/${id}/vitals`,
+		REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/reports`,
+		REPORTS_CREATE: `${BASE_URL}/api/patients/reports`,
+	},
+	PHARMACY: {
+		ME: `${BASE_URL}/api/pharmacies/me`,
+		DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
 	},
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {
 		LIST: `${BASE_URL}/api/locations`,
 	},
 }
+

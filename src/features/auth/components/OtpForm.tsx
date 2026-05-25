@@ -9,6 +9,7 @@ import {
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    useWindowDimensions,
 } from 'react-native'
 import { verifyOtp } from '../authService'
 import { useAuth, UserRole } from '../../../context/AuthContext'
@@ -16,6 +17,7 @@ import { useAuth, UserRole } from '../../../context/AuthContext'
 interface Props {
     contactNumber: string
     onVerify: () => void
+    onEditContact?: () => void
     onBack?: () => void
     backLabel?: string
 }
@@ -23,12 +25,17 @@ interface Props {
 const OTP_LENGTH = 6
 const TEAL = '#0d9488'
 
-export default function OtpForm({ contactNumber, onVerify, onBack, backLabel = 'Back' }: Props) {
+export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack, backLabel = 'Back' }: Props) {
     const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''))
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const inputs = useRef<(TextInput | null)[]>([])
     const { setAuth } = useAuth()
+    const { width, height } = useWindowDimensions()
+    const isTablet = width >= 768
+    const isLandscape = width > height
+    const contentMaxWidth = isTablet ? 520 : 420
+    const otpBoxSize = isTablet ? 58 : isLandscape ? 48 : 46
 
     const handleChange = (val: string, idx: number) => {
         const digit = val.replace(/\D/g, '').slice(-1)
@@ -64,8 +71,13 @@ export default function OtpForm({ contactNumber, onVerify, onBack, backLabel = '
             }
 
             const normalizedRole = String(response.data.user?.role || '').toLowerCase()
-            const role: UserRole = normalizedRole === 'doctor' ? 'doctor' : 'patient'
-
+            
+const role: UserRole =
+    normalizedRole === 'doctor'
+        ? 'doctor'
+        : normalizedRole === 'pharmacy'
+        ? 'pharmacy'
+        : 'patient'
             await setAuth(
                 role,
                 {
@@ -97,12 +109,30 @@ export default function OtpForm({ contactNumber, onVerify, onBack, backLabel = '
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-            <View style={styles.container}>
-                <Text style={styles.title}>Verify OTP</Text>
+            <View
+                style={[
+                    styles.container,
+                    {
+                        paddingHorizontal: isTablet ? 40 : 28,
+                        justifyContent: isLandscape && !isTablet ? 'flex-start' : 'center',
+                        paddingTop: isLandscape && !isTablet ? 64 : 28,
+                    },
+                ]}
+            >
+                <View style={[styles.content, { maxWidth: contentMaxWidth }]}>
+                <Text style={[styles.title, isTablet && styles.titleTablet]}>Verify OTP</Text>
 
                 <Text style={styles.subtitle}>
                     Enter the 6-digit code sent to{'\n'}
                     <Text style={styles.phone}>+91 {contactNumber}</Text>
+                    {onEditContact ? (
+                        <>
+                            <Text>  </Text>
+                            <Text style={styles.editText} onPress={onEditContact}>
+                                Edit
+                            </Text>
+                        </>
+                    ) : null}
                 </Text>
 
                 <View style={styles.otpRow}>
@@ -112,6 +142,7 @@ export default function OtpForm({ contactNumber, onVerify, onBack, backLabel = '
                             ref={(el) => { inputs.current[idx] = el }}
                             style={[
                                 styles.otpBox,
+                                { width: otpBoxSize, height: isTablet ? 62 : 54, fontSize: isTablet ? 24 : 22 },
                                 digit ? styles.otpBoxFilled : null,
                                 !!error ? styles.otpBoxError : null,
                             ]}
@@ -152,6 +183,7 @@ export default function OtpForm({ contactNumber, onVerify, onBack, backLabel = '
                         <Text style={styles.backText}>{`<- ${backLabel}`}</Text>
                     </TouchableOpacity>
                 ) : null}
+                </View>
             </View>
         </KeyboardAvoidingView>
     )
@@ -161,14 +193,19 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#fff',
-        padding: 28,
-        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    content: {
+        width: '100%',
     },
     title: {
         fontSize: 28,
         fontWeight: '600',
         color: '#111',
         marginBottom: 10,
+    },
+    titleTablet: {
+        fontSize: 32,
     },
     subtitle: {
         color: '#666',
@@ -179,6 +216,11 @@ const styles = StyleSheet.create({
     phone: {
         color: '#111',
         fontWeight: '600',
+    },
+    editText: {
+        color: TEAL,
+        fontWeight: '700',
+        textDecorationLine: 'underline',
     },
     otpRow: {
         flexDirection: 'row',

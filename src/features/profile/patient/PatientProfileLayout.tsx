@@ -20,9 +20,9 @@ import * as ImagePicker from 'expo-image-picker'
 import HealthProfileField from './HealthProfileField'
 import { PROFILE_TABS } from './profileFieldsConfig'
 import type { TabConfig } from './profileFieldsConfig'
-import { getPatientDetails, patchPatientDetails, mapApiDataToLocalState } from './ProfileService'
+import { getPatientDetails, updatePatientProfile, mapApiDataToLocalState } from './ProfileService'
 import PatientQR from '../../../assets/icons/PatientQR.svg'
-type Tab = 'Personal' | 'Medical' | 'Life style'
+type Tab = 'Personal' | 'Medical' | 'Lifestyle'
 const TEAL = '#1a8c8c'
 
 /* ──────────────── SKELETON ──────────────── */
@@ -179,7 +179,7 @@ export default function PatientProfileLayout() {
 	const handleSave = async () => {
 		try {
 			setLoading(true)
-			const res = await patchPatientDetails(data)
+			const res = await updatePatientProfile(data)
 
 			if (res.success) {
 				await fetchProfile()

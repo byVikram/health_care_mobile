@@ -3,7 +3,8 @@ import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-nat
 import { Text, Card, useTheme, Button } from 'react-native-paper';
 import { useAuth, UserRole } from '../../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { ROUTES } from '../../navigation/routes';
+import { navigate as navigateRoot } from '../../navigation/navigationService';
 
 interface StatsProps {
     label: string;
@@ -20,7 +21,15 @@ const StatBox = ({ label, value }: StatsProps) => (
 export default function PortalPage() {
     const { role, user } = useAuth();
     const theme = useTheme();
-    const navigation = useNavigation<any>();
+
+    const openAppointments = () => {
+        if (role === 'doctor') {
+            navigateRoot(ROUTES.STACK.APPOINTMENTS);
+            return;
+        }
+
+        navigateRoot(ROUTES.STACK.CONSULTATION);
+    };
 
     return (
         <ScrollView style={styles.container}>
@@ -65,17 +74,25 @@ export default function PortalPage() {
                 </View>
 
                 {/* Mock Appointment Card */}
-                <TouchableOpacity onPress={() => navigation.navigate('Consultation')} activeOpacity={0.8}>
+                <TouchableOpacity onPress={openAppointments} activeOpacity={0.8}>
                     <Card style={styles.appointmentCard}>
                         <Card.Content>
-                            <Text variant="labelMedium" style={{ color: theme.colors.primary, marginBottom: 4 }}>Tomorrow, 10:30 AM</Text>
-                            <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>Dental Checkup</Text>
-                            <Text variant="bodySmall" style={{ color: '#666', marginTop: 4 }}>Dr. Simran Kaur - City Hospital</Text>
+                            <Text variant="labelMedium" style={{ color: theme.colors.primary, marginBottom: 4 }}>
+                                {role === 'doctor' ? 'Appointments' : 'Tomorrow, 10:30 AM'}
+                            </Text>
+                            <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
+                                {role === 'doctor' ? 'All Appointments' : 'Dental Checkup'}
+                            </Text>
+                            <Text variant="bodySmall" style={{ color: '#666', marginTop: 4 }}>
+                                {role === 'doctor'
+                                    ? 'View patient bookings, modes, hospitals, and statuses.'
+                                    : 'Dr. Simran Kaur - City Hospital'}
+                            </Text>
                         </Card.Content>
                         <Card.Actions style={{ borderTopWidth: 1, borderTopColor: '#f0f0f0', marginTop: 12 }}>
-                            <Button mode="text" textColor="#d32f2f">Cancel</Button>
-                            <Button mode="contained" onPress={() => navigation.navigate('Consultation')}>
-                                Join Call
+                            {role !== 'doctor' && <Button mode="text" textColor="#d32f2f">Cancel</Button>}
+                            <Button mode="contained" onPress={openAppointments}>
+                                {role === 'doctor' ? 'View All' : 'Join Call'}
                             </Button>
                         </Card.Actions>
                     </Card>

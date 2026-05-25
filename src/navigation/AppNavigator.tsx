@@ -1,115 +1,124 @@
 import React from 'react'
+import { ActivityIndicator, View } from 'react-native'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { useAuth } from '../context/AuthContext'
-import { ActivityIndicator, View } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useTheme } from 'react-native-paper'
 
-// Screens
-import LoginPage from '../features/auth/LoginPage'
-import RegisterPage from '../features/auth/RegisterPage'
-import OnboardingPage from '../features/onboarding/OnboardingPage'
-import WelcomePage from '../features/auth/WelcomePage'
-import AccountPage from '../features/auth/AccountPage'
-import DashboardPage from '../features/dashboard/DashboardPage'
+import { useAuth } from '../context/AuthContext'
+import { navigationRef } from './navigationService'
+import { ROUTES } from './routes'
+import type { AppStackParamList } from './types'
+import AuthNavigator from './AuthNavigator'
+import MainTabNavigator from './MainTabNavigator'
+
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
 import ConsultationPage from '../features/consultation/ConsultationPage'
-import PortalPage from '../features/portal/PortalPage'
-import ProfilePage from '../features/profile/ProfilePage'
 import PatientProfileLayout from '../features/profile/patient/PatientProfileLayout'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
+
 import NotificationPage from '../features/notification/NotificationPage'
-import SidebarLayout from '../components/layout/SidebarLayout'
 import SettingPage from '../features/setting/SettingPage'
+import AccountPage from '../features/auth/AccountPage'
+import PatientPayment from '../features/patientPayment/PatientPayment'
+import ConsentForm from '../features/doctor/components/ConsentForm'
+import SearchPage from '../features/doctor/search/SearchPage'
+import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
+import AppointmentList from '../features/appointment/AppointmentList'
 
-const Stack = createNativeStackNavigator()
-const Tab = createBottomTabNavigator()
+import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
+import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
+const AppStack = createNativeStackNavigator<AppStackParamList>()
 
-export const navigationRef = React.createRef<any>()
+function AuthenticatedNavigator() {
+  return (
+    <AppStack.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName={ROUTES.MAIN.TABS}
+    >
+      <AppStack.Screen
+        name={ROUTES.MAIN.TABS}
+        component={MainTabNavigator}
+        options={{ animation: 'none' }}
+      />
 
-function HomeWithSidebar() {
-	return (
-		<SidebarLayout>
-			<DashboardPage />
-		</SidebarLayout>
-	)
-}
+      {/* General Search (for patients / doctors) */}
+      <AppStack.Screen name={ROUTES.STACK.SEARCH} component={SearchPage} />
 
-function MainTabNavigator() {
-	const theme = useTheme()
-	return (
-		<Tab.Navigator
-			screenOptions={({ route }) => ({
-				headerShown: false,
-				tabBarActiveTintColor: theme.colors.primary,
-				tabBarInactiveTintColor: 'gray',
-				tabBarIcon: ({ color, size }) => {
-					let iconName: keyof typeof MaterialCommunityIcons.glyphMap = 'home'
-					if (route.name === 'Home') iconName = 'home'
-					else if (route.name === 'Search') iconName = 'magnify'
-					else if (route.name === 'Portal') iconName = 'calendar-clock'
-					else if (route.name === 'Profile') iconName = 'account'
-					return <MaterialCommunityIcons name={iconName} size={size} color={color} />
-				},
-			})}
-		>
-			<Tab.Screen name="Home" component={HomeWithSidebar} />
-			<Tab.Screen name="Search" component={DoctorSearchPage} />
-			<Tab.Screen name="Portal" component={PortalPage} />
-			<Tab.Screen name="Profile" component={ProfilePage} />
-		</Tab.Navigator>
-	)
+      {/* ✅ Pharmacy Search (for pharmacy role) */}
+      <AppStack.Screen
+        name={ROUTES.STACK.PHARMACY_SEARCH}
+        component={PharmacySearchPage}
+      />
+      <AppStack.Screen name={ROUTES.STACK.ORDER_DETAILS} component={OrderDetailsScreen} />
+      <AppStack.Screen
+        name={ROUTES.STACK.DOCTOR_SEARCH}
+        component={DoctorSearchPage}
+      />
+
+      <AppStack.Screen
+        name={ROUTES.STACK.DOCTOR_DETAIL}
+        component={DoctorDetailPage}
+      />
+
+      <AppStack.Screen
+        name={ROUTES.STACK.FAVOURITE_DOCTOR}
+        component={MyDoctorPage}
+      />
+
+      <AppStack.Screen
+        name={ROUTES.STACK.NOTIFICATION}
+        component={NotificationPage}
+      />
+
+      <AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
+
+      <AppStack.Screen
+        name={ROUTES.STACK.HEALTH_PROFILE}
+        component={PatientProfileLayout}
+      />
+
+      <AppStack.Screen
+        name={ROUTES.STACK.SETTINGS}
+        component={SettingPage}
+      />
+
+      <AppStack.Screen
+        name={ROUTES.STACK.DOCTOR_WELCOME}
+        component={WelcomeDoctorPage}
+        options={{ animation: 'none' }}
+      />
+
+      <AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
+
+			<AppStack.Screen name={ROUTES.STACK.APPOINTMENTS} component={AppointmentList} />
+
+      <AppStack.Screen
+        name={ROUTES.STACK.CONSENT_FORM}
+        component={ConsentForm}
+        options={{ presentation: 'transparentModal' }}
+      />
+
+      <AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
+    </AppStack.Navigator>
+  )
 }
 
 export default function AppNavigator() {
-	const { accessToken, isLoading } = useAuth()
-	const theme = useTheme()
+  const { accessToken, isLoading } = useAuth()
+  const theme = useTheme()
 
-	if (isLoading) {
-		return (
-			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-				<ActivityIndicator size="large" color={theme.colors.primary} />
-			</View>
-		)
-	}
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    )
+  }
 
-	return (
-		<NavigationContainer ref={navigationRef}>
-			<Stack.Navigator screenOptions={{ headerShown: false }}>
-				{accessToken == null ? (
-					// ─── UNAUTHENTICATED STACK ───────────────────────────
-					<>
-						{/* 1. First screen: app intro */}
-						<Stack.Screen name="Onboarding" component={OnboardingPage} options={{ animation: 'none' }} />
-						{/* 2. Login screen */}
-						<Stack.Screen name="Login" component={LoginPage} options={{ animation: 'none' }} />
-						{/* 3. Register screen */}
-						<Stack.Screen name="Register" component={RegisterPage} />
-					</>
-				) : (
-					// ─── AUTHENTICATED STACK ─────────────────────────────
-					<>
-						{/* 3. Main app with bottom tabs */}
-						<Stack.Screen name="MainTabs" component={MainTabNavigator} options={{ animation: 'none' }} />
-
-						{/* ─── Screens accessible from MainTabs ─── */}
-						<Stack.Screen name="DoctorDetail" component={DoctorDetailPage} />
-						<Stack.Screen name="FavouriteDoctor" component={MyDoctorPage} />
-						<Stack.Screen name="Notification" component={NotificationPage} />
-						<Stack.Screen name="Consultation" component={ConsultationPage} />
-						<Stack.Screen name="HealthProfile" component={PatientProfileLayout} />
-						<Stack.Screen name="SettingPage" component={SettingPage} />
-
-						{/* 1. First screen after login: Doctor onboarding welcome */}
-						<Stack.Screen name="DoctorWelcome" component={WelcomePage} options={{ animation: 'none' }} />
-						{/* 2. Account details form (Location + Speciality) */}
-						<Stack.Screen name="AccountPage" component={AccountPage} />
-					</>
-				)}
-			</Stack.Navigator>
-		</NavigationContainer>
-	)
+  return (
+    <NavigationContainer ref={navigationRef}>
+      {!accessToken ? <AuthNavigator /> : <AuthenticatedNavigator />}
+    </NavigationContainer>
+  )
 }

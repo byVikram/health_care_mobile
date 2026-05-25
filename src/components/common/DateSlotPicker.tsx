@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, useWindowDimensions } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from './AppTypography'
 import { AppSkeleton } from './AppSkeleton'
@@ -32,10 +32,18 @@ export type PickProps = {
 	disableBookedSlots?: boolean
 	onSelectAll?: () => void
 	onUnselectAll?: () => void
+	showTimeSlots?: boolean
+	hideNavigation?: boolean
+	use12HourTime?: boolean
+	showSlotStatusLabels?: boolean
+	selectedAppointmentType?: 'clinic' | 'video' | string
+	onAppointmentTypeChange?: (type: 'clinic' | 'video') => void
 }
 
 export default function DateSlotPicker(props: PickProps) {
-	const [visitType, setVisitType] = useState('online')
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
+	const [visitType, setVisitType] = useState<'clinic' | 'video'>('clinic')
 
 	const {
 		selectedDate,
@@ -52,6 +60,12 @@ export default function DateSlotPicker(props: PickProps) {
 		disableBookedSlots = true,
 		onSelectAll,
 		onUnselectAll,
+		showTimeSlots = true,
+		hideNavigation = false,
+		use12HourTime = false,
+		showSlotStatusLabels = true,
+		selectedAppointmentType,
+		onAppointmentTypeChange,
 	} = props
 
 	const today = new Date()
@@ -86,6 +100,15 @@ export default function DateSlotPicker(props: PickProps) {
 	}
 
 	const selectedTimes = Array.isArray(selectedTime) ? selectedTime : selectedTime ? [selectedTime] : []
+	const resolvedVisitType =
+		selectedAppointmentType === 'video' ? 'video' : selectedAppointmentType === 'clinic' ? 'clinic' : visitType
+	const dateBoxWidth = isTablet ? 62 : 50
+	const slotBasis = `${100 / timeSlotColumns - (isTablet ? 1.8 : 2.8)}%` as `${number}%`
+
+	const handleVisitTypeChange = (type: 'clinic' | 'video') => {
+		setVisitType(type)
+		onAppointmentTypeChange?.(type)
+	}
 
 	const handleTimePress = (time: string) => {
 		if (!multiSelect) {
@@ -99,24 +122,41 @@ export default function DateSlotPicker(props: PickProps) {
 		onTimeChange(next)
 	}
 
+	const formatTimeLabel = (time: string) => {
+		if (!use12HourTime) return time
+
+		const [hourText, minuteText] = time.split(':')
+		const hour = Number(hourText)
+		const minute = Number(minuteText)
+
+		if (!Number.isFinite(hour) || !Number.isFinite(minute)) return time
+
+		const period = hour >= 12 ? 'PM' : 'AM'
+		const hour12 = hour % 12 || 12
+
+		return `${hour12}:${String(minute).padStart(2, '0')} ${period}`
+	}
+
 	return (
-		<View style={styles.container}>
+		<View style={[styles.container, isTablet && styles.containerTablet]}>
 			{/* Date Header */}
 			<View style={styles.dateHeader}>
 				<AppTypography variant="h4" style={styles.sectionTitle}>
 					{dateLabel}
 				</AppTypography>
-				<View style={styles.monthNav}>
-					<TouchableOpacity onPress={handlePrevWeek} style={styles.chevron}>
-						<MaterialCommunityIcons name="chevron-left" size={20} color="#0c7c7c" />
-					</TouchableOpacity>
-					<AppTypography variant="body" style={styles.monthLabel}>
-						{monthLabel}
-					</AppTypography>
-					<TouchableOpacity onPress={handleNextWeek} style={styles.chevron}>
-						<MaterialCommunityIcons name="chevron-right" size={20} color="#0c7c7c" />
-					</TouchableOpacity>
-				</View>
+				{hideNavigation ? null : (
+					<View style={styles.monthNav}>
+						<TouchableOpacity onPress={handlePrevWeek} style={styles.chevron}>
+							<MaterialCommunityIcons name="chevron-left" size={20} color="#0c7c7c" />
+						</TouchableOpacity>
+						<AppTypography variant="body" style={styles.monthLabel}>
+							{monthLabel}
+						</AppTypography>
+						<TouchableOpacity onPress={handleNextWeek} style={styles.chevron}>
+							<MaterialCommunityIcons name="chevron-right" size={20} color="#0c7c7c" />
+						</TouchableOpacity>
+					</View>
+				)}
 			</View>
 
 			{/* Date Strip */}
@@ -136,6 +176,7 @@ export default function DateSlotPicker(props: PickProps) {
 								key={date.toISOString()}
 								style={[
 									styles.dateBox,
+									{ width: dateBoxWidth },
 									styles.dateBoxSpacingRight,
 									isSelected && styles.dateBoxSelected,
 									past && styles.dateBoxDisabled,
@@ -170,138 +211,189 @@ export default function DateSlotPicker(props: PickProps) {
 				</View>
 			</ScrollView>
 
-			{/* Time Header */}
-			<View style={styles.timeHeader}>
-				<AppTypography variant="h4" style={styles.timeSectionTitle}>
-					{timeLabel}
-				</AppTypography>
-				{multiSelect && (onSelectAll || onUnselectAll) ? (
-					<View style={styles.bulkActions}>
-						{onSelectAll ? (
-							<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
-								<AppTypography variant="caption" style={styles.bulkButtonText}>
-									Select All
-								</AppTypography>
-							</TouchableOpacity>
-						) : null}
-						{onUnselectAll ? (
-							<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
-								<AppTypography variant="caption" style={styles.bulkButtonText}>
-									Unselect All
-								</AppTypography>
-							</TouchableOpacity>
-						) : null}
-					</View>
-				) : null}
-			</View>
-
-			{loading ? (
-				<AppSkeleton height={100} style={{ marginTop: 8 }} />
-			) : availableSlots.length === 0 ? (
-				<AppTypography variant="caption" style={styles.greyText}>
-					No slots available for this date.
-				</AppTypography>
-			) : (
-				<View style={styles.timeGridContainer}>
-					{/* Toggle */}
+			{showTimeSlots ? (
+				<>
+					{/* Time Header */}
 					<View style={styles.toggleContainer}>
-						<Text style={styles.toggleTitle}>Select Visit Type</Text>
+						<Text style={styles.toggleTitle}>Type of Appointment</Text>
 
-						<View style={styles.toggleGroup}>
+						<View style={[styles.toggleGroup, isTablet && styles.toggleGroupTablet]}>
 							<TouchableOpacity
-								style={[styles.toggleOption, visitType === 'online' && styles.toggleSelectedOption]}
-								onPress={() => setVisitType('online')}
+								style={[
+									styles.toggleOption,
+									resolvedVisitType === 'clinic' && styles.toggleSelectedOption,
+								]}
+								onPress={() => handleVisitTypeChange('clinic')}
 							>
-								<Text style={[styles.toggleText, visitType === 'online' && styles.toggleSelectedText]}>
-									Online Visit
+								<Text
+									style={[
+										styles.toggleText,
+										resolvedVisitType === 'clinic' && styles.toggleSelectedText,
+									]}
+								>
+									Clinic
 								</Text>
 							</TouchableOpacity>
 
 							<TouchableOpacity
-								style={[styles.toggleOption, visitType === 'clinic' && styles.toggleSelectedOption]}
-								onPress={() => setVisitType('clinic')}
+								style={[
+									styles.toggleOption,
+									resolvedVisitType === 'video' && styles.toggleSelectedOption,
+								]}
+								onPress={() => handleVisitTypeChange('video')}
 							>
-								<Text style={[styles.toggleText, visitType === 'clinic' && styles.toggleSelectedText]}>
-									Clinic Visit
+								<Text
+									style={[
+										styles.toggleText,
+										resolvedVisitType === 'video' && styles.toggleSelectedText,
+									]}
+								>
+									Video
 								</Text>
 							</TouchableOpacity>
 						</View>
 					</View>
-					{/* Toggle */}
-					{availableSlots.map((group, groupIdx) => (
-						<View key={`group-${groupIdx}`} style={styles.timeGroupContainer}>
-							<AppTypography variant="subtitle" style={styles.timeGroupLabel}>
-								{group.label}
-							</AppTypography>
-							<View style={styles.slotsGridFlex}>
-								{group.slots.map((slot, idx) => {
-									const isSelected = selectedTimes.includes(slot.start_time)
-									const isAvailable = slot.status === 'AVAILABLE' || slot.status === ('' as any)
-									const isBlocked = slot.status === 'BLOCKED'
-									const isBooked = slot.status === 'BOOKED' || slot.status === 'UNAVAILABLE'
-									const canSelect =
-										slot.can_toggle !== false &&
-										(isAvailable || isBlocked || !disableBookedSlots || !isBooked)
-									const isEndOfRow = (idx + 1) % timeSlotColumns === 0
 
-									return (
-										<TouchableOpacity
-											key={`${slot.start_time}-${idx}`}
-											style={[
-												styles.timeBox,
-												{ flexBasis: `${100 / timeSlotColumns - 3}%` },
-												!isEndOfRow && styles.timeBoxSpacingRight,
-												isSelected && styles.timeBoxSelected,
-												!isSelected && isBlocked && styles.timeBoxBlocked,
-												!canSelect && styles.timeBoxDisabled,
-											]}
-											onPress={() => canSelect && handleTimePress(slot.start_time)}
-											activeOpacity={canSelect ? 0.6 : 1}
-											disabled={!canSelect}
-										>
-											<AppTypography
-												variant="caption"
-												style={[
-													styles.timeText,
-													isSelected && styles.timeTextSelected,
-													!isSelected && isBlocked && styles.timeTextBlocked,
-													!canSelect && styles.timeTextDisabled,
-												]}
-											>
-												{slot.start_time}
-											</AppTypography>
-										</TouchableOpacity>
-									)
-								})}
+					<View style={styles.timeHeader}>
+						<AppTypography variant="h4" style={styles.timeSectionTitle}>
+							{timeLabel}
+						</AppTypography>
+						{multiSelect && (onSelectAll || onUnselectAll) ? (
+							<View style={styles.bulkActions}>
+								{onSelectAll ? (
+									<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
+										<AppTypography variant="caption" style={styles.bulkButtonText}>
+											Select All
+										</AppTypography>
+									</TouchableOpacity>
+								) : null}
+								{onUnselectAll ? (
+									<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
+										<AppTypography variant="caption" style={styles.bulkButtonText}>
+											Unselect All
+										</AppTypography>
+									</TouchableOpacity>
+								) : null}
 							</View>
+						) : null}
+					</View>
+
+					{loading ? (
+						<AppSkeleton height={100} style={{ marginTop: 8 }} />
+					) : availableSlots.length === 0 ? (
+						<AppTypography variant="caption" style={styles.greyText}>
+							No slots available for this date.
+						</AppTypography>
+					) : (
+						<View style={styles.timeGridContainer}>
+							{availableSlots.map((group, groupIdx) => (
+								<View key={`group-${groupIdx}`} style={styles.timeGroupContainer}>
+									<AppTypography variant="subtitle" style={styles.timeGroupLabel}>
+										{group.label}
+									</AppTypography>
+									<View style={styles.slotsGridFlex}>
+										{group.slots.map((slot, idx) => {
+											const isSelected = selectedTimes.includes(slot.start_time)
+											const isAvailable =
+												slot.status === 'AVAILABLE' || slot.status === ('' as any)
+											const isBlocked = slot.status === 'BLOCKED'
+											const isBooked =
+												slot.is_booked ||
+												slot.status === 'BOOKED' ||
+												slot.status === 'OCCUPIED' ||
+												slot.status === 'UNAVAILABLE'
+											const canSelect =
+												slot.can_toggle !== false &&
+												!slot.is_booked &&
+												(isAvailable || isBlocked || !disableBookedSlots || !isBooked)
+											// const statusLabel =
+												// slot.status === 'OCCUPIED' || slot.is_booked
+												// 	? 'Occupied'
+												// 	: slot.status === 'UNAVAILABLE'
+												// 		? 'Unavailable'
+												// 		: isBlocked
+												// 			? 'Blocked'
+												// 			: ''
+
+											return (
+												<TouchableOpacity
+													key={`${slot.start_time}-${idx}`}
+													style={[
+														styles.timeBox,
+														{ flexBasis: slotBasis },
+														isSelected && styles.timeBoxSelected,
+														!isSelected && isBlocked && styles.timeBoxBlocked,
+														!isSelected && isBooked && styles.timeBoxBooked,
+														!canSelect && styles.timeBoxDisabled,
+														!showSlotStatusLabels && styles.timeBoxSingleLine,
+													]}
+													onPress={() => canSelect && handleTimePress(slot.start_time)}
+													activeOpacity={canSelect ? 0.6 : 1}
+													disabled={!canSelect}
+												>
+													<AppTypography
+														variant="caption"
+														style={[
+															styles.timeText,
+															isSelected && styles.timeTextSelected,
+															!isSelected && isBlocked && styles.timeTextBlocked,
+															!canSelect && styles.timeTextDisabled,
+														]}
+													>
+														{formatTimeLabel(slot.start_time)}
+													</AppTypography>
+													{/* {showSlotStatusLabels && statusLabel ? (
+														<AppTypography
+															variant="caption"
+															style={[
+																styles.slotStatusText,
+																isSelected && styles.timeTextSelected,
+																!isSelected && isBlocked && styles.timeTextBlocked,
+																!isSelected && isBooked && styles.timeTextBooked,
+																!canSelect && styles.timeTextDisabled,
+															]}
+														>
+															{statusLabel}
+														</AppTypography>
+													) : null} */}
+												</TouchableOpacity>
+											)
+										})}
+									</View>
+								</View>
+							))}
 						</View>
-					))}
-				</View>
-			)}
+					)}
+				</>
+			) : null}
 		</View>
 	)
 }
 
 const styles = StyleSheet.create({
 	container: {
-		paddingVertical: 8,
+		paddingTop: 10,
+		paddingBottom: 8,
 		paddingHorizontal: 16,
+	},
+	containerTablet: {
+		paddingHorizontal: 20,
 	},
 	dateHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		marginBottom: 10,
+		marginBottom: 12,
 	},
 	sectionTitle: {
-		fontWeight: 'bold',
+		fontWeight: '700',
 		color: '#233238',
-		fontSize: 14,
+		fontSize: 15,
 	},
 	timeSectionTitle: {
-		fontWeight: 'bold',
+		fontWeight: '700',
 		color: '#233238',
-		fontSize: 14,
+		fontSize: 15,
 		flexShrink: 1,
 	},
 	timeHeader: {
@@ -309,8 +401,8 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 		alignItems: 'center',
 		gap: 10,
-		marginTop: 18,
-		marginBottom: 10,
+		marginTop: 22,
+		marginBottom: 12,
 	},
 	bulkActions: {
 		flexDirection: 'row',
@@ -324,13 +416,13 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: '#0c7c7c',
 		borderRadius: 8,
-		paddingHorizontal: 10,
-		paddingVertical: 6,
+		paddingHorizontal: 12,
+		paddingVertical: 7,
 		backgroundColor: '#fff',
 	},
 	bulkButtonText: {
 		color: '#0c7c7c',
-		fontSize: 11,
+		fontSize: 12,
 		fontWeight: '600',
 	},
 	monthNav: {
@@ -352,13 +444,13 @@ const styles = StyleSheet.create({
 	},
 	dateStripContent: {
 		paddingHorizontal: 0,
+		paddingBottom: 2,
 	},
 	dateBox: {
-		width: 50,
-		height: 55,
 		borderRadius: 10,
 		paddingVertical: 10,
 		paddingHorizontal: 6,
+		minHeight: 56,
 		backgroundColor: 'transparent',
 		justifyContent: 'center',
 		alignItems: 'center',
@@ -397,7 +489,7 @@ const styles = StyleSheet.create({
 	},
 	greyText: {
 		color: '#73818a',
-		marginTop: 8,
+		marginTop: 4,
 		fontSize: 13,
 	},
 	timeGridContainer: {
@@ -407,27 +499,33 @@ const styles = StyleSheet.create({
 		marginTop: 18,
 	},
 	timeGroupLabel: {
-		fontWeight: 'bold',
+		fontWeight: '700',
 		color: '#62707a',
-		marginBottom: 10,
+		marginBottom: 12,
 		fontSize: 13,
 	},
 	slotsGridFlex: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		justifyContent: 'flex-start',
+		gap: 10,
 	},
 	timeBox: {
 		borderWidth: 1.5,
 		borderColor: '#dde3e8',
 		borderRadius: 8,
-		paddingVertical: 8,
-		paddingHorizontal: 16,
+		paddingVertical: 10,
+		paddingHorizontal: 10,
 		marginBottom: 10,
-		minWidth: 70,
+		height: 44,
+		minHeight: 44,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#fff',
+	},
+	timeBoxSingleLine: {
+		height: 44,
+		paddingVertical: 0,
 	},
 	timeBoxSpacingRight: {
 		marginRight: 10,
@@ -440,13 +538,17 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(0,0,0,0.06)',
 		borderColor: '#eee',
 	},
+	timeBoxBooked: {
+		backgroundColor: '#fff3f0',
+		borderColor: '#f0c7bd',
+	},
 	timeBoxBlocked: {
 		backgroundColor: '#f1f4f5',
 		borderColor: '#cfd8dc',
 	},
 	timeText: {
-		fontSize: 12,
-		fontWeight: '500',
+		fontSize: 13,
+		fontWeight: '600',
 		color: '#42525d',
 	},
 	timeTextSelected: {
@@ -459,31 +561,45 @@ const styles = StyleSheet.create({
 	timeTextBlocked: {
 		color: '#7b8790',
 	},
+	timeTextBooked: {
+		color: '#b15a43',
+	},
+	slotStatusText: {
+		marginTop: 2,
+		fontSize: 10,
+		fontWeight: '600',
+	},
 
 	// Toggle
 	toggleContainer: {
-		padding: 16,
+		marginTop: 22,
 	},
 
 	toggleTitle: {
-		fontSize: 16,
-		fontWeight: '600',
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#233238',
 		marginBottom: 12,
 	},
 
 	toggleGroup: {
 		flexDirection: 'row',
-		backgroundColor: '#eee',
-		borderRadius: 25,
+		backgroundColor: '#eef3f4',
+		borderRadius: 24,
 		padding: 4,
-		maxWidth: 400,
-		margin: 'auto',
+		alignSelf: 'stretch',
+	},
+
+	toggleGroupTablet: {
+		alignSelf: 'flex-start',
+		width: '56%',
 	},
 
 	toggleOption: {
 		flex: 1,
 		paddingVertical: 10,
-		borderRadius: 25,
+		paddingHorizontal: 14,
+		borderRadius: 20,
 		alignItems: 'center',
 	},
 
@@ -493,7 +609,8 @@ const styles = StyleSheet.create({
 
 	toggleText: {
 		color: '#333',
-		fontWeight: '500',
+		fontSize: 13,
+		fontWeight: '600',
 	},
 
 	toggleSelectedText: {

@@ -10,12 +10,13 @@ import { DoctorProfileApiResponse, DoctorProfileApiData } from '../../types/doct
 import { DoctorProfile } from '../../types/doctor-profile'
 
 export interface TimeSlot {
-	id: string | number
+	id?: string | number
 	start_time: string
 	end_time: string
-	status: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE' | 'BLOCKED' | ''
+	status: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE' | 'BLOCKED' | 'OCCUPIED' | ''
 	can_toggle?: boolean
 	is_enabled?: boolean
+	is_booked?: boolean
 }
 // Add this to doctorService.ts
 export interface Appointment {
@@ -30,7 +31,8 @@ export interface Appointment {
 
 export interface SlotGroup {
 	label: string
-	period: string
+	period?: string
+	range?: string
 	slots: TimeSlot[]
 }
 
@@ -39,6 +41,7 @@ export interface AppointmentParams {
 	limit?: number
 	appointment_date?: string
 	status?: string
+	variant?: 'upcoming' | 'all'
 }
 
 export interface DoctorSearchParams {
@@ -55,7 +58,7 @@ export interface DoctorSearchParams {
 export interface CreateAppointmentPayload {
 	doctor_id: string
 	hospital_id?: string
-	appointment_mode: 'offline' | 'online'
+	appointment_mode: 'offline' | 'online' | 'clinic_visit' | 'video_call'
 	appointment_date: string
 	start_time: string
 	end_time?: string
@@ -115,6 +118,18 @@ export const rescheduleAppointment = async (
 	return res.data
 }
 
+export interface ReferAppointmentPayload {
+	appointment_id: string
+	doctor_id: string
+}
+
+export const referAppointment = async (
+	payload: ReferAppointmentPayload
+): Promise<AppointmentResponse> => {
+	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.REFER, payload)
+	return res.data
+}
+
 export const getAppointments = async (params?: AppointmentParams): Promise<AppointmentsResponse> => {
 	const res = await ApiService.getWithParams<AppointmentsResponse>(
 		API_ENDPOINTS.APPOINTMENTS.GET,
@@ -124,30 +139,106 @@ export const getAppointments = async (params?: AppointmentParams): Promise<Appoi
 }
 
 export const createAppointment = async (
-	payload: CreateAppointmentPayload
+	payload: CreateAppointmentPayload,
+	token?: string | null
 ): Promise<CreateAppointmentResponse> => {
+	const config = token
+		? {
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			}
+		: undefined
+
+	console.log('[createAppointment][RN] request', {
+		url: API_ENDPOINTS.APPOINTMENTS.CREATE,
+		payload,
+		token,
+		headers: config?.headers,
+		webComparison:
+			'React web booking uses axios interceptor with localStorage access_token and sends Authorization: Bearer <access_token>.',
+	})
+
 	const res = await ApiService.post<CreateAppointmentResponse>(
 		API_ENDPOINTS.APPOINTMENTS.CREATE,
-		payload
+		payload,
+		config
 	)
+
+	console.log('[createAppointment][RN] response', {
+		status: res.status,
+		requestHeaders: res.config?.headers,
+		data: res.data,
+	})
+
 	return res.data
 }
-export const getDoctors = async (params?: DoctorSearchParams): Promise<DoctorSearchResponse> => {
-	const res = await ApiService.getWithParams<DoctorSearchResponse>(
-		API_ENDPOINTS.DOCTORS.SEARCH,
-		(params ?? {}) as Record<string, unknown>
+export const getDoctors = async (
+  params?: DoctorSearchParams
+): Promise<DoctorSearchResponse> => {
+  const res = await ApiService.getWithParams<DoctorSearchResponse>(
+    API_ENDPOINTS.DOCTORS.SEARCH,
+    (params ?? {}) as Record<string, unknown>
+  );
+
+  console.log("DOCTORS RESPONSE:", JSON.stringify(res.data, null, 2));
+
+  return res.data;
+};
+
+export interface FavouriteDoctor {
+	id: string
+	name: string
+	is_verified: boolean
+	avatar_s3_key: string | null
+	location: string | null
+	experience_years: number | null
+	specialities: string[]
+}
+
+export interface FavouritesResponse {
+	success: boolean
+	message: string
+	data: {
+		favourites: FavouriteDoctor[]
+		favourite_ids: string[]
+	}
+}
+
+export interface ToggleFavouriteResponse {
+	success?: boolean
+	message?: string
+	data?: {
+		action?: 'added' | 'removed'
+		favourite_ids?: string[]
+		favourites?: FavouriteDoctor[]
+	}
+}
+
+export const getFavouriteDoctors = async (): Promise<FavouritesResponse> => {
+	const res = await ApiService.get<FavouritesResponse>(API_ENDPOINTS.DOCTORS_FAVOURITES.GET)
+	return res.data
+}
+
+export const toggleFavouriteDoctor = async (publicId: string): Promise<ToggleFavouriteResponse> => {
+	const res = await ApiService.post<ToggleFavouriteResponse>(
+		API_ENDPOINTS.DOCTORS_FAVOURITES.TOGGLE(publicId),
+		{}
 	)
 	return res.data
 }
 
 export interface AvailabilityResponse {
-	data?: SlotGroup[]
+	success?: boolean
+	message?: string
+	data?: any[]
 }
 
 export const getDoctorAvailability = async (params: {
 	doctor_id?: string
 	hospital_id: number | string
 	date: string
+	location?: string
 }): Promise<SlotGroup[] | AvailabilityResponse> => {
 	const res = await ApiService.getWithParams<SlotGroup[] | AvailabilityResponse>(
 		API_ENDPOINTS.DOCTORS.AVAILABILITY,
@@ -213,6 +304,55 @@ export const deleteHospital = async (hospitalId: string) => {
 	return res.data
 }
 
+export interface DoctorAchievementPayload {
+	title: string
+	category: string
+	description: string
+	organization: string
+	date_awarded: string
+	image?: string | null
+	document_url?: string | null
+	is_public: boolean
+}
+
+export interface DoctorAchievement {
+	id: string
+	title: string
+	category: string
+	description: string
+	organization: string
+	date: string
+	image: string | null
+	isPublic: boolean
+}
+
+export const mapDoctorAchievementApi = (item: any): DoctorAchievement => ({
+	id: String(item?.id ?? item?.achievement_id ?? Date.now()),
+	title: item?.title ?? '',
+	category: item?.category ?? '',
+	description: item?.description ?? '',
+	organization: item?.organization ?? item?.issuing_organization ?? item?.hospital ?? '',
+	date: item?.date_awarded ?? item?.awarded_on ?? item?.date ?? '',
+	image: item?.image ?? item?.image_url ?? item?.document_url ?? item?.verification_document_s3_key ?? null,
+	isPublic: item?.is_public ?? item?.isPublic ?? true,
+})
+
+export const getDoctorAchievements = async (): Promise<DoctorAchievement[]> => {
+	const res = await ApiService.get<any>(API_ENDPOINTS.DOCTOR_PROFILE.ACHIEVEMENTS)
+	const raw = res.data?.data?.achievements ?? res.data?.data ?? res.data?.achievements ?? []
+	return Array.isArray(raw) ? raw.map(mapDoctorAchievementApi) : []
+}
+
+export const createDoctorAchievement = async (data: DoctorAchievementPayload) => {
+	const res = await ApiService.post(API_ENDPOINTS.DOCTOR_PROFILE.ACHIEVEMENTS, data)
+	return res.data
+}
+
+export const updateDoctorAchievement = async (achievementId: string, data: DoctorAchievementPayload) => {
+	const res = await ApiService.patch(`${API_ENDPOINTS.DOCTOR_PROFILE.ACHIEVEMENTS}/${achievementId}`, data)
+	return res.data
+}
+
 // -- Doctor profile -------------------------------------------------------------
 export const getDoctorProfile = async (): Promise<DoctorProfileApiResponse> => {
 	const token = await AsyncStorage.getItem('access_token')
@@ -275,6 +415,7 @@ export const mapDoctorProfileApi = (data: DoctorProfileApiData): DoctorProfile =
 	// Build hospitals
 	const hospitals: DoctorProfile['hospitals'] = (data.hospitals ?? []).map((h) => ({
 		id: h.id,
+		hospital_id: h.hospital?.id ?? h.id,
 		name: h.hospital?.name ?? '',
 		location: h.hospital?.address ?? '',
 		fullAddress: h.hospital?.address ?? '',

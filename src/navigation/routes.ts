@@ -1,0 +1,38 @@
+export const ROUTES = {
+	AUTH: {
+		LOGIN: 'Login',
+		ROLE_SELECTION: 'RoleSelection',
+		ONBOARDING: 'Onboarding',
+		REGISTER: 'Register',
+	},
+	MAIN: {
+		TABS: 'MainTabs',
+		HOME: 'Home',
+		SEARCH: 'Search',
+		PORTAL: 'Portal',
+		PROFILE: 'Profile',
+	},
+	PORTAL: {
+		PROFILE: 'Profile',
+	},
+	STACK: {
+		SEARCH: 'SearchPage',
+		DOCTOR_SEARCH: 'DoctorSearch',
+		DOCTOR_DETAIL: 'DoctorDetail',
+		FAVOURITE_DOCTOR: 'FavouriteDoctor',
+		NOTIFICATION: 'Notification',
+		CONSULTATION: 'Consultation',
+		HEALTH_PROFILE: 'HealthProfile',
+		SETTINGS: 'Settings',
+		DOCTOR_WELCOME: 'DoctorWelcome',
+		ACCOUNT: 'Account',
+		APPOINTMENTS: 'Appointments',
+		VIDEO_CONSULTATION: 'VideoConsultation',
+		RESCHEDULE_APPOINTMENT: 'RescheduleAppointment',
+		CANCEL_APPOINTMENT: 'CancelAppointment',
+		CONSENT_FORM: 'ConsentForm',
+		PATIENT_PAYMENT: 'PatientPayment',
+		PHARMACY_SEARCH: 'PharmacySearch',
+		ORDER_DETAILS: 'OrderDetails',
+	},
+} as const

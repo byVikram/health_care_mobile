@@ -6,27 +6,31 @@ import {
 	TouchableOpacity,
 	Alert,
 	ActivityIndicator,
-	TextInput as NativeInput,
 	Modal,
-	Platform,
+	useWindowDimensions,
 } from 'react-native'
-import { useTheme, Card, Avatar, Button, IconButton, Divider, Text, Snackbar } from 'react-native-paper'
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
+import { useTheme, Card, Avatar, Button, IconButton, Divider, Text } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import type { SvgProps } from 'react-native-svg'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Asset } from 'expo-asset'
 import * as FileSystem from 'expo-file-system/legacy'
-// import * as SpeechRecognition from 'expo-speech-recognition';
-import Voice from '@react-native-voice/voice'
-import { Audio } from 'expo-av'
 import DicomViewer from './components/DicomViewer'
+import VitalsTab from './components/VitalsTab'
+// import ScribbleNoteEditor from './components/ScribbleNoteEditor'
 import Prescription from '../../assets/icons/consultation/prescription.svg'
 import LaboratoryIcon from '../../assets/icons/consultation/lab.svg'
 import RadiologyTabIcon from '../../assets/icons/consultation/radiology.svg'
 import AncillaryIcon from '../../assets/icons/consultation/ancillary.svg'
-import { patientService, PatientDetails, doctorService, DocterDetails } from './ConsultationService'
+import { patientService, PatientDetails, DocterDetails } from './ConsultationService'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
+import DateSlotPicker from '../../components/common/DateSlotPicker'
+import DoctorHospitalDropdown from '../../components/common/DoctorHospitalDropdown'
+import { getDoctorAvailability, getDoctorById, getDoctorProfile, rescheduleAppointment } from '../doctor/doctorService'
+import { APPOINTMENT_STATUS } from '../../constants/constants'
+import { useAuth } from '../../context/AuthContext'
 
 const SAMPLE_DICOM_MODULE = require('../../assets/dicon/sample-dicon.dcm')
 
@@ -339,7 +343,7 @@ function ShareWith() {
 				</View>
 
 				<Text style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>Select address</Text>
-				<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 ,}}>
+				<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
 					<Button
 						mode="outlined"
 						style={{ width: '48%', borderRadius: 8 }}
@@ -356,15 +360,6 @@ function ShareWith() {
 					>
 						Area ▼
 					</Button>
-					
-					{/* <Button
-						mode="outlined"
-						style={{ flex: 1, borderRadius: 8 }}
-						contentStyle={{ height: 32 }}
-						labelStyle={{ fontSize: 10 }}
-					>
-						Locality ▼
-					</Button> */}
 				</View>
 
 				{MOCK_PLACES.map((place, i) => (
@@ -418,6 +413,9 @@ export default function ConsultationPage() {
 	const theme = useTheme()
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
+	const { width: pageWidth } = useWindowDimensions()
+	const pagerRef = useRef<ScrollView>(null)
+	const { selectedHospitalId } = useAuth() as any
 
 	const [patient, setPatient] = useState<PatientDetails | null>(null)
 	const [doctor, setDoctor] = useState<DocterDetails | null>(null)
@@ -425,20 +423,22 @@ export default function ConsultationPage() {
 	const [patientLoading, setPatientLoading] = useState(false)
 	const [doctorLoading, setDoctorLoading] = useState(false)
 	const [activeTab, setActiveTab] = useState(0)
-	const [notes, setNotes] = useState('')
+	// Stores the base64 PNG snapshot from the scribble canvas
+	const [noteCanvasData, setNoteCanvasData] = useState<string>('')
 	const [saving, setSaving] = useState(false)
-	const [finalText, setFinalText] = useState('') // confirmed text
-	const [liveText, setLiveText] = useState('') // current speaking text
-
-	// Voice recognition states
-	const [isListening, setIsListening] = useState(false)
-	const [snackbarVisible, setSnackbarVisible] = useState(false)
-	const [snackbarMessage, setSnackbarMessage] = useState('')
-	const [permissionsGranted, setPermissionsGranted] = useState(false)
+	const [followUpOpen, setFollowUpOpen] = useState(false)
+	const [followUpDate, setFollowUpDate] = useState<Date>(new Date())
+	const [followUpSelectedSlot, setFollowUpSelectedSlot] = useState('')
+	const [followUpSlots, setFollowUpSlots] = useState<any[]>([])
+	const [followUpSlotsLoading, setFollowUpSlotsLoading] = useState(false)
+	const [followUpHospitalId, setFollowUpHospitalId] = useState<string>('')
 
 	const params = route.params as any
+	useEffect(() => {
+		if (pageWidth <= 0) return
+		pagerRef.current?.scrollTo({ x: pageWidth * activeTab, animated: false })
+	}, [pageWidth, activeTab])
 
-	// Try to get IDs from params first
 	const appointmentId = params?.appointmentId ?? params?.appointment_id ?? params?.id ?? ''
 	const patientId = params?.patient_id ?? params?.patientId ?? params?.patient?.id ?? ''
 	const doctorID = params?.doctor_id ?? params?.doctorID ?? params?.doctor?.id ?? ''
@@ -446,78 +446,16 @@ export default function ConsultationPage() {
 	console.log('Full params:', JSON.stringify(params, null, 2))
 	console.log('Extracted - appointmentId:', appointmentId, 'patientId:', patientId, 'doctorID:', doctorID)
 
-	// Request microphone permissions on component mount
-	useEffect(() => {
-		try {
-			if (!Voice) {
-				console.warn('Voice module not available')
-				return
-			}
-
-			Voice.onSpeechStart = () => {
-				console.log('Started listening')
-			}
-
-			// 🎤 LIVE text (updates while speaking)
-			Voice.onSpeechPartialResults = (event) => {
-				if (event?.value?.length) {
-					setLiveText(event.value[0])
-				}
-			}
-
-			// ✅ FINAL text (append when speech chunk ends)
-			Voice.onSpeechResults = (event) => {
-				if (event?.value?.length) {
-					setFinalText((prev) => prev + ' ' + event.value[0])
-					setLiveText('') // clear live
-				}
-			}
-
-			// ❗ KEEP LISTENING after pause
-			Voice.onSpeechEnd = async () => {
-				console.log('Speech ended → restarting...')
-				if (isListening) {
-					try {
-						await Voice.start('en-US') // 🔥 restart automatically
-					} catch (e) {
-						console.log('Restart error:', e)
-					}
-				}
-			}
-
-			Voice.onSpeechError = (e) => {
-				console.log('Voice error:', e)
-			}
-
-			return () => {
-				try {
-					if (Voice?.destroy) {
-						Voice.destroy().catch((e) => console.log('Destroy error:', e))
-					}
-					if (Voice?.removeAllListeners) {
-						Voice.removeAllListeners()
-					}
-				} catch (e) {
-					console.log('Cleanup error:', e)
-				}
-			}
-		} catch (e) {
-			console.log('Voice setup error:', e)
-			return () => {}
-		}
-	}, [isListening])
 	// Set doctor directly from params without API call
 	useEffect(() => {
-		// Get doctor data from params (passed from DoctorAppointments)
 		const doctorFromParams = params?.doctor
 		const hospitalFromParams = params?.appointment?.hospital || params?.hospital
 
 		if (doctorFromParams) {
-			console.log('Setting doctor from params:', doctorFromParams)
 			const doctorData: DocterDetails = {
 				name: doctorFromParams.name,
-				degree: '', // If not available, keep empty
-				specialization: '', // If not available, keep empty
+				degree: '',
+				specialization: '',
 				clinicName: hospitalFromParams?.name || '',
 				clinicAddress: hospitalFromParams?.address || '',
 			}
@@ -538,34 +476,27 @@ export default function ConsultationPage() {
 		}
 	}
 
-	// Fetch appointment details to get complete data
+	// Fetch appointment details
 	useEffect(() => {
 		const fetchAppointmentDetails = async () => {
 			if (appointmentId && !appointment) {
 				try {
-					console.log('Fetching appointment details for ID:', appointmentId)
 					const response = (await ApiService.get(API_ENDPOINTS.APPOINTMENTS.GET_BY_ID(appointmentId))) as any
-
 					const appointmentData = response?.data?.data || response?.data || response
-					console.log('Parsed appointment data:', appointmentData)
-
 					setAppointment(appointmentData)
 
-					// Set patient if not already set
 					if (!patient && appointmentData?.patient?.id) {
 						fetchPatientData(appointmentData.patient.id)
 					}
 
-					// Set doctor from appointment data if not already set from params
 					if (!doctor && appointmentData?.doctor) {
 						const doctorData: DocterDetails = {
 							name: appointmentData.doctor.name,
-							degree: '', // Will be empty if not in API response
-							specialization: '', // Will be empty if not in API response
+							degree: '',
+							specialization: '',
 							clinicName: appointmentData.hospital?.name,
 							clinicAddress: appointmentData.hospital?.address,
 						}
-						console.log('Setting doctor from appointment API:', doctorData)
 						setDoctor(doctorData)
 						setDoctorLoading(false)
 					}
@@ -574,7 +505,6 @@ export default function ConsultationPage() {
 				}
 			}
 		}
-
 		fetchAppointmentDetails()
 	}, [appointmentId])
 
@@ -585,50 +515,128 @@ export default function ConsultationPage() {
 		}
 	}, [patientId])
 
-	const startListening = async () => {
-		try {
-			if (!Voice?.start) {
-				console.warn('Voice.start not available')
-				return
+	useEffect(() => {
+		if (!followUpOpen) return
+		const fetchHospitals = async () => {
+			try {
+				let hospitals: any[] = []
+				if (doctorID) {
+					const res = await getDoctorById(doctorID)
+					hospitals = res?.data?.hospitals || []
+				} else {
+					const res = await getDoctorProfile()
+					hospitals = res?.data?.hospitals || []
+				}
+				if (!followUpHospitalId && hospitals.length > 0) {
+					setFollowUpHospitalId(hospitals[0]?.hospital?.id || '')
+				}
+			} catch {
+				// The dropdown fetches independently; this is only fallback for payload defaults.
 			}
-			setIsListening(true)
-			await Voice.start('en-US')
-		} catch (e) {
-			console.log('Start listening error:', e)
-			setIsListening(false)
+		}
+		fetchHospitals()
+	}, [followUpOpen, doctorID, followUpHospitalId])
+
+	useEffect(() => {
+		if (!followUpOpen) return
+		const hospitalId =
+			selectedHospitalId ||
+			followUpHospitalId ||
+			params?.appointment?.hospital?.id ||
+			params?.appointment?.hospital_id
+		const dateStr = followUpDate.toISOString().split('T')[0]
+		if (!hospitalId || !dateStr) {
+			setFollowUpSlots([])
+			setFollowUpSelectedSlot('')
+			return
+		}
+		const fetchSlots = async () => {
+			setFollowUpSlotsLoading(true)
+			setFollowUpSelectedSlot('')
+			try {
+				const responseData = await getDoctorAvailability({
+					doctor_id: doctorID,
+					hospital_id: hospitalId,
+					date: dateStr,
+				})
+				const groups = Array.isArray(responseData)
+					? responseData
+					: Array.isArray((responseData as any)?.data)
+						? (responseData as any).data
+						: []
+				setFollowUpSlots(groups)
+			} catch {
+				setFollowUpSlots([])
+			} finally {
+				setFollowUpSlotsLoading(false)
+			}
+		}
+		fetchSlots()
+	}, [followUpOpen, followUpDate, followUpHospitalId, selectedHospitalId, doctorID, params])
+
+	const handleConfirmFollowUp = async () => {
+		if (!followUpSelectedSlot) {
+			Alert.alert('Select time', 'Please select a slot to schedule the follow up.')
+			return
+		}
+		if (!appointmentId) {
+			Alert.alert('Error', 'Appointment id missing.')
+			return
+		}
+		const hospitalId =
+			selectedHospitalId ||
+			followUpHospitalId ||
+			params?.appointment?.hospital?.id ||
+			params?.appointment?.hospital_id
+		const dateStr = followUpDate.toISOString().split('T')[0]
+		if (!hospitalId || !dateStr) {
+			Alert.alert('Error', 'Missing hospital or date for follow up.')
+			return
+		}
+
+		setFollowUpSlotsLoading(true)
+		try {
+			const res = await rescheduleAppointment({
+				appointment_id: appointmentId,
+				appointment_date: dateStr,
+				start_time: followUpSelectedSlot,
+				end_time: null,
+				hospital_id: hospitalId,
+				reason: 'Doctor follow up',
+				status_id: APPOINTMENT_STATUS.CONFIRM,
+			})
+			if (res?.success) {
+				Alert.alert('Success', res.message || 'Follow up appointment scheduled')
+				setFollowUpOpen(false)
+			} else {
+				Alert.alert('Error', res?.message || 'Unable to schedule follow up')
+			}
+		} catch {
+			Alert.alert('Error', 'Unable to schedule follow up')
+		} finally {
+			setFollowUpSlotsLoading(false)
 		}
 	}
 
-	const stopListening = async () => {
-		try {
-			if (!Voice?.stop) {
-				console.warn('Voice.stop not available')
-				setIsListening(false)
-				return
-			}
-			setIsListening(false)
-			await Voice.stop()
-		} catch (e) {
-			console.log('Stop listening error:', e)
-			setIsListening(false)
-		}
+	const handleTabPress = (idx: number) => {
+		setActiveTab(idx)
+		pagerRef.current?.scrollTo({ x: pageWidth * idx, animated: true })
 	}
 
-	const toggleVoiceInput = async () => {
-		if (isListening) {
-			await stopListening()
-		} else {
-			await startListening()
-		}
+	const handlePagerMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+		const nextTab = Math.min(Math.max(Math.round(event.nativeEvent.contentOffset.x / pageWidth), 0), 1)
+		if (nextTab !== activeTab) setActiveTab(nextTab)
 	}
+
 	// ── Save notes ──────────────────────────────────────────────────────────────
 	const handleSaveNotes = async () => {
-		if (!notes.trim()) {
-			Alert.alert('Info', 'Please add some consultation notes')
+		if (!noteCanvasData) {
+			Alert.alert('Info', 'Please add some consultation notes by drawing or speaking')
 			return
 		}
 		setSaving(true)
 		try {
+			// noteCanvasData is a base64 PNG – send to your API here
 			Alert.alert('Success', 'Consultation notes saved successfully')
 			navigation.goBack()
 		} catch {
@@ -639,9 +647,7 @@ export default function ConsultationPage() {
 	}
 
 	// ── Loading / error states ──────────────────────────────────────────────────
-	const loading = patientLoading
-
-	if (loading) {
+	if (patientLoading) {
 		return (
 			<View style={[styles.container, styles.centerContent]}>
 				<ActivityIndicator size="large" color={theme.colors.primary} />
@@ -702,7 +708,18 @@ export default function ConsultationPage() {
 							</Text>
 						</View>
 					</View>
-					<Button mode="contained" compact style={{ borderRadius: 20 }}>
+					<Button
+						mode="contained"
+						compact
+						style={{ borderRadius: 20 }}
+						onPress={() => {
+							setFollowUpDate(new Date())
+							setFollowUpSelectedSlot('')
+							setFollowUpSlots([])
+							setFollowUpHospitalId('')
+							setFollowUpOpen(true)
+						}}
+					>
 						+ Follow up
 					</Button>
 				</View>
@@ -719,7 +736,7 @@ export default function ConsultationPage() {
 									borderBottomWidth: 2,
 								},
 							]}
-							onPress={() => setActiveTab(idx)}
+							onPress={() => handleTabPress(idx)}
 						>
 							<Text
 								style={[
@@ -738,8 +755,16 @@ export default function ConsultationPage() {
 			</View>
 
 			{/* ── Content ── */}
-			<ScrollView contentContainerStyle={styles.content}>
-				{activeTab === 0 && (
+			<ScrollView
+				ref={pagerRef}
+				style={styles.pager}
+				horizontal
+				pagingEnabled
+				showsHorizontalScrollIndicator={false}
+				onMomentumScrollEnd={handlePagerMomentumEnd}
+				scrollEventThrottle={16}
+			>
+				<ScrollView style={[styles.tabPage, { width: pageWidth }]} contentContainerStyle={styles.content}>
 					<View>
 						{/* Patient Details */}
 						<Card style={styles.card}>
@@ -904,17 +929,12 @@ export default function ConsultationPage() {
 						{/* Past Medical History */}
 						<PastMedicalHistory />
 
-						{/* Consultation Notes */}
+						{/* ── Consultation Notes (Scribble + Speech) ── */}
 						<Card style={[styles.card, { borderColor: theme.colors.primary, borderWidth: 1 }]}>
+							{/* Doctor letterhead */}
 							<View style={styles.notesHeader}>
 								<View style={{ flex: 1 }}>
-									<Text
-										style={{
-											color: theme.colors.primary,
-											fontWeight: 'bold',
-											fontSize: 12,
-										}}
-									>
+									<Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 12 }}>
 										{doctor?.name ?? '--'}
 										{doctor?.degree ? `, ${doctor.degree}` : ''}
 									</Text>
@@ -923,13 +943,7 @@ export default function ConsultationPage() {
 									</Text>
 								</View>
 								<View style={{ flex: 1, alignItems: 'flex-end' }}>
-									<Text
-										style={{
-											color: theme.colors.primary,
-											fontWeight: 'bold',
-											fontSize: 12,
-										}}
-									>
+									<Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 12 }}>
 										{doctor?.clinicName ?? ''}
 									</Text>
 									<Text style={{ color: theme.colors.primary, fontSize: 10 }}>
@@ -937,47 +951,14 @@ export default function ConsultationPage() {
 									</Text>
 								</View>
 							</View>
-							<Divider />
-							<View style={styles.editorToolbar}>
-								{(
-									['undo', 'redo', 'format-text', 'camera-outline', 'format-list-bulleted'] as const
-								).map((icon) => (
-									<MaterialCommunityIcons
-										key={icon}
-										name={icon}
-										size={18}
-										color="#666"
-										style={{ marginHorizontal: 6 }}
-									/>
-								))}
 
-								{/* Microphone button with voice recording state */}
-								<TouchableOpacity onPress={toggleVoiceInput}>
-									<MaterialCommunityIcons
-										name={isListening ? 'microphone' : 'microphone-outline'}
-										size={18}
-										color={isListening ? '#e53935' : '#666'}
-										style={{ marginHorizontal: 6 }}
-									/>
-								</TouchableOpacity>
-
-								{/* Recording indicator */}
-								{isListening && (
-									<View style={styles.recordingIndicator}>
-										<View style={styles.recordingDot} />
-										<Text style={styles.recordingText}>Recording...</Text>
-									</View>
-								)}
-							</View>
 							<Divider />
-							<NativeInput
-								placeholder="Type or tap the microphone to speak your consultation notes..."
-								multiline
-								textAlignVertical="top"
-								value={notes}
-								onChangeText={setNotes}
-								style={styles.textArea}
-							/>
+
+							{/* Scribble + Speech editor – replaces the old NativeInput
+							<ScribbleNoteEditor
+								accentColor={theme.colors.primary}
+								onChange={(base64) => setNoteCanvasData(base64)}
+							/> */}
 						</Card>
 
 						{/* Share With */}
@@ -992,50 +973,58 @@ export default function ConsultationPage() {
 							Save
 						</Button>
 					</View>
-				)}
-
-				{activeTab === 1 && (
-					<Card style={styles.card}>
-						<Card.Content>
-							<Text variant="titleMedium" style={{ fontWeight: 'bold', marginBottom: 16 }}>
-								Vitals History
-							</Text>
-							{[
-								{ label: 'Heart Rate', value: '72 bpm', color: '#333' },
-								{ label: 'Blood Pressure', value: '140/90 mmHg', color: '#d32f2f' },
-								{ label: 'Temperature', value: '98.6 °F', color: '#333' },
-							].map((vital, i, arr) => (
-								<View
-									key={vital.label}
-									style={{
-										flexDirection: 'row',
-										justifyContent: 'space-between',
-										paddingVertical: 8,
-										borderBottomWidth: i < arr.length - 1 ? 1 : 0,
-										borderBottomColor: '#f0f0f0',
-									}}
-								>
-									<Text style={{ color: '#666', fontWeight: '500' }}>{vital.label}</Text>
-									<Text style={{ fontWeight: 'bold', color: vital.color }}>{vital.value}</Text>
-								</View>
-							))}
-						</Card.Content>
-					</Card>
-				)}
+				</ScrollView>
+				<View style={[styles.tabPage, styles.vitalsContent, { width: pageWidth }]}>
+					<VitalsTab patientId={patient?.id || patientId} />
+				</View>
 			</ScrollView>
 
-			{/* Snackbar for feedback messages */}
-			<Snackbar
-				visible={snackbarVisible}
-				onDismiss={() => setSnackbarVisible(false)}
-				duration={3000}
-				action={{
-					label: 'OK',
-					onPress: () => setSnackbarVisible(false),
-				}}
+			<Modal
+				visible={followUpOpen}
+				transparent
+				animationType="slide"
+				onRequestClose={() => setFollowUpOpen(false)}
 			>
-				{snackbarMessage}
-			</Snackbar>
+				<TouchableOpacity
+					activeOpacity={1}
+					style={styles.drawerBackdrop}
+					onPress={() => setFollowUpOpen(false)}
+				>
+					<TouchableOpacity activeOpacity={1} style={styles.drawerSheet} onPress={() => {}}>
+						<View style={styles.drawerHeader}>
+							<View>
+								<Text style={styles.drawerTitle}>Follow Up Appointment</Text>
+								<Text style={styles.drawerSubtitle}>{patient?.name ?? 'Patient'}</Text>
+							</View>
+							<TouchableOpacity style={styles.drawerCloseBtn} onPress={() => setFollowUpOpen(false)}>
+								<MaterialCommunityIcons name="close" size={18} color="#7a848d" />
+							</TouchableOpacity>
+						</View>
+						<ScrollView style={styles.drawerBody} contentContainerStyle={styles.drawerBodyContent}>
+							<DoctorHospitalDropdown />
+							<DateSlotPicker
+								selectedDate={followUpDate}
+								onDateChange={(date) => {
+									setFollowUpDate(date)
+									setFollowUpSelectedSlot('')
+								}}
+								selectedTime={followUpSelectedSlot}
+								onTimeChange={setFollowUpSelectedSlot}
+								availableSlots={followUpSlots}
+								loading={followUpSlotsLoading}
+							/>
+						</ScrollView>
+						<View style={styles.drawerActions}>
+							<TouchableOpacity style={styles.drawerCancelBtn} onPress={() => setFollowUpOpen(false)}>
+								<Text style={styles.drawerCancelBtnText}>Cancel</Text>
+							</TouchableOpacity>
+							<TouchableOpacity style={styles.drawerConfirmBtn} onPress={handleConfirmFollowUp}>
+								<Text style={styles.drawerConfirmBtnText}>Confirm</Text>
+							</TouchableOpacity>
+						</View>
+					</TouchableOpacity>
+				</TouchableOpacity>
+			</Modal>
 		</View>
 	)
 }
@@ -1050,6 +1039,15 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 		padding: 24,
+	},
+	vitalsContent: {
+		flex: 1,
+	},
+	pager: {
+		flex: 1,
+	},
+	tabPage: {
+		flex: 1,
 	},
 	header: {
 		paddingTop: 48,
@@ -1085,6 +1083,7 @@ const styles = StyleSheet.create({
 		marginHorizontal: 16,
 		marginBottom: 16,
 		backgroundColor: '#fff',
+		borderRadius: 12,
 	},
 	notesHeader: {
 		backgroundColor: '#e0f2f1',
@@ -1092,18 +1091,6 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		borderTopLeftRadius: 10,
 		borderTopRightRadius: 10,
-	},
-	editorToolbar: {
-		flexDirection: 'row',
-		padding: 8,
-		backgroundColor: '#fafafa',
-		alignItems: 'center',
-	},
-	textArea: {
-		height: 160,
-		padding: 12,
-		fontSize: 14,
-		color: '#333',
 	},
 	dicomModalContainer: {
 		flex: 1,
@@ -1126,20 +1113,89 @@ const styles = StyleSheet.create({
 	dicomModalBody: {
 		flex: 1,
 	},
-	recordingIndicator: {
+	drawerBackdrop: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.35)',
+		justifyContent: 'flex-end',
+		padding: 12,
+	},
+	drawerSheet: {
+		backgroundColor: '#fff',
+		borderRadius: 16,
+		maxHeight: '80%',
+		overflow: 'hidden',
+		borderWidth: 1,
+		borderColor: '#edf1f3',
+		width: '100%',
+		flexShrink: 1,
+	},
+	drawerHeader: {
 		flexDirection: 'row',
+		justifyContent: 'space-between',
 		alignItems: 'center',
-		marginLeft: 8,
+		paddingHorizontal: 16,
+		paddingVertical: 14,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e5eaee',
 	},
-	recordingDot: {
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-		backgroundColor: '#e53935',
-		marginRight: 4,
+	drawerCloseBtn: {
+		width: 28,
+		height: 28,
+		borderRadius: 14,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#f3f6f8',
 	},
-	recordingText: {
-		fontSize: 10,
-		color: '#e53935',
+	drawerBody: {
+		flexShrink: 1,
+	},
+	drawerBodyContent: {
+		paddingVertical: 14,
+	},
+	drawerTitle: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#233238',
+	},
+	drawerSubtitle: {
+		fontSize: 12,
+		color: '#62707a',
+		marginTop: 2,
+	},
+	drawerActions: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		gap: 10,
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#e5eaee',
+	},
+	drawerCancelBtn: {
+		borderRadius: 20,
+		borderWidth: 1,
+		borderColor: '#d5dde2',
+		paddingHorizontal: 22,
+		paddingVertical: 10,
+		flex: 1,
+		alignItems: 'center',
+	},
+	drawerCancelBtnText: {
+		color: '#60717d',
+		fontWeight: '600',
+		fontSize: 14,
+	},
+	drawerConfirmBtn: {
+		borderRadius: 20,
+		backgroundColor: '#3d7b7b',
+		paddingHorizontal: 22,
+		paddingVertical: 10,
+		flex: 1,
+		alignItems: 'center',
+	},
+	drawerConfirmBtnText: {
+		color: '#fff',
+		fontWeight: '700',
+		fontSize: 14,
 	},
 })

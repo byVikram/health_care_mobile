@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
+  type ImageSourcePropType,
   Modal,
   Pressable,
   ScrollView,
@@ -14,14 +15,30 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../context/AuthContext";
 import PatientQR from "../../assets/icons/PatientQR.svg";
-import ORCode  from "../../assets/icons/QrCode.png";
-import PatientQr from "../../features/patientQr/PatientQr"; // adjust path if needed
+const ORCode = require("../../assets/icons/QrCode.png");
+
+import PatientQr from "../../features/patientQr/PatientQr";
+import { USER_ROLES } from "../../constants/constants"; // adjust path if needed
+
 export interface AppSidebarItem {
   id: string;
   label: string;
   icon: keyof typeof MaterialCommunityIcons.glyphMap | React.ReactNode;
   onPress: () => void;
 }
+
+export interface AppSidebarProfile {
+  id: string;
+  label: string;
+  variant?: "smile" | "mom" | "dad" | "add";
+  avatar?: ImageSourcePropType;
+  avatarUrl?: string;
+}
+
+type ProfileAvatarVariant = Exclude<
+  NonNullable<AppSidebarProfile["variant"]>,
+  "add"
+>;
 
 interface AppSidebarProps {
   visible: boolean;
@@ -30,10 +47,19 @@ interface AppSidebarProps {
   onLogout: () => void;
   onEditProfile?: () => void;
   menuItems: AppSidebarItem[];
+  profiles?: AppSidebarProfile[];
 }
 
 const SIDEBAR_WIDTH = 290;
 const FALLBACK_IMAGE = require("../../assets/Banner/doctor.png");
+const PROFILE_AVATAR_FALLBACKS: Record<
+  ProfileAvatarVariant,
+  ImageSourcePropType
+> = {
+  smile: require("../../assets/Banner/patient.png"),
+  mom: require("../../assets/Banner/doctor.png"),
+  dad: require("../../assets/Banner/welcome-doctor.png"),
+};
 
 export default function AppSidebar({
   visible,
@@ -42,14 +68,18 @@ export default function AppSidebar({
   onLogout,
   onEditProfile,
   menuItems,
+  profiles = [],
 }: AppSidebarProps) {
   const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-const [showQR, setShowQR] = useState(false);
-  const userName = user?.name ?? user?.full_name ?? user?.username ?? "User";
-  const profileImageUrl = user?.profile_image ?? user?.photo ?? user?.avatar ?? null;
+  const { user, role } = useAuth();
+  const [showQR, setShowQR] = useState(false);
+ const userName = user?.name ?? "User";
+
+const profileImageUrl = user?.avatar ?? null;
   const imageSource = profileImageUrl ? { uri: profileImageUrl } : FALLBACK_IMAGE;
+
+  const isPatient = role === USER_ROLES.PATIENT;
 
   const progress =
     typeof profileCompletion === "number"
@@ -86,50 +116,95 @@ const [showQR, setShowQR] = useState(false);
           ]}
         >
           {/* ── Profile Section ── */}
-         <View style={styles.profileSection}>
+          <View style={styles.profileSection}>
+            {/* Avatar */}
+            <View style={styles.avatarWrapper}>
+              <Image source={imageSource} style={styles.avatarImage} />
+            </View>
 
-  {/* Avatar */}
-  <View style={styles.avatarWrapper}>
-    <Image source={imageSource} style={styles.avatarImage} />
-  </View>
+            {/* Center Info */}
+            <View style={styles.profileInfo}>
+              <Text style={styles.nameText}>{userName}</Text>
 
-  {/* Center Info */}
-  <View style={styles.profileInfo}>
-    <Text style={styles.nameText}>{userName}</Text>
+              <TouchableOpacity onPress={handleEditProfile}>
+                <Text style={styles.profileLink}>View and Edit profile</Text>
+              </TouchableOpacity>
 
-    <TouchableOpacity onPress={handleEditProfile}>
-      <Text style={styles.profileLink}>View and Edit profile</Text>
-    </TouchableOpacity>
+              {progress !== null && (
+                <Text style={styles.profileCompletion}>
+                  {progress}% Profile completed
+                </Text>
+              )}
+            </View>
 
-    {progress !== null && (
-      <Text style={styles.profileCompletion}>
-        {progress}% Profile completed
-      </Text>
-    )}
-  </View>
+            {/* QR Code - only for Patient */}
+            {isPatient && (
+              <TouchableOpacity
+                style={styles.qrRight}
+                onPress={() => setShowQR(true)}
+              >
+                <Image source={ORCode} style={styles.qrRight} />
+              </TouchableOpacity>
+            )}
+          </View>
 
-  {/* QR Code Right */}
- <TouchableOpacity
-  style={styles.qrRight}
-  onPress={() => setShowQR(true)}
->
- <Image source={ORCode} style={styles.qrRight} />
-</TouchableOpacity>
-<PatientQr
-  visible={showQR}
-  onClose={() => setShowQR(false)}
-  name={userName}
-  patientId="PID1120"
-  phone="+91 9876543210"
-  email="email@address.com"
-  address="KR Market Bengaluru"
-  image={imageSource}
-/>
-</View>
           <View style={styles.separator} />
 
+          {isPatient && profiles.length > 0 && (
+            <>
+              <View style={styles.profilesSection}>
+                <Text style={styles.profilesTitle}>Profiles</Text>
+                <View style={styles.profilesRow}>
+                  {profiles.map((profile) => {
+                    const isAdd = profile.variant === "add";
+                    const profileAvatarVariant: ProfileAvatarVariant =
+                      profile.variant && profile.variant !== "add"
+                        ? profile.variant
+                        : "smile";
+                    const profileAvatarSource =
+                      profile.avatar ??
+                      (profile.avatarUrl ? { uri: profile.avatarUrl } : null) ??
+                      PROFILE_AVATAR_FALLBACKS[profileAvatarVariant];
+
+                    return (
+                      <TouchableOpacity
+                        key={profile.id}
+                        style={styles.profileOption}
+                        activeOpacity={0.75}
+                      >
+                        <View
+                          style={[
+                            styles.profileCircle,
+                            isAdd && styles.profileCircleAdd,
+                          ]}
+                        >
+                          {isAdd ? (
+                            <MaterialCommunityIcons name="plus" size={34} color="#ffffff" />
+                          ) : (
+                            <Image
+                              source={profileAvatarSource}
+                              style={styles.profileCircleImage}
+                            />
+                          )}
+                        </View>
+                        <Text style={styles.profileOptionLabel} numberOfLines={1}>
+                          {profile.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.separator} />
+            </>
+          )}
+
           {/* ── Menu Items ── */}
-          <ScrollView style={styles.menuSection} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.menuSection}
+            showsVerticalScrollIndicator={false}
+          >
             {menuItems.map((item) => (
               <TouchableOpacity
                 key={item.id}
@@ -142,7 +217,9 @@ const [showQR, setShowQR] = useState(false);
               >
                 {typeof item.icon === "string" ? (
                   <MaterialCommunityIcons
-                    name={item.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                    name={
+                      item.icon as keyof typeof MaterialCommunityIcons.glyphMap
+                    }
                     size={20}
                     color="#41565c"
                   />
@@ -150,7 +227,11 @@ const [showQR, setShowQR] = useState(false);
                   item.icon
                 )}
                 <Text style={styles.menuLabel}>{item.label}</Text>
-                <MaterialCommunityIcons name="chevron-right" size={18} color="#9aa4a8" />
+                <MaterialCommunityIcons
+                  name="chevron-right"
+                  size={18}
+                  color="#9aa4a8"
+                />
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -162,6 +243,20 @@ const [showQR, setShowQR] = useState(false);
           </TouchableOpacity>
         </Animated.View>
       </View>
+
+      {/* QR Modal - only for Patient */}
+      {isPatient && (
+        <PatientQr
+          visible={showQR}
+          onClose={() => setShowQR(false)}
+          name={userName}
+          patientId="PID1120"
+          phone="+91 9876543210"
+          email="email@address.com"
+          address="KR Market Bengaluru"
+          image={imageSource}
+        />
+      )}
     </Modal>
   );
 }
@@ -178,40 +273,108 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   profileSection: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between", // 🔥 important
-  paddingVertical: 14,
-},
-  avatarWrapper: { width: 70, height: 80, borderRadius: 12, overflow: "hidden", backgroundColor: "#e8f0f2" },
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+  },
+  avatarWrapper: {
+    width: 70,
+    height: 80,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#e8f0f2",
+  },
   avatarImage: { width: "100%", height: "100%" },
- profileInfo: {
-  flex: 1,
-  marginHorizontal: 2, // 🔥 spacing between avatar & QR
-},
-  nameText: { fontSize: 16, fontWeight: "700", color: "#142b30", marginBottom: 2 },
-  profileLink: { fontSize: 12, color: "#1f8c9e", marginTop: 2, textDecorationLine: "underline" },
-  progressBarBg: { marginTop: 6, height: 4, borderRadius: 2, backgroundColor: "#e0ecee", overflow: "hidden" },
-  progressBarFill: { height: "100%", borderRadius: 2, backgroundColor: "#2f8c58" },
-  profileCompletion: { fontSize: 11, color: "#2f8c58", marginTop: 3 },
+  profileInfo: {
+    flex: 1,
+    marginHorizontal: 2,
+  },
+  nameText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#142b30",
+    marginBottom: 2,
+  },
+  profileLink: {
+    fontSize: 12,
+    color: "#1f8c9e",
+    marginTop: 2,
+    textDecorationLine: "underline",
+  },
+  profileCompletion: {
+    fontSize: 11,
+    color: "#2f8c58",
+    marginTop: 3,
+  },
   separator: { height: 1, backgroundColor: "#e9eef0" },
+  profilesSection: {
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  profilesTitle: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#142b30",
+    marginBottom: 14,
+  },
+  profilesRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  profileOption: {
+    width: 58,
+    alignItems: "center",
+  },
+  profileCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    overflow: "hidden",
+    backgroundColor:'#d1cacad8',
+    borderColor:'#474646',
+    borderWidth:0.8,
+  },
+  profileCircleAdd: {
+    backgroundColor: "#252525",
+  },
+  profileCircleImage: {
+    width: "100%",
+    height: "100%",
+  },
+  profileOptionLabel: {
+    fontSize: 12,
+    color: "#142b30",
+    textAlign: "center",
+  },
   menuSection: { flex: 1, paddingTop: 10 },
   menuItem: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f0f3f4",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f3f4",
   },
-qrRight: {
-  width: 65,
-  height: 65,
-
-  borderRadius: 8,
-  justifyContent: "center",
-  alignItems: "center",
-},
+  qrRight: {
+    width: 65,
+    height: 65,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   menuLabel: { flex: 1, fontSize: 14, color: "#24373d" },
   logoutItem: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    paddingVertical: 14, borderTopWidth: 1, borderTopColor: "#e9eef0",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#e9eef0",
   },
   logoutText: { color: "#c63e3e", fontWeight: "700", fontSize: 14 },
 });

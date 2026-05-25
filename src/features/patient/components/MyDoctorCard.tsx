@@ -3,6 +3,7 @@ import {
     Image,
     ImageSourcePropType,
     StyleSheet,
+    TouchableOpacity,
     View,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -10,13 +11,19 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { AppTypography } from '../../../components/common';
 
 export type DoctorCardItem = {
+    id?: string;
     image: ImageSourcePropType | string;
     name: string;
     speciality: string;
     experience: string;
+    location?: string;
 };
 
-type MyDoctorCardProps = DoctorCardItem;
+type MyDoctorCardProps = DoctorCardItem & {
+    saved?: boolean;
+    disabled?: boolean;
+    onToggleSaved?: () => void;
+};
 
 const FALLBACK_DOCTOR_IMAGE = require('../../../assets/Banner/doctor.png');
 
@@ -25,6 +32,10 @@ export default function MyDoctorCard({
     name,
     speciality,
     experience,
+    location,
+    saved = false,
+    disabled = false,
+    onToggleSaved,
 }: MyDoctorCardProps) {
     const imageSource =
         typeof image === 'string' ? { uri: image } : image || FALLBACK_DOCTOR_IMAGE;
@@ -59,7 +70,33 @@ export default function MyDoctorCard({
                         {experience}
                     </AppTypography>
                 </View>
+
+                {!!location && (
+                    <View style={[styles.metaRow, styles.locationRow]}>
+                        <MaterialCommunityIcons
+                            name="map-marker-outline"
+                            size={14}
+                            color="#7f98a3"
+                        />
+                        <AppTypography variant="caption" style={styles.metaText} numberOfLines={1}>
+                            {location}
+                        </AppTypography>
+                    </View>
+                )}
             </View>
+
+            <TouchableOpacity
+                style={[styles.bookmarkButton, disabled && styles.bookmarkButtonDisabled]}
+                onPress={onToggleSaved}
+                disabled={disabled}
+                activeOpacity={0.75}
+            >
+                <MaterialCommunityIcons
+                    name={saved ? 'bookmark' : 'bookmark-outline'}
+                    size={24}
+                    color={saved ? '#245f67' : '#8ca0a9'}
+                />
+            </TouchableOpacity>
         </View>
     );
 }
@@ -73,7 +110,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#d9e6eb',
         padding: 12,
-        marginBottom: 14,
         shadowColor: '#12343b',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
@@ -95,6 +131,7 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         justifyContent: 'center',
+        paddingRight: 10,
     },
     name: {
         fontSize: 17,
@@ -116,5 +153,19 @@ const styles = StyleSheet.create({
         marginLeft: 5,
         color: '#7f98a3',
         fontSize: 11,
+    },
+    locationRow: {
+        marginTop: 3,
+    },
+    bookmarkButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f2f7f8',
+    },
+    bookmarkButtonDisabled: {
+        opacity: 0.55,
     },
 });

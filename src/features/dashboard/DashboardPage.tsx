@@ -1,14 +1,25 @@
 ﻿import React, { useEffect, useState } from 'react'
-import { ScrollView, StyleSheet, TouchableOpacity, Text, View, useWindowDimensions } from 'react-native'
-import { useTheme } from 'react-native-paper'
-import { useNavigation, NavigationProp } from '@react-navigation/native'
+import {
+	RefreshControl,
+	ScrollView,
+	StyleSheet,
+	TouchableOpacity,
+	Text,
+	View,
+	useWindowDimensions,
+} from 'react-native'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import HeroSection from './HeroSection'
 import SpecialitySection from './SpecialitySection'
 import ConsultSection from './ConsultSection'
-import CommunityBlogsSection from './CommunityBlogsSection'
 import PatientQuestionsSection from './PatientQuestionsSection'
-
+import PharmacyOrder from './PharmacyOrder'
+import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
+import CommunitySection from './CommunitySection'
+import LocationScreen from '../../components/common/LocationScreen'
+import { GPSLocationCard } from '../../components/common/GPSLocationCard'
+import BlogsSection from './BlogsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
 import { getAppointments, Appointment } from '../doctor/doctorService'
 
@@ -19,24 +30,27 @@ import StatusModal from '../../components/common/StatusModal'
 
 import TreatmentHistoryIcon from '../../assets/icons/treatmenthistory.svg'
 import TreatmentHistoryArrowIcon from '../../assets/icons/treatmenthistory-icon.svg'
+import { ROUTES } from '../../navigation/routes'
+import type { AppNavigationParamList } from '../../navigation/types'
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
-	// const isTablet = width >= 768
 	const isTablet = width >= 768
 	const isLandscape = width > 1024
 
 	const { role } = useAuth()
-	const isDoctor = role === USER_ROLES.DOCTOR
-	const navigation = useNavigation<NavigationProp<any>>()
+	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
 
 	const [appointments, setAppointments] = useState<Appointment[]>([])
 	const [apptLoading, setApptLoading] = useState(false)
 	const [apptError, setApptError] = useState('')
+	const [refreshing, setRefreshing] = useState(false)
+	const [refreshToken, setRefreshToken] = useState(0)
 	const [modalType, setModalType] = useState<'success' | 'error' | null>(null)
 
 	const [selectedDate, setSelectedDate] = useState(0)
 
+	// ---------------- WEEK DAYS ----------------
 	const buildWeekDays = () => {
 		const today = new Date()
 		const days = []
@@ -56,15 +70,18 @@ export default function DashboardPage() {
 
 	const [weekDays] = useState(() => buildWeekDays())
 
+	// ---------------- DOCTOR API ----------------
 	useEffect(() => {
-		if (!isDoctor) return
+		if (role !== USER_ROLES.DOCTOR) return
 
 		const fetchAppointments = async () => {
 			try {
 				setApptLoading(true)
 				setApptError('')
 
-				const dateStr = formatDateForApi(weekDays[selectedDate]?.dateObj ?? new Date())
+				const dateStr = formatDateForApi(
+					weekDays[selectedDate]?.dateObj ?? new Date()
+				)
 
 				const res = await getAppointments({
 					appointment_date: dateStr,
@@ -83,12 +100,45 @@ export default function DashboardPage() {
 		}
 
 		fetchAppointments()
-	}, [isDoctor, selectedDate, weekDays])
+	}, [role, selectedDate, weekDays])
 
-	function handleRetry() {
-		setModalType(null)
+	const handleRefresh = async () => {
+		setRefreshing(true)
+
+		try {
+			if (role === USER_ROLES.DOCTOR) {
+				setApptError('')
+
+				const dateStr = formatDateForApi(
+					weekDays[selectedDate]?.dateObj ?? new Date()
+				)
+
+				const res = await getAppointments({
+					appointment_date: dateStr,
+				})
+
+				if (res.success) {
+					setAppointments(Array.isArray(res.data) ? (res.data as Appointment[]) : [])
+				} else {
+					setApptError(res.message ?? 'Failed to load appointments')
+				}
+			} else if (role === USER_ROLES.PHARMACY) {
+				setRefreshing(false)
+			} else {
+				setRefreshToken((token) => token + 1)
+			}
+		} catch {
+			if (role === USER_ROLES.DOCTOR) {
+				setApptError('Failed to load appointments')
+			}
+		} finally {
+			if (role === USER_ROLES.DOCTOR) {
+				setRefreshing(false)
+			}
+		}
 	}
 
+	// ---------------- DOCTOR PANEL ----------------
 	const renderDoctorPanel = () => (
 		<DoctorAppointments
 			selectedDate={selectedDate}
@@ -101,20 +151,91 @@ export default function DashboardPage() {
 		/>
 	)
 
+	// ---------------- PATIENT PANEL ----------------
 	const renderUserPanel = () => (
 		<>
-			<TouchableOpacity activeOpacity={0.85} style={styles.treatmentHistoryCard}>
+			<TouchableOpacity style={styles.treatmentHistoryCard}>
 				<View style={styles.treatmentHistoryLeft}>
 					<TreatmentHistoryIcon width={52} height={52} />
-					<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
+					<Text style={styles.treatmentHistoryTitle}>
+						Treatment History
+					</Text>
 				</View>
 				<TreatmentHistoryArrowIcon width={26} height={26} />
 			</TouchableOpacity>
+
+			<PatientUpcomingAppointments
+				refreshToken={refreshToken}
+				onRefreshComplete={() => setRefreshing(false)}
+				onJoin={(appointment) =>
+					navigation.navigate(ROUTES.STACK.VIDEO_CONSULTATION, {
+						appointmentId: appointment.id,
+					})
+				}
+			/>
 
 			<SpecialitySection />
 			<ConsultSection />
 		</>
 	)
+
+	// ---------------- PHARMACY PANEL ----------------
+	const renderPharmacyPanel = () => (
+		<>
+			 <LocationScreen /> 
+			 <GPSLocationCard />
+		</>
+	)
+
+	// ---------------- ROLE SWITCH ----------------
+	const renderRoleBasedPanel = () => {
+		switch (role) {
+			case USER_ROLES.DOCTOR:
+				return renderDoctorPanel()
+
+			case USER_ROLES.PHARMACY:
+				return renderPharmacyPanel()
+
+			default:
+				return renderUserPanel()
+		}
+	}
+
+	// ---- Helper: main content (hero + role panel) ----
+	const renderMainContent = () => {
+		if (isTablet) {
+			return (
+				<View style={styles.tabletRow}>
+					{/* HERO */}
+					<View
+						style={[
+							styles.heroColumn,
+							isLandscape && styles.heroColumnHalf,
+						]}
+					>
+						<HeroSection role={role} />
+					</View>
+
+					{/* ROLE PANEL */}
+					<View
+						style={[
+							styles.column,
+							isLandscape && styles.rightColumnHalf,
+						]}
+					>
+						{renderRoleBasedPanel()}
+					</View>
+				</View>
+			)
+		}
+		// Mobile: stack vertically
+		return (
+			<>
+				<HeroSection role={role} />
+				{renderRoleBasedPanel()}
+			</>
+		)
+	}
 
 	return (
 		<>
@@ -122,56 +243,44 @@ export default function DashboardPage() {
 				style={styles.container}
 				contentContainerStyle={styles.content}
 				showsVerticalScrollIndicator={false}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={handleRefresh}
+						colors={['#0c7c7c']}
+						tintColor="#0c7c7c"
+						progressBackgroundColor="#ffffff"
+					/>
+				}
 			>
-				{/* MAIN RESPONSIVE LAYOUT */}
-				{isTablet ? (
-					<View style={styles.tabletRow}>
-						{/* HERO SECTION - Left Column */}
-						<View style={[styles.heroColumn, isLandscape && styles.heroColumnHalf]}>
-							<HeroSection />
-						</View>
+				{/* For PHARMACY role: show PharmacyOrder at the top (before HeroSection) */}
+				{role === USER_ROLES.PHARMACY && <PharmacyOrder />}
 
-						{/* RIGHT SIDE - Appointments/Treatment History */}
-						<View style={[styles.column, isLandscape && styles.rightColumnHalf]}>
-							{isDoctor ? renderDoctorPanel() : renderUserPanel()}
-						</View>
-					</View>
-				) : (
-					<>
-						{/* Mobile View - Hero then panels stacked */}
-						<HeroSection />
-						{isDoctor ? renderDoctorPanel() : renderUserPanel()}
-					</>
-				)}
+				{renderMainContent()}
 
-				{/* COMMON SECTIONS */}
-				<CommunityBlogsSection />
-				<PatientQuestionsSection />
+				{/* Common sections for all roles */}
+				<CommunitySection />
+				<BlogsSection />
+
+				{/* PatientQuestionsSection is NOT rendered for Pharmacy */}
+				{role !== USER_ROLES.PHARMACY && <PatientQuestionsSection />}
 			</ScrollView>
 
 			<StatusModal
 				visible={modalType !== null}
 				status={modalType === 'success' ? 'success' : 'error'}
-				title={modalType === 'success' ? 'Your appointment is successfully booked' : 'Booking Failed'}
+				title={
+					modalType === 'success'
+						? 'Success'
+						: 'Booking Failed'
+				}
 				description={
 					modalType === 'success'
-						? 'The update will appear in your profile.'
-						: 'Something went wrong. Please try again.'
+						? 'Updated successfully'
+						: 'Something went wrong'
 				}
 				submitText={modalType === 'success' ? 'Go Home' : 'Try Again'}
-				cancelText={modalType === 'error' ? 'Go Home' : undefined}
-				onSubmit={() => {
-					if (modalType === 'success') {
-						setModalType(null)
-						navigation.navigate('Home')
-					} else {
-						handleRetry()
-					}
-				}}
-				onCancel={() => {
-					setModalType(null)
-					navigation.navigate('Home')
-				}}
+				onSubmit={() => setModalType(null)}
 			/>
 		</>
 	)
@@ -203,19 +312,26 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 
+	heroColumn: {
+		flex: 1,
+	},
+
+	heroColumnHalf: {
+		flex: 0.5,
+	},
+
+	rightColumnHalf: {
+		flex: 0.5,
+	},
+
 	treatmentHistoryCard: {
 		marginHorizontal: 16,
 		marginTop: 8,
-		marginBottom: 12,
-		minHeight: 64,
-		paddingHorizontal: 12,
+		padding: 14,
 		borderWidth: 1,
 		borderColor: '#CFDBDD',
 		borderRadius: 10,
 		backgroundColor: '#fff',
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
 	},
 
 	treatmentHistoryLeft: {
@@ -228,17 +344,5 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '500',
 		color: '#30353A',
-	},
-
-	heroColumn: {
-		flex: 1,
-	},
-
-	heroColumnHalf: {
-		flex: 0.5, // Adjust ratio as needed
-	},
-
-	rightColumnHalf: {
-		flex: 0.5, // Adjust ratio as needed
 	},
 })
