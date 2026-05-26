@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import { verifyOtp } from '../authService'
 import { useAuth, UserRole } from '../../../context/AuthContext'
+import * as Device from 'expo-device'
 
 interface Props {
     contactNumber: string
@@ -65,7 +66,21 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
         setError('')
 
         try {
-            const response = await verifyOtp(contactNumber, code)
+            const deviceName = Device.deviceName
+            const deviceMetadata = {
+                manufacturer: Device.manufacturer,
+                model: Device.modelName,
+                os_version: Device.osVersion,
+                brand: Device.brand,
+            }
+            const response = await verifyOtp({
+                contact_number: contactNumber, 
+                otp: code,
+                device_name: deviceName,
+                device_type: Platform.OS,
+                fcm_token: null,
+                device_metadata: deviceMetadata,
+            })
             if (response.success === false || !response.data?.access_token || !response.data?.refresh_token) {
                 throw new Error(response.message || 'OTP verification failed')
             }
