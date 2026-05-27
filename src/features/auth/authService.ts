@@ -56,11 +56,26 @@ export const sendOtp = async (contactNumber: string): Promise<SendOtpResponse> =
 	return res.data
 }
 
-export const verifyOtp = async (contactNumber: string, otp: string): Promise<VerifyOtpResponse> => {
-	const res = await ApiService.post<VerifyOtpResponse>(API_ENDPOINTS.AUTH.VERIFY_OTP, {
-		contact_number: contactNumber,
-		otp,
-	})
+export interface VerifyOtpRequest {
+	contact_number: string
+	otp: string
+
+	device_type: string
+	device_name?: string | null
+
+	fcm_token?: string | null
+
+	device_metadata?: Record<string, unknown>
+}
+
+export const verifyOtp = async (
+	data: VerifyOtpRequest
+): Promise<VerifyOtpResponse> => {
+	const res = await ApiService.post<VerifyOtpResponse>(
+		API_ENDPOINTS.AUTH.VERIFY_OTP,
+		data
+	)
+
 	return res.data
 }
 

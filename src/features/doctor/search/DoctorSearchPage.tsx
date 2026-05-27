@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
 	View,
 	StyleSheet,
 	FlatList,
 	RefreshControl,
+	ActivityIndicator,
 	useWindowDimensions,
 	DimensionValue,
 } from 'react-native'
@@ -18,6 +19,8 @@ import { doctorCardStyles } from './components/DoctorCard.styles'
 import type { RouteProp } from '@react-navigation/native'
 import type { AppStackParamList } from '../../../navigation/types'
 import { ROUTES } from '../../../navigation/routes'
+
+const PAGE_LIMIT = 5
 
 // ─── Doctor Card Skeleton ─────────────────────────────────────────────────
 function DoctorCardSkeleton({ mobile = false }: { mobile?: boolean }) {
@@ -71,16 +74,28 @@ export default function DoctorSearchPage() {
 	const [doctors, setDoctors] = useState<DoctorSearchItem[]>([])
 	const [loading, setLoading] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
+	const [page, setPage] = useState(1)
+	const [loadingMore, setLoadingMore] = useState(false)
+	const [hasMore, setHasMore] = useState(true)
+	const isFetchingPageRef = useRef(false)
 
 	// Fetch the base doctor list. Search and speciality tabs are applied locally.
-	const fetchDoctorsList = async (isRefresh = false) => {
-		if (!isRefresh) setLoading(true)
+	const fetchDoctorsList = async (targetPage = 1, isRefresh = false, isLoadMore = false) => {
+		if (isFetchingPageRef.current) return
+		isFetchingPageRef.current = true
+
+		if (isLoadMore) {
+			setLoadingMore(true)
+		} else if (!isRefresh) {
+			setLoading(true)
+		}
 		try {
 			// 🔁 ADJUST THIS MAPPING TO MATCH YOUR BACKEND
 			// Option 1: if backend expects 'q' instead of 'search'
 			// Option 2: if backend expects 'speciality' instead of 'speciality_id'
 			const params = {
-				limit: 50,
+				page: targetPage,
+				limit: PAGE_LIMIT,
 			}
 
 			console.log('📤 Sending params:', JSON.stringify(params, null, 2))
@@ -89,27 +104,44 @@ export default function DoctorSearchPage() {
 			console.log('📥 API response:', JSON.stringify(res, null, 2))
 
 			if (res.success && res.data) {
-				setDoctors(res.data)
+				const newData = res.data
+				setDoctors((prev) => (targetPage === 1 ? newData : [...prev, ...newData]))
+				setPage(targetPage)
+				setHasMore(newData.length >= PAGE_LIMIT)
 			} else {
-				setDoctors([])
+				if (targetPage === 1) setDoctors([])
+				setHasMore(false)
 			}
 		} catch (error) {
 			console.error('Error fetching doctors:', error)
-			setDoctors([])
+			if (targetPage === 1) setDoctors([])
 		} finally {
 			setLoading(false)
 			setRefreshing(false)
+			setLoadingMore(false)
+			isFetchingPageRef.current = false
 		}
 	}
 
 	useEffect(() => {
-		fetchDoctorsList()
+		fetchDoctorsList(1)
 	}, [])
 
 	const onRefresh = useCallback(() => {
+		if (isFetchingPageRef.current) return
 		setRefreshing(true)
-		fetchDoctorsList(true)
+		setPage(1)
+		setDoctors([])
+		setHasMore(true)
+		fetchDoctorsList(1, true)
 	}, [])
+
+	const handleEndReached = useCallback(() => {
+		if (isFetchingPageRef.current || loading || refreshing || loadingMore || !hasMore) return
+		console.log('🔥 Loading next page:', page + 1)
+
+		fetchDoctorsList(page + 1, false, true)
+	}, [hasMore, loading, loadingMore, page, refreshing])
 
 	const handleSearchSubmit = () => {
 		// The visible list is controlled by speciality tabs only on this page.
@@ -132,6 +164,12 @@ export default function DoctorSearchPage() {
 	const listData = loading && !refreshing ? Array(6).fill({}) : displayedDoctors
 	const keyExtractor = (item: any, index: number) =>
 		item.id ? String(item.id) : `skeleton-${index}`
+	const renderFooter = () =>
+		loadingMore ? (
+			<View style={styles.footerLoader}>
+				<ActivityIndicator size="small" color="#888" />
+			</View>
+		) : null
 
 	return (
 		<View style={styles.container}>
@@ -168,7 +206,7 @@ export default function DoctorSearchPage() {
 			</View> */}
 
 			{/* Results or empty state */}
-			{!loading && displayedDoctors.length === 0 ? (
+			{!loading && !refreshing && displayedDoctors.length === 0 ? (
 				<View style={styles.emptyContainer}>
 					<MaterialCommunityIcons name="magnify-close" size={48} color="#ccc" />
 					<AppTypography variant="body" style={styles.emptyText}>
@@ -210,6 +248,9 @@ export default function DoctorSearchPage() {
 						isMobile && { paddingHorizontal: mobileListPadding },
 					]}
 					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+					onEndReached={handleEndReached}
+					onEndReachedThreshold={0.6}
+					ListFooterComponent={renderFooter}
 					removeClippedSubviews={true}
 					maxToRenderPerBatch={6}
 					initialNumToRender={6}
@@ -269,4 +310,9 @@ const styles = StyleSheet.create({
 	},
 	emptyText: { fontWeight: '600', color: '#888' },
 	emptySubtext: { color: '#aaa', textAlign: 'center', paddingHorizontal: 40 },
+	footerLoader: {
+		paddingVertical: 16,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
 })
