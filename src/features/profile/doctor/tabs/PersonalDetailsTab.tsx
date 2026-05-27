@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert } from 'react-native'
+import { ActivityIndicator, Alert, Image } from 'react-native'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import {
 	FlatList,
@@ -13,6 +13,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import { TextInput as PaperTextInput } from 'react-native-paper'
 import { AppInput, AppSelect, AppSelectOption, AppTypography } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
@@ -22,6 +23,7 @@ import { doctorService } from '../../../consultation/ConsultationService'
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say']
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Marathi', 'Bengali']
 const GENDER_SELECT_OPTIONS: AppSelectOption[] = GENDER_OPTIONS.map((option) => ({ label: option, value: option }))
+const DEFAULT_PROFILE_IMAGE = require('../../../../assets/Banner/doctor.png')
 
 type InputFieldProps = {
 	label: string
@@ -419,6 +421,12 @@ type SocialErrors = {
 	twitter?: string
 }
 
+type ProfileImageUpload = {
+	uri: string
+	name: string
+	type: string
+}
+
 const formatDobForDisplay = (value?: string) => {
 	if (!value) return ''
 	if (/^\d{2}-\d{2}-\d{4}$/.test(value)) return value
@@ -457,6 +465,10 @@ export default function PersonalDetailsTab() {
 	const [socialErrors, setSocialErrors] = useState<SocialErrors>({})
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
+	const [profilePhotoUri, setProfilePhotoUri] = useState(user?.avatar || '')
+	const [profilePhotoUpload, setProfilePhotoUpload] = useState<ProfileImageUpload | null>(null)
+	const [isProfilePhotoRemoved, setIsProfilePhotoRemoved] = useState(false)
+	const [photoSheetVisible, setPhotoSheetVisible] = useState(false)
 
 	const updateFormData = <K extends keyof PersonalDetailsFormData>(key: K, value: PersonalDetailsFormData[K]) => {
 		setFormData((prev) => ({
@@ -473,6 +485,76 @@ export default function PersonalDetailsTab() {
 				[field]: undefined,
 			}))
 		}
+	}
+
+	const closePhotoSheet = () => setPhotoSheetVisible(false)
+
+	const prepareProfileImageUpload = (asset: ImagePicker.ImagePickerAsset): ProfileImageUpload => {
+		const fileName = asset.fileName || asset.uri.split('/').pop() || `doctor-profile-${Date.now()}.jpg`
+		const extension = fileName.split('.').pop()?.toLowerCase()
+		const mimeType = asset.mimeType || (extension ? `image/${extension === 'jpg' ? 'jpeg' : extension}` : 'image/jpeg')
+
+		return {
+			uri: asset.uri,
+			name: fileName,
+			type: mimeType,
+		}
+	}
+
+	const applySelectedProfilePhoto = (asset: ImagePicker.ImagePickerAsset) => {
+		setProfilePhotoUri(asset.uri)
+		setProfilePhotoUpload(prepareProfileImageUpload(asset))
+		setIsProfilePhotoRemoved(false)
+	}
+
+	const takeProfilePhoto = async () => {
+		closePhotoSheet()
+		const permission = await ImagePicker.requestCameraPermissionsAsync()
+
+		if (!permission.granted) {
+			Alert.alert('Permission needed', 'Please allow camera access to take a profile photo.')
+			return
+		}
+
+		const result = await ImagePicker.launchCameraAsync({
+			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			allowsEditing: true,
+			aspect: [1, 1],
+			quality: 0.8,
+		})
+
+		if (!result.canceled && result.assets.length > 0) {
+			applySelectedProfilePhoto(result.assets[0])
+		}
+	}
+
+	const chooseProfilePhoto = async () => {
+		closePhotoSheet()
+		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+		if (!permission.granted) {
+			Alert.alert('Permission needed', 'Please allow photo library access to choose a profile photo.')
+			return
+		}
+
+		const result = await ImagePicker.launchImageLibraryAsync({
+			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			allowsEditing: true,
+			aspect: [1, 1],
+			allowsMultipleSelection: false,
+			quality: 0.8,
+		})
+
+		if (!result.canceled && result.assets.length > 0) {
+			applySelectedProfilePhoto(result.assets[0])
+		}
+	}
+
+	const removeProfilePhoto = () => {
+		closePhotoSheet()
+		setProfilePhotoUri('')
+		setProfilePhotoUpload(null)
+		setIsProfilePhotoRemoved(true)
 	}
 
 	const handleSocialBlur = (field: keyof SocialErrors) => {
@@ -493,6 +575,9 @@ export default function PersonalDetailsTab() {
 				if (!response?.success || !response.data) return
 
 				const profile = mapDoctorProfileApi(response.data)
+				setProfilePhotoUri(profile.personal.avatar || '')
+				setProfilePhotoUpload(null)
+				setIsProfilePhotoRemoved(false)
 				setFormData({
 					name: profile.personal.name || user?.name || '',
 					email: profile.personal.email || user?.email || '',
@@ -596,12 +681,15 @@ export default function PersonalDetailsTab() {
 				instagram_url: trimmedInstagram,
 				facebook_url: trimmedFacebook,
 				twitter_url: trimmedTwitter,
+				...(profilePhotoUpload ? { avatar: profilePhotoUpload } : {}),
+				...(isProfilePhotoRemoved ? { avatar: null, avatar_s3_key: null } : {}),
 			}
 
 			await doctorService.updateDoctorProfile(payload)
 			await updateUser({
 				name: trimmedName,
 				email: trimmedEmail || user?.email,
+				avatar: isProfilePhotoRemoved ? undefined : profilePhotoUri || user?.avatar,
 			})
 			setFormData((prev) => ({
 				...prev,
@@ -665,6 +753,25 @@ export default function PersonalDetailsTab() {
 				<AppTypography variant="h3" style={[styles.title, { marginBottom: titleBottom }]}>
 					Personal Details
 				</AppTypography>
+
+				<View style={styles.profilePhotoSection}>
+					<View style={styles.profilePhotoWrapper}>
+						<Image
+							source={profilePhotoUri ? { uri: profilePhotoUri } : DEFAULT_PROFILE_IMAGE}
+							style={styles.profilePhoto}
+							resizeMode="cover"
+						/>
+						<TouchableOpacity
+							style={styles.profilePhotoEditButton}
+							onPress={() => setPhotoSheetVisible(true)}
+							activeOpacity={0.85}
+							accessibilityRole="button"
+							accessibilityLabel="Edit profile photo"
+						>
+							<MaterialCommunityIcons name="camera-outline" size={15} color="#0c7c7c" />
+						</TouchableOpacity>
+					</View>
+				</View>
 
 				<View style={{ marginBottom: rowSpacing }}>
 					<InputField
@@ -854,6 +961,32 @@ export default function PersonalDetailsTab() {
 					)}
 				</TouchableOpacity>
 			</View>
+
+			<Modal visible={photoSheetVisible} transparent animationType="slide" onRequestClose={closePhotoSheet}>
+				<Pressable style={styles.photoSheetOverlay} onPress={closePhotoSheet}>
+					<Pressable style={styles.photoSheet} onPress={(event) => event.stopPropagation()}>
+						<View style={styles.photoSheetHandle} />
+						<TouchableOpacity style={styles.photoSheetOption} onPress={takeProfilePhoto} activeOpacity={0.85}>
+							<MaterialCommunityIcons name="camera-outline" size={22} color="#0c7c7c" />
+							<AppTypography variant="body" style={styles.photoSheetOptionText}>
+								Take Photo
+							</AppTypography>
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.photoSheetOption} onPress={chooseProfilePhoto} activeOpacity={0.85}>
+							<MaterialCommunityIcons name="image-outline" size={22} color="#0c7c7c" />
+							<AppTypography variant="body" style={styles.photoSheetOptionText}>
+								Choose from Library
+							</AppTypography>
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.photoSheetOption} onPress={removeProfilePhoto} activeOpacity={0.85}>
+							<MaterialCommunityIcons name="trash-can-outline" size={22} color="#d84545" />
+							<AppTypography variant="body" style={[styles.photoSheetOptionText, styles.photoSheetDeleteText]}>
+								Remove Current Picture
+							</AppTypography>
+						</TouchableOpacity>
+					</Pressable>
+				</Pressable>
+			</Modal>
 		</ScrollView>
 	)
 }
@@ -875,6 +1008,35 @@ const styles = StyleSheet.create({
 	},
 	contentShell: {
 		width: '100%',
+	},
+	profilePhotoSection: {
+		alignItems: 'center',
+		marginBottom: 18,
+	},
+	profilePhotoWrapper: {
+		width: 92,
+		height: 92,
+		borderRadius: 46,
+		position: 'relative',
+	},
+	profilePhoto: {
+		width: 92,
+		height: 92,
+		borderRadius: 46,
+		backgroundColor: '#edf4f5',
+	},
+	profilePhotoEditButton: {
+		position: 'absolute',
+		right: 2,
+		bottom: 4,
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		backgroundColor: '#ffffff',
+		borderWidth: 1,
+		borderColor: '#a7d3db',
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	title: {
 		color: '#343434',
@@ -1038,6 +1200,42 @@ const styles = StyleSheet.create({
 	doneButtonText: {
 		color: '#ffffff',
 		fontWeight: '600',
+	},
+	photoSheetOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(18, 28, 33, 0.28)',
+		justifyContent: 'flex-end',
+	},
+	photoSheet: {
+		backgroundColor: '#ffffff',
+		borderTopLeftRadius: 18,
+		borderTopRightRadius: 18,
+		paddingTop: 10,
+		paddingBottom: 20,
+	},
+	photoSheetHandle: {
+		width: 42,
+		height: 4,
+		borderRadius: 2,
+		backgroundColor: '#d5e4e6',
+		alignSelf: 'center',
+		marginBottom: 8,
+	},
+	photoSheetOption: {
+		minHeight: 54,
+		paddingHorizontal: 22,
+		flexDirection: 'row',
+		alignItems: 'center',
+		borderTopWidth: 1,
+		borderTopColor: '#eef4f5',
+	},
+	photoSheetOptionText: {
+		marginLeft: 14,
+		color: '#2f2f2f',
+		fontWeight: '500',
+	},
+	photoSheetDeleteText: {
+		color: '#d84545',
 	},
 	saveButton: {
 		marginTop: 24,
