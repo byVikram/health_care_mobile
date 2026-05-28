@@ -984,8 +984,9 @@ const styles = StyleSheet.create({
 		color: '#d84545',
 	},
 	saveButton: {
-		alignSelf: 'flex-end',
+		alignSelf: 'stretch',
 		marginTop: 0,
+		width: '100%',
 		minWidth: 160,
 	},
 })

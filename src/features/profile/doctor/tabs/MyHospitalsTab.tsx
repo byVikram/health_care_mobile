@@ -1721,12 +1721,14 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	formActions: {
-		alignItems: 'flex-end',
+		alignItems: 'stretch',
 	},
 	formActionButton: {
 		marginTop: 0,
+		width: '100%',
 	},
 	saveContinueButton: {
-		alignSelf: 'flex-end',
+		alignSelf: 'stretch',
+		width: '100%',
 	},
 })

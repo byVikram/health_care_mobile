@@ -731,7 +731,8 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	saveButton: {
-		alignSelf: 'flex-end',
+		alignSelf: 'stretch',
 		marginTop: 0,
+		width: '100%',
 	},
 })
