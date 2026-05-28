@@ -468,8 +468,6 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 			showsVerticalScrollIndicator={false}
 		>
 			<View style={[styles.card, isTablet && styles.cardTablet]}>
-				<Text style={styles.title}>Availability</Text>
-
 				<View style={styles.fieldGroup}>
 					<Text style={styles.sectionLabel}>Choose Hospital</Text>
 					{resolvedHospitals.length === 0 ? (
@@ -576,12 +574,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 24,
 		paddingVertical: 22,
 	},
-	title: {
-		fontSize: 22,
-		fontWeight: '700',
-		color: '#233238',
-		marginBottom: 22,
-	},
+	
 	fieldGroup: {
 		marginBottom: 14,
 	},
