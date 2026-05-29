@@ -24,6 +24,7 @@ import AvailabilityTab from './tabs/AvailabilityTab'
 import AchievementsTab from './tabs/AchievementsTab'
 import FavouriteDoctorsTab from './tabs/FavouriteDoctorsTab'
 import SettingsTab from './tabs/SettingsTab'
+import SessionsTab from '../SessionsTab'
 
 const TABS = [
 	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
@@ -32,6 +33,7 @@ const TABS = [
 	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
 	{ key: 'achievements', label: 'Achievements', Component: AchievementsTab },
 	{ key: 'favourites', label: 'Favourite doctors', Component: FavouriteDoctorsTab },
+	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
 	{ key: 'settings', label: 'Settings', Component: SettingsTab },
 ]
 
@@ -121,13 +123,16 @@ export default function DoctorProfileLayout() {
 		})
 	}, [activeTabIndex])
 
-	const goToTab = useCallback((tabKey: string, animated = true) => {
-		const nextIndex = TABS.findIndex((tab) => tab.key === tabKey)
-		if (nextIndex < 0) return
+	const goToTab = useCallback(
+		(tabKey: string, animated = true) => {
+			const nextIndex = TABS.findIndex((tab) => tab.key === tabKey)
+			if (nextIndex < 0) return
 
-		setActiveTab(tabKey)
-		pagerRef.current?.scrollTo({ x: nextIndex * width, animated })
-	}, [width])
+			setActiveTab(tabKey)
+			pagerRef.current?.scrollTo({ x: nextIndex * width, animated })
+		},
+		[width]
+	)
 
 	const handleHeaderBack = useCallback(() => {
 		if (navigation.canGoBack()) {
@@ -138,11 +143,14 @@ export default function DoctorProfileLayout() {
 		navigation.navigate(ROUTES.MAIN.HOME)
 	}, [navigation])
 
-	const handlePagerMomentumEnd = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-		const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
-		const clampedIndex = Math.max(0, Math.min(TABS.length - 1, nextIndex))
-		setActiveTab(TABS[clampedIndex].key)
-	}, [width])
+	const handlePagerMomentumEnd = useCallback(
+		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
+			const clampedIndex = Math.max(0, Math.min(TABS.length - 1, nextIndex))
+			setActiveTab(TABS[clampedIndex].key)
+		},
+		[width]
+	)
 
 	const renderTabContent = (tabKey: string) => {
 		if (tabKey === 'hospitals') {
