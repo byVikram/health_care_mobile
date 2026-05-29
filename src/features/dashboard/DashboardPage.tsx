@@ -325,6 +325,10 @@ const styles = StyleSheet.create({
 	},
 
 	treatmentHistoryCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 12,
 		marginHorizontal: 16,
 		marginTop: 8,
 		padding: 14,
@@ -335,12 +339,14 @@ const styles = StyleSheet.create({
 	},
 
 	treatmentHistoryLeft: {
+		flex: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 12,
 	},
 
 	treatmentHistoryTitle: {
+		flex: 1,
 		fontSize: 16,
 		fontWeight: '500',
 		color: '#30353A',
