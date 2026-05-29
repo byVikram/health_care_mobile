@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-	ActivityIndicator,
 	Alert,
 	Image,
 	Modal,
@@ -14,8 +13,8 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { AppButton, AppInput, AppTypography } from '../../../../components/common'
-import ApiService from '../../../../services/apiService'
-import { API_ENDPOINTS } from '../../../../constants/apiUrls'
+import { mergePharmacyProfileData, updatePharmacyProfile } from '../pharmacyService'
+import { PharmacyProfileData } from '../../../../types/pharmacy-profile-api'
 
 const DEFAULT_LOGO_IMAGE = require('../../../../assets/Banner/pharmacy.png')
 
@@ -51,35 +50,19 @@ type PharmacyDetailsFormData = {
 	state: string
 	pincode: string
 	landmark: string
-}
-
-type PharmacyDetailsApi = {
-	name?: string
-	logo_s3_key?: string | null
-	drug_license_number?: string
-	drug_license_s3_key?: string | null
-	gst_number?: string
-	gst_certificate_s3_key?: string | null
-	address?: string
-	city?: string
-	state?: string
-	pincode?: string
-	landmark?: string | null
-}
-
-type PharmacyProfileResponse = {
-	success?: boolean
-	message?: string
-	data?: PharmacyDetailsApi & {
-		pharmacy?: PharmacyDetailsApi
-		pharmacy_details?: PharmacyDetailsApi
-	}
+	latitude: string
+	longitude: string
 }
 
 type ProfileImageUpload = {
 	uri: string
 	name: string
 	type: string
+}
+
+type PharmacyDetailsTabProps = {
+	profileData?: PharmacyProfileData | null
+	onProfileChange?: React.Dispatch<React.SetStateAction<PharmacyProfileData | null>>
 }
 
 function FormRow({
@@ -184,21 +167,7 @@ function UploadBox({ label, required, description, fileName, onUpload, stacked }
 	)
 }
 
-async function getPharmacyDetails(): Promise<PharmacyProfileResponse> {
-	const res = await ApiService.get<PharmacyProfileResponse>(API_ENDPOINTS.PHARMACY.DETAILS)
-	return res.data
-}
-
-async function updatePharmacyDetails(payload: Record<string, unknown>): Promise<PharmacyProfileResponse> {
-	const res = await ApiService.patch<PharmacyProfileResponse>(API_ENDPOINTS.PHARMACY.DETAILS, payload)
-	return res.data
-}
-
-const getPharmacyPayloadSource = (data?: PharmacyProfileResponse['data']): PharmacyDetailsApi => (
-	data?.pharmacy ?? data?.pharmacy_details ?? data ?? {}
-)
-
-export default function PharmacyDetailsTab() {
+export default function PharmacyDetailsTab({ profileData, onProfileChange }: PharmacyDetailsTabProps) {
 	const { width } = useWindowDimensions()
 
 	const isTablet = width >= 768 && width < 1024
@@ -217,8 +186,9 @@ export default function PharmacyDetailsTab() {
 		state: '',
 		pincode: '',
 		landmark: '',
+		latitude: '',
+		longitude: '',
 	})
-	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [logoUri, setLogoUri] = useState('')
 	const [logoUpload, setLogoUpload] = useState<ProfileImageUpload | null>(null)
@@ -317,51 +287,39 @@ export default function PharmacyDetailsTab() {
 	}
 
 	useEffect(() => {
-		const loadPharmacyDetails = async () => {
-			try {
-				setIsLoadingProfile(true)
-				const response = await getPharmacyDetails()
+		const pharmacy = profileData?.pharmacy
+		if (!pharmacy) return
 
-				if (response?.success === false || !response.data) return
-
-				const pharmacy = getPharmacyPayloadSource(response.data)
-				setLogoUri(pharmacy.logo_s3_key || '')
-				setLogoUpload(null)
-				setFormData({
-					name: pharmacy.name || '',
-					drugLicenseNumber: pharmacy.drug_license_number || '',
-					drugLicenseCertificate: pharmacy.drug_license_s3_key || '',
-					gstNumber: pharmacy.gst_number || '',
-					gstCertificate: pharmacy.gst_certificate_s3_key || '',
-					address: pharmacy.address || '',
-					city: pharmacy.city || '',
-					state: pharmacy.state || '',
-					pincode: pharmacy.pincode || '',
-					landmark: pharmacy.landmark || '',
-				})
-			} catch (error) {
-				console.error('[PharmacyDetailsTab] failed to load pharmacy details:', error)
-			} finally {
-				setIsLoadingProfile(false)
-			}
-		}
-
-		loadPharmacyDetails()
-	}, [])
+		setLogoUri(pharmacy.logo_s3_key || '')
+		setLogoUpload(null)
+		setFormData({
+			name: pharmacy.name || '',
+			drugLicenseNumber: pharmacy.drug_license_number || '',
+			drugLicenseCertificate: pharmacy.drug_license_s3_key || '',
+			gstNumber: pharmacy.gst_number || '',
+			gstCertificate: pharmacy.gst_certificate_s3_key || '',
+			address: pharmacy.address || '',
+			city: pharmacy.city || '',
+			state: pharmacy.state || '',
+			pincode: pharmacy.pincode || '',
+			landmark: pharmacy.landmark || '',
+			latitude: pharmacy.latitude !== undefined && pharmacy.latitude !== null ? String(pharmacy.latitude) : '',
+			longitude: pharmacy.longitude !== undefined && pharmacy.longitude !== null ? String(pharmacy.longitude) : '',
+		})
+	}, [profileData?.pharmacy])
 
 	const handleSave = async () => {
 		const payload = {
 			name: formData.name.trim(),
 			drug_license_number: formData.drugLicenseNumber.trim(),
-			drug_license_s3_key: formData.drugLicenseCertificate.trim(),
 			gst_number: formData.gstNumber.trim(),
-			gst_certificate_s3_key: formData.gstCertificate.trim(),
 			address: formData.address.trim(),
 			city: formData.city.trim(),
 			state: formData.state.trim(),
 			pincode: formData.pincode.trim(),
 			landmark: formData.landmark.trim(),
-			...(logoUpload ? { logo: logoUpload } : {}),
+			latitude: formData.latitude ? Number(formData.latitude) : null,
+			longitude: formData.longitude ? Number(formData.longitude) : null,
 		}
 
 		if (!payload.name) {
@@ -386,7 +344,7 @@ export default function PharmacyDetailsTab() {
 
 		try {
 			setIsSaving(true)
-			const response = await updatePharmacyDetails(payload)
+			const response = await updatePharmacyProfile(payload)
 
 			if (response?.success === false) {
 				Alert.alert('Error', response.message || 'Unable to save pharmacy details right now.')
@@ -396,15 +354,26 @@ export default function PharmacyDetailsTab() {
 			setFormData({
 				name: payload.name,
 				drugLicenseNumber: payload.drug_license_number,
-				drugLicenseCertificate: payload.drug_license_s3_key,
+				drugLicenseCertificate: formData.drugLicenseCertificate.trim(),
 				gstNumber: payload.gst_number,
-				gstCertificate: payload.gst_certificate_s3_key,
+				gstCertificate: formData.gstCertificate.trim(),
 				address: payload.address,
 				city: payload.city,
 				state: payload.state,
 				pincode: payload.pincode,
 				landmark: payload.landmark,
+				latitude: formData.latitude,
+				longitude: formData.longitude,
 			})
+			onProfileChange?.((current) =>
+				mergePharmacyProfileData(current, response.data ?? {
+					pharmacy: {
+						...payload,
+						drug_license_s3_key: formData.drugLicenseCertificate.trim(),
+						gst_certificate_s3_key: formData.gstCertificate.trim(),
+					},
+				})
+			)
 			setLogoUpload(null)
 			Alert.alert('Success', 'Pharmacy details saved successfully.')
 		} catch (error) {
@@ -424,14 +393,6 @@ export default function PharmacyDetailsTab() {
 
 	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
 	const rowSpacing = isMobile ? 18 : isLandscape ? 22 : 20
-
-	if (isLoadingProfile) {
-		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="small" color="#0c7c7c" />
-			</View>
-		)
-	}
 
 	return (
 		<ScrollView
@@ -601,12 +562,6 @@ export default function PharmacyDetailsTab() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#ffffff',
-	},
-	loadingContainer: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
 		backgroundColor: '#ffffff',
 	},
 	contentContainer: {

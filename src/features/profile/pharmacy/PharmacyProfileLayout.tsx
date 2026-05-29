@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+	ActivityIndicator,
 	NativeScrollEvent,
 	NativeSyntheticEvent,
 	View,
@@ -17,6 +18,8 @@ import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import PharmacyDetailsTab from './tabs/PharmacyDetailsTab'
 import ServicesTab from './tabs/ServicesTab'
 import SettingsTab from './tabs/SettingTab'
+import { getPharmacyProfile } from './pharmacyService'
+import { PharmacyProfileData } from '../../../types/pharmacy-profile-api'
 
 const TABS = [
 	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
@@ -32,11 +35,38 @@ export default function PharmacyProfileLayout() {
 	const pagerRef = useRef<ScrollView>(null)
 	const tabScrollRef = useRef<ScrollView>(null)
 	const [activeTab, setActiveTab] = useState('personal')
+	const [profileLoading, setProfileLoading] = useState(false)
+	const [profileData, setProfileData] = useState<PharmacyProfileData | null>(null)
 
 	const activeTabIndex = useMemo(() => {
 		const index = TABS.findIndex((tab) => tab.key === activeTab)
 		return index >= 0 ? index : 0
 	}, [activeTab])
+
+	useEffect(() => {
+		const fetchPharmacyProfile = async () => {
+			try {
+				setProfileLoading(true)
+				const response = await getPharmacyProfile()
+
+				if (response?.success === false) {
+					console.log('[PharmacyProfileLayout] pharmacy profile API returned no usable data:', {
+						success: response?.success,
+						message: response?.message,
+					})
+					return
+				}
+
+				setProfileData(response.data ?? null)
+			} catch (error) {
+				console.log('[PharmacyProfileLayout] failed to fetch pharmacy profile:', error)
+			} finally {
+				setProfileLoading(false)
+			}
+		}
+
+		fetchPharmacyProfile()
+	}, [])
 
 	useEffect(() => {
 		pagerRef.current?.scrollTo({ x: activeTabIndex * width, animated: false })
@@ -73,6 +103,26 @@ export default function PharmacyProfileLayout() {
 	}, [width])
 
 	const renderTabContent = (tabKey: string) => {
+		if (profileLoading && tabKey !== 'settings') {
+			return (
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator color="#0c7c7c" />
+				</View>
+			)
+		}
+
+		if (tabKey === 'personal') {
+			return <PersonalDetailsTab profileData={profileData} onProfileChange={setProfileData} />
+		}
+
+		if (tabKey === 'pharmacy') {
+			return <PharmacyDetailsTab profileData={profileData} onProfileChange={setProfileData} />
+		}
+
+		if (tabKey === 'services') {
+			return <ServicesTab profileData={profileData} onProfileChange={setProfileData} />
+		}
+
 		const TabComponent = TABS.find((tab) => tab.key === tabKey)?.Component || PersonalDetailsTab
 		return <TabComponent />
 	}
@@ -203,6 +253,12 @@ const styles = StyleSheet.create({
 	pagerPage: {
 		flex: 1,
 		minHeight: 0,
+		backgroundColor: '#f8fafc',
+	},
+	loadingContainer: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
 		backgroundColor: '#f8fafc',
 	},
 })

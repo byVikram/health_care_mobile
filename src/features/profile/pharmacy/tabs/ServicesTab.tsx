@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-	ActivityIndicator,
 	Alert,
 	Platform,
 	Pressable,
@@ -19,8 +18,8 @@ import {
 	AppTypography,
 	type AppSelectOption,
 } from '../../../../components/common'
-import ApiService from '../../../../services/apiService'
-import { API_ENDPOINTS } from '../../../../constants/apiUrls'
+import { mergePharmacyProfileData, updatePharmacyProfile } from '../pharmacyService'
+import { PharmacyProfileData } from '../../../../types/pharmacy-profile-api'
 
 const DAY_OPTIONS: AppSelectOption[] = [
 	{ label: 'Monday', value: 'Mon' },
@@ -51,32 +50,12 @@ type ServicesFormData = {
 	paymentMethods: string[]
 }
 
-type PharmacyServicesApi = {
-	operating_hours?: {
-		open?: string
-		close?: string
-	}
-	open_days?: string[]
-	payment_methods?: string[]
-	home_delivery_available?: boolean
-	delivery_radius_km?: number | string
-	estimated_delivery_time_mins?: number | string
-	min_order_amount?: number | string
-	is_24_x_7?: boolean
-	emergency_medicine_available?: boolean
-}
-
-type PharmacyServicesResponse = {
-	success?: boolean
-	message?: string
-	data?: PharmacyServicesApi & {
-		services?: PharmacyServicesApi
-		service_details?: PharmacyServicesApi
-		services_details?: PharmacyServicesApi
-	}
-}
-
 type TimeField = 'openingTime' | 'closingTime'
+
+type ServicesTabProps = {
+	profileData?: PharmacyProfileData | null
+	onProfileChange?: React.Dispatch<React.SetStateAction<PharmacyProfileData | null>>
+}
 
 function FieldLabel({ label, required = false }: { label: string; required?: boolean }) {
 	return (
@@ -250,21 +229,7 @@ function TimePickerField({
 	)
 }
 
-async function getPharmacyDetails(): Promise<PharmacyServicesResponse> {
-	const res = await ApiService.get<PharmacyServicesResponse>(API_ENDPOINTS.PHARMACY.DETAILS)
-	return res.data
-}
-
-async function updatePharmacyServices(payload: Record<string, unknown>): Promise<PharmacyServicesResponse> {
-	const res = await ApiService.patch<PharmacyServicesResponse>(API_ENDPOINTS.PHARMACY.DETAILS, payload)
-	return res.data
-}
-
-const getServicesPayloadSource = (data?: PharmacyServicesResponse['data']): PharmacyServicesApi => (
-	data?.services ?? data?.service_details ?? data?.services_details ?? data ?? {}
-)
-
-export default function ServicesTab() {
+export default function ServicesTab({ profileData, onProfileChange }: ServicesTabProps) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768 && width < 1024
 	const isMobile = width < 768
@@ -282,7 +247,6 @@ export default function ServicesTab() {
 		minOrderAmount: '',
 		paymentMethods: [],
 	})
-	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [activeTimeField, setActiveTimeField] = useState<TimeField | null>(null)
 
@@ -291,36 +255,23 @@ export default function ServicesTab() {
 	}
 
 	useEffect(() => {
-		const loadPharmacyServices = async () => {
-			try {
-				setIsLoadingProfile(true)
-				const response = await getPharmacyDetails()
+		const services = profileData?.services
+		if (!services) return
 
-				if (response?.success === false || !response.data) return
-
-				const services = getServicesPayloadSource(response.data)
-				setFormData({
-					openDays: Array.isArray(services.open_days) ? services.open_days : [],
-					openingTime: services.operating_hours?.open || '09:00',
-					closingTime: services.operating_hours?.close || '22:00',
-					is24x7: Boolean(services.is_24_x_7),
-					emergencyMedicineAvailable: Boolean(services.emergency_medicine_available),
-					homeDeliveryAvailable: Boolean(services.home_delivery_available),
-					deliveryRadiusKm: services.delivery_radius_km !== undefined ? String(services.delivery_radius_km) : '',
-					estimatedDeliveryTimeMins:
-						services.estimated_delivery_time_mins !== undefined ? String(services.estimated_delivery_time_mins) : '',
-					minOrderAmount: services.min_order_amount !== undefined ? String(services.min_order_amount) : '',
-					paymentMethods: Array.isArray(services.payment_methods) ? services.payment_methods : [],
-				})
-			} catch (error) {
-				console.error('[PharmacyServicesTab] failed to load pharmacy services:', error)
-			} finally {
-				setIsLoadingProfile(false)
-			}
-		}
-
-		loadPharmacyServices()
-	}, [])
+		setFormData({
+			openDays: Array.isArray(services.open_days) ? services.open_days : [],
+			openingTime: services.operating_hours?.open || '09:00',
+			closingTime: services.operating_hours?.close || '22:00',
+			is24x7: Boolean(services.is_24_x_7),
+			emergencyMedicineAvailable: Boolean(services.emergency_medicine_available),
+			homeDeliveryAvailable: Boolean(services.home_delivery_available),
+			deliveryRadiusKm: services.delivery_radius_km !== undefined ? String(services.delivery_radius_km) : '',
+			estimatedDeliveryTimeMins:
+				services.estimated_delivery_time_mins !== undefined ? String(services.estimated_delivery_time_mins) : '',
+			minOrderAmount: services.min_order_amount !== undefined ? String(services.min_order_amount) : '',
+			paymentMethods: Array.isArray(services.payment_methods) ? services.payment_methods : [],
+		})
+	}, [profileData?.services])
 
 	const handleTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
 		if (Platform.OS !== 'ios') {
@@ -376,13 +327,14 @@ export default function ServicesTab() {
 
 		try {
 			setIsSaving(true)
-			const response = await updatePharmacyServices(payload)
+			const response = await updatePharmacyProfile(payload)
 
 			if (response?.success === false) {
 				Alert.alert('Error', response.message || 'Unable to save pharmacy services right now.')
 				return
 			}
 
+			onProfileChange?.((current) => mergePharmacyProfileData(current, response.data ?? { services: payload }))
 			Alert.alert('Success', 'Pharmacy services saved successfully.')
 		} catch (error) {
 			console.error('[PharmacyServicesTab] save error:', error)
@@ -401,14 +353,6 @@ export default function ServicesTab() {
 
 	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
 	const sectionGap = isMobile ? 14 : 18
-
-	if (isLoadingProfile) {
-		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="small" color="#0c7c7c" />
-			</View>
-		)
-	}
 
 	return (
 		<ScrollView
@@ -547,12 +491,6 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: '#f8fafc',
-	},
-	loadingContainer: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#ffffff',
 	},
 	contentContainer: {
 		flexGrow: 1,

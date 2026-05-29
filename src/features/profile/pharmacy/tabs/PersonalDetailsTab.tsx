@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, Image } from 'react-native'
+import { Alert, Image } from 'react-native'
 import {
 	Modal,
 	Pressable,
@@ -18,8 +18,8 @@ import {
 	AppTypography,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
-import ApiService from '../../../../services/apiService'
-import { API_ENDPOINTS } from '../../../../constants/apiUrls'
+import { mergePharmacyProfileData, updatePharmacyProfile } from '../pharmacyService'
+import { PharmacyProfileData } from '../../../../types/pharmacy-profile-api'
 
 const DEFAULT_PROFILE_IMAGE = require('../../../../assets/Banner/doctor.png')
 
@@ -48,25 +48,15 @@ type PharmacyPersonalFormData = {
 	email: string
 }
 
-type PharmacyProfileResponse = {
-	success?: boolean
-	message?: string
-	data?: {
-		personal?: {
-			owner_name?: string
-			mobile_number?: string
-			alternate_mobile?: string
-			whatsapp_number?: string
-			email?: string
-			avatar_s3_key?: string | null
-		}
-	}
-}
-
 type ProfileImageUpload = {
 	uri: string
 	name: string
 	type: string
+}
+
+type PersonalDetailsTabProps = {
+	profileData?: PharmacyProfileData | null
+	onProfileChange?: React.Dispatch<React.SetStateAction<PharmacyProfileData | null>>
 }
 
 function FormRow({
@@ -150,17 +140,7 @@ function InputField({
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 const isValidPhone = (value: string) => value.replace(/\D/g, '').length >= 10
 
-async function getPharmacyDetails(): Promise<PharmacyProfileResponse> {
-	const res = await ApiService.get<PharmacyProfileResponse>(API_ENDPOINTS.PHARMACY.DETAILS)
-	return res.data
-}
-
-async function updatePharmacyPersonalDetails(payload: Record<string, unknown>): Promise<PharmacyProfileResponse> {
-	const res = await ApiService.patch<PharmacyProfileResponse>(API_ENDPOINTS.PHARMACY.DETAILS, payload)
-	return res.data
-}
-
-export default function PersonalDetailsTab() {
+export default function PersonalDetailsTab({ profileData, onProfileChange }: PersonalDetailsTabProps) {
 	const { user, updateUser } = useAuth()
 	const { width } = useWindowDimensions()
 
@@ -175,7 +155,6 @@ export default function PersonalDetailsTab() {
 		whatsappNumber: '',
 		email: user?.email || '',
 	})
-	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [profilePhotoUri, setProfilePhotoUri] = useState(user?.avatar || '')
 	const [profilePhotoUpload, setProfilePhotoUpload] = useState<ProfileImageUpload | null>(null)
@@ -251,32 +230,19 @@ export default function PersonalDetailsTab() {
 	}
 
 	useEffect(() => {
-		const loadPharmacyProfile = async () => {
-			try {
-				setIsLoadingProfile(true)
-				const response = await getPharmacyDetails()
+		const personal = profileData?.personal
+		if (!personal) return
 
-				if (response?.success === false || !response.data) return
-
-				const personal = response.data.personal ?? {}
-				setProfilePhotoUri(personal.avatar_s3_key || '')
-				setProfilePhotoUpload(null)
-				setFormData({
-					ownerName: personal.owner_name || user?.name || '',
-					mobileNumber: personal.mobile_number || '',
-					alternateMobile: personal.alternate_mobile || '',
-					whatsappNumber: personal.whatsapp_number || '',
-					email: personal.email || user?.email || '',
-				})
-			} catch (error) {
-				console.error('[PharmacyPersonalDetailsTab] failed to load pharmacy profile:', error)
-			} finally {
-				setIsLoadingProfile(false)
-			}
-		}
-
-		loadPharmacyProfile()
-	}, [])
+		setProfilePhotoUri(personal.avatar_s3_key || '')
+		setProfilePhotoUpload(null)
+		setFormData({
+			ownerName: personal.owner_name || user?.name || '',
+			mobileNumber: personal.mobile_number || '',
+			alternateMobile: personal.alternate_mobile || '',
+			whatsappNumber: personal.whatsapp_number || '',
+			email: personal.email || user?.email || '',
+		})
+	}, [profileData?.personal, user?.email, user?.name])
 
 	const handleSave = async () => {
 		const trimmedOwnerName = formData.ownerName.trim()
@@ -315,14 +281,11 @@ export default function PersonalDetailsTab() {
 
 			const payload = {
 				owner_name: trimmedOwnerName,
-				mobile_number: trimmedMobileNumber,
 				alternate_mobile: trimmedAlternateMobile,
 				whatsapp_number: trimmedWhatsappNumber,
-				email: trimmedEmail,
-				...(profilePhotoUpload ? { avatar: profilePhotoUpload } : {}),
 			}
 
-			const response = await updatePharmacyPersonalDetails(payload)
+			const response = await updatePharmacyProfile(payload)
 
 			if (response?.success === false) {
 				Alert.alert('Error', response.message || 'Unable to save personal details right now.')
@@ -331,8 +294,6 @@ export default function PersonalDetailsTab() {
 
 			await updateUser({
 				name: trimmedOwnerName,
-				email: trimmedEmail || user?.email,
-				avatar: profilePhotoUri || user?.avatar,
 			})
 			setFormData({
 				ownerName: trimmedOwnerName,
@@ -341,6 +302,15 @@ export default function PersonalDetailsTab() {
 				whatsappNumber: trimmedWhatsappNumber,
 				email: trimmedEmail,
 			})
+			onProfileChange?.((current) =>
+				mergePharmacyProfileData(current, response.data ?? {
+					personal: {
+						owner_name: trimmedOwnerName,
+						alternate_mobile: trimmedAlternateMobile,
+						whatsapp_number: trimmedWhatsappNumber,
+					},
+				})
+			)
 			setProfilePhotoUpload(null)
 			Alert.alert('Success', 'Personal details saved successfully.')
 		} catch (err) {
@@ -360,14 +330,6 @@ export default function PersonalDetailsTab() {
 
 	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
 	const rowSpacing = isMobile ? 16 : isTablet ? 18 : 20
-
-	if (isLoadingProfile) {
-		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="small" color="#0c7c7c" />
-			</View>
-		)
-	}
 
 	return (
 		<ScrollView
@@ -504,12 +466,6 @@ export default function PersonalDetailsTab() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#ffffff',
-	},
-	loadingContainer: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
 		backgroundColor: '#ffffff',
 	},
 	contentContainer: {
