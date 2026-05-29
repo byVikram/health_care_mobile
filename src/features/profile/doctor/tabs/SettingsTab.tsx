@@ -63,7 +63,7 @@ export default function SettingsTab() {
 			showsVerticalScrollIndicator={false}
 		>
 			{/* NOTIFICATION SETTINGS */}
-			<AppTypography variant="body" style={styles.title}>Notification Settings</AppTypography>
+			<AppTypography variant="h4" style={styles.Title}>Notification Settings</AppTypography>
 
 			<View style={styles.settingsCard}>
 				<View style={styles.settingRow}>
@@ -114,7 +114,7 @@ export default function SettingsTab() {
 			</View>
 
 			{/* TITLE */}
-			<AppTypography variant="body" style={styles.title}>Account Settings</AppTypography>
+			<AppTypography variant="h4" style={styles.Title}>Account Settings</AppTypography>
 
 			<View style={styles.settingsCard}>
 				{accountItems.map((item, index) => (
@@ -204,7 +204,8 @@ const styles = StyleSheet.create({
 		paddingBottom: 0,
 	},
 
-	title: {
+	Title: {
+		color: '#343434',
 		fontSize: 18,
 		lineHeight: 24,
 		fontWeight: '700',
