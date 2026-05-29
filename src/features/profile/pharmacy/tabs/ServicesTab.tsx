@@ -1,19 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
 	Alert,
-	Platform,
-	Pressable,
 	ScrollView,
 	StyleSheet,
 	View,
 	useWindowDimensions,
 } from 'react-native'
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppButton,
 	AppInput,
 	AppMultiSelect,
+	AppTimePicker,
 	AppToggle,
 	AppTypography,
 	type AppSelectOption,
@@ -49,8 +47,6 @@ type ServicesFormData = {
 	minOrderAmount: string
 	paymentMethods: string[]
 }
-
-type TimeField = 'openingTime' | 'closingTime'
 
 type ServicesTabProps = {
 	profileData?: PharmacyProfileData | null
@@ -183,52 +179,6 @@ function ToggleRow({
 	)
 }
 
-function parseTimeValue(value: string) {
-	const [hours = '0', minutes = '0'] = value.split(':')
-	const date = new Date()
-	date.setHours(Number(hours) || 0, Number(minutes) || 0, 0, 0)
-	return date
-}
-
-function formatTimeForApi(date: Date) {
-	const hours = String(date.getHours()).padStart(2, '0')
-	const minutes = String(date.getMinutes()).padStart(2, '0')
-	return `${hours}:${minutes}`
-}
-
-function formatTimeForDisplay(value: string) {
-	const date = parseTimeValue(value)
-	return date.toLocaleTimeString('en-US', {
-		hour: '2-digit',
-		minute: '2-digit',
-		hour12: true,
-	})
-}
-
-function TimePickerField({
-	label,
-	value,
-	onPress,
-	required = false,
-}: {
-	label: string
-	value: string
-	onPress: () => void
-	required?: boolean
-}) {
-	return (
-		<View style={styles.fieldGroup}>
-			<FieldLabel label={label} required={required} />
-			<Pressable style={styles.timeInput} onPress={onPress} accessibilityRole="button">
-				<AppTypography variant="body" style={styles.timeInputText}>
-					{formatTimeForDisplay(value)}
-				</AppTypography>
-				<MaterialCommunityIcons name="clock-time-four-outline" size={18} color="#61727b" />
-			</Pressable>
-		</View>
-	)
-}
-
 export default function ServicesTab({ profileData, onProfileChange }: ServicesTabProps) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768 && width < 1024
@@ -248,7 +198,6 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 		paymentMethods: [],
 	})
 	const [isSaving, setIsSaving] = useState(false)
-	const [activeTimeField, setActiveTimeField] = useState<TimeField | null>(null)
 
 	const updateFormData = <K extends keyof ServicesFormData>(key: K, value: ServicesFormData[K]) => {
 		setFormData((prev) => ({ ...prev, [key]: value }))
@@ -272,18 +221,6 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 			paymentMethods: Array.isArray(services.payment_methods) ? services.payment_methods : [],
 		})
 	}, [profileData?.services])
-
-	const handleTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-		if (Platform.OS !== 'ios') {
-			setActiveTimeField(null)
-		}
-
-		if (event.type === 'dismissed' || !selectedDate || !activeTimeField) {
-			return
-		}
-
-		updateFormData(activeTimeField, formatTimeForApi(selectedDate))
-	}
 
 	const handleSave = async () => {
 		const deliveryRadius = formData.deliveryRadiusKm.trim()
@@ -384,17 +321,19 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 					</View>
 
 					<FormRow stacked={!useTwoColumns} compact={isTablet}>
-						<TimePickerField
+						<AppTimePicker
 							label="Opening Time"
 							value={formData.openingTime}
-							onPress={() => setActiveTimeField('openingTime')}
+							onChange={(value) => updateFormData('openingTime', value)}
 							required
+							noMargin
 						/>
-						<TimePickerField
+						<AppTimePicker
 							label="Closing Time"
 							value={formData.closingTime}
-							onPress={() => setActiveTimeField('closingTime')}
+							onChange={(value) => updateFormData('closingTime', value)}
 							required
+							noMargin
 						/>
 					</FormRow>
 				</SectionCard>
@@ -474,15 +413,6 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 					Save
 				</AppButton>
 			</View>
-
-			{activeTimeField ? (
-				<DateTimePicker
-					value={parseTimeValue(formData[activeTimeField])}
-					mode="time"
-					display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-					onChange={handleTimeChange}
-				/>
-			) : null}
 		</ScrollView>
 	)
 }
@@ -568,22 +498,6 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		lineHeight: 20,
 		fontWeight: '600',
-	},
-	timeInput: {
-		height: 48,
-		borderWidth: 1,
-		borderColor: '#a7d3db',
-		borderRadius: 10,
-		backgroundColor: '#ffffff',
-		paddingHorizontal: 14,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	timeInputText: {
-		color: '#2f2f2f',
-		fontSize: 14,
-		lineHeight: 20,
 	},
 	toggleRow: {
 		flexDirection: 'row',

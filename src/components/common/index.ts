@@ -4,6 +4,7 @@ export * from "./AppTypography";
 export * from "./AppModal";
 export * from "./AppSelect";
 export * from "./AppMultiSelect";
+export * from "./AppTimePicker";
 export * from "./AppCalendar";
 export * from "./AppSkeleton";
 export { default as AppToggle } from "./AppToggle";
