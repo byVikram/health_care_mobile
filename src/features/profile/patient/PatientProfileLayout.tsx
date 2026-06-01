@@ -21,16 +21,18 @@ import type { PatientProfileState } from './PatientProfileService'
 import PersonalTab from './tabs/PersonalTab'
 import MedicalTab from './tabs/MedicalTab'
 import LifestyleTab from './tabs/LifestyleTab'
+import AddressTab from './tabs/AddressTab'
 import SessionsTab from '../SessionsTab'
 
 
-type Tab = 'Personal' | 'Medical' | 'Lifestyle' | 'Sessions'
+type Tab = 'Personal' | 'Medical' | 'Lifestyle' | 'Address' | 'Sessions'
 
 const TABS: { tab: Tab }[] = [
 	{ tab: 'Personal' },
 	{ tab: 'Medical' },
 	{ tab: 'Lifestyle' },
-	{ tab: 'Sessions' },	
+	{ tab: 'Address' },
+	{ tab: 'Sessions' },
 ]
 
 export default function PatientProfileLayout() {
@@ -130,7 +132,10 @@ export default function PatientProfileLayout() {
 		if (tabKey === 'Lifestyle') {
 			return <LifestyleTab data={data} onChange={handleChange} onSave={handleSave} saving={saving} />
 		}
-		if (tabKey === 'Sessions'){
+		if (tabKey === 'Address') {
+			return <AddressTab />
+		}
+		if (tabKey === 'Sessions') {
 			return <SessionsTab />
 		}
 		return <PersonalTab data={data} onChange={handleChange} onSave={handleSave} saving={saving} />
