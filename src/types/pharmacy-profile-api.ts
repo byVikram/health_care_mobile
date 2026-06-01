@@ -58,7 +58,11 @@ export type PharmacyProfileUpdatePayload = Partial<{
 	owner_name: string
 	alternate_mobile: string
 	whatsapp_number: string
+	avatar: unknown
+	avatar_s3_key: string | null
 	name: string
+	logo: unknown
+	logo_s3_key: string | null
 	drug_license_number: string
 	gst_number: string
 	address: string

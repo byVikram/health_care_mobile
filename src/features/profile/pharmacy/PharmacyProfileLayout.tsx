@@ -20,11 +20,13 @@ import ServicesTab from './tabs/ServicesTab'
 import SettingsTab from './tabs/SettingTab'
 import { getPharmacyProfile } from './pharmacyService'
 import { PharmacyProfileData } from '../../../types/pharmacy-profile-api'
+import SessionsTab from '../SessionsTab'
 
 const TABS = [
-	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
 	{ key: 'pharmacy', label: 'Pharmacy details', Component: PharmacyDetailsTab },
+	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
 	{ key: 'services', label: 'Services', Component: ServicesTab },
+	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
 	{ key: 'settings', label: 'Settings', Component: SettingsTab },
 ]
 
@@ -34,7 +36,7 @@ export default function PharmacyProfileLayout() {
 	const { width } = useWindowDimensions()
 	const pagerRef = useRef<ScrollView>(null)
 	const tabScrollRef = useRef<ScrollView>(null)
-	const [activeTab, setActiveTab] = useState('personal')
+	const [activeTab, setActiveTab] = useState('pharmacy')
 	const [profileLoading, setProfileLoading] = useState(false)
 	const [profileData, setProfileData] = useState<PharmacyProfileData | null>(null)
 

@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
 	contentContainer: {
 		flexGrow: 1,
 		padding: 16,
-		paddingBottom: 0,
+		paddingBottom: 24,
 	},
 
 	Title: {
@@ -280,6 +280,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		backgroundColor: '#e53935',
 		padding: 14,
+		paddingBottom: 12,
 		borderRadius: 8,
 	},
 

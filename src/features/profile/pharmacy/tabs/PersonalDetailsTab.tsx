@@ -1,20 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Image } from 'react-native'
+import { Alert } from 'react-native'
 import {
-	Modal,
-	Pressable,
 	ScrollView,
 	StyleSheet,
-	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import * as ImagePicker from 'expo-image-picker'
 import { TextInput as PaperTextInput } from 'react-native-paper'
 import {
 	AppButton,
 	AppInput,
+	AppPhotoPicker,
+	type AppPhotoPickerUpload,
 	AppTypography,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
@@ -46,12 +44,6 @@ type PharmacyPersonalFormData = {
 	alternateMobile: string
 	whatsappNumber: string
 	email: string
-}
-
-type ProfileImageUpload = {
-	uri: string
-	name: string
-	type: string
 }
 
 type PersonalDetailsTabProps = {
@@ -157,8 +149,8 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 	})
 	const [isSaving, setIsSaving] = useState(false)
 	const [profilePhotoUri, setProfilePhotoUri] = useState(user?.avatar || '')
-	const [profilePhotoUpload, setProfilePhotoUpload] = useState<ProfileImageUpload | null>(null)
-	const [photoSheetVisible, setPhotoSheetVisible] = useState(false)
+	const [profilePhotoUpload, setProfilePhotoUpload] = useState<AppPhotoPickerUpload | null>(null)
+	const [isProfilePhotoRemoved, setIsProfilePhotoRemoved] = useState(false)
 
 	const updateFormData = <K extends keyof PharmacyPersonalFormData>(key: K, value: PharmacyPersonalFormData[K]) => {
 		setFormData((prev) => ({
@@ -167,74 +159,13 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 		}))
 	}
 
-	const closePhotoSheet = () => setPhotoSheetVisible(false)
-
-	const prepareProfileImageUpload = (asset: ImagePicker.ImagePickerAsset): ProfileImageUpload => {
-		const fileName = asset.fileName || asset.uri.split('/').pop() || `pharmacy-profile-${Date.now()}.jpg`
-		const extension = fileName.split('.').pop()?.toLowerCase()
-		const mimeType = asset.mimeType || (extension ? `image/${extension === 'jpg' ? 'jpeg' : extension}` : 'image/jpeg')
-
-		return {
-			uri: asset.uri,
-			name: fileName,
-			type: mimeType,
-		}
-	}
-
-	const applySelectedProfilePhoto = (asset: ImagePicker.ImagePickerAsset) => {
-		setProfilePhotoUri(asset.uri)
-		setProfilePhotoUpload(prepareProfileImageUpload(asset))
-	}
-
-	const takeProfilePhoto = async () => {
-		closePhotoSheet()
-		const permission = await ImagePicker.requestCameraPermissionsAsync()
-
-		if (!permission.granted) {
-			Alert.alert('Permission needed', 'Please allow camera access to take a profile photo.')
-			return
-		}
-
-		const result = await ImagePicker.launchCameraAsync({
-			mediaTypes: ImagePicker.MediaTypeOptions.Images,
-			allowsEditing: true,
-			aspect: [1, 1],
-			quality: 0.8,
-		})
-
-		if (!result.canceled && result.assets.length > 0) {
-			applySelectedProfilePhoto(result.assets[0])
-		}
-	}
-
-	const chooseProfilePhoto = async () => {
-		closePhotoSheet()
-		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
-
-		if (!permission.granted) {
-			Alert.alert('Permission needed', 'Please allow photo library access to choose a profile photo.')
-			return
-		}
-
-		const result = await ImagePicker.launchImageLibraryAsync({
-			mediaTypes: ImagePicker.MediaTypeOptions.Images,
-			allowsEditing: true,
-			aspect: [1, 1],
-			allowsMultipleSelection: false,
-			quality: 0.8,
-		})
-
-		if (!result.canceled && result.assets.length > 0) {
-			applySelectedProfilePhoto(result.assets[0])
-		}
-	}
-
 	useEffect(() => {
 		const personal = profileData?.personal
 		if (!personal) return
 
 		setProfilePhotoUri(personal.avatar_s3_key || '')
 		setProfilePhotoUpload(null)
+		setIsProfilePhotoRemoved(false)
 		setFormData({
 			ownerName: personal.owner_name || user?.name || '',
 			mobileNumber: personal.mobile_number || '',
@@ -283,6 +214,8 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 				owner_name: trimmedOwnerName,
 				alternate_mobile: trimmedAlternateMobile,
 				whatsapp_number: trimmedWhatsappNumber,
+				...(profilePhotoUpload ? { avatar: profilePhotoUpload } : {}),
+				...(isProfilePhotoRemoved ? { avatar: null, avatar_s3_key: null } : {}),
 			}
 
 			const response = await updatePharmacyProfile(payload)
@@ -294,6 +227,7 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 
 			await updateUser({
 				name: trimmedOwnerName,
+				avatar: isProfilePhotoRemoved ? undefined : profilePhotoUri || user?.avatar,
 			})
 			setFormData({
 				ownerName: trimmedOwnerName,
@@ -308,10 +242,13 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 						owner_name: trimmedOwnerName,
 						alternate_mobile: trimmedAlternateMobile,
 						whatsapp_number: trimmedWhatsappNumber,
+						...(profilePhotoUpload ? { avatar: profilePhotoUpload, avatar_s3_key: profilePhotoUri } : {}),
+						...(isProfilePhotoRemoved ? { avatar: null, avatar_s3_key: null } : {}),
 					},
 				})
 			)
 			setProfilePhotoUpload(null)
+			setIsProfilePhotoRemoved(false)
 			Alert.alert('Success', 'Personal details saved successfully.')
 		} catch (err) {
 			console.error('[PharmacyPersonalDetailsTab] save error:', err)
@@ -346,24 +283,16 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 			showsVerticalScrollIndicator={false}
 		>
 			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-				<View style={styles.profilePhotoSection}>
-					<View style={styles.profilePhotoWrapper}>
-						<Image
-							source={profilePhotoUri ? { uri: profilePhotoUri } : DEFAULT_PROFILE_IMAGE}
-							style={styles.profilePhoto}
-							resizeMode="cover"
-						/>
-						<TouchableOpacity
-							style={styles.profilePhotoEditButton}
-							onPress={() => setPhotoSheetVisible(true)}
-							activeOpacity={0.85}
-							accessibilityRole="button"
-							accessibilityLabel="Edit profile photo"
-						>
-							<MaterialCommunityIcons name="camera-outline" size={15} color="#0c7c7c" />
-						</TouchableOpacity>
-					</View>
-				</View>
+				<AppPhotoPicker
+					imageUri={profilePhotoUri}
+					fallbackSource={DEFAULT_PROFILE_IMAGE}
+					fileNamePrefix="pharmacy-profile"
+					onChange={({ uri, upload, removed }) => {
+						setProfilePhotoUri(uri)
+						setProfilePhotoUpload(upload)
+						setIsProfilePhotoRemoved(removed)
+					}}
+				/>
 
 				<View style={{ marginBottom: rowSpacing }}>
 					<InputField
@@ -440,25 +369,6 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 				</AppButton>
 			</View>
 
-			<Modal visible={photoSheetVisible} transparent animationType="slide" onRequestClose={closePhotoSheet}>
-				<Pressable style={styles.photoSheetOverlay} onPress={closePhotoSheet}>
-					<Pressable style={styles.photoSheet} onPress={(event) => event.stopPropagation()}>
-						<View style={styles.photoSheetHandle} />
-						<TouchableOpacity style={styles.photoSheetOption} onPress={takeProfilePhoto} activeOpacity={0.85}>
-							<MaterialCommunityIcons name="camera-outline" size={22} color="#0c7c7c" />
-							<AppTypography variant="body" style={styles.photoSheetOptionText}>
-								Take Photo
-							</AppTypography>
-						</TouchableOpacity>
-						<TouchableOpacity style={styles.photoSheetOption} onPress={chooseProfilePhoto} activeOpacity={0.85}>
-							<MaterialCommunityIcons name="image-outline" size={22} color="#0c7c7c" />
-							<AppTypography variant="body" style={styles.photoSheetOptionText}>
-								Choose from Library
-							</AppTypography>
-						</TouchableOpacity>
-					</Pressable>
-				</Pressable>
-			</Modal>
 		</ScrollView>
 	)
 }
@@ -474,35 +384,6 @@ const styles = StyleSheet.create({
 	},
 	contentShell: {
 		width: '100%',
-	},
-	profilePhotoSection: {
-		alignItems: 'center',
-		marginBottom: 18,
-	},
-	profilePhotoWrapper: {
-		width: 92,
-		height: 92,
-		borderRadius: 46,
-		position: 'relative',
-	},
-	profilePhoto: {
-		width: 92,
-		height: 92,
-		borderRadius: 46,
-		backgroundColor: '#edf4f5',
-	},
-	profilePhotoEditButton: {
-		position: 'absolute',
-		right: 2,
-		bottom: 4,
-		width: 24,
-		height: 24,
-		borderRadius: 12,
-		backgroundColor: '#ffffff',
-		borderWidth: 1,
-		borderColor: '#a7d3db',
-		alignItems: 'center',
-		justifyContent: 'center',
 	},
 	formRow: {
 		flexDirection: 'row',
@@ -553,39 +434,6 @@ const styles = StyleSheet.create({
 	leftPrefixText: {
 		color: '#303030',
 		fontSize: 14,
-	},
-	photoSheetOverlay: {
-		flex: 1,
-		backgroundColor: 'rgba(18, 28, 33, 0.28)',
-		justifyContent: 'flex-end',
-	},
-	photoSheet: {
-		backgroundColor: '#ffffff',
-		borderTopLeftRadius: 18,
-		borderTopRightRadius: 18,
-		paddingTop: 10,
-		paddingBottom: 20,
-	},
-	photoSheetHandle: {
-		width: 42,
-		height: 4,
-		borderRadius: 2,
-		backgroundColor: '#d5e4e6',
-		alignSelf: 'center',
-		marginBottom: 8,
-	},
-	photoSheetOption: {
-		minHeight: 54,
-		paddingHorizontal: 22,
-		flexDirection: 'row',
-		alignItems: 'center',
-		borderTopWidth: 1,
-		borderTopColor: '#eef4f5',
-	},
-	photoSheetOptionText: {
-		marginLeft: 14,
-		color: '#2f2f2f',
-		fontWeight: '500',
 	},
 	saveButton: {
 		alignSelf: 'stretch',
