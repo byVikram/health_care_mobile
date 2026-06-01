@@ -7,7 +7,6 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { TextInput as PaperTextInput } from 'react-native-paper'
 import {
 	AppButton,
 	AppCalendar,
@@ -144,7 +143,7 @@ function InputField({
 				fieldSize="compact"
 				noMargin
 				dense
-				left={leftText ? <PaperTextInput.Affix text={leftText} textStyle={styles.leftPrefixText} /> : undefined}
+				left={leftText ? <AppInput.Affix text={leftText} textStyle={styles.leftPrefixText} /> : undefined}
 				right={rightIcon ? <AppInput.Icon icon={rightIcon} color={rightIconColor} /> : undefined}
 			/>
 		</View>

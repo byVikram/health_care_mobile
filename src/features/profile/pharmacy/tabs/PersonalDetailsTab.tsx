@@ -7,10 +7,10 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { TextInput as PaperTextInput } from 'react-native-paper'
 import {
 	AppButton,
 	AppInput,
+	AppModal,
 	AppPhotoPicker,
 	type AppPhotoPickerUpload,
 	AppTypography,
@@ -122,7 +122,7 @@ function InputField({
 				fieldSize="compact"
 				noMargin
 				dense
-				left={leftText ? <PaperTextInput.Affix text={leftText} textStyle={styles.leftPrefixText} /> : undefined}
+				left={leftText ? <AppInput.Affix text={leftText} textStyle={styles.leftPrefixText} /> : undefined}
 				right={rightIcon ? <AppInput.Icon icon={rightIcon} color={rightIconColor} /> : undefined}
 			/>
 		</View>
@@ -151,6 +151,7 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 	const [profilePhotoUri, setProfilePhotoUri] = useState(user?.avatar || '')
 	const [profilePhotoUpload, setProfilePhotoUpload] = useState<AppPhotoPickerUpload | null>(null)
 	const [isProfilePhotoRemoved, setIsProfilePhotoRemoved] = useState(false)
+	const [successModalVisible, setSuccessModalVisible] = useState(false)
 
 	const updateFormData = <K extends keyof PharmacyPersonalFormData>(key: K, value: PharmacyPersonalFormData[K]) => {
 		setFormData((prev) => ({
@@ -249,7 +250,7 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 			)
 			setProfilePhotoUpload(null)
 			setIsProfilePhotoRemoved(false)
-			Alert.alert('Success', 'Personal details saved successfully.')
+			setSuccessModalVisible(true)
 		} catch (err) {
 			console.error('[PharmacyPersonalDetailsTab] save error:', err)
 			Alert.alert('Error', 'Unable to save personal details right now.')
@@ -369,6 +370,23 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 				</AppButton>
 			</View>
 
+			<AppModal
+				visible={successModalVisible}
+				onDismiss={() => setSuccessModalVisible(false)}
+				title="Success"
+			>
+				<AppTypography variant="body" style={styles.successModalMessage}>
+					Personal details saved successfully
+				</AppTypography>
+				<AppButton
+					variant="primary"
+					formAction
+					style={styles.successModalButton}
+					onPress={() => setSuccessModalVisible(false)}
+				>
+					OK
+				</AppButton>
+			</AppModal>
 		</ScrollView>
 	)
 }
@@ -440,5 +458,16 @@ const styles = StyleSheet.create({
 		marginTop: 0,
 		width: '100%',
 		minWidth: 160,
+	},
+	successModalMessage: {
+		color: '#343434',
+		fontSize: 14,
+		lineHeight: 20,
+		marginBottom: 20,
+	},
+	successModalButton: {
+		alignSelf: 'stretch',
+		marginTop: 0,
+		minWidth: 120,
 	},
 })

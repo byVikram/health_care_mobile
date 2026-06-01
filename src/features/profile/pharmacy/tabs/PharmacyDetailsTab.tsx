@@ -9,7 +9,14 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { AppButton, AppInput, AppPhotoPicker, AppTypography, type AppPhotoPickerUpload } from '../../../../components/common'
+import {
+	AppButton,
+	AppInput,
+	AppModal,
+	AppPhotoPicker,
+	AppTypography,
+	type AppPhotoPickerUpload,
+} from '../../../../components/common'
 import { mergePharmacyProfileData, updatePharmacyProfile } from '../pharmacyService'
 import { PharmacyProfileData } from '../../../../types/pharmacy-profile-api'
 
@@ -184,6 +191,7 @@ export default function PharmacyDetailsTab({ profileData, onProfileChange }: Pha
 	const [logoUri, setLogoUri] = useState('')
 	const [logoUpload, setLogoUpload] = useState<AppPhotoPickerUpload | null>(null)
 	const [isLogoRemoved, setIsLogoRemoved] = useState(false)
+	const [successModalVisible, setSuccessModalVisible] = useState(false)
 
 	const updateFormData = <K extends keyof PharmacyDetailsFormData>(key: K, value: PharmacyDetailsFormData[K]) => {
 		setFormData((prev) => ({
@@ -310,7 +318,7 @@ export default function PharmacyDetailsTab({ profileData, onProfileChange }: Pha
 			)
 			setLogoUpload(null)
 			setIsLogoRemoved(false)
-			Alert.alert('Success', 'Pharmacy details saved successfully.')
+			setSuccessModalVisible(true)
 		} catch (error) {
 			console.error('[PharmacyDetailsTab] save error:', error)
 			Alert.alert('Error', 'Unable to save pharmacy details right now.')
@@ -464,6 +472,23 @@ export default function PharmacyDetailsTab({ profileData, onProfileChange }: Pha
 				</AppButton>
 			</View>
 
+			<AppModal
+				visible={successModalVisible}
+				onDismiss={() => setSuccessModalVisible(false)}
+				title="Success"
+			>
+				<AppTypography variant="body" style={styles.successModalMessage}>
+					Pharmacy details saved successfully
+				</AppTypography>
+				<AppButton
+					variant="primary"
+					formAction
+					style={styles.successModalButton}
+					onPress={() => setSuccessModalVisible(false)}
+				>
+					OK
+				</AppButton>
+			</AppModal>
 		</ScrollView>
 	)
 }
@@ -593,5 +618,16 @@ const styles = StyleSheet.create({
 		alignSelf: 'stretch',
 		marginTop: 0,
 		width: '100%',
+	},
+	successModalMessage: {
+		color: '#343434',
+		fontSize: 14,
+		lineHeight: 20,
+		marginBottom: 20,
+	},
+	successModalButton: {
+		alignSelf: 'stretch',
+		marginTop: 0,
+		minWidth: 120,
 	},
 })

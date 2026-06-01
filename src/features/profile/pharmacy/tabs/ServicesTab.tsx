@@ -10,6 +10,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppButton,
 	AppInput,
+	AppModal,
 	AppMultiSelect,
 	AppTimePicker,
 	AppToggle,
@@ -198,6 +199,7 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 		paymentMethods: [],
 	})
 	const [isSaving, setIsSaving] = useState(false)
+	const [successModalVisible, setSuccessModalVisible] = useState(false)
 
 	const updateFormData = <K extends keyof ServicesFormData>(key: K, value: ServicesFormData[K]) => {
 		setFormData((prev) => ({ ...prev, [key]: value }))
@@ -272,7 +274,7 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 			}
 
 			onProfileChange?.((current) => mergePharmacyProfileData(current, response.data ?? { services: payload }))
-			Alert.alert('Success', 'Pharmacy services saved successfully.')
+			setSuccessModalVisible(true)
 		} catch (error) {
 			console.error('[PharmacyServicesTab] save error:', error)
 			Alert.alert('Error', 'Unable to save pharmacy services right now.')
@@ -413,6 +415,23 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 					Save
 				</AppButton>
 			</View>
+			<AppModal
+				visible={successModalVisible}
+				onDismiss={() => setSuccessModalVisible(false)}
+				title="Success"
+			>
+				<AppTypography variant="body" style={styles.successModalMessage}>
+					Pharmacy services saved successfully
+				</AppTypography>
+				<AppButton
+					variant="primary"
+					formAction
+					style={styles.successModalButton}
+					onPress={() => setSuccessModalVisible(false)}
+				>
+					OK
+				</AppButton>
+			</AppModal>
 		</ScrollView>
 	)
 }
@@ -534,5 +553,16 @@ const styles = StyleSheet.create({
 		marginTop: 0,
 		width: '100%',
 		minWidth: 160,
+	},
+	successModalMessage: {
+		color: '#343434',
+		fontSize: 14,
+		lineHeight: 20,
+		marginBottom: 20,
+	},
+	successModalButton: {
+		alignSelf: 'stretch',
+		marginTop: 0,
+		minWidth: 120,
 	},
 })

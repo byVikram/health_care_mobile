@@ -4,15 +4,13 @@ import {
 	StyleSheet,
 	ScrollView,
 	TouchableOpacity,
-	Modal,
-	Pressable,
 	useWindowDimensions,
 	Alert,
 	Linking,
 	Share,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { AppToggle, AppTypography } from '../../../../components/common'
+import { AppModal, AppToggle, AppTypography } from '../../../../components/common'
 
 export default function SettingsTab() {
 	const [showModal, setShowModal] = useState(false)
@@ -152,45 +150,30 @@ export default function SettingsTab() {
 				<Ionicons name="trash-outline" size={18} color="#fff" />
 			</TouchableOpacity>
 
-			<Modal
-				transparent
-				visible={showModal}
-				animationType="fade"
-			>
-				<Pressable
-					style={styles.overlay}
-					onPress={() => setShowModal(false)}
-				>
-					<Pressable
-						style={[
-							styles.modalCard,
-							{ width: width * 0.85 },
-						]}
-						onPress={(e) => e.stopPropagation()}
-					>
-						<AppTypography variant="body" style={styles.modalTitle}>
-							Deactivate Account?
-						</AppTypography>
+			<AppModal visible={showModal} onDismiss={() => setShowModal(false)}>
+				<View style={[styles.modalContent, { width: Math.max(width * 0.85 - 40, 240) }]}>
+					<AppTypography variant="body" style={styles.modalTitle}>
+						Deactivate Account?
+					</AppTypography>
 
-						<AppTypography variant="body" style={styles.modalText}>
-							All your data will be permanently deactivated.
-						</AppTypography>
+					<AppTypography variant="body" style={styles.modalText}>
+						All your data will be permanently deactivated.
+					</AppTypography>
 
-						<View style={styles.modalActions}>
-							<TouchableOpacity
-								style={styles.cancelBtn}
-								onPress={() => setShowModal(false)}
-							>
-								<AppTypography variant="body" style={styles.cancelText}>Cancel</AppTypography>
-							</TouchableOpacity>
+					<View style={styles.modalActions}>
+						<TouchableOpacity
+							style={styles.cancelBtn}
+							onPress={() => setShowModal(false)}
+						>
+							<AppTypography variant="body" style={styles.cancelText}>Cancel</AppTypography>
+						</TouchableOpacity>
 
-							<TouchableOpacity style={styles.confirmBtn}>
-								<AppTypography variant="body" style={styles.confirmText}>Deactivate</AppTypography>
-							</TouchableOpacity>
-						</View>
-					</Pressable>
-				</Pressable>
-			</Modal>
+						<TouchableOpacity style={styles.confirmBtn}>
+							<AppTypography variant="body" style={styles.confirmText}>Deactivate</AppTypography>
+						</TouchableOpacity>
+					</View>
+				</View>
+			</AppModal>
 		</ScrollView>
 	)
 }
@@ -291,19 +274,6 @@ const styles = StyleSheet.create({
 		fontWeight: '400',
 	},
 
-	overlay: {
-		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.4)',
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-
-	modalCard: {
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		padding: 16,
-	},
-
 	modalTitle: {
 		fontSize: 16,
 		lineHeight: 22,
@@ -316,6 +286,10 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		lineHeight: 20,
 		marginBottom: 16,
+	},
+
+	modalContent: {
+		maxWidth: 420,
 	},
 
 	modalActions: {

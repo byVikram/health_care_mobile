@@ -12,6 +12,7 @@ interface AppInputProps extends React.ComponentProps<typeof PaperTextInput> {
 
 type AppInputComponent = React.FC<AppInputProps> & {
 	Icon: typeof PaperTextInput.Icon
+	Affix: typeof PaperTextInput.Affix
 }
 
 const FIELD_HEIGHTS = {
@@ -72,6 +73,7 @@ export const AppInput: AppInputComponent = ({
 }
 
 AppInput.Icon = PaperTextInput.Icon
+AppInput.Affix = PaperTextInput.Affix
 
 const styles = StyleSheet.create({
 	container: {
