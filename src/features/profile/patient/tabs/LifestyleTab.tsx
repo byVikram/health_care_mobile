@@ -173,6 +173,6 @@ const styles = StyleSheet.create({
 	},
 	saveButton: {
 		width: '100%',
-		maxWidth: 320,
+		// maxWidth: 320,
 	},
 })
