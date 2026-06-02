@@ -29,13 +29,14 @@ export interface AppMultiSelectProps {
   customCardStyle?: StyleProp<ViewStyle>;
   noMargin?: boolean;
   floatingLabel?: boolean;
-  dropdownPosition?: "top" | "bottom";
+  dropdownPosition?: "top" | "bottom" | "auto";
   maxDropdownHeight?: number;
   bottomOffset?: number;
 }
 
 const DROPDOWN_GAP = 4;
 const DEFAULT_DROPDOWN_HEIGHT = 220;
+const OPTION_ROW_MIN_HEIGHT = 44;
 const SELECT_HEIGHTS = {
   small: 32,
   compact: 42,
@@ -69,7 +70,7 @@ export const AppMultiSelect = ({
   customCardStyle,
   noMargin = false,
   floatingLabel = false,
-  dropdownPosition = "bottom",
+  dropdownPosition = "auto",
   maxDropdownHeight,
   bottomOffset = 24,
 }: AppMultiSelectProps) => {
@@ -110,16 +111,26 @@ export const AppMultiSelect = ({
   const horizontalPadding = SELECT_HORIZONTAL_PADDING[size];
   const textSize = SELECT_TEXT_SIZE[size];
   const requestedDropdownHeight = maxDropdownHeight ?? DEFAULT_DROPDOWN_HEIGHT;
+  const estimatedContentHeight = Math.min(requestedDropdownHeight, Math.max(OPTION_ROW_MIN_HEIGHT, options.length * OPTION_ROW_MIN_HEIGHT));
   const reservedBottomSpace = Math.max(bottomOffset, insets.bottom + bottomOffset);
-  const dropdownTop =
-    dropdownPosition === "top"
-      ? Math.max(insets.top + DROPDOWN_GAP, anchorLayout.y - requestedDropdownHeight - DROPDOWN_GAP)
-      : anchorLayout.y + anchorLayout.height + DROPDOWN_GAP;
+  const availableSpaceAbove = Math.max(0, anchorLayout.y - insets.top - DROPDOWN_GAP * 2);
+  const availableSpaceBelow = Math.max(
+    0,
+    windowHeight - (anchorLayout.y + anchorLayout.height + DROPDOWN_GAP) - reservedBottomSpace,
+  );
+  const resolvedDropdownPosition =
+    dropdownPosition === "auto"
+      ? availableSpaceBelow >= estimatedContentHeight || availableSpaceBelow >= availableSpaceAbove
+        ? "bottom"
+        : "top"
+      : dropdownPosition;
   const availableDropdownHeight =
-    dropdownPosition === "top"
-      ? anchorLayout.y - insets.top - DROPDOWN_GAP * 2
-      : windowHeight - dropdownTop - reservedBottomSpace;
-  const dropdownHeight = Math.min(requestedDropdownHeight, Math.max(0, availableDropdownHeight));
+    resolvedDropdownPosition === "top" ? availableSpaceAbove : availableSpaceBelow;
+  const dropdownHeight = Math.min(estimatedContentHeight, Math.max(0, availableDropdownHeight));
+  const dropdownTop =
+    resolvedDropdownPosition === "top"
+      ? Math.max(insets.top + DROPDOWN_GAP, anchorLayout.y - dropdownHeight - DROPDOWN_GAP)
+      : anchorLayout.y + anchorLayout.height + DROPDOWN_GAP;
 
   return (
     <View style={[styles.container, noMargin && styles.containerNoMargin, floatingLabel && styles.containerFloatingLabel, style]}>

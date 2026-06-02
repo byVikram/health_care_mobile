@@ -1,18 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { StyleSheet, View, ScrollView, RefreshControl, Animated, Easing } from 'react-native'
-import {
-	Card,
-	useTheme,
-	Dialog,
-	Portal,
-	ActivityIndicator,
-	IconButton,
-	Surface,
-} from 'react-native-paper'
+import { Card, useTheme, Surface } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { getSessions, logoutSession, Session } from '../auth/authService'
 import StatusModal from '../../components/common/StatusModal'
-import { AppTypography, AppButton } from '../../components/common'
+import { AppTypography, AppButton, AppModal } from '../../components/common'
 
 // --- Small helper: shimmer placeholder ----------------------------------------
 const ShimmerPlaceholder = () => {
@@ -181,7 +173,9 @@ export default function SessionsTab() {
 		return (
 			<View style={styles.container}>
 				<View style={styles.header}>
-					<AppTypography style={[styles.title, { color: theme.colors.onSurface }]}>Active Sessions</AppTypography>
+					<AppTypography style={[styles.title, { color: theme.colors.onSurface }]}>
+						Active Sessions
+					</AppTypography>
 					<AppTypography style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
 						Manage the devices where your account is currently logged in.
 					</AppTypography>
@@ -223,7 +217,9 @@ export default function SessionsTab() {
 			>
 				{/* Header */}
 				<View style={styles.header}>
-					<AppTypography style={[styles.title, { color: theme.colors.onSurface }]}>Active Sessions</AppTypography>
+					<AppTypography style={[styles.title, { color: theme.colors.onSurface }]}>
+						Active Sessions
+					</AppTypography>
 					<AppTypography style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
 						Manage the devices where your account is currently logged in.
 					</AppTypography>
@@ -287,7 +283,9 @@ export default function SessionsTab() {
 														{ borderColor: theme.colors.primary, borderWidth: 1 },
 													]}
 												>
-													<AppTypography style={[styles.badgeText, { color: theme.colors.primary }]}>
+													<AppTypography
+														style={[styles.badgeText, { color: theme.colors.primary }]}
+													>
 														Current
 													</AppTypography>
 												</View>
@@ -295,9 +293,11 @@ export default function SessionsTab() {
 										</View>
 
 										{/* IP / location */}
-										<AppTypography style={[styles.ipAddress, { color: theme.colors.onSurfaceVariant }]}>
+										<AppTypography
+											style={[styles.ipAddress, { color: theme.colors.onSurfaceVariant }]}
+										>
 											{session.ip_address || 'Unknown IP'}
-											{session.location ? ` – ${session.location}` : ''}
+											{/* {session.location ? ` – ${session.location}` : ''} */}
 										</AppTypography>
 
 										{/* Last active with relative time */}
@@ -307,7 +307,9 @@ export default function SessionsTab() {
 												size={14}
 												color={theme.colors.onSurfaceVariant}
 											/>
-											<AppTypography style={[styles.timeText, { color: theme.colors.onSurfaceVariant }]}>
+											<AppTypography
+												style={[styles.timeText, { color: theme.colors.onSurfaceVariant }]}
+											>
 												Last active: {getRelativeTime(session.last_active_at)}
 											</AppTypography>
 										</View>
@@ -341,25 +343,33 @@ export default function SessionsTab() {
 				)}
 			</ScrollView>
 
-			{/* Logout confirmation dialog */}
-			<Portal>
-				<Dialog visible={logoutConfirmVisible} onDismiss={() => setLogoutConfirmVisible(false)}>
-					<Dialog.Icon icon="logout" color={theme.colors.error} />
-					<Dialog.Title style={styles.dialogTitle}>Logout Session</Dialog.Title>
-					<Dialog.Content>
-						<AppTypography>
-							Are you sure you want to logout from this device? You will need to sign in again on that
-							device.
-						</AppTypography>
-					</Dialog.Content>
-					<Dialog.Actions>
-						<AppButton variant="text" onPress={() => setLogoutConfirmVisible(false)}>Cancel</AppButton>
-						<AppButton variant="text" onPress={handleLogout} loading={isLoggingOut} textColor={theme.colors.error}>
-							Logout
-						</AppButton>
-					</Dialog.Actions>
-				</Dialog>
-			</Portal>
+			{/* Logout confirmation modal */}
+			<AppModal
+				visible={logoutConfirmVisible}
+				onDismiss={() => setLogoutConfirmVisible(false)}
+				title="Logout Session"
+			>
+				<View style={styles.modalIconContainer}>
+					<MaterialCommunityIcons name="logout" size={32} color={theme.colors.error} />
+				</View>
+				<AppTypography style={[styles.modalDescription, { color: theme.colors.onSurfaceVariant }]}>
+					Are you sure you want to logout from this device? You will need to sign in again on that device.
+				</AppTypography>
+				<View style={styles.modalActions}>
+					<AppButton variant="text" onPress={() => setLogoutConfirmVisible(false)}>
+						Cancel
+					</AppButton>
+					<AppButton
+						variant="text"
+						onPress={handleLogout}
+						loading={isLoggingOut}
+						textColor={theme.colors.error}
+						style={styles.logoutConfirmButton}
+					>
+						Logout
+					</AppButton>
+				</View>
+			</AppModal>
 
 			{/* Status modal (success / error feedback) */}
 			<StatusModal
@@ -506,8 +516,23 @@ const styles = StyleSheet.create({
 	retryButton: {
 		marginTop: 8,
 	},
-	dialogTitle: {
+	modalIconContainer: {
+		alignItems: 'center',
+		marginBottom: 12,
+	},
+	modalDescription: {
 		textAlign: 'center',
+		fontSize: 15,
+		lineHeight: 21,
+	},
+	modalActions: {
+		flexDirection: 'row',
+		justifyContent: 'flex-end',
+		alignItems: 'center',
+		marginTop: 20,
+	},
+	logoutConfirmButton: {
+		marginLeft: 8,
 	},
 	// Shimmer styles
 	shimmerIconPlaceholder: {
