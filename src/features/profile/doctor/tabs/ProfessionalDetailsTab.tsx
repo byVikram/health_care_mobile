@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { AppInput, AppSelect, AppSelectOption, AppTypography } from '../../../../components/common'
+import { AppButton, AppInput, AppSelect, AppSelectOption, AppTypography } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import { getDoctorProfile, getSpecialities, mapDoctorProfileApi } from '../../../doctor/doctorService'
 import { doctorService } from '../../../consultation/ConsultationService'
@@ -437,19 +437,15 @@ export default function ProfessionalDetailsTab() {
 				{
 					paddingHorizontal: sectionPadding,
 					paddingTop: sectionPadding,
-					paddingBottom: 0,
+					paddingBottom: rowSpacing,
 				},
 			]}
 			keyboardShouldPersistTaps="handled"
 			showsVerticalScrollIndicator={false}
 		>
 			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-				<AppTypography variant="h3" style={[styles.title, { marginBottom: titleBottom }]}>
-					Professional Details
-				</AppTypography>
-
 				<View style={{ marginBottom: rowSpacing }}>
-					<SectionTitle>Select specialization</SectionTitle>
+					<SectionTitle>Select Specialization</SectionTitle>
 					{isLoadingSpecialities ? (
 						<View style={styles.inlineLoader}>
 							<ActivityIndicator size="small" color="#0c7c7c" />
@@ -468,7 +464,7 @@ export default function ProfessionalDetailsTab() {
 				<View style={styles.sectionDivider} />
 
 				<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
-					<SectionTitle>Educational qualification and proof</SectionTitle>
+					<SectionTitle>Educational Qualification and Proof</SectionTitle>
 					<View style={{ gap: 18 }}>
 						<SelectDropdown
 							label="Select Degree"
@@ -513,7 +509,7 @@ export default function ProfessionalDetailsTab() {
 				<View style={styles.sectionDivider} />
 
 				<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
-					<SectionTitle>Registration details and proofs</SectionTitle>
+					<SectionTitle>Registration Details and Proofs</SectionTitle>
 					<View style={{ gap: 18 }}>
 						{selectedLabel ? (
 							<View style={styles.noticeCard}>
@@ -553,20 +549,16 @@ export default function ProfessionalDetailsTab() {
 					</View>
 				</View>
 
-				<TouchableOpacity
-					style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+				<AppButton
+					variant="primary"
+					formAction
+					style={styles.saveButton}
 					onPress={handleSave}
+					loading={isSaving}
 					disabled={isSaving}
-					activeOpacity={0.85}
 				>
-					{isSaving ? (
-						<ActivityIndicator size="small" color="#ffffff" />
-					) : (
-						<AppTypography variant="body" style={styles.saveButtonText}>
-							Save / Continue
-						</AppTypography>
-					)}
-				</TouchableOpacity>
+					Save 
+				</AppButton>
 			</View>
 		</ScrollView>
 	)
@@ -590,11 +582,7 @@ const styles = StyleSheet.create({
 	contentShell: {
 		width: '100%',
 	},
-	title: {
-		color: '#343434',
-		fontSize: 22,
-		fontWeight: '600',
-	},
+
 	sectionTitle: {
 		color: '#343434',
 		fontSize: 18,
@@ -743,21 +731,8 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	saveButton: {
-		marginTop: 28,
-		alignSelf: 'flex-start',
-		minWidth: 160,
-		paddingHorizontal: 20,
-		paddingVertical: 12,
-		borderRadius: 10,
-		backgroundColor: '#0c7c7c',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	saveButtonDisabled: {
-		opacity: 0.7,
-	},
-	saveButtonText: {
-		color: '#ffffff',
-		fontWeight: '600',
+		alignSelf: 'stretch',
+		marginTop: 0,
+		width: '100%',
 	},
 })

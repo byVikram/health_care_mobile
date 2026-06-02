@@ -41,6 +41,11 @@ function getTabConfig(routeName: string) {
 function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 	const theme = useTheme()
 	const insets = useSafeAreaInsets()
+	const activeRoute = state.routes[state.index]
+
+	if (activeRoute?.name === ROUTES.MAIN.PROFILE) {
+		return null
+	}
 
 	return (
 		<View style={[styles.tabBar, { bottom: insets.bottom + 10 }]}>

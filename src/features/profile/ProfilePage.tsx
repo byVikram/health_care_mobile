@@ -1,7 +1,7 @@
 import React from 'react'
 import { useAuth } from '../../context/AuthContext'
 import DoctorProfileLayout from './doctor/DoctorProfileLayout'
-import PatientProfilePage from './patient/PatientProfilePage'
+import PatientProfileLayout from './patient/PatientProfileLayout'
 import PharmacyProfileLayout from './pharmacy/PharmacyProfileLayout'
 
 export default function ProfilePage() {
@@ -16,5 +16,5 @@ export default function ProfilePage() {
 	}
 
 	// Patient Profile acts as default fallback
-	return <PatientProfilePage />
+	return <PatientProfileLayout />
 }

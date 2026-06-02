@@ -93,6 +93,11 @@ type DoctorAppointmentsProps = {
 }
 
 type AppointmentModeKey = 'clinic' | 'video'
+type AppointmentModeIcon = {
+	name: React.ComponentProps<typeof MaterialCommunityIcons>['name']
+	color: string
+	backgroundColor: string
+}
 
 type AvailabilityAppointmentMode = 'clinic_visit' | 'video_call' | 'offline' | 'online' | 'clinic' | 'video' | string
 
@@ -357,13 +362,11 @@ const [successMessage, setSuccessMessage] = useState('')
 		return start ?? '--'
 	}
 
-	const getTypeIcon = (type?: string) => {
-		switch (type) {
-			case 'video':   return { name: 'video',                    color: '#4d6bb1' }
-			case 'clinic':  return { name: 'hospital-building',        color: '#2e7d32' }
-			case 'home':    return { name: 'home-heart',               color: '#e67e22' }
-			default:        return { name: 'calendar',                 color: '#999'    }
+	const getTypeIcon = (mode: AppointmentModeKey): AppointmentModeIcon => {
+		if (mode === 'video') {
+			return { name: 'video', color: '#0066ff', backgroundColor: '#e6f0ff' }
 		}
+		return { name: 'home-plus', color: '#00a82d', backgroundColor: '#e8faee' }
 	}
 
 	const mapReferDoctor = (doctor: FavouriteDoctor | ReferDoctor): ReferDoctor => ({
@@ -1107,29 +1110,33 @@ const [successMessage, setSuccessMessage] = useState('')
 	// Card renderer
 	// ─────────────────────────────────────────────────────────────────────────
 
-	const renderPatientNameRow = (apt: any, status: string, statusStyle: any, statusTextStyle: any) => (
-		<View style={styles.patientNameRow}>
-			<View style={styles.patientIconBox}>
-				<MaterialCommunityIcons name="home-heart" size={20} color="#2e7d32" />
+	const renderPatientNameRow = (apt: any, status: string, statusStyle: any, statusTextStyle: any) => {
+		const modeIcon = getTypeIcon(getAppointmentModeKey(apt))
+
+		return (
+			<View style={styles.patientNameRow}>
+				<View style={[styles.patientIconBox, { backgroundColor: modeIcon.backgroundColor }]}>
+					<MaterialCommunityIcons name={modeIcon.name} size={20} color={modeIcon.color} />
+				</View>
+				<View style={styles.patientNameWithInfo}>
+					<Text style={styles.name} numberOfLines={1}>
+						{apt?.patient?.name || 'Unknown Patient'}
+					</Text>
+					<TouchableOpacity
+						activeOpacity={0.75}
+						style={styles.symptomsInfoButton}
+						onPress={(event) => openSymptomsPopover(apt, event)}
+						hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+					>
+						<MaterialCommunityIcons name="information-outline" size={17} color={TEAL} />
+					</TouchableOpacity>
+				</View>
+				<View style={[styles.pill, statusStyle]}>
+					<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
+				</View>
 			</View>
-			<View style={styles.patientNameWithInfo}>
-				<Text style={styles.name} numberOfLines={1}>
-					{apt?.patient?.name || 'Unknown Patient'}
-				</Text>
-				<TouchableOpacity
-					activeOpacity={0.75}
-					style={styles.symptomsInfoButton}
-					onPress={(event) => openSymptomsPopover(apt, event)}
-					hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-				>
-					<MaterialCommunityIcons name="information-outline" size={17} color={TEAL} />
-				</TouchableOpacity>
-			</View>
-			<View style={[styles.pill, statusStyle]}>
-				<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
-			</View>
-		</View>
-	)
+		)
+	}
 
 	const renderSymptomsPopover = () => {
 		if (!symptomsPopover.visible) return null

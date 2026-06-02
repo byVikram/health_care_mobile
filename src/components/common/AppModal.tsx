@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, StyleProp, View, ViewStyle } from 'react-native';
 import { Modal as PaperModal, Portal, useTheme, IconButton } from 'react-native-paper';
 import { AppTypography } from './AppTypography';
 
@@ -9,9 +9,17 @@ interface AppModalProps {
     title?: string;
     children: React.ReactNode;
     dismissable?: boolean;
+    contentContainerStyle?: StyleProp<ViewStyle>;
 }
 
-export const AppModal = ({ visible, onDismiss, title, children, dismissable = true }: AppModalProps) => {
+export const AppModal = ({
+    visible,
+    onDismiss,
+    title,
+    children,
+    dismissable = true,
+    contentContainerStyle,
+}: AppModalProps) => {
     const theme = useTheme();
 
     return (
@@ -20,7 +28,11 @@ export const AppModal = ({ visible, onDismiss, title, children, dismissable = tr
                 visible={visible} 
                 onDismiss={onDismiss} 
                 dismissable={dismissable}
-                contentContainerStyle={[styles.modalContainer, { backgroundColor: theme.colors.background }]}
+                contentContainerStyle={[
+                    styles.modalContainer,
+                    { backgroundColor: theme.colors.background },
+                    contentContainerStyle,
+                ]}
             >
                 {title && (
                     <View style={styles.header}>

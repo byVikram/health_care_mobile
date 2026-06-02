@@ -11,7 +11,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppInput, AppSelect, AppToggle, AppTypography } from '../../../../components/common'
+import { AppButton, AppInput, AppSelect, AppToggle, AppTypography } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -626,6 +626,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}, [width])
 
 	const sectionPadding = isMobile ? 16 : isTablet ? 24 : 28
+	const actionSpacing = isMobile ? 18 : 24
 	const cardDirection = useWideHospitalRows ? 'row' : 'column'
 	const actionStacked = !useWideHospitalRows
 	const selectedWorkingHours = weeklyWorkingHours[selectedWorkingDay][selectedAppointmentType]
@@ -899,7 +900,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 					{
 						paddingHorizontal: sectionPadding,
 						paddingTop: sectionPadding,
-						paddingBottom: 0,
+						paddingBottom: actionSpacing,
 					},
 				]}
 				keyboardShouldPersistTaps="handled"
@@ -1025,21 +1026,17 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						</View>
 					</View>
 
-					<View style={styles.formActions}>
-						<TouchableOpacity
-							style={[styles.primaryButton, isSavingAddress && styles.primaryButtonDisabled]}
+					<View style={[styles.formActions, { marginTop: actionSpacing }]}>
+						<AppButton
+							variant="primary"
+							formAction
+							style={styles.formActionButton}
 							onPress={handleSaveAddress}
-							activeOpacity={0.85}
+							loading={isSavingAddress}
 							disabled={isSavingAddress}
 						>
-							{isSavingAddress ? (
-								<ActivityIndicator size="small" color="#ffffff" />
-							) : (
-								<AppTypography variant="body" style={styles.primaryButtonText}>
-									Save Details
-								</AppTypography>
-							)}
-						</TouchableOpacity>
+							Save Details
+						</AppButton>
 					</View>
 				</View>
 			</ScrollView>
@@ -1055,7 +1052,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 					{
 						paddingHorizontal: sectionPadding,
 						paddingTop: sectionPadding,
-						paddingBottom: 0,
+						paddingBottom: actionSpacing,
 					},
 				]}
 				keyboardShouldPersistTaps="handled"
@@ -1063,9 +1060,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			>
 				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
 					<View style={[styles.header, actionStacked && styles.headerStacked]}>
-						<AppTypography variant="h3" style={styles.title}>
-							My Hospital
-						</AppTypography>
+						
 						<TouchableOpacity
 							style={[styles.addButton, actionStacked && styles.addButtonStacked]}
 							onPress={() => setShowForm(true)}
@@ -1176,20 +1171,16 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						</View>
 					)}
 
-					<TouchableOpacity
-						style={[styles.primaryButton, styles.saveContinueButton, isSaving && styles.primaryButtonDisabled]}
+					<AppButton
+						variant="primary"
+						formAction
+						style={[styles.saveContinueButton, { marginTop: actionSpacing }]}
 						onPress={handleSave}
+						loading={isSaving}
 						disabled={isSaving}
-						activeOpacity={0.85}
 					>
-						{isSaving ? (
-							<ActivityIndicator size="small" color="#ffffff" />
-						) : (
-							<AppTypography variant="body" style={styles.primaryButtonText}>
-								Save / Continue
-							</AppTypography>
-						)}
-					</TouchableOpacity>
+						Save 
+					</AppButton>
 				</View>
 			</ScrollView>
 		</Pressable>
@@ -1225,11 +1216,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'column',
 		alignItems: 'stretch',
 	},
-	title: {
-		color: '#1f2b33',
-		fontSize: 22,
-		fontWeight: '700',
-	},
+	
 	addButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1734,27 +1721,14 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	formActions: {
-		alignItems: 'flex-end',
-		marginTop: 28,
+		alignItems: 'stretch',
 	},
-	primaryButton: {
-		minWidth: 160,
-		paddingHorizontal: 20,
-		paddingVertical: 12,
-		borderRadius: 10,
-		backgroundColor: '#0c7c7c',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	primaryButtonDisabled: {
-		opacity: 0.7,
-	},
-	primaryButtonText: {
-		color: '#ffffff',
-		fontWeight: '600',
+	formActionButton: {
+		marginTop: 0,
+		width: '100%',
 	},
 	saveContinueButton: {
-		marginTop: 28,
-		alignSelf: 'flex-start',
+		alignSelf: 'stretch',
+		width: '100%',
 	},
 })
