@@ -229,23 +229,24 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 		const deliveryRadius = formData.deliveryRadiusKm.trim()
 		const deliveryTime = formData.estimatedDeliveryTimeMins.trim()
 		const minOrder = formData.minOrderAmount.trim()
+		const isHomeDeliveryAvailable = formData.homeDeliveryAvailable
 
 		if (!formData.openDays.length) {
 			Alert.alert('Validation', 'Please select open days.')
 			return
 		}
 
-		if (deliveryRadius && Number.isNaN(Number(deliveryRadius))) {
+		if (isHomeDeliveryAvailable && deliveryRadius && Number.isNaN(Number(deliveryRadius))) {
 			Alert.alert('Validation', 'Please enter a valid delivery radius.')
 			return
 		}
 
-		if (deliveryTime && Number.isNaN(Number(deliveryTime))) {
+		if (isHomeDeliveryAvailable && deliveryTime && Number.isNaN(Number(deliveryTime))) {
 			Alert.alert('Validation', 'Please enter a valid estimated delivery time.')
 			return
 		}
 
-		if (minOrder && Number.isNaN(Number(minOrder))) {
+		if (isHomeDeliveryAvailable && minOrder && Number.isNaN(Number(minOrder))) {
 			Alert.alert('Validation', 'Please enter a valid minimum order amount.')
 			return
 		}
@@ -257,10 +258,10 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 			},
 			open_days: formData.openDays,
 			payment_methods: formData.paymentMethods,
-			home_delivery_available: formData.homeDeliveryAvailable,
-			delivery_radius_km: deliveryRadius ? Number(deliveryRadius) : 0,
-			estimated_delivery_time_mins: deliveryTime ? Number(deliveryTime) : 0,
-			min_order_amount: minOrder ? Number(minOrder) : 0,
+			home_delivery_available: isHomeDeliveryAvailable,
+			delivery_radius_km: isHomeDeliveryAvailable && deliveryRadius ? Number(deliveryRadius) : 0,
+			estimated_delivery_time_mins: isHomeDeliveryAvailable && deliveryTime ? Number(deliveryTime) : 0,
+			min_order_amount: isHomeDeliveryAvailable && minOrder ? Number(minOrder) : 0,
 			is_24_x_7: formData.is24x7,
 			emergency_medicine_available: formData.emergencyMedicineAvailable,
 		}
@@ -364,30 +365,34 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 						onValueChange={(value) => updateFormData('homeDeliveryAvailable', value)}
 					/>
 
-					<FormRow stacked={!useTwoColumns} compact={isTablet}>
-						<InputField
-							label="Delivery Radius (km)"
-							value={formData.deliveryRadiusKm}
-							onChangeText={(value) => updateFormData('deliveryRadiusKm', value.replace(/[^\d.]/g, ''))}
-							placeholder="Enter radius"
-							keyboardType="numeric"
-						/>
-						<InputField
-							label="Estimated Delivery Time (mins)"
-							value={formData.estimatedDeliveryTimeMins}
-							onChangeText={(value) => updateFormData('estimatedDeliveryTimeMins', value.replace(/\D/g, ''))}
-							placeholder="Enter delivery time"
-							keyboardType="numeric"
-						/>
-					</FormRow>
+					{formData.homeDeliveryAvailable ? (
+						<>
+							<FormRow stacked={!useTwoColumns} compact={isTablet}>
+								<InputField
+									label="Delivery Radius (km)"
+									value={formData.deliveryRadiusKm}
+									onChangeText={(value) => updateFormData('deliveryRadiusKm', value.replace(/[^\d.]/g, ''))}
+									placeholder="Enter radius"
+									keyboardType="numeric"
+								/>
+								<InputField
+									label="Estimated Delivery Time (mins)"
+									value={formData.estimatedDeliveryTimeMins}
+									onChangeText={(value) => updateFormData('estimatedDeliveryTimeMins', value.replace(/\D/g, ''))}
+									placeholder="Enter delivery time"
+									keyboardType="numeric"
+								/>
+							</FormRow>
 
-					<InputField
-						label="Minimum Order Amount"
-						value={formData.minOrderAmount}
-						onChangeText={(value) => updateFormData('minOrderAmount', value.replace(/[^\d.]/g, ''))}
-						placeholder="Enter minimum order amount"
-						keyboardType="numeric"
-					/>
+							<InputField
+								label="Minimum Order Amount"
+								value={formData.minOrderAmount}
+								onChangeText={(value) => updateFormData('minOrderAmount', value.replace(/[^\d.]/g, ''))}
+								placeholder="Enter minimum order amount"
+								keyboardType="numeric"
+							/>
+						</>
+					) : null}
 				</SectionCard>
 
 				<SectionCard title="Accepted Payments" icon="credit-card-outline">
