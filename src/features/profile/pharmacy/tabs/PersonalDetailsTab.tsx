@@ -20,6 +20,7 @@ import { mergePharmacyProfileData, updatePharmacyProfile } from '../pharmacyServ
 import { PharmacyProfileData } from '../../../../types/pharmacy-profile-api'
 
 const DEFAULT_PROFILE_IMAGE = require('../../../../assets/Banner/doctor.png')
+const SUCCESS_MESSAGE = 'Personal details saved successfully'
 
 type InputFieldProps = {
 	label: string
@@ -373,18 +374,26 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 			<AppModal
 				visible={successModalVisible}
 				onDismiss={() => setSuccessModalVisible(false)}
-				title="Success"
+				contentContainerStyle={styles.successModalContainer}
 			>
+				<View style={styles.successIconCircle}>
+					<MaterialCommunityIcons name="check" size={46} color="#2E7D32" />
+				</View>
+				<AppTypography variant="h3" style={styles.successModalTitle}>
+					Success
+				</AppTypography>
 				<AppTypography variant="body" style={styles.successModalMessage}>
-					Personal details saved successfully
+					{SUCCESS_MESSAGE}
 				</AppTypography>
 				<AppButton
 					variant="primary"
 					formAction
 					style={styles.successModalButton}
+					contentStyle={styles.successModalButtonContent}
+					labelStyle={styles.successModalButtonLabel}
 					onPress={() => setSuccessModalVisible(false)}
 				>
-					OK
+					Okay
 				</AppButton>
 			</AppModal>
 		</ScrollView>
@@ -459,15 +468,54 @@ const styles = StyleSheet.create({
 		width: '100%',
 		minWidth: 160,
 	},
+	successModalContainer: {
+		alignSelf: 'center',
+		width: '78%',
+		maxWidth: 330,
+		borderRadius: 16,
+		paddingHorizontal: 20,
+		paddingTop: 18,
+		paddingBottom: 18,
+	},
+	successIconCircle: {
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+		backgroundColor: '#E6F4EA',
+		alignItems: 'center',
+		justifyContent: 'center',
+		alignSelf: 'center',
+		marginBottom: 12,
+	},
+	successModalTitle: {
+		color: '#000000',
+		fontSize: 21,
+		lineHeight: 26,
+		fontWeight: '700',
+		textAlign: 'center',
+		marginBottom: 6,
+	},
 	successModalMessage: {
-		color: '#343434',
+		color: '#6b6b6b',
 		fontSize: 14,
 		lineHeight: 20,
-		marginBottom: 20,
+		textAlign: 'center',
+		marginBottom: 16,
 	},
 	successModalButton: {
 		alignSelf: 'stretch',
 		marginTop: 0,
 		minWidth: 120,
+		borderRadius: 12,
+		paddingVertical: 0,
+	},
+	successModalButtonContent: {
+		minHeight: 44,
+		paddingVertical: 0,
+	},
+	successModalButtonLabel: {
+		fontSize: 16,
+		lineHeight: 20,
+		fontWeight: '700',
 	},
 })
