@@ -65,6 +65,7 @@ export const API_ENDPOINTS = {
 		GET: `${BASE_URL}/api/appointments`,
 		CREATE: `${BASE_URL}/api/appointments`,
 		GET_BY_ID: (id: string) => `${BASE_URL}/api/appointments/${id}`, // Add this
+		PRE_INTAKE: (id: string) => `${BASE_URL}/api/appointments/${id}/pre-intake`,
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
