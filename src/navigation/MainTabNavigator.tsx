@@ -10,7 +10,7 @@ import { ROUTES } from './routes'
 
 import DashboardPage from '../features/dashboard/DashboardPage'
 import SearchPage from '../features/doctor/search/SearchPage'
-import PortalPage from '../features/portal/PortalPage'
+// import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 
@@ -28,9 +28,9 @@ function getTabConfig(routeName: string) {
 	if (routeName === ROUTES.MAIN.SEARCH) {
 		return { iconName: 'magnify' as const, label: 'Search' }
 	}
-	if (routeName === ROUTES.MAIN.PORTAL) {
-		return { iconName: 'calendar-clock' as const, label: 'Portal' }
-	}
+	// if (routeName === ROUTES.MAIN.PORTAL) {
+	// 	return { iconName: 'calendar-clock' as const, label: 'Portal' }
+	// }
 	if (routeName === ROUTES.MAIN.PROFILE) {
 		return { iconName: 'account' as const, label: 'Profile' }
 	}
@@ -118,7 +118,7 @@ export default function MainTabNavigator() {
 		>
 			<Tab.Screen name={ROUTES.MAIN.HOME} component={HomeWithSidebar} />
 			<Tab.Screen name={ROUTES.MAIN.SEARCH} component={SearchPage} />
-			<Tab.Screen name={ROUTES.MAIN.PORTAL} component={PortalPage} />
+			{/* <Tab.Screen name={ROUTES.MAIN.PORTAL} component={PortalPage} /> */}
 			<Tab.Screen name={ROUTES.MAIN.PROFILE} component={ProfilePage} />
 		</Tab.Navigator>
 	)

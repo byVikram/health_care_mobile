@@ -78,6 +78,21 @@ export interface AppointmentResponse {
 }
 
 
+export interface PreIntakePayload {
+	symptoms: string;
+	duration?: string;
+	severity?: "mild" | "moderate" | "severe"|"";
+}
+
+export const updatePreIntake = async (appointmentId: string, payload: PreIntakePayload) => {
+	console.log("PRE_INTAKE URL =>", API_ENDPOINTS.APPOINTMENTS.PRE_INTAKE(appointmentId))
+	const res = await ApiService.patch(
+		API_ENDPOINTS.APPOINTMENTS.PRE_INTAKE(appointmentId),
+		payload
+	);
+	return res.data;
+};
+
 export const updateAppointmentsStatus = async (
 	appointmentId: string,
 	statusId: string
@@ -100,6 +115,7 @@ export const updateAppointmentsStatus = async (
 
 	return res.data;
 };
+
 export interface RescheduleAppointmentPayload {
 	appointment_id: string
 	appointment_date: string
