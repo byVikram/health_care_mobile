@@ -415,9 +415,9 @@ export default function ProfessionalDetailsTab() {
 	}
 
 	const contentWidth = useMemo(() => {
-		if (width >= 1280) return 980
-		if (width >= 1024) return 920
-		if (isTablet) return 820
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
 		return 640
 	}, [isTablet, width])
 

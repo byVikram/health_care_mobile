@@ -636,12 +636,11 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}, [externalHospitals])
 
 	const contentWidth = useMemo(() => {
-		if (width >= 1366) return 1120
-		if (width >= 1180) return 1040
-		if (width >= 1024) return 960
-		if (width >= 768) return Math.min(width - 48, 860)
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
 		return 640
-	}, [width])
+	}, [width, isTablet])
 
 	const sectionPadding = isMobile ? 16 : isTablet ? 24 : 28
 	const actionSpacing = isMobile ? 18 : 24

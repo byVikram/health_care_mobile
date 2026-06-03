@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert } from 'react-native'
+import { ActivityIndicator, Alert, KeyboardAvoidingView } from 'react-native'
 import {
 	ScrollView,
 	StyleSheet,
@@ -507,13 +507,13 @@ export default function PersonalDetailsTab() {
 	}
 
 	const contentWidth = useMemo(() => {
-		if (width >= 1280) return 980
-		if (width >= 1024) return 920
-		if (isTablet) return 820
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
 		return 640
 	}, [isTablet, width])
 
-	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
+	const sectionPadding = isMobile ? 16 : isTablet ? 32 : 48
 	const rowSpacing = isMobile ? 16 : isTablet ? 18 : 20
 	const titleBottom = isMobile ? 18 : 22
 
@@ -540,7 +540,7 @@ export default function PersonalDetailsTab() {
 			showsVerticalScrollIndicator={false}
 		>	
 			
-			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+			<KeyboardAvoidingView style={[styles.contentShell, { maxWidth: contentWidth }]}>
 
 				<AppPhotoPicker
 					imageUri={profilePhotoUri}
@@ -733,7 +733,7 @@ export default function PersonalDetailsTab() {
 				>
 					Save 
 				</AppButton>
-			</View>
+			</KeyboardAvoidingView>
 
 		</ScrollView>
 	)
@@ -753,9 +753,11 @@ const styles = StyleSheet.create({
 	contentContainer: {
 		flexGrow: 1,
 		alignItems: 'center',
+		width: '100%',
 	},
 	contentShell: {
 		width: '100%',
+		alignSelf: 'center',
 	},
 	sectionTitle: {
 		color: '#343434',
