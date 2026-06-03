@@ -181,6 +181,24 @@ const buildHospitalPayload = (hospital: HospitalItem, isPrimary = hospital.isPri
 	offline_consultation_fee: hospital.offline_consultation_fee.trim(),
 })
 
+const coerceHospitalId = (id: string | undefined) => {
+	const numericId = Number(id)
+	return Number.isFinite(numericId) ? numericId : id ?? ''
+}
+
+const buildHospitalUpdatePayload = (
+	hospital: HospitalItem,
+	isPrimary = hospital.isPrimary,
+	weeklyWorkingHours = createWeeklyWorkingHours()
+) => ({
+	hospital_id: coerceHospitalId(hospital.hospital_id ?? hospital.id),
+	is_primary: isPrimary,
+	video_consultation_fee: hospital.video_consultation_fee.trim(),
+	offline_consultation_fee: hospital.offline_consultation_fee.trim(),
+	available_days: WORKING_DAYS.map((day) => day.key),
+	working_hours: JSON.stringify(weeklyWorkingHours),
+})
+
 function FieldLabel({ label }: { label: string }) {
 	return (
 		<AppTypography variant="caption" style={styles.fieldLabel}>
@@ -751,7 +769,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		updateHospitalsState((prev) => prev.map((hospital) => ({ ...hospital, isPrimary: hospital.id === id })))
 
 		try {
-			await updateHospital(id, buildHospitalPayload(selectedHospital, true))
+			await updateHospital(id, buildHospitalUpdatePayload(selectedHospital, true, weeklyWorkingHours))
 			await loadHospitals()
 		} catch (error) {
 			console.log('[MyHospitalsTab] set primary error:', error)
@@ -832,7 +850,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						offline_consultation_fee: trimmedOfflineFee,
 					}
 
-					const response = await updateHospital(editingId, buildHospitalPayload(updatedHospital))
+					const response = await updateHospital(editingId, buildHospitalUpdatePayload(updatedHospital, updatedHospital.isPrimary, weeklyWorkingHours))
 					Alert.alert('Success', getSuccessMessage(response, 'Hospital updated successfully'))
 					await loadHospitals()
 				} else {
@@ -870,7 +888,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			const hasPrimary = hospitals.some((hospital) => hospital.isPrimary)
 			await Promise.all(
 				hospitals.map((hospital, index) =>
-					updateHospital(hospital.id, buildHospitalPayload(hospital, hospital.isPrimary || (!hasPrimary && index === 0)))
+					updateHospital(hospital.id, buildHospitalUpdatePayload(hospital, hospital.isPrimary || (!hasPrimary && index === 0), weeklyWorkingHours))
 				)
 			)
 			await loadHospitals()

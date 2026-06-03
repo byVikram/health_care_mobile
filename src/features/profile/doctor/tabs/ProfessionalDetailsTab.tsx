@@ -13,8 +13,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { AppButton, AppInput, AppSelect, AppSelectOption, AppTypography } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
-import { getDoctorProfile, getSpecialities, mapDoctorProfileApi } from '../../../doctor/doctorService'
-import { doctorService } from '../../../consultation/ConsultationService'
+import {
+	getDoctorProfile,
+	getSpecialities,
+	mapDoctorProfileApi,
+	updateDoctorProfessionalDetails,
+} from '../../../doctor/doctorService'
 
 const DEGREE_OPTIONS = [
 	{ value: 'mbbs', label: 'MBBS' },
@@ -241,6 +245,7 @@ export default function ProfessionalDetailsTab() {
 		registrationProof: '',
 		about: '',
 	})
+	const [experienceYears, setExperienceYears] = useState(0)
 	const [specialities, setSpecialities] = useState<Option[]>([])
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isLoadingSpecialities, setIsLoadingSpecialities] = useState(false)
@@ -289,6 +294,7 @@ export default function ProfessionalDetailsTab() {
 					registrationProof: profile.professional.registrationProof || '',
 					about: profile.professional.about || '',
 				})
+				setExperienceYears(Number(response.data.professional_details?.experience_years ?? 0))
 			} catch (error) {
 				console.log('[ProfessionalDetailsTab] failed to load profile:', error)
 			} finally {
@@ -318,6 +324,7 @@ export default function ProfessionalDetailsTab() {
 				registrationProof: profile.professional.registrationProof || '',
 				about: profile.professional.about || '',
 			})
+			setExperienceYears(Number(response.data.professional_details?.experience_years ?? 0))
 
 			await updateUser({
 				name: profile.personal.name || user?.name || '',
@@ -363,19 +370,17 @@ export default function ProfessionalDetailsTab() {
 
 	const handleSave = async () => {
 		const payload = {
-			speciality_id: formData.specialization_id,
-			specialization_id: formData.specialization_id,
-			specialization: formData.specialization_id,
+			experience_years: Number.isFinite(experienceYears) ? experienceYears : 0,
 			degree: formData.degree.trim(),
 			college: formData.college.trim(),
 			year_of_passing: formData.yearOfPassing.trim(),
-			qualification_proof_s3_key: formData.qualificationProof.trim(),
+			qualification_proof_s3_key: formData.qualificationProof.trim() || null,
 			registration_number: formData.registrationNumber.trim(),
-			registration_proof_s3_key: formData.registrationProof.trim(),
+			registration_proof_s3_key: formData.registrationProof.trim() || null,
 			about: formData.about.trim(),
 		}
 
-		if (!payload.speciality_id) {
+		if (!formData.specialization_id) {
 			Alert.alert('Validation', 'Please select your specialization.')
 			return
 		}
@@ -398,7 +403,7 @@ export default function ProfessionalDetailsTab() {
 		try {
 			setIsSaving(true)
 
-			await doctorService.updateDoctorProfile(payload)
+			await updateDoctorProfessionalDetails(payload)
 			await syncProfileAfterSave()
 			Alert.alert('Success', 'Professional details saved successfully.')
 		} catch (error) {

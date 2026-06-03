@@ -94,10 +94,10 @@ export default function SidebarLayout({
 				icon: (
 					<AppointmentsIcon width={24} height={24} />
 				),
-				onPress: () =>
-					navigation.navigate(ROUTES.MAIN.TABS, {
-						screen: ROUTES.MAIN.PORTAL,
-					}),
+				onPress: () => {
+					setIsSidebarOpen(false)
+					navigation.navigate(ROUTES.STACK.APPOINTMENTS)
+				},
 			},
 			{
 				id: 'pharmacy',
