@@ -329,19 +329,16 @@ const [successMessage, setSuccessMessage] = useState('')
 	}
 
 	const getPatientSymptoms = (apt: any) => {
-		const symptoms =
-			normalizeSymptoms(apt?.symptoms) ||
-			normalizeSymptoms(apt?.patient?.symptoms) ||
-			normalizeSymptoms(apt?.symptom) ||
-			normalizeSymptoms(apt?.patient?.symptom) ||
-			normalizeSymptoms(apt?.symptom_description) ||
-			normalizeSymptoms(apt?.patient?.symptom_description) ||
-			normalizeSymptoms(apt?.chief_complaint) ||
-			normalizeSymptoms(apt?.patient?.chief_complaint) ||
-			normalizeSymptoms(apt?.complaint) ||
-			normalizeSymptoms(apt?.patient?.complaint)
+		const preIntake = apt?.pre_intake
+		if (!preIntake?.symptoms) {
+			return 'No symptoms entered by patient'
+		}
 
-		return symptoms || 'No symptoms entered by patient.'
+		return (
+			`Symptoms: ${preIntake.symptoms}\n\n`+
+			`Duration: ${preIntake.duration || 'Not specified'}\n\n`+
+			`Severity: ${preIntake.severity || 'Not specified'}`
+		)
 	}
 
 	const openSymptomsPopover = (apt: any, event: any) => {

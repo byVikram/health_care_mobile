@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert } from 'react-native'
+import { ActivityIndicator, Alert, KeyboardAvoidingView } from 'react-native'
 import {
 	ScrollView,
 	StyleSheet,
@@ -19,8 +19,7 @@ import {
 	AppTypography,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
-import { getDoctorProfile, mapDoctorProfileApi } from '../../../doctor/doctorService'
-import { doctorService } from '../../../consultation/ConsultationService'
+import { getDoctorProfile, mapDoctorProfileApi, updateDoctorPersonalDetails } from '../../../doctor/doctorService'
 
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say']
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Marathi', 'Bengali']
@@ -286,6 +285,11 @@ const formatDobForApi = (value: string) => {
 	return match ? `${match[3]}-${match[2]}-${match[1]}` : value
 }
 
+const parseExperienceYears = (value: string) => {
+	const years = Number(value)
+	return Number.isFinite(years) ? years : 0
+}
+
 export default function PersonalDetailsTab() {
 	const { user, updateUser } = useAuth()
 	const { width } = useWindowDimensions()
@@ -388,17 +392,14 @@ export default function PersonalDetailsTab() {
 	}, [])
 
 	const handleSave = async () => {
-		debugger
 		console.log('Saving personal details with formData:', formData)
 		const trimmedName = formData.name.trim()
 		const trimmedEmail = formData.email.trim()
 		const trimmedLocation = formData.location.trim()
 		const formattedDob = formatDobForApi(formData.dob.trim())
-		const experienceYears = formData.experience ? Number(formData.experience) : 0
 		const normalizedMobile = formData.mobile.replace(/\D/g, '')
 		const normalizedGender = normalizeGenderValue(formData.gender)
 		const normalizedLanguages = normalizeLanguageValues(formData.languages)
-		const trimmedRegistrationNumber = formData.registrationNumber.trim()
 		const trimmedInstagram = formData.instagram.trim()
 		const trimmedFacebook = formData.facebook.trim()
 		const trimmedTwitter = formData.twitter.trim()
@@ -446,22 +447,37 @@ export default function PersonalDetailsTab() {
 
 			const payload = {
 				name: trimmedName,
-				email: trimmedEmail,
-				location: trimmedLocation,
+				avatar_s3_key: isProfilePhotoRemoved
+					? null
+					: profilePhotoUpload?.uri ?? profilePhotoUri ?? '',
 				gender: normalizedGender,
-				languages: normalizedLanguages,
-				contact_number: normalizedMobile,
 				date_of_birth: formattedDob,
-				experience_years: Number.isFinite(experienceYears) ? experienceYears : 0,
-				registration_number: trimmedRegistrationNumber,
-				instagram_url: trimmedInstagram,
-				facebook_url: trimmedFacebook,
-				twitter_url: trimmedTwitter,
-				...(profilePhotoUpload ? { avatar: profilePhotoUpload } : {}),
-				...(isProfilePhotoRemoved ? { avatar: null, avatar_s3_key: null } : {}),
+				location: trimmedLocation,
+				languages: normalizedLanguages,
+				mobile_number: normalizedMobile,
+				email: trimmedEmail,
+				experience_years: parseExperienceYears(formData.experience),
 			}
 
-			await doctorService.updateDoctorProfile(payload)
+			const updateResponse = await updateDoctorPersonalDetails(payload)
+			const refreshedResponse = await getDoctorProfile()
+			console.log('[PersonalDetailsTab] post-save verification:', {
+				updateResponse,
+				requested: payload,
+				persisted: refreshedResponse?.data
+					? {
+							name: refreshedResponse.data.personal_details?.name,
+							avatar_s3_key: refreshedResponse.data.personal_details?.avatar_s3_key,
+							gender: refreshedResponse.data.personal_details?.gender,
+							date_of_birth: refreshedResponse.data.personal_details?.date_of_birth,
+							location: refreshedResponse.data.personal_details?.location,
+							languages: refreshedResponse.data.personal_details?.languages,
+							contact_number: refreshedResponse.data.personal_details?.contact_number,
+							email: refreshedResponse.data.personal_details?.email,
+							experience_years: refreshedResponse.data.professional_details?.experience_years,
+						}
+					: null,
+			})
 			await updateUser({
 				name: trimmedName,
 				email: trimmedEmail || user?.email,
@@ -475,9 +491,8 @@ export default function PersonalDetailsTab() {
 				mobile: normalizedMobile,
 				gender: normalizedGender,
 				dob: formData.dob.trim(),
+				experience: String(parseExperienceYears(formData.experience)),
 				languages: normalizedLanguages,
-				experience: String(Number.isFinite(experienceYears) ? experienceYears : 0),
-				registrationNumber: trimmedRegistrationNumber,
 				instagram: trimmedInstagram,
 				facebook: trimmedFacebook,
 				twitter: trimmedTwitter,
@@ -492,13 +507,13 @@ export default function PersonalDetailsTab() {
 	}
 
 	const contentWidth = useMemo(() => {
-		if (width >= 1280) return 980
-		if (width >= 1024) return 920
-		if (isTablet) return 820
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
 		return 640
 	}, [isTablet, width])
 
-	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
+	const sectionPadding = isMobile ? 16 : isTablet ? 32 : 48
 	const rowSpacing = isMobile ? 16 : isTablet ? 18 : 20
 	const titleBottom = isMobile ? 18 : 22
 
@@ -525,7 +540,7 @@ export default function PersonalDetailsTab() {
 			showsVerticalScrollIndicator={false}
 		>	
 			
-			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+			<KeyboardAvoidingView style={[styles.contentShell, { maxWidth: contentWidth }]}>
 
 				<AppPhotoPicker
 					imageUri={profilePhotoUri}
@@ -718,7 +733,7 @@ export default function PersonalDetailsTab() {
 				>
 					Save 
 				</AppButton>
-			</View>
+			</KeyboardAvoidingView>
 
 		</ScrollView>
 	)
@@ -738,9 +753,11 @@ const styles = StyleSheet.create({
 	contentContainer: {
 		flexGrow: 1,
 		alignItems: 'center',
+		width: '100%',
 	},
 	contentShell: {
 		width: '100%',
+		alignSelf: 'center',
 	},
 	sectionTitle: {
 		color: '#343434',

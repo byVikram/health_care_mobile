@@ -22,6 +22,7 @@ import {
 	SlotOverrideBatchPayload,
 	SlotOverridePayload,
 	TimeSlot,
+	updateDoctorAvailability,
 } from '../../../doctor/doctorService'
 import { DoctorAvailability, DoctorHospital } from '../../../../types/doctor-profile'
 
@@ -84,6 +85,31 @@ const getModeKey = (mode?: string): AppointmentTypeKey => {
 }
 
 const getAvailabilityHospitalId = (hospital: DoctorHospital) => String(hospital.hospital_id ?? hospital.id)
+
+const getDayOfWeek = (date: Date) => date.getDay()
+
+const coerceHospitalId = (id: string) => {
+	const numericId = Number(id)
+	return Number.isFinite(numericId) ? numericId : id
+}
+
+const normalizeTimeForUpdate = (time: string) => {
+	if (!time) return time
+	if (time.endsWith('Z')) return time
+	if (/^\d{2}:\d{2}$/.test(time)) return `${time}:00.000Z`
+	if (/^\d{2}:\d{2}:\d{2}$/.test(time)) return `${time}.000Z`
+	return time
+}
+
+const getSlotDuration = (startTime: string, endTime: string) => {
+	const [startHour, startMinute] = startTime.split(':').map(Number)
+	const [endHour, endMinute] = endTime.split(':').map(Number)
+	const startTotal = startHour * 60 + startMinute
+	const endTotal = endHour * 60 + endMinute
+	const duration = endTotal - startTotal
+
+	return Number.isFinite(duration) && duration > 0 ? duration : 1
+}
 
 const normalizeProfileHospitals = (rawHospitals: DoctorHospital[]): DoctorHospital[] =>
 	rawHospitals.map((hospital) => ({
@@ -415,14 +441,35 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	}
 
 	const handleSaveAvailability = async () => {
-		if (pendingOverrides.length === 0) {
-			setPendingSaveToast(null)
+		if (!selectedHospitalId) {
 			return
 		}
 
 		setSaveLoading(true)
 		try {
 			let backendMessage = ''
+			const selectedUpdatePayload = {
+				hospital_id: coerceHospitalId(selectedHospitalId),
+				day_of_week: getDayOfWeek(selectedDate),
+				appointment_mode: APPOINTMENT_MODE_BY_TYPE[selectedAppointmentType],
+				slots: selectedSlots.map((startTime) => {
+					const endTime = getSlotEndTime(startTime)
+
+					return {
+						start_time: normalizeTimeForUpdate(startTime),
+						end_time: normalizeTimeForUpdate(endTime),
+						slot_duration: getSlotDuration(startTime, endTime),
+						buffer_time: 0,
+					}
+				}),
+				is_active: selectedSlots.length > 0,
+			}
+
+			const availabilityResponse = await updateDoctorAvailability(selectedUpdatePayload)
+			if ((availabilityResponse as { message?: string })?.message) {
+				backendMessage = (availabilityResponse as { message: string }).message
+			}
+
 			const overridesByHospitalAndDate = pendingOverrides.reduce<Record<string, SlotOverrideBatchPayload>>(
 				(acc, override) => {
 					const groupKey = `${override.hospital_id ?? ''}__${override.date}`

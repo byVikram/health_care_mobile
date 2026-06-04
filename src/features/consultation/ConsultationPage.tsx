@@ -693,20 +693,6 @@ export default function ConsultationPage() {
 						<Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
 							{patient.name}
 						</Text>
-						<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-							<Text variant="bodySmall" style={{ color: '#666', fontSize: 11 }}>
-								{patient.age} yrs / {patient.gender} |{' '}
-							</Text>
-							<MaterialCommunityIcons
-								name="phone"
-								size={10}
-								color="#666"
-								style={{ marginHorizontal: 2 }}
-							/>
-							<Text variant="bodySmall" style={{ color: '#666', fontSize: 11 }}>
-								{patient.phone}
-							</Text>
-						</View>
 					</View>
 					<Button
 						mode="contained"

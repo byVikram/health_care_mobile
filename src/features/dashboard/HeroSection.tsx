@@ -8,6 +8,7 @@ import {
   Modal,
   Pressable,
   Animated,
+  useWindowDimensions,
 } from 'react-native';
 
 import { BlurView } from 'expo-blur';
@@ -33,7 +34,7 @@ const AD_IMAGE = require('../../assets/blog-and-community/ad-image.png');
 // Types
 // ─────────────────────────────────────────────────────────────
 
-type Role = 'doctor' | 'patient' | 'pharmacy';
+type Role = 'doctor' | 'patient' | 'pharmacy' | null;
 
 // ─────────────────────────────────────────────────────────────
 // Video Slide
@@ -159,7 +160,11 @@ function usePingPongScroll(
 // ─────────────────────────────────────────────────────────────
 
 export default function HeroSection({ role }: { role: Role }) {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
   const isPharmacy = role === 'pharmacy';
+  const serviceIconSize = isTablet ? 40 : 30;
+  const othersSquareSize = isTablet ? 17 : 12;
 
   // ───────────────────────────────────────────────────────────
   // Video Carousel (doctor & patient only)
@@ -280,35 +285,56 @@ export default function HeroSection({ role }: { role: Role }) {
       ───────────────────────────────────────────── */}
 
       {!isPharmacy && (
-        <View style={styles.horizontalServicesRow}>
-          {horizontalServices.map((s) =>
-            s.title === 'Others' ? (
+        <View style={[styles.horizontalServicesRow, isTablet && styles.horizontalServicesRowTablet]}>
+          {horizontalServices.map((s) => {
+            if (s.title === 'Others' || !s.Component) {
+              return (
+                <TouchableOpacity
+                  key={s.title}
+                  style={[styles.hServiceCard, isTablet && styles.hServiceCardTablet]}
+                  activeOpacity={0.8}
+                  onPress={openOthersModal}
+                >
+                  <View
+                    style={[
+                      styles.othersIconContainer,
+                      { width: serviceIconSize, height: serviceIconSize },
+                    ]}
+                  >
+                    <View style={[styles.othersSquare, { width: othersSquareSize, height: othersSquareSize, backgroundColor: '#0c7c7c' }]} />
+                    <View style={[styles.othersSquare, { width: othersSquareSize, height: othersSquareSize, backgroundColor: '#4264D0' }]} />
+                    <View style={[styles.othersSquare, { width: othersSquareSize, height: othersSquareSize, backgroundColor: '#EA7F06' }]} />
+                    <View style={[styles.othersSquare, { width: othersSquareSize, height: othersSquareSize, backgroundColor: '#DE3B40' }]} />
+                  </View>
+                  <AppTypography
+                    style={[styles.hServiceTitle, isTablet && styles.hServiceTitleTablet]}
+                    numberOfLines={1}
+                  >
+                    Others
+                  </AppTypography>
+                </TouchableOpacity>
+              );
+            }
+
+            const ServiceIcon = s.Component;
+
+            return (
               <TouchableOpacity
                 key={s.title}
-                style={styles.hServiceCard}
-                activeOpacity={0.8}
-                onPress={openOthersModal}
-              >
-                <View style={styles.othersIconContainer}>
-                  <View style={[styles.othersSquare, { backgroundColor: '#0c7c7c' }]} />
-                  <View style={[styles.othersSquare, { backgroundColor: '#4264D0' }]} />
-                  <View style={[styles.othersSquare, { backgroundColor: '#EA7F06' }]} />
-                  <View style={[styles.othersSquare, { backgroundColor: '#DE3B40' }]} />
-                </View>
-                <AppTypography style={styles.hServiceTitle}>Others</AppTypography>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                key={s.title}
-                style={styles.hServiceCard}
+                style={[styles.hServiceCard, isTablet && styles.hServiceCardTablet]}
                 activeOpacity={0.8}
                 onPress={() => handleServicePress(s.title)}
               >
-                <s.Component width={30} height={30} />
-                <AppTypography style={styles.hServiceTitle}>{s.title}</AppTypography>
+                <ServiceIcon width={serviceIconSize} height={serviceIconSize} />
+                <AppTypography
+                  style={[styles.hServiceTitle, isTablet && styles.hServiceTitleTablet]}
+                  numberOfLines={1}
+                >
+                  {s.title}
+                </AppTypography>
               </TouchableOpacity>
-            )
-          )}
+            );
+          })}
         </View>
       )}
 
@@ -539,10 +565,20 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
 
+  horizontalServicesRowTablet: {
+    gap: 6,
+  },
+
   hServiceCard: {
     alignItems: 'center',
     justifyContent: 'flex-start',
     width: 64,
+  },
+
+  hServiceCardTablet: {
+    flex: 1,
+    width: 'auto',
+    minWidth: 0,
   },
 
   hServiceTitle: {
@@ -552,6 +588,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
     minHeight: 28,
+    width: '100%',
+  },
+
+  hServiceTitleTablet: {
+    fontSize: 11,
+    lineHeight: 16,
+    minHeight: 16,
+    marginTop: 8,
   },
 
   othersIconContainer: {

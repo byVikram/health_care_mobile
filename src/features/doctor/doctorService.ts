@@ -369,6 +369,81 @@ export const updateDoctorAchievement = async (achievementId: string, data: Docto
 	return res.data
 }
 
+export interface DoctorPersonalUpdatePayload {
+	name: string
+	avatar_s3_key: string | null
+	gender: string
+	date_of_birth: string
+	location: string
+	languages: string[]
+	mobile_number: string
+	email: string
+	experience_years: number
+}
+
+export interface DoctorProfessionalUpdatePayload {
+	experience_years: number
+	degree: string
+	college: string
+	year_of_passing: string
+	qualification_proof_s3_key: string | null
+	registration_number: string
+	registration_proof_s3_key: string | null
+	about: string
+}
+
+export interface DoctorAvailabilityUpdatePayload {
+	hospital_id: number | string
+	day_of_week: number
+	appointment_mode: 'clinic_visit' | 'video_call'
+	slots: Array<{
+		start_time: string
+		end_time: string
+		slot_duration: number
+		buffer_time: number
+	}>
+	is_active: boolean
+}
+
+export const updateDoctorPersonalDetails = async (data: DoctorPersonalUpdatePayload) => {
+	const url = API_ENDPOINTS.DOCTOR_PROFILE.PERSONAL_DETAILS
+	console.log('[updateDoctorPersonalDetails] request:', {
+		method: 'PATCH',
+		url,
+		payload: data,
+	})
+
+	try {
+		const res = await ApiService.patch(url, data)
+		console.log('[updateDoctorPersonalDetails] response:', {
+			status: res.status,
+			url: res.config?.url,
+			method: res.config?.method,
+			data: res.data,
+		})
+		return res.data
+	} catch (error: any) {
+		console.log('[updateDoctorPersonalDetails] error:', {
+			status: error?.response?.status,
+			url: error?.config?.url,
+			method: error?.config?.method,
+			data: error?.response?.data,
+			message: error?.message,
+		})
+		throw error
+	}
+}
+
+export const updateDoctorProfessionalDetails = async (data: DoctorProfessionalUpdatePayload) => {
+	const res = await ApiService.patch(API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS, data)
+	return res.data
+}
+
+export const updateDoctorAvailability = async (data: DoctorAvailabilityUpdatePayload) => {
+	const res = await ApiService.patch(API_ENDPOINTS.DOCTORS.AVAILABILITY, data)
+	return res.data
+}
+
 // -- Doctor profile -------------------------------------------------------------
 export const getDoctorProfile = async (): Promise<DoctorProfileApiResponse> => {
 	const token = await AsyncStorage.getItem('access_token')
