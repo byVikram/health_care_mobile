@@ -93,6 +93,7 @@ export const API_ENDPOINTS = {
 	PHARMACY_ORDERS: {
 		CREATE: `${BASE_URL}/api/pharmacy-orders`,
 		LIST: `${BASE_URL}/api/pharmacy-orders`,
+		LIST_BY_PHARMACY: `${BASE_URL}/api/pharmacies`, // New endpoint to get orders fr the logged-in pharmacy
 		GET_BY_ID: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}`,
 		UPDATE_STATUS: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/status`,
 		UPDATE_MEDICINES: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/medicines`,

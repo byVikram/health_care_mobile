@@ -69,9 +69,9 @@ export type AppStackParamList = {
   [ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
   [ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
   [ROUTES.STACK.CONSENT_FORM]: { paymentParams: PatientPaymentParams }
-  [ROUTES.STACK.PHARMACY_SEARCH]: undefined
+  [ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
   [ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
-  // ✅ Updated: now receives booking data
+  //  Updated: now receives booking data
   [ROUTES.STACK.PATIENT_PAYMENT]: {
     doctor: DoctorDetailData
     hospitalId: string
