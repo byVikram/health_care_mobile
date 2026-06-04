@@ -81,8 +81,8 @@ export default function AppHeader({
     console.log("Search pressed");
     // For pharmacy role, navigate to pharmacy search page; otherwise general search
     if (isPharmacy) {
-      if (navigation && ROUTES.STACK.PHARMACY_SEARCH) {
-        navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH);
+      if (navigation && ROUTES.STACK.ORDER_LIST) {
+        navigation.navigate(ROUTES.STACK.ORDER_LIST);
       } else {
         Alert.alert("Error", "Pharmacy search page not available");
       }

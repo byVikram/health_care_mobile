@@ -90,6 +90,16 @@ export const API_ENDPOINTS = {
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,
 		DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
+        ME_DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
+	},
+	PHARMACY_ORDERS: {
+		CREATE: `${BASE_URL}/api/pharmacy-orders`,
+		LIST: `${BASE_URL}/api/pharmacy-orders`,
+		LIST_BY_PHARMACY: `${BASE_URL}/api/pharmacies`, // New endpoint to get orders fr the logged-in pharmacy
+		GET_BY_ID: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}`,
+		UPDATE_STATUS: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/status`,
+		UPDATE_MEDICINES: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/medicines`,
+		SEND_REMINDER: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/remind`,
 	},
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {
