@@ -13,6 +13,7 @@ import SearchPage from '../features/doctor/search/SearchPage'
 import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
 import SidebarLayout from '../components/layout/SidebarLayout'
+import { useAuth } from '../context/AuthContext'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
@@ -109,6 +110,9 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 }
 
 export default function MainTabNavigator() {
+	const { role } = useAuth()
+	const shouldShowSearch = role !== 'doctor'
+
 	return (
 		<Tab.Navigator
 			tabBar={(props) => <FloatingTabBar {...props} />}
@@ -117,7 +121,9 @@ export default function MainTabNavigator() {
 			}}
 		>
 			<Tab.Screen name={ROUTES.MAIN.HOME} component={HomeWithSidebar} />
-			<Tab.Screen name={ROUTES.MAIN.SEARCH} component={SearchPage} />
+			{shouldShowSearch ? (
+				<Tab.Screen name={ROUTES.MAIN.SEARCH} component={SearchPage} />
+			) : null}
 			<Tab.Screen name={ROUTES.MAIN.PORTAL} component={PortalPage} />
 			<Tab.Screen name={ROUTES.MAIN.PROFILE} component={ProfilePage} />
 		</Tab.Navigator>

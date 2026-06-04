@@ -40,9 +40,10 @@ export const API_ENDPOINTS = {
 	},
 	DOCTOR_PROFILE: {
 		DETAILS: `${BASE_URL}/api/doctors/details`,
+		PERSONAL_DETAILS: `${BASE_URL}/api/doctors/personal-details`,
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
-		ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
+		// ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
 		DELETE_ACCOUNT: `${BASE_URL}/api/doctors/profile`,
 	},
 	SPECIALITIES: {
@@ -65,6 +66,7 @@ export const API_ENDPOINTS = {
 		GET: `${BASE_URL}/api/appointments`,
 		CREATE: `${BASE_URL}/api/appointments`,
 		GET_BY_ID: (id: string) => `${BASE_URL}/api/appointments/${id}`, // Add this
+		PRE_INTAKE: (id: string) => `${BASE_URL}/api/appointments/${id}/pre-intake`,
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
