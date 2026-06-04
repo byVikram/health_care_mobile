@@ -693,14 +693,14 @@ export default function AppointmentList() {
 
 		try {
 			if (showLoader) setLoading(true)
-			const token = await AsyncStorage.getItem('access_token')
-			console.log('[AppointmentList][debug] appointments fetch request:', {
-				url: requestUrl,
-				method: 'GET',
-				queryParams,
-				requestPayload: null,
-				authToken: maskToken(token),
-			})
+			// const token = await AsyncStorage.getItem('access_token')
+			// console.log('[AppointmentList][debug] appointments fetch request:', {
+			// 	url: requestUrl,
+			// 	method: 'GET',
+			// 	queryParams,
+			// 	requestPayload: null,
+			// 	authToken: maskToken(token),
+			// })
 
 			const hasQueryParams = Object.keys(queryParams).length > 0
 			const res = await ApiService.get<ApiAppointmentsResponse>(

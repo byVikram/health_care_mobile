@@ -4,11 +4,11 @@ import {
 	Image,
 	ImageSourcePropType,
 	StyleSheet,
-	Text,
 	TouchableOpacity,
 	View,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { AppTypography } from '../../../../components/common'
 
 export type FavouriteDoctorListItem = {
 	id: string
@@ -63,36 +63,38 @@ export default function FavouriteDoctorList({
 				resizeMode="cover"
 			/>
 			<View style={styles.info}>
-				<Text style={[styles.name, isCompact && styles.nameCompact]} numberOfLines={1}>
+				<AppTypography variant="h4" style={[styles.name, isCompact && styles.nameCompact]} numberOfLines={1}>
 					{doctor.name}
-				</Text>
-				<Text
-					style={[styles.speciality, isCompact && styles.specialityCompact]}
-					numberOfLines={1}
-				>
-					{speciality}
-				</Text>
+				</AppTypography>
 				<View style={styles.metaRow}>
 					<MaterialCommunityIcons
 						name="briefcase-outline"
 						size={isCompact ? 12 : 15}
 						color="#969696"
 					/>
-					<Text style={[styles.metaText, isCompact && styles.metaTextCompact]}>
+					<AppTypography variant="caption" style={[styles.metaText, isCompact && styles.metaTextCompact]}>
 						{experience}
-					</Text>
+					</AppTypography>
 					<MaterialCommunityIcons
 						name="map-marker-outline"
 						size={isCompact ? 12 : 15}
 						color="#969696"
 					/>
-					<Text
+					<AppTypography
+						variant="caption"
 						style={[styles.metaText, isCompact && styles.metaTextCompact]}
 						numberOfLines={1}
 					>
 						{location}
-					</Text>
+					</AppTypography>
 				</View>
+				<AppTypography
+					variant="subtitle"
+					style={[styles.speciality, isCompact && styles.specialityCompact]}
+					numberOfLines={1}
+				>
+					{speciality}
+				</AppTypography>
 			</View>
 			<View style={[styles.actionButtons, isCompact && styles.actionButtonsCompact]}>
 				{showShare && onShare ? (
@@ -152,9 +154,9 @@ const styles = StyleSheet.create({
 	row: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 38,
+		marginBottom: 24,
 	},
-	rowCompact: { marginBottom: 22 },
+	rowCompact: { marginBottom: 16 },
 	image: {
 		width: 78,
 		height: 78,
@@ -176,36 +178,44 @@ const styles = StyleSheet.create({
 	},
 	name: {
 		fontSize: 20,
+		lineHeight: 24,
 		fontWeight: '700',
 		color: '#172838',
-		marginBottom: 8,
+		marginBottom: 3,
 	},
 	nameCompact: {
 		fontSize: 15,
-		marginBottom: 4,
+		lineHeight: 18,
+		marginBottom: 2,
 	},
 	speciality: {
 		fontSize: 16,
+		lineHeight: 20,
 		color: '#526b7a',
-		marginBottom: 14,
+		marginTop: 4,
+		marginBottom: 0,
 	},
 	specialityCompact: {
 		fontSize: 13,
-		marginBottom: 6,
+		lineHeight: 16,
+		marginTop: 2,
 	},
 	metaRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
 		flexWrap: 'wrap',
+		marginBottom: 0,
 	},
 	metaText: {
 		fontSize: 15,
+		lineHeight: 18,
 		color: '#969696',
 		marginRight: 16,
 	},
 	metaTextCompact: {
 		fontSize: 11,
+		lineHeight: 14,
 		marginRight: 8,
 	},
 	actionButtons: {

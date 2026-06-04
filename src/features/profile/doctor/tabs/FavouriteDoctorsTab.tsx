@@ -3,7 +3,6 @@ import {
 	ActivityIndicator,
 	FlatList,
 	StyleSheet,
-	Text,
 	useWindowDimensions,
 	View,
 } from 'react-native'
@@ -16,7 +15,7 @@ import {
 	getFavouriteDoctors,
 	toggleFavouriteDoctor,
 } from '../../../doctor/doctorService'
-import { AppInput } from '../../../../components/common'
+import { AppInput, AppTypography } from '../../../../components/common'
 import FavouriteDoctorList, {
 	type FavouriteDoctorListItem,
 } from '../../../doctor/search/components/FavouriteDoctorList'
@@ -36,6 +35,13 @@ const mapFavouriteDoctor = (doctor: FavouriteDoctor): FavouriteDoctorListItem =>
 
 export default function FavouriteDoctorsTab() {
 	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
+	const contentWidth = React.useMemo(() => {
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
+		return 640
+	}, [width, isTablet])
 	const isCompact = width < 520
 	const [favouriteDoctors, setFavouriteDoctors] = useState<FavouriteDoctorListItem[]>([])
 	const [favouriteDoctorIds, setFavouriteDoctorIds] = useState<Set<string>>(new Set())
@@ -203,77 +209,79 @@ export default function FavouriteDoctorsTab() {
 
 	return (
 		<View style={styles.container}>
-			<FlatList
-				data={isSearching ? searchResults : favouriteDoctors}
-				keyExtractor={(item) => item.id}
-				contentContainerStyle={[
-					styles.listContent,
-					(isSearching ? searchResults.length === 0 : favouriteDoctors.length === 0) &&
-						!searchLoading &&
-						styles.emptyListContent,
-				]}
-				ListHeaderComponent={
-					<View style={styles.headerContent}>
-						<AppInput
-							value={searchQuery}
-							onChangeText={setSearchQuery}
-							placeholder="Search doctor..."
-							placeholderTextColor="#98a1aa"
-							containerStyle={[styles.searchInputContainer, isCompact && styles.searchInputContainerCompact]}
-							style={[styles.searchInput, isCompact && styles.searchInputCompact]}
-							contentStyle={[styles.searchInputContent, isCompact && styles.searchInputContentCompact]}
-							outlineStyle={[styles.searchInputOutline, isCompact && styles.searchInputOutlineCompact]}
-							outlineColor="#2e7b7d"
-							activeOutlineColor="#2e7b7d"
-							textColor="#1b2d3c"
-							left={<AppInput.Icon icon="magnify" size={isCompact ? 20 : 28} color="#9b9b9b" />}
-							right={<AppInput.Icon icon="microphone-outline" size={isCompact ? 20 : 28} color="#9b9b9b" />}
-							autoCorrect={false}
-							returnKeyType="search"
-							noMargin
-						/>
-
-						<Text style={[styles.sectionTitle, isCompact && styles.sectionTitleCompact]}>
-							{isSearching ? 'SEARCH RESULTS' : 'FAVOURITE DOCTORS'}
-						</Text>
-					</View>
-				}
-				renderItem={({ item }) => (
-					<FavouriteDoctorList
-						doctor={item}
-						isCompact={isCompact}
-						showShare={false}
-						isBookmarked={favouriteDoctorIds.has(item.id)}
-						isBookmarking={bookmarkingIds.has(item.id)}
-						onToggleBookmark={handleToggleBookmark}
-						placeholderImage={DOCTOR_IMAGE_PLACEHOLDER}
-						primaryColor={TEAL}
-					/>
-				)}
-				ListFooterComponent={
-					searchLoading ? (
-						<View style={styles.searchLoadingBox}>
-							<ActivityIndicator size="small" color={TEAL} />
-						</View>
-					) : null
-				}
-				ListEmptyComponent={
-					searchLoading ? null : (
-						<View style={styles.emptyState}>
-							<MaterialCommunityIcons
-								name={isSearching ? 'doctor' : 'bookmark-outline'}
-								size={40}
-								color="#8ca0a9"
+			<View style={[styles.contentShell,{ maxWidth: contentWidth }]}>
+				<FlatList
+					data={isSearching ? searchResults : favouriteDoctors}
+					keyExtractor={(item) => item.id}
+					contentContainerStyle={[
+						styles.listContent,
+						(isSearching ? searchResults.length === 0 : favouriteDoctors.length === 0) &&
+							!searchLoading &&
+							styles.emptyListContent,
+					]}
+					ListHeaderComponent={
+						<View style={styles.headerContent}>
+							<AppInput
+								value={searchQuery}
+								onChangeText={setSearchQuery}
+								placeholder="Search doctor..."
+								placeholderTextColor="#98a1aa"
+								containerStyle={[styles.searchInputContainer, isCompact && styles.searchInputContainerCompact]}
+								style={[styles.searchInput, isCompact && styles.searchInputCompact]}
+								contentStyle={[styles.searchInputContent, isCompact && styles.searchInputContentCompact]}
+								outlineStyle={[styles.searchInputOutline, isCompact && styles.searchInputOutlineCompact]}
+								outlineColor="#2e7b7d"
+								activeOutlineColor="#2e7b7d"
+								textColor="#1b2d3c"
+								left={<AppInput.Icon icon="magnify" size={isCompact ? 20 : 28} color="#9b9b9b" />}
+								right={<AppInput.Icon icon="microphone-outline" size={isCompact ? 20 : 28} color="#9b9b9b" />}
+								autoCorrect={false}
+								returnKeyType="search"
+								noMargin
 							/>
-							<Text style={styles.emptyTitle}>
-								{isSearching ? 'No doctors found' : 'No favourite doctors yet'}
-							</Text>
+
+							<AppTypography variant="caption" style={[styles.sectionTitle, isCompact && styles.sectionTitleCompact]}>
+								{isSearching ? 'SEARCH RESULTS' : 'FAVOURITE DOCTORS'}
+							</AppTypography>
 						</View>
-					)
-				}
-				showsVerticalScrollIndicator={false}
-				keyboardShouldPersistTaps="handled"
-			/>
+					}
+					renderItem={({ item }) => (
+						<FavouriteDoctorList
+							doctor={item}
+							isCompact={isCompact}
+							showShare={false}
+							isBookmarked={favouriteDoctorIds.has(item.id)}
+							isBookmarking={bookmarkingIds.has(item.id)}
+							onToggleBookmark={handleToggleBookmark}
+							placeholderImage={DOCTOR_IMAGE_PLACEHOLDER}
+							primaryColor={TEAL}
+						/>
+					)}
+					ListFooterComponent={
+						searchLoading ? (
+							<View style={styles.searchLoadingBox}>
+								<ActivityIndicator size="small" color={TEAL} />
+							</View>
+						) : null
+					}
+					ListEmptyComponent={
+						searchLoading ? null : (
+							<View style={styles.emptyState}>
+								<MaterialCommunityIcons
+									name={isSearching ? 'doctor' : 'bookmark-outline'}
+									size={40}
+									color="#8ca0a9"
+								/>
+								<AppTypography variant="caption" style={styles.emptyTitle}>
+									{isSearching ? 'No doctors found' : 'No favourite doctors yet'}
+								</AppTypography>
+							</View>
+						)
+					}
+					showsVerticalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
+				/>
+			</View>
 		</View>
 	)
 }
@@ -292,10 +300,10 @@ const styles = StyleSheet.create({
 		paddingBottom: 2,
 	},
 	searchInputContainer: {
-		marginBottom: 28,
+		marginBottom: 12,
 	},
 	searchInputContainerCompact: {
-		marginBottom: 18,
+		marginBottom: 10,
 	},
 	searchInput: {
 		height: 54,
@@ -327,11 +335,11 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#526b7a',
 		letterSpacing: 0,
-		marginBottom: 30,
+		marginBottom: 12,
 	},
 	sectionTitleCompact: {
 		fontSize: 13,
-		marginBottom: 18,
+		marginBottom: 10,
 	},
 	emptyListContent: {
 		flexGrow: 1,
@@ -352,6 +360,10 @@ const styles = StyleSheet.create({
 		paddingVertical: 24,
 		alignItems: 'center',
 	},
+	contentShell: {
+		alignSelf: 'center',
+		width: '100%',
+	},
 	emptyTitle: {
 		color: '#7f98a3',
 		fontSize: 13,
@@ -360,8 +372,4 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 	},
 })
-// import React from 'react'
-// import MyDoctorPage from '../../../patient/MyDoctorPage'
-// export default function FavouriteDoctorsTab() {
-// 	return <MyDoctorPage />
-// }
+
