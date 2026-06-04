@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, useWindowDimensions } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from './AppTypography'
@@ -15,6 +15,19 @@ function getWeekDates(start: Date) {
 		d.setDate(start.getDate() + i)
 		return d
 	})
+}
+
+function startOfDay(date: Date) {
+	return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function getFocusedRangeStart(selectedDate: Date | null, today: Date, disablePast: boolean) {
+	const todayStart = startOfDay(today)
+	const selectedStart = selectedDate ? startOfDay(selectedDate) : todayStart
+
+	if (disablePast && selectedStart < todayStart) return todayStart
+
+	return selectedStart
 }
 
 export type PickProps = {
@@ -70,24 +83,39 @@ export default function DateSlotPicker(props: PickProps) {
 
 	const today = new Date()
 	const [weekStart, setWeekStart] = useState(() => {
-		const d = new Date(selectedDate || today)
-		d.setDate(d.getDate() - d.getDay())
-		return d
+	return disablePast
+		? startOfDay(today)
+		: getFocusedRangeStart(selectedDate, today, disablePast)
 	})
 	const weekDates = getWeekDates(weekStart)
 	const monthLabel = `${MONTHS[weekDates[0].getMonth()]} ${weekDates[0].getFullYear()}`
+
+	useEffect(() => {
+		if (disablePast && !selectedDate) {
+			setWeekStart(startOfDay(new Date()))
+		} else {
+			setWeekStart(getFocusedRangeStart(selectedDate, new Date(), disablePast))
+		}
+		}, [selectedDate?.toDateString(), disablePast])
 
 	const isSameDay = (a: Date, b: Date) =>
 		a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
 
 	const isPast = (d: Date) => {
 		if (!disablePast) return false
-		const today0 = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-		const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-		return d0 < today0
+		return startOfDay(d) < startOfDay(today)
 	}
 
+	const getPreviousWeekDates = () => {
+		const d = new Date(weekStart)
+		d.setDate(d.getDate() - 7)
+		return getWeekDates(d)
+	}
+
+	const canNavigatePrevWeek = !disablePast || getPreviousWeekDates().some((date) => !isPast(date))
+
 	const handlePrevWeek = () => {
+		if (!canNavigatePrevWeek) return
 		const d = new Date(weekStart)
 		d.setDate(d.getDate() - 7)
 		setWeekStart(d)
@@ -166,6 +194,18 @@ export default function DateSlotPicker(props: PickProps) {
 				contentContainerStyle={styles.dateStripContent}
 			>
 				<View style={styles.dateStrip}>
+					<TouchableOpacity
+						style={[styles.dateStripArrow, !canNavigatePrevWeek && styles.dateStripArrowDisabled]}
+						onPress={handlePrevWeek}
+						activeOpacity={canNavigatePrevWeek ? 0.7 : 1}
+						disabled={!canNavigatePrevWeek}
+					>
+						<MaterialCommunityIcons
+							name="chevron-left"
+							size={22}
+							color={canNavigatePrevWeek ? '#0c7c7c' : '#b8c2c8'}
+						/>
+					</TouchableOpacity>
 					{weekDates.map((date) => {
 						const isSelected = selectedDate ? isSameDay(date, selectedDate) : false
 						const past = isPast(date)
@@ -208,6 +248,13 @@ export default function DateSlotPicker(props: PickProps) {
 							</TouchableOpacity>
 						)
 					})}
+					<TouchableOpacity
+						style={styles.dateStripArrow}
+						onPress={handleNextWeek}
+						activeOpacity={0.7}
+					>
+						<MaterialCommunityIcons name="chevron-right" size={22} color="#0c7c7c" />
+					</TouchableOpacity>
 				</View>
 			</ScrollView>
 
@@ -441,10 +488,22 @@ const styles = StyleSheet.create({
 	dateStrip: {
 		flexDirection: 'row',
 		justifyContent: 'flex-start',
+		alignItems: 'center',
 	},
 	dateStripContent: {
 		paddingHorizontal: 0,
 		paddingBottom: 2,
+	},
+	dateStripArrow: {
+		width: 30,
+		height: 56,
+		borderRadius: 8,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: 10,
+	},
+	dateStripArrowDisabled: {
+		opacity: 0.55,
 	},
 	dateBox: {
 		borderRadius: 10,
