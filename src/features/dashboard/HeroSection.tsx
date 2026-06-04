@@ -274,6 +274,8 @@ export default function HeroSection({ role }: { role: Role }) {
   const handleServicePress = (title: string) => {
     if (title === 'Appointment') {
       navigateRoot(ROUTES.STACK.APPOINTMENTS);
+    } else if (title === 'Pharmacy') {
+      navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE);
     }
   };
 

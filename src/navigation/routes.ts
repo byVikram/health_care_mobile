@@ -32,7 +32,7 @@ export const ROUTES = {
 		CANCEL_APPOINTMENT: 'CancelAppointment',
 		CONSENT_FORM: 'ConsentForm',
 		PATIENT_PAYMENT: 'PatientPayment',
-		PHARMACY_SEARCH_PAGE: 'PharmacySearchPages',
+		PHARMACY_SEARCH_PAGE: 'PharmacySearchPage',
 		ORDER_LIST: 'OrderListPage',
 		
 		ORDER_DETAILS: 'OrderDetails',

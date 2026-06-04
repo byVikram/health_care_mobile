@@ -28,6 +28,7 @@ interface AppHeaderProps {
   onSearchChange?: (text: string) => void;
   onSearchSubmit?: () => void;
   isSearchEditable?: boolean;
+  onSearchPress?: () => void;
 }
 
 export default function AppHeader({
@@ -40,6 +41,7 @@ export default function AppHeader({
   onSearchChange,
   onSearchSubmit,
   isSearchEditable = true,
+  onSearchPress,
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -78,7 +80,11 @@ export default function AppHeader({
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSearchPress = () => {
-    console.log("Search pressed");
+    if (onSearchPress) {
+      onSearchPress();
+      return;
+    }
+
     // For pharmacy role, navigate to pharmacy search page; otherwise general search
     if (isPharmacy) {
       if (navigation && ROUTES.STACK.ORDER_LIST) {

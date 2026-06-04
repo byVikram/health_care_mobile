@@ -5,8 +5,10 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useTheme } from 'react-native-paper'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useNavigation } from '@react-navigation/native'
 import type { MainTabParamList } from './types'
 import { ROUTES } from './routes'
+import { AppScreenHeader } from '../components/common'
 
 import DashboardPage from '../features/dashboard/DashboardPage'
 import SearchPage from '../features/doctor/search/SearchPage'
@@ -111,6 +113,7 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
 export default function MainTabNavigator() {
 	const { role } = useAuth()
+	const navigation = useNavigation<any>()
 	const shouldShowSearch = role !== 'doctor'
 
 	return (
@@ -122,7 +125,14 @@ export default function MainTabNavigator() {
 		>
 			<Tab.Screen name={ROUTES.MAIN.HOME} component={HomeWithSidebar} />
 			{shouldShowSearch ? (
-				<Tab.Screen name={ROUTES.MAIN.SEARCH} component={SearchPage} />
+				<Tab.Screen
+					name={ROUTES.MAIN.SEARCH}
+					component={SearchPage}
+					options={{
+						headerShown: true,
+						header: () => <AppScreenHeader title="Find Doctors" onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} />,
+					}}
+				/>
 			) : null}
 			<Tab.Screen name={ROUTES.MAIN.PORTAL} component={PortalPage} />
 			<Tab.Screen name={ROUTES.MAIN.PROFILE} component={ProfilePage} />

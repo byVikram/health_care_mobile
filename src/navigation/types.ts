@@ -55,7 +55,7 @@ export type PatientPaymentParams = {
 export type AppStackParamList = {
   [ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
   [ROUTES.STACK.SEARCH]: undefined
-  [ROUTES.STACK.DOCTOR_SEARCH]: { query?: string } | undefined
+  [ROUTES.STACK.DOCTOR_SEARCH]: { query?: string; specialityId?: string } | undefined
   [ROUTES.STACK.DOCTOR_DETAIL]: { id: string }
   [ROUTES.STACK.FAVOURITE_DOCTOR]: undefined
   [ROUTES.STACK.NOTIFICATION]: undefined
@@ -83,7 +83,7 @@ export type AppStackParamList = {
     appointmentMode: 'offline' | 'online'
     consultationTypeLabel: string
     fee: number
-  }
+  } | undefined
 }
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList

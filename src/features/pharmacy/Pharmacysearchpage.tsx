@@ -45,7 +45,6 @@ const insets = useSafeAreaInsets()
 		setError(null)
 		try {
 			const result = await getPharmacies()
-			console.log('[PharmacySearchPage] result:', JSON.stringify(result))
 
 			// ApiService.get returns res.data which is the full API body:
 			// { success, message, data: [...] }
@@ -56,8 +55,6 @@ const insets = useSafeAreaInsets()
 					? raw.data // { data: [] } ← normal shape
 					: []
 
-			console.log('[PharmacySearchPage] list length:', list.length)
-
 			const mapped: PharmacyItem[] = list.map((item: any) => ({
 				...item,
 				owner_name: item.owner_name ?? '',
@@ -65,7 +62,6 @@ const insets = useSafeAreaInsets()
 			}))
 			setAllPharmacies(mapped)
 		} catch (err: any) {
-			console.error('[PharmacySearchPage] error:', err)
 			setError(err?.message || 'Failed to load pharmacies')
 		} finally {
 			setLoading(false)
@@ -178,23 +174,7 @@ const insets = useSafeAreaInsets()
 	// ── Render ────────────────────────────────────────────────────────────────
 
 	return (
-		<SafeAreaView style={styles.safe}>
-
-	{/* HEADER (same as Settings page) */}
-	<View style={[styles.headerWrapper, { paddingTop: insets.top + 16 }]}>
-		<View style={styles.waveOne} />
-		<View style={styles.waveTwo} />
-
-		<View style={styles.headerContent}>
-			<TouchableOpacity onPress={() => navigation.goBack()}>
-				<ArrowIcon />
-			</TouchableOpacity>
-
-			<Text style={styles.headerTitle}>Pharmacies</Text>
-
-			<View style={{ width: 22 }} />
-		</View>
-	</View>
+		<View style={styles.safe}>
 			{/* Search Bar */}
 			<View style={styles.searchBar}>
 				<Text style={styles.searchIcon}>🔍</Text>
@@ -273,7 +253,7 @@ const insets = useSafeAreaInsets()
 					</View>
 				</View>
 			</Modal>
-		</SafeAreaView>
+		</View>
 	)
 }
 

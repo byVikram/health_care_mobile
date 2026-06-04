@@ -10,6 +10,7 @@ import { ROUTES } from './routes'
 import type { AppStackParamList } from './types'
 import AuthNavigator from './AuthNavigator'
 import MainTabNavigator from './MainTabNavigator'
+import { AppScreenHeader } from '../components/common'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
@@ -26,7 +27,7 @@ import SearchPage from '../features/doctor/search/SearchPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 import AppointmentList from '../features/appointment/AppointmentList'
 
-import PharmacySearchPages from '../features/pharmacy/Pharmacysearchpages'
+import PharmacySearchPage from '../features/pharmacy/Pharmacysearchpage'
 import OrderListPage from '../features/pharmacy/OrderListPage'
 import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
@@ -36,14 +37,34 @@ function AuthenticatedNavigator() {
 		<AppStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={ROUTES.MAIN.TABS}>
 			<AppStack.Screen name={ROUTES.MAIN.TABS} component={MainTabNavigator} options={{ animation: 'none' }} />
 
-			{/* General Search (for patients / doctors) */}
-			<AppStack.Screen name={ROUTES.STACK.SEARCH} component={SearchPage} />
+			<AppStack.Screen
+				name={ROUTES.STACK.SEARCH}
+				component={SearchPage}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="Find Doctors" />,
+				}}
+			/>
 
-			<AppStack.Screen name={ROUTES.STACK.PHARMACY_SEARCH_PAGE} component={PharmacySearchPages} />
+			<AppStack.Screen
+				name={ROUTES.STACK.PHARMACY_SEARCH_PAGE}
+				component={PharmacySearchPage}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="Pharmacies" />,
+				}}
+			/>
 			<AppStack.Screen name={ROUTES.STACK.ORDER_LIST as keyof AppStackParamList} component={OrderListPage} />
 
 			<AppStack.Screen name={ROUTES.STACK.ORDER_DETAILS} component={OrderDetailsScreen} />
-			<AppStack.Screen name={ROUTES.STACK.DOCTOR_SEARCH} component={DoctorSearchPage} />
+			<AppStack.Screen
+				name={ROUTES.STACK.DOCTOR_SEARCH}
+				component={DoctorSearchPage}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="Search Doctors" />,
+				}}
+			/>
 
 			<AppStack.Screen name={ROUTES.STACK.DOCTOR_DETAIL} component={DoctorDetailPage} />
 
@@ -65,7 +86,14 @@ function AuthenticatedNavigator() {
 
 			<AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
 
-			<AppStack.Screen name={ROUTES.STACK.APPOINTMENTS} component={AppointmentList} />
+			<AppStack.Screen
+				name={ROUTES.STACK.APPOINTMENTS}
+				component={AppointmentList}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="Appointments" />,
+				}}
+			/>
 
 			<AppStack.Screen
 				name={ROUTES.STACK.CONSENT_FORM}
