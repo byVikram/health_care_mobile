@@ -189,18 +189,20 @@ export default function AppHeader({
             />
             <View style={styles.notificationDot} />
           </Pressable>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() =>
-              navigation.navigate(ROUTES.STACK.FAVOURITE_DOCTOR)
-            }
-          >
-            <MaterialCommunityIcons
-              name="heart-outline"
-              size={22}
-              color="#1b5f66"
-            />
+          {isPatient && (
+            <Pressable
+              style={styles.actionButton}
+              onPress={() =>
+                navigation.navigate(ROUTES.STACK.FAVOURITE_DOCTOR)
+              }
+            >
+              <MaterialCommunityIcons
+                name="heart-outline"
+                size={22}
+                color="#1b5f66"
+              />
           </Pressable>
+          )}
         </View>
       </View>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import {
 	RefreshControl,
 	ScrollView,
@@ -20,6 +20,9 @@ import CommunitySection from './CommunitySection'
 import LocationScreen from '../../components/common/LocationScreen'
 import { GPSLocationCard } from '../../components/common/GPSLocationCard'
 import BlogsSection from './BlogsSection'
+import ArticleSection from './ArticleSection'
+import UpcomingEventsSection from './EventSection'
+import PodcastsSection from './PodcastsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
 import { getAppointments } from '../doctor/doctorService'
 
@@ -182,8 +185,8 @@ export default function DashboardPage() {
 	// ---------------- PHARMACY PANEL ----------------
 	const renderPharmacyPanel = () => (
 		<>
-			 <LocationScreen /> 
-			 <GPSLocationCard />
+			<LocationScreen />
+			<GPSLocationCard />
 		</>
 	)
 
@@ -203,6 +206,15 @@ export default function DashboardPage() {
 
 	// ---- Helper: main content (hero + role panel) ----
 	const renderMainContent = () => {
+		if (role !== USER_ROLES.DOCTOR && role !== USER_ROLES.PHARMACY) {
+			return (
+				<>
+					<HeroSection role={role} />
+					{renderUserPanel()}
+				</>
+			)
+		}
+
 		if (isTablet) {
 			return (
 				<View style={styles.tabletRow}>
@@ -257,9 +269,15 @@ export default function DashboardPage() {
 				{role === USER_ROLES.PHARMACY && <PharmacyOrderDashboardCard />}
 
 				{renderMainContent()}
-				{/* Common sections for all roles */}
+
+				{/* New dashboard sections inserted before the existing community/blog sections. */}
+				<ArticleSection />
+				<UpcomingEventsSection />
+
+				{/* Existing common sections */}
 				<CommunitySection />
 				<BlogsSection />
+				<PodcastsSection />
 
 				{/* PatientQuestionsSection is NOT rendered for Pharmacy */}
 				{role !== USER_ROLES.PHARMACY && <PatientQuestionsSection />}
