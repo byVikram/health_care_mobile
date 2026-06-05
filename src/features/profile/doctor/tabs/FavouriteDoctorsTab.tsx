@@ -1,9 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, FlatList, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import {
+	ActivityIndicator,
+	FlatList,
+	StyleSheet,
+	Text,
+	useWindowDimensions,
+	View,
+} from 'react-native'
 import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
-import { FavouriteDoctor, getFavouriteDoctors, toggleFavouriteDoctor } from '../../../doctor/doctorService'
+import {
+	FavouriteDoctor,
+	getFavouriteDoctors,
+	toggleFavouriteDoctor,
+} from '../../../doctor/doctorService'
 import { AppInput } from '../../../../components/common'
 import FavouriteDoctorList, {
 	type FavouriteDoctorListItem,
@@ -168,7 +179,10 @@ export default function FavouriteDoctorsTab() {
 			<FlatList
 				data={dataToShow}
 				keyExtractor={(item) => item.id}
-				contentContainerStyle={[styles.listContent, isEmpty && !loading && styles.emptyListContent]}
+				contentContainerStyle={[
+					styles.listContent,
+					isEmpty && styles.emptyListContent,
+				]}
 				ListHeaderComponent={
 					<View style={styles.headerContent}>
 						<AppInput
@@ -176,10 +190,7 @@ export default function FavouriteDoctorsTab() {
 							onChangeText={setSearchQuery}
 							placeholder="Search doctor..."
 							placeholderTextColor="#98a1aa"
-							containerStyle={[
-								styles.searchInputContainer,
-								isCompact && styles.searchInputContainerCompact,
-							]}
+							containerStyle={[styles.searchInputContainer, isCompact && styles.searchInputContainerCompact]}
 							style={[styles.searchInput, isCompact && styles.searchInputCompact]}
 							contentStyle={[styles.searchInputContent, isCompact && styles.searchInputContentCompact]}
 							outlineStyle={[styles.searchInputOutline, isCompact && styles.searchInputOutlineCompact]}
@@ -187,9 +198,7 @@ export default function FavouriteDoctorsTab() {
 							activeOutlineColor="#2e7b7d"
 							textColor="#1b2d3c"
 							left={<AppInput.Icon icon="magnify" size={isCompact ? 20 : 28} color="#9b9b9b" />}
-							right={
-								<AppInput.Icon icon="microphone-outline" size={isCompact ? 20 : 28} color="#9b9b9b" />
-							}
+							right={<AppInput.Icon icon="microphone-outline" size={isCompact ? 20 : 28} color="#9b9b9b" />}
 							autoCorrect={false}
 							returnKeyType="search"
 							noMargin
@@ -213,18 +222,16 @@ export default function FavouriteDoctorsTab() {
 					/>
 				)}
 				ListEmptyComponent={
-					!loading && (
-						<View style={styles.emptyState}>
-							<MaterialCommunityIcons
-								name={isSearching ? 'doctor' : 'bookmark-outline'}
-								size={40}
-								color="#8ca0a9"
-							/>
-							<Text style={styles.emptyTitle}>
-								{isSearching ? 'No favourite doctors match your search' : 'No favourite doctors yet'}
-							</Text>
-						</View>
-					)
+					<View style={styles.emptyState}>
+						<MaterialCommunityIcons
+							name={isSearching ? 'doctor' : 'bookmark-outline'}
+							size={40}
+							color="#8ca0a9"
+						/>
+						<Text style={styles.emptyTitle}>
+							{isSearching ? 'No favourite doctors match your search' : 'No favourite doctors yet'}
+						</Text>
+					</View>
 				}
 				showsVerticalScrollIndicator={false}
 				keyboardShouldPersistTaps="handled"
@@ -247,10 +254,10 @@ const styles = StyleSheet.create({
 		paddingBottom: 2,
 	},
 	searchInputContainer: {
-		marginBottom: 28,
+		marginBottom: 12,
 	},
 	searchInputContainerCompact: {
-		marginBottom: 18,
+		marginBottom: 10,
 	},
 	searchInput: {
 		height: 54,
@@ -282,11 +289,11 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#526b7a',
 		letterSpacing: 0,
-		marginBottom: 30,
+		marginBottom: 12,
 	},
 	sectionTitleCompact: {
 		fontSize: 13,
-		marginBottom: 18,
+		marginBottom: 10,
 	},
 	emptyListContent: {
 		flexGrow: 1,
@@ -311,3 +318,8 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 	},
 })
+// import React from 'react'
+// import MyDoctorPage from '../../../patient/MyDoctorPage'
+// export default function FavouriteDoctorsTab() {
+// 	return <MyDoctorPage />
+// }

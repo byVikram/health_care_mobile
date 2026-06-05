@@ -178,6 +178,12 @@ const normalizeAvailabilityGroups = (response: unknown, selectedAppointmentType:
 export default function AvailabilityTab({ hospitals, availability, onChange }: AvailabilityTabProps) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
+	const contentWidth = useMemo(() => {
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
+		return 640
+	}, [isTablet, width])
 	const timeSlotColumns = width >= 900 ? 5 : width >= 768 ? 4 : 3
 
 	const [localAvailability, setLocalAvailability] = useState<DoctorAvailability>(availability ?? EMPTY_AVAILABILITY)
@@ -514,7 +520,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 			keyboardShouldPersistTaps="handled"
 			showsVerticalScrollIndicator={false}
 		>
-			<View style={[styles.card, isTablet && styles.cardTablet]}>
+			<View style={[styles.card, isTablet && styles.cardTablet, { maxWidth: contentWidth },]}>
 				<View style={styles.fieldGroup}>
 					<Text style={styles.sectionLabel}>Choose Hospital</Text>
 					{resolvedHospitals.length === 0 ? (
@@ -612,7 +618,6 @@ const styles = StyleSheet.create({
 	},
 	card: {
 		width: '100%',
-		maxWidth: 980,
 		alignSelf: 'center',
 		backgroundColor: '#fff',
 		padding: 18,

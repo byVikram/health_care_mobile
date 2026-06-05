@@ -5,9 +5,7 @@ import {
 	Animated,
 	FlatList,
 	Image,
-	Modal,
 	Platform,
-	Pressable,
 	RefreshControl,
 	ScrollView,
 	StyleSheet,
@@ -17,12 +15,11 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
-import { BlurView } from 'expo-blur'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { AppSelect, AppSelectOption, AppTable, AppTableColumn, AppTypography } from '../../components/common'
+import { AppFilterBottomSheet, AppSelect, AppSelectOption, AppTable, AppTableColumn, AppTypography } from '../../components/common'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { useAuth } from '../../context/AuthContext'
@@ -450,8 +447,6 @@ export default function AppointmentList() {
 	const [hospitalsLoading, setHospitalsLoading] = useState(false)
 	const [statusOptions, setStatusOptions] = useState<AppSelectOption[]>([{ label: 'All', value: 'all' }])
 	const [statusesLoading, setStatusesLoading] = useState(false)
-	const filterSheetAnim = useRef(new Animated.Value(0)).current
-	const filterBackdropAnim = useRef(new Animated.Value(0)).current
 	const skipNextFilterFetchRef = useRef(false)
 
 	const isPatientView = role === 'patient'
@@ -558,14 +553,14 @@ export default function AppointmentList() {
 
 		try {
 			if (showLoader) setLoading(true)
-			const token = await AsyncStorage.getItem('access_token')
-			console.log('[AppointmentList][debug] appointments fetch request:', {
-				url: requestUrl,
-				method: 'GET',
-				queryParams,
-				requestPayload: null,
-				authToken: maskToken(token),
-			})
+			// const token = await AsyncStorage.getItem('access_token')
+			// console.log('[AppointmentList][debug] appointments fetch request:', {
+			// 	url: requestUrl,
+			// 	method: 'GET',
+			// 	queryParams,
+			// 	requestPayload: null,
+			// 	authToken: maskToken(token),
+			// })
 
 			const hasQueryParams = Object.keys(queryParams).length > 0
 			const res = await ApiService.get<AppointmentsResponse>(
@@ -781,38 +776,11 @@ export default function AppointmentList() {
 		setDraftToDateFilter(toDateFilter)
 		setDraftSelectedHospitalValue(selectedHospitalValue)
 		setFilterModalVisible(true)
-		filterSheetAnim.setValue(0)
-		filterBackdropAnim.setValue(0)
-		Animated.parallel([
-			Animated.timing(filterSheetAnim, {
-				toValue: 1,
-				duration: 260,
-				useNativeDriver: true,
-			}),
-			Animated.timing(filterBackdropAnim, {
-				toValue: 1,
-				duration: 220,
-				useNativeDriver: true,
-			}),
-		]).start()
 	}
 
 	const closeFilterModal = () => {
 		setActiveDatePicker(null)
-		Animated.parallel([
-			Animated.timing(filterSheetAnim, {
-				toValue: 0,
-				duration: 220,
-				useNativeDriver: true,
-			}),
-			Animated.timing(filterBackdropAnim, {
-				toValue: 0,
-				duration: 180,
-				useNativeDriver: true,
-			}),
-		]).start(({ finished }) => {
-			if (finished) setFilterModalVisible(false)
-		})
+		setFilterModalVisible(false)
 	}
 
 	const applyFilters = () => {
@@ -1090,68 +1058,32 @@ export default function AppointmentList() {
 		</View>
 	)
 
-	const renderFilterModal = () => {
-		const translateY = filterSheetAnim.interpolate({
-			inputRange: [0, 1],
-			outputRange: [420, 0],
-		})
-		const backdropOpacity = filterBackdropAnim.interpolate({
-			inputRange: [0, 1],
-			outputRange: [0, 1],
-		})
+	const renderFilterModal = () => (
+		<AppFilterBottomSheet
+			visible={filterModalVisible}
+			title="Filters"
+			onClose={closeFilterModal}
+		>
+			<View style={[styles.filterSheetBody, { maxHeight: Math.min(height * 0.62, 500) }]}>
+				<ScrollView
+					style={styles.filterSheetScroll}
+					contentContainerStyle={styles.filterSheetContent}
+					showsVerticalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
+				>
+					<View style={styles.filterGroup}>
+						<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
+						{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
+							setDraftDateFilter(value)
+							if (value !== 'custom') setActiveDatePicker(null)
+						})}
+						{renderDateRangePicker()}
+					</View>
 
-		return (
-			<Modal
-				visible={filterModalVisible}
-				transparent
-				animationType="none"
-				onRequestClose={closeFilterModal}
-			>
-				<View style={styles.filterModalRoot}>
-					<Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
-						<BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
-						<View style={styles.filterDim} />
-						<Pressable style={StyleSheet.absoluteFill} onPress={closeFilterModal} />
-					</Animated.View>
-
-					<Animated.View
-						style={[
-							styles.filterSheet,
-							{
-								width: Math.min(width - 24, 520),
-								maxHeight: Math.min(height * 0.78, 620),
-								paddingBottom: Math.max(insets.bottom + 18, 26),
-								transform: [{ translateY }],
-							},
-						]}
-					>
-						<View style={styles.filterSheetHandle} />
-
-						<View style={styles.filterSheetHeader}>
-							<AppTypography style={styles.filterSheetTitle}>Filters</AppTypography>
-							<TouchableOpacity style={styles.filterCloseButton} onPress={closeFilterModal}>
-								<MaterialCommunityIcons name="close" size={22} color={MUTED} />
-							</TouchableOpacity>
-						</View>
-
-						<ScrollView
-							style={styles.filterSheetScroll}
-							contentContainerStyle={styles.filterSheetContent}
-							showsVerticalScrollIndicator={false}
-						>
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
-								{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
-									setDraftDateFilter(value)
-									if (value !== 'custom') setActiveDatePicker(null)
-								})}
-								{renderDateRangePicker()}
-							</View>
-
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Consultation Mode</AppTypography>
-								{renderFilterChips(MODE_OPTIONS, draftModeFilter, setDraftModeFilter)}
-							</View>
+					<View style={styles.filterGroup}>
+						<AppTypography style={styles.filterGroupLabel}>Consultation Mode</AppTypography>
+						{renderFilterChips(MODE_OPTIONS, draftModeFilter, setDraftModeFilter)}
+					</View>
 
 							<View style={styles.filterGroup}>
 								<AppTypography style={styles.filterGroupLabel}>Appointment Status</AppTypography>
@@ -1177,19 +1109,17 @@ export default function AppointmentList() {
 							</View>
 						</ScrollView>
 
-						<View style={styles.filterSheetActions}>
-							<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
-								<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
-							</TouchableOpacity>
-							<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
-								<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
-							</TouchableOpacity>
-						</View>
-					</Animated.View>
+				<View style={[styles.filterSheetActions, { paddingBottom: Math.max(insets.bottom + 18, 26) }]}>
+					<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+						<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
+					</TouchableOpacity>
+					<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+						<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
+					</TouchableOpacity>
 				</View>
-			</Modal>
-		)
-	}
+			</View>
+		</AppFilterBottomSheet>
+	)
 
 	const content = (
 		<>
@@ -1499,57 +1429,8 @@ const styles = StyleSheet.create({
 		backgroundColor: '#e9f8f7',
 		borderColor: TEAL,
 	},
-	filterModalRoot: {
-		flex: 1,
-		justifyContent: 'flex-end',
-		alignItems: 'center',
-	},
-	filterBackdrop: {
-		...StyleSheet.absoluteFillObject,
-	},
-	filterDim: {
-		...StyleSheet.absoluteFillObject,
-		backgroundColor: 'rgba(15, 23, 42, 0.34)',
-	},
-	filterSheet: {
-		backgroundColor: SURFACE,
-		borderTopLeftRadius: 24,
-		borderTopRightRadius: 24,
-		paddingTop: 8,
-		overflow: 'hidden',
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: -10 },
-		shadowOpacity: 0.14,
-		shadowRadius: 24,
-		elevation: 18,
-	},
-	filterSheetHandle: {
-		width: 44,
-		height: 4,
-		borderRadius: 999,
-		backgroundColor: '#d7dee6',
-		alignSelf: 'center',
-		marginBottom: 10,
-	},
-	filterSheetHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 18,
-		paddingBottom: 12,
-	},
-	filterSheetTitle: {
-		fontSize: 18,
-		lineHeight: 24,
-		fontWeight: '700',
-		color: TEXT,
-	},
-	filterCloseButton: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		alignItems: 'center',
-		justifyContent: 'center',
+	filterSheetBody: {
+		width: '100%',
 	},
 	filterSheetScroll: {
 		flexGrow: 0,
