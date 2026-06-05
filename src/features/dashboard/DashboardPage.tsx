@@ -257,7 +257,6 @@ export default function DashboardPage() {
 				{role === USER_ROLES.PHARMACY && <PharmacyOrder />}
 
 				{renderMainContent()}
-
 				{/* Common sections for all roles */}
 				<CommunitySection />
 				<BlogsSection />

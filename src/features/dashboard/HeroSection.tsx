@@ -16,6 +16,7 @@ import { Video, ResizeMode } from 'expo-av';
 import { AppTypography } from '../../components/common';
 import { ROUTES } from '../../navigation/routes';
 import { navigate as navigateRoot } from '../../navigation/navigationService';
+import ServicesSection from './ServiceSection';
 
 import EmergencyIcon from '../../assets/quick-services/emergency.svg';
 import AmbulanceIcon from '../../assets/quick-services/ambulance.svg';
@@ -342,6 +343,8 @@ export default function HeroSection({ role }: { role: Role }) {
           Others Popup — doctor & patient only
       ───────────────────────────────────────────── */}
 
+      {!isPharmacy && <ServicesSection />}
+
       {!isPharmacy && (
         <Modal
           visible={showOthersModal}
@@ -562,7 +565,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingTop: 16,
-    paddingBottom: 16,
+    paddingBottom: 0,
   },
 
   horizontalServicesRowTablet: {
