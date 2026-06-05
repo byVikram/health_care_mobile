@@ -14,7 +14,7 @@ import HeroSection from './HeroSection'
 import SpecialitySection from './SpecialitySection'
 import ConsultSection from './ConsultSection'
 import PatientQuestionsSection from './PatientQuestionsSection'
-import PharmacyOrder from './PharmacyOrder'
+import PharmacyOrderDashboardCard from './PharmacyOrderDashboardCard'
 import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
 import CommunitySection from './CommunitySection'
 import LocationScreen from '../../components/common/LocationScreen'
@@ -254,7 +254,7 @@ export default function DashboardPage() {
 				}
 			>
 				{/* For PHARMACY role: show PharmacyOrder at the top (before HeroSection) */}
-				{role === USER_ROLES.PHARMACY && <PharmacyOrder />}
+				{role === USER_ROLES.PHARMACY && <PharmacyOrderDashboardCard />}
 
 				{renderMainContent()}
 

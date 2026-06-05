@@ -1,20 +1,29 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
+	Animated,
 	FlatList,
 	Image,
-	SafeAreaView,
+	Modal,
+	Platform,
+	Pressable,
+	ScrollView,
 	StyleSheet,
 	Text,
 	TextInput,
 	TouchableOpacity,
 	View,
+	useWindowDimensions,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import Toast from 'react-native-toast-message'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { BlurView } from 'expo-blur'
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 
-import AppHeader from '../../components/common/AppHeader'
+import { AppSelect, AppSelectOption, AppTypography } from '../../components/common'
+import PaginationBar from '../../components/common/AppPagination'
 import Card from '../../components/common/CommonCard'
 import { getPharmacyOrders } from '../profile/pharmacy/pharmacyService'
 
@@ -68,6 +77,24 @@ const STATUS_STYLES: Record<NormalizedStatus, { bg: string; text: string }> = {
 	Packed: { bg: '#DEE9FF', text: '#3F7EE8' },
 }
 
+const DATE_OPTIONS: AppSelectOption[] = [
+	{ label: 'All', value: 'all' },
+	{ label: 'Yesterday', value: 'yesterday' },
+	{ label: 'Today', value: 'today' },
+	{ label: 'Tomorrow', value: 'tomorrow' },
+	{ label: 'Last 7 Days', value: 'last_7_days' },
+	{ label: 'Last 30 Days', value: 'last_30_days' },
+	{ label: 'Custom', value: 'custom' },
+]
+
+const STATUS_OPTIONS: AppSelectOption[] = [
+	{ label: 'All', value: 'all' },
+	{ label: 'Pending', value: 'pending' },
+	{ label: 'Packed', value: 'packed' },
+	{ label: 'Collected', value: 'collected' },
+	{ label: 'Rejected', value: 'rejected' },
+]
+
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
@@ -106,30 +133,17 @@ const normalizeStatus = (status: string): NormalizedStatus => {
 	}
 }
 
-/**
- * Safely extracts the PharmacyOrder array from whatever shape the API returns.
- *
- * The service does:  return res.data
- *
- * Depending on the backend response envelope, res.data may be:
- *   1. { data: PharmacyOrder[] }   ← most common (matches the web OrderList.tsx)
- *   2. PharmacyOrder[]             ← raw array
- *   3. { orders: PharmacyOrder[] } ← alternative key
- */
 const extractOrders = (response: unknown): PharmacyOrder[] => {
 	if (!response) return []
 
-	// Case 1: { data: [...] }
 	if (typeof response === 'object' && 'data' in (response as object) && Array.isArray((response as any).data)) {
 		return (response as any).data
 	}
 
-	// Case 2: raw array
 	if (Array.isArray(response)) {
 		return response
 	}
 
-	// Case 3: { orders: [...] }
 	if (typeof response === 'object' && 'orders' in (response as object) && Array.isArray((response as any).orders)) {
 		return (response as any).orders
 	}
@@ -153,6 +167,61 @@ const mapOrderToItem = (item: PharmacyOrder): OrderItem => ({
 	raw: item,
 })
 
+const formatApiDate = (date: Date) => {
+	const year = date.getFullYear()
+	const month = String(date.getMonth() + 1).padStart(2, '0')
+	const day = String(date.getDate()).padStart(2, '0')
+	return `${year}-${month}-${day}`
+}
+
+const applyDateFilterParams = (
+	params: Record<string, unknown>,
+	filter: string,
+	customFromDate?: string,
+	customToDate?: string
+) => {
+	if (filter === 'all') return
+
+	if (filter === 'custom') {
+		if (customFromDate) params.start_date = customFromDate
+		if (customToDate) params.end_date = customToDate
+		return
+	}
+
+	const today = new Date()
+	const endDate = formatApiDate(today)
+
+	if (filter === 'today') {
+		params.start_date = endDate
+		params.end_date = endDate
+		return
+	}
+
+	if (filter === 'yesterday') {
+		const yesterday = new Date(today)
+		yesterday.setDate(today.getDate() - 1)
+		const yestStr = formatApiDate(yesterday)
+		params.start_date = yestStr
+		params.end_date = yestStr
+		return
+	}
+
+	if (filter === 'tomorrow') {
+		const tomorrow = new Date(today)
+		tomorrow.setDate(today.getDate() + 1)
+		const tomStr = formatApiDate(tomorrow)
+		params.start_date = tomStr
+		params.end_date = tomStr
+		return
+	}
+
+	const days = filter === 'last_30_days' ? 30 : 7
+	const startDate = new Date(today)
+	startDate.setDate(today.getDate() - (days - 1))
+	params.start_date = formatApiDate(startDate)
+	params.end_date = endDate
+}
+
 // ─────────────────────────────────────────────
 // OrderCard
 // ─────────────────────────────────────────────
@@ -175,7 +244,6 @@ const OrderCard = React.memo(function OrderCard({ order, onPress }: { order: Ord
 					<Text numberOfLines={1} style={styles.patientName}>
 						{order.name}
 					</Text>
-					{/* <Text style={styles.orderId}>({order.orderId})</Text> */}
 				</View>
 
 				<Text numberOfLines={1} style={styles.doctorText}>
@@ -201,179 +269,113 @@ const OrderCard = React.memo(function OrderCard({ order, onPress }: { order: Ord
 })
 
 // ─────────────────────────────────────────────
-// ListHeader
-// ─────────────────────────────────────────────
-
-type ListHeaderProps = {
-	searchQuery: string
-	onSearchChange: (v: string) => void
-	selectedDate: string
-	onDatePress: () => void
-	totalCount: number
-	isSearching: boolean
-	searchResults: OrderItem[]
-	searchLoading: boolean
-	onOrderPress: (order: OrderItem) => void
-}
-
-const ListHeader = React.memo(function ListHeader({
-	searchQuery,
-	onSearchChange,
-	selectedDate,
-	onDatePress,
-	totalCount,
-	isSearching,
-	searchResults,
-	searchLoading,
-	onOrderPress,
-}: ListHeaderProps) {
-	return (
-		<View>
-			{/* Search bar */}
-			{/* <View style={styles.searchBar}>
-				<MaterialCommunityIcons name="magnify" size={20} color="#7d8b94" />
-				<TextInput
-					value={searchQuery}
-					onChangeText={onSearchChange}
-					placeholder="Search by patient name or order ID"
-					placeholderTextColor="#8b9aa2"
-					style={styles.searchInput}
-					autoCorrect={false}
-					returnKeyType="search"
-				/>
-				{searchQuery.length > 0 && (
-					<TouchableOpacity onPress={() => onSearchChange('')} activeOpacity={0.7}>
-						<MaterialCommunityIcons name="close-circle" size={18} color="#8b9aa2" />
-					</TouchableOpacity>
-				)}
-			</View> */}
-
-			{/* Inline search results */}
-			{isSearching && (
-				<View style={styles.searchResultsSection}>
-					<Text style={styles.sectionLabel}>SEARCH RESULTS</Text>
-
-					{searchLoading ? (
-						<View style={styles.centeredBlock}>
-							<ActivityIndicator size="small" color="#2E7C86" />
-						</View>
-					) : searchResults.length === 0 ? (
-						<View style={styles.emptyState}>
-							<Text style={styles.emptyTitle}>No orders found</Text>
-							<Text style={styles.emptyText}>Try a different patient name or order ID.</Text>
-						</View>
-					) : (
-						searchResults.map((order) => (
-							<View key={order.id} style={{ marginBottom: 12 }}>
-								<OrderCard order={order} onPress={() => onOrderPress(order)} />
-							</View>
-						))
-					)}
-				</View>
-			)}
-
-			{/* Date filter + section title (non-search mode) */}
-			{!isSearching && (
-				<>
-					<View style={styles.listTopRow}>
-						<Text style={styles.pageTitle}>Medicine orders</Text>
-						<View style={styles.countBadge}>
-							<Text style={styles.countBadgeText}>{totalCount}</Text>
-						</View>
-					</View>
-
-					<Text style={styles.label}>Select date:</Text>
-					<TouchableOpacity style={styles.dateSelect} onPress={onDatePress} activeOpacity={0.8}>
-						<Text style={styles.dateText}>{selectedDate}</Text>
-						<View style={styles.dateDivider} />
-						<MaterialCommunityIcons name="chevron-down" size={20} color="#6d7f86" />
-					</TouchableOpacity>
-				</>
-			)}
-		</View>
-	)
-})
-
-// ─────────────────────────────────────────────
 // Main screen
 // ─────────────────────────────────────────────
 
 export default function OrderListPage() {
 	const navigation = useNavigation<any>()
+	const route = useRoute<any>()
+	const insets = useSafeAreaInsets()
+	const { width, height } = useWindowDimensions()
+	const useInlineFilters = width >= 768
 
 	const [orders, setOrders] = useState<OrderItem[]>([])
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 
+	// Pagination state
+	const [page, setPage] = useState(1)
+	const [pageSize, setPageSize] = useState(10)
+	const [apiMeta, setApiMeta] = useState<{ total: number; page: number; limit: number; pages: number } | null>(null)
+
+	// Filter state
 	const [searchQuery, setSearchQuery] = useState('')
-	const [searchResults, setSearchResults] = useState<OrderItem[]>([])
-	const [searchLoading, setSearchLoading] = useState(false)
-	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const [debouncedSearch, setDebouncedSearch] = useState('')
+	const [statusFilter, setStatusFilter] = useState(route.params?.status ?? 'all')
 
-	const [selectedDate, setSelectedDate] = useState('Date')
+	// Sync status filter from navigation route params
+	useEffect(() => {
+		if (route.params?.status) {
+			setStatusFilter(route.params.status)
+		}
+	}, [route.params?.status])
 
-	const trimmedSearch = searchQuery.trim()
-	const isSearching = trimmedSearch.length >= 2
+	const [dateFilter, setDateFilter] = useState('all')
+	const [fromDateFilter, setFromDateFilter] = useState('')
+	const [toDateFilter, setToDateFilter] = useState('')
 
-	// ── Fetch all orders ───────────────────────────────────────────────
+	// Mobile filter sheet draft states
+	const [draftStatusFilter, setDraftStatusFilter] = useState('all')
+	const [draftDateFilter, setDraftDateFilter] = useState('all')
+	const [draftFromDateFilter, setDraftFromDateFilter] = useState('')
+	const [draftToDateFilter, setDraftToDateFilter] = useState('')
+
+	const [filterModalVisible, setFilterModalVisible] = useState(false)
+	const [activeDatePicker, setActiveDatePicker] = useState<'from' | 'to' | null>(null)
+
+	const filterSheetAnim = useRef(new Animated.Value(0)).current
+	const filterBackdropAnim = useRef(new Animated.Value(0)).current
+
+	// Search Debounce Effect
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			setDebouncedSearch(searchQuery)
+		}, 300)
+		return () => clearTimeout(timer)
+	}, [searchQuery])
+
+	// Reset page to 1 when filters or search change
+	useEffect(() => {
+		setPage(1)
+	}, [debouncedSearch, statusFilter, dateFilter, fromDateFilter, toDateFilter, pageSize])
+
+	// ── Fetch orders ───────────────────────────────────────────────
 
 	const fetchOrders = useCallback(async (isRefresh = false) => {
 		try {
 			isRefresh ? setRefreshing(true) : setLoading(true)
 
-			const response = await getPharmacyOrders({ page: 1, limit: 100 })
+			const params: Record<string, any> = {
+				page,
+				limit: pageSize,
+			}
 
-			// Log raw response so you can confirm shape during development
-			console.log('[OrderListPage] raw response:', JSON.stringify(response).slice(0, 300))
+			if (statusFilter !== 'all') {
+				params.status = statusFilter
+			}
 
+			if (debouncedSearch.trim().length > 0) {
+				params.search = debouncedSearch.trim()
+			}
+
+			applyDateFilterParams(params, dateFilter, fromDateFilter, toDateFilter)
+
+			const response = (await getPharmacyOrders(params)) as any
 			const apiOrders = extractOrders(response)
 
-			console.log(`[OrderListPage] extracted ${apiOrders.length} orders`)
-
 			setOrders(apiOrders.map(mapOrderToItem))
+
+			if (response && response.meta) {
+				setApiMeta({
+					total: response.meta.total ?? apiOrders.length,
+					page: response.meta.page ?? page,
+					limit: response.meta.limit ?? pageSize,
+					pages: response.meta.pages ?? 1,
+				})
+			} else {
+				setApiMeta(null)
+			}
 		} catch (error) {
 			console.error('[OrderListPage] fetchOrders error:', error)
 			Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load pharmacy orders' })
 		} finally {
 			isRefresh ? setRefreshing(false) : setLoading(false)
 		}
-	}, [])
+	}, [page, pageSize, statusFilter, debouncedSearch, dateFilter, fromDateFilter, toDateFilter])
 
 	useEffect(() => {
 		fetchOrders()
 	}, [fetchOrders])
-
-	// ── Debounced client-side search ───────────────────────────────────
-
-	useEffect(() => {
-		if (debounceRef.current) clearTimeout(debounceRef.current)
-
-		if (!isSearching) {
-			setSearchResults([])
-			setSearchLoading(false)
-			return
-		}
-
-		setSearchLoading(true)
-
-		debounceRef.current = setTimeout(() => {
-			const query = trimmedSearch.toLowerCase()
-
-			const results = orders.filter(
-				(order) =>
-					order.name?.toLowerCase().includes(query) ||
-					order.orderId?.toLowerCase().includes(query) ||
-					order.doctor?.toLowerCase().includes(query)
-			)
-
-			setSearchResults(results)
-			setSearchLoading(false)
-		}, 300)
-
-		return () => {
-			if (debounceRef.current) clearTimeout(debounceRef.current)
-		}
-	}, [isSearching, trimmedSearch, orders])
 
 	// ── Navigate to order detail ───────────────────────────────────────
 
@@ -384,7 +386,7 @@ export default function OrderListPage() {
 		[navigation]
 	)
 
-	// ── Render grouped rows ────────────────────────────────────────────
+	// ── Render rows ────────────────────────────────────────────
 
 	const renderItem = useCallback(
 		({ item, index }: { item: OrderItem; index: number }) => {
@@ -402,60 +404,374 @@ export default function OrderListPage() {
 		[orders, handleOrderPress]
 	)
 
-	const listHeader = useMemo(
-		() => (
-			<ListHeader
-				searchQuery={searchQuery}
-				onSearchChange={setSearchQuery}
-				selectedDate={selectedDate}
-				onDatePress={() => {
-					/* TODO: wire date picker */
-				}}
-				totalCount={orders.length}
-				isSearching={isSearching}
-				searchResults={searchResults}
-				searchLoading={searchLoading}
-				onOrderPress={handleOrderPress}
+	// ── Mobile Modal Actions ───────────────────────────────────────────
+
+	const openFilterModal = () => {
+		setDraftStatusFilter(statusFilter)
+		setDraftDateFilter(dateFilter)
+		setDraftFromDateFilter(fromDateFilter)
+		setDraftToDateFilter(toDateFilter)
+		setFilterModalVisible(true)
+		filterSheetAnim.setValue(0)
+		filterBackdropAnim.setValue(0)
+		Animated.parallel([
+			Animated.timing(filterSheetAnim, {
+				toValue: 1,
+				duration: 260,
+				useNativeDriver: true,
+			}),
+			Animated.timing(filterBackdropAnim, {
+				toValue: 1,
+				duration: 220,
+				useNativeDriver: true,
+			}),
+		]).start()
+	}
+
+	const closeFilterModal = () => {
+		setActiveDatePicker(null)
+		Animated.parallel([
+			Animated.timing(filterSheetAnim, {
+				toValue: 0,
+				duration: 220,
+				useNativeDriver: true,
+			}),
+			Animated.timing(filterBackdropAnim, {
+				toValue: 0,
+				duration: 180,
+				useNativeDriver: true,
+			}),
+		]).start(({ finished }) => {
+			if (finished) setFilterModalVisible(false)
+		})
+	}
+
+	const applyFilters = () => {
+		if (draftDateFilter === 'custom' && draftFromDateFilter && draftToDateFilter) {
+			const fromDate = new Date(draftFromDateFilter)
+			const toDate = new Date(draftToDateFilter)
+			if (fromDate > toDate) {
+				Toast.show({ type: 'error', text1: 'Invalid Range', text2: 'From Date cannot be later than To Date.' })
+				return
+			}
+		}
+
+		setStatusFilter(draftStatusFilter)
+		setDateFilter(draftDateFilter)
+		setFromDateFilter(draftDateFilter === 'custom' ? draftFromDateFilter : '')
+		setToDateFilter(draftDateFilter === 'custom' ? draftToDateFilter : '')
+		closeFilterModal()
+	}
+
+	const resetFilters = () => {
+		setDraftStatusFilter('all')
+		setDraftDateFilter('all')
+		setDraftFromDateFilter('')
+		setDraftToDateFilter('')
+		setActiveDatePicker(null)
+		setStatusFilter('all')
+		setDateFilter('all')
+		setFromDateFilter('')
+		setToDateFilter('')
+	}
+
+	const handleDateRangeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+		if (Platform.OS === 'android') setActiveDatePicker(null)
+		if (event.type === 'dismissed' || !selectedDate || !activeDatePicker) return
+
+		const nextValue = formatApiDate(selectedDate)
+		if (activeDatePicker === 'from') {
+			setDraftFromDateFilter(nextValue)
+		} else {
+			setDraftToDateFilter(nextValue)
+		}
+		setDraftDateFilter('custom')
+	}
+
+	// ── Render Filter Components ───────────────────────────────────────
+
+	const renderFilterChips = (
+		options: AppSelectOption[],
+		value: string,
+		onChange: (nextValue: string) => void
+	) => (
+		<ScrollView
+			horizontal
+			showsHorizontalScrollIndicator={false}
+			style={styles.filterChipScroller}
+			contentContainerStyle={styles.filterChipRow}
+			keyboardShouldPersistTaps="handled"
+		>
+			{options.map((option) => {
+				const selected = option.value === value
+
+				return (
+					<TouchableOpacity
+						key={option.value}
+						style={[styles.filterChip, selected && styles.filterChipActive]}
+						onPress={() => onChange(option.value)}
+						activeOpacity={0.82}
+					>
+						<AppTypography style={[styles.filterChipText, selected && styles.filterChipTextActive]}>
+							{option.label}
+						</AppTypography>
+					</TouchableOpacity>
+				)
+			})}
+		</ScrollView>
+	)
+
+	const renderDateField = (label: string, value: string, picker: 'from' | 'to') => (
+		<TouchableOpacity
+			style={styles.dateRangeField}
+			onPress={() => setActiveDatePicker(picker)}
+			activeOpacity={0.82}
+		>
+			<AppTypography style={[styles.dateRangeText, !value && styles.dateRangePlaceholder]} numberOfLines={1}>
+				{value ? value : label}
+			</AppTypography>
+			<MaterialCommunityIcons name="calendar-month-outline" size={20} color="#1f5f68" />
+		</TouchableOpacity>
+	)
+
+	const renderDateRangePicker = () => (
+		<View style={styles.dateRangeWrap}>
+			<AppTypography style={styles.filterGroupLabel}>Date Range</AppTypography>
+			<View style={styles.dateRangeRow}>
+				{renderDateField('From Date', draftFromDateFilter, 'from')}
+				<View style={styles.dateRangeDivider} />
+				{renderDateField('To Date', draftToDateFilter, 'to')}
+			</View>
+			{activeDatePicker ? (
+				<View style={styles.datePickerWrap}>
+					<DateTimePicker
+						value={
+							activeDatePicker === 'from'
+								? (draftFromDateFilter ? new Date(draftFromDateFilter) : new Date())
+								: (draftToDateFilter ? new Date(draftToDateFilter) : new Date())
+						}
+						mode="date"
+						display={Platform.OS === 'ios' ? 'inline' : Platform.OS === 'android' ? 'calendar' : 'default'}
+						onChange={handleDateRangeChange}
+					/>
+				</View>
+			) : null}
+		</View>
+	)
+
+	const renderFilterModal = () => {
+		const translateY = filterSheetAnim.interpolate({
+			inputRange: [0, 1],
+			outputRange: [420, 0],
+		})
+		const backdropOpacity = filterBackdropAnim.interpolate({
+			inputRange: [0, 1],
+			outputRange: [0, 1],
+		})
+
+		return (
+			<Modal
+				visible={filterModalVisible}
+				transparent
+				animationType="none"
+				onRequestClose={closeFilterModal}
+			>
+				<View style={styles.filterModalRoot}>
+					<Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
+						<BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
+						<View style={styles.filterDim} />
+						<Pressable style={StyleSheet.absoluteFill} onPress={closeFilterModal} />
+					</Animated.View>
+
+					<Animated.View
+						style={[
+							styles.filterSheet,
+							{
+								width: Math.min(width - 24, 520),
+								maxHeight: Math.min(height * 0.78, 620),
+								paddingBottom: Math.max(insets.bottom + 18, 26),
+								transform: [{ translateY }],
+							},
+						]}
+					>
+						<View style={styles.filterSheetHandle} />
+
+						<View style={styles.filterSheetHeader}>
+							<AppTypography style={styles.filterSheetTitle}>Filters</AppTypography>
+							<TouchableOpacity style={styles.filterCloseButton} onPress={closeFilterModal}>
+								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
+							</TouchableOpacity>
+						</View>
+
+						<ScrollView
+							style={styles.filterSheetScroll}
+							contentContainerStyle={styles.filterSheetContent}
+							showsVerticalScrollIndicator={false}
+						>
+							<View style={styles.filterGroup}>
+								<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
+								{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
+									setDraftDateFilter(value)
+									if (value !== 'custom') setActiveDatePicker(null)
+								})}
+								{renderDateRangePicker()}
+							</View>
+
+							<View style={styles.filterGroup}>
+								<AppTypography style={styles.filterGroupLabel}>Order Status</AppTypography>
+								{renderFilterChips(STATUS_OPTIONS, draftStatusFilter, setDraftStatusFilter)}
+							</View>
+						</ScrollView>
+
+						<View style={styles.filterSheetActions}>
+							<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+								<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
+							</TouchableOpacity>
+							<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+								<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
+							</TouchableOpacity>
+						</View>
+					</Animated.View>
+				</View>
+			</Modal>
+		)
+	}
+
+	const searchInput = (
+		<View style={[styles.searchBox, !useInlineFilters && styles.searchBoxMobile, useInlineFilters && styles.searchBoxWide]}>
+			<MaterialCommunityIcons name="magnify" size={21} color="#9aa0a6" />
+			<TextInput
+				value={searchQuery}
+				onChangeText={setSearchQuery}
+				placeholder="Search Patient, Order ID..."
+				placeholderTextColor="#9aa4af"
+				style={styles.searchInput}
 			/>
-		),
-		[searchQuery, selectedDate, orders.length, isSearching, searchResults, searchLoading, handleOrderPress]
+			{searchQuery.length > 0 && (
+				<TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
+					<MaterialCommunityIcons name="close-circle" size={18} color="#8b9aa2" />
+				</TouchableOpacity>
+			)}
+		</View>
+	)
+
+	const mobileFilterButton = (
+		<TouchableOpacity
+			style={[
+				styles.filterIconButton,
+				(statusFilter !== 'all' || dateFilter !== 'all') && styles.filterIconButtonActive,
+			]}
+			onPress={openFilterModal}
+			activeOpacity={0.84}
+		>
+			<MaterialCommunityIcons name="tune" size={23} color="#1f5f68" />
+		</TouchableOpacity>
+	)
+
+	const renderInlineFilter = (label: string, child: React.ReactNode, style?: any) => (
+		<View style={[styles.outlinedFilterWrap, style]}>
+			<View pointerEvents="none" style={styles.outlinedFilterLabel}>
+				<AppTypography style={styles.outlinedFilterLabelText}>{label}</AppTypography>
+			</View>
+			{child}
+		</View>
+	)
+
+	const statusSelect = renderInlineFilter(
+		'Status',
+		<AppSelect
+			options={STATUS_OPTIONS}
+			value={statusFilter}
+			onSelect={(value) => setStatusFilter(value)}
+			placeholder="Status"
+			size="small"
+			style={styles.inlineSelectFill}
+			customCardStyle={styles.inlineFilterSelect}
+			borderColor="#c8ced6"
+			maxDropdownHeight={220}
+		/>,
+		styles.compactFilterSelectWrap
+	)
+
+	const dateSelect = renderInlineFilter(
+		'Date',
+		<AppSelect
+			options={DATE_OPTIONS}
+			value={dateFilter}
+			onSelect={(value) => setDateFilter(value)}
+			placeholder="Date"
+			size="small"
+			style={styles.inlineSelectFill}
+			customCardStyle={styles.inlineFilterSelect}
+			borderColor="#c8ced6"
+			maxDropdownHeight={220}
+		/>,
+		styles.compactFilterSelectWrap
 	)
 
 	// ── Render ─────────────────────────────────────────────────────────
 
 	return (
-		<SafeAreaView style={styles.safeArea}>
-			<AppHeader variant="search" location="KR Market" onAvatarPress={() => navigation.goBack()} />
-
+		<View style={styles.safeArea}>
 			<View style={styles.content}>
-				{loading ? (
+				<View style={styles.filtersSection}>
+					{useInlineFilters ? (
+						<View style={styles.filterRowWide}>
+							{dateSelect}
+							{statusSelect}
+							{searchInput}
+						</View>
+					) : (
+						<View style={styles.mobileSearchRow}>
+							<View style={{ flex: 1 }}>{searchInput}</View>
+							{mobileFilterButton}
+						</View>
+					)}
+				</View>
+
+				{loading && !refreshing ? (
 					<View style={styles.centeredFull}>
-						<ActivityIndicator size="large" color="#2E7C86" />
+						<ActivityIndicator size="large" color="#1f5f68" />
 					</View>
 				) : (
-					<FlatList
-						data={isSearching ? [] : orders}
-						keyExtractor={(item) => item.id}
-						renderItem={renderItem}
-						ListHeaderComponent={listHeader}
-						contentContainerStyle={styles.listContent}
-						showsVerticalScrollIndicator={false}
-						keyboardShouldPersistTaps="always"
-						onRefresh={() => fetchOrders(true)}
-						refreshing={refreshing}
-						ListEmptyComponent={
-							!isSearching ? (
+					<View style={{ flex: 1 }}>
+						<FlatList
+							data={orders}
+							keyExtractor={(item) => item.id}
+							renderItem={renderItem}
+							contentContainerStyle={styles.listContent}
+							showsVerticalScrollIndicator={false}
+							keyboardShouldPersistTaps="always"
+							onRefresh={() => fetchOrders(true)}
+							refreshing={refreshing}
+							ListEmptyComponent={
 								<View style={styles.emptyState}>
 									<MaterialCommunityIcons name="pill" size={40} color="#b0bec5" />
-									<Text style={styles.emptyTitle}>No orders yet</Text>
-									<Text style={styles.emptyText}>Pull down to refresh.</Text>
+									<Text style={styles.emptyTitle}>No orders found</Text>
+									<Text style={styles.emptyText}>Try adjusting the search or filter settings.</Text>
 								</View>
-							) : null
-						}
-					/>
+							}
+						/>
+						{apiMeta && apiMeta.total > 0 ? (
+							<View style={[styles.paginationWrap, !useInlineFilters && styles.mobilePaginationWrap, { paddingBottom: Math.max(insets.bottom + 8, 16) }]}>
+								<PaginationBar
+									page={page}
+									pageSize={pageSize}
+									totalRows={apiMeta.total}
+									pageSizeOptions={[10, 20, 50]}
+									onPageChange={(nextPage) => setPage(nextPage)}
+									onPageSizeChange={(nextSize) => {
+										setPageSize(nextSize)
+										setPage(1)
+									}}
+								/>
+							</View>
+						) : null}
+					</View>
 				)}
 			</View>
-		</SafeAreaView>
+			{!useInlineFilters && renderFilterModal()}
+		</View>
 	)
 }
 
@@ -482,93 +798,6 @@ const styles = StyleSheet.create({
 		paddingVertical: 20,
 		alignItems: 'center',
 		justifyContent: 'center',
-	},
-	// Search bar
-	searchBar: {
-		minHeight: 46,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#d9e6eb',
-		backgroundColor: '#ffffff',
-		paddingHorizontal: 14,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		marginBottom: 16,
-		shadowColor: '#12343b',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.05,
-		shadowRadius: 8,
-		elevation: 2,
-	},
-	searchInput: {
-		flex: 1,
-		minHeight: 46,
-		color: '#22343d',
-		fontSize: 14,
-	},
-	// Search results section
-	searchResultsSection: {
-		paddingBottom: 8,
-	},
-	sectionLabel: {
-		color: '#4e6670',
-		fontSize: 11,
-		fontWeight: '700',
-		letterSpacing: 0.5,
-		marginBottom: 10,
-	},
-	// List header — non-search mode
-	listTopRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 12,
-	},
-	pageTitle: {
-		color: '#24292b',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-	countBadge: {
-		minWidth: 24,
-		height: 22,
-		borderRadius: 11,
-		paddingHorizontal: 7,
-		backgroundColor: '#dcecee',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginLeft: 8,
-	},
-	countBadgeText: {
-		color: '#245f67',
-		fontSize: 12,
-		fontWeight: '700',
-	},
-	label: {
-		color: '#7d868a',
-		fontSize: 12,
-		marginBottom: 6,
-	},
-	dateSelect: {
-		height: 38,
-		borderWidth: 1,
-		borderColor: '#2E9CAA',
-		borderRadius: 6,
-		backgroundColor: '#ffffff',
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 20,
-	},
-	dateText: {
-		flex: 1,
-		color: '#236772',
-		fontSize: 13,
-		paddingHorizontal: 12,
-	},
-	dateDivider: {
-		width: 1,
-		height: '100%',
-		backgroundColor: '#d8e2e5',
 	},
 	// FlatList
 	listContent: {
@@ -665,5 +894,297 @@ const styles = StyleSheet.create({
 		color: '#8b969b',
 		fontSize: 12,
 		textAlign: 'center',
+	},
+	filtersSection: {
+		marginBottom: 10,
+	},
+	filterRowWide: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flexWrap: 'nowrap',
+		gap: 12,
+		width: '100%',
+	},
+	filterGridMobile: {
+		gap: 8,
+	},
+	mobileSearchRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	searchBox: {
+		height: 48,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#e5eaef',
+		backgroundColor: '#ffffff',
+		paddingHorizontal: 16,
+		flexDirection: 'row',
+		alignItems: 'center',
+		width: '100%',
+	},
+	searchBoxWide: {
+		height: 50,
+		flexGrow: 2.2,
+		flexShrink: 1,
+		flexBasis: 190,
+		minWidth: 170,
+		borderColor: '#d8dee6',
+		borderRadius: 8,
+	},
+	searchBoxMobile: {
+		height: 44,
+		width: '100%',
+		borderRadius: 8,
+		paddingHorizontal: 12,
+	},
+	searchInput: {
+		flex: 1,
+		height: '100%',
+		paddingHorizontal: 12,
+		fontSize: 16,
+		color: '#111827',
+	},
+	outlinedFilterWrap: {
+		height: 56,
+		justifyContent: 'center',
+		position: 'relative',
+		flexShrink: 1,
+	},
+	outlinedFilterLabel: {
+		position: 'absolute',
+		top: -1,
+		left: 14,
+		zIndex: 2,
+		backgroundColor: '#f4f4f4',
+		paddingHorizontal: 5,
+	},
+	outlinedFilterLabelText: {
+		fontSize: 12,
+		lineHeight: 16,
+		color: '#46627d',
+	},
+	inlineSelectFill: {
+		width: '100%',
+		marginBottom: 0,
+	},
+	inlineFilterSelect: {
+		height: 50,
+		borderRadius: 8,
+		backgroundColor: '#ffffff',
+	},
+	compactFilterSelectWrap: {
+		flexGrow: 1,
+		flexShrink: 1,
+		flexBasis: 112,
+		minWidth: 104,
+	},
+	filterIconButton: {
+		width: 48,
+		height: 44,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#e5eaef',
+		backgroundColor: '#ffffff',
+		alignItems: 'center',
+		justifyContent: 'center',
+		flexShrink: 0,
+		padding: 0,
+	},
+	filterIconButtonActive: {
+		backgroundColor: '#e9f8f7',
+		borderColor: '#1f5f68',
+	},
+	filterModalRoot: {
+		flex: 1,
+		justifyContent: 'flex-end',
+		alignItems: 'center',
+	},
+	filterBackdrop: {
+		...StyleSheet.absoluteFillObject,
+	},
+	filterDim: {
+		...StyleSheet.absoluteFillObject,
+		backgroundColor: 'rgba(15, 23, 42, 0.34)',
+	},
+	filterSheet: {
+		backgroundColor: '#ffffff',
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
+		paddingTop: 8,
+		overflow: 'hidden',
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: -10 },
+		shadowOpacity: 0.14,
+		shadowRadius: 24,
+		elevation: 18,
+	},
+	filterSheetHandle: {
+		width: 44,
+		height: 4,
+		borderRadius: 999,
+		backgroundColor: '#d7dee6',
+		alignSelf: 'center',
+		marginBottom: 10,
+	},
+	filterSheetHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 18,
+		paddingBottom: 12,
+	},
+	filterSheetTitle: {
+		fontSize: 18,
+		lineHeight: 24,
+		fontWeight: '700',
+		color: '#111827',
+	},
+	filterCloseButton: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	filterSheetScroll: {
+		flexGrow: 0,
+	},
+	filterSheetContent: {
+		paddingHorizontal: 18,
+		paddingTop: 4,
+		paddingBottom: 20,
+		gap: 22,
+	},
+	filterGroup: {
+		gap: 10,
+	},
+	filterGroupLabel: {
+		fontSize: 11,
+		lineHeight: 14,
+		fontWeight: '800',
+		color: '#64707d',
+		textTransform: 'uppercase',
+	},
+	filterChipScroller: {
+		marginHorizontal: -2,
+	},
+	filterChipRow: {
+		flexDirection: 'row',
+		flexWrap: 'nowrap',
+		gap: 10,
+		paddingHorizontal: 2,
+		paddingVertical: 1,
+	},
+	filterChip: {
+		minHeight: 38,
+		minWidth: 74,
+		borderRadius: 19,
+		paddingHorizontal: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#f2f6fb',
+		flexShrink: 0,
+	},
+	filterChipActive: {
+		backgroundColor: '#1f5f68',
+	},
+	filterChipText: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+		color: '#64707d',
+	},
+	filterChipTextActive: {
+		color: '#ffffff',
+	},
+	dateRangeWrap: {
+		gap: 10,
+		marginTop: 10,
+	},
+	dateRangeRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+	},
+	dateRangeField: {
+		flex: 1,
+		minWidth: 0,
+		height: 52,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#e5eaef',
+		backgroundColor: '#ffffff',
+		paddingHorizontal: 14,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	dateRangeText: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#111827',
+		flex: 1,
+	},
+	dateRangePlaceholder: {
+		color: '#94a3b8',
+		fontWeight: '400',
+	},
+	dateRangeDivider: {
+		width: 12,
+		height: 1,
+		backgroundColor: '#94a3b8',
+	},
+	datePickerWrap: {
+		marginTop: 6,
+		backgroundColor: '#ffffff',
+		borderRadius: 8,
+		padding: 4,
+	},
+	filterSheetActions: {
+		flexDirection: 'row',
+		paddingHorizontal: 18,
+		paddingTop: 12,
+		gap: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#e5eaef',
+	},
+	resetButton: {
+		flex: 1,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: '#e5eaef',
+		backgroundColor: '#ffffff',
+	},
+	resetButtonText: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#64707d',
+	},
+	applyButton: {
+		flex: 2,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#1f5f68',
+	},
+	applyButtonText: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#ffffff',
+	},
+	paginationWrap: {
+		paddingVertical: 10,
+		borderTopWidth: 1,
+		borderTopColor: '#e5eaef',
+		backgroundColor: 'transparent',
+	},
+	mobilePaginationWrap: {
+		paddingVertical: 6,
 	},
 })

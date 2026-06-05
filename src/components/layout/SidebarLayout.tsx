@@ -62,7 +62,7 @@ export default function SidebarLayout({
 	const navigation =
 		useNavigation<NavigationProp<AppStackParamList>>()
 
-	const { clearAuth, user: authUser } = useAuth()
+	const { clearAuth, user: authUser, role } = useAuth()
 
 	const user = {
 		name: authUser?.name ?? MOCK_USER.name,
@@ -81,9 +81,13 @@ export default function SidebarLayout({
 	}
 
 	const handleSearchPress = () => {
-		navigation.navigate(ROUTES.MAIN.TABS, {
-			screen: ROUTES.MAIN.SEARCH,
-		})
+		if (role === 'pharmacy') {
+			navigation.navigate(ROUTES.STACK.ORDER_LIST as any)
+		} else {
+			navigation.navigate(ROUTES.MAIN.TABS, {
+				screen: ROUTES.MAIN.SEARCH,
+			})
+		}
 	}
 
 	const menuItems = useMemo<AppSidebarItem[]>(

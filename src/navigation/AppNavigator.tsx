@@ -54,7 +54,14 @@ function AuthenticatedNavigator() {
 					header: () => <AppScreenHeader title="Pharmacies" />,
 				}}
 			/>
-			<AppStack.Screen name={ROUTES.STACK.ORDER_LIST as keyof AppStackParamList} component={OrderListPage} />
+			<AppStack.Screen
+				name={ROUTES.STACK.ORDER_LIST as keyof AppStackParamList}
+				component={OrderListPage}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="Medicine Orders" />,
+				}}
+			/>
 
 			<AppStack.Screen name={ROUTES.STACK.ORDER_DETAILS} component={OrderDetailsScreen} />
 			<AppStack.Screen

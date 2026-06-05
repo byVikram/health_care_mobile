@@ -446,6 +446,7 @@ export default function AppointmentList() {
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
 	const [hospitals, setHospitals] = useState<HospitalOption[]>([{ label: 'All', value: 'all' }])
 	const [selectedHospitalValue, setSelectedHospitalValue] = useState('all')
+	const [draftSelectedHospitalValue, setDraftSelectedHospitalValue] = useState('all')
 	const [hospitalsLoading, setHospitalsLoading] = useState(false)
 	const [statusOptions, setStatusOptions] = useState<AppSelectOption[]>([{ label: 'All', value: 'all' }])
 	const [statusesLoading, setStatusesLoading] = useState(false)
@@ -778,6 +779,7 @@ export default function AppointmentList() {
 		setDraftStatusFilter(statusFilter)
 		setDraftFromDateFilter(fromDateFilter)
 		setDraftToDateFilter(toDateFilter)
+		setDraftSelectedHospitalValue(selectedHospitalValue)
 		setFilterModalVisible(true)
 		filterSheetAnim.setValue(0)
 		filterBackdropAnim.setValue(0)
@@ -832,6 +834,7 @@ export default function AppointmentList() {
 		setStatusFilter(draftStatusFilter)
 		setFromDateFilter(nextFromDateFilter)
 		setToDateFilter(nextToDateFilter)
+		setSelectedHospitalValue(draftSelectedHospitalValue)
 		setPage(1)
 		void fetchAppointments(true, {
 			page: 1,
@@ -849,6 +852,7 @@ export default function AppointmentList() {
 		setDraftStatusFilter('all')
 		setDraftFromDateFilter('')
 		setDraftToDateFilter('')
+		setDraftSelectedHospitalValue('all')
 		setActiveDatePicker(null)
 		setModeFilter('all')
 		setDateFilter('all')
@@ -1153,6 +1157,24 @@ export default function AppointmentList() {
 								<AppTypography style={styles.filterGroupLabel}>Appointment Status</AppTypography>
 								{renderFilterChips(statusOptions, draftStatusFilter, setDraftStatusFilter)}
 							</View>
+
+							<View style={styles.filterGroup}>
+								<AppTypography style={styles.filterGroupLabel}>Hospital</AppTypography>
+								<AppSelect
+									options={hospitals}
+									value={draftSelectedHospitalValue}
+									onSelect={(value) => {
+										setDraftSelectedHospitalValue(value)
+									}}
+									placeholder={hospitalsLoading ? 'Loading hospitals...' : 'Select hospital'}
+									size="medium"
+									borderRadius={10}
+									customCardStyle={[styles.inlineFilterSelect, styles.mobileHospitalSelectCard]}
+									borderColor={BORDER}
+									maxDropdownHeight={240}
+									style={styles.inlineSelectFill}
+								/>
+							</View>
 						</ScrollView>
 
 						<View style={styles.filterSheetActions}>
@@ -1182,12 +1204,9 @@ export default function AppointmentList() {
 							{searchInput}
 						</View>
 					) : (
-						<View style={styles.filterGridMobile}>
-							{searchInput}
-							<View style={styles.mobileSearchRow}>
-								{hospitalSelect}
-								{mobileFilterButton}
-							</View>
+						<View style={styles.mobileSearchRow}>
+							<View style={{ flex: 1 }}>{searchInput}</View>
+							{mobileFilterButton}
 						</View>
 					)}
 				</View>

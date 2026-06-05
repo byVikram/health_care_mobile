@@ -81,7 +81,14 @@ export const getPharmacies = async () => {
 	return res.data
 }
 
-export const getPharmacyOrders = async (params?: { page?: number; limit?: number }) => {
+export const getPharmacyOrders = async (params?: {
+	page?: number
+	limit?: number
+	status?: string
+	search?: string
+	start_date?: string
+	end_date?: string
+}) => {
 	const res = await ApiService.get(API_ENDPOINTS.PHARMACY_ORDERS.LIST, { params })
 	return res.data
 }

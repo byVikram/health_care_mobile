@@ -20,6 +20,7 @@ import { getPharmacies } from '../profile/pharmacy/pharmacyService'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import ArrowIcon from '../../assets/Settings/arrow.svg'	
 import { useNavigation } from '@react-navigation/native'
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 
 const LIMIT = 12
 
@@ -176,23 +177,31 @@ const insets = useSafeAreaInsets()
 	return (
 		<View style={styles.safe}>
 			{/* Search Bar */}
-			<View style={styles.searchBar}>
-				<Text style={styles.searchIcon}>🔍</Text>
-				<TextInput
-					style={styles.searchInput}
-					placeholder="Search by pharmacy name, owner, city..."
-					placeholderTextColor="#9AA0AC"
-					value={searchQuery}
-					onChangeText={setSearchQuery}
-					returnKeyType="search"
-				/>
-				{searchQuery.length > 0 && (
-					<TouchableOpacity onPress={() => setSearchQuery('')}>
-						<Text style={styles.clearBtn}>✕</Text>
-					</TouchableOpacity>
-				)}
-				<TouchableOpacity onPress={() => setShowFilters(true)} style={styles.filterBtn}>
-					<Text style={styles.filterBtnText}>⚙</Text>
+			<View style={styles.searchRowMobile}>
+				<View style={styles.searchFieldContainer}>
+					<MaterialCommunityIcons name="magnify" size={20} color="#9aa0a6" style={styles.searchIcon} />
+					<TextInput
+						style={styles.searchInput}
+						placeholder="Search by pharmacy name, owner, city..."
+						placeholderTextColor="#9AA0AC"
+						value={searchQuery}
+						onChangeText={setSearchQuery}
+						returnKeyType="search"
+					/>
+					{searchQuery.length > 0 && (
+						<TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtnWrapper}>
+							<MaterialCommunityIcons name="close-circle" size={18} color="#9aa4af" />
+						</TouchableOpacity>
+					)}
+				</View>
+				<TouchableOpacity
+					onPress={() => setShowFilters(true)}
+					style={[
+						styles.filterIconButton,
+						hasActiveFilters && styles.filterIconButtonActive,
+					]}
+				>
+					<MaterialCommunityIcons name="tune" size={22} color="#1f5f68" />
 				</TouchableOpacity>
 			</View>
 
@@ -302,15 +311,22 @@ waveTwo: {
 		flex: 1,
 		backgroundColor: '#F5F7FA',
 	},
-	searchBar: {
+	searchRowMobile: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginHorizontal: 12,
+		marginTop: 12,
+		marginBottom: 8,
+		gap: 8,
+	},
+	searchFieldContainer: {
+		flex: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#fff',
-		margin: 12,
-		marginBottom: 8,
 		borderRadius: 12,
 		paddingHorizontal: 12,
-		paddingVertical: Platform.OS === 'ios' ? 10 : 4,
+		height: 48,
 		borderWidth: 1,
 		borderColor: '#EAECF0',
 		gap: 8,
@@ -320,16 +336,29 @@ waveTwo: {
 		shadowRadius: 4,
 		elevation: 1,
 	},
-	searchIcon: { fontSize: 16 },
-	searchInput: { flex: 1, fontSize: 14, color: '#101828' },
-	clearBtn: { fontSize: 16, color: '#9AA0AC', padding: 4 },
-	filterBtn: {
-		backgroundColor: '#E8F5F5',
-		borderRadius: 8,
-		paddingHorizontal: 10,
-		paddingVertical: 6,
+	searchIcon: { marginRight: 4 },
+	searchInput: { flex: 1, height: '100%', fontSize: 14, color: '#101828' },
+	clearBtnWrapper: { padding: 4 },
+	filterIconButton: {
+		width: 48,
+		height: 48,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#EAECF0',
+		backgroundColor: '#ffffff',
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: 0,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 1,
 	},
-	filterBtnText: { fontSize: 18, color: '#2B6F71' },
+	filterIconButtonActive: {
+		backgroundColor: '#eaf8f9',
+		borderColor: '#1f5f68',
+	},
 	listContent: { paddingHorizontal: 12, paddingBottom: 24 },
 	resultCount: {
 		fontSize: 15,

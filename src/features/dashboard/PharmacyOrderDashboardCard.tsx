@@ -6,7 +6,9 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { ROUTES } from '../../navigation/routes'
 
 import PendingIcon from '../../assets/Pharmacy/Pendingorders.svg'
 import OnTheWayIcon from '../../assets/Pharmacy/Ontheway.svg'
@@ -14,7 +16,13 @@ import DeliveredIcon from '../../assets/Pharmacy/Deliveredorders.svg'
 import CancelledIcon from '../../assets/Pharmacy/Cancelledorders.svg'
 import DocIcon from '../../assets/Pharmacy/docxs.svg'
 
-export default function OrdersScreen() {
+export default function PharmacyOrderDashboardCard() {
+  const navigation = useNavigation<any>()
+
+  const handleNavigate = (status: string) => {
+    navigation.navigate(ROUTES.STACK.ORDER_LIST, { status })
+  }
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
 
@@ -33,7 +41,10 @@ export default function OrdersScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.viewBtn}>
+        <TouchableOpacity 
+          style={styles.viewBtn}
+          onPress={() => handleNavigate('all')}
+        >
           <Text style={styles.viewText}>View</Text>
           <MaterialCommunityIcons name="arrow-right" size={18} color="#2bbec7" />
         </TouchableOpacity>
@@ -43,7 +54,10 @@ export default function OrdersScreen() {
       <View style={styles.grid}>
 
         {/* Pending */}
-        <View style={styles.card}>
+        <TouchableOpacity 
+          style={styles.card}
+          onPress={() => handleNavigate('pending')}
+        >
           <View style={styles.row}>
             <View style={styles.smallIcon}>
               <PendingIcon width={48} height={48} />
@@ -54,10 +68,13 @@ export default function OrdersScreen() {
               <Text style={styles.cardValue}>03 Orders</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* On the way */}
-        <View style={styles.card}>
+        <TouchableOpacity 
+          style={styles.card}
+          onPress={() => handleNavigate('packed')}
+        >
           <View style={styles.row}>
             <View style={styles.smallIcon}>
               <OnTheWayIcon width={48} height={48} />
@@ -68,10 +85,13 @@ export default function OrdersScreen() {
               <Text style={styles.cardValue}>08 Orders</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Delivered */}
-        <View style={styles.card}>
+        <TouchableOpacity 
+          style={styles.card}
+          onPress={() => handleNavigate('collected')}
+        >
           <View style={styles.row}>
             <View style={styles.smallIcon}>
               <DeliveredIcon width={48} height={48} />
@@ -82,10 +102,13 @@ export default function OrdersScreen() {
               <Text style={styles.cardValue}>120 Orders</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Cancelled */}
-        <View style={styles.card}>
+        <TouchableOpacity 
+          style={styles.card}
+          onPress={() => handleNavigate('rejected')}
+        >
           <View style={styles.row}>
             <View style={styles.smallIcon}>
               <CancelledIcon width={48} height={48} />
@@ -96,7 +119,7 @@ export default function OrdersScreen() {
               <Text style={styles.cardValue}>21 Orders</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
       </View>
 
@@ -114,7 +137,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     marginBottom: 16,
-    
   },
 
   mainCard: {
@@ -188,7 +210,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    
   },
 
   textBlock: {
@@ -204,7 +225,5 @@ const styles = StyleSheet.create({
 
   cardValue: {
     fontSize: 15,
-   
-    
   },
 })
