@@ -55,7 +55,7 @@ export type PatientPaymentParams = {
 export type AppStackParamList = {
   [ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
   [ROUTES.STACK.SEARCH]: undefined
-  [ROUTES.STACK.DOCTOR_SEARCH]: { query?: string } | undefined
+  [ROUTES.STACK.DOCTOR_SEARCH]: { query?: string; specialityId?: string } | undefined
   [ROUTES.STACK.DOCTOR_DETAIL]: { id: string }
   [ROUTES.STACK.FAVOURITE_DOCTOR]: undefined
   [ROUTES.STACK.NOTIFICATION]: undefined
@@ -69,9 +69,9 @@ export type AppStackParamList = {
   [ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
   [ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
   [ROUTES.STACK.CONSENT_FORM]: { paymentParams: PatientPaymentParams }
-  [ROUTES.STACK.PHARMACY_SEARCH]: undefined
+  [ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
   [ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
-  // ✅ Updated: now receives booking data
+  //  Updated: now receives booking data
   [ROUTES.STACK.PATIENT_PAYMENT]: {
     doctor: DoctorDetailData
     hospitalId: string
@@ -83,7 +83,7 @@ export type AppStackParamList = {
     appointmentMode: 'offline' | 'online'
     consultationTypeLabel: string
     fee: number
-  }
+  } | undefined
 }
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList

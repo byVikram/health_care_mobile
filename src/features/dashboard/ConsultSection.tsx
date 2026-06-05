@@ -121,7 +121,11 @@ export default function ConsultSection() {
 					mode="outlined"
 					style={styles.viewAllBtn}
 					labelStyle={{ fontSize: 12 }}
-					onPress={() => navigation.navigate(ROUTES.MAIN.SEARCH)}
+					onPress={() =>
+						navigation.navigate(ROUTES.MAIN.TABS, {
+							screen: ROUTES.MAIN.SEARCH,
+						})
+					}
 				>
 					View All
 				</Button>

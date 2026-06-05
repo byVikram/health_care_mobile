@@ -7,14 +7,16 @@ import {
 	ActivityIndicator,
 	useWindowDimensions,
 	DimensionValue,
+	Platform,
+	TextInput,
+	TouchableOpacity,
 } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
-import { useRoute } from '@react-navigation/native'
+import { useRoute, useNavigation } from '@react-navigation/native'
 import DoctorSearchCard from './components/DoctorSearchCard'
 import { AppTypography, AppSkeleton } from '../../../components/common'
 import { getDoctors } from '../doctorService'
 import { DoctorSearchItem } from '../../../types/doctor-search'
-import AppHeader from '../../../components/common/AppHeader'
 import { doctorCardStyles } from './components/DoctorCard.styles'
 import type { RouteProp } from '@react-navigation/native'
 import type { AppStackParamList } from '../../../navigation/types'
@@ -60,6 +62,7 @@ function DoctorCardSkeleton({ mobile = false }: { mobile?: boolean }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────
 export default function DoctorSearchPage() {
+	const navigation = useNavigation<any>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
 	const { width } = useWindowDimensions()
 
@@ -173,16 +176,31 @@ export default function DoctorSearchPage() {
 
 	return (
 		<View style={styles.container}>
-			{/* Editable header search bar */}
-			<AppHeader
-				variant="search"
-				location="KR Market"
-				onAvatarPress={() => {}}
-				isSearchEditable={true}
-				searchValue={searchQuery}
-				onSearchChange={setSearchQuery}
-				onSearchSubmit={handleSearchSubmit}
-			/>
+			{/* Search Bar - Pressable to open SearchPage */}
+			<TouchableOpacity
+				style={styles.searchBar}
+				onPress={() => navigation.navigate(ROUTES.STACK.SEARCH)}
+				activeOpacity={0.8}
+			>
+				<MaterialCommunityIcons name="magnify" size={20} color="#9aa0a6" style={styles.searchIcon} />
+				<View style={styles.searchInputContainer}>
+					<AppTypography style={searchQuery ? styles.searchQueryText : styles.searchPlaceholderText}>
+						{searchQuery || "Search Doctors/Symptoms"}
+					</AppTypography>
+				</View>
+				{searchQuery.length > 0 && (
+					<TouchableOpacity
+						onPress={(e) => {
+							e.stopPropagation()
+							setSearchQuery('')
+							void fetchDoctorsList(1, true)
+						}}
+						style={styles.clearButton}
+					>
+						<MaterialCommunityIcons name="close" size={20} color="#9aa0a6" />
+					</TouchableOpacity>
+				)}
+			</TouchableOpacity>
 
 			{/* Specialities chips temporarily hidden.
 			<View style={[styles.filterSection, isMobile && styles.filterSectionMobile]}>
@@ -314,5 +332,39 @@ const styles = StyleSheet.create({
 		paddingVertical: 16,
 		alignItems: 'center',
 		justifyContent: 'center',
+	},
+	searchBar: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+		margin: 12,
+		marginBottom: 8,
+		borderRadius: 12,
+		paddingHorizontal: 12,
+		paddingVertical: Platform.OS === 'ios' ? 10 : 4,
+		borderWidth: 1,
+		borderColor: '#EAECF0',
+		gap: 8,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 1,
+	},
+	searchIcon: { marginRight: 4 },
+	searchInputContainer: {
+		flex: 1,
+		justifyContent: 'center',
+	},
+	searchPlaceholderText: {
+		fontSize: 14,
+		color: '#9AA0AC',
+	},
+	searchQueryText: {
+		fontSize: 14,
+		color: '#101828',
+	},
+	clearButton: {
+		padding: 4,
 	},
 })

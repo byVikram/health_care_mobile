@@ -354,7 +354,7 @@ export default function BookingDetailsScreen() {
 
 	const closeSymptomsForm = () => {
 		setSymptomsOpen(false)
-		navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })
+		navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor?.id ?? '' })
 	}
 
 	const handleSubmitSymptoms = async () => {

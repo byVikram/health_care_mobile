@@ -103,10 +103,10 @@ export default function SidebarLayout({
 				id: 'pharmacy',
 				label: 'Pharmacy',
 				icon: <PharmacyIcon width={20} height={20} />,
-				onPress: () =>
-					navigation.navigate(ROUTES.MAIN.TABS, {
-						screen: ROUTES.MAIN.HOME,
-					}),
+				onPress: () => {
+					setIsSidebarOpen(false)
+					navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
+				},
 			},
 			{
 				id: 'lab',

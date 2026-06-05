@@ -6,7 +6,8 @@ import { Platform } from 'react-native'
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	const url = "http://192.168.29.250:8000"
 
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
@@ -43,7 +44,7 @@ export const API_ENDPOINTS = {
 		PERSONAL_DETAILS: `${BASE_URL}/api/doctors/personal-details`,
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
-		// ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
+		ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
 		DELETE_ACCOUNT: `${BASE_URL}/api/doctors/profile`,
 	},
 	SPECIALITIES: {
@@ -90,6 +91,16 @@ export const API_ENDPOINTS = {
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,
 		DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
+        ME_DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
+	},
+	PHARMACY_ORDERS: {
+		CREATE: `${BASE_URL}/api/pharmacy-orders`,
+		LIST: `${BASE_URL}/api/pharmacy-orders`,
+		LIST_BY_PHARMACY: `${BASE_URL}/api/pharmacies`, // New endpoint to get orders fr the logged-in pharmacy
+		GET_BY_ID: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}`,
+		UPDATE_STATUS: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/status`,
+		UPDATE_MEDICINES: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/medicines`,
+		SEND_REMINDER: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/remind`,
 	},
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {

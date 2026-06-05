@@ -89,7 +89,7 @@ const SettingPage = () => {
   return (
     <SafeAreaView style={styles.container}>
       
-      {/* 🔥 Gradient Header */}
+    
       <View style={[styles.headerWrapper, { paddingTop: insets.top + 16 }]}>
         <View style={styles.waveOne} />
         <View style={styles.waveTwo} />

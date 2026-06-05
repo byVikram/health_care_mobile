@@ -1,13 +1,14 @@
 import React from 'react'
 import {
-	View,
-	StyleSheet,
-	useWindowDimensions,
-	Image,
-	TouchableOpacity,
 	FlatList,
+	Image,
+	StyleSheet,
+	TouchableOpacity,
+	useWindowDimensions,
+	View,
 } from 'react-native'
-import { AppTypography } from '../../components/common';
+
+import { AppTypography } from '../../components/common'
 import DoctorsService from '../../assets/Services/doctors-service.png'
 import VideoConsultation from '../../assets/Services/doctor-video-consultation.png'
 import LabTests from '../../assets/Services/lab-service.png'
@@ -60,8 +61,8 @@ export default function ServicesSection() {
 		<View style={styles.container}>
 			<FlatList
 				data={services}
-				keyExtractor={(service) => String(service.id)}
 				horizontal
+				keyExtractor={(service) => String(service.id)}
 				showsHorizontalScrollIndicator={false}
 				contentContainerStyle={styles.listContent}
 				renderItem={({ item, index }) => (
@@ -75,19 +76,11 @@ export default function ServicesSection() {
 								marginRight: index === services.length - 1 ? 0 : 12,
 							},
 						]}
-						onPress={() => {
-							// navigation.navigate('DoctorSearch')
-						}}
 					>
 						<Image
 							source={item.image}
 							resizeMode="cover"
-							style={[
-								styles.image,
-								{
-									height: imageHeight,
-								},
-							]}
+							style={[styles.image, { height: imageHeight }]}
 						/>
 
 						<View style={styles.textWrap}>

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
 	RefreshControl,
 	ScrollView,
@@ -21,7 +21,7 @@ import LocationScreen from '../../components/common/LocationScreen'
 import { GPSLocationCard } from '../../components/common/GPSLocationCard'
 import BlogsSection from './BlogsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
-import { getAppointments, Appointment } from '../doctor/doctorService'
+import { getAppointments } from '../doctor/doctorService'
 
 import { formatDateForApi } from '../../utils/date'
 import { USER_ROLES } from '../../constants/constants'
@@ -41,7 +41,7 @@ export default function DashboardPage() {
 	const { role } = useAuth()
 	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
 
-	const [appointments, setAppointments] = useState<Appointment[]>([])
+	const [appointments, setAppointments] = useState<any[]>([])
 	const [apptLoading, setApptLoading] = useState(false)
 	const [apptError, setApptError] = useState('')
 	const [refreshing, setRefreshing] = useState(false)
@@ -118,7 +118,7 @@ export default function DashboardPage() {
 				})
 
 				if (res.success) {
-					setAppointments(Array.isArray(res.data) ? (res.data as Appointment[]) : [])
+					setAppointments(Array.isArray(res.data) ? res.data : [])
 				} else {
 					setApptError(res.message ?? 'Failed to load appointments')
 				}

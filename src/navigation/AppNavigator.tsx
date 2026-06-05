@@ -10,6 +10,7 @@ import { ROUTES } from './routes'
 import type { AppStackParamList } from './types'
 import AuthNavigator from './AuthNavigator'
 import MainTabNavigator from './MainTabNavigator'
+import { AppScreenHeader } from '../components/common'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
@@ -26,99 +27,100 @@ import SearchPage from '../features/doctor/search/SearchPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 import AppointmentList from '../features/appointment/AppointmentList'
 
-import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
+import PharmacySearchPage from '../features/pharmacy/Pharmacysearchpage'
+import OrderListPage from '../features/pharmacy/OrderListPage'
 import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
-  return (
-    <AppStack.Navigator
-      screenOptions={{ headerShown: false }}
-      initialRouteName={ROUTES.MAIN.TABS}
-    >
-      <AppStack.Screen
-        name={ROUTES.MAIN.TABS}
-        component={MainTabNavigator}
-        options={{ animation: 'none' }}
-      />
+	return (
+		<AppStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={ROUTES.MAIN.TABS}>
+			<AppStack.Screen name={ROUTES.MAIN.TABS} component={MainTabNavigator} options={{ animation: 'none' }} />
 
-      {/* General Search (for patients / doctors) */}
-      <AppStack.Screen name={ROUTES.STACK.SEARCH} component={SearchPage} />
+			<AppStack.Screen
+				name={ROUTES.STACK.SEARCH}
+				component={SearchPage}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="Find Doctors" />,
+				}}
+			/>
 
-      {/* ✅ Pharmacy Search (for pharmacy role) */}
-      <AppStack.Screen
-        name={ROUTES.STACK.PHARMACY_SEARCH}
-        component={PharmacySearchPage}
-      />
-      <AppStack.Screen name={ROUTES.STACK.ORDER_DETAILS} component={OrderDetailsScreen} />
-      <AppStack.Screen
-        name={ROUTES.STACK.DOCTOR_SEARCH}
-        component={DoctorSearchPage}
-      />
+			<AppStack.Screen
+				name={ROUTES.STACK.PHARMACY_SEARCH_PAGE}
+				component={PharmacySearchPage}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="Pharmacies" />,
+				}}
+			/>
+			<AppStack.Screen name={ROUTES.STACK.ORDER_LIST as keyof AppStackParamList} component={OrderListPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.DOCTOR_DETAIL}
-        component={DoctorDetailPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.ORDER_DETAILS} component={OrderDetailsScreen} />
+			<AppStack.Screen
+				name={ROUTES.STACK.DOCTOR_SEARCH}
+				component={DoctorSearchPage}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="Search Doctors" />,
+				}}
+			/>
 
-      <AppStack.Screen
-        name={ROUTES.STACK.FAVOURITE_DOCTOR}
-        component={MyDoctorPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.DOCTOR_DETAIL} component={DoctorDetailPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.NOTIFICATION}
-        component={NotificationPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.FAVOURITE_DOCTOR} component={MyDoctorPage} />
 
-      <AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
+			<AppStack.Screen name={ROUTES.STACK.NOTIFICATION} component={NotificationPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.HEALTH_PROFILE}
-        component={PatientProfileLayout}
-      />
+			<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.SETTINGS}
-        component={SettingPage}
-      />
+			<AppStack.Screen name={ROUTES.STACK.HEALTH_PROFILE} component={PatientProfileLayout} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.DOCTOR_WELCOME}
-        component={WelcomeDoctorPage}
-        options={{ animation: 'none' }}
-      />
+			<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
 
-      <AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
+			<AppStack.Screen
+				name={ROUTES.STACK.DOCTOR_WELCOME}
+				component={WelcomeDoctorPage}
+				options={{ animation: 'none' }}
+			/>
 
-			<AppStack.Screen name={ROUTES.STACK.APPOINTMENTS} component={AppointmentList} />
+			<AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
 
-      <AppStack.Screen
-        name={ROUTES.STACK.CONSENT_FORM}
-        component={ConsentForm}
-        options={{ presentation: 'transparentModal' }}
-      />
+			<AppStack.Screen
+				name={ROUTES.STACK.APPOINTMENTS}
+				component={AppointmentList}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="Appointments" />,
+				}}
+			/>
 
-      <AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
-    </AppStack.Navigator>
-  )
+			<AppStack.Screen
+				name={ROUTES.STACK.CONSENT_FORM}
+				component={ConsentForm}
+				options={{ presentation: 'transparentModal' }}
+			/>
+
+			<AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
+		</AppStack.Navigator>
+	)
 }
 
 export default function AppNavigator() {
-  const { accessToken, isLoading } = useAuth()
-  const theme = useTheme()
+	const { accessToken, isLoading } = useAuth()
+	const theme = useTheme()
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    )
-  }
+	if (isLoading) {
+		return (
+			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+				<ActivityIndicator size="large" color={theme.colors.primary} />
+			</View>
+		)
+	}
 
-  return (
-    <NavigationContainer ref={navigationRef}>
-      {!accessToken ? <AuthNavigator /> : <AuthenticatedNavigator />}
-    </NavigationContainer>
-  )
+	return (
+		<NavigationContainer ref={navigationRef}>
+			{!accessToken ? <AuthNavigator /> : <AuthenticatedNavigator />}
+		</NavigationContainer>
+	)
 }

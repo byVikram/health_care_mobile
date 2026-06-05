@@ -70,3 +70,40 @@ const pickUpdatedValues = (
 
 	return returned
 }
+
+// ── NEW: public pharmacy list (GET /api/pharmacies) ───────────────────────────
+export const getPharmacies = async () => {
+	// Mobile apiUrls uses PHARMACY.LIST (not PHARMACIES.LIST)
+	const url = API_ENDPOINTS.PHARMACY_ORDERS.LIST_BY_PHARMACY ?? API_ENDPOINTS.PHARMACY_ORDERS?.LIST_BY_PHARMACY
+	console.log('[getPharmacies] hitting URL:', url)
+	const res = await ApiService.get(url)
+	console.log('[getPharmacies] raw res.data:', JSON.stringify(res.data))
+	return res.data
+}
+
+export const getPharmacyOrders = async (params?: { page?: number; limit?: number }) => {
+	const res = await ApiService.get(API_ENDPOINTS.PHARMACY_ORDERS.LIST, { params })
+	return res.data
+}
+
+export const getPharmacyOrderById = async (id: string) => {
+	const res = await ApiService.get(API_ENDPOINTS.PHARMACY_ORDERS.GET_BY_ID(id))
+	return res.data
+}
+
+export const updatePharmacyOrderStatus = async (id: string, status: string) => {
+	const res = await ApiService.patch(API_ENDPOINTS.PHARMACY_ORDERS.UPDATE_STATUS(id), { status })
+	return res.data
+}
+
+export const updatePharmacyOrderMedicines = async (id: string, medicines: any[]) => {
+	const res = await ApiService.patch(API_ENDPOINTS.PHARMACY_ORDERS.UPDATE_MEDICINES(id), {
+		medicines,
+	})
+	return res.data
+}
+
+// export const sendPharmacyOrderReminder = async (id: string) => {
+// 	const res = await ApiService.post(API_ENDPOINTS.PHARMACY_ORDERS.SEND_REMINDER(id))
+// 	return res.data
+// }
