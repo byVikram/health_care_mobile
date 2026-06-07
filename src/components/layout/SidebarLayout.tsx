@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import { AppSidebar } from '../common'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import AppHeader from '../common/AppHeader'
 import type { AppSidebarItem, AppSidebarProfile } from '../common'
 import { useAuth } from '../../context/AuthContext'
@@ -104,6 +105,15 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				onPress: () => {
 					setIsSidebarOpen(false)
 					navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
+				},
+			},
+			{
+				id: 'medicine-orders',
+				label: 'Medicine Orders',
+				icon: <MaterialCommunityIcons name="pill" size={20} color="#1f5f68" />,
+				onPress: () => {
+					setIsSidebarOpen(false)
+					navigation.navigate(ROUTES.STACK.ORDER_LIST as any)
 				},
 			},
 			{

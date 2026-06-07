@@ -73,6 +73,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
 	[ROUTES.STACK.ORDER_LIST]: undefined
 	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
+	[ROUTES.STACK.PLACE_PHARMACY_ORDER]: { pharmacyId: string; pharmacyName: string }
 	//  Updated: now receives booking data
 	[ROUTES.STACK.PATIENT_PAYMENT]:
 		| {

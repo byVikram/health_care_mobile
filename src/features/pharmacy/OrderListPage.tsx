@@ -37,6 +37,7 @@ export interface PharmacyOrder {
 	status: string
 	created_at: string
 	bill_amount: number
+	delivery_type?: string
 	patient: {
 		id: string
 		name: string
@@ -228,43 +229,67 @@ const applyDateFilterParams = (
 
 const OrderCard = React.memo(function OrderCard({ order, onPress }: { order: OrderItem; onPress: () => void }) {
 	const statusStyle = STATUS_STYLES[order.status] ?? STATUS_STYLES.Pending
+	const isHomeDelivery = order.raw?.delivery_type === 'home_delivery'
 
 	return (
-		<Card style={styles.orderCard} onPress={onPress}>
-			<View style={styles.avatarBox}>
-				{order.avatar ? (
-					<Image source={{ uri: order.avatar }} style={styles.avatar} />
-				) : (
-					<MaterialCommunityIcons name="account" size={34} color="#ffffff" />
-				)}
-			</View>
+		<TouchableOpacity style={styles.orderCard} onPress={onPress} activeOpacity={0.85}>
+			<View style={styles.cardMainContent}>
+				{/* Top Row: Pharmacy/Clinic info & Status badge */}
+				<View style={styles.cardHeader}>
+					<View style={styles.pharmacyTitleContainer}>
+						<MaterialCommunityIcons name="storefront-outline" size={18} color="#1f5f68" style={styles.pharmacyIcon} />
+						<Text numberOfLines={1} style={styles.pharmacyName}>
+							{order.doctor}
+						</Text>
+					</View>
+					<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+						<Text style={[styles.statusText, { color: statusStyle.text }]}>{order.status}</Text>
+					</View>
+				</View>
 
-			<View style={styles.orderInfo}>
-				<View style={styles.nameRow}>
-					<Text numberOfLines={1} style={styles.patientName}>
-						{order.name}
+				{/* Patient Row */}
+				<View style={styles.detailRow}>
+					<MaterialCommunityIcons name="account-outline" size={15} color="#667085" style={styles.rowIcon} />
+					<Text style={styles.detailText} numberOfLines={1}>
+						Patient: <Text style={styles.boldText}>{order.name}</Text>
 					</Text>
 				</View>
 
-				<Text numberOfLines={1} style={styles.doctorText}>
-					By {order.doctor}
-					{order.clinic ? ` - ${order.clinic}` : ''}
-				</Text>
+				{/* Date & Time Row */}
+				<View style={styles.detailRow}>
+					<MaterialCommunityIcons name="calendar-clock-outline" size={15} color="#667085" style={styles.rowIcon} />
+					<Text style={styles.detailText} numberOfLines={1}>
+						{order.date} • {order.time}
+					</Text>
+				</View>
 
-				<View style={styles.metaRow}>
-					<MaterialCommunityIcons name="calendar-blank-outline" size={10} color="#8b969b" />
-					<Text style={styles.metaText}>{order.date}</Text>
-					<MaterialCommunityIcons name="clock-time-three-outline" size={10} color="#8b969b" />
-					<Text style={styles.metaText}>{order.time}</Text>
+				{/* Footer Row: Delivery Mode & Total Bill */}
+				<View style={styles.cardFooter}>
+					<View style={[styles.deliveryBadge, isHomeDelivery ? styles.badgeHome : styles.badgePickup]}>
+						<MaterialCommunityIcons
+							name={isHomeDelivery ? "truck-delivery-outline" : "store-outline"}
+							size={13}
+							color={isHomeDelivery ? "#0D47A1" : "#1B5E20"}
+						/>
+						<Text style={[styles.deliveryBadgeText, { color: isHomeDelivery ? "#0D47A1" : "#1B5E20" }]}>
+							{isHomeDelivery ? 'Home Delivery' : 'Store Pickup'}
+						</Text>
+					</View>
+
+					<View style={styles.priceContainer}>
+						<Text style={styles.priceLabel}>Total Bill</Text>
+						<Text style={styles.priceTag}>
+							{order.billAmount > 0 ? `₹${order.billAmount.toFixed(2)}` : 'Pending'}
+						</Text>
+					</View>
 				</View>
 			</View>
 
-			<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-				<Text style={[styles.statusText, { color: statusStyle.text }]}>{order.status}</Text>
+			{/* Subtle right chevron */}
+			<View style={styles.chevronContainer}>
+				<MaterialCommunityIcons name="chevron-right" size={20} color="#98A2B3" />
 			</View>
-
-			<MaterialCommunityIcons name="chevron-right" size={24} color="#2E7C86" />
-		</Card>
+		</TouchableOpacity>
 	)
 })
 
@@ -812,72 +837,116 @@ const styles = StyleSheet.create({
 	},
 	// Order card
 	orderCard: {
-		paddingHorizontal: 12,
-		paddingVertical: 12,
+		backgroundColor: '#ffffff',
+		borderRadius: 16,
 		flexDirection: 'row',
-		alignItems: 'center',
+		alignItems: 'stretch',
+		borderWidth: 1,
+		borderColor: '#F2F4F7',
+		shadowColor: '#101828',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.03,
+		shadowRadius: 10,
+		elevation: 2,
+		marginBottom: 14,
 	},
-	avatarBox: {
-		width: 50,
-		height: 50,
-		borderRadius: 8,
-		backgroundColor: '#dfe4e6',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginRight: 12,
-		overflow: 'hidden',
-	},
-	avatar: {
-		width: '100%',
-		height: '100%',
-	},
-	orderInfo: {
+	cardMainContent: {
 		flex: 1,
-		minWidth: 0,
+		paddingVertical: 14,
+		paddingLeft: 16,
+		paddingRight: 4,
 	},
-	nameRow: {
-		flexDirection: 'row',
-		alignItems: 'baseline',
-		marginBottom: 2,
-	},
-	patientName: {
-		color: '#22292c',
-		fontSize: 14,
-		fontWeight: '700',
-		maxWidth: 100,
-	},
-	orderId: {
-		color: '#2E7C86',
-		fontSize: 9,
-		fontWeight: '600',
-		marginLeft: 4,
-	},
-	doctorText: {
-		color: '#68777d',
-		fontSize: 8,
-		marginBottom: 4,
-	},
-	metaRow: {
+	cardHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 4,
+		justifyContent: 'space-between',
+		marginBottom: 12,
 	},
-	metaText: {
-		color: '#8b969b',
-		fontSize: 8,
+	pharmacyTitleContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+		marginRight: 8,
+	},
+	pharmacyIcon: {
 		marginRight: 6,
 	},
+	pharmacyName: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#1D2939',
+	},
 	statusBadge: {
-		width: 70,
-		height: 26,
-		borderRadius: 4,
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginLeft: 8,
 	},
 	statusText: {
 		fontSize: 10,
+		fontWeight: '700',
+	},
+	detailRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 8,
+	},
+	rowIcon: {
+		marginRight: 8,
+	},
+	detailText: {
+		fontSize: 13,
+		color: '#475467',
+	},
+	boldText: {
 		fontWeight: '600',
+		color: '#344054',
+	},
+	cardFooter: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginTop: 8,
+		paddingTop: 10,
+		borderTopWidth: 1,
+		borderTopColor: '#F2F4F7',
+	},
+	deliveryBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 6,
+		gap: 4,
+	},
+	badgeHome: {
+		backgroundColor: '#E3F2FD',
+	},
+	badgePickup: {
+		backgroundColor: '#E8F5E9',
+	},
+	deliveryBadgeText: {
+		fontSize: 11,
+		fontWeight: '600',
+	},
+	priceContainer: {
+		alignItems: 'flex-end',
+	},
+	priceLabel: {
+		fontSize: 10,
+		color: '#667085',
+		marginBottom: 1,
+	},
+	priceTag: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#101828',
+	},
+	chevronContainer: {
+		width: 32,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	// Empty state
 	emptyState: {

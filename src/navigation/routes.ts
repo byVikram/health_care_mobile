@@ -36,5 +36,6 @@ export const ROUTES = {
 		ORDER_LIST: 'OrderListPage',
 		
 		ORDER_DETAILS: 'OrderDetails',
+		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
 	},
 } as const

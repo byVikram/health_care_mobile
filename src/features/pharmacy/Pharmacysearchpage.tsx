@@ -20,6 +20,7 @@ import { getPharmacies } from '../profile/pharmacy/pharmacyService'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import ArrowIcon from '../../assets/Settings/arrow.svg'	
 import { useNavigation } from '@react-navigation/native'
+import { ROUTES } from '../../navigation/routes'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 
 const LIMIT = 12
@@ -229,7 +230,10 @@ const insets = useSafeAreaInsets()
 								/* navigate to detail */
 							}}
 							onPlaceOrder={() => {
-								/* navigate to order */
+								(navigation as any).navigate(ROUTES.STACK.PLACE_PHARMACY_ORDER, {
+									pharmacyId: item.id,
+									pharmacyName: item.name,
+								})
 							}}
 						/>
 					)}

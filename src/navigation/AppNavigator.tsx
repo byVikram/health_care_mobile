@@ -29,6 +29,7 @@ import AppointmentList from '../features/appointment/AppointmentList'
 import PharmacySearchPage from '../features/pharmacy/Pharmacysearchpage'
 import OrderListPage from '../features/pharmacy/OrderListPage'
 import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
+import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -69,6 +70,14 @@ function AuthenticatedNavigator() {
 			/>
 
 			<AppStack.Screen name={ROUTES.STACK.ORDER_DETAILS} component={OrderDetailsScreen} />
+			<AppStack.Screen
+				name={ROUTES.STACK.PLACE_PHARMACY_ORDER}
+				component={PlacePharmacyOrderPage}
+				options={{
+					headerShown: true,
+					title: 'Order Medicines',
+				}}
+			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.DOCTOR_SEARCH}
 				component={DoctorSearchPage}
