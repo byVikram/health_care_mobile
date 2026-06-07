@@ -19,8 +19,6 @@ import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAuth } from '../../context/AuthContext'
-import ApiService from '../../services/apiService'
-import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import {
@@ -31,30 +29,15 @@ import {
 	StatusModal,
 } from '../../components/common'
 import { createPharmacyOrder } from '../profile/pharmacy/pharmacyService'
+import {
+	PatientAddress,
+	TreatmentRecord,
+	getPatientTreatmentHistory,
+	getPatientAddresses,
+	createPatientAddress,
+} from './pharmacyService'
 
 type RouteProps = RouteProp<AppStackParamList, typeof ROUTES.STACK.PLACE_PHARMACY_ORDER>
-
-export interface PatientAddress {
-	id: string
-	label: string
-	address_line: string
-	city: string
-	state: string
-	pincode: string
-	is_default: boolean
-}
-
-export interface TreatmentRecord {
-	id: string
-	appointment_id: number
-	vitals?: Record<string, any> | null
-	notes?: string | null
-	prescription_s3_key?: string | null
-	follow_up_date?: string | null
-	created_at: string
-	doctor_name?: string
-	hospital_name?: string
-}
 
 const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || process.env.REACT_APP_S3_BASE_URL || 'https://healthcare-s3-bucket.s3.amazonaws.com'
 
@@ -117,9 +100,7 @@ export default function PlacePharmacyOrderPage() {
 			}
 			try {
 				setLoadingReports(true)
-				// Fetch using endpoint added to API_ENDPOINTS
-				const res = await ApiService.get<{ success: boolean; data: TreatmentRecord[] }>(API_ENDPOINTS.PATIENT.TREATMENT_HISTORY(user.id))
-				const data = res.data?.data ?? []
+				const data = await getPatientTreatmentHistory(user.id)
 				setTreatments(data)
 				if (data.length > 0) {
 					setSelectedTreatmentId(data[0].id)
@@ -138,8 +119,7 @@ export default function PlacePharmacyOrderPage() {
 	const loadAddresses = useCallback(async () => {
 		try {
 			setLoadingAddresses(true)
-			const res = await ApiService.get<{ success: boolean; data: PatientAddress[] }>(API_ENDPOINTS.PATIENT.ADDRESSES)
-			const list = res.data?.data ?? []
+			const list = await getPatientAddresses()
 			setAddresses(list)
 			const def = list.find(a => a.is_default)
 			if (def) {
@@ -167,7 +147,7 @@ export default function PlacePharmacyOrderPage() {
 		}
 		setSavingAddress(true)
 		try {
-			await ApiService.post(API_ENDPOINTS.PATIENT.ADDRESSES, {
+			await createPatientAddress({
 				label: newLabel,
 				address_line: newLine,
 				city: newCity,
@@ -261,7 +241,7 @@ export default function PlacePharmacyOrderPage() {
 	return (
 		<View style={styles.safe}>
 			<ScrollView
-				contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 20, 40) }]}
+				contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 100, 120) }]}
 				showsVerticalScrollIndicator={false}
 			>
 				{/* Pharmacy Banner Card */}
@@ -467,7 +447,7 @@ export default function PlacePharmacyOrderPage() {
 							</View>
 						</View>
 					) : (
-						<View style={styles.deliveryDetailsPanel}>
+						<View style={[styles.deliveryDetailsPanel, { flexDirection: 'column', alignItems: 'stretch' }]}>
 							<View style={styles.addressSectionHeader}>
 								<AppTypography variant="subtitle" style={styles.panelTitle}>
 									Select Delivery Address
@@ -547,7 +527,10 @@ export default function PlacePharmacyOrderPage() {
 					/>
 				</View>
 
-				{/* Place Order CTA */}
+			</ScrollView>
+
+			{/* Fixed Bottom Action Button */}
+			<View style={[styles.bottomActionContainer, { paddingBottom: Math.max(insets.bottom + 12, 16) }]}>
 				<AppButton
 					variant="primary"
 					onPress={handlePlaceOrder}
@@ -557,7 +540,7 @@ export default function PlacePharmacyOrderPage() {
 				>
 					Confirm & Book Order
 				</AppButton>
-			</ScrollView>
+			</View>
 
 			{/* Inline Add Address Modal */}
 			<Modal visible={showAddressModal} transparent animationType="slide" onRequestClose={() => setShowAddressModal(false)}>
@@ -978,7 +961,6 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 	},
 	addressSectionHeader: {
-		flex: 1,
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
@@ -1053,8 +1035,22 @@ const styles = StyleSheet.create({
 	},
 	submitBtn: {
 		width: '100%',
-		marginTop: 8,
-		marginBottom: 16,
+	},
+	bottomActionContainer: {
+		position: 'absolute',
+		bottom: 0,
+		left: 0,
+		right: 0,
+		backgroundColor: '#ffffff',
+		borderTopWidth: 1,
+		borderTopColor: '#EAECF0',
+		paddingHorizontal: 16,
+		paddingTop: 12,
+		shadowColor: '#101828',
+		shadowOffset: { width: 0, height: -4 },
+		shadowOpacity: 0.05,
+		shadowRadius: 8,
+		elevation: 8,
 	},
 	modalOverlay: {
 		flex: 1,
