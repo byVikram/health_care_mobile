@@ -1,15 +1,8 @@
 import React from 'react'
-import {
-	FlatList,
-	Image,
-	StyleSheet,
-	TouchableOpacity,
-	useWindowDimensions,
-	View,
-} from 'react-native'
+import { FlatList, Image, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 
-import { AppTypography } from '../../components/common'
+import { AppTypography } from '../../../components/common'
 
 interface Props {
 	variant?: 'row' | 'column'
@@ -23,36 +16,32 @@ const eventList = [
 		title: 'Annual Health & Wellness Expo',
 		date: '10 Aug 2024',
 		location: 'City Park, Health Center',
-		image:
-			'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=500&h=320&fit=crop',
+		image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=500&h=320&fit=crop',
 	},
 	{
 		id: 2,
 		title: 'Community Blood Donation Drive',
 		date: '05 Sep 2024',
 		location: 'Central Hospital, Main Hall',
-		image:
-			'https://images.unsplash.com/photo-1615461066841-6116e61058f4?w=500&h=320&fit=crop',
+		image: 'https://images.unsplash.com/photo-1615461066841-6116e61058f4?w=500&h=320&fit=crop',
 	},
 	{
 		id: 3,
 		title: 'Free Diabetes Screening Camp',
 		date: '20 Jun 2024',
 		location: 'City Community Hall',
-		image:
-			'https://images.unsplash.com/photo-1579154204601-01588f351e67?w=500&h=320&fit=crop',
+		image: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?w=500&h=320&fit=crop',
 	},
 	{
 		id: 4,
 		title: 'Online Yoga & Wellness Workshop',
 		date: '25 Jul 2024',
 		location: 'Virtual Event',
-		image:
-			'https://images.unsplash.com/photo-1524901548305-08eeddc35080?w=500&h=320&fit=crop',
+		image: 'https://images.unsplash.com/photo-1524901548305-08eeddc35080?w=500&h=320&fit=crop',
 	},
 ]
 
-export default function UpcomingEventsSection({ variant = 'row' }: Props) {
+function UpcomingEventsSection({ variant = 'row' }: Props) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
 	const cardWidth = isTablet ? 260 : Math.min(206, width * 0.58)
@@ -63,10 +52,7 @@ export default function UpcomingEventsSection({ variant = 'row' }: Props) {
 			<View style={styles.headerRow}>
 				<AppTypography
 					variant="subtitle"
-					style={[
-						styles.sectionTitle,
-						variant === 'column' && styles.sectionTitleLeft,
-					]}
+					style={[styles.sectionTitle, variant === 'column' && styles.sectionTitleLeft]}
 				>
 					Upcoming Events
 				</AppTypography>
@@ -123,11 +109,7 @@ export default function UpcomingEventsSection({ variant = 'row' }: Props) {
 								</AppTypography>
 							</View>
 
-							<TouchableOpacity
-								activeOpacity={0.82}
-								style={styles.registerButton}
-								onPress={() => {}}
-							>
+							<TouchableOpacity activeOpacity={0.82} style={styles.registerButton} onPress={() => {}}>
 								<AppTypography variant="caption" color="#fff" style={styles.registerLabel}>
 									Register Now
 								</AppTypography>
@@ -139,6 +121,8 @@ export default function UpcomingEventsSection({ variant = 'row' }: Props) {
 		</View>
 	)
 }
+
+export default React.memo(UpcomingEventsSection)
 
 const styles = StyleSheet.create({
 	container: {

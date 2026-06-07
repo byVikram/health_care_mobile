@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
 	RefreshControl,
 	ScrollView,
@@ -7,22 +7,23 @@ import {
 	Text,
 	View,
 	useWindowDimensions,
+	Animated,
 } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
-import HeroSection from './HeroSection'
-import SpecialitySection from './SpecialitySection'
-import ConsultSection from './ConsultSection'
-import PatientQuestionsSection from './PatientQuestionsSection'
-import PharmacyOrderDashboardCard from './PharmacyOrderDashboardCard'
+import HeroSection from './components/HeroSection'
+import SpecialitySection from './components/SpecialitySection'
+import ConsultSection from './components/ConsultSection'
+import PatientQuestionsSection from './components/PatientQuestionsSection'
+import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
 import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
-import CommunitySection from './CommunitySection'
+import CommunitySection from './components/CommunitySection'
 import LocationScreen from '../../components/common/LocationScreen'
 import { GPSLocationCard } from '../../components/common/GPSLocationCard'
-import BlogsSection from './BlogsSection'
-import ArticleSection from './ArticleSection'
-import UpcomingEventsSection from './EventSection'
-import PodcastsSection from './PodcastsSection'
+import BlogsSection from './components/BlogsSection'
+import ArticleSection from './components/ArticleSection'
+import UpcomingEventsSection from './components/EventSection'
+import PodcastsSection from './components/PodcastsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
 import { getAppointments } from '../doctor/doctorService'
 
@@ -30,6 +31,8 @@ import { formatDateForApi } from '../../utils/date'
 import { USER_ROLES } from '../../constants/constants'
 import { useAuth } from '../../context/AuthContext'
 import StatusModal from '../../components/common/StatusModal'
+import { useScroll } from '../../context/ScrollContext'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import TreatmentHistoryIcon from '../../assets/icons/treatmenthistory.svg'
 import TreatmentHistoryArrowIcon from '../../assets/icons/treatmenthistory-icon.svg'
@@ -38,10 +41,21 @@ import type { AppNavigationParamList } from '../../navigation/types'
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
+	const scrollData = useScroll()
 	const isTablet = width >= 768
 	const isLandscape = width > 1024
 
+	const scrollY = React.useRef(new Animated.Value(0)).current
+
+	React.useEffect(() => {
+		scrollData?.registerScrollY(scrollY)
+		return () => scrollData?.unregisterScrollY(scrollY)
+	}, [scrollData, scrollY])
+
+	const insets = useSafeAreaInsets()
 	const { role } = useAuth()
+	const isDoctor = role === USER_ROLES.DOCTOR
+	const headerHeight = isDoctor ? insets.top + 84 : insets.top + 146
 	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
 
 	const [appointments, setAppointments] = useState<any[]>([])
@@ -82,9 +96,7 @@ export default function DashboardPage() {
 				setApptLoading(true)
 				setApptError('')
 
-				const dateStr = formatDateForApi(
-					weekDays[selectedDate]?.dateObj ?? new Date()
-				)
+				const dateStr = formatDateForApi(weekDays[selectedDate]?.dateObj ?? new Date())
 
 				const res = await getAppointments({
 					appointment_date: dateStr,
@@ -112,9 +124,7 @@ export default function DashboardPage() {
 			if (role === USER_ROLES.DOCTOR) {
 				setApptError('')
 
-				const dateStr = formatDateForApi(
-					weekDays[selectedDate]?.dateObj ?? new Date()
-				)
+				const dateStr = formatDateForApi(weekDays[selectedDate]?.dateObj ?? new Date())
 
 				const res = await getAppointments({
 					appointment_date: dateStr,
@@ -160,9 +170,7 @@ export default function DashboardPage() {
 			<TouchableOpacity style={styles.treatmentHistoryCard}>
 				<View style={styles.treatmentHistoryLeft}>
 					<TreatmentHistoryIcon width={52} height={52} />
-					<Text style={styles.treatmentHistoryTitle}>
-						Treatment History
-					</Text>
+					<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
 				</View>
 				<TreatmentHistoryArrowIcon width={26} height={26} />
 			</TouchableOpacity>
@@ -170,9 +178,9 @@ export default function DashboardPage() {
 			<PatientUpcomingAppointments
 				refreshToken={refreshToken}
 				onRefreshComplete={() => setRefreshing(false)}
-				onJoin={(appointment) =>
-					navigation.navigate(ROUTES.STACK.VIDEO_CONSULTATION, {
-						appointmentId: appointment.id,
+				onJoin={() =>
+					navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
+						mode: 'video',
 					})
 				}
 			/>
@@ -219,24 +227,12 @@ export default function DashboardPage() {
 			return (
 				<View style={styles.tabletRow}>
 					{/* HERO */}
-					<View
-						style={[
-							styles.heroColumn,
-							isLandscape && styles.heroColumnHalf,
-						]}
-					>
+					<View style={[styles.heroColumn, isLandscape && styles.heroColumnHalf]}>
 						<HeroSection role={role} />
 					</View>
 
 					{/* ROLE PANEL */}
-					<View
-						style={[
-							styles.column,
-							isLandscape && styles.rightColumnHalf,
-						]}
-					>
-						{renderRoleBasedPanel()}
-					</View>
+					<View style={[styles.column, isLandscape && styles.rightColumnHalf]}>{renderRoleBasedPanel()}</View>
 				</View>
 			)
 		}
@@ -251,10 +247,14 @@ export default function DashboardPage() {
 
 	return (
 		<>
-			<ScrollView
+			<Animated.ScrollView
 				style={styles.container}
-				contentContainerStyle={styles.content}
+				contentContainerStyle={[styles.content, { paddingTop: headerHeight }]}
 				showsVerticalScrollIndicator={false}
+				scrollEventThrottle={16}
+				onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+					useNativeDriver: true,
+				})}
 				refreshControl={
 					<RefreshControl
 						refreshing={refreshing}
@@ -281,21 +281,13 @@ export default function DashboardPage() {
 
 				{/* PatientQuestionsSection is NOT rendered for Pharmacy */}
 				{role !== USER_ROLES.PHARMACY && <PatientQuestionsSection />}
-			</ScrollView>
+			</Animated.ScrollView>
 
 			<StatusModal
 				visible={modalType !== null}
 				status={modalType === 'success' ? 'success' : 'error'}
-				title={
-					modalType === 'success'
-						? 'Success'
-						: 'Booking Failed'
-				}
-				description={
-					modalType === 'success'
-						? 'Updated successfully'
-						: 'Something went wrong'
-				}
+				title={modalType === 'success' ? 'Success' : 'Booking Failed'}
+				description={modalType === 'success' ? 'Updated successfully' : 'Something went wrong'}
 				submitText={modalType === 'success' ? 'Go Home' : 'Try Again'}
 				onSubmit={() => setModalType(null)}
 			/>

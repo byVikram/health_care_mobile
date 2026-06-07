@@ -135,7 +135,14 @@ export default function MainTabNavigator() {
 				/>
 			) : null}
 			<Tab.Screen name={ROUTES.MAIN.PORTAL} component={PortalPage} />
-			<Tab.Screen name={ROUTES.MAIN.PROFILE} component={ProfilePage} />
+			<Tab.Screen
+				name={ROUTES.MAIN.PROFILE}
+				component={ProfilePage}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="My Profile" onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} />,
+				}}
+			/>
 		</Tab.Navigator>
 	)
 }

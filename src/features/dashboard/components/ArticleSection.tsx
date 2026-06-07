@@ -1,17 +1,10 @@
 import React from 'react'
-import {
-	FlatList,
-	Image,
-	StyleSheet,
-	TouchableOpacity,
-	useWindowDimensions,
-	View,
-} from 'react-native'
+import { FlatList, Image, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native'
 
-import { AppTypography } from '../../components/common'
+import { AppTypography } from '../../../components/common'
 
 const TEAL = '#0c7c7c'
-const AUTHOR_IMAGE = require('../../assets/Banner/doctor.png')
+const AUTHOR_IMAGE = require('../../../assets/Banner/doctor.png')
 
 const articles = [
 	{
@@ -19,36 +12,32 @@ const articles = [
 		category: 'VITAMINS & SUPPLEMENTS',
 		title: 'Eating Right to Build Immunity Against Cold and Viral Infections',
 		author: 'Dr. Diana Borgio',
-		image:
-			'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=500&h=320&fit=crop',
+		image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=500&h=320&fit=crop',
 	},
 	{
 		id: 2,
 		category: 'CORONAVIRUS',
 		title: '12 Coronavirus Myths and Facts That You Should Be Aware Of',
 		author: 'Dr. Diana Borgio',
-		image:
-			'https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?w=500&h=320&fit=crop',
+		image: 'https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?w=500&h=320&fit=crop',
 	},
 	{
 		id: 3,
 		category: 'FITNESS & WELLNESS',
 		title: 'Simple Daily Habits for a Healthier and Happier You',
 		author: 'Dr. Diana Borgio',
-		image:
-			'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=500&h=320&fit=crop',
+		image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=500&h=320&fit=crop',
 	},
 	{
 		id: 4,
 		category: 'MENTAL HEALTH',
 		title: 'Managing Stress and Anxiety in Daily Life',
 		author: 'Dr. Diana Borgio',
-		image:
-			'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=500&h=320&fit=crop',
+		image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=500&h=320&fit=crop',
 	},
 ]
 
-export default function ArticleSection() {
+function ArticleSection() {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
 	const cardWidth = isTablet ? 260 : Math.min(228, width * 0.64)
@@ -117,6 +106,8 @@ export default function ArticleSection() {
 		</View>
 	)
 }
+
+export default React.memo(ArticleSection)
 
 const styles = StyleSheet.create({
 	container: {

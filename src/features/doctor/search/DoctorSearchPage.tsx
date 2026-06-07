@@ -91,6 +91,7 @@ export default function DoctorSearchPage() {
 
 	// Initial route params
 	const initialQuery = route.params?.query || ''
+	const initialMode = route.params?.mode || 'all'
 
 	const [searchQuery, setSearchQuery] = useState(initialQuery)
 	const [doctors, setDoctors] = useState<DoctorSearchItem[]>([])
@@ -103,14 +104,14 @@ export default function DoctorSearchPage() {
 
 	// Filter states
 	const [specialityFilter, setSpecialityFilter] = useState('all')
-	const [consultationTypeFilter, setConsultationTypeFilter] = useState('all')
+	const [consultationTypeFilter, setConsultationTypeFilter] = useState<string>(initialMode)
 	const [minRatingFilter, setMinRatingFilter] = useState('all')
 	const [specialities, setSpecialities] = useState<AppSelectOption[]>([{ label: 'All Specialities', value: 'all' }])
 	const [specialitiesLoading, setSpecialitiesLoading] = useState(false)
 
 	// Modal draft states
 	const [draftSpecialityFilter, setDraftSpecialityFilter] = useState('all')
-	const [draftConsultationType, setDraftConsultationType] = useState('all')
+	const [draftConsultationType, setDraftConsultationType] = useState<string>(initialMode)
 	const [draftMinRating, setDraftMinRating] = useState('all')
 
 	const [showFilters, setShowFilters] = useState(false)
@@ -222,7 +223,17 @@ export default function DoctorSearchPage() {
 		if (isFetchingPageRef.current || loading || refreshing || loadingMore || !hasMore) return
 		console.log('🔥 Loading next page:', page + 1)
 		fetchDoctorsList(page + 1, false, true)
-	}, [hasMore, loading, loadingMore, page, refreshing, searchQuery, specialityFilter, consultationTypeFilter, minRatingFilter])
+	}, [
+		hasMore,
+		loading,
+		loadingMore,
+		page,
+		refreshing,
+		searchQuery,
+		specialityFilter,
+		consultationTypeFilter,
+		minRatingFilter,
+	])
 
 	// Modal handlers
 	const openFilterModal = () => {
@@ -280,20 +291,19 @@ export default function DoctorSearchPage() {
 	}
 
 	// Render item for FlatList
-	const renderItem = useCallback(({ item }: { item: DoctorSearchItem }) => {
-		const itemWidth: DimensionValue = `${100 / numColumns}%`
-		return (
-			<View style={[styles.cardListItem, isMobile && styles.cardListItemMobile, { width: itemWidth }]}>
-				<DoctorSearchCard doctor={item} mobile={isMobile} />
-			</View>
-		)
-	}, [isMobile, numColumns])
+	const renderItem = useCallback(
+		({ item }: { item: DoctorSearchItem }) => {
+			const itemWidth: DimensionValue = `${100 / numColumns}%`
+			return (
+				<View style={[styles.cardListItem, isMobile && styles.cardListItemMobile, { width: itemWidth }]}>
+					<DoctorSearchCard doctor={item} mobile={isMobile} />
+				</View>
+			)
+		},
+		[isMobile, numColumns]
+	)
 
-	const renderFilterChips = (
-		options: AppSelectOption[],
-		value: string,
-		onChange: (nextValue: string) => void
-	) => (
+	const renderFilterChips = (options: AppSelectOption[], value: string, onChange: (nextValue: string) => void) => (
 		<ScrollView
 			horizontal
 			showsHorizontalScrollIndicator={false}
@@ -322,8 +332,7 @@ export default function DoctorSearchPage() {
 
 	// Skeleton placeholder list when loading
 	const listData = loading && !refreshing ? Array(6).fill({}) : doctors
-	const keyExtractor = (item: any, index: number) =>
-		item.id ? String(item.id) : `skeleton-${index}`
+	const keyExtractor = (item: any, index: number) => (item.id ? String(item.id) : `skeleton-${index}`)
 
 	const renderFooter = () =>
 		loadingMore ? (
@@ -343,12 +352,7 @@ export default function DoctorSearchPage() {
 		})
 
 		return (
-			<Modal
-				visible={showFilters}
-				transparent
-				animationType="none"
-				onRequestClose={closeFilterModal}
-			>
+			<Modal visible={showFilters} transparent animationType="none" onRequestClose={closeFilterModal}>
 				<View style={styles.filterModalRoot}>
 					<Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
 						<BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
@@ -401,7 +405,11 @@ export default function DoctorSearchPage() {
 
 							<View style={styles.filterGroup}>
 								<AppTypography style={styles.filterGroupLabel}>Consultation Mode</AppTypography>
-								{renderFilterChips(CONSULTATION_OPTIONS, draftConsultationType, setDraftConsultationType)}
+								{renderFilterChips(
+									CONSULTATION_OPTIONS,
+									draftConsultationType,
+									setDraftConsultationType
+								)}
 							</View>
 
 							<View style={styles.filterGroup}>
@@ -438,7 +446,7 @@ export default function DoctorSearchPage() {
 					<MaterialCommunityIcons name="magnify" size={20} color="#9aa0a6" style={styles.searchIcon} />
 					<View style={styles.searchInputContainer}>
 						<AppTypography style={searchQuery ? styles.searchQueryText : styles.searchPlaceholderText}>
-							{searchQuery || "Search Doctors/Symptoms"}
+							{searchQuery || 'Search Doctors/Symptoms'}
 						</AppTypography>
 					</View>
 					{searchQuery.length > 0 && (
@@ -456,10 +464,7 @@ export default function DoctorSearchPage() {
 				</TouchableOpacity>
 				<TouchableOpacity
 					onPress={openFilterModal}
-					style={[
-						styles.filterIconButton,
-						hasActiveFilters && styles.filterIconButtonActive,
-					]}
+					style={[styles.filterIconButton, hasActiveFilters && styles.filterIconButtonActive]}
 				>
 					<MaterialCommunityIcons name="tune" size={22} color="#1f5f68" />
 				</TouchableOpacity>
@@ -483,9 +488,7 @@ export default function DoctorSearchPage() {
 					keyExtractor={keyExtractor}
 					numColumns={numColumns}
 					columnWrapperStyle={
-						numColumns > 1
-							? { paddingHorizontal: 12, justifyContent: 'space-between' }
-							: undefined
+						numColumns > 1 ? { paddingHorizontal: 12, justifyContent: 'space-between' } : undefined
 					}
 					renderItem={({ item }) =>
 						loading && !refreshing && !item.id ? (

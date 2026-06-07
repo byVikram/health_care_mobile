@@ -2,11 +2,11 @@ import React from 'react'
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
 import { Card } from 'react-native-paper'
 
-import { AppTypography } from '../../components/common'
+import { AppTypography } from '../../../components/common'
 
-import Blog1 from '../../assets/blog-and-community/blog-1.svg'
-import Blog2 from '../../assets/blog-and-community/blog-2.svg'
-import Community1 from '../../assets/blog-and-community/community-1.svg'
+import Blog1 from '../../../assets/blog-and-community/blog-1.svg'
+import Blog2 from '../../../assets/blog-and-community/blog-2.svg'
+import Community1 from '../../../assets/blog-and-community/community-1.svg'
 
 const TEAL = '#0c7c7c'
 
@@ -30,8 +30,7 @@ const blogs = [
 		id: 1,
 		ImageComponent: Blog1,
 		title: 'The Future of Digital Health: What to Expect!',
-		description:
-			'Explore how technology is transforming healthcare and patient experiences.',
+		description: 'Explore how technology is transforming healthcare and patient experiences.',
 		author: 'Dr. Emily White',
 		date: '15 May 2024',
 	},
@@ -39,8 +38,7 @@ const blogs = [
 		id: 2,
 		ImageComponent: Blog2,
 		title: 'Understanding Telemedicine: Your Guide to Virtual Care',
-		description:
-			'A comprehensive guide to telemedicine services and virtual consultations.',
+		description: 'A comprehensive guide to telemedicine services and virtual consultations.',
 		author: 'Dr. Emily White',
 		date: '15 May 2024',
 	},
@@ -50,7 +48,7 @@ const CARD_WIDTH = 206
 const IMAGE_HEIGHT = 88
 const COMMUNITY_AVATAR_SIZE = 44
 
-export default function CommunityBlogsSection() {
+function CommunityBlogsSection() {
 	return (
 		<View style={styles.container}>
 			<View style={styles.headerRow}>
@@ -59,11 +57,7 @@ export default function CommunityBlogsSection() {
 				</AppTypography>
 
 				<TouchableOpacity activeOpacity={0.8}>
-					<AppTypography
-						variant="caption"
-						color={TEAL}
-						style={styles.viewAllText}
-					>
+					<AppTypography variant="caption" color={TEAL} style={styles.viewAllText}>
 						View All
 					</AppTypography>
 				</TouchableOpacity>
@@ -80,72 +74,43 @@ export default function CommunityBlogsSection() {
 							{community.name}
 						</AppTypography>
 
-						<AppTypography
-							variant="caption"
-							style={styles.locationText}
-						>
+						<AppTypography variant="caption" style={styles.locationText}>
 							{community.location}
 						</AppTypography>
 					</View>
 
 					<TouchableOpacity style={styles.viewButton}>
-						<AppTypography
-							variant="caption"
-							color={TEAL}
-							style={styles.viewButtonText}
-						>
+						<AppTypography variant="caption" color={TEAL} style={styles.viewButtonText}>
 							View
 						</AppTypography>
 					</TouchableOpacity>
 				</View>
 			))}
 
-			<ScrollView
-				horizontal
-				showsHorizontalScrollIndicator={false}
-				contentContainerStyle={styles.blogScroll}
-			>
+			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.blogScroll}>
 				{blogs.map((blog) => (
 					<Card key={blog.id} style={styles.blogCard}>
 						<View style={styles.blogImageContainer}>
 							<View style={StyleSheet.absoluteFillObject}>
-								<blog.ImageComponent
-									width="100%"
-									height="100%"
-									preserveAspectRatio="xMidYMid slice"
-								/>
+								<blog.ImageComponent width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
 							</View>
 						</View>
 
 						<View style={styles.blogContent}>
-							<AppTypography
-								variant="body"
-								numberOfLines={2}
-								style={styles.blogTitle}
-							>
+							<AppTypography variant="body" numberOfLines={2} style={styles.blogTitle}>
 								{blog.title}
 							</AppTypography>
 
-							<AppTypography
-								variant="caption"
-								numberOfLines={2}
-								style={styles.blogDesc}
-							>
+							<AppTypography variant="caption" numberOfLines={2} style={styles.blogDesc}>
 								{blog.description}
 							</AppTypography>
 
 							<View style={styles.blogFooter}>
-								<AppTypography
-									variant="caption"
-									style={styles.footerText}
-								>
+								<AppTypography variant="caption" style={styles.footerText}>
 									{blog.author}
 								</AppTypography>
 
-								<AppTypography
-									variant="caption"
-									style={styles.footerText}
-								>
+								<AppTypography variant="caption" style={styles.footerText}>
 									{blog.date}
 								</AppTypography>
 							</View>
@@ -156,6 +121,8 @@ export default function CommunityBlogsSection() {
 		</View>
 	)
 }
+
+export default React.memo(CommunityBlogsSection)
 
 const styles = StyleSheet.create({
 	container: {

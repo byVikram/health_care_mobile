@@ -1,14 +1,7 @@
 import React from 'react'
-import {
-	View,
-	StyleSheet,
-	Image,
-	TouchableOpacity,
-	FlatList,
-	useWindowDimensions,
-} from 'react-native'
+import { View, StyleSheet, Image, TouchableOpacity, FlatList, useWindowDimensions } from 'react-native'
 
-import { AppTypography } from '../../components/common'
+import { AppTypography } from '../../../components/common'
 
 const TEAL = '#0c7c7c'
 
@@ -17,26 +10,23 @@ const podcasts = [
 		id: '1',
 		type: 'Podcast',
 		title: 'Healthy Habits for a Busy Life',
-		image:
-			'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=400&h=300&fit=crop&crop=center',
+		image: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=400&h=300&fit=crop&crop=center',
 	},
 	{
 		id: '2',
 		type: 'Videocast',
 		title: 'Expert Panel on Chronic Disease Management',
-		image:
-			'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=400&h=300&fit=crop&crop=center',
+		image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=400&h=300&fit=crop&crop=center',
 	},
 	{
 		id: '3',
 		type: 'Podcast',
 		title: 'Mindfulness for Stress Reduction',
-		image:
-			'https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=400&h=300&fit=crop&crop=center',
+		image: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=400&h=300&fit=crop&crop=center',
 	},
 ]
 
-export default function PodcastsSection() {
+function PodcastsSection() {
 	const { width } = useWindowDimensions()
 
 	const isTablet = width >= 768
@@ -51,11 +41,7 @@ export default function PodcastsSection() {
 				</AppTypography>
 
 				<TouchableOpacity activeOpacity={0.75}>
-					<AppTypography
-						variant="caption"
-						color={TEAL}
-						style={styles.viewAllText}
-					>
+					<AppTypography variant="caption" color={TEAL} style={styles.viewAllText}>
 						View All
 					</AppTypography>
 				</TouchableOpacity>
@@ -73,8 +59,7 @@ export default function PodcastsSection() {
 							styles.card,
 							{
 								width: cardWidth,
-								marginRight:
-									index === podcasts.length - 1 ? 0 : 12,
+								marginRight: index === podcasts.length - 1 ? 0 : 12,
 							},
 						]}
 					>
@@ -86,31 +71,21 @@ export default function PodcastsSection() {
 
 						<View style={styles.cardBody}>
 							<View style={styles.typeBadge}>
-								<AppTypography
-									variant="caption"
-									style={styles.typeText}
-								>
+								<AppTypography variant="caption" style={styles.typeText}>
 									{item.type}
 								</AppTypography>
 							</View>
 
 							<AppTypography
 								variant="body"
-								style={[
-									styles.title,
-									isTablet && styles.titleTablet,
-								]}
+								style={[styles.title, isTablet && styles.titleTablet]}
 								numberOfLines={2}
 							>
 								{item.title}
 							</AppTypography>
 
 							<TouchableOpacity activeOpacity={0.8}>
-								<AppTypography
-									variant="caption"
-									color={TEAL}
-									style={styles.actionText}
-								>
+								<AppTypography variant="caption" color={TEAL} style={styles.actionText}>
 									Watch / Listen
 								</AppTypography>
 							</TouchableOpacity>
@@ -121,6 +96,8 @@ export default function PodcastsSection() {
 		</View>
 	)
 }
+
+export default React.memo(PodcastsSection)
 
 const styles = StyleSheet.create({
 	container: {
@@ -212,5 +189,4 @@ const styles = StyleSheet.create({
 		lineHeight: 14,
 		fontWeight: '700',
 	},
-
 })

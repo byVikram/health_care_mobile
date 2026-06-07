@@ -12,8 +12,8 @@ import {
 	ActivityIndicator,
 	Alert,
 } from 'react-native'
-import { USER_ROLES } from '../../constants/constants'
-import { useAuth } from '../../context/AuthContext'
+import { USER_ROLES } from '../../../constants/constants'
+import { useAuth } from '../../../context/AuthContext'
 
 export type PatientQuestion = {
 	id: string
@@ -85,17 +85,10 @@ const TEAL = '#2E8B8B'
 const CARD_BORDER = '#D0D5D8'
 const FOOTER_BG = '#DCE5E6'
 
-export default function PatientQuestionsSection({
-	questions = MOCK_QUESTIONS,
-	loading = false,
-	onSubmitAnswer,
-}: Props) {
+function PatientQuestionsSection({ questions = MOCK_QUESTIONS, loading = false, onSubmitAnswer }: Props) {
 	const { role } = useAuth()
 	const isDoctor = role === USER_ROLES.DOCTOR
-	const sectionTitle =
-		role === USER_ROLES.PATIENT
-			? 'Free Expert Q&A'
-			: "Take time to answer patients' questions"
+	const sectionTitle = role === USER_ROLES.PATIENT ? 'Free Expert Q&A' : "Take time to answer patients' questions"
 
 	const [answers, setAnswers] = useState<Record<string, string>>({})
 	const [submitting, setSubmitting] = useState<Record<string, boolean>>({})
@@ -212,6 +205,8 @@ export default function PatientQuestionsSection({
 		</View>
 	)
 }
+
+export default React.memo(PatientQuestionsSection)
 
 const styles = StyleSheet.create({
 	wrapper: {

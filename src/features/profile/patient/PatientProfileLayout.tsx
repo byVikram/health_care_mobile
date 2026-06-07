@@ -11,11 +11,15 @@ import {
 	Alert,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 
 import { AppTypography } from '../../../components/common'
-import { getPatientDetails, updatePatientProfile, mapApiToLocalState, INITIAL_PATIENT_STATE } from './PatientProfileService'
+import {
+	getPatientDetails,
+	updatePatientProfile,
+	mapApiToLocalState,
+	INITIAL_PATIENT_STATE,
+} from './PatientProfileService'
 import type { PatientProfileState } from './PatientProfileService'
 
 import PersonalTab from './tabs/PersonalTab'
@@ -23,7 +27,6 @@ import MedicalTab from './tabs/MedicalTab'
 import LifestyleTab from './tabs/LifestyleTab'
 import AddressTab from './tabs/AddressTab'
 import SessionsTab from '../SessionsTab'
-
 
 type Tab = 'Personal' | 'Medical' | 'Lifestyle' | 'Address' | 'Sessions'
 
@@ -36,7 +39,6 @@ const TABS: { tab: Tab }[] = [
 ]
 
 export default function PatientProfileLayout() {
-	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
 	const { width } = useWindowDimensions()
 
@@ -150,17 +152,7 @@ export default function PatientProfileLayout() {
 	}
 
 	return (
-		<View style={[styles.container, { paddingTop: insets.top + 16 }]}>
-			{/* Header */}
-			<View style={styles.header}>
-				<TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.8}>
-					<MaterialCommunityIcons name="chevron-left" size={28} color="#0c7c7c" />
-					<AppTypography variant="h3" style={styles.headerTitle}>
-						Your health profile
-					</AppTypography>
-				</TouchableOpacity>
-			</View>
-
+		<View style={styles.container}>
 			{/* Tabs */}
 			<View style={styles.tabContainer}>
 				<ScrollView

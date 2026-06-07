@@ -1,15 +1,15 @@
 import React from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, Image } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
-import { ROUTES } from '../../navigation/routes'
-import type { MainTabParamList } from '../../navigation/types'
+import { ROUTES } from '../../../navigation/routes'
+import type { MainTabParamList } from '../../../navigation/types'
 
-import pregnancyImage from '../../assets/specialties/pregnancy.svg'
-import acneImage from '../../assets/specialties/acne.svg'
-import performanceImage from '../../assets/specialties/performance.svg'
-import coughImage from '../../assets/specialties/cough.svg'
-import childImage from '../../assets/specialties/child.svg'
-import depressionImage from '../../assets/specialties/depression.svg'
+import pregnancyImage from '../../../assets/specialties/pregnancy.svg'
+import acneImage from '../../../assets/specialties/acne.svg'
+import performanceImage from '../../../assets/specialties/performance.svg'
+import coughImage from '../../../assets/specialties/cough.svg'
+import childImage from '../../../assets/specialties/child.svg'
+import depressionImage from '../../../assets/specialties/depression.svg'
 import { Button } from 'react-native-paper'
 
 const TEAL = '#0c7c7c'
@@ -23,7 +23,7 @@ const specialities = [
 	{ id: 6, title: 'Depression or\nanxiety', icon: depressionImage },
 ]
 
-export default function SpecialitySection() {
+function SpecialitySection() {
 	const navigation = useNavigation<NavigationProp<MainTabParamList>>()
 	const { width } = useWindowDimensions()
 
@@ -107,6 +107,8 @@ export default function SpecialitySection() {
 		</View>
 	)
 }
+
+export default React.memo(SpecialitySection)
 
 const styles = StyleSheet.create({
 	container: {

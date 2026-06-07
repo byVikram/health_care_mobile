@@ -1,45 +1,29 @@
-import React from "react";
-import {
-	View,
-	StyleSheet,
-	ScrollView,
-	Image,
-	TouchableOpacity,
-	useWindowDimensions,
-} from "react-native";
-import { Text, Button, useTheme } from "react-native-paper";
-import { useNavigation } from "@react-navigation/native";
-import { ROUTES } from "../../navigation/routes";
-import type { AppStackParamList } from "../../navigation/types";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import React from 'react'
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity, useWindowDimensions } from 'react-native'
+import { Text, Button, useTheme } from 'react-native-paper'
+import { useNavigation } from '@react-navigation/native'
+import { ROUTES } from '../../../navigation/routes'
+import type { AppStackParamList } from '../../../navigation/types'
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
-type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
+type NavigationProp = NativeStackNavigationProp<AppStackParamList>
 
 // ─────────────────────────────────────────────
 // Card Component
 // ─────────────────────────────────────────────
 interface ConsultCardProps {
-	image: any;
-	title: string;
-	description: string;
-	onConsult?: () => void;
+	image: any
+	title: string
+	description: string
+	onConsult?: () => void
 }
 
-function ConsultCard({
-	image,
-	title,
-	description,
-	onConsult,
-}: ConsultCardProps) {
+function ConsultCard({ image, title, description, onConsult }: ConsultCardProps) {
 	return (
-		<TouchableOpacity
-			style={styles.cardContainer}
-			onPress={onConsult}
-			activeOpacity={0.8}
-		>
+		<TouchableOpacity style={styles.cardContainer} onPress={onConsult} activeOpacity={0.8}>
 			<Image source={image} style={styles.cardImage} resizeMode="cover" />
 
 			<View style={styles.cardBody}>
@@ -52,7 +36,7 @@ function ConsultCard({
 				</Text>
 			</View>
 		</TouchableOpacity>
-	);
+	)
 }
 
 // ─────────────────────────────────────────────
@@ -61,60 +45,50 @@ function ConsultCard({
 const consults = [
 	{
 		id: 1,
-		title: "Dentist",
-		description: "Teething troubles? Schedule a dental checkup",
-		image: require("../../assets/specialties/dentist.png"),
+		title: 'Dentist',
+		description: 'Teething troubles? Schedule a dental checkup',
+		image: require('../../../assets/specialties/dentist.png'),
 	},
 	{
 		id: 2,
-		title: "Gynecologist",
-		description:
-			"Explore for women's health, pregnancy & infertility treatments",
-		image: require("../../assets/specialties/gynocologist.png"),
+		title: 'Gynecologist',
+		description: "Explore for women's health, pregnancy & infertility treatments",
+		image: require('../../../assets/specialties/gynocologist.png'),
 	},
 	{
 		id: 3,
-		title: "Dietitian/Nutrition",
-		description:
-			"Get guidance on eating right, weight management & sports nutrition",
-		image: require("../../assets/specialties/nutrition.png"),
+		title: 'Dietitian/Nutrition',
+		description: 'Get guidance on eating right, weight management & sports nutrition',
+		image: require('../../../assets/specialties/nutrition.png'),
 	},
 	{
 		id: 4,
-		title: "Physiotherapist",
-		description:
-			"Pulled a muscle? Get it treated by a trained physiotherapist",
-		image: require("../../assets/specialties/physiotherapist.png"),
+		title: 'Physiotherapist',
+		description: 'Pulled a muscle? Get it treated by a trained physiotherapist',
+		image: require('../../../assets/specialties/physiotherapist.png'),
 	},
-];
+]
 
 // ─────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────
-export default function ConsultSection() {
-	const theme = useTheme();
-	const { width } = useWindowDimensions();
-	const navigation = useNavigation<NavigationProp>();
+function ConsultSection() {
+	const theme = useTheme()
+	const { width } = useWindowDimensions()
+	const navigation = useNavigation<NavigationProp>()
 
-	const isTablet = width >= 768;
+	const isTablet = width >= 768
 
 	return (
 		<View style={styles.sectionContainer}>
 			{/* HEADER */}
 			<View style={styles.headerRow}>
-				<View
-					style={[
-						styles.titleBorder,
-						{ borderLeftColor: theme.colors.primary },
-					]}
-				>
+				<View style={[styles.titleBorder, { borderLeftColor: theme.colors.primary }]}>
 					<Text variant="titleMedium" style={styles.mainTitle}>
 						Book an appointment
 					</Text>
 
-					<Text variant="bodySmall">
-						Find experienced doctors across all specialties
-					</Text>
+					<Text variant="bodySmall">Find experienced doctors across all specialties</Text>
 				</View>
 
 				<Button
@@ -132,11 +106,7 @@ export default function ConsultSection() {
 			</View>
 
 			{/* CARDS */}
-			<ScrollView
-				horizontal
-				showsHorizontalScrollIndicator={false}
-				contentContainerStyle={styles.scrollContent}
-			>
+			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 				{consults.map((s) => (
 					<ConsultCard
 						key={s.id}
@@ -152,8 +122,10 @@ export default function ConsultSection() {
 				))}
 			</ScrollView>
 		</View>
-	);
+	)
 }
+
+export default React.memo(ConsultSection)
 
 // ─────────────────────────────────────────────
 // Styles
@@ -164,9 +136,9 @@ const styles = StyleSheet.create({
 	},
 
 	headerRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
 		paddingHorizontal: 16,
 		marginBottom: 16,
 	},
@@ -179,7 +151,7 @@ const styles = StyleSheet.create({
 	},
 
 	mainTitle: {
-		fontWeight: "bold",
+		fontWeight: 'bold',
 		marginBottom: 2,
 	},
 
@@ -195,16 +167,16 @@ const styles = StyleSheet.create({
 		width: 160,
 		marginHorizontal: 8,
 		marginBottom: 16,
-		backgroundColor: "#fff",
+		backgroundColor: '#fff',
 		borderRadius: 16,
-		overflow: "hidden",
+		overflow: 'hidden',
 		elevation: 2,
 	},
 
 	cardImage: {
-		width: "100%",
+		width: '100%',
 		height: 120,
-		backgroundColor: "#f0f4f8",
+		backgroundColor: '#f0f4f8',
 	},
 
 	cardBody: {
@@ -212,12 +184,12 @@ const styles = StyleSheet.create({
 	},
 
 	cardTitle: {
-		fontWeight: "bold",
+		fontWeight: 'bold',
 		marginBottom: 4,
 	},
 
 	cardDesc: {
-		color: "#666",
+		color: '#666',
 		fontSize: 12,
 	},
-});
+})
