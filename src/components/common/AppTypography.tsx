@@ -1,10 +1,10 @@
 import React from 'react'
-import { TextStyle, StyleSheet, useWindowDimensions } from 'react-native'
+import { StyleProp, TextStyle, useWindowDimensions } from 'react-native'
 import { Text as PaperText, useTheme } from 'react-native-paper'
 
 export type AppTypographyProps = Omit<React.ComponentProps<typeof PaperText>, 'variant'> & {
 	variant?: 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'subtitle' | 'caption'
-	style?: TextStyle | TextStyle[]
+	style?: StyleProp<TextStyle>
 	color?: string
 	align?: 'auto' | 'left' | 'right' | 'center' | 'justify'
 }
