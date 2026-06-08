@@ -4,6 +4,7 @@ import {
 	Modal,
 	PanResponder,
 	Pressable,
+	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
 	useWindowDimensions,
@@ -111,12 +112,13 @@ export function AppBottomSheet({
 							transform: [{ translateY: sheetTranslateY }],
 						},
 					]}
+					{...panResponder.panHandlers}
 				>
 					<Pressable onPress={(event) => event.stopPropagation()}>
 						<View style={styles.sheetHandleHitArea} {...panResponder.panHandlers}>
 							<View style={styles.sheetHandle} />
 						</View>
-						<View style={styles.sheetHeader} {...panResponder.panHandlers}>
+						<View style={styles.sheetHeader}>
 							<AppTypography variant="h4" style={styles.sheetTitle}>
 								{title}
 							</AppTypography>
@@ -124,7 +126,10 @@ export function AppBottomSheet({
 								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
 							</TouchableOpacity>
 						</View>
-						<View style={styles.sheetContent}>{children}</View>
+						<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
+							{children}
+						</ScrollView>
+						{/* <View style={styles.sheetContent}>{children}</View> */}
 					</Pressable>
 				</Animated.View>
 			</Pressable>

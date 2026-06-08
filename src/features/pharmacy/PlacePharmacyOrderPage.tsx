@@ -9,7 +9,6 @@ import {
 	ScrollView,
 	StyleSheet,
 	Text,
-	TextInput,
 	TouchableOpacity,
 	View,
 } from 'react-native'
@@ -23,6 +22,7 @@ import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import {
 	AppButton,
+	AppBottomSheet,
 	AppInput,
 	AppSelect,
 	AppTypography,
@@ -542,102 +542,79 @@ export default function PlacePharmacyOrderPage() {
 				</AppButton>
 			</View>
 
-			{/* Inline Add Address Modal */}
-			<Modal visible={showAddressModal} transparent animationType="slide" onRequestClose={() => setShowAddressModal(false)}>
-				<View style={styles.modalOverlay}>
-					<TouchableOpacity
-						style={styles.modalBackdrop}
-						onPress={() => {
-							if (!savingAddress) setShowAddressModal(false)
-						}}
-					/>
-					<KeyboardAvoidingView
-						style={styles.sheetKeyboard}
-						behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+			{/* Inline Add Address Bottom Sheet */}
+			<AppBottomSheet
+				visible={showAddressModal}
+				title="Add New Delivery Address"
+				onClose={() => {
+					if (!savingAddress) setShowAddressModal(false)
+				}}
+			>
+				<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+					<ScrollView
+						contentContainerStyle={styles.sheetBody}
+						keyboardShouldPersistTaps="handled"
+						showsVerticalScrollIndicator={false}
 					>
-						<View style={styles.sheet}>
-							<View style={styles.sheetHandle} />
-							<View style={styles.sheetHeader}>
-								<AppTypography variant="h3" style={styles.sheetTitle}>
-									Add New Delivery Address
-								</AppTypography>
-								<TouchableOpacity
-									onPress={() => {
-										if (!savingAddress) setShowAddressModal(false)
-									}}
-									disabled={savingAddress}
-									style={styles.sheetCloseBtn}
-								>
-									<MaterialCommunityIcons name="close" size={22} color="#667085" />
-								</TouchableOpacity>
+						<AppInput
+							label="Address Label (e.g. Home, Work)"
+							placeholder="Enter address label"
+							value={newLabel}
+							onChangeText={setNewLabel}
+							fieldSize="form"
+						/>
+
+						<AppInput
+							label="Street / Address Line"
+							placeholder="Enter street name, building number"
+							value={newLine}
+							onChangeText={setNewLine}
+							fieldSize="form"
+						/>
+
+						<AppInput
+							label="City"
+							placeholder="Enter city"
+							value={newCity}
+							onChangeText={setNewCity}
+							fieldSize="form"
+						/>
+
+						<View style={styles.rowFields}>
+							<View style={{ flex: 1, marginRight: 8 }}>
+								<AppInput
+									label="State"
+									placeholder="State"
+									value={newState}
+									onChangeText={setNewState}
+									fieldSize="form"
+								/>
 							</View>
-
-							<ScrollView
-								contentContainerStyle={styles.sheetBody}
-								keyboardShouldPersistTaps="handled"
-								showsVerticalScrollIndicator={false}
-							>
+							<View style={{ flex: 1 }}>
 								<AppInput
-									label="Address Label (e.g. Home, Work)"
-									placeholder="Enter address label"
-									value={newLabel}
-									onChangeText={setNewLabel}
+									label="Pincode"
+									placeholder="Pincode"
+									value={newPincode}
+									onChangeText={(v) => setNewPincode(v.replace(/\D/g, ''))}
+									keyboardType="numeric"
+									maxLength={6}
 									fieldSize="form"
 								/>
-
-								<AppInput
-									label="Street / Address Line"
-									placeholder="Enter street name, building number"
-									value={newLine}
-									onChangeText={setNewLine}
-									fieldSize="form"
-								/>
-
-								<AppInput
-									label="City"
-									placeholder="Enter city"
-									value={newCity}
-									onChangeText={setNewCity}
-									fieldSize="form"
-								/>
-
-								<View style={styles.rowFields}>
-									<View style={{ flex: 1, marginRight: 8 }}>
-										<AppInput
-											label="State"
-											placeholder="State"
-											value={newState}
-											onChangeText={setNewState}
-											fieldSize="form"
-										/>
-									</View>
-									<View style={{ flex: 1 }}>
-										<AppInput
-											label="Pincode"
-											placeholder="Pincode"
-											value={newPincode}
-											onChangeText={(v) => setNewPincode(v.replace(/\D/g, ''))}
-											keyboardType="numeric"
-											maxLength={6}
-											fieldSize="form"
-										/>
-									</View>
-								</View>
-
-								<AppButton
-									variant="primary"
-									onPress={handleAddAddress}
-									loading={savingAddress}
-									disabled={savingAddress}
-									style={styles.saveAddressBtn}
-								>
-									Save Address
-								</AppButton>
-							</ScrollView>
+							</View>
 						</View>
-					</KeyboardAvoidingView>
-				</View>
-			</Modal>
+
+						<AppButton
+							variant="primary"
+							onPress={handleAddAddress}
+							loading={savingAddress}
+							disabled={savingAddress}
+							style={styles.saveAddressBtn}
+						>
+							Save Address
+						</AppButton>
+					</ScrollView>
+				</KeyboardAvoidingView>
+			</AppBottomSheet>
 
 			{/* Image Viewer Lightbox Modal */}
 			<Modal
@@ -1051,51 +1028,6 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.05,
 		shadowRadius: 8,
 		elevation: 8,
-	},
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.4)',
-		justifyContent: 'flex-end',
-	},
-	modalBackdrop: {
-		...StyleSheet.absoluteFillObject,
-	},
-	sheetKeyboard: {
-		justifyContent: 'flex-end',
-		width: '100%',
-	},
-	sheet: {
-		backgroundColor: '#fff',
-		borderTopLeftRadius: 20,
-		borderTopRightRadius: 20,
-		maxHeight: '85%',
-		overflow: 'hidden',
-	},
-	sheetHandle: {
-		width: 40,
-		height: 4,
-		backgroundColor: '#E0E0E0',
-		borderRadius: 2,
-		alignSelf: 'center',
-		marginTop: 8,
-		marginBottom: 4,
-	},
-	sheetHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#F2F4F7',
-	},
-	sheetTitle: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#101828',
-	},
-	sheetCloseBtn: {
-		padding: 4,
 	},
 	sheetBody: {
 		paddingHorizontal: 16,

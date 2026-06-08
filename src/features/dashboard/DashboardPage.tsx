@@ -249,7 +249,13 @@ export default function DashboardPage() {
 		<>
 			<Animated.ScrollView
 				style={styles.container}
-				contentContainerStyle={[styles.content, { paddingTop: headerHeight }]}
+				contentContainerStyle={[
+					styles.content,
+					{
+						paddingTop: headerHeight,
+						paddingBottom: Math.max(insets.bottom + 96, 120),
+					},
+				]}
 				showsVerticalScrollIndicator={false}
 				scrollEventThrottle={16}
 				onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
@@ -306,7 +312,6 @@ const styles = StyleSheet.create({
 		maxWidth: 1200,
 		alignSelf: 'center',
 		width: '100%',
-		paddingBottom: 24,
 	},
 
 	tabletRow: {
