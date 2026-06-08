@@ -27,6 +27,7 @@ import {
 	AppSelect,
 	AppTypography,
 	StatusModal,
+	AppModal,
 } from '../../components/common'
 import { createPharmacyOrder } from '../profile/pharmacy/pharmacyService'
 import {
@@ -543,101 +544,76 @@ export default function PlacePharmacyOrderPage() {
 			</View>
 
 			{/* Inline Add Address Modal */}
-			<Modal visible={showAddressModal} transparent animationType="slide" onRequestClose={() => setShowAddressModal(false)}>
-				<View style={styles.modalOverlay}>
-					<TouchableOpacity
-						style={styles.modalBackdrop}
-						onPress={() => {
-							if (!savingAddress) setShowAddressModal(false)
-						}}
+			<AppModal
+				visible={showAddressModal}
+				onDismiss={() => {
+					if (!savingAddress) setShowAddressModal(false)
+				}}
+				title="Add New Delivery Address"
+				dismissable={!savingAddress}
+			>
+				<ScrollView
+					keyboardShouldPersistTaps="handled"
+					showsVerticalScrollIndicator={false}
+				>
+					<AppInput
+						label="Address Label (e.g. Home, Work)"
+						placeholder="Enter address label"
+						value={newLabel}
+						onChangeText={setNewLabel}
+						fieldSize="form"
 					/>
-					<KeyboardAvoidingView
-						style={styles.sheetKeyboard}
-						behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-					>
-						<View style={styles.sheet}>
-							<View style={styles.sheetHandle} />
-							<View style={styles.sheetHeader}>
-								<AppTypography variant="h3" style={styles.sheetTitle}>
-									Add New Delivery Address
-								</AppTypography>
-								<TouchableOpacity
-									onPress={() => {
-										if (!savingAddress) setShowAddressModal(false)
-									}}
-									disabled={savingAddress}
-									style={styles.sheetCloseBtn}
-								>
-									<MaterialCommunityIcons name="close" size={22} color="#667085" />
-								</TouchableOpacity>
-							</View>
 
-							<ScrollView
-								contentContainerStyle={styles.sheetBody}
-								keyboardShouldPersistTaps="handled"
-								showsVerticalScrollIndicator={false}
-							>
-								<AppInput
-									label="Address Label (e.g. Home, Work)"
-									placeholder="Enter address label"
-									value={newLabel}
-									onChangeText={setNewLabel}
-									fieldSize="form"
-								/>
+					<AppInput
+						label="Street / Address Line"
+						placeholder="Enter street name, building number"
+						value={newLine}
+						onChangeText={setNewLine}
+						fieldSize="form"
+					/>
 
-								<AppInput
-									label="Street / Address Line"
-									placeholder="Enter street name, building number"
-									value={newLine}
-									onChangeText={setNewLine}
-									fieldSize="form"
-								/>
+					<AppInput
+						label="City"
+						placeholder="Enter city"
+						value={newCity}
+						onChangeText={setNewCity}
+						fieldSize="form"
+					/>
 
-								<AppInput
-									label="City"
-									placeholder="Enter city"
-									value={newCity}
-									onChangeText={setNewCity}
-									fieldSize="form"
-								/>
-
-								<View style={styles.rowFields}>
-									<View style={{ flex: 1, marginRight: 8 }}>
-										<AppInput
-											label="State"
-											placeholder="State"
-											value={newState}
-											onChangeText={setNewState}
-											fieldSize="form"
-										/>
-									</View>
-									<View style={{ flex: 1 }}>
-										<AppInput
-											label="Pincode"
-											placeholder="Pincode"
-											value={newPincode}
-											onChangeText={(v) => setNewPincode(v.replace(/\D/g, ''))}
-											keyboardType="numeric"
-											maxLength={6}
-											fieldSize="form"
-										/>
-									</View>
-								</View>
-
-								<AppButton
-									variant="primary"
-									onPress={handleAddAddress}
-									loading={savingAddress}
-									disabled={savingAddress}
-									style={styles.saveAddressBtn}
-								>
-									Save Address
-								</AppButton>
-							</ScrollView>
+					<View style={styles.rowFields}>
+						<View style={{ flex: 1, marginRight: 8 }}>
+							<AppInput
+								label="State"
+								placeholder="State"
+								value={newState}
+								onChangeText={setNewState}
+								fieldSize="form"
+							/>
 						</View>
-					</KeyboardAvoidingView>
-				</View>
-			</Modal>
+						<View style={{ flex: 1 }}>
+							<AppInput
+								label="Pincode"
+								placeholder="Pincode"
+								value={newPincode}
+								onChangeText={(v) => setNewPincode(v.replace(/\D/g, ''))}
+								keyboardType="numeric"
+								maxLength={6}
+								fieldSize="form"
+							/>
+						</View>
+					</View>
+
+					<AppButton
+						variant="primary"
+						onPress={handleAddAddress}
+						loading={savingAddress}
+						disabled={savingAddress}
+						style={styles.saveAddressBtn}
+					>
+						Save Address
+					</AppButton>
+				</ScrollView>
+			</AppModal>
 
 			{/* Image Viewer Lightbox Modal */}
 			<Modal

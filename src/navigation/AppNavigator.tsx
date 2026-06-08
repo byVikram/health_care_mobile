@@ -69,7 +69,14 @@ function AuthenticatedNavigator() {
 				}}
 			/>
 
-			<AppStack.Screen name={ROUTES.STACK.ORDER_DETAILS} component={OrderDetailsScreen} />
+			<AppStack.Screen
+				name={ROUTES.STACK.ORDER_DETAILS}
+				component={OrderDetailsScreen}
+				options={{
+					headerShown: true,
+					title: 'Order Details',
+				}}
+			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.PLACE_PHARMACY_ORDER}
 				component={PlacePharmacyOrderPage}
