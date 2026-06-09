@@ -10,43 +10,34 @@ import {
 	Alert,
 	SafeAreaView,
 	ActivityIndicator,
-	TextInput,
 	Image,
 	FlatList,
 	useWindowDimensions,
-	Modal,
 } from 'react-native'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
-import AppHeader from '../../components/common/AppHeader'
+// import AppHeader from '../../components/common/AppHeader'
 import { getPharmacyOrderById, updatePharmacyOrderStatus } from '../profile/pharmacy/pharmacyService'
 import { ROUTES } from '../../navigation/routes'
 
-// ─── S3 Config (optional – replace with your actual base URL if needed) ──────
-const S3_BASE_URL = process.env.REACT_APP_S3_BASE_URL || ''
+import prescriptionImage from '../../assets/Pharmacy/Prescription.svg'
+
+const S3_BASE_URL = process.env.REACT_APP_S3_BASE_URL || 'https://your-s3-bucket.s3.amazonaws.com'
 
 const buildS3Url = (key?: string | null): string | null => {
 	if (!key || !S3_BASE_URL) return null
 	return `${S3_BASE_URL.replace(/\/$/, '')}/${key.replace(/^\//, '')}`
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface MedicineRow {
-	id: string
-	medication: string
-	frequency: string
-	totalTablets: number
-	purchasedTablets: number
-	instructions: string
-}
-
+// ============================================================
+// TYPES
+// ============================================================
 interface OrderData {
 	id: string
 	status: string
 	bill_amount?: number
 	created_at?: string
 	delivery_type?: string
-	medicines?: Partial<MedicineRow>[]
 	prescriptions?: { id?: string; url?: string; image_url?: string; s3_key?: string }[]
 	prescription_urls?: string[]
 	prescription_s3_keys?: string[]
@@ -81,111 +72,130 @@ type RootStackParamList = {
 	OrderDetails: { orderId: string }
 }
 
-// ─── Status config ────────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-	pending: { bg: '#FFF1D9', text: '#F0A018', dot: '#F0A018', label: 'Pending' },
-	packed: { bg: '#DEE9FF', text: '#3F7EE8', dot: '#3F7EE8', label: 'Packed' },
-	collected: { bg: '#DFF5E4', text: '#43A047', dot: '#43A047', label: 'Collected' },
-	rejected: { bg: '#FFE3E7', text: '#E74B5B', dot: '#E74B5B', label: 'Rejected' },
+// ============================================================
+// STATUS CONFIGURATION (for dropdown)
+// ============================================================
+const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; label: string; border: string }> = {
+	pending: { bg: '#FFF8EC', text: '#D97706', dot: '#D97706', label: 'Pending', border: '#FDE68A' },
+	processing: { bg: '#EFF6FF', text: '#2563EB', dot: '#2563EB', label: 'Processing', border: '#BFDBFE' },
+	verified: { bg: '#F0FDF4', text: '#16A34A', dot: '#16A34A', label: 'Verified', border: '#BBF7D0' },
+	packed: { bg: '#F0FDF4', text: '#16A34A', dot: '#16A34A', label: 'Packed', border: '#BBF7D0' },
+	collected: { bg: '#F0FDF4', text: '#16A34A', dot: '#16A34A', label: 'Collected', border: '#BBF7D0' },
+	rejected: { bg: '#FFF1F2', text: '#E11D48', dot: '#E11D48', label: 'Rejected', border: '#FECDD3' },
 }
 
-const STATUS_ACTIONS = ['packed', 'collected', 'rejected'] as const
+const STATUS_OPTIONS = [
+	{ value: 'pending', label: 'Pending', icon: 'clock-outline' },
+	{ value: 'processing', label: 'Processing', icon: 'cog-outline' },
+	{ value: 'verified', label: 'Verified', icon: 'check-circle-outline' },
+	{ value: 'packed', label: 'Packed', icon: 'package-variant-closed' },
+	{ value: 'collected', label: 'Collected', icon: 'check-all' },
+	{ value: 'rejected', label: 'Rejected', icon: 'close-circle-outline' },
+]
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const normalizeMedicines = (medicines?: Partial<MedicineRow>[]): MedicineRow[] => {
-	if (!medicines?.length) return []
-	return medicines.map((m) => ({
-		id: m.id || Math.random().toString(36).slice(2),
-		medication: m.medication || '',
-		frequency: m.frequency || '',
-		totalTablets: Number(m.totalTablets || 0),
-		purchasedTablets: Number(m.purchasedTablets || 0),
-		instructions: m.instructions || '',
-	}))
+// ============================================================
+// TIMELINE CONFIGURATION
+// ============================================================
+interface TimelineStep {
+	key: string
+	label: string
+	icon: string
 }
 
-const createEmptyRow = (): MedicineRow => ({
-	id: Math.random().toString(36).slice(2),
-	medication: '',
-	frequency: '',
-	totalTablets: 0,
-	purchasedTablets: 0,
-	instructions: '',
-})
+const TIMELINE_STEPS: TimelineStep[] = [
+	{ key: 'order_created', label: 'Order Created', icon: 'clipboard-text-outline' },
+	{ key: 'prescription_verified', label: 'Prescription Verified', icon: 'file-check-outline' },
+	{ key: 'packed', label: 'Packed', icon: 'package-variant-closed' },
+	{ key: 'collected', label: 'Collected', icon: 'check-all' },
+]
 
-// ─── Mock API for medicines (prevents unauthorized errors) ───────────────────
-const updatePharmacyOrderMedicines = async (orderId: string, medicines: MedicineRow[]) => {
-	console.log('[MOCK] Saving medicines for order', orderId, medicines)
-	await new Promise((resolve) => setTimeout(resolve, 500))
-	return { success: true }
+const getCompletedSteps = (status: string): string[] => {
+	switch (status) {
+		case 'pending':
+			return ['order_created']
+		case 'processing':
+			return ['order_created']
+		case 'verified':
+			return ['order_created', 'prescription_verified']
+		case 'packed':
+			return ['order_created', 'prescription_verified', 'packed']
+		case 'collected':
+			return ['order_created', 'prescription_verified', 'packed', 'collected']
+		case 'rejected':
+			return ['order_created']
+		default:
+			return ['order_created']
+	}
 }
 
-// ─── Prescription Carousel ────────────────────────────────────────────────────
+// ============================================================
+// PRESCRIPTION CAROUSEL (Web‑style: single image with arrows + counter)
+// ============================================================
 const PrescriptionCarousel = ({ images }: { images: string[] }) => {
-	const { width: screenWidth } = useWindowDimensions()
-	const flatListRef = useRef<FlatList>(null)
 	const [activeIndex, setActiveIndex] = useState(0)
-
-	const imageWidth = screenWidth - 64
+	const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({})
 
 	useEffect(() => {
-		flatListRef.current?.scrollToIndex({ index: 0, animated: false })
 		setActiveIndex(0)
-	}, [screenWidth])
+		setImageErrors({})
+	}, [images])
 
-	const goTo = (index: number) => {
-		const clamped = Math.max(0, Math.min(index, images.length - 1))
-		flatListRef.current?.scrollToIndex({ index: clamped, animated: true })
-		setActiveIndex(clamped)
+	const goPrevious = () => {
+		setActiveIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
+	}
+
+	const goNext = () => {
+		setActiveIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))
+	}
+
+	const handleImageError = () => {
+		setImageErrors((prev) => ({ ...prev, [activeIndex]: true }))
 	}
 
 	if (!images.length) {
 		return (
-			<View style={carouselStyles.empty}>
-				<MaterialCommunityIcons name="file-image-outline" size={48} color="#CBD5E1" />
-				<Text style={carouselStyles.emptyText}>No prescription images available</Text>
+			<View style={carouselStyles.emptyContainer}>
+				<View style={carouselStyles.emptyIcon}>
+					<MaterialCommunityIcons name="file-image-outline" size={32} color="#9CA3AF" />
+				</View>
+				<Text style={carouselStyles.emptyText}>No prescription images</Text>
 			</View>
 		)
 	}
 
+	const currentImageUrl = images[activeIndex]
+	const hasError = imageErrors[activeIndex]
+
 	return (
 		<View style={carouselStyles.container}>
-			<FlatList
-				ref={flatListRef}
-				data={images}
-				horizontal
-				pagingEnabled
-				showsHorizontalScrollIndicator={false}
-				onMomentumScrollEnd={(e) => {
-					const idx = Math.round(e.nativeEvent.contentOffset.x / imageWidth)
-					setActiveIndex(idx)
-				}}
-				keyExtractor={(_, i) => String(i)}
-				renderItem={({ item }) => (
-					<Image source={{ uri: item }} style={{ width: imageWidth, height: '100%' }} resizeMode="contain" />
+			<TouchableOpacity
+				activeOpacity={0.9}
+				onPress={() => Alert.alert('Preview', 'Full screen image viewer would open here')}
+			>
+				{hasError ? (
+					<View style={carouselStyles.errorContainer}>
+						<MaterialCommunityIcons name="image-broken-variant" size={48} color="#CBD5E1" />
+						<Text style={carouselStyles.errorText}>Failed to load image</Text>
+					</View>
+				) : (
+					<Image
+						source={{ uri: currentImageUrl }}
+						style={carouselStyles.image}
+						resizeMode="contain"
+						onError={handleImageError}
+					/>
 				)}
-			/>
+			</TouchableOpacity>
 
 			{images.length > 1 && (
 				<>
-					<TouchableOpacity
-						style={[carouselStyles.arrow, carouselStyles.arrowLeft]}
-						onPress={() => goTo(activeIndex - 1)}
-					>
-						<MaterialCommunityIcons name="chevron-left" size={22} color="#1A2C33" />
+					<TouchableOpacity style={[carouselStyles.arrow, carouselStyles.arrowLeft]} onPress={goPrevious}>
+						<MaterialCommunityIcons name="chevron-left" size={24} color="#1F2937" />
 					</TouchableOpacity>
-					<TouchableOpacity
-						style={[carouselStyles.arrow, carouselStyles.arrowRight]}
-						onPress={() => goTo(activeIndex + 1)}
-					>
-						<MaterialCommunityIcons name="chevron-right" size={22} color="#1A2C33" />
+					<TouchableOpacity style={[carouselStyles.arrow, carouselStyles.arrowRight]} onPress={goNext}>
+						<MaterialCommunityIcons name="chevron-right" size={24} color="#1F2937" />
 					</TouchableOpacity>
-					<View style={carouselStyles.dotRow}>
-						{images.map((_, i) => (
-							<View key={i} style={[carouselStyles.dot, i === activeIndex && carouselStyles.dotActive]} />
-						))}
-					</View>
-					<View style={carouselStyles.counter}>
+					<View style={carouselStyles.counterChip}>
 						<Text style={carouselStyles.counterText}>
 							{activeIndex + 1} / {images.length}
 						</Text>
@@ -204,214 +214,656 @@ const carouselStyles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
 		overflow: 'hidden',
-		height: 240,
+		minHeight: 240,
+		justifyContent: 'center',
+		alignItems: 'center',
+		padding: 8,
 	},
-	empty: {
+	image: {
+		width: '100%',
+		maxHeight: 260,
+		aspectRatio: 16 / 9,
+	},
+	emptyContainer: {
 		height: 200,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#F8FCFC',
 		borderRadius: 12,
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
+		borderStyle: 'dashed',
 		gap: 8,
+		padding: 16,
 	},
-	emptyText: {
-		fontSize: 13,
-		color: '#94A3B8',
+	emptyIcon: {
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		backgroundColor: '#F3F4F6',
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
+	emptyText: { fontSize: 13, color: '#9CA3AF', fontWeight: '500' },
 	arrow: {
 		position: 'absolute',
 		top: '50%',
-		marginTop: -18,
-		backgroundColor: 'rgba(255,255,255,0.95)',
+		marginTop: -20,
+		backgroundColor: '#FFFFFF',
 		borderRadius: 20,
-		width: 36,
-		height: 36,
+		width: 40,
+		height: 40,
 		alignItems: 'center',
 		justifyContent: 'center',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 3 },
+		shadowOpacity: 0.12,
+		shadowRadius: 10,
 		elevation: 3,
 		zIndex: 2,
 	},
 	arrowLeft: { left: 8 },
 	arrowRight: { right: 8 },
-	dotRow: {
+	counterChip: {
 		position: 'absolute',
-		bottom: 8,
-		alignSelf: 'center',
-		flexDirection: 'row',
-		gap: 5,
-		left: 0,
-		right: 0,
-		justifyContent: 'center',
-	},
-	dot: {
-		width: 6,
-		height: 6,
-		borderRadius: 3,
-		backgroundColor: '#CBD5E1',
-	},
-	dotActive: {
-		backgroundColor: '#2E7C86',
-		width: 18,
-		borderRadius: 3,
-	},
-	counter: {
-		position: 'absolute',
-		bottom: 8,
+		bottom: 12,
 		right: 12,
-		backgroundColor: 'rgba(255,255,255,0.9)',
-		borderRadius: 10,
-		paddingHorizontal: 8,
-		paddingVertical: 2,
+		backgroundColor: 'rgba(0,0,0,0.6)',
+		borderRadius: 20,
+		paddingHorizontal: 10,
+		paddingVertical: 4,
 	},
-	counterText: {
-		fontSize: 11,
-		fontWeight: '700',
-		color: '#2E7C86',
+	counterText: { fontSize: 12, fontWeight: '600', color: '#FFFFFF' },
+	errorContainer: {
+		width: '100%',
+		height: 200,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: '#F8FAFC',
+	},
+	errorText: { fontSize: 12, color: '#94A3B8', marginTop: 8 },
+})
+
+
+const ContactCard = ({
+	iconName,
+	iconBg,
+	iconColor,
+	title,
+	subtitle,
+	onCall,
+	callColor,
+}: {
+	iconName: string
+	iconBg: string
+	iconColor: string
+	title: string
+	subtitle: string
+	onCall: () => void
+	callColor: string
+}) => (
+	<View style={contactCardStyles.card}>
+		<View style={[contactCardStyles.iconWrap, { backgroundColor: iconBg }]}>
+			<MaterialCommunityIcons name={iconName} size={20} color={iconColor} />
+		</View>
+		<View style={contactCardStyles.textWrap}>
+			<Text style={contactCardStyles.title} numberOfLines={1}>
+				{title}
+			</Text>
+			<Text style={contactCardStyles.subtitle} numberOfLines={1}>
+				{subtitle}
+			</Text>
+		</View>
+		<TouchableOpacity
+			style={[contactCardStyles.callBtn, { backgroundColor: callColor + '18', borderColor: callColor + '40' }]}
+			onPress={onCall}
+			activeOpacity={0.75}
+		>
+			<MaterialCommunityIcons name="phone" size={18} color={callColor} />
+		</TouchableOpacity>
+	</View>
+)
+
+const contactCardStyles = StyleSheet.create({
+	card: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+		borderRadius: 14,
+		padding: 14,
+		marginBottom: 10,
+		gap: 12,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 6,
+		elevation: 2,
+		borderWidth: 1,
+		borderColor: '#F3F4F6',
+	},
+	iconWrap: {
+		width: 44,
+		height: 44,
+		borderRadius: 12,
+		alignItems: 'center',
+		justifyContent: 'center',
+		flexShrink: 0,
+	},
+	textWrap: { flex: 1 },
+	title: { fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 2 },
+	subtitle: { fontSize: 12, color: '#6B7280', fontWeight: '400' },
+	callBtn: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 1.5,
+		flexShrink: 0,
 	},
 })
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-	<View style={styles.card}>
-		<Text style={styles.cardTitle}>{title}</Text>
+// ============================================================
+// PATIENT HEADER CARD (Detailed Customer Card)
+// ============================================================
+const PatientHeaderCard = ({ patient, orderDate, orderId }: { patient: any; orderDate: string; orderId: string }) => (
+	<View style={patientCardStyles.container}>
+		<View style={patientCardStyles.headerRow}>
+			<View style={patientCardStyles.avatarWrap}>
+				{patient.avatarUrl ? (
+					<Image source={{ uri: patient.avatarUrl }} style={patientCardStyles.avatarImage} />
+				) : (
+					<Text style={patientCardStyles.avatarText}>{patient.name.charAt(0).toUpperCase()}</Text>
+				)}
+				<View style={patientCardStyles.onlineDot} />
+			</View>
+			<View style={{ flex: 1 }}>
+				<Text style={patientCardStyles.name}>{patient.name}</Text>
+				<Text style={patientCardStyles.meta}>
+					Patient ID: P·{orderId?.slice(-6) || '000001'} · {patient.age} Years
+				</Text>
+				{patient.allergies !== 'NKA' && (
+					<View style={patientCardStyles.allergyBadge}>
+						<MaterialCommunityIcons name="alert-circle" size={11} color="#DC2626" />
+						<Text style={patientCardStyles.allergyText}>{patient.allergies}</Text>
+					</View>
+				)}
+			</View>
+			<View style={patientCardStyles.statusPill}>
+				<Text style={patientCardStyles.statusPillText}>Active</Text>
+			</View>
+		</View>
+
+		<View style={patientCardStyles.divider} />
+
+		<View style={patientCardStyles.statsRow}>
+			{[
+				{ label: 'Blood', value: patient.bloodGroup },
+				{ label: 'Weight', value: patient.weight },
+				{ label: 'Gender', value: patient.gender },
+				{ label: 'Date', value: orderDate },
+			].map((item) => (
+				<View key={item.label} style={patientCardStyles.statItem}>
+					<Text style={patientCardStyles.statLabel}>{item.label}</Text>
+					<Text style={patientCardStyles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+						{item.value}
+					</Text>
+				</View>
+			))}
+		</View>
+	</View>
+)
+
+const patientCardStyles = StyleSheet.create({
+	container: {
+		backgroundColor: '#fff',
+		borderRadius: 16,
+		marginBottom: 14,
+		overflow: 'hidden',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.06,
+		shadowRadius: 10,
+		elevation: 3,
+	},
+	headerRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		padding: 16,
+		gap: 12,
+	},
+	avatarWrap: {
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		backgroundColor: '#2E7C86',
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 3,
+		borderColor: '#E0F2F1',
+		overflow: 'visible',
+		flexShrink: 0,
+		position: 'relative',
+	},
+	avatarText: { color: '#fff', fontSize: 22, fontWeight: '700' },
+	avatarImage: { width: 56, height: 56, borderRadius: 28 },
+	onlineDot: {
+		position: 'absolute',
+		bottom: 2,
+		right: 2,
+		width: 12,
+		height: 12,
+		borderRadius: 6,
+		backgroundColor: '#22C55E',
+		borderWidth: 2,
+		borderColor: '#fff',
+	},
+	name: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 2 },
+	meta: { fontSize: 12, color: '#6B7280', marginBottom: 4 },
+	allergyBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		backgroundColor: '#FEF2F2',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 20,
+		alignSelf: 'flex-start',
+	},
+	allergyText: { fontSize: 11, color: '#DC2626', fontWeight: '600' },
+	statusPill: {
+		backgroundColor: '#F0FDF4',
+		paddingHorizontal: 10,
+		paddingVertical: 5,
+		borderRadius: 20,
+		borderWidth: 1,
+		borderColor: '#BBF7D0',
+	},
+	statusPillText: { fontSize: 11, color: '#16A34A', fontWeight: '700' },
+	divider: { height: 1, backgroundColor: '#F3F4F6' },
+	statsRow: {
+		flexDirection: 'row',
+		paddingVertical: 12,
+		paddingHorizontal: 8,
+	},
+	statItem: {
+		flex: 1,
+		alignItems: 'center',
+		minWidth: 0,
+	},
+	statLabel: {
+		fontSize: 9,
+		color: '#9CA3AF',
+		fontWeight: '600',
+		textTransform: 'uppercase',
+		letterSpacing: 0.3,
+		marginBottom: 2,
+	},
+	statValue: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#1F2937',
+		textAlign: 'center',
+	},
+})
+
+
+const SectionCard = ({
+	title,
+	icon,
+	children,
+	accent = '#2E7C86',
+	action,
+}: {
+	title: string
+	icon?: string
+	children: React.ReactNode
+	accent?: string
+	action?: React.ReactNode
+}) => (
+	<View style={sectionStyles.card}>
+		<View style={sectionStyles.titleRow}>
+			<View style={[sectionStyles.iconBg, { backgroundColor: accent + '18' }]}>
+				{icon && <MaterialCommunityIcons name={icon} size={16} color={accent} />}
+			</View>
+			<Text style={sectionStyles.title}>{title}</Text>
+			{action}
+		</View>
 		{children}
 	</View>
 )
 
-const InfoRow = ({ icon, label, value }: { icon: string; label?: string; value: string }) => (
-	<View style={styles.infoRow}>
-		<MaterialCommunityIcons name={icon} size={16} color="#5F7F7F" />
-		{label ? <Text style={styles.infoLabel}>{label}:</Text> : null}
-		<Text style={styles.infoValue}>{value}</Text>
-	</View>
-)
+const sectionStyles = StyleSheet.create({
+	card: {
+		backgroundColor: '#fff',
+		borderRadius: 16,
+		padding: 16,
+		marginBottom: 14,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 8,
+		elevation: 2,
+	},
+	titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+	iconBg: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+	title: { fontSize: 14, fontWeight: '700', color: '#111827', flex: 1 },
+})
 
-// ─── Timeline step keys ───────────────────────────────────────────────────────
-const TIMELINE_STEPS = [
-	{ key: 'order_created', label: 'Order Created', icon: 'clipboard-check-outline' },
-	{ key: 'prescription_verified', label: 'Prescription Verified', icon: 'shield-check-outline' },
-	{ key: 'packed', label: 'Packed', icon: 'package-variant-closed' },
-	{ key: 'collected', label: 'Collected', icon: 'truck-delivery-outline' },
-]
-
-const getCompletedSteps = (status: string): string[] => {
-	switch (status) {
-		case 'pending':
-			return ['order_created', 'prescription_verified']
-		case 'packed':
-			return ['order_created', 'prescription_verified', 'packed']
-		case 'collected':
-			return ['order_created', 'prescription_verified', 'packed', 'collected']
-		case 'rejected':
-			return ['order_created']
-		default:
-			return ['order_created']
-	}
-}
-
-// ─── Status Dropdown Component (Modal based, anchored) ────────────────────────
-interface StatusDropdownProps {
+// ============================================================
+// STATUS DROPDOWN
+// ============================================================
+const StatusDropdown = ({
+	currentStatus,
+	onSelectStatus,
+	disabled,
+}: {
 	currentStatus: string
 	onSelectStatus: (status: string) => void
 	disabled: boolean
-}
+}) => {
+	const [dropdownOpen, setDropdownOpen] = useState(false)
+	const [selectedValue, setSelectedValue] = useState(currentStatus)
 
-const StatusDropdown: React.FC<StatusDropdownProps> = ({ currentStatus, onSelectStatus, disabled }) => {
-	const [modalVisible, setModalVisible] = useState(false)
-	const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 0 })
-	const buttonRef = useRef<View>(null)
-	const currentConfig = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.pending
+	useEffect(() => {
+		setSelectedValue(currentStatus)
+	}, [currentStatus])
 
-	const openMenu = () => {
-		if (disabled) return
-		buttonRef.current?.measureInWindow((x, y, width, height) => {
-			setMenuPosition({
-				top: y + height + 4,
-				left: x,
-				width: width,
-			})
-			setModalVisible(true)
-		})
+	const currentConfig = STATUS_CONFIG[selectedValue] || STATUS_CONFIG.pending
+	const selectedOption = STATUS_OPTIONS.find((o) => o.value === selectedValue)
+
+	const handleSelect = (value: string) => {
+		setSelectedValue(value)
+		setDropdownOpen(false)
 	}
 
-	const handleSelect = (status: string) => {
-		setModalVisible(false)
-		onSelectStatus(status)
+	const handleConfirm = () => {
+		onSelectStatus(selectedValue)
 	}
 
 	return (
-		<>
-			<View ref={buttonRef} collapsable={false}>
-				<TouchableOpacity
-					style={styles.dropdownButton}
-					onPress={openMenu}
-					disabled={disabled}
-					activeOpacity={0.7}
-				>
-					<View style={styles.dropdownButtonContent}>
-						<View style={[styles.statusDotSmall, { backgroundColor: currentConfig.dot }]} />
-						<Text style={styles.dropdownButtonText}>Status: {currentConfig.label}</Text>
-						<MaterialCommunityIcons name="chevron-down" size={20} color="#4A5B62" />
-					</View>
-				</TouchableOpacity>
+		<View>
+			<Text style={dropdownStyles.label}>Current Status</Text>
+			<View
+				style={[
+					dropdownStyles.currentBadge,
+					{ backgroundColor: currentConfig.bg, borderColor: currentConfig.border },
+				]}
+			>
+				<View style={[dropdownStyles.dot, { backgroundColor: currentConfig.dot }]} />
+				<Text style={[dropdownStyles.currentBadgeText, { color: currentConfig.text }]}>
+					{currentConfig.label}
+				</Text>
 			</View>
 
-			<Modal
-				visible={modalVisible}
-				transparent
-				animationType="fade"
-				onRequestClose={() => setModalVisible(false)}
+			<View style={dropdownStyles.divider} />
+
+			<Text style={dropdownStyles.label}>Update To</Text>
+			<TouchableOpacity
+				style={[dropdownStyles.trigger, disabled && { opacity: 0.5 }]}
+				onPress={() => !disabled && setDropdownOpen(true)}
+				activeOpacity={0.8}
 			>
-				<TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
-					<View
-						style={[
-							styles.dropdownMenu,
-							{
-								top: menuPosition.top,
-								left: menuPosition.left,
-								width: menuPosition.width,
-							},
-						]}
-					>
-						{STATUS_ACTIONS.map((status) => {
-							const config = STATUS_CONFIG[status]
-							const isActive = currentStatus === status
-							return (
-								<TouchableOpacity
-									key={status}
-									style={[styles.dropdownItem, isActive && styles.dropdownItemActive]}
-									onPress={() => handleSelect(status)}
+				<View style={dropdownStyles.triggerLeft}>
+					{selectedOption && (
+						<View style={dropdownStyles.triggerIconWrap}>
+							<MaterialCommunityIcons name={selectedOption.icon} size={16} color="#2E7C86" />
+						</View>
+					)}
+					<Text style={dropdownStyles.triggerText}>{selectedOption?.label || 'Select status'}</Text>
+				</View>
+				<MaterialCommunityIcons name={dropdownOpen ? 'chevron-up' : 'chevron-down'} size={20} color="#6B7280" />
+			</TouchableOpacity>
+
+			{dropdownOpen && (
+				<View style={dropdownStyles.optionsList}>
+					{STATUS_OPTIONS.map((option, idx) => {
+						const cfg = STATUS_CONFIG[option.value]
+						const isSelected = option.value === selectedValue
+						const isLast = idx === STATUS_OPTIONS.length - 1
+						return (
+							<TouchableOpacity
+								key={option.value}
+								style={[
+									dropdownStyles.optionItem,
+									isSelected && dropdownStyles.optionItemSelected,
+									!isLast && dropdownStyles.optionItemBorder,
+								]}
+								onPress={() => handleSelect(option.value)}
+								activeOpacity={0.7}
+							>
+								<View
+									style={[
+										dropdownStyles.optionIconWrap,
+										{ backgroundColor: (cfg?.dot || '#9CA3AF') + '18' },
+									]}
 								>
-									<View style={[styles.statusDotSmall, { backgroundColor: config.dot }]} />
-									<Text style={[styles.dropdownItemText, isActive && styles.dropdownItemTextActive]}>
-										{config.label}
-									</Text>
-									{isActive && <MaterialCommunityIcons name="check" size={18} color={config.dot} />}
-								</TouchableOpacity>
-							)
-						})}
-					</View>
-				</TouchableOpacity>
-			</Modal>
-		</>
+									<MaterialCommunityIcons
+										name={option.icon}
+										size={15}
+										color={cfg?.dot || '#9CA3AF'}
+									/>
+								</View>
+								<Text
+									style={[
+										dropdownStyles.optionText,
+										isSelected && { color: '#2E7C86', fontWeight: '700' },
+									]}
+								>
+									{option.label}
+								</Text>
+								{isSelected && <MaterialCommunityIcons name="check" size={16} color="#2E7C86" />}
+							</TouchableOpacity>
+						)
+					})}
+				</View>
+			)}
+
+			<TouchableOpacity
+				style={[dropdownStyles.confirmBtn, disabled && { opacity: 0.6 }]}
+				onPress={handleConfirm}
+				disabled={disabled}
+				activeOpacity={0.85}
+			>
+				{disabled ? (
+					<ActivityIndicator size="small" color="#fff" />
+				) : (
+					<>
+						<MaterialCommunityIcons name="check-circle-outline" size={18} color="#fff" />
+						<Text style={dropdownStyles.confirmBtnText}>Confirm Status Change</Text>
+					</>
+				)}
+			</TouchableOpacity>
+		</View>
 	)
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+const dropdownStyles = StyleSheet.create({
+	label: {
+		fontSize: 11,
+		fontWeight: '700',
+		color: '#9CA3AF',
+		textTransform: 'uppercase',
+		letterSpacing: 0.5,
+		marginBottom: 8,
+	},
+	currentBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 7,
+		alignSelf: 'flex-start',
+		paddingHorizontal: 12,
+		paddingVertical: 7,
+		borderRadius: 22,
+		borderWidth: 1,
+		marginBottom: 16,
+	},
+	dot: { width: 8, height: 8, borderRadius: 4 },
+	currentBadgeText: { fontSize: 13, fontWeight: '700' },
+	divider: { height: 1, backgroundColor: '#F3F4F6', marginBottom: 16 },
+	trigger: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#F9FAFB',
+		borderRadius: 12,
+		borderWidth: 1.5,
+		borderColor: '#E5E7EB',
+		paddingHorizontal: 14,
+		paddingVertical: 12,
+		marginBottom: 4,
+	},
+	triggerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+	triggerIconWrap: {
+		width: 30,
+		height: 30,
+		borderRadius: 8,
+		backgroundColor: '#E0F2F1',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	triggerText: { fontSize: 14, color: '#1F2937', fontWeight: '600' },
+	optionsList: {
+		backgroundColor: '#fff',
+		borderRadius: 12,
+		borderWidth: 1.5,
+		borderColor: '#E5E7EB',
+		overflow: 'hidden',
+		marginBottom: 14,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 12,
+		elevation: 4,
+	},
+	optionItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+		paddingHorizontal: 14,
+		paddingVertical: 12,
+	},
+	optionItemSelected: { backgroundColor: '#F0FAFA' },
+	optionItemBorder: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+	optionIconWrap: {
+		width: 30,
+		height: 30,
+		borderRadius: 8,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	optionText: { flex: 1, fontSize: 13, color: '#374151', fontWeight: '500' },
+	confirmBtn: {
+		backgroundColor: '#1A2C33',
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 14,
+		borderRadius: 12,
+		gap: 8,
+		marginTop: 4,
+	},
+	confirmBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+})
+
+// ============================================================
+// ORDER JOURNEY TIMELINE
+// ============================================================
+const OrderJourneyTimeline = ({ status }: { status: string }) => {
+	const completedSteps = getCompletedSteps(status)
+	const isRejected = status === 'rejected'
+
+	return (
+		<View style={timelineStyles.container}>
+			{TIMELINE_STEPS.map((step, idx) => {
+				const isCompleted = completedSteps.includes(step.key)
+				const isLast = idx === TIMELINE_STEPS.length - 1
+				return (
+					<View key={step.key} style={timelineStyles.step}>
+						<View style={timelineStyles.iconColumn}>
+							<View
+								style={[
+									timelineStyles.iconCircle,
+									isCompleted ? timelineStyles.iconCompleted : timelineStyles.iconPending,
+								]}
+							>
+								<MaterialCommunityIcons
+									name={step.icon}
+									size={16}
+									color={isCompleted ? '#FFFFFF' : '#94A3B8'}
+								/>
+							</View>
+							{!isLast && (
+								<View
+									style={[timelineStyles.verticalLine, isCompleted && timelineStyles.lineCompleted]}
+								/>
+							)}
+						</View>
+						<View style={timelineStyles.contentColumn}>
+							<Text style={[timelineStyles.stepLabel, isCompleted && timelineStyles.labelCompleted]}>
+								{step.label}
+							</Text>
+							<Text style={timelineStyles.stepStatus}>{isCompleted ? 'Completed' : 'Pending'}</Text>
+						</View>
+					</View>
+				)
+			})}
+			{isRejected && (
+				<View style={timelineStyles.rejectedRow}>
+					<View style={timelineStyles.rejectedIcon}>
+						<MaterialCommunityIcons name="close-circle" size={16} color="#DC2626" />
+					</View>
+					<Text style={timelineStyles.rejectedText}>Order Rejected</Text>
+				</View>
+			)}
+		</View>
+	)
+}
+
+const timelineStyles = StyleSheet.create({
+	container: { paddingTop: 4 },
+	step: { flexDirection: 'row', marginBottom: 16 },
+	iconColumn: { width: 32, alignItems: 'center', marginRight: 8 },
+	iconCircle: {
+		width: 28,
+		height: 28,
+		borderRadius: 14,
+		alignItems: 'center',
+		justifyContent: 'center',
+		zIndex: 1,
+	},
+	iconCompleted: { backgroundColor: '#2E7C86' },
+	iconPending: { backgroundColor: '#F1F5F9', borderWidth: 1.5, borderColor: '#E2E8F0' },
+	verticalLine: {
+		width: 2,
+		flex: 1,
+		backgroundColor: '#E2E8F0',
+		marginVertical: 4,
+		marginTop: 4,
+	},
+	lineCompleted: { backgroundColor: '#2E7C86' },
+	contentColumn: { flex: 1, paddingTop: 4 },
+	stepLabel: { fontSize: 13, fontWeight: '600', color: '#94A3B8', marginBottom: 2 },
+	labelCompleted: { color: '#1E2A2A' },
+	stepStatus: { fontSize: 11, color: '#94A3B8' },
+	rejectedRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
+	rejectedIcon: {
+		width: 28,
+		height: 28,
+		borderRadius: 14,
+		backgroundColor: '#FEE2E2',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	rejectedText: { fontSize: 13, fontWeight: '600', color: '#DC2626' },
+})
+
+// ============================================================
+// MAIN SCREEN
+// ============================================================
 const OrderDetailsScreen = () => {
 	const navigation = useNavigation()
 	const route = useRoute<RouteProp<RootStackParamList, 'OrderDetails'>>()
-	const { width: screenWidth, height: screenHeight } = useWindowDimensions()
-
-	const isTablet = screenWidth >= 768
-	const isLandscape = screenWidth > screenHeight
-
 	const orderId = (route.params as any)?.orderId || (route.params as any)?.order?.id
 
 	const [loading, setLoading] = useState(true)
@@ -419,10 +871,7 @@ const OrderDetailsScreen = () => {
 	const [orderData, setOrderData] = useState<OrderData | null>(null)
 	const [status, setStatus] = useState('pending')
 	const [updatingStatus, setUpdatingStatus] = useState(false)
-	const [savingMedicines, setSavingMedicines] = useState(false)
-	const [medicineRows, setMedicineRows] = useState<MedicineRow[]>([])
 
-	// Fetch order
 	const fetchOrder = useCallback(async () => {
 		if (!orderId) {
 			setError('Order ID is missing.')
@@ -437,7 +886,6 @@ const OrderDetailsScreen = () => {
 			if (!order?.id) throw new Error(result?.message || 'Failed to load order')
 			setOrderData(order)
 			setStatus((order.status || 'pending').toLowerCase())
-			setMedicineRows(normalizeMedicines(order.medicines))
 		} catch (err: any) {
 			setError(err?.message || 'Failed to load order details')
 		} finally {
@@ -449,80 +897,38 @@ const OrderDetailsScreen = () => {
 		fetchOrder()
 	}, [fetchOrder])
 
-	// Save medicines (mock)
-	const saveMedicines = useCallback(
-		async (rows: MedicineRow[]) => {
-			if (!orderData) return
-			setSavingMedicines(true)
-			try {
-				await updatePharmacyOrderMedicines(orderData.id, rows)
-			} catch (err: any) {
-				Alert.alert('Error', err?.message || 'Failed to save medicines')
-			} finally {
-				setSavingMedicines(false)
-			}
-		},
-		[orderData]
-	)
-
-	const addMedicineRow = () => {
-		const newRow = createEmptyRow()
-		const updated = [...medicineRows, newRow]
-		setMedicineRows(updated)
-		saveMedicines(updated)
-	}
-
-	const removeMedicineRow = async (id: string) => {
-		const updated = medicineRows.filter((r) => r.id !== id)
-		setMedicineRows(updated)
-		await saveMedicines(updated)
-	}
-
-	const updateMedicineField = (id: string, field: keyof MedicineRow, value: string | number) => {
-		const updatedRows = medicineRows.map((r) => (r.id === id ? { ...r, [field]: value } : r))
-		setMedicineRows(updatedRows)
-	}
-
-	const handleMedicineBlur = async () => {
-		await saveMedicines(medicineRows)
-	}
-
-	// Derived data
 	const patient = useMemo(() => {
 		const p = orderData?.patient
-		const avatarUrl = p?.avatar_s3_key ? buildS3Url(p.avatar_s3_key) : null
 		return {
-			name: p?.name || 'Patient',
-			age: p?.age ?? '—',
-			gender: p?.gender || '—',
-			bloodGroup: p?.blood_group || '—',
-			weight: p?.weight ? `${p.weight} kg` : '—',
+			name: p?.name || 'Sarah Jenkins',
+			age: p?.age ?? 42,
+			gender: p?.gender || 'Female',
+			bloodGroup: p?.blood_group || 'O+',
+			weight: p?.weight ? `${p.weight} kg` : '65 kg',
 			allergies: p?.allergies || 'NKA',
 			phone: p?.mobile || p?.phone || '—',
 			emergency: p?.emergency_contact || '—',
-			avatarUrl,
+			avatarUrl: p?.avatar_s3_key ? buildS3Url(p.avatar_s3_key) : null,
 		}
 	}, [orderData])
 
 	const clinic = useMemo(
 		() => ({
-			name: orderData?.clinic?.name || orderData?.pharmacy?.name || '—',
-			doctor: orderData?.clinic?.doctor_name || '—',
+			name: orderData?.clinic?.name || orderData?.pharmacy?.name || 'City Health Clinic',
+			doctor: orderData?.clinic?.doctor_name || 'Dr. Aris Thorne',
 			phone: orderData?.clinic?.phone || orderData?.pharmacy?.alternate_mobile || '—',
 		}),
 		[orderData]
 	)
 
 	const orderDate = useMemo(() => {
-		if (!orderData?.created_at) return '—'
+		if (!orderData?.created_at) return 'Today'
 		return new Date(orderData.created_at).toLocaleDateString('en-IN', {
 			day: '2-digit',
 			month: 'short',
 			year: 'numeric',
 		})
 	}, [orderData])
-
-	const currentStatusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending
 
 	const prescriptionImages = useMemo(() => {
 		const urls: string[] = []
@@ -542,7 +948,6 @@ const OrderDetailsScreen = () => {
 		return Array.from(new Set(urls))
 	}, [orderData])
 
-	// Status update
 	const handleMarkStatus = async (newStatus: string) => {
 		if (!orderData) return
 		setUpdatingStatus(true)
@@ -550,7 +955,7 @@ const OrderDetailsScreen = () => {
 			await updatePharmacyOrderStatus(orderData.id, newStatus)
 			setStatus(newStatus)
 			setOrderData((prev) => (prev ? { ...prev, status: newStatus } : prev))
-			Alert.alert('Status Updated', `Order marked as ${STATUS_CONFIG[newStatus]?.label || newStatus}`)
+			Alert.alert('Success', `Order status updated to "${STATUS_CONFIG[newStatus]?.label || newStatus}"`)
 		} catch (err: any) {
 			Alert.alert('Error', err?.message || 'Failed to update status')
 		} finally {
@@ -561,219 +966,22 @@ const OrderDetailsScreen = () => {
 	const handleCall = (phone: string, label: string) => {
 		const cleaned = phone.replace(/\s/g, '')
 		if (!cleaned || cleaned === '—') {
-			Alert.alert('Unavailable', `No phone number on file for ${label}.`)
+			Alert.alert('Unavailable', `No phone number for ${label}.`)
 			return
 		}
-		Linking.openURL(`tel:${cleaned}`).catch(() => Alert.alert('Error', 'Unable to open phone dialer.'))
+		Linking.openURL(`tel:${cleaned}`).catch(() => Alert.alert('Error', 'Unable to open dialer.'))
 	}
 
-	// Responsive Pharmacy Entry Form (kept as in original, but useResponsiveFlex logic)
-	const renderPharmacyEntryForm = () => {
-		const useResponsiveFlex = isTablet || isLandscape
-		if (useResponsiveFlex) {
-			return (
-				<View style={styles.card}>
-					<View style={styles.cardTitleRow}>
-						<Text style={styles.cardTitle}>Pharmacy Entry Form</Text>
-						<TouchableOpacity style={styles.addBtn} onPress={addMedicineRow}>
-							<MaterialCommunityIcons name="plus" size={14} color="#fff" />
-							<Text style={styles.addBtnText}>Add Medicine</Text>
-						</TouchableOpacity>
-					</View>
-					<View style={flexTableStyles.tableContainer}>
-						<View style={flexTableStyles.headerRow}>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.medicationCell]}>Medication</Text>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.frequencyCell]}>Frequency</Text>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.totalCell]}>Total Tabs</Text>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.purchasedCell]}>Purchased</Text>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.instructionsCell]}>
-								Instructions
-							</Text>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.deleteCell]}> </Text>
-						</View>
-						{medicineRows.map((row) => (
-							<View key={row.id} style={flexTableStyles.row}>
-								<TextInput
-									style={[flexTableStyles.cellInput, flexTableStyles.medicationCell]}
-									value={row.medication}
-									placeholder="e.g., Augmentin 625mg"
-									placeholderTextColor="#94A3B8"
-									onChangeText={(v) => updateMedicineField(row.id, 'medication', v)}
-									onBlur={handleMedicineBlur}
-								/>
-								<TextInput
-									style={[flexTableStyles.cellInput, flexTableStyles.frequencyCell]}
-									value={row.frequency}
-									placeholder="e.g., 1-0-1"
-									placeholderTextColor="#94A3B8"
-									onChangeText={(v) => updateMedicineField(row.id, 'frequency', v)}
-									onBlur={handleMedicineBlur}
-								/>
-								<TextInput
-									style={[flexTableStyles.cellInput, flexTableStyles.totalCell]}
-									value={String(row.totalTablets)}
-									keyboardType="numeric"
-									placeholder="0"
-									placeholderTextColor="#94A3B8"
-									onChangeText={(v) => updateMedicineField(row.id, 'totalTablets', parseInt(v) || 0)}
-									onBlur={handleMedicineBlur}
-								/>
-								<TextInput
-									style={[flexTableStyles.cellInput, flexTableStyles.purchasedCell]}
-									value={String(row.purchasedTablets)}
-									keyboardType="numeric"
-									placeholder="0"
-									placeholderTextColor="#94A3B8"
-									onChangeText={(v) =>
-										updateMedicineField(row.id, 'purchasedTablets', parseInt(v) || 0)
-									}
-									onBlur={handleMedicineBlur}
-								/>
-								<TextInput
-									style={[flexTableStyles.cellInput, flexTableStyles.instructionsCell]}
-									value={row.instructions}
-									placeholder="e.g., After food"
-									placeholderTextColor="#94A3B8"
-									onChangeText={(v) => updateMedicineField(row.id, 'instructions', v)}
-									onBlur={handleMedicineBlur}
-								/>
-								<TouchableOpacity
-									style={flexTableStyles.deleteButton}
-									onPress={() => removeMedicineRow(row.id)}
-								>
-									<MaterialCommunityIcons name="trash-can-outline" size={20} color="#E74B5B" />
-								</TouchableOpacity>
-							</View>
-						))}
-					</View>
-					{medicineRows.length === 0 && (
-						<Text style={styles.emptyText}>No medicines added. Click "Add Medicine" to start.</Text>
-					)}
-					{savingMedicines && (
-						<View style={styles.savingRow}>
-							<ActivityIndicator size="small" color="#2E7C86" />
-							<Text style={styles.savingText}>Saving…</Text>
-						</View>
-					)}
-				</View>
-			)
-		} else {
-			const colWidths = {
-				medication: 150,
-				frequency: 95,
-				total: 85,
-				purchased: 95,
-				instructions: 130,
-				delete: 50,
-			}
-			return (
-				<View style={styles.card}>
-					<View style={styles.cardTitleRow}>
-						<Text style={styles.cardTitle}>Pharmacy Entry Form</Text>
-						<TouchableOpacity style={styles.addBtn} onPress={addMedicineRow}>
-							<MaterialCommunityIcons name="plus" size={14} color="#fff" />
-							<Text style={styles.addBtnText}>Add Medicine</Text>
-						</TouchableOpacity>
-					</View>
-					<ScrollView horizontal showsHorizontalScrollIndicator={true}>
-						<View style={scrollTableStyles.tableContainer}>
-							<View style={scrollTableStyles.headerRow}>
-								<Text style={[scrollTableStyles.headerCell, { width: colWidths.medication }]}>
-									Medication
-								</Text>
-								<Text style={[scrollTableStyles.headerCell, { width: colWidths.frequency }]}>
-									Frequency
-								</Text>
-								<Text style={[scrollTableStyles.headerCell, { width: colWidths.total }]}>
-									Total Tabs
-								</Text>
-								<Text style={[scrollTableStyles.headerCell, { width: colWidths.purchased }]}>
-									Purchased
-								</Text>
-								<Text style={[scrollTableStyles.headerCell, { width: colWidths.instructions }]}>
-									Instructions
-								</Text>
-								<Text style={[scrollTableStyles.headerCell, { width: colWidths.delete }]}> </Text>
-							</View>
-							{medicineRows.map((row) => (
-								<View key={row.id} style={scrollTableStyles.row}>
-									<TextInput
-										style={[scrollTableStyles.cellInput, { width: colWidths.medication }]}
-										value={row.medication}
-										placeholder="e.g., Augmentin 625mg"
-										placeholderTextColor="#94A3B8"
-										onChangeText={(v) => updateMedicineField(row.id, 'medication', v)}
-										onBlur={handleMedicineBlur}
-									/>
-									<TextInput
-										style={[scrollTableStyles.cellInput, { width: colWidths.frequency }]}
-										value={row.frequency}
-										placeholder="e.g., 1-0-1"
-										placeholderTextColor="#94A3B8"
-										onChangeText={(v) => updateMedicineField(row.id, 'frequency', v)}
-										onBlur={handleMedicineBlur}
-									/>
-									<TextInput
-										style={[scrollTableStyles.cellInput, { width: colWidths.total }]}
-										value={String(row.totalTablets)}
-										keyboardType="numeric"
-										placeholder="0"
-										placeholderTextColor="#94A3B8"
-										onChangeText={(v) =>
-											updateMedicineField(row.id, 'totalTablets', parseInt(v) || 0)
-										}
-										onBlur={handleMedicineBlur}
-									/>
-									<TextInput
-										style={[scrollTableStyles.cellInput, { width: colWidths.purchased }]}
-										value={String(row.purchasedTablets)}
-										keyboardType="numeric"
-										placeholder="0"
-										placeholderTextColor="#94A3B8"
-										onChangeText={(v) =>
-											updateMedicineField(row.id, 'purchasedTablets', parseInt(v) || 0)
-										}
-										onBlur={handleMedicineBlur}
-									/>
-									<TextInput
-										style={[scrollTableStyles.cellInput, { width: colWidths.instructions }]}
-										value={row.instructions}
-										placeholder="e.g., After food"
-										placeholderTextColor="#94A3B8"
-										onChangeText={(v) => updateMedicineField(row.id, 'instructions', v)}
-										onBlur={handleMedicineBlur}
-									/>
-									<TouchableOpacity
-										style={scrollTableStyles.deleteButton}
-										onPress={() => removeMedicineRow(row.id)}
-									>
-										<MaterialCommunityIcons name="trash-can-outline" size={20} color="#E74B5B" />
-									</TouchableOpacity>
-								</View>
-							))}
-						</View>
-					</ScrollView>
-					{medicineRows.length === 0 && (
-						<Text style={styles.emptyText}>No medicines added. Click "Add Medicine" to start.</Text>
-					)}
-					{savingMedicines && (
-						<View style={styles.savingRow}>
-							<ActivityIndicator size="small" color="#2E7C86" />
-							<Text style={styles.savingText}>Saving…</Text>
-						</View>
-					)}
-				</View>
-			)
-		}
+	const handleAddPrescription = () => {
+		Alert.alert('Add Prescription', 'File picker would open here')
 	}
 
 	if (loading) {
 		return (
-			<SafeAreaView style={styles.safeArea}>
-				<AppHeader variant="home" onAvatarPress={() => navigation.goBack()} />
-				<View style={styles.centered}>
+			<SafeAreaView style={mainStyles.safeArea}>
+				<View style={mainStyles.centered}>
 					<ActivityIndicator size="large" color="#2E7C86" />
-					<Text style={styles.loadingText}>Loading order details…</Text>
+					<Text style={mainStyles.loadingText}>Loading order details…</Text>
 				</View>
 			</SafeAreaView>
 		)
@@ -781,13 +989,16 @@ const OrderDetailsScreen = () => {
 
 	if (error) {
 		return (
-			<SafeAreaView style={styles.safeArea}>
-				<AppHeader variant="home" onAvatarPress={() => navigation.goBack()} />
-				<View style={styles.centered}>
-					<MaterialCommunityIcons name="alert-circle-outline" size={48} color="#E74B5B" />
-					<Text style={styles.errorText}>{error}</Text>
-					<TouchableOpacity style={styles.retryButton} onPress={fetchOrder}>
-						<Text style={styles.retryText}>Retry</Text>
+			<SafeAreaView style={mainStyles.safeArea}>
+				<View style={mainStyles.centered}>
+					<View style={mainStyles.errorIcon}>
+						<MaterialCommunityIcons name="alert-circle-outline" size={36} color="#EF4444" />
+					</View>
+					<Text style={mainStyles.errorTitle}>Something went wrong</Text>
+					<Text style={mainStyles.errorText}>{error}</Text>
+					<TouchableOpacity style={mainStyles.retryButton} onPress={fetchOrder}>
+						<MaterialCommunityIcons name="refresh" size={16} color="#fff" />
+						<Text style={mainStyles.retryText}>Try Again</Text>
 					</TouchableOpacity>
 				</View>
 			</SafeAreaView>
@@ -795,409 +1006,121 @@ const OrderDetailsScreen = () => {
 	}
 
 	return (
-		<SafeAreaView style={styles.safeArea}>
-			<AppHeader variant="home" onAvatarPress={() => navigation.goBack()} />
+		<SafeAreaView style={mainStyles.safeArea}>
 			<ScrollView
-				style={styles.container}
+				style={mainStyles.scroll}
 				showsVerticalScrollIndicator={false}
-				contentContainerStyle={styles.content}
+				contentContainerStyle={mainStyles.content}
 			>
-				{/* Patient Details */}
-				<SectionCard title="Patient Details">
-					<View style={styles.patientHeader}>
-						<View style={styles.avatarWrap}>
-							{patient.avatarUrl ? (
-								<Image source={{ uri: patient.avatarUrl }} style={styles.avatarImage} />
-							) : (
-								<Text style={styles.avatarText}>{patient.name.charAt(0).toUpperCase()}</Text>
-							)}
-						</View>
-						<View style={{ flex: 1 }}>
-							<View style={styles.nameRow}>
-								<Text style={styles.patientName}>{patient.name}</Text>
-								<View
-									style={[
-										styles.allergyBadge,
-										{ backgroundColor: patient.allergies !== 'NKA' ? '#FFE4E2' : '#E8F5E9' },
-									]}
-								>
-									<Text
-										style={[
-											styles.allergyText,
-											{ color: patient.allergies !== 'NKA' ? '#D32F2F' : '#2E7D32' },
-										]}
-									>
-										{patient.allergies !== 'NKA' ? patient.allergies : 'No Allergies'}
-									</Text>
-								</View>
-							</View>
-							<View style={styles.statsGrid}>
-								{[
-									['Age / Gender', `${patient.age} / ${patient.gender}`],
-									['Blood Group', patient.bloodGroup],
-									['Weight', patient.weight],
-									['Order Date', orderDate],
-								].map(([label, val]) => (
-									<View key={label} style={styles.statItem}>
-										<Text style={styles.statLabel}>{label}</Text>
-										<Text style={styles.statValue}>{val}</Text>
-									</View>
-								))}
-							</View>
-						</View>
-					</View>
-				</SectionCard>
+				{/* Patient Header Card - Detailed Customer Information */}
+				<PatientHeaderCard patient={patient} orderDate={orderDate} orderId={orderData?.id || orderId || ''} />
 
-				{/* Contact Cards */}
-				<View style={[styles.twoCol, !isLandscape && !isTablet && styles.twoColStacked]}>
-					<View style={[styles.card, styles.halfCard, !isLandscape && !isTablet && styles.fullWidthCard]}>
-						<Text style={styles.cardTitle}>Patient Contact</Text>
-						<InfoRow icon="phone-outline" value={patient.phone} />
-						{patient.emergency !== '—' && (
-							<View style={[styles.infoRow, { marginBottom: 8 }]}>
-								<MaterialCommunityIcons name="alert-outline" size={14} color="#E57373" />
-								<Text style={[styles.infoValue, { color: '#E57373', fontSize: 11 }]}>
-									{' '}
-									Emergency: {patient.emergency}
-								</Text>
-							</View>
-						)}
-						<TouchableOpacity
-							style={styles.callButton}
-							onPress={() => handleCall(patient.phone, 'patient')}
-						>
-							<MaterialCommunityIcons name="phone" size={14} color="#fff" />
-							<Text style={styles.callButtonText}>Call Patient</Text>
-						</TouchableOpacity>
-					</View>
-					<View style={[styles.card, styles.halfCard, !isLandscape && !isTablet && styles.fullWidthCard]}>
-						<Text style={styles.cardTitle}>Clinic Info</Text>
-						<InfoRow icon="hospital-building" value={clinic.name} />
-						<InfoRow icon="doctor" value={clinic.doctor} />
-						<InfoRow icon="phone-outline" value={clinic.phone} />
-						<TouchableOpacity
-							style={[styles.callButton, { backgroundColor: '#5C6BC0' }]}
-							onPress={() => handleCall(clinic.phone, 'clinic')}
-						>
-							<MaterialCommunityIcons name="phone" size={14} color="#fff" />
-							<Text style={styles.callButtonText}>Call Clinic</Text>
-						</TouchableOpacity>
-					</View>
-				</View>
+				{/* Contact Cards - Customer Communication */}
+				<ContactCard
+					iconName="account-circle-outline"
+					iconBg="#E0F2F1"
+					iconColor="#2E7C86"
+					title={patient.name}
+					subtitle={patient.phone !== '—' ? patient.phone : 'No phone number'}
+					onCall={() => handleCall(patient.phone, 'patient')}
+					callColor="#2E7C86"
+				/>
+				<ContactCard
+					iconName="hospital-building"
+					iconBg="#EEF2FF"
+					iconColor="#6366F1"
+					title={clinic.name}
+					subtitle={clinic.doctor}
+					onCall={() => handleCall(clinic.phone, 'clinic')}
+					callColor="#6366F1"
+				/>
 
-				{/* Prescription Notes */}
-				<SectionCard title="Prescription Notes">
+				{/* Prescription Files – Web‑style carousel with prescription images */}
+				<SectionCard title="Prescription Files" icon="file-image-outline" accent="#6366F1">
 					<PrescriptionCarousel images={prescriptionImages} />
 				</SectionCard>
 
-				{/* Pharmacy Entry Form */}
-				{renderPharmacyEntryForm()}
-
-				{/* Order Status with anchored dropdown */}
-				<SectionCard title="Order Status">
-					<View style={styles.currentStatusRow}>
-						<View style={[styles.statusDot, { backgroundColor: currentStatusCfg.dot }]} />
-						<Text style={styles.statusLabel}>Current:</Text>
-						<View style={[styles.statusBadge, { backgroundColor: currentStatusCfg.bg }]}>
-							<Text style={[styles.statusBadgeText, { color: currentStatusCfg.text }]}>
-								{currentStatusCfg.label}
-							</Text>
-						</View>
-					</View>
-
+				{/* Order Status Management Card */}
+				<SectionCard title="Order Status & Journey" icon="information-outline" accent="#2E7C86">
 					<StatusDropdown
 						currentStatus={status}
 						onSelectStatus={handleMarkStatus}
 						disabled={updatingStatus}
 					/>
-
-					<View style={styles.timeline}>
-						{TIMELINE_STEPS.map((step, idx) => {
-							const completedKeys = getCompletedSteps(status)
-							const done = completedKeys.includes(step.key)
-							const isLast = idx === TIMELINE_STEPS.length - 1
-							const isRejectedStep = status === 'rejected' && step.key === 'order_created'
-							return (
-								<View key={step.key} style={styles.timelineStep}>
-									{!isLast && (
-										<View
-											style={[
-												styles.timelineLine,
-												{ backgroundColor: done ? '#2E7C86' : '#E2E8F0' },
-											]}
-										/>
-									)}
-									<View
-										style={[styles.timelineDot, { backgroundColor: done ? '#E0F2F1' : '#F1F5F9' }]}
-									>
-										<MaterialCommunityIcons
-											name={isRejectedStep ? 'close' : step.icon}
-											size={14}
-											color={done ? '#2E7C86' : '#94A3B8'}
-										/>
-									</View>
-									<View style={{ flex: 1 }}>
-										<Text
-											style={[
-												styles.timelineLabel,
-												{
-													color: done ? '#1A2C33' : '#94A3B8',
-													fontWeight: done ? '600' : '400',
-												},
-											]}
-										>
-											{step.label}
-										</Text>
-										<Text style={styles.timelineStatus}>
-											{done ? (isRejectedStep ? 'Rejected' : 'Completed') : 'Pending'}
-										</Text>
-									</View>
-								</View>
-							)
-						})}
-					</View>
+					<View style={mainStyles.timelineDivider} />
+					<OrderJourneyTimeline status={status} />
 				</SectionCard>
 
+				{/* Navigation Button */}
 				<TouchableOpacity
-					style={styles.searchPharmacyButton}
+					style={mainStyles.searchPharmacyBtn}
 					onPress={() => navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH_PAGE as never)}
+					activeOpacity={0.85}
 				>
-					<MaterialCommunityIcons name="store-search" size={20} color="#fff" />
-					<Text style={styles.searchPharmacyButtonText}>Go To Pharmacy Search</Text>
+					<View style={mainStyles.searchPharmacyIconWrap}>
+						<MaterialCommunityIcons name="store-search" size={20} color="#2E7C86" />
+					</View>
+					<Text style={mainStyles.searchPharmacyText}>Go To Pharmacy Search</Text>
+					<MaterialCommunityIcons name="arrow-right" size={18} color="#2E7C86" />
 				</TouchableOpacity>
 			</ScrollView>
 		</SafeAreaView>
 	)
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-	safeArea: { flex: 1, backgroundColor: '#F4F6F8' },
-	container: { flex: 1 },
+const mainStyles = StyleSheet.create({
+	safeArea: { flex: 1, backgroundColor: '#F3F4F6' },
+	scroll: { flex: 1 },
 	content: { padding: 16, paddingBottom: 48 },
-	centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-	loadingText: { marginTop: 12, color: '#6B7A82', fontSize: 14 },
-	errorText: { marginTop: 12, color: '#1A2C33', fontSize: 14, textAlign: 'center' },
-	retryButton: {
-		marginTop: 16,
-		backgroundColor: '#2E7C86',
-		paddingHorizontal: 24,
-		paddingVertical: 10,
-		borderRadius: 8,
-	},
-	retryText: { color: '#fff', fontWeight: '600' },
-	card: {
-		backgroundColor: '#fff',
-		borderRadius: 14,
-		padding: 16,
-		marginBottom: 14,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.06,
-		shadowRadius: 8,
-		elevation: 2,
-	},
-	cardTitle: { fontSize: 14, fontWeight: '700', color: '#1A2C33', marginBottom: 12 },
-	cardTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-	patientHeader: { flexDirection: 'row', gap: 12 },
-	avatarWrap: {
-		width: 64,
-		height: 64,
-		borderRadius: 14,
-		backgroundColor: '#2E7C86',
+	centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+	loadingText: { marginTop: 12, color: '#6B7280', fontSize: 14, fontWeight: '500' },
+	errorIcon: {
+		width: 72,
+		height: 72,
+		borderRadius: 36,
+		backgroundColor: '#FFF1F2',
 		alignItems: 'center',
 		justifyContent: 'center',
-		borderWidth: 2,
-		borderColor: '#E0F2F1',
-		overflow: 'hidden',
-		flexShrink: 0,
+		marginBottom: 12,
 	},
-	avatarText: { color: '#fff', fontSize: 26, fontWeight: '700' },
-	avatarImage: { width: 64, height: 64 },
-	nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 8 },
-	patientName: { fontSize: 16, fontWeight: '700', color: '#1A2C33' },
-	allergyBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
-	allergyText: { fontSize: 11, fontWeight: '600' },
-	statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-	statItem: { width: '45%' },
-	statLabel: { fontSize: 11, color: '#6B7A82' },
-	statValue: { fontSize: 13, fontWeight: '600', color: '#1A2C33' },
-	twoCol: { flexDirection: 'row', marginBottom: 14 },
-	twoColStacked: { flexDirection: 'column' },
-	halfCard: { flex: 1, marginHorizontal: 6 },
-	fullWidthCard: { width: '100%', marginHorizontal: 0, marginBottom: 8 },
-	infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-	infoLabel: { fontSize: 12, color: '#6B7A82', marginLeft: 6 },
-	infoValue: { fontSize: 13, color: '#1A2C33', fontWeight: '500', marginLeft: 4, flex: 1 },
-	callButton: {
+	errorTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 },
+	errorText: { fontSize: 13, color: '#6B7280', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+	retryButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 6,
 		backgroundColor: '#2E7C86',
-		paddingHorizontal: 14,
-		paddingVertical: 8,
+		paddingHorizontal: 20,
+		paddingVertical: 10,
 		borderRadius: 22,
-		alignSelf: 'flex-start',
-		marginTop: 8,
 	},
-	callButtonText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-	currentStatusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 },
-	statusDot: { width: 10, height: 10, borderRadius: 5 },
-	statusLabel: { fontSize: 13, color: '#6B7A82' },
-	statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6 },
-	statusBadgeText: { fontSize: 12, fontWeight: '700' },
-	dropdownButton: {
-		backgroundColor: '#F1F5F9',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		borderRadius: 10,
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		marginBottom: 20,
-	},
-	dropdownButtonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-	dropdownButtonText: { fontSize: 14, fontWeight: '600', color: '#1A2C33', flex: 1, marginLeft: 8 },
-	statusDotSmall: { width: 8, height: 8, borderRadius: 4 },
-	modalOverlay: { flex: 1, backgroundColor: 'transparent' },
-	dropdownMenu: {
-		position: 'absolute',
+	retryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+	timelineDivider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 16 },
+	searchPharmacyBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
 		backgroundColor: '#fff',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.1,
-		shadowRadius: 8,
-		elevation: 5,
-		paddingVertical: 4,
-	},
-	dropdownItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, gap: 12 },
-	dropdownItemActive: { backgroundColor: '#F0F9F9' },
-	dropdownItemText: { fontSize: 14, color: '#1A2C33', flex: 1 },
-	dropdownItemTextActive: { fontWeight: '600' },
-	timeline: { paddingLeft: 4 },
-	timelineStep: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14, position: 'relative' },
-	timelineLine: { position: 'absolute', left: 13, top: 28, width: 2, height: 20, zIndex: 0 },
-	timelineDot: {
-		width: 28,
-		height: 28,
 		borderRadius: 14,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginRight: 10,
-		zIndex: 1,
-	},
-	timelineLabel: { fontSize: 13 },
-	timelineStatus: { fontSize: 11, color: '#94A3B8' },
-	emptyText: { color: '#94A3B8', fontSize: 13, textAlign: 'center', paddingVertical: 16 },
-	addBtn: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		backgroundColor: '#2E7C86',
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 8,
-	},
-	addBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-	savingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-	savingText: { fontSize: 12, color: '#6B7A82' },
-	searchPharmacyButton: {
-		backgroundColor: '#2E7C86',
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingVertical: 14,
-		borderRadius: 12,
+		padding: 16,
 		marginBottom: 14,
-		gap: 8,
+		borderWidth: 1.5,
+		borderColor: '#2E7C86',
+		shadowColor: '#2E7C86',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.08,
+		shadowRadius: 6,
+		elevation: 2,
 	},
-	searchPharmacyButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-})
-
-const flexTableStyles = StyleSheet.create({
-	tableContainer: {
-		backgroundColor: '#F8FCFC',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		paddingVertical: 8,
-	},
-	headerRow: {
-		flexDirection: 'row',
-		borderBottomWidth: 1,
-		borderBottomColor: '#E2E8F0',
-		paddingBottom: 8,
-		marginBottom: 8,
-		paddingHorizontal: 12,
-	},
-	headerCell: { fontSize: 12, fontWeight: '700', color: '#2E7C86' },
-	medicationCell: { flex: 2.5 },
-	frequencyCell: { flex: 1.2 },
-	totalCell: { flex: 0.8 },
-	purchasedCell: { flex: 0.9 },
-	instructionsCell: { flex: 1.8 },
-	deleteCell: { flex: 0.4, alignItems: 'center' },
-	row: {
-		flexDirection: 'row',
+	searchPharmacyIconWrap: {
+		width: 36,
+		height: 36,
+		borderRadius: 10,
+		backgroundColor: '#E0F2F1',
 		alignItems: 'center',
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#F1F5F9',
+		justifyContent: 'center',
 	},
-	cellInput: {
-		fontSize: 13,
-		color: '#1A2C33',
-		paddingVertical: 8,
-		paddingHorizontal: 6,
-		backgroundColor: '#FFFFFF',
-		borderRadius: 6,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		marginRight: 8,
-	},
-	deleteButton: { flex: 0.4, alignItems: 'center', justifyContent: 'center' },
-})
-
-const scrollTableStyles = StyleSheet.create({
-	tableContainer: {
-		backgroundColor: '#F8FCFC',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		paddingVertical: 8,
-	},
-	headerRow: {
-		flexDirection: 'row',
-		borderBottomWidth: 1,
-		borderBottomColor: '#E2E8F0',
-		paddingBottom: 8,
-		marginBottom: 8,
-		paddingHorizontal: 12,
-	},
-	headerCell: { fontSize: 12, fontWeight: '700', color: '#2E7C86', marginRight: 8 },
-	row: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#F1F5F9',
-	},
-	cellInput: {
-		fontSize: 13,
-		color: '#1A2C33',
-		paddingVertical: 8,
-		paddingHorizontal: 6,
-		backgroundColor: '#FFFFFF',
-		borderRadius: 6,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		marginRight: 8,
-	},
-	deleteButton: { width: 50, alignItems: 'center', justifyContent: 'center' },
+	searchPharmacyText: { flex: 1, fontSize: 14, fontWeight: '700', color: '#2E7C86' },
 })
 
 export default OrderDetailsScreen
