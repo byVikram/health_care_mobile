@@ -12,6 +12,7 @@ export interface PatientProfileState {
 	maritalStatus: string
 	height: string
 	weight: string
+	emergencyContactName: string
 	emergencyContact: string
 	location: string
 	photoUrl: string
@@ -19,12 +20,14 @@ export interface PatientProfileState {
 	// Medical
 	allergies: string[]
 	chronicConditions: string[]
+	currentMedications: string[]
+	familyHistory: string
 
 	// Lifestyle
 	smoking: string
 	alcohol: string
 	exerciseFrequency: string
-	dietType: string
+	foodPreference: string
 	sleepHours: string
 	occupation: string
 }
@@ -39,15 +42,18 @@ export const INITIAL_PATIENT_STATE: PatientProfileState = {
 	maritalStatus: '',
 	height: '',
 	weight: '',
+	emergencyContactName: '',
 	emergencyContact: '',
 	location: '',
 	photoUrl: '',
 	allergies: [],
 	chronicConditions: [],
+	currentMedications: [],
+	familyHistory: '',
 	smoking: '',
 	alcohol: '',
 	exerciseFrequency: '',
-	dietType: '',
+	foodPreference: '',
 	sleepHours: '',
 	occupation: '',
 }
@@ -66,34 +72,44 @@ export const getPatientDetails = async (): Promise<PatientProfileResponse> => {
 
 // PATCH /api/patients/me/details -> update profile
 export const updatePatientProfile = async (state: PatientProfileState): Promise<PatientProfileResponse> => {
+	const formatDateForApi = (date: string) => {
+		if (!date) return null
+		const [day, month, year] = date.split('-')
+		return `${year}-${month}-${day}`
+	}
+
 	// Build API payload
 	const payload = {
-		full_name: state.name,
+		name: state.name,
 		phone_number: state.contactNumber,
 		email: state.email,
 		gender: state.gender,
-		// API expects DD/MM/YYYY format for Date of birth
-		date_of_birth: state.dateOfBirth ? state.dateOfBirth.replace(/-/g, '/') : '',
+		date_of_birth: formatDateForApi(state.dateOfBirth),
 		blood_group: state.bloodGroup,
 		marital_status: state.maritalStatus,
-		height_cm: state.height,
-		weight_kg: state.weight,
-		emergency_contact: state.emergencyContact,
+		height: Number(state.height) || 0,
+		weight: Number(state.weight) || 0,
+		emergency_contact_name: state.emergencyContactName,
+		emergency_contact_number: state.emergencyContact,
 		location: state.location,
 		avatar: state.photoUrl,
 
 		// Medical
 		allergies: state.allergies,
 		chronic_conditions: state.chronicConditions,
+		current_medications: state.currentMedications,
+		family_history: state.familyHistory,
 
 		// Lifestyle
 		smoking_status: state.smoking,
 		alcohol_consumption: state.alcohol,
-		exercise_frequency: state.exerciseFrequency,
-		diet_type: state.dietType,
-		sleep_hours: state.sleepHours,
+		activity_level: state.exerciseFrequency,
+		food_preference: state.foodPreference,
+		sleep_hours: Number(state.sleepHours),
 		occupation: state.occupation,
 	}
+
+	console.log('PATCH PAYLOAD', payload)
 
 	const res = await ApiService.patch<PatientProfileResponse>(API_ENDPOINTS.PATIENT.DETAILS, payload)
 	return res.data
@@ -117,10 +133,16 @@ export const mapApiToLocalState = (apiData: any): PatientProfileState => {
 		return []
 	}
 
-	// Format date from DD/MM/YYYY to DD-MM-YYYY for AppCalendar
+	// Format date from YYYY-MM-DD to DD-MM-YYYY for AppCalendar
 	const formatDob = (dob?: string): string => {
 		if (!dob) return ''
-		return dob.replace(/\//g, '-')
+		const [year, month, day] = dob.split('-')
+		return `${day}-${month}-${year}`
+	}
+
+	const toStateString = (val: any): string => {
+		if (val === null || val === undefined) return ''
+		return String(val)
 	}
 
 	return {
@@ -131,20 +153,23 @@ export const mapApiToLocalState = (apiData: any): PatientProfileState => {
 		dateOfBirth: formatDob(personal?.date_of_birth),
 		bloodGroup: personal?.blood_group || '',
 		maritalStatus: personal?.marital_status || '',
-		height: personal?.height || '',
-		weight: personal?.weight || '',
+		height: toStateString(personal?.height),
+		weight: toStateString(personal?.weight),
 		location: personal?.location || '',
 		photoUrl: personal?.avatar || '',
+		emergencyContactName: personal?.emergency_contact?.name || '',
 		emergencyContact: personal?.emergency_contact?.number || '',
 
 		allergies: parseArray(medical?.allergies),
 		chronicConditions: parseArray(medical?.chronic_conditions),
+		currentMedications: parseArray(medical?.current_medications),
+		familyHistory: medical?.family_history || '',
 
 		smoking: lifestyle?.smoking_status || '',
 		alcohol: lifestyle?.alcohol_consumption || '',
 		exerciseFrequency: lifestyle?.activity_level || '',
-		dietType: lifestyle?.diet_type || '',
-		sleepHours: lifestyle?.sleep_hours || '',
+		foodPreference: lifestyle?.food_preference || '',
+		sleepHours: toStateString(lifestyle?.sleep_hours),
 		occupation: lifestyle?.occupation || '',
 	}
 }
