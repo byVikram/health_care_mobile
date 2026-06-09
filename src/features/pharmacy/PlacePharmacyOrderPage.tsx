@@ -387,7 +387,11 @@ export default function PlacePharmacyOrderPage() {
 						</View>
 					)}
 				</View>
-
+				<View style={styles.addOrderButtonContainer}>
+					<AppButton variant="primary" style={styles.addOrderButton}>
+						+ Add More Pharmacy Orders
+					</AppButton>
+				</View>
 				{/* STEP 2: Select Delivery Type */}
 				<View style={styles.sectionCard}>
 					<View style={styles.sectionHeader}>
@@ -1089,5 +1093,13 @@ const styles = StyleSheet.create({
 	fullScreenImage: {
 		width: '90%',
 		height: '80%',
+	},
+	addOrderButtonContainer: {
+		marginBottom: 16, // spacing below button
+	},
+
+	addOrderButton: {
+		backgroundColor: '#1f5f68', // same theme color as other primary buttons
+		borderColor: '#1f5f68',
 	},
 })

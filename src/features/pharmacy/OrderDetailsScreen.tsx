@@ -24,8 +24,9 @@ import { AppSelect, StatusModal } from '../../components/common'
 const S3_BASE_URL = process.env.REACT_APP_S3_BASE_URL || ''
 
 const buildS3Url = (key?: string | null): string | null => {
-	if (!key || !S3_BASE_URL) return null
-	return `${S3_BASE_URL.replace(/\/$/, '')}/${key.replace(/^\//, '')}`
+	// if (!key || !S3_BASE_URL) return null
+	// return `${S3_BASE_URL.replace(/\/$/, '')}/${key.replace(/^\//, '')}`
+	return key
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -400,7 +401,7 @@ const OrderDetailsScreen = () => {
 					visible: true,
 					status: 'error',
 					title: 'Error',
-					description: err?.message || 'Failed to save medicines'
+					description: err?.message || 'Failed to save medicines',
 				})
 			} finally {
 				setSavingMedicines(false)
@@ -480,6 +481,7 @@ const OrderDetailsScreen = () => {
 
 	const prescriptionImages = useMemo(() => {
 		const urls: string[] = []
+		console.log('[DEBUG] Extracting prescription images from order data', orderData)
 		orderData?.prescriptions?.forEach((item) => {
 			const url = item.url || item.image_url || buildS3Url(item.s3_key)
 			if (url) urls.push(url)
@@ -504,7 +506,7 @@ const OrderDetailsScreen = () => {
 			const payload: { status: string; bill_amount?: number | null; rejection_reason?: string | null } = {
 				status: newStatus,
 			}
-			
+
 			// Handle bill amount logic
 			if (billVal !== undefined) {
 				payload.bill_amount = billVal
@@ -527,23 +529,29 @@ const OrderDetailsScreen = () => {
 					? {
 							...prev,
 							status: newStatus,
-							bill_amount: payload.bill_amount !== undefined ? (payload.bill_amount ?? undefined) : prev.bill_amount,
-							rejection_reason: payload.rejection_reason !== undefined ? (payload.rejection_reason ?? undefined) : prev.rejection_reason,
-					  }
+							bill_amount:
+								payload.bill_amount !== undefined
+									? (payload.bill_amount ?? undefined)
+									: prev.bill_amount,
+							rejection_reason:
+								payload.rejection_reason !== undefined
+									? (payload.rejection_reason ?? undefined)
+									: prev.rejection_reason,
+						}
 					: prev
 			)
 			setStatusModal({
 				visible: true,
 				status: 'success',
 				title: 'Success',
-				description: res?.message || 'Order updated successfully'
+				description: res?.message || 'Order updated successfully',
 			})
 		} catch (err: any) {
 			setStatusModal({
 				visible: true,
 				status: 'error',
 				title: 'Error',
-				description: err?.message || 'Failed to update status'
+				description: err?.message || 'Failed to update status',
 			})
 		} finally {
 			setUpdatingStatus(false)
@@ -557,7 +565,7 @@ const OrderDetailsScreen = () => {
 				visible: true,
 				status: 'error',
 				title: 'Unavailable',
-				description: `No phone number on file for ${label}.`
+				description: `No phone number on file for ${label}.`,
 			})
 			return
 		}
@@ -566,212 +574,212 @@ const OrderDetailsScreen = () => {
 				visible: true,
 				status: 'error',
 				title: 'Error',
-				description: 'Unable to open phone dialer.'
+				description: 'Unable to open phone dialer.',
 			})
 		)
 	}
 
 	// Responsive Pharmacy Entry Form
-	const renderPharmacyEntryForm = () => {
-		const useResponsiveFlex = isTablet || isLandscape
-		if (useResponsiveFlex) {
-			return (
-				<View style={styles.card}>
-					<View style={styles.cardTitleRow}>
-						<Text style={styles.cardTitle}>Pharmacy Entry Form</Text>
-						<TouchableOpacity style={styles.addBtn} onPress={addMedicineRow}>
-							<MaterialCommunityIcons name="plus" size={14} color="#fff" />
-							<Text style={styles.addBtnText}>Add Medicine</Text>
-						</TouchableOpacity>
-					</View>
-					<View style={flexTableStyles.tableContainer}>
-						<View style={flexTableStyles.headerRow}>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.medicationCell]}>Medication</Text>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.frequencyCell]}>Frequency</Text>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.totalCell]}>Total Tabs</Text>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.purchasedCell]}>Purchased</Text>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.instructionsCell]}>
-								Instructions
-							</Text>
-							<Text style={[flexTableStyles.headerCell, flexTableStyles.deleteCell]}> </Text>
-						</View>
-						{medicineRows.map((row) => (
-							<View key={row.id} style={flexTableStyles.row}>
-								<TextInput
-									style={[flexTableStyles.cellInput, flexTableStyles.medicationCell]}
-									value={row.medication}
-									placeholder="e.g., Augmentin 625mg"
-									placeholderTextColor="#94A3B8"
-									onChangeText={(v) => updateMedicineField(row.id, 'medication', v)}
-									onBlur={handleMedicineBlur}
-								/>
-								<TextInput
-									style={[flexTableStyles.cellInput, flexTableStyles.frequencyCell]}
-									value={row.frequency}
-									placeholder="e.g., 1-0-1"
-									placeholderTextColor="#94A3B8"
-									onChangeText={(v) => updateMedicineField(row.id, 'frequency', v)}
-									onBlur={handleMedicineBlur}
-								/>
-								<TextInput
-									style={[flexTableStyles.cellInput, flexTableStyles.totalCell]}
-									value={String(row.totalTablets)}
-									keyboardType="numeric"
-									placeholder="0"
-									placeholderTextColor="#94A3B8"
-									onChangeText={(v) => updateMedicineField(row.id, 'totalTablets', parseInt(v) || 0)}
-									onBlur={handleMedicineBlur}
-								/>
-								<TextInput
-									style={[flexTableStyles.cellInput, flexTableStyles.purchasedCell]}
-									value={String(row.purchasedTablets)}
-									keyboardType="numeric"
-									placeholder="0"
-									placeholderTextColor="#94A3B8"
-									onChangeText={(v) =>
-										updateMedicineField(row.id, 'purchasedTablets', parseInt(v) || 0)
-									}
-									onBlur={handleMedicineBlur}
-								/>
-								<TextInput
-									style={[flexTableStyles.cellInput, flexTableStyles.instructionsCell]}
-									value={row.instructions}
-									placeholder="e.g., After food"
-									placeholderTextColor="#94A3B8"
-									onChangeText={(v) => updateMedicineField(row.id, 'instructions', v)}
-									onBlur={handleMedicineBlur}
-								/>
-								<TouchableOpacity
-									style={flexTableStyles.deleteButton}
-									onPress={() => removeMedicineRow(row.id)}
-								>
-									<MaterialCommunityIcons name="trash-can-outline" size={20} color="#E74B5B" />
-								</TouchableOpacity>
-							</View>
-						))}
-					</View>
-					{medicineRows.length === 0 && (
-						<Text style={styles.emptyText}>No medicines added. Click "Add Medicine" to start.</Text>
-					)}
-					{savingMedicines && (
-						<View style={styles.savingRow}>
-							<ActivityIndicator size="small" color="#2E7C86" />
-							<Text style={styles.savingText}>Saving…</Text>
-						</View>
-					)}
-				</View>
-			)
-		} else {
-			return (
-				<View style={styles.card}>
-					<View style={styles.cardTitleRow}>
-						<Text style={styles.cardTitle}>Pharmacy Entry Form</Text>
-						<TouchableOpacity style={styles.addBtn} onPress={addMedicineRow}>
-							<MaterialCommunityIcons name="plus" size={14} color="#fff" />
-							<Text style={styles.addBtnText}>Add Medicine</Text>
-						</TouchableOpacity>
-					</View>
+	// const renderPharmacyEntryForm = () => {
+	// 	const useResponsiveFlex = isTablet || isLandscape
+	// 	if (useResponsiveFlex) {
+	// 		return (
+	// 			<View style={styles.card}>
+	// 				<View style={styles.cardTitleRow}>
+	// 					<Text style={styles.cardTitle}>Pharmacy Entry Form</Text>
+	// 					<TouchableOpacity style={styles.addBtn} onPress={addMedicineRow}>
+	// 						<MaterialCommunityIcons name="plus" size={14} color="#fff" />
+	// 						<Text style={styles.addBtnText}>Add Medicine</Text>
+	// 					</TouchableOpacity>
+	// 				</View>
+	// 				<View style={flexTableStyles.tableContainer}>
+	// 					<View style={flexTableStyles.headerRow}>
+	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.medicationCell]}>Medication</Text>
+	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.frequencyCell]}>Frequency</Text>
+	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.totalCell]}>Total Tabs</Text>
+	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.purchasedCell]}>Purchased</Text>
+	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.instructionsCell]}>
+	// 							Instructions
+	// 						</Text>
+	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.deleteCell]}> </Text>
+	// 					</View>
+	// 					{medicineRows.map((row) => (
+	// 						<View key={row.id} style={flexTableStyles.row}>
+	// 							<TextInput
+	// 								style={[flexTableStyles.cellInput, flexTableStyles.medicationCell]}
+	// 								value={row.medication}
+	// 								placeholder="e.g., Augmentin 625mg"
+	// 								placeholderTextColor="#94A3B8"
+	// 								onChangeText={(v) => updateMedicineField(row.id, 'medication', v)}
+	// 								onBlur={handleMedicineBlur}
+	// 							/>
+	// 							<TextInput
+	// 								style={[flexTableStyles.cellInput, flexTableStyles.frequencyCell]}
+	// 								value={row.frequency}
+	// 								placeholder="e.g., 1-0-1"
+	// 								placeholderTextColor="#94A3B8"
+	// 								onChangeText={(v) => updateMedicineField(row.id, 'frequency', v)}
+	// 								onBlur={handleMedicineBlur}
+	// 							/>
+	// 							<TextInput
+	// 								style={[flexTableStyles.cellInput, flexTableStyles.totalCell]}
+	// 								value={String(row.totalTablets)}
+	// 								keyboardType="numeric"
+	// 								placeholder="0"
+	// 								placeholderTextColor="#94A3B8"
+	// 								onChangeText={(v) => updateMedicineField(row.id, 'totalTablets', parseInt(v) || 0)}
+	// 								onBlur={handleMedicineBlur}
+	// 							/>
+	// 							<TextInput
+	// 								style={[flexTableStyles.cellInput, flexTableStyles.purchasedCell]}
+	// 								value={String(row.purchasedTablets)}
+	// 								keyboardType="numeric"
+	// 								placeholder="0"
+	// 								placeholderTextColor="#94A3B8"
+	// 								onChangeText={(v) =>
+	// 									updateMedicineField(row.id, 'purchasedTablets', parseInt(v) || 0)
+	// 								}
+	// 								onBlur={handleMedicineBlur}
+	// 							/>
+	// 							<TextInput
+	// 								style={[flexTableStyles.cellInput, flexTableStyles.instructionsCell]}
+	// 								value={row.instructions}
+	// 								placeholder="e.g., After food"
+	// 								placeholderTextColor="#94A3B8"
+	// 								onChangeText={(v) => updateMedicineField(row.id, 'instructions', v)}
+	// 								onBlur={handleMedicineBlur}
+	// 							/>
+	// 							<TouchableOpacity
+	// 								style={flexTableStyles.deleteButton}
+	// 								onPress={() => removeMedicineRow(row.id)}
+	// 							>
+	// 								<MaterialCommunityIcons name="trash-can-outline" size={20} color="#E74B5B" />
+	// 							</TouchableOpacity>
+	// 						</View>
+	// 					))}
+	// 				</View>
+	// 				{medicineRows.length === 0 && (
+	// 					<Text style={styles.emptyText}>No medicines added. Click "Add Medicine" to start.</Text>
+	// 				)}
+	// 				{savingMedicines && (
+	// 					<View style={styles.savingRow}>
+	// 						<ActivityIndicator size="small" color="#2E7C86" />
+	// 						<Text style={styles.savingText}>Saving…</Text>
+	// 					</View>
+	// 				)}
+	// 			</View>
+	// 		)
+	// 	} else {
+	// 		return (
+	// 			<View style={styles.card}>
+	// 				<View style={styles.cardTitleRow}>
+	// 					<Text style={styles.cardTitle}>Pharmacy Entry Form</Text>
+	// 					<TouchableOpacity style={styles.addBtn} onPress={addMedicineRow}>
+	// 						<MaterialCommunityIcons name="plus" size={14} color="#fff" />
+	// 						<Text style={styles.addBtnText}>Add Medicine</Text>
+	// 					</TouchableOpacity>
+	// 				</View>
 
-					<View style={mobileMedStyles.cardList}>
-						{medicineRows.map((row, index) => (
-							<View key={row.id} style={mobileMedStyles.medCard}>
-								<View style={mobileMedStyles.cardHeader}>
-									<View style={mobileMedStyles.headerLeft}>
-										<MaterialCommunityIcons name="pill" size={16} color="#2E7C86" />
-										<Text style={mobileMedStyles.cardIndexText}>Medicine #{index + 1}</Text>
-									</View>
-									<TouchableOpacity
-										style={mobileMedStyles.deleteIconBtn}
-										onPress={() => removeMedicineRow(row.id)}
-									>
-										<MaterialCommunityIcons name="delete-outline" size={18} color="#E74B5B" />
-									</TouchableOpacity>
-								</View>
+	// 				<View style={mobileMedStyles.cardList}>
+	// 					{medicineRows.map((row, index) => (
+	// 						<View key={row.id} style={mobileMedStyles.medCard}>
+	// 							<View style={mobileMedStyles.cardHeader}>
+	// 								<View style={mobileMedStyles.headerLeft}>
+	// 									<MaterialCommunityIcons name="pill" size={16} color="#2E7C86" />
+	// 									<Text style={mobileMedStyles.cardIndexText}>Medicine #{index + 1}</Text>
+	// 								</View>
+	// 								<TouchableOpacity
+	// 									style={mobileMedStyles.deleteIconBtn}
+	// 									onPress={() => removeMedicineRow(row.id)}
+	// 								>
+	// 									<MaterialCommunityIcons name="delete-outline" size={18} color="#E74B5B" />
+	// 								</TouchableOpacity>
+	// 							</View>
 
-								<View style={mobileMedStyles.inputGroup}>
-									<Text style={mobileMedStyles.inputLabel}>Medication Name</Text>
-									<TextInput
-										style={mobileMedStyles.textInput}
-										value={row.medication}
-										placeholder="e.g., Augmentin 625mg"
-										placeholderTextColor="#94A3B8"
-										onChangeText={(v) => updateMedicineField(row.id, 'medication', v)}
-										onBlur={handleMedicineBlur}
-									/>
-								</View>
+	// 							<View style={mobileMedStyles.inputGroup}>
+	// 								<Text style={mobileMedStyles.inputLabel}>Medication Name</Text>
+	// 								<TextInput
+	// 									style={mobileMedStyles.textInput}
+	// 									value={row.medication}
+	// 									placeholder="e.g., Augmentin 625mg"
+	// 									placeholderTextColor="#94A3B8"
+	// 									onChangeText={(v) => updateMedicineField(row.id, 'medication', v)}
+	// 									onBlur={handleMedicineBlur}
+	// 								/>
+	// 							</View>
 
-								<View style={mobileMedStyles.rowFields}>
-									<View style={[mobileMedStyles.inputGroup, { flex: 1, marginRight: 8 }]}>
-										<Text style={mobileMedStyles.inputLabel}>Frequency</Text>
-										<TextInput
-											style={mobileMedStyles.textInput}
-											value={row.frequency}
-											placeholder="e.g., 1-0-1"
-											placeholderTextColor="#94A3B8"
-											onChangeText={(v) => updateMedicineField(row.id, 'frequency', v)}
-											onBlur={handleMedicineBlur}
-										/>
-									</View>
-									<View style={[mobileMedStyles.inputGroup, { flex: 1 }]}>
-										<Text style={mobileMedStyles.inputLabel}>Instructions</Text>
-										<TextInput
-											style={mobileMedStyles.textInput}
-											value={row.instructions}
-											placeholder="e.g., After food"
-											placeholderTextColor="#94A3B8"
-											onChangeText={(v) => updateMedicineField(row.id, 'instructions', v)}
-											onBlur={handleMedicineBlur}
-										/>
-									</View>
-								</View>
+	// 							<View style={mobileMedStyles.rowFields}>
+	// 								<View style={[mobileMedStyles.inputGroup, { flex: 1, marginRight: 8 }]}>
+	// 									<Text style={mobileMedStyles.inputLabel}>Frequency</Text>
+	// 									<TextInput
+	// 										style={mobileMedStyles.textInput}
+	// 										value={row.frequency}
+	// 										placeholder="e.g., 1-0-1"
+	// 										placeholderTextColor="#94A3B8"
+	// 										onChangeText={(v) => updateMedicineField(row.id, 'frequency', v)}
+	// 										onBlur={handleMedicineBlur}
+	// 									/>
+	// 								</View>
+	// 								<View style={[mobileMedStyles.inputGroup, { flex: 1 }]}>
+	// 									<Text style={mobileMedStyles.inputLabel}>Instructions</Text>
+	// 									<TextInput
+	// 										style={mobileMedStyles.textInput}
+	// 										value={row.instructions}
+	// 										placeholder="e.g., After food"
+	// 										placeholderTextColor="#94A3B8"
+	// 										onChangeText={(v) => updateMedicineField(row.id, 'instructions', v)}
+	// 										onBlur={handleMedicineBlur}
+	// 									/>
+	// 								</View>
+	// 							</View>
 
-								<View style={mobileMedStyles.rowFields}>
-									<View style={[mobileMedStyles.inputGroup, { flex: 1, marginRight: 8 }]}>
-										<Text style={mobileMedStyles.inputLabel}>Total Prescribed</Text>
-										<TextInput
-											style={mobileMedStyles.textInput}
-											value={row.totalTablets ? String(row.totalTablets) : ''}
-											keyboardType="numeric"
-											placeholder="0"
-											placeholderTextColor="#94A3B8"
-											onChangeText={(v) =>
-												updateMedicineField(row.id, 'totalTablets', parseInt(v) || 0)
-											}
-											onBlur={handleMedicineBlur}
-										/>
-									</View>
-									<View style={[mobileMedStyles.inputGroup, { flex: 1 }]}>
-										<Text style={mobileMedStyles.inputLabel}>Purchased / Dispensed</Text>
-										<TextInput
-											style={mobileMedStyles.textInput}
-											value={row.purchasedTablets ? String(row.purchasedTablets) : ''}
-											keyboardType="numeric"
-											placeholder="0"
-											placeholderTextColor="#94A3B8"
-											onChangeText={(v) =>
-												updateMedicineField(row.id, 'purchasedTablets', parseInt(v) || 0)
-											}
-											onBlur={handleMedicineBlur}
-										/>
-									</View>
-								</View>
-							</View>
-						))}
-					</View>
+	// 							<View style={mobileMedStyles.rowFields}>
+	// 								<View style={[mobileMedStyles.inputGroup, { flex: 1, marginRight: 8 }]}>
+	// 									<Text style={mobileMedStyles.inputLabel}>Total Prescribed</Text>
+	// 									<TextInput
+	// 										style={mobileMedStyles.textInput}
+	// 										value={row.totalTablets ? String(row.totalTablets) : ''}
+	// 										keyboardType="numeric"
+	// 										placeholder="0"
+	// 										placeholderTextColor="#94A3B8"
+	// 										onChangeText={(v) =>
+	// 											updateMedicineField(row.id, 'totalTablets', parseInt(v) || 0)
+	// 										}
+	// 										onBlur={handleMedicineBlur}
+	// 									/>
+	// 								</View>
+	// 								<View style={[mobileMedStyles.inputGroup, { flex: 1 }]}>
+	// 									<Text style={mobileMedStyles.inputLabel}>Purchased / Dispensed</Text>
+	// 									<TextInput
+	// 										style={mobileMedStyles.textInput}
+	// 										value={row.purchasedTablets ? String(row.purchasedTablets) : ''}
+	// 										keyboardType="numeric"
+	// 										placeholder="0"
+	// 										placeholderTextColor="#94A3B8"
+	// 										onChangeText={(v) =>
+	// 											updateMedicineField(row.id, 'purchasedTablets', parseInt(v) || 0)
+	// 										}
+	// 										onBlur={handleMedicineBlur}
+	// 									/>
+	// 								</View>
+	// 							</View>
+	// 						</View>
+	// 					))}
+	// 				</View>
 
-					{medicineRows.length === 0 && (
-						<Text style={styles.emptyText}>No medicines added. Click "Add Medicine" to start.</Text>
-					)}
-					{savingMedicines && (
-						<View style={styles.savingRow}>
-							<ActivityIndicator size="small" color="#2E7C86" />
-							<Text style={styles.savingText}>Saving…</Text>
-						</View>
-					)}
-				</View>
-			)
-		}
-	}
+	// 				{medicineRows.length === 0 && (
+	// 					<Text style={styles.emptyText}>No medicines added. Click "Add Medicine" to start.</Text>
+	// 				)}
+	// 				{savingMedicines && (
+	// 					<View style={styles.savingRow}>
+	// 						<ActivityIndicator size="small" color="#2E7C86" />
+	// 						<Text style={styles.savingText}>Saving…</Text>
+	// 					</View>
+	// 				)}
+	// 			</View>
+	// 		)
+	// 	}
+	// }
 
 	if (loading) {
 		return (
@@ -833,7 +841,12 @@ const OrderDetailsScreen = () => {
 								<Text style={styles.receiptDate}>Ordered on {orderDate}</Text>
 							</View>
 							<View style={[styles.badgeStyle, { backgroundColor: currentStatusCfg.bg }]}>
-								<View style={[styles.statusDotSmall, { backgroundColor: currentStatusCfg.dot, marginRight: 4 }]} />
+								<View
+									style={[
+										styles.statusDotSmall,
+										{ backgroundColor: currentStatusCfg.dot, marginRight: 4 },
+									]}
+								/>
 								<Text style={[styles.badgeStyleText, { color: currentStatusCfg.text }]}>
 									{currentStatusCfg.label}
 								</Text>
@@ -845,13 +858,20 @@ const OrderDetailsScreen = () => {
 						<View style={styles.summaryGrid}>
 							<View style={styles.summaryItem}>
 								<Text style={styles.summaryLabel}>Delivery Type</Text>
-								<View style={[styles.badgeStyle, isHomeDelivery ? styles.badgeHome : styles.badgePickup]}>
+								<View
+									style={[styles.badgeStyle, isHomeDelivery ? styles.badgeHome : styles.badgePickup]}
+								>
 									<MaterialCommunityIcons
 										name={isHomeDelivery ? 'truck-delivery' : 'storefront'}
 										size={12}
 										color={isHomeDelivery ? '#0D47A1' : '#1B5E20'}
 									/>
-									<Text style={[styles.badgeStyleText, { color: isHomeDelivery ? '#0D47A1' : '#1B5E20' }]}>
+									<Text
+										style={[
+											styles.badgeStyleText,
+											{ color: isHomeDelivery ? '#0D47A1' : '#1B5E20' },
+										]}
+									>
 										{isHomeDelivery ? 'Home Delivery' : 'Store Pickup'}
 									</Text>
 								</View>
@@ -873,7 +893,8 @@ const OrderDetailsScreen = () => {
 									<Text style={styles.addressBadgeText}>{deliveryAddress.label}</Text>
 								</View>
 								<Text style={styles.addressDetailsText}>
-									{deliveryAddress.address_line}, {deliveryAddress.city}, {deliveryAddress.state} - {deliveryAddress.pincode}
+									{deliveryAddress.address_line}, {deliveryAddress.city}, {deliveryAddress.state} -{' '}
+									{deliveryAddress.pincode}
 								</Text>
 							</View>
 						)}
@@ -882,7 +903,12 @@ const OrderDetailsScreen = () => {
 					{/* Pharmacy Details */}
 					<SectionCard title="Pharmacy Details">
 						<View style={styles.pharmacyHeader}>
-							<MaterialCommunityIcons name="storefront-outline" size={24} color="#1f5f68" style={{ marginRight: 10 }} />
+							<MaterialCommunityIcons
+								name="storefront-outline"
+								size={24}
+								color="#1f5f68"
+								style={{ marginRight: 10 }}
+							/>
 							<View style={{ flex: 1 }}>
 								<Text style={styles.pharmacyName}>{pharmacy.name}</Text>
 								<Text style={styles.pharmacyAddress}>
@@ -926,9 +952,17 @@ const OrderDetailsScreen = () => {
 						) : (
 							<View style={styles.readOnlyMedList}>
 								{medicineRows.map((med, index) => (
-									<View key={med.id} style={[styles.readOnlyMedCard, index > 0 && styles.medCardBorder]}>
+									<View
+										key={med.id}
+										style={[styles.readOnlyMedCard, index > 0 && styles.medCardBorder]}
+									>
 										<View style={styles.medCardHeader}>
-											<MaterialCommunityIcons name="pill" size={16} color="#1f5f68" style={{ marginRight: 6 }} />
+											<MaterialCommunityIcons
+												name="pill"
+												size={16}
+												color="#1f5f68"
+												style={{ marginRight: 6 }}
+											/>
 											<Text style={styles.medCardName}>{med.medication || 'Medication'}</Text>
 										</View>
 										<View style={styles.medCardDetails}>
@@ -936,16 +970,16 @@ const OrderDetailsScreen = () => {
 												<Text style={styles.boldLabel}>Frequency:</Text> {med.frequency || '—'}
 											</Text>
 											<Text style={styles.medCardDetailText}>
-												<Text style={styles.boldLabel}>Total Tablets:</Text> {med.totalTablets || 0}
+												<Text style={styles.boldLabel}>Total Tablets:</Text>{' '}
+												{med.totalTablets || 0}
 											</Text>
 											<Text style={styles.medCardDetailText}>
-												<Text style={styles.boldLabel}>Purchased:</Text> {med.purchasedTablets || 0}
+												<Text style={styles.boldLabel}>Purchased:</Text>{' '}
+												{med.purchasedTablets || 0}
 											</Text>
 										</View>
 										{med.instructions ? (
-											<Text style={styles.medCardInstructions}>
-												Note: {med.instructions}
-											</Text>
+											<Text style={styles.medCardInstructions}>Note: {med.instructions}</Text>
 										) : null}
 									</View>
 								))}
@@ -961,25 +995,18 @@ const OrderDetailsScreen = () => {
 								const done = completedKeys.includes(step.key)
 								const isLast = idx === TIMELINE_STEPS.length - 1
 								const isRejectedStep = status === 'rejected' && step.key === 'order_created'
-								
+
 								// Dynamic coloring
-								const stepColor = isRejectedStep ? '#E74B5B' : (done ? '#1f5f68' : '#94A3B8')
-								const stepBg = isRejectedStep ? '#FFE3E7' : (done ? '#E8F5F5' : '#F1F5F9')
+								const stepColor = isRejectedStep ? '#E74B5B' : done ? '#1f5f68' : '#94A3B8'
+								const stepBg = isRejectedStep ? '#FFE3E7' : done ? '#E8F5F5' : '#F1F5F9'
 								const lineColor = done ? (status === 'rejected' ? '#E2E8F0' : '#1f5f68') : '#E2E8F0'
 
 								return (
 									<View key={step.key} style={styles.timelineStep}>
 										{!isLast && (
-											<View
-												style={[
-													styles.timelineLine,
-													{ backgroundColor: lineColor },
-												]}
-											/>
+											<View style={[styles.timelineLine, { backgroundColor: lineColor }]} />
 										)}
-										<View
-											style={[styles.timelineDot, { backgroundColor: stepBg }]}
-										>
+										<View style={[styles.timelineDot, { backgroundColor: stepBg }]}>
 											<MaterialCommunityIcons
 												name={isRejectedStep ? 'close' : step.icon}
 												size={14}
@@ -1051,7 +1078,10 @@ const OrderDetailsScreen = () => {
 							onSelect={(val) => handleMarkStatus(val)}
 							size="form"
 							noMargin
-							customCardStyle={{ borderColor: currentStatusCfg.dot + '60', backgroundColor: currentStatusCfg.bg }}
+							customCardStyle={{
+								borderColor: currentStatusCfg.dot + '60',
+								backgroundColor: currentStatusCfg.bg,
+							}}
 						/>
 					</View>
 
@@ -1060,7 +1090,12 @@ const OrderDetailsScreen = () => {
 						<Text style={styles.billInputLabel}>Final Bill Amount (₹):</Text>
 						<View style={styles.billInputWrapper}>
 							<View style={styles.billInputContainer}>
-								<MaterialCommunityIcons name="currency-inr" size={18} color="#6B7A82" style={{ marginLeft: 10 }} />
+								<MaterialCommunityIcons
+									name="currency-inr"
+									size={18}
+									color="#6B7A82"
+									style={{ marginLeft: 10 }}
+								/>
 								<TextInput
 									style={styles.billTextInput}
 									keyboardType="numeric"
@@ -1079,7 +1114,7 @@ const OrderDetailsScreen = () => {
 											visible: true,
 											status: 'error',
 											title: 'Invalid Amount',
-											description: 'Please enter a valid numeric bill amount.'
+											description: 'Please enter a valid numeric bill amount.',
 										})
 										return
 									}
@@ -1154,7 +1189,9 @@ const OrderDetailsScreen = () => {
 					<View style={styles.profileDivider} />
 
 					{/* Profile Details Grid */}
-					<View style={[(isTablet || isLandscape) ? styles.profileDetailsGrid : styles.profileDetailsGridStacked]}>
+					<View
+						style={[isTablet || isLandscape ? styles.profileDetailsGrid : styles.profileDetailsGridStacked]}
+					>
 						{/* Left: Patient Contact */}
 						<View style={styles.profileDetailsColumn}>
 							<Text style={styles.profileSectionTitle}>Patient Contact</Text>
@@ -1162,7 +1199,12 @@ const OrderDetailsScreen = () => {
 						</View>
 
 						{/* Right: Clinic Info */}
-						<View style={[styles.profileDetailsColumn, (isTablet || isLandscape) ? styles.borderLeft : styles.borderTop]}>
+						<View
+							style={[
+								styles.profileDetailsColumn,
+								isTablet || isLandscape ? styles.borderLeft : styles.borderTop,
+							]}
+						>
 							<Text style={styles.profileSectionTitle}>Prescribing Clinic</Text>
 							<InfoRow icon="hospital-building" value={clinic.name} />
 							<InfoRow icon="doctor" value={`Dr. ${clinic.doctor}`} />
@@ -1201,7 +1243,7 @@ const OrderDetailsScreen = () => {
 				</SectionCard>
 
 				{/* Pharmacy Entry Form */}
-				{renderPharmacyEntryForm()}
+				{/* {renderPharmacyEntryForm()} */}
 
 				{/* Order Stepper Timeline */}
 				<SectionCard title="Status History">
@@ -1211,25 +1253,16 @@ const OrderDetailsScreen = () => {
 							const done = completedKeys.includes(step.key)
 							const isLast = idx === TIMELINE_STEPS.length - 1
 							const isRejectedStep = status === 'rejected' && step.key === 'order_created'
-							
+
 							// Dynamic coloring
-							const stepColor = isRejectedStep ? '#E74B5B' : (done ? '#2E7C86' : '#94A3B8')
-							const stepBg = isRejectedStep ? '#FFE3E7' : (done ? '#E0F2F1' : '#F1F5F9')
+							const stepColor = isRejectedStep ? '#E74B5B' : done ? '#2E7C86' : '#94A3B8'
+							const stepBg = isRejectedStep ? '#FFE3E7' : done ? '#E0F2F1' : '#F1F5F9'
 							const lineColor = done ? (status === 'rejected' ? '#E2E8F0' : '#2E7C86') : '#E2E8F0'
 
 							return (
 								<View key={step.key} style={styles.timelineStep}>
-									{!isLast && (
-										<View
-											style={[
-												styles.timelineLine,
-												{ backgroundColor: lineColor },
-											]}
-										/>
-									)}
-									<View
-										style={[styles.timelineDot, { backgroundColor: stepBg }]}
-									>
+									{!isLast && <View style={[styles.timelineLine, { backgroundColor: lineColor }]} />}
+									<View style={[styles.timelineDot, { backgroundColor: stepBg }]}>
 										<MaterialCommunityIcons
 											name={isRejectedStep ? 'close' : step.icon}
 											size={14}
