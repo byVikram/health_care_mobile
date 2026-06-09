@@ -27,6 +27,7 @@ import {
 	AppSelect,
 	AppTypography,
 	StatusModal,
+	AppModal,
 } from '../../components/common'
 import { createPharmacyOrder } from '../profile/pharmacy/pharmacyService'
 import {
@@ -39,7 +40,10 @@ import {
 
 type RouteProps = RouteProp<AppStackParamList, typeof ROUTES.STACK.PLACE_PHARMACY_ORDER>
 
-const S3_BASE_URL = process.env.EXPO_PUBLIC_S3_BASE_URL || process.env.REACT_APP_S3_BASE_URL || 'https://healthcare-s3-bucket.s3.amazonaws.com'
+const S3_BASE_URL =
+	process.env.EXPO_PUBLIC_S3_BASE_URL ||
+	process.env.REACT_APP_S3_BASE_URL ||
+	'https://healthcare-s3-bucket.s3.amazonaws.com'
 
 const buildS3Url = (key?: string | null): string | null => {
 	if (!key) return null
@@ -121,7 +125,7 @@ export default function PlacePharmacyOrderPage() {
 			setLoadingAddresses(true)
 			const list = await getPatientAddresses()
 			setAddresses(list)
-			const def = list.find(a => a.is_default)
+			const def = list.find((a) => a.is_default)
 			if (def) {
 				setSelectedAddressId(def.id)
 			} else if (list.length > 0) {
@@ -142,7 +146,11 @@ export default function PlacePharmacyOrderPage() {
 
 	const handleAddAddress = async () => {
 		if (!newLabel.trim() || !newLine.trim() || !newCity.trim() || !newState.trim() || !newPincode.trim()) {
-			Toast.show({ type: 'error', text1: 'Validation Error', text2: 'Please fill in all fields for the address.' })
+			Toast.show({
+				type: 'error',
+				text1: 'Validation Error',
+				text2: 'Please fill in all fields for the address.',
+			})
 			return
 		}
 		setSavingAddress(true)
@@ -213,7 +221,7 @@ export default function PlacePharmacyOrderPage() {
 	}
 
 	// Prepare dropdown options
-	const treatmentOptions = treatments.map(t => {
+	const treatmentOptions = treatments.map((t) => {
 		const dateStr = new Date(t.created_at).toLocaleDateString('en-IN', {
 			day: 'numeric',
 			month: 'short',
@@ -228,15 +236,15 @@ export default function PlacePharmacyOrderPage() {
 	})
 
 	// Find active consultation details
-	const selectedTreatment = treatments.find(t => t.id === selectedTreatmentId)
+	const selectedTreatment = treatments.find((t) => t.id === selectedTreatmentId)
 
 	// Address select options
-	const addressOptions = addresses.map(a => ({
+	const addressOptions = addresses.map((a) => ({
 		label: `${a.label}: ${a.address_line}, ${a.city} - ${a.pincode}`,
 		value: a.id,
 	}))
 
-	const activeAddress = addresses.find(a => a.id === selectedAddressId)
+	const activeAddress = addresses.find((a) => a.id === selectedAddressId)
 
 	return (
 		<View style={styles.safe}>
@@ -353,12 +361,20 @@ export default function PlacePharmacyOrderPage() {
 												activeOpacity={0.9}
 											>
 												<Image
-													source={{ uri: buildS3Url(selectedTreatment.prescription_s3_key) || undefined }}
+													source={{
+														uri:
+															buildS3Url(selectedTreatment.prescription_s3_key) ||
+															undefined,
+													}}
 													style={styles.prescriptionImage}
 													resizeMode="contain"
 												/>
 												<View style={styles.imageKeyInfo}>
-													<MaterialCommunityIcons name="fullscreen" size={16} color="#1f5f68" />
+													<MaterialCommunityIcons
+														name="fullscreen"
+														size={16}
+														color="#1f5f68"
+													/>
 													<Text style={styles.imageKeyText} numberOfLines={1}>
 														Tap to expand prescription document
 													</Text>
@@ -366,14 +382,16 @@ export default function PlacePharmacyOrderPage() {
 											</TouchableOpacity>
 										</View>
 									) : null}
-
-
 								</View>
 							)}
 						</View>
 					)}
 				</View>
-
+				<View style={styles.addOrderButtonContainer}>
+					<AppButton variant="primary" style={styles.addOrderButton}>
+						+ Add More Pharmacy Orders
+					</AppButton>
+				</View>
 				{/* STEP 2: Select Delivery Type */}
 				<View style={styles.sectionCard}>
 					<View style={styles.sectionHeader}>
@@ -436,13 +454,19 @@ export default function PlacePharmacyOrderPage() {
 					{/* Step 3 (Conditional based on preference) */}
 					{deliveryType === 'pickup' ? (
 						<View style={styles.deliveryDetailsPanel}>
-							<MaterialCommunityIcons name="information-outline" size={18} color="#1f5f68" style={{ marginTop: 2 }} />
+							<MaterialCommunityIcons
+								name="information-outline"
+								size={18}
+								color="#1f5f68"
+								style={{ marginTop: 2 }}
+							/>
 							<View style={{ flex: 1 }}>
 								<AppTypography variant="subtitle" style={styles.panelTitle}>
 									Collect from Pharmacy Store
 								</AppTypography>
 								<AppTypography variant="body" style={styles.panelSub}>
-									Your prescription details will be verified by the pharmacist at {pharmacyName}. Once packed, you will receive an alert to collect it.
+									Your prescription details will be verified by the pharmacist at {pharmacyName}. Once
+									packed, you will receive an alert to collect it.
 								</AppTypography>
 							</View>
 						</View>
@@ -468,7 +492,11 @@ export default function PlacePharmacyOrderPage() {
 								</View>
 							) : addresses.length === 0 ? (
 								<View style={styles.addressEmptyCard}>
-									<MaterialCommunityIcons name="map-marker-question-outline" size={28} color="#90a4ae" />
+									<MaterialCommunityIcons
+										name="map-marker-question-outline"
+										size={28}
+										color="#90a4ae"
+									/>
 									<Text style={styles.addressEmptyMsg}>No addresses saved yet.</Text>
 									<TouchableOpacity
 										style={styles.addAddressPrimaryBtn}
@@ -494,7 +522,8 @@ export default function PlacePharmacyOrderPage() {
 												<Text style={styles.addressBadgeTxt}>{activeAddress.label}</Text>
 											</View>
 											<Text style={styles.addressPreviewTxt}>
-												{activeAddress.address_line}, {activeAddress.city}, {activeAddress.state} - {activeAddress.pincode}
+												{activeAddress.address_line}, {activeAddress.city},{' '}
+												{activeAddress.state} - {activeAddress.pincode}
 											</Text>
 										</View>
 									)}
@@ -526,7 +555,6 @@ export default function PlacePharmacyOrderPage() {
 						style={styles.remarksInput}
 					/>
 				</View>
-
 			</ScrollView>
 
 			{/* Fixed Bottom Action Button */}
@@ -629,7 +657,7 @@ export default function PlacePharmacyOrderPage() {
 						onPress={() => setIsImageViewerOpen(false)}
 						activeOpacity={1}
 					/>
-					
+
 					{/* Close Button */}
 					<TouchableOpacity
 						style={[styles.viewerCloseBtn, { top: Math.max(insets.top, 24) }]}
@@ -1065,5 +1093,13 @@ const styles = StyleSheet.create({
 	fullScreenImage: {
 		width: '90%',
 		height: '80%',
+	},
+	addOrderButtonContainer: {
+		marginBottom: 16, // spacing below button
+	},
+
+	addOrderButton: {
+		backgroundColor: '#1f5f68', // same theme color as other primary buttons
+		borderColor: '#1f5f68',
 	},
 })
