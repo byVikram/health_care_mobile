@@ -19,7 +19,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { AppFilterBottomSheet, AppSelect, AppSelectOption, AppTable, AppTableColumn, AppTypography } from '../../components/common'
+import { AppBottomSheet, AppSelect, AppSelectOption, AppTable, AppTableColumn, AppTypography } from '../../components/common'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { useAuth } from '../../context/AuthContext'
@@ -1059,7 +1059,7 @@ export default function AppointmentList() {
 	)
 
 	const renderFilterModal = () => (
-		<AppFilterBottomSheet
+		<AppBottomSheet
 			visible={filterModalVisible}
 			title="Filters"
 			onClose={closeFilterModal}
@@ -1118,7 +1118,7 @@ export default function AppointmentList() {
 					</TouchableOpacity>
 				</View>
 			</View>
-		</AppFilterBottomSheet>
+		</AppBottomSheet>
 	)
 
 	const content = (

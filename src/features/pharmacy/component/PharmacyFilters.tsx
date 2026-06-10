@@ -1,16 +1,12 @@
 // src/features/Pharmacy/components/PharmacyFilters.tsx
-import React, { useState } from 'react'
+import React from 'react'
 import {
 	View,
 	Text,
-	Switch,
 	StyleSheet,
 	Platform,
-	TouchableOpacity,
-	Modal,
-	ScrollView,
-	SafeAreaView,
 } from 'react-native'
+import { AppSelect, AppToggle } from '../../../components/common'
 
 export interface PharmacyFilterState {
 	city: string
@@ -38,33 +34,34 @@ const CITY_OPTIONS = [
 	{ label: 'Surat', value: 'Surat' },
 ]
 
-export default function PharmacyFilters({ filters, onChange }: Props) {
-	const [cityModalVisible, setCityModalVisible] = useState(false)
+const cityOptions = CITY_OPTIONS.map((city) => ({
+	label: city.label,
+	value: city.value,
+}))
 
+export default function PharmacyFilters({ filters, onChange }: Props) {
 	const handleToggle = (key: keyof Omit<PharmacyFilterState, 'city'>) => (value: boolean) => {
 		onChange({ ...filters, [key]: value })
 	}
-
-	const selectedCityLabel = CITY_OPTIONS.find((o) => o.value === filters.city)?.label ?? 'All Cities'
 
 	return (
 		<View style={styles.card}>
 			<Text style={styles.title}>Filters</Text>
 
 			{/* City Selector */}
-			<View style={styles.pickerWrapper}>
-				<Text style={styles.label}>City</Text>
-				<TouchableOpacity
-					style={styles.citySelector}
-					onPress={() => setCityModalVisible(true)}
-					activeOpacity={0.7}
-				>
-					<Text style={[styles.citySelectorText, !filters.city && styles.citySelectorPlaceholder]}>
-						{selectedCityLabel}
-					</Text>
-					<Text style={styles.chevron}>▾</Text>
-				</TouchableOpacity>
-			</View>
+			<AppSelect
+				label="City"
+				placeholder="All Cities"
+				value={filters.city}
+				options={cityOptions}
+				onSelect={(value) =>
+					onChange({
+						...filters,
+						city: value,
+					})
+				}
+				size="form"
+			/>
 
 			{/* Toggle Rows */}
 			<FilterToggle
@@ -80,47 +77,6 @@ export default function PharmacyFilters({ filters, onChange }: Props) {
 				last
 			/>
 
-			{/* City Modal */}
-			<Modal
-				visible={cityModalVisible}
-				animationType="slide"
-				transparent
-				onRequestClose={() => setCityModalVisible(false)}
-			>
-				<View style={styles.modalOverlay}>
-					<TouchableOpacity style={styles.modalBackdrop} onPress={() => setCityModalVisible(false)} />
-					<SafeAreaView style={styles.modalSheet}>
-						<View style={styles.modalHeader}>
-							<Text style={styles.modalTitle}>Select City</Text>
-							<TouchableOpacity onPress={() => setCityModalVisible(false)}>
-								<Text style={styles.modalClose}>✕</Text>
-							</TouchableOpacity>
-						</View>
-						<ScrollView>
-							{CITY_OPTIONS.map((opt) => (
-								<TouchableOpacity
-									key={opt.value}
-									style={[styles.cityOption, filters.city === opt.value && styles.cityOptionSelected]}
-									onPress={() => {
-										onChange({ ...filters, city: opt.value })
-										setCityModalVisible(false)
-									}}
-								>
-									<Text
-										style={[
-											styles.cityOptionText,
-											filters.city === opt.value && styles.cityOptionTextSelected,
-										]}
-									>
-										{opt.label}
-									</Text>
-									{filters.city === opt.value && <Text style={styles.cityOptionCheck}>✓</Text>}
-								</TouchableOpacity>
-							))}
-						</ScrollView>
-					</SafeAreaView>
-				</View>
-			</Modal>
 		</View>
 	)
 }
@@ -139,11 +95,13 @@ function FilterToggle({
 	return (
 		<View style={[styles.toggleRow, last && styles.toggleRowLast]}>
 			<Text style={styles.toggleLabel}>{label}</Text>
-			<Switch
+			<AppToggle
 				value={value}
 				onValueChange={onValueChange}
-				trackColor={{ false: '#E0E0E0', true: '#2B6F71' }}
-				thumbColor={Platform.OS === 'android' ? (value ? '#fff' : '#f4f3f4') : undefined}
+				showStatusText={false}
+				size="small"
+				activeColor="#2B6F71"
+				inactiveColor="#D0D5DD"
 			/>
 		</View>
 	)

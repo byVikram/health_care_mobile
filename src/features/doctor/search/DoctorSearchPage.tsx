@@ -1,26 +1,20 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
 	View,
-	Text,
 	StyleSheet,
 	FlatList,
 	RefreshControl,
 	ActivityIndicator,
 	useWindowDimensions,
 	DimensionValue,
-	Platform,
 	TouchableOpacity,
-	Animated,
-	Pressable,
 	ScrollView,
-	Modal,
 } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import { useRoute, useNavigation } from '@react-navigation/native'
-import { BlurView } from 'expo-blur'
 
 import DoctorSearchCard from './components/DoctorSearchCard'
-import { AppTypography, AppSkeleton, AppSelect, AppSelectOption } from '../../../components/common'
+import { AppTypography, AppSkeleton, AppSelect, AppSelectOption, AppBottomSheet } from '../../../components/common'
 import { getDoctors, getSpecialities } from '../doctorService'
 import { DoctorSearchItem } from '../../../types/doctor-search'
 import { doctorCardStyles } from './components/DoctorCard.styles'
@@ -83,7 +77,7 @@ function DoctorCardSkeleton({ mobile = false }: { mobile?: boolean }) {
 export default function DoctorSearchPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
-	const { width, height } = useWindowDimensions()
+	const { width } = useWindowDimensions()
 
 	const isMobile = width < 600
 	const numColumns = isMobile ? 1 : width >= 900 ? 4 : 3
@@ -115,8 +109,6 @@ export default function DoctorSearchPage() {
 	const [draftMinRating, setDraftMinRating] = useState('all')
 
 	const [showFilters, setShowFilters] = useState(false)
-	const filterSheetAnim = useRef(new Animated.Value(0)).current
-	const filterBackdropAnim = useRef(new Animated.Value(0)).current
 
 	// Load specialities on mount
 	useEffect(() => {
@@ -241,37 +233,10 @@ export default function DoctorSearchPage() {
 		setDraftConsultationType(consultationTypeFilter)
 		setDraftMinRating(minRatingFilter)
 		setShowFilters(true)
-		filterSheetAnim.setValue(0)
-		filterBackdropAnim.setValue(0)
-		Animated.parallel([
-			Animated.timing(filterSheetAnim, {
-				toValue: 1,
-				duration: 260,
-				useNativeDriver: true,
-			}),
-			Animated.timing(filterBackdropAnim, {
-				toValue: 1,
-				duration: 220,
-				useNativeDriver: true,
-			}),
-		]).start()
 	}
 
 	const closeFilterModal = () => {
-		Animated.parallel([
-			Animated.timing(filterSheetAnim, {
-				toValue: 0,
-				duration: 220,
-				useNativeDriver: true,
-			}),
-			Animated.timing(filterBackdropAnim, {
-				toValue: 0,
-				duration: 180,
-				useNativeDriver: true,
-			}),
-		]).start(({ finished }) => {
-			if (finished) setShowFilters(false)
-		})
+		setShowFilters(false)
 	}
 
 	const applyFilters = () => {
@@ -341,94 +306,64 @@ export default function DoctorSearchPage() {
 			</View>
 		) : null
 
-	const renderFilterModal = () => {
-		const translateY = filterSheetAnim.interpolate({
-			inputRange: [0, 1],
-			outputRange: [420, 0],
-		})
-		const backdropOpacity = filterBackdropAnim.interpolate({
-			inputRange: [0, 1],
-			outputRange: [0, 1],
-		})
-
+	const renderFilterContent = () => {
 		return (
-			<Modal visible={showFilters} transparent animationType="none" onRequestClose={closeFilterModal}>
-				<View style={styles.filterModalRoot}>
-					<Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
-						<BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
-						<View style={styles.filterDim} />
-						<Pressable style={StyleSheet.absoluteFill} onPress={closeFilterModal} />
-					</Animated.View>
+			<View style={[styles.filterSheetContentWrapper, { maxWidth: Math.min(width, 520) }]}>
+				<ScrollView
+					style={styles.filterSheetScroll}
+					contentContainerStyle={styles.filterSheetContent}
+					showsVerticalScrollIndicator={false}
+				>
+					<View style={styles.filterGroup}>
+						<AppTypography style={styles.filterGroupLabel}>Speciality</AppTypography>
+						<AppSelect
+							options={specialities}
+							value={draftSpecialityFilter}
+							onSelect={(value) => {
+								setDraftSpecialityFilter(value)
+							}}
+							placeholder={specialitiesLoading ? 'Loading specialities...' : 'Select Speciality'}
+							size="medium"
+							borderRadius={10}
+							customCardStyle={[styles.inlineFilterSelect, styles.mobileHospitalSelectCard]}
+							borderColor="#EAECF0"
+							maxDropdownHeight={240}
+							style={styles.inlineSelectFill}
+						/>
+					</View>
 
-					<Animated.View
-						style={[
-							styles.filterSheet,
-							{
-								width: Math.min(width - 24, 520),
-								maxHeight: Math.min(height * 0.78, 620),
-								paddingBottom: 26,
-								transform: [{ translateY }],
-							},
-						]}
-					>
-						<View style={styles.filterSheetHandle} />
+					<View style={styles.filterGroup}>
+						<AppTypography style={styles.filterGroupLabel}>Consultation Mode</AppTypography>
+						{renderFilterChips(
+							CONSULTATION_OPTIONS,
+							draftConsultationType,
+							setDraftConsultationType
+						)}
+					</View>
 
-						<View style={styles.filterSheetHeader}>
-							<Text style={styles.filterSheetTitle}>Filters</Text>
-							<TouchableOpacity style={styles.filterCloseButton} onPress={closeFilterModal}>
-								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
-							</TouchableOpacity>
-						</View>
+					<View style={styles.filterGroup}>
+						<AppTypography style={styles.filterGroupLabel}>Minimum Rating</AppTypography>
+						{renderFilterChips(RATING_OPTIONS, draftMinRating, setDraftMinRating)}
+					</View>
+				</ScrollView>
 
-						<ScrollView
-							style={styles.filterSheetScroll}
-							contentContainerStyle={styles.filterSheetContent}
-							showsVerticalScrollIndicator={false}
-						>
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Speciality</AppTypography>
-								<AppSelect
-									options={specialities}
-									value={draftSpecialityFilter}
-									onSelect={(value) => {
-										setDraftSpecialityFilter(value)
-									}}
-									placeholder={specialitiesLoading ? 'Loading specialities...' : 'Select Speciality'}
-									size="medium"
-									borderRadius={10}
-									customCardStyle={[styles.inlineFilterSelect, styles.mobileHospitalSelectCard]}
-									borderColor="#EAECF0"
-									maxDropdownHeight={240}
-									style={styles.inlineSelectFill}
-								/>
-							</View>
-
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Consultation Mode</AppTypography>
-								{renderFilterChips(
-									CONSULTATION_OPTIONS,
-									draftConsultationType,
-									setDraftConsultationType
-								)}
-							</View>
-
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Minimum Rating</AppTypography>
-								{renderFilterChips(RATING_OPTIONS, draftMinRating, setDraftMinRating)}
-							</View>
-						</ScrollView>
-
-						<View style={styles.filterSheetActions}>
-							<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
-								<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
-							</TouchableOpacity>
-							<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
-								<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
-							</TouchableOpacity>
-						</View>
-					</Animated.View>
+				<View style={styles.filterSheetActions}>
+					<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+						<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
+					</TouchableOpacity>
+					<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+						<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
+					</TouchableOpacity>
 				</View>
-			</Modal>
+			</View>
+		)
+	}
+
+	const renderFilterModal = () => {
+		return (
+			<AppBottomSheet visible={showFilters} title="Filters" onClose={closeFilterModal}>
+				{renderFilterContent()}
+			</AppBottomSheet>
 		)
 	}
 
@@ -613,58 +548,9 @@ const styles = StyleSheet.create({
 		backgroundColor: '#eaf8f9',
 		borderColor: '#1f5f68',
 	},
-	// Modal styles
-	filterModalRoot: {
-		flex: 1,
-		justifyContent: 'flex-end',
-		alignItems: 'center',
-	},
-	filterBackdrop: {
-		...StyleSheet.absoluteFillObject,
-	},
-	filterDim: {
-		...StyleSheet.absoluteFillObject,
-		backgroundColor: 'rgba(15, 23, 42, 0.34)',
-	},
-	filterSheet: {
-		backgroundColor: '#ffffff',
-		borderTopLeftRadius: 24,
-		borderTopRightRadius: 24,
-		paddingTop: 8,
-		overflow: 'hidden',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: -10 },
-		shadowOpacity: 0.14,
-		shadowRadius: 24,
-		elevation: 18,
-	},
-	filterSheetHandle: {
-		width: 44,
-		height: 4,
-		borderRadius: 999,
-		backgroundColor: '#d7dee6',
+	filterSheetContentWrapper: {
+		width: '100%',
 		alignSelf: 'center',
-		marginBottom: 10,
-	},
-	filterSheetHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 18,
-		paddingBottom: 12,
-	},
-	filterSheetTitle: {
-		fontSize: 18,
-		lineHeight: 24,
-		fontWeight: '700',
-		color: '#111827',
-	},
-	filterCloseButton: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		alignItems: 'center',
-		justifyContent: 'center',
 	},
 	filterSheetScroll: {
 		flexGrow: 0,
