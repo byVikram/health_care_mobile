@@ -17,6 +17,7 @@ import { BASE_URL } from '../../../constants/apiUrls'
 import { DoctorAvailability, DoctorHospital } from '../../../types/doctor-profile'
 import { ROUTES } from '../../../navigation/routes'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
+import EducationTab from './tabs/EducationalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import MyHospitalsTab from './tabs/MyHospitalsTab'
 import AvailabilityTab from './tabs/AvailabilityTab'
@@ -27,6 +28,7 @@ import SessionsTab from '../SessionsTab'
 
 const TABS = [
 	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
+	{ key: 'education', label: 'Education details', Component: EducationTab },
 	{ key: 'professional', label: 'Professional details', Component: ProfessionalDetailsTab },
 	{ key: 'hospitals', label: 'My hospitals', Component: MyHospitalsTab },
 	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },

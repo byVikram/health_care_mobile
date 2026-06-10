@@ -2,15 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
 	ActivityIndicator,
 	Alert,
-	Platform,
 	ScrollView,
 	StyleSheet,
+	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import * as ImagePicker from 'expo-image-picker'
 import { AppButton, AppInput, AppSelect, AppSelectOption, AppTypography } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import {
@@ -20,64 +19,25 @@ import {
 	updateDoctorProfessionalDetails,
 } from '../../../doctor/doctorService'
 
-const DEGREE_OPTIONS = [
-	{ value: 'mbbs', label: 'MBBS' },
-	{ value: 'md', label: 'MD' },
-	{ value: 'ms', label: 'MS' },
-	{ value: 'bds', label: 'BDS' },
-	{ value: 'mds', label: 'MDS' },
-	{ value: 'bams', label: 'BAMS' },
-	{ value: 'bhms', label: 'BHMS' },
-	{ value: 'bpt', label: 'BPT' },
-	{ value: 'dnb', label: 'DNB' },
-]
-
-const COLLEGE_OPTIONS = [
-	{ value: 'kms', label: 'Karnataka Medical Science (KMS)' },
-	{ value: 'aiims', label: 'AIIMS' },
-	{ value: 'afmc', label: 'Armed Forces Medical College' },
-	{ value: 'jipmer', label: 'JIPMER' },
-	{ value: 'mmc', label: 'Madras Medical College' },
-	{ value: 'other', label: 'Other' },
+const EXPERTISE_SUGGESTIONS = [
+	'Echocardiography',
+	'Heart Failure',
+	'Interventional Cardiology',
+	'Pediatrics',
+	'Cardiac Imaging',
+	'Electrophysiology',
+	'Preventive Cardiology',
+	'Vascular Medicine',
 ]
 
 type Option = AppSelectOption
 
-type InputFieldProps = {
-	label: string
-	value: string
-	onChangeText: (value: string) => void
-	placeholder: string
-	keyboardType?: React.ComponentProps<typeof AppInput>['keyboardType']
-	maxLength?: number
-	required?: boolean
-}
-
-type SelectDropdownProps = {
-	label: string
-	value?: string
-	placeholder: string
-	options: Option[]
-	onSelect: (value: string) => void
-	required?: boolean
-}
-
-type UploadBoxProps = {
-	label: string
-	required?: boolean
-	description?: string
-	fileName?: string
-	onUpload: () => void
-	stacked: boolean
-}
-
 type ProfessionalFormData = {
 	specialization_id: string
 	specialization_label: string
-	degree: string
-	college: string
-	yearOfPassing: string
-	qualificationProof: string
+	currentDesignation: string
+	areasOfExpertise: string[]
+	treatments: string
 	registrationNumber: string
 	registrationProof: string
 	about: string
@@ -86,7 +46,9 @@ type ProfessionalFormData = {
 const normalizeOptionValue = (value: string, options: Option[]) => {
 	if (!value) return ''
 	const normalized = value.trim().toLowerCase()
-	const match = options.find((option) => option.value.toLowerCase() === normalized || option.label.toLowerCase() === normalized)
+	const match = options.find(
+		(option) => option.value.toLowerCase() === normalized || option.label.toLowerCase() === normalized
+	)
 	return match?.value || value
 }
 
@@ -132,7 +94,11 @@ function FieldLabel({ label, required = false }: { label: string; required?: boo
 	return (
 		<AppTypography variant="caption" style={styles.fieldLabel}>
 			{label}
-			{required ? <AppTypography variant="caption" style={styles.requiredMark}>*</AppTypography> : null}
+			{required ? (
+				<AppTypography variant="caption" style={styles.requiredMark}>
+					*
+				</AppTypography>
+			) : null}
 		</AppTypography>
 	)
 }
@@ -153,7 +119,15 @@ function InputField({
 	keyboardType = 'default',
 	maxLength,
 	required = false,
-}: InputFieldProps) {
+}: {
+	label: string
+	value: string
+	onChangeText: (value: string) => void
+	placeholder: string
+	keyboardType?: React.ComponentProps<typeof AppInput>['keyboardType']
+	maxLength?: number
+	required?: boolean
+}) {
 	const isAboutField = label === 'About / Bio'
 
 	return (
@@ -178,7 +152,21 @@ function InputField({
 	)
 }
 
-function SelectDropdown({ label, value, placeholder, options, onSelect, required = false }: SelectDropdownProps) {
+function SelectDropdown({
+	label,
+	value,
+	placeholder,
+	options,
+	onSelect,
+	required = false,
+}: {
+	label: string
+	value?: string
+	placeholder: string
+	options: Option[]
+	onSelect: (value: string) => void
+	required?: boolean
+}) {
 	return (
 		<View style={styles.fieldGroup}>
 			{label ? <FieldLabel label={label} required={required} /> : null}
@@ -195,32 +183,139 @@ function SelectDropdown({ label, value, placeholder, options, onSelect, required
 	)
 }
 
-function UploadBox({ label, required, description, fileName, onUpload, stacked }: UploadBoxProps) {
+function ChipInput({
+	label,
+	chips,
+	onAdd,
+	onRemove,
+	placeholder,
+	required = false,
+}: {
+	label: string
+	chips: string[]
+	onAdd: (value: string) => void
+	onRemove: (index: number) => void
+	placeholder: string
+	required?: boolean
+}) {
+	const [inputValue, setInputValue] = useState('')
+
+	const handleAdd = () => {
+		const trimmed = inputValue.trim()
+		if (!trimmed) return
+		if (chips.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+			setInputValue('')
+			return
+		}
+		onAdd(trimmed)
+		setInputValue('')
+	}
+
+	const handleKeyPress = (e: any) => {
+		if (e.nativeEvent.key === 'Enter' || e.nativeEvent.key === ',') {
+			handleAdd()
+		}
+	}
+
 	return (
-		<View style={[styles.uploadSection, stacked && styles.uploadSectionStacked]}>
-			<View style={styles.uploadCopy}>
-				{label ? <FieldLabel label={label} required={required} /> : null}
-				{description ? (
-					<AppTypography variant="caption" style={styles.uploadDescription}>
-						{description}
-					</AppTypography>
-				) : null}
-				{fileName ? (
-					<AppTypography variant="caption" style={styles.uploadFileName}>
-						Selected: {fileName}
-					</AppTypography>
-				) : null}
+		<View style={styles.fieldGroup}>
+			{label ? <FieldLabel label={label} required={required} /> : null}
+
+			{/* Selected chips */}
+			{chips.length > 0 && (
+				<View style={styles.chipsContainer}>
+					{chips.map((chip, index) => (
+						<View key={`${chip}-${index}`} style={styles.chip}>
+							<AppTypography variant="caption" style={styles.chipText}>
+								{chip}
+							</AppTypography>
+							<TouchableOpacity
+								onPress={() => onRemove(index)}
+								style={styles.chipRemove}
+								hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+							>
+								<MaterialCommunityIcons name="close" size={13} color="#1f8a8f" />
+							</TouchableOpacity>
+						</View>
+					))}
+				</View>
+			)}
+
+			{/* Input row */}
+			<View style={styles.chipInputRow}>
+				<TextInput
+					value={inputValue}
+					onChangeText={setInputValue}
+					placeholder={placeholder}
+					placeholderTextColor="#9a9a9a"
+					style={styles.chipTextInput}
+					onSubmitEditing={handleAdd}
+					onKeyPress={handleKeyPress}
+					returnKeyType="done"
+					blurOnSubmit={false}
+				/>
+				<TouchableOpacity style={styles.chipAddButton} onPress={handleAdd} activeOpacity={0.8}>
+					<MaterialCommunityIcons name="plus" size={18} color="#0c7c7c" />
+				</TouchableOpacity>
 			</View>
-			<TouchableOpacity
-				style={[styles.uploadTile, stacked && styles.uploadTileStacked, !label && styles.uploadTileCompact]}
-				onPress={onUpload}
-				activeOpacity={0.85}
-			>
-				<MaterialCommunityIcons name="cloud-upload-outline" size={26} color="#0c7c7c" />
-				<AppTypography variant="caption" style={styles.uploadTileText}>
-					Upload
+
+			{/* Suggestions */}
+			<View style={styles.suggestionsRow}>
+				{EXPERTISE_SUGGESTIONS.filter((s) => !chips.some((c) => c.toLowerCase() === s.toLowerCase())).map(
+					(suggestion) => (
+						<TouchableOpacity
+							key={suggestion}
+							style={styles.suggestionChip}
+							onPress={() => onAdd(suggestion)}
+							activeOpacity={0.75}
+						>
+							<AppTypography variant="caption" style={styles.suggestionChipText}>
+								+ {suggestion}
+							</AppTypography>
+						</TouchableOpacity>
+					)
+				)}
+			</View>
+		</View>
+	)
+}
+
+function MultilineField({
+	label,
+	value,
+	onChangeText,
+	placeholder,
+	helperText,
+	required = false,
+}: {
+	label: string
+	value: string
+	onChangeText: (value: string) => void
+	placeholder: string
+	helperText?: string
+	required?: boolean
+}) {
+	return (
+		<View style={styles.fieldGroup}>
+			{label ? <FieldLabel label={label} required={required} /> : null}
+			<AppInput
+				value={value}
+				onChangeText={onChangeText}
+				placeholder={placeholder}
+				placeholderTextColor="#9a9a9a"
+				style={styles.multilineInput}
+				contentStyle={styles.multilineInputContent}
+				multiline
+				textAlignVertical="top"
+				fieldSize="form"
+				noMargin
+				dense
+			/>
+			{helperText ? (
+				<AppTypography variant="caption" style={styles.helperText}>
+					{helperText}
 				</AppTypography>
-			</TouchableOpacity>
+			) : null}
 		</View>
 	)
 }
@@ -237,25 +332,21 @@ export default function ProfessionalDetailsTab() {
 	const [formData, setFormData] = useState<ProfessionalFormData>({
 		specialization_id: '',
 		specialization_label: '',
-		degree: '',
-		college: '',
-		yearOfPassing: '',
-		qualificationProof: '',
+		currentDesignation: '',
+		areasOfExpertise: [],
+		treatments: '',
 		registrationNumber: '',
 		registrationProof: '',
 		about: '',
 	})
-	const [experienceYears, setExperienceYears] = useState(0)
+	const [experienceYears, setExperienceYears] = useState<string>('')
 	const [specialities, setSpecialities] = useState<Option[]>([])
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isLoadingSpecialities, setIsLoadingSpecialities] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 
 	const updateFormData = <K extends keyof ProfessionalFormData>(key: K, value: ProfessionalFormData[K]) => {
-		setFormData((prev) => ({
-			...prev,
-			[key]: value,
-		}))
+		setFormData((prev) => ({ ...prev, [key]: value }))
 	}
 
 	useEffect(() => {
@@ -286,15 +377,14 @@ export default function ProfessionalDetailsTab() {
 				setFormData({
 					specialization_id: profile.professional.specialization_id || '',
 					specialization_label: profile.professional.specialization_label || '',
-					degree: normalizeOptionValue(profile.professional.degree || '', DEGREE_OPTIONS),
-					college: normalizeOptionValue(profile.professional.college || '', COLLEGE_OPTIONS),
-					yearOfPassing: profile.professional.yearOfPassing || '',
-					qualificationProof: profile.professional.qualificationProof || '',
+					currentDesignation: profile.professional.currentDesignation || '',
+					areasOfExpertise: profile.professional.areasOfExpertise || [],
+					treatments: profile.professional.treatments || '',
 					registrationNumber: profile.professional.registrationNumber || '',
 					registrationProof: profile.professional.registrationProof || '',
 					about: profile.professional.about || '',
 				})
-				setExperienceYears(Number(response.data.professional_details?.experience_years ?? 0))
+				setExperienceYears(String(response.data.professional_details?.experience_years ?? ''))
 			} catch (error) {
 				console.log('[ProfessionalDetailsTab] failed to load profile:', error)
 			} finally {
@@ -316,15 +406,14 @@ export default function ProfessionalDetailsTab() {
 			setFormData({
 				specialization_id: profile.professional.specialization_id || '',
 				specialization_label: profile.professional.specialization_label || '',
-				degree: normalizeOptionValue(profile.professional.degree || '', DEGREE_OPTIONS),
-				college: normalizeOptionValue(profile.professional.college || '', COLLEGE_OPTIONS),
-				yearOfPassing: profile.professional.yearOfPassing || '',
-				qualificationProof: profile.professional.qualificationProof || '',
+				currentDesignation: profile.professional.currentDesignation || '',
+				areasOfExpertise: profile.professional.areasOfExpertise || [],
+				treatments: profile.professional.treatments || '',
 				registrationNumber: profile.professional.registrationNumber || '',
 				registrationProof: profile.professional.registrationProof || '',
 				about: profile.professional.about || '',
 			})
-			setExperienceYears(Number(response.data.professional_details?.experience_years ?? 0))
+			setExperienceYears(String(response.data.professional_details?.experience_years ?? ''))
 
 			await updateUser({
 				name: profile.personal.name || user?.name || '',
@@ -336,29 +425,6 @@ export default function ProfessionalDetailsTab() {
 		}
 	}
 
-	const handleUpload = async (field: 'qualificationProof' | 'registrationProof') => {
-		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
-
-		if (!permission.granted) {
-			Alert.alert('Permission needed', 'Please allow photo library access to upload your proof.')
-			return
-		}
-
-		const result = await ImagePicker.launchImageLibraryAsync({
-			mediaTypes: ImagePicker.MediaTypeOptions.Images,
-			allowsMultipleSelection: false,
-			quality: 0.8,
-		})
-
-		if (result.canceled || !result.assets.length) {
-			return
-		}
-
-		const asset = result.assets[0]
-		const fileLabel = asset.fileName || asset.uri.split('/').pop() || 'Selected file'
-		updateFormData(field, fileLabel)
-	}
-
 	const handleSpecialitySelect = (value: string) => {
 		const selected = specialities.find((item) => item.value === value)
 		setFormData((prev) => ({
@@ -368,41 +434,42 @@ export default function ProfessionalDetailsTab() {
 		}))
 	}
 
+	const handleAddExpertise = (value: string) => {
+		updateFormData('areasOfExpertise', [...formData.areasOfExpertise, value])
+	}
+
+	const handleRemoveExpertise = (index: number) => {
+		updateFormData(
+			'areasOfExpertise',
+			formData.areasOfExpertise.filter((_, i) => i !== index)
+		)
+	}
+
 	const handleSave = async () => {
-		const payload = {
-			experience_years: Number.isFinite(experienceYears) ? experienceYears : 0,
-			degree: formData.degree.trim(),
-			college: formData.college.trim(),
-			year_of_passing: formData.yearOfPassing.trim(),
-			qualification_proof_s3_key: formData.qualificationProof.trim() || null,
-			registration_number: formData.registrationNumber.trim(),
-			registration_proof_s3_key: formData.registrationProof.trim() || null,
-			about: formData.about.trim(),
-		}
+		const parsedExperience = parseInt(experienceYears, 10)
 
 		if (!formData.specialization_id) {
 			Alert.alert('Validation', 'Please select your specialization.')
 			return
 		}
 
-		if (!payload.degree) {
-			Alert.alert('Validation', 'Please select your degree.')
+		if (experienceYears !== '' && (isNaN(parsedExperience) || parsedExperience < 0)) {
+			Alert.alert('Validation', 'Please enter a valid number for years of experience.')
 			return
 		}
 
-		if (!payload.college) {
-			Alert.alert('Validation', 'Please select your college or university.')
-			return
-		}
-
-		if (payload.year_of_passing && !/^\d{4}$/.test(payload.year_of_passing)) {
-			Alert.alert('Validation', 'Please enter a valid 4-digit year of passing.')
-			return
+		const payload = {
+			experience_years: experienceYears !== '' && !isNaN(parsedExperience) ? parsedExperience : 0,
+			current_designation: formData.currentDesignation.trim(),
+			areas_of_expertise: formData.areasOfExpertise,
+			treatments: formData.treatments.trim(),
+			registration_number: formData.registrationNumber.trim(),
+			registration_proof_s3_key: formData.registrationProof.trim() || null,
+			about: formData.about.trim(),
 		}
 
 		try {
 			setIsSaving(true)
-
 			await updateDoctorProfessionalDetails(payload)
 			await syncProfileAfterSave()
 			Alert.alert('Success', 'Professional details saved successfully.')
@@ -423,7 +490,6 @@ export default function ProfessionalDetailsTab() {
 
 	const sectionPadding = isMobile ? 16 : isTablet ? 20 : 24
 	const rowSpacing = isMobile ? 18 : isLandscape ? 22 : 20
-	const titleBottom = isMobile ? 18 : 22
 	const selectedLabel = formData.specialization_label
 
 	if (isLoadingProfile) {
@@ -449,6 +515,7 @@ export default function ProfessionalDetailsTab() {
 			showsVerticalScrollIndicator={false}
 		>
 			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+				{/* Specialization */}
 				<View style={{ marginBottom: rowSpacing }}>
 					<SectionTitle>Select Specialization</SectionTitle>
 					{isLoadingSpecialities ? (
@@ -468,51 +535,48 @@ export default function ProfessionalDetailsTab() {
 
 				<View style={styles.sectionDivider} />
 
+				{/* Professional Info */}
 				<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
-					<SectionTitle>Educational Qualification and Proof</SectionTitle>
+					<SectionTitle>Professional Information</SectionTitle>
 					<View style={{ gap: 18 }}>
-						<SelectDropdown
-							label="Select Degree"
-							value={formData.degree}
-							placeholder="Select your degree"
-							options={DEGREE_OPTIONS}
-							onSelect={(value) => updateFormData('degree', value)}
-							required
-						/>
-
 						<FormRow stacked={!useTwoColumns} compact={isTablet}>
-							<SelectDropdown
-								label="Select College/University"
-								value={formData.college}
-								placeholder="Select college or university"
-								options={COLLEGE_OPTIONS}
-								onSelect={(value) => updateFormData('college', value)}
-								required
+							<InputField
+								label="Current Designation"
+								value={formData.currentDesignation}
+								onChangeText={(value) => updateFormData('currentDesignation', value)}
+								placeholder="e.g. Senior Consultant"
 							/>
 							<InputField
-								label="Select Year"
-								value={formData.yearOfPassing}
-								onChangeText={(value) => updateFormData('yearOfPassing', value.replace(/\D/g, '').slice(0, 4))}
-								placeholder="Enter year of passing"
-								keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
-								maxLength={4}
-								required
+								label="Years of Experience"
+								value={experienceYears}
+								onChangeText={(value) => setExperienceYears(value.replace(/\D/g, '').slice(0, 3))}
+								placeholder="0"
+								keyboardType="numeric"
+								maxLength={3}
 							/>
 						</FormRow>
 
-						<UploadBox
-							label="Upload image or PDF of Qualification proofs"
-							required
-							description="Non allied practitioners should submit council registration proof with mentioned degree name. Allied practitioners should submit mark sheets / passing certificates from UGC approved university."
-							fileName={formData.qualificationProof}
-							onUpload={() => handleUpload('qualificationProof')}
-							stacked={isMobile}
+						<ChipInput
+							label="Areas of Expertise"
+							chips={formData.areasOfExpertise}
+							onAdd={handleAddExpertise}
+							onRemove={handleRemoveExpertise}
+							placeholder="Add expertise..."
+						/>
+
+						<MultilineField
+							label="Treatments & Procedures"
+							value={formData.treatments}
+							onChangeText={(value) => updateFormData('treatments', value)}
+							placeholder="List the medical procedures you perform regularly..."
+							helperText="Separate items with commas for better readability."
 						/>
 					</View>
 				</View>
 
 				<View style={styles.sectionDivider} />
 
+				{/* Registration Details */}
 				<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
 					<SectionTitle>Registration Details and Proofs</SectionTitle>
 					<View style={{ gap: 18 }}>
@@ -528,22 +592,13 @@ export default function ProfessionalDetailsTab() {
 							</View>
 						) : null}
 
-						<FormRow stacked={!useTwoColumns} compact={isTablet} alignBottom>
-							<InputField
-								label="Registration Number"
-								value={formData.registrationNumber}
-								onChangeText={(value) => updateFormData('registrationNumber', value)}
-								placeholder="Enter registration number"
-								required
-							/>
-							<UploadBox
-								label=""
-								required
-								fileName={formData.registrationProof}
-								onUpload={() => handleUpload('registrationProof')}
-								stacked={isMobile}
-							/>
-						</FormRow>
+						<InputField
+							label="Registration Number"
+							value={formData.registrationNumber}
+							onChangeText={(value) => updateFormData('registrationNumber', value)}
+							placeholder="Enter registration number"
+							required
+						/>
 
 						<InputField
 							label="About / Bio"
@@ -562,7 +617,7 @@ export default function ProfessionalDetailsTab() {
 					loading={isSaving}
 					disabled={isSaving}
 				>
-					Save 
+					Save
 				</AppButton>
 			</View>
 		</ScrollView>
@@ -587,7 +642,6 @@ const styles = StyleSheet.create({
 	contentShell: {
 		width: '100%',
 	},
-
 	sectionTitle: {
 		color: '#343434',
 		fontSize: 18,
@@ -658,58 +712,92 @@ const styles = StyleSheet.create({
 		paddingTop: 12,
 		paddingBottom: 12,
 	},
-	uploadSection: {
+	// Chip input
+	chipsContainer: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+		marginBottom: 10,
+	},
+	chip: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'space-between',
-		columnGap: 16,
+		backgroundColor: 'rgba(43,111,113,0.08)',
+		borderWidth: 1,
+		borderColor: 'rgba(43,111,113,0.25)',
+		borderRadius: 20,
+		paddingHorizontal: 12,
+		paddingVertical: 5,
+		gap: 5,
 	},
-	uploadSectionStacked: {
-		flexDirection: 'column',
-		alignItems: 'stretch',
-		rowGap: 14,
-	},
-	uploadCopy: {
-		flex: 1,
-		minWidth: 0,
-	},
-	uploadDescription: {
-		color: '#6e6e6e',
-		fontSize: 12,
-		lineHeight: 19,
-	},
-	uploadFileName: {
-		marginTop: 6,
-		color: '#1f8a8f',
-		fontSize: 12,
+	chipText: {
+		color: '#1f6e71',
+		fontSize: 13,
 		lineHeight: 18,
-		fontWeight: '600',
+		fontWeight: '500',
 	},
-	uploadTile: {
-		width: 84,
-		height: 84,
-		borderWidth: 1.5,
-		borderStyle: 'dashed',
-		borderColor: '#c8d8db',
+	chipRemove: {
+		marginLeft: 2,
+	},
+	chipInputRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		borderWidth: 1,
+		borderColor: '#d4dfe1',
 		borderRadius: 10,
-		backgroundColor: 'rgba(43,111,113,0.03)',
+		backgroundColor: '#fafcfc',
+		overflow: 'hidden',
+	},
+	chipTextInput: {
+		flex: 1,
+		height: 46,
+		paddingHorizontal: 14,
+		fontSize: 14,
+		color: '#343434',
+	},
+	chipAddButton: {
+		width: 44,
+		height: 46,
 		alignItems: 'center',
 		justifyContent: 'center',
-		paddingHorizontal: 8,
+		borderLeftWidth: 1,
+		borderLeftColor: '#e9eef0',
 	},
-	uploadTileCompact: {
-		alignSelf: 'flex-start',
+	suggestionsRow: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 7,
+		marginTop: 10,
 	},
-	uploadTileStacked: {
-		width: '100%',
-		height: 90,
+	suggestionChip: {
+		borderWidth: 1,
+		borderColor: '#c8d8db',
+		borderRadius: 20,
+		borderStyle: 'dashed',
+		paddingHorizontal: 11,
+		paddingVertical: 4,
 	},
-	uploadTileText: {
-		marginTop: 4,
-		color: '#0c7c7c',
+	suggestionChipText: {
+		color: '#6e8e90',
 		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '600',
+		lineHeight: 18,
+	},
+	// Multiline field
+	multilineInput: {
+		minHeight: 110,
+		height: 110,
+	},
+	multilineInputContent: {
+		minHeight: 90,
+		height: 90,
+		paddingTop: 12,
+		paddingBottom: 12,
+	},
+	helperText: {
+		marginTop: 6,
+		color: '#9a9a9a',
+		fontSize: 12,
+		lineHeight: 17,
 	},
 	noticeCard: {
 		backgroundColor: 'rgba(43,111,113,0.07)',
