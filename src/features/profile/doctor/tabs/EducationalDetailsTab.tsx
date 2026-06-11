@@ -1,15 +1,8 @@
 import React, { useMemo, useState } from 'react'
-import {
-	Alert,
-	ScrollView,
-	StyleSheet,
-	TouchableOpacity,
-	View,
-	useWindowDimensions,
-} from 'react-native'
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { AppButton, AppInput, AppSelect, AppSelectOption, AppTypography } from '../../../../components/common'
+import { AppButton, AppInput, AppSelect, AppSelectOption, AppStickyFooter, AppTypography } from '../../../../components/common'
 import {
 	type DoctorEducationalQualificationPayload,
 	updateDoctorEducationalQualifications,
@@ -118,7 +111,12 @@ function FieldLabel({ label, required = false }: { label: string; required?: boo
 	return (
 		<AppTypography variant="caption" style={styles.fieldLabel}>
 			{label}
-			{required ? <AppTypography variant="caption" style={styles.requiredMark}> *</AppTypography> : null}
+			{required ? (
+				<AppTypography variant="caption" style={styles.requiredMark}>
+					{' '}
+					*
+				</AppTypography>
+			) : null}
 		</AppTypography>
 	)
 }
@@ -305,8 +303,8 @@ export default function EducationalDetailsTab() {
 		if (editingId) {
 			setQualifications((prev) =>
 				prev.map((qualification) =>
-					qualification.id === editingId ? { ...qualification, ...formData } : qualification,
-				),
+					qualification.id === editingId ? { ...qualification, ...formData } : qualification
+				)
 			)
 		} else {
 			setQualifications((prev) => [
@@ -341,7 +339,7 @@ export default function EducationalDetailsTab() {
 	const handleSave = async () => {
 		const qualificationsForSubmission = editingId
 			? qualifications.map((qualification) =>
-					qualification.id === editingId ? { ...qualification, ...formData } : qualification,
+					qualification.id === editingId ? { ...qualification, ...formData } : qualification
 				)
 			: qualifications
 
@@ -381,175 +379,179 @@ export default function EducationalDetailsTab() {
 	const rowSpacing = isMobile ? 16 : 20
 
 	return (
-		<ScrollView
-			style={styles.container}
-			contentContainerStyle={[
-				styles.contentContainer,
-				{
-					paddingHorizontal: sectionPadding,
-					paddingTop: sectionPadding,
-					paddingBottom: sectionPadding + 10,
-				},
-			]}
-			keyboardShouldPersistTaps="handled"
-			showsVerticalScrollIndicator={false}
-		>
-			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-				<View style={styles.headerRow}>
-					<View>
-						<AppTypography variant="h4" style={styles.headerTitle}>
-							Educational Qualifications
-						</AppTypography>
-						<AppTypography variant="caption" style={styles.headerSubtitle}>
-							Add your degrees, fellowships, diplomas and certificates.
-						</AppTypography>
+		<View style={{ flex: 1 }}>
+			<ScrollView
+				style={styles.container}
+				contentContainerStyle={[
+					styles.contentContainer,
+					{
+						paddingHorizontal: sectionPadding,
+						paddingTop: sectionPadding,
+						paddingBottom: 100,
+					},
+				]}
+				keyboardShouldPersistTaps="handled"
+				showsVerticalScrollIndicator={false}
+			>
+				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+					<View style={styles.headerRow}>
+						<View>
+							<AppTypography variant="h4" style={styles.headerTitle}>
+								Educational Qualifications
+							</AppTypography>
+							<AppTypography variant="caption" style={styles.headerSubtitle}>
+								Add your degrees, fellowships, diplomas and certificates.
+							</AppTypography>
+						</View>
 					</View>
-				</View>
 
-				<View style={[styles.formPanel, { marginBottom: rowSpacing }]}>
-					<View style={styles.formGrid}>
-						<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
-							<SelectDropdown
-								label="Qualification Type"
-								value={formData.type}
-								placeholder="Select Type"
-								options={QUALIFICATION_TYPE_OPTIONS}
-								onSelect={(value) => updateFormData('type', value)}
-								required
-							/>
-						</View>
-
-						<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
-							<SelectDropdown
-								label="Qualification Name"
-								value={formData.name}
-								placeholder="Select Qualification"
-								options={DEGREE_OPTIONS}
-								onSelect={(value) => updateFormData('name', value)}
-								required
-							/>
-						</View>
-
-						<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
-							<SelectDropdown
-								label="Institute/University"
-								value={formData.institute}
-								placeholder="Select Institute/University"
-								options={COLLEGE_OPTIONS}
-								onSelect={(value) =>
-									setFormData((prev) => ({
-										...prev,
-										institute: value,
-										customInstitute: value === 'other' ? prev.customInstitute : '',
-									}))
-								}
-								required
-							/>
-						</View>
-
-						{formData.institute === 'other' ? (
+					<View style={[styles.formPanel, { marginBottom: rowSpacing }]}>
+						<View style={styles.formGrid}>
 							<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
-								<InputField
-									label="Custom Institute/University"
-									value={formData.customInstitute}
-									onChangeText={(value) => updateFormData('customInstitute', value)}
-									placeholder="Enter college or university name"
+								<SelectDropdown
+									label="Qualification Type"
+									value={formData.type}
+									placeholder="Select Type"
+									options={QUALIFICATION_TYPE_OPTIONS}
+									onSelect={(value) => updateFormData('type', value)}
 									required
 								/>
 							</View>
-						) : null}
 
-						<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
-							<SelectDropdown
-								label="Year of Completion"
-								value={formData.yearOfCompletion}
-								placeholder="Select Year"
-								options={YEAR_OPTIONS}
-								onSelect={(value) => updateFormData('yearOfCompletion', value)}
-								required
-							/>
+							<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
+								<SelectDropdown
+									label="Qualification Name"
+									value={formData.name}
+									placeholder="Select Qualification"
+									options={DEGREE_OPTIONS}
+									onSelect={(value) => updateFormData('name', value)}
+									required
+								/>
+							</View>
+
+							<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
+								<SelectDropdown
+									label="Institute/University"
+									value={formData.institute}
+									placeholder="Select Institute/University"
+									options={COLLEGE_OPTIONS}
+									onSelect={(value) =>
+										setFormData((prev) => ({
+											...prev,
+											institute: value,
+											customInstitute: value === 'other' ? prev.customInstitute : '',
+										}))
+									}
+									required
+								/>
+							</View>
+
+							{formData.institute === 'other' ? (
+								<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
+									<InputField
+										label="Custom Institute/University"
+										value={formData.customInstitute}
+										onChangeText={(value) => updateFormData('customInstitute', value)}
+										placeholder="Enter college or university name"
+										required
+									/>
+								</View>
+							) : null}
+
+							<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
+								<SelectDropdown
+									label="Year of Completion"
+									value={formData.yearOfCompletion}
+									placeholder="Select Year"
+									options={YEAR_OPTIONS}
+									onSelect={(value) => updateFormData('yearOfCompletion', value)}
+									required
+								/>
+							</View>
+
+							<View style={styles.formCell}>
+								<UploadBox fileName={formData.certificate} onUpload={handleUpload} />
+							</View>
 						</View>
 
-						<View style={styles.formCell}>
-							<UploadBox fileName={formData.certificate} onUpload={handleUpload} />
-						</View>
-					</View>
-
-					<View style={styles.formActions}>
-						<AppButton
-							variant={editingId ? 'secondary' : 'primary'}
-							formAction
-							icon={editingId ? 'content-save-edit-outline' : 'plus'}
-							style={styles.addButton}
-							onPress={handleAddOrUpdateQualification}
-						>
-							{editingId ? 'Update Qualification' : 'Add Qualification'}
-						</AppButton>
-
-						{editingId ? (
-							<AppButton variant="text" formAction style={styles.cancelButton} onPress={resetForm}>
-								Cancel
+						<View style={styles.formActions}>
+							<AppButton
+								variant={editingId ? 'secondary' : 'primary'}
+								formAction
+								icon={editingId ? 'content-save-edit-outline' : 'plus'}
+								style={styles.addButton}
+								onPress={handleAddOrUpdateQualification}
+							>
+								{editingId ? 'Update Qualification' : 'Add Qualification'}
 							</AppButton>
-						) : null}
+
+							{editingId ? (
+								<AppButton variant="text" formAction style={styles.cancelButton} onPress={resetForm}>
+									Cancel
+								</AppButton>
+							) : null}
+						</View>
 					</View>
-				</View>
 
-				<View style={styles.listHeader}>
-					<AppTypography variant="h4" style={styles.listTitle}>
-						Your Qualifications ({qualifications.length})
-					</AppTypography>
-					<AppTypography variant="caption" style={styles.reorderHint}>
-						Drag to reorder
-					</AppTypography>
-				</View>
+					<View style={styles.listHeader}>
+						<AppTypography variant="h4" style={styles.listTitle}>
+							Your Qualifications ({qualifications.length})
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.reorderHint}>
+							Drag to reorder
+						</AppTypography>
+					</View>
 
-				<View style={styles.cardList}>
-					{qualifications.length ? (
-						qualifications.map((qualification) => (
-							<QualificationCard
-								key={qualification.id}
-								qualification={qualification}
-								onEdit={() => handleEditQualification(qualification)}
-								onDelete={() => handleDeleteQualification(qualification.id)}
-							/>
-						))
-					) : (
-						<View style={styles.emptyCard}>
-							<MaterialCommunityIcons name="school-outline" size={24} color="#0c7c7c" />
-							<AppTypography variant="body" style={styles.emptyTitle}>
-								No qualifications added yet
+					<View style={styles.cardList}>
+						{qualifications.length ? (
+							qualifications.map((qualification) => (
+								<QualificationCard
+									key={qualification.id}
+									qualification={qualification}
+									onEdit={() => handleEditQualification(qualification)}
+									onDelete={() => handleDeleteQualification(qualification.id)}
+								/>
+							))
+						) : (
+							<View style={styles.emptyCard}>
+								<MaterialCommunityIcons name="school-outline" size={24} color="#0c7c7c" />
+								<AppTypography variant="body" style={styles.emptyTitle}>
+									No qualifications added yet
+								</AppTypography>
+								<AppTypography variant="caption" style={styles.emptyText}>
+									Fill the form above and add your first qualification.
+								</AppTypography>
+							</View>
+						)}
+					</View>
+
+					<View style={styles.infoCard}>
+						<MaterialCommunityIcons name="information" size={18} color="#0c7c7c" />
+						<View style={styles.infoCopy}>
+							<AppTypography variant="body" style={styles.infoTitle}>
+								Why add all your qualifications?
 							</AppTypography>
-							<AppTypography variant="caption" style={styles.emptyText}>
-								Fill the form above and add your first qualification.
+							<AppTypography variant="caption" style={styles.infoText}>
+								Your qualifications help patients trust your expertise and help us verify your profile
+								more efficiently.
 							</AppTypography>
 						</View>
-					)}
-				</View>
-
-				<View style={styles.infoCard}>
-					<MaterialCommunityIcons name="information" size={18} color="#0c7c7c" />
-					<View style={styles.infoCopy}>
-						<AppTypography variant="body" style={styles.infoTitle}>
-							Why add all your qualifications?
-						</AppTypography>
-						<AppTypography variant="caption" style={styles.infoText}>
-							Your qualifications help patients trust your expertise and help us verify your profile more efficiently.
-						</AppTypography>
 					</View>
 				</View>
-
-				<AppButton
-					variant="primary"
-					formAction
-					style={styles.saveButton}
-					onPress={handleSave}
-					loading={isSaving}
-					disabled={isSaving}
-				>
-					Save & Continue
-				</AppButton>
-			</View>
-		</ScrollView>
+			</ScrollView>
+			<AppStickyFooter
+				centered
+				horizontalPadding={sectionPadding}
+				contentStyle={styles.contentShell}
+				contentMaxWidth={contentWidth}
+				buttonStyle={styles.saveButton}
+				onPress={handleSave}
+				loading={isSaving}
+				disabled={isSaving}
+			>
+				Save & Continue
+			</AppStickyFooter>
+		</View>
 	)
 }
 
@@ -806,7 +808,7 @@ const styles = StyleSheet.create({
 	},
 	saveButton: {
 		alignSelf: 'stretch',
-		marginTop: 28,
+		marginTop: 0,
 		width: '100%',
 	},
 })

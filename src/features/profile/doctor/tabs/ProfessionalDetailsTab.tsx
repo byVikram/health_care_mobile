@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
 	ActivityIndicator,
 	Alert,
+	KeyboardAvoidingView,
+	Platform,
 	ScrollView,
 	StyleSheet,
 	TextInput,
@@ -10,7 +12,14 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppButton, AppInput, AppSelect, AppSelectOption, AppTypography } from '../../../../components/common'
+import {
+	AppBottomSheet,
+	AppStickyFooter,
+	AppInput,
+	AppSelect,
+	AppSelectOption,
+	AppTypography,
+} from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import {
 	getDoctorProfile,
@@ -19,17 +28,6 @@ import {
 	updateDoctorProfessionalDetails,
 } from '../../../doctor/doctorService'
 
-const EXPERTISE_SUGGESTIONS = [
-	'Echocardiography',
-	'Heart Failure',
-	'Interventional Cardiology',
-	'Pediatrics',
-	'Cardiac Imaging',
-	'Electrophysiology',
-	'Preventive Cardiology',
-	'Vascular Medicine',
-]
-
 type Option = AppSelectOption
 
 type ProfessionalFormData = {
@@ -37,20 +35,13 @@ type ProfessionalFormData = {
 	specialization_label: string
 	currentDesignation: string
 	areasOfExpertise: string[]
-	treatments: string
+	treatments: string[]
 	registrationNumber: string
 	registrationProof: string
 	about: string
 }
 
-const normalizeOptionValue = (value: string, options: Option[]) => {
-	if (!value) return ''
-	const normalized = value.trim().toLowerCase()
-	const match = options.find(
-		(option) => option.value.toLowerCase() === normalized || option.label.toLowerCase() === normalized
-	)
-	return match?.value || value
-}
+type SheetMode = 'expertise' | 'treatment' | null
 
 function FormRow({
 	children,
@@ -183,139 +174,53 @@ function SelectDropdown({
 	)
 }
 
-function ChipInput({
+// Chip list with "+ add" trigger that opens AppBottomSheet
+function ChipListField({
 	label,
-	chips,
-	onAdd,
+	items,
 	onRemove,
-	placeholder,
+	onOpenSheet,
+	emptyText,
 	required = false,
 }: {
 	label: string
-	chips: string[]
-	onAdd: (value: string) => void
+	items: string[]
 	onRemove: (index: number) => void
-	placeholder: string
+	onOpenSheet: () => void
+	emptyText: string
 	required?: boolean
 }) {
-	const [inputValue, setInputValue] = useState('')
-
-	const handleAdd = () => {
-		const trimmed = inputValue.trim()
-		if (!trimmed) return
-		if (chips.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
-			setInputValue('')
-			return
-		}
-		onAdd(trimmed)
-		setInputValue('')
-	}
-
-	const handleKeyPress = (e: any) => {
-		if (e.nativeEvent.key === 'Enter' || e.nativeEvent.key === ',') {
-			handleAdd()
-		}
-	}
-
 	return (
 		<View style={styles.fieldGroup}>
-			{label ? <FieldLabel label={label} required={required} /> : null}
-
-			{/* Selected chips */}
-			{chips.length > 0 && (
-				<View style={styles.chipsContainer}>
-					{chips.map((chip, index) => (
-						<View key={`${chip}-${index}`} style={styles.chip}>
+			<View style={styles.fieldHeaderRow}>
+				<FieldLabel label={label} required={required} />
+				<TouchableOpacity onPress={onOpenSheet} activeOpacity={0.8} style={styles.addBtn}>
+					<AppTypography variant="caption" style={styles.addBtnText}>
+						+ add
+					</AppTypography>
+				</TouchableOpacity>
+			</View>
+			<View style={styles.chipsContainer}>
+				{items.length === 0 ? (
+					<AppTypography variant="body" style={styles.emptyText}>
+						{emptyText}
+					</AppTypography>
+				) : (
+					items.map((item, index) => (
+						<View key={`${item}-${index}`} style={styles.chip}>
 							<AppTypography variant="caption" style={styles.chipText}>
-								{chip}
+								{item}
 							</AppTypography>
 							<TouchableOpacity
 								onPress={() => onRemove(index)}
-								style={styles.chipRemove}
 								hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
 							>
-								<MaterialCommunityIcons name="close" size={13} color="#1f8a8f" />
+								<MaterialCommunityIcons name="close-circle" size={16} color="#0c7c7c" />
 							</TouchableOpacity>
 						</View>
-					))}
-				</View>
-			)}
-
-			{/* Input row */}
-			<View style={styles.chipInputRow}>
-				<TextInput
-					value={inputValue}
-					onChangeText={setInputValue}
-					placeholder={placeholder}
-					placeholderTextColor="#9a9a9a"
-					style={styles.chipTextInput}
-					onSubmitEditing={handleAdd}
-					onKeyPress={handleKeyPress}
-					returnKeyType="done"
-					blurOnSubmit={false}
-				/>
-				<TouchableOpacity style={styles.chipAddButton} onPress={handleAdd} activeOpacity={0.8}>
-					<MaterialCommunityIcons name="plus" size={18} color="#0c7c7c" />
-				</TouchableOpacity>
-			</View>
-
-			{/* Suggestions */}
-			<View style={styles.suggestionsRow}>
-				{EXPERTISE_SUGGESTIONS.filter((s) => !chips.some((c) => c.toLowerCase() === s.toLowerCase())).map(
-					(suggestion) => (
-						<TouchableOpacity
-							key={suggestion}
-							style={styles.suggestionChip}
-							onPress={() => onAdd(suggestion)}
-							activeOpacity={0.75}
-						>
-							<AppTypography variant="caption" style={styles.suggestionChipText}>
-								+ {suggestion}
-							</AppTypography>
-						</TouchableOpacity>
-					)
+					))
 				)}
 			</View>
-		</View>
-	)
-}
-
-function MultilineField({
-	label,
-	value,
-	onChangeText,
-	placeholder,
-	helperText,
-	required = false,
-}: {
-	label: string
-	value: string
-	onChangeText: (value: string) => void
-	placeholder: string
-	helperText?: string
-	required?: boolean
-}) {
-	return (
-		<View style={styles.fieldGroup}>
-			{label ? <FieldLabel label={label} required={required} /> : null}
-			<AppInput
-				value={value}
-				onChangeText={onChangeText}
-				placeholder={placeholder}
-				placeholderTextColor="#9a9a9a"
-				style={styles.multilineInput}
-				contentStyle={styles.multilineInputContent}
-				multiline
-				textAlignVertical="top"
-				fieldSize="form"
-				noMargin
-				dense
-			/>
-			{helperText ? (
-				<AppTypography variant="caption" style={styles.helperText}>
-					{helperText}
-				</AppTypography>
-			) : null}
 		</View>
 	)
 }
@@ -334,7 +239,7 @@ export default function ProfessionalDetailsTab() {
 		specialization_label: '',
 		currentDesignation: '',
 		areasOfExpertise: [],
-		treatments: '',
+		treatments: [],
 		registrationNumber: '',
 		registrationProof: '',
 		about: '',
@@ -345,8 +250,59 @@ export default function ProfessionalDetailsTab() {
 	const [isLoadingSpecialities, setIsLoadingSpecialities] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 
+	// Bottom sheet state
+	const [sheetMode, setSheetMode] = useState<SheetMode>(null)
+	const [sheetDraft, setSheetDraft] = useState('')
+
 	const updateFormData = <K extends keyof ProfessionalFormData>(key: K, value: ProfessionalFormData[K]) => {
 		setFormData((prev) => ({ ...prev, [key]: value }))
+	}
+
+	const openSheet = (mode: SheetMode) => {
+		setSheetDraft('')
+		setSheetMode(mode)
+	}
+
+	const closeSheet = () => {
+		setSheetMode(null)
+		setSheetDraft('')
+	}
+
+	const handleSheetSave = () => {
+		const trimmed = sheetDraft.trim()
+		if (!trimmed) return
+
+		if (sheetMode === 'expertise') {
+			const isDuplicate = formData.areasOfExpertise.some(
+				(e) => e.toLowerCase() === trimmed.toLowerCase()
+			)
+			if (!isDuplicate) {
+				updateFormData('areasOfExpertise', [...formData.areasOfExpertise, trimmed])
+			}
+		} else if (sheetMode === 'treatment') {
+			const isDuplicate = formData.treatments.some(
+				(t) => t.toLowerCase() === trimmed.toLowerCase()
+			)
+			if (!isDuplicate) {
+				updateFormData('treatments', [...formData.treatments, trimmed])
+			}
+		}
+
+		closeSheet()
+	}
+
+	const handleRemoveExpertise = (index: number) => {
+		updateFormData(
+			'areasOfExpertise',
+			formData.areasOfExpertise.filter((_, i) => i !== index)
+		)
+	}
+
+	const handleRemoveTreatment = (index: number) => {
+		updateFormData(
+			'treatments',
+			formData.treatments.filter((_, i) => i !== index)
+		)
 	}
 
 	useEffect(() => {
@@ -379,7 +335,7 @@ export default function ProfessionalDetailsTab() {
 					specialization_label: profile.professional.specialization_label || '',
 					currentDesignation: profile.professional.currentDesignation || '',
 					areasOfExpertise: profile.professional.areasOfExpertise || [],
-					treatments: profile.professional.treatments || '',
+					treatments: profile.professional.treatments || [],
 					registrationNumber: profile.professional.registrationNumber || '',
 					registrationProof: profile.professional.registrationProof || '',
 					about: profile.professional.about || '',
@@ -408,7 +364,7 @@ export default function ProfessionalDetailsTab() {
 				specialization_label: profile.professional.specialization_label || '',
 				currentDesignation: profile.professional.currentDesignation || '',
 				areasOfExpertise: profile.professional.areasOfExpertise || [],
-				treatments: profile.professional.treatments || '',
+				treatments: profile.professional.treatments || [],
 				registrationNumber: profile.professional.registrationNumber || '',
 				registrationProof: profile.professional.registrationProof || '',
 				about: profile.professional.about || '',
@@ -434,17 +390,6 @@ export default function ProfessionalDetailsTab() {
 		}))
 	}
 
-	const handleAddExpertise = (value: string) => {
-		updateFormData('areasOfExpertise', [...formData.areasOfExpertise, value])
-	}
-
-	const handleRemoveExpertise = (index: number) => {
-		updateFormData(
-			'areasOfExpertise',
-			formData.areasOfExpertise.filter((_, i) => i !== index)
-		)
-	}
-
 	const handleSave = async () => {
 		const parsedExperience = parseInt(experienceYears, 10)
 
@@ -462,7 +407,7 @@ export default function ProfessionalDetailsTab() {
 			experience_years: experienceYears !== '' && !isNaN(parsedExperience) ? parsedExperience : 0,
 			current_designation: formData.currentDesignation.trim(),
 			areas_of_expertise: formData.areasOfExpertise,
-			treatments: formData.treatments.trim(),
+			treatments: formData.treatments,
 			registration_number: formData.registrationNumber.trim(),
 			registration_proof_s3_key: formData.registrationProof.trim() || null,
 			about: formData.about.trim(),
@@ -492,6 +437,17 @@ export default function ProfessionalDetailsTab() {
 	const rowSpacing = isMobile ? 18 : isLandscape ? 22 : 20
 	const selectedLabel = formData.specialization_label
 
+	const sheetTitle =
+		sheetMode === 'expertise'
+			? 'Add Area of Expertise'
+			: sheetMode === 'treatment'
+				? 'Add Treatment & Procedure'
+				: ''
+	const sheetPlaceholder =
+		sheetMode === 'expertise'
+			? 'e.g. Interventional Cardiology'
+			: 'e.g. Coronary Angioplasty'
+
 	if (isLoadingProfile) {
 		return (
 			<View style={styles.loadingContainer}>
@@ -501,126 +457,160 @@ export default function ProfessionalDetailsTab() {
 	}
 
 	return (
-		<ScrollView
-			style={styles.container}
-			contentContainerStyle={[
-				styles.contentContainer,
-				{
-					paddingHorizontal: sectionPadding,
-					paddingTop: sectionPadding,
-					paddingBottom: rowSpacing,
-				},
-			]}
-			keyboardShouldPersistTaps="handled"
-			showsVerticalScrollIndicator={false}
-		>
-			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-				{/* Specialization */}
-				<View style={{ marginBottom: rowSpacing }}>
-					<SectionTitle>Select Specialization</SectionTitle>
-					{isLoadingSpecialities ? (
-						<View style={styles.inlineLoader}>
-							<ActivityIndicator size="small" color="#0c7c7c" />
-						</View>
-					) : (
-						<SelectDropdown
-							label=""
-							value={formData.specialization_id}
-							placeholder="Select your specialization"
-							options={specialities}
-							onSelect={handleSpecialitySelect}
-						/>
-					)}
-				</View>
-
-				<View style={styles.sectionDivider} />
-
-				{/* Professional Info */}
-				<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
-					<SectionTitle>Professional Information</SectionTitle>
-					<View style={{ gap: 18 }}>
-						<FormRow stacked={!useTwoColumns} compact={isTablet}>
-							<InputField
-								label="Current Designation"
-								value={formData.currentDesignation}
-								onChangeText={(value) => updateFormData('currentDesignation', value)}
-								placeholder="e.g. Senior Consultant"
-							/>
-							<InputField
-								label="Years of Experience"
-								value={experienceYears}
-								onChangeText={(value) => setExperienceYears(value.replace(/\D/g, '').slice(0, 3))}
-								placeholder="0"
-								keyboardType="numeric"
-								maxLength={3}
-							/>
-						</FormRow>
-
-						<ChipInput
-							label="Areas of Expertise"
-							chips={formData.areasOfExpertise}
-							onAdd={handleAddExpertise}
-							onRemove={handleRemoveExpertise}
-							placeholder="Add expertise..."
-						/>
-
-						<MultilineField
-							label="Treatments & Procedures"
-							value={formData.treatments}
-							onChangeText={(value) => updateFormData('treatments', value)}
-							placeholder="List the medical procedures you perform regularly..."
-							helperText="Separate items with commas for better readability."
-						/>
-					</View>
-				</View>
-
-				<View style={styles.sectionDivider} />
-
-				{/* Registration Details */}
-				<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
-					<SectionTitle>Registration Details and Proofs</SectionTitle>
-					<View style={{ gap: 18 }}>
-						{selectedLabel ? (
-							<View style={styles.noticeCard}>
-								<AppTypography variant="caption" style={styles.noticeText}>
-									We are asking you for registration details because you have selected{' '}
-									<AppTypography variant="caption" style={styles.noticeTextStrong}>
-										{selectedLabel}
-									</AppTypography>{' '}
-									as a speciality
-								</AppTypography>
+		<View style = {{flex: 1}} >
+			<ScrollView
+				style={styles.container}
+				contentContainerStyle={[
+					styles.contentContainer,
+					{
+						paddingHorizontal: sectionPadding,
+						paddingTop: sectionPadding,
+						paddingBottom: 100,
+					},
+				]}
+				keyboardShouldPersistTaps="handled"
+				showsVerticalScrollIndicator={false}
+			>
+				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+					{/* Specialization */}
+					<View style={{ marginBottom: rowSpacing }}>
+						<SectionTitle>Select Specialization</SectionTitle>
+						{isLoadingSpecialities ? (
+							<View style={styles.inlineLoader}>
+								<ActivityIndicator size="small" color="#0c7c7c" />
 							</View>
-						) : null}
-
-						<InputField
-							label="Registration Number"
-							value={formData.registrationNumber}
-							onChangeText={(value) => updateFormData('registrationNumber', value)}
-							placeholder="Enter registration number"
-							required
-						/>
-
-						<InputField
-							label="About / Bio"
-							value={formData.about}
-							onChangeText={(value) => updateFormData('about', value)}
-							placeholder="Write a short bio about yourself"
-						/>
+						) : (
+							<SelectDropdown
+								label=""
+								value={formData.specialization_id}
+								placeholder="Select your specialization"
+								options={specialities}
+								onSelect={handleSpecialitySelect}
+							/>
+						)}
 					</View>
+
+					<View style={styles.sectionDivider} />
+
+					{/* Professional Info */}
+					<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
+						<SectionTitle>Professional Information</SectionTitle>
+						<View style={{ gap: 18 }}>
+							<FormRow stacked={!useTwoColumns} compact={isTablet}>
+								<InputField
+									label="Current Designation"
+									value={formData.currentDesignation}
+									onChangeText={(value) => updateFormData('currentDesignation', value)}
+									placeholder="e.g. Senior Consultant"
+								/>
+								<InputField
+									label="Years of Experience"
+									value={experienceYears}
+									onChangeText={(value) => setExperienceYears(value.replace(/\D/g, '').slice(0, 3))}
+									placeholder="0"
+									keyboardType="numeric"
+									maxLength={3}
+								/>
+							</FormRow>
+
+							<ChipListField
+								label="Areas of Expertise"
+								items={formData.areasOfExpertise}
+								onRemove={handleRemoveExpertise}
+								onOpenSheet={() => openSheet('expertise')}
+								emptyText="No areas of expertise added yet."
+							/>
+
+							<ChipListField
+								label="Treatments & Procedures"
+								items={formData.treatments}
+								onRemove={handleRemoveTreatment}
+								onOpenSheet={() => openSheet('treatment')}
+								emptyText="No treatments or procedures added yet."
+							/>
+						</View>
+					</View>
+
+					<View style={styles.sectionDivider} />
+
+					{/* Registration Details */}
+					<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
+						<SectionTitle>Registration Details and Proofs</SectionTitle>
+						<View style={{ gap: 18 }}>
+							{selectedLabel ? (
+								<View style={styles.noticeCard}>
+									<AppTypography variant="caption" style={styles.noticeText}>
+										We are asking you for registration details because you have selected{' '}
+										<AppTypography variant="caption" style={styles.noticeTextStrong}>
+											{selectedLabel}
+										</AppTypography>{' '}
+										as a speciality
+									</AppTypography>
+								</View>
+							) : null}
+
+							<InputField
+								label="Registration Number"
+								value={formData.registrationNumber}
+								onChangeText={(value) => updateFormData('registrationNumber', value)}
+								placeholder="Enter registration number"
+								required
+							/>
+
+							<InputField
+								label="About / Bio"
+								value={formData.about}
+								onChangeText={(value) => updateFormData('about', value)}
+								placeholder="Write a short bio about yourself"
+							/>
+						</View>
+					</View>
+
+				
 				</View>
 
-				<AppButton
-					variant="primary"
-					formAction
-					style={styles.saveButton}
-					onPress={handleSave}
-					loading={isSaving}
-					disabled={isSaving}
+				{/* Shared bottom sheet for expertise + treatments */}
+				<AppBottomSheet
+					visible={sheetMode !== null}
+					title={sheetTitle}
+					onClose={closeSheet}
 				>
-					Save
-				</AppButton>
-			</View>
-		</ScrollView>
+					<KeyboardAvoidingView
+						behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+						keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+					>
+						<View style={styles.sheetBody}>
+							<View style={styles.sheetInputBox}>
+								<TextInput
+									style={styles.sheetTextInput}
+									value={sheetDraft}
+									onChangeText={setSheetDraft}
+									placeholder={sheetPlaceholder}
+									placeholderTextColor="#b0bcc0"
+									multiline={sheetMode === 'treatment'}
+									autoFocus
+									textAlignVertical={sheetMode === 'treatment' ? 'top' : 'center'}
+								/>
+							</View>
+							<TouchableOpacity
+								style={[styles.sheetSaveBtn, !sheetDraft.trim() && styles.sheetSaveBtnDisabled]}
+								onPress={handleSheetSave}
+								activeOpacity={0.8}
+								disabled={!sheetDraft.trim()}
+							>
+								<AppTypography variant="subtitle" style={styles.sheetSaveBtnText}>
+									Save
+								</AppTypography>
+							</TouchableOpacity>
+						</View>
+					</KeyboardAvoidingView>
+				</AppBottomSheet>
+			</ScrollView>
+			<AppStickyFooter onPress={handleSave} disabled={isSaving} buttonStyle={styles.saveButton}>
+				Save
+			</AppStickyFooter>
+		</View>
+		
 	)
 }
 
@@ -689,12 +679,27 @@ const styles = StyleSheet.create({
 	fieldGroup: {
 		width: '100%',
 	},
-	fieldLabel: {
+	fieldHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
 		marginBottom: 8,
+	},
+	fieldLabel: {
+		marginBottom: 0,
 		fontSize: 14,
 		lineHeight: 20,
 		color: '#8f8f8f',
 		fontWeight: '500',
+	},
+	addBtn: {
+		paddingVertical: 2,
+		paddingHorizontal: 8,
+	},
+	addBtnText: {
+		color: '#0c7c7c',
+		fontWeight: '600',
+		fontSize: 13,
 	},
 	requiredMark: {
 		color: '#ef5d5d',
@@ -712,92 +717,35 @@ const styles = StyleSheet.create({
 		paddingTop: 12,
 		paddingBottom: 12,
 	},
-	// Chip input
+	// Chip list
 	chipsContainer: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
+		marginTop: 4,
 		gap: 8,
-		marginBottom: 10,
 	},
 	chip: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: 'rgba(43,111,113,0.08)',
+		backgroundColor: '#f0f7f7',
 		borderWidth: 1,
-		borderColor: 'rgba(43,111,113,0.25)',
+		borderColor: '#d4e8ea',
 		borderRadius: 20,
+		paddingVertical: 6,
 		paddingHorizontal: 12,
-		paddingVertical: 5,
-		gap: 5,
+		gap: 6,
 	},
 	chipText: {
-		color: '#1f6e71',
 		fontSize: 13,
-		lineHeight: 18,
+		color: '#1f6e71',
 		fontWeight: '500',
 	},
-	chipRemove: {
-		marginLeft: 2,
-	},
-	chipInputRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#d4dfe1',
-		borderRadius: 10,
-		backgroundColor: '#fafcfc',
-		overflow: 'hidden',
-	},
-	chipTextInput: {
-		flex: 1,
-		height: 46,
-		paddingHorizontal: 14,
+	emptyText: {
+		color: '#9aabb0',
 		fontSize: 14,
-		color: '#343434',
-	},
-	chipAddButton: {
-		width: 44,
-		height: 46,
-		alignItems: 'center',
-		justifyContent: 'center',
-		borderLeftWidth: 1,
-		borderLeftColor: '#e9eef0',
-	},
-	suggestionsRow: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 7,
-		marginTop: 10,
-	},
-	suggestionChip: {
-		borderWidth: 1,
-		borderColor: '#c8d8db',
-		borderRadius: 20,
-		borderStyle: 'dashed',
-		paddingHorizontal: 11,
-		paddingVertical: 4,
-	},
-	suggestionChipText: {
-		color: '#6e8e90',
-		fontSize: 12,
-		lineHeight: 18,
-	},
-	// Multiline field
-	multilineInput: {
-		minHeight: 110,
-		height: 110,
-	},
-	multilineInputContent: {
-		minHeight: 90,
-		height: 90,
-		paddingTop: 12,
-		paddingBottom: 12,
-	},
-	helperText: {
-		marginTop: 6,
-		color: '#9a9a9a',
-		fontSize: 12,
-		lineHeight: 17,
+		fontStyle: 'italic',
+		marginLeft: 2,
+		marginTop: 2,
 	},
 	noticeCard: {
 		backgroundColor: 'rgba(43,111,113,0.07)',
@@ -827,5 +775,39 @@ const styles = StyleSheet.create({
 		alignSelf: 'stretch',
 		marginTop: 0,
 		width: '100%',
+	},
+	// Bottom sheet
+	sheetBody: {
+		paddingHorizontal: 16,
+		paddingTop: 8,
+		paddingBottom: 8,
+	},
+	sheetInputBox: {
+		borderWidth: 1,
+		borderColor: '#d0dadd',
+		borderRadius: 10,
+		minHeight: 100,
+		padding: 12,
+		backgroundColor: '#fafcfc',
+	},
+	sheetTextInput: {
+		fontSize: 14,
+		color: '#1a2226',
+		minHeight: 80,
+		padding: 0,
+	},
+	sheetSaveBtn: {
+		marginTop: 16,
+		backgroundColor: '#0c7c7c',
+		borderRadius: 24,
+		paddingVertical: 13,
+		alignItems: 'center',
+	},
+	sheetSaveBtnDisabled: {
+		opacity: 0.45,
+	},
+	sheetSaveBtnText: {
+		color: '#fff',
+		fontWeight: '600',
 	},
 })

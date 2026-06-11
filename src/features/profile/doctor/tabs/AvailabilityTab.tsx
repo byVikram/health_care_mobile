@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-	ActivityIndicator,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -11,7 +10,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import Toast from 'react-native-toast-message'
 
-import { AppSelect } from '../../../../components/common'
+import { AppSelect, AppStickyFooter } from '../../../../components/common'
 import DateSlotPicker from '../../../../components/common/DateSlotPicker'
 import {
 	createSlotOverrideBatch,
@@ -514,96 +513,86 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	}
 
 	return (
-		<ScrollView
-			style={styles.screen}
-			contentContainerStyle={styles.screenContent}
-			keyboardShouldPersistTaps="handled"
-			showsVerticalScrollIndicator={false}
-		>
-			<View style={[styles.card, isTablet && styles.cardTablet, { maxWidth: contentWidth },]}>
-				<View style={styles.fieldGroup}>
-					<Text style={styles.sectionLabel}>Choose Hospital</Text>
-					{resolvedHospitals.length === 0 ? (
-						<Text style={styles.emptyText}>
-							{hospitalsLoading ? 'Loading hospitals...' : 'No hospitals added. Please add a hospital first.'}
-						</Text>
-					) : (
-						<AppSelect
-							value={selectedHospitalId}
-							onSelect={(value) => {
-								setSelectedHospitalId(value)
-								setPendingOverrides([])
-							}}
-							options={resolvedHospitals.map((hospital) => ({
-								value: getAvailabilityHospitalId(hospital),
-								label: hospital.name,
-							}))}
-							size="small"
-							borderRadius={10}
-						/>
-					)}
-				</View>
-
-				<View style={[styles.todayRow, isTablet && styles.todayRowTablet]}>
-					<TouchableOpacity style={styles.todayButton} onPress={() => setSelectedDate(new Date())}>
-						<Text style={styles.todayButtonText}>Today</Text>
-					</TouchableOpacity>
-				</View>
-
-				<DateSlotPicker
-					multiSelect
-					selectedDate={selectedDate}
-					onDateChange={setSelectedDate}
-					selectedTime={selectedSlots}
-					onTimeChange={handleTimeChange}
-					dateLabel="Select follow up date"
-					hideNavigation
-					timeSlotColumns={timeSlotColumns}
-					disableBookedSlots={false}
-					use12HourTime
-					availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
-					loading={slotsLoading || toggleRefreshing}
-					onSelectAll={() => {
-						stageSlotSelection(allSelectableSlots)
-						setPendingSaveToast('Selected All Successfully')
-					}}
-					onUnselectAll={() => {
-						stageSlotSelection([])
-						setPendingSaveToast('Unselected All Successfully')
-					}}
-					selectedAppointmentType={selectedAppointmentType}
-					onAppointmentTypeChange={(type) => {
-						setToggleRefreshing(true)
-						setSelectedAppointmentType(type)
-						setTimeout(() => setToggleRefreshing(false), 300)
-					}}
-				/>
-
-				<View style={[styles.actions, isTablet && styles.actionsTablet]}>
-					<TouchableOpacity
-						style={[styles.actionButton, styles.cancelButton]}
-						onPress={() => {
-							updateAvailability({ ...resolvedAvailability, [dayKey]: [] })
-							setPendingOverrides([])
-							setPendingSaveToast(null)
-						}}
-					>
-						<Text style={styles.cancelButtonText}>Cancel</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={[styles.actionButton, styles.saveButton, saveLoading && styles.disabledButton]}
-						onPress={handleSaveAvailability}
-						disabled={saveLoading}
-					>
-						{saveLoading ? (
-							<ActivityIndicator color="#fff" />
+		<View style={{ flex: 1 }}>
+			<ScrollView
+				style={styles.screen}
+				contentContainerStyle={styles.screenContent}
+				keyboardShouldPersistTaps="handled"
+				showsVerticalScrollIndicator={false}
+			>
+				<View style={[styles.card, isTablet && styles.cardTablet, { maxWidth: contentWidth },]}>
+					<View style={styles.fieldGroup}>
+						<Text style={styles.sectionLabel}>Choose Hospital</Text>
+						{resolvedHospitals.length === 0 ? (
+							<Text style={styles.emptyText}>
+								{hospitalsLoading ? 'Loading hospitals...' : 'No hospitals added. Please add a hospital first.'}
+							</Text>
 						) : (
-							<Text style={styles.saveButtonText}>Save Availability</Text>
+							<AppSelect
+								value={selectedHospitalId}
+								onSelect={(value) => {
+									setSelectedHospitalId(value)
+									setPendingOverrides([])
+								}}
+								options={resolvedHospitals.map((hospital) => ({
+									value: getAvailabilityHospitalId(hospital),
+									label: hospital.name,
+								}))}
+								size="small"
+								borderRadius={10}
+							/>
 						)}
-					</TouchableOpacity>
+					</View>
+
+					<View style={[styles.todayRow, isTablet && styles.todayRowTablet]}>
+						<TouchableOpacity style={styles.todayButton} onPress={() => setSelectedDate(new Date())}>
+							<Text style={styles.todayButtonText}>Today</Text>
+						</TouchableOpacity>
+					</View>
+
+					<DateSlotPicker
+						multiSelect
+						selectedDate={selectedDate}
+						onDateChange={setSelectedDate}
+						selectedTime={selectedSlots}
+						onTimeChange={handleTimeChange}
+						dateLabel="Select follow up date"
+						hideNavigation
+						timeSlotColumns={timeSlotColumns}
+						disableBookedSlots={false}
+						use12HourTime
+						availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
+						loading={slotsLoading || toggleRefreshing}
+						onSelectAll={() => {
+							stageSlotSelection(allSelectableSlots)
+							setPendingSaveToast('Selected All Successfully')
+						}}
+						onUnselectAll={() => {
+							stageSlotSelection([])
+							setPendingSaveToast('Unselected All Successfully')
+						}}
+						selectedAppointmentType={selectedAppointmentType}
+						onAppointmentTypeChange={(type) => {
+							setToggleRefreshing(true)
+							setSelectedAppointmentType(type)
+							setTimeout(() => setToggleRefreshing(false), 300)
+						}}
+					/>
+
 				</View>
-			</View>
-		</ScrollView>
+			</ScrollView>
+			<AppStickyFooter
+				centered
+				contentStyle={styles.footerContent}
+				contentMaxWidth={contentWidth}
+				buttonStyle={styles.footerSaveButton}
+				onPress={handleSaveAvailability}
+				loading={saveLoading}
+				disabled={saveLoading}
+			>
+				Save Availability
+			</AppStickyFooter>
+		</View>	
 	)
 }
 
@@ -615,6 +604,7 @@ const styles = StyleSheet.create({
 	screenContent: {
 		flexGrow: 1,
 		padding: 0,
+		paddingBottom: 100,
 	},
 	card: {
 		width: '100%',
@@ -648,13 +638,13 @@ const styles = StyleSheet.create({
 	todayButton: {
 		borderRadius: 10,
 		borderWidth: 1,
-		borderColor: TEAL,
+		borderColor: '#215d60',
 		paddingHorizontal: 14,
 		paddingVertical: 7,
 		backgroundColor: '#fff',
 	},
 	todayButtonText: {
-		color: TEAL,
+		color: '#215d60',
 		fontSize: 13,
 		fontWeight: '600',
 	},
@@ -663,42 +653,10 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		marginBottom: 18,
 	},
-	actions: {
-		flexDirection: 'column',
-		gap: 12,
-		marginTop: 34,
+	footerContent: {
+		width: '100%',
 	},
-	actionsTablet: {
-		flexDirection: 'row',
-		gap: 16,
-	},
-	actionButton: {
-		flex: 1,
-		minHeight: 46,
-		borderRadius: 12,
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingHorizontal: 16,
-	},
-	cancelButton: {
-		borderWidth: 1,
-		borderColor: '#d1dbe0',
-		backgroundColor: '#fff',
-	},
-	cancelButtonText: {
-		color: '#52636d',
-		fontSize: 14,
-		fontWeight: '700',
-	},
-	saveButton: {
-		backgroundColor: TEAL,
-	},
-	saveButtonText: {
-		color: '#fff',
-		fontSize: 14,
-		fontWeight: '700',
-	},
-	disabledButton: {
-		opacity: 0.7,
+	footerSaveButton: {
+		backgroundColor: '#215d60',
 	},
 })
