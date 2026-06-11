@@ -14,7 +14,8 @@ import { AppScreenHeader } from '../components/common'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
-import ConsultationPage from '../features/consultation/ConsultationPage'
+// import ConsultationPage from '../features/consultation/ConsultationPage'
+import ConsultationPage from '../features/consultation/ConsultationPageVersion2'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 
 import NotificationPage from '../features/notification/NotificationPage'
@@ -69,14 +70,14 @@ function AuthenticatedNavigator() {
 				}}
 			/>
 
-			<AppStack.Screen
+			{/* <AppStack.Screen
 				name={ROUTES.STACK.ORDER_DETAILS}
 				component={OrderDetailsScreen}
 				options={{
 					headerShown: true,
 					title: 'Order Details',
 				}}
-			/>
+			/> */}
 
 			<AppStack.Screen name={ROUTES.STACK.ORDER_DETAILS as keyof AppStackParamList} component={OrderDetailsScreen} 
 			options={{
