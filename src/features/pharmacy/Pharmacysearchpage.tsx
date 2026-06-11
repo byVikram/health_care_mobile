@@ -3,9 +3,6 @@ import React, { useCallback, useEffect, useState } from 'react'
 import {
 	ActivityIndicator,
 	FlatList,
-	Modal,
-	Platform,
-	SafeAreaView,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -22,6 +19,7 @@ import ArrowIcon from '../../assets/Settings/arrow.svg'
 import { useNavigation } from '@react-navigation/native'
 import { ROUTES } from '../../navigation/routes'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
+import { AppBottomSheet } from '../../components/common'
 
 const LIMIT = 12
 
@@ -236,27 +234,17 @@ export default function PharmacySearchPage() {
 				/>
 			)}
 
-			{/* Filter Bottom Sheet Modal */}
-			<Modal visible={showFilters} animationType="slide" transparent onRequestClose={() => setShowFilters(false)}>
-				<View style={styles.modalOverlay}>
-					<TouchableOpacity style={styles.modalBackdrop} onPress={() => setShowFilters(false)} />
-					<View style={styles.modalSheet}>
-						<View style={styles.sheetHandle} />
-						<View style={styles.sheetHeader}>
-							<Text style={styles.sheetTitle}>Filters</Text>
-							<TouchableOpacity onPress={() => setShowFilters(false)}>
-								<Text style={styles.sheetClose}>✕</Text>
-							</TouchableOpacity>
-						</View>
-						<ScrollView showsVerticalScrollIndicator={false}>
-							<PharmacyFilters filters={filters} onChange={handleFilterChange} />
-						</ScrollView>
-						<TouchableOpacity style={styles.applyBtn} onPress={() => setShowFilters(false)}>
-							<Text style={styles.applyBtnText}>Apply Filters</Text>
-						</TouchableOpacity>
-					</View>
+			{/* Filter Bottom Sheet */}
+			<AppBottomSheet visible={showFilters} title="Filters" onClose={() => setShowFilters(false)}>
+				<View style={styles.sheetContent}>
+					<ScrollView showsVerticalScrollIndicator={false}>
+						<PharmacyFilters filters={filters} onChange={handleFilterChange} />
+					</ScrollView>
+					<TouchableOpacity style={styles.applyBtn} onPress={() => setShowFilters(false)}>
+						<Text style={styles.applyBtnText}>Apply Filters</Text>
+					</TouchableOpacity>
 				</View>
-			</Modal>
+			</AppBottomSheet>
 		</View>
 	)
 }
@@ -430,36 +418,11 @@ const styles = StyleSheet.create({
 	pageBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
 	pageBtnTextDisabled: { color: '#999' },
 	pageInfo: { fontSize: 14, color: '#344054', fontWeight: '600' },
-	modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-	modalBackdrop: {
-		...StyleSheet.absoluteFillObject,
-		backgroundColor: 'rgba(0,0,0,0.4)',
-	},
-	modalSheet: {
-		backgroundColor: '#fff',
-		borderTopLeftRadius: 20,
-		borderTopRightRadius: 20,
+	sheetContent: {
 		paddingHorizontal: 16,
-		paddingBottom: Platform.OS === 'ios' ? 32 : 16,
-		maxHeight: '85%',
+		paddingTop: 20,
+		paddingBottom: 16,
 	},
-	sheetHandle: {
-		width: 40,
-		height: 4,
-		backgroundColor: '#E0E0E0',
-		borderRadius: 2,
-		alignSelf: 'center',
-		marginTop: 10,
-		marginBottom: 14,
-	},
-	sheetHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginBottom: 16,
-	},
-	sheetTitle: { fontSize: 17, fontWeight: '700', color: '#101828' },
-	sheetClose: { fontSize: 20, color: '#667085', padding: 4 },
 	applyBtn: {
 		backgroundColor: '#2B6F71',
 		borderRadius: 12,

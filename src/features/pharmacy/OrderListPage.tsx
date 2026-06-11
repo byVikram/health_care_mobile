@@ -1,12 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
-	Animated,
 	FlatList,
 	Image,
-	Modal,
 	Platform,
-	Pressable,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -19,10 +16,9 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 
-import { AppSelect, AppSelectOption, AppTypography } from '../../components/common'
+import { AppBottomSheet, AppSelect, AppSelectOption, AppTypography } from '../../components/common'
 import PaginationBar from '../../components/common/AppPagination'
 import Card from '../../components/common/CommonCard'
 import { getPharmacyOrders } from '../profile/pharmacy/pharmacyService'
@@ -314,7 +310,7 @@ export default function OrderListPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
-	const { width, height } = useWindowDimensions()
+	const { width } = useWindowDimensions()
 	const useInlineFilters = width >= 768
 
 	// ── Role — exactly the same as OrderDetailsScreen ─────────────────
@@ -348,9 +344,6 @@ export default function OrderListPage() {
 
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
 	const [activeDatePicker, setActiveDatePicker] = useState<'from' | 'to' | null>(null)
-
-	const filterSheetAnim = useRef(new Animated.Value(0)).current
-	const filterBackdropAnim = useRef(new Animated.Value(0)).current
 
 	// Sync route param status
 	useEffect(() => {
@@ -446,22 +439,11 @@ export default function OrderListPage() {
 		setDraftFromDateFilter(fromDateFilter)
 		setDraftToDateFilter(toDateFilter)
 		setFilterModalVisible(true)
-		filterSheetAnim.setValue(0)
-		filterBackdropAnim.setValue(0)
-		Animated.parallel([
-			Animated.timing(filterSheetAnim, { toValue: 1, duration: 260, useNativeDriver: true }),
-			Animated.timing(filterBackdropAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
-		]).start()
 	}
 
 	const closeFilterModal = () => {
 		setActiveDatePicker(null)
-		Animated.parallel([
-			Animated.timing(filterSheetAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
-			Animated.timing(filterBackdropAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
-		]).start(({ finished }) => {
-			if (finished) setFilterModalVisible(false)
-		})
+		setFilterModalVisible(false)
 	}
 
 	const applyFilters = () => {
@@ -569,67 +551,39 @@ export default function OrderListPage() {
 	)
 
 	const renderFilterModal = () => {
-		const translateY = filterSheetAnim.interpolate({ inputRange: [0, 1], outputRange: [420, 0] })
-		const backdropOpacity = filterBackdropAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })
-
 		return (
-			<Modal visible={filterModalVisible} transparent animationType="none" onRequestClose={closeFilterModal}>
-				<View style={styles.filterModalRoot}>
-					<Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
-						<BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
-						<View style={styles.filterDim} />
-						<Pressable style={StyleSheet.absoluteFill} onPress={closeFilterModal} />
-					</Animated.View>
-
-					<Animated.View
-						style={[
-							styles.filterSheet,
-							{
-								width: Math.min(width - 24, 520),
-								maxHeight: Math.min(height * 0.78, 620),
-								paddingBottom: Math.max(insets.bottom + 18, 26),
-								transform: [{ translateY }],
-							},
-						]}
+			<AppBottomSheet visible={filterModalVisible} title="Filters" onClose={closeFilterModal}>
+				<View style={[styles.filterSheetContentWrapper, { maxWidth: Math.min(width, 520) }]}>
+					<ScrollView
+						style={styles.filterSheetScroll}
+						contentContainerStyle={styles.filterSheetContent}
+						showsVerticalScrollIndicator={false}
 					>
-						<View style={styles.filterSheetHandle} />
-						<View style={styles.filterSheetHeader}>
-							<AppTypography style={styles.filterSheetTitle}>Filters</AppTypography>
-							<TouchableOpacity style={styles.filterCloseButton} onPress={closeFilterModal}>
-								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
-							</TouchableOpacity>
+						<View style={styles.filterGroup}>
+							<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
+							{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
+								setDraftDateFilter(value)
+								if (value !== 'custom') setActiveDatePicker(null)
+							})}
+							{renderDateRangePicker()}
 						</View>
 
-						<ScrollView
-							style={styles.filterSheetScroll}
-							contentContainerStyle={styles.filterSheetContent}
-							showsVerticalScrollIndicator={false}
-						>
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
-								{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
-									setDraftDateFilter(value)
-									if (value !== 'custom') setActiveDatePicker(null)
-								})}
-								{renderDateRangePicker()}
-							</View>
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Order Status</AppTypography>
-								{renderFilterChips(STATUS_OPTIONS, draftStatusFilter, setDraftStatusFilter)}
-							</View>
-						</ScrollView>
-
-						<View style={styles.filterSheetActions}>
-							<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
-								<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
-							</TouchableOpacity>
-							<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
-								<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
-							</TouchableOpacity>
+						<View style={styles.filterGroup}>
+							<AppTypography style={styles.filterGroupLabel}>Order Status</AppTypography>
+							{renderFilterChips(STATUS_OPTIONS, draftStatusFilter, setDraftStatusFilter)}
 						</View>
-					</Animated.View>
+					</ScrollView>
+
+					<View style={styles.filterSheetActions}>
+						<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+							<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+							<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
+						</TouchableOpacity>
+					</View>
 				</View>
-			</Modal>
+			</AppBottomSheet>
 		)
 	}
 
@@ -928,46 +882,43 @@ const styles = StyleSheet.create({
 		flexShrink: 0,
 		padding: 0,
 	},
-	filterIconButtonActive: { backgroundColor: '#e9f8f7', borderColor: '#1f5f68' },
-	// Filter modal
-	filterModalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
-	filterBackdrop: { ...StyleSheet.absoluteFillObject },
-	filterDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
-	filterSheet: {
-		backgroundColor: '#ffffff',
-		borderTopLeftRadius: 24,
-		borderTopRightRadius: 24,
-		paddingTop: 8,
-		overflow: 'hidden',
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: -10 },
-		shadowOpacity: 0.14,
-		shadowRadius: 24,
-		elevation: 18,
+	filterIconButtonActive: {
+		backgroundColor: '#e9f8f7',
+		borderColor: '#1f5f68',
 	},
-	filterSheetHandle: {
-		width: 44,
-		height: 4,
-		borderRadius: 999,
-		backgroundColor: '#d7dee6',
+	filterSheetContentWrapper: {
+		width: '100%',
 		alignSelf: 'center',
-		marginBottom: 10,
 	},
-	filterSheetHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
+	filterSheetScroll: {
+		flexGrow: 0,
+	},
+	filterSheetContent: {
 		paddingHorizontal: 18,
-		paddingBottom: 12,
+		paddingTop: 4,
+		paddingBottom: 20,
+		gap: 22,
 	},
-	filterSheetTitle: { fontSize: 18, lineHeight: 24, fontWeight: '700', color: '#111827' },
-	filterCloseButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-	filterSheetScroll: { flexGrow: 0 },
-	filterSheetContent: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 20, gap: 22 },
-	filterGroup: { gap: 10 },
-	filterGroupLabel: { fontSize: 11, lineHeight: 14, fontWeight: '800', color: '#64707d', textTransform: 'uppercase' },
-	filterChipScroller: { marginHorizontal: -2 },
-	filterChipRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 10, paddingHorizontal: 2, paddingVertical: 1 },
+	filterGroup: {
+		gap: 10,
+	},
+	filterGroupLabel: {
+		fontSize: 11,
+		lineHeight: 14,
+		fontWeight: '800',
+		color: '#64707d',
+		textTransform: 'uppercase',
+	},
+	filterChipScroller: {
+		marginHorizontal: -2,
+	},
+	filterChipRow: {
+		flexDirection: 'row',
+		flexWrap: 'nowrap',
+		gap: 10,
+		paddingHorizontal: 2,
+		paddingVertical: 1,
+	},
 	filterChip: {
 		minHeight: 38,
 		minWidth: 74,

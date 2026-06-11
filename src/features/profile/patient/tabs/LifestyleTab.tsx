@@ -24,7 +24,7 @@ const EXERCISE_OPTIONS = [
 	{ label: '5+ days/week', value: '5+ days/week' },
 ]
 
-const DIET_OPTIONS = [
+const FOOD_PREFERENCE_OPTIONS = [
 	{ label: 'Omnivore', value: 'Omnivore' },
 	{ label: 'Vegetarian', value: 'Vegetarian' },
 	{ label: 'Vegan', value: 'Vegan' },
@@ -33,10 +33,11 @@ const DIET_OPTIONS = [
 ]
 
 const SLEEP_OPTIONS = [
-	{ label: 'Less than 5', value: 'Less than 5' },
-	{ label: '5-6 hours', value: '5-6 hours' },
-	{ label: '7-8 hours', value: '7-8 hours' },
-	{ label: 'More than 8', value: 'More than 8' },
+	{ label: '5 hours', value: '5' },
+	{ label: '6 hours', value: '6' },
+	{ label: '7 hours', value: '7' },
+	{ label: '8 hours', value: '8' },
+	{ label: '9 hours', value: '9' },
 ]
 
 const OCCUPATION_OPTIONS = [
@@ -104,9 +105,9 @@ export default function LifestyleTab({ data, onChange, onSave, saving }: Props) 
 				{/* Food Preferences */}
 				<AppSelect
 					label="Food Preferences"
-					options={DIET_OPTIONS}
-					value={data.dietType}
-					onSelect={(val: string) => onChange('dietType', val)}
+					options={FOOD_PREFERENCE_OPTIONS}
+					value={data.foodPreference}
+					onSelect={(val: string) => onChange('foodPreference', val)}
 					placeholder="Select food preference"
 					size="compact"
 					style={styles.fieldMargin}

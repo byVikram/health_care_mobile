@@ -199,10 +199,27 @@ export default function PersonalTab({ data, onChange, onSave, saving }: Props) {
 					/>
 				</View>
 
-				{/* Emergency Contact */}
+				{/* Emergency Contact Name */}
 				<View style={styles.fieldMargin}>
 					<AppTypography variant="caption" style={styles.fieldLabel}>
-						Emergency contact
+						Emergency Contact Name
+					</AppTypography>
+					<AppInput
+						value={data.emergencyContactName}
+						onChangeText={(val: string) => onChange('emergencyContactName', val)}
+						placeholder="Contact person name"
+						placeholderTextColor="#9a9a9a"
+						fieldSize="compact"
+						noMargin
+						dense
+						style={styles.inputStyle}
+					/>
+				</View>
+
+				{/* Emergency Contact Number */}
+				<View style={styles.fieldMargin}>
+					<AppTypography variant="caption" style={styles.fieldLabel}>
+						Emergency Contact Number
 					</AppTypography>
 					<AppInput
 						value={data.emergencyContact}

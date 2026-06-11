@@ -6,7 +6,7 @@ export * from "./AppSelect";
 export * from "./AppMultiSelect";
 export * from "./AppTimePicker";
 export * from "./AppPhotoPicker";
-export * from "./AppFilterBottomSheet";
+export * from "./AppBottomSheet";
 export * from "./AppCalendar";
 export * from "./AppSkeleton";
 export { default as AppToggle } from "./AppToggle";
