@@ -22,6 +22,7 @@ import {
 	SlotOverrideBatchPayload,
 	SlotOverridePayload,
 	TimeSlot,
+	updateDoctorAvailability,
 } from '../../../doctor/doctorService'
 import { DoctorAvailability, DoctorHospital } from '../../../../types/doctor-profile'
 
@@ -84,6 +85,31 @@ const getModeKey = (mode?: string): AppointmentTypeKey => {
 }
 
 const getAvailabilityHospitalId = (hospital: DoctorHospital) => String(hospital.hospital_id ?? hospital.id)
+
+const getDayOfWeek = (date: Date) => date.getDay()
+
+const coerceHospitalId = (id: string) => {
+	const numericId = Number(id)
+	return Number.isFinite(numericId) ? numericId : id
+}
+
+const normalizeTimeForUpdate = (time: string) => {
+	if (!time) return time
+	if (time.endsWith('Z')) return time
+	if (/^\d{2}:\d{2}$/.test(time)) return `${time}:00.000Z`
+	if (/^\d{2}:\d{2}:\d{2}$/.test(time)) return `${time}.000Z`
+	return time
+}
+
+const getSlotDuration = (startTime: string, endTime: string) => {
+	const [startHour, startMinute] = startTime.split(':').map(Number)
+	const [endHour, endMinute] = endTime.split(':').map(Number)
+	const startTotal = startHour * 60 + startMinute
+	const endTotal = endHour * 60 + endMinute
+	const duration = endTotal - startTotal
+
+	return Number.isFinite(duration) && duration > 0 ? duration : 1
+}
 
 const normalizeProfileHospitals = (rawHospitals: DoctorHospital[]): DoctorHospital[] =>
 	rawHospitals.map((hospital) => ({
@@ -152,6 +178,12 @@ const normalizeAvailabilityGroups = (response: unknown, selectedAppointmentType:
 export default function AvailabilityTab({ hospitals, availability, onChange }: AvailabilityTabProps) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
+	const contentWidth = useMemo(() => {
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
+		return 640
+	}, [isTablet, width])
 	const timeSlotColumns = width >= 900 ? 5 : width >= 768 ? 4 : 3
 
 	const [localAvailability, setLocalAvailability] = useState<DoctorAvailability>(availability ?? EMPTY_AVAILABILITY)
@@ -415,14 +447,35 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	}
 
 	const handleSaveAvailability = async () => {
-		if (pendingOverrides.length === 0) {
-			setPendingSaveToast(null)
+		if (!selectedHospitalId) {
 			return
 		}
 
 		setSaveLoading(true)
 		try {
 			let backendMessage = ''
+			const selectedUpdatePayload = {
+				hospital_id: coerceHospitalId(selectedHospitalId),
+				day_of_week: getDayOfWeek(selectedDate),
+				appointment_mode: APPOINTMENT_MODE_BY_TYPE[selectedAppointmentType],
+				slots: selectedSlots.map((startTime) => {
+					const endTime = getSlotEndTime(startTime)
+
+					return {
+						start_time: normalizeTimeForUpdate(startTime),
+						end_time: normalizeTimeForUpdate(endTime),
+						slot_duration: getSlotDuration(startTime, endTime),
+						buffer_time: 0,
+					}
+				}),
+				is_active: selectedSlots.length > 0,
+			}
+
+			const availabilityResponse = await updateDoctorAvailability(selectedUpdatePayload)
+			if ((availabilityResponse as { message?: string })?.message) {
+				backendMessage = (availabilityResponse as { message: string }).message
+			}
+
 			const overridesByHospitalAndDate = pendingOverrides.reduce<Record<string, SlotOverrideBatchPayload>>(
 				(acc, override) => {
 					const groupKey = `${override.hospital_id ?? ''}__${override.date}`
@@ -467,9 +520,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 			keyboardShouldPersistTaps="handled"
 			showsVerticalScrollIndicator={false}
 		>
-			<View style={[styles.card, isTablet && styles.cardTablet]}>
-				<Text style={styles.title}>Availability</Text>
-
+			<View style={[styles.card, isTablet && styles.cardTablet, { maxWidth: contentWidth },]}>
 				<View style={styles.fieldGroup}>
 					<Text style={styles.sectionLabel}>Choose Hospital</Text>
 					{resolvedHospitals.length === 0 ? (
@@ -489,7 +540,6 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 							}))}
 							size="small"
 							borderRadius={10}
-							customCardStyle={styles.selectCard}
 						/>
 					)}
 				</View>
@@ -568,7 +618,6 @@ const styles = StyleSheet.create({
 	},
 	card: {
 		width: '100%',
-		maxWidth: 980,
 		alignSelf: 'center',
 		backgroundColor: '#fff',
 		padding: 18,
@@ -577,12 +626,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 24,
 		paddingVertical: 22,
 	},
-	title: {
-		fontSize: 22,
-		fontWeight: '700',
-		color: '#233238',
-		marginBottom: 22,
-	},
+	
 	fieldGroup: {
 		marginBottom: 14,
 	},
@@ -591,9 +635,6 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#62707a',
 		marginBottom: 8,
-	},
-	selectCard: {
-		borderRadius: 10,
 	},
 	todayRow: {
 		alignItems: 'flex-end',

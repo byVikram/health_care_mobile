@@ -27,6 +27,8 @@ export const API_ENDPOINTS = {
 		LOGOUT: `${BASE_URL}/api/auth/logout`,
 		GET_ROLES: `${BASE_URL}/api/auth/get-roles`,
 		CREATE_USER: `${BASE_URL}/api/auth/create-user`,
+		SESSIONS: `${BASE_URL}/api/auth/sessions`,
+		SESSION_LOGOUT: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}`,
 	},
 	DOCTORS: {
 		SEARCH: `${BASE_URL}/api/doctors`,
@@ -41,6 +43,7 @@ export const API_ENDPOINTS = {
 	},
 	DOCTOR_PROFILE: {
 		DETAILS: `${BASE_URL}/api/doctors/details`,
+		PERSONAL_DETAILS: `${BASE_URL}/api/doctors/personal-details`,
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
 		ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
@@ -66,6 +69,7 @@ export const API_ENDPOINTS = {
 		GET: `${BASE_URL}/api/appointments`,
 		CREATE: `${BASE_URL}/api/appointments`,
 		GET_BY_ID: (id: string) => `${BASE_URL}/api/appointments/${id}`, // Add this
+		PRE_INTAKE: (id: string) => `${BASE_URL}/api/appointments/${id}/pre-intake`,
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
@@ -83,10 +87,22 @@ export const API_ENDPOINTS = {
 		VITALS_HISTORY: (id: string) => `${BASE_URL}/api/patients/${id}/vitals`,
 		REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/reports`,
 		REPORTS_CREATE: `${BASE_URL}/api/patients/reports`,
+		ADDRESSES: `${BASE_URL}/api/patients/me/addresses`,
+		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
 	},
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,
 		DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
+        ME_DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
+	},
+	PHARMACY_ORDERS: {
+		CREATE: `${BASE_URL}/api/pharmacy-orders`,
+		LIST: `${BASE_URL}/api/pharmacy-orders`,
+		LIST_BY_PHARMACY: `${BASE_URL}/api/pharmacies`, // New endpoint to get orders fr the logged-in pharmacy
+		GET_BY_ID: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}`,
+		UPDATE_STATUS: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/status`,
+		UPDATE_MEDICINES: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/medicines`,
+		SEND_REMINDER: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/remind`,
 	},
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {

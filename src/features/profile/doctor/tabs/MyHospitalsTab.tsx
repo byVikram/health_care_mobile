@@ -6,13 +6,12 @@ import {
 	Pressable,
 	ScrollView,
 	StyleSheet,
-	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppToggle, AppTypography } from '../../../../components/common'
+import { AppButton, AppInput, AppSelect, AppToggle, AppTypography } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -21,8 +20,6 @@ import {
 	updateHospital,
 } from '../../../doctor/doctorService'
 import { DoctorHospital } from '../../../../types/doctor-profile'
-import App from '../../../../../App'
-import { all } from 'axios'
 
 type HospitalFormData = {
 	name: string
@@ -184,6 +181,24 @@ const buildHospitalPayload = (hospital: HospitalItem, isPrimary = hospital.isPri
 	offline_consultation_fee: hospital.offline_consultation_fee.trim(),
 })
 
+const coerceHospitalId = (id: string | undefined) => {
+	const numericId = Number(id)
+	return Number.isFinite(numericId) ? numericId : id ?? ''
+}
+
+const buildHospitalUpdatePayload = (
+	hospital: HospitalItem,
+	isPrimary = hospital.isPrimary,
+	weeklyWorkingHours = createWeeklyWorkingHours()
+) => ({
+	hospital_id: coerceHospitalId(hospital.hospital_id ?? hospital.id),
+	is_primary: isPrimary,
+	video_consultation_fee: hospital.video_consultation_fee.trim(),
+	offline_consultation_fee: hospital.offline_consultation_fee.trim(),
+	available_days: WORKING_DAYS.map((day) => day.key),
+	working_hours: JSON.stringify(weeklyWorkingHours),
+})
+
 function FieldLabel({ label }: { label: string }) {
 	return (
 		<AppTypography variant="caption" style={styles.fieldLabel}>
@@ -232,23 +247,25 @@ function InputField({
 	onChangeText: (value: string) => void
 	placeholder: string
 	multiline?: boolean
-	keyboardType?: React.ComponentProps<typeof TextInput>['keyboardType']
+	keyboardType?: React.ComponentProps<typeof AppInput>['keyboardType']
 }) {
 	return (
 		<View style={styles.fieldGroup}>
 			<FieldLabel label={label} />
-			<View style={[styles.inputShell, multiline && styles.inputShellMultiline]}>
-				<TextInput
-					value={value}
-					onChangeText={onChangeText}
-					placeholder={placeholder}
-					placeholderTextColor="#9a9a9a"
-					style={[styles.textInput, multiline && styles.textInputMultiline]}
-					multiline={multiline}
-					keyboardType={keyboardType}
-					textAlignVertical={multiline ? 'top' : 'center'}
-				/>
-			</View>
+			<AppInput
+				value={value}
+				onChangeText={onChangeText}
+				placeholder={placeholder}
+				placeholderTextColor="#9a9a9a"
+				style={multiline && styles.multilineInput}
+				contentStyle={multiline && styles.multilineInputContent}
+				multiline={multiline}
+				keyboardType={keyboardType}
+				textAlignVertical={multiline ? 'top' : 'center'}
+				fieldSize="form"
+				noMargin
+				dense
+			/>
 		</View>
 	)
 }
@@ -268,62 +285,27 @@ function DropdownSelect({
 	compact?: boolean
 	showFloatingLabel?: boolean
 }) {
-	const [isOpen, setIsOpen] = useState(false)
-	const selectedOption = options.find((option) => option.value === value)
+	const normalizedOptions = options.map((option) => ({
+		value: String(option.value),
+		label: option.label,
+	}))
 
 	return (
 		<View style={[styles.dropdownGroup, compact && styles.dropdownGroupCompact]}>
-			{showFloatingLabel ? (
-				<AppTypography variant="caption" style={styles.dropdownFloatingLabel}>
-					{label}
-				</AppTypography>
-			) : null}
-			<TouchableOpacity
-				style={[styles.dropdownTrigger, compact && styles.dropdownTriggerCompact]}
-				onPress={() => setIsOpen(true)}
-				activeOpacity={0.85}
-			>
-				<AppTypography variant="body" style={[styles.dropdownValue, compact && styles.dropdownValueCompact]}>
-					{selectedOption?.label ?? 'Select'}
-				</AppTypography>
-				<MaterialCommunityIcons name="menu-down" size={26} color="#7c7c7c" />
-			</TouchableOpacity>
-
-			<Modal visible={isOpen} transparent animationType="fade" onRequestClose={() => setIsOpen(false)}>
-				<Pressable style={styles.dropdownOverlay} onPress={() => setIsOpen(false)}>
-					<Pressable style={styles.dropdownMenu}>
-						<AppTypography variant="caption" style={styles.dropdownTitle}>
-							{label}
-						</AppTypography>
-						<ScrollView style={styles.dropdownList} showsVerticalScrollIndicator={false}>
-							{options.map((option) => {
-								const isSelected = option.value === value
-								return (
-									<TouchableOpacity
-										key={String(option.value)}
-										style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
-										onPress={() => {
-											onChange(option.value)
-											setIsOpen(false)
-										}}
-										activeOpacity={0.85}
-									>
-										<AppTypography
-											variant="body"
-											style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}
-										>
-											{option.label}
-										</AppTypography>
-										{isSelected ? (
-											<MaterialCommunityIcons name="check" size={18} color={TEAL} />
-										) : null}
-									</TouchableOpacity>
-								)
-							})}
-						</ScrollView>
-					</Pressable>
-				</Pressable>
-			</Modal>
+			<AppSelect
+				label={showFloatingLabel ? label : undefined}
+				value={String(value)}
+				options={normalizedOptions}
+				onSelect={(selectedValue) => {
+					const selectedOption = options.find((option) => String(option.value) === selectedValue)
+					if (selectedOption) onChange(selectedOption.value)
+				}}
+				placeholder="Select"
+				size="form"
+				borderRadius={10}
+				floatingLabel={showFloatingLabel}
+				noMargin
+			/>
 		</View>
 	)
 }
@@ -654,14 +636,14 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}, [externalHospitals])
 
 	const contentWidth = useMemo(() => {
-		if (width >= 1366) return 1120
-		if (width >= 1180) return 1040
-		if (width >= 1024) return 960
-		if (width >= 768) return Math.min(width - 48, 860)
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
 		return 640
-	}, [width])
+	}, [width, isTablet])
 
 	const sectionPadding = isMobile ? 16 : isTablet ? 24 : 28
+	const actionSpacing = isMobile ? 18 : 24
 	const cardDirection = useWideHospitalRows ? 'row' : 'column'
 	const actionStacked = !useWideHospitalRows
 	const selectedWorkingHours = weeklyWorkingHours[selectedWorkingDay][selectedAppointmentType]
@@ -786,7 +768,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		updateHospitalsState((prev) => prev.map((hospital) => ({ ...hospital, isPrimary: hospital.id === id })))
 
 		try {
-			await updateHospital(id, buildHospitalPayload(selectedHospital, true))
+			await updateHospital(id, buildHospitalUpdatePayload(selectedHospital, true, weeklyWorkingHours))
 			await loadHospitals()
 		} catch (error) {
 			console.log('[MyHospitalsTab] set primary error:', error)
@@ -867,7 +849,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						offline_consultation_fee: trimmedOfflineFee,
 					}
 
-					const response = await updateHospital(editingId, buildHospitalPayload(updatedHospital))
+					const response = await updateHospital(editingId, buildHospitalUpdatePayload(updatedHospital, updatedHospital.isPrimary, weeklyWorkingHours))
 					Alert.alert('Success', getSuccessMessage(response, 'Hospital updated successfully'))
 					await loadHospitals()
 				} else {
@@ -905,7 +887,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			const hasPrimary = hospitals.some((hospital) => hospital.isPrimary)
 			await Promise.all(
 				hospitals.map((hospital, index) =>
-					updateHospital(hospital.id, buildHospitalPayload(hospital, hospital.isPrimary || (!hasPrimary && index === 0)))
+					updateHospital(hospital.id, buildHospitalUpdatePayload(hospital, hospital.isPrimary || (!hasPrimary && index === 0), weeklyWorkingHours))
 				)
 			)
 			await loadHospitals()
@@ -935,7 +917,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 					{
 						paddingHorizontal: sectionPadding,
 						paddingTop: sectionPadding,
-						paddingBottom: 0,
+						paddingBottom: actionSpacing,
 					},
 				]}
 				keyboardShouldPersistTaps="handled"
@@ -1061,21 +1043,17 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						</View>
 					</View>
 
-					<View style={styles.formActions}>
-						<TouchableOpacity
-							style={[styles.primaryButton, isSavingAddress && styles.primaryButtonDisabled]}
+					<View style={[styles.formActions, { marginTop: actionSpacing }]}>
+						<AppButton
+							variant="primary"
+							formAction
+							style={styles.formActionButton}
 							onPress={handleSaveAddress}
-							activeOpacity={0.85}
+							loading={isSavingAddress}
 							disabled={isSavingAddress}
 						>
-							{isSavingAddress ? (
-								<ActivityIndicator size="small" color="#ffffff" />
-							) : (
-								<AppTypography variant="body" style={styles.primaryButtonText}>
-									Save Details
-								</AppTypography>
-							)}
-						</TouchableOpacity>
+							Save Details
+						</AppButton>
 					</View>
 				</View>
 			</ScrollView>
@@ -1091,7 +1069,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 					{
 						paddingHorizontal: sectionPadding,
 						paddingTop: sectionPadding,
-						paddingBottom: 0,
+						paddingBottom: actionSpacing,
 					},
 				]}
 				keyboardShouldPersistTaps="handled"
@@ -1099,9 +1077,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			>
 				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
 					<View style={[styles.header, actionStacked && styles.headerStacked]}>
-						<AppTypography variant="h3" style={styles.title}>
-							My Hospital
-						</AppTypography>
+						
 						<TouchableOpacity
 							style={[styles.addButton, actionStacked && styles.addButtonStacked]}
 							onPress={() => setShowForm(true)}
@@ -1212,20 +1188,16 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						</View>
 					)}
 
-					<TouchableOpacity
-						style={[styles.primaryButton, styles.saveContinueButton, isSaving && styles.primaryButtonDisabled]}
+					<AppButton
+						variant="primary"
+						formAction
+						style={[styles.saveContinueButton, { marginTop: actionSpacing }]}
 						onPress={handleSave}
+						loading={isSaving}
 						disabled={isSaving}
-						activeOpacity={0.85}
 					>
-						{isSaving ? (
-							<ActivityIndicator size="small" color="#ffffff" />
-						) : (
-							<AppTypography variant="body" style={styles.primaryButtonText}>
-								Save / Continue
-							</AppTypography>
-						)}
-					</TouchableOpacity>
+						Save 
+					</AppButton>
 				</View>
 			</ScrollView>
 		</Pressable>
@@ -1261,11 +1233,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'column',
 		alignItems: 'stretch',
 	},
-	title: {
-		color: '#1f2b33',
-		fontSize: 22,
-		fontWeight: '700',
-	},
+	
 	addButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1514,28 +1482,13 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		lineHeight: 20,
 	},
-	inputShell: {
-		minHeight: 48,
-		borderWidth: 1,
-		borderColor: '#a7d3db',
-		borderRadius: 10,
-		paddingHorizontal: 14,
-		backgroundColor: '#ffffff',
-	},
-	inputShellMultiline: {
+	multilineInput: {
 		minHeight: 96,
-		paddingVertical: 12,
 	},
-	textInput: {
-		minHeight: 48,
-		fontSize: 14,
-		lineHeight: 20,
-		color: '#2f2f2f',
-		paddingVertical: 12,
-	},
-	textInputMultiline: {
-		minHeight: 72,
-		paddingVertical: 0,
+	multilineInputContent: {
+		minHeight: 96,
+		paddingTop: 12,
+		paddingBottom: 12,
 	},
 	workingHours: {
 		width: '100%',
@@ -1764,94 +1717,6 @@ const styles = StyleSheet.create({
 	dropdownGroupCompact: {
 		paddingTop: 0,
 	},
-	dropdownFloatingLabel: {
-		position: 'absolute',
-		top: -11,
-		left: 17,
-		zIndex: 2,
-		paddingHorizontal: 7,
-		backgroundColor: '#ffffff',
-		color: '#7b8790',
-		fontSize: 14,
-		fontWeight: '500',
-		lineHeight: 18,
-	},
-	dropdownTrigger: {
-		minHeight: 48,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: '#a7d3db',
-		backgroundColor: '#ffffff',
-		paddingHorizontal: 20,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	dropdownTriggerCompact: {
-		minHeight: 48,
-		paddingHorizontal: 12,
-	},
-	dropdownValue: {
-		color: '#2f2f2f',
-		fontSize: 14,
-		lineHeight: 20,
-		fontWeight: '400',
-	},
-	dropdownValueCompact: {
-		color: '#2f2f2f',
-		fontSize: 14,
-		lineHeight: 20,
-		fontWeight: '400',
-	},
-	dropdownOverlay: {
-		flex: 1,
-		backgroundColor: 'rgba(18, 28, 33, 0.18)',
-		alignItems: 'center',
-		justifyContent: 'center',
-		padding: 20,
-	},
-	dropdownMenu: {
-		width: '100%',
-		maxWidth: 360,
-		maxHeight: '70%',
-		borderRadius: 14,
-		backgroundColor: '#ffffff',
-		paddingVertical: 10,
-		shadowColor: '#000000',
-		shadowOpacity: 0.14,
-		shadowRadius: 14,
-		shadowOffset: { width: 0, height: 8 },
-		elevation: 10,
-	},
-	dropdownTitle: {
-		color: '#66757f',
-		fontSize: 13,
-		fontWeight: '700',
-		paddingHorizontal: 16,
-		paddingBottom: 8,
-	},
-	dropdownList: {
-		maxHeight: 320,
-	},
-	dropdownItem: {
-		minHeight: 46,
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	dropdownItemActive: {
-		backgroundColor: 'rgba(12,124,124,0.06)',
-	},
-	dropdownItemText: {
-		color: '#2f2f2f',
-		fontSize: 14,
-		fontWeight: '600',
-	},
-	dropdownItemTextActive: {
-		color: TEAL,
-	},
 	appointmentRules: {
 		marginTop: 14,
 		gap: 14,
@@ -1873,27 +1738,14 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	formActions: {
-		alignItems: 'flex-end',
-		marginTop: 28,
+		alignItems: 'stretch',
 	},
-	primaryButton: {
-		minWidth: 160,
-		paddingHorizontal: 20,
-		paddingVertical: 12,
-		borderRadius: 10,
-		backgroundColor: '#0c7c7c',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	primaryButtonDisabled: {
-		opacity: 0.7,
-	},
-	primaryButtonText: {
-		color: '#ffffff',
-		fontWeight: '600',
+	formActionButton: {
+		marginTop: 0,
+		width: '100%',
 	},
 	saveContinueButton: {
-		marginTop: 28,
-		alignSelf: 'flex-start',
+		alignSelf: 'stretch',
+		width: '100%',
 	},
 })

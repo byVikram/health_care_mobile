@@ -92,6 +92,10 @@ export default function PatientQuestionsSection({
 }: Props) {
 	const { role } = useAuth()
 	const isDoctor = role === USER_ROLES.DOCTOR
+	const sectionTitle =
+		role === USER_ROLES.PATIENT
+			? 'Free Expert Q&A'
+			: "Take time to answer patients' questions"
 
 	const [answers, setAnswers] = useState<Record<string, string>>({})
 	const [submitting, setSubmitting] = useState<Record<string, boolean>>({})
@@ -118,7 +122,7 @@ export default function PatientQuestionsSection({
 
 	return (
 		<View style={styles.wrapper}>
-			<Text style={styles.sectionTitle}>Take a time to answer the Patients questions</Text>
+			<Text style={styles.sectionTitle}>{sectionTitle}</Text>
 
 			{loading ? (
 				<ActivityIndicator color={TEAL} style={{ marginTop: 24 }} />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, {useMemo, useState } from 'react'
 import {
 	View,
 	StyleSheet,
@@ -20,6 +20,14 @@ export default function SettingsTab() {
 	const [notifyReferral, setNotifyReferral] = useState(false)
 	const [notifyBooking, setNotifyBooking] = useState(true)
 	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
+
+	const contentWidth = useMemo(() => {
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
+		return 640
+	}, [isTablet, width])
 
 	const handleAbout = () => {
 		Alert.alert('About Whisper ai', 'Version 1.0.0')
@@ -62,142 +70,135 @@ export default function SettingsTab() {
 			keyboardShouldPersistTaps="handled"
 			showsVerticalScrollIndicator={false}
 		>
-			{/* NOTIFICATION SETTINGS */}
-			<AppTypography variant="body" style={styles.title}>Notification Settings</AppTypography>
+			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+				{/* NOTIFICATION SETTINGS */}
+				<AppTypography variant="h4" style={styles.Title}>Notification Settings</AppTypography>
 
-			<View style={styles.settingsCard}>
-				<View style={styles.settingRow}>
-					<AppTypography variant="body" style={styles.settingText}>
-						Get notifications when the patient cancels the appointment
-					</AppTypography>
-					<AppToggle
-						value={notifyCancellation}
-						onValueChange={setNotifyCancellation}
-						showStatusText={false}
-						activeColor="#287779"
-						inactiveColor="#d8e0ea"
-						accessibilityLabel="Get notifications when the patient cancels the appointment"
-					/>
-				</View>
-
-				<View style={styles.settingDivider} />
-
-				<View style={styles.settingRow}>
-					<AppTypography variant="body" style={styles.settingText}>
-						Get notification when other doctors refer you
-					</AppTypography>
-					<AppToggle
-						value={notifyReferral}
-						onValueChange={setNotifyReferral}
-						showStatusText={false}
-						activeColor="#287779"
-						inactiveColor="#d8e0ea"
-						accessibilityLabel="Get notification when other doctors refer you"
-					/>
-				</View>
-
-				<View style={styles.settingDivider} />
-
-				<View style={styles.settingRow}>
-					<AppTypography variant="body" style={styles.settingText}>
-						Get notification when patient books an appointment
-					</AppTypography>
-					<AppToggle
-						value={notifyBooking}
-						onValueChange={setNotifyBooking}
-						showStatusText={false}
-						activeColor="#287779"
-						inactiveColor="#d8e0ea"
-						accessibilityLabel="Get notification when patient books an appointment"
-					/>
-				</View>
-			</View>
-
-			{/* TITLE */}
-			<AppTypography variant="body" style={styles.title}>Account Settings</AppTypography>
-
-			<View style={styles.settingsCard}>
-				{accountItems.map((item, index) => (
-					<React.Fragment key={item.label}>
-						<TouchableOpacity
-							style={styles.accountRow}
-							onPress={item.onPress}
-							activeOpacity={0.8}
-						>
-							<View style={styles.accountRowLeft}>
-								<Ionicons name={item.icon} size={22} color="#287779" />
-								<AppTypography variant="body" style={styles.accountText}>
-									{item.label}
-								</AppTypography>
-							</View>
-							<Ionicons name="chevron-forward" size={20} color="#9aa4af" />
-						</TouchableOpacity>
-						{index < accountItems.length - 1 ? <View style={styles.settingDivider} /> : null}
-					</React.Fragment>
-				))}
-			</View>
-
-			{/* PASSWORD SECTION
-			<AppTypography variant="caption" style={styles.label}>Set Password</AppTypography>
-
-			<TouchableOpacity style={styles.inputBox}>
-				<AppTypography variant="body" style={styles.placeholder}>Type to set password</AppTypography>
-
-				<Ionicons name="chevron-forward" size={18} color="#7aaeb0" />
-			</TouchableOpacity> */}
-
-			{/* DELETE BUTTON */}
-			<TouchableOpacity
-				style={styles.deleteBtn}
-				onPress={() => setShowModal(true)}
-			>
-				<AppTypography variant="body" style={styles.deleteText}>Deactivate the Account</AppTypography>
-				<Ionicons name="trash-outline" size={18} color="#fff" />
-			</TouchableOpacity>
-
-			{/* MODAL */}
-			<Modal
-				transparent
-				visible={showModal}
-				animationType="fade"
-			>
-				{/* BACKDROP */}
-				<Pressable
-					style={styles.overlay}
-					onPress={() => setShowModal(false)}
-				>
-
-					{/* POPUP CARD */}
-					<Pressable
-						style={[
-							styles.modalCard,
-							{ width: width * 0.85 },
-						]}
-						onPress={(e) => e.stopPropagation()}
-					>
-						<AppTypography variant="body" style={styles.modalTitle}>
-							Deactivate Account?
+				<View style={styles.settingsCard}>
+					<View style={styles.settingRow}>
+						<AppTypography variant="body" style={styles.settingText}>
+							Get notifications when the patient cancels the appointment
 						</AppTypography>
+						<AppToggle
+							value={notifyCancellation}
+							onValueChange={setNotifyCancellation}
+							showStatusText={false}
+							activeColor="#287779"
+							inactiveColor="#d8e0ea"
+							accessibilityLabel="Get notifications when the patient cancels the appointment"
+						/>
+					</View>
 
-						<AppTypography variant="body" style={styles.modalText}>
-							All your data will be permanently deactivated.
+					<View style={styles.settingDivider} />
+
+					<View style={styles.settingRow}>
+						<AppTypography variant="body" style={styles.settingText}>
+							Get notification when other doctors refer you
 						</AppTypography>
+						<AppToggle
+							value={notifyReferral}
+							onValueChange={setNotifyReferral}
+							showStatusText={false}
+							activeColor="#287779"
+							inactiveColor="#d8e0ea"
+							accessibilityLabel="Get notification when other doctors refer you"
+						/>
+					</View>
 
-						<View style={styles.modalActions}>
+					<View style={styles.settingDivider} />
+
+					<View style={styles.settingRow}>
+						<AppTypography variant="body" style={styles.settingText}>
+							Get notification when patient books an appointment
+						</AppTypography>
+						<AppToggle
+							value={notifyBooking}
+							onValueChange={setNotifyBooking}
+							showStatusText={false}
+							activeColor="#287779"
+							inactiveColor="#d8e0ea"
+							accessibilityLabel="Get notification when patient books an appointment"
+						/>
+					</View>
+				</View>
+
+				{/* TITLE */}
+				<AppTypography variant="h4" style={styles.Title}>Account Settings</AppTypography>
+
+				<View style={styles.settingsCard}>
+					{accountItems.map((item, index) => (
+						<React.Fragment key={item.label}>
 							<TouchableOpacity
-								style={styles.cancelBtn}
-								onPress={() => setShowModal(false)}
+								style={styles.accountRow}
+								onPress={item.onPress}
+								activeOpacity={0.8}
 							>
-								<AppTypography variant="body" style={styles.cancelText}>Cancel</AppTypography>
+								<View style={styles.accountRowLeft}>
+									<Ionicons name={item.icon} size={22} color="#287779" />
+									<AppTypography variant="body" style={styles.accountText}>
+										{item.label}
+									</AppTypography>
+								</View>
+								<Ionicons name="chevron-forward" size={20} color="#9aa4af" />
 							</TouchableOpacity>
+							{index < accountItems.length - 1 ? <View style={styles.settingDivider} /> : null}
+						</React.Fragment>
+					))}
+				</View>
 
-							<TouchableOpacity style={styles.confirmBtn}>
-								<AppTypography variant="body" style={styles.confirmText}>Deactivate</AppTypography>
-							</TouchableOpacity>
-						</View>
+				{/* DELETE BUTTON */}
+				<TouchableOpacity
+					style={styles.deleteBtn}
+					onPress={() => setShowModal(true)}
+				>
+					<AppTypography variant="body" style={styles.deleteText}>Deactivate the Account</AppTypography>
+					<Ionicons name="trash-outline" size={18} color="#fff" />
+				</TouchableOpacity>
+
+				{/* MODAL */}
+				<Modal
+					transparent
+					visible={showModal}
+					animationType="fade"
+				>
+					{/* BACKDROP */}
+					<Pressable
+						style={styles.overlay}
+						onPress={() => setShowModal(false)}
+					>
+
+						{/* POPUP CARD */}
+						<Pressable
+							style={[
+								styles.modalCard,
+								{ width: width * 0.85 },
+							]}
+							onPress={(e) => e.stopPropagation()}
+						>
+							<AppTypography variant="body" style={styles.modalTitle}>
+								Deactivate Account?
+							</AppTypography>
+
+							<AppTypography variant="body" style={styles.modalText}>
+								All your data will be permanently deactivated.
+							</AppTypography>
+
+							<View style={styles.modalActions}>
+								<TouchableOpacity
+									style={styles.cancelBtn}
+									onPress={() => setShowModal(false)}
+								>
+									<AppTypography variant="body" style={styles.cancelText}>Cancel</AppTypography>
+								</TouchableOpacity>
+
+								<TouchableOpacity style={styles.confirmBtn}>
+									<AppTypography variant="body" style={styles.confirmText}>Deactivate</AppTypography>
+								</TouchableOpacity>
+							</View>
+						</Pressable>
 					</Pressable>
-				</Pressable>
-			</Modal>
+				</Modal>
+			</View>
 		</ScrollView>
 	)
 }
@@ -209,11 +210,16 @@ const styles = StyleSheet.create({
 	},
 	contentContainer: {
 		flexGrow: 1,
+		alignItems: 'center',
 		padding: 16,
 		paddingBottom: 0,
 	},
-
-	title: {
+	contentShell: {
+		width: '100%',
+		alignSelf: 'center',
+	},
+	Title: {
+		color: '#343434',
 		fontSize: 18,
 		lineHeight: 24,
 		fontWeight: '700',
@@ -278,28 +284,6 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 		lineHeight: 21,
 		fontWeight: '400',
-	},
-
-	label: {
-		color: '#777',
-		marginBottom: 6,
-		fontSize: 13,
-	},
-
-	inputBox: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#7aaeb0',
-		backgroundColor: '#e6f1f2',
-		padding: 12,
-		borderRadius: 8,
-		marginBottom: 20,
-	},
-
-	placeholder: {
-		color: '#666',
 	},
 
 	deleteBtn: {

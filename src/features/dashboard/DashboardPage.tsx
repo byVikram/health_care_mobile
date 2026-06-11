@@ -1,5 +1,6 @@
-﻿import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
+	RefreshControl,
 	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
@@ -13,14 +14,14 @@ import HeroSection from './HeroSection'
 import SpecialitySection from './SpecialitySection'
 import ConsultSection from './ConsultSection'
 import PatientQuestionsSection from './PatientQuestionsSection'
-import PharmacyOrder from './PharmacyOrder'
+import PharmacyOrderDashboardCard from './PharmacyOrderDashboardCard'
 import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
 import CommunitySection from './CommunitySection'
 import LocationScreen from '../../components/common/LocationScreen'
 import { GPSLocationCard } from '../../components/common/GPSLocationCard'
 import BlogsSection from './BlogsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
-import { getAppointments, Appointment } from '../doctor/doctorService'
+import { getAppointments } from '../doctor/doctorService'
 
 import { formatDateForApi } from '../../utils/date'
 import { USER_ROLES } from '../../constants/constants'
@@ -40,9 +41,11 @@ export default function DashboardPage() {
 	const { role } = useAuth()
 	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
 
-	const [appointments, setAppointments] = useState<Appointment[]>([])
+	const [appointments, setAppointments] = useState<any[]>([])
 	const [apptLoading, setApptLoading] = useState(false)
 	const [apptError, setApptError] = useState('')
+	const [refreshing, setRefreshing] = useState(false)
+	const [refreshToken, setRefreshToken] = useState(0)
 	const [modalType, setModalType] = useState<'success' | 'error' | null>(null)
 
 	const [selectedDate, setSelectedDate] = useState(0)
@@ -99,6 +102,42 @@ export default function DashboardPage() {
 		fetchAppointments()
 	}, [role, selectedDate, weekDays])
 
+	const handleRefresh = async () => {
+		setRefreshing(true)
+
+		try {
+			if (role === USER_ROLES.DOCTOR) {
+				setApptError('')
+
+				const dateStr = formatDateForApi(
+					weekDays[selectedDate]?.dateObj ?? new Date()
+				)
+
+				const res = await getAppointments({
+					appointment_date: dateStr,
+				})
+
+				if (res.success) {
+					setAppointments(Array.isArray(res.data) ? res.data : [])
+				} else {
+					setApptError(res.message ?? 'Failed to load appointments')
+				}
+			} else if (role === USER_ROLES.PHARMACY) {
+				setRefreshing(false)
+			} else {
+				setRefreshToken((token) => token + 1)
+			}
+		} catch {
+			if (role === USER_ROLES.DOCTOR) {
+				setApptError('Failed to load appointments')
+			}
+		} finally {
+			if (role === USER_ROLES.DOCTOR) {
+				setRefreshing(false)
+			}
+		}
+	}
+
 	// ---------------- DOCTOR PANEL ----------------
 	const renderDoctorPanel = () => (
 		<DoctorAppointments
@@ -126,18 +165,10 @@ export default function DashboardPage() {
 			</TouchableOpacity>
 
 			<PatientUpcomingAppointments
+				refreshToken={refreshToken}
+				onRefreshComplete={() => setRefreshing(false)}
 				onJoin={(appointment) =>
 					navigation.navigate(ROUTES.STACK.VIDEO_CONSULTATION, {
-						appointmentId: appointment.id,
-					})
-				}
-				onReschedule={(appointment) =>
-					navigation.navigate(ROUTES.STACK.RESCHEDULE_APPOINTMENT, {
-						appointmentId: appointment.id,
-					})
-				}
-				onCancel={(appointment) =>
-					navigation.navigate(ROUTES.STACK.CANCEL_APPOINTMENT, {
 						appointmentId: appointment.id,
 					})
 				}
@@ -212,12 +243,20 @@ export default function DashboardPage() {
 				style={styles.container}
 				contentContainerStyle={styles.content}
 				showsVerticalScrollIndicator={false}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={handleRefresh}
+						colors={['#0c7c7c']}
+						tintColor="#0c7c7c"
+						progressBackgroundColor="#ffffff"
+					/>
+				}
 			>
 				{/* For PHARMACY role: show PharmacyOrder at the top (before HeroSection) */}
-				{role === USER_ROLES.PHARMACY && <PharmacyOrder />}
+				{role === USER_ROLES.PHARMACY && <PharmacyOrderDashboardCard />}
 
 				{renderMainContent()}
-
 				{/* Common sections for all roles */}
 				<CommunitySection />
 				<BlogsSection />
@@ -285,6 +324,10 @@ const styles = StyleSheet.create({
 	},
 
 	treatmentHistoryCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 12,
 		marginHorizontal: 16,
 		marginTop: 8,
 		padding: 14,
@@ -295,12 +338,14 @@ const styles = StyleSheet.create({
 	},
 
 	treatmentHistoryLeft: {
+		flex: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 12,
 	},
 
 	treatmentHistoryTitle: {
+		flex: 1,
 		fontSize: 16,
 		fontWeight: '500',
 		color: '#30353A',

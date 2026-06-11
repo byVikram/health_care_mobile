@@ -6,11 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
+  TextInput,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "react-native-paper";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
-import AppHeader from "../../../components/common/AppHeader";
 import { AppTypography } from "../../../components/common";
 import { getSpecialities } from "../doctorService";
 import { ROUTES } from "../../../navigation/routes";
@@ -142,19 +143,25 @@ export default function SearchPage() {
 
   return (
     <View style={styles.container}>
-      {/*
-        variant="search" → shows location row + editable search bar.
-        Keyboard opens automatically because isSearchEditable=true.
-      */}
-      <AppHeader
-        variant="search"
-        location="KR Market"
-        onAvatarPress={() => navigation.goBack()}
-        isSearchEditable={true}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        onSearchSubmit={handleSearchSubmit}
-      />
+      {/* Search Bar - Editable TextInput */}
+      <View style={styles.searchBar}>
+        <MaterialCommunityIcons name="magnify" size={20} color="#9aa0a6" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search Doctors/Symptoms"
+          placeholderTextColor="#9AA0AC"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSubmitEditing={handleSearchSubmit}
+          returnKeyType="search"
+          autoFocus={true}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <MaterialCommunityIcons name="close" size={20} color="#9aa0a6" />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* ── Specialities section ─────────────────────────────────────────── */}
       <View style={styles.filterSection}>
@@ -263,4 +270,24 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    margin: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 4,
+    borderWidth: 1,
+    borderColor: '#EAECF0',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  searchIcon: { marginRight: 4 },
+  searchInput: { flex: 1, fontSize: 14, color: '#101828' },
 });
