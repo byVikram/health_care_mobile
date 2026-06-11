@@ -6,12 +6,17 @@ import DoctorsService from '../../../assets/Services/doctors-service.png'
 import VideoConsultation from '../../../assets/Services/doctor-video-consultation.png'
 import LabTests from '../../../assets/Services/lab-service.png'
 import Surgeries from '../../../assets/Services/serguries.png'
+import { useNavigation } from '@react-navigation/native'
+import type { NavigationProp } from '@react-navigation/native'
+import type { AppStackParamList } from '../../../navigation/types'
+import { ROUTES } from '../../../navigation/routes'
 
 interface ServiceType {
 	id: number
 	image: any
 	title: string
 	description: string
+	mode?: 'clinic' | 'video'
 }
 
 const services: ServiceType[] = [
@@ -20,12 +25,14 @@ const services: ServiceType[] = [
 		image: DoctorsService,
 		title: 'Find Doctors Near You',
 		description: 'Confirmed appointments',
+		mode: 'clinic',
 	},
 	{
 		id: 2,
 		image: VideoConsultation,
 		title: 'Instant Video Consultation',
 		description: 'Connect within 60 sec',
+		mode: 'video',
 	},
 	{
 		id: 3,
@@ -43,6 +50,7 @@ const services: ServiceType[] = [
 
 function ServicesSection() {
 	const { width } = useWindowDimensions()
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 	const isTablet = width >= 768
 	const cardWidth = isTablet ? 172 : Math.max(140, Math.min(140, (width - 56) / 4))
 	const cardHeight = isTablet ? 238 : 200
@@ -67,6 +75,26 @@ function ServicesSection() {
 								marginRight: index === services.length - 1 ? 0 : 12,
 							},
 						]}
+						onPress={() => {
+							if (item.id === 1) {
+								navigation.navigate(ROUTES.STACK.SEARCH, {
+									mode: 'clinic',
+								} as any)
+							}
+
+							if (item.id === 2) {
+								navigation.navigate(ROUTES.STACK.SEARCH, {
+									mode: 'video',
+								} as any)
+							}
+							if (item.id === 3) {
+								// Navigate to Lab Tests page
+							}
+
+							if (item.id === 4) {
+								// Navigate to Surgeries page
+							}
+						}}
 					>
 						<Image source={item.image} resizeMode="cover" style={[styles.image, { height: imageHeight }]} />
 

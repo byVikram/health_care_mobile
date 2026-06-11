@@ -21,7 +21,11 @@ export type AuthStackParamList = {
 
 export type MainTabParamList = {
 	[ROUTES.MAIN.HOME]: undefined
-	[ROUTES.MAIN.SEARCH]: undefined
+	[ROUTES.STACK.SEARCH]:
+		| {
+				mode?: 'clinic' | 'video'
+		  }
+		| undefined
 	[ROUTES.MAIN.PORTAL]: undefined
 	[ROUTES.MAIN.PROFILE]: undefined
 }
@@ -64,6 +68,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.CONSULTATION]: ConsultationParams | undefined
 	[ROUTES.STACK.HEALTH_PROFILE]: undefined
 	[ROUTES.STACK.SETTINGS]: undefined
+	[ROUTES.STACK.SCREEN_CAPTURE_TEST]: undefined
 	[ROUTES.STACK.DOCTOR_WELCOME]: undefined
 	[ROUTES.STACK.ACCOUNT]: undefined
 	[ROUTES.STACK.APPOINTMENTS]: undefined

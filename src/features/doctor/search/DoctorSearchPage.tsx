@@ -77,6 +77,7 @@ function DoctorCardSkeleton({ mobile = false }: { mobile?: boolean }) {
 export default function DoctorSearchPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
+	console.log('Route params:', route.params)
 	const { width } = useWindowDimensions()
 
 	const isMobile = width < 600
@@ -86,6 +87,7 @@ export default function DoctorSearchPage() {
 	// Initial route params
 	const initialQuery = route.params?.query || ''
 	const initialMode = route.params?.mode || 'all'
+	console.log('Route params:', route.params)
 
 	const [searchQuery, setSearchQuery] = useState(initialQuery)
 	const [doctors, setDoctors] = useState<DoctorSearchItem[]>([])
@@ -334,11 +336,7 @@ export default function DoctorSearchPage() {
 
 					<View style={styles.filterGroup}>
 						<AppTypography style={styles.filterGroupLabel}>Consultation Mode</AppTypography>
-						{renderFilterChips(
-							CONSULTATION_OPTIONS,
-							draftConsultationType,
-							setDraftConsultationType
-						)}
+						{renderFilterChips(CONSULTATION_OPTIONS, draftConsultationType, setDraftConsultationType)}
 					</View>
 
 					<View style={styles.filterGroup}>

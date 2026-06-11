@@ -82,7 +82,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 			navigation.navigate(ROUTES.STACK.ORDER_LIST as any)
 		} else {
 			navigation.navigate(ROUTES.MAIN.TABS, {
-				screen: ROUTES.MAIN.SEARCH,
+				screen: ROUTES.MAIN.SEARCH as any,
 			})
 		}
 	}
@@ -181,6 +181,12 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				label: 'Settings',
 				icon: <SettingsIcon width={20} height={20} />,
 				onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
+			},
+			{
+				id: 'screencapturetest',
+				label: 'Screen Capture Test',
+				icon: <MaterialCommunityIcons name="camera" size={20} color="#1f5f68" />,
+				onPress: () => navigation.navigate(ROUTES.STACK.SCREEN_CAPTURE_TEST),
 			},
 		],
 		[navigation]
