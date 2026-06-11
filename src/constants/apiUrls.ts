@@ -6,7 +6,10 @@ import { Platform } from 'react-native'
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	const url = 'http://192.168.4.76:8000'
+
+
 
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')

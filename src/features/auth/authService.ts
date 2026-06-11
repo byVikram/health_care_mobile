@@ -52,8 +52,11 @@ export interface VerifyUserCreationResponse {
 }
 
 export const sendOtp = async (contactNumber: string): Promise<SendOtpResponse> => {
+	
 	const res = await ApiService.post<SendOtpResponse>(API_ENDPOINTS.AUTH.SEND_OTP, { contact_number: contactNumber })
+	console.log('sendOtp response:', res)  
 	return res.data
+
 }
 
 export const verifyOtp = async (contactNumber: string, otp: string): Promise<VerifyOtpResponse> => {
