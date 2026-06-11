@@ -16,9 +16,9 @@ import {
 import PharmacySearchCard from './component/PharmacyCard'
 import PharmacyFilters, { PharmacyFilterState } from './component/PharmacyFilters'
 import { PharmacyItem } from './pharmacy'
-import { getPharmacies } from '../profile/pharmacy/pharmacyService' 
+import { getPharmacies } from '../profile/pharmacy/pharmacyService'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import ArrowIcon from '../../assets/Settings/arrow.svg'	
+import ArrowIcon from '../../assets/Settings/arrow.svg'
 import { useNavigation } from '@react-navigation/native'
 import { ROUTES } from '../../navigation/routes'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
@@ -39,23 +39,17 @@ export default function PharmacySearchPage() {
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [showFilters, setShowFilters] = useState(false)
-const insets = useSafeAreaInsets()
+	const insets = useSafeAreaInsets()
 	// ── Fetch — same pattern as OrderDetailsScreen ────────────────────────────
 
 	const fetchPharmacyList = useCallback(async () => {
 		setLoading(true)
 		setError(null)
 		try {
-			const result = await getPharmacies()
+			const result = await getPharmacies({}, { signal: new AbortController().signal })
 
-			// ApiService.get returns res.data which is the full API body:
-			// { success, message, data: [...] }
 			const raw = result as any
-			const list: any[] = Array.isArray(raw)
-				? raw // already the array
-				: Array.isArray(raw?.data)
-					? raw.data // { data: [] } ← normal shape
-					: []
+			const list: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []
 
 			const mapped: PharmacyItem[] = list.map((item: any) => ({
 				...item,
@@ -197,10 +191,7 @@ const insets = useSafeAreaInsets()
 				</View>
 				<TouchableOpacity
 					onPress={() => setShowFilters(true)}
-					style={[
-						styles.filterIconButton,
-						hasActiveFilters && styles.filterIconButtonActive,
-					]}
+					style={[styles.filterIconButton, hasActiveFilters && styles.filterIconButtonActive]}
 				>
 					<MaterialCommunityIcons name="tune" size={22} color="#1f5f68" />
 				</TouchableOpacity>
@@ -230,7 +221,7 @@ const insets = useSafeAreaInsets()
 								/* navigate to detail */
 							}}
 							onPlaceOrder={() => {
-								(navigation as any).navigate(ROUTES.STACK.PLACE_PHARMACY_ORDER, {
+								;(navigation as any).navigate(ROUTES.STACK.PLACE_PHARMACY_ORDER, {
 									pharmacyId: item.id,
 									pharmacyName: item.name,
 								})
@@ -272,45 +263,45 @@ const insets = useSafeAreaInsets()
 
 const styles = StyleSheet.create({
 	headerWrapper: {
-	backgroundColor: '#1f5f68',
-	paddingBottom: 20,
-	paddingHorizontal: 16,
-	overflow: 'hidden',
-},
+		backgroundColor: '#1f5f68',
+		paddingBottom: 20,
+		paddingHorizontal: 16,
+		overflow: 'hidden',
+	},
 
-headerContent: {
-	flexDirection: 'row',
-	justifyContent: 'space-between',
-	alignItems: 'center',
-},
+	headerContent: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+	},
 
-headerTitle: {
-	color: '#fff',
-	fontSize: 20,
-	fontWeight: '600',
-},
+	headerTitle: {
+		color: '#fff',
+		fontSize: 20,
+		fontWeight: '600',
+	},
 
-waveOne: {
-	position: 'absolute',
-	width: 420,
-	height: 240,
-	borderRadius: 120,
-	backgroundColor: 'rgba(255,255,255,0.06)',
-	left: -140,
-	top: -70,
-	transform: [{ rotate: '-4deg' }],
-},
+	waveOne: {
+		position: 'absolute',
+		width: 420,
+		height: 240,
+		borderRadius: 120,
+		backgroundColor: 'rgba(255,255,255,0.06)',
+		left: -140,
+		top: -70,
+		transform: [{ rotate: '-4deg' }],
+	},
 
-waveTwo: {
-	position: 'absolute',
-	width: 430,
-	height: 240,
-	borderRadius: 120,
-	backgroundColor: 'rgba(255,255,255,0.05)',
-	left: -95,
-	top: -22,
-	transform: [{ rotate: '-4deg' }],
-},
+	waveTwo: {
+		position: 'absolute',
+		width: 430,
+		height: 240,
+		borderRadius: 120,
+		backgroundColor: 'rgba(255,255,255,0.05)',
+		left: -95,
+		top: -22,
+		transform: [{ rotate: '-4deg' }],
+	},
 	safe: {
 		flex: 1,
 		backgroundColor: '#F5F7FA',
@@ -478,4 +469,3 @@ waveTwo: {
 	},
 	applyBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 })
-
