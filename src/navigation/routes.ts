@@ -24,6 +24,7 @@ export const ROUTES = {
 		CONSULTATION: 'Consultation',
 		HEALTH_PROFILE: 'HealthProfile',
 		SETTINGS: 'Settings',
+		SCREEN_CAPTURE_TEST: 'ScreenCaptureTest',
 		DOCTOR_WELCOME: 'DoctorWelcome',
 		ACCOUNT: 'Account',
 		APPOINTMENTS: 'Appointments',
@@ -34,7 +35,7 @@ export const ROUTES = {
 		PATIENT_PAYMENT: 'PatientPayment',
 		PHARMACY_SEARCH_PAGE: 'PharmacySearchPage',
 		ORDER_LIST: 'OrderListPage',
-		
+
 		ORDER_DETAILS: 'OrderDetails',
 		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
 	},
