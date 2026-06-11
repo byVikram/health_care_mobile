@@ -4,6 +4,7 @@ import {
 	Modal,
 	PanResponder,
 	Pressable,
+	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
 	useWindowDimensions,
@@ -12,7 +13,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from './AppTypography'
 
-export type AppFilterBottomSheetProps = {
+export type AppBottomSheetProps = {
 	visible: boolean
 	title: string
 	onClose: () => void
@@ -23,12 +24,12 @@ const DISMISS_DRAG_DISTANCE = 84
 const DISMISS_DRAG_VELOCITY = 0.75
 const MAX_HEIGHT_RATIO = 0.8
 
-export function AppFilterBottomSheet({
+export function AppBottomSheet({
 	visible,
 	title,
 	onClose,
 	children,
-}: AppFilterBottomSheetProps) {
+}: AppBottomSheetProps) {
 	const { height } = useWindowDimensions()
 	const closedOffset = height
 	const maxSheetHeight = height * MAX_HEIGHT_RATIO
@@ -111,12 +112,13 @@ export function AppFilterBottomSheet({
 							transform: [{ translateY: sheetTranslateY }],
 						},
 					]}
+					{...panResponder.panHandlers}
 				>
 					<Pressable onPress={(event) => event.stopPropagation()}>
 						<View style={styles.sheetHandleHitArea} {...panResponder.panHandlers}>
 							<View style={styles.sheetHandle} />
 						</View>
-						<View style={styles.sheetHeader} {...panResponder.panHandlers}>
+						<View style={styles.sheetHeader}>
 							<AppTypography variant="h4" style={styles.sheetTitle}>
 								{title}
 							</AppTypography>
@@ -124,7 +126,10 @@ export function AppFilterBottomSheet({
 								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
 							</TouchableOpacity>
 						</View>
-						<View style={styles.sheetContent}>{children}</View>
+						<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
+							{children}
+						</ScrollView>
+						{/* <View style={styles.sheetContent}>{children}</View> */}
 					</Pressable>
 				</Animated.View>
 			</Pressable>
@@ -132,7 +137,7 @@ export function AppFilterBottomSheet({
 	)
 }
 
-export default AppFilterBottomSheet
+export default AppBottomSheet
 
 const styles = StyleSheet.create({
 	sheetOverlay: {

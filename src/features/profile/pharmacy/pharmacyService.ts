@@ -98,8 +98,26 @@ export const getPharmacyOrderById = async (id: string) => {
 	return res.data
 }
 
-export const updatePharmacyOrderStatus = async (id: string, status: string) => {
-	const res = await ApiService.patch(API_ENDPOINTS.PHARMACY_ORDERS.UPDATE_STATUS(id), { status })
+export interface PharmacyOrderStatusUpdateResponse {
+	success: boolean
+	message: string
+	data: {
+		id: string
+		status: string
+		bill_amount: number | null
+		rejection_reason: string | null
+		updated_at: string
+	}
+}
+
+export const updatePharmacyOrderStatus = async (
+	id: string,
+	payload: { status: string; bill_amount?: number | null; rejection_reason?: string | null }
+): Promise<PharmacyOrderStatusUpdateResponse> => {
+	const res = await ApiService.patch<PharmacyOrderStatusUpdateResponse>(
+		API_ENDPOINTS.PHARMACY_ORDERS.UPDATE_STATUS(id),
+		payload
+	)
 	return res.data
 }
 
@@ -114,3 +132,15 @@ export const updatePharmacyOrderMedicines = async (id: string, medicines: any[])
 // 	const res = await ApiService.post(API_ENDPOINTS.PHARMACY_ORDERS.SEND_REMINDER(id))
 // 	return res.data
 // }
+
+export const createPharmacyOrder = async (order: {
+	pharmacy_public_id: string
+	treatment_public_id?: string | null
+	external_prescription_s3_key?: string | null
+	delivery_type: string
+	delivery_address_public_id?: string | null
+	notes?: string | null
+}) => {
+	const res = await ApiService.post(API_ENDPOINTS.PHARMACY_ORDERS.CREATE, order)
+	return res.data
+}

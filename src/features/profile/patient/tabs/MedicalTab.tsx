@@ -20,7 +20,7 @@ interface Props {
 	saving: boolean
 }
 
-type MultiFieldKey = 'allergies' | 'chronicConditions'
+type MultiFieldKey = 'allergies' | 'chronicConditions' | 'currentMedications'
 
 interface MultiFieldDetails {
 	key: MultiFieldKey
@@ -41,6 +41,12 @@ const FIELD_DETAILS: Record<MultiFieldKey, MultiFieldDetails> = {
 		label: 'Chronic diseases',
 		addLabel: 'Add Chronic diseases',
 		placeholder: 'Write your condition',
+	},
+	currentMedications: {
+		key: 'currentMedications',
+		label: 'Current Medications',
+		addLabel: 'Add Current Medications',
+		placeholder: 'Write your medication',
 	},
 }
 
@@ -121,6 +127,24 @@ export default function MedicalTab({ data, onChange, onSave, saving }: Props) {
 			<View style={styles.formFieldsWrapper}>
 				{renderMultiField('allergies')}
 				{renderMultiField('chronicConditions')}
+				{renderMultiField('currentMedications')}
+
+				<View style={styles.multiFieldContainer}>
+					<AppTypography variant="caption" style={styles.fieldLabel}>
+						Family History
+					</AppTypography>
+					<View style={styles.multiInputBox}>
+						<TextInput
+							style={styles.multiTextInput}
+							value={data.familyHistory}
+							onChangeText={(val: string) => onChange('familyHistory', val)}
+							placeholder="Write relevant family medical history"
+							placeholderTextColor="#b0bcc0"
+							multiline
+							textAlignVertical="top"
+						/>
+					</View>
+				</View>
 			</View>
 
 			<View style={styles.saveButtonWrapper}>

@@ -1,18 +1,11 @@
 import React from 'react'
-import {
-	FlatList,
-	Image,
-	StyleSheet,
-	TouchableOpacity,
-	useWindowDimensions,
-	View,
-} from 'react-native'
+import { FlatList, Image, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native'
 
-import { AppTypography } from '../../components/common'
-import DoctorsService from '../../assets/Services/doctors-service.png'
-import VideoConsultation from '../../assets/Services/doctor-video-consultation.png'
-import LabTests from '../../assets/Services/lab-service.png'
-import Surgeries from '../../assets/Services/serguries.png'
+import { AppTypography } from '../../../components/common'
+import DoctorsService from '../../../assets/Services/doctors-service.png'
+import VideoConsultation from '../../../assets/Services/doctor-video-consultation.png'
+import LabTests from '../../../assets/Services/lab-service.png'
+import Surgeries from '../../../assets/Services/serguries.png'
 
 interface ServiceType {
 	id: number
@@ -48,14 +41,12 @@ const services: ServiceType[] = [
 	},
 ]
 
-export default function ServicesSection() {
+function ServicesSection() {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
-	const cardWidth = isTablet
-		? 172
-		: Math.max(92, Math.min(108, (width - 56) / 4))
-	const cardHeight = isTablet ? 238 : 190
-	const imageHeight = isTablet ? 150 : 116
+	const cardWidth = isTablet ? 172 : Math.max(140, Math.min(140, (width - 56) / 4))
+	const cardHeight = isTablet ? 238 : 200
+	const imageHeight = isTablet ? 150 : 100
 
 	return (
 		<View style={styles.container}>
@@ -77,11 +68,7 @@ export default function ServicesSection() {
 							},
 						]}
 					>
-						<Image
-							source={item.image}
-							resizeMode="cover"
-							style={[styles.image, { height: imageHeight }]}
-						/>
+						<Image source={item.image} resizeMode="cover" style={[styles.image, { height: imageHeight }]} />
 
 						<View style={styles.textWrap}>
 							<AppTypography
@@ -116,6 +103,8 @@ export default function ServicesSection() {
 		</View>
 	)
 }
+
+export default React.memo(ServicesSection) // verified export
 
 const styles = StyleSheet.create({
 	container: {

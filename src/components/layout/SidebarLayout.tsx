@@ -4,9 +4,11 @@ import { StyleSheet, View } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import { AppSidebar } from '../common'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import AppHeader from '../common/AppHeader'
 import type { AppSidebarItem, AppSidebarProfile } from '../common'
 import { useAuth } from '../../context/AuthContext'
+import { ScrollProvider } from '../../context/ScrollContext'
 
 import AppointmentsIcon from '../../assets/quick-services/appointments.svg'
 import PharmacyIcon from '../../assets/icons/pharmacy.svg'
@@ -54,22 +56,17 @@ interface SidebarLayoutProps {
 	children: React.ReactNode
 }
 
-export default function SidebarLayout({
-	children,
-}: SidebarLayoutProps) {
+export default function SidebarLayout({ children }: SidebarLayoutProps) {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
-	const navigation =
-		useNavigation<NavigationProp<AppStackParamList>>()
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
 	const { clearAuth, user: authUser, role } = useAuth()
 
 	const user = {
 		name: authUser?.name ?? MOCK_USER.name,
 		avatar: authUser?.avatar ?? MOCK_USER.avatar,
-		profileCompletion:
-			authUser?.profileCompletion ??
-			MOCK_USER.profileCompletion,
+		profileCompletion: authUser?.profileCompletion ?? MOCK_USER.profileCompletion,
 	}
 
 	const handleEditProfile = () => {
@@ -95,9 +92,7 @@ export default function SidebarLayout({
 			{
 				id: 'appointments',
 				label: 'My Appointments',
-				icon: (
-					<AppointmentsIcon width={24} height={24} />
-				),
+				icon: <AppointmentsIcon width={24} height={24} />,
 				onPress: () => {
 					setIsSidebarOpen(false)
 					navigation.navigate(ROUTES.STACK.APPOINTMENTS)
@@ -110,6 +105,15 @@ export default function SidebarLayout({
 				onPress: () => {
 					setIsSidebarOpen(false)
 					navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
+				},
+			},
+			{
+				id: 'medicine-orders',
+				label: 'Medicine Orders',
+				icon: <MaterialCommunityIcons name="pill" size={20} color="#1f5f68" />,
+				onPress: () => {
+					setIsSidebarOpen(false)
+					navigation.navigate(ROUTES.STACK.ORDER_LIST as any)
 				},
 			},
 			{
@@ -151,9 +155,7 @@ export default function SidebarLayout({
 			{
 				id: 'reminders',
 				label: 'Reminders',
-				icon: (
-					<RemindersIcon width={20} height={20} />
-				),
+				icon: <RemindersIcon width={20} height={20} />,
 				onPress: () =>
 					navigation.navigate(ROUTES.MAIN.TABS, {
 						screen: ROUTES.MAIN.HOME,
@@ -163,17 +165,12 @@ export default function SidebarLayout({
 				id: 'payments',
 				label: 'Payments',
 				icon: <PaymentsIcon width={20} height={20} />,
-				onPress: () =>
-					navigation.navigate(
-						ROUTES.STACK.PATIENT_PAYMENT,
-					),
+				onPress: () => navigation.navigate(ROUTES.STACK.PATIENT_PAYMENT),
 			},
 			{
 				id: 'help',
 				label: 'Help Center',
-				icon: (
-					<HelpCenterIcon width={20} height={20} />
-				),
+				icon: <HelpCenterIcon width={20} height={20} />,
 				onPress: () =>
 					navigation.navigate(ROUTES.MAIN.TABS, {
 						screen: ROUTES.MAIN.PROFILE,
@@ -183,40 +180,37 @@ export default function SidebarLayout({
 				id: 'settings',
 				label: 'Settings',
 				icon: <SettingsIcon width={20} height={20} />,
-				onPress: () =>
-					navigation.navigate(
-						ROUTES.STACK.SETTINGS,
-					),
+				onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
 			},
 		],
-		[navigation],
+		[navigation]
 	)
 
 	return (
-		<View style={styles.container}>
-			<AppSidebar
-				visible={isSidebarOpen}
-				profileCompletion={user.profileCompletion}
-				onClose={() => setIsSidebarOpen(false)}
-				onLogout={clearAuth}
-				onEditProfile={handleEditProfile}
-				menuItems={menuItems}
-				profiles={PROFILES}
-			/>
+		<ScrollProvider>
+			<View style={styles.container}>
+				<AppSidebar
+					visible={isSidebarOpen}
+					profileCompletion={user.profileCompletion}
+					onClose={() => setIsSidebarOpen(false)}
+					onLogout={clearAuth}
+					onEditProfile={handleEditProfile}
+					menuItems={menuItems}
+					profiles={PROFILES}
+				/>
 
-			<AppHeader
-				variant="home"
-				userName={user.name}
-				avatarUri={user.avatar}
-				onAvatarPress={() =>
-					setIsSidebarOpen(true)
-				}
-				isSearchEditable={false}
-				onSearchPress={handleSearchPress}
-			/>
+				<AppHeader
+					variant="home"
+					userName={user.name}
+					avatarUri={user.avatar}
+					onAvatarPress={() => setIsSidebarOpen(true)}
+					isSearchEditable={false}
+					onSearchPress={handleSearchPress}
+				/>
 
-			<View style={styles.content}>{children}</View>
-		</View>
+				<View style={styles.content}>{children}</View>
+			</View>
+		</ScrollProvider>
 	)
 }
 

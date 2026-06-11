@@ -6,7 +6,7 @@ export * from "./AppSelect";
 export * from "./AppMultiSelect";
 export * from "./AppTimePicker";
 export * from "./AppPhotoPicker";
-export * from "./AppFilterBottomSheet";
+export * from "./AppBottomSheet";
 export * from "./AppCalendar";
 export * from "./AppSkeleton";
 export { default as AppToggle } from "./AppToggle";
@@ -20,3 +20,5 @@ export { default as SplashScreen } from "./SplashScreen";
 export { default as DateSlotPicker } from './DateSlotPicker';
 export type { PickProps as DateSlotPickerProps } from './DateSlotPicker';
 export { default as AppScreenHeader } from "./AppScreenHeader";
+export { default as StatusModal } from "./StatusModal";
+

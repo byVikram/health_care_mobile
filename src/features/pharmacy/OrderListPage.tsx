@@ -1,12 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
-	Animated,
 	FlatList,
 	Image,
-	Modal,
 	Platform,
-	Pressable,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -19,13 +16,13 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 
-import { AppSelect, AppSelectOption, AppTypography } from '../../components/common'
+import { AppBottomSheet, AppSelect, AppSelectOption, AppTypography } from '../../components/common'
 import PaginationBar from '../../components/common/AppPagination'
 import Card from '../../components/common/CommonCard'
 import { getPharmacyOrders } from '../profile/pharmacy/pharmacyService'
+import { useAuth } from '../../context/AuthContext' // ← same import as OrderDetailsScreen
 
 // ─────────────────────────────────────────────
 // Types
@@ -37,6 +34,7 @@ export interface PharmacyOrder {
 	status: string
 	created_at: string
 	bill_amount: number
+	delivery_type?: string
 	patient: {
 		id: string
 		name: string
@@ -135,19 +133,11 @@ const normalizeStatus = (status: string): NormalizedStatus => {
 
 const extractOrders = (response: unknown): PharmacyOrder[] => {
 	if (!response) return []
-
-	if (typeof response === 'object' && 'data' in (response as object) && Array.isArray((response as any).data)) {
+	if (typeof response === 'object' && 'data' in (response as object) && Array.isArray((response as any).data))
 		return (response as any).data
-	}
-
-	if (Array.isArray(response)) {
-		return response
-	}
-
-	if (typeof response === 'object' && 'orders' in (response as object) && Array.isArray((response as any).orders)) {
+	if (Array.isArray(response)) return response
+	if (typeof response === 'object' && 'orders' in (response as object) && Array.isArray((response as any).orders))
 		return (response as any).orders
-	}
-
 	console.warn('[OrderListPage] Unexpected API response shape:', response)
 	return []
 }
@@ -181,44 +171,38 @@ const applyDateFilterParams = (
 	customToDate?: string
 ) => {
 	if (filter === 'all') return
-
 	if (filter === 'custom') {
 		if (customFromDate) params.start_date = customFromDate
 		if (customToDate) params.end_date = customToDate
 		return
 	}
-
 	const today = new Date()
 	const endDate = formatApiDate(today)
-
 	if (filter === 'today') {
 		params.start_date = endDate
 		params.end_date = endDate
 		return
 	}
-
 	if (filter === 'yesterday') {
-		const yesterday = new Date(today)
-		yesterday.setDate(today.getDate() - 1)
-		const yestStr = formatApiDate(yesterday)
-		params.start_date = yestStr
-		params.end_date = yestStr
+		const d = new Date(today)
+		d.setDate(today.getDate() - 1)
+		const s = formatApiDate(d)
+		params.start_date = s
+		params.end_date = s
 		return
 	}
-
 	if (filter === 'tomorrow') {
-		const tomorrow = new Date(today)
-		tomorrow.setDate(today.getDate() + 1)
-		const tomStr = formatApiDate(tomorrow)
-		params.start_date = tomStr
-		params.end_date = tomStr
+		const d = new Date(today)
+		d.setDate(today.getDate() + 1)
+		const s = formatApiDate(d)
+		params.start_date = s
+		params.end_date = s
 		return
 	}
-
 	const days = filter === 'last_30_days' ? 30 : 7
-	const startDate = new Date(today)
-	startDate.setDate(today.getDate() - (days - 1))
-	params.start_date = formatApiDate(startDate)
+	const start = new Date(today)
+	start.setDate(today.getDate() - (days - 1))
+	params.start_date = formatApiDate(start)
 	params.end_date = endDate
 }
 
@@ -226,45 +210,99 @@ const applyDateFilterParams = (
 // OrderCard
 // ─────────────────────────────────────────────
 
-const OrderCard = React.memo(function OrderCard({ order, onPress }: { order: OrderItem; onPress: () => void }) {
+interface OrderCardProps {
+	order: OrderItem
+	onPress: () => void
+	isPatient: boolean // true  → hide patient name row  (viewer IS the patient)
+	isPharmacy: boolean // true  → hide pharmacy name, show Order # instead
+}
+
+const OrderCard = React.memo(function OrderCard({ order, onPress, isPatient, isPharmacy }: OrderCardProps) {
 	const statusStyle = STATUS_STYLES[order.status] ?? STATUS_STYLES.Pending
+	const isHomeDelivery = order.raw?.delivery_type === 'home_delivery'
 
 	return (
-		<Card style={styles.orderCard} onPress={onPress}>
-			<View style={styles.avatarBox}>
-				{order.avatar ? (
-					<Image source={{ uri: order.avatar }} style={styles.avatar} />
-				) : (
-					<MaterialCommunityIcons name="account" size={34} color="#ffffff" />
-				)}
-			</View>
+		<TouchableOpacity style={styles.orderCard} onPress={onPress} activeOpacity={0.85}>
+			<View style={styles.cardMainContent}>
+				{/* ── Header row: Pharmacy name OR Order ID (pharmacy role) ── */}
+				<View style={styles.cardHeader}>
+					{isPharmacy ? (
+						// Pharmacy is the viewer → they know their own name, show Order ID instead
+						<View style={styles.pharmacyTitleContainer}></View>
+					) : (
+						// Patient or other role → show pharmacy name
+						<View style={styles.pharmacyTitleContainer}>
+							<MaterialCommunityIcons
+								name="storefront-outline"
+								size={18}
+								color="#1f5f68"
+								style={styles.pharmacyIcon}
+							/>
+							<Text numberOfLines={1} style={styles.pharmacyName}>
+								{order.doctor}
+							</Text>
+						</View>
+					)}
 
-			<View style={styles.orderInfo}>
-				<View style={styles.nameRow}>
-					<Text numberOfLines={1} style={styles.patientName}>
-						{order.name}
+					<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+						<Text style={[styles.statusText, { color: statusStyle.text }]}>{order.status}</Text>
+					</View>
+				</View>
+
+				{/* ── Patient row: hidden when the viewer IS the patient ── */}
+				{!isPatient && (
+					<View style={styles.detailRow}>
+						<MaterialCommunityIcons
+							name="account-outline"
+							size={28}
+							color="#667085"
+							style={styles.rowIcon}
+						/>
+						<Text style={styles.detailText} numberOfLines={1}>
+							Patient: <Text style={styles.boldText}>{order.name}</Text>
+						</Text>
+					</View>
+				)}
+
+				{/* ── Date & Time ── */}
+				<View style={styles.detailRow}>
+					<MaterialCommunityIcons
+						name="calendar-clock-outline"
+						size={15}
+						color="#667085"
+						style={styles.rowIcon}
+					/>
+					<Text style={styles.detailText} numberOfLines={1}>
+						{order.date} • {order.time}
 					</Text>
 				</View>
 
-				<Text numberOfLines={1} style={styles.doctorText}>
-					By {order.doctor}
-					{order.clinic ? ` - ${order.clinic}` : ''}
-				</Text>
+				{/* ── Footer: delivery badge + bill ── */}
+				<View style={styles.cardFooter}>
+					<View style={[styles.deliveryBadge, isHomeDelivery ? styles.badgeHome : styles.badgePickup]}>
+						<MaterialCommunityIcons
+							name={isHomeDelivery ? 'truck-delivery-outline' : 'store-outline'}
+							size={13}
+							color={isHomeDelivery ? '#0D47A1' : '#1B5E20'}
+						/>
+						<Text style={[styles.deliveryBadgeText, { color: isHomeDelivery ? '#0D47A1' : '#1B5E20' }]}>
+							{isHomeDelivery ? 'Home Delivery' : 'Store Pickup'}
+						</Text>
+					</View>
 
-				<View style={styles.metaRow}>
-					<MaterialCommunityIcons name="calendar-blank-outline" size={10} color="#8b969b" />
-					<Text style={styles.metaText}>{order.date}</Text>
-					<MaterialCommunityIcons name="clock-time-three-outline" size={10} color="#8b969b" />
-					<Text style={styles.metaText}>{order.time}</Text>
+					<View style={styles.priceContainer}>
+						<Text style={styles.priceLabel}>Total Bill</Text>
+						<Text style={styles.priceTag}>
+							{order.billAmount > 0 ? `₹${order.billAmount.toFixed(2)}` : 'Pending'}
+						</Text>
+					</View>
 				</View>
 			</View>
 
-			<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-				<Text style={[styles.statusText, { color: statusStyle.text }]}>{order.status}</Text>
+			<View style={styles.chevronContainer}>
+				<MaterialCommunityIcons name="chevron-right" size={20} color="#98A2B3" />
 			</View>
-
-			<MaterialCommunityIcons name="chevron-right" size={24} color="#2E7C86" />
-		</Card>
+		</TouchableOpacity>
 	)
 })
 
@@ -276,35 +314,33 @@ export default function OrderListPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
-	const { width, height } = useWindowDimensions()
+	const { width } = useWindowDimensions()
 	const useInlineFilters = width >= 768
+
+	// ── Role — exactly the same as OrderDetailsScreen ─────────────────
+	const { role } = useAuth()
+	const isPatient = role === 'patient'
+	const isPharmacy = role === 'pharmacy'
+	// ──────────────────────────────────────────────────────────────────
 
 	const [orders, setOrders] = useState<OrderItem[]>([])
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 
-	// Pagination state
+	// Pagination
 	const [page, setPage] = useState(1)
 	const [pageSize, setPageSize] = useState(10)
 	const [apiMeta, setApiMeta] = useState<{ total: number; page: number; limit: number; pages: number } | null>(null)
 
-	// Filter state
+	// Filters
 	const [searchQuery, setSearchQuery] = useState('')
 	const [debouncedSearch, setDebouncedSearch] = useState('')
 	const [statusFilter, setStatusFilter] = useState(route.params?.status ?? 'all')
-
-	// Sync status filter from navigation route params
-	useEffect(() => {
-		if (route.params?.status) {
-			setStatusFilter(route.params.status)
-		}
-	}, [route.params?.status])
-
 	const [dateFilter, setDateFilter] = useState('all')
 	const [fromDateFilter, setFromDateFilter] = useState('')
 	const [toDateFilter, setToDateFilter] = useState('')
 
-	// Mobile filter sheet draft states
+	// Draft (mobile filter sheet)
 	const [draftStatusFilter, setDraftStatusFilter] = useState('all')
 	const [draftDateFilter, setDraftDateFilter] = useState('all')
 	const [draftFromDateFilter, setDraftFromDateFilter] = useState('')
@@ -313,71 +349,62 @@ export default function OrderListPage() {
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
 	const [activeDatePicker, setActiveDatePicker] = useState<'from' | 'to' | null>(null)
 
-	const filterSheetAnim = useRef(new Animated.Value(0)).current
-	const filterBackdropAnim = useRef(new Animated.Value(0)).current
-
-	// Search Debounce Effect
+	// Sync route param status
 	useEffect(() => {
-		const timer = setTimeout(() => {
-			setDebouncedSearch(searchQuery)
-		}, 300)
-		return () => clearTimeout(timer)
+		if (route.params?.status) setStatusFilter(route.params.status)
+	}, [route.params?.status])
+
+	// Debounce search
+	useEffect(() => {
+		const t = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+		return () => clearTimeout(t)
 	}, [searchQuery])
 
-	// Reset page to 1 when filters or search change
+	// Reset page on filter change
 	useEffect(() => {
 		setPage(1)
 	}, [debouncedSearch, statusFilter, dateFilter, fromDateFilter, toDateFilter, pageSize])
 
-	// ── Fetch orders ───────────────────────────────────────────────
+	// ── Fetch ──────────────────────────────────────────────────────────
 
-	const fetchOrders = useCallback(async (isRefresh = false) => {
-		try {
-			isRefresh ? setRefreshing(true) : setLoading(true)
+	const fetchOrders = useCallback(
+		async (isRefresh = false) => {
+			try {
+				isRefresh ? setRefreshing(true) : setLoading(true)
+				const params: Record<string, any> = { page, limit: pageSize }
+				if (statusFilter !== 'all') params.status = statusFilter
+				if (debouncedSearch.trim().length > 0) params.search = debouncedSearch.trim()
+				applyDateFilterParams(params, dateFilter, fromDateFilter, toDateFilter)
 
-			const params: Record<string, any> = {
-				page,
-				limit: pageSize,
+				const response = (await getPharmacyOrders(params)) as any
+				const apiOrders = extractOrders(response)
+				setOrders(apiOrders.map(mapOrderToItem))
+
+				if (response?.meta) {
+					setApiMeta({
+						total: response.meta.total ?? apiOrders.length,
+						page: response.meta.page ?? page,
+						limit: response.meta.limit ?? pageSize,
+						pages: response.meta.pages ?? 1,
+					})
+				} else {
+					setApiMeta(null)
+				}
+			} catch (error) {
+				console.error('[OrderListPage] fetchOrders error:', error)
+				Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load pharmacy orders' })
+			} finally {
+				isRefresh ? setRefreshing(false) : setLoading(false)
 			}
-
-			if (statusFilter !== 'all') {
-				params.status = statusFilter
-			}
-
-			if (debouncedSearch.trim().length > 0) {
-				params.search = debouncedSearch.trim()
-			}
-
-			applyDateFilterParams(params, dateFilter, fromDateFilter, toDateFilter)
-
-			const response = (await getPharmacyOrders(params)) as any
-			const apiOrders = extractOrders(response)
-
-			setOrders(apiOrders.map(mapOrderToItem))
-
-			if (response && response.meta) {
-				setApiMeta({
-					total: response.meta.total ?? apiOrders.length,
-					page: response.meta.page ?? page,
-					limit: response.meta.limit ?? pageSize,
-					pages: response.meta.pages ?? 1,
-				})
-			} else {
-				setApiMeta(null)
-			}
-		} catch (error) {
-			console.error('[OrderListPage] fetchOrders error:', error)
-			Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load pharmacy orders' })
-		} finally {
-			isRefresh ? setRefreshing(false) : setLoading(false)
-		}
-	}, [page, pageSize, statusFilter, debouncedSearch, dateFilter, fromDateFilter, toDateFilter])
+		},
+		[page, pageSize, statusFilter, debouncedSearch, dateFilter, fromDateFilter, toDateFilter]
+	)
 
 	useEffect(() => {
 		fetchOrders()
 	}, [fetchOrders])
 
-	// ── Navigate to order detail ───────────────────────────────────────
+	// ── Navigate ───────────────────────────────────────────────────────
 
 	const handleOrderPress = useCallback(
 		(order: OrderItem) => {
@@ -386,25 +413,29 @@ export default function OrderListPage() {
 		[navigation]
 	)
 
-	// ── Render rows ────────────────────────────────────────────
+	// ── Render item ────────────────────────────────────────────────────
 
 	const renderItem = useCallback(
 		({ item, index }: { item: OrderItem; index: number }) => {
 			const previous = orders[index - 1]
 			const showGroup = !previous || previous.group !== item.group
-
 			return (
 				<View>
 					{showGroup && <Text style={styles.groupTitle}>{item.group}</Text>}
-					<OrderCard order={item} onPress={() => handleOrderPress(item)} />
+					<OrderCard
+						order={item}
+						onPress={() => handleOrderPress(item)}
+						isPatient={isPatient}
+						isPharmacy={isPharmacy}
+					/>
 					<View style={{ height: 12 }} />
 				</View>
 			)
 		},
-		[orders, handleOrderPress]
+		[orders, handleOrderPress, isPatient, isPharmacy]
 	)
 
-	// ── Mobile Modal Actions ───────────────────────────────────────────
+	// ── Filter modal ───────────────────────────────────────────────────
 
 	const openFilterModal = () => {
 		setDraftStatusFilter(statusFilter)
@@ -412,50 +443,20 @@ export default function OrderListPage() {
 		setDraftFromDateFilter(fromDateFilter)
 		setDraftToDateFilter(toDateFilter)
 		setFilterModalVisible(true)
-		filterSheetAnim.setValue(0)
-		filterBackdropAnim.setValue(0)
-		Animated.parallel([
-			Animated.timing(filterSheetAnim, {
-				toValue: 1,
-				duration: 260,
-				useNativeDriver: true,
-			}),
-			Animated.timing(filterBackdropAnim, {
-				toValue: 1,
-				duration: 220,
-				useNativeDriver: true,
-			}),
-		]).start()
 	}
 
 	const closeFilterModal = () => {
 		setActiveDatePicker(null)
-		Animated.parallel([
-			Animated.timing(filterSheetAnim, {
-				toValue: 0,
-				duration: 220,
-				useNativeDriver: true,
-			}),
-			Animated.timing(filterBackdropAnim, {
-				toValue: 0,
-				duration: 180,
-				useNativeDriver: true,
-			}),
-		]).start(({ finished }) => {
-			if (finished) setFilterModalVisible(false)
-		})
+		setFilterModalVisible(false)
 	}
 
 	const applyFilters = () => {
 		if (draftDateFilter === 'custom' && draftFromDateFilter && draftToDateFilter) {
-			const fromDate = new Date(draftFromDateFilter)
-			const toDate = new Date(draftToDateFilter)
-			if (fromDate > toDate) {
+			if (new Date(draftFromDateFilter) > new Date(draftToDateFilter)) {
 				Toast.show({ type: 'error', text1: 'Invalid Range', text2: 'From Date cannot be later than To Date.' })
 				return
 			}
 		}
-
 		setStatusFilter(draftStatusFilter)
 		setDateFilter(draftDateFilter)
 		setFromDateFilter(draftDateFilter === 'custom' ? draftFromDateFilter : '')
@@ -478,23 +479,14 @@ export default function OrderListPage() {
 	const handleDateRangeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
 		if (Platform.OS === 'android') setActiveDatePicker(null)
 		if (event.type === 'dismissed' || !selectedDate || !activeDatePicker) return
-
-		const nextValue = formatApiDate(selectedDate)
-		if (activeDatePicker === 'from') {
-			setDraftFromDateFilter(nextValue)
-		} else {
-			setDraftToDateFilter(nextValue)
-		}
+		const val = formatApiDate(selectedDate)
+		activeDatePicker === 'from' ? setDraftFromDateFilter(val) : setDraftToDateFilter(val)
 		setDraftDateFilter('custom')
 	}
 
-	// ── Render Filter Components ───────────────────────────────────────
+	// ── Filter UI helpers ──────────────────────────────────────────────
 
-	const renderFilterChips = (
-		options: AppSelectOption[],
-		value: string,
-		onChange: (nextValue: string) => void
-	) => (
+	const renderFilterChips = (options: AppSelectOption[], value: string, onChange: (v: string) => void) => (
 		<ScrollView
 			horizontal
 			showsHorizontalScrollIndicator={false}
@@ -504,7 +496,6 @@ export default function OrderListPage() {
 		>
 			{options.map((option) => {
 				const selected = option.value === value
-
 				return (
 					<TouchableOpacity
 						key={option.value}
@@ -528,7 +519,7 @@ export default function OrderListPage() {
 			activeOpacity={0.82}
 		>
 			<AppTypography style={[styles.dateRangeText, !value && styles.dateRangePlaceholder]} numberOfLines={1}>
-				{value ? value : label}
+				{value || label}
 			</AppTypography>
 			<MaterialCommunityIcons name="calendar-month-outline" size={20} color="#1f5f68" />
 		</TouchableOpacity>
@@ -547,8 +538,12 @@ export default function OrderListPage() {
 					<DateTimePicker
 						value={
 							activeDatePicker === 'from'
-								? (draftFromDateFilter ? new Date(draftFromDateFilter) : new Date())
-								: (draftToDateFilter ? new Date(draftToDateFilter) : new Date())
+								? draftFromDateFilter
+									? new Date(draftFromDateFilter)
+									: new Date()
+								: draftToDateFilter
+									? new Date(draftToDateFilter)
+									: new Date()
 						}
 						mode="date"
 						display={Platform.OS === 'ios' ? 'inline' : Platform.OS === 'android' ? 'calendar' : 'default'}
@@ -560,90 +555,57 @@ export default function OrderListPage() {
 	)
 
 	const renderFilterModal = () => {
-		const translateY = filterSheetAnim.interpolate({
-			inputRange: [0, 1],
-			outputRange: [420, 0],
-		})
-		const backdropOpacity = filterBackdropAnim.interpolate({
-			inputRange: [0, 1],
-			outputRange: [0, 1],
-		})
-
 		return (
-			<Modal
-				visible={filterModalVisible}
-				transparent
-				animationType="none"
-				onRequestClose={closeFilterModal}
-			>
-				<View style={styles.filterModalRoot}>
-					<Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
-						<BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
-						<View style={styles.filterDim} />
-						<Pressable style={StyleSheet.absoluteFill} onPress={closeFilterModal} />
-					</Animated.View>
-
-					<Animated.View
-						style={[
-							styles.filterSheet,
-							{
-								width: Math.min(width - 24, 520),
-								maxHeight: Math.min(height * 0.78, 620),
-								paddingBottom: Math.max(insets.bottom + 18, 26),
-								transform: [{ translateY }],
-							},
-						]}
+			<AppBottomSheet visible={filterModalVisible} title="Filters" onClose={closeFilterModal}>
+				<View style={[styles.filterSheetContentWrapper, { maxWidth: Math.min(width, 520) }]}>
+					<ScrollView
+						style={styles.filterSheetScroll}
+						contentContainerStyle={styles.filterSheetContent}
+						showsVerticalScrollIndicator={false}
 					>
-						<View style={styles.filterSheetHandle} />
-
-						<View style={styles.filterSheetHeader}>
-							<AppTypography style={styles.filterSheetTitle}>Filters</AppTypography>
-							<TouchableOpacity style={styles.filterCloseButton} onPress={closeFilterModal}>
-								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
-							</TouchableOpacity>
+						<View style={styles.filterGroup}>
+							<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
+							{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
+								setDraftDateFilter(value)
+								if (value !== 'custom') setActiveDatePicker(null)
+							})}
+							{renderDateRangePicker()}
 						</View>
 
-						<ScrollView
-							style={styles.filterSheetScroll}
-							contentContainerStyle={styles.filterSheetContent}
-							showsVerticalScrollIndicator={false}
-						>
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
-								{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
-									setDraftDateFilter(value)
-									if (value !== 'custom') setActiveDatePicker(null)
-								})}
-								{renderDateRangePicker()}
-							</View>
-
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Order Status</AppTypography>
-								{renderFilterChips(STATUS_OPTIONS, draftStatusFilter, setDraftStatusFilter)}
-							</View>
-						</ScrollView>
-
-						<View style={styles.filterSheetActions}>
-							<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
-								<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
-							</TouchableOpacity>
-							<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
-								<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
-							</TouchableOpacity>
+						<View style={styles.filterGroup}>
+							<AppTypography style={styles.filterGroupLabel}>Order Status</AppTypography>
+							{renderFilterChips(STATUS_OPTIONS, draftStatusFilter, setDraftStatusFilter)}
 						</View>
-					</Animated.View>
+					</ScrollView>
+
+					<View style={styles.filterSheetActions}>
+						<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+							<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+							<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
+						</TouchableOpacity>
+					</View>
 				</View>
-			</Modal>
+			</AppBottomSheet>
 		)
 	}
 
+	// ── Search box & filter controls ───────────────────────────────────
+
 	const searchInput = (
-		<View style={[styles.searchBox, !useInlineFilters && styles.searchBoxMobile, useInlineFilters && styles.searchBoxWide]}>
+		<View
+			style={[
+				styles.searchBox,
+				!useInlineFilters && styles.searchBoxMobile,
+				useInlineFilters && styles.searchBoxWide,
+			]}
+		>
 			<MaterialCommunityIcons name="magnify" size={21} color="#9aa0a6" />
 			<TextInput
 				value={searchQuery}
 				onChangeText={setSearchQuery}
-				placeholder="Search Patient, Order ID..."
+				placeholder={isPatient ? 'Search Order ID...' : 'Search Patient, Order ID...'}
 				placeholderTextColor="#9aa4af"
 				style={styles.searchInput}
 			/>
@@ -753,7 +715,13 @@ export default function OrderListPage() {
 							}
 						/>
 						{apiMeta && apiMeta.total > 0 ? (
-							<View style={[styles.paginationWrap, !useInlineFilters && styles.mobilePaginationWrap, { paddingBottom: Math.max(insets.bottom + 8, 16) }]}>
+							<View
+								style={[
+									styles.paginationWrap,
+									!useInlineFilters && styles.mobilePaginationWrap,
+									{ paddingBottom: Math.max(insets.bottom + 8, 16) },
+								]}
+							>
 								<PaginationBar
 									page={page}
 									pageSize={pageSize}
@@ -780,29 +748,10 @@ export default function OrderListPage() {
 // ─────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: '#f4f4f4',
-	},
-	content: {
-		flex: 1,
-		paddingHorizontal: 16,
-		paddingTop: 16,
-	},
-	centeredFull: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	centeredBlock: {
-		paddingVertical: 20,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	// FlatList
-	listContent: {
-		paddingBottom: 30,
-	},
+	safeArea: { flex: 1, backgroundColor: '#f4f4f4' },
+	content: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+	centeredFull: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+	listContent: { paddingBottom: 30 },
 	groupTitle: {
 		color: '#9aa1a5',
 		fontSize: 12,
@@ -812,107 +761,84 @@ const styles = StyleSheet.create({
 	},
 	// Order card
 	orderCard: {
-		paddingHorizontal: 12,
-		paddingVertical: 12,
+		backgroundColor: '#ffffff',
+		borderRadius: 16,
+		flexDirection: 'row',
+		alignItems: 'stretch',
+		borderWidth: 1,
+		borderColor: '#F2F4F7',
+		shadowColor: '#101828',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.03,
+		shadowRadius: 10,
+		elevation: 2,
+		marginBottom: 14,
+	},
+	cardMainContent: {
+		flex: 1,
+		paddingVertical: 14,
+		paddingLeft: 16,
+		paddingRight: 4,
+	},
+	cardHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: 12,
 	},
-	avatarBox: {
-		width: 50,
-		height: 50,
-		borderRadius: 8,
-		backgroundColor: '#dfe4e6',
+	pharmacyTitleContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+		marginRight: 8,
+	},
+	pharmacyIcon: { marginRight: 6 },
+	pharmacyName: { fontSize: 15, fontWeight: '700', color: '#1D2939' },
+	statusBadge: {
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginRight: 12,
-		overflow: 'hidden',
 	},
-	avatar: {
-		width: '100%',
-		height: '100%',
-	},
-	orderInfo: {
-		flex: 1,
-		minWidth: 0,
-	},
-	nameRow: {
-		flexDirection: 'row',
-		alignItems: 'baseline',
-		marginBottom: 2,
-	},
-	patientName: {
-		color: '#22292c',
-		fontSize: 14,
-		fontWeight: '700',
-		maxWidth: 100,
-	},
-	orderId: {
-		color: '#2E7C86',
-		fontSize: 9,
-		fontWeight: '600',
-		marginLeft: 4,
-	},
-	doctorText: {
-		color: '#68777d',
-		fontSize: 8,
-		marginBottom: 4,
-	},
-	metaRow: {
+	statusText: { fontSize: 10, fontWeight: '700' },
+	detailRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+	rowIcon: { marginRight: 8 },
+	detailText: { fontSize: 13, color: '#475467' },
+	boldText: { fontWeight: '900', color: '#344054' },
+	cardFooter: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginTop: 8,
+		paddingTop: 10,
+		borderTopWidth: 1,
+		borderTopColor: '#F2F4F7',
+	},
+	deliveryBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 6,
 		gap: 4,
 	},
-	metaText: {
-		color: '#8b969b',
-		fontSize: 8,
-		marginRight: 6,
-	},
-	statusBadge: {
-		width: 70,
-		height: 26,
-		borderRadius: 4,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginLeft: 8,
-	},
-	statusText: {
-		fontSize: 10,
-		fontWeight: '600',
-	},
+	badgeHome: { backgroundColor: '#E3F2FD' },
+	badgePickup: { backgroundColor: '#E8F5E9' },
+	deliveryBadgeText: { fontSize: 11, fontWeight: '600' },
+	priceContainer: { alignItems: 'flex-end' },
+	priceLabel: { fontSize: 10, color: '#667085', marginBottom: 1 },
+	priceTag: { fontSize: 14, fontWeight: '700', color: '#101828' },
+	chevronContainer: { width: 32, alignItems: 'center', justifyContent: 'center' },
 	// Empty state
-	emptyState: {
-		alignItems: 'center',
-		paddingVertical: 40,
-		gap: 8,
-	},
-	emptyTitle: {
-		color: '#536167',
-		fontSize: 16,
-		fontWeight: '700',
-	},
-	emptyText: {
-		color: '#8b969b',
-		fontSize: 12,
-		textAlign: 'center',
-	},
-	filtersSection: {
-		marginBottom: 10,
-	},
-	filterRowWide: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		flexWrap: 'nowrap',
-		gap: 12,
-		width: '100%',
-	},
-	filterGridMobile: {
-		gap: 8,
-	},
-	mobileSearchRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
+	emptyState: { alignItems: 'center', paddingVertical: 40, gap: 8 },
+	emptyTitle: { color: '#536167', fontSize: 16, fontWeight: '700' },
+	emptyText: { color: '#8b969b', fontSize: 12, textAlign: 'center' },
+	// Filter section
+	filtersSection: { marginBottom: 10 },
+	filterRowWide: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap', gap: 12, width: '100%' },
+	filterGridMobile: { gap: 8 },
+	mobileSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 	searchBox: {
 		height: 48,
 		borderRadius: 8,
@@ -933,25 +859,9 @@ const styles = StyleSheet.create({
 		borderColor: '#d8dee6',
 		borderRadius: 8,
 	},
-	searchBoxMobile: {
-		height: 44,
-		width: '100%',
-		borderRadius: 8,
-		paddingHorizontal: 12,
-	},
-	searchInput: {
-		flex: 1,
-		height: '100%',
-		paddingHorizontal: 12,
-		fontSize: 16,
-		color: '#111827',
-	},
-	outlinedFilterWrap: {
-		height: 56,
-		justifyContent: 'center',
-		position: 'relative',
-		flexShrink: 1,
-	},
+	searchBoxMobile: { height: 44, width: '100%', borderRadius: 8, paddingHorizontal: 12 },
+	searchInput: { flex: 1, height: '100%', paddingHorizontal: 12, fontSize: 16, color: '#111827' },
+	outlinedFilterWrap: { height: 56, justifyContent: 'center', position: 'relative', flexShrink: 1 },
 	outlinedFilterLabel: {
 		position: 'absolute',
 		top: -1,
@@ -960,26 +870,10 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f4f4f4',
 		paddingHorizontal: 5,
 	},
-	outlinedFilterLabelText: {
-		fontSize: 12,
-		lineHeight: 16,
-		color: '#46627d',
-	},
-	inlineSelectFill: {
-		width: '100%',
-		marginBottom: 0,
-	},
-	inlineFilterSelect: {
-		height: 50,
-		borderRadius: 8,
-		backgroundColor: '#ffffff',
-	},
-	compactFilterSelectWrap: {
-		flexGrow: 1,
-		flexShrink: 1,
-		flexBasis: 112,
-		minWidth: 104,
-	},
+	outlinedFilterLabelText: { fontSize: 12, lineHeight: 16, color: '#46627d' },
+	inlineSelectFill: { width: '100%', marginBottom: 0 },
+	inlineFilterSelect: { height: 50, borderRadius: 8, backgroundColor: '#ffffff' },
+	compactFilterSelectWrap: { flexGrow: 1, flexShrink: 1, flexBasis: 112, minWidth: 104 },
 	filterIconButton: {
 		width: 48,
 		height: 44,
@@ -996,57 +890,9 @@ const styles = StyleSheet.create({
 		backgroundColor: '#e9f8f7',
 		borderColor: '#1f5f68',
 	},
-	filterModalRoot: {
-		flex: 1,
-		justifyContent: 'flex-end',
-		alignItems: 'center',
-	},
-	filterBackdrop: {
-		...StyleSheet.absoluteFillObject,
-	},
-	filterDim: {
-		...StyleSheet.absoluteFillObject,
-		backgroundColor: 'rgba(15, 23, 42, 0.34)',
-	},
-	filterSheet: {
-		backgroundColor: '#ffffff',
-		borderTopLeftRadius: 24,
-		borderTopRightRadius: 24,
-		paddingTop: 8,
-		overflow: 'hidden',
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: -10 },
-		shadowOpacity: 0.14,
-		shadowRadius: 24,
-		elevation: 18,
-	},
-	filterSheetHandle: {
-		width: 44,
-		height: 4,
-		borderRadius: 999,
-		backgroundColor: '#d7dee6',
+	filterSheetContentWrapper: {
+		width: '100%',
 		alignSelf: 'center',
-		marginBottom: 10,
-	},
-	filterSheetHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 18,
-		paddingBottom: 12,
-	},
-	filterSheetTitle: {
-		fontSize: 18,
-		lineHeight: 24,
-		fontWeight: '700',
-		color: '#111827',
-	},
-	filterCloseButton: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		alignItems: 'center',
-		justifyContent: 'center',
 	},
 	filterSheetScroll: {
 		flexGrow: 0,
@@ -1087,27 +933,11 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f2f6fb',
 		flexShrink: 0,
 	},
-	filterChipActive: {
-		backgroundColor: '#1f5f68',
-	},
-	filterChipText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		color: '#64707d',
-	},
-	filterChipTextActive: {
-		color: '#ffffff',
-	},
-	dateRangeWrap: {
-		gap: 10,
-		marginTop: 10,
-	},
-	dateRangeRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 10,
-	},
+	filterChipActive: { backgroundColor: '#1f5f68' },
+	filterChipText: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: '#64707d' },
+	filterChipTextActive: { color: '#ffffff' },
+	dateRangeWrap: { gap: 10, marginTop: 10 },
+	dateRangeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 	dateRangeField: {
 		flex: 1,
 		minWidth: 0,
@@ -1121,27 +951,10 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'space-between',
 	},
-	dateRangeText: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: '#111827',
-		flex: 1,
-	},
-	dateRangePlaceholder: {
-		color: '#94a3b8',
-		fontWeight: '400',
-	},
-	dateRangeDivider: {
-		width: 12,
-		height: 1,
-		backgroundColor: '#94a3b8',
-	},
-	datePickerWrap: {
-		marginTop: 6,
-		backgroundColor: '#ffffff',
-		borderRadius: 8,
-		padding: 4,
-	},
+	dateRangeText: { fontSize: 13, fontWeight: '600', color: '#111827', flex: 1 },
+	dateRangePlaceholder: { color: '#94a3b8', fontWeight: '400' },
+	dateRangeDivider: { width: 12, height: 1, backgroundColor: '#94a3b8' },
+	datePickerWrap: { marginTop: 6, backgroundColor: '#ffffff', borderRadius: 8, padding: 4 },
 	filterSheetActions: {
 		flexDirection: 'row',
 		paddingHorizontal: 18,
@@ -1160,11 +973,7 @@ const styles = StyleSheet.create({
 		borderColor: '#e5eaef',
 		backgroundColor: '#ffffff',
 	},
-	resetButtonText: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#64707d',
-	},
+	resetButtonText: { fontSize: 14, fontWeight: '700', color: '#64707d' },
 	applyButton: {
 		flex: 2,
 		height: 48,
@@ -1173,18 +982,12 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		backgroundColor: '#1f5f68',
 	},
-	applyButtonText: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#ffffff',
-	},
+	applyButtonText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
 	paginationWrap: {
 		paddingVertical: 10,
 		borderTopWidth: 1,
 		borderTopColor: '#e5eaef',
 		backgroundColor: 'transparent',
 	},
-	mobilePaginationWrap: {
-		paddingVertical: 6,
-	},
+	mobilePaginationWrap: { paddingVertical: 6 },
 })

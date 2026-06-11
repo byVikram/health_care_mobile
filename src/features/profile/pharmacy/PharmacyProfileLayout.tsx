@@ -12,7 +12,6 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { AppTypography } from '../../../components/common'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from '../../../navigation/routes'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import PharmacyDetailsTab from './tabs/PharmacyDetailsTab'
@@ -31,7 +30,6 @@ const TABS = [
 ]
 
 export default function PharmacyProfileLayout() {
-	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
 	const { width } = useWindowDimensions()
 	const pagerRef = useRef<ScrollView>(null)
@@ -81,13 +79,16 @@ export default function PharmacyProfileLayout() {
 		})
 	}, [activeTabIndex])
 
-	const goToTab = useCallback((tabKey: string, animated = true) => {
-		const nextIndex = TABS.findIndex((tab) => tab.key === tabKey)
-		if (nextIndex < 0) return
+	const goToTab = useCallback(
+		(tabKey: string, animated = true) => {
+			const nextIndex = TABS.findIndex((tab) => tab.key === tabKey)
+			if (nextIndex < 0) return
 
-		setActiveTab(tabKey)
-		pagerRef.current?.scrollTo({ x: nextIndex * width, animated })
-	}, [width])
+			setActiveTab(tabKey)
+			pagerRef.current?.scrollTo({ x: nextIndex * width, animated })
+		},
+		[width]
+	)
 
 	const handleHeaderBack = useCallback(() => {
 		if (navigation.canGoBack()) {
@@ -98,11 +99,14 @@ export default function PharmacyProfileLayout() {
 		navigation.navigate(ROUTES.MAIN.HOME)
 	}, [navigation])
 
-	const handlePagerMomentumEnd = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-		const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
-		const clampedIndex = Math.max(0, Math.min(TABS.length - 1, nextIndex))
-		setActiveTab(TABS[clampedIndex].key)
-	}, [width])
+	const handlePagerMomentumEnd = useCallback(
+		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
+			const clampedIndex = Math.max(0, Math.min(TABS.length - 1, nextIndex))
+			setActiveTab(TABS[clampedIndex].key)
+		},
+		[width]
+	)
 
 	const renderTabContent = (tabKey: string) => {
 		if (profileLoading && tabKey !== 'settings') {
@@ -130,17 +134,7 @@ export default function PharmacyProfileLayout() {
 	}
 
 	return (
-		<View style={[styles.container, { paddingTop: insets.top + 16 }]}>
-			{/* Back Button Header */}
-			<View style={styles.header}>
-				<TouchableOpacity onPress={handleHeaderBack} style={styles.backBtn} activeOpacity={0.8}>
-					<MaterialCommunityIcons name="chevron-left" size={28} color="#0c7c7c" />
-					<AppTypography variant="h3" style={styles.headerTitle}>
-						Profile
-					</AppTypography>
-				</TouchableOpacity>
-			</View>
-
+		<View style={styles.container}>
 			<View style={styles.tabContainer}>
 				<ScrollView
 					ref={tabScrollRef}
