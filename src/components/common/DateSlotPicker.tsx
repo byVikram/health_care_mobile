@@ -51,6 +51,8 @@ export type PickProps = {
 	showSlotStatusLabels?: boolean
 	selectedAppointmentType?: 'clinic' | 'video' | string
 	onAppointmentTypeChange?: (type: 'clinic' | 'video') => void
+	/** Availability screen only: shows left-side status strip on each slot + legend */
+	showAvailabilityMode?: boolean
 }
 
 export default function DateSlotPicker(props: PickProps) {
@@ -79,6 +81,7 @@ export default function DateSlotPicker(props: PickProps) {
 		showSlotStatusLabels = true,
 		selectedAppointmentType,
 		onAppointmentTypeChange,
+		showAvailabilityMode = false,
 	} = props
 
 	const today = new Date()
@@ -325,6 +328,31 @@ export default function DateSlotPicker(props: PickProps) {
 						) : null}
 					</View>
 
+					{/* ── LEGEND — availability screen only ─────────────── */}
+					{showAvailabilityMode ? (
+						<View style={styles.legendRow}>
+							<View style={styles.legendItem}>
+								<View style={[styles.legendDot, styles.legendDotAvailable]} />
+								<AppTypography variant="caption" style={styles.legendLabel}>
+									Available
+								</AppTypography>
+							</View>
+							<View style={styles.legendItem}>
+								<View style={[styles.legendDot, styles.legendDotBlocked]} />
+								<AppTypography variant="caption" style={styles.legendLabel}>
+									Blocked
+								</AppTypography>
+							</View>
+							<View style={styles.legendItem}>
+								<View style={[styles.legendDot, styles.legendDotBooked]} />
+								<AppTypography variant="caption" style={styles.legendLabel}>
+									Booked
+								</AppTypography>
+							</View>
+						</View>
+					) : null}
+					{/* ───────────────────────────────────────────────────── */}
+
 					{loading ? (
 						<AppSkeleton height={100} style={{ marginTop: 8 }} />
 					) : availableSlots.length === 0 ? (
@@ -362,15 +390,27 @@ export default function DateSlotPicker(props: PickProps) {
 												// 			? 'Blocked'
 												// 			: ''
 
+											// ── Derive strip color (availability screen only) ──
+											const stripStyle = showAvailabilityMode
+												? isBooked
+													? styles.statusStripBooked
+													: isBlocked
+													? styles.statusStripBlocked
+													: styles.statusStripAvailable
+												: null
+											// ─────────────────────────────────────────────────
+
 											return (
 												<TouchableOpacity
 													key={`${slot.start_time}-${idx}`}
 													style={[
 														styles.timeBox,
+														showAvailabilityMode && styles.timeBoxAvailabilityMode,
 														{ flexBasis: slotBasis },
-														isSelected && styles.timeBoxSelected,
-														!isSelected && isBlocked && styles.timeBoxBlocked,
-														!isSelected && isBooked && styles.timeBoxBooked,
+														isSelected && (showAvailabilityMode ? styles.timeBoxSelectedAvailability : styles.timeBoxSelected),
+														!showAvailabilityMode && !isSelected && isBlocked && styles.timeBoxBlocked,
+														!showAvailabilityMode && !isSelected && isBooked && styles.timeBoxBooked,
+														showAvailabilityMode && !isSelected && isBooked && styles.timeBoxBookedAvailability,
 														!canSelect && styles.timeBoxDisabled,
 														!showSlotStatusLabels && styles.timeBoxSingleLine,
 													]}
@@ -378,11 +418,17 @@ export default function DateSlotPicker(props: PickProps) {
 													activeOpacity={canSelect ? 0.6 : 1}
 													disabled={!canSelect}
 												>
+													{/* ── Left-side status strip — availability screen only ── */}
+													{showAvailabilityMode ? (
+														<View style={[styles.statusStrip, stripStyle]} />
+													) : null}
+													{/* ───────────────────────────────────────────────────── */}
+
 													<AppTypography
 														variant="caption"
 														style={[
 															styles.timeText,
-															isSelected && styles.timeTextSelected,
+															isSelected && !showAvailabilityMode && styles.timeTextSelected,
 															!isSelected && isBlocked && styles.timeTextBlocked,
 															!canSelect && styles.timeTextDisabled,
 														]}
@@ -449,7 +495,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		gap: 10,
 		marginTop: 22,
-		marginBottom: 12,
+		marginBottom: 8,
 	},
 	bulkActions: {
 		flexDirection: 'row',
@@ -582,6 +628,13 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		backgroundColor: '#fff',
 	},
+	// Applied on top of timeBox only when showAvailabilityMode=true
+	timeBoxAvailabilityMode: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'flex-start',
+		overflow: 'hidden',
+	},
 	timeBoxSingleLine: {
 		height: 44,
 		paddingVertical: 0,
@@ -598,12 +651,23 @@ const styles = StyleSheet.create({
 		borderColor: '#eee',
 	},
 	timeBoxBooked: {
-		backgroundColor: '#fff3f0',
-		borderColor: '#f0c7bd',
+		backgroundColor: 'rgba(0,0,0,0.04)',
+		borderColor: '#dde3e8',
 	},
 	timeBoxBlocked: {
-		backgroundColor: '#f1f4f5',
-		borderColor: '#cfd8dc',
+		backgroundColor: '#fff',
+		borderColor: '#dde3e8',
+	},
+	// Booked slot in availability mode: neutral grey, no warm tint
+	timeBoxBookedAvailability: {
+		backgroundColor: 'rgba(0,0,0,0.04)',
+		borderColor: '#dde3e8',
+		opacity: 0.7,
+		
+	},
+	timeBoxSelectedAvailability: {
+		borderColor: '#0c7c7c',
+		backgroundColor: '#fff',
 	},
 	timeText: {
 		fontSize: 13,
@@ -628,6 +692,60 @@ const styles = StyleSheet.create({
 		fontSize: 10,
 		fontWeight: '600',
 	},
+
+	// ── Status strip (left-side indicator) ──────────────────────────────────
+	statusStrip: {
+		width: 4,
+		alignSelf: 'stretch',  // fills full card height
+		borderRadius: 0,       // card's overflow:hidden + borderRadius clips the corners
+		marginRight: 8,
+		marginLeft: -10,       // escape card's paddingHorizontal so strip touches left edge
+		marginTop: -10,        // escape card's paddingVertical
+		marginBottom: -10,     // escape card's paddingVertical
+	},
+	statusStripAvailable: {
+		backgroundColor: '#0c7c7c',   // teal — matches selected/available theme
+	},
+	statusStripBlocked: {
+		backgroundColor: '#e53935',   // red — matches textRed
+	},
+	statusStripBooked: {
+		backgroundColor: '#b0bec5',   // muted grey
+	},
+	// ────────────────────────────────────────────────────────────────────────
+
+	// ── Legend ───────────────────────────────────────────────────────────────
+	legendRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 16,
+		marginBottom: 4,
+	},
+	legendItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	legendDot: {
+		width: 10,
+		height: 10,
+		borderRadius: 5,
+	},
+	legendDotAvailable: {
+		backgroundColor: '#0c7c7c',
+	},
+	legendDotBlocked: {
+		backgroundColor: '#e53935',
+	},
+	legendDotBooked: {
+		backgroundColor: '#b0bec5',
+	},
+	legendLabel: {
+		fontSize: 12,
+		color: '#62707a',
+		fontWeight: '500',
+	},
+	// ────────────────────────────────────────────────────────────────────────
 
 	// Toggle
 	toggleContainer: {

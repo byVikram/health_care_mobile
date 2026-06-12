@@ -561,6 +561,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 						timeSlotColumns={timeSlotColumns}
 						disableBookedSlots={false}
 						use12HourTime
+						showAvailabilityMode
 						availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
 						loading={slotsLoading || toggleRefreshing}
 						onSelectAll={() => {
