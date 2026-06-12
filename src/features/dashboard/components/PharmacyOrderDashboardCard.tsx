@@ -29,7 +29,11 @@ function PharmacyOrderDashboardCard() {
 						<DocIcon width={28} height={28} />
 					</View>
 
-					<Text style={styles.mainText}>Manage the orders shared by doctors/patients</Text>
+					<View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+						<TouchableOpacity onPress={() => handleNavigate('all')}>
+							<Text style={styles.mainText}>Manage the orders shared by doctors/patients</Text>
+						</TouchableOpacity>
+					</View>
 				</View>
 
 				<TouchableOpacity style={styles.viewBtn} onPress={() => handleNavigate('all')}>
@@ -62,7 +66,7 @@ function PharmacyOrderDashboardCard() {
 						</View>
 
 						<View style={styles.textBlock}>
-							<Text style={styles.cardTitle}>On the way</Text>
+							<Text style={styles.cardTitle}>Out for delivery</Text>
 							<Text style={styles.cardValue}>08 Orders</Text>
 						</View>
 					</View>
@@ -90,7 +94,7 @@ function PharmacyOrderDashboardCard() {
 						</View>
 
 						<View style={styles.textBlock}>
-							<Text style={styles.cardTitle}>Cancelled orders</Text>
+							<Text style={styles.cardTitle}>Rejected orders</Text>
 							<Text style={styles.cardValue}>21 Orders</Text>
 						</View>
 					</View>
