@@ -392,6 +392,20 @@ export interface DoctorProfessionalUpdatePayload {
 	about: string
 }
 
+export interface DoctorEducationalQualificationPayload {
+	qualification_type: string
+	qualification_name: string
+	institute_university: string
+	institute_university_value: string
+	custom_institute_university: string | null
+	year_of_completion: string
+	certificate_s3_key: string | null
+}
+
+export interface DoctorEducationalQualificationsUpdatePayload {
+	educational_qualifications: DoctorEducationalQualificationPayload[]
+}
+
 export interface DoctorAvailabilityUpdatePayload {
 	hospital_id: number | string
 	day_of_week: number
@@ -435,6 +449,11 @@ export const updateDoctorPersonalDetails = async (data: DoctorPersonalUpdatePayl
 }
 
 export const updateDoctorProfessionalDetails = async (data: DoctorProfessionalUpdatePayload) => {
+	const res = await ApiService.patch(API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS, data)
+	return res.data
+}
+
+export const updateDoctorEducationalQualifications = async (data: DoctorEducationalQualificationsUpdatePayload) => {
 	const res = await ApiService.patch(API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS, data)
 	return res.data
 }

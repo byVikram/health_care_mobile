@@ -4,13 +4,13 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	StyleSheet,
-	Modal,
-	KeyboardAvoidingView,
 	TextInput,
+	KeyboardAvoidingView,
 	Platform,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography, AppButton } from '../../../../components/common'
+import { AppBottomSheet } from '../../../../components/common'
 import type { PatientProfileState } from '../PatientProfileService'
 
 interface Props {
@@ -51,7 +51,7 @@ const FIELD_DETAILS: Record<MultiFieldKey, MultiFieldDetails> = {
 }
 
 export default function MedicalTab({ data, onChange, onSave, saving }: Props) {
-	const [multiModalVisible, setMultiModalVisible] = useState(false)
+	const [sheetVisible, setSheetVisible] = useState(false)
 	const [activeKey, setActiveKey] = useState<MultiFieldKey>('allergies')
 	const [multiDraft, setMultiDraft] = useState('')
 
@@ -67,7 +67,13 @@ export default function MedicalTab({ data, onChange, onSave, saving }: Props) {
 		const next = [...currentValues, multiDraft.trim()]
 		onChange(activeKey, next)
 		setMultiDraft('')
-		setMultiModalVisible(false)
+		setSheetVisible(false)
+	}
+
+	const openSheet = (fieldKey: MultiFieldKey) => {
+		setActiveKey(fieldKey)
+		setMultiDraft('')
+		setSheetVisible(true)
 	}
 
 	const renderMultiField = (fieldKey: MultiFieldKey) => {
@@ -81,11 +87,7 @@ export default function MedicalTab({ data, onChange, onSave, saving }: Props) {
 						{details.label}
 					</AppTypography>
 					<TouchableOpacity
-						onPress={() => {
-							setActiveKey(fieldKey)
-							setMultiDraft('')
-							setMultiModalVisible(true)
-						}}
+						onPress={() => openSheet(fieldKey)}
 						activeOpacity={0.8}
 						style={styles.addMultiBtn}
 					>
@@ -101,7 +103,12 @@ export default function MedicalTab({ data, onChange, onSave, saving }: Props) {
 								{item}
 							</AppTypography>
 							<TouchableOpacity onPress={() => removeMultiItem(fieldKey, idx)}>
-								<MaterialCommunityIcons name="close-circle" size={16} color="#0c7c7c" style={styles.chipCloseIcon} />
+								<MaterialCommunityIcons
+									name="close-circle"
+									size={16}
+									color="#0c7c7c"
+									style={styles.chipCloseIcon}
+								/>
 							</TouchableOpacity>
 						</View>
 					))}
@@ -160,41 +167,16 @@ export default function MedicalTab({ data, onChange, onSave, saving }: Props) {
 				</AppButton>
 			</View>
 
-			{/* Multi Modal Sheet */}
-			<Modal
-				visible={multiModalVisible}
-				transparent
-				animationType="slide"
-				onRequestClose={() => setMultiModalVisible(false)}
+			<AppBottomSheet
+				visible={sheetVisible}
+				title={activeFieldDetails.addLabel}
+				onClose={() => setSheetVisible(false)}
 			>
-				<TouchableOpacity
-					style={styles.modalOverlay}
-					activeOpacity={1}
-					onPress={() => setMultiModalVisible(false)}
-				/>
-				<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-					<View style={styles.multiSheet}>
-						<View style={styles.sheetHandle} />
-
-						{/* Sheet header */}
-						<View style={styles.sheetHeader}>
-							<TouchableOpacity onPress={() => setMultiModalVisible(false)}>
-								<MaterialCommunityIcons
-									name="chevron-left"
-									size={24}
-									color="#0c7c7c"
-								/>
-							</TouchableOpacity>
-							<AppTypography variant="h4" style={styles.sheetTitle}>
-								{activeFieldDetails.addLabel}
-							</AppTypography>
-						</View>
-
-						<AppTypography variant="caption" style={styles.sheetSubtitle}>
-							Add {activeFieldDetails.label}
-						</AppTypography>
-
-						{/* Textarea input */}
+				<KeyboardAvoidingView
+					behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+					keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+				>
+					<View style={styles.sheetBody}>
 						<View style={styles.multiInputBox}>
 							<TextInput
 								style={styles.multiTextInput}
@@ -208,20 +190,19 @@ export default function MedicalTab({ data, onChange, onSave, saving }: Props) {
 							/>
 						</View>
 
-						{/* Save button */}
 						<TouchableOpacity
-							style={[styles.saveBtnModal, !multiDraft.trim() && styles.saveBtnModalDisabled]}
+							style={[styles.saveBtnSheet, !multiDraft.trim() && styles.saveBtnSheetDisabled]}
 							onPress={addMultiItem}
 							activeOpacity={0.8}
 							disabled={!multiDraft.trim()}
 						>
-							<AppTypography variant="subtitle" style={styles.saveBtnModalTxt}>
+							<AppTypography variant="subtitle" style={styles.saveBtnSheetTxt}>
 								Save
 							</AppTypography>
 						</TouchableOpacity>
 					</View>
 				</KeyboardAvoidingView>
-			</Modal>
+			</AppBottomSheet>
 		</ScrollView>
 	)
 }
@@ -252,7 +233,6 @@ const styles = StyleSheet.create({
 	},
 	saveButton: {
 		width: '100%',
-		// maxWidth: 320,
 	},
 	multiFieldContainer: {
 		marginBottom: 16,
@@ -302,49 +282,7 @@ const styles = StyleSheet.create({
 		marginLeft: 4,
 		marginTop: 4,
 	},
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.35)',
-	},
-	multiSheet: {
-		backgroundColor: '#fff',
-		borderTopLeftRadius: 20,
-		borderTopRightRadius: 20,
-		paddingBottom: 32,
-		minHeight: 300,
-	},
-	sheetHandle: {
-		width: 40,
-		height: 4,
-		borderRadius: 2,
-		backgroundColor: '#d0dadd',
-		alignSelf: 'center',
-		marginTop: 10,
-		marginBottom: 4,
-	},
-	sheetHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: 14,
-		paddingVertical: 10,
-		borderBottomWidth: 0.5,
-		borderBottomColor: '#e8ecee',
-		gap: 4,
-	},
-	sheetTitle: {
-		fontSize: 15,
-		fontWeight: '600',
-		color: '#1a2226',
-	},
-	sheetSubtitle: {
-		fontSize: 13,
-		color: '#7a8c91',
-		paddingHorizontal: 16,
-		paddingTop: 14,
-		paddingBottom: 6,
-	},
 	multiInputBox: {
-		marginHorizontal: 16,
 		borderWidth: 1,
 		borderColor: '#d0dadd',
 		borderRadius: 10,
@@ -358,18 +296,23 @@ const styles = StyleSheet.create({
 		minHeight: 80,
 		padding: 0,
 	},
-	saveBtnModal: {
-		marginHorizontal: 16,
+	// Sheet content
+	sheetBody: {
+		paddingHorizontal: 16,
+		paddingTop: 4,
+		paddingBottom: 8,
+	},
+	saveBtnSheet: {
 		marginTop: 16,
 		backgroundColor: '#0c7c7c',
 		borderRadius: 24,
 		paddingVertical: 13,
 		alignItems: 'center',
 	},
-	saveBtnModalDisabled: {
+	saveBtnSheetDisabled: {
 		opacity: 0.45,
 	},
-	saveBtnModalTxt: {
+	saveBtnSheetTxt: {
 		color: '#fff',
 		fontWeight: '600',
 	},

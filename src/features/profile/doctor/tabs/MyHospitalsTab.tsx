@@ -11,7 +11,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppButton, AppInput, AppSelect, AppToggle, AppTypography } from '../../../../components/common'
+import { AppInput, AppSelect, AppStickyFooter, AppToggle, AppTypography } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -183,7 +183,7 @@ const buildHospitalPayload = (hospital: HospitalItem, isPrimary = hospital.isPri
 
 const coerceHospitalId = (id: string | undefined) => {
 	const numericId = Number(id)
-	return Number.isFinite(numericId) ? numericId : id ?? ''
+	return Number.isFinite(numericId) ? numericId : (id ?? '')
 }
 
 const buildHospitalUpdatePayload = (
@@ -207,13 +207,7 @@ function FieldLabel({ label }: { label: string }) {
 	)
 }
 
-function FormRow({
-	children,
-	stacked,
-}: {
-	children: React.ReactNode
-	stacked: boolean
-}) {
+function FormRow({ children, stacked }: { children: React.ReactNode; stacked: boolean }) {
 	return (
 		<View style={[styles.formRow, stacked && styles.formRowStacked]}>
 			{React.Children.map(children, (child, index) => (
@@ -310,13 +304,7 @@ function DropdownSelect({
 	)
 }
 
-function WorkingHoursRow({
-	children,
-	stacked,
-}: {
-	children: React.ReactNode
-	stacked: boolean
-}) {
+function WorkingHoursRow({ children, stacked }: { children: React.ReactNode; stacked: boolean }) {
 	return (
 		<View style={[styles.workingRow, stacked && styles.workingRowStacked]}>
 			{React.Children.map(children, (child) => (
@@ -369,13 +357,21 @@ function WorkingHoursSection({
 					return (
 						<TouchableOpacity
 							key={day.key}
-							style={[styles.dayChip, stacked && styles.dayChipCompact, isSelected && styles.dayChipActive]}
+							style={[
+								styles.dayChip,
+								stacked && styles.dayChipCompact,
+								isSelected && styles.dayChipActive,
+							]}
 							onPress={() => onWorkingDayChange(day.key)}
 							activeOpacity={0.85}
 						>
 							<AppTypography
 								variant="body"
-								style={[styles.dayChipText, stacked && styles.dayChipTextCompact, isSelected && styles.dayChipTextActive]}
+								style={[
+									styles.dayChipText,
+									stacked && styles.dayChipTextCompact,
+									isSelected && styles.dayChipTextActive,
+								]}
 							>
 								{day.label}
 							</AppTypography>
@@ -390,25 +386,37 @@ function WorkingHoursSection({
 				</AppTypography>
 				<View style={styles.segmentedControl}>
 					<TouchableOpacity
-						style={[styles.segmentedOption, selectedAppointmentType === 'clinic' && styles.segmentedOptionActive]}
+						style={[
+							styles.segmentedOption,
+							selectedAppointmentType === 'clinic' && styles.segmentedOptionActive,
+						]}
 						onPress={() => onAppointmentTypeChange('clinic')}
 						activeOpacity={0.85}
 					>
 						<AppTypography
 							variant="caption"
-							style={[styles.segmentedText, selectedAppointmentType === 'clinic' && styles.segmentedTextActive]}
+							style={[
+								styles.segmentedText,
+								selectedAppointmentType === 'clinic' && styles.segmentedTextActive,
+							]}
 						>
 							Clinic Visit
 						</AppTypography>
 					</TouchableOpacity>
 					<TouchableOpacity
-						style={[styles.segmentedOption, selectedAppointmentType === 'video' && styles.segmentedOptionActive]}
+						style={[
+							styles.segmentedOption,
+							selectedAppointmentType === 'video' && styles.segmentedOptionActive,
+						]}
 						onPress={() => onAppointmentTypeChange('video')}
 						activeOpacity={0.85}
 					>
 						<AppTypography
 							variant="caption"
-							style={[styles.segmentedText, selectedAppointmentType === 'video' && styles.segmentedTextActive]}
+							style={[
+								styles.segmentedText,
+								selectedAppointmentType === 'video' && styles.segmentedTextActive,
+							]}
 						>
 							Video Call
 						</AppTypography>
@@ -433,7 +441,9 @@ function WorkingHoursSection({
 									const stepMins = selectedWorkingHours.slotDuration
 									const allOptions = makeTimeOptions(section.startHour, section.endHour, stepMins)
 									const startOptions =
-										slotIndex === 0 ? allOptions : allOptions.filter((option) => option.value >= slots[slotIndex - 1].end)
+										slotIndex === 0
+											? allOptions
+											: allOptions.filter((option) => option.value >= slots[slotIndex - 1].end)
 									const endOptions = allOptions.filter((option) => option.value > slot.start)
 									const showAdd = slotIndex === slots.length - 1 && canAdd
 
@@ -452,7 +462,14 @@ function WorkingHoursSection({
 														label="Start Time"
 														value={slot.start}
 														options={startOptions}
-														onChange={(value) => onUpdateSlotTime(section.key, slotIndex, 'start', String(value))}
+														onChange={(value) =>
+															onUpdateSlotTime(
+																section.key,
+																slotIndex,
+																'start',
+																String(value)
+															)
+														}
 														compact
 													/>
 												</View>
@@ -461,7 +478,14 @@ function WorkingHoursSection({
 														label="End Time"
 														value={slot.end}
 														options={endOptions}
-														onChange={(value) => onUpdateSlotTime(section.key, slotIndex, 'end', String(value))}
+														onChange={(value) =>
+															onUpdateSlotTime(
+																section.key,
+																slotIndex,
+																'end',
+																String(value)
+															)
+														}
 														compact
 													/>
 												</View>
@@ -474,7 +498,12 @@ function WorkingHoursSection({
 														onPress={() => onAddSlot(section.key)}
 														activeOpacity={0.8}
 													>
-														<MaterialCommunityIcons name="plus" size={21} color={TEAL} style={styles.slotActionIcon} />
+														<MaterialCommunityIcons
+															name="plus"
+															size={21}
+															color={TEAL}
+															style={styles.slotActionIcon}
+														/>
 													</TouchableOpacity>
 												) : null}
 
@@ -484,7 +513,12 @@ function WorkingHoursSection({
 														onPress={() => onRemoveSlot(section.key, slotIndex)}
 														activeOpacity={0.8}
 													>
-														<MaterialCommunityIcons name="close" size={21} color="#62707a" style={styles.slotActionIcon} />
+														<MaterialCommunityIcons
+															name="close"
+															size={21}
+															color="#62707a"
+															style={styles.slotActionIcon}
+														/>
 													</TouchableOpacity>
 												) : null}
 											</View>
@@ -504,7 +538,10 @@ function WorkingHoursSection({
 						<DropdownSelect
 							label="Duration"
 							value={selectedWorkingHours.slotDuration}
-							options={durationOptions.map((duration) => ({ value: duration, label: `${duration} mins` }))}
+							options={durationOptions.map((duration) => ({
+								value: duration,
+								label: `${duration} mins`,
+							}))}
 							onChange={(value) => onSlotDurationChange(Number(value))}
 							compact
 						/>
@@ -614,7 +651,9 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			console.log('[MyHospitalsTab] failed to load hospitals:', error)
 			Alert.alert(
 				'Error',
-				(error as any)?.response?.data?.message || (error as any)?.message || 'Unable to load hospitals right now.'
+				(error as any)?.response?.data?.message ||
+					(error as any)?.message ||
+					'Unable to load hospitals right now.'
 			)
 		} finally {
 			if (showLoader) setIsLoading(false)
@@ -849,7 +888,10 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						offline_consultation_fee: trimmedOfflineFee,
 					}
 
-					const response = await updateHospital(editingId, buildHospitalUpdatePayload(updatedHospital, updatedHospital.isPrimary, weeklyWorkingHours))
+					const response = await updateHospital(
+						editingId,
+						buildHospitalUpdatePayload(updatedHospital, updatedHospital.isPrimary, weeklyWorkingHours)
+					)
 					Alert.alert('Success', getSuccessMessage(response, 'Hospital updated successfully'))
 					await loadHospitals()
 				} else {
@@ -887,7 +929,14 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			const hasPrimary = hospitals.some((hospital) => hospital.isPrimary)
 			await Promise.all(
 				hospitals.map((hospital, index) =>
-					updateHospital(hospital.id, buildHospitalUpdatePayload(hospital, hospital.isPrimary || (!hasPrimary && index === 0), weeklyWorkingHours))
+					updateHospital(
+						hospital.id,
+						buildHospitalUpdatePayload(
+							hospital,
+							hospital.isPrimary || (!hasPrimary && index === 0),
+							weeklyWorkingHours
+						)
+					)
 				)
 			)
 			await loadHospitals()
@@ -910,297 +959,350 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 
 	if (showForm) {
 		return (
-			<ScrollView
-				style={styles.container}
-				contentContainerStyle={[
-					styles.contentContainer,
-					{
-						paddingHorizontal: sectionPadding,
-						paddingTop: sectionPadding,
-						paddingBottom: actionSpacing,
-					},
-				]}
-				keyboardShouldPersistTaps="handled"
-				showsVerticalScrollIndicator={false}
-			>
-				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-					<View style={styles.formHeader}>
-						<TouchableOpacity onPress={resetForm} style={styles.backButton} activeOpacity={0.8}>
-							<MaterialCommunityIcons name="chevron-left" size={20} color="#5f6b73" />
-						</TouchableOpacity>
-						<AppTypography variant="h4" style={styles.formTitle}>
-							{editingId ? 'Edit Hospital Details' : 'Add new Hospital Details'}
-						</AppTypography>
-					</View>
-
-					<View style={styles.formBody}>
-						<InputField
-							label="Enter hospital name"
-							value={form.name}
-							onChangeText={(value) => setForm((prev) => ({ ...prev, name: value }))}
-							placeholder="e.g. Arogya Clinic"
-						/>
-
-						<InputField
-							label="Phone number"
-							value={form.phone_number}
-							onChangeText={(value) => setForm((prev) => ({ ...prev, phone_number: value }))}
-							placeholder="e.g. +91 98765 43210"
-							keyboardType="phone-pad"
-						/>
-
-						<InputField
-							label="Enter Full address"
-							value={form.fullAddress}
-							onChangeText={(value) => setForm((prev) => ({ ...prev, fullAddress: value }))}
-							placeholder="Enter complete address"
-							multiline
-						/>
-
-						<InputField
-							label="Video consultation fee"
-							value={form.video_consultation_fee}
-							onChangeText={(value) =>
-								setForm((prev) => ({ ...prev, video_consultation_fee: value.replace(/[^\d.]/g, '') }))
-							}
-							placeholder="e.g. 500"
-							keyboardType="numeric"
-						/>
-
-						<InputField
-							label="Offline consultation fee"
-							value={form.offline_consultation_fee}
-							onChangeText={(value) =>
-								setForm((prev) => ({ ...prev, offline_consultation_fee: value.replace(/[^\d.]/g, '') }))
-							}
-							placeholder="e.g. 300"
-							keyboardType="numeric"
-						/>
-
-						<WorkingHoursSection
-							selectedWorkingDay={selectedWorkingDay}
-							onWorkingDayChange={setSelectedWorkingDay}
-							selectedAppointmentType={selectedAppointmentType}
-							onAppointmentTypeChange={setSelectedAppointmentType}
-							selectedWorkingHours={selectedWorkingHours}
-							onAddSlot={addSlot}
-							onRemoveSlot={removeSlot}
-							onUpdateSlotTime={updateSlotTime}
-							onSlotDurationChange={updateSlotDuration}
-							stacked={!useTwoColumns}
-						/>
-
-						<View style={styles.appointmentRules}>
-							<AppTypography variant="body" style={[styles.workingTitle, styles.appointmentRulesTitle]}>
-								Appointment Rules
+			<View style={{ flex: 1 }}>
+				<ScrollView
+					style={styles.container}
+					contentContainerStyle={[
+						styles.contentContainer,
+						{
+							paddingHorizontal: sectionPadding,
+							paddingTop: sectionPadding,
+							paddingBottom: 16,
+						},
+					]}
+					keyboardShouldPersistTaps="handled"
+					showsVerticalScrollIndicator={false}
+				>
+					<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+						<View style={styles.formHeader}>
+							<TouchableOpacity onPress={resetForm} style={styles.backButton} activeOpacity={0.8}>
+								<MaterialCommunityIcons name="chevron-left" size={20} color="#5f6b73" />
+							</TouchableOpacity>
+							<AppTypography variant="h4" style={styles.formTitle}>
+								{editingId ? 'Edit Hospital Details' : 'Add new Hospital Details'}
 							</AppTypography>
+						</View>
 
-							<View style={styles.ruleBlock}>
-								<AppTypography variant="caption" style={styles.shiftTitle}>
-									Free Follow-up Validity
+						<View style={styles.formBody}>
+							<InputField
+								label="Enter hospital name"
+								value={form.name}
+								onChangeText={(value) => setForm((prev) => ({ ...prev, name: value }))}
+								placeholder="e.g. Arogya Clinic"
+							/>
+
+							<InputField
+								label="Phone number"
+								value={form.phone_number}
+								onChangeText={(value) => setForm((prev) => ({ ...prev, phone_number: value }))}
+								placeholder="e.g. +91 98765 43210"
+								keyboardType="phone-pad"
+							/>
+
+							<InputField
+								label="Enter Full address"
+								value={form.fullAddress}
+								onChangeText={(value) => setForm((prev) => ({ ...prev, fullAddress: value }))}
+								placeholder="Enter complete address"
+								multiline
+							/>
+
+							<InputField
+								label="Video consultation fee"
+								value={form.video_consultation_fee}
+								onChangeText={(value) =>
+									setForm((prev) => ({
+										...prev,
+										video_consultation_fee: value.replace(/[^\d.]/g, ''),
+									}))
+								}
+								placeholder="e.g. 500"
+								keyboardType="numeric"
+							/>
+
+							<InputField
+								label="Offline consultation fee"
+								value={form.offline_consultation_fee}
+								onChangeText={(value) =>
+									setForm((prev) => ({
+										...prev,
+										offline_consultation_fee: value.replace(/[^\d.]/g, ''),
+									}))
+								}
+								placeholder="e.g. 300"
+								keyboardType="numeric"
+							/>
+
+							<WorkingHoursSection
+								selectedWorkingDay={selectedWorkingDay}
+								onWorkingDayChange={setSelectedWorkingDay}
+								selectedAppointmentType={selectedAppointmentType}
+								onAppointmentTypeChange={setSelectedAppointmentType}
+								selectedWorkingHours={selectedWorkingHours}
+								onAddSlot={addSlot}
+								onRemoveSlot={removeSlot}
+								onUpdateSlotTime={updateSlotTime}
+								onSlotDurationChange={updateSlotDuration}
+								stacked={!useTwoColumns}
+							/>
+
+							<View style={styles.appointmentRules}>
+								<AppTypography
+									variant="body"
+									style={[styles.workingTitle, styles.appointmentRulesTitle]}
+								>
+									Appointment Rules
 								</AppTypography>
-								<View style={styles.ruleField}>
-									<DropdownSelect
-										label="Free Follow-up Validity"
-										value={followUpDays}
-										options={followUpOptions}
-										onChange={(value) => setFollowUpDays(Number(value))}
-										compact
-										showFloatingLabel={false}
+
+								<View style={styles.ruleBlock}>
+									<AppTypography variant="caption" style={styles.shiftTitle}>
+										Free Follow-up Validity
+									</AppTypography>
+									<View style={styles.ruleField}>
+										<DropdownSelect
+											label="Free Follow-up Validity"
+											value={followUpDays}
+											options={followUpOptions}
+											onChange={(value) => setFollowUpDays(Number(value))}
+											compact
+											showFloatingLabel={false}
+										/>
+									</View>
+								</View>
+
+								<View style={styles.ruleBlock}>
+									<AppTypography variant="caption" style={styles.shiftTitle}>
+										Reschedule Allowed Until
+									</AppTypography>
+									<View style={styles.ruleField}>
+										<DropdownSelect
+											label="Reschedule Allowed Until"
+											value={rescheduleCutoff}
+											options={rescheduleCutoffOptions}
+											onChange={(value) => setRescheduleCutoff(Number(value))}
+											compact
+											showFloatingLabel={false}
+										/>
+									</View>
+								</View>
+
+								<View style={styles.ruleBlock}>
+									<AppTypography variant="caption" style={styles.shiftTitle}>
+										Allow Pay Later
+									</AppTypography>
+
+									<AppToggle
+										value={allowPayLater}
+										onValueChange={setAllowPayLater}
+										showStatusText={false}
+										accessibilityLabel="Allow Pay Later"
+										style={styles.payLaterControl}
 									/>
 								</View>
-							</View>
-
-							<View style={styles.ruleBlock}>
-								<AppTypography variant="caption" style={styles.shiftTitle}>
-									Reschedule Allowed Until
-								</AppTypography>
-								<View style={styles.ruleField}>
-									<DropdownSelect
-										label="Reschedule Allowed Until"
-										value={rescheduleCutoff}
-										options={rescheduleCutoffOptions}
-										onChange={(value) => setRescheduleCutoff(Number(value))}
-										compact
-										showFloatingLabel={false}
-									/>
-								</View>
-							</View>
-
-							<View style={styles.ruleBlock}>
-								<AppTypography variant="caption" style={styles.shiftTitle}>
-									Allow Pay Later
-								</AppTypography>
-
-								<AppToggle
-									value={allowPayLater}
-									onValueChange={setAllowPayLater}
-									showStatusText={false}
-									accessibilityLabel="Allow Pay Later"
-									style={styles.payLaterControl}
-								/>
 							</View>
 						</View>
 					</View>
-
-					<View style={[styles.formActions, { marginTop: actionSpacing }]}>
-						<AppButton
-							variant="primary"
-							formAction
-							style={styles.formActionButton}
-							onPress={handleSaveAddress}
-							loading={isSavingAddress}
-							disabled={isSavingAddress}
-						>
-							Save Details
-						</AppButton>
-					</View>
-				</View>
-			</ScrollView>
+				</ScrollView>
+				<AppStickyFooter
+					onPress={handleSaveAddress}
+					loading={isSavingAddress}
+					disabled={isSavingAddress}
+					buttonStyle={styles.saveButton}
+				>
+					Save Details
+				</AppStickyFooter>
+			</View>
 		)
 	}
 
 	return (
-		<Pressable style={styles.container} onPress={() => setMenuVisibleId(null)}>
-			<ScrollView
-				style={styles.container}
-				contentContainerStyle={[
-					styles.contentContainer,
-					{
-						paddingHorizontal: sectionPadding,
-						paddingTop: sectionPadding,
-						paddingBottom: actionSpacing,
-					},
-				]}
-				keyboardShouldPersistTaps="handled"
-				showsVerticalScrollIndicator={false}
-			>
-				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-					<View style={[styles.header, actionStacked && styles.headerStacked]}>
-						
-						<TouchableOpacity
-							style={[styles.addButton, actionStacked && styles.addButtonStacked]}
-							onPress={() => setShowForm(true)}
-							activeOpacity={0.85}
-						>
-							<MaterialCommunityIcons name="plus" size={18} color="#ffffff" />
-							<AppTypography variant="body" style={styles.addButtonText}>
-								Add new hospital
-							</AppTypography>
-						</TouchableOpacity>
-					</View>
-
-					{hospitals.length === 0 ? (
-						<View style={styles.emptyState}>
-							<MaterialCommunityIcons name="home-outline" size={48} color="rgba(56,72,80,0.28)" />
-							<AppTypography variant="body" style={styles.emptyText}>
-								No hospitals added yet
-							</AppTypography>
+		<View style={{ flex: 1 }}>
+			<Pressable style={styles.container} onPress={() => setMenuVisibleId(null)}>
+				<ScrollView
+					style={styles.container}
+					contentContainerStyle={[
+						styles.contentContainer,
+						{
+							paddingHorizontal: sectionPadding,
+							paddingTop: sectionPadding,
+							paddingBottom: 100,
+						},
+					]}
+					keyboardShouldPersistTaps="handled"
+					showsVerticalScrollIndicator={false}
+				>
+					<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+						<View style={[styles.header, actionStacked && styles.headerStacked]}>
+							<TouchableOpacity
+								style={[styles.addButton, actionStacked && styles.addButtonStacked]}
+								onPress={() => setShowForm(true)}
+								activeOpacity={0.85}
+							>
+								<MaterialCommunityIcons name="plus" size={18} color="#ffffff" />
+								<AppTypography variant="body" style={styles.addButtonText}>
+									Add new hospital
+								</AppTypography>
+							</TouchableOpacity>
 						</View>
-					) : (
-						<View style={styles.listSection}>
-							{hospitals.map((hospital, index) => (
-								<View key={hospital.id} style={styles.hospitalBlock}>
-									<AppTypography variant="caption" style={styles.addressTitle}>
-										Address {index + 1}
-									</AppTypography>
 
-									<View style={[styles.cardRow, { flexDirection: cardDirection }]}>
-										<View
-											style={[
-												styles.cardMain,
-												hospital.isPrimary && styles.cardMainPrimary,
-												cardDirection === 'column' && styles.cardMainStacked,
-											]}
-										>
-											<View style={styles.cardMainInner}>
-												<MaterialCommunityIcons name="home-outline" size={18} color="#0c7c7c" style={styles.cardIcon} />
-												<View style={styles.cardCopy}>
-													<AppTypography variant="body" style={styles.hospitalName}>
-														{hospital.name}
-													</AppTypography>
-													<AppTypography variant="caption" style={styles.addressText}>
-														{getHospitalAddressText(hospital)}
-													</AppTypography>
-													{hospital.phone_number ? (
-														<AppTypography variant="caption" style={styles.metaText}>
-															Phone: {hospital.phone_number}
+						{hospitals.length === 0 ? (
+							<View style={styles.emptyState}>
+								<MaterialCommunityIcons name="home-outline" size={48} color="rgba(56,72,80,0.28)" />
+								<AppTypography variant="body" style={styles.emptyText}>
+									No hospitals added yet
+								</AppTypography>
+							</View>
+						) : (
+							<View style={styles.listSection}>
+								{hospitals.map((hospital, index) => (
+									<View key={hospital.id} style={styles.hospitalBlock}>
+										<AppTypography variant="caption" style={styles.addressTitle}>
+											Address {index + 1}
+										</AppTypography>
+
+										<View style={[styles.cardRow, { flexDirection: cardDirection }]}>
+											<View
+												style={[
+													styles.cardMain,
+													hospital.isPrimary && styles.cardMainPrimary,
+													cardDirection === 'column' && styles.cardMainStacked,
+												]}
+											>
+												<View style={styles.cardMainInner}>
+													<MaterialCommunityIcons
+														name="home-outline"
+														size={18}
+														color="#0c7c7c"
+														style={styles.cardIcon}
+													/>
+													<View style={styles.cardCopy}>
+														<AppTypography variant="body" style={styles.hospitalName}>
+															{hospital.name}
 														</AppTypography>
-													) : null}
-													{hospital.video_consultation_fee || hospital.offline_consultation_fee ? (
-														<AppTypography variant="caption" style={styles.metaText}>
-															Video: {hospital.video_consultation_fee || '-'} | Offline: {hospital.offline_consultation_fee || '-'}
+														<AppTypography variant="caption" style={styles.addressText}>
+															{getHospitalAddressText(hospital)}
 														</AppTypography>
-													) : null}
+														{hospital.phone_number ? (
+															<AppTypography variant="caption" style={styles.metaText}>
+																Phone: {hospital.phone_number}
+															</AppTypography>
+														) : null}
+														{hospital.video_consultation_fee ||
+														hospital.offline_consultation_fee ? (
+															<AppTypography variant="caption" style={styles.metaText}>
+																Video: {hospital.video_consultation_fee || '-'} |
+																Offline: {hospital.offline_consultation_fee || '-'}
+															</AppTypography>
+														) : null}
+													</View>
 												</View>
 											</View>
-										</View>
 
-										<View style={[styles.actionGroup, actionStacked && styles.actionGroupStacked]}>
-											<TouchableOpacity
-												style={[styles.primaryToggle, hospital.isPrimary && styles.primaryToggleActive, actionStacked && styles.primaryToggleStacked]}
-												onPress={() => handleSetPrimary(hospital.id)}
-												activeOpacity={0.85}
+											<View
+												style={[styles.actionGroup, actionStacked && styles.actionGroupStacked]}
 											>
-												<AppTypography variant="caption" style={styles.primaryText}>
-													Set as Primary
-												</AppTypography>
-												<View style={[styles.radioOuter, hospital.isPrimary && styles.radioOuterActive]}>
-													{hospital.isPrimary ? <View style={styles.radioInner} /> : null}
-												</View>
-											</TouchableOpacity>
-
-											<View style={styles.menuWrapper}>
 												<TouchableOpacity
-													style={[styles.menuButton, actionStacked && styles.menuButtonStacked]}
-													onPress={() => setMenuVisibleId((prev) => (prev === hospital.id ? null : hospital.id))}
+													style={[
+														styles.primaryToggle,
+														hospital.isPrimary && styles.primaryToggleActive,
+														actionStacked && styles.primaryToggleStacked,
+													]}
+													onPress={() => handleSetPrimary(hospital.id)}
 													activeOpacity={0.85}
 												>
-													<MaterialCommunityIcons name="dots-horizontal" size={20} color="#62707a" />
+													<AppTypography variant="caption" style={styles.primaryText}>
+														Set as Primary
+													</AppTypography>
+													<View
+														style={[
+															styles.radioOuter,
+															hospital.isPrimary && styles.radioOuterActive,
+														]}
+													>
+														{hospital.isPrimary ? <View style={styles.radioInner} /> : null}
+													</View>
 												</TouchableOpacity>
 
-												<Modal
-													visible={menuVisibleId === hospital.id}
-													transparent
-													animationType="fade"
-													onRequestClose={() => setMenuVisibleId(null)}
-												>
-													<Pressable style={styles.modalOverlay} onPress={() => setMenuVisibleId(null)}>
-														<View style={[styles.menuCard, isMobile && styles.menuCardMobile]}>
-															<TouchableOpacity style={styles.menuItem} onPress={() => handleEdit(hospital)}>
-																<AppTypography variant="body" style={styles.menuItemText}>
-																	Edit
-																</AppTypography>
-															</TouchableOpacity>
-															<TouchableOpacity style={styles.menuItem} onPress={() => confirmDelete(hospital.id)}>
-																<AppTypography variant="body" style={styles.menuItemDelete}>
-																	Delete
-																</AppTypography>
-															</TouchableOpacity>
-														</View>
-													</Pressable>
-												</Modal>
+												<View style={styles.menuWrapper}>
+													<TouchableOpacity
+														style={[
+															styles.menuButton,
+															actionStacked && styles.menuButtonStacked,
+														]}
+														onPress={() =>
+															setMenuVisibleId((prev) =>
+																prev === hospital.id ? null : hospital.id
+															)
+														}
+														activeOpacity={0.85}
+													>
+														<MaterialCommunityIcons
+															name="dots-horizontal"
+															size={20}
+															color="#62707a"
+														/>
+													</TouchableOpacity>
+
+													<Modal
+														visible={menuVisibleId === hospital.id}
+														transparent
+														animationType="fade"
+														onRequestClose={() => setMenuVisibleId(null)}
+													>
+														<Pressable
+															style={styles.modalOverlay}
+															onPress={() => setMenuVisibleId(null)}
+														>
+															<View
+																style={[
+																	styles.menuCard,
+																	isMobile && styles.menuCardMobile,
+																]}
+															>
+																<TouchableOpacity
+																	style={styles.menuItem}
+																	onPress={() => handleEdit(hospital)}
+																>
+																	<AppTypography
+																		variant="body"
+																		style={styles.menuItemText}
+																	>
+																		Edit
+																	</AppTypography>
+																</TouchableOpacity>
+																<TouchableOpacity
+																	style={styles.menuItem}
+																	onPress={() => confirmDelete(hospital.id)}
+																>
+																	<AppTypography
+																		variant="body"
+																		style={styles.menuItemDelete}
+																	>
+																		Delete
+																	</AppTypography>
+																</TouchableOpacity>
+															</View>
+														</Pressable>
+													</Modal>
+												</View>
 											</View>
 										</View>
 									</View>
-								</View>
-							))}
-						</View>
-					)}
-
-					<AppButton
-						variant="primary"
-						formAction
-						style={[styles.saveContinueButton, { marginTop: actionSpacing }]}
-						onPress={handleSave}
-						loading={isSaving}
-						disabled={isSaving}
-					>
-						Save 
-					</AppButton>
-				</View>
-			</ScrollView>
-		</Pressable>
+								))}
+							</View>
+						)}
+					</View>
+				</ScrollView>
+			</Pressable>
+			<AppStickyFooter
+				onPress={handleSave}
+				loading={isSaving}
+				disabled={isSaving}
+				buttonStyle={styles.saveButton}
+			>
+				Save
+			</AppStickyFooter>
+		</View>
 	)
 }
 
@@ -1233,7 +1335,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'column',
 		alignItems: 'stretch',
 	},
-	
+
 	addButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1292,8 +1394,8 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 	},
 	cardMainPrimary: {
-		borderColor: '#0c7c7c',
-		borderLeftColor: '#0c7c7c',
+		borderColor: '#0c3c3c',
+		borderLeftColor: '#194545',
 	},
 	cardMainStacked: {
 		width: '100%',
@@ -1740,12 +1842,9 @@ const styles = StyleSheet.create({
 	formActions: {
 		alignItems: 'stretch',
 	},
-	formActionButton: {
-		marginTop: 0,
-		width: '100%',
-	},
-	saveContinueButton: {
+	saveButton: {
 		alignSelf: 'stretch',
+		marginTop: 0,
 		width: '100%',
 	},
 })
