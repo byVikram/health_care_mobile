@@ -8,7 +8,6 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
-	AppButton,
 	AppCalendar,
 	AppInput,
 	AppMultiSelect,
@@ -17,6 +16,7 @@ import {
 	AppSelect,
 	AppSelectOption,
 	AppTypography,
+	StickyFooter,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import { getDoctorProfile, mapDoctorProfileApi, updateDoctorPersonalDetails } from '../../../doctor/doctorService'
@@ -526,216 +526,213 @@ export default function PersonalDetailsTab() {
 	}
 
 	return (
-		<ScrollView
-			style={styles.container}
-			contentContainerStyle={[
-				styles.contentContainer,
-				{
-					paddingHorizontal: sectionPadding,
-					paddingTop: sectionPadding,
-					paddingBottom: rowSpacing,
-				},
-			]}
-			keyboardShouldPersistTaps="handled"
-			showsVerticalScrollIndicator={false}
-		>	
-			
-			<KeyboardAvoidingView style={[styles.contentShell, { maxWidth: contentWidth }]}>
+		<View style={{flex:1}}>
+			<ScrollView
+				style={styles.container}
+				contentContainerStyle={[
+					styles.contentContainer,
+					{
+						paddingHorizontal: sectionPadding,
+						paddingTop: sectionPadding,
+						paddingBottom: 100,
+					},
+				]}
+				keyboardShouldPersistTaps="handled"
+				showsVerticalScrollIndicator={false}
+			>	
+				
+				<KeyboardAvoidingView style={[styles.contentShell, { maxWidth: contentWidth }]}>
 
-				<AppPhotoPicker
-					imageUri={profilePhotoUri}
-					fallbackSource={DEFAULT_PROFILE_IMAGE}
-					fileNamePrefix="doctor-profile"
-					onChange={({ uri, upload, removed }) => {
-						setProfilePhotoUri(uri)
-						setProfilePhotoUpload(upload)
-						setIsProfilePhotoRemoved(removed)
-					}}
-				/>
-
-				<View style={{ marginBottom: rowSpacing }}>
-					<InputField
-						label="Full name"
-						value={formData.name}
-						onChangeText={(value) => updateFormData('name', value)}
-						placeholder="Enter full name"
-						autoCapitalize="words"
-						onFocus={() => setFocusedField('fullName')}
-						onBlur={() => setFocusedField('')}
-						required
+					<AppPhotoPicker
+						imageUri={profilePhotoUri}
+						fallbackSource={DEFAULT_PROFILE_IMAGE}
+						fileNamePrefix="doctor-profile"
+						onChange={({ uri, upload, removed }) => {
+							setProfilePhotoUri(uri)
+							setProfilePhotoUpload(upload)
+							setIsProfilePhotoRemoved(removed)
+						}}
 					/>
-				</View>
 
-				<View style={{ marginBottom: rowSpacing }}>
-					<InputField
-						label="Registration Number"
-						value={formData.registrationNumber}
-						onChangeText={(value) => updateFormData('registrationNumber', value)}
-						placeholder="Enter registration number"
-						autoCapitalize="characters"
-						rightIcon={focusedField === 'registrationNumber' ? 'pencil-outline' : undefined}
-						onFocus={() => setFocusedField('registrationNumber')}
-						onBlur={() => setFocusedField('')}
-						required
-					/>
-				</View>
-
-				<View style={{ marginBottom: rowSpacing }}>
-					<InputField
-						label="Location"
-						value={formData.location}
-						onChangeText={(value) => updateFormData('location', value)}
-						placeholder="Enter location"
-						autoCapitalize="words"
-						onFocus={() => setFocusedField('location')}
-						onBlur={() => setFocusedField('')}
-						required
-					/>
-				</View>
-
-				<View style={{ marginBottom: rowSpacing }}>
-					<FormRow stacked={!useTwoColumns} compact={isTablet}>
+					<View style={{ marginBottom: rowSpacing }}>
 						<InputField
-							label="Mobile Number"
-							value={formData.mobile}
-							onChangeText={(value) => updateFormData('mobile', value.replace(/\D/g, ''))}
-							placeholder="Enter mobile number"
-							keyboardType="phone-pad"
-							leftText="+91"
-							rightIcon={isValidPhone(formData.mobile) ? 'check-circle' : undefined}
-							rightIconColor="#24a148"
-							onFocus={() => setFocusedField('mobileNumber')}
+							label="Full name"
+							value={formData.name}
+							onChangeText={(value) => updateFormData('name', value)}
+							placeholder="Enter full name"
+							autoCapitalize="words"
+							onFocus={() => setFocusedField('fullName')}
 							onBlur={() => setFocusedField('')}
 							required
 						/>
+					</View>
+
+					<View style={{ marginBottom: rowSpacing }}>
 						<InputField
-							label="Email ID"
-							value={formData.email}
-							onChangeText={(value) => updateFormData('email', value)}
-							placeholder="Enter email"
-							keyboardType="email-address"
-							autoCapitalize="none"
-							rightIcon={isValidEmail(formData.email) ? 'check-circle' : undefined}
-							rightIconColor="#24a148"
-							onFocus={() => setFocusedField('email')}
+							label="Registration Number"
+							value={formData.registrationNumber}
+							onChangeText={(value) => updateFormData('registrationNumber', value)}
+							placeholder="Enter registration number"
+							autoCapitalize="characters"
+							rightIcon={focusedField === 'registrationNumber' ? 'pencil-outline' : undefined}
+							onFocus={() => setFocusedField('registrationNumber')}
 							onBlur={() => setFocusedField('')}
 							required
 						/>
-					</FormRow>
-				</View>
+					</View>
 
-				<View style={{ marginBottom: rowSpacing }}>
-					<FormRow stacked={!useTwoColumns} compact={isTablet}>
-						<SelectDropdown
-							label="Gender"
-							value={formData.gender}
-							placeholder="Select your gender"
-							options={GENDER_SELECT_OPTIONS}
-							onSelect={(value) => updateFormData('gender', value)}
+					<View style={{ marginBottom: rowSpacing }}>
+						<InputField
+							label="Location"
+							value={formData.location}
+							onChangeText={(value) => updateFormData('location', value)}
+							placeholder="Enter location"
+							autoCapitalize="words"
+							onFocus={() => setFocusedField('location')}
+							onBlur={() => setFocusedField('')}
 							required
 						/>
-						<DobPickerField
-							label="DOB"
-							value={formData.dob}
-							onChange={(value) => updateFormData('dob', value)}
-							placeholder="DD-MM-YYYY"
-							isMobile={isMobile}
+					</View>
+
+					<View style={{ marginBottom: rowSpacing }}>
+						<FormRow stacked={!useTwoColumns} compact={isTablet}>
+							<InputField
+								label="Mobile Number"
+								value={formData.mobile}
+								onChangeText={(value) => updateFormData('mobile', value.replace(/\D/g, ''))}
+								placeholder="Enter mobile number"
+								keyboardType="phone-pad"
+								leftText="+91"
+								rightIcon={isValidPhone(formData.mobile) ? 'check-circle' : undefined}
+								rightIconColor="#24a148"
+								onFocus={() => setFocusedField('mobileNumber')}
+								onBlur={() => setFocusedField('')}
+								required
+							/>
+							<InputField
+								label="Email ID"
+								value={formData.email}
+								onChangeText={(value) => updateFormData('email', value)}
+								placeholder="Enter email"
+								keyboardType="email-address"
+								autoCapitalize="none"
+								rightIcon={isValidEmail(formData.email) ? 'check-circle' : undefined}
+								rightIconColor="#24a148"
+								onFocus={() => setFocusedField('email')}
+								onBlur={() => setFocusedField('')}
+								required
+							/>
+						</FormRow>
+					</View>
+
+					<View style={{ marginBottom: rowSpacing }}>
+						<FormRow stacked={!useTwoColumns} compact={isTablet}>
+							<SelectDropdown
+								label="Gender"
+								value={formData.gender}
+								placeholder="Select your gender"
+								options={GENDER_SELECT_OPTIONS}
+								onSelect={(value) => updateFormData('gender', value)}
+								required
+							/>
+							<DobPickerField
+								label="DOB"
+								value={formData.dob}
+								onChange={(value) => updateFormData('dob', value)}
+								placeholder="DD-MM-YYYY"
+								isMobile={isMobile}
+								required
+							/>
+						</FormRow>
+					</View>
+
+					<View style={{ marginBottom: rowSpacing }}>
+						<InputField
+							label="Total year of experience"
+							value={formData.experience}
+							onChangeText={(value) => updateFormData('experience', value.replace(/[^\d.]/g, ''))}
+							placeholder="Enter years of experience"
+							keyboardType="numeric"
+							rightIcon={focusedField === 'experience' ? 'pencil-outline' : undefined}
+							onFocus={() => setFocusedField('experience')}
+							onBlur={() => setFocusedField('')}
 							required
 						/>
-					</FormRow>
-				</View>
+					</View>
 
-				<View style={{ marginBottom: rowSpacing }}>
-					<InputField
-						label="Total year of experience"
-						value={formData.experience}
-						onChangeText={(value) => updateFormData('experience', value.replace(/[^\d.]/g, ''))}
-						placeholder="Enter years of experience"
-						keyboardType="numeric"
-						rightIcon={focusedField === 'experience' ? 'pencil-outline' : undefined}
-						onFocus={() => setFocusedField('experience')}
-						onBlur={() => setFocusedField('')}
-						required
-					/>
-				</View>
-
-				<View style={{ marginBottom: rowSpacing }}>
-					<MultiSelectDropdown
-						label="Languages Known"
-						values={formData.languages}
-						placeholder="Select languages"
-						options={LANGUAGE_SELECT_OPTIONS}
-						onChange={(values) => updateFormData('languages', values)}
-						required
-					/>
-				</View>
-
-				<View style={[styles.socialSection, { marginBottom: rowSpacing }]}>
-					<AppTypography variant="h4" style={styles.sectionTitle}>
-						Social Media
-					</AppTypography>
-					<FormRow stacked={!useTwoColumns} compact={isTablet}>
-						<InputField
-							label="Instagram"
-							value={formData.instagram}
-							onChangeText={(value) => updateSocialField('instagram', value)}
-							placeholder="https://instagram.com/username"
-							keyboardType="url"
-							autoCapitalize="none"
-							rightIcon="instagram"
-							errorText={socialErrors.instagram}
-							onFocus={() => setFocusedField('instagram')}
-							onBlur={() => {
-								setFocusedField('')
-								handleSocialBlur('instagram')
-							}}
+					<View style={{ marginBottom: rowSpacing }}>
+						<MultiSelectDropdown
+							label="Languages Known"
+							values={formData.languages}
+							placeholder="Select languages"
+							options={LANGUAGE_SELECT_OPTIONS}
+							onChange={(values) => updateFormData('languages', values)}
+							required
 						/>
-						<InputField
-							label="Facebook"
-							value={formData.facebook}
-							onChangeText={(value) => updateSocialField('facebook', value)}
-							placeholder="https://www.facebook.com/profile"
-							keyboardType="url"
-							autoCapitalize="none"
-							rightIcon="facebook"
-							errorText={socialErrors.facebook}
-							onFocus={() => setFocusedField('facebook')}
-							onBlur={() => {
-								setFocusedField('')
-								handleSocialBlur('facebook')
-							}}
-						/>
-						<InputField
-							label="Twitter"
-							value={formData.twitter}
-							onChangeText={(value) => updateSocialField('twitter', value)}
-							placeholder="https://twitter.com/username"
-							keyboardType="url"
-							autoCapitalize="none"
-							rightIcon="twitter"
-							errorText={socialErrors.twitter}
-							onFocus={() => setFocusedField('twitter')}
-							onBlur={() => {
-								setFocusedField('')
-								handleSocialBlur('twitter')
-							}}
-						/>
-					</FormRow>
-				</View>
+					</View>
 
-				<AppButton
-					variant="primary"
-					formAction
-					style={styles.saveButton}
-					onPress={handleSave}
-					loading={isSaving}
-					disabled={isSaving}
-				>
-					Save 
-				</AppButton>
-			</KeyboardAvoidingView>
+					<View style={[styles.socialSection, { marginBottom: rowSpacing }]}>
+						<AppTypography variant="h4" style={styles.sectionTitle}>
+							Social Media
+						</AppTypography>
+						<FormRow stacked={!useTwoColumns} compact={isTablet}>
+							<InputField
+								label="Instagram"
+								value={formData.instagram}
+								onChangeText={(value) => updateSocialField('instagram', value)}
+								placeholder="https://instagram.com/username"
+								keyboardType="url"
+								autoCapitalize="none"
+								rightIcon="instagram"
+								errorText={socialErrors.instagram}
+								onFocus={() => setFocusedField('instagram')}
+								onBlur={() => {
+									setFocusedField('')
+									handleSocialBlur('instagram')
+								}}
+							/>
+							<InputField
+								label="Facebook"
+								value={formData.facebook}
+								onChangeText={(value) => updateSocialField('facebook', value)}
+								placeholder="https://www.facebook.com/profile"
+								keyboardType="url"
+								autoCapitalize="none"
+								rightIcon="facebook"
+								errorText={socialErrors.facebook}
+								onFocus={() => setFocusedField('facebook')}
+								onBlur={() => {
+									setFocusedField('')
+									handleSocialBlur('facebook')
+								}}
+							/>
+							<InputField
+								label="Twitter"
+								value={formData.twitter}
+								onChangeText={(value) => updateSocialField('twitter', value)}
+								placeholder="https://twitter.com/username"
+								keyboardType="url"
+								autoCapitalize="none"
+								rightIcon="twitter"
+								errorText={socialErrors.twitter}
+								onFocus={() => setFocusedField('twitter')}
+								onBlur={() => {
+									setFocusedField('')
+									handleSocialBlur('twitter')
+								}}
+							/>
+						</FormRow>
+					</View>
 
-		</ScrollView>
+					
+				</KeyboardAvoidingView>
+
+			</ScrollView>
+			<StickyFooter onPress={handleSave} disabled={isSaving} loading={isSaving}>
+				Save 
+			</StickyFooter>
+		</View>
+		
 	)
 }
 
@@ -821,11 +818,5 @@ const styles = StyleSheet.create({
 	leftPrefixText: {
 		color: '#303030',
 		fontSize: 14,
-	},
-	saveButton: {
-		alignSelf: 'stretch',
-		marginTop: 0,
-		width: '100%',
-		minWidth: 160,
 	},
 })

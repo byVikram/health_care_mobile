@@ -86,6 +86,7 @@ export const API_ENDPOINTS = {
 		REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/reports`,
 		REPORTS_CREATE: `${BASE_URL}/api/patients/reports`,
 		ADDRESSES: `${BASE_URL}/api/patients/me/addresses`,
+		TREATMENT_HISTORY: (id: string) => `${BASE_URL}/api/treatments/patient/${id}/history`,
 		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
 	},
 	PHARMACY: {
