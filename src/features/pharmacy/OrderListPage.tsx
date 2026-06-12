@@ -22,7 +22,7 @@ import { AppBottomSheet, AppSelect, AppSelectOption, AppTypography } from '../..
 import PaginationBar from '../../components/common/AppPagination'
 import Card from '../../components/common/CommonCard'
 import { getPharmacyOrders } from '../profile/pharmacy/pharmacyService'
-import { useAuth } from '../../context/AuthContext' // ← same import as OrderDetailsScreen
+import { useAuth } from '../../context/AuthContext'
 
 // ─────────────────────────────────────────────
 // Types
@@ -226,43 +226,39 @@ const OrderCard = React.memo(function OrderCard({ order, onPress, isPatient, isP
 			<View style={styles.cardMainContent}>
 				{/* ── Header row: Pharmacy name OR Order ID (pharmacy role) ── */}
 				<View style={styles.cardHeader}>
-					{isPharmacy ? (
-						// Pharmacy is the viewer → they know their own name, show Order ID instead
-						<View style={styles.pharmacyTitleContainer}></View>
-					) : (
-						// Patient or other role → show pharmacy name
-						<View style={styles.pharmacyTitleContainer}>
-							<MaterialCommunityIcons
-								name="storefront-outline"
-								size={18}
-								color="#1f5f68"
-								style={styles.pharmacyIcon}
-							/>
-							<Text numberOfLines={1} style={styles.pharmacyName}>
-								{order.doctor}
-							</Text>
-						</View>
-					)}
-
-					<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-						<Text style={[styles.statusText, { color: statusStyle.text }]}>{order.status}</Text>
-					</View>
-				</View>
-
-				{/* ── Patient row: hidden when the viewer IS the patient ── */}
-				{!isPatient && (
-					<View style={styles.detailRow}>
+					<View style={styles.pharmacyTitleContainer}>
 						<MaterialCommunityIcons
-							name="account-outline"
-							size={28}
-							color="#667085"
-							style={styles.rowIcon}
+							name={isPharmacy ? 'account-outline' : 'storefront-outline'}
+							size={18}
+							color="#1f5f68"
+							style={styles.pharmacyIcon}
 						/>
-						<Text style={styles.detailText} numberOfLines={1}>
-							Patient: <Text style={styles.boldText}>{order.name}</Text>
+
+						<Text numberOfLines={1} style={styles.pharmacyName}>
+							{isPharmacy ? order.name : order.doctor}
 						</Text>
 					</View>
-				)}
+
+					<View
+						style={[
+							styles.statusBadge,
+							{
+								backgroundColor: statusStyle.bg,
+							},
+						]}
+					>
+						<Text
+							style={[
+								styles.statusText,
+								{
+									color: statusStyle.text,
+								},
+							]}
+						>
+							{order.status}
+						</Text>
+					</View>
+				</View>
 
 				{/* ── Date & Time ── */}
 				<View style={styles.detailRow}>

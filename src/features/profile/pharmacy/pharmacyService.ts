@@ -72,7 +72,7 @@ const pickUpdatedValues = (
 }
 
 // ── NEW: public pharmacy list (GET /api/pharmacies) ───────────────────────────
-export const getPharmacies = async () => {
+export const getPharmacies = async (params: Record<string, any>, p0: { signal: AbortSignal }) => {
 	// Mobile apiUrls uses PHARMACY.LIST (not PHARMACIES.LIST)
 	const url = API_ENDPOINTS.PHARMACY_ORDERS.LIST_BY_PHARMACY ?? API_ENDPOINTS.PHARMACY_ORDERS?.LIST_BY_PHARMACY
 	console.log('[getPharmacies] hitting URL:', url)
