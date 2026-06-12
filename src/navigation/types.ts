@@ -3,8 +3,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs'
 import { ROUTES } from './routes'
 
-// Import the DoctorDetailData type from your doctor feature
-// Adjust the path as needed.
 import type { DoctorDetailData } from '../types/doctor-detail'
 
 export type RoleParams = {
@@ -21,7 +19,7 @@ export type AuthStackParamList = {
 
 export type MainTabParamList = {
 	[ROUTES.MAIN.HOME]: undefined
-	[ROUTES.STACK.SEARCH]:
+	[ROUTES.MAIN.SEARCH]:
 		| {
 				mode?: 'clinic' | 'video'
 		  }

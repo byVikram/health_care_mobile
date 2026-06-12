@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
+	Animated,
 	FlatList,
 	Image,
+	Modal,
 	Platform,
+	Pressable,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -16,9 +19,10 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 
-import { AppBottomSheet, AppSelect, AppSelectOption, AppTypography } from '../../components/common'
+import { AppSelect, AppSelectOption, AppTypography } from '../../components/common'
 import PaginationBar from '../../components/common/AppPagination'
 import Card from '../../components/common/CommonCard'
 import { getPharmacyOrders } from '../profile/pharmacy/pharmacyService'
@@ -35,6 +39,11 @@ export interface PharmacyOrder {
 	created_at: string
 	bill_amount: number
 	delivery_type?: string
+	rejection_reason?: any
+	delivery_address?: {
+		address_line?: string
+		city?: string
+	}
 	patient: {
 		id: string
 		name: string
@@ -44,6 +53,7 @@ export interface PharmacyOrder {
 		id: string
 		name: string
 		city?: string
+		address?: string
 	}
 }
 
@@ -219,11 +229,31 @@ interface OrderCardProps {
 
 const OrderCard = React.memo(function OrderCard({ order, onPress, isPatient, isPharmacy }: OrderCardProps) {
 	const statusStyle = STATUS_STYLES[order.status] ?? STATUS_STYLES.Pending
-	const isHomeDelivery = order.raw?.delivery_type === 'home_delivery'
+
+	// Fixed: case-insensitive check for home delivery
+	const isHomeDelivery = order.raw?.delivery_type?.toUpperCase() === 'HOME_DELIVERY'
+
+	// Additional info: resolved address based on delivery type
+	const address = isHomeDelivery
+		? `${order.raw?.delivery_address?.address_line || ''}, ${order.raw?.delivery_address?.city || ''}`
+		: `${order.raw?.pharmacy?.address || ''}, ${order.raw?.pharmacy?.city || ''}`
+
+	// Additional info: rejection reason
+	const rejectionReason = order.raw?.rejection_reason
 
 	return (
 		<TouchableOpacity style={styles.orderCard} onPress={onPress} activeOpacity={0.85}>
 			<View style={styles.cardMainContent}>
+				{/* ── Additional: Rejection reason badge ── */}
+				{order.status === 'Rejected' && rejectionReason ? (
+					<View style={styles.reasonBadge}>
+						<MaterialCommunityIcons name="alert-circle-outline" size={13} color="#D94B4B" />
+						<Text style={styles.reasonText} numberOfLines={1}>
+							Reason: {rejectionReason}
+						</Text>
+					</View>
+				) : null}
+
 				{/* ── Header row: Pharmacy name OR Order ID (pharmacy role) ── */}
 				<View style={styles.cardHeader}>
 					<View style={styles.pharmacyTitleContainer}>
@@ -293,6 +323,11 @@ const OrderCard = React.memo(function OrderCard({ order, onPress, isPatient, isP
 						</Text>
 					</View>
 				</View>
+
+				{/* ── Additional: Address ── */}
+				<Text style={styles.addressText} numberOfLines={2}>
+					{address}
+				</Text>
 			</View>
 
 			<View style={styles.chevronContainer}>
@@ -310,7 +345,7 @@ export default function OrderListPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
-	const { width } = useWindowDimensions()
+	const { width, height } = useWindowDimensions()
 	const useInlineFilters = width >= 768
 
 	// ── Role — exactly the same as OrderDetailsScreen ─────────────────
@@ -344,6 +379,9 @@ export default function OrderListPage() {
 
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
 	const [activeDatePicker, setActiveDatePicker] = useState<'from' | 'to' | null>(null)
+
+	const filterSheetAnim = useRef(new Animated.Value(0)).current
+	const filterBackdropAnim = useRef(new Animated.Value(0)).current
 
 	// Sync route param status
 	useEffect(() => {
@@ -439,11 +477,22 @@ export default function OrderListPage() {
 		setDraftFromDateFilter(fromDateFilter)
 		setDraftToDateFilter(toDateFilter)
 		setFilterModalVisible(true)
+		filterSheetAnim.setValue(0)
+		filterBackdropAnim.setValue(0)
+		Animated.parallel([
+			Animated.timing(filterSheetAnim, { toValue: 1, duration: 260, useNativeDriver: true }),
+			Animated.timing(filterBackdropAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+		]).start()
 	}
 
 	const closeFilterModal = () => {
 		setActiveDatePicker(null)
-		setFilterModalVisible(false)
+		Animated.parallel([
+			Animated.timing(filterSheetAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+			Animated.timing(filterBackdropAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
+		]).start(({ finished }) => {
+			if (finished) setFilterModalVisible(false)
+		})
 	}
 
 	const applyFilters = () => {
@@ -551,39 +600,67 @@ export default function OrderListPage() {
 	)
 
 	const renderFilterModal = () => {
+		const translateY = filterSheetAnim.interpolate({ inputRange: [0, 1], outputRange: [420, 0] })
+		const backdropOpacity = filterBackdropAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })
+
 		return (
-			<AppBottomSheet visible={filterModalVisible} title="Filters" onClose={closeFilterModal}>
-				<View style={[styles.filterSheetContentWrapper, { maxWidth: Math.min(width, 520) }]}>
-					<ScrollView
-						style={styles.filterSheetScroll}
-						contentContainerStyle={styles.filterSheetContent}
-						showsVerticalScrollIndicator={false}
+			<Modal visible={filterModalVisible} transparent animationType="none" onRequestClose={closeFilterModal}>
+				<View style={styles.filterModalRoot}>
+					<Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
+						<BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
+						<View style={styles.filterDim} />
+						<Pressable style={StyleSheet.absoluteFill} onPress={closeFilterModal} />
+					</Animated.View>
+
+					<Animated.View
+						style={[
+							styles.filterSheet,
+							{
+								width: Math.min(width - 24, 520),
+								maxHeight: Math.min(height * 0.78, 620),
+								paddingBottom: Math.max(insets.bottom + 18, 26),
+								transform: [{ translateY }],
+							},
+						]}
 					>
-						<View style={styles.filterGroup}>
-							<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
-							{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
-								setDraftDateFilter(value)
-								if (value !== 'custom') setActiveDatePicker(null)
-							})}
-							{renderDateRangePicker()}
+						<View style={styles.filterSheetHandle} />
+						<View style={styles.filterSheetHeader}>
+							<AppTypography style={styles.filterSheetTitle}>Filters</AppTypography>
+							<TouchableOpacity style={styles.filterCloseButton} onPress={closeFilterModal}>
+								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
+							</TouchableOpacity>
 						</View>
 
-						<View style={styles.filterGroup}>
-							<AppTypography style={styles.filterGroupLabel}>Order Status</AppTypography>
-							{renderFilterChips(STATUS_OPTIONS, draftStatusFilter, setDraftStatusFilter)}
-						</View>
-					</ScrollView>
+						<ScrollView
+							style={styles.filterSheetScroll}
+							contentContainerStyle={styles.filterSheetContent}
+							showsVerticalScrollIndicator={false}
+						>
+							<View style={styles.filterGroup}>
+								<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
+								{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
+									setDraftDateFilter(value)
+									if (value !== 'custom') setActiveDatePicker(null)
+								})}
+								{renderDateRangePicker()}
+							</View>
+							<View style={styles.filterGroup}>
+								<AppTypography style={styles.filterGroupLabel}>Order Status</AppTypography>
+								{renderFilterChips(STATUS_OPTIONS, draftStatusFilter, setDraftStatusFilter)}
+							</View>
+						</ScrollView>
 
-					<View style={styles.filterSheetActions}>
-						<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
-							<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
-						</TouchableOpacity>
-						<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
-							<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
-						</TouchableOpacity>
-					</View>
+						<View style={styles.filterSheetActions}>
+							<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+								<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
+							</TouchableOpacity>
+							<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+								<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
+							</TouchableOpacity>
+						</View>
+					</Animated.View>
 				</View>
-			</AppBottomSheet>
+			</Modal>
 		)
 	}
 
@@ -882,43 +959,46 @@ const styles = StyleSheet.create({
 		flexShrink: 0,
 		padding: 0,
 	},
-	filterIconButtonActive: {
-		backgroundColor: '#e9f8f7',
-		borderColor: '#1f5f68',
+	filterIconButtonActive: { backgroundColor: '#e9f8f7', borderColor: '#1f5f68' },
+	// Filter modal
+	filterModalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
+	filterBackdrop: { ...StyleSheet.absoluteFillObject },
+	filterDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
+	filterSheet: {
+		backgroundColor: '#ffffff',
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
+		paddingTop: 8,
+		overflow: 'hidden',
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: -10 },
+		shadowOpacity: 0.14,
+		shadowRadius: 24,
+		elevation: 18,
 	},
-	filterSheetContentWrapper: {
-		width: '100%',
+	filterSheetHandle: {
+		width: 44,
+		height: 4,
+		borderRadius: 999,
+		backgroundColor: '#d7dee6',
 		alignSelf: 'center',
+		marginBottom: 10,
 	},
-	filterSheetScroll: {
-		flexGrow: 0,
-	},
-	filterSheetContent: {
-		paddingHorizontal: 18,
-		paddingTop: 4,
-		paddingBottom: 20,
-		gap: 22,
-	},
-	filterGroup: {
-		gap: 10,
-	},
-	filterGroupLabel: {
-		fontSize: 11,
-		lineHeight: 14,
-		fontWeight: '800',
-		color: '#64707d',
-		textTransform: 'uppercase',
-	},
-	filterChipScroller: {
-		marginHorizontal: -2,
-	},
-	filterChipRow: {
+	filterSheetHeader: {
 		flexDirection: 'row',
-		flexWrap: 'nowrap',
-		gap: 10,
-		paddingHorizontal: 2,
-		paddingVertical: 1,
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 18,
+		paddingBottom: 12,
 	},
+	filterSheetTitle: { fontSize: 18, lineHeight: 24, fontWeight: '700', color: '#111827' },
+	filterCloseButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+	filterSheetScroll: { flexGrow: 0 },
+	filterSheetContent: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 20, gap: 22 },
+	filterGroup: { gap: 10 },
+	filterGroupLabel: { fontSize: 11, lineHeight: 14, fontWeight: '800', color: '#64707d', textTransform: 'uppercase' },
+	filterChipScroller: { marginHorizontal: -2 },
+	filterChipRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 10, paddingHorizontal: 2, paddingVertical: 1 },
 	filterChip: {
 		minHeight: 38,
 		minWidth: 74,
@@ -986,4 +1066,27 @@ const styles = StyleSheet.create({
 		backgroundColor: 'transparent',
 	},
 	mobilePaginationWrap: { paddingVertical: 6 },
+	// Additional: rejection reason badge
+	reasonBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FFE8E8',
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 8,
+		marginBottom: 8,
+		alignSelf: 'flex-start',
+	},
+	reasonText: {
+		fontSize: 11,
+		color: '#D94B4B',
+		marginLeft: 4,
+	},
+	// Additional: address text
+	addressText: {
+		fontSize: 12,
+		color: '#667085',
+		marginTop: 8,
+		marginLeft: 2,
+	},
 })

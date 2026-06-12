@@ -9,13 +9,13 @@ import {
 	TextInput,
 	TouchableOpacity,
 	View,
+	useWindowDimensions,
 } from 'react-native'
 import PharmacySearchCard from './component/PharmacyCard'
 import PharmacyFilters, { PharmacyFilterState } from './component/PharmacyFilters'
 import { PharmacyItem } from './pharmacy'
 import { getPharmacies } from '../profile/pharmacy/pharmacyService'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import ArrowIcon from '../../assets/Settings/arrow.svg'
 import { useNavigation } from '@react-navigation/native'
 import { ROUTES } from '../../navigation/routes'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
@@ -25,6 +25,18 @@ const LIMIT = 12
 
 export default function PharmacySearchPage() {
 	const navigation = useNavigation()
+
+	const { width, height } = useWindowDimensions()
+
+	const isMobile = width < 600
+	const isLandscape = width > height
+	const numColumns = isMobile ? (isLandscape ? 3 : 1) : width >= 900 ? 4 : 3
+
+	const HORIZONTAL_PADDING = 12
+	const GAP = 12
+
+	const itemWidth = (width - HORIZONTAL_PADDING * 2 - GAP * (numColumns - 1)) / numColumns
+
 	const [searchQuery, setSearchQuery] = useState('')
 	const [page, setPage] = useState(1)
 	const [filters, setFilters] = useState<PharmacyFilterState>({
@@ -66,7 +78,6 @@ export default function PharmacySearchPage() {
 		fetchPharmacyList()
 	}, [fetchPharmacyList])
 
-	// Reset page on filter/search change
 	useEffect(() => {
 		setPage(1)
 	}, [searchQuery, filters])
@@ -210,26 +221,30 @@ export default function PharmacySearchPage() {
 				</View>
 			) : (
 				<FlatList
+					key={numColumns}
 					data={visiblePharmacies}
 					keyExtractor={(item) => item.id}
+					numColumns={numColumns}
+					columnWrapperStyle={numColumns > 1 ? { gap: GAP } : undefined}
 					renderItem={({ item }) => (
-						<PharmacySearchCard
-							pharmacy={item}
-							onPress={() => {
-								/* navigate to detail */
-							}}
-							onPlaceOrder={() => {
-								;(navigation as any).navigate(ROUTES.STACK.PLACE_PHARMACY_ORDER, {
-									pharmacyId: item.id,
-									pharmacyName: item.name,
-								})
-							}}
-						/>
+						<View style={[styles.cardWrapper, { width: numColumns === 1 ? '100%' : itemWidth }]}>
+							<PharmacySearchCard
+								pharmacy={item}
+								layout={isMobile && !isLandscape ? 'horizontal' : 'vertical'}
+								onPress={() => {}}
+								onPlaceOrder={() => {
+									;(navigation as any).navigate(ROUTES.STACK.PLACE_PHARMACY_ORDER, {
+										pharmacyId: item.id,
+										pharmacyName: item.name,
+									})
+								}}
+							/>
+						</View>
 					)}
 					ListHeaderComponent={renderHeader}
 					ListEmptyComponent={renderEmpty}
 					ListFooterComponent={renderFooter}
-					contentContainerStyle={styles.listContent}
+					contentContainerStyle={[styles.listContent, numColumns === 1 && { alignItems: 'stretch' }]}
 					showsVerticalScrollIndicator={false}
 				/>
 			)}
@@ -250,6 +265,9 @@ export default function PharmacySearchPage() {
 }
 
 const styles = StyleSheet.create({
+	cardWrapper: {
+		marginBottom: 12,
+	},
 	headerWrapper: {
 		backgroundColor: '#1f5f68',
 		paddingBottom: 20,
@@ -342,7 +360,11 @@ const styles = StyleSheet.create({
 		backgroundColor: '#eaf8f9',
 		borderColor: '#1f5f68',
 	},
-	listContent: { paddingHorizontal: 12, paddingBottom: 24 },
+	listContent: {
+		paddingHorizontal: 12,
+		paddingBottom: 24,
+		width: '100%',
+	},
 	resultCount: {
 		fontSize: 15,
 		fontWeight: '700',

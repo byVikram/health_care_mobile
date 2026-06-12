@@ -1,6 +1,6 @@
-// src/features/Pharmacy/components/PharmacySearchCard.tsx
 import React from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, ImageSourcePropType } from 'react-native'
+
 import { PharmacyItem } from '../pharmacy'
 
 import pharmacy2 from '../../../assets/Pharmacy/pharmacy2.png'
@@ -11,20 +11,23 @@ const pharmacyImages: ImageSourcePropType[] = [pharmacy2, pharmacy3, pharmacy4]
 
 const getPharmacyImage = (id: string): ImageSourcePropType => {
 	let hash = 0
+
 	for (let i = 0; i < id.length; i++) {
 		hash = (hash << 5) - hash + id.charCodeAt(i)
 		hash |= 0
 	}
+
 	return pharmacyImages[Math.abs(hash) % pharmacyImages.length]
 }
 
 interface Props {
 	pharmacy: PharmacyItem
+	layout?: 'horizontal' | 'vertical'
 	onPress?: () => void
 	onPlaceOrder?: () => void
 }
 
-export default function PharmacySearchCard({ pharmacy, onPress, onPlaceOrder }: Props) {
+export default function PharmacySearchCard({ pharmacy, layout = 'vertical', onPress, onPlaceOrder }: Props) {
 	const {
 		id,
 		name,
@@ -36,51 +39,51 @@ export default function PharmacySearchCard({ pharmacy, onPress, onPlaceOrder }: 
 		emergency_medicine_available,
 	} = pharmacy
 
-	return (
-		<TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-			{/* Left column: Image */}
-			<Image source={getPharmacyImage(id)} style={styles.image} resizeMode="cover" />
+	const isHorizontal = layout === 'horizontal'
 
-			{/* Right column: Information */}
-			<View style={styles.body}>
-				{/* Name */}
-				<Text style={styles.name} numberOfLines={1}>
+	return (
+		<TouchableOpacity
+			style={[styles.card, isHorizontal && styles.horizontalCard]}
+			activeOpacity={0.9}
+			onPress={onPress}
+		>
+			{/* IMAGE */}
+			<View style={[styles.imageContainer, isHorizontal && styles.horizontalImageContainer]}>
+				<Image source={getPharmacyImage(id)} style={styles.image} resizeMode="cover" />
+			</View>
+
+			{/* CONTENT */}
+			<View style={styles.content}>
+				<Text style={styles.name} numberOfLines={2}>
 					{name}
 				</Text>
 
-				{/* Address */}
-				<View style={styles.row}>
-					<Text style={styles.icon}>📍</Text>
-					<Text style={styles.subText} numberOfLines={1}>
-						{address}, {city}
-					</Text>
-				</View>
+				<Text style={styles.subText}>📍 {city}</Text>
 
-				{/* Hours */}
-				<View style={styles.row}>
-					<Text style={styles.icon}>🕐</Text>
-					<Text style={styles.subText}>
-						{is_24_x_7 ? 'Open 24×7' : `${operating_hours?.open ?? ''} – ${operating_hours?.close ?? ''}`}
-					</Text>
-				</View>
+				<Text style={styles.subText}>
+					🕐 {is_24_x_7 ? 'Open 24×7' : `${operating_hours?.open ?? ''} - ${operating_hours?.close ?? ''}`}
+				</Text>
 
-				{/* Chips */}
+				<Text style={styles.subText} numberOfLines={1}>
+					{address}
+				</Text>
+
 				<View style={styles.chips}>
 					{home_delivery_available && (
-						<View style={[styles.chip, styles.chipDelivery]}>
-							<Text style={styles.chipDeliveryText}>🚚 Home Delivery</Text>
+						<View style={[styles.chip, styles.deliveryChip]}>
+							<Text style={styles.deliveryText}>Home Delivery</Text>
 						</View>
 					)}
+
 					{emergency_medicine_available && (
-						<View style={[styles.chip, styles.chipEmergency]}>
-							<Text style={styles.chipEmergencyText}>🚨 Emergency Meds</Text>
+						<View style={[styles.chip, styles.emergencyChip]}>
+							<Text style={styles.emergencyText}>Emergency Meds</Text>
 						</View>
 					)}
 				</View>
 
-				{/* CTA Button */}
-				<TouchableOpacity style={styles.button} onPress={onPlaceOrder} activeOpacity={0.8}>
-					<Text style={styles.buttonText}>🛒 Place Order</Text>
+				<TouchableOpacity style={styles.button} onPress={onPlaceOrder}>
+					<Text style={styles.buttonText}>Place Order</Text>
 				</TouchableOpacity>
 			</View>
 		</TouchableOpacity>
@@ -89,84 +92,97 @@ export default function PharmacySearchCard({ pharmacy, onPress, onPlaceOrder }: 
 
 const styles = StyleSheet.create({
 	card: {
-		flexDirection: 'row', // Horizontal layout (two columns)
 		backgroundColor: '#fff',
 		borderRadius: 12,
+		overflow: 'hidden',
 		borderWidth: 1,
 		borderColor: '#EAECF0',
-		overflow: 'hidden',
-		marginBottom: 16,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.06,
-		shadowRadius: 6,
-		elevation: 2,
+		marginBottom: 12,
 	},
-	image: {
-		width: 120, // Fixed width for left column
-		height: 'auto', // Let height adjust based on content
-		alignSelf: 'stretch', // Stretch to fill card height
-		backgroundColor: '#E8F5F5',
-	},
-	body: {
-		flex: 1, // Take remaining space
-		padding: 12,
-		justifyContent: 'space-between',
-	},
-	name: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#101828',
-		marginBottom: 4,
-	},
-	row: {
+
+	horizontalCard: {
 		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 4,
-		gap: 4,
+		minHeight: 180,
 	},
-	icon: {
-		fontSize: 12,
+
+	imageContainer: {
+		height: 140,
+
+		backgroundColor: '#f0f4f8',
 	},
+
+	horizontalImageContainer: {
+		width: 120,
+		height: 180, // match image height
+	},
+
+	image: {
+		width: '100%',
+		height: '100%',
+	},
+
+	content: {
+		flex: 1,
+		padding: 10,
+		justifyContent: 'flex-start',
+	},
+
+	name: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#082b45',
+	},
+
 	subText: {
 		fontSize: 12,
-		color: '#667085',
-		flex: 1,
+		color: '#5b7282',
+		marginTop: 2,
 	},
+
+	/* CHIPS */
 	chips: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		gap: 6,
-		marginTop: 8,
-		marginBottom: 12,
+		marginTop: 6,
 	},
+
 	chip: {
 		paddingHorizontal: 8,
 		paddingVertical: 4,
-		borderRadius: 16,
+		borderRadius: 14,
 	},
-	chipDelivery: {
+
+	deliveryChip: {
 		backgroundColor: '#E8F5F5',
 	},
-	chipDeliveryText: {
-		fontSize: 10,
+
+	deliveryText: {
 		color: '#2B6F71',
+		fontSize: 10,
 		fontWeight: '600',
 	},
-	chipEmergency: {
+
+	emergencyChip: {
 		backgroundColor: '#FFEBEE',
 	},
-	chipEmergencyText: {
-		fontSize: 10,
+
+	emergencyText: {
 		color: '#C62828',
+		fontSize: 10,
 		fontWeight: '600',
 	},
+
+	/* BUTTON */
 	button: {
 		backgroundColor: '#2B6F71',
 		borderRadius: 8,
-		paddingVertical: 8,
+		paddingVertical: 10,
 		alignItems: 'center',
+		marginTop: 8,
+		marginBottom: 4,
 	},
+
 	buttonText: {
 		color: '#fff',
 		fontWeight: '700',
