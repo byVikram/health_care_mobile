@@ -7,7 +7,7 @@ import { DoctorSearchResponse } from '../../types/doctor-search'
 import { DoctorDetailResponse } from '../../types/doctor-detail'
 import { SpecialitiesResponse } from '../../types/speciality'
 import { DoctorProfileApiResponse, DoctorProfileApiData } from '../../types/doctor-profile-api'
-import { DoctorProfile } from '../../types/doctor-profile'
+import { DoctorProfile, DoctorDegree } from '../../types/doctor-profile'
 
 export interface TimeSlot {
 	id?: string | number
@@ -383,27 +383,28 @@ export interface DoctorPersonalUpdatePayload {
 
 export interface DoctorProfessionalUpdatePayload {
 	experience_years: number
-	degree: string
-	college: string
-	year_of_passing: string
-	qualification_proof_s3_key: string | null
+	degree?: string
+	college?: string
+	year_of_passing?: string
+	qualification_proof_s3_key?: string | null
 	registration_number: string
 	registration_proof_s3_key: string | null
 	about: string
+	current_designation?: string
+	areas_of_expertise?: string[]
+	treatments?: string[]
 }
 
-export interface DoctorEducationalQualificationPayload {
-	qualification_type: string
-	qualification_name: string
-	institute_university: string
-	institute_university_value: string
-	custom_institute_university: string | null
-	year_of_completion: string
-	certificate_s3_key: string | null
+export interface DoctorDegreeUpdatePayload {
+	degree: string
+	specialization: string | null
+	college: string
+	year_of_passing: string
+	qualification_proof_s3_key: string | null
 }
 
 export interface DoctorEducationalQualificationsUpdatePayload {
-	educational_qualifications: DoctorEducationalQualificationPayload[]
+	degrees: DoctorDegreeUpdatePayload[]
 }
 
 export interface DoctorAvailabilityUpdatePayload {
@@ -561,6 +562,16 @@ export const mapDoctorProfileApi = (data: DoctorProfileApiData): DoctorProfile =
 			college: prof?.college ?? '',
 			yearOfPassing: prof?.year_of_passing ?? '',
 			qualificationProof: prof?.qualification_proof_s3_key ?? '',
+			degrees: Array.isArray(prof?.degrees)
+				? prof.degrees.map((d) => ({
+						id: d.id,
+						degree: d.degree,
+						specialization: d.specialization || '',
+						college: d.college,
+						yearOfPassing: d.year_of_passing,
+						qualificationProof: d.qualification_proof_s3_key || '',
+					}))
+				: [],
 			registrationNumber: prof?.registration_number ?? '',
 			registrationProof: prof?.registration_proof_s3_key ?? '',
 			about: prof?.about ?? '',

@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react'
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
+import React, { useMemo, useState, useEffect } from 'react'
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { AppButton, AppInput, AppSelect, AppSelectOption, AppStickyFooter, AppTypography } from '../../../../components/common'
+import { AppBottomSheet, AppButton, AppInput, AppSelect, AppSelectOption, AppStickyFooter, AppTypography } from '../../../../components/common'
 import {
-	type DoctorEducationalQualificationPayload,
+	type DoctorEducationalQualificationsUpdatePayload,
 	updateDoctorEducationalQualifications,
+	getDoctorProfile,
+	mapDoctorProfileApi,
 } from '../../../doctor/doctorService'
 
 const QUALIFICATION_TYPE_OPTIONS: AppSelectOption[] = [
@@ -45,6 +47,7 @@ const YEAR_OPTIONS: AppSelectOption[] = Array.from({ length: 55 }, (_, index) =>
 type QualificationFormData = {
 	type: string
 	name: string
+	specialization?: string
 	institute: string
 	customInstitute: string
 	yearOfCompletion: string
@@ -82,6 +85,7 @@ type UploadBoxProps = {
 const EMPTY_FORM: QualificationFormData = {
 	type: '',
 	name: '',
+	specialization: '',
 	institute: '',
 	customInstitute: '',
 	yearOfCompletion: '',
@@ -96,16 +100,7 @@ const getInstituteLabel = (qualification: QualificationFormData) =>
 		? qualification.customInstitute
 		: getOptionLabel(COLLEGE_OPTIONS, qualification.institute)
 
-const mapQualificationToPayload = (qualification: Qualification): DoctorEducationalQualificationPayload => ({
-	qualification_type: qualification.type.trim(),
-	qualification_name: qualification.name.trim(),
-	institute_university: getInstituteLabel(qualification).trim(),
-	institute_university_value: qualification.institute.trim(),
-	custom_institute_university:
-		qualification.institute === 'other' ? qualification.customInstitute.trim() || null : null,
-	year_of_completion: qualification.yearOfCompletion.trim(),
-	certificate_s3_key: qualification.certificate.trim() || null,
-})
+
 
 function FieldLabel({ label, required = false }: { label: string; required?: boolean }) {
 	return (
@@ -208,7 +203,7 @@ function QualificationCard({
 
 			<View style={styles.cardContent}>
 				<AppTypography variant="body" style={styles.cardTitle} numberOfLines={1}>
-					{qualificationName}
+					{qualificationName}{qualification.specialization ? ` (${qualification.specialization})` : ''}
 				</AppTypography>
 				<AppTypography variant="caption" style={styles.cardSubtitle} numberOfLines={1}>
 					{instituteName || qualification.type}
@@ -240,6 +235,57 @@ export default function EducationalDetailsTab() {
 	const [qualifications, setQualifications] = useState<Qualification[]>([])
 	const [editingId, setEditingId] = useState<string | null>(null)
 	const [isSaving, setIsSaving] = useState(false)
+	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
+	const [sheetVisible, setSheetVisible] = useState(false)
+
+	useEffect(() => {
+		const loadDoctorProfile = async () => {
+			try {
+				setIsLoadingProfile(true)
+				const response = await getDoctorProfile()
+
+				if (!response?.success || !response.data) return
+
+				const profile = mapDoctorProfileApi(response.data)
+				const degrees = profile.professional.degrees || []
+
+				const mapped = degrees.map((d, index) => {
+					const degValue = d.degree.toLowerCase()
+					const isKnownDegree = DEGREE_OPTIONS.some((opt) => opt.value === degValue)
+
+					let type = 'Degree'
+					if (!isKnownDegree) {
+						if (degValue.includes('fellowship')) type = 'Fellowship'
+						else if (degValue.includes('diploma')) type = 'Diploma'
+						else if (degValue.includes('certification')) type = 'Certification'
+						else type = 'Other'
+					}
+
+					const isKnownCollege = COLLEGE_OPTIONS.some((opt) => opt.value === d.college)
+					const institute = isKnownCollege ? d.college : 'other'
+					const customInstitute = isKnownCollege ? '' : d.college
+
+					return {
+						id: d.id ? String(d.id) : `deg-${index}`,
+						type,
+						name: isKnownDegree ? degValue : d.degree,
+						specialization: d.specialization || '',
+						institute,
+						customInstitute,
+						yearOfCompletion: d.yearOfPassing,
+						certificate: d.qualificationProof || '',
+					}
+				})
+				setQualifications(mapped)
+			} catch (error) {
+				console.log('[EducationalDetailsTab] failed to load profile:', error)
+			} finally {
+				setIsLoadingProfile(false)
+			}
+		}
+
+		loadDoctorProfile()
+	}, [])
 
 	const contentWidth = useMemo(() => {
 		if (width >= 1280) return 760
@@ -247,6 +293,14 @@ export default function EducationalDetailsTab() {
 		if (isTablet) return 600
 		return 640
 	}, [isTablet, width])
+
+	if (isLoadingProfile) {
+		return (
+			<View style={styles.loadingContainer}>
+				<ActivityIndicator size="small" color="#0c7c7c" />
+			</View>
+		)
+	}
 
 	const updateFormData = <K extends keyof QualificationFormData>(key: K, value: QualificationFormData[K]) => {
 		setFormData((prev) => ({
@@ -258,6 +312,16 @@ export default function EducationalDetailsTab() {
 	const resetForm = () => {
 		setFormData(EMPTY_FORM)
 		setEditingId(null)
+	}
+
+	const handleAddPress = () => {
+		resetForm()
+		setSheetVisible(true)
+	}
+
+	const handleCloseSheet = () => {
+		resetForm()
+		setSheetVisible(false)
 	}
 
 	const handleUpload = async () => {
@@ -317,23 +381,29 @@ export default function EducationalDetailsTab() {
 		}
 
 		resetForm()
+		setSheetVisible(false)
 	}
 
 	const handleEditQualification = (qualification: Qualification) => {
 		setFormData({
 			type: qualification.type,
 			name: qualification.name,
+			specialization: qualification.specialization || '',
 			institute: qualification.institute,
 			customInstitute: qualification.customInstitute,
 			yearOfCompletion: qualification.yearOfCompletion,
 			certificate: qualification.certificate,
 		})
 		setEditingId(qualification.id)
+		setSheetVisible(true)
 	}
 
 	const handleDeleteQualification = (id: string) => {
 		setQualifications((prev) => prev.filter((qualification) => qualification.id !== id))
-		if (editingId === id) resetForm()
+		if (editingId === id) {
+			resetForm()
+			setSheetVisible(false)
+		}
 	}
 
 	const handleSave = async () => {
@@ -357,15 +427,27 @@ export default function EducationalDetailsTab() {
 			return
 		}
 
-		const payload = {
-			educational_qualifications: qualificationsForSubmission.map(mapQualificationToPayload),
+		const payload: DoctorEducationalQualificationsUpdatePayload = {
+			degrees: qualificationsForSubmission.map((q) => {
+				const collegeValue = q.institute === 'other' ? q.customInstitute : getOptionLabel(COLLEGE_OPTIONS, q.institute)
+				return {
+					degree: q.name,
+					specialization: q.specialization?.trim() || null,
+					college: collegeValue.trim(),
+					year_of_passing: q.yearOfCompletion.trim(),
+					qualification_proof_s3_key: q.certificate.trim() || null,
+				}
+			}),
 		}
 
 		try {
 			setIsSaving(true)
 			await updateDoctorEducationalQualifications(payload)
 			setQualifications(qualificationsForSubmission)
-			if (editingId) resetForm()
+			if (editingId) {
+				resetForm()
+				setSheetVisible(false)
+			}
 			Alert.alert('Success', 'Educational qualifications saved successfully.')
 		} catch (error) {
 			console.log('[EducationalDetailsTab] save error:', error)
@@ -394,7 +476,7 @@ export default function EducationalDetailsTab() {
 				showsVerticalScrollIndicator={false}
 			>
 				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-					<View style={styles.headerRow}>
+					<View style={[styles.headerRow, { marginBottom: rowSpacing }]}>
 						<View>
 							<AppTypography variant="h4" style={styles.headerTitle}>
 								Educational Qualifications
@@ -405,101 +487,18 @@ export default function EducationalDetailsTab() {
 						</View>
 					</View>
 
-					<View style={[styles.formPanel, { marginBottom: rowSpacing }]}>
-						<View style={styles.formGrid}>
-							<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
-								<SelectDropdown
-									label="Qualification Type"
-									value={formData.type}
-									placeholder="Select Type"
-									options={QUALIFICATION_TYPE_OPTIONS}
-									onSelect={(value) => updateFormData('type', value)}
-									required
-								/>
-							</View>
-
-							<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
-								<SelectDropdown
-									label="Qualification Name"
-									value={formData.name}
-									placeholder="Select Qualification"
-									options={DEGREE_OPTIONS}
-									onSelect={(value) => updateFormData('name', value)}
-									required
-								/>
-							</View>
-
-							<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
-								<SelectDropdown
-									label="Institute/University"
-									value={formData.institute}
-									placeholder="Select Institute/University"
-									options={COLLEGE_OPTIONS}
-									onSelect={(value) =>
-										setFormData((prev) => ({
-											...prev,
-											institute: value,
-											customInstitute: value === 'other' ? prev.customInstitute : '',
-										}))
-									}
-									required
-								/>
-							</View>
-
-							{formData.institute === 'other' ? (
-								<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
-									<InputField
-										label="Custom Institute/University"
-										value={formData.customInstitute}
-										onChangeText={(value) => updateFormData('customInstitute', value)}
-										placeholder="Enter college or university name"
-										required
-									/>
-								</View>
-							) : null}
-
-							<View style={[styles.formCell, useTwoColumns && styles.formCellHalf]}>
-								<SelectDropdown
-									label="Year of Completion"
-									value={formData.yearOfCompletion}
-									placeholder="Select Year"
-									options={YEAR_OPTIONS}
-									onSelect={(value) => updateFormData('yearOfCompletion', value)}
-									required
-								/>
-							</View>
-
-							<View style={styles.formCell}>
-								<UploadBox fileName={formData.certificate} onUpload={handleUpload} />
-							</View>
-						</View>
-
-						<View style={styles.formActions}>
-							<AppButton
-								variant={editingId ? 'secondary' : 'primary'}
-								formAction
-								icon={editingId ? 'content-save-edit-outline' : 'plus'}
-								style={styles.addButton}
-								onPress={handleAddOrUpdateQualification}
-							>
-								{editingId ? 'Update Qualification' : 'Add Qualification'}
-							</AppButton>
-
-							{editingId ? (
-								<AppButton variant="text" formAction style={styles.cancelButton} onPress={resetForm}>
-									Cancel
-								</AppButton>
-							) : null}
-						</View>
-					</View>
-
 					<View style={styles.listHeader}>
 						<AppTypography variant="h4" style={styles.listTitle}>
 							Your Qualifications ({qualifications.length})
 						</AppTypography>
-						<AppTypography variant="caption" style={styles.reorderHint}>
-							Drag to reorder
-						</AppTypography>
+						{qualifications.length > 0 ? (
+							<TouchableOpacity style={styles.headerAddButton} onPress={handleAddPress} activeOpacity={0.8}>
+								<MaterialCommunityIcons name="plus" size={16} color="#0c7c7c" />
+								<AppTypography variant="caption" style={styles.headerAddButtonText}>
+									Add New
+								</AppTypography>
+							</TouchableOpacity>
+						) : null}
 					</View>
 
 					<View style={styles.cardList}>
@@ -514,13 +513,21 @@ export default function EducationalDetailsTab() {
 							))
 						) : (
 							<View style={styles.emptyCard}>
-								<MaterialCommunityIcons name="school-outline" size={24} color="#0c7c7c" />
+								<MaterialCommunityIcons name="school-outline" size={32} color="#0c7c7c" />
 								<AppTypography variant="body" style={styles.emptyTitle}>
 									No qualifications added yet
 								</AppTypography>
 								<AppTypography variant="caption" style={styles.emptyText}>
-									Fill the form above and add your first qualification.
+									Add your first degree, fellowship, or certificate to complete your profile.
 								</AppTypography>
+								<AppButton
+									variant="primary"
+									icon="plus"
+									style={styles.emptyAddButton}
+									onPress={handleAddPress}
+								>
+									Add Qualification
+								</AppButton>
 							</View>
 						)}
 					</View>
@@ -551,11 +558,109 @@ export default function EducationalDetailsTab() {
 			>
 				Save & Continue
 			</AppStickyFooter>
+
+			<AppBottomSheet
+				visible={sheetVisible}
+				title={editingId ? 'Edit Qualification' : 'Add Qualification'}
+				onClose={handleCloseSheet}
+			>
+				<KeyboardAvoidingView
+					behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+					keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+				>
+					<View style={styles.sheetBody}>
+						<View style={styles.sheetFormGrid}>
+							<SelectDropdown
+								label="Qualification Type"
+								value={formData.type}
+								placeholder="Select Type"
+								options={QUALIFICATION_TYPE_OPTIONS}
+								onSelect={(value) => updateFormData('type', value)}
+								required
+							/>
+
+							<SelectDropdown
+								label="Qualification Name"
+								value={formData.name}
+								placeholder="Select Qualification"
+								options={DEGREE_OPTIONS}
+								onSelect={(value) => updateFormData('name', value)}
+								required
+							/>
+
+							<InputField
+								label="Specialization / Field (Optional)"
+								value={formData.specialization || ''}
+								onChangeText={(value) => updateFormData('specialization', value)}
+								placeholder="e.g. Cardiology, Pediatrics"
+							/>
+
+							<SelectDropdown
+								label="Institute/University"
+								value={formData.institute}
+								placeholder="Select Institute/University"
+								options={COLLEGE_OPTIONS}
+								onSelect={(value) =>
+									setFormData((prev) => ({
+										...prev,
+										institute: value,
+										customInstitute: value === 'other' ? prev.customInstitute : '',
+									}))
+								}
+								required
+							/>
+
+							{formData.institute === 'other' ? (
+								<InputField
+									label="Custom Institute/University"
+									value={formData.customInstitute}
+									onChangeText={(value) => updateFormData('customInstitute', value)}
+									placeholder="Enter college or university name"
+									required
+								/>
+							) : null}
+
+							<SelectDropdown
+								label="Year of Completion"
+								value={formData.yearOfCompletion}
+								placeholder="Select Year"
+								options={YEAR_OPTIONS}
+								onSelect={(value) => updateFormData('yearOfCompletion', value)}
+								required
+							/>
+
+							<UploadBox fileName={formData.certificate} onUpload={handleUpload} />
+						</View>
+
+						<View style={styles.sheetActions}>
+							<AppButton
+								variant="primary"
+								formAction
+								icon={editingId ? 'content-save-edit-outline' : 'plus'}
+								style={styles.sheetSubmitButton}
+								onPress={handleAddOrUpdateQualification}
+							>
+								{editingId ? 'Update' : 'Add'}
+							</AppButton>
+
+							<AppButton variant="text" formAction style={styles.sheetCancelButton} onPress={handleCloseSheet}>
+								Cancel
+							</AppButton>
+						</View>
+					</View>
+				</KeyboardAvoidingView>
+			</AppBottomSheet>
 		</View>
 	)
 }
 
 const styles = StyleSheet.create({
+	loadingContainer: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#ffffff',
+	},
 	container: {
 		flex: 1,
 		backgroundColor: '#ffffff',
@@ -589,28 +694,6 @@ const styles = StyleSheet.create({
 		color: '#6e7882',
 		fontSize: 12,
 		lineHeight: 18,
-	},
-	formPanel: {
-		borderWidth: 1,
-		borderTopWidth: 0,
-		borderColor: '#dfe7f5',
-		borderBottomLeftRadius: 8,
-		borderBottomRightRadius: 8,
-		padding: 14,
-		backgroundColor: '#ffffff',
-	},
-	formGrid: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		marginHorizontal: -6,
-		rowGap: 14,
-	},
-	formCell: {
-		width: '100%',
-		paddingHorizontal: 6,
-	},
-	formCellHalf: {
-		width: '50%',
 	},
 	fieldGroup: {
 		width: '100%',
@@ -661,26 +744,33 @@ const styles = StyleSheet.create({
 		fontSize: 11,
 		lineHeight: 16,
 	},
-	formActions: {
+	sheetBody: {
+		paddingHorizontal: 20,
+		paddingTop: 8,
+		paddingBottom: 80,
+	},
+	sheetFormGrid: {
+		gap: 16,
+	},
+	sheetActions: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		flexWrap: 'wrap',
-		marginTop: 16,
-		gap: 10,
+		marginTop: 24,
+		gap: 12,
 	},
-	addButton: {
-		flexGrow: 1,
+	sheetSubmitButton: {
+		flex: 1,
 		marginTop: 0,
-		minWidth: 190,
 	},
-	cancelButton: {
+	sheetCancelButton: {
+		flex: 1,
 		marginTop: 0,
-		minWidth: 90,
 	},
 	listHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
+		marginTop: 20,
 		marginBottom: 10,
 	},
 	listTitle: {
@@ -689,10 +779,23 @@ const styles = StyleSheet.create({
 		lineHeight: 22,
 		fontWeight: '700',
 	},
-	reorderHint: {
-		color: '#7a858d',
-		fontSize: 11,
-		lineHeight: 16,
+	headerAddButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 4,
+		paddingHorizontal: 8,
+		borderRadius: 6,
+		backgroundColor: '#e6f5f6',
+		gap: 4,
+	},
+	headerAddButtonText: {
+		color: '#0c7c7c',
+		fontWeight: '700',
+		fontSize: 12,
+	},
+	emptyAddButton: {
+		marginTop: 14,
+		minWidth: 160,
 	},
 	cardList: {
 		gap: 10,
