@@ -21,9 +21,9 @@ import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
-
-import { AppSelect, AppSelectOption, AppTypography } from '../../components/common'
+import { AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
 import PaginationBar from '../../components/common/AppPagination'
+
 import Card from '../../components/common/CommonCard'
 import { getPharmacyOrders } from '../profile/pharmacy/pharmacyService'
 import { useAuth } from '../../context/AuthContext'
@@ -103,6 +103,28 @@ const STATUS_OPTIONS: AppSelectOption[] = [
 	{ label: 'Rejected', value: 'rejected' },
 ]
 
+const OrderCardSkeleton = () => (
+	<View style={styles.orderCard}>
+		<View style={styles.cardMainContent}>
+			<AppSkeleton width={160} height={18} borderRadius={6} style={{ marginBottom: 14 }} />
+
+			<AppSkeleton width={120} height={14} borderRadius={6} style={{ marginBottom: 10 }} />
+
+			<AppSkeleton width={'100%'} height={40} borderRadius={8} style={{ marginBottom: 12 }} />
+
+			<View
+				style={{
+					flexDirection: 'row',
+					justifyContent: 'space-between',
+				}}
+			>
+				<AppSkeleton width={90} height={24} borderRadius={12} />
+
+				<AppSkeleton width={80} height={18} borderRadius={6} />
+			</View>
+		</View>
+	</View>
+)
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
@@ -346,7 +368,7 @@ export default function OrderListPage() {
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
 	const { width, height } = useWindowDimensions()
-	const useInlineFilters = width >= 768
+	const isTablet = width >= 768
 
 	// ── Role — exactly the same as OrderDetailsScreen ─────────────────
 	const { role } = useAuth()
@@ -667,13 +689,7 @@ export default function OrderListPage() {
 	// ── Search box & filter controls ───────────────────────────────────
 
 	const searchInput = (
-		<View
-			style={[
-				styles.searchBox,
-				!useInlineFilters && styles.searchBoxMobile,
-				useInlineFilters && styles.searchBoxWide,
-			]}
-		>
+		<View style={[styles.searchBox, !isTablet && styles.searchBoxMobile, isTablet && styles.searchBoxWide]}>
 			<MaterialCommunityIcons name="magnify" size={21} color="#9aa0a6" />
 			<TextInput
 				value={searchQuery}
@@ -748,9 +764,9 @@ export default function OrderListPage() {
 
 	return (
 		<View style={styles.safeArea}>
-			<View style={styles.content}>
+			<View style={[styles.content, isTablet && styles.contentTablet]}>
 				<View style={styles.filtersSection}>
-					{useInlineFilters ? (
+					{isTablet ? (
 						<View style={styles.filterRowWide}>
 							{dateSelect}
 							{statusSelect}
@@ -765,9 +781,11 @@ export default function OrderListPage() {
 				</View>
 
 				{loading && !refreshing ? (
-					<View style={styles.centeredFull}>
-						<ActivityIndicator size="large" color="#1f5f68" />
-					</View>
+					<ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+						{[1, 2, 3, 4, 5].map((item) => (
+							<OrderCardSkeleton key={item} />
+						))}
+					</ScrollView>
 				) : (
 					<View style={{ flex: 1 }}>
 						<FlatList
@@ -791,7 +809,7 @@ export default function OrderListPage() {
 							<View
 								style={[
 									styles.paginationWrap,
-									!useInlineFilters && styles.mobilePaginationWrap,
+									!isTablet && styles.mobilePaginationWrap,
 									{ paddingBottom: Math.max(insets.bottom + 8, 16) },
 								]}
 							>
@@ -811,7 +829,7 @@ export default function OrderListPage() {
 					</View>
 				)}
 			</View>
-			{!useInlineFilters && renderFilterModal()}
+			{!isTablet && renderFilterModal()}
 		</View>
 	)
 }
@@ -823,6 +841,7 @@ export default function OrderListPage() {
 const styles = StyleSheet.create({
 	safeArea: { flex: 1, backgroundColor: '#f4f4f4' },
 	content: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+	contentTablet: { paddingHorizontal: 24, paddingTop: 20 },
 	centeredFull: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 	listContent: { paddingBottom: 30 },
 	groupTitle: {

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
-
+import { useWindowDimensions } from 'react-native'
 import PendingIcon from '../../../assets/Pharmacy/Pendingorders.svg'
 import OnTheWayIcon from '../../../assets/Pharmacy/Ontheway.svg'
 import DeliveredIcon from '../../../assets/Pharmacy/Deliveredorders.svg'
@@ -11,6 +11,8 @@ import CancelledIcon from '../../../assets/Pharmacy/Cancelledorders.svg'
 import DocIcon from '../../../assets/Pharmacy/docxs.svg'
 
 function PharmacyOrderDashboardCard() {
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
 	const navigation = useNavigation<any>()
 
 	const handleNavigate = (status: string) => {
@@ -30,8 +32,12 @@ function PharmacyOrderDashboardCard() {
 					</View>
 
 					<View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-						<TouchableOpacity onPress={() => handleNavigate('all')}>
-							<Text style={styles.mainText}>Manage the orders shared by doctors/patients</Text>
+						<TouchableOpacity style={{ flex: 1 }} onPress={() => handleNavigate('all')}>
+							<Text style={styles.mainText}>
+								{isTablet
+									? 'Manage the orders shared by doctors/patients'
+									: 'Manage the orders\nshared by doctors/patients'}
+							</Text>
 						</TouchableOpacity>
 					</View>
 				</View>
