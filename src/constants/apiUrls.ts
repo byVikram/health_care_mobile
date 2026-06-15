@@ -92,7 +92,7 @@ export const API_ENDPOINTS = {
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,
 		DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
-        ME_DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
+		ME_DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
 	},
 	PHARMACY_ORDERS: {
 		CREATE: `${BASE_URL}/api/pharmacy-orders`,
@@ -103,9 +103,19 @@ export const API_ENDPOINTS = {
 		UPDATE_MEDICINES: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/medicines`,
 		SEND_REMINDER: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/remind`,
 	},
+	RADIOLOGY_PROFILE: {
+		DETAILS: `${BASE_URL}/api/radiology/profile`,
+		UPDATE: `${BASE_URL}/api/radiology/profile`,
+		SCAN_TYPES: `${BASE_URL}/api/radiology/scan-types`,
+		SCANS: `${BASE_URL}/api/radiology/scans`,
+		BOOKINGS: `${BASE_URL}/api/radiology/bookings`,
+		BOOKING_DETAIL: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}`,
+		SUBMIT_QUOTE: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/quote`,
+		VERIFY_PRESCRIPTION: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/verify`,
+		UPLOAD_REPORT: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/report`,
+	},
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {
 		LIST: `${BASE_URL}/api/locations`,
 	},
 }
-
