@@ -14,6 +14,15 @@ export interface DoctorProfilePersonal {
 	languages: string[]
 }
 
+export interface DoctorDegree {
+	id?: number
+	degree: string
+	specialization?: string
+	college: string
+	yearOfPassing: string
+	qualificationProof?: string
+}
+
 export interface DoctorProfileProfessional {
 	specialization_id: string
 	specialization_label: string
@@ -21,9 +30,13 @@ export interface DoctorProfileProfessional {
 	college: string
 	yearOfPassing: string
 	qualificationProof: string
+	degrees?: DoctorDegree[]
 	registrationNumber: string
 	registrationProof: string
 	about: string
+	currentDesignation?: string
+	areasOfExpertise?: string[]
+	treatments?: string[]
 }
 
 export interface DoctorHospital {

@@ -1,4 +1,4 @@
-﻿// src/types/doctor-profile-api.ts
+// src/types/doctor-profile-api.ts
 // Matches the /api/doctors/details API response shape
 
 export interface DoctorProfileApiSpeciality {
@@ -51,6 +51,15 @@ export interface DoctorProfileApiAchievement {
 	isPublic?: boolean | null
 }
 
+export interface DoctorDegreeApi {
+	id?: number
+	degree: string
+	specialization?: string | null
+	college: string
+	year_of_passing: string
+	qualification_proof_s3_key?: string | null
+}
+
 export interface DoctorProfileApiData {
 	personal_details: {
 		name: string
@@ -69,6 +78,7 @@ export interface DoctorProfileApiData {
 		college: string
 		year_of_passing: string
 		qualification_proof_s3_key: string | null
+		degrees?: DoctorDegreeApi[]
 		registration_number: string
 		registration_proof_s3_key: string | null
 		about: string
