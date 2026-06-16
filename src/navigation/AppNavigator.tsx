@@ -16,7 +16,6 @@ import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
 import ConsultationPage from '../features/consultation/ConsultationPage'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
-
 import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/setting/SettingPage'
 import ScreenCaptureTest from '../features/doctor/search/components/ScreenCaptureTest'
@@ -26,11 +25,14 @@ import ConsentForm from '../features/doctor/components/ConsentForm'
 import SearchPage from '../features/doctor/search/SearchPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 import AppointmentList from '../features/appointment/AppointmentList'
-
 import PharmacySearchPage from '../features/pharmacy/Pharmacysearchpage'
 import OrderListPage from '../features/pharmacy/OrderListPage'
 import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
 import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
+
+import PatientHealthQuestionsList from '../features/dashboard/components/PatientHealthQuestionsList'
+import PatientHealthQuestionDetail from '../features/dashboard/components/PatientHealthQuestionDetail'
+
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -47,92 +49,67 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.SEARCH}
 				component={SearchPage}
-				options={{
-					headerShown: true,
-					title: 'Find Doctors',
-				}}
+				options={{ headerShown: true, title: 'Find Doctors' }}
+			/>
+
+			<AppStack.Screen
+				name={ROUTES.STACK.PATIENT_QUESTIONS_LIST as keyof AppStackParamList}
+				component={PatientHealthQuestionsList}
+				options={{ headerShown: true, title: 'Patient Questions' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.PATIENT_QUESTION_DETAIL as keyof AppStackParamList}
+				component={PatientHealthQuestionDetail}
+				options={{ headerShown: true, title: 'Question Detail' }}
 			/>
 
 			<AppStack.Screen
 				name={ROUTES.STACK.PHARMACY_SEARCH_PAGE}
 				component={PharmacySearchPage}
-				options={{
-					headerShown: true,
-					title: 'Pharmacies',
-				}}
+				options={{ headerShown: true, title: 'Pharmacies' }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.ORDER_LIST}
 				component={OrderListPage}
-				options={{
-					headerShown: true,
-					title: 'Medicine Orders',
-				}}
+				options={{ headerShown: true, title: 'Medicine Orders' }}
 			/>
-
 			<AppStack.Screen
 				name={ROUTES.STACK.ORDER_DETAILS}
 				component={OrderDetailsScreen}
-				options={{
-					headerShown: true,
-					title: 'Order Details',
-				}}
+				options={{ headerShown: true, title: 'Order Details' }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.PLACE_PHARMACY_ORDER}
 				component={PlacePharmacyOrderPage}
-				options={{
-					headerShown: true,
-					title: 'Order Medicines',
-				}}
+				options={{ headerShown: true, title: 'Order Medicines' }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.DOCTOR_SEARCH}
 				component={DoctorSearchPage}
-				options={{
-					headerShown: true,
-					title: 'Search Doctors',
-				}}
+				options={{ headerShown: true, title: 'Search Doctors' }}
 			/>
-
 			<AppStack.Screen name={ROUTES.STACK.DOCTOR_DETAIL} component={DoctorDetailPage} />
-
 			<AppStack.Screen name={ROUTES.STACK.FAVOURITE_DOCTOR} component={MyDoctorPage} />
-
 			<AppStack.Screen name={ROUTES.STACK.NOTIFICATION} component={NotificationPage} />
-
 			<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
-
 			<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
-
-			<AppStack.Screen
-				name={ROUTES.STACK.SCREEN_CAPTURE_TEST as keyof AppStackParamList}
-				component={ScreenCaptureTest}
-			/>
-
+			<AppStack.Screen name={ROUTES.STACK.SCREEN_CAPTURE_TEST} component={ScreenCaptureTest} />
 			<AppStack.Screen
 				name={ROUTES.STACK.DOCTOR_WELCOME}
 				component={WelcomeDoctorPage}
 				options={{ animation: 'none' }}
 			/>
-
 			<AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
-
 			<AppStack.Screen
 				name={ROUTES.STACK.APPOINTMENTS}
 				component={AppointmentList}
-				options={{
-					headerShown: true,
-					title: 'Appointments',
-				}}
+				options={{ headerShown: true, title: 'Appointments' }}
 			/>
-
 			<AppStack.Screen
 				name={ROUTES.STACK.CONSENT_FORM}
 				component={ConsentForm}
 				options={{ presentation: 'transparentModal' }}
 			/>
-
 			<AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
 		</AppStack.Navigator>
 	)

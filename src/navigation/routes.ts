@@ -38,5 +38,8 @@ export const ROUTES = {
 
 		ORDER_DETAILS: 'OrderDetails',
 		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
+
+		PATIENT_QUESTIONS_LIST: 'PatientQuestionsList',
+		PATIENT_QUESTION_DETAIL: 'PatientQuestionDetail',
 	},
 } as const
