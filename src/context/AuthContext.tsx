@@ -27,23 +27,17 @@ export interface AuthState {
 	setSelectedHospitalId: (id: string | null) => void
 
 	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string) => Promise<void>
-	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string) => Promise<void>
+	
 
 	updateUser: (updates: Partial<AuthUser>) => Promise<void>
-	updateUser: (updates: Partial<AuthUser>) => Promise<void>
+	
 
 	clearAuth: () => Promise<void>
-	clearAuth: () => Promise<void>
+	
 }
 
 const AuthContext = createContext<AuthState>({} as AuthState)
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-	const [role, setRole] = useState<UserRole | null>(null)
-	const [user, setUser] = useState<AuthUser | null>(null)
-	const [accessToken, setAccessToken] = useState<string | null>(null)
-	const [refreshToken, setRefreshToken] = useState<string | null>(null)
-	const [isLoading, setIsLoading] = useState(true)
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	const [role, setRole] = useState<UserRole | null>(null)
 	const [user, setUser] = useState<AuthUser | null>(null)
@@ -76,11 +70,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			const role = await AsyncStorage.getItem('role')
 			const user = await AsyncStorage.getItem('user')
 			const token = await AsyncStorage.getItem('access_token')
-	useEffect(() => {
-		const load = async () => {
-			const role = await AsyncStorage.getItem('role')
-			const user = await AsyncStorage.getItem('user')
-			const token = await AsyncStorage.getItem('access_token')
 
 			setRole(role as UserRole)
 			setUser(user ? JSON.parse(user) : null)
@@ -108,8 +97,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	}
 
 	const updateUser = async (updates: Partial<AuthUser>) => {
-		const nextUser = {
-			...(user ?? { name: '' }),
+		const base: AuthUser = (user ?? { name: '' }) as AuthUser
+		const nextUser: AuthUser = {
+			...base,
 			...updates,
 		}
 
