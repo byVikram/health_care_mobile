@@ -11,7 +11,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppInput, AppSelect, AppStickyFooter, AppToggle, AppTypography } from '../../../../components/common'
+import { AppInput, AppSelect, AppStickyFooter, AppToggle, AppTypography, StatusModal } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -609,6 +609,13 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const [isLoading, setIsLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [isSavingAddress, setIsSavingAddress] = useState(false)
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		status: 'success' | 'error'
+		title: string
+		description: string
+		submitText?: string
+	} | null>(null)
 	const [selectedWorkingDay, setSelectedWorkingDay] = useState<WorkingDayKey>('monday')
 	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentType>('clinic')
 	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState(createWeeklyWorkingHours)
@@ -892,7 +899,13 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						editingId,
 						buildHospitalUpdatePayload(updatedHospital, updatedHospital.isPrimary, weeklyWorkingHours)
 					)
-					Alert.alert('Success', getSuccessMessage(response, 'Hospital updated successfully'))
+					setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Success',
+				description: getSuccessMessage(response, 'Hospital updated successfully'),
+				submitText: 'Okay',
+			})
 					await loadHospitals()
 				} else {
 					const response = await createHospital({
@@ -904,17 +917,25 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						offline_consultation_fee: trimmedOfflineFee,
 					})
 
-					Alert.alert('Success', getSuccessMessage(response))
-					await loadHospitals()
-				}
-
-				resetForm()
+					setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Success',
+				description: getSuccessMessage(response),
+				submitText: 'Okay',
+			})
+			await loadHospitals()
+		}
 			} catch (error) {
 				console.log('[MyHospitalsTab] save address error:', error)
-				Alert.alert(
-					'Error',
-					(error as any)?.response?.data?.message || (error as any)?.message || 'Failed to save hospital'
-				)
+				setStatusModal({
+					visible: true,
+					status: 'error',
+					title: 'Error',
+					description:
+						(error as any)?.response?.data?.message || (error as any)?.message || 'Failed to save hospital',
+					submitText: 'Okay',
+				})
 			} finally {
 				setIsSavingAddress(false)
 			}
@@ -940,51 +961,55 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 				)
 			)
 			await loadHospitals()
-			Alert.alert('Success', 'Hospitals saved successfully.')
-		} catch (error) {
-			console.log('[MyHospitalsTab] save error:', error)
-			Alert.alert('Error', 'Unable to save hospitals right now.')
-		} finally {
-			setIsSaving(false)
-		}
+		setStatusModal({
+			visible: true,
+			status: 'success',
+			title: 'Success',
+			description: 'Hospitals saved successfully.',
+			submitText: 'Okay',
+		})
+	} catch (error) {
+		console.log('[MyHospitalsTab] save error:', error)
+		setStatusModal({
+			visible: true,
+			status: 'error',
+			title: 'Error',
+			description: 'Unable to save hospitals right now.',
+			submitText: 'Okay',
+		})
+	} finally {
+		setIsSaving(false)
 	}
+}
 
-	if (isLoading) {
-		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="small" color="#0c7c7c" />
+if (editingId) {
+	return (
+		<View style={{ flex: 1 }}>
+			<ScrollView
+				style={styles.container}
+				contentContainerStyle={[
+					styles.contentContainer,
+					{
+						paddingHorizontal: sectionPadding,
+						paddingTop: sectionPadding,
+						paddingBottom: 16,
+					},
+				]}
+				keyboardShouldPersistTaps="handled"
+				showsVerticalScrollIndicator={false}
+			>
+				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+					<View style={styles.formHeader}>
+						<TouchableOpacity onPress={resetForm} style={styles.backButton} activeOpacity={0.8}>
+							<MaterialCommunityIcons name="chevron-left" size={20} color="#5f6b73" />
+						</TouchableOpacity>
+						<AppTypography variant="h4" style={styles.formTitle}>
+							{editingId ? 'Edit Hospital Details' : 'Add new Hospital Details'}
+				</AppTypography>
 			</View>
-		)
-	}
 
-	if (showForm) {
-		return (
-			<View style={{ flex: 1 }}>
-				<ScrollView
-					style={styles.container}
-					contentContainerStyle={[
-						styles.contentContainer,
-						{
-							paddingHorizontal: sectionPadding,
-							paddingTop: sectionPadding,
-							paddingBottom: 16,
-						},
-					]}
-					keyboardShouldPersistTaps="handled"
-					showsVerticalScrollIndicator={false}
-				>
-					<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-						<View style={styles.formHeader}>
-							<TouchableOpacity onPress={resetForm} style={styles.backButton} activeOpacity={0.8}>
-								<MaterialCommunityIcons name="chevron-left" size={20} color="#5f6b73" />
-							</TouchableOpacity>
-							<AppTypography variant="h4" style={styles.formTitle}>
-								{editingId ? 'Edit Hospital Details' : 'Add new Hospital Details'}
-							</AppTypography>
-						</View>
-
-						<View style={styles.formBody}>
-							<InputField
+			<View style={styles.formBody}>
+				<InputField
 								label="Enter hospital name"
 								value={form.name}
 								onChangeText={(value) => setForm((prev) => ({ ...prev, name: value }))}
@@ -1302,6 +1327,17 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			>
 				Save
 			</AppStickyFooter>
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status={statusModal.status}
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText={statusModal.submitText}
+					onSubmit={() => setStatusModal(null)}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
 		</View>
 	)
 }

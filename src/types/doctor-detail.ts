@@ -29,6 +29,14 @@ export interface DoctorAvailability {
 	can_toggle?: boolean
 }
 
+export interface DoctorDetailDegree {
+	id?: string | number
+	degree: string
+	specialization?: string
+	college: string
+	year_of_passing: string
+}
+
 export interface DoctorDetailData {
 	id: string
 	name: string
@@ -43,6 +51,7 @@ export interface DoctorDetailData {
 		year_of_passing: string
 		about: string
 		registration_number: string
+		degrees?: DoctorDetailDegree[]
 	}
 	specialities: string[]
 	hospitals: DoctorDetailHospital[]

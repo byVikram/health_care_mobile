@@ -19,6 +19,7 @@ import {
 	AppSelect,
 	AppSelectOption,
 	AppTypography,
+	StatusModal,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import {
@@ -249,6 +250,13 @@ export default function ProfessionalDetailsTab() {
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isLoadingSpecialities, setIsLoadingSpecialities] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		status: 'success' | 'error'
+		title: string
+		description: string
+		submitText?: string
+	} | null>(null)
 
 	// Bottom sheet state
 	const [sheetMode, setSheetMode] = useState<SheetMode>(null)
@@ -417,10 +425,22 @@ export default function ProfessionalDetailsTab() {
 			setIsSaving(true)
 			await updateDoctorProfessionalDetails(payload)
 			await syncProfileAfterSave()
-			Alert.alert('Success', 'Professional details saved successfully.')
+			setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Success',
+				description: 'Professional details saved successfully.',
+				submitText: 'Okay',
+			})
 		} catch (error) {
 			console.log('[ProfessionalDetailsTab] save error:', error)
-			Alert.alert('Error', 'Unable to save professional details right now.')
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Error',
+				description: 'Unable to save professional details right now.',
+				submitText: 'Okay',
+			})
 		} finally {
 			setIsSaving(false)
 		}
@@ -609,8 +629,18 @@ export default function ProfessionalDetailsTab() {
 			<AppStickyFooter onPress={handleSave} disabled={isSaving} buttonStyle={styles.saveButton}>
 				Save
 			</AppStickyFooter>
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status={statusModal.status}
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText={statusModal.submitText}
+					onSubmit={() => setStatusModal(null)}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
 		</View>
-		
 	)
 }
 

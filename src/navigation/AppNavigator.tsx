@@ -19,7 +19,7 @@ import MyDoctorPage from '../features/patient/MyDoctorPage'
 
 import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/setting/SettingPage'
-import ScreenCaptureTest from '../features/doctor/search/components/ScreenCaptureTest'
+// import ScreenCaptureTest from '../features/doctor/search/components/ScreenCaptureTest'
 import AccountPage from '../features/auth/AccountPage'
 import PatientPayment from '../features/patientPayment/PatientPayment'
 import ConsentForm from '../features/doctor/components/ConsentForm'
@@ -105,10 +105,10 @@ function AuthenticatedNavigator() {
 
 			<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
 
-			<AppStack.Screen
+			{/* <AppStack.Screen
 				name={ROUTES.STACK.SCREEN_CAPTURE_TEST as keyof AppStackParamList}
 				component={ScreenCaptureTest}
-			/>
+			/> */}
 
 			<AppStack.Screen
 				name={ROUTES.STACK.DOCTOR_WELCOME}

@@ -18,6 +18,7 @@ export type AppBottomSheetProps = {
 	title: string
 	onClose: () => void
 	children: React.ReactNode
+	maxHeightRatio?: number
 }
 
 const DISMISS_DRAG_DISTANCE = 84
@@ -29,10 +30,11 @@ export function AppBottomSheet({
 	title,
 	onClose,
 	children,
+	maxHeightRatio = MAX_HEIGHT_RATIO,
 }: AppBottomSheetProps) {
 	const { height } = useWindowDimensions()
 	const closedOffset = height
-	const maxSheetHeight = height * MAX_HEIGHT_RATIO
+	const maxSheetHeight = height * maxHeightRatio
 	const [modalVisible, setModalVisible] = useState(visible)
 	const sheetTranslateY = useRef(new Animated.Value(closedOffset)).current
 
@@ -114,7 +116,7 @@ export function AppBottomSheet({
 					]}
 					{...panResponder.panHandlers}
 				>
-					<Pressable onPress={(event) => event.stopPropagation()}>
+					<Pressable style={styles.sheetBody} onPress={(event) => event.stopPropagation()}>
 						<View style={styles.sheetHandleHitArea} {...panResponder.panHandlers}>
 							<View style={styles.sheetHandle} />
 						</View>
@@ -126,7 +128,11 @@ export function AppBottomSheet({
 								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
 							</TouchableOpacity>
 						</View>
-						<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
+						<ScrollView
+							style={styles.sheetScroll}
+							showsVerticalScrollIndicator={false}
+							contentContainerStyle={styles.sheetContent}
+						>
 							{children}
 						</ScrollView>
 						{/* <View style={styles.sheetContent}>{children}</View> */}
@@ -152,6 +158,10 @@ const styles = StyleSheet.create({
 		paddingTop: 10,
 		paddingBottom: 20,
 		overflow: 'hidden',
+	},
+	sheetBody: {
+		maxHeight: '100%',
+		flexShrink: 1,
 	},
 	sheetHandle: {
 		width: 42,
@@ -187,6 +197,9 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginLeft: 12,
+	},
+	sheetScroll: {
+		flexShrink: 1,
 	},
 	sheetContent: {
 		flexGrow: 0,
