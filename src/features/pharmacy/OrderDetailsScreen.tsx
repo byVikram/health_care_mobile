@@ -12,21 +12,22 @@ import {
 	Image,
 	FlatList,
 	useWindowDimensions,
+	Modal,
+	StatusBar,
+	SafeAreaView,
 } from 'react-native'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import { getPharmacyOrderById, updatePharmacyOrderStatus } from '../profile/pharmacy/pharmacyService'
 import { ROUTES } from '../../navigation/routes'
 import { useAuth } from '../../context/AuthContext'
-import { AppSelect, StatusModal } from '../../components/common'
+import { AppSelect, StatusModal, AppSkeleton } from '../../components/common'
 
-// ─── S3 Config (optional – replace with your actual base URL if needed) ──────
+// ─── S3 Config ────────────────────────────────────────────────────────────────
 const S3_BASE_URL = process.env.REACT_APP_S3_BASE_URL || ''
 
 const buildS3Url = (key?: string | null): string | null => {
-	// if (!key || !S3_BASE_URL) return null
-	// return `${S3_BASE_URL.replace(/\/$/, '')}/${key.replace(/^\//, '')}`
-	return key
+	return key ?? null
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -99,8 +100,6 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; lab
 	rejected: { bg: '#FFE3E7', text: '#E74B5B', dot: '#E74B5B', label: 'Rejected' },
 }
 
-const STATUS_ACTIONS = ['packed', 'collected', 'rejected'] as const
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const normalizeMedicines = (medicines?: Partial<MedicineRow>[]): MedicineRow[] => {
 	if (!medicines?.length) return []
@@ -123,15 +122,191 @@ const createEmptyRow = (): MedicineRow => ({
 	instructions: '',
 })
 
-// ─── Mock API for medicines (prevents unauthorized errors) ───────────────────
+// ─── Mock API for medicines ───────────────────────────────────────────────────
 const updatePharmacyOrderMedicines = async (orderId: string, medicines: MedicineRow[]) => {
 	console.log('[MOCK] Saving medicines for order', orderId, medicines)
 	await new Promise((resolve) => setTimeout(resolve, 500))
 	return { success: true }
 }
 
+// ─── Fullscreen Image Viewer Modal ────────────────────────────────────────────
+const ImageViewerModal = ({
+	visible,
+	images,
+	initialIndex,
+	onClose,
+}: {
+	visible: boolean
+	images: string[]
+	initialIndex: number
+	onClose: () => void
+}) => {
+	const { width: screenWidth, height: screenHeight } = useWindowDimensions()
+	const flatListRef = useRef<FlatList>(null)
+	const [activeIndex, setActiveIndex] = useState(initialIndex)
+
+	useEffect(() => {
+		if (visible) {
+			setActiveIndex(initialIndex)
+			setTimeout(() => {
+				flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false })
+			}, 50)
+		}
+	}, [visible, initialIndex])
+
+	const goTo = (index: number) => {
+		const clamped = Math.max(0, Math.min(index, images.length - 1))
+		flatListRef.current?.scrollToIndex({ index: clamped, animated: true })
+		setActiveIndex(clamped)
+	}
+
+	return (
+		<Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+			<StatusBar backgroundColor="rgba(0,0,0,0.95)" barStyle="light-content" />
+			<View style={viewerStyles.overlay}>
+				{/* Header */}
+				<SafeAreaView style={viewerStyles.header}>
+					<Text style={viewerStyles.headerTitle}>
+						Prescription {images.length > 1 ? `${activeIndex + 1} / ${images.length}` : ''}
+					</Text>
+					<TouchableOpacity
+						style={viewerStyles.closeBtn}
+						onPress={onClose}
+						hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+					>
+						<MaterialCommunityIcons name="close" size={24} color="#fff" />
+					</TouchableOpacity>
+				</SafeAreaView>
+
+				{/* Images */}
+				<FlatList
+					ref={flatListRef}
+					data={images}
+					horizontal
+					pagingEnabled
+					showsHorizontalScrollIndicator={false}
+					keyExtractor={(_, i) => String(i)}
+					onMomentumScrollEnd={(e) => {
+						const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth)
+						setActiveIndex(idx)
+					}}
+					getItemLayout={(_, index) => ({ length: screenWidth, offset: screenWidth * index, index })}
+					renderItem={({ item }) => (
+						<View
+							style={{
+								width: screenWidth,
+								height: screenHeight - 120,
+								justifyContent: 'center',
+								alignItems: 'center',
+							}}
+						>
+							<Image
+								source={{ uri: item }}
+								style={{ width: screenWidth, height: screenHeight - 120 }}
+								resizeMode="contain"
+							/>
+						</View>
+					)}
+				/>
+
+				{/* Arrows */}
+				{images.length > 1 && (
+					<>
+						<TouchableOpacity
+							style={[viewerStyles.arrow, viewerStyles.arrowLeft]}
+							onPress={() => goTo(activeIndex - 1)}
+							disabled={activeIndex === 0}
+						>
+							<MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={[viewerStyles.arrow, viewerStyles.arrowRight]}
+							onPress={() => goTo(activeIndex + 1)}
+							disabled={activeIndex === images.length - 1}
+						>
+							<MaterialCommunityIcons name="chevron-right" size={28} color="#fff" />
+						</TouchableOpacity>
+
+						{/* Dots */}
+						<View style={viewerStyles.dotRow}>
+							{images.map((_, i) => (
+								<View key={i} style={[viewerStyles.dot, i === activeIndex && viewerStyles.dotActive]} />
+							))}
+						</View>
+					</>
+				)}
+			</View>
+		</Modal>
+	)
+}
+
+const viewerStyles = StyleSheet.create({
+	overlay: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.95)',
+	},
+	header: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+	},
+	headerTitle: {
+		color: '#fff',
+		fontSize: 15,
+		fontWeight: '600',
+	},
+	closeBtn: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		backgroundColor: 'rgba(255,255,255,0.15)',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	arrow: {
+		position: 'absolute',
+		top: '50%',
+		marginTop: -24,
+		backgroundColor: 'rgba(255,255,255,0.15)',
+		borderRadius: 24,
+		width: 48,
+		height: 48,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	arrowLeft: { left: 12 },
+	arrowRight: { right: 12 },
+	dotRow: {
+		position: 'absolute',
+		bottom: 32,
+		left: 0,
+		right: 0,
+		flexDirection: 'row',
+		justifyContent: 'center',
+		gap: 6,
+	},
+	dot: {
+		width: 6,
+		height: 6,
+		borderRadius: 3,
+		backgroundColor: 'rgba(255,255,255,0.4)',
+	},
+	dotActive: {
+		backgroundColor: '#fff',
+		width: 18,
+	},
+})
+
 // ─── Prescription Carousel ────────────────────────────────────────────────────
-const PrescriptionCarousel = ({ images }: { images: string[] }) => {
+const PrescriptionCarousel = ({
+	images,
+	onImagePress,
+}: {
+	images: string[]
+	onImagePress: (index: number) => void
+}) => {
 	const { width: screenWidth } = useWindowDimensions()
 	const flatListRef = useRef<FlatList>(null)
 	const [activeIndex, setActiveIndex] = useState(0)
@@ -171,8 +346,19 @@ const PrescriptionCarousel = ({ images }: { images: string[] }) => {
 					setActiveIndex(idx)
 				}}
 				keyExtractor={(_, i) => String(i)}
-				renderItem={({ item }) => (
-					<Image source={{ uri: item }} style={{ width: imageWidth, height: '100%' }} resizeMode="contain" />
+				getItemLayout={(_, index) => ({ length: imageWidth, offset: imageWidth * index, index })}
+				renderItem={({ item, index }) => (
+					<TouchableOpacity
+						activeOpacity={0.9}
+						onPress={() => onImagePress(index)}
+						style={{ width: imageWidth }}
+					>
+						<Image source={{ uri: item }} style={{ width: imageWidth, height: 220 }} resizeMode="contain" />
+						<View style={scrollTableStyles.imageKeyInfo}>
+							<MaterialCommunityIcons name="fullscreen" size={16} color="#1f5f68" />
+							<Text style={scrollTableStyles.imageKeyText}>Tap to expand prescription document</Text>
+						</View>
+					</TouchableOpacity>
 				)}
 			/>
 
@@ -214,7 +400,7 @@ const carouselStyles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
 		overflow: 'hidden',
-		height: 240,
+		height: 260,
 	},
 	empty: {
 		height: 200,
@@ -325,7 +511,7 @@ const getCompletedSteps = (status: string): string[] => {
 	}
 }
 
-// ─── Status Options ──────────────────────────────────────────────────────────
+// ─── Status Options ───────────────────────────────────────────────────────────
 const STATUS_OPTIONS = [
 	{ label: 'Packed', value: 'packed' },
 	{ label: 'Collected', value: 'collected' },
@@ -360,7 +546,16 @@ const OrderDetailsScreen = () => {
 		description: string
 	} | null>(null)
 
-	// Fetch order
+	// ─── Image viewer state ───────────────────────────────────────────────────
+	const [imageViewerVisible, setImageViewerVisible] = useState(false)
+	const [imageViewerIndex, setImageViewerIndex] = useState(0)
+
+	const openImageViewer = (index: number) => {
+		setImageViewerIndex(index)
+		setImageViewerVisible(true)
+	}
+
+	// ─── Fetch order ──────────────────────────────────────────────────────────
 	const fetchOrder = useCallback(async () => {
 		if (!orderId) {
 			setError('Order ID is missing.')
@@ -389,7 +584,7 @@ const OrderDetailsScreen = () => {
 		fetchOrder()
 	}, [fetchOrder])
 
-	// Save medicines (mock)
+	// ─── Save medicines (mock) ────────────────────────────────────────────────
 	const saveMedicines = useCallback(
 		async (rows: MedicineRow[]) => {
 			if (!orderData) return
@@ -432,7 +627,7 @@ const OrderDetailsScreen = () => {
 		await saveMedicines(medicineRows)
 	}
 
-	// Derived data
+	// ─── Derived data ─────────────────────────────────────────────────────────
 	const patient = useMemo(() => {
 		const p = orderData?.patient
 		const avatarUrl = p?.avatar_s3_key ? buildS3Url(p.avatar_s3_key) : null
@@ -498,7 +693,7 @@ const OrderDetailsScreen = () => {
 		return Array.from(new Set(urls))
 	}, [orderData])
 
-	// Status update
+	// ─── Status update ────────────────────────────────────────────────────────
 	const handleMarkStatus = async (newStatus: string, billVal?: number | null, reason?: string | null) => {
 		if (!orderData) return
 		setUpdatingStatus(true)
@@ -506,22 +701,17 @@ const OrderDetailsScreen = () => {
 			const payload: { status: string; bill_amount?: number | null; rejection_reason?: string | null } = {
 				status: newStatus,
 			}
-
-			// Handle bill amount logic
 			if (billVal !== undefined) {
 				payload.bill_amount = billVal
 			} else {
 				const num = parseFloat(billAmountInput)
 				payload.bill_amount = isNaN(num) ? null : num
 			}
-
-			// Handle rejection reason logic
 			if (reason !== undefined) {
 				payload.rejection_reason = reason
 			} else {
 				payload.rejection_reason = rejectionReasonInput || null
 			}
-
 			const res = await updatePharmacyOrderStatus(orderData.id, payload)
 			setStatus(newStatus)
 			setOrderData((prev) =>
@@ -579,215 +769,20 @@ const OrderDetailsScreen = () => {
 		)
 	}
 
-	// Responsive Pharmacy Entry Form
-	// const renderPharmacyEntryForm = () => {
-	// 	const useResponsiveFlex = isTablet || isLandscape
-	// 	if (useResponsiveFlex) {
-	// 		return (
-	// 			<View style={styles.card}>
-	// 				<View style={styles.cardTitleRow}>
-	// 					<Text style={styles.cardTitle}>Pharmacy Entry Form</Text>
-	// 					<TouchableOpacity style={styles.addBtn} onPress={addMedicineRow}>
-	// 						<MaterialCommunityIcons name="plus" size={14} color="#fff" />
-	// 						<Text style={styles.addBtnText}>Add Medicine</Text>
-	// 					</TouchableOpacity>
-	// 				</View>
-	// 				<View style={flexTableStyles.tableContainer}>
-	// 					<View style={flexTableStyles.headerRow}>
-	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.medicationCell]}>Medication</Text>
-	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.frequencyCell]}>Frequency</Text>
-	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.totalCell]}>Total Tabs</Text>
-	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.purchasedCell]}>Purchased</Text>
-	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.instructionsCell]}>
-	// 							Instructions
-	// 						</Text>
-	// 						<Text style={[flexTableStyles.headerCell, flexTableStyles.deleteCell]}> </Text>
-	// 					</View>
-	// 					{medicineRows.map((row) => (
-	// 						<View key={row.id} style={flexTableStyles.row}>
-	// 							<TextInput
-	// 								style={[flexTableStyles.cellInput, flexTableStyles.medicationCell]}
-	// 								value={row.medication}
-	// 								placeholder="e.g., Augmentin 625mg"
-	// 								placeholderTextColor="#94A3B8"
-	// 								onChangeText={(v) => updateMedicineField(row.id, 'medication', v)}
-	// 								onBlur={handleMedicineBlur}
-	// 							/>
-	// 							<TextInput
-	// 								style={[flexTableStyles.cellInput, flexTableStyles.frequencyCell]}
-	// 								value={row.frequency}
-	// 								placeholder="e.g., 1-0-1"
-	// 								placeholderTextColor="#94A3B8"
-	// 								onChangeText={(v) => updateMedicineField(row.id, 'frequency', v)}
-	// 								onBlur={handleMedicineBlur}
-	// 							/>
-	// 							<TextInput
-	// 								style={[flexTableStyles.cellInput, flexTableStyles.totalCell]}
-	// 								value={String(row.totalTablets)}
-	// 								keyboardType="numeric"
-	// 								placeholder="0"
-	// 								placeholderTextColor="#94A3B8"
-	// 								onChangeText={(v) => updateMedicineField(row.id, 'totalTablets', parseInt(v) || 0)}
-	// 								onBlur={handleMedicineBlur}
-	// 							/>
-	// 							<TextInput
-	// 								style={[flexTableStyles.cellInput, flexTableStyles.purchasedCell]}
-	// 								value={String(row.purchasedTablets)}
-	// 								keyboardType="numeric"
-	// 								placeholder="0"
-	// 								placeholderTextColor="#94A3B8"
-	// 								onChangeText={(v) =>
-	// 									updateMedicineField(row.id, 'purchasedTablets', parseInt(v) || 0)
-	// 								}
-	// 								onBlur={handleMedicineBlur}
-	// 							/>
-	// 							<TextInput
-	// 								style={[flexTableStyles.cellInput, flexTableStyles.instructionsCell]}
-	// 								value={row.instructions}
-	// 								placeholder="e.g., After food"
-	// 								placeholderTextColor="#94A3B8"
-	// 								onChangeText={(v) => updateMedicineField(row.id, 'instructions', v)}
-	// 								onBlur={handleMedicineBlur}
-	// 							/>
-	// 							<TouchableOpacity
-	// 								style={flexTableStyles.deleteButton}
-	// 								onPress={() => removeMedicineRow(row.id)}
-	// 							>
-	// 								<MaterialCommunityIcons name="trash-can-outline" size={20} color="#E74B5B" />
-	// 							</TouchableOpacity>
-	// 						</View>
-	// 					))}
-	// 				</View>
-	// 				{medicineRows.length === 0 && (
-	// 					<Text style={styles.emptyText}>No medicines added. Click "Add Medicine" to start.</Text>
-	// 				)}
-	// 				{savingMedicines && (
-	// 					<View style={styles.savingRow}>
-	// 						<ActivityIndicator size="small" color="#2E7C86" />
-	// 						<Text style={styles.savingText}>Saving…</Text>
-	// 					</View>
-	// 				)}
-	// 			</View>
-	// 		)
-	// 	} else {
-	// 		return (
-	// 			<View style={styles.card}>
-	// 				<View style={styles.cardTitleRow}>
-	// 					<Text style={styles.cardTitle}>Pharmacy Entry Form</Text>
-	// 					<TouchableOpacity style={styles.addBtn} onPress={addMedicineRow}>
-	// 						<MaterialCommunityIcons name="plus" size={14} color="#fff" />
-	// 						<Text style={styles.addBtnText}>Add Medicine</Text>
-	// 					</TouchableOpacity>
-	// 				</View>
-
-	// 				<View style={mobileMedStyles.cardList}>
-	// 					{medicineRows.map((row, index) => (
-	// 						<View key={row.id} style={mobileMedStyles.medCard}>
-	// 							<View style={mobileMedStyles.cardHeader}>
-	// 								<View style={mobileMedStyles.headerLeft}>
-	// 									<MaterialCommunityIcons name="pill" size={16} color="#2E7C86" />
-	// 									<Text style={mobileMedStyles.cardIndexText}>Medicine #{index + 1}</Text>
-	// 								</View>
-	// 								<TouchableOpacity
-	// 									style={mobileMedStyles.deleteIconBtn}
-	// 									onPress={() => removeMedicineRow(row.id)}
-	// 								>
-	// 									<MaterialCommunityIcons name="delete-outline" size={18} color="#E74B5B" />
-	// 								</TouchableOpacity>
-	// 							</View>
-
-	// 							<View style={mobileMedStyles.inputGroup}>
-	// 								<Text style={mobileMedStyles.inputLabel}>Medication Name</Text>
-	// 								<TextInput
-	// 									style={mobileMedStyles.textInput}
-	// 									value={row.medication}
-	// 									placeholder="e.g., Augmentin 625mg"
-	// 									placeholderTextColor="#94A3B8"
-	// 									onChangeText={(v) => updateMedicineField(row.id, 'medication', v)}
-	// 									onBlur={handleMedicineBlur}
-	// 								/>
-	// 							</View>
-
-	// 							<View style={mobileMedStyles.rowFields}>
-	// 								<View style={[mobileMedStyles.inputGroup, { flex: 1, marginRight: 8 }]}>
-	// 									<Text style={mobileMedStyles.inputLabel}>Frequency</Text>
-	// 									<TextInput
-	// 										style={mobileMedStyles.textInput}
-	// 										value={row.frequency}
-	// 										placeholder="e.g., 1-0-1"
-	// 										placeholderTextColor="#94A3B8"
-	// 										onChangeText={(v) => updateMedicineField(row.id, 'frequency', v)}
-	// 										onBlur={handleMedicineBlur}
-	// 									/>
-	// 								</View>
-	// 								<View style={[mobileMedStyles.inputGroup, { flex: 1 }]}>
-	// 									<Text style={mobileMedStyles.inputLabel}>Instructions</Text>
-	// 									<TextInput
-	// 										style={mobileMedStyles.textInput}
-	// 										value={row.instructions}
-	// 										placeholder="e.g., After food"
-	// 										placeholderTextColor="#94A3B8"
-	// 										onChangeText={(v) => updateMedicineField(row.id, 'instructions', v)}
-	// 										onBlur={handleMedicineBlur}
-	// 									/>
-	// 								</View>
-	// 							</View>
-
-	// 							<View style={mobileMedStyles.rowFields}>
-	// 								<View style={[mobileMedStyles.inputGroup, { flex: 1, marginRight: 8 }]}>
-	// 									<Text style={mobileMedStyles.inputLabel}>Total Prescribed</Text>
-	// 									<TextInput
-	// 										style={mobileMedStyles.textInput}
-	// 										value={row.totalTablets ? String(row.totalTablets) : ''}
-	// 										keyboardType="numeric"
-	// 										placeholder="0"
-	// 										placeholderTextColor="#94A3B8"
-	// 										onChangeText={(v) =>
-	// 											updateMedicineField(row.id, 'totalTablets', parseInt(v) || 0)
-	// 										}
-	// 										onBlur={handleMedicineBlur}
-	// 									/>
-	// 								</View>
-	// 								<View style={[mobileMedStyles.inputGroup, { flex: 1 }]}>
-	// 									<Text style={mobileMedStyles.inputLabel}>Purchased / Dispensed</Text>
-	// 									<TextInput
-	// 										style={mobileMedStyles.textInput}
-	// 										value={row.purchasedTablets ? String(row.purchasedTablets) : ''}
-	// 										keyboardType="numeric"
-	// 										placeholder="0"
-	// 										placeholderTextColor="#94A3B8"
-	// 										onChangeText={(v) =>
-	// 											updateMedicineField(row.id, 'purchasedTablets', parseInt(v) || 0)
-	// 										}
-	// 										onBlur={handleMedicineBlur}
-	// 									/>
-	// 								</View>
-	// 							</View>
-	// 						</View>
-	// 					))}
-	// 				</View>
-
-	// 				{medicineRows.length === 0 && (
-	// 					<Text style={styles.emptyText}>No medicines added. Click "Add Medicine" to start.</Text>
-	// 				)}
-	// 				{savingMedicines && (
-	// 					<View style={styles.savingRow}>
-	// 						<ActivityIndicator size="small" color="#2E7C86" />
-	// 						<Text style={styles.savingText}>Saving…</Text>
-	// 					</View>
-	// 				)}
-	// 			</View>
-	// 		)
-	// 	}
-	// }
-
+	// ─── Loading state ────────────────────────────────────────────────────────
 	if (loading) {
 		return (
 			<View style={styles.safeArea}>
-				<View style={styles.centered}>
-					<ActivityIndicator size="large" color="#2E7C86" />
-					<Text style={styles.loadingText}>Loading order details…</Text>
-				</View>
+				<ScrollView
+					style={styles.container}
+					contentContainerStyle={styles.content}
+					showsVerticalScrollIndicator={false}
+				>
+					<AppSkeleton height={180} borderRadius={14} style={{ marginBottom: 14 }} />
+					<AppSkeleton height={220} borderRadius={14} style={{ marginBottom: 14 }} />
+					<AppSkeleton height={320} borderRadius={14} style={{ marginBottom: 14 }} />
+					<AppSkeleton height={200} borderRadius={14} />
+				</ScrollView>
 			</View>
 		)
 	}
@@ -806,7 +801,7 @@ const OrderDetailsScreen = () => {
 		)
 	}
 
-	// ─── RENDERING ROLE BASED PERSPECTIVES ───────────────────────────────────────
+	// ─── Role-based rendering ─────────────────────────────────────────────────
 	const isPatient = role === 'patient'
 
 	if (isPatient) {
@@ -925,14 +920,14 @@ const OrderDetailsScreen = () => {
 						</TouchableOpacity>
 					</SectionCard>
 
-					{/* Prescribed Doctor & Clinic */}
+					{/* Consultation Info */}
 					<SectionCard title="Consultation Info">
 						<InfoRow icon="hospital-building" label="Clinic/Hospital" value={clinic.name} />
 						<InfoRow icon="doctor" label="Doctor Name" value={clinic.doctor} />
 						<InfoRow icon="phone-outline" label="Contact" value={clinic.phone} />
 					</SectionCard>
 
-					{/* Prescription Notes & Lightbox */}
+					{/* Prescription Document */}
 					<SectionCard title="Prescription Document">
 						{orderData?.notes ? (
 							<View style={styles.notesBox}>
@@ -940,10 +935,10 @@ const OrderDetailsScreen = () => {
 								<Text style={styles.notesText}>{orderData.notes}</Text>
 							</View>
 						) : null}
-						<PrescriptionCarousel images={prescriptionImages} />
+						<PrescriptionCarousel images={prescriptionImages} onImagePress={openImageViewer} />
 					</SectionCard>
 
-					{/* Ordered Medicine List */}
+					{/* Medicine Details */}
 					<SectionCard title="Medicine Details">
 						{medicineRows.length === 0 ? (
 							<Text style={styles.emptyText}>
@@ -987,7 +982,7 @@ const OrderDetailsScreen = () => {
 						)}
 					</SectionCard>
 
-					{/* Status Timeline */}
+					{/* Order Progress */}
 					<SectionCard title="Order Progress">
 						<View style={styles.timeline}>
 							{TIMELINE_STEPS.map((step, idx) => {
@@ -996,7 +991,6 @@ const OrderDetailsScreen = () => {
 								const isLast = idx === TIMELINE_STEPS.length - 1
 								const isRejectedStep = status === 'rejected' && step.key === 'order_created'
 
-								// Dynamic coloring
 								const stepColor = isRejectedStep ? '#E74B5B' : done ? '#1f5f68' : '#94A3B8'
 								const stepBg = isRejectedStep ? '#FFE3E7' : done ? '#E8F5F5' : '#F1F5F9'
 								const lineColor = done ? (status === 'rejected' ? '#E2E8F0' : '#1f5f68') : '#E2E8F0'
@@ -1035,6 +1029,15 @@ const OrderDetailsScreen = () => {
 						</View>
 					</SectionCard>
 				</ScrollView>
+
+				{/* Fullscreen Image Viewer */}
+				<ImageViewerModal
+					visible={imageViewerVisible}
+					images={prescriptionImages}
+					initialIndex={imageViewerIndex}
+					onClose={() => setImageViewerVisible(false)}
+				/>
+
 				{statusModal && (
 					<StatusModal
 						visible={statusModal.visible}
@@ -1050,7 +1053,7 @@ const OrderDetailsScreen = () => {
 		)
 	}
 
-	// ─── PHARMACIST PERSPECTIVE (MANAGEMENT & FORM EDITING) ───────────────────
+	// ─── PHARMACIST PERSPECTIVE ───────────────────────────────────────────────
 	return (
 		<View style={styles.safeArea}>
 			<ScrollView
@@ -1058,7 +1061,7 @@ const OrderDetailsScreen = () => {
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={styles.content}
 			>
-				{/* Order Status & Billing Management Card */}
+				{/* Order Management */}
 				<SectionCard title="Order Management">
 					<View style={styles.currentStatusRow}>
 						<View style={[styles.statusDot, { backgroundColor: currentStatusCfg.dot }]} />
@@ -1128,7 +1131,7 @@ const OrderDetailsScreen = () => {
 						</View>
 					</View>
 
-					{/* Rejection Reason Form */}
+					{/* Rejection Reason */}
 					{status === 'rejected' && (
 						<View style={styles.rejectionReasonBox}>
 							<Text style={styles.rejectionReasonLabel}>Rejection Reason:</Text>
@@ -1146,13 +1149,12 @@ const OrderDetailsScreen = () => {
 					)}
 				</SectionCard>
 
-				{/* Patient & Prescribing Consultation Details */}
+				{/* Patient & Prescriber Profile */}
 				<View style={styles.card}>
 					<View style={styles.cardTitleRow}>
 						<Text style={styles.cardTitle}>Patient & Prescriber Profile</Text>
 					</View>
 
-					{/* Patient Header & Avatar */}
 					<View style={styles.patientProfileHeader}>
 						<View style={styles.avatarWrap}>
 							{patient.avatarUrl ? (
@@ -1188,17 +1190,13 @@ const OrderDetailsScreen = () => {
 
 					<View style={styles.profileDivider} />
 
-					{/* Profile Details Grid */}
 					<View
 						style={[isTablet || isLandscape ? styles.profileDetailsGrid : styles.profileDetailsGridStacked]}
 					>
-						{/* Left: Patient Contact */}
 						<View style={styles.profileDetailsColumn}>
 							<Text style={styles.profileSectionTitle}>Patient Contact</Text>
 							<InfoRow icon="phone-outline" value={patient.phone} />
 						</View>
-
-						{/* Right: Clinic Info */}
 						<View
 							style={[
 								styles.profileDetailsColumn,
@@ -1212,7 +1210,6 @@ const OrderDetailsScreen = () => {
 						</View>
 					</View>
 
-					{/* Action Buttons Row */}
 					<View style={styles.profileActionsRow}>
 						<TouchableOpacity
 							style={[styles.profileCallBtn, { backgroundColor: '#2E7C86' }]}
@@ -1231,7 +1228,7 @@ const OrderDetailsScreen = () => {
 					</View>
 				</View>
 
-				{/* Prescription Notes */}
+				{/* Prescription Document */}
 				<SectionCard title="Prescription Document">
 					{orderData?.notes ? (
 						<View style={styles.notesBox}>
@@ -1239,13 +1236,10 @@ const OrderDetailsScreen = () => {
 							<Text style={styles.notesText}>{orderData.notes}</Text>
 						</View>
 					) : null}
-					<PrescriptionCarousel images={prescriptionImages} />
+					<PrescriptionCarousel images={prescriptionImages} onImagePress={openImageViewer} />
 				</SectionCard>
 
-				{/* Pharmacy Entry Form */}
-				{/* {renderPharmacyEntryForm()} */}
-
-				{/* Order Stepper Timeline */}
+				{/* Status History Timeline */}
 				<SectionCard title="Status History">
 					<View style={styles.timeline}>
 						{TIMELINE_STEPS.map((step, idx) => {
@@ -1254,7 +1248,6 @@ const OrderDetailsScreen = () => {
 							const isLast = idx === TIMELINE_STEPS.length - 1
 							const isRejectedStep = status === 'rejected' && step.key === 'order_created'
 
-							// Dynamic coloring
 							const stepColor = isRejectedStep ? '#E74B5B' : done ? '#2E7C86' : '#94A3B8'
 							const stepBg = isRejectedStep ? '#FFE3E7' : done ? '#E0F2F1' : '#F1F5F9'
 							const lineColor = done ? (status === 'rejected' ? '#E2E8F0' : '#2E7C86') : '#E2E8F0'
@@ -1291,6 +1284,15 @@ const OrderDetailsScreen = () => {
 					</View>
 				</SectionCard>
 			</ScrollView>
+
+			{/* Fullscreen Image Viewer */}
+			<ImageViewerModal
+				visible={imageViewerVisible}
+				images={prescriptionImages}
+				initialIndex={imageViewerIndex}
+				onClose={() => setImageViewerVisible(false)}
+			/>
+
 			{statusModal && (
 				<StatusModal
 					visible={statusModal.visible}
@@ -1335,7 +1337,6 @@ const styles = StyleSheet.create({
 	},
 	cardTitle: { fontSize: 14, fontWeight: '700', color: '#1A2C33', marginBottom: 12 },
 	cardTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-	patientHeader: { flexDirection: 'row', gap: 12 },
 	avatarWrap: {
 		width: 64,
 		height: 64,
@@ -1354,14 +1355,6 @@ const styles = StyleSheet.create({
 	patientName: { fontSize: 16, fontWeight: '700', color: '#1A2C33' },
 	allergyBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
 	allergyText: { fontSize: 11, fontWeight: '600' },
-	statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-	statItem: { width: '45%' },
-	statLabel: { fontSize: 11, color: '#6B7A82' },
-	statValue: { fontSize: 13, fontWeight: '600', color: '#1A2C33' },
-	twoCol: { flexDirection: 'row', marginBottom: 14 },
-	twoColStacked: { flexDirection: 'column' },
-	halfCard: { flex: 1, marginHorizontal: 6 },
-	fullWidthCard: { width: '100%', marginHorizontal: 0, marginBottom: 8 },
 	infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
 	infoLabel: { fontSize: 12, color: '#6B7A82', marginLeft: 6 },
 	infoValue: { fontSize: 13, color: '#1A2C33', fontWeight: '500', marginLeft: 4, flex: 1 },
@@ -1382,36 +1375,7 @@ const styles = StyleSheet.create({
 	statusLabel: { fontSize: 13, color: '#6B7A82' },
 	statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6 },
 	statusBadgeText: { fontSize: 12, fontWeight: '700' },
-	dropdownButton: {
-		backgroundColor: '#F1F5F9',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		borderRadius: 10,
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		marginBottom: 20,
-	},
-	dropdownButtonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-	dropdownButtonText: { fontSize: 14, fontWeight: '600', color: '#1A2C33', flex: 1, marginLeft: 8 },
 	statusDotSmall: { width: 8, height: 8, borderRadius: 4 },
-	modalOverlay: { flex: 1, backgroundColor: 'transparent' },
-	dropdownMenu: {
-		position: 'absolute',
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.1,
-		shadowRadius: 8,
-		elevation: 5,
-		paddingVertical: 4,
-	},
-	dropdownItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, gap: 12 },
-	dropdownItemActive: { backgroundColor: '#F0F9F9' },
-	dropdownItemText: { fontSize: 14, color: '#1A2C33', flex: 1 },
-	dropdownItemTextActive: { fontWeight: '600' },
 	timeline: { paddingLeft: 4 },
 	timelineStep: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14, position: 'relative' },
 	timelineLine: { position: 'absolute', left: 13, top: 28, width: 2, height: 20, zIndex: 0 },
@@ -1439,17 +1403,6 @@ const styles = StyleSheet.create({
 	addBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
 	savingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
 	savingText: { fontSize: 12, color: '#6B7A82' },
-	searchPharmacyButton: {
-		backgroundColor: '#2E7C86',
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingVertical: 14,
-		borderRadius: 12,
-		marginBottom: 14,
-		gap: 8,
-	},
-	searchPharmacyButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 	rejectionBanner: {
 		flexDirection: 'row',
 		backgroundColor: '#FFEAEA',
@@ -1461,41 +1414,13 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: '#FFCDD2',
 	},
-	rejectionBannerTitle: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#C62828',
-		marginBottom: 2,
-	},
-	rejectionBannerText: {
-		fontSize: 13,
-		color: '#D32F2F',
-	},
-	summaryGrid: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		justifyContent: 'space-between',
-		gap: 16,
-	},
-	summaryItem: {
-		width: '45%',
-		marginBottom: 12,
-	},
-	summaryLabel: {
-		fontSize: 11,
-		color: '#6B7A82',
-		marginBottom: 4,
-	},
-	summaryValue: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#1A2C33',
-	},
-	billEmphasis: {
-		color: '#2E7C86',
-		fontSize: 16,
-		fontWeight: '700',
-	},
+	rejectionBannerTitle: { fontSize: 14, fontWeight: '700', color: '#C62828', marginBottom: 2 },
+	rejectionBannerText: { fontSize: 13, color: '#D32F2F' },
+	summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16 },
+	summaryItem: { width: '45%', marginBottom: 12 },
+	summaryLabel: { fontSize: 11, color: '#6B7A82', marginBottom: 4 },
+	summaryValue: { fontSize: 14, fontWeight: '600', color: '#1A2C33' },
+	billEmphasis: { color: '#2E7C86', fontSize: 16, fontWeight: '700' },
 	badgeStyle: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1505,54 +1430,16 @@ const styles = StyleSheet.create({
 		borderRadius: 6,
 		alignSelf: 'flex-start',
 	},
-	badgeHome: {
-		backgroundColor: '#E8EFFF',
-	},
-	badgePickup: {
-		backgroundColor: '#E8F5E9',
-	},
-	badgeStyleText: {
-		fontSize: 11,
-		fontWeight: '700',
-	},
-	addressSummaryBox: {
-		marginTop: 12,
-		paddingTop: 12,
-		borderTopWidth: 1,
-		borderTopColor: '#F1F5F9',
-	},
-	addressBadgeHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		marginBottom: 4,
-	},
-	addressBadgeText: {
-		fontSize: 12,
-		fontWeight: '700',
-		color: '#4A5B62',
-	},
-	addressDetailsText: {
-		fontSize: 12,
-		color: '#6B7A82',
-		lineHeight: 18,
-	},
-	pharmacyHeader: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		marginBottom: 12,
-	},
-	pharmacyName: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#1A2C33',
-		marginBottom: 4,
-	},
-	pharmacyAddress: {
-		fontSize: 12,
-		color: '#6B7A82',
-		lineHeight: 18,
-	},
+	badgeHome: { backgroundColor: '#E8EFFF' },
+	badgePickup: { backgroundColor: '#E8F5E9' },
+	badgeStyleText: { fontSize: 11, fontWeight: '700' },
+	addressSummaryBox: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+	addressBadgeHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+	addressBadgeText: { fontSize: 12, fontWeight: '700', color: '#4A5B62' },
+	addressDetailsText: { fontSize: 12, color: '#6B7A82', lineHeight: 18 },
+	pharmacyHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+	pharmacyName: { fontSize: 14, fontWeight: '700', color: '#1A2C33', marginBottom: 4 },
+	pharmacyAddress: { fontSize: 12, color: '#6B7A82', lineHeight: 18 },
 	notesBox: {
 		backgroundColor: '#F8FCFC',
 		borderWidth: 1,
@@ -1561,51 +1448,16 @@ const styles = StyleSheet.create({
 		padding: 12,
 		marginBottom: 12,
 	},
-	notesLabel: {
-		fontSize: 12,
-		fontWeight: '700',
-		color: '#2E7C86',
-		marginBottom: 4,
-	},
-	notesText: {
-		fontSize: 13,
-		color: '#4A5B62',
-		lineHeight: 18,
-	},
-	readOnlyMedList: {
-		gap: 12,
-	},
-	readOnlyMedCard: {
-		paddingVertical: 8,
-	},
-	medCardBorder: {
-		borderTopWidth: 1,
-		borderTopColor: '#F1F5F9',
-		paddingTop: 12,
-	},
-	medCardHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 8,
-	},
-	medCardName: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#1A2C33',
-	},
-	medCardDetails: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 16,
-	},
-	medCardDetailText: {
-		fontSize: 12,
-		color: '#6B7A82',
-	},
-	boldLabel: {
-		fontWeight: '600',
-		color: '#4A5B62',
-	},
+	notesLabel: { fontSize: 12, fontWeight: '700', color: '#2E7C86', marginBottom: 4 },
+	notesText: { fontSize: 13, color: '#4A5B62', lineHeight: 18 },
+	readOnlyMedList: { gap: 12 },
+	readOnlyMedCard: { paddingVertical: 8 },
+	medCardBorder: { borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12 },
+	medCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+	medCardName: { fontSize: 14, fontWeight: '700', color: '#1A2C33' },
+	medCardDetails: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+	medCardDetailText: { fontSize: 12, color: '#6B7A82' },
+	boldLabel: { fontWeight: '600', color: '#4A5B62' },
 	medCardInstructions: {
 		fontSize: 12,
 		fontStyle: 'italic',
@@ -1617,29 +1469,12 @@ const styles = StyleSheet.create({
 		borderRadius: 4,
 		alignSelf: 'flex-start',
 	},
-	billInputRow: {
-		marginTop: 16,
-		paddingTop: 16,
-		borderTopWidth: 1,
-		borderTopColor: '#F1F5F9',
-	},
-	billInputLabel: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: '#4A5B62',
-		marginBottom: 8,
-	},
-	billInputWrapper: {
-		flexDirection: 'row',
-		gap: 10,
-	},
+	billInputRow: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+	billInputLabel: { fontSize: 13, fontWeight: '600', color: '#4A5B62', marginBottom: 8 },
+	billInputWrapper: { flexDirection: 'row', gap: 10 },
 	billTextInput: {
 		flex: 1,
 		height: 40,
-		backgroundColor: '#FFF',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		borderRadius: 8,
 		paddingHorizontal: 12,
 		fontSize: 14,
 		color: '#1A2C33',
@@ -1650,26 +1485,10 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		borderRadius: 8,
 	},
-	saveBillButtonDisabled: {
-		backgroundColor: '#A3D1D5',
-	},
-	saveBillButtonText: {
-		color: '#FFF',
-		fontSize: 13,
-		fontWeight: '700',
-	},
-	rejectionReasonBox: {
-		marginTop: 14,
-		paddingTop: 14,
-		borderTopWidth: 1,
-		borderTopColor: '#F1F5F9',
-	},
-	rejectionReasonLabel: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: '#C62828',
-		marginBottom: 6,
-	},
+	saveBillButtonDisabled: { backgroundColor: '#A3D1D5' },
+	saveBillButtonText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+	rejectionReasonBox: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+	rejectionReasonLabel: { fontSize: 13, fontWeight: '600', color: '#C62828', marginBottom: 6 },
 	rejectionReasonInput: {
 		backgroundColor: '#FFF',
 		borderWidth: 1,
@@ -1691,22 +1510,9 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		height: 40,
 	},
-	receiptHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginBottom: 12,
-	},
-	receiptOrderNo: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#1A2C33',
-	},
-	receiptDate: {
-		fontSize: 12,
-		color: '#6B7A82',
-		marginTop: 2,
-	},
+	receiptHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+	receiptOrderNo: { fontSize: 16, fontWeight: '700', color: '#1A2C33' },
+	receiptDate: { fontSize: 12, color: '#6B7A82', marginTop: 2 },
 	receiptDivider: {
 		borderWidth: 0.5,
 		borderColor: '#CBD5E1',
@@ -1714,46 +1520,14 @@ const styles = StyleSheet.create({
 		marginVertical: 12,
 		height: 0,
 	},
-	patientProfileHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		marginBottom: 12,
-	},
-	patientSubText: {
-		fontSize: 12,
-		color: '#6B7A82',
-		marginTop: 2,
-	},
-	profileDivider: {
-		height: 1,
-		backgroundColor: '#F1F5F9',
-		marginVertical: 12,
-	},
-	profileDetailsGrid: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		gap: 16,
-		marginBottom: 14,
-	},
-	profileDetailsGridStacked: {
-		flexDirection: 'column',
-		gap: 12,
-		marginBottom: 14,
-	},
-	profileDetailsColumn: {
-		flex: 1,
-	},
-	borderLeft: {
-		borderLeftWidth: 1,
-		borderLeftColor: '#F1F5F9',
-		paddingLeft: 16,
-	},
-	borderTop: {
-		borderTopWidth: 1,
-		borderTopColor: '#F1F5F9',
-		paddingTop: 12,
-	},
+	patientProfileHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+	patientSubText: { fontSize: 12, color: '#6B7A82', marginTop: 2 },
+	profileDivider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 12 },
+	profileDetailsGrid: { flexDirection: 'row', justifyContent: 'space-between', gap: 16, marginBottom: 14 },
+	profileDetailsGridStacked: { flexDirection: 'column', gap: 12, marginBottom: 14 },
+	profileDetailsColumn: { flex: 1 },
+	borderLeft: { borderLeftWidth: 1, borderLeftColor: '#F1F5F9', paddingLeft: 16 },
+	borderTop: { borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12 },
 	profileSectionTitle: {
 		fontSize: 12,
 		fontWeight: '700',
@@ -1762,11 +1536,7 @@ const styles = StyleSheet.create({
 		textTransform: 'uppercase',
 		letterSpacing: 0.5,
 	},
-	profileActionsRow: {
-		flexDirection: 'row',
-		gap: 10,
-		marginTop: 6,
-	},
+	profileActionsRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
 	profileCallBtn: {
 		flex: 1,
 		flexDirection: 'row',
@@ -1776,165 +1546,22 @@ const styles = StyleSheet.create({
 		paddingVertical: 10,
 		borderRadius: 20,
 	},
-	profileCallBtnText: {
-		color: '#fff',
-		fontSize: 12,
-		fontWeight: '700',
-	},
-	emergencyRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 4,
-	},
-	emergencyText: {
-		fontSize: 11,
-		color: '#E57373',
-		fontWeight: '600',
-	},
-})
-
-const mobileMedStyles = StyleSheet.create({
-	cardList: {
-		gap: 12,
-	},
-	medCard: {
-		backgroundColor: '#F8FCFC',
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		padding: 12,
-		marginBottom: 4,
-	},
-	cardHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginBottom: 10,
-		borderBottomWidth: 1,
-		borderBottomColor: '#E2E8F0',
-		paddingBottom: 6,
-	},
-	headerLeft: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	cardIndexText: {
-		fontSize: 12,
-		fontWeight: '700',
-		color: '#2E7C86',
-	},
-	deleteIconBtn: {
-		padding: 4,
-	},
-	inputGroup: {
-		marginBottom: 10,
-	},
-	inputLabel: {
-		fontSize: 11,
-		color: '#6B7A82',
-		fontWeight: '600',
-		marginBottom: 4,
-	},
-	textInput: {
-		fontSize: 13,
-		color: '#1A2C33',
-		backgroundColor: '#FFFFFF',
-		borderRadius: 6,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		paddingVertical: 6,
-		paddingHorizontal: 10,
-		height: 36,
-	},
-	rowFields: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-	},
-})
-
-const flexTableStyles = StyleSheet.create({
-	tableContainer: {
-		backgroundColor: '#F8FCFC',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		paddingVertical: 8,
-	},
-	headerRow: {
-		flexDirection: 'row',
-		borderBottomWidth: 1,
-		borderBottomColor: '#E2E8F0',
-		paddingBottom: 8,
-		marginBottom: 8,
-		paddingHorizontal: 12,
-	},
-	headerCell: { fontSize: 12, fontWeight: '700', color: '#2E7C86' },
-	medicationCell: { flex: 2.5 },
-	frequencyCell: { flex: 1.2 },
-	totalCell: { flex: 0.8 },
-	purchasedCell: { flex: 0.9 },
-	instructionsCell: { flex: 1.8 },
-	deleteCell: { flex: 0.4, alignItems: 'center' },
-	row: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#F1F5F9',
-	},
-	cellInput: {
-		fontSize: 13,
-		color: '#1A2C33',
-		paddingVertical: 8,
-		paddingHorizontal: 6,
-		backgroundColor: '#FFFFFF',
-		borderRadius: 6,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		marginRight: 8,
-	},
-	deleteButton: { flex: 0.4, alignItems: 'center', justifyContent: 'center' },
+	profileCallBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 })
 
 const scrollTableStyles = StyleSheet.create({
-	tableContainer: {
-		backgroundColor: '#F8FCFC',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		paddingVertical: 8,
-	},
-	headerRow: {
-		flexDirection: 'row',
-		borderBottomWidth: 1,
-		borderBottomColor: '#E2E8F0',
-		paddingBottom: 8,
-		marginBottom: 8,
-		paddingHorizontal: 12,
-	},
-	headerCell: { fontSize: 12, fontWeight: '700', color: '#2E7C86', marginRight: 8 },
-	row: {
+	imageKeyInfo: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#F1F5F9',
+		justifyContent: 'center',
+		paddingVertical: 10,
+		gap: 6,
 	},
-	cellInput: {
+	imageKeyText: {
 		fontSize: 13,
-		color: '#1A2C33',
-		paddingVertical: 8,
-		paddingHorizontal: 6,
-		backgroundColor: '#FFFFFF',
-		borderRadius: 6,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		marginRight: 8,
+		color: '#1f5f68',
+		fontWeight: '500',
 	},
-	deleteButton: { width: 50, alignItems: 'center', justifyContent: 'center' },
 })
 
 export default OrderDetailsScreen
