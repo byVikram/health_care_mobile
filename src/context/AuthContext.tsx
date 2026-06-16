@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { setUnauthorizedHandler } from '../services/apiService'
 
-export type UserRole = 'doctor' | 'patient' | 'pharmacy'
+export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology'
 
 export interface AuthUser {
 	id?: string
@@ -27,14 +27,23 @@ export interface AuthState {
 	setSelectedHospitalId: (id: string | null) => void
 
 	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string) => Promise<void>
+	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string) => Promise<void>
 
 	updateUser: (updates: Partial<AuthUser>) => Promise<void>
+	updateUser: (updates: Partial<AuthUser>) => Promise<void>
 
+	clearAuth: () => Promise<void>
 	clearAuth: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState>({} as AuthState)
 
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+	const [role, setRole] = useState<UserRole | null>(null)
+	const [user, setUser] = useState<AuthUser | null>(null)
+	const [accessToken, setAccessToken] = useState<string | null>(null)
+	const [refreshToken, setRefreshToken] = useState<string | null>(null)
+	const [isLoading, setIsLoading] = useState(true)
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	const [role, setRole] = useState<UserRole | null>(null)
 	const [user, setUser] = useState<AuthUser | null>(null)
@@ -62,6 +71,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		setSelectedHospitalIdState(id)
 	}
 
+	useEffect(() => {
+		const load = async () => {
+			const role = await AsyncStorage.getItem('role')
+			const user = await AsyncStorage.getItem('user')
+			const token = await AsyncStorage.getItem('access_token')
 	useEffect(() => {
 		const load = async () => {
 			const role = await AsyncStorage.getItem('role')
