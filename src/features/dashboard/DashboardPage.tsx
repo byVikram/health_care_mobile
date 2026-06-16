@@ -41,6 +41,7 @@ import { ROUTES } from '../../navigation/routes'
 import type { AppNavigationParamList } from '../../navigation/types'
 
 import PatientHealthQuestionsList from '../dashboard/components/PatientHealthQuestionsList'
+import { AppButton } from '../../components/common'
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
@@ -283,7 +284,19 @@ export default function DashboardPage() {
 				<BlogsSection />
 				<PodcastsSection />
 
-				{role !== USER_ROLES.PHARMACY && <PatientHealthQuestionsList showViewAll={true} />}
+				{role !== USER_ROLES.PHARMACY && (
+					<>
+						<PatientHealthQuestionsList showViewAll={true} />
+
+						{role === USER_ROLES.PATIENT && (
+							<View style={styles.askQuestionContainer}>
+								<AppButton onPress={() => navigation.navigate(ROUTES.STACK.ASK_FREE_QUESTION)}>
+									Ask a Free Question
+								</AppButton>
+							</View>
+						)}
+					</>
+				)}
 			</Animated.ScrollView>
 
 			<StatusModal
@@ -299,6 +312,27 @@ export default function DashboardPage() {
 }
 
 const styles = StyleSheet.create({
+	askQuestionContainer: {
+		marginHorizontal: 16,
+		marginTop: 12,
+		marginBottom: 8,
+	},
+	askQuestionButton: {
+		marginHorizontal: 16,
+		marginTop: 12,
+		marginBottom: 8,
+		backgroundColor: '#0C7C7C',
+		borderRadius: 12,
+		paddingVertical: 14,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+
+	askQuestionText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
+	},
 	container: {
 		flex: 1,
 		backgroundColor: '#f5f5f5',
