@@ -195,24 +195,30 @@ export default function DateSlotPicker(props: PickProps) {
 			)}
 
 			{/* Date Strip */}
-			<ScrollView
-				horizontal
-				showsHorizontalScrollIndicator={false}
-				contentContainerStyle={styles.dateStripContent}
-			>
-				<View style={styles.dateStrip}>
-					<TouchableOpacity
-						style={[styles.dateStripArrow, !canNavigatePrevWeek && styles.dateStripArrowDisabled]}
-						onPress={handlePrevWeek}
-						activeOpacity={canNavigatePrevWeek ? 0.7 : 1}
-						disabled={!canNavigatePrevWeek}
-					>
-						<MaterialCommunityIcons
-							name="chevron-left"
-							size={22}
-							color={canNavigatePrevWeek ? '#0c7c7c' : '#b8c2c8'}
-						/>
-					</TouchableOpacity>
+			<View style={styles.dateStripRow}>
+				<TouchableOpacity
+					style={[styles.dateStripArrow, !canNavigatePrevWeek && styles.dateStripArrowDisabled]}
+					onPress={handlePrevWeek}
+					activeOpacity={canNavigatePrevWeek ? 0.7 : 1}
+					disabled={!canNavigatePrevWeek}
+				>
+					<MaterialCommunityIcons
+						name="chevron-left"
+						size={22}
+						color={canNavigatePrevWeek ? '#0c7c7c' : '#b8c2c8'}
+					/>
+				</TouchableOpacity>
+
+				<ScrollView
+					horizontal
+					nestedScrollEnabled
+					directionalLockEnabled
+					showsHorizontalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
+					style={styles.dateCardsScroll}
+					contentContainerStyle={styles.dateStripContent}
+				>
+					<View style={styles.dateStrip}>
 					{weekDates.map((date) => {
 						const isSelected = selectedDate ? isSameDay(date, selectedDate) : false
 						const past = isPast(date)
@@ -255,15 +261,17 @@ export default function DateSlotPicker(props: PickProps) {
 							</TouchableOpacity>
 						)
 					})}
-					<TouchableOpacity
-						style={styles.dateStripArrow}
-						onPress={handleNextWeek}
-						activeOpacity={0.7}
-					>
-						<MaterialCommunityIcons name="chevron-right" size={22} color="#0c7c7c" />
-					</TouchableOpacity>
-				</View>
-			</ScrollView>
+					</View>
+				</ScrollView>
+
+				<TouchableOpacity
+					style={styles.dateStripArrow}
+					onPress={handleNextWeek}
+					activeOpacity={0.7}
+				>
+					<MaterialCommunityIcons name="chevron-right" size={22} color="#0c7c7c" />
+				</TouchableOpacity>
+			</View>
 
 			{showTimeSlots ? (
 				<>
@@ -541,6 +549,14 @@ const styles = StyleSheet.create({
 	chevron: {
 		padding: 4,
 	},
+	dateStripRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		width: '100%',
+	},
+	dateCardsScroll: {
+		flex: 1,
+	},
 	dateStrip: {
 		flexDirection: 'row',
 		justifyContent: 'flex-start',
@@ -556,7 +572,7 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginRight: 10,
+		flexShrink: 0,
 	},
 	dateStripArrowDisabled: {
 		opacity: 0.55,

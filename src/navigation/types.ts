@@ -58,7 +58,7 @@ export type AppStackParamList = {
 	[ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
 	[ROUTES.STACK.SEARCH]: undefined
 	[ROUTES.STACK.DOCTOR_SEARCH]:
-		| { query?: string; specialityId?: string; mode?: 'all' | 'video' | 'clinic' }
+		| { query?: string; specialityId?: string; specialityName?: string; mode?: 'all' | 'video' | 'clinic' }
 		| undefined
 	[ROUTES.STACK.DOCTOR_DETAIL]: { id: string }
 	[ROUTES.STACK.FAVOURITE_DOCTOR]: undefined
@@ -77,6 +77,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.ORDER_LIST]: undefined
 	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
 	[ROUTES.STACK.PLACE_PHARMACY_ORDER]: { pharmacyId: string; pharmacyName: string }
+	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
 	[ROUTES.STACK.PATIENT_PAYMENT]:
 		| {

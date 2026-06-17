@@ -534,6 +534,8 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 				contentContainerStyle={styles.screenContent}
 				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
+				nestedScrollEnabled
+				directionalLockEnabled
 			>
 				<View style={[styles.card, isTablet && styles.cardTablet, { maxWidth: contentWidth },]}>
 					<View style={styles.fieldGroup}>

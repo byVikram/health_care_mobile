@@ -96,10 +96,9 @@ function ConsultSection() {
 					style={styles.viewAllBtn}
 					labelStyle={{ fontSize: 12 }}
 					onPress={() =>
-						navigation.navigate(ROUTES.MAIN.TABS, {
-							screen: ROUTES.MAIN.SEARCH,
-						})
-					}
+					navigation.navigate(ROUTES.STACK.ALL_SPECIALITIES as never)
+						}
+					
 				>
 					View All
 				</Button>
