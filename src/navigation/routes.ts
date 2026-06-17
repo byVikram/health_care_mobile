@@ -41,5 +41,10 @@ export const ROUTES = {
 
 		PATIENT_QUESTIONS_LIST: 'PatientQuestionsList',
 		PATIENT_QUESTION_DETAIL: 'PatientQuestionDetail',
+
+		RADIOLOGY_LIST: 'RadiologySearchPage',
+		RADIOLOGY_ORDERS: 'OrderListRadiologyPage',
+		PLACE_RADIOLOGY_ORDER: 'PlaceRadiologyOrder',
+		RADIOLOGY_ORDER_DETAIL: 'BookingDetailsRadiologyPage',
 	},
 } as const

@@ -27,13 +27,10 @@ export interface AuthState {
 	setSelectedHospitalId: (id: string | null) => void
 
 	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string) => Promise<void>
-	
 
 	updateUser: (updates: Partial<AuthUser>) => Promise<void>
-	
 
 	clearAuth: () => Promise<void>
-	
 }
 
 const AuthContext = createContext<AuthState>({} as AuthState)
@@ -68,6 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	useEffect(() => {
 		const load = async () => {
 			const role = await AsyncStorage.getItem('role')
+			console.log('[PlaceRadiologyOrderPage] active role:', role)
 			const user = await AsyncStorage.getItem('user')
 			const token = await AsyncStorage.getItem('access_token')
 

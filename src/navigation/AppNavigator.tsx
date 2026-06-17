@@ -32,7 +32,10 @@ import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 
 import PatientHealthQuestionsList from '../features/dashboard/components/PatientHealthQuestionsList'
 import PatientHealthQuestionDetail from '../features/dashboard/components/PatientHealthQuestionDetail'
-
+import PlaceRadiologyOrderPage from '../features/radiology/PlaceRadiologyOrderPage'
+import RadiologyBookingDetailsPage from '../features/radiology/BookingDetailsRadiologyPage'
+import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
+import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -69,6 +72,11 @@ function AuthenticatedNavigator() {
 				options={{ headerShown: true, title: 'Pharmacies' }}
 			/>
 			<AppStack.Screen
+				name={ROUTES.STACK.RADIOLOGY_ORDERS as keyof AppStackParamList}
+				component={OrderListRadiologyPage}
+				options={{ headerShown: true, title: 'Radiology Orders' }}
+			/>
+			<AppStack.Screen
 				name={ROUTES.STACK.ORDER_LIST}
 				component={OrderListPage}
 				options={{ headerShown: true, title: 'Medicine Orders' }}
@@ -82,6 +90,21 @@ function AuthenticatedNavigator() {
 				name={ROUTES.STACK.PLACE_PHARMACY_ORDER}
 				component={PlacePharmacyOrderPage}
 				options={{ headerShown: true, title: 'Order Medicines' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.RADIOLOGY_LIST as keyof AppStackParamList}
+				component={RadiologySearchPage}
+				options={{ headerShown: true, title: 'Radiology' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.PLACE_RADIOLOGY_ORDER}
+				component={PlaceRadiologyOrderPage}
+				options={{ headerShown: true, title: 'Book Radiology Scan' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.RADIOLOGY_ORDER_DETAIL as keyof AppStackParamList}
+				component={RadiologyBookingDetailsPage}
+				options={{ headerShown: true, title: 'Radiology Detail' }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.DOCTOR_SEARCH}

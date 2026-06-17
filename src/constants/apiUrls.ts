@@ -104,6 +104,7 @@ export const API_ENDPOINTS = {
 		SEND_REMINDER: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/remind`,
 	},
 	RADIOLOGY_PROFILE: {
+		SEARCH: `${BASE_URL}/api/radiology/search`, // Add this line
 		DETAILS: `${BASE_URL}/api/radiology/profile`,
 		UPDATE: `${BASE_URL}/api/radiology/profile`,
 		SCAN_TYPES: `${BASE_URL}/api/radiology/scan-types`,

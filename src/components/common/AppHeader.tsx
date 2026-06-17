@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, TextInput, View, Alert, Animated } 
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-
+import { USER_ROLES } from '../../constants/constants'
 import DoctorHospitalDropdown from './DoctorHospitalDropdown'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
@@ -39,13 +39,14 @@ export default function AppHeader({
 	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
 	const { user, role } = useAuth()
-
 	const scrollData = useScroll()
 	const scrollY = scrollData?.scrollY
 
 	const isDoctor = role === 'doctor'
 	const isPharmacy = role === 'pharmacy'
-	const isPatient = !isDoctor && !isPharmacy
+
+	const isRadiology = role === USER_ROLES.RADIOLOGY
+	const isPatient = !isDoctor && !isPharmacy && !isRadiology
 
 	// Option B GPU animation values
 	const maxScroll = isDoctor ? 40 : 60
@@ -96,28 +97,32 @@ export default function AppHeader({
 		displayName = userName
 	}
 
-	const searchPlaceholder = isPharmacy ? 'Search order ID' : 'Search Doctors/Symptoms'
+	const searchPlaceholder = isPharmacy
+		? 'Search Order ID'
+		: isRadiology
+			? 'Search Radiology ID'
+			: 'Search Doctors/Symptoms'
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	const handleSearchPress = () => {
+		console.log('onSearchPress =', onSearchPress)
+		console.log('isRadiology =', isRadiology)
+
 		if (onSearchPress) {
+			console.log('Using parent onSearchPress')
 			onSearchPress()
 			return
 		}
 
-		// For pharmacy role, navigate to pharmacy search page; otherwise general search
 		if (isPharmacy) {
-			if (navigation && ROUTES.STACK.ORDER_LIST) {
-				navigation.navigate(ROUTES.STACK.ORDER_LIST)
-			} else {
-				Alert.alert('Error', 'Pharmacy search page not available')
-			}
+			console.log('ORDER_LIST')
+			navigation.navigate(ROUTES.STACK.ORDER_LIST)
+		} else if (isRadiology) {
+			console.log('RADIOLOGY_ORDERS')
+			navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS)
 		} else {
-			if (navigation && ROUTES.STACK.SEARCH) {
-				navigation.navigate(ROUTES.STACK.SEARCH)
-			} else {
-				Alert.alert('Error', 'Search page not available')
-			}
+			console.log('SEARCH')
+			navigation.navigate(ROUTES.STACK.SEARCH)
 		}
 	}
 

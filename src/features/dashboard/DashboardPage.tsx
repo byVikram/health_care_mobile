@@ -17,6 +17,7 @@ import SpecialitySection from './components/SpecialitySection'
 import ConsultSection from './components/ConsultSection'
 import PatientQuestionsSection from './components/PatientQuestionsSection'
 import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
+
 import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
 import CommunitySection from './components/CommunitySection'
 import LocationScreen from '../../components/common/LocationScreen'
@@ -199,7 +200,11 @@ export default function DashboardPage() {
 			<GPSLocationCard />
 		</>
 	)
-
+	const renderRadiologyPanel = () => (
+		<>
+			<GPSLocationCard />
+		</>
+	)
 	const renderRoleBasedPanel = () => {
 		switch (role) {
 			case USER_ROLES.DOCTOR:
@@ -208,13 +213,16 @@ export default function DashboardPage() {
 			case USER_ROLES.PHARMACY:
 				return renderPharmacyPanel()
 
+			case USER_ROLES.RADIOLOGY:
+				return renderRadiologyPanel()
+
 			default:
 				return renderUserPanel()
 		}
 	}
 
 	const renderMainContent = () => {
-		if (role !== USER_ROLES.DOCTOR && role !== USER_ROLES.PHARMACY) {
+		if (role !== USER_ROLES.DOCTOR && role !== USER_ROLES.PHARMACY && role !== USER_ROLES.RADIOLOGY) {
 			return (
 				<>
 					<HeroSection role={role} />
