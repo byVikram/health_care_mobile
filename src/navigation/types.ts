@@ -97,6 +97,11 @@ export type AppStackParamList = {
 				fee: number
 		  }
 		| undefined
+	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: undefined
+	[ROUTES.STACK.PATIENT_QUESTION_DETAIL]: { questionId: string } | undefined
+	[ROUTES.STACK.RADIOLOGY_LIST]: undefined
+	[ROUTES.STACK.RADIOLOGY_ORDERS]: undefined
+	[ROUTES.STACK.RADIOLOGY_ORDER_DETAIL]: { publicId: string; booking?: any }
 }
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList

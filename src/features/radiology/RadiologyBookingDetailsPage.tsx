@@ -23,7 +23,15 @@ import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AppSkeleton, AppSelect, StatusModal } from '../../components/common'
-import { fetchRadiologyBookingDetail, updateRadiologyBookingStatus, type RadiologyBooking } from './RadiologyService'
+import {
+	fetchRadiologyBookingDetail,
+	updateRadiologyBookingStatus,
+	submitRadiologyBookingQuote,
+	verifyRadiologyPrescription,
+	confirmRadiologyPayment,
+	fetchRadiologyScans,
+	type RadiologyBooking,
+} from './RadiologyService'
 import { useAuth } from '../../context/AuthContext'
 
 // ─────────────────────────────────────────────
@@ -70,8 +78,12 @@ const formatDisplayDate = (isoDate: string) =>
 
 const formatDisplayTime = (time: string) => {
 	if (!time) return ''
+	if (['morning', 'afternoon', 'evening'].includes(time.toLowerCase())) {
+		return time.charAt(0).toUpperCase() + time.slice(1).toLowerCase()
+	}
 	const parts = time.split(':')
 	const hours = parseInt(parts[0], 10)
+	if (isNaN(hours)) return time
 	const minutes = parts[1] || '00'
 	const ampm = hours >= 12 ? 'PM' : 'AM'
 	const h12 = hours % 12 || 12
@@ -433,6 +445,99 @@ export default function RadiologyBookingDetailsPage() {
 		description: string
 	} | null>(null)
 
+	interface EditedBookingItem {
+		id?: number
+		radiology_scan_id?: number
+		name: string
+		price: string
+		base_price?: string
+	}
+
+	const [editedItems, setEditedItems] = useState<EditedBookingItem[]>([])
+	const [centerScans, setCenterScans] = useState<any[]>([])
+	const [loadingCenterScans, setLoadingCenterScans] = useState(false)
+
+	useEffect(() => {
+		if (booking?.booking_items) {
+			const items = booking.booking_items.map((item) => ({
+				id: item.id,
+				radiology_scan_id: item.radiology_scan?.id,
+				name: item.custom_scan_name || item.radiology_scan?.scan_type?.name || 'Scan',
+				price:
+					item.quoted_price !== null && item.quoted_price !== undefined
+						? item.quoted_price.toString()
+						: item.radiology_scan?.base_price !== null && item.radiology_scan?.base_price !== undefined
+							? item.radiology_scan.base_price.toString()
+							: '0',
+				base_price:
+					item.radiology_scan?.base_price !== null && item.radiology_scan?.base_price !== undefined
+						? item.radiology_scan.base_price.toString()
+						: '0',
+			}))
+			setEditedItems(items)
+		}
+	}, [booking])
+
+	useEffect(() => {
+		if (
+			role === 'radiology' &&
+			(booking?.status === 'pending_quote' || booking?.status === 'pending_payment') &&
+			booking?.radiology_public_id
+		) {
+			const loadScans = async () => {
+				try {
+					setLoadingCenterScans(true)
+					const scans = await fetchRadiologyScans(booking.radiology_public_id, accessToken)
+					setCenterScans(scans)
+				} catch (err) {
+					console.error('[RadiologyBookingDetails] failed to load center scans:', err)
+				} finally {
+					setLoadingCenterScans(false)
+				}
+			}
+			loadScans()
+		}
+	}, [role, booking?.status, booking?.radiology_public_id, accessToken])
+
+	const availableScanOptions = useMemo(() => {
+		const selectedIds = new Set(editedItems.map((item) => item.radiology_scan_id))
+		return centerScans
+			.filter((scan) => !selectedIds.has(scan.id))
+			.map((scan) => ({
+				label: `${scan.scan_type?.name} (₹${scan.base_price || 0})`,
+				value: scan.id.toString(),
+			}))
+	}, [centerScans, editedItems])
+
+	const handleAddScan = (scanIdStr: string) => {
+		const scanId = parseInt(scanIdStr, 10)
+		const scan = centerScans.find((s) => s.id === scanId)
+		if (scan) {
+			setEditedItems((prev) => [
+				...prev,
+				{
+					radiology_scan_id: scan.id,
+					name: scan.scan_type?.name || 'New Scan',
+					price: scan.base_price ? scan.base_price.toString() : '0',
+					base_price: scan.base_price ? scan.base_price.toString() : '0',
+				},
+			])
+		}
+	}
+
+	const handleDeleteScan = (index: number) => {
+		setEditedItems((prev) => prev.filter((_, i) => i !== index))
+	}
+
+	const computedTotalFee = useMemo(() => {
+		let total = 0
+		editedItems.forEach((item) => {
+			const val = parseFloat(item.price || '0')
+			if (!isNaN(val)) total += val
+		})
+		return total.toFixed(2)
+	}, [editedItems])
+
 	// ── Document viewer state ──
 	const [viewerVisible, setViewerVisible] = useState(false)
 	const [viewerIndex, setViewerIndex] = useState(0)
@@ -517,15 +622,12 @@ export default function RadiologyBookingDetailsPage() {
 		if (!booking) return
 		setUpdating(true)
 		try {
-			await updateRadiologyBookingStatus(accessToken, booking.public_id, {
-				status: 'confirmed',
-				total_price: parseFloat(finalFee) || 0,
-			})
+			await verifyRadiologyPrescription(accessToken, booking.public_id)
 			setStatusModal({
 				visible: true,
 				status: 'success',
-				title: 'Report Verified',
-				description: 'Radiology report has been verified and confirmed.',
+				title: 'Prescription Verified',
+				description: 'The prescription has been successfully verified.',
 			})
 			await fetchBooking()
 		} catch (error: any) {
@@ -533,7 +635,7 @@ export default function RadiologyBookingDetailsPage() {
 				visible: true,
 				status: 'error',
 				title: 'Error',
-				description: error?.message || 'Failed to verify report.',
+				description: error?.message || 'Failed to verify prescription.',
 			})
 		} finally {
 			setUpdating(false)
@@ -542,26 +644,50 @@ export default function RadiologyBookingDetailsPage() {
 
 	const handleConfirmBill = async () => {
 		if (!booking) return
-		const fee = parseFloat(finalFee)
-		if (isNaN(fee) || fee < 0) {
+
+		if (editedItems.length === 0) {
 			setStatusModal({
 				visible: true,
 				status: 'error',
-				title: 'Invalid Amount',
-				description: 'Please enter a valid non‑negative amount.',
+				title: 'No Scans Selected',
+				description: 'Please add at least one scan to the booking.',
 			})
 			return
 		}
+
+		const items = editedItems.map((item) => {
+			const price = parseFloat(item.price || '0')
+			return {
+				booking_item_id: item.id || null,
+				radiology_scan_id: item.id ? null : item.radiology_scan_id,
+				quoted_price: price,
+				custom_scan_name: item.name,
+			}
+		})
+
+		if (items.some((it) => isNaN(it.quoted_price) || it.quoted_price <= 0)) {
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Invalid Quote',
+				description: 'Please enter a valid positive quote price for all scan items.',
+			})
+			return
+		}
+
 		setUpdating(true)
 		try {
-			await updateRadiologyBookingStatus(accessToken, booking.public_id, {
-				total_price: fee,
+			await submitRadiologyBookingQuote(accessToken, booking.public_id, {
+				items,
+				prescription_verified: booking.prescription_verified,
+				notes: booking.notes || null,
 			})
+
 			setStatusModal({
 				visible: true,
 				status: 'success',
-				title: 'Bill Saved',
-				description: `Final radiology fee set to ₹${fee.toFixed(2)}`,
+				title: 'Quotation Submitted',
+				description: `Quotation of ₹${parseFloat(computedTotalFee).toFixed(2)} submitted successfully.`,
 			})
 			await fetchBooking()
 		} catch (error: any) {
@@ -569,7 +695,7 @@ export default function RadiologyBookingDetailsPage() {
 				visible: true,
 				status: 'error',
 				title: 'Error',
-				description: error?.message || 'Failed to save bill.',
+				description: error?.message || 'Failed to submit quotation.',
 			})
 		} finally {
 			setUpdating(false)
@@ -583,6 +709,31 @@ export default function RadiologyBookingDetailsPage() {
 			'This would open a file picker. After selecting, upload to S3 and update the booking.',
 			[{ text: 'OK' }]
 		)
+	}
+
+	// ── Payment handler ──
+	const handlePayment = async () => {
+		if (!booking) return
+		setUpdating(true)
+		try {
+			await confirmRadiologyPayment(accessToken, booking.public_id)
+			setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Payment Confirmed',
+				description: 'Your payment was successfully confirmed and booking is now scheduled.',
+			})
+			await fetchBooking()
+		} catch (error: any) {
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Error',
+				description: error?.message || 'Failed to complete payment.',
+			})
+		} finally {
+			setUpdating(false)
+		}
 	}
 
 	// ── Loading ──
@@ -614,11 +765,15 @@ export default function RadiologyBookingDetailsPage() {
 	const statusDisplay = normalizeStatus(booking.status)
 	const statusStyle = STATUS_STYLES[statusDisplay] || { bg: '#f0f0f0', text: '#555', dot: '#999' }
 
-	// Placeholder patient details – replace with real data from patient profile
-	const patientName = booking.patient_name || 'N/A'
-	const patientAge = '45'
-	const patientGender = 'Male'
+	// Real patient details from nested object (with fallbacks)
+	const patientName = booking.patient?.name || booking.patient_name || 'N/A'
+	const patientAge = booking.patient?.age != null ? String(booking.patient.age) : '—'
+	const patientGender = booking.patient?.gender || '—'
 	const patientId = booking.public_id ? `#${booking.public_id.slice(0, 8).toUpperCase()}` : 'N/A'
+	// Phone numbers from nested objects (with flat-field fallback)
+	const patientPhone = booking.patient?.phone || booking.patient_phone || ''
+	const radiologyPhone = booking.radiology?.phone || booking.radiology_phone || ''
+	const clinicPhone = booking.clinic?.phone || booking.doctor_phone || ''
 
 	// Billing status – can be derived from booking status or a dedicated field
 	const billingStatus = statusDisplay === 'Confirmed' || statusDisplay === 'Completed' ? 'Billed' : 'Pending Review'
@@ -627,7 +782,9 @@ export default function RadiologyBookingDetailsPage() {
 	const isPatient = role === 'patient'
 
 	if (isPatient) {
-		// Patient view – no edit actions
+		// Patient view
+		const isPendingPayment = booking.status === 'pending_payment' && booking.payment_status === 'pending'
+
 		return (
 			<View style={[styles.container, { paddingTop: insets.top }]}>
 				<ScrollView
@@ -646,18 +803,11 @@ export default function RadiologyBookingDetailsPage() {
 							</View>
 							<View style={styles.actionButtonsRow}>
 								<TouchableOpacity
-									style={[styles.callBtn, { backgroundColor: '#2E7C86' }]}
-									onPress={() => handleCall(booking.patient_phone || '', 'patient')}
-								>
-									<MaterialCommunityIcons name="phone" size={14} color="#fff" />
-									<Text style={styles.callBtnText}>Call Patient</Text>
-								</TouchableOpacity>
-								<TouchableOpacity
 									style={[styles.callBtn, { backgroundColor: '#5C6BC0' }]}
-									onPress={() => handleCall(booking.doctor_phone || '', 'clinic')}
+									onPress={() => handleCall(radiologyPhone, 'radiology')}
 								>
 									<MaterialCommunityIcons name="phone" size={14} color="#fff" />
-									<Text style={styles.callBtnText}>Call Clinic</Text>
+									<Text style={styles.callBtnText}>Call Radiology</Text>
 								</TouchableOpacity>
 							</View>
 						</View>
@@ -669,71 +819,66 @@ export default function RadiologyBookingDetailsPage() {
 							<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
 								<Text style={[styles.statusText, { color: statusStyle.text }]}>{billingStatus}</Text>
 							</View>
-							<TouchableOpacity
-								style={[styles.actionSelectBtn, { backgroundColor: '#1f5f68' }]}
-								onPress={() => Alert.alert('Action', 'Select Action: Verify Radiology Report')}
-							>
-								<Text style={styles.actionSelectText}>Select Action</Text>
-								<MaterialCommunityIcons name="chevron-down" size={18} color="#fff" />
-							</TouchableOpacity>
-						</View>
-
-						{/* Final Radiology Fee */}
-						<View style={styles.feeRow}>
-							<Text style={styles.feeLabel}>Final Radiology Fee</Text>
-							<Text style={styles.feeValue}>₹ {finalFee}</Text>
-						</View>
-						<TouchableOpacity
-							style={styles.confirmBillBtn}
-							onPress={() => Alert.alert('Confirm Bill', 'Bill would be confirmed.')}
-						>
-							<Text style={styles.confirmBillText}>Confirm & Save Bill</Text>
-						</TouchableOpacity>
-					</SectionCard>
-
-					{/* Document Control */}
-					<SectionCard title="Document Control">
-						<TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
-							<MaterialCommunityIcons name="cloud-upload" size={20} color="#1f5f68" />
-							<Text style={styles.uploadBtnText}>Upload Medical Report</Text>
-							<Text style={styles.uploadSubText}>PDF, JPG, PNG (Max 10MB)</Text>
-						</TouchableOpacity>
-
-						<View style={styles.digitalPrescriptionRow}>
-							<Text style={styles.digitalLabel}>Digital Prescription & Records</Text>
-							<TouchableOpacity>
-								<Text style={styles.viewAllText}>View All</Text>
-							</TouchableOpacity>
-						</View>
-
-						{/* File list */}
-						{docUrls.length > 0 ? (
-							<View style={styles.fileList}>
-								{docUrls.map((url, idx) => (
-									<View key={idx} style={styles.fileItem}>
-										<MaterialCommunityIcons name="file-pdf-box" size={20} color="#E74B5B" />
-										<Text style={styles.fileName}>CT_Scan_Report.pdf</Text>
-										<Text style={styles.fileDate}>Uploaded 24 Oct, 2023</Text>
-									</View>
-								))}
+							<View style={styles.feeRow}>
+								<Text style={styles.feeLabel}>Final Radiology Fee: </Text>
+								<Text style={styles.feeValue}>
+									{booking.total_price != null
+										? `₹ ${booking.total_price.toFixed(2)}`
+										: 'Awaiting Quote'}
+								</Text>
 							</View>
-						) : (
-							<Text style={styles.noDocsText}>No uploaded documents</Text>
+						</View>
+
+						{isPendingPayment && (
+							<TouchableOpacity
+								style={[styles.confirmBillBtn, { backgroundColor: '#0c7c7c', marginTop: 12 }]}
+								onPress={handlePayment}
+								disabled={updating}
+							>
+								<Text style={styles.confirmBillText}>{updating ? 'Processing...' : 'Pay Now'}</Text>
+							</TouchableOpacity>
 						)}
 					</SectionCard>
 
-					{/* Booking details (read‑only) */}
+					{/* Scan Items */}
+					<SectionCard title="Scan Items">
+						<View style={styles.fileList}>
+							{booking.booking_items.map((item, idx) => (
+								<View key={idx} style={styles.fileItem}>
+									<MaterialCommunityIcons name="radiology-box" size={20} color="#1f5f68" />
+									<Text style={styles.fileName}>
+										{item.custom_scan_name || item.radiology_scan?.scan_type?.name}
+									</Text>
+									<Text style={[styles.fileDate, { fontWeight: '700', color: '#1f5f68' }]}>
+										{item.quoted_price != null
+											? `₹${item.quoted_price.toFixed(2)}`
+											: item.radiology_scan?.base_price != null
+												? `₹${item.radiology_scan.base_price.toFixed(2)}`
+												: 'Awaiting Quote'}
+									</Text>
+								</View>
+							))}
+						</View>
+					</SectionCard>
+
+					{/* Booking Details */}
 					<SectionCard title="Booking Details">
 						<InfoRow label="Radiology Center" value={booking.radiology_name || 'N/A'} />
-						<InfoRow
-							label="Booking Date"
-							value={formatDateTime(booking.booking_date, booking.booking_time)}
-						/>
+						<InfoRow label="Booking Date" value={formatDisplayDate(booking.booking_date)} />
+						<InfoRow label="Booking Time" value={formatDisplayTime(booking.booking_time)} />
 						<InfoRow label="Status" value={statusDisplay} />
 						<InfoRow label="Payment Status" value={booking.payment_status || 'N/A'} />
-						<InfoRow
-							label="Total Amount"
-							value={booking.total_price != null ? `₹${booking.total_price.toFixed(2)}` : 'Not quoted'}
+						{booking.notes && <InfoRow label="Notes" value={booking.notes} />}
+					</SectionCard>
+
+					{/* Prescription Document preview */}
+					<SectionCard title="Prescription & Referral Document">
+						<DocumentCarousel
+							documents={docUrls}
+							onImagePress={(idx) => {
+								setViewerIndex(idx)
+								setViewerVisible(true)
+							}}
 						/>
 					</SectionCard>
 				</ScrollView>
@@ -761,14 +906,14 @@ export default function RadiologyBookingDetailsPage() {
 						<View style={styles.actionButtonsRow}>
 							<TouchableOpacity
 								style={[styles.callBtn, { backgroundColor: '#2E7C86' }]}
-								onPress={() => handleCall(booking.patient_phone || '', 'patient')}
+								onPress={() => handleCall(patientPhone, 'patient')}
 							>
 								<MaterialCommunityIcons name="phone" size={14} color="#fff" />
 								<Text style={styles.callBtnText}>Call Patient</Text>
 							</TouchableOpacity>
 							<TouchableOpacity
 								style={[styles.callBtn, { backgroundColor: '#5C6BC0' }]}
-								onPress={() => handleCall(booking.radiology_phone || '', 'clinic')}
+								onPress={() => handleCall(clinicPhone, 'clinic')}
 							>
 								<MaterialCommunityIcons name="phone" size={14} color="#fff" />
 								<Text style={styles.callBtnText}>Call Clinic</Text>
@@ -783,44 +928,108 @@ export default function RadiologyBookingDetailsPage() {
 						<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
 							<Text style={[styles.statusText, { color: statusStyle.text }]}>{billingStatus}</Text>
 						</View>
-						<View style={styles.selectActionWrapper}>
-							<AppSelect
-								placeholder="Select Action"
-								options={[{ label: 'Verify Radiology Report', value: 'verify' }]}
-								value={selectedAction}
-								onSelect={(val) => {
-									setSelectedAction(val)
-									if (val === 'verify') handleVerifyReport()
-								}}
-								size="form"
-								noMargin
-								customCardStyle={{ minWidth: 180, borderColor: '#CBD5E1' }}
-							/>
-						</View>
+						{(booking.status === 'pending_quote' || booking.status === 'pending_payment') && (
+							<View style={styles.selectActionWrapper}>
+								<AppSelect
+									placeholder="Select Action"
+									options={[{ label: 'Verify Prescription', value: 'verify' }]}
+									value={selectedAction}
+									onSelect={(val) => {
+										setSelectedAction(val)
+										if (val === 'verify') handleVerifyReport()
+									}}
+									size="form"
+									noMargin
+									customCardStyle={{ minWidth: 180, borderColor: '#CBD5E1' }}
+								/>
+							</View>
+						)}
 					</View>
 
-					{/* Final Radiology Fee */}
-					<View style={styles.feeRow}>
-						<Text style={styles.feeLabel}>Final Radiology Fee</Text>
-						<View style={styles.feeInputWrapper}>
-							<Text style={styles.feeCurrency}>₹</Text>
-							<TextInput
-								style={styles.feeInput}
-								keyboardType="numeric"
-								value={finalFee}
-								onChangeText={setFinalFee}
-								placeholder="0.00"
-								placeholderTextColor="#94A3B8"
-							/>
+					{booking.status === 'pending_quote' || booking.status === 'pending_payment' ? (
+						<View style={styles.quoteFormContainer}>
+							<Text style={styles.quoteInstruction}>Review and edit scan items for this booking:</Text>
+
+							{editedItems.map((item, index) => (
+								<View key={index} style={styles.quoteItemRow}>
+									<View style={styles.quoteItemLeft}>
+										<Text style={styles.quoteItemName} numberOfLines={2}>
+											{item.name}
+										</Text>
+										{item.base_price !== undefined && (
+											<Text style={styles.quoteItemBasePrice}>
+												Base Price: ₹{parseFloat(item.base_price || '0').toFixed(2)}
+											</Text>
+										)}
+									</View>
+									<View style={styles.quoteItemRight}>
+										<View style={styles.feeInputWrapper}>
+											<Text style={styles.feeCurrency}>₹</Text>
+											<TextInput
+												style={styles.feeInput}
+												keyboardType="numeric"
+												value={item.price}
+												onChangeText={(val) => {
+													setEditedItems((prev) => {
+														const next = [...prev]
+														next[index] = { ...next[index], price: val }
+														return next
+													})
+												}}
+												placeholder="0.00"
+												placeholderTextColor="#94A3B8"
+											/>
+										</View>
+										<TouchableOpacity
+											onPress={() => handleDeleteScan(index)}
+											style={styles.deleteScanBtn}
+											hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+										>
+											<MaterialCommunityIcons
+												name="trash-can-outline"
+												size={20}
+												color="#E74B5B"
+											/>
+										</TouchableOpacity>
+									</View>
+								</View>
+							))}
+
+							{availableScanOptions.length > 0 && (
+								<View style={{ marginTop: 12, marginBottom: 16 }}>
+									<AppSelect
+										placeholder="+ Add Scan Item"
+										options={availableScanOptions}
+										value={undefined}
+										onSelect={handleAddScan}
+										size="form"
+										noMargin
+										customCardStyle={{ borderColor: '#2E7C86', borderWidth: 1 }}
+									/>
+								</View>
+							)}
+
+							<View style={styles.feeTotalRow}>
+								<Text style={styles.feeLabel}>Total Quoted Price:</Text>
+								<Text style={styles.feeValue}>₹ {computedTotalFee}</Text>
+							</View>
+
+							<TouchableOpacity
+								style={[styles.confirmBillBtn, updating && { opacity: 0.7 }]}
+								onPress={handleConfirmBill}
+								disabled={updating}
+							>
+								<Text style={styles.confirmBillText}>Submit Quotation</Text>
+							</TouchableOpacity>
 						</View>
-						<TouchableOpacity
-							style={[styles.confirmBillBtn, updating && { opacity: 0.7 }]}
-							onPress={handleConfirmBill}
-							disabled={updating}
-						>
-							<Text style={styles.confirmBillText}>Confirm & Save Bill</Text>
-						</TouchableOpacity>
-					</View>
+					) : (
+						<View style={styles.readOnlyFeeRow}>
+							<Text style={styles.feeLabel}>Final Radiology Fee:</Text>
+							<Text style={styles.feeValue}>
+								₹ {booking.total_price != null ? booking.total_price.toFixed(2) : '0.00'}
+							</Text>
+						</View>
+					)}
 				</SectionCard>
 
 				{/* Document Control */}
@@ -870,7 +1079,9 @@ export default function RadiologyBookingDetailsPage() {
 							color={booking.prescription_verified ? '#43A047' : '#D9711B'}
 						/>
 						<Text style={styles.verificationText}>
-							{booking.prescription_verified ? 'Verified' : 'Pending Verification'}
+							{booking.prescription_verified
+								? `Verified by ${booking.verified_by_name || 'Staff'}`
+								: 'Pending Verification'}
 						</Text>
 					</View>
 				</SectionCard>
@@ -981,6 +1192,7 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		paddingHorizontal: 8,
 		backgroundColor: '#F8FAFC',
+		width: 100,
 	},
 	feeCurrency: { fontSize: 14, fontWeight: '600', color: '#64707d', marginRight: 4 },
 	feeInput: { flex: 1, height: 36, fontSize: 14, color: '#1A2C33', paddingVertical: 0 },
@@ -990,9 +1202,75 @@ const styles = StyleSheet.create({
 		paddingVertical: 10,
 		borderRadius: 8,
 		alignSelf: 'flex-start',
-		marginTop: 8,
+		marginTop: 12,
 	},
 	confirmBillText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+	quoteFormContainer: {
+		marginTop: 10,
+	},
+	quoteInstruction: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#4A5B62',
+		marginBottom: 10,
+	},
+	quoteItemRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#F8FAFC',
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+		padding: 12,
+		marginBottom: 10,
+		gap: 12,
+	},
+	quoteItemLeft: {
+		flex: 1,
+		flexDirection: 'column',
+		gap: 4,
+	},
+	quoteItemName: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#1A2C33',
+	},
+	quoteItemBasePrice: {
+		fontSize: 12,
+		color: '#64707D',
+		fontWeight: '500',
+	},
+	quoteItemRight: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	deleteScanBtn: {
+		width: 36,
+		height: 36,
+		borderRadius: 8,
+		backgroundColor: '#FFF5F5',
+		borderWidth: 1,
+		borderColor: '#FFE3E3',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	feeTotalRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#E2E8F0',
+		paddingTop: 10,
+	},
+	readOnlyFeeRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginTop: 4,
+	},
 	uploadBtn: {
 		borderWidth: 1,
 		borderColor: '#CBD5E1',

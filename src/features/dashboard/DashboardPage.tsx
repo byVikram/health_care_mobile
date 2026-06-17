@@ -298,7 +298,7 @@ export default function DashboardPage() {
 
 						{role === USER_ROLES.PATIENT && (
 							<View style={styles.askQuestionContainer}>
-								<AppButton onPress={() => navigation.navigate(ROUTES.STACK.ASK_FREE_QUESTION)}>
+								<AppButton onPress={() => navigation.navigate(ROUTES.STACK.PATIENT_QUESTIONS_LIST)}>
 									Ask a Free Question
 								</AppButton>
 							</View>

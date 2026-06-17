@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	useEffect(() => {
 		const load = async () => {
 			const role = await AsyncStorage.getItem('role')
-			console.log('[PlaceRadiologyOrderPage] active role:', role)
+			console.log('[AuthContext] active role:', role)
 			const user = await AsyncStorage.getItem('user')
 			const token = await AsyncStorage.getItem('access_token')
 

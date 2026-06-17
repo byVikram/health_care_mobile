@@ -146,6 +146,15 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				},
 			},
 			{
+				id: 'radiology-bookings',
+				label: 'Radiology Bookings',
+				icon: <MaterialCommunityIcons name="clipboard-text-play-outline" size={20} color="#1f5f68" />,
+				onPress: () => {
+					setIsSidebarOpen(false)
+					navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS as any)
+				},
+			},
+			{
 				id: 'ancillary',
 				label: 'Ancillary',
 				icon: <AncillaryIcon width={20} height={20} />,

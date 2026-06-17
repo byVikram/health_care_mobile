@@ -32,8 +32,8 @@ import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 
 import PatientHealthQuestionsList from '../features/dashboard/components/PatientHealthQuestionsList'
 import PatientHealthQuestionDetail from '../features/dashboard/components/PatientHealthQuestionDetail'
-import PlaceRadiologyOrderPage from '../features/radiology/PlaceRadiologyOrderPage'
-import RadiologyBookingDetailsPage from '../features/radiology/BookingDetailsRadiologyPage'
+import RadiologyBookingPage from '../features/radiology/RadiologyBookingPage'
+import RadiologyBookingDetailsPage from '../features/radiology/RadiologyBookingDetailsPage'
 import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
 import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
@@ -98,7 +98,7 @@ function AuthenticatedNavigator() {
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.PLACE_RADIOLOGY_ORDER}
-				component={PlaceRadiologyOrderPage}
+				component={RadiologyBookingPage}
 				options={{ headerShown: true, title: 'Book Radiology Scan' }}
 			/>
 			<AppStack.Screen

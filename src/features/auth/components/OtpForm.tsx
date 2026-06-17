@@ -102,7 +102,7 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 			// const role: UserRole =
 			// normalizedRole === 'doctor' ? 'doctor' : normalizedRole === 'pharmacy' ? 'pharmacy' : 'patient'
 
-			const role: UserRole = normalizedRole
+			const role = normalizedRole as UserRole
 
 			await setAuth(
 				role,

@@ -169,7 +169,7 @@ export default function RadiologySearchPage() {
 
 	// ── Handle Book Navigation ───────────────────
 	const handleBook = (item: RadiologyItem) => {
-		// Navigate to PlaceRadiologyOrderPage with the required params
+		// Navigate to RadiologyBookingPage with the required params
 		// Use the correct navigation method
 		navigation.navigate(ROUTES.STACK.PLACE_RADIOLOGY_ORDER, {
 			radiologyId: item.id,
