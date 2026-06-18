@@ -21,6 +21,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import ScanTypeSelectorModal from './component/Scantypeselectormodal'
 
 import { AppSkeleton, AppSelect, StatusModal } from '../../components/common'
 import {
@@ -94,7 +95,8 @@ const formatDateTime = (date: string, time: string) => `${formatDisplayDate(date
 
 // ─── S3 URL builder ──────────────────────────────────────────────────────────
 const S3_BASE_URL = process.env.REACT_APP_S3_BASE_URL || ''
-const buildS3Url = (key?: string | null): string | null => (key ? `${S3_BASE_URL}/${key}` : null)
+// const buildS3Url = (key?: string | null): string | null => (key ? `${S3_BASE_URL}/${key}` : null)
+const buildS3Url = (key?: string | null): string | null => key 
 
 // ─── Full‑screen image viewer ────────────────────────────────────────────────
 const ImageViewerModal = ({
@@ -421,6 +423,7 @@ const SectionCard = ({ title, children }: { title: string; children: React.React
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function RadiologyBookingDetailsPage() {
+	
 	const navigation = useNavigation<any>()
 	const route = useRoute()
 	const insets = useSafeAreaInsets()
@@ -626,8 +629,8 @@ export default function RadiologyBookingDetailsPage() {
 			setStatusModal({
 				visible: true,
 				status: 'success',
-				title: 'Prescription Verified',
-				description: 'The prescription has been successfully verified.',
+				title: 'diagnosis Verified',
+				description: 'The diagnosis has been successfully verified.',
 			})
 			await fetchBooking()
 		} catch (error: any) {
@@ -635,7 +638,7 @@ export default function RadiologyBookingDetailsPage() {
 				visible: true,
 				status: 'error',
 				title: 'Error',
-				description: error?.message || 'Failed to verify prescription.',
+				description: error?.message || 'Failed to verify diagnosis.',
 			})
 		} finally {
 			setUpdating(false)
@@ -872,7 +875,7 @@ export default function RadiologyBookingDetailsPage() {
 					</SectionCard>
 
 					{/* Prescription Document preview */}
-					<SectionCard title="Prescription & Referral Document">
+					<SectionCard title="diagnosis & Referral Document">
 						<DocumentCarousel
 							documents={docUrls}
 							onImagePress={(idx) => {
@@ -932,7 +935,7 @@ export default function RadiologyBookingDetailsPage() {
 							<View style={styles.selectActionWrapper}>
 								<AppSelect
 									placeholder="Select Action"
-									options={[{ label: 'Verify Prescription', value: 'verify' }]}
+									options={[{ label: 'Verify diagnosis', value: 'verify' }]}
 									value={selectedAction}
 									onSelect={(val) => {
 										setSelectedAction(val)
@@ -1034,20 +1037,13 @@ export default function RadiologyBookingDetailsPage() {
 
 				{/* Document Control */}
 				<SectionCard title="Document Control">
-					<TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
-						<MaterialCommunityIcons name="cloud-upload" size={20} color="#1f5f68" />
-						<Text style={styles.uploadBtnText}>Upload Medical Report</Text>
-						<Text style={styles.uploadSubText}>PDF, JPG, PNG (Max 10MB)</Text>
-					</TouchableOpacity>
-
 					<View style={styles.digitalPrescriptionRow}>
-						<Text style={styles.digitalLabel}>Digital Prescription & Records</Text>
+						<Text style={styles.digitalLabel}>Diagnosis & Records</Text>
 						<TouchableOpacity>
 							<Text style={styles.viewAllText}>View All</Text>
 						</TouchableOpacity>
 					</View>
 
-					{/* File list with carousel */}
 					<DocumentCarousel
 						documents={docUrls}
 						onImagePress={(idx) => {
@@ -1055,7 +1051,39 @@ export default function RadiologyBookingDetailsPage() {
 							setViewerVisible(true)
 						}}
 					/>
+
+					{/* QR Scan Section */}
+					<TouchableOpacity style={styles.scanBtn} >
+						<MaterialCommunityIcons name="qrcode-scan" size={22} color="#1f5f68" />
+						<View style={{ marginLeft: 10 }}>
+							<Text style={styles.scanBtnText}>Scan QR Code</Text>
+							<Text style={styles.scanSubText}>Retrieve Previous Diagnosis Reports</Text>
+						</View>
+					</TouchableOpacity>
+
+					{/* Upload Section */}
+					<TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
+						<MaterialCommunityIcons name="cloud-upload" size={20} color="#1f5f68" />
+						<Text style={styles.uploadBtnText}>Upload Diagnosis Report</Text>
+						<Text style={styles.uploadSubText}>PDF, JPG, PNG (Max 10MB)</Text>
+					</TouchableOpacity>
 				</SectionCard>
+				{/* <View style={styles.digitalPrescriptionRow}>
+						<Text style={styles.digitalLabel}>Diagnosis Prescription & Records</Text>
+						<TouchableOpacity>
+							<Text style={styles.viewAllText}>View All</Text>
+						</TouchableOpacity>
+					</View> */}
+
+				{/* File list with carousel */}
+				<DocumentCarousel
+						documents={docUrls}
+						onImagePress={(idx) => {
+							setViewerIndex(idx)
+							setViewerVisible(true)
+						}}
+					/>
+				{/* </SectionCard> */}
 
 				{/* Booking details */}
 				<SectionCard title="Booking Details">
@@ -1071,7 +1099,7 @@ export default function RadiologyBookingDetailsPage() {
 				</SectionCard>
 
 				{/* Prescription Verification */}
-				<SectionCard title="Prescription">
+				<SectionCard title="diagnosis">
 					<View style={styles.verificationRow}>
 						<MaterialCommunityIcons
 							name={booking.prescription_verified ? 'check-circle' : 'clock-alert'}
@@ -1121,6 +1149,29 @@ const InfoRow = ({ label, value }: { label: string; value: string | React.ReactN
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+	scanBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#f5fffd',
+		borderWidth: 1,
+		borderColor: '#1f5f68',
+		borderStyle: 'dashed',
+		borderRadius: 12,
+		padding: 16,
+		marginTop: 16,
+	},
+
+	scanBtnText: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#1f5f68',
+	},
+
+	scanSubText: {
+		fontSize: 12,
+		color: '#666',
+		marginTop: 2,
+	},
 	container: { flex: 1, backgroundColor: '#f4f6f8' },
 	centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
 	scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },

@@ -387,3 +387,5 @@ export function clearRadiologyCache() {
 	radiologyCache.clear()
 	cacheTimestamp = 0
 }
+export { ScanType }
+

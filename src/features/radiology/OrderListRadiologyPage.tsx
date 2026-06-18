@@ -213,7 +213,7 @@ const BookingCard = React.memo(function BookingCard({ booking, onPress, isRadiol
 					<View style={styles.reasonBadge}>
 						<MaterialCommunityIcons name="file-clock-outline" size={13} color="#D9711B" />
 						<Text style={styles.reasonText} numberOfLines={1}>
-							Prescription pending verification
+							diagnosis pending verification
 						</Text>
 					</View>
 				) : null}
@@ -304,6 +304,11 @@ const BookingCard = React.memo(function BookingCard({ booking, onPress, isRadiol
 export default function OrderListRadiologyPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
+	const [scanTypeId, setScanTypeId] = useState(route.params?.scanTypeId)
+	useEffect(() => {
+		console.log('📦 scanTypeId from route:', route.params?.scanTypeId)
+		setScanTypeId(route.params?.scanTypeId)
+	}, [route.params?.scanTypeId])
 	const insets = useSafeAreaInsets()
 	const { width, height } = useWindowDimensions()
 	const isTablet = width >= 768
@@ -350,8 +355,7 @@ export default function OrderListRadiologyPage() {
 
 	useEffect(() => {
 		setPage(1)
-	}, [debouncedSearch, statusFilter, dateFilter, fromDateFilter, toDateFilter, pageSize])
-
+	}, [debouncedSearch, statusFilter, dateFilter, fromDateFilter, toDateFilter, pageSize, scanTypeId])
 	// ── Fetch ──────────────────────────────────────────────────────────
 
 	const fetchBookings = useCallback(
@@ -380,6 +384,10 @@ export default function OrderListRadiologyPage() {
 	const filteredRows = useMemo(() => {
 		const q = debouncedSearch.trim().toLowerCase()
 		return allBookings
+			.filter((booking) => {
+				if (!scanTypeId) return true
+				return booking.booking_items.some((item) => item.radiology_scan?.scan_type?.id === scanTypeId)
+			})
 			.map((b) => mapBookingToRow(b, isRadiologyViewer))
 			.filter((row) => {
 				const matchesSearch =
@@ -390,7 +398,7 @@ export default function OrderListRadiologyPage() {
 				const matchesDate = matchesDateFilter(row.raw.booking_date, dateFilter, fromDateFilter, toDateFilter)
 				return matchesSearch && matchesDate
 			})
-	}, [allBookings, isRadiologyViewer, debouncedSearch, dateFilter, fromDateFilter, toDateFilter])
+	}, [allBookings, isRadiologyViewer, debouncedSearch, dateFilter, fromDateFilter, toDateFilter, scanTypeId])
 
 	const total = filteredRows.length
 	const pagedRows = useMemo(

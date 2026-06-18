@@ -36,6 +36,8 @@ import RadiologyBookingPage from '../features/radiology/RadiologyBookingPage'
 import RadiologyBookingDetailsPage from '../features/radiology/RadiologyBookingDetailsPage'
 import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
 import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage'
+import Component from 'react-native-paper/lib/typescript/components/List/ListItem'
+import ScanTypeSelectorModal from '../features/radiology/component/Scantypeselectormodal'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -106,6 +108,7 @@ function AuthenticatedNavigator() {
 				component={RadiologyBookingDetailsPage}
 				options={{ headerShown: true, title: 'Radiology Detail' }}
 			/>
+			
 			<AppStack.Screen
 				name={ROUTES.STACK.DOCTOR_SEARCH}
 				component={DoctorSearchPage}

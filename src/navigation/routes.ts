@@ -46,5 +46,6 @@ export const ROUTES = {
 		RADIOLOGY_ORDERS: 'OrderListRadiologyPage',
 		PLACE_RADIOLOGY_ORDER: 'PlaceRadiologyOrder',
 		RADIOLOGY_ORDER_DETAIL: 'BookingDetailsRadiologyPage',
+		RADIOLOGY_SCAN_TYPES: 'Scantypeselectormodal',
 	},
 } as const

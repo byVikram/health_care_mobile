@@ -99,10 +99,12 @@ export type AppStackParamList = {
 		| undefined
 	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: undefined
 	[ROUTES.STACK.PATIENT_QUESTION_DETAIL]: { questionId: string } | undefined
-	[ROUTES.STACK.RADIOLOGY_LIST]: undefined
+	[ROUTES.STACK.RADIOLOGY_LIST]: { scanTypeId?: number; scanTypeName?: string } | undefined
 	[ROUTES.STACK.RADIOLOGY_ORDERS]: undefined
 	[ROUTES.STACK.RADIOLOGY_ORDER_DETAIL]: { publicId: string; booking?: any }
+	[ROUTES.STACK.RADIOLOGY_SCAN_TYPES]: undefined
 }
+
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList
 export type AppNavigationParamList = RootStackParamList & MainTabParamList

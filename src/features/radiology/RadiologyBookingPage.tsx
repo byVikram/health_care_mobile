@@ -176,7 +176,7 @@ export default function RadiologyBookingPage() {
 			month: 'short',
 			year: 'numeric',
 		})
-		const docStr = t.doctor_name ? ` - Dr. ${t.doctor_name}` : ''
+		const docStr = t.doctor_name ? ` - ${t.doctor_name}` : ''
 		const hospStr = t.hospital_name ? ` (${t.hospital_name})` : ''
 		return { label: `${dateStr}${docStr}${hospStr}`, value: t.id }
 	})
@@ -188,7 +188,7 @@ export default function RadiologyBookingPage() {
 	// ── Submit ──
 	const handlePlaceOrder = async () => {
 		if (!selectedTreatmentId) {
-			Toast.show({ type: 'error', text1: 'Required', text2: 'Please select a consultation with a prescription.' })
+			Toast.show({ type: 'error', text1: 'Required', text2: 'Please select a consultation with a diagnosis.' })
 			return
 		}
 		if (selectedScanIds.length === 0) {
@@ -288,7 +288,7 @@ export default function RadiologyBookingPage() {
 						<View style={styles.emptyContainer}>
 							<MaterialCommunityIcons name="note-text-outline" size={36} color="#90a4ae" />
 							<AppTypography variant="body" style={styles.emptyMessage}>
-								No consultation history found. A valid referral prescription is required to book a scan.
+								No consultation history found. A valid referral diagnosis is required to book a scan.
 							</AppTypography>
 						</View>
 					) : (
@@ -336,7 +336,7 @@ export default function RadiologyBookingPage() {
 												Referring Doctor:
 											</AppTypography>
 											<AppTypography variant="body" style={styles.detailValue}>
-												Dr. {selectedTreatment.doctor_name}
+												 {selectedTreatment.doctor_name}
 											</AppTypography>
 										</View>
 									) : null}
@@ -344,7 +344,7 @@ export default function RadiologyBookingPage() {
 									{selectedTreatment.prescription_s3_key ? (
 										<View style={styles.detailRow}>
 											<AppTypography variant="caption" style={styles.detailLabel}>
-												Prescription Document (Tap to view full screen):
+												Diagnosis Document (Tap to view full screen):
 											</AppTypography>
 											<TouchableOpacity
 												style={styles.imageCard}
@@ -367,7 +367,7 @@ export default function RadiologyBookingPage() {
 														color="#1f5f68"
 													/>
 													<Text style={styles.imageKeyText} numberOfLines={1}>
-														Tap to expand prescription document
+														Tap to expand Diagnosis document
 													</Text>
 												</View>
 											</TouchableOpacity>
