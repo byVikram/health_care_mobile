@@ -46,6 +46,7 @@ export type PickProps = {
 	onSelectAll?: () => void
 	onUnselectAll?: () => void
 	showTimeSlots?: boolean
+	hideHeader?: boolean
 	hideNavigation?: boolean
 	use12HourTime?: boolean
 	showSlotStatusLabels?: boolean
@@ -76,6 +77,7 @@ export default function DateSlotPicker(props: PickProps) {
 		onSelectAll,
 		onUnselectAll,
 		showTimeSlots = true,
+		hideHeader = false,
 		hideNavigation = false,
 		use12HourTime = false,
 		showSlotStatusLabels = true,
@@ -171,44 +173,52 @@ export default function DateSlotPicker(props: PickProps) {
 	return (
 		<View style={[styles.container, isTablet && styles.containerTablet]}>
 			{/* Date Header */}
-			<View style={styles.dateHeader}>
-				<AppTypography variant="h4" style={styles.sectionTitle}>
-					{dateLabel}
-				</AppTypography>
-				{hideNavigation ? null : (
-					<View style={styles.monthNav}>
-						<TouchableOpacity onPress={handlePrevWeek} style={styles.chevron}>
-							<MaterialCommunityIcons name="chevron-left" size={20} color="#0c7c7c" />
-						</TouchableOpacity>
-						<AppTypography variant="body" style={styles.monthLabel}>
-							{monthLabel}
-						</AppTypography>
-						<TouchableOpacity onPress={handleNextWeek} style={styles.chevron}>
-							<MaterialCommunityIcons name="chevron-right" size={20} color="#0c7c7c" />
-						</TouchableOpacity>
-					</View>
-				)}
-			</View>
+			{hideHeader ? null : (
+				<View style={styles.dateHeader}>
+					<AppTypography variant="h4" style={styles.sectionTitle}>
+						{dateLabel}
+					</AppTypography>
+					{hideNavigation ? null : (
+						<View style={styles.monthNav}>
+							<TouchableOpacity onPress={handlePrevWeek} style={styles.chevron}>
+								<MaterialCommunityIcons name="chevron-left" size={20} color="#0c7c7c" />
+							</TouchableOpacity>
+							<AppTypography variant="body" style={styles.monthLabel}>
+								{monthLabel}
+							</AppTypography>
+							<TouchableOpacity onPress={handleNextWeek} style={styles.chevron}>
+								<MaterialCommunityIcons name="chevron-right" size={20} color="#0c7c7c" />
+							</TouchableOpacity>
+						</View>
+					)}
+				</View>
+			)}
 
 			{/* Date Strip */}
-			<ScrollView
-				horizontal
-				showsHorizontalScrollIndicator={false}
-				contentContainerStyle={styles.dateStripContent}
-			>
-				<View style={styles.dateStrip}>
-					<TouchableOpacity
-						style={[styles.dateStripArrow, !canNavigatePrevWeek && styles.dateStripArrowDisabled]}
-						onPress={handlePrevWeek}
-						activeOpacity={canNavigatePrevWeek ? 0.7 : 1}
-						disabled={!canNavigatePrevWeek}
-					>
-						<MaterialCommunityIcons
-							name="chevron-left"
-							size={22}
-							color={canNavigatePrevWeek ? '#0c7c7c' : '#b8c2c8'}
-						/>
-					</TouchableOpacity>
+			<View style={styles.dateStripRow}>
+				<TouchableOpacity
+					style={[styles.dateStripArrow, !canNavigatePrevWeek && styles.dateStripArrowDisabled]}
+					onPress={handlePrevWeek}
+					activeOpacity={canNavigatePrevWeek ? 0.7 : 1}
+					disabled={!canNavigatePrevWeek}
+				>
+					<MaterialCommunityIcons
+						name="chevron-left"
+						size={22}
+						color={canNavigatePrevWeek ? '#0c7c7c' : '#b8c2c8'}
+					/>
+				</TouchableOpacity>
+
+				<ScrollView
+					horizontal
+					nestedScrollEnabled
+					directionalLockEnabled
+					showsHorizontalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
+					style={styles.dateCardsScroll}
+					contentContainerStyle={styles.dateStripContent}
+				>
+					<View style={styles.dateStrip}>
 					{weekDates.map((date) => {
 						const isSelected = selectedDate ? isSameDay(date, selectedDate) : false
 						const past = isPast(date)
@@ -251,82 +261,90 @@ export default function DateSlotPicker(props: PickProps) {
 							</TouchableOpacity>
 						)
 					})}
-					<TouchableOpacity
-						style={styles.dateStripArrow}
-						onPress={handleNextWeek}
-						activeOpacity={0.7}
-					>
-						<MaterialCommunityIcons name="chevron-right" size={22} color="#0c7c7c" />
-					</TouchableOpacity>
-				</View>
-			</ScrollView>
+					</View>
+				</ScrollView>
+
+				<TouchableOpacity
+					style={styles.dateStripArrow}
+					onPress={handleNextWeek}
+					activeOpacity={0.7}
+				>
+					<MaterialCommunityIcons name="chevron-right" size={22} color="#0c7c7c" />
+				</TouchableOpacity>
+			</View>
 
 			{showTimeSlots ? (
 				<>
 					{/* Time Header */}
-					<View style={styles.toggleContainer}>
-						<Text style={styles.toggleTitle}>Type of Appointment</Text>
+					{hideHeader ? null : (
+						<View style={styles.toggleContainer}>
+							<Text style={styles.toggleTitle}>Type of Appointment</Text>
 
-						<View style={[styles.toggleGroup, isTablet && styles.toggleGroupTablet]}>
-							<TouchableOpacity
-								style={[
-									styles.toggleOption,
-									resolvedVisitType === 'clinic' && styles.toggleSelectedOption,
-								]}
-								onPress={() => handleVisitTypeChange('clinic')}
-							>
-								<Text
+							<View style={[styles.toggleGroup, isTablet && styles.toggleGroupTablet]}>
+								<TouchableOpacity
 									style={[
-										styles.toggleText,
-										resolvedVisitType === 'clinic' && styles.toggleSelectedText,
+										styles.toggleOption,
+										resolvedVisitType === 'clinic' && styles.toggleSelectedOption,
 									]}
+									onPress={() => handleVisitTypeChange('clinic')}
 								>
-									Clinic
-								</Text>
-							</TouchableOpacity>
+									<Text
+										style={[
+											styles.toggleText,
+											resolvedVisitType === 'clinic' && styles.toggleSelectedText,
+										]}
+									>
+										Clinic
+									</Text>
+								</TouchableOpacity>
 
-							<TouchableOpacity
-								style={[
-									styles.toggleOption,
-									resolvedVisitType === 'video' && styles.toggleSelectedOption,
-								]}
-								onPress={() => handleVisitTypeChange('video')}
-							>
-								<Text
+								<TouchableOpacity
 									style={[
-										styles.toggleText,
-										resolvedVisitType === 'video' && styles.toggleSelectedText,
+										styles.toggleOption,
+										resolvedVisitType === 'video' && styles.toggleSelectedOption,
 									]}
+									onPress={() => handleVisitTypeChange('video')}
 								>
-									Video
-								</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-
-					<View style={styles.timeHeader}>
-						<AppTypography variant="h4" style={styles.timeSectionTitle}>
-							{timeLabel}
-						</AppTypography>
-						{multiSelect && (onSelectAll || onUnselectAll) ? (
-							<View style={styles.bulkActions}>
-								{onSelectAll ? (
-									<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
-										<AppTypography variant="caption" style={styles.bulkButtonText}>
-											Select All
-										</AppTypography>
-									</TouchableOpacity>
-								) : null}
-								{onUnselectAll ? (
-									<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
-										<AppTypography variant="caption" style={styles.bulkButtonText}>
-											Unselect All
-										</AppTypography>
-									</TouchableOpacity>
-								) : null}
+									<Text
+										style={[
+											styles.toggleText,
+											resolvedVisitType === 'video' && styles.toggleSelectedText,
+										]}
+									>
+										Video
+									</Text>
+								</TouchableOpacity>
 							</View>
-						) : null}
-					</View>
+						</View>
+					)}
+
+					{hideHeader && !multiSelect ? null : (
+						<View style={styles.timeHeader}>
+							{hideHeader ? null : (
+								<AppTypography variant="h4" style={styles.timeSectionTitle}>
+									{timeLabel}
+								</AppTypography>
+							)}
+							{multiSelect && (onSelectAll || onUnselectAll) ? (
+								<View style={styles.bulkActions}>
+									{onSelectAll ? (
+										<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
+											<AppTypography variant="caption" style={styles.bulkButtonText}>
+												Select All
+											</AppTypography>
+										</TouchableOpacity>
+									) : null}
+									{onUnselectAll ? (
+										<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
+											<AppTypography variant="caption" style={styles.bulkButtonText}>
+												Unselect All
+											</AppTypography>
+										</TouchableOpacity>
+									) : null}
+								</View>
+							) : null}
+						</View>
+					)}
 
 					{/* ── LEGEND — availability screen only ─────────────── */}
 					{showAvailabilityMode ? (
@@ -531,6 +549,14 @@ const styles = StyleSheet.create({
 	chevron: {
 		padding: 4,
 	},
+	dateStripRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		width: '100%',
+	},
+	dateCardsScroll: {
+		flex: 1,
+	},
 	dateStrip: {
 		flexDirection: 'row',
 		justifyContent: 'flex-start',
@@ -546,7 +572,7 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginRight: 10,
+		flexShrink: 0,
 	},
 	dateStripArrowDisabled: {
 		opacity: 0.55,

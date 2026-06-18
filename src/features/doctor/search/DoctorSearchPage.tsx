@@ -87,6 +87,7 @@ export default function DoctorSearchPage() {
 	// Initial route params
 	const initialQuery = route.params?.query || ''
 	const initialMode = route.params?.mode || 'all'
+	const initialSpecialityId = route.params?.specialityId ? String(route.params.specialityId) : 'all'
 	console.log('Route params:', route.params)
 
 	const [searchQuery, setSearchQuery] = useState(initialQuery)
@@ -99,14 +100,19 @@ export default function DoctorSearchPage() {
 	const isFetchingPageRef = useRef(false)
 
 	// Filter states
-	const [specialityFilter, setSpecialityFilter] = useState('all')
+	const [specialityFilter, setSpecialityFilter] = useState(initialSpecialityId)
 	const [consultationTypeFilter, setConsultationTypeFilter] = useState<string>(initialMode)
 	const [minRatingFilter, setMinRatingFilter] = useState('all')
-	const [specialities, setSpecialities] = useState<AppSelectOption[]>([{ label: 'All Specialities', value: 'all' }])
+	const [specialities, setSpecialities] = useState<AppSelectOption[]>([
+		{ label: 'All Specialities', value: 'all' },
+		...(route.params?.specialityId && route.params?.specialityName
+			? [{ label: route.params.specialityName, value: String(route.params.specialityId) }]
+			: []),
+	])
 	const [specialitiesLoading, setSpecialitiesLoading] = useState(false)
 
 	// Modal draft states
-	const [draftSpecialityFilter, setDraftSpecialityFilter] = useState('all')
+	const [draftSpecialityFilter, setDraftSpecialityFilter] = useState(initialSpecialityId)
 	const [draftConsultationType, setDraftConsultationType] = useState<string>(initialMode)
 	const [draftMinRating, setDraftMinRating] = useState('all')
 
@@ -121,14 +127,14 @@ export default function DoctorSearchPage() {
 				if (res.success && res.data) {
 					const mapped = res.data.map((s) => ({
 						label: s.label,
-						value: s.label.toLowerCase().trim(),
+						value: String(s.id),
 					}))
 					setSpecialities([{ label: 'All Specialities', value: 'all' }, ...mapped])
 
 					if (route.params?.specialityId) {
 						const found = res.data.find((s) => String(s.id) === String(route.params?.specialityId))
 						if (found) {
-							const val = found.label.toLowerCase().trim()
+							const val = String(found.id)
 							setSpecialityFilter(val)
 							setDraftSpecialityFilter(val)
 						}
@@ -164,7 +170,7 @@ export default function DoctorSearchPage() {
 			}
 
 			if (specialityFilter !== 'all') {
-				params.speciality = specialityFilter
+				params.speciality_id = specialityFilter
 			}
 
 			if (consultationTypeFilter !== 'all') {

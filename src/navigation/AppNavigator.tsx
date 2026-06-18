@@ -18,7 +18,7 @@ import ConsultationPage from '../features/consultation/ConsultationPage'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/setting/SettingPage'
-import ScreenCaptureTest from '../features/doctor/search/components/ScreenCaptureTest'
+// import ScreenCaptureTest from '../features/doctor/search/components/ScreenCaptureTest'
 import AccountPage from '../features/auth/AccountPage'
 import PatientPayment from '../features/patientPayment/PatientPayment'
 import ConsentForm from '../features/doctor/components/ConsentForm'
@@ -38,6 +38,7 @@ import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
 import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage'
 import Component from 'react-native-paper/lib/typescript/components/List/ListItem'
 import ScanTypeSelectorModal from '../features/radiology/component/Scantypeselectormodal'
+import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -108,6 +109,14 @@ function AuthenticatedNavigator() {
 				component={RadiologyBookingDetailsPage}
 				options={{ headerShown: true, title: 'Radiology Detail' }}
 			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ALL_SPECIALITIES}
+				component={AllSpecialitiesPage}
+				options={{
+					headerShown: true,
+					title: 'All Specialities',
+				}}
+			/>
 			
 			<AppStack.Screen
 				name={ROUTES.STACK.DOCTOR_SEARCH}
@@ -119,7 +128,7 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen name={ROUTES.STACK.NOTIFICATION} component={NotificationPage} />
 			<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
 			<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
-			<AppStack.Screen name={ROUTES.STACK.SCREEN_CAPTURE_TEST} component={ScreenCaptureTest} />
+			{/* <AppStack.Screen name={ROUTES.STACK.SCREEN_CAPTURE_TEST} component={ScreenCaptureTest} /> */}
 			<AppStack.Screen
 				name={ROUTES.STACK.DOCTOR_WELCOME}
 				component={WelcomeDoctorPage}

@@ -6,7 +6,7 @@ import { getSessions, logoutSession, Session } from '../auth/authService'
 import StatusModal from '../../components/common/StatusModal'
 import { AppTypography, AppButton, AppModal } from '../../components/common'
 
-// --- Small helper: shimmer placeholder ----------------------------------------
+// --- Shimmer placeholder ------------------------------------------------------
 const ShimmerPlaceholder = () => {
 	const animatedValue = new Animated.Value(0)
 
@@ -40,19 +40,11 @@ const ShimmerPlaceholder = () => {
 		<Card style={styles.card}>
 			<Card.Content style={styles.cardContent}>
 				<View style={styles.deviceInfo}>
-					{/* Icon placeholder */}
-					<Animated.View style={[styles.shimmerIconPlaceholder, { opacity }]} />
+					<Animated.View style={[styles.shimmerIcon, { opacity }]} />
 					<View style={styles.detailsContainer}>
-						{/* Device name placeholder */}
-						<Animated.View
-							style={[styles.shimmerLine, { width: '60%', height: 16, marginBottom: 8 }, { opacity }]}
-						/>
-						{/* IP / location placeholder */}
-						<Animated.View
-							style={[styles.shimmerLine, { width: '40%', height: 12, marginBottom: 6 }, { opacity }]}
-						/>
-						{/* Time placeholder */}
-						<Animated.View style={[styles.shimmerLine, { width: '50%', height: 12 }, { opacity }]} />
+						<Animated.View style={[styles.shimmerLine, { width: '55%', height: 14, marginBottom: 6 }, { opacity }]} />
+						<Animated.View style={[styles.shimmerLine, { width: '40%', height: 12, marginBottom: 4 }, { opacity }]} />
+						<Animated.View style={[styles.shimmerLine, { width: '60%', height: 12 }, { opacity }]} />
 					</View>
 				</View>
 			</Card.Content>
@@ -73,20 +65,18 @@ export default function SessionsTab() {
 	const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
 	const [fetchError, setFetchError] = useState<string | null>(null)
 
-	// --- Data fetching ----------------------------------------------------------
 	const fetchSessions = useCallback(async (isRefresh = false) => {
 		try {
 			if (isRefresh) setRefreshing(true)
 			else setIsLoading(true)
 			setFetchError(null)
-
 			const response = await getSessions()
 			if (response.success && response.data) {
 				setSessions(response.data)
 			} else {
 				setFetchError(response.message || 'Failed to load sessions.')
 			}
-		} catch (error) {
+		} catch {
 			setFetchError('Unable to connect. Please check your network.')
 		} finally {
 			setIsLoading(false)
@@ -98,7 +88,6 @@ export default function SessionsTab() {
 		fetchSessions()
 	}, [fetchSessions])
 
-	// --- Logout flow ------------------------------------------------------------
 	const openLogoutConfirmation = (sessionId: string) => {
 		setSelectedSessionId(sessionId)
 		setLogoutConfirmVisible(true)
@@ -112,12 +101,12 @@ export default function SessionsTab() {
 			if (response.success) {
 				setModalMessage('Session logged out successfully.')
 				setModalType('success')
-				fetchSessions() // refresh list
+				fetchSessions()
 			} else {
 				setModalMessage(response.message || 'Failed to logout session.')
 				setModalType('error')
 			}
-		} catch (error) {
+		} catch {
 			setModalMessage('An unexpected error occurred.')
 			setModalType('error')
 		} finally {
@@ -127,7 +116,6 @@ export default function SessionsTab() {
 		}
 	}
 
-	// --- Formatting helpers -----------------------------------------------------
 	const renderDeviceIcon = (deviceType: string): keyof typeof MaterialCommunityIcons.glyphMap => {
 		const type = (deviceType || '').toLowerCase()
 		if (type.includes('mobile') || type.includes('ios') || type.includes('android')) return 'cellphone'
@@ -136,51 +124,31 @@ export default function SessionsTab() {
 		return 'laptop'
 	}
 
-	// Returns a relative time string (e.g. "2 hours ago") plus the full date in a tooltip‑like display.
 	const getRelativeTime = (dateString: string): string => {
 		if (!dateString) return 'Unknown'
-		const now = Date.now()
-		const then = new Date(dateString).getTime()
-		const seconds = Math.floor((now - then) / 1000)
+		const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000)
 		if (seconds < 60) return 'Just now'
 		const minutes = Math.floor(seconds / 60)
-		if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`
+		if (minutes < 60) return `${minutes}m ago`
 		const hours = Math.floor(minutes / 60)
-		if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`
+		if (hours < 24) return `${hours}h ago`
 		const days = Math.floor(hours / 24)
-		if (days < 7) return `${days} day${days !== 1 ? 's' : ''} ago`
-		return new Date(dateString).toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric',
-		})
+		if (days < 7) return `${days}d ago`
+		return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 	}
 
-	const formatFullDate = (dateString: string): string => {
-		if (!dateString) return ''
-		return new Date(dateString).toLocaleString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric',
-			hour: 'numeric',
-			minute: '2-digit',
-			hour12: true,
-		})
-	}
-
-	// --- Render: loading state (shimmer) ----------------------------------------
+	// --- Loading state ----------------------------------------------------------
 	if (isLoading && !refreshing) {
 		return (
 			<View style={styles.container}>
 				<View style={styles.header}>
-					<AppTypography style={[styles.title, { color: theme.colors.onSurface }]}>
+					<AppTypography variant="h3" style={{ color: theme.colors.onSurface }}>
 						Active Sessions
 					</AppTypography>
-					<AppTypography style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
-						Manage the devices where your account is currently logged in.
+					<AppTypography variant="caption" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
+						Manage devices where you're currently signed in.
 					</AppTypography>
 				</View>
-				{/* Show three shimmer cards */}
 				<ShimmerPlaceholder />
 				<ShimmerPlaceholder />
 				<ShimmerPlaceholder />
@@ -188,13 +156,19 @@ export default function SessionsTab() {
 		)
 	}
 
-	// --- Render: error state ----------------------------------------------------
+	// --- Error state ------------------------------------------------------------
 	if (fetchError && sessions.length === 0) {
 		return (
 			<View style={styles.centeredContainer}>
-				<MaterialCommunityIcons name="cloud-alert" size={48} color={theme.colors.error} />
-				<AppTypography style={[styles.errorText, { color: theme.colors.error }]}>{fetchError}</AppTypography>
-				<AppButton variant="primary" onPress={() => fetchSessions()} style={styles.retryButton}>
+				<MaterialCommunityIcons name="cloud-alert" size={40} color={theme.colors.error} />
+				<AppTypography
+					variant="body"
+					align="center"
+					style={{ color: theme.colors.error, marginVertical: 12 }}
+				>
+					{fetchError}
+				</AppTypography>
+				<AppButton variant="primary" onPress={() => fetchSessions()}>
 					Retry
 				</AppButton>
 			</View>
@@ -217,23 +191,19 @@ export default function SessionsTab() {
 			>
 				{/* Header */}
 				<View style={styles.header}>
-					<AppTypography style={[styles.title, { color: theme.colors.onSurface }]}>
+					<AppTypography variant="h3" style={{ color: theme.colors.onSurface }}>
 						Active Sessions
 					</AppTypography>
-					<AppTypography style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
-						Manage the devices where your account is currently logged in.
+					<AppTypography variant="caption" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
+						Manage devices where you're currently signed in.
 					</AppTypography>
 				</View>
 
 				{/* Empty state */}
 				{sessions.length === 0 ? (
 					<Surface style={styles.emptyState}>
-						<MaterialCommunityIcons
-							name="shield-check-outline"
-							size={48}
-							color={theme.colors.onSurfaceVariant}
-						/>
-						<AppTypography style={[styles.emptyStateText, { color: theme.colors.onSurfaceVariant }]}>
+						<MaterialCommunityIcons name="shield-check-outline" size={40} color={theme.colors.onSurfaceVariant} />
+						<AppTypography variant="body" style={{ color: theme.colors.onSurfaceVariant, marginTop: 10 }}>
 							No active sessions found.
 						</AppTypography>
 					</Surface>
@@ -245,98 +215,91 @@ export default function SessionsTab() {
 								styles.card,
 								session.is_current && {
 									borderColor: theme.colors.primary,
-									// backgroundColor: theme.colors.primaryContainer + '1A', // 10% opacity
+									borderWidth: 1.5,
 								},
 							]}
 						>
 							<Card.Content style={styles.cardContent}>
-								{/* Device info row */}
-								<View style={styles.deviceInfo}>
-									<View
-										style={[styles.iconContainer, { backgroundColor: theme.colors.surfaceVariant }]}
-									>
+								<View style={styles.row}>
+									{/* Icon */}
+									<View style={[styles.iconContainer, { backgroundColor: theme.colors.surfaceVariant }]}>
 										<MaterialCommunityIcons
 											name={renderDeviceIcon(session.device_type)}
-											size={24}
-											color={
-												session.is_current
-													? theme.colors.primary
-													: theme.colors.onSurfaceVariant
-											}
+											size={20}
+											color={session.is_current ? theme.colors.primary : theme.colors.onSurfaceVariant}
 										/>
 									</View>
 
+									{/* Details */}
 									<View style={styles.detailsContainer}>
-										{/* Device name + current badge */}
-										<View style={styles.deviceHeader}>
-											<AppTypography
-												style={[styles.deviceName, { color: theme.colors.onSurface }]}
-												numberOfLines={1}
-												ellipsizeMode="tail"
-											>
-												{session.device_name || 'Unknown Device'}
-											</AppTypography>
-											{session.is_current && (
-												<View
-													style={[
-														styles.badge,
-														{ borderColor: theme.colors.primary, borderWidth: 1 },
-													]}
-												>
-													<AppTypography
-														style={[styles.badgeText, { color: theme.colors.primary }]}
-													>
-														Current
-													</AppTypography>
-												</View>
-											)}
-										</View>
-
-										{/* IP / location */}
+										{/* Device name */}
 										<AppTypography
-											style={[styles.ipAddress, { color: theme.colors.onSurfaceVariant }]}
+											variant="body"
+											numberOfLines={1}
+											style={{ color: theme.colors.onSurface, fontWeight: '600' }}
 										>
-											{session.ip_address || 'Unknown IP'}
-											{/* {session.location ? ` – ${session.location}` : ''} */}
+											{session.device_name || 'Unknown Device'}
 										</AppTypography>
 
-										{/* Last active with relative time */}
-										<View style={styles.timeInfo}>
+										{/* Current badge */}
+										{session.is_current && (
+											<View style={[styles.badge, { borderColor: theme.colors.primary }]}>
+												<AppTypography
+													variant="caption"
+													style={[styles.badgeText, { color: theme.colors.primary }]}
+												>
+													Current Device
+												</AppTypography>
+											</View>
+										)}
+
+										{/* IP address — own line */}
+										<View style={styles.metaRow}>
 											<MaterialCommunityIcons
-												name="clock-outline"
-												size={14}
+												name="web"
+												size={12}
 												color={theme.colors.onSurfaceVariant}
 											/>
 											<AppTypography
-												style={[styles.timeText, { color: theme.colors.onSurfaceVariant }]}
+												variant="caption"
+												style={{ color: theme.colors.onSurfaceVariant, marginLeft: 4 }}
 											>
-												Last active: {getRelativeTime(session.last_active_at)}
+												{session.ip_address || 'Unknown IP'}
 											</AppTypography>
 										</View>
-										{session.last_active_at && (
-											<AppTypography
-												style={[styles.fullDateText, { color: theme.colors.onSurfaceVariant }]}
-											>
-												{formatFullDate(session.last_active_at)}
-											</AppTypography>
-										)}
-									</View>
-								</View>
 
-								{/* Logout button (only for non‑current sessions) */}
-								{!session.is_current && (
-									<AppButton
-										variant="outline"
-										textColor={theme.colors.error}
-										style={[styles.logoutButton, { borderColor: theme.colors.error }]}
-										labelStyle={styles.logoutButtonLabel}
-										onPress={() => openLogoutConfirmation(session.id)}
-										disabled={isLoggingOut}
-										icon="logout"
-									>
-										Logout
-									</AppButton>
-								)}
+										{/* Last active — own line */}
+										<View style={[styles.metaRow, { marginTop: 2 }]}>
+											<MaterialCommunityIcons
+												name="clock-outline"
+												size={12}
+												color={theme.colors.onSurfaceVariant}
+											/>
+											<AppTypography
+												variant="caption"
+												style={{ color: theme.colors.onSurfaceVariant, marginLeft: 4 }}
+											>
+												Last active {getRelativeTime(session.last_active_at)}
+											</AppTypography>
+										</View>
+									</View>
+
+									{/* Logout button — trailing, vertically centered */}
+									{!session.is_current && (
+										<AppButton
+											variant="outline"
+											textColor={theme.colors.error}
+											style={[styles.logoutButton, { borderColor: theme.colors.error }]}
+											labelStyle={styles.logoutButtonLabel}
+											onPress={() => openLogoutConfirmation(session.id)}
+											disabled={isLoggingOut}
+											icon="logout"
+											compact
+										>
+											Logout
+										</AppButton>
+									)}
+								</View>
 							</Card.Content>
 						</Card>
 					))
@@ -350,9 +313,13 @@ export default function SessionsTab() {
 				title="Logout Session"
 			>
 				<View style={styles.modalIconContainer}>
-					<MaterialCommunityIcons name="logout" size={32} color={theme.colors.error} />
+					<MaterialCommunityIcons name="logout" size={28} color={theme.colors.error} />
 				</View>
-				<AppTypography style={[styles.modalDescription, { color: theme.colors.onSurfaceVariant }]}>
+				<AppTypography
+					variant="body"
+					align="center"
+					style={{ color: theme.colors.onSurfaceVariant, lineHeight: 20 }}
+				>
 					Are you sure you want to logout from this device? You will need to sign in again on that device.
 				</AppTypography>
 				<View style={styles.modalActions}>
@@ -364,14 +331,14 @@ export default function SessionsTab() {
 						onPress={handleLogout}
 						loading={isLoggingOut}
 						textColor={theme.colors.error}
-						style={styles.logoutConfirmButton}
+						style={{ marginLeft: 8 }}
 					>
 						Logout
 					</AppButton>
 				</View>
 			</AppModal>
 
-			{/* Status modal (success / error feedback) */}
+			{/* Status modal */}
 			<StatusModal
 				visible={modalType !== null}
 				status={modalType === 'success' ? 'success' : 'error'}
@@ -389,11 +356,11 @@ export default function SessionsTab() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#f8fafc', // subtle cool gray – you can also use theme.colors.background
+		backgroundColor: '#f8fafc',
 	},
 	content: {
-		padding: 16,
-		paddingBottom: 40,
+		padding: 14,
+		paddingBottom: 32,
 	},
 	centeredContainer: {
 		flex: 1,
@@ -402,148 +369,101 @@ const styles = StyleSheet.create({
 		padding: 32,
 	},
 	header: {
-		marginBottom: 20,
-		paddingHorizontal: 4,
-	},
-	title: {
-		fontSize: 24,
-		fontWeight: '700',
-		letterSpacing: 0.15,
-		marginBottom: 4,
-	},
-	subtitle: {
-		fontSize: 15,
-		lineHeight: 20,
-		opacity: 0.8,
+		marginBottom: 14,
+		paddingHorizontal: 2,
 	},
 	card: {
-		marginBottom: 12,
-		borderRadius: 14,
+		marginBottom: 8,
+		borderRadius: 12,
 		elevation: 1,
 		backgroundColor: '#ffffff',
 		borderWidth: 1,
 		borderColor: 'transparent',
 	},
 	cardContent: {
-		padding: 16,
+		paddingVertical: 12,
+		paddingHorizontal: 14,
 	},
-	deviceInfo: {
+	row: {
 		flexDirection: 'row',
-		alignItems: 'flex-start',
+		alignItems: 'center',
 	},
 	iconContainer: {
-		width: 50,
-		height: 50,
-		borderRadius: 16,
+		width: 40,
+		height: 40,
+		borderRadius: 12,
 		justifyContent: 'center',
 		alignItems: 'center',
-		marginRight: 14,
+		marginRight: 12,
+		flexShrink: 0,
 	},
 	detailsContainer: {
 		flex: 1,
-	},
-	deviceHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 4,
-	},
-	deviceName: {
-		fontSize: 17,
-		fontWeight: '600',
-		flexShrink: 1,
 		marginRight: 8,
 	},
 	badge: {
-		paddingHorizontal: 10,
-		paddingVertical: 3,
-		borderRadius: 12,
+		alignSelf: 'flex-start',
+		borderWidth: 1,
+		borderRadius: 6,
+		paddingHorizontal: 6,
+		paddingVertical: 1,
+		marginTop: 3,
+		marginBottom: 4,
 	},
 	badgeText: {
-		fontSize: 12,
+		fontSize: 10,
 		fontWeight: '700',
 		textTransform: 'uppercase',
-		letterSpacing: 0.3,
+		letterSpacing: 0.4,
 	},
-	ipAddress: {
-		fontSize: 14,
-		marginBottom: 6,
-		fontWeight: '500',
-	},
-	timeInfo: {
+	metaRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 2,
-	},
-	timeText: {
-		fontSize: 13,
-		marginLeft: 5,
-		fontWeight: '500',
-	},
-	fullDateText: {
-		fontSize: 12,
-		opacity: 0.7,
-		marginLeft: 19, // aligns with text after icon
+		marginTop: 4,
 	},
 	logoutButton: {
-		marginTop: 14,
-		alignSelf: 'flex-start',
 		borderWidth: 1.5,
+		flexShrink: 0,
+		minWidth: 0,
+		paddingHorizontal: 0,
 	},
 	logoutButtonLabel: {
-		fontSize: 14,
+		fontSize: 12,
 		fontWeight: '700',
-		letterSpacing: 0.3,
+		letterSpacing: 0.2,
 	},
 	emptyState: {
-		marginTop: 20,
+		marginTop: 16,
 		alignItems: 'center',
 		justifyContent: 'center',
-		paddingVertical: 48,
-		borderRadius: 14,
+		paddingVertical: 40,
+		borderRadius: 12,
 		backgroundColor: '#ffffff',
 		elevation: 1,
 	},
-	emptyStateText: {
-		marginTop: 14,
-		fontSize: 16,
-		fontWeight: '500',
-	},
-	errorText: {
-		fontSize: 16,
-		textAlign: 'center',
-		marginVertical: 16,
-	},
-	retryButton: {
-		marginTop: 8,
-	},
 	modalIconContainer: {
 		alignItems: 'center',
-		marginBottom: 12,
-	},
-	modalDescription: {
-		textAlign: 'center',
-		fontSize: 15,
-		lineHeight: 21,
+		marginBottom: 10,
 	},
 	modalActions: {
 		flexDirection: 'row',
 		justifyContent: 'flex-end',
 		alignItems: 'center',
-		marginTop: 20,
+		marginTop: 16,
 	},
-	logoutConfirmButton: {
-		marginLeft: 8,
-	},
-	// Shimmer styles
-	shimmerIconPlaceholder: {
-		width: 50,
-		height: 50,
-		borderRadius: 16,
-		marginRight: 14,
+	shimmerIcon: {
+		width: 40,
+		height: 40,
+		borderRadius: 12,
+		marginRight: 12,
 		backgroundColor: '#E1E9EE',
 	},
 	shimmerLine: {
 		borderRadius: 4,
 		backgroundColor: '#E1E9EE',
+	},
+	deviceInfo: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
 	},
 })

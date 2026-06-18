@@ -68,12 +68,21 @@ function unwrapPatient(response: any): PatientDetails {
   const lifestyle = raw?.lifestyle ?? {};
 
   // Step 3: parse allergies — API returns a comma-separated string
-  const parseList = (val?: string): string[] => {
-    if (!val || !val.trim()) return [];
-    return val
-      .split(",")
-      .map((s: string) => s.trim())
-      .filter(Boolean);
+  const parseList = (val: any): string[] => {
+    if (!val) return [];
+
+    if (Array.isArray(val)) {
+      return val;
+    }
+
+    if (typeof val === "string") {
+      return val
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    return [];
   };
 
   return {
@@ -128,6 +137,7 @@ export const patientService = {
       const response = await ApiService.get(
         API_ENDPOINTS.PATIENT.GET_BY_PUBLIC_ID(patientPublicId),
       );
+      console.log("API response:", response);
 
       const patient = unwrapPatient(response);
 

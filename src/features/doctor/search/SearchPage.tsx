@@ -102,10 +102,12 @@ export default function SearchPage() {
 	// Called when user presses Search keyboard key
 	const handleSearchSubmit = () => {
 		const trimmed = searchQuery.trim()
+		const selectedSpeciality = specialities.find((spec) => spec.id === activeSpec)
 
 		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
 			query: trimmed,
 			specialityId: activeSpec !== 'all' ? activeSpec : undefined,
+			specialityName: activeSpec !== 'all' ? selectedSpeciality?.label : undefined,
 			mode,
 		})
 	}
@@ -115,9 +117,12 @@ export default function SearchPage() {
 		setActiveSpec(specId)
 
 		if (specId !== 'all') {
+			const selectedSpeciality = specialities.find((spec) => spec.id === specId)
+
 			navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
 				query: searchQuery.trim() || '',
 				specialityId: specId,
+				specialityName: selectedSpeciality?.label,
 				mode,
 			})
 		}

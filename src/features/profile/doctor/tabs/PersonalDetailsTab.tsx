@@ -17,6 +17,7 @@ import {
 	AppSelectOption,
 	AppTypography,
 	StickyFooter,
+	StatusModal,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import { getDoctorProfile, mapDoctorProfileApi, updateDoctorPersonalDetails } from '../../../doctor/doctorService'
@@ -316,6 +317,13 @@ export default function PersonalDetailsTab() {
 	const [socialErrors, setSocialErrors] = useState<SocialErrors>({})
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		status: 'success' | 'error'
+		title: string
+		description: string
+		submitText?: string
+	} | null>(null)
 	const [profilePhotoUri, setProfilePhotoUri] = useState(user?.avatar || '')
 	const [profilePhotoUpload, setProfilePhotoUpload] = useState<AppPhotoPickerUpload | null>(null)
 	const [isProfilePhotoRemoved, setIsProfilePhotoRemoved] = useState(false)
@@ -497,10 +505,22 @@ export default function PersonalDetailsTab() {
 				facebook: trimmedFacebook,
 				twitter: trimmedTwitter,
 			}))
-			Alert.alert('Success', 'Personal details saved successfully/.')
+			setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Success',
+				description: 'Personal details saved successfully.',
+				submitText: 'Okay',
+			})
 		} catch (err) {
 			console.error('[PersonalDetailsTab] save error:', err)
-			Alert.alert('Error', 'Unable to save personal details right now.')
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Error',
+				description: 'Unable to save personal details right now.',
+				submitText: 'Okay',
+			})
 		} finally {
 			setIsSaving(false)
 		}
@@ -731,6 +751,17 @@ export default function PersonalDetailsTab() {
 			<StickyFooter onPress={handleSave} disabled={isSaving} loading={isSaving}>
 				Save 
 			</StickyFooter>
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status={statusModal.status}
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText={statusModal.submitText}
+					onSubmit={() => setStatusModal(null)}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
 		</View>
 		
 	)

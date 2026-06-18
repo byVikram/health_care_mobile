@@ -8,9 +8,8 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import Toast from 'react-native-toast-message'
 
-import { AppSelect, AppStickyFooter } from '../../../../components/common'
+import { AppSelect, AppStickyFooter, StatusModal } from '../../../../components/common'
 import DateSlotPicker from '../../../../components/common/DateSlotPicker'
 import {
 	createSlotOverrideBatch,
@@ -201,7 +200,13 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	const [unselectedSlotsByDate, setUnselectedSlotsByDate] = useState<UnselectedSlotsByDate>({})
 	const [pendingOverrides, setPendingOverrides] = useState<SlotOverridePayload[]>([])
 	const [saveLoading, setSaveLoading] = useState(false)
-	const [pendingSaveToast, setPendingSaveToast] = useState<string | null>(null)
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		status: 'success' | 'error'
+		title: string
+		description: string
+		submitText?: string
+	} | null>(null)
 	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentTypeKey>('clinic')
 	const [toggleRefreshing, setToggleRefreshing] = useState(false)
 
@@ -441,7 +446,6 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	}
 
 	const handleTimeChange = (slots: string | string[]) => {
-		setPendingSaveToast(null)
 		stageSlotSelection(Array.isArray(slots) ? slots : [slots])
 	}
 
@@ -501,12 +505,23 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 			}
 
 			setPendingOverrides([])
-			Toast.show({ type: 'success', text1: backendMessage || pendingSaveToast || 'Saved successfully' })
+			setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Success',
+				description: backendMessage || 'Saved successfully',
+				submitText: 'Okay',
+			})
 			await fetchAvailability()
-			setPendingSaveToast(null)
 		} catch (error) {
 			console.error('[AvailabilityTab] save availability error:', error)
-			Toast.show({ type: 'error', text1: 'Unable to save availability', text2: 'Please try again.' })
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Error',
+				description: 'Unable to save availability. Please try again.',
+				submitText: 'Okay',
+			})
 		} finally {
 			setSaveLoading(false)
 		}
@@ -519,6 +534,8 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 				contentContainerStyle={styles.screenContent}
 				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
+				nestedScrollEnabled
+				directionalLockEnabled
 			>
 				<View style={[styles.card, isTablet && styles.cardTablet, { maxWidth: contentWidth },]}>
 					<View style={styles.fieldGroup}>
@@ -566,11 +583,9 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 						loading={slotsLoading || toggleRefreshing}
 						onSelectAll={() => {
 							stageSlotSelection(allSelectableSlots)
-							setPendingSaveToast('Selected All Successfully')
 						}}
 						onUnselectAll={() => {
 							stageSlotSelection([])
-							setPendingSaveToast('Unselected All Successfully')
 						}}
 						selectedAppointmentType={selectedAppointmentType}
 						onAppointmentTypeChange={(type) => {
@@ -593,6 +608,17 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 			>
 				Save Availability
 			</AppStickyFooter>
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status={statusModal.status}
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText={statusModal.submitText}
+					onSubmit={() => setStatusModal(null)}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
 		</View>	
 	)
 }

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { AppBottomSheet, AppButton, AppInput, AppSelect, AppSelectOption, AppStickyFooter, AppTypography } from '../../../../components/common'
+import { AppBottomSheet, AppButton, AppInput, AppSelect, AppSelectOption, AppStickyFooter, AppTypography, StatusModal } from '../../../../components/common'
 import {
 	type DoctorEducationalQualificationsUpdatePayload,
 	updateDoctorEducationalQualifications,
@@ -237,6 +237,13 @@ export default function EducationalDetailsTab() {
 	const [isSaving, setIsSaving] = useState(false)
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [sheetVisible, setSheetVisible] = useState(false)
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		status: 'success' | 'error'
+		title: string
+		description: string
+		submitText?: string
+	} | null>(null)
 
 	useEffect(() => {
 		const loadDoctorProfile = async () => {
@@ -448,10 +455,22 @@ export default function EducationalDetailsTab() {
 				resetForm()
 				setSheetVisible(false)
 			}
-			Alert.alert('Success', 'Educational qualifications saved successfully.')
+			setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Success',
+				description: 'Educational qualifications saved successfully.',
+				submitText: 'Okay',
+			})
 		} catch (error) {
 			console.log('[EducationalDetailsTab] save error:', error)
-			Alert.alert('Error', 'Unable to save educational qualifications right now.')
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Error',
+				description: 'Unable to save educational qualifications right now.',
+				submitText: 'Okay',
+			})
 		} finally {
 			setIsSaving(false)
 		}
@@ -650,6 +669,17 @@ export default function EducationalDetailsTab() {
 					</View>
 				</KeyboardAvoidingView>
 			</AppBottomSheet>
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status={statusModal.status}
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText={statusModal.submitText}
+					onSubmit={() => setStatusModal(null)}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
 		</View>
 	)
 }

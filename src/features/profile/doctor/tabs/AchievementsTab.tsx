@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
-	ActivityIndicator,
 	Alert,
 	Image,
 	KeyboardAvoidingView,
@@ -16,14 +15,6 @@ import * as ImagePicker from 'expo-image-picker'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { AppInput, AppTypography } from '../../../../components/common'
-import {
-	createDoctorAchievement,
-	DoctorAchievement,
-	getDoctorAchievements,
-	getDoctorProfile,
-	mapDoctorAchievementApi,
-	updateDoctorAchievement,
-} from '../../../doctor/doctorService'
 
 const TEAL = '#00857d'
 const TEXT = '#111f28'
@@ -82,42 +73,42 @@ const FORM_CATEGORIES = [
 	'Recognition',
 ]
 
-type AchievementFormData = DoctorAchievement
-
-const getSuccessMessage = (response: unknown, fallback = 'Achievement saved successfully') => {
-	if (
-		typeof response === 'object' &&
-		response !== null &&
-		'message' in response &&
-		typeof response.message === 'string'
-	) {
-		return response.message
-	}
-
-	return fallback
+type AchievementFormData = {
+	id: string
+	title: string
+	category: string
+	description: string
+	organization: string
+	date: string
+	image: string | null
+	isPublic: boolean
 }
 
-const normalizeDateForApi = (value: string) => {
-	const trimmed = value.trim()
-	if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
-
-	const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-	if (!match) return trimmed
-
-	const [, month, day, year] = match
-	return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-}
-
-const buildAchievementPayload = (data: AchievementFormData) => ({
-	title: data.title.trim(),
-	category: data.category.trim(),
-	description: data.description.trim(),
-	organization: data.organization.trim(),
-	date_awarded: normalizeDateForApi(data.date),
-	image: data.image,
-	document_url: data.image,
-	is_public: data.isPublic,
-})
+// Achievement APIs are intentionally disabled until the backend contract is finalized.
+const MOCK_ACHIEVEMENTS: AchievementFormData[] = [
+	{
+		id: 'mock-achievement-1',
+		title: 'Advanced Cardiac Life Support Certification',
+		category: 'Certification',
+		description:
+			'Completed advanced emergency cardiac care training and renewed clinical certification.',
+		organization: 'American Heart Association',
+		date: '2024-08-15',
+		image: null,
+		isPublic: true,
+	},
+	{
+		id: 'mock-achievement-2',
+		title: 'Excellence in Patient Care Award',
+		category: 'Award',
+		description:
+			'Recognized for consistently high patient satisfaction and clinical outcomes.',
+		organization: 'City Medical Center',
+		date: '2023-12-10',
+		image: null,
+		isPublic: true,
+	},
+]
 
 function AchievementCard({
 	item,
@@ -202,9 +193,9 @@ function AchievementTimeline({
 	onAddNew,
 	onEdit,
 }: {
-	data: any[]
+	data: AchievementFormData[]
 	onAddNew: () => void
-	onEdit: (item: any) => void
+	onEdit: (item: AchievementFormData) => void
 }) {
 	return (
 		<View style={styles.timelineWrapper}>
@@ -709,11 +700,11 @@ export default function AchievementsTab() {
 
 	const [showForm, setShowForm] = useState(false)
 
-	const [achievements, setAchievements] = useState<AchievementFormData[]>([])
+	const [achievements, setAchievements] = useState<AchievementFormData[]>(
+		MOCK_ACHIEVEMENTS
+	)
 
 	const [editingItem, setEditingItem] = useState<AchievementFormData | null>(null)
-
-	const [isLoading, setIsLoading] = useState(false)
 
 	const [isSaving, setIsSaving] = useState(false)
 
@@ -739,64 +730,32 @@ export default function AchievementsTab() {
 		}
 	}
 
-	const loadAchievements = async (showLoader = false) => {
-		try {
-			if (showLoader) setIsLoading(true)
-
-			const profileResponse = await getDoctorProfile()
-			const profileAchievements = profileResponse?.data?.achievements
-
-			if (Array.isArray(profileAchievements)) {
-				setAchievements(profileAchievements.map(mapDoctorAchievementApi))
-				return
-			}
-
-			const achievementsResponse = await getDoctorAchievements()
-			setAchievements(achievementsResponse)
-		} catch (error) {
-			console.log('[AchievementsTab] failed to load achievements:', error)
-			Alert.alert(
-				'Error',
-				(error as any)?.response?.data?.message || (error as any)?.message || 'Unable to load achievements right now.'
-			)
-		} finally {
-			if (showLoader) setIsLoading(false)
-		}
-	}
-
-	useEffect(() => {
-		loadAchievements(true)
-	}, [])
-
-	const handleSave = async (data: AchievementFormData) => {
-		const payload = buildAchievementPayload(data)
-
+	const handleSave = (data: AchievementFormData) => {
 		try {
 			setIsSaving(true)
-			const response = editingItem
-				? await updateDoctorAchievement(editingItem.id, payload)
-				: await createDoctorAchievement(payload)
+			setAchievements((currentAchievements) => {
+				if (!editingItem) return [data, ...currentAchievements]
 
-			await loadAchievements()
+				return currentAchievements.map((item) =>
+					item.id === editingItem.id ? data : item
+				)
+			})
 			closeForm()
-			Alert.alert('Success', getSuccessMessage(response))
+			Alert.alert(
+				'Success',
+				editingItem
+					? 'Achievement updated locally.'
+					: 'Achievement saved locally.'
+			)
 		} catch (error) {
 			console.log('[AchievementsTab] save error:', error)
 			Alert.alert(
 				'Error',
-				(error as any)?.response?.data?.message || (error as any)?.message || 'Unable to save achievement right now.'
+				(error as any)?.message || 'Unable to save achievement right now.'
 			)
 		} finally {
 			setIsSaving(false)
 		}
-	}
-
-	if (isLoading) {
-		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="small" color={TEAL} />
-			</View>
-		)
 	}
 
 	return (
