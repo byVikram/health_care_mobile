@@ -12,9 +12,14 @@ import {
   View,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useTheme } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../context/AuthContext";
+import { AppButton } from "./AppButton";
+import { AppModal } from "./AppModal";
+import { AppTypography } from "./AppTypography";
 import PatientQR from "../../assets/icons/PatientQR.svg";
+import LogoutIcon from "../../assets/icons/logout.svg";
 const ORCode = require("../../assets/icons/QrCode.png");
 
 import PatientQr from "../../features/patientQr/PatientQr";
@@ -72,8 +77,10 @@ export default function AppSidebar({
 }: AppSidebarProps) {
   const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   const { user, role } = useAuth();
   const [showQR, setShowQR] = useState(false);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
  const userName = user?.name ?? "User";
 
 const profileImageUrl = user?.avatar ?? null;
@@ -99,9 +106,23 @@ const profileImageUrl = user?.avatar ?? null;
     onEditProfile?.();
   };
 
+  const handleLogoutPress = () => {
+    setLogoutConfirmVisible(true);
+  };
+
+  const handleCancelLogout = () => {
+    setLogoutConfirmVisible(false);
+  };
+
+  const handleConfirmLogout = () => {
+    setLogoutConfirmVisible(false);
+    onLogout();
+  };
+
   return (
+    <>
     <Modal
-      visible={visible}
+      visible={visible && !logoutConfirmVisible}
       transparent
       animationType="none"
       onRequestClose={onClose}
@@ -237,7 +258,7 @@ const profileImageUrl = user?.avatar ?? null;
           </ScrollView>
 
           {/* ── Logout ── */}
-          <TouchableOpacity style={styles.logoutItem} onPress={onLogout}>
+          <TouchableOpacity style={styles.logoutItem} onPress={handleLogoutPress}>
             <MaterialCommunityIcons name="logout" size={20} color="#c63e3e" />
             <Text style={styles.logoutText}>Log out</Text>
           </TouchableOpacity>
@@ -258,6 +279,56 @@ const profileImageUrl = user?.avatar ?? null;
         />
       )}
     </Modal>
+
+    <AppModal
+      visible={logoutConfirmVisible}
+      onDismiss={handleCancelLogout}
+      contentContainerStyle={styles.logoutModalContainer}
+    >
+      <View style={styles.logoutModalContent}>
+        <View style={styles.logoutIconCircle}>
+          <LogoutIcon width={27} height={27} />
+        </View>
+
+        <AppTypography variant="h3" align="center" style={styles.logoutModalTitle}>
+          Logout
+        </AppTypography>
+
+        <AppTypography
+          variant="body"
+          align="center"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          style={styles.logoutModalMessage}
+        >
+          Are you sure you want to logout?
+        </AppTypography>
+      </View>
+
+      <View style={styles.logoutModalActions}>
+        <AppButton
+          variant="outline"
+          style={[
+            styles.logoutModalButton,
+            styles.cancelLogoutButton,
+            { borderColor: theme.colors.outline },
+          ]}
+          textColor={theme.colors.onSurfaceVariant}
+          onPress={handleCancelLogout}
+        >
+          Cancel
+        </AppButton>
+        <AppButton
+          style={styles.logoutModalButton}
+          buttonColor={theme.colors.error || "#EF4C5A"}
+          textColor="#ffffff"
+          onPress={handleConfirmLogout}
+        >
+          Logout
+        </AppButton>
+      </View>
+    </AppModal>
+    </>
   );
 }
 
@@ -377,4 +448,54 @@ const styles = StyleSheet.create({
     borderTopColor: "#e9eef0",
   },
   logoutText: { color: "#c63e3e", fontWeight: "700", fontSize: 14 },
+  logoutModalContainer: {
+    width: "84%",
+    maxWidth: 340,
+    alignSelf: "center",
+    borderRadius: 18,
+    padding: 0,
+    overflow: "hidden",
+  },
+  logoutModalContent: {
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  logoutIconCircle: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: "#fde3e3",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  logoutModalTitle: {
+    color: "#142b30",
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  logoutModalMessage: {
+    color: "#5d6670",
+    fontSize: 14,
+    lineHeight: 20,
+    maxWidth: "100%",
+  },
+  logoutModalActions: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#eef0f2",
+  },
+  logoutModalButton: {
+    flex: 1,
+    borderRadius: 10,
+  },
+  cancelLogoutButton: {
+    backgroundColor: "#ffffff",
+  },
 });

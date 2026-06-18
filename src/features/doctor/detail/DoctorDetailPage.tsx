@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   LayoutAnimation,
   UIManager,
+  Animated,
 } from "react-native";
 import { useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -87,6 +88,11 @@ interface AvailabilityApiModeGroup {
 }
 
 const PRIMARY = "#2B6F71";
+const HEADER_BACKGROUND_HEIGHT = 180;
+const COMPACT_HEADER_HEIGHT = Platform.OS === "ios" ? 106 : 86;
+const HEADER_COLLAPSE_START = 0;
+const HEADER_COLLAPSE_END = 150;
+
 const STAT_LOGOS = {
   experience: { uri: "https://img.icons8.com/ios-filled/50/2b7571/briefcase.png" },
   instagram: { uri: "https://img.icons8.com/ios-filled/50/2b7571/instagram-new.png" },
@@ -711,6 +717,7 @@ export default function DoctorDetailPage() {
     useState<Record<AppointmentModeKey, SlotGroup[]>>(emptyAvailabilityByMode);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [booking, setBooking] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const formatDateForApi = (date: Date) => {
     const year = date.getFullYear();
@@ -910,28 +917,55 @@ export default function DoctorDetailPage() {
     details?.about ||
     "Dr. Anjali Singh is a highly skilled Interventional Cardiologist with over 14 years of experience in managing complex cardiac conditions. She has extensive expertise in coronary angioplasty, heart failure management, and pacemaker implantation, and is committed to providing compassionate, evidence-based care to every patient.";
 
+  const compactSpeciality = specialities?.[0] || "Doctor Consultation";
+
+  const appointmentTitleOpacity = scrollY.interpolate({
+    inputRange: [HEADER_COLLAPSE_START, HEADER_COLLAPSE_END],
+    outputRange: [1, 0],
+    extrapolate: "clamp",
+  });
+
+  const compactHeaderOpacity = scrollY.interpolate({
+    inputRange: [HEADER_COLLAPSE_START, HEADER_COLLAPSE_END],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+
+  const compactHeaderTranslateY = scrollY.interpolate({
+    inputRange: [HEADER_COLLAPSE_START, HEADER_COLLAPSE_END],
+    outputRange: [6, 0],
+    extrapolate: "clamp",
+  });
+
   return (
     <View style={styles.container}>
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scrollArea}
         contentContainerStyle={{ paddingBottom: 100 }}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
       >
         {/* Header Gradient / Background Placeholder */}
         <View style={styles.headerBackground}>
           <View style={styles.headerTop}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+            <View style={styles.headerLeft}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
                 <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
               </TouchableOpacity>
-              <AppTypography variant="h3" style={{ color: "#fff", marginLeft: 8 }}>
-                Appointment
-              </AppTypography>
+              <Animated.View style={{ opacity: appointmentTitleOpacity }}>
+                <AppTypography variant="h3" style={styles.headerTitle}>
+                  Appointment
+                </AppTypography>
+              </Animated.View>
             </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <TouchableOpacity style={{ padding: 8 }}>
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.headerIconButton}>
                 <MaterialCommunityIcons name="heart-outline" size={24} color="#fff" />
               </TouchableOpacity>
-              <TouchableOpacity style={{ padding: 8 }}>
+              <TouchableOpacity style={styles.headerIconButton}>
                 <MaterialCommunityIcons name="share-variant" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -1220,7 +1254,44 @@ export default function DoctorDetailPage() {
             )}
           </View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          styles.compactHeaderOverlay,
+          {
+            opacity: compactHeaderOpacity,
+            transform: [{ translateY: compactHeaderTranslateY }],
+          },
+        ]}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
+          <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
+        </TouchableOpacity>
+
+        <View style={styles.compactHeaderText}>
+          <AppTypography variant="h3" style={styles.compactDoctorName} numberOfLines={1}>
+            {doctor.name}
+          </AppTypography>
+          <AppTypography
+            variant="caption"
+            style={styles.compactDoctorSpeciality}
+            numberOfLines={1}
+          >
+            {compactSpeciality}
+          </AppTypography>
+        </View>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerIconButton}>
+            <MaterialCommunityIcons name="heart-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerIconButton}>
+            <MaterialCommunityIcons name="share-variant" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
 
       <AppBottomSheet
         visible={!!selectedAchievement}
@@ -1333,11 +1404,64 @@ const styles = StyleSheet.create({
   scrollArea: { flex: 1 },
   headerBackground: {
     backgroundColor: "#568b8b",
-    height: 180,
+    height: HEADER_BACKGROUND_HEIGHT,
     paddingTop: Platform.OS === "ios" ? 50 : 30,
     paddingHorizontal: 16,
   },
-  headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerLeft: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerIconButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    color: "#fff",
+    marginLeft: 8,
+  },
+  compactHeaderOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: COMPACT_HEADER_HEIGHT,
+    zIndex: 20,
+    elevation: 12,
+    backgroundColor: "#568b8b",
+    paddingTop: Platform.OS === "ios" ? 44 : 24,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  compactHeaderText: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 8,
+  },
+  compactDoctorName: {
+    color: "#fff",
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: "700",
+  },
+  compactDoctorSpeciality: {
+    color: "#fff",
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 1,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 8,
+  },
   profileCard: {
     backgroundColor: "#fff",
     borderRadius: 16,
