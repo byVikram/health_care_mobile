@@ -183,6 +183,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 		return 640
 	}, [isTablet, width])
 	const timeSlotColumns = width >= 900 ? 5 : width >= 768 ? 4 : 3
+	const datePickerHorizontalOffset = isTablet ? -20 : -16
 
 	const [localAvailability, setLocalAvailability] = useState<DoctorAvailability>(availability ?? EMPTY_AVAILABILITY)
 	const [apiHospitals, setApiHospitals] = useState<DoctorHospital[]>([])
@@ -567,33 +568,35 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 						</TouchableOpacity>
 					</View>
 
-					<DateSlotPicker
-						multiSelect
-						selectedDate={selectedDate}
-						onDateChange={setSelectedDate}
-						selectedTime={selectedSlots}
-						onTimeChange={handleTimeChange}
-						dateLabel="Select follow up date"
-						hideNavigation
-						timeSlotColumns={timeSlotColumns}
-						disableBookedSlots={false}
-						use12HourTime
-						showAvailabilityMode
-						availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
-						loading={slotsLoading || toggleRefreshing}
-						onSelectAll={() => {
-							stageSlotSelection(allSelectableSlots)
-						}}
-						onUnselectAll={() => {
-							stageSlotSelection([])
-						}}
-						selectedAppointmentType={selectedAppointmentType}
-						onAppointmentTypeChange={(type) => {
-							setToggleRefreshing(true)
-							setSelectedAppointmentType(type)
-							setTimeout(() => setToggleRefreshing(false), 300)
-						}}
-					/>
+					<View style={{ marginHorizontal: datePickerHorizontalOffset }}>
+						<DateSlotPicker
+							multiSelect
+							selectedDate={selectedDate}
+							onDateChange={setSelectedDate}
+							selectedTime={selectedSlots}
+							onTimeChange={handleTimeChange}
+							dateLabel="Select follow up date"
+							hideNavigation
+							timeSlotColumns={timeSlotColumns}
+							disableBookedSlots={false}
+							use12HourTime
+							showAvailabilityMode
+							availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
+							loading={slotsLoading || toggleRefreshing}
+							onSelectAll={() => {
+								stageSlotSelection(allSelectableSlots)
+							}}
+							onUnselectAll={() => {
+								stageSlotSelection([])
+							}}
+							selectedAppointmentType={selectedAppointmentType}
+							onAppointmentTypeChange={(type) => {
+								setToggleRefreshing(true)
+								setSelectedAppointmentType(type)
+								setTimeout(() => setToggleRefreshing(false), 300)
+							}}
+						/>
+					</View>
 
 				</View>
 			</ScrollView>
