@@ -96,7 +96,7 @@ const formatDateTime = (date: string, time: string) => `${formatDisplayDate(date
 // ─── S3 URL builder ──────────────────────────────────────────────────────────
 const S3_BASE_URL = process.env.REACT_APP_S3_BASE_URL || ''
 // const buildS3Url = (key?: string | null): string | null => (key ? `${S3_BASE_URL}/${key}` : null)
-const buildS3Url = (key?: string | null): string | null => key 
+const buildS3Url = (key?: string | null): string | null => key
 
 // ─── Full‑screen image viewer ────────────────────────────────────────────────
 const ImageViewerModal = ({
@@ -423,7 +423,6 @@ const SectionCard = ({ title, children }: { title: string; children: React.React
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function RadiologyBookingDetailsPage() {
-	
 	const navigation = useNavigation<any>()
 	const route = useRoute()
 	const insets = useSafeAreaInsets()
@@ -481,6 +480,7 @@ export default function RadiologyBookingDetailsPage() {
 		}
 	}, [booking])
 
+	// 5. fetchRadiologyScans — load center's available scan catalogue for quoting
 	useEffect(() => {
 		if (
 			role === 'radiology' &&
@@ -512,6 +512,7 @@ export default function RadiologyBookingDetailsPage() {
 			}))
 	}, [centerScans, editedItems])
 
+	// 7. handleAddScan
 	const handleAddScan = (scanIdStr: string) => {
 		const scanId = parseInt(scanIdStr, 10)
 		const scan = centerScans.find((s) => s.id === scanId)
@@ -528,10 +529,12 @@ export default function RadiologyBookingDetailsPage() {
 		}
 	}
 
+	// 8. handleDeleteScan
 	const handleDeleteScan = (index: number) => {
 		setEditedItems((prev) => prev.filter((_, i) => i !== index))
 	}
 
+	// 9. computedTotalFee
 	const computedTotalFee = useMemo(() => {
 		let total = 0
 		editedItems.forEach((item) => {
@@ -546,17 +549,37 @@ export default function RadiologyBookingDetailsPage() {
 	const [viewerIndex, setViewerIndex] = useState(0)
 
 	// ── Uploaded documents (from booking.external_prescription_s3_key) ──
-	const docUrls = useMemo(() => {
+	const reportDocUrls = useMemo(() => {
 		const urls: string[] = []
-		const key = booking?.external_prescription_s3_key
-		if (key) {
-			const url = buildS3Url(key)
+
+		if (booking?.report?.report_pdf_s3_key) {
+			const url = buildS3Url(booking.report.report_pdf_s3_key)
 			if (url) urls.push(url)
 		}
+
+		if (booking?.report?.scan_images_s3_keys) {
+			booking.report.scan_images_s3_keys.forEach((key) => {
+				const url = buildS3Url(key)
+				if (url) urls.push(url)
+			})
+		}
+
 		return urls
 	}, [booking])
+	const docUrls = useMemo(() => {
+		const urls: string[] = []
 
-	// ── Fetch booking ──
+		if (booking?.external_prescription_s3_key) {
+			const url = buildS3Url(booking.external_prescription_s3_key)
+
+			if (url) {
+				urls.push(url)
+			}
+		}
+
+		return urls
+	}, [booking])
+	// 1. fetchBooking
 	const fetchBooking = useCallback(
 		async (isRefresh = false) => {
 			if (!publicId) {
@@ -620,7 +643,7 @@ export default function RadiologyBookingDetailsPage() {
 		)
 	}
 
-	// ── Action: Verify Radiology Report ──
+	// 4. handleVerifyReport
 	const handleVerifyReport = async () => {
 		if (!booking) return
 		setUpdating(true)
@@ -645,6 +668,7 @@ export default function RadiologyBookingDetailsPage() {
 		}
 	}
 
+	// 10. handleConfirmBill
 	const handleConfirmBill = async () => {
 		if (!booking) return
 
@@ -705,7 +729,7 @@ export default function RadiologyBookingDetailsPage() {
 		}
 	}
 
-	// ── Upload handler ──
+	// 11. Upload Reports
 	const handleUpload = () => {
 		Alert.alert(
 			'Upload Medical Report',
@@ -714,7 +738,7 @@ export default function RadiologyBookingDetailsPage() {
 		)
 	}
 
-	// ── Payment handler ──
+	// 8 (patient). handlePayment
 	const handlePayment = async () => {
 		if (!booking) return
 		setUpdating(true)
@@ -768,24 +792,25 @@ export default function RadiologyBookingDetailsPage() {
 	const statusDisplay = normalizeStatus(booking.status)
 	const statusStyle = STATUS_STYLES[statusDisplay] || { bg: '#f0f0f0', text: '#555', dot: '#999' }
 
-	// Real patient details from nested object (with fallbacks)
 	const patientName = booking.patient?.name || booking.patient_name || 'N/A'
 	const patientAge = booking.patient?.age != null ? String(booking.patient.age) : '—'
 	const patientGender = booking.patient?.gender || '—'
 	const patientId = booking.public_id ? `#${booking.public_id.slice(0, 8).toUpperCase()}` : 'N/A'
-	// Phone numbers from nested objects (with flat-field fallback)
 	const patientPhone = booking.patient?.phone || booking.patient_phone || ''
 	const radiologyPhone = booking.radiology?.phone || booking.radiology_phone || ''
 	const clinicPhone = booking.clinic?.phone || booking.doctor_phone || ''
 
-	// Billing status – can be derived from booking status or a dedicated field
 	const billingStatus = statusDisplay === 'Confirmed' || statusDisplay === 'Completed' ? 'Billed' : 'Pending Review'
 
-	// ── Role‑based view ──
 	const isPatient = role === 'patient'
+	const isQuoteEditable = booking.status === 'pending_quote' || booking.status === 'pending_payment'
 
+	// ═══════════════════════════════════════════════════════════════════════
+	// PATIENT VIEW
+	// 1.fetchBooking 2.Patient Details 3.Call Radiology 4.Billing Status
+	// 5.Scan Items 6.Booking Details 7.View Documents 8.handlePayment
+	// ═══════════════════════════════════════════════════════════════════════
 	if (isPatient) {
-		// Patient view
 		const isPendingPayment = booking.status === 'pending_payment' && booking.payment_status === 'pending'
 
 		return (
@@ -795,7 +820,7 @@ export default function RadiologyBookingDetailsPage() {
 					showsVerticalScrollIndicator={false}
 					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchBooking(true)} />}
 				>
-					{/* Header with patient info */}
+					{/* 2 & 3: Patient Details + Call Radiology */}
 					<View style={styles.headerCard}>
 						<View style={styles.patientHeaderRow}>
 							<View style={styles.patientInfo}>
@@ -816,7 +841,7 @@ export default function RadiologyBookingDetailsPage() {
 						</View>
 					</View>
 
-					{/* Billing Status */}
+					{/* 4: Billing Status (display only, payment action moved to bottom) */}
 					<SectionCard title="Billing Status">
 						<View style={styles.billingStatusRow}>
 							<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -831,19 +856,9 @@ export default function RadiologyBookingDetailsPage() {
 								</Text>
 							</View>
 						</View>
-
-						{isPendingPayment && (
-							<TouchableOpacity
-								style={[styles.confirmBillBtn, { backgroundColor: '#0c7c7c', marginTop: 12 }]}
-								onPress={handlePayment}
-								disabled={updating}
-							>
-								<Text style={styles.confirmBillText}>{updating ? 'Processing...' : 'Pay Now'}</Text>
-							</TouchableOpacity>
-						)}
 					</SectionCard>
 
-					{/* Scan Items */}
+					{/* 5: Scan Items */}
 					<SectionCard title="Scan Items">
 						<View style={styles.fileList}>
 							{booking.booking_items.map((item, idx) => (
@@ -863,8 +878,19 @@ export default function RadiologyBookingDetailsPage() {
 							))}
 						</View>
 					</SectionCard>
+					{/* Diagnosis Report */}
 
-					{/* Booking Details */}
+					<SectionCard title="Diagnosis Report Documents">
+						<DocumentCarousel
+							documents={reportDocUrls}
+							onImagePress={(idx) => {
+								setViewerIndex(idx)
+								setViewerVisible(true)
+							}}
+						/>
+					</SectionCard>
+					
+					{/* 6: Booking Details */}
 					<SectionCard title="Booking Details">
 						<InfoRow label="Radiology Center" value={booking.radiology_name || 'N/A'} />
 						<InfoRow label="Booking Date" value={formatDisplayDate(booking.booking_date)} />
@@ -874,7 +900,7 @@ export default function RadiologyBookingDetailsPage() {
 						{booking.notes && <InfoRow label="Notes" value={booking.notes} />}
 					</SectionCard>
 
-					{/* Prescription Document preview */}
+					{/* 7: View Documents */}
 					<SectionCard title="diagnosis & Referral Document">
 						<DocumentCarousel
 							documents={docUrls}
@@ -884,12 +910,49 @@ export default function RadiologyBookingDetailsPage() {
 							}}
 						/>
 					</SectionCard>
+					{/* 8: handlePayment */}
+					{isPendingPayment && (
+						<TouchableOpacity
+							style={[
+								styles.confirmBillBtn,
+								{ backgroundColor: '#0c7c7c', alignSelf: 'stretch', alignItems: 'center' },
+							]}
+							onPress={handlePayment}
+							disabled={updating}
+						>
+							<Text style={styles.confirmBillText}>{updating ? 'Processing...' : 'Pay Now'}</Text>
+						</TouchableOpacity>
+					)}
 				</ScrollView>
+
+				<ImageViewerModal
+					visible={viewerVisible}
+					images={[...docUrls, ...reportDocUrls]}
+					initialIndex={viewerIndex}
+					onClose={() => setViewerVisible(false)}
+				/>
+
+				{statusModal && (
+					<StatusModal
+						visible={statusModal.visible}
+						status={statusModal.status}
+						title={statusModal.title}
+						description={statusModal.description}
+						submitText="Okay"
+						onSubmit={() => setStatusModal(null)}
+						onCancel={() => setStatusModal(null)}
+					/>
+				)}
 			</View>
 		)
 	}
 
-	// ─── STAFF / ADMIN VIEW ──────────────────────────────────────────────────────
+	// ═══════════════════════════════════════════════════════════════════════
+	// STAFF / ADMIN VIEW
+	// 1.fetchBooking 2.Patient Details 3.View Documents 4.handleVerifyReport
+	// 5.fetchRadiologyScans 6.Edit Prices 7.handleAddScan 8.handleDeleteScan
+	// 9.computedTotalFee 10.handleConfirmBill 11.Upload Reports 12.QR Scan
+	// ═══════════════════════════════════════════════════════════════════════
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
 			<ScrollView
@@ -897,7 +960,7 @@ export default function RadiologyBookingDetailsPage() {
 				showsVerticalScrollIndicator={false}
 				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchBooking(true)} />}
 			>
-				{/* Header with patient info */}
+				{/* 2: Patient Details */}
 				<View style={styles.headerCard}>
 					<View style={styles.patientHeaderRow}>
 						<View style={styles.patientInfo}>
@@ -925,13 +988,24 @@ export default function RadiologyBookingDetailsPage() {
 					</View>
 				</View>
 
-				{/* Billing Status with actions */}
+				{/* 3: View Diagnosis Documents */}
+				<SectionCard title="diagnosis & Referral Document">
+					<DocumentCarousel
+						documents={docUrls}
+						onImagePress={(idx) => {
+							setViewerIndex(idx)
+							setViewerVisible(true)
+						}}
+					/>
+				</SectionCard>
+
+				{/* 4: handleVerifyReport, 5-10: quote workflow */}
 				<SectionCard title="Billing Status">
 					<View style={styles.billingStatusRow}>
 						<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
 							<Text style={[styles.statusText, { color: statusStyle.text }]}>{billingStatus}</Text>
 						</View>
-						{(booking.status === 'pending_quote' || booking.status === 'pending_payment') && (
+						{isQuoteEditable && (
 							<View style={styles.selectActionWrapper}>
 								<AppSelect
 									placeholder="Select Action"
@@ -949,10 +1023,11 @@ export default function RadiologyBookingDetailsPage() {
 						)}
 					</View>
 
-					{booking.status === 'pending_quote' || booking.status === 'pending_payment' ? (
+					{isQuoteEditable ? (
 						<View style={styles.quoteFormContainer}>
 							<Text style={styles.quoteInstruction}>Review and edit scan items for this booking:</Text>
 
+							{/* 6: Edit Scan Prices (incl. 8: handleDeleteScan per row) */}
 							{editedItems.map((item, index) => (
 								<View key={index} style={styles.quoteItemRow}>
 									<View style={styles.quoteItemLeft}>
@@ -998,6 +1073,7 @@ export default function RadiologyBookingDetailsPage() {
 								</View>
 							))}
 
+							{/* 7: handleAddScan */}
 							{availableScanOptions.length > 0 && (
 								<View style={{ marginTop: 12, marginBottom: 16 }}>
 									<AppSelect
@@ -1012,11 +1088,13 @@ export default function RadiologyBookingDetailsPage() {
 								</View>
 							)}
 
+							{/* 9: computedTotalFee */}
 							<View style={styles.feeTotalRow}>
 								<Text style={styles.feeLabel}>Total Quoted Price:</Text>
 								<Text style={styles.feeValue}>₹ {computedTotalFee}</Text>
 							</View>
 
+							{/* 10: handleConfirmBill */}
 							<TouchableOpacity
 								style={[styles.confirmBillBtn, updating && { opacity: 0.7 }]}
 								onPress={handleConfirmBill}
@@ -1035,57 +1113,24 @@ export default function RadiologyBookingDetailsPage() {
 					)}
 				</SectionCard>
 
-				{/* Document Control */}
+				{/* 11 & 12: Upload Reports, QR Scan */}
 				<SectionCard title="Document Control">
-					<View style={styles.digitalPrescriptionRow}>
-						<Text style={styles.digitalLabel}>Diagnosis & Records</Text>
-						<TouchableOpacity>
-							<Text style={styles.viewAllText}>View All</Text>
-						</TouchableOpacity>
-					</View>
+					<TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
+						<MaterialCommunityIcons name="cloud-upload" size={20} color="#1f5f68" />
+						<Text style={styles.uploadBtnText}>Upload Diagnosis Report</Text>
+						<Text style={styles.uploadSubText}>PDF, JPG, PNG (Max 10MB)</Text>
+					</TouchableOpacity>
 
-					<DocumentCarousel
-						documents={docUrls}
-						onImagePress={(idx) => {
-							setViewerIndex(idx)
-							setViewerVisible(true)
-						}}
-					/>
-
-					{/* QR Scan Section */}
-					<TouchableOpacity style={styles.scanBtn} >
+					<TouchableOpacity style={styles.scanBtn}>
 						<MaterialCommunityIcons name="qrcode-scan" size={22} color="#1f5f68" />
 						<View style={{ marginLeft: 10 }}>
 							<Text style={styles.scanBtnText}>Scan QR Code</Text>
 							<Text style={styles.scanSubText}>Retrieve Previous Diagnosis Reports</Text>
 						</View>
 					</TouchableOpacity>
-
-					{/* Upload Section */}
-					<TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
-						<MaterialCommunityIcons name="cloud-upload" size={20} color="#1f5f68" />
-						<Text style={styles.uploadBtnText}>Upload Diagnosis Report</Text>
-						<Text style={styles.uploadSubText}>PDF, JPG, PNG (Max 10MB)</Text>
-					</TouchableOpacity>
 				</SectionCard>
-				{/* <View style={styles.digitalPrescriptionRow}>
-						<Text style={styles.digitalLabel}>Diagnosis Prescription & Records</Text>
-						<TouchableOpacity>
-							<Text style={styles.viewAllText}>View All</Text>
-						</TouchableOpacity>
-					</View> */}
 
-				{/* File list with carousel */}
-				<DocumentCarousel
-						documents={docUrls}
-						onImagePress={(idx) => {
-							setViewerIndex(idx)
-							setViewerVisible(true)
-						}}
-					/>
-				{/* </SectionCard> */}
-
-				{/* Booking details */}
+				{/* Not in priority list — kept at the end as supplementary info */}
 				<SectionCard title="Booking Details">
 					<InfoRow label="Radiology Center" value={booking.radiology_name || 'N/A'} />
 					<InfoRow label="Booking Date" value={formatDateTime(booking.booking_date, booking.booking_time)} />
@@ -1098,7 +1143,6 @@ export default function RadiologyBookingDetailsPage() {
 					{booking.notes && <InfoRow label="Notes" value={booking.notes} />}
 				</SectionCard>
 
-				{/* Prescription Verification */}
 				<SectionCard title="diagnosis">
 					<View style={styles.verificationRow}>
 						<MaterialCommunityIcons
@@ -1115,15 +1159,13 @@ export default function RadiologyBookingDetailsPage() {
 				</SectionCard>
 			</ScrollView>
 
-			{/* Full‑screen viewer */}
 			<ImageViewerModal
 				visible={viewerVisible}
-				images={docUrls}
+				images={[...docUrls, ...reportDocUrls]}
 				initialIndex={viewerIndex}
 				onClose={() => setViewerVisible(false)}
 			/>
 
-			{/* Status Modal */}
 			{statusModal && (
 				<StatusModal
 					visible={statusModal.visible}
@@ -1158,20 +1200,10 @@ const styles = StyleSheet.create({
 		borderStyle: 'dashed',
 		borderRadius: 12,
 		padding: 16,
-		marginTop: 16,
+		marginTop: 12,
 	},
-
-	scanBtnText: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#1f5f68',
-	},
-
-	scanSubText: {
-		fontSize: 12,
-		color: '#666',
-		marginTop: 2,
-	},
+	scanBtnText: { fontSize: 16, fontWeight: '700', color: '#1f5f68' },
+	scanSubText: { fontSize: 12, color: '#666', marginTop: 2 },
 	container: { flex: 1, backgroundColor: '#f4f6f8' },
 	centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
 	scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
@@ -1256,15 +1288,8 @@ const styles = StyleSheet.create({
 		marginTop: 12,
 	},
 	confirmBillText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-	quoteFormContainer: {
-		marginTop: 10,
-	},
-	quoteInstruction: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: '#4A5B62',
-		marginBottom: 10,
-	},
+	quoteFormContainer: { marginTop: 10 },
+	quoteInstruction: { fontSize: 13, fontWeight: '600', color: '#4A5B62', marginBottom: 10 },
 	quoteItemRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1277,26 +1302,10 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 		gap: 12,
 	},
-	quoteItemLeft: {
-		flex: 1,
-		flexDirection: 'column',
-		gap: 4,
-	},
-	quoteItemName: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#1A2C33',
-	},
-	quoteItemBasePrice: {
-		fontSize: 12,
-		color: '#64707D',
-		fontWeight: '500',
-	},
-	quoteItemRight: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
+	quoteItemLeft: { flex: 1, flexDirection: 'column', gap: 4 },
+	quoteItemName: { fontSize: 14, fontWeight: '600', color: '#1A2C33' },
+	quoteItemBasePrice: { fontSize: 12, color: '#64707D', fontWeight: '500' },
+	quoteItemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 	deleteScanBtn: {
 		width: 36,
 		height: 36,
@@ -1316,12 +1325,7 @@ const styles = StyleSheet.create({
 		borderTopColor: '#E2E8F0',
 		paddingTop: 10,
 	},
-	readOnlyFeeRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		marginTop: 4,
-	},
+	readOnlyFeeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
 	uploadBtn: {
 		borderWidth: 1,
 		borderColor: '#CBD5E1',
@@ -1329,7 +1333,6 @@ const styles = StyleSheet.create({
 		padding: 14,
 		alignItems: 'center',
 		backgroundColor: '#F8FAFC',
-		marginBottom: 12,
 	},
 	uploadBtnText: { fontSize: 14, fontWeight: '600', color: '#1f5f68', marginTop: 4 },
 	uploadSubText: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
