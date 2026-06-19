@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import {
 	ActivityIndicator,
 	Alert,
+	Image,
 	Modal,
 	ScrollView,
 	StyleSheet,
@@ -351,6 +352,9 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 	const displayName = role === 'doctor'
 		? localRow.patientName || 'Unknown patient'
 		: localRow.doctorName || localRow.patientName || 'Unknown doctor'
+	const displayAvatar = role === 'doctor'
+		? localRow.patientAvatar
+		: localRow.doctorAvatar || localRow.patientAvatar
 	const locationName = localRow.hospitalName ?? (isVirtual ? 'Virtual consultation' : 'Hospital')
 	const locationAddress = localRow.address || localRow.hospitalAddress?.split(',')[0] || localRow.hospitalAddress || '-'
 	const canAct = isAppointmentUpcoming(localRow) && normalizedStatus !== 'cancelled' && normalizedStatus !== 'completed'
@@ -501,7 +505,11 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 		<View style={[styles.card, horizontalInset > 0 && { marginHorizontal: horizontalInset }]}>
 			<View style={styles.headerRow}>
 				<View style={[styles.avatar, { borderColor: statusStyle.color }]}>
-					<Ionicons name="person-outline" size={26} color="#5B7186" />
+					{displayAvatar ? (
+						<Image source={{ uri: displayAvatar }} style={styles.avatarImage} resizeMode="cover" />
+					) : (
+						<Ionicons name="person-outline" size={26} color="#5B7186" />
+					)}
 				</View>
 
 				<View style={styles.headerText}>
@@ -774,6 +782,11 @@ const styles = StyleSheet.create({
 		borderWidth: 2,
 		alignItems: 'center',
 		justifyContent: 'center',
+		overflow: 'hidden',
+	},
+	avatarImage: {
+		width: '100%',
+		height: '100%',
 	},
 	headerText: {
 		flex: 1,
