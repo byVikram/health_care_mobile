@@ -305,6 +305,29 @@ const compactParams = (params: Record<string, unknown>) =>
 const maskToken = (token: string | null) =>
 	token ? `${token.slice(0, 12)}...${token.slice(-6)}` : null
 
+const firstString = (...values: unknown[]) => {
+	const match = values.find((value) => typeof value === 'string' && value.trim().length > 0)
+	return typeof match === 'string' ? match.trim() : ''
+}
+
+const getProfileImageUrl = (entity: unknown) => {
+	const item = entity as Record<string, any> | null | undefined
+	return firstString(
+		item?.avatar_s3_key,
+		item?.avatar,
+		item?.profile_image,
+		item?.profile_image_url,
+		item?.details?.avatar_s3_key,
+		item?.details?.avatar,
+		item?.details?.profile_image,
+		item?.details?.profile_image_url,
+		item?.personal_details?.avatar_s3_key,
+		item?.personal_details?.avatar,
+		item?.personal_details?.profile_image,
+		item?.personal_details?.profile_image_url
+	)
+}
+
 const normalizeRows = (appointments: Appointment[]): AppointmentRow[] =>
 	appointments.map((appt, index) => {
 		const patientId = String(appt.patient?.id ?? '')
@@ -316,7 +339,7 @@ const normalizeRows = (appointments: Appointment[]): AppointmentRow[] =>
 			patientId,
 			patientIds: [patientId],
 			patientName: appt.patient?.name || 'Unknown patient',
-			patientAvatar: appt.patient?.avatar_s3_key || '',
+			patientAvatar: getProfileImageUrl(appt.patient),
 			doctorId,
 			doctorIds: [doctorId],
 			appointmentDate: appt.appointment_date || '',
@@ -325,7 +348,7 @@ const normalizeRows = (appointments: Appointment[]): AppointmentRow[] =>
 			appointmentMode: appt.appointment_mode || '',
 			status: getStatusLabel(appt.status),
 			doctorName: appt.doctor?.name || 'Unknown doctor',
-			doctorAvatar: (appt.doctor as any)?.avatar_s3_key || '',
+			doctorAvatar: getProfileImageUrl(appt.doctor),
 			hospitalName: appt.hospital?.name || null,
 			hospitalAddress: appt.hospital?.address || null,
 			hospitalId,

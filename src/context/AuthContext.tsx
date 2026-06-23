@@ -23,7 +23,6 @@ export interface AuthState {
 	selectedHospital: string | null
 	setSelectedHospital: (hospital: string) => void
 
-	// ✅ NEW — hospital ID used for filtering appointments & fetching slots
 	selectedHospitalId: string | null
 	setSelectedHospitalId: (id: string | null) => void
 
@@ -44,7 +43,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	const [isLoading, setIsLoading] = useState(true)
 
 	const [selectedHospital, setSelectedHospitalState] = useState<string | null>(null)
-	const [selectedHospitalId, setSelectedHospitalIdState] = useState<string | null>(null) // ✅ NEW
+	const [selectedHospitalId, setSelectedHospitalIdState] = useState<string | null>(null)
 
 	const clearAuthState = () => {
 		setRole(null)
@@ -59,7 +58,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		setSelectedHospitalState(hospital)
 	}
 
-	// ✅ NEW
 	const setSelectedHospitalId = (id: string | null) => {
 		setSelectedHospitalIdState(id)
 	}
@@ -67,6 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	useEffect(() => {
 		const load = async () => {
 			const role = await AsyncStorage.getItem('role')
+			console.log('[AuthContext] active role:', role)
 			const user = await AsyncStorage.getItem('user')
 			const token = await AsyncStorage.getItem('access_token')
 
@@ -96,8 +95,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	}
 
 	const updateUser = async (updates: Partial<AuthUser>) => {
-		const nextUser = {
-			...(user ?? { name: '' }),
+		const base: AuthUser = (user ?? { name: '' }) as AuthUser
+		const nextUser: AuthUser = {
+			...base,
 			...updates,
 		}
 

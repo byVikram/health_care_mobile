@@ -38,5 +38,14 @@ export const ROUTES = {
 		ALL_SPECIALITIES: 'AllSpecialitiesPage',
 		ORDER_DETAILS: 'OrderDetails',
 		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
+
+		PATIENT_QUESTIONS_LIST: 'PatientQuestionsList',
+		PATIENT_QUESTION_DETAIL: 'PatientQuestionDetail',
+
+		RADIOLOGY_LIST: 'RadiologySearchPage',
+		RADIOLOGY_ORDERS: 'OrderListRadiologyPage',
+		PLACE_RADIOLOGY_ORDER: 'PlaceRadiologyOrder',
+		RADIOLOGY_ORDER_DETAIL: 'BookingDetailsRadiologyPage',
+		RADIOLOGY_SCAN_TYPES: 'Scantypeselectormodal',
 	},
 } as const

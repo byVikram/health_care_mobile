@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Linking,
   Platform,
   Pressable,
   Modal,
@@ -14,6 +15,7 @@ import {
   LayoutAnimation,
   UIManager,
   Animated,
+  useWindowDimensions,
 } from "react-native";
 import { useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -88,8 +90,6 @@ interface AvailabilityApiModeGroup {
 }
 
 const PRIMARY = "#2B6F71";
-const HEADER_BACKGROUND_HEIGHT = 180;
-const COMPACT_HEADER_HEIGHT = Platform.OS === "ios" ? 106 : 86;
 const HEADER_COLLAPSE_START = 0;
 const HEADER_COLLAPSE_END = 150;
 
@@ -164,20 +164,6 @@ const normalizeAvailabilityByMode = (
   });
 
   return grouped;
-};
-
-const formatSocialHandle = (value?: unknown, fallback = "", prefix = "@") => {
-  const rawValue = typeof value === "string" ? value.trim() : "";
-  if (!rawValue) return fallback;
-
-  try {
-    const url = new URL(rawValue);
-    const username = url.pathname.split("/").filter(Boolean)[0];
-    return username ? `${prefix}${username}` : fallback;
-  } catch {
-    const username = rawValue.replace(/^[@/]+/, "").split("/").filter(Boolean)[0];
-    return username ? `${prefix}${username}` : fallback;
-  }
 };
 
 function DoctorHospitalDropdown({
@@ -279,8 +265,6 @@ interface AchievementItem {
   issuingOrganization: string;
   description: string;
 }
-
-
 
 const MOCK_SPECIALIZATIONS: BackgroundListItem[] = [
   { id: "spec-1", label: "Coronary Angioplasty" },
@@ -413,14 +397,12 @@ function AchievementsSubsection({
   onAchievementPress,
 }: AchievementsSubsectionProps) {
   return (
-    <View style={[styles.backgroundSection, styles.achievementsSection]}>
+    <View style={styles.achievementsSection}>
       <View style={styles.achievementsHeader}>
-        <View style={styles.backgroundSectionHeader}>
-          <MaterialCommunityIcons name="trophy-outline" size={18} color={PRIMARY} />
-          <AppTypography variant="body" style={styles.backgroundSectionTitle}>
-            Achievements
-          </AppTypography>
-        </View>
+        <MaterialCommunityIcons name="trophy-outline" size={18} color={PRIMARY} />
+        <AppTypography variant="body" style={styles.backgroundSectionTitle}>
+          Achievements
+        </AppTypography>
       </View>
 
       <ScrollView
@@ -510,7 +492,9 @@ function HospitalAppointmentCard({
   slotsLoading,
   selectedAppointmentType,
 }: HospitalAppointmentCardProps) {
+  const { width } = useWindowDimensions();
   const { hospital, is_primary, offline_consultation_fee, video_consultation_fee } = entry;
+  const datePickerHorizontalOffset = width >= 768 ? -20 : -16;
 
   const fee =
     apptType === "video"
@@ -642,7 +626,10 @@ function HospitalAppointmentCard({
             2. SELECT DATE
           </AppTypography>
 
-          <View onStartShouldSetResponder={() => true}>
+          <View
+            style={{ marginHorizontal: datePickerHorizontalOffset }}
+            onStartShouldSetResponder={() => true}
+          >
             <DateSlotPicker
               selectedDate={selectedDate}
               onDateChange={onDateChange}
@@ -693,6 +680,7 @@ export default function DoctorDetailPage() {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_DETAIL>>();
+  const { width } = useWindowDimensions();
 
   const [doctor, setDoctor] = useState<DoctorDetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -718,6 +706,23 @@ export default function DoctorDetailPage() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [booking, setBooking] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const isTablet = width >= 768 && width < 1024;
+  const isMobile = width < 768;
+
+  const contentWidth = useMemo(() => {
+    if (width >= 1280) return 760;
+    if (width >= 1024) return 680;
+    if (isTablet) return 600;
+    return 640;
+  }, [width, isTablet]);
+
+  const sectionPadding = isMobile ? 16 : isTablet ? 32 : 48;
+  const headerHeight = Platform.OS === "ios" ? (isMobile ? 92 : 96) : (isMobile ? 74 : 78);
+  const headerPaddingTop = Platform.OS === "ios" ? (isMobile ? 42 : 44) : (isMobile ? 18 : 20);
+  const compactHeaderHeight = Platform.OS === "ios" ? (isMobile ? 90 : 92) : (isMobile ? 74 : 76);
+  const compactHeaderPaddingTop = Platform.OS === "ios" ? (isMobile ? 40 : 42) : (isMobile ? 16 : 18);
+  const profileImageHeight = isMobile ? 125 : isTablet ? 176 : 190;
+  const profileTopMargin = isMobile ? 16 : 18;
 
   const formatDateForApi = (date: Date) => {
     const year = date.getFullYear();
@@ -846,7 +851,7 @@ export default function DoctorDetailPage() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { padding: 16 }]}>
+      <View style={[styles.container, { padding: sectionPadding }]}>
         <AppSkeleton height={150} style={{ marginBottom: 16, marginTop: 40 }} />
         <AppSkeleton height={100} style={{ marginBottom: 16 }} />
         <AppSkeleton height={300} style={{ marginBottom: 16 }} />
@@ -880,38 +885,56 @@ export default function DoctorDetailPage() {
         ? `${deg.college}${deg.year_of_passing ? `, ${deg.year_of_passing}` : ""}`
         : undefined,
     })) ?? [];
-  const avatarUrl = details?.avatar_s3_key || "https://via.placeholder.com/150";
-  const profileHospitals = hospitals.slice(0, 2);
-  const socialDetails = (details || {}) as Record<string, unknown>;
-  const doctorFirstName = doctor.name.replace(/^dr\.?\s*/i, "").trim().split(/\s+/)[0]?.toLowerCase() || "doctor";
-  const defaultAtHandle = `@dr.${doctorFirstName}`;
-  const defaultSlashHandle = `/dr.${doctorFirstName}`;
-  const statItems = [
-    {
-      key: "experience",
-      logo: STAT_LOGOS.experience,
-      title: details?.experience_years ? `${details.experience_years}+` : "--",
-      subtitle: "Experience",
-    },
-    {
-      key: "instagram",
-      logo: STAT_LOGOS.instagram,
-      title: "Instagram",
-      subtitle: formatSocialHandle(socialDetails.instagram_url || socialDetails.instagram, defaultAtHandle),
-    },
+  const detailRecord = (details || {}) as Record<string, unknown>;
+  const avatarValue =
+    detailRecord.avatar_s3_key ||
+    detailRecord.avatar ||
+    detailRecord.profile_image ||
+    detailRecord.profile_image_url;
+  const avatarUrl =
+    typeof avatarValue === "string" && avatarValue.trim()
+      ? avatarValue
+      : "https://via.placeholder.com/600x440";
+  const socialDetails = detailRecord;
+  const qualificationText =
+    details?.degrees
+      ?.map((degree) => degree.degree)
+      .filter(Boolean)
+      .join(", ") ||
+    details?.degree ||
+    "Qualifications not available";
+  const experienceText =
+    details?.experience_years != null
+      ? `${details.experience_years}+ Years`
+      : "-- Years";
+  const socialLinks = [
     {
       key: "facebook",
       logo: STAT_LOGOS.facebook,
-      title: "Facebook",
-      subtitle: formatSocialHandle(socialDetails.facebook_url || socialDetails.facebook, defaultSlashHandle, "/"),
+      url: socialDetails.facebook_url || socialDetails.facebook,
     },
     {
       key: "twitter",
       logo: STAT_LOGOS.twitter,
-      title: "Twitter",
-      subtitle: formatSocialHandle(socialDetails.twitter_url || socialDetails.twitter, defaultAtHandle),
+      url: socialDetails.twitter_url || socialDetails.twitter,
+    },
+    {
+      key: "instagram",
+      logo: STAT_LOGOS.instagram,
+      url: socialDetails.instagram_url || socialDetails.instagram,
     },
   ];
+
+  const openSocialLink = (value: unknown) => {
+    if (typeof value !== "string" || !value.trim()) return;
+
+    const url = /^https?:\/\//i.test(value.trim())
+      ? value.trim()
+      : `https://${value.trim()}`;
+    Linking.openURL(url).catch((error) => {
+      console.warn("[DoctorDetailPage] Unable to open social link:", error);
+    });
+  };
 
   const aboutText =
     details?.about ||
@@ -949,49 +972,175 @@ export default function DoctorDetailPage() {
         )}
       >
         {/* Header Gradient / Background Placeholder */}
-        <View style={styles.headerBackground}>
-          <View style={styles.headerTop}>
-            <View style={styles.headerLeft}>
-              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
-                <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
-              </TouchableOpacity>
-              <Animated.View style={{ opacity: appointmentTitleOpacity }}>
-                <AppTypography variant="h3" style={styles.headerTitle}>
-                  Appointment
-                </AppTypography>
-              </Animated.View>
-            </View>
-            <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.headerIconButton}>
-                <MaterialCommunityIcons name="heart-outline" size={24} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.headerIconButton}>
-                <MaterialCommunityIcons name="share-variant" size={24} color="#fff" />
-              </TouchableOpacity>
+        <View style={[styles.headerBackground, { height: headerHeight, paddingTop: headerPaddingTop }]}>
+          <View style={[styles.contentContainer, { paddingHorizontal: sectionPadding }]}>
+            <View style={[styles.headerShell, { maxWidth: contentWidth }]}>
+              <View style={styles.headerLeft}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
+                  <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
+                </TouchableOpacity>
+                <Animated.View style={[styles.headerTitleBlock, { opacity: appointmentTitleOpacity }]}>
+                  <AppTypography variant="h3" style={styles.headerTitle}>
+                    Appointment
+                  </AppTypography>
+                </Animated.View>
+              </View>
+              <View style={styles.headerActions}>
+                <TouchableOpacity style={styles.headerIconButton}>
+                  <MaterialCommunityIcons name="heart-outline" size={23} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.headerIconButton}>
+                  <MaterialCommunityIcons name="share-variant" size={23} color="#fff" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
 
         {/* Overhead Profile Card */}
-        <View style={styles.profileCard}>
-          <View style={styles.profileTopRow}>
-            <View style={styles.avatarWrapper}>
-              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-              <View style={styles.verifiedBadge}>
-                <MaterialCommunityIcons name="check" size={12} color="#fff" />
+        <View style={[styles.contentContainer, { paddingHorizontal: sectionPadding }]}>
+          <View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+            <View style={[styles.profileCard, { marginTop: profileTopMargin }]}>
+              <Image
+                source={{ uri: avatarUrl }}
+                style={[
+                  styles.profileHeroImage,
+                  { height: profileImageHeight },
+                ]}
+                resizeMode="contain"
+              />
+
+              <View style={styles.profileContent}>
+                <AppTypography variant="h3" style={styles.doctorName} numberOfLines={1}>
+                  {doctor.name}
+                </AppTypography>
+
+                <AppTypography variant="body" style={styles.doctorSpec} numberOfLines={1}>
+                  {specialities?.[0] || "Doctor Consultation"}
+                </AppTypography>
+
+                <AppTypography variant="caption" style={styles.qualificationText} numberOfLines={1}>
+                  {qualificationText}
+                </AppTypography>
+
+                <View style={styles.profileFooterRow}>
+                  <View style={styles.experienceBadge}>
+                    <AppTypography variant="caption" style={styles.experienceLabel}>
+                      EXP:
+                    </AppTypography>
+                    <AppTypography variant="caption" style={styles.experienceValue}>
+                      {experienceText}
+                    </AppTypography>
+                  </View>
+
+                  <View style={styles.socialRow}>
+                    {socialLinks.map((item) => {
+                      const hasUrl = typeof item.url === "string" && item.url.trim().length > 0;
+
+                      return (
+                        <TouchableOpacity
+                          key={item.key}
+                          style={styles.socialButton}
+                          activeOpacity={0.75}
+                          disabled={!hasUrl}
+                          onPress={() => openSocialLink(item.url)}
+                        >
+                          <Image source={item.logo} style={styles.socialIcon} resizeMode="contain" />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
               </View>
             </View>
-            <View style={styles.profileInfo}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <AppTypography variant="h3" style={styles.doctorName}>
+
+            {/* Clinic & Appointment Section - expandable hospital cards */}
+            <View style={styles.section}>
+              <AppTypography variant="h4" style={styles.sectionTitle}>
+                Clinic &amp; Appointment
+              </AppTypography>
+
+              {hospitals.length > 0 ? (
+                hospitals.map((entry) => (
+                  <HospitalAppointmentCard
+                    key={entry.hospital.id}
+                    entry={entry as HospitalEntry}
+                    isExpanded={expandedHospitalId === entry.hospital.id}
+                    onToggleExpand={() => handleToggleExpand(entry.hospital.id)}
+                    apptType={apptType}
+                    onAppointmentTypeChange={handleAppointmentTypeChange}
+                    selectedDate={selectedDate}
+                    onDateChange={(date) => {
+                      setSelectedDate(date);
+                      setSelectedTime(null);
+                    }}
+                    selectedTime={selectedTime}
+                    onTimeChange={setSelectedTime}
+                    availableSlots={
+                      expandedHospitalId === entry.hospital.id ? visibleSlotGroups : []
+                    }
+                    slotsLoading={expandedHospitalId === entry.hospital.id ? slotsLoading : false}
+                    selectedAppointmentType={selectedAppointmentType}
+                  />
+                ))
+              ) : (
+                <AppTypography variant="caption" style={styles.greyText}>
+                  No hospitals available for this doctor
+                </AppTypography>
+              )}
+            </View>
+
+            {/* Location */}
+            <View style={styles.section}>
+              <AppTypography variant="h4" style={styles.sectionTitle}>
+                Location
+              </AppTypography>
+
+              <View style={styles.locationMapCard}>
+                <View style={styles.mapGridLineHorizontal} />
+                <View style={[styles.mapGridLineHorizontal, { top: 76 }]} />
+                <View style={[styles.mapGridLineHorizontal, { top: 124 }]} />
+                <View style={styles.mapGridLineVertical} />
+                <View style={[styles.mapGridLineVertical, { left: "68%" }]} />
+                <View style={styles.mapRouteLine} />
+                <View style={styles.mapPin}>
+                  <MaterialCommunityIcons name="map-marker" size={22} color="#fff" />
+                </View>
+
+                <View style={styles.locationOverlayCard}>
+                  <View style={styles.locationOverlayHeader}>
+                    <View style={styles.locationIconBox}>
+                      <MaterialCommunityIcons name="hospital-building" size={18} color={PRIMARY} />
+                    </View>
+                    <View style={styles.locationInfo}>
+                      <AppTypography variant="body" style={styles.locationHospitalName} numberOfLines={1}>
+                        {selectedHospitalEntry?.hospital.name || "Hospital"}
+                      </AppTypography>
+                      <AppTypography variant="caption" style={styles.locationHospitalAddress} numberOfLines={2}>
+                        {selectedHospitalEntry?.hospital.address || details?.location || "Address not available"}
+                      </AppTypography>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.getDirectionsButton} activeOpacity={0.85}>
+                    <MaterialCommunityIcons name="navigation-variant" size={18} color="#fff" />
+                    <Text style={styles.getDirectionsText}>Get Directions</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* About the Doctor */}
+            <View style={styles.section}>
+              <AppTypography variant="h4" style={styles.sectionTitle}>
+                About the Doctor
+              </AppTypography>
+
+              {/* <View style={styles.aboutProfileHeader}>
+                <Image source={{ uri: avatarUrl }} style={styles.aboutProfileImage} />
+                <View style={styles.aboutProfileInfo}>
+                  <View style={styles.aboutProfileNameRow}>
+                    <AppTypography variant="h3" style={styles.aboutProfileName} numberOfLines={1}>
                       {doctor.name}
                     </AppTypography>
                     <MaterialCommunityIcons
@@ -1001,257 +1150,104 @@ export default function DoctorDetailPage() {
                       style={{ marginLeft: 6 }}
                     />
                   </View>
-                  <AppTypography variant="caption" style={styles.doctorSpec}>
-                    {specialities?.[0] || "Dentist Consultation"}
+                  <AppTypography variant="caption" style={styles.aboutProfileSpec} numberOfLines={1}>
+                    {specialities?.[0] || "Doctor Consultation"}
+                  </AppTypography>
+                  <View style={styles.aboutCouncilVerifiedBadge}>
+                    <MaterialCommunityIcons name="shield-check-outline" size={13} color={PRIMARY} />
+                    <Text style={styles.councilVerifiedText}>COUNCIL VERIFIED</Text>
+                  </View>
+                </View>
+              </View> */}
+
+              <View style={styles.aboutCard}>
+                <AppTypography variant="caption" style={styles.aboutCardTitle}>
+                  About
+                </AppTypography>
+                <AppTypography
+                  variant="caption"
+                  style={styles.aboutBodyText}
+                  numberOfLines={aboutExpanded ? undefined : 3}
+                >
+                  {aboutText}
+                </AppTypography>
+                <TouchableOpacity onPress={handleToggleAbout} activeOpacity={0.7}>
+                  <AppTypography variant="caption" style={styles.readMoreText}>
+                    {aboutExpanded ? "Show Less" : "Read More"}
+                  </AppTypography>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Professional Background */}
+            <View style={styles.section}>
+              <View style={styles.professionalCard}>
+                <View style={styles.professionalCardHeader}>
+                  <View style={styles.professionalIconBox}>
+                    <MaterialCommunityIcons name="briefcase-outline" size={18} color={PRIMARY} />
+                  </View>
+                  <AppTypography variant="body" style={styles.professionalCardTitle}>
+                    Professional Background
                   </AppTypography>
                 </View>
-              </View>
 
-              <View style={{ marginTop: 8 }}>
-                {profileHospitals.length > 0 ? (
-                  profileHospitals.map((entry) => (
-                    <View key={entry.hospital.id} style={styles.locationRow}>
-                      <MaterialCommunityIcons name="map-marker" size={12} color="#2b7571" />
-                      <AppTypography
-                        variant="caption"
-                        style={styles.locationText}
-                        numberOfLines={1}
-                      >
-                        {entry.hospital.name}
-                        {entry.hospital.address ? `, ${entry.hospital.address}` : ""}
-                      </AppTypography>
-                      {entry.hospital.distance ? (
-                        <AppTypography variant="caption" style={styles.distanceText}>
-                          {entry.hospital.distance}
-                        </AppTypography>
-                      ) : null}
-                    </View>
-                  ))
-                ) : (
-                  <View style={styles.locationRow}>
-                    <MaterialCommunityIcons name="map-marker" size={12} color="#2b7571" />
-                    <AppTypography variant="caption" style={styles.locationText} numberOfLines={1}>
-                      {details?.location || "Location not available"}
-                    </AppTypography>
+                <AppTypography variant="caption" style={styles.professionalCardSubtitle}>
+                  Explore the doctor's qualifications, experience, certifications, and professional
+                  affiliations.
+                </AppTypography>
+
+                <TouchableOpacity
+                  style={styles.viewMoreRow}
+                  activeOpacity={0.75}
+                  onPress={handleToggleBackground}
+                >
+                  <AppTypography variant="caption" style={styles.readMoreText}>
+                    {backgroundExpanded ? "View Less" : "View More"}
+                  </AppTypography>
+                  <MaterialCommunityIcons
+                    name={backgroundExpanded ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color={PRIMARY}
+                    style={{ marginLeft: 4 }}
+                  />
+                </TouchableOpacity>
+
+                {/* Expanded Professional Background content */}
+                {backgroundExpanded && (
+                  <View style={styles.professionalExpandedContainer}>
+                    <BackgroundSubsection
+                      icon="school-outline"
+                      title="Education"
+                      items={educationItems}
+                      emptyText="No educational qualifications available"
+                    />
+                    <BackgroundSubsection
+                      icon="stethoscope"
+                      title="Specializations"
+                      items={MOCK_SPECIALIZATIONS}
+                    />
+                    <BackgroundSubsection
+                      icon="certificate-outline"
+                      title="Certifications"
+                      items={MOCK_CERTIFICATIONS}
+                    />
+                    <BackgroundSubsection
+                      icon="account-group-outline"
+                      title="Memberships"
+                      items={MOCK_MEMBERSHIPS}
+                    />
                   </View>
                 )}
               </View>
             </View>
-          </View>
 
-          {/* Stats Metrics Row */}
-          <View style={styles.statsRow}>
-            {statItems.map((item, index) => (
-              <React.Fragment key={item.key}>
-                {index > 0 ? <View style={styles.statsDivider} /> : null}
-                <View style={styles.statBox}>
-                  <Image source={item.logo} style={styles.statLogo} resizeMode="contain" />
-                  <AppTypography variant="caption" style={styles.statTitle} numberOfLines={1}>
-                    {item.title}
-                  </AppTypography>
-                  <AppTypography variant="caption" style={styles.statSubtitle} numberOfLines={1}>
-                    {item.subtitle}
-                  </AppTypography>
-                </View>
-              </React.Fragment>
-            ))}
-          </View>
-
-         
-        </View>
-
-     
-
-        {/* Clinic & Appointment Section - expandable hospital cards */}
-        <View style={styles.section}>
-          <AppTypography variant="h4" style={styles.sectionTitle}>
-            Clinic &amp; Appointment
-          </AppTypography>
-
-          {hospitals.length > 0 ? (
-            hospitals.map((entry) => (
-              <HospitalAppointmentCard
-                key={entry.hospital.id}
-                entry={entry as HospitalEntry}
-                isExpanded={expandedHospitalId === entry.hospital.id}
-                onToggleExpand={() => handleToggleExpand(entry.hospital.id)}
-                apptType={apptType}
-                onAppointmentTypeChange={handleAppointmentTypeChange}
-                selectedDate={selectedDate}
-                onDateChange={(date) => {
-                  setSelectedDate(date);
-                  setSelectedTime(null);
-                }}
-                selectedTime={selectedTime}
-                onTimeChange={setSelectedTime}
-                availableSlots={
-                  expandedHospitalId === entry.hospital.id ? visibleSlotGroups : []
-                }
-                slotsLoading={expandedHospitalId === entry.hospital.id ? slotsLoading : false}
-                selectedAppointmentType={selectedAppointmentType}
+            {/* Achievements */}
+            <View style={styles.section}>
+              <AchievementsSubsection
+                achievements={MOCK_ACHIEVEMENTS}
+                onAchievementPress={setSelectedAchievement}
               />
-            ))
-          ) : (
-            <AppTypography variant="caption" style={styles.greyText}>
-              No hospitals available for this doctor
-            </AppTypography>
-          )}
-        </View>
-
-        {/* Location */}
-        <View style={styles.section}>
-          <AppTypography variant="h4" style={styles.sectionTitle}>
-            Location
-          </AppTypography>
-
-          <View style={styles.locationMapCard}>
-            <View style={styles.mapGridLineHorizontal} />
-            <View style={[styles.mapGridLineHorizontal, { top: 76 }]} />
-            <View style={[styles.mapGridLineHorizontal, { top: 124 }]} />
-            <View style={styles.mapGridLineVertical} />
-            <View style={[styles.mapGridLineVertical, { left: "68%" }]} />
-            <View style={styles.mapRouteLine} />
-            <View style={styles.mapPin}>
-              <MaterialCommunityIcons name="map-marker" size={22} color="#fff" />
             </View>
-
-            <View style={styles.locationOverlayCard}>
-              <View style={styles.locationOverlayHeader}>
-                <View style={styles.locationIconBox}>
-                  <MaterialCommunityIcons name="hospital-building" size={18} color={PRIMARY} />
-                </View>
-                <View style={styles.locationInfo}>
-                  <AppTypography variant="body" style={styles.locationHospitalName} numberOfLines={1}>
-                    {selectedHospitalEntry?.hospital.name || "Hospital"}
-                  </AppTypography>
-                  <AppTypography variant="caption" style={styles.locationHospitalAddress} numberOfLines={2}>
-                    {selectedHospitalEntry?.hospital.address || details?.location || "Address not available"}
-                  </AppTypography>
-                </View>
-              </View>
-
-              <TouchableOpacity style={styles.getDirectionsButton} activeOpacity={0.85}>
-                <MaterialCommunityIcons name="navigation-variant" size={18} color="#fff" />
-                <Text style={styles.getDirectionsText}>Get Directions</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* About the Doctor */}
-        <View style={styles.section}>
-          <AppTypography variant="h4" style={styles.sectionTitle}>
-            About the Doctor
-          </AppTypography>
-
-          {/* <View style={styles.aboutProfileHeader}>
-            <Image source={{ uri: avatarUrl }} style={styles.aboutProfileImage} />
-            <View style={styles.aboutProfileInfo}>
-              <View style={styles.aboutProfileNameRow}>
-                <AppTypography variant="h3" style={styles.aboutProfileName} numberOfLines={1}>
-                  {doctor.name}
-                </AppTypography>
-                <MaterialCommunityIcons
-                  name="check-decagram"
-                  size={16}
-                  color={PRIMARY}
-                  style={{ marginLeft: 6 }}
-                />
-              </View>
-              <AppTypography variant="caption" style={styles.aboutProfileSpec} numberOfLines={1}>
-                {specialities?.[0] || "Doctor Consultation"}
-              </AppTypography>
-              <View style={styles.aboutCouncilVerifiedBadge}>
-                <MaterialCommunityIcons name="shield-check-outline" size={13} color={PRIMARY} />
-                <Text style={styles.councilVerifiedText}>COUNCIL VERIFIED</Text>
-              </View>
-            </View>
-          </View> */}
-
-          <View style={styles.aboutCard}>
-            <AppTypography variant="caption" style={styles.aboutCardTitle}>
-              About
-            </AppTypography>
-            <AppTypography
-              variant="caption"
-              style={styles.aboutBodyText}
-              numberOfLines={aboutExpanded ? undefined : 3}
-            >
-              {aboutText}
-            </AppTypography>
-            <TouchableOpacity onPress={handleToggleAbout} activeOpacity={0.7}>
-              <AppTypography variant="caption" style={styles.readMoreText}>
-                {aboutExpanded ? "Show Less" : "Read More"}
-              </AppTypography>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Professional Background */}
-        <View style={styles.section}>
-          <View
-            style={styles.professionalCard}
-          >
-            <View style={styles.professionalCardHeader}>
-              <View style={styles.professionalIconBox}>
-                <MaterialCommunityIcons name="briefcase-outline" size={18} color={PRIMARY} />
-              </View>
-              <AppTypography variant="body" style={styles.professionalCardTitle}>
-                Professional Background
-              </AppTypography>
-            </View>
-
-            <AppTypography variant="caption" style={styles.professionalCardSubtitle}>
-              Explore the doctor's qualifications, experience, certifications, and professional
-              affiliations.
-            </AppTypography>
-
-            <TouchableOpacity
-              style={styles.viewMoreRow}
-              activeOpacity={0.75}
-              onPress={handleToggleBackground}
-            >
-              <AppTypography variant="caption" style={styles.readMoreText}>
-                {backgroundExpanded ? "View Less" : "View More"}
-              </AppTypography>
-              <MaterialCommunityIcons
-                name={backgroundExpanded ? "chevron-up" : "chevron-down"}
-                size={16}
-                color={PRIMARY}
-                style={{ marginLeft: 4 }}
-              />
-            </TouchableOpacity>
-
-            {/* Expanded Professional Background content */}
-            {backgroundExpanded && (
-              <View style={styles.professionalExpandedContainer}>
-                <BackgroundSubsection
-                  icon="school-outline"
-                  title="Education"
-                  items={educationItems}
-                  emptyText="No educational qualifications available"
-                />
-                <BackgroundSubsection
-                  icon="stethoscope"
-                  title="Specializations"
-                  items={MOCK_SPECIALIZATIONS}
-                />
-                <BackgroundSubsection
-                  icon="certificate-outline"
-                  title="Certifications"
-                  items={MOCK_CERTIFICATIONS}
-                />
-                <BackgroundSubsection
-                  icon="account-group-outline"
-                  title="Memberships"
-                  items={MOCK_MEMBERSHIPS}
-                />
-                <AchievementsSubsection
-                  achievements={MOCK_ACHIEVEMENTS}
-                  onAchievementPress={setSelectedAchievement}
-                />
-              </View>
-            )}
           </View>
         </View>
       </Animated.ScrollView>
@@ -1261,35 +1257,47 @@ export default function DoctorDetailPage() {
         style={[
           styles.compactHeaderOverlay,
           {
+            height: compactHeaderHeight,
+            paddingTop: compactHeaderPaddingTop,
             opacity: compactHeaderOpacity,
             transform: [{ translateY: compactHeaderTranslateY }],
           },
         ]}
       >
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
-          <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
+        <View style={[styles.contentContainer, { paddingHorizontal: sectionPadding }]}>
+          <View style={[styles.headerShell, { maxWidth: contentWidth }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
+              <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
+            </TouchableOpacity>
 
-        <View style={styles.compactHeaderText}>
-          <AppTypography variant="h3" style={styles.compactDoctorName} numberOfLines={1}>
-            {doctor.name}
-          </AppTypography>
-          <AppTypography
-            variant="caption"
-            style={styles.compactDoctorSpeciality}
-            numberOfLines={1}
-          >
-            {compactSpeciality}
-          </AppTypography>
-        </View>
+            <Image
+              source={{ uri: avatarUrl }}
+              style={styles.compactDoctorAvatar}
+              resizeMode="cover"
+            />
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerIconButton}>
-            <MaterialCommunityIcons name="heart-outline" size={24} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}>
-            <MaterialCommunityIcons name="share-variant" size={24} color="#fff" />
-          </TouchableOpacity>
+            <View style={styles.compactHeaderText}>
+              <AppTypography variant="h3" style={styles.compactDoctorName} numberOfLines={1}>
+                {doctor.name}
+              </AppTypography>
+              <AppTypography
+                variant="caption"
+                style={styles.compactDoctorSpeciality}
+                numberOfLines={1}
+              >
+                {compactSpeciality}
+              </AppTypography>
+            </View>
+
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.headerIconButton}>
+                <MaterialCommunityIcons name="heart-outline" size={23} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.headerIconButton}>
+                <MaterialCommunityIcons name="share-variant" size={23} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Animated.View>
 
@@ -1402,16 +1410,23 @@ export default function DoctorDetailPage() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fafafa" },
   scrollArea: { flex: 1 },
+  contentContainer: {
+    width: "100%",
+  },
+  contentShell: {
+    width: "100%",
+    alignSelf: "center",
+  },
   headerBackground: {
     backgroundColor: "#568b8b",
-    height: HEADER_BACKGROUND_HEIGHT,
-    paddingTop: Platform.OS === "ios" ? 50 : 30,
-    paddingHorizontal: 16,
   },
-  headerTop: {
+  headerShell: {
+    width: "100%",
+    alignSelf: "center",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    minHeight: 44,
   },
   headerLeft: {
     flex: 1,
@@ -1420,74 +1435,147 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerIconButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 8,
   },
   headerTitle: {
     color: "#fff",
-    marginLeft: 8,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: "800",
   },
   compactHeaderOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: COMPACT_HEADER_HEIGHT,
     zIndex: 20,
     elevation: 12,
     backgroundColor: "#568b8b",
-    paddingTop: Platform.OS === "ios" ? 44 : 24,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
   },
   compactHeaderText: {
     flex: 1,
     minWidth: 0,
-    marginLeft: 8,
+    marginLeft: 10,
+  },
+  compactDoctorAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#dfecec",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.7)",
   },
   compactDoctorName: {
     color: "#fff",
-    fontSize: 18,
-    lineHeight: 23,
-    fontWeight: "700",
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "800",
   },
   compactDoctorSpeciality: {
-    color: "#fff",
-    fontSize: 13,
-    lineHeight: 18,
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
     marginTop: 1,
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: 8,
+    marginLeft: 6,
   },
   profileCard: {
     backgroundColor: "#fff",
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginTop: -60,
-    padding: 16,
+    borderRadius: 10,
+    overflow: "hidden",
     elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
   },
-  profileTopRow: { flexDirection: "row", marginBottom: 16 },
-  avatarWrapper: { position: "relative", marginRight: 16 },
-  avatar: { width: 65, height: 65, borderRadius: 12, backgroundColor: "#eee" },
-  verifiedBadge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    backgroundColor: "#2b7571",
-    borderRadius: 10,
-    padding: 2,
+  profileHeroImage: {
+    width: "100%",
+    backgroundColor: "#dfecec",
   },
-  profileInfo: { flex: 1 },
-  doctorName: { fontWeight: "bold", color: "#333", fontSize: 16 },
-  doctorSpec: { color: "#888", marginTop: 2 },
+  profileContent: {
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 14,
+  },
+  doctorName: {
+    fontWeight: "800",
+    color: "#050c14",
+    fontSize: 21,
+    lineHeight: 26,
+  },
+  doctorSpec: {
+    color: PRIMARY,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  qualificationText: {
+    color: "#6f7378",
+    fontSize: 13,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  profileFooterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+    gap: 8,
+  },
+  experienceBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f4f5f6",
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    minHeight: 28,
+  },
+  experienceLabel: {
+    color: "#9ba1a6",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "800",
+    marginRight: 5,
+  },
+  experienceValue: {
+    color: PRIMARY,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: "800",
+  },
+  socialRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  socialButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#eef2f2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  socialIcon: {
+    width: 15,
+    height: 15,
+  },
   locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
   locationText: { color: "#888", marginLeft: 4, flex: 1 },
   distanceText: { color: "#2b7571", fontWeight: "bold" },
@@ -1543,7 +1631,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginLeft: 6,
   },
-  section: { paddingHorizontal: 16, paddingVertical: 12 },
+  section: { paddingVertical: 12 },
   sectionTitle: { color: "#333", fontWeight: "bold", marginBottom: 8 },
   divider: { height: 1, backgroundColor: "#f0f0f0", marginHorizontal: 16 },
   greyText: { color: "#888" },
@@ -1720,11 +1808,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   achievementsSection: {
-    borderBottomWidth: 0,
-    paddingBottom: 0,
+    paddingVertical: 2,
   },
   achievementsHeader: {
-    marginBottom: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
   },
   achievementsScrollContent: {
     paddingTop: 2,

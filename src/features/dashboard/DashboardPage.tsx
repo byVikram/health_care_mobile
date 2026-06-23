@@ -1,3 +1,4 @@
+// src/features/dashboard/screens/DashboardPage.tsx
 import React, { useEffect, useState } from 'react'
 import {
 	RefreshControl,
@@ -16,6 +17,7 @@ import SpecialitySection from './components/SpecialitySection'
 import ConsultSection from './components/ConsultSection'
 import PatientQuestionsSection from './components/PatientQuestionsSection'
 import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
+
 import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
 import CommunitySection from './components/CommunitySection'
 import LocationScreen from '../../components/common/LocationScreen'
@@ -38,6 +40,9 @@ import TreatmentHistoryIcon from '../../assets/icons/treatmenthistory.svg'
 import TreatmentHistoryArrowIcon from '../../assets/icons/treatmenthistory-icon.svg'
 import { ROUTES } from '../../navigation/routes'
 import type { AppNavigationParamList } from '../../navigation/types'
+
+import PatientHealthQuestionsList from '../dashboard/components/PatientHealthQuestionsList'
+import { AppButton } from '../../components/common'
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
@@ -151,7 +156,6 @@ export default function DashboardPage() {
 		}
 	}
 
-	// ---------------- DOCTOR PANEL ----------------
 	const renderDoctorPanel = () => (
 		<DoctorAppointments
 			selectedDate={selectedDate}
@@ -164,7 +168,6 @@ export default function DashboardPage() {
 		/>
 	)
 
-	// ---------------- PATIENT PANEL ----------------
 	const renderUserPanel = () => (
 		<>
 			<TouchableOpacity style={styles.treatmentHistoryCard}>
@@ -187,18 +190,21 @@ export default function DashboardPage() {
 
 			<SpecialitySection />
 			<ConsultSection />
+			{/* <PatientHealthQuestionsList /> */}
 		</>
 	)
 
-	// ---------------- PHARMACY PANEL ----------------
 	const renderPharmacyPanel = () => (
 		<>
 			<LocationScreen />
 			<GPSLocationCard />
 		</>
 	)
-
-	// ---------------- ROLE SWITCH ----------------
+	const renderRadiologyPanel = () => (
+		<>
+			<GPSLocationCard />
+		</>
+	)
 	const renderRoleBasedPanel = () => {
 		switch (role) {
 			case USER_ROLES.DOCTOR:
@@ -207,14 +213,16 @@ export default function DashboardPage() {
 			case USER_ROLES.PHARMACY:
 				return renderPharmacyPanel()
 
+			case USER_ROLES.RADIOLOGY:
+				return renderRadiologyPanel()
+
 			default:
 				return renderUserPanel()
 		}
 	}
 
-	// ---- Helper: main content (hero + role panel) ----
 	const renderMainContent = () => {
-		if (role !== USER_ROLES.DOCTOR && role !== USER_ROLES.PHARMACY) {
+		if (role !== USER_ROLES.DOCTOR && role !== USER_ROLES.PHARMACY && role !== USER_ROLES.RADIOLOGY) {
 			return (
 				<>
 					<HeroSection role={role} />
@@ -271,7 +279,6 @@ export default function DashboardPage() {
 					/>
 				}
 			>
-				{/* For PHARMACY role: show PharmacyOrder at the top (before HeroSection) */}
 				{role === USER_ROLES.PHARMACY && <PharmacyOrderDashboardCard />}
 
 				{renderMainContent()}
@@ -285,8 +292,19 @@ export default function DashboardPage() {
 				<BlogsSection />
 				<PodcastsSection />
 
-				{/* PatientQuestionsSection is NOT rendered for Pharmacy */}
-				{role !== USER_ROLES.PHARMACY && <PatientQuestionsSection />}
+				{role !== USER_ROLES.PHARMACY && (
+					<>
+						<PatientHealthQuestionsList showViewAll={true} />
+
+						{role === USER_ROLES.PATIENT && (
+							<View style={styles.askQuestionContainer}>
+								<AppButton onPress={() => navigation.navigate(ROUTES.STACK.PATIENT_QUESTIONS_LIST)}>
+									Ask a Free Question
+								</AppButton>
+							</View>
+						)}
+					</>
+				)}
 			</Animated.ScrollView>
 
 			<StatusModal
@@ -302,6 +320,27 @@ export default function DashboardPage() {
 }
 
 const styles = StyleSheet.create({
+	askQuestionContainer: {
+		marginHorizontal: 16,
+		marginTop: 12,
+		marginBottom: 8,
+	},
+	askQuestionButton: {
+		marginHorizontal: 16,
+		marginTop: 12,
+		marginBottom: 8,
+		backgroundColor: '#0C7C7C',
+		borderRadius: 12,
+		paddingVertical: 14,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+
+	askQuestionText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
+	},
 	container: {
 		flex: 1,
 		backgroundColor: '#f5f5f5',

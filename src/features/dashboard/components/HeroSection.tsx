@@ -15,7 +15,7 @@ import { BlurView } from 'expo-blur'
 import { Video, ResizeMode } from 'expo-av'
 import { AppTypography } from '../../../components/common'
 import { ROUTES } from '../../../navigation/routes'
-import { navigate as navigateRoot } from '../../../navigation/navigationService'
+import { navigate, navigate as navigateRoot } from '../../../navigation/navigationService'
 import ServicesSection from './ServiceSection'
 
 import EmergencyIcon from '../../../assets/quick-services/emergency.svg'
@@ -27,6 +27,7 @@ import PharmacyIcon from '../../../assets/quick-services/pharmacy.svg'
 import LabIcon from '../../../assets/quick-services/lab.svg'
 import RadiologyIcon from '../../../assets/quick-services/radiology.svg'
 import AncilaryIcon from '../../../assets/quick-services/ancilary.svg'
+import ScanTypeSelectorModal from '../../radiology/component/Scantypeselectormodal'
 
 const VIDEO_SOURCE = require('../../../assets/blog-and-community/video.mp4')
 const AD_IMAGE = require('../../../assets/blog-and-community/ad-image.png')
@@ -155,6 +156,10 @@ function HeroSection({ role }: { role: Role }) {
 	const isPharmacy = role === 'pharmacy'
 	const serviceIconSize = isTablet ? 40 : 30
 	const othersSquareSize = isTablet ? 17 : 12
+	const [showScanTypeModal, setShowScanTypeModal] = useState(false)
+	const [selectedScanTypeId, setSelectedScanTypeId] = useState<number | undefined>()
+
+	const [selectedScanTypeName, setSelectedScanTypeName] = useState<string | undefined>()
 
 	// ───────────────────────────────────────────────────────────
 	// Video Carousel (doctor & patient only)
@@ -260,7 +265,13 @@ function HeroSection({ role }: { role: Role }) {
 			navigateRoot(ROUTES.STACK.APPOINTMENTS)
 		} else if (title === 'Pharmacy') {
 			navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
+		} else if (title === 'Radiology') {
+			setShowScanTypeModal(true)
 		}
+	}
+
+	function setFilters(arg0: (prev: any) => any) {
+		throw new Error('Function not implemented.')
 	}
 
 	return (
@@ -485,6 +496,24 @@ function HeroSection({ role }: { role: Role }) {
 					</>
 				)}
 			</View>
+			<ScanTypeSelectorModal
+    visible={showScanTypeModal}
+    onClose={() => setShowScanTypeModal(false)}
+    onSelect={(scanTypeId, scanTypeName) => {
+        setSelectedScanTypeId(scanTypeId)
+        setSelectedScanTypeName(scanTypeName)
+
+        setShowScanTypeModal(false)
+
+        navigate(
+            ROUTES.STACK.RADIOLOGY_LIST,
+            {
+                scanTypeId,
+                scanTypeName,
+            } as any
+        )
+    }}
+/>
 		</View>
 	)
 }

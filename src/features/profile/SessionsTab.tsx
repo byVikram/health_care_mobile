@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { StyleSheet, View, ScrollView, RefreshControl, Animated, Easing } from 'react-native'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { StyleSheet, View, ScrollView, RefreshControl, Animated, Easing, useWindowDimensions } from 'react-native'
 import { Card, useTheme, Surface } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { getSessions, logoutSession, Session } from '../auth/authService'
@@ -55,6 +55,19 @@ const ShimmerPlaceholder = () => {
 // --- Main component -----------------------------------------------------------
 export default function SessionsTab() {
 	const theme = useTheme()
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768 && width < 1024
+	const isMobile = width < 768
+
+	const contentWidth = useMemo(() => {
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
+		return 640
+	}, [width, isTablet])
+
+	const sectionPadding = isMobile ? 16 : isTablet ? 32 : 48
+
 	const [sessions, setSessions] = useState<Session[]>([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -141,17 +154,21 @@ export default function SessionsTab() {
 	if (isLoading && !refreshing) {
 		return (
 			<View style={styles.container}>
-				<View style={styles.header}>
-					<AppTypography variant="h3" style={{ color: theme.colors.onSurface }}>
-						Active Sessions
-					</AppTypography>
-					<AppTypography variant="caption" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
-						Manage devices where you're currently signed in.
-					</AppTypography>
+				<View style={[styles.loadingContent, { paddingHorizontal: sectionPadding }]}>
+					<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+						<View style={styles.header}>
+							<AppTypography variant="h3" style={{ color: theme.colors.onSurface }}>
+								Active Sessions
+							</AppTypography>
+							<AppTypography variant="caption" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
+								Manage devices where you're currently signed in.
+							</AppTypography>
+						</View>
+						<ShimmerPlaceholder />
+						<ShimmerPlaceholder />
+						<ShimmerPlaceholder />
+					</View>
 				</View>
-				<ShimmerPlaceholder />
-				<ShimmerPlaceholder />
-				<ShimmerPlaceholder />
 			</View>
 		)
 	}
@@ -159,18 +176,20 @@ export default function SessionsTab() {
 	// --- Error state ------------------------------------------------------------
 	if (fetchError && sessions.length === 0) {
 		return (
-			<View style={styles.centeredContainer}>
-				<MaterialCommunityIcons name="cloud-alert" size={40} color={theme.colors.error} />
-				<AppTypography
-					variant="body"
-					align="center"
-					style={{ color: theme.colors.error, marginVertical: 12 }}
-				>
-					{fetchError}
-				</AppTypography>
-				<AppButton variant="primary" onPress={() => fetchSessions()}>
-					Retry
-				</AppButton>
+			<View style={[styles.centeredContainer, { paddingHorizontal: sectionPadding }]}>
+				<View style={[styles.centeredContentShell, { maxWidth: contentWidth }]}>
+					<MaterialCommunityIcons name="cloud-alert" size={40} color={theme.colors.error} />
+					<AppTypography
+						variant="body"
+						align="center"
+						style={{ color: theme.colors.error, marginVertical: 12 }}
+					>
+						{fetchError}
+					</AppTypography>
+					<AppButton variant="primary" onPress={() => fetchSessions()}>
+						Retry
+					</AppButton>
+				</View>
 			</View>
 		)
 	}
@@ -179,7 +198,7 @@ export default function SessionsTab() {
 	return (
 		<View style={styles.container}>
 			<ScrollView
-				contentContainerStyle={styles.content}
+				contentContainerStyle={[styles.content, { paddingHorizontal: sectionPadding }]}
 				refreshControl={
 					<RefreshControl
 						refreshing={refreshing}
@@ -189,46 +208,47 @@ export default function SessionsTab() {
 					/>
 				}
 			>
-				{/* Header */}
-				<View style={styles.header}>
-					<AppTypography variant="h3" style={{ color: theme.colors.onSurface }}>
-						Active Sessions
-					</AppTypography>
-					<AppTypography variant="caption" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
-						Manage devices where you're currently signed in.
-					</AppTypography>
-				</View>
-
-				{/* Empty state */}
-				{sessions.length === 0 ? (
-					<Surface style={styles.emptyState}>
-						<MaterialCommunityIcons name="shield-check-outline" size={40} color={theme.colors.onSurfaceVariant} />
-						<AppTypography variant="body" style={{ color: theme.colors.onSurfaceVariant, marginTop: 10 }}>
-							No active sessions found.
+				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+					{/* Header */}
+					<View style={styles.header}>
+						<AppTypography variant="h3" style={{ color: theme.colors.onSurface }}>
+							Active Sessions
 						</AppTypography>
-					</Surface>
-				) : (
-					sessions.map((session) => (
-						<Card
-							key={session.id}
-							style={[
-								styles.card,
-								session.is_current && {
-									borderColor: theme.colors.primary,
-									borderWidth: 1.5,
-								},
-							]}
-						>
-							<Card.Content style={styles.cardContent}>
-								<View style={styles.row}>
-									{/* Icon */}
-									<View style={[styles.iconContainer, { backgroundColor: theme.colors.surfaceVariant }]}>
-										<MaterialCommunityIcons
-											name={renderDeviceIcon(session.device_type)}
-											size={20}
-											color={session.is_current ? theme.colors.primary : theme.colors.onSurfaceVariant}
-										/>
-									</View>
+						<AppTypography variant="caption" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
+							Manage devices where you're currently signed in.
+						</AppTypography>
+					</View>
+
+					{/* Empty state */}
+					{sessions.length === 0 ? (
+						<Surface style={styles.emptyState}>
+							<MaterialCommunityIcons name="shield-check-outline" size={40} color={theme.colors.onSurfaceVariant} />
+							<AppTypography variant="body" style={{ color: theme.colors.onSurfaceVariant, marginTop: 10 }}>
+								No active sessions found.
+							</AppTypography>
+						</Surface>
+					) : (
+						sessions.map((session) => (
+							<Card
+								key={session.id}
+								style={[
+									styles.card,
+									session.is_current && {
+										borderColor: theme.colors.primary,
+										borderWidth: 1.5,
+									},
+								]}
+							>
+								<Card.Content style={styles.cardContent}>
+									<View style={styles.row}>
+										{/* Icon */}
+										<View style={[styles.iconContainer, { backgroundColor: theme.colors.surfaceVariant }]}>
+											<MaterialCommunityIcons
+												name={renderDeviceIcon(session.device_type)}
+												size={20}
+												color={session.is_current ? theme.colors.primary : theme.colors.onSurfaceVariant}
+											/>
+										</View>
 
 									{/* Details */}
 									<View style={styles.detailsContainer}>
@@ -304,6 +324,7 @@ export default function SessionsTab() {
 						</Card>
 					))
 				)}
+				</View>
 			</ScrollView>
 
 			{/* Logout confirmation modal */}
@@ -359,14 +380,30 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f8fafc',
 	},
 	content: {
-		padding: 14,
+		paddingTop: 16,
 		paddingBottom: 32,
+		alignItems: 'center',
+		width: '100%',
+	},
+	loadingContent: {
+		flex: 1,
+		paddingTop: 16,
+		width: '100%',
+		alignItems: 'center',
+	},
+	contentShell: {
+		width: '100%',
+		alignSelf: 'center',
 	},
 	centeredContainer: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		padding: 32,
+	},
+	centeredContentShell: {
+		width: '100%',
+		alignSelf: 'center',
+		alignItems: 'center',
 	},
 	header: {
 		marginBottom: 14,

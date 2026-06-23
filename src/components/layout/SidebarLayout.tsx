@@ -80,6 +80,8 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 	const handleSearchPress = () => {
 		if (role === 'pharmacy') {
 			navigation.navigate(ROUTES.STACK.ORDER_LIST as any)
+		} else if (role === 'radiology') {
+			navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS as any)
 		} else {
 			navigation.navigate(ROUTES.MAIN.TABS, {
 				screen: ROUTES.MAIN.SEARCH as any,
@@ -125,14 +127,32 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 						screen: ROUTES.MAIN.HOME,
 					}),
 			},
+			// {
+			// 	id: 'radiology',
+			// 	label: 'Radiology',
+			// 	icon: <RadiologyIcon width={20} height={20} />,
+			// 	onPress: () =>
+			// 		navigation.navigate(ROUTES.MAIN.TABS, {
+			// 			screen: ROUTES.MAIN.HOME,
+			// 		}),
+			// },
 			{
 				id: 'radiology',
 				label: 'Radiology',
 				icon: <RadiologyIcon width={20} height={20} />,
-				onPress: () =>
-					navigation.navigate(ROUTES.MAIN.TABS, {
-						screen: ROUTES.MAIN.HOME,
-					}),
+				onPress: () => {
+					setIsSidebarOpen(false)
+					navigation.navigate(ROUTES.STACK.RADIOLOGY_LIST as any)
+				},
+			},
+			{
+				id: 'radiology-bookings',
+				label: 'Radiology Bookings',
+				icon: <MaterialCommunityIcons name="clipboard-text-play-outline" size={20} color="#1f5f68" />,
+				onPress: () => {
+					setIsSidebarOpen(false)
+					navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS as any)
+				},
 			},
 			{
 				id: 'ancillary',

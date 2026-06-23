@@ -77,6 +77,11 @@ export type AppStackParamList = {
 	[ROUTES.STACK.ORDER_LIST]: undefined
 	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
 	[ROUTES.STACK.PLACE_PHARMACY_ORDER]: { pharmacyId: string; pharmacyName: string }
+	[ROUTES.STACK.PLACE_RADIOLOGY_ORDER]: {
+		radiologyId: string
+		centerName: string
+		centerAddress?: string
+	}
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
 	[ROUTES.STACK.PATIENT_PAYMENT]:
@@ -93,7 +98,14 @@ export type AppStackParamList = {
 				fee: number
 		  }
 		| undefined
+	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: undefined
+	[ROUTES.STACK.PATIENT_QUESTION_DETAIL]: { questionId: string } | undefined
+	[ROUTES.STACK.RADIOLOGY_LIST]: { scanTypeId?: number; scanTypeName?: string } | undefined
+	[ROUTES.STACK.RADIOLOGY_ORDERS]: undefined
+	[ROUTES.STACK.RADIOLOGY_ORDER_DETAIL]: { publicId: string; booking?: any }
+	[ROUTES.STACK.RADIOLOGY_SCAN_TYPES]: undefined
 }
+
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList
 export type AppNavigationParamList = RootStackParamList & MainTabParamList
