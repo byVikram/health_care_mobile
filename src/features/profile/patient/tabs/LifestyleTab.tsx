@@ -1,5 +1,5 @@
-import React from 'react'
-import { View, ScrollView, StyleSheet } from 'react-native'
+import React, { useMemo } from 'react'
+import { View, ScrollView, StyleSheet, useWindowDimensions } from 'react-native'
 import { AppSelect, AppButton } from '../../../../components/common'
 import type { PatientProfileState } from '../PatientProfileService'
 
@@ -61,14 +61,28 @@ interface Props {
 }
 
 export default function LifestyleTab({ data, onChange, onSave, saving }: Props) {
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768 && width < 1024
+	const isMobile = width < 768
+
+	const contentWidth = useMemo(() => {
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
+		return 640
+	}, [width, isTablet])
+
+	const sectionPadding = isMobile ? 16 : isTablet ? 32 : 48
+
 	return (
 		<ScrollView
 			style={styles.scroll}
-			contentContainerStyle={styles.scrollContent}
+			contentContainerStyle={[styles.scrollContent, { paddingHorizontal: sectionPadding }]}
 			keyboardShouldPersistTaps="handled"
 			showsVerticalScrollIndicator={false}
 		>
-			<View style={styles.formFieldsWrapper}>
+			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+				<View style={styles.formFieldsWrapper}>
 				{/* Smoking Habits */}
 				<AppSelect
 					label="Smoking Habits"
@@ -134,19 +148,20 @@ export default function LifestyleTab({ data, onChange, onSave, saving }: Props) 
 					size="compact"
 					style={styles.fieldMargin}
 				/>
-			</View>
+				</View>
 
-			<View style={styles.saveButtonWrapper}>
-				<AppButton
-					variant="primary"
-					formAction
-					style={styles.saveButton}
-					onPress={onSave}
-					loading={saving}
-					disabled={saving}
-				>
-					Save
-				</AppButton>
+				<View style={styles.saveButtonWrapper}>
+					<AppButton
+						variant="primary"
+						formAction
+						style={styles.saveButton}
+						onPress={onSave}
+						loading={saving}
+						disabled={saving}
+					>
+						Save
+					</AppButton>
+				</View>
 			</View>
 		</ScrollView>
 	)
@@ -159,16 +174,20 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		flexGrow: 1,
+		alignItems: 'center',
+		width: '100%',
+	},
+	contentShell: {
+		width: '100%',
+		alignSelf: 'center',
 	},
 	formFieldsWrapper: {
-		paddingHorizontal: 16,
 		paddingVertical: 16,
 	},
 	fieldMargin: {
 		marginBottom: 16,
 	},
 	saveButtonWrapper: {
-		paddingHorizontal: 16,
 		paddingBottom: 24,
 		alignItems: 'center',
 	},
