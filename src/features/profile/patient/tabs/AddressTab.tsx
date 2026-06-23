@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	View,
 	ScrollView,
@@ -11,6 +11,7 @@ import {
 	Animated,
 	PanResponder,
 	Pressable,
+	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography, AppInput, AppButton, AppModal, AppToggle } from '../../../../components/common'
@@ -76,6 +77,19 @@ const deleteAddress = async (id: string): Promise<void> => {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AddressTab() {
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768 && width < 1024
+	const isMobile = width < 768
+
+	const contentWidth = useMemo(() => {
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
+		return 640
+	}, [width, isTablet])
+
+	const sectionPadding = isMobile ? 16 : isTablet ? 32 : 48
+
 	const [addresses, setAddresses] = useState<PatientAddress[]>([])
 	const [loadingList, setLoadingList] = useState(true)
 	const [modalVisible, setModalVisible] = useState(false)
@@ -253,6 +267,8 @@ export default function AddressTab() {
 
 	return (
 		<View style={styles.root}>
+			<View style={[styles.contentContainer, { paddingHorizontal: sectionPadding }]}>
+				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
 			{/* Add button */}
 			<View style={styles.headerRow}>
 				<AppTypography variant="caption" style={styles.sectionCaption}>
@@ -283,7 +299,11 @@ export default function AddressTab() {
 					</TouchableOpacity>
 				</View>
 			) : (
-				<ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+				<ScrollView
+					style={styles.listScroll}
+					contentContainerStyle={styles.list}
+					showsVerticalScrollIndicator={false}
+				>
 					{addresses.map((addr) => (
 						<View key={addr.id} style={[styles.card, addr.is_default && styles.cardDefault]}>
 							{/* Label row */}
@@ -352,6 +372,8 @@ export default function AddressTab() {
 					))}
 				</ScrollView>
 			)}
+				</View>
+			</View>
 
 			{/* Add / Edit Modal */}
 			<Modal visible={modalVisible} transparent animationType="fade" onRequestClose={closeModal}>
@@ -581,11 +603,19 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#fff',
 	},
+	contentContainer: {
+		flex: 1,
+		width: '100%',
+	},
+	contentShell: {
+		flex: 1,
+		width: '100%',
+		alignSelf: 'center',
+	},
 	headerRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		paddingHorizontal: 16,
 		paddingTop: 16,
 		paddingBottom: 8,
 	},
@@ -634,8 +664,10 @@ const styles = StyleSheet.create({
 		color: '#0c7c7c',
 		fontWeight: '600',
 	},
+	listScroll: {
+		flex: 1,
+	},
 	list: {
-		paddingHorizontal: 16,
 		paddingVertical: 8,
 		gap: 12,
 	},

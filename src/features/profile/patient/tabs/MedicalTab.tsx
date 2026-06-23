@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
 	View,
 	ScrollView,
@@ -7,6 +7,7 @@ import {
 	TextInput,
 	KeyboardAvoidingView,
 	Platform,
+	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography, AppButton } from '../../../../components/common'
@@ -51,6 +52,19 @@ const FIELD_DETAILS: Record<MultiFieldKey, MultiFieldDetails> = {
 }
 
 export default function MedicalTab({ data, onChange, onSave, saving }: Props) {
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768 && width < 1024
+	const isMobile = width < 768
+
+	const contentWidth = useMemo(() => {
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
+		return 640
+	}, [width, isTablet])
+
+	const sectionPadding = isMobile ? 16 : isTablet ? 32 : 48
+
 	const [sheetVisible, setSheetVisible] = useState(false)
 	const [activeKey, setActiveKey] = useState<MultiFieldKey>('allergies')
 	const [multiDraft, setMultiDraft] = useState('')
@@ -127,44 +141,46 @@ export default function MedicalTab({ data, onChange, onSave, saving }: Props) {
 	return (
 		<ScrollView
 			style={styles.scroll}
-			contentContainerStyle={styles.scrollContent}
+			contentContainerStyle={[styles.scrollContent, { paddingHorizontal: sectionPadding }]}
 			keyboardShouldPersistTaps="handled"
 			showsVerticalScrollIndicator={false}
 		>
-			<View style={styles.formFieldsWrapper}>
-				{renderMultiField('allergies')}
-				{renderMultiField('chronicConditions')}
-				{renderMultiField('currentMedications')}
+			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
+				<View style={styles.formFieldsWrapper}>
+					{renderMultiField('allergies')}
+					{renderMultiField('chronicConditions')}
+					{renderMultiField('currentMedications')}
 
-				<View style={styles.multiFieldContainer}>
-					<AppTypography variant="caption" style={styles.fieldLabel}>
-						Family History
-					</AppTypography>
-					<View style={styles.multiInputBox}>
-						<TextInput
-							style={styles.multiTextInput}
-							value={data.familyHistory}
-							onChangeText={(val: string) => onChange('familyHistory', val)}
-							placeholder="Write relevant family medical history"
-							placeholderTextColor="#b0bcc0"
-							multiline
-							textAlignVertical="top"
-						/>
+					<View style={styles.multiFieldContainer}>
+						<AppTypography variant="caption" style={styles.fieldLabel}>
+							Family History
+						</AppTypography>
+						<View style={styles.multiInputBox}>
+							<TextInput
+								style={styles.multiTextInput}
+								value={data.familyHistory}
+								onChangeText={(val: string) => onChange('familyHistory', val)}
+								placeholder="Write relevant family medical history"
+								placeholderTextColor="#b0bcc0"
+								multiline
+								textAlignVertical="top"
+							/>
+						</View>
 					</View>
 				</View>
-			</View>
 
-			<View style={styles.saveButtonWrapper}>
-				<AppButton
-					variant="primary"
-					formAction
-					style={styles.saveButton}
-					onPress={onSave}
-					loading={saving}
-					disabled={saving}
-				>
-					Save
-				</AppButton>
+				<View style={styles.saveButtonWrapper}>
+					<AppButton
+						variant="primary"
+						formAction
+						style={styles.saveButton}
+						onPress={onSave}
+						loading={saving}
+						disabled={saving}
+					>
+						Save
+					</AppButton>
+				</View>
 			</View>
 
 			<AppBottomSheet
@@ -214,9 +230,14 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		flexGrow: 1,
+		alignItems: 'center',
+		width: '100%',
+	},
+	contentShell: {
+		width: '100%',
+		alignSelf: 'center',
 	},
 	formFieldsWrapper: {
-		paddingHorizontal: 16,
 		paddingVertical: 16,
 	},
 	fieldLabel: {
@@ -227,7 +248,6 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 	},
 	saveButtonWrapper: {
-		paddingHorizontal: 16,
 		paddingBottom: 24,
 		alignItems: 'center',
 	},
