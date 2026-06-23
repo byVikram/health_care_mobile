@@ -47,5 +47,10 @@ export const ROUTES = {
 		PLACE_RADIOLOGY_ORDER: 'PlaceRadiologyOrder',
 		RADIOLOGY_ORDER_DETAIL: 'BookingDetailsRadiologyPage',
 		RADIOLOGY_SCAN_TYPES: 'Scantypeselectormodal',
+
+		LABORATORY_LIST: 'LaboratorySearchPage',
+		PLACE_LABORATORY_TEST: 'PlaceLabOrderPage',
+		LABORATORY_ORDERS: 'Orderlistlaboratorypage',
+		LABORATORY_ORDER_DETAILS: 'Bookingdetailslaboratorypage',
 	},
 } as const

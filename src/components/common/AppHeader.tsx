@@ -46,7 +46,8 @@ export default function AppHeader({
 	const isPharmacy = role === 'pharmacy'
 
 	const isRadiology = role === USER_ROLES.RADIOLOGY
-	const isPatient = !isDoctor && !isPharmacy && !isRadiology
+	const isLaboratory = role === USER_ROLES.LABORATORY
+	const isPatient = !isDoctor && !isPharmacy && !isRadiology && !isLaboratory
 
 	// Option B GPU animation values
 	const maxScroll = isDoctor ? 40 : 60
@@ -120,7 +121,13 @@ export default function AppHeader({
 		} else if (isRadiology) {
 			console.log('RADIOLOGY_ORDERS')
 			navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS)
-		} else {
+		} 
+		else if (isLaboratory){
+			console.log('LABORATORY_ORDERS')
+			navigation.navigate(ROUTES.STACK.LABORATORY_ORDERS)
+		}
+		
+		else {
 			console.log('SEARCH')
 			navigation.navigate(ROUTES.STACK.SEARCH)
 		}
