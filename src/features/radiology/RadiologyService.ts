@@ -63,7 +63,7 @@ export interface RadiologyBooking {
 	patient_name: string
 	radiology_name: string
 	radiology_public_id: string
-	booking_date: string // YYYY-MM-DD
+	booking_date: string
 	booking_time: string
 	status: string
 	payment_status: string
@@ -75,6 +75,21 @@ export interface RadiologyBooking {
 	notes?: string | null
 	external_prescription_s3_key?: string | null
 	booking_items: RadiologyBookingItem[]
+	report?: {
+    report_pdf_s3_key?: string
+    dicom_images_s3_keys?: string[]
+    scan_images_s3_keys?: string[]
+    summary_findings?: string
+}
+
+consultation?: {
+	doctor_name?: string
+	chief_complaint?: string
+	clinical_history?: string
+	notes?: string
+	recommendation?: string
+	follow_up?: string
+}
 	created_at: string
 }
 
