@@ -73,6 +73,11 @@ This report outlines the structural, architectural, and logical improvements ide
   - Move user-facing booking operations (like placing or checking an order) to `src/features/pharmacy/`.
   - Address operations should be linked directly to a centralized `src/features/profile/patient/` or shared helper service.
 
+### 2.3 Wrong Placeholder Image Category Mismatch
+* **Location:** [RadiologyCard.tsx](src/features/radiology/component/RadiologyCard.tsx#L7-L11)
+* **Problem:** The card imports pharmacy placeholder image assets (`pharmacy2`, `pharmacy3`, `pharmacy4`) to render as default images for radiology centers, even though dedicated radiology placeholder assets were pulled (e.g., under `src/assets/Radiology/`).
+* **Refactoring Suggestion:** Use the appropriate radiology image placeholder assets instead of pharmacy-related images.
+
 ---
 
 ## 3. Medium Severity Issues
@@ -80,19 +85,21 @@ This report outlines the structural, architectural, and logical improvements ide
 ### 3.1 Duplicated Helper and Utility Logic
 * **Issue A: Date Formatting:**
   - Standard formatting helpers are provided in [date.ts](src/utils/date.ts).
-  - However, screens like [DoctorDetailPage.tsx](src/features/doctor/detail/DoctorDetailPage.tsx#L727), [AvailabilityTab.tsx](src/features/profile/doctor/tabs/AvailabilityTab.tsx#L214), and [PatientProfileService.ts](src/features/profile/patient/PatientProfileService.ts#L75) redefine a local copy of `formatDateForApi`.
+  - However, screens like [DoctorDetailPage.tsx](src/features/doctor/detail/DoctorDetailPage.tsx#L727), [AvailabilityTab.tsx](src/features/profile/doctor/tabs/AvailabilityTab.tsx#L214), [PatientProfileService.ts](src/features/profile/patient/PatientProfileService.ts#L75), and [OrderListRadiologyPage.tsx](src/features/radiology/OrderListRadiologyPage.tsx#L112) redefine a local copy of `formatDateForApi` / `formatApiDate`.
 * **Issue B: Geocoding Duplication:**
   - `useGPSLocation.ts` contains custom geocoding hooks [useGPSLocation.ts](src/useGPSLocation/useGPSLocation.ts#L64).
   - `locationService.ts` contains a duplicate geocoding utility `getAddressFromCoords` [locationService.ts](src/useGPSLocation/locationService.ts#L26).
 * **Issue C: S3 URL Resolution:**
-  - [PlacePharmacyOrderPage.tsx](src/features/pharmacy/PlacePharmacyOrderPage.tsx#L48) formats the S3 url properly.
+  - [PlacePharmacyOrderPage.tsx](src/features/pharmacy/PlacePharmacyOrderPage.tsx#L48) and [RadiologyBookingPage.tsx](src/features/radiology/RadiologyBookingPage.tsx#L40) format the S3 url properly.
   - [RadiologyBookingDetailsPage.tsx](src/features/radiology/RadiologyBookingDetailsPage.tsx#L99) contains a mock function that returns just the raw key, which will fail to fetch the remote images for radiology documents.
 * **Refactoring Suggestion:** Consolidate these helpers into shared utilities (`src/utils/`). Import them on screens instead of redeclaring local variations.
 
-### 3.2 Redundant Request Token Passing
-* **Location:** [RadiologyService.ts](src/features/radiology/RadiologyService.ts) & [doctorService.ts](src/features/doctor/doctorService.ts#L157)
-* **Problem:** Service methods accept a redundant `token` parameter and build request auth headers manually. The global Axios client instance in `ApiService` is already configured with a request interceptor that retrieves the accessToken from `AsyncStorage` and appends it automatically. Passing the token manually creates API clutter and leads to maintenance discrepancies.
-* **Refactoring Suggestion:** Remove the manual token arguments and header overrides from feature services. Let the global request interceptor handle the authorization automatically.
+### 3.2 Redundant Request Token Passing & API Duplication
+* **Location:** [RadiologyService.ts](src/features/radiology/RadiologyService.ts), [doctorService.ts](src/features/doctor/doctorService.ts#L157), and [radiologyService.ts](src/features/profile/radiology/radiologyService.ts#L66)
+* **Problem:** 
+  - Service methods accept a redundant `token` parameter and build request auth headers manually. The global Axios client instance in `ApiService` is already configured with a request interceptor that retrieves the accessToken from `AsyncStorage` and appends it automatically. Passing the token manually creates API clutter and leads to maintenance discrepancies.
+  - The exact same API endpoint `API_ENDPOINTS.RADIOLOGY_PROFILE.SCAN_TYPES` is requested by two different services: `fetchScanTypes` in `src/features/radiology/RadiologyService.ts` and `getScanTypes` in `src/features/profile/radiology/radiologyService.ts`.
+* **Refactoring Suggestion:** Clean up token passing from service interfaces, and unify duplicate endpoints into a single radiology service.
 
 ### 3.3 Folder Directory Structure Anomaly
 * **Location:** `src/useGPSLocation/`
@@ -106,11 +113,11 @@ This report outlines the structural, architectural, and logical improvements ide
 ## 4. Low Severity & Best Practice Improvements
 
 ### 4.1 Massive Component Bloat (Inlining Subcomponents)
-* **Problem:** Multiple screen files have grown extremely large, exceeding 1,000 to 2,000 lines (e.g., [DoctorDetailPage.tsx](src/features/doctor/detail/DoctorDetailPage.tsx) at 2226 lines; [RadiologyBookingDetailsPage.tsx](src/features/radiology/RadiologyBookingDetailsPage.tsx) at 1381 lines). They contain several standalone components inline (`BackgroundSubsection`, `HospitalAppointmentCard`, `ImageViewerModal`, etc.).
+* **Problem:** Multiple screen files have grown extremely large, exceeding 1,000 to 2,000 lines (e.g., [DoctorDetailPage.tsx](src/features/doctor/detail/DoctorDetailPage.tsx) at 2226 lines; [RadiologyBookingDetailsPage.tsx](src/features/radiology/RadiologyBookingDetailsPage.tsx) at 1381 lines; [OrderListRadiologyPage.tsx](src/features/radiology/OrderListRadiologyPage.tsx) at 1021 lines). They contain several standalone components inline (`BackgroundSubsection`, `HospitalAppointmentCard`, `ImageViewerModal`, `BookingCard`, etc.).
 * **Refactoring Suggestion:** Split these files up. Define subcomponents inside a `components/` subfolder located next to the page component (e.g., `src/features/doctor/detail/components/HospitalAppointmentCard.tsx`).
 
 ### 4.2 Hardcoded Color Strings
-* **Problem:** CSS colors like `#1f5f68` or `#2E7C86` are hardcoded in styles across features instead of utilizing the defined application theme tokens.
+* **Problem:** CSS colors like `#1f5f68`, `#2E7C86`, or `#2B6F71` are hardcoded in styles across features instead of utilizing the defined application theme tokens. Similarly, local `COLORS` configuration objects are created in components like [Scantypeselectormodal.tsx](src/features/radiology/component/Scantypeselectormodal.tsx#L91).
 * **Refactoring Suggestion:** Access constants dynamically using `useTheme()` from `react-native-paper` to make the codebase easier to update and to prepare it for optional dark-mode integration.
 
 ### 4.3 Redundant Android LayoutAnimation Setup
