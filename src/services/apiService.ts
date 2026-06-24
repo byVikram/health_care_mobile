@@ -30,6 +30,7 @@ axiosInstance.interceptors.request.use(
 	async (config) => {
 		// Use AsyncStorage in React Native
 		const token = await AsyncStorage.getItem('access_token')
+		console.log('[API TOKEN]', token)
 		const requestUrl = String(config.url || '')
 		const isBookingRequest = requestUrl.includes('/appointments') || requestUrl.includes('appointments')
 		config.headers = config.headers || {}

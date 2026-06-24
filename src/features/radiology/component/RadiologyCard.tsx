@@ -10,12 +10,15 @@ import pharmacy4 from '../../../assets/Pharmacy/pharmacy4.png'
 
 const radiologyImages: ImageSourcePropType[] = [pharmacy2, pharmacy3, pharmacy4]
 
-const getRadiologyImage = (id: string): ImageSourcePropType => {
+const getRadiologyImage = (id: string | undefined): ImageSourcePropType => {
+	const safeId = typeof id === 'string' && id.length > 0 ? id : 'default'
+
 	let hash = 0
-	for (let i = 0; i < id.length; i++) {
-		hash = (hash << 5) - hash + id.charCodeAt(i)
+	for (let i = 0; i < safeId.length; i++) {
+		hash = (hash << 5) - hash + safeId.charCodeAt(i)
 		hash |= 0
 	}
+
 	return radiologyImages[Math.abs(hash) % radiologyImages.length]
 }
 

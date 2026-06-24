@@ -68,10 +68,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			console.log('[AuthContext] active role:', role)
 			const user = await AsyncStorage.getItem('user')
 			const token = await AsyncStorage.getItem('access_token')
+			const refresh = await AsyncStorage.getItem('refresh_token')
 
 			setRole(role as UserRole)
 			setUser(user ? JSON.parse(user) : null)
 			setAccessToken(token)
+			setRefreshToken(refresh)
 
 			setIsLoading(false)
 		}
@@ -87,6 +89,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		await AsyncStorage.setItem('role', role)
 		await AsyncStorage.setItem('user', JSON.stringify(user))
 		await AsyncStorage.setItem('access_token', accessToken)
+		await AsyncStorage.setItem('refresh_token', refreshToken)
 
 		setRole(role)
 		setUser(user)
@@ -106,10 +109,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	}
 
 	const clearAuth = async () => {
-		await AsyncStorage.clear()
-		clearAuthState()
-	}
+	await AsyncStorage.multiRemove([
+		'role',
+		'user',
+		'access_token',
+		'refresh_token',
+	])
 
+	clearAuthState()
+}
 	return (
 		<AuthContext.Provider
 			value={{
