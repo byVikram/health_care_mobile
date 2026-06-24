@@ -127,7 +127,7 @@ let cacheTimestamp: number = 0
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 export async function fetchRadiologyCatalog(
-	token?: string | null,
+	
 	options?: { signal?: AbortSignal }
 ): Promise<RadiologyItem[]> {
 	const cacheKey = 'all'
@@ -136,7 +136,7 @@ export async function fetchRadiologyCatalog(
 		return cachedData
 	}
 
-	const scanTypes = await fetchScanTypes(token, options)
+	const scanTypes = await fetchScanTypes(options)
 
 	const response = await ApiService.get<{ success: boolean; message?: string; data: RadiologySearchItem[] }>(
 		API_ENDPOINTS.RADIOLOGY_PROFILE.SEARCH,
@@ -147,7 +147,7 @@ export async function fetchRadiologyCatalog(
 	const items: RadiologyItem[] = json.data.map((item: RadiologySearchItem) => {
 		const scanType = scanTypes.find((st) => st.id === item.scan_id)
 		return {
-			id: item.radiology_id,
+			id: item.id,
 			name: item.name,
 			address: item.address,
 			city: item.city,
@@ -171,7 +171,7 @@ export async function fetchRadiologyCatalog(
 	return items
 }
 
-export async function fetchScanTypes(token?: string | null, options?: { signal?: AbortSignal }): Promise<ScanType[]> {
+export async function fetchScanTypes( options?: { signal?: AbortSignal }): Promise<ScanType[]> {
 	const cachedScanTypes = scanTypesCache
 	if (cachedScanTypes !== null) {
 		return cachedScanTypes
@@ -190,7 +190,7 @@ export async function fetchScanTypes(token?: string | null, options?: { signal?:
 
 export async function fetchRadiologyScans(
 	radiologyId: string,
-	token?: string | null,
+	
 	options?: { signal?: AbortSignal }
 ): Promise<any[]> {
 	const response = await ApiService.get<{ success: boolean; message?: string; data: any[] }>(
@@ -201,7 +201,6 @@ export async function fetchRadiologyScans(
 }
 
 export async function fetchRadiologyBookings(
-	token?: string | null,
 	status?: string,
 	options?: { signal?: AbortSignal }
 ): Promise<RadiologyBooking[]> {
@@ -216,7 +215,7 @@ export async function fetchRadiologyBookings(
 }
 
 export async function fetchRadiologyBookingDetail(
-	token?: string | null,
+	
 	publicId?: string,
 	options?: { signal?: AbortSignal }
 ): Promise<RadiologyBooking> {
@@ -232,7 +231,7 @@ export async function fetchRadiologyBookingDetail(
 }
 
 export async function updateRadiologyBookingStatus(
-	token?: string | null,
+	
 	publicId?: string,
 	payload?: UpdateRadiologyBookingPayload,
 	options?: { signal?: AbortSignal }
@@ -247,7 +246,7 @@ export async function updateRadiologyBookingStatus(
 }
 
 export async function submitRadiologyBookingQuote(
-	token?: string | null,
+	
 	publicId?: string,
 	payload?: SubmitQuotePayload,
 	options?: { signal?: AbortSignal }
@@ -262,7 +261,7 @@ export async function submitRadiologyBookingQuote(
 }
 
 export async function verifyRadiologyPrescription(
-	token?: string | null,
+	
 	publicId?: string,
 	options?: { signal?: AbortSignal }
 ): Promise<any> {
@@ -276,7 +275,7 @@ export async function verifyRadiologyPrescription(
 }
 
 export async function confirmRadiologyPayment(
-	token?: string | null,
+	
 	publicId?: string,
 	options?: { signal?: AbortSignal }
 ): Promise<any> {
@@ -290,7 +289,7 @@ export async function confirmRadiologyPayment(
 }
 
 export async function uploadRadiologyReport(
-	token?: string | null,
+	
 	publicId?: string,
 	payload?: RadiologyReportCreatePayload,
 	options?: { signal?: AbortSignal }
@@ -386,7 +385,7 @@ export function getPricingModelColor(model: PricingModel): string {
 
 export async function createRadiologyBooking(
 	bookingData: RadiologyBookingPayload,
-	token?: string | null,
+	
 	options?: { signal?: AbortSignal }
 ): Promise<any> {
 	const response = await ApiService.post<{ success: boolean; message?: string }>(

@@ -5,6 +5,7 @@ import {
 	PharmacyProfileData,
 	PharmacyProfileUpdatePayload,
 } from '../../../types/pharmacy-profile-api'
+import { PatientAddress, TreatmentRecord } from '../../pharmacy/pharmacyService'
 
 export const getPharmacyProfile = async (): Promise<PharmacyProfileApiResponse> => {
 	const res = await ApiService.get<PharmacyProfileApiResponse>(API_ENDPOINTS.PHARMACY.DETAILS)
@@ -127,20 +128,22 @@ export const updatePharmacyOrderMedicines = async (id: string, medicines: any[])
 	})
 	return res.data
 }
+export const getPatientTreatmentHistory = async (userId: string): Promise<TreatmentRecord[]> => {
+	const res = await ApiService.get<{ success: boolean; data: TreatmentRecord[] }>(
+		API_ENDPOINTS.PATIENT.TREATMENT_HISTORY(userId)
+	)
+	return res.data?.data ?? []
+}
+export const getPatientAddresses = async (): Promise<PatientAddress[]> => {
+	const res = await ApiService.get<{ success: boolean; data: PatientAddress[] }>(
+		API_ENDPOINTS.PATIENT.ADDRESSES
+	)
+	return res.data?.data ?? []
+}
 
 // export const sendPharmacyOrderReminder = async (id: string) => {
 // 	const res = await ApiService.post(API_ENDPOINTS.PHARMACY_ORDERS.SEND_REMINDER(id))
 // 	return res.data
 // }
 
-export const createPharmacyOrder = async (order: {
-	pharmacy_public_id: string
-	treatment_public_id?: string | null
-	external_prescription_s3_key?: string | null
-	delivery_type: string
-	delivery_address_public_id?: string | null
-	notes?: string | null
-}) => {
-	const res = await ApiService.post(API_ENDPOINTS.PHARMACY_ORDERS.CREATE, order)
-	return res.data
-}
+

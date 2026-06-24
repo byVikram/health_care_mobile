@@ -40,11 +40,11 @@ import RadiologyBookingPage from '../features/radiology/RadiologyBookingPage'
 import RadiologyBookingDetailsPage from '../features/radiology/RadiologyBookingDetailsPage'
 import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
 import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage'
-import Component from 'react-native-paper/lib/typescript/components/List/ListItem'
-import ScanTypeSelectorModal from '../features/radiology/component/Scantypeselectormodal'
+
+
 import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
 import PlaceLabOrderPage from '../features/laboratory/PlaceLabOrderPage'
-import OrderListLaboratoryPage from '../features/laboratory/Orderlistlaboratorypage'
+
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {

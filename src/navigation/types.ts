@@ -79,7 +79,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.PLACE_PHARMACY_ORDER]: { pharmacyId: string; pharmacyName: string }
 	[ROUTES.STACK.PLACE_RADIOLOGY_ORDER]: {
 		radiologyId: string
-		centerName: string
+		centerName?: string
 		centerAddress?: string
 	}
 	[ROUTES.STACK.LABORATORY_LIST]: undefined

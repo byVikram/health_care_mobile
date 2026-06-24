@@ -23,21 +23,23 @@ export interface TreatmentRecord {
 	hospital_name?: string
 }
 
-export const getPatientTreatmentHistory = async (userId: string): Promise<TreatmentRecord[]> => {
-	const res = await ApiService.get<{ success: boolean; data: TreatmentRecord[] }>(
-		API_ENDPOINTS.PATIENT.TREATMENT_HISTORY(userId)
-	)
-	return res.data?.data ?? []
-}
 
-export const getPatientAddresses = async (): Promise<PatientAddress[]> => {
-	const res = await ApiService.get<{ success: boolean; data: PatientAddress[] }>(
-		API_ENDPOINTS.PATIENT.ADDRESSES
-	)
-	return res.data?.data ?? []
-}
+
+
+
 
 export const createPatientAddress = async (address: Omit<PatientAddress, 'id'>): Promise<any> => {
 	const res = await ApiService.post(API_ENDPOINTS.PATIENT.ADDRESSES, address)
+	return res.data
+}
+export const createPharmacyOrder = async (order: {
+	pharmacy_public_id: string
+	treatment_public_id?: string | null
+	external_prescription_s3_key?: string | null
+	delivery_type: string
+	delivery_address_public_id?: string | null
+	notes?: string | null
+}) => {
+	const res = await ApiService.post(API_ENDPOINTS.PHARMACY_ORDERS.CREATE, order)
 	return res.data
 }

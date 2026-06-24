@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getCurrentLocation,
   getAddressFromCoords,
-} from '../../useGPSLocation/locationService';
+} from '../../services/locationService';
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -95,9 +95,28 @@ export default function LocationScreen() {
     }).start();
   };
 
-  const applyLocation = (position: LatLng, readable: string) => {
+  interface AddressResponse {
+    area?: string;
+    city?: string;
+    district?: string;
+    state?: string;
+    country?: string;
+    fullAddress?: string;
+  }
+
+  const resolveReadableAddress = (
+    value: string | AddressResponse | null | undefined
+  ) => {
+    if (typeof value === 'string') return value;
+    return value?.fullAddress ?? '';
+  };
+
+  const applyLocation = (
+    position: LatLng,
+    readable: string | AddressResponse | null | undefined
+  ) => {
     setCoords(position);
-    setAddress(readable);
+    setAddress(resolveReadableAddress(readable));
     setSuggestions([]);
     setSearchText('');
     showMap();
@@ -166,14 +185,14 @@ export default function LocationScreen() {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setCoords({ latitude, longitude });
     const readable = await getAddressFromCoords(latitude, longitude);
-    setAddress(readable);
+    setAddress(resolveReadableAddress(readable));
   };
 
   const handleMarkerDragEnd = async (e: any) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setCoords({ latitude, longitude });
     const readable = await getAddressFromCoords(latitude, longitude);
-    setAddress(readable);
+    setAddress(resolveReadableAddress(readable));
   };
 
   // ── Confirm ──────────────────────────────────────────────

@@ -34,7 +34,7 @@ export interface RadiologySearchResponse {
 }
 
 export interface RadiologySearchItem {
-	radiology_id: string
+	id: string
 	name: string
 	address: string
 	city: string

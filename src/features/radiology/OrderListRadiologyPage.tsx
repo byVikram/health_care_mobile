@@ -363,7 +363,7 @@ export default function OrderListRadiologyPage() {
 			try {
 				isRefresh ? setRefreshing(true) : setLoading(true)
 				const status = statusFilter !== 'all' ? statusFilter : undefined
-				const data = await fetchRadiologyBookings(accessToken, status)
+				const data = await fetchRadiologyBookings(status)
 				setAllBookings(data)
 			} catch (error: any) {
 				console.error('[OrderListRadiologyPage] fetchBookings error:', error?.message || error)
