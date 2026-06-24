@@ -1,5 +1,6 @@
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
+import { formatApiDateForDisplay, formatDateStringForApi } from '../../../utils/date'
 
 export interface PatientProfileState {
 	// Personal
@@ -72,11 +73,7 @@ export const getPatientDetails = async (): Promise<PatientProfileResponse> => {
 
 // PATCH /api/patients/me/details -> update profile
 export const updatePatientProfile = async (state: PatientProfileState): Promise<PatientProfileResponse> => {
-	const formatDateForApi = (date: string) => {
-		if (!date) return null
-		const [day, month, year] = date.split('-')
-		return `${year}-${month}-${day}`
-	}
+	
 
 	// Build API payload
 	const payload = {
@@ -84,7 +81,7 @@ export const updatePatientProfile = async (state: PatientProfileState): Promise<
 		phone_number: state.contactNumber,
 		email: state.email,
 		gender: state.gender,
-		date_of_birth: formatDateForApi(state.dateOfBirth),
+		date_of_birth: formatDateStringForApi(state.dateOfBirth),
 		blood_group: state.bloodGroup,
 		marital_status: state.maritalStatus,
 		height: Number(state.height) || 0,
@@ -133,12 +130,6 @@ export const mapApiToLocalState = (apiData: any): PatientProfileState => {
 		return []
 	}
 
-	// Format date from YYYY-MM-DD to DD-MM-YYYY for AppCalendar
-	const formatDob = (dob?: string): string => {
-		if (!dob) return ''
-		const [year, month, day] = dob.split('-')
-		return `${day}-${month}-${year}`
-	}
 
 	const toStateString = (val: any): string => {
 		if (val === null || val === undefined) return ''
@@ -150,7 +141,7 @@ export const mapApiToLocalState = (apiData: any): PatientProfileState => {
 		contactNumber: personal?.contact_number || '',
 		email: personal?.email || '',
 		gender: personal?.gender || '',
-		dateOfBirth: formatDob(personal?.date_of_birth),
+		dateOfBirth: formatApiDateForDisplay(personal?.date_of_birth),
 		bloodGroup: personal?.blood_group || '',
 		maritalStatus: personal?.marital_status || '',
 		height: toStateString(personal?.height),

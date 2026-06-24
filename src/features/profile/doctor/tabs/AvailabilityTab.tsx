@@ -23,6 +23,7 @@ import {
 	updateDoctorAvailability,
 } from '../../../doctor/doctorService'
 import { DoctorAvailability, DoctorHospital } from '../../../../types/doctor-profile'
+import { formatDateForApi } from '../../../../utils/date'
 
 interface AvailabilityTabProps {
 	hospitals?: DoctorHospital[]
@@ -210,13 +211,6 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	} | null>(null)
 	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentTypeKey>('clinic')
 	const [toggleRefreshing, setToggleRefreshing] = useState(false)
-
-	const formatDateForApi = (date: Date) => {
-		const year = date.getFullYear()
-		const month = String(date.getMonth() + 1).padStart(2, '0')
-		const day = String(date.getDate()).padStart(2, '0')
-		return `${year}-${month}-${day}`
-	}
 
 	const getDayKey = (date: Date): keyof DoctorAvailability => {
 		switch (date.getDay()) {

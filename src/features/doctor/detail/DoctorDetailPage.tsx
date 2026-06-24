@@ -39,6 +39,11 @@ import {
 } from "../../../types/doctor-detail";
 import { ROUTES } from "../../../navigation/routes";
 import type { AppStackParamList } from "../../../navigation/types";
+import {
+  formatDateDisplay,
+  formatDateForApi,
+  formatTimeForApi,
+} from "../../../utils/date";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -724,24 +729,6 @@ export default function DoctorDetailPage() {
   const profileImageHeight = isMobile ? 125 : isTablet ? 176 : 190;
   const profileTopMargin = isMobile ? 16 : 18;
 
-  const formatDateForApi = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const formatTimeForApi = (timeLabel: string) => {
-    const trimmed = timeLabel.trim().toUpperCase();
-    const match = trimmed.match(/^(\d{1,2}):(\d{2})(AM|PM)$/);
-    if (!match) return timeLabel;
-    const [, hText, mText, suffix] = match;
-    let hour = Number.parseInt(hText, 10);
-    if (suffix === "PM" && hour !== 12) hour += 12;
-    if (suffix === "AM" && hour === 12) hour = 0;
-    return `${String(hour).padStart(2, "0")}:${mText}`;
-  };
-
   useEffect(() => {
     const fetchDetail = async () => {
       if (!route.params?.id) return;
@@ -1387,7 +1374,7 @@ export default function DoctorDetailPage() {
                 hospitalId: selectedHospital,
                 hospitalName: targetHospitalEntry?.hospital.name || "",
                 appointmentDate: formattedDate,
-                appointmentDateDisplay: selectedDate.toDateString(),
+                appointmentDateDisplay: formatDateDisplay(selectedDate),
                 startTime: formattedTime,
                 startTimeDisplay: selectedTime,
                 appointmentMode: apptType === "offline" ? "offline" : "online",
