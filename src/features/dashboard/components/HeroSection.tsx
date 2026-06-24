@@ -42,7 +42,7 @@ const AD_IMAGE = require('../../../assets/blog-and-community/ad-image.png')
 // Types
 // ─────────────────────────────────────────────────────────────
 
-type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | null
+type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | null
 type PopupSvgIconItem = {
 	title: string
 	type: 'svg'
@@ -343,6 +343,8 @@ function HeroSection({ role }: { role: Role }) {
 			navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
 		} else if (title === 'Radiology') {
 			setShowScanTypeModal(true)
+		} else if (title === 'Laboratory') {
+			navigateRoot(ROUTES.STACK.LABORATORY_LIST)
 		}
 	}
 
@@ -597,22 +599,19 @@ function HeroSection({ role }: { role: Role }) {
 				)}
 			</View>
 			<ScanTypeSelectorModal
-    visible={showScanTypeModal}
-    onClose={() => setShowScanTypeModal(false)}
-    onSelect={(scanTypeId, scanTypeName) => {
-        setSelectedScanTypeId(scanTypeId)
-        setSelectedScanTypeName(scanTypeName)
+				visible={showScanTypeModal}
+				onClose={() => setShowScanTypeModal(false)}
+				onSelect={(scanTypeId, scanTypeName) => {
+					setSelectedScanTypeId(scanTypeId)
+					setSelectedScanTypeName(scanTypeName)
 
-        setShowScanTypeModal(false)
+					setShowScanTypeModal(false)
 
-        navigate(
-            ROUTES.STACK.RADIOLOGY_LIST,
-            {
-                scanTypeId,
-                scanTypeName,
-            } as any
-        )
-    }}
+					navigate(ROUTES.STACK.RADIOLOGY_LIST, {
+						scanTypeId,
+						scanTypeName,
+					} as any)
+				}}
 />
 			<AncillarySelectorModal
 				open={showAncillaryModal}
@@ -625,7 +624,7 @@ function HeroSection({ role }: { role: Role }) {
 			<TherapeuticSelector
 				open={showTherapeuticModal}
 				onClose={() => setShowTherapeuticModal(false)}
-			/>
+						/>
 		</View>
 	)
 }

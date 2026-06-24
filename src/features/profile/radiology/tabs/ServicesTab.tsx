@@ -1,14 +1,7 @@
 // src/features/profile/radiology/tabs/ServicesTab.tsx
 
 import React, { useEffect, useMemo, useState } from 'react'
-import {
-	Alert,
-	ScrollView,
-	StyleSheet,
-	View,
-	useWindowDimensions,
-	ActivityIndicator,
-} from 'react-native'
+import { Alert, ScrollView, StyleSheet, View, useWindowDimensions, ActivityIndicator } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppButton,
@@ -73,7 +66,11 @@ function FieldLabel({ label, required = false }: { label: string; required?: boo
 	return (
 		<AppTypography variant="caption" style={styles.fieldLabel}>
 			{label}
-			{required ? <AppTypography variant="caption" style={styles.requiredMark}>*</AppTypography> : null}
+			{required ? (
+				<AppTypography variant="caption" style={styles.requiredMark}>
+					*
+				</AppTypography>
+			) : null}
 		</AppTypography>
 	)
 }
@@ -100,15 +97,7 @@ function SectionCard({
 	)
 }
 
-function FormRow({
-	children,
-	stacked,
-	compact,
-}: {
-	children: React.ReactNode
-	stacked: boolean
-	compact: boolean
-}) {
+function FormRow({ children, stacked, compact }: { children: React.ReactNode; stacked: boolean; compact: boolean }) {
 	return (
 		<View style={[styles.formRow, stacked && styles.formRowStacked, compact && styles.formRowCompact]}>
 			{React.Children.map(children, (child, index) => (
@@ -178,12 +167,17 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 
 	const [catalogLoading, setCatalogLoading] = useState(true)
 	const [scanTypes, setScanTypes] = useState<MobileScanType[]>([])
-	const [catalogDraft, setCatalogDraft] = useState<Record<number, {
-		is_available: boolean
-		pricing_model: 'fixed' | 'starting_from' | 'quote_required'
-		base_price: string
-		price_details: string
-	}>>({})
+	const [catalogDraft, setCatalogDraft] = useState<
+		Record<
+			number,
+			{
+				is_available: boolean
+				pricing_model: 'fixed' | 'starting_from' | 'quote_required'
+				base_price: string
+				price_details: string
+			}
+		>
+	>({})
 
 	const [isSaving, setIsSaving] = useState(false)
 	const [successModalVisible, setSuccessModalVisible] = useState(false)
@@ -237,22 +231,26 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 		const details = profileData?.details
 		if (!details) return
 
-		const openDaysMapped = Array.isArray(details.open_days)
-			? details.open_days.map(String)
-			: []
+		const openDaysMapped = Array.isArray(details.open_days) ? details.open_days.map(String) : []
 
 		// Parse mon-sat or general operating hours string if present, or fallback
 		let openVal = '09:00 AM'
 		let closeVal = '09:00 PM'
 		const oh = details.operating_hours
-		if (oh) {
+		console.log('operating_hours =', oh)
+
+		if (oh && typeof oh === 'object') {
 			const keys = Object.keys(oh)
-			if (keys.length) {
-				const timeStr = oh[keys[0]] // e.g. "08:00 AM - 08:00 PM"
-				if (timeStr && timeStr.includes(' - ')) {
-					const parts = timeStr.split(' - ')
-					openVal = parts[0]
-					closeVal = parts[1]
+
+			if (keys.length > 0) {
+				const timeStr = oh[keys[0]]
+				console.log('timeStr =', timeStr)
+
+				if (typeof timeStr === 'string' && timeStr.includes(' - ')) {
+					const [open, close] = timeStr.split(' - ')
+
+					openVal = open
+					closeVal = close
 				}
 			}
 		}
@@ -307,7 +305,7 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 			const daysAsInt = formData.openDays.map(Number)
 			const ohPayload = {
 				operating_hours: {
-					"mon-sat": `${formData.openingTime} - ${formData.closingTime}`
+					'mon-sat': `${formData.openingTime} - ${formData.closingTime}`,
 				},
 				open_days: daysAsInt,
 				payment_methods: formData.paymentMethods,
@@ -453,7 +451,9 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 													<FieldLabel label="Base Price (INR)" required />
 													<AppInput
 														value={draft.base_price}
-														onChangeText={(text) => handleBasePriceChange(t.id, text.replace(/\D/g, ''))}
+														onChangeText={(text) =>
+															handleBasePriceChange(t.id, text.replace(/\D/g, ''))
+														}
 														placeholder="e.g. 1500"
 														keyboardType="numeric"
 														fieldSize="form"

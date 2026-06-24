@@ -30,6 +30,10 @@ import OrderListPage from '../features/pharmacy/OrderListPage'
 import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
 import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 
+import LaboratorySearchPage from '../features/laboratory/LaboratorySearchPage'
+import LaboratoryOrderPage from '../features/laboratory/Orderlistlaboratorypage'
+import LaboratoryBookingDetail from '../features/laboratory/Bookingdetailslaboratorypage'
+
 import PatientHealthQuestionsList from '../features/dashboard/components/PatientHealthQuestionsList'
 import PatientHealthQuestionDetail from '../features/dashboard/components/PatientHealthQuestionDetail'
 import RadiologyBookingPage from '../features/radiology/RadiologyBookingPage'
@@ -39,6 +43,8 @@ import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage
 import Component from 'react-native-paper/lib/typescript/components/List/ListItem'
 import ScanTypeSelectorModal from '../features/radiology/component/Scantypeselectormodal'
 import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
+import PlaceLabOrderPage from '../features/laboratory/PlaceLabOrderPage'
+import OrderListLaboratoryPage from '../features/laboratory/Orderlistlaboratorypage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -109,6 +115,30 @@ function AuthenticatedNavigator() {
 				component={RadiologyBookingDetailsPage}
 				options={{ headerShown: true, title: 'Radiology Detail' }}
 			/>
+
+			<AppStack.Screen
+				name={ROUTES.STACK.LABORATORY_LIST as keyof AppStackParamList}
+				component={LaboratorySearchPage}
+				options={{ headerShown: true, title: 'Laboratory list' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.PLACE_LABORATORY_TEST as keyof AppStackParamList}
+				component={PlaceLabOrderPage}
+				options={{ headerShown: true, title: 'Place Laboratory Test' }}
+			/>
+
+			<AppStack.Screen
+				name={ROUTES.STACK.LABORATORY_ORDERS as keyof AppStackParamList}
+				component={LaboratoryOrderPage}
+				options={{ headerShown: true, title: 'laboratory order list' }}
+			/>
+
+			<AppStack.Screen
+				name={ROUTES.STACK.LABORATORY_ORDER_DETAILS as keyof AppStackParamList}
+				component={LaboratoryBookingDetail}
+				options={{ headerShown: true, title: 'laboratory detail' }}
+			/>
+
 			<AppStack.Screen
 				name={ROUTES.STACK.ALL_SPECIALITIES}
 				component={AllSpecialitiesPage}
@@ -117,7 +147,7 @@ function AuthenticatedNavigator() {
 					title: 'All Specialities',
 				}}
 			/>
-			
+
 			<AppStack.Screen
 				name={ROUTES.STACK.DOCTOR_SEARCH}
 				component={DoctorSearchPage}
