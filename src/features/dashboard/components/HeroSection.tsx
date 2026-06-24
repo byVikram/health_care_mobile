@@ -9,6 +9,7 @@ import {
 	Pressable,
 	Animated,
 	useWindowDimensions,
+	type ImageSourcePropType,
 } from 'react-native'
 
 import { BlurView } from 'expo-blur'
@@ -27,7 +28,12 @@ import PharmacyIcon from '../../../assets/quick-services/pharmacy.svg'
 import LabIcon from '../../../assets/quick-services/lab.svg'
 import RadiologyIcon from '../../../assets/quick-services/radiology.svg'
 import AncilaryIcon from '../../../assets/quick-services/ancilary.svg'
+import AlliedIcon from '../../../assets/quick-services/allied.png'
+import TherapeuticIcon from '../../../assets/quick-services/therapeutic.png'
 import ScanTypeSelectorModal from '../../radiology/component/Scantypeselectormodal'
+import AncillarySelectorModal from './AncillarySelectorModal'
+import AlliedSelectorModal from './AlliedSelcetorModel'
+import TherapeuticSelector from './TherapeuticSelector'
 
 const VIDEO_SOURCE = require('../../../assets/blog-and-community/video.mp4')
 const AD_IMAGE = require('../../../assets/blog-and-community/ad-image.png')
@@ -37,6 +43,17 @@ const AD_IMAGE = require('../../../assets/blog-and-community/ad-image.png')
 // ─────────────────────────────────────────────────────────────
 
 type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | null
+type PopupSvgIconItem = {
+	title: string
+	type: 'svg'
+	Component: React.ComponentType<{ width?: number; height?: number }>
+}
+type PopupImageIconItem = {
+	title: string
+	type: 'image'
+	source: ImageSourcePropType
+}
+type PopupIconItem = PopupSvgIconItem | PopupImageIconItem
 
 // ─────────────────────────────────────────────────────────────
 // Video Slide
@@ -154,9 +171,30 @@ function HeroSection({ role }: { role: Role }) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
 	const isPharmacy = role === 'pharmacy'
+	const othersButtonRef = useRef<any>(null)
 	const serviceIconSize = isTablet ? 40 : 30
 	const othersSquareSize = isTablet ? 17 : 12
+	const popupHorizontalPadding = isTablet ? 18 : width < 360 ? 10 : 12
+	const popupItemGap = isTablet ? 12 : 8
+	const popupMenuWidth = Math.min(width - 24, isTablet ? 440 : 352)
+	const popupColumns = 4
+	const popupItemWidth = Math.floor(
+		(popupMenuWidth - popupHorizontalPadding * 2 - popupItemGap * (popupColumns - 1)) / popupColumns
+	)
+	const popupIconBoxSize = isTablet ? 44 : 40
+	const popupIconSize = isTablet ? 28 : 24
+	const [othersAnchor, setOthersAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
+	const popupTop = othersAnchor ? othersAnchor.y + othersAnchor.height + 8 : isTablet ? 130 : 96
+	const popupLeft = othersAnchor
+		? Math.min(
+				Math.max(12, othersAnchor.x + othersAnchor.width / 2 - popupMenuWidth / 2),
+				width - popupMenuWidth - 12,
+			)
+		: Math.max(12, (width - popupMenuWidth) / 2)
 	const [showScanTypeModal, setShowScanTypeModal] = useState(false)
+	const [showAncillaryModal, setShowAncillaryModal] = useState(false)
+	const [showAlliedModal, setShowAlliedModal] = useState(false)
+	const [showTherapeuticModal, setShowTherapeuticModal] = useState(false)
 	const [selectedScanTypeId, setSelectedScanTypeId] = useState<number | undefined>()
 
 	const [selectedScanTypeName, setSelectedScanTypeName] = useState<string | undefined>()
@@ -181,24 +219,60 @@ function HeroSection({ role }: { role: Role }) {
 	const popupTranslateY = useRef(new Animated.Value(25)).current
 
 	const openOthersModal = () => {
-		setShowOthersModal(true)
-		popupScale.setValue(0.7)
-		popupOpacity.setValue(0)
-		popupTranslateY.setValue(25)
+		const showPopup = () => {
+			setShowOthersModal(true)
+			popupScale.setValue(0.7)
+			popupOpacity.setValue(0)
+			popupTranslateY.setValue(14)
 
-		Animated.parallel([
-			Animated.spring(popupScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
-			Animated.timing(popupOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
-			Animated.timing(popupTranslateY, { toValue: 0, duration: 220, useNativeDriver: true }),
-		]).start()
+			Animated.parallel([
+				Animated.spring(popupScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+				Animated.timing(popupOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+				Animated.timing(popupTranslateY, { toValue: 0, duration: 180, useNativeDriver: true }),
+			]).start()
+		}
+
+		if (othersButtonRef.current?.measureInWindow) {
+			othersButtonRef.current.measureInWindow(
+				(x: number, y: number, measuredWidth: number, measuredHeight: number) => {
+					setOthersAnchor({ x, y, width: measuredWidth, height: measuredHeight })
+					showPopup()
+				},
+			)
+			return
+		}
+
+		showPopup()
 	}
 
-	const closeOthersModal = () => {
+	const closeOthersModal = (afterClose?: () => void) => {
 		Animated.parallel([
 			Animated.timing(popupScale, { toValue: 0.7, duration: 180, useNativeDriver: true }),
 			Animated.timing(popupOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
 			Animated.timing(popupTranslateY, { toValue: 25, duration: 180, useNativeDriver: true }),
-		]).start(() => setShowOthersModal(false))
+		]).start(() => {
+			setShowOthersModal(false)
+			afterClose?.()
+		})
+	}
+
+	const handleOtherServicePress = (title: string) => {
+		if (title === 'Ancillary') {
+			closeOthersModal(() => setShowAncillaryModal(true))
+			return
+		}
+
+		if (title === 'Allied') {
+			closeOthersModal(() => setShowAlliedModal(true))
+			return
+		}
+
+		if (title === 'Therapeutic') {
+			closeOthersModal(() => setShowTherapeuticModal(true))
+			return
+		}
+
+		closeOthersModal()
 	}
 
 	// ───────────────────────────────────────────────────────────
@@ -252,12 +326,14 @@ function HeroSection({ role }: { role: Role }) {
 		{ title: 'Others', Component: null },
 	]
 
-	const othersPopupItems = [
-		{ title: 'Ancillary', Component: AncilaryIcon },
-		{ title: 'Ambulance', Component: AmbulanceIcon },
-		{ title: 'Blood Bank', Component: BloodBankIcon },
-		{ title: 'ICU', Component: IcuIcon },
-		{ title: 'Emergency', Component: EmergencyIcon },
+	const othersPopupItems: PopupIconItem[] = [
+		{ title: 'Ancillary', type: 'svg', Component: AncilaryIcon },
+		{ title: 'Ambulance', type: 'svg', Component: AmbulanceIcon },
+		{ title: 'Blood Bank', type: 'svg', Component: BloodBankIcon },
+		{ title: 'ICU', type: 'svg', Component: IcuIcon },
+		{ title: 'Emergency', type: 'svg', Component: EmergencyIcon },
+		{ title: 'Allied', type: 'image', source: AlliedIcon },
+		{ title: 'Therapeutic', type: 'image', source: TherapeuticIcon },
 	]
 
 	const handleServicePress = (title: string) => {
@@ -286,6 +362,7 @@ function HeroSection({ role }: { role: Role }) {
 						if (s.title === 'Others' || !s.Component) {
 							return (
 								<TouchableOpacity
+									ref={othersButtonRef}
 									key={s.title}
 									style={[styles.hServiceCard, isTablet && styles.hServiceCardTablet]}
 									activeOpacity={0.8}
@@ -377,8 +454,11 @@ function HeroSection({ role }: { role: Role }) {
 			{!isPharmacy && <ServicesSection />}
 
 			{!isPharmacy && (
-				<Modal visible={showOthersModal} transparent animationType="none" onRequestClose={closeOthersModal}>
-					<Pressable style={styles.overlay} onPress={closeOthersModal}>
+				<Modal visible={showOthersModal} transparent animationType="none" onRequestClose={() => closeOthersModal()}>
+					<Pressable
+						style={styles.overlay}
+						onPress={() => closeOthersModal()}
+					>
 						<Animated.View style={[StyleSheet.absoluteFillObject, { opacity: popupOpacity }]}>
 							<BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFillObject} />
 						</Animated.View>
@@ -387,24 +467,44 @@ function HeroSection({ role }: { role: Role }) {
 							style={[
 								styles.popupMenu,
 								{
+									position: 'absolute',
+									top: popupTop,
+									left: popupLeft,
+									width: popupMenuWidth,
+									paddingHorizontal: popupHorizontalPadding,
 									opacity: popupOpacity,
 									transform: [{ scale: popupScale }, { translateY: popupTranslateY }],
 								},
 							]}
 						>
 							<Pressable onPress={() => {}}>
-								<View style={styles.popupRow}>
+								<View style={[styles.popupRow, { gap: popupItemGap }]}>
 									{othersPopupItems.map((item) => (
 										<TouchableOpacity
 											key={item.title}
-											style={styles.popupItem}
+											style={[styles.popupItem, { width: popupItemWidth }]}
 											activeOpacity={0.8}
-											onPress={closeOthersModal}
+											onPress={() => handleOtherServicePress(item.title)}
 										>
-											<View style={styles.popupIconCircle}>
-												<item.Component width={30} height={30} />
+											<View
+												style={[
+													styles.popupIconCircle,
+													{ width: popupIconBoxSize, height: popupIconBoxSize },
+												]}
+											>
+												{item.type === 'svg' ? (
+													<item.Component width={popupIconSize} height={popupIconSize} />
+												) : (
+													<Image
+														source={item.source}
+														style={{ width: popupIconSize, height: popupIconSize }}
+														resizeMode="contain"
+													/>
+												)}
 											</View>
-											<AppTypography style={styles.popupText}>{item.title}</AppTypography>
+											<AppTypography style={styles.popupText} numberOfLines={3}>
+												{item.title}
+											</AppTypography>
 										</TouchableOpacity>
 									))}
 								</View>
@@ -514,6 +614,18 @@ function HeroSection({ role }: { role: Role }) {
         )
     }}
 />
+			<AncillarySelectorModal
+				open={showAncillaryModal}
+				onClose={() => setShowAncillaryModal(false)}
+			/>
+			<AlliedSelectorModal
+				open={showAlliedModal}
+				onClose={() => setShowAlliedModal(false)}
+			/>
+			<TherapeuticSelector
+				open={showTherapeuticModal}
+				onClose={() => setShowTherapeuticModal(false)}
+			/>
 		</View>
 	)
 }
@@ -664,48 +776,51 @@ const styles = StyleSheet.create({
 		flex: 1,
 		justifyContent: 'flex-start',
 		alignItems: 'center',
-		paddingTop: 200,
 	},
 
 	popupMenu: {
 		backgroundColor: '#fff',
-		borderRadius: 18,
-		paddingVertical: 22,
-		paddingHorizontal: 6,
+		borderRadius: 14,
+		paddingVertical: 14,
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 6 },
-		shadowOpacity: 0.16,
-		shadowRadius: 14,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.14,
+		shadowRadius: 10,
 		elevation: 12,
 	},
 
 	popupRow: {
 		flexDirection: 'row',
+		flexWrap: 'wrap',
 		alignItems: 'flex-start',
 		justifyContent: 'center',
-		gap: 16,
 	},
 
 	popupItem: {
 		alignItems: 'center',
-		width: 58,
+		justifyContent: 'flex-start',
+		minHeight: 76,
+		flexShrink: 0,
 	},
 
 	popupIconCircle: {
-		width: 48,
-		height: 48,
-		borderRadius: 12,
+		borderRadius: 10,
 		backgroundColor: '#f5f7fb',
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
 
 	popupText: {
-		fontSize: 11,
+		fontSize: 9,
+		lineHeight: 12,
 		fontWeight: '600',
 		color: '#1e2a3a',
 		textAlign: 'center',
-		marginTop: 8,
+		marginTop: 6,
+		width: '100%',
+		minHeight: 36,
+		includeFontPadding: false,
+		textAlignVertical: 'center',
 	},
 
 	adBox: {
