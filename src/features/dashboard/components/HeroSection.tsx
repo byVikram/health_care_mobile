@@ -36,7 +36,7 @@ const AD_IMAGE = require('../../../assets/blog-and-community/ad-image.png')
 // Types
 // ─────────────────────────────────────────────────────────────
 
-type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | null
+type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | null
 
 // ─────────────────────────────────────────────────────────────
 // Video Slide
