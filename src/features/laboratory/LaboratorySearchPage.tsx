@@ -1,7 +1,11 @@
-// src/features/Laboratory/screens/LaboratorySearchPage.tsx
-import React, { useCallback, useEffect, useState } from 'react'
+// src/features/laboratory/LaboratorySearchPage.tsx
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+	Animated,
 	FlatList,
+	Modal,
+	Platform,
+	Pressable,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -13,17 +17,40 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
+import { BlurView } from 'expo-blur'
 import Toast from 'react-native-toast-message'
-import { AppBottomSheet, AppSkeleton } from '../../components/common'
+
+import { AppBottomSheet, AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
 import PaginationBar from '../../components/common/AppPagination'
-import LaboratoryCard from '../laboratory/component/LaboratoryCard'
-import LaboratoryFilters, { LaboratoryFilterState } from '../laboratory/component/LaboratoryFilters'
-import { getLaboratories } from '../laboratory/laboratoryService'
-import { LaboratoryItem } from '../laboratory/laboratory'
+import LaboratoryCard from './component/LaboratoryCard'
+import { getLaboratories, clearLaboratoryCache } from './laboratoryService'
+import type { LaboratoryItem } from './laboratory'
 import { ROUTES } from '../../navigation/routes'
 
-const PAGE_SIZE = 10
-// ── Skeleton ──────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────
+
+const PAGE_SIZE_OPTIONS = [12, 24, 48]
+
+const CITY_OPTIONS: AppSelectOption[] = [
+	{ label: 'All Cities', value: '' },
+	{ label: 'Ahmedabad', value: 'Ahmedabad' },
+	{ label: 'Bangalore', value: 'Bangalore' },
+	{ label: 'Bengaluru', value: 'Bengaluru' },
+	{ label: 'Chennai', value: 'Chennai' },
+	{ label: 'Delhi', value: 'Delhi' },
+	{ label: 'Hyderabad', value: 'Hyderabad' },
+	{ label: 'Jaipur', value: 'Jaipur' },
+	{ label: 'Kolkata', value: 'Kolkata' },
+	{ label: 'Mumbai', value: 'Mumbai' },
+	{ label: 'Pune', value: 'Pune' },
+	{ label: 'Surat', value: 'Surat' },
+]
+
+// ─────────────────────────────────────────────
+// Skeleton
+// ─────────────────────────────────────────────
 
 const LabCardSkeleton = ({ horizontal }: { horizontal: boolean }) => (
 	<View style={[skeletonStyles.card, horizontal && skeletonStyles.horizontalCard]}>
@@ -59,13 +86,16 @@ const skeletonStyles = StyleSheet.create({
 	content: { flex: 1, padding: 10 },
 })
 
-// ── Main screen ───────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Main Screen
+// ─────────────────────────────────────────────
 
 export default function LaboratorySearchPage() {
-	const navigation = useNavigation()
+	const navigation = useNavigation<any>()
 	const insets = useSafeAreaInsets()
 	const { width, height } = useWindowDimensions()
 
+	// Responsive layout
 	const isMobile = width < 600
 	const isLandscape = width > height
 	const numColumns = isMobile ? (isLandscape ? 3 : 1) : width >= 900 ? 4 : 3
@@ -74,115 +104,145 @@ export default function LaboratorySearchPage() {
 	const GAP = 12
 	const itemWidth = (width - HORIZONTAL_PADDING * 2 - GAP * (numColumns - 1)) / numColumns
 
+	// ── State ───────────────────────────────────────────────────────────
 	const [searchQuery, setSearchQuery] = useState('')
+	const [debouncedSearch, setDebouncedSearch] = useState('')
 	const [page, setPage] = useState(1)
-	const [pageSize, setPageSize] = useState(PAGE_SIZE)
-	const [filters, setFilters] = useState<LaboratoryFilterState>({
-		city: '',
-		homeCollection: false,
-		is24x7: false,
-		nablAccredited: false,
-		emergencyTests: false,
-	})
-	const [allLabs, setAllLabs] = useState<LaboratoryItem[]>([])
+	const [pageSize, setPageSize] = useState(12)
+	const [cityFilter, setCityFilter] = useState('')
+
+	const [serverLabs, setServerLabs] = useState<LaboratoryItem[]>([])
+	const [totalRows, setTotalRows] = useState(0)
 	const [loading, setLoading] = useState(true)
+	const [refreshing, setRefreshing] = useState(false)
 	const [error, setError] = useState<string | null>(null)
-	const [showFilters, setShowFilters] = useState(false)
 
-	// ── Fetch ─────────────────────────────────────────────────────────────────
+	// Filter modal
+	const [filterModalVisible, setFilterModalVisible] = useState(false)
+	const [draftCity, setDraftCity] = useState('')
+	const filterSheetAnim = useRef(new Animated.Value(0)).current
+	const filterBackdropAnim = useRef(new Animated.Value(0)).current
 
-	const fetchLabs = useCallback(async () => {
-		setLoading(true)
-		setError(null)
-		try {
-			const result = await getLaboratories({}, { signal: new AbortController().signal })
-			const raw = result as any
-			const list: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []
-			const mapped: LaboratoryItem[] = list.map((item: any) => ({
-				...item,
-				owner_name: item.owner_name ?? '',
-				image: item.avatar_s3_key ?? item.image,
-			}))
-			setAllLabs(mapped)
-		} catch (err: any) {
-			const msg = err?.message || 'Failed to load laboratories'
-			setError(msg)
-			Toast.show({ type: 'error', text1: 'Error', text2: msg })
-		} finally {
-			setLoading(false)
-		}
-	}, [])
-
+	// ── Debounce search ─────────────────────────────────────────────────
 	useEffect(() => {
-		fetchLabs()
-	}, [fetchLabs])
+		const t = setTimeout(() => setDebouncedSearch(searchQuery), 400)
+		return () => clearTimeout(t)
+	}, [searchQuery])
 
+	// ── Reset page on filter / search / pageSize change ─────────────────
 	useEffect(() => {
 		setPage(1)
-	}, [searchQuery, filters, pageSize])
+	}, [debouncedSearch, cityFilter, pageSize])
 
-	// ── Filter logic ──────────────────────────────────────────────────────────
+	// ── Fetch laboratories (server-side search + pagination) ────────────
+	const fetchLabs = useCallback(
+		async (showLoading = true, currentPage = page) => {
+			if (showLoading) setLoading(true)
+			setError(null)
+			try {
+				const result = await getLaboratories({
+					search: debouncedSearch || undefined,
+					city: cityFilter || undefined,
+					page: currentPage,
+					limit: pageSize,
+				})
+				setServerLabs(result.data)
+				setTotalRows(result.total)
+			} catch (err: any) {
+				const msg = err?.message || 'Failed to load laboratories'
+				setError(msg)
+				Toast.show({ type: 'error', text1: 'Error', text2: msg })
+			} finally {
+				if (showLoading) setLoading(false)
+				setRefreshing(false)
+			}
+		},
+		[debouncedSearch, cityFilter, pageSize, page]
+	)
 
-	const filteredLabs = allLabs.filter((lab) => {
-		const query = searchQuery.trim().toLowerCase()
-		const matchesSearch =
-			!query ||
-			[lab.name, lab.owner_name, lab.address, lab.city]
-				.filter(Boolean)
-				.some((v) => v!.toLowerCase().includes(query))
+	// Fetch on search / filter / pageSize change (reset to page 1)
+	useEffect(() => {
+		fetchLabs(true, 1)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [debouncedSearch, cityFilter, pageSize])
 
-		return (
-			matchesSearch &&
-			(!filters.city || lab.city === filters.city) &&
-			(!filters.homeCollection || lab.home_collection_available) &&
-			(!filters.is24x7 || lab.is_24_x_7) &&
-			(!filters.nablAccredited || lab.is_nabl_accredited) &&
-			(!filters.emergencyTests || lab.emergency_tests_available)
-		)
-	})
+	// Fetch on page change
+	useEffect(() => {
+		fetchLabs(true, page)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [page])
 
-	const total = filteredLabs.length
-	const visibleLabs = filteredLabs.slice((page - 1) * pageSize, page * pageSize)
+	const handleRefresh = async () => {
+		setRefreshing(true)
+		clearLaboratoryCache()
+		await fetchLabs(false, 1)
+		setPage(1)
+	}
 
-	const hasActiveFilters =
-		!!filters.city ||
-		filters.homeCollection ||
-		filters.is24x7 ||
-		filters.nablAccredited ||
-		filters.emergencyTests ||
-		!!searchQuery
+	// ── Filter modal helpers ────────────────────────────────────────────
+	const hasActiveFilters = !!cityFilter || !!searchQuery
 
-	const clearAllFilters = () => {
-		setFilters({ city: '', homeCollection: false, is24x7: false, nablAccredited: false, emergencyTests: false })
+	const openFilterModal = () => {
+		setDraftCity(cityFilter)
+		setFilterModalVisible(true)
+		filterSheetAnim.setValue(0)
+		filterBackdropAnim.setValue(0)
+		Animated.parallel([
+			Animated.timing(filterSheetAnim, { toValue: 1, duration: 260, useNativeDriver: true }),
+			Animated.timing(filterBackdropAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+		]).start()
+	}
+
+	const closeFilterModal = () => {
+		Animated.parallel([
+			Animated.timing(filterSheetAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+			Animated.timing(filterBackdropAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
+		]).start(({ finished }) => {
+			if (finished) setFilterModalVisible(false)
+		})
+	}
+
+	const applyFilters = () => {
+		setCityFilter(draftCity)
+		setPage(1)
+		closeFilterModal()
+	}
+
+	const resetFilters = () => {
+		setDraftCity('')
+		setCityFilter('')
 		setSearchQuery('')
+		setDebouncedSearch('')
 		setPage(1)
 	}
 
-	const handleFilterChange = (newFilters: LaboratoryFilterState) => {
-		setFilters(newFilters)
-		setPage(1)
-	}
-
-	// ── Render helpers ────────────────────────────────────────────────────────
-
+	// ── Render helpers ──────────────────────────────────────────────────
 	const renderHeader = () => (
-		<View>
-			{hasActiveFilters ? (
+		<View style={styles.headerContainer}>
+			{hasActiveFilters && (
 				<View style={styles.chipRow}>
-					{filters.city ? (
+					{cityFilter ? (
 						<View style={styles.activeChip}>
-							<Text style={styles.activeChipText}>{filters.city}</Text>
-							<TouchableOpacity onPress={() => handleFilterChange({ ...filters, city: '' })}>
+							<Text style={styles.activeChipText}>{cityFilter}</Text>
+							<TouchableOpacity onPress={() => { setCityFilter(''); setPage(1) }}>
 								<Text style={styles.activeChipRemove}> ✕</Text>
 							</TouchableOpacity>
 						</View>
 					) : null}
-					<TouchableOpacity style={styles.clearChip} onPress={clearAllFilters}>
-						<Text style={styles.clearChipText}>Clear all filters</Text>
+					{searchQuery ? (
+						<View style={styles.activeChip}>
+							<Text style={styles.activeChipText}>"{searchQuery}"</Text>
+							<TouchableOpacity onPress={() => { setSearchQuery(''); setDebouncedSearch('') }}>
+								<Text style={styles.activeChipRemove}> ✕</Text>
+							</TouchableOpacity>
+						</View>
+					) : null}
+					<TouchableOpacity style={styles.clearChip} onPress={resetFilters}>
+						<Text style={styles.clearChipText}>Clear all</Text>
 					</TouchableOpacity>
 				</View>
-			) : null}
-			<Text style={styles.resultCount}>{total} Laboratories Found</Text>
+			)}
+			<Text style={styles.resultCount}>{totalRows} Laboratories Found</Text>
 		</View>
 	)
 
@@ -190,38 +250,32 @@ export default function LaboratorySearchPage() {
 		if (loading) return null
 		return (
 			<View style={styles.emptyCard}>
-				<MaterialCommunityIcons name="flask-outline" size={40} color="#b0bec5" />
+				<MaterialCommunityIcons name="flask-outline" size={48} color="#D0D5DD" />
 				<Text style={styles.emptyTitle}>No laboratories found</Text>
 				<Text style={styles.emptySubtitle}>Try adjusting your search or filters</Text>
 			</View>
 		)
 	}
 
-	// ── Skeleton grid ─────────────────────────────────────────────────────────
-
 	const renderSkeletons = () => {
-		const skeletonCount = pageSize
 		const isHorizontal = isMobile && !isLandscape
-
 		if (numColumns === 1) {
 			return (
 				<ScrollView
 					contentContainerStyle={[styles.listContent, { alignItems: 'stretch' }]}
 					showsVerticalScrollIndicator={false}
 				>
-					{Array.from({ length: skeletonCount }).map((_, i) => (
+					{Array.from({ length: pageSize > 6 ? 6 : pageSize }).map((_, i) => (
 						<LabCardSkeleton key={i} horizontal={isHorizontal} />
 					))}
 				</ScrollView>
 			)
 		}
-
-		// multi-column grid
 		const rows: number[][] = []
-		for (let i = 0; i < skeletonCount; i += numColumns) {
-			rows.push(Array.from({ length: Math.min(numColumns, skeletonCount - i) }, (_, j) => i + j))
+		const count = pageSize > 6 ? 6 : pageSize
+		for (let i = 0; i < count; i += numColumns) {
+			rows.push(Array.from({ length: Math.min(numColumns, count - i) }, (_, j) => i + j))
 		}
-
 		return (
 			<ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
 				{rows.map((row, ri) => (
@@ -237,8 +291,75 @@ export default function LaboratorySearchPage() {
 		)
 	}
 
-	// ── Render ────────────────────────────────────────────────────────────────
+	// ── Filter Modal ────────────────────────────────────────────────────
+	const renderFilterModal = () => {
+		const translateY = filterSheetAnim.interpolate({ inputRange: [0, 1], outputRange: [420, 0] })
+		const backdropOpacity = filterBackdropAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })
 
+		return (
+			<Modal visible={filterModalVisible} transparent animationType="none" onRequestClose={closeFilterModal}>
+				<View style={styles.filterModalRoot}>
+					<Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
+						<BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
+						<View style={styles.filterDim} />
+						<Pressable style={StyleSheet.absoluteFill} onPress={closeFilterModal} />
+					</Animated.View>
+
+					<Animated.View
+						style={[
+							styles.filterSheet,
+							{
+								width: Math.min(width - 24, 520),
+								maxHeight: Math.min(height * 0.78, 500),
+								paddingBottom: Math.max(insets.bottom + 18, 26),
+								transform: [{ translateY }],
+							},
+						]}
+					>
+						<View style={styles.filterSheetHandle} />
+						<View style={styles.filterSheetHeader}>
+							<AppTypography style={styles.filterSheetTitle}>Filters</AppTypography>
+							<TouchableOpacity style={styles.filterCloseButton} onPress={closeFilterModal}>
+								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
+							</TouchableOpacity>
+						</View>
+
+						<ScrollView
+							style={styles.filterSheetScroll}
+							contentContainerStyle={styles.filterSheetContent}
+							showsVerticalScrollIndicator={false}
+						>
+							<View style={styles.filterGroup}>
+								<AppTypography style={styles.filterGroupLabel}>City</AppTypography>
+								<AppSelect
+									placeholder="All Cities"
+									value={draftCity}
+									options={CITY_OPTIONS}
+									onSelect={(value) => setDraftCity(value)}
+									size="form"
+									noMargin
+									customCardStyle={styles.selectCard}
+									borderColor="#EAECF0"
+									maxDropdownHeight={240}
+								/>
+							</View>
+						</ScrollView>
+
+						<View style={styles.filterSheetActions}>
+							<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+								<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
+							</TouchableOpacity>
+							<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+								<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
+							</TouchableOpacity>
+						</View>
+					</Animated.View>
+				</View>
+			</Modal>
+		)
+	}
+
+	// ── Main Render ─────────────────────────────────────────────────────
 	return (
 		<View style={styles.safe}>
 			{/* Search Bar */}
@@ -247,20 +368,26 @@ export default function LaboratorySearchPage() {
 					<MaterialCommunityIcons name="magnify" size={20} color="#9aa0a6" style={styles.searchIcon} />
 					<TextInput
 						style={styles.searchInput}
-						placeholder="Search by lab name, owner, city..."
+						placeholder="Search by lab name, city..."
 						placeholderTextColor="#9AA0AC"
 						value={searchQuery}
-						onChangeText={setSearchQuery}
+						onChangeText={(text) => {
+							setSearchQuery(text)
+							setPage(1)
+						}}
 						returnKeyType="search"
 					/>
 					{searchQuery.length > 0 && (
-						<TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtnWrapper}>
+						<TouchableOpacity
+							onPress={() => { setSearchQuery(''); setDebouncedSearch('') }}
+							style={styles.clearBtnWrapper}
+						>
 							<MaterialCommunityIcons name="close-circle" size={18} color="#9aa4af" />
 						</TouchableOpacity>
 					)}
 				</View>
 				<TouchableOpacity
-					onPress={() => setShowFilters(true)}
+					onPress={openFilterModal}
 					style={[styles.filterIconButton, hasActiveFilters && styles.filterIconButtonActive]}
 				>
 					<MaterialCommunityIcons name="tune" size={22} color="#1f5f68" />
@@ -268,13 +395,13 @@ export default function LaboratorySearchPage() {
 			</View>
 
 			{/* Content */}
-			{loading ? (
+			{loading && !refreshing ? (
 				renderSkeletons()
 			) : error ? (
 				<View style={styles.centered}>
 					<MaterialCommunityIcons name="alert-circle-outline" size={40} color="#C62828" />
 					<Text style={styles.errorText}>{error}</Text>
-					<TouchableOpacity style={styles.retryButton} onPress={fetchLabs}>
+					<TouchableOpacity style={styles.retryButton} onPress={() => fetchLabs(true, 1)}>
 						<Text style={styles.retryText}>Retry</Text>
 					</TouchableOpacity>
 				</View>
@@ -282,7 +409,7 @@ export default function LaboratorySearchPage() {
 				<View style={{ flex: 1 }}>
 					<FlatList
 						key={numColumns}
-						data={visibleLabs}
+						data={serverLabs}
 						keyExtractor={(item) => item.id}
 						numColumns={numColumns}
 						columnWrapperStyle={numColumns > 1 ? { gap: GAP } : undefined}
@@ -291,13 +418,18 @@ export default function LaboratorySearchPage() {
 								<LaboratoryCard
 									lab={item}
 									layout={isMobile && !isLandscape ? 'horizontal' : 'vertical'}
-									onPress={() => {}}
-									onBookTest={() => {
-										;(navigation as any).navigate(ROUTES.STACK.PLACE_LABORATORY_TEST, {
+									onPress={() =>
+										navigation.navigate(ROUTES.STACK.PLACE_LABORATORY_TEST, {
 											labId: item.id,
 											labName: item.name,
 										})
-									}}
+									}
+									onBookTest={() =>
+										navigation.navigate(ROUTES.STACK.PLACE_LABORATORY_TEST, {
+											labId: item.id,
+											labName: item.name,
+										})
+									}
 								/>
 							</View>
 						)}
@@ -305,16 +437,18 @@ export default function LaboratorySearchPage() {
 						ListEmptyComponent={renderEmpty}
 						contentContainerStyle={[styles.listContent, numColumns === 1 && { alignItems: 'stretch' }]}
 						showsVerticalScrollIndicator={false}
+						refreshing={refreshing}
+						onRefresh={handleRefresh}
+						keyboardShouldPersistTaps="always"
 					/>
 
-					{/* PaginationBar — same pattern as OrderListPage */}
-					{total > 0 && (
+					{totalRows > 0 && (
 						<View style={[styles.paginationWrap, { paddingBottom: Math.max(insets.bottom + 8, 16) }]}>
 							<PaginationBar
 								page={page}
 								pageSize={pageSize}
-								totalRows={total}
-								pageSizeOptions={[12, 24, 48]}
+								totalRows={totalRows}
+								pageSizeOptions={PAGE_SIZE_OPTIONS}
 								onPageChange={(nextPage) => setPage(nextPage)}
 								onPageSizeChange={(nextSize) => {
 									setPageSize(nextSize)
@@ -326,22 +460,14 @@ export default function LaboratorySearchPage() {
 				</View>
 			)}
 
-			{/* Filter Bottom Sheet */}
-			<AppBottomSheet visible={showFilters} title="Filters" onClose={() => setShowFilters(false)}>
-				<View style={styles.sheetContent}>
-					<ScrollView showsVerticalScrollIndicator={false}>
-						<LaboratoryFilters filters={filters} onChange={handleFilterChange} />
-					</ScrollView>
-					<TouchableOpacity style={styles.applyBtn} onPress={() => setShowFilters(false)}>
-						<Text style={styles.applyBtnText}>Apply Filters</Text>
-					</TouchableOpacity>
-				</View>
-			</AppBottomSheet>
+			{renderFilterModal()}
 		</View>
 	)
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────
 
 const styles = StyleSheet.create({
 	safe: { flex: 1, backgroundColor: '#F5F7FA' },
@@ -391,8 +517,9 @@ const styles = StyleSheet.create({
 		elevation: 1,
 	},
 	filterIconButtonActive: { backgroundColor: '#eaf8f9', borderColor: '#1f5f68' },
+	headerContainer: { marginBottom: 12 },
 	listContent: { paddingHorizontal: 12, paddingBottom: 8, width: '100%' },
-	resultCount: { fontSize: 15, fontWeight: '700', color: '#101828', marginBottom: 12, marginTop: 4 },
+	resultCount: { fontSize: 15, fontWeight: '700', color: '#101828', marginBottom: 4, marginTop: 4 },
 	chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10, marginTop: 4 },
 	activeChip: {
 		flexDirection: 'row',
@@ -406,7 +533,7 @@ const styles = StyleSheet.create({
 	activeChipRemove: { fontSize: 12, color: '#2B6F71' },
 	clearChip: { backgroundColor: '#F2F4F7', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
 	clearChipText: { fontSize: 13, color: '#344054', fontWeight: '600' },
-	centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+	centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 24 },
 	errorText: { color: '#C62828', fontSize: 15, textAlign: 'center' },
 	retryButton: {
 		marginTop: 8,
@@ -424,23 +551,86 @@ const styles = StyleSheet.create({
 		padding: 40,
 		alignItems: 'center',
 		marginTop: 8,
-		gap: 8,
+		gap: 12,
 	},
 	emptyTitle: { fontSize: 16, fontWeight: '700', color: '#101828' },
-	emptySubtitle: { fontSize: 13, color: '#667085' },
+	emptySubtitle: { fontSize: 13, color: '#667085', textAlign: 'center' },
 	paginationWrap: {
 		paddingVertical: 10,
 		borderTopWidth: 1,
 		borderTopColor: '#EAECF0',
 		backgroundColor: '#F5F7FA',
 	},
-	sheetContent: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 16 },
-	applyBtn: {
-		backgroundColor: '#2B6F71',
-		borderRadius: 12,
-		paddingVertical: 14,
-		alignItems: 'center',
-		marginTop: 16,
+	// Filter modal
+	filterModalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
+	filterBackdrop: { ...StyleSheet.absoluteFillObject },
+	filterDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
+	filterSheet: {
+		backgroundColor: '#ffffff',
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
+		paddingTop: 8,
+		overflow: 'hidden',
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: -10 },
+		shadowOpacity: 0.14,
+		shadowRadius: 24,
+		elevation: 18,
 	},
-	applyBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+	filterSheetHandle: {
+		width: 44,
+		height: 4,
+		borderRadius: 999,
+		backgroundColor: '#d7dee6',
+		alignSelf: 'center',
+		marginBottom: 10,
+	},
+	filterSheetHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 18,
+		paddingBottom: 12,
+	},
+	filterSheetTitle: { fontSize: 18, lineHeight: 24, fontWeight: '700', color: '#111827' },
+	filterCloseButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+	filterSheetScroll: { flexGrow: 0 },
+	filterSheetContent: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 20, gap: 20 },
+	filterGroup: { gap: 10 },
+	filterGroupLabel: {
+		fontSize: 11,
+		fontWeight: '800',
+		color: '#64707d',
+		textTransform: 'uppercase',
+		letterSpacing: 0.5,
+	},
+	selectCard: { height: 50, borderRadius: 10, backgroundColor: '#ffffff' },
+	filterSheetActions: {
+		flexDirection: 'row',
+		paddingHorizontal: 18,
+		paddingTop: 12,
+		gap: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#e5eaef',
+	},
+	resetButton: {
+		flex: 1,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: '#e5eaef',
+		backgroundColor: '#ffffff',
+	},
+	resetButtonText: { fontSize: 14, fontWeight: '700', color: '#64707d' },
+	applyButton: {
+		flex: 2,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#2B6F71',
+	},
+	applyButtonText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
 })

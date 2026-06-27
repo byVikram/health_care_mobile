@@ -23,7 +23,17 @@ import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppSkeleton, AppSelect, StatusModal } from '../../components/common'
 import { useAuth } from '../../context/AuthContext'
-import type { LabBooking, LabBookingItem } from '../laboratory/Orderlistlaboratorypage'
+import { buildS3Url } from '../../utils/s3Utils'
+import {
+	getLabBookingDetail,
+	submitLabBookingQuote,
+	confirmLabPayment,
+	markLabSampleCollected,
+	markLabReportReady,
+	uploadLabReport,
+	verifyLabPrescription,
+} from './laboratoryService'
+import type { LabBooking, LabBookingItem } from './laboratory'
 
 // ─────────────────────────────────────────────
 // Types
@@ -35,13 +45,16 @@ type RouteParams = {
 }
 
 // ─────────────────────────────────────────────
-// Helpers
+// Status helpers — values match actual API responses
+// pending_quote | pending_payment | confirmed | sample_collected | report_ready | completed | cancelled
 // ─────────────────────────────────────────────
 
 const normalizeStatus = (status: string): string => {
 	switch (status?.toLowerCase()) {
-		case 'pending_confirmation':
-			return 'Pending Confirmation'
+		case 'pending_quote':
+			return 'Pending Quote'
+		case 'pending_payment':
+			return 'Pending Payment'
 		case 'confirmed':
 			return 'Confirmed'
 		case 'sample_collected':
@@ -59,7 +72,8 @@ const normalizeStatus = (status: string): string => {
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-	'Pending Confirmation': { bg: '#FFF1D9', text: '#F0A018', dot: '#F0A018' },
+	'Pending Quote': { bg: '#FFF1D9', text: '#F0A018', dot: '#F0A018' },
+	'Pending Payment': { bg: '#FDE7D8', text: '#D9711B', dot: '#D9711B' },
 	Confirmed: { bg: '#DEE9FF', text: '#3F7EE8', dot: '#3F7EE8' },
 	'Sample Collected': { bg: '#EDE7F6', text: '#673AB7', dot: '#673AB7' },
 	'Report Ready': { bg: '#E0F7FA', text: '#0097A7', dot: '#0097A7' },
@@ -68,7 +82,11 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> =
 }
 
 const formatDisplayDate = (isoDate: string) =>
-	new Date(isoDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+	new Date(isoDate).toLocaleDateString('en-IN', {
+		day: '2-digit',
+		month: 'short',
+		year: 'numeric',
+	})
 
 const formatDisplayTime = (time: string) => {
 	if (!time) return ''
@@ -79,86 +97,6 @@ const formatDisplayTime = (time: string) => {
 	const ampm = hours >= 12 ? 'PM' : 'AM'
 	const h12 = hours % 12 || 12
 	return `${h12}:${minutes} ${ampm}`
-}
-
-const buildS3Url = (key?: string | null): string | null => key ?? null
-
-// ─────────────────────────────────────────────
-// Mock API calls — replace with real endpoints
-// ─────────────────────────────────────────────
-
-const fetchLabBookingDetail = async (_accessToken: string, publicId: string): Promise<LabBooking> => {
-	// TODO: replace with ApiService.get(API_ENDPOINTS.LABORATORY.BOOKING_DETAIL(publicId))
-	return new Promise((resolve) =>
-		setTimeout(
-			() =>
-				resolve({
-					public_id: publicId,
-					patient_name: 'Ravi Kumar',
-					patient_phone: '9876543210',
-					laboratory_name: 'Apollo Diagnostics',
-					laboratory_public_id: 'lab-001',
-					laboratory_phone: '0801234567',
-					booking_date: new Date().toISOString().split('T')[0],
-					booking_time: '09:00',
-					collection_type: 'walk_in',
-					status: 'confirmed',
-					payment_status: 'paid',
-					total_price: 850,
-					notes: 'Patient is fasting since last night.',
-					created_at: new Date().toISOString(),
-					prescription_verified: false,
-					booking_items: [
-						{
-							id: 1,
-							test_name: 'Complete Blood Count',
-							category: 'Haematology',
-							quoted_price: 350,
-							base_price: 300,
-							turnaround: 'Same Day',
-						},
-						{
-							id: 2,
-							test_name: 'HbA1c',
-							category: 'Biochemistry',
-							quoted_price: 500,
-							base_price: 450,
-							turnaround: '24 hrs',
-						},
-					],
-					patient: { name: 'Ravi Kumar', age: 45, gender: 'Male', phone: '9876543210' },
-					laboratory: { phone: '0801234567' },
-				}),
-			600
-		)
-	)
-}
-
-const submitLabBookingQuote = async (
-	_accessToken: string,
-	publicId: string,
-	payload: {
-		items: { booking_item_id: number | null; test_name: string; quoted_price: number }[]
-		notes?: string | null
-	}
-): Promise<void> => {
-	// TODO: replace with ApiService.post(API_ENDPOINTS.LABORATORY.SUBMIT_QUOTE(publicId), payload)
-	return new Promise((resolve) => setTimeout(resolve, 800))
-}
-
-const confirmLabPayment = async (_accessToken: string, publicId: string): Promise<void> => {
-	// TODO: replace with ApiService.post(API_ENDPOINTS.LABORATORY.CONFIRM_PAYMENT(publicId))
-	return new Promise((resolve) => setTimeout(resolve, 800))
-}
-
-const markSampleCollected = async (_accessToken: string, publicId: string): Promise<void> => {
-	// TODO: replace with ApiService.post(API_ENDPOINTS.LABORATORY.MARK_SAMPLE_COLLECTED(publicId))
-	return new Promise((resolve) => setTimeout(resolve, 800))
-}
-
-const markReportReady = async (_accessToken: string, publicId: string): Promise<void> => {
-	// TODO: replace with ApiService.post(API_ENDPOINTS.LABORATORY.MARK_REPORT_READY(publicId))
-	return new Promise((resolve) => setTimeout(resolve, 800))
 }
 
 // ─────────────────────────────────────────────
@@ -330,11 +268,6 @@ const DocumentCarousel = ({
 	const [activeIndex, setActiveIndex] = useState(0)
 	const imageWidth = screenWidth - 64
 
-	useEffect(() => {
-		flatListRef.current?.scrollToIndex({ index: 0, animated: false })
-		setActiveIndex(0)
-	}, [screenWidth])
-
 	const goTo = (index: number) => {
 		const clamped = Math.max(0, Math.min(index, documents.length - 1))
 		flatListRef.current?.scrollToIndex({ index: clamped, animated: true })
@@ -419,7 +352,7 @@ const carouselStyles = StyleSheet.create({
 		height: 260,
 	},
 	empty: {
-		height: 200,
+		height: 160,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#F8FAFC',
@@ -470,12 +403,18 @@ const carouselStyles = StyleSheet.create({
 		paddingVertical: 2,
 	},
 	counterText: { fontSize: 11, fontWeight: '700', color: '#2B6F71' },
-	imageKeyInfo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, gap: 6 },
+	imageKeyInfo: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 10,
+		gap: 6,
+	},
 	imageKeyText: { fontSize: 13, color: '#2B6F71', fontWeight: '500' },
 })
 
 // ─────────────────────────────────────────────
-// Section card
+// Section / InfoRow helpers
 // ─────────────────────────────────────────────
 
 const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -500,13 +439,13 @@ export default function BookingDetailsLaboratoryPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute()
 	const insets = useSafeAreaInsets()
-	const { accessToken, role } = useAuth()
+	const { role } = useAuth()
 
 	const params = route.params as RouteParams | undefined
 	const publicId = params?.publicId
 	const initialBooking = params?.booking
 
-	const [booking, setBooking] = useState<LabBooking | null>(initialBooking || null)
+	const [booking, setBooking] = useState<LabBooking | null>(initialBooking ?? null)
 	const [loading, setLoading] = useState(!initialBooking)
 	const [refreshing, setRefreshing] = useState(false)
 	const [updating, setUpdating] = useState(false)
@@ -519,7 +458,8 @@ export default function BookingDetailsLaboratoryPage() {
 		description: string
 	} | null>(null)
 
-	// ── Editable quote items (lab staff view) ──
+	// ── Editable quote items ───────────────────────────────────────────
+
 	interface EditedTestItem {
 		id?: number
 		test_name: string
@@ -543,7 +483,7 @@ export default function BookingDetailsLaboratoryPage() {
 							: item.base_price != null
 								? item.base_price.toString()
 								: '0',
-					base_price: item.base_price != null ? item.base_price.toString() : '0',
+					base_price: item.base_price != null ? item.base_price.toString() : undefined,
 					category: item.category,
 					turnaround: item.turnaround,
 				}))
@@ -560,7 +500,8 @@ export default function BookingDetailsLaboratoryPage() {
 		return total.toFixed(2)
 	}, [editedItems])
 
-	// ── Document viewer ──
+	// ── Document viewer ────────────────────────────────────────────────
+
 	const [viewerVisible, setViewerVisible] = useState(false)
 	const [viewerIndex, setViewerIndex] = useState(0)
 
@@ -588,25 +529,29 @@ export default function BookingDetailsLaboratoryPage() {
 		return urls
 	}, [booking])
 
-	// ── Fetch ──
+	// ── Fetch ──────────────────────────────────────────────────────────
 
 	const fetchBooking = useCallback(
 		async (isRefresh = false) => {
-			if (!publicId || !accessToken) {
-				Toast.show({ type: 'error', text1: 'Error', text2: 'Missing booking ID or access token' })
+			if (!publicId) {
+				Toast.show({ type: 'error', text1: 'Error', text2: 'Missing booking ID' })
 				return
 			}
 			try {
 				isRefresh ? setRefreshing(true) : setLoading(true)
-				const data = await fetchLabBookingDetail(accessToken, publicId)
+				const data = await getLabBookingDetail(publicId)
 				setBooking(data)
 			} catch (error: any) {
-				Toast.show({ type: 'error', text1: 'Error', text2: error?.message || 'Failed to load booking details' })
+				Toast.show({
+					type: 'error',
+					text1: 'Error',
+					text2: error?.message || 'Failed to load booking details',
+				})
 			} finally {
 				isRefresh ? setRefreshing(false) : setLoading(false)
 			}
 		},
-		[accessToken, publicId]
+		[publicId]
 	)
 
 	useEffect(() => {
@@ -617,10 +562,10 @@ export default function BookingDetailsLaboratoryPage() {
 		navigation.setOptions({ title: 'Lab Booking Details', headerBackTitle: 'Back' })
 	}, [navigation])
 
-	// ── Handlers ──
+	// ── Handlers ───────────────────────────────────────────────────────
 
 	const handleCall = (phone: string, label: string) => {
-		const cleaned = phone.replace(/\s/g, '')
+		const cleaned = (phone || '').replace(/\s/g, '')
 		if (!cleaned || cleaned === '—') {
 			setStatusModal({
 				visible: true,
@@ -641,24 +586,7 @@ export default function BookingDetailsLaboratoryPage() {
 	}
 
 	const handleSubmitQuote = async () => {
-		if (!accessToken) {
-			setStatusModal({
-				visible: true,
-				status: 'error',
-				title: 'Error',
-				description: 'Unable to submit quote without a valid access token.',
-			})
-			return
-		}
-		if (!booking || !booking.public_id) {
-			setStatusModal({
-				visible: true,
-				status: 'error',
-				title: 'Error',
-				description: 'Unable to submit quote without a valid booking ID.',
-			})
-			return
-		}
+		if (!booking?.public_id) return
 		if (editedItems.length === 0) {
 			setStatusModal({
 				visible: true,
@@ -669,7 +597,7 @@ export default function BookingDetailsLaboratoryPage() {
 			return
 		}
 		const items = editedItems.map((item) => ({
-			booking_item_id: item.id || null,
+			booking_item_id: item.id ?? null,
 			test_name: item.test_name,
 			quoted_price: parseFloat(item.quoted_price || '0'),
 		}))
@@ -684,7 +612,7 @@ export default function BookingDetailsLaboratoryPage() {
 		}
 		setUpdating(true)
 		try {
-			await submitLabBookingQuote(accessToken, booking.public_id, { items, notes: booking.notes })
+			await submitLabBookingQuote(booking.public_id, { items, notes: booking.notes })
 			setStatusModal({
 				visible: true,
 				status: 'success',
@@ -705,10 +633,10 @@ export default function BookingDetailsLaboratoryPage() {
 	}
 
 	const handleMarkSampleCollected = async () => {
-		if (!accessToken || !booking || !booking.public_id) return
+		if (!booking?.public_id) return
 		setUpdating(true)
 		try {
-			await markSampleCollected(accessToken, booking.public_id)
+			await markLabSampleCollected(booking.public_id)
 			setStatusModal({
 				visible: true,
 				status: 'success',
@@ -725,14 +653,15 @@ export default function BookingDetailsLaboratoryPage() {
 			})
 		} finally {
 			setUpdating(false)
+			setSelectedAction('')
 		}
 	}
 
 	const handleMarkReportReady = async () => {
-		if (!accessToken || !booking || !booking.public_id) return
+		if (!booking?.public_id) return
 		setUpdating(true)
 		try {
-			await markReportReady(accessToken, booking.public_id)
+			await markLabReportReady(booking.public_id)
 			setStatusModal({
 				visible: true,
 				status: 'success',
@@ -749,14 +678,15 @@ export default function BookingDetailsLaboratoryPage() {
 			})
 		} finally {
 			setUpdating(false)
+			setSelectedAction('')
 		}
 	}
 
 	const handlePayment = async () => {
-		if (!accessToken || !booking || !booking.public_id) return
+		if (!booking?.public_id) return
 		setUpdating(true)
 		try {
-			await confirmLabPayment(accessToken, booking.public_id)
+			await confirmLabPayment(booking.public_id)
 			setStatusModal({
 				visible: true,
 				status: 'success',
@@ -780,7 +710,7 @@ export default function BookingDetailsLaboratoryPage() {
 		Alert.alert('Upload Lab Report', 'This would open a file picker to upload the lab report.', [{ text: 'OK' }])
 	}
 
-	// ── Loading state ──
+	// ── Loading ────────────────────────────────────────────────────────
 
 	if (loading) {
 		return (
@@ -806,10 +736,10 @@ export default function BookingDetailsLaboratoryPage() {
 		)
 	}
 
-	// ── Derived data ──
+	// ── Derived data ───────────────────────────────────────────────────
 
 	const statusDisplay = normalizeStatus(booking.status)
-	const statusStyle = STATUS_STYLES[statusDisplay] || { bg: '#f0f0f0', text: '#555', dot: '#999' }
+	const statusStyle = STATUS_STYLES[statusDisplay] ?? { bg: '#f0f0f0', text: '#555', dot: '#999' }
 
 	const patientName = booking.patient?.name || booking.patient_name || 'N/A'
 	const patientAge = booking.patient?.age != null ? String(booking.patient.age) : '—'
@@ -821,20 +751,21 @@ export default function BookingDetailsLaboratoryPage() {
 	const isPatient = role === 'patient'
 	const isLabStaff = role === 'laboratory'
 
-	const isQuoteEditable = booking.status === 'pending_confirmation' || booking.status === 'confirmed'
-	const isPendingPayment = booking.status === 'confirmed' && booking.payment_status === 'pending'
+	// Quote is editable when status is pending_quote
+	const isQuoteEditable = booking.status === 'pending_quote'
+	// Patient pays when status is pending_payment
+	const isPendingPayment = booking.status === 'pending_payment' && booking.payment_status === 'pending'
 	const isConfirmed = booking.status === 'confirmed'
 	const isSampleCollected = booking.status === 'sample_collected'
 
-	// Lab staff action options based on current status
 	const labActionOptions = [
-		isConfirmed && { label: 'Mark Sample Collected', value: 'sample_collected' },
-		isSampleCollected && { label: 'Mark Report Ready', value: 'report_ready' },
+		isConfirmed ? { label: 'Mark Sample Collected', value: 'sample_collected' } : null,
+		isSampleCollected ? { label: 'Mark Report Ready', value: 'report_ready' } : null,
 	].filter(Boolean) as { label: string; value: string }[]
 
-	// ══════════════════════════════════════════
+	// ════════════════════════════════════════
 	// PATIENT VIEW
-	// ══════════════════════════════════════════
+	// ════════════════════════════════════════
 
 	if (isPatient) {
 		return (
@@ -844,7 +775,6 @@ export default function BookingDetailsLaboratoryPage() {
 					showsVerticalScrollIndicator={false}
 					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchBooking(true)} />}
 				>
-					{/* Patient header */}
 					<View style={styles.headerCard}>
 						<View style={styles.patientHeaderRow}>
 							<View style={styles.patientInfo}>
@@ -865,7 +795,6 @@ export default function BookingDetailsLaboratoryPage() {
 						</View>
 					</View>
 
-					{/* Status & billing */}
 					<SectionCard title="Billing Status">
 						<View style={styles.billingStatusRow}>
 							<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -882,7 +811,6 @@ export default function BookingDetailsLaboratoryPage() {
 						</View>
 					</SectionCard>
 
-					{/* Test items */}
 					<SectionCard title="Test Items">
 						<View style={styles.fileList}>
 							{booking.booking_items.map((item, idx) => (
@@ -909,7 +837,6 @@ export default function BookingDetailsLaboratoryPage() {
 						</View>
 					</SectionCard>
 
-					{/* Collection type */}
 					<SectionCard title="Collection Details">
 						<InfoRow
 							label="Collection Type"
@@ -920,7 +847,6 @@ export default function BookingDetailsLaboratoryPage() {
 						)}
 					</SectionCard>
 
-					{/* Report documents */}
 					{reportDocUrls.length > 0 && (
 						<SectionCard title="Lab Report">
 							<DocumentCarousel
@@ -933,7 +859,6 @@ export default function BookingDetailsLaboratoryPage() {
 						</SectionCard>
 					)}
 
-					{/* Booking details */}
 					<SectionCard title="Booking Details">
 						<InfoRow label="Laboratory" value={booking.laboratory_name || 'N/A'} />
 						<InfoRow label="Booking Date" value={formatDisplayDate(booking.booking_date)} />
@@ -943,7 +868,6 @@ export default function BookingDetailsLaboratoryPage() {
 						{booking.notes ? <InfoRow label="Notes" value={booking.notes} /> : null}
 					</SectionCard>
 
-					{/* Prescription */}
 					{prescriptionUrls.length > 0 && (
 						<SectionCard title="Prescription / Referral">
 							<DocumentCarousel
@@ -956,7 +880,6 @@ export default function BookingDetailsLaboratoryPage() {
 						</SectionCard>
 					)}
 
-					{/* Pay now button */}
 					{isPendingPayment && (
 						<TouchableOpacity
 							style={[styles.primaryActionBtn, { backgroundColor: '#2B6F71' }]}
@@ -990,9 +913,9 @@ export default function BookingDetailsLaboratoryPage() {
 		)
 	}
 
-	// ══════════════════════════════════════════
-	// LAB STAFF / ADMIN VIEW
-	// ══════════════════════════════════════════
+	// ════════════════════════════════════════
+	// LAB STAFF VIEW
+	// ════════════════════════════════════════
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
@@ -1001,7 +924,6 @@ export default function BookingDetailsLaboratoryPage() {
 				showsVerticalScrollIndicator={false}
 				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchBooking(true)} />}
 			>
-				{/* Patient details */}
 				<View style={styles.headerCard}>
 					<View style={styles.patientHeaderRow}>
 						<View style={styles.patientInfo}>
@@ -1022,29 +944,30 @@ export default function BookingDetailsLaboratoryPage() {
 					</View>
 				</View>
 
-				{/* Collection details */}
 				<SectionCard title="Collection Details">
 					<InfoRow
 						label="Collection Type"
-						value={booking.collection_type === 'home_collection' ? '🏠 Home Collection' : '🚶 Walk-in'}
+						value={
+							booking.collection_type === 'home_collection' ? '🏠 Home Collection' : '🚶 Walk-in'
+						}
 					/>
 					{booking.collection_type === 'home_collection' && booking.collection_address && (
 						<InfoRow label="Address" value={booking.collection_address} />
 					)}
 				</SectionCard>
 
-				{/* Prescription */}
-				<SectionCard title="Prescription / Referral Document">
-					<DocumentCarousel
-						documents={prescriptionUrls}
-						onImagePress={(idx) => {
-							setViewerIndex(idx)
-							setViewerVisible(true)
-						}}
-					/>
-				</SectionCard>
+				{prescriptionUrls.length > 0 && (
+					<SectionCard title="Prescription / Referral Document">
+						<DocumentCarousel
+							documents={prescriptionUrls}
+							onImagePress={(idx) => {
+								setViewerIndex(idx)
+								setViewerVisible(true)
+							}}
+						/>
+					</SectionCard>
+				)}
 
-				{/* Billing & quote */}
 				<SectionCard title="Billing Status">
 					<View style={styles.billingStatusRow}>
 						<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -1110,7 +1033,9 @@ export default function BookingDetailsLaboratoryPage() {
 											/>
 										</View>
 										<TouchableOpacity
-											onPress={() => setEditedItems((prev) => prev.filter((_, i) => i !== index))}
+											onPress={() =>
+												setEditedItems((prev) => prev.filter((_, i) => i !== index))
+											}
 											style={styles.deleteScanBtn}
 											hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
 										>
@@ -1149,7 +1074,6 @@ export default function BookingDetailsLaboratoryPage() {
 					)}
 				</SectionCard>
 
-				{/* Document control */}
 				<SectionCard title="Document Control">
 					<TouchableOpacity style={styles.uploadBtn} onPress={handleUploadReport}>
 						<MaterialCommunityIcons name="cloud-upload" size={20} color="#2B6F71" />
@@ -1158,7 +1082,6 @@ export default function BookingDetailsLaboratoryPage() {
 					</TouchableOpacity>
 				</SectionCard>
 
-				{/* Report viewer */}
 				{reportDocUrls.length > 0 && (
 					<SectionCard title="Uploaded Lab Reports">
 						<DocumentCarousel
@@ -1171,7 +1094,6 @@ export default function BookingDetailsLaboratoryPage() {
 					</SectionCard>
 				)}
 
-				{/* Full booking details */}
 				<SectionCard title="Booking Details">
 					<InfoRow label="Laboratory" value={booking.laboratory_name || 'N/A'} />
 					<InfoRow label="Booking Date" value={formatDisplayDate(booking.booking_date)} />
@@ -1185,7 +1107,6 @@ export default function BookingDetailsLaboratoryPage() {
 					{booking.notes ? <InfoRow label="Notes" value={booking.notes} /> : null}
 				</SectionCard>
 
-				{/* Test items read-only */}
 				<SectionCard title="Ordered Tests">
 					<View style={styles.fileList}>
 						{booking.booking_items.map((item, idx) => (
@@ -1193,7 +1114,9 @@ export default function BookingDetailsLaboratoryPage() {
 								<MaterialCommunityIcons name="flask-outline" size={20} color="#2B6F71" />
 								<View style={{ flex: 1 }}>
 									<Text style={styles.fileName}>{item.custom_test_name || item.test_name}</Text>
-									{item.category ? <Text style={styles.fileCategory}>{item.category}</Text> : null}
+									{item.category ? (
+										<Text style={styles.fileCategory}>{item.category}</Text>
+									) : null}
 								</View>
 								<Text style={[styles.filePrice, { color: '#2B6F71' }]}>
 									{item.quoted_price != null ? `₹${item.quoted_price.toFixed(2)}` : 'TBD'}
@@ -1245,7 +1168,12 @@ const styles = StyleSheet.create({
 		shadowRadius: 8,
 		elevation: 2,
 	},
-	patientHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' },
+	patientHeaderRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		flexWrap: 'wrap',
+	},
 	patientInfo: { flex: 1, marginRight: 8 },
 	patientNameText: { fontSize: 16, fontWeight: '700', color: '#1A2C33' },
 	patientMeta: { fontSize: 12, color: '#64707d', marginTop: 2 },
@@ -1376,7 +1304,13 @@ const styles = StyleSheet.create({
 	},
 	infoLabel: { fontSize: 13, color: '#64707d', fontWeight: '500', flexShrink: 0, marginRight: 12 },
 	infoValue: { fontSize: 13, color: '#1D2939', fontWeight: '500', textAlign: 'right', flex: 1 },
-	primaryActionBtn: { borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 16 },
+	primaryActionBtn: {
+		borderRadius: 12,
+		paddingVertical: 14,
+		alignItems: 'center',
+		marginTop: 8,
+		marginBottom: 16,
+	},
 	primaryActionBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 	errorTitle: { fontSize: 18, fontWeight: '600', color: '#1D2939', marginTop: 12 },
 	goBackButton: {

@@ -1,4 +1,4 @@
-// src/features/Laboratory/screens/PlaceLabOrderPage.tsx
+// src/features/laboratory/PlaceLabOrderPage.tsx
 import React, { useCallback, useEffect, useState } from 'react'
 import {
 	ActivityIndicator,
@@ -10,122 +10,82 @@ import {
 	TouchableOpacity,
 	View,
 } from 'react-native'
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
-import type { AppStackParamList } from '../../navigation/types'
 import { AppButton, AppBottomSheet, AppInput, AppTypography, StatusModal } from '../../components/common'
-import { PatientAddress, getPatientAddresses, createPatientAddress } from '../pharmacy/pharmacyService'
+import { PatientAddress, createPatientAddress } from '../pharmacy/pharmacyService'
+import { getPatientAddresses } from '../profile/pharmacy/pharmacyService'
+import { getLabTestTypes, placeLabOrder } from './laboratoryService'
+import type { LabTestType, PlaceLabOrderPayload } from './laboratory'
 
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
 
-type RouteProps = RouteProp<AppStackParamList, typeof ROUTES.STACK.PLACE_LAB_ORDER>
-
-export interface LabTestType {
-	id: string
-	name: string
-	category: string
-	turnaround: string // e.g. "Same Day", "24 hrs", "48 hrs"
-}
-
-export interface PlaceLabOrderPayload {
-	laboratory_public_id: string
-	test_type_ids: string[]
-	custom_tests: string // free text
-	collection_type: 'walk_in' | 'home_collection'
-	collection_address_public_id: string | null
-	notes: string | null
+type PlaceLabOrderParams = {
+	labId: string
+	labName: string
 }
 
 // ─────────────────────────────────────────────
-// Mock data  ← remove once API is ready
+// Helpers
 // ─────────────────────────────────────────────
 
-const MOCK_TEST_TYPES: LabTestType[] = [
-	{ id: 'tt-001', name: 'Complete Blood Count (CBC)', category: 'Haematology', turnaround: 'Same Day' },
-	{ id: 'tt-002', name: 'Blood Glucose (Fasting)', category: 'Biochemistry', turnaround: 'Same Day' },
-	{ id: 'tt-003', name: 'HbA1c', category: 'Biochemistry', turnaround: '24 hrs' },
-	{ id: 'tt-004', name: 'Lipid Profile', category: 'Biochemistry', turnaround: '24 hrs' },
-	{ id: 'tt-005', name: 'Liver Function Test (LFT)', category: 'Biochemistry', turnaround: '24 hrs' },
-	{ id: 'tt-006', name: 'Kidney Function Test (KFT)', category: 'Biochemistry', turnaround: '24 hrs' },
-	{ id: 'tt-007', name: 'Thyroid Profile (T3/T4/TSH)', category: 'Endocrinology', turnaround: '24 hrs' },
-	{ id: 'tt-008', name: 'Urine Routine & Microscopy', category: 'Urology', turnaround: 'Same Day' },
-	{ id: 'tt-009', name: 'Vitamin D (25-OH)', category: 'Biochemistry', turnaround: '48 hrs' },
-	{ id: 'tt-010', name: 'Vitamin B12', category: 'Biochemistry', turnaround: '48 hrs' },
-	{ id: 'tt-011', name: 'HIV I & II (ELISA)', category: 'Serology', turnaround: '24 hrs' },
-	{ id: 'tt-012', name: 'HBsAg (Hepatitis B)', category: 'Serology', turnaround: '24 hrs' },
-	{ id: 'tt-013', name: 'Dengue NS1 Antigen', category: 'Serology', turnaround: 'Same Day' },
-	{ id: 'tt-014', name: 'Malaria Antigen Test', category: 'Serology', turnaround: 'Same Day' },
-	{ id: 'tt-015', name: 'Chest X-Ray', category: 'Radiology', turnaround: 'Same Day' },
-	{ id: 'tt-016', name: 'ECG (12-Lead)', category: 'Cardiology', turnaround: 'Same Day' },
-	{ id: 'tt-017', name: 'Stool Routine & Microscopy', category: 'Microbiology', turnaround: '24 hrs' },
-	{ id: 'tt-018', name: 'Culture & Sensitivity (Urine)', category: 'Microbiology', turnaround: '48 hrs' },
-]
-
-// TODO: replace with real API call
-const USE_MOCK = true
-
-const fetchLabTestTypes = async (_labId: string): Promise<LabTestType[]> => {
-	if (USE_MOCK) {
-		return new Promise((resolve) => setTimeout(() => resolve(MOCK_TEST_TYPES), 600))
-	}
-	// const res = await ApiService.get(API_ENDPOINTS.LABORATORY.TEST_TYPES(_labId))
-	// return res.data?.data ?? []
-	return []
-}
-
-const createLabOrder = async (payload: PlaceLabOrderPayload): Promise<void> => {
-	if (USE_MOCK) {
-		return new Promise((resolve) => setTimeout(resolve, 800))
-	}
-	// await ApiService.post(API_ENDPOINTS.LABORATORY.ORDERS, payload)
-}
-
-// ─────────────────────────────────────────────
-// Category grouping helper
-// ─────────────────────────────────────────────
-
-const groupByCategory = (tests: LabTestType[]) => {
+/**
+ * Group test types by category for display.
+ * Since the API doesn't return a category field, we display them in a single group.
+ */
+const groupByCategory = (tests: LabTestType[]): Record<string, LabTestType[]> => {
 	const map: Record<string, LabTestType[]> = {}
 	for (const t of tests) {
-		if (!map[t.category]) map[t.category] = []
-		map[t.category].push(t)
+		const key = t.category || 'Available Tests'
+		if (!map[key]) map[key] = []
+		map[key].push(t)
 	}
 	return map
 }
 
+/**
+ * Format a price for display on a test row.
+ * base_price === 0 means quote_required from the API mapping.
+ */
+const formatTestPrice = (test: LabTestType): string => {
+	if (!test.base_price || test.base_price === 0) return 'Quote on request'
+	return `₹${test.base_price.toLocaleString('en-IN')}`
+}
+
 // ─────────────────────────────────────────────
-// Main screen
+// Main Screen
 // ─────────────────────────────────────────────
 
 export default function PlaceLabOrderPage() {
 	const navigation = useNavigation<any>()
-	const route = useRoute<RouteProps>()
+	const route = useRoute()
 	const insets = useSafeAreaInsets()
 	const { user } = useAuth()
-	const { labId, labName } = route.params
+	const { labId, labName } = route.params as PlaceLabOrderParams
 
-	// Test types
+	// ── Test types ──────────────────────────────────────────────────────
 	const [testTypes, setTestTypes] = useState<LabTestType[]>([])
 	const [selectedTestIds, setSelectedTestIds] = useState<string[]>([])
 	const [customTests, setCustomTests] = useState('')
 	const [loadingTests, setLoadingTests] = useState(true)
+	const [testsError, setTestsError] = useState<string | null>(null)
 
-	// Collection type
+	// ── Collection type ─────────────────────────────────────────────────
 	const [collectionType, setCollectionType] = useState<'walk_in' | 'home_collection'>('walk_in')
 
-	// Addresses
+	// ── Addresses ───────────────────────────────────────────────────────
 	const [addresses, setAddresses] = useState<PatientAddress[]>([])
 	const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
 	const [loadingAddresses, setLoadingAddresses] = useState(false)
 
-	// Add address sheet
+	// ── Add address sheet ────────────────────────────────────────────────
 	const [showAddressModal, setShowAddressModal] = useState(false)
 	const [newLabel, setNewLabel] = useState('')
 	const [newLine, setNewLine] = useState('')
@@ -134,11 +94,11 @@ export default function PlaceLabOrderPage() {
 	const [newPincode, setNewPincode] = useState('')
 	const [savingAddress, setSavingAddress] = useState(false)
 
-	// Notes & submit
+	// ── Notes & submit ───────────────────────────────────────────────────
 	const [notes, setNotes] = useState('')
 	const [submitting, setSubmitting] = useState(false)
 
-	// Status modal
+	// ── Status modal ─────────────────────────────────────────────────────
 	const [statusModal, setStatusModal] = useState<{
 		visible: boolean
 		status: 'success' | 'error'
@@ -146,25 +106,30 @@ export default function PlaceLabOrderPage() {
 		description: string
 	} | null>(null)
 
-	// ── Fetch test types ──────────────────────────────────────────────────────
-
+	// ── Fetch test types for this lab ────────────────────────────────────
 	useEffect(() => {
+		let cancelled = false
 		const load = async () => {
 			try {
 				setLoadingTests(true)
-				const data = await fetchLabTestTypes(labId)
-				setTestTypes(data)
+				setTestsError(null)
+				const data = await getLabTestTypes(labId)
+				if (!cancelled) setTestTypes(data)
 			} catch (err: any) {
-				Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load test types' })
+				if (!cancelled) {
+					const msg = err?.message || 'Failed to load test types'
+					setTestsError(msg)
+					Toast.show({ type: 'error', text1: 'Error', text2: msg })
+				}
 			} finally {
-				setLoadingTests(false)
+				if (!cancelled) setLoadingTests(false)
 			}
 		}
 		load()
+		return () => { cancelled = true }
 	}, [labId])
 
-	// ── Fetch addresses ───────────────────────────────────────────────────────
-
+	// ── Fetch patient addresses when home collection is selected ─────────
 	const loadAddresses = useCallback(async () => {
 		try {
 			setLoadingAddresses(true)
@@ -173,7 +138,7 @@ export default function PlaceLabOrderPage() {
 			const def = list.find((a) => a.is_default)
 			setSelectedAddressId(def?.id ?? list[0]?.id ?? null)
 		} catch {
-			// silent
+			// silent — user can still add one
 		} finally {
 			setLoadingAddresses(false)
 		}
@@ -183,16 +148,22 @@ export default function PlaceLabOrderPage() {
 		if (collectionType === 'home_collection') loadAddresses()
 	}, [collectionType, loadAddresses])
 
-	// ── Toggle test selection ─────────────────────────────────────────────────
-
+	// ── Toggle test selection ────────────────────────────────────────────
 	const toggleTest = (id: string) => {
-		setSelectedTestIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+		setSelectedTestIds((prev) =>
+			prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+		)
 	}
 
-	// ── Add address ───────────────────────────────────────────────────────────
-
+	// ── Add address ──────────────────────────────────────────────────────
 	const handleAddAddress = async () => {
-		if (!newLabel.trim() || !newLine.trim() || !newCity.trim() || !newState.trim() || !newPincode.trim()) {
+		if (
+			!newLabel.trim() ||
+			!newLine.trim() ||
+			!newCity.trim() ||
+			!newState.trim() ||
+			!newPincode.trim()
+		) {
 			Toast.show({ type: 'error', text1: 'Validation Error', text2: 'Please fill in all address fields.' })
 			return
 		}
@@ -221,8 +192,7 @@ export default function PlaceLabOrderPage() {
 		}
 	}
 
-	// ── Place order ───────────────────────────────────────────────────────────
-
+	// ── Place order ──────────────────────────────────────────────────────
 	const handlePlaceOrder = async () => {
 		if (selectedTestIds.length === 0 && !customTests.trim()) {
 			Toast.show({ type: 'error', text1: 'Required', text2: 'Please select at least one test.' })
@@ -240,10 +210,11 @@ export default function PlaceLabOrderPage() {
 				test_type_ids: selectedTestIds,
 				custom_tests: customTests.trim(),
 				collection_type: collectionType,
-				collection_address_public_id: collectionType === 'home_collection' ? selectedAddressId : null,
+				collection_address_public_id:
+					collectionType === 'home_collection' ? selectedAddressId : null,
 				notes: notes.trim() || null,
 			}
-			await createLabOrder(payload)
+			await placeLabOrder(payload)
 			setStatusModal({
 				visible: true,
 				status: 'success',
@@ -262,25 +233,51 @@ export default function PlaceLabOrderPage() {
 		}
 	}
 
-	// ── Render helpers ────────────────────────────────────────────────────────
-
+	// ── Computed values ──────────────────────────────────────────────────
 	const grouped = groupByCategory(testTypes)
-	const activeAddress = addresses.find((a) => a.id === selectedAddressId)
+	const selectedTests = testTypes.filter((t) => selectedTestIds.includes(t.id))
+	const estimatedTotal = selectedTests.reduce((sum, t) => sum + (t.base_price ?? 0), 0)
+	const hasQuoteRequired = selectedTests.some((t) => !t.base_price || t.base_price === 0)
 
+	// ── Render: test selector ────────────────────────────────────────────
 	const renderTestSelector = () => {
 		if (loadingTests) {
 			return (
 				<View style={styles.spinnerContainer}>
-					<ActivityIndicator size="small" color="#1f5f68" />
+					<ActivityIndicator size="small" color="#2B6F71" />
 					<Text style={styles.loadingText}>Loading available tests…</Text>
 				</View>
 			)
 		}
+
+		if (testsError) {
+			return (
+				<View style={styles.emptyContainer}>
+					<MaterialCommunityIcons name="alert-circle-outline" size={36} color="#C62828" />
+					<Text style={[styles.emptyMessage, { color: '#C62828' }]}>{testsError}</Text>
+					<TouchableOpacity
+						style={styles.retryBtn}
+						onPress={() => {
+							setTestsError(null)
+							setLoadingTests(true)
+							getLabTestTypes(labId)
+								.then(setTestTypes)
+								.catch((e) => setTestsError(e?.message || 'Failed'))
+								.finally(() => setLoadingTests(false))
+						}}
+					>
+						<Text style={styles.retryBtnText}>Retry</Text>
+					</TouchableOpacity>
+				</View>
+			)
+		}
+
 		if (testTypes.length === 0) {
 			return (
 				<View style={styles.emptyContainer}>
 					<MaterialCommunityIcons name="flask-outline" size={36} color="#90a4ae" />
 					<Text style={styles.emptyMessage}>No tests available for this laboratory.</Text>
+					<Text style={styles.emptySubMessage}>You can still enter custom tests below.</Text>
 				</View>
 			)
 		}
@@ -300,36 +297,61 @@ export default function PlaceLabOrderPage() {
 									activeOpacity={0.8}
 								>
 									<View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-										{selected && <MaterialCommunityIcons name="check" size={14} color="#fff" />}
+										{selected && (
+											<MaterialCommunityIcons name="check" size={14} color="#fff" />
+										)}
 									</View>
 									<View style={styles.testInfo}>
 										<Text style={[styles.testName, selected && styles.testNameSelected]}>
 											{test.name}
 										</Text>
-										<Text style={styles.testMeta}>Result in {test.turnaround}</Text>
+										{test.turnaround ? (
+											<Text style={styles.testMeta}>Result in {test.turnaround}</Text>
+										) : null}
+										{test.description ? (
+											<Text style={styles.testDescription} numberOfLines={2}>
+												{test.description}
+											</Text>
+										) : null}
 									</View>
+									<Text style={[styles.testPrice, selected && { color: '#2B6F71' }]}>
+										{formatTestPrice(test)}
+									</Text>
 								</TouchableOpacity>
 							)
 						})}
 					</View>
 				))}
 
-				{/* Selected summary chip row */}
 				{selectedTestIds.length > 0 && (
-					<View style={styles.selectedSummary}>
-						<MaterialCommunityIcons name="check-circle-outline" size={16} color="#1f5f68" />
-						<Text style={styles.selectedSummaryText}>
-							{selectedTestIds.length} test{selectedTestIds.length > 1 ? 's' : ''} selected
-						</Text>
-						<TouchableOpacity onPress={() => setSelectedTestIds([])}>
-							<Text style={styles.clearSelectionText}>Clear</Text>
-						</TouchableOpacity>
+					<View style={styles.selectionSummary}>
+						<View style={styles.selectionSummaryLeft}>
+							<MaterialCommunityIcons name="check-circle-outline" size={16} color="#2B6F71" />
+							<Text style={styles.selectionSummaryText}>
+								{selectedTestIds.length} test{selectedTestIds.length > 1 ? 's' : ''} selected
+							</Text>
+						</View>
+						<View style={styles.selectionSummaryRight}>
+							{estimatedTotal > 0 && (
+								<Text style={styles.selectionTotal}>
+									{hasQuoteRequired
+										? `₹${estimatedTotal.toLocaleString('en-IN')}+`
+										: `₹${estimatedTotal.toLocaleString('en-IN')}`}
+								</Text>
+							)}
+							<TouchableOpacity onPress={() => setSelectedTestIds([])}>
+								<Text style={styles.clearSelectionText}>Clear</Text>
+							</TouchableOpacity>
+						</View>
 					</View>
 				)}
 
-				{/* Free-text custom tests */}
+				{/* Custom tests input */}
 				<View style={styles.customTestBlock}>
 					<Text style={styles.customTestLabel}>Other / Custom Tests</Text>
+					<Text style={styles.customTestHint}>
+						Enter test names not listed above, separated by commas
+					</Text>
 					<AppInput
 						placeholder="e.g. Semen Analysis, ANA Profile…"
 						value={customTests}
@@ -345,25 +367,32 @@ export default function PlaceLabOrderPage() {
 		)
 	}
 
+	// ── Render: address section ──────────────────────────────────────────
 	const renderAddressSection = () => {
 		if (loadingAddresses) {
 			return (
 				<View style={[styles.spinnerContainer, { paddingVertical: 12 }]}>
-					<ActivityIndicator size="small" color="#1f5f68" />
+					<ActivityIndicator size="small" color="#2B6F71" />
+					<Text style={styles.loadingText}>Loading addresses…</Text>
 				</View>
 			)
 		}
+
 		if (addresses.length === 0) {
 			return (
 				<View style={styles.addressEmptyCard}>
 					<MaterialCommunityIcons name="map-marker-question-outline" size={28} color="#90a4ae" />
 					<Text style={styles.addressEmptyMsg}>No addresses saved yet.</Text>
-					<TouchableOpacity style={styles.addAddressPrimaryBtn} onPress={() => setShowAddressModal(true)}>
+					<TouchableOpacity
+						style={styles.addAddressPrimaryBtn}
+						onPress={() => setShowAddressModal(true)}
+					>
 						<Text style={styles.addAddressPrimaryBtnTxt}>+ Add Address</Text>
 					</TouchableOpacity>
 				</View>
 			)
 		}
+
 		return (
 			<>
 				{addresses.map((addr) => {
@@ -392,26 +421,31 @@ export default function PlaceLabOrderPage() {
 						</TouchableOpacity>
 					)
 				})}
-				<TouchableOpacity style={styles.inlineAddAddressBtn} onPress={() => setShowAddressModal(true)}>
-					<MaterialCommunityIcons name="plus" size={16} color="#1f5f68" />
+				<TouchableOpacity
+					style={styles.inlineAddAddressBtn}
+					onPress={() => setShowAddressModal(true)}
+				>
+					<MaterialCommunityIcons name="plus" size={16} color="#2B6F71" />
 					<Text style={styles.inlineAddAddressTxt}>Add New Address</Text>
 				</TouchableOpacity>
 			</>
 		)
 	}
 
-	// ── Render ────────────────────────────────────────────────────────────────
-
+	// ── Main render ──────────────────────────────────────────────────────
 	return (
 		<View style={styles.safe}>
 			<ScrollView
-				contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 100, 120) }]}
+				contentContainerStyle={[
+					styles.scrollContent,
+					{ paddingBottom: Math.max(insets.bottom + 100, 120) },
+				]}
 				showsVerticalScrollIndicator={false}
 				keyboardShouldPersistTaps="handled"
 			>
-				{/* Lab Banner */}
+				{/* Lab banner */}
 				<View style={styles.labBanner}>
-					<MaterialCommunityIcons name="flask-plus" size={32} color="#1f5f68" />
+					<MaterialCommunityIcons name="flask-plus" size={32} color="#2B6F71" />
 					<View style={{ flex: 1 }}>
 						<AppTypography variant="caption" style={styles.bannerLabel}>
 							Booking Lab Tests At
@@ -422,7 +456,7 @@ export default function PlaceLabOrderPage() {
 					</View>
 				</View>
 
-				{/* STEP 1 — Select Tests */}
+				{/* Step 1: Select Tests */}
 				<View style={styles.sectionCard}>
 					<View style={styles.sectionHeader}>
 						<View style={styles.stepBadge}>
@@ -435,7 +469,7 @@ export default function PlaceLabOrderPage() {
 					{renderTestSelector()}
 				</View>
 
-				{/* STEP 2 — Collection Type */}
+				{/* Step 2: Collection Preference */}
 				<View style={styles.sectionCard}>
 					<View style={styles.sectionHeader}>
 						<View style={styles.stepBadge}>
@@ -499,7 +533,7 @@ export default function PlaceLabOrderPage() {
 							<MaterialCommunityIcons
 								name="information-outline"
 								size={18}
-								color="#1f5f68"
+								color="#2B6F71"
 								style={{ marginTop: 2 }}
 							/>
 							<View style={{ flex: 1 }}>
@@ -520,7 +554,7 @@ export default function PlaceLabOrderPage() {
 					)}
 				</View>
 
-				{/* STEP 3 — Notes */}
+				{/* Step 3: Notes */}
 				<View style={styles.sectionCard}>
 					<View style={styles.sectionHeader}>
 						<View style={styles.stepBadge}>
@@ -543,7 +577,7 @@ export default function PlaceLabOrderPage() {
 				</View>
 			</ScrollView>
 
-			{/* Fixed Bottom Button */}
+			{/* Fixed bottom action */}
 			<View style={[styles.bottomActionContainer, { paddingBottom: Math.max(insets.bottom + 12, 16) }]}>
 				<AppButton
 					variant="primary"
@@ -667,7 +701,7 @@ const styles = StyleSheet.create({
 		marginBottom: 16,
 		gap: 12,
 	},
-	bannerLabel: { fontSize: 12, color: '#1f5f68', fontWeight: '600', marginBottom: 2 },
+	bannerLabel: { fontSize: 12, color: '#2B6F71', fontWeight: '600', marginBottom: 2 },
 	bannerTitle: { fontSize: 18, fontWeight: '700', color: '#101828' },
 
 	// Section card
@@ -689,7 +723,7 @@ const styles = StyleSheet.create({
 		width: 24,
 		height: 24,
 		borderRadius: 12,
-		backgroundColor: '#1f5f68',
+		backgroundColor: '#2B6F71',
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
@@ -699,11 +733,20 @@ const styles = StyleSheet.create({
 	// Loading / empty
 	spinnerContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 24, gap: 10 },
 	loadingText: { fontSize: 13, color: '#667085' },
-	emptyContainer: { alignItems: 'center', paddingVertical: 24, gap: 10 },
+	emptyContainer: { alignItems: 'center', paddingVertical: 24, gap: 8 },
 	emptyMessage: { fontSize: 13, color: '#667085', textAlign: 'center' },
+	emptySubMessage: { fontSize: 12, color: '#94A3B8', textAlign: 'center' },
+	retryBtn: {
+		backgroundColor: '#E8F5F5',
+		borderRadius: 8,
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+		marginTop: 4,
+	},
+	retryBtnText: { fontSize: 13, color: '#2B6F71', fontWeight: '600' },
 
-	// Category + test rows
-	categoryBlock: { marginBottom: 12 },
+	// Test list
+	categoryBlock: { marginBottom: 14 },
 	categoryLabel: {
 		fontSize: 11,
 		fontWeight: '800',
@@ -721,12 +764,9 @@ const styles = StyleSheet.create({
 		borderColor: '#EAECF0',
 		padding: 12,
 		marginBottom: 8,
-		gap: 12,
+		gap: 10,
 	},
-	testRowSelected: {
-		backgroundColor: '#E8F5F5',
-		borderColor: '#1f5f68',
-	},
+	testRowSelected: { backgroundColor: '#E8F5F5', borderColor: '#2B6F71' },
 	checkbox: {
 		width: 22,
 		height: 22,
@@ -736,33 +776,40 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#fff',
+		flexShrink: 0,
 	},
-	checkboxSelected: { backgroundColor: '#1f5f68', borderColor: '#1f5f68' },
+	checkboxSelected: { backgroundColor: '#2B6F71', borderColor: '#2B6F71' },
 	testInfo: { flex: 1 },
 	testName: { fontSize: 13, fontWeight: '600', color: '#344054' },
-	testNameSelected: { color: '#1f5f68' },
+	testNameSelected: { color: '#2B6F71' },
 	testMeta: { fontSize: 11, color: '#667085', marginTop: 2 },
+	testDescription: { fontSize: 11, color: '#94A3B8', marginTop: 2, lineHeight: 16 },
+	testPrice: { fontSize: 12, fontWeight: '700', color: '#344054', flexShrink: 0 },
 
-	// Selected summary
-	selectedSummary: {
+	// Selection summary
+	selectionSummary: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		justifyContent: 'space-between',
 		backgroundColor: '#E8F5F5',
 		borderRadius: 8,
 		paddingHorizontal: 12,
 		paddingVertical: 8,
-		gap: 6,
 		marginBottom: 12,
 	},
-	selectedSummaryText: { fontSize: 13, color: '#1f5f68', fontWeight: '600', flex: 1 },
+	selectionSummaryLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+	selectionSummaryText: { fontSize: 13, color: '#2B6F71', fontWeight: '600' },
+	selectionSummaryRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+	selectionTotal: { fontSize: 13, fontWeight: '700', color: '#2B6F71' },
 	clearSelectionText: { fontSize: 12, color: '#667085', fontWeight: '600' },
 
 	// Custom tests
 	customTestBlock: { marginTop: 4 },
-	customTestLabel: { fontSize: 13, fontWeight: '600', color: '#344054', marginBottom: 8 },
+	customTestLabel: { fontSize: 13, fontWeight: '600', color: '#344054', marginBottom: 4 },
+	customTestHint: { fontSize: 11, color: '#94A3B8', marginBottom: 8 },
 	customTestInput: { fontSize: 13, textAlignVertical: 'top', minHeight: 80 },
 
-	// Collection type selector
+	// Collection toggle
 	collectionSelectorRow: {
 		flexDirection: 'row',
 		backgroundColor: '#F2F4F7',
@@ -780,7 +827,7 @@ const styles = StyleSheet.create({
 		borderRadius: 10,
 		gap: 6,
 	},
-	collectionSelectorBtnActive: { backgroundColor: '#1f5f68' },
+	collectionSelectorBtnActive: { backgroundColor: '#2B6F71' },
 	collectionSelectorLabel: { fontSize: 14, fontWeight: '600', color: '#667085' },
 	collectionSelectorLabelActive: { color: '#fff' },
 
@@ -796,8 +843,6 @@ const styles = StyleSheet.create({
 	},
 	infoPanelTitle: { fontSize: 14, fontWeight: '700', color: '#101828', marginBottom: 4 },
 	infoPanelSub: { fontSize: 12, color: '#475467', lineHeight: 18 },
-
-	// Address section header
 	addressSectionHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
@@ -805,7 +850,7 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 	},
 
-	// Address cards (radio style)
+	// Address cards
 	addressCard: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -817,7 +862,7 @@ const styles = StyleSheet.create({
 		marginBottom: 8,
 		gap: 10,
 	},
-	addressCardSelected: { borderColor: '#1f5f68', backgroundColor: '#E8F5F5' },
+	addressCardSelected: { borderColor: '#2B6F71', backgroundColor: '#E8F5F5' },
 	radioCircle: {
 		width: 20,
 		height: 20,
@@ -826,20 +871,14 @@ const styles = StyleSheet.create({
 		borderColor: '#D0D5DD',
 		alignItems: 'center',
 		justifyContent: 'center',
+		flexShrink: 0,
 	},
-	radioCircleSelected: { borderColor: '#1f5f68' },
-	radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#1f5f68' },
+	radioCircleSelected: { borderColor: '#2B6F71' },
+	radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#2B6F71' },
 	addressLabel: { fontSize: 13, fontWeight: '700', color: '#101828', marginBottom: 2 },
 	addressLine: { fontSize: 12, color: '#475467', lineHeight: 16 },
-	defaultBadge: {
-		backgroundColor: '#E8F5F5',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 6,
-	},
-	defaultBadgeText: { fontSize: 10, fontWeight: '700', color: '#1f5f68' },
-
-	// Add address inline button
+	defaultBadge: { backgroundColor: '#E8F5F5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+	defaultBadgeText: { fontSize: 10, fontWeight: '700', color: '#2B6F71' },
 	inlineAddAddressBtn: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -847,9 +886,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 8,
 		alignSelf: 'flex-start',
 	},
-	inlineAddAddressTxt: { fontSize: 13, color: '#1f5f68', fontWeight: '700' },
-
-	// Empty address
+	inlineAddAddressTxt: { fontSize: 13, color: '#2B6F71', fontWeight: '700' },
 	addressEmptyCard: { alignItems: 'center', paddingVertical: 16, gap: 8 },
 	addressEmptyMsg: { fontSize: 12, color: '#667085' },
 	addAddressPrimaryBtn: {
@@ -860,9 +897,9 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 12,
 		borderRadius: 8,
 	},
-	addAddressPrimaryBtnTxt: { fontSize: 12, color: '#1f5f68', fontWeight: '600' },
+	addAddressPrimaryBtnTxt: { fontSize: 12, color: '#2B6F71', fontWeight: '600' },
 
-	// Remarks
+	// Notes
 	remarksInput: { fontSize: 13, textAlignVertical: 'top', minHeight: 100 },
 
 	// Bottom action
@@ -884,7 +921,7 @@ const styles = StyleSheet.create({
 	},
 	submitBtn: { width: '100%' },
 
-	// Add address sheet
+	// Address sheet
 	sheetBody: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 },
 	rowFields: { flexDirection: 'row', justifyContent: 'space-between' },
 	saveAddressBtn: { width: '100%', marginTop: 16 },

@@ -7,7 +7,7 @@ import { Platform } from 'react-native'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	const url = "http://192.168.4.52:8000"
+	const url = 'http://192.168.4.26:8000'
 
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
@@ -115,6 +115,28 @@ export const API_ENDPOINTS = {
 		VERIFY_PRESCRIPTION: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/verify`,
 		UPLOAD_REPORT: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/report`,
 	},
+
+	LABORATORY: {
+		SEARCH: `${BASE_URL}/api/laboratory/search`,
+
+		PROFILE: `${BASE_URL}/api/laboratory/profile`,
+		DETAILS: `${BASE_URL}/api/laboratory/details`,
+
+		TEST_TYPES: `${BASE_URL}/api/laboratory/test-types`,
+		TESTS: `${BASE_URL}/api/laboratory/tests`,
+
+		BOOKINGS: `${BASE_URL}/api/laboratory/bookings`,
+		BOOKING_DETAIL: (id: string) => `${BASE_URL}/api/laboratory/bookings/${id}`,
+
+		BOOKING_ITEMS: (bookingId: string) => `${BASE_URL}/api/laboratory/bookings/${bookingId}/items`,
+
+		REPORTS: `${BASE_URL}/api/laboratory/reports`,
+		UPLOAD_REPORT: (bookingId: string) => `${BASE_URL}/api/laboratory/bookings/${bookingId}/report`,
+
+		VERIFY_PRESCRIPTION: (bookingId: string) => `${BASE_URL}/api/laboratory/bookings/${bookingId}/verify`,
+		TESTS_BY_PUBLIC_ID: (publicId: string) => `${BASE_URL}/api/laboratories/${publicId}/tests`,
+	},
+
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {
 		LIST: `${BASE_URL}/api/locations`,

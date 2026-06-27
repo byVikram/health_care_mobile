@@ -24,64 +24,23 @@ import { AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../co
 import PaginationBar from '../../components/common/AppPagination'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
+import { getLabBookings } from './laboratoryService'
+import type { LabBooking } from './laboratory'
+import { formatDateForApi, formatGroupDateDisplay, formatShortDateDisplay } from '../../utils/date'
 
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
 
+// Matches actual API status values
 export type LabBookingStatus =
-	| 'Pending Confirmation'
+	| 'Pending Quote'
+	| 'Pending Payment'
 	| 'Confirmed'
 	| 'Sample Collected'
 	| 'Report Ready'
 	| 'Completed'
 	| 'Cancelled'
-
-export type LabBooking = {
-	public_id: string
-	patient_name: string
-	patient_phone?: string
-	laboratory_name: string
-	laboratory_public_id?: string
-	laboratory_phone?: string
-	booking_date: string
-	booking_time: string
-	collection_type: 'walk_in' | 'home_collection'
-	collection_address?: string
-	status: string
-	payment_status: string
-	total_price: number | null
-	notes?: string | null
-	created_at: string
-	booking_items: LabBookingItem[]
-	report?: {
-		report_pdf_s3_key?: string | null
-		result_images_s3_keys?: string[]
-	} | null
-	external_prescription_s3_key?: string | null
-	verified_by_name?: string
-	prescription_verified?: boolean
-	patient?: {
-		name?: string
-		age?: number
-		gender?: string
-		phone?: string
-	}
-	laboratory?: {
-		phone?: string
-	}
-}
-
-export type LabBookingItem = {
-	id?: number
-	test_name: string
-	custom_test_name?: string | null
-	category?: string
-	quoted_price?: number | null
-	base_price?: number | null
-	turnaround?: string
-	result?: string | null
-}
 
 type BookingRow = {
 	id: string
@@ -103,7 +62,8 @@ type BookingRow = {
 // ─────────────────────────────────────────────
 
 const STATUS_STYLES: Record<LabBookingStatus, { bg: string; text: string }> = {
-	'Pending Confirmation': { bg: '#FFF1D9', text: '#F0A018' },
+	'Pending Quote': { bg: '#FFF1D9', text: '#F0A018' },
+	'Pending Payment': { bg: '#FDE7D8', text: '#D9711B' },
 	Confirmed: { bg: '#DEE9FF', text: '#3F7EE8' },
 	'Sample Collected': { bg: '#EDE7F6', text: '#673AB7' },
 	'Report Ready': { bg: '#E0F7FA', text: '#0097A7' },
@@ -121,9 +81,11 @@ const DATE_OPTIONS: AppSelectOption[] = [
 	{ label: 'Custom', value: 'custom' },
 ]
 
+// Values match the backend `status` query param exactly
 const STATUS_OPTIONS: AppSelectOption[] = [
 	{ label: 'All', value: 'all' },
-	{ label: 'Pending Confirmation', value: 'pending_confirmation' },
+	{ label: 'Pending Quote', value: 'pending_quote' },
+	{ label: 'Pending Payment', value: 'pending_payment' },
 	{ label: 'Confirmed', value: 'confirmed' },
 	{ label: 'Sample Collected', value: 'sample_collected' },
 	{ label: 'Report Ready', value: 'report_ready' },
@@ -153,28 +115,12 @@ const BookingCardSkeleton = () => (
 // Helpers
 // ─────────────────────────────────────────────
 
-const formatDisplayDate = (isoDate: string) =>
-	new Date(isoDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-
-const formatGroupDate = (dateString: string) =>
-	new Date(dateString).toLocaleDateString('en-IN', {
-		weekday: 'long',
-		day: '2-digit',
-		month: 'short',
-		year: 'numeric',
-	})
-
-const formatApiDate = (date: Date) => {
-	const year = date.getFullYear()
-	const month = String(date.getMonth() + 1).padStart(2, '0')
-	const day = String(date.getDate()).padStart(2, '0')
-	return `${year}-${month}-${day}`
-}
-
 const normalizeStatus = (status: string): LabBookingStatus => {
 	switch (status?.toLowerCase()) {
-		case 'pending_confirmation':
-			return 'Pending Confirmation'
+		case 'pending_quote':
+			return 'Pending Quote'
+		case 'pending_payment':
+			return 'Pending Payment'
 		case 'confirmed':
 			return 'Confirmed'
 		case 'sample_collected':
@@ -187,22 +133,24 @@ const normalizeStatus = (status: string): LabBookingStatus => {
 		case 'rejected':
 			return 'Cancelled'
 		default:
-			return 'Pending Confirmation'
+			return 'Pending Quote'
 	}
 }
 
 const buildTestSummary = (booking: LabBooking): string => {
-	const names = booking.booking_items.map((item) => item.custom_test_name || item.test_name).filter(Boolean)
+	const names = booking.booking_items
+		.map((item) => item.custom_test_name || item.test_name)
+		.filter(Boolean)
 	return names.length > 0 ? names.join(', ') : 'Test details unavailable'
 }
 
 const mapBookingToRow = (booking: LabBooking, isLabViewer: boolean): BookingRow => ({
 	id: booking.public_id,
 	bookingRef: booking.public_id.slice(0, 8).toUpperCase(),
-	group: formatGroupDate(booking.created_at),
+	group: formatGroupDateDisplay(booking.created_at),
 	primaryName: isLabViewer ? booking.patient_name : booking.laboratory_name,
 	testSummary: buildTestSummary(booking),
-	date: formatDisplayDate(booking.booking_date),
+	date: formatShortDateDisplay(booking.booking_date),
 	time: booking.booking_time,
 	status: normalizeStatus(booking.status),
 	collectionType: booking.collection_type,
@@ -213,23 +161,24 @@ const mapBookingToRow = (booking: LabBooking, isLabViewer: boolean): BookingRow 
 
 const matchesDateFilter = (bookingDate: string, filter: string, from?: string, to?: string): boolean => {
 	if (filter === 'all') return true
-	const today = formatApiDate(new Date())
+	const today = formatDateForApi(new Date())
+
 	if (filter === 'today') return bookingDate === today
 	if (filter === 'yesterday') {
 		const d = new Date()
 		d.setDate(d.getDate() - 1)
-		return bookingDate === formatApiDate(d)
+		return bookingDate === formatDateForApi(d)
 	}
 	if (filter === 'tomorrow') {
 		const d = new Date()
 		d.setDate(d.getDate() + 1)
-		return bookingDate === formatApiDate(d)
+		return bookingDate === formatDateForApi(d)
 	}
 	if (filter === 'last_7_days' || filter === 'last_30_days') {
 		const days = filter === 'last_30_days' ? 30 : 7
 		const start = new Date()
 		start.setDate(start.getDate() - (days - 1))
-		return bookingDate >= formatApiDate(start) && bookingDate <= today
+		return bookingDate >= formatDateForApi(start) && bookingDate <= today
 	}
 	if (filter === 'custom') {
 		if (from && bookingDate < from) return false
@@ -237,61 +186,6 @@ const matchesDateFilter = (bookingDate: string, filter: string, from?: string, t
 		return true
 	}
 	return true
-}
-
-// ─────────────────────────────────────────────
-// Mock fetch — replace with real API
-// ─────────────────────────────────────────────
-
-const fetchLabBookings = async (_accessToken: string | null, _status?: string): Promise<LabBooking[]> => {
-	// TODO: replace with real API call, e.g.:
-	// const res = await ApiService.get(API_ENDPOINTS.LABORATORY.BOOKINGS, { params: { status } })
-	// return res.data?.data ?? []
-	return new Promise((resolve) =>
-		setTimeout(
-			() =>
-				resolve([
-					{
-						public_id: 'lb-001-abc-def',
-						patient_name: 'Ravi Kumar',
-						patient_phone: '9876543210',
-						laboratory_name: 'Apollo Diagnostics',
-						laboratory_public_id: 'lab-001',
-						booking_date: formatApiDate(new Date()),
-						booking_time: '09:00',
-						collection_type: 'walk_in',
-						status: 'confirmed',
-						payment_status: 'paid',
-						total_price: 850,
-						created_at: new Date().toISOString(),
-						booking_items: [
-							{ test_name: 'Complete Blood Count', category: 'Haematology', quoted_price: 350 },
-							{ test_name: 'HbA1c', category: 'Biochemistry', quoted_price: 500 },
-						],
-					},
-					{
-						public_id: 'lb-002-xyz-ghi',
-						patient_name: 'Priya Sharma',
-						patient_phone: '9123456780',
-						laboratory_name: 'SRL Diagnostics',
-						laboratory_public_id: 'lab-002',
-						booking_date: formatApiDate(new Date()),
-						booking_time: '11:30',
-						collection_type: 'home_collection',
-						collection_address: '45, MG Road, Bangalore',
-						status: 'pending_confirmation',
-						payment_status: 'pending',
-						total_price: null,
-						created_at: new Date().toISOString(),
-						booking_items: [
-							{ test_name: 'Lipid Profile', category: 'Biochemistry', quoted_price: null },
-							{ test_name: 'Thyroid Profile', category: 'Endocrinology', quoted_price: null },
-						],
-					},
-				]),
-			600
-		)
-	)
 }
 
 // ─────────────────────────────────────────────
@@ -305,7 +199,7 @@ interface BookingCardProps {
 }
 
 const BookingCard = React.memo(function BookingCard({ booking, onPress, isLabViewer }: BookingCardProps) {
-	const statusStyle = STATUS_STYLES[booking.status] ?? STATUS_STYLES['Pending Confirmation']
+	const statusStyle = STATUS_STYLES[booking.status] ?? STATUS_STYLES['Pending Quote']
 
 	return (
 		<TouchableOpacity style={styles.orderCard} onPress={onPress} activeOpacity={0.85}>
@@ -383,7 +277,9 @@ const BookingCard = React.memo(function BookingCard({ booking, onPress, isLabVie
 					<View style={styles.priceContainer}>
 						<Text style={styles.priceLabel}>Total</Text>
 						<Text style={styles.priceTag}>
-							{booking.totalAmount != null ? `₹${booking.totalAmount.toFixed(2)}` : 'Awaiting Quote'}
+							{booking.totalAmount != null
+								? `₹${booking.totalAmount.toFixed(2)}`
+								: 'Awaiting Quote'}
 						</Text>
 					</View>
 				</View>
@@ -418,11 +314,9 @@ export default function OrderListLaboratoryPage() {
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 
-	// Pagination
 	const [page, setPage] = useState(1)
 	const [pageSize, setPageSize] = useState(10)
 
-	// Filters
 	const [searchQuery, setSearchQuery] = useState('')
 	const [debouncedSearch, setDebouncedSearch] = useState('')
 	const [statusFilter, setStatusFilter] = useState(route.params?.status ?? 'all')
@@ -430,7 +324,6 @@ export default function OrderListLaboratoryPage() {
 	const [fromDateFilter, setFromDateFilter] = useState('')
 	const [toDateFilter, setToDateFilter] = useState('')
 
-	// Draft filters (mobile sheet)
 	const [draftStatusFilter, setDraftStatusFilter] = useState('all')
 	const [draftDateFilter, setDraftDateFilter] = useState('all')
 	const [draftFromDateFilter, setDraftFromDateFilter] = useState('')
@@ -462,11 +355,14 @@ export default function OrderListLaboratoryPage() {
 			try {
 				isRefresh ? setRefreshing(true) : setLoading(true)
 				const status = statusFilter !== 'all' ? statusFilter : undefined
-				const data = await fetchLabBookings(accessToken, status)
+				const data = await getLabBookings(status)
 				setAllBookings(data)
 			} catch (error: any) {
-				console.error('[OrderListLaboratoryPage] fetchBookings error:', error?.message || error)
-				Toast.show({ type: 'error', text1: 'Error', text2: error?.message || 'Failed to load bookings' })
+				Toast.show({
+					type: 'error',
+					text1: 'Error',
+					text2: error?.message || 'Failed to load bookings',
+				})
 			} finally {
 				isRefresh ? setRefreshing(false) : setLoading(false)
 			}
@@ -490,14 +386,19 @@ export default function OrderListLaboratoryPage() {
 					row.primaryName.toLowerCase().includes(q) ||
 					row.bookingRef.toLowerCase().includes(q) ||
 					row.testSummary.toLowerCase().includes(q)
-				const matchesDate = matchesDateFilter(row.raw.booking_date, dateFilter, fromDateFilter, toDateFilter)
+				const matchesDate = matchesDateFilter(
+					row.raw.booking_date,
+					dateFilter,
+					fromDateFilter,
+					toDateFilter
+				)
 				return matchesSearch && matchesDate
 			})
 	}, [allBookings, isLabViewer, debouncedSearch, dateFilter, fromDateFilter, toDateFilter])
 
 	const total = filteredRows.length
 	const pagedRows = useMemo(
-		() => filteredRows.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize),
+		() => filteredRows.slice((page - 1) * pageSize, page * pageSize),
 		[filteredRows, page, pageSize]
 	)
 
@@ -522,7 +423,11 @@ export default function OrderListLaboratoryPage() {
 			return (
 				<View>
 					{showGroup && <Text style={styles.groupTitle}>{item.group}</Text>}
-					<BookingCard booking={item} onPress={() => handleBookingPress(item)} isLabViewer={isLabViewer} />
+					<BookingCard
+						booking={item}
+						onPress={() => handleBookingPress(item)}
+						isLabViewer={isLabViewer}
+					/>
 					<View style={{ height: 12 }} />
 				</View>
 			)
@@ -559,7 +464,11 @@ export default function OrderListLaboratoryPage() {
 	const applyFilters = () => {
 		if (draftDateFilter === 'custom' && draftFromDateFilter && draftToDateFilter) {
 			if (new Date(draftFromDateFilter) > new Date(draftToDateFilter)) {
-				Toast.show({ type: 'error', text1: 'Invalid Range', text2: 'From Date cannot be later than To Date.' })
+				Toast.show({
+					type: 'error',
+					text1: 'Invalid Range',
+					text2: 'From Date cannot be later than To Date.',
+				})
 				return
 			}
 		}
@@ -585,14 +494,18 @@ export default function OrderListLaboratoryPage() {
 	const handleDateRangeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
 		if (Platform.OS === 'android') setActiveDatePicker(null)
 		if (event.type === 'dismissed' || !selectedDate || !activeDatePicker) return
-		const val = formatApiDate(selectedDate)
+		const val = formatDateForApi(selectedDate)
 		activeDatePicker === 'from' ? setDraftFromDateFilter(val) : setDraftToDateFilter(val)
 		setDraftDateFilter('custom')
 	}
 
-	// ── Filter UI helpers ──────────────────────────────────────────────
+	// ── Filter chip row ────────────────────────────────────────────────
 
-	const renderFilterChips = (options: AppSelectOption[], value: string, onChange: (v: string) => void) => (
+	const renderFilterChips = (
+		options: AppSelectOption[],
+		value: string,
+		onChange: (v: string) => void
+	) => (
 		<ScrollView
 			horizontal
 			showsHorizontalScrollIndicator={false}
@@ -609,7 +522,9 @@ export default function OrderListLaboratoryPage() {
 						onPress={() => onChange(option.value)}
 						activeOpacity={0.82}
 					>
-						<AppTypography style={[styles.filterChipText, selected && styles.filterChipTextActive]}>
+						<AppTypography
+							style={[styles.filterChipText, selected && styles.filterChipTextActive]}
+						>
 							{option.label}
 						</AppTypography>
 					</TouchableOpacity>
@@ -624,7 +539,10 @@ export default function OrderListLaboratoryPage() {
 			onPress={() => setActiveDatePicker(picker)}
 			activeOpacity={0.82}
 		>
-			<AppTypography style={[styles.dateRangeText, !value && styles.dateRangePlaceholder]} numberOfLines={1}>
+			<AppTypography
+				style={[styles.dateRangeText, !value && styles.dateRangePlaceholder]}
+				numberOfLines={1}
+			>
 				{value || label}
 			</AppTypography>
 			<MaterialCommunityIcons name="calendar-month-outline" size={20} color="#2B6F71" />
@@ -652,7 +570,13 @@ export default function OrderListLaboratoryPage() {
 									: new Date()
 						}
 						mode="date"
-						display={Platform.OS === 'ios' ? 'inline' : Platform.OS === 'android' ? 'calendar' : 'default'}
+						display={
+							Platform.OS === 'ios'
+								? 'inline'
+								: Platform.OS === 'android'
+									? 'calendar'
+									: 'default'
+						}
 						onChange={handleDateRangeChange}
 					/>
 				</View>
@@ -665,7 +589,12 @@ export default function OrderListLaboratoryPage() {
 		const backdropOpacity = filterBackdropAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })
 
 		return (
-			<Modal visible={filterModalVisible} transparent animationType="none" onRequestClose={closeFilterModal}>
+			<Modal
+				visible={filterModalVisible}
+				transparent
+				animationType="none"
+				onRequestClose={closeFilterModal}
+			>
 				<View style={styles.filterModalRoot}>
 					<Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
 						<BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
@@ -712,10 +641,18 @@ export default function OrderListLaboratoryPage() {
 						</ScrollView>
 
 						<View style={styles.filterSheetActions}>
-							<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+							<TouchableOpacity
+								style={styles.resetButton}
+								onPress={resetFilters}
+								activeOpacity={0.82}
+							>
 								<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
 							</TouchableOpacity>
-							<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+							<TouchableOpacity
+								style={styles.applyButton}
+								onPress={applyFilters}
+								activeOpacity={0.88}
+							>
 								<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
 							</TouchableOpacity>
 						</View>
@@ -725,7 +662,7 @@ export default function OrderListLaboratoryPage() {
 		)
 	}
 
-	// ── Search box & filter controls ───────────────────────────────────
+	// ── Inline filters (tablet) ────────────────────────────────────────
 
 	const searchInput = (
 		<View style={[styles.searchBox, !isTablet && styles.searchBoxMobile, isTablet && styles.searchBoxWide]}>
@@ -820,7 +757,10 @@ export default function OrderListLaboratoryPage() {
 				</View>
 
 				{loading && !refreshing ? (
-					<ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+					<ScrollView
+						contentContainerStyle={styles.listContent}
+						showsVerticalScrollIndicator={false}
+					>
 						{[1, 2, 3, 4, 5].map((item) => (
 							<BookingCardSkeleton key={item} />
 						))}
@@ -840,7 +780,9 @@ export default function OrderListLaboratoryPage() {
 								<View style={styles.emptyState}>
 									<MaterialCommunityIcons name="flask-outline" size={40} color="#b0bec5" />
 									<Text style={styles.emptyTitle}>No bookings found</Text>
-									<Text style={styles.emptyText}>Try adjusting the search or filter settings.</Text>
+									<Text style={styles.emptyText}>
+										Try adjusting the search or filter settings.
+									</Text>
 								</View>
 							}
 						/>
@@ -898,7 +840,12 @@ const styles = StyleSheet.create({
 		marginBottom: 14,
 	},
 	cardMainContent: { flex: 1, paddingVertical: 14, paddingLeft: 16, paddingRight: 4 },
-	cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+	cardHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: 12,
+	},
 	titleContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 },
 	titleIcon: { marginRight: 6 },
 	primaryName: { fontSize: 15, fontWeight: '700', color: '#1D2939' },
@@ -942,7 +889,13 @@ const styles = StyleSheet.create({
 	emptyTitle: { color: '#536167', fontSize: 16, fontWeight: '700' },
 	emptyText: { color: '#8b969b', fontSize: 12, textAlign: 'center' },
 	filtersSection: { marginBottom: 10 },
-	filterRowWide: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap', gap: 12, width: '100%' },
+	filterRowWide: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flexWrap: 'nowrap',
+		gap: 12,
+		width: '100%',
+	},
 	mobileSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 	searchBox: {
 		height: 48,
@@ -1022,7 +975,13 @@ const styles = StyleSheet.create({
 		paddingBottom: 12,
 	},
 	filterSheetTitle: { fontSize: 18, lineHeight: 24, fontWeight: '700', color: '#111827' },
-	filterCloseButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+	filterCloseButton: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
 	filterSheetScroll: { flexGrow: 0 },
 	filterSheetContent: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 20, gap: 22 },
 	filterGroup: { gap: 10 },
@@ -1034,7 +993,13 @@ const styles = StyleSheet.create({
 		textTransform: 'uppercase',
 	},
 	filterChipScroller: { marginHorizontal: -2 },
-	filterChipRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 10, paddingHorizontal: 2, paddingVertical: 1 },
+	filterChipRow: {
+		flexDirection: 'row',
+		flexWrap: 'nowrap',
+		gap: 10,
+		paddingHorizontal: 2,
+		paddingVertical: 1,
+	},
 	filterChip: {
 		minHeight: 38,
 		minWidth: 74,
