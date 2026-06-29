@@ -30,6 +30,7 @@ axiosInstance.interceptors.request.use(
 	async (config) => {
 		// Use AsyncStorage in React Native
 		const token = await AsyncStorage.getItem('access_token')
+		console.log('[API TOKEN]', token)
 		const requestUrl = String(config.url || '')
 		const isBookingRequest = requestUrl.includes('/appointments') || requestUrl.includes('appointments')
 		config.headers = config.headers || {}
@@ -122,7 +123,12 @@ axiosInstance.interceptors.response.use(
 				])
 			}
 		} else if (status === 403) {
-			Alert.alert('Access Denied', message || 'You do not have permission to perform this action.')
+			console.log('403 RESPONSE:', error.response?.data)
+
+			Alert.alert(
+				'Access Denied',
+				error.response?.data?.message || 'You do not have permission to perform this action.'
+			)
 		} else {
 			// Replace react-toastify with Alert in RN
 			Alert.alert('API Error', message)
@@ -142,7 +148,7 @@ const ApiService = {
 	post<T = unknown>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
 		return axiosInstance.post<T>(url, body, config)
 	},
-	patch<T = unknown>(url: string, body: unknown): Promise<AxiosResponse<T>> {
+	patch<T = unknown>(url: string, body: unknown, p0: { signal: AbortSignal | undefined }): Promise<AxiosResponse<T>> {
 		return axiosInstance.patch<T>(url, body)
 	},
 	put<T = unknown>(url: string, body: unknown): Promise<AxiosResponse<T>> {

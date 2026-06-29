@@ -122,10 +122,20 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				id: 'lab',
 				label: 'Lab',
 				icon: <LabIcon width={20} height={20} />,
-				onPress: () =>
-					navigation.navigate(ROUTES.MAIN.TABS, {
-						screen: ROUTES.MAIN.HOME,
-					}),
+				onPress: () => {
+					setIsSidebarOpen(false)
+					navigation.navigate(ROUTES.STACK.LABORATORY_LIST as any)
+				},
+			},
+
+			{
+				id: 'lab booking',
+				label: 'Lab Bookings',
+				icon: <MaterialCommunityIcons name="clipboard-text-play-outline" size={20} color="#1f5f68" />,
+				onPress: () => {
+					setIsSidebarOpen(false)
+					navigation.navigate(ROUTES.STACK.LABORATORY_ORDERS as any)
+				},
 			},
 			// {
 			// 	id: 'radiology',

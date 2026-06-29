@@ -1,6 +1,6 @@
 // src/features/doctor/doctorService.ts
 import ApiService from '../../services/apiService'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { AppointmentsResponse } from '../../types/appointment'
 import { DoctorSearchResponse } from '../../types/doctor-search'
@@ -20,13 +20,13 @@ export interface TimeSlot {
 }
 // Add this to doctorService.ts
 export interface Appointment {
-	id: string;
-	appointment_date: string;
-	doctor_name?: string;
-	patient_name?: string;
-	status?: string;
-	time?: string;
-	notes?: string;
+	id: string
+	appointment_date: string
+	doctor_name?: string
+	patient_name?: string
+	status?: string
+	time?: string
+	notes?: string
 }
 
 export interface SlotGroup {
@@ -70,51 +70,42 @@ export interface CreateAppointmentResponse {
 	data?: unknown
 }
 
-
 export interface AppointmentResponse {
 	success: boolean
 	message: string
 	// data: Appointment
 }
 
-
 export interface PreIntakePayload {
-	symptoms: string;
-	duration?: string;
-	severity?: "mild" | "moderate" | "severe"|"";
+	symptoms: string
+	duration?: string
+	severity?: 'mild' | 'moderate' | 'severe' | ''
 }
 
 export const updatePreIntake = async (appointmentId: string, payload: PreIntakePayload) => {
-	console.log("PRE_INTAKE URL =>", API_ENDPOINTS.APPOINTMENTS.PRE_INTAKE(appointmentId))
-	const res = await ApiService.patch(
-		API_ENDPOINTS.APPOINTMENTS.PRE_INTAKE(appointmentId),
-		payload
-	);
-	return res.data;
-};
+	console.log('PRE_INTAKE URL =>', API_ENDPOINTS.APPOINTMENTS.PRE_INTAKE(appointmentId))
+	const res = await ApiService.patch(API_ENDPOINTS.APPOINTMENTS.PRE_INTAKE(appointmentId), payload)
+	return res.data
+}
 
 export const updateAppointmentsStatus = async (
 	appointmentId: string,
 	statusId: string
 ): Promise<AppointmentResponse> => {
-
-	console.log("PAYLOAD 👉", {
+	console.log('PAYLOAD 👉', {
 		appointment_id: appointmentId,
 		status_id: statusId,
-	});
+	})
 
-	const res = await ApiService.patch<AppointmentResponse>(
-		API_ENDPOINTS.APPOINTMENTS.UPDATE,
-		{
-			appointment_id: appointmentId,
-			status_id: statusId,
-		}
-	);
+	const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
+		appointment_id: appointmentId,
+		status_id: statusId,
+	})
 
-	console.log("RESPONSE 👉", res.data);
+	console.log('RESPONSE 👉', res.data)
 
-	return res.data;
-};
+	return res.data
+}
 
 export interface RescheduleAppointmentPayload {
 	appointment_id: string
@@ -127,9 +118,7 @@ export interface RescheduleAppointmentPayload {
 	status_id?: string // 👈 ADD THIS
 }
 
-export const rescheduleAppointment = async (
-	payload: RescheduleAppointmentPayload
-): Promise<AppointmentResponse> => {
+export const rescheduleAppointment = async (payload: RescheduleAppointmentPayload): Promise<AppointmentResponse> => {
 	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, payload)
 	return res.data
 }
@@ -139,9 +128,7 @@ export interface ReferAppointmentPayload {
 	doctor_id: string
 }
 
-export const referAppointment = async (
-	payload: ReferAppointmentPayload
-): Promise<AppointmentResponse> => {
+export const referAppointment = async (payload: ReferAppointmentPayload): Promise<AppointmentResponse> => {
 	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.REFER, payload)
 	return res.data
 }
@@ -154,32 +141,16 @@ export const getAppointments = async (params?: AppointmentParams): Promise<Appoi
 	return res.data
 }
 
-export const createAppointment = async (
-	payload: CreateAppointmentPayload,
-	token?: string | null
-): Promise<CreateAppointmentResponse> => {
-	const config = token
-		? {
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-			}
-		: undefined
-
+export const createAppointment = async (payload: CreateAppointmentPayload): Promise<CreateAppointmentResponse> => {
 	console.log('[createAppointment][RN] request', {
 		url: API_ENDPOINTS.APPOINTMENTS.CREATE,
 		payload,
-		token,
-		headers: config?.headers,
+
 		webComparison:
 			'React web booking uses axios interceptor with localStorage access_token and sends Authorization: Bearer <access_token>.',
 	})
 
-	const res = await ApiService.post<CreateAppointmentResponse>(
-		API_ENDPOINTS.APPOINTMENTS.CREATE,
-		payload,
-		config
-	)
+	const res = await ApiService.post<CreateAppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.CREATE, payload)
 
 	console.log('[createAppointment][RN] response', {
 		status: res.status,
@@ -189,18 +160,16 @@ export const createAppointment = async (
 
 	return res.data
 }
-export const getDoctors = async (
-  params?: DoctorSearchParams
-): Promise<DoctorSearchResponse> => {
-  const res = await ApiService.getWithParams<DoctorSearchResponse>(
-    API_ENDPOINTS.DOCTORS.SEARCH,
-    (params ?? {}) as Record<string, unknown>
-  );
+export const getDoctors = async (params?: DoctorSearchParams): Promise<DoctorSearchResponse> => {
+	const res = await ApiService.getWithParams<DoctorSearchResponse>(
+		API_ENDPOINTS.DOCTORS.SEARCH,
+		(params ?? {}) as Record<string, unknown>
+	)
 
-  console.log("DOCTORS RESPONSE:", JSON.stringify(res.data, null, 2));
+	console.log('DOCTORS RESPONSE:', JSON.stringify(res.data, null, 2))
 
-  return res.data;
-};
+	return res.data
+}
 
 export interface FavouriteDoctor {
 	id: string
@@ -237,10 +206,7 @@ export const getFavouriteDoctors = async (): Promise<FavouritesResponse> => {
 }
 
 export const toggleFavouriteDoctor = async (publicId: string): Promise<ToggleFavouriteResponse> => {
-	const res = await ApiService.post<ToggleFavouriteResponse>(
-		API_ENDPOINTS.DOCTORS_FAVOURITES.TOGGLE(publicId),
-		{}
-	)
+	const res = await ApiService.post<ToggleFavouriteResponse>(API_ENDPOINTS.DOCTORS_FAVOURITES.TOGGLE(publicId), {})
 	return res.data
 }
 
@@ -288,9 +254,7 @@ export interface SlotOverrideResponse {
 	message: string
 }
 
-export const createSlotOverrideBatch = async (
-	payload: SlotOverrideBatchPayload
-): Promise<SlotOverrideResponse> => {
+export const createSlotOverrideBatch = async (payload: SlotOverrideBatchPayload): Promise<SlotOverrideResponse> => {
 	const res = await ApiService.post<SlotOverrideResponse>(API_ENDPOINTS.DOCTORS.OVERRIDES, payload)
 	return res.data
 }
@@ -466,17 +430,8 @@ export const updateDoctorAvailability = async (data: DoctorAvailabilityUpdatePay
 
 // -- Doctor profile -------------------------------------------------------------
 export const getDoctorProfile = async (): Promise<DoctorProfileApiResponse> => {
-	const token = await AsyncStorage.getItem('access_token')
-	console.log('[getDoctorProfile] access_token:', token)
-
 	try {
-		const res = await ApiService.get<DoctorProfileApiResponse>(API_ENDPOINTS.DOCTOR_PROFILE.DETAILS, {
-			headers: token
-				? {
-						Authorization: `Bearer ${token}`,
-					}
-				: undefined,
-		})
+		const res = await ApiService.get<DoctorProfileApiResponse>(API_ENDPOINTS.DOCTOR_PROFILE.DETAILS)
 		console.log('[getDoctorProfile] API response:', res.data)
 		return res.data
 	} catch (error: any) {

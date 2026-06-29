@@ -26,6 +26,7 @@ import PaginationBar from '../../components/common/AppPagination'
 import { fetchRadiologyBookings, RadiologyBooking } from './RadiologyService'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
+import { formatDateForApi, formatGroupDateDisplay, formatShortDateDisplay } from '../../utils/date'
 
 // ─────────────────────────────────────────────
 // Types
@@ -98,24 +99,6 @@ const BookingCardSkeleton = () => (
 // Helpers
 // ─────────────────────────────────────────────
 
-const formatDisplayDate = (isoDate: string) =>
-	new Date(isoDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-
-const formatGroupDate = (dateString: string) =>
-	new Date(dateString).toLocaleDateString('en-IN', {
-		weekday: 'long',
-		day: '2-digit',
-		month: 'short',
-		year: 'numeric',
-	})
-
-const formatApiDate = (date: Date) => {
-	const year = date.getFullYear()
-	const month = String(date.getMonth() + 1).padStart(2, '0')
-	const day = String(date.getDate()).padStart(2, '0')
-	return `${year}-${month}-${day}`
-}
-
 const normalizeStatus = (status: string): NormalizedStatus => {
 	switch (status?.toLowerCase()) {
 		case 'pending_quote':
@@ -144,10 +127,10 @@ const buildScanSummary = (booking: RadiologyBooking): string => {
 const mapBookingToRow = (booking: RadiologyBooking, isRadiologyViewer: boolean): BookingRow => ({
 	id: booking.public_id,
 	bookingRef: booking.public_id.slice(0, 8).toUpperCase(),
-	group: formatGroupDate(booking.created_at),
+	group: formatGroupDateDisplay(booking.created_at),
 	primaryName: isRadiologyViewer ? booking.patient_name : booking.radiology_name,
 	scanSummary: buildScanSummary(booking),
-	date: formatDisplayDate(booking.booking_date),
+	date: formatShortDateDisplay(booking.booking_date),
 	time: booking.booking_time,
 	status: normalizeStatus(booking.status),
 	totalAmount: booking.total_price,
@@ -159,27 +142,27 @@ const mapBookingToRow = (booking: RadiologyBooking, isRadiologyViewer: boolean):
 // booking_date is already YYYY-MM-DD, so lexicographic string comparison works directly.
 const matchesDateFilter = (bookingDate: string, filter: string, from?: string, to?: string): boolean => {
 	if (filter === 'all') return true
-	const today = formatApiDate(new Date())
+	const today = formatDateForApi(new Date())
 
 	if (filter === 'today') return bookingDate === today
 
 	if (filter === 'yesterday') {
 		const d = new Date()
 		d.setDate(d.getDate() - 1)
-		return bookingDate === formatApiDate(d)
+		return bookingDate === formatDateForApi(d)
 	}
 
 	if (filter === 'tomorrow') {
 		const d = new Date()
 		d.setDate(d.getDate() + 1)
-		return bookingDate === formatApiDate(d)
+		return bookingDate === formatDateForApi(d)
 	}
 
 	if (filter === 'last_7_days' || filter === 'last_30_days') {
 		const days = filter === 'last_30_days' ? 30 : 7
 		const start = new Date()
 		start.setDate(start.getDate() - (days - 1))
-		return bookingDate >= formatApiDate(start) && bookingDate <= today
+		return bookingDate >= formatDateForApi(start) && bookingDate <= today
 	}
 
 	if (filter === 'custom') {
@@ -363,7 +346,7 @@ export default function OrderListRadiologyPage() {
 			try {
 				isRefresh ? setRefreshing(true) : setLoading(true)
 				const status = statusFilter !== 'all' ? statusFilter : undefined
-				const data = await fetchRadiologyBookings(accessToken, status)
+				const data = await fetchRadiologyBookings(status)
 				setAllBookings(data)
 			} catch (error: any) {
 				console.error('[OrderListRadiologyPage] fetchBookings error:', error?.message || error)
@@ -494,7 +477,7 @@ export default function OrderListRadiologyPage() {
 	const handleDateRangeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
 		if (Platform.OS === 'android') setActiveDatePicker(null)
 		if (event.type === 'dismissed' || !selectedDate || !activeDatePicker) return
-		const val = formatApiDate(selectedDate)
+		const val = formatDateForApi(selectedDate)
 		activeDatePicker === 'from' ? setDraftFromDateFilter(val) : setDraftToDateFilter(val)
 		setDraftDateFilter('custom')
 	}

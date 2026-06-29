@@ -6,7 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { useGPSLocation } from "../../useGPSLocation/useGPSLocation";
+import { useGPSLocation } from '../../hooks/useGPSLocation'
 
 export const GPSLocationCard = () => {
   const {

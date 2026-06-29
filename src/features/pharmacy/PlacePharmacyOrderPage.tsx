@@ -16,7 +16,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-
+import { buildS3Url } from '../../utils/s3Utils'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
@@ -29,29 +29,26 @@ import {
 	StatusModal,
 	AppModal,
 } from '../../components/common'
-import { createPharmacyOrder } from '../profile/pharmacy/pharmacyService'
-import {
-	PatientAddress,
-	TreatmentRecord,
-	getPatientTreatmentHistory,
-	getPatientAddresses,
-	createPatientAddress,
-} from './pharmacyService'
+import ApiService from '../../services/apiService'
+import { API_ENDPOINTS } from '../../constants/apiUrls'
+
+import { PatientAddress, TreatmentRecord, createPatientAddress, createPharmacyOrder } from './pharmacyService'
+import { getPatientAddresses, getPatientTreatmentHistory } from '../profile/pharmacy/pharmacyService'
 
 type RouteProps = RouteProp<AppStackParamList, typeof ROUTES.STACK.PLACE_PHARMACY_ORDER>
 
-const S3_BASE_URL =
-	process.env.EXPO_PUBLIC_S3_BASE_URL ||
-	process.env.REACT_APP_S3_BASE_URL ||
-	'https://healthcare-s3-bucket.s3.amazonaws.com'
+// const S3_BASE_URL =
+// 	process.env.EXPO_PUBLIC_S3_BASE_URL ||
+// 	process.env.REACT_APP_S3_BASE_URL ||
+// 	'https://healthcare-s3-bucket.s3.amazonaws.com'
 
-const buildS3Url = (key?: string | null): string | null => {
-	if (!key) return null
-	if (key.startsWith('http://') || key.startsWith('https://')) {
-		return key
-	}
-	return `${S3_BASE_URL.replace(/\/$/, '')}/${key.replace(/^\//, '')}`
-}
+// const buildS3Url = (key?: string | null): string | null => {
+// 	if (!key) return null
+// 	if (key.startsWith('http://') || key.startsWith('https://')) {
+// 		return key
+// 	}
+// 	return `${S3_BASE_URL.replace(/\/$/, '')}/${key.replace(/^\//, '')}`
+// }
 
 export default function PlacePharmacyOrderPage() {
 	const navigation = useNavigation<any>()

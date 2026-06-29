@@ -205,6 +205,7 @@ export default function DashboardPage() {
 			<GPSLocationCard />
 		</>
 	)
+	const renderLaboratoryPanel = () => <></>
 	const renderRoleBasedPanel = () => {
 		switch (role) {
 			case USER_ROLES.DOCTOR:
@@ -216,13 +217,21 @@ export default function DashboardPage() {
 			case USER_ROLES.RADIOLOGY:
 				return renderRadiologyPanel()
 
+			case USER_ROLES.LABORATORY:
+				return renderLaboratoryPanel()
+
 			default:
 				return renderUserPanel()
 		}
 	}
 
 	const renderMainContent = () => {
-		if (role !== USER_ROLES.DOCTOR && role !== USER_ROLES.PHARMACY && role !== USER_ROLES.RADIOLOGY) {
+		if (
+			role !== USER_ROLES.DOCTOR &&
+			role !== USER_ROLES.PHARMACY &&
+			role !== USER_ROLES.RADIOLOGY &&
+			role !== USER_ROLES.LABORATORY
+		) {
 			return (
 				<>
 					<HeroSection role={role} />

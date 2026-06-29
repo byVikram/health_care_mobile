@@ -9,24 +9,20 @@ import {
 	Alert,
 	RefreshControl,
 	TextInput,
-	Image,
-	FlatList,
-	Modal,
-	StatusBar,
-	SafeAreaView,
-	useWindowDimensions,
+	
 	Linking,
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import ScanTypeSelectorModal from './component/Scantypeselectormodal'
 
+
+import { buildS3Url } from '../../utils/s3Utils'
 import { AppSkeleton, AppSelect, StatusModal } from '../../components/common'
 import {
 	fetchRadiologyBookingDetail,
-	updateRadiologyBookingStatus,
+	// updateRadiologyBookingStatus,
 	submitRadiologyBookingQuote,
 	verifyRadiologyPrescription,
 	confirmRadiologyPayment,
@@ -34,10 +30,9 @@ import {
 	type RadiologyBooking,
 } from './RadiologyService'
 import { useAuth } from '../../context/AuthContext'
+import ImageViewerModal from './component/ImageViewerModal'
+import DocumentCarousel from './component/DocumentCarousel'
 
-// ─────────────────────────────────────────────
-// Types & Helpers
-// ─────────────────────────────────────────────
 
 type RouteParams = {
 	publicId: string
@@ -93,325 +88,7 @@ const formatDisplayTime = (time: string) => {
 
 const formatDateTime = (date: string, time: string) => `${formatDisplayDate(date)} • ${formatDisplayTime(time)}`
 
-// ─── S3 URL builder ──────────────────────────────────────────────────────────
-const S3_BASE_URL = process.env.REACT_APP_S3_BASE_URL || ''
-// const buildS3Url = (key?: string | null): string | null => (key ? `${S3_BASE_URL}/${key}` : null)
-const buildS3Url = (key?: string | null): string | null => key
 
-// ─── Full‑screen image viewer ────────────────────────────────────────────────
-const ImageViewerModal = ({
-	visible,
-	images,
-	initialIndex,
-	onClose,
-}: {
-	visible: boolean
-	images: string[]
-	initialIndex: number
-	onClose: () => void
-}) => {
-	const { width: screenWidth, height: screenHeight } = useWindowDimensions()
-	const flatListRef = useRef<FlatList>(null)
-	const [activeIndex, setActiveIndex] = useState(initialIndex)
-
-	useEffect(() => {
-		if (visible) {
-			setActiveIndex(initialIndex)
-			setTimeout(() => {
-				flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false })
-			}, 50)
-		}
-	}, [visible, initialIndex])
-
-	const goTo = (index: number) => {
-		const clamped = Math.max(0, Math.min(index, images.length - 1))
-		flatListRef.current?.scrollToIndex({ index: clamped, animated: true })
-		setActiveIndex(clamped)
-	}
-
-	return (
-		<Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-			<StatusBar backgroundColor="rgba(0,0,0,0.95)" barStyle="light-content" />
-			<View style={viewerStyles.overlay}>
-				<SafeAreaView style={viewerStyles.header}>
-					<Text style={viewerStyles.headerTitle}>
-						Document {images.length > 1 ? `${activeIndex + 1} / ${images.length}` : ''}
-					</Text>
-					<TouchableOpacity
-						style={viewerStyles.closeBtn}
-						onPress={onClose}
-						hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-					>
-						<MaterialCommunityIcons name="close" size={24} color="#fff" />
-					</TouchableOpacity>
-				</SafeAreaView>
-
-				<FlatList
-					ref={flatListRef}
-					data={images}
-					horizontal
-					pagingEnabled
-					showsHorizontalScrollIndicator={false}
-					keyExtractor={(_, i) => String(i)}
-					onMomentumScrollEnd={(e) => {
-						const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth)
-						setActiveIndex(idx)
-					}}
-					getItemLayout={(_, index) => ({ length: screenWidth, offset: screenWidth * index, index })}
-					renderItem={({ item }) => (
-						<View
-							style={{
-								width: screenWidth,
-								height: screenHeight - 120,
-								justifyContent: 'center',
-								alignItems: 'center',
-							}}
-						>
-							<Image
-								source={{ uri: item }}
-								style={{ width: screenWidth, height: screenHeight - 120 }}
-								resizeMode="contain"
-							/>
-						</View>
-					)}
-				/>
-
-				{images.length > 1 && (
-					<>
-						<TouchableOpacity
-							style={[viewerStyles.arrow, viewerStyles.arrowLeft]}
-							onPress={() => goTo(activeIndex - 1)}
-							disabled={activeIndex === 0}
-						>
-							<MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={[viewerStyles.arrow, viewerStyles.arrowRight]}
-							onPress={() => goTo(activeIndex + 1)}
-							disabled={activeIndex === images.length - 1}
-						>
-							<MaterialCommunityIcons name="chevron-right" size={28} color="#fff" />
-						</TouchableOpacity>
-
-						<View style={viewerStyles.dotRow}>
-							{images.map((_, i) => (
-								<View key={i} style={[viewerStyles.dot, i === activeIndex && viewerStyles.dotActive]} />
-							))}
-						</View>
-					</>
-				)}
-			</View>
-		</Modal>
-	)
-}
-
-const viewerStyles = StyleSheet.create({
-	overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' },
-	header: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-	},
-	headerTitle: { color: '#fff', fontSize: 15, fontWeight: '600' },
-	closeBtn: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		backgroundColor: 'rgba(255,255,255,0.15)',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	arrow: {
-		position: 'absolute',
-		top: '50%',
-		marginTop: -24,
-		backgroundColor: 'rgba(255,255,255,0.15)',
-		borderRadius: 24,
-		width: 48,
-		height: 48,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	arrowLeft: { left: 12 },
-	arrowRight: { right: 12 },
-	dotRow: {
-		position: 'absolute',
-		bottom: 32,
-		left: 0,
-		right: 0,
-		flexDirection: 'row',
-		justifyContent: 'center',
-		gap: 6,
-	},
-	dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.4)' },
-	dotActive: { backgroundColor: '#fff', width: 18 },
-})
-
-// ─── Document carousel ────────────────────────────────────────────────────────
-const DocumentCarousel = ({
-	documents,
-	onImagePress,
-}: {
-	documents: string[]
-	onImagePress: (index: number) => void
-}) => {
-	const { width: screenWidth } = useWindowDimensions()
-	const flatListRef = useRef<FlatList>(null)
-	const [activeIndex, setActiveIndex] = useState(0)
-	const imageWidth = screenWidth - 64
-
-	useEffect(() => {
-		flatListRef.current?.scrollToIndex({ index: 0, animated: false })
-		setActiveIndex(0)
-	}, [screenWidth])
-
-	const goTo = (index: number) => {
-		const clamped = Math.max(0, Math.min(index, documents.length - 1))
-		flatListRef.current?.scrollToIndex({ index: clamped, animated: true })
-		setActiveIndex(clamped)
-	}
-
-	if (!documents.length) {
-		return (
-			<View style={carouselStyles.empty}>
-				<MaterialCommunityIcons name="file-image-outline" size={48} color="#CBD5E1" />
-				<Text style={carouselStyles.emptyText}>No documents uploaded</Text>
-			</View>
-		)
-	}
-
-	return (
-		<View style={carouselStyles.container}>
-			<FlatList
-				ref={flatListRef}
-				data={documents}
-				horizontal
-				pagingEnabled
-				showsHorizontalScrollIndicator={false}
-				onMomentumScrollEnd={(e) => {
-					const idx = Math.round(e.nativeEvent.contentOffset.x / imageWidth)
-					setActiveIndex(idx)
-				}}
-				keyExtractor={(_, i) => String(i)}
-				getItemLayout={(_, index) => ({ length: imageWidth, offset: imageWidth * index, index })}
-				renderItem={({ item, index }) => (
-					<TouchableOpacity
-						activeOpacity={0.9}
-						onPress={() => onImagePress(index)}
-						style={{ width: imageWidth }}
-					>
-						<Image source={{ uri: item }} style={{ width: imageWidth, height: 220 }} resizeMode="contain" />
-						<View style={carouselStyles.imageKeyInfo}>
-							<MaterialCommunityIcons name="fullscreen" size={16} color="#1f5f68" />
-							<Text style={carouselStyles.imageKeyText}>Tap to expand document</Text>
-						</View>
-					</TouchableOpacity>
-				)}
-			/>
-
-			{documents.length > 1 && (
-				<>
-					<TouchableOpacity
-						style={[carouselStyles.arrow, carouselStyles.arrowLeft]}
-						onPress={() => goTo(activeIndex - 1)}
-					>
-						<MaterialCommunityIcons name="chevron-left" size={22} color="#1A2C33" />
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={[carouselStyles.arrow, carouselStyles.arrowRight]}
-						onPress={() => goTo(activeIndex + 1)}
-					>
-						<MaterialCommunityIcons name="chevron-right" size={22} color="#1A2C33" />
-					</TouchableOpacity>
-					<View style={carouselStyles.dotRow}>
-						{documents.map((_, i) => (
-							<View key={i} style={[carouselStyles.dot, i === activeIndex && carouselStyles.dotActive]} />
-						))}
-					</View>
-					<View style={carouselStyles.counter}>
-						<Text style={carouselStyles.counterText}>
-							{activeIndex + 1} / {documents.length}
-						</Text>
-					</View>
-				</>
-			)}
-		</View>
-	)
-}
-
-const carouselStyles = StyleSheet.create({
-	container: {
-		position: 'relative',
-		backgroundColor: '#F8FCFC',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		overflow: 'hidden',
-		height: 260,
-	},
-	empty: {
-		height: 200,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#F8FAFC',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		gap: 8,
-	},
-	emptyText: { fontSize: 13, color: '#94A3B8' },
-	arrow: {
-		position: 'absolute',
-		top: '50%',
-		marginTop: -18,
-		backgroundColor: 'rgba(255,255,255,0.95)',
-		borderRadius: 20,
-		width: 36,
-		height: 36,
-		alignItems: 'center',
-		justifyContent: 'center',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
-		zIndex: 2,
-	},
-	arrowLeft: { left: 8 },
-	arrowRight: { right: 8 },
-	dotRow: {
-		position: 'absolute',
-		bottom: 8,
-		alignSelf: 'center',
-		flexDirection: 'row',
-		gap: 5,
-		left: 0,
-		right: 0,
-		justifyContent: 'center',
-	},
-	dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#CBD5E1' },
-	dotActive: { backgroundColor: '#2E7C86', width: 18, borderRadius: 3 },
-	counter: {
-		position: 'absolute',
-		bottom: 8,
-		right: 12,
-		backgroundColor: 'rgba(255,255,255,0.9)',
-		borderRadius: 10,
-		paddingHorizontal: 8,
-		paddingVertical: 2,
-	},
-	counterText: { fontSize: 11, fontWeight: '700', color: '#2E7C86' },
-	imageKeyInfo: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingVertical: 10,
-		gap: 6,
-	},
-	imageKeyText: { fontSize: 13, color: '#1f5f68', fontWeight: '500' },
-})
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
 const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -426,7 +103,7 @@ export default function RadiologyBookingDetailsPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute()
 	const insets = useSafeAreaInsets()
-	const { accessToken, role } = useAuth()
+	const {  role } = useAuth()
 
 	const params = route.params as RouteParams | undefined
 	const publicId = params?.publicId
@@ -490,7 +167,7 @@ export default function RadiologyBookingDetailsPage() {
 			const loadScans = async () => {
 				try {
 					setLoadingCenterScans(true)
-					const scans = await fetchRadiologyScans(booking.radiology_public_id, accessToken)
+					const scans = await fetchRadiologyScans(booking.radiology_public_id)
 					setCenterScans(scans)
 				} catch (err) {
 					console.error('[RadiologyBookingDetails] failed to load center scans:', err)
@@ -500,7 +177,7 @@ export default function RadiologyBookingDetailsPage() {
 			}
 			loadScans()
 		}
-	}, [role, booking?.status, booking?.radiology_public_id, accessToken])
+	}, [role, booking?.status, booking?.radiology_public_id])
 
 	const availableScanOptions = useMemo(() => {
 		const selectedIds = new Set(editedItems.map((item) => item.radiology_scan_id))
@@ -588,7 +265,7 @@ export default function RadiologyBookingDetailsPage() {
 			}
 			try {
 				isRefresh ? setRefreshing(true) : setLoading(true)
-				const data = await fetchRadiologyBookingDetail(accessToken, publicId)
+				const data = await fetchRadiologyBookingDetail(publicId)
 				setBooking(data)
 				if (data?.total_price != null) {
 					setFinalFee(data.total_price.toFixed(2))
@@ -604,7 +281,7 @@ export default function RadiologyBookingDetailsPage() {
 				isRefresh ? setRefreshing(false) : setLoading(false)
 			}
 		},
-		[accessToken, publicId]
+		[ publicId]
 	)
 
 	useEffect(() => {
@@ -648,7 +325,7 @@ export default function RadiologyBookingDetailsPage() {
 		if (!booking) return
 		setUpdating(true)
 		try {
-			await verifyRadiologyPrescription(accessToken, booking.public_id)
+			await verifyRadiologyPrescription(booking.public_id)
 			setStatusModal({
 				visible: true,
 				status: 'success',
@@ -704,7 +381,7 @@ export default function RadiologyBookingDetailsPage() {
 
 		setUpdating(true)
 		try {
-			await submitRadiologyBookingQuote(accessToken, booking.public_id, {
+			await submitRadiologyBookingQuote( booking.public_id, {
 				items,
 				prescription_verified: booking.prescription_verified,
 				notes: booking.notes || null,
@@ -743,7 +420,7 @@ export default function RadiologyBookingDetailsPage() {
 		if (!booking) return
 		setUpdating(true)
 		try {
-			await confirmRadiologyPayment(accessToken, booking.public_id)
+			await confirmRadiologyPayment( booking.public_id)
 			setStatusModal({
 				visible: true,
 				status: 'success',

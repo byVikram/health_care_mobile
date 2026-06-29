@@ -110,7 +110,7 @@ export default function RadiologySearchPage() {
 		setError(null)
 		try {
 			const data = await fetchRadiologyCatalog()
-			setAllScans(data)
+			setAllScans(Array.isArray(data) ? data : [])
 		} catch (err: any) {
 			setError(err?.message || 'Failed to load radiology scans')
 			Toast.show({
@@ -132,15 +132,16 @@ export default function RadiologySearchPage() {
 
 	// ── Apply Filters ───────────────────────────
 	const filteredScans = useMemo(() => {
-		let result = applyRadiologyFilters(allScans, {
+		const result = applyRadiologyFilters(allScans ?? [], {
 			...filters,
 			search: debouncedSearch,
 		})
-		return result
+
+		return Array.isArray(result) ? result : []
 	}, [allScans, filters, debouncedSearch])
 
 	// ── Pagination ──────────────────────────────
-	const total = filteredScans.length
+	const total = filteredScans?.length ?? 0
 	const totalPages = Math.max(1, Math.ceil(total / pageSize))
 	const startIndex = (page - 1) * pageSize
 	const visibleScans = filteredScans.slice(startIndex, startIndex + pageSize)

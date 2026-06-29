@@ -11,7 +11,8 @@ import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import { AppButton, AppCalendar, AppInput, AppSelect, AppTypography, StatusModal } from '../../components/common'
 import { createRadiologyBooking, fetchRadiologyScans, RadiologyBookingPayload } from './RadiologyService'
-import { getPatientTreatmentHistory, TreatmentRecord } from '../pharmacy/pharmacyService'
+import { getPatientTreatmentHistory} from '../profile/pharmacy/pharmacyService'
+import {TreatmentRecord } from '../pharmacy/pharmacyService'
 
 type RouteProps = RouteProp<AppStackParamList, typeof ROUTES.STACK.PLACE_RADIOLOGY_ORDER>
 
@@ -151,7 +152,7 @@ export default function RadiologyBookingPage() {
 			}
 			try {
 				setLoadingScans(true)
-				const data = await fetchRadiologyScans(radiologyId, accessToken)
+				const data = await fetchRadiologyScans(radiologyId)
 				setScans(data)
 			} catch (err: any) {
 				const detail = getErrorMessage(err, 'Failed to load available scans')
@@ -221,7 +222,7 @@ export default function RadiologyBookingPage() {
 				notes: notes.trim() || null,
 			}
 
-			await createRadiologyBooking(payload, accessToken)
+			await createRadiologyBooking(payload)
 
 			setStatusModal({
 				visible: true,
