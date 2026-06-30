@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
-import { AppButton, AppCalendar, AppInput, AppSelect, AppTypography, StatusModal } from '../../components/common'
+import { AppButton, AppCalendar, AppInput, AppSelect, AppTypography, ProviderDetailsCard, StatusModal } from '../../components/common'
 import { createRadiologyBooking, fetchRadiologyScans, RadiologyBookingPayload } from './RadiologyService'
 import { getPatientTreatmentHistory} from '../profile/pharmacy/pharmacyService'
 import {TreatmentRecord } from '../pharmacy/pharmacyService'
@@ -91,7 +91,7 @@ export default function RadiologyBookingPage() {
 	const insets = useSafeAreaInsets()
 	const { user, accessToken } = useAuth()
 
-	const { radiologyId, centerName, centerAddress } = route.params
+	const { radiologyId, centerName, centerAddress, centerCity, centerPhone } = route.params
 
 	// STEP 1: Consultation / treatment — carries the referral prescription
 	const [treatments, setTreatments] = useState<TreatmentRecord[]>([])
@@ -251,23 +251,15 @@ export default function RadiologyBookingPage() {
 				contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 100, 120) }]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Radiology Center Banner */}
-				<View style={styles.centerBanner}>
-					<MaterialCommunityIcons name="radiology-box" size={32} color="#1f5f68" />
-					<View style={styles.centerDetails}>
-						<AppTypography variant="caption" style={styles.centerLabel}>
-							Booking Radiology Scan At
-						</AppTypography>
-						<AppTypography variant="h3" style={styles.centerTitle}>
-							{centerName || 'Radiology Center'}
-						</AppTypography>
-						{centerAddress ? (
-							<AppTypography variant="caption" style={styles.centerAddress}>
-								{centerAddress}
-							</AppTypography>
-						) : null}
-					</View>
-				</View>
+				<ProviderDetailsCard
+					name={centerName || 'Selected Radiology Center'}
+					subtitle="Selected Radiology Center"
+					icon="radiology-box-outline"
+					address={centerAddress}
+					city={centerCity}
+					phone={centerPhone}
+					accentColor="#1f5f68"
+				/>
 
 				{/* STEP 1: Select Consultation */}
 				<View style={styles.sectionCard}>

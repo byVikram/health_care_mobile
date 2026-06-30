@@ -76,11 +76,34 @@ export type AppStackParamList = {
 	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
 	[ROUTES.STACK.ORDER_LIST]: undefined
 	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
-	[ROUTES.STACK.PLACE_PHARMACY_ORDER]: { pharmacyId: string; pharmacyName: string }
+	[ROUTES.STACK.PLACE_PHARMACY_ORDER]: {
+		pharmacyId: string
+		pharmacyName: string
+		// Optional provider details forwarded from the search list so the booking
+		// screen's ProviderDetailsCard can render without an extra fetch.
+		pharmacyAddress?: string
+		pharmacyCity?: string
+		pharmacyPhone?: string
+		pharmacyAvatarKey?: string | null
+		pharmacyOperatingHours?: { open: string; close: string }
+		pharmacyIs24x7?: boolean
+	}
 	[ROUTES.STACK.PLACE_RADIOLOGY_ORDER]: {
 		radiologyId: string
 		centerName?: string
 		centerAddress?: string
+		centerCity?: string
+		centerPhone?: string
+	}
+	[ROUTES.STACK.PLACE_LABORATORY_TEST]: {
+		labId: string
+		labName: string
+		labAddress?: string
+		labCity?: string
+		labPhone?: string
+		labAvatarKey?: string | null
+		labOperatingHours?: { open: string; close: string }
+		labIs24x7?: boolean
 	}
 	[ROUTES.STACK.LABORATORY_LIST]: undefined
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined

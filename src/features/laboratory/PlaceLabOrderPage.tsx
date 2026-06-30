@@ -2,7 +2,9 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
 	ActivityIndicator,
+	Image,
 	KeyboardAvoidingView,
+	Modal,
 	Platform,
 	ScrollView,
 	StyleSheet,
@@ -17,9 +19,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
-import { AppButton, AppBottomSheet, AppInput, AppTypography, StatusModal } from '../../components/common'
+import { buildS3Url } from '../../utils/s3Utils'
+import {
+	AppButton,
+	AppBottomSheet,
+	AppCalendar,
+	AppInput,
+	AppSelect,
+	AppTypography,
+	ProviderDetailsCard,
+	StatusModal,
+} from '../../components/common'
 import { PatientAddress, createPatientAddress } from '../pharmacy/pharmacyService'
-import { getPatientAddresses } from '../profile/pharmacy/pharmacyService'
+import { getPatientAddresses, getPatientTreatmentHistory } from '../profile/pharmacy/pharmacyService'
+import { TreatmentRecord } from '../pharmacy/pharmacyService'
 import { getLabTestTypes, placeLabOrder } from './laboratoryService'
 import type { LabTestType, PlaceLabOrderPayload } from './laboratory'
 
@@ -30,6 +43,12 @@ import type { LabTestType, PlaceLabOrderPayload } from './laboratory'
 type PlaceLabOrderParams = {
 	labId: string
 	labName: string
+	labAddress?: string
+	labCity?: string
+	labPhone?: string
+	labAvatarKey?: string | null
+	labOperatingHours?: { open: string; close: string }
+	labIs24x7?: boolean
 }
 
 // ─────────────────────────────────────────────
@@ -59,6 +78,27 @@ const formatTestPrice = (test: LabTestType): string => {
 	return `₹${test.base_price.toLocaleString('en-IN')}`
 }
 
+// Schedule helpers — mirrors RadiologyBookingPage so the Schedule & Notes step
+// behaves identically across both booking flows.
+const TIME_SLOTS = [
+	{ label: 'Morning', value: 'Morning' },
+	{ label: 'Afternoon', value: 'Afternoon' },
+	{ label: 'Evening', value: 'Evening' },
+]
+
+const isValidIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+
+const calendarToApiDate = (dateStr: string): string => {
+	if (!dateStr) return ''
+	const [day, month, year] = dateStr.split('-')
+	return `${year}-${month}-${day}`
+}
+
+const formatProviderHours = (hours?: { open?: string; close?: string }) => {
+	if (!hours?.open || !hours?.close) return undefined
+	return [{ label: 'Daily', value: `${hours.open} - ${hours.close}` }]
+}
+
 // ─────────────────────────────────────────────
 // Main Screen
 // ─────────────────────────────────────────────
@@ -68,19 +108,34 @@ export default function PlaceLabOrderPage() {
 	const route = useRoute()
 	const insets = useSafeAreaInsets()
 	const { user } = useAuth()
-	const { labId, labName } = route.params as PlaceLabOrderParams
+	const {
+		labId,
+		labName,
+		labAddress,
+		labCity,
+		labPhone,
+		labAvatarKey,
+		labOperatingHours,
+		labIs24x7,
+	} = route.params as PlaceLabOrderParams
 
-	// ── Test types ──────────────────────────────────────────────────────
+	// ── Step 1: Doctor Consultation (referral) ────────────────────────────
+	const [treatments, setTreatments] = useState<TreatmentRecord[]>([])
+	const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | null>(null)
+	const [loadingTreatments, setLoadingTreatments] = useState(true)
+	const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
+
+	// ── Step 2: Test types ──────────────────────────────────────────────
 	const [testTypes, setTestTypes] = useState<LabTestType[]>([])
 	const [selectedTestIds, setSelectedTestIds] = useState<string[]>([])
 	const [customTests, setCustomTests] = useState('')
 	const [loadingTests, setLoadingTests] = useState(true)
 	const [testsError, setTestsError] = useState<string | null>(null)
 
-	// ── Collection type ─────────────────────────────────────────────────
+	// ── Step 3: Collection type ─────────────────────────────────────────
 	const [collectionType, setCollectionType] = useState<'walk_in' | 'home_collection'>('walk_in')
 
-	// ── Addresses ───────────────────────────────────────────────────────
+	// ── Addresses (part of Step 3 when home collection is chosen) ─────────
 	const [addresses, setAddresses] = useState<PatientAddress[]>([])
 	const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
 	const [loadingAddresses, setLoadingAddresses] = useState(false)
@@ -94,7 +149,9 @@ export default function PlaceLabOrderPage() {
 	const [newPincode, setNewPincode] = useState('')
 	const [savingAddress, setSavingAddress] = useState(false)
 
-	// ── Notes & submit ───────────────────────────────────────────────────
+	// ── Step 4: Schedule & Notes ────────────────────────────────────────
+	const [calendarDate, setCalendarDate] = useState('')
+	const [bookingTime, setBookingTime] = useState('')
 	const [notes, setNotes] = useState('')
 	const [submitting, setSubmitting] = useState(false)
 
@@ -106,7 +163,32 @@ export default function PlaceLabOrderPage() {
 		description: string
 	} | null>(null)
 
-	// ── Fetch test types for this lab ────────────────────────────────────
+	// ── Fetch consultations / treatments (Step 1) ─────────────────────────
+	useEffect(() => {
+		const fetchTreatments = async () => {
+			if (!user?.id) {
+				setLoadingTreatments(false)
+				return
+			}
+			try {
+				setLoadingTreatments(true)
+				const data = await getPatientTreatmentHistory(user.id)
+				setTreatments(data)
+				if (data.length > 0) {
+					setSelectedTreatmentId(data[0].id)
+				}
+			} catch (err: any) {
+				const msg = err?.response?.data?.detail || err?.message || 'Failed to load consultations'
+				console.error('[PlaceLabOrderPage] fetchTreatments error:', msg)
+				Toast.show({ type: 'error', text1: 'Error', text2: msg })
+			} finally {
+				setLoadingTreatments(false)
+			}
+		}
+		fetchTreatments()
+	}, [user?.id])
+
+	// ── Fetch test types for this lab (Step 2) ────────────────────────────
 	useEffect(() => {
 		let cancelled = false
 		const load = async () => {
@@ -129,7 +211,7 @@ export default function PlaceLabOrderPage() {
 		return () => { cancelled = true }
 	}, [labId])
 
-	// ── Fetch patient addresses when home collection is selected ─────────
+	// ── Fetch patient addresses when home collection is selected (Step 3) ─
 	const loadAddresses = useCallback(async () => {
 		try {
 			setLoadingAddresses(true)
@@ -194,12 +276,29 @@ export default function PlaceLabOrderPage() {
 
 	// ── Place order ──────────────────────────────────────────────────────
 	const handlePlaceOrder = async () => {
+		if (!selectedTreatmentId) {
+			Toast.show({ type: 'error', text1: 'Required', text2: 'Please select a consultation with a diagnosis.' })
+			return
+		}
 		if (selectedTestIds.length === 0) {
 			Toast.show({ type: 'error', text1: 'Required', text2: 'Please select at least one test.' })
 			return
 		}
 		if (collectionType === 'home_collection' && !selectedAddressId) {
 			Toast.show({ type: 'error', text1: 'Required', text2: 'Please select a collection address.' })
+			return
+		}
+		if (!calendarDate) {
+			Toast.show({ type: 'error', text1: 'Required', text2: 'Please select a preferred booking date.' })
+			return
+		}
+		const apiDate = calendarToApiDate(calendarDate)
+		if (!isValidIsoDate(apiDate)) {
+			Toast.show({ type: 'error', text1: 'Required', text2: 'Please select a valid booking date.' })
+			return
+		}
+		if (!bookingTime) {
+			Toast.show({ type: 'error', text1: 'Required', text2: 'Please select a preferred time slot.' })
 			return
 		}
 
@@ -212,6 +311,9 @@ export default function PlaceLabOrderPage() {
 				collection_type: collectionType,
 				collection_address_public_id:
 					collectionType === 'home_collection' ? selectedAddressId : null,
+				treatment_id: selectedTreatmentId,
+				booking_date: apiDate,
+				booking_time: bookingTime,
 				notes: [notes.trim(), customTests.trim() ? `Custom tests requested: ${customTests.trim()}` : '']
 					.filter(Boolean)
 					.join('\n') || null,
@@ -236,12 +338,115 @@ export default function PlaceLabOrderPage() {
 	}
 
 	// ── Computed values ──────────────────────────────────────────────────
+	const selectedTreatment = treatments.find((t) => t.id === selectedTreatmentId)
+
+	const treatmentOptions = treatments.map((t) => {
+		const dateStr = new Date(t.created_at).toLocaleDateString('en-IN', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric',
+		})
+		const docStr = t.doctor_name ? ` - ${t.doctor_name}` : ''
+		const hospStr = t.hospital_name ? ` (${t.hospital_name})` : ''
+		return { label: `${dateStr}${docStr}${hospStr}`, value: t.id }
+	})
+
 	const grouped = groupByCategory(testTypes)
 	const selectedTests = testTypes.filter((t) => selectedTestIds.includes(t.id))
 	const estimatedTotal = selectedTests.reduce((sum, t) => sum + (t.base_price ?? 0), 0)
 	const hasQuoteRequired = selectedTests.some((t) => !t.base_price || t.base_price === 0)
 
-	// ── Render: test selector ────────────────────────────────────────────
+	// ── Render: Step 1 — consultation selector ─────────────────────────────
+	const renderConsultationSelector = () => {
+		if (loadingTreatments) {
+			return (
+				<View style={styles.spinnerContainer}>
+					<ActivityIndicator size="small" color="#2B6F71" />
+					<Text style={styles.loadingText}>Fetching consultations...</Text>
+				</View>
+			)
+		}
+
+		if (treatments.length === 0) {
+			return (
+				<View style={styles.emptyContainer}>
+					<MaterialCommunityIcons name="note-text-outline" size={36} color="#90a4ae" />
+					<Text style={styles.emptyMessage}>
+						No consultation history found. A valid referral diagnosis is required to book a test.
+					</Text>
+				</View>
+			)
+		}
+
+		return (
+			<View style={styles.dropdownContainer}>
+				<AppSelect
+					label="Select Consultation"
+					placeholder="Choose consultation"
+					options={treatmentOptions}
+					value={selectedTreatmentId || undefined}
+					onSelect={(val) => setSelectedTreatmentId(val)}
+					size="form"
+					noMargin
+				/>
+
+				{selectedTreatment && (
+					<View style={styles.detailCard}>
+						<View style={styles.detailRow}>
+							<Text style={styles.detailLabel}>Consultation Date:</Text>
+							<Text style={styles.detailValue}>
+								{new Date(selectedTreatment.created_at).toLocaleDateString('en-IN', {
+									weekday: 'long',
+									day: 'numeric',
+									month: 'long',
+									year: 'numeric',
+								})}
+							</Text>
+						</View>
+
+						{selectedTreatment.notes ? (
+							<View style={styles.detailRow}>
+								<Text style={styles.detailLabel}>Diagnosis / Notes:</Text>
+								<Text style={styles.detailNotes}>{selectedTreatment.notes}</Text>
+							</View>
+						) : null}
+
+						{selectedTreatment.doctor_name ? (
+							<View style={styles.detailRow}>
+								<Text style={styles.detailLabel}>Referring Doctor:</Text>
+								<Text style={styles.detailValue}>{selectedTreatment.doctor_name}</Text>
+							</View>
+						) : null}
+
+						{selectedTreatment.prescription_s3_key ? (
+							<View style={styles.detailRow}>
+								<Text style={styles.detailLabel}>Diagnosis Document (Tap to view full screen):</Text>
+								<TouchableOpacity
+									style={styles.imageCard}
+									onPress={() => setIsImageViewerOpen(true)}
+									activeOpacity={0.9}
+								>
+									<Image
+										source={{ uri: buildS3Url(selectedTreatment.prescription_s3_key) || undefined }}
+										style={styles.prescriptionImage}
+										resizeMode="contain"
+									/>
+									<View style={styles.imageKeyInfo}>
+										<MaterialCommunityIcons name="fullscreen" size={16} color="#2B6F71" />
+										<Text style={styles.imageKeyText} numberOfLines={1}>
+											Tap to expand Diagnosis document
+										</Text>
+									</View>
+								</TouchableOpacity>
+							</View>
+						) : null}
+					</View>
+				)}
+			</View>
+		)
+	}
+
+	// ── Render: Step 2 — test selector ────────────────────────────────────
 	const renderTestSelector = () => {
 		if (loadingTests) {
 			return (
@@ -369,7 +574,7 @@ export default function PlaceLabOrderPage() {
 		)
 	}
 
-	// ── Render: address section ──────────────────────────────────────────
+	// ── Render: address section (part of Step 3) ───────────────────────────
 	const renderAddressSection = () => {
 		if (loadingAddresses) {
 			return (
@@ -445,17 +650,27 @@ export default function PlaceLabOrderPage() {
 				showsVerticalScrollIndicator={false}
 				keyboardShouldPersistTaps="handled"
 			>
-				{/* Lab banner */}
-				<View style={styles.labBanner}>
-					<MaterialCommunityIcons name="flask-plus" size={32} color="#2B6F71" />
-					<View style={{ flex: 1 }}>
-						<AppTypography variant="caption" style={styles.bannerLabel}>
-							Booking Lab Tests At
-						</AppTypography>
-						<AppTypography variant="h3" style={styles.bannerTitle}>
-							{labName}
+				<ProviderDetailsCard
+					name={labName}
+					subtitle="Booking Lab Tests At"
+					icon="flask-plus"
+					imageUri={buildS3Url(labAvatarKey) || undefined}
+					address={labAddress}
+					city={labCity}
+					phone={labPhone}
+					hours={labIs24x7 ? undefined : formatProviderHours(labOperatingHours)}
+					is24x7={labIs24x7}
+					accentColor="#2B6F71"
+				/>
+
+				{/* Select Doctor Consultation */}
+				<View style={styles.sectionCard}>
+					<View style={styles.sectionHeader}>
+						<AppTypography variant="h4" style={styles.sectionTitle}>
+							Select Doctor Consultation
 						</AppTypography>
 					</View>
+					{renderConsultationSelector()}
 				</View>
 
 				{/* Step 1: Select Tests */}
@@ -465,20 +680,20 @@ export default function PlaceLabOrderPage() {
 							<Text style={styles.stepText}>1</Text>
 						</View>
 						<AppTypography variant="h4" style={styles.sectionTitle}>
-							Select Tests
+							Select Test
 						</AppTypography>
 					</View>
 					{renderTestSelector()}
 				</View>
 
-				{/* Step 2: Collection Preference */}
+				{/* Step 2: Collection Preferences */}
 				<View style={styles.sectionCard}>
 					<View style={styles.sectionHeader}>
 						<View style={styles.stepBadge}>
 							<Text style={styles.stepText}>2</Text>
 						</View>
 						<AppTypography variant="h4" style={styles.sectionTitle}>
-							Collection Preference
+							Collection Preferences
 						</AppTypography>
 					</View>
 
@@ -556,26 +771,50 @@ export default function PlaceLabOrderPage() {
 					)}
 				</View>
 
-				{/* Step 3: Notes */}
+				{/* Step 3: Schedule Notes */}
 				<View style={styles.sectionCard}>
 					<View style={styles.sectionHeader}>
 						<View style={styles.stepBadge}>
 							<Text style={styles.stepText}>3</Text>
 						</View>
 						<AppTypography variant="h4" style={styles.sectionTitle}>
-							Additional Remarks
+							Schedule Notes
 						</AppTypography>
 					</View>
-					<AppInput
-						placeholder="e.g. Fasting required, preferred timing, prior conditions to note…"
-						value={notes}
-						onChangeText={setNotes}
-						multiline
-						numberOfLines={4}
-						fieldSize="form"
-						noMargin
-						style={styles.remarksInput}
-					/>
+
+					<View style={styles.bookingFields}>
+						<AppCalendar
+							label="Preferred Date"
+							value={calendarDate}
+							onChange={setCalendarDate}
+							placeholder="Select Date"
+							required
+							isMobile
+							modalTitle="Select Appointment Date"
+							minimumDate={new Date()}
+						/>
+
+						<AppSelect
+							label="Preferred Time"
+							placeholder="Choose a time slot"
+							options={TIME_SLOTS}
+							value={bookingTime || undefined}
+							onSelect={(val) => setBookingTime(val)}
+							size="form"
+						/>
+
+						<AppInput
+							label="Additional Notes / Instructions"
+							placeholder="e.g. Fasting required, preferred timing, prior conditions to note…"
+							value={notes}
+							onChangeText={setNotes}
+							multiline
+							numberOfLines={4}
+							fieldSize="form"
+							noMargin
+							style={styles.remarksInput}
+						/>
+					</View>
 				</View>
 			</ScrollView>
 
@@ -585,7 +824,7 @@ export default function PlaceLabOrderPage() {
 					variant="primary"
 					onPress={handlePlaceOrder}
 					loading={submitting}
-					disabled={submitting || loadingTests}
+					disabled={submitting || loadingTests || loadingTreatments}
 					style={styles.submitBtn}
 				>
 					Confirm & Book Tests
@@ -661,6 +900,37 @@ export default function PlaceLabOrderPage() {
 					</ScrollView>
 				</KeyboardAvoidingView>
 			</AppBottomSheet>
+
+			{/* Diagnosis Document Image Viewer Lightbox */}
+			<Modal
+				visible={isImageViewerOpen}
+				transparent
+				animationType="fade"
+				onRequestClose={() => setIsImageViewerOpen(false)}
+			>
+				<View style={styles.viewerOverlay}>
+					<TouchableOpacity
+						style={styles.viewerBackdrop}
+						onPress={() => setIsImageViewerOpen(false)}
+						activeOpacity={1}
+					/>
+					<TouchableOpacity
+						style={[styles.viewerCloseBtn, { top: Math.max(insets.top, 24) }]}
+						onPress={() => setIsImageViewerOpen(false)}
+						activeOpacity={0.8}
+					>
+						<MaterialCommunityIcons name="close" size={24} color="#fff" />
+					</TouchableOpacity>
+
+					{selectedTreatment?.prescription_s3_key && (
+						<Image
+							source={{ uri: buildS3Url(selectedTreatment.prescription_s3_key) || undefined }}
+							style={styles.fullScreenImage}
+							resizeMode="contain"
+						/>
+					)}
+				</View>
+			</Modal>
 
 			{/* Status Modal */}
 			{statusModal && (
@@ -747,7 +1017,41 @@ const styles = StyleSheet.create({
 	},
 	retryBtnText: { fontSize: 13, color: '#2B6F71', fontWeight: '600' },
 
-	// Test list
+	// Consultation selector (Step 1)
+	dropdownContainer: { marginTop: 4 },
+	detailCard: {
+		marginTop: 14,
+		backgroundColor: '#F8F9FA',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#EAECEF',
+		padding: 14,
+	},
+	detailRow: { paddingBottom: 10, marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#EAECEF' },
+	detailLabel: { fontSize: 12, color: '#667085', fontWeight: '500', marginBottom: 3 },
+	detailValue: { fontSize: 14, color: '#101828', fontWeight: '600' },
+	detailNotes: { fontSize: 14, color: '#475467', lineHeight: 20 },
+	imageCard: {
+		backgroundColor: '#fff',
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: '#EAECF0',
+		padding: 8,
+		marginTop: 4,
+	},
+	prescriptionImage: { width: '100%', height: 200, backgroundColor: '#f2f4f7', borderRadius: 8, marginTop: 4 },
+	imageKeyInfo: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 6,
+		gap: 4,
+		backgroundColor: '#F8F9FA',
+		padding: 6,
+		borderRadius: 6,
+	},
+	imageKeyText: { fontSize: 11, color: '#475467', flex: 1 },
+
+	// Test list (Step 2)
 	categoryBlock: { marginBottom: 14 },
 	categoryLabel: {
 		fontSize: 11,
@@ -811,7 +1115,7 @@ const styles = StyleSheet.create({
 	customTestHint: { fontSize: 11, color: '#94A3B8', marginBottom: 8 },
 	customTestInput: { fontSize: 13, textAlignVertical: 'top', minHeight: 80 },
 
-	// Collection toggle
+	// Collection toggle (Step 3)
 	collectionSelectorRow: {
 		flexDirection: 'row',
 		backgroundColor: '#F2F4F7',
@@ -901,7 +1205,8 @@ const styles = StyleSheet.create({
 	},
 	addAddressPrimaryBtnTxt: { fontSize: 12, color: '#2B6F71', fontWeight: '600' },
 
-	// Notes
+	// Schedule & Notes (Step 4)
+	bookingFields: { gap: 12 },
 	remarksInput: { fontSize: 13, textAlignVertical: 'top', minHeight: 100 },
 
 	// Bottom action
@@ -927,4 +1232,20 @@ const styles = StyleSheet.create({
 	sheetBody: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 },
 	rowFields: { flexDirection: 'row', justifyContent: 'space-between' },
 	saveAddressBtn: { width: '100%', marginTop: 16 },
+
+	// Diagnosis document viewer (Step 1)
+	viewerOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.95)', justifyContent: 'center', alignItems: 'center' },
+	viewerBackdrop: { ...StyleSheet.absoluteFillObject },
+	viewerCloseBtn: {
+		position: 'absolute',
+		right: 24,
+		backgroundColor: 'rgba(255, 255, 255, 0.25)',
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		alignItems: 'center',
+		justifyContent: 'center',
+		zIndex: 10,
+	},
+	fullScreenImage: { width: '90%', height: '80%' },
 })

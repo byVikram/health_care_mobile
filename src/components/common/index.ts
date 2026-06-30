@@ -22,4 +22,5 @@ export type { PickProps as DateSlotPickerProps } from './DateSlotPicker';
 export { default as AppScreenHeader } from "./AppScreenHeader";
 export { default as StatusModal } from "./StatusModal";
 export { default as AppStickyFooter, StickyFooter } from "./AppStickyFooter";
-
+export { default as ProviderDetailsCard } from "./ProviderDetailsCard";
+export type { ProviderDetailsCardProps, ProviderHoursRow } from "./ProviderDetailsCard";

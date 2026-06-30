@@ -327,9 +327,11 @@ export async function placeLabOrder(
 	const apiPayload = {
 		laboratory_id: payload.laboratory_public_id,
 		test_ids: testIds,
-		booking_date: formatDateForApi(new Date()),
-		booking_time: '10:00 AM',
-		treatment_id: null,
+		// booking_date/booking_time/treatment_id now come from the Schedule & Consultation
+		// steps (mirrors RadiologyBookingPayload), falling back to "today" only as a safety net.
+		booking_date: payload.booking_date || formatDateForApi(new Date()),
+		booking_time: payload.booking_time || '10:00 AM',
+		treatment_id: payload.treatment_id ?? null,
 		external_prescription_s3_key: null,
 		notes: payload.notes ?? '',
 	}

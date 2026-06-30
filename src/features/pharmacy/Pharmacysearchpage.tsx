@@ -236,6 +236,11 @@ export default function PharmacySearchPage() {
 									;(navigation as any).navigate(ROUTES.STACK.PLACE_PHARMACY_ORDER, {
 										pharmacyId: item.id,
 										pharmacyName: item.name,
+										pharmacyAddress: item.address,
+										pharmacyCity: item.city,
+										pharmacyAvatarKey: item.avatar_s3_key,
+										pharmacyOperatingHours: item.operating_hours,
+										pharmacyIs24x7: item.is_24_x_7,
 									})
 								}}
 							/>

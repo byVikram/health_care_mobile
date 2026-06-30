@@ -176,6 +176,8 @@ export default function RadiologySearchPage() {
 			radiologyId: item.id,
 			centerName: item.name,
 			centerAddress: item.address || item.city || '',
+			centerCity: item.city,
+			centerPhone: item.phone,
 		})
 	}
 	// ── Filter Modal ────────────────────────────

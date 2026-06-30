@@ -422,12 +422,22 @@ export default function LaboratorySearchPage() {
 										navigation.navigate(ROUTES.STACK.PLACE_LABORATORY_TEST, {
 											labId: item.id,
 											labName: item.name,
+											labAddress: item.address,
+											labCity: item.city,
+											labAvatarKey: item.avatar_s3_key,
+											labOperatingHours: item.operating_hours,
+											labIs24x7: item.is_24_x_7,
 										})
 									}
 									onBookTest={() =>
 										navigation.navigate(ROUTES.STACK.PLACE_LABORATORY_TEST, {
 											labId: item.id,
 											labName: item.name,
+											labAddress: item.address,
+											labCity: item.city,
+											labAvatarKey: item.avatar_s3_key,
+											labOperatingHours: item.operating_hours,
+											labIs24x7: item.is_24_x_7,
 										})
 									}
 								/>

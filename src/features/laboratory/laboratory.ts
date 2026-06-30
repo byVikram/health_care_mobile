@@ -145,6 +145,10 @@ export interface PlaceLabOrderPayload {
 	custom_tests: string
 	collection_type: CollectionType
 	collection_address_public_id: string | null
+	// Carries the referral consultation, mirrors RadiologyBookingPayload.treatment_id
+	treatment_id: string | null
+	booking_date: string
+	booking_time: string
 	notes: string | null
 }
 
