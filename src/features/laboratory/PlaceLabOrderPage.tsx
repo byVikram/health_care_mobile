@@ -194,7 +194,7 @@ export default function PlaceLabOrderPage() {
 
 	// ── Place order ──────────────────────────────────────────────────────
 	const handlePlaceOrder = async () => {
-		if (selectedTestIds.length === 0 && !customTests.trim()) {
+		if (selectedTestIds.length === 0) {
 			Toast.show({ type: 'error', text1: 'Required', text2: 'Please select at least one test.' })
 			return
 		}
@@ -212,7 +212,9 @@ export default function PlaceLabOrderPage() {
 				collection_type: collectionType,
 				collection_address_public_id:
 					collectionType === 'home_collection' ? selectedAddressId : null,
-				notes: notes.trim() || null,
+				notes: [notes.trim(), customTests.trim() ? `Custom tests requested: ${customTests.trim()}` : '']
+					.filter(Boolean)
+					.join('\n') || null,
 			}
 			await placeLabOrder(payload)
 			setStatusModal({

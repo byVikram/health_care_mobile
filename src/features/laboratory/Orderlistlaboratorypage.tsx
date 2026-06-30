@@ -339,14 +339,15 @@ export default function OrderListLaboratoryPage() {
 		if (route.params?.status) setStatusFilter(route.params.status)
 	}, [route.params?.status])
 
+	// Debounce search input; reset page in the same timeout so page 1 is
+	// always active by the time the new debouncedSearch reaches filteredRows.
 	useEffect(() => {
-		const t = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+		const t = setTimeout(() => {
+			setDebouncedSearch(searchQuery)
+			setPage(1)
+		}, 300)
 		return () => clearTimeout(t)
 	}, [searchQuery])
-
-	useEffect(() => {
-		setPage(1)
-	}, [debouncedSearch, statusFilter, dateFilter, fromDateFilter, toDateFilter, pageSize])
 
 	// ── Fetch ──────────────────────────────────────────────────────────
 
@@ -472,6 +473,9 @@ export default function OrderListLaboratoryPage() {
 				return
 			}
 		}
+		// Reset page synchronously so the new filter set always starts at page 1
+		// in the same render, avoiding a one-frame flash of the old page number.
+		setPage(1)
 		setStatusFilter(draftStatusFilter)
 		setDateFilter(draftDateFilter)
 		setFromDateFilter(draftDateFilter === 'custom' ? draftFromDateFilter : '')
@@ -485,6 +489,8 @@ export default function OrderListLaboratoryPage() {
 		setDraftFromDateFilter('')
 		setDraftToDateFilter('')
 		setActiveDatePicker(null)
+		// Reset page synchronously alongside filter state
+		setPage(1)
 		setStatusFilter('all')
 		setDateFilter('all')
 		setFromDateFilter('')
@@ -709,7 +715,7 @@ export default function OrderListLaboratoryPage() {
 		<AppSelect
 			options={STATUS_OPTIONS}
 			value={statusFilter}
-			onSelect={(value) => setStatusFilter(value)}
+			onSelect={(value) => { setPage(1); setStatusFilter(value) }}
 			placeholder="Status"
 			size="small"
 			style={styles.inlineSelectFill}
@@ -725,7 +731,7 @@ export default function OrderListLaboratoryPage() {
 		<AppSelect
 			options={DATE_OPTIONS}
 			value={dateFilter}
-			onSelect={(value) => setDateFilter(value)}
+			onSelect={(value) => { setPage(1); setDateFilter(value) }}
 			placeholder="Date"
 			size="small"
 			style={styles.inlineSelectFill}

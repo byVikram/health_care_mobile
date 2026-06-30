@@ -31,6 +31,7 @@ export interface LaboratoryItem {
 
 export interface LabTestType {
 	id: string
+	test_type_id?: string
 	name: string
 	category: string
 	turnaround: string
