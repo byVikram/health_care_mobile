@@ -427,6 +427,25 @@ export async function submitLabBookingQuote(
 }
 
 // ─────────────────────────────────────────────
+// 7b. Update booking status (lab staff)
+//     PATCH /api/laboratory/bookings/{id}/status
+// ─────────────────────────────────────────────
+
+export async function updateLabBookingStatus(
+	publicId: string,
+	status: string,
+	notes?: string,
+	options?: { signal?: AbortSignal }
+): Promise<void> {
+	if (!publicId) throw new Error('Booking public ID is required')
+	await ApiService.patch(
+		`${API_ENDPOINTS.LABORATORY.BOOKING_DETAIL(publicId)}/status`,
+		{ status, notes: notes ?? null },
+		{ signal: options?.signal }
+	)
+}
+
+// ─────────────────────────────────────────────
 // 8. Confirm payment (patient)
 //    POST /api/laboratory/bookings/{id}/pay
 // ─────────────────────────────────────────────
