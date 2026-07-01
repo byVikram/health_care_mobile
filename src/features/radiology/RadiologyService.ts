@@ -1,7 +1,14 @@
 // src/features/radiology/RadiologyService.ts
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
-import { RadiologyItem, RadiologySearchItem, RadiologyFilters, ScanType, PricingModel } from './radiology'
+import {
+	RadiologyItem,
+	RadiologySearchItem,
+	RadiologyFilters,
+	ScanType,
+	PricingModel,
+	RadiologyScanOffering,
+} from './radiology'
 
 export interface RadiologyBookingPayload {
 	radiology_id: string
@@ -122,53 +129,171 @@ export interface RadiologyReportCreatePayload {
 
 // Cache management
 let scanTypesCache: ScanType[] | null = null
-let radiologyCache: Map<string, RadiologyItem[]> = new Map()
-let cacheTimestamp: number = 0
+let radiologyCache: Map<string, { data: RadiologyItem[]; timestamp: number }> = new Map()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+const RAW_SEARCH_PAGE_SIZE = 100
 
-export async function fetchRadiologyCatalog(
-	
-	options?: { signal?: AbortSignal }
-): Promise<RadiologyItem[]> {
-	const cacheKey = 'all'
-	const cachedData = radiologyCache.get(cacheKey)
-	if (cachedData && Date.now() - cacheTimestamp < CACHE_DURATION) {
-		return cachedData
-	}
+interface RadiologySearchMeta {
+	total?: number
+	page?: number
+	limit?: number
+	pages?: number
+}
 
-	const scanTypes = await fetchScanTypes(options)
+export interface RadiologyCatalogParams {
+	search?: string
+	city?: string
+	scan_type_id?: number
+	pricing_model?: PricingModel | 'all'
+	available_only?: boolean
+	page?: number
+	limit?: number
+}
 
-	const response = await ApiService.get<{ success: boolean; message?: string; data: RadiologySearchItem[] }>(
-		API_ENDPOINTS.RADIOLOGY_PROFILE.SEARCH,
-		{ signal: options?.signal }
-	)
-	const json = response.data
+export interface RadiologyCatalogResult {
+	data: RadiologyItem[]
+	total: number
+	page: number
+	limit: number
+}
 
-	const items: RadiologyItem[] = json.data.map((item: RadiologySearchItem) => {
-		const scanType = scanTypes.find((st) => st.id === item.scan_id)
-		return {
-			id: item.id,
-			name: item.name,
-			address: item.address,
-			city: item.city,
-			state: item.state,
+function getCenterSummaryScan(scans: RadiologyScanOffering[]): RadiologyScanOffering {
+	const pricedScans = scans.filter((scan) => scan.base_price !== null)
+	const cheapestScan = pricedScans.sort((a, b) => (a.base_price ?? 0) - (b.base_price ?? 0))[0]
+	return cheapestScan ?? scans[0]
+}
+
+function mapRawSearchItemsToCenters(rawItems: RadiologySearchItem[]): RadiologyItem[] {
+	const centerMap = new Map<string, RadiologyItem>()
+
+	for (const item of rawItems) {
+		const scan: RadiologyScanOffering = {
 			scan_id: item.scan_id,
 			scan_name: item.scan_name,
 			pricing_model: item.pricing_model,
 			base_price: item.base_price,
 			price_details: item.price_details,
 			is_available: true,
+		}
+		const existing = centerMap.get(item.id)
+
+		if (existing) {
+			if (!existing.scans?.some((existingScan) => existingScan.scan_id === scan.scan_id)) {
+				existing.scans = [...(existing.scans ?? []), scan]
+				const summaryScan = getCenterSummaryScan(existing.scans)
+				existing.scan_id = summaryScan.scan_id
+				existing.scan_name = summaryScan.scan_name
+				existing.pricing_model = summaryScan.pricing_model
+				existing.base_price = summaryScan.base_price
+				existing.price_details = summaryScan.price_details
+				existing.is_available = existing.scans.some((scanItem) => scanItem.is_available)
+			}
+			continue
+		}
+
+		centerMap.set(item.id, {
+			id: item.id,
+			name: item.name,
+			address: item.address,
+			city: item.city,
+			state: item.state,
+			scan_id: scan.scan_id,
+			scan_name: scan.scan_name,
+			pricing_model: scan.pricing_model,
+			base_price: scan.base_price,
+			price_details: scan.price_details,
+			is_available: true,
+			scans: [scan],
 			rating: Math.floor(Math.random() * 2) + 3.5,
 			reviews: Math.floor(Math.random() * 100) + 10,
 			phone: '+91 9876543210',
 			email: 'info@radiology.com',
+		})
+	}
+
+	return Array.from(centerMap.values())
+}
+
+export async function fetchRadiologyCatalog(
+	params: RadiologyCatalogParams = {},
+	options?: { signal?: AbortSignal }
+): Promise<RadiologyCatalogResult> {
+	const requestedPage = params.page || 1
+	const requestedLimit = params.limit || 10
+	const cacheKey = JSON.stringify({
+		search: params.search || '',
+		city: params.city || '',
+		scan_type_id: params.scan_type_id || '',
+		pricing_model: params.pricing_model || 'all',
+		available_only: Boolean(params.available_only),
+	})
+	const cachedData = radiologyCache.get(cacheKey)
+	if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
+		const start = (requestedPage - 1) * requestedLimit
+		return {
+			data: cachedData.data.slice(start, start + requestedLimit),
+			total: cachedData.data.length,
+			page: requestedPage,
+			limit: requestedLimit,
 		}
+	}
+
+	const baseParams = {
+		search: params.search || undefined,
+		city: params.city || undefined,
+		scan_type_id: params.scan_type_id || undefined,
+		pricing_model:
+			params.pricing_model && params.pricing_model !== 'all' ? params.pricing_model : undefined,
+		available_only: params.available_only || undefined,
+	}
+
+	const fetchRawPage = (page: number) =>
+		ApiService.get<{
+			success: boolean
+			message?: string
+			data: RadiologySearchItem[]
+			meta?: RadiologySearchMeta
+		}>(API_ENDPOINTS.RADIOLOGY_PROFILE.SEARCH, {
+			params: {
+				...baseParams,
+				page,
+				limit: RAW_SEARCH_PAGE_SIZE,
+			},
+			signal: options?.signal,
+		})
+
+	const firstResponse = await fetchRawPage(1)
+	const firstData = firstResponse.data?.data ?? []
+	const firstMeta = firstResponse.data?.meta
+	const totalRawRows = firstMeta?.total ?? firstData.length
+	const rawLimit = firstMeta?.limit || RAW_SEARCH_PAGE_SIZE
+	const totalRawPages = firstMeta?.pages || Math.ceil(totalRawRows / rawLimit) || 1
+	const remainingResponses =
+		totalRawPages > 1
+			? await Promise.all(Array.from({ length: totalRawPages - 1 }, (_, index) => fetchRawPage(index + 2)))
+			: []
+
+	const rawItems = [
+		...firstData,
+		...remainingResponses.flatMap((response) => response.data?.data ?? []),
+	]
+	const centers = mapRawSearchItemsToCenters(rawItems)
+	const start = (requestedPage - 1) * requestedLimit
+	const pagedCenters = centers.slice(start, start + requestedLimit)
+
+	const result: RadiologyCatalogResult = {
+		data: pagedCenters,
+		total: centers.length,
+		page: requestedPage,
+		limit: requestedLimit,
+	}
+
+	radiologyCache.set(cacheKey, {
+		data: centers,
+		timestamp: Date.now(),
 	})
 
-	radiologyCache.set(cacheKey, items)
-	cacheTimestamp = Date.now()
-
-	return items
+	return result
 }
 
 export async function fetchScanTypes( options?: { signal?: AbortSignal }): Promise<ScanType[]> {
@@ -307,19 +432,36 @@ export function applyRadiologyFilters(items: RadiologyItem[], filters: Radiology
 	const query = filters.search.trim().toLowerCase()
 
 	let result = items.filter((item) => {
+		const scans = item.scans ?? []
+		const matchingScans =
+			scans.length === 0
+				? [item]
+				: scans.filter((scan) => {
+						const matchesSearch =
+							query.length === 0 ||
+							scan.scan_name.toLowerCase().includes(query) ||
+							item.name.toLowerCase().includes(query) ||
+							item.address.toLowerCase().includes(query) ||
+							item.city.toLowerCase().includes(query)
+						const matchesPricing =
+							filters.pricingModel === 'all' || scan.pricing_model === filters.pricingModel
+						const matchesAvailability = !filters.availableOnly || scan.is_available
+						const matchesScanType = !filters.scanType || scan.scan_id === filters.scanType
+
+						return matchesSearch && matchesPricing && matchesAvailability && matchesScanType
+					})
 		const matchesSearch =
 			query.length === 0 ||
 			item.name.toLowerCase().includes(query) ||
 			item.scan_name.toLowerCase().includes(query) ||
+			scans.some((scan) => scan.scan_name.toLowerCase().includes(query)) ||
 			item.address.toLowerCase().includes(query) ||
 			item.city.toLowerCase().includes(query)
 
 		const matchesCity = !filters.city || item.city === filters.city
-		const matchesPricing = filters.pricingModel === 'all' || item.pricing_model === filters.pricingModel
-		const matchesAvailability = !filters.availableOnly || item.is_available
-		const matchesScanType = !filters.scanType || item.scan_id === filters.scanType
+		const matchesScanFilters = matchingScans.length > 0
 
-		return matchesSearch && matchesCity && matchesPricing && matchesAvailability && matchesScanType
+		return matchesSearch && matchesCity && matchesScanFilters
 	})
 
 	result = [...result].sort((a, b) => {
@@ -399,7 +541,6 @@ export async function createRadiologyBooking(
 export function clearRadiologyCache() {
 	scanTypesCache = null
 	radiologyCache.clear()
-	cacheTimestamp = 0
 }
 export { ScanType }
 

@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import {
 	ActivityIndicator,
 	FlatList,
+	RefreshControl,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -21,7 +22,7 @@ import { ROUTES } from '../../navigation/routes'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import { AppBottomSheet } from '../../components/common'
 
-const LIMIT = 12
+const LIMIT = 10
 
 export default function PharmacySearchPage() {
 	const navigation = useNavigation()
@@ -38,7 +39,6 @@ export default function PharmacySearchPage() {
 	const itemWidth = (width - HORIZONTAL_PADDING * 2 - GAP * (numColumns - 1)) / numColumns
 
 	const [searchQuery, setSearchQuery] = useState('')
-	const [page, setPage] = useState(1)
 	const [filters, setFilters] = useState<PharmacyFilterState>({
 		city: '',
 		homeDelivery: false,
@@ -46,43 +46,81 @@ export default function PharmacySearchPage() {
 		emergencyMeds: false,
 	})
 	const [allPharmacies, setAllPharmacies] = useState<PharmacyItem[]>([])
+	const [page, setPage] = useState(1)
+	const [hasMore, setHasMore] = useState(true)
 	const [loading, setLoading] = useState(true)
+	const [loadingMore, setLoadingMore] = useState(false)
+	const [refreshing, setRefreshing] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [showFilters, setShowFilters] = useState(false)
 	const insets = useSafeAreaInsets()
-	// ── Fetch — same pattern as OrderDetailsScreen ────────────────────────────
 
-	const fetchPharmacyList = useCallback(async () => {
-		setLoading(true)
-		setError(null)
-		try {
-			const result = await getPharmacies({}, { signal: new AbortController().signal })
+	// ── Fetch a single page from the server and either replace or append ──────
+	const fetchPharmacyPage = useCallback(
+		async (pageToFetch: number, mode: 'initial' | 'refresh' | 'loadMore') => {
+			const controller = new AbortController()
+			try {
+				if (mode === 'loadMore') setLoadingMore(true)
+				else {
+					setLoading(mode === 'initial')
+					setError(null)
+				}
 
-			const raw = result as any
-			const list: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []
+				const result = await getPharmacies(
+					{ page: pageToFetch, limit: LIMIT },
+					{ signal: controller.signal }
+				)
 
-			const mapped: PharmacyItem[] = list.map((item: any) => ({
-				...item,
-				owner_name: item.owner_name ?? '',
-				image: item.avatar_s3_key ?? item.image,
-			}))
-			setAllPharmacies(mapped)
-		} catch (err: any) {
-			setError(err?.message || 'Failed to load pharmacies')
-		} finally {
-			setLoading(false)
-		}
+				const raw = result as any
+				const list: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []
+				const apiMeta = raw?.meta as { total?: number; page?: number; limit?: number; pages?: number } | undefined
+
+				const mapped: PharmacyItem[] = list.map((item: any) => ({
+					...item,
+					owner_name: item.owner_name ?? '',
+					image: item.avatar_s3_key ?? item.image,
+				}))
+
+				setAllPharmacies((prev) => {
+					if (mode !== 'loadMore') return mapped
+					const existingIds = new Set(prev.map((p) => p.id))
+					return [...prev, ...mapped.filter((p) => !existingIds.has(p.id))]
+				})
+
+				// Determine if there's another page to fetch. Prefer server meta when
+				// available; otherwise fall back to "got a full page" heuristic.
+				const more = apiMeta?.pages != null ? pageToFetch < apiMeta.pages : mapped.length === LIMIT
+				setHasMore(more)
+				setPage(pageToFetch)
+			} catch (err: any) {
+				if (mode !== 'loadMore') setError(err?.message || 'Failed to load pharmacies')
+			} finally {
+				if (mode === 'loadMore') setLoadingMore(false)
+				else {
+					setLoading(false)
+					setRefreshing(false)
+				}
+			}
+		},
+		[]
+	)
+
+	useEffect(() => {
+		void fetchPharmacyPage(1, 'initial')
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
-	useEffect(() => {
-		fetchPharmacyList()
-	}, [fetchPharmacyList])
+	const handleLoadMore = useCallback(() => {
+		if (loading || loadingMore || refreshing || !hasMore) return
+		void fetchPharmacyPage(page + 1, 'loadMore')
+	}, [loading, loadingMore, refreshing, hasMore, page, fetchPharmacyPage])
 
-	useEffect(() => {
-		setPage(1)
-	}, [searchQuery, filters])
+	const onRefresh = useCallback(() => {
+		setRefreshing(true)
+		void fetchPharmacyPage(1, 'refresh')
+	}, [fetchPharmacyPage])
 
-	// ── Filter logic ──────────────────────────────────────────────────────────
+	// ── Filter logic (operates over whatever has been loaded so far) ──────────
 
 	const filteredPharmacies = allPharmacies.filter((pharmacy) => {
 		const query = searchQuery.trim().toLowerCase()
@@ -101,8 +139,6 @@ export default function PharmacySearchPage() {
 	})
 
 	const total = filteredPharmacies.length
-	const totalPages = Math.ceil(total / LIMIT)
-	const visiblePharmacies = filteredPharmacies.slice((page - 1) * LIMIT, page * LIMIT)
 
 	const hasActiveFilters =
 		filters.city || filters.homeDelivery || filters.is24x7 || filters.emergencyMeds || searchQuery
@@ -110,12 +146,10 @@ export default function PharmacySearchPage() {
 	const clearAllFilters = () => {
 		setFilters({ city: '', homeDelivery: false, is24x7: false, emergencyMeds: false })
 		setSearchQuery('')
-		setPage(1)
 	}
 
 	const handleFilterChange = (newFilters: PharmacyFilterState) => {
 		setFilters(newFilters)
-		setPage(1)
 	}
 
 	// ── Render helpers ────────────────────────────────────────────────────────
@@ -152,26 +186,10 @@ export default function PharmacySearchPage() {
 	}
 
 	const renderFooter = () => {
-		if (totalPages <= 1) return null
+		if (!loadingMore) return null
 		return (
-			<View style={styles.pagination}>
-				<TouchableOpacity
-					style={[styles.pageBtn, page === 1 && styles.pageBtnDisabled]}
-					onPress={() => setPage((p) => Math.max(1, p - 1))}
-					disabled={page === 1}
-				>
-					<Text style={[styles.pageBtnText, page === 1 && styles.pageBtnTextDisabled]}>← Prev</Text>
-				</TouchableOpacity>
-				<Text style={styles.pageInfo}>
-					{page} / {totalPages}
-				</Text>
-				<TouchableOpacity
-					style={[styles.pageBtn, page === totalPages && styles.pageBtnDisabled]}
-					onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-					disabled={page === totalPages}
-				>
-					<Text style={[styles.pageBtnText, page === totalPages && styles.pageBtnTextDisabled]}>Next →</Text>
-				</TouchableOpacity>
+			<View style={styles.loadMoreFooter}>
+				<ActivityIndicator size="small" color="#2B6F71" />
 			</View>
 		)
 	}
@@ -215,14 +233,14 @@ export default function PharmacySearchPage() {
 			) : error ? (
 				<View style={styles.centered}>
 					<Text style={styles.errorText}>{error}</Text>
-					<TouchableOpacity style={styles.retryButton} onPress={fetchPharmacyList}>
+					<TouchableOpacity style={styles.retryButton} onPress={() => fetchPharmacyPage(1, 'initial')}>
 						<Text style={styles.retryText}>Retry</Text>
 					</TouchableOpacity>
 				</View>
 			) : (
 				<FlatList
 					key={numColumns}
-					data={visiblePharmacies}
+					data={filteredPharmacies}
 					keyExtractor={(item) => item.id}
 					numColumns={numColumns}
 					columnWrapperStyle={numColumns > 1 ? { gap: GAP } : undefined}
@@ -251,6 +269,9 @@ export default function PharmacySearchPage() {
 					ListFooterComponent={renderFooter}
 					contentContainerStyle={[styles.listContent, numColumns === 1 && { alignItems: 'stretch' }]}
 					showsVerticalScrollIndicator={false}
+					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+					onEndReached={handleLoadMore}
+					onEndReachedThreshold={0.4}
 				/>
 			)}
 
@@ -428,23 +449,10 @@ const styles = StyleSheet.create({
 	},
 	emptyTitle: { fontSize: 16, fontWeight: '700', color: '#101828', marginBottom: 6 },
 	emptySubtitle: { fontSize: 13, color: '#667085' },
-	pagination: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
+	loadMoreFooter: {
 		paddingVertical: 16,
-		gap: 16,
+		alignItems: 'center',
 	},
-	pageBtn: {
-		backgroundColor: '#2B6F71',
-		paddingHorizontal: 18,
-		paddingVertical: 8,
-		borderRadius: 8,
-	},
-	pageBtnDisabled: { backgroundColor: '#E0E0E0' },
-	pageBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-	pageBtnTextDisabled: { color: '#999' },
-	pageInfo: { fontSize: 14, color: '#344054', fontWeight: '600' },
 	sheetContent: {
 		paddingHorizontal: 16,
 		paddingTop: 20,

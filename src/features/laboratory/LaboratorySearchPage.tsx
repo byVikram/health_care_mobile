@@ -1,6 +1,7 @@
-// src/features/laboratory/LaboratorySearchPage.tsx
+﻿// src/features/laboratory/LaboratorySearchPage.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+	ActivityIndicator,
 	Animated,
 	FlatList,
 	Modal,
@@ -21,17 +22,16 @@ import { BlurView } from 'expo-blur'
 import Toast from 'react-native-toast-message'
 
 import { AppBottomSheet, AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
-import PaginationBar from '../../components/common/AppPagination'
 import LaboratoryCard from './component/LaboratoryCard'
 import { getLaboratories, clearLaboratoryCache } from './laboratoryService'
 import type { LaboratoryItem } from './laboratory'
 import { ROUTES } from '../../navigation/routes'
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Constants
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const PAGE_SIZE_OPTIONS = [12, 24, 48]
+const PAGE_SIZE = 10
 
 const CITY_OPTIONS: AppSelectOption[] = [
 	{ label: 'All Cities', value: '' },
@@ -48,9 +48,9 @@ const CITY_OPTIONS: AppSelectOption[] = [
 	{ label: 'Surat', value: 'Surat' },
 ]
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Skeleton
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const LabCardSkeleton = ({ horizontal }: { horizontal: boolean }) => (
 	<View style={[skeletonStyles.card, horizontal && skeletonStyles.horizontalCard]}>
@@ -86,9 +86,9 @@ const skeletonStyles = StyleSheet.create({
 	content: { flex: 1, padding: 10 },
 })
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Main Screen
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function LaboratorySearchPage() {
 	const navigation = useNavigation<any>()
@@ -104,18 +104,20 @@ export default function LaboratorySearchPage() {
 	const GAP = 12
 	const itemWidth = (width - HORIZONTAL_PADDING * 2 - GAP * (numColumns - 1)) / numColumns
 
-	// ── State ───────────────────────────────────────────────────────────
+	// â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	const [searchQuery, setSearchQuery] = useState('')
 	const [debouncedSearch, setDebouncedSearch] = useState('')
 	const [page, setPage] = useState(1)
-	const [pageSize, setPageSize] = useState(12)
 	const [cityFilter, setCityFilter] = useState('')
 
 	const [serverLabs, setServerLabs] = useState<LaboratoryItem[]>([])
 	const [totalRows, setTotalRows] = useState(0)
 	const [loading, setLoading] = useState(true)
+	const [loadingMore, setLoadingMore] = useState(false)
+	const [hasMore, setHasMore] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const requestInFlightRef = useRef(false)
 
 	// Filter modal
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
@@ -123,63 +125,75 @@ export default function LaboratorySearchPage() {
 	const filterSheetAnim = useRef(new Animated.Value(0)).current
 	const filterBackdropAnim = useRef(new Animated.Value(0)).current
 
-	// ── Debounce search ─────────────────────────────────────────────────
+	// -- Debounce search --
 	useEffect(() => {
 		const t = setTimeout(() => setDebouncedSearch(searchQuery), 400)
 		return () => clearTimeout(t)
 	}, [searchQuery])
 
-	// ── Reset page on filter / search / pageSize change ─────────────────
-	useEffect(() => {
-		setPage(1)
-	}, [debouncedSearch, cityFilter, pageSize])
-
-	// ── Fetch laboratories (server-side search + pagination) ────────────
+	// -- Fetch laboratories (server-side search + pagination / infinite scroll) --
 	const fetchLabs = useCallback(
-		async (showLoading = true, currentPage = page) => {
-			if (showLoading) setLoading(true)
+		async (mode: 'initial' | 'refresh' | 'loadMore', targetPage = 1) => {
+			if (requestInFlightRef.current) return
+			requestInFlightRef.current = true
+			if (mode === 'loadMore') setLoadingMore(true)
+			else setLoading(true)
 			setError(null)
 			try {
 				const result = await getLaboratories({
 					search: debouncedSearch || undefined,
 					city: cityFilter || undefined,
-					page: currentPage,
-					limit: pageSize,
+					page: targetPage,
+					limit: PAGE_SIZE,
 				})
-				setServerLabs(result.data)
+				setServerLabs((prev) => {
+					if (mode !== 'loadMore') {
+						setHasMore(result.data.length === PAGE_SIZE && result.data.length < result.total)
+						return result.data
+					}
+					const existingIds = new Set(prev.map((lab) => lab.id))
+					const merged = [...prev, ...result.data.filter((lab) => !existingIds.has(lab.id))]
+					setHasMore(result.data.length === PAGE_SIZE && merged.length < result.total)
+					return merged
+				})
 				setTotalRows(result.total)
+				setPage(targetPage)
 			} catch (err: any) {
 				const msg = err?.message || 'Failed to load laboratories'
 				setError(msg)
 				Toast.show({ type: 'error', text1: 'Error', text2: msg })
 			} finally {
-				if (showLoading) setLoading(false)
-				setRefreshing(false)
+				if (mode === 'loadMore') setLoadingMore(false)
+				else {
+					setLoading(false)
+					setRefreshing(false)
+				}
+				requestInFlightRef.current = false
 			}
 		},
-		[debouncedSearch, cityFilter, pageSize, page]
+		[debouncedSearch, cityFilter]
 	)
 
-	// Fetch on search / filter / pageSize change (reset to page 1)
+	// Fetch on search / filter change (always resets to page 1)
 	useEffect(() => {
-		fetchLabs(true, 1)
+		void fetchLabs('initial', 1)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [debouncedSearch, cityFilter, pageSize])
+	}, [debouncedSearch, cityFilter])
 
-	// Fetch on page change
-	useEffect(() => {
-		fetchLabs(true, page)
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [page])
+	const handleLoadMore = useCallback(() => {
+		if (loading || loadingMore || refreshing) return
+		if (!hasMore || serverLabs.length >= totalRows) return
+		void fetchLabs('loadMore', page + 1)
+	}, [loading, loadingMore, refreshing, hasMore, serverLabs.length, totalRows, page, fetchLabs])
 
 	const handleRefresh = async () => {
 		setRefreshing(true)
 		clearLaboratoryCache()
-		await fetchLabs(false, 1)
-		setPage(1)
+		await fetchLabs('refresh', 1)
 	}
 
-	// ── Filter modal helpers ────────────────────────────────────────────
+
+	// â”€â”€ Filter modal helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	const hasActiveFilters = !!cityFilter || !!searchQuery
 
 	const openFilterModal = () => {
@@ -216,7 +230,7 @@ export default function LaboratorySearchPage() {
 		setPage(1)
 	}
 
-	// ── Render helpers ──────────────────────────────────────────────────
+	// â”€â”€ Render helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	const renderHeader = () => (
 		<View style={styles.headerContainer}>
 			{hasActiveFilters && (
@@ -225,7 +239,7 @@ export default function LaboratorySearchPage() {
 						<View style={styles.activeChip}>
 							<Text style={styles.activeChipText}>{cityFilter}</Text>
 							<TouchableOpacity onPress={() => { setCityFilter(''); setPage(1) }}>
-								<Text style={styles.activeChipRemove}> ✕</Text>
+								<Text style={styles.activeChipRemove}> âœ•</Text>
 							</TouchableOpacity>
 						</View>
 					) : null}
@@ -233,7 +247,7 @@ export default function LaboratorySearchPage() {
 						<View style={styles.activeChip}>
 							<Text style={styles.activeChipText}>"{searchQuery}"</Text>
 							<TouchableOpacity onPress={() => { setSearchQuery(''); setDebouncedSearch('') }}>
-								<Text style={styles.activeChipRemove}> ✕</Text>
+								<Text style={styles.activeChipRemove}> âœ•</Text>
 							</TouchableOpacity>
 						</View>
 					) : null}
@@ -265,14 +279,14 @@ export default function LaboratorySearchPage() {
 					contentContainerStyle={[styles.listContent, { alignItems: 'stretch' }]}
 					showsVerticalScrollIndicator={false}
 				>
-					{Array.from({ length: pageSize > 6 ? 6 : pageSize }).map((_, i) => (
+					{Array.from({ length: PAGE_SIZE > 6 ? 6 : PAGE_SIZE }).map((_, i) => (
 						<LabCardSkeleton key={i} horizontal={isHorizontal} />
 					))}
 				</ScrollView>
 			)
 		}
 		const rows: number[][] = []
-		const count = pageSize > 6 ? 6 : pageSize
+		const count = PAGE_SIZE > 6 ? 6 : PAGE_SIZE
 		for (let i = 0; i < count; i += numColumns) {
 			rows.push(Array.from({ length: Math.min(numColumns, count - i) }, (_, j) => i + j))
 		}
@@ -291,7 +305,7 @@ export default function LaboratorySearchPage() {
 		)
 	}
 
-	// ── Filter Modal ────────────────────────────────────────────────────
+	// â”€â”€ Filter Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	const renderFilterModal = () => {
 		const translateY = filterSheetAnim.interpolate({ inputRange: [0, 1], outputRange: [420, 0] })
 		const backdropOpacity = filterBackdropAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })
@@ -359,7 +373,7 @@ export default function LaboratorySearchPage() {
 		)
 	}
 
-	// ── Main Render ─────────────────────────────────────────────────────
+	// â”€â”€ Main Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	return (
 		<View style={styles.safe}>
 			{/* Search Bar */}
@@ -401,7 +415,7 @@ export default function LaboratorySearchPage() {
 				<View style={styles.centered}>
 					<MaterialCommunityIcons name="alert-circle-outline" size={40} color="#C62828" />
 					<Text style={styles.errorText}>{error}</Text>
-					<TouchableOpacity style={styles.retryButton} onPress={() => fetchLabs(true, 1)}>
+					<TouchableOpacity style={styles.retryButton} onPress={() => fetchLabs('initial', 1)}>
 						<Text style={styles.retryText}>Retry</Text>
 					</TouchableOpacity>
 				</View>
@@ -450,23 +464,16 @@ export default function LaboratorySearchPage() {
 						refreshing={refreshing}
 						onRefresh={handleRefresh}
 						keyboardShouldPersistTaps="always"
+						onEndReached={handleLoadMore}
+						onEndReachedThreshold={0.4}
+						ListFooterComponent={
+							loadingMore ? (
+								<View style={styles.loadMoreFooter}>
+									<ActivityIndicator size="small" color="#2B6F71" />
+								</View>
+							) : null
+						}
 					/>
-
-					{totalRows > 0 && (
-						<View style={[styles.paginationWrap, { paddingBottom: Math.max(insets.bottom + 8, 16) }]}>
-							<PaginationBar
-								page={page}
-								pageSize={pageSize}
-								totalRows={totalRows}
-								pageSizeOptions={PAGE_SIZE_OPTIONS}
-								onPageChange={(nextPage) => setPage(nextPage)}
-								onPageSizeChange={(nextSize) => {
-									setPageSize(nextSize)
-									setPage(1)
-								}}
-							/>
-						</View>
-					)}
 				</View>
 			)}
 
@@ -475,9 +482,9 @@ export default function LaboratorySearchPage() {
 	)
 }
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Styles
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const styles = StyleSheet.create({
 	safe: { flex: 1, backgroundColor: '#F5F7FA' },
@@ -565,6 +572,10 @@ const styles = StyleSheet.create({
 	},
 	emptyTitle: { fontSize: 16, fontWeight: '700', color: '#101828' },
 	emptySubtitle: { fontSize: 13, color: '#667085', textAlign: 'center' },
+	loadMoreFooter: {
+		paddingVertical: 16,
+		alignItems: 'center',
+	},
 	paginationWrap: {
 		paddingVertical: 10,
 		borderTopWidth: 1,

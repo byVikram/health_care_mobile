@@ -103,7 +103,7 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.RADIOLOGY_LIST as keyof AppStackParamList}
 				component={RadiologySearchPage}
-				options={{ headerShown: true, title: 'Radiology' }}
+				options={{ headerShown: true, title: 'Radiology List' }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.PLACE_RADIOLOGY_ORDER}

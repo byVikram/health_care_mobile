@@ -7,6 +7,15 @@ export interface ScanType {
 	description: string
 }
 
+export interface RadiologyScanOffering {
+	scan_id: number
+	scan_name: string
+	pricing_model: PricingModel
+	base_price: number | null
+	price_details: string
+	is_available: boolean
+}
+
 export interface RadiologyItem {
 	id: string // radiology_id from API
 	name: string
@@ -19,6 +28,7 @@ export interface RadiologyItem {
 	base_price: number | null
 	price_details: string
 	is_available: boolean
+	scans?: RadiologyScanOffering[]
 	// Additional fields for display
 	rating?: number
 	reviews?: number

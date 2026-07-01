@@ -451,6 +451,7 @@ export default function AppointmentList() {
 	const [allRows, setAllRows] = useState<AppointmentRow[]>([])
 	const [apiMeta, setApiMeta] = useState<AppointmentMeta | null>(null)
 	const [loading, setLoading] = useState(false)
+	const [loadingMore, setLoadingMore] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 	const [modeFilter, setModeFilter] = useState('all')
 	const [dateFilter, setDateFilter] = useState('all')
@@ -554,7 +555,8 @@ export default function AppointmentList() {
 			search: string
 			hospital_id: string
 			status_id: string
-		}>
+		}>,
+		isLoadMore = false
 	) => {
 		if (role !== 'doctor' && role !== 'patient') return
 
@@ -575,7 +577,8 @@ export default function AppointmentList() {
 		applyDateFilterParams(queryParams, effectiveDateFilter, effectiveFromDateFilter, effectiveToDateFilter)
 
 		try {
-			if (showLoader) setLoading(true)
+			if (isLoadMore) setLoadingMore(true)
+			else if (showLoader) setLoading(true)
 			// const token = await AsyncStorage.getItem('access_token')
 			// console.log('[AppointmentList][debug] appointments fetch request:', {
 			// 	url: requestUrl,
@@ -614,7 +617,11 @@ export default function AppointmentList() {
 					doctorName: row.doctorName,
 				})),
 			})
-			setAllRows(next.rows)
+			setAllRows((prev) => {
+				if (useTable || effectivePage <= 1) return next.rows
+				const existingIds = new Set(prev.map((row) => row.id))
+				return [...prev, ...next.rows.filter((row) => !existingIds.has(row.id))]
+			})
 		} catch (error) {
 			const err = error as any
 			console.log('[AppointmentList][debug] appointments fetch error:', {
@@ -633,10 +640,13 @@ export default function AppointmentList() {
 				(error as any)?.response?.data?.message || (error as any)?.message || 'Unable to load appointments right now.'
 			)
 		} finally {
-			setLoading(false)
-			setRefreshing(false)
+			if (isLoadMore) setLoadingMore(false)
+			else {
+				setLoading(false)
+				setRefreshing(false)
+			}
 		}
-	}, [dateFilter, fromDateFilter, page, pageSize, role, toDateFilter, search, selectedHospitalValue, statusFilter])
+	}, [dateFilter, fromDateFilter, page, pageSize, role, toDateFilter, search, selectedHospitalValue, statusFilter, useTable])
 
 	const  fetchHospitals = useCallback(async () => {
 		if (role !== 'doctor') return
@@ -785,11 +795,24 @@ export default function AppointmentList() {
 		setPageSize(nextPageSize)
 		setPage(1)
 	}
-
 	const onRefresh = () => {
 		setRefreshing(true)
-		void fetchAppointments(false)
+		setPage(1)
+		skipNextFilterFetchRef.current = true
+		void fetchAppointments(false, { page: 1 })
 	}
+
+	const handleLoadMore = useCallback(() => {
+		if (useTable) return
+		if (loading || loadingMore || refreshing) return
+		const totalPages = apiMeta?.pages ?? 1
+		if (page >= totalPages) return
+		const nextPage = page + 1
+		skipNextFilterFetchRef.current = true
+		setPage(nextPage)
+		void fetchAppointments(false, { page: nextPage }, true)
+	}, [useTable, loading, loadingMore, refreshing, apiMeta, page, fetchAppointments])
+
 
 	const openFilterModal = () => {
 		setDraftModeFilter(modeFilter)
@@ -1210,21 +1233,17 @@ export default function AppointmentList() {
 						showsVerticalScrollIndicator={false}
 						ListEmptyComponent={<EmptyState />}
 						refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+						onEndReached={handleLoadMore}
+						onEndReachedThreshold={0.4}
+						ListFooterComponent={
+							loadingMore ? (
+								<View style={styles.loadMoreFooter}>
+									<ActivityIndicator size="small" color={TEAL} />
+								</View>
+							) : null
+						}
 					/>
 				)}
-
-				{!useTable && rows.length > 0 ? (
-					<View style={[styles.paginationWrap, styles.mobilePaginationWrap, { paddingBottom: Math.max(insets.bottom + 8, 16) }]}>
-						<PaginationBar
-							page={meta.page}
-							pageSize={pageSize}
-							totalRows={meta.total}
-							pageSizeOptions={MOBILE_PAGE_SIZE_OPTIONS}
-							onPageChange={handlePageChange}
-							onPageSizeChange={handlePageSizeChange}
-						/>
-					</View>
-				) : null}
 
 				{!useInlineFilters && renderFilterModal()}
 		</>
@@ -1739,6 +1758,10 @@ const styles = StyleSheet.create({
 	},
 	mobilePaginationWrap: {
 		paddingTop: 4,
+	},
+	loadMoreFooter: {
+		paddingVertical: 16,
+		alignItems: 'center',
 	},
 	emptyListContent: {
 		flexGrow: 1,

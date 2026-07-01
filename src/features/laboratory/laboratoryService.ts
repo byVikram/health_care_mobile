@@ -15,9 +15,9 @@ import type {
 // Cache
 // ─────────────────────────────────────────────
 
-let labListCache: { data: LaboratoryItem[]; total: number } | null = null
-let labListCacheTimestamp = 0
+let labListCache: Map<string, { data: LaboratoryItem[]; timestamp: number }> = new Map()
 const CACHE_DURATION = 5 * 60 * 1000
+const RAW_SEARCH_PAGE_SIZE = 100
 
 // ─────────────────────────────────────────────
 // Raw API shapes
@@ -158,61 +158,9 @@ function mapRawBooking(raw: RawBooking): LabBooking {
 // 1. Search / list laboratories
 // ─────────────────────────────────────────────
 
-export async function getLaboratories(
-	params: {
-		search?: string
-		city?: string
-		test_type_id?: number
-		page?: number
-		limit?: number
-	} = {},
-	options?: { signal?: AbortSignal }
-): Promise<{ data: LaboratoryItem[]; total: number; page: number; limit: number }> {
-	const isUnfiltered =
-		!params.search && !params.city && !params.test_type_id && (!params.page || params.page === 1)
-	const requestedPage = params.page || 1
-	const requestedLimit = params.limit || 12
-
-	if (isUnfiltered && labListCache && Date.now() - labListCacheTimestamp < CACHE_DURATION) {
-		return {
-			data: labListCache.data.slice(0, requestedLimit),
-			total: labListCache.total,
-			page: 1,
-			limit: requestedLimit,
-		}
-	}
-
-	const apiLimit = 100
-	const firstResponse = await ApiService.get<RawLaboratorySearchResponse>(API_ENDPOINTS.LABORATORY.SEARCH, {
-		params: {
-			search: params.search || undefined,
-			city: params.city || undefined,
-			test_type_id: params.test_type_id || undefined,
-			page: 1,
-			limit: apiLimit,
-		},
-		signal: options?.signal,
-	})
-
-	const firstMeta = firstResponse.data?.meta ?? { total: 0, page: 1, limit: apiLimit, pages: 0 }
-	const rawItems: RawSearchItem[] = [...(firstResponse.data?.data ?? [])]
-
-	for (let nextPage = 2; nextPage <= firstMeta.pages; nextPage += 1) {
-		const response = await ApiService.get<RawLaboratorySearchResponse>(API_ENDPOINTS.LABORATORY.SEARCH, {
-			params: {
-				search: params.search || undefined,
-				city: params.city || undefined,
-				test_type_id: params.test_type_id || undefined,
-				page: nextPage,
-				limit: apiLimit,
-			},
-			signal: options?.signal,
-		})
-		rawItems.push(...(response.data?.data ?? []))
-	}
-
-	// Deduplicate by lab id — the search endpoint returns one row per test offering
+function mapRawSearchItemsToLabs(rawItems: RawSearchItem[]): LaboratoryItem[] {
 	const labMap = new Map<string, LaboratoryItem>()
+
 	for (const item of rawItems) {
 		if (!labMap.has(item.id)) {
 			labMap.set(item.id, {
@@ -232,16 +180,79 @@ export async function getLaboratories(
 		}
 	}
 
-	const labs = Array.from(labMap.values())
-	const total = labs.length
-	const pagedLabs = labs.slice((requestedPage - 1) * requestedLimit, requestedPage * requestedLimit)
+	return Array.from(labMap.values())
+}
 
-	if (isUnfiltered) {
-		labListCache = { data: labs, total }
-		labListCacheTimestamp = Date.now()
+export async function getLaboratories(
+	params: {
+		search?: string
+		city?: string
+		test_type_id?: number
+		page?: number
+		limit?: number
+	} = {},
+	options?: { signal?: AbortSignal }
+): Promise<{ data: LaboratoryItem[]; total: number; page: number; limit: number }> {
+	const requestedPage = params.page || 1
+	const requestedLimit = params.limit || 12
+	const cacheKey = JSON.stringify({
+		search: params.search || '',
+		city: params.city || '',
+		test_type_id: params.test_type_id || '',
+	})
+	const cached = labListCache.get(cacheKey)
+
+	if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+		const start = (requestedPage - 1) * requestedLimit
+		return {
+			data: cached.data.slice(start, start + requestedLimit),
+			total: cached.data.length,
+			page: requestedPage,
+			limit: requestedLimit,
+		}
 	}
 
-	return { data: pagedLabs, total, page: requestedPage, limit: requestedLimit }
+	const baseParams = {
+		search: params.search || undefined,
+		city: params.city || undefined,
+		test_type_id: params.test_type_id || undefined,
+	}
+
+	const fetchRawPage = (page: number) =>
+		ApiService.get<RawLaboratorySearchResponse>(API_ENDPOINTS.LABORATORY.SEARCH, {
+			params: {
+				...baseParams,
+				page,
+				limit: RAW_SEARCH_PAGE_SIZE,
+			},
+			signal: options?.signal,
+		})
+
+	const firstResponse = await fetchRawPage(1)
+	const firstData = firstResponse.data?.data ?? []
+	const firstMeta = firstResponse.data?.meta
+	const totalRawRows = firstMeta?.total ?? firstData.length
+	const rawLimit = firstMeta?.limit || RAW_SEARCH_PAGE_SIZE
+	const totalRawPages = firstMeta?.pages || Math.ceil(totalRawRows / rawLimit) || 1
+	const remainingResponses =
+		totalRawPages > 1
+			? await Promise.all(Array.from({ length: totalRawPages - 1 }, (_, index) => fetchRawPage(index + 2)))
+			: []
+
+	const rawItems: RawSearchItem[] = [
+		...firstData,
+		...remainingResponses.flatMap((response) => response.data?.data ?? []),
+	]
+	const labs = mapRawSearchItemsToLabs(rawItems)
+	const start = (requestedPage - 1) * requestedLimit
+	const pagedLabs = labs.slice(start, start + requestedLimit)
+
+	labListCache.set(cacheKey, {
+		data: labs,
+		timestamp: Date.now(),
+	})
+
+	return { data: pagedLabs, total: labs.length, page: requestedPage, limit: requestedLimit }
 }
 
 // ─────────────────────────────────────────────
@@ -577,6 +588,5 @@ export function applyLaboratoryFilters(
 // ─────────────────────────────────────────────
 
 export function clearLaboratoryCache(): void {
-	labListCache = null
-	labListCacheTimestamp = 0
+	labListCache.clear()
 }

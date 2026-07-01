@@ -1,8 +1,12 @@
 // RadiologySearchPage.tsx
-import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
+	Animated,
 	FlatList,
+	Modal,
+	Platform,
+	Pressable,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -10,10 +14,6 @@ import {
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
-	Animated,
-	Modal,
-	Pressable,
-	Platform,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native'
@@ -26,14 +26,13 @@ import RadiologyFilter from './component/RadiologyFilter'
 import { RadiologyItem, RadiologyFilters, DEFAULT_RADIOLOGY_FILTERS } from './radiology'
 import { fetchRadiologyCatalog, applyRadiologyFilters, clearRadiologyCache } from './RadiologyService'
 import { AppBottomSheet, AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
-import PaginationBar from '../../components/common/AppPagination'
 import { ROUTES } from '../../navigation/routes'
 
 // ─────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50]
+const PAGE_SIZE = 10
 
 // ─────────────────────────────────────────────
 // Skeleton Loader
@@ -74,104 +73,138 @@ export default function RadiologySearchPage() {
 	const GAP = 12
 	const itemWidth = (width - HORIZONTAL_PADDING * 2 - GAP * (numColumns - 1)) / numColumns
 
-	// ── State ───────────────────────────────────
+	// ── State ─────────────────────────────────────────────────────────────────
 	const [searchQuery, setSearchQuery] = useState('')
 	const [debouncedSearch, setDebouncedSearch] = useState('')
 	const [page, setPage] = useState(1)
-	const [pageSize, setPageSize] = useState(12)
 	const [filters, setFilters] = useState<RadiologyFilters>(DEFAULT_RADIOLOGY_FILTERS)
-	const [allScans, setAllScans] = useState<RadiologyItem[]>([])
+	const [scans, setScans] = useState<RadiologyItem[]>([])
+	const [totalRows, setTotalRows] = useState(0)
 	const [loading, setLoading] = useState(true)
+	const [loadingMore, setLoadingMore] = useState(false)
+	const [hasMore, setHasMore] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
 	const [error, setError] = useState<string | null>(null)
-	const [showFilters, setShowFilters] = useState(false)
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
+	const requestInFlightRef = useRef(false)
 
-	// ── Filter Sheet Animation ────────────────
+	// ── Filter Sheet Animation ─────────────────────────────────────────────────
 	const filterSheetAnim = useRef(new Animated.Value(0)).current
 	const filterBackdropAnim = useRef(new Animated.Value(0)).current
 
-	// ── Debounce Search ────────────────────────
+	// ── Debounce Search ────────────────────────────────────────────────────────
 	useEffect(() => {
 		const t = setTimeout(() => setDebouncedSearch(searchQuery), 300)
 		return () => clearTimeout(t)
 	}, [searchQuery])
 
-	// ── Reset page on filter change ─────────────
-	useEffect(() => {
-		setPage(1)
-	}, [debouncedSearch, filters, pageSize])
+	// ── Fetch radiology centers (server-side pagination + infinite scroll) ─────
+	const fetchScans = useCallback(
+		async (mode: 'initial' | 'refresh' | 'loadMore', targetPage = 1) => {
+			if (requestInFlightRef.current) return
+			requestInFlightRef.current = true
 
-	// ── Fetch Data ──────────────────────────────
-	const fetchScans = useCallback(async (showLoading = true) => {
-		if (showLoading) {
-			setLoading(true)
-		}
-		setError(null)
-		try {
-			const data = await fetchRadiologyCatalog()
-			setAllScans(Array.isArray(data) ? data : [])
-		} catch (err: any) {
-			setError(err?.message || 'Failed to load radiology scans')
-			Toast.show({
-				type: 'error',
-				text1: 'Error',
-				text2: 'Failed to load radiology scans',
-			})
-		} finally {
-			if (showLoading) {
-				setLoading(false)
+			if (mode === 'loadMore') setLoadingMore(true)
+			else setLoading(true)
+			setError(null)
+
+			try {
+				const result = await fetchRadiologyCatalog({
+					search: debouncedSearch || undefined,
+					city: filters.city || undefined,
+					scan_type_id: filters.scanType,
+					pricing_model: filters.pricingModel,
+					available_only: filters.availableOnly,
+					page: targetPage,
+					limit: PAGE_SIZE,
+				})
+
+				setScans((prev) => {
+					if (mode !== 'loadMore') {
+						setHasMore(result.data.length === PAGE_SIZE && result.data.length < result.total)
+						return result.data
+					}
+					const existingIds = new Set(prev.map((s) => s.id))
+					const merged = [...prev, ...result.data.filter((s) => !existingIds.has(s.id))]
+					setHasMore(result.data.length === PAGE_SIZE && merged.length < result.total)
+					return merged
+				})
+
+				setTotalRows(result.total)
+				setPage(targetPage)
+			} catch (err: any) {
+				setError(err?.message || 'Failed to load radiology scans')
+				Toast.show({
+					type: 'error',
+					text1: 'Error',
+					text2: 'Failed to load radiology scans',
+				})
+			} finally {
+				if (mode === 'loadMore') setLoadingMore(false)
+				else {
+					setLoading(false)
+					setRefreshing(false)
+				}
+				requestInFlightRef.current = false
 			}
-			setRefreshing(false)
-		}
+		},
+		[debouncedSearch, filters]
+	)
+
+	// Initial load
+	useEffect(() => {
+		void fetchScans('initial', 1)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
+	// Re-fetch from page 1 whenever search or filters change
 	useEffect(() => {
-		fetchScans(true)
+		void fetchScans('initial', 1)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [debouncedSearch, filters])
+
+	const handleLoadMore = useCallback(() => {
+		if (loading || loadingMore || refreshing || !hasMore) return
+		void fetchScans('loadMore', page + 1)
+	}, [loading, loadingMore, refreshing, hasMore, page, fetchScans])
+
+	const handleRefresh = useCallback(() => {
+		setRefreshing(true)
+		clearRadiologyCache()
+		void fetchScans('refresh', 1)
 	}, [fetchScans])
 
-	// ── Apply Filters ───────────────────────────
+	// ── Client-side filter (applied over loaded pages) ─────────────────────────
 	const filteredScans = useMemo(() => {
-		const result = applyRadiologyFilters(allScans ?? [], {
+		const result = applyRadiologyFilters(scans, {
 			...filters,
 			search: debouncedSearch,
 		})
-
 		return Array.isArray(result) ? result : []
-	}, [allScans, filters, debouncedSearch])
+	}, [scans, filters, debouncedSearch])
 
-	// ── Pagination ──────────────────────────────
-	const total = filteredScans?.length ?? 0
-	const totalPages = Math.max(1, Math.ceil(total / pageSize))
-	const startIndex = (page - 1) * pageSize
-	const visibleScans = filteredScans.slice(startIndex, startIndex + pageSize)
+	const total = totalRows
 
-	// ── Filter Helpers ──────────────────────────
+	// ── Filter helpers ─────────────────────────────────────────────────────────
 	const hasActiveFilters =
-		filters.city || filters.pricingModel !== 'all' || filters.availableOnly || filters.scanType || searchQuery
+		!!filters.city ||
+		filters.pricingModel !== 'all' ||
+		!!filters.availableOnly ||
+		!!filters.scanType ||
+		!!searchQuery
 
 	const clearAllFilters = () => {
 		setFilters(DEFAULT_RADIOLOGY_FILTERS)
 		setSearchQuery('')
 		setDebouncedSearch('')
-		setPage(1)
 	}
 
 	const handleFilterChange = (newFilters: RadiologyFilters) => {
 		setFilters(newFilters)
-		setPage(1)
 	}
 
-	const handleRefresh = async () => {
-		setRefreshing(true)
-		clearRadiologyCache()
-		await fetchScans(false)
-	}
-
-	// ── Handle Book Navigation ───────────────────
+	// ── Handle Book Navigation ─────────────────────────────────────────────────
 	const handleBook = (item: RadiologyItem) => {
-		// Navigate to RadiologyBookingPage with the required params
-		// Use the correct navigation method
 		navigation.navigate(ROUTES.STACK.PLACE_RADIOLOGY_ORDER, {
 			radiologyId: item.id,
 			centerName: item.name,
@@ -180,7 +213,8 @@ export default function RadiologySearchPage() {
 			centerPhone: item.phone,
 		})
 	}
-	// ── Filter Modal ────────────────────────────
+
+	// ── Filter Modal ───────────────────────────────────────────────────────────
 	const openFilterModal = () => {
 		setFilterModalVisible(true)
 		filterSheetAnim.setValue(0)
@@ -200,11 +234,7 @@ export default function RadiologySearchPage() {
 		})
 	}
 
-	const applyFiltersFromModal = () => {
-		closeFilterModal()
-	}
-
-	// ── Render Helpers ──────────────────────────
+	// ── Render Helpers ─────────────────────────────────────────────────────────
 	const renderHeader = () => (
 		<View style={styles.headerContainer}>
 			{hasActiveFilters ? (
@@ -238,7 +268,7 @@ export default function RadiologySearchPage() {
 					</TouchableOpacity>
 				</View>
 			) : null}
-			<Text style={styles.resultCount}>{total} Scans Found</Text>
+			<Text style={styles.resultCount}>{total} Centers Found</Text>
 		</View>
 	)
 
@@ -253,24 +283,18 @@ export default function RadiologySearchPage() {
 		)
 	}
 
-	const renderItem = ({ item }: { item: RadiologyItem }) => {
-		const isHorizontal = isMobile && !isLandscape
-		return (
-			<View style={[styles.cardWrapper, { width: numColumns === 1 ? '100%' : itemWidth }]}>
-				<RadiologyCard
-					radiology={item}
-					layout={isHorizontal ? 'horizontal' : 'vertical'}
-					onPress={() => {
-						// Navigate to detail or booking
-						handleBook(item)
-					}}
-					onBook={() => handleBook(item)}
-				/>
-			</View>
-		)
-	}
+	const renderItem = ({ item }: { item: RadiologyItem }) => (
+		<View style={[styles.cardWrapper, { width: numColumns === 1 ? '100%' : itemWidth }]}>
+			<RadiologyCard
+				radiology={item}
+				layout={isMobile && !isLandscape ? 'horizontal' : 'vertical'}
+				onPress={() => handleBook(item)}
+				onBook={() => handleBook(item)}
+			/>
+		</View>
+	)
 
-	// ── Filter Modal UI ─────────────────────────
+	// ── Filter Modal UI ────────────────────────────────────────────────────────
 	const renderFilterModal = () => {
 		const translateY = filterSheetAnim.interpolate({ inputRange: [0, 1], outputRange: [420, 0] })
 		const backdropOpacity = filterBackdropAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })
@@ -317,7 +341,7 @@ export default function RadiologySearchPage() {
 							</TouchableOpacity>
 							<TouchableOpacity
 								style={styles.applyButton}
-								onPress={applyFiltersFromModal}
+								onPress={closeFilterModal}
 								activeOpacity={0.88}
 							>
 								<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
@@ -329,9 +353,9 @@ export default function RadiologySearchPage() {
 		)
 	}
 
-	// ── Main Render ─────────────────────────────
+	// ── Main Render ────────────────────────────────────────────────────────────
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
+		<View style={styles.container}>
 			{/* Search Bar */}
 			<View style={styles.searchRow}>
 				<View style={styles.searchFieldContainer}>
@@ -377,7 +401,7 @@ export default function RadiologySearchPage() {
 				<View style={styles.centered}>
 					<MaterialCommunityIcons name="alert-circle" size={48} color="#C62828" />
 					<Text style={styles.errorText}>{error}</Text>
-					<TouchableOpacity style={styles.retryButton} onPress={() => fetchScans(true)}>
+					<TouchableOpacity style={styles.retryButton} onPress={() => fetchScans('initial', 1)}>
 						<Text style={styles.retryText}>Retry</Text>
 					</TouchableOpacity>
 				</View>
@@ -385,8 +409,8 @@ export default function RadiologySearchPage() {
 				<View style={{ flex: 1 }}>
 					<FlatList
 						key={numColumns}
-						data={visibleScans}
-						keyExtractor={(item) => `${item.id}-${item.scan_id}`}
+						data={filteredScans}
+						keyExtractor={(item) => item.id}
 						numColumns={numColumns}
 						columnWrapperStyle={numColumns > 1 ? { gap: GAP } : undefined}
 						renderItem={renderItem}
@@ -397,24 +421,16 @@ export default function RadiologySearchPage() {
 						refreshing={refreshing}
 						onRefresh={handleRefresh}
 						keyboardShouldPersistTaps="always"
+						onEndReached={handleLoadMore}
+						onEndReachedThreshold={0.4}
+						ListFooterComponent={
+							loadingMore ? (
+								<View style={styles.loadMoreFooter}>
+									<ActivityIndicator size="small" color="#1f5f68" />
+								</View>
+							) : null
+						}
 					/>
-
-					{/* Pagination Bar - Matching OrderListPage style */}
-					{total > 0 ? (
-						<View style={[styles.paginationWrap, { paddingBottom: Math.max(insets.bottom + 8, 16) }]}>
-							<PaginationBar
-								page={page}
-								pageSize={pageSize}
-								totalRows={total}
-								pageSizeOptions={PAGE_SIZE_OPTIONS}
-								onPageChange={(nextPage) => setPage(nextPage)}
-								onPageSizeChange={(nextSize) => {
-									setPageSize(nextSize)
-									setPage(1)
-								}}
-							/>
-						</View>
-					) : null}
 				</View>
 			)}
 
@@ -470,7 +486,6 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 		alignItems: 'center',
 		justifyContent: 'center',
-		padding: 0,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 1 },
 		shadowOpacity: 0.05,
@@ -530,7 +545,6 @@ const styles = StyleSheet.create({
 		gap: 12,
 		paddingHorizontal: 24,
 	},
-	loadingText: { color: '#667085', fontSize: 14, marginTop: 8 },
 	errorText: { color: '#C62828', fontSize: 15, textAlign: 'center' },
 	retryButton: {
 		marginTop: 8,
@@ -552,17 +566,10 @@ const styles = StyleSheet.create({
 	},
 	emptyTitle: { fontSize: 16, fontWeight: '700', color: '#101828' },
 	emptySubtitle: { fontSize: 13, color: '#667085', textAlign: 'center' },
-
-	// Pagination styles (matching OrderListPage)
-	paginationWrap: {
-		paddingVertical: 10,
-		borderTopWidth: 1,
-		borderTopColor: '#e5eaef',
-		backgroundColor: 'transparent',
-		paddingHorizontal: 12,
+	loadMoreFooter: {
+		paddingVertical: 16,
+		alignItems: 'center',
 	},
-
-	// Skeleton styles
 	skeletonCard: {
 		backgroundColor: '#ffffff',
 		borderRadius: 12,
@@ -574,8 +581,6 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		gap: 12,
 	},
-
-	// Filter Modal styles (matching OrderListPage)
 	filterModalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
 	filterBackdrop: { ...StyleSheet.absoluteFillObject },
 	filterDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
