@@ -148,8 +148,8 @@ const ApiService = {
 	post<T = unknown>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
 		return axiosInstance.post<T>(url, body, config)
 	},
-	patch<T = unknown>(url: string, body: unknown, p0: { signal: AbortSignal | undefined }): Promise<AxiosResponse<T>> {
-		return axiosInstance.patch<T>(url, body)
+	patch<T = unknown>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+		return axiosInstance.patch<T>(url, body, config)
 	},
 	put<T = unknown>(url: string, body: unknown): Promise<AxiosResponse<T>> {
 		return axiosInstance.put<T>(url, body)

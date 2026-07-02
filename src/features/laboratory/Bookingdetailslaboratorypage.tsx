@@ -33,8 +33,9 @@ import {
 	uploadLabReport,
 	verifyLabPrescription,
 	updateLabBookingStatus,
+	getLabTestTypes,
 } from './laboratoryService'
-import type { LabBooking, LabBookingItem } from './laboratory'
+import type { LabBooking, LabBookingItem, LabTestType } from './laboratory'
 
 // ─────────────────────────────────────────────
 // Types
@@ -482,14 +483,13 @@ export default function BookingDetailsLaboratoryPage() {
 
 	// ── Booking Status card (manual status override) ──────────────────
 
-	const [statusSheetVisible, setStatusSheetVisible] = useState(false)
-	const [selectedStatusValue, setSelectedStatusValue] = useState<string>('')
 	const [statusUpdating, setStatusUpdating] = useState(false)
 
 	// ── Editable quote items ───────────────────────────────────────────
 
 	interface EditedTestItem {
 		id?: number
+		laboratory_test_id?: number
 		test_name: string
 		quoted_price: string
 		base_price?: string
@@ -498,12 +498,15 @@ export default function BookingDetailsLaboratoryPage() {
 	}
 
 	const [editedItems, setEditedItems] = useState<EditedTestItem[]>([])
+	const [labTests, setLabTests] = useState<LabTestType[]>([])
+	const [loadingLabTests, setLoadingLabTests] = useState(false)
 
 	useEffect(() => {
 		if (booking?.booking_items) {
 			setEditedItems(
 				booking.booking_items.map((item) => ({
 					id: item.id,
+					laboratory_test_id: item.laboratory_test_id,
 					test_name: item.custom_test_name || item.test_name || 'Test',
 					quoted_price:
 						item.quoted_price != null
@@ -518,6 +521,60 @@ export default function BookingDetailsLaboratoryPage() {
 			)
 		}
 	}, [booking])
+
+	// Fetch laboratory available tests list for quoting
+	useEffect(() => {
+		const labId = booking?.laboratory_public_id
+		if (
+			role === 'laboratory' &&
+			(booking?.status === 'pending_quote' || booking?.status === 'pending_payment') &&
+			labId
+		) {
+			const loadTests = async () => {
+				try {
+					setLoadingLabTests(true)
+					const tests = await getLabTestTypes(labId)
+					setLabTests(tests)
+				} catch (err) {
+					console.error('[BookingDetailsLaboratoryPage] failed to load lab tests:', err)
+				} finally {
+					setLoadingLabTests(false)
+				}
+			}
+			loadTests()
+		}
+	}, [role, booking?.status, booking?.laboratory_public_id])
+
+	const availableTestOptions = useMemo(() => {
+		const selectedIds = new Set(
+			editedItems
+				.map((item) => item.laboratory_test_id)
+				.filter(Boolean)
+		)
+		return labTests
+			.filter((test) => !selectedIds.has(Number(test.id)))
+			.map((test) => ({
+				label: `${test.name} (₹${test.base_price || 0})`,
+				value: test.id,
+			}))
+	}, [labTests, editedItems])
+
+	const handleAddTest = (testIdStr: string) => {
+		const test = labTests.find((t) => t.id === testIdStr)
+		if (test) {
+			setEditedItems((prev) => [
+				...prev,
+				{
+					laboratory_test_id: Number(test.id),
+					test_name: test.name,
+					quoted_price: test.base_price ? test.base_price.toString() : '0',
+					base_price: test.base_price ? test.base_price.toString() : '0',
+					category: test.category,
+					turnaround: test.turnaround,
+				},
+			])
+		}
+	}
 
 	useEffect(() => {
 		bookingRef.current = booking
@@ -636,16 +693,18 @@ export default function BookingDetailsLaboratoryPage() {
 			const normalizedPrice = item.quoted_price.replace(/,/g, '').trim()
 
 			return {
-				booking_item_id: item.id ?? null,
+				booking_item_id: item.id || null,
+				laboratory_test_id: item.id ? null : item.laboratory_test_id,
+				custom_test_name: item.test_name,
 				quoted_price: Number(normalizedPrice || '0'),
 			}
 		})
-		if (items.some((it) => !it.booking_item_id)) {
+		if (items.some((it) => !it.booking_item_id && !it.laboratory_test_id)) {
 			setStatusModal({
 				visible: true,
 				status: 'error',
 				title: 'Missing Test Details',
-				description: 'Please refresh this booking and try again. Test item IDs are required to submit a quote.',
+				description: 'Please select a valid test from the catalog.',
 			})
 			return
 		}
@@ -736,6 +795,31 @@ export default function BookingDetailsLaboratoryPage() {
 		}
 	}
 
+	const handleVerifyPrescription = async () => {
+		if (!booking?.public_id) return
+		setUpdating(true)
+		try {
+			await verifyLabPrescription(booking.public_id)
+			setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Prescription Verified',
+				description: 'Prescription has been verified successfully.',
+			})
+			await fetchBooking()
+		} catch (error: any) {
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Error',
+				description: error?.message || 'Failed to verify prescription.',
+			})
+		} finally {
+			setUpdating(false)
+			setSelectedAction('')
+		}
+	}
+
 	const handlePayment = async () => {
 		if (!booking?.public_id) return
 		setUpdating(true)
@@ -764,46 +848,6 @@ export default function BookingDetailsLaboratoryPage() {
 		Alert.alert('Upload Lab Report', 'This would open a file picker to upload the lab report.', [{ text: 'OK' }])
 	}
 
-	const handleOpenStatusSheet = () => {
-		if (!booking) return
-		setSelectedStatusValue(booking.status)
-		setStatusSheetVisible(true)
-	}
-
-	const handleConfirmStatusUpdate = async () => {
-		if (!booking?.public_id || !selectedStatusValue) return
-		if (selectedStatusValue === booking.status) {
-			setStatusSheetVisible(false)
-			return
-		}
-		setStatusUpdating(true)
-		try {
-			await updateLabBookingStatus(booking.public_id, selectedStatusValue)
-			setStatusSheetVisible(false)
-			await fetchBooking()
-			const label = STATUS_OPTIONS.find((option) => option.value === selectedStatusValue)?.label
-			setStatusModal({
-				visible: true,
-				status: 'success',
-				title: 'Status Updated',
-				description: `Booking status changed to ${label ?? selectedStatusValue}.`,
-			})
-		} catch (error: any) {
-			const message =
-				error?.response?.data?.message ||
-				error?.response?.data?.detail ||
-				error?.message ||
-				'Failed to update booking status.'
-			setStatusModal({
-				visible: true,
-				status: 'error',
-				title: 'Error',
-				description: message,
-			})
-		} finally {
-			setStatusUpdating(false)
-		}
-	}
 
 	// ── Loading ────────────────────────────────────────────────────────
 
@@ -846,14 +890,19 @@ export default function BookingDetailsLaboratoryPage() {
 	const isPatient = role === 'patient'
 	const isLabStaff = role === 'laboratory'
 
-	// Quote is editable when status is pending_quote
-	const isQuoteEditable = booking.status === 'pending_quote'
+	// Quote is editable when status is pending_quote or pending_payment (before payment is paid)
+	const isQuoteEditable =
+		booking.status === 'pending_quote' ||
+		(booking.status === 'pending_payment' && booking.payment_status !== 'paid')
 	// Patient pays when status is pending_payment
 	const isPendingPayment = booking.status === 'pending_payment' && booking.payment_status === 'pending'
 	const isConfirmed = booking.status === 'confirmed'
 	const isSampleCollected = booking.status === 'sample_collected'
 
 	const labActionOptions = [
+		!booking.prescription_verified && booking.external_prescription_s3_key
+			? { label: 'Verify Prescription', value: 'verify_prescription' }
+			: null,
 		isConfirmed ? { label: 'Mark Sample Collected', value: 'sample_collected' } : null,
 		isSampleCollected ? { label: 'Mark Report Ready', value: 'report_ready' } : null,
 	].filter(Boolean) as { label: string; value: string }[]
@@ -870,6 +919,22 @@ export default function BookingDetailsLaboratoryPage() {
 					showsVerticalScrollIndicator={false}
 					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchBooking(true)} />}
 				>
+					<SectionCard title="Billing Status">
+						<View style={styles.billingStatusRow}>
+							<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+								<Text style={[styles.statusText, { color: statusStyle.text }]}>{statusDisplay}</Text>
+							</View>
+							<View style={styles.feeRow}>
+								<Text style={styles.feeLabel}>Total Amount: </Text>
+								<Text style={styles.feeValue}>
+									{booking.total_price != null
+										? `₹ ${booking.total_price.toFixed(2)}`
+										: 'Awaiting Quote'}
+								</Text>
+							</View>
+						</View>
+					</SectionCard>
+
 					<View style={styles.headerCard}>
 						<View style={styles.patientHeaderRow}>
 							<View style={styles.patientInfo}>
@@ -898,22 +963,6 @@ export default function BookingDetailsLaboratoryPage() {
 								setViewerVisible(true)
 							}}
 						/>
-					</SectionCard>
-
-					<SectionCard title="Billing Status">
-						<View style={styles.billingStatusRow}>
-							<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-								<Text style={[styles.statusText, { color: statusStyle.text }]}>{statusDisplay}</Text>
-							</View>
-							<View style={styles.feeRow}>
-								<Text style={styles.feeLabel}>Total Amount: </Text>
-								<Text style={styles.feeValue}>
-									{booking.total_price != null
-										? `₹ ${booking.total_price.toFixed(2)}`
-										: 'Awaiting Quote'}
-								</Text>
-							</View>
-						</View>
 					</SectionCard>
 
 					<SectionCard title="Test Items">
@@ -1016,22 +1065,6 @@ export default function BookingDetailsLaboratoryPage() {
 				showsVerticalScrollIndicator={false}
 				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchBooking(true)} />}
 			>
-				<SectionCard title="Booking Status">
-					<View style={styles.bookingStatusRow}>
-						<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-							<Text style={[styles.statusText, { color: statusStyle.text }]}>{statusDisplay}</Text>
-						</View>
-						<TouchableOpacity
-							style={styles.updateStatusBtn}
-							onPress={handleOpenStatusSheet}
-							disabled={statusUpdating}
-						>
-							<MaterialCommunityIcons name="clock-outline" size={15} color="#2B6F71" />
-							<Text style={styles.updateStatusBtnText}>Update Status</Text>
-						</TouchableOpacity>
-					</View>
-				</SectionCard>
-
 				<View style={styles.headerCard}>
 					<View style={styles.patientHeaderRow}>
 						<View style={styles.patientInfo}>
@@ -1051,6 +1084,66 @@ export default function BookingDetailsLaboratoryPage() {
 						</View>
 					</View>
 				</View>
+
+				<SectionCard title="Booking Status">
+					<View style={styles.bookingStatusRow}>
+						<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+							<Text style={[styles.statusText, { color: statusStyle.text }]}>{statusDisplay}</Text>
+						</View>
+						{labActionOptions.length > 0 && (
+							<View style={styles.selectActionWrapper}>
+								<AppSelect
+									placeholder="Select Action"
+									options={labActionOptions}
+									value={selectedAction}
+									onSelect={(val) => {
+										setSelectedAction(val)
+										if (val === 'verify_prescription') handleVerifyPrescription()
+										else if (val === 'sample_collected') handleMarkSampleCollected()
+										else if (val === 'report_ready') handleMarkReportReady()
+									}}
+									size="form"
+									noMargin
+									customCardStyle={{ minWidth: 180, borderColor: '#CBD5E1' }}
+								/>
+							</View>
+						)}
+						<View style={styles.selectActionWrapper}>
+							<AppSelect
+								placeholder="Update Status"
+								options={STATUS_OPTIONS}
+								value={booking.status}
+								onSelect={async (val) => {
+									if (val === booking.status) return
+									setStatusUpdating(true)
+									try {
+										await updateLabBookingStatus(booking.public_id, val)
+										await fetchBooking()
+										const label = STATUS_OPTIONS.find((o) => o.value === val)?.label || val
+										setStatusModal({
+											visible: true,
+											status: 'success',
+											title: 'Status Updated',
+											description: `Booking status changed to ${label}.`,
+										})
+									} catch (error: any) {
+										setStatusModal({
+											visible: true,
+											status: 'error',
+											title: 'Error',
+											description: error?.message || 'Failed to update status.',
+										})
+									} finally {
+										setStatusUpdating(false)
+									}
+								}}
+								size="form"
+								noMargin
+								customCardStyle={{ minWidth: 180, borderColor: '#CBD5E1' }}
+							/>
+						</View>
+					</View>
+				</SectionCard>
 
 				<SectionCard title="diagnosis & Referral Document">
 					<DocumentCarousel
@@ -1075,28 +1168,6 @@ export default function BookingDetailsLaboratoryPage() {
 				</SectionCard>
 
 				<SectionCard title="Billing Status">
-					<View style={styles.billingStatusRow}>
-						<View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-							<Text style={[styles.statusText, { color: statusStyle.text }]}>{statusDisplay}</Text>
-						</View>
-						{labActionOptions.length > 0 && (
-							<View style={styles.selectActionWrapper}>
-								<AppSelect
-									placeholder="Select Action"
-									options={labActionOptions}
-									value={selectedAction}
-									onSelect={(val) => {
-										setSelectedAction(val)
-										if (val === 'sample_collected') handleMarkSampleCollected()
-										else if (val === 'report_ready') handleMarkReportReady()
-									}}
-									size="form"
-									noMargin
-									customCardStyle={{ minWidth: 200, borderColor: '#CBD5E1' }}
-								/>
-							</View>
-						)}
-					</View>
 
 					{isQuoteEditable ? (
 						<View style={styles.quoteFormContainer}>
@@ -1154,6 +1225,21 @@ export default function BookingDetailsLaboratoryPage() {
 									</View>
 								</View>
 							))}
+
+							{/* Add Test dropdown */}
+							{availableTestOptions.length > 0 && (
+								<View style={{ marginTop: 12, marginBottom: 16 }}>
+									<AppSelect
+										placeholder="+ Add Test Item"
+										options={availableTestOptions}
+										value={undefined}
+										onSelect={handleAddTest}
+										size="form"
+										noMargin
+										customCardStyle={{ borderColor: '#2B6F71' }}
+									/>
+								</View>
+							)}
 
 							<View style={styles.feeTotalRow}>
 								<Text style={styles.feeLabel}>Total Quoted Price:</Text>
@@ -1221,47 +1307,7 @@ export default function BookingDetailsLaboratoryPage() {
 				onClose={() => setViewerVisible(false)}
 			/>
 
-			<AppBottomSheet
-				visible={statusSheetVisible}
-				title="Update Booking Status"
-				onClose={() => {
-					if (!statusUpdating) setStatusSheetVisible(false)
-				}}
-			>
-				<View style={styles.statusOptionList}>
-					{STATUS_OPTIONS.map((option) => {
-						const isSelected = selectedStatusValue === option.value
-						return (
-							<TouchableOpacity
-								key={option.value}
-								style={[styles.statusOptionRow, isSelected && styles.statusOptionRowActive]}
-								onPress={() => setSelectedStatusValue(option.value)}
-								disabled={statusUpdating}
-							>
-								<View style={[styles.radioOuter, isSelected && styles.radioOuterActive]}>
-									{isSelected && <View style={styles.radioInner} />}
-								</View>
-								<Text style={[styles.statusOptionText, isSelected && styles.statusOptionTextActive]}>
-									{option.label}
-								</Text>
-							</TouchableOpacity>
-						)
-					})}
-				</View>
 
-				<TouchableOpacity
-					style={[
-						styles.confirmStatusBtn,
-						(statusUpdating || !selectedStatusValue) && { opacity: 0.7 },
-					]}
-					onPress={handleConfirmStatusUpdate}
-					disabled={statusUpdating || !selectedStatusValue}
-				>
-					<Text style={styles.confirmStatusBtnText}>
-						{statusUpdating ? 'Updating...' : 'Confirm Update'}
-					</Text>
-				</TouchableOpacity>
-			</AppBottomSheet>
 
 			{statusModal && (
 				<StatusModal

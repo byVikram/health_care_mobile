@@ -30,9 +30,13 @@ import {
 	ProviderDetailsCard,
 	StatusModal,
 } from '../../components/common'
-import { PatientAddress, createPatientAddress } from '../pharmacy/pharmacyService'
-import { getPatientAddresses, getPatientTreatmentHistory } from '../profile/pharmacy/pharmacyService'
-import { TreatmentRecord } from '../pharmacy/pharmacyService'
+import {
+	PatientAddress,
+	TreatmentRecord,
+	createPatientAddress,
+	getPatientAddresses,
+	getPatientTreatmentHistory,
+} from '../profile/patient/PatientProfileService'
 import { getLabTestTypes, placeLabOrder } from './laboratoryService'
 import type { LabTestType, PlaceLabOrderPayload } from './laboratory'
 

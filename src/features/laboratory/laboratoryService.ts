@@ -110,6 +110,7 @@ interface RawBooking {
 function mapRawBookingItem(raw: RawBookingItem): LabBookingItem {
 	return {
 		id: raw.id,
+		laboratory_test_id: raw.laboratory_test?.id,
 		test_name: raw.laboratory_test?.test_type?.name ?? '',
 		custom_test_name: raw.custom_test_name ?? null,
 		category: undefined,

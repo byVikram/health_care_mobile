@@ -91,6 +91,7 @@ export const DEFAULT_LABORATORY_FILTERS: LaboratoryFilters = {
 
 export interface LabBookingItem {
 	id?: number
+	laboratory_test_id?: number
 	test_name: string
 	custom_test_name?: string | null
 	category?: string
@@ -155,7 +156,9 @@ export interface PlaceLabOrderPayload {
 export interface SubmitLabQuotePayload {
 	items: {
 		booking_item_id: number | null
-		test_name: string
+		laboratory_test_id?: number | null
+		custom_test_name?: string | null
+		test_name?: string
 		quoted_price: number
 	}[]
 	notes?: string | null
