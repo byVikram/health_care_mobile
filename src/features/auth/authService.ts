@@ -1,4 +1,4 @@
-﻿// src/features/auth/authService.ts
+// src/features/auth/authService.ts
 
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
@@ -56,11 +56,26 @@ export const sendOtp = async (contactNumber: string): Promise<SendOtpResponse> =
 	return res.data
 }
 
-export const verifyOtp = async (contactNumber: string, otp: string): Promise<VerifyOtpResponse> => {
-	const res = await ApiService.post<VerifyOtpResponse>(API_ENDPOINTS.AUTH.VERIFY_OTP, {
-		contact_number: contactNumber,
-		otp,
-	})
+export interface VerifyOtpRequest {
+	contact_number: string
+	otp: string
+
+	device_type: string
+	device_name?: string | null
+
+	fcm_token?: string | null
+
+	device_metadata?: Record<string, unknown>
+}
+
+export const verifyOtp = async (
+	data: VerifyOtpRequest
+): Promise<VerifyOtpResponse> => {
+	const res = await ApiService.post<VerifyOtpResponse>(
+		API_ENDPOINTS.AUTH.VERIFY_OTP,
+		data
+	)
+
 	return res.data
 }
 
@@ -71,5 +86,37 @@ export const getRoles = async (): Promise<VerifyRolesResponse> => {
 
 export const createUser = async (data: CreateUserRequest): Promise<VerifyUserCreationResponse> => {
 	const res = await ApiService.post<VerifyUserCreationResponse>(API_ENDPOINTS.AUTH.CREATE_USER, data)
+	return res.data
+}
+
+export interface Session {
+	id: string
+	device_type: string
+	device_name: string
+	ip_address: string
+	login_at: string
+	last_active_at: string
+	is_active: boolean
+	is_current: boolean
+}
+
+export interface SessionsResponse {
+	success: boolean
+	message: string
+	data: Session[]
+}
+
+export interface SessionLogoutResponse {
+	success: boolean
+	message: string
+}
+
+export const getSessions = async (): Promise<SessionsResponse> => {
+	const res = await ApiService.get<SessionsResponse>(API_ENDPOINTS.AUTH.SESSIONS)
+	return res.data
+}
+
+export const logoutSession = async (publicId: string): Promise<SessionLogoutResponse> => {
+	const res = await ApiService.delete<SessionLogoutResponse>(API_ENDPOINTS.AUTH.SESSION_LOGOUT(publicId))
 	return res.data
 }

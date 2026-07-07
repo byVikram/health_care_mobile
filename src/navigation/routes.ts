@@ -24,6 +24,7 @@ export const ROUTES = {
 		CONSULTATION: 'Consultation',
 		HEALTH_PROFILE: 'HealthProfile',
 		SETTINGS: 'Settings',
+		SCREEN_CAPTURE_TEST: 'ScreenCaptureTest',
 		DOCTOR_WELCOME: 'DoctorWelcome',
 		ACCOUNT: 'Account',
 		APPOINTMENTS: 'Appointments',
@@ -32,7 +33,24 @@ export const ROUTES = {
 		CANCEL_APPOINTMENT: 'CancelAppointment',
 		CONSENT_FORM: 'ConsentForm',
 		PATIENT_PAYMENT: 'PatientPayment',
-		PHARMACY_SEARCH: 'PharmacySearch',
+		PHARMACY_SEARCH_PAGE: 'PharmacySearchPage',
+		ORDER_LIST: 'OrderListPage',
+		ALL_SPECIALITIES: 'AllSpecialitiesPage',
 		ORDER_DETAILS: 'OrderDetails',
+		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
+
+		PATIENT_QUESTIONS_LIST: 'PatientQuestionsList',
+		PATIENT_QUESTION_DETAIL: 'PatientQuestionDetail',
+
+		RADIOLOGY_LIST: 'RadiologySearchPage',
+		RADIOLOGY_ORDERS: 'OrderListRadiologyPage',
+		PLACE_RADIOLOGY_ORDER: 'PlaceRadiologyOrder',
+		RADIOLOGY_ORDER_DETAIL: 'BookingDetailsRadiologyPage',
+		RADIOLOGY_SCAN_TYPES: 'Scantypeselectormodal',
+
+		LABORATORY_LIST: 'LaboratorySearchPage',
+		PLACE_LABORATORY_TEST: 'PlaceLabOrderPage',
+		LABORATORY_ORDERS: 'Orderlistlaboratorypage',
+		LABORATORY_ORDER_DETAILS: 'Bookingdetailslaboratorypage',
 	},
 } as const

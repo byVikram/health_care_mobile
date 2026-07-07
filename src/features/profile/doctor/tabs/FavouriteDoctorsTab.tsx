@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
 	ActivityIndicator,
 	FlatList,
 	StyleSheet,
 	Text,
-	TextInput,
 	useWindowDimensions,
 	View,
 } from 'react-native'
@@ -13,10 +12,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import {
 	FavouriteDoctor,
-	getDoctors,
 	getFavouriteDoctors,
 	toggleFavouriteDoctor,
 } from '../../../doctor/doctorService'
+import { AppInput } from '../../../../components/common'
 import FavouriteDoctorList, {
 	type FavouriteDoctorListItem,
 } from '../../../doctor/search/components/FavouriteDoctorList'
@@ -41,12 +40,21 @@ export default function FavouriteDoctorsTab() {
 	const [favouriteDoctorIds, setFavouriteDoctorIds] = useState<Set<string>>(new Set())
 	const [loading, setLoading] = useState(true)
 	const [searchQuery, setSearchQuery] = useState('')
-	const [searchResults, setSearchResults] = useState<FavouriteDoctorListItem[]>([])
-	const [searchLoading, setSearchLoading] = useState(false)
 	const [bookmarkingIds, setBookmarkingIds] = useState<Set<string>>(new Set())
-	const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
 	const trimmedSearch = searchQuery.trim()
 	const isSearching = trimmedSearch.length >= 2
+
+	// Filter favourites locally based on name or first specialty
+	const filteredFavourites = useMemo(() => {
+		if (!isSearching) return favouriteDoctors
+		const query = trimmedSearch.toLowerCase()
+		return favouriteDoctors.filter(
+			(doctor) =>
+				doctor.name.toLowerCase().includes(query) ||
+				(doctor.specialities[0]?.toLowerCase().includes(query) ?? false)
+		)
+	}, [favouriteDoctors, isSearching, trimmedSearch])
 
 	useEffect(() => {
 		const fetchFavouriteDoctors = async () => {
@@ -77,42 +85,6 @@ export default function FavouriteDoctorsTab() {
 		fetchFavouriteDoctors()
 	}, [])
 
-	useEffect(() => {
-		if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
-
-		if (!isSearching) {
-			setSearchResults([])
-			setSearchLoading(false)
-			return
-		}
-
-		setSearchLoading(true)
-		searchDebounceRef.current = setTimeout(async () => {
-			try {
-				const res = await getDoctors({
-					search: trimmedSearch,
-					limit: 20,
-				})
-
-				if (res.success) {
-					setSearchResults((res.data ?? []).map(mapFavouriteDoctor))
-				}
-			} catch {
-				Toast.show({
-					type: 'error',
-					text1: 'Error',
-					text2: 'Search failed',
-				})
-			} finally {
-				setSearchLoading(false)
-			}
-		}, 350)
-
-		return () => {
-			if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
-		}
-	}, [isSearching, trimmedSearch])
-
 	const handleToggleBookmark = async (doctor: FavouriteDoctorListItem) => {
 		if (bookmarkingIds.has(doctor.id)) return
 
@@ -137,9 +109,7 @@ export default function FavouriteDoctorsTab() {
 				throw new Error(res.message || 'Failed to update favourites')
 			}
 
-			const isFavourite = res.data?.action
-				? res.data.action === 'added'
-				: !wasFavourite
+			const isFavourite = res.data?.action ? res.data.action === 'added' : !wasFavourite
 
 			if (res.data?.favourite_ids) {
 				setFavouriteDoctorIds(new Set(res.data.favourite_ids))
@@ -201,43 +171,38 @@ export default function FavouriteDoctorsTab() {
 		)
 	}
 
+	const dataToShow = isSearching ? filteredFavourites : favouriteDoctors
+	const isEmpty = dataToShow.length === 0
+
 	return (
 		<View style={styles.container}>
 			<FlatList
-				data={isSearching ? searchResults : favouriteDoctors}
+				data={dataToShow}
 				keyExtractor={(item) => item.id}
 				contentContainerStyle={[
 					styles.listContent,
-					(isSearching ? searchResults.length === 0 : favouriteDoctors.length === 0) &&
-						!searchLoading &&
-						styles.emptyListContent,
+					isEmpty && styles.emptyListContent,
 				]}
 				ListHeaderComponent={
 					<View style={styles.headerContent}>
-						<View style={[styles.searchBox, isCompact && styles.searchBoxCompact]}>
-							<MaterialCommunityIcons
-								name="magnify"
-								size={isCompact ? 20 : 28}
-								color="#9b9b9b"
-							/>
-							<TextInput
-								value={searchQuery}
-								onChangeText={setSearchQuery}
-								placeholder="Search doctor..."
-								placeholderTextColor="#98a1aa"
-								style={[
-									styles.searchInput,
-									isCompact && styles.searchInputCompact,
-								]}
-								autoCorrect={false}
-								returnKeyType="search"
-							/>
-							<MaterialCommunityIcons
-								name="microphone-outline"
-								size={isCompact ? 20 : 28}
-								color="#9b9b9b"
-							/>
-						</View>
+						<AppInput
+							value={searchQuery}
+							onChangeText={setSearchQuery}
+							placeholder="Search doctor..."
+							placeholderTextColor="#98a1aa"
+							containerStyle={[styles.searchInputContainer, isCompact && styles.searchInputContainerCompact]}
+							style={[styles.searchInput, isCompact && styles.searchInputCompact]}
+							contentStyle={[styles.searchInputContent, isCompact && styles.searchInputContentCompact]}
+							outlineStyle={[styles.searchInputOutline, isCompact && styles.searchInputOutlineCompact]}
+							outlineColor="#2e7b7d"
+							activeOutlineColor="#2e7b7d"
+							textColor="#1b2d3c"
+							left={<AppInput.Icon icon="magnify" size={isCompact ? 20 : 28} color="#9b9b9b" />}
+							right={<AppInput.Icon icon="microphone-outline" size={isCompact ? 20 : 28} color="#9b9b9b" />}
+							autoCorrect={false}
+							returnKeyType="search"
+							noMargin
+						/>
 
 						<Text style={[styles.sectionTitle, isCompact && styles.sectionTitleCompact]}>
 							{isSearching ? 'SEARCH RESULTS' : 'FAVOURITE DOCTORS'}
@@ -256,26 +221,17 @@ export default function FavouriteDoctorsTab() {
 						primaryColor={TEAL}
 					/>
 				)}
-				ListFooterComponent={
-					searchLoading ? (
-						<View style={styles.searchLoadingBox}>
-							<ActivityIndicator size="small" color={TEAL} />
-						</View>
-					) : null
-				}
 				ListEmptyComponent={
-					searchLoading ? null : (
-						<View style={styles.emptyState}>
-							<MaterialCommunityIcons
-								name={isSearching ? 'doctor' : 'bookmark-outline'}
-								size={40}
-								color="#8ca0a9"
-							/>
-							<Text style={styles.emptyTitle}>
-								{isSearching ? 'No doctors found' : 'No favourite doctors yet'}
-							</Text>
-						</View>
-					)
+					<View style={styles.emptyState}>
+						<MaterialCommunityIcons
+							name={isSearching ? 'doctor' : 'bookmark-outline'}
+							size={40}
+							color="#8ca0a9"
+						/>
+						<Text style={styles.emptyTitle}>
+							{isSearching ? 'No favourite doctors match your search' : 'No favourite doctors yet'}
+						</Text>
+					</View>
 				}
 				showsVerticalScrollIndicator={false}
 				keyboardShouldPersistTaps="handled"
@@ -297,46 +253,47 @@ const styles = StyleSheet.create({
 	headerContent: {
 		paddingBottom: 2,
 	},
-	searchBox: {
-		height: 54,
-		borderRadius: 18,
-		borderWidth: 3,
-		borderColor: '#2e7b7d',
-		backgroundColor: '#f8fbff',
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: 18,
-		marginBottom: 28,
+	searchInputContainer: {
+		marginBottom: 12,
 	},
-	searchBoxCompact: {
-		height: 44,
-		borderRadius: 14,
-		borderWidth: 2,
-		paddingHorizontal: 12,
-		marginBottom: 18,
+	searchInputContainerCompact: {
+		marginBottom: 10,
 	},
 	searchInput: {
-		flex: 1,
-		height: 50,
-		paddingHorizontal: 12,
-		fontSize: 17,
-		color: '#1b2d3c',
+		height: 54,
+		backgroundColor: '#f8fbff',
 	},
 	searchInputCompact: {
-		height: 42,
-		paddingHorizontal: 8,
+		height: 44,
+	},
+	searchInputContent: {
+		height: 54,
+		paddingHorizontal: 0,
+		paddingVertical: 0,
+		fontSize: 17,
+	},
+	searchInputContentCompact: {
+		height: 44,
 		fontSize: 15,
+	},
+	searchInputOutline: {
+		borderRadius: 18,
+		borderWidth: 3,
+	},
+	searchInputOutlineCompact: {
+		borderRadius: 14,
+		borderWidth: 2,
 	},
 	sectionTitle: {
 		fontSize: 15,
 		fontWeight: '700',
 		color: '#526b7a',
 		letterSpacing: 0,
-		marginBottom: 30,
+		marginBottom: 12,
 	},
 	sectionTitleCompact: {
 		fontSize: 13,
-		marginBottom: 18,
+		marginBottom: 10,
 	},
 	emptyListContent: {
 		flexGrow: 1,
@@ -352,10 +309,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		paddingVertical: 40,
-	},
-	searchLoadingBox: {
-		paddingVertical: 24,
-		alignItems: 'center',
 	},
 	emptyTitle: {
 		color: '#7f98a3',

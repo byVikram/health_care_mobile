@@ -3,10 +3,9 @@ import {
 	ActivityIndicator,
 	Alert,
 	Animated,
+	FlatList,
 	Image,
-	Modal,
 	Platform,
-	Pressable,
 	RefreshControl,
 	ScrollView,
 	StyleSheet,
@@ -16,15 +15,15 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
-import { BlurView } from 'expo-blur'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { AppSelect, AppSelectOption, AppTable, AppTableColumn, AppTypography } from '../../components/common'
+import { AppBottomSheet, AppSelect, AppSelectOption, AppTable, AppTableColumn, AppTypography } from '../../components/common'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { useAuth } from '../../context/AuthContext'
+import { AppointmentsResponse, Appointment } from '../../types/appointment'
 import PaginationBar from '../../components/common/AppPagination'
 import MobileAppointmentCard from './components/MobileAppointmentCard'
 
@@ -78,58 +77,7 @@ type ApiHospitalsResponse = {
 	hospitals?: ApiDoctorHospital[]
 }
 
-type ApiAppointment = {
-	id: string
-	appointment_id?: string | number
-	patient_id?: string | number
-	patient_profile_id?: string | number
-	doctor_id?: string | number
-	hospital_id?: string | number
-	public_id?: string | number
-	user_id?: string | number
-	appointment_mode?: string
-	appointment_date?: string
-	appointment_time?: string
-	start_time?: string
-	end_time?: string | null
-	status?: string | { label?: string }
-	doctor?: {
-		id?: string | number
-		doctor_id?: string | number
-		public_id?: string | number
-		user_id?: string | number
-		name?: string
-		avatar_s3_key?: string | null
-	}
-	patient?: {
-		id?: string | number
-		patient_id?: string | number
-		patient_profile_id?: string | number
-		public_id?: string | number
-		user_id?: string | number
-		name?: string
-		avatar_s3_key?: string | null
-	}
-	user?: {
-		id?: string | number
-		public_id?: string | number
-		user_id?: string | number
-		role?: string
-	}
-	hospital?: { id?: string | number; hospital_id?: string | number; name?: string; address?: string } | null
-}
 
-type ApiAppointmentsResponse = {
-	success?: boolean
-	message?: string
-	data?: ApiAppointment[] | { data?: ApiAppointment[]; appointments?: ApiAppointment[] }
-	appointments?: ApiAppointment[]
-	meta?: Partial<AppointmentMeta>
-	total?: number
-	page?: number
-	limit?: number
-	pages?: number
-}
 
 const PAGE_SIZE = 10
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
@@ -162,7 +110,7 @@ const BORDER = '#e5eaef'
 const SURFACE = '#ffffff'
 const BACKGROUND = '#f6f8fb'
 
-const getStatusLabel = (status: ApiAppointment['status']) => {
+const getStatusLabel = (status: any) => {
 	if (!status) return 'Pending'
 	if (typeof status === 'string') return status
 	return status.label || 'Pending'
@@ -233,8 +181,8 @@ const applyDateFilterParams = (
 	if (filter === 'all') return
 
 	if (filter === 'custom') {
-		if (customFromDate) params.from_date = customFromDate
-		if (customToDate) params.to_date = customToDate
+		if (customFromDate) params.start_date = customFromDate
+		if (customToDate) params.end_date = customToDate
 		params.date_filter = filter
 		return
 	}
@@ -267,8 +215,8 @@ const applyDateFilterParams = (
 	const days = filter === 'last_30_days' ? 30 : 7
 	const startDate = new Date(today)
 	startDate.setDate(today.getDate() - (days - 1))
-	params.from_date = formatApiDate(startDate)
-	params.to_date = endDate
+	params.start_date = formatApiDate(startDate)
+	params.end_date = endDate
 	params.date_filter = filter
 }
 
@@ -338,74 +286,73 @@ const statusColors = (status: string) => {
 	return { color: TEAL, backgroundColor: '#edfafa' }
 }
 
-const getAppointmentId = (appt: ApiAppointment) => String(appt.appointment_id ?? appt.id ?? '')
-const uniqueStrings = (values: Array<string | number | null | undefined>) =>
-	Array.from(
-		new Set(
-			values
-				.map((value) => String(value ?? '').trim())
-				.filter(Boolean)
-		)
-	)
-const getPatientIds = (appt: ApiAppointment) =>
-	uniqueStrings([
-		appt.patient?.id,
-		appt.patient?.patient_id,
-		appt.patient?.patient_profile_id,
-		appt.patient?.public_id,
-		appt.patient?.user_id,
-		appt.patient_id,
-		appt.patient_profile_id,
-		appt.user?.id,
-		appt.user?.public_id,
-		appt.user?.user_id,
-		appt.public_id,
-		appt.user_id,
-	])
-const getDoctorIds = (appt: ApiAppointment) =>
-	uniqueStrings([appt.doctor?.id, appt.doctor?.doctor_id, appt.doctor?.public_id, appt.doctor?.user_id, appt.doctor_id])
-const getHospitalIds = (appt: ApiAppointment) =>
-	uniqueStrings([appt.hospital?.id, appt.hospital?.hospital_id, appt.hospital_id])
-const getPatientId = (appt: ApiAppointment) => getPatientIds(appt)[0] ?? ''
-const getDoctorId = (appt: ApiAppointment) => getDoctorIds(appt)[0] ?? ''
-const getHospitalId = (appt: ApiAppointment) => getHospitalIds(appt)[0] ?? ''
-const normalizeId = (value: string | number | null | undefined) => String(value ?? '').trim().toLowerCase()
-const idsInclude = (rowIds: string[], authIds: string[]) => {
-	const normalizedRowIds = new Set(rowIds.map(normalizeId).filter(Boolean))
-	return authIds.some((id) => normalizedRowIds.has(normalizeId(id)))
+const mapStatusToId = (status: string): number | undefined => {
+	switch (status.toLowerCase()) {
+		case 'pending': return 1
+		case 'confirmed': return 2
+		case 'cancelled': return 3
+		case 'completed': return 4
+		case 'no_show': return 5
+		default: return undefined
+	}
 }
+
 const compactParams = (params: Record<string, unknown>) =>
 	Object.fromEntries(
 		Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
 	)
+
 const maskToken = (token: string | null) =>
 	token ? `${token.slice(0, 12)}...${token.slice(-6)}` : null
 
-const normalizeRows = (appointments: ApiAppointment[]): AppointmentRow[] =>
+const firstString = (...values: unknown[]) => {
+	const match = values.find((value) => typeof value === 'string' && value.trim().length > 0)
+	return typeof match === 'string' ? match.trim() : ''
+}
+
+const getProfileImageUrl = (entity: unknown) => {
+	const item = entity as Record<string, any> | null | undefined
+	return firstString(
+		item?.avatar_s3_key,
+		item?.avatar,
+		item?.profile_image,
+		item?.profile_image_url,
+		item?.details?.avatar_s3_key,
+		item?.details?.avatar,
+		item?.details?.profile_image,
+		item?.details?.profile_image_url,
+		item?.personal_details?.avatar_s3_key,
+		item?.personal_details?.avatar,
+		item?.personal_details?.profile_image,
+		item?.personal_details?.profile_image_url
+	)
+}
+
+const normalizeRows = (appointments: Appointment[]): AppointmentRow[] =>
 	appointments.map((appt, index) => {
-		const patientIds = getPatientIds(appt)
-		const doctorIds = getDoctorIds(appt)
-		const hospitalIds = getHospitalIds(appt)
+		const patientId = String(appt.patient?.id ?? '')
+		const doctorId = String(appt.doctor?.id ?? '')
+		const hospitalId = String(appt.hospital?.id ?? '')
 
 		return {
-			id: getAppointmentId(appt) || `appointment-${index}`,
-			patientId: patientIds[0] ?? '',
-			patientIds,
+			id: appt.id || `appointment-${index}`,
+			patientId,
+			patientIds: [patientId],
 			patientName: appt.patient?.name || 'Unknown patient',
-			patientAvatar: appt.patient?.avatar_s3_key || '',
-			doctorId: doctorIds[0] ?? '',
-			doctorIds,
+			patientAvatar: getProfileImageUrl(appt.patient),
+			doctorId,
+			doctorIds: [doctorId],
 			appointmentDate: appt.appointment_date || '',
-			startTime: appt.start_time || appt.appointment_time || '',
-			endTime: appt.end_time ?? null,
+			startTime: appt.appointment_time || '',
+			endTime: null,
 			appointmentMode: appt.appointment_mode || '',
 			status: getStatusLabel(appt.status),
 			doctorName: appt.doctor?.name || 'Unknown doctor',
-			doctorAvatar: appt.doctor?.avatar_s3_key || '',
+			doctorAvatar: getProfileImageUrl(appt.doctor),
 			hospitalName: appt.hospital?.name || null,
 			hospitalAddress: appt.hospital?.address || null,
-			hospitalId: hospitalIds[0] ?? '',
-			hospitalIds,
+			hospitalId,
+			hospitalIds: [hospitalId],
 		}
 	})
 
@@ -438,31 +385,13 @@ const normalizeHospitals = (response: ApiHospitalsResponse): HospitalOption[] =>
 		.filter((item): item is HospitalOption => Boolean(item))
 }
 
-const unpackAppointments = (response: ApiAppointmentsResponse) => {
-	const nestedData = typeof response.data === 'object' && !Array.isArray(response.data)
-		? response.data.data ?? response.data.appointments
-		: undefined
-	const rows = Array.isArray(response.data)
-		? response.data
-		: Array.isArray(nestedData)
-			? nestedData
-			: Array.isArray(response.appointments)
-				? response.appointments
-				: []
-
-	console.log('[AppointmentList][debug] raw appointments response shape:', {
-		dataIsArray: Array.isArray(response.data),
-		nestedDataIsArray: Array.isArray(nestedData),
-		appointmentsIsArray: Array.isArray(response.appointments),
-		rowsLength: rows.length,
-		firstRawAppointment: rows[0] ?? null,
-	})
-
-	const metaSource = response.meta ?? {}
-	const total = metaSource.total ?? response.total ?? rows.length
-	const page = metaSource.page ?? response.page ?? 1
-	const limit = metaSource.limit ?? response.limit ?? PAGE_SIZE
-	const pages = metaSource.pages ?? response.pages ?? Math.max(1, Math.ceil(total / limit))
+const unpackAppointments = (response: AppointmentsResponse) => {
+	const rows = response.data || []
+	const meta = response.meta || response || {}
+	const total = meta.total ?? rows.length
+	const page = meta.page ?? 1
+	const limit = meta.limit ?? PAGE_SIZE
+	const pages = meta.pages ?? Math.max(1, Math.ceil(total / limit))
 
 	return {
 		rows: normalizeRows(rows),
@@ -521,7 +450,6 @@ export default function AppointmentList() {
 	const [pageSize, setPageSize] = useState(PAGE_SIZE)
 	const [allRows, setAllRows] = useState<AppointmentRow[]>([])
 	const [apiMeta, setApiMeta] = useState<AppointmentMeta | null>(null)
-	const [usingApiPagination, setUsingApiPagination] = useState(false)
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 	const [modeFilter, setModeFilter] = useState('all')
@@ -538,65 +466,14 @@ export default function AppointmentList() {
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
 	const [hospitals, setHospitals] = useState<HospitalOption[]>([{ label: 'All', value: 'all' }])
 	const [selectedHospitalValue, setSelectedHospitalValue] = useState('all')
+	const [draftSelectedHospitalValue, setDraftSelectedHospitalValue] = useState('all')
 	const [hospitalsLoading, setHospitalsLoading] = useState(false)
-	const filterSheetAnim = useRef(new Animated.Value(0)).current
-	const filterBackdropAnim = useRef(new Animated.Value(0)).current
+	const [statusOptions, setStatusOptions] = useState<AppSelectOption[]>([{ label: 'All', value: 'all' }])
+	const [statusesLoading, setStatusesLoading] = useState(false)
 	const skipNextFilterFetchRef = useRef(false)
-	const listScrollY = useRef(new Animated.Value(0)).current
-
-	const headerCollapseStyle = useMemo(() => ({
-		opacity: listScrollY.interpolate({
-			inputRange: [0, 28, 56],
-			outputRange: [1, 0.35, 0],
-			extrapolate: 'clamp',
-		}),
-		maxHeight: listScrollY.interpolate({
-			inputRange: [0, 56],
-			outputRange: [64, 0],
-			extrapolate: 'clamp',
-		}),
-		marginBottom: listScrollY.interpolate({
-			inputRange: [0, 56],
-			outputRange: [16, 0],
-			extrapolate: 'clamp',
-		}),
-	}), [listScrollY])
 
 	const isPatientView = role === 'patient'
-	const currentUserIds = useMemo(() => {
-		const authUser = user as (typeof user & Record<string, unknown>) | null
-		const roleSpecificId = role === 'doctor'
-			? authUser?.doctor_id ?? authUser?.doctorId
-			: authUser?.patient_id ?? authUser?.patientId ?? authUser?.patient_profile_id ?? authUser?.patientProfileId
-		const nestedRole = role === 'doctor'
-			? (authUser?.doctor as Record<string, unknown> | undefined)
-			: (authUser?.patient as Record<string, unknown> | undefined)
 
-		return uniqueStrings([
-			authUser?.id as string | number | undefined,
-			authUser?.public_id as string | number | undefined,
-			authUser?.publicId as string | number | undefined,
-			authUser?.user_id as string | number | undefined,
-			authUser?.userId as string | number | undefined,
-			authUser?.patient_profile_id as string | number | undefined,
-			authUser?.patientProfileId as string | number | undefined,
-			roleSpecificId as string | number | undefined,
-			nestedRole?.id as string | number | undefined,
-			nestedRole?.patient_id as string | number | undefined,
-			nestedRole?.patient_profile_id as string | number | undefined,
-			nestedRole?.public_id as string | number | undefined,
-			nestedRole?.user_id as string | number | undefined,
-		])
-	}, [role, user])
-
-	useEffect(() => {
-		console.log('[AppointmentList][debug] auth state:', {
-			authLoading,
-			role,
-			user,
-			currentUserIds,
-		})
-	}, [authLoading, currentUserIds, role, user])
 
 	const columns = useMemo<AppTableColumn<AppointmentRow>[]>(() => [
 		{
@@ -674,6 +551,9 @@ export default function AppointmentList() {
 			dateFilter: string
 			fromDateFilter: string
 			toDateFilter: string
+			search: string
+			hospital_id: string
+			status_id: string
 		}>
 	) => {
 		if (role !== 'doctor' && role !== 'patient') return
@@ -688,22 +568,25 @@ export default function AppointmentList() {
 		const queryParams = compactParams({
 			page: effectivePage,
 			limit: effectivePageSize,
+			search: (overrides && 'search' in overrides ? overrides.search || '' : search).trim() || undefined,
+			hospital_id: (overrides && 'hospital_id' in overrides ? overrides.hospital_id : (selectedHospitalValue !== 'all' ? selectedHospitalValue : undefined)),
+			status_id: (overrides && 'status_id' in overrides ? overrides.status_id : (statusFilter !== 'all' ? statusFilter : undefined)),
 		})
 		applyDateFilterParams(queryParams, effectiveDateFilter, effectiveFromDateFilter, effectiveToDateFilter)
 
 		try {
 			if (showLoader) setLoading(true)
-			const token = await AsyncStorage.getItem('access_token')
-			console.log('[AppointmentList][debug] appointments fetch request:', {
-				url: requestUrl,
-				method: 'GET',
-				queryParams,
-				requestPayload: null,
-				authToken: maskToken(token),
-			})
+			// const token = await AsyncStorage.getItem('access_token')
+			// console.log('[AppointmentList][debug] appointments fetch request:', {
+			// 	url: requestUrl,
+			// 	method: 'GET',
+			// 	queryParams,
+			// 	requestPayload: null,
+			// 	authToken: maskToken(token),
+			// })
 
 			const hasQueryParams = Object.keys(queryParams).length > 0
-			const res = await ApiService.get<ApiAppointmentsResponse>(
+			const res = await ApiService.get<AppointmentsResponse>(
 				requestUrl,
 				hasQueryParams ? { params: queryParams } : undefined
 			)
@@ -717,7 +600,6 @@ export default function AppointmentList() {
 			})
 			const next = unpackAppointments(res.data)
 			setApiMeta(next.meta)
-			setUsingApiPagination(true)
 			console.log('[AppointmentList][debug] mapped appointment IDs:', {
 				mappedRowsLength: next.rows.length,
 				sampleMappedRows: next.rows.slice(0, 5).map((row) => ({
@@ -745,20 +627,6 @@ export default function AppointmentList() {
 				message: err?.message,
 			})
 
-			if (err?.response?.status === 422 && Object.keys(queryParams).length > 0) {
-				try {
-					console.log('[AppointmentList][debug] retrying appointments fetch without query params after validation error')
-					const fallbackRes = await ApiService.get<ApiAppointmentsResponse>(requestUrl)
-					const fallbackNext = unpackAppointments(fallbackRes.data)
-					setApiMeta(null)
-					setUsingApiPagination(false)
-					setAllRows(fallbackNext.rows)
-					return
-				} catch (fallbackError) {
-					console.log('[AppointmentList][debug] appointments fallback fetch error:', fallbackError)
-				}
-			}
-
 			console.log('[AppointmentList] fetch appointments error:', error)
 			Alert.alert(
 				'Error',
@@ -768,7 +636,7 @@ export default function AppointmentList() {
 			setLoading(false)
 			setRefreshing(false)
 		}
-	}, [dateFilter, fromDateFilter, page, pageSize, role, toDateFilter])
+	}, [dateFilter, fromDateFilter, page, pageSize, role, toDateFilter, search, selectedHospitalValue, statusFilter])
 
 	const  fetchHospitals = useCallback(async () => {
 		if (role !== 'doctor') return
@@ -793,6 +661,30 @@ export default function AppointmentList() {
 		}
 	}, [role])
 
+	const fetchStatuses = useCallback(async () => {
+		try {
+			setStatusesLoading(true)
+			const res = await ApiService.get<{ success: boolean; data: { id: string; label: string }[] }>(
+				API_ENDPOINTS.APPOINTMENTS.STATUSES
+			)
+			if (res.data?.success && Array.isArray(res.data.data)) {
+				const apiOptions = res.data.data.map((item) => ({
+					label: item.label.charAt(0).toUpperCase() + item.label.slice(1),
+					value: item.id,
+				}))
+				setStatusOptions([{ label: 'All', value: 'all' }, ...apiOptions])
+			}
+		} catch (error) {
+			console.log('[AppointmentList] fetch statuses error:', error)
+			Alert.alert(
+				'Error',
+				(error as any)?.response?.data?.message || (error as any)?.message || 'Unable to load statuses right now.'
+			)
+		} finally {
+			setStatusesLoading(false)
+		}
+	}, [])
+
 	useEffect(() => {
 		if (skipNextFilterFetchRef.current) {
 			skipNextFilterFetchRef.current = false
@@ -811,55 +703,22 @@ export default function AppointmentList() {
 	}, [fetchHospitals])
 
 	useEffect(() => {
+		void fetchStatuses()
+	}, [fetchStatuses])
+
+	useEffect(() => {
 		if (useTable || MOBILE_PAGE_SIZE_OPTIONS.includes(pageSize)) return
 
 		setPageSize(MOBILE_PAGE_SIZE_OPTIONS[0])
 		setPage(1)
 	}, [pageSize, useTable])
 
-	const roleRows = useMemo(() => {
-		if (role !== 'doctor' && role !== 'patient') return []
-		if (currentUserIds.length === 0) return []
-
-		return allRows.filter((row) =>
-			role === 'doctor'
-				? idsInclude(row.doctorIds, currentUserIds)
-				: idsInclude(row.patientIds, currentUserIds)
-		)
-	}, [allRows, currentUserIds, role])
-
-	useEffect(() => {
-		console.log('[AppointmentList][debug] role filter result:', {
-			authLoading,
-			role,
-			loggedInUserIds: currentUserIds,
-			allRowsLength: allRows.length,
-			roleFilteredRowsLength: roleRows.length,
-		})
-
-		if (role === 'patient' && !authLoading && allRows.length > 0 && roleRows.length === 0) {
-			console.log('[AppointmentList][debug] patient role filter empty; mapped row dump:', allRows.map((row) => ({
-				id: row.id,
-				patientId: row.patientId,
-				patientIds: row.patientIds,
-				doctorId: row.doctorId,
-				doctorIds: row.doctorIds,
-				hospitalId: row.hospitalId,
-				hospitalIds: row.hospitalIds,
-				patientName: row.patientName,
-				doctorName: row.doctorName,
-				appointmentDate: row.appointmentDate,
-				status: row.status,
-			})))
-		}
-	}, [allRows, authLoading, currentUserIds, role, roleRows])
-
 	useEffect(() => {
 		if (role !== 'patient') return
 
 		const derivedHospitals = Array.from(
 			new Map(
-				roleRows
+				allRows
 					.filter((row) => row.hospitalId && row.hospitalName)
 					.map((row) => [row.hospitalId, { value: row.hospitalId, label: row.hospitalName || 'Hospital' }])
 			).values()
@@ -869,41 +728,21 @@ export default function AppointmentList() {
 			if (current === 'all' || derivedHospitals.some((hospital) => hospital.value === current)) return current
 			return 'all'
 		})
-	}, [role, roleRows])
+	}, [role, allRows])
 
 	const filteredRows = useMemo(() => {
-		const query = search.trim().toLowerCase()
-
-		return roleRows.filter((row) => {
-			if (selectedHospitalValue !== 'all' && !idsInclude(row.hospitalIds, [selectedHospitalValue])) return false
+		return allRows.filter((row) => {
 			if (modeFilter !== 'all' && normalizeModeValue(row.appointmentMode) !== modeFilter) return false
-			if (statusFilter !== 'all' && normalizeStatusValue(row.status) !== statusFilter) return false
-			if (!isDateInFilter(row.appointmentDate, dateFilter, fromDateFilter, toDateFilter)) return false
-
-			if (query) {
-				const searchable = [
-					row.id,
-					row.patientId,
-					...row.patientIds,
-					row.doctorId,
-					...row.doctorIds,
-					row.patientName,
-					row.doctorName,
-					row.hospitalName ?? '',
-				].join(' ').toLowerCase()
-				if (!searchable.includes(query)) return false
-			}
-
 			return true
 		})
-	}, [dateFilter, fromDateFilter, modeFilter, roleRows, search, selectedHospitalValue, statusFilter, toDateFilter])
+	}, [allRows, modeFilter])
 
 	useEffect(() => {
 		setPage(1)
 	}, [dateFilter, fromDateFilter, modeFilter, search, selectedHospitalValue, statusFilter, toDateFilter])
 
 	const meta = useMemo<AppointmentMeta>(() => {
-		if (usingApiPagination && apiMeta) {
+		if (apiMeta) {
 			const total = apiMeta.total
 			const limit = pageSize || apiMeta.limit || PAGE_SIZE
 			const pages = apiMeta.pages || Math.max(1, Math.ceil(total / Math.max(1, limit)))
@@ -927,14 +766,11 @@ export default function AppointmentList() {
 			limit: pageSize,
 			pages,
 		}
-	}, [apiMeta, filteredRows.length, page, pageSize, usingApiPagination])
+	}, [apiMeta, filteredRows.length, page, pageSize])
 
 	const rows = useMemo(() => {
-		if (usingApiPagination) return filteredRows
-
-		const start = (meta.page - 1) * pageSize
-		return filteredRows.slice(start, start + pageSize)
-	}, [filteredRows, meta.page, pageSize, usingApiPagination])
+		return filteredRows
+	}, [filteredRows])
 
 	useEffect(() => {
 		if (meta.page !== page) setPage(meta.page)
@@ -961,39 +797,13 @@ export default function AppointmentList() {
 		setDraftStatusFilter(statusFilter)
 		setDraftFromDateFilter(fromDateFilter)
 		setDraftToDateFilter(toDateFilter)
+		setDraftSelectedHospitalValue(selectedHospitalValue)
 		setFilterModalVisible(true)
-		filterSheetAnim.setValue(0)
-		filterBackdropAnim.setValue(0)
-		Animated.parallel([
-			Animated.timing(filterSheetAnim, {
-				toValue: 1,
-				duration: 260,
-				useNativeDriver: true,
-			}),
-			Animated.timing(filterBackdropAnim, {
-				toValue: 1,
-				duration: 220,
-				useNativeDriver: true,
-			}),
-		]).start()
 	}
 
 	const closeFilterModal = () => {
 		setActiveDatePicker(null)
-		Animated.parallel([
-			Animated.timing(filterSheetAnim, {
-				toValue: 0,
-				duration: 220,
-				useNativeDriver: true,
-			}),
-			Animated.timing(filterBackdropAnim, {
-				toValue: 0,
-				duration: 180,
-				useNativeDriver: true,
-			}),
-		]).start(({ finished }) => {
-			if (finished) setFilterModalVisible(false)
-		})
+		setFilterModalVisible(false)
 	}
 
 	const applyFilters = () => {
@@ -1015,6 +825,7 @@ export default function AppointmentList() {
 		setStatusFilter(draftStatusFilter)
 		setFromDateFilter(nextFromDateFilter)
 		setToDateFilter(nextToDateFilter)
+		setSelectedHospitalValue(draftSelectedHospitalValue)
 		setPage(1)
 		void fetchAppointments(true, {
 			page: 1,
@@ -1032,6 +843,7 @@ export default function AppointmentList() {
 		setDraftStatusFilter('all')
 		setDraftFromDateFilter('')
 		setDraftToDateFilter('')
+		setDraftSelectedHospitalValue('all')
 		setActiveDatePicker(null)
 		setModeFilter('all')
 		setDateFilter('all')
@@ -1141,7 +953,7 @@ export default function AppointmentList() {
 	const statusSelect = renderInlineFilter(
 		'Status',
 		<AppSelect
-			options={STATUS_OPTIONS}
+			options={statusOptions}
 			value={statusFilter}
 			onSelect={(value) => {
 				setStatusFilter(value)
@@ -1269,99 +1081,71 @@ export default function AppointmentList() {
 		</View>
 	)
 
-	const renderFilterModal = () => {
-		const translateY = filterSheetAnim.interpolate({
-			inputRange: [0, 1],
-			outputRange: [420, 0],
-		})
-		const backdropOpacity = filterBackdropAnim.interpolate({
-			inputRange: [0, 1],
-			outputRange: [0, 1],
-		})
+	const renderFilterModal = () => (
+		<AppBottomSheet
+			visible={filterModalVisible}
+			title="Filters"
+			onClose={closeFilterModal}
+		>
+			<View style={[styles.filterSheetBody, { maxHeight: Math.min(height * 0.62, 500) }]}>
+				<ScrollView
+					style={styles.filterSheetScroll}
+					contentContainerStyle={styles.filterSheetContent}
+					showsVerticalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
+				>
+					<View style={styles.filterGroup}>
+						<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
+						{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
+							setDraftDateFilter(value)
+							if (value !== 'custom') setActiveDatePicker(null)
+						})}
+						{renderDateRangePicker()}
+					</View>
 
-		return (
-			<Modal
-				visible={filterModalVisible}
-				transparent
-				animationType="none"
-				onRequestClose={closeFilterModal}
-			>
-				<View style={styles.filterModalRoot}>
-					<Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
-						<BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
-						<View style={styles.filterDim} />
-						<Pressable style={StyleSheet.absoluteFill} onPress={closeFilterModal} />
-					</Animated.View>
-
-					<Animated.View
-						style={[
-							styles.filterSheet,
-							{
-								width: Math.min(width - 24, 520),
-								maxHeight: Math.min(height * 0.78, 620),
-								paddingBottom: Math.max(insets.bottom + 18, 26),
-								transform: [{ translateY }],
-							},
-						]}
-					>
-						<View style={styles.filterSheetHandle} />
-
-						<View style={styles.filterSheetHeader}>
-							<AppTypography style={styles.filterSheetTitle}>Filters</AppTypography>
-							<TouchableOpacity style={styles.filterCloseButton} onPress={closeFilterModal}>
-								<MaterialCommunityIcons name="close" size={22} color={MUTED} />
-							</TouchableOpacity>
-						</View>
-
-						<ScrollView
-							style={styles.filterSheetScroll}
-							contentContainerStyle={styles.filterSheetContent}
-							showsVerticalScrollIndicator={false}
-						>
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Date Selection</AppTypography>
-								{renderFilterChips(DATE_OPTIONS, draftDateFilter, (value) => {
-									setDraftDateFilter(value)
-									if (value !== 'custom') setActiveDatePicker(null)
-								})}
-								{renderDateRangePicker()}
-							</View>
-
-							<View style={styles.filterGroup}>
-								<AppTypography style={styles.filterGroupLabel}>Consultation Mode</AppTypography>
-								{renderFilterChips(MODE_OPTIONS, draftModeFilter, setDraftModeFilter)}
-							</View>
+					<View style={styles.filterGroup}>
+						<AppTypography style={styles.filterGroupLabel}>Consultation Mode</AppTypography>
+						{renderFilterChips(MODE_OPTIONS, draftModeFilter, setDraftModeFilter)}
+					</View>
 
 							<View style={styles.filterGroup}>
 								<AppTypography style={styles.filterGroupLabel}>Appointment Status</AppTypography>
-								{renderFilterChips(STATUS_OPTIONS, draftStatusFilter, setDraftStatusFilter)}
+								{renderFilterChips(statusOptions, draftStatusFilter, setDraftStatusFilter)}
+							</View>
+
+							<View style={styles.filterGroup}>
+								<AppTypography style={styles.filterGroupLabel}>Hospital</AppTypography>
+								<AppSelect
+									options={hospitals}
+									value={draftSelectedHospitalValue}
+									onSelect={(value) => {
+										setDraftSelectedHospitalValue(value)
+									}}
+									placeholder={hospitalsLoading ? 'Loading hospitals...' : 'Select hospital'}
+									size="medium"
+									borderRadius={10}
+									customCardStyle={[styles.inlineFilterSelect, styles.mobileHospitalSelectCard]}
+									borderColor={BORDER}
+									maxDropdownHeight={240}
+									style={styles.inlineSelectFill}
+								/>
 							</View>
 						</ScrollView>
 
-						<View style={styles.filterSheetActions}>
-							<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
-								<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
-							</TouchableOpacity>
-							<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
-								<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
-							</TouchableOpacity>
-						</View>
-					</Animated.View>
+				<View style={[styles.filterSheetActions, { paddingBottom: Math.max(insets.bottom + 18, 26) }]}>
+					<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+						<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
+					</TouchableOpacity>
+					<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+						<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
+					</TouchableOpacity>
 				</View>
-			</Modal>
-		)
-	}
+			</View>
+		</AppBottomSheet>
+	)
 
 	const content = (
 		<>
-				<Animated.View style={[styles.header, !useTable && headerCollapseStyle]}>
-					<TouchableOpacity style={styles.backButton} onPress={goBack} activeOpacity={0.8}>
-						<MaterialCommunityIcons name="chevron-left" size={28} color={TEAL} />
-					</TouchableOpacity>
-					<View style={styles.headerText}>
-						<AppTypography style={styles.title}>Appointments</AppTypography>
-					</View>
-				</Animated.View>
 
 				<View style={styles.filtersSection}>
 					{useInlineFilters ? (
@@ -1373,12 +1157,9 @@ export default function AppointmentList() {
 							{searchInput}
 						</View>
 					) : (
-						<View style={styles.filterGridMobile}>
-							{searchInput}
-							<View style={styles.mobileSearchRow}>
-								{hospitalSelect}
-								{mobileFilterButton}
-							</View>
+						<View style={styles.mobileSearchRow}>
+							<View style={{ flex: 1 }}>{searchInput}</View>
+							{mobileFilterButton}
 						</View>
 					)}
 				</View>
@@ -1418,7 +1199,7 @@ export default function AppointmentList() {
 						) : null}
 					</>
 				) : (
-					<Animated.FlatList
+					<FlatList
 						data={rows}
 						keyExtractor={(item) => item.id}
 						renderItem={({ item }) => (
@@ -1427,11 +1208,6 @@ export default function AppointmentList() {
 						style={styles.mobileList}
 						contentContainerStyle={rows.length === 0 ? styles.emptyListContent : styles.listContent}
 						showsVerticalScrollIndicator={false}
-						scrollEventThrottle={16}
-						onScroll={Animated.event(
-							[{ nativeEvent: { contentOffset: { y: listScrollY } } }],
-							{ useNativeDriver: false }
-						)}
 						ListEmptyComponent={<EmptyState />}
 						refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
 					/>
@@ -1461,7 +1237,7 @@ export default function AppointmentList() {
 					style={styles.tablePageScroll}
 					contentContainerStyle={[
 						styles.tablePageContent,
-						{ paddingTop: insets.top + 12, maxWidth: contentWidth },
+						{ paddingTop: 12, maxWidth: contentWidth },
 					]}
 					showsVerticalScrollIndicator={false}
 					keyboardShouldPersistTaps="handled"
@@ -1475,7 +1251,7 @@ export default function AppointmentList() {
 
 	return (
 		<View style={styles.screen}>
-			<View style={[styles.container, { paddingTop: insets.top + 12, maxWidth: contentWidth }]}>
+			<View style={[styles.container, { paddingTop: 12, maxWidth: contentWidth }]}>
 				{content}
 			</View>
 		</View>
@@ -1676,57 +1452,8 @@ const styles = StyleSheet.create({
 		backgroundColor: '#e9f8f7',
 		borderColor: TEAL,
 	},
-	filterModalRoot: {
-		flex: 1,
-		justifyContent: 'flex-end',
-		alignItems: 'center',
-	},
-	filterBackdrop: {
-		...StyleSheet.absoluteFillObject,
-	},
-	filterDim: {
-		...StyleSheet.absoluteFillObject,
-		backgroundColor: 'rgba(15, 23, 42, 0.34)',
-	},
-	filterSheet: {
-		backgroundColor: SURFACE,
-		borderTopLeftRadius: 24,
-		borderTopRightRadius: 24,
-		paddingTop: 8,
-		overflow: 'hidden',
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: -10 },
-		shadowOpacity: 0.14,
-		shadowRadius: 24,
-		elevation: 18,
-	},
-	filterSheetHandle: {
-		width: 44,
-		height: 4,
-		borderRadius: 999,
-		backgroundColor: '#d7dee6',
-		alignSelf: 'center',
-		marginBottom: 10,
-	},
-	filterSheetHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 18,
-		paddingBottom: 12,
-	},
-	filterSheetTitle: {
-		fontSize: 18,
-		lineHeight: 24,
-		fontWeight: '700',
-		color: TEXT,
-	},
-	filterCloseButton: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		alignItems: 'center',
-		justifyContent: 'center',
+	filterSheetBody: {
+		width: '100%',
 	},
 	filterSheetScroll: {
 		flexGrow: 0,

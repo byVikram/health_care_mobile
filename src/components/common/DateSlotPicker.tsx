@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, useWindowDimensions } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from './AppTypography'
@@ -17,6 +17,19 @@ function getWeekDates(start: Date) {
 	})
 }
 
+function startOfDay(date: Date) {
+	return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function getFocusedRangeStart(selectedDate: Date | null, today: Date, disablePast: boolean) {
+	const todayStart = startOfDay(today)
+	const selectedStart = selectedDate ? startOfDay(selectedDate) : todayStart
+
+	if (disablePast && selectedStart < todayStart) return todayStart
+
+	return selectedStart
+}
+
 export type PickProps = {
 	selectedDate: Date | null
 	onDateChange: (date: Date) => void
@@ -33,11 +46,14 @@ export type PickProps = {
 	onSelectAll?: () => void
 	onUnselectAll?: () => void
 	showTimeSlots?: boolean
+	hideHeader?: boolean
 	hideNavigation?: boolean
 	use12HourTime?: boolean
 	showSlotStatusLabels?: boolean
 	selectedAppointmentType?: 'clinic' | 'video' | string
 	onAppointmentTypeChange?: (type: 'clinic' | 'video') => void
+	/** Availability screen only: shows left-side status strip on each slot + legend */
+	showAvailabilityMode?: boolean
 }
 
 export default function DateSlotPicker(props: PickProps) {
@@ -61,33 +77,50 @@ export default function DateSlotPicker(props: PickProps) {
 		onSelectAll,
 		onUnselectAll,
 		showTimeSlots = true,
+		hideHeader = false,
 		hideNavigation = false,
 		use12HourTime = false,
 		showSlotStatusLabels = true,
 		selectedAppointmentType,
 		onAppointmentTypeChange,
+		showAvailabilityMode = false,
 	} = props
 
 	const today = new Date()
 	const [weekStart, setWeekStart] = useState(() => {
-		const d = new Date(selectedDate || today)
-		d.setDate(d.getDate() - d.getDay())
-		return d
+	return disablePast
+		? startOfDay(today)
+		: getFocusedRangeStart(selectedDate, today, disablePast)
 	})
 	const weekDates = getWeekDates(weekStart)
 	const monthLabel = `${MONTHS[weekDates[0].getMonth()]} ${weekDates[0].getFullYear()}`
+
+	useEffect(() => {
+		if (disablePast && !selectedDate) {
+			setWeekStart(startOfDay(new Date()))
+		} else {
+			setWeekStart(getFocusedRangeStart(selectedDate, new Date(), disablePast))
+		}
+		}, [selectedDate?.toDateString(), disablePast])
 
 	const isSameDay = (a: Date, b: Date) =>
 		a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
 
 	const isPast = (d: Date) => {
 		if (!disablePast) return false
-		const today0 = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-		const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-		return d0 < today0
+		return startOfDay(d) < startOfDay(today)
 	}
 
+	const getPreviousWeekDates = () => {
+		const d = new Date(weekStart)
+		d.setDate(d.getDate() - 7)
+		return getWeekDates(d)
+	}
+
+	const canNavigatePrevWeek = !disablePast || getPreviousWeekDates().some((date) => !isPast(date))
+
 	const handlePrevWeek = () => {
+		if (!canNavigatePrevWeek) return
 		const d = new Date(weekStart)
 		d.setDate(d.getDate() - 7)
 		setWeekStart(d)
@@ -140,32 +173,52 @@ export default function DateSlotPicker(props: PickProps) {
 	return (
 		<View style={[styles.container, isTablet && styles.containerTablet]}>
 			{/* Date Header */}
-			<View style={styles.dateHeader}>
-				<AppTypography variant="h4" style={styles.sectionTitle}>
-					{dateLabel}
-				</AppTypography>
-				{hideNavigation ? null : (
-					<View style={styles.monthNav}>
-						<TouchableOpacity onPress={handlePrevWeek} style={styles.chevron}>
-							<MaterialCommunityIcons name="chevron-left" size={20} color="#0c7c7c" />
-						</TouchableOpacity>
-						<AppTypography variant="body" style={styles.monthLabel}>
-							{monthLabel}
-						</AppTypography>
-						<TouchableOpacity onPress={handleNextWeek} style={styles.chevron}>
-							<MaterialCommunityIcons name="chevron-right" size={20} color="#0c7c7c" />
-						</TouchableOpacity>
-					</View>
-				)}
-			</View>
+			{hideHeader ? null : (
+				<View style={styles.dateHeader}>
+					<AppTypography variant="h4" style={styles.sectionTitle}>
+						{dateLabel}
+					</AppTypography>
+					{hideNavigation ? null : (
+						<View style={styles.monthNav}>
+							<TouchableOpacity onPress={handlePrevWeek} style={styles.chevron}>
+								<MaterialCommunityIcons name="chevron-left" size={20} color="#0c7c7c" />
+							</TouchableOpacity>
+							<AppTypography variant="body" style={styles.monthLabel}>
+								{monthLabel}
+							</AppTypography>
+							<TouchableOpacity onPress={handleNextWeek} style={styles.chevron}>
+								<MaterialCommunityIcons name="chevron-right" size={20} color="#0c7c7c" />
+							</TouchableOpacity>
+						</View>
+					)}
+				</View>
+			)}
 
 			{/* Date Strip */}
-			<ScrollView
-				horizontal
-				showsHorizontalScrollIndicator={false}
-				contentContainerStyle={styles.dateStripContent}
-			>
-				<View style={styles.dateStrip}>
+			<View style={styles.dateStripRow}>
+				<TouchableOpacity
+					style={[styles.dateStripArrow, !canNavigatePrevWeek && styles.dateStripArrowDisabled]}
+					onPress={handlePrevWeek}
+					activeOpacity={canNavigatePrevWeek ? 0.7 : 1}
+					disabled={!canNavigatePrevWeek}
+				>
+					<MaterialCommunityIcons
+						name="chevron-left"
+						size={22}
+						color={canNavigatePrevWeek ? '#0c7c7c' : '#b8c2c8'}
+					/>
+				</TouchableOpacity>
+
+				<ScrollView
+					horizontal
+					nestedScrollEnabled
+					directionalLockEnabled
+					showsHorizontalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
+					style={styles.dateCardsScroll}
+					contentContainerStyle={styles.dateStripContent}
+				>
+					<View style={styles.dateStrip}>
 					{weekDates.map((date) => {
 						const isSelected = selectedDate ? isSameDay(date, selectedDate) : false
 						const past = isPast(date)
@@ -208,75 +261,115 @@ export default function DateSlotPicker(props: PickProps) {
 							</TouchableOpacity>
 						)
 					})}
-				</View>
-			</ScrollView>
+					</View>
+				</ScrollView>
+
+				<TouchableOpacity
+					style={styles.dateStripArrow}
+					onPress={handleNextWeek}
+					activeOpacity={0.7}
+				>
+					<MaterialCommunityIcons name="chevron-right" size={22} color="#0c7c7c" />
+				</TouchableOpacity>
+			</View>
 
 			{showTimeSlots ? (
 				<>
 					{/* Time Header */}
-					<View style={styles.toggleContainer}>
-						<Text style={styles.toggleTitle}>Type of Appointment</Text>
+					{hideHeader ? null : (
+						<View style={styles.toggleContainer}>
+							<Text style={styles.toggleTitle}>Type of Appointment</Text>
 
-						<View style={[styles.toggleGroup, isTablet && styles.toggleGroupTablet]}>
-							<TouchableOpacity
-								style={[
-									styles.toggleOption,
-									resolvedVisitType === 'clinic' && styles.toggleSelectedOption,
-								]}
-								onPress={() => handleVisitTypeChange('clinic')}
-							>
-								<Text
+							<View style={[styles.toggleGroup, isTablet && styles.toggleGroupTablet]}>
+								<TouchableOpacity
 									style={[
-										styles.toggleText,
-										resolvedVisitType === 'clinic' && styles.toggleSelectedText,
+										styles.toggleOption,
+										resolvedVisitType === 'clinic' && styles.toggleSelectedOption,
 									]}
+									onPress={() => handleVisitTypeChange('clinic')}
 								>
-									Clinic
-								</Text>
-							</TouchableOpacity>
+									<Text
+										style={[
+											styles.toggleText,
+											resolvedVisitType === 'clinic' && styles.toggleSelectedText,
+										]}
+									>
+										Clinic
+									</Text>
+								</TouchableOpacity>
 
-							<TouchableOpacity
-								style={[
-									styles.toggleOption,
-									resolvedVisitType === 'video' && styles.toggleSelectedOption,
-								]}
-								onPress={() => handleVisitTypeChange('video')}
-							>
-								<Text
+								<TouchableOpacity
 									style={[
-										styles.toggleText,
-										resolvedVisitType === 'video' && styles.toggleSelectedText,
+										styles.toggleOption,
+										resolvedVisitType === 'video' && styles.toggleSelectedOption,
 									]}
+									onPress={() => handleVisitTypeChange('video')}
 								>
-									Video
-								</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-
-					<View style={styles.timeHeader}>
-						<AppTypography variant="h4" style={styles.timeSectionTitle}>
-							{timeLabel}
-						</AppTypography>
-						{multiSelect && (onSelectAll || onUnselectAll) ? (
-							<View style={styles.bulkActions}>
-								{onSelectAll ? (
-									<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
-										<AppTypography variant="caption" style={styles.bulkButtonText}>
-											Select All
-										</AppTypography>
-									</TouchableOpacity>
-								) : null}
-								{onUnselectAll ? (
-									<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
-										<AppTypography variant="caption" style={styles.bulkButtonText}>
-											Unselect All
-										</AppTypography>
-									</TouchableOpacity>
-								) : null}
+									<Text
+										style={[
+											styles.toggleText,
+											resolvedVisitType === 'video' && styles.toggleSelectedText,
+										]}
+									>
+										Video
+									</Text>
+								</TouchableOpacity>
 							</View>
-						) : null}
-					</View>
+						</View>
+					)}
+
+					{hideHeader && !multiSelect ? null : (
+						<View style={styles.timeHeader}>
+							{hideHeader ? null : (
+								<AppTypography variant="h4" style={styles.timeSectionTitle}>
+									{timeLabel}
+								</AppTypography>
+							)}
+							{multiSelect && (onSelectAll || onUnselectAll) ? (
+								<View style={styles.bulkActions}>
+									{onSelectAll ? (
+										<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
+											<AppTypography variant="caption" style={styles.bulkButtonText}>
+												Select All
+											</AppTypography>
+										</TouchableOpacity>
+									) : null}
+									{onUnselectAll ? (
+										<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
+											<AppTypography variant="caption" style={styles.bulkButtonText}>
+												Unselect All
+											</AppTypography>
+										</TouchableOpacity>
+									) : null}
+								</View>
+							) : null}
+						</View>
+					)}
+
+					{/* ── LEGEND — availability screen only ─────────────── */}
+					{showAvailabilityMode ? (
+						<View style={styles.legendRow}>
+							<View style={styles.legendItem}>
+								<View style={[styles.legendDot, styles.legendDotAvailable]} />
+								<AppTypography variant="caption" style={styles.legendLabel}>
+									Available
+								</AppTypography>
+							</View>
+							<View style={styles.legendItem}>
+								<View style={[styles.legendDot, styles.legendDotBlocked]} />
+								<AppTypography variant="caption" style={styles.legendLabel}>
+									Blocked
+								</AppTypography>
+							</View>
+							<View style={styles.legendItem}>
+								<View style={[styles.legendDot, styles.legendDotBooked]} />
+								<AppTypography variant="caption" style={styles.legendLabel}>
+									Booked
+								</AppTypography>
+							</View>
+						</View>
+					) : null}
+					{/* ───────────────────────────────────────────────────── */}
 
 					{loading ? (
 						<AppSkeleton height={100} style={{ marginTop: 8 }} />
@@ -315,15 +408,27 @@ export default function DateSlotPicker(props: PickProps) {
 												// 			? 'Blocked'
 												// 			: ''
 
+											// ── Derive strip color (availability screen only) ──
+											const stripStyle = showAvailabilityMode
+												? isBooked
+													? styles.statusStripBooked
+													: isBlocked
+													? styles.statusStripBlocked
+													: styles.statusStripAvailable
+												: null
+											// ─────────────────────────────────────────────────
+
 											return (
 												<TouchableOpacity
 													key={`${slot.start_time}-${idx}`}
 													style={[
 														styles.timeBox,
+														showAvailabilityMode && styles.timeBoxAvailabilityMode,
 														{ flexBasis: slotBasis },
-														isSelected && styles.timeBoxSelected,
-														!isSelected && isBlocked && styles.timeBoxBlocked,
-														!isSelected && isBooked && styles.timeBoxBooked,
+														isSelected && (showAvailabilityMode ? styles.timeBoxSelectedAvailability : styles.timeBoxSelected),
+														!showAvailabilityMode && !isSelected && isBlocked && styles.timeBoxBlocked,
+														!showAvailabilityMode && !isSelected && isBooked && styles.timeBoxBooked,
+														showAvailabilityMode && !isSelected && isBooked && styles.timeBoxBookedAvailability,
 														!canSelect && styles.timeBoxDisabled,
 														!showSlotStatusLabels && styles.timeBoxSingleLine,
 													]}
@@ -331,11 +436,17 @@ export default function DateSlotPicker(props: PickProps) {
 													activeOpacity={canSelect ? 0.6 : 1}
 													disabled={!canSelect}
 												>
+													{/* ── Left-side status strip — availability screen only ── */}
+													{showAvailabilityMode ? (
+														<View style={[styles.statusStrip, stripStyle]} />
+													) : null}
+													{/* ───────────────────────────────────────────────────── */}
+
 													<AppTypography
 														variant="caption"
 														style={[
 															styles.timeText,
-															isSelected && styles.timeTextSelected,
+															isSelected && !showAvailabilityMode && styles.timeTextSelected,
 															!isSelected && isBlocked && styles.timeTextBlocked,
 															!canSelect && styles.timeTextDisabled,
 														]}
@@ -402,7 +513,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		gap: 10,
 		marginTop: 22,
-		marginBottom: 12,
+		marginBottom: 8,
 	},
 	bulkActions: {
 		flexDirection: 'row',
@@ -438,13 +549,33 @@ const styles = StyleSheet.create({
 	chevron: {
 		padding: 4,
 	},
+	dateStripRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		width: '100%',
+	},
+	dateCardsScroll: {
+		flex: 1,
+	},
 	dateStrip: {
 		flexDirection: 'row',
 		justifyContent: 'flex-start',
+		alignItems: 'center',
 	},
 	dateStripContent: {
 		paddingHorizontal: 0,
 		paddingBottom: 2,
+	},
+	dateStripArrow: {
+		width: 30,
+		height: 56,
+		borderRadius: 8,
+		alignItems: 'center',
+		justifyContent: 'center',
+		flexShrink: 0,
+	},
+	dateStripArrowDisabled: {
+		opacity: 0.55,
 	},
 	dateBox: {
 		borderRadius: 10,
@@ -523,6 +654,13 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		backgroundColor: '#fff',
 	},
+	// Applied on top of timeBox only when showAvailabilityMode=true
+	timeBoxAvailabilityMode: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'flex-start',
+		overflow: 'hidden',
+	},
 	timeBoxSingleLine: {
 		height: 44,
 		paddingVertical: 0,
@@ -539,12 +677,23 @@ const styles = StyleSheet.create({
 		borderColor: '#eee',
 	},
 	timeBoxBooked: {
-		backgroundColor: '#fff3f0',
-		borderColor: '#f0c7bd',
+		backgroundColor: 'rgba(0,0,0,0.04)',
+		borderColor: '#dde3e8',
 	},
 	timeBoxBlocked: {
-		backgroundColor: '#f1f4f5',
-		borderColor: '#cfd8dc',
+		backgroundColor: '#fff',
+		borderColor: '#dde3e8',
+	},
+	// Booked slot in availability mode: neutral grey, no warm tint
+	timeBoxBookedAvailability: {
+		backgroundColor: 'rgba(0,0,0,0.04)',
+		borderColor: '#dde3e8',
+		opacity: 0.7,
+		
+	},
+	timeBoxSelectedAvailability: {
+		borderColor: '#0c7c7c',
+		backgroundColor: '#fff',
 	},
 	timeText: {
 		fontSize: 13,
@@ -569,6 +718,60 @@ const styles = StyleSheet.create({
 		fontSize: 10,
 		fontWeight: '600',
 	},
+
+	// ── Status strip (left-side indicator) ──────────────────────────────────
+	statusStrip: {
+		width: 4,
+		alignSelf: 'stretch',  // fills full card height
+		borderRadius: 0,       // card's overflow:hidden + borderRadius clips the corners
+		marginRight: 8,
+		marginLeft: -10,       // escape card's paddingHorizontal so strip touches left edge
+		marginTop: -10,        // escape card's paddingVertical
+		marginBottom: -10,     // escape card's paddingVertical
+	},
+	statusStripAvailable: {
+		backgroundColor: '#0c7c7c',   // teal — matches selected/available theme
+	},
+	statusStripBlocked: {
+		backgroundColor: '#e53935',   // red — matches textRed
+	},
+	statusStripBooked: {
+		backgroundColor: '#b0bec5',   // muted grey
+	},
+	// ────────────────────────────────────────────────────────────────────────
+
+	// ── Legend ───────────────────────────────────────────────────────────────
+	legendRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 16,
+		marginBottom: 4,
+	},
+	legendItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	legendDot: {
+		width: 10,
+		height: 10,
+		borderRadius: 5,
+	},
+	legendDotAvailable: {
+		backgroundColor: '#0c7c7c',
+	},
+	legendDotBlocked: {
+		backgroundColor: '#e53935',
+	},
+	legendDotBooked: {
+		backgroundColor: '#b0bec5',
+	},
+	legendLabel: {
+		fontSize: 12,
+		color: '#62707a',
+		fontWeight: '500',
+	},
+	// ────────────────────────────────────────────────────────────────────────
 
 	// Toggle
 	toggleContainer: {

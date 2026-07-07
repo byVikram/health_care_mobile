@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-	ActivityIndicator,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -9,9 +8,8 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import Toast from 'react-native-toast-message'
 
-import { AppSelect } from '../../../../components/common'
+import { AppSelect, AppStickyFooter, StatusModal } from '../../../../components/common'
 import DateSlotPicker from '../../../../components/common/DateSlotPicker'
 import {
 	createSlotOverrideBatch,
@@ -22,8 +20,10 @@ import {
 	SlotOverrideBatchPayload,
 	SlotOverridePayload,
 	TimeSlot,
+	updateDoctorAvailability,
 } from '../../../doctor/doctorService'
 import { DoctorAvailability, DoctorHospital } from '../../../../types/doctor-profile'
+import { formatDateForApi } from '../../../../utils/date'
 
 interface AvailabilityTabProps {
 	hospitals?: DoctorHospital[]
@@ -84,6 +84,31 @@ const getModeKey = (mode?: string): AppointmentTypeKey => {
 }
 
 const getAvailabilityHospitalId = (hospital: DoctorHospital) => String(hospital.hospital_id ?? hospital.id)
+
+const getDayOfWeek = (date: Date) => date.getDay()
+
+const coerceHospitalId = (id: string) => {
+	const numericId = Number(id)
+	return Number.isFinite(numericId) ? numericId : id
+}
+
+const normalizeTimeForUpdate = (time: string) => {
+	if (!time) return time
+	if (time.endsWith('Z')) return time
+	if (/^\d{2}:\d{2}$/.test(time)) return `${time}:00.000Z`
+	if (/^\d{2}:\d{2}:\d{2}$/.test(time)) return `${time}.000Z`
+	return time
+}
+
+const getSlotDuration = (startTime: string, endTime: string) => {
+	const [startHour, startMinute] = startTime.split(':').map(Number)
+	const [endHour, endMinute] = endTime.split(':').map(Number)
+	const startTotal = startHour * 60 + startMinute
+	const endTotal = endHour * 60 + endMinute
+	const duration = endTotal - startTotal
+
+	return Number.isFinite(duration) && duration > 0 ? duration : 1
+}
 
 const normalizeProfileHospitals = (rawHospitals: DoctorHospital[]): DoctorHospital[] =>
 	rawHospitals.map((hospital) => ({
@@ -152,7 +177,14 @@ const normalizeAvailabilityGroups = (response: unknown, selectedAppointmentType:
 export default function AvailabilityTab({ hospitals, availability, onChange }: AvailabilityTabProps) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
+	const contentWidth = useMemo(() => {
+		if (width >= 1280) return 760
+		if (width >= 1024) return 680
+		if (isTablet) return 600
+		return 640
+	}, [isTablet, width])
 	const timeSlotColumns = width >= 900 ? 5 : width >= 768 ? 4 : 3
+	const datePickerHorizontalOffset = isTablet ? -20 : -16
 
 	const [localAvailability, setLocalAvailability] = useState<DoctorAvailability>(availability ?? EMPTY_AVAILABILITY)
 	const [apiHospitals, setApiHospitals] = useState<DoctorHospital[]>([])
@@ -170,16 +202,15 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	const [unselectedSlotsByDate, setUnselectedSlotsByDate] = useState<UnselectedSlotsByDate>({})
 	const [pendingOverrides, setPendingOverrides] = useState<SlotOverridePayload[]>([])
 	const [saveLoading, setSaveLoading] = useState(false)
-	const [pendingSaveToast, setPendingSaveToast] = useState<string | null>(null)
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		status: 'success' | 'error'
+		title: string
+		description: string
+		submitText?: string
+	} | null>(null)
 	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentTypeKey>('clinic')
 	const [toggleRefreshing, setToggleRefreshing] = useState(false)
-
-	const formatDateForApi = (date: Date) => {
-		const year = date.getFullYear()
-		const month = String(date.getMonth() + 1).padStart(2, '0')
-		const day = String(date.getDate()).padStart(2, '0')
-		return `${year}-${month}-${day}`
-	}
 
 	const getDayKey = (date: Date): keyof DoctorAvailability => {
 		switch (date.getDay()) {
@@ -410,19 +441,39 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	}
 
 	const handleTimeChange = (slots: string | string[]) => {
-		setPendingSaveToast(null)
 		stageSlotSelection(Array.isArray(slots) ? slots : [slots])
 	}
 
 	const handleSaveAvailability = async () => {
-		if (pendingOverrides.length === 0) {
-			setPendingSaveToast(null)
+		if (!selectedHospitalId) {
 			return
 		}
 
 		setSaveLoading(true)
 		try {
 			let backendMessage = ''
+			const selectedUpdatePayload = {
+				hospital_id: coerceHospitalId(selectedHospitalId),
+				day_of_week: getDayOfWeek(selectedDate),
+				appointment_mode: APPOINTMENT_MODE_BY_TYPE[selectedAppointmentType],
+				slots: selectedSlots.map((startTime) => {
+					const endTime = getSlotEndTime(startTime)
+
+					return {
+						start_time: normalizeTimeForUpdate(startTime),
+						end_time: normalizeTimeForUpdate(endTime),
+						slot_duration: getSlotDuration(startTime, endTime),
+						buffer_time: 0,
+					}
+				}),
+				is_active: selectedSlots.length > 0,
+			}
+
+			const availabilityResponse = await updateDoctorAvailability(selectedUpdatePayload)
+			if ((availabilityResponse as { message?: string })?.message) {
+				backendMessage = (availabilityResponse as { message: string }).message
+			}
+
 			const overridesByHospitalAndDate = pendingOverrides.reduce<Record<string, SlotOverrideBatchPayload>>(
 				(acc, override) => {
 					const groupKey = `${override.hospital_id ?? ''}__${override.date}`
@@ -449,111 +500,123 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 			}
 
 			setPendingOverrides([])
-			Toast.show({ type: 'success', text1: backendMessage || pendingSaveToast || 'Saved successfully' })
+			setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Success',
+				description: backendMessage || 'Saved successfully',
+				submitText: 'Okay',
+			})
 			await fetchAvailability()
-			setPendingSaveToast(null)
 		} catch (error) {
 			console.error('[AvailabilityTab] save availability error:', error)
-			Toast.show({ type: 'error', text1: 'Unable to save availability', text2: 'Please try again.' })
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Error',
+				description: 'Unable to save availability. Please try again.',
+				submitText: 'Okay',
+			})
 		} finally {
 			setSaveLoading(false)
 		}
 	}
 
 	return (
-		<ScrollView
-			style={styles.screen}
-			contentContainerStyle={styles.screenContent}
-			keyboardShouldPersistTaps="handled"
-			showsVerticalScrollIndicator={false}
-		>
-			<View style={[styles.card, isTablet && styles.cardTablet]}>
-				<Text style={styles.title}>Availability</Text>
-
-				<View style={styles.fieldGroup}>
-					<Text style={styles.sectionLabel}>Choose Hospital</Text>
-					{resolvedHospitals.length === 0 ? (
-						<Text style={styles.emptyText}>
-							{hospitalsLoading ? 'Loading hospitals...' : 'No hospitals added. Please add a hospital first.'}
-						</Text>
-					) : (
-						<AppSelect
-							value={selectedHospitalId}
-							onSelect={(value) => {
-								setSelectedHospitalId(value)
-								setPendingOverrides([])
-							}}
-							options={resolvedHospitals.map((hospital) => ({
-								value: getAvailabilityHospitalId(hospital),
-								label: hospital.name,
-							}))}
-							size="small"
-							borderRadius={10}
-							customCardStyle={styles.selectCard}
-						/>
-					)}
-				</View>
-
-				<View style={[styles.todayRow, isTablet && styles.todayRowTablet]}>
-					<TouchableOpacity style={styles.todayButton} onPress={() => setSelectedDate(new Date())}>
-						<Text style={styles.todayButtonText}>Today</Text>
-					</TouchableOpacity>
-				</View>
-
-				<DateSlotPicker
-					multiSelect
-					selectedDate={selectedDate}
-					onDateChange={setSelectedDate}
-					selectedTime={selectedSlots}
-					onTimeChange={handleTimeChange}
-					dateLabel="Select follow up date"
-					hideNavigation
-					timeSlotColumns={timeSlotColumns}
-					disableBookedSlots={false}
-					use12HourTime
-					availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
-					loading={slotsLoading || toggleRefreshing}
-					onSelectAll={() => {
-						stageSlotSelection(allSelectableSlots)
-						setPendingSaveToast('Selected All Successfully')
-					}}
-					onUnselectAll={() => {
-						stageSlotSelection([])
-						setPendingSaveToast('Unselected All Successfully')
-					}}
-					selectedAppointmentType={selectedAppointmentType}
-					onAppointmentTypeChange={(type) => {
-						setToggleRefreshing(true)
-						setSelectedAppointmentType(type)
-						setTimeout(() => setToggleRefreshing(false), 300)
-					}}
-				/>
-
-				<View style={[styles.actions, isTablet && styles.actionsTablet]}>
-					<TouchableOpacity
-						style={[styles.actionButton, styles.cancelButton]}
-						onPress={() => {
-							updateAvailability({ ...resolvedAvailability, [dayKey]: [] })
-							setPendingOverrides([])
-							setPendingSaveToast(null)
-						}}
-					>
-						<Text style={styles.cancelButtonText}>Cancel</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={[styles.actionButton, styles.saveButton, saveLoading && styles.disabledButton]}
-						onPress={handleSaveAvailability}
-						disabled={saveLoading}
-					>
-						{saveLoading ? (
-							<ActivityIndicator color="#fff" />
+		<View style={{ flex: 1 }}>
+			<ScrollView
+				style={styles.screen}
+				contentContainerStyle={styles.screenContent}
+				keyboardShouldPersistTaps="handled"
+				showsVerticalScrollIndicator={false}
+				nestedScrollEnabled
+				directionalLockEnabled
+			>
+				<View style={[styles.card, isTablet && styles.cardTablet, { maxWidth: contentWidth },]}>
+					<View style={styles.fieldGroup}>
+						<Text style={styles.sectionLabel}>Choose Hospital</Text>
+						{resolvedHospitals.length === 0 ? (
+							<Text style={styles.emptyText}>
+								{hospitalsLoading ? 'Loading hospitals...' : 'No hospitals added. Please add a hospital first.'}
+							</Text>
 						) : (
-							<Text style={styles.saveButtonText}>Save Availability</Text>
+							<AppSelect
+								value={selectedHospitalId}
+								onSelect={(value) => {
+									setSelectedHospitalId(value)
+									setPendingOverrides([])
+								}}
+								options={resolvedHospitals.map((hospital) => ({
+									value: getAvailabilityHospitalId(hospital),
+									label: hospital.name,
+								}))}
+								size="small"
+								borderRadius={10}
+							/>
 						)}
-					</TouchableOpacity>
+					</View>
+
+					<View style={[styles.todayRow, isTablet && styles.todayRowTablet]}>
+						<TouchableOpacity style={styles.todayButton} onPress={() => setSelectedDate(new Date())}>
+							<Text style={styles.todayButtonText}>Today</Text>
+						</TouchableOpacity>
+					</View>
+
+					<View style={{ marginHorizontal: datePickerHorizontalOffset }}>
+						<DateSlotPicker
+							multiSelect
+							selectedDate={selectedDate}
+							onDateChange={setSelectedDate}
+							selectedTime={selectedSlots}
+							onTimeChange={handleTimeChange}
+							dateLabel="Select follow up date"
+							hideNavigation
+							timeSlotColumns={timeSlotColumns}
+							disableBookedSlots={false}
+							use12HourTime
+							showAvailabilityMode
+							availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
+							loading={slotsLoading || toggleRefreshing}
+							onSelectAll={() => {
+								stageSlotSelection(allSelectableSlots)
+							}}
+							onUnselectAll={() => {
+								stageSlotSelection([])
+							}}
+							selectedAppointmentType={selectedAppointmentType}
+							onAppointmentTypeChange={(type) => {
+								setToggleRefreshing(true)
+								setSelectedAppointmentType(type)
+								setTimeout(() => setToggleRefreshing(false), 300)
+							}}
+						/>
+					</View>
+
 				</View>
-			</View>
-		</ScrollView>
+			</ScrollView>
+			<AppStickyFooter
+				centered
+				contentStyle={styles.footerContent}
+				contentMaxWidth={contentWidth}
+				buttonStyle={styles.footerSaveButton}
+				onPress={handleSaveAvailability}
+				loading={saveLoading}
+				disabled={saveLoading}
+			>
+				Save Availability
+			</AppStickyFooter>
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status={statusModal.status}
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText={statusModal.submitText}
+					onSubmit={() => setStatusModal(null)}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
+		</View>	
 	)
 }
 
@@ -565,10 +628,10 @@ const styles = StyleSheet.create({
 	screenContent: {
 		flexGrow: 1,
 		padding: 0,
+		paddingBottom: 100,
 	},
 	card: {
 		width: '100%',
-		maxWidth: 980,
 		alignSelf: 'center',
 		backgroundColor: '#fff',
 		padding: 18,
@@ -577,12 +640,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 24,
 		paddingVertical: 22,
 	},
-	title: {
-		fontSize: 22,
-		fontWeight: '700',
-		color: '#233238',
-		marginBottom: 22,
-	},
+	
 	fieldGroup: {
 		marginBottom: 14,
 	},
@@ -591,9 +649,6 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#62707a',
 		marginBottom: 8,
-	},
-	selectCard: {
-		borderRadius: 10,
 	},
 	todayRow: {
 		alignItems: 'flex-end',
@@ -607,13 +662,13 @@ const styles = StyleSheet.create({
 	todayButton: {
 		borderRadius: 10,
 		borderWidth: 1,
-		borderColor: TEAL,
+		borderColor: '#215d60',
 		paddingHorizontal: 14,
 		paddingVertical: 7,
 		backgroundColor: '#fff',
 	},
 	todayButtonText: {
-		color: TEAL,
+		color: '#215d60',
 		fontSize: 13,
 		fontWeight: '600',
 	},
@@ -622,42 +677,10 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		marginBottom: 18,
 	},
-	actions: {
-		flexDirection: 'column',
-		gap: 12,
-		marginTop: 34,
+	footerContent: {
+		width: '100%',
 	},
-	actionsTablet: {
-		flexDirection: 'row',
-		gap: 16,
-	},
-	actionButton: {
-		flex: 1,
-		minHeight: 46,
-		borderRadius: 12,
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingHorizontal: 16,
-	},
-	cancelButton: {
-		borderWidth: 1,
-		borderColor: '#d1dbe0',
-		backgroundColor: '#fff',
-	},
-	cancelButtonText: {
-		color: '#52636d',
-		fontSize: 14,
-		fontWeight: '700',
-	},
-	saveButton: {
-		backgroundColor: TEAL,
-	},
-	saveButtonText: {
-		color: '#fff',
-		fontSize: 14,
-		fontWeight: '700',
-	},
-	disabledButton: {
-		opacity: 0.7,
+	footerSaveButton: {
+		backgroundColor: '#215d60',
 	},
 })

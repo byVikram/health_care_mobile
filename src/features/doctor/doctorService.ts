@@ -1,13 +1,13 @@
 // src/features/doctor/doctorService.ts
 import ApiService from '../../services/apiService'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { AppointmentsResponse } from '../../types/appointment'
 import { DoctorSearchResponse } from '../../types/doctor-search'
 import { DoctorDetailResponse } from '../../types/doctor-detail'
 import { SpecialitiesResponse } from '../../types/speciality'
 import { DoctorProfileApiResponse, DoctorProfileApiData } from '../../types/doctor-profile-api'
-import { DoctorProfile } from '../../types/doctor-profile'
+import { DoctorProfile, DoctorDegree } from '../../types/doctor-profile'
 
 export interface TimeSlot {
 	id?: string | number
@@ -20,13 +20,13 @@ export interface TimeSlot {
 }
 // Add this to doctorService.ts
 export interface Appointment {
-	id: string;
-	appointment_date: string;
-	doctor_name?: string;
-	patient_name?: string;
-	status?: string;
-	time?: string;
-	notes?: string;
+	id: string
+	appointment_date: string
+	doctor_name?: string
+	patient_name?: string
+	status?: string
+	time?: string
+	notes?: string
 }
 
 export interface SlotGroup {
@@ -70,36 +70,43 @@ export interface CreateAppointmentResponse {
 	data?: unknown
 }
 
-
 export interface AppointmentResponse {
 	success: boolean
 	message: string
 	// data: Appointment
 }
 
+export interface PreIntakePayload {
+	symptoms: string
+	duration?: string
+	severity?: 'mild' | 'moderate' | 'severe' | ''
+}
+
+export const updatePreIntake = async (appointmentId: string, payload: PreIntakePayload) => {
+	console.log('PRE_INTAKE URL =>', API_ENDPOINTS.APPOINTMENTS.PRE_INTAKE(appointmentId))
+	const res = await ApiService.patch(API_ENDPOINTS.APPOINTMENTS.PRE_INTAKE(appointmentId), payload)
+	return res.data
+}
 
 export const updateAppointmentsStatus = async (
 	appointmentId: string,
 	statusId: string
 ): Promise<AppointmentResponse> => {
-
-	console.log("PAYLOAD 👉", {
+	console.log('PAYLOAD 👉', {
 		appointment_id: appointmentId,
 		status_id: statusId,
-	});
+	})
 
-	const res = await ApiService.patch<AppointmentResponse>(
-		API_ENDPOINTS.APPOINTMENTS.UPDATE,
-		{
-			appointment_id: appointmentId,
-			status_id: statusId,
-		}
-	);
+	const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
+		appointment_id: appointmentId,
+		status_id: statusId,
+	})
 
-	console.log("RESPONSE 👉", res.data);
+	console.log('RESPONSE 👉', res.data)
 
-	return res.data;
-};
+	return res.data
+}
+
 export interface RescheduleAppointmentPayload {
 	appointment_id: string
 	appointment_date: string
@@ -111,9 +118,7 @@ export interface RescheduleAppointmentPayload {
 	status_id?: string // 👈 ADD THIS
 }
 
-export const rescheduleAppointment = async (
-	payload: RescheduleAppointmentPayload
-): Promise<AppointmentResponse> => {
+export const rescheduleAppointment = async (payload: RescheduleAppointmentPayload): Promise<AppointmentResponse> => {
 	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, payload)
 	return res.data
 }
@@ -123,9 +128,7 @@ export interface ReferAppointmentPayload {
 	doctor_id: string
 }
 
-export const referAppointment = async (
-	payload: ReferAppointmentPayload
-): Promise<AppointmentResponse> => {
+export const referAppointment = async (payload: ReferAppointmentPayload): Promise<AppointmentResponse> => {
 	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.REFER, payload)
 	return res.data
 }
@@ -138,32 +141,16 @@ export const getAppointments = async (params?: AppointmentParams): Promise<Appoi
 	return res.data
 }
 
-export const createAppointment = async (
-	payload: CreateAppointmentPayload,
-	token?: string | null
-): Promise<CreateAppointmentResponse> => {
-	const config = token
-		? {
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-			}
-		: undefined
-
+export const createAppointment = async (payload: CreateAppointmentPayload): Promise<CreateAppointmentResponse> => {
 	console.log('[createAppointment][RN] request', {
 		url: API_ENDPOINTS.APPOINTMENTS.CREATE,
 		payload,
-		token,
-		headers: config?.headers,
+
 		webComparison:
 			'React web booking uses axios interceptor with localStorage access_token and sends Authorization: Bearer <access_token>.',
 	})
 
-	const res = await ApiService.post<CreateAppointmentResponse>(
-		API_ENDPOINTS.APPOINTMENTS.CREATE,
-		payload,
-		config
-	)
+	const res = await ApiService.post<CreateAppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.CREATE, payload)
 
 	console.log('[createAppointment][RN] response', {
 		status: res.status,
@@ -173,18 +160,16 @@ export const createAppointment = async (
 
 	return res.data
 }
-export const getDoctors = async (
-  params?: DoctorSearchParams
-): Promise<DoctorSearchResponse> => {
-  const res = await ApiService.getWithParams<DoctorSearchResponse>(
-    API_ENDPOINTS.DOCTORS.SEARCH,
-    (params ?? {}) as Record<string, unknown>
-  );
+export const getDoctors = async (params?: DoctorSearchParams): Promise<DoctorSearchResponse> => {
+	const res = await ApiService.getWithParams<DoctorSearchResponse>(
+		API_ENDPOINTS.DOCTORS.SEARCH,
+		(params ?? {}) as Record<string, unknown>
+	)
 
-  console.log("DOCTORS RESPONSE:", JSON.stringify(res.data, null, 2));
+	console.log('DOCTORS RESPONSE:', JSON.stringify(res.data, null, 2))
 
-  return res.data;
-};
+	return res.data
+}
 
 export interface FavouriteDoctor {
 	id: string
@@ -221,10 +206,7 @@ export const getFavouriteDoctors = async (): Promise<FavouritesResponse> => {
 }
 
 export const toggleFavouriteDoctor = async (publicId: string): Promise<ToggleFavouriteResponse> => {
-	const res = await ApiService.post<ToggleFavouriteResponse>(
-		API_ENDPOINTS.DOCTORS_FAVOURITES.TOGGLE(publicId),
-		{}
-	)
+	const res = await ApiService.post<ToggleFavouriteResponse>(API_ENDPOINTS.DOCTORS_FAVOURITES.TOGGLE(publicId), {})
 	return res.data
 }
 
@@ -272,9 +254,7 @@ export interface SlotOverrideResponse {
 	message: string
 }
 
-export const createSlotOverrideBatch = async (
-	payload: SlotOverrideBatchPayload
-): Promise<SlotOverrideResponse> => {
+export const createSlotOverrideBatch = async (payload: SlotOverrideBatchPayload): Promise<SlotOverrideResponse> => {
 	const res = await ApiService.post<SlotOverrideResponse>(API_ENDPOINTS.DOCTORS.OVERRIDES, payload)
 	return res.data
 }
@@ -353,19 +333,105 @@ export const updateDoctorAchievement = async (achievementId: string, data: Docto
 	return res.data
 }
 
-// -- Doctor profile -------------------------------------------------------------
-export const getDoctorProfile = async (): Promise<DoctorProfileApiResponse> => {
-	const token = await AsyncStorage.getItem('access_token')
-	console.log('[getDoctorProfile] access_token:', token)
+export interface DoctorPersonalUpdatePayload {
+	name: string
+	avatar_s3_key: string | null
+	gender: string
+	date_of_birth: string
+	location: string
+	languages: string[]
+	mobile_number: string
+	email: string
+	experience_years: number
+}
+
+export interface DoctorProfessionalUpdatePayload {
+	experience_years: number
+	degree?: string
+	college?: string
+	year_of_passing?: string
+	qualification_proof_s3_key?: string | null
+	registration_number: string
+	registration_proof_s3_key: string | null
+	about: string
+	current_designation?: string
+	areas_of_expertise?: string[]
+	treatments?: string[]
+}
+
+export interface DoctorDegreeUpdatePayload {
+	degree: string
+	specialization: string | null
+	college: string
+	year_of_passing: string
+	qualification_proof_s3_key: string | null
+}
+
+export interface DoctorEducationalQualificationsUpdatePayload {
+	degrees: DoctorDegreeUpdatePayload[]
+}
+
+export interface DoctorAvailabilityUpdatePayload {
+	hospital_id: number | string
+	day_of_week: number
+	appointment_mode: 'clinic_visit' | 'video_call'
+	slots: Array<{
+		start_time: string
+		end_time: string
+		slot_duration: number
+		buffer_time: number
+	}>
+	is_active: boolean
+}
+
+export const updateDoctorPersonalDetails = async (data: DoctorPersonalUpdatePayload) => {
+	const url = API_ENDPOINTS.DOCTOR_PROFILE.PERSONAL_DETAILS
+	console.log('[updateDoctorPersonalDetails] request:', {
+		method: 'PATCH',
+		url,
+		payload: data,
+	})
 
 	try {
-		const res = await ApiService.get<DoctorProfileApiResponse>(API_ENDPOINTS.DOCTOR_PROFILE.DETAILS, {
-			headers: token
-				? {
-						Authorization: `Bearer ${token}`,
-					}
-				: undefined,
+		const res = await ApiService.patch(url, data)
+		console.log('[updateDoctorPersonalDetails] response:', {
+			status: res.status,
+			url: res.config?.url,
+			method: res.config?.method,
+			data: res.data,
 		})
+		return res.data
+	} catch (error: any) {
+		console.log('[updateDoctorPersonalDetails] error:', {
+			status: error?.response?.status,
+			url: error?.config?.url,
+			method: error?.config?.method,
+			data: error?.response?.data,
+			message: error?.message,
+		})
+		throw error
+	}
+}
+
+export const updateDoctorProfessionalDetails = async (data: DoctorProfessionalUpdatePayload) => {
+	const res = await ApiService.patch(API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS, data)
+	return res.data
+}
+
+export const updateDoctorEducationalQualifications = async (data: DoctorEducationalQualificationsUpdatePayload) => {
+	const res = await ApiService.patch(API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS, data)
+	return res.data
+}
+
+export const updateDoctorAvailability = async (data: DoctorAvailabilityUpdatePayload) => {
+	const res = await ApiService.patch(API_ENDPOINTS.DOCTORS.AVAILABILITY, data)
+	return res.data
+}
+
+// -- Doctor profile -------------------------------------------------------------
+export const getDoctorProfile = async (): Promise<DoctorProfileApiResponse> => {
+	try {
+		const res = await ApiService.get<DoctorProfileApiResponse>(API_ENDPOINTS.DOCTOR_PROFILE.DETAILS)
 		console.log('[getDoctorProfile] API response:', res.data)
 		return res.data
 	} catch (error: any) {
@@ -451,6 +517,16 @@ export const mapDoctorProfileApi = (data: DoctorProfileApiData): DoctorProfile =
 			college: prof?.college ?? '',
 			yearOfPassing: prof?.year_of_passing ?? '',
 			qualificationProof: prof?.qualification_proof_s3_key ?? '',
+			degrees: Array.isArray(prof?.degrees)
+				? prof.degrees.map((d) => ({
+						id: d.id,
+						degree: d.degree,
+						specialization: d.specialization || '',
+						college: d.college,
+						yearOfPassing: d.year_of_passing,
+						qualificationProof: d.qualification_proof_s3_key || '',
+					}))
+				: [],
 			registrationNumber: prof?.registration_number ?? '',
 			registrationProof: prof?.registration_proof_s3_key ?? '',
 			about: prof?.about ?? '',

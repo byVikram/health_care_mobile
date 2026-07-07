@@ -1,234 +1,291 @@
-import React from "react";
+import React, { useState } from 'react'
 import {
-  SafeAreaView,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  Share,
-  Linking,
-  StyleSheet,
-} from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import ArrowIcon from "../../assets/Settings/arrow.svg";
+	SafeAreaView,
+	View,
+	Text,
+	TouchableOpacity,
+	ScrollView,
+	Share,
+	Linking,
+	StyleSheet,
+	Modal,
+	Alert,
+} from 'react-native'
+import { useNavigation } from '@react-navigation/native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import ArrowIcon from '../../assets/Settings/arrow.svg'
 // SVG Icons
-import FrameIcon from "../../assets/Settings/Frame.svg";
-import StarIcon from "../../assets/Settings/star.svg";
-import VectorIcon from "../../assets/Settings/Vector.svg";
+import FrameIcon from '../../assets/Settings/Frame.svg'
+import StarIcon from '../../assets/Settings/star.svg'
+import VectorIcon from '../../assets/Settings/Vector.svg'
+import { useAuth } from '../../context/AuthContext'
 
 const SettingPage = () => {
-  const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
+	const navigation = useNavigation()
+	const insets = useSafeAreaInsets()
+	const { clearAuth } = useAuth()
+	const [showLogoutModal, setShowLogoutModal] = useState(false)
+	// ─── Handlers ─────────────────────────────
+	const handleAbout = () => {
+		Alert.alert('About Whisper AI', 'Version 1.0.0')
+	}
 
-  // ─── Handlers ─────────────────────────────
-  const handleAbout = () => {
-    Alert.alert("About Whisper AI", "Version 1.0.0");
-  };
+	const handleRateUs = () => {
+		Linking.openURL('https://apps.apple.com').catch(() => Alert.alert('Error', 'Unable to open store'))
+	}
 
-  const handleRateUs = () => {
-    Linking.openURL("https://apps.apple.com").catch(() =>
-      Alert.alert("Error", "Unable to open store")
-    );
-  };
+	const handleShare = async () => {
+		await Share.share({
+			message: 'Check out Whisper AI!',
+		})
+	}
 
-  const handleShare = async () => {
-    await Share.share({
-      message: "Check out Whisper AI!",
-    });
-  };
+	const handleLogout = () => {
+		setShowLogoutModal(true)
+	}
+	const confirmLogout = async () => {
+		try {
+			setShowLogoutModal(false)
+			await clearAuth()
+		} catch (error) {
+			setShowLogoutModal(false)
+		}
+	}
+	const handleDelete = () => {
+		Alert.alert('Delete Account', 'Permanent action!', [
+			{ text: 'Cancel' },
+			{ text: 'Delete', style: 'destructive' },
+		])
+	}
 
-  const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure?", [
-      { text: "Cancel" },
-      { text: "Logout", style: "destructive" },
-    ]);
-  };
+	const menuItems = [
+		{
+			label: 'About whisper ai',
+			icon: <FrameIcon width={22} height={22} />,
+			onPress: handleAbout,
+			destructive: false,
+		},
+		{
+			label: 'Rate us on app store',
+			icon: <StarIcon width={22} height={22} />,
+			onPress: handleRateUs,
+			destructive: false,
+		},
+		{
+			label: 'Share the app with family & friends',
+			icon: <VectorIcon width={22} height={22} />,
+			onPress: handleShare,
+			destructive: false,
+		},
+		{
+			label: 'Logout',
+			onPress: handleLogout,
+			destructive: true,
+		},
+		{
+			label: 'Delete account',
+			onPress: handleDelete,
+			destructive: true,
+		},
+	]
 
-  const handleDelete = () => {
-    Alert.alert("Delete Account", "Permanent action!", [
-      { text: "Cancel" },
-      { text: "Delete", style: "destructive" },
-    ]);
-  };
+	return (
+		<SafeAreaView style={styles.container}>
+			<View style={[styles.headerWrapper, { paddingTop: insets.top + 16 }]}>
+				<View style={styles.waveOne} />
+				<View style={styles.waveTwo} />
 
-  // ✅ ALL ITEMS IN ONE LIST
-  const menuItems = [
-    {
-      label: "About whisper ai",
-      icon: <FrameIcon width={22} height={22} />,
-      onPress: handleAbout,
-      destructive: false,
-    },
-    {
-      label: "Rate us on app store",
-      icon: <StarIcon width={22} height={22} />,
-      onPress: handleRateUs,
-      destructive: false,
-    },
-    {
-      label: "Share the app with family & friends",
-      icon: <VectorIcon width={22} height={22} />,
-      onPress: handleShare,
-      destructive: false,
-    },
-    {
-      label: "Logout",
-      onPress: handleLogout,
-      destructive: true,
-    },
-    {
-      label: "Delete account",
-      onPress: handleDelete,
-      destructive: true,
-    },
-  ];
+				<View style={styles.headerContent}>
+					<TouchableOpacity onPress={() => navigation.goBack()}>
+						<ArrowIcon />
+					</TouchableOpacity>
 
-  return (
-    <SafeAreaView style={styles.container}>
-      
-      {/* 🔥 Gradient Header */}
-      <View style={[styles.headerWrapper, { paddingTop: insets.top + 16 }]}>
-        <View style={styles.waveOne} />
-        <View style={styles.waveTwo} />
+					<Text style={styles.headerTitle}>Settings</Text>
 
-        <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <ArrowIcon />
-          </TouchableOpacity>
+					<View style={{ width: 22 }} />
+				</View>
+			</View>
 
-          <Text style={styles.headerTitle}>Settings</Text>
+			<ScrollView showsVerticalScrollIndicator={false}>
+				<View style={styles.card}>
+					{menuItems.map((item, index) => (
+						<TouchableOpacity
+							key={index}
+							style={[styles.row, index !== menuItems.length - 1 && styles.borderBottom]}
+							onPress={item.onPress}
+						>
+							<View style={styles.left}>
+								{item.icon && item.icon}
 
-          <View style={{ width: 22 }} />
-        </View>
-      </View>
+								<Text style={[styles.text, item.destructive && styles.destructive]}>{item.label}</Text>
+							</View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        
-        {/* ✅ SINGLE CARD */}
-        <View style={styles.card}>
-          {menuItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.row,
-                index !== menuItems.length - 1 && styles.borderBottom,
-              ]}
-              onPress={item.onPress}
-            >
-              <View style={styles.left}>
-                {item.icon && item.icon}
+							<MaterialCommunityIcons
+								name="chevron-right"
+								size={20}
+								color={item.destructive ? '#FF3B30' : '#999'}
+							/>
+						</TouchableOpacity>
+					))}
+				</View>
+			</ScrollView>
+			<Modal visible={showLogoutModal} transparent animationType="fade">
+				<View style={styles.modalOverlay}>
+					<View style={styles.modalCard}>
+						<Text style={styles.modalTitle}>Logout</Text>
 
-                <Text
-                  style={[
-                    styles.text,
-                    item.destructive && styles.destructive,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </View>
+						<Text style={styles.modalDescription}>Are you sure you want to logout?</Text>
 
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={20}
-                color={item.destructive ? "#FF3B30" : "#999"}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
+						<View style={styles.modalButtons}>
+							<TouchableOpacity onPress={() => setShowLogoutModal(false)}>
+								<Text style={styles.cancelText}>Cancel</Text>
+							</TouchableOpacity>
 
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
+							<TouchableOpacity style={styles.logoutButton} onPress={confirmLogout}>
+								<Text style={styles.logoutText}>Logout</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				</View>
+			</Modal>
+		</SafeAreaView>
+	)
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f2f4f5",
-  },
+	container: {
+		flex: 1,
+		backgroundColor: '#f2f4f5',
+	},
 
-  // 🔥 Header
-  headerWrapper: {
-    backgroundColor: "#1f5f68",
-    paddingBottom: 20,
-    paddingHorizontal: 16,
-    overflow: "hidden",
-  },
+	// 🔥 Header
+	headerWrapper: {
+		backgroundColor: '#1f5f68',
+		paddingBottom: 20,
+		paddingHorizontal: 16,
+		overflow: 'hidden',
+	},
 
-  headerContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+	headerContent: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+	},
 
-  headerTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "600",
-  },
+	headerTitle: {
+		color: '#fff',
+		fontSize: 20,
+		fontWeight: '600',
+	},
 
-  waveOne: {
-    position: "absolute",
-    width: 420,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    left: -140,
-    top: -70,
-    transform: [{ rotate: "-4deg" }],
-  },
+	waveOne: {
+		position: 'absolute',
+		width: 420,
+		height: 240,
+		borderRadius: 120,
+		backgroundColor: 'rgba(255,255,255,0.06)',
+		left: -140,
+		top: -70,
+		transform: [{ rotate: '-4deg' }],
+	},
 
-  waveTwo: {
-    position: "absolute",
-    width: 430,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    left: -95,
-    top: -22,
-    transform: [{ rotate: "-4deg" }],
-  },
+	waveTwo: {
+		position: 'absolute',
+		width: 430,
+		height: 240,
+		borderRadius: 120,
+		backgroundColor: 'rgba(255,255,255,0.05)',
+		left: -95,
+		top: -22,
+		transform: [{ rotate: '-4deg' }],
+	},
 
-  // Card
-  card: {
-    backgroundColor: "#fff",
-    marginHorizontal: 12,
-    marginTop: 12,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
+	// Card
+	card: {
+		backgroundColor: '#fff',
+		marginHorizontal: 12,
+		marginTop: 12,
+		borderRadius: 12,
+		overflow: 'hidden',
+	},
 
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
+	row: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingVertical: 14,
+		paddingHorizontal: 16,
+	},
 
-  borderBottom: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
+	borderBottom: {
+		borderBottomWidth: 1,
+		borderBottomColor: '#eee',
+	},
 
-  left: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
+	left: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+	},
 
-  text: {
-    fontSize: 15,
-    color: "#333",
-  },
+	text: {
+		fontSize: 15,
+		color: '#333',
+	},
 
-  destructive: {
-    color: "#FF3B30",
-  },
-});
+	destructive: {
+		color: '#FF3B30',
+	},
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.4)',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
 
-export default SettingPage;
+	modalCard: {
+		width: '85%',
+		backgroundColor: '#fff',
+		borderRadius: 16,
+		padding: 20,
+	},
+
+	modalTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#333',
+	},
+
+	modalDescription: {
+		marginTop: 10,
+		color: '#666',
+		fontSize: 14,
+	},
+
+	modalButtons: {
+		flexDirection: 'row',
+		justifyContent: 'flex-end',
+		marginTop: 20,
+	},
+
+	cancelText: {
+		fontSize: 15,
+		color: '#666',
+		marginRight: 20,
+	},
+
+	logoutButton: {
+		backgroundColor: '#FF3B30',
+		borderRadius: 8,
+		paddingHorizontal: 18,
+		paddingVertical: 8,
+	},
+
+	logoutText: {
+		color: '#fff',
+		fontWeight: '600',
+	},
+})
+
+export default SettingPage

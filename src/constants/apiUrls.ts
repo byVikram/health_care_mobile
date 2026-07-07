@@ -6,7 +6,8 @@ import { Platform } from 'react-native'
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	const url = 'http://192.168.4.26:8000'
 
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
@@ -24,6 +25,8 @@ export const API_ENDPOINTS = {
 		LOGOUT: `${BASE_URL}/api/auth/logout`,
 		GET_ROLES: `${BASE_URL}/api/auth/get-roles`,
 		CREATE_USER: `${BASE_URL}/api/auth/create-user`,
+		SESSIONS: `${BASE_URL}/api/auth/sessions`,
+		SESSION_LOGOUT: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}`,
 	},
 	DOCTORS: {
 		SEARCH: `${BASE_URL}/api/doctors`,
@@ -38,6 +41,7 @@ export const API_ENDPOINTS = {
 	},
 	DOCTOR_PROFILE: {
 		DETAILS: `${BASE_URL}/api/doctors/details`,
+		PERSONAL_DETAILS: `${BASE_URL}/api/doctors/personal-details`,
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
 		ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
@@ -63,6 +67,7 @@ export const API_ENDPOINTS = {
 		GET: `${BASE_URL}/api/appointments`,
 		CREATE: `${BASE_URL}/api/appointments`,
 		GET_BY_ID: (id: string) => `${BASE_URL}/api/appointments/${id}`, // Add this
+		PRE_INTAKE: (id: string) => `${BASE_URL}/api/appointments/${id}/pre-intake`,
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
@@ -80,14 +85,60 @@ export const API_ENDPOINTS = {
 		VITALS_HISTORY: (id: string) => `${BASE_URL}/api/patients/${id}/vitals`,
 		REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/reports`,
 		REPORTS_CREATE: `${BASE_URL}/api/patients/reports`,
+		ADDRESSES: `${BASE_URL}/api/patients/me/addresses`,
+		TREATMENT_HISTORY: (id: string) => `${BASE_URL}/api/treatments/patient/${id}/history`,
+		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
 	},
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,
 		DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
+		ME_DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
 	},
+	PHARMACY_ORDERS: {
+		CREATE: `${BASE_URL}/api/pharmacy-orders`,
+		LIST: `${BASE_URL}/api/pharmacy-orders`,
+		LIST_BY_PHARMACY: `${BASE_URL}/api/pharmacies`, // New endpoint to get orders fr the logged-in pharmacy
+		GET_BY_ID: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}`,
+		UPDATE_STATUS: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/status`,
+		UPDATE_MEDICINES: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/medicines`,
+		SEND_REMINDER: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/remind`,
+	},
+	RADIOLOGY_PROFILE: {
+		SEARCH: `${BASE_URL}/api/radiology/search`, // Add this line
+		DETAILS: `${BASE_URL}/api/radiology/profile`,
+		UPDATE: `${BASE_URL}/api/radiology/profile`,
+		SCAN_TYPES: `${BASE_URL}/api/radiology/scan-types`,
+		SCANS: `${BASE_URL}/api/radiology/scans`,
+		BOOKINGS: `${BASE_URL}/api/radiology/bookings`,
+		BOOKING_DETAIL: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}`,
+		SUBMIT_QUOTE: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/quote`,
+		VERIFY_PRESCRIPTION: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/verify`,
+		UPLOAD_REPORT: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/report`,
+	},
+
+	LABORATORY: {
+		SEARCH: `${BASE_URL}/api/laboratory/search`,
+
+		PROFILE: `${BASE_URL}/api/laboratory/profile`,
+		DETAILS: `${BASE_URL}/api/laboratory/details`,
+
+		TEST_TYPES: `${BASE_URL}/api/laboratory/test-types`,
+		TESTS: `${BASE_URL}/api/laboratory/tests`,
+
+		BOOKINGS: `${BASE_URL}/api/laboratory/bookings`,
+		BOOKING_DETAIL: (id: string) => `${BASE_URL}/api/laboratory/bookings/${id}`,
+
+		BOOKING_ITEMS: (bookingId: string) => `${BASE_URL}/api/laboratory/bookings/${bookingId}/items`,
+
+		REPORTS: `${BASE_URL}/api/laboratory/reports`,
+		UPLOAD_REPORT: (bookingId: string) => `${BASE_URL}/api/laboratory/bookings/${bookingId}/report`,
+
+		VERIFY_PRESCRIPTION: (bookingId: string) => `${BASE_URL}/api/laboratory/bookings/${bookingId}/verify`,
+		TESTS_BY_PUBLIC_ID: (publicId: string) => `${BASE_URL}/api/laboratories/${publicId}/tests`,
+	},
+
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {
 		LIST: `${BASE_URL}/api/locations`,
 	},
 }
-

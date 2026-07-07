@@ -1,4 +1,4 @@
-﻿// src/types/appointment.ts
+// src/types/appointment.ts
 
 export type AppointmentStatusValue = 'pending' | 'confirmed' | 'completed' | 'cancelled' | string
 
@@ -41,8 +41,14 @@ export interface AppointmentsResponse {
 	success: boolean
 	message: string
 	data: Appointment[]
-	total: number
-	page: number
-	limit: number
-	pages: number
+	total?: number
+	page?: number
+	limit?: number
+	pages?: number
+	meta?: {
+		total: number
+		page: number
+		limit: number
+		pages: number
+	}
 }

@@ -1,163 +1,71 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	View,
-	Text,
 	ScrollView,
 	TouchableOpacity,
 	StyleSheet,
-	Image,
-	Alert,
+	useWindowDimensions,
+	NativeScrollEvent,
+	NativeSyntheticEvent,
 	ActivityIndicator,
-	Animated,
-	Easing,
-	ViewStyle,
+	Alert,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
-import * as ImagePicker from 'expo-image-picker'
 
-import HealthProfileField from './HealthProfileField'
-import { PROFILE_TABS } from './profileFieldsConfig'
-import type { TabConfig } from './profileFieldsConfig'
-import { getPatientDetails, updatePatientProfile, mapApiDataToLocalState } from './ProfileService'
-import PatientQR from '../../../assets/icons/PatientQR.svg'
-type Tab = 'Personal' | 'Medical' | 'Lifestyle'
-const TEAL = '#1a8c8c'
+import { AppTypography } from '../../../components/common'
+import {
+	getPatientDetails,
+	updatePatientProfile,
+	mapApiToLocalState,
+	INITIAL_PATIENT_STATE,
+} from './PatientProfileService'
+import type { PatientProfileState } from './PatientProfileService'
 
-/* ──────────────── SKELETON ──────────────── */
+import PersonalTab from './tabs/PersonalTab'
+import MedicalTab from './tabs/MedicalTab'
+import LifestyleTab from './tabs/LifestyleTab'
+import AddressTab from './tabs/AddressTab'
+import SessionsTab from '../SessionsTab'
 
-type SkeletonProps = {
-	width: number | string
-	height: number
-	borderRadius?: number
-	style?: ViewStyle
-}
+type Tab = 'Personal' | 'Medical' | 'Lifestyle' | 'Address' | 'Sessions'
 
-function AppSkeleton({ width, height, borderRadius = 6, style }: SkeletonProps) {
-	const opacity = useRef(new Animated.Value(0.3)).current
-
-	useEffect(() => {
-		const loop = Animated.loop(
-			Animated.sequence([
-				Animated.timing(opacity, {
-					toValue: 1,
-					duration: 800,
-					easing: Easing.inOut(Easing.ease),
-					useNativeDriver: false,
-				}),
-				Animated.timing(opacity, {
-					toValue: 0.3,
-					duration: 800,
-					easing: Easing.inOut(Easing.ease),
-					useNativeDriver: false,
-				}),
-			])
-		)
-		loop.start()
-		return () => loop.stop()
-	}, [])
-
-	return (
-		<Animated.View
-			style={[
-				{
-					width: width as any,
-					height,
-					borderRadius,
-					backgroundColor: '#e0e8ea',
-				},
-				{ opacity },
-				style,
-			]}
-		/>
-	)
-}
-
-/* ──────────────── SKELETON SCREEN ──────────────── */
-
-function PatientProfileLayoutSkeleton() {
-	const insets = useSafeAreaInsets()
-
-	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
-			{/* Header */}
-			<View style={styles.header}>
-				<AppSkeleton width={180} height={18} />
-				<AppSkeleton width={40} height={18} />
-			</View>
-
-			{/* Progress */}
-			<View style={styles.progressBarBg}>
-				<AppSkeleton width="50%" height={3} />
-			</View>
-
-			{/* Tabs */}
-			<View style={styles.tabRow}>
-				<AppSkeleton width="30%" height={36} borderRadius={22} />
-				<AppSkeleton width="30%" height={36} borderRadius={22} />
-				<AppSkeleton width="30%" height={36} borderRadius={22} />
-			</View>
-
-			{/* Profile Section */}
-			<View style={styles.nameAvatarRow}>
-				<View>
-					<AppSkeleton width={40} height={12} />
-					<AppSkeleton width={120} height={20} style={{ marginTop: 6 }} />
-				</View>
-				<AppSkeleton width={60} height={60} borderRadius={10} />
-			</View>
-
-			<View style={styles.divider} />
-
-			{/* Fields */}
-			{Array.from({ length: 9 }).map((_, i) => (
-				<View key={i} style={styles.fieldRow}>
-					<View>
-						<AppSkeleton width={100} height={12} />
-						<AppSkeleton width={140} height={14} style={{ marginTop: 6 }} />
-					</View>
-					<AppSkeleton width={30} height={14} />
-				</View>
-			))}
-		</View>
-	)
-}
-
-/* ──────────────── HELPER ──────────────── */
-
-function calcCompletion(data: Record<string, string>): number {
-	let total = 0
-	let filled = 0
-
-	PROFILE_TABS.forEach((t) =>
-		t.fields.forEach((f) => {
-			total++
-			if (data[f.key]) filled++
-		})
-	)
-
-	return total === 0 ? 0 : Math.round((filled / total) * 100)
-}
-
-/* ──────────────── MAIN SCREEN ──────────────── */
+const TABS: { tab: Tab }[] = [
+	{ tab: 'Personal' },
+	{ tab: 'Medical' },
+	{ tab: 'Lifestyle' },
+	{ tab: 'Address' },
+	{ tab: 'Sessions' },
+]
 
 export default function PatientProfileLayout() {
-	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
+	const { width } = useWindowDimensions()
+
+	const pagerRef = useRef<ScrollView>(null)
+	const tabScrollRef = useRef<ScrollView>(null)
 
 	const [activeTab, setActiveTab] = useState<Tab>('Personal')
-	const [data, setData] = useState<Record<string, string>>({})
+	const [data, setData] = useState<PatientProfileState>(INITIAL_PATIENT_STATE)
+	useEffect(() => {
+		console.log('CURRENT DATA =>', JSON.stringify(data, null, 2))
+	}, [data])
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
+
+	const activeTabIndex = useMemo(() => {
+		const index = TABS.findIndex((tab) => tab.tab === activeTab)
+		return index >= 0 ? index : 0
+	}, [activeTab])
 
 	const fetchProfile = async () => {
 		try {
 			setLoading(true)
 			const res = await getPatientDetails()
+			console.log('Get Profile Response =>', JSON.stringify(res, null, 2))
 
 			if (res.success && res.data) {
-				setData(mapApiDataToLocalState(res.data))
+				setData(mapApiToLocalState(res.data))
 			} else {
 				Alert.alert('Error', res.message ?? 'Could not load profile.')
 			}
@@ -172,14 +80,76 @@ export default function PatientProfileLayout() {
 		fetchProfile()
 	}, [])
 
-	const handleChange = (key: string, value: string) => setData((prev) => ({ ...prev, [key]: value }))
+	useEffect(() => {
+		pagerRef.current?.scrollTo({ x: activeTabIndex * width, animated: false })
+	}, [width])
 
-	const completion = calcCompletion(data)
+	useEffect(() => {
+		tabScrollRef.current?.scrollTo({
+			x: Math.max(0, activeTabIndex * 120 - 24),
+			animated: true,
+		})
+	}, [activeTabIndex])
+
+	const goToTab = useCallback(
+		(tabKey: Tab, animated = true) => {
+			const nextIndex = TABS.findIndex((tab) => tab.tab === tabKey)
+			if (nextIndex < 0) return
+
+			setActiveTab(tabKey)
+			pagerRef.current?.scrollTo({ x: nextIndex * width, animated })
+		},
+		[width]
+	)
+
+	const handlePagerMomentumEnd = useCallback(
+		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
+			const clampedIndex = Math.max(0, Math.min(TABS.length - 1, nextIndex))
+			setActiveTab(TABS[clampedIndex].tab)
+		},
+		[width]
+	)
+
+	const handleChange = (key: keyof PatientProfileState, value: any) => {
+		console.log('CHANGE =>', key, value)
+
+		setData((prev) => ({
+			...prev,
+			[key]: value,
+		}))
+	}
+
+	// const handleSave = async () => {
+	// 	try {
+	// 		setSaving(true)
+	// 		const res = await updatePatientProfile(data)
+
+	// 		if (res.success) {
+	// 			await fetchProfile()
+	// 			Alert.alert('Saved', 'Profile updated successfully.')
+	// 		} else {
+	// 			Alert.alert('Error', res.message ?? 'Failed to save.')
+	// 		}
+	// 	} catch {
+	// 		Alert.alert('Error', 'Something went wrong.')
+	// 	} finally {
+	// 		setSaving(false)
+	// 	}
+	// }
 
 	const handleSave = async () => {
 		try {
-			setLoading(true)
+			setSaving(true)
+
+			console.log('===== PROFILE DATA =====')
+			console.log(JSON.stringify(data, null, 2))
+
 			const res = await updatePatientProfile(data)
+
+			console.log('===== API RESPONSE =====')
+			console.log('PATCH RESPONSE:', JSON.stringify(res, null, 2))
+			
 
 			if (res.success) {
 				await fetchProfile()
@@ -187,210 +157,165 @@ export default function PatientProfileLayout() {
 			} else {
 				Alert.alert('Error', res.message ?? 'Failed to save.')
 			}
-		} catch {
+		} catch (error: any) {
+			console.log('===== API ERROR =====')
+			console.log(error)
+			console.log(error?.response?.data)
+
 			Alert.alert('Error', 'Something went wrong.')
 		} finally {
-			setLoading(false)
+			setSaving(false)
 		}
 	}
 
-	const renderTab = (tabCfg: TabConfig) => (
-		<>
-			{tabCfg.tab === 'Personal' && (
-				<>
-					<View style={styles.nameAvatarRow}>
-						<View>
-							<Text style={styles.fieldSmallLabel}>Name</Text>
-							<Text style={styles.nameValue}>{data.name || '—'}</Text>
-						</View>
-
-						<View style={styles.avatarCol}>
-							<TouchableOpacity onPress={onUploadPhoto}>
-								{data.photoUrl ? (
-									<Image source={{ uri: data.photoUrl }} style={styles.avatarImg} />
-								) : (
-									<View style={styles.avatarPlaceholder}>
-										<MaterialCommunityIcons name="account" size={32} color="#9aabb0" />
-									</View>
-								)}
-							</TouchableOpacity>
-						</View>
-					</View>
-
-					<View style={styles.divider} />
-				</>
-			)}
-
-			{tabCfg.fields.map((field) => (
-				<HealthProfileField key={field.key} config={field} value={data[field.key]} onChange={handleChange} />
-			))}
-		</>
-	)
-
-	const currentTabConfig = PROFILE_TABS.find((t) => t.tab === activeTab)!
-
-	if (loading) return <PatientProfileLayoutSkeleton />
-	const onUploadPhoto = () => {
-		Alert.alert('Upload Photo', 'Choose an option', [
-			{ text: 'Camera', onPress: openCamera },
-			{ text: 'Gallery', onPress: openGallery },
-			{ text: 'Cancel', style: 'cancel' },
-		])
+	const renderTabContent = (tabKey: Tab) => {
+		if (tabKey === 'Medical') {
+			return <MedicalTab data={data} onChange={handleChange} onSave={handleSave} saving={saving} />
+		}
+		if (tabKey === 'Lifestyle') {
+			return <LifestyleTab data={data} onChange={handleChange} onSave={handleSave} saving={saving} />
+		}
+		if (tabKey === 'Address') {
+			return <AddressTab />
+		}
+		if (tabKey === 'Sessions') {
+			return <SessionsTab />
+		}
+		return <PersonalTab data={data} onChange={handleChange} onSave={handleSave} saving={saving} />
 	}
 
-	const openCamera = async () => {
-		const permission = await ImagePicker.requestCameraPermissionsAsync()
-
-		if (!permission.granted) {
-			Alert.alert('Permission required', 'Camera access is needed')
-			return
-		}
-
-		const result = await ImagePicker.launchCameraAsync({
-			mediaTypes: ImagePicker.MediaTypeOptions.Images,
-			quality: 0.7,
-		})
-
-		if (!result.canceled) {
-			handleImage(result.assets[0].uri)
-		}
-	}
-
-	const openGallery = async () => {
-		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
-
-		if (!permission.granted) {
-			Alert.alert('Permission required', 'Gallery access is needed')
-			return
-		}
-
-		const result = await ImagePicker.launchImageLibraryAsync({
-			mediaTypes: ImagePicker.MediaTypeOptions.Images,
-			quality: 0.7,
-		})
-
-		if (!result.canceled) {
-			handleImage(result.assets[0].uri)
-		}
-	}
-
-	const handleImage = (uri: string) => {
-		setData((prev) => ({
-			...prev,
-			photoUrl: uri,
-		}))
-
-		// 🔥 Optional: call API here to upload image
+	if (loading) {
+		return (
+			<View style={styles.loadingContainer}>
+				<ActivityIndicator size="small" color="#0c7c7c" />
+			</View>
+		)
 	}
 
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
-			{/* Header */}
-			<View style={styles.header}>
-				<TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-					<MaterialCommunityIcons name="chevron-left" size={22} color={TEAL} />
-					<Text style={styles.backTxt}>Your health profile</Text>
-					<Text style={styles.progressTxt}>({completion}%)</Text>
-				</TouchableOpacity>
-
-				<TouchableOpacity onPress={handleSave} disabled={saving}>
-					{saving ? (
-						<ActivityIndicator size="small" color={TEAL} />
-					) : (
-						<Text style={styles.saveTxt}>Save</Text>
-					)}
-				</TouchableOpacity>
-			</View>
-
-			{/* Progress */}
-			<View style={styles.progressBarBg}>
-				<View style={[styles.progressBarFill, { width: `${completion}%` }]} />
-			</View>
-
+		<View style={styles.container}>
 			{/* Tabs */}
-			<View style={styles.tabRow}>
-				{PROFILE_TABS.map(({ tab }) => (
-					<TouchableOpacity
-						key={tab}
-						onPress={() => setActiveTab(tab as Tab)}
-						style={[styles.tab, activeTab === tab && styles.tabActive]}
-					>
-						<Text style={[styles.tabTxt, activeTab === tab && styles.tabTxtActive]}>{tab}</Text>
-					</TouchableOpacity>
-				))}
+			<View style={styles.tabContainer}>
+				<ScrollView
+					ref={tabScrollRef}
+					horizontal
+					showsHorizontalScrollIndicator={false}
+					contentContainerStyle={styles.tabScrollContainer}
+				>
+					{TABS.map(({ tab }) => {
+						const isActive = activeTab === tab
+						return (
+							<TouchableOpacity
+								key={tab}
+								style={[styles.tabButton, isActive && styles.tabButtonActive]}
+								onPress={() => goToTab(tab)}
+							>
+								<AppTypography
+									variant="subtitle"
+									style={[styles.tabLabel, isActive && styles.tabLabelActive]}
+								>
+									{tab}
+								</AppTypography>
+							</TouchableOpacity>
+						)
+					})}
+				</ScrollView>
 			</View>
 
-			{/* Fields */}
-			<ScrollView style={styles.scroll}>{renderTab(currentTabConfig)}</ScrollView>
+			{/* Content/Pager */}
+			<View style={styles.contentContainer}>
+				<ScrollView
+					ref={pagerRef}
+					style={styles.pager}
+					horizontal
+					pagingEnabled
+					bounces={false}
+					alwaysBounceHorizontal={false}
+					overScrollMode="never"
+					directionalLockEnabled
+					showsHorizontalScrollIndicator={false}
+					scrollEventThrottle={16}
+					onMomentumScrollEnd={handlePagerMomentumEnd}
+					keyboardShouldPersistTaps="handled"
+				>
+					{TABS.map(({ tab }) => (
+						<View key={tab} style={[styles.pagerPage, { width }]}>
+							{renderTabContent(tab)}
+						</View>
+					))}
+				</ScrollView>
+			</View>
 		</View>
 	)
 }
 
-/* ──────────────── STYLES (UNCHANGED) ──────────────── */
-
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: '#fff' },
-	header: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderBottomWidth: 0.5,
-		borderBottomColor: '#e8ecee',
-	},
-	backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-	backTxt: { fontSize: 14, color: TEAL, fontWeight: '600' },
-	progressTxt: { fontSize: 13, color: TEAL, marginLeft: 4 },
-	saveTxt: { fontSize: 14, color: TEAL, fontWeight: '700' },
-	progressBarBg: { height: 3, backgroundColor: '#e0ecee' },
-	progressBarFill: { height: '100%', backgroundColor: TEAL },
-	tabRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
-	tab: {
+	container: {
 		flex: 1,
-		paddingVertical: 9,
-		borderRadius: 22,
-		borderWidth: 1,
-		borderColor: '#c5d0d3',
-		alignItems: 'center',
+		minHeight: 0,
+		backgroundColor: '#fff',
 	},
-	qrContainer: {
-		marginTop: 10,
-		alignItems: 'center',
-	},
-	tabActive: { backgroundColor: '#1a6e6e', borderColor: '#1a6e6e' },
-	tabTxt: { fontSize: 13, fontWeight: '500', color: '#5a6c72' },
-	tabTxtActive: { color: '#fff' },
-	scroll: { flex: 1 },
-	nameAvatarRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		justifyContent: 'space-between',
+	header: {
 		paddingHorizontal: 16,
-		paddingTop: 14,
-		paddingBottom: 12,
+		paddingBottom: 16,
+		flexDirection: 'row',
+		alignItems: 'center',
+		flexShrink: 0,
 	},
-	fieldSmallLabel: { fontSize: 12, color: '#9aabb0', marginBottom: 3 },
-	nameValue: { fontSize: 18, fontWeight: '700', color: '#1a2226' },
-	avatarCol: { alignItems: 'center', gap: 5 },
-	avatarPlaceholder: {
-		width: 60,
-		height: 60,
-		borderRadius: 10,
-		backgroundColor: '#dde8ea',
+	backBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	headerTitle: {
+		marginLeft: 4,
+		color: '#1a1a1a',
+		fontWeight: 'bold',
+	},
+	tabContainer: {
+		borderBottomWidth: 1,
+		borderBottomColor: '#f0f4f7',
+		backgroundColor: '#fff',
+		flexShrink: 0,
+	},
+	tabScrollContainer: {
+		paddingHorizontal: 8,
+	},
+	tabButton: {
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		marginHorizontal: 4,
+		borderBottomWidth: 2,
+		borderBottomColor: 'transparent',
+	},
+	tabButtonActive: {
+		borderBottomColor: '#0c7c7c',
+	},
+	tabLabel: {
+		color: '#62707a',
+		fontWeight: '500',
+		fontSize: 14,
+	},
+	tabLabelActive: {
+		color: '#0c7c7c',
+		fontWeight: 'bold',
+	},
+	contentContainer: {
+		flex: 1,
+		minHeight: 0,
+		backgroundColor: '#f8fafc',
+	},
+	pager: {
+		flex: 1,
+	},
+	pagerPage: {
+		flex: 1,
+		minHeight: 0,
+		backgroundColor: '#f8fafc',
+	},
+	loadingContainer: {
+		flex: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
-	},
-	avatarImg: { width: 60, height: 60, borderRadius: 10 },
-	divider: {
-		height: 0.5,
-		backgroundColor: '#e8ecee',
-		marginHorizontal: 16,
-		marginBottom: 2,
-	},
-	fieldRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		padding: 16,
+		backgroundColor: '#fff',
 	},
 })

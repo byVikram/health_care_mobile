@@ -1,23 +1,41 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
 	View,
 	StyleSheet,
 	FlatList,
 	RefreshControl,
+	ActivityIndicator,
 	useWindowDimensions,
 	DimensionValue,
+	TouchableOpacity,
+	ScrollView,
 } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
-import { useRoute } from '@react-navigation/native'
+import { useRoute, useNavigation } from '@react-navigation/native'
+
 import DoctorSearchCard from './components/DoctorSearchCard'
-import { AppTypography, AppSkeleton } from '../../../components/common'
-import { getDoctors } from '../doctorService'
+import { AppTypography, AppSkeleton, AppSelect, AppSelectOption, AppBottomSheet } from '../../../components/common'
+import { getDoctors, getSpecialities } from '../doctorService'
 import { DoctorSearchItem } from '../../../types/doctor-search'
-import AppHeader from '../../../components/common/AppHeader'
 import { doctorCardStyles } from './components/DoctorCard.styles'
 import type { RouteProp } from '@react-navigation/native'
 import type { AppStackParamList } from '../../../navigation/types'
 import { ROUTES } from '../../../navigation/routes'
+
+const PAGE_LIMIT = 5
+
+const CONSULTATION_OPTIONS: AppSelectOption[] = [
+	{ label: 'All Modes', value: 'all' },
+	{ label: 'Video Call', value: 'video' },
+	{ label: 'Clinic Visit', value: 'clinic' },
+]
+
+const RATING_OPTIONS: AppSelectOption[] = [
+	{ label: 'All Ratings', value: 'all' },
+	{ label: '4.5+ Stars', value: '4.5' },
+	{ label: '4.0+ Stars', value: '4.0' },
+	{ label: '3.5+ Stars', value: '3.5' },
+]
 
 // ─── Doctor Card Skeleton ─────────────────────────────────────────────────
 function DoctorCardSkeleton({ mobile = false }: { mobile?: boolean }) {
@@ -57,118 +75,342 @@ function DoctorCardSkeleton({ mobile = false }: { mobile?: boolean }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────
 export default function DoctorSearchPage() {
+	const navigation = useNavigation<any>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
+	console.log('Route params:', route.params)
 	const { width } = useWindowDimensions()
 
 	const isMobile = width < 600
 	const numColumns = isMobile ? 1 : width >= 900 ? 4 : 3
 	const mobileListPadding = width < 360 ? 12 : 20
 
-	// Read initial search query from navigation params (passed from SearchPage)
+	// Initial route params
 	const initialQuery = route.params?.query || ''
+	const initialMode = route.params?.mode || 'all'
+	const initialSpecialityId = route.params?.specialityId ? String(route.params.specialityId) : 'all'
+	console.log('Route params:', route.params)
 
 	const [searchQuery, setSearchQuery] = useState(initialQuery)
 	const [doctors, setDoctors] = useState<DoctorSearchItem[]>([])
 	const [loading, setLoading] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
+	const [page, setPage] = useState(1)
+	const [loadingMore, setLoadingMore] = useState(false)
+	const [hasMore, setHasMore] = useState(true)
+	const isFetchingPageRef = useRef(false)
 
-	// Fetch the base doctor list. Search and speciality tabs are applied locally.
-	const fetchDoctorsList = async (isRefresh = false) => {
-		if (!isRefresh) setLoading(true)
+	// Filter states
+	const [specialityFilter, setSpecialityFilter] = useState(initialSpecialityId)
+	const [consultationTypeFilter, setConsultationTypeFilter] = useState<string>(initialMode)
+	const [minRatingFilter, setMinRatingFilter] = useState('all')
+	const [specialities, setSpecialities] = useState<AppSelectOption[]>([
+		{ label: 'All Specialities', value: 'all' },
+		...(route.params?.specialityId && route.params?.specialityName
+			? [{ label: route.params.specialityName, value: String(route.params.specialityId) }]
+			: []),
+	])
+	const [specialitiesLoading, setSpecialitiesLoading] = useState(false)
+
+	// Modal draft states
+	const [draftSpecialityFilter, setDraftSpecialityFilter] = useState(initialSpecialityId)
+	const [draftConsultationType, setDraftConsultationType] = useState<string>(initialMode)
+	const [draftMinRating, setDraftMinRating] = useState('all')
+
+	const [showFilters, setShowFilters] = useState(false)
+
+	// Load specialities on mount
+	useEffect(() => {
+		const loadSpecialities = async () => {
+			try {
+				setSpecialitiesLoading(true)
+				const res = await getSpecialities()
+				if (res.success && res.data) {
+					const mapped = res.data.map((s) => ({
+						label: s.label,
+						value: String(s.id),
+					}))
+					setSpecialities([{ label: 'All Specialities', value: 'all' }, ...mapped])
+
+					if (route.params?.specialityId) {
+						const found = res.data.find((s) => String(s.id) === String(route.params?.specialityId))
+						if (found) {
+							const val = String(found.id)
+							setSpecialityFilter(val)
+							setDraftSpecialityFilter(val)
+						}
+					}
+				}
+			} catch (error) {
+				console.error('Error fetching specialities:', error)
+			} finally {
+				setSpecialitiesLoading(false)
+			}
+		}
+		loadSpecialities()
+	}, [route.params?.specialityId])
+
+	// Fetch doctor list
+	const fetchDoctorsList = async (targetPage = 1, isRefresh = false, isLoadMore = false) => {
+		if (isFetchingPageRef.current) return
+		isFetchingPageRef.current = true
+
+		if (isLoadMore) {
+			setLoadingMore(true)
+		} else if (!isRefresh) {
+			setLoading(true)
+		}
 		try {
-			// 🔁 ADJUST THIS MAPPING TO MATCH YOUR BACKEND
-			// Option 1: if backend expects 'q' instead of 'search'
-			// Option 2: if backend expects 'speciality' instead of 'speciality_id'
-			const params = {
-				limit: 50,
+			const params: Record<string, any> = {
+				page: targetPage,
+				limit: PAGE_LIMIT,
+			}
+
+			if (searchQuery.trim().length > 0) {
+				params.search = searchQuery.trim()
+			}
+
+			if (specialityFilter !== 'all') {
+				params.speciality_id = specialityFilter
+			}
+
+			if (consultationTypeFilter !== 'all') {
+				params.consultation_type = consultationTypeFilter
+			}
+
+			if (minRatingFilter !== 'all') {
+				params.min_rating = Number(minRatingFilter)
 			}
 
 			console.log('📤 Sending params:', JSON.stringify(params, null, 2))
 
-			const res = await getDoctors(params)  // getDoctors already uses these params
+			const res = await getDoctors(params)
 			console.log('📥 API response:', JSON.stringify(res, null, 2))
 
 			if (res.success && res.data) {
-				setDoctors(res.data)
+				const newData = res.data
+				setDoctors((prev) => (targetPage === 1 ? newData : [...prev, ...newData]))
+				setPage(targetPage)
+				setHasMore(newData.length >= PAGE_LIMIT)
 			} else {
-				setDoctors([])
+				if (targetPage === 1) setDoctors([])
+				setHasMore(false)
 			}
 		} catch (error) {
 			console.error('Error fetching doctors:', error)
-			setDoctors([])
+			if (targetPage === 1) setDoctors([])
 		} finally {
 			setLoading(false)
 			setRefreshing(false)
+			setLoadingMore(false)
+			isFetchingPageRef.current = false
 		}
 	}
 
 	useEffect(() => {
-		fetchDoctorsList()
-	}, [])
+		fetchDoctorsList(1)
+	}, [searchQuery, specialityFilter, consultationTypeFilter, minRatingFilter])
 
 	const onRefresh = useCallback(() => {
+		if (isFetchingPageRef.current) return
 		setRefreshing(true)
-		fetchDoctorsList(true)
-	}, [])
+		setPage(1)
+		setDoctors([])
+		setHasMore(true)
+		fetchDoctorsList(1, true)
+	}, [searchQuery, specialityFilter, consultationTypeFilter, minRatingFilter])
 
-	const handleSearchSubmit = () => {
-		// The visible list is controlled by speciality tabs only on this page.
+	const handleEndReached = useCallback(() => {
+		if (isFetchingPageRef.current || loading || refreshing || loadingMore || !hasMore) return
+		console.log('🔥 Loading next page:', page + 1)
+		fetchDoctorsList(page + 1, false, true)
+	}, [
+		hasMore,
+		loading,
+		loadingMore,
+		page,
+		refreshing,
+		searchQuery,
+		specialityFilter,
+		consultationTypeFilter,
+		minRatingFilter,
+	])
+
+	// Modal handlers
+	const openFilterModal = () => {
+		setDraftSpecialityFilter(specialityFilter)
+		setDraftConsultationType(consultationTypeFilter)
+		setDraftMinRating(minRatingFilter)
+		setShowFilters(true)
 	}
 
-	// Speciality filtering is temporarily disabled while the speciality section is hidden.
-	const displayedDoctors = doctors
+	const closeFilterModal = () => {
+		setShowFilters(false)
+	}
+
+	const applyFilters = () => {
+		setSpecialityFilter(draftSpecialityFilter)
+		setConsultationTypeFilter(draftConsultationType)
+		setMinRatingFilter(draftMinRating)
+		closeFilterModal()
+	}
+
+	const resetFilters = () => {
+		setDraftSpecialityFilter('all')
+		setDraftConsultationType('all')
+		setDraftMinRating('all')
+		setSpecialityFilter('all')
+		setConsultationTypeFilter('all')
+		setMinRatingFilter('all')
+	}
 
 	// Render item for FlatList
-	const renderItem = useCallback(({ item }: { item: DoctorSearchItem }) => {
-		const itemWidth: DimensionValue = `${100 / numColumns}%`
-		return (
-			<View style={[styles.cardListItem, isMobile && styles.cardListItemMobile, { width: itemWidth }]}>
-				<DoctorSearchCard doctor={item} mobile={isMobile} />
-			</View>
-		)
-	}, [isMobile, numColumns])
+	const renderItem = useCallback(
+		({ item }: { item: DoctorSearchItem }) => {
+			const itemWidth: DimensionValue = `${100 / numColumns}%`
+			return (
+				<View style={[styles.cardListItem, isMobile && styles.cardListItemMobile, { width: itemWidth }]}>
+					<DoctorSearchCard doctor={item} mobile={isMobile} />
+				</View>
+			)
+		},
+		[isMobile, numColumns]
+	)
+
+	const renderFilterChips = (options: AppSelectOption[], value: string, onChange: (nextValue: string) => void) => (
+		<ScrollView
+			horizontal
+			showsHorizontalScrollIndicator={false}
+			style={styles.filterChipScroller}
+			contentContainerStyle={styles.filterChipRow}
+			keyboardShouldPersistTaps="handled"
+		>
+			{options.map((option) => {
+				const selected = option.value === value
+
+				return (
+					<TouchableOpacity
+						key={option.value}
+						style={[styles.filterChip, selected && styles.filterChipActive]}
+						onPress={() => onChange(option.value)}
+						activeOpacity={0.82}
+					>
+						<AppTypography style={[styles.filterChipText, selected && styles.filterChipTextActive]}>
+							{option.label}
+						</AppTypography>
+					</TouchableOpacity>
+				)
+			})}
+		</ScrollView>
+	)
 
 	// Skeleton placeholder list when loading
-	const listData = loading && !refreshing ? Array(6).fill({}) : displayedDoctors
-	const keyExtractor = (item: any, index: number) =>
-		item.id ? String(item.id) : `skeleton-${index}`
+	const listData = loading && !refreshing ? Array(6).fill({}) : doctors
+	const keyExtractor = (item: any, index: number) => (item.id ? String(item.id) : `skeleton-${index}`)
+
+	const renderFooter = () =>
+		loadingMore ? (
+			<View style={styles.footerLoader}>
+				<ActivityIndicator size="small" color="#888" />
+			</View>
+		) : null
+
+	const renderFilterContent = () => {
+		return (
+			<View style={[styles.filterSheetContentWrapper, { maxWidth: Math.min(width, 520) }]}>
+				<ScrollView
+					style={styles.filterSheetScroll}
+					contentContainerStyle={styles.filterSheetContent}
+					showsVerticalScrollIndicator={false}
+				>
+					<View style={styles.filterGroup}>
+						<AppTypography style={styles.filterGroupLabel}>Speciality</AppTypography>
+						<AppSelect
+							options={specialities}
+							value={draftSpecialityFilter}
+							onSelect={(value) => {
+								setDraftSpecialityFilter(value)
+							}}
+							placeholder={specialitiesLoading ? 'Loading specialities...' : 'Select Speciality'}
+							size="medium"
+							borderRadius={10}
+							customCardStyle={[styles.inlineFilterSelect, styles.mobileHospitalSelectCard]}
+							borderColor="#EAECF0"
+							maxDropdownHeight={240}
+							style={styles.inlineSelectFill}
+						/>
+					</View>
+
+					<View style={styles.filterGroup}>
+						<AppTypography style={styles.filterGroupLabel}>Consultation Mode</AppTypography>
+						{renderFilterChips(CONSULTATION_OPTIONS, draftConsultationType, setDraftConsultationType)}
+					</View>
+
+					<View style={styles.filterGroup}>
+						<AppTypography style={styles.filterGroupLabel}>Minimum Rating</AppTypography>
+						{renderFilterChips(RATING_OPTIONS, draftMinRating, setDraftMinRating)}
+					</View>
+				</ScrollView>
+
+				<View style={styles.filterSheetActions}>
+					<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+						<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
+					</TouchableOpacity>
+					<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+						<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
+					</TouchableOpacity>
+				</View>
+			</View>
+		)
+	}
+
+	const renderFilterModal = () => {
+		return (
+			<AppBottomSheet visible={showFilters} title="Filters" onClose={closeFilterModal}>
+				{renderFilterContent()}
+			</AppBottomSheet>
+		)
+	}
+
+	const hasActiveFilters = specialityFilter !== 'all' || consultationTypeFilter !== 'all' || minRatingFilter !== 'all'
 
 	return (
 		<View style={styles.container}>
-			{/* Editable header search bar */}
-			<AppHeader
-				variant="search"
-				location="KR Market"
-				onAvatarPress={() => {}}
-				isSearchEditable={true}
-				searchValue={searchQuery}
-				onSearchChange={setSearchQuery}
-				onSearchSubmit={handleSearchSubmit}
-			/>
-
-			{/* Specialities chips temporarily hidden.
-			<View style={[styles.filterSection, isMobile && styles.filterSectionMobile]}>
-				<AppTypography variant="h4" style={[styles.filterTitle, isMobile && styles.filterTitleMobile]}>
-					Search by Specialities
-				</AppTypography>
-				<ScrollView
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					contentContainerStyle={[styles.filterScroll, isMobile && styles.filterScrollMobile]}
+			{/* Search Bar Row */}
+			<View style={styles.mobileSearchRow}>
+				<TouchableOpacity
+					style={styles.searchBar}
+					onPress={() => navigation.navigate(ROUTES.STACK.SEARCH)}
+					activeOpacity={0.8}
 				>
-					{specialities.map((spec) => (
-						<SpecialityChip
-							key={spec.id}
-							spec={spec}
-							selected={activeSpec === spec.id}
-							onPress={() => setActiveSpec(spec.id)}
-						/>
-					))}
-				</ScrollView>
-			</View> */}
+					<MaterialCommunityIcons name="magnify" size={20} color="#9aa0a6" style={styles.searchIcon} />
+					<View style={styles.searchInputContainer}>
+						<AppTypography style={searchQuery ? styles.searchQueryText : styles.searchPlaceholderText}>
+							{searchQuery || 'Search Doctors/Symptoms'}
+						</AppTypography>
+					</View>
+					{searchQuery.length > 0 && (
+						<TouchableOpacity
+							onPress={(e) => {
+								e.stopPropagation()
+								setSearchQuery('')
+								void fetchDoctorsList(1, true)
+							}}
+							style={styles.clearButton}
+						>
+							<MaterialCommunityIcons name="close" size={20} color="#9aa0a6" />
+						</TouchableOpacity>
+					)}
+				</TouchableOpacity>
+				<TouchableOpacity
+					onPress={openFilterModal}
+					style={[styles.filterIconButton, hasActiveFilters && styles.filterIconButtonActive]}
+				>
+					<MaterialCommunityIcons name="tune" size={22} color="#1f5f68" />
+				</TouchableOpacity>
+			</View>
 
 			{/* Results or empty state */}
-			{!loading && displayedDoctors.length === 0 ? (
+			{!loading && !refreshing && doctors.length === 0 ? (
 				<View style={styles.emptyContainer}>
 					<MaterialCommunityIcons name="magnify-close" size={48} color="#ccc" />
 					<AppTypography variant="body" style={styles.emptyText}>
@@ -185,9 +427,7 @@ export default function DoctorSearchPage() {
 					keyExtractor={keyExtractor}
 					numColumns={numColumns}
 					columnWrapperStyle={
-						numColumns > 1
-							? { paddingHorizontal: 12, justifyContent: 'space-between' }
-							: undefined
+						numColumns > 1 ? { paddingHorizontal: 12, justifyContent: 'space-between' } : undefined
 					}
 					renderItem={({ item }) =>
 						loading && !refreshing && !item.id ? (
@@ -210,45 +450,22 @@ export default function DoctorSearchPage() {
 						isMobile && { paddingHorizontal: mobileListPadding },
 					]}
 					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+					onEndReached={handleEndReached}
+					onEndReachedThreshold={0.6}
+					ListFooterComponent={renderFooter}
 					removeClippedSubviews={true}
 					maxToRenderPerBatch={6}
 					initialNumToRender={6}
 				/>
 			)}
+			{renderFilterModal()}
 		</View>
 	)
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: '#f5f7fa' },
-	filterSection: { paddingTop: 20, paddingBottom: 8 },
-	filterSectionMobile: { paddingTop: 16, paddingBottom: 6 },
-	filterTitle: { paddingHorizontal: 16, marginBottom: 14 },
-	filterTitleMobile: { marginBottom: 12 },
-	filterScroll: { paddingHorizontal: 16, gap: 14 },
-	filterScrollMobile: { gap: 10 },
-	chipWrapper: { alignItems: 'center', gap: 8, width: 72 },
-	chipWrapperMobile: {
-		width: 64,
-		gap: 6,
-	},
-	chipIconBox: {
-		width: 64,
-		height: 64,
-		borderRadius: 16,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	chipIconBoxMobile: {
-		width: 56,
-		height: 56,
-		borderRadius: 14,
-	},
-	chipLabel: { fontSize: 11, textAlign: 'center' },
-	chipLabelMobile: {
-		fontSize: 10,
-		lineHeight: 14,
-	},
 	resultsList: { paddingBottom: 24 },
 	resultsListMobile: {
 		paddingTop: 20,
@@ -269,4 +486,174 @@ const styles = StyleSheet.create({
 	},
 	emptyText: { fontWeight: '600', color: '#888' },
 	emptySubtext: { color: '#aaa', textAlign: 'center', paddingHorizontal: 40 },
+	footerLoader: {
+		paddingVertical: 16,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	mobileSearchRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginHorizontal: 16,
+		marginTop: 12,
+		marginBottom: 8,
+		gap: 8,
+	},
+	searchBar: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+		borderRadius: 12,
+		paddingHorizontal: 12,
+		height: 48,
+		borderWidth: 1,
+		borderColor: '#EAECF0',
+		gap: 8,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 1,
+	},
+	searchIcon: { marginRight: 4 },
+	searchInputContainer: {
+		flex: 1,
+		justifyContent: 'center',
+	},
+	searchPlaceholderText: {
+		fontSize: 14,
+		color: '#9AA0AC',
+	},
+	searchQueryText: {
+		fontSize: 14,
+		color: '#101828',
+	},
+	clearButton: {
+		padding: 4,
+	},
+	filterIconButton: {
+		width: 48,
+		height: 48,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#EAECF0',
+		backgroundColor: '#ffffff',
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: 0,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 1,
+	},
+	filterIconButtonActive: {
+		backgroundColor: '#eaf8f9',
+		borderColor: '#1f5f68',
+	},
+	filterSheetContentWrapper: {
+		width: '100%',
+		alignSelf: 'center',
+	},
+	filterSheetScroll: {
+		flexGrow: 0,
+	},
+	filterSheetContent: {
+		paddingHorizontal: 18,
+		paddingTop: 4,
+		paddingBottom: 20,
+		gap: 22,
+	},
+	filterGroup: {
+		gap: 10,
+	},
+	filterGroupLabel: {
+		fontSize: 11,
+		lineHeight: 14,
+		fontWeight: '800',
+		color: '#64707d',
+		textTransform: 'uppercase',
+	},
+	filterChipScroller: {
+		marginHorizontal: -2,
+	},
+	filterChipRow: {
+		flexDirection: 'row',
+		flexWrap: 'nowrap',
+		gap: 10,
+		paddingHorizontal: 2,
+		paddingVertical: 1,
+	},
+	filterChip: {
+		minHeight: 38,
+		minWidth: 74,
+		borderRadius: 19,
+		paddingHorizontal: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#f2f6fb',
+		flexShrink: 0,
+	},
+	filterChipActive: {
+		backgroundColor: '#1f5f68',
+	},
+	filterChipText: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+		color: '#64707d',
+	},
+	filterChipTextActive: {
+		color: '#ffffff',
+	},
+	filterSheetActions: {
+		flexDirection: 'row',
+		paddingHorizontal: 18,
+		paddingTop: 12,
+		gap: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#EAECF0',
+	},
+	resetButton: {
+		flex: 1,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: '#EAECF0',
+		backgroundColor: '#ffffff',
+	},
+	resetButtonText: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#64707d',
+	},
+	applyButton: {
+		flex: 2,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#1f5f68',
+	},
+	applyButtonText: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#ffffff',
+	},
+	inlineSelectFill: {
+		width: '100%',
+		marginBottom: 0,
+	},
+	inlineFilterSelect: {
+		height: 50,
+		borderRadius: 8,
+		backgroundColor: '#ffffff',
+	},
+	mobileHospitalSelectCard: {
+		height: 42,
+		borderRadius: 8,
+	},
 })
