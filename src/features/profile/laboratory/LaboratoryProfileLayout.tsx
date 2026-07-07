@@ -14,9 +14,9 @@ import SessionsTab from '../SessionsTab'
 import { LaboratoryProfileData } from '../../../types/laboratory-profile-api'
 import { getLaboratoryProfile } from './laboratoryService'
 import LaboratoryDetailsTab from './tabs/LaboratoryDetailsTab'
-import PersonalDetailsTab from './tabs/PersonalDetailsTab'
-import ServicesTab from './tabs/ServicesTab'
-import SettingsTab from './tabs/SettingTab'
+import PersonalDetailsTab from './profile/PersonalDetailsTab'
+import ServicesTab from './profile/ServicesTab'
+import SettingsTab from './profile/SettingTab'
 
 const TABS = [
 	{ key: 'laboratory', label: 'Laboratory details', Component: LaboratoryDetailsTab },

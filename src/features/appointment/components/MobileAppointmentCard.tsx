@@ -19,6 +19,7 @@ import { APPOINTMENT_STATUS } from '../../../constants/constants'
 import { useAuth } from '../../../context/AuthContext'
 import DateSlotPicker from '../../../components/common/DateSlotPicker'
 import { AppModal } from '../../../components/common/AppModal'
+import AppointmentHistoryTab from './AppointmentHistoryTab'
 import {
 	getDoctorAvailability,
 	getDoctorById,
@@ -252,6 +253,7 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 	const isLandscape = width > height
 
 	const [localRow, setLocalRow] = useState<MobileAppointmentRow>(row)
+	const [detailsOpen, setDetailsOpen] = useState(false)
 	const [cancelledStatusId, setCancelledStatusId] = useState('')
 	const [cancelOpen, setCancelOpen] = useState(false)
 	const [cancelReason, setCancelReason] = useState('')
@@ -523,6 +525,15 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 					</View>
 					<Text style={styles.consultationType}>{localRow.consultationType || 'Consultation'}</Text>
 				</View>
+
+				<TouchableOpacity
+					style={styles.infoButton}
+					onPress={() => setDetailsOpen(true)}
+					activeOpacity={0.75}
+					hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+				>
+					<Ionicons name="information-circle-outline" size={22} color="#0c7c7c" />
+				</TouchableOpacity>
 			</View>
 
 			<View style={styles.metaRow}>
@@ -755,6 +766,12 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 					</TouchableOpacity>
 				</View>
 			</AppModal>
+
+			<AppointmentHistoryTab
+				open={detailsOpen}
+				onClose={() => setDetailsOpen(false)}
+				appointmentId={localRow.id}
+			/>
 		</View>
 	)
 }
@@ -773,6 +790,16 @@ const styles = StyleSheet.create({
 	headerRow: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
+	},
+	infoButton: {
+		width: 34,
+		height: 34,
+		borderRadius: 17,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginLeft: 8,
+		backgroundColor: '#EAF6F6',
+		flexShrink: 0,
 	},
 	avatar: {
 		width: 56,
