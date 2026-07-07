@@ -1,4 +1,4 @@
-import ApiService from '../../../services/apiService'
+﻿import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import {
 	PharmacyProfileApiResponse,
@@ -72,13 +72,12 @@ const pickUpdatedValues = (
 	return returned
 }
 
-// ── NEW: public pharmacy list (GET /api/pharmacies) ───────────────────────────
-export const getPharmacies = async (params: Record<string, any>, p0: { signal: AbortSignal }) => {
+// -- public pharmacy list (GET /api/pharmacies) -- supports page/limit pagination params
+export const getPharmacies = async (params: Record<string, any> = {}, options?: { signal?: AbortSignal }) => {
 	// Mobile apiUrls uses PHARMACY.LIST (not PHARMACIES.LIST)
 	const url = API_ENDPOINTS.PHARMACY_ORDERS.LIST_BY_PHARMACY ?? API_ENDPOINTS.PHARMACY_ORDERS?.LIST_BY_PHARMACY
-	console.log('[getPharmacies] hitting URL:', url)
-	const res = await ApiService.get(url)
-	console.log('[getPharmacies] raw res.data:', JSON.stringify(res.data))
+	const hasParams = params && Object.keys(params).length > 0
+	const res = await ApiService.get(url, hasParams ? { params, signal: options?.signal } : { signal: options?.signal })
 	return res.data
 }
 

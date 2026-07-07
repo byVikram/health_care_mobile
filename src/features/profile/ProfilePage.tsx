@@ -4,6 +4,7 @@ import DoctorProfileLayout from './doctor/DoctorProfileLayout'
 import PatientProfileLayout from './patient/PatientProfileLayout'
 import PharmacyProfileLayout from './pharmacy/PharmacyProfileLayout'
 import RadiologyProfileLayout from './radiology/RadiologyProfileLayout'
+import LaboratoryProfileLayout from './laboratory/LaboratoryProfileLayout'
 
 export default function ProfilePage() {
 	const { role } = useAuth()
@@ -18,6 +19,10 @@ export default function ProfilePage() {
 
 	if (role === 'radiology') {
 		return <RadiologyProfileLayout />
+	}
+
+	if (role === 'laboratory') {
+		return <LaboratoryProfileLayout />
 	}
 
 	// Patient Profile acts as default fallback

@@ -1,6 +1,7 @@
 // src/features/laboratory/laboratoryService.ts
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
+import { formatDateForApi } from '../../utils/date'
 import type {
 	LaboratoryItem,
 	LabTestType,
@@ -14,9 +15,9 @@ import type {
 // Cache
 // ─────────────────────────────────────────────
 
-let labListCache: { data: LaboratoryItem[]; total: number } | null = null
-let labListCacheTimestamp = 0
+let labListCache: Map<string, { data: LaboratoryItem[]; timestamp: number }> = new Map()
 const CACHE_DURATION = 5 * 60 * 1000
+const RAW_SEARCH_PAGE_SIZE = 100
 
 // ─────────────────────────────────────────────
 // Raw API shapes
@@ -34,6 +35,13 @@ interface RawSearchItem {
 	pricing_model: string
 	base_price: number | null
 	price_details: string
+}
+
+interface RawLaboratorySearchResponse {
+	success: boolean
+	message: string
+	data: RawSearchItem[]
+	meta: { total: number; page: number; limit: number; pages: number }
 }
 
 interface RawBookingItem {
@@ -102,6 +110,7 @@ interface RawBooking {
 function mapRawBookingItem(raw: RawBookingItem): LabBookingItem {
 	return {
 		id: raw.id,
+		laboratory_test_id: raw.laboratory_test?.id,
 		test_name: raw.laboratory_test?.test_type?.name ?? '',
 		custom_test_name: raw.custom_test_name ?? null,
 		category: undefined,
@@ -150,49 +159,9 @@ function mapRawBooking(raw: RawBooking): LabBooking {
 // 1. Search / list laboratories
 // ─────────────────────────────────────────────
 
-export async function getLaboratories(
-	params: {
-		search?: string
-		city?: string
-		test_type_id?: number
-		page?: number
-		limit?: number
-	} = {},
-	options?: { signal?: AbortSignal }
-): Promise<{ data: LaboratoryItem[]; total: number; page: number; limit: number }> {
-	const isUnfiltered =
-		!params.search && !params.city && !params.test_type_id && (!params.page || params.page === 1)
-
-	if (isUnfiltered && labListCache && Date.now() - labListCacheTimestamp < CACHE_DURATION) {
-		return {
-			data: labListCache.data,
-			total: labListCache.total,
-			page: 1,
-			limit: labListCache.data.length,
-		}
-	}
-
-	const response = await ApiService.get<{
-		success: boolean
-		message: string
-		data: RawSearchItem[]
-		meta: { total: number; page: number; limit: number; pages: number }
-	}>(API_ENDPOINTS.LABORATORY.SEARCH, {
-		params: {
-			search: params.search || undefined,
-			city: params.city || undefined,
-			test_type_id: params.test_type_id || undefined,
-			page: params.page || 1,
-			limit: params.limit || 12,
-		},
-		signal: options?.signal,
-	})
-
-	const rawItems: RawSearchItem[] = response.data?.data ?? []
-	const meta = response.data?.meta ?? { total: 0, page: 1, limit: 12 }
-
-	// Deduplicate by lab id — the search endpoint returns one row per test offering
+function mapRawSearchItemsToLabs(rawItems: RawSearchItem[]): LaboratoryItem[] {
 	const labMap = new Map<string, LaboratoryItem>()
+
 	for (const item of rawItems) {
 		if (!labMap.has(item.id)) {
 			labMap.set(item.id, {
@@ -212,14 +181,79 @@ export async function getLaboratories(
 		}
 	}
 
-	const labs = Array.from(labMap.values())
+	return Array.from(labMap.values())
+}
 
-	if (isUnfiltered) {
-		labListCache = { data: labs, total: meta.total }
-		labListCacheTimestamp = Date.now()
+export async function getLaboratories(
+	params: {
+		search?: string
+		city?: string
+		test_type_id?: number
+		page?: number
+		limit?: number
+	} = {},
+	options?: { signal?: AbortSignal }
+): Promise<{ data: LaboratoryItem[]; total: number; page: number; limit: number }> {
+	const requestedPage = params.page || 1
+	const requestedLimit = params.limit || 12
+	const cacheKey = JSON.stringify({
+		search: params.search || '',
+		city: params.city || '',
+		test_type_id: params.test_type_id || '',
+	})
+	const cached = labListCache.get(cacheKey)
+
+	if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+		const start = (requestedPage - 1) * requestedLimit
+		return {
+			data: cached.data.slice(start, start + requestedLimit),
+			total: cached.data.length,
+			page: requestedPage,
+			limit: requestedLimit,
+		}
 	}
 
-	return { data: labs, total: meta.total, page: meta.page, limit: meta.limit }
+	const baseParams = {
+		search: params.search || undefined,
+		city: params.city || undefined,
+		test_type_id: params.test_type_id || undefined,
+	}
+
+	const fetchRawPage = (page: number) =>
+		ApiService.get<RawLaboratorySearchResponse>(API_ENDPOINTS.LABORATORY.SEARCH, {
+			params: {
+				...baseParams,
+				page,
+				limit: RAW_SEARCH_PAGE_SIZE,
+			},
+			signal: options?.signal,
+		})
+
+	const firstResponse = await fetchRawPage(1)
+	const firstData = firstResponse.data?.data ?? []
+	const firstMeta = firstResponse.data?.meta
+	const totalRawRows = firstMeta?.total ?? firstData.length
+	const rawLimit = firstMeta?.limit || RAW_SEARCH_PAGE_SIZE
+	const totalRawPages = firstMeta?.pages || Math.ceil(totalRawRows / rawLimit) || 1
+	const remainingResponses =
+		totalRawPages > 1
+			? await Promise.all(Array.from({ length: totalRawPages - 1 }, (_, index) => fetchRawPage(index + 2)))
+			: []
+
+	const rawItems: RawSearchItem[] = [
+		...firstData,
+		...remainingResponses.flatMap((response) => response.data?.data ?? []),
+	]
+	const labs = mapRawSearchItemsToLabs(rawItems)
+	const start = (requestedPage - 1) * requestedLimit
+	const pagedLabs = labs.slice(start, start + requestedLimit)
+
+	labListCache.set(cacheKey, {
+		data: labs,
+		timestamp: Date.now(),
+	})
+
+	return { data: pagedLabs, total: labs.length, page: requestedPage, limit: requestedLimit }
 }
 
 // ─────────────────────────────────────────────
@@ -258,7 +292,8 @@ export async function getLabTestTypes(
 	return items
 		.filter((item) => item.is_available)
 		.map((item) => ({
-			id: String(item.test_type_id),
+			id: String(item.id),
+			test_type_id: String(item.test_type_id),
 			name: item.test_type.name,
 			category: 'General',
 			turnaround: '24 hrs',
@@ -293,26 +328,45 @@ export async function placeLabOrder(
 	payload: PlaceLabOrderPayload,
 	options?: { signal?: AbortSignal }
 ): Promise<{ public_id: string }> {
+	const testIds = payload.test_type_ids
+		.map((id) => Number.parseInt(id, 10))
+		.filter((id) => Number.isInteger(id) && id > 0)
+
+	if (testIds.length === 0) {
+		throw new Error('Please select at least one available test.')
+	}
+
 	const apiPayload = {
 		laboratory_id: payload.laboratory_public_id,
-		test_ids: payload.test_type_ids.map((id) => parseInt(id, 10)),
-		booking_date: new Date().toISOString().split('T')[0],
-		booking_time: '10:00 AM',
-		treatment_id: null,
+		test_ids: testIds,
+		// booking_date/booking_time/treatment_id now come from the Schedule & Consultation
+		// steps (mirrors RadiologyBookingPayload), falling back to "today" only as a safety net.
+		booking_date: payload.booking_date || formatDateForApi(new Date()),
+		booking_time: payload.booking_time || '10:00 AM',
+		treatment_id: payload.treatment_id ?? null,
 		external_prescription_s3_key: null,
 		notes: payload.notes ?? '',
 	}
 
-	const response = await ApiService.post<{
-		success: boolean
-		message: string
-		data: { public_id: string }
-	}>(API_ENDPOINTS.LABORATORY.BOOKINGS, apiPayload, { signal: options?.signal })
+	try {
+		const response = await ApiService.post<{
+			success: boolean
+			message: string
+			data: { public_id: string }
+		}>(API_ENDPOINTS.LABORATORY.BOOKINGS, apiPayload, { signal: options?.signal })
 
-	if (!response.data?.data?.public_id) {
-		throw new Error('Booking creation failed: no public_id returned')
+		if (!response.data?.data?.public_id) {
+			throw new Error(response.data?.message || 'Booking creation failed: no public_id returned')
+		}
+		return { public_id: response.data.data.public_id }
+	} catch (error: any) {
+		throw new Error(
+			error?.response?.data?.message ||
+				error?.response?.data?.detail ||
+				error?.message ||
+				'Failed to create lab booking'
+		)
 	}
-	return { public_id: response.data.data.public_id }
 }
 
 // ─────────────────────────────────────────────
@@ -369,6 +423,25 @@ export async function submitLabBookingQuote(
 	await ApiService.patch(
 		`${API_ENDPOINTS.LABORATORY.BOOKING_DETAIL(publicId)}/quote`,
 		payload,
+		{ signal: options?.signal }
+	)
+}
+
+// ─────────────────────────────────────────────
+// 7b. Update booking status (lab staff)
+//     PATCH /api/laboratory/bookings/{id}/status
+// ─────────────────────────────────────────────
+
+export async function updateLabBookingStatus(
+	publicId: string,
+	status: string,
+	notes?: string,
+	options?: { signal?: AbortSignal }
+): Promise<void> {
+	if (!publicId) throw new Error('Booking public ID is required')
+	await ApiService.patch(
+		`${API_ENDPOINTS.LABORATORY.BOOKING_DETAIL(publicId)}/status`,
+		{ status, notes: notes ?? null },
 		{ signal: options?.signal }
 	)
 }
@@ -535,6 +608,5 @@ export function applyLaboratoryFilters(
 // ─────────────────────────────────────────────
 
 export function clearLaboratoryCache(): void {
-	labListCache = null
-	labListCacheTimestamp = 0
+	labListCache.clear()
 }

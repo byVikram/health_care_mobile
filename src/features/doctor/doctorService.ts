@@ -133,6 +133,14 @@ export const referAppointment = async (payload: ReferAppointmentPayload): Promis
 	return res.data
 }
 
+export const startConsultation = async (appointmentId: string): Promise<{ success: boolean }> => {
+	const res = await ApiService.post<{ success: boolean }>(
+		`${API_ENDPOINTS.APPOINTMENTS.GET_BY_ID(appointmentId)}/start-consultation`,
+		{}
+	)
+	return res.data
+}
+
 export const getAppointments = async (params?: AppointmentParams): Promise<AppointmentsResponse> => {
 	const res = await ApiService.getWithParams<AppointmentsResponse>(
 		API_ENDPOINTS.APPOINTMENTS.GET,

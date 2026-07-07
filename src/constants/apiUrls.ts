@@ -1,13 +1,12 @@
 // src/constants/apiUrls.ts
 
-import { Platform } from 'react-native'
-
 // Replace Vite's import.meta.env with Expo's process.env.EXPO_PUBLIC_
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	const url = 'http://192.168.4.26:8000'
+	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	// const url = "http:// 192.168.4.27:8000"
+	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
@@ -114,6 +113,12 @@ export const API_ENDPOINTS = {
 		SUBMIT_QUOTE: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/quote`,
 		VERIFY_PRESCRIPTION: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/verify`,
 		UPLOAD_REPORT: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/report`,
+	},
+	LABORATORY_PROFILE: {
+		DETAILS: `${BASE_URL}/api/laboratory/profile`,
+		UPDATE: `${BASE_URL}/api/laboratory/profile`,
+		TEST_TYPES: `${BASE_URL}/api/laboratory/test-types`,
+		TESTS: `${BASE_URL}/api/laboratory/tests`,
 	},
 
 	LABORATORY: {

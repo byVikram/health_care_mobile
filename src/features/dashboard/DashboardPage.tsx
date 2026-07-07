@@ -71,6 +71,7 @@ export default function DashboardPage() {
 	const [modalType, setModalType] = useState<'success' | 'error' | null>(null)
 
 	const [selectedDate, setSelectedDate] = useState(0)
+	const [doctorAppointmentSearch, setDoctorAppointmentSearch] = useState('')
 
 	// ---------------- WEEK DAYS ----------------
 	const buildWeekDays = () => {
@@ -165,6 +166,8 @@ export default function DashboardPage() {
 			apptError={apptError}
 			weekDays={weekDays}
 			selectedDateObj={weekDays[selectedDate]?.dateObj}
+			searchQuery={doctorAppointmentSearch}
+			setSearchQuery={setDoctorAppointmentSearch}
 		/>
 	)
 

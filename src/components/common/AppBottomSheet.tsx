@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from './AppTypography'
+import { yellow100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors'
 
 export type AppBottomSheetProps = {
 	visible: boolean
@@ -124,14 +125,28 @@ export function AppBottomSheet({
 							<AppTypography variant="h4" style={styles.sheetTitle}>
 								{title}
 							</AppTypography>
-							<TouchableOpacity style={styles.sheetCloseButton} onPress={requestClose} activeOpacity={0.82}>
-								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
+							<TouchableOpacity
+								style={styles.sheetCloseButton}
+								onPress={requestClose}
+								activeOpacity={0.82}
+							>
+								ScrollView <MaterialCommunityIcons name="close" size={22} color="#64707d" />
 							</TouchableOpacity>
 						</View>
-						<ScrollView
+						{/* <ScrollView
 							style={styles.sheetScroll}
 							showsVerticalScrollIndicator={false}
 							contentContainerStyle={styles.sheetContent}
+						>
+							{children}
+						</ScrollView> */}
+						<ScrollView
+							style={styles.sheetScroll}
+							showsVerticalScrollIndicator={false}
+							contentContainerStyle={[
+								styles.sheetContent,
+								{ paddingHorizontal: 22 }, // add this
+							]}
 						>
 							{children}
 						</ScrollView>
@@ -203,5 +218,7 @@ const styles = StyleSheet.create({
 	},
 	sheetContent: {
 		flexGrow: 0,
+		paddingHorizontal: 30,
+		paddingBottom: 16,
 	},
 })

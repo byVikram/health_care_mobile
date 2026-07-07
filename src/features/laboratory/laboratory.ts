@@ -31,6 +31,7 @@ export interface LaboratoryItem {
 
 export interface LabTestType {
 	id: string
+	test_type_id?: string
 	name: string
 	category: string
 	turnaround: string
@@ -90,6 +91,7 @@ export const DEFAULT_LABORATORY_FILTERS: LaboratoryFilters = {
 
 export interface LabBookingItem {
 	id?: number
+	laboratory_test_id?: number
 	test_name: string
 	custom_test_name?: string | null
 	category?: string
@@ -144,13 +146,19 @@ export interface PlaceLabOrderPayload {
 	custom_tests: string
 	collection_type: CollectionType
 	collection_address_public_id: string | null
+	// Carries the referral consultation, mirrors RadiologyBookingPayload.treatment_id
+	treatment_id: string | null
+	booking_date: string
+	booking_time: string
 	notes: string | null
 }
 
 export interface SubmitLabQuotePayload {
 	items: {
 		booking_item_id: number | null
-		test_name: string
+		laboratory_test_id?: number | null
+		custom_test_name?: string | null
+		test_name?: string
 		quoted_price: number
 	}[]
 	notes?: string | null
