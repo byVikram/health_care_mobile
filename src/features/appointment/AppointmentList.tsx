@@ -4,13 +4,12 @@
 // All business logic (fetching, sorting, status labels, action handling,
 // reschedule flow) is preserved exactly. UI uses React Native primitives.
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
-  TextInput,
   Modal,
   Pressable,
   StyleSheet,
@@ -19,10 +18,9 @@ import {
   Animated,
   Easing,
   Image,
-  ScrollView,
-  Platform,
   useWindowDimensions,
 } from 'react-native'
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import Toast from 'react-native-toast-message'
 import ApiService from '../../services/apiService'
@@ -30,6 +28,9 @@ import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { Appointment } from '../../types/appointment'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
 import DateSlotPicker from '../../components/common/DateSlotPicker'
+import { AppBottomSheet } from '../../components/common/AppBottomSheet'
+import { AppInput } from '../../components/common/AppInput'
+import { AppSelect, AppSelectOption, AppTypography, AppCalendar } from '../../components/common'
 import {
   getDoctorAvailability,
   getDoctorById,
@@ -38,12 +39,24 @@ import {
   type TimeSlot,
 } from '../doctor/doctorService'
 import AppointmentHistoryTab from './components/AppointmentHistoryTab'
+import { yellow100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const FALLBACK_CONFIRMED_STATUS_ID = '3f9a2c8e-7b61-4d2a-9a3f-5c8e1b2d4f90'
 const FALLBACK_REJECTED_STATUS_ID = 'a7d4e1c2-9f6b-4c83-b2e1-6f3a9d8c7b12'
 const TERMINAL_STATUSES = new Set(['cancelled'])
+const HOSPITAL_FILTER_OPTIONS: AppSelectOption[] = [
+  { value: 'all', label: 'All' },
+  { value: 'manipal', label: 'Manipal Hospital' },
+  { value: 'apollo', label: 'Apollo Hospital' },
+]
+
+const MODE_FILTER_OPTIONS: AppSelectOption[] = [
+  { value: 'all', label: 'All Modes' },
+  { value: 'video', label: 'Video Call' },
+  { value: 'clinic', label: 'Clinic Visit' },
+]
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -100,13 +113,6 @@ type AvailabilityApiModeGroup = {
   slots?: AvailabilityApiSlot[]
 }
 
-interface AppointmentMeta {
-  total: number
-  page: number
-  limit: number
-  pages: number
-}
-
 interface AppointmentsResponse {
   success: boolean
   message: string
@@ -125,36 +131,6 @@ interface AppointmentsResponse {
   }[]
   meta: { total: number; page: number; limit: number; pages: number }
 }
-
-// ── Filter options ────────────────────────────────────────────────────────────
-
-const hospitalOptions = [
-  { value: 'all', label: 'All Hospitals' },
-  { value: 'manipal', label: 'Manipal Hospital' },
-  { value: 'apollo', label: 'Apollo Hospital' },
-]
-
-const modeOptions = [
-  { value: 'all', label: 'All Modes' },
-  { value: 'clinic', label: 'Clinic Visit' },
-  { value: 'video', label: 'Video Call' },
-]
-
-const dateOptions = [
-  { value: 'all', label: 'All Dates' },
-  { value: 'today', label: 'Today' },
-  { value: 'yesterday', label: 'Yesterday' },
-  { value: 'last7', label: 'Last 7 days' },
-  { value: 'last30', label: 'Last 30 days' },
-]
-
-const statusOptions = [
-  { value: 'all', label: 'All Statuses' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'reschedule', label: 'Reschedule' },
-  { value: 'cancelled', label: 'Cancelled' },
-]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -280,51 +256,6 @@ function SkeletonRow() {
   )
 }
 
-// ── Dropdown picker (mobile-native) ───────────────────────────────────────────
-
-interface DropdownProps {
-  label: string
-  value: string
-  options: { value: string; label: string }[]
-  onChange: (v: string) => void
-}
-
-function FilterDropdown({ label, value, options, onChange }: DropdownProps) {
-  const [open, setOpen] = useState(false)
-  const selected = options.find((o) => o.value === value)
-
-  return (
-    <View style={styles.dropdownWrapper}>
-      <TouchableOpacity style={styles.dropdownTrigger} onPress={() => setOpen(true)} activeOpacity={0.7}>
-        <Text style={styles.dropdownLabel}>{label}</Text>
-        <Text style={styles.dropdownValue} numberOfLines={1}>
-          {selected?.value !== 'all' ? selected?.label : ''}
-        </Text>
-        <Text style={styles.dropdownChevron}>▾</Text>
-      </TouchableOpacity>
-
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.dropdownBackdrop} onPress={() => setOpen(false)} />
-        <View style={styles.dropdownMenu}>
-          <Text style={styles.dropdownMenuTitle}>{label}</Text>
-          {options.map((opt) => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.dropdownMenuItem, opt.value === value && styles.dropdownMenuItemSelected]}
-              onPress={() => { onChange(opt.value); setOpen(false) }}
-            >
-              <Text style={[styles.dropdownMenuItemText, opt.value === value && styles.dropdownMenuItemTextSelected]}>
-                {opt.label}
-              </Text>
-              {opt.value === value && <Text style={styles.dropdownMenuItemCheck}>✓</Text>}
-            </TouchableOpacity>
-          ))}
-        </View>
-      </Modal>
-    </View>
-  )
-}
-
 // ── Reject confirmation modal ─────────────────────────────────────────────────
 
 interface RejectModalProps {
@@ -385,7 +316,7 @@ function AppointmentCard({
   const avatarToShow = viewAs === 'doctor' ? row.patientAvatar : row.doctorAvatar
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onViewDetails}>
       {/* Status accent bar */}
       {!terminal && <View style={[styles.cardAccent, { backgroundColor: textColor }]} />}
 
@@ -407,10 +338,9 @@ function AppointmentCard({
               </Text>
             </View>
           </View>
-          {/* Info button */}
-          <TouchableOpacity style={styles.infoBtn} onPress={onViewDetails} hitSlop={8}>
+          <View style={styles.infoBtn}>
             <Text style={styles.infoBtnText}>ℹ</Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* Date / time / mode row */}
@@ -438,20 +368,41 @@ function AppointmentCard({
         {showActions && (
           <View style={styles.actionRow}>
             {showConfirm && (
-              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnConfirm]} onPress={onConfirm} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionBtnConfirm]}
+                onPress={(event) => {
+                  event.stopPropagation()
+                  onConfirm()
+                }}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.actionBtnText}>✓ Confirm</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnReject]} onPress={onReject} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnReject]}
+              onPress={(event) => {
+                event.stopPropagation()
+                onReject()
+              }}
+              activeOpacity={0.8}
+            >
               <Text style={[styles.actionBtnText, { color: '#e53935' }]}>✕ Reject</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnReschedule]} onPress={onReschedule} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnReschedule]}
+              onPress={(event) => {
+                event.stopPropagation()
+                onReschedule()
+              }}
+              activeOpacity={0.8}
+            >
               <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>↻ Reschedule</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   )
 }
 
@@ -461,6 +412,8 @@ interface AppointmentListProps {
   viewAs?: 'doctor' | 'patient'
 }
 
+const PAGE_SIZE = 10
+
 export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListProps) {
   const { width, height } = useWindowDimensions()
   const isTablet = width >= 768
@@ -468,15 +421,12 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
   const [viewAs, setViewAs] = useState<'doctor' | 'patient'>('patient')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const size = 10
+  const size = PAGE_SIZE
   const [rows, setRows] = useState<AppointmentRow[]>([])
-  const [meta, setMeta] = useState<AppointmentMeta>({ total: 0, page: 1, limit: 10, pages: 0 })
   const [loading, setLoading] = useState(true)
-
-  const [filterHospital, setFilterHospital] = useState('all')
-  const [filterMode, setFilterMode] = useState('all')
-  const [filterDate, setFilterDate] = useState('all')
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const isFetchingRef = useRef(false)
 
   // Reject popover state
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
@@ -485,6 +435,13 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
   // Details drawer state
   const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
   const [detailsAppointmentId, setDetailsAppointmentId] = useState<string | null>(null)
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+  const [filterHospital, setFilterHospital] = useState('all')
+  const [filterMode, setFilterMode] = useState('all')
+  const [filterDate, setFilterDate] = useState('')
+  const [draftFilterHospital, setDraftFilterHospital] = useState('all')
+  const [draftFilterMode, setDraftFilterMode] = useState('all')
+  const [draftFilterDate, setDraftFilterDate] = useState('')
 
   const [rescheduleOpen, setRescheduleOpen] = useState(false)
   const [rescheduleRow, setRescheduleRow] = useState<AppointmentRow | null>(null)
@@ -585,64 +542,76 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
     }
   }, [appointmentType, rescheduleDate, rescheduleHospitalId, rescheduleOpen, rescheduleRow])
 
-  const fetchAppointments = useCallback(async () => {
-    setLoading(true)
-    try {
-      const patientId = await AsyncStorage.getItem('patient_id')
-      const params: Record<string, unknown> = {
-        page,
-        limit: size,
-        patient_id: patientId,
+  const fetchAppointments = useCallback(
+    async (targetPage = 1, isLoadMore = false) => {
+      if (isFetchingRef.current) return
+      isFetchingRef.current = true
+
+      if (isLoadMore) setLoadingMore(true)
+      else setLoading(true)
+
+      try {
+        const patientId = await AsyncStorage.getItem('patient_id')
+        const params: Record<string, unknown> = {
+          page: targetPage,
+          limit: size,
+          patient_id: patientId,
+        }
+        if (search) params.search = search
+
+        const res = await ApiService.getWithParams<AppointmentsResponse>(
+          API_ENDPOINTS.APPOINTMENTS.GET,
+          params
+        )
+
+        const mapped: AppointmentRow[] = res.data.data.map((appt) => ({
+          id: appt.id,
+          patientName: appt.patient.name,
+          patientAvatar: appt.patient.avatar_s3_key ?? '',
+          patientId: appt.patient.id,
+          appointmentDate: appt.appointment_date,
+          startTime: appt.start_time,
+          endTime: appt.end_time,
+          appointmentMode: appt.appointment_mode,
+          status: appt.status,
+          rescheduledBy: appt.rescheduled_by ?? null,
+          doctorName: appt.doctor.name,
+          doctorAvatar: appt.doctor.avatar_s3_key ?? '',
+          doctorId: appt.doctor.id,
+          hospitalName: appt.hospital?.name ?? null,
+          hospitalAddress: appt.hospital?.address ?? null,
+          hospitalId: appt.hospital?.id ?? null,
+          fees: appt.fees ?? null,
+        }))
+
+        const sorted = [...mapped].sort((a, b) => {
+          const dateDiff = b.appointmentDate.localeCompare(a.appointmentDate)
+          if (dateDiff !== 0) return dateDiff
+          return (b.startTime ?? '').localeCompare(a.startTime ?? '')
+        })
+
+        setRows((prev) => (isLoadMore ? [...prev, ...sorted] : sorted))
+        setPage(targetPage)
+        setHasMore(targetPage < (res.data.meta.pages ?? 1))
+      } finally {
+        setLoading(false)
+        setLoadingMore(false)
+        isFetchingRef.current = false
       }
-      if (search) params.search = search
-
-      const res = await ApiService.getWithParams<AppointmentsResponse>(
-        API_ENDPOINTS.APPOINTMENTS.GET,
-        params
-      )
-
-      const mapped: AppointmentRow[] = res.data.data.map((appt) => ({
-        id: appt.id,
-        patientName: appt.patient.name,
-        patientAvatar: appt.patient.avatar_s3_key ?? '',
-        patientId: appt.patient.id,
-        appointmentDate: appt.appointment_date,
-        startTime: appt.start_time,
-        endTime: appt.end_time,
-        appointmentMode: appt.appointment_mode,
-        status: appt.status,
-        rescheduledBy: appt.rescheduled_by ?? null,
-        doctorName: appt.doctor.name,
-        doctorAvatar: appt.doctor.avatar_s3_key ?? '',
-        doctorId: appt.doctor.id,
-        hospitalName: appt.hospital?.name ?? null,
-        hospitalAddress: appt.hospital?.address ?? null,
-        hospitalId: appt.hospital?.id ?? null,
-        fees: appt.fees ?? null,
-      }))
-
-      // Sort by appointment date descending, then start time descending
-      const sorted = [...mapped].sort((a, b) => {
-        const dateDiff = b.appointmentDate.localeCompare(a.appointmentDate)
-        if (dateDiff !== 0) return dateDiff
-        return (b.startTime ?? '').localeCompare(a.startTime ?? '')
-      })
-
-      setRows(sorted)
-      setMeta({
-        total: res.data.meta.total,
-        page: res.data.meta.page,
-        limit: res.data.meta.limit,
-        pages: res.data.meta.pages,
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [page, search, size])
+    },
+    [search, size]
+  )
 
   useEffect(() => {
-    fetchAppointments()
-  }, [fetchAppointments])
+    setHasMore(true)
+    fetchAppointments(1, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
+
+  const handleEndReached = useCallback(() => {
+    if (isFetchingRef.current || loading || loadingMore || !hasMore) return
+    fetchAppointments(page + 1, true)
+  }, [loading, loadingMore, hasMore, page, fetchAppointments])
 
   // ── Status label (role-aware) ─────────────────────────────────────────────
 
@@ -799,43 +768,6 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
     }
   }
 
-  // ── Client-side filtering (applied on top of server-paginated data) ────────
-
-  const filteredRows = rows.filter((row) => {
-    if (filterMode !== 'all') {
-      const mode = row.appointmentMode.toLowerCase()
-      if (filterMode === 'clinic' && !mode.includes('clinic')) return false
-      if (filterMode === 'video' && !mode.includes('video')) return false
-    }
-    if (filterHospital !== 'all') {
-      const hospital = (row.hospitalName ?? '').toLowerCase()
-      if (!hospital.includes(filterHospital)) return false
-    }
-    if (filterStatus !== 'all') {
-      if (!row.status.toLowerCase().includes(filterStatus)) return false
-    }
-    if (filterDate !== 'all') {
-      const now = new Date()
-      const apptDate = new Date(row.appointmentDate)
-      if (filterDate === 'today') {
-        if (apptDate.toDateString() !== now.toDateString()) return false
-      } else if (filterDate === 'yesterday') {
-        const yesterday = new Date(now)
-        yesterday.setDate(yesterday.getDate() - 1)
-        if (apptDate.toDateString() !== yesterday.toDateString()) return false
-      } else if (filterDate === 'last7') {
-        const cutoff = new Date(now)
-        cutoff.setDate(cutoff.getDate() - 7)
-        if (apptDate < cutoff) return false
-      } else if (filterDate === 'last30') {
-        const cutoff = new Date(now)
-        cutoff.setDate(cutoff.getDate() - 30)
-        if (apptDate < cutoff) return false
-      }
-    }
-    return true
-  })
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   const renderItem = ({ item }: { item: AppointmentRow }) => (
@@ -853,6 +785,13 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
     />
   )
 
+  const renderFooter = () =>
+    loadingMore ? (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#0c7c7c" />
+      </View>
+    ) : null
+
   const selectedHospitalLabel =
     rescheduleHospitals.find((hospital) => hospital.id === rescheduleHospitalId)?.label ||
     rescheduleRow?.hospitalName ||
@@ -867,29 +806,107 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
   )
   const rescheduleColumns = isTablet || isLandscape ? 4 : 3
 
+  const hasActiveFilters =
+    filterHospital !== 'all' || filterMode !== 'all' || filterDate !== ''
+
+  const openFilterSheet = () => {
+    setDraftFilterHospital(filterHospital)
+    setDraftFilterMode(filterMode)
+    setDraftFilterDate(filterDate)
+    setFilterSheetOpen(true)
+  }
+
+  const closeFilterSheet = () => {
+    setFilterSheetOpen(false)
+  }
+
+  const applyFilters = () => {
+    setFilterHospital(draftFilterHospital)
+    setFilterMode(draftFilterMode)
+    setFilterDate(draftFilterDate)
+    setPage(1)
+    closeFilterSheet()
+  }
+
+  const resetFilters = () => {
+    setDraftFilterHospital('all')
+    setDraftFilterMode('all')
+    setDraftFilterDate('')
+    setFilterHospital('all')
+    setFilterMode('all')
+    setFilterDate('')
+    setPage(1)
+  }
+
+  const renderModeChips = () => (
+    <View style={styles.filterChipRow}>
+      {MODE_FILTER_OPTIONS.map((option) => {
+        const selected = option.value === draftFilterMode
+        return (
+          <TouchableOpacity
+            key={option.value}
+            style={[styles.filterChip, selected && styles.filterChipActive]}
+            onPress={() => setDraftFilterMode(option.value)}
+            activeOpacity={0.82}
+          >
+            <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        )
+      })}
+    </View>
+  )
+
   return (
     <View style={styles.container}>
       {/* ── Search bar ─────────────────────────────────────────────────── */}
-      <View style={styles.searchBar}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder={viewAs === 'doctor' ? 'Search Patient ID, Name...' : 'Search Doctor ID, Name...'}
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={(t) => { setSearch(t); setPage(1) }}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
+      <View style={styles.searchRow}>
+        <View style={styles.searchInputWrap}>
+          <AppInput
+            value={search}
+            onChangeText={(text) => {
+              setSearch(text)
+              setPage(1)
+            }}
+            placeholder={viewAs === 'doctor' ? 'Search Patient ID, Name...' : 'Search Doctor ID, Name...'}
+            placeholderTextColor="#98a1aa"
+            containerStyle={styles.searchInputContainer}
+            style={styles.searchInput}
+            contentStyle={styles.searchInputContent}
+            outlineStyle={styles.searchInputOutline}
+            outlineColor="#2e7b7d"
+            activeOutlineColor="#2e7b7d"
+            textColor="#1b2d3c"
+            left={<AppInput.Icon icon="magnify" size={22} color="#9b9b9b" />}
+            right={
+              search.length > 0 ? (
+                <AppInput.Icon
+                  icon="close-circle"
+                  size={20}
+                  color="#9b9b9b"
+                  onPress={() => {
+                    setSearch('')
+                    setPage(1)
+                  }}
+                />
+              ) : undefined
+            }
+            autoCorrect={false}
+            returnKeyType="search"
+            noMargin
+          />
+        </View>
+        <TouchableOpacity
+          style={[styles.filterIconButton, hasActiveFilters && styles.filterIconButtonActive]}
+          onPress={openFilterSheet}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Filter appointments"
+        >
+          <MaterialCommunityIcons name="tune" size={22} color="#1f5f68" />
+        </TouchableOpacity>
       </View>
-
-      {/* ── Filter row ─────────────────────────────────────────────────── */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScrollRow} contentContainerStyle={styles.filterScrollContent}>
-        <FilterDropdown label="Hospital" value={filterHospital} options={hospitalOptions} onChange={(v) => { setFilterHospital(v); setPage(1) }} />
-        <FilterDropdown label="Mode" value={filterMode} options={modeOptions} onChange={(v) => { setFilterMode(v); setPage(1) }} />
-        <FilterDropdown label="Date" value={filterDate} options={dateOptions} onChange={(v) => { setFilterDate(v); setPage(1) }} />
-        <FilterDropdown label="Status" value={filterStatus} options={statusOptions} onChange={(v) => { setFilterStatus(v); setPage(1) }} />
-      </ScrollView>
 
       {/* ── List ───────────────────────────────────────────────────────── */}
       {loading ? (
@@ -898,7 +915,7 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
         </View>
       ) : (
         <FlatList
-          data={filteredRows}
+          data={rows}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           ListEmptyComponent={
@@ -909,28 +926,10 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
         />
-      )}
-
-      {/* ── Pagination ─────────────────────────────────────────────────── */}
-      {!loading && meta.pages > 1 && (
-        <View style={styles.paginationRow}>
-          <TouchableOpacity
-            style={[styles.pageBtn, page === 1 && styles.pageBtnDisabled]}
-            onPress={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            <Text style={styles.pageBtnText}>‹ Prev</Text>
-          </TouchableOpacity>
-          <Text style={styles.pageInfo}>{page} / {meta.pages}</Text>
-          <TouchableOpacity
-            style={[styles.pageBtn, page === meta.pages && styles.pageBtnDisabled]}
-            onPress={() => setPage((p) => Math.min(meta.pages, p + 1))}
-            disabled={page === meta.pages}
-          >
-            <Text style={styles.pageBtnText}>Next ›</Text>
-          </TouchableOpacity>
-        </View>
       )}
 
       {/* ── Reject confirmation modal ───────────────────────────────────── */}
@@ -940,7 +939,63 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
         onConfirm={handleConfirmReject}
       />
 
-      {/* ── Appointment Details Drawer ──────────────────────────────────── */}
+      {/* ── Appointments Filter Sheet ──────────────────────────────────── */}
+      <AppBottomSheet
+        visible={filterSheetOpen}
+        title="Filters"
+        onClose={closeFilterSheet}
+        maxHeightRatio={0.62}
+      >
+        <View style={styles.filterSheetBody}>
+          <View style={styles.filterGroup}>
+            <AppTypography style={styles.filterGroupLabel}>Hospital</AppTypography>
+            <AppSelect
+              options={HOSPITAL_FILTER_OPTIONS}
+              value={draftFilterHospital}
+              onSelect={setDraftFilterHospital}
+              placeholder="Select Hospital"
+              size="medium"
+              borderRadius={10}
+              customCardStyle={styles.filterSelectCard}
+              borderColor="#EAECF0"
+              style={styles.filterSelectFill}
+            />
+          </View>
+
+          <View style={styles.filterGroup}>
+            <AppTypography style={styles.filterGroupLabel}>Mode</AppTypography>
+            {renderModeChips()}
+          </View>
+
+          <View style={styles.filterGroup}>
+            <AppTypography style={styles.filterGroupLabel}>Date</AppTypography>
+            <AppCalendar
+              value={draftFilterDate}
+              onChange={setDraftFilterDate}
+              placeholder="Select Date"
+              modalTitle="Select Date"
+            />
+          </View>
+
+          <View style={styles.filterSheetActions}>
+            <TouchableOpacity
+              style={styles.filterResetButton}
+              activeOpacity={0.8}
+              onPress={resetFilters}
+            >
+              <Text style={styles.filterResetText}>Reset</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.filterApplyButton}
+              activeOpacity={0.85}
+              onPress={applyFilters}
+            >
+              <Text style={styles.filterApplyText}>Apply Filters</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </AppBottomSheet>
+
       <AppointmentHistoryTab
         open={detailsDrawerOpen}
         onClose={() => {
@@ -960,129 +1015,148 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  // Search
-  searchBar: {
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 8,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
+    gap: 8,
+    marginLeft: 22,
+    marginRight: 12,
+    marginTop: 12,
+    marginBottom: 12,
   },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
+  searchInputWrap: {
+    flex: 1,
+  },
+  searchInputContainer: {
+    width: '100%',
   },
   searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#111827',
-  },
-  // Filter row
-  filterScrollRow: {
-    maxHeight: 52,
-    marginBottom: 6,
-  },
-  filterScrollContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-    alignItems: 'center',
-  },
-  // Dropdown
-  dropdownWrapper: {
-    marginRight: 8,
-  },
-  dropdownTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  },
+  searchInputContent: {
+    height: 48,
+    minHeight: 48,
+    paddingVertical: 0,
+    fontSize: 14,
+  },
+  searchInputOutline: {
+    borderRadius: 12,
+  },
+  filterIconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    gap: 4,
-    minWidth: 100,
-  },
-  dropdownLabel: {
-    fontSize: 11,
-    color: '#9ca3af',
-    fontWeight: '500',
-  },
-  dropdownValue: {
-    fontSize: 12,
-    color: '#0c7c7c',
-    fontWeight: '600',
-    flex: 1,
-  },
-  dropdownChevron: {
-    fontSize: 10,
-    color: '#6b7280',
-  },
-  dropdownBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  dropdownMenu: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 32,
+    borderColor: '#EAECF0',
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 16,
-  },
-  dropdownMenuTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 12,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  dropdownMenuItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 11,
-    paddingHorizontal: 4,
-    borderRadius: 8,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  dropdownMenuItemSelected: {
-    backgroundColor: '#f0fdf4',
+  filterIconButtonActive: {
+    backgroundColor: '#eaf8f9',
+    borderColor: '#1f5f68',
   },
-  dropdownMenuItemText: {
-    fontSize: 14,
-    color: '#374151',
+  filterSheetBody: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 12,
+    gap: 20,
+    alignItems: 'center',
   },
-  dropdownMenuItemTextSelected: {
-    color: '#0c7c7c',
-    fontWeight: '600',
+  filterGroup: {
+    gap: 10,
+    width: '100%',
+    alignItems: 'center',
   },
-  dropdownMenuItemCheck: {
-    fontSize: 14,
-    color: '#0c7c7c',
+  filterGroupLabel: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
+    color: '#64707d',
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    alignSelf: 'stretch',
+  },
+  filterSelectFill: {
+    width: '100%',
+    marginBottom: 0,
+  },
+  filterSelectCard: {
+    height: 46,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+  },
+  filterChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  filterChip: {
+    minHeight: 38,
+    minWidth: 74,
+    borderRadius: 19,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f2f6fb',
+  },
+  filterChipActive: {
+    backgroundColor: '#1f5f68',
+  },
+  filterChipText: {
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '700',
+    color: '#64707d',
+  },
+  filterChipTextActive: {
+    color: '#ffffff',
+  },
+  filterSheetActions: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#EAECF0',
+  },
+  filterResetButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1,
+    borderColor: '#D7E5E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  filterResetText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64707d',
+  },
+  filterApplyButton: {
+    flex: 2,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1f5f68',
+  },
+  filterApplyText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   // Skeleton
   skeletonContainer: {
-    paddingHorizontal: 16,
+    paddingLeft: 22,
+    paddingRight: 16,
     gap: 10,
     marginTop: 4,
   },
@@ -1110,9 +1184,10 @@ const styles = StyleSheet.create({
   },
   // List
   listContent: {
-    paddingHorizontal: 16,
+    paddingLeft: 22,
+    paddingRight: 16,
     paddingBottom: 16,
-    paddingTop: 4,
+    paddingTop: 8,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -1245,34 +1320,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#4caf50',
   },
-  // Pagination
-  paginationRow: {
-    flexDirection: 'row',
+  footerLoader: {
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-  },
-  pageBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#0c7c7c',
-    borderRadius: 10,
-  },
-  pageBtnDisabled: {
-    backgroundColor: '#e5e7eb',
-  },
-  pageBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  pageInfo: {
-    fontSize: 13,
-    color: '#6b7280',
-    fontWeight: '500',
   },
   // Reject modal
   rejectBackdrop: {

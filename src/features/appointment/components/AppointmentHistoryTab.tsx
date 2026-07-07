@@ -1,22 +1,7 @@
 // src/features/appointment/components/AppointmentHistoryTab.tsx
-//
-// React Native port of AppointmentDetailsDrawer.tsx (web).
-// All sub-components (InfoRow, StatusChip, HistoryTimeline, DrawerSkeleton) are
-// merged into this single file as requested. Business logic, state management,
-// and API integration are unchanged from the web/existing mobile versions.
 
 import React, { useEffect, useRef, useState } from 'react'
-import {
-	Animated,
-	Easing,
-	Image,
-	Linking,
-	Platform,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
-} from 'react-native'
+import { Animated, Easing, Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppBottomSheet } from '../../../components/common/AppBottomSheet'
 import { getAppointmentById } from '../../../services/appointmentService'
@@ -183,7 +168,12 @@ function HistoryTimeline({ entries }: { entries: AppointmentHistoryEntry[] }) {
 						{!isLast && <View style={[styles.historyConnector, { borderColor: color + '33' }]} />}
 
 						{/* Icon bubble */}
-						<View style={[styles.historyIconBubble, { borderColor: color + '40', backgroundColor: color + '18' }]}>
+						<View
+							style={[
+								styles.historyIconBubble,
+								{ borderColor: color + '40', backgroundColor: color + '18' },
+							]}
+						>
 							<MaterialCommunityIcons name={icon} size={13} color={color} />
 						</View>
 
@@ -353,11 +343,15 @@ export default function AppointmentHistoryTab({ open, onClose, appointmentId }: 
 			)}
 
 			{appt && !loading && (
-				<>
+				<View style={styles.contentContainer}>
 					{/* ── Doctor header ─────────────────────────────────── */}
 					<View style={styles.doctorHeader}>
 						{appt.doctor?.avatar_s3_key ? (
-							<Image source={{ uri: appt.doctor.avatar_s3_key }} style={styles.avatar} resizeMode="cover" />
+							<Image
+								source={{ uri: appt.doctor.avatar_s3_key }}
+								style={styles.avatar}
+								resizeMode="cover"
+							/>
 						) : (
 							<View style={[styles.avatar, styles.avatarPlaceholder]}>
 								<Text style={styles.avatarInitial}>{appt.doctor?.name?.charAt(0) ?? 'D'}</Text>
@@ -369,7 +363,9 @@ export default function AppointmentHistoryTab({ open, onClose, appointmentId }: 
 								<StatusChip status={rawStatus} />
 							</View>
 							{(appt.doctor?.specialty || appt.doctor?.specialization) && (
-								<Text style={styles.specialty}>{appt.doctor?.specialty ?? appt.doctor?.specialization}</Text>
+								<Text style={styles.specialty}>
+									{appt.doctor?.specialty ?? appt.doctor?.specialization}
+								</Text>
 							)}
 						</View>
 					</View>
@@ -392,7 +388,9 @@ export default function AppointmentHistoryTab({ open, onClose, appointmentId }: 
 								value={
 									<View>
 										<Text style={styles.hospitalName}>{appt.hospital.name}</Text>
-										{appt.hospital.address && <Text style={styles.hospitalAddress}>{appt.hospital.address}</Text>}
+										{appt.hospital.address && (
+											<Text style={styles.hospitalAddress}>{appt.hospital.address}</Text>
+										)}
 										{(appt.hospital.address || appt.hospital.name) && (
 											<TouchableOpacity
 												onPress={() => openOnMap(appt.hospital?.address, appt.hospital?.name)}
@@ -437,7 +435,7 @@ export default function AppointmentHistoryTab({ open, onClose, appointmentId }: 
 					<TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.85}>
 						<Text style={styles.closeButtonText}>Close</Text>
 					</TouchableOpacity>
-				</>
+				</View>
 			)}
 		</AppBottomSheet>
 	)
@@ -504,6 +502,9 @@ const styles = StyleSheet.create({
 		height: 1,
 		backgroundColor: '#f3f4f6',
 		marginVertical: 4,
+	},
+	contentContainer: {
+		paddingHorizontal: 20,
 	},
 
 	// Status chip
