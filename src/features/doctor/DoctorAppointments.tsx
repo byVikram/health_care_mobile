@@ -4,7 +4,7 @@
 // All business logic (status helpers, confirm/reject/reschedule flow,
 // local state overrides) is preserved exactly.
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   View,
   Text,
@@ -23,18 +23,24 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import Toast from 'react-native-toast-message'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { Appointment } from '../../types/appointment'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import DateSlotPicker from '../../components/common/DateSlotPicker'
+import { AppInput } from '../../components/common'
+import FavouriteDoctorList, { type FavouriteDoctorListItem } from './search/components/FavouriteDoctorList'
 import {
   getDoctorAvailability,
   getDoctorProfile,
   rescheduleAppointment,
   startConsultation,
+  getFavouriteDoctors,
+  toggleFavouriteDoctor,
+  referAppointment,
   type SlotGroup,
+  type FavouriteDoctor,
 } from './doctorService'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -284,6 +290,15 @@ export function DoctorAppointments({
   const [hospitalDropdownOpen, setHospitalDropdownOpen] = useState(false)
   const [appointmentType, setAppointmentType] = useState<'clinic' | 'video'>('clinic')
 
+  // Refer state
+  const [referOpen, setReferOpen] = useState(false)
+  const [referApptId, setReferApptId] = useState<string | null>(null)
+  const [favouriteDoctors, setFavouriteDoctors] = useState<FavouriteDoctorListItem[]>([])
+  const [favouriteDoctorIds, setFavouriteDoctorIds] = useState<Set<string>>(new Set())
+  const [referLoading, setReferLoading] = useState(false)
+  const [referSearchQuery, setReferSearchQuery] = useState('')
+  const [bookmarkingIds, setBookmarkingIds] = useState<Set<string>>(new Set())
+
   const { width, height } = useWindowDimensions()
   const isTablet = width >= 768
   const isLandscape = width > height
@@ -370,6 +385,169 @@ export function DoctorAppointments({
       mounted = false
     }
   }, [appointmentType, rescheduleAppt, rescheduleDate, rescheduleHospitalId, rescheduleOpen])
+
+  useEffect(() => {
+    if (!referOpen) return
+
+    let mounted = true
+    const fetchFavouriteDoctors = async () => {
+      try {
+        setReferLoading(true)
+        const res = await getFavouriteDoctors()
+        if (mounted && res.success) {
+          const mapped = (res.data?.favourites ?? []).map((doctor: FavouriteDoctor) => ({
+            id: doctor.id,
+            name: doctor.name,
+            avatar_s3_key: doctor.avatar_s3_key ?? null,
+            location: doctor.location ?? '',
+            experience_years: doctor.experience_years ?? null,
+            specialities: doctor.specialities ?? [],
+            is_verified: doctor.is_verified,
+          }))
+          setFavouriteDoctors(mapped)
+          setFavouriteDoctorIds(new Set(res.data?.favourite_ids ?? []))
+        } else if (mounted) {
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: res.message || 'Failed to load favourite doctors',
+          })
+        }
+      } catch {
+        if (mounted) {
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: 'Failed to load favourite doctors',
+          })
+        }
+      } finally {
+        if (mounted) setReferLoading(false)
+      }
+    }
+
+    void fetchFavouriteDoctors()
+
+    return () => {
+      mounted = false
+    }
+  }, [referOpen])
+
+  const filteredReferDoctors = useMemo(() => {
+    const query = referSearchQuery.trim().toLowerCase()
+    if (!query) return favouriteDoctors
+    return favouriteDoctors.filter(
+      (doctor) =>
+        doctor.name.toLowerCase().includes(query) ||
+        (doctor.specialities[0]?.toLowerCase().includes(query) ?? false)
+    )
+  }, [favouriteDoctors, referSearchQuery])
+
+  const handleToggleBookmark = async (doctor: FavouriteDoctorListItem) => {
+    if (bookmarkingIds.has(doctor.id)) return
+
+    const wasFavourite = favouriteDoctorIds.has(doctor.id)
+
+    setBookmarkingIds((prev) => new Set(prev).add(doctor.id))
+    setFavouriteDoctorIds((prev) => {
+      const next = new Set(prev)
+      if (wasFavourite) next.delete(doctor.id)
+      else next.add(doctor.id)
+      return next
+    })
+
+    try {
+      const res = await toggleFavouriteDoctor(doctor.id)
+      if (res.success === false) {
+        throw new Error(res.message || 'Failed to update favourites')
+      }
+
+      const isFavourite = res.data?.action ? res.data.action === 'added' : !wasFavourite
+      
+      if (res.data?.favourite_ids) {
+        setFavouriteDoctorIds(new Set(res.data.favourite_ids))
+      }
+      
+      if (res.data?.favourites) {
+        const mapped = res.data.favourites.map((doc: FavouriteDoctor) => ({
+          id: doc.id,
+          name: doc.name,
+          avatar_s3_key: doc.avatar_s3_key ?? null,
+          location: doc.location ?? '',
+          experience_years: doc.experience_years ?? null,
+          specialities: doc.specialities ?? [],
+          is_verified: doc.is_verified,
+        }))
+        setFavouriteDoctors(mapped)
+      } else {
+        setFavouriteDoctors((prev) => {
+          if (!isFavourite) return prev.filter((item) => item.id !== doctor.id)
+          return prev.some((item) => item.id === doctor.id) ? prev : [...prev, doctor]
+        })
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: isFavourite ? 'Added to favourites' : 'Removed from favourites',
+      })
+    } catch {
+      setFavouriteDoctorIds((prev) => {
+        const next = new Set(prev)
+        if (wasFavourite) next.add(doctor.id)
+        else next.delete(doctor.id)
+        return next
+      })
+      setFavouriteDoctors((prev) => {
+        if (wasFavourite) {
+          return prev.some((item) => item.id === doctor.id) ? prev : [...prev, doctor]
+        }
+        return prev.filter((item) => item.id !== doctor.id)
+      })
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to update favourites',
+      })
+    } finally {
+      setBookmarkingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(doctor.id)
+        return next
+      })
+    }
+  }
+
+  const handleReferClick = (appointmentId: string) => {
+    setReferApptId(appointmentId)
+    setReferSearchQuery('')
+    setReferOpen(true)
+  }
+
+  const handleReferConfirm = async (doctor: FavouriteDoctorListItem) => {
+    if (!referApptId) return
+
+    try {
+      const res = await referAppointment({
+        appointment_id: referApptId,
+        doctor_id: doctor.id,
+      })
+
+      if (res.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: `Referred appointment to Dr. ${doctor.name}`,
+        })
+        setReferOpen(false)
+      } else {
+        Alert.alert('Error', res.message || 'Failed to refer appointment.')
+      }
+    } catch (error) {
+      console.log('[DoctorAppointments] refer error:', error)
+      Alert.alert('Error', 'Something went wrong. Please try again.')
+    }
+  }
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -547,6 +725,7 @@ export function DoctorAppointments({
       { label: 'Confirm', action: 'confirm', bg: '#e8f5e9', color: '#4caf50' },
       { label: 'Reject', action: 'reject', bg: '#ffeeee', color: '#e53935' },
       { label: 'Reschedule', action: 'reschedule', bg: '#fff8e8', color: '#f59e0b' },
+      { label: 'Refer', action: 'refer', bg: '#e8f4f8', color: '#0c7c7c' },
     ]
 
     const visibleActions = allActionButtons.filter(
@@ -620,6 +799,7 @@ export function DoctorAppointments({
                     if (btn.action === 'confirm') handleConfirmAppointment(apt.id)
                     else if (btn.action === 'reject') handleRejectClick(apt.id)
                     else if (btn.action === 'reschedule') handleRescheduleClick(apt)
+                    else if (btn.action === 'refer') handleReferClick(apt.id)
                   }}
                   activeOpacity={0.8}
                 >
@@ -694,6 +874,74 @@ export function DoctorAppointments({
         onCancel={handleCancelReject}
         onConfirm={handleConfirmReject}
       />
+
+      {/* Refer modal */}
+      <Modal
+        visible={referOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setReferOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isTablet && styles.modalCardTablet]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Refer to Doctor</Text>
+              <TouchableOpacity
+                onPress={() => setReferOpen(false)}
+                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              >
+                <Ionicons name="close" size={22} color="#526173" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ padding: 16 }}>
+              <AppInput
+                value={referSearchQuery}
+                onChangeText={setReferSearchQuery}
+                placeholder="Search doctor..."
+                placeholderTextColor="#98a1aa"
+                textColor="#1b2d3c"
+                left={<AppInput.Icon icon="magnify" size={20} color="#9b9b9b" />}
+                autoCorrect={false}
+                noMargin
+              />
+            </View>
+
+            {referLoading ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator color="#0c7c7c" />
+              </View>
+            ) : (
+              <FlatList
+                data={filteredReferDoctors}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+                renderItem={({ item }) => (
+                  <FavouriteDoctorList
+                    doctor={item}
+                    isCompact={true}
+                    showShare={true}
+                    onShare={() => handleReferConfirm(item)}
+                    isBookmarked={favouriteDoctorIds.has(item.id)}
+                    isBookmarking={bookmarkingIds.has(item.id)}
+                    onToggleBookmark={handleToggleBookmark}
+                    placeholderImage={require('../../assets/Banner/doctor.png')}
+                    primaryColor="#0c7c7c"
+                  />
+                )}
+                ListEmptyComponent={
+                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                    <MaterialCommunityIcons name="bookmark-outline" size={40} color="#8ca0a9" />
+                    <Text style={{ color: '#7f98a3', fontSize: 13, marginTop: 10, textAlign: 'center' }}>
+                      No favourite doctors yet
+                    </Text>
+                  </View>
+                }
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Reschedule confirm modal */}
       <Modal
@@ -972,6 +1220,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingTop: 4,
   },
+  // Appointment card
   // Appointment card
   aptCard: {
     flexDirection: 'row',
