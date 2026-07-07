@@ -136,14 +136,12 @@ export default React.memo(ServicesSection) // verified export
 
 const styles = StyleSheet.create({
 	container: {
-		marginTop: 16,
-		marginBottom: 24,
-		marginHorizontal: -16,
+		paddingVertical: 12,
+		paddingHorizontal: 16,
 	},
 
 	listContent: {
-		paddingHorizontal: 16,
-		paddingBottom: 4,
+		paddingBottom: 10,
 	},
 
 	card: {

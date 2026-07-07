@@ -130,7 +130,7 @@ export function AppBottomSheet({
 								onPress={requestClose}
 								activeOpacity={0.82}
 							>
-								ScrollView <MaterialCommunityIcons name="close" size={22} color="#64707d" />
+								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
 							</TouchableOpacity>
 						</View>
 						{/* <ScrollView

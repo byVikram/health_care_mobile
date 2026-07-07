@@ -4,6 +4,7 @@ import { theme } from './src/config/theme'
 import { AuthProvider } from './src/context/AuthContext'
 import AppNavigator from './src/navigation/AppNavigator'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import Toast from 'react-native-toast-message'
 
 export default function App() {
 	return (
@@ -11,6 +12,7 @@ export default function App() {
 			<PaperProvider theme={theme}>
 				<AuthProvider>
 					<AppNavigator />
+					<Toast />
 				</AuthProvider>
 			</PaperProvider>
 		</SafeAreaProvider>

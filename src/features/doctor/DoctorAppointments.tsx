@@ -267,6 +267,7 @@ export function DoctorAppointments({
   searchQuery,
   setSearchQuery,
 }: DoctorAppointmentsProps) {
+
   // Local status overrides (set after an action without a full refresh)
   const [localStatuses, setLocalStatuses] = useState<Record<string, string>>({})
   const [localTimes, setLocalTimes] = useState<Record<string, { start_time: string; end_time: string | null }>>({})

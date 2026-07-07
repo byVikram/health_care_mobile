@@ -12,7 +12,9 @@ import {
 } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
-import HeroSection from './components/HeroSection'
+import QuickServicesSection from './components/QuickServicesSection'
+import MediaPromotionsSection from './components/MediaPromotionsSection'
+import ServicesSection from './components/ServiceSection'
 import SpecialitySection from './components/SpecialitySection'
 import ConsultSection from './components/ConsultSection'
 import PatientQuestionsSection from './components/PatientQuestionsSection'
@@ -237,7 +239,9 @@ export default function DashboardPage() {
 		) {
 			return (
 				<>
-					<HeroSection role={role} />
+					<QuickServicesSection role={role} />
+					<ServicesSection />
+					<MediaPromotionsSection role={role} />
 					{renderUserPanel()}
 				</>
 			)
@@ -248,7 +252,8 @@ export default function DashboardPage() {
 				<View style={styles.tabletRow}>
 					{/* HERO */}
 					<View style={[styles.heroColumn, isLandscape && styles.heroColumnHalf]}>
-						<HeroSection role={role} />
+						<QuickServicesSection role={role} />
+						<MediaPromotionsSection role={role} />
 					</View>
 
 					{/* ROLE PANEL */}
@@ -259,7 +264,8 @@ export default function DashboardPage() {
 		// Mobile: stack vertically
 		return (
 			<>
-				<HeroSection role={role} />
+				<QuickServicesSection role={role} />
+				<MediaPromotionsSection role={role} />
 				{renderRoleBasedPanel()}
 			</>
 		)
