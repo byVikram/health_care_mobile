@@ -444,10 +444,28 @@ export async function getPatientReports(patientPublicId: string): Promise<Report
 	return response.data.data ?? []
 }
 
+export async function recordVital(
+	patientPublicId: string,
+	vitalType: string,
+	value: Record<string, unknown>
+): Promise<VitalRecord> {
+	const response = await ApiService.post<{
+		success: boolean
+		data: VitalRecord
+	}>(API_ENDPOINTS.PATIENT.VITALS_CREATE, {
+		patient_public_id: patientPublicId,
+		vital_type: vitalType,
+		recorded_at: new Date().toISOString(),
+		value,
+	})
+	return response.data.data
+}
+
 export const vitalsService = {
 	getLatestVitals,
 	getVitalsHistory,
 	getPatientReports,
 	mapLatestVitalsToStats,
 	mapVitalToRow,
+	recordVital,
 }

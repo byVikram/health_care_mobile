@@ -129,6 +129,42 @@ function unwrapPatient(response: any): PatientDetails {
   };
 }
 
+export interface TreatmentRecord {
+  id: string;
+  appointment_id: number;
+  vitals?: Record<string, any> | null;
+  notes?: string | null;
+  prescription_s3_key?: string | null;
+  follow_up_date?: string | null;
+  created_at: string;
+  doctor_name?: string;
+  hospital_name?: string;
+}
+
+export interface LaboratoryReportRecord {
+  id: number;
+  public_id: string;
+  booking_id: number;
+  patient_id: number;
+  report_pdf_s3_key: string;
+  result_values?: Record<string, any> | null;
+  report_images_s3_keys?: string[] | null;
+  summary_findings?: string | null;
+  uploaded_at: string;
+}
+
+export interface RadiologyReportRecord {
+  id: number;
+  public_id: string;
+  booking_id: number;
+  patient_id: number;
+  report_pdf_s3_key: string;
+  dicom_images_s3_keys?: string[] | null;
+  scan_images_s3_keys?: string[] | null;
+  summary_findings?: string | null;
+  uploaded_at: string;
+}
+
 export const patientService = {
   getPatientDetails: async (
     patientPublicId: string,
@@ -144,6 +180,48 @@ export const patientService = {
       return patient;
     } catch (err: any) {
       console.error("[patientService] error:", err);
+      throw err;
+    }
+  },
+
+  getPatientTreatmentHistory: async (
+    patientPublicId: string,
+  ): Promise<TreatmentRecord[]> => {
+    try {
+      const response = await ApiService.get<{ success: boolean; data: TreatmentRecord[] }>(
+        API_ENDPOINTS.PATIENT.TREATMENT_HISTORY(patientPublicId)
+      );
+      return response.data?.data ?? [];
+    } catch (err: any) {
+      console.error("[patientService.getPatientTreatmentHistory] error:", err);
+      throw err;
+    }
+  },
+
+  getPatientLaboratoryReports: async (
+    patientPublicId: string,
+  ): Promise<LaboratoryReportRecord[]> => {
+    try {
+      const response = await ApiService.get<{ success: boolean; data: LaboratoryReportRecord[] }>(
+        API_ENDPOINTS.PATIENT.LABORATORY_REPORTS(patientPublicId)
+      );
+      return response.data?.data ?? [];
+    } catch (err: any) {
+      console.error("[patientService.getPatientLaboratoryReports] error:", err);
+      throw err;
+    }
+  },
+
+  getPatientRadiologyReports: async (
+    patientPublicId: string,
+  ): Promise<RadiologyReportRecord[]> => {
+    try {
+      const response = await ApiService.get<{ success: boolean; data: RadiologyReportRecord[] }>(
+        API_ENDPOINTS.PATIENT.RADIOLOGY_REPORTS(patientPublicId)
+      );
+      return response.data?.data ?? [];
+    } catch (err: any) {
+      console.error("[patientService.getPatientRadiologyReports] error:", err);
       throw err;
     }
   },

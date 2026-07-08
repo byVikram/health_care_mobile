@@ -24,6 +24,8 @@ import {
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import { useNavigation } from '@react-navigation/native'
+import { ROUTES } from '../../navigation/routes'
 import { Appointment } from '../../types/appointment'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
 import ApiService from '../../services/apiService'
@@ -267,6 +269,7 @@ export function DoctorAppointments({
   searchQuery,
   setSearchQuery,
 }: DoctorAppointmentsProps) {
+  const navigation = useNavigation<any>()
 
   // Local status overrides (set after an action without a full refresh)
   const [localStatuses, setLocalStatuses] = useState<Record<string, string>>({})
@@ -686,9 +689,10 @@ export function DoctorAppointments({
     try {
       const res = await startConsultation(appointmentId)
       if (res.success) {
-        // Navigate to OTP or consultation screen
-        console.log('Start consultation for patient', patientId)
-        Alert.alert('Consultation', 'Starting OTP verification…')
+        navigation.navigate(ROUTES.STACK.CONSULTATION, {
+          appointmentId: appointmentId,
+          patientId: patientId,
+        })
       }
     } catch {
       Toast.show({ type: 'error', text1: 'Failed to generate OTP' })
