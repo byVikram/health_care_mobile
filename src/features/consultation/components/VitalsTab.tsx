@@ -8,6 +8,7 @@ import {
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
+	Alert,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../../../components/common'
@@ -18,6 +19,7 @@ import {
 	getVitalsHistory,
 	mapLatestVitalsToStats,
 	mapVitalToRow,
+	recordVital,
 	type ReportRecord,
 } from '../VitalsService'
 import AddVitalsModal from './AddVitalsModal'
@@ -609,6 +611,89 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 		}
 	}
 
+	const handleSaveVitals = async (formData: any) => {
+		if (!patientId) return
+		try {
+			setLoading(true)
+			const promises: Promise<any>[] = []
+
+			// 1. Blood Pressure
+			if (formData.bloodPressure) {
+				const bpParts = formData.bloodPressure.split('/')
+				const systolic = parseFloat(bpParts[0])
+				const diastolic = parseFloat(bpParts[1] || '80')
+				if (!isNaN(systolic)) {
+					promises.push(
+						recordVital(patientId, 'blood_pressure', {
+							systolic,
+							diastolic,
+						})
+					)
+				}
+			}
+
+			// 2. Glucose Level
+			const glucoseValue: Record<string, number> = {}
+			if (formData.fastingSugar) {
+				const fasting = parseFloat(formData.fastingSugar)
+				if (!isNaN(fasting)) glucoseValue.fasting = fasting
+			}
+			if (formData.randomSugar) {
+				const random = parseFloat(formData.randomSugar)
+				if (!isNaN(random)) glucoseValue.random = random
+			}
+			if (Object.keys(glucoseValue).length > 0) {
+				promises.push(recordVital(patientId, 'glucose_level', glucoseValue))
+			}
+
+			// 3. Weight
+			if (formData.weight) {
+				const w = parseFloat(formData.weight)
+				if (!isNaN(w)) {
+					promises.push(recordVital(patientId, 'weight', { weight: w }))
+				}
+			}
+
+			// 4. SpO2
+			if (formData.spo2) {
+				const o2 = parseFloat(formData.spo2)
+				if (!isNaN(o2)) {
+					promises.push(recordVital(patientId, 'spo2', { spo2: o2 }))
+				}
+			}
+
+			// 5. Temperature
+			if (formData.temperature) {
+				const temp = parseFloat(formData.temperature)
+				if (!isNaN(temp)) {
+					promises.push(recordVital(patientId, 'temperature', { temperature: temp }))
+				}
+			}
+
+			// 6. Others
+			const othersValue: Record<string, any> = {}
+			const fields = ['waist', 'ldl', 'hba1c', 'hdl', 'tgl', 'pulseRate', 'respirationRate']
+			fields.forEach((f) => {
+				if (formData[f]) {
+					othersValue[f === 'pulseRate' ? 'pulse_rate' : f === 'respirationRate' ? 'respiration_rate' : f] = formData[f]
+				}
+			})
+			if (Object.keys(othersValue).length > 0) {
+				promises.push(recordVital(patientId, 'others', othersValue))
+			}
+
+			if (promises.length > 0) {
+				await Promise.all(promises)
+				Alert.alert('Success', 'Patient vitals recorded successfully')
+				handleRefresh()
+			}
+		} catch (error: any) {
+			Alert.alert('Error', error?.message || 'Failed to save patient vitals.')
+		} finally {
+			setLoading(false)
+		}
+	}
+
 	return (
 		<View style={styles.container}>
 			{/* Vital stat cards — flex wrap grid */}
@@ -777,10 +862,7 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 			<AddVitalsModal
 				visible={addVitalsVisible}
 				onClose={() => setAddVitalsVisible(false)}
-				onSave={(data) => {
-					console.log('[VitalsTab] new vitals submitted:', data)
-					// TODO: call API to persist the new vitals entry
-				}}
+				onSave={handleSaveVitals}
 			/>
 		</View>
 	)

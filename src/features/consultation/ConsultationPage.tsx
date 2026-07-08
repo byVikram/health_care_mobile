@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import {
 	View,
 	StyleSheet,
@@ -8,6 +8,7 @@ import {
 	ActivityIndicator,
 	Modal,
 	useWindowDimensions,
+	Linking,
 } from 'react-native'
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import { useTheme, Card, Avatar, Button, IconButton, Divider, Text } from 'react-native-paper'
@@ -73,13 +74,39 @@ function resolveAvatar(patient: PatientDetails | null): string | undefined {
 }
 
 // ---------- PastMedicalHistory (complete) ----------
-function PastMedicalHistory() {
+interface PastMedicalHistoryProps {
+	patientId: string
+}
+
+const formatDate = (dateString?: string) => {
+	if (!dateString) return '--'
+	try {
+		const date = new Date(dateString)
+		if (isNaN(date.getTime())) return dateString
+		return date.toLocaleDateString('en-IN', {
+			day: '2-digit',
+			month: 'short',
+			year: 'numeric',
+		})
+	} catch {
+		return dateString
+	}
+}
+
+function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
 	const theme = useTheme()
 	const [activeTab, setActiveTab] = useState('Laboratory')
 	const [dicomBase64, setDicomBase64] = useState<string | null>(null)
 	const [dicomLoading, setDicomLoading] = useState(false)
 	const [dicomError, setDicomError] = useState<string | null>(null)
 	const [isDicomExpanded, setIsDicomExpanded] = useState(false)
+
+	const [loading, setLoading] = useState(false)
+	const [treatmentHistory, setTreatmentHistory] = useState<any[]>([])
+	const [laboratoryReports, setLaboratoryReports] = useState<any[]>([])
+	const [radiologyReports, setRadiologyReports] = useState<any[]>([])
+	const [ancillaryReports, setAncillaryReports] = useState<any[]>([])
+
 	const tabs: TabItem[] = [
 		{ id: 'Prescription', Icon: Prescription },
 		{ id: 'Laboratory', Icon: LaboratoryIcon },
@@ -88,34 +115,233 @@ function PastMedicalHistory() {
 	]
 
 	useEffect(() => {
-		if (activeTab !== 'Radiology' || dicomBase64 || dicomLoading) return
-		const loadDicom = async () => {
-			setDicomLoading(true)
-			setDicomError(null)
+		if (!patientId) return
+		const fetchHistory = async () => {
+			setLoading(true)
 			try {
-				const asset = Asset.fromModule(SAMPLE_DICOM_MODULE)
-				await asset.downloadAsync()
-				if (!asset.localUri) throw new Error('Could not resolve local URI for DICOM asset.')
-				const base64 = await FileSystem.readAsStringAsync(asset.localUri, {
-					encoding: FileSystem.EncodingType.Base64,
-				})
-				setDicomBase64(base64)
-			} catch (err: any) {
-				setDicomError(err?.message ?? 'Failed to load DICOM file.')
+				const [treatments, labs, rads, ancilsRes] = await Promise.all([
+					patientService.getPatientTreatmentHistory(patientId),
+					patientService.getPatientLaboratoryReports(patientId),
+					patientService.getPatientRadiologyReports(patientId),
+					ApiService.get(API_ENDPOINTS.PATIENT.REPORTS(patientId)).catch(() => ({ data: { data: [] } }))
+				])
+				setTreatmentHistory(treatments)
+				setLaboratoryReports(labs)
+				setRadiologyReports(rads)
+
+				const rawReports = (ancilsRes as any)?.data?.data ?? (ancilsRes as any)?.data ?? []
+				const filteredAncillary = rawReports.filter(
+					(r: any) => r.report_type?.toLowerCase() === 'ancillary'
+				)
+				setAncillaryReports(filteredAncillary)
+			} catch (err) {
+				console.error('Failed to fetch past medical history:', err)
 			} finally {
-				setDicomLoading(false)
+				setLoading(false)
 			}
 		}
-		loadDicom()
-	}, [activeTab])
+		fetchHistory()
+	}, [patientId])
+
+	const handleLoadDicomForReport = async (s3Key: string) => {
+		setDicomLoading(true)
+		setDicomError(null)
+		try {
+			const url = s3Key
+			if (url) {
+				const response = await fetch(url)
+				const blob = await response.blob()
+				const reader = new FileReader()
+				reader.onloadend = () => {
+					const base64data = reader.result as string
+					const base64 = base64data.split(',')[1] || base64data
+					setDicomBase64(base64)
+				}
+				reader.readAsDataURL(blob)
+			} else {
+				throw new Error('Invalid DICOM URL')
+			}
+		} catch (err: any) {
+			handleLoadSampleDicom()
+		} finally {
+			setDicomLoading(false)
+		}
+	}
+
+	const handleLoadSampleDicom = async () => {
+		setDicomLoading(true)
+		setDicomError(null)
+		try {
+			const asset = Asset.fromModule(SAMPLE_DICOM_MODULE)
+			await asset.downloadAsync()
+			if (!asset.localUri) throw new Error('Could not resolve local URI for DICOM asset.')
+			const base64 = await FileSystem.readAsStringAsync(asset.localUri, {
+				encoding: FileSystem.EncodingType.Base64,
+			})
+			setDicomBase64(base64)
+		} catch (err: any) {
+			setDicomError(err?.message ?? 'Failed to load DICOM file.')
+		} finally {
+			setDicomLoading(false)
+		}
+	}
+
+	const renderEmptyState = () => (
+		<View style={{ alignItems: 'center', paddingVertical: 24 }}>
+			<MaterialCommunityIcons name="emoticon-sad-outline" size={48} color="#ccc" />
+			<Text style={{ color: '#666', marginTop: 8, fontWeight: '500' }}>
+				No past {activeTab.toLowerCase()} history!
+			</Text>
+		</View>
+	)
+
+	const renderTabContent = () => {
+		if (activeTab === 'Prescription') {
+			if (treatmentHistory.length === 0) return renderEmptyState()
+			return treatmentHistory.map((item) => (
+				<View key={item.id} style={styles.historyItem}>
+					<View style={styles.historyHeader}>
+						<MaterialCommunityIcons name="file-document-outline" size={22} color={theme.colors.primary} />
+						<View style={{ flex: 1, marginLeft: 10 }}>
+							<Text style={styles.historyTitle}>Prescription - {formatDate(item.created_at)}</Text>
+							<Text style={styles.historySubtitle}>
+								{item.doctor_name ? `Dr. ${item.doctor_name}` : 'Doctor'} · {item.hospital_name || 'Hospital'}
+							</Text>
+						</View>
+						{item.prescription_s3_key ? (
+							<IconButton
+								icon="download"
+								size={20}
+								iconColor={theme.colors.primary}
+								onPress={() => Linking.openURL(item.prescription_s3_key || '')}
+							/>
+						) : null}
+					</View>
+					{item.notes ? <Text style={styles.historyNotes}>{item.notes}</Text> : null}
+				</View>
+			))
+		}
+
+		if (activeTab === 'Laboratory') {
+			if (laboratoryReports.length === 0) return renderEmptyState()
+			return laboratoryReports.map((item) => (
+				<View key={item.id} style={styles.historyItem}>
+					<View style={styles.historyHeader}>
+						<MaterialCommunityIcons name="flask-outline" size={22} color={theme.colors.primary} />
+						<View style={{ flex: 1, marginLeft: 10 }}>
+							<Text style={styles.historyTitle}>Lab Report - {formatDate(item.uploaded_at)}</Text>
+							{item.summary_findings ? <Text style={styles.historySubtitle}>{item.summary_findings}</Text> : null}
+						</View>
+						{item.report_pdf_s3_key ? (
+							<IconButton
+								icon="eye"
+								size={20}
+								iconColor={theme.colors.primary}
+								onPress={() => Linking.openURL(item.report_pdf_s3_key || '')}
+							/>
+						) : null}
+					</View>
+					{item.result_values && Object.keys(item.result_values).length > 0 ? (
+						<View style={styles.resultsGrid}>
+							{Object.entries(item.result_values).map(([testName, testValue]) => (
+								<View key={testName} style={styles.resultRow}>
+									<Text style={styles.resultLabel}>{testName}:</Text>
+									<Text style={styles.resultValue}>{String(testValue)}</Text>
+								</View>
+							))}
+						</View>
+					) : null}
+				</View>
+			))
+		}
+
+		if (activeTab === 'Radiology') {
+			if (dicomBase64) {
+				return (
+					<View style={{ marginTop: 16 }}>
+						<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+							<MaterialCommunityIcons name="radioactive" size={16} color={theme.colors.primary} />
+							<Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: 'bold', marginLeft: 6 }}>
+								Radiology Scan DICOM Viewer
+							</Text>
+							<IconButton icon="close" size={16} style={{ marginLeft: 'auto' }} onPress={() => setDicomBase64(null)} />
+						</View>
+						<View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 }}>
+							<Button mode="outlined" compact icon="arrow-expand" onPress={() => setIsDicomExpanded(true)}>
+								Expand view
+							</Button>
+						</View>
+						<DicomViewer base64Data={dicomBase64} />
+						<Text style={{ fontSize: 10, color: '#999', marginTop: 8, textAlign: 'center' }}>
+							Drag to adjust Window/Level · Pinch or +/- to zoom · ⊙ resets view · ☀ inverts
+						</Text>
+					</View>
+				)
+			}
+			if (radiologyReports.length === 0) return renderEmptyState()
+			return radiologyReports.map((item) => (
+				<View key={item.id} style={styles.historyItem}>
+					<View style={styles.historyHeader}>
+						<MaterialCommunityIcons name="radioactive" size={22} color={theme.colors.primary} />
+						<View style={{ flex: 1, marginLeft: 10 }}>
+							<Text style={styles.historyTitle}>Radiology Scan - {formatDate(item.uploaded_at)}</Text>
+							{item.summary_findings ? <Text style={styles.historySubtitle}>{item.summary_findings}</Text> : null}
+						</View>
+						<View style={{ flexDirection: 'row' }}>
+							{item.report_pdf_s3_key ? (
+								<IconButton
+									icon="file-pdf-box"
+									size={20}
+									iconColor={theme.colors.primary}
+									onPress={() => Linking.openURL(item.report_pdf_s3_key || '')}
+								/>
+							) : null}
+							<IconButton
+								icon="television-play"
+								size={20}
+								iconColor={theme.colors.primary}
+								onPress={() => {
+									if (item.dicom_images_s3_keys && item.dicom_images_s3_keys.length > 0) {
+										handleLoadDicomForReport(item.dicom_images_s3_keys[0])
+									} else {
+										handleLoadSampleDicom()
+									}
+								}}
+							/>
+						</View>
+					</View>
+				</View>
+			))
+		}
+
+		if (activeTab === 'Ancillary') {
+			if (ancillaryReports.length === 0) return renderEmptyState()
+			return ancillaryReports.map((item) => (
+				<View key={item.id} style={styles.historyItem}>
+					<View style={styles.historyHeader}>
+						<MaterialCommunityIcons name="medical-bag" size={22} color={theme.colors.primary} />
+						<View style={{ flex: 1, marginLeft: 10 }}>
+							<Text style={styles.historyTitle}>Ancillary Report - {formatDate(item.created_at || item.uploaded_at)}</Text>
+							{item.notes ? <Text style={styles.historySubtitle}>{item.notes}</Text> : null}
+						</View>
+						{item.file_s3_key ? (
+							<IconButton
+								icon="eye"
+								size={20}
+								iconColor={theme.colors.primary}
+								onPress={() => Linking.openURL(item.file_s3_key || '')}
+							/>
+						) : null}
+					</View>
+				</View>
+			))
+		}
+	}
 
 	return (
 		<Card style={[styles.card, { marginTop: 0 }]}>
 			<Card.Content>
-				<Text
-					variant="titleMedium"
-					style={{ color: theme.colors.primary, fontWeight: 'bold', marginBottom: 16 }}
-				>
+				<Text variant="titleMedium" style={{ color: theme.colors.primary, fontWeight: 'bold', marginBottom: 16 }}>
 					Past medical history
 				</Text>
 				<View
@@ -131,11 +357,7 @@ function PastMedicalHistory() {
 						const isActive = activeTab === tab.id
 						const TabIcon = tab.Icon
 						return (
-							<TouchableOpacity
-								key={tab.id}
-								onPress={() => setActiveTab(tab.id)}
-								style={{ alignItems: 'center', flex: 1 }}
-							>
+							<TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1 }}>
 								<TabIcon width={42} height={42} />
 								<Text
 									style={{
@@ -163,7 +385,7 @@ function PastMedicalHistory() {
 					})}
 				</View>
 
-				<View style={{ marginTop: 16 }}>
+				<View style={{ marginTop: 16, marginBottom: 8 }}>
 					<Text style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>Select date</Text>
 					<Button
 						mode="outlined"
@@ -175,73 +397,25 @@ function PastMedicalHistory() {
 					</Button>
 				</View>
 
-				{activeTab === 'Radiology' ? (
-					<View style={{ marginTop: 16 }}>
-						{dicomLoading ? (
-							<View style={{ alignItems: 'center', paddingVertical: 24 }}>
-								<ActivityIndicator size="large" />
-								<Text style={{ color: '#666', marginTop: 8, fontSize: 12 }}>Loading DICOM image…</Text>
-							</View>
-						) : dicomError ? (
-							<View style={{ alignItems: 'center', paddingVertical: 24 }}>
-								<MaterialCommunityIcons name="alert-circle-outline" size={40} color="#e53935" />
-								<Text
-									style={{
-										color: '#e53935',
-										marginTop: 8,
-										fontSize: 12,
-										textAlign: 'center',
-									}}
-								>
-									{dicomError}
-								</Text>
-							</View>
-						) : (
-							<>
-								<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-									<MaterialCommunityIcons name="radioactive" size={16} color={theme.colors.primary} />
-									<Text
-										style={{
-											fontSize: 12,
-											color: theme.colors.primary,
-											fontWeight: 'bold',
-											marginLeft: 6,
-										}}
-									>
-										Radiology Scan DICOM Viewer
-									</Text>
-								</View>
-								<View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 }}>
-									<Button
-										mode="outlined"
-										compact
-										icon="arrow-expand"
-										onPress={() => setIsDicomExpanded(true)}
-									>
-										Expand view
-									</Button>
-								</View>
-								<DicomViewer base64Data={dicomBase64} />
-								<Text
-									style={{
-										fontSize: 10,
-										color: '#999',
-										marginTop: 8,
-										textAlign: 'center',
-									}}
-								>
-									Drag to adjust Window/Level · Pinch or +/- to zoom · ⊙ resets view · ☀ inverts
-								</Text>
-							</>
-						)}
-					</View>
-				) : (
+				{loading ? (
 					<View style={{ alignItems: 'center', paddingVertical: 24 }}>
-						<MaterialCommunityIcons name="emoticon-sad-outline" size={48} color="#ccc" />
-						<Text style={{ color: '#666', marginTop: 8, fontWeight: '500' }}>
-							No past {activeTab.toLowerCase()} history!
+						<ActivityIndicator size="small" color={theme.colors.primary} />
+						<Text style={{ color: '#666', marginTop: 8, fontSize: 12 }}>Loading history…</Text>
+					</View>
+				) : dicomLoading ? (
+					<View style={{ alignItems: 'center', paddingVertical: 24 }}>
+						<ActivityIndicator size="large" />
+						<Text style={{ color: '#666', marginTop: 8, fontSize: 12 }}>Loading DICOM image…</Text>
+					</View>
+				) : dicomError ? (
+					<View style={{ alignItems: 'center', paddingVertical: 24 }}>
+						<MaterialCommunityIcons name="alert-circle-outline" size={40} color="#e53935" />
+						<Text style={{ color: '#e53935', marginTop: 8, fontSize: 12, textAlign: 'center' }}>
+							{dicomError}
 						</Text>
 					</View>
+				) : (
+					renderTabContent()
 				)}
 			</Card.Content>
 
@@ -913,7 +1087,7 @@ export default function ConsultationPage() {
 						</Card>
 
 						{/* Past Medical History */}
-						<PastMedicalHistory />
+						<PastMedicalHistory patientId={patient.patient_public_id || patient.id || patientId} />
 
 						{/* ── Consultation Notes (Scribble + Speech) ── */}
 						<Card style={[styles.card, { borderColor: theme.colors.primary, borderWidth: 1 }]}>
@@ -1183,5 +1357,57 @@ const styles = StyleSheet.create({
 		color: '#fff',
 		fontWeight: '700',
 		fontSize: 14,
+	},
+	historyItem: {
+		backgroundColor: '#f8fafc',
+		borderRadius: 8,
+		padding: 12,
+		marginBottom: 12,
+		borderWidth: 1,
+		borderColor: '#edf2f7',
+	},
+	historyHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	historyTitle: {
+		fontSize: 12,
+		fontWeight: 'bold',
+		color: '#2d3748',
+	},
+	historySubtitle: {
+		fontSize: 10,
+		color: '#718096',
+		marginTop: 2,
+	},
+	historyNotes: {
+		fontSize: 11,
+		color: '#4a5568',
+		marginTop: 8,
+		lineHeight: 16,
+	},
+	resultsGrid: {
+		marginTop: 10,
+		paddingTop: 8,
+		borderTopWidth: 1,
+		borderTopColor: '#edf2f7',
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+	},
+	resultRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		width: '48%',
+	},
+	resultLabel: {
+		fontSize: 10,
+		fontWeight: 'bold',
+		color: '#4a5568',
+	},
+	resultValue: {
+		fontSize: 10,
+		color: '#2d3748',
+		marginLeft: 4,
 	},
 })

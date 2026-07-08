@@ -41,7 +41,7 @@ function getTabConfig(routeName: string) {
 	return { iconName: 'home' as const, label: 'Home' }
 }
 
-function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+function DockedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 	const theme = useTheme()
 	const insets = useSafeAreaInsets()
 	const activeRoute = state.routes[state.index]
@@ -51,13 +51,20 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 	}
 
 	return (
-		<View style={[styles.tabBar, { bottom: insets.bottom + 10 }]}>
+		<View
+			style={[
+				styles.tabBar,
+				{
+					paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+					height: 60 + (insets.bottom > 0 ? insets.bottom : 8),
+				},
+			]}
+		>
 			{state.routes.map((route, index) => {
 				const focused = state.index === index
 				const { options } = descriptors[route.key]
 				const { iconName, label } = getTabConfig(route.name)
-				const color = focused ? '#ffffff' : '#242833'
-				const labelColor = focused ? '#ffffff' : '#242833'
+				const color = focused ? '#0C7C7C' : '#94a3b8'
 
 				const onPress = () => {
 					const event = navigation.emit({
@@ -92,17 +99,21 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 						<View style={styles.tabButton}>
 							<View
 								style={[
-									styles.activeCircle,
-									focused && { backgroundColor: theme.colors.primary },
+									styles.iconActiveCapsule,
+									focused && styles.iconActiveCapsuleFocused,
 								]}
 							>
-								<View style={styles.iconWrapper}>
-									<MaterialCommunityIcons name={iconName} size={26} color={color} />
-								</View>
-								<Text style={[styles.tabLabel, { color: labelColor }]}>
-									{label}
-								</Text>
+								<MaterialCommunityIcons name={iconName} size={24} color={color} />
 							</View>
+							<Text
+								style={[
+									styles.tabLabel,
+									{ color },
+									focused && styles.tabLabelFocused,
+								]}
+							>
+								{label}
+							</Text>
 						</View>
 					</Pressable>
 				)
@@ -118,7 +129,7 @@ export default function MainTabNavigator() {
 
 	return (
 		<Tab.Navigator
-			tabBar={(props) => <FloatingTabBar {...props} />}
+			tabBar={(props) => <DockedTabBar {...props} />}
 			screenOptions={{
 				headerShown: false,
 			}}
@@ -149,74 +160,49 @@ export default function MainTabNavigator() {
 
 const styles = StyleSheet.create({
 	tabBar: {
-		position: 'absolute',
-		left: 18,
-		right: 18,
-		bottom: 18,
-		height: 74,
-		borderRadius: 37,
 		backgroundColor: '#ffffff',
-		borderTopWidth: 0,
-		paddingHorizontal: 12,
-		paddingTop: 6,
-		paddingBottom: 6,
-		overflow: 'visible',
+		borderTopWidth: 1,
+		borderTopColor: '#f1f5f9',
 		flexDirection: 'row',
 		alignItems: 'center',
-
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: 14 },
-		shadowOpacity: 0.18,
-		shadowRadius: 18,
-		elevation: 18,
+		justifyContent: 'space-between',
+		width: '100%',
 	},
 
 	tabBarItem: {
 		flex: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
-		height: 62,
+		height: '100%',
 	},
 
 	tabButton: {
-		width: 76,
-		height: 58,
 		alignItems: 'center',
 		justifyContent: 'center',
-		flexGrow: 0,
-		flexShrink: 0,
+		gap: 3,
 	},
 
-	activeCircle: {
-		width: 76,
-		height: 58,
-		minWidth: 76,
-		maxWidth: 76,
-		minHeight: 58,
-		maxHeight: 58,
-		borderRadius: 29,
-		overflow: 'hidden',
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingTop: 6,
-		paddingBottom: 6,
-		flexGrow: 0,
-		flexShrink: 0,
-	},
-
-	iconWrapper: {
-		width: 30,
+	iconActiveCapsule: {
+		width: 52,
 		height: 30,
+		borderRadius: 15,
 		alignItems: 'center',
 		justifyContent: 'center',
-		flexGrow: 0,
-		flexShrink: 0,
+		backgroundColor: 'transparent',
+	},
+
+	iconActiveCapsuleFocused: {
+		backgroundColor: '#eef8f8',
 	},
 
 	tabLabel: {
-		fontSize: 11,
-		lineHeight: 13,
+		fontSize: 10.5,
+		lineHeight: 12,
 		textAlign: 'center',
-		marginTop: 1,
+		fontWeight: '500',
+	},
+
+	tabLabelFocused: {
+		fontWeight: '600',
 	},
 })
