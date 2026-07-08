@@ -578,7 +578,7 @@ export function DoctorAppointments({
     try {
       const res = await updateAppointmentsStatus(appointmentId, '3f9a2c8e-7b61-4d2a-9a3f-5c8e1b2d4f90')
       if (res.success) {
-        Toast.show({ type: 'success', text1: res.message })
+        Toast.show({ type: 'success', text1: 'Appointment confirmed successfully.' })
         setLocalStatuses((prev) => ({ ...prev, [appointmentId]: 'confirmed' }))
       }
     } catch {
@@ -602,7 +602,7 @@ export function DoctorAppointments({
     try {
       const res = await updateAppointmentsStatus(pendingRejectId, 'a7d4e1c2-9f6b-4c83-b2e1-6f3a9d8c7b12')
       if (res.success) {
-        Toast.show({ type: 'success', text1: res.message })
+        Toast.show({ type: 'success', text1: 'Appointment rejected successfully.' })
         setLocalStatuses((prev) => ({ ...prev, [pendingRejectId!]: 'cancelled' }))
       }
     } catch {

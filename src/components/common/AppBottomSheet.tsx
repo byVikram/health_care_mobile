@@ -214,6 +214,7 @@ const styles = StyleSheet.create({
 		marginLeft: 12,
 	},
 	sheetScroll: {
+		flexGrow: 1,
 		flexShrink: 1,
 	},
 	sheetContent: {
