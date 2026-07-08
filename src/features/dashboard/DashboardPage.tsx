@@ -211,6 +211,11 @@ export default function DashboardPage() {
 		</>
 	)
 	const renderLaboratoryPanel = () => <></>
+	const renderQuickServicesSection = () => (
+		<View style={isDoctor && styles.doctorQuickServicesSpacing}>
+			<QuickServicesSection role={role} />
+		</View>
+	)
 	const renderRoleBasedPanel = () => {
 		switch (role) {
 			case USER_ROLES.DOCTOR:
@@ -239,7 +244,7 @@ export default function DashboardPage() {
 		) {
 			return (
 				<>
-					<QuickServicesSection role={role} />
+					{renderQuickServicesSection()}
 					<ServicesSection />
 					<MediaPromotionsSection role={role} />
 					{renderUserPanel()}
@@ -252,7 +257,7 @@ export default function DashboardPage() {
 				<View style={styles.tabletRow}>
 					{/* HERO */}
 					<View style={[styles.heroColumn, isLandscape && styles.heroColumnHalf]}>
-						<QuickServicesSection role={role} />
+						{renderQuickServicesSection()}
 						<MediaPromotionsSection role={role} />
 					</View>
 
@@ -264,7 +269,7 @@ export default function DashboardPage() {
 		// Mobile: stack vertically
 		return (
 			<>
-				<QuickServicesSection role={role} />
+				{renderQuickServicesSection()}
 				<MediaPromotionsSection role={role} />
 				{renderRoleBasedPanel()}
 			</>
@@ -369,6 +374,10 @@ const styles = StyleSheet.create({
 		maxWidth: 1200,
 		alignSelf: 'center',
 		width: '100%',
+	},
+
+	doctorQuickServicesSpacing: {
+		marginTop: 12,
 	},
 
 	tabletRow: {

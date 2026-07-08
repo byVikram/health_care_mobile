@@ -1,7 +1,7 @@
 // src/features/appointment/components/AppointmentHistoryTab.tsx
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Animated, Easing, Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Animated, Easing, Image, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppBottomSheet } from '../../../components/common/AppBottomSheet'
 import { getAppointmentById } from '../../../services/appointmentService'
@@ -290,11 +290,12 @@ interface AppointmentHistoryTabProps {
 	open: boolean
 	onClose: () => void
 	appointmentId: string | null
+	viewAs?: 'doctor' | 'patient'
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export default function AppointmentHistoryTab({ open, onClose, appointmentId }: AppointmentHistoryTabProps) {
+export default function AppointmentHistoryTab({ open, onClose, appointmentId, viewAs = 'patient' }: AppointmentHistoryTabProps) {
 	const [appt, setAppt] = useState<Appointment | null>(null)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
@@ -344,30 +345,63 @@ export default function AppointmentHistoryTab({ open, onClose, appointmentId }: 
 
 			{appt && !loading && (
 				<View style={styles.contentContainer}>
-					{/* ── Doctor header ─────────────────────────────────── */}
+					{/* ── Profile header (switches based on logged-in role) ── */}
 					<View style={styles.doctorHeader}>
-						{appt.doctor?.avatar_s3_key ? (
-							<Image
-								source={{ uri: appt.doctor.avatar_s3_key }}
-								style={styles.avatar}
-								resizeMode="cover"
-							/>
+						{viewAs === 'doctor' ? (
+							// Doctor is logged in → show patient's profile
+							<>
+								{appt.patient?.avatar_s3_key ? (
+									<Image
+										source={{ uri: appt.patient.avatar_s3_key }}
+										style={styles.avatar}
+										resizeMode="cover"
+									/>
+								) : (
+									<View style={[styles.avatar, styles.avatarPlaceholder]}>
+										<Text style={styles.avatarInitial}>{appt.patient?.name?.charAt(0) ?? 'P'}</Text>
+									</View>
+								)}
+								<View style={styles.doctorInfo}>
+									<View style={styles.doctorNameRow}>
+										<Text style={styles.doctorName}>{appt.patient?.name ?? '—'}</Text>
+										<StatusChip status={rawStatus} />
+									</View>
+									{(appt.patient?.gender || appt.patient?.age) && (
+										<Text style={styles.specialty}>
+											{[appt.patient?.gender, appt.patient?.age ? `${appt.patient.age} yrs` : undefined]
+												.filter(Boolean)
+												.join(' · ')}
+										</Text>
+									)}
+								</View>
+							</>
 						) : (
-							<View style={[styles.avatar, styles.avatarPlaceholder]}>
-								<Text style={styles.avatarInitial}>{appt.doctor?.name?.charAt(0) ?? 'D'}</Text>
-							</View>
+							// Patient is logged in → show doctor's profile (original behaviour)
+							<>
+								{appt.doctor?.avatar_s3_key ? (
+									<Image
+										source={{ uri: appt.doctor.avatar_s3_key }}
+										style={styles.avatar}
+										resizeMode="cover"
+									/>
+								) : (
+									<View style={[styles.avatar, styles.avatarPlaceholder]}>
+										<Text style={styles.avatarInitial}>{appt.doctor?.name?.charAt(0) ?? 'D'}</Text>
+									</View>
+								)}
+								<View style={styles.doctorInfo}>
+									<View style={styles.doctorNameRow}>
+										<Text style={styles.doctorName}>{appt.doctor?.name ?? '—'}</Text>
+										<StatusChip status={rawStatus} />
+									</View>
+									{(appt.doctor?.specialty || appt.doctor?.specialization) && (
+										<Text style={styles.specialty}>
+											{appt.doctor?.specialty ?? appt.doctor?.specialization}
+										</Text>
+									)}
+								</View>
+							</>
 						)}
-						<View style={styles.doctorInfo}>
-							<View style={styles.doctorNameRow}>
-								<Text style={styles.doctorName}>{appt.doctor?.name ?? '—'}</Text>
-								<StatusChip status={rawStatus} />
-							</View>
-							{(appt.doctor?.specialty || appt.doctor?.specialization) && (
-								<Text style={styles.specialty}>
-									{appt.doctor?.specialty ?? appt.doctor?.specialization}
-								</Text>
-							)}
-						</View>
 					</View>
 
 					<View style={styles.divider} />
@@ -428,13 +462,20 @@ export default function AppointmentHistoryTab({ open, onClose, appointmentId }: 
 					{/* ── History timeline ───────────────────────────────── */}
 					<View style={styles.historySection}>
 						<Text style={styles.historySectionTitle}>Appointment History</Text>
-						<HistoryTimeline entries={appt.history ?? []} />
+						<View style={styles.historyScrollBox}>
+							<ScrollView
+								nestedScrollEnabled
+								showsVerticalScrollIndicator={true}
+								indicatorStyle="black"
+								persistentScrollbar={true}
+								contentContainerStyle={styles.historyScrollContent}
+							>
+								<HistoryTimeline entries={appt.history ?? []} />
+							</ScrollView>
+						</View>
 					</View>
 
-					{/* ── Close button ────────────────────────────────────── */}
-					<TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.85}>
-						<Text style={styles.closeButtonText}>Close</Text>
-					</TouchableOpacity>
+
 				</View>
 			)}
 		</AppBottomSheet>
@@ -505,6 +546,7 @@ const styles = StyleSheet.create({
 	},
 	contentContainer: {
 		paddingHorizontal: 20,
+		paddingBottom: 28,
 	},
 
 	// Status chip
@@ -582,8 +624,19 @@ const styles = StyleSheet.create({
 		color: '#111827',
 		marginBottom: 12,
 	},
+	historyScrollBox: {
+		maxHeight: 220,
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		borderRadius: 10,
+		backgroundColor: '#f9fafb',
+		overflow: 'hidden',
+	},
 	historyContainer: {
 		marginTop: 4,
+	},
+	historyScrollContent: {
+		padding: 10,
 	},
 	historyEmptyText: {
 		fontSize: 13,
@@ -710,25 +763,5 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 
-	// Close button
-	closeButton: {
-		backgroundColor: '#0c7c7c',
-		borderRadius: 14,
-		paddingVertical: 14,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginTop: 8,
-		marginBottom: 4,
-		shadowColor: '#0c7c7c',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.3,
-		shadowRadius: 8,
-		elevation: 6,
-	},
-	closeButtonText: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#ffffff',
-		letterSpacing: 0.3,
-	},
+
 })

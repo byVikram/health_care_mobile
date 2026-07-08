@@ -4,7 +4,7 @@
 // All business logic (fetching, sorting, status labels, action handling,
 // reschedule flow) is preserved exactly. UI uses React Native primitives.
 
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import {
   Animated,
   Easing,
   Image,
-  useWindowDimensions,
 } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -27,19 +26,11 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { Appointment } from '../../types/appointment'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
-import DateSlotPicker from '../../components/common/DateSlotPicker'
 import { AppBottomSheet } from '../../components/common/AppBottomSheet'
 import { AppInput } from '../../components/common/AppInput'
 import { AppSelect, AppSelectOption, AppTypography, AppCalendar } from '../../components/common'
-import {
-  getDoctorAvailability,
-  getDoctorById,
-  rescheduleAppointment,
-  type SlotGroup,
-  type TimeSlot,
-} from '../doctor/doctorService'
 import AppointmentHistoryTab from './components/AppointmentHistoryTab'
-import { yellow100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors'
+import RescheduleModal, { type RescheduleResult } from './components/RescheduleModal'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -78,39 +69,6 @@ interface AppointmentRow {
   hospitalAddress: string | null
   hospitalId: string | null
   fees: number | null
-}
-
-type RescheduleAppointmentMode = 'clinic' | 'video'
-
-type RescheduleHospital = {
-  id: string
-  label: string
-  address?: string
-}
-
-type AvailabilityApiSlot = {
-  start_time?: string
-  end_time?: string
-  status?: TimeSlot['status'] | string
-  is_enabled?: boolean
-  is_booked?: boolean
-  can_toggle?: boolean
-}
-
-type AvailabilityApiSession = {
-  label?: string
-  range?: string
-  period?: string
-  slots?: AvailabilityApiSlot[]
-}
-
-type AvailabilityApiModeGroup = {
-  appointment_mode?: string
-  sessions?: AvailabilityApiSession[]
-  label?: string
-  range?: string
-  period?: string
-  slots?: AvailabilityApiSlot[]
 }
 
 interface AppointmentsResponse {
@@ -167,67 +125,13 @@ function getStatusColor(status: string): { bg: string; text: string } {
   return { bg: '#f3e5f5', text: '#6a1b9a' }
 }
 
-function toApiDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+// Filter "Date" values come back from AppCalendar as "DD-MM-YYYY"; appointment
+// rows carry API-formatted "YYYY-MM-DD" dates, so convert before comparing.
+function convertDisplayDateToApiDate(displayDate: string): string | null {
+  const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(displayDate)
+  if (!match) return null
+  const [, day, month, year] = match
   return `${year}-${month}-${day}`
-}
-
-function getRescheduleModeKey(appointmentType: RescheduleAppointmentMode): string {
-  return appointmentType === 'video' ? 'video_call' : 'clinic_visit'
-}
-
-function getSlotStatus(slot: AvailabilityApiSlot): TimeSlot['status'] {
-  const status = typeof slot.status === 'string' ? slot.status.toUpperCase() : ''
-
-  if (slot.is_booked || status === 'OCCUPIED') return 'OCCUPIED'
-  if (slot.is_enabled === false || status === 'UNAVAILABLE') return 'UNAVAILABLE'
-  if (status === 'BLOCKED') return 'BLOCKED'
-  if (status === 'BOOKED') return 'BOOKED'
-  return 'AVAILABLE'
-}
-
-function normalizeAvailabilitySlots(
-  response: SlotGroup[] | { data?: AvailabilityApiModeGroup[] } | null | undefined,
-  appointmentType: RescheduleAppointmentMode
-): SlotGroup[] {
-  const rawData = (
-    Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : []
-  ) as AvailabilityApiModeGroup[]
-  const modeKey = getRescheduleModeKey(appointmentType)
-
-  return rawData
-    .filter((item) => !item.appointment_mode || item.appointment_mode.toLowerCase() === modeKey)
-    .flatMap((item, itemIndex) => {
-      const sessions =
-        Array.isArray(item.sessions) && item.sessions.length > 0
-          ? item.sessions
-          : [{ label: item.label, range: item.range, period: item.period, slots: item.slots }]
-
-      return sessions
-        .map((session, sessionIndex): SlotGroup => {
-          const label = session.label || `Session ${sessionIndex + 1}`
-
-          return {
-            label,
-            range: session.range,
-            period: session.period || session.range,
-            slots: (session.slots ?? [])
-              .filter((slot) => Boolean(slot.start_time && slot.end_time))
-              .map((slot, slotIndex): TimeSlot => ({
-                id: `${modeKey}-${itemIndex}-${label}-${slot.start_time}-${slotIndex}`,
-                start_time: slot.start_time as string,
-                end_time: slot.end_time as string,
-                status: getSlotStatus(slot),
-                is_enabled: slot.is_enabled,
-                is_booked: slot.is_booked,
-                can_toggle: slot.is_enabled === false ? false : slot.can_toggle,
-              })),
-          }
-        })
-        .filter((session) => session.slots.length > 0)
-    })
 }
 
 // ── Skeleton row ──────────────────────────────────────────────────────────────
@@ -317,9 +221,6 @@ function AppointmentCard({
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onViewDetails}>
-      {/* Status accent bar */}
-      {!terminal && <View style={[styles.cardAccent, { backgroundColor: textColor }]} />}
-
       <View style={styles.cardBody}>
         {/* Avatar + name row */}
         <View style={styles.cardTopRow}>
@@ -345,13 +246,22 @@ function AppointmentCard({
 
         {/* Date / time / mode row */}
         <View style={styles.cardMeta}>
-          <Text style={styles.cardMetaText}>📅 {row.appointmentDate}</Text>
-          <Text style={styles.cardMetaText}>  🕐 {formatTime(row.startTime)}{row.endTime ? ' – ' + formatTime(row.endTime) : ''}</Text>
+          <View style={styles.metaIconGroup}>
+            <MaterialCommunityIcons name="calendar-blank-outline" size={13} color="#6b7280" />
+            <Text style={styles.cardMetaText}>{row.appointmentDate}</Text>
+          </View>
+          <View style={[styles.metaIconGroup, styles.metaIconGroupSpaced]}>
+            <MaterialCommunityIcons name="clock-outline" size={13} color="#6b7280" />
+            <Text style={styles.cardMetaText}>{formatTime(row.startTime)}{row.endTime ? ' – ' + formatTime(row.endTime) : ''}</Text>
+          </View>
         </View>
         <View style={styles.cardMeta}>
-          <Text style={styles.cardMetaText} numberOfLines={1}>
-            🏥 {row.appointmentMode?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-          </Text>
+          <View style={styles.metaIconGroup}>
+            <MaterialCommunityIcons name="hospital-box-outline" size={13} color="#6b7280" />
+            <Text style={styles.cardMetaText} numberOfLines={1}>
+              {row.appointmentMode?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+            </Text>
+          </View>
           {row.fees != null && (
             <Text style={styles.cardFee}>  ₹{row.fees}</Text>
           )}
@@ -359,9 +269,12 @@ function AppointmentCard({
 
         {/* Hospital */}
         {row.hospitalName && (
-          <Text style={styles.cardHospital} numberOfLines={1}>
-            📍 {row.hospitalName}
-          </Text>
+          <View style={styles.cardHospitalRow}>
+            <MaterialCommunityIcons name="map-marker-outline" size={13} color="#6b7280" />
+            <Text style={styles.cardHospital} numberOfLines={1}>
+              {row.hospitalName}
+            </Text>
+          </View>
         )}
 
         {/* Action buttons (patient only, non-past, non-terminal) */}
@@ -415,9 +328,6 @@ interface AppointmentListProps {
 const PAGE_SIZE = 10
 
 export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListProps) {
-  const { width, height } = useWindowDimensions()
-  const isTablet = width >= 768
-  const isLandscape = width > height
   const [viewAs, setViewAs] = useState<'doctor' | 'patient'>('patient')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -445,15 +355,6 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
 
   const [rescheduleOpen, setRescheduleOpen] = useState(false)
   const [rescheduleRow, setRescheduleRow] = useState<AppointmentRow | null>(null)
-  const [rescheduleDate, setRescheduleDate] = useState(new Date())
-  const [rescheduleTime, setRescheduleTime] = useState('')
-  const [rescheduleSlots, setRescheduleSlots] = useState<SlotGroup[]>([])
-  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
-  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false)
-  const [rescheduleHospitals, setRescheduleHospitals] = useState<RescheduleHospital[]>([])
-  const [rescheduleHospitalId, setRescheduleHospitalId] = useState('')
-  const [hospitalDropdownOpen, setHospitalDropdownOpen] = useState(false)
-  const [appointmentType, setAppointmentType] = useState<RescheduleAppointmentMode>('clinic')
 
   const confirmedStatusId = FALLBACK_CONFIRMED_STATUS_ID
   const rejectedStatusId = FALLBACK_REJECTED_STATUS_ID
@@ -471,76 +372,6 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
   }, [viewAsProp])
 
   // ── Fetch appointments ────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!rescheduleOpen || !rescheduleRow?.doctorId) return
-
-    let mounted = true
-
-    const fetchDoctorHospitals = async () => {
-      try {
-        const res = await getDoctorById(rescheduleRow.doctorId)
-        if (mounted && res.success && res.data) {
-          const hospitals = (res.data.hospitals ?? []).map((hospital) => ({
-            id: hospital.hospital.id,
-            label: hospital.hospital.name,
-            address: hospital.hospital.address,
-          }))
-
-          setRescheduleHospitals(hospitals)
-          setRescheduleHospitalId((current) => current || rescheduleRow.hospitalId || hospitals[0]?.id || '')
-        }
-      } catch (error) {
-        console.log('[AppointmentList] fetch doctor hospitals error:', error)
-      }
-    }
-
-    fetchDoctorHospitals()
-
-    return () => {
-      mounted = false
-    }
-  }, [rescheduleOpen, rescheduleRow])
-
-  useEffect(() => {
-    if (!rescheduleOpen || !rescheduleRow) return
-
-    const hospitalId = rescheduleHospitalId || rescheduleRow.hospitalId
-
-    if (!rescheduleRow.doctorId || !hospitalId) {
-      setRescheduleSlots([])
-      setRescheduleTime('')
-      return
-    }
-
-    let mounted = true
-
-    const fetchSlots = async () => {
-      setRescheduleSlotsLoading(true)
-      setRescheduleSlots([])
-      setRescheduleTime('')
-
-      try {
-        const responseData = await getDoctorAvailability({
-          doctor_id: rescheduleRow.doctorId,
-          hospital_id: hospitalId,
-          date: toApiDate(rescheduleDate),
-        })
-        if (mounted) setRescheduleSlots(normalizeAvailabilitySlots(responseData, appointmentType))
-      } catch (error) {
-        console.log('[AppointmentList] fetch reschedule slots error:', error)
-        if (mounted) Alert.alert('Error', 'Could not load available slots.')
-      } finally {
-        if (mounted) setRescheduleSlotsLoading(false)
-      }
-    }
-
-    fetchSlots()
-
-    return () => {
-      mounted = false
-    }
-  }, [appointmentType, rescheduleDate, rescheduleHospitalId, rescheduleOpen, rescheduleRow])
 
   const fetchAppointments = useCallback(
     async (targetPage = 1, isLoadMore = false) => {
@@ -640,7 +471,7 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
     try {
       const res = await updateAppointmentsStatus(row.id, confirmedStatusId)
       if (res.success) {
-        Toast.show({ type: 'success', text1: res.message || 'Appointment confirmed.' })
+        Toast.show({ type: 'success', text1: 'Appointment confirmed successfully.' })
         setRows((prev) =>
           prev.map((r) => (r.id === row.id ? { ...r, status: 'confirmed', rescheduledBy: null } : r))
         )
@@ -667,7 +498,7 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
     try {
       const res = await updateAppointmentsStatus(rowId, rejectedStatusId)
       if (res.success) {
-        Toast.show({ type: 'success', text1: res.message || 'Appointment rejected.' })
+        Toast.show({ type: 'success', text1: 'Appointment rejected successfully.' })
         setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, status: 'cancelled' } : r)))
       }
     } catch {
@@ -678,9 +509,7 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
   }
 
   const closeReschedule = () => {
-    if (rescheduleSubmitting) return
     setRescheduleOpen(false)
-    setHospitalDropdownOpen(false)
   }
 
   const handleRescheduleClick = (row: AppointmentRow) => {
@@ -690,82 +519,31 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
     }
 
     setRescheduleRow(row)
-    setRescheduleDate(new Date())
-    setRescheduleTime('')
-    setRescheduleSlots([])
-    setRescheduleHospitals([])
-    setHospitalDropdownOpen(false)
-    setRescheduleHospitalId(row.hospitalId ?? '')
-    setAppointmentType(row.appointmentMode?.toLowerCase().includes('video') ? 'video' : 'clinic')
     setRescheduleOpen(true)
   }
 
-  const handleRescheduleDateChange = (date: Date) => {
-    setRescheduleDate(date)
-    setRescheduleTime('')
-    setRescheduleSlots([])
-  }
-
-  const handleRescheduleConfirm = async () => {
+  const handleRescheduled = (result: RescheduleResult) => {
     if (!rescheduleRow) return
 
-    if (!rescheduleTime) {
-      Alert.alert('Select time', 'Please select a time slot before confirming.')
-      return
-    }
+    setRows((prev) =>
+      prev.map((row) => {
+        if (row.id !== rescheduleRow.id) return row
+        const wasPending = (row.status || '').toLowerCase() === 'pending'
 
-    const hospitalId = rescheduleHospitalId || rescheduleRow.hospitalId
-    if (!hospitalId) {
-      Alert.alert('Select hospital', 'Please select a hospital before confirming.')
-      return
-    }
-
-    const dateStr = toApiDate(rescheduleDate)
-    const selectedSlot = rescheduleSlots.flatMap((group) => group.slots).find((slot) => slot.start_time === rescheduleTime)
-
-    setRescheduleSubmitting(true)
-    try {
-      const res = await rescheduleAppointment({
-        appointment_id: rescheduleRow.id,
-        appointment_date: dateStr,
-        start_time: rescheduleTime,
-        end_time: selectedSlot?.end_time ?? null,
-        hospital_id: hospitalId,
-        reason: 'Doctor unavailable',
+        return {
+          ...row,
+          appointmentDate: result.appointmentDate,
+          startTime: result.startTime,
+          endTime: result.endTime ?? row.endTime,
+          hospitalId: result.hospitalId,
+          hospitalName: result.hospitalName ?? row.hospitalName,
+          hospitalAddress: result.hospitalAddress ?? row.hospitalAddress,
+          status: wasPending ? row.status : result.status,
+          rescheduledBy: wasPending ? row.rescheduledBy : 'patient',
+        }
       })
-
-      if (res.success) {
-        Toast.show({ type: 'success', text1: res.message || 'Appointment rescheduled.' })
-        setRows((prev) =>
-          prev.map((row) => {
-            if (row.id !== rescheduleRow.id) return row
-            const wasPending = (row.status || '').toLowerCase() === 'pending'
-            const selectedHospital = rescheduleHospitals.find((hospital) => hospital.id === hospitalId)
-
-            return {
-              ...row,
-              appointmentDate: dateStr,
-              startTime: rescheduleTime,
-              endTime: selectedSlot?.end_time ?? row.endTime,
-              hospitalId,
-              hospitalName: selectedHospital?.label ?? row.hospitalName,
-              hospitalAddress: selectedHospital?.address ?? row.hospitalAddress,
-              status: wasPending ? row.status : 'rescheduled',
-              rescheduledBy: wasPending ? row.rescheduledBy : 'patient',
-            }
-          })
-        )
-        setRescheduleOpen(false)
-        setHospitalDropdownOpen(false)
-      } else {
-        Toast.show({ type: 'error', text1: res.message || 'Reschedule failed. Please try again.' })
-      }
-    } catch (error: any) {
-      console.log('[AppointmentList] reschedule appointment error:', error?.response?.data || error?.message || error)
-      Toast.show({ type: 'error', text1: 'Something went wrong. Please try again.' })
-    } finally {
-      setRescheduleSubmitting(false)
-    }
+    )
+    setRescheduleOpen(false)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -792,22 +570,25 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
       </View>
     ) : null
 
-  const selectedHospitalLabel =
-    rescheduleHospitals.find((hospital) => hospital.id === rescheduleHospitalId)?.label ||
-    rescheduleRow?.hospitalName ||
-    'Choose Hospital'
-  const canConfirmReschedule = Boolean(
-    rescheduleRow &&
-      rescheduleDate &&
-      rescheduleTime &&
-      (rescheduleHospitalId || rescheduleRow.hospitalId) &&
-      !rescheduleSlotsLoading &&
-      !rescheduleSubmitting
-  )
-  const rescheduleColumns = isTablet || isLandscape ? 4 : 3
-
   const hasActiveFilters =
     filterHospital !== 'all' || filterMode !== 'all' || filterDate !== ''
+
+  const filteredRows = useMemo(() => {
+    const apiFilterDate = filterDate ? convertDisplayDateToApiDate(filterDate) : null
+
+    return rows.filter((row) => {
+      if (filterHospital !== 'all' && !(row.hospitalName ?? '').toLowerCase().includes(filterHospital)) {
+        return false
+      }
+      if (filterMode !== 'all' && !(row.appointmentMode ?? '').toLowerCase().includes(filterMode)) {
+        return false
+      }
+      if (apiFilterDate && row.appointmentDate !== apiFilterDate) {
+        return false
+      }
+      return true
+    })
+  }, [rows, filterHospital, filterMode, filterDate])
 
   const openFilterSheet = () => {
     setDraftFilterHospital(filterHospital)
@@ -915,12 +696,14 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
         </View>
       ) : (
         <FlatList
-          data={rows}
+          data={filteredRows}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No appointments found</Text>
+              <Text style={styles.emptyText}>
+                {hasActiveFilters ? 'No appointments match your filters' : 'No appointments found'}
+              </Text>
             </View>
           }
           contentContainerStyle={styles.listContent}
@@ -1003,6 +786,17 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
           setDetailsAppointmentId(null)
         }}
         appointmentId={detailsAppointmentId}
+        viewAs={viewAs}
+      />
+
+      <RescheduleModal
+        visible={rescheduleOpen}
+        onClose={closeReschedule}
+        appointmentId={rescheduleRow?.id ?? ''}
+        doctorId={rescheduleRow?.doctorId}
+        hospitalId={rescheduleRow?.hospitalId}
+        isVirtual={rescheduleRow?.appointmentMode?.toLowerCase().includes('video')}
+        onRescheduled={handleRescheduled}
       />
     </View>
   )
@@ -1211,9 +1005,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#f3f4f6',
   },
-  cardAccent: {
-    height: 3,
-  },
+
   cardBody: {
     padding: 14,
     gap: 6,
@@ -1277,6 +1069,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  metaIconGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaIconGroupSpaced: {
+    marginLeft: 12,
+  },
   cardMetaText: {
     fontSize: 12,
     color: '#6b7280',
@@ -1285,10 +1085,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
   },
+  cardHospitalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
   cardHospital: {
     fontSize: 12,
     color: '#6b7280',
-    marginTop: 2,
   },
   // Action buttons
   actionRow: {
