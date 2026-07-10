@@ -10,7 +10,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   StyleSheet,
   FlatList,
   Modal,
@@ -44,6 +43,13 @@ import {
   type SlotGroup,
   type FavouriteDoctor,
 } from './doctorService'
+
+// ── Action icons ──────────────────────────────────────────────────────────────
+
+import ConfirmIcon from '../../assets/icons/confirm.svg'
+import RejectIcon from '../../assets/icons/reject.svg'
+import RescheduleIcon from '../../assets/icons/reschedule.svg'
+import ReferIcon from '../../assets/icons/refer.svg'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -578,7 +584,7 @@ export function DoctorAppointments({
     try {
       const res = await updateAppointmentsStatus(appointmentId, '3f9a2c8e-7b61-4d2a-9a3f-5c8e1b2d4f90')
       if (res.success) {
-        Toast.show({ type: 'success', text1: 'Appointment confirmed successfully.' })
+        Toast.show({ type: 'success', text1: res.message })
         setLocalStatuses((prev) => ({ ...prev, [appointmentId]: 'confirmed' }))
       }
     } catch {
@@ -602,7 +608,9 @@ export function DoctorAppointments({
     try {
       const res = await updateAppointmentsStatus(pendingRejectId, 'a7d4e1c2-9f6b-4c83-b2e1-6f3a9d8c7b12')
       if (res.success) {
-        Toast.show({ type: 'success', text1: 'Appointment rejected successfully.' })
+        // Rejection uses a visually distinct toast (red left border) while
+        // still reusing the shared BaseToast styling from the design system.
+        Toast.show({ type: 'rejectSuccess', text1: res.message })
         setLocalStatuses((prev) => ({ ...prev, [pendingRejectId!]: 'cancelled' }))
       }
     } catch {
@@ -727,10 +735,10 @@ export function DoctorAppointments({
     const video = isVideoMode(apt.appointment_mode)
 
     const allActionButtons = [
-      { label: 'Confirm', action: 'confirm', bg: '#e8f5e9', color: '#4caf50' },
-      { label: 'Reject', action: 'reject', bg: '#ffeeee', color: '#e53935' },
-      { label: 'Reschedule', action: 'reschedule', bg: '#fff8e8', color: '#f59e0b' },
-      { label: 'Refer', action: 'refer', bg: '#e8f4f8', color: '#0c7c7c' },
+      { label: 'Confirm', action: 'confirm', bg: '#e8f5e9', Icon: ConfirmIcon },
+      { label: 'Reject', action: 'reject', bg: '#ffeeee', Icon: RejectIcon },
+      { label: 'Reschedule', action: 'reschedule', bg: '#fff8e8', Icon: RescheduleIcon },
+      { label: 'Refer', action: 'refer', bg: '#e8f4f8', Icon: ReferIcon },
     ]
 
     const visibleActions = allActionButtons.filter(
@@ -795,22 +803,33 @@ export function DoctorAppointments({
           {/* Action buttons */}
           {!isCancelled && (
             <View style={styles.aptActionRow}>
-              {visibleActions.map((btn) => (
-                <TouchableOpacity
-                  key={btn.action}
-                  style={[styles.aptActionBtn, { backgroundColor: btn.bg }]}
-                  onPress={(e) => {
-                    // Prevent triggering the card's onPress
-                    if (btn.action === 'confirm') handleConfirmAppointment(apt.id)
-                    else if (btn.action === 'reject') handleRejectClick(apt.id)
-                    else if (btn.action === 'reschedule') handleRescheduleClick(apt)
-                    else if (btn.action === 'refer') handleReferClick(apt.id)
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.aptActionBtnText, { color: btn.color }]}>{btn.label}</Text>
-                </TouchableOpacity>
-              ))}
+              {visibleActions.map((btn) => {
+                const ActionIcon = btn.Icon
+                return (
+                  <TouchableOpacity
+                    key={btn.action}
+                    style={styles.aptActionItem}
+                    onPress={() => {
+                      // Prevent triggering the card's onPress
+                      if (btn.action === 'confirm') handleConfirmAppointment(apt.id)
+                      else if (btn.action === 'reject') handleRejectClick(apt.id)
+                      else if (btn.action === 'reschedule') handleRescheduleClick(apt)
+                      else if (btn.action === 'refer') handleReferClick(apt.id)
+                    }}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={btn.label}
+                  >
+                    <View style={[styles.aptActionIconBox, { backgroundColor: btn.bg }]}>
+                      <ActionIcon width={18} height={18} />
+                    </View>
+                    <Text style={styles.aptActionLabel} numberOfLines={1}>
+                      {btn.label}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
             </View>
           )}
         </View>
@@ -822,19 +841,35 @@ export function DoctorAppointments({
 
   return (
     <View style={styles.container}>
-      {/* Search */}
-      <View style={styles.searchSection}>
-        <Text style={styles.searchLabel}>Search Patient</Text>
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search Patient ID, Name..."
-            placeholderTextColor="#9ca3af"
+      {/* Search — reuses the same AppInput-based search field as the All Appointments tab */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchInputWrap}>
+          <AppInput
             value={searchQuery}
             onChangeText={setSearchQuery}
+            placeholder="Search Patient ID, Name..."
+            placeholderTextColor="#98a1aa"
+            containerStyle={styles.searchInputContainer}
+            style={styles.searchInput}
+            contentStyle={styles.searchInputContent}
+            outlineStyle={styles.searchInputOutline}
+            outlineColor="#2e7b7d"
+            activeOutlineColor="#2e7b7d"
+            textColor="#1b2d3c"
+            left={<AppInput.Icon icon="magnify" size={22} color="#9b9b9b" />}
+            right={
+              searchQuery.length > 0 ? (
+                <AppInput.Icon
+                  icon="close-circle"
+                  size={20}
+                  color="#9b9b9b"
+                  onPress={() => setSearchQuery('')}
+                />
+              ) : undefined
+            }
+            autoCorrect={false}
             returnKeyType="search"
-            clearButtonMode="while-editing"
+            noMargin
           />
         </View>
       </View>
@@ -1083,41 +1118,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  // Search
-  searchSection: {
+  // Search — matches the AppointmentList (All Appointments) search field
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
   },
-  searchLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
+  searchInputWrap: {
+    flex: 1,
   },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
+  searchInputContainer: {
+    width: '100%',
   },
   searchInput: {
-    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  searchInputContent: {
+    height: 48,
+    minHeight: 48,
+    paddingVertical: 0,
     fontSize: 14,
-    color: '#111827',
+  },
+  searchInputOutline: {
+    borderRadius: 12,
   },
   // Week selector
   weekHeader: {
@@ -1226,7 +1252,6 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   // Appointment card
-  // Appointment card
   aptCard: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
@@ -1314,18 +1339,27 @@ const styles = StyleSheet.create({
   },
   aptActionRow: {
     flexDirection: 'row',
-    gap: 6,
-    marginTop: 8,
+    gap: 16,
+    marginTop: 10,
     flexWrap: 'wrap',
   },
-  aptActionBtn: {
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  aptActionItem: {
+    alignItems: 'center',
+    minWidth: 48,
   },
-  aptActionBtnText: {
-    fontSize: 11,
+  aptActionIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aptActionLabel: {
+    fontSize: 10,
     fontWeight: '600',
+    color: '#3949ab',
+    marginTop: 4,
+    textAlign: 'center',
   },
   // Reject modal
   rejectBackdrop: {
