@@ -1,7 +1,18 @@
 // src/features/appointment/components/AppointmentHistoryTab.tsx
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Animated, Easing, Image, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import {
+	Animated,
+	Easing,
+	Image,
+	Linking,
+	Platform,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppBottomSheet } from '../../../components/common/AppBottomSheet'
 import { getAppointmentById } from '../../../services/appointmentService'
@@ -334,7 +345,7 @@ export default function AppointmentHistoryTab({ open, onClose, appointmentId, vi
 		: ''
 
 	return (
-		<AppBottomSheet visible={open} title="Appointment Details" onClose={onClose} maxHeightRatio={0.92}>
+		<AppBottomSheet visible={open} title="Appointment Details" onClose={onClose} maxHeightRatio={0.92} scrollEnabled={false}>
 			{loading && <DrawerSkeleton />}
 
 			{error && !loading && (
@@ -464,17 +475,17 @@ export default function AppointmentHistoryTab({ open, onClose, appointmentId, vi
 						<Text style={styles.historySectionTitle}>Appointment History</Text>
 						<View style={styles.historyScrollBox}>
 							<ScrollView
-								nestedScrollEnabled
+								nestedScrollEnabled={true}
 								showsVerticalScrollIndicator={true}
 								indicatorStyle="black"
 								persistentScrollbar={true}
+								scrollEventThrottle={16}
 								contentContainerStyle={styles.historyScrollContent}
 							>
 								<HistoryTimeline entries={appt.history ?? []} />
 							</ScrollView>
 						</View>
 					</View>
-
 
 				</View>
 			)}
@@ -625,12 +636,13 @@ const styles = StyleSheet.create({
 		marginBottom: 12,
 	},
 	historyScrollBox: {
-		maxHeight: 220,
+		minHeight: 80,
+		maxHeight: 240,
 		borderWidth: 1,
 		borderColor: '#e5e7eb',
 		borderRadius: 10,
 		backgroundColor: '#f9fafb',
-		overflow: 'hidden',
+		// NOTE: overflow must NOT be 'hidden' — that clips the scrollbar indicator
 	},
 	historyContainer: {
 		marginTop: 4,

@@ -20,6 +20,12 @@ export type AppBottomSheetProps = {
 	onClose: () => void
 	children: React.ReactNode
 	maxHeightRatio?: number
+	/**
+	 * When false the sheet's own ScrollView is replaced with a plain View,
+	 * allowing the child to own all scrolling behaviour independently.
+	 * Defaults to true (existing behaviour is preserved for all other callers).
+	 */
+	scrollEnabled?: boolean
 }
 
 const DISMISS_DRAG_DISTANCE = 84
@@ -32,6 +38,7 @@ export function AppBottomSheet({
 	onClose,
 	children,
 	maxHeightRatio = MAX_HEIGHT_RATIO,
+	scrollEnabled = true,
 }: AppBottomSheetProps) {
 	const { height } = useWindowDimensions()
 	const closedOffset = height
@@ -140,17 +147,20 @@ export function AppBottomSheet({
 						>
 							{children}
 						</ScrollView> */}
-						<ScrollView
-							style={styles.sheetScroll}
-							showsVerticalScrollIndicator={false}
-							contentContainerStyle={[
-								styles.sheetContent,
-								{ paddingHorizontal: 22 }, // add this
-							]}
-						>
-							{children}
-						</ScrollView>
-						{/* <View style={styles.sheetContent}>{children}</View> */}
+						{scrollEnabled ? (
+							<ScrollView
+								style={styles.sheetScroll}
+								showsVerticalScrollIndicator={false}
+								contentContainerStyle={[
+									styles.sheetContent,
+									{ paddingHorizontal: 22 },
+								]}
+							>
+								{children}
+							</ScrollView>
+						) : (
+							<View style={[styles.sheetScroll, styles.sheetContent]}>{children}</View>
+						)}
 					</Pressable>
 				</Animated.View>
 			</Pressable>
