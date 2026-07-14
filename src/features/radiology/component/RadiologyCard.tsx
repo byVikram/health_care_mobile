@@ -2,7 +2,6 @@
 import React from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, ImageSourcePropType } from 'react-native'
 import { RadiologyItem } from '../radiology'
-import { formatPrice, getPricingModelLabel, getPricingModelColor } from '../RadiologyService'
 
 import pharmacy2 from '../../../assets/Pharmacy/pharmacy2.png'
 import pharmacy3 from '../../../assets/Pharmacy/pharmacy3.png'
@@ -37,16 +36,12 @@ export default function RadiologyCard({ radiology, layout = 'vertical', onPress,
 		address,
 		city,
 		state,
-
-		pricing_model,
-		price_details,
 		is_available,
 		rating,
 		reviews,
 	} = radiology
 
 	const isHorizontal = layout === 'horizontal'
-	const pricingColor = getPricingModelColor(pricing_model)
 
 	return (
 		<TouchableOpacity
@@ -66,11 +61,9 @@ export default function RadiologyCard({ radiology, layout = 'vertical', onPress,
 
 			{/* CONTENT */}
 			<View style={styles.content}>
-				<Text style={styles.name} numberOfLines={1}>
+				<Text style={styles.name} numberOfLines={2}>
 					{name}
 				</Text>
-
-				{/* <Text style={styles.scanName}>{scan_name}</Text> */}
 
 				<Text style={styles.subText}>
 					📍 {city}, {state}
@@ -87,20 +80,6 @@ export default function RadiologyCard({ radiology, layout = 'vertical', onPress,
 						<Text style={styles.reviews}>({reviews} reviews)</Text>
 					</View>
 				)} */}
-
-				{/* Pricing */}
-				<View style={styles.priceContainer}>
-					<Text style={[styles.priceLabel, { color: pricingColor }]}>
-						{getPricingModelLabel(pricing_model)}
-					</Text>
-					<Text style={styles.price}>{formatPrice(radiology)}</Text>
-				</View>
-
-				{price_details && (
-					<Text style={styles.priceDetails} numberOfLines={1}>
-						{price_details}
-					</Text>
-				)}
 
 				{/* Book Button */}
 				<TouchableOpacity
@@ -167,12 +146,6 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#082b45',
 	},
-	scanName: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: '#2B6F71',
-		marginTop: 2,
-	},
 	subText: {
 		fontSize: 12,
 		color: '#5b7282',
@@ -192,25 +165,6 @@ const styles = StyleSheet.create({
 	reviews: {
 		fontSize: 11,
 		color: '#667085',
-	},
-	priceContainer: {
-		flexDirection: 'row',
-		alignItems: 'baseline',
-		marginTop: 4,
-		gap: 8,
-	},
-	priceLabel: {
-		fontSize: 11,
-		fontWeight: '600',
-	},
-	price: {
-		fontSize: 11,
-		fontWeight: '600',
-	},
-	priceDetails: {
-		fontSize: 11,
-		color: '#667085',
-		marginTop: 2,
 	},
 	button: {
 		backgroundColor: '#2B6F71',

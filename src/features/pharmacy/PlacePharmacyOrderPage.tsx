@@ -26,6 +26,7 @@ import {
 	AppInput,
 	AppSelect,
 	AppTypography,
+	ProviderDetailsCard,
 	StatusModal,
 	AppModal,
 } from '../../components/common'
@@ -36,6 +37,11 @@ import { PatientAddress, TreatmentRecord, createPatientAddress, createPharmacyOr
 import { getPatientAddresses, getPatientTreatmentHistory } from '../profile/pharmacy/pharmacyService'
 
 type RouteProps = RouteProp<AppStackParamList, typeof ROUTES.STACK.PLACE_PHARMACY_ORDER>
+
+const formatProviderHours = (hours?: { open?: string; close?: string }) => {
+	if (!hours?.open || !hours?.close) return undefined
+	return [{ label: 'Daily', value: `${hours.open} - ${hours.close}` }]
+}
 
 // const S3_BASE_URL =
 // 	process.env.EXPO_PUBLIC_S3_BASE_URL ||
@@ -55,7 +61,16 @@ export default function PlacePharmacyOrderPage() {
 	const route = useRoute<RouteProps>()
 	const insets = useSafeAreaInsets()
 	const { user } = useAuth()
-	const { pharmacyId, pharmacyName } = route.params
+	const {
+		pharmacyId,
+		pharmacyName,
+		pharmacyAddress,
+		pharmacyCity,
+		pharmacyPhone,
+		pharmacyAvatarKey,
+		pharmacyOperatingHours,
+		pharmacyIs24x7,
+	} = route.params
 
 	// Consultation / Treatment States
 	const [treatments, setTreatments] = useState<TreatmentRecord[]>([])
@@ -249,18 +264,18 @@ export default function PlacePharmacyOrderPage() {
 				contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 100, 120) }]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Pharmacy Banner Card */}
-				<View style={styles.pharmacyBanner}>
-					<MaterialCommunityIcons name="store-plus" size={32} color="#1f5f68" />
-					<View style={styles.pharmacyDetails}>
-						<AppTypography variant="caption" style={styles.pharmacyLabel}>
-							Ordering Medicines From
-						</AppTypography>
-						<AppTypography variant="h3" style={styles.pharmacyTitle}>
-							{pharmacyName}
-						</AppTypography>
-					</View>
-				</View>
+				<ProviderDetailsCard
+					name={pharmacyName}
+					subtitle="Ordering Medicines From"
+					icon="store-plus"
+					imageUri={buildS3Url(pharmacyAvatarKey) || undefined}
+					address={pharmacyAddress}
+					city={pharmacyCity}
+					phone={pharmacyPhone}
+					hours={pharmacyIs24x7 ? undefined : formatProviderHours(pharmacyOperatingHours)}
+					is24x7={pharmacyIs24x7}
+					accentColor="#1f5f68"
+				/>
 
 				{/* STEP 1: Select Consultation */}
 				<View style={styles.sectionCard}>

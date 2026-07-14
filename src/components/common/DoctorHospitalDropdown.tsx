@@ -3,17 +3,16 @@ import {
   View,
   Text,
   Pressable,
-  Modal,
-  FlatList,
-  TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  TouchableOpacity,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import axios from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { useAuth } from '../../context/AuthContext'
+import AppBottomSheet from './AppBottomSheet'
 
 interface HospitalItem {
   id: string
@@ -28,8 +27,6 @@ export default function DoctorHospitalDropdown() {
   const [selectedHospitalLocal, setSelectedHospitalLocal] = useState<HospitalItem | null>(null)
   const [dropdownVisible, setDropdownVisible] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 })
-  const buttonRef = React.useRef<any>(null)
 
   // ── Pull BOTH setters from context ────────────────────────────────────────
   const { setSelectedHospital, setSelectedHospitalId } = useAuth() as any
@@ -76,12 +73,7 @@ export default function DoctorHospitalDropdown() {
   }
 
   const openDropdown = () => {
-    buttonRef.current?.measure(
-      (_fx: number, _fy: number, width: number, height: number, px: number, py: number) => {
-        setDropdownPos({ top: py + height, left: px, width })
-        setDropdownVisible(true)
-      }
-    )
+    setDropdownVisible(true)
   }
 
   const handleSelect = (item: HospitalItem) => {
@@ -94,7 +86,7 @@ export default function DoctorHospitalDropdown() {
   return (
     <>
       {/* ── Selector button ───────────────────────────────────────────────── */}
-      <Pressable ref={buttonRef} style={styles.selector} onPress={openDropdown}>
+      <Pressable style={styles.selector} onPress={openDropdown}>
         <MaterialCommunityIcons name="map-marker-outline" size={16} color="#fff" />
         <Text style={styles.selectorText} numberOfLines={1}>
           {selectedHospitalLocal?.label || (loading ? 'Loading...' : 'Select Hospital')}
@@ -105,42 +97,70 @@ export default function DoctorHospitalDropdown() {
         <MaterialCommunityIcons name="chevron-down" size={18} color="#fff" />
       </Pressable>
 
-      {/* ── Dropdown modal ────────────────────────────────────────────────── */}
-      <Modal visible={dropdownVisible} transparent animationType="fade">
-        <Pressable style={styles.modalOverlay} onPress={() => setDropdownVisible(false)}>
-          <View
-            style={[
-              styles.dropdownBox,
-              { top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width },
-            ]}
-          >
-            {loading ? (
-              <View style={styles.centerBox}>
-                <ActivityIndicator color={PRIMARY} />
-              </View>
-            ) : (
-              <FlatList
-                data={hospitals}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.dropdownItem,
-                      selectedHospitalLocal?.id === item.id && { backgroundColor: `${PRIMARY}15` },
-                    ]}
-                    onPress={() => handleSelect(item)}
-                  >
-                    <Text style={styles.dropdownTitle}>{item.label}</Text>
-                    {!!item.address && (
-                      <Text style={styles.dropdownAddress}>{item.address}</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-              />
-            )}
+      {/* ── Dropdown bottom sheet ─────────────────────────────────────────── */}
+      <AppBottomSheet
+        visible={dropdownVisible}
+        title="Select Clinic / Hospital"
+        onClose={() => setDropdownVisible(false)}
+      >
+        {loading ? (
+          <View style={styles.centerBox}>
+            <ActivityIndicator color={PRIMARY} size="large" />
           </View>
-        </Pressable>
-      </Modal>
+        ) : hospitals.length === 0 ? (
+          <View style={styles.centerBox}>
+            <Text style={styles.noHospitalsText}>No hospitals assigned</Text>
+          </View>
+        ) : (
+          <View style={styles.bottomSheetList}>
+            {hospitals.map((item) => {
+              const isSelected = selectedHospitalLocal?.id === item.id
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.bottomSheetItem,
+                    isSelected && styles.bottomSheetItemActive,
+                  ]}
+                  onPress={() => handleSelect(item)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.itemHeader}>
+                    <View style={[
+                      styles.iconCircle,
+                      isSelected ? styles.iconCircleActive : styles.iconCircleInactive
+                    ]}>
+                      <MaterialCommunityIcons 
+                        name="hospital-building" 
+                        size={20} 
+                        color={isSelected ? '#ffffff' : '#64748b'} 
+                      />
+                    </View>
+                    <View style={styles.itemTextContent}>
+                      <Text style={[
+                        styles.itemTitle,
+                        isSelected && styles.itemTitleActive
+                      ]}>
+                        {item.label}
+                      </Text>
+                      {!!item.address && (
+                        <Text style={styles.itemAddress}>{item.address}</Text>
+                      )}
+                    </View>
+                    <View style={styles.selectionIndicator}>
+                      <MaterialCommunityIcons 
+                        name={isSelected ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"} 
+                        size={22} 
+                        color={isSelected ? PRIMARY : '#cbd5e1'} 
+                      />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        )}
+      </AppBottomSheet>
     </>
   )
 }
@@ -150,53 +170,91 @@ const styles = StyleSheet.create({
     marginTop: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#276668',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    maxWidth: 320,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    maxWidth: 240,
   },
   selectorText: {
     color: '#fff',
     fontSize: 13,
-    marginLeft: 8,
+    marginLeft: 6,
     flex: 1,
+    fontWeight: '500',
   },
   extraCount: {
     color: '#d8f3f5',
     fontSize: 12,
-    marginHorizontal: 6,
+    marginHorizontal: 4,
     fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-  },
-  dropdownBox: {
-    position: 'absolute', 
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    maxHeight: 300,
-    elevation: 10,
-    overflow: 'hidden',
-  },
-  dropdownItem: {
-    padding: 14,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#eee',
-  },
-  dropdownTitle: {
-    fontWeight: '600',
-    fontSize: 14,
-    color: '#222',
-  },
-  dropdownAddress: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
   },
   centerBox: {
-    padding: 20,
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noHospitalsText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  bottomSheetList: {
+    paddingVertical: 12,
+    gap: 12,
+  },
+  bottomSheetItem: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 14,
+  },
+  bottomSheetItemActive: {
+    backgroundColor: '#f0fdfa',
+    borderColor: PRIMARY,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconCircleInactive: {
+    backgroundColor: '#e2e8f0',
+  },
+  iconCircleActive: {
+    backgroundColor: PRIMARY,
+  },
+  itemTextContent: {
+    flex: 1,
+    gap: 2,
+  },
+  itemTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  itemTitleActive: {
+    color: PRIMARY,
+    fontWeight: '700',
+  },
+  itemAddress: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  selectionIndicator: {
+    justifyContent: 'center',
     alignItems: 'center',
   },
 })

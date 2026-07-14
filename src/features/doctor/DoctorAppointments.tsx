@@ -1,1876 +1,1568 @@
-import React, { useEffect, useState } from 'react'
+// src/features/doctor/DoctorAppointments.tsx
+//
+// React Native equivalent of the web DoctorAppointments component.
+// All business logic (status helpers, confirm/reject/reschedule flow,
+// local state overrides) is preserved exactly.
+
+import React, { useState, useEffect, useMemo } from 'react'
 import {
-	View,
-	Text,
-	TextInput,
-	ScrollView,
-	StyleSheet,
-	TouchableOpacity,
-	Pressable,
-	useWindowDimensions,
-	Alert,
-	Modal,
-	ActivityIndicator,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  Modal,
+  Pressable,
+  Alert,
+  Animated,
+  Easing,
+  Platform,
+  useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native'
 import Toast from 'react-native-toast-message'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useNavigation, type NavigationProp } from '@react-navigation/native'
-import { AppSkeleton } from '../../components/common'
-import {
-	getDoctorAvailability,
-	updateAppointmentsStatus,
-	rescheduleAppointment,
-	referAppointment,
-	getFavouriteDoctors,
-	toggleFavouriteDoctor,
-	getDoctors,
-	getDoctorById,
-	getDoctorProfile,
-	type FavouriteDoctor,
-	type SlotGroup,
-} from './doctorService'
-import { DateSlotPicker } from '../../components/common'
-import { APPOINTMENT_STATUS } from '../../constants/constants'
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import { useNavigation } from '@react-navigation/native'
 import { ROUTES } from '../../navigation/routes'
-import type { AppStackParamList } from '../../navigation/types'
-import { navigate as navigateRoot } from '../../navigation/navigationService'
-import DoctorHospitalDropdown from '../../components/common/DoctorHospitalDropdown'
-import { useAuth } from '../../context/AuthContext'
-import FavouriteDoctorList from './search/components/FavouriteDoctorList'
+import { Appointment } from '../../types/appointment'
+import { updateAppointmentsStatus } from '../../services/appointmentService'
+import ApiService from '../../services/apiService'
+import { API_ENDPOINTS } from '../../constants/apiUrls'
+import DateSlotPicker from '../../components/common/DateSlotPicker'
+import { AppInput } from '../../components/common'
+import FavouriteDoctorList, { type FavouriteDoctorListItem } from './search/components/FavouriteDoctorList'
+import {
+  getDoctorAvailability,
+  getDoctorProfile,
+  rescheduleAppointment,
+  startConsultation,
+  getFavouriteDoctors,
+  toggleFavouriteDoctor,
+  referAppointment,
+  type SlotGroup,
+  type FavouriteDoctor,
+} from './doctorService'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Action icons ──────────────────────────────────────────────────────────────
 
-type Appointment = {
-	id: string
-	doctor?: { id?: string }
-	doctor_id?: string
-	hospital?: { id?: string }
-	hospital_id?: string
-	patient: {
-		id: string
-		name: string
-		age: number
-		gender: string
-		sex?: string
-	}
-	age?: number
-	gender?: string
-	sex?: string
-	status: string | { label: string }
-	appointment_date: string
-	appointment_mode?: string
-	mode?: string
-	type?: string
-	start_time: string
-	end_time?: string
-	symptoms?: string | string[]
-	symptom?: string
-	symptom_description?: string
-	chief_complaint?: string
-	complaint?: string
+import ConfirmIcon from '../../assets/icons/confirm.svg'
+import RejectIcon from '../../assets/icons/reject.svg'
+import RescheduleIcon from '../../assets/icons/reschedule.svg'
+import ReferIcon from '../../assets/icons/refer.svg'
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const formatTime12h = (t?: string | null): string => {
+  if (!t) return '--'
+  const [h, m] = t.split(':').map(Number)
+  const suffix = h >= 12 ? 'PM' : 'AM'
+  const hour = h > 12 ? h - 12 : h === 0 ? 12 : h
+  return `${String(hour).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`
 }
 
-type ReferDoctor = {
-	id: string
-	name: string
-	avatar_s3_key: string | null
-	location: string | null
-	experience_years: number | null
-	specialities: string[]
-	is_verified?: boolean
+const isVideoMode = (mode?: string | null): boolean => mode === 'video_call'
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
+function SkeletonCard() {
+  const opacity = React.useRef(new Animated.Value(0.4)).current
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 700, easing: Easing.ease, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 700, easing: Easing.ease, useNativeDriver: true }),
+      ])
+    )
+    anim.start()
+    return () => anim.stop()
+  }, [opacity])
+
+  return (
+    <Animated.View style={[styles.skeletonCard, { opacity }]}>
+      <View style={styles.skeletonIcon} />
+      <View style={styles.skeletonContent}>
+        <View style={[styles.skeletonLine, { width: '60%' }]} />
+        <View style={[styles.skeletonLine, { width: '35%', marginTop: 6 }]} />
+      </View>
+    </Animated.View>
+  )
 }
 
-type DoctorAppointmentsProps = {
-	selectedDate: number
-	setSelectedDate: (i: number) => void
-	appointments: Appointment[]
-	apptLoading: boolean
-	apptError: string
-	weekDays: { day: string; date: string; red: boolean; dateObj: Date }[]
-	selectedDateObj: Date
+// ── Status chip ───────────────────────────────────────────────────────────────
+
+function getStatusChipStyle(
+  isCancelled: boolean,
+  isConfirmed: boolean,
+  isWaitingPatient: boolean
+): { bg: string; color: string } {
+  if (isCancelled) return { bg: '#ffeeee', color: '#e53935' }
+  if (isConfirmed) return { bg: '#e8f5e9', color: '#4caf50' }
+  if (isWaitingPatient) return { bg: '#fff3e0', color: '#e65100' }
+  return { bg: '#fff8e8', color: '#f59e0b' }
 }
 
-type AppointmentModeKey = 'clinic' | 'video'
-type AppointmentModeIcon = {
-	name: React.ComponentProps<typeof MaterialCommunityIcons>['name']
-	color: string
-	backgroundColor: string
+// ── Reject confirm modal ──────────────────────────────────────────────────────
+
+interface RejectModalProps {
+  visible: boolean
+  onCancel: () => void
+  onConfirm: () => void
 }
 
-type AvailabilityAppointmentMode = 'clinic_visit' | 'video_call' | 'offline' | 'online' | 'clinic' | 'video' | string
-
-type AvailabilityApiSlot = {
-	start_time?: string
-	end_time?: string
-	status?: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE' | 'BLOCKED' | 'OCCUPIED' | ''
-	is_enabled?: boolean
-	is_booked?: boolean
-	can_toggle?: boolean
+function RejectConfirmModal({ visible, onCancel, onConfirm }: RejectModalProps) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <Pressable style={styles.rejectBackdrop} onPress={onCancel} />
+      <View style={styles.rejectCard}>
+        <Text style={styles.rejectTitle}>Are you sure?</Text>
+        <Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
+        <View style={styles.rejectButtons}>
+          <TouchableOpacity style={styles.rejectCancelBtn} onPress={onCancel} activeOpacity={0.8}>
+            <Text style={styles.rejectCancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.rejectConfirmBtn} onPress={onConfirm} activeOpacity={0.8}>
+            <Text style={styles.rejectConfirmText}>Yes, Reject</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  )
 }
 
-type AvailabilityApiSession = {
-	label?: string
-	range?: string
-	period?: string
-	slots?: AvailabilityApiSlot[]
+// ── Week day selector ─────────────────────────────────────────────────────────
+
+interface WeekDay {
+  day: string
+  date: string
+  red: boolean
+  dateObj: Date
 }
 
-type AvailabilityApiModeGroup = {
-	appointment_mode?: AvailabilityAppointmentMode
-	sessions?: AvailabilityApiSession[]
-	label?: string
-	range?: string
-	period?: string
-	slots?: AvailabilityApiSlot[]
+interface WeekSelectorProps {
+  weekDays: WeekDay[]
+  selectedDate: number
+  onSelectDate: (i: number) => void
+  selectedDateObj: Date
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-const TEAL = '#1a8c8c'
-const DOCTOR_IMAGE_PLACEHOLDER = require('../../assets/Banner/doctor.png')
-
-const showSuccess = (message: string) =>
-	Toast.show({ type: 'success', text1: 'Success', text2: message })
-
-const showError = (message: string) =>
-	Toast.show({ type: 'error', text1: 'Error', text2: message })
-
-/**
- * Extracts the hospital id from an appointment, handling every possible shape
- * that different API endpoints return.
- */
-function getAptHospitalId(apt: any): string {
-	const raw =
-		apt?.hospital?.id ??
-		apt?.hospital_id ??
-		apt?.hospital?.hospital_id ??
-		apt?.pivot?.hospital_id ??
-		''
-	return raw ? String(raw) : ''
+function WeekSelector({ weekDays, selectedDate, onSelectDate, selectedDateObj }: WeekSelectorProps) {
+  return (
+    <View>
+      <View style={styles.weekHeader}>
+        <Text style={styles.weekHeaderTitle}>Today's Appointments</Text>
+        <Text style={styles.weekMonth}>
+          {selectedDateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weekDayRow}>
+        {weekDays.map((d, i) => (
+          <TouchableOpacity
+            key={i}
+            style={[
+              styles.dayCell,
+              selectedDate === i && styles.dayCellSelected,
+            ]}
+            onPress={() => onSelectDate(i)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.dayLabel, selectedDate === i && styles.dayLabelSelected]}>
+              {d.day}
+            </Text>
+            <Text
+              style={[
+                styles.dateLabel,
+                selectedDate === i && styles.dateLabelSelected,
+                !selectedDate && d.red && styles.dateLabelRed,
+              ]}
+            >
+              {d.date}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <View style={styles.divider} />
+    </View>
+  )
 }
 
-const getModeKey = (mode?: string | null): AppointmentModeKey => {
-	const normalized = String(mode || '').toLowerCase()
-	if (normalized === 'video_call' || normalized === 'online' || normalized === 'video') {
-		return 'video'
-	}
-	return 'clinic'
+// ── Reschedule Helpers ────────────────────────────────────────────────────────
+
+const toApiDate = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-const getAppointmentModeKey = (appointment?: Appointment | null): AppointmentModeKey => {
-	const rawMode =
-		appointment?.appointment_mode ||
-		appointment?.mode ||
-		appointment?.type ||
-		(appointment as any)?.appointment_type ||
-		(appointment as any)?.consultation_type
+const getRescheduleModeKey = (appointmentType: 'clinic' | 'video') =>
+  appointmentType === 'video' ? 'video_call' : 'clinic_visit'
 
-	return getModeKey(rawMode)
+const getSlotStatus = (slot: any) => {
+  const status = typeof slot.status === 'string' ? slot.status.toUpperCase() : ''
+
+  if (slot.is_booked || status === 'OCCUPIED') return 'OCCUPIED'
+  if (slot.is_enabled === false || status === 'UNAVAILABLE') return 'UNAVAILABLE'
+  if (status === 'BLOCKED') return 'BLOCKED'
+  if (status === 'BOOKED') return 'BOOKED'
+  return 'AVAILABLE'
 }
 
-const normalizeSlotStatus = (slot: AvailabilityApiSlot): SlotGroup['slots'][number]['status'] => {
-	if (slot.is_booked || slot.status === 'OCCUPIED') return 'OCCUPIED'
-	if (slot.is_enabled === false) return 'UNAVAILABLE'
-	return slot.status || 'AVAILABLE'
+const normalizeAvailabilitySlots = (
+  response: any,
+  appointmentType: 'clinic' | 'video'
+): SlotGroup[] => {
+  const rawData = (
+    Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : []
+  )
+  const modeKey = getRescheduleModeKey(appointmentType)
+
+  return rawData
+    .filter((item: any) => !item.appointment_mode || item.appointment_mode.toLowerCase() === modeKey)
+    .flatMap((item: any, itemIndex: number) => {
+      const sessions =
+        Array.isArray(item.sessions) && item.sessions.length > 0
+          ? item.sessions
+          : [{ label: item.label, range: item.range, period: item.period, slots: item.slots }]
+
+      return sessions
+        .map((session: any, sessionIndex: number): SlotGroup => {
+          const label = session.label || `Session ${sessionIndex + 1}`
+
+          return {
+            label,
+            range: session.range,
+            period: session.period || session.range,
+            slots: (session.slots ?? [])
+              .filter((slot: any) => Boolean(slot.start_time && slot.end_time))
+              .map((slot: any, slotIndex: number) => ({
+                id: `${modeKey}-${itemIndex}-${label}-${slot.start_time}-${slotIndex}`,
+                start_time: slot.start_time as string,
+                end_time: slot.end_time as string,
+                status: getSlotStatus(slot),
+                is_enabled: slot.is_enabled,
+                is_booked: slot.is_booked,
+                can_toggle: slot.is_enabled === false ? false : slot.can_toggle,
+              })),
+          }
+        })
+        .filter((session: any) => session.slots.length > 0)
+    })
 }
 
-const normalizeAvailabilityByMode = (
-	response: unknown
-): Record<AppointmentModeKey, SlotGroup[]> => {
-	const rawData = Array.isArray(response)
-		? response
-		: Array.isArray((response as { data?: unknown })?.data)
-			? ((response as { data: AvailabilityApiModeGroup[] }).data)
-			: []
+// ── Main component ────────────────────────────────────────────────────────────
 
-	const grouped: Record<AppointmentModeKey, SlotGroup[]> = {
-		clinic: [],
-		video: [],
-	}
-
-	rawData.forEach((item: AvailabilityApiModeGroup, itemIndex) => {
-		const hasModeStructure =
-			Boolean(item.appointment_mode) || Array.isArray(item.sessions)
-		const modeKey = hasModeStructure ? getModeKey(item.appointment_mode) : 'clinic'
-		const sessions =
-			Array.isArray(item.sessions) && item.sessions.length > 0
-				? item.sessions
-				: [{ label: item.label, range: item.range, period: item.period, slots: item.slots }]
-
-		const normalizedSessions = sessions
-			.map((session, sessionIndex): SlotGroup => {
-				const range = session.range || session.period || ''
-				const label = session.label || `Session ${sessionIndex + 1}`
-				const groupLabel = range ? `${label} (${range})` : label
-
-				return {
-					label: groupLabel,
-					period: range,
-					range,
-					slots: (session.slots || [])
-						.filter((slot) => slot.start_time)
-						.map((slot, slotIndex) => ({
-							id: `${modeKey}-${itemIndex}-${sessionIndex}-${slot.start_time}-${slotIndex}`,
-							start_time: String(slot.start_time || ''),
-							end_time: String(slot.end_time || ''),
-							status: normalizeSlotStatus(slot),
-							is_enabled: slot.is_enabled,
-							is_booked: slot.is_booked,
-							can_toggle: slot.can_toggle,
-						})),
-				}
-			})
-			.filter((session) => session.slots.length > 0)
-
-		grouped[modeKey] = [...grouped[modeKey], ...normalizedSessions]
-	})
-
-	return grouped
+interface DoctorAppointmentsProps {
+  selectedDate: number
+  setSelectedDate: (i: number) => void
+  appointments: Appointment[]
+  apptLoading: boolean
+  apptError: string
+  weekDays: WeekDay[]
+  selectedDateObj: Date
+  searchQuery: string
+  setSearchQuery: (value: string) => void
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Component
-// ─────────────────────────────────────────────────────────────────────────────
-
-export default function DoctorAppointments({
-	selectedDate,
-	setSelectedDate,
-	appointments,
-	apptLoading,
-	apptError,
-	weekDays,
-	selectedDateObj,
+export function DoctorAppointments({
+  selectedDate,
+  setSelectedDate,
+  appointments,
+  apptLoading,
+  apptError,
+  weekDays,
+  selectedDateObj,
+  searchQuery,
+  setSearchQuery,
 }: DoctorAppointmentsProps) {
-	const { width, height } = useWindowDimensions()
-	const isTablet = width >= 768
-	const useCompactCancelledLayout = width < 640
-	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
-
-	// ── Read the globally selected hospital ID from AuthContext ───────────────
-	//    DoctorHospitalDropdown (in the header) writes both:
-	//      • selectedHospital   → display name
-	//      • selectedHospitalId → numeric/string id used for filtering & API calls
-	const { selectedHospitalId: contextHospitalId } = useAuth() as any
-
-	// ── Filter appointments by selected hospital ──────────────────────────────
-	//    contextHospitalId === null | undefined | '' → show ALL appointments
-	const filteredAppointments =
-		contextHospitalId
-			? appointments.filter(
-					(apt) => getAptHospitalId(apt) === String(contextHospitalId)
-				)
-			: appointments
-
-	// ── Reschedule state ──────────────────────────────────────────────────────
-	const [rescheduleOpen, setRescheduleOpen] = useState(false)
-	const [rescheduleAppt, setRescheduleAppt] = useState<Appointment | null>(null)
-	const [rescheduleDate, setRescheduleDate] = useState<Date>(new Date())
-	const [selectedSlot, setSelectedSlot] = useState('')
-	const [rescheduleSlots, setRescheduleSlots] = useState<any[]>([])
-	const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
-const [successModalVisible, setSuccessModalVisible] = useState(false)
-const [successMessage, setSuccessMessage] = useState('')
-	const [symptomsPopover, setSymptomsPopover] = useState({
-		visible: false,
-		message: '',
-		x: 0,
-		y: 0,
-	})
-	// ── Optimistic UI sets ────────────────────────────────────────────────────
-	const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set())
-	const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set())
-
-	// ── Reject modal ──────────────────────────────────────────────────────────
-	const [rejectModalId, setRejectModalId] = useState<string | null>(null)
-
-	// ── Refer modal ───────────────────────────────────────────────────────────
-	const [referOpen, setReferOpen] = useState(false)
-	const [referAppt, setReferAppt] = useState<Appointment | null>(null)
-	const [referQuery, setReferQuery] = useState('')
-	const [favouriteDoctors, setFavouriteDoctors] = useState<ReferDoctor[]>([])
-	const [favouriteDoctorIds, setFavouriteDoctorIds] = useState<Set<string>>(new Set())
-	const [referSearchResults, setReferSearchResults] = useState<ReferDoctor[]>([])
-	const [referLoading, setReferLoading] = useState(false)
-	const [referSearchLoading, setReferSearchLoading] = useState(false)
-	const [referringIds, setReferringIds] = useState<Set<string>>(new Set())
-	const [bookmarkingIds, setBookmarkingIds] = useState<Set<string>>(new Set())
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Small helpers
-	// ─────────────────────────────────────────────────────────────────────────
-
-	const getStatusLabel = (status: any) =>
-		typeof status === 'string' ? status : (status?.label ?? 'pending')
-
-	const formatStatus = (s: string) =>
-		s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
-
-	const getPatientAge = (apt: any) => apt?.patient?.age ?? apt?.age ?? '--'
-
-	const getPatientGender = (apt: any) =>
-		apt?.patient?.gender ?? apt?.patient?.sex ?? apt?.gender ?? '--'
-
-	const normalizeSymptoms = (value: any): string => {
-		if (Array.isArray(value)) {
-			return value
-				.map((item) =>
-					typeof item === 'string'
-						? item.trim()
-						: String(item?.label ?? item?.name ?? item?.symptom ?? item?.description ?? '').trim()
-				)
-				.filter(Boolean)
-				.join(', ')
-		}
-		return typeof value === 'string' ? value.trim() : ''
-	}
-
-	const getPatientSymptoms = (apt: any) => {
-		const preIntake = apt?.pre_intake
-		if (!preIntake?.symptoms) {
-			return 'No symptoms entered by patient'
-		}
-
-		return (
-			`Symptoms: ${preIntake.symptoms}\n\n`+
-			`Duration: ${preIntake.duration || 'Not specified'}\n\n`+
-			`Severity: ${preIntake.severity || 'Not specified'}`
-		)
-	}
-
-	const openSymptomsPopover = (apt: any, event: any) => {
-		event?.stopPropagation?.()
-		const { pageX = width / 2, pageY = height / 2 } = event?.nativeEvent ?? {}
-		setSymptomsPopover({
-			visible: true,
-			message: getPatientSymptoms(apt),
-			x: pageX,
-			y: pageY,
-		})
-	}
-
-	const getTimeRange = (apt: any) => {
-		const start = apt?.start_time
-		const end = apt?.end_time
-		if (start && end) return `${start} - ${end}`
-		return start ?? '--'
-	}
-
-	const getTypeIcon = (mode: AppointmentModeKey): AppointmentModeIcon => {
-		if (mode === 'video') {
-			return { name: 'video', color: '#0066ff', backgroundColor: '#e6f0ff' }
-		}
-		return { name: 'home-plus', color: '#00a82d', backgroundColor: '#e8faee' }
-	}
-
-	const mapReferDoctor = (doctor: FavouriteDoctor | ReferDoctor): ReferDoctor => ({
-		id: doctor.id,
-		name: doctor.name,
-		avatar_s3_key: doctor.avatar_s3_key ?? null,
-		location: doctor.location ?? '',
-		experience_years: doctor.experience_years ?? null,
-		specialities: doctor.specialities ?? [],
-		is_verified: doctor.is_verified,
-	})
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Reschedule
-	// ─────────────────────────────────────────────────────────────────────────
-
-	const handleOpenReschedule = (apt: Appointment) => {
-		debugger
-		const isLocallyRejected = rejectedIds.has(apt.id)
-		const status = getStatusLabel(apt.status)
-		if (isLocallyRejected || status === 'cancelled' || status === 'rejected') {
-			showError('Cannot reschedule a rejected or cancelled appointment.')
-			return
-		}
-		setRescheduleAppt(apt)
-		setRescheduleDate(new Date())
-		setRescheduleSlots([])
-		setSelectedSlot('')
-		setRescheduleOpen(true)
-	}
-
-	// ── Resolve the hospital id to use for the reschedule API call ───────────
-	//    Priority: context selection (what the dropdown shows) → appointment's own hospital
-	const resolveRescheduleHospitalId = (): string => {
-		if (contextHospitalId) return String(contextHospitalId)
-		if (!rescheduleAppt) return ''
-		return getAptHospitalId(rescheduleAppt)
-	}
-
-	const handleConfirmReschedule = async () => {
-		if (!selectedSlot) {
-			Alert.alert('Select time', 'Please select a time slot to reschedule.')
-			return
-		}
-		if (!rescheduleAppt) return
-
-		const hospitalId = resolveRescheduleHospitalId()
-		const dateStr = rescheduleDate.toISOString().split('T')[0]
-
-		if (!hospitalId) {
-			showError('Please select a hospital before rescheduling.')
-			return
-		}
-
-		setRescheduleSlotsLoading(true)
-		try {
-			const res = await rescheduleAppointment({
-				appointment_id: rescheduleAppt.id,
-				appointment_date: dateStr,
-				start_time: selectedSlot,
-				end_time: null,
-				hospital_id: hospitalId,
-				reason: 'Doctor unavailable',
-				status_id: APPOINTMENT_STATUS.CONFIRM,
-			})
-			if (res.success) {
-	setRescheduleOpen(false)
-
-	setSuccessMessage(res.message || 'Appointment rescheduled successfully')
-	setSuccessModalVisible(true)
-}else {
-				showError(res.message || 'Reschedule failed. Please try again.')
-			}
-		} catch {
-			showError('Something went wrong. Please try again.')
-		} finally {
-			setRescheduleSlotsLoading(false)
-		}
-	}
-
-	const renderSuccessModal = () => (
-	<Modal
-		visible={successModalVisible}
-		transparent
-		animationType="fade"
-		onRequestClose={() => setSuccessModalVisible(false)}
-	>
-		<View style={styles.successBackdrop}>
-			<View style={styles.successCard}>
-
-				<MaterialCommunityIcons
-					name="check-circle"
-					size={60}
-					color="#2e8b57"
-				/>
-
-				<Text style={styles.successTitle}>Success</Text>
-
-				<Text style={styles.successMessage}>
-					{successMessage}
-				</Text>
-
-				<TouchableOpacity
-					style={styles.successBtn}
-					onPress={() => setSuccessModalVisible(false)}
-				>
-					<Text style={styles.successBtnText}>Done</Text>
-				</TouchableOpacity>
-
-			</View>
-		</View>
-	</Modal>
-)
-	// ── Fetch available slots whenever the hospital or date changes ───────────
-	//    Uses contextHospitalId so it stays in sync with the dropdown inside the drawer.
-	useEffect(() => {
-		if (!rescheduleOpen || !rescheduleAppt) return
-
-		const doctorId =
-			rescheduleAppt?.doctor?.id ?? (rescheduleAppt as any)?.doctor_id
-		const hospitalId = resolveRescheduleHospitalId()
-		const dateStr = rescheduleDate.toISOString().split('T')[0]
-
-		if (!hospitalId) {
-			setRescheduleSlots([])
-			setSelectedSlot('')
-			return
-		}
-
-		const fetchSlots = async () => {
-			try {
-				setRescheduleSlotsLoading(true)
-				setRescheduleSlots([])
-				setSelectedSlot('')
-
-				const responseData = await getDoctorAvailability({
-					doctor_id: doctorId,
-					hospital_id: hospitalId,
-					date: dateStr,
-				})
-
-				const availabilityByMode = normalizeAvailabilityByMode(responseData)
-				const appointmentMode = getAppointmentModeKey(rescheduleAppt)
-
-				setRescheduleSlots(availabilityByMode[appointmentMode])
-			} catch {
-				setRescheduleSlots([])
-				setSelectedSlot('')
-			} finally {
-				setRescheduleSlotsLoading(false)
-			}
-		}
-
-		fetchSlots()
-		// Re-run whenever: drawer opens, appointment changes, date changes, or the
-		// globally selected hospital changes (user switches via the in-drawer dropdown).
-	}, [rescheduleOpen, rescheduleAppt, rescheduleDate, contextHospitalId])
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Confirm / Reject
-	// ─────────────────────────────────────────────────────────────────────────
-
-	const handleConfirmAppointment = async (appointmentId: string) => {
-		try {
-			const res = await updateAppointmentsStatus(appointmentId, APPOINTMENT_STATUS.CONFIRM)
-			if (res.success) {
-				showSuccess(res.message)
-				setConfirmedIds((prev) => new Set(prev).add(appointmentId))
-			} else {
-				showError(res.message || 'Failed to confirm')
-			}
-		} catch (err: any) {
-			console.log('CONFIRM ERROR 👉', err?.response?.data)
-			showError('Something went wrong')
-		}
-	}
-
-	const handleConfirmReject = async () => {
-		if (!rejectModalId) return
-		try {
-			const res = await updateAppointmentsStatus(rejectModalId, APPOINTMENT_STATUS.REJECT)
-			if (res.success) {
-				showSuccess(res.message)
-				setRejectedIds((prev) => new Set(prev).add(rejectModalId))
-				setConfirmedIds((prev) => {
-					const next = new Set(prev)
-					next.delete(rejectModalId!)
-					return next
-				})
-			} else {
-				showError(res.message || 'Failed to reject appointment.')
-			}
-		} catch {
-			showError('Something went wrong')
-		} finally {
-			setRejectModalId(null)
-		}
-	}
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Refer
-	// ─────────────────────────────────────────────────────────────────────────
-
-	const handleOpenRefer = (apt: Appointment) => {
-		setReferAppt(apt)
-		setReferQuery('')
-		setReferSearchResults([])
-		setReferOpen(true)
-	}
-
-	const handleCloseRefer = () => {
-		setReferOpen(false)
-		setReferAppt(null)
-		setReferQuery('')
-		setReferSearchResults([])
-		setReferringIds(new Set())
-		setBookmarkingIds(new Set())
-	}
-
-	useEffect(() => {
-		if (!referOpen) return
-
-		const fetchFavouriteDoctors = async () => {
-			try {
-				setReferLoading(true)
-				const res = await getFavouriteDoctors()
-				if (res.success) {
-					setFavouriteDoctors((res.data?.favourites ?? []).map(mapReferDoctor))
-					setFavouriteDoctorIds(new Set(res.data?.favourite_ids ?? []))
-				} else {
-					showError(res.message || 'Failed to load doctors')
-				}
-			} catch {
-				showError('Failed to load doctors')
-			} finally {
-				setReferLoading(false)
-			}
-		}
-
-		fetchFavouriteDoctors()
-	}, [referOpen])
-
-	useEffect(() => {
-		if (!referOpen) return
-
-		const query = referQuery.trim()
-		if (query.length < 2) {
-			setReferSearchResults([])
-			setReferSearchLoading(false)
-			return
-		}
-
-		let cancelled = false
-		const timer = setTimeout(async () => {
-			try {
-				setReferSearchLoading(true)
-				const res = await getDoctors({ search: query, limit: 20 })
-				if (!cancelled && res.success) {
-					setReferSearchResults((res.data ?? []).map(mapReferDoctor))
-				}
-			} catch {
-				if (!cancelled) showError('Search failed')
-			} finally {
-				if (!cancelled) setReferSearchLoading(false)
-			}
-		}, 350)
-
-		return () => {
-			cancelled = true
-			clearTimeout(timer)
-		}
-	}, [referOpen, referQuery])
-
-	const handleReferDoctor = async (doctor: ReferDoctor) => {
-		if (!referAppt || referringIds.has(doctor.id)) return
-
-		setReferringIds((prev) => new Set(prev).add(doctor.id))
-		try {
-			const res = await referAppointment({
-				appointment_id: referAppt.id,
-				doctor_id: doctor.id,
-			})
-
-			if (res.success) {
-				showSuccess(res.message || 'Appointment referred successfully')
-				handleCloseRefer()
-			} else {
-				showError(res.message || 'Failed to refer appointment')
-			}
-		} catch {
-			showError('Failed to refer appointment')
-		} finally {
-			setReferringIds((prev) => {
-				const next = new Set(prev)
-				next.delete(doctor.id)
-				return next
-			})
-		}
-	}
-
-	const handleToggleBookmark = async (doctor: ReferDoctor) => {
-		if (bookmarkingIds.has(doctor.id)) return
-
-		const wasFavourite = favouriteDoctorIds.has(doctor.id)
-
-		setBookmarkingIds((prev) => new Set(prev).add(doctor.id))
-		setFavouriteDoctorIds((prev) => {
-			const next = new Set(prev)
-			if (wasFavourite) next.delete(doctor.id)
-			else next.add(doctor.id)
-			return next
-		})
-		setFavouriteDoctors((prev) => {
-			if (wasFavourite) return prev.filter((item) => item.id !== doctor.id)
-			return prev.some((item) => item.id === doctor.id) ? prev : [...prev, doctor]
-		})
-
-		try {
-			const res = await toggleFavouriteDoctor(doctor.id)
-
-			if (res.success === false) {
-				throw new Error(res.message || 'Failed to update favourites')
-			}
-
-			const isFavourite = res.data?.action
-				? res.data.action === 'added'
-				: !wasFavourite
-
-			if (res.data?.favourite_ids) {
-				setFavouriteDoctorIds(new Set(res.data.favourite_ids))
-			} else {
-				setFavouriteDoctorIds((prev) => {
-					const next = new Set(prev)
-					if (isFavourite) next.add(doctor.id)
-					else next.delete(doctor.id)
-					return next
-				})
-			}
-
-			if (res.data?.favourites) {
-				setFavouriteDoctors(res.data.favourites.map(mapReferDoctor))
-			} else {
-				setFavouriteDoctors((prev) => {
-					if (!isFavourite) return prev.filter((item) => item.id !== doctor.id)
-					return prev.some((item) => item.id === doctor.id) ? prev : [...prev, doctor]
-				})
-			}
-
-			showSuccess(isFavourite ? 'Added to favourites' : 'Removed from favourites')
-		} catch {
-			setFavouriteDoctorIds((prev) => {
-				const next = new Set(prev)
-				if (wasFavourite) next.add(doctor.id)
-				else next.delete(doctor.id)
-				return next
-			})
-			setFavouriteDoctors((prev) => {
-				if (wasFavourite) {
-					return prev.some((item) => item.id === doctor.id) ? prev : [...prev, doctor]
-				}
-				return prev.filter((item) => item.id !== doctor.id)
-			})
-			showError('Failed to update favourites')
-		} finally {
-			setBookmarkingIds((prev) => {
-				const next = new Set(prev)
-				next.delete(doctor.id)
-				return next
-			})
-		}
-	}
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Navigation
-	//───────────────────────────────────────────────────────────────────
-
-	const handleCardPress = (apt: any) => {
-		const appointmentId = apt.id || apt.appointment_id
-		const patientId =
-			apt.patient?.id ||
-			apt.patient?.patient_id ||
-			apt.patient?.public_id ||
-			apt.patient_public_id
-		const doctorId = apt.doctor?.id || apt.doctor_id
-
-		if (!patientId) {
-			Alert.alert('Error', 'Patient ID not found for this appointment')
-			return
-		}
-		if (!doctorId) {
-			Alert.alert('Error', 'Doctor ID not found for this appointment')
-			return
-		}
-		if (!appointmentId) {
-			Alert.alert('Error', 'Appointment ID not found for this appointment')
-			return
-		}
-
-		const consultationParams = {
-			appointmentId,
-			patientId,
-			patient: apt.patient,
-			doctorID: doctorId,
-			doctor: apt.doctor,
-			appointment: apt,
-		}
-
-		navigateRoot(ROUTES.STACK.CONSULTATION, consultationParams)
-	}
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Skeleton
-	// ─────────────────────────────────────────────────────────────────────────
-
-	const renderSkeleton = () =>
-		Array.from({ length: 3 }).map((_, i) => (
-			<View key={`sk-${i}`} style={styles.card}>
-				<View style={isTablet ? styles.tabletCardInner : undefined}>
-					<View style={styles.skeletonNameRow}>
-						<AppSkeleton width={24} height={24} borderRadius={6} />
-						<AppSkeleton width={110} height={16} borderRadius={6} />
-						<AppSkeleton width={72} height={16} borderRadius={999} />
-					</View>
-					<View style={[styles.skeletonMetaRow, { marginTop: 8 }]}>
-						<AppSkeleton width={14} height={14} borderRadius={7} />
-						<AppSkeleton width="80%" height={13} borderRadius={6} />
-					</View>
-					{isTablet && (
-						<View style={styles.skeletonActionsRow}>
-							{[0, 1, 2, 3].map((j) => (
-								<AppSkeleton key={j} width={52} height={44} borderRadius={6} style={{ marginRight: 8 }} />
-							))}
-						</View>
-					)}
-				</View>
-			</View>
-		))
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Action buttons
-	// ─────────────────────────────────────────────────────────────────────────
-
-	const renderActions = (apt: any) => {
-		const rawStatus = getStatusLabel(apt.status)
-		const isConfirmed = confirmedIds.has(apt.id) || rawStatus === 'confirmed'
-		const isRejected =
-			rejectedIds.has(apt.id) ||
-			rawStatus === 'rejected' ||
-			rawStatus === 'cancelled'
-
-		if (isRejected) return null
-
-		return (
-			<View style={[styles.actions, isTablet && styles.actionsTablet]}>
-				{!isConfirmed && (
-					<TouchableOpacity
-						onPress={(e) => { e.stopPropagation?.(); handleConfirmAppointment(apt.id) }}
-						style={[styles.btn, { backgroundColor: '#d6eed8' }]}
-						activeOpacity={0.75}
-					>
-						<MaterialCommunityIcons name="check" size={16} color="#2e8b57" />
-						<Text style={[styles.btnLabel, { color: '#2e8b57' }]}>Confirm</Text>
-					</TouchableOpacity>
-				)}
-
-				<TouchableOpacity
-					onPress={(e) => { e.stopPropagation?.(); setRejectModalId(apt.id) }}
-					style={[styles.btn, { backgroundColor: '#f8dddd' }]}
-					activeOpacity={0.75}
-				>
-					<MaterialCommunityIcons name="close" size={16} color="#d84545" />
-					<Text style={[styles.btnLabel, { color: '#d84545' }]}>Reject</Text>
-				</TouchableOpacity>
-
-				<TouchableOpacity
-					onPress={(e) => { e.stopPropagation?.(); handleOpenReschedule(apt) }}
-					style={[styles.btn, { backgroundColor: '#f8e8c6' }]}
-					activeOpacity={0.75}
-				>
-					<MaterialCommunityIcons name="refresh" size={16} color="#d08a0a" />
-					<Text style={[styles.btnLabel, { color: '#d08a0a' }]}>Reschedule</Text>
-				</TouchableOpacity>
-
-				<TouchableOpacity
-					onPress={(e) => { e.stopPropagation?.(); handleOpenRefer(apt) }}
-					style={[styles.btn, { backgroundColor: '#dbe2f5' }]}
-					activeOpacity={0.75}
-				>
-					<MaterialCommunityIcons name="account-multiple-outline" size={16} color="#4d6bb1" />
-					<Text style={[styles.btnLabel, { color: '#4d6bb1' }]}>Refer</Text>
-				</TouchableOpacity>
-
-				<TouchableOpacity
-					style={styles.chevronBtn}
-					activeOpacity={0.7}
-					onPress={() => handleCardPress(apt)}
-				>
-					<MaterialCommunityIcons name="chevron-right" size={26} color={TEAL} />
-				</TouchableOpacity>
-			</View>
-		)
-	}
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Notice banners
-	// ─────────────────────────────────────────────────────────────────────────
-
-	const renderRejectedNotice = () => (
-		<View style={styles.cancelNoticeBox}>
-			<MaterialCommunityIcons name="close-circle-outline" size={34} color="#d84545" />
-			<Text style={styles.cancelNoticeText}>Appointment rejected by doctor</Text>
-		</View>
-	)
-
-	const renderCancelledNotice = () => (
-		<View style={styles.cancelNoticeBox}>
-			<MaterialCommunityIcons name="close-thick" size={34} color="#df4a4a" />
-			<Text style={styles.cancelNoticeText}>Patient has cancelled the appointment</Text>
-		</View>
-	)
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Reject modal
-	// ─────────────────────────────────────────────────────────────────────────
-
-	const renderRejectModal = () => (
-		<Modal
-			visible={rejectModalId !== null}
-			transparent
-			animationType="fade"
-			onRequestClose={() => setRejectModalId(null)}
-		>
-			<TouchableOpacity
-				activeOpacity={1}
-				style={styles.rejectBackdrop}
-				onPress={() => setRejectModalId(null)}
-			>
-				<TouchableOpacity activeOpacity={1} style={styles.rejectCard} onPress={() => {}}>
-					<View style={styles.rejectIconCircle}>
-						<MaterialCommunityIcons name="close" size={28} color="#d84545" />
-					</View>
-					<Text style={styles.rejectTitle}>Are you sure?</Text>
-					<Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
-					<View style={styles.rejectBtnRow}>
-						<TouchableOpacity style={styles.rejectCancelBtn} onPress={() => setRejectModalId(null)}>
-							<Text style={styles.rejectCancelText}>Cancel</Text>
-						</TouchableOpacity>
-						<TouchableOpacity style={styles.rejectConfirmBtn} onPress={handleConfirmReject}>
-							<Text style={styles.rejectConfirmText}>Yes, Reject</Text>
-						</TouchableOpacity>
-					</View>
-				</TouchableOpacity>
-			</TouchableOpacity>
-		</Modal>
-	)
-
-	const renderReferDoctorRow = (doctor: ReferDoctor) => {
-		const isSubmitting = referringIds.has(doctor.id)
-		const isBookmarking = bookmarkingIds.has(doctor.id)
-		const isBookmarked = favouriteDoctorIds.has(doctor.id)
-		const isCompactRefer = width < 520
-
-		return (
-			<FavouriteDoctorList
-				key={doctor.id}
-				doctor={doctor}
-				isCompact={isCompactRefer}
-				isSubmitting={isSubmitting}
-				isBookmarking={isBookmarking}
-				isBookmarked={isBookmarked}
-				onShare={handleReferDoctor}
-				onToggleBookmark={handleToggleBookmark}
-				placeholderImage={DOCTOR_IMAGE_PLACEHOLDER}
-				primaryColor={TEAL}
-			/>
-		)
-	}
-
-	const renderReferModal = () => {
-		const searchText = referQuery.trim()
-		const currentDoctorId = referAppt?.doctor?.id ?? (referAppt as any)?.doctor_id
-		const doctors = (searchText.length >= 2 ? referSearchResults : favouriteDoctors).filter(
-			(doctor) => doctor.id !== currentDoctorId
-		)
-		const isSearching = searchText.length >= 2
-		const showLoading = isSearching ? referSearchLoading : referLoading
-		const isCompactRefer = width < 520
-		const referBodyMaxHeight = Math.max(220, Math.floor(height * (isCompactRefer ? 0.58 : 0.62)))
-
-		return (
-			<Modal
-				visible={referOpen}
-				transparent
-				animationType="fade"
-				onRequestClose={handleCloseRefer}
-			>
-				<TouchableOpacity
-					activeOpacity={1}
-					style={styles.referBackdrop}
-					onPress={handleCloseRefer}
-				>
-					<TouchableOpacity
-						activeOpacity={1}
-						style={[
-							styles.referCard,
-							isCompactRefer && styles.referCardCompact,
-							{ width: Math.min(width - 28, 900) },
-						]}
-						onPress={() => {}}
-					>
-						<View style={[styles.referHeader, isCompactRefer && styles.referHeaderCompact]}>
-							<Text style={[styles.referTitle, isCompactRefer && styles.referTitleCompact]}>Refer a doctor</Text>
-						</View>
-
-						<ScrollView
-							style={[styles.referBody, { maxHeight: referBodyMaxHeight }]}
-							contentContainerStyle={[
-								styles.referBodyContent,
-								isCompactRefer && styles.referBodyContentCompact,
-							]}
-							showsVerticalScrollIndicator
-							persistentScrollbar
-							scrollIndicatorInsets={{ right: 2 }}
-							nestedScrollEnabled
-							keyboardShouldPersistTaps="handled"
-						>
-							<View style={[styles.referSearchBox, isCompactRefer && styles.referSearchBoxCompact]}>
-								<MaterialCommunityIcons name="magnify" size={isCompactRefer ? 20 : 28} color="#9b9b9b" />
-								<TextInput
-									value={referQuery}
-									onChangeText={setReferQuery}
-									placeholder="Search doctor..."
-									placeholderTextColor="#98a1aa"
-									style={[styles.referSearchInput, isCompactRefer && styles.referSearchInputCompact]}
-									autoCorrect={false}
-									returnKeyType="search"
-								/>
-								<MaterialCommunityIcons name="microphone-outline" size={isCompactRefer ? 20 : 28} color="#9b9b9b" />
-							</View>
-
-							<Text style={[styles.referSectionTitle, isCompactRefer && styles.referSectionTitleCompact]}>
-								{isSearching ? 'SEARCH RESULTS' : 'FAVOURITE DOCTORS'}
-							</Text>
-
-							{showLoading ? (
-								<View style={styles.referLoadingBox}>
-									<ActivityIndicator size="small" color={TEAL} />
-								</View>
-							) : doctors.length === 0 ? (
-								<Text style={styles.referEmptyText}>
-									{isSearching ? 'No doctors found' : 'No favourite doctors found'}
-								</Text>
-							) : (
-								doctors.map(renderReferDoctorRow)
-							)}
-						</ScrollView>
-					</TouchableOpacity>
-				</TouchableOpacity>
-			</Modal>
-		)
-	}
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Reschedule drawer
-	// ─────────────────────────────────────────────────────────────────────────
-
-	const renderRescheduleDrawer = () => (
-		<Modal
-			visible={rescheduleOpen}
-			transparent
-			animationType="slide"
-			onRequestClose={() => setRescheduleOpen(false)}
-		>
-			<TouchableOpacity
-				activeOpacity={1}
-				style={styles.drawerBackdrop}
-				onPress={() => setRescheduleOpen(false)}
-			>
-				<TouchableOpacity activeOpacity={1} style={styles.drawerSheet} onPress={() => {}}>
-
-					{/* Header */}
-					<View style={styles.drawerHeader}>
-						<View>
-							<Text style={styles.drawerTitle}>Reschedule Appointment</Text>
-							<Text style={styles.drawerSubtitle}>
-								{rescheduleAppt?.patient?.name ?? 'Patient'}
-							</Text>
-						</View>
-						<TouchableOpacity style={styles.drawerCloseBtn} onPress={() => setRescheduleOpen(false)}>
-							<MaterialCommunityIcons name="close" size={18} color="#7a848d" />
-						</TouchableOpacity>
-					</View>
-
-					{/* Body */}
-					<ScrollView
-						style={styles.drawerBody}
-						contentContainerStyle={styles.drawerBodyContent}
-						showsVerticalScrollIndicator={false}
-					>
-						{/* ── Hospital selector ─────────────────────────────────────────────
-						    Same DoctorHospitalDropdown used in the header.
-						    When the user picks a hospital here it writes to AuthContext
-						    (setSelectedHospitalId), which triggers the slot-fetch useEffect above.
-						    This means the appointment list AND the reschedule drawer always stay
-						    in sync with the same selected hospital. ── */}
-						<Text style={styles.drawerSectionTitle}>Select Hospital</Text>
-						<DoctorHospitalDropdown />
-
-						{/* ── Date + time slots ─────────────────────────────────────────── */}
-						<DateSlotPicker
-							selectedDate={rescheduleDate}
-							onDateChange={(date) => {
-								setRescheduleDate(date)
-								setSelectedSlot('')
-							}}
-							selectedTime={selectedSlot}
-							onTimeChange={setSelectedSlot}
-							availableSlots={rescheduleSlots}
-							loading={rescheduleSlotsLoading}
-							selectedAppointmentType={getAppointmentModeKey(rescheduleAppt)}
-							showSlotStatusLabels={false}
-						/>
-					</ScrollView>
-
-					{/* Footer actions */}
-					<View style={styles.drawerActions}>
-						<TouchableOpacity style={styles.drawerCancelBtn} onPress={() => setRescheduleOpen(false)}>
-							<Text style={styles.drawerCancelBtnText}>Cancel</Text>
-						</TouchableOpacity>
-						<TouchableOpacity style={styles.drawerConfirmBtn} onPress={handleConfirmReschedule}>
-							<Text style={styles.drawerConfirmBtnText}>Confirm</Text>
-						</TouchableOpacity>
-					</View>
-
-				</TouchableOpacity>
-			</TouchableOpacity>
-		</Modal>
-	)
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Card renderer
-	// ─────────────────────────────────────────────────────────────────────────
-
-	const renderPatientNameRow = (apt: any, status: string, statusStyle: any, statusTextStyle: any) => {
-		const modeIcon = getTypeIcon(getAppointmentModeKey(apt))
-
-		return (
-			<View style={styles.patientNameRow}>
-				<View style={[styles.patientIconBox, { backgroundColor: modeIcon.backgroundColor }]}>
-					<MaterialCommunityIcons name={modeIcon.name} size={20} color={modeIcon.color} />
-				</View>
-				<View style={styles.patientNameWithInfo}>
-					<Text style={styles.name} numberOfLines={1}>
-						{apt?.patient?.name || 'Unknown Patient'}
-					</Text>
-					<TouchableOpacity
-						activeOpacity={0.75}
-						style={styles.symptomsInfoButton}
-						onPress={(event) => openSymptomsPopover(apt, event)}
-						hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-					>
-						<MaterialCommunityIcons name="information-outline" size={17} color={TEAL} />
-					</TouchableOpacity>
-				</View>
-				<View style={[styles.pill, statusStyle]}>
-					<Text style={[styles.pillText, statusTextStyle]}>{formatStatus(status)}</Text>
-				</View>
-			</View>
-		)
-	}
-
-	const renderSymptomsPopover = () => {
-		if (!symptomsPopover.visible) return null
-
-		const popoverWidth = Math.min(width - 32, isTablet ? 330 : 300)
-		const popoverLeft = Math.max(16, Math.min(symptomsPopover.x - 32, width - popoverWidth - 16))
-		const verticalLift = isTablet ? 24 : 18
-		const shouldOpenAbove = symptomsPopover.y + 160 > height
-		const popoverTop = shouldOpenAbove
-			? Math.max(16, symptomsPopover.y - 150 - verticalLift)
-			: Math.max(16, symptomsPopover.y + 16 - verticalLift)
-
-		return (
-			<Modal
-				visible={symptomsPopover.visible}
-				transparent
-				animationType="fade"
-				onRequestClose={() => setSymptomsPopover((prev) => ({ ...prev, visible: false }))}
-			>
-				<Pressable
-					style={styles.symptomsModalOverlay}
-					onPress={() => setSymptomsPopover((prev) => ({ ...prev, visible: false }))}
-				>
-					<Pressable
-						style={[
-							styles.symptomsPopover,
-							{
-								width: popoverWidth,
-								left: popoverLeft,
-								top: popoverTop,
-							},
-						]}
-						onPress={(event) => event.stopPropagation()}
-					>
-						<Text style={styles.symptomsPopoverTitle}>Patient Symptoms</Text>
-						<Text
-							style={[
-								styles.symptomsPopoverMessage,
-								symptomsPopover.message === 'No symptoms entered by patient.' && styles.symptomsPopoverEmpty,
-							]}
-						>
-							{symptomsPopover.message}
-						</Text>
-					</Pressable>
-				</Pressable>
-			</Modal>
-		)
-	}
-
-	const renderCard = (apt: any) => {
-		const rawStatus = getStatusLabel(apt.status)
-		const isRejectedLocally = rejectedIds.has(apt.id)
-		const isRejectedFromProp = rawStatus === 'rejected' || rawStatus === 'cancelled'
-		const isRejected = isRejectedLocally || isRejectedFromProp
-
-		let status = rawStatus
-		if (confirmedIds.has(apt.id)) status = 'confirmed'
-		if (rejectedIds.has(apt.id)) status = 'rejected'
-
-		const statusStyle =
-			status === 'confirmed' ? styles.pillConfirmed :
-			status === 'rejected'  ? styles.pillCancelled :
-			                         styles.pillPending
-
-		const statusTextStyle =
-			status === 'confirmed' ? styles.pillTextConfirmed :
-			status === 'rejected'  ? styles.pillTextCancelled :
-			                         styles.pillTextPending
-
-		// ── Rejected / Cancelled card ─────────────────────────────────────────
-		if (isRejected) {
-			const isPatientCancelled = rawStatus === 'cancelled' && !isRejectedLocally
-			return (
-				<TouchableOpacity
-					key={apt.id}
-					activeOpacity={0.85}
-					onPress={() => handleCardPress(apt)}
-					style={styles.card}
-				>
-					<View style={[styles.cancelledCardInner, useCompactCancelledLayout && styles.cancelledCardInnerCompact]}>
-						<View style={[styles.cancelledCardLeft, useCompactCancelledLayout && styles.cancelledCardLeftCompact]}>
-							{renderPatientNameRow(apt, status, statusStyle, statusTextStyle)}
-							<View style={styles.cancelledMetaRow}>
-								<Text style={styles.subText}>
-									{getPatientAge(apt)} years / {getPatientGender(apt)}
-								</Text>
-								<View style={styles.metaDot} />
-								<MaterialCommunityIcons name="clock-time-three-outline" size={16} color="#9ea5ac" />
-								<Text style={styles.subText}>{getTimeRange(apt)}</Text>
-							</View>
-						</View>
-						<View style={[styles.cancelDivider, useCompactCancelledLayout && styles.cancelDividerCompact]} />
-						<View
-							style={[
-								styles.cancelledCardRight,
-								!useCompactCancelledLayout && !isTablet && { width: Math.max(230, Math.floor(width * 0.52)) },
-								useCompactCancelledLayout && styles.cancelledCardRightCompact,
-							]}
-						>
-							{isPatientCancelled ? renderCancelledNotice() : renderRejectedNotice()}
-						</View>
-					</View>
-				</TouchableOpacity>
-			)
-		}
-
-		// ── Tablet card ───────────────────────────────────────────────────────
-		if (isTablet) {
-			return (
-				<TouchableOpacity key={apt.id} activeOpacity={0.85} onPress={() => handleCardPress(apt)} style={styles.card}>
-					<View style={styles.tabletCardInner}>
-						<View style={styles.tabletLeft}>
-							{renderPatientNameRow(apt, status, statusStyle, statusTextStyle)}
-							<View style={styles.metaRow}>
-								<MaterialCommunityIcons name="clock-time-three-outline" size={14} color="#5f6973" />
-								<Text style={styles.subText}>
-									{getPatientAge(apt)} yrs / {getPatientGender(apt)} | {getTimeRange(apt)}
-								</Text>
-							</View>
-						</View>
-						<View style={styles.tabletRight}>{renderActions(apt)}</View>
-					</View>
-				</TouchableOpacity>
-			)
-		}
-
-		// ── Mobile card ───────────────────────────────────────────────────────
-		return (
-			<TouchableOpacity key={apt.id} activeOpacity={0.85} onPress={() => handleCardPress(apt)} style={styles.card}>
-				{renderPatientNameRow(apt, status, statusStyle, statusTextStyle)}
-				<View style={styles.metaRow}>
-					<MaterialCommunityIcons name="clock-time-three-outline" size={14} color="#5f6973" />
-					<Text style={styles.subText}>
-						{getPatientAge(apt)} yrs / {getPatientGender(apt)} | {getTimeRange(apt)}
-					</Text>
-				</View>
-				{renderActions(apt)}
-			</TouchableOpacity>
-		)
-	}
-
-	// ─────────────────────────────────────────────────────────────────────────
-	// Root render
-	// ─────────────────────────────────────────────────────────────────────────
-
-	return (
-		<View style={styles.container}>
-			{/* Header */}
-			<View style={styles.header}>
-				<Text style={styles.heading}>Doctor Appointments</Text>
-				<Text style={styles.month}>
-					{selectedDateObj?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-				</Text>
-			</View>
-
-			{/* Week strip */}
-			<ScrollView
-				horizontal
-				showsHorizontalScrollIndicator={false}
-				style={styles.weekContainer}
-				contentContainerStyle={styles.weekContent}
-			>
-				{weekDays.map((d: any, i: number) => (
-					<TouchableOpacity
-						key={i}
-						onPress={() => setSelectedDate(i)}
-						style={[
-							styles.dayBox,
-							d.red && styles.weekendDayBox,
-							selectedDate === i && styles.selectedDay,
-						]}
-					>
-						<Text style={[styles.dayText, d.red && styles.weekendText, selectedDate === i && styles.selectedText]}>
-							{d.day}
-						</Text>
-						<Text style={[styles.dateText, d.red && styles.weekendText, selectedDate === i && styles.selectedText]}>
-							{d.date}
-						</Text>
-					</TouchableOpacity>
-				))}
-			</ScrollView>
-
-			{/* Appointment list — uses filteredAppointments, not raw appointments */}
-			<View style={styles.listContainer}>
-				{apptLoading ? renderSkeleton() : null}
-				{apptError ? <Text style={styles.error}>{apptError}</Text> : null}
-				{!apptLoading && filteredAppointments.length === 0 && (
-					<Text style={styles.empty}>
-						{contextHospitalId
-							? 'No appointments for the selected hospital'
-							: 'No appointments'}
-					</Text>
-				)}
-				{!apptLoading && filteredAppointments.map(renderCard)}
-			</View>
-
-			{/* Modals */}
-			
-{renderRejectModal()}
-{renderReferModal()}
-{renderRescheduleDrawer()}
-{renderSuccessModal()}
-{renderSymptomsPopover()}
-		</View>
-	)
+  const navigation = useNavigation<any>()
+
+  // Local status overrides (set after an action without a full refresh)
+  const [localStatuses, setLocalStatuses] = useState<Record<string, string>>({})
+  const [localTimes, setLocalTimes] = useState<Record<string, { start_time: string; end_time: string | null }>>({})
+  // Tracks who initiated the most recent reschedule for each appointment.
+  const [localRescheduledBy, setLocalRescheduledBy] = useState<Record<string, string>>({})
+
+  // Reject confirmation modal state
+  const [rejectModalVisible, setRejectModalVisible] = useState(false)
+  const [pendingRejectId, setPendingRejectId] = useState<string | null>(null)
+
+  // Reschedule state
+  const [rescheduleAppt, setRescheduleAppt] = useState<Appointment | null>(null)
+  const [rescheduleOpen, setRescheduleOpen] = useState(false)
+  const [rescheduleDate, setRescheduleDate] = useState(new Date())
+  const [rescheduleTime, setRescheduleTime] = useState('')
+  const [rescheduleSlots, setRescheduleSlots] = useState<SlotGroup[]>([])
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false)
+  const [rescheduleHospitals, setRescheduleHospitals] = useState<{ id: string; label: string }[]>([])
+  const [rescheduleHospitalId, setRescheduleHospitalId] = useState('')
+  const [hospitalDropdownOpen, setHospitalDropdownOpen] = useState(false)
+  const [appointmentType, setAppointmentType] = useState<'clinic' | 'video'>('clinic')
+
+  // Refer state
+  const [referOpen, setReferOpen] = useState(false)
+  const [referApptId, setReferApptId] = useState<string | null>(null)
+  const [favouriteDoctors, setFavouriteDoctors] = useState<FavouriteDoctorListItem[]>([])
+  const [favouriteDoctorIds, setFavouriteDoctorIds] = useState<Set<string>>(new Set())
+  const [referLoading, setReferLoading] = useState(false)
+  const [referSearchQuery, setReferSearchQuery] = useState('')
+  const [bookmarkingIds, setBookmarkingIds] = useState<Set<string>>(new Set())
+
+  const { width, height } = useWindowDimensions()
+  const isTablet = width >= 768
+  const isLandscape = width > height
+  const rescheduleColumns = isTablet || isLandscape ? 4 : 3
+
+  const canConfirmReschedule = Boolean(
+    rescheduleDate &&
+      rescheduleTime &&
+      (rescheduleHospitalId || rescheduleAppt?.hospital?.id) &&
+      !rescheduleSlotsLoading &&
+      !rescheduleSubmitting
+  )
+
+  useEffect(() => {
+    if (!rescheduleOpen || !rescheduleAppt) return
+
+    const doctorId = rescheduleAppt.doctor?.id
+    if (!doctorId) return
+
+    let mounted = true
+    const fetchDoctorHospitals = async () => {
+      try {
+        const res = await getDoctorProfile()
+        if (mounted && res.success && res.data) {
+          const hospitals = (res.data.hospitals ?? []).map((h) => ({
+            id: h.hospital?.id || h.id,
+            label: h.hospital?.name || 'Unknown Hospital',
+          }))
+          setRescheduleHospitals(hospitals)
+          setRescheduleHospitalId((current) => current || rescheduleAppt.hospital?.id || hospitals[0]?.id || '')
+        }
+      } catch (error) {
+        console.log('[DoctorAppointments] fetch doctor hospitals error:', error)
+      }
+    }
+
+    void fetchDoctorHospitals()
+
+    return () => {
+      mounted = false
+    }
+  }, [rescheduleAppt, rescheduleOpen])
+
+  useEffect(() => {
+    if (!rescheduleOpen || !rescheduleAppt) return
+
+    const doctorId = rescheduleAppt.doctor?.id
+    const hospitalId = rescheduleHospitalId || rescheduleAppt.hospital?.id
+
+    if (!doctorId || !hospitalId) {
+      setRescheduleSlots([])
+      setRescheduleTime('')
+      return
+    }
+
+    let mounted = true
+
+    const fetchSlots = async () => {
+      setRescheduleSlotsLoading(true)
+      setRescheduleSlots([])
+      setRescheduleTime('')
+
+      try {
+        const dateStr = toApiDate(rescheduleDate)
+        const responseData = await getDoctorAvailability({
+          doctor_id: doctorId,
+          hospital_id: hospitalId,
+          date: dateStr,
+        })
+        if (mounted) {
+          setRescheduleSlots(normalizeAvailabilitySlots(responseData, appointmentType))
+        }
+      } catch (error) {
+        console.log('[DoctorAppointments] fetch reschedule slots error:', error)
+        if (mounted) Alert.alert('Error', 'Could not load available slots.')
+      } finally {
+        if (mounted) setRescheduleSlotsLoading(false)
+      }
+    }
+
+    void fetchSlots()
+
+    return () => {
+      mounted = false
+    }
+  }, [appointmentType, rescheduleAppt, rescheduleDate, rescheduleHospitalId, rescheduleOpen])
+
+  useEffect(() => {
+    if (!referOpen) return
+
+    let mounted = true
+    const fetchFavouriteDoctors = async () => {
+      try {
+        setReferLoading(true)
+        const res = await getFavouriteDoctors()
+        if (mounted && res.success) {
+          const mapped = (res.data?.favourites ?? []).map((doctor: FavouriteDoctor) => ({
+            id: doctor.id,
+            name: doctor.name,
+            avatar_s3_key: doctor.avatar_s3_key ?? null,
+            location: doctor.location ?? '',
+            experience_years: doctor.experience_years ?? null,
+            specialities: doctor.specialities ?? [],
+            is_verified: doctor.is_verified,
+          }))
+          setFavouriteDoctors(mapped)
+          setFavouriteDoctorIds(new Set(res.data?.favourite_ids ?? []))
+        } else if (mounted) {
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: res.message || 'Failed to load favourite doctors',
+          })
+        }
+      } catch {
+        if (mounted) {
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: 'Failed to load favourite doctors',
+          })
+        }
+      } finally {
+        if (mounted) setReferLoading(false)
+      }
+    }
+
+    void fetchFavouriteDoctors()
+
+    return () => {
+      mounted = false
+    }
+  }, [referOpen])
+
+  const filteredReferDoctors = useMemo(() => {
+    const query = referSearchQuery.trim().toLowerCase()
+    if (!query) return favouriteDoctors
+    return favouriteDoctors.filter(
+      (doctor) =>
+        doctor.name.toLowerCase().includes(query) ||
+        (doctor.specialities[0]?.toLowerCase().includes(query) ?? false)
+    )
+  }, [favouriteDoctors, referSearchQuery])
+
+  const handleToggleBookmark = async (doctor: FavouriteDoctorListItem) => {
+    if (bookmarkingIds.has(doctor.id)) return
+
+    const wasFavourite = favouriteDoctorIds.has(doctor.id)
+
+    setBookmarkingIds((prev) => new Set(prev).add(doctor.id))
+    setFavouriteDoctorIds((prev) => {
+      const next = new Set(prev)
+      if (wasFavourite) next.delete(doctor.id)
+      else next.add(doctor.id)
+      return next
+    })
+
+    try {
+      const res = await toggleFavouriteDoctor(doctor.id)
+      if (res.success === false) {
+        throw new Error(res.message || 'Failed to update favourites')
+      }
+
+      const isFavourite = res.data?.action ? res.data.action === 'added' : !wasFavourite
+      
+      if (res.data?.favourite_ids) {
+        setFavouriteDoctorIds(new Set(res.data.favourite_ids))
+      }
+      
+      if (res.data?.favourites) {
+        const mapped = res.data.favourites.map((doc: FavouriteDoctor) => ({
+          id: doc.id,
+          name: doc.name,
+          avatar_s3_key: doc.avatar_s3_key ?? null,
+          location: doc.location ?? '',
+          experience_years: doc.experience_years ?? null,
+          specialities: doc.specialities ?? [],
+          is_verified: doc.is_verified,
+        }))
+        setFavouriteDoctors(mapped)
+      } else {
+        setFavouriteDoctors((prev) => {
+          if (!isFavourite) return prev.filter((item) => item.id !== doctor.id)
+          return prev.some((item) => item.id === doctor.id) ? prev : [...prev, doctor]
+        })
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: isFavourite ? 'Added to favourites' : 'Removed from favourites',
+      })
+    } catch {
+      setFavouriteDoctorIds((prev) => {
+        const next = new Set(prev)
+        if (wasFavourite) next.add(doctor.id)
+        else next.delete(doctor.id)
+        return next
+      })
+      setFavouriteDoctors((prev) => {
+        if (wasFavourite) {
+          return prev.some((item) => item.id === doctor.id) ? prev : [...prev, doctor]
+        }
+        return prev.filter((item) => item.id !== doctor.id)
+      })
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to update favourites',
+      })
+    } finally {
+      setBookmarkingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(doctor.id)
+        return next
+      })
+    }
+  }
+
+  const handleReferClick = (appointmentId: string) => {
+    setReferApptId(appointmentId)
+    setReferSearchQuery('')
+    setReferOpen(true)
+  }
+
+  const handleReferConfirm = async (doctor: FavouriteDoctorListItem) => {
+    if (!referApptId) return
+
+    try {
+      const res = await referAppointment({
+        appointment_id: referApptId,
+        doctor_id: doctor.id,
+      })
+
+      if (res.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: `Referred appointment to Dr. ${doctor.name}`,
+        })
+        setReferOpen(false)
+      } else {
+        Alert.alert('Error', res.message || 'Failed to refer appointment.')
+      }
+    } catch (error) {
+      console.log('[DoctorAppointments] refer error:', error)
+      Alert.alert('Error', 'Something went wrong. Please try again.')
+    }
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────
+
+  const getStatusLabel = (apt: Appointment): string => {
+    const localStatus = localStatuses[apt.id]
+    const status = (
+      localStatus ??
+      (typeof apt.status === 'string' ? apt.status : (apt.status?.label ?? 'pending'))
+    ).toLowerCase()
+
+    if (status === 'rescheduled') {
+      const rescheduledBy = (localRescheduledBy[apt.id] ?? apt.rescheduled_by ?? '').toLowerCase()
+      if (rescheduledBy === 'doctor') return 'Waiting for Patient Confirmation'
+      if (rescheduledBy === 'patient') return 'Waiting for Your Confirmation'
+      return 'Rescheduled'
+    }
+
+    return localStatus ?? (typeof apt.status === 'string' ? apt.status : (apt.status?.label ?? 'pending'))
+  }
+
+  // ── Action handlers ───────────────────────────────────────────────────────
+
+  const handleConfirmAppointment = async (appointmentId: string) => {
+    try {
+      const res = await updateAppointmentsStatus(appointmentId, '3f9a2c8e-7b61-4d2a-9a3f-5c8e1b2d4f90')
+      if (res.success) {
+        Toast.show({ type: 'success', text1: res.message })
+        setLocalStatuses((prev) => ({ ...prev, [appointmentId]: 'confirmed' }))
+      }
+    } catch {
+      Toast.show({ type: 'error', text1: 'Something went wrong. Please try again.' })
+    }
+  }
+
+  const handleRejectClick = (appointmentId: string) => {
+    setPendingRejectId(appointmentId)
+    setRejectModalVisible(true)
+  }
+
+  const handleCancelReject = () => {
+    setRejectModalVisible(false)
+    setPendingRejectId(null)
+  }
+
+  const handleConfirmReject = async () => {
+    if (!pendingRejectId) return
+    setRejectModalVisible(false)
+    try {
+      const res = await updateAppointmentsStatus(pendingRejectId, 'a7d4e1c2-9f6b-4c83-b2e1-6f3a9d8c7b12')
+      if (res.success) {
+        // Rejection uses a visually distinct toast (red left border) while
+        // still reusing the shared BaseToast styling from the design system.
+        Toast.show({ type: 'rejectSuccess', text1: res.message })
+        setLocalStatuses((prev) => ({ ...prev, [pendingRejectId!]: 'cancelled' }))
+      }
+    } catch {
+      Toast.show({ type: 'error', text1: 'Something went wrong. Please try again.' })
+    } finally {
+      setPendingRejectId(null)
+    }
+  }
+
+  const handleRescheduleDateChange = (date: Date) => {
+    setRescheduleDate(date)
+    setRescheduleTime('')
+    setRescheduleSlots([])
+  }
+
+  const handleRescheduleClick = (apt: Appointment) => {
+    const isVirtual = isVideoMode(apt.appointment_mode)
+    setRescheduleAppt(apt)
+    setRescheduleDate(new Date())
+    setRescheduleTime('')
+    setRescheduleSlots([])
+    setRescheduleHospitals([])
+    setHospitalDropdownOpen(false)
+    setRescheduleHospitalId(apt.hospital?.id || '')
+    setAppointmentType(isVirtual ? 'video' : 'clinic')
+    setRescheduleOpen(true)
+  }
+
+  const handleRescheduleConfirm = async () => {
+    if (!rescheduleAppt || !rescheduleTime) {
+      Alert.alert('Select time', 'Please select a time slot before confirming.')
+      return
+    }
+
+    const hospitalId = rescheduleHospitalId || rescheduleAppt.hospital?.id
+    if (!hospitalId) {
+      Alert.alert('Select hospital', 'Please select a hospital before confirming.')
+      return
+    }
+
+    const selectedSlot = rescheduleSlots
+      .flatMap((group) => group.slots)
+      .find((slot) => slot.start_time === rescheduleTime)
+    
+    const dateStr = toApiDate(rescheduleDate)
+
+    setRescheduleSubmitting(true)
+    try {
+      const res = await rescheduleAppointment({
+        appointment_id: rescheduleAppt.id,
+        appointment_date: dateStr,
+        start_time: rescheduleTime,
+        end_time: selectedSlot?.end_time ?? null,
+        hospital_id: hospitalId,
+        reason: 'Doctor unavailable',
+      })
+
+      if (res.success) {
+        Toast.show({ type: 'success', text1: 'Appointment rescheduled successfully.' })
+        setLocalStatuses((prev) => ({ ...prev, [rescheduleAppt.id]: 'rescheduled' }))
+        setLocalRescheduledBy((prev) => ({ ...prev, [rescheduleAppt.id]: 'doctor' }))
+        
+        setLocalTimes((prev) => ({
+          ...prev,
+          [rescheduleAppt.id]: {
+            start_time: rescheduleTime,
+            end_time: selectedSlot?.end_time ?? null
+          }
+        }))
+
+        setRescheduleOpen(false)
+      } else {
+        Alert.alert('Error', res.message || 'Reschedule failed. Please try again.')
+      }
+    } catch (error: any) {
+      console.log('[DoctorAppointments] reschedule error:', error?.response?.data || error?.message || error)
+      Alert.alert('Error', 'Something went wrong. Please try again.')
+    } finally {
+      setRescheduleSubmitting(false)
+    }
+  }
+
+  const handleStartConsultation = async (appointmentId: string, patientId: string) => {
+    try {
+      const res = await startConsultation(appointmentId)
+      if (res.success) {
+        navigation.navigate(ROUTES.STACK.CONSULTATION, {
+          appointmentId: appointmentId,
+          patientId: patientId,
+        })
+      }
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to generate OTP' })
+    }
+  }
+
+  // ── Filter (by search query) ─────────────────────────────────────────────
+
+  const filteredAppointments = appointments
+    .filter((apt) => getStatusLabel(apt).toLowerCase() !== 'cancelled')
+    .filter((apt) => {
+      if (!searchQuery.trim()) return true
+      const q = searchQuery.toLowerCase()
+      return (
+        (apt.patient?.name ?? '').toLowerCase().includes(q) ||
+        (apt.patient?.id ?? '').toLowerCase().includes(q)
+      )
+    })
+
+  // ── Render each appointment card ─────────────────────────────────────────
+
+  const renderAppointment = ({ item: apt }: { item: Appointment }) => {
+    const statusLabel = getStatusLabel(apt)
+    const isCancelled = statusLabel.toLowerCase() === 'cancelled'
+    const isConfirmed = statusLabel.toLowerCase() === 'confirmed'
+    const rescheduledByDoctor =
+      statusLabel.toLowerCase().includes('waiting for patient') ||
+      (statusLabel === 'rescheduled' &&
+        (localRescheduledBy[apt.id] ?? apt.rescheduled_by ?? '').toLowerCase() === 'doctor')
+
+    const chipStyle = getStatusChipStyle(isCancelled, isConfirmed, rescheduledByDoctor)
+    const video = isVideoMode(apt.appointment_mode)
+
+    const allActionButtons = [
+      { label: 'Confirm', action: 'confirm', bg: '#e8f5e9', Icon: ConfirmIcon },
+      { label: 'Reject', action: 'reject', bg: '#ffeeee', Icon: RejectIcon },
+      { label: 'Reschedule', action: 'reschedule', bg: '#fff8e8', Icon: RescheduleIcon },
+      { label: 'Refer', action: 'refer', bg: '#e8f4f8', Icon: ReferIcon },
+    ]
+
+    const visibleActions = allActionButtons.filter(
+      (btn) =>
+        !(btn.action === 'confirm' && isConfirmed) &&
+        !(btn.action === 'confirm' && rescheduledByDoctor)
+    )
+
+    return (
+      <TouchableOpacity
+        style={[styles.aptCard, isCancelled && styles.aptCardCancelled]}
+        onPress={() => {
+          if (apt.patient?.id && apt.id) {
+            handleStartConsultation(apt.id, apt.patient.id)
+          }
+        }}
+        activeOpacity={0.85}
+      >
+        {/* Mode icon */}
+        <View style={[styles.modeIcon, { backgroundColor: isCancelled ? '#f5f5f5' : '#e8f4f0' }]}>
+          <Text style={[styles.modeIconText, { color: isCancelled ? '#b0b0b0' : '#0c7c7c' }]}>
+            {video ? '📹' : '🏠'}
+          </Text>
+        </View>
+
+        {/* Content */}
+        <View style={styles.aptContent}>
+          {/* Name + Status */}
+          <View style={styles.aptNameRow}>
+            <Text style={[styles.aptName, isCancelled && styles.aptNameMuted]} numberOfLines={1}>
+              {apt.patient?.name ?? 'Unknown Patient'}
+            </Text>
+            <View style={[styles.aptChip, { backgroundColor: chipStyle.bg }]}>
+              <Text style={[styles.aptChipText, { color: chipStyle.color }]} numberOfLines={1}>
+                {statusLabel}
+              </Text>
+            </View>
+          </View>
+
+          {/* Age / gender / time */}
+          <View style={styles.aptMetaRow}>
+            {(apt.patient?.age || apt.patient?.gender) && (
+              <Text style={styles.aptMeta}>
+                {apt.patient?.age} yrs / {apt.patient?.gender}{'  '}
+              </Text>
+            )}
+            <Text style={styles.aptMeta}>🕐 </Text>
+            <Text style={styles.aptMeta}>
+              {formatTime12h(localTimes[apt.id]?.start_time ?? apt.start_time)} –{' '}
+              {formatTime12h(localTimes[apt.id]?.end_time ?? apt.end_time)}
+            </Text>
+          </View>
+
+          {/* Cancelled banner */}
+          {isCancelled && (
+            <View style={styles.cancelledBanner}>
+              <Text style={styles.cancelledBannerIcon}>✕</Text>
+              <Text style={styles.cancelledBannerText}>Doctor rejected the appointment</Text>
+            </View>
+          )}
+
+          {/* Action buttons */}
+          {!isCancelled && (
+            <View style={styles.aptActionRow}>
+              {visibleActions.map((btn) => {
+                const ActionIcon = btn.Icon
+                return (
+                  <TouchableOpacity
+                    key={btn.action}
+                    style={styles.aptActionItem}
+                    onPress={() => {
+                      // Prevent triggering the card's onPress
+                      if (btn.action === 'confirm') handleConfirmAppointment(apt.id)
+                      else if (btn.action === 'reject') handleRejectClick(apt.id)
+                      else if (btn.action === 'reschedule') handleRescheduleClick(apt)
+                      else if (btn.action === 'refer') handleReferClick(apt.id)
+                    }}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={btn.label}
+                  >
+                    <View style={[styles.aptActionIconBox, { backgroundColor: btn.bg }]}>
+                      <ActionIcon width={18} height={18} />
+                    </View>
+                    <Text style={styles.aptActionLabel} numberOfLines={1}>
+                      {btn.label}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    )
+  }
+
+  // ── Root render ───────────────────────────────────────────────────────────
+
+  return (
+    <View style={styles.container}>
+      {/* Search — reuses the same AppInput-based search field as the All Appointments tab */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchInputWrap}>
+          <AppInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search Patient ID, Name..."
+            placeholderTextColor="#98a1aa"
+            containerStyle={styles.searchInputContainer}
+            style={styles.searchInput}
+            contentStyle={styles.searchInputContent}
+            outlineStyle={styles.searchInputOutline}
+            outlineColor="#2e7b7d"
+            activeOutlineColor="#2e7b7d"
+            textColor="#1b2d3c"
+            left={<AppInput.Icon icon="magnify" size={22} color="#9b9b9b" />}
+            right={
+              searchQuery.length > 0 ? (
+                <AppInput.Icon
+                  icon="close-circle"
+                  size={20}
+                  color="#9b9b9b"
+                  onPress={() => setSearchQuery('')}
+                />
+              ) : undefined
+            }
+            autoCorrect={false}
+            returnKeyType="search"
+            noMargin
+          />
+        </View>
+      </View>
+
+      {/* Week selector */}
+      <WeekSelector
+        weekDays={weekDays}
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        selectedDateObj={selectedDateObj}
+      />
+
+      {/* Appointments */}
+      {apptLoading && (
+        <View style={styles.skeletonContainer}>
+          {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
+        </View>
+      )}
+
+      {!apptLoading && apptError !== '' && (
+        <Text style={styles.errorText}>{apptError}</Text>
+      )}
+
+      {!apptLoading && apptError === '' && filteredAppointments.length === 0 && (
+        <Text style={styles.emptyText}>No appointments for the selected date.</Text>
+      )}
+
+      {!apptLoading && apptError === '' && filteredAppointments.length > 0 && (
+        <FlatList
+          data={filteredAppointments}
+          keyExtractor={(item) => item.id}
+          renderItem={renderAppointment}
+          contentContainerStyle={styles.aptList}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+        />
+      )}
+
+      {/* Reject confirm modal */}
+      <RejectConfirmModal
+        visible={rejectModalVisible}
+        onCancel={handleCancelReject}
+        onConfirm={handleConfirmReject}
+      />
+
+      {/* Refer modal */}
+      <Modal
+        visible={referOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setReferOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isTablet && styles.modalCardTablet]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Refer to Doctor</Text>
+              <TouchableOpacity
+                onPress={() => setReferOpen(false)}
+                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              >
+                <Ionicons name="close" size={22} color="#526173" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ padding: 16 }}>
+              <AppInput
+                value={referSearchQuery}
+                onChangeText={setReferSearchQuery}
+                placeholder="Search doctor..."
+                placeholderTextColor="#98a1aa"
+                textColor="#1b2d3c"
+                left={<AppInput.Icon icon="magnify" size={20} color="#9b9b9b" />}
+                autoCorrect={false}
+                noMargin
+              />
+            </View>
+
+            {referLoading ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator color="#0c7c7c" />
+              </View>
+            ) : (
+              <FlatList
+                data={filteredReferDoctors}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+                renderItem={({ item }) => (
+                  <FavouriteDoctorList
+                    doctor={item}
+                    isCompact={true}
+                    showShare={true}
+                    onShare={() => handleReferConfirm(item)}
+                    isBookmarked={favouriteDoctorIds.has(item.id)}
+                    isBookmarking={bookmarkingIds.has(item.id)}
+                    onToggleBookmark={handleToggleBookmark}
+                    placeholderImage={require('../../assets/Banner/doctor.png')}
+                    primaryColor="#0c7c7c"
+                  />
+                )}
+                ListEmptyComponent={
+                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                    <MaterialCommunityIcons name="bookmark-outline" size={40} color="#8ca0a9" />
+                    <Text style={{ color: '#7f98a3', fontSize: 13, marginTop: 10, textAlign: 'center' }}>
+                      No favourite doctors yet
+                    </Text>
+                  </View>
+                }
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reschedule confirm modal */}
+      <Modal
+        visible={rescheduleOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!rescheduleSubmitting) setRescheduleOpen(false)
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isTablet && styles.modalCardTablet]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reschedule Appointment</Text>
+              <TouchableOpacity
+                onPress={() => setRescheduleOpen(false)}
+                disabled={rescheduleSubmitting}
+                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              >
+                <Ionicons name="close" size={22} color="#526173" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+              {rescheduleHospitals.length > 0 ? (
+                <View style={styles.hospitalPicker}>
+                  <Text style={styles.modalLabel}>Choose Hospital</Text>
+                  <TouchableOpacity
+                    style={styles.hospitalSelectTrigger}
+                    activeOpacity={0.85}
+                    onPress={() => setHospitalDropdownOpen((prev) => !prev)}
+                  >
+                    <Text
+                      style={[
+                        styles.hospitalSelectValue,
+                        !rescheduleHospitalId && styles.hospitalSelectPlaceholder,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {rescheduleHospitals.find((h) => h.id === rescheduleHospitalId)?.label || 'Choose Hospital'}
+                    </Text>
+                    <Ionicons
+                      name={hospitalDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                      size={18}
+                      color="#526173"
+                    />
+                  </TouchableOpacity>
+
+                  {hospitalDropdownOpen ? (
+                    <View style={styles.hospitalDropdown}>
+                      <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={rescheduleHospitals.length > 4}>
+                        {rescheduleHospitals.map((hospital) => {
+                          const selected = hospital.id === rescheduleHospitalId
+                          return (
+                            <TouchableOpacity
+                              key={hospital.id}
+                              style={[styles.hospitalDropdownItem, selected && styles.hospitalDropdownItemSelected]}
+                              onPress={() => {
+                                setRescheduleHospitalId(hospital.id)
+                                setRescheduleTime('')
+                                setRescheduleSlots([])
+                                setHospitalDropdownOpen(false)
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.hospitalDropdownText,
+                                  selected && styles.hospitalDropdownTextSelected,
+                                ]}
+                                numberOfLines={2}
+                              >
+                                {hospital.label}
+                              </Text>
+                              {selected ? <Ionicons name="checkmark-circle" size={18} color="#0c7c7c" /> : null}
+                            </TouchableOpacity>
+                          )
+                        })}
+                      </ScrollView>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              <DateSlotPicker
+                selectedDate={rescheduleDate}
+                onDateChange={handleRescheduleDateChange}
+                selectedTime={rescheduleTime}
+                onTimeChange={setRescheduleTime}
+                availableSlots={rescheduleSlots}
+                loading={rescheduleSlotsLoading}
+                timeSlotColumns={rescheduleColumns}
+                disablePast
+                disableBookedSlots
+                dateLabel="Select Date"
+                timeLabel="Select Time"
+                selectedAppointmentType={appointmentType}
+                onAppointmentTypeChange={setAppointmentType}
+              />
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalSecondaryButton, rescheduleSubmitting && styles.buttonDisabled]}
+                onPress={() => setRescheduleOpen(false)}
+                disabled={rescheduleSubmitting}
+              >
+                <Text style={styles.modalSecondaryButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalPrimaryButton, !canConfirmReschedule && styles.buttonDisabled]}
+                onPress={handleRescheduleConfirm}
+                disabled={!canConfirmReschedule}
+              >
+                {rescheduleSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.modalPrimaryButtonText}>Confirm</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles  (unchanged from original)
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+export default DoctorAppointments
 
 const styles = StyleSheet.create({
-	container: {
-		paddingHorizontal: 18,
-		paddingTop: 16,
-		paddingBottom: 18,
-		backgroundColor: '#fff',
-		borderRadius: 12,
-	},
-	header: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginBottom: 14,
-	},
-	heading: { fontSize: 18, fontWeight: '700', color: '#253136' },
-	month: { color: '#0c7c7c', fontWeight: '600', fontSize: 13 },
-	weekContainer: { marginBottom: 16 },
-	weekContent: { paddingRight: 8 },
-	dayBox: {
-		width: 64,
-		height: 64,
-		borderRadius: 8,
-		marginRight: 10,
-		alignItems: 'center',
-		justifyContent: 'center',
-		borderWidth: 1,
-		borderColor: '#b8bec3',
-	},
-	weekendDayBox: { borderColor: '#efb2b2', backgroundColor: '#fff9f9' },
-	selectedDay: { backgroundColor: '#2d7679', borderColor: '#2d7679' },
-	dayText: { fontSize: 12, color: '#6f7680', marginBottom: 2 },
-	dateText: { fontSize: 16, fontWeight: '700', color: '#2c3136', lineHeight: 32 },
-	selectedText: { color: '#fff' },
-	weekendText: { color: '#e25555' },
-	listContainer: { marginTop: 6, paddingBottom: 4 },
-	card: {
-		padding: 14,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: '#d6dbde',
-		marginBottom: 12,
-		backgroundColor: '#fff',
-	},
-	tabletCardInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-	tabletLeft: { flex: 1, minWidth: 0 },
-	tabletRight: { flexShrink: 0 },
-	cancelledCardInner: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	cancelledCardInnerCompact: {
-		flexDirection: 'column',
-		alignItems: 'stretch',
-		justifyContent: 'flex-start',
-	},
-	cancelledCardLeft: { flex: 1, minWidth: 0, paddingRight: 12 },
-	cancelledCardLeftCompact: { paddingRight: 0 },
-	cancelledCardRight: { width: 250, paddingLeft: 12 },
-	cancelledCardRightCompact: { width: '100%', paddingLeft: 0 },
-	patientNameRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		marginBottom: 4,
-	},
-	patientIconBox: {
-		width: 28,
-		height: 28,
-		borderRadius: 6,
-		backgroundColor: '#e8f4ea',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	patientNameWithInfo: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		flex: 1,
-		minWidth: 0,
-		gap: 4,
-	},
-	name: { fontSize: 15, fontWeight: '600', color: '#2a2f34', flexShrink: 1, minWidth: 0 },
-	symptomsInfoButton: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
-		alignItems: 'center',
-		justifyContent: 'center',
-		flexShrink: 0,
-	},
-	symptomsModalOverlay: {
-		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.01)',
-	},
-	symptomsPopover: {
-		position: 'absolute',
-		borderRadius: 14,
-		backgroundColor: '#fff',
-		paddingHorizontal: 22,
-		paddingVertical: 20,
-		borderWidth: 1,
-		borderColor: '#e5edf2',
-		shadowColor: '#172838',
-		shadowOffset: { width: 0, height: 12 },
-		shadowOpacity: 0.16,
-		shadowRadius: 24,
-		elevation: 12,
-	},
-	symptomsPopoverTitle: {
-		fontSize: 17,
-		fontWeight: '700',
-		color: '#1f2d3d',
-		marginBottom: 18,
-	},
-	symptomsPopoverMessage: {
-		fontSize: 15,
-		lineHeight: 22,
-		color: '#526b7a',
-	},
-	symptomsPopoverEmpty: {
-		fontStyle: 'italic',
-	},
-	pill: {
-		paddingHorizontal: 10,
-		paddingVertical: 2,
-		borderRadius: 999,
-		minWidth: 68,
-		alignItems: 'center',
-	},
-	pillPending:          { backgroundColor: '#f8df8d' },
-	pillConfirmed:        { backgroundColor: '#d6eed8' },
-	pillCancelled:        { backgroundColor: '#f8dddd' },
-	pillText:             { fontSize: 12, fontWeight: '600' },
-	pillTextPending:      { color: '#c48508' },
-	pillTextConfirmed:    { color: '#2e7d32' },
-	pillTextCancelled:    { color: '#d84545' },
-	metaRow:              { flexDirection: 'row', alignItems: 'center', gap: 4 },
-	cancelledMetaRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		marginTop: 2,
-		flexWrap: 'wrap',
-	},
-	metaDot: { width: 5, height: 5, borderRadius: 999, backgroundColor: '#cfd5d9' },
-	subText: { fontSize: 13, color: '#5f6973', fontWeight: '500' },
-	cancelDivider: {
-		width: 1,
-		alignSelf: 'stretch',
-		backgroundColor: '#eceff2',
-		marginHorizontal: 4,
-	},
-	cancelDividerCompact: {
-		width: '100%',
-		height: 1,
-		alignSelf: 'auto',
-		marginHorizontal: 0,
-		marginVertical: 10,
-	},
-	cancelNoticeBox: {
-		borderWidth: 1,
-		borderColor: '#f08d8d',
-		backgroundColor: '#fbeaea',
-		borderRadius: 10,
-		minHeight: 64,
-		paddingHorizontal: 14,
-		paddingVertical: 12,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-	},
-	cancelNoticeText: {
-		color: '#df4a4a',
-		fontSize: 15,
-		fontWeight: '500',
-		lineHeight: 20,
-		flex: 1,
-		flexShrink: 1,
-	},
-	actions: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 12,
-		flexWrap: 'wrap',
-		gap: 6,
-	},
-	actionsTablet: { flexWrap: 'nowrap', marginTop: 0 },
-	btn: {
-		alignItems: 'center',
-		justifyContent: 'center',
-		borderRadius: 6,
-		paddingVertical: 4,
-		paddingHorizontal: 8,
-		minWidth: 52,
-	},
-	btnLabel: { fontSize: 10, fontWeight: '500', textAlign: 'center', marginTop: 3 },
-	chevronBtn: { marginLeft: 'auto', paddingLeft: 4 },
-	confirmedMiniBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		backgroundColor: '#eaf7ec',
-		borderWidth: 1,
-		borderColor: '#b6debb',
-		borderRadius: 6,
-		paddingHorizontal: 8,
-		paddingVertical: 6,
-		minWidth: 52,
-	},
-	confirmedMiniText: { fontSize: 10, fontWeight: '600', color: '#2e8b57' },
-	rejectBackdrop: {
-		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.45)',
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingHorizontal: 32,
-	},
-	rejectCard: {
-		backgroundColor: '#fff',
-		borderRadius: 16,
-		paddingHorizontal: 24,
-		paddingTop: 28,
-		paddingBottom: 20,
-		width: '100%',
-		alignItems: 'center',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.18,
-		shadowRadius: 20,
-		elevation: 10,
-	},
-	rejectIconCircle: {
-		width: 56,
-		height: 56,
-		borderRadius: 28,
-		backgroundColor: '#fbeaea',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginBottom: 14,
-	},
-	rejectTitle: {
-		fontSize: 17,
-		fontWeight: '700',
-		color: '#1a2429',
-		textAlign: 'center',
-		marginBottom: 6,
-	},
-	rejectSubtitle: {
-		fontSize: 14,
-		color: '#5f6973',
-		textAlign: 'center',
-		marginBottom: 22,
-		lineHeight: 20,
-	},
-	rejectBtnRow: { flexDirection: 'row', gap: 10, width: '100%' },
-	rejectCancelBtn: {
-		flex: 1,
-		borderRadius: 24,
-		borderWidth: 1.5,
-		borderColor: '#0c7c7c',
-		paddingVertical: 11,
-		alignItems: 'center',
-	},
-	rejectCancelText: { color: '#0c7c7c', fontWeight: '600', fontSize: 14 },
-	rejectConfirmBtn: {
-		flex: 1,
-		borderRadius: 24,
-		backgroundColor: '#d84545',
-		paddingVertical: 11,
-		alignItems: 'center',
-	},
-	rejectConfirmText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-	drawerBackdrop: {
-		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.35)',
-		justifyContent: 'flex-end',
-		padding: 12,
-	},
-	drawerSheet: {
-		backgroundColor: '#fff',
-		borderRadius: 16,
-		maxHeight: '80%',
-		overflow: 'hidden',
-		borderWidth: 1,
-		borderColor: '#edf1f3',
-		width: '100%',
-		flexShrink: 1,
-	},
-	drawerHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		paddingHorizontal: 16,
-		paddingVertical: 14,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5eaee',
-	},
-	drawerCloseBtn: {
-		width: 28,
-		height: 28,
-		borderRadius: 14,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#f3f6f8',
-	},
-	drawerBody: { flexShrink: 1 },
-	drawerBodyContent: { paddingHorizontal: 16, paddingVertical: 14 },
-	drawerTitle: { fontSize: 16, fontWeight: '700', color: '#233238' },
-	drawerSubtitle: { fontSize: 12, color: '#62707a', marginTop: 2 },
-	drawerSectionTitle: {
-		fontSize: 14,
-		color: '#2b3a40',
-		fontWeight: '600',
-		marginTop: 10,
-		marginBottom: 10,
-	},
-	drawerInfoText: { fontSize: 13, color: '#73818a', marginBottom: 8 },
-	hospitalList: { flexDirection: 'column', gap: 8 },
-	hospitalItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		padding: 12,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#e5eaee',
-		backgroundColor: '#fff',
-	},
-	hospitalItemActive: {
-		borderColor: '#0c7c7c',
-		backgroundColor: 'rgba(79, 209, 197, 0.06)',
-	},
-	hospitalIcon: {
-		width: 26,
-		height: 26,
-		backgroundColor: '#0c7c7c',
-		borderTopLeftRadius: 13,
-		borderTopRightRadius: 13,
-		borderBottomRightRadius: 13,
-		borderBottomLeftRadius: 0,
-		transform: [{ rotate: '-45deg' }],
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	hospitalIconActive: { backgroundColor: '#3d7b7b' },
-	hospitalIconText: {
-		color: '#fff',
-		fontSize: 12,
-		fontWeight: '600',
-		transform: [{ rotate: '45deg' }],
-	},
-	hospitalTextCol: { flex: 1 },
-	hospitalName: { fontSize: 14, fontWeight: '600', color: '#233238' },
-	hospitalAddress: { fontSize: 11, color: '#62707a', marginTop: 2 },
-	drawerActions: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		gap: 10,
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderTopWidth: 1,
-		borderTopColor: '#e5eaee',
-	},
-	drawerCancelBtn: {
-		borderRadius: 20,
-		borderWidth: 1,
-		borderColor: '#d5dde2',
-		paddingHorizontal: 22,
-		paddingVertical: 10,
-		flex: 1,
-		alignItems: 'center',
-	},
-	drawerCancelBtnText: { color: '#60717d', fontWeight: '600', fontSize: 14 },
-	drawerConfirmBtn: {
-		borderRadius: 20,
-		backgroundColor: '#3d7b7b',
-		paddingHorizontal: 22,
-		paddingVertical: 10,
-		flex: 1,
-		alignItems: 'center',
-	},
-	drawerConfirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-	skeletonNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-	skeletonMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-	skeletonActionsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
-	error: { color: 'red', fontSize: 13, paddingVertical: 12 },
-	empty: { color: '#999', fontSize: 13, paddingVertical: 16 },
-	referBackdrop: {
-		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.5)',
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingHorizontal: 14,
-	},
-	referCard: {
-		backgroundColor: '#fff',
-		borderRadius: 26,
-		maxHeight: '90%',
-		overflow: 'hidden',
-		shadowColor: '#000',
-		shadowOffset: { width: 8, height: 0 },
-		shadowOpacity: 0.18,
-		shadowRadius: 0,
-		elevation: 12,
-	},
-	referCardCompact: {
-		borderRadius: 18,
-		maxHeight: '86%',
-	},
-	referHeader: {
-		paddingHorizontal: 36,
-		paddingVertical: 36,
-		borderBottomWidth: 1,
-		borderBottomColor: '#dfe7ec',
-	},
-	referHeaderCompact: {
-		paddingHorizontal: 18,
-		paddingVertical: 18,
-	},
-	referTitle: {
-		fontSize: 23,
-		fontWeight: '500',
-		color: '#172838',
-	},
-	referTitleCompact: { fontSize: 20 },
-	referBody: { flexShrink: 1 },
-	referBodyContent: {
-		paddingHorizontal: 36,
-		paddingTop: 24,
-		paddingBottom: 34,
-	},
-	referBodyContentCompact: {
-		paddingHorizontal: 16,
-		paddingTop: 16,
-		paddingBottom: 22,
-	},
-	referSearchBox: {
-		height: 54,
-		borderRadius: 18,
-		borderWidth: 3,
-		borderColor: '#2e7b7d',
-		backgroundColor: '#f8fbff',
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: 18,
-		marginBottom: 64,
-	},
-	referSearchBoxCompact: {
-		height: 44,
-		borderRadius: 14,
-		borderWidth: 2,
-		paddingHorizontal: 12,
-		marginBottom: 28,
-	},
-	referSearchInput: {
-		flex: 1,
-		height: 50,
-		paddingHorizontal: 12,
-		fontSize: 17,
-		color: '#1b2d3c',
-	},
-	referSearchInputCompact: {
-		height: 42,
-		paddingHorizontal: 8,
-		fontSize: 15,
-	},
-	referSectionTitle: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#526b7a',
-		letterSpacing: 0,
-		marginBottom: 30,
-	},
-	referSectionTitleCompact: {
-		fontSize: 13,
-		marginBottom: 18,
-	},
-	referLoadingBox: {
-		paddingVertical: 30,
-		alignItems: 'center',
-	},
-	referEmptyText: {
-		color: '#8a969d',
-		fontSize: 15,
-		paddingVertical: 22,
-		textAlign: 'center',
-	},
-	successBackdrop: {
-	flex: 1,
-	backgroundColor: 'rgba(0,0,0,0.5)',
-	justifyContent: 'center',
-	alignItems: 'center',
-},
-
-successCard: {
-	width: 280,
-	backgroundColor: '#fff',
-	borderRadius: 14,
-	padding: 20,
-	alignItems: 'center',
-},
-
-successTitle: {
-	fontSize: 18,
-	fontWeight: '700',
-	color: '#1a1a1a',
-	marginTop: 10,
-},
-
-successMessage: {
-	fontSize: 14,
-	color: '#555',
-	textAlign: 'center',
-	marginTop: 8,
-	marginBottom: 20,
-},
-
-successBtn: {
-	backgroundColor: '#2e8b57',
-	paddingHorizontal: 20,
-	paddingVertical: 10,
-	borderRadius: 8,
-},
-
-successBtnText: {
-	color: '#fff',
-	fontWeight: '600',
-},
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  // Search — matches the AppointmentList (All Appointments) search field
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  searchInputWrap: {
+    flex: 1,
+  },
+  searchInputContainer: {
+    width: '100%',
+  },
+  searchInput: {
+    backgroundColor: '#ffffff',
+  },
+  searchInputContent: {
+    height: 48,
+    minHeight: 48,
+    paddingVertical: 0,
+    fontSize: 14,
+  },
+  searchInputOutline: {
+    borderRadius: 12,
+  },
+  // Week selector
+  weekHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  weekHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  weekMonth: {
+    fontSize: 13,
+    color: '#0c7c7c',
+    fontWeight: '600',
+  },
+  weekDayRow: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingBottom: 8,
+  },
+  dayCell: {
+    width: 52,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(51,51,51,0.2)',
+  },
+  dayCellSelected: {
+    backgroundColor: '#0c7c7c',
+    borderColor: '#0c7c7c',
+  },
+  dayLabel: {
+    fontSize: 11,
+    color: '#6b7280',
+  },
+  dayLabelSelected: {
+    color: 'rgba(255,255,255,0.8)',
+  },
+  dateLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 2,
+  },
+  dateLabelSelected: {
+    color: '#ffffff',
+  },
+  dateLabelRed: {
+    color: '#e53935',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginHorizontal: 16,
+    marginVertical: 12,
+  },
+  // Skeleton
+  skeletonContainer: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  skeletonCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 14,
+    gap: 12,
+  },
+  skeletonIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#e5e7eb',
+  },
+  skeletonContent: {
+    flex: 1,
+  },
+  skeletonLine: {
+    height: 13,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+  },
+  // Error / empty
+  errorText: {
+    fontSize: 13,
+    color: '#dc2626',
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#9ca3af',
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  // Appointment list
+  aptList: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    paddingTop: 4,
+  },
+  // Appointment card
+  aptCard: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 14,
+    gap: 12,
+    alignItems: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  aptCardCancelled: {
+    opacity: 0.6,
+  },
+  modeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  modeIconText: {
+    fontSize: 16,
+  },
+  aptContent: {
+    flex: 1,
+    gap: 4,
+  },
+  aptNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  aptName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    flexShrink: 1,
+  },
+  aptNameMuted: {
+    color: '#6b7280',
+  },
+  aptChip: {
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    maxWidth: 200,
+  },
+  aptChipText: {
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  aptMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  aptMeta: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  cancelledBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#e8c7c7',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  cancelledBannerIcon: {
+    fontSize: 12,
+    color: '#e53935',
+  },
+  cancelledBannerText: {
+    fontSize: 10,
+    color: '#e53935',
+    fontWeight: '600',
+  },
+  aptActionRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 10,
+    flexWrap: 'wrap',
+  },
+  aptActionItem: {
+    alignItems: 'center',
+    minWidth: 48,
+  },
+  aptActionIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aptActionLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#3949ab',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  // Reject modal
+  rejectBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  rejectCard: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '40%',
+    width: 280,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 24,
+  },
+  rejectTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  rejectSubtitle: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  rejectButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  rejectCancelBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: '#0c7c7c',
+    alignItems: 'center',
+  },
+  rejectCancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0c7c7c',
+  },
+  rejectConfirmBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 50,
+    backgroundColor: '#e53935',
+    alignItems: 'center',
+  },
+  rejectConfirmText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  // Reschedule Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(18, 28, 33, 0.35)',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    maxHeight: '90%',
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  modalCardTablet: {
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#edf2f5',
+  },
+  modalTitle: {
+    flex: 1,
+    color: '#1D2B36',
+    fontSize: 17,
+    fontWeight: '700',
+    paddingRight: 12,
+  },
+  modalScrollContent: {
+    paddingBottom: 8,
+  },
+  hospitalPicker: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  modalLabel: {
+    color: '#536672',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  hospitalSelectTrigger: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: '#d7e2e8',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  hospitalSelectValue: {
+    flex: 1,
+    color: '#1D2B36',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  hospitalSelectPlaceholder: {
+    color: '#8a9aa6',
+  },
+  hospitalDropdown: {
+    marginTop: 8,
+    maxHeight: 190,
+    borderWidth: 1,
+    borderColor: '#d7e2e8',
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  hospitalDropdownItem: {
+    minHeight: 46,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eef3f5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  hospitalDropdownItemSelected: {
+    backgroundColor: '#eefafa',
+  },
+  hospitalDropdownText: {
+    flex: 1,
+    color: '#526173',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  hospitalDropdownTextSelected: {
+    color: '#0c7c7c',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#edf2f5',
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d7e2e8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+  },
+  modalSecondaryButtonText: {
+    color: '#1A2A38',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: '#0c7c7c',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  modalPrimaryButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
 })

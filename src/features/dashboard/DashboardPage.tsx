@@ -12,7 +12,9 @@ import {
 } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
-import HeroSection from './components/HeroSection'
+import QuickServicesSection from './components/QuickServicesSection'
+import MediaPromotionsSection from './components/MediaPromotionsSection'
+import ServicesSection from './components/ServiceSection'
 import SpecialitySection from './components/SpecialitySection'
 import ConsultSection from './components/ConsultSection'
 import PatientQuestionsSection from './components/PatientQuestionsSection'
@@ -71,6 +73,7 @@ export default function DashboardPage() {
 	const [modalType, setModalType] = useState<'success' | 'error' | null>(null)
 
 	const [selectedDate, setSelectedDate] = useState(0)
+	const [doctorAppointmentSearch, setDoctorAppointmentSearch] = useState('')
 
 	// ---------------- WEEK DAYS ----------------
 	const buildWeekDays = () => {
@@ -165,6 +168,8 @@ export default function DashboardPage() {
 			apptError={apptError}
 			weekDays={weekDays}
 			selectedDateObj={weekDays[selectedDate]?.dateObj}
+			searchQuery={doctorAppointmentSearch}
+			setSearchQuery={setDoctorAppointmentSearch}
 		/>
 	)
 
@@ -206,6 +211,11 @@ export default function DashboardPage() {
 		</>
 	)
 	const renderLaboratoryPanel = () => <></>
+	const renderQuickServicesSection = () => (
+		<View style={isDoctor && styles.doctorQuickServicesSpacing}>
+			<QuickServicesSection role={role} />
+		</View>
+	)
 	const renderRoleBasedPanel = () => {
 		switch (role) {
 			case USER_ROLES.DOCTOR:
@@ -234,7 +244,9 @@ export default function DashboardPage() {
 		) {
 			return (
 				<>
-					<HeroSection role={role} />
+					{renderQuickServicesSection()}
+					<ServicesSection />
+					<MediaPromotionsSection role={role} />
 					{renderUserPanel()}
 				</>
 			)
@@ -245,7 +257,8 @@ export default function DashboardPage() {
 				<View style={styles.tabletRow}>
 					{/* HERO */}
 					<View style={[styles.heroColumn, isLandscape && styles.heroColumnHalf]}>
-						<HeroSection role={role} />
+						{renderQuickServicesSection()}
+						<MediaPromotionsSection role={role} />
 					</View>
 
 					{/* ROLE PANEL */}
@@ -256,7 +269,8 @@ export default function DashboardPage() {
 		// Mobile: stack vertically
 		return (
 			<>
-				<HeroSection role={role} />
+				{renderQuickServicesSection()}
+				<MediaPromotionsSection role={role} />
 				{renderRoleBasedPanel()}
 			</>
 		)
@@ -360,6 +374,10 @@ const styles = StyleSheet.create({
 		maxWidth: 1200,
 		alignSelf: 'center',
 		width: '100%',
+	},
+
+	doctorQuickServicesSpacing: {
+		marginTop: 12,
 	},
 
 	tabletRow: {

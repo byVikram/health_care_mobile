@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from './AppTypography'
+import { yellow100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors'
 
 export type AppBottomSheetProps = {
 	visible: boolean
@@ -19,6 +20,12 @@ export type AppBottomSheetProps = {
 	onClose: () => void
 	children: React.ReactNode
 	maxHeightRatio?: number
+	/**
+	 * When false the sheet's own ScrollView is replaced with a plain View,
+	 * allowing the child to own all scrolling behaviour independently.
+	 * Defaults to true (existing behaviour is preserved for all other callers).
+	 */
+	scrollEnabled?: boolean
 }
 
 const DISMISS_DRAG_DISTANCE = 84
@@ -31,6 +38,7 @@ export function AppBottomSheet({
 	onClose,
 	children,
 	maxHeightRatio = MAX_HEIGHT_RATIO,
+	scrollEnabled = true,
 }: AppBottomSheetProps) {
 	const { height } = useWindowDimensions()
 	const closedOffset = height
@@ -124,18 +132,35 @@ export function AppBottomSheet({
 							<AppTypography variant="h4" style={styles.sheetTitle}>
 								{title}
 							</AppTypography>
-							<TouchableOpacity style={styles.sheetCloseButton} onPress={requestClose} activeOpacity={0.82}>
+							<TouchableOpacity
+								style={styles.sheetCloseButton}
+								onPress={requestClose}
+								activeOpacity={0.82}
+							>
 								<MaterialCommunityIcons name="close" size={22} color="#64707d" />
 							</TouchableOpacity>
 						</View>
-						<ScrollView
+						{/* <ScrollView
 							style={styles.sheetScroll}
 							showsVerticalScrollIndicator={false}
 							contentContainerStyle={styles.sheetContent}
 						>
 							{children}
-						</ScrollView>
-						{/* <View style={styles.sheetContent}>{children}</View> */}
+						</ScrollView> */}
+						{scrollEnabled ? (
+							<ScrollView
+								style={styles.sheetScroll}
+								showsVerticalScrollIndicator={false}
+								contentContainerStyle={[
+									styles.sheetContent,
+									{ paddingHorizontal: 22 },
+								]}
+							>
+								{children}
+							</ScrollView>
+						) : (
+							<View style={[styles.sheetScroll, styles.sheetContent]}>{children}</View>
+						)}
 					</Pressable>
 				</Animated.View>
 			</Pressable>
@@ -199,9 +224,12 @@ const styles = StyleSheet.create({
 		marginLeft: 12,
 	},
 	sheetScroll: {
+		flexGrow: 1,
 		flexShrink: 1,
 	},
 	sheetContent: {
 		flexGrow: 0,
+		paddingHorizontal: 30,
+		paddingBottom: 16,
 	},
 })

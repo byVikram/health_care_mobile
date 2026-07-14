@@ -178,7 +178,7 @@ export default function RadiologyDetailsTab({ profileData, onProfileChange }: Ra
 	const [isSaving, setIsSaving] = useState(false)
 	const [logoUri, setLogoUri] = useState('')
 	const [logoUpload, setLogoUpload] = useState<AppPhotoPickerUpload | null>(null)
-	const [isLogoRemoved, setIsLogoRemoved] = useState(false)
+	const [isLogoRemoved, setIsLogoRemoved] = useState(false)  
 	const [successModalVisible, setSuccessModalVisible] = useState(false)
 
 	const updateFormData = <K extends keyof RadiologyDetailsFormData>(key: K, value: RadiologyDetailsFormData[K]) => {

@@ -309,16 +309,13 @@ export default function BookingDetailsScreen() {
 					'React web booking expected header is the same shape: Authorization: Bearer <localStorage access_token>.',
 			})
 
-			const res = await createAppointment(
-				{
-					doctor_id: doctor.id,
-					hospital_id: hospitalId,
-					appointment_mode: appointmentMode === 'offline' ? 'clinic_visit' : 'video_call',
-					appointment_date: appointmentDate,
-					start_time: startTime,
-				},
-				patientToken
-			)
+			const res = await createAppointment({
+				doctor_id: doctor.id,
+				hospital_id: hospitalId,
+				appointment_mode: appointmentMode === 'offline' ? 'clinic_visit' : 'video_call',
+				appointment_date: appointmentDate,
+				start_time: startTime,
+			})
 			console.log('[PatientPayment] booking API response', res)
 			const bookingResponse = mapBookAppointmentResponse(res)
 
