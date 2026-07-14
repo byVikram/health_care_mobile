@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppSkeleton, AppSelect, StatusModal, AppBottomSheet } from '../../components/common'
 import { useAuth } from '../../context/AuthContext'
 import { buildS3Url } from '../../utils/s3Utils'
+import { getStatusStyle } from '../../constants/statusColors'
 import {
 	getLabBookingDetail,
 	submitLabBookingQuote,
@@ -80,18 +81,6 @@ const normalizeStatus = (status: string): string => {
 	}
 }
 
-const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-	'Pending Quote': { bg: '#FFF1D9', text: '#F0A018', dot: '#F0A018' },
-	'Pending Payment': { bg: '#FDE7D8', text: '#D9711B', dot: '#D9711B' },
-	Confirmed: { bg: '#DEE9FF', text: '#3F7EE8', dot: '#3F7EE8' },
-	'Sample Collected': { bg: '#EDE7F6', text: '#673AB7', dot: '#673AB7' },
-	'Report Ready': { bg: '#E0F7FA', text: '#0097A7', dot: '#0097A7' },
-	Completed: { bg: '#DFF5E4', text: '#43A047', dot: '#43A047' },
-	Cancelled: { bg: '#FFE3E7', text: '#E74B5B', dot: '#E74B5B' },
-	Pending: { bg: '#F1F5F9', text: '#64748B', dot: '#64748B' },
-	'Awaiting Sample': { bg: '#FDF2E9', text: '#C2660B', dot: '#C2660B' },
-	Processing: { bg: '#E8F0FE', text: '#3457D5', dot: '#3457D5' },
-}
 
 // Options surfaced in the "Update Status" bottom sheet.
 // Kept in sync with the values accepted by PATCH /api/laboratory/bookings/{id}/status
@@ -878,7 +867,7 @@ export default function BookingDetailsLaboratoryPage() {
 	// ── Derived data ───────────────────────────────────────────────────
 
 	const statusDisplay = normalizeStatus(booking.status)
-	const statusStyle = STATUS_STYLES[statusDisplay] ?? { bg: '#f0f0f0', text: '#555', dot: '#999' }
+	const statusStyle = getStatusStyle(statusDisplay)
 
 	const patientName = booking.patient?.name || booking.patient_name || 'N/A'
 	const patientAge = booking.patient?.age != null ? String(booking.patient.age) : '—'

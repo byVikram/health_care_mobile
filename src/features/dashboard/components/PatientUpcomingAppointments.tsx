@@ -8,11 +8,11 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
-import { getAppointments } from '../../features/doctor/doctorService'
-import MobileAppointmentCard from '../../features/appointment/components/MobileAppointmentCard'
-import type { Appointment } from '../../types/appointment'
-import { ROUTES } from '../../navigation/routes'
-import type { RootStackParamList } from '../../navigation/types'
+import { getAppointments } from '../../doctor/doctorService'
+import MobileAppointmentCard from '../../appointment/components/MobileAppointmentCard'
+import type { Appointment } from '../../../types/appointment'
+import { ROUTES } from '../../../navigation/routes'
+import type { RootStackParamList } from '../../../navigation/types'
 
 export type PatientAppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'rescheduled' | string
 export type PatientAppointmentMode = 'in-person' | 'virtual'
@@ -27,6 +27,7 @@ type ApiAppointment = Appointment & {
 export type PatientAppointmentItem = {
 	id: string
 	doctorName: string
+	doctorAvatar?: string
 	consultationType: string
 	rating: number
 	qualifications: string
@@ -78,10 +79,17 @@ const mapApiAppointment = (appointment: ApiAppointment): PatientAppointmentItem 
 	const appointmentMode = appointment.appointment_mode?.toLowerCase()
 	const isVirtual = appointmentMode === 'online' || appointmentMode === 'video_call'
 	const hospitalAddress = appointment.hospital?.address ?? ''
+	const avatar = appointment.doctor?.avatar_s3_key || 
+	               (appointment.doctor as any)?.avatar_url || 
+	               (appointment.doctor as any)?.avatar || 
+	               (appointment.doctor as any)?.profile_picture || 
+	               (appointment.doctor as any)?.photo_url || 
+	               (appointment.doctor as any)?.image_url;
 
 	return {
 		id: appointment.id,
 		doctorName: appointment.doctor?.name ?? 'Doctor',
+		doctorAvatar: avatar ?? undefined,
 		consultationType: 'Consultation',
 		rating: 4.8,
 		qualifications: '',

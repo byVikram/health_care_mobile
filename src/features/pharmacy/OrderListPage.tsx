@@ -27,6 +27,7 @@ import PaginationBar from '../../components/common/AppPagination'
 import Card from '../../components/common/CommonCard'
 import { getPharmacyOrders } from '../profile/pharmacy/pharmacyService'
 import { useAuth } from '../../context/AuthContext'
+import { getStatusStyle } from '../../constants/statusColors'
 
 // ─────────────────────────────────────────────
 // Types
@@ -78,12 +79,6 @@ type OrderItem = {
 // Constants
 // ─────────────────────────────────────────────
 
-const STATUS_STYLES: Record<NormalizedStatus, { bg: string; text: string }> = {
-	Pending: { bg: '#FFF1D9', text: '#F0A018' },
-	Collected: { bg: '#DFF5E4', text: '#43A047' },
-	Rejected: { bg: '#FFE3E7', text: '#E74B5B' },
-	Packed: { bg: '#DEE9FF', text: '#3F7EE8' },
-}
 
 const DATE_OPTIONS: AppSelectOption[] = [
 	{ label: 'All', value: 'all' },
@@ -250,7 +245,7 @@ interface OrderCardProps {
 }
 
 const OrderCard = React.memo(function OrderCard({ order, onPress, isPatient, isPharmacy }: OrderCardProps) {
-	const statusStyle = STATUS_STYLES[order.status] ?? STATUS_STYLES.Pending
+	const statusStyle = getStatusStyle(order.status)
 
 	// Fixed: case-insensitive check for home delivery
 	const isHomeDelivery = order.raw?.delivery_type?.toUpperCase() === 'HOME_DELIVERY'

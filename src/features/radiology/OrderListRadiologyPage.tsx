@@ -25,6 +25,7 @@ import PaginationBar from '../../components/common/AppPagination'
 
 import { fetchRadiologyBookings, RadiologyBooking } from './RadiologyService'
 import { useAuth } from '../../context/AuthContext'
+import { getStatusStyle } from '../../constants/statusColors'
 import { ROUTES } from '../../navigation/routes'
 import { formatDateForApi, formatGroupDateDisplay, formatShortDateDisplay } from '../../utils/date'
 
@@ -53,13 +54,6 @@ type BookingRow = {
 // Constants
 // ─────────────────────────────────────────────
 
-const STATUS_STYLES: Record<NormalizedStatus, { bg: string; text: string }> = {
-	'Pending Quote': { bg: '#FFF1D9', text: '#F0A018' },
-	'Pending Payment': { bg: '#FDE7D8', text: '#D9711B' },
-	Confirmed: { bg: '#DEE9FF', text: '#3F7EE8' },
-	Completed: { bg: '#DFF5E4', text: '#43A047' },
-	Cancelled: { bg: '#FFE3E7', text: '#E74B5B' },
-}
 
 const DATE_OPTIONS: AppSelectOption[] = [
 	{ label: 'All', value: 'all' },
@@ -185,7 +179,7 @@ interface BookingCardProps {
 }
 
 const BookingCard = React.memo(function BookingCard({ booking, onPress, isRadiologyViewer }: BookingCardProps) {
-	const statusStyle = STATUS_STYLES[booking.status] ?? STATUS_STYLES['Pending Quote']
+	const statusStyle = getStatusStyle(booking.status)
 	const showVerificationFlag =
 		!booking.prescriptionVerified && booking.status !== 'Completed' && booking.status !== 'Cancelled'
 

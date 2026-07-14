@@ -18,7 +18,7 @@ import ConsultSection from './components/ConsultSection'
 import PatientQuestionsSection from './components/PatientQuestionsSection'
 import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
 
-import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
+import PatientUpcomingAppointments from './components/PatientUpcomingAppointments'
 import CommunitySection from './components/CommunitySection'
 import LocationScreen from '../../components/common/LocationScreen'
 import { GPSLocationCard } from '../../components/common/GPSLocationCard'

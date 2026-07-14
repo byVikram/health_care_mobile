@@ -20,6 +20,7 @@ import {
   Platform,
   useWindowDimensions,
   ActivityIndicator,
+  Image,
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
@@ -30,7 +31,7 @@ import { updateAppointmentsStatus } from '../../services/appointmentService'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import DateSlotPicker from '../../components/common/DateSlotPicker'
-import { AppInput } from '../../components/common'
+import { AppInput, AppModal } from '../../components/common'
 import FavouriteDoctorList, { type FavouriteDoctorListItem } from './search/components/FavouriteDoctorList'
 import {
   getDoctorAvailability,
@@ -97,10 +98,10 @@ function getStatusChipStyle(
   isConfirmed: boolean,
   isWaitingPatient: boolean
 ): { bg: string; color: string } {
-  if (isCancelled) return { bg: '#ffeeee', color: '#e53935' }
-  if (isConfirmed) return { bg: '#e8f5e9', color: '#4caf50' }
-  if (isWaitingPatient) return { bg: '#fff3e0', color: '#e65100' }
-  return { bg: '#fff8e8', color: '#f59e0b' }
+  if (isCancelled) return { bg: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }
+  if (isConfirmed) return { bg: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }
+  if (isWaitingPatient) return { bg: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }
+  return { bg: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }
 }
 
 // ── Reject confirm modal ──────────────────────────────────────────────────────
@@ -315,6 +316,11 @@ export function DoctorAppointments({
   const [referSelectedDoctor, setReferSelectedDoctor] = useState<FavouriteDoctorListItem | null>(null)
   const [referNotes, setReferNotes] = useState('')
   const [referSubmitting, setReferSubmitting] = useState(false)
+  const [referDetail, setReferDetail] = useState<{
+    doctorName: string
+    avatar?: string | null
+    notes?: string
+  } | null>(null)
 
   const { width, height } = useWindowDimensions()
   const isTablet = width >= 768
@@ -831,8 +837,17 @@ export function DoctorAppointments({
                 style={styles.referralBadge}
                 onPress={() => {
                   const ref = apt.referral!
-                  const msg = 'Referred by Dr. ' + ref.referring_doctor.name + (ref.notes ? ('\n\nNotes: ' + ref.notes) : '')
-                  Alert.alert('Referral', msg)
+                  const avatar = ref.referring_doctor.avatar_s3_key || 
+                                 ref.referring_doctor.avatar_url || 
+                                 ref.referring_doctor.avatar || 
+                                 ref.referring_doctor.profile_picture || 
+                                 ref.referring_doctor.photo_url || 
+                                 ref.referring_doctor.image_url;
+                  setReferDetail({
+                    doctorName: ref.referring_doctor.name,
+                    avatar: avatar ?? undefined,
+                    notes: ref.notes ?? undefined,
+                  })
                 }}
                 hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               >
@@ -985,160 +1000,130 @@ export function DoctorAppointments({
       />
 
       {/* Refer modal */}
-      <Modal
+      <AppModal
         visible={referOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setReferOpen(false)}
+        onDismiss={() => setReferOpen(false)}
+        title="Refer to Doctor"
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, isTablet && styles.modalCardTablet]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Refer to Doctor</Text>
-              <TouchableOpacity
-                onPress={() => setReferOpen(false)}
-                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-              >
-                <Ionicons name="close" size={22} color="#526173" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ padding: 16 }}>
-              <AppInput
-                value={referSearchQuery}
-                onChangeText={setReferSearchQuery}
-                placeholder="Search doctor..."
-                placeholderTextColor="#98a1aa"
-                textColor="#1b2d3c"
-                left={<AppInput.Icon icon="magnify" size={20} color="#9b9b9b" />}
-                autoCorrect={false}
-                noMargin
-              />
-            </View>
-
-            {(referLoading || (isReferSearching && referSearchLoading)) ? (
-              <View style={{ padding: 40, alignItems: 'center' }}>
-                <ActivityIndicator color="#0c7c7c" />
-              </View>
-            ) : (
-              <FlatList
-                data={filteredReferDoctors}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-                renderItem={({ item }) => (
-                  <FavouriteDoctorList
-                    doctor={item}
-                    isCompact={true}
-                    showShare={true}
-                    onShare={() => handleReferSelectDoctor(item)}
-                    isBookmarked={favouriteDoctorIds.has(item.id)}
-                    isBookmarking={bookmarkingIds.has(item.id)}
-                    onToggleBookmark={handleToggleBookmark}
-                    placeholderImage={require('../../assets/Banner/doctor.png')}
-                    primaryColor="#0c7c7c"
-                  />
-                )}
-                ListEmptyComponent={
-                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                    <MaterialCommunityIcons
-                      name={isReferSearching ? 'account-search-outline' : 'bookmark-outline'}
-                      size={40}
-                      color="#8ca0a9"
-                    />
-                    <Text style={{ color: '#7f98a3', fontSize: 13, marginTop: 10, textAlign: 'center' }}>
-                      {isReferSearching ? 
-                        'No doctors found'
-                        : 'No favourite doctors yet'}
-                    </Text>
-                  </View>
-                }
-              />
-            )}
+        <View style={{ maxHeight: 450 }}>
+          <View style={{ paddingBottom: 16 }}>
+            <AppInput
+              value={referSearchQuery}
+              onChangeText={setReferSearchQuery}
+              placeholder="Search doctor..."
+              placeholderTextColor="#98a1aa"
+              textColor="#1b2d3c"
+              left={<AppInput.Icon icon="magnify" size={20} color="#9b9b9b" />}
+              autoCorrect={false}
+              noMargin
+            />
           </View>
+
+          {(referLoading || (isReferSearching && referSearchLoading)) ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <ActivityIndicator color="#0c7c7c" />
+            </View>
+          ) : (
+            <FlatList
+              data={filteredReferDoctors}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: 24 }}
+              renderItem={({ item }) => (
+                <FavouriteDoctorList
+                  doctor={item}
+                  isCompact={true}
+                  showShare={true}
+                  onShare={() => handleReferSelectDoctor(item)}
+                  isBookmarked={favouriteDoctorIds.has(item.id)}
+                  isBookmarking={bookmarkingIds.has(item.id)}
+                  onToggleBookmark={handleToggleBookmark}
+                  placeholderImage={require('../../assets/Banner/doctor.png')}
+                  primaryColor="#0c7c7c"
+                />
+              )}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                  <MaterialCommunityIcons
+                    name={isReferSearching ? 'account-search-outline' : 'bookmark-outline'}
+                    size={40}
+                    color="#8ca0a9"
+                  />
+                  <Text style={{ color: '#7f98a3', fontSize: 13, marginTop: 10, textAlign: 'center' }}>
+                    {isReferSearching ? 
+                      'No doctors found'
+                      : 'No favourite doctors yet'}
+                  </Text>
+                </View>
+              }
+            />
+          )}
         </View>
-      </Modal>
+      </AppModal>
 
       {/* Referral notes modal — step 2, mirrors web ReferralNotesDialog */}
-      <Modal
+      <AppModal
         visible={referNotesOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
+        onDismiss={() => {
           if (referSubmitting) return
           setReferNotesOpen(false)
         }}
+        title="Refer Patient"
+        dismissable={!referSubmitting}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, isTablet && styles.modalCardTablet]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Refer Patient</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  if (referSubmitting) return
-                  setReferNotesOpen(false)
-                }}
-                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-              >
-                <Ionicons name="close" size={22} color="#526173" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ padding: 16 }}>
-              {referSelectedDoctor && (
-                <View style={styles.referSelectedDoctorCard}>
-                  <View style={styles.referSelectedDoctorAvatar}>
-                    <Text style={styles.referSelectedDoctorInitial}>
-                      {referSelectedDoctor.name.charAt(0)}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.referSelectedDoctorName} numberOfLines={1}>
-                      {referSelectedDoctor.name}
-                    </Text>
-                    <Text style={styles.referSelectedDoctorSpecialty} numberOfLines={1}>
-                      {referSelectedDoctor.specialities?.[0] ?? 'General Physician'}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              <Text style={styles.referNotesLabel}>Referral Notes (optional)</Text>
-              <AppInput
-                value={referNotes}
-                onChangeText={(text: string) => setReferNotes(text.slice(0, 500))}
-                placeholder="Add any clinical notes, reason for referral..."
-                placeholderTextColor="#98a1aa"
-                textColor="#1b2d3c"
-                multiline
-                numberOfLines={4}
-                noMargin
-              />
-              <Text style={styles.referNotesCount}>{referNotes.length}/500</Text>
-
-              <View style={styles.referNotesActions}>
-                <TouchableOpacity
-                  style={[styles.referNotesButton, styles.referNotesButtonOutline]}
-                  disabled={referSubmitting}
-                  onPress={() => setReferNotesOpen(false)}
-                >
-                  <Text style={styles.referNotesButtonOutlineText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.referNotesButton, styles.referNotesButtonFilled]}
-                  disabled={referSubmitting}
-                  onPress={handleReferSubmit}
-                >
-                  {referSubmitting ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.referNotesButtonFilledText}>Refer</Text>
-                  )}
-                </TouchableOpacity>
+        <View>
+          {referSelectedDoctor && (
+            <View style={styles.referSelectedDoctorCard}>
+              <View style={styles.referSelectedDoctorAvatar}>
+                <Text style={styles.referSelectedDoctorInitial}>
+                  {referSelectedDoctor.name.charAt(0)}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.referSelectedDoctorName} numberOfLines={1}>
+                  {referSelectedDoctor.name}
+                </Text>
+                <Text style={styles.referSelectedDoctorSpecialty} numberOfLines={1}>
+                  {referSelectedDoctor.specialities?.[0] ?? 'General Physician'}
+                </Text>
               </View>
             </View>
+          )}
+
+          <Text style={styles.referNotesLabel}>Referral Notes (optional)</Text>
+          <AppInput
+            value={referNotes}
+            onChangeText={(text: string) => setReferNotes(text.slice(0, 500))}
+            placeholder="Add any clinical notes, reason for referral..."
+            placeholderTextColor="#98a1aa"
+            textColor="#1b2d3c"
+            multiline
+            numberOfLines={4}
+            noMargin
+          />
+          <Text style={styles.referNotesCount}>{referNotes.length}/500</Text>
+
+          <View style={styles.referNotesActions}>
+            <TouchableOpacity
+              style={[styles.referNotesButton, styles.referNotesButtonOutline]}
+              disabled={referSubmitting}
+              onPress={() => setReferNotesOpen(false)}
+            >
+              <Text style={styles.referNotesButtonOutlineText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.referNotesButton, styles.referNotesButtonFilled]}
+              disabled={referSubmitting}
+              onPress={handleReferSubmit}
+            >
+              {referSubmitting ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.referNotesButtonFilledText}>Refer</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </AppModal>
 
       {/* Reschedule confirm modal */}
       <Modal
@@ -1262,6 +1247,47 @@ export function DoctorAppointments({
           </View>
         </View>
       </Modal>
+
+      {/* Referral detail modal */}
+      <AppModal
+        visible={referDetail !== null}
+        onDismiss={() => setReferDetail(null)}
+        title="Referral Details"
+      >
+        {referDetail && (
+          <View style={{ paddingVertical: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 }}>
+              <Image
+                source={referDetail.avatar ? { uri: referDetail.avatar } : require('../../assets/Banner/doctor.png')}
+                style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#f3f4f6' }}
+                resizeMode="cover"
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#172838' }}>
+                  {referDetail.doctorName}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#0c7c7c', fontWeight: '600', marginTop: 2 }}>
+                  Referring Doctor
+                </Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#526b7a', marginBottom: 6 }}>
+              Referral Notes
+            </Text>
+            {referDetail.notes ? (
+              <View style={{ backgroundColor: '#f3f4f6', borderRadius: 8, padding: 12 }}>
+                <Text style={{ fontSize: 13, color: '#374151', lineHeight: 18 }}>
+                  {referDetail.notes}
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>
+                No referral notes provided.
+              </Text>
+            )}
+          </View>
+        )}
+      </AppModal>
     </View>
   )
 }

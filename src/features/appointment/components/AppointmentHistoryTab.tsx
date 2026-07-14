@@ -17,6 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppBottomSheet } from '../../../components/common/AppBottomSheet'
 import { getAppointmentById } from '../../../services/appointmentService'
 import { Appointment, AppointmentHistoryEntry } from '../../../types/appointment'
+import { getStatusStyle } from '../../../constants/statusColors'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,15 +75,6 @@ function formatSlotValue(raw: unknown): string | null {
 	return String(raw)
 }
 
-function getStatusColors(status: string): { bg: string; color: string } {
-	const s = status.toLowerCase()
-	if (s === 'confirmed') return { bg: '#e8f5e9', color: '#2e7d32' }
-	if (s === 'cancelled') return { bg: '#ffebee', color: '#c62828' }
-	if (s === 'completed') return { bg: '#e3f2fd', color: '#1565c0' }
-	if (s === 'rescheduled') return { bg: '#fff8e1', color: '#e65100' }
-	return { bg: '#f3e5f5', color: '#6a1b9a' } // pending / other
-}
-
 function getHistoryActionMeta(action: string): { icon: keyof typeof MaterialCommunityIcons.glyphMap; color: string } {
 	const a = action.toLowerCase()
 	if (a === 'created') return { icon: 'check-circle-outline', color: '#43a047' }
@@ -117,7 +109,7 @@ function openOnMap(address: string | undefined, name: string | undefined) {
 // ── Sub-component: StatusChip ───────────────────────────────────────────────
 
 function StatusChip({ status, fontSize = 11, height = 22 }: { status: string; fontSize?: number; height?: number }) {
-	const { bg, color } = getStatusColors(status)
+	const { bg, color } = getStatusStyle(status)
 	return (
 		<View style={[styles.statusChip, { backgroundColor: bg, height, borderRadius: height / 2 }]}>
 			<Text style={[styles.statusChipText, { color, fontSize }]}>{capitalise(status)}</Text>

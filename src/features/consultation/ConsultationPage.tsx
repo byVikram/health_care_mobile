@@ -29,6 +29,7 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import DateSlotPicker from '../../components/common/DateSlotPicker'
 import DoctorHospitalDropdown from '../../components/common/DoctorHospitalDropdown'
+import { AppSkeleton } from '../../components/common'
 import { getDoctorAvailability, getDoctorById, getDoctorProfile, rescheduleAppointment } from '../doctor/doctorService'
 import { APPOINTMENT_STATUS } from '../../constants/constants'
 import { useAuth } from '../../context/AuthContext'
@@ -210,7 +211,7 @@ function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
 						</View>
 						{item.prescription_s3_key ? (
 							<IconButton
-								icon="download"
+								icon="eye"
 								size={20}
 								iconColor={theme.colors.primary}
 								onPress={() => Linking.openURL(item.prescription_s3_key || '')}
@@ -398,9 +399,27 @@ function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
 				</View>
 
 				{loading ? (
-					<View style={{ alignItems: 'center', paddingVertical: 24 }}>
-						<ActivityIndicator size="small" color={theme.colors.primary} />
-						<Text style={{ color: '#666', marginTop: 8, fontSize: 12 }}>Loading history…</Text>
+					<View style={{ marginTop: 8 }}>
+						<View style={styles.historyItem}>
+							<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+								<AppSkeleton width={22} height={22} borderRadius={11} />
+								<View style={{ flex: 1, gap: 4 }}>
+									<AppSkeleton width="60%" height={12} />
+									<AppSkeleton width="40%" height={10} />
+								</View>
+							</View>
+							<AppSkeleton width="100%" height={12} style={{ marginTop: 8 }} />
+						</View>
+						<View style={styles.historyItem}>
+							<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+								<AppSkeleton width={22} height={22} borderRadius={11} />
+								<View style={{ flex: 1, gap: 4 }}>
+									<AppSkeleton width="75%" height={12} />
+									<AppSkeleton width="30%" height={10} />
+								</View>
+							</View>
+							<AppSkeleton width="90%" height={12} style={{ marginTop: 8 }} />
+						</View>
 					</View>
 				) : dicomLoading ? (
 					<View style={{ alignItems: 'center', paddingVertical: 24 }}>
@@ -823,9 +842,86 @@ export default function ConsultationPage() {
 	// ── Loading / error states ──────────────────────────────────────────────────
 	if (patientLoading) {
 		return (
-			<View style={[styles.container, styles.centerContent]}>
-				<ActivityIndicator size="large" color={theme.colors.primary} />
-				<Text style={{ marginTop: 16, color: '#666' }}>Loading details…</Text>
+			<View style={[styles.container, { backgroundColor: '#f8fafc' }]}>
+				{/* Skeleton Header */}
+				<View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 40, paddingBottom: 8, gap: 12, borderBottomWidth: 1, borderBottomColor: '#edf2f7' }}>
+					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+						<AppSkeleton width={32} height={32} borderRadius={16} />
+						<AppSkeleton width={42} height={42} borderRadius={21} />
+						<View style={{ flex: 1, gap: 6 }}>
+							<AppSkeleton width="60%" height={16} />
+							<AppSkeleton width="40%" height={12} />
+						</View>
+						<AppSkeleton width={85} height={32} borderRadius={16} />
+					</View>
+					{/* Skeleton Tabs */}
+					<View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
+						<AppSkeleton width={120} height={20} borderRadius={4} />
+						<AppSkeleton width={100} height={20} borderRadius={4} />
+					</View>
+				</View>
+
+				{/* Skeleton Body Content */}
+				<ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} showsVerticalScrollIndicator={false}>
+					{/* Card 1: Details */}
+					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: '#edf2f7' }}>
+						<AppSkeleton width="40%" height={18} style={{ marginBottom: 8 }} />
+						<View style={{ flexDirection: 'row', gap: 16, marginBottom: 8 }}>
+							<AppSkeleton width={70} height={70} borderRadius={8} />
+							<View style={{ flex: 1, gap: 8, justifyContent: 'center' }}>
+								<AppSkeleton width="80%" height={14} />
+								<AppSkeleton width="60%" height={12} />
+								<AppSkeleton width="50%" height={12} />
+							</View>
+						</View>
+						<Divider style={{ marginVertical: 4 }} />
+						<View style={{ flexDirection: 'row', gap: 16 }}>
+							<View style={{ flex: 1, gap: 8 }}>
+								<AppSkeleton width="90%" height={12} />
+								<AppSkeleton width="80%" height={12} />
+								<AppSkeleton width="75%" height={12} />
+							</View>
+							<View style={{ flex: 1, gap: 8 }}>
+								<AppSkeleton width="85%" height={12} />
+								<AppSkeleton width="70%" height={12} />
+								<AppSkeleton width="80%" height={12} />
+							</View>
+						</View>
+					</View>
+
+					{/* Card 2: History */}
+					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: '#edf2f7' }}>
+						<AppSkeleton width="50%" height={18} style={{ marginBottom: 8 }} />
+						<View style={{ gap: 10 }}>
+							<View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+								<AppSkeleton width={20} height={20} borderRadius={10} />
+								<AppSkeleton width="70%" height={14} />
+							</View>
+							<AppSkeleton width="100%" height={32} borderRadius={6} />
+						</View>
+					</View>
+
+					{/* Card 3: Consultation Notes */}
+					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: '#edf2f7' }}>
+						<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+							<View style={{ gap: 6 }}>
+								<AppSkeleton width={80} height={14} />
+								<AppSkeleton width={50} height={10} />
+							</View>
+							<View style={{ gap: 6, alignItems: 'flex-end' }}>
+								<AppSkeleton width={90} height={14} />
+								<AppSkeleton width={60} height={10} />
+							</View>
+						</View>
+						<Divider style={{ marginVertical: 4 }} />
+						<AppSkeleton width="100%" height={120} borderRadius={8} />
+					</View>
+
+				</ScrollView>
+
+				<View style={styles.stickyFooter}>
+					<AppSkeleton width="100%" height={48} borderRadius={24} />
+				</View>
 			</View>
 		)
 	}
@@ -924,8 +1020,9 @@ export default function ConsultationPage() {
 				onMomentumScrollEnd={handlePagerMomentumEnd}
 				scrollEventThrottle={16}
 			>
-				<ScrollView style={[styles.tabPage, { width: pageWidth }]} contentContainerStyle={styles.content}>
-					<View>
+				<View style={[styles.tabPage, { width: pageWidth }]}>
+					<ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
+						<View>
 						{/* Patient Details */}
 						<Card style={styles.card}>
 							<Card.Content>
@@ -1124,16 +1221,20 @@ export default function ConsultationPage() {
 						{/* Share With */}
 						<ShareWith />
 
-						<Button
-							mode="contained"
-							loading={saving}
-							onPress={handleSaveNotes}
-							style={{ marginHorizontal: 16, marginBottom: 32 }}
-						>
-							Save
-						</Button>
 					</View>
 				</ScrollView>
+
+				<View style={styles.stickyFooter}>
+					<Button
+						mode="contained"
+						loading={saving}
+						onPress={handleSaveNotes}
+						style={styles.saveButton}
+					>
+						Save
+					</Button>
+				</View>
+			</View>
 				<View style={[styles.tabPage, styles.vitalsContent, { width: pageWidth }]}>
 					<VitalsTab patientId={patient?.id || patientId} />
 				</View>
@@ -1194,6 +1295,16 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: '#f5f7fa',
+	},
+	stickyFooter: {
+		backgroundColor: '#ffffff',
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#edf2f7',
+	},
+	saveButton: {
+		borderRadius: 24,
 	},
 	centerContent: {
 		justifyContent: 'center',

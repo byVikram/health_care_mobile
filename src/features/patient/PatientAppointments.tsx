@@ -26,6 +26,7 @@ import Toast from 'react-native-toast-message'
 import { Appointment } from '../../types/appointment'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
+import { getStatusStyle } from '../../constants/statusColors'
 
 // ── Helpers that are imported from doctorService in the web version ───────────
 // Replicated here to avoid cross-feature circular imports in RN.
@@ -42,18 +43,6 @@ async function getAppointments(params: {
   return res.data
 }
 
-// ── Status styles (identical to web STATUS_STYLES) ────────────────────────────
-
-const STATUS_STYLES: Record<string, { color: string; bgColor: string; text: string }> = {
-  confirmed: { color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.1)', text: 'Confirmed' },
-  pending: { color: '#f59e0b', bgColor: 'rgba(245, 158, 11, 0.1)', text: 'Pending' },
-  cancelled: { color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)', text: 'Cancelled' },
-  completed: { color: '#6366f1', bgColor: 'rgba(99, 102, 241, 0.1)', text: 'Completed' },
-  rescheduled: { color: '#8b5cf6', bgColor: 'rgba(139, 92, 246, 0.1)', text: 'Rescheduled' },
-}
-
-const getStatusStyle = (status: string) =>
-  STATUS_STYLES[status?.toLowerCase()] ?? { color: '#64748b', bgColor: '#f1f5f9', text: status }
 
 // ── Formatting (identical to web) ─────────────────────────────────────────────
 
@@ -283,7 +272,9 @@ export function PatientAppointments() {
                   {appt.doctor?.name ?? 'Unknown Doctor'}
                 </Text>
                 <View style={[styles.statusPill, { backgroundColor: style.bgColor }]}>
-                  <Text style={[styles.statusPillText, { color: style.color }]}>{style.text}</Text>
+                  <Text style={[styles.statusPillText, { color: style.color }]}>
+                    {status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
+                  </Text>
                 </View>
               </View>
               <Text style={styles.consultationLabel}>Consultation</Text>

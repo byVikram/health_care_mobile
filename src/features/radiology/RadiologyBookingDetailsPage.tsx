@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 
 import { buildS3Url } from '../../utils/s3Utils'
+import { getStatusStyle } from '../../constants/statusColors'
 import { AppSkeleton, AppSelect, StatusModal } from '../../components/common'
 import {
 	fetchRadiologyBookingDetail,
@@ -57,13 +58,6 @@ const normalizeStatus = (status: string): string => {
 	}
 }
 
-const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-	'Pending Quote': { bg: '#FFF1D9', text: '#F0A018', dot: '#F0A018' },
-	'Pending Payment': { bg: '#FDE7D8', text: '#D9711B', dot: '#D9711B' },
-	Confirmed: { bg: '#DEE9FF', text: '#3F7EE8', dot: '#3F7EE8' },
-	Completed: { bg: '#DFF5E4', text: '#43A047', dot: '#43A047' },
-	Cancelled: { bg: '#FFE3E7', text: '#E74B5B', dot: '#E74B5B' },
-}
 
 const formatDisplayDate = (isoDate: string) =>
 	new Date(isoDate).toLocaleDateString('en-IN', {
@@ -467,7 +461,7 @@ export default function RadiologyBookingDetailsPage() {
 
 	// ── Derived data ──
 	const statusDisplay = normalizeStatus(booking.status)
-	const statusStyle = STATUS_STYLES[statusDisplay] || { bg: '#f0f0f0', text: '#555', dot: '#999' }
+	const statusStyle = getStatusStyle(statusDisplay)
 
 	const patientName = booking.patient?.name || booking.patient_name || 'N/A'
 	const patientAge = booking.patient?.age != null ? String(booking.patient.age) : '—'
