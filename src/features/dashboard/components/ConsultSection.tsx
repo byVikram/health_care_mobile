@@ -18,13 +18,23 @@ interface ConsultCardProps {
 	image: any
 	title: string
 	description: string
+	cardWidth: number
+	cardImageHeight: number
+	cardGap: number
 	onConsult?: () => void
 }
 
-function ConsultCard({ image, title, description, onConsult }: ConsultCardProps) {
+function ConsultCard({ image, title, description, cardWidth, cardImageHeight, cardGap, onConsult }: ConsultCardProps) {
 	return (
-		<TouchableOpacity style={styles.cardContainer} onPress={onConsult} activeOpacity={0.8}>
-			<Image source={image} style={styles.cardImage} resizeMode="cover" />
+		<TouchableOpacity
+			style={[
+				styles.cardContainer,
+				{ width: cardWidth, marginRight: cardGap },
+			]}
+			onPress={onConsult}
+			activeOpacity={0.8}
+		>
+			<Image source={image} style={[styles.cardImage, { height: cardImageHeight }]} resizeMode="cover" />
 
 			<View style={styles.cardBody}>
 				<Text variant="titleSmall" style={styles.cardTitle}>
@@ -79,13 +89,25 @@ function ConsultSection() {
 
 	const isTablet = width >= 768
 
+	// Calculate how many cards to show per visible window, with a peeking card
+	// to signal that the list is scrollable.
+	const HORIZONTAL_PADDING = 16 // container padding on each side
+	const CARD_GAP = 12
+	const visibleCards = isTablet ? 3.2 : 2.15
+	const totalGaps = Math.floor(visibleCards) // gaps between fully-visible cards
+	const cardWidth = Math.floor(
+		(width - HORIZONTAL_PADDING * 2 - CARD_GAP * totalGaps) / visibleCards,
+	)
+	const cardImageHeight = Math.floor(cardWidth * 0.68)
+
 	return (
 		<View style={styles.sectionContainer}>
+
 			{/* HEADER */}
 			<View style={styles.headerRow}>
 				<View style={[styles.titleBorder, { borderLeftColor: theme.colors.primary }]}>
 					<Text variant="titleMedium" style={styles.mainTitle}>
-						Book an appointment
+						Book an Appointment
 					</Text>
 
 					<Text variant="bodySmall">Find experienced doctors across all specialties</Text>
@@ -105,13 +127,23 @@ function ConsultSection() {
 			</View>
 
 			{/* CARDS */}
-			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-				{consults.map((s) => (
+			<ScrollView
+				horizontal
+				showsHorizontalScrollIndicator={false}
+				contentContainerStyle={[
+					styles.scrollContent,
+					{ paddingHorizontal: HORIZONTAL_PADDING },
+				]}
+			>
+				{consults.map((s, index) => (
 					<ConsultCard
 						key={s.id}
 						title={s.title}
 						description={s.description}
 						image={s.image}
+						cardWidth={cardWidth}
+						cardImageHeight={cardImageHeight}
+						cardGap={index < consults.length - 1 ? CARD_GAP : 0}
 						onConsult={() =>
 							navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
 								query: s.title,
@@ -159,22 +191,23 @@ const styles = StyleSheet.create({
 	},
 
 	scrollContent: {
-		paddingHorizontal: 8,
+		paddingBottom: 4,
 	},
 
 	cardContainer: {
-		width: 160,
-		marginHorizontal: 8,
 		marginBottom: 16,
 		backgroundColor: '#fff',
 		borderRadius: 16,
 		overflow: 'hidden',
 		elevation: 2,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.08,
+		shadowRadius: 6,
 	},
 
 	cardImage: {
 		width: '100%',
-		height: 120,
 		backgroundColor: '#f0f4f8',
 	},
 

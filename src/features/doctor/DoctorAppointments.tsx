@@ -4,7 +4,7 @@
 // All business logic (status helpers, confirm/reject/reschedule flow,
 // local state overrides) is preserved exactly.
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import {
   View,
   Text,
@@ -39,10 +39,11 @@ import {
   startConsultation,
   getFavouriteDoctors,
   toggleFavouriteDoctor,
-  referAppointment,
+  getDoctors,
   type SlotGroup,
   type FavouriteDoctor,
 } from './doctorService'
+import { createReferral } from '../referrals/referralService'
 
 // ── Action icons ──────────────────────────────────────────────────────────────
 
@@ -307,7 +308,13 @@ export function DoctorAppointments({
   const [favouriteDoctorIds, setFavouriteDoctorIds] = useState<Set<string>>(new Set())
   const [referLoading, setReferLoading] = useState(false)
   const [referSearchQuery, setReferSearchQuery] = useState('')
+  const [referSearchResults, setReferSearchResults] = useState<FavouriteDoctorListItem[]>([])
+  const [referSearchLoading, setReferSearchLoading] = useState(false)
   const [bookmarkingIds, setBookmarkingIds] = useState<Set<string>>(new Set())
+  const [referNotesOpen, setReferNotesOpen] = useState(false)
+  const [referSelectedDoctor, setReferSelectedDoctor] = useState<FavouriteDoctorListItem | null>(null)
+  const [referNotes, setReferNotes] = useState('')
+  const [referSubmitting, setReferSubmitting] = useState(false)
 
   const { width, height } = useWindowDimensions()
   const isTablet = width >= 768
@@ -443,16 +450,52 @@ export function DoctorAppointments({
     }
   }, [referOpen])
 
-  const filteredReferDoctors = useMemo(() => {
-    const query = referSearchQuery.trim().toLowerCase()
-    if (!query) return favouriteDoctors
-    return favouriteDoctors.filter(
-      (doctor) =>
-        doctor.name.toLowerCase().includes(query) ||
-        (doctor.specialities[0]?.toLowerCase().includes(query) ?? false)
-    )
-  }, [favouriteDoctors, referSearchQuery])
+  const isReferSearching = referSearchQuery.trim().length > 0
 
+  useEffect(() => {
+    if (!referOpen) return
+
+    const trimmed = referSearchQuery.trim()
+    if (!trimmed) {
+      setReferSearchResults([])
+      setReferSearchLoading(false)
+      return
+    }
+
+    let mounted = true
+    const timer = setTimeout(async () => {
+      setReferSearchLoading(true)
+      try {
+        const res = await getDoctors({ search: trimmed, limit: 20 })
+        if (mounted && res.success) {
+          const mapped = (res.data ?? []).map((doctor) => ({
+            id: doctor.id,
+            name: doctor.name,
+            avatar_s3_key: doctor.avatar_s3_key ?? null,
+            location: doctor.location ?? '',
+            experience_years: doctor.experience_years ?? null,
+            specialities: doctor.specialities ?? [],
+            is_verified: doctor.is_verified,
+          }))
+          setReferSearchResults(mapped)
+        } else if (mounted) {
+          setReferSearchResults([])
+        }
+      } catch (error) {
+        console.log('[DoctorAppointments] refer search error:', error)
+        if (mounted) setReferSearchResults([])
+      } finally {
+        if (mounted) setReferSearchLoading(false)
+      }
+    }, 400)
+
+    return () => {
+      mounted = false
+      clearTimeout(timer)
+    }
+  }, [referOpen, referSearchQuery])
+
+  const filteredReferDoctors = isReferSearching ? referSearchResults : favouriteDoctors
   const handleToggleBookmark = async (doctor: FavouriteDoctorListItem) => {
     if (bookmarkingIds.has(doctor.id)) return
 
@@ -531,31 +574,41 @@ export function DoctorAppointments({
   const handleReferClick = (appointmentId: string) => {
     setReferApptId(appointmentId)
     setReferSearchQuery('')
+    setReferSearchResults([])
     setReferOpen(true)
   }
 
-  const handleReferConfirm = async (doctor: FavouriteDoctorListItem) => {
+  const handleReferSelectDoctor = (doctor: FavouriteDoctorListItem) => {
     if (!referApptId) return
+    setReferSelectedDoctor(doctor)
+    setReferNotes('')
+    setReferNotesOpen(true)
+  }
 
+  const handleReferSubmit = async () => {
+    if (!referApptId || !referSelectedDoctor) return
+    setReferSubmitting(true)
     try {
-      const res = await referAppointment({
+      await createReferral({
         appointment_id: referApptId,
-        doctor_id: doctor.id,
+        referred_doctor_id: referSelectedDoctor.id,
+        notes: referNotes.trim() || undefined,
       })
-
-      if (res.success) {
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: `Referred appointment to Dr. ${doctor.name}`,
-        })
-        setReferOpen(false)
-      } else {
-        Alert.alert('Error', res.message || 'Failed to refer appointment.')
-      }
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: `Patient successfully referred to ${referSelectedDoctor.name}`,
+      })
+      setReferNotesOpen(false)
+      setReferOpen(false)
+      setReferSelectedDoctor(null)
+      setReferNotes('')
+      setReferApptId(null)
     } catch (error) {
       console.log('[DoctorAppointments] refer error:', error)
-      Alert.alert('Error', 'Something went wrong. Please try again.')
+      Alert.alert('Error', 'Failed to refer appointment. Please try again.')
+    } finally {
+      setReferSubmitting(false)
     }
   }
 
@@ -759,9 +812,11 @@ export function DoctorAppointments({
       >
         {/* Mode icon */}
         <View style={[styles.modeIcon, { backgroundColor: isCancelled ? '#f5f5f5' : '#e8f4f0' }]}>
-          <Text style={[styles.modeIconText, { color: isCancelled ? '#b0b0b0' : '#0c7c7c' }]}>
-            {video ? '📹' : '🏠'}
-          </Text>
+          {video ? (
+            <MaterialCommunityIcons name="video" size={18} color={isCancelled ? '#b0b0b0' : '#0c7c7c'} />
+          ) : (
+            <MaterialCommunityIcons name="home" size={18} color={isCancelled ? '#b0b0b0' : '#0c7c7c'} />
+          )}
         </View>
 
         {/* Content */}
@@ -771,6 +826,20 @@ export function DoctorAppointments({
             <Text style={[styles.aptName, isCancelled && styles.aptNameMuted]} numberOfLines={1}>
               {apt.patient?.name ?? 'Unknown Patient'}
             </Text>
+            {apt.referral && (
+              <TouchableOpacity
+                style={styles.referralBadge}
+                onPress={() => {
+                  const ref = apt.referral!
+                  const msg = 'Referred by Dr. ' + ref.referring_doctor.name + (ref.notes ? ('\n\nNotes: ' + ref.notes) : '')
+                  Alert.alert('Referral', msg)
+                }}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              >
+                <MaterialCommunityIcons name="call-made" size={10} color="#0c7c7c" />
+                <Text style={styles.referralBadgeText}>referred</Text>
+              </TouchableOpacity>
+            )}
             <View style={[styles.aptChip, { backgroundColor: chipStyle.bg }]}>
               <Text style={[styles.aptChipText, { color: chipStyle.color }]} numberOfLines={1}>
                 {statusLabel}
@@ -947,7 +1016,7 @@ export function DoctorAppointments({
               />
             </View>
 
-            {referLoading ? (
+            {(referLoading || (isReferSearching && referSearchLoading)) ? (
               <View style={{ padding: 40, alignItems: 'center' }}>
                 <ActivityIndicator color="#0c7c7c" />
               </View>
@@ -961,7 +1030,7 @@ export function DoctorAppointments({
                     doctor={item}
                     isCompact={true}
                     showShare={true}
-                    onShare={() => handleReferConfirm(item)}
+                    onShare={() => handleReferSelectDoctor(item)}
                     isBookmarked={favouriteDoctorIds.has(item.id)}
                     isBookmarking={bookmarkingIds.has(item.id)}
                     onToggleBookmark={handleToggleBookmark}
@@ -971,14 +1040,102 @@ export function DoctorAppointments({
                 )}
                 ListEmptyComponent={
                   <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                    <MaterialCommunityIcons name="bookmark-outline" size={40} color="#8ca0a9" />
+                    <MaterialCommunityIcons
+                      name={isReferSearching ? 'account-search-outline' : 'bookmark-outline'}
+                      size={40}
+                      color="#8ca0a9"
+                    />
                     <Text style={{ color: '#7f98a3', fontSize: 13, marginTop: 10, textAlign: 'center' }}>
-                      No favourite doctors yet
+                      {isReferSearching ? 
+                        'No doctors found'
+                        : 'No favourite doctors yet'}
                     </Text>
                   </View>
                 }
               />
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Referral notes modal — step 2, mirrors web ReferralNotesDialog */}
+      <Modal
+        visible={referNotesOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (referSubmitting) return
+          setReferNotesOpen(false)
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isTablet && styles.modalCardTablet]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Refer Patient</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (referSubmitting) return
+                  setReferNotesOpen(false)
+                }}
+                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              >
+                <Ionicons name="close" size={22} color="#526173" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ padding: 16 }}>
+              {referSelectedDoctor && (
+                <View style={styles.referSelectedDoctorCard}>
+                  <View style={styles.referSelectedDoctorAvatar}>
+                    <Text style={styles.referSelectedDoctorInitial}>
+                      {referSelectedDoctor.name.charAt(0)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.referSelectedDoctorName} numberOfLines={1}>
+                      {referSelectedDoctor.name}
+                    </Text>
+                    <Text style={styles.referSelectedDoctorSpecialty} numberOfLines={1}>
+                      {referSelectedDoctor.specialities?.[0] ?? 'General Physician'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              <Text style={styles.referNotesLabel}>Referral Notes (optional)</Text>
+              <AppInput
+                value={referNotes}
+                onChangeText={(text: string) => setReferNotes(text.slice(0, 500))}
+                placeholder="Add any clinical notes, reason for referral..."
+                placeholderTextColor="#98a1aa"
+                textColor="#1b2d3c"
+                multiline
+                numberOfLines={4}
+                noMargin
+              />
+              <Text style={styles.referNotesCount}>{referNotes.length}/500</Text>
+
+              <View style={styles.referNotesActions}>
+                <TouchableOpacity
+                  style={[styles.referNotesButton, styles.referNotesButtonOutline]}
+                  disabled={referSubmitting}
+                  onPress={() => setReferNotesOpen(false)}
+                >
+                  <Text style={styles.referNotesButtonOutlineText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.referNotesButton, styles.referNotesButtonFilled]}
+                  disabled={referSubmitting}
+                  onPress={handleReferSubmit}
+                >
+                  {referSubmitting ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.referNotesButtonFilledText}>Refer</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1564,5 +1721,94 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5,
+  },
+  referSelectedDoctorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#f0f9f9',
+    borderWidth: 1,
+    borderColor: 'rgba(12,124,124,0.2)',
+    marginBottom: 16,
+  },
+  referSelectedDoctorAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#0c7c7c',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  referSelectedDoctorInitial: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  referSelectedDoctorName: {
+    color: '#1D2B36',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  referSelectedDoctorSpecialty: {
+    color: '#6b7c86',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  referNotesLabel: {
+    color: '#1D2B36',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  referNotesCount: {
+    color: '#98a1aa',
+    fontSize: 11,
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  referNotesActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  referNotesButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  referNotesButtonOutline: {
+    borderWidth: 1.5,
+    borderColor: '#0c7c7c',
+  },
+  referNotesButtonOutlineText: {
+    color: '#0c7c7c',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  referNotesButtonFilled: {
+    backgroundColor: '#0c7c7c',
+  },
+  referNotesButtonFilledText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  referralBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#e8f4f8',
+  },
+  referralBadgeText: {
+    color: '#0c7c7c',
+    fontSize: 9,
+    fontWeight: '600',
   },
 })

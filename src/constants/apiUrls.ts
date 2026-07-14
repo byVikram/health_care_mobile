@@ -70,7 +70,16 @@ export const API_ENDPOINTS = {
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
-		REFER: `${BASE_URL}/api/appointments/refer`,
+	},
+	REFERRALS: {
+		CREATE: `${BASE_URL}/api/referrals`,
+		SENT: `${BASE_URL}/api/referrals/sent`,
+		RECEIVED: `${BASE_URL}/api/referrals/received`,
+		DETAIL: (id: string) => `${BASE_URL}/api/referrals/${id}`,
+	},
+	NOTIFICATIONS: {
+		LIST: `${BASE_URL}/api/notifications`,
+		MARK_READ: (id: string) => `${BASE_URL}/api/notifications/${id}/read`,
 	},
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
 
