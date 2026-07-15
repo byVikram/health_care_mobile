@@ -62,6 +62,7 @@ export interface CreateAppointmentPayload {
 	appointment_date: string
 	start_time: string
 	end_time?: string
+	referral_id?: string
 }
 
 export interface CreateAppointmentResponse {
@@ -122,17 +123,6 @@ export const rescheduleAppointment = async (payload: RescheduleAppointmentPayloa
 	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, payload)
 	return res.data
 }
-
-export interface ReferAppointmentPayload {
-	appointment_id: string
-	doctor_id: string
-}
-
-export const referAppointment = async (payload: ReferAppointmentPayload): Promise<AppointmentResponse> => {
-	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.REFER, payload)
-	return res.data
-}
-
 export const startConsultation = async (appointmentId: string): Promise<{ success: boolean }> => {
 	const res = await ApiService.post<{ success: boolean }>(
 		`${API_ENDPOINTS.APPOINTMENTS.GET_BY_ID(appointmentId)}/start-consultation`,

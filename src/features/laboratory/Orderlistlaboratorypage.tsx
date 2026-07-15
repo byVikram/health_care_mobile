@@ -25,6 +25,7 @@ import PaginationBar from '../../components/common/AppPagination'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
 import { getLabBookings } from './laboratoryService'
+import { getStatusStyle } from '../../constants/statusColors'
 import type { LabBooking } from './laboratory'
 import { formatDateForApi, formatGroupDateDisplay, formatShortDateDisplay } from '../../utils/date'
 
@@ -61,15 +62,6 @@ type BookingRow = {
 // Constants
 // ─────────────────────────────────────────────
 
-const STATUS_STYLES: Record<LabBookingStatus, { bg: string; text: string }> = {
-	'Pending Quote': { bg: '#FFF1D9', text: '#F0A018' },
-	'Pending Payment': { bg: '#FDE7D8', text: '#D9711B' },
-	Confirmed: { bg: '#DEE9FF', text: '#3F7EE8' },
-	'Sample Collected': { bg: '#EDE7F6', text: '#673AB7' },
-	'Report Ready': { bg: '#E0F7FA', text: '#0097A7' },
-	Completed: { bg: '#DFF5E4', text: '#43A047' },
-	Cancelled: { bg: '#FFE3E7', text: '#E74B5B' },
-}
 
 const DATE_OPTIONS: AppSelectOption[] = [
 	{ label: 'All', value: 'all' },
@@ -199,7 +191,7 @@ interface BookingCardProps {
 }
 
 const BookingCard = React.memo(function BookingCard({ booking, onPress, isLabViewer }: BookingCardProps) {
-	const statusStyle = STATUS_STYLES[booking.status] ?? STATUS_STYLES['Pending Quote']
+	const statusStyle = getStatusStyle(booking.status)
 
 	return (
 		<TouchableOpacity style={styles.orderCard} onPress={onPress} activeOpacity={0.85}>

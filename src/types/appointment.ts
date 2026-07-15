@@ -64,6 +64,21 @@ export interface Appointment {
   } | null
   history?: AppointmentHistoryEntry[]
   rescheduled_by?: string | null
+  referral?: {
+    id: string
+    referring_doctor: {
+      id: string
+      name: string
+      avatar_s3_key?: string | null
+      avatar_url?: string | null
+      avatar?: string | null
+      profile_picture?: string | null
+      photo_url?: string | null
+      image_url?: string | null
+    }
+    notes: string | null
+    status: string
+  } | null
 }
 
 export interface AppointmentsResponse {

@@ -166,6 +166,7 @@ const normalizeAvailabilityByMode = (
 export default function DoctorDetailPage() {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_DETAIL>>();
+  const referralId = route.params?.referralId;
   const { width } = useWindowDimensions();
 
   const [doctor, setDoctor] = useState<DoctorDetailData | null>(null);
@@ -809,6 +810,7 @@ export default function DoctorDetailPage() {
                 appointmentMode: apptType === "offline" ? "offline" : "online",
                 consultationTypeLabel: apptType === "offline" ? "Clinic Visit" : "Video Call",
                 fee: fee,
+                referralId: referralId,
               },
             });
           }}

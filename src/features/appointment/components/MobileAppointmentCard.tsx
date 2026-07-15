@@ -16,6 +16,7 @@ import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { useAuth } from '../../../context/AuthContext'
 import { AppModal } from '../../../components/common/AppModal'
+import { getStatusStyle } from '../../../constants/statusColors'
 import AppointmentHistoryTab from './AppointmentHistoryTab'
 import RescheduleModal, { type RescheduleResult } from './RescheduleModal'
 
@@ -55,18 +56,6 @@ type MobileAppointmentCardProps<TAppointment extends MobileAppointmentRow = Mobi
 	horizontalInset?: number
 }
 
-const STATUS_STYLES: Record<string, { color: string; bgColor: string; text: string }> = {
-	confirmed: { color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.1)', text: 'Confirmed' },
-	pending: { color: '#f59e0b', bgColor: 'rgba(245, 158, 11, 0.1)', text: 'Pending' },
-	cancelled: { color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)', text: 'Cancelled' },
-	completed: { color: '#6366f1', bgColor: 'rgba(99, 102, 241, 0.1)', text: 'Completed' },
-	rescheduled: { color: '#8b5cf6', bgColor: 'rgba(139, 92, 246, 0.1)', text: 'Rescheduled' },
-}
-
-const getStatusStyle = (status: string) => {
-	const normalized = status?.trim().toLowerCase()
-	return STATUS_STYLES[normalized] ?? { color: '#64748b', bgColor: '#f1f5f9', text: status || 'Pending' }
-}
 
 const parseDateOnly = (value?: string) => {
 	if (!value) return null
@@ -164,6 +153,7 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 	const status = localRow.status || 'pending'
 	const normalizedStatus = status.trim().toLowerCase()
 	const statusStyle = getStatusStyle(status)
+	const displayStatusText = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
 	const displayMode = getModeLabel(localRow)
 	const isVirtual = displayMode === 'Virtual'
 	const displayName = role === 'doctor'
@@ -255,7 +245,10 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 	return (
 		<View style={[styles.card, horizontalInset > 0 && { marginHorizontal: horizontalInset }]}>
 			<View style={styles.headerRow}>
-				<View style={[styles.avatar, { borderColor: statusStyle.color }]}>
+				<View style={[styles.avatar, 
+					// { borderColor: statusStyle.color }
+					{ borderColor: 'transparent' }
+					]}>
 					{displayAvatar ? (
 						<Image source={{ uri: displayAvatar }} style={styles.avatarImage} resizeMode="cover" />
 					) : (
@@ -269,7 +262,7 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 							{displayName}
 						</Text>
 						<View style={[styles.statusBadge, { backgroundColor: statusStyle.bgColor }]}>
-							<Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.text}</Text>
+							<Text style={[styles.statusText, { color: statusStyle.color }]}>{displayStatusText}</Text>
 						</View>
 					</View>
 					<Text style={styles.consultationType}>{localRow.consultationType || 'Consultation'}</Text>

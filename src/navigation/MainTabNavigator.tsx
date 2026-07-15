@@ -151,7 +151,7 @@ export default function MainTabNavigator() {
 				component={ProfilePage}
 				options={{
 					headerShown: true,
-					header: () => <AppScreenHeader title="My Profile" onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} />,
+					header: ({ navigation: screenNavigation }) => <AppScreenHeader title="My Profile" onBack={() => (screenNavigation.canGoBack() ? screenNavigation.goBack() : navigation.navigate(ROUTES.MAIN.HOME))} />,
 				}}
 			/>
 		</Tab.Navigator>

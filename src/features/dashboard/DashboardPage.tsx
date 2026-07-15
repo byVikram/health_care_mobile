@@ -4,8 +4,6 @@ import {
 	RefreshControl,
 	ScrollView,
 	StyleSheet,
-	TouchableOpacity,
-	Text,
 	View,
 	useWindowDimensions,
 	Animated,
@@ -20,7 +18,7 @@ import ConsultSection from './components/ConsultSection'
 import PatientQuestionsSection from './components/PatientQuestionsSection'
 import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
 
-import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
+import PatientUpcomingAppointments from './components/PatientUpcomingAppointments'
 import CommunitySection from './components/CommunitySection'
 import LocationScreen from '../../components/common/LocationScreen'
 import { GPSLocationCard } from '../../components/common/GPSLocationCard'
@@ -38,8 +36,6 @@ import StatusModal from '../../components/common/StatusModal'
 import { useScroll } from '../../context/ScrollContext'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import TreatmentHistoryIcon from '../../assets/icons/treatmenthistory.svg'
-import TreatmentHistoryArrowIcon from '../../assets/icons/treatmenthistory-icon.svg'
 import { ROUTES } from '../../navigation/routes'
 import type { AppNavigationParamList } from '../../navigation/types'
 
@@ -175,23 +171,17 @@ export default function DashboardPage() {
 
 	const renderUserPanel = () => (
 		<>
-			<TouchableOpacity style={styles.treatmentHistoryCard}>
-				<View style={styles.treatmentHistoryLeft}>
-					<TreatmentHistoryIcon width={52} height={52} />
-					<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
-				</View>
-				<TreatmentHistoryArrowIcon width={26} height={26} />
-			</TouchableOpacity>
-
-			<PatientUpcomingAppointments
-				refreshToken={refreshToken}
-				onRefreshComplete={() => setRefreshing(false)}
-				onJoin={() =>
-					navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
-						mode: 'video',
-					})
-				}
-			/>
+			<View style={styles.upcomingAppointmentsWrapper}>
+				<PatientUpcomingAppointments
+					refreshToken={refreshToken}
+					onRefreshComplete={() => setRefreshing(false)}
+					onJoin={() =>
+						navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
+							mode: 'video',
+						})
+					}
+				/>
+			</View>
 
 			<SpecialitySection />
 			<ConsultSection />
@@ -404,31 +394,7 @@ const styles = StyleSheet.create({
 		flex: 0.5,
 	},
 
-	treatmentHistoryCard: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		gap: 12,
-		marginHorizontal: 16,
+	upcomingAppointmentsWrapper: {
 		marginTop: 8,
-		padding: 14,
-		borderWidth: 1,
-		borderColor: '#CFDBDD',
-		borderRadius: 10,
-		backgroundColor: '#fff',
-	},
-
-	treatmentHistoryLeft: {
-		flex: 1,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-	},
-
-	treatmentHistoryTitle: {
-		flex: 1,
-		fontSize: 16,
-		fontWeight: '500',
-		color: '#30353A',
 	},
 })

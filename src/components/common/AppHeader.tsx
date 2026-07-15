@@ -50,8 +50,8 @@ export default function AppHeader({
 	const isPatient = !isDoctor && !isPharmacy && !isRadiology && !isLaboratory
 
 	// Option B GPU animation values
-	const maxScroll = isDoctor ? 40 : 60
-	const headerTranslateY = scrollY
+	const maxScroll = 60
+	const headerTranslateY = scrollY && !isDoctor
 		? scrollY.interpolate({
 				inputRange: [0, maxScroll],
 				outputRange: [0, -maxScroll],
@@ -59,7 +59,7 @@ export default function AppHeader({
 			})
 		: 0
 
-	const topRowOpacity = scrollY
+	const topRowOpacity = scrollY && !isDoctor
 		? scrollY.interpolate({
 				inputRange: [0, maxScroll - 10],
 				outputRange: [1, 0],
@@ -67,7 +67,7 @@ export default function AppHeader({
 			})
 		: 1
 
-	const waveOpacity = scrollY
+	const waveOpacity = scrollY && !isDoctor
 		? scrollY.interpolate({
 				inputRange: [0, maxScroll],
 				outputRange: [1, 0.4],

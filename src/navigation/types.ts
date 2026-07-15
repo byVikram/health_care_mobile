@@ -52,6 +52,7 @@ export type PatientPaymentParams = {
 	appointmentMode: 'offline' | 'online'
 	consultationTypeLabel: string
 	fee: number
+	referralId?: string
 }
 
 export type AppStackParamList = {
@@ -60,7 +61,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.DOCTOR_SEARCH]:
 		| { query?: string; specialityId?: string; specialityName?: string; mode?: 'all' | 'video' | 'clinic' }
 		| undefined
-	[ROUTES.STACK.DOCTOR_DETAIL]: { id: string }
+	[ROUTES.STACK.DOCTOR_DETAIL]: { id: string; referralId?: string }
 	[ROUTES.STACK.FAVOURITE_DOCTOR]: undefined
 	[ROUTES.STACK.NOTIFICATION]: undefined
 	[ROUTES.STACK.CONSULTATION]: ConsultationParams | undefined
@@ -120,6 +121,7 @@ export type AppStackParamList = {
 				appointmentMode: 'offline' | 'online'
 				consultationTypeLabel: string
 				fee: number
+				referralId?: string
 		  }
 		| undefined
 	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: undefined
