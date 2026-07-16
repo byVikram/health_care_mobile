@@ -10,7 +10,7 @@ import { ROUTES } from './routes'
 import type { AppStackParamList } from './types'
 import AuthNavigator from './AuthNavigator'
 import MainTabNavigator from './MainTabNavigator'
-import { AppScreenHeader } from '../components/common'
+import { AppScreenHeader, LocationSelector } from '../components/common'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
@@ -63,6 +63,7 @@ function AuthenticatedNavigator() {
 				component={SearchPage}
 				options={{ headerShown: true, title: 'Find Doctors' }}
 			/>
+
 
 			<AppStack.Screen
 				name={ROUTES.STACK.PATIENT_QUESTIONS_LIST as keyof AppStackParamList}

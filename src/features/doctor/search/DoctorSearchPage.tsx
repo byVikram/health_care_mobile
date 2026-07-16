@@ -10,11 +10,12 @@ import {
 	TouchableOpacity,
 	ScrollView,
 } from 'react-native'
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useRoute, useNavigation } from '@react-navigation/native'
+import { NativeStackScreenProps } from '@react-navigation/native-stack'
 
 import DoctorSearchCard from './components/DoctorSearchCard'
-import { AppTypography, AppSkeleton, AppSelect, AppSelectOption, AppBottomSheet } from '../../../components/common'
+import { AppScreenHeader, AppTypography, AppSkeleton, AppSelect, AppSelectOption, AppBottomSheet, AppInput } from '../../../components/common'
 import { getDoctors, getSpecialities } from '../doctorService'
 import { DoctorSearchItem } from '../../../types/doctor-search'
 import { doctorCardStyles } from './components/DoctorCard.styles'
@@ -377,30 +378,17 @@ export default function DoctorSearchPage() {
 		<View style={styles.container}>
 			{/* Search Bar Row */}
 			<View style={styles.mobileSearchRow}>
-				<TouchableOpacity
+				<AppInput
+					isSearch
+					showMicrophone
+					value={searchQuery}
+					onChangeText={setSearchQuery}
+					placeholder="Search Doctors/Symptoms"
+					noMargin
+					borderRadius={10}
 					style={styles.searchBar}
-					onPress={() => navigation.navigate(ROUTES.STACK.SEARCH)}
-					activeOpacity={0.8}
-				>
-					<MaterialCommunityIcons name="magnify" size={20} color="#9aa0a6" style={styles.searchIcon} />
-					<View style={styles.searchInputContainer}>
-						<AppTypography style={searchQuery ? styles.searchQueryText : styles.searchPlaceholderText}>
-							{searchQuery || 'Search Doctors/Symptoms'}
-						</AppTypography>
-					</View>
-					{searchQuery.length > 0 && (
-						<TouchableOpacity
-							onPress={(e) => {
-								e.stopPropagation()
-								setSearchQuery('')
-								void fetchDoctorsList(1, true)
-							}}
-							style={styles.clearButton}
-						>
-							<MaterialCommunityIcons name="close" size={20} color="#9aa0a6" />
-						</TouchableOpacity>
-					)}
-				</TouchableOpacity>
+					containerStyle={{ flex: 1 }}
+				/>
 				<TouchableOpacity
 					onPress={openFilterModal}
 					style={[styles.filterIconButton, hasActiveFilters && styles.filterIconButtonActive]}

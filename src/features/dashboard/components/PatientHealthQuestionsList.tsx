@@ -1,6 +1,8 @@
 // src/features/dashboard/components/PatientHealthQuestionsList.tsx
 import React, { useState } from 'react'
-import { View, Text, TextInput, FlatList, TouchableOpacity, Image, StyleSheet } from 'react-native'
+import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native'
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
+import { AppInput } from '../../../components/common'
 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MOCK_PATIENT_QUESTIONS, PatientQuestion } from '../../../constants/Questionmockdata'
@@ -70,16 +72,27 @@ export default function PatientHealthQuestionsList({ showViewAll = true, itemLim
 			</View>
 			{/* Card */}
 			<View style={styles.container}>
-				<View style={styles.searchContainer}>
-					<Text style={styles.searchIcon}>🔍</Text>
-
-					<TextInput
-						style={styles.searchInput}
-						placeholder="Search questions..."
-						placeholderTextColor="#999"
-						value={searchQuery}
-						onChangeText={setSearchQuery}
-					/>
+				<View style={styles.searchRow}>
+					<View style={styles.searchInputWrap}>
+						<AppInput
+							isSearch
+							showMicrophone
+							value={searchQuery}
+							onChangeText={setSearchQuery}
+							placeholder="Search questions..."
+							placeholderTextColor="#98a1aa"
+							containerStyle={styles.searchInputContainer}
+							style={styles.searchInput}
+							contentStyle={styles.searchInputContent}
+							outlineStyle={styles.searchInputOutline}
+							outlineColor="#2e7b7d"
+							activeOutlineColor="#2e7b7d"
+							textColor="#1b2d3c"
+							autoCorrect={false}
+							returnKeyType="search"
+							noMargin
+						/>
+					</View>
 				</View>
 
 				<FlatList
@@ -125,26 +138,29 @@ const styles = StyleSheet.create({
 		color: '#0c7c7c',
 		fontWeight: '600',
 	},
-	searchContainer: {
+	searchRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#f7f7f7',
-		paddingHorizontal: 12,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: '#e0e0e0',
+		gap: 8,
 		marginBottom: 12,
 	},
-	searchIcon: {
-		fontSize: 18,
-		marginRight: 8,
-		color: '#888',
+	searchInputWrap: {
+		flex: 1,
+	},
+	searchInputContainer: {
+		width: '100%',
 	},
 	searchInput: {
-		flex: 1,
-		height: 44,
-		fontSize: 16,
-		color: '#333',
+		backgroundColor: '#ffffff',
+	},
+	searchInputContent: {
+		height: 48,
+		minHeight: 48,
+		paddingVertical: 0,
+		fontSize: 14,
+	},
+	searchInputOutline: {
+		borderRadius: 12,
 	},
 	card: {
 		paddingVertical: 12,

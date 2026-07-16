@@ -58,7 +58,8 @@ export default function DashboardPage() {
 	const insets = useSafeAreaInsets()
 	const { role } = useAuth()
 	const isDoctor = role === USER_ROLES.DOCTOR
-	const headerHeight = isDoctor ? insets.top + 84 : insets.top + 146
+	const defaultHeaderHeight = isDoctor ? insets.top + 84 : insets.top + 146
+	const headerHeight = (scrollData?.headerHeight && scrollData.headerHeight > 0) ? scrollData.headerHeight : defaultHeaderHeight
 	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
 
 	const [appointments, setAppointments] = useState<any[]>([])

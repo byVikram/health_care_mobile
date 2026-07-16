@@ -5,9 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { USER_ROLES } from '../../constants/constants'
 import DoctorHospitalDropdown from './DoctorHospitalDropdown'
+import LocationSelector from './LocationSelector'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
 import { useScroll } from '../../context/ScrollContext'
+import { AppInput } from './AppInput'
 
 interface AppHeaderProps {
 	variant?: 'home' | 'search' // home → pressable; search → editable input
@@ -129,7 +131,7 @@ export default function AppHeader({
 		
 		else {
 			console.log('SEARCH')
-			navigation.navigate(ROUTES.STACK.SEARCH)
+			navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH)
 		}
 	}
 
@@ -137,36 +139,58 @@ export default function AppHeader({
 		if (variant === 'search') {
 			// Editable TextInput for SearchPage
 			return (
-				<View style={[styles.searchContainer, { marginTop: 0 }]}>
-					<MaterialCommunityIcons name="magnify" size={24} color="#26727a" />
-					<TextInput
-						style={styles.searchInput}
-						placeholder={searchPlaceholder}
-						placeholderTextColor="#8b8e94"
-						value={searchValue}
-						onChangeText={onSearchChange}
-						onSubmitEditing={onSearchSubmit}
-						editable={isSearchEditable}
-						returnKeyType="search"
-						autoFocus={isSearchEditable}
-					/>
-					<MaterialCommunityIcons name="microphone-outline" size={24} color="#26727a" />
-				</View>
+				<AppInput
+					isSearch
+					showMicrophone
+					placeholder={searchPlaceholder}
+					placeholderTextColor="#8b8e94"
+					value={searchValue}
+					onChangeText={onSearchChange}
+					onSubmitEditing={onSearchSubmit}
+					editable={isSearchEditable}
+					returnKeyType="search"
+					autoFocus={isSearchEditable}
+					noMargin
+					borderRadius={12}
+					containerStyle={{ marginTop: 20 }}
+					style={{ backgroundColor: '#ffffff', height: 48 }}
+					contentStyle={{ height: 48 }}
+					outlineStyle={{ borderWidth: 0 }}
+				/>
 			)
 		} else {
 			// Pressable for dashboard (navigates to appropriate search page)
 			return (
-				<Pressable style={[styles.searchContainer, { marginTop: 0 }]} onPress={handleSearchPress}>
-					<MaterialCommunityIcons name="magnify" size={28} color="#26727a" />
-					<Text style={styles.searchPlaceholder}>{searchPlaceholder}</Text>
-					<MaterialCommunityIcons name="microphone-outline" size={24} color="#26727a" />
+				<Pressable onPress={handleSearchPress} style={{ marginTop: 20 }}>
+					<View pointerEvents="none">
+						<AppInput
+							isSearch
+							showMicrophone
+							placeholder={searchPlaceholder}
+							placeholderTextColor="#8b8e94"
+							editable={false}
+							noMargin
+							borderRadius={12}
+							style={{ backgroundColor: '#ffffff', height: 48 }}
+							contentStyle={{ height: 48 }}
+							outlineStyle={{ borderWidth: 0 }}
+						/>
+					</View>
 				</Pressable>
 			)
 		}
 	}
 
+	const handleLayout = (e: any) => {
+		const height = e.nativeEvent.layout.height
+		if (scrollData?.setHeaderHeight && height > 0) {
+			scrollData.setHeaderHeight(height)
+		}
+	}
+
 	return (
 		<Animated.View
+			onLayout={handleLayout}
 			style={[
 				styles.wrapper,
 				{
@@ -212,11 +236,7 @@ export default function AppHeader({
 						{isDoctor ? (
 							<DoctorHospitalDropdown />
 						) : (
-							<View style={styles.locationRow}>
-								<MaterialCommunityIcons name="map-marker-outline" size={16} color="#f2f4f4" />
-								<Text style={styles.locationText}>{location}</Text>
-								<MaterialCommunityIcons name="chevron-down" size={16} color="#f2f4f4" />
-							</View>
+							<LocationSelector location={location} />
 						)}
 					</View>
 				</Pressable>
@@ -301,18 +321,9 @@ const styles = StyleSheet.create({
 		color: '#5dd0d7',
 		fontWeight: '400',
 	},
-	locationRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 2,
-	},
-	locationText: {
-		color: '#f2f4f4',
-		fontSize: 12,
-		marginHorizontal: 4,
-	},
 	actionsRow: {
 		flexDirection: 'row',
+		alignItems: 'center',
 		gap: 8,
 	},
 	actionButton: {

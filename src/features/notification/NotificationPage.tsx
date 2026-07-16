@@ -61,6 +61,10 @@ export default function NotificationPage({ navigation: navProp }: any) {
 				id: notification.redirect_id,
 				referralId,
 			})
+		} else if (notification.redirect_type === 'appointment' && notification.redirect_id) {
+			navigation.navigate(ROUTES.STACK.APPOINTMENTS, {
+				appointmentId: notification.redirect_id,
+			})
 		}
 	}
 

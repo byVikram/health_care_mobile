@@ -8,9 +8,10 @@ import { AppTypography } from './AppTypography'
 interface AppScreenHeaderProps {
 	title?: string
 	onBack?: () => void
+	rightElement?: React.ReactNode
 }
 
-export default function AppScreenHeader({ title, onBack }: AppScreenHeaderProps) {
+export default function AppScreenHeader({ title, onBack, rightElement }: AppScreenHeaderProps) {
 	const navigation = useNavigation<any>()
 	const insets = useSafeAreaInsets()
 
@@ -37,6 +38,11 @@ export default function AppScreenHeader({ title, onBack }: AppScreenHeaderProps)
 				<View style={styles.headerText}>
 					<AppTypography style={styles.title}>{title}</AppTypography>
 				</View>
+				{rightElement && (
+					<View style={styles.rightElementContainer}>
+						{rightElement}
+					</View>
+				)}
 			</View>
 		</View>
 	)
@@ -86,16 +92,19 @@ const styles = StyleSheet.create({
 		borderColor: 'rgba(255,255,255,0.3)',
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginRight: 12,
 	},
 	headerText: {
 		flex: 1,
-		minWidth: 0,
+		justifyContent: 'center',
+		paddingHorizontal: 8,
 	},
 	title: {
-		fontSize: 20,
-		lineHeight: 26,
-		fontWeight: '600',
 		color: '#ffffff',
+		fontSize: 20,
+		fontWeight: '600',
+	},
+	rightElementContainer: {
+		justifyContent: 'center',
+		alignItems: 'flex-end',
 	},
 })

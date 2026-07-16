@@ -70,7 +70,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.SCREEN_CAPTURE_TEST]: undefined
 	[ROUTES.STACK.DOCTOR_WELCOME]: undefined
 	[ROUTES.STACK.ACCOUNT]: undefined
-	[ROUTES.STACK.APPOINTMENTS]: undefined
+	[ROUTES.STACK.APPOINTMENTS]: { appointmentId?: string } | undefined
 	[ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: PatientPaymentParams }

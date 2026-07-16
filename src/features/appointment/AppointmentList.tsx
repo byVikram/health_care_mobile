@@ -319,11 +319,12 @@ function AppointmentCard({
 
 interface AppointmentListProps {
   viewAs?: 'doctor' | 'patient'
+  route?: any
 }
 
 const PAGE_SIZE = 10
 
-export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListProps) {
+export default function AppointmentList({ viewAs: viewAsProp, route }: AppointmentListProps) {
   const [viewAs, setViewAs] = useState<'doctor' | 'patient'>('patient')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -399,6 +400,14 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
       console.log('[fetchHospitals] failed to load hospitals:', err)
     }
   }
+
+  // ── Handle route params ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (route?.params?.appointmentId) {
+      setDetailsAppointmentId(route.params.appointmentId)
+      setDetailsDrawerOpen(true)
+    }
+  }, [route?.params?.appointmentId])
 
   // ── Fetch appointments ────────────────────────────────────────────────────
 
@@ -669,6 +678,8 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
       <View style={styles.searchRow}>
         <View style={styles.searchInputWrap}>
           <AppInput
+            isSearch
+            showMicrophone
             value={search}
             onChangeText={(text) => {
               setSearch(text)
@@ -683,20 +694,6 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
             outlineColor="#2e7b7d"
             activeOutlineColor="#2e7b7d"
             textColor="#1b2d3c"
-            left={<AppInput.Icon icon="magnify" size={22} color="#9b9b9b" />}
-            right={
-              search.length > 0 ? (
-                <AppInput.Icon
-                  icon="close-circle"
-                  size={20}
-                  color="#9b9b9b"
-                  onPress={() => {
-                    setSearch('')
-                    setPage(1)
-                  }}
-                />
-              ) : undefined
-            }
             autoCorrect={false}
             returnKeyType="search"
             noMargin
@@ -755,7 +752,7 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
       >
         <View style={styles.filterSheetBody}>
           <View style={styles.filterGroup}>
-            <AppTypography variant="subtitle2" style={styles.filterGroupLabel}>Hospital</AppTypography>
+            <AppTypography variant="subtitle" style={styles.filterGroupLabel}>Hospital</AppTypography>
             <AppSelect
               options={hospitalOptions}
               value={draftFilterHospital}
@@ -770,7 +767,7 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
           </View>
 
           <View style={styles.filterGroup}>
-            <AppTypography variant="subtitle2" style={styles.filterGroupLabel}>Mode</AppTypography>
+            <AppTypography variant="subtitle" style={styles.filterGroupLabel}>Mode</AppTypography>
             {renderModeChips()}
           </View>
 
