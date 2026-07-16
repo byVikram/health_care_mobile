@@ -92,6 +92,7 @@ export const API_ENDPOINTS = {
 
 	PATIENT: {
 		ME: `${BASE_URL}/api/patients/me`,
+		APPOINTMENT_HOSPITALS: `${BASE_URL}/api/patients/appointments/hospitals`,
 		DETAILS: `${BASE_URL}/api/patients/me/details`,
 		GET_BY_PUBLIC_ID: (publicId: string) => `${BASE_URL}/api/patients/${publicId}/details`,
 		GET_BY_ID: (id: string) => `${BASE_URL}/api/patients/${id}/details`,

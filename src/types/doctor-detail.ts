@@ -53,6 +53,10 @@ export interface DoctorDetailData {
 		registration_number: string
 		degrees?: DoctorDetailDegree[]
 	}
+	additionalDetail?: {
+		areas_of_expertise?: { id: string; label: string }[]
+		treatments?: { id: string; label: string }[]
+	}
 	specialities: string[]
 	hospitals: DoctorDetailHospital[]
 	availability: DoctorAvailability[]

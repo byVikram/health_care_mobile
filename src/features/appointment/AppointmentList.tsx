@@ -18,6 +18,7 @@ import {
   Animated,
   Easing,
   Image,
+  ScrollView,
 } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -37,11 +38,6 @@ import RescheduleModal, { type RescheduleResult } from './components/RescheduleM
 const FALLBACK_CONFIRMED_STATUS_ID = '3f9a2c8e-7b61-4d2a-9a3f-5c8e1b2d4f90'
 const FALLBACK_REJECTED_STATUS_ID = 'a7d4e1c2-9f6b-4c83-b2e1-6f3a9d8c7b12'
 const TERMINAL_STATUSES = new Set(['cancelled'])
-const HOSPITAL_FILTER_OPTIONS: AppSelectOption[] = [
-  { value: 'all', label: 'All' },
-  { value: 'manipal', label: 'Manipal Hospital' },
-  { value: 'apollo', label: 'Apollo Hospital' },
-]
 
 const MODE_FILTER_OPTIONS: AppSelectOption[] = [
   { value: 'all', label: 'All Modes' },
@@ -348,10 +344,9 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [filterHospital, setFilterHospital] = useState('all')
   const [filterMode, setFilterMode] = useState('all')
-  const [filterDate, setFilterDate] = useState('')
   const [draftFilterHospital, setDraftFilterHospital] = useState('all')
   const [draftFilterMode, setDraftFilterMode] = useState('all')
-  const [draftFilterDate, setDraftFilterDate] = useState('')
+  const [hospitalOptions, setHospitalOptions] = useState<AppSelectOption[]>([{ value: 'all', label: 'All' }])
 
   const [rescheduleOpen, setRescheduleOpen] = useState(false)
   const [rescheduleRow, setRescheduleRow] = useState<AppointmentRow | null>(null)
@@ -363,13 +358,47 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
   useEffect(() => {
     if (viewAsProp) {
       setViewAs(viewAsProp)
+      fetchHospitals(viewAsProp)
       return
     }
     AsyncStorage.getItem('role').then((role) => {
-      if (role === 'patient') setViewAs('patient')
-      else setViewAs('doctor')
+      const activeRole = role === 'patient' ? 'patient' : 'doctor'
+      setViewAs(activeRole)
+      fetchHospitals(activeRole)
     })
   }, [viewAsProp])
+
+  const fetchHospitals = async (role: 'doctor' | 'patient') => {
+    try {
+      if (role === 'patient') {
+        const res = await ApiService.get<{ data: { hospital_id: string; hospital_name: string }[] }>(
+          API_ENDPOINTS.PATIENT.APPOINTMENT_HOSPITALS
+        )
+        if (res.data?.data) {
+          const options: AppSelectOption[] = [{ value: 'all', label: 'All Hospitals' }]
+          res.data.data.forEach((h) => {
+            options.push({ value: h.hospital_id, label: h.hospital_name })
+          })
+          setHospitalOptions(options)
+        }
+      } else {
+        const res = await ApiService.get<{ data: { hospital: { id: string; name: string } }[] }>(
+          API_ENDPOINTS.DOCTOR_PROFILE.HOSPITALS
+        )
+        if (res.data?.data) {
+          const options: AppSelectOption[] = [{ value: 'all', label: 'All Hospitals' }]
+          res.data.data.forEach((h) => {
+            if (h.hospital) {
+              options.push({ value: h.hospital.id, label: h.hospital.name })
+            }
+          })
+          setHospitalOptions(options)
+        }
+      }
+    } catch (err) {
+      console.log('[fetchHospitals] failed to load hospitals:', err)
+    }
+  }
 
   // ── Fetch appointments ────────────────────────────────────────────────────
 
@@ -571,29 +600,23 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
     ) : null
 
   const hasActiveFilters =
-    filterHospital !== 'all' || filterMode !== 'all' || filterDate !== ''
+    filterHospital !== 'all' || filterMode !== 'all'
 
   const filteredRows = useMemo(() => {
-    const apiFilterDate = filterDate ? convertDisplayDateToApiDate(filterDate) : null
-
     return rows.filter((row) => {
-      if (filterHospital !== 'all' && !(row.hospitalName ?? '').toLowerCase().includes(filterHospital)) {
+      if (filterHospital !== 'all' && row.hospitalId !== filterHospital) {
         return false
       }
       if (filterMode !== 'all' && !(row.appointmentMode ?? '').toLowerCase().includes(filterMode)) {
         return false
       }
-      if (apiFilterDate && row.appointmentDate !== apiFilterDate) {
-        return false
-      }
       return true
     })
-  }, [rows, filterHospital, filterMode, filterDate])
+  }, [rows, filterHospital, filterMode])
 
   const openFilterSheet = () => {
     setDraftFilterHospital(filterHospital)
     setDraftFilterMode(filterMode)
-    setDraftFilterDate(filterDate)
     setFilterSheetOpen(true)
   }
 
@@ -604,7 +627,6 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
   const applyFilters = () => {
     setFilterHospital(draftFilterHospital)
     setFilterMode(draftFilterMode)
-    setFilterDate(draftFilterDate)
     setPage(1)
     closeFilterSheet()
   }
@@ -612,15 +634,17 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
   const resetFilters = () => {
     setDraftFilterHospital('all')
     setDraftFilterMode('all')
-    setDraftFilterDate('')
     setFilterHospital('all')
     setFilterMode('all')
-    setFilterDate('')
     setPage(1)
   }
 
   const renderModeChips = () => (
-    <View style={styles.filterChipRow}>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.filterChipRow}
+    >
       {MODE_FILTER_OPTIONS.map((option) => {
         const selected = option.value === draftFilterMode
         return (
@@ -636,7 +660,7 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
           </TouchableOpacity>
         )
       })}
-    </View>
+    </ScrollView>
   )
 
   return (
@@ -731,45 +755,35 @@ export default function AppointmentList({ viewAs: viewAsProp }: AppointmentListP
       >
         <View style={styles.filterSheetBody}>
           <View style={styles.filterGroup}>
-            <AppTypography style={styles.filterGroupLabel}>Hospital</AppTypography>
+            <AppTypography variant="subtitle2" style={styles.filterGroupLabel}>Hospital</AppTypography>
             <AppSelect
-              options={HOSPITAL_FILTER_OPTIONS}
+              options={hospitalOptions}
               value={draftFilterHospital}
               onSelect={setDraftFilterHospital}
               placeholder="Select Hospital"
               size="medium"
-              borderRadius={10}
+              borderRadius={16}
               customCardStyle={styles.filterSelectCard}
-              borderColor="#EAECF0"
+              borderColor="#c1e0de"
               style={styles.filterSelectFill}
             />
           </View>
 
           <View style={styles.filterGroup}>
-            <AppTypography style={styles.filterGroupLabel}>Mode</AppTypography>
+            <AppTypography variant="subtitle2" style={styles.filterGroupLabel}>Mode</AppTypography>
             {renderModeChips()}
-          </View>
-
-          <View style={styles.filterGroup}>
-            <AppTypography style={styles.filterGroupLabel}>Date</AppTypography>
-            <AppCalendar
-              value={draftFilterDate}
-              onChange={setDraftFilterDate}
-              placeholder="Select Date"
-              modalTitle="Select Date"
-            />
           </View>
 
           <View style={styles.filterSheetActions}>
             <TouchableOpacity
-              style={styles.filterResetButton}
+              style={[styles.filterActionBtn, styles.filterResetButton]}
               activeOpacity={0.8}
               onPress={resetFilters}
             >
               <Text style={styles.filterResetText}>Reset</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.filterApplyButton}
+              style={[styles.filterActionBtn, styles.filterApplyButton]}
               activeOpacity={0.85}
               onPress={applyFilters}
             >
@@ -863,18 +877,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filterGroup: {
-    gap: 10,
+    gap: 8,
     width: '100%',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   filterGroupLabel: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '800',
-    color: '#64707d',
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    alignSelf: 'stretch',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: '#333333',
+    alignSelf: 'flex-start',
+    marginLeft: 4,
   },
   filterSelectFill: {
     width: '100%',
@@ -887,64 +900,63 @@ const styles = StyleSheet.create({
   },
   filterChipRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
+    gap: 8,
+    paddingHorizontal: 2,
   },
   filterChip: {
-    minHeight: 38,
-    minWidth: 74,
-    borderRadius: 19,
-    paddingHorizontal: 18,
+    minHeight: 36,
+    borderRadius: 18,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f2f6fb',
+    backgroundColor: '#f0f7f7',
   },
   filterChipActive: {
-    backgroundColor: '#1f5f68',
+    backgroundColor: '#eef8f7',
+    borderWidth: 1,
+    borderColor: '#c1e0de',
   },
   filterChipText: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '500',
     color: '#64707d',
   },
   filterChipTextActive: {
-    color: '#ffffff',
+    color: '#2e7d74',
+    fontWeight: '600',
   },
   filterSheetActions: {
     flexDirection: 'row',
     gap: 12,
-    paddingTop: 8,
+    paddingTop: 16,
+    paddingBottom: 8,
     borderTopWidth: 1,
-    borderTopColor: '#EAECF0',
+    borderTopColor: '#f0f0f0',
+  },
+  filterActionBtn: {
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterResetButton: {
     flex: 1,
-    height: 46,
-    borderRadius: 23,
     borderWidth: 1,
-    borderColor: '#D7E5E8',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: '#c1e0de',
     backgroundColor: '#ffffff',
   },
   filterResetText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#64707d',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2e7d74',
   },
   filterApplyButton: {
     flex: 2,
-    height: 46,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1f5f68',
+    backgroundColor: '#1f6e71',
   },
   filterApplyText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#ffffff',
   },
   // Skeleton
