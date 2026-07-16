@@ -18,6 +18,7 @@ import {
 	AppInput,
 	AppSelect,
 	AppSelectOption,
+	AppMultiSelect,
 	AppTypography,
 	StatusModal,
 } from '../../../../components/common'
@@ -25,8 +26,11 @@ import { useAuth } from '../../../../context/AuthContext'
 import {
 	getDoctorProfile,
 	getSpecialities,
+	getAreasOfExpertise,
+	getTreatmentsOffering,
 	mapDoctorProfileApi,
 	updateDoctorProfessionalDetails,
+	updateDoctorAdditionalDetails,
 } from '../../../doctor/doctorService'
 
 type Option = AppSelectOption
@@ -42,7 +46,7 @@ type ProfessionalFormData = {
 	about: string
 }
 
-type SheetMode = 'expertise' | 'treatment' | null
+
 
 function FormRow({
 	children,
@@ -175,53 +179,33 @@ function SelectDropdown({
 	)
 }
 
-// Chip list with "+ add" trigger that opens AppBottomSheet
-function ChipListField({
+function MultiSelectDropdown({
 	label,
-	items,
-	onRemove,
-	onOpenSheet,
-	emptyText,
+	values,
+	placeholder,
+	options,
+	onChange,
 	required = false,
 }: {
 	label: string
-	items: string[]
-	onRemove: (index: number) => void
-	onOpenSheet: () => void
-	emptyText: string
+	values: string[]
+	placeholder: string
+	options: Option[]
+	onChange: (values: string[]) => void
 	required?: boolean
 }) {
 	return (
 		<View style={styles.fieldGroup}>
-			<View style={styles.fieldHeaderRow}>
-				<FieldLabel label={label} required={required} />
-				<TouchableOpacity onPress={onOpenSheet} activeOpacity={0.8} style={styles.addBtn}>
-					<AppTypography variant="caption" style={styles.addBtnText}>
-						+ add
-					</AppTypography>
-				</TouchableOpacity>
-			</View>
-			<View style={styles.chipsContainer}>
-				{items.length === 0 ? (
-					<AppTypography variant="body" style={styles.emptyText}>
-						{emptyText}
-					</AppTypography>
-				) : (
-					items.map((item, index) => (
-						<View key={`${item}-${index}`} style={styles.chip}>
-							<AppTypography variant="caption" style={styles.chipText}>
-								{item}
-							</AppTypography>
-							<TouchableOpacity
-								onPress={() => onRemove(index)}
-								hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-							>
-								<MaterialCommunityIcons name="close-circle" size={16} color="#0c7c7c" />
-							</TouchableOpacity>
-						</View>
-					))
-				)}
-			</View>
+			{label ? <FieldLabel label={label} required={required} /> : null}
+			<AppMultiSelect
+				values={values}
+				placeholder={placeholder}
+				options={options}
+				onChange={onChange}
+				borderRadius={10}
+				size="form"
+				noMargin
+			/>
 		</View>
 	)
 }
@@ -258,73 +242,39 @@ export default function ProfessionalDetailsTab() {
 		submitText?: string
 	} | null>(null)
 
-	// Bottom sheet state
-	const [sheetMode, setSheetMode] = useState<SheetMode>(null)
-	const [sheetDraft, setSheetDraft] = useState('')
+	const [expertiseOptions, setExpertiseOptions] = useState<Option[]>([])
+	const [treatmentOptions, setTreatmentOptions] = useState<Option[]>([])
 
 	const updateFormData = <K extends keyof ProfessionalFormData>(key: K, value: ProfessionalFormData[K]) => {
 		setFormData((prev) => ({ ...prev, [key]: value }))
-	}
-
-	const openSheet = (mode: SheetMode) => {
-		setSheetDraft('')
-		setSheetMode(mode)
-	}
-
-	const closeSheet = () => {
-		setSheetMode(null)
-		setSheetDraft('')
-	}
-
-	const handleSheetSave = () => {
-		const trimmed = sheetDraft.trim()
-		if (!trimmed) return
-
-		if (sheetMode === 'expertise') {
-			const isDuplicate = formData.areasOfExpertise.some(
-				(e) => e.toLowerCase() === trimmed.toLowerCase()
-			)
-			if (!isDuplicate) {
-				updateFormData('areasOfExpertise', [...formData.areasOfExpertise, trimmed])
-			}
-		} else if (sheetMode === 'treatment') {
-			const isDuplicate = formData.treatments.some(
-				(t) => t.toLowerCase() === trimmed.toLowerCase()
-			)
-			if (!isDuplicate) {
-				updateFormData('treatments', [...formData.treatments, trimmed])
-			}
-		}
-
-		closeSheet()
-	}
-
-	const handleRemoveExpertise = (index: number) => {
-		updateFormData(
-			'areasOfExpertise',
-			formData.areasOfExpertise.filter((_, i) => i !== index)
-		)
-	}
-
-	const handleRemoveTreatment = (index: number) => {
-		updateFormData(
-			'treatments',
-			formData.treatments.filter((_, i) => i !== index)
-		)
 	}
 
 	useEffect(() => {
 		const fetchSpecialities = async () => {
 			try {
 				setIsLoadingSpecialities(true)
-				const res = await getSpecialities()
-				const formatted = (res.data ?? []).map((item: { id: string; label: string }) => ({
+				const [resSpec, resExp, resTreat] = await Promise.all([
+					getSpecialities(),
+					getAreasOfExpertise(),
+					getTreatmentsOffering(),
+				])
+				const formattedSpec = (resSpec.data ?? []).map((item: { id: string; label: string }) => ({
 					value: item.id,
 					label: item.label,
 				}))
-				setSpecialities(formatted)
+				const formattedExp = (resExp.data ?? []).map((item: { id: string; label: string }) => ({
+					value: item.id,
+					label: item.label,
+				}))
+				const formattedTreat = (resTreat.data ?? []).map((item: { id: string; label: string }) => ({
+					value: item.id,
+					label: item.label,
+				}))
+				setSpecialities(formattedSpec)
+				setExpertiseOptions(formattedExp)
+				setTreatmentOptions(formattedTreat)
 			} catch (error) {
-				console.log('[ProfessionalDetailsTab] failed to fetch specialities:', error)
+				console.log('[ProfessionalDetailsTab] failed to fetch specialities/master data:', error)
 			} finally {
 				setIsLoadingSpecialities(false)
 			}
@@ -411,19 +361,25 @@ export default function ProfessionalDetailsTab() {
 			return
 		}
 
-		const payload = {
+		const profPayload = {
 			experience_years: experienceYears !== '' && !isNaN(parsedExperience) ? parsedExperience : 0,
 			current_designation: formData.currentDesignation.trim(),
-			areas_of_expertise: formData.areasOfExpertise,
-			treatments: formData.treatments,
 			registration_number: formData.registrationNumber.trim(),
 			registration_proof_s3_key: formData.registrationProof.trim() || null,
 			about: formData.about.trim(),
 		}
 
+		const addlPayload = {
+			areas_of_expertise: formData.areasOfExpertise,
+			treatments: formData.treatments,
+		}
+
 		try {
 			setIsSaving(true)
-			await updateDoctorProfessionalDetails(payload)
+			await Promise.all([
+				updateDoctorProfessionalDetails(profPayload),
+				updateDoctorAdditionalDetails(addlPayload),
+			])
 			await syncProfileAfterSave()
 			setStatusModal({
 				visible: true,
@@ -457,16 +413,7 @@ export default function ProfessionalDetailsTab() {
 	const rowSpacing = isMobile ? 18 : isLandscape ? 22 : 20
 	const selectedLabel = formData.specialization_label
 
-	const sheetTitle =
-		sheetMode === 'expertise'
-			? 'Add Area of Expertise'
-			: sheetMode === 'treatment'
-				? 'Add Treatment & Procedure'
-				: ''
-	const sheetPlaceholder =
-		sheetMode === 'expertise'
-			? 'e.g. Interventional Cardiology'
-			: 'e.g. Coronary Angioplasty'
+
 
 	if (isLoadingProfile) {
 		return (
@@ -533,20 +480,20 @@ export default function ProfessionalDetailsTab() {
 								/>
 							</FormRow>
 
-							<ChipListField
+							<MultiSelectDropdown
 								label="Areas of Expertise"
-								items={formData.areasOfExpertise}
-								onRemove={handleRemoveExpertise}
-								onOpenSheet={() => openSheet('expertise')}
-								emptyText="No areas of expertise added yet."
+								values={formData.areasOfExpertise}
+								onChange={(val) => updateFormData('areasOfExpertise', val)}
+								options={expertiseOptions}
+								placeholder="Select areas of expertise"
 							/>
 
-							<ChipListField
+							<MultiSelectDropdown
 								label="Treatments & Procedures"
-								items={formData.treatments}
-								onRemove={handleRemoveTreatment}
-								onOpenSheet={() => openSheet('treatment')}
-								emptyText="No treatments or procedures added yet."
+								values={formData.treatments}
+								onChange={(val) => updateFormData('treatments', val)}
+								options={treatmentOptions}
+								placeholder="Select treatments or procedures"
 							/>
 						</View>
 					</View>
@@ -589,42 +536,7 @@ export default function ProfessionalDetailsTab() {
 				
 				</View>
 
-				{/* Shared bottom sheet for expertise + treatments */}
-				<AppBottomSheet
-					visible={sheetMode !== null}
-					title={sheetTitle}
-					onClose={closeSheet}
-				>
-					<KeyboardAvoidingView
-						behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-						keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
-					>
-						<View style={styles.sheetBody}>
-							<View style={styles.sheetInputBox}>
-								<TextInput
-									style={styles.sheetTextInput}
-									value={sheetDraft}
-									onChangeText={setSheetDraft}
-									placeholder={sheetPlaceholder}
-									placeholderTextColor="#b0bcc0"
-									multiline={sheetMode === 'treatment'}
-									autoFocus
-									textAlignVertical={sheetMode === 'treatment' ? 'top' : 'center'}
-								/>
-							</View>
-							<TouchableOpacity
-								style={[styles.sheetSaveBtn, !sheetDraft.trim() && styles.sheetSaveBtnDisabled]}
-								onPress={handleSheetSave}
-								activeOpacity={0.8}
-								disabled={!sheetDraft.trim()}
-							>
-								<AppTypography variant="subtitle" style={styles.sheetSaveBtnText}>
-									Save
-								</AppTypography>
-							</TouchableOpacity>
-						</View>
-					</KeyboardAvoidingView>
-				</AppBottomSheet>
+
 			</ScrollView>
 			<AppStickyFooter onPress={handleSave} disabled={isSaving} buttonStyle={styles.saveButton}>
 				Save
@@ -722,15 +634,6 @@ const styles = StyleSheet.create({
 		color: '#8f8f8f',
 		fontWeight: '500',
 	},
-	addBtn: {
-		paddingVertical: 2,
-		paddingHorizontal: 8,
-	},
-	addBtnText: {
-		color: '#0c7c7c',
-		fontWeight: '600',
-		fontSize: 13,
-	},
 	requiredMark: {
 		color: '#ef5d5d',
 		fontSize: 14,
@@ -746,36 +649,6 @@ const styles = StyleSheet.create({
 		height: 100,
 		paddingTop: 12,
 		paddingBottom: 12,
-	},
-	// Chip list
-	chipsContainer: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		marginTop: 4,
-		gap: 8,
-	},
-	chip: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#f0f7f7',
-		borderWidth: 1,
-		borderColor: '#d4e8ea',
-		borderRadius: 20,
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		gap: 6,
-	},
-	chipText: {
-		fontSize: 13,
-		color: '#1f6e71',
-		fontWeight: '500',
-	},
-	emptyText: {
-		color: '#9aabb0',
-		fontSize: 14,
-		fontStyle: 'italic',
-		marginLeft: 2,
-		marginTop: 2,
 	},
 	noticeCard: {
 		backgroundColor: 'rgba(43,111,113,0.07)',

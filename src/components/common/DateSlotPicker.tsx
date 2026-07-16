@@ -21,13 +21,19 @@ function startOfDay(date: Date) {
 	return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
+function getSundayOfWeek(d: Date) {
+	const result = new Date(d)
+	result.setDate(result.getDate() - result.getDay())
+	return startOfDay(result)
+}
+
 function getFocusedRangeStart(selectedDate: Date | null, today: Date, disablePast: boolean) {
 	const todayStart = startOfDay(today)
 	const selectedStart = selectedDate ? startOfDay(selectedDate) : todayStart
 
-	if (disablePast && selectedStart < todayStart) return todayStart
+	const focalDate = (disablePast && selectedStart < todayStart) ? todayStart : selectedStart
 
-	return selectedStart
+	return getSundayOfWeek(focalDate)
 }
 
 export type PickProps = {
@@ -88,20 +94,14 @@ export default function DateSlotPicker(props: PickProps) {
 
 	const today = new Date()
 	const [weekStart, setWeekStart] = useState(() => {
-	return disablePast
-		? startOfDay(today)
-		: getFocusedRangeStart(selectedDate, today, disablePast)
+		return getFocusedRangeStart(selectedDate, today, disablePast)
 	})
 	const weekDates = getWeekDates(weekStart)
 	const monthLabel = `${MONTHS[weekDates[0].getMonth()]} ${weekDates[0].getFullYear()}`
 
 	useEffect(() => {
-		if (disablePast && !selectedDate) {
-			setWeekStart(startOfDay(new Date()))
-		} else {
-			setWeekStart(getFocusedRangeStart(selectedDate, new Date(), disablePast))
-		}
-		}, [selectedDate?.toDateString(), disablePast])
+		setWeekStart(getFocusedRangeStart(selectedDate, new Date(), disablePast))
+	}, [selectedDate?.toDateString(), disablePast])
 
 	const isSameDay = (a: Date, b: Date) =>
 		a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()

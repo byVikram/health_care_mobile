@@ -83,9 +83,9 @@ export const AppMultiSelect = ({
 
   const selectedValues = useMemo(() => Array.from(new Set(values)), [values]);
   const selectedValueSet = useMemo(() => new Set(selectedValues), [selectedValues]);
-  const selectedLabels = useMemo(
-    () => options.filter((option) => selectedValueSet.has(option.value)).map((option) => option.label),
-    [options, selectedValueSet],
+  const selectedOptions = useMemo(
+    () => selectedValues.map((value) => options.find((o) => o.value === value) || { value, label: value }),
+    [selectedValues, options],
   );
 
   const closeMenu = () => setVisible(false);
@@ -105,7 +105,6 @@ export const AppMultiSelect = ({
     onChange([...selectedValues, value]);
   };
 
-  const displayValue = selectedLabels.join(", ");
   const resolvedBorderColor = errorText ? theme.colors.error : borderColor ?? (size === "medium" ? "#ccc" : "#a7d3db");
   const selectHeight = SELECT_HEIGHTS[size];
   const horizontalPadding = SELECT_HORIZONTAL_PADDING[size];
@@ -149,24 +148,44 @@ export const AppMultiSelect = ({
             {
               borderColor: resolvedBorderColor,
               borderRadius,
-              height: selectHeight,
               minHeight: selectHeight,
             },
             customCardStyle,
           ]}
         >
           <View style={[styles.dropdownContent, { paddingHorizontal: horizontalPadding }]}>
-            <AppTypography
-              variant="body"
-              style={[
-                styles.dropdownText,
-                { fontSize: textSize },
-                { color: displayValue ? theme.colors.onSurfaceVariant : "#7c878d" },
-              ]}
-              numberOfLines={1}
-            >
-              {displayValue || placeholder}
-            </AppTypography>
+            {selectedValues.length === 0 ? (
+              <AppTypography
+                variant="body"
+                style={[
+                  styles.dropdownText,
+                  { fontSize: textSize, color: "#7c878d" },
+                ]}
+                numberOfLines={1}
+              >
+                {placeholder}
+              </AppTypography>
+            ) : (
+              <View style={styles.chipsContainer}>
+                {selectedOptions.map((option, index) => (
+                  <View key={`${option.value}-${index}`} style={styles.chip}>
+                    <AppTypography variant="caption" style={styles.chipText}>
+                      {option.label}
+                    </AppTypography>
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        toggleValue(option.value);
+                      }}
+                      style={styles.chipCloseBtn}
+                      hitSlop={6}
+                    >
+                      <MaterialCommunityIcons name="close" size={14} color="#1f6e71" />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
             <MaterialCommunityIcons
               name={visible ? "chevron-up" : "chevron-down"}
               size={20}
@@ -277,6 +296,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
+    paddingVertical: 4,
   },
   dropdownText: {
     flex: 1,
@@ -330,5 +350,31 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     marginLeft: 8,
+  },
+  chipsContainer: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingVertical: 4,
+    marginRight: 8,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#eef8f7",
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    gap: 4,
+  },
+  chipText: {
+    fontSize: 13,
+    color: "#2e7d74",
+    fontWeight: "500",
+  },
+  chipCloseBtn: {
+    padding: 2,
+    borderRadius: 10,
   },
 });
