@@ -93,6 +93,10 @@ export interface DoctorProfileApiData {
 	hospitals: DoctorProfileApiHospital[]
 	availability: DoctorProfileApiAvailability[]
 	achievements?: DoctorProfileApiAchievement[]
+	additionalDetail?: {
+		areas_of_expertise: Array<{ id: string; label: string }>
+		treatments: Array<{ id: string; label: string }>
+	}
 }
 
 export interface DoctorProfileApiResponse {

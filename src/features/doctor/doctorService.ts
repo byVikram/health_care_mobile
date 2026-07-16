@@ -267,6 +267,16 @@ export const getSpecialities = async (): Promise<SpecialitiesResponse> => {
 	return res.data
 }
 
+export const getAreasOfExpertise = async (): Promise<any> => {
+	const res = await ApiService.get<any>(API_ENDPOINTS.AREA_OF_EXPERTISE.LIST)
+	return res.data
+}
+
+export const getTreatmentsOffering = async (): Promise<any> => {
+	const res = await ApiService.get<any>(API_ENDPOINTS.TREATMENTS_OFFERING.LIST)
+	return res.data
+}
+
 export const createHospital = async (data: Record<string, unknown>) => {
 	const res = await ApiService.post(API_ENDPOINTS.DOCTOR_PROFILE.HOSPITALS, data)
 	return res.data
@@ -353,6 +363,9 @@ export interface DoctorProfessionalUpdatePayload {
 	registration_proof_s3_key: string | null
 	about: string
 	current_designation?: string
+}
+
+export interface DoctorAdditionalDetailsUpdatePayload {
 	areas_of_expertise?: string[]
 	treatments?: string[]
 }
@@ -413,6 +426,11 @@ export const updateDoctorPersonalDetails = async (data: DoctorPersonalUpdatePayl
 
 export const updateDoctorProfessionalDetails = async (data: DoctorProfessionalUpdatePayload) => {
 	const res = await ApiService.patch(API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS, data)
+	return res.data
+}
+
+export const updateDoctorAdditionalDetails = async (data: DoctorAdditionalDetailsUpdatePayload) => {
+	const res = await ApiService.patch(API_ENDPOINTS.DOCTOR_PROFILE.ADDITIONAL_DETAILS, data)
 	return res.data
 }
 
@@ -528,6 +546,9 @@ export const mapDoctorProfileApi = (data: DoctorProfileApiData): DoctorProfile =
 			registrationNumber: prof?.registration_number ?? '',
 			registrationProof: prof?.registration_proof_s3_key ?? '',
 			about: prof?.about ?? '',
+			currentDesignation: prof?.current_designation ?? '',
+			areasOfExpertise: (data.additionalDetail?.areas_of_expertise ?? []).map((a: any) => a.id ?? a.public_id ?? a),
+			treatments: (data.additionalDetail?.treatments ?? []).map((t: any) => t.id ?? t.public_id ?? t),
 		},
 		hospitals,
 		availability,

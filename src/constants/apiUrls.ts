@@ -5,7 +5,7 @@
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	const url = "http://192.168.29.250:8000"
+	const url = "http://192.168.4.84:8000"
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 
 	if (!url) {
@@ -42,12 +42,19 @@ export const API_ENDPOINTS = {
 		DETAILS: `${BASE_URL}/api/doctors/details`,
 		PERSONAL_DETAILS: `${BASE_URL}/api/doctors/personal-details`,
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
+		ADDITIONAL_DETAILS: `${BASE_URL}/api/doctors/profile/additional-details`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
 		ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
 		DELETE_ACCOUNT: `${BASE_URL}/api/doctors/profile`,
 	},
 	SPECIALITIES: {
 		LIST: `${BASE_URL}/api/specialities`,
+	},
+	AREA_OF_EXPERTISE: {
+		LIST: `${BASE_URL}/api/area-of-expertise`,
+	},
+	TREATMENTS_OFFERING: {
+		LIST: `${BASE_URL}/api/treatments-offering`,
 	},
 	USERS: {
 		GET: `${BASE_URL}/api/users`,
