@@ -44,6 +44,8 @@ import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage
 
 import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
 import PlaceLabOrderPage from '../features/laboratory/PlaceLabOrderPage'
+import AddFamilyMemberPage from '../features/profile/patient/family/AddFamilyMemberPage'
+import EditFamilyMemberPage from '../features/profile/patient/family/EditFamilyMemberPage'
 
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
@@ -177,6 +179,16 @@ function AuthenticatedNavigator() {
 				options={{ presentation: 'transparentModal' }}
 			/>
 			<AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
+			<AppStack.Screen
+				name={ROUTES.STACK.ADD_FAMILY_MEMBER as keyof AppStackParamList}
+				component={AddFamilyMemberPage}
+				options={{ headerShown: false, title: 'Add Family Member' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.EDIT_FAMILY_MEMBER as keyof AppStackParamList}
+				component={EditFamilyMemberPage}
+				options={{ headerShown: false, title: 'Edit Family Member' }}
+			/>
 		</AppStack.Navigator>
 	)
 }

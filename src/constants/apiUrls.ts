@@ -5,7 +5,7 @@
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	const url = "http://192.168.4.84:8000"
+	const url = "http://192.168.4.35:8000"
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 
 	if (!url) {
@@ -166,4 +166,14 @@ export const API_ENDPOINTS = {
 	LOCATIONS: {
 		LIST: `${BASE_URL}/api/locations`,
 	},
+
+	FAMILY_MEMBERS: {
+		LIST:   `${BASE_URL}/api/patients/family-members`,
+		CREATE: `${BASE_URL}/api/patients/family-members`,
+		DELETE: (id: string) => `${BASE_URL}/api/patients/family-members/${id}`,
+		// Edit reuses the existing patient details endpoint with a patient_id query param
+		GET_DETAILS:    (patientId: string) => `${BASE_URL}/api/patients/me/details?patient_id=${patientId}`,
+		UPDATE_DETAILS: (patientId: string) => `${BASE_URL}/api/patients/me/details?patient_id=${patientId}`,
+	},
 }
+

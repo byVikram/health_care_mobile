@@ -52,5 +52,8 @@ export const ROUTES = {
 		PLACE_LABORATORY_TEST: 'PlaceLabOrderPage',
 		LABORATORY_ORDERS: 'Orderlistlaboratorypage',
 		LABORATORY_ORDER_DETAILS: 'Bookingdetailslaboratorypage',
+
+		ADD_FAMILY_MEMBER: 'AddFamilyMember',
+		EDIT_FAMILY_MEMBER: 'EditFamilyMember',
 	},
 } as const

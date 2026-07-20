@@ -53,6 +53,9 @@ interface AppSidebarProps {
   onEditProfile?: () => void;
   menuItems: AppSidebarItem[];
   profiles?: AppSidebarProfile[];
+  onProfilePress?: (profileId: string) => void;
+  onAddProfile?: () => void;
+  profilesLoading?: boolean;
 }
 
 const SIDEBAR_WIDTH = 290;
@@ -74,6 +77,9 @@ export default function AppSidebar({
   onEditProfile,
   menuItems,
   profiles = [],
+  onProfilePress,
+  onAddProfile,
+  profilesLoading = false,
 }: AppSidebarProps) {
   const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const insets = useSafeAreaInsets();
@@ -171,50 +177,64 @@ const profileImageUrl = user?.avatar ?? null;
 
           <View style={styles.separator} />
 
-          {isPatient && profiles.length > 0 && (
+          {isPatient && (
             <>
               <View style={styles.profilesSection}>
                 <Text style={styles.profilesTitle}>Profiles</Text>
-                <View style={styles.profilesRow}>
-                  {profiles.map((profile) => {
-                    const isAdd = profile.variant === "add";
-                    const profileAvatarVariant: ProfileAvatarVariant =
-                      profile.variant && profile.variant !== "add"
-                        ? profile.variant
-                        : "smile";
-                    const profileAvatarSource =
-                      profile.avatar ??
-                      (profile.avatarUrl ? { uri: profile.avatarUrl } : null) ??
-                      PROFILE_AVATAR_FALLBACKS[profileAvatarVariant];
+                {profilesLoading ? (
+                  <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: '#9aa4a8' }}>Loading profiles…</Text>
+                  </View>
+                ) : (
+                  <View style={styles.profilesRow}>
+                    {profiles.map((profile) => {
+                      const isAdd = profile.variant === 'add';
+                      const profileAvatarVariant: ProfileAvatarVariant =
+                        profile.variant && profile.variant !== 'add'
+                          ? profile.variant
+                          : 'smile';
+                      const profileAvatarSource =
+                        profile.avatar ??
+                        (profile.avatarUrl ? { uri: profile.avatarUrl } : null) ??
+                        PROFILE_AVATAR_FALLBACKS[profileAvatarVariant];
 
-                    return (
-                      <TouchableOpacity
-                        key={profile.id}
-                        style={styles.profileOption}
-                        activeOpacity={0.75}
-                      >
-                        <View
-                          style={[
-                            styles.profileCircle,
-                            isAdd && styles.profileCircleAdd,
-                          ]}
+                      return (
+                        <TouchableOpacity
+                          key={profile.id}
+                          style={styles.profileOption}
+                          activeOpacity={0.75}
+                          onPress={() => {
+                            onClose();
+                            if (isAdd) {
+                              onAddProfile?.();
+                            } else {
+                              onProfilePress?.(profile.id);
+                            }
+                          }}
                         >
-                          {isAdd ? (
-                            <MaterialCommunityIcons name="plus" size={34} color="#ffffff" />
-                          ) : (
-                            <Image
-                              source={profileAvatarSource}
-                              style={styles.profileCircleImage}
-                            />
-                          )}
-                        </View>
-                        <Text style={styles.profileOptionLabel} numberOfLines={1}>
-                          {profile.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                          <View
+                            style={[
+                              styles.profileCircle,
+                              isAdd && styles.profileCircleAdd,
+                            ]}
+                          >
+                            {isAdd ? (
+                              <MaterialCommunityIcons name="plus" size={34} color="#ffffff" />
+                            ) : (
+                              <Image
+                                source={profileAvatarSource}
+                                style={styles.profileCircleImage}
+                              />
+                            )}
+                          </View>
+                          <Text style={styles.profileOptionLabel} numberOfLines={1}>
+                            {profile.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
 
               <View style={styles.separator} />

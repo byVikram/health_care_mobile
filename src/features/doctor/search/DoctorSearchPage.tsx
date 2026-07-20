@@ -9,8 +9,11 @@ import {
 	DimensionValue,
 	TouchableOpacity,
 	ScrollView,
+	Alert,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import * as Location from 'expo-location'
+import { getCurrentLocation } from '../../../services/locationService'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 
@@ -89,6 +92,7 @@ export default function DoctorSearchPage() {
 	const initialQuery = route.params?.query || ''
 	const initialMode = route.params?.mode || 'all'
 	const initialSpecialityId = route.params?.specialityId ? String(route.params.specialityId) : 'all'
+	const initialNearby = route.params?.nearby || false
 	console.log('Route params:', route.params)
 
 	const [searchQuery, setSearchQuery] = useState(initialQuery)
@@ -104,6 +108,8 @@ export default function DoctorSearchPage() {
 	const [specialityFilter, setSpecialityFilter] = useState(initialSpecialityId)
 	const [consultationTypeFilter, setConsultationTypeFilter] = useState<string>(initialMode)
 	const [minRatingFilter, setMinRatingFilter] = useState('all')
+	const [nearbyFilter, setNearbyFilter] = useState(initialNearby)
+	const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null)
 	const [specialities, setSpecialities] = useState<AppSelectOption[]>([
 		{ label: 'All Specialities', value: 'all' },
 		...(route.params?.specialityId && route.params?.specialityName
@@ -150,6 +156,28 @@ export default function DoctorSearchPage() {
 		loadSpecialities()
 	}, [route.params?.specialityId])
 
+	// Load location if nearby is requested
+	useEffect(() => {
+		const initLocation = async () => {
+			if (!nearbyFilter || userLocation) return
+			try {
+				const isEnabled = await Location.hasServicesEnabledAsync()
+				if (!isEnabled) {
+					Alert.alert(
+						'Location Services Disabled',
+						'Please enable location services on your device to find nearby doctors.'
+					)
+				}
+				const coords = await getCurrentLocation()
+				setUserLocation(coords)
+			} catch (error) {
+				console.warn('Geolocation failed or denied, using default coordinates.', error)
+				setUserLocation({ latitude: 12.9716, longitude: 77.5946 })
+			}
+		}
+		initLocation()
+	}, [nearbyFilter])
+
 	// Fetch doctor list
 	const fetchDoctorsList = async (targetPage = 1, isRefresh = false, isLoadMore = false) => {
 		if (isFetchingPageRef.current) return
@@ -182,6 +210,17 @@ export default function DoctorSearchPage() {
 				params.min_rating = Number(minRatingFilter)
 			}
 
+			if (nearbyFilter) {
+				if (!userLocation) {
+					isFetchingPageRef.current = false
+					return
+				}
+				params.latitude = userLocation.latitude
+				params.longitude = userLocation.longitude
+				params.nearby = true
+				params.radius = 10.0
+			}
+
 			console.log('📤 Sending params:', JSON.stringify(params, null, 2))
 
 			const res = await getDoctors(params)
@@ -208,8 +247,12 @@ export default function DoctorSearchPage() {
 	}
 
 	useEffect(() => {
+		if (nearbyFilter && !userLocation) {
+			setLoading(true)
+			return
+		}
 		fetchDoctorsList(1)
-	}, [searchQuery, specialityFilter, consultationTypeFilter, minRatingFilter])
+	}, [searchQuery, specialityFilter, consultationTypeFilter, minRatingFilter, nearbyFilter, userLocation])
 
 	const onRefresh = useCallback(() => {
 		if (isFetchingPageRef.current) return
@@ -218,7 +261,7 @@ export default function DoctorSearchPage() {
 		setDoctors([])
 		setHasMore(true)
 		fetchDoctorsList(1, true)
-	}, [searchQuery, specialityFilter, consultationTypeFilter, minRatingFilter])
+	}, [searchQuery, specialityFilter, consultationTypeFilter, minRatingFilter, nearbyFilter, userLocation])
 
 	const handleEndReached = useCallback(() => {
 		if (isFetchingPageRef.current || loading || refreshing || loadingMore || !hasMore) return
@@ -234,6 +277,8 @@ export default function DoctorSearchPage() {
 		specialityFilter,
 		consultationTypeFilter,
 		minRatingFilter,
+		nearbyFilter,
+		userLocation,
 	])
 
 	// Modal handlers

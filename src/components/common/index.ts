@@ -25,3 +25,6 @@ export { default as AppStickyFooter, StickyFooter } from "./AppStickyFooter";
 export { default as ProviderDetailsCard } from "./ProviderDetailsCard";
 export type { ProviderDetailsCardProps, ProviderHoursRow } from "./ProviderDetailsCard";
 export { default as LocationSelector } from "./LocationSelector";
+export { default as FamilyMemberSelector } from "./FamilyMemberSelector";
+export type { FamilyMemberSelectorProps } from "./FamilyMemberSelector";
+

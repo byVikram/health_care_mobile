@@ -77,7 +77,8 @@ function ServicesSection() {
 						]}
 						onPress={() => {
 							if (item.id === 1) {
-								navigation.navigate(ROUTES.STACK.SEARCH, {
+								navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
+									nearby: true,
 									mode: 'clinic',
 								} as any)
 							}

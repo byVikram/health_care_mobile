@@ -59,7 +59,7 @@ export type AppStackParamList = {
 	[ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
 	[ROUTES.STACK.SEARCH]: undefined
 	[ROUTES.STACK.DOCTOR_SEARCH]:
-		| { query?: string; specialityId?: string; specialityName?: string; mode?: 'all' | 'video' | 'clinic' }
+		| { query?: string; specialityId?: string; specialityName?: string; mode?: 'all' | 'video' | 'clinic'; nearby?: boolean }
 		| undefined
 	[ROUTES.STACK.DOCTOR_DETAIL]: { id: string; referralId?: string }
 	[ROUTES.STACK.FAVOURITE_DOCTOR]: undefined
@@ -130,6 +130,8 @@ export type AppStackParamList = {
 	[ROUTES.STACK.RADIOLOGY_ORDERS]: undefined
 	[ROUTES.STACK.RADIOLOGY_ORDER_DETAIL]: { publicId: string; booking?: any }
 	[ROUTES.STACK.RADIOLOGY_SCAN_TYPES]: undefined
+	[ROUTES.STACK.ADD_FAMILY_MEMBER]: undefined
+	[ROUTES.STACK.EDIT_FAMILY_MEMBER]: { patientPublicId: string }
 }
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList

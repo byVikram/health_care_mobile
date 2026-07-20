@@ -53,6 +53,10 @@ export interface DoctorSearchParams {
 	min_rating?: number
 	max_price?: number
 	sort?: string
+	latitude?: number
+	longitude?: number
+	nearby?: boolean
+	radius?: number
 }
 
 export interface CreateAppointmentPayload {
