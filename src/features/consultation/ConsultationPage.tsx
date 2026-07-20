@@ -9,6 +9,7 @@ import {
 	Modal,
 	useWindowDimensions,
 	Linking,
+	Image,
 } from 'react-native'
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import { useTheme, Card, Avatar, Button, IconButton, Divider, Text } from 'react-native-paper'
@@ -29,10 +30,14 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import DateSlotPicker from '../../components/common/DateSlotPicker'
 import DoctorHospitalDropdown from '../../components/common/DoctorHospitalDropdown'
-import { AppSkeleton } from '../../components/common'
+import { AppSkeleton, AppSelect, AppTypography, AppButton } from '../../components/common'
 import { getDoctorAvailability, getDoctorById, getDoctorProfile, rescheduleAppointment } from '../doctor/doctorService'
 import { APPOINTMENT_STATUS } from '../../constants/constants'
 import { useAuth } from '../../context/AuthContext'
+import Toast from 'react-native-toast-message'
+import { getPharmacies } from '../profile/pharmacy/pharmacyService'
+import { getLaboratories } from '../laboratory/laboratoryService'
+import { fetchRadiologyCatalog } from '../radiology/RadiologyService'
 
 const SAMPLE_DICOM_MODULE = require('../../assets/dicon/sample-dicon.dcm')
 
@@ -454,31 +459,181 @@ function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
 }
 
 // ---------- ShareWith (complete) ----------
-function ShareWith() {
+interface Place {
+	id: string
+	name: string
+	address: string
+	phone?: string
+	distance?: string
+	icon?: string
+}
+
+const CITY_OPTIONS = [
+	{ value: 'bengaluru', label: 'Bengaluru' },
+	{ value: 'mysuru', label: 'Mysuru' },
+]
+const AREA_OPTIONS = [
+	{ value: 'kr_puram', label: 'KR Puram' },
+	{ value: 'whitefield', label: 'Whitefield' },
+	{ value: 'marathalli', label: 'Marathalli' },
+]
+
+const ANCILLARY_MOCK_PLACES: Place[] = [
+	{
+		id: '1',
+		name: 'Apollo Pharmacy, Chikpet - KR Puram',
+		address:
+			'1st Block, 318, 9th Main Rd, Kalyan Nagar, Bengaluru, Karnataka 560043',
+		phone: '+91 9876543250',
+		distance: '300m away',
+	},
+	{
+		id: '2',
+		name: 'Med plus, Chikpet - KR Puram',
+		address:
+			'1st Block, 318, 9th Main Rd, Kalyan Nagar, Bengaluru, Karnataka 560043',
+		phone: '+91 9876543250',
+		distance: '300m away',
+	},
+	{
+		id: '3',
+		name: 'jeevan medstore, Chikpet- KR Puram',
+		address:
+			'1st Block, 318, 9th Main Rd, Kalyan Nagar, Bengaluru, Karnataka 560043',
+		phone: '+91 9876543250',
+		distance: '300m away',
+	},
+]
+
+function toPlaces(items: any[]): Place[] {
+	const byId = new Map<string, Place>()
+	items.forEach((item) => {
+		if (byId.has(item.id)) return
+		byId.set(item.id, {
+			id: item.id,
+			name: item.name,
+			address: [item.address, item.city, item.state].filter(Boolean).join(', '),
+			phone: item.phone || undefined,
+			distance: item.distance || undefined,
+			icon: item.avatar_s3_key || item.avatar || item.logo_s3_key || undefined,
+		})
+	})
+	return Array.from(byId.values())
+}
+
+function toPharmacyPlaces(items: any[]): Place[] {
+	return items.map((item) => ({
+		id: item.id,
+		name: item.name || item.owner_name || 'Pharmacy',
+		address: [item.address, item.city].filter(Boolean).join(', ') || 'Address not available',
+		phone: item.phone || undefined,
+		distance: item.distance || undefined,
+		icon: item.avatar_s3_key || item.avatar || item.logo_s3_key || undefined,
+	}))
+}
+
+function ShareWith({ appointmentId }: { appointmentId?: string }) {
 	const theme = useTheme()
-	const [activeTab, setActiveTab] = useState('Laboratory')
-	const tabs: TabItem[] = [
-		{ id: 'Pharmacy', Icon: Prescription },
-		{ id: 'Laboratory', Icon: LaboratoryIcon },
-		{ id: 'Radiology', Icon: RadiologyTabIcon },
-		{ id: 'Ancillary', Icon: AncillaryIcon },
+	const [activeTab, setActiveTab] = useState('laboratory')
+	const [city, setCity] = useState('')
+	const [area, setArea] = useState('')
+
+	const [pharmacyPlaces, setPharmacyPlaces] = useState<Place[]>([])
+	const [laboratoryPlaces, setLaboratoryPlaces] = useState<Place[]>([])
+	const [radiologyPlaces, setRadiologyPlaces] = useState<Place[]>([])
+	const [placesLoading, setPlacesLoading] = useState(false)
+	const [placesError, setPlacesError] = useState<string | null>(null)
+
+	const isBackedTab = activeTab === 'pharmacy' || activeTab === 'laboratory' || activeTab === 'radiology'
+
+	useEffect(() => {
+		if (!isBackedTab) return
+
+		let cancelled = false
+
+		const fetchPlaces = async () => {
+			setPlacesLoading(true)
+			setPlacesError(null)
+
+			try {
+				if (activeTab === 'pharmacy') {
+					const res: any = await getPharmacies({ city: city || undefined, limit: 50 })
+					if (!cancelled) {
+						const items = res.data || res || []
+						setPharmacyPlaces(toPharmacyPlaces(Array.isArray(items) ? items : []))
+					}
+				} else if (activeTab === 'laboratory') {
+					const res: any = await getLaboratories({ city: city || undefined, limit: 50 })
+					if (!cancelled) {
+						const items = res.data || res || []
+						setLaboratoryPlaces(toPlaces(Array.isArray(items) ? items : []))
+					}
+				} else {
+					const res: any = await fetchRadiologyCatalog({ city: city || undefined, limit: 50 })
+					if (!cancelled) {
+						const items = res.data || res || []
+						setRadiologyPlaces(toPlaces(Array.isArray(items) ? items : []))
+					}
+				}
+			} catch (err) {
+				console.error('Error loading places:', err)
+				if (!cancelled) setPlacesError('Unable to load centers right now. Please try again.')
+			} finally {
+				if (!cancelled) setPlacesLoading(false)
+			}
+		}
+
+		fetchPlaces()
+
+		return () => {
+			cancelled = true
+		}
+	}, [activeTab, city])
+
+	const handleShare = async (place: Place) => {
+		if (!appointmentId) {
+			Toast.show({
+				type: 'error',
+				text1: 'Error',
+				text2: 'No active appointment context found.',
+			})
+			return
+		}
+		try {
+			await ApiService.post(API_ENDPOINTS.REFERRALS.SHARE, {
+				appointment_id: appointmentId,
+				target_type: activeTab,
+				target_id: place.id,
+			})
+			Toast.show({
+				type: 'success',
+				text1: 'Success',
+				text2: `Successfully shared prescription with ${place.name}!`,
+			})
+		} catch (err: any) {
+			Toast.show({
+				type: 'error',
+				text1: 'Error',
+				text2: 'Failed to share prescription with selected center.',
+			})
+		}
+	}
+
+	const tabs = [
+		{ id: 'pharmacy', label: 'Pharmacy', Icon: Prescription },
+		{ id: 'laboratory', label: 'Laboratory', Icon: LaboratoryIcon },
+		{ id: 'radiology', label: 'Radiology', Icon: RadiologyTabIcon },
+		{ id: 'ancillary', label: 'Ancillary', Icon: AncillaryIcon },
 	]
-	const MOCK_PLACES = [
-		{
-			id: '1',
-			name: 'Apollo Pharmacy, KR Puram',
-			address: '1st Block, 9th Main Rd, Bengaluru',
-			phone: '+91 9876543250',
-			distance: '300m away',
-		},
-		{
-			id: '2',
-			name: 'Med Plus, KR Puram',
-			address: '1st Block, 9th Main Rd, Bengaluru',
-			phone: '+91 9876543250',
-			distance: '1.2km away',
-		},
-	]
+
+	const places: Place[] =
+		activeTab === 'pharmacy'
+			? pharmacyPlaces
+			: activeTab === 'laboratory'
+				? laboratoryPlaces
+				: activeTab === 'radiology'
+					? radiologyPlaces
+					: ANCILLARY_MOCK_PLACES
 
 	return (
 		<Card style={styles.card}>
@@ -517,7 +672,7 @@ function ShareWith() {
 										fontWeight: isActive ? 'bold' : 'normal',
 									}}
 								>
-									{tab.id}
+									{tab.label}
 								</Text>
 								{isActive && (
 									<View
@@ -536,66 +691,182 @@ function ShareWith() {
 				</View>
 
 				<Text style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>Select address</Text>
-				<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-					<Button
-						mode="outlined"
-						style={{ width: '48%', borderRadius: 8 }}
-						contentStyle={{ height: 36 }}
-						labelStyle={{ fontSize: 11 }}
-					>
-						City ▼
-					</Button>
-					<Button
-						mode="outlined"
-						style={{ width: '48%', borderRadius: 8 }}
-						contentStyle={{ height: 36 }}
-						labelStyle={{ fontSize: 11 }}
-					>
-						Area ▼
-					</Button>
+				<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 8 }}>
+					<AppSelect
+						label="City"
+						value={city}
+						options={CITY_OPTIONS}
+						onSelect={(val) => setCity(val)}
+						size="small"
+						style={{ width: '48%' }}
+					/>
+					<AppSelect
+						label="Area"
+						value={area}
+						options={AREA_OPTIONS}
+						onSelect={(val) => setArea(val)}
+						size="small"
+						style={{ width: '48%' }}
+					/>
 				</View>
 
-				{MOCK_PLACES.map((place, i) => (
-					<View
-						key={place.id}
-						style={{
-							paddingTop: 12,
-							borderTopWidth: i === 0 ? 0 : 1,
-							borderTopColor: '#eee',
-							marginBottom: 12,
-						}}
-					>
-						<Text style={{ fontWeight: 'bold', fontSize: 13 }}>{place.name}</Text>
-						<Text style={{ color: '#666', fontSize: 11, marginVertical: 4 }}>{place.address}</Text>
-						<View
-							style={{
-								flexDirection: 'row',
-								justifyContent: 'space-between',
-								alignItems: 'center',
-							}}
-						>
-							<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-								<MaterialCommunityIcons name="phone" size={12} color={theme.colors.primary} />
-								<Text
+				{placesLoading && (
+					<ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 20 }} />
+				)}
+
+				{!placesLoading && placesError && (
+					<Text style={{ color: 'red', textAlign: 'center', marginVertical: 12, fontSize: 12 }}>
+						{placesError}
+					</Text>
+				)}
+
+				{!placesLoading && !placesError && places.length === 0 && (
+					<Text style={{ color: '#888', textAlign: 'center', marginVertical: 20, fontSize: 12 }}>
+						{activeTab === 'pharmacy'
+							? 'No pharmacies found nearby.'
+							: activeTab === 'laboratory'
+								? 'No laboratories found nearby.'
+								: activeTab === 'radiology'
+									? 'No radiology centers found nearby.'
+									: 'No results found nearby.'}
+					</Text>
+				)}
+
+				{!placesLoading && !placesError && places.length > 0 && places.map((place, i) => {
+					if (activeTab === 'ancillary') {
+						return (
+							<View
+								key={place.id}
+								style={{
+									paddingTop: 12,
+									borderTopWidth: i === 0 ? 0 : 1,
+									borderTopColor: '#eee',
+									marginBottom: 12,
+								}}
+							>
+								<Text style={{ fontWeight: 'bold', fontSize: 13 }}>{place.name}</Text>
+								<Text style={{ color: '#666', fontSize: 11, marginVertical: 4 }}>{place.address}</Text>
+								<View
 									style={{
-										fontSize: 11,
-										color: theme.colors.primary,
-										marginLeft: 2,
-										marginRight: 8,
+										flexDirection: 'row',
+										justifyContent: 'space-between',
+										alignItems: 'center',
 									}}
 								>
-									{place.phone}
-								</Text>
-								<Text style={{ fontSize: 11, color: '#ccc', marginRight: 8 }}>|</Text>
-								<MaterialCommunityIcons name="map-marker-outline" size={12} color="#666" />
-								<Text style={{ fontSize: 11, color: '#666', marginLeft: 2 }}>{place.distance}</Text>
+									<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+										{place.phone ? (
+											<>
+												<MaterialCommunityIcons name="phone" size={12} color={theme.colors.primary} />
+												<Text
+													style={{
+														fontSize: 11,
+														color: theme.colors.primary,
+														marginLeft: 2,
+														marginRight: 8,
+													}}
+												>
+													{place.phone}
+												</Text>
+											</>
+										) : null}
+										{place.phone && place.distance ? (
+											<Text style={{ fontSize: 11, color: '#ccc', marginRight: 8 }}>|</Text>
+										) : null}
+										{place.distance ? (
+											<>
+												<MaterialCommunityIcons name="map-marker-outline" size={12} color="#666" />
+												<Text style={{ fontSize: 11, color: '#666', marginLeft: 2 }}>{place.distance}</Text>
+											</>
+										) : null}
+									</View>
+									<Button 
+										mode="contained" 
+										compact 
+										style={{ borderRadius: 8 }}
+										onPress={() => handleShare(place)}
+									>
+										Share
+									</Button>
+								</View>
 							</View>
-							<Button mode="contained" compact style={{ borderRadius: 8 }}>
+						)
+					}
+
+					// Dynamic Fallback Icon Logic
+					const colors = [
+						{ bg: '#e6f4f2', icon: '#0d7a6e' },
+						{ bg: '#fff6ed', icon: '#df7618' },
+						{ bg: '#edf7ff', icon: '#1879df' },
+						{ bg: '#fbf5ff', icon: '#8f18df' },
+					]
+					const config = colors[i % colors.length]
+					let iconName = 'storefront'
+					if (activeTab === 'laboratory') {
+						iconName = 'flask-outline'
+					} else if (activeTab === 'radiology') {
+						iconName = 'radiation'
+					}
+
+					return (
+						<View
+							key={place.id}
+							style={styles.providerItemCard}
+						>
+							<View style={[styles.providerIconBg, { backgroundColor: config.bg }]}>
+								{place.icon && (place.icon.startsWith('http://') || place.icon.startsWith('https://')) ? (
+									<Image 
+										source={{ uri: place.icon }} 
+										style={{ width: 26, height: 26, borderRadius: 4 }} 
+									/>
+								) : (
+									<MaterialCommunityIcons name={iconName as any} size={18} color={config.icon} />
+								)}
+							</View>
+
+							<View style={styles.providerDetails}>
+								<AppTypography 
+									variant="subtitle" 
+									color={theme.colors.onSurface} 
+									numberOfLines={1}
+									style={styles.providerName}
+								>
+									{place.name}
+								</AppTypography>
+								
+								<View style={styles.providerInfoRow}>
+									<MaterialCommunityIcons name="map-marker-outline" size={14} color="#a0aec0" style={{ marginTop: 2 }} />
+									<AppTypography 
+										variant="body" 
+										numberOfLines={3} 
+										style={styles.providerAddress}
+									>
+										{place.address}
+									</AppTypography>
+								</View>
+
+								<View style={styles.providerInfoRow}>
+									<MaterialCommunityIcons name="phone" size={14} color="#0d7a6e" style={{ marginTop: 2 }} />
+									<AppTypography 
+										variant="body" 
+										style={styles.providerPhone}
+									>
+										{place.phone || '+91 9876543210'}
+									</AppTypography>
+								</View>
+							</View>
+
+							<AppButton 
+								variant="primary" 
+								style={styles.providerShareBtn}
+								contentStyle={{ height: 36, paddingHorizontal: 16 }}
+								labelStyle={{ fontSize: 12, fontWeight: 'bold', marginHorizontal: 8 }}
+								onPress={() => handleShare(place)}
+							>
 								Share
-							</Button>
+							</AppButton>
 						</View>
-					</View>
-				))}
+					)
+				})}
 			</Card.Content>
 		</Card>
 	)
@@ -1219,7 +1490,7 @@ export default function ConsultationPage() {
 						</Card>
 
 						{/* Share With */}
-						<ShareWith />
+						<ShareWith appointmentId={appointmentId} />
 
 					</View>
 				</ScrollView>
@@ -1520,5 +1791,60 @@ const styles = StyleSheet.create({
 		fontSize: 10,
 		color: '#2d3748',
 		marginLeft: 4,
+	},
+	providerItemCard: {
+		backgroundColor: '#ffffff',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#e8ecef',
+		padding: 12,
+		marginBottom: 12,
+		flexDirection: 'row',
+		alignItems: 'center',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.04,
+		shadowRadius: 3,
+		elevation: 1,
+	},
+	providerIconBg: {
+		width: 38,
+		height: 38,
+		borderRadius: 8,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	providerDetails: {
+		flex: 1,
+		marginLeft: 10,
+		marginRight: 10,
+	},
+	providerName: {
+		fontWeight: '700',
+		fontSize: 12,
+		color: '#1a202c',
+		marginBottom: 4,
+	},
+	providerInfoRow: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		marginTop: 3,
+		gap: 6,
+	},
+	providerAddress: {
+		color: '#4a5568',
+		fontSize: 11,
+		lineHeight: 15,
+		flex: 1,
+	},
+	providerPhone: {
+		color: '#0d7a6e',
+		fontSize: 11,
+		lineHeight: 15,
+		flex: 1,
+	},
+	providerShareBtn: {
+		borderRadius: 8,
+		minWidth: 88,
 	},
 })

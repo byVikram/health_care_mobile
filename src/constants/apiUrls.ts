@@ -83,6 +83,7 @@ export const API_ENDPOINTS = {
 		SENT: `${BASE_URL}/api/referrals/sent`,
 		RECEIVED: `${BASE_URL}/api/referrals/received`,
 		DETAIL: (id: string) => `${BASE_URL}/api/referrals/${id}`,
+		SHARE: `${BASE_URL}/api/referrals/share`,
 	},
 	NOTIFICATIONS: {
 		LIST: `${BASE_URL}/api/notifications`,
