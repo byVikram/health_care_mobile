@@ -91,22 +91,26 @@ export const updatePreIntake = async (appointmentId: string, payload: PreIntakeP
 
 export const updateAppointmentsStatus = async (
 	appointmentId: string,
-	statusId: string
+	statusId: string,
+	reason?: string
 ): Promise<AppointmentResponse> => {
 	console.log('PAYLOAD 👉', {
 		appointment_id: appointmentId,
 		status_id: statusId,
+		...(reason ? { reason } : {}),
 	})
 
 	const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
 		appointment_id: appointmentId,
 		status_id: statusId,
+		...(reason ? { reason } : {}),
 	})
 
 	console.log('RESPONSE 👉', res.data)
 
 	return res.data
 }
+
 
 export interface RescheduleAppointmentPayload {
 	appointment_id: string

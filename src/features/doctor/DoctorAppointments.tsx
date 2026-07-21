@@ -106,31 +106,97 @@ function getStatusChipStyle(
 
 // ── Reject confirm modal ──────────────────────────────────────────────────────
 
+export const REJECTION_REASONS = [
+  'Doctor is unavailable at the requested time.',
+  'The requested appointment slot is no longer available.',
+  'The appointment request is not suitable for this specialty.',
+  'Required medical information is incomplete.',
+] as const
+
 interface RejectModalProps {
   visible: boolean
   onCancel: () => void
-  onConfirm: () => void
+  onConfirm: (reason: string) => void
+  submitting?: boolean
 }
 
-function RejectConfirmModal({ visible, onCancel, onConfirm }: RejectModalProps) {
+function RejectConfirmModal({ visible, onCancel, onConfirm, submitting = false }: RejectModalProps) {
+  const [selectedReason, setSelectedReason] = useState('')
+
+  useEffect(() => {
+    if (visible) setSelectedReason('')
+  }, [visible])
+
+  const handleConfirmClick = () => {
+    if (!selectedReason || submitting) return
+    onConfirm(selectedReason)
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.rejectBackdrop} onPress={onCancel} />
-      <View style={styles.rejectCard}>
-        <Text style={styles.rejectTitle}>Are you sure?</Text>
-        <Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
-        <View style={styles.rejectButtons}>
-          <TouchableOpacity style={styles.rejectCancelBtn} onPress={onCancel} activeOpacity={0.8}>
-            <Text style={styles.rejectCancelText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.rejectConfirmBtn} onPress={onConfirm} activeOpacity={0.8}>
-            <Text style={styles.rejectConfirmText}>Yes, Reject</Text>
-          </TouchableOpacity>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={submitting ? undefined : onCancel}>
+      <Pressable style={styles.rejectBackdrop} onPress={submitting ? undefined : onCancel} />
+      <View style={styles.modalCenteredView}>
+        <View style={styles.rejectCard}>
+          <Text style={styles.rejectTitle}>Are you sure?</Text>
+          <Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
+
+          <Text style={styles.rejectSectionTitle}>Select a reason for rejection</Text>
+          <View style={styles.reasonsList}>
+            {REJECTION_REASONS.map((reason) => {
+              const isSelected = selectedReason === reason
+              return (
+                <TouchableOpacity
+                  key={reason}
+                  style={[styles.reasonRow, isSelected && styles.reasonRowSelected]}
+                  onPress={() => setSelectedReason(reason)}
+                  disabled={submitting}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons
+                    name={isSelected ? 'radiobox-marked' : 'radiobox-blank'}
+                    size={18}
+                    color={isSelected ? '#0c7c7c' : '#9ca3af'}
+                    style={styles.radioIcon}
+                  />
+                  <Text style={[styles.reasonText, isSelected && styles.reasonTextSelected]}>
+                    {reason}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+
+          <View style={styles.rejectButtons}>
+            <TouchableOpacity
+              style={styles.rejectCancelBtn}
+              onPress={onCancel}
+              disabled={submitting}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.rejectCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.rejectConfirmBtn,
+                (!selectedReason || submitting) && styles.rejectConfirmBtnDisabled,
+              ]}
+              onPress={handleConfirmClick}
+              disabled={!selectedReason || submitting}
+              activeOpacity={0.8}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.rejectConfirmText}>Yes, Reject</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
   )
 }
+
 
 // ── Week day selector ─────────────────────────────────────────────────────────
 
@@ -288,6 +354,8 @@ export function DoctorAppointments({
   // Reject confirmation modal state
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [pendingRejectId, setPendingRejectId] = useState<string | null>(null)
+  const [rejectSubmitting, setRejectSubmitting] = useState(false)
+
 
   // Reschedule state
   const [rescheduleAppt, setRescheduleAppt] = useState<Appointment | null>(null)
@@ -657,27 +725,32 @@ export function DoctorAppointments({
   }
 
   const handleCancelReject = () => {
+    if (rejectSubmitting) return
     setRejectModalVisible(false)
     setPendingRejectId(null)
   }
 
-  const handleConfirmReject = async () => {
+  const handleConfirmReject = async (reason: string) => {
     if (!pendingRejectId) return
-    setRejectModalVisible(false)
+    const rowId = pendingRejectId
+    setRejectSubmitting(true)
     try {
-      const res = await updateAppointmentsStatus(pendingRejectId, 'a7d4e1c2-9f6b-4c83-b2e1-6f3a9d8c7b12')
+      const res = await updateAppointmentsStatus(rowId, 'a7d4e1c2-9f6b-4c83-b2e1-6f3a9d8c7b12', reason)
       if (res.success) {
         // Rejection uses a visually distinct toast (red left border) while
         // still reusing the shared BaseToast styling from the design system.
         Toast.show({ type: 'rejectSuccess', text1: res.message })
-        setLocalStatuses((prev) => ({ ...prev, [pendingRejectId!]: 'cancelled' }))
+        setLocalStatuses((prev) => ({ ...prev, [rowId]: 'cancelled' }))
       }
     } catch {
       Toast.show({ type: 'error', text1: 'Something went wrong. Please try again.' })
     } finally {
+      setRejectSubmitting(false)
+      setRejectModalVisible(false)
       setPendingRejectId(null)
     }
   }
+
 
   const handleRescheduleDateChange = (date: Date) => {
     setRescheduleDate(date)
@@ -997,7 +1070,9 @@ export function DoctorAppointments({
         visible={rejectModalVisible}
         onCancel={handleCancelReject}
         onConfirm={handleConfirmReject}
+        submitting={rejectSubmitting}
       />
+
 
       {/* Refer modal */}
       <AppModal
@@ -1039,6 +1114,10 @@ export function DoctorAppointments({
                   onToggleBookmark={handleToggleBookmark}
                   placeholderImage={require('../../assets/Banner/doctor.png')}
                   primaryColor="#0c7c7c"
+                  onPress={(doc) => {
+                    setReferOpen(false)
+                    navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doc.id })
+                  }}
                 />
               )}
               ListEmptyComponent={
@@ -1544,19 +1623,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  // Reject modal
+  modalCenteredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   rejectBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   rejectCard: {
-    position: 'absolute',
-    alignSelf: 'center',
-    top: '40%',
-    width: 280,
+    width: 320,
     backgroundColor: '#ffffff',
     borderRadius: 20,
-    padding: 24,
+    padding: 20,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -1569,13 +1649,50 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     marginBottom: 6,
+    textAlign: 'center',
   },
   rejectSubtitle: {
     fontSize: 14,
     color: '#374151',
     fontWeight: '500',
-    marginBottom: 24,
+    marginBottom: 16,
     textAlign: 'center',
+  },
+  rejectSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  reasonsList: {
+    gap: 8,
+    marginBottom: 20,
+    width: '100%',
+  },
+  reasonRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+  },
+  reasonRowSelected: {
+    backgroundColor: 'rgba(12, 124, 124, 0.06)',
+  },
+  radioIcon: {
+    marginRight: 8,
+    marginTop: 1,
+  },
+  reasonText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 18,
+  },
+  reasonTextSelected: {
+    color: '#0c7c7c',
+    fontWeight: '500',
   },
   rejectButtons: {
     flexDirection: 'row',
@@ -1589,6 +1706,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#0c7c7c',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   rejectCancelText: {
     fontSize: 13,
@@ -1601,12 +1719,17 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     backgroundColor: '#e53935',
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rejectConfirmBtnDisabled: {
+    opacity: 0.5,
   },
   rejectConfirmText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#ffffff',
   },
+
   // Reschedule Modal styles
   modalOverlay: {
     flex: 1,

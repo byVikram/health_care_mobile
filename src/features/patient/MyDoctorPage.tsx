@@ -2,11 +2,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, FlatList, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import Toast from 'react-native-toast-message'
+import { useNavigation } from '@react-navigation/native'
+import type { NavigationProp } from '@react-navigation/native'
 
 import { AppTypography } from '../../components/common'
 import { FavouriteDoctor, getDoctors, getFavouriteDoctors, toggleFavouriteDoctor } from '../doctor/doctorService'
 import { DoctorSearchItem } from '../../types/doctor-search'
 import MyDoctorCard, { DoctorCardItem } from './components/MyDoctorCard'
+import { ROUTES } from '../../navigation/routes'
+import type { AppStackParamList } from '../../navigation/types'
 
 type DoctorRow = DoctorCardItem & {
 	id: string
@@ -25,6 +29,7 @@ type HeaderProps = {
 	togglingIds: Set<string>
 	onSearchChange: (value: string) => void
 	onToggleSaved: (doctor: DoctorRow) => void
+	onPressDoctor?: (doctor: DoctorRow) => void
 }
 
 function mapDoctorToRow(doctor: FavouriteDoctor | DoctorSearchItem): DoctorRow {
@@ -53,6 +58,7 @@ const DoctorsListHeader = React.memo(function DoctorsListHeader({
 	togglingIds,
 	onSearchChange,
 	onToggleSaved,
+	onPressDoctor,
 }: HeaderProps) {
 	return (
 		<View style={styles.headerContent}>
@@ -97,6 +103,7 @@ const DoctorsListHeader = React.memo(function DoctorsListHeader({
 										saved={favouriteIds.has(doctor.id)}
 										disabled={togglingIds.has(doctor.id)}
 										onToggleSaved={() => onToggleSaved(doctor)}
+										onPress={() => onPressDoctor?.(doctor)}
 									/>
 									{index < searchResults.length - 1 && <View style={styles.cardGap} />}
 								</View>
@@ -139,6 +146,7 @@ const DoctorsListHeader = React.memo(function DoctorsListHeader({
 })
 
 export default function MyDoctorPage() {
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 	const [searchQuery, setSearchQuery] = useState('')
 	const [searchResults, setSearchResults] = useState<DoctorRow[]>([])
 	const [searchLoading, setSearchLoading] = useState(false)
@@ -148,6 +156,13 @@ export default function MyDoctorPage() {
 	const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
 	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 	const togglingIdsRef = useRef<Set<string>>(new Set())
+
+	const handleDoctorPress = useCallback(
+		(doctor: DoctorRow) => {
+			navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })
+		},
+		[navigation]
+	)
 
 	const trimmedSearch = searchQuery.trim()
 	const isSearching = trimmedSearch.length >= 3
@@ -316,9 +331,10 @@ export default function MyDoctorPage() {
 				saved={favouriteIds.has(item.id)}
 				disabled={togglingIds.has(item.id)}
 				onToggleSaved={() => handleToggleSaved(item)}
+				onPress={() => handleDoctorPress(item)}
 			/>
 		),
-		[favouriteIds, handleToggleSaved, togglingIds]
+		[favouriteIds, handleDoctorPress, handleToggleSaved, togglingIds]
 	)
 
 	const listHeader = useMemo(
@@ -335,6 +351,7 @@ export default function MyDoctorPage() {
 				togglingIds={togglingIds}
 				onSearchChange={setSearchQuery}
 				onToggleSaved={handleToggleSaved}
+				onPressDoctor={handleDoctorPress}
 			/>
 		),
 		[
@@ -347,6 +364,7 @@ export default function MyDoctorPage() {
 			favLoading,
 			togglingIds,
 			handleToggleSaved,
+			handleDoctorPress,
 		]
 	)
 

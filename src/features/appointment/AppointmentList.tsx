@@ -19,6 +19,7 @@ import {
   Easing,
   Image,
   ScrollView,
+  TextInput,
 } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -27,11 +28,14 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { Appointment } from '../../types/appointment'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
+import { getReviewForAppointment, createReview, DoctorReview } from '../../services/reviewService'
 import { AppBottomSheet } from '../../components/common/AppBottomSheet'
 import { AppInput } from '../../components/common/AppInput'
-import { AppSelect, AppSelectOption, AppTypography, AppCalendar } from '../../components/common'
+import { AppSelect, AppSelectOption, AppTypography, AppCalendar, AppButton } from '../../components/common'
+import StatusModal from '../../components/common/StatusModal'
 import AppointmentHistoryTab from './components/AppointmentHistoryTab'
 import RescheduleModal, { type RescheduleResult } from './components/RescheduleModal'
+
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -158,26 +162,227 @@ function SkeletonRow() {
 
 // ── Reject confirmation modal ─────────────────────────────────────────────────
 
+export const REJECTION_REASONS = [
+  'Doctor is unavailable at the requested time.',
+  'The requested appointment slot is no longer available.',
+  'The appointment request is not suitable for this specialty.',
+  'Required medical information is incomplete.',
+] as const
+
 interface RejectModalProps {
   visible: boolean
   onCancel: () => void
-  onConfirm: () => void
+  onConfirm: (reason: string) => void
+  submitting?: boolean
 }
 
-function RejectConfirmModal({ visible, onCancel, onConfirm }: RejectModalProps) {
+function RejectConfirmModal({ visible, onCancel, onConfirm, submitting = false }: RejectModalProps) {
+  const [selectedReason, setSelectedReason] = useState('')
+
+  useEffect(() => {
+    if (visible) setSelectedReason('')
+  }, [visible])
+
+  const handleConfirmClick = () => {
+    if (!selectedReason || submitting) return
+    onConfirm(selectedReason)
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.rejectBackdrop} onPress={onCancel} />
-      <View style={styles.rejectCard}>
-        <Text style={styles.rejectTitle}>Are you sure?</Text>
-        <Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
-        <View style={styles.rejectButtons}>
-          <TouchableOpacity style={styles.rejectCancelBtn} onPress={onCancel} activeOpacity={0.8}>
-            <Text style={styles.rejectCancelText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.rejectConfirmBtn} onPress={onConfirm} activeOpacity={0.8}>
-            <Text style={styles.rejectConfirmText}>Yes, Reject</Text>
-          </TouchableOpacity>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={submitting ? undefined : onCancel}>
+      <Pressable style={styles.rejectBackdrop} onPress={submitting ? undefined : onCancel} />
+      <View style={styles.modalCenteredView}>
+        <View style={styles.rejectCard}>
+          <Text style={styles.rejectTitle}>Are you sure?</Text>
+          <Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
+
+          <Text style={styles.rejectSectionTitle}>Select a reason for rejection</Text>
+          <View style={styles.reasonsList}>
+            {REJECTION_REASONS.map((reason) => {
+              const isSelected = selectedReason === reason
+              return (
+                <TouchableOpacity
+                  key={reason}
+                  style={[styles.reasonRow, isSelected && styles.reasonRowSelected]}
+                  onPress={() => setSelectedReason(reason)}
+                  disabled={submitting}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons
+                    name={isSelected ? 'radiobox-marked' : 'radiobox-blank'}
+                    size={18}
+                    color={isSelected ? '#0c7c7c' : '#9ca3af'}
+                    style={styles.radioIcon}
+                  />
+                  <Text style={[styles.reasonText, isSelected && styles.reasonTextSelected]}>
+                    {reason}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+
+          <View style={styles.rejectButtons}>
+            <TouchableOpacity
+              style={styles.rejectCancelBtn}
+              onPress={onCancel}
+              disabled={submitting}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.rejectCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.rejectConfirmBtn,
+                (!selectedReason || submitting) && styles.rejectConfirmBtnDisabled,
+              ]}
+              onPress={handleConfirmClick}
+              disabled={!selectedReason || submitting}
+              activeOpacity={0.8}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.rejectConfirmText}>Yes, Reject</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+// ── Give Review modal ──────────────────────────────────────────────────────────
+
+interface GiveReviewModalProps {
+  visible: boolean
+  onClose: () => void
+  appointment: AppointmentRow | null
+  existingReview: DoctorReview | null
+  loadingExisting: boolean
+  submitting: boolean
+  onSubmit: (rating: number, comment: string) => void
+}
+
+function GiveReviewModal({
+  visible,
+  onClose,
+  appointment,
+  existingReview,
+  loadingExisting,
+  submitting,
+  onSubmit,
+}: GiveReviewModalProps) {
+  const [rating, setRating] = useState(0)
+  const [comment, setComment] = useState('')
+
+  useEffect(() => {
+    if (visible) {
+      setRating(0)
+      setComment('')
+    }
+  }, [visible])
+
+  const handleSubmit = () => {
+    if (rating < 1 || submitting) return
+    onSubmit(rating, comment)
+  }
+
+  const title = appointment?.doctorName ? `Review ${appointment.doctorName}` : 'Give Review'
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={submitting ? undefined : onClose}>
+      <Pressable style={styles.rejectBackdrop} onPress={submitting ? undefined : onClose} />
+      <View style={styles.modalCenteredView}>
+        <View style={styles.rejectCard}>
+          <Text style={styles.rejectTitle}>{title}</Text>
+
+          {loadingExisting ? (
+            <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color="#0c7c7c" />
+              <Text style={{ marginTop: 8, fontSize: 13, color: '#6b7280' }}>Loading review...</Text>
+            </View>
+          ) : existingReview ? (
+            <View style={styles.existingReviewBox}>
+              <View style={styles.existingReviewHeader}>
+                <View style={{ flexDirection: 'row', gap: 4 }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <MaterialCommunityIcons
+                      key={star}
+                      name={star <= existingReview.rating ? 'star' : 'star-outline'}
+                      size={20}
+                      color="#f59e0b"
+                    />
+                  ))}
+                </View>
+                {existingReview.created_at && (
+                  <Text style={{ fontSize: 11, color: '#9ca3af' }}>
+                    {new Date(existingReview.created_at).toLocaleDateString()}
+                  </Text>
+                )}
+              </View>
+              {existingReview.comment ? (
+                <Text style={styles.existingReviewComment}>{existingReview.comment}</Text>
+              ) : null}
+              <AppButton
+                variant="outline"
+                onPress={onClose}
+                style={{ marginTop: 16, width: '100%' }}
+              >
+                Close
+              </AppButton>
+            </View>
+          ) : (
+            <View style={{ width: '100%', marginTop: 12 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151', textAlign: 'center', marginBottom: 10 }}>
+                Tap to Rate
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity key={star} onPress={() => setRating(star)} disabled={submitting} activeOpacity={0.7}>
+                    <MaterialCommunityIcons
+                      name={star <= rating ? 'star' : 'star-outline'}
+                      size={32}
+                      color={star <= rating ? '#f59e0b' : '#d1d5db'}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 }}>Write Review</Text>
+              <TextInput
+                style={styles.reviewTextInput}
+                placeholder="Share your experience..."
+                placeholderTextColor="#9ca3af"
+                value={comment}
+                onChangeText={setComment}
+                multiline
+                numberOfLines={3}
+                editable={!submitting}
+              />
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                <AppButton
+                  variant="outline"
+                  onPress={onClose}
+                  disabled={submitting}
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </AppButton>
+                <AppButton
+                  variant="primary"
+                  onPress={handleSubmit}
+                  disabled={rating < 1 || submitting}
+                  loading={submitting}
+                  style={{ flex: 1 }}
+                >
+                  Submit
+                </AppButton>
+              </View>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -194,6 +399,7 @@ interface AppointmentCardProps {
   onConfirm: () => void
   onReject: () => void
   onReschedule: () => void
+  onReview?: () => void
 }
 
 function AppointmentCard({
@@ -204,12 +410,14 @@ function AppointmentCard({
   onConfirm,
   onReject,
   onReschedule,
+  onReview,
 }: AppointmentCardProps) {
   const status = (row.status || '').toLowerCase()
   const rescheduledBy = (row.rescheduledBy || '').toLowerCase()
   const past = isAppointmentPast(row)
   const terminal = TERMINAL_STATUSES.has(status)
   const showActions = viewAs === 'patient' && !past && !terminal
+  const showReview = viewAs === 'patient' && status === 'completed'
   const showConfirm = showActions && status === 'rescheduled' && rescheduledBy === 'doctor'
   const { bg, text: textColor } = getStatusColor(statusLabel)
   const nameToShow = viewAs === 'doctor' ? row.patientName : row.doctorName
@@ -273,47 +481,64 @@ function AppointmentCard({
           </View>
         )}
 
-        {/* Action buttons (patient only, non-past, non-terminal) */}
-        {showActions && (
+        {/* Action buttons (patient only) */}
+        {(showActions || showReview) && (
           <View style={styles.actionRow}>
-            {showConfirm && (
+            {showReview ? (
               <TouchableOpacity
-                style={[styles.actionBtn, styles.actionBtnConfirm]}
+                style={[styles.actionBtn, styles.actionBtnReview]}
                 onPress={(event) => {
                   event.stopPropagation()
-                  onConfirm()
+                  onReview?.()
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={styles.actionBtnText}>✓ Confirm</Text>
+                <MaterialCommunityIcons name="star-outline" size={14} color="#0c7c7c" style={{ marginRight: 4 }} />
+                <Text style={[styles.actionBtnText, { color: '#0c7c7c' }]}>Review</Text>
               </TouchableOpacity>
+            ) : (
+              <>
+                {showConfirm && (
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.actionBtnConfirm]}
+                    onPress={(event) => {
+                      event.stopPropagation()
+                      onConfirm()
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.actionBtnText}>✓ Confirm</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.actionBtnReject]}
+                  onPress={(event) => {
+                    event.stopPropagation()
+                    onReject()
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.actionBtnText, { color: '#e53935' }]}>✕ Reject</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.actionBtnReschedule]}
+                  onPress={(event) => {
+                    event.stopPropagation()
+                    onReschedule()
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>↻ Reschedule</Text>
+                </TouchableOpacity>
+              </>
             )}
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionBtnReject]}
-              onPress={(event) => {
-                event.stopPropagation()
-                onReject()
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.actionBtnText, { color: '#e53935' }]}>✕ Reject</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionBtnReschedule]}
-              onPress={(event) => {
-                event.stopPropagation()
-                onReschedule()
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>↻ Reschedule</Text>
-            </TouchableOpacity>
           </View>
         )}
       </View>
     </TouchableOpacity>
   )
 }
+
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -338,6 +563,7 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
   // Reject popover state
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [pendingRejectId, setPendingRejectId] = useState<string | null>(null)
+  const [rejectSubmitting, setRejectSubmitting] = useState(false)
 
   // Details drawer state
   const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
@@ -352,8 +578,63 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
   const [rescheduleOpen, setRescheduleOpen] = useState(false)
   const [rescheduleRow, setRescheduleRow] = useState<AppointmentRow | null>(null)
 
+  // Give Review modal state (patient view only)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [reviewAppt, setReviewAppt] = useState<AppointmentRow | null>(null)
+  const [reviewSubmitting, setReviewSubmitting] = useState(false)
+  const [existingReview, setExistingReview] = useState<DoctorReview | null>(null)
+  const [existingReviewLoading, setExistingReviewLoading] = useState(false)
+  const [statusModal, setStatusModal] = useState<{
+    visible: boolean
+    status: 'success' | 'error'
+    title: string
+    description: string
+  } | null>(null)
+
   const confirmedStatusId = FALLBACK_CONFIRMED_STATUS_ID
   const rejectedStatusId = FALLBACK_REJECTED_STATUS_ID
+
+  const handleOpenReview = async (row: AppointmentRow) => {
+    setReviewAppt(row)
+    setReviewOpen(true)
+    setExistingReviewLoading(true)
+    setExistingReview(null)
+    const review = await getReviewForAppointment(row.id)
+    setExistingReview(review)
+    setExistingReviewLoading(false)
+  }
+
+  const handleSubmitReview = async (rating: number, comment: string) => {
+    if (!reviewAppt || !rating || rating < 1) return
+    setReviewSubmitting(true)
+    try {
+      const res = await createReview({
+        doctor_id: reviewAppt.doctorId,
+        appointment_id: reviewAppt.id,
+        rating,
+        comment: comment.trim() || undefined,
+      })
+      setReviewOpen(false)
+      setReviewAppt(null)
+      setStatusModal({
+        visible: true,
+        status: 'success',
+        title: 'Review Submitted',
+        description: res.message || 'Thank you for your review!',
+      })
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Unable to submit your review right now. Please try again.'
+      setStatusModal({
+        visible: true,
+        status: 'error',
+        title: 'Submission Failed',
+        description: msg,
+      })
+    } finally {
+      setReviewSubmitting(false)
+    }
+  }
+
 
   // Resolve role from AsyncStorage on mount
   useEffect(() => {
@@ -451,6 +732,7 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
           hospitalAddress: appt.hospital?.address ?? null,
           hospitalId: appt.hospital?.id ?? null,
           fees: appt.fees ?? null,
+          reason: (appt as any).reason ?? null,
         }))
 
         const sorted = [...mapped].sort((a, b) => {
@@ -525,23 +807,28 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
   }
 
   const handleCancelReject = () => {
+    if (rejectSubmitting) return
     setRejectModalVisible(false)
     setPendingRejectId(null)
   }
 
-  const handleConfirmReject = async () => {
+  const handleConfirmReject = async (reason: string) => {
     if (!pendingRejectId) return
     const rowId = pendingRejectId
-    setRejectModalVisible(false)
+    setRejectSubmitting(true)
     try {
-      const res = await updateAppointmentsStatus(rowId, rejectedStatusId)
+      const res = await updateAppointmentsStatus(rowId, rejectedStatusId, reason)
       if (res.success) {
-        Toast.show({ type: 'success', text1: 'Appointment rejected successfully.' })
-        setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, status: 'cancelled' } : r)))
+        Toast.show({ type: 'success', text1: res.message || 'Appointment rejected successfully.' })
+        setRows((prev) =>
+          prev.map((r) => (r.id === rowId ? { ...r, status: 'cancelled', reason } : r))
+        )
       }
     } catch {
       Toast.show({ type: 'error', text1: 'Something went wrong. Please try again.' })
     } finally {
+      setRejectSubmitting(false)
+      setRejectModalVisible(false)
       setPendingRejectId(null)
     }
   }
@@ -598,6 +885,7 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
       onConfirm={() => handleConfirm(item)}
       onReject={() => handleRejectClick(item.id)}
       onReschedule={() => handleRescheduleClick(item)}
+      onReview={() => handleOpenReview(item)}
     />
   )
 
@@ -741,7 +1029,36 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
         visible={rejectModalVisible}
         onCancel={handleCancelReject}
         onConfirm={handleConfirmReject}
+        submitting={rejectSubmitting}
       />
+
+      {/* ── Give Review modal ───────────────────────────────────────────── */}
+      <GiveReviewModal
+        visible={reviewOpen}
+        onClose={() => {
+          setReviewOpen(false)
+          setReviewAppt(null)
+        }}
+        appointment={reviewAppt}
+        existingReview={existingReview}
+        loadingExisting={existingReviewLoading}
+        submitting={reviewSubmitting}
+        onSubmit={handleSubmitReview}
+      />
+
+      {/* ── Status modal for alerts ────────────────────────────────────── */}
+      {statusModal && (
+        <StatusModal
+          visible={statusModal.visible}
+          status={statusModal.status}
+          title={statusModal.title}
+          description={statusModal.description}
+          submitText="OK"
+          onSubmit={() => setStatusModal(null)}
+          onCancel={() => setStatusModal(null)}
+        />
+      )}
+
 
       {/* ── Appointments Filter Sheet ──────────────────────────────────── */}
       <AppBottomSheet
@@ -1144,16 +1461,19 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
+  modalCenteredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
   rejectCard: {
-    position: 'absolute',
-    left: '50%',
-    top: '50%',
-    transform: [{ translateX: -140 }, { translateY: -90 }],
-    width: 280,
+    width: '85%',
+    maxWidth: 340,
     backgroundColor: '#ffffff',
     borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
+    padding: 20,
+    alignItems: 'stretch',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
@@ -1165,13 +1485,48 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     marginBottom: 6,
+    textAlign: 'center',
   },
   rejectSubtitle: {
     fontSize: 14,
     color: '#374151',
     fontWeight: '500',
-    marginBottom: 24,
+    marginBottom: 16,
     textAlign: 'center',
+  },
+  rejectSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 10,
+  },
+  reasonsList: {
+    gap: 8,
+    marginBottom: 20,
+  },
+  reasonRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+  },
+  reasonRowSelected: {
+    backgroundColor: 'rgba(12, 124, 124, 0.06)',
+  },
+  radioIcon: {
+    marginRight: 8,
+    marginTop: 1,
+  },
+  reasonText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 18,
+  },
+  reasonTextSelected: {
+    color: '#0c7c7c',
+    fontWeight: '500',
   },
   rejectButtons: {
     flexDirection: 'row',
@@ -1185,6 +1540,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#0c7c7c',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   rejectCancelText: {
     fontSize: 13,
@@ -1197,10 +1553,51 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     backgroundColor: '#e53935',
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rejectConfirmBtnDisabled: {
+    opacity: 0.5,
   },
   rejectConfirmText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#ffffff',
   },
+  actionBtnReview: {
+    borderColor: '#0c7c7c',
+    backgroundColor: '#f0fdf4',
+  },
+  existingReviewBox: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 12,
+    backgroundColor: '#f9fafb',
+  },
+  existingReviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  existingReviewComment: {
+    fontSize: 13,
+    color: '#374151',
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  reviewTextInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: '#1f2937',
+    minHeight: 80,
+    textAlignVertical: 'top',
+    backgroundColor: '#ffffff',
+  },
 })
+

@@ -64,6 +64,7 @@ export interface Appointment {
   } | null
   history?: AppointmentHistoryEntry[]
   rescheduled_by?: string | null
+  reason?: string | null
   referral?: {
     id: string
     referring_doctor: {
