@@ -94,10 +94,10 @@ const coerceHospitalId = (id: string) => {
 
 const normalizeTimeForUpdate = (time: string) => {
 	if (!time) return time
-	if (time.endsWith('Z')) return time
-	if (/^\d{2}:\d{2}$/.test(time)) return `${time}:00.000Z`
-	if (/^\d{2}:\d{2}:\d{2}$/.test(time)) return `${time}.000Z`
-	return time
+	const clean = time.replace(/Z$/, '').split('T').pop() || time
+	if (/^\d{2}:\d{2}$/.test(clean)) return `${clean}:00`
+	if (/^\d{2}:\d{2}:\d{2}/.test(clean)) return clean.substring(0, 8)
+	return clean
 }
 
 const getSlotDuration = (startTime: string, endTime: string) => {
@@ -124,8 +124,8 @@ const normalizeProfileHospitals = (rawHospitals: DoctorHospital[]): DoctorHospit
 	}))
 
 const normalizeSlotStatus = (slot: AvailabilityApiSlot): TimeSlot['status'] => {
-	if (slot.is_booked || slot.status === 'OCCUPIED') return 'OCCUPIED'
 	if (slot.is_enabled === false || slot.status === 'BLOCKED') return 'BLOCKED'
+	if (slot.is_booked || slot.status === 'OCCUPIED' || slot.status === 'BOOKED') return 'OCCUPIED'
 	return slot.status || 'AVAILABLE'
 }
 
@@ -159,15 +159,18 @@ const normalizeAvailabilityGroups = (response: unknown, selectedAppointmentType:
 					range: period,
 					slots: (session.slots ?? [])
 						.filter((slot) => Boolean(slot.start_time && slot.end_time))
-						.map((slot, slotIndex) => ({
-							id: `${selectedAppointmentType}-${label}-${slot.start_time}-${slotIndex}`,
-							start_time: slot.start_time as string,
-							end_time: slot.end_time as string,
-							status: normalizeSlotStatus(slot),
-							is_enabled: slot.is_enabled,
-							is_booked: slot.is_booked,
-							can_toggle: slot.can_toggle,
-						})),
+						.map((slot, slotIndex) => {
+							const normalizedStatus = normalizeSlotStatus(slot)
+							return {
+								id: `${selectedAppointmentType}-${label}-${slot.start_time}-${slotIndex}`,
+								start_time: slot.start_time as string,
+								end_time: slot.end_time as string,
+								status: normalizedStatus,
+								is_enabled: normalizedStatus === 'BLOCKED' ? false : slot.is_enabled,
+								is_booked: normalizedStatus === 'BLOCKED' ? false : slot.is_booked,
+								can_toggle: slot.can_toggle,
+							}
+						}),
 				}
 			})
 			.filter((session) => session.slots.length > 0)
@@ -208,6 +211,10 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 		title: string
 		description: string
 		submitText?: string
+	} | null>(null)
+	const [saveConfirmModal, setSaveConfirmModal] = useState<{
+		visible: boolean
+		count: number
 	} | null>(null)
 	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentTypeKey>('clinic')
 	const [toggleRefreshing, setToggleRefreshing] = useState(false)
@@ -369,34 +376,73 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 		[availableSlotGroups]
 	)
 
+	const bookedSlotTimes = useMemo(
+		() =>
+			Array.from(
+				new Set(
+					availableSlotGroups.flatMap((group) =>
+						(group.slots ?? [])
+							.filter(
+								(slot: TimeSlot) =>
+									Boolean(slot.start_time) &&
+									slot.status !== 'BLOCKED' &&
+									slot.is_enabled !== false &&
+									(slot.is_booked || slot.status === 'OCCUPIED' || slot.status === 'BOOKED')
+							)
+							.map((slot: TimeSlot) => slot.start_time)
+					)
+				)
+			),
+		[availableSlotGroups]
+	)
+
 	const todayUnselected: string[] = unselectedSlotsByDate[selectedStorageKey] ?? apiBlockedSlots
 	const selectedSlots: string[] = allSelectableSlots.filter((slot) => !todayUnselected.includes(slot))
 
 	const slotGroupsForPicker: SlotGroup[] = availableSlotGroups.map((group) => ({
 		...group,
 		slots: group.slots.map((slot) => {
-			if (slot.can_toggle === false) return slot
 			if (todayUnselected.includes(slot.start_time)) {
 				return { ...slot, status: 'BLOCKED', is_enabled: false, is_booked: false }
 			}
-			if (slot.status === 'BLOCKED') {
-				return { ...slot, status: 'AVAILABLE', is_enabled: true }
+			
+			// Check if the slot was explicitly unblocked in this session
+			const pending = pendingOverrides.find(
+				(o) =>
+					o.start_time === slot.start_time &&
+					o.date === selectedDateKey &&
+					(o.hospital_id === selectedHospitalId || !o.hospital_id)
+			)
+			if (pending && pending.is_blocked === false) {
+				return { ...slot, status: 'AVAILABLE', is_enabled: true, is_booked: false }
 			}
-			return slot
+
+			if (slot.can_toggle === false) return slot
+			if (slot.is_booked || slot.status === 'OCCUPIED' || slot.status === 'BOOKED') {
+				return slot
+			}
+			return { ...slot, status: 'AVAILABLE', is_enabled: true, is_booked: false }
 		}),
 	}))
 
 	const getSlotEndTime = (startTime: string): string => {
 		for (const group of availableSlotGroups) {
 			const match = group.slots.find((slot) => slot.start_time === startTime)
-			if (match) return match.end_time
+			if (match && match.end_time) return match.end_time
 		}
-		return startTime
+		try {
+			const [hours, minutes] = startTime.split(':').map(Number)
+			const date = new Date(1970, 0, 1, hours, minutes)
+			date.setMinutes(date.getMinutes() + 30) // Default 30 min duration
+			const endHours = String(date.getHours()).padStart(2, '0')
+			const endMinutes = String(date.getMinutes()).padStart(2, '0')
+			return `${endHours}:${endMinutes}:00`
+		} catch (e) {
+			return startTime
+		}
 	}
 
-	const stageSlotSelection = async (slots: string[]) => {
-		const newlyBlocked = selectedSlots.filter((slot) => !slots.includes(slot))
-		const newlyUnblocked = todayUnselected.filter((slot) => slots.includes(slot))
+	const commitSlotSelection = async (newlyBlocked: string[], newlyUnblocked: string[], slots: string[]) => {
 		const updatedUnselected = [...todayUnselected.filter((slot) => !newlyUnblocked.includes(slot)), ...newlyBlocked]
 		const updated: UnselectedSlotsByDate = { ...unselectedSlotsByDate, [selectedStorageKey]: updatedUnselected }
 
@@ -433,18 +479,70 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 							changed.end_time === pending.end_time
 					)
 			)
-			const effectiveOverrides = changedOverrides.filter(
-				(override) => initialBlockedSlots.has(override.start_time) !== override.is_blocked
-			)
+			const effectiveOverrides = changedOverrides.filter((override) => {
+				const isStateChanged = initialBlockedSlots.has(override.start_time) !== override.is_blocked
+				if (isStateChanged) return true
+				
+				// Keep override if it explicitly unblocks an originally booked slot
+				const originalSlot = availableSlotGroups
+					.flatMap((g) => g.slots || [])
+					.find((s) => s.start_time === override.start_time)
+				
+				const wasBooked = originalSlot?.is_booked || originalSlot?.status === 'OCCUPIED' || originalSlot?.status === 'BOOKED'
+				if (wasBooked && override.is_blocked === false) {
+					return true
+				}
+				
+				return false
+			})
 			return [...filtered, ...effectiveOverrides]
 		})
+	}
+
+	const stageSlotSelection = async (slots: string[]) => {
+		const toggledSlot =
+			slots.find((s) => !selectedSlots.includes(s)) || selectedSlots.find((s) => !slots.includes(s))
+
+		let newlyBlocked: string[] = []
+		let newlyUnblocked: string[] = []
+
+		if (toggledSlot && bookedSlotTimes.includes(toggledSlot)) {
+			if (todayUnselected.includes(toggledSlot)) {
+				newlyUnblocked = [toggledSlot]
+			} else {
+				newlyBlocked = [toggledSlot]
+			}
+		} else {
+			newlyBlocked = selectedSlots.filter((slot) => !slots.includes(slot))
+			newlyUnblocked = todayUnselected.filter((slot) => slots.includes(slot))
+		}
+
+		await commitSlotSelection(newlyBlocked, newlyUnblocked, slots)
 	}
 
 	const handleTimeChange = (slots: string | string[]) => {
 		stageSlotSelection(Array.isArray(slots) ? slots : [slots])
 	}
 
-	const handleSaveAvailability = async () => {
+	const handleClearSelection = async () => {
+		const updated: UnselectedSlotsByDate = {
+			...unselectedSlotsByDate,
+			[selectedStorageKey]: apiBlockedSlots,
+		}
+		setUnselectedSlotsByDate(updated)
+		await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+		setPendingOverrides((prev) =>
+			prev.filter(
+				(override) =>
+					!(
+						override.hospital_id === selectedHospitalId &&
+						override.date === selectedDateKey
+					)
+			)
+		)
+	}
+
+	const executeSaveAvailability = async () => {
 		if (!selectedHospitalId) {
 			return
 		}
@@ -452,41 +550,22 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 		setSaveLoading(true)
 		try {
 			let backendMessage = ''
-			const selectedUpdatePayload = {
-				hospital_id: coerceHospitalId(selectedHospitalId),
-				day_of_week: getDayOfWeek(selectedDate),
-				appointment_mode: APPOINTMENT_MODE_BY_TYPE[selectedAppointmentType],
-				slots: selectedSlots.map((startTime) => {
-					const endTime = getSlotEndTime(startTime)
-
-					return {
-						start_time: normalizeTimeForUpdate(startTime),
-						end_time: normalizeTimeForUpdate(endTime),
-						slot_duration: getSlotDuration(startTime, endTime),
-						buffer_time: 0,
-					}
-				}),
-				is_active: selectedSlots.length > 0,
-			}
-
-			const availabilityResponse = await updateDoctorAvailability(selectedUpdatePayload)
-			if ((availabilityResponse as { message?: string })?.message) {
-				backendMessage = (availabilityResponse as { message: string }).message
-			}
 
 			const overridesByHospitalAndDate = pendingOverrides.reduce<Record<string, SlotOverrideBatchPayload>>(
 				(acc, override) => {
-					const groupKey = `${override.hospital_id ?? ''}__${override.date}`
+					const hospitalIdToUse = override.hospital_id || selectedHospitalId
+					const groupKey = `${hospitalIdToUse}__${override.date}`
 					if (!acc[groupKey]) {
 						acc[groupKey] = {
-							hospital_id: override.hospital_id ?? null,
+							hospital_id: String(coerceHospitalId(hospitalIdToUse)),
 							date: override.date,
+							appointment_mode: APPOINTMENT_MODE_BY_TYPE[selectedAppointmentType],
 							slots: [],
 						}
 					}
 					acc[groupKey].slots.push({
-						start_time: override.start_time,
-						end_time: override.end_time,
+						start_time: normalizeTimeForUpdate(override.start_time),
+						end_time: normalizeTimeForUpdate(override.end_time),
 						is_blocked: override.is_blocked,
 					})
 					return acc
@@ -500,6 +579,11 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 			}
 
 			setPendingOverrides([])
+			const nextUnselected = { ...unselectedSlotsByDate }
+			delete nextUnselected[selectedStorageKey]
+			setUnselectedSlotsByDate(nextUnselected)
+			await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextUnselected))
+
 			setStatusModal({
 				visible: true,
 				status: 'success',
@@ -508,8 +592,11 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 				submitText: 'Okay',
 			})
 			await fetchAvailability()
-		} catch (error) {
+		} catch (error: any) {
 			console.error('[AvailabilityTab] save availability error:', error)
+			if (error?.response) {
+				console.error('[AvailabilityTab] Error response data:', error.response.data)
+			}
 			setStatusModal({
 				visible: true,
 				status: 'error',
@@ -520,6 +607,24 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 		} finally {
 			setSaveLoading(false)
 		}
+	}
+
+	const handleSaveAvailability = () => {
+		if (!selectedHospitalId) return
+
+		const newlyBlockedBookedCount = pendingOverrides.filter(
+			(o) => o.is_blocked && bookedSlotTimes.includes(o.start_time)
+		).length
+
+		if (newlyBlockedBookedCount > 0) {
+			setSaveConfirmModal({
+				visible: true,
+				count: newlyBlockedBookedCount,
+			})
+			return
+		}
+
+		executeSaveAvailability()
 	}
 
 	return (
@@ -578,11 +683,29 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 							availableSlots={slotGroupsForPicker.length > 0 ? slotGroupsForPicker : undefined}
 							loading={slotsLoading || toggleRefreshing}
 							onSelectAll={() => {
-								stageSlotSelection(allSelectableSlots)
+								const allToggleableSlots = availableSlotGroups.flatMap((group) =>
+									(group.slots ?? []).filter((s) => Boolean(s.start_time)).map((s) => s.start_time)
+								)
+								commitSlotSelection([], todayUnselected, allToggleableSlots)
 							}}
 							onUnselectAll={() => {
-								stageSlotSelection([])
+								const allToggleableSlots = Array.from(
+									new Set(
+										availableSlotGroups.flatMap((group) =>
+											(group.slots ?? [])
+												.filter((s) => {
+													if (!s.start_time) return false
+													if (s.status === 'UNAVAILABLE' || s.is_enabled === false) return false
+													return true
+												})
+												.map((s) => s.start_time)
+										)
+									)
+								)
+								const newlyBlocked = allToggleableSlots.filter((slot) => !todayUnselected.includes(slot))
+								commitSlotSelection(newlyBlocked, [], [])
 							}}
+							onClearSelection={handleClearSelection}
 							selectedAppointmentType={selectedAppointmentType}
 							onAppointmentTypeChange={(type) => {
 								setToggleRefreshing(true)
@@ -614,6 +737,21 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 					submitText={statusModal.submitText}
 					onSubmit={() => setStatusModal(null)}
 					onCancel={() => setStatusModal(null)}
+				/>
+			)}
+			{saveConfirmModal && (
+				<StatusModal
+					visible={saveConfirmModal.visible}
+					status="error"
+					title="Confirm Blocking Booked Slots"
+					description={`${saveConfirmModal.count} patient(s) have booked appointments in the selected slot(s). If you proceed, these appointments will be blocked and the affected patients will need to reschedule at their convenience. Are you sure you want to continue?`}
+					submitText="Confirm"
+					cancelText="Cancel"
+					onSubmit={() => {
+						setSaveConfirmModal(null)
+						executeSaveAvailability()
+					}}
+					onCancel={() => setSaveConfirmModal(null)}
 				/>
 			)}
 		</View>	

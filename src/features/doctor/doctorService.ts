@@ -241,13 +241,14 @@ export interface SlotOverridePayload {
 }
 
 export interface SlotOverrideBatchPayload {
-	hospital_id?: string | null
+	hospital_id?: string | number | null
 	date: string
 	slots: Array<{
 		start_time: string
 		end_time: string
 		is_blocked: boolean
 	}>
+	appointment_mode?: 'clinic_visit' | 'video_call'
 	reason?: string
 }
 

@@ -51,6 +51,7 @@ export type PickProps = {
 	disableBookedSlots?: boolean
 	onSelectAll?: () => void
 	onUnselectAll?: () => void
+	onClearSelection?: () => void
 	showTimeSlots?: boolean
 	hideHeader?: boolean
 	hideNavigation?: boolean
@@ -82,6 +83,7 @@ export default function DateSlotPicker(props: PickProps) {
 		disableBookedSlots = true,
 		onSelectAll,
 		onUnselectAll,
+		onClearSelection,
 		showTimeSlots = true,
 		hideHeader = false,
 		hideNavigation = false,
@@ -325,7 +327,7 @@ export default function DateSlotPicker(props: PickProps) {
 									{timeLabel}
 								</AppTypography>
 							)}
-							{multiSelect && (onSelectAll || onUnselectAll) ? (
+							{multiSelect && (onSelectAll || onUnselectAll || onClearSelection) ? (
 								<View style={styles.bulkActions}>
 									{onSelectAll ? (
 										<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
@@ -338,6 +340,13 @@ export default function DateSlotPicker(props: PickProps) {
 										<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
 											<AppTypography variant="caption" style={styles.bulkButtonText}>
 												Unselect All
+											</AppTypography>
+										</TouchableOpacity>
+									) : null}
+									{onClearSelection ? (
+										<TouchableOpacity style={styles.bulkButton} onPress={onClearSelection}>
+											<AppTypography variant="caption" style={styles.bulkButtonText}>
+												Clear Selection
 											</AppTypography>
 										</TouchableOpacity>
 									) : null}
@@ -370,21 +379,47 @@ export default function DateSlotPicker(props: PickProps) {
 						</View>
 					) : null}
 					{/* ───────────────────────────────────────────────────── */}
+					{/* ───────────────────────────────────────────────────── */}
 
-					{loading ? (
-						<AppSkeleton height={100} style={{ marginTop: 8 }} />
-					) : availableSlots.length === 0 ? (
-						<AppTypography variant="caption" style={styles.greyText}>
-							No slots available for this date.
-						</AppTypography>
-					) : (
-						<View style={styles.timeGridContainer}>
-							{availableSlots.map((group, groupIdx) => (
-								<View key={`group-${groupIdx}`} style={styles.timeGroupContainer}>
-									<AppTypography variant="subtitle" style={styles.timeGroupLabel}>
-										{group.label}
-									</AppTypography>
-									<View style={styles.slotsGridFlex}>
+					{(() => {
+						const displaySlots = showAvailabilityMode
+							? availableSlots
+							: availableSlots
+									.map((group) => {
+										const filteredSlots = group.slots.filter((slot) => {
+											const isAvailable = slot.status === 'AVAILABLE' || slot.status === ('' as any)
+											const isBlocked = slot.status === 'BLOCKED' || slot.is_enabled === false
+											const isBooked =
+												slot.is_booked ||
+												slot.status === 'BOOKED' ||
+												slot.status === 'OCCUPIED' ||
+												slot.status === 'UNAVAILABLE'
+											return isAvailable && !isBlocked && !isBooked
+										})
+										return { ...group, slots: filteredSlots }
+									})
+									.filter((group) => group.slots.length > 0)
+
+						if (loading) {
+							return <AppSkeleton height={100} style={{ marginTop: 8 }} />
+						}
+
+						if (displaySlots.length === 0) {
+							return (
+								<AppTypography variant="caption" style={styles.greyText}>
+									No slots available for the selected date.
+								</AppTypography>
+							)
+						}
+
+						return (
+							<View style={styles.timeGridContainer}>
+								{displaySlots.map((group, groupIdx) => (
+									<View key={`group-${groupIdx}`} style={styles.timeGroupContainer}>
+										<AppTypography variant="subtitle" style={styles.timeGroupLabel}>
+											{group.label}
+										</AppTypography>
+										<View style={styles.slotsGridFlex}>
 										{group.slots.map((slot, idx) => {
 											const isSelected = selectedTimes.includes(slot.start_time)
 											const isAvailable =
@@ -396,8 +431,7 @@ export default function DateSlotPicker(props: PickProps) {
 												slot.status === 'OCCUPIED' ||
 												slot.status === 'UNAVAILABLE'
 											const canSelect =
-												slot.can_toggle !== false &&
-												!slot.is_booked &&
+												(slot.can_toggle !== false || !disableBookedSlots) &&
 												(isAvailable || isBlocked || !disableBookedSlots || !isBooked)
 											// const statusLabel =
 												// slot.status === 'OCCUPIED' || slot.is_booked
@@ -474,7 +508,7 @@ export default function DateSlotPicker(props: PickProps) {
 								</View>
 							))}
 						</View>
-					)}
+					)})()}
 				</>
 			) : null}
 		</View>
@@ -692,7 +726,7 @@ const styles = StyleSheet.create({
 		
 	},
 	timeBoxSelectedAvailability: {
-		borderColor: '#0c7c7c',
+		borderColor: '#dde3e8',
 		backgroundColor: '#fff',
 	},
 	timeText: {

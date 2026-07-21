@@ -95,6 +95,7 @@ const STATUS_MAPPING: Record<string, keyof typeof SEMANTIC_STATUS_COLORS> = {
 
 	// purple/rescheduled states
 	rescheduled: 'purple',
+	reschedule_required: 'danger',
 	'waiting for patient confirmation': 'purple',
 	'waiting for your confirmation': 'purple',
 }
