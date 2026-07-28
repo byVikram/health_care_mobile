@@ -20,6 +20,7 @@ import { Asset } from 'expo-asset'
 import * as FileSystem from 'expo-file-system/legacy'
 import DicomViewer from './components/DicomViewer'
 import VitalsTab from './components/VitalsTab'
+import FollowUpModal from './components/FollowUpModal'
 // import ScribbleNoteEditor from './components/ScribbleNoteEditor'
 import Prescription from '../../assets/icons/consultation/prescription.svg'
 import LaboratoryIcon from '../../assets/icons/consultation/lab.svg'
@@ -979,106 +980,34 @@ export default function ConsultationPage() {
 		}
 	}, [patientId])
 
-	useEffect(() => {
-		if (!followUpOpen) return
-		const fetchHospitals = async () => {
-			try {
-				let hospitals: any[] = []
-				if (doctorID) {
-					const res = await getDoctorById(doctorID)
-					hospitals = res?.data?.hospitals || []
-				} else {
-					const res = await getDoctorProfile()
-					hospitals = res?.data?.hospitals || []
-				}
-				if (!followUpHospitalId && hospitals.length > 0) {
-					setFollowUpHospitalId(hospitals[0]?.hospital?.id || '')
-				}
-			} catch {
-				// The dropdown fetches independently; this is only fallback for payload defaults.
-			}
-		}
-		fetchHospitals()
-	}, [followUpOpen, doctorID, followUpHospitalId])
+	const [followUpLoading, setFollowUpLoading] = useState(false)
 
-	useEffect(() => {
-		if (!followUpOpen) return
-		const hospitalId =
-			selectedHospitalId ||
-			followUpHospitalId ||
-			params?.appointment?.hospital?.id ||
-			params?.appointment?.hospital_id
-		const dateStr = followUpDate.toISOString().split('T')[0]
-		if (!hospitalId || !dateStr) {
-			setFollowUpSlots([])
-			setFollowUpSelectedSlot('')
+	const handleSaveFollowUpRecommendation = async (dueDate: Date, note: string) => {
+		if (!appointmentId || !patient?.id) {
+			Alert.alert('Error', 'Missing appointment or patient details.')
 			return
 		}
-		const fetchSlots = async () => {
-			setFollowUpSlotsLoading(true)
-			setFollowUpSelectedSlot('')
-			try {
-				const responseData = await getDoctorAvailability({
-					doctor_id: doctorID,
-					hospital_id: hospitalId,
-					date: dateStr,
-				})
-				const groups = Array.isArray(responseData)
-					? responseData
-					: Array.isArray((responseData as any)?.data)
-						? (responseData as any).data
-						: []
-				setFollowUpSlots(groups)
-			} catch {
-				setFollowUpSlots([])
-			} finally {
-				setFollowUpSlotsLoading(false)
-			}
-		}
-		fetchSlots()
-	}, [followUpOpen, followUpDate, followUpHospitalId, selectedHospitalId, doctorID, params])
-
-	const handleConfirmFollowUp = async () => {
-		if (!followUpSelectedSlot) {
-			Alert.alert('Select time', 'Please select a slot to schedule the follow up.')
-			return
-		}
-		if (!appointmentId) {
-			Alert.alert('Error', 'Appointment id missing.')
-			return
-		}
-		const hospitalId =
-			selectedHospitalId ||
-			followUpHospitalId ||
-			params?.appointment?.hospital?.id ||
-			params?.appointment?.hospital_id
-		const dateStr = followUpDate.toISOString().split('T')[0]
-		if (!hospitalId || !dateStr) {
-			Alert.alert('Error', 'Missing hospital or date for follow up.')
-			return
-		}
-
-		setFollowUpSlotsLoading(true)
+		setFollowUpLoading(true)
 		try {
-			const res = await rescheduleAppointment({
+			const due_date_str = dueDate.toISOString().split('T')[0]
+			const payload = {
 				appointment_id: appointmentId,
-				appointment_date: dateStr,
-				start_time: followUpSelectedSlot,
-				end_time: null,
-				hospital_id: hospitalId,
-				reason: 'Doctor follow up',
-				status_id: APPOINTMENT_STATUS.CONFIRM,
-			})
-			if (res?.success) {
-				Alert.alert('Success', res.message || 'Follow up appointment scheduled')
+				patient_id: patient.id,
+				due_date: due_date_str,
+				doctor_note: note || undefined,
+			}
+			const res = await ApiService.post(API_ENDPOINTS.FOLLOW_UPS.CREATE, payload)
+			if (res.data?.success || res.status === 201 || res.status === 200) {
+				Alert.alert('Success', 'Follow-up recommendation saved successfully.')
 				setFollowUpOpen(false)
 			} else {
-				Alert.alert('Error', res?.message || 'Unable to schedule follow up')
+				Alert.alert('Error', res.data?.message || 'Failed to save follow-up recommendation.')
 			}
-		} catch {
-			Alert.alert('Error', 'Unable to schedule follow up')
+		} catch (err: any) {
+			console.error('Save follow-up error:', err)
+			Alert.alert('Error', err?.response?.data?.message || 'Failed to save follow-up recommendation.')
 		} finally {
-			setFollowUpSlotsLoading(false)
+			setFollowUpLoading(false)
 		}
 	}
 
@@ -1511,52 +1440,12 @@ export default function ConsultationPage() {
 				</View>
 			</ScrollView>
 
-			<Modal
+			<FollowUpModal
 				visible={followUpOpen}
-				transparent
-				animationType="slide"
-				onRequestClose={() => setFollowUpOpen(false)}
-			>
-				<TouchableOpacity
-					activeOpacity={1}
-					style={styles.drawerBackdrop}
-					onPress={() => setFollowUpOpen(false)}
-				>
-					<TouchableOpacity activeOpacity={1} style={styles.drawerSheet} onPress={() => {}}>
-						<View style={styles.drawerHeader}>
-							<View>
-								<Text style={styles.drawerTitle}>Follow Up Appointment</Text>
-								<Text style={styles.drawerSubtitle}>{patient?.name ?? 'Patient'}</Text>
-							</View>
-							<TouchableOpacity style={styles.drawerCloseBtn} onPress={() => setFollowUpOpen(false)}>
-								<MaterialCommunityIcons name="close" size={18} color="#7a848d" />
-							</TouchableOpacity>
-						</View>
-						<ScrollView style={styles.drawerBody} contentContainerStyle={styles.drawerBodyContent}>
-							<DoctorHospitalDropdown />
-							<DateSlotPicker
-								selectedDate={followUpDate}
-								onDateChange={(date) => {
-									setFollowUpDate(date)
-									setFollowUpSelectedSlot('')
-								}}
-								selectedTime={followUpSelectedSlot}
-								onTimeChange={setFollowUpSelectedSlot}
-								availableSlots={followUpSlots}
-								loading={followUpSlotsLoading}
-							/>
-						</ScrollView>
-						<View style={styles.drawerActions}>
-							<TouchableOpacity style={styles.drawerCancelBtn} onPress={() => setFollowUpOpen(false)}>
-								<Text style={styles.drawerCancelBtnText}>Cancel</Text>
-							</TouchableOpacity>
-							<TouchableOpacity style={styles.drawerConfirmBtn} onPress={handleConfirmFollowUp}>
-								<Text style={styles.drawerConfirmBtnText}>Confirm</Text>
-							</TouchableOpacity>
-						</View>
-					</TouchableOpacity>
-				</TouchableOpacity>
-			</Modal>
+				onClose={() => setFollowUpOpen(false)}
+				onSave={handleSaveFollowUpRecommendation}
+				loading={followUpLoading}
+			/>
 		</View>
 	)
 }
