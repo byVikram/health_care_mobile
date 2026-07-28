@@ -4,8 +4,8 @@
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	// const url = "http://192.168.4.35:8000"
+	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	const url = "http://192.168.4.60:8000"
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 
 	if (!url) {
@@ -170,5 +170,9 @@ export const API_ENDPOINTS = {
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {
 		LIST: `${BASE_URL}/api/locations`,
+	},
+	FOLLOW_UPS: {
+		CREATE: `${BASE_URL}/api/follow-ups`,
+		CANCEL: (id: string) => `${BASE_URL}/api/follow-ups/${id}/cancel`,
 	},
 }
