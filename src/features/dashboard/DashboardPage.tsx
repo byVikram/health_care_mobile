@@ -7,7 +7,10 @@ import {
 	View,
 	useWindowDimensions,
 	Animated,
+	Text,
+	TouchableOpacity,
 } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import QuickServicesSection from './components/QuickServicesSection'
@@ -40,7 +43,9 @@ import { ROUTES } from '../../navigation/routes'
 import type { AppNavigationParamList } from '../../navigation/types'
 
 import PatientHealthQuestionsList from '../dashboard/components/PatientHealthQuestionsList'
-import { AppButton } from '../../components/common'
+import { AppButton, AppModal, AppTypography } from '../../components/common'
+import { getDoctorStatus, DoctorStatusResponse } from '../doctor/doctorService'
+
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
@@ -72,6 +77,10 @@ export default function DashboardPage() {
 	const [selectedDate, setSelectedDate] = useState(0)
 	const [doctorAppointmentSearch, setDoctorAppointmentSearch] = useState('')
 
+	// ----- Doctor Status Fetch effect -----
+	const [doctorStatus, setDoctorStatus] = useState<DoctorStatusResponse['data'] | null>(null)
+	const [showUnverifiedBanner, setShowUnverifiedBanner] = useState(false)
+
 	// ---------------- WEEK DAYS ----------------
 	const buildWeekDays = () => {
 		const today = new Date()
@@ -95,6 +104,25 @@ export default function DashboardPage() {
 	// ---------------- DOCTOR API ----------------
 	useEffect(() => {
 		if (role !== USER_ROLES.DOCTOR) return
+
+		const fetchStatus = async () => {
+			try {
+				const status = await getDoctorStatus()
+				console.log("DOCTOR STATUS IN DASHBOARD:", status)
+				setDoctorStatus(status)
+				
+				if (status.profile_completed && !status.is_verified) {
+					console.log("SETTING SHOW UNVERIFIED BANNER TO TRUE")
+					setShowUnverifiedBanner(true)
+				} else {
+					console.log("BANNER NOT SHOWN. profile_completed:", status.profile_completed, "is_verified:", status.is_verified)
+				}
+			} catch (error) {
+				console.error('Failed to fetch doctor status:', error)
+			}
+		}
+
+		fetchStatus()
 
 		const fetchAppointments = async () => {
 			try {
@@ -157,7 +185,24 @@ export default function DashboardPage() {
 	}
 
 	const renderDoctorPanel = () => (
-		<DoctorAppointments
+		<>
+			{showUnverifiedBanner && (
+				<View style={styles.verificationBannerContainer}>
+					<View style={styles.verificationBannerIconBox}>
+						<MaterialCommunityIcons name="clock-outline" size={24} color="#F57C00" />
+					</View>
+					<View style={styles.verificationBannerTextContainer}>
+						<Text style={styles.verificationBannerTitle}>Verification Pending</Text>
+						<Text style={styles.verificationBannerDesc}>
+							Your profile is under review. You'll get full access once your account is verified.
+						</Text>
+					</View>
+					<TouchableOpacity style={styles.verificationBannerButton}>
+						<Text style={styles.verificationBannerButtonText}>Learn More</Text>
+					</TouchableOpacity>
+				</View>
+			)}
+			<DoctorAppointments
 			selectedDate={selectedDate}
 			setSelectedDate={setSelectedDate}
 			appointments={appointments}
@@ -168,6 +213,7 @@ export default function DashboardPage() {
 			searchQuery={doctorAppointmentSearch}
 			setSearchQuery={setDoctorAppointmentSearch}
 		/>
+		</>
 	)
 
 	const renderUserPanel = () => (
@@ -329,6 +375,22 @@ export default function DashboardPage() {
 				submitText={modalType === 'success' ? 'Go Home' : 'Try Again'}
 				onSubmit={() => setModalType(null)}
 			/>
+
+			{/* Doctor Status Modals */}
+			{/* Complete Profile Blocking Modal */}
+			<AppModal 
+				visible={role === USER_ROLES.DOCTOR && !!doctorStatus && !doctorStatus.profile_completed} 
+				dismissable={false}
+				onDismiss={() => {}}
+				title="Complete Your Profile"
+			>
+				<AppTypography variant="body" style={{ marginBottom: 16 }}>
+					Your profile is incomplete. Please complete your profile to continue using the application.
+				</AppTypography>
+				<AppButton onPress={() => navigation.navigate(ROUTES.MAIN.PROFILE as any)}>
+					Complete Profile
+				</AppButton>
+			</AppModal>
 		</>
 	)
 }
@@ -398,4 +460,53 @@ const styles = StyleSheet.create({
 	upcomingAppointmentsWrapper: {
 		marginTop: 8,
 	},
+	verificationBannerContainer: {
+		backgroundColor: '#FFF8E1',
+		borderWidth: 1,
+		borderColor: '#FFE082',
+		borderRadius: 12,
+		padding: 16,
+		marginHorizontal: 16,
+		marginBottom: 16,
+		flexDirection: 'column',
+		alignItems: 'flex-start',
+	},
+	verificationBannerIconBox: {
+		backgroundColor: '#FFECB3',
+		borderRadius: 8,
+		width: 48,
+		height: 48,
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginBottom: 12,
+	},
+	verificationBannerTextContainer: {
+		marginBottom: 16,
+	},
+	verificationBannerTitle: {
+		fontWeight: '700',
+		fontSize: 16,
+		color: '#212121',
+		marginBottom: 4,
+	},
+	verificationBannerDesc: {
+		fontSize: 14,
+		color: '#616161',
+		lineHeight: 20,
+	},
+	verificationBannerButton: {
+		borderWidth: 1,
+		borderColor: '#F57C00',
+		borderRadius: 24,
+		paddingVertical: 8,
+		paddingHorizontal: 24,
+		alignItems: 'center',
+		alignSelf: 'flex-start',
+	},
+	verificationBannerButtonText: {
+		color: '#F57C00',
+		fontWeight: '600',
+		fontSize: 14,
+	},
 })
+

@@ -4,8 +4,8 @@
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	const url = "http://192.168.4.60:8000"
+	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	// const url = "http://192.168.255.157:8000"
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 
 	if (!url) {
@@ -39,6 +39,7 @@ export const API_ENDPOINTS = {
 		TOGGLE: (publicId: string) => `${BASE_URL}/api/doctors/favourites/${publicId}`,
 	},
 	DOCTOR_PROFILE: {
+		STATUS: `${BASE_URL}/api/doctors/me/status`,
 		DETAILS: `${BASE_URL}/api/doctors/details`,
 		PERSONAL_DETAILS: `${BASE_URL}/api/doctors/personal-details`,
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
@@ -76,6 +77,7 @@ export const API_ENDPOINTS = {
 		PRE_INTAKE: (id: string) => `${BASE_URL}/api/appointments/${id}/pre-intake`,
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
+		ACTIVE_CONSENT: `${BASE_URL}/api/appointments/active/consent`,
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
 	},
 	REVIEWS: {

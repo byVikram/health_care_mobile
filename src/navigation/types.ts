@@ -53,6 +53,7 @@ export type PatientPaymentParams = {
 	consultationTypeLabel: string
 	fee: number
 	referralId?: string
+	consentVersionId: string
 }
 
 export type AppStackParamList = {
@@ -73,7 +74,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.APPOINTMENTS]: { appointmentId?: string } | undefined
 	[ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
-	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: PatientPaymentParams }
+	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: Omit<PatientPaymentParams, 'consentVersionId'> }
 	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
 	[ROUTES.STACK.ORDER_LIST]: undefined
 	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
@@ -109,21 +110,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.LABORATORY_LIST]: undefined
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
-	[ROUTES.STACK.PATIENT_PAYMENT]:
-		| {
-				doctor: DoctorDetailData
-				hospitalId: string
-				hospitalName: string
-				appointmentDate: string // YYYY-MM-DD
-				appointmentDateDisplay: string // e.g. "Wed Oct 11 2025"
-				startTime: string // HH:MM (24h format)
-				startTimeDisplay: string // e.g. "01:00 PM"
-				appointmentMode: 'offline' | 'online'
-				consultationTypeLabel: string
-				fee: number
-				referralId?: string
-		  }
-		| undefined
+	[ROUTES.STACK.PATIENT_PAYMENT]: PatientPaymentParams | undefined
 	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: undefined
 	[ROUTES.STACK.PATIENT_QUESTION_DETAIL]: { questionId: string } | undefined
 	[ROUTES.STACK.RADIOLOGY_LIST]: { scanTypeId?: number; scanTypeName?: string } | undefined

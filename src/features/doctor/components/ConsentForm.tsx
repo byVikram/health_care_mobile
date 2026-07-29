@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Modal,
   View,
@@ -7,38 +7,27 @@ import {
   ScrollView,
   TouchableOpacity,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { StackActions, useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
+import { getActiveConsent, ActiveConsentResponse } from '../doctorService'
 
 interface Props {
   open?: boolean
   onClose?: () => void
-  onAgree?: () => void
+  onAgree?: (consentId: string) => void
 }
-
-const appointmentRules = [
-  'The appointment is subject to doctor availability and confirmation.',
-  'Please provide accurate personal and medical information.',
-  'Arrive at least 10-15 minutes before your appointment time.',
-  'Late arrival may result in delay or rescheduling.',
-  'Cancellation or rescheduling must follow clinic/hospital policy.',
-  "Consultation outcomes are determined by the doctor's medical judgment.",
-  'For online consultations, patients are responsible for internet/device availability.',
-  'Patient information will be stored securely for healthcare purposes.',
-]
-
-const consentPoints = [
-  'You have read and understood these terms.',
-  'You agree to follow appointment policies.',
-  'You consent to the collection and use of your information for appointment scheduling.',
-]
 
 export default function ConsentModal({ open, onClose, onAgree }: Props) {
   const [checked, setChecked] = useState(false)
+  const [activeConsent, setActiveConsent] = useState<ActiveConsentResponse['data'] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
+  
   const { width, height } = useWindowDimensions()
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>()
   const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.CONSENT_FORM>>()
@@ -46,6 +35,23 @@ export default function ConsentModal({ open, onClose, onAgree }: Props) {
   const isTablet = width >= 768
   const isScreenMode = open === undefined
   const visible = open ?? true
+  const paymentParams = route.params?.paymentParams
+
+  useEffect(() => {
+    if (visible) {
+      setChecked(false)
+      setLoading(true)
+      setError(false)
+      getActiveConsent()
+        .then(data => setActiveConsent(data))
+        .catch(() => setError(true))
+        .finally(() => setLoading(false))
+    }
+  }, [visible])
+
+  const parsedContent = typeof activeConsent?.content === 'string'
+    ? (() => { try { return JSON.parse(activeConsent.content) } catch { return { points: [] } } })()
+    : activeConsent?.content
 
   const handleClose = () => {
     setChecked(false)
@@ -57,15 +63,18 @@ export default function ConsentModal({ open, onClose, onAgree }: Props) {
   }
 
   const handleAgree = () => {
+    if (!activeConsent) return
     setChecked(false)
     if (onAgree) {
-      onAgree()
+      onAgree(activeConsent.id)
       return
     }
 
-    const paymentParams = route.params?.paymentParams
     if (paymentParams) {
-      navigation.dispatch(StackActions.replace(ROUTES.STACK.PATIENT_PAYMENT, paymentParams))
+      navigation.dispatch(StackActions.replace(ROUTES.STACK.PATIENT_PAYMENT, {
+        ...paymentParams,
+        consentVersionId: activeConsent.id
+      }))
     }
   }
 
@@ -91,36 +100,29 @@ export default function ConsentModal({ open, onClose, onAgree }: Props) {
             Please read the following terms carefully before booking your appointment.
           </Text>
 
-          <ScrollView style={styles.scrollBox} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator>
-            <Text style={styles.sectionTitle}>
-              By booking an appointment through this app, you agree to:
-            </Text>
+          {loading ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#0c7c7c" />
+            </View>
+          ) : error ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <Text style={{ color: 'red' }}>Failed to load consent terms. Please try again.</Text>
+            </View>
+          ) : (
+            <>
+              <ScrollView style={styles.scrollBox} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator>
+                {parsedContent?.points?.map((point: string, index: number) => (
+                  <Text key={index} style={styles.listItem}>
+                    • {point}
+                  </Text>
+                ))}
+              </ScrollView>
 
-            {appointmentRules.map((rule, index) => (
-              <Text key={index} style={styles.listItem}>
-                • {rule}
-              </Text>
-            ))}
-
-            <View style={styles.divider} />
-
-            <Text style={styles.sectionTitle}>Consent</Text>
-            <Text style={styles.smallText}>
-              By clicking "Agree and Continue", you confirm that:
-            </Text>
-
-            {consentPoints.map((point, index) => (
-              <Text key={index} style={styles.listItem}>
-                • {point}
-              </Text>
-            ))}
-          </ScrollView>
-
-          <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={() => setChecked((current) => !current)}
-            activeOpacity={0.75}
-          >
+              <TouchableOpacity
+                style={styles.checkboxContainer}
+                onPress={() => setChecked((current) => !current)}
+                activeOpacity={0.75}
+              >
             <View
               style={[
                 styles.checkbox,
@@ -135,6 +137,8 @@ export default function ConsentModal({ open, onClose, onAgree }: Props) {
               I agree to the appointment booking terms and conditions.
             </Text>
           </TouchableOpacity>
+          </>
+          )}
 
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.cancelBtn} onPress={handleClose}>
@@ -144,9 +148,9 @@ export default function ConsentModal({ open, onClose, onAgree }: Props) {
             <TouchableOpacity
               style={[
                 styles.primaryBtn,
-                !checked && styles.primaryBtnDisabled,
+                (!checked || !activeConsent || loading) && styles.primaryBtnDisabled,
               ]}
-              disabled={!checked}
+              disabled={!checked || !activeConsent || loading}
               onPress={handleAgree}
             >
               <Text style={styles.primaryText}>Agree and Continue</Text>
