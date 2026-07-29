@@ -189,16 +189,16 @@ export default function DashboardPage() {
 			{showUnverifiedBanner && (
 				<View style={styles.verificationBannerContainer}>
 					<View style={styles.verificationBannerIconBox}>
-						<MaterialCommunityIcons name="clock-outline" size={24} color="#F57C00" />
+						<MaterialCommunityIcons name="clock-outline" size={18} color="#F57C00" />
 					</View>
 					<View style={styles.verificationBannerTextContainer}>
-						<Text style={styles.verificationBannerTitle}>Verification Pending</Text>
-						<Text style={styles.verificationBannerDesc}>
+						<AppTypography style={styles.verificationBannerTitle}>Verification Pending</AppTypography>
+						<AppTypography style={styles.verificationBannerDesc} numberOfLines={3}>
 							Your profile is under review. You'll get full access once your account is verified.
-						</Text>
+						</AppTypography>
 					</View>
 					<TouchableOpacity style={styles.verificationBannerButton}>
-						<Text style={styles.verificationBannerButtonText}>Learn More</Text>
+						<AppTypography style={styles.verificationBannerButtonText} numberOfLines={1}>Learn More</AppTypography>
 					</TouchableOpacity>
 				</View>
 			)}
@@ -465,48 +465,49 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: '#FFE082',
 		borderRadius: 12,
-		padding: 16,
+		padding: 12,
 		marginHorizontal: 16,
 		marginBottom: 16,
-		flexDirection: 'column',
-		alignItems: 'flex-start',
+		flexDirection: 'row',
+		alignItems: 'center',
 	},
 	verificationBannerIconBox: {
 		backgroundColor: '#FFECB3',
 		borderRadius: 8,
-		width: 48,
-		height: 48,
+		width: 32,
+		height: 32,
 		justifyContent: 'center',
 		alignItems: 'center',
-		marginBottom: 12,
+		marginRight: 8,
 	},
 	verificationBannerTextContainer: {
-		marginBottom: 16,
+		flex: 1,
+		marginRight: 8,
 	},
 	verificationBannerTitle: {
 		fontWeight: '700',
-		fontSize: 16,
+		fontSize: 14,
 		color: '#212121',
-		marginBottom: 4,
+		marginBottom: 2,
 	},
 	verificationBannerDesc: {
-		fontSize: 14,
+		fontSize: 12,
 		color: '#616161',
-		lineHeight: 20,
+		lineHeight: 16,
 	},
 	verificationBannerButton: {
 		borderWidth: 1,
 		borderColor: '#F57C00',
 		borderRadius: 24,
-		paddingVertical: 8,
-		paddingHorizontal: 24,
+		paddingVertical: 6,
+		paddingHorizontal: 12,
 		alignItems: 'center',
-		alignSelf: 'flex-start',
+		justifyContent: 'center',
 	},
 	verificationBannerButtonText: {
 		color: '#F57C00',
 		fontWeight: '600',
-		fontSize: 14,
+		fontSize: 12,
 	},
 })
 
