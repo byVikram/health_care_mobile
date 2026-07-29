@@ -63,6 +63,7 @@ export interface CreateAppointmentPayload {
 	start_time: string
 	end_time?: string
 	referral_id?: string
+	consent_version_id?: string
 }
 
 export interface CreateAppointmentResponse {
@@ -141,6 +142,34 @@ export const getAppointments = async (params?: AppointmentParams): Promise<Appoi
 		(params ?? {}) as Record<string, unknown>
 	)
 	return res.data
+}
+
+export interface ActiveConsentResponse {
+	success: boolean
+	data: {
+		id: string
+		version: string
+		content: { points: string[] } | string
+		is_active: boolean
+	}
+}
+
+export const getActiveConsent = async (): Promise<ActiveConsentResponse['data']> => {
+	const res = await ApiService.get<ActiveConsentResponse>(API_ENDPOINTS.APPOINTMENTS.ACTIVE_CONSENT)
+	return res.data.data
+}
+
+export interface DoctorStatusResponse {
+	success: boolean
+	data: {
+		profile_completed: boolean
+		is_verified: boolean
+	}
+}
+
+export const getDoctorStatus = async (): Promise<DoctorStatusResponse['data']> => {
+	const res = await ApiService.get<DoctorStatusResponse>(API_ENDPOINTS.DOCTOR_PROFILE.STATUS)
+	return res.data.data
 }
 
 export const createAppointment = async (payload: CreateAppointmentPayload): Promise<CreateAppointmentResponse> => {

@@ -996,7 +996,7 @@ export default function ConsultationPage() {
 				due_date: due_date_str,
 				doctor_note: note || undefined,
 			}
-			const res = await ApiService.post(API_ENDPOINTS.FOLLOW_UPS.CREATE, payload)
+			const res = await ApiService.post<any>(API_ENDPOINTS.FOLLOW_UPS.CREATE, payload)
 			if (res.data?.success || res.status === 201 || res.status === 200) {
 				Alert.alert('Success', 'Follow-up recommendation saved successfully.')
 				setFollowUpOpen(false)

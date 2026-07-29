@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
-import { Text, Card, useTheme, Button } from 'react-native-paper';
+import { Text, Card, useTheme, Button, Portal, Dialog, Paragraph } from 'react-native-paper';
 import { useAuth, UserRole } from '../../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ROUTES } from '../../navigation/routes';
@@ -21,6 +21,7 @@ const StatBox = ({ label, value }: StatsProps) => (
 export default function PortalPage() {
     const { role, user } = useAuth();
     const theme = useTheme();
+
 
     const openAppointments = () => {
         if (role === 'doctor') {
@@ -103,7 +104,6 @@ export default function PortalPage() {
                     <MaterialCommunityIcons name="calendar-blank" size={48} color="#ccc" />
                     <Text variant="bodyMedium" style={{ color: '#666', marginTop: 8 }}>No other appointments scheduled.</Text>
                 </View>
-
             </View>
 
         </ScrollView>
