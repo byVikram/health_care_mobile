@@ -10,7 +10,7 @@ import { ROUTES } from './routes'
 import type { AppStackParamList } from './types'
 import AuthNavigator from './AuthNavigator'
 import MainTabNavigator from './MainTabNavigator'
-import { AppScreenHeader, LocationSelector } from '../components/common'
+import { AppScreenHeader, LocationSelector, NotificationPermissionPopup } from '../components/common'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
@@ -49,6 +49,7 @@ const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
 	return (
+		<>
 		<AppStack.Navigator
 			screenOptions={{
 				headerShown: false,
@@ -178,6 +179,8 @@ function AuthenticatedNavigator() {
 			/>
 			<AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
 		</AppStack.Navigator>
+		<NotificationPermissionPopup />
+		</>
 	)
 }
 
