@@ -18,6 +18,8 @@ export interface AuthState {
 	user: AuthUser | null
 	accessToken: string | null
 	refreshToken: string | null
+	notificationPromptShown: boolean
+	setNotificationPromptShown: (val: boolean) => Promise<void>
 	isLoading: boolean
 
 	selectedHospital: string | null
@@ -26,7 +28,7 @@ export interface AuthState {
 	selectedHospitalId: string | null
 	setSelectedHospitalId: (id: string | null) => void
 
-	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string) => Promise<void>
+	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string, notificationPromptShown?: boolean) => Promise<void>
 
 	updateUser: (updates: Partial<AuthUser>) => Promise<void>
 
@@ -40,6 +42,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	const [user, setUser] = useState<AuthUser | null>(null)
 	const [accessToken, setAccessToken] = useState<string | null>(null)
 	const [refreshToken, setRefreshToken] = useState<string | null>(null)
+	const [notificationPromptShown, setNotificationPromptShownState] = useState<boolean>(false)
 	const [isLoading, setIsLoading] = useState(true)
 
 	const [selectedHospital, setSelectedHospitalState] = useState<string | null>(null)
@@ -50,6 +53,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		setUser(null)
 		setAccessToken(null)
 		setRefreshToken(null)
+		setNotificationPromptShownState(false)
 		setSelectedHospitalState(null)
 		setSelectedHospitalIdState(null)
 	}
@@ -62,6 +66,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		setSelectedHospitalIdState(id)
 	}
 
+	const setNotificationPromptShown = async (val: boolean) => {
+		await AsyncStorage.setItem('notification_prompt_shown', String(val))
+		setNotificationPromptShownState(val)
+	}
+
 	useEffect(() => {
 		const load = async () => {
 			const role = await AsyncStorage.getItem('role')
@@ -69,11 +78,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			const user = await AsyncStorage.getItem('user')
 			const token = await AsyncStorage.getItem('access_token')
 			const refresh = await AsyncStorage.getItem('refresh_token')
+			const nps = await AsyncStorage.getItem('notification_prompt_shown')
 
 			setRole(role as UserRole)
 			setUser(user ? JSON.parse(user) : null)
 			setAccessToken(token)
 			setRefreshToken(refresh)
+			setNotificationPromptShownState(nps === 'true')
 
 			setIsLoading(false)
 		}
@@ -85,16 +96,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		return () => setUnauthorizedHandler(null)
 	}, [])
 
-	const setAuth = async (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string) => {
+	const setAuth = async (
+		role: UserRole,
+		user: AuthUser,
+		accessToken: string,
+		refreshToken: string,
+		nps: boolean = false
+	) => {
 		await AsyncStorage.setItem('role', role)
 		await AsyncStorage.setItem('user', JSON.stringify(user))
 		await AsyncStorage.setItem('access_token', accessToken)
 		await AsyncStorage.setItem('refresh_token', refreshToken)
+		await AsyncStorage.setItem('notification_prompt_shown', String(nps))
 
 		setRole(role)
 		setUser(user)
 		setAccessToken(accessToken)
 		setRefreshToken(refreshToken)
+		setNotificationPromptShownState(nps)
 	}
 
 	const updateUser = async (updates: Partial<AuthUser>) => {
@@ -109,15 +128,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	}
 
 	const clearAuth = async () => {
-	await AsyncStorage.multiRemove([
-		'role',
-		'user',
-		'access_token',
-		'refresh_token',
-	])
+		await AsyncStorage.multiRemove([
+			'role',
+			'user',
+			'access_token',
+			'refresh_token',
+			'notification_prompt_shown',
+		])
 
-	clearAuthState()
-}
+		clearAuthState()
+	}
+
 	return (
 		<AuthContext.Provider
 			value={{
@@ -125,6 +146,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 				user,
 				accessToken,
 				refreshToken,
+				notificationPromptShown,
+				setNotificationPromptShown,
 				isLoading,
 				selectedHospital,
 				setSelectedHospital,
