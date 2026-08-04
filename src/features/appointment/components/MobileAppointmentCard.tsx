@@ -17,6 +17,10 @@ import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { useAuth } from '../../../context/AuthContext'
 import { AppModal } from '../../../components/common/AppModal'
 import { getStatusStyle } from '../../../constants/statusColors'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
+import { ROUTES } from '../../../navigation/routes'
+import type { RootStackParamList } from '../../../navigation/types'
+import { getRideState } from '../../transportation/transportationService'
 import AppointmentHistoryTab from './AppointmentHistoryTab'
 import RescheduleModal, { type RescheduleResult } from './RescheduleModal'
 
@@ -168,6 +172,25 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 	const rescheduleDoctorId = localRow.doctorId || localRow.raw?.doctor?.id
 	const rescheduleHospitalId = localRow.hospitalId || localRow.raw?.hospital?.id
 
+	const navigation = useNavigation<NavigationProp<RootStackParamList>>()
+	const [hasBookedCab, setHasBookedCab] = useState(false)
+
+	useEffect(() => {
+		if (localRow.id) {
+			getRideState(String(localRow.id))
+				.then((state) => setHasBookedCab(state.hasOnward || state.hasReturn))
+				.catch(() => setHasBookedCab(false))
+		}
+	}, [localRow.id])
+
+	const handleCabAction = () => {
+		if (hasBookedCab) {
+			navigation.navigate(ROUTES.STACK.RIDE_TRACKING, { appointmentId: localRow.id })
+		} else {
+			navigation.navigate(ROUTES.STACK.BOOK_RIDE, { appointmentId: localRow.id, type: 'onward' })
+		}
+	}
+
 	const openReschedule = () => {
 		if (!rescheduleDoctorId) {
 			Alert.alert('Unable to reschedule', 'Doctor details are missing for this appointment.')
@@ -309,7 +332,19 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 						style={[styles.actionButton, styles.secondaryButton]}
 						onPress={openReschedule}
 					>
-						<Text style={styles.secondaryButtonText}>Reschedule</Text>
+						<Text style={styles.secondaryButtonText} numberOfLines={1} adjustsFontSizeToFit>
+							Reschedule
+						</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						activeOpacity={0.88}
+						style={[styles.actionButton, styles.cabButton]}
+						onPress={handleCabAction}
+					>
+						<Text style={styles.cabButtonText} numberOfLines={1} adjustsFontSizeToFit>
+							{hasBookedCab ? 'Track Cab' : 'Book a Cab'}
+						</Text>
 					</TouchableOpacity>
 
 					<TouchableOpacity
@@ -317,7 +352,9 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 						style={[styles.actionButton, styles.dangerButton]}
 						onPress={openCancel}
 					>
-						<Text style={styles.dangerButtonText}>Cancel</Text>
+						<Text style={styles.dangerButtonText} numberOfLines={1} adjustsFontSizeToFit>
+							Cancel
+						</Text>
 					</TouchableOpacity>
 				</View>
 			) : null}
@@ -510,16 +547,17 @@ const styles = StyleSheet.create({
 	},
 	actionsRow: {
 		flexDirection: 'row',
-		gap: 10,
+		alignItems: 'center',
+		gap: 6,
 	},
 	actionButton: {
 		flex: 1,
 		minWidth: 0,
 		minHeight: 38,
-		borderRadius: 14,
+		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
-		paddingHorizontal: 10,
+		paddingHorizontal: 4,
 	},
 	secondaryButton: {
 		backgroundColor: '#FFFFFF',
@@ -528,8 +566,18 @@ const styles = StyleSheet.create({
 	},
 	secondaryButtonText: {
 		color: '#1A2A38',
-		fontSize: 15,
-		fontWeight: '500',
+		fontSize: 12.5,
+		fontWeight: '700',
+	},
+	cabButton: {
+		backgroundColor: '#EAF6F6',
+		borderWidth: 1,
+		borderColor: '#0c7c7c',
+	},
+	cabButtonText: {
+		color: '#0c7c7c',
+		fontSize: 12.5,
+		fontWeight: '700',
 	},
 	dangerButton: {
 		backgroundColor: '#FFFFFF',
@@ -538,8 +586,8 @@ const styles = StyleSheet.create({
 	},
 	dangerButtonText: {
 		color: '#FF3B30',
-		fontSize: 15,
-		fontWeight: '500',
+		fontSize: 12.5,
+		fontWeight: '700',
 	},
 	modalOverlay: {
 		flex: 1,

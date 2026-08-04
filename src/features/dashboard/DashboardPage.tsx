@@ -353,17 +353,7 @@ export default function DashboardPage() {
 				<PodcastsSection />
 
 				{role !== USER_ROLES.PHARMACY && (
-					<>
-						<PatientHealthQuestionsList showViewAll={true} />
-
-						{role === USER_ROLES.PATIENT && (
-							<View style={styles.askQuestionContainer}>
-								<AppButton onPress={() => navigation.navigate(ROUTES.STACK.PATIENT_QUESTIONS_LIST)}>
-									Ask a Free Question
-								</AppButton>
-							</View>
-						)}
-					</>
+					<PatientHealthQuestionsList showViewAll={true} />
 				)}
 			</Animated.ScrollView>
 

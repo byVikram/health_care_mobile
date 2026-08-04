@@ -111,12 +111,19 @@ export type AppStackParamList = {
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
 	[ROUTES.STACK.PATIENT_PAYMENT]: PatientPaymentParams | undefined
-	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: undefined
-	[ROUTES.STACK.PATIENT_QUESTION_DETAIL]: { questionId: string } | undefined
+	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: { openAskModal?: boolean } | undefined
+	[ROUTES.STACK.PATIENT_QUESTION_DETAIL]: { questionId?: string; question?: any } | undefined
 	[ROUTES.STACK.RADIOLOGY_LIST]: { scanTypeId?: number; scanTypeName?: string } | undefined
 	[ROUTES.STACK.RADIOLOGY_ORDERS]: undefined
 	[ROUTES.STACK.RADIOLOGY_ORDER_DETAIL]: { publicId: string; booking?: any }
 	[ROUTES.STACK.RADIOLOGY_SCAN_TYPES]: undefined
+	[ROUTES.STACK.COMMUNITY_FORUM]: undefined
+	[ROUTES.STACK.COMMUNITY_THREAD]: { threadId: string }
+	[ROUTES.STACK.BLOG_LIST]: undefined
+	[ROUTES.STACK.BLOG_ARTICLE]: { slug: string }
+	[ROUTES.STACK.TRANSPORTATION_LANDING]: undefined
+	[ROUTES.STACK.BOOK_RIDE]: { appointmentId: string; type?: 'onward' | 'return' }
+	[ROUTES.STACK.RIDE_TRACKING]: { appointmentId: string; type?: 'onward' | 'return' }
 }
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList

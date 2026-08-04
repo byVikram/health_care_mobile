@@ -177,4 +177,23 @@ export const API_ENDPOINTS = {
 		CREATE: `${BASE_URL}/api/follow-ups`,
 		CANCEL: (id: string) => `${BASE_URL}/api/follow-ups/${id}/cancel`,
 	},
+	COMMUNITIES: {
+		LIST: `${BASE_URL}/api/communities`,
+		POSTS: (groupId: string) => `${BASE_URL}/api/communities/${groupId}/posts`,
+		POST_DETAIL: (postId: string) => `${BASE_URL}/api/communities/threads/${postId}`,
+		COMMENTS: (postId: string) => `${BASE_URL}/api/communities/threads/${postId}/comments`,
+	},
+	BLOGS: {
+		LIST: `${BASE_URL}/api/blogs`,
+		DETAIL: (slug: string) => `${BASE_URL}/api/blogs/${slug}`,
+		COMMENTS: (slug: string) => `${BASE_URL}/api/blogs/${slug}/comments`,
+	},
+	QA: {
+		LIST: `${BASE_URL}/api/qa`,
+		DETAIL: (id: string) => `${BASE_URL}/api/qa/${id}`,
+		SUBMIT_QUESTION: `${BASE_URL}/api/qa/questions`,
+		SUBMIT_ANSWER: (questionId: string) => `${BASE_URL}/api/qa/questions/${questionId}/answers`,
+		SUBMIT_REPLY: (answerId: string) => `${BASE_URL}/api/qa/answers/${answerId}/replies`,
+		LIKE_ANSWER: (answerId: string) => `${BASE_URL}/api/qa/answers/${answerId}/like`,
+	},
 }

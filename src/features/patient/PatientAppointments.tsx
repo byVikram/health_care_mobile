@@ -27,6 +27,9 @@ import { Appointment } from '../../types/appointment'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { getStatusStyle } from '../../constants/statusColors'
+import { ROUTES } from '../../navigation/routes'
+import { navigate } from '../../navigation/navigationService'
+import { getRideState } from '../transportation/transportationService'
 
 // ── Helpers that are imported from doctorService in the web version ───────────
 // Replicated here to avoid cross-feature circular imports in RN.
@@ -144,6 +147,20 @@ export function PatientAppointments() {
   const [cancelReason, setCancelReason] = useState('')
   const [cancelSubmitting, setCancelSubmitting] = useState(false)
   const [cancelledStatusId, setCancelledStatusId] = useState('')
+  const [bookedCabApptIds, setBookedCabApptIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (appointments.length > 0) {
+      Promise.all(
+        appointments.map(async (a) => {
+          const state = await getRideState(a.id)
+          return (state.hasOnward || state.hasReturn) ? a.id : null
+        })
+      ).then((ids) => {
+        setBookedCabApptIds(new Set(ids.filter(Boolean) as string[]))
+      })
+    }
+  }, [appointments])
 
   // ── Fetch data ────────────────────────────────────────────────────────────
 
@@ -209,6 +226,28 @@ export function PatientAppointments() {
       Toast.show({ type: 'error', text1: 'Something went wrong. Please try again.' })
     } finally {
       setCancelSubmitting(false)
+    }
+  }
+
+  const handleCabPress = async (appointmentId: string) => {
+    try {
+      const state = await getRideState(appointmentId)
+      if (state.hasOnward || state.hasReturn) {
+        navigate(ROUTES.STACK.RIDE_TRACKING, {
+          appointmentId,
+          type: state.hasReturn ? 'return' : 'onward',
+        })
+      } else {
+        navigate(ROUTES.STACK.BOOK_RIDE, {
+          appointmentId,
+          type: 'onward',
+        })
+      }
+    } catch {
+      navigate(ROUTES.STACK.BOOK_RIDE, {
+        appointmentId,
+        type: 'onward',
+      })
     }
   }
 
@@ -309,30 +348,48 @@ export function PatientAppointments() {
 
           {/* Actions */}
           {canAct && (
-            <View style={styles.cardActions}>
-              {canJoin && (
+            <View style={styles.cardActionsRow}>
+              {canJoin ? (
                 <TouchableOpacity style={styles.joinBtn} activeOpacity={0.85}>
                   <Text style={styles.joinBtnIcon}>📹</Text>
                   <Text style={styles.joinBtnText}>Join</Text>
                 </TouchableOpacity>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.actionBtnEqualSecondary}
+                    onPress={() => handleOpenReschedule(appt)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.actionBtnTextSecondary} numberOfLines={1} adjustsFontSizeToFit>
+                      Reschedule
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.actionBtnEqualCab}
+                    onPress={() => handleCabPress(appt.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.actionBtnTextCab} numberOfLines={1} adjustsFontSizeToFit>
+                      {bookedCabApptIds.has(appt.id) ? 'Track Cab' : 'Book a Cab'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.actionBtnEqualDanger}
+                    onPress={() => {
+                      setCancelAppt(appt)
+                      setCancelOpen(true)
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.actionBtnTextDanger} numberOfLines={1} adjustsFontSizeToFit>
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+                </>
               )}
-              <TouchableOpacity
-                style={styles.rescheduleBtn}
-                onPress={() => handleOpenReschedule(appt)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.rescheduleBtnText}>Reschedule</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => {
-                  setCancelAppt(appt)
-                  setCancelOpen(true)
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -732,5 +789,62 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 6,
+  },
+  actionBtnEqualSecondary: {
+    flex: 1,
+    minWidth: 0,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  actionBtnTextSecondary: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  actionBtnEqualCab: {
+    flex: 1,
+    minWidth: 0,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(12, 124, 124, 0.08)',
+    borderWidth: 1,
+    borderColor: '#0c7c7c',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  actionBtnTextCab: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#0c7c7c',
+  },
+  actionBtnEqualDanger: {
+    flex: 1,
+    minWidth: 0,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  actionBtnTextDanger: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#dc2626',
   },
 })

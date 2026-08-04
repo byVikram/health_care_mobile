@@ -7,12 +7,14 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 import { getAppointments } from '../../doctor/doctorService'
 import MobileAppointmentCard from '../../appointment/components/MobileAppointmentCard'
 import type { Appointment } from '../../../types/appointment'
 import { ROUTES } from '../../../navigation/routes'
 import type { RootStackParamList } from '../../../navigation/types'
+
 
 export type PatientAppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'rescheduled' | string
 export type PatientAppointmentMode = 'in-person' | 'virtual'
@@ -170,6 +172,7 @@ export default function PatientUpcomingAppointments({
 		navigation.navigate(ROUTES.STACK.APPOINTMENTS)
 	}
 
+
 	return (
 		<View style={[styles.section, isTablet && styles.sectionTablet]}>
 			<View style={styles.sectionHeader}>
@@ -202,6 +205,7 @@ export default function PatientUpcomingAppointments({
 						<MobileAppointmentCard key={appointment.id} row={appointment} horizontalInset={16} />
 					))
 				: null}
+
 		</View>
 	)
 }
@@ -279,4 +283,5 @@ const styles = StyleSheet.create({
 		color: '#ef4444',
 		fontSize: 14,
 	},
+
 })

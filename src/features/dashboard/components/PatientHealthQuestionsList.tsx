@@ -1,15 +1,13 @@
 // src/features/dashboard/components/PatientHealthQuestionsList.tsx
-import React, { useState } from 'react'
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native'
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
-import { AppInput } from '../../../components/common'
-
+import React, { useEffect, useState } from 'react'
+import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from 'react-native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { MOCK_PATIENT_QUESTIONS, PatientQuestion } from '../../../constants/Questionmockdata'
+import { useNavigation, useRoute } from '@react-navigation/native'
+
+import { AppInput } from '../../../components/common'
+import { listHealthQuestions, PatientQuestion } from '../../../services/qaService'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppNavigationParamList } from '../../../navigation/types'
-import { useAuth } from '../../../context/AuthContext'
-import { useNavigation, useRoute } from '@react-navigation/native'
 
 type NavigationProp = NativeStackNavigationProp<AppNavigationParamList>
 
@@ -18,41 +16,72 @@ type Props = {
 	itemLimit?: number
 }
 
-export default function PatientHealthQuestionsList({ showViewAll = true, itemLimit = 3 }: Props) {
+export default function PatientHealthQuestionsList({ showViewAll = true, itemLimit = 6 }: Props) {
 	const navigation = useNavigation<NavigationProp>()
-	const { role } = useAuth()
-
 	const route = useRoute()
 
 	const isQuestionsListScreen = route.name === ROUTES.STACK.PATIENT_QUESTIONS_LIST
 
 	const [searchQuery, setSearchQuery] = useState('')
+	const [questions, setQuestions] = useState<PatientQuestion[]>([])
+	const [loading, setLoading] = useState(true)
 
-	const filteredQuestions = MOCK_PATIENT_QUESTIONS.filter(
-		(q) =>
-			q.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			q.shortDescription.toLowerCase().includes(searchQuery.toLowerCase())
-	)
+	const fetchQuestions = async () => {
+		setLoading(true)
+		try {
+			const res = await listHealthQuestions(searchQuery)
+			if (res.success && res.data) {
+				setQuestions(res.data)
+			}
+		} catch (err) {
+			console.error('Error fetching health expert questions:', err)
+		} finally {
+			setLoading(false)
+		}
+	}
+
+	useEffect(() => {
+		fetchQuestions()
+	}, [searchQuery])
+
+	const displayData = isQuestionsListScreen ? questions : questions.slice(0, itemLimit)
 
 	const renderItem = ({ item }: { item: PatientQuestion }) => (
 		<TouchableOpacity
 			style={styles.card}
-			onPress={() => navigation.navigate(ROUTES.STACK.PATIENT_QUESTION_DETAIL as any, { question: item })}
+			onPress={() => navigation.navigate(ROUTES.STACK.PATIENT_QUESTION_DETAIL as any, { questionId: item.id })}
 			activeOpacity={0.7}
 		>
 			<View style={styles.cardHeader}>
-				<Image source={{ uri: item.patientAvatar }} style={styles.avatar} />
+				<Image
+					source={{
+						uri:
+							item.patient_avatar ||
+							'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200',
+					}}
+					style={styles.avatar}
+				/>
 				<View style={styles.cardText}>
 					<View style={styles.tagRow}>
-						<Text style={styles.tag}>{item.tag}</Text>
-						<Text style={styles.timeAgo}>{item.timeAgo}</Text>
+						<Text style={styles.tag}>{item.tag || 'General'}</Text>
+						<Text style={styles.timeAgo}>
+							Asked for {item.gender || 'Patient'}{item.age ? `, ${item.age}` : ''}
+						</Text>
 					</View>
 					<Text style={styles.question} numberOfLines={2}>
 						{item.question}
 					</Text>
 					<Text style={styles.shortDesc} numberOfLines={2}>
-						{item.shortDescription}
+						{item.short_description || item.full_description}
 					</Text>
+					<View style={styles.footerRow}>
+						<Text style={styles.answersCount}>
+							{item.answers ? item.answers.length : 0} Doctors Answered
+						</Text>
+						<Text style={styles.dateText}>
+							{new Date(item.created_at).toLocaleDateString()}
+						</Text>
+					</View>
 				</View>
 			</View>
 		</TouchableOpacity>
@@ -62,7 +91,7 @@ export default function PatientHealthQuestionsList({ showViewAll = true, itemLim
 		<>
 			{/* Header outside card */}
 			<View style={styles.headerContainer}>
-				<Text style={styles.sectionTitle}>Health Questions</Text>
+				<Text style={styles.sectionTitle}>Health Expert Answers to Your Health Questions</Text>
 
 				{showViewAll && !isQuestionsListScreen && (
 					<TouchableOpacity onPress={() => navigation.navigate(ROUTES.STACK.PATIENT_QUESTIONS_LIST as any)}>
@@ -70,6 +99,7 @@ export default function PatientHealthQuestionsList({ showViewAll = true, itemLim
 					</TouchableOpacity>
 				)}
 			</View>
+
 			{/* Card */}
 			<View style={styles.container}>
 				<View style={styles.searchRow}>
@@ -79,7 +109,7 @@ export default function PatientHealthQuestionsList({ showViewAll = true, itemLim
 							showMicrophone
 							value={searchQuery}
 							onChangeText={setSearchQuery}
-							placeholder="Search questions..."
+							placeholder="Search questions or symptoms..."
 							placeholderTextColor="#98a1aa"
 							containerStyle={styles.searchInputContainer}
 							style={styles.searchInput}
@@ -95,18 +125,31 @@ export default function PatientHealthQuestionsList({ showViewAll = true, itemLim
 					</View>
 				</View>
 
-				<FlatList
-					data={isQuestionsListScreen ? filteredQuestions : filteredQuestions.slice(0, itemLimit)}
-					keyExtractor={(item) => item.id.toString()}
-					renderItem={renderItem}
-					ItemSeparatorComponent={() => <View style={styles.separator} />}
-					scrollEnabled={false}
-					ListEmptyComponent={
-						<View style={styles.emptyContainer}>
-							<Text style={styles.emptyText}>No questions found</Text>
-						</View>
-					}
-				/>
+				{loading ? (
+					<ActivityIndicator size="small" color="#0c7c7c" style={{ marginVertical: 20 }} />
+				) : (
+					<FlatList
+						data={displayData}
+						keyExtractor={(item) => item.id.toString()}
+						renderItem={renderItem}
+						ItemSeparatorComponent={() => <View style={styles.separator} />}
+						scrollEnabled={false}
+						ListEmptyComponent={
+							<View style={styles.emptyContainer}>
+								<Text style={styles.emptyText}>No medical questions found.</Text>
+							</View>
+						}
+					/>
+				)}
+
+				{!isQuestionsListScreen && (
+					<TouchableOpacity
+						style={styles.askButton}
+						onPress={() => navigation.navigate(ROUTES.STACK.PATIENT_QUESTIONS_LIST as any, { openAskModal: true })}
+					>
+						<Text style={styles.askButtonText}>Ask a Free Question</Text>
+					</TouchableOpacity>
+				)}
 			</View>
 		</>
 	)
@@ -130,11 +173,13 @@ const styles = StyleSheet.create({
 	},
 	sectionTitle: {
 		fontWeight: '700',
-		textAlign: 'center',
+		fontSize: 14,
 		color: '#1a1a1a',
+		flex: 1,
+		marginRight: 8,
 	},
 	seeAllText: {
-		fontSize: 14,
+		fontSize: 13,
 		color: '#0c7c7c',
 		fontWeight: '600',
 	},
@@ -170,9 +215,9 @@ const styles = StyleSheet.create({
 		alignItems: 'flex-start',
 	},
 	avatar: {
-		width: 48,
-		height: 48,
-		borderRadius: 24,
+		width: 44,
+		height: 44,
+		borderRadius: 22,
 		marginRight: 12,
 		borderWidth: 1,
 		borderColor: '#e0e0e0',
@@ -186,8 +231,8 @@ const styles = StyleSheet.create({
 		marginBottom: 4,
 	},
 	tag: {
-		backgroundColor: '#e8f4f4',
-		color: '#0c7c7c',
+		backgroundColor: '#ccfbf1',
+		color: '#0f766e',
 		fontSize: 10,
 		fontWeight: '700',
 		paddingHorizontal: 8,
@@ -197,32 +242,61 @@ const styles = StyleSheet.create({
 		marginRight: 8,
 	},
 	timeAgo: {
-		fontSize: 10,
-		color: '#888',
+		fontSize: 11,
+		color: '#64748b',
 		fontWeight: '500',
 	},
 	question: {
-		fontSize: 15,
+		fontSize: 14.5,
 		fontWeight: '700',
-		color: '#1a1a1a',
+		color: '#0f172a',
 		marginBottom: 4,
-		lineHeight: 20,
+		lineHeight: 19,
 	},
 	shortDesc: {
-		fontSize: 13,
-		color: '#666',
-		lineHeight: 18,
+		fontSize: 12.5,
+		color: '#475569',
+		lineHeight: 17,
+		marginBottom: 6,
+	},
+	footerRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginTop: 4,
+	},
+	answersCount: {
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#0c7c7c',
+	},
+	dateText: {
+		fontSize: 10.5,
+		color: '#94a3b8',
 	},
 	separator: {
 		height: 1,
-		backgroundColor: '#f0f0f0',
+		backgroundColor: '#f1f5f9',
 	},
 	emptyContainer: {
 		padding: 20,
 		alignItems: 'center',
 	},
 	emptyText: {
+		fontSize: 13,
+		color: '#94a3b8',
+	},
+	askButton: {
+		backgroundColor: '#0c7c7c',
+		borderRadius: 10,
+		paddingVertical: 12,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 14,
+	},
+	askButtonText: {
+		color: '#ffffff',
 		fontSize: 14,
-		color: '#999',
+		fontWeight: '700',
 	},
 })

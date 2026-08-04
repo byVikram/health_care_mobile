@@ -39,6 +39,11 @@ export const ROUTES = {
 		ORDER_DETAILS: 'OrderDetails',
 		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
 
+		COMMUNITY_FORUM: 'CommunityForum',
+		COMMUNITY_THREAD: 'CommunityThread',
+		BLOG_LIST: 'BlogList',
+		BLOG_ARTICLE: 'BlogArticle',
+
 		PATIENT_QUESTIONS_LIST: 'PatientQuestionsList',
 		PATIENT_QUESTION_DETAIL: 'PatientQuestionDetail',
 
@@ -52,5 +57,9 @@ export const ROUTES = {
 		PLACE_LABORATORY_TEST: 'PlaceLabOrderPage',
 		LABORATORY_ORDERS: 'Orderlistlaboratorypage',
 		LABORATORY_ORDER_DETAILS: 'Bookingdetailslaboratorypage',
+
+		TRANSPORTATION_LANDING: 'TransportationLanding',
+		BOOK_RIDE: 'BookRide',
+		RIDE_TRACKING: 'RideTracking',
 	},
 } as const

@@ -170,6 +170,15 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 									navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS as any)
 								},
 							},
+							{
+								id: 'book-cab',
+								label: 'Book a Cab',
+								icon: <MaterialCommunityIcons name="car" size={20} color="#1f5f68" />,
+								onPress: () => {
+									setIsSidebarOpen(false)
+									navigation.navigate(ROUTES.STACK.TRANSPORTATION_LANDING as any)
+								},
+							},
 						]
 
 			return [

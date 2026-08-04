@@ -45,6 +45,10 @@ import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage
 import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
 import PlaceLabOrderPage from '../features/laboratory/PlaceLabOrderPage'
 
+import TransportationLandingPage from '../features/transportation/TransportationLandingPage'
+import BookRidePage from '../features/transportation/BookRidePage'
+import RideTrackingPage from '../features/transportation/RideTrackingPage'
+
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -178,6 +182,21 @@ function AuthenticatedNavigator() {
 				options={{ presentation: 'transparentModal' }}
 			/>
 			<AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
+			<AppStack.Screen
+				name={ROUTES.STACK.TRANSPORTATION_LANDING}
+				component={TransportationLandingPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.BOOK_RIDE}
+				component={BookRidePage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.RIDE_TRACKING}
+				component={RideTrackingPage}
+				options={{ headerShown: false }}
+			/>
 		</AppStack.Navigator>
 		<NotificationPermissionPopup />
 		</>
