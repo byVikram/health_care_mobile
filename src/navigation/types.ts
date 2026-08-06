@@ -128,6 +128,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.DOCTOR_EVENT_FORM]: { eventId?: string }
 	[ROUTES.STACK.ALL_EVENTS]: undefined
 	[ROUTES.STACK.EVENT_DETAILS]: { eventId: string }
+	[ROUTES.STACK.LOCATION_SELECT]: undefined
 }
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList

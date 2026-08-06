@@ -65,5 +65,6 @@ export const ROUTES = {
 		DOCTOR_EVENT_FORM: 'DoctorEventForm',
 		ALL_EVENTS: 'AllEvents',
 		EVENT_DETAILS: 'EventDetails',
+		LOCATION_SELECT: 'LocationSelect',
 	},
 } as const

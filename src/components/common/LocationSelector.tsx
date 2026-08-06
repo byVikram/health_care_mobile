@@ -4,25 +4,31 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { AppTypography } from './AppTypography'
 import { useNavigation } from '@react-navigation/native'
 
+import { ROUTES } from '../../navigation/routes'
+import { useAuth } from '../../context/AuthContext'
+
 interface LocationSelectorProps {
 	location?: string
 	color?: string
 }
 
-export default function LocationSelector({ location = 'Bangalore', color = '#f2f4f4' }: LocationSelectorProps) {
+export default function LocationSelector({ location, color = '#f2f4f4' }: LocationSelectorProps) {
 	const navigation = useNavigation<any>()
+	const { currentLocation } = useAuth()
+
+	const displayLocation = currentLocation?.address || location || 'Select Location'
 
 	return (
 		<TouchableOpacity 
 			style={styles.locationRow} 
 			onPress={() => {
-				// Navigate to home or location screen
+				navigation.navigate(ROUTES.STACK.LOCATION_SELECT)
 			}} 
 			activeOpacity={0.7}
 		>
 			<MaterialCommunityIcons name="map-marker-outline" size={16} color={color} />
-			<AppTypography variant="body" style={[styles.locationText, { color }]}>
-				{location}
+			<AppTypography variant="body" style={[styles.locationText, { color }]} numberOfLines={1}>
+				{displayLocation}
 			</AppTypography>
 			<MaterialCommunityIcons name="chevron-down" size={16} color={color} />
 		</TouchableOpacity>
@@ -37,5 +43,6 @@ const styles = StyleSheet.create({
 	},
 	locationText: {
 		fontWeight: '500',
+		maxWidth: 200,
 	},
 })
