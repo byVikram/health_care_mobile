@@ -11,6 +11,7 @@ export const ROUTES = {
 		SEARCH: 'Search',
 		PORTAL: 'Portal',
 		PROFILE: 'Profile',
+		ANCILLARY: 'Ancillary',
 	},
 	PORTAL: {
 		PROFILE: 'Profile',
@@ -65,5 +66,13 @@ export const ROUTES = {
 		DOCTOR_EVENT_FORM: 'DoctorEventForm',
 		ALL_EVENTS: 'AllEvents',
 		EVENT_DETAILS: 'EventDetails',
+
+		NURSE_ACTIVE_BOOKING: 'NurseActiveBooking',
+		NURSE_PATIENT_VERIFICATION: 'NursePatientVerification',
+		NURSE_SERVICE_IN_PROGRESS: 'NurseServiceInProgress',
+		NURSE_COMPLETE_SERVICE: 'NurseCompleteService',
+
+		ANCILLARY_SERVICES: 'AncillaryServices',
+		ANCILLARY_PROVIDERS: 'AncillaryProviders',
 	},
 } as const

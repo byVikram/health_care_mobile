@@ -11,7 +11,7 @@ import { Video, ResizeMode } from 'expo-av'
 const VIDEO_SOURCE = require('../../../assets/blog-and-community/video.mp4')
 const AD_IMAGE = require('../../../assets/blog-and-community/ad-image.png')
 
-type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | null
+type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | null
 
 // ─────────────────────────────────────────────────────────────
 // Video Slide

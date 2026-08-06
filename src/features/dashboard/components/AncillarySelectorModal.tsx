@@ -1,4 +1,6 @@
 import React, { useMemo } from 'react'
+import { useNavigation } from '@react-navigation/native'
+import { ROUTES } from '../../../navigation/routes'
 
 import CardGridSelectorModal, { SelectorCardItem } from './CardGridSelcetor'
 import ElderDayCareIcon from '../../../assets/ancillary/elder-day-care.png'
@@ -19,13 +21,20 @@ const ANCILLARY_CARDS: Omit<SelectorCardItem, 'onClick'>[] = [
 ]
 
 export default function AncillarySelectorModal({ open, onClose }: AncillarySelectorModalProps) {
+	const navigation = useNavigation<any>()
 	const cards: SelectorCardItem[] = useMemo(
 		() =>
 			ANCILLARY_CARDS.map((card) => ({
 				...card,
-				onClick: onClose,
+				onClick: () => {
+					onClose()
+					navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
+						serviceKey: card.key,
+						serviceLabel: card.label,
+					})
+				},
 			})),
-		[onClose],
+		[onClose, navigation],
 	)
 
 	return (

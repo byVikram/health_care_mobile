@@ -32,7 +32,7 @@ import AncillarySelectorModal from './AncillarySelectorModal'
 import AlliedSelectorModal from './AlliedSelcetorModel'
 import TherapeuticSelector from './TherapeuticSelector'
 
-type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | null
+type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | null
 type PopupSvgIconItem = {
 	title: string
 	type: 'svg'

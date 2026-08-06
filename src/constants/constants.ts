@@ -4,6 +4,7 @@ export const USER_ROLES = {
 	PHARMACY: 'pharmacy',
 	RADIOLOGY: 'radiology',
 	LABORATORY: 'laboratory',
+	ANCILLARY: 'ancillary',
 }
 
 export const APPOINTMENT_STATUS = {

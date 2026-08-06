@@ -55,6 +55,13 @@ import DoctorEventFormPage from '../features/doctor/events/DoctorEventFormPage'
 import AllEventsPage from '../features/events/AllEventsPage'
 import EventDetailsPage from '../features/events/EventDetailsPage'
 
+import ActiveBookingPage from '../features/ancillary/ActiveBookingPage'
+import PatientVerificationPage from '../features/ancillary/PatientVerificationPage'
+import ServiceInProgressPage from '../features/ancillary/ServiceInProgressPage'
+import CompleteServicePage from '../features/ancillary/CompleteServicePage'
+import AncillaryServicesPage from '../features/ancillary/AncillaryServicesPage'
+import AncillaryProvidersPage from '../features/ancillary/AncillaryProvidersPage'
+
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -221,6 +228,36 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.EVENT_DETAILS}
 				component={EventDetailsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_ACTIVE_BOOKING}
+				component={ActiveBookingPage}
+				options={{ headerShown: true, title: 'Active Booking' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_PATIENT_VERIFICATION}
+				component={PatientVerificationPage}
+				options={{ headerShown: true, title: 'Patient Verification' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS}
+				component={ServiceInProgressPage}
+				options={{ headerShown: true, title: 'Service In Progress' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_COMPLETE_SERVICE}
+				component={CompleteServicePage}
+				options={{ headerShown: true, title: 'Complete Service' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_SERVICES}
+				component={AncillaryServicesPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_PROVIDERS}
+				component={AncillaryProvidersPage}
 				options={{ headerShown: false }}
 			/>
 		</AppStack.Navigator>

@@ -26,6 +26,7 @@ export type MainTabParamList = {
 		| undefined
 	[ROUTES.MAIN.PORTAL]: undefined
 	[ROUTES.MAIN.PROFILE]: undefined
+	[ROUTES.MAIN.ANCILLARY]: undefined
 }
 
 export type ConsultationParams = {
@@ -128,6 +129,12 @@ export type AppStackParamList = {
 	[ROUTES.STACK.DOCTOR_EVENT_FORM]: { eventId?: string }
 	[ROUTES.STACK.ALL_EVENTS]: undefined
 	[ROUTES.STACK.EVENT_DETAILS]: { eventId: string }
+	[ROUTES.STACK.NURSE_ACTIVE_BOOKING]: { bookingId: string }
+	[ROUTES.STACK.NURSE_PATIENT_VERIFICATION]: { bookingId: string }
+	[ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS]: { bookingId: string }
+	[ROUTES.STACK.NURSE_COMPLETE_SERVICE]: { bookingId: string; elapsedSeconds: number }
+	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string }
+	[ROUTES.STACK.ANCILLARY_PROVIDERS]: { serviceKey: string; serviceLabel: string; procedureName?: string }
 }
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList

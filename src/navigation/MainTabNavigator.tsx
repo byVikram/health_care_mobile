@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -16,6 +16,7 @@ import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
+import AncillaryDashboard from '../features/ancillary/AncillaryDashboard'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
@@ -24,6 +25,14 @@ function HomeWithSidebar() {
 		<SidebarLayout>
 			<DashboardPage />
 		</SidebarLayout>
+	)
+}
+
+function AncillaryTabWrapper() {
+	return (
+		<ScrollView style={{ flex: 1, backgroundColor: '#F8FAFC' }} contentContainerStyle={{ paddingBottom: 100 }}>
+			<AncillaryDashboard />
+		</ScrollView>
 	)
 }
 
@@ -36,6 +45,9 @@ function getTabConfig(routeName: string) {
 	}
 	if (routeName === ROUTES.MAIN.PROFILE) {
 		return { iconName: 'account' as const, label: 'Profile' }
+	}
+	if (routeName === ROUTES.MAIN.ANCILLARY) {
+		return { iconName: 'medical-bag' as const, label: 'Ancillary' }
 	}
 
 	return { iconName: 'home' as const, label: 'Home' }
@@ -152,6 +164,14 @@ export default function MainTabNavigator() {
 				/>
 			) : null}
 			<Tab.Screen name={ROUTES.MAIN.PORTAL} component={PortalPage} />
+			<Tab.Screen
+				name={ROUTES.MAIN.ANCILLARY}
+				component={AncillaryTabWrapper}
+				options={{
+					headerShown: true,
+					header: () => <AppScreenHeader title="Ancillary Dashboard" onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} />,
+				}}
+			/>
 			<Tab.Screen
 				name={ROUTES.MAIN.PROFILE}
 				component={ProfilePage}

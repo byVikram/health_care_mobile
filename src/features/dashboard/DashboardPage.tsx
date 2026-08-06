@@ -31,6 +31,7 @@ import UpcomingEventsSection from './components/EventSection'
 import PodcastsSection from './components/PodcastsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
 import { getAppointments } from '../doctor/doctorService'
+import StaffAncillaryDashboard from '../ancillary/StaffAncillaryDashboard'
 
 import { formatDateForApi } from '../../utils/date'
 import { USER_ROLES } from '../../constants/constants'
@@ -63,7 +64,8 @@ export default function DashboardPage() {
 	const insets = useSafeAreaInsets()
 	const { role } = useAuth()
 	const isDoctor = role === USER_ROLES.DOCTOR
-	const defaultHeaderHeight = isDoctor ? insets.top + 84 : insets.top + 146
+	const isStaffRole = isDoctor || role === USER_ROLES.ANCILLARY
+	const defaultHeaderHeight = isStaffRole ? insets.top + 84 : insets.top + 146
 	const headerHeight = (scrollData?.headerHeight && scrollData.headerHeight > 0) ? scrollData.headerHeight : defaultHeaderHeight
 	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
 
@@ -248,6 +250,9 @@ export default function DashboardPage() {
 		</>
 	)
 	const renderLaboratoryPanel = () => <></>
+	const renderAncillaryPanel = () => (
+		<StaffAncillaryDashboard />
+	)
 	const renderQuickServicesSection = () => (
 		<View style={isDoctor && styles.doctorQuickServicesSpacing}>
 			<QuickServicesSection role={role} />
@@ -267,6 +272,9 @@ export default function DashboardPage() {
 			case USER_ROLES.LABORATORY:
 				return renderLaboratoryPanel()
 
+			case USER_ROLES.ANCILLARY:
+				return renderAncillaryPanel()
+
 			default:
 				return renderUserPanel()
 		}
@@ -277,7 +285,8 @@ export default function DashboardPage() {
 			role !== USER_ROLES.DOCTOR &&
 			role !== USER_ROLES.PHARMACY &&
 			role !== USER_ROLES.RADIOLOGY &&
-			role !== USER_ROLES.LABORATORY
+			role !== USER_ROLES.LABORATORY &&
+			role !== USER_ROLES.ANCILLARY
 		) {
 			return (
 				<>
