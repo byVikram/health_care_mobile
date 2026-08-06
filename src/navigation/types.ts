@@ -135,6 +135,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.NURSE_COMPLETE_SERVICE]: { bookingId: string; elapsedSeconds: number }
 	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string }
 	[ROUTES.STACK.ANCILLARY_PROVIDERS]: { serviceKey: string; serviceLabel: string; procedureName?: string }
+	[ROUTES.STACK.LOCATION_SELECT]: undefined
 }
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList

@@ -13,6 +13,12 @@ export interface AuthUser {
 	profileCompletion?: number
 }
 
+export interface LocationData {
+	address: string
+	latitude: number
+	longitude: number
+}
+
 export interface AuthState {
 	role: UserRole | null
 	user: AuthUser | null
@@ -27,6 +33,9 @@ export interface AuthState {
 
 	selectedHospitalId: string | null
 	setSelectedHospitalId: (id: string | null) => void
+
+	currentLocation: LocationData | null
+	setCurrentLocation: (loc: LocationData | null) => void
 
 	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string, notificationPromptShown?: boolean) => Promise<void>
 
@@ -47,6 +56,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 	const [selectedHospital, setSelectedHospitalState] = useState<string | null>(null)
 	const [selectedHospitalId, setSelectedHospitalIdState] = useState<string | null>(null)
+	const [currentLocation, setCurrentLocationState] = useState<LocationData | null>(null)
 
 	const clearAuthState = () => {
 		setRole(null)
@@ -56,6 +66,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		setNotificationPromptShownState(false)
 		setSelectedHospitalState(null)
 		setSelectedHospitalIdState(null)
+		setCurrentLocationState(null)
 	}
 
 	const setSelectedHospital = (hospital: string) => {
@@ -64,6 +75,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 	const setSelectedHospitalId = (id: string | null) => {
 		setSelectedHospitalIdState(id)
+	}
+
+	const setCurrentLocation = async (loc: LocationData | null) => {
+		if (loc) {
+			await AsyncStorage.setItem('current_location', JSON.stringify(loc))
+		} else {
+			await AsyncStorage.removeItem('current_location')
+		}
+		setCurrentLocationState(loc)
 	}
 
 	const setNotificationPromptShown = async (val: boolean) => {
@@ -79,12 +99,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			const token = await AsyncStorage.getItem('access_token')
 			const refresh = await AsyncStorage.getItem('refresh_token')
 			const nps = await AsyncStorage.getItem('notification_prompt_shown')
+			const savedLocation = await AsyncStorage.getItem('current_location')
 
 			setRole(role as UserRole)
 			setUser(user ? JSON.parse(user) : null)
 			setAccessToken(token)
 			setRefreshToken(refresh)
 			setNotificationPromptShownState(nps === 'true')
+			
+			if (savedLocation) {
+				try {
+					setCurrentLocationState(JSON.parse(savedLocation))
+				} catch (e) {
+					console.error("Failed to parse saved location", e)
+				}
+			}
 
 			setIsLoading(false)
 		}
@@ -134,6 +163,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			'access_token',
 			'refresh_token',
 			'notification_prompt_shown',
+			'current_location',
 		])
 
 		clearAuthState()
@@ -153,6 +183,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 				setSelectedHospital,
 				selectedHospitalId,
 				setSelectedHospitalId,
+				currentLocation,
+				setCurrentLocation,
 				setAuth,
 				updateUser,
 				clearAuth,

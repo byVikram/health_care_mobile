@@ -74,5 +74,6 @@ export const ROUTES = {
 
 		ANCILLARY_SERVICES: 'AncillaryServices',
 		ANCILLARY_PROVIDERS: 'AncillaryProviders',
+		LOCATION_SELECT: 'LocationSelect',
 	},
 } as const

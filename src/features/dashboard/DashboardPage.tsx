@@ -23,8 +23,6 @@ import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
 
 import PatientUpcomingAppointments from './components/PatientUpcomingAppointments'
 import CommunitySection from './components/CommunitySection'
-import LocationScreen from '../../components/common/LocationScreen'
-import { GPSLocationCard } from '../../components/common/GPSLocationCard'
 import BlogsSection from './components/BlogsSection'
 import ArticleSection from './components/ArticleSection'
 import UpcomingEventsSection from './components/EventSection'
@@ -238,17 +236,8 @@ export default function DashboardPage() {
 		</>
 	)
 
-	const renderPharmacyPanel = () => (
-		<>
-			<LocationScreen />
-			<GPSLocationCard />
-		</>
-	)
-	const renderRadiologyPanel = () => (
-		<>
-			<GPSLocationCard />
-		</>
-	)
+	const renderPharmacyPanel = () => <></>
+	const renderRadiologyPanel = () => <></>
 	const renderLaboratoryPanel = () => <></>
 	const renderAncillaryPanel = () => (
 		<StaffAncillaryDashboard />

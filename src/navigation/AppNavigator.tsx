@@ -11,6 +11,7 @@ import type { AppStackParamList } from './types'
 import AuthNavigator from './AuthNavigator'
 import MainTabNavigator from './MainTabNavigator'
 import { AppScreenHeader, LocationSelector, NotificationPermissionPopup } from '../components/common'
+import LocationScreen from '../components/common/LocationScreen'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
@@ -258,6 +259,11 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.ANCILLARY_PROVIDERS}
 				component={AncillaryProvidersPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.LOCATION_SELECT as keyof AppStackParamList}
+				component={LocationScreen}
 				options={{ headerShown: false }}
 			/>
 		</AppStack.Navigator>
