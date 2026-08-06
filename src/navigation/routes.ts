@@ -61,5 +61,9 @@ export const ROUTES = {
 		TRANSPORTATION_LANDING: 'TransportationLanding',
 		BOOK_RIDE: 'BookRide',
 		RIDE_TRACKING: 'RideTracking',
+		DOCTOR_EVENTS: 'DoctorEvents',
+		DOCTOR_EVENT_FORM: 'DoctorEventForm',
+		ALL_EVENTS: 'AllEvents',
+		EVENT_DETAILS: 'EventDetails',
 	},
 } as const

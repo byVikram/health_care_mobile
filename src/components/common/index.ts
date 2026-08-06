@@ -26,6 +26,7 @@ export { default as ProviderDetailsCard } from "./ProviderDetailsCard";
 export type { ProviderDetailsCardProps, ProviderHoursRow } from "./ProviderDetailsCard";
 export { default as LocationSelector } from "./LocationSelector";
 export { default as NotificationPermissionPopup } from "./NotificationPermissionPopup";
+export { default as EventCard } from "./EventCard";
 
 
 

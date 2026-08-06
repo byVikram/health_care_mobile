@@ -4,8 +4,8 @@
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	// const url = "http://192.168.255.157:8000"
+	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	const url = "http://192.168.4.44:8000"
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 
 	if (!url) {
@@ -195,5 +195,14 @@ export const API_ENDPOINTS = {
 		SUBMIT_ANSWER: (questionId: string) => `${BASE_URL}/api/qa/questions/${questionId}/answers`,
 		SUBMIT_REPLY: (answerId: string) => `${BASE_URL}/api/qa/answers/${answerId}/replies`,
 		LIKE_ANSWER: (answerId: string) => `${BASE_URL}/api/qa/answers/${answerId}/like`,
+	},
+	EVENTS: {
+		PUBLIC: `${BASE_URL}/api/events/public`,
+		PUBLIC_DETAIL: (id: string) => `${BASE_URL}/api/events/public/${id}`,
+		LIST: `${BASE_URL}/api/events`,
+		CREATE: `${BASE_URL}/api/events`,
+		DETAIL: (id: string) => `${BASE_URL}/api/events/${id}`,
+		UPDATE: (id: string) => `${BASE_URL}/api/events/${id}`,
+		DELETE: (id: string) => `${BASE_URL}/api/events/${id}`,
 	},
 }

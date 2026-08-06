@@ -53,14 +53,7 @@ export default function PatientHealthQuestionsList({ showViewAll = true, itemLim
 			activeOpacity={0.7}
 		>
 			<View style={styles.cardHeader}>
-				<Image
-					source={{
-						uri:
-							item.patient_avatar ||
-							'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200',
-					}}
-					style={styles.avatar}
-				/>
+
 				<View style={styles.cardText}>
 					<View style={styles.tagRow}>
 						<Text style={styles.tag}>{item.tag || 'General'}</Text>

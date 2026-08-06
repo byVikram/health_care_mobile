@@ -141,6 +141,15 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 								icon: <MaterialCommunityIcons name="stethoscope" size={20} color="#1f5f68" />,
 								onPress: openAppointments,
 							},
+							{
+								id: 'create-event',
+								label: 'Create Event',
+								icon: <MaterialCommunityIcons name="calendar-plus" size={20} color="#1f5f68" />,
+								onPress: () => {
+									setIsSidebarOpen(false)
+									navigation.navigate(ROUTES.STACK.DOCTOR_EVENTS as any)
+								},
+							},
 						]
 					: [
 							{

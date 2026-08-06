@@ -49,6 +49,12 @@ import TransportationLandingPage from '../features/transportation/Transportation
 import BookRidePage from '../features/transportation/BookRidePage'
 import RideTrackingPage from '../features/transportation/RideTrackingPage'
 
+import DoctorEventListPage from '../features/doctor/events/DoctorEventListPage'
+import DoctorEventFormPage from '../features/doctor/events/DoctorEventFormPage'
+
+import AllEventsPage from '../features/events/AllEventsPage'
+import EventDetailsPage from '../features/events/EventDetailsPage'
+
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -195,6 +201,26 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.RIDE_TRACKING}
 				component={RideTrackingPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.DOCTOR_EVENTS}
+				component={DoctorEventListPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.DOCTOR_EVENT_FORM}
+				component={DoctorEventFormPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ALL_EVENTS}
+				component={AllEventsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.EVENT_DETAILS}
+				component={EventDetailsPage}
 				options={{ headerShown: false }}
 			/>
 		</AppStack.Navigator>
