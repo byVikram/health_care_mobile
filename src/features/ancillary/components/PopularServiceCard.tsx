@@ -1,0 +1,256 @@
+import React from 'react'
+import { View, StyleSheet, Image, TouchableOpacity, useWindowDimensions } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { AppTypography } from '../../../components/common/AppTypography'
+import { AppButton } from '../../../components/common/AppButton'
+import { ServiceProcedureItem } from './AllServiceCard'
+
+export interface PopularService {
+	id: string
+	title: string
+	description: string
+	price: string
+	image: string
+}
+
+interface PopularServiceCardProps {
+	item: PopularService
+	quantity?: number
+	onIncrement?: (item: ServiceProcedureItem) => void
+	onDecrement?: (item: ServiceProcedureItem) => void
+	onCardPress?: (item: ServiceProcedureItem) => void
+	onSelectService?: (item: ServiceProcedureItem) => void
+}
+
+export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
+	item,
+	quantity = 0,
+	onIncrement,
+	onDecrement,
+	onCardPress,
+	onSelectService,
+}) => {
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
+
+	const toProcedureItem = (): ServiceProcedureItem => ({
+		id: item.id,
+		title: item.title,
+		description: item.description,
+		duration: '45 mins',
+		price: item.price,
+		image: item.image,
+	})
+
+	const handleCardClick = () => {
+		const procItem = toProcedureItem()
+		if (onCardPress) {
+			onCardPress(procItem)
+		} else if (onSelectService) {
+			onSelectService(procItem)
+		}
+	}
+
+	const handleIncrementClick = () => {
+		const procItem = toProcedureItem()
+		if (onIncrement) {
+			onIncrement(procItem)
+		} else if (onSelectService) {
+			onSelectService(procItem)
+		}
+	}
+
+	const handleDecrementClick = () => {
+		const procItem = toProcedureItem()
+		if (onDecrement) {
+			onDecrement(procItem)
+		}
+	}
+
+	const renderActionControls = () => {
+		if (quantity > 0) {
+			return (
+				<View style={[styles.stepperContainer, isTablet && styles.stepperContainerTablet]}>
+					<TouchableOpacity style={styles.stepperBtn} onPress={handleDecrementClick} activeOpacity={0.7}>
+						<MaterialCommunityIcons name="minus" size={14} color="#1F5F68" />
+					</TouchableOpacity>
+					<AppTypography variant="h4" style={[styles.quantityText, isTablet && styles.quantityTextTablet]}>
+						{quantity}
+					</AppTypography>
+					<TouchableOpacity style={styles.stepperBtn} onPress={handleIncrementClick} activeOpacity={0.7}>
+						<MaterialCommunityIcons name="plus" size={14} color="#1F5F68" />
+					</TouchableOpacity>
+				</View>
+			)
+		}
+
+		return (
+			<AppButton
+				variant="secondary"
+				style={[styles.selectBtn, isTablet && styles.selectBtnTablet]}
+				labelStyle={[styles.selectBtnLabel, isTablet && styles.selectBtnLabelTablet]}
+				onPress={handleIncrementClick}
+			>
+				Select
+			</AppButton>
+		)
+	}
+
+	return (
+		<TouchableOpacity
+			style={[styles.card, isTablet && styles.cardTablet]}
+			onPress={handleCardClick}
+			activeOpacity={0.9}
+		>
+			<Image source={{ uri: item.image }} style={[styles.image, isTablet && styles.imageTablet]} resizeMode="cover" />
+			<View style={[styles.content, isTablet && styles.contentTablet]}>
+				<AppTypography
+					variant="h4"
+					style={[styles.title, isTablet && styles.titleTablet]}
+					numberOfLines={1}
+				>
+					{item.title}
+				</AppTypography>
+				<AppTypography
+					variant="caption"
+					style={[styles.description, isTablet && styles.descriptionTablet]}
+					numberOfLines={2}
+				>
+					{item.description}
+				</AppTypography>
+				<View style={styles.footerRow}>
+					<AppTypography
+						variant="body"
+						style={[styles.price, isTablet && styles.priceTablet]}
+					>
+						From {item.price}
+					</AppTypography>
+					{renderActionControls()}
+				</View>
+			</View>
+		</TouchableOpacity>
+	)
+}
+
+const styles = StyleSheet.create({
+	card: {
+		width: 210,
+		backgroundColor: '#FFFFFF',
+		borderRadius: 14,
+		marginRight: 14,
+		borderWidth: 1,
+		borderColor: '#E8ECEC',
+		overflow: 'hidden',
+		elevation: 1,
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 3,
+	},
+	cardTablet: {
+		width: 280,
+		marginRight: 18,
+		borderRadius: 18,
+	},
+	image: {
+		width: '100%',
+		height: 110,
+	},
+	imageTablet: {
+		height: 150,
+	},
+	content: {
+		padding: 12,
+	},
+	contentTablet: {
+		padding: 16,
+	},
+	title: {
+		fontSize: 15,
+		fontWeight: '600',
+		color: '#191C1D',
+		lineHeight: 20,
+	},
+	titleTablet: {
+		fontSize: 18,
+		lineHeight: 24,
+	},
+	description: {
+		fontSize: 12,
+		color: '#526062',
+		marginTop: 4,
+		marginBottom: 12,
+		lineHeight: 16,
+	},
+	descriptionTablet: {
+		fontSize: 14,
+		lineHeight: 20,
+		marginBottom: 16,
+	},
+	footerRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	price: {
+		fontSize: 13,
+		fontWeight: '700',
+		color: '#1F5F68',
+	},
+	priceTablet: {
+		fontSize: 16,
+	},
+	selectBtn: {
+		backgroundColor: '#E6F3F4',
+		borderRadius: 14,
+		paddingVertical: 0,
+		minWidth: 64,
+		height: 32,
+		justifyContent: 'center',
+	},
+	selectBtnTablet: {
+		borderRadius: 18,
+		minWidth: 84,
+		height: 40,
+	},
+	selectBtnLabel: {
+		color: '#1F5F68',
+		fontSize: 12,
+		fontWeight: '600',
+		marginVertical: 0,
+	},
+	selectBtnLabelTablet: {
+		fontSize: 14,
+	},
+	stepperContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#F0F9F9',
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: '#1F5F68',
+		paddingHorizontal: 4,
+		paddingVertical: 2,
+		gap: 6,
+	},
+	stepperContainerTablet: {
+		borderRadius: 12,
+		paddingHorizontal: 6,
+		paddingVertical: 4,
+		gap: 8,
+	},
+	stepperBtn: {
+		padding: 2,
+	},
+	quantityText: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#1F5F68',
+		minWidth: 14,
+		textAlign: 'center',
+	},
+	quantityTextTablet: {
+		fontSize: 14,
+		minWidth: 18,
+	},
+})

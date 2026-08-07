@@ -206,6 +206,8 @@ const PHYSIO_DATA: ServiceDetails = {
 	],
 }
 
+import NursingCarePage from './NursingCarePage'
+
 export default function AncillaryServicesPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
@@ -214,6 +216,10 @@ export default function AncillaryServicesPage() {
 	const isTablet = width >= 768
 
 	const [searchQuery, setSearchQuery] = useState('')
+
+	if (!serviceKey || serviceKey === 'nursing-care') {
+		return <NursingCarePage />
+	}
 
 	const data = serviceKey === 'physiotherapy' ? PHYSIO_DATA : NURSING_DATA
 
