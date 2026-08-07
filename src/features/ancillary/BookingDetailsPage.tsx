@@ -18,6 +18,7 @@ import { AppInput } from '../../components/common/AppInput'
 import { AppSelect, AppSelectOption } from '../../components/common/AppSelect'
 import { AppBottomSheet } from '../../components/common/AppBottomSheet'
 import { ServiceProcedureItem } from './components/AllServiceCard'
+import { BookingProgressStepper } from './components/BookingProgressStepper'
 
 const GENDER_OPTIONS: AppSelectOption[] = [
 	{ label: 'Male', value: 'Male' },
@@ -213,47 +214,8 @@ export default function BookingDetailsPage() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* 1. Header Security & Progress Stepper */}
-				<View style={styles.topHeaderBanner}>
-					<View style={styles.secureBadge}>
-						<MaterialCommunityIcons name="shield-check-outline" size={18} color="#1F5F68" />
-						<View style={styles.secureTextCol}>
-							<AppTypography variant="caption" style={styles.secureTitle}>
-								100% Secure
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.secureSub}>
-								Your data is safe
-							</AppTypography>
-						</View>
-					</View>
-
-					{/* Stepper Bar */}
-					<View style={styles.stepperRow}>
-						<View style={styles.stepItemActive}>
-							<View style={styles.stepCircleActive}>
-								<AppTypography variant="caption" style={styles.stepNumActive}>
-									1
-								</AppTypography>
-							</View>
-							<AppTypography variant="caption" style={styles.stepLabelActive}>
-								Appointment Details
-							</AppTypography>
-						</View>
-
-						<View style={styles.stepLine} />
-
-						<View style={styles.stepItemInactive}>
-							<View style={styles.stepCircleInactive}>
-								<AppTypography variant="caption" style={styles.stepNumInactive}>
-									2
-								</AppTypography>
-							</View>
-							<AppTypography variant="caption" style={styles.stepLabelInactive}>
-								Payment
-							</AppTypography>
-						</View>
-					</View>
-				</View>
+				{/* 1. Progress Stepper */}
+				<BookingProgressStepper currentStep={2} />
 
 				{/* 2. Card 1: Selected Services (Supports Multiple Services) */}
 				<View style={styles.card}>

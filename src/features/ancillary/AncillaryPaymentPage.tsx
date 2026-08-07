@@ -14,6 +14,7 @@ import { ROUTES } from '../../navigation/routes'
 import AppScreenHeader from '../../components/common/AppScreenHeader'
 import { AppTypography } from '../../components/common/AppTypography'
 import { AppButton } from '../../components/common/AppButton'
+import { BookingProgressStepper } from './components/BookingProgressStepper'
 
 interface PaymentMethodItem {
 	id: string
@@ -109,32 +110,8 @@ export default function AncillaryPaymentPage() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* 1. Header Progress Stepper */}
-				<View style={styles.stepperContainer}>
-					<View style={styles.stepperRow}>
-						<View style={styles.stepItemCompleted}>
-							<View style={styles.stepCircleCompleted}>
-								<Ionicons name="checkmark" size={14} color="#FFFFFF" />
-							</View>
-							<AppTypography variant="caption" style={styles.stepLabelCompleted}>
-								Appointment Details
-							</AppTypography>
-						</View>
-
-						<View style={styles.stepLineActive} />
-
-						<View style={styles.stepItemActive}>
-							<View style={styles.stepCircleActive}>
-								<AppTypography variant="caption" style={styles.stepNumActive}>
-									2
-								</AppTypography>
-							</View>
-							<AppTypography variant="caption" style={styles.stepLabelActive}>
-								Payment
-							</AppTypography>
-						</View>
-					</View>
-				</View>
+				{/* 1. Progress Stepper */}
+				<BookingProgressStepper currentStep={3} />
 
 				{/* 2. Security Banner */}
 				<View style={styles.securityBanner}>
