@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
+	Image,
 	ImageBackground,
 	ScrollView,
 	StyleSheet,
@@ -10,50 +11,194 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons'
 import { ROUTES } from '../../navigation/routes'
 
-interface DashboardCard {
+interface ServiceItem {
 	key: string
 	title: string
-	subtitle: string
-	iconName: keyof typeof MaterialCommunityIcons.glyphMap
-	bgColor: string
-	iconColor: string
+	image: string
+	routeType: 'stack' | 'main'
+	route: string
+	params?: any
 }
 
-const CARDS: DashboardCard[] = [
+const EXPLORE_SERVICES: ServiceItem[] = [
 	{
 		key: 'nursing-care',
-		title: 'Nursing Care',
-		subtitle: 'Professional nursing services at your doorstep',
-		iconName: 'medical-bag',
-		bgColor: '#EAF6F6',
-		iconColor: '#2B6F71',
+		title: 'Nursing\nCare',
+		image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=150',
+		routeType: 'stack',
+		route: ROUTES.STACK.ANCILLARY_SERVICES,
+		params: { serviceKey: 'nursing-care', serviceLabel: 'Nursing Care' },
 	},
 	{
 		key: 'physiotherapy',
-		title: 'Physiotherapy',
-		subtitle: 'Pain relief & mobility restoration sessions',
-		iconName: 'walk',
-		bgColor: '#EEF2FF',
-		iconColor: '#4F46E5',
+		title: 'Physio-\ntherapy',
+		image: 'https://images.unsplash.com/photo-1576091160607-21c38dba92c6?auto=format&fit=crop&q=80&w=150',
+		routeType: 'stack',
+		route: ROUTES.STACK.ANCILLARY_SERVICES,
+		params: { serviceKey: 'physiotherapy', serviceLabel: 'Physiotherapy' },
 	},
 	{
 		key: 'rehab-care',
-		title: 'Rehab Care',
-		subtitle: 'Neuro, stroke, and cardiac rehab specialists',
-		iconName: 'heart-pulse',
-		bgColor: '#ECFDF5',
-		iconColor: '#059669',
+		title: 'Rehab\nCare',
+		image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&q=80&w=150',
+		routeType: 'stack',
+		route: ROUTES.STACK.ANCILLARY_SERVICES,
+		params: { serviceKey: 'rehab-care', serviceLabel: 'Rehab Care' },
 	},
 	{
-		key: 'elder-day-care',
-		title: 'Elder Day Care',
-		subtitle: 'Companionship & vital setup care for seniors',
+		key: 'doctor-visit',
+		title: 'Doctor\nVisit',
+		image: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=150',
+		routeType: 'stack',
+		route: ROUTES.STACK.SEARCH,
+		params: { mode: 'clinic' },
+	},
+	{
+		key: 'lab-tests',
+		title: 'Lab\nTests',
+		image: 'https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?auto=format&fit=crop&q=80&w=150',
+		routeType: 'main',
+		route: ROUTES.MAIN.PORTAL,
+	},
+]
+
+interface PopularItem {
+	id: string
+	title: string
+	rating: string
+	reviews: string
+	price: string
+	image: string
+	iconName: keyof typeof MaterialCommunityIcons.glyphMap
+	serviceKey: string
+	serviceLabel: string
+}
+
+const POPULAR_SERVICES: PopularItem[] = [
+	{
+		id: 'pop-1',
+		title: 'Injection at Home',
+		rating: '4.8',
+		reviews: '1.2k',
+		price: '$45',
+		image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=260',
+		iconName: 'needle',
+		serviceKey: 'nursing-care',
+		serviceLabel: 'Nursing Care',
+	},
+	{
+		id: 'pop-2',
+		title: 'Wound Dressing',
+		rating: '4.9',
+		reviews: '850',
+		price: '$55',
+		image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&q=80&w=260',
+		iconName: 'bandage',
+		serviceKey: 'nursing-care',
+		serviceLabel: 'Nursing Care',
+	},
+	{
+		id: 'pop-3',
+		title: 'Blood Collection',
+		rating: '4.7',
+		reviews: '2.1k',
+		price: '$30',
+		image: 'https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?auto=format&fit=crop&q=80&w=260',
+		iconName: 'blood-bag',
+		serviceKey: 'nursing-care',
+		serviceLabel: 'Nursing Care',
+	},
+]
+
+interface NeedItem {
+	title: string
+	iconName: keyof typeof MaterialCommunityIcons.glyphMap
+	bgColor: string
+	iconColor: string
+	serviceKey: string
+	serviceLabel: string
+	procedureName: string
+}
+
+const NEEDS: NeedItem[] = [
+	{
+		title: 'Back Pain',
+		iconName: 'wheelchair-accessibility',
+		bgColor: '#FEF2F2',
+		iconColor: '#EF4444',
+		serviceKey: 'physiotherapy',
+		serviceLabel: 'Physiotherapy',
+		procedureName: 'Manual Therapy Session',
+	},
+	{
+		title: 'Knee Pain',
+		iconName: 'run',
+		bgColor: '#EFF6FF',
+		iconColor: '#3B82F6',
+		serviceKey: 'physiotherapy',
+		serviceLabel: 'Physiotherapy',
+		procedureName: 'Post-Op Knee Rehab',
+	},
+	{
+		title: 'Post Surgery',
+		iconName: 'hospital-building',
+		bgColor: '#F3E8FF',
+		iconColor: '#A855F7',
+		serviceKey: 'rehab-care',
+		serviceLabel: 'Rehab Care',
+		procedureName: 'Cognitive Rehabilitation',
+	},
+	{
+		title: 'Elderly Care',
 		iconName: 'human-cane',
-		bgColor: '#FFF7ED',
-		iconColor: '#D97706',
+		bgColor: '#ECFDF5',
+		iconColor: '#10B981',
+		serviceKey: 'elder-day-care',
+		serviceLabel: 'Elder Day Care',
+		procedureName: 'Safety Assessment Check',
+	},
+]
+
+interface ProfessionalItem {
+	name: string
+	specialty: string
+	exp: string
+	rating: string
+	reviews: string
+	price: string
+	distance: string
+	avatar: string
+	serviceKey: string
+	serviceLabel: string
+}
+
+const TOP_PROFESSIONALS: ProfessionalItem[] = [
+	{
+		name: 'Dr. James Wilson',
+		specialty: 'Physiotherapist',
+		exp: '10y exp',
+		rating: '4.9',
+		reviews: '120',
+		price: '$85',
+		distance: '1.2m',
+		avatar: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=120',
+		serviceKey: 'physiotherapy',
+		serviceLabel: 'Physiotherapy',
+	},
+	{
+		name: 'Nurse Emily Chen',
+		specialty: 'Registered Nurse',
+		exp: '8y exp',
+		rating: '4.8',
+		reviews: '95',
+		price: '$60',
+		distance: '2.5m',
+		avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
+		serviceKey: 'nursing-care',
+		serviceLabel: 'Nursing Care',
 	},
 ]
 
@@ -62,74 +207,230 @@ export default function AncillaryDashboard() {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
 
-	const handleCardPress = (card: DashboardCard) => {
-		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
-			serviceKey: card.key,
-			serviceLabel: card.title,
+	const [searchQuery, setSearchQuery] = useState('')
+
+	const handleServicePress = (item: ServiceItem) => {
+		if (item.routeType === 'stack') {
+			navigation.navigate(item.route, item.params)
+		} else {
+			navigation.navigate(item.route)
+		}
+	}
+
+	const handlePopularBook = (item: PopularItem) => {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+			serviceKey: item.serviceKey,
+			serviceLabel: item.serviceLabel,
+			procedureName: item.title,
+		})
+	}
+
+	const handleNeedPress = (item: NeedItem) => {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+			serviceKey: item.serviceKey,
+			serviceLabel: item.serviceLabel,
+			procedureName: item.procedureName,
+		})
+	}
+
+	const handleProfessionalBook = (item: ProfessionalItem) => {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+			serviceKey: item.serviceKey,
+			serviceLabel: item.serviceLabel,
+			procedureName: item.specialty,
 		})
 	}
 
 	return (
-		<ScrollView style={styles.container} contentContainerStyle={styles.content}>
-			{/* Banner Card */}
+		<ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+			{/* Promotional Banner */}
 			<ImageBackground
 				source={{ uri: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&q=80&w=600' }}
 				style={[styles.banner, isTablet && styles.bannerTablet]}
 				imageStyle={styles.bannerImage}
 			>
 				<View style={styles.bannerOverlay}>
-					<View style={styles.badge}>
-						<Text style={styles.badgeText}>Premium Care</Text>
+					<View style={styles.bannerBadge}>
+						<Text style={styles.bannerBadgeText}>Premium Care</Text>
 					</View>
 					<Text style={styles.bannerTitle}>Complete Home Healthcare</Text>
-					<Text style={styles.bannerSub}>Professional clinicians dispatched instantly to you</Text>
+					<TouchableOpacity
+						style={styles.bannerBtn}
+						activeOpacity={0.9}
+						onPress={() => navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, { serviceKey: 'nursing-care', serviceLabel: 'Nursing Care' })}
+					>
+						<Text style={styles.bannerBtnText}>Book Now</Text>
+					</TouchableOpacity>
 				</View>
 			</ImageBackground>
 
-			{/* Search */}
-			<View style={styles.searchBar}>
-				<Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
-				<TextInput
-					style={styles.searchInput}
-					placeholder="Search home care, injections, physio..."
-					placeholderTextColor="#94A3B8"
-				/>
+			{/* Explore Services Horizontal */}
+			<View style={styles.sectionHeaderRow}>
+				<Text style={styles.sectionTitle}>Explore Services</Text>
 			</View>
-
-			{/* Services Section */}
-			<Text style={styles.sectionTitle}>Ancillary Healthcare Services</Text>
-			<Text style={styles.sectionDesc}>Select a category to view procedures and available providers</Text>
-
-			<View style={[styles.grid, isTablet && styles.gridTablet]}>
-				{CARDS.map((card) => (
+			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.exploreScroll}>
+				{EXPLORE_SERVICES.map((item) => (
 					<TouchableOpacity
-						key={card.key}
-						style={[styles.card, { width: isTablet ? '48%' : '100%' }]}
-						onPress={() => handleCardPress(card)}
-						activeOpacity={0.9}
+						key={item.key}
+						style={styles.exploreCard}
+						onPress={() => handleServicePress(item)}
+						activeOpacity={0.8}
 					>
-						<View style={[styles.iconCircle, { backgroundColor: card.bgColor }]}>
-							<MaterialCommunityIcons name={card.iconName} size={28} color={card.iconColor} />
+						<View style={styles.exploreIconBox}>
+							<Image source={{ uri: item.image }} style={styles.exploreImg} />
 						</View>
-						<View style={styles.textContainer}>
-							<Text style={styles.cardTitle}>{card.title}</Text>
-							<Text style={styles.cardSub} numberOfLines={2}>
-								{card.subtitle}
-							</Text>
+						<Text style={styles.exploreText}>{item.title}</Text>
+					</TouchableOpacity>
+				))}
+			</ScrollView>
+
+			{/* Popular Near You */}
+			<View style={styles.sectionHeaderRow}>
+				<Text style={styles.sectionTitle}>Popular Near You</Text>
+				<TouchableOpacity>
+					<Text style={styles.seeAllText}>See All</Text>
+				</TouchableOpacity>
+			</View>
+			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularScroll}>
+				{POPULAR_SERVICES.map((item) => (
+					<View key={item.id} style={styles.popularCard}>
+						<View style={styles.popularImageContainer}>
+							<Image source={{ uri: item.image }} style={styles.popularImg} />
+							<View style={styles.popularIconBadge}>
+								<MaterialCommunityIcons name={item.iconName} size={16} color="#2B6F71" />
+							</View>
 						</View>
-						<Ionicons name="chevron-forward" size={18} color="#94A3B8" style={styles.chevron} />
+						<Text style={styles.popularTitle} numberOfLines={1}>{item.title}</Text>
+						<View style={styles.ratingRow}>
+							<Ionicons name="star" size={14} color="#F59E0B" />
+							<Text style={styles.ratingNum}>{item.rating}</Text>
+							<Text style={styles.reviewsText}> ({item.reviews} reviews)</Text>
+						</View>
+						<View style={styles.cardFooter}>
+							<View>
+								<Text style={styles.startsAtLabel}>Starts at</Text>
+								<Text style={styles.startsAtPrice}>{item.price}</Text>
+							</View>
+							<TouchableOpacity style={styles.cardBookBtn} onPress={() => handlePopularBook(item)}>
+								<Text style={styles.cardBookBtnText}>Book</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				))}
+			</ScrollView>
+
+			{/* Based on Your Needs (Symptom-based) */}
+			<Text style={styles.sectionTitle}>Based on Your Needs</Text>
+			<View style={styles.needsGrid}>
+				{NEEDS.map((item, idx) => (
+					<TouchableOpacity
+						key={idx}
+						style={[styles.needCard, { width: isTablet ? '23%' : '48%' }]}
+						activeOpacity={0.8}
+						onPress={() => handleNeedPress(item)}
+					>
+						<View style={[styles.needIconBox, { backgroundColor: item.bgColor }]}>
+							<MaterialCommunityIcons name={item.iconName} size={22} color={item.iconColor} />
+						</View>
+						<Text style={styles.needText} numberOfLines={1}>{item.title}</Text>
 					</TouchableOpacity>
 				))}
 			</View>
 
-			{/* Safe Trust Banner */}
-			<View style={styles.trustBanner}>
-				<Ionicons name="shield-checkmark" size={24} color="#2B6F71" style={styles.trustIcon} />
-				<View style={styles.trustTextCol}>
-					<Text style={styles.trustTitle}>100% Certified & Background Checked</Text>
-					<Text style={styles.trustDesc}>Every clinician undergoes rigorous vetting and credential verifications.</Text>
+			{/* Recommended Professionals */}
+			<View style={styles.sectionHeaderRow}>
+				<Text style={styles.sectionTitle}>Top Professionals</Text>
+				<TouchableOpacity>
+					<Text style={styles.seeAllText}>View All</Text>
+				</TouchableOpacity>
+			</View>
+			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularScroll}>
+				{TOP_PROFESSIONALS.map((item, idx) => (
+					<View key={idx} style={styles.profCard}>
+						<View style={styles.profHeader}>
+							<Image source={{ uri: item.avatar }} style={styles.profAvatar} />
+							<View style={styles.profInfoCol}>
+								<Text style={styles.profName} numberOfLines={1}>{item.name}</Text>
+								<Text style={styles.profSpecialty}>{item.specialty} • {item.exp}</Text>
+								<View style={styles.ratingRow}>
+									<Ionicons name="star" size={14} color="#F59E0B" />
+									<Text style={styles.ratingNum}>{item.rating}</Text>
+									<Text style={styles.reviewsText}> ({item.reviews})</Text>
+								</View>
+							</View>
+						</View>
+						<View style={styles.profFooter}>
+							<View>
+								<Text style={styles.startsAtLabel}>Consultation</Text>
+								<Text style={styles.startsAtPrice}>{item.price}<Text style={styles.hrLabel}>/hr</Text></Text>
+							</View>
+							<View style={styles.profFooterRight}>
+								<View style={styles.distanceBadge}>
+									<MaterialIcons name="location-on" size={12} color="#6F7979" />
+									<Text style={styles.distanceText}>{item.distance}</Text>
+								</View>
+								<TouchableOpacity style={styles.cardBookBtn} onPress={() => handleProfessionalBook(item)}>
+									<Text style={styles.cardBookBtnText}>Book</Text>
+								</TouchableOpacity>
+							</View>
+						</View>
+					</View>
+				))}
+			</ScrollView>
+
+			{/* Healthcare Packages */}
+			<Text style={styles.sectionTitle}>Healthcare Packages</Text>
+			<View style={styles.packagesContainer}>
+				<View style={styles.packageCard}>
+					<View style={styles.packageHeader}>
+						<View style={styles.packageTextCol}>
+							<Text style={styles.packageTitle}>Monthly Nursing Care</Text>
+							<Text style={styles.packageDesc}>Comprehensive daily care by registered nurses for chronic conditions.</Text>
+						</View>
+						<View style={styles.packageIconCircle}>
+							<MaterialCommunityIcons name="heart-plus" size={24} color="#2B6F71" />
+						</View>
+					</View>
+					<View style={styles.packageFooter}>
+						<View>
+							<Text style={styles.startsAtLabel}>Starting from</Text>
+							<Text style={styles.startsAtPrice}>$899<Text style={styles.hrLabel}>/month</Text></Text>
+						</View>
+						<TouchableOpacity
+							style={styles.packageBtn}
+							onPress={() => navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, { serviceKey: 'nursing-care', serviceLabel: 'Nursing Care' })}
+						>
+							<Text style={styles.packageBtnText}>View Details</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+
+				<View style={styles.packageCard}>
+					<View style={styles.packageHeader}>
+						<View style={styles.packageTextCol}>
+							<Text style={styles.packageTitle}>Elder Care Package</Text>
+							<Text style={styles.packageDesc}>Assistance with daily activities, medication management, and companionship.</Text>
+						</View>
+						<View style={styles.packageIconCircle}>
+							<MaterialCommunityIcons name="human-cane" size={24} color="#2B6F71" />
+						</View>
+					</View>
+					<View style={styles.packageFooter}>
+						<View>
+							<Text style={styles.startsAtLabel}>Starting from</Text>
+							<Text style={styles.startsAtPrice}>$599<Text style={styles.hrLabel}>/month</Text></Text>
+						</View>
+						<TouchableOpacity
+							style={styles.packageBtn}
+							onPress={() => navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, { serviceKey: 'elder-day-care', serviceLabel: 'Elder Day Care' })}
+						>
+							<Text style={styles.packageBtnText}>View Details</Text>
+						</TouchableOpacity>
+					</View>
 				</View>
 			</View>
+
 		</ScrollView>
 	)
 }
@@ -137,163 +438,502 @@ export default function AncillaryDashboard() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#f8fafa',
 	},
 	content: {
-		padding: 16,
-		paddingBottom: 40,
+		paddingBottom: 120,
+	},
+	topBar: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: 16,
+		paddingTop: 16,
+		paddingBottom: 12,
+		backgroundColor: '#ffffff',
+	},
+	helloText: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#3f4849',
+	},
+	locationPill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 4,
+		gap: 2,
+	},
+	locationLabel: {
+		fontSize: 13,
+		fontWeight: '800',
+		color: '#12373E',
+	},
+	headerActions: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+	},
+	iconButton: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: '#eceeee',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	avatarButton: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		borderWidth: 1,
+		borderColor: '#bfc8c8',
+		overflow: 'hidden',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	avatar: {
+		width: '100%',
+		height: '100%',
+		resizeMode: 'cover',
+	},
+	searchBar: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#ffffff',
+		borderWidth: 1,
+		borderColor: '#bfc8c8',
+		borderRadius: 24,
+		paddingHorizontal: 14,
+		height: 48,
+		marginHorizontal: 16,
+		marginVertical: 12,
+	},
+	searchIcon: {
+		marginRight: 8,
+	},
+	searchInput: {
+		flex: 1,
+		fontSize: 13,
+		color: '#191c1d',
+	},
+	micButton: {
+		backgroundColor: '#2B6F71',
+		width: 28,
+		height: 28,
+		borderRadius: 14,
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 	banner: {
-		height: 160,
-		borderRadius: 20,
+		height: 180,
+		borderRadius: 16,
 		overflow: 'hidden',
-		marginBottom: 20,
+		marginHorizontal: 16,
+		marginBottom: 24,
+		elevation: 2,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
 	},
 	bannerTablet: {
-		height: 220,
+		height: 240,
 	},
 	bannerImage: {
 		resizeMode: 'cover',
 	},
 	bannerOverlay: {
 		flex: 1,
-		backgroundColor: 'rgba(18, 55, 62, 0.65)',
+		backgroundColor: 'rgba(0, 0, 0, 0.45)',
 		padding: 20,
 		justifyContent: 'center',
 	},
-	badge: {
+	bannerBadge: {
 		alignSelf: 'flex-start',
-		backgroundColor: '#0c7c7c',
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 8,
+		backgroundColor: 'rgba(255, 255, 255, 0.25)',
+		borderWidth: 1,
+		borderColor: 'rgba(255, 255, 255, 0.35)',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 4,
 		marginBottom: 8,
 	},
-	badgeText: {
+	bannerBadgeText: {
 		fontSize: 10,
 		fontWeight: '800',
 		color: '#FFFFFF',
 		textTransform: 'uppercase',
 	},
 	bannerTitle: {
-		fontSize: 20,
+		fontSize: 22,
 		fontWeight: '800',
 		color: '#FFFFFF',
-		marginBottom: 4,
+		marginBottom: 12,
+		textShadowColor: 'rgba(0, 0, 0, 0.5)',
+		textShadowOffset: { width: 0, height: 1 },
+		textShadowRadius: 3,
 	},
-	bannerSub: {
-		fontSize: 12,
-		color: '#D1FAE5',
-		fontWeight: '600',
-	},
-	searchBar: {
-		flexDirection: 'row',
-		alignItems: 'center',
+	bannerBtn: {
 		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		borderRadius: 14,
-		paddingHorizontal: 14,
-		height: 52,
-		marginBottom: 24,
-		shadowColor: '#12373E',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.03,
-		shadowRadius: 6,
-		elevation: 1,
+		borderRadius: 20,
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+		alignSelf: 'flex-start',
 	},
-	searchIcon: {
-		marginRight: 10,
+	bannerBtnText: {
+		fontSize: 13,
+		fontWeight: '800',
+		color: '#2B6F71',
 	},
-	searchInput: {
-		flex: 1,
-		fontSize: 14,
-		color: '#1E293B',
+	sectionHeaderRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: 16,
+		marginTop: 8,
+		marginBottom: 12,
 	},
 	sectionTitle: {
 		fontSize: 16,
 		fontWeight: '800',
-		color: '#16324A',
-		marginBottom: 2,
+		color: '#12373E',
+		paddingHorizontal: 16,
+		marginTop: 8,
+		marginBottom: 12,
 	},
-	sectionDesc: {
-		fontSize: 12,
-		color: '#64748B',
-		marginBottom: 16,
+	seeAllText: {
+		fontSize: 13,
+		fontWeight: '800',
+		color: '#2B6F71',
 	},
-	grid: {
+	exploreScroll: {
+		paddingHorizontal: 16,
 		gap: 12,
+		paddingBottom: 16,
 	},
-	gridTablet: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		justifyContent: 'space-between',
-	},
-	card: {
-		flexDirection: 'row',
+	exploreCard: {
 		alignItems: 'center',
-		backgroundColor: '#FFFFFF',
+		width: 80,
+	},
+	exploreIconBox: {
+		width: 72,
+		height: 72,
+		borderRadius: 16,
+		backgroundColor: '#ffffff',
 		borderWidth: 1,
-		borderColor: '#E6EDF2',
-		borderRadius: 18,
-		padding: 16,
-		shadowColor: '#12373E',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.03,
-		shadowRadius: 6,
+		borderColor: '#eceeee',
+		overflow: 'hidden',
+		padding: 2,
+		elevation: 1,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 2,
+	},
+	exploreImg: {
+		width: '100%',
+		height: '100%',
+		borderRadius: 12,
+		resizeMode: 'cover',
+	},
+	exploreText: {
+		fontSize: 11,
+		fontWeight: '700',
+		color: '#191c1d',
+		textAlign: 'center',
+		marginTop: 6,
+		lineHeight: 14,
+	},
+	popularScroll: {
+		paddingHorizontal: 16,
+		gap: 12,
+		paddingBottom: 16,
+	},
+	popularCard: {
+		width: 180,
+		backgroundColor: '#ffffff',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#eceeee',
+		padding: 12,
+		elevation: 2,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 3,
+	},
+	popularImageContainer: {
+		width: '100%',
+		height: 96,
+		borderRadius: 12,
+		overflow: 'hidden',
+		position: 'relative',
+		marginBottom: 8,
+	},
+	popularImg: {
+		width: '100%',
+		height: '100%',
+		resizeMode: 'cover',
+	},
+	popularIconBadge: {
+		position: 'absolute',
+		top: 8,
+		right: 8,
+		width: 28,
+		height: 28,
+		borderRadius: 14,
+		backgroundColor: 'rgba(255, 255, 255, 0.9)',
+		justifyContent: 'center',
+		alignItems: 'center',
 		elevation: 1,
 	},
-	iconCircle: {
-		width: 52,
-		height: 52,
-		borderRadius: 26,
+	popularTitle: {
+		fontSize: 13,
+		fontWeight: '800',
+		color: '#191c1d',
+		marginBottom: 4,
+	},
+	ratingRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 6,
+	},
+	ratingNum: {
+		fontSize: 11,
+		fontWeight: '800',
+		color: '#191c1d',
+		marginLeft: 4,
+	},
+	reviewsText: {
+		fontSize: 11,
+		color: '#3f4849',
+	},
+	cardFooter: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		borderTopWidth: 1,
+		borderTopColor: '#eceeee',
+		paddingTop: 8,
+		marginTop: 4,
+	},
+	startsAtLabel: {
+		fontSize: 9,
+		color: '#3f4849',
+		textTransform: 'uppercase',
+	},
+	startsAtPrice: {
+		fontSize: 13,
+		fontWeight: '800',
+		color: '#2B6F71',
+	},
+	cardBookBtn: {
+		backgroundColor: '#2B6F71',
+		borderRadius: 14,
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+	},
+	cardBookBtnText: {
+		fontSize: 11,
+		fontWeight: '800',
+		color: '#FFFFFF',
+	},
+	needsGrid: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		paddingHorizontal: 16,
+		gap: 12,
+		marginBottom: 20,
+	},
+	needCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#ffffff',
+		borderWidth: 1,
+		borderColor: '#eceeee',
+		borderRadius: 12,
+		padding: 10,
+		elevation: 1,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 2,
+	},
+	needIconBox: {
+		width: 40,
+		height: 40,
+		borderRadius: 8,
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginRight: 10,
+	},
+	needText: {
+		fontSize: 13,
+		fontWeight: '800',
+		color: '#191c1d',
+		flex: 1,
+	},
+	profCard: {
+		width: 260,
+		backgroundColor: '#ffffff',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#eceeee',
+		padding: 12,
+		elevation: 2,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 3,
+	},
+	profHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	profAvatar: {
+		width: 64,
+		height: 64,
+		borderRadius: 12,
+		resizeMode: 'cover',
+	},
+	profInfoCol: {
+		flex: 1,
+		marginLeft: 12,
+	},
+	profName: {
+		fontSize: 13,
+		fontWeight: '800',
+		color: '#191c1d',
+		marginBottom: 2,
+	},
+	profSpecialty: {
+		fontSize: 11,
+		color: '#3f4849',
+		marginBottom: 4,
+	},
+	hrLabel: {
+		fontSize: 11,
+		fontWeight: 'normal',
+		color: '#3f4849',
+	},
+	profFooter: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		borderTopWidth: 1,
+		borderTopColor: '#eceeee',
+		paddingTop: 8,
+		marginTop: 8,
+	},
+	profFooterRight: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	distanceBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#eceeee',
+		borderRadius: 12,
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		gap: 2,
+	},
+	distanceText: {
+		fontSize: 9,
+		fontWeight: '600',
+		color: '#3f4849',
+	},
+	packagesContainer: {
+		paddingHorizontal: 16,
+		gap: 12,
+		marginBottom: 24,
+	},
+	packageCard: {
+		backgroundColor: '#ffffff',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#eceeee',
+		padding: 16,
+		elevation: 2,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 3,
+	},
+	packageHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'flex-start',
+		marginBottom: 16,
+	},
+	packageTextCol: {
+		flex: 1,
+		marginRight: 12,
+	},
+	packageTitle: {
+		fontSize: 15,
+		fontWeight: '800',
+		color: '#191c1d',
+		marginBottom: 4,
+	},
+	packageDesc: {
+		fontSize: 13,
+		color: '#3f4849',
+		lineHeight: 18,
+	},
+	packageIconCircle: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: 'rgba(43, 111, 113, 0.1)',
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
-	textContainer: {
-		flex: 1,
-		marginLeft: 14,
-		marginRight: 8,
-	},
-	cardTitle: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#16324A',
-		marginBottom: 4,
-	},
-	cardSub: {
-		fontSize: 12,
-		color: '#587087',
-		lineHeight: 16,
-	},
-	chevron: {
-		alignSelf: 'center',
-	},
-	trustBanner: {
+	packageFooter: {
 		flexDirection: 'row',
-		backgroundColor: '#EAF6F6',
-		borderWidth: 1,
-		borderColor: '#C7E7E8',
-		borderRadius: 16,
-		padding: 14,
-		marginTop: 28,
+		justifyContent: 'space-between',
 		alignItems: 'center',
+		borderTopWidth: 1,
+		borderTopColor: '#eceeee',
+		paddingTop: 12,
 	},
-	trustIcon: {
-		marginRight: 12,
+	packageBtn: {
+		borderWidth: 2,
+		borderColor: '#2B6F71',
+		borderRadius: 20,
+		paddingHorizontal: 16,
+		paddingVertical: 8,
 	},
-	trustTextCol: {
-		flex: 1,
-	},
-	trustTitle: {
+	packageBtnText: {
 		fontSize: 13,
-		fontWeight: '700',
-		color: '#16324A',
-		marginBottom: 2,
+		fontWeight: '800',
+		color: '#2B6F71',
 	},
-	trustDesc: {
-		fontSize: 11,
-		color: '#587087',
-		lineHeight: 14,
+	recentTitle: {
+		fontSize: 13,
+		fontWeight: '800',
+		color: '#3f4849',
+		paddingHorizontal: 16,
+		marginTop: 8,
+		marginBottom: 12,
+	},
+	recentScroll: {
+		paddingHorizontal: 16,
+		gap: 8,
+		paddingBottom: 24,
+	},
+	recentPill: {
+		borderWidth: 1,
+		borderColor: '#bfc8c8',
+		backgroundColor: '#ffffff',
+		borderRadius: 20,
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+	},
+	recentPillText: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#191c1d',
 	},
 })
