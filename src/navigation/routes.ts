@@ -80,6 +80,7 @@ export const ROUTES = {
 		ANCILLARY_PRICING_REVIEW: 'AncillaryPricingReview',
 		ANCILLARY_CONFIRMATION: 'AncillaryConfirmation',
 		ANCILLARY_BOOKING_STATUS: 'AncillaryBookingStatus',
+		ANCILLARY_MY_BOOKINGS: 'AncillaryMyBookings',
 		LOCATION_SELECT: 'LocationSelect',
 	},
 } as const
