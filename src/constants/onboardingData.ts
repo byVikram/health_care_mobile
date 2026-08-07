@@ -17,7 +17,7 @@ type OnboardingScreen = {
 	description: string
 }
 
-type OnboardingConfig = Record<UserRole, { screens: OnboardingScreen[] }>
+type OnboardingConfig = Record<string, { screens: OnboardingScreen[] }>
 
 // 🔁 Reusable common screens
 const commonScreens: OnboardingScreen[] = [
@@ -95,6 +95,52 @@ export const onboardingData: OnboardingConfig = {
 			{
 				Illustration: Onboarding2,
 				description: 'Upload scan reports and imaging results securely',
+			},
+			...commonScreens,
+		],
+	},
+
+	// Specialties mapping definitions
+	'nursing-care': {
+		screens: [
+			{
+				Illustration: Onboarding1,
+				description: 'Manage home visits, prepare medication injections, and monitor vitals.',
+			},
+			{
+				Illustration: Onboarding2,
+				description: 'Secure OTP checks to verify in-person visits.',
+			},
+			...commonScreens,
+		],
+	},
+	'physiotherapy': {
+		screens: [
+			{
+				Illustration: Onboarding1,
+				description: 'Track joint mobilization goals and therapeutic exercises logs.',
+			},
+			{
+				Illustration: Onboarding2,
+				description: 'Guide post-op recovery sequences remotely.',
+			},
+			...commonScreens,
+		],
+	},
+	'rehab-care': {
+		screens: [
+			{
+				Illustration: Onboarding1,
+				description: 'Assess post-stroke cognitive progress and therapy goals.',
+			},
+			...commonScreens,
+		],
+	},
+	'elder-day-care': {
+		screens: [
+			{
+				Illustration: Onboarding1,
+				description: 'Log daily activities, meals, and safety checklists.',
 			},
 			...commonScreens,
 		],

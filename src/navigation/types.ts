@@ -8,6 +8,7 @@ import type { DoctorDetailData } from '../types/doctor-detail'
 export type RoleParams = {
 	roleId: string
 	roleLabel: string
+	specialty?: string
 }
 
 export type AuthStackParamList = {

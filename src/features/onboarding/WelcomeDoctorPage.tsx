@@ -10,7 +10,11 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  TextInput, // ✅ Added for license input
+  Text, // ✅ Added for checklist text
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import ProfileIcon from "../../assets/Register/profile.svg";
 import ConsultIcon from "../../assets/Register/Consult.svg";
@@ -28,6 +32,28 @@ type Speciality = {
   id: string;
   label: string;
   icon_key: string;
+};
+
+const SPECIALTY_PROCEDURES = {
+  "nursing-care": [
+    { label: "Injection Administration", rate: "₹299" },
+    { label: "IV Drip Setup", rate: "₹799" },
+    { label: "Bandage Dressing", rate: "₹499" },
+    { label: "ICU Care at Home", rate: "Custom Pricing" },
+  ],
+  "physiotherapy": [
+    { label: "Manual Therapy Session", rate: "₹799" },
+    { label: "Therapeutic Exercise Guidance", rate: "₹599" },
+    { label: "Post-Op Knee Rehab", rate: "₹899" },
+  ],
+  "rehab-care": [
+    { label: "Cognitive Rehabilitation", rate: "₹699" },
+    { label: "Cardiac Rehabilitation", rate: "₹899" },
+  ],
+  "elder-day-care": [
+    { label: "Daily Activity Monitoring", rate: "₹599" },
+    { label: "Safety Assessment Check", rate: "₹499" },
+  ],
 };
 
 const MOCK_LOCATIONS: AppSelectOption[] = [
@@ -82,10 +108,54 @@ export default function WelcomeDoctorPage({
   const accountDropdownHeight = isSmallPhone || isCompactHeight ? 180 : 220;
   const accountDropdownBottomOffset = isTablet ? 40 : 96;
   const accountTopPadding = isTablet ? 40 : isCompactHeight ? 34 : 44;
-  const canContinue = Boolean(selectedLocation && selectedSpeciality) && !loadingSpecialities && !isSaving;
   const isPharmacist = role === "pharmacy";
+  const isAncillary = role === "ancillary";
 
-  const welcomeConfig = isPharmacist
+  const [licenseNumber, setLicenseNumber] = useState("");
+  const [selectedProcedures, setSelectedProcedures] = useState<string[]>([]);
+  const [providerSpecialty, setProviderSpecialty] = useState<string>("nursing-care");
+
+  // Load specialty from AsyncStorage if available
+  useEffect(() => {
+    const loadSpecialty = async () => {
+      try {
+        const stored = await AsyncStorage.getItem("user_specialty");
+        if (stored) setProviderSpecialty(stored);
+      } catch (e) {
+        console.log(e);
+      }
+    };
+    if (isAncillary) loadSpecialty();
+  }, [isAncillary]);
+
+  const canContinue = isAncillary
+    ? Boolean(selectedLocation && licenseNumber && selectedProcedures.length > 0) && !isSaving
+    : Boolean(selectedLocation && selectedSpeciality) && !loadingSpecialities && !isSaving;
+
+  const welcomeConfig = isAncillary
+    ? {
+        title: "Welcome Specialist! 👋",
+        subtitle: "Let's help you get set up to start accepting home visits.",
+        buttonLabel: "Set Up Profile",
+        features: [
+          {
+            Icon: ProfileIcon,
+            title: "Schedule",
+            description: "View daily patient bookings, locations, and directions.",
+          },
+          {
+            Icon: ConsultIcon,
+            title: "Verify",
+            description: "Verify in-person visits using secure OTP verification pins.",
+          },
+          {
+            Icon: FeedbackIcon,
+            title: "Clinical Reports",
+            description: "Log procedures checklist, vital results, and treatment summaries.",
+          },
+        ],
+      }
+    : isPharmacist
     ? {
         title: "Welcome Pharmacist👋",
         subtitle: "Let's get your pharmacy listed and ready to serve patients.",
@@ -109,7 +179,7 @@ export default function WelcomeDoctorPage({
         ],
       }
     : {
-        title: "Welcome Doctor! \uD83D\uDC4B\uD83C\uDFFB",
+        title: "Welcome Doctor! 👋",
         subtitle: "Let's help you get started on Whisper ai by making your Doctor Profile.",
         buttonLabel: "Create free profile",
         features: [
@@ -130,10 +200,10 @@ export default function WelcomeDoctorPage({
           },
         ],
       };
-  const welcomeTitleSize = isPharmacist && isTablet ? 44 : titleSize;
-  const welcomeSubtitleSize = isPharmacist && isTablet ? 18 : subtitleSize;
-  const welcomeBodySize = isPharmacist && isTablet ? 17 : bodySize;
-  const welcomeButtonWidth = isPharmacist && useSplitLayout ? 430 : useSplitLayout ? 360 : 420;
+  const welcomeTitleSize = (isPharmacist || isAncillary) && isTablet ? 44 : titleSize;
+  const welcomeSubtitleSize = (isPharmacist || isAncillary) && isTablet ? 18 : subtitleSize;
+  const welcomeBodySize = (isPharmacist || isAncillary) && isTablet ? 17 : bodySize;
+  const welcomeButtonWidth = (isPharmacist || isAncillary) && useSplitLayout ? 430 : useSplitLayout ? 360 : 420;
 
   useEffect(() => {
     const fetchSpecialities = async () => {
@@ -160,6 +230,49 @@ export default function WelcomeDoctorPage({
 
   const handleContinue = async () => {
     let hasError = false;
+
+    if (isAncillary) {
+      if (!selectedLocation) {
+        setLocationError("Please select a location");
+        hasError = true;
+      } else {
+        setLocationError("");
+      }
+
+      if (!licenseNumber) {
+        Alert.alert("Error", "Please input your professional license number");
+        hasError = true;
+      }
+
+      if (selectedProcedures.length === 0) {
+        Alert.alert("Error", "Please select at least one capability service");
+        hasError = true;
+      }
+
+      if (hasError) return;
+
+      try {
+        setIsSaving(true);
+        await AsyncStorage.setItem("ancillary_license", licenseNumber);
+        await AsyncStorage.setItem("ancillary_location", selectedLocation);
+        await AsyncStorage.setItem("ancillary_capabilities", JSON.stringify(selectedProcedures));
+
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: ROUTES.MAIN.TABS,
+              params: { screen: ROUTES.PORTAL.PROFILE },
+            },
+          ],
+        });
+      } catch (error) {
+        console.error("Ancillary welcome profile save error:", error);
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
 
     if (!selectedLocation) {
       setLocationError("Please select a location");
@@ -290,7 +403,53 @@ export default function WelcomeDoctorPage({
                 bottomOffset={accountDropdownBottomOffset}
               />
 
-              {loadingSpecialities ? (
+              {isAncillary ? (
+                <View style={styles.ancillaryFields}>
+                  <TextInput
+                    style={styles.licenseInput}
+                    placeholder="Enter License Number (e.g. RN-12345)"
+                    placeholderTextColor="#6f7979"
+                    value={licenseNumber}
+                    onChangeText={setLicenseNumber}
+                  />
+
+                  <AppTypography variant="body" style={styles.checklistTitle}>
+                    Select services you can provide:
+                  </AppTypography>
+
+                  <View style={styles.checklistContainer}>
+                    {((SPECIALTY_PROCEDURES as any)[providerSpecialty] || SPECIALTY_PROCEDURES["nursing-care"]).map((item: any) => {
+                      const isChecked = selectedProcedures.includes(item.label);
+                      return (
+                        <TouchableOpacity
+                          key={item.label}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            if (isChecked) {
+                              setSelectedProcedures(selectedProcedures.filter((p) => p !== item.label));
+                            } else {
+                              setSelectedProcedures([...selectedProcedures, item.label]);
+                            }
+                          }}
+                          style={[styles.checkRow, isChecked && styles.checkRowActive]}
+                        >
+                          <MaterialCommunityIcons
+                            name={isChecked ? "checkbox-marked" : "checkbox-blank-outline"}
+                            size={22}
+                            color={isChecked ? "#2b6f71" : "#6f7979"}
+                          />
+                          <View style={styles.checkRowText}>
+                            <Text style={[styles.checkLabel, isChecked && styles.checkLabelActive]}>
+                              {item.label}
+                            </Text>
+                            <Text style={styles.checkRate}>{item.rate}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : loadingSpecialities ? (
                 <View style={styles.fieldLoadingWrapper}>
                   <ActivityIndicator size="small" color="#2e7d74" />
                   <AppTypography variant="caption" style={styles.fieldLoadingText}>
@@ -679,5 +838,62 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 16,
     letterSpacing: 0.3,
+  },
+  ancillaryFields: {
+    width: "100%",
+    gap: 16,
+    marginBottom: 16,
+  },
+  licenseInput: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: "#bfc8c8",
+    borderRadius: 4,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: "#191c1d",
+    backgroundColor: "#ffffff",
+  },
+  checklistTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#191c1d",
+    marginBottom: 4,
+  },
+  checklistContainer: {
+    gap: 10,
+  },
+  checkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#bfc8c8",
+    borderRadius: 8,
+    padding: 12,
+    gap: 10,
+  },
+  checkRowActive: {
+    borderColor: "#2b6f71",
+    backgroundColor: "rgba(43, 111, 113, 0.04)",
+  },
+  checkRowText: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  checkLabel: {
+    fontSize: 14,
+    color: "#3f4849",
+  },
+  checkLabelActive: {
+    fontWeight: "700",
+    color: "#002021",
+  },
+  checkRate: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#2b6f71",
   },
 });
