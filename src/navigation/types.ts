@@ -135,6 +135,32 @@ export type AppStackParamList = {
 	[ROUTES.STACK.NURSE_COMPLETE_SERVICE]: { bookingId: string; elapsedSeconds: number }
 	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string }
 	[ROUTES.STACK.ANCILLARY_PROVIDERS]: { serviceKey: string; serviceLabel: string; procedureName?: string }
+	[ROUTES.STACK.ANCILLARY_BOOKING_CART]: {
+		services?: any[]
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_SUMMARY]: {
+		services?: any[]
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_DETAILS]: {
+		serviceId?: string
+		serviceName?: string
+		description?: string
+		image?: string
+		price?: string
+		duration?: string
+		services?: any[]
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_PRICING_REVIEW]: {
+		bookingPayload?: any
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_CONFIRMATION]: {
+		bookingId?: string
+		bookingPayload?: any
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_STATUS]: {
+		bookingId?: string
+		bookingData?: any
+	} | undefined
 	[ROUTES.STACK.LOCATION_SELECT]: undefined
 }
 
