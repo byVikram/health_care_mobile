@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
@@ -17,6 +17,7 @@ import ProfilePage from '../features/profile/ProfilePage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
 import AncillaryDashboard from '../features/ancillary/AncillaryDashboard'
+import BookingsBottomSheet from '../features/bookings/BookingsBottomSheet'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
@@ -41,7 +42,7 @@ function getTabConfig(routeName: string) {
 		return { iconName: 'magnify' as const, label: 'Search' }
 	}
 	if (routeName === ROUTES.MAIN.PORTAL) {
-		return { iconName: 'calendar-clock' as const, label: 'Portal' }
+		return { iconName: 'calendar-multiple-check' as const, label: 'Bookings' }
 	}
 	if (routeName === ROUTES.MAIN.PROFILE) {
 		return { iconName: 'account' as const, label: 'Profile' }
@@ -53,7 +54,11 @@ function getTabConfig(routeName: string) {
 	return { iconName: 'home' as const, label: 'Home' }
 }
 
-function DockedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+interface DockedTabBarProps extends BottomTabBarProps {
+	onBookingsPress: () => void
+}
+
+function DockedTabBar({ state, descriptors, navigation, onBookingsPress }: DockedTabBarProps) {
 	const theme = useTheme()
 	const insets = useSafeAreaInsets()
 	const activeRoute = state.routes[state.index]
@@ -77,6 +82,7 @@ function DockedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 				const { options } = descriptors[route.key]
 				const { iconName, label } = getTabConfig(route.name)
 				const color = focused ? '#0C7C7C' : '#94a3b8'
+				const isBookingsTab = route.name === ROUTES.MAIN.PORTAL
 
 				const onPress = () => {
 					const event = navigation.emit({
@@ -85,7 +91,16 @@ function DockedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 						canPreventDefault: true,
 					})
 
-					if (!focused && !event.defaultPrevented) {
+					if (event.defaultPrevented) return
+
+					// The Bookings tab opens a bottom sheet instead of navigating to a screen,
+					// so the existing navigation for every other tab is left untouched.
+					if (isBookingsTab) {
+						onBookingsPress()
+						return
+					}
+
+					if (!focused) {
 						navigation.navigate(route.name, route.params)
 					}
 				}
@@ -138,49 +153,74 @@ export default function MainTabNavigator() {
 	const { role } = useAuth()
 	const navigation = useNavigation<any>()
 	const shouldShowSearch = role !== 'doctor'
+	const [bookingsSheetVisible, setBookingsSheetVisible] = useState(false)
 
 	return (
-		<Tab.Navigator
-			tabBar={(props) => <DockedTabBar {...props} />}
-			screenOptions={{
-				headerShown: false,
-			}}
-		>
-			<Tab.Screen name={ROUTES.MAIN.HOME} component={HomeWithSidebar} />
-			{shouldShowSearch ? (
+		<>
+			<Tab.Navigator
+				tabBar={(props) => (
+					<DockedTabBar {...props} onBookingsPress={() => setBookingsSheetVisible(true)} />
+				)}
+				screenOptions={{
+					headerShown: false,
+				}}
+			>
+				<Tab.Screen name={ROUTES.MAIN.HOME} component={HomeWithSidebar} />
+				{shouldShowSearch ? (
+					<Tab.Screen
+						name={ROUTES.MAIN.SEARCH}
+						component={SearchPage}
+						options={{
+							headerShown: true,
+							header: () => (
+								<AppScreenHeader 
+									title="Find Doctors" 
+									onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} 
+									rightElement={<LocationSelector />}
+								/>
+							),
+						}}
+					/>
+				) : null}
+				{/* Portal route name is preserved so no existing navigation to it breaks;
+					the tab bar intercepts its press to open the Bookings sheet instead. */}
+				<Tab.Screen name={ROUTES.MAIN.PORTAL} component={PortalPage} />
 				<Tab.Screen
-					name={ROUTES.MAIN.SEARCH}
-					component={SearchPage}
+					name={ROUTES.MAIN.ANCILLARY}
+					component={AncillaryTabWrapper}
 					options={{
 						headerShown: true,
 						header: () => (
-							<AppScreenHeader 
-								title="Find Doctors" 
-								onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} 
-								rightElement={<LocationSelector />}
+							<AppScreenHeader
+								title="Ancillary Dashboard"
+								onBack={() => navigation.navigate(ROUTES.MAIN.HOME)}
+								rightElement={
+									<Pressable
+										onPress={() => navigation.navigate(ROUTES.STACK.ANCILLARY_MY_BOOKINGS)}
+										hitSlop={8}
+									>
+										<MaterialCommunityIcons name="calendar-check-outline" size={22} color="#ffffff" />
+									</Pressable>
+								}
 							/>
 						),
 					}}
 				/>
-			) : null}
-			<Tab.Screen name={ROUTES.MAIN.PORTAL} component={PortalPage} />
-			<Tab.Screen
-				name={ROUTES.MAIN.ANCILLARY}
-				component={AncillaryTabWrapper}
-				options={{
-					headerShown: true,
-					header: () => <AppScreenHeader title="Ancillary Dashboard" onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} />,
-				}}
+				<Tab.Screen
+					name={ROUTES.MAIN.PROFILE}
+					component={ProfilePage}
+					options={{
+						headerShown: true,
+						header: ({ navigation: screenNavigation }) => <AppScreenHeader title="My Profile" onBack={() => (screenNavigation.canGoBack() ? screenNavigation.goBack() : navigation.navigate(ROUTES.MAIN.HOME))} />,
+					}}
+				/>
+			</Tab.Navigator>
+
+			<BookingsBottomSheet
+				visible={bookingsSheetVisible}
+				onClose={() => setBookingsSheetVisible(false)}
 			/>
-			<Tab.Screen
-				name={ROUTES.MAIN.PROFILE}
-				component={ProfilePage}
-				options={{
-					headerShown: true,
-					header: ({ navigation: screenNavigation }) => <AppScreenHeader title="My Profile" onBack={() => (screenNavigation.canGoBack() ? screenNavigation.goBack() : navigation.navigate(ROUTES.MAIN.HOME))} />,
-				}}
-			/>
-		</Tab.Navigator>
+		</>
 	)
 }
 

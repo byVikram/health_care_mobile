@@ -478,3 +478,75 @@ export const ANCILLARY_MOCK_DATA: Record<string, AncillaryCategoryData> = {
 		],
 	},
 }
+
+
+// --- Patient-Facing "My Bookings" Interfaces ---
+export interface AncillaryBookingProvider {
+	name: string
+	designation: string
+	avatar: string
+}
+
+export interface AncillaryBooking {
+	id: string
+	serviceName: string
+	serviceKey: string
+	serviceLabel: string
+	status: 'upcoming' | 'completed' | 'cancelled'
+	date: string
+	timeRange?: string
+	provider: AncillaryBookingProvider
+	amount?: number
+	rating?: number
+	cancellationReason?: string
+	refundStatus?: string
+	refundReferenceId?: string
+}
+
+export const MOCK_ANCILLARY_BOOKINGS: AncillaryBooking[] = [
+	{
+		id: 'book-1',
+		serviceName: 'Nursing Care',
+		serviceKey: 'nursing-care',
+		serviceLabel: 'Nursing Care',
+		status: 'upcoming',
+		date: 'Tomorrow',
+		timeRange: '09:00 AM - 11:00 AM',
+		provider: {
+			name: 'Anita Sharma',
+			designation: 'Registered Nurse',
+			avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
+		},
+	},
+	{
+		id: 'book-2',
+		serviceName: 'Wound Dressing',
+		serviceKey: 'nursing-care',
+		serviceLabel: 'Nursing Care',
+		status: 'completed',
+		date: '12 Oct 2023',
+		provider: {
+			name: 'Anita Sharma',
+			designation: 'Registered Nurse',
+			avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
+		},
+		amount: 549,
+		rating: 4.5,
+	},
+	{
+		id: 'book-3',
+		serviceName: 'Physiotherapy Session',
+		serviceKey: 'physiotherapy',
+		serviceLabel: 'Physiotherapy',
+		status: 'cancelled',
+		date: '05 Oct 2023',
+		provider: {
+			name: 'Dr. James Wilson',
+			designation: 'Physiotherapist',
+			avatar: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=120',
+		},
+		cancellationReason: 'Provider unavailable due to emergency.',
+		refundStatus: 'Refund Initiated',
+		refundReferenceId: '#RF9832K',
+	},
+]

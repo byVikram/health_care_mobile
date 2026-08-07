@@ -61,6 +61,7 @@ export const SEMANTIC_STATUS_COLORS = {
 const STATUS_MAPPING: Record<string, keyof typeof SEMANTIC_STATUS_COLORS> = {
 	// success states
 	confirmed: 'success',
+	upcoming: 'primary',
 	completed: 'success',
 	sample_collected: 'success',
 	'sample collected': 'success',

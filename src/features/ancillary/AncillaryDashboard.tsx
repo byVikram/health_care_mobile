@@ -35,7 +35,7 @@ const EXPLORE_SERVICES: ServiceItem[] = [
 	{
 		key: 'physiotherapy',
 		title: 'Physio-\ntherapy',
-		image: 'https://images.unsplash.com/photo-1576091160607-21c38dba92c6?auto=format&fit=crop&q=80&w=150',
+		image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=150',
 		routeType: 'stack',
 		route: ROUTES.STACK.ANCILLARY_SERVICES,
 		params: { serviceKey: 'physiotherapy', serviceLabel: 'Physiotherapy' },
@@ -49,17 +49,9 @@ const EXPLORE_SERVICES: ServiceItem[] = [
 		params: { serviceKey: 'rehab-care', serviceLabel: 'Rehab Care' },
 	},
 	{
-		key: 'doctor-visit',
-		title: 'Doctor\nVisit',
-		image: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=150',
-		routeType: 'stack',
-		route: ROUTES.STACK.SEARCH,
-		params: { mode: 'clinic' },
-	},
-	{
-		key: 'lab-tests',
-		title: 'Lab\nTests',
-		image: 'https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?auto=format&fit=crop&q=80&w=150',
+		key: 'medical-equipment',
+		title: 'Medical\nEquipment',
+		image: 'https://images.unsplash.com/photo-1576671081837-49000212a370?auto=format&fit=crop&q=80&w=150',
 		routeType: 'main',
 		route: ROUTES.MAIN.PORTAL,
 	},
@@ -83,7 +75,7 @@ const POPULAR_SERVICES: PopularItem[] = [
 		title: 'Injection at Home',
 		rating: '4.8',
 		reviews: '1.2k',
-		price: '$45',
+		price: '₹450',
 		image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=260',
 		iconName: 'needle',
 		serviceKey: 'nursing-care',
@@ -94,7 +86,7 @@ const POPULAR_SERVICES: PopularItem[] = [
 		title: 'Wound Dressing',
 		rating: '4.9',
 		reviews: '850',
-		price: '$55',
+		price: '₹550',
 		image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&q=80&w=260',
 		iconName: 'bandage',
 		serviceKey: 'nursing-care',
@@ -105,7 +97,7 @@ const POPULAR_SERVICES: PopularItem[] = [
 		title: 'Blood Collection',
 		rating: '4.7',
 		reviews: '2.1k',
-		price: '$30',
+		price: '₹300',
 		image: 'https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?auto=format&fit=crop&q=80&w=260',
 		iconName: 'blood-bag',
 		serviceKey: 'nursing-care',
@@ -182,9 +174,9 @@ const TOP_PROFESSIONALS: ProfessionalItem[] = [
 		exp: '10y exp',
 		rating: '4.9',
 		reviews: '120',
-		price: '$85',
+		price: '₹850',
 		distance: '1.2m',
-		avatar: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=120',
+		avatar: 'https://i.pravatar.cc/150?img=12',
 		serviceKey: 'physiotherapy',
 		serviceLabel: 'Physiotherapy',
 	},
@@ -194,9 +186,9 @@ const TOP_PROFESSIONALS: ProfessionalItem[] = [
 		exp: '8y exp',
 		rating: '4.8',
 		reviews: '95',
-		price: '$60',
+		price: '₹600',
 		distance: '2.5m',
-		avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
+		avatar: 'https://i.pravatar.cc/150?img=47',
 		serviceKey: 'nursing-care',
 		serviceLabel: 'Nursing Care',
 	},
@@ -301,20 +293,22 @@ export default function AncillaryDashboard() {
 								<MaterialCommunityIcons name={item.iconName} size={16} color="#2B6F71" />
 							</View>
 						</View>
-						<Text style={styles.popularTitle} numberOfLines={1}>{item.title}</Text>
-						<View style={styles.ratingRow}>
-							<Ionicons name="star" size={14} color="#F59E0B" />
-							<Text style={styles.ratingNum}>{item.rating}</Text>
-							<Text style={styles.reviewsText}> ({item.reviews} reviews)</Text>
-						</View>
-						<View style={styles.cardFooter}>
-							<View>
-								<Text style={styles.startsAtLabel}>Starts at</Text>
-								<Text style={styles.startsAtPrice}>{item.price}</Text>
+						<View style={styles.popularContent}>
+							<Text style={styles.popularTitle} numberOfLines={1}>{item.title}</Text>
+							<View style={styles.ratingRow}>
+								<Ionicons name="star" size={14} color="#F59E0B" />
+								<Text style={styles.ratingNum}>{item.rating}</Text>
+								<Text style={styles.reviewsText}> ({item.reviews} reviews)</Text>
 							</View>
-							<TouchableOpacity style={styles.cardBookBtn} onPress={() => handlePopularBook(item)}>
-								<Text style={styles.cardBookBtnText}>Book</Text>
-							</TouchableOpacity>
+							<View style={styles.cardFooter}>
+								<View>
+									<Text style={styles.startsAtLabel}>Starts at</Text>
+									<Text style={styles.startsAtPrice}>{item.price}</Text>
+								</View>
+								<TouchableOpacity style={styles.cardBookBtn} onPress={() => handlePopularBook(item)}>
+									<Text style={styles.cardBookBtnText}>Book</Text>
+								</TouchableOpacity>
+							</View>
 						</View>
 					</View>
 				))}
@@ -356,18 +350,18 @@ export default function AncillaryDashboard() {
 								<View style={styles.ratingRow}>
 									<Ionicons name="star" size={14} color="#F59E0B" />
 									<Text style={styles.ratingNum}>{item.rating}</Text>
-									<Text style={styles.reviewsText}> ({item.reviews})</Text>
+									<Text style={styles.reviewsText}> ({item.reviews} reviews)</Text>
 								</View>
 							</View>
 						</View>
 						<View style={styles.profFooter}>
 							<View>
-								<Text style={styles.startsAtLabel}>Consultation</Text>
-								<Text style={styles.startsAtPrice}>{item.price}<Text style={styles.hrLabel}>/hr</Text></Text>
+								<Text style={styles.profFeeLabel}>Consultation Fee</Text>
+								<Text style={styles.profFeePrice}>{item.price}<Text style={styles.hrLabel}>/hr</Text></Text>
 							</View>
 							<View style={styles.profFooterRight}>
 								<View style={styles.distanceBadge}>
-									<MaterialIcons name="location-on" size={12} color="#6F7979" />
+									<MaterialIcons name="location-on" size={12} color="#2B6F71" />
 									<Text style={styles.distanceText}>{item.distance}</Text>
 								</View>
 								<TouchableOpacity style={styles.cardBookBtn} onPress={() => handleProfessionalBook(item)}>
@@ -395,7 +389,7 @@ export default function AncillaryDashboard() {
 					<View style={styles.packageFooter}>
 						<View>
 							<Text style={styles.startsAtLabel}>Starting from</Text>
-							<Text style={styles.startsAtPrice}>$899<Text style={styles.hrLabel}>/month</Text></Text>
+							<Text style={styles.startsAtPrice}>₹8,990<Text style={styles.hrLabel}>/month</Text></Text>
 						</View>
 						<TouchableOpacity
 							style={styles.packageBtn}
@@ -419,7 +413,7 @@ export default function AncillaryDashboard() {
 					<View style={styles.packageFooter}>
 						<View>
 							<Text style={styles.startsAtLabel}>Starting from</Text>
-							<Text style={styles.startsAtPrice}>$599<Text style={styles.hrLabel}>/month</Text></Text>
+							<Text style={styles.startsAtPrice}>₹5,990<Text style={styles.hrLabel}>/month</Text></Text>
 						</View>
 						<TouchableOpacity
 							style={styles.packageBtn}
@@ -441,6 +435,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f8fafa',
 	},
 	content: {
+		paddingTop: 16,
 		paddingBottom: 120,
 	},
 	topBar: {
@@ -655,7 +650,7 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		borderWidth: 1,
 		borderColor: '#eceeee',
-		padding: 12,
+		overflow: 'hidden',
 		elevation: 2,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 1 },
@@ -665,10 +660,10 @@ const styles = StyleSheet.create({
 	popularImageContainer: {
 		width: '100%',
 		height: 96,
-		borderRadius: 12,
-		overflow: 'hidden',
 		position: 'relative',
-		marginBottom: 8,
+	},
+	popularContent: {
+		padding: 12,
 	},
 	popularImg: {
 		width: '100%',
@@ -774,12 +769,12 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	profCard: {
-		width: 260,
+		width: 280,
 		backgroundColor: '#ffffff',
-		borderRadius: 16,
+		borderRadius: 20,
 		borderWidth: 1,
 		borderColor: '#eceeee',
-		padding: 12,
+		padding: 16,
 		elevation: 2,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
@@ -789,30 +784,32 @@ const styles = StyleSheet.create({
 	profHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		marginBottom: 20,
 	},
 	profAvatar: {
-		width: 64,
-		height: 64,
-		borderRadius: 12,
+		width: 72,
+		height: 72,
+		borderRadius: 36,
+		backgroundColor: '#eceeee',
 		resizeMode: 'cover',
 	},
 	profInfoCol: {
 		flex: 1,
-		marginLeft: 12,
+		marginLeft: 14,
 	},
 	profName: {
-		fontSize: 13,
+		fontSize: 15,
 		fontWeight: '800',
 		color: '#191c1d',
 		marginBottom: 2,
 	},
 	profSpecialty: {
-		fontSize: 11,
+		fontSize: 12,
 		color: '#3f4849',
-		marginBottom: 4,
+		marginBottom: 6,
 	},
 	hrLabel: {
-		fontSize: 11,
+		fontSize: 12,
 		fontWeight: 'normal',
 		color: '#3f4849',
 	},
@@ -820,10 +817,16 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		borderTopWidth: 1,
-		borderTopColor: '#eceeee',
-		paddingTop: 8,
-		marginTop: 8,
+	},
+	profFeeLabel: {
+		fontSize: 12,
+		color: '#3f4849',
+		marginBottom: 2,
+	},
+	profFeePrice: {
+		fontSize: 20,
+		fontWeight: '800',
+		color: '#191c1d',
 	},
 	profFooterRight: {
 		flexDirection: 'row',
@@ -833,16 +836,16 @@ const styles = StyleSheet.create({
 	distanceBadge: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#eceeee',
+		backgroundColor: '#E6F2F2',
 		borderRadius: 12,
 		paddingHorizontal: 8,
-		paddingVertical: 4,
-		gap: 2,
+		paddingVertical: 6,
+		gap: 4,
 	},
 	distanceText: {
-		fontSize: 9,
-		fontWeight: '600',
-		color: '#3f4849',
+		fontSize: 11,
+		fontWeight: '700',
+		color: '#2B6F71',
 	},
 	packagesContainer: {
 		paddingHorizontal: 16,

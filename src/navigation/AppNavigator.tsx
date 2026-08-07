@@ -62,6 +62,7 @@ import ServiceInProgressPage from '../features/ancillary/ServiceInProgressPage'
 import CompleteServicePage from '../features/ancillary/CompleteServicePage'
 import AncillaryServicesPage from '../features/ancillary/AncillaryServicesPage'
 import AncillaryProvidersPage from '../features/ancillary/AncillaryProvidersPage'
+import MyBookingsPage from '../features/ancillary/MyBookingsPage'
 
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
@@ -259,6 +260,11 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.ANCILLARY_PROVIDERS}
 				component={AncillaryProvidersPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_MY_BOOKINGS}
+				component={MyBookingsPage}
 				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen

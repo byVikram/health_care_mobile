@@ -180,6 +180,15 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 								},
 							},
 							{
+								id: 'ancillary-orders',
+								label: 'Ancillary Orders',
+								icon: <MaterialCommunityIcons name="medical-bag" size={20} color="#1f5f68" />,
+								onPress: () => {
+									setIsSidebarOpen(false)
+									navigation.navigate(ROUTES.STACK.ANCILLARY_MY_BOOKINGS as any)
+								},
+							},
+							{
 								id: 'book-cab',
 								label: 'Book a Cab',
 								icon: <MaterialCommunityIcons name="car" size={20} color="#1f5f68" />,
