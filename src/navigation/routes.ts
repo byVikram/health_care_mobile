@@ -74,6 +74,12 @@ export const ROUTES = {
 
 		ANCILLARY_SERVICES: 'AncillaryServices',
 		ANCILLARY_PROVIDERS: 'AncillaryProviders',
+		ANCILLARY_BOOKING_CART: 'AncillaryBookingCart',
+		ANCILLARY_BOOKING_SUMMARY: 'AncillaryBookingSummary',
+		ANCILLARY_BOOKING_DETAILS: 'AncillaryBookingDetails',
+		ANCILLARY_PRICING_REVIEW: 'AncillaryPricingReview',
+		ANCILLARY_CONFIRMATION: 'AncillaryConfirmation',
+		ANCILLARY_BOOKING_STATUS: 'AncillaryBookingStatus',
 		ANCILLARY_MY_BOOKINGS: 'AncillaryMyBookings',
 		LOCATION_SELECT: 'LocationSelect',
 	},

@@ -62,6 +62,12 @@ import ServiceInProgressPage from '../features/ancillary/ServiceInProgressPage'
 import CompleteServicePage from '../features/ancillary/CompleteServicePage'
 import AncillaryServicesPage from '../features/ancillary/AncillaryServicesPage'
 import AncillaryProvidersPage from '../features/ancillary/AncillaryProvidersPage'
+import BookingCartPage from '../features/ancillary/BookingCartPage'
+import BookingSummaryPage from '../features/ancillary/BookingSummaryPage'
+import BookingDetailsPage from '../features/ancillary/BookingDetailsPage'
+import PricingReviewPage from '../features/ancillary/PricingReviewPage'
+import AncillaryConfirmationPage from '../features/ancillary/AncillaryConfirmationPage'
+import AncillaryBookingStatusPage from '../features/ancillary/AncillaryBookingStatusPage'
 import MyBookingsPage from '../features/ancillary/MyBookingsPage'
 
 const AppStack = createNativeStackNavigator<AppStackParamList>()
@@ -260,6 +266,36 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.ANCILLARY_PROVIDERS}
 				component={AncillaryProvidersPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_BOOKING_CART}
+				component={BookingCartPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_BOOKING_SUMMARY}
+				component={BookingSummaryPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_BOOKING_DETAILS}
+				component={BookingDetailsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_PRICING_REVIEW}
+				component={PricingReviewPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_CONFIRMATION}
+				component={AncillaryConfirmationPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_BOOKING_STATUS}
+				component={AncillaryBookingStatusPage}
 				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen

@@ -10,8 +10,9 @@ import {
 	TextStyle,
 	useWindowDimensions,
 	View,
+	TouchableOpacity, // ✅ Added
 } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons' // ✅ Added MaterialCommunityIcons
 import type { RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -59,9 +60,29 @@ const resolvedRoleLabel = roleLabel ?? ''
 		}
 	}, [accessToken, roleId, navigation])
 
+	const isAncillary = resolvedRoleLabel.toLowerCase() === 'ancillary' || resolvedRoleId === 'ancillary'
+	const [selectedSpecialty, setSelectedSpecialty] = useState<'nursing-care' | 'physiotherapy' | 'rehab-care' | 'elder-day-care'>('nursing-care')
+
 	// ✅ Dynamic slides based on role
 	const slides: Slide[] = useMemo(() => {
 		if (!resolvedRoleId) return []
+
+		if (isAncillary) {
+			const firstSlide: Slide = {
+				key: 'specialty-selector',
+				description: 'Select your clinical discipline to continue',
+				Illustration: () => null,
+			}
+
+			const specialtyData = onboardingData[selectedSpecialty] || onboardingData['nursing-care']
+			const specialtySlides = specialtyData.screens.map((screen, index) => ({
+				key: `${selectedSpecialty}-${index}`,
+				description: screen.description,
+				Illustration: screen.Illustration,
+			}))
+
+			return [firstSlide, ...specialtySlides]
+		}
 
 		const roleKey = resolvedRoleId as UserRole
 		const roleData = onboardingData[roleKey]
@@ -73,7 +94,7 @@ const resolvedRoleLabel = roleLabel ?? ''
 			description: screen.description,
 			Illustration: screen.Illustration,
 		}))
-	}, [resolvedRoleId])
+	}, [resolvedRoleId, isAncillary, selectedSpecialty])
 
 	// 🚨 Prevent crash if no slides
 	if (!slides.length) return null
@@ -89,9 +110,10 @@ const resolvedRoleLabel = roleLabel ?? ''
 			navigation.replace(ROUTES.AUTH.REGISTER, {
 				roleId: resolvedRoleId,
 				roleLabel: resolvedRoleLabel,
+				specialty: isAncillary ? selectedSpecialty : undefined,
 			})
 		}
-	}, [accessToken, navigation, resolvedRoleId, resolvedRoleLabel])
+	}, [accessToken, navigation, resolvedRoleId, resolvedRoleLabel, isAncillary, selectedSpecialty])
 
 	const scrollToIndex = useCallback((index: number) => {
 		flatListRef.current?.scrollToIndex({
@@ -138,8 +160,59 @@ const resolvedRoleLabel = roleLabel ?? ''
 		[activeIndex, cardWidth]
 	)
 
+	const renderSpecialtySelector = () => {
+		const options = [
+			{ key: 'nursing-care', label: 'Nursing Care', sub: 'Home injections, IV drip setups, vitals logging', icon: 'medical-bag' },
+			{ key: 'physiotherapy', label: 'Physiotherapy', sub: 'Joint mobilization, sports injury & stroke rehab', icon: 'run' },
+			{ key: 'rehab-care', label: 'Rehabilitation', sub: 'Post-op recovery support & cognitive therapies', icon: 'wheelchair-accessibility' },
+			{ key: 'elder-day-care', label: 'Elder Day Care', sub: 'Daily activities logs, meals, safety checks', icon: 'human-cane' },
+		] as const
+
+		return (
+			<View style={[styles.slide, { width: cardWidth, justifyContent: 'flex-start', paddingTop: 64 }]}>
+				<Text style={styles.selectorTitle}>Choose Specialty</Text>
+				<Text style={styles.selectorSub}>Select your clinical discipline to continue</Text>
+
+				<View style={styles.selectorGrid}>
+					{options.map((opt) => {
+						const isSelected = selectedSpecialty === opt.key
+						return (
+							<TouchableOpacity
+								key={opt.key}
+								activeOpacity={0.8}
+								onPress={() => setSelectedSpecialty(opt.key)}
+								style={[styles.selectorCard, isSelected && styles.selectorCardSelected]}
+							>
+								<View style={[styles.selectorIconBox, isSelected && styles.selectorIconBoxSelected]}>
+									<MaterialCommunityIcons
+										name={opt.icon as any}
+										size={24}
+										color={isSelected ? '#ffffff' : '#1f5d65'}
+									/>
+								</View>
+								<View style={styles.selectorTextCol}>
+									<Text style={[styles.selectorCardLabel, isSelected && styles.selectorLabelSelected]}>
+										{opt.label}
+									</Text>
+									<Text style={styles.selectorCardSub}>{opt.sub}</Text>
+								</View>
+								{isSelected && (
+									<Ionicons name="checkmark-circle" size={20} color="#ffffff" style={styles.checkIcon} />
+								)}
+							</TouchableOpacity>
+						)
+					})}
+				</View>
+			</View>
+		)
+	}
+
 	const renderItem = useCallback(
 		({ item }: { item: Slide }) => {
+			if (item.key === 'specialty-selector') {
+				return renderSpecialtySelector()
+			}
+
 			const { Illustration } = item
 
 			return (
@@ -149,16 +222,10 @@ const resolvedRoleLabel = roleLabel ?? ''
 					</View>
 
 					<TextLabel text={item.description} style={styles.description} />
-
-					{/* {roleLabel ? (
-						<Text style={styles.roleBadge}>
-							Registering as: {roleLabel}
-						</Text>
-					) : null} */}
 				</View>
 			)
 		},
-		[cardWidth, illustrationSize, roleLabel]
+		[cardWidth, illustrationSize, roleLabel, selectedSpecialty]
 	)
 
 	return (
@@ -337,5 +404,67 @@ const styles = StyleSheet.create({
 		color: '#1f5d65',
 		fontSize: 18,
 		fontWeight: '500',
+	},
+	selectorTitle: {
+		fontSize: 24,
+		fontWeight: '800',
+		color: '#ffffff',
+		textAlign: 'center',
+		marginBottom: 6,
+	},
+	selectorSub: {
+		fontSize: 14,
+		color: '#d7e7e8',
+		textAlign: 'center',
+		marginBottom: 24,
+	},
+	selectorGrid: {
+		gap: 12,
+		width: '100%',
+	},
+	selectorCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: 'rgba(255, 255, 255, 0.08)',
+		borderWidth: 1.5,
+		borderColor: 'rgba(255, 255, 255, 0.15)',
+		borderRadius: 12,
+		padding: 14,
+		gap: 14,
+	},
+	selectorCardSelected: {
+		backgroundColor: '#ffffff',
+		borderColor: '#ffffff',
+	},
+	selectorIconBox: {
+		width: 44,
+		height: 44,
+		borderRadius: 8,
+		backgroundColor: 'rgba(255, 255, 255, 0.15)',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	selectorIconBoxSelected: {
+		backgroundColor: 'rgba(31, 93, 101, 0.1)',
+	},
+	selectorTextCol: {
+		flex: 1,
+	},
+	selectorCardLabel: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#ffffff',
+		marginBottom: 2,
+	},
+	selectorLabelSelected: {
+		color: '#1f5d65',
+	},
+	selectorCardSub: {
+		fontSize: 11,
+		color: '#b0d1d4',
+	},
+	checkIcon: {
+		marginLeft: 'auto',
+		color: '#1f5d65',
 	},
 })
