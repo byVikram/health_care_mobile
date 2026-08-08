@@ -65,6 +65,7 @@ import AncillaryProvidersPage from '../features/ancillary/AncillaryProvidersPage
 import BookingCartPage from '../features/ancillary/BookingCartPage'
 import BookingSummaryPage from '../features/ancillary/BookingSummaryPage'
 import BookingDetailsPage from '../features/ancillary/BookingDetailsPage'
+import AncillaryPaymentPage from '../features/ancillary/AncillaryPaymentPage'
 import PricingReviewPage from '../features/ancillary/PricingReviewPage'
 import AncillaryConfirmationPage from '../features/ancillary/AncillaryConfirmationPage'
 import AncillaryBookingStatusPage from '../features/ancillary/AncillaryBookingStatusPage'
@@ -281,6 +282,11 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.ANCILLARY_BOOKING_DETAILS}
 				component={BookingDetailsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_PAYMENT}
+				component={AncillaryPaymentPage}
 				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen

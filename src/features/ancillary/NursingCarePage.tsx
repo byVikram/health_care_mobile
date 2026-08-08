@@ -231,7 +231,7 @@ export default function NursingCarePage() {
 			}
 		})
 
-		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_CART, {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
 			services: selectedServices,
 		})
 	}
