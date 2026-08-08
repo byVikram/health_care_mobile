@@ -16,7 +16,7 @@ import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
-import AncillaryDashboard from '../features/ancillary/AncillaryDashboard'
+import AncillaryDashboard from '../features/ancillary/patient/AncillaryDashboard'
 import BookingsBottomSheet from '../features/bookings/BookingsBottomSheet'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()

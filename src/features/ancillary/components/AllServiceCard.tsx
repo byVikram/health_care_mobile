@@ -7,8 +7,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
-import { AppButton } from '../../../components/common/AppButton'
+import { AppTypography, AppButton, CommonCard } from '../../../components/common'
 
 export interface ServiceProcedureItem {
 	id: string
@@ -150,10 +149,9 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 
 	if (isTablet) {
 		return (
-			<TouchableOpacity
+			<CommonCard
 				style={[styles.cardTablet, cardWidth ? { width: cardWidth } : undefined, style]}
 				onPress={handleCardClick}
-				activeOpacity={0.9}
 			>
 				<Image source={{ uri: item.image }} style={styles.imageTablet} resizeMode="cover" />
 
@@ -205,16 +203,15 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 						{renderActionControlsTablet()}
 					</View>
 				</View>
-			</TouchableOpacity>
+			</CommonCard>
 		)
 	}
 
 	// Mobile Layout (Compact, clean & balanced)
 	return (
-		<TouchableOpacity
+		<CommonCard
 			style={[styles.cardMobile, cardWidth ? { width: cardWidth } : undefined, style]}
 			onPress={handleCardClick}
-			activeOpacity={0.9}
 		>
 			<Image source={{ uri: item.image }} style={styles.imageMobile} resizeMode="cover" />
 
@@ -264,7 +261,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 					{renderActionControlsMobile()}
 				</View>
 			</View>
-		</TouchableOpacity>
+		</CommonCard>
 	)
 }
 

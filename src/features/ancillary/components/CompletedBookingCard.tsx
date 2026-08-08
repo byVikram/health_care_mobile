@@ -3,6 +3,7 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { AncillaryBooking } from '../ancillaryService'
 import BookingStatusBadge from './BookingStatusBadge'
 import RatingStars from './RatingStars'
+import { CommonCard } from '../../../components/common'
 
 interface CompletedBookingCardProps {
 	booking: AncillaryBooking
@@ -12,7 +13,7 @@ interface CompletedBookingCardProps {
 
 export default function CompletedBookingCard({ booking, onViewInvoice, onBookAgain }: CompletedBookingCardProps) {
 	return (
-		<View style={styles.card}>
+		<CommonCard style={styles.card}>
 			<View style={styles.headerRow}>
 				<View style={styles.headerLeft}>
 					<Text style={styles.serviceName}>{booking.serviceName}</Text>
@@ -42,7 +43,7 @@ export default function CompletedBookingCard({ booking, onViewInvoice, onBookAga
 					<Text style={styles.filledBtnText}>Book Again</Text>
 				</TouchableOpacity>
 			</View>
-		</View>
+		</CommonCard>
 	)
 }
 

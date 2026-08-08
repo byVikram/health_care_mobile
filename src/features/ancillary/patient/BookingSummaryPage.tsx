@@ -10,11 +10,11 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { ROUTES } from '../../navigation/routes'
-import AppScreenHeader from '../../components/common/AppScreenHeader'
-import { AppTypography } from '../../components/common/AppTypography'
-import { AppButton } from '../../components/common/AppButton'
-import { ServiceProcedureItem } from './components/AllServiceCard'
+import { ROUTES } from '../../../navigation/routes'
+import AppScreenHeader from '../../../components/common/AppScreenHeader'
+import { AppTypography } from '../../../components/common/AppTypography'
+import { AppButton } from '../../../components/common/AppButton'
+import { ServiceProcedureItem } from '../components/AllServiceCard'
 
 const DEFAULT_MOCK_SERVICES: ServiceProcedureItem[] = [
 	{
@@ -37,7 +37,7 @@ const DEFAULT_MOCK_SERVICES: ServiceProcedureItem[] = [
 	},
 ]
 
-export default function BookingCartPage() {
+export default function BookingSummaryPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
@@ -56,7 +56,7 @@ export default function BookingCartPage() {
 		setServices((prev) => prev.filter((s) => s.id !== serviceId))
 	}
 
-	const handleContinueBooking = () => {
+	const handleContinue = () => {
 		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
 			services,
 			serviceName: services[0]?.title || 'Healthcare Service',
@@ -77,9 +77,28 @@ export default function BookingCartPage() {
 		}
 	}
 
+	// Price summary calculation (numeric sum when possible)
+	const calculateEstimatedTotal = () => {
+		let total = 0
+		let hasCustomPricing = false
+
+		services.forEach((s) => {
+			if (s.price && s.price.includes('₹')) {
+				const num = parseInt(s.price.replace(/[^0-9]/g, ''), 10)
+				if (!isNaN(num)) total += num
+			} else {
+				hasCustomPricing = true
+			}
+		})
+
+		if (hasCustomPricing && total === 0) return 'Custom Pricing'
+		if (hasCustomPricing && total > 0) return `From ₹${total} + Custom`
+		return `₹${total}`
+	}
+
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader title="Booking Cart" />
+			<AppScreenHeader title="Booking Summary" />
 
 			<ScrollView
 				contentContainerStyle={[
@@ -94,10 +113,10 @@ export default function BookingCartPage() {
 						{/* 1. Header Title */}
 						<View style={styles.sectionHeader}>
 							<AppTypography variant="h2" style={styles.mainTitle}>
-								Your Booking Cart ({services.length})
+								Selected Services ({services.length})
 							</AppTypography>
 							<AppTypography variant="caption" style={styles.subTitle}>
-								Review selected healthcare services before proceeding to patient details
+								Review selected healthcare services before providing patient details
 							</AppTypography>
 						</View>
 
@@ -151,11 +170,11 @@ export default function BookingCartPage() {
 											<View style={styles.durationRow}>
 												<Ionicons name="time-outline" size={13} color="#64748B" />
 												<AppTypography variant="caption" style={styles.durationText}>
-													{item.duration || 'Flexible duration'}
+													{item.duration}
 												</AppTypography>
 											</View>
 
-											<AppTypography variant="body" style={styles.pricePillText}>
+											<AppTypography variant="body" style={styles.priceText}>
 												{item.price}
 											</AppTypography>
 										</View>
@@ -164,18 +183,27 @@ export default function BookingCartPage() {
 							))}
 						</View>
 
-						{/* 3. Cart Summary Card */}
+						{/* 3. Booking Summary Breakdown Card */}
 						<View style={styles.summaryCard}>
 							<AppTypography variant="h3" style={styles.summaryTitle}>
-								Selected Services Breakdown
+								Summary Breakdown
 							</AppTypography>
 
 							<View style={styles.summaryRow}>
 								<AppTypography variant="body" style={styles.summaryLabel}>
-									Total Selected Services
+									Total Services
 								</AppTypography>
-								<AppTypography variant="h4" style={styles.summaryValue}>
+								<AppTypography variant="body" style={styles.summaryValue}>
 									{services.length} Service{services.length > 1 ? 's' : ''}
+								</AppTypography>
+							</View>
+
+							<View style={styles.summaryRow}>
+								<AppTypography variant="body" style={styles.summaryLabel}>
+									Est. Starting Total
+								</AppTypography>
+								<AppTypography variant="h4" style={styles.totalPriceValue}>
+									{calculateEstimatedTotal()}
 								</AppTypography>
 							</View>
 
@@ -189,36 +217,31 @@ export default function BookingCartPage() {
 									style={styles.noteIcon}
 								/>
 								<AppTypography variant="caption" style={styles.noteText}>
-									Final pricing will be calculated after entering patient information, case severity details, visit location, date, and appointment time slot.
+									Estimated total starting price. Final pricing will be determined based on specific case severity and service requirements.
 								</AppTypography>
 							</View>
 						</View>
 
-						{/* 4. Continue Booking Button */}
+						{/* 4. Continue Button */}
 						<View style={styles.ctaWrapper}>
-							<AppButton
-								variant="primary"
-								formAction
-								style={styles.continueBtn}
-								onPress={handleContinueBooking}
-							>
-								Continue Booking
+							<AppButton variant="primary" formAction style={styles.continueBtn} onPress={handleContinue}>
+								Continue
 							</AppButton>
 						</View>
 					</>
 				) : (
-					/* 5. Empty Cart State */
+					/* 5. Empty State when all services are removed */
 					<View style={styles.emptyContainer}>
 						<View style={styles.emptyIconCircle}>
-							<MaterialCommunityIcons name="shopping-outline" size={48} color="#1F5F68" />
+							<MaterialCommunityIcons name="medical-bag" size={48} color="#1F5F68" />
 						</View>
 
 						<AppTypography variant="h2" style={styles.emptyTitle}>
-							Booking Cart Empty
+							No Services Selected
 						</AppTypography>
 
 						<AppTypography variant="body" style={styles.emptySubtitle}>
-							You currently have no services selected. Browse our nursing procedures to add a service to your booking.
+							Your booking summary is currently empty. Please browse our healthcare services and select a service to proceed.
 						</AppTypography>
 
 						<AppButton
@@ -363,7 +386,7 @@ const styles = StyleSheet.create({
 		fontSize: 11,
 		color: '#64748B',
 	},
-	pricePillText: {
+	priceText: {
 		fontSize: 13,
 		fontWeight: '700',
 		color: '#1F5F68',
@@ -398,7 +421,12 @@ const styles = StyleSheet.create({
 		color: '#526062',
 	},
 	summaryValue: {
-		fontSize: 15,
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#191C1D',
+	},
+	totalPriceValue: {
+		fontSize: 16,
 		fontWeight: '700',
 		color: '#1F5F68',
 	},

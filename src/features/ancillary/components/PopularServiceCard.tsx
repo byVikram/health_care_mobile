@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, StyleSheet, Image, TouchableOpacity, useWindowDimensions } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { AppTypography, CommonCard } from '../../../components/common'
 import { AppButton } from '../../../components/common/AppButton'
 import { ServiceProcedureItem } from './AllServiceCard'
 
@@ -97,10 +97,9 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 	}
 
 	return (
-		<TouchableOpacity
+		<CommonCard
 			style={[styles.card, isTablet && styles.cardTablet]}
 			onPress={handleCardClick}
-			activeOpacity={0.9}
 		>
 			<Image source={{ uri: item.image }} style={[styles.image, isTablet && styles.imageTablet]} resizeMode="cover" />
 			<View style={[styles.content, isTablet && styles.contentTablet]}>
@@ -128,7 +127,7 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 					{renderActionControls()}
 				</View>
 			</View>
-		</TouchableOpacity>
+		</CommonCard>
 	)
 }
 
@@ -146,11 +145,13 @@ const styles = StyleSheet.create({
 		shadowOffset: { width: 0, height: 1 },
 		shadowOpacity: 0.05,
 		shadowRadius: 3,
+		padding: 0,
 	},
 	cardTablet: {
 		width: 280,
 		marginRight: 18,
 		borderRadius: 18,
+		padding: 0,
 	},
 	image: {
 		width: '100%',

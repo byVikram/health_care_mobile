@@ -12,7 +12,7 @@ import {
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons'
-import { ROUTES } from '../../navigation/routes'
+import { ROUTES } from '../../../navigation/routes'
 
 interface ServiceItem {
 	key: string

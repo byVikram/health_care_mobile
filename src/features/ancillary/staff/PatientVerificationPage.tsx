@@ -11,10 +11,10 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState, saveBookingState } from './ancillaryService'
-import { ROUTES } from '../../navigation/routes'
-import OtpPinInput from './components/OtpPinInput'
-import ServiceTimeline from './components/ServiceTimeline'
+import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState, saveBookingState } from '../ancillaryService'
+import { ROUTES } from '../../../navigation/routes'
+import OtpPinInput from '../components/OtpPinInput'
+import ServiceTimeline from '../components/ServiceTimeline'
 
 export default function PatientVerificationPage() {
 	const navigation = useNavigation<any>()

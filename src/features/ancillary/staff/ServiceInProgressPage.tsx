@@ -13,14 +13,14 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { MOCK_NURSE_BOOKINGS, NurseBooking, NurseBookingState, getBookingState, saveBookingState } from './ancillaryService'
-import { ROUTES } from '../../navigation/routes'
-import ServiceTimeline from './components/ServiceTimeline'
-import PatientInformationCard from './components/PatientInformationCard'
-import CareChecklist from './components/CareChecklist'
-import NotesInput from './components/NotesInput'
-import UploadSection from './components/UploadSection'
-import ConfirmationModal from './components/ConfirmationModal'
+import { MOCK_NURSE_BOOKINGS, NurseBooking, NurseBookingState, getBookingState, saveBookingState } from '../ancillaryService'
+import { ROUTES } from '../../../navigation/routes'
+import ServiceTimeline from '../components/ServiceTimeline'
+import PatientInformationCard from '../components/PatientInformationCard'
+import CareChecklist from '../components/CareChecklist'
+import NotesInput from '../components/NotesInput'
+import UploadSection from '../components/UploadSection'
+import ConfirmationModal from '../components/ConfirmationModal'
 
 export default function ServiceInProgressPage() {
 	const navigation = useNavigation<any>()

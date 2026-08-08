@@ -12,10 +12,10 @@ import {
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import { ANCILLARY_MOCK_DATA, AncillaryProvider } from './ancillaryService'
-import { ROUTES } from '../../navigation/routes'
-import StatusModal from '../../components/common/StatusModal'
-import { AppModal } from '../../components/common/AppModal'
+import { ANCILLARY_MOCK_DATA, AncillaryProvider } from '../ancillaryService'
+import { ROUTES } from '../../../navigation/routes'
+import StatusModal from '../../../components/common/StatusModal'
+import { AppModal } from '../../../components/common/AppModal'
 
 const FILTERS = ['Available Now', 'Today', 'Tomorrow', 'Distance', 'Experience', 'Rating 4.9+']
 

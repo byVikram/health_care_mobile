@@ -10,15 +10,19 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { ROUTES } from '../../navigation/routes'
-import AppScreenHeader from '../../components/common/AppScreenHeader'
-import { AppTypography } from '../../components/common/AppTypography'
-import { AppButton } from '../../components/common/AppButton'
-import { AppInput } from '../../components/common/AppInput'
-import { AppSelect, AppSelectOption } from '../../components/common/AppSelect'
-import { AppBottomSheet } from '../../components/common/AppBottomSheet'
-import { ServiceProcedureItem } from './components/AllServiceCard'
-import { BookingProgressStepper } from './components/BookingProgressStepper'
+import { ROUTES } from '../../../navigation/routes'
+import {
+	AppBottomSheet,
+	AppButton,
+	AppInput,
+	AppScreenHeader,
+	AppSelect,
+	AppSelectOption,
+	AppTypography,
+	CommonCard,
+} from '../../../components/common'
+import { ServiceProcedureItem } from '../components/AllServiceCard'
+import { BookingProgressStepper } from '../components/BookingProgressStepper'
 
 const GENDER_OPTIONS: AppSelectOption[] = [
 	{ label: 'Male', value: 'Male' },
@@ -204,332 +208,271 @@ export default function BookingDetailsPage() {
 
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader title="Book Nursing Care" />
+			<AppScreenHeader title="Booking Details" />
 
 			<ScrollView
 				contentContainerStyle={[
 					styles.scrollContent,
 					isTablet && styles.scrollContentTablet,
-					{ paddingBottom: insets.bottom + 110 },
+					{ paddingBottom: insets.bottom + 120 },
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* 1. Progress Stepper */}
-				<BookingProgressStepper currentStep={2} />
+				{/* Progress Stepper */}
+				<BookingProgressStepper currentStep={2} style={styles.progressStepper} />
 
-				{/* 2. Card 1: Selected Services (Supports Multiple Services) */}
-				<View style={styles.card}>
-					<View style={styles.cardHeaderRow}>
-						<View style={styles.titleWithIcon}>
-							<MaterialCommunityIcons name="medical-bag" size={20} color="#1F5F68" />
-							<AppTypography variant="h3" style={styles.cardTitle}>
-								Selected Services ({services.length})
-							</AppTypography>
-						</View>
-						<TouchableOpacity onPress={handleEditServices} activeOpacity={0.7}>
-							<AppTypography variant="caption" style={styles.editLink}>
-								Edit / Add
-							</AppTypography>
-						</TouchableOpacity>
-					</View>
-
-					{services.length > 0 ? (
-						<View style={styles.servicesListContainer}>
-							{services.map((serviceItem) => (
-								<View key={serviceItem.id} style={styles.serviceItemCard}>
-									<View style={styles.serviceItemRow}>
-										<Image source={{ uri: serviceItem.image }} style={styles.serviceImage} resizeMode="cover" />
-
-										<View style={styles.serviceTextCol}>
-											<View style={styles.serviceTitleRow}>
-												<AppTypography variant="h4" style={styles.serviceTitle} numberOfLines={1}>
-													{serviceItem.title}
-												</AppTypography>
-												<TouchableOpacity
-													style={styles.removeBtn}
-													onPress={() => handleRemoveService(serviceItem.id)}
-													activeOpacity={0.7}
-												>
-													<Ionicons name="trash-outline" size={17} color="#D32F2F" />
-												</TouchableOpacity>
-											</View>
-											<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={2}>
-												{serviceItem.description}
-											</AppTypography>
-
-											<View style={styles.metaBadgeRow}>
-												<View style={styles.metaItem}>
-													<Ionicons name="time-outline" size={12} color="#526062" />
-													<AppTypography variant="caption" style={styles.metaText}>
-														{serviceItem.duration || '30 - 45 mins'}
-													</AppTypography>
-												</View>
-												<View style={styles.metaItem}>
-													<Ionicons name="home-outline" size={12} color="#526062" />
-													<AppTypography variant="caption" style={styles.metaText}>
-														At Home Service
-													</AppTypography>
-												</View>
-											</View>
-										</View>
-									</View>
-
-									<View style={styles.serviceFooterRow}>
-										<View style={styles.councilBadge}>
-											<Ionicons name="shield-checkmark" size={12} color="#1F5F68" />
-											<AppTypography variant="caption" style={styles.councilText}>
-												Recommended by Nursing Council
-											</AppTypography>
-										</View>
-										<AppTypography variant="h3" style={styles.priceVal}>
-											{serviceItem.price}
-										</AppTypography>
-									</View>
-								</View>
-							))}
-						</View>
-					) : (
-						<View style={styles.emptyBox}>
-							<AppTypography variant="caption" style={styles.emptyText}>
-								No services selected. Tap Edit / Add to select healthcare services.
-							</AppTypography>
-						</View>
-					)}
+				{/* 1. SECTION: SELECTED SERVICES */}
+				<View style={styles.sectionHeaderRow}>
+					<AppTypography variant="h3" style={styles.sectionHeading}>
+						Selected Services
+					</AppTypography>
+					<TouchableOpacity style={styles.headerActionBtn} onPress={handleEditServices} activeOpacity={0.7}>
+						<MaterialCommunityIcons name="plus-circle-outline" size={16} color="#1F5F68" />
+						<AppTypography variant="caption" style={styles.actionBtnText}>
+							Add / Edit
+						</AppTypography>
+					</TouchableOpacity>
 				</View>
 
-				{/* 3. Card 2: Patient Details (With Edit Modal Trigger) */}
-				<View style={styles.card}>
-					<View style={styles.cardHeaderRow}>
-						<View style={styles.titleWithIcon}>
-							<MaterialCommunityIcons name="account-outline" size={20} color="#1F5F68" />
-							<AppTypography variant="h3" style={styles.cardTitle}>
-								Patient Details
-							</AppTypography>
-						</View>
-						<TouchableOpacity onPress={handleOpenPatientEdit} activeOpacity={0.7}>
-							<AppTypography variant="caption" style={styles.editLink}>
-								Edit
-							</AppTypography>
-						</TouchableOpacity>
+				{services.length > 0 ? (
+					<View style={styles.servicesListContainer}>
+						{services.map((serviceItem, index) => (
+							<View key={serviceItem.id} style={styles.serviceItemFlat}>
+								{index > 0 && <View style={styles.itemDivider} />}
+								<View style={styles.serviceItemRow}>
+									<Image source={{ uri: serviceItem.image }} style={styles.serviceImage} resizeMode="cover" />
+
+									<View style={styles.serviceTextCol}>
+										<View style={styles.serviceTitleRow}>
+											<AppTypography variant="h4" style={styles.serviceTitle} numberOfLines={1}>
+												{serviceItem.title}
+											</AppTypography>
+											<TouchableOpacity
+												style={styles.removeBtn}
+												onPress={() => handleRemoveService(serviceItem.id)}
+												activeOpacity={0.7}
+											>
+												<Ionicons name="trash-outline" size={17} color="#D32F2F" />
+											</TouchableOpacity>
+										</View>
+										<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={2}>
+											{serviceItem.description}
+										</AppTypography>
+
+										<View style={styles.metaBadgeRow}>
+											<View style={styles.metaItem}>
+												<Ionicons name="time-outline" size={12} color="#526062" />
+												<AppTypography variant="caption" style={styles.metaText}>
+													{serviceItem.duration || '30 - 45 mins'}
+												</AppTypography>
+											</View>
+											<View style={styles.metaItem}>
+												<Ionicons name="home-outline" size={12} color="#526062" />
+												<AppTypography variant="caption" style={styles.metaText}>
+													At Home
+												</AppTypography>
+											</View>
+										</View>
+									</View>
+								</View>
+
+								<View style={styles.serviceFooterRow}>
+									<View style={styles.councilBadge}>
+										<Ionicons name="shield-checkmark" size={12} color="#1F5F68" />
+										<AppTypography variant="caption" style={styles.councilText}>
+											Recommended by Nursing Council
+										</AppTypography>
+									</View>
+									<AppTypography variant="h3" style={styles.priceVal}>
+										{serviceItem.price}
+									</AppTypography>
+								</View>
+							</View>
+						))}
 					</View>
+				) : (
+					<View style={styles.emptyBox}>
+						<MaterialCommunityIcons name="medical-bag" size={32} color="#94A3B8" />
+						<AppTypography variant="caption" style={styles.emptyText}>
+							No services selected. Add services to configure your appointment.
+						</AppTypography>
+					</View>
+				)}
 
-					<View style={styles.patientRow}>
-						<Image source={{ uri: patient.avatar }} style={styles.patientAvatar} resizeMode="cover" />
+				<View style={styles.sectionDivider} />
 
-						<View style={styles.patientInfoCol}>
+				{/* 2. SECTION: PATIENT PROFILE */}
+				<View style={styles.sectionHeaderRow}>
+					<AppTypography variant="h3" style={styles.sectionHeading}>
+						Patient Profile
+					</AppTypography>
+					<TouchableOpacity style={styles.headerActionBtn} onPress={handleOpenPatientEdit} activeOpacity={0.7}>
+						<MaterialCommunityIcons name="pencil-outline" size={15} color="#1F5F68" />
+						<AppTypography variant="caption" style={styles.actionBtnText}>
+							Edit Details
+						</AppTypography>
+					</TouchableOpacity>
+				</View>
+
+				<View style={styles.patientProfileContainer}>
+					<Image source={{ uri: patient.avatar }} style={styles.patientAvatar} resizeMode="cover" />
+					<View style={styles.patientInfoCol}>
+						<View style={styles.patientNameRow}>
 							<AppTypography variant="h3" style={styles.patientName}>
 								{patient.name}
 							</AppTypography>
-							<AppTypography variant="caption" style={styles.patientMeta}>
-								{patient.age} Years • {patient.gender} • {patient.bloodGroup}
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.patientRel}>
-								Relationship: {patient.relationship}
-							</AppTypography>
+							<View style={styles.relationshipChip}>
+								<AppTypography variant="caption" style={styles.relationshipText}>
+									{patient.relationship}
+								</AppTypography>
+							</View>
 						</View>
+						<AppTypography variant="caption" style={styles.patientMeta}>
+							{patient.age} Yrs  •  {patient.gender}  •  Blood Group: {patient.bloodGroup}
+						</AppTypography>
 					</View>
 				</View>
 
-				{/* 4. Card 3: Visit Details (With Edit Modal Trigger) */}
-				<View style={styles.card}>
-					<View style={styles.cardHeaderRow}>
-						<View style={styles.titleWithIcon}>
-							<MaterialCommunityIcons name="map-marker-outline" size={20} color="#1F5F68" />
-							<AppTypography variant="h3" style={styles.cardTitle}>
-								Visit Details
-							</AppTypography>
-						</View>
-						<TouchableOpacity onPress={() => setEditVisitVisible(true)} activeOpacity={0.7}>
-							<AppTypography variant="caption" style={styles.editLink}>
-								Edit
-							</AppTypography>
-						</TouchableOpacity>
-					</View>
+				<View style={styles.sectionDivider} />
 
+				{/* 3. SECTION: VISIT SCHEDULE & LOCATION */}
+				<View style={styles.sectionHeaderRow}>
+					<AppTypography variant="h3" style={styles.sectionHeading}>
+						Schedule & Location
+					</AppTypography>
+					<TouchableOpacity style={styles.headerActionBtn} onPress={() => setEditVisitVisible(true)} activeOpacity={0.7}>
+						<MaterialCommunityIcons name="pencil-outline" size={15} color="#1F5F68" />
+						<AppTypography variant="caption" style={styles.actionBtnText}>
+							Modify
+						</AppTypography>
+					</TouchableOpacity>
+				</View>
+
+				<View style={styles.visitSummaryBlock}>
 					{/* Address Row */}
-					<TouchableOpacity
-						style={styles.visitRowItem}
-						onPress={() => setEditVisitVisible(true)}
-						activeOpacity={0.8}
-					>
-						<MaterialCommunityIcons name="home-map-marker" size={20} color="#1F5F68" style={styles.visitRowIcon} />
-						<View style={styles.visitTextCol}>
-							<View style={styles.addressTagRow}>
-								<AppTypography variant="h4" style={styles.visitLabel}>
-									Address
+					<View style={styles.visitSummaryItem}>
+						<View style={styles.visitIconBox}>
+							<MaterialCommunityIcons name="map-marker" size={18} color="#1F5F68" />
+						</View>
+						<View style={styles.visitDetailsCol}>
+							<View style={styles.addressLabelRow}>
+								<AppTypography variant="h4" style={styles.visitDetailsHeading}>
+									Visit Address
 								</AppTypography>
-								<View style={styles.tagChip}>
-									<AppTypography variant="caption" style={styles.tagText}>
+								<View style={styles.addressTypeBadge}>
+									<AppTypography variant="caption" style={styles.addressTypeText}>
 										{visit.addressLabel}
 									</AppTypography>
 								</View>
 							</View>
-							<AppTypography variant="caption" style={styles.visitValText}>
+							<AppTypography variant="caption" style={styles.visitDetailsVal}>
 								{visit.address}
 							</AppTypography>
 						</View>
-						<Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-					</TouchableOpacity>
+					</View>
 
-					<View style={styles.dividerLight} />
+					<View style={styles.visitItemSeparator} />
 
-					{/* Date Row */}
-					<TouchableOpacity
-						style={styles.visitRowItem}
-						onPress={() => setEditVisitVisible(true)}
-						activeOpacity={0.8}
-					>
-						<MaterialCommunityIcons name="calendar-outline" size={20} color="#1F5F68" style={styles.visitRowIcon} />
-						<View style={styles.visitTextCol}>
-							<AppTypography variant="caption" style={styles.visitLabel}>
-								Date
-							</AppTypography>
-							<AppTypography variant="body" style={styles.visitValBold}>
-								{visit.date}
-							</AppTypography>
+					{/* Date & Time Row */}
+					<View style={styles.visitSummaryItem}>
+						<View style={styles.visitIconBox}>
+							<MaterialCommunityIcons name="calendar-clock" size={18} color="#1F5F68" />
 						</View>
-						<Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-					</TouchableOpacity>
-
-					<View style={styles.dividerLight} />
-
-					{/* Time Slot Row */}
-					<TouchableOpacity
-						style={styles.visitRowItem}
-						onPress={() => setEditVisitVisible(true)}
-						activeOpacity={0.8}
-					>
-						<MaterialCommunityIcons name="clock-outline" size={20} color="#1F5F68" style={styles.visitRowIcon} />
-						<View style={styles.visitTextCol}>
-							<AppTypography variant="caption" style={styles.visitLabel}>
-								Time Slot
+						<View style={styles.visitDetailsCol}>
+							<AppTypography variant="h4" style={styles.visitDetailsHeading}>
+								Preferred Date & Time Slot
 							</AppTypography>
-							<View style={styles.timeValRow}>
-								<AppTypography variant="body" style={styles.visitValBold}>
-									{visit.timeSlot}
+							<View style={styles.visitTimeValRow}>
+								<AppTypography variant="body" style={styles.visitTimeValText}>
+									{visit.date}  •  {visit.timeSlot}
 								</AppTypography>
-								<View style={styles.timeBadge}>
-									<AppTypography variant="caption" style={styles.timeBadgeText}>
+								<View style={styles.timeStatusBadge}>
+									<AppTypography variant="caption" style={styles.timeStatusText}>
 										{visit.timeBadge}
 									</AppTypography>
 								</View>
 							</View>
 						</View>
-						<Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-					</TouchableOpacity>
+					</View>
 				</View>
 
-				{/* 5. Card 4: Charges Summary */}
-				<View style={styles.card}>
-					<View style={styles.cardHeaderRow}>
-						<View style={styles.titleWithIcon}>
-							<MaterialCommunityIcons name="file-document-outline" size={20} color="#1F5F68" />
-							<AppTypography variant="h3" style={styles.cardTitle}>
-								Charges Summary
-							</AppTypography>
-						</View>
-						<AppTypography variant="caption" style={styles.editLink}>
-							{services.length} Item(s)
-						</AppTypography>
-					</View>
+				<View style={styles.sectionDivider} />
 
-					<View style={styles.lineItem}>
-						<AppTypography variant="body" style={styles.lineLabel}>
-							Base Service Price ({services.length} service{services.length > 1 ? 's' : ''})
+				{/* 4. SECTION: BILLING BREAKDOWN */}
+				<AppTypography variant="h3" style={[styles.sectionHeading, { marginBottom: 12 }]}>
+					Billing Breakdown
+				</AppTypography>
+				
+				<View style={styles.receiptContainer}>
+					<View style={styles.receiptItem}>
+						<AppTypography variant="body" style={styles.receiptItemLabel}>
+							Base Treatment Price
 						</AppTypography>
-						<AppTypography variant="body" style={styles.lineVal}>
+						<AppTypography variant="body" style={styles.receiptItemVal}>
 							{charges.basePrice}
 						</AppTypography>
 					</View>
-
-					<View style={styles.lineItem}>
-						<AppTypography variant="body" style={styles.lineLabel}>
-							Home Visit & Equipment Sanitization
+					
+					<View style={styles.receiptItem}>
+						<AppTypography variant="body" style={styles.receiptItemLabel}>
+							Home Visit & Disinfection Charge
 						</AppTypography>
-						<AppTypography variant="body" style={styles.lineVal}>
+						<AppTypography variant="body" style={styles.receiptItemVal}>
 							{charges.visitFee}
 						</AppTypography>
 					</View>
 
-					<View style={styles.lineItem}>
-						<AppTypography variant="body" style={styles.lineLabel}>
-							Taxes & Admin Fee
+					<View style={styles.receiptItem}>
+						<AppTypography variant="body" style={styles.receiptItemLabel}>
+							Taxes & Medical Admin Fee
 						</AppTypography>
-						<AppTypography variant="body" style={styles.lineVal}>
+						<AppTypography variant="body" style={styles.receiptItemVal}>
 							{charges.taxes}
 						</AppTypography>
 					</View>
 
-					<View style={styles.divider} />
+					<View style={styles.receiptDivider} />
 
-					<View style={styles.totalLine}>
-						<AppTypography variant="h3" style={styles.totalLabel}>
-							Total Amount
+					<View style={styles.receiptTotalRow}>
+						<AppTypography variant="h3" style={styles.receiptTotalLabel}>
+							Amount Payable
 						</AppTypography>
-						<AppTypography variant="h2" style={styles.totalValText}>
+						<AppTypography variant="h2" style={styles.receiptTotalVal}>
 							{charges.totalAmount}
 						</AppTypography>
 					</View>
 				</View>
 
-				{/* 6. Trust Badges Row */}
-				<View style={styles.trustBadgesRow}>
-					<View style={styles.trustItem}>
-						<Ionicons name="checkmark-circle-outline" size={16} color="#1F5F68" />
-						<AppTypography variant="caption" style={styles.trustText}>
-							Verified Nurses
-						</AppTypography>
-					</View>
-					<View style={styles.trustItem}>
-						<MaterialCommunityIcons name="spray-bottle" size={16} color="#1F5F68" />
-						<AppTypography variant="caption" style={styles.trustText}>
-							Sanitized Equipment
-						</AppTypography>
-					</View>
-					<View style={styles.trustItem}>
-						<Ionicons name="time-outline" size={16} color="#1F5F68" />
-						<AppTypography variant="caption" style={styles.trustText}>
-							On-time Service
-						</AppTypography>
-					</View>
-					<View style={styles.trustItem}>
-						<MaterialCommunityIcons name="shield-lock-outline" size={16} color="#1F5F68" />
-						<AppTypography variant="caption" style={styles.trustText}>
-							Safe & Secure
-						</AppTypography>
-					</View>
+				{/* Elegant Integrated Reassurance Banner */}
+				<View style={styles.reassuranceBanner}>
+					<MaterialCommunityIcons name="shield-check-outline" size={20} color="#1F5F68" />
+					<AppTypography variant="caption" style={styles.reassuranceText}>
+						Includes fully certified clinical specialists, 100% sanitized single-use medical equipment, and active safety protocols.
+					</AppTypography>
 				</View>
 			</ScrollView>
 
-			{/* 7. Sticky Bottom CTA Footer */}
+			{/* Sticky Bottom Footer */}
 			<View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-				<View style={styles.stickyLeftCol}>
-					<AppTypography variant="caption" style={styles.stickyLabel}>
+				<View style={styles.stickyLeft}>
+					<AppTypography variant="caption" style={styles.stickyPayLabel}>
 						Total Amount
 					</AppTypography>
-					<AppTypography variant="h2" style={styles.stickyPrice}>
+					<AppTypography variant="h2" style={styles.stickyPayVal}>
 						{charges.totalAmount}
 					</AppTypography>
-					<TouchableOpacity style={styles.priceDetailsLinkRow} activeOpacity={0.7}>
-						<AppTypography variant="caption" style={styles.priceDetailsText}>
-							View price details
-						</AppTypography>
-						<Ionicons name="chevron-down" size={12} color="#1F5F68" />
-					</TouchableOpacity>
-					<AppTypography variant="caption" style={styles.stickySubtext}>
-						You won't be charged now
+					<AppTypography variant="caption" style={styles.stickyPaySub}>
+						No immediate charge
 					</AppTypography>
 				</View>
-
+				
 				<AppButton
 					variant="primary"
-					style={styles.continueBtn}
-					labelStyle={styles.continueBtnLabel}
-					contentStyle={styles.continueBtnContent}
 					disabled={services.length === 0}
 					onPress={handleContinueToPayment}
+					style={styles.continueBtn}
 				>
-					Continue to Payment →
+					Confirm & Proceed →
 				</AppButton>
 			</View>
 
@@ -723,11 +666,11 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#F4F7F8',
+		backgroundColor: '#FFFFFF',
 	},
 	scrollContent: {
 		paddingHorizontal: 16,
-		paddingTop: 12,
+		paddingTop: 16,
 	},
 	scrollContentTablet: {
 		maxWidth: 720,
@@ -736,149 +679,61 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 24,
 		paddingTop: 20,
 	},
-	topHeaderBanner: {
-		marginBottom: 16,
+	progressStepper: {
+		marginBottom: 20,
 	},
-	secureBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#E6F3F4',
-		borderRadius: 12,
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-		alignSelf: 'flex-end',
-		marginBottom: 14,
-		gap: 6,
-	},
-	secureTextCol: {
-		flexDirection: 'column',
-	},
-	secureTitle: {
-		fontSize: 11,
-		fontWeight: '700',
-		color: '#1F5F68',
-	},
-	secureSub: {
-		fontSize: 9,
-		color: '#526062',
-	},
-	stepperRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingHorizontal: 20,
-	},
-	stepItemActive: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	stepCircleActive: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
-		backgroundColor: '#1F5F68',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	stepNumActive: {
-		color: '#FFFFFF',
-		fontSize: 12,
-		fontWeight: '700',
-	},
-	stepLabelActive: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#1F5F68',
-	},
-	stepLine: {
-		flex: 1,
-		height: 2,
-		backgroundColor: '#CBD5E1',
-		marginHorizontal: 12,
-	},
-	stepItemInactive: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	stepCircleInactive: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
-		borderWidth: 1.5,
-		borderColor: '#94A3B8',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	stepNumInactive: {
-		color: '#94A3B8',
-		fontSize: 12,
-		fontWeight: '700',
-	},
-	stepLabelInactive: {
-		fontSize: 13,
-		fontWeight: '500',
-		color: '#94A3B8',
-	},
-	card: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		marginBottom: 14,
-		borderWidth: 1,
-		borderColor: '#E8ECEC',
-		elevation: 1,
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.04,
-		shadowRadius: 3,
-	},
-	cardHeaderRow: {
+	sectionHeaderRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginBottom: 14,
+		marginTop: 8,
+		marginBottom: 12,
 	},
-	titleWithIcon: {
+	sectionHeading: {
+		fontSize: 15,
+		fontWeight: '800',
+		color: '#1A2E35',
+		letterSpacing: 0.1,
+	},
+	headerActionBtn: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
+		gap: 4,
+		paddingVertical: 4,
+		paddingHorizontal: 8,
+		borderRadius: 8,
+		backgroundColor: '#F0F9F9',
 	},
-	cardTitle: {
-		fontSize: 16,
+	actionBtnText: {
+		fontSize: 12,
 		fontWeight: '700',
-		color: '#191C1D',
-	},
-	editLink: {
-		fontSize: 13,
-		fontWeight: '600',
 		color: '#1F5F68',
 	},
 	servicesListContainer: {
-		gap: 12,
+		marginBottom: 8,
 	},
-	serviceItemCard: {
-		backgroundColor: '#F8FAFC',
-		borderRadius: 12,
-		padding: 10,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
+	serviceItemFlat: {
+		paddingVertical: 12,
+	},
+	itemDivider: {
+		height: 1,
+		backgroundColor: '#ECEFF1',
+		marginBottom: 12,
 	},
 	serviceItemRow: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
-		marginBottom: 8,
+		marginBottom: 10,
 	},
 	serviceImage: {
-		width: 64,
-		height: 64,
-		borderRadius: 10,
+		width: 60,
+		height: 60,
+		borderRadius: 12,
 		backgroundColor: '#F1F5F9',
 	},
 	serviceTextCol: {
 		flex: 1,
-		marginLeft: 10,
+		marginLeft: 12,
 	},
 	serviceTitleRow: {
 		flexDirection: 'row',
@@ -887,25 +742,25 @@ const styles = StyleSheet.create({
 	},
 	serviceTitle: {
 		fontSize: 14,
-		fontWeight: '700',
-		color: '#191C1D',
+		fontWeight: '800',
+		color: '#1A2E35',
 		flex: 1,
 	},
 	removeBtn: {
 		padding: 4,
-		marginLeft: 6,
+		marginLeft: 8,
 	},
 	serviceDesc: {
 		fontSize: 11,
-		color: '#526062',
+		color: '#546E7A',
 		marginTop: 2,
 		lineHeight: 15,
 	},
 	metaBadgeRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 10,
-		marginTop: 4,
+		gap: 12,
+		marginTop: 6,
 	},
 	metaItem: {
 		flexDirection: 'row',
@@ -914,194 +769,246 @@ const styles = StyleSheet.create({
 	},
 	metaText: {
 		fontSize: 10,
-		color: '#526062',
+		color: '#607D8B',
+		fontWeight: '600',
 	},
 	serviceFooterRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		paddingTop: 8,
-		borderTopWidth: 1,
-		borderTopColor: '#E2E8F0',
+		marginTop: 2,
 	},
 	councilBadge: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 6,
-		paddingVertical: 3,
-		borderRadius: 8,
+		paddingHorizontal: 8,
+		paddingVertical: 2,
+		borderRadius: 6,
 		gap: 4,
 	},
 	councilText: {
-		fontSize: 10,
-		fontWeight: '600',
+		fontSize: 9,
+		fontWeight: '700',
 		color: '#1F5F68',
 	},
 	priceVal: {
 		fontSize: 15,
-		fontWeight: '700',
+		fontWeight: '800',
 		color: '#1F5F68',
 	},
 	emptyBox: {
-		padding: 16,
+		paddingVertical: 24,
+		paddingHorizontal: 16,
 		alignItems: 'center',
+		backgroundColor: '#F8FAFC',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#ECEFF1',
+		gap: 8,
+		marginBottom: 16,
 	},
 	emptyText: {
 		fontSize: 12,
-		color: '#64748B',
+		color: '#78909C',
 		textAlign: 'center',
+		lineHeight: 16,
 	},
-	patientRow: {
+	sectionDivider: {
+		height: 1,
+		backgroundColor: '#ECEFF1',
+		marginVertical: 16,
+	},
+	patientProfileContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		backgroundColor: '#F8FAFC',
+		borderRadius: 16,
+		padding: 16,
+		borderWidth: 1,
+		borderColor: '#ECEFF1',
 	},
 	patientAvatar: {
-		width: 56,
-		height: 56,
-		borderRadius: 28,
-		backgroundColor: '#E2E8F0',
+		width: 50,
+		height: 50,
+		borderRadius: 25,
+		backgroundColor: '#CFD8DC',
 	},
 	patientInfoCol: {
 		flex: 1,
 		marginLeft: 14,
 	},
+	patientNameRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginBottom: 4,
+	},
 	patientName: {
-		fontSize: 16,
+		fontSize: 15,
+		fontWeight: '800',
+		color: '#1A2E35',
+	},
+	relationshipChip: {
+		backgroundColor: '#ECEFF1',
+		paddingHorizontal: 6,
+		paddingVertical: 1.5,
+		borderRadius: 6,
+	},
+	relationshipText: {
+		fontSize: 10,
 		fontWeight: '700',
-		color: '#191C1D',
+		color: '#546E7A',
+		textTransform: 'uppercase',
 	},
 	patientMeta: {
 		fontSize: 12,
-		color: '#526062',
-		marginTop: 2,
+		color: '#546E7A',
+		fontWeight: '500',
 	},
-	patientRel: {
-		fontSize: 12,
-		color: '#64748B',
-		marginTop: 2,
-	},
-	visitRowItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
+	visitSummaryBlock: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#ECEFF1',
 		paddingVertical: 8,
+		paddingHorizontal: 14,
+		elevation: 1,
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.03,
+		shadowRadius: 2,
 	},
-	visitRowIcon: {
-		marginRight: 12,
+	visitSummaryItem: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		paddingVertical: 12,
 	},
-	visitTextCol: {
+	visitIconBox: {
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		backgroundColor: '#E6F3F4',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 2,
+	},
+	visitDetailsCol: {
 		flex: 1,
+		marginLeft: 12,
 	},
-	addressTagRow: {
+	addressLabelRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 6,
+		gap: 8,
+		marginBottom: 4,
 	},
-	visitLabel: {
+	visitDetailsHeading: {
 		fontSize: 13,
-		fontWeight: '600',
-		color: '#64748B',
+		fontWeight: '700',
+		color: '#546E7A',
 	},
-	tagChip: {
+	addressTypeBadge: {
 		backgroundColor: '#E6F3F4',
 		paddingHorizontal: 6,
-		paddingVertical: 1,
+		paddingVertical: 1.5,
 		borderRadius: 6,
 	},
-	tagText: {
-		fontSize: 10,
+	addressTypeText: {
+		fontSize: 9,
 		fontWeight: '700',
 		color: '#1F5F68',
 	},
-	visitValText: {
+	visitDetailsVal: {
 		fontSize: 12,
-		color: '#191C1D',
-		marginTop: 2,
+		color: '#1A2E35',
 		lineHeight: 16,
 	},
-	visitValBold: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#191C1D',
-		marginTop: 2,
+	visitItemSeparator: {
+		height: 1,
+		backgroundColor: '#ECEFF1',
 	},
-	timeValRow: {
+	visitTimeValRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		flexWrap: 'wrap',
 		gap: 8,
+		marginTop: 4,
 	},
-	timeBadge: {
-		backgroundColor: '#E6F3F4',
+	visitTimeValText: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#1A2E35',
+	},
+	timeStatusBadge: {
+		backgroundColor: '#FFECB3',
 		paddingHorizontal: 6,
 		paddingVertical: 2,
-		borderRadius: 8,
+		borderRadius: 6,
 	},
-	timeBadgeText: {
-		fontSize: 10,
-		fontWeight: '600',
-		color: '#1F5F68',
+	timeStatusText: {
+		fontSize: 9,
+		fontWeight: '700',
+		color: '#B7791F',
 	},
-	dividerLight: {
-		height: 1,
-		backgroundColor: '#F1F5F9',
+	receiptContainer: {
+		backgroundColor: '#F8FAFC',
+		borderRadius: 16,
+		padding: 16,
+		borderWidth: 1,
+		borderColor: '#ECEFF1',
+	},
+	receiptItem: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
 		marginVertical: 4,
 	},
-	lineItem: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginBottom: 8,
+	receiptItemLabel: {
+		fontSize: 12,
+		color: '#546E7A',
 	},
-	lineLabel: {
+	receiptItemVal: {
 		fontSize: 13,
-		color: '#526062',
+		fontWeight: '700',
+		color: '#1A2E35',
 	},
-	lineVal: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: '#191C1D',
-	},
-	divider: {
+	receiptDivider: {
 		height: 1,
-		backgroundColor: '#E8ECEC',
+		backgroundColor: '#ECEFF1',
 		marginVertical: 10,
 	},
-	totalLine: {
+	receiptTotalRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
 	},
-	totalLabel: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#191C1D',
+	receiptTotalLabel: {
+		fontSize: 14,
+		fontWeight: '800',
+		color: '#1A2E35',
 	},
-	totalValText: {
-		fontSize: 20,
-		fontWeight: '700',
+	receiptTotalVal: {
+		fontSize: 18,
+		fontWeight: '800',
 		color: '#1F5F68',
 	},
-	trustBadgesRow: {
+	reassuranceBanner: {
 		flexDirection: 'row',
-		flexWrap: 'wrap',
-		justifyContent: 'space-between',
-		backgroundColor: '#FFFFFF',
-		borderRadius: 14,
+		backgroundColor: '#F0F9F9',
+		borderRadius: 12,
 		padding: 12,
-		marginBottom: 16,
-		borderWidth: 1,
-		borderColor: '#E8ECEC',
-		gap: 8,
-	},
-	trustItem: {
-		flexDirection: 'row',
+		marginTop: 20,
+		marginBottom: 10,
 		alignItems: 'center',
-		gap: 4,
+		gap: 10,
 	},
-	trustText: {
-		fontSize: 11,
-		fontWeight: '600',
+	reassuranceText: {
+		flex: 1,
+		fontSize: 10.5,
 		color: '#1F5F68',
+		lineHeight: 14,
+		fontWeight: '500',
 	},
 	stickyFooter: {
 		position: 'absolute',
@@ -1110,7 +1017,7 @@ const styles = StyleSheet.create({
 		right: 0,
 		backgroundColor: '#FFFFFF',
 		borderTopWidth: 1,
-		borderTopColor: '#E2E8F0',
+		borderTopColor: '#ECEFF1',
 		paddingHorizontal: 16,
 		paddingTop: 12,
 		flexDirection: 'row',
@@ -1118,54 +1025,37 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 		elevation: 8,
 		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: -2 },
-		shadowOpacity: 0.1,
+		shadowOffset: { width: 0, height: -3 },
+		shadowOpacity: 0.08,
 		shadowRadius: 6,
 	},
-	stickyLeftCol: {
+	stickyLeft: {
 		flex: 1,
-		marginRight: 12,
+		marginRight: 16,
 	},
-	stickyLabel: {
+	stickyPayLabel: {
 		fontSize: 10,
-		color: '#64748B',
-		fontWeight: '600',
-	},
-	stickyPrice: {
-		fontSize: 18,
+		color: '#78909C',
 		fontWeight: '700',
+		textTransform: 'uppercase',
+	},
+	stickyPayVal: {
+		fontSize: 20,
+		fontWeight: '800',
 		color: '#1F5F68',
-		lineHeight: 22,
+		lineHeight: 24,
 	},
-	priceDetailsLinkRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 2,
-		marginTop: 1,
-	},
-	priceDetailsText: {
+	stickyPaySub: {
 		fontSize: 10,
-		fontWeight: '600',
-		color: '#1F5F68',
-	},
-	stickySubtext: {
-		fontSize: 9,
-		color: '#94A3B8',
+		color: '#78909C',
 		marginTop: 1,
 	},
 	continueBtn: {
 		backgroundColor: '#1F5F68',
 		borderRadius: 12,
-		minWidth: 160,
-	},
-	continueBtnLabel: {
-		color: '#FFFFFF',
-		fontSize: 13,
-		fontWeight: '700',
-	},
-	continueBtnContent: {
-		height: 44,
-		paddingHorizontal: 16,
+		minWidth: 180,
+		height: 48,
+		justifyContent: 'center',
 	},
 	sheetFormContainer: {
 		paddingVertical: 12,

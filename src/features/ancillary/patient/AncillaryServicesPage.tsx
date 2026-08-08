@@ -12,7 +12,9 @@ import {
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { ROUTES } from '../../navigation/routes'
+import { ROUTES } from '../../../navigation/routes'
+import { RecommendationCard } from '../components/RecommendationCard'
+import { AppTypography } from '../../../components/common/AppTypography'
 
 interface PopularCardItem {
 	id: string
@@ -213,7 +215,24 @@ export default function AncillaryServicesPage() {
 	const route = useRoute<any>()
 	const { serviceKey, serviceLabel } = route.params || {}
 	const { width } = useWindowDimensions()
+
+	let numColumns = 1
+	let paddingHorizontal = 16
+	const gap = 16
+
+	if (width >= 1024) {
+		numColumns = 3
+		paddingHorizontal = 28
+	} else if (width >= 768) {
+		numColumns = 2
+		paddingHorizontal = 24
+	}
+
 	const isTablet = width >= 768
+	const contentWidth = width - paddingHorizontal * 2
+	const gridCardWidth = numColumns > 1
+		? Math.floor((contentWidth - gap * (numColumns - 1)) / numColumns)
+		: undefined
 
 	const [searchQuery, setSearchQuery] = useState('')
 
@@ -246,7 +265,7 @@ export default function AncillaryServicesPage() {
 				</View>
 			</View>
 
-			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+			<ScrollView contentContainerStyle={[styles.scrollContent, { paddingHorizontal }]} showsVerticalScrollIndicator={false}>
 				{/* Emergency Urgent Assistance Card */}
 				<View style={styles.urgentBanner}>
 					<View style={styles.urgentHeader}>
@@ -294,28 +313,24 @@ export default function AncillaryServicesPage() {
 				/>
 
 				{/* Recommended For You Section */}
-				<View style={styles.recommendedWrapper}>
-					<View style={styles.recommendedHeader}>
-						<Ionicons name="time-outline" size={20} color="#30535a" />
-						<Text style={styles.recommendedTitle}>Recommended For You</Text>
+				<View style={styles.sectionContainer}>
+					<View style={styles.recommendedHeaderRow}>
+						<MaterialCommunityIcons name="clock-outline" size={18} color="#1F5F68" style={styles.recommendedIcon} />
+						<AppTypography variant="h3" style={styles.sectionTitleNoMargin}>
+							Recommended For You
+						</AppTypography>
 					</View>
-					<Text style={styles.recommendedSub}>Based on previous searches</Text>
+					<AppTypography variant="caption" style={styles.recommendedSubText}>
+						BASED ON PREVIOUS SEARCHES
+					</AppTypography>
 					<View style={[styles.recommendedGrid, isTablet && styles.recommendedGridTablet]}>
 						{data.recommended.map((item) => (
-							<TouchableOpacity
-								key={item.id}
-								style={[styles.recommendedCard, { width: isTablet ? '48%' : '100%' }]}
-								activeOpacity={0.8}
-								onPress={() => handleProcedureSelect(item.title)}
-							>
-								<View style={styles.recommendedIconCircle}>
-									<MaterialCommunityIcons name={item.iconName} size={24} color="#296769" />
-								</View>
-								<View style={styles.recommendedCardText}>
-									<Text style={styles.recCardTitle}>{item.title}</Text>
-									<Text style={styles.recCardDesc}>{item.description}</Text>
-								</View>
-							</TouchableOpacity>
+							<View key={item.id} style={gridCardWidth ? { width: gridCardWidth } : { width: '100%', marginBottom: 10 }}>
+								<RecommendationCard
+									item={item}
+									onPress={() => handleProcedureSelect(item.title)}
+								/>
+							</View>
 						))}
 					</View>
 				</View>
@@ -554,71 +569,36 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#2e6c6e',
 	},
-	recommendedWrapper: {
-		backgroundColor: '#eceeee',
-		borderRadius: 12,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#bfc8c8',
-		marginBottom: 28,
+	sectionContainer: {
+		marginBottom: 24,
 	},
-	recommendedHeader: {
+	recommendedHeaderRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 6,
-		marginBottom: 4,
 	},
-	recommendedTitle: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#30535a',
+	recommendedIcon: {
+		marginRight: 6,
 	},
-	recommendedSub: {
+	sectionTitleNoMargin: {
+		fontSize: 17,
+		fontWeight: '700',
+		color: '#191C1D',
+	},
+	recommendedSubText: {
 		fontSize: 11,
-		color: '#3f4849',
-		textTransform: 'uppercase',
+		fontWeight: '600',
+		color: '#526062',
 		letterSpacing: 0.5,
-		marginBottom: 14,
+		marginTop: 2,
+		marginBottom: 12,
 	},
 	recommendedGrid: {
-		gap: 12,
+		marginTop: 4,
 	},
 	recommendedGridTablet: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		justifyContent: 'space-between',
-	},
-	recommendedCard: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#ffffff',
-		borderWidth: 1,
-		borderColor: '#bfc8c8',
-		borderRadius: 8,
-		padding: 12,
-		elevation: 1,
-	},
-	recommendedIconCircle: {
-		width: 48,
-		height: 48,
-		borderRadius: 8,
-		backgroundColor: 'rgba(41, 103, 105, 0.1)',
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginRight: 12,
-	},
-	recommendedCardText: {
-		flex: 1,
-	},
-	recCardTitle: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#191c1d',
-		marginBottom: 2,
-	},
-	recCardDesc: {
-		fontSize: 12,
-		color: '#3f4849',
+		gap: 16,
 	},
 	allServicesHeader: {
 		fontSize: 20,
