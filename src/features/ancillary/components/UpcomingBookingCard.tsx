@@ -1,8 +1,9 @@
 import React from 'react'
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { AncillaryBooking } from '../ancillaryService'
 import BookingStatusBadge from './BookingStatusBadge'
+import AppAvatar from '../../../components/common/AppAvatar'
 
 interface UpcomingBookingCardProps {
 	booking: AncillaryBooking
@@ -26,7 +27,7 @@ export default function UpcomingBookingCard({ booking, onChat, onReschedule, onT
 			</View>
 
 			<View style={styles.providerRow}>
-				<Image source={{ uri: booking.provider.avatar }} style={styles.avatar} />
+				<AppAvatar uri={booking.provider.avatar} name={booking.provider.name} size={44} style={styles.avatar} />
 				<View style={styles.providerInfo}>
 					<Text style={styles.providerName} numberOfLines={1}>{booking.provider.name}</Text>
 					<Text style={styles.providerRole} numberOfLines={1}>{booking.provider.designation}</Text>
@@ -41,7 +42,7 @@ export default function UpcomingBookingCard({ booking, onChat, onReschedule, onT
 					<Text style={styles.outlineBtnText}>Reschedule</Text>
 				</TouchableOpacity>
 				<TouchableOpacity style={styles.filledBtn} onPress={() => onTrack(booking)} activeOpacity={0.85}>
-					<Text style={styles.filledBtnText}>Track Nurse</Text>
+					<Text style={styles.filledBtnText}>Track Order</Text>
 				</TouchableOpacity>
 			</View>
 		</View>

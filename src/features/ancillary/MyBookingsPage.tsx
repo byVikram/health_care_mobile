@@ -1,12 +1,14 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { ROUTES } from '../../navigation/routes'
 import { AncillaryBooking, MOCK_ANCILLARY_BOOKINGS } from './ancillaryService'
 import UpcomingBookingCard from './components/UpcomingBookingCard'
 import CompletedBookingCard from './components/CompletedBookingCard'
 import CancelledBookingCard from './components/CancelledBookingCard'
+import AppScreenHeader from '../../components/common/AppScreenHeader'
+import { AppSkeleton } from '../../components/common/AppSkeleton'
 
 type BookingTab = 'upcoming' | 'completed' | 'cancelled'
 
@@ -16,12 +18,16 @@ const TABS: { key: BookingTab; label: string }[] = [
 	{ key: 'cancelled', label: 'Cancelled' },
 ]
 
+const PAGE_SIZE = 10
+
 export default function MyBookingsPage() {
 	const navigation = useNavigation<any>()
 
 	const [bookings] = useState<AncillaryBooking[]>(MOCK_ANCILLARY_BOOKINGS)
 	const [activeTab, setActiveTab] = useState<BookingTab>('upcoming')
 	const [searchQuery, setSearchQuery] = useState('')
+	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+	const [filterActive, setFilterActive] = useState(false)
 
 	const filteredBookings = useMemo(() => {
 		const query = searchQuery.trim().toLowerCase()
@@ -39,6 +45,15 @@ export default function MyBookingsPage() {
 		})
 	}, [bookings, activeTab, searchQuery])
 
+	const pagedBookings = useMemo(
+		() => filteredBookings.slice(0, visibleCount),
+		[filteredBookings, visibleCount]
+	)
+
+	const handleLoadMore = useCallback(() => {
+		setVisibleCount((prev) => (prev >= filteredBookings.length ? prev : Math.min(prev + PAGE_SIZE, filteredBookings.length)))
+	}, [filteredBookings.length])
+
 	const handleChat = (booking: AncillaryBooking) => {
 		Alert.alert('Chat', `Opening chat with ${booking.provider.name}...`)
 	}
@@ -51,7 +66,20 @@ export default function MyBookingsPage() {
 	}
 
 	const handleTrack = (booking: AncillaryBooking) => {
-		Alert.alert('Track Nurse', `Live tracking for ${booking.provider.name} will be available shortly.`)
+		navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+			bookingId: booking.id,
+			bookingData: {
+				provider: booking.provider,
+				serviceKey: booking.serviceKey,
+				serviceLabel: booking.serviceLabel,
+				appointment: {
+					service: booking.serviceName,
+					dateTime: [booking.date, booking.timeRange].filter(Boolean).join('  •  '),
+					locationLabel: 'Home Visit',
+					address: '',
+				},
+			},
+		})
 	}
 
 	const handleViewInvoice = (booking: AncillaryBooking) => {
@@ -63,6 +91,10 @@ export default function MyBookingsPage() {
 			serviceKey: booking.serviceKey,
 			serviceLabel: booking.serviceLabel,
 		})
+	}
+
+	const handleFilterPress = () => {
+		setFilterActive((prev) => !prev)
 	}
 
 	const renderItem = ({ item }: { item: AncillaryBooking }) => {
@@ -90,30 +122,40 @@ export default function MyBookingsPage() {
 
 	return (
 		<View style={styles.container}>
-			{/* Header */}
-			<View style={styles.header}>
-				<TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-					<Ionicons name="chevron-back" size={24} color="#16324A" />
-				</TouchableOpacity>
-				<View style={styles.titleContainer}>
-					<Text style={styles.title}>My Bookings</Text>
-				</View>
-				<TouchableOpacity style={styles.moreBtn}>
-					<Ionicons name="ellipsis-vertical" size={20} color="#16324A" />
-				</TouchableOpacity>
-			</View>
+			{/* Header without 3-dot menu */}
+			<AppScreenHeader
+				title="Ancillary Orders"
+				rightElement={null}
+			/>
 
-			{/* Search */}
-			<View style={styles.searchBarContainer}>
-				<View style={styles.searchBar}>
-					<Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
-					<TextInput
-						style={styles.searchInput}
-						placeholder="Search provider, service or date..."
-						placeholderTextColor="#94A3B8"
-						value={searchQuery}
-						onChangeText={setSearchQuery}
-					/>
+			{/* Search Bar + Filter Icon */}
+			<View style={styles.searchSectionContainer}>
+				<View style={styles.searchRow}>
+					<View style={styles.searchBar}>
+						<Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+						<TextInput
+							style={styles.searchInput}
+							placeholder="Search provider, service or date..."
+							placeholderTextColor="#94A3B8"
+							value={searchQuery}
+							onChangeText={(text) => {
+								setSearchQuery(text)
+								setVisibleCount(PAGE_SIZE)
+							}}
+						/>
+						{searchQuery.length > 0 && (
+							<TouchableOpacity onPress={() => setSearchQuery('')}>
+								<Ionicons name="close-circle" size={18} color="#94A3B8" />
+							</TouchableOpacity>
+						)}
+					</View>
+					<TouchableOpacity
+						style={[styles.filterIconButton, filterActive && styles.filterIconButtonActive]}
+						onPress={handleFilterPress}
+						activeOpacity={0.84}
+					>
+						<MaterialCommunityIcons name="tune" size={22} color={filterActive ? '#ffffff' : '#2B6F71'} />
+					</TouchableOpacity>
 				</View>
 			</View>
 
@@ -125,7 +167,10 @@ export default function MyBookingsPage() {
 						<TouchableOpacity
 							key={tab.key}
 							style={styles.tabItem}
-							onPress={() => setActiveTab(tab.key)}
+							onPress={() => {
+								setActiveTab(tab.key)
+								setVisibleCount(PAGE_SIZE)
+							}}
 							activeOpacity={0.8}
 						>
 							<Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
@@ -135,13 +180,15 @@ export default function MyBookingsPage() {
 				})}
 			</View>
 
-			{/* List */}
+			{/* Infinite scroll list */}
 			<FlatList
-				data={filteredBookings}
+				data={pagedBookings}
 				renderItem={renderItem}
 				keyExtractor={(item) => item.id}
 				contentContainerStyle={styles.listContent}
 				showsVerticalScrollIndicator={false}
+				onEndReached={handleLoadMore}
+				onEndReachedThreshold={0.4}
 				ListEmptyComponent={
 					<View style={styles.emptyContainer}>
 						<Ionicons name="calendar-outline" size={48} color="#CBD5E1" />
@@ -151,6 +198,13 @@ export default function MyBookingsPage() {
 								: `You have no ${activeTab} bookings yet.`}
 						</Text>
 					</View>
+				}
+				ListFooterComponent={
+					visibleCount < filteredBookings.length ? (
+						<View style={{ paddingVertical: 8, opacity: 0.6 }}>
+							<AppSkeleton width={'100%'} height={110} borderRadius={16} />
+						</View>
+					) : null
 				}
 			/>
 		</View>
@@ -162,38 +216,18 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#F8FAFA',
 	},
-	header: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingTop: 56,
-		paddingBottom: 16,
-		paddingHorizontal: 16,
-		backgroundColor: '#FFFFFF',
-		borderBottomWidth: 1,
-		borderBottomColor: '#F1F5F9',
-	},
-	backBtn: {
-		padding: 4,
-		marginRight: 12,
-	},
-	titleContainer: {
-		flex: 1,
-	},
-	title: {
-		fontSize: 18,
-		fontWeight: '800',
-		color: '#16324A',
-	},
-	moreBtn: {
-		padding: 4,
-		marginLeft: 12,
-	},
-	searchBarContainer: {
+	searchSectionContainer: {
 		paddingHorizontal: 16,
 		paddingVertical: 12,
 		backgroundColor: '#FFFFFF',
 	},
+	searchRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+	},
 	searchBar: {
+		flex: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#F8FAFC',
@@ -210,6 +244,20 @@ const styles = StyleSheet.create({
 		flex: 1,
 		fontSize: 14,
 		color: '#1E293B',
+	},
+	filterIconButton: {
+		width: 48,
+		height: 48,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+		backgroundColor: '#F8FAFC',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	filterIconButtonActive: {
+		backgroundColor: '#2B6F71',
+		borderColor: '#2B6F71',
 	},
 	tabsRow: {
 		flexDirection: 'row',

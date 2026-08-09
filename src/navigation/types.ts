@@ -162,6 +162,10 @@ export type AppStackParamList = {
 		bookingId?: string
 		bookingData?: any
 	} | undefined
+	[ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT]: {
+		bookingId?: string
+		bookingData?: any
+	} | undefined
 	[ROUTES.STACK.ANCILLARY_MY_BOOKINGS]: undefined
 	[ROUTES.STACK.LOCATION_SELECT]: undefined
 }

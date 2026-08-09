@@ -20,6 +20,7 @@ export { default as SplashScreen } from "./SplashScreen";
 export { default as DateSlotPicker } from './DateSlotPicker';
 export type { PickProps as DateSlotPickerProps } from './DateSlotPicker';
 export { default as AppScreenHeader } from "./AppScreenHeader";
+export { default as AppAvatar } from "./AppAvatar";
 export { default as StatusModal } from "./StatusModal";
 export { default as AppStickyFooter, StickyFooter } from "./AppStickyFooter";
 export { default as ProviderDetailsCard } from "./ProviderDetailsCard";
