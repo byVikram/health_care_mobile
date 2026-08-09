@@ -7,8 +7,7 @@ import { AncillaryBooking, MOCK_ANCILLARY_BOOKINGS } from '../ancillaryService'
 import UpcomingBookingCard from '../components/UpcomingBookingCard'
 import CompletedBookingCard from '../components/CompletedBookingCard'
 import CancelledBookingCard from '../components/CancelledBookingCard'
-import AppScreenHeader from '../../components/common/AppScreenHeader'
-import { AppSkeleton } from '../../components/common/AppSkeleton'
+import { AppScreenHeader, AppSkeleton } from '../../../components/common'
 
 type BookingTab = 'upcoming' | 'completed' | 'cancelled'
 
