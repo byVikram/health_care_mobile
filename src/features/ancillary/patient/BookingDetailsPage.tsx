@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
 	Image,
 	ScrollView,
@@ -10,6 +10,8 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { getPatientDetails } from '../../profile/patient/PatientProfileService'
 import { ROUTES } from '../../../navigation/routes'
 import {
 	AppBottomSheet,
@@ -20,6 +22,7 @@ import {
 	AppSelectOption,
 	AppTypography,
 	CommonCard,
+	PatientProfileSelectorBottomSheet,
 } from '../../../components/common'
 import { ServiceProcedureItem } from '../components/AllServiceCard'
 import { BookingProgressStepper } from '../components/BookingProgressStepper'
@@ -120,12 +123,84 @@ export default function BookingDetailsPage() {
 	// Edit Modal Visibility States
 	const [editPatientVisible, setEditPatientVisible] = useState(false)
 	const [editVisitVisible, setEditVisitVisible] = useState(false)
+	const [switchProfileVisible, setSwitchProfileVisible] = useState(false)
+	const [selectedProfileId, setSelectedProfileId] = useState<string>('self-1')
 
 	// Temporary Form States for Patient Edit Sheet
 	const [tempPatientName, setTempPatientName] = useState(patient.name)
 	const [tempPatientAge, setTempPatientAge] = useState(patient.age)
 	const [tempPatientGender, setTempPatientGender] = useState(patient.gender)
 	const [tempPatientRel, setTempPatientRel] = useState(patient.relationship)
+
+	useEffect(() => {
+		const fetchProfile = async () => {
+			let loadedPatient = {
+				name: 'John Doe',
+				age: '45',
+				gender: 'Male',
+				bloodGroup: 'O+',
+				relationship: 'Self',
+				avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+			}
+
+			try {
+				const response = await getPatientDetails()
+				if (response.success && response.data) {
+					const personal = response.data.personal
+					if (personal) {
+						let parsedAge = '45'
+						if (personal.date_of_birth) {
+							const dob = new Date(personal.date_of_birth)
+							const diff = Date.now() - dob.getTime()
+							parsedAge = String(Math.abs(new Date(diff).getUTCFullYear() - 1970))
+						}
+
+						loadedPatient = {
+							name: personal.name || 'John Doe',
+							age: parsedAge,
+							gender: personal.gender || 'Male',
+							bloodGroup: personal.blood_group || 'O+',
+							relationship: 'Self',
+							avatar: personal.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+						}
+						setPatient(loadedPatient)
+						setTempPatientName(loadedPatient.name)
+						setTempPatientAge(loadedPatient.age)
+						setTempPatientGender(loadedPatient.gender)
+						setTempPatientRel(loadedPatient.relationship)
+						return
+					}
+				}
+			} catch (e) {
+				console.error('Failed to fetch patient profile details from API', e)
+			}
+
+			try {
+				const userRaw = await AsyncStorage.getItem('user')
+				if (userRaw) {
+					const userData = JSON.parse(userRaw)
+					loadedPatient = {
+						name: userData.name || 'John Doe',
+						age: userData.age || '45',
+						gender: userData.gender || 'Male',
+						bloodGroup: userData.bloodGroup || 'O+',
+						relationship: 'Self',
+						avatar: userData.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+					}
+					setPatient(loadedPatient)
+					setTempPatientName(loadedPatient.name)
+					setTempPatientAge(loadedPatient.age)
+					setTempPatientGender(loadedPatient.gender)
+					setTempPatientRel(loadedPatient.relationship)
+				}
+			} catch (err) {
+				console.error('Failed to load user profile from AsyncStorage', err)
+			}
+		}
+
+		fetchProfile()
+	}, [])
+
 
 	// Dynamic Charges Calculation based on ALL selected services
 	const basePriceSum = services.reduce((sum, item) => {
@@ -156,6 +231,18 @@ export default function BookingDetailsPage() {
 				serviceLabel: 'Nursing Care',
 			})
 		}
+	}
+
+	const handleSelectProfile = (selected: any) => {
+		setSelectedProfileId(selected.id)
+		setPatient({
+			name: selected.name,
+			age: String(selected.age),
+			gender: selected.gender,
+			bloodGroup: selected.bloodGroup || 'O+',
+			relationship: selected.relationship,
+			avatar: selected.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+		})
 	}
 
 	const handleOpenPatientEdit = () => {
@@ -306,13 +393,22 @@ export default function BookingDetailsPage() {
 					<AppTypography variant="h3" style={styles.sectionHeading}>
 						Patient Profile
 					</AppTypography>
-					<TouchableOpacity style={styles.headerActionBtn} onPress={handleOpenPatientEdit} activeOpacity={0.7}>
-						<MaterialCommunityIcons name="pencil-outline" size={15} color="#1F5F68" />
-						<AppTypography variant="caption" style={styles.actionBtnText}>
-							Edit Details
-						</AppTypography>
-					</TouchableOpacity>
+					<View style={styles.patientActionRow}>
+						<TouchableOpacity style={[styles.headerActionBtn, { marginRight: 12 }]} onPress={() => setSwitchProfileVisible(true)} activeOpacity={0.7}>
+							<MaterialCommunityIcons name="account-switch-outline" size={15} color="#1F5F68" />
+							<AppTypography variant="caption" style={styles.actionBtnText}>
+								Switch
+							</AppTypography>
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.headerActionBtn} onPress={handleOpenPatientEdit} activeOpacity={0.7}>
+							<MaterialCommunityIcons name="pencil-outline" size={15} color="#1F5F68" />
+							<AppTypography variant="caption" style={styles.actionBtnText}>
+								Edit Details
+							</AppTypography>
+						</TouchableOpacity>
+					</View>
 				</View>
+
 
 				<View style={styles.patientProfileContainer}>
 					<Image source={{ uri: patient.avatar }} style={styles.patientAvatar} resizeMode="cover" />
@@ -535,6 +631,14 @@ export default function BookingDetailsPage() {
 					navigation.navigate(ROUTES.STACK.LOCATION_SELECT)
 				}}
 			/>
+
+			{/* 10. Patient Profile Selector Bottom Sheet */}
+			<PatientProfileSelectorBottomSheet
+				visible={switchProfileVisible}
+				onClose={() => setSwitchProfileVisible(false)}
+				selectedProfileId={selectedProfileId}
+				onSelectProfile={handleSelectProfile}
+			/>
 		</View>
 	)
 }
@@ -689,6 +793,11 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 		marginBottom: 12,
 	},
+	patientActionRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+
 	sectionHeading: {
 		fontSize: 15,
 		fontWeight: '800',

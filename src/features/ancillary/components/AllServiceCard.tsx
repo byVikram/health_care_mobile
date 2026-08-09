@@ -160,36 +160,46 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 						<AppTypography variant="h3" style={styles.titleTablet} numberOfLines={2}>
 							{item.title}
 						</AppTypography>
-
-						<View style={styles.badgeRowTablet}>
-							{item.verified && (
-								<View style={styles.verifiedBadgeTablet}>
-									<Ionicons name="checkmark-circle" size={14} color="#1F5F68" />
-									<AppTypography variant="caption" style={styles.verifiedTextTablet}>
-										Verified
-									</AppTypography>
-								</View>
-							)}
-
-							{item.premiumBadgeText && (
-								<View style={styles.premiumBadgeTablet}>
-									<AppTypography variant="caption" style={styles.premiumTextTablet}>
-										{item.premiumBadgeText}
-									</AppTypography>
-								</View>
-							)}
-						</View>
 					</View>
 
 					<AppTypography variant="caption" style={styles.descriptionTablet} numberOfLines={3}>
 						{item.description}
 					</AppTypography>
 
-					<View style={styles.durationRowTablet}>
-						<Ionicons name="time-outline" size={16} color="#64748B" />
-						<AppTypography variant="caption" style={styles.durationTextTablet}>
-							{item.duration}
+					{/* Prominent View Details Badge */}
+					<TouchableOpacity onPress={handleCardClick} activeOpacity={0.7} style={styles.viewDetailsHelperTablet}>
+						<Ionicons name="information-circle-outline" size={14} color="#1F5F68" />
+						<AppTypography variant="caption" style={styles.viewDetailsHelperText}>
+							View Details
 						</AppTypography>
+					</TouchableOpacity>
+
+					{/* Metadata Chips Row */}
+					<View style={styles.metaBadgeRowTablet}>
+						<View style={styles.durationChipTablet}>
+							<Ionicons name="time-outline" size={13} color="#546E7A" />
+							<AppTypography variant="caption" style={styles.durationTextTablet}>
+								{item.duration}
+							</AppTypography>
+						</View>
+
+						{item.verified && (
+							<View style={styles.verifiedChipTablet}>
+								<Ionicons name="checkmark-circle-outline" size={13} color="#1F5F68" />
+								<AppTypography variant="caption" style={styles.verifiedTextTablet}>
+									Verified
+								</AppTypography>
+							</View>
+						)}
+
+						{item.premiumBadgeText && (
+							<View style={styles.premiumChipTablet}>
+								<Ionicons name="star-outline" size={13} color="#D4AF37" />
+								<AppTypography variant="caption" style={styles.premiumTextTablet}>
+									{item.premiumBadgeText}
+								</AppTypography>
+							</View>
+						)}
 					</View>
 
 					<View style={styles.footerRowTablet}>
@@ -207,7 +217,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 		)
 	}
 
-	// Mobile Layout (Compact, clean & balanced)
+	// Mobile Layout
 	return (
 		<CommonCard
 			style={[styles.cardMobile, cardWidth ? { width: cardWidth } : undefined, style]}
@@ -220,10 +230,32 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 					<AppTypography variant="h4" style={styles.titleMobile} numberOfLines={1}>
 						{item.title}
 					</AppTypography>
+				</View>
+
+				<AppTypography variant="caption" style={styles.descriptionMobile} numberOfLines={2}>
+					{item.description}
+				</AppTypography>
+
+				{/* Prominent View Details Badge */}
+				<TouchableOpacity onPress={handleCardClick} activeOpacity={0.7} style={styles.viewDetailsHelperMobile}>
+					<Ionicons name="information-circle-outline" size={13} color="#1F5F68" />
+					<AppTypography variant="caption" style={styles.viewDetailsHelperText}>
+						View Details
+					</AppTypography>
+				</TouchableOpacity>
+
+				{/* Metadata Chips Row */}
+				<View style={styles.metaBadgeRowMobile}>
+					<View style={styles.durationChipMobile}>
+						<Ionicons name="time-outline" size={11} color="#607D8B" />
+						<AppTypography variant="caption" style={styles.durationTextMobile}>
+							{item.duration}
+						</AppTypography>
+					</View>
 
 					{item.verified && (
-						<View style={styles.verifiedBadgeMobile}>
-							<Ionicons name="checkmark-circle" size={11} color="#1F5F68" />
+						<View style={styles.verifiedChipMobile}>
+							<Ionicons name="checkmark-circle-outline" size={11} color="#1F5F68" />
 							<AppTypography variant="caption" style={styles.verifiedTextMobile}>
 								Verified
 							</AppTypography>
@@ -231,23 +263,12 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 					)}
 
 					{item.premiumBadgeText && (
-						<View style={styles.premiumBadgeMobile}>
+						<View style={styles.premiumChipMobile}>
 							<AppTypography variant="caption" style={styles.premiumTextMobile}>
 								{item.premiumBadgeText}
 							</AppTypography>
 						</View>
 					)}
-				</View>
-
-				<AppTypography variant="caption" style={styles.descriptionMobile} numberOfLines={2}>
-					{item.description}
-				</AppTypography>
-
-				<View style={styles.durationRowMobile}>
-					<Ionicons name="time-outline" size={13} color="#64748B" />
-					<AppTypography variant="caption" style={styles.durationTextMobile}>
-						{item.duration}
-					</AppTypography>
 				</View>
 
 				<View style={styles.footerRowMobile}>
@@ -274,12 +295,12 @@ const styles = StyleSheet.create({
 		padding: 16,
 		marginBottom: 16,
 		borderWidth: 1,
-		borderColor: '#E8ECEC',
-		elevation: 2,
+		borderColor: '#ECEFF1',
+		elevation: 1,
 		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.06,
-		shadowRadius: 6,
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.03,
+		shadowRadius: 4,
 	},
 	imageTablet: {
 		width: 120,
@@ -298,86 +319,105 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 	},
 	titleTablet: {
-		fontSize: 17,
-		fontWeight: '700',
-		color: '#191C1D',
+		fontSize: 16,
+		fontWeight: '800',
+		color: '#1A2E35',
 		flex: 1,
 		marginRight: 12,
 		lineHeight: 22,
 	},
-	badgeRowTablet: {
+	viewDetailsHelperTablet: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		alignSelf: 'flex-start',
+		marginTop: 6,
+	},
+	metaBadgeRowTablet: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
+		marginVertical: 4,
 	},
-	verifiedBadgeTablet: {
+	durationChipTablet: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#F1F5F9',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 8,
+		gap: 4,
+	},
+	durationTextTablet: {
+		fontSize: 11,
+		fontWeight: '600',
+		color: '#546E7A',
+	},
+	verifiedChipTablet: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#E6F3F4',
 		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 12,
+		paddingVertical: 3,
+		borderRadius: 8,
 		gap: 4,
 	},
 	verifiedTextTablet: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#1F5F68',
-	},
-	premiumBadgeTablet: {
-		backgroundColor: '#CFF4F5',
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 12,
-	},
-	premiumTextTablet: {
 		fontSize: 11,
 		fontWeight: '700',
-		color: '#0D474D',
-		letterSpacing: 0.5,
+		color: '#1F5F68',
+	},
+	premiumChipTablet: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FFF8E1',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 8,
+		gap: 4,
+	},
+	premiumTextTablet: {
+		fontSize: 10.5,
+		fontWeight: '700',
+		color: '#B7791F',
 	},
 	descriptionTablet: {
 		fontSize: 13,
-		color: '#526062',
+		color: '#546E7A',
 		lineHeight: 18,
 		marginVertical: 4,
-	},
-	durationRowTablet: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		marginBottom: 8,
-	},
-	durationTextTablet: {
-		fontSize: 12,
-		color: '#64748B',
 	},
 	footerRowTablet: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginTop: 4,
+		marginTop: 6,
 	},
 	priceTablet: {
-		fontSize: 17,
-		fontWeight: '700',
+		fontSize: 16,
+		fontWeight: '800',
 		color: '#1F5F68',
 	},
 	customPriceLabelTablet: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#526062',
+		fontSize: 13,
+		fontWeight: '700',
+		color: '#78909C',
 	},
 	actionBtnTablet: {
-		minWidth: 84,
+		minWidth: 90,
 		borderRadius: 10,
+		paddingVertical: 0,
+		backgroundColor: '#1F5F68',
 	},
 	actionBtnLabelTablet: {
 		fontSize: 13,
-		fontWeight: '600',
+		fontWeight: '700',
+		color: '#FFFFFF',
+		marginVertical: 0,
+		paddingVertical: 0,
 	},
 	actionBtnContentTablet: {
-		paddingHorizontal: 12,
+		paddingHorizontal: 16,
 		height: 36,
 	},
 	stepperContainerTablet: {
@@ -406,26 +446,27 @@ const styles = StyleSheet.create({
 	cardMobile: {
 		flexDirection: 'row',
 		backgroundColor: '#FFFFFF',
-		borderRadius: 14,
-		padding: 10,
+		borderRadius: 16,
+		padding: 12,
 		marginBottom: 12,
 		borderWidth: 1,
-		borderColor: '#E8ECEC',
+		borderColor: '#ECEFF1',
 		elevation: 1,
 		shadowColor: '#000000',
 		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.04,
+		shadowOpacity: 0.02,
 		shadowRadius: 3,
 	},
 	imageMobile: {
-		width: 76,
-		height: 76,
-		borderRadius: 10,
+		width: 84,
+		height: 84,
+		borderRadius: 12,
 		backgroundColor: '#F1F5F9',
+		alignSelf: 'center',
 	},
 	contentColMobile: {
 		flex: 1,
-		marginLeft: 10,
+		marginLeft: 12,
 		justifyContent: 'space-between',
 	},
 	headerRowMobile: {
@@ -434,81 +475,109 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 	},
 	titleMobile: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#191C1D',
+		fontSize: 14.5,
+		fontWeight: '800',
+		color: '#1A2E35',
 		flex: 1,
 		marginRight: 6,
 	},
-	verifiedBadgeMobile: {
+	viewDetailsHelperMobile: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		alignSelf: 'flex-start',
+		marginTop: 6,
+	},
+	viewDetailsHelperText: {
+		fontSize: 10.5,
+		fontWeight: '700',
+		color: '#1F5F68',
+		textDecorationLine: 'underline',
+	},
+	metaBadgeRowMobile: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		marginTop: 6,
+		marginBottom: 2,
+	},
+	durationChipMobile: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#F1F5F9',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 6,
+		gap: 2,
+	},
+	durationTextMobile: {
+		fontSize: 10,
+		fontWeight: '600',
+		color: '#546E7A',
+	},
+	verifiedChipMobile: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 5,
+		paddingHorizontal: 6,
 		paddingVertical: 2,
-		borderRadius: 8,
+		borderRadius: 6,
 		gap: 2,
 	},
 	verifiedTextMobile: {
 		fontSize: 10,
-		fontWeight: '600',
+		fontWeight: '700',
 		color: '#1F5F68',
 	},
-	premiumBadgeMobile: {
-		backgroundColor: '#CFF4F5',
-		paddingHorizontal: 5,
+	premiumChipMobile: {
+		backgroundColor: '#FFF8E1',
+		paddingHorizontal: 6,
 		paddingVertical: 2,
-		borderRadius: 8,
+		borderRadius: 6,
 	},
 	premiumTextMobile: {
-		fontSize: 9,
+		fontSize: 9.5,
 		fontWeight: '700',
-		color: '#0D474D',
-		letterSpacing: 0.3,
+		color: '#B7791F',
 	},
 	descriptionMobile: {
-		fontSize: 11,
-		color: '#526062',
-		lineHeight: 15,
+		fontSize: 11.5,
+		color: '#546E7A',
+		lineHeight: 15.5,
 		marginTop: 2,
-	},
-	durationRowMobile: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		marginTop: 2,
-	},
-	durationTextMobile: {
-		fontSize: 10,
-		color: '#64748B',
 	},
 	footerRowMobile: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginTop: 4,
+		marginTop: 8,
 	},
 	priceMobile: {
-		fontSize: 14,
-		fontWeight: '700',
+		fontSize: 14.5,
+		fontWeight: '800',
 		color: '#1F5F68',
 	},
 	customPriceLabelMobile: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#526062',
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#78909C',
 	},
 	actionBtnMobile: {
-		minWidth: 70,
+		minWidth: 72,
 		borderRadius: 8,
+		paddingVertical: 0,
+		backgroundColor: '#1F5F68',
 	},
 	actionBtnLabelMobile: {
-		fontSize: 11,
-		fontWeight: '600',
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#FFFFFF',
+		marginVertical: 0,
+		paddingVertical: 0,
 	},
 	actionBtnContentMobile: {
-		paddingHorizontal: 8,
-		height: 28,
+		paddingHorizontal: 12,
+		height: 32,
 	},
 	stepperContainerMobile: {
 		flexDirection: 'row',

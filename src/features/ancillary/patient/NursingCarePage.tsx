@@ -571,4 +571,32 @@ const styles = StyleSheet.create({
 	procedureList: {
 		marginTop: 4,
 	},
+	tabsContainer: {
+		marginBottom: 16,
+	},
+	tabsScrollContent: {
+		gap: 8,
+		paddingRight: 16,
+	},
+	tabChip: {
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+		borderRadius: 20,
+		backgroundColor: '#F1F5F9',
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	tabChipActive: {
+		backgroundColor: '#1F5F68',
+		borderColor: '#1F5F68',
+	},
+	tabChipText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#64748B',
+	},
+	tabChipTextActive: {
+		color: '#FFFFFF',
+		fontWeight: '700',
+	},
 })

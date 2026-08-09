@@ -1,6 +1,6 @@
 import React from 'react'
 import { View, StyleSheet, Image, TouchableOpacity, useWindowDimensions } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
 import { AppTypography, CommonCard } from '../../../components/common'
 import { AppButton } from '../../../components/common/AppButton'
 import { ServiceProcedureItem } from './AllServiceCard'
@@ -117,6 +117,15 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 				>
 					{item.description}
 				</AppTypography>
+
+				{/* Prominent View Details Helper */}
+				<TouchableOpacity onPress={handleCardClick} activeOpacity={0.7} style={styles.viewDetailsHelper}>
+					<Ionicons name="information-circle-outline" size={13} color="#1F5F68" />
+					<AppTypography variant="caption" style={styles.viewDetailsHelperText}>
+						View Details
+					</AppTypography>
+				</TouchableOpacity>
+
 				<View style={styles.footerRow}>
 					<AppTypography
 						variant="body"
@@ -180,13 +189,26 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#526062',
 		marginTop: 4,
-		marginBottom: 12,
+		marginBottom: 6,
 		lineHeight: 16,
 	},
 	descriptionTablet: {
 		fontSize: 14,
 		lineHeight: 20,
-		marginBottom: 16,
+		marginBottom: 8,
+	},
+	viewDetailsHelper: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		alignSelf: 'flex-start',
+		marginBottom: 10,
+	},
+	viewDetailsHelperText: {
+		fontSize: 10.5,
+		fontWeight: '700',
+		color: '#1F5F68',
+		textDecorationLine: 'underline',
 	},
 	footerRow: {
 		flexDirection: 'row',
