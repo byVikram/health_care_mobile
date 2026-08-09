@@ -29,7 +29,7 @@ import UpcomingEventsSection from './components/EventSection'
 import PodcastsSection from './components/PodcastsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
 import { getAppointments } from '../doctor/doctorService'
-import StaffAncillaryDashboard from '../ancillary/StaffAncillaryDashboard'
+import StaffAncillaryDashboard from '../ancillary/staff/StaffAncillaryDashboard'
 
 import { formatDateForApi } from '../../utils/date'
 import { USER_ROLES } from '../../constants/constants'

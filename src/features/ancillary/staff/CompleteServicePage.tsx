@@ -11,11 +11,11 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { MOCK_NURSE_BOOKINGS, NurseBooking, NurseBookingState, getBookingState, clearBookingState } from './ancillaryService'
-import { ROUTES } from '../../navigation/routes'
-import OtpPinInput from './components/OtpPinInput'
-import ServiceTimeline from './components/ServiceTimeline'
-import StatusModal from '../../components/common/StatusModal'
+import { MOCK_NURSE_BOOKINGS, NurseBooking, NurseBookingState, getBookingState, clearBookingState } from '../ancillaryService'
+import { ROUTES } from '../../../navigation/routes'
+import OtpPinInput from '../components/OtpPinInput'
+import ServiceTimeline from '../components/ServiceTimeline'
+import StatusModal from '../../../components/common/StatusModal'
 
 export default function CompleteServicePage() {
 	const navigation = useNavigation<any>()

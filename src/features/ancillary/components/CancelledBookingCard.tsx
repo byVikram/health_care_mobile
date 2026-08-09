@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { AncillaryBooking } from '../ancillaryService'
 import BookingStatusBadge from './BookingStatusBadge'
+import { CommonCard } from '../../../components/common'
 
 interface CancelledBookingCardProps {
 	booking: AncillaryBooking
@@ -10,7 +11,7 @@ interface CancelledBookingCardProps {
 
 export default function CancelledBookingCard({ booking }: CancelledBookingCardProps) {
 	return (
-		<View style={styles.card}>
+		<CommonCard style={styles.card}>
 			<View style={styles.headerRow}>
 				<View style={styles.headerLeft}>
 					<Text style={styles.serviceName}>{booking.serviceName}</Text>
@@ -41,7 +42,7 @@ export default function CancelledBookingCard({ booking }: CancelledBookingCardPr
 					) : null}
 				</View>
 			)}
-		</View>
+		</CommonCard>
 	)
 }
 

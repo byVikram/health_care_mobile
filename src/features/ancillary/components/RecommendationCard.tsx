@@ -1,7 +1,7 @@
 import React from 'react'
-import { View, StyleSheet, useWindowDimensions } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { View, StyleSheet, useWindowDimensions, TouchableOpacity } from 'react-native'
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
+import { AppTypography, CommonCard } from '../../../components/common'
 
 export interface RecommendationItem {
 	id: string
@@ -12,16 +12,17 @@ export interface RecommendationItem {
 
 interface RecommendationCardProps {
 	item: RecommendationItem
+	onPress?: () => void
 }
 
-export const RecommendationCard: React.FC<RecommendationCardProps> = ({ item }) => {
+export const RecommendationCard: React.FC<RecommendationCardProps> = ({ item, onPress }) => {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
 
-	return (
-		<View style={[styles.card, isTablet && styles.cardTablet]}>
+	const content = (
+		<View style={styles.row}>
 			<View style={[styles.iconBox, isTablet && styles.iconBoxTablet]}>
-				<MaterialCommunityIcons name={item.iconName} size={isTablet ? 26 : 22} color="#1F5F68" />
+				<MaterialCommunityIcons name={item.iconName} size={isTablet ? 24 : 20} color="#1F5F68" />
 			</View>
 			<View style={styles.textColumn}>
 				<AppTypography
@@ -34,68 +35,97 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({ item }) 
 				<AppTypography
 					variant="caption"
 					style={[styles.description, isTablet && styles.descriptionTablet]}
-					numberOfLines={1}
+					numberOfLines={2}
 				>
 					{item.description}
 				</AppTypography>
 			</View>
+			<View style={styles.chevronBox}>
+				<Ionicons name="chevron-forward" size={16} color="#B0BEC5" />
+			</View>
 		</View>
+	)
+
+	if (onPress) {
+		return (
+			<TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.wrapper}>
+				<CommonCard style={[styles.card, styles.cardInteractive, isTablet && styles.cardTablet]}>
+					{content}
+				</CommonCard>
+			</TouchableOpacity>
+		)
+	}
+
+	return (
+		<CommonCard style={[styles.card, isTablet && styles.cardTablet]}>
+			{content}
+		</CommonCard>
 	)
 }
 
 const styles = StyleSheet.create({
+	wrapper: {
+		width: '100%',
+	},
 	card: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#FFFFFF',
-		borderRadius: 12,
 		padding: 12,
 		marginBottom: 10,
+		backgroundColor: '#FFFFFF',
+		borderRadius: 14,
 		borderWidth: 1,
-		borderColor: '#E8ECEC',
+		borderColor: '#ECEFF1',
+	},
+	cardInteractive: {
+		backgroundColor: '#FFFFFF',
 	},
 	cardTablet: {
-		padding: 16,
+		padding: 14,
 		borderRadius: 16,
-		marginBottom: 14,
+		marginBottom: 12,
+	},
+	row: {
+		flexDirection: 'row',
+		alignItems: 'center',
 	},
 	iconBox: {
-		width: 44,
-		height: 44,
+		width: 40,
+		height: 40,
 		borderRadius: 10,
 		backgroundColor: '#E6F3F4',
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginRight: 12,
 	},
 	iconBoxTablet: {
-		width: 54,
-		height: 54,
-		borderRadius: 14,
-		marginRight: 16,
+		width: 48,
+		height: 48,
+		borderRadius: 12,
 	},
 	textColumn: {
 		flex: 1,
+		marginLeft: 12,
+		marginRight: 8,
 	},
 	title: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#191C1D',
-		lineHeight: 18,
+		fontSize: 13.5,
+		fontWeight: '800',
+		color: '#1A2E35',
 	},
 	titleTablet: {
-		fontSize: 17,
-		lineHeight: 22,
+		fontSize: 15,
 	},
 	description: {
-		fontSize: 12,
-		color: '#526062',
+		fontSize: 11,
+		color: '#546E7A',
 		marginTop: 2,
-		lineHeight: 16,
+		lineHeight: 14,
 	},
 	descriptionTablet: {
-		fontSize: 14,
-		lineHeight: 18,
-		marginTop: 4,
+		fontSize: 12,
+		marginTop: 3,
+	},
+	chevronBox: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingLeft: 4,
 	},
 })

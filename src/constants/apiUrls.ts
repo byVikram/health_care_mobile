@@ -4,8 +4,8 @@
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	const url = "http://172.20.10.2:8000"
+	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	// const url = "http://10.149.226.49:8000"
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 
 	if (!url) {
@@ -114,6 +114,7 @@ export const API_ENDPOINTS = {
 		ADDRESSES: `${BASE_URL}/api/patients/me/addresses`,
 		TREATMENT_HISTORY: (id: string) => `${BASE_URL}/api/treatments/patient/${id}/history`,
 		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
+		FAMILY_MEMBERS: `${BASE_URL}/api/patients/family-members`,
 	},
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,

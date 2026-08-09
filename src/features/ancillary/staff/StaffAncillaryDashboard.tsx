@@ -11,9 +11,9 @@ import {
 } from 'react-native'
 import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState } from './ancillaryService'
-import { ROUTES } from '../../navigation/routes'
-import ServiceStatusIndicator from './components/ServiceStatusIndicator'
+import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState } from '../ancillaryService'
+import { ROUTES } from '../../../navigation/routes'
+import ServiceStatusIndicator from '../components/ServiceStatusIndicator'
 
 export default function StaffAncillaryDashboard() {
 	const navigation = useNavigation<any>()

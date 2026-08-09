@@ -209,3 +209,22 @@ export const getPatientTreatmentHistory = async (userId: string): Promise<Treatm
 	)
 	return res.data?.data ?? []
 }
+
+export interface FamilyMember {
+	id: string
+	name: string
+	relation: string
+	avatar_s3_key?: string | null
+	is_self: boolean
+	age?: string | number
+	gender?: string
+	blood_group?: string
+}
+
+export const getFamilyMembers = async (): Promise<FamilyMember[]> => {
+	const res = await ApiService.get<{ success: boolean; data: FamilyMember[] }>(
+		API_ENDPOINTS.PATIENT.FAMILY_MEMBERS
+	)
+	return res.data?.data ?? []
+}
+

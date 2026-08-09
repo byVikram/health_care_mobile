@@ -10,15 +10,15 @@ import {
 import { useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ROUTES } from '../../navigation/routes'
-import { AppTypography } from '../../components/common/AppTypography'
-import { AppButton } from '../../components/common/AppButton'
+import { ROUTES } from '../../../navigation/routes'
+import { AppTypography } from '../../../components/common/AppTypography'
+import { AppButton } from '../../../components/common/AppButton'
 
-import { PopularService, PopularServiceCard } from './components/PopularServiceCard'
-import { RecommendationItem, RecommendationCard } from './components/RecommendationCard'
-import { ServiceProcedureItem, AllServiceCard } from './components/AllServiceCard'
-import { ServiceDetailsBottomSheet } from './components/ServiceDetailsBottomSheet'
-import { ViewCartFloatingBar } from './components/ViewCartFloatingBar'
+import { PopularService, PopularServiceCard } from '../components/PopularServiceCard'
+import { RecommendationItem, RecommendationCard } from '../components/RecommendationCard'
+import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCard'
+import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
+import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
 
 interface CategoryGroup {
 	categoryName: string
@@ -219,6 +219,29 @@ export default function NursingCarePage() {
 		setSheetVisible(true)
 	}
 
+	const handleRecommendationPress = (rec: RecommendationItem) => {
+		for (const category of ALL_NURSING_CATEGORIES) {
+			const found = category.procedures.find(
+				(p) =>
+					p.title.toLowerCase() === rec.title.toLowerCase() ||
+					p.title.toLowerCase().includes(rec.title.toLowerCase())
+			)
+			if (found) {
+				handleCardPress(found)
+				return
+			}
+		}
+		const fallbackProcedure: ServiceProcedureItem = {
+			id: rec.id,
+			title: rec.title,
+			description: rec.description,
+			duration: '30 - 45 mins',
+			price: '₹399',
+			image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=80',
+		}
+		handleCardPress(fallbackProcedure)
+	}
+
 	const handleAddToBookingFromSheet = (service: ServiceProcedureItem) => {
 		handleIncrement(service)
 	}
@@ -231,7 +254,7 @@ export default function NursingCarePage() {
 			}
 		})
 
-		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_CART, {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
 			services: selectedServices,
 		})
 	}
@@ -326,7 +349,10 @@ export default function NursingCarePage() {
 					<View style={[styles.recommendedList, isTablet && styles.gridRow]}>
 						{RECOMMENDED_SERVICES.map((rec) => (
 							<View key={rec.id} style={gridCardWidth ? { width: gridCardWidth } : undefined}>
-								<RecommendationCard item={rec} />
+								<RecommendationCard
+									item={rec}
+									onPress={() => handleRecommendationPress(rec)}
+								/>
 							</View>
 						))}
 					</View>
@@ -544,5 +570,33 @@ const styles = StyleSheet.create({
 	},
 	procedureList: {
 		marginTop: 4,
+	},
+	tabsContainer: {
+		marginBottom: 16,
+	},
+	tabsScrollContent: {
+		gap: 8,
+		paddingRight: 16,
+	},
+	tabChip: {
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+		borderRadius: 20,
+		backgroundColor: '#F1F5F9',
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	tabChipActive: {
+		backgroundColor: '#1F5F68',
+		borderColor: '#1F5F68',
+	},
+	tabChipText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#64748B',
+	},
+	tabChipTextActive: {
+		color: '#FFFFFF',
+		fontWeight: '700',
 	},
 })

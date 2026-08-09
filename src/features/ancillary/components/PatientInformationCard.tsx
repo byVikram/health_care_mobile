@@ -1,6 +1,7 @@
 import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { CommonCard } from '../../../components/common'
 
 interface PatientInformationCardProps {
 	name: string
@@ -20,7 +21,7 @@ export default function PatientInformationCard({
 	onCallPress,
 }: PatientInformationCardProps) {
 	return (
-		<View style={styles.card}>
+		<CommonCard style={styles.card}>
 			<View style={styles.headerRow}>
 				{avatarUrl ? (
 					<Image source={{ uri: avatarUrl }} style={styles.avatar} resizeMode="cover" />
@@ -48,7 +49,7 @@ export default function PatientInformationCard({
 				<Ionicons name="phone-portrait-outline" size={16} color="#667B8F" style={styles.phoneIcon} />
 				<Text style={styles.phoneText}>{phone}</Text>
 			</View>
-		</View>
+		</CommonCard>
 	)
 }
 

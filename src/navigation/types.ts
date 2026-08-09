@@ -151,6 +151,9 @@ export type AppStackParamList = {
 		duration?: string
 		services?: any[]
 	} | undefined
+	[ROUTES.STACK.ANCILLARY_PAYMENT]: {
+		bookingPayload?: any
+	} | undefined
 	[ROUTES.STACK.ANCILLARY_PRICING_REVIEW]: {
 		bookingPayload?: any
 	} | undefined

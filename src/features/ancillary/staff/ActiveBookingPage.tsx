@@ -12,11 +12,11 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState } from './ancillaryService'
-import { ROUTES } from '../../navigation/routes'
-import PatientInformationCard from './components/PatientInformationCard'
-import AppointmentSummary from './components/AppointmentSummary'
-import ServiceTimeline from './components/ServiceTimeline'
+import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState } from '../ancillaryService'
+import { ROUTES } from '../../../navigation/routes'
+import PatientInformationCard from '../components/PatientInformationCard'
+import AppointmentSummary from '../components/AppointmentSummary'
+import ServiceTimeline from '../components/ServiceTimeline'
 
 export default function ActiveBookingPage() {
 	const navigation = useNavigation<any>()

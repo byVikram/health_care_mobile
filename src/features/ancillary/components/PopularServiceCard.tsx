@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, StyleSheet, Image, TouchableOpacity, useWindowDimensions } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
+import { AppTypography, CommonCard } from '../../../components/common'
 import { AppButton } from '../../../components/common/AppButton'
 import { ServiceProcedureItem } from './AllServiceCard'
 
@@ -97,10 +97,9 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 	}
 
 	return (
-		<TouchableOpacity
+		<CommonCard
 			style={[styles.card, isTablet && styles.cardTablet]}
 			onPress={handleCardClick}
-			activeOpacity={0.9}
 		>
 			<Image source={{ uri: item.image }} style={[styles.image, isTablet && styles.imageTablet]} resizeMode="cover" />
 			<View style={[styles.content, isTablet && styles.contentTablet]}>
@@ -118,6 +117,15 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 				>
 					{item.description}
 				</AppTypography>
+
+				{/* Prominent View Details Helper */}
+				<TouchableOpacity onPress={handleCardClick} activeOpacity={0.7} style={styles.viewDetailsHelper}>
+					<Ionicons name="information-circle-outline" size={13} color="#1F5F68" />
+					<AppTypography variant="caption" style={styles.viewDetailsHelperText}>
+						View Details
+					</AppTypography>
+				</TouchableOpacity>
+
 				<View style={styles.footerRow}>
 					<AppTypography
 						variant="body"
@@ -128,7 +136,7 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 					{renderActionControls()}
 				</View>
 			</View>
-		</TouchableOpacity>
+		</CommonCard>
 	)
 }
 
@@ -146,11 +154,13 @@ const styles = StyleSheet.create({
 		shadowOffset: { width: 0, height: 1 },
 		shadowOpacity: 0.05,
 		shadowRadius: 3,
+		padding: 0,
 	},
 	cardTablet: {
 		width: 280,
 		marginRight: 18,
 		borderRadius: 18,
+		padding: 0,
 	},
 	image: {
 		width: '100%',
@@ -179,13 +189,26 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#526062',
 		marginTop: 4,
-		marginBottom: 12,
+		marginBottom: 6,
 		lineHeight: 16,
 	},
 	descriptionTablet: {
 		fontSize: 14,
 		lineHeight: 20,
-		marginBottom: 16,
+		marginBottom: 8,
+	},
+	viewDetailsHelper: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		alignSelf: 'flex-start',
+		marginBottom: 10,
+	},
+	viewDetailsHelperText: {
+		fontSize: 10.5,
+		fontWeight: '700',
+		color: '#1F5F68',
+		textDecorationLine: 'underline',
 	},
 	footerRow: {
 		flexDirection: 'row',

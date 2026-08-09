@@ -56,20 +56,21 @@ import DoctorEventFormPage from '../features/doctor/events/DoctorEventFormPage'
 import AllEventsPage from '../features/events/AllEventsPage'
 import EventDetailsPage from '../features/events/EventDetailsPage'
 
-import ActiveBookingPage from '../features/ancillary/ActiveBookingPage'
-import PatientVerificationPage from '../features/ancillary/PatientVerificationPage'
-import ServiceInProgressPage from '../features/ancillary/ServiceInProgressPage'
-import CompleteServicePage from '../features/ancillary/CompleteServicePage'
-import AncillaryServicesPage from '../features/ancillary/AncillaryServicesPage'
-import AncillaryProvidersPage from '../features/ancillary/AncillaryProvidersPage'
-import BookingCartPage from '../features/ancillary/BookingCartPage'
-import BookingSummaryPage from '../features/ancillary/BookingSummaryPage'
-import BookingDetailsPage from '../features/ancillary/BookingDetailsPage'
-import PricingReviewPage from '../features/ancillary/PricingReviewPage'
-import AncillaryConfirmationPage from '../features/ancillary/AncillaryConfirmationPage'
-import AncillaryBookingStatusPage from '../features/ancillary/AncillaryBookingStatusPage'
+import ActiveBookingPage from '../features/ancillary/staff/ActiveBookingPage'
+import PatientVerificationPage from '../features/ancillary/staff/PatientVerificationPage'
+import ServiceInProgressPage from '../features/ancillary/staff/ServiceInProgressPage'
+import CompleteServicePage from '../features/ancillary/staff/CompleteServicePage'
+import AncillaryServicesPage from '../features/ancillary/patient/AncillaryServicesPage'
+import AncillaryProvidersPage from '../features/ancillary/patient/AncillaryProvidersPage'
+import BookingCartPage from '../features/ancillary/patient/BookingCartPage'
+import BookingSummaryPage from '../features/ancillary/patient/BookingSummaryPage'
+import BookingDetailsPage from '../features/ancillary/patient/BookingDetailsPage'
+import AncillaryPaymentPage from '../features/ancillary/patient/AncillaryPaymentPage'
+import PricingReviewPage from '../features/ancillary/staff/PricingReviewPage'
+import AncillaryConfirmationPage from '../features/ancillary/patient/AncillaryConfirmationPage'
+import AncillaryBookingStatusPage from '../features/ancillary/patient/AncillaryBookingStatusPage'
 import TrackAppointmentPage from '../features/ancillary/TrackAppointmentPage'
-import MyBookingsPage from '../features/ancillary/MyBookingsPage'
+import MyBookingsPage from '../features/ancillary/patient/MyBookingsPage'
 
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
@@ -282,6 +283,11 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.ANCILLARY_BOOKING_DETAILS}
 				component={BookingDetailsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_PAYMENT}
+				component={AncillaryPaymentPage}
 				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen
