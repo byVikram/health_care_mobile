@@ -1,8 +1,9 @@
 import React from 'react'
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { AncillaryBooking } from '../ancillaryService'
 import BookingStatusBadge from './BookingStatusBadge'
 import RatingStars from './RatingStars'
+import AppAvatar from '../../../components/common/AppAvatar'
 import { CommonCard } from '../../../components/common'
 
 interface CompletedBookingCardProps {
@@ -26,7 +27,7 @@ export default function CompletedBookingCard({ booking, onViewInvoice, onBookAga
 			</View>
 
 			<View style={styles.providerRow}>
-				<Image source={{ uri: booking.provider.avatar }} style={styles.avatar} />
+				<AppAvatar uri={booking.provider.avatar} name={booking.provider.name} size={36} style={styles.avatar} />
 				<Text style={styles.providerName} numberOfLines={1}>{booking.provider.name}</Text>
 				{booking.rating != null && (
 					<View style={styles.ratingWrap}>

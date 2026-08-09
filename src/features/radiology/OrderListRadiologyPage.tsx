@@ -21,7 +21,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
-import PaginationBar from '../../components/common/AppPagination'
 
 import { fetchRadiologyBookings, RadiologyBooking } from './RadiologyService'
 import { useAuth } from '../../context/AuthContext'
@@ -200,7 +199,7 @@ const BookingCard = React.memo(function BookingCard({ booking, onPress, isRadiol
 						<MaterialCommunityIcons
 							name={isRadiologyViewer ? 'account-outline' : 'radiology-box-outline'}
 							size={18}
-							color="#1f5f68"
+							color="#2B6F71"
 							style={styles.pharmacyIcon}
 						/>
 						<Text numberOfLines={1} style={styles.pharmacyName}>
@@ -226,8 +225,8 @@ const BookingCard = React.memo(function BookingCard({ booking, onPress, isRadiol
 				</View>
 
 				<View style={styles.detailRow}>
-					<MaterialCommunityIcons name="radiology-box" size={15} color="#667085" style={styles.rowIcon} />
-					<Text style={styles.detailText} numberOfLines={1}>
+					<MaterialCommunityIcons name="radiology-box-outline" size={15} color="#667085" style={styles.rowIcon} />
+					<Text style={styles.detailText} numberOfLines={2}>
 						{booking.scanSummary}
 					</Text>
 				</View>
@@ -246,28 +245,28 @@ const BookingCard = React.memo(function BookingCard({ booking, onPress, isRadiol
 						/>
 						<Text
 							style={[
-								styles.deliveryBadgeText,
-								{ color: booking.paymentStatus === 'paid' ? '#1B5E20' : '#9A6700' },
+								styles.detailText,
+								{ color: booking.paymentStatus === 'paid' ? '#1B5E20' : '#9A6700', fontSize: 11, fontWeight: '600' },
 							]}
 						>
 							{booking.paymentStatus === 'paid' ? 'Paid' : 'Payment Pending'}
 						</Text>
 					</View>
 
-					<View style={styles.priceContainer}>
-						<Text style={styles.priceLabel}>Total</Text>
-						<Text style={styles.priceTag}>
+					<View style={{ alignItems: 'flex-end' }}>
+						<Text style={{ fontSize: 10, color: '#667085', marginBottom: 1 }}>Total</Text>
+						<Text style={{ fontSize: 14, fontWeight: '700', color: '#101828' }}>
 							{booking.totalAmount != null ? `₹${booking.totalAmount.toFixed(2)}` : 'Awaiting Quote'}
 						</Text>
 					</View>
 				</View>
 
-				<Text style={styles.addressText} numberOfLines={1}>
+				<Text style={{ fontSize: 12, color: '#667085', marginTop: 8, marginLeft: 2 }} numberOfLines={1}>
 					Ref: {booking.bookingRef}
 				</Text>
 			</View>
 
-			<View style={styles.chevronContainer}>
+			<View style={{ width: 32, alignItems: 'center', justifyContent: 'center' }}>
 				<MaterialCommunityIcons name="chevron-right" size={20} color="#98A2B3" />
 			</View>
 		</TouchableOpacity>
@@ -281,11 +280,6 @@ const BookingCard = React.memo(function BookingCard({ booking, onPress, isRadiol
 export default function OrderListRadiologyPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
-	const [scanTypeId, setScanTypeId] = useState(route.params?.scanTypeId)
-	useEffect(() => {
-		console.log('📦 scanTypeId from route:', route.params?.scanTypeId)
-		setScanTypeId(route.params?.scanTypeId)
-	}, [route.params?.scanTypeId])
 	const insets = useSafeAreaInsets()
 	const { width, height } = useWindowDimensions()
 	const isTablet = width >= 768
@@ -293,13 +287,14 @@ export default function OrderListRadiologyPage() {
 	const { role, accessToken } = useAuth()
 	const isRadiologyViewer = role === 'radiology'
 
+	const scanTypeId: string | undefined = route.params?.scanTypeId
+
 	const [allBookings, setAllBookings] = useState<RadiologyBooking[]>([])
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 
-	// Pagination — handled client-side since the documented endpoint has no page/limit params
-	const [page, setPage] = useState(1)
-	const [pageSize, setPageSize] = useState(10)
+	const PAGE_SIZE = 10
+	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
 	// Filters
 	const [searchQuery, setSearchQuery] = useState('')
@@ -326,13 +321,13 @@ export default function OrderListRadiologyPage() {
 	}, [route.params?.status])
 
 	useEffect(() => {
-		const t = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+		const t = setTimeout(() => {
+			setDebouncedSearch(searchQuery)
+			setVisibleCount(PAGE_SIZE)
+		}, 300)
 		return () => clearTimeout(t)
 	}, [searchQuery])
 
-	useEffect(() => {
-		setPage(1)
-	}, [debouncedSearch, statusFilter, dateFilter, fromDateFilter, toDateFilter, pageSize, scanTypeId])
 	// ── Fetch ──────────────────────────────────────────────────────────
 
 	const fetchBookings = useCallback(
@@ -356,14 +351,14 @@ export default function OrderListRadiologyPage() {
 		fetchBookings()
 	}, [fetchBookings])
 
-	// ── Derived rows: search + date filter + pagination, all client-side ──
+	// ── Derived rows ──────────────────────────────────────────────────
 
 	const filteredRows = useMemo(() => {
 		const q = debouncedSearch.trim().toLowerCase()
 		return allBookings
 			.filter((booking) => {
 				if (!scanTypeId) return true
-				return booking.booking_items.some((item) => item.radiology_scan?.scan_type?.id === scanTypeId)
+				return booking.booking_items.some((item) => String(item.radiology_scan?.scan_type?.id) === String(scanTypeId))
 			})
 			.map((b) => mapBookingToRow(b, isRadiologyViewer))
 			.filter((row) => {
@@ -379,9 +374,13 @@ export default function OrderListRadiologyPage() {
 
 	const total = filteredRows.length
 	const pagedRows = useMemo(
-		() => filteredRows.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize),
-		[filteredRows, page, pageSize]
+		() => filteredRows.slice(0, visibleCount),
+		[filteredRows, visibleCount]
 	)
+
+	const handleLoadMore = useCallback(() => {
+		setVisibleCount((prev) => (prev >= total ? prev : Math.min(prev + PAGE_SIZE, total)))
+	}, [total])
 
 	// ── Navigate ───────────────────────────────────────────────────────
 
@@ -717,11 +716,13 @@ export default function OrderListRadiologyPage() {
 							data={pagedRows}
 							keyExtractor={(item) => item.id}
 							renderItem={renderItem}
-							contentContainerStyle={styles.listContent}
+							contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 16, 30) }]}
 							showsVerticalScrollIndicator={false}
 							keyboardShouldPersistTaps="always"
 							onRefresh={() => fetchBookings(true)}
 							refreshing={refreshing}
+							onEndReached={handleLoadMore}
+							onEndReachedThreshold={0.4}
 							ListEmptyComponent={
 								<View style={styles.emptyState}>
 									<MaterialCommunityIcons name="radiology-box-outline" size={40} color="#b0bec5" />
@@ -729,28 +730,14 @@ export default function OrderListRadiologyPage() {
 									<Text style={styles.emptyText}>Try adjusting the search or filter settings.</Text>
 								</View>
 							}
+							ListFooterComponent={
+								visibleCount < total ? (
+									<View style={{ paddingVertical: 6, opacity: 0.6 }}>
+										<AppSkeleton width={'100%'} height={90} borderRadius={16} />
+									</View>
+								) : null
+							}
 						/>
-						{total > 0 ? (
-							<View
-								style={[
-									styles.paginationWrap,
-									!isTablet && styles.mobilePaginationWrap,
-									{ paddingBottom: Math.max(insets.bottom + 8, 16) },
-								]}
-							>
-								<PaginationBar
-									page={page}
-									pageSize={pageSize}
-									totalRows={total}
-									pageSizeOptions={[10, 20, 50]}
-									onPageChange={(nextPage) => setPage(nextPage)}
-									onPageSizeChange={(nextSize) => {
-										setPageSize(nextSize)
-										setPage(1)
-									}}
-								/>
-							</View>
-						) : null}
 					</View>
 				)}
 			</View>

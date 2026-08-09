@@ -69,6 +69,7 @@ import AncillaryPaymentPage from '../features/ancillary/patient/AncillaryPayment
 import PricingReviewPage from '../features/ancillary/staff/PricingReviewPage'
 import AncillaryConfirmationPage from '../features/ancillary/patient/AncillaryConfirmationPage'
 import AncillaryBookingStatusPage from '../features/ancillary/patient/AncillaryBookingStatusPage'
+import TrackAppointmentPage from '../features/ancillary/TrackAppointmentPage'
 import MyBookingsPage from '../features/ancillary/patient/MyBookingsPage'
 
 const AppStack = createNativeStackNavigator<AppStackParamList>()
@@ -302,6 +303,11 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.ANCILLARY_BOOKING_STATUS}
 				component={AncillaryBookingStatusPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT}
+				component={TrackAppointmentPage}
 				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen

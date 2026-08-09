@@ -21,7 +21,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
-import PaginationBar from '../../components/common/AppPagination'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
 import { getLabBookings } from './laboratoryService'
@@ -306,8 +305,8 @@ export default function OrderListLaboratoryPage() {
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 
-	const [page, setPage] = useState(1)
-	const [pageSize, setPageSize] = useState(10)
+	const PAGE_SIZE = 10
+	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
 	const [searchQuery, setSearchQuery] = useState('')
 	const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -336,7 +335,7 @@ export default function OrderListLaboratoryPage() {
 	useEffect(() => {
 		const t = setTimeout(() => {
 			setDebouncedSearch(searchQuery)
-			setPage(1)
+			setVisibleCount(PAGE_SIZE)
 		}, 300)
 		return () => clearTimeout(t)
 	}, [searchQuery])
@@ -391,9 +390,13 @@ export default function OrderListLaboratoryPage() {
 
 	const total = filteredRows.length
 	const pagedRows = useMemo(
-		() => filteredRows.slice((page - 1) * pageSize, page * pageSize),
-		[filteredRows, page, pageSize]
+		() => filteredRows.slice(0, visibleCount),
+		[filteredRows, visibleCount]
 	)
+
+	const handleLoadMore = useCallback(() => {
+		setVisibleCount((prev) => (prev >= total ? prev : Math.min(prev + PAGE_SIZE, total)))
+	}, [total])
 
 	// ── Navigate ───────────────────────────────────────────────────────
 
@@ -465,9 +468,9 @@ export default function OrderListLaboratoryPage() {
 				return
 			}
 		}
-		// Reset page synchronously so the new filter set always starts at page 1
-		// in the same render, avoiding a one-frame flash of the old page number.
-		setPage(1)
+		// Reset visible count synchronously so the new filter set always starts
+		// from the first page in the same render.
+		setVisibleCount(PAGE_SIZE)
 		setStatusFilter(draftStatusFilter)
 		setDateFilter(draftDateFilter)
 		setFromDateFilter(draftDateFilter === 'custom' ? draftFromDateFilter : '')
@@ -481,8 +484,8 @@ export default function OrderListLaboratoryPage() {
 		setDraftFromDateFilter('')
 		setDraftToDateFilter('')
 		setActiveDatePicker(null)
-		// Reset page synchronously alongside filter state
-		setPage(1)
+		// Reset visible count synchronously alongside filter state
+		setVisibleCount(PAGE_SIZE)
 		setStatusFilter('all')
 		setDateFilter('all')
 		setFromDateFilter('')
@@ -707,7 +710,7 @@ export default function OrderListLaboratoryPage() {
 		<AppSelect
 			options={STATUS_OPTIONS}
 			value={statusFilter}
-			onSelect={(value) => { setPage(1); setStatusFilter(value) }}
+			onSelect={(value) => { setVisibleCount(PAGE_SIZE); setStatusFilter(value) }}
 			placeholder="Status"
 			size="small"
 			style={styles.inlineSelectFill}
@@ -723,7 +726,7 @@ export default function OrderListLaboratoryPage() {
 		<AppSelect
 			options={DATE_OPTIONS}
 			value={dateFilter}
-			onSelect={(value) => { setPage(1); setDateFilter(value) }}
+			onSelect={(value) => { setVisibleCount(PAGE_SIZE); setDateFilter(value) }}
 			placeholder="Date"
 			size="small"
 			style={styles.inlineSelectFill}
@@ -769,11 +772,13 @@ export default function OrderListLaboratoryPage() {
 							data={pagedRows}
 							keyExtractor={(item) => item.id}
 							renderItem={renderItem}
-							contentContainerStyle={styles.listContent}
+							contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 16, 30) }]}
 							showsVerticalScrollIndicator={false}
 							keyboardShouldPersistTaps="always"
 							onRefresh={() => fetchBookings(true)}
 							refreshing={refreshing}
+							onEndReached={handleLoadMore}
+							onEndReachedThreshold={0.4}
 							ListEmptyComponent={
 								<View style={styles.emptyState}>
 									<MaterialCommunityIcons name="flask-outline" size={40} color="#b0bec5" />
@@ -783,28 +788,14 @@ export default function OrderListLaboratoryPage() {
 									</Text>
 								</View>
 							}
+							ListFooterComponent={
+								visibleCount < total ? (
+									<View style={styles.loadMoreFooter}>
+										<AppSkeleton width={'100%'} height={90} borderRadius={16} />
+									</View>
+								) : null
+							}
 						/>
-						{total > 0 ? (
-							<View
-								style={[
-									styles.paginationWrap,
-									!isTablet && styles.mobilePaginationWrap,
-									{ paddingBottom: Math.max(insets.bottom + 8, 16) },
-								]}
-							>
-								<PaginationBar
-									page={page}
-									pageSize={pageSize}
-									totalRows={total}
-									pageSizeOptions={[10, 20, 50]}
-									onPageChange={(nextPage) => setPage(nextPage)}
-									onPageSizeChange={(nextSize) => {
-										setPageSize(nextSize)
-										setPage(1)
-									}}
-								/>
-							</View>
-						) : null}
 					</View>
 				)}
 			</View>
@@ -1058,11 +1049,8 @@ const styles = StyleSheet.create({
 		backgroundColor: '#2B6F71',
 	},
 	applyButtonText: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
-	paginationWrap: {
-		paddingVertical: 10,
-		borderTopWidth: 1,
-		borderTopColor: '#e5eaef',
-		backgroundColor: 'transparent',
+	loadMoreFooter: {
+		paddingVertical: 6,
+		opacity: 0.6,
 	},
-	mobilePaginationWrap: { paddingVertical: 6 },
 })

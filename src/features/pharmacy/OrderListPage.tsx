@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
 	Animated,
@@ -22,7 +22,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
-import PaginationBar from '../../components/common/AppPagination'
 
 import Card from '../../components/common/CommonCard'
 import { getPharmacyOrders } from '../profile/pharmacy/pharmacyService'
@@ -375,10 +374,8 @@ export default function OrderListPage() {
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 
-	// Pagination
-	const [page, setPage] = useState(1)
-	const [pageSize, setPageSize] = useState(10)
-	const [apiMeta, setApiMeta] = useState<{ total: number; page: number; limit: number; pages: number } | null>(null)
+	const PAGE_SIZE = 10
+	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
 	// Filters
 	const [searchQuery, setSearchQuery] = useState('')
@@ -407,14 +404,12 @@ export default function OrderListPage() {
 
 	// Debounce search
 	useEffect(() => {
-		const t = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+		const t = setTimeout(() => {
+			setDebouncedSearch(searchQuery)
+			setVisibleCount(PAGE_SIZE)
+		}, 300)
 		return () => clearTimeout(t)
 	}, [searchQuery])
-
-	// Reset page on filter change
-	useEffect(() => {
-		setPage(1)
-	}, [debouncedSearch, statusFilter, dateFilter, fromDateFilter, toDateFilter, pageSize])
 
 	// ── Fetch ──────────────────────────────────────────────────────────
 
@@ -422,7 +417,7 @@ export default function OrderListPage() {
 		async (isRefresh = false) => {
 			try {
 				isRefresh ? setRefreshing(true) : setLoading(true)
-				const params: Record<string, any> = { page, limit: pageSize }
+				const params: Record<string, any> = { limit: 50 }
 				if (statusFilter !== 'all') params.status = statusFilter
 				if (debouncedSearch.trim().length > 0) params.search = debouncedSearch.trim()
 				applyDateFilterParams(params, dateFilter, fromDateFilter, toDateFilter)
@@ -430,17 +425,6 @@ export default function OrderListPage() {
 				const response = (await getPharmacyOrders(params)) as any
 				const apiOrders = extractOrders(response)
 				setOrders(apiOrders.map(mapOrderToItem))
-
-				if (response?.meta) {
-					setApiMeta({
-						total: response.meta.total ?? apiOrders.length,
-						page: response.meta.page ?? page,
-						limit: response.meta.limit ?? pageSize,
-						pages: response.meta.pages ?? 1,
-					})
-				} else {
-					setApiMeta(null)
-				}
 			} catch (error) {
 				console.error('[OrderListPage] fetchOrders error:', error)
 				Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load pharmacy orders' })
@@ -448,12 +432,21 @@ export default function OrderListPage() {
 				isRefresh ? setRefreshing(false) : setLoading(false)
 			}
 		},
-		[page, pageSize, statusFilter, debouncedSearch, dateFilter, fromDateFilter, toDateFilter]
+		[statusFilter, debouncedSearch, dateFilter, fromDateFilter, toDateFilter]
 	)
 
 	useEffect(() => {
 		fetchOrders()
 	}, [fetchOrders])
+
+	const pagedOrders = useMemo(
+		() => orders.slice(0, visibleCount),
+		[orders, visibleCount]
+	)
+
+	const handleLoadMore = useCallback(() => {
+		setVisibleCount((prev) => (prev >= orders.length ? prev : Math.min(prev + PAGE_SIZE, orders.length)))
+	}, [orders.length])
 
 	// ── Navigate ───────────────────────────────────────────────────────
 
@@ -784,14 +777,16 @@ export default function OrderListPage() {
 				) : (
 					<View style={{ flex: 1 }}>
 						<FlatList
-							data={orders}
+							data={pagedOrders}
 							keyExtractor={(item) => item.id}
 							renderItem={renderItem}
-							contentContainerStyle={styles.listContent}
+							contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 16, 30) }]}
 							showsVerticalScrollIndicator={false}
 							keyboardShouldPersistTaps="always"
 							onRefresh={() => fetchOrders(true)}
 							refreshing={refreshing}
+							onEndReached={handleLoadMore}
+							onEndReachedThreshold={0.4}
 							ListEmptyComponent={
 								<View style={styles.emptyState}>
 									<MaterialCommunityIcons name="pill" size={40} color="#b0bec5" />
@@ -799,28 +794,14 @@ export default function OrderListPage() {
 									<Text style={styles.emptyText}>Try adjusting the search or filter settings.</Text>
 								</View>
 							}
+							ListFooterComponent={
+								visibleCount < orders.length ? (
+									<View style={{ paddingVertical: 6, opacity: 0.6 }}>
+										<AppSkeleton width={'100%'} height={90} borderRadius={16} />
+									</View>
+								) : null
+							}
 						/>
-						{apiMeta && apiMeta.total > 0 ? (
-							<View
-								style={[
-									styles.paginationWrap,
-									!isTablet && styles.mobilePaginationWrap,
-									{ paddingBottom: Math.max(insets.bottom + 8, 16) },
-								]}
-							>
-								<PaginationBar
-									page={page}
-									pageSize={pageSize}
-									totalRows={apiMeta.total}
-									pageSizeOptions={[10, 20, 50]}
-									onPageChange={(nextPage) => setPage(nextPage)}
-									onPageSizeChange={(nextSize) => {
-										setPageSize(nextSize)
-										setPage(1)
-									}}
-								/>
-							</View>
-						) : null}
 					</View>
 				)}
 			</View>

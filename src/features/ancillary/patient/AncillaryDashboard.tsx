@@ -181,14 +181,14 @@ const TOP_PROFESSIONALS: ProfessionalItem[] = [
 		serviceLabel: 'Physiotherapy',
 	},
 	{
-		name: 'Nurse Emily Chen',
+		name: 'Anita Sharma',
 		specialty: 'Registered Nurse',
 		exp: '8y exp',
 		rating: '4.8',
 		reviews: '95',
 		price: '₹600',
 		distance: '2.5m',
-		avatar: 'https://i.pravatar.cc/150?img=47',
+		avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=200',
 		serviceKey: 'nursing-care',
 		serviceLabel: 'Nursing Care',
 	},
@@ -381,6 +381,16 @@ export default function AncillaryDashboard() {
 						<View style={styles.packageTextCol}>
 							<Text style={styles.packageTitle}>Monthly Nursing Care</Text>
 							<Text style={styles.packageDesc}>Comprehensive daily care by registered nurses for chronic conditions.</Text>
+							<View style={styles.nurseAssignedRow}>
+								<Image
+									source={{ uri: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120' }}
+									style={styles.nurseAvatarCircle}
+								/>
+								<View style={styles.nurseInfoCol}>
+									<Text style={styles.nurseNameText}>Anita Sharma</Text>
+									<Text style={styles.nurseRoleText}>Registered Nurse</Text>
+								</View>
+							</View>
 						</View>
 						<View style={styles.packageIconCircle}>
 							<MaterialCommunityIcons name="heart-plus" size={24} color="#2B6F71" />
@@ -423,6 +433,54 @@ export default function AncillaryDashboard() {
 						</TouchableOpacity>
 					</View>
 				</View>
+
+				<View style={styles.packageCard}>
+					<View style={styles.packageHeader}>
+						<View style={styles.packageTextCol}>
+							<Text style={styles.packageTitle}>Post-Surgery Recovery Package</Text>
+							<Text style={styles.packageDesc}>Dedicated wound care, mobility support, and vitals monitoring after surgery.</Text>
+						</View>
+						<View style={styles.packageIconCircle}>
+							<MaterialCommunityIcons name="hospital-box-outline" size={24} color="#2B6F71" />
+						</View>
+					</View>
+					<View style={styles.packageFooter}>
+						<View>
+							<Text style={styles.startsAtLabel}>Starting from</Text>
+							<Text style={styles.startsAtPrice}>₹7,490<Text style={styles.hrLabel}>/month</Text></Text>
+						</View>
+						<TouchableOpacity
+							style={styles.packageBtn}
+							onPress={() => navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, { serviceKey: 'rehab-care', serviceLabel: 'Rehab Care' })}
+						>
+							<Text style={styles.packageBtnText}>View Details</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+
+				<View style={styles.packageCard}>
+					<View style={styles.packageHeader}>
+						<View style={styles.packageTextCol}>
+							<Text style={styles.packageTitle}>Physiotherapy & Rehab Package</Text>
+							<Text style={styles.packageDesc}>Personalized physical therapy sessions for injury rehabilitation & pain relief.</Text>
+						</View>
+						<View style={styles.packageIconCircle}>
+							<MaterialCommunityIcons name="run" size={24} color="#2B6F71" />
+						</View>
+					</View>
+					<View style={styles.packageFooter}>
+						<View>
+							<Text style={styles.startsAtLabel}>Starting from</Text>
+							<Text style={styles.startsAtPrice}>₹6,490<Text style={styles.hrLabel}>/month</Text></Text>
+						</View>
+						<TouchableOpacity
+							style={styles.packageBtn}
+							onPress={() => navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, { serviceKey: 'physiotherapy', serviceLabel: 'Physiotherapy' })}
+						>
+							<Text style={styles.packageBtnText}>View Details</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
 			</View>
 
 		</ScrollView>
@@ -436,7 +494,7 @@ const styles = StyleSheet.create({
 	},
 	content: {
 		paddingTop: 16,
-		paddingBottom: 120,
+		paddingBottom: 24,
 	},
 	topBar: {
 		flexDirection: 'row',
@@ -938,5 +996,29 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 		fontWeight: '600',
 		color: '#191c1d',
+	},
+	nurseAssignedRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 8,
+		gap: 8,
+	},
+	nurseAvatarCircle: {
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		backgroundColor: '#eceeee',
+	},
+	nurseInfoCol: {
+		justifyContent: 'center',
+	},
+	nurseNameText: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#191c1d',
+	},
+	nurseRoleText: {
+		fontSize: 10,
+		color: '#526062',
 	},
 })
