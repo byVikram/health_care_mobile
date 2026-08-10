@@ -18,7 +18,7 @@ const PROCEDURES_LOOKUP = {
 		{ label: 'Injection Administration', rate: '₹299' },
 		{ label: 'IV Drip Setup', rate: '₹799' },
 		{ label: 'Bandage Dressing', rate: '₹499' },
-		{ label: 'ICU Care at Home', rate: 'Custom Pricing' },
+		{ label: 'ICU Care at Home', rate: '₹2,499' },
 	],
 	'physiotherapy': [
 		{ label: 'Manual Therapy Session', rate: '₹799' },
@@ -144,7 +144,7 @@ export default function CapabilitiesTab() {
 				onPress={handleSave}
 				loading={saving}
 			>
-				Save Capabilities
+				Save 
 			</AppStickyFooter>
 		</View>
 	)
