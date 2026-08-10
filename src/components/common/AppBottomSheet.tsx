@@ -10,6 +10,7 @@ import {
 	useWindowDimensions,
 	View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from './AppTypography'
 
@@ -31,7 +32,6 @@ export type AppBottomSheetProps = {
 const DISMISS_DRAG_DISTANCE = 84
 const DISMISS_DRAG_VELOCITY = 0.75
 const MAX_HEIGHT_RATIO = 0.8
-const SCROLL_TOP_THRESHOLD = 2
 
 export function AppBottomSheet({
 	visible,
@@ -42,17 +42,22 @@ export function AppBottomSheet({
 	scrollEnabled = true,
 	footer,
 }: AppBottomSheetProps) {
-	const { height } = useWindowDimensions()
+	const insets = useSafeAreaInsets()
+	const { width, height } = useWindowDimensions()
+	const isTablet = width >= 768
 	const closedOffset = height
 	const maxSheetHeight = height * maxHeightRatio
+
+	const headerAndHandleHeight = 74
+	const footerHeight = footer ? 64 : 0
+	const maxScrollHeight = Math.max(
+		120,
+		maxSheetHeight - headerAndHandleHeight - footerHeight - insets.bottom,
+	)
 
 	const [modalVisible, setModalVisible] = useState(visible)
 
 	const sheetTranslateY = useRef(new Animated.Value(closedOffset)).current
-
-	// Keep this in a ref rather than state so the PanResponder always
-	// has access to the latest scroll position without being recreated.
-	const scrollOffsetY = useRef(0)
 
 	const animateSheetOpen = () => {
 		sheetTranslateY.setValue(closedOffset)
@@ -92,26 +97,14 @@ export function AppBottomSheet({
 	}
 
 	/**
-	 * Sheet drag responder.
-	 *
-	 * IMPORTANT:
-	 * We only take control of the gesture when the ScrollView is already
-	 * at the top and the user is dragging downward.
-	 *
-	 * This means:
-	 * - Scrolling up/down normally remains owned by ScrollView.
-	 * - Pulling down from the top moves the entire sheet.
-	 * - Releasing after enough distance/velocity closes the sheet.
+	 * Dedicated handle & header PanResponder:
+	 * Responds ONLY to downward dragging gestures on the handle bar or header area.
 	 */
-	const panResponder = useRef(
+	const handlePanResponder = useRef(
 		PanResponder.create({
-			onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-				const isAtTop = scrollOffsetY.current <= SCROLL_TOP_THRESHOLD
-				const isDraggingDown = gestureState.dy > 6
-				const isMostlyVertical =
-					Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
-
-				return isAtTop && isDraggingDown && isMostlyVertical
+			onStartShouldSetPanResponder: () => false,
+			onMoveShouldSetPanResponder: (_, gestureState) => {
+				return Math.abs(gestureState.dy) > 4 && gestureState.dy > 0
 			},
 
 			onPanResponderGrant: () => {
@@ -161,29 +154,42 @@ export function AppBottomSheet({
 			animationType="fade"
 			onRequestClose={requestClose}
 		>
-			<Pressable
-				style={styles.sheetOverlay}
-				onPress={requestClose}
+			<View
+				style={[
+					styles.sheetOverlay,
+					isTablet && styles.sheetOverlayTablet,
+				]}
 			>
+				{/* Backdrop pressable behind the sheet card */}
+				<Pressable
+					style={StyleSheet.absoluteFill}
+					onPress={requestClose}
+				/>
+
 				<Animated.View
 					style={[
 						styles.sheet,
+						isTablet && styles.sheetTablet,
 						{
 							maxHeight: maxSheetHeight,
 							transform: [{ translateY: sheetTranslateY }],
 						},
 					]}
 				>
-					<Pressable
-	style={styles.sheetBody}
-	onPress={(event) => event.stopPropagation()}
-	{...panResponder.panHandlers}
->
-						<View style={styles.sheetHandleHitArea}>
+					<View style={[styles.sheetBody, { maxHeight: maxSheetHeight }]}>
+						{/* Drag Handle Area */}
+						<View
+							style={styles.sheetHandleHitArea}
+							{...handlePanResponder.panHandlers}
+						>
 							<View style={styles.sheetHandle} />
 						</View>
 
-						<View style={styles.sheetHeader}>
+						{/* Header Area */}
+						<View
+							style={styles.sheetHeader}
+							{...handlePanResponder.panHandlers}
+						>
 							<AppTypography
 								variant="h4"
 								style={styles.sheetTitle}
@@ -204,40 +210,57 @@ export function AppBottomSheet({
 							</TouchableOpacity>
 						</View>
 
+						{/* Scrollable Content or Custom View */}
 						{scrollEnabled ? (
 							<ScrollView
-	style={styles.sheetScroll}
-	showsVerticalScrollIndicator={false}
-	bounces={false}
-	scrollEventThrottle={16}
-	onScroll={(event) => {
-		scrollOffsetY.current =
-			event.nativeEvent.contentOffset.y
-	}}
-	contentContainerStyle={[
-		styles.sheetContent,
-		{ paddingHorizontal: 22 },
-	]}
->
-	{children}
-</ScrollView>
+								style={[styles.sheetScroll, { maxHeight: maxScrollHeight }]}
+								showsVerticalScrollIndicator={false}
+								keyboardShouldPersistTaps="handled"
+								scrollEventThrottle={16}
+								bounces={true}
+								overScrollMode="always"
+								contentContainerStyle={[
+									styles.sheetContent,
+									{
+										paddingBottom: footer
+											? 16
+											: Math.max(insets.bottom + 16, 24),
+									},
+								]}
+							>
+								{children}
+							</ScrollView>
 						) : (
 							<View
-								style={[styles.sheetScroll, styles.sheetContent]}
-								{...panResponder.panHandlers}
+								style={[
+									styles.sheetScroll,
+									styles.sheetContent,
+									{
+										maxHeight: maxScrollHeight,
+										paddingBottom: footer
+											? 16
+											: Math.max(insets.bottom + 16, 24),
+									},
+								]}
 							>
 								{children}
 							</View>
 						)}
 
+						{/* Footer Area */}
 						{footer && (
-							<View style={styles.sheetFooterContainer}>
+							<View
+								style={[
+									styles.sheetFooterContainer,
+									{ paddingBottom: Math.max(insets.bottom, 12) },
+								]}
+							>
 								{footer}
 							</View>
 						)}
-					</Pressable>
+					</View>
 				</Animated.View>
-			</Pressable>
+			</View>
 		</Modal>
 	)
 }
@@ -247,21 +270,39 @@ export default AppBottomSheet
 const styles = StyleSheet.create({
 	sheetOverlay: {
 		flex: 1,
-		backgroundColor: 'rgba(18, 28, 33, 0.28)',
+		backgroundColor: 'rgba(18, 28, 33, 0.38)',
 		justifyContent: 'flex-end',
+		alignItems: 'center',
+	},
+
+	sheetOverlayTablet: {
+		paddingHorizontal: 24,
+		paddingBottom: 24,
 	},
 
 	sheet: {
+		width: '100%',
+		maxWidth: 540,
 		backgroundColor: '#ffffff',
-		borderTopLeftRadius: 18,
-		borderTopRightRadius: 18,
-		paddingTop: 10,
-		paddingBottom: 20,
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
 		overflow: 'hidden',
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: -4 },
+		shadowOpacity: 0.12,
+		shadowRadius: 16,
+		elevation: 10,
+		zIndex: 10,
+		flexShrink: 1,
+	},
+
+	sheetTablet: {
+		borderRadius: 22,
+		maxWidth: 540,
 	},
 
 	sheetBody: {
-		maxHeight: '100%',
+		width: '100%',
 		flexShrink: 1,
 	},
 
@@ -276,14 +317,14 @@ const styles = StyleSheet.create({
 	sheetHandleHitArea: {
 		paddingTop: 10,
 		paddingBottom: 8,
-		marginBottom: 8,
+		marginBottom: 4,
 	},
 
 	sheetHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		paddingHorizontal: 22,
+		paddingHorizontal: 16,
 		paddingBottom: 14,
 		borderBottomWidth: 1,
 		borderBottomColor: '#eef4f5',
@@ -306,20 +347,18 @@ const styles = StyleSheet.create({
 	},
 
 	sheetScroll: {
-		flexGrow: 1,
 		flexShrink: 1,
 	},
 
 	sheetContent: {
-		flexGrow: 0,
-		paddingHorizontal: 30,
-		paddingBottom: 16,
+		paddingTop: 12,
+		paddingHorizontal: 16,
 	},
 
 	sheetFooterContainer: {
-		paddingHorizontal: 22,
+		paddingHorizontal: 16,
 		paddingTop: 12,
-		paddingBottom: 4,
+		paddingBottom: 12,
 		borderTopWidth: 1,
 		borderTopColor: '#eef4f5',
 		backgroundColor: '#ffffff',

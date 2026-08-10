@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
+import { FlatList, Pressable, RefreshControl, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import { useNavigation } from '@react-navigation/native'
@@ -17,6 +17,10 @@ import type { AppStackParamList } from '../../navigation/types'
 
 export default function NotificationPage({ navigation: navProp }: any) {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
+	const paddingHorizontal = isTablet ? (width >= 1024 ? 40 : 32) : 16
+
 	const [notifications, setNotifications] = useState<AppNotification[]>([])
 	const [loading, setLoading] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
@@ -74,7 +78,7 @@ export default function NotificationPage({ navigation: navProp }: any) {
 				<View style={styles.waveOne} />
 				<View style={styles.waveTwo} />
 
-				<View style={styles.headerRow}>
+				<View style={[styles.headerRow, isTablet && styles.containerTablet]}>
 					<Pressable
 						onPress={() => (navProp ?? navigation)?.goBack?.()}
 						hitSlop={10}
@@ -92,7 +96,11 @@ export default function NotificationPage({ navigation: navProp }: any) {
 			<FlatList
 				data={notifications}
 				keyExtractor={(item) => item.id}
-				contentContainerStyle={styles.listContent}
+				contentContainerStyle={[
+					styles.listContent,
+					isTablet && styles.containerTablet,
+					{ paddingHorizontal },
+				]}
 				showsVerticalScrollIndicator={false}
 				refreshControl={
 					<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#0c7c7c']} />
@@ -148,6 +156,12 @@ const styles = StyleSheet.create({
 	headerRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		width: '100%',
+	},
+	containerTablet: {
+		maxWidth: 960,
+		width: '100%',
+		alignSelf: 'center',
 	},
 	backButton: {
 		width: 28,
@@ -166,6 +180,7 @@ const styles = StyleSheet.create({
 		paddingTop: 16,
 		paddingBottom: 28,
 		flexGrow: 1,
+		width: '100%',
 	},
 	emptyState: {
 		alignItems: 'center',

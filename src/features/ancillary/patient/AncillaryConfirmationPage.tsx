@@ -1,7 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import {
-	ActivityIndicator,
-	Image,
 	ScrollView,
 	StyleSheet,
 	View,
@@ -28,16 +26,6 @@ export default function AncillaryConfirmationPage() {
 	const schedule = payload.schedule || { dateLabel: 'Today, Oct 14', timeSlot: '09:00 AM - 10:00 AM' }
 	const location = payload.location || '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi'
 	const serviceName = payload.serviceName || 'Wound Dressing & Care'
-
-	// Simulated backend auto-assignment loading state
-	const [assigning, setAssigning] = useState(true)
-
-	useEffect(() => {
-		const timer = setTimeout(() => {
-			setAssigning(false)
-		}, 1500)
-		return () => clearTimeout(timer)
-	}, [])
 
 	const handleGoToBookings = () => {
 		if (ROUTES.STACK.APPOINTMENTS) {
@@ -78,93 +66,9 @@ export default function AncillaryConfirmationPage() {
 					<View style={styles.confirmMsgBox}>
 						<MaterialCommunityIcons name="information-outline" size={18} color="#1F5F68" style={styles.msgIcon} />
 						<AppTypography variant="caption" style={styles.confirmMsgText}>
-							Your healthcare service has been successfully booked. A suitable nearby healthcare professional has been assigned and has received the appointment details.
+							Your healthcare service has been successfully booked. You will receive appointment details and updates shortly.
 						</AppTypography>
 					</View>
-				</View>
-
-				{/* 2. Assigned Healthcare Professional Profile Section */}
-				<View style={styles.assignmentCard}>
-					<AppTypography variant="h3" style={styles.cardHeading}>
-						Assigned Healthcare Professional
-					</AppTypography>
-
-					{assigning ? (
-						<View style={styles.assigningBox}>
-							<ActivityIndicator size="small" color="#1F5F68" style={styles.spinner} />
-							<View style={styles.assigningTextCol}>
-								<AppTypography variant="h4" style={styles.assigningTitle}>
-									Assigning nearby healthcare professional...
-								</AppTypography>
-								<AppTypography variant="caption" style={styles.assigningDesc}>
-									Automatic matching based on patient location, availability & eligibility
-								</AppTypography>
-							</View>
-						</View>
-					) : (
-						<View style={styles.proProfileBox}>
-							<View style={styles.proHeaderRow}>
-								<Image
-									source={{
-										uri: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80',
-									}}
-									style={styles.proAvatar}
-									resizeMode="cover"
-								/>
-								<View style={styles.proInfoCol}>
-									<View style={styles.proNameRow}>
-										<AppTypography variant="h3" style={styles.proName}>
-											Nurse Sarah Jenkins, RN
-										</AppTypography>
-										<View style={styles.verifiedTag}>
-											<Ionicons name="checkmark-circle" size={12} color="#1F5F68" />
-											<AppTypography variant="caption" style={styles.verifiedTagText}>
-												Verified
-											</AppTypography>
-										</View>
-									</View>
-
-									<AppTypography variant="caption" style={styles.proProfession}>
-										Certified Home Healthcare Nurse
-									</AppTypography>
-
-									<View style={styles.proMetaRow}>
-										<View style={styles.metaItem}>
-											<Ionicons name="star" size={13} color="#F59E0B" />
-											<AppTypography variant="caption" style={styles.metaText}>
-												4.9 (124 reviews)
-											</AppTypography>
-										</View>
-										<AppTypography variant="caption" style={styles.metaDivider}>
-											•
-										</AppTypography>
-										<AppTypography variant="caption" style={styles.metaText}>
-											7 yrs experience
-										</AppTypography>
-									</View>
-
-									<View style={styles.distanceBadge}>
-										<Ionicons name="navigate-outline" size={12} color="#1F5F68" />
-										<AppTypography variant="caption" style={styles.distanceText}>
-											2.4 km away from visit location
-										</AppTypography>
-									</View>
-								</View>
-							</View>
-
-							<View style={styles.arrivalBox}>
-								<MaterialCommunityIcons name="clock-check-outline" size={20} color="#1F5F68" />
-								<View style={styles.arrivalTextCol}>
-									<AppTypography variant="caption" style={styles.arrivalTitle}>
-										Scheduled Appointment Time
-									</AppTypography>
-									<AppTypography variant="h4" style={styles.arrivalVal}>
-										{schedule.dateLabel || 'Today'} at {schedule.timeSlot || '09:00 AM'}
-									</AppTypography>
-								</View>
-							</View>
-						</View>
-					)}
 				</View>
 
 				{/* 3. Appointment Confirmation Details Card */}
@@ -321,134 +225,6 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#191C1D',
 		marginBottom: 12,
-	},
-	assigningBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#F0F9F9',
-		borderRadius: 12,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#D4EFEF',
-	},
-	spinner: {
-		marginRight: 14,
-	},
-	assigningTextCol: {
-		flex: 1,
-	},
-	assigningTitle: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#1F5F68',
-	},
-	assigningDesc: {
-		fontSize: 11,
-		color: '#475569',
-		marginTop: 2,
-	},
-	proProfileBox: {
-		backgroundColor: '#F8FAFC',
-		borderRadius: 14,
-		padding: 14,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-	},
-	proHeaderRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-	},
-	proAvatar: {
-		width: 58,
-		height: 58,
-		borderRadius: 29,
-		backgroundColor: '#E2E8F0',
-	},
-	proInfoCol: {
-		flex: 1,
-		marginLeft: 12,
-	},
-	proNameRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	proName: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#191C1D',
-		flex: 1,
-	},
-	verifiedTag: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 10,
-		gap: 2,
-	},
-	verifiedTagText: {
-		fontSize: 10,
-		fontWeight: '600',
-		color: '#1F5F68',
-	},
-	proProfession: {
-		fontSize: 12,
-		color: '#526062',
-		marginTop: 1,
-	},
-	proMetaRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 4,
-		gap: 6,
-	},
-	metaItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 3,
-	},
-	metaText: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#64748B',
-	},
-	metaDivider: {
-		color: '#94A3B8',
-		fontSize: 10,
-	},
-	distanceBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 6,
-		gap: 4,
-	},
-	distanceText: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#1F5F68',
-	},
-	arrivalBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#F0F9F9',
-		borderRadius: 10,
-		padding: 10,
-		marginTop: 12,
-		gap: 8,
-	},
-	arrivalTextCol: {
-		flex: 1,
-	},
-	arrivalTitle: {
-		fontSize: 11,
-		color: '#526062',
-	},
-	arrivalVal: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#1F5F68',
 	},
 	card: {
 		backgroundColor: '#FFFFFF',

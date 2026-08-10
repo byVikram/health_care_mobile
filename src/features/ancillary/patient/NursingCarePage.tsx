@@ -163,7 +163,7 @@ export default function NursingCarePage() {
 
 	if (width >= 1024) {
 		numColumns = 3
-		paddingHorizontal = 28
+		paddingHorizontal = 32
 	} else if (width >= 768) {
 		numColumns = 2
 		paddingHorizontal = 24
@@ -262,7 +262,11 @@ export default function NursingCarePage() {
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
 			<ScrollView
-				contentContainerStyle={[styles.scrollContent, { paddingHorizontal }]}
+				contentContainerStyle={[
+					styles.scrollContent,
+					isTablet && styles.scrollContentTablet,
+					{ paddingHorizontal },
+				]}
 				showsVerticalScrollIndicator={false}
 			>
 				{/* 1. Header Section */}
@@ -320,7 +324,8 @@ export default function NursingCarePage() {
 					<ScrollView
 						horizontal
 						showsHorizontalScrollIndicator={false}
-						contentContainerStyle={styles.horizontalScrollContent}
+						style={{ marginHorizontal: -paddingHorizontal }}
+						contentContainerStyle={{ paddingHorizontal }}
 					>
 						{POPULAR_SERVICES.map((service) => (
 							<PopularServiceCard
@@ -412,6 +417,11 @@ const styles = StyleSheet.create({
 	scrollContent: {
 		paddingHorizontal: 16,
 		paddingBottom: 80,
+	},
+	scrollContentTablet: {
+		maxWidth: 1080,
+		width: '100%',
+		alignSelf: 'center',
 	},
 	headerContainer: {
 		paddingTop: 8,

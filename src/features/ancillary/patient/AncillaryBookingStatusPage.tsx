@@ -54,17 +54,6 @@ export default function AncillaryBookingStatusPage() {
 		timeSlot: '09:00 AM - 10:00 AM',
 	}
 
-	const professional = bookingData.professional || {
-		name: 'Nurse Sarah Jenkins, RN',
-		profession: 'Certified Home Healthcare Nurse',
-		rating: '4.9 ★ (124 reviews)',
-		experience: '7 yrs experience',
-		verified: true,
-		distance: '2.4 km away',
-		avatar:
-			'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80',
-	}
-
 	const pricing = bookingData.pricing || {
 		basePrice: '₹499',
 		severityAdjustment: '₹100',
@@ -116,66 +105,11 @@ export default function AncillaryBookingStatusPage() {
 						Appointment Confirmed
 					</AppTypography>
 					<AppTypography variant="caption" style={styles.statusSubtitle}>
-						Healthcare professional assigned and scheduled for home visit.
+						Your appointment has been scheduled for a home visit.
 					</AppTypography>
 				</View>
 
-				{/* 2. Assigned Healthcare Professional Profile */}
-				<View style={styles.card}>
-					<AppTypography variant="h3" style={styles.cardSectionTitle}>
-						Assigned Healthcare Professional
-					</AppTypography>
-
-					<View style={styles.proProfileBox}>
-						<View style={styles.proHeaderRow}>
-							<Image source={{ uri: professional.avatar }} style={styles.proAvatar} resizeMode="cover" />
-
-							<View style={styles.proInfoCol}>
-								<View style={styles.proNameRow}>
-									<AppTypography variant="h3" style={styles.proName}>
-										{professional.name}
-									</AppTypography>
-									{professional.verified && (
-										<View style={styles.verifiedTag}>
-											<Ionicons name="checkmark-circle" size={12} color="#1F5F68" />
-											<AppTypography variant="caption" style={styles.verifiedTagText}>
-												Verified
-											</AppTypography>
-										</View>
-									)}
-								</View>
-
-								<AppTypography variant="caption" style={styles.proProfession}>
-									{professional.profession}
-								</AppTypography>
-
-								<View style={styles.proMetaRow}>
-									<View style={styles.metaItem}>
-										<Ionicons name="star" size={13} color="#F59E0B" />
-										<AppTypography variant="caption" style={styles.metaText}>
-											{professional.rating}
-										</AppTypography>
-									</View>
-									<AppTypography variant="caption" style={styles.metaDivider}>
-										•
-									</AppTypography>
-									<AppTypography variant="caption" style={styles.metaText}>
-										{professional.experience}
-									</AppTypography>
-								</View>
-
-								<View style={styles.distanceBadge}>
-									<Ionicons name="navigate-outline" size={12} color="#1F5F68" />
-									<AppTypography variant="caption" style={styles.distanceText}>
-										{professional.distance}
-									</AppTypography>
-								</View>
-							</View>
-						</View>
-					</View>
-				</View>
-
-				{/* 3. Healthcare Service Details */}
+				{/* 2. Healthcare Service Details */}
 				<View style={styles.card}>
 					<AppTypography variant="h3" style={styles.cardSectionTitle}>
 						Healthcare Service Details
@@ -204,7 +138,7 @@ export default function AncillaryBookingStatusPage() {
 					</View>
 				</View>
 
-				{/* 4. Patient Information (Read-Only) */}
+				{/* 3. Patient Information (Read-Only) */}
 				<View style={styles.card}>
 					<AppTypography variant="h3" style={styles.cardSectionTitle}>
 						Patient Information
@@ -457,88 +391,6 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#191C1D',
 		marginBottom: 12,
-	},
-	proProfileBox: {
-		backgroundColor: '#F8FAFC',
-		borderRadius: 14,
-		padding: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-	},
-	proHeaderRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-	},
-	proAvatar: {
-		width: 58,
-		height: 58,
-		borderRadius: 29,
-		backgroundColor: '#E2E8F0',
-	},
-	proInfoCol: {
-		flex: 1,
-		marginLeft: 12,
-	},
-	proNameRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	proName: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#191C1D',
-		flex: 1,
-	},
-	verifiedTag: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 10,
-		gap: 2,
-	},
-	verifiedTagText: {
-		fontSize: 10,
-		fontWeight: '600',
-		color: '#1F5F68',
-	},
-	proProfession: {
-		fontSize: 12,
-		color: '#526062',
-		marginTop: 1,
-	},
-	proMetaRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 4,
-		gap: 6,
-	},
-	metaItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 3,
-	},
-	metaText: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#64748B',
-	},
-	metaDivider: {
-		color: '#94A3B8',
-		fontSize: 10,
-	},
-	distanceBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 6,
-		gap: 4,
-	},
-	distanceText: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#1F5F68',
 	},
 	serviceRow: {
 		flexDirection: 'row',
