@@ -61,6 +61,7 @@ export type PickProps = {
 	onAppointmentTypeChange?: (type: 'clinic' | 'video') => void
 	/** Availability screen only: shows left-side status strip on each slot + legend */
 	showAvailabilityMode?: boolean
+	showAppointmentTypeToggle?: boolean
 }
 
 export default function DateSlotPicker(props: PickProps) {
@@ -92,6 +93,7 @@ export default function DateSlotPicker(props: PickProps) {
 		selectedAppointmentType,
 		onAppointmentTypeChange,
 		showAvailabilityMode = false,
+		showAppointmentTypeToggle = true,
 	} = props
 
 	const today = new Date()
@@ -278,7 +280,7 @@ export default function DateSlotPicker(props: PickProps) {
 			{showTimeSlots ? (
 				<>
 					{/* Time Header */}
-					{hideHeader ? null : (
+					{hideHeader || !showAppointmentTypeToggle ? null : (
 						<View style={styles.toggleContainer}>
 							<Text style={styles.toggleTitle}>Type of Appointment</Text>
 
@@ -478,6 +480,8 @@ export default function DateSlotPicker(props: PickProps) {
 
 													<AppTypography
 														variant="caption"
+														numberOfLines={1}
+														adjustsFontSizeToFit
 														style={[
 															styles.timeText,
 															isSelected && !showAvailabilityMode && styles.timeTextSelected,
@@ -678,12 +682,11 @@ const styles = StyleSheet.create({
 	timeBox: {
 		borderWidth: 1.5,
 		borderColor: '#dde3e8',
-		borderRadius: 8,
+		borderRadius: 10,
 		paddingVertical: 10,
-		paddingHorizontal: 10,
+		paddingHorizontal: 12,
 		marginBottom: 10,
-		height: 44,
-		minHeight: 44,
+		minHeight: 48,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#fff',
@@ -696,7 +699,7 @@ const styles = StyleSheet.create({
 		overflow: 'hidden',
 	},
 	timeBoxSingleLine: {
-		height: 44,
+		minHeight: 48,
 		paddingVertical: 0,
 	},
 	timeBoxSpacingRight: {
@@ -730,9 +733,10 @@ const styles = StyleSheet.create({
 		backgroundColor: '#fff',
 	},
 	timeText: {
-		fontSize: 13,
+		fontSize: 13.5,
 		fontWeight: '600',
 		color: '#42525d',
+		textAlign: 'center',
 	},
 	timeTextSelected: {
 		color: '#fff',

@@ -50,6 +50,7 @@ export default function TrackAppointmentPage() {
 
 	const activeStageIndex = bookingData.activeStageIndex ?? 2
 	const otp = String(bookingData.otp || '4291')
+	const isTravelling = activeStageIndex >= 1 && activeStageIndex <= 3
 
 	const handleCallNurse = () => {
 		Linking.openURL(`tel:${nurse.phone || '+919876543210'}`)
@@ -66,147 +67,204 @@ export default function TrackAppointmentPage() {
 		})
 	}
 
+	const renderStatusBanner = () => (
+		<View style={styles.statusBanner}>
+			<View style={styles.statusIconWrap}>
+				<Ionicons name="car-outline" size={20} color="#296769" />
+			</View>
+			<View style={styles.statusTextCol}>
+				<AppTypography variant="h4" style={styles.statusTitle}>
+					{activeStageIndex === 2 ? 'Your nurse is on the way' : TRACKING_STAGES[activeStageIndex]?.label || 'Service In Progress'}
+				</AppTypography>
+				<AppTypography variant="caption" style={styles.statusSubtitle}>
+					{nurse.name} is arriving in {etaMinutes} minutes
+				</AppTypography>
+			</View>
+		</View>
+	)
+
+	const renderOtpCard = () => (
+		<View style={[styles.otpCard, isTablet && styles.otpCardTablet]}>
+			{isTablet ? (
+				/* Approved Tablet Layout */
+				<>
+					<View style={styles.otpInfoSection}>
+						<View style={styles.otpIconBadge}>
+							<Ionicons name="lock-closed" size={14} color="#2B6F71" />
+						</View>
+						<View style={styles.otpTextCol}>
+							<Text style={styles.otpHeaderText} numberOfLines={1}>Start-Service OTP</Text>
+							<Text style={styles.otpSubtext}>Provide this to the nurse upon arrival</Text>
+						</View>
+					</View>
+
+					<View style={styles.otpDigitsRow}>
+						{otp.split('').map((digit: string, index: number) => (
+							<View key={index} style={styles.otpDigitBoxTablet}>
+								<Text style={styles.otpDigitTextTablet}>{digit}</Text>
+							</View>
+						))}
+					</View>
+				</>
+			) : (
+				/* Refined Mobile Layout */
+				<View style={styles.otpMobileCardInner}>
+					<View style={styles.otpMobileLeftBlock}>
+						<View style={styles.otpIconBadgeMobile}>
+							<Ionicons name="lock-closed" size={12} color="#2B6F71" />
+						</View>
+						<View style={styles.otpMobileTextCol}>
+							<Text style={styles.otpHeaderTextMobile} numberOfLines={1}>Start-Service OTP</Text>
+							<Text style={styles.otpSubtextMobile}>Provide this to the nurse upon arrival</Text>
+						</View>
+					</View>
+
+					<View style={styles.otpDigitsRowMobile}>
+						{otp.split('').map((digit: string, index: number) => (
+							<View key={index} style={styles.otpDigitBoxMobile}>
+								<Text style={styles.otpDigitTextMobile}>{digit}</Text>
+							</View>
+						))}
+					</View>
+				</View>
+			)}
+		</View>
+	)
+
+	const renderNurseCard = () => (
+		<View style={styles.nurseCard}>
+			<View style={styles.nurseHeaderRow}>
+				<Image source={{ uri: nurse.avatar }} style={styles.nurseAvatar} />
+				<View style={styles.nurseInfoCol}>
+					<AppTypography variant="h4" style={styles.nurseName}>
+						{nurse.name}
+					</AppTypography>
+					<AppTypography variant="caption" style={styles.nurseRole}>
+						{nurse.designation || 'Registered Nurse'}
+					</AppTypography>
+					<View style={styles.ratingRow}>
+						<RatingStars rating={rating} size={13} />
+						<Text style={styles.ratingText}>
+							{rating.toFixed(1)} ({reviewsCount} reviews) • {experienceYears} yrs exp
+						</Text>
+					</View>
+				</View>
+			</View>
+
+			<View style={styles.nurseActionsRow}>
+				<TouchableOpacity style={styles.nurseActionBtn} onPress={handleCallNurse} activeOpacity={0.8}>
+					<Ionicons name="call-outline" size={16} color="#055759" />
+					<Text style={styles.nurseActionText} numberOfLines={1}>Call Nurse</Text>
+				</TouchableOpacity>
+				<TouchableOpacity style={styles.nurseActionBtn} onPress={handleMessage} activeOpacity={0.8}>
+					<Ionicons name="chatbubble-outline" size={16} color="#055759" />
+					<Text style={styles.nurseActionText} numberOfLines={1}>Message</Text>
+				</TouchableOpacity>
+				<TouchableOpacity style={styles.nurseActionBtn} onPress={handleReschedule} activeOpacity={0.8}>
+					<Ionicons name="calendar-outline" size={16} color="#055759" />
+					<Text style={styles.nurseActionText} numberOfLines={1}>Reschedule</Text>
+				</TouchableOpacity>
+			</View>
+		</View>
+	)
+
+	const renderAppointmentCard = () => (
+		<View style={styles.card}>
+			<AppTypography variant="h4" style={styles.cardTitle}>
+				Appointment Details
+			</AppTypography>
+
+			<View style={styles.detailRow}>
+				<View style={styles.detailIconWrap}>
+					<MaterialCommunityIcons name="medical-bag" size={18} color="#3f4849" />
+				</View>
+				<View style={styles.detailTextCol}>
+					<Text style={styles.detailLabel}>Service</Text>
+					<Text style={styles.detailValue}>{appointment.service}</Text>
+				</View>
+			</View>
+
+			<View style={styles.detailRow}>
+				<View style={styles.detailIconWrap}>
+					<Ionicons name="calendar-outline" size={18} color="#3f4849" />
+				</View>
+				<View style={styles.detailTextCol}>
+					<Text style={styles.detailLabel}>Date & Time</Text>
+					<Text style={styles.detailValue}>{appointment.dateTime}</Text>
+				</View>
+			</View>
+
+			<View style={[styles.detailRow, styles.detailRowLast]}>
+				<View style={styles.detailIconWrap}>
+					<Ionicons name="location-outline" size={18} color="#3f4849" />
+				</View>
+				<View style={styles.detailTextCol}>
+					<Text style={styles.detailLabel}>Location</Text>
+					<Text style={styles.detailValue}>{appointment.locationLabel}</Text>
+					<Text style={styles.detailSubValue}>{appointment.address}</Text>
+				</View>
+			</View>
+		</View>
+	)
+
+	const renderTimelineCard = () => (
+		<View style={styles.card}>
+			<AppTypography variant="h4" style={styles.cardTitle}>
+				Service Progress
+			</AppTypography>
+			<AppointmentTrackingTimeline stages={TRACKING_STAGES} activeIndex={activeStageIndex} />
+		</View>
+	)
+
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader
-				title="Track Appointment"
-				rightElement={
-					<TouchableOpacity style={styles.helpBtn} activeOpacity={0.8}>
-						<Ionicons name="help-circle-outline" size={22} color="#ffffff" />
-					</TouchableOpacity>
-				}
-			/>
+			<AppScreenHeader title="Track Appointment" />
 
 			<ScrollView
 				contentContainerStyle={[
 					styles.scrollContent,
 					isTablet && styles.scrollContentTablet,
-					{ paddingBottom: insets.bottom + 140 },
+					{ paddingBottom: insets.bottom + 24 },
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Nurse status banner */}
-				<View style={styles.statusBanner}>
-					<View style={styles.statusIconWrap}>
-						<Ionicons name="car-outline" size={20} color="#296769" />
-					</View>
-					<View style={styles.statusTextCol}>
-						<AppTypography variant="h4" style={styles.statusTitle}>
-							Your nurse is on the way
-						</AppTypography>
-						<AppTypography variant="caption" style={styles.statusSubtitle}>
-							{nurse.name} is arriving in {etaMinutes} minutes
-						</AppTypography>
-					</View>
-				</View>
+				{isTablet ? (
+					<View style={styles.tabletGrid}>
+						<View style={styles.tabletCol}>
+							{renderStatusBanner()}
+							{renderOtpCard()}
+							{isTravelling && (
+								<NurseMapTracker
+									nurseAvatar={nurse.avatar}
+									etaText={`Arriving in ${etaMinutes} mins`}
+									distanceText="1.5 km away"
+								/>
+							)}
+							{renderTimelineCard()}
+						</View>
 
-				{/* Map / tracking section */}
-				<NurseMapTracker nurseAvatar={nurse.avatar} etaText={`Arriving in ${etaMinutes} mins`} />
-
-				{/* Nurse info card */}
-				<View style={styles.nurseCard}>
-					<View style={styles.nurseHeaderRow}>
-						<Image source={{ uri: nurse.avatar }} style={styles.nurseAvatar} />
-						<View style={styles.nurseInfoCol}>
-							<AppTypography variant="h4" style={styles.nurseName}>
-								{nurse.name}
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.nurseRole}>
-								{nurse.designation || 'Registered Nurse'}
-							</AppTypography>
-							<View style={styles.ratingRow}>
-								<RatingStars rating={rating} size={13} />
-								<Text style={styles.ratingText}>
-									{rating.toFixed(1)} ({reviewsCount} reviews) • {experienceYears} yrs exp
-								</Text>
-							</View>
+						<View style={styles.tabletCol}>
+							{renderNurseCard()}
+							{renderAppointmentCard()}
 						</View>
 					</View>
-
-					<View style={styles.nurseActionsRow}>
-						<TouchableOpacity style={styles.nurseActionBtn} onPress={handleCallNurse} activeOpacity={0.8}>
-							<Ionicons name="call-outline" size={18} color="#055759" />
-							<Text style={styles.nurseActionText}>Call Nurse</Text>
-						</TouchableOpacity>
-						<TouchableOpacity style={styles.nurseActionBtn} onPress={handleMessage} activeOpacity={0.8}>
-							<Ionicons name="chatbubble-outline" size={18} color="#055759" />
-							<Text style={styles.nurseActionText}>Message</Text>
-						</TouchableOpacity>
-					</View>
-				</View>
-
-				{/* Appointment details */}
-				<View style={styles.card}>
-					<AppTypography variant="h4" style={styles.cardTitle}>
-						Appointment Details
-					</AppTypography>
-
-					<View style={styles.detailRow}>
-						<View style={styles.detailIconWrap}>
-							<MaterialCommunityIcons name="medical-bag" size={18} color="#3f4849" />
-						</View>
-						<View style={styles.detailTextCol}>
-							<Text style={styles.detailLabel}>Service</Text>
-							<Text style={styles.detailValue}>{appointment.service}</Text>
-						</View>
-					</View>
-
-					<View style={styles.detailRow}>
-						<View style={styles.detailIconWrap}>
-							<Ionicons name="calendar-outline" size={18} color="#3f4849" />
-						</View>
-						<View style={styles.detailTextCol}>
-							<Text style={styles.detailLabel}>Date & Time</Text>
-							<Text style={styles.detailValue}>{appointment.dateTime}</Text>
-						</View>
-					</View>
-
-					<View style={[styles.detailRow, styles.detailRowLast]}>
-						<View style={styles.detailIconWrap}>
-							<Ionicons name="location-outline" size={18} color="#3f4849" />
-						</View>
-						<View style={styles.detailTextCol}>
-							<Text style={styles.detailLabel}>Location</Text>
-							<Text style={styles.detailValue}>{appointment.locationLabel}</Text>
-							<Text style={styles.detailSubValue}>{appointment.address}</Text>
-						</View>
-					</View>
-				</View>
-
-				{/* Status tracking */}
-				<View style={styles.card}>
-					<AppTypography variant="h4" style={styles.cardTitle}>
-						Status Tracking
-					</AppTypography>
-					<AppointmentTrackingTimeline stages={TRACKING_STAGES} activeIndex={activeStageIndex} />
-				</View>
-
-				{/* OTP section */}
-				<View style={styles.otpCard}>
-					<View style={styles.otpHeaderRow}>
-						<Ionicons name="lock-closed-outline" size={16} color="#191c1d" />
-						<Text style={styles.otpHeaderText}>Share OTP to start service</Text>
-					</View>
-					<Text style={styles.otpSubtext}>Provide this pin to the nurse once they arrive.</Text>
-					<View style={styles.otpDigitsRow}>
-						{otp.split('').map((digit: string, index: number) => (
-							<View key={index} style={styles.otpDigitBox}>
-								<Text style={styles.otpDigitText}>{digit}</Text>
-							</View>
-						))}
-					</View>
-				</View>
+				) : (
+					<>
+						{renderStatusBanner()}
+						{renderOtpCard()}
+						{isTravelling && (
+							<NurseMapTracker
+								nurseAvatar={nurse.avatar}
+								etaText={`Arriving in ${etaMinutes} mins`}
+								distanceText="1.5 km away"
+							/>
+						)}
+						{renderNurseCard()}
+						{renderAppointmentCard()}
+						{renderTimelineCard()}
+					</>
+				)}
 			</ScrollView>
-
-			{/* Bottom actions */}
-			<View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-				<AppButton variant="primary" formAction style={styles.bottomBtn} onPress={handleCallNurse}>
-					Call Nurse
-				</AppButton>
-				<AppButton variant="outline" formAction style={[styles.bottomBtn, styles.bottomBtnOutline]} onPress={handleReschedule}>
-					Reschedule
-				</AppButton>
-			</View>
 		</View>
 	)
 }
@@ -216,23 +274,22 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#f8fafa',
 	},
-	helpBtn: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		backgroundColor: 'rgba(255,255,255,0.15)',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
 	scrollContent: {
 		paddingHorizontal: 16,
 		paddingTop: 16,
 	},
 	scrollContentTablet: {
-		maxWidth: 720,
+		maxWidth: 960,
 		width: '100%',
 		alignSelf: 'center',
 		paddingHorizontal: 24,
+	},
+	tabletGrid: {
+		flexDirection: 'row',
+		gap: 20,
+	},
+	tabletCol: {
+		flex: 1,
 	},
 	statusBanner: {
 		flexDirection: 'row',
@@ -240,7 +297,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#adebec',
 		borderRadius: 16,
 		padding: 14,
-		marginBottom: 12,
+		marginBottom: 14,
 		gap: 12,
 	},
 	statusIconWrap: {
@@ -264,19 +321,145 @@ const styles = StyleSheet.create({
 		color: '#296769',
 		marginTop: 2,
 	},
+	otpCard: {
+		backgroundColor: '#ffffff',
+		borderRadius: 12,
+		paddingVertical: 10,
+		paddingHorizontal: 12,
+		marginBottom: 12,
+		borderWidth: 1.2,
+		borderColor: '#2B6F71',
+		elevation: 1,
+		shadowColor: '#2B6F71',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.08,
+		shadowRadius: 4,
+	},
+	otpCardTablet: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingVertical: 12,
+		paddingHorizontal: 18,
+		borderRadius: 14,
+		marginBottom: 16,
+	},
+	otpMobileCardInner: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 10,
+		width: '100%',
+	},
+	otpMobileLeftBlock: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		gap: 8,
+		flex: 1,
+	},
+	otpIconBadgeMobile: {
+		width: 22,
+		height: 22,
+		borderRadius: 11,
+		backgroundColor: '#eef8f8',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 1,
+	},
+	otpMobileTextCol: {
+		flex: 1,
+	},
+	otpHeaderTextMobile: {
+		fontSize: 12.5,
+		fontWeight: '700',
+		color: '#12373E',
+	},
+	otpSubtextMobile: {
+		fontSize: 10,
+		color: '#4b5563',
+		marginTop: 2,
+		lineHeight: 13,
+	},
+	otpDigitsRowMobile: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	otpDigitBoxMobile: {
+		width: 26,
+		height: 32,
+		borderRadius: 6,
+		backgroundColor: '#f8fafc',
+		borderWidth: 1,
+		borderColor: '#94a3b8',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	otpDigitTextMobile: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#12373E',
+	},
+	otpInfoSection: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+		flex: 1,
+		marginRight: 10,
+	},
+	otpIconBadge: {
+		width: 28,
+		height: 28,
+		borderRadius: 14,
+		backgroundColor: '#eef8f8',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	otpTextCol: {
+		flex: 1,
+	},
+	otpHeaderText: {
+		fontSize: 13,
+		fontWeight: '700',
+		color: '#12373E',
+	},
+	otpSubtext: {
+		fontSize: 10.5,
+		color: '#4b5563',
+		marginTop: 1,
+	},
+	otpDigitsRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	otpDigitBoxTablet: {
+		width: 38,
+		height: 40,
+		borderRadius: 9,
+		borderWidth: 1.2,
+		backgroundColor: '#f8fafc',
+		borderColor: '#94a3b8',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	otpDigitTextTablet: {
+		fontSize: 18,
+		fontWeight: '700',
+		color: '#12373E',
+	},
 	nurseCard: {
 		backgroundColor: '#ffffff',
 		borderRadius: 16,
 		padding: 16,
-		marginTop: -32,
-		marginBottom: 12,
+		marginBottom: 16,
 		borderWidth: 1,
 		borderColor: '#e1e3e3',
-		elevation: 3,
+		elevation: 2,
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.08,
-		shadowRadius: 10,
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 6,
 	},
 	nurseHeaderRow: {
 		flexDirection: 'row',
@@ -315,7 +498,7 @@ const styles = StyleSheet.create({
 	},
 	nurseActionsRow: {
 		flexDirection: 'row',
-		gap: 10,
+		gap: 6,
 		marginTop: 16,
 	},
 	nurseActionBtn: {
@@ -323,13 +506,14 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		gap: 6,
+		gap: 4,
 		backgroundColor: '#f2f4f4',
 		borderRadius: 10,
-		paddingVertical: 12,
+		paddingVertical: 10,
+		paddingHorizontal: 4,
 	},
 	nurseActionText: {
-		fontSize: 13,
+		fontSize: 12,
 		fontWeight: '700',
 		color: '#055759',
 	},
@@ -337,7 +521,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 		borderRadius: 16,
 		padding: 16,
-		marginBottom: 12,
+		marginBottom: 16,
 		borderWidth: 1,
 		borderColor: '#e1e3e3',
 	},
@@ -345,7 +529,7 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 		fontWeight: '700',
 		color: '#191c1d',
-		marginBottom: 12,
+		marginBottom: 14,
 	},
 	detailRow: {
 		flexDirection: 'row',
@@ -383,52 +567,7 @@ const styles = StyleSheet.create({
 		color: '#3f4849',
 		marginTop: 1,
 	},
-	otpCard: {
-		backgroundColor: '#eceeee',
-		borderRadius: 16,
-		padding: 16,
-		marginBottom: 12,
-		borderWidth: 1,
-		borderColor: '#e1e3e3',
-		opacity: 0.85,
-	},
-	otpHeaderRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	otpHeaderText: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#191c1d',
-	},
-	otpSubtext: {
-		fontSize: 11,
-		color: '#3f4849',
-		marginTop: 4,
-		marginBottom: 14,
-	},
-	otpDigitsRow: {
-		flexDirection: 'row',
-		justifyContent: 'center',
-		gap: 10,
-	},
-	otpDigitBox: {
-		width: 48,
-		height: 56,
-		borderRadius: 12,
-		backgroundColor: '#ffffff',
-		borderWidth: 1,
-		borderColor: '#bfc8c8',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	otpDigitText: {
-		fontSize: 22,
-		fontWeight: '700',
-		color: '#191c1d',
-	},
-	bottomBar: {
+	stickyBottomBar: {
 		position: 'absolute',
 		left: 0,
 		right: 0,
@@ -436,17 +575,38 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 		borderTopWidth: 1,
 		borderTopColor: '#e1e3e3',
-		paddingHorizontal: 16,
 		paddingTop: 12,
-		gap: 8,
+		paddingHorizontal: 16,
+		elevation: 8,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: -3 },
+		shadowOpacity: 0.08,
+		shadowRadius: 6,
 	},
-	bottomBtn: {
+	bottomBarContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
 		width: '100%',
-		alignSelf: 'stretch',
-		marginTop: 0,
-		borderRadius: 999,
 	},
-	bottomBtnOutline: {
+	bottomBarContainerTablet: {
+		maxWidth: 960,
+		alignSelf: 'center',
+		paddingHorizontal: 24,
+	},
+	actionBtn: {
+		flex: 1,
+		marginTop: 0,
+		borderRadius: 24,
+	},
+	actionBtnOutline: {
 		borderColor: '#2B6F71',
+	},
+	actionBtnLabel: {
+		fontSize: 13,
+		fontWeight: '700',
+	},
+	actionBtnOutlineLabel: {
+		color: '#2B6F71',
 	},
 })

@@ -24,6 +24,8 @@ import {
 	CommonCard,
 	PatientProfileSelectorBottomSheet,
 } from '../../../components/common'
+import DateSlotPicker from '../../../components/common/DateSlotPicker'
+import { SlotGroup } from '../../doctor/doctorService'
 import { ServiceProcedureItem } from '../components/AllServiceCard'
 import { BookingProgressStepper } from '../components/BookingProgressStepper'
 
@@ -56,19 +58,29 @@ const SAVED_ADDRESSES = [
 	},
 ]
 
-const DATE_OPTIONS = [
-	{ id: 'd1', label: 'Today', date: '10 Aug 2025' },
-	{ id: 'd2', label: 'Tomorrow', date: '11 Aug 2025' },
-	{ id: 'd3', label: 'Wed', date: '12 Aug 2025' },
-	{ id: 'd4', label: 'Thu', date: '13 Aug 2025' },
-]
+const ADDRESS_SELECT_OPTIONS: AppSelectOption[] = SAVED_ADDRESSES.map((addr) => ({
+	label: `${addr.label} (${addr.address})`,
+	value: addr.id,
+}))
 
-const TIME_SLOTS = [
-	'09:00 AM - 10:00 AM',
-	'11:00 AM - 12:00 PM',
-	'02:00 PM - 03:00 PM',
-	'05:00 PM - 06:00 PM',
-	'07:00 PM - 08:00 PM',
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+const ANCILLARY_SLOTS: SlotGroup[] = [
+	{
+		label: 'Morning Slots',
+		slots: [
+			{ id: 's1', start_time: '9:00 AM – 10:00 AM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's2', start_time: '11:00 AM – 12:00 PM', end_time: '', status: 'AVAILABLE' },
+		],
+	},
+	{
+		label: 'Afternoon & Evening Slots',
+		slots: [
+			{ id: 's3', start_time: '2:00 PM – 3:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's4', start_time: '5:00 PM – 6:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's5', start_time: '7:00 PM – 8:00 PM', end_time: '', status: 'AVAILABLE' },
+		],
+	},
 ]
 
 const DEFAULT_MOCK_SERVICES: ServiceProcedureItem[] = [
@@ -264,18 +276,22 @@ export default function BookingDetailsPage() {
 		setEditPatientVisible(false)
 	}
 
-	const handleSaveVisitDetails = (addressId: string, dateId: string, timeSlot: string) => {
+	const [selectedDateObj, setSelectedDateObj] = useState<Date>(new Date())
+
+	const handleSaveVisitDetails = (addressId: string, newDate: Date, timeSlot: string) => {
 		const selectedAddrObj = SAVED_ADDRESSES.find((a) => a.id === addressId)
-		const selectedDateObj = DATE_OPTIONS.find((d) => d.id === dateId)
+		setSelectedDateObj(newDate)
+
+		const dayStr = `${newDate.getDate()} ${MONTH_NAMES[newDate.getMonth()]} ${newDate.getFullYear()}`
 
 		setVisit({
 			addressId,
 			addressLabel: selectedAddrObj?.label || 'Home',
 			address: selectedAddrObj?.address || visit.address,
-			dateId,
-			date: selectedDateObj ? `${selectedDateObj.label}, ${selectedDateObj.date}` : visit.date,
-			timeSlot,
-			timeBadge: timeSlot.includes('09:00') ? 'In 2 hours' : 'Confirmed',
+			dateId: 'custom',
+			date: dayStr,
+			timeSlot: timeSlot || '09:00 AM - 10:00 AM',
+			timeBadge: 'Confirmed',
 		})
 		setEditVisitVisible(false)
 	}
@@ -393,20 +409,12 @@ export default function BookingDetailsPage() {
 					<AppTypography variant="h3" style={styles.sectionHeading}>
 						Patient Profile
 					</AppTypography>
-					<View style={styles.patientActionRow}>
-						<TouchableOpacity style={[styles.headerActionBtn, { marginRight: 12 }]} onPress={() => setSwitchProfileVisible(true)} activeOpacity={0.7}>
-							<MaterialCommunityIcons name="account-switch-outline" size={15} color="#1F5F68" />
-							<AppTypography variant="caption" style={styles.actionBtnText}>
-								Switch
-							</AppTypography>
-						</TouchableOpacity>
-						<TouchableOpacity style={styles.headerActionBtn} onPress={handleOpenPatientEdit} activeOpacity={0.7}>
-							<MaterialCommunityIcons name="pencil-outline" size={15} color="#1F5F68" />
-							<AppTypography variant="caption" style={styles.actionBtnText}>
-								Edit Details
-							</AppTypography>
-						</TouchableOpacity>
-					</View>
+					<TouchableOpacity style={styles.headerActionBtn} onPress={() => setSwitchProfileVisible(true)} activeOpacity={0.7}>
+						<MaterialCommunityIcons name="account-switch-outline" size={15} color="#1F5F68" />
+						<AppTypography variant="caption" style={styles.actionBtnText}>
+							Switch Profile
+						</AppTypography>
+					</TouchableOpacity>
 				</View>
 
 
@@ -453,7 +461,7 @@ export default function BookingDetailsPage() {
 						<View style={styles.visitDetailsCol}>
 							<View style={styles.addressLabelRow}>
 								<AppTypography variant="h4" style={styles.visitDetailsHeading}>
-									Visit Address
+									Selected Visit Address
 								</AppTypography>
 								<View style={styles.addressTypeBadge}>
 									<AppTypography variant="caption" style={styles.addressTypeText}>
@@ -622,7 +630,7 @@ export default function BookingDetailsPage() {
 			<EditVisitModal
 				visible={editVisitVisible}
 				currentAddressId={visit.addressId}
-				currentDateId={visit.dateId}
+				currentDate={selectedDateObj}
 				currentTimeSlot={visit.timeSlot}
 				onClose={() => setEditVisitVisible(false)}
 				onSave={handleSaveVisitDetails}
@@ -647,24 +655,27 @@ export default function BookingDetailsPage() {
 interface EditVisitModalProps {
 	visible: boolean
 	currentAddressId: string
-	currentDateId: string
+	currentDate: Date
 	currentTimeSlot: string
 	onClose: () => void
-	onSave: (addressId: string, dateId: string, timeSlot: string) => void
+	onSave: (addressId: string, selectedDate: Date, timeSlot: string) => void
 	onOpenMap: () => void
 }
 
 const EditVisitModal: React.FC<EditVisitModalProps> = ({
 	visible,
 	currentAddressId,
-	currentDateId,
+	currentDate,
 	currentTimeSlot,
 	onClose,
 	onSave,
 	onOpenMap,
 }) => {
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
+
 	const [selectedAddrId, setSelectedAddrId] = useState(currentAddressId)
-	const [selectedDateId, setSelectedDateId] = useState(currentDateId)
+	const [selectedDate, setSelectedDate] = useState<Date>(currentDate || new Date())
 	const [selectedSlot, setSelectedSlot] = useState(currentTimeSlot)
 
 	return (
@@ -673,7 +684,7 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 				{/* Address Section */}
 				<View style={styles.sheetSectionHeaderRow}>
 					<AppTypography variant="h4" style={styles.sheetSectionTitle}>
-						Select Visit Address
+						Selected Visit Address
 					</AppTypography>
 					<TouchableOpacity style={styles.mapLinkBtn} onPress={onOpenMap} activeOpacity={0.7}>
 						<Ionicons name="map-outline" size={14} color="#1F5F68" />
@@ -683,82 +694,35 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 					</TouchableOpacity>
 				</View>
 
-				{SAVED_ADDRESSES.map((addr) => {
-					const isSel = selectedAddrId === addr.id
-					return (
-						<TouchableOpacity
-							key={addr.id}
-							style={[styles.sheetAddrItem, isSel && styles.sheetAddrItemSelected]}
-							onPress={() => setSelectedAddrId(addr.id)}
-							activeOpacity={0.8}
-						>
-							<View style={styles.radioCircle}>
-								{isSel && <View style={styles.radioDot} />}
-							</View>
-							<View style={styles.sheetAddrTextCol}>
-								<AppTypography variant="h4" style={styles.sheetAddrLabel}>
-									{addr.label}
-								</AppTypography>
-								<AppTypography variant="caption" style={styles.sheetAddrSub}>
-									{addr.address}
-								</AppTypography>
-							</View>
-						</TouchableOpacity>
-					)
-				})}
+				<AppSelect
+					options={ADDRESS_SELECT_OPTIONS}
+					value={selectedAddrId}
+					onSelect={setSelectedAddrId}
+					size="form"
+				/>
 
-				{/* Date Picker Section */}
-				<AppTypography variant="h4" style={styles.sheetSectionTitleMargin}>
-					Select Preferred Date
-				</AppTypography>
-				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateRowScroll}>
-					{DATE_OPTIONS.map((d) => {
-						const isSel = selectedDateId === d.id
-						return (
-							<TouchableOpacity
-								key={d.id}
-								style={[styles.dateChip, isSel && styles.dateChipSelected]}
-								onPress={() => setSelectedDateId(d.id)}
-								activeOpacity={0.8}
-							>
-								<AppTypography variant="caption" style={[styles.dateChipText, isSel && styles.dateChipTextSelected]}>
-									{d.label}
-								</AppTypography>
-								<AppTypography variant="h4" style={[styles.dateChipDate, isSel && styles.dateChipDateSelected]}>
-									{d.date}
-								</AppTypography>
-							</TouchableOpacity>
-						)
-					})}
-				</ScrollView>
-
-				{/* Time Slot Section */}
-				<AppTypography variant="h4" style={styles.sheetSectionTitleMargin}>
-					Select Time Slot
-				</AppTypography>
-				<View style={styles.slotGrid}>
-					{TIME_SLOTS.map((slot) => {
-						const isSel = selectedSlot === slot
-						return (
-							<TouchableOpacity
-								key={slot}
-								style={[styles.slotItem, isSel && styles.slotItemSelected]}
-								onPress={() => setSelectedSlot(slot)}
-								activeOpacity={0.8}
-							>
-								<AppTypography variant="caption" style={[styles.slotItemText, isSel && styles.slotItemTextSelected]}>
-									{slot}
-								</AppTypography>
-							</TouchableOpacity>
-						)
-					})}
+				{/* Responsive Date & Time Picker */}
+				<View style={styles.dateSlotPickerWrapper}>
+					<DateSlotPicker
+						selectedDate={selectedDate}
+						onDateChange={setSelectedDate}
+						selectedTime={selectedSlot}
+						onTimeChange={setSelectedSlot}
+						availableSlots={ANCILLARY_SLOTS}
+						dateLabel="Select Preferred Date"
+						timeLabel="Select Time Slot"
+						timeSlotColumns={isTablet ? 2 : 1}
+						disablePast
+						hideHeader={false}
+						showAppointmentTypeToggle={false}
+					/>
 				</View>
 
 				<AppButton
 					variant="primary"
 					formAction
 					style={styles.saveSheetBtn}
-					onPress={() => onSave(selectedAddrId, selectedDateId, selectedSlot)}
+					onPress={() => onSave(selectedAddrId, selectedDate, selectedSlot)}
 				>
 					Save Visit Details
 				</AppButton>
@@ -1303,5 +1267,10 @@ const styles = StyleSheet.create({
 	},
 	slotItemTextSelected: {
 		color: '#FFFFFF',
+	},
+	dateSlotPickerWrapper: {
+		marginTop: 8,
+		marginBottom: 8,
+		marginHorizontal: -8,
 	},
 })

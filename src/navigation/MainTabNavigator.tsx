@@ -194,14 +194,6 @@ export default function MainTabNavigator() {
 							<AppScreenHeader
 								title="Ancillary Dashboard"
 								onBack={() => navigation.navigate(ROUTES.MAIN.HOME)}
-								rightElement={
-									<Pressable
-										onPress={() => navigation.navigate(ROUTES.STACK.ANCILLARY_MY_BOOKINGS)}
-										hitSlop={8}
-									>
-										<MaterialCommunityIcons name="calendar-check-outline" size={22} color="#ffffff" />
-									</Pressable>
-								}
 							/>
 						),
 					}}

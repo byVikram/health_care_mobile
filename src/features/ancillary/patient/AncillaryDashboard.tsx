@@ -233,8 +233,24 @@ export default function AncillaryDashboard() {
 		})
 	}
 
+	let paddingHorizontal = 16
+
+	if (width >= 1024) {
+		paddingHorizontal = 32
+	} else if (width >= 768) {
+		paddingHorizontal = 24
+	}
+
 	return (
-		<ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+		<ScrollView
+			style={styles.container}
+			contentContainerStyle={[
+				styles.content,
+				isTablet && styles.scrollContentTablet,
+				isTablet ? { paddingHorizontal } : undefined,
+			]}
+			showsVerticalScrollIndicator={false}
+		>
 
 			{/* Promotional Banner */}
 			<ImageBackground
@@ -333,7 +349,7 @@ export default function AncillaryDashboard() {
 			</View>
 
 			{/* Recommended Professionals */}
-			<View style={styles.sectionHeaderRow}>
+			{/* <View style={styles.sectionHeaderRow}>
 				<Text style={styles.sectionTitle}>Top Professionals</Text>
 				<TouchableOpacity>
 					<Text style={styles.seeAllText}>View All</Text>
@@ -371,12 +387,12 @@ export default function AncillaryDashboard() {
 						</View>
 					</View>
 				))}
-			</ScrollView>
+			</ScrollView> */}
 
 			{/* Healthcare Packages */}
 			<Text style={styles.sectionTitle}>Healthcare Packages</Text>
-			<View style={styles.packagesContainer}>
-				<View style={styles.packageCard}>
+			<View style={[styles.packagesContainer, isTablet && styles.packagesContainerTablet]}>
+				<View style={[styles.packageCard, isTablet && styles.packageCardTablet]}>
 					<View style={styles.packageHeader}>
 						<View style={styles.packageTextCol}>
 							<Text style={styles.packageTitle}>Monthly Nursing Care</Text>
@@ -410,7 +426,7 @@ export default function AncillaryDashboard() {
 					</View>
 				</View>
 
-				<View style={styles.packageCard}>
+				<View style={[styles.packageCard, isTablet && styles.packageCardTablet]}>
 					<View style={styles.packageHeader}>
 						<View style={styles.packageTextCol}>
 							<Text style={styles.packageTitle}>Elder Care Package</Text>
@@ -434,7 +450,7 @@ export default function AncillaryDashboard() {
 					</View>
 				</View>
 
-				<View style={styles.packageCard}>
+				<View style={[styles.packageCard, isTablet && styles.packageCardTablet]}>
 					<View style={styles.packageHeader}>
 						<View style={styles.packageTextCol}>
 							<Text style={styles.packageTitle}>Post-Surgery Recovery Package</Text>
@@ -458,7 +474,7 @@ export default function AncillaryDashboard() {
 					</View>
 				</View>
 
-				<View style={styles.packageCard}>
+				<View style={[styles.packageCard, isTablet && styles.packageCardTablet]}>
 					<View style={styles.packageHeader}>
 						<View style={styles.packageTextCol}>
 							<Text style={styles.packageTitle}>Physiotherapy & Rehab Package</Text>
@@ -495,6 +511,11 @@ const styles = StyleSheet.create({
 	content: {
 		paddingTop: 16,
 		paddingBottom: 24,
+	},
+	scrollContentTablet: {
+		maxWidth: 1200,
+		width: '100%',
+		alignSelf: 'center',
 	},
 	topBar: {
 		flexDirection: 'row',
@@ -910,6 +931,12 @@ const styles = StyleSheet.create({
 		gap: 12,
 		marginBottom: 24,
 	},
+	packagesContainerTablet: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		justifyContent: 'space-between',
+		gap: 16,
+	},
 	packageCard: {
 		backgroundColor: '#ffffff',
 		borderRadius: 16,
@@ -921,6 +948,9 @@ const styles = StyleSheet.create({
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.05,
 		shadowRadius: 3,
+	},
+	packageCardTablet: {
+		width: '48.8%',
 	},
 	packageHeader: {
 		flexDirection: 'row',
