@@ -234,9 +234,9 @@ const isValidProfileUrl = (value: string, allowedHosts: string[]) => {
 		return false
 	}
 }
-const isValidInstagramUrl = (value: string) => isValidProfileUrl(value, ['instagram.com', 'www.instagram.com'])
-const isValidFacebookUrl = (value: string) => isValidProfileUrl(value, ['facebook.com', 'www.facebook.com'])
-const isValidTwitterUrl = (value: string) => isValidProfileUrl(value, ['twitter.com', 'www.twitter.com', 'x.com', 'www.x.com'])
+// const isValidInstagramUrl = (value: string) => isValidProfileUrl(value, ['instagram.com', 'www.instagram.com'])
+// const isValidFacebookUrl = (value: string) => isValidProfileUrl(value, ['facebook.com', 'www.facebook.com'])
+// const isValidTwitterUrl = (value: string) => isValidProfileUrl(value, ['twitter.com', 'www.twitter.com', 'x.com', 'www.x.com'])
 const matchOptionValue = (value: string, options: string[]) => {
 	const normalizedValue = value.trim().toLowerCase()
 	return options.find((option) => option.toLowerCase() === normalizedValue) ?? value.trim()
@@ -252,17 +252,17 @@ const validateSocialUrl = (field: keyof SocialErrors, value: string) => {
 	const trimmedValue = value.trim()
 	if (!trimmedValue) return ''
 
-	if (field === 'instagram' && !isValidInstagramUrl(trimmedValue)) {
-		return 'Enter a valid Instagram profile URL.'
-	}
+	// if (field === 'instagram' && !isValidInstagramUrl(trimmedValue)) {
+	// 	return 'Enter a valid Instagram profile URL.'
+	// }
 
-	if (field === 'facebook' && !isValidFacebookUrl(trimmedValue)) {
-		return 'Enter a valid Facebook profile URL.'
-	}
+	// if (field === 'facebook' && !isValidFacebookUrl(trimmedValue)) {
+	// 	return 'Enter a valid Facebook profile URL.'
+	// }
 
-	if (field === 'twitter' && !isValidTwitterUrl(trimmedValue)) {
-		return 'Enter a valid Twitter profile URL.'
-	}
+	// if (field === 'twitter' && !isValidTwitterUrl(trimmedValue)) {
+	// 	return 'Enter a valid Twitter profile URL.'
+	// }
 
 	return ''
 }
@@ -431,20 +431,20 @@ export default function PersonalDetailsTab() {
 			return
 		}
 
-		if (trimmedInstagram && !isValidInstagramUrl(trimmedInstagram)) {
-			nextSocialErrors.instagram = 'Enter a valid Instagram profile URL.'
-		}
+		// if (trimmedInstagram && !isValidInstagramUrl(trimmedInstagram)) {
+		// 	nextSocialErrors.instagram = 'Enter a valid Instagram profile URL.'
+		// }
 
-		if (trimmedFacebook && !isValidFacebookUrl(trimmedFacebook)) {
-			nextSocialErrors.facebook = 'Enter a valid Facebook profile URL.'
-		}
+		// if (trimmedFacebook && !isValidFacebookUrl(trimmedFacebook)) {
+		// 	nextSocialErrors.facebook = 'Enter a valid Facebook profile URL.'
+		// }
 
-		if (trimmedTwitter && !isValidTwitterUrl(trimmedTwitter)) {
-			nextSocialErrors.twitter = 'Enter a valid Twitter profile URL.'
-		}
+		// if (trimmedTwitter && !isValidTwitterUrl(trimmedTwitter)) {
+		// 	nextSocialErrors.twitter = 'Enter a valid Twitter profile URL.'
+		// }
 
 		setSocialErrors(nextSocialErrors)
-		if (Object.keys(nextSocialErrors).length > 0) {
+		if (Object.keys(nextSocialErrors).length > 0) {    
 			return
 		}
 
@@ -636,7 +636,7 @@ export default function PersonalDetailsTab() {
 						/>
 					</View>
 
-					{/* Social Media Section */}
+					{/* Social Media Section
 					<View style={[styles.socialSection, { marginBottom: rowSpacing }]}>
 						<SectionTitle>Social Media</SectionTitle>
 						<FormRow stacked={!useTwoColumns} compact={isTablet}>
@@ -686,7 +686,7 @@ export default function PersonalDetailsTab() {
 								}}
 							/>
 						</FormRow>
-					</View>
+					</View> */}
 				</KeyboardAvoidingView>
 			</ScrollView>
 
