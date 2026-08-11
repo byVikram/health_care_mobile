@@ -28,7 +28,7 @@ const TABS: TabDefinition[] = [
 	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
 	{ key: 'professional', label: 'Professional details', Component: ProfessionalDetailsTab },
 	{ key: 'capabilities', label: 'Capabilities', Component: CapabilitiesTab },
-	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
+	// { key: 'sessions', label: 'Sessions', Component: SessionsTab },
 ]
 
 export default function AncillaryProfileLayout() {
