@@ -10,14 +10,14 @@ import {
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { AppTypography } from '../../../components/common'
-import AncillaryDetailsTab from './tabs/AncillaryDetailsTab'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
+import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import CapabilitiesTab from './tabs/CapabilitiesTab'
 import SessionsTab from '../SessionsTab'
 
 const TABS = [
-	{ key: 'ancillary', label: 'Ancillary details', Component: AncillaryDetailsTab },
 	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
+	{ key: 'professional', label: 'Professional details', Component: ProfessionalDetailsTab },
 	{ key: 'capabilities', label: 'Capabilities', Component: CapabilitiesTab },
 	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
 ]
@@ -27,7 +27,7 @@ export default function AncillaryProfileLayout() {
 	const { width } = useWindowDimensions()
 	const pagerRef = useRef<ScrollView>(null)
 	const tabScrollRef = useRef<ScrollView>(null)
-	const [activeTab, setActiveTab] = useState('ancillary')
+	const [activeTab, setActiveTab] = useState('personal')
 
 	const activeTabIndex = useMemo(() => {
 		const index = TABS.findIndex((tab) => tab.key === activeTab)
@@ -56,7 +56,6 @@ export default function AncillaryProfileLayout() {
 		[width]
 	)
 
-
 	const handlePagerMomentumEnd = useCallback(
 		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
 			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
@@ -68,7 +67,6 @@ export default function AncillaryProfileLayout() {
 
 	return (
 		<View style={styles.container}>
-
 			{/* Tabs scroll selector */}
 			<View style={styles.tabContainer}>
 				<ScrollView
