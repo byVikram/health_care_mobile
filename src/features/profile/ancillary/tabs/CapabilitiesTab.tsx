@@ -4,43 +4,166 @@ import {
 	Alert,
 	ScrollView,
 	StyleSheet,
-	Text,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography, AppStickyFooter } from '../../../../components/common'
+import { AppButton, AppTypography } from '../../../../components/common'
 
-const PROCEDURES_LOOKUP = {
-	'nursing-care': [
-		{ label: 'Injection Administration', rate: '₹299' },
-		{ label: 'IV Drip Setup', rate: '₹799' },
-		{ label: 'Bandage Dressing', rate: '₹499' },
-		{ label: 'ICU Care at Home', rate: '₹2,499' },
-	],
-	'physiotherapy': [
-		{ label: 'Manual Therapy Session', rate: '₹799' },
-		{ label: 'Therapeutic Exercise Guidance', rate: '₹599' },
-		{ label: 'Post-Op Knee Rehab', rate: '₹899' },
-	],
-	'rehab-care': [
-		{ label: 'Cognitive Rehabilitation', rate: '₹699' },
-		{ label: 'Cardiac Rehabilitation', rate: '₹899' },
-	],
-	'elder-day-care': [
-		{ label: 'Daily Activity Monitoring', rate: '₹599' },
-		{ label: 'Safety Assessment Check', rate: '₹499' },
-	],
+interface CapabilityItem {
+	id: string
+	label: string
+	subtitle?: string
+}
+
+interface CapabilityCategory {
+	key: string
+	title: string
+	icon: keyof typeof MaterialCommunityIcons.glyphMap
+	items: CapabilityItem[]
+}
+
+type CapabilityCardProps = {
+	item: CapabilityItem
+	selected: boolean
+	onPress: () => void
+}
+
+const CAPABILITIES_CATEGORIES: CapabilityCategory[] = [
+	{
+		key: 'general_nursing',
+		title: 'General Nursing',
+		icon: 'medical-bag',
+		items: [
+			{ id: 'vitals', label: 'Vital Signs Monitoring', subtitle: 'Standard vitals check' },
+			{ id: 'elderly', label: 'Elderly Care', subtitle: 'Assisted living support' },
+			{ id: 'catheter', label: 'Catheter Care', subtitle: 'Maintenance & changing' },
+		],
+	},
+	{
+		key: 'medication_iv',
+		title: 'Medication & IV Care',
+		icon: 'needle',
+		items: [
+			{ id: 'injection', label: 'Injection Administration', subtitle: 'IM, SC, IV Push' },
+			{ id: 'iv_drip', label: 'IV Drip Setup', subtitle: 'Continuous infusion management' },
+			{ id: 'iv_cannula', label: 'IV Cannulation', subtitle: 'Peripheral line insertion' },
+			{ id: 'med_admin', label: 'Medication Administration', subtitle: 'Oral, topical, inhaled' },
+		],
+	},
+	{
+		key: 'wound_care',
+		title: 'Wound & Specialized Care',
+		icon: 'bandage',
+		items: [
+			{ id: 'wound_dress', label: 'Wound Dressing', subtitle: 'Basic & advanced care' },
+			{ id: 'bandage_dress', label: 'Bandage Dressing' },
+			{ id: 'post_op', label: 'Post-Operative Care', subtitle: 'Surgical site monitoring' },
+			{ id: 'diabetes', label: 'Diabetes Care', subtitle: 'Insulin management' },
+			{ id: 'ryles_tube', label: "Ryle's Tube Care", subtitle: 'Nasogastric feeding' },
+		],
+	},
+	{
+		key: 'critical_care',
+		title: 'Critical Care',
+		icon: 'heart-pulse',
+		items: [
+			{ id: 'icu_home', label: 'ICU Care at Home', subtitle: 'Advanced life support' },
+			{ id: 'tracheostomy', label: 'Tracheostomy Care', subtitle: 'Airway management' },
+			{ id: 'bedridden', label: 'Bedridden Patient Care', subtitle: 'Immobility support' },
+		],
+	},
+]
+
+const DEFAULT_SELECTED_LABELS = [
+	'Vital Signs Monitoring',
+	'Injection Administration',
+	'IV Drip Setup',
+	'Medication Administration',
+	'Wound Dressing',
+	'Diabetes Care',
+]
+
+function CategoryHeader({ category }: { category: CapabilityCategory }) {
+	return (
+		<View style={styles.categoryHeader}>
+			<MaterialCommunityIcons name={category.icon} size={18} color="#2B6F71" />
+			<AppTypography variant="h3" style={styles.categoryTitle}>
+				{category.title}
+			</AppTypography>
+		</View>
+	)
+}
+
+function CapabilityCard({ item, selected, onPress }: CapabilityCardProps) {
+	return (
+		<TouchableOpacity
+			activeOpacity={0.8}
+			onPress={onPress}
+			style={[styles.capabilityCard, selected && styles.capabilityCardSelected]}
+		>
+			<View style={[styles.checkbox, selected && styles.checkboxSelected]}>
+				{selected && <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" />}
+			</View>
+
+			<View style={styles.textContainer}>
+				<AppTypography
+					variant="h4"
+					style={[styles.itemLabel, selected && styles.itemLabelSelected]}
+					numberOfLines={1}
+				>
+					{item.label}
+				</AppTypography>
+				{item.subtitle ? (
+					<AppTypography
+						variant="caption"
+						style={[styles.itemSubtitle, selected && styles.itemSubtitleSelected]}
+						numberOfLines={1}
+					>
+						{item.subtitle}
+					</AppTypography>
+				) : null}
+			</View>
+
+		</TouchableOpacity>
+	)
+}
+
+function CapabilityCategorySection({
+	category,
+	selectedLabels,
+	onToggleItem,
+}: {
+	category: CapabilityCategory
+	selectedLabels: string[]
+	onToggleItem: (label: string) => void
+}) {
+	return (
+		<View style={styles.categorySection}>
+			<CategoryHeader category={category} />
+
+			<View style={styles.cardsList}>
+				{category.items.map((item) => (
+					<CapabilityCard
+						key={item.id}
+						item={item}
+						selected={selectedLabels.includes(item.label)}
+						onPress={() => onToggleItem(item.label)}
+					/>
+				))}
+			</View>
+		</View>
+	)
 }
 
 export default function CapabilitiesTab() {
 	const { width } = useWindowDimensions()
-	const contentWidth = width >= 768 ? 560 : '100%'
+	const isTablet = width >= 768
+	const contentWidth = isTablet ? 600 : '100%'
 
-	const [specialty, setSpecialty] = useState('nursing-care')
-	const [selected, setSelected] = useState<string[]>([])
+	const [selected, setSelected] = useState<string[]>(DEFAULT_SELECTED_LABELS)
 	const [loading, setLoading] = useState(false)
 	const [saving, setSaving] = useState(false)
 
@@ -48,13 +171,15 @@ export default function CapabilitiesTab() {
 		const loadCapabilities = async () => {
 			try {
 				setLoading(true)
-				const spec = await AsyncStorage.getItem('user_specialty')
-				const caps = await AsyncStorage.getItem('ancillary_capabilities')
-
-				if (spec) setSpecialty(spec)
-				if (caps) setSelected(JSON.parse(caps))
+				const stored = await AsyncStorage.getItem('ancillary_capabilities')
+				if (stored) {
+					const parsed = JSON.parse(stored)
+					if (Array.isArray(parsed)) {
+						setSelected(parsed)
+					}
+				}
 			} catch (e) {
-				console.log(e)
+				console.log('[CapabilitiesTab] Failed to load capabilities:', e)
 			} finally {
 				setLoading(false)
 			}
@@ -63,16 +188,12 @@ export default function CapabilitiesTab() {
 	}, [])
 
 	const handleSave = async () => {
-		if (selected.length === 0) {
-			Alert.alert('Error', 'Please select at least one capability service')
-			return
-		}
 		try {
 			setSaving(true)
 			await AsyncStorage.setItem('ancillary_capabilities', JSON.stringify(selected))
 			Alert.alert('Saved', 'Service capabilities saved successfully')
 		} catch (e) {
-			console.log(e)
+			console.log('[CapabilitiesTab] Failed to save capabilities:', e)
 			Alert.alert('Error', 'Failed to save capabilities')
 		} finally {
 			setSaving(false)
@@ -80,72 +201,80 @@ export default function CapabilitiesTab() {
 	}
 
 	const toggleItem = (label: string) => {
-		if (selected.includes(label)) {
-			setSelected(selected.filter((item) => item !== label))
-		} else {
-			setSelected([...selected, label])
-		}
+		setSelected((prev) =>
+			prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+		)
+	}
+
+	const handleClearAll = () => {
+		setSelected([])
 	}
 
 	if (loading) {
 		return (
 			<View style={styles.center}>
-				<ActivityIndicator size="small" color="#0c7c7c" />
+				<ActivityIndicator size="small" color="#2B6F71" />
 			</View>
 		)
 	}
 
-	const items = (PROCEDURES_LOOKUP as any)[specialty] || PROCEDURES_LOOKUP['nursing-care']
-
 	return (
 		<View style={styles.root}>
-			<ScrollView 
+			<ScrollView
 				style={styles.scroll}
 				contentContainerStyle={styles.scrollContent}
-				showsVerticalScrollIndicator={false}
+				showsVerticalScrollIndicator={true}
 			>
 				<View style={[styles.contentShell, { width: contentWidth }]}>
-					<AppTypography variant="h3" style={styles.title}>
-						Clinical Capabilities
-					</AppTypography>
-					<AppTypography variant="body" style={styles.subtitle}>
-						Check the services you are certified to provide at standard clinic rates:
-					</AppTypography>
-
-					<View style={styles.list}>
-						{items.map((item: any) => {
-							const isChecked = selected.includes(item.label)
-							return (
-								<TouchableOpacity
-									key={item.label}
-									activeOpacity={0.8}
-									onPress={() => toggleItem(item.label)}
-									style={[styles.row, isChecked && styles.rowActive]}
-								>
-									<MaterialCommunityIcons
-										name={isChecked ? 'checkbox-marked' : 'checkbox-blank-outline'}
-										size={22}
-										color={isChecked ? '#0c7c7c' : '#6f7979'}
-									/>
-									<View style={styles.textRow}>
-										<Text style={[styles.label, isChecked && styles.labelActive]}>
-											{item.label}
-										</Text>
-										<Text style={styles.rate}>{item.rate}</Text>
-									</View>
-								</TouchableOpacity>
-							)
-						})}
+					{/* Section Header */}
+					<View style={styles.headerBlock}>
+						<AppTypography variant="h2" style={styles.mainTitle}>
+							Clinical Capabilities
+						</AppTypography>
+						<AppTypography variant="body" style={styles.subtitle}>
+							Select the services you are certified to provide for patient matching.
+						</AppTypography>
 					</View>
+
+					{CAPABILITIES_CATEGORIES.map((category) => (
+						<CapabilityCategorySection
+							key={category.key}
+							category={category}
+							selectedLabels={selected}
+							onToggleItem={toggleItem}
+						/>
+					))}
 				</View>
 			</ScrollView>
-			
-			<AppStickyFooter 
-				onPress={handleSave}
-				loading={saving}
-			>
-				Save 
-			</AppStickyFooter>
+
+			{/* Sticky Bottom Action Bar */}
+			<View style={styles.stickyFooterContainer}>
+				<View style={[styles.stickyFooterContent, { maxWidth: isTablet ? 600 : '100%' }]}>
+					<View style={styles.selectionInfoRow}>
+						<View style={styles.counterBadge}>
+							<View style={styles.activeDot} />
+							<AppTypography variant="caption" style={styles.selectionCountText}>
+								{selected.length} capability{selected.length === 1 ? '' : 'ies'} selected
+							</AppTypography>
+						</View>
+						<TouchableOpacity onPress={handleClearAll} activeOpacity={0.7}>
+							<AppTypography variant="caption" style={styles.clearAllText}>
+								Clear all
+							</AppTypography>
+						</TouchableOpacity>
+					</View>
+
+					<AppButton
+						variant="primary"
+						formAction
+						style={styles.saveButton}
+						onPress={handleSave}
+						loading={saving}
+					>
+						{'Save Preferences ->'}
+					</AppButton>
+				</View>
+			</View>
 		</View>
 	)
 }
@@ -153,7 +282,7 @@ export default function CapabilitiesTab() {
 const styles = StyleSheet.create({
 	root: {
 		flex: 1,
-		backgroundColor: '#f8fafc',
+		backgroundColor: '#F7FAFA',
 	},
 	scroll: {
 		flex: 1,
@@ -161,7 +290,7 @@ const styles = StyleSheet.create({
 	scrollContent: {
 		paddingHorizontal: 16,
 		paddingTop: 16,
-		paddingBottom: 100,
+		paddingBottom: 132,
 		alignItems: 'center',
 	},
 	contentShell: {
@@ -171,54 +300,143 @@ const styles = StyleSheet.create({
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		backgroundColor: '#f8fafc',
+		backgroundColor: '#F8FAFA',
 	},
-	title: {
-		color: '#191c1d',
-		marginBottom: 6,
+	headerBlock: {
+		marginBottom: 18,
+	},
+	mainTitle: {
+		color: '#111827',
+		fontSize: 20,
 		fontWeight: '700',
+		marginBottom: 2,
 	},
 	subtitle: {
-		fontSize: 13,
-		color: '#62707a',
-		lineHeight: 18,
-		marginBottom: 20,
+		fontSize: 12,
+		color: '#4B5563',
+		lineHeight: 17,
 	},
-	list: {
-		gap: 10,
-		marginBottom: 20,
+	categorySection: {
+		marginBottom: 22,
 	},
-	row: {
+	categoryHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#ffffff',
-		borderWidth: 1,
-		borderColor: '#eceeee',
-		borderRadius: 8,
-		padding: 14,
-		gap: 10,
+		gap: 8,
+		marginBottom: 10,
 	},
-	rowActive: {
-		borderColor: '#0c7c7c',
-		backgroundColor: 'rgba(12, 124, 124, 0.04)',
-	},
-	textRow: {
-		flex: 1,
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-	},
-	label: {
+	categoryTitle: {
 		fontSize: 14,
-		color: '#3f4849',
-	},
-	labelActive: {
 		fontWeight: '700',
-		color: '#002021',
+		color: '#253136',
 	},
-	rate: {
-		fontSize: 13,
+	cardsList: {
+		gap: 10,
+	},
+	capabilityCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FFFFFF',
+		borderWidth: 1,
+		borderColor: '#D9E1E2',
+		borderRadius: 12,
+		paddingHorizontal: 16,
+		paddingVertical: 14,
+		gap: 12,
+		elevation: 1,
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.03,
+		shadowRadius: 3,
+	},
+	capabilityCardSelected: {
+		borderColor: '#2B6F71',
+		backgroundColor: '#C6D9DA',
+		shadowOpacity: 0.03,
+		elevation: 1,
+	},
+	checkbox: {
+		width: 22,
+		height: 22,
+		borderRadius: 6,
+		borderWidth: 1.5,
+		borderColor: '#B9C4C6',
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: '#FFFFFF',
+	},
+	checkboxSelected: {
+		backgroundColor: '#2B6F71',
+		borderColor: '#2B6F71',
+	},
+	textContainer: {
+		flex: 1,
+	},
+	itemLabel: {
+		fontSize: 14,
+		lineHeight: 19,
 		fontWeight: '700',
-		color: '#0c7c7c',
+		color: '#1F2933',
+	},
+	itemLabelSelected: {
+		color: '#1F2933',
+		fontWeight: '700',
+	},
+	itemSubtitle: {
+		fontSize: 12,
+		lineHeight: 16,
+		color: '#4B5F66',
+		marginTop: 1,
+	},
+	itemSubtitleSelected: {
+		color: '#334E55',
+	},
+	stickyFooterContainer: {
+		backgroundColor: '#FFFFFF',
+		borderTopWidth: 0,
+		paddingHorizontal: 16,
+		paddingTop: 12,
+		paddingBottom: 16,
+		alignItems: 'center',
+		elevation: 8,
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: -3 },
+		shadowOpacity: 0.06,
+		shadowRadius: 6,
+	},
+	stickyFooterContent: {
+		width: '100%',
+	},
+	selectionInfoRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: 10,
+	},
+	counterBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	activeDot: {
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+		backgroundColor: '#2B6F71',
+	},
+	selectionCountText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#3F4945',
+	},
+	clearAllText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#006A62',
+	},
+	saveButton: {
+		width: '100%',
+		borderRadius: 12,
+		marginTop: 0,
 	},
 })

@@ -30,6 +30,9 @@ export { default as NotificationPermissionPopup } from "./NotificationPermission
 export { default as EventCard } from "./EventCard";
 export { default as CommonCard } from "./CommonCard";
 export * from "./PatientProfileSelectorBottomSheet";
+export { default as WorkingHoursSection } from "./WorkingHoursSection";
+export type { WorkingHoursSectionProps, WorkingDayKey, AppointmentType, TimeSlot as WorkingHoursTimeSlot, SectionSlots, WorkingHoursState } from "./WorkingHoursSection";
+export { WORKING_DAYS, SECTION_META, durationOptions as workingHoursDurationOptions, makeTimeOptions, snapToStep, createWorkingHoursState, DropdownSelect as WorkingHoursDropdownSelect } from "./WorkingHoursSection";
 
 
 

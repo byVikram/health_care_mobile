@@ -13,12 +13,14 @@ import { AppTypography } from '../../../components/common'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import CapabilitiesTab from './tabs/CapabilitiesTab'
+import AvailabilityTab from './tabs/AvailabilityTab'
 import SessionsTab from '../SessionsTab'
 
 const TABS = [
 	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
 	{ key: 'professional', label: 'Professional details', Component: ProfessionalDetailsTab },
 	{ key: 'capabilities', label: 'Capabilities', Component: CapabilitiesTab },
+	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
 	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
 ]
 
