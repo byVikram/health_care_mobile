@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from '../../../navigation/routes'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
+import AppScreenHeader from '../../../components/common/AppScreenHeader'
 
 import { PopularService, PopularServiceCard } from '../components/PopularServiceCard'
 import { RecommendationItem, RecommendationCard } from '../components/RecommendationCard'
@@ -128,7 +129,7 @@ const ALL_NURSING_CATEGORIES: CategoryGroup[] = [
 				price: 'Custom Pricing',
 				image: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=500&q=80',
 				premiumBadgeText: 'PREMIUM',
-				actionLabel: 'Enquire',
+				actionLabel: 'Select',
 			},
 			{
 				id: 'spec2',
@@ -138,7 +139,7 @@ const ALL_NURSING_CATEGORIES: CategoryGroup[] = [
 				price: 'Custom Pricing',
 				image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
 				verified: true,
-				actionLabel: 'Enquire',
+				actionLabel: 'Select',
 			},
 		],
 	},
@@ -260,7 +261,9 @@ export default function NursingCarePage() {
 	}
 
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
+		<View style={styles.container}>
+			<AppScreenHeader title="Nursing Care" onBack={handleBack} />
+
 			<ScrollView
 				contentContainerStyle={[
 					styles.scrollContent,
@@ -269,27 +272,6 @@ export default function NursingCarePage() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* 1. Header Section */}
-				<View style={styles.headerContainer}>
-					<View style={styles.headerTopRow}>
-						<TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-							<MaterialCommunityIcons name="arrow-left" size={24} color="#191C1D" />
-						</TouchableOpacity>
-						<View style={styles.titleContainer}>
-							<AppTypography variant="h3" style={styles.pageTitle}>
-								Nursing Care
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.pageSubtitle}>
-								Professional nursing services at your doorstep
-							</AppTypography>
-						</View>
-						{Platform.OS === 'web' && (
-							<TouchableOpacity style={styles.notificationButton} activeOpacity={0.7}>
-								<MaterialCommunityIcons name="bell-outline" size={22} color="#191C1D" />
-							</TouchableOpacity>
-						)}
-					</View>
-				</View>
 
 				{/* 2. Emergency Assistance Banner */}
 				<View style={[styles.emergencyBanner, isTablet && styles.emergencyBannerTablet]}>

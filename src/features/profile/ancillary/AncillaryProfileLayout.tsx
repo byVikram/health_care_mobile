@@ -16,12 +16,21 @@ import CapabilitiesTab from './tabs/CapabilitiesTab'
 import AvailabilityTab from './tabs/AvailabilityTab'
 import SessionsTab from '../SessionsTab'
 
-const TABS = [
+type TabDefinition = {
+	key: string
+	label: string
+	// Components may ignore this, but CapabilitiesTab uses it to know when it
+	// has lost focus (all tabs stay mounted inside the pager below) so it can
+	// discard any unsaved edits instead of letting them look saved.
+	Component: React.ComponentType<{ isActive?: boolean }>
+}
+
+const TABS: TabDefinition[] = [
 	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
 	{ key: 'professional', label: 'Professional details', Component: ProfessionalDetailsTab },
 	{ key: 'capabilities', label: 'Capabilities', Component: CapabilitiesTab },
 	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
-	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
+	// { key: 'sessions', label: 'Sessions', Component: SessionsTab },
 ]
 
 export default function AncillaryProfileLayout() {
@@ -117,7 +126,7 @@ export default function AncillaryProfileLayout() {
 						const TabComponent = tab.Component
 						return (
 							<View key={tab.key} style={[styles.pagerPage, { width }]}>
-								<TabComponent />
+								<TabComponent isActive={activeTab === tab.key} />
 							</View>
 						)
 					})}

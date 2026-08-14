@@ -103,7 +103,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 				contentStyle={styles.actionBtnContentTablet}
 				onPress={handleIncrementClick}
 			>
-				{item.actionLabel || (isCustomPrice ? 'Enquire' : 'Select')}
+				{item.actionLabel || 'Select'}
 			</AppButton>
 		)
 	}
@@ -142,7 +142,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 				contentStyle={styles.actionBtnContentMobile}
 				onPress={handleIncrementClick}
 			>
-				{item.actionLabel || (isCustomPrice ? 'Enquire' : 'Select')}
+				{item.actionLabel || 'Select'}
 			</AppButton>
 		)
 	}
