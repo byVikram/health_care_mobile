@@ -578,3 +578,96 @@ export const MOCK_ANCILLARY_BOOKINGS: AncillaryBooking[] = [
 		refundReferenceId: '#RF9832K',
 	},
 ]
+
+// --- Nurse Instant Care Request Interfaces & Backend Simulation ---
+export interface SoftReviewRequestData {
+	id: string
+	serviceName: string
+	requestedDate: string
+	requestedTime: string
+	generalLocation: string
+	distanceKm: string
+	travelTime: string
+	serviceRequirement: string
+	requiredSkills: string[]
+	urgency: string
+	specialRequirements: string
+	earning: string
+	expiresAt: number // Timestamp in ms for 30-min response window
+}
+
+export interface AuthorizedDetailedPatientInfo {
+	id: string
+	patientName: string
+	patientAge: number
+	patientGender: 'Male' | 'Female' | 'Other'
+	patientPhone: string
+	exactAddress: string
+	serviceName: string
+	procedureDetails: string
+	clinicalNotes: string
+	careInstructions: string
+	requiredDocuments: string[]
+	verificationOtp: string
+	completionPin: string
+}
+
+export const fetchSoftReviewRequest = async (requestId: string): Promise<SoftReviewRequestData> => {
+	// Simulates backend API returning ONLY soft-review non-PHI info before acceptance
+	// 30-second response window
+	const expiresAt = Date.now() + 30 * 1000
+	return {
+		id: requestId || 'REQ-NURSE-991',
+		serviceName: 'Wound Care',
+		requestedDate: '18 Aug 2026',
+		requestedTime: '10:00 AM',
+		generalLocation: 'Whitefield, Bengaluru',
+		distanceKm: '4.2 km',
+		travelTime: '~18 min',
+		serviceRequirement: 'Post-surgical wound dressing',
+		requiredSkills: ['Wound Care', 'Sterile Dressing'],
+		urgency: 'Routine',
+		specialRequirements: 'Sterile dressing required',
+		earning: '₹850',
+		expiresAt,
+	}
+}
+
+export interface AcceptResponse {
+	success: boolean
+	alreadyClaimed?: boolean
+	message?: string
+	detailedInfo?: AuthorizedDetailedPatientInfo
+}
+
+export const acceptCareRequestBackend = async (
+	requestId: string,
+	simulateClaimed: boolean = false
+): Promise<AcceptResponse> => {
+	// Simulates backend acceptance API call and race condition check
+	if (simulateClaimed) {
+		return {
+			success: false,
+			alreadyClaimed: true,
+			message: 'This care request has already been assigned to another nurse.',
+		}
+	}
+	return {
+		success: true,
+		detailedInfo: {
+			id: requestId || 'REQ-NURSE-991',
+			patientName: 'Eleanor Vance',
+			patientAge: 68,
+			patientGender: 'Female',
+			patientPhone: '+91 98765 43210',
+			exactAddress: '72 Park Street, Block B, Apt 402, Whitefield, Bengaluru',
+			serviceName: 'Wound Care',
+			procedureDetails: 'Abdominal surgical incision dressing change, aseptic cleaning, and topical antibiotic application.',
+			clinicalNotes: 'Post-laparoscopic surgery Day 5. Mild serous drainage. Patient resting comfortably at home.',
+			careInstructions: 'Verify patient identity with OTP check. Check vitals (BP, SpO2) before starting procedure.',
+			requiredDocuments: ['Sterile Dressing Kit Prescription', 'Nurse Care Chart Note'],
+			verificationOtp: '4829',
+			completionPin: '9182',
+		},
+	}
+}
