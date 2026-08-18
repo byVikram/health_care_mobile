@@ -131,6 +131,19 @@ export interface RecommendedService {
 	iconName: string
 }
 
+// --- Patient-Facing Rating & Review Interfaces ---
+export interface AncillaryReviewData {
+	id: string
+	bookingId: string
+	providerId: string
+	providerName: string
+	serviceName: string
+	rating: number // 1 to 5
+	comment?: string
+	createdAt: string
+	patientName?: string
+}
+
 export interface AncillaryProvider {
 	id: string
 	name: string
@@ -144,6 +157,7 @@ export interface AncillaryProvider {
 	distance: number
 	avatar: string
 	badges: string[]
+	reviews?: AncillaryReviewData[]
 }
 
 export interface AncillaryCategoryData {
@@ -417,6 +431,7 @@ export const ANCILLARY_MOCK_DATA: Record<string, AncillaryCategoryData> = {
 				distance: 2.1,
 				avatar: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=120',
 				badges: ['Board Certified', 'Background Checked'],
+				reviews: [],
 			},
 		],
 	},
@@ -474,6 +489,7 @@ export const ANCILLARY_MOCK_DATA: Record<string, AncillaryCategoryData> = {
 				distance: 1.2,
 				avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=120',
 				badges: ['Background Checked', 'CPR Certified'],
+				reviews: [],
 			},
 		],
 	},
@@ -485,6 +501,7 @@ export interface AncillaryBookingProvider {
 	name: string
 	designation: string
 	avatar: string
+	id?: string
 }
 
 export interface AncillaryBooking {
@@ -498,6 +515,8 @@ export interface AncillaryBooking {
 	provider: AncillaryBookingProvider
 	amount?: number
 	rating?: number
+	hasReview?: boolean
+	review?: AncillaryReviewData
 	cancellationReason?: string
 	refundStatus?: string
 	refundReferenceId?: string
@@ -547,19 +566,48 @@ export const MOCK_ANCILLARY_BOOKINGS: AncillaryBooking[] = [
 		},
 	},
 	{
+		id: 'book-4',
+		serviceName: 'Intravenous (IV) Infusion & Monitoring',
+		serviceKey: 'nursing-care',
+		serviceLabel: 'Nursing Care',
+		status: 'completed',
+		date: 'Today, 18 Aug 2026',
+		provider: {
+			id: 'n-prov-2',
+			name: 'David Chen',
+			designation: 'Registered Nurse',
+			avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=120',
+		},
+		amount: 699,
+		hasReview: false,
+	},
+	{
 		id: 'book-2',
-		serviceName: 'Wound Dressing',
+		serviceName: 'Wound Dressing & Care',
 		serviceKey: 'nursing-care',
 		serviceLabel: 'Nursing Care',
 		status: 'completed',
 		date: '12 Oct 2023',
 		provider: {
+			id: 'n-prov-1',
 			name: 'Anita Sharma',
 			designation: 'Registered Nurse',
 			avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
 		},
 		amount: 549,
-		rating: 4.5,
+		rating: 5,
+		hasReview: true,
+		review: {
+			id: 'rev-001',
+			bookingId: 'book-2',
+			providerId: 'n-prov-1',
+			providerName: 'Anita Sharma',
+			serviceName: 'Wound Dressing & Care',
+			rating: 5,
+			comment: 'Nurse Anita was very punctual and sterile with the dressing change. Explained every step clearly.',
+			createdAt: '12 Oct 2023',
+			patientName: 'John D.',
+		},
 	},
 	{
 		id: 'book-3',
@@ -569,15 +617,190 @@ export const MOCK_ANCILLARY_BOOKINGS: AncillaryBooking[] = [
 		status: 'cancelled',
 		date: '05 Oct 2023',
 		provider: {
-			name: 'Dr. James Wilson',
+			id: 'p-prov-1',
+			name: 'Dr. Sarah Jenkins',
 			designation: 'Physiotherapist',
-			avatar: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=120',
+			avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=120',
 		},
 		cancellationReason: 'Provider unavailable due to emergency.',
 		refundStatus: 'Refund Initiated',
 		refundReferenceId: '#RF9832K',
 	},
 ]
+
+// Global in-memory review map to maintain consistency across all screens
+const REVIEW_STORE = new Map<string, AncillaryReviewData>()
+
+// Seed initial review
+REVIEW_STORE.set('book-2', {
+	id: 'rev-001',
+	bookingId: 'book-2',
+	providerId: 'n-prov-1',
+	providerName: 'Anita Sharma',
+	serviceName: 'Wound Dressing & Care',
+	rating: 5,
+	comment: 'Nurse Anita was very punctual and sterile with the dressing change. Explained every step clearly.',
+	createdAt: '12 Oct 2023',
+	patientName: 'John D.',
+})
+
+// Provider initial reviews
+const PROVIDER_REVIEWS_MOCK: Record<string, AncillaryReviewData[]> = {
+	'n-prov-1': [
+		{
+			id: 'rev-001',
+			bookingId: 'book-2',
+			providerId: 'n-prov-1',
+			providerName: 'Anita Sharma',
+			serviceName: 'Wound Dressing & Care',
+			rating: 5,
+			comment: 'Nurse Anita was very punctual and sterile with the dressing change. Explained every step clearly.',
+			createdAt: '12 Oct 2023',
+			patientName: 'John D.',
+		},
+		{
+			id: 'rev-002',
+			bookingId: 'prev-102',
+			providerId: 'n-prov-1',
+			providerName: 'Anita Sharma',
+			serviceName: 'Injection Administration',
+			rating: 5,
+			comment: 'Quick and painless IV administration. Extremely gentle and professional.',
+			createdAt: '28 Sep 2023',
+			patientName: 'Sunita R.',
+		},
+		{
+			id: 'rev-003',
+			bookingId: 'prev-103',
+			providerId: 'n-prov-1',
+			providerName: 'Anita Sharma',
+			serviceName: 'Post-Op Vital Monitoring',
+			rating: 4,
+			comment: 'Very polite and knowledgeable. Checked vitals before starting the procedure.',
+			createdAt: '15 Sep 2023',
+			patientName: 'Kavita M.',
+		},
+	],
+	'n-prov-2': [
+		{
+			id: 'rev-004',
+			bookingId: 'prev-104',
+			providerId: 'n-prov-2',
+			providerName: 'David Chen',
+			serviceName: 'IV Drip Setup',
+			rating: 5,
+			comment: 'Excellent service. Arrived on time with full sterile PPE kit.',
+			createdAt: '10 Aug 2026',
+			patientName: 'Ravi T.',
+		},
+	],
+	'p-prov-1': [
+		{
+			id: 'rev-005',
+			bookingId: 'prev-105',
+			providerId: 'p-prov-1',
+			providerName: 'Dr. Sarah Jenkins',
+			serviceName: 'Post-Op Knee Rehab',
+			rating: 5,
+			comment: 'Dr. Sarah helped restore my walking posture after knee surgery. Highly skilled!',
+			createdAt: '01 Aug 2026',
+			patientName: 'Arjun K.',
+		},
+	],
+	'e-prov-1': [
+		{
+			id: 'rev-006',
+			bookingId: 'prev-106',
+			providerId: 'e-prov-1',
+			providerName: 'Michael Thorne',
+			serviceName: 'Elderly Care Visit',
+			rating: 5,
+			comment: 'Very patient and kind with my elderly mother. Organized her medicines perfectly.',
+			createdAt: '18 Jul 2026',
+			patientName: 'Meera S.',
+		},
+	],
+}
+
+/**
+ * Submit or update a rating & review for a completed ancillary booking.
+ */
+export const submitAncillaryReview = async (
+	data: Omit<AncillaryReviewData, 'id' | 'createdAt'>
+): Promise<AncillaryReviewData> => {
+	const todayStr = new Date().toLocaleDateString('en-US', {
+		day: 'numeric',
+		month: 'short',
+		year: 'numeric',
+	})
+
+	const existing = REVIEW_STORE.get(data.bookingId)
+	const reviewItem: AncillaryReviewData = {
+		id: existing?.id || `rev-${Date.now()}`,
+		bookingId: data.bookingId,
+		providerId: data.providerId || 'n-prov-1',
+		providerName: data.providerName,
+		serviceName: data.serviceName,
+		rating: data.rating,
+		comment: data.comment?.trim() || undefined,
+		createdAt: existing?.createdAt || todayStr,
+		patientName: data.patientName || 'Verified Patient',
+	}
+
+	// Save to in-memory store
+	REVIEW_STORE.set(data.bookingId, reviewItem)
+
+	// Update mock bookings list
+	const bIdx = MOCK_ANCILLARY_BOOKINGS.findIndex((b) => b.id === data.bookingId)
+	if (bIdx !== -1) {
+		MOCK_ANCILLARY_BOOKINGS[bIdx].rating = data.rating
+		MOCK_ANCILLARY_BOOKINGS[bIdx].hasReview = true
+		MOCK_ANCILLARY_BOOKINGS[bIdx].review = reviewItem
+	}
+
+	// Add to provider review list
+	const provKey = data.providerId || 'n-prov-1'
+	if (!PROVIDER_REVIEWS_MOCK[provKey]) {
+		PROVIDER_REVIEWS_MOCK[provKey] = []
+	}
+	const existingIdx = PROVIDER_REVIEWS_MOCK[provKey].findIndex((r) => r.bookingId === data.bookingId)
+	if (existingIdx !== -1) {
+		PROVIDER_REVIEWS_MOCK[provKey][existingIdx] = reviewItem
+	} else {
+		PROVIDER_REVIEWS_MOCK[provKey].unshift(reviewItem)
+	}
+
+	return reviewItem
+}
+
+/**
+ * Get review for a specific booking.
+ */
+export const getAncillaryReviewByBookingId = (bookingId: string): AncillaryReviewData | null => {
+	if (REVIEW_STORE.has(bookingId)) {
+		return REVIEW_STORE.get(bookingId)!
+	}
+	const b = MOCK_ANCILLARY_BOOKINGS.find((item) => item.id === bookingId)
+	return b?.review || null
+}
+
+/**
+ * Get all reviews for a provider.
+ */
+export const getProviderReviews = (providerIdOrName: string): AncillaryReviewData[] => {
+	if (PROVIDER_REVIEWS_MOCK[providerIdOrName]) {
+		return PROVIDER_REVIEWS_MOCK[providerIdOrName]
+	}
+	// Fallback lookup by provider name
+	for (const reviews of Object.values(PROVIDER_REVIEWS_MOCK)) {
+		if (reviews.length > 0 && reviews[0].providerName === providerIdOrName) {
+			return reviews
+		}
+	}
+	return []
+}
+
+
 
 // --- Nurse Instant Care Request Interfaces & Backend Simulation ---
 export interface SoftReviewRequestData {
