@@ -1,5 +1,6 @@
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { AncillaryBooking } from '../ancillaryService'
 import BookingStatusBadge from './BookingStatusBadge'
 import RatingStars from './RatingStars'
@@ -10,11 +11,21 @@ interface CompletedBookingCardProps {
 	booking: AncillaryBooking
 	onViewInvoice: (booking: AncillaryBooking) => void
 	onBookAgain: (booking: AncillaryBooking) => void
+	onRateReview: (booking: AncillaryBooking) => void
 }
 
-export default function CompletedBookingCard({ booking, onViewInvoice, onBookAgain }: CompletedBookingCardProps) {
+export default function CompletedBookingCard({
+	booking,
+	onViewInvoice,
+	onBookAgain,
+	onRateReview,
+}: CompletedBookingCardProps) {
+	const hasReview = booking.hasReview || (booking.rating != null && booking.rating > 0)
+	const ratingValue = booking.rating || 5
+
 	return (
 		<CommonCard style={styles.card}>
+			{/* Top Header Row: Service Name + Status + Amount */}
 			<View style={styles.headerRow}>
 				<View style={styles.headerLeft}>
 					<Text style={styles.serviceName}>{booking.serviceName}</Text>
@@ -26,21 +37,80 @@ export default function CompletedBookingCard({ booking, onViewInvoice, onBookAga
 				</View>
 			</View>
 
+			{/* Provider Row: Avatar, Name, Rating Tag */}
 			<View style={styles.providerRow}>
-				<AppAvatar uri={booking.provider.avatar} name={booking.provider.name} size={36} style={styles.avatar} />
-				<Text style={styles.providerName} numberOfLines={1}>{booking.provider.name}</Text>
-				{booking.rating != null && (
-					<View style={styles.ratingWrap}>
-						<RatingStars rating={booking.rating} />
+				<AppAvatar
+					uri={booking.provider.avatar}
+					name={booking.provider.name}
+					size={38}
+					style={styles.avatar}
+				/>
+				<View style={styles.providerMetaCol}>
+					<Text style={styles.providerName} numberOfLines={1}>
+						{booking.provider.name}
+					</Text>
+					<Text style={styles.providerRole} numberOfLines={1}>
+						{booking.provider.designation || 'Registered Nurse'}
+					</Text>
+				</View>
+
+				{hasReview ? (
+					<View style={styles.reviewedChip}>
+						<RatingStars rating={ratingValue} size={12} />
+						<Text style={styles.reviewedScoreText}>{ratingValue.toFixed(1)}</Text>
+					</View>
+				) : (
+					<View style={styles.pendingReviewChip}>
+						<Text style={styles.pendingReviewText}>Awaiting Review</Text>
 					</View>
 				)}
 			</View>
 
+			{/* Primary Rating & Review Action Banner */}
+			<View style={styles.reviewActionStrip}>
+				{hasReview ? (
+					<TouchableOpacity
+						style={styles.viewReviewBtn}
+						onPress={() => onRateReview(booking)}
+						activeOpacity={0.8}
+					>
+						<View style={styles.reviewBtnLeft}>
+							<Ionicons name="star" size={14} color="#D97706" />
+							<Text style={styles.viewReviewBtnText}>View Your Review</Text>
+						</View>
+						<Ionicons name="chevron-forward" size={14} color="#0C7C7C" />
+					</TouchableOpacity>
+				) : (
+					<TouchableOpacity
+						style={styles.rateReviewBtn}
+						onPress={() => onRateReview(booking)}
+						activeOpacity={0.85}
+					>
+						<View style={styles.reviewBtnLeft}>
+							<Ionicons name="star" size={15} color="#D97706" />
+							<Text style={styles.rateReviewBtnText}>Rate & Review Service</Text>
+						</View>
+						<View style={styles.rateBadge}>
+							<Text style={styles.rateBadgeText}>Earn Rewards</Text>
+						</View>
+					</TouchableOpacity>
+				)}
+			</View>
+
+			{/* Secondary Actions: View Invoice + Book Again */}
 			<View style={styles.actionsRow}>
-				<TouchableOpacity style={styles.textBtn} onPress={() => onViewInvoice(booking)} activeOpacity={0.8}>
+				<TouchableOpacity
+					style={styles.textBtn}
+					onPress={() => onViewInvoice(booking)}
+					activeOpacity={0.8}
+				>
 					<Text style={styles.textBtnText}>View Invoice</Text>
 				</TouchableOpacity>
-				<TouchableOpacity style={styles.filledBtn} onPress={() => onBookAgain(booking)} activeOpacity={0.85}>
+				<TouchableOpacity
+					style={styles.filledBtn}
+					onPress={() => onBookAgain(booking)}
+					activeOpacity={0.85}
+				>
 					<Text style={styles.filledBtnText}>Book Again</Text>
 				</TouchableOpacity>
 			</View>
@@ -60,12 +130,12 @@ const styles = StyleSheet.create({
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.05,
 		shadowRadius: 6,
+		gap: 12,
 	},
 	headerRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'flex-start',
-		marginBottom: 14,
 	},
 	headerLeft: {
 		flexShrink: 1,
@@ -93,54 +163,150 @@ const styles = StyleSheet.create({
 	providerRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 14,
 		borderTopWidth: 1,
-		borderTopColor: '#eceeee',
-		paddingTop: 14,
+		borderTopColor: '#f1f5f9',
+		paddingTop: 12,
 	},
 	avatar: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
+		width: 38,
+		height: 38,
+		borderRadius: 19,
 		marginRight: 10,
 		backgroundColor: '#eceeee',
 	},
-	providerName: {
+	providerMetaCol: {
 		flex: 1,
-		fontSize: 13,
+		minWidth: 0,
+		marginRight: 8,
+	},
+	providerName: {
+		fontSize: 13.5,
 		fontWeight: '700',
 		color: '#191c1d',
 	},
-	ratingWrap: {
-		flexDirection: 'row',
+	providerRole: {
+		fontSize: 11.5,
+		color: '#64748b',
+		marginTop: 1,
 	},
+	reviewedChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FEF3C7',
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 10,
+		gap: 4,
+	},
+	reviewedScoreText: {
+		fontSize: 11,
+		fontWeight: '800',
+		color: '#92400E',
+	},
+	pendingReviewChip: {
+		backgroundColor: '#F1F5F9',
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 8,
+	},
+	pendingReviewText: {
+		fontSize: 10.5,
+		fontWeight: '600',
+		color: '#64748B',
+	},
+
+	/* Review Action Strip */
+	reviewActionStrip: {
+		borderTopWidth: 1,
+		borderTopColor: '#f1f5f9',
+		paddingTop: 10,
+	},
+	rateReviewBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#FFFBEB',
+		borderColor: '#FDE68A',
+		borderWidth: 1,
+		paddingHorizontal: 12,
+		paddingVertical: 9,
+		borderRadius: 10,
+	},
+	reviewBtnLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	rateReviewBtnText: {
+		fontSize: 12.5,
+		fontWeight: '700',
+		color: '#92400E',
+	},
+	rateBadge: {
+		backgroundColor: '#FEF3C7',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 6,
+	},
+	rateBadgeText: {
+		fontSize: 9.5,
+		fontWeight: '800',
+		color: '#B45309',
+		textTransform: 'uppercase',
+		letterSpacing: 0.3,
+	},
+	viewReviewBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#F0FDFA',
+		borderColor: '#CCFBF1',
+		borderWidth: 1,
+		paddingHorizontal: 12,
+		paddingVertical: 9,
+		borderRadius: 10,
+	},
+	viewReviewBtnText: {
+		fontSize: 12.5,
+		fontWeight: '700',
+		color: '#0C7C7C',
+	},
+
+	/* Actions Row */
 	actionsRow: {
 		flexDirection: 'row',
-		gap: 12,
+		gap: 10,
 		borderTopWidth: 1,
 		borderTopColor: '#eceeee',
-		paddingTop: 14,
+		paddingTop: 10,
 	},
 	textBtn: {
 		flex: 1,
-		paddingVertical: 12,
+		paddingVertical: 10,
 		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#F8FAFC',
+		borderColor: '#E2E8F0',
+		borderWidth: 1,
+		borderRadius: 10,
 	},
 	textBtnText: {
-		fontSize: 13,
-		fontWeight: '800',
+		fontSize: 12.5,
+		fontWeight: '700',
 		color: '#2B6F71',
 	},
 	filledBtn: {
 		flex: 1,
 		backgroundColor: '#2B6F71',
-		borderRadius: 12,
-		paddingVertical: 12,
+		borderRadius: 10,
+		paddingVertical: 10,
 		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	filledBtnText: {
-		fontSize: 13,
+		fontSize: 12.5,
 		fontWeight: '800',
 		color: '#ffffff',
 	},
 })
+

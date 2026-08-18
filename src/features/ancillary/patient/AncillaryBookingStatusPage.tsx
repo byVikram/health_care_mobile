@@ -1,8 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
 	Image,
 	ScrollView,
 	StyleSheet,
+	Text,
+	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
@@ -13,6 +15,15 @@ import { ROUTES } from '../../../navigation/routes'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
+import StatusModal from '../../../components/common/StatusModal'
+import RatingStars from '../components/RatingStars'
+import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
+import {
+	AncillaryBooking,
+	AncillaryReviewData,
+	getAncillaryReviewByBookingId,
+	submitAncillaryReview,
+} from '../ancillaryService'
 
 export default function AncillaryBookingStatusPage() {
 	const navigation = useNavigation<any>()
@@ -26,6 +37,7 @@ export default function AncillaryBookingStatusPage() {
 
 	// Mock / Data fallback structures
 	const statusLabel = bookingData.status || 'Assigned'
+	const isCompleted = statusLabel.toLowerCase() === 'completed' || bookingData.status === 'completed'
 	const serviceName = bookingData.serviceName || 'Wound Dressing & Care'
 	const serviceDesc =
 		bookingData.serviceDesc ||
@@ -34,6 +46,18 @@ export default function AncillaryBookingStatusPage() {
 	const serviceImage =
 		bookingData.serviceImage ||
 		'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=80'
+
+	// Review state
+	const [reviewData, setReviewData] = useState<AncillaryReviewData | null>(() =>
+		getAncillaryReviewByBookingId(bookingId)
+	)
+	const [reviewModalVisible, setReviewModalVisible] = useState(false)
+	const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+	const [statusFeedbackModal, setStatusFeedbackModal] = useState<{
+		visible: boolean
+		title: string
+		description: string
+	} | null>(null)
 
 	const patient = bookingData.patient || {
 		name: 'John Doe',
@@ -74,6 +98,50 @@ export default function AncillaryBookingStatusPage() {
 		navigation.navigate(ROUTES.MAIN.TABS)
 	}
 
+	const handleSubmitReview = async (stars: number, comment: string) => {
+		setIsSubmittingReview(true)
+		try {
+			const saved = await submitAncillaryReview({
+				bookingId,
+				providerId: bookingData.provider?.id || 'n-prov-1',
+				providerName: bookingData.provider?.name || 'Healthcare Clinician',
+				serviceName,
+				rating: stars,
+				comment,
+				patientName: patient.name || 'John Doe',
+			})
+			setReviewData(saved)
+			setReviewModalVisible(false)
+			setStatusFeedbackModal({
+				visible: true,
+				title: 'Thank You!',
+				description: 'Your rating and feedback have been successfully submitted.',
+			})
+		} finally {
+			setIsSubmittingReview(false)
+		}
+	}
+
+	const modalBookingObj: AncillaryBooking = {
+		id: bookingId,
+		serviceName,
+		serviceKey: bookingData.serviceKey || 'nursing-care',
+		serviceLabel: bookingData.serviceLabel || 'Nursing Care',
+		status: 'completed',
+		date: appointment.date || 'Today',
+		provider: {
+			id: bookingData.provider?.id || 'n-prov-1',
+			name: bookingData.provider?.name || 'Anita Sharma',
+			designation: bookingData.provider?.designation || 'Registered Nurse',
+			avatar:
+				bookingData.provider?.avatar ||
+				'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
+		},
+		hasReview: !!reviewData,
+		rating: reviewData?.rating,
+		review: reviewData || undefined,
+	}
+
 	return (
 		<View style={styles.container}>
 			<AppScreenHeader title="Booking Details & Status" />
@@ -102,12 +170,56 @@ export default function AncillaryBookingStatusPage() {
 					</View>
 
 					<AppTypography variant="h2" style={styles.statusTitle}>
-						Appointment Confirmed
+						{isCompleted ? 'Service Completed' : 'Appointment Confirmed'}
 					</AppTypography>
 					<AppTypography variant="caption" style={styles.statusSubtitle}>
-						Your appointment has been scheduled for a home visit.
+						{isCompleted
+							? 'Your home care visit has been successfully completed.'
+							: 'Your appointment has been scheduled for a home visit.'}
 					</AppTypography>
 				</View>
+
+				{/* 1b. Post-Service Rating Prompt (Only when Completed) */}
+				{isCompleted && (
+					<View style={styles.feedbackCard}>
+						<View style={styles.feedbackHeaderRow}>
+							<View style={styles.feedbackIconWrap}>
+								<Ionicons name="star" size={18} color="#D97706" />
+							</View>
+							<View style={styles.feedbackTextCol}>
+								<AppTypography variant="h4" style={styles.feedbackTitle}>
+									How was your care experience?
+								</AppTypography>
+								<AppTypography variant="caption" style={styles.feedbackSubtitle}>
+									Your rating helps us improve clinical service quality.
+								</AppTypography>
+							</View>
+						</View>
+
+						{reviewData ? (
+							<TouchableOpacity
+								style={styles.feedbackActionBtnReviewed}
+								onPress={() => setReviewModalVisible(true)}
+								activeOpacity={0.8}
+							>
+								<RatingStars rating={reviewData.rating} size={14} />
+								<Text style={styles.feedbackActionTextReviewed}>
+									★ {reviewData.rating}.0 • View Your Submitted Review
+								</Text>
+								<Ionicons name="chevron-forward" size={14} color="#0C7C7C" />
+							</TouchableOpacity>
+						) : (
+							<AppButton
+								variant="primary"
+								onPress={() => setReviewModalVisible(true)}
+								style={{ width: '100%', borderRadius: 12, marginTop: 4 }}
+							>
+								Rate & Review Service
+							</AppButton>
+						)}
+					</View>
+				)}
+
 
 				{/* 2. Healthcare Service Details */}
 				<View style={styles.card}>
@@ -306,15 +418,97 @@ export default function AncillaryBookingStatusPage() {
 					</AppButton>
 				</View>
 			</ScrollView>
+
+			{/* Rating & Review Bottom Sheet */}
+			<RateAncillaryReviewModal
+				visible={reviewModalVisible}
+				onClose={() => setReviewModalVisible(false)}
+				booking={modalBookingObj}
+				existingReview={reviewData}
+				onSubmit={handleSubmitReview}
+				isSubmitting={isSubmittingReview}
+			/>
+
+			{/* Status Feedback Confirmation */}
+			{statusFeedbackModal && (
+				<StatusModal
+					visible={statusFeedbackModal.visible}
+					status="success"
+					title={statusFeedbackModal.title}
+					description={statusFeedbackModal.description}
+					submitText="Done"
+					onSubmit={() => setStatusFeedbackModal(null)}
+					onCancel={() => setStatusFeedbackModal(null)}
+				/>
+			)}
 		</View>
 	)
 }
 
 const styles = StyleSheet.create({
+	feedbackCard: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		padding: 16,
+		marginBottom: 16,
+		borderWidth: 1.5,
+		borderColor: '#FDE68A',
+		shadowColor: '#F59E0B',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.08,
+		shadowRadius: 6,
+		elevation: 2,
+		gap: 12,
+	},
+	feedbackHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+	},
+	feedbackIconWrap: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		backgroundColor: '#FEF3C7',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	feedbackTextCol: {
+		flex: 1,
+	},
+	feedbackTitle: {
+		fontSize: 14.5,
+		fontWeight: '700',
+		color: '#191C1D',
+	},
+	feedbackSubtitle: {
+		fontSize: 11.5,
+		color: '#64748B',
+		marginTop: 1,
+	},
+	feedbackActionBtnReviewed: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#F0FDFA',
+		borderColor: '#CCFBF1',
+		borderWidth: 1,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		borderRadius: 12,
+	},
+	feedbackActionTextReviewed: {
+		fontSize: 12.5,
+		fontWeight: '700',
+		color: '#0C7C7C',
+		flex: 1,
+		marginLeft: 8,
+	},
 	container: {
 		flex: 1,
 		backgroundColor: '#F8FAFC',
 	},
+
 	scrollContent: {
 		paddingHorizontal: 16,
 		paddingTop: 16,
