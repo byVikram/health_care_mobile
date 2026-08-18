@@ -5,6 +5,7 @@ export const USER_ROLES = {
 	RADIOLOGY: 'radiology',
 	LABORATORY: 'laboratory',
 	ANCILLARY: 'ancillary',
+	NURSE: 'nurse',
 }
 
 export const APPOINTMENT_STATUS = {

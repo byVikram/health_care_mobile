@@ -189,7 +189,7 @@ export default function MainTabNavigator() {
 					name={ROUTES.MAIN.ANCILLARY}
 					component={AncillaryTabWrapper}
 					options={{
-						headerShown: true,
+						headerShown: !(role === 'ancillary' || role === 'nurse'),
 						header: () => (
 							<AppScreenHeader
 								title="Ancillary Dashboard"
