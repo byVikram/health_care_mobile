@@ -20,6 +20,8 @@ import { RecommendationItem, RecommendationCard } from '../components/Recommenda
 import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCard'
 import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
+import ApiService from '../../../services/apiService'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 interface CategoryGroup {
 	categoryName: string
@@ -176,6 +178,70 @@ export default function NursingCarePage() {
 		? Math.floor((contentWidth - gap * (numColumns - 1)) / numColumns)
 		: undefined
 
+	const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>(ALL_NURSING_CATEGORIES)
+	const [popularServices, setPopularServices] = useState<PopularService[]>(POPULAR_SERVICES)
+
+	React.useEffect(() => {
+		const fetchBackendServices = async () => {
+			try {
+				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.SERVICES)
+				// Handle FastAPI success_response format ({ status: 'success', data: [...] })
+				const payload = res.data
+				const apiData: any[] = Array.isArray(payload)
+					? payload
+					: Array.isArray(payload?.data)
+					? payload.data
+					: Array.isArray(res)
+					? res
+					: []
+
+				console.log('[NursingCarePage] Fetched live DB procedures count:', apiData.length)
+
+				if (apiData.length > 0) {
+					// Group by categoryName returned from backend API
+					const groupsMap: { [key: string]: ServiceProcedureItem[] } = {}
+
+					apiData.forEach((item: any) => {
+						const catName = item.categoryName || 'General Nursing & In-Home Procedures'
+						if (!groupsMap[catName]) {
+							groupsMap[catName] = []
+						}
+						groupsMap[catName].push({
+							id: item.id || `srv-${Math.random()}`,
+							title: item.title || item.label || 'Ancillary Procedure',
+							description: item.description || 'Professional in-home medical procedure',
+							duration: item.duration || '45 mins',
+							price: typeof item.price === 'number' ? `₹${item.price}` : (item.price || '₹499'),
+							image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
+							verified: true,
+						})
+					})
+
+					const liveGroups: CategoryGroup[] = Object.keys(groupsMap).map((catName) => ({
+						categoryName: `${catName} (Live DB Services)`,
+						procedures: groupsMap[catName],
+					}))
+
+					setCategoryGroups(liveGroups)
+
+					// Dynamic Popular Services derived from DB
+					const popMapped: PopularService[] = apiData.slice(0, 4).map((item: any) => ({
+						id: item.id,
+						title: item.title || item.label,
+						description: item.description || 'Certified in-home procedure',
+						price: typeof item.price === 'number' ? `₹${item.price}` : (item.price || '₹499'),
+						image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
+					}))
+					setPopularServices(popMapped)
+				}
+			} catch (err) {
+				console.log('[NursingCarePage] Failed to load services from API, using fallback', err)
+			}
+		}
+
+		fetchBackendServices()
+	}, [])
+
 	const handleBack = () => {
 		if (navigation.canGoBack()) {
 			navigation.goBack()
@@ -221,7 +287,7 @@ export default function NursingCarePage() {
 	}
 
 	const handleRecommendationPress = (rec: RecommendationItem) => {
-		for (const category of ALL_NURSING_CATEGORIES) {
+		for (const category of categoryGroups) {
 			const found = category.procedures.find(
 				(p) =>
 					p.title.toLowerCase() === rec.title.toLowerCase() ||
@@ -309,7 +375,7 @@ export default function NursingCarePage() {
 						style={{ marginHorizontal: -paddingHorizontal }}
 						contentContainerStyle={{ paddingHorizontal }}
 					>
-						{POPULAR_SERVICES.map((service) => (
+						{popularServices.map((service) => (
 							<PopularServiceCard
 								key={service.id}
 								item={service}
@@ -351,7 +417,7 @@ export default function NursingCarePage() {
 						All Nursing Services
 					</AppTypography>
 
-					{ALL_NURSING_CATEGORIES.map((category) => (
+					{categoryGroups.map((category) => (
 						<View key={category.categoryName} style={styles.categoryContainer}>
 							<AppTypography variant="h3" style={styles.categoryTitle}>
 								{category.categoryName}

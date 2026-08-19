@@ -18,6 +18,9 @@ import {
 	getAncillaryReviewByBookingId,
 	submitAncillaryReview,
 } from './ancillaryService'
+import NursePulseRadarView from './components/NursePulseRadarView'
+import ApiService from '../../services/apiService'
+import { API_ENDPOINTS } from '../../constants/apiUrls'
 
 const TRACKING_STAGES: TrackingStage[] = [
 	{ key: 'confirmed', label: 'Booking Confirmed', time: '09:00 AM' },
@@ -71,11 +74,49 @@ export default function TrackAppointmentPage() {
 	}
 
 	const [activeStageIndex, setActiveStageIndex] = useState<number>(
-		() => bookingData.activeStageIndex ?? 2
+		() => bookingData.activeStageIndex ?? 0
 	)
-	const otp = String(bookingData.otp || '4291')
+	const [liveStatus, setLiveStatus] = useState<string>(() => (bookingData.status || 'SEARCHING').toUpperCase())
+	const [liveNurse, setLiveNurse] = useState<any>(bookingData.provider || null)
+
+	React.useEffect(() => {
+		const pollStatus = async () => {
+			try {
+				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
+				const data = res.data?.data || res.data
+				if (data && data.status) {
+					const st = String(data.status).toUpperCase()
+					setLiveStatus(st)
+					if (data.assignedProvider) {
+						setLiveNurse(data.assignedProvider)
+					}
+					if (st === 'SEARCHING' || st === 'SEARCHING_FOR_NURSE') {
+						setActiveStageIndex(0)
+					} else if (st === 'ASSIGNED' || st === 'NURSE_ASSIGNED') {
+						setActiveStageIndex(1)
+					} else if (st === 'EN_ROUTE') {
+						setActiveStageIndex(2)
+					} else if (st === 'ARRIVED') {
+						setActiveStageIndex(3)
+					} else if (st === 'IN_PROGRESS') {
+						setActiveStageIndex(4)
+					} else if (st === 'COMPLETED') {
+						setActiveStageIndex(5)
+					}
+				}
+			} catch (e) {
+				console.log('[TrackAppointmentPage] Live status poll logged')
+			}
+		}
+
+		void pollStatus()
+		const interval = setInterval(pollStatus, 3000)
+		return () => clearInterval(interval)
+	}, [bookingId])
+
+	const otp = String(bookingData.otp || '4829')
 	const isTravelling = activeStageIndex >= 1 && activeStageIndex <= 3
-	const isCompleted = activeStageIndex >= 5 || bookingData.status === 'completed'
+	const isCompleted = activeStageIndex >= 5 || liveStatus === 'COMPLETED'
 
 	const handleCallNurse = () => {
 		Linking.openURL(`tel:${nurse.phone || '+919876543210'}`)
@@ -369,6 +410,19 @@ export default function TrackAppointmentPage() {
 		hasReview: !!reviewData,
 		rating: reviewData?.rating,
 		review: reviewData || undefined,
+	}
+
+	if (liveStatus === 'SEARCHING' || liveStatus === 'SEARCHING_FOR_NURSE') {
+		return (
+			<View style={styles.container}>
+				<AppScreenHeader title="Finding Nurse..." onBack={() => navigation.goBack()} />
+				<NursePulseRadarView
+					patientAddress={appointment.address}
+					serviceName={appointment.service}
+					onCancelSearch={() => navigation.goBack()}
+				/>
+			</View>
+		)
 	}
 
 	return (

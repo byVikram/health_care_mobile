@@ -2,7 +2,7 @@ import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 
-type StepStatus = 'assigned' | 'verification_pending' | 'in_progress' | 'completed'
+type StepStatus = 'assigned' | 'verification_pending' | 'in_progress' | 'completed' | 'ASSIGNED' | 'EN_ROUTE' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED'
 
 interface ServiceTimelineProps {
 	currentStatus: StepStatus

@@ -4,8 +4,8 @@
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	const url = "http://192.168.4.104:8000"
+	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	// const url = "http://192.168.4.20:8000"
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 
 	if (!url) {
@@ -205,5 +205,29 @@ export const API_ENDPOINTS = {
 		DETAIL: (id: string) => `${BASE_URL}/api/events/${id}`,
 		UPDATE: (id: string) => `${BASE_URL}/api/events/${id}`,
 		DELETE: (id: string) => `${BASE_URL}/api/events/${id}`,
+	},
+	ANCILLARY: {
+		CATEGORIES: `${BASE_URL}/api/ancillary/categories`,
+		SERVICES: `${BASE_URL}/api/ancillary/services`,
+		REQUESTS: `${BASE_URL}/api/ancillary/patient/requests`,
+		PATIENT_ACTIVE_REQUEST: `${BASE_URL}/api/ancillary/patient/requests/active`,
+		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
+		CANCEL_PATIENT: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/cancel`,
+		MY_REQUESTS: `${BASE_URL}/api/ancillary/patient/requests/my`,
+		PROVIDER_STATUS: `${BASE_URL}/api/ancillary/provider/status`,
+		PROVIDER_LOCATION: `${BASE_URL}/api/ancillary/provider/location`,
+		PROVIDER_AVAILABLE: `${BASE_URL}/api/ancillary/provider/requests/available`,
+		MY_APPOINTMENTS: `${BASE_URL}/api/ancillary/provider/requests/my`,
+		ACCEPT_OFFER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/accept`,
+		UPDATE_STATUS: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/status`,
+		EN_ROUTE: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/en-route`,
+		ARRIVE: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/arrive`,
+		VERIFY_OTP: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/verify-otp`,
+		COMPLETE_SERVICE: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/complete`,
+		CLINICAL_DETAILS: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/clinical-details`,
+		PAYMENTS_AUTHORIZE: `${BASE_URL}/api/ancillary/payments/authorize`,
+		REVIEWS: `${BASE_URL}/api/ancillary/reviews`,
+		WS_PATIENT_REQUEST: (id: string) => `${BASE_URL.replace('http', 'ws')}/api/ancillary/ws/patient/requests/${id}`,
+		WS_PROVIDER_DISPATCH: `${BASE_URL.replace('http', 'ws')}/api/ancillary/ws/provider/dispatch`,
 	},
 }

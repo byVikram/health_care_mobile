@@ -13,6 +13,8 @@ import {
 	NurseBooking,
 	getBookingState,
 	acceptCareRequestBackend,
+	fetchAvailableRequestsBackend,
+	fetchMyNurseAppointmentsBackend,
 	SoftReviewRequestData,
 	AuthorizedDetailedPatientInfo,
 } from '../ancillaryService'
@@ -35,7 +37,8 @@ export default function StaffAncillaryDashboard() {
 	const isWideTablet = width >= 960 || (isTablet && isLandscape && width >= 800)
 	const isNarrowCol = isTablet && !isWideTablet
 
-	const [bookings, setBookings] = useState<NurseBooking[]>(MOCK_NURSE_BOOKINGS)
+	const [bookings, setBookings] = useState<NurseBooking[]>([])
+	const [isNurseOnline, setIsNurseOnline] = useState<boolean>(true)
 
 	const [incomingRequest, setIncomingRequest] = useState<SoftReviewRequestData | null>(null)
 	const [detailedInfo, setDetailedInfo] = useState<AuthorizedDetailedPatientInfo | null>(null)
@@ -45,17 +48,22 @@ export default function StaffAncillaryDashboard() {
 	const [acceptLoading, setAcceptLoading] = useState(false)
 	const [claimedModalVisible, setClaimedModalVisible] = useState(false)
 
+	const handleAvailabilityToggle = (online: boolean) => {
+		setIsNurseOnline(online)
+		if (!online) {
+			setIncomingRequest(null)
+			setDetailedInfo(null)
+			setRequestStep('none')
+		}
+	}
+
 	const handleDeclineRequest = () => {
 		setIncomingRequest(null)
 		setDetailedInfo(null)
 		setRequestStep('none')
 	}
 
-	const handleAcceptClick = () => {
-		setRequestStep('accept_confirm')
-	}
-
-	const handleConfirmAcceptBackend = async () => {
+	const handleAcceptClick = async () => {
 		if (!incomingRequest) return
 		setAcceptLoading(true)
 		try {
@@ -68,29 +76,33 @@ export default function StaffAncillaryDashboard() {
 				return
 			}
 
-			if (result.success && result.detailedInfo) {
-				const info = result.detailedInfo
-				const newBooking: NurseBooking = {
-					id: info.id,
-					patientName: info.patientName,
-					patientAge: info.patientAge,
-					patientGender: info.patientGender,
-					patientPhone: info.patientPhone,
-					serviceName: info.serviceName,
-					serviceDescription: info.procedureDetails,
-					appointmentDate: 'Today',
-					appointmentTime: incomingRequest.requestedTime,
-					patientAddress: info.exactAddress,
-					status: 'verification_pending',
-					otpCode: info.verificationOtp,
-					completePin: info.completionPin,
-				}
-				setBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== newBooking.id)])
-				setDetailedInfo(info)
-				setRequestStep('detailed_review')
+			const targetId = result.travelInfo?.requestId || incomingRequest.id
+
+			const newBooking: NurseBooking = {
+				id: targetId,
+				patientName: result.travelInfo?.patientFirstName || (incomingRequest as any)?.patientFirstName || 'Patient Eleanor V.',
+				patientAge: 68,
+				patientGender: 'Female',
+				patientPhone: '+91 98765 43210',
+				serviceName: incomingRequest.serviceName || 'General Nursing Care',
+				serviceDescription: incomingRequest.serviceRequirement || 'In-home procedure',
+				appointmentDate: 'Today',
+				appointmentTime: incomingRequest.requestedTime || 'Just now',
+				patientAddress: result.travelInfo?.streetAddress || incomingRequest.generalLocation || '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
+				status: 'assigned',
+				otpCode: '4829',
+				completePin: '9182',
 			}
+
+			setBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== targetId)])
+			setIncomingRequest(null)
+			setDetailedInfo(null)
+			setRequestStep('none')
+
+			// 1-Tap Accept: Navigate directly to ActiveBookingPage (Navigation & En-Route screen)
+			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: targetId })
 		} catch (error) {
-			console.error('Error confirming acceptance:', error)
+			console.error('Error accepting request:', error)
 		} finally {
 			setAcceptLoading(false)
 		}
@@ -107,7 +119,35 @@ export default function StaffAncillaryDashboard() {
 	}
 
 	useEffect(() => {
+		const fetchLiveAvailableRequests = async () => {
+			if (!isNurseOnline) return
+			try {
+				const available = await fetchAvailableRequestsBackend()
+				if (available.length > 0 && isNurseOnline) {
+					console.log('[StaffAncillaryDashboard] Loaded live patient requests count:', available.length)
+					setIncomingRequest(available[0])
+					setRequestStep('request_card')
+				}
+			} catch (e) {
+				console.log('[StaffAncillaryDashboard] Error checking available requests:', e)
+			}
+		}
+
 		const syncStatuses = async () => {
+			try {
+				const myAppointments = await fetchMyNurseAppointmentsBackend()
+				if (myAppointments.length > 0) {
+					setBookings((prev) => {
+						const existingIds = new Set(myAppointments.map((a) => a.id))
+						const remaining = prev.filter((b) => !existingIds.has(b.id))
+						return [...myAppointments, ...remaining]
+					})
+					return
+				}
+			} catch (e) {
+				console.log('[StaffAncillaryDashboard] Loading provider appointments via fallback')
+			}
+
 			const updated = await Promise.all(
 				MOCK_NURSE_BOOKINGS.map(async (b) => {
 					const state = await getBookingState(b.id)
@@ -119,10 +159,12 @@ export default function StaffAncillaryDashboard() {
 			)
 			setBookings(updated)
 		}
-		if (isFocused) {
+
+		if (isFocused && isNurseOnline) {
 			void syncStatuses()
+			void fetchLiveAvailableRequests()
 		}
-	}, [isFocused])
+	}, [isFocused, isNurseOnline])
 
 	const acceptedCount = bookings.filter(
 		(b) => b.status === 'assigned' || b.status === 'verification_pending' || b.status === 'in_progress'
@@ -131,15 +173,21 @@ export default function StaffAncillaryDashboard() {
 	const cancelledCount = 0
 	const todayEarningsAmount = completedCount > 0 ? completedCount * 850 + 450 : 1300
 
-	const inProgressBooking = bookings.find((b) => b.status === 'in_progress')
-	const assignedBooking = bookings.find((b) => b.status === 'assigned' || b.status === 'verification_pending')
-	const activeBooking = inProgressBooking || assignedBooking || bookings[0]
+	const inProgressBooking = bookings.find((b) => b.status?.toLowerCase() === 'in_progress')
+	const enRouteOrArrivedBooking = bookings.find(
+		(b) => b.status?.toUpperCase() === 'EN_ROUTE' || b.status?.toUpperCase() === 'ARRIVED'
+	)
+	const assignedBooking = bookings.find(
+		(b) => b.status?.toLowerCase() === 'assigned' || b.status?.toLowerCase() === 'verification_pending'
+	)
+	const activeBooking = inProgressBooking || enRouteOrArrivedBooking || assignedBooking || null
 
 	const handleStartCare = () => {
 		if (!activeBooking) return
-		if (activeBooking.status === 'in_progress') {
+		const st = activeBooking.status?.toUpperCase()
+		if (st === 'IN_PROGRESS') {
 			navigation.navigate(ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS, { bookingId: activeBooking.id })
-		} else if (activeBooking.status === 'verification_pending') {
+		} else if (st === 'ARRIVED' || st === 'VERIFICATION_PENDING') {
 			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: activeBooking.id })
 		} else {
 			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: activeBooking.id })
@@ -384,17 +432,17 @@ export default function StaffAncillaryDashboard() {
 						/>
 						<View style={styles.patientMetaCol}>
 							<AppTypography variant="h4" style={styles.patientName} numberOfLines={1}>
-								{activeBooking.patientName || 'William Mercer'}
+								{activeBooking.patientName}
 							</AppTypography>
 							<AppTypography variant="caption" style={styles.patientSubtext} numberOfLines={1}>
-								{activeBooking.patientGender || 'Male'} • {activeBooking.patientAge || 68} yrs • ID: 45871
+								{activeBooking.patientGender || 'Patient'} • {activeBooking.patientAge} yrs • ID: {activeBooking.id}
 							</AppTypography>
 						</View>
 
 						{/* Status Badge */}
 						<View style={styles.statusPillBadge}>
 							<AppTypography variant="caption" style={styles.statusPillText}>
-								Assigned
+								{(activeBooking.status || 'ASSIGNED').toUpperCase()}
 							</AppTypography>
 						</View>
 					</View>
@@ -403,7 +451,7 @@ export default function StaffAncillaryDashboard() {
 					<View style={styles.careDetailRow}>
 						<Ionicons name="medkit-outline" size={15} color="#0C7C7C" />
 						<AppTypography variant="body" style={styles.careServiceName} numberOfLines={1}>
-							{activeBooking.serviceName || 'Post-Surgical Wound Care & Dressing Change'}
+							{activeBooking.serviceName}
 						</AppTypography>
 					</View>
 
@@ -416,14 +464,14 @@ export default function StaffAncillaryDashboard() {
 							<View style={styles.metaRowLeftFull}>
 								<Ionicons name="location-outline" size={15} color="#64748B" />
 								<AppTypography variant="caption" style={styles.metaText} numberOfLines={2}>
-									{activeBooking.patientAddress || '4382 Oakwood Ave, Apt 3B, Los Angeles, CA 90004'}
+									{activeBooking.patientAddress}
 								</AppTypography>
 							</View>
 							<View style={styles.metaRowTimePill}>
 								<View style={styles.metaTimeChip}>
 									<Ionicons name="time-outline" size={13} color="#0C7C7C" />
 									<AppTypography variant="caption" style={styles.metaTimeChipText}>
-										Today • 4:30 PM – 5:00 PM
+										Today • {activeBooking.appointmentTime}
 									</AppTypography>
 								</View>
 							</View>
@@ -434,19 +482,16 @@ export default function StaffAncillaryDashboard() {
 								<Ionicons name="location-outline" size={15} color="#64748B" />
 								<View style={{ flex: 1 }}>
 									<AppTypography variant="caption" style={styles.metaText} numberOfLines={2}>
-										{activeBooking.patientAddress || '4382 Oakwood Ave, Apt 3B, Los Angeles, CA 90004'}
+										{activeBooking.patientAddress}
 									</AppTypography>
 								</View>
 							</View>
 
 							<View style={styles.metaColRight}>
-								<Ionicons name="time-outline" size={15} color="#64748B" />
-								<View>
-									<AppTypography variant="caption" style={styles.metaLabelText}>
-										Today
-									</AppTypography>
-									<AppTypography variant="caption" style={styles.metaTextBold}>
-										4:30 PM – 5:00 PM
+								<View style={styles.metaTimeChip}>
+									<Ionicons name="time-outline" size={13} color="#0C7C7C" />
+									<AppTypography variant="caption" style={styles.metaTimeChipText}>
+										Today • {activeBooking.appointmentTime}
 									</AppTypography>
 								</View>
 								<Ionicons name="chevron-forward" size={15} color="#94A3B8" />
@@ -649,7 +694,8 @@ export default function StaffAncillaryDashboard() {
 					<View style={styles.tabletRow}>
 						<View style={styles.tabletCol}>
 							<NurseAvailabilityCard
-								onManageSchedulePress={() => navigation.navigate(ROUTES.MAIN.PROFILE)}
+								initialAvailable={isNurseOnline}
+								onAvailabilityChange={handleAvailabilityToggle}
 							/>
 						</View>
 						<View style={styles.tabletCol}>
@@ -691,7 +737,8 @@ export default function StaffAncillaryDashboard() {
 				/* -- MOBILE RESPONSIVE 1-COLUMN COMPACT STACK ---------------- */
 				<View style={styles.mobileStackContainer}>
 					<NurseAvailabilityCard
-						onManageSchedulePress={() => navigation.navigate(ROUTES.MAIN.PROFILE)}
+						initialAvailable={isNurseOnline}
+						onAvailabilityChange={handleAvailabilityToggle}
 					/>
 					{renderTodaySection()}
 					{renderActiveCareSection()}
@@ -720,21 +767,6 @@ export default function StaffAncillaryDashboard() {
 			)}
 
 			{/* Modals */}
-			<AcceptConfirmationModal
-				visible={requestStep === 'accept_confirm'}
-				request={incomingRequest}
-				onConfirmAccept={handleConfirmAcceptBackend}
-				onCancel={() => setRequestStep('request_card')}
-				loading={acceptLoading}
-			/>
-
-			<DetailedReviewModal
-				visible={requestStep === 'detailed_review'}
-				detailedInfo={detailedInfo}
-				onProceedToVerification={handleProceedToVerification}
-				onClose={() => setRequestStep('none')}
-			/>
-
 			<StatusModal
 				visible={claimedModalVisible}
 				status="error"

@@ -2,17 +2,30 @@ import React, { useState } from 'react'
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import { MOCK_NURSE_BOOKINGS, NurseBooking } from '../ancillaryService'
+import { fetchMyNurseAppointmentsBackend, NurseBooking } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
 import ServiceStatusIndicator from '../components/ServiceStatusIndicator'
 
 export default function NurseVisitsPage() {
 	const navigation = useNavigation<any>()
 	const [activeFilter, setActiveFilter] = useState<'all' | 'assigned' | 'in_progress' | 'completed'>('all')
+	const [bookings, setBookings] = useState<NurseBooking[]>([])
 
-	const filteredBookings = MOCK_NURSE_BOOKINGS.filter((b: NurseBooking) => {
+	React.useEffect(() => {
+		const loadData = async () => {
+			try {
+				const items = await fetchMyNurseAppointmentsBackend()
+				setBookings(items)
+			} catch (e) {
+				console.log('Error loading visits')
+			}
+		}
+		void loadData()
+	}, [])
+
+	const filteredBookings = bookings.filter((b: NurseBooking) => {
 		if (activeFilter === 'all') return true
-		if (activeFilter === 'assigned') return b.status === 'assigned' || b.status === 'verification_pending'
+		if (activeFilter === 'assigned') return b.status === 'assigned' || b.status === 'verification_pending' || b.status === 'EN_ROUTE' || b.status === 'ARRIVED'
 		if (activeFilter === 'in_progress') return b.status === 'in_progress'
 		if (activeFilter === 'completed') return b.status === 'completed'
 		return true

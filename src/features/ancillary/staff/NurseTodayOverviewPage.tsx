@@ -27,6 +27,8 @@ const MOCK_CANCELLED_RECORDS = [
 	},
 ]
 
+import { fetchAvailableRequestsBackend, fetchMyNurseAppointmentsBackend, NurseBooking } from '../ancillaryService'
+
 export default function NurseTodayOverviewPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
@@ -35,13 +37,33 @@ export default function NurseTodayOverviewPage() {
 
 	const initialFilter: FilterOption = route.params?.filter || 'all'
 	const [activeFilter, setActiveFilter] = useState<FilterOption>(initialFilter)
+	const [requestsReceivedCount, setRequestsReceivedCount] = useState<number>(0)
+	const [myBookings, setMyBookings] = useState<NurseBooking[]>([])
 
-	const acceptedBookings = MOCK_NURSE_BOOKINGS.filter(
-		(b) => b.status === 'assigned' || b.status === 'verification_pending' || b.status === 'in_progress'
+	React.useEffect(() => {
+		const loadData = async () => {
+			try {
+				const available = await fetchAvailableRequestsBackend()
+				setRequestsReceivedCount(available.length)
+			} catch (e) {
+				console.log('[NurseTodayOverviewPage] Available requests fetch error')
+			}
+
+			try {
+				const appointments = await fetchMyNurseAppointmentsBackend()
+				setMyBookings(appointments)
+			} catch (e) {
+				console.log('[NurseTodayOverviewPage] Appointments fetch error')
+			}
+		}
+		void loadData()
+	}, [])
+
+	const acceptedBookings = myBookings.filter(
+		(b) => b.status === 'assigned' || b.status === 'verification_pending' || b.status === 'in_progress' || b.status === 'EN_ROUTE' || b.status === 'ARRIVED'
 	)
-	const completedBookings = MOCK_NURSE_BOOKINGS.filter((b) => b.status === 'completed')
+	const completedBookings = myBookings.filter((b) => b.status === 'completed')
 
-	const requestsReceivedCount = 3
 	const acceptedCount = acceptedBookings.length
 	const completedCount = completedBookings.length
 	const declinedCount = 0

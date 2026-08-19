@@ -1,14 +1,25 @@
 import React, { useState } from 'react'
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { MOCK_NURSE_BOOKINGS, NurseBooking } from '../ancillaryService'
+import { fetchMyNurseAppointmentsBackend, NurseBooking } from '../ancillaryService'
 
 export default function NurseHistoryPage() {
 	const [searchQuery, setSearchQuery] = useState('')
+	const [visits, setVisits] = useState<NurseBooking[]>([])
 
-	const completedVisits = MOCK_NURSE_BOOKINGS.filter((b: NurseBooking) => b.status === 'completed')
+	React.useEffect(() => {
+		const loadData = async () => {
+			try {
+				const items = await fetchMyNurseAppointmentsBackend()
+				setVisits(items.filter((b: NurseBooking) => b.status === 'completed'))
+			} catch (e) {
+				console.log('Error loading history')
+			}
+		}
+		void loadData()
+	}, [])
 
-	const filteredHistory = completedVisits.filter(
+	const filteredHistory = visits.filter(
 		(b: NurseBooking) =>
 			b.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			b.serviceName.toLowerCase().includes(searchQuery.toLowerCase())
