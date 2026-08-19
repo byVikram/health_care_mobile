@@ -60,6 +60,10 @@ import ActiveBookingPage from '../features/ancillary/staff/ActiveBookingPage'
 import PatientVerificationPage from '../features/ancillary/staff/PatientVerificationPage'
 import ServiceInProgressPage from '../features/ancillary/staff/ServiceInProgressPage'
 import CompleteServicePage from '../features/ancillary/staff/CompleteServicePage'
+import NurseTodayOverviewPage from '../features/ancillary/staff/NurseTodayOverviewPage'
+import NurseVisitsPage from '../features/ancillary/staff/NurseVisitsPage'
+import NurseEarningsPage from '../features/ancillary/staff/NurseEarningsPage'
+import NurseHistoryPage from '../features/ancillary/staff/NurseHistoryPage'
 import AncillaryServicesPage from '../features/ancillary/patient/AncillaryServicesPage'
 import AncillaryProvidersPage from '../features/ancillary/patient/AncillaryProvidersPage'
 import BookingCartPage from '../features/ancillary/patient/BookingCartPage'
@@ -259,6 +263,26 @@ function AuthenticatedNavigator() {
 				name={ROUTES.STACK.NURSE_COMPLETE_SERVICE}
 				component={CompleteServicePage}
 				options={{ headerShown: true, title: 'Complete Service' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_TODAY_OVERVIEW}
+				component={NurseTodayOverviewPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_VISITS}
+				component={NurseVisitsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_EARNINGS}
+				component={NurseEarningsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_HISTORY}
+				component={NurseHistoryPage}
+				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.ANCILLARY_SERVICES}

@@ -10,9 +10,12 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
+import ApiService from '../../../services/apiService'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
+import { fetchPatientActiveRequestBackend, AncillaryBooking } from '../ancillaryService'
 
 interface ServiceItem {
 	key: string
@@ -196,8 +199,27 @@ const TOP_PROFESSIONALS: ProfessionalItem[] = [
 
 export default function AncillaryDashboard() {
 	const navigation = useNavigation<any>()
+	const isFocused = useIsFocused()
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
+	const gridCardWidth = (width - 48 - 12) / 2
+
+	const [activeBooking, setActiveBooking] = useState<AncillaryBooking | null>(null)
+
+	React.useEffect(() => {
+		const loadActiveRequest = async () => {
+			try {
+				const active = await fetchPatientActiveRequestBackend()
+				setActiveBooking(active)
+			} catch (err) {
+				console.log('[AncillaryDashboard] Error loading active booking')
+			}
+		}
+
+		if (isFocused) {
+			void loadActiveRequest()
+		}
+	}, [isFocused])
 
 	const [searchQuery, setSearchQuery] = useState('')
 
@@ -251,6 +273,41 @@ export default function AncillaryDashboard() {
 			]}
 			showsVerticalScrollIndicator={false}
 		>
+			{/* Active Care Visit Tracker Card */}
+			{activeBooking && (
+				<TouchableOpacity
+					style={{
+						backgroundColor: '#E0F2FE',
+						borderRadius: 14,
+						padding: 14,
+						marginBottom: 16,
+						borderWidth: 1,
+						borderColor: '#38BDF8',
+					}}
+					onPress={() => navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: activeBooking.id, status: activeBooking.status })}
+					activeOpacity={0.88}
+				>
+					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+						<View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#0284C7', justifyContent: 'center', alignItems: 'center' }}>
+							<Ionicons name="pulse" size={22} color="#FFFFFF" />
+						</View>
+						<View style={{ flex: 1 }}>
+							<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+								<Text style={{ fontSize: 15, fontWeight: '700', color: '#0369A1' }}>Active Nurse Visit</Text>
+								<View style={{ backgroundColor: '#0284C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+									<Text style={{ fontSize: 10, fontWeight: '700', color: '#FFFFFF' }}>
+										{(activeBooking.status as string) === 'SEARCHING' ? 'SEARCHING FOR NURSE' : activeBooking.status}
+									</Text>
+								</View>
+							</View>
+							<Text style={{ fontSize: 12, color: '#0284C7', marginTop: 2 }} numberOfLines={1}>
+								{activeBooking.serviceName} • Tap to view tracking & details
+							</Text>
+						</View>
+						<Ionicons name="chevron-forward" size={20} color="#0284C7" />
+					</View>
+				</TouchableOpacity>
+			)}
 
 			{/* Promotional Banner */}
 			<ImageBackground

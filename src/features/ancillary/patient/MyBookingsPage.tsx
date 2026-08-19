@@ -3,11 +3,19 @@ import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } 
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
-import { AncillaryBooking, MOCK_ANCILLARY_BOOKINGS } from '../ancillaryService'
+import {
+	AncillaryBooking,
+	AncillaryReviewData,
+	MOCK_ANCILLARY_BOOKINGS,
+	getAncillaryReviewByBookingId,
+	submitAncillaryReview,
+} from '../ancillaryService'
 import UpcomingBookingCard from '../components/UpcomingBookingCard'
 import CompletedBookingCard from '../components/CompletedBookingCard'
 import CancelledBookingCard from '../components/CancelledBookingCard'
+import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
 import { AppScreenHeader, AppSkeleton } from '../../../components/common'
+import StatusModal from '../../../components/common/StatusModal'
 
 type BookingTab = 'upcoming' | 'completed' | 'cancelled'
 
@@ -22,11 +30,24 @@ const PAGE_SIZE = 10
 export default function MyBookingsPage() {
 	const navigation = useNavigation<any>()
 
-	const [bookings] = useState<AncillaryBooking[]>(MOCK_ANCILLARY_BOOKINGS)
+	const [bookings, setBookings] = useState<AncillaryBooking[]>(MOCK_ANCILLARY_BOOKINGS)
 	const [activeTab, setActiveTab] = useState<BookingTab>('upcoming')
 	const [searchQuery, setSearchQuery] = useState('')
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 	const [filterActive, setFilterActive] = useState(false)
+
+	// Rating & Review Modal State
+	const [reviewBooking, setReviewBooking] = useState<AncillaryBooking | null>(null)
+	const [existingReview, setExistingReview] = useState<AncillaryReviewData | null>(null)
+	const [reviewModalVisible, setReviewModalVisible] = useState(false)
+	const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+
+	// Success Feedback Modal
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		title: string
+		description: string
+	} | null>(null)
 
 	const filteredBookings = useMemo(() => {
 		const query = searchQuery.trim().toLowerCase()
@@ -92,6 +113,59 @@ export default function MyBookingsPage() {
 		})
 	}
 
+	const handleRateReview = (booking: AncillaryBooking) => {
+		const review = getAncillaryReviewByBookingId(booking.id) || booking.review || null
+		setReviewBooking(booking)
+		setExistingReview(review)
+		setReviewModalVisible(true)
+	}
+
+	const handleSubmitReview = async (rating: number, comment: string) => {
+		if (!reviewBooking) return
+		setIsSubmittingReview(true)
+
+		try {
+			const savedReview = await submitAncillaryReview({
+				bookingId: reviewBooking.id,
+				providerId: reviewBooking.provider.id || 'n-prov-1',
+				providerName: reviewBooking.provider.name,
+				serviceName: reviewBooking.serviceName,
+				rating,
+				comment,
+				patientName: 'John Doe',
+			})
+
+			// Update in-place in local state array immediately
+			setBookings((prev) =>
+				prev.map((b) =>
+					b.id === reviewBooking.id
+						? {
+								...b,
+								rating,
+								hasReview: true,
+								review: savedReview,
+						  }
+						: b
+				)
+			)
+
+			setReviewModalVisible(false)
+			setReviewBooking(null)
+			setExistingReview(null)
+
+			// Show success status modal
+			setStatusModal({
+				visible: true,
+				title: 'Feedback Submitted!',
+				description: `Thank you for reviewing ${reviewBooking.provider.name}. Your rating helps us maintain top healthcare quality.`,
+			})
+		} catch (error) {
+			Alert.alert('Error', 'Unable to submit review. Please try again.')
+		} finally {
+			setIsSubmittingReview(false)
+		}
+	}
+
 	const handleFilterPress = () => {
 		setFilterActive((prev) => !prev)
 	}
@@ -113,6 +187,7 @@ export default function MyBookingsPage() {
 					booking={item}
 					onViewInvoice={handleViewInvoice}
 					onBookAgain={handleBookAgain}
+					onRateReview={handleRateReview}
 				/>
 			)
 		}
@@ -121,13 +196,11 @@ export default function MyBookingsPage() {
 
 	return (
 		<View style={styles.container}>
-			{/* Header without 3-dot menu */}
 			<AppScreenHeader
 				title="Ancillary Orders"
 				rightElement={null}
 			/>
 
-			{/* Search Bar + Filter Icon */}
 			<View style={styles.searchSectionContainer}>
 				<View style={styles.searchRow}>
 					<View style={styles.searchBar}>
@@ -158,7 +231,6 @@ export default function MyBookingsPage() {
 				</View>
 			</View>
 
-			{/* Tabs */}
 			<View style={styles.tabsRow}>
 				{TABS.map((tab) => {
 					const isActive = tab.key === activeTab
@@ -179,7 +251,6 @@ export default function MyBookingsPage() {
 				})}
 			</View>
 
-			{/* Infinite scroll list */}
 			<FlatList
 				data={pagedBookings}
 				renderItem={renderItem}
@@ -206,6 +277,33 @@ export default function MyBookingsPage() {
 					) : null
 				}
 			/>
+
+			{/* Rating & Review Bottom Sheet Modal */}
+			<RateAncillaryReviewModal
+				visible={reviewModalVisible}
+				onClose={() => {
+					setReviewModalVisible(false)
+					setReviewBooking(null)
+					setExistingReview(null)
+				}}
+				booking={reviewBooking}
+				existingReview={existingReview}
+				onSubmit={handleSubmitReview}
+				isSubmitting={isSubmittingReview}
+			/>
+
+			{/* Status Feedback Confirmation */}
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status="success"
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText="Done"
+					onSubmit={() => setStatusModal(null)}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
 		</View>
 	)
 }

@@ -100,11 +100,15 @@ export default function AppHeader({
 		displayName = userName
 	}
 
+	const isNurse = role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE
+
 	const searchPlaceholder = isPharmacy
 		? 'Search Order ID'
 		: isRadiology
 			? 'Search Radiology ID'
-			: 'Search Doctors/Symptoms'
+			: isNurse
+				? 'Search patient, booking or care request...'
+				: 'Search Doctors/Symptoms'
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	const handleSearchPress = () => {

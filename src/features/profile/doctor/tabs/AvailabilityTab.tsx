@@ -2,22 +2,21 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
 	ScrollView,
 	StyleSheet,
-	Text,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { Ionicons } from '@expo/vector-icons'
 
 import { AppSelect, AppStickyFooter, StatusModal } from '../../../../components/common'
+import { AppTypography } from '../../../../components/common/AppTypography'
 import DateSlotPicker from '../../../../components/common/DateSlotPicker'
 import {
-	createSlotOverrideBatch,
 	getDoctorAvailability,
 	getDoctorProfile,
 	mapDoctorProfileApi,
 	SlotGroup,
-	SlotOverrideBatchPayload,
 	SlotOverridePayload,
 	TimeSlot,
 	updateDoctorAvailability,
@@ -71,7 +70,7 @@ const EMPTY_AVAILABILITY: DoctorAvailability = {
 }
 
 const STORAGE_KEY = 'doctorBlockedSlots'
-const TEAL = '#0c7c7c'
+const TEAL = '#0C7C7C'
 
 const APPOINTMENT_MODE_BY_TYPE: Record<AppointmentTypeKey, AvailabilityAppointmentMode> = {
 	clinic: 'clinic_visit',
@@ -180,14 +179,8 @@ const normalizeAvailabilityGroups = (response: unknown, selectedAppointmentType:
 export default function AvailabilityTab({ hospitals, availability, onChange }: AvailabilityTabProps) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
-	const contentWidth = useMemo(() => {
-		if (width >= 1280) return 760
-		if (width >= 1024) return 680
-		if (isTablet) return 600
-		return 640
-	}, [isTablet, width])
-	const timeSlotColumns = width >= 900 ? 5 : width >= 768 ? 4 : 3
-	const datePickerHorizontalOffset = isTablet ? -20 : -16
+
+	const timeSlotColumns = width >= 1024 ? 5 : width >= 768 ? 4 : 3
 
 	const [localAvailability, setLocalAvailability] = useState<DoctorAvailability>(availability ?? EMPTY_AVAILABILITY)
 	const [apiHospitals, setApiHospitals] = useState<DoctorHospital[]>([])
@@ -448,155 +441,120 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 
 		setUnselectedSlotsByDate(updated)
 		await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-		updateAvailability({ ...resolvedAvailability, [dayKey]: slots })
 
-		const changedOverrides: SlotOverridePayload[] = [
-			...newlyBlocked.map((slot) => ({
-				hospital_id: selectedHospitalId,
-				date: formatDateForApi(selectedDate),
-				start_time: slot,
-				end_time: getSlotEndTime(slot),
-				is_blocked: true,
-			})),
-			...newlyUnblocked.map((slot) => ({
-				hospital_id: selectedHospitalId,
-				date: formatDateForApi(selectedDate),
-				start_time: slot,
-				end_time: getSlotEndTime(slot),
-				is_blocked: false,
-			})),
-		]
-
-		const initialBlockedSlots = new Set(apiBlockedSlots)
-		setPendingOverrides((prev) => {
-			const filtered = prev.filter(
-				(pending) =>
-					!changedOverrides.some(
-						(changed) =>
-							changed.hospital_id === pending.hospital_id &&
-							changed.date === pending.date &&
-							changed.start_time === pending.start_time &&
-							changed.end_time === pending.end_time
+		setPendingOverrides((current) => {
+			const filtered = current.filter(
+				(o) =>
+					!(
+						(newlyBlocked.includes(o.start_time) || newlyUnblocked.includes(o.start_time)) &&
+						o.date === selectedDateKey &&
+						o.hospital_id === selectedHospitalId
 					)
 			)
-			const effectiveOverrides = changedOverrides.filter((override) => {
-				const isStateChanged = initialBlockedSlots.has(override.start_time) !== override.is_blocked
-				if (isStateChanged) return true
-				
-				// Keep override if it explicitly unblocks an originally booked slot
-				const originalSlot = availableSlotGroups
-					.flatMap((g) => g.slots || [])
-					.find((s) => s.start_time === override.start_time)
-				
-				const wasBooked = originalSlot?.is_booked || originalSlot?.status === 'OCCUPIED' || originalSlot?.status === 'BOOKED'
-				if (wasBooked && override.is_blocked === false) {
-					return true
-				}
-				
-				return false
-			})
-			return [...filtered, ...effectiveOverrides]
+
+			const nextBlocked: SlotOverridePayload[] = newlyBlocked.map((start_time) => ({
+				hospital_id: selectedHospitalId,
+				date: selectedDateKey,
+				start_time: normalizeTimeForUpdate(start_time),
+				end_time: normalizeTimeForUpdate(getSlotEndTime(start_time)),
+				is_blocked: true,
+				mode: APPOINTMENT_MODE_BY_TYPE[selectedAppointmentType],
+			}))
+
+			const nextUnblocked: SlotOverridePayload[] = newlyUnblocked.map((start_time) => ({
+				hospital_id: selectedHospitalId,
+				date: selectedDateKey,
+				start_time: normalizeTimeForUpdate(start_time),
+				end_time: normalizeTimeForUpdate(getSlotEndTime(start_time)),
+				is_blocked: false,
+				mode: APPOINTMENT_MODE_BY_TYPE[selectedAppointmentType],
+			}))
+
+			return [...filtered, ...nextBlocked, ...nextUnblocked]
 		})
 	}
 
-	const stageSlotSelection = async (slots: string[]) => {
-		const toggledSlot =
-			slots.find((s) => !selectedSlots.includes(s)) || selectedSlots.find((s) => !slots.includes(s))
+	const handleTimeChange = async (nextSelected: string[]) => {
+		const newlyUnblocked = nextSelected.filter((slot) => todayUnselected.includes(slot))
+		const newlyBlocked = allSelectableSlots.filter(
+			(slot) => !nextSelected.includes(slot) && !todayUnselected.includes(slot)
+		)
 
-		let newlyBlocked: string[] = []
-		let newlyUnblocked: string[] = []
-
-		if (toggledSlot && bookedSlotTimes.includes(toggledSlot)) {
-			if (todayUnselected.includes(toggledSlot)) {
-				newlyUnblocked = [toggledSlot]
-			} else {
-				newlyBlocked = [toggledSlot]
-			}
-		} else {
-			newlyBlocked = selectedSlots.filter((slot) => !slots.includes(slot))
-			newlyUnblocked = todayUnselected.filter((slot) => slots.includes(slot))
-		}
-
-		await commitSlotSelection(newlyBlocked, newlyUnblocked, slots)
-	}
-
-	const handleTimeChange = (slots: string | string[]) => {
-		stageSlotSelection(Array.isArray(slots) ? slots : [slots])
+		await commitSlotSelection(newlyBlocked, newlyUnblocked, nextSelected)
 	}
 
 	const handleClearSelection = async () => {
-		const updated: UnselectedSlotsByDate = {
-			...unselectedSlotsByDate,
-			[selectedStorageKey]: apiBlockedSlots,
-		}
-		setUnselectedSlotsByDate(updated)
-		await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-		setPendingOverrides((prev) =>
-			prev.filter(
-				(override) =>
-					!(
-						override.hospital_id === selectedHospitalId &&
-						override.date === selectedDateKey
-					)
-			)
-		)
+		await commitSlotSelection(allSelectableSlots, [], [])
 	}
 
 	const executeSaveAvailability = async () => {
-		if (!selectedHospitalId) {
-			return
-		}
+		if (!selectedHospitalId) return
 
-		setSaveLoading(true)
 		try {
-			let backendMessage = ''
+			setSaveLoading(true)
 
-			const overridesByHospitalAndDate = pendingOverrides.reduce<Record<string, SlotOverrideBatchPayload>>(
-				(acc, override) => {
-					const hospitalIdToUse = override.hospital_id || selectedHospitalId
-					const groupKey = `${hospitalIdToUse}__${override.date}`
-					if (!acc[groupKey]) {
-						acc[groupKey] = {
-							hospital_id: String(coerceHospitalId(hospitalIdToUse)),
-							date: override.date,
-							appointment_mode: APPOINTMENT_MODE_BY_TYPE[selectedAppointmentType],
-							slots: [],
-						}
-					}
-					acc[groupKey].slots.push({
-						start_time: normalizeTimeForUpdate(override.start_time),
-						end_time: normalizeTimeForUpdate(override.end_time),
-						is_blocked: override.is_blocked,
-					})
-					return acc
-				},
-				{}
-			)
+			const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+			const activeDayOfWeek = getDayOfWeek(selectedDate)
+			const activeDayName = days[activeDayOfWeek]
 
-			for (const payload of Object.values(overridesByHospitalAndDate)) {
-				const response = await createSlotOverrideBatch(payload)
-				if (response?.message) backendMessage = response.message
+			const validAvailableSlots = availableSlotGroups
+				.flatMap((group) => group.slots ?? [])
+				.filter(
+					(s) =>
+						s.status !== 'BLOCKED' &&
+						s.status !== 'UNAVAILABLE' &&
+						s.is_enabled !== false &&
+						!todayUnselected.includes(s.start_time)
+				)
+
+			const mergedSlots = validAvailableSlots.map((s) => {
+				const start_time = normalizeTimeForUpdate(s.start_time)
+				const end_time = normalizeTimeForUpdate(s.end_time || getSlotEndTime(s.start_time))
+				return {
+					hospital_id: coerceHospitalId(selectedHospitalId),
+					day_of_week: activeDayOfWeek,
+					start_time,
+					end_time,
+					duration_minutes: getSlotDuration(start_time, end_time),
+				}
+			})
+
+			const updatedAvailability: DoctorAvailability = {
+				...resolvedAvailability,
+				[activeDayName]: mergedSlots,
 			}
 
-			setPendingOverrides([])
-			const nextUnselected = { ...unselectedSlotsByDate }
-			delete nextUnselected[selectedStorageKey]
-			setUnselectedSlotsByDate(nextUnselected)
-			await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextUnselected))
+			const payload = {
+				availability: Object.entries(updatedAvailability).flatMap(([day, slots]) =>
+					(slots ?? []).map((slot: any) => {
+						const normalizedStart = normalizeTimeForUpdate(slot.start_time)
+						const normalizedEnd = normalizeTimeForUpdate(slot.end_time)
+						return {
+							hospital_id: coerceHospitalId(slot.hospital_id ? String(slot.hospital_id) : selectedHospitalId),
+							day_of_week: slot.day_of_week ?? days.indexOf(day as any),
+							start_time: normalizedStart,
+							end_time: normalizedEnd,
+							duration_minutes:
+								slot.duration_minutes ?? getSlotDuration(normalizedStart, normalizedEnd),
+						}
+					})
+				),
+			}
+
+			await updateDoctorAvailability(payload as any)
+			updateAvailability(updatedAvailability)
 
 			setStatusModal({
 				visible: true,
 				status: 'success',
-				title: 'Success',
-				description: backendMessage || 'Saved successfully',
-				submitText: 'Okay',
+				title: 'Availability Saved',
+				description: 'Your availability schedule has been updated successfully.',
+				submitText: 'Done',
 			})
+
 			await fetchAvailability()
 		} catch (error: any) {
 			console.error('[AvailabilityTab] save availability error:', error)
-			if (error?.response) {
-				console.error('[AvailabilityTab] Error response data:', error.response.data)
-			}
 			setStatusModal({
 				visible: true,
 				status: 'error',
@@ -628,7 +586,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	}
 
 	return (
-		<View style={{ flex: 1 }}>
+		<View style={styles.container}>
 			<ScrollView
 				style={styles.screen}
 				contentContainerStyle={styles.screenContent}
@@ -637,45 +595,76 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 				nestedScrollEnabled
 				directionalLockEnabled
 			>
-				<View style={[styles.card, isTablet && styles.cardTablet, { maxWidth: contentWidth },]}>
-					<View style={styles.fieldGroup}>
-						<Text style={styles.sectionLabel}>Choose Hospital</Text>
-						{resolvedHospitals.length === 0 ? (
-							<Text style={styles.emptyText}>
-								{hospitalsLoading ? 'Loading hospitals...' : 'No hospitals added. Please add a hospital first.'}
-							</Text>
-						) : (
-							<AppSelect
-								value={selectedHospitalId}
-								onSelect={(value) => {
-									setSelectedHospitalId(value)
-									setPendingOverrides([])
-								}}
-								options={resolvedHospitals.map((hospital) => ({
-									value: getAvailabilityHospitalId(hospital),
-									label: hospital.name,
-								}))}
-								size="small"
-								borderRadius={10}
-							/>
-						)}
+				<View style={[styles.mainCard, isTablet && styles.mainCardTablet]}>
+					{/* Header Row: Title + Hospital Selector + Today Button */}
+					<View style={[styles.headerCard, isTablet && styles.headerCardTablet]}>
+						<View style={styles.headerTitleCol}>
+							<View style={styles.titleWithIconRow}>
+								<View style={styles.iconBox}>
+									<Ionicons name="calendar" size={18} color="#0C7C7C" />
+								</View>
+								<View style={{ flex: 1 }}>
+									<AppTypography variant="h3" style={styles.mainTitle}>
+										Schedule & Availability
+									</AppTypography>
+									<AppTypography variant="caption" style={styles.subTitle}>
+										Manage consultation sessions, hospital locations, and time slots
+									</AppTypography>
+								</View>
+							</View>
+						</View>
+
+						{/* Hospital Selector Block */}
+						<View style={styles.hospitalSelectBlock}>
+							<AppTypography variant="caption" style={styles.fieldLabel}>
+								PRACTICE / HOSPITAL LOCATION
+							</AppTypography>
+							{resolvedHospitals.length === 0 ? (
+								<AppTypography variant="caption" style={styles.emptyText}>
+									{hospitalsLoading ? 'Loading locations...' : 'No locations configured.'}
+								</AppTypography>
+							) : (
+								<AppSelect
+									value={selectedHospitalId}
+									onSelect={(value) => {
+										setSelectedHospitalId(value)
+										setPendingOverrides([])
+									}}
+									options={resolvedHospitals.map((hospital) => ({
+										value: getAvailabilityHospitalId(hospital),
+										label: hospital.name,
+									}))}
+									size="small"
+									borderRadius={10}
+								/>
+							)}
+						</View>
 					</View>
 
-					<View style={[styles.todayRow, isTablet && styles.todayRowTablet]}>
-						<TouchableOpacity style={styles.todayButton} onPress={() => setSelectedDate(new Date())}>
-							<Text style={styles.todayButtonText}>Today</Text>
-						</TouchableOpacity>
-					</View>
+					{/* Date & Time Slot Picker Container */}
+					<View style={styles.pickerWrapper}>
+						<View style={styles.todayQuickActionRow}>
+							<TouchableOpacity
+								style={styles.todayJumpButton}
+								onPress={() => setSelectedDate(new Date())}
+								activeOpacity={0.75}
+							>
+								<Ionicons name="today-outline" size={14} color="#0C7C7C" />
+								<AppTypography variant="caption" style={styles.todayJumpText}>
+									Jump to Today
+								</AppTypography>
+							</TouchableOpacity>
+						</View>
 
-					<View style={{ marginHorizontal: datePickerHorizontalOffset }}>
 						<DateSlotPicker
 							multiSelect
 							selectedDate={selectedDate}
 							onDateChange={setSelectedDate}
 							selectedTime={selectedSlots}
 							onTimeChange={handleTimeChange}
-							dateLabel="Select follow up date"
-							hideNavigation
+							dateLabel="Select Schedule Date"
+							timeLabel="Available Time Sessions"
+							hideNavigation={false}
 							timeSlotColumns={timeSlotColumns}
 							disableBookedSlots={false}
 							use12HourTime
@@ -714,20 +703,21 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 							}}
 						/>
 					</View>
-
 				</View>
 			</ScrollView>
+
+			{/* Sticky Save Action Footer */}
 			<AppStickyFooter
 				centered
 				contentStyle={styles.footerContent}
-				contentMaxWidth={contentWidth}
 				buttonStyle={styles.footerSaveButton}
 				onPress={handleSaveAvailability}
 				loading={saveLoading}
 				disabled={saveLoading}
 			>
-				Save Availability
+				Save Availability Schedule
 			</AppStickyFooter>
+
 			{statusModal && (
 				<StatusModal
 					visible={statusModal.visible}
@@ -739,6 +729,7 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 					onCancel={() => setStatusModal(null)}
 				/>
 			)}
+
 			{saveConfirmModal && (
 				<StatusModal
 					visible={saveConfirmModal.visible}
@@ -754,71 +745,144 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 					onCancel={() => setSaveConfirmModal(null)}
 				/>
 			)}
-		</View>	
+		</View>
 	)
 }
 
 const styles = StyleSheet.create({
+	container: {
+		flex: 1,
+		backgroundColor: '#F8FAFC',
+	},
 	screen: {
 		flex: 1,
-		backgroundColor: '#f8fafc',
+		backgroundColor: '#F8FAFC',
 	},
 	screenContent: {
 		flexGrow: 1,
-		padding: 0,
-		paddingBottom: 100,
+		paddingHorizontal: 12,
+		paddingTop: 10,
+		paddingBottom: 110,
 	},
-	card: {
+
+	/* Main Container Card */
+	mainCard: {
 		width: '100%',
+		maxWidth: 860,
 		alignSelf: 'center',
-		backgroundColor: '#fff',
-		padding: 18,
-	},
-	cardTablet: {
-		paddingHorizontal: 24,
-		paddingVertical: 22,
-	},
-	
-	fieldGroup: {
-		marginBottom: 14,
-	},
-	sectionLabel: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#62707a',
-		marginBottom: 8,
-	},
-	todayRow: {
-		alignItems: 'flex-end',
-		marginTop: 4,
-		marginBottom: -30,
-		zIndex: 1,
-	},
-	todayRowTablet: {
-		marginBottom: -34,
-	},
-	todayButton: {
-		borderRadius: 10,
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		padding: 14,
+		borderColor: '#E2E8F0',
 		borderWidth: 1,
-		borderColor: '#215d60',
-		paddingHorizontal: 14,
-		paddingVertical: 7,
-		backgroundColor: '#fff',
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.03,
+		shadowRadius: 3,
+		elevation: 1,
+		gap: 12,
 	},
-	todayButtonText: {
-		color: '#215d60',
-		fontSize: 13,
-		fontWeight: '600',
+	mainCardTablet: {
+		padding: 20,
+		gap: 16,
+	},
+
+	/* Header Card */
+	headerCard: {
+		backgroundColor: '#F8FAFC',
+		borderColor: '#E2E8F0',
+		borderWidth: 1,
+		borderRadius: 12,
+		padding: 12,
+		gap: 10,
+	},
+	headerCardTablet: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		padding: 16,
+		gap: 16,
+	},
+	headerTitleCol: {
+		flex: 1,
+	},
+	titleWithIconRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+	},
+	iconBox: {
+		width: 36,
+		height: 36,
+		borderRadius: 10,
+		backgroundColor: '#E6F4F4',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	mainTitle: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	subTitle: {
+		fontSize: 11.5,
+		color: '#64748B',
+		marginTop: 1,
+	},
+
+	/* Hospital Select Block */
+	hospitalSelectBlock: {
+		width: '100%',
+		gap: 4,
+	},
+	fieldLabel: {
+		fontSize: 10,
+		fontWeight: '800',
+		color: '#64748B',
+		letterSpacing: 0.5,
+		textTransform: 'uppercase',
 	},
 	emptyText: {
-		color: '#9aa5ad',
+		color: '#94A3B8',
 		fontSize: 12,
-		marginBottom: 18,
+		marginVertical: 4,
 	},
-	footerContent: {
+
+	/* Date & Slot Picker Wrapper */
+	pickerWrapper: {
 		width: '100%',
 	},
+	todayQuickActionRow: {
+		flexDirection: 'row',
+		justifyContent: 'flex-end',
+		marginBottom: 6,
+	},
+	todayJumpButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		backgroundColor: '#E6F4F4',
+		borderColor: '#BCE3E3',
+		borderWidth: 1,
+		borderRadius: 8,
+		paddingHorizontal: 10,
+		paddingVertical: 5,
+	},
+	todayJumpText: {
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#0C7C7C',
+	},
+
+	/* Sticky Footer Button */
+	footerContent: {
+		width: '100%',
+		maxWidth: 860,
+		alignSelf: 'center',
+	},
 	footerSaveButton: {
-		backgroundColor: '#215d60',
+		backgroundColor: '#0C7C7C',
+		borderRadius: 12,
+		height: 46,
 	},
 })

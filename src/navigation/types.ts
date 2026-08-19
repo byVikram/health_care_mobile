@@ -134,6 +134,10 @@ export type AppStackParamList = {
 	[ROUTES.STACK.NURSE_PATIENT_VERIFICATION]: { bookingId: string }
 	[ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS]: { bookingId: string }
 	[ROUTES.STACK.NURSE_COMPLETE_SERVICE]: { bookingId: string; elapsedSeconds: number }
+	[ROUTES.STACK.NURSE_TODAY_OVERVIEW]: { filter?: 'all' | 'accepted' | 'completed' | 'cancelled' } | undefined
+	[ROUTES.STACK.NURSE_VISITS]: undefined
+	[ROUTES.STACK.NURSE_EARNINGS]: undefined
+	[ROUTES.STACK.NURSE_HISTORY]: undefined
 	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string }
 	[ROUTES.STACK.ANCILLARY_PROVIDERS]: { serviceKey: string; serviceLabel: string; procedureName?: string }
 	[ROUTES.STACK.ANCILLARY_BOOKING_CART]: {

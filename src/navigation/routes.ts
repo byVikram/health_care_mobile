@@ -71,6 +71,10 @@ export const ROUTES = {
 		NURSE_PATIENT_VERIFICATION: 'NursePatientVerification',
 		NURSE_SERVICE_IN_PROGRESS: 'NurseServiceInProgress',
 		NURSE_COMPLETE_SERVICE: 'NurseCompleteService',
+		NURSE_TODAY_OVERVIEW: 'NurseTodayOverviewPage',
+		NURSE_VISITS: 'NurseVisitsPage',
+		NURSE_EARNINGS: 'NurseEarningsPage',
+		NURSE_HISTORY: 'NurseHistoryPage',
 
 		ANCILLARY_SERVICES: 'AncillaryServices',
 		ANCILLARY_PROVIDERS: 'AncillaryProviders',

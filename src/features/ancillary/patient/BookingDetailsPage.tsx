@@ -104,9 +104,11 @@ export default function BookingDetailsPage() {
 
 	const routeParams = route.params || {}
 	const initialServices: ServiceProcedureItem[] =
-		routeParams.services && routeParams.services.length > 0
+		(routeParams.services && routeParams.services.length > 0)
 			? routeParams.services
-			: DEFAULT_MOCK_SERVICES
+			: (routeParams.selectedServices && routeParams.selectedServices.length > 0)
+				? routeParams.selectedServices
+				: (routeParams.service ? [routeParams.service] : DEFAULT_MOCK_SERVICES)
 
 	// 1. Multiple Selected Services State
 	const [services, setServices] = useState<ServiceProcedureItem[]>(initialServices)
@@ -121,7 +123,10 @@ export default function BookingDetailsPage() {
 		avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
 	})
 
-	// 3. Visit Details State
+	// 3. Booking Dispatch Mode State (INSTANT vs SCHEDULED)
+	const [bookingType, setBookingType] = useState<'INSTANT' | 'SCHEDULED'>('INSTANT')
+
+	// 4. Visit Details State
 	const [visit, setVisit] = useState({
 		addressId: 'addr1',
 		addressLabel: 'Home',
@@ -129,7 +134,7 @@ export default function BookingDetailsPage() {
 		dateId: 'd1',
 		date: 'Today, 10 Aug 2025',
 		timeSlot: '09:00 AM - 10:00 AM',
-		timeBadge: 'In 2 hours',
+		timeBadge: 'Instant Dispatch (15-30 mins)',
 	})
 
 	// Edit Modal Visibility States
@@ -302,6 +307,7 @@ export default function BookingDetailsPage() {
 			patient,
 			visit,
 			charges,
+			bookingType,
 		}
 
 		navigation.navigate(ROUTES.STACK.ANCILLARY_PAYMENT, {
@@ -439,17 +445,71 @@ export default function BookingDetailsPage() {
 
 				<View style={styles.sectionDivider} />
 
-				{/* 3. SECTION: VISIT SCHEDULE & LOCATION */}
+				{/* 3. SECTION: VISIT DISPATCH TYPE & SCHEDULE */}
 				<View style={styles.sectionHeaderRow}>
 					<AppTypography variant="h3" style={styles.sectionHeading}>
-						Schedule & Location
+						Booking Mode & Schedule
 					</AppTypography>
-					<TouchableOpacity style={styles.headerActionBtn} onPress={() => setEditVisitVisible(true)} activeOpacity={0.7}>
-						<MaterialCommunityIcons name="pencil-outline" size={15} color="#1F5F68" />
+					<TouchableOpacity
+						style={styles.headerActionBtn}
+						onPress={() => setEditVisitVisible(true)}
+						activeOpacity={0.7}
+					>
+						<MaterialCommunityIcons
+							name={bookingType === 'INSTANT' ? 'map-marker-outline' : 'pencil-outline'}
+							size={15}
+							color="#1F5F68"
+						/>
 						<AppTypography variant="caption" style={styles.actionBtnText}>
-							Modify
+							{bookingType === 'INSTANT' ? 'Change Address' : 'Modify Schedule & Address'}
 						</AppTypography>
 					</TouchableOpacity>
+				</View>
+
+				{/* INTERACTIVE DISPATCH MODE TOGGLE SWITCHER */}
+				<View style={styles.dispatchToggleWrap}>
+					<TouchableOpacity
+						style={[styles.dispatchToggleTab, bookingType === 'INSTANT' && styles.dispatchToggleTabActive]}
+						onPress={() => {
+							setBookingType('INSTANT')
+							setVisit((prev) => ({ ...prev, timeBadge: 'Instant Dispatch (15-30 mins)' }))
+						}}
+						activeOpacity={0.88}
+					>
+						<Ionicons name="flash" size={16} color={bookingType === 'INSTANT' ? '#FFFFFF' : '#1F5F68'} />
+						<AppTypography variant="h4" style={[styles.dispatchToggleText, bookingType === 'INSTANT' && styles.dispatchToggleTextActive]}>
+							Instant Care
+						</AppTypography>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[styles.dispatchToggleTab, bookingType === 'SCHEDULED' && styles.dispatchToggleTabActive]}
+						onPress={() => {
+							setBookingType('SCHEDULED')
+							setVisit((prev) => ({ ...prev, timeBadge: 'Scheduled Appointment' }))
+							setEditVisitVisible(true)
+						}}
+						activeOpacity={0.88}
+					>
+						<Ionicons name="calendar" size={16} color={bookingType === 'SCHEDULED' ? '#FFFFFF' : '#1F5F68'} />
+						<AppTypography variant="h4" style={[styles.dispatchToggleText, bookingType === 'SCHEDULED' && styles.dispatchToggleTextActive]}>
+							Schedule Visit
+						</AppTypography>
+					</TouchableOpacity>
+				</View>
+
+				{/* DISPATCH MODE HELPER BANNER */}
+				<View style={[styles.dispatchHelperBanner, bookingType === 'INSTANT' ? styles.instantBannerBg : styles.scheduledBannerBg]}>
+					<Ionicons
+						name={bookingType === 'INSTANT' ? 'information-circle' : 'time'}
+						size={18}
+						color={bookingType === 'INSTANT' ? '#065F46' : '#1E40AF'}
+					/>
+					<AppTypography variant="caption" style={[styles.dispatchHelperText, bookingType === 'INSTANT' ? styles.instantHelperTextColor : styles.scheduledHelperTextColor]}>
+						{bookingType === 'INSTANT'
+							? '⚡ Instant Care Mode: Certified nurse nearby will be alerted immediately after booking.'
+							: '📅 Scheduled Care Mode: Nurse will be assigned & dispatched at your chosen date & time slot.'}
+					</AppTypography>
 				</View>
 
 				<View style={styles.visitSummaryBlock}>
@@ -468,6 +528,15 @@ export default function BookingDetailsPage() {
 										{visit.addressLabel}
 									</AppTypography>
 								</View>
+								<TouchableOpacity
+									style={styles.changeAddressLinkBtn}
+									onPress={() => setEditVisitVisible(true)}
+									activeOpacity={0.7}
+								>
+									<AppTypography variant="caption" style={styles.changeAddressLinkText}>
+										Change
+									</AppTypography>
+								</TouchableOpacity>
 							</View>
 							<AppTypography variant="caption" style={styles.visitDetailsVal}>
 								{visit.address}
@@ -480,15 +549,21 @@ export default function BookingDetailsPage() {
 					{/* Date & Time Row */}
 					<View style={styles.visitSummaryItem}>
 						<View style={styles.visitIconBox}>
-							<MaterialCommunityIcons name="calendar-clock" size={18} color="#1F5F68" />
+							<MaterialCommunityIcons
+								name={bookingType === 'INSTANT' ? 'lightning-bolt' : 'calendar-clock'}
+								size={18}
+								color="#1F5F68"
+							/>
 						</View>
 						<View style={styles.visitDetailsCol}>
 							<AppTypography variant="h4" style={styles.visitDetailsHeading}>
-								Preferred Date & Time Slot
+								{bookingType === 'INSTANT' ? 'Care Dispatch Arrival Window' : 'Preferred Date & Time Slot'}
 							</AppTypography>
 							<View style={styles.visitTimeValRow}>
 								<AppTypography variant="body" style={styles.visitTimeValText}>
-									{visit.date}  •  {visit.timeSlot}
+									{bookingType === 'INSTANT'
+										? 'Within 15 - 30 minutes of booking'
+										: `${visit.date}  •  ${visit.timeSlot}`}
 								</AppTypography>
 								<View style={styles.timeStatusBadge}>
 									<AppTypography variant="caption" style={styles.timeStatusText}>
@@ -629,6 +704,7 @@ export default function BookingDetailsPage() {
 			{/* 9. Edit Visit Details Bottom Sheet */}
 			<EditVisitModal
 				visible={editVisitVisible}
+				bookingType={bookingType}
 				currentAddressId={visit.addressId}
 				currentDate={selectedDateObj}
 				currentTimeSlot={visit.timeSlot}
@@ -645,7 +721,18 @@ export default function BookingDetailsPage() {
 				visible={switchProfileVisible}
 				onClose={() => setSwitchProfileVisible(false)}
 				selectedProfileId={selectedProfileId}
-				onSelectProfile={handleSelectProfile}
+				onSelectProfile={(profile: any) => {
+					setSelectedProfileId(profile.id)
+					setPatient({
+						name: profile.name || 'John Doe',
+						age: String(profile.age || '45'),
+						gender: profile.gender || 'Male',
+						bloodGroup: profile.bloodGroup || 'O+',
+						relationship: profile.relationship || 'Self',
+						avatar: profile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+					})
+					setSwitchProfileVisible(false)
+				}}
 			/>
 		</View>
 	)
@@ -654,6 +741,7 @@ export default function BookingDetailsPage() {
 // Sub-Component: Edit Visit Details Bottom Sheet
 interface EditVisitModalProps {
 	visible: boolean
+	bookingType: 'INSTANT' | 'SCHEDULED'
 	currentAddressId: string
 	currentDate: Date
 	currentTimeSlot: string
@@ -664,6 +752,7 @@ interface EditVisitModalProps {
 
 const EditVisitModal: React.FC<EditVisitModalProps> = ({
 	visible,
+	bookingType,
 	currentAddressId,
 	currentDate,
 	currentTimeSlot,
@@ -678,13 +767,19 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 	const [selectedDate, setSelectedDate] = useState<Date>(currentDate || new Date())
 	const [selectedSlot, setSelectedSlot] = useState(currentTimeSlot)
 
+	const isInstant = bookingType === 'INSTANT'
+
 	return (
-		<AppBottomSheet visible={visible} title="Edit Visit Details" onClose={onClose}>
+		<AppBottomSheet
+			visible={visible}
+			title={isInstant ? 'Select Visit Address' : 'Modify Schedule & Address'}
+			onClose={onClose}
+		>
 			<View style={styles.sheetFormContainer}>
 				{/* Address Section */}
 				<View style={styles.sheetSectionHeaderRow}>
 					<AppTypography variant="h4" style={styles.sheetSectionTitle}>
-						Selected Visit Address
+						{isInstant ? 'Select Delivery Address for Immediate Care' : 'Selected Visit Address'}
 					</AppTypography>
 					<TouchableOpacity style={styles.mapLinkBtn} onPress={onOpenMap} activeOpacity={0.7}>
 						<Ionicons name="map-outline" size={14} color="#1F5F68" />
@@ -701,22 +796,31 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 					size="form"
 				/>
 
-				{/* Responsive Date & Time Picker */}
-				<View style={styles.dateSlotPickerWrapper}>
-					<DateSlotPicker
-						selectedDate={selectedDate}
-						onDateChange={setSelectedDate}
-						selectedTime={selectedSlot}
-						onTimeChange={setSelectedSlot}
-						availableSlots={ANCILLARY_SLOTS}
-						dateLabel="Select Preferred Date"
-						timeLabel="Select Time Slot"
-						timeSlotColumns={isTablet ? 2 : 1}
-						disablePast
-						hideHeader={false}
-						showAppointmentTypeToggle={false}
-					/>
-				</View>
+				{isInstant ? (
+					<View style={styles.instantNoticeBox}>
+						<Ionicons name="flash-outline" size={18} color="#065F46" />
+						<AppTypography variant="caption" style={styles.instantNoticeText}>
+							⚡ Nurse will be dispatched immediately to this address after payment authorization (~15-30 min arrival).
+						</AppTypography>
+					</View>
+				) : (
+					/* Responsive Date & Time Picker for Scheduled Visit */
+					<View style={styles.dateSlotPickerWrapper}>
+						<DateSlotPicker
+							selectedDate={selectedDate}
+							onDateChange={setSelectedDate}
+							selectedTime={selectedSlot}
+							onTimeChange={setSelectedSlot}
+							availableSlots={ANCILLARY_SLOTS}
+							dateLabel="Select Preferred Date"
+							timeLabel="Select Time Slot"
+							timeSlotColumns={isTablet ? 2 : 1}
+							disablePast
+							hideHeader={false}
+							showAppointmentTypeToggle={false}
+						/>
+					</View>
+				)}
 
 				<AppButton
 					variant="primary"
@@ -724,7 +828,7 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 					style={styles.saveSheetBtn}
 					onPress={() => onSave(selectedAddrId, selectedDate, selectedSlot)}
 				>
-					Save Visit Details
+					{isInstant ? 'Save & Use This Address' : 'Save Schedule & Address'}
 				</AppButton>
 			</View>
 		</AppBottomSheet>
@@ -1272,5 +1376,100 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 		marginBottom: 8,
 		marginHorizontal: -8,
+	},
+	dispatchToggleWrap: {
+		flexDirection: 'row',
+		backgroundColor: '#F1F5F9',
+		borderRadius: 14,
+		padding: 4,
+		marginVertical: 12,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	dispatchToggleTab: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 10,
+		paddingHorizontal: 12,
+		borderRadius: 10,
+		gap: 6,
+	},
+	dispatchToggleTabActive: {
+		backgroundColor: '#1F5F68',
+		shadowColor: '#1F5F68',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.15,
+		shadowRadius: 4,
+		elevation: 2,
+	},
+	dispatchToggleText: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#475569',
+	},
+	dispatchToggleTextActive: {
+		color: '#FFFFFF',
+		fontWeight: '700',
+	},
+	dispatchHelperBanner: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		borderRadius: 12,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		marginBottom: 16,
+		gap: 8,
+	},
+	instantBannerBg: {
+		backgroundColor: '#ECFDF5',
+		borderColor: '#A7F3D0',
+		borderWidth: 1,
+	},
+	scheduledBannerBg: {
+		backgroundColor: '#EFF6FF',
+		borderColor: '#BFDBFE',
+		borderWidth: 1,
+	},
+	dispatchHelperText: {
+		flex: 1,
+		fontSize: 11.5,
+		lineHeight: 16,
+	},
+	instantHelperTextColor: {
+		color: '#065F46',
+	},
+	scheduledHelperTextColor: {
+		color: '#1E40AF',
+	},
+	changeAddressLinkBtn: {
+		marginLeft: 'auto',
+		paddingHorizontal: 8,
+		paddingVertical: 2,
+		borderRadius: 6,
+		backgroundColor: '#E6F3F4',
+	},
+	changeAddressLinkText: {
+		fontSize: 10,
+		fontWeight: '700',
+		color: '#1F5F68',
+	},
+	instantNoticeBox: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#ECFDF5',
+		borderRadius: 12,
+		padding: 12,
+		marginVertical: 14,
+		gap: 8,
+		borderWidth: 1,
+		borderColor: '#A7F3D0',
+	},
+	instantNoticeText: {
+		flex: 1,
+		fontSize: 11.5,
+		color: '#065F46',
+		lineHeight: 16,
 	},
 })

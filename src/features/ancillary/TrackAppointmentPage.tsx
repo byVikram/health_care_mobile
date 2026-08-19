@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -7,9 +7,20 @@ import { ROUTES } from '../../navigation/routes'
 import AppScreenHeader from '../../components/common/AppScreenHeader'
 import { AppTypography } from '../../components/common/AppTypography'
 import { AppButton } from '../../components/common/AppButton'
+import StatusModal from '../../components/common/StatusModal'
 import NurseMapTracker from './components/NurseMapTracker'
 import AppointmentTrackingTimeline, { TrackingStage } from './components/AppointmentTrackingTimeline'
 import RatingStars from './components/RatingStars'
+import RateAncillaryReviewModal from './components/RateAncillaryReviewModal'
+import {
+	AncillaryBooking,
+	AncillaryReviewData,
+	getAncillaryReviewByBookingId,
+	submitAncillaryReview,
+} from './ancillaryService'
+import NursePulseRadarView from './components/NursePulseRadarView'
+import ApiService from '../../services/apiService'
+import { API_ENDPOINTS } from '../../constants/apiUrls'
 
 const TRACKING_STAGES: TrackingStage[] = [
 	{ key: 'confirmed', label: 'Booking Confirmed', time: '09:00 AM' },
@@ -28,8 +39,22 @@ export default function TrackAppointmentPage() {
 	const isTablet = width >= 768
 
 	const bookingData = route.params?.bookingData || {}
+	const bookingId = String(route.params?.bookingId || bookingData.id || 'book-4')
+
+	// Review state
+	const [reviewData, setReviewData] = useState<AncillaryReviewData | null>(() =>
+		getAncillaryReviewByBookingId(bookingId)
+	)
+	const [reviewModalVisible, setReviewModalVisible] = useState(false)
+	const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		title: string
+		description: string
+	} | null>(null)
 
 	const nurse = bookingData.provider || {
+		id: 'n-prov-1',
 		name: 'Anita Sharma',
 		designation: 'Registered Nurse',
 		avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=200',
@@ -48,9 +73,50 @@ export default function TrackAppointmentPage() {
 		address: '123 Horizon Lane, Apt 4B',
 	}
 
-	const activeStageIndex = bookingData.activeStageIndex ?? 2
-	const otp = String(bookingData.otp || '4291')
+	const [activeStageIndex, setActiveStageIndex] = useState<number>(
+		() => bookingData.activeStageIndex ?? 0
+	)
+	const [liveStatus, setLiveStatus] = useState<string>(() => (bookingData.status || 'SEARCHING').toUpperCase())
+	const [liveNurse, setLiveNurse] = useState<any>(bookingData.provider || null)
+
+	React.useEffect(() => {
+		const pollStatus = async () => {
+			try {
+				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
+				const data = res.data?.data || res.data
+				if (data && data.status) {
+					const st = String(data.status).toUpperCase()
+					setLiveStatus(st)
+					if (data.assignedProvider) {
+						setLiveNurse(data.assignedProvider)
+					}
+					if (st === 'SEARCHING' || st === 'SEARCHING_FOR_NURSE') {
+						setActiveStageIndex(0)
+					} else if (st === 'ASSIGNED' || st === 'NURSE_ASSIGNED') {
+						setActiveStageIndex(1)
+					} else if (st === 'EN_ROUTE') {
+						setActiveStageIndex(2)
+					} else if (st === 'ARRIVED') {
+						setActiveStageIndex(3)
+					} else if (st === 'IN_PROGRESS') {
+						setActiveStageIndex(4)
+					} else if (st === 'COMPLETED') {
+						setActiveStageIndex(5)
+					}
+				}
+			} catch (e) {
+				console.log('[TrackAppointmentPage] Live status poll logged')
+			}
+		}
+
+		void pollStatus()
+		const interval = setInterval(pollStatus, 3000)
+		return () => clearInterval(interval)
+	}, [bookingId])
+
+	const otp = String(bookingData.otp || '4829')
 	const isTravelling = activeStageIndex >= 1 && activeStageIndex <= 3
+	const isCompleted = activeStageIndex >= 5 || liveStatus === 'COMPLETED'
 
 	const handleCallNurse = () => {
 		Linking.openURL(`tel:${nurse.phone || '+919876543210'}`)
@@ -67,21 +133,133 @@ export default function TrackAppointmentPage() {
 		})
 	}
 
+	const handleSubmitReview = async (stars: number, comment: string) => {
+		setIsSubmittingReview(true)
+		try {
+			const saved = await submitAncillaryReview({
+				bookingId,
+				providerId: nurse.id || 'n-prov-1',
+				providerName: nurse.name,
+				serviceName: appointment.service || 'Nursing Care',
+				rating: stars,
+				comment,
+				patientName: 'John Doe',
+			})
+			setReviewData(saved)
+			setReviewModalVisible(false)
+			setStatusModal({
+				visible: true,
+				title: 'Thank You!',
+				description: `Your feedback for ${nurse.name} has been recorded.`,
+			})
+		} finally {
+			setIsSubmittingReview(false)
+		}
+	}
+
+
 	const renderStatusBanner = () => (
 		<View style={styles.statusBanner}>
 			<View style={styles.statusIconWrap}>
-				<Ionicons name="car-outline" size={20} color="#296769" />
+				<Ionicons
+					name={isCompleted ? 'checkmark-circle' : 'car-outline'}
+					size={20}
+					color="#296769"
+				/>
 			</View>
 			<View style={styles.statusTextCol}>
 				<AppTypography variant="h4" style={styles.statusTitle}>
-					{activeStageIndex === 2 ? 'Your nurse is on the way' : TRACKING_STAGES[activeStageIndex]?.label || 'Service In Progress'}
+					{isCompleted
+						? 'Service Completed'
+						: activeStageIndex === 2
+						? 'Your nurse is on the way'
+						: TRACKING_STAGES[activeStageIndex]?.label || 'Service In Progress'}
 				</AppTypography>
 				<AppTypography variant="caption" style={styles.statusSubtitle}>
-					{nurse.name} is arriving in {etaMinutes} minutes
+					{isCompleted
+						? `Home visit with ${nurse.name} has concluded.`
+						: `${nurse.name} is arriving in ${etaMinutes} minutes`}
 				</AppTypography>
 			</View>
 		</View>
 	)
+
+	const renderDemoControl = () => {
+		return (
+			<View style={styles.demoBox}>
+				<View style={styles.demoHeader}>
+					<Ionicons name="construct-outline" size={13} color="#B45309" />
+					<Text style={styles.demoTitle}>Frontend Testing Control</Text>
+				</View>
+				<TouchableOpacity
+					style={styles.demoBtn}
+					onPress={() => setActiveStageIndex(5)}
+					activeOpacity={0.8}
+				>
+					<Ionicons name="checkmark-done-circle" size={16} color="#047857" />
+					<Text style={styles.demoBtnText}>Demo: Mark Service Completed</Text>
+				</TouchableOpacity>
+			</View>
+		)
+	}
+
+	const renderFeedbackCard = () => {
+		if (!isCompleted) return null
+		const hasReview = !!reviewData
+		const reviewScore = reviewData?.rating || 5
+
+		return (
+			<View style={styles.feedbackCard}>
+				<View style={styles.feedbackHeaderRow}>
+					<View style={styles.feedbackIconWrap}>
+						<Ionicons name="star" size={18} color="#D97706" />
+					</View>
+					<View style={styles.feedbackTextCol}>
+						<AppTypography variant="h4" style={styles.feedbackTitle}>
+							Service Completed
+						</AppTypography>
+						<AppTypography variant="h4" style={[styles.feedbackTitle, { marginTop: 2 }]}>
+							How was your experience with {nurse.name}?
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.feedbackSubtitle}>
+							Your feedback helps us improve your care experience.
+						</AppTypography>
+					</View>
+				</View>
+
+				{hasReview ? (
+					<TouchableOpacity
+						style={styles.feedbackActionBtnReviewed}
+						onPress={() => setReviewModalVisible(true)}
+						activeOpacity={0.8}
+					>
+						<RatingStars rating={reviewScore} size={14} />
+						<Text style={styles.feedbackActionTextReviewed}>
+							★ {reviewScore}.0 • View Submitted Review
+						</Text>
+						<Ionicons name="chevron-forward" size={14} color="#0C7C7C" />
+					</TouchableOpacity>
+				) : (
+					<TouchableOpacity
+						style={styles.feedbackActionBtn}
+						onPress={() => setReviewModalVisible(true)}
+						activeOpacity={0.85}
+					>
+						<Ionicons name="star" size={15} color="#D97706" />
+						<Text style={styles.feedbackActionText}>Rate & Review</Text>
+					</TouchableOpacity>
+				)}
+
+				<TouchableOpacity
+					style={styles.demoResetBtn}
+					onPress={() => setActiveStageIndex(2)}
+					activeOpacity={0.7}
+				>
+					<Text style={styles.demoResetBtnText}>Reset Demo to In Progress</Text>
+				</TouchableOpacity>
+			</View>
+		)
+	}
 
 	const renderOtpCard = () => (
 		<View style={[styles.otpCard, isTablet && styles.otpCardTablet]}>
@@ -216,6 +394,37 @@ export default function TrackAppointmentPage() {
 		</View>
 	)
 
+	const modalBookingObj: AncillaryBooking = {
+		id: bookingId,
+		serviceName: appointment.service || 'Nursing Care',
+		serviceKey: bookingData.serviceKey || 'nursing-care',
+		serviceLabel: bookingData.serviceLabel || 'Nursing Care',
+		status: 'completed',
+		date: appointment.dateTime || 'Today',
+		provider: {
+			id: nurse.id || 'n-prov-1',
+			name: nurse.name,
+			designation: nurse.designation || 'Registered Nurse',
+			avatar: nurse.avatar,
+		},
+		hasReview: !!reviewData,
+		rating: reviewData?.rating,
+		review: reviewData || undefined,
+	}
+
+	if (liveStatus === 'SEARCHING' || liveStatus === 'SEARCHING_FOR_NURSE') {
+		return (
+			<View style={styles.container}>
+				<AppScreenHeader title="Finding Nurse..." onBack={() => navigation.goBack()} />
+				<NursePulseRadarView
+					patientAddress={appointment.address}
+					serviceName={appointment.service}
+					onCancelSearch={() => navigation.goBack()}
+				/>
+			</View>
+		)
+	}
+
 	return (
 		<View style={styles.container}>
 			<AppScreenHeader title="Track Appointment" />
@@ -232,7 +441,9 @@ export default function TrackAppointmentPage() {
 					<View style={styles.tabletGrid}>
 						<View style={styles.tabletCol}>
 							{renderStatusBanner()}
-							{renderOtpCard()}
+							{!isCompleted && renderDemoControl()}
+							{renderFeedbackCard()}
+							{!isCompleted && renderOtpCard()}
 							{isTravelling && (
 								<NurseMapTracker
 									nurseAvatar={nurse.avatar}
@@ -251,7 +462,9 @@ export default function TrackAppointmentPage() {
 				) : (
 					<>
 						{renderStatusBanner()}
-						{renderOtpCard()}
+						{!isCompleted && renderDemoControl()}
+						{renderFeedbackCard()}
+						{!isCompleted && renderOtpCard()}
 						{isTravelling && (
 							<NurseMapTracker
 								nurseAvatar={nurse.avatar}
@@ -265,11 +478,160 @@ export default function TrackAppointmentPage() {
 					</>
 				)}
 			</ScrollView>
+
+
+			{/* Review Bottom Sheet */}
+			<RateAncillaryReviewModal
+				visible={reviewModalVisible}
+				onClose={() => setReviewModalVisible(false)}
+				booking={modalBookingObj}
+				existingReview={reviewData}
+				onSubmit={handleSubmitReview}
+				isSubmitting={isSubmittingReview}
+			/>
+
+			{/* Status Feedback Confirmation */}
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status="success"
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText="Done"
+					onSubmit={() => setStatusModal(null)}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
 		</View>
 	)
 }
 
 const styles = StyleSheet.create({
+	demoBox: {
+		backgroundColor: '#FFFBEB',
+		borderColor: '#FDE68A',
+		borderWidth: 1.5,
+		borderRadius: 14,
+		padding: 12,
+		marginBottom: 14,
+		gap: 8,
+	},
+	demoHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	demoTitle: {
+		fontSize: 11,
+		fontWeight: '800',
+		color: '#B45309',
+		textTransform: 'uppercase',
+		letterSpacing: 0.5,
+	},
+	demoBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 6,
+		backgroundColor: '#ECFDF5',
+		borderColor: '#A7F3D0',
+		borderWidth: 1,
+		borderRadius: 10,
+		paddingVertical: 10,
+		paddingHorizontal: 12,
+	},
+	demoBtnText: {
+		fontSize: 13,
+		fontWeight: '800',
+		color: '#047857',
+	},
+	demoResetBtn: {
+		alignSelf: 'center',
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		marginTop: 4,
+	},
+	demoResetBtnText: {
+		fontSize: 11.5,
+		fontWeight: '600',
+		color: '#94A3B8',
+		textDecorationLine: 'underline',
+	},
+	feedbackCard: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		padding: 16,
+		marginBottom: 16,
+		borderWidth: 1.5,
+		borderColor: '#FDE68A',
+		shadowColor: '#F59E0B',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.08,
+		shadowRadius: 6,
+		elevation: 2,
+		gap: 12,
+	},
+	feedbackHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+	},
+	feedbackIconWrap: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		backgroundColor: '#FEF3C7',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	feedbackTextCol: {
+		flex: 1,
+	},
+	feedbackTitle: {
+		fontSize: 14.5,
+		fontWeight: '700',
+		color: '#191C1D',
+	},
+	feedbackSubtitle: {
+		fontSize: 11.5,
+		color: '#64748B',
+		marginTop: 1,
+	},
+	feedbackActionBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 6,
+		backgroundColor: '#FFFBEB',
+		borderColor: '#FDE68A',
+		borderWidth: 1,
+		paddingVertical: 10,
+		borderRadius: 12,
+	},
+	feedbackActionText: {
+		fontSize: 13,
+		fontWeight: '700',
+		color: '#92400E',
+	},
+	feedbackActionBtnReviewed: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#F0FDFA',
+		borderColor: '#CCFBF1',
+		borderWidth: 1,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		borderRadius: 12,
+	},
+	feedbackActionTextReviewed: {
+		fontSize: 12.5,
+		fontWeight: '700',
+		color: '#0C7C7C',
+		flex: 1,
+		marginLeft: 8,
+	},
+
 	container: {
 		flex: 1,
 		backgroundColor: '#f8fafa',

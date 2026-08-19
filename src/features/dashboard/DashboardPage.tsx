@@ -62,7 +62,8 @@ export default function DashboardPage() {
 	const insets = useSafeAreaInsets()
 	const { role } = useAuth()
 	const isDoctor = role === USER_ROLES.DOCTOR
-	const isStaffRole = isDoctor || role === USER_ROLES.ANCILLARY
+	const isNurse = role === USER_ROLES.ANCILLARY
+	const isStaffRole = isDoctor || isNurse
 	const defaultHeaderHeight = isStaffRole ? insets.top + 84 : insets.top + 146
 	const headerHeight = (scrollData?.headerHeight && scrollData.headerHeight > 0) ? scrollData.headerHeight : defaultHeaderHeight
 	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
@@ -270,12 +271,15 @@ export default function DashboardPage() {
 	}
 
 	const renderMainContent = () => {
+		if (isNurse) {
+			return renderRoleBasedPanel()
+		}
+
 		if (
 			role !== USER_ROLES.DOCTOR &&
 			role !== USER_ROLES.PHARMACY &&
 			role !== USER_ROLES.RADIOLOGY &&
-			role !== USER_ROLES.LABORATORY &&
-			role !== USER_ROLES.ANCILLARY
+			role !== USER_ROLES.LABORATORY
 		) {
 			return (
 				<>
@@ -341,17 +345,21 @@ export default function DashboardPage() {
 
 				{renderMainContent()}
 
-				{/* New dashboard sections inserted before the existing community/blog sections. */}
-				<ArticleSection />
-				<UpcomingEventsSection />
+				{!isNurse && (
+					<>
+						{/* New dashboard sections inserted before the existing community/blog sections. */}
+						<ArticleSection />
+						<UpcomingEventsSection />
 
-				{/* Existing common sections */}
-				<CommunitySection />
-				<BlogsSection />
-				<PodcastsSection />
+						{/* Existing common sections */}
+						<CommunitySection />
+						<BlogsSection />
+						<PodcastsSection />
 
-				{role !== USER_ROLES.PHARMACY && (
-					<PatientHealthQuestionsList showViewAll={true} />
+						{role !== USER_ROLES.PHARMACY && (
+							<PatientHealthQuestionsList showViewAll={true} />
+						)}
+					</>
 				)}
 			</Animated.ScrollView>
 
