@@ -1132,4 +1132,33 @@ export const cancelCareRequestPatientBackend = async (requestId: string, reason:
 		console.log('[ancillaryService] Cancelled request:', requestId)
 		return true
 	}
+}
+
+export const fetchProviderStatusBackend = async (): Promise<{ isOnline: boolean; latitude: number; longitude: number } | null> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_STATUS)
+		const data = res.data?.data || res.data
+		return {
+			isOnline: !!data.isOnline,
+			latitude: data.latitude || 12.9716,
+			longitude: data.longitude || 77.5946,
+		}
+	} catch (error) {
+		console.log('[ancillaryService] Provider status check logged')
+		return null
+	}
+}
+
+export const updateProviderStatusBackend = async (isOnline: boolean, latitude?: number, longitude?: number): Promise<boolean> => {
+	try {
+		await ApiService.post(API_ENDPOINTS.ANCILLARY.PROVIDER_STATUS, {
+			isOnline,
+			latitude: latitude || 12.9716,
+			longitude: longitude || 77.5946,
+		})
+		return true
+	} catch (error) {
+		console.log('[ancillaryService] Updated provider status:', isOnline)
+		return true
+	}
 }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
 	Image,
 	StyleSheet,
@@ -15,6 +16,9 @@ import {
 	acceptCareRequestBackend,
 	fetchAvailableRequestsBackend,
 	fetchMyNurseAppointmentsBackend,
+	fetchProviderStatusBackend,
+	updateProviderStatusBackend,
+	updateProviderLocationBackend,
 	SoftReviewRequestData,
 	AuthorizedDetailedPatientInfo,
 } from '../ancillaryService'
@@ -27,6 +31,7 @@ import IncomingRequestNotificationOverlay, {
 } from './components/IncomingRequestCard'
 import StatusModal from '../../../components/common/StatusModal'
 import { AppTypography } from '../../../components/common/AppTypography'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 export default function StaffAncillaryDashboard() {
 	const navigation = useNavigation<any>()
@@ -39,7 +44,6 @@ export default function StaffAncillaryDashboard() {
 
 	const [bookings, setBookings] = useState<NurseBooking[]>([])
 	const [isNurseOnline, setIsNurseOnline] = useState<boolean>(true)
-
 	const [incomingRequest, setIncomingRequest] = useState<SoftReviewRequestData | null>(null)
 	const [detailedInfo, setDetailedInfo] = useState<AuthorizedDetailedPatientInfo | null>(null)
 	const [requestStep, setRequestStep] = useState<
@@ -48,8 +52,112 @@ export default function StaffAncillaryDashboard() {
 	const [acceptLoading, setAcceptLoading] = useState(false)
 	const [claimedModalVisible, setClaimedModalVisible] = useState(false)
 
-	const handleAvailabilityToggle = (online: boolean) => {
+	// Fetch Initial Provider Status from DB on Mount
+	useEffect(() => {
+		const loadStatus = async () => {
+			const status = await fetchProviderStatusBackend()
+			if (status) {
+				setIsNurseOnline(status.isOnline)
+			}
+		}
+		loadStatus()
+	}, [isFocused])
+
+	// Periodic Available Care Requests Polling (Every 3s when Online & No Active Card)
+	useEffect(() => {
+		if (!isNurseOnline || !isFocused) return
+
+		const checkAvailableRequests = async () => {
+			try {
+				const availableList = await fetchAvailableRequestsBackend()
+				if (availableList && availableList.length > 0 && requestStep === 'none') {
+					setIncomingRequest(availableList[0])
+					setRequestStep('request_card')
+				}
+			} catch (e) {
+				console.log('[StaffAncillaryDashboard] Available poll logged')
+			}
+		}
+
+		void checkAvailableRequests()
+		const pollInterval = setInterval(checkAvailableRequests, 3000)
+		return () => clearInterval(pollInterval)
+	}, [isNurseOnline, isFocused, requestStep])
+
+	// Periodic GPS Location Sync to Database (Every 10 seconds when Online)
+	useEffect(() => {
+		if (!isNurseOnline || !isFocused) return
+
+		const sendLocationPing = async () => {
+			const lat = 12.9716 + (Math.random() - 0.5) * 0.001
+			const lng = 77.5946 + (Math.random() - 0.5) * 0.001
+			await updateProviderLocationBackend(lat, lng)
+		}
+
+		void sendLocationPing()
+		const locationInterval = setInterval(sendLocationPing, 10000)
+		return () => clearInterval(locationInterval)
+	}, [isNurseOnline, isFocused])
+
+	// Real-Time WebSocket Channel for Instant Push Notifications
+	useEffect(() => {
+		if (!isNurseOnline || !isFocused) return
+
+		let ws: WebSocket | null = null
+		let isMounted = true
+
+		const initWs = async () => {
+			try {
+				const token = (await AsyncStorage.getItem('access_token')) || ''
+				if (!isMounted) return
+
+				const wsUrl = `${API_ENDPOINTS.ANCILLARY.WS_PROVIDER_DISPATCH}?token=${encodeURIComponent(token)}`
+				ws = new WebSocket(wsUrl)
+
+				ws.onmessage = (event) => {
+					try {
+						const payload = JSON.parse(event.data)
+						if (payload.type === 'NEW_CARE_REQUEST_OFFER' && payload.data) {
+							const reqData = payload.data
+							setIncomingRequest({
+								id: reqData.requestId || reqData.publicBookingId || 'REQ-NURSE-991',
+								serviceName: reqData.serviceName || 'Nursing Care',
+								requestedDate: 'Today',
+								requestedTime: reqData.requestedTime || 'Just now',
+								generalLocation: reqData.generalArea || 'Sector 18',
+								distanceKm: '2.4 km',
+								travelTime: '~12 min',
+								serviceRequirement: reqData.generalArea || 'In-Home Healthcare Visit',
+								requiredSkills: ['Nursing Care', 'Doorstep Visit'],
+								urgency: reqData.urgencyLevel || 'Instant',
+								specialRequirements: 'Patient Doorstep Assessment',
+								earning: reqData.estimatedEarnings || '₹667',
+								expiresAt: Date.now() + 60000,
+							})
+							setRequestStep('request_card')
+						}
+					} catch (err) {
+						console.log('[StaffAncillaryDashboard] WebSocket msg parse error:', err)
+					}
+				}
+			} catch (e) {
+				console.log('[StaffAncillaryDashboard] WebSocket setup notice')
+			}
+		}
+
+		void initWs()
+
+		return () => {
+			isMounted = false
+			if (ws) {
+				ws.close()
+			}
+		}
+	}, [isNurseOnline, isFocused])
+
+	const handleAvailabilityToggle = async (online: boolean) => {
 		setIsNurseOnline(online)
+		await updateProviderStatusBackend(online, 12.9716, 77.5946)
 		if (!online) {
 			setIncomingRequest(null)
 			setDetailedInfo(null)

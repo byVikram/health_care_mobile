@@ -18,6 +18,10 @@ export default function NurseAvailabilityCard({
 	const { role } = useAuth()
 	const [isAvailable, setIsAvailable] = useState(initialAvailable)
 
+	React.useEffect(() => {
+		setIsAvailable(initialAvailable)
+	}, [initialAvailable])
+
 	// Strict Role Guard: Only visible when logged-in user is a Nurse / Ancillary
 	const isNurse = role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE
 	if (!isNurse) {

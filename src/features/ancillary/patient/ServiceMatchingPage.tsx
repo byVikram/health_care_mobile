@@ -15,6 +15,7 @@ import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
 import { fetchPatientActiveRequestBackend, cancelCareRequestPatientBackend } from '../ancillaryService'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 export default function ServiceMatchingPage() {
 	const navigation = useNavigation<any>()
@@ -67,6 +68,45 @@ export default function ServiceMatchingPage() {
 			anim2.stop()
 		}
 	}, [pulse1, pulse2])
+
+	// Real-Time WebSocket Channel for Instant Assignment Push
+	useEffect(() => {
+		let ws: WebSocket | null = null
+		try {
+			const targetId = String(bookingId || 'active')
+			const wsUrl = API_ENDPOINTS.ANCILLARY.WS_PATIENT_REQUEST(targetId)
+			ws = new WebSocket(wsUrl)
+
+			ws.onmessage = (event) => {
+				try {
+					const payload = JSON.parse(event.data)
+					if (payload.type === 'CARE_REQUEST_STATUS_CHANGE' && payload.data) {
+						const st = String(payload.data.status || '').toUpperCase()
+						if (st === 'ASSIGNED' || st === 'NURSE_ASSIGNED' || st === 'EN_ROUTE') {
+							setSearchStatus('ASSIGNED')
+							if (payload.data.assignedProvider) {
+								setAssignedProvider(payload.data.assignedProvider)
+							}
+							setTimeout(() => {
+								navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+									bookingId: targetId,
+									bookingData: payload.data,
+								})
+							}, 800)
+						}
+					}
+				} catch (e) {
+					console.log('[ServiceMatchingPage] WS parse error:', e)
+				}
+			}
+		} catch (e) {
+			console.log('[ServiceMatchingPage] WS setup notice')
+		}
+
+		return () => {
+			if (ws) ws.close()
+		}
+	}, [bookingId, navigation])
 
 	// Polling Backend Status
 	useEffect(() => {
