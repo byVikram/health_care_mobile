@@ -69,6 +69,10 @@ export default function NotificationPage({ navigation: navProp }: any) {
 			navigation.navigate(ROUTES.STACK.APPOINTMENTS, {
 				appointmentId: notification.redirect_id,
 			})
+		} else if ((notification.redirect_type === 'ancillary_booking' || notification.redirect_type === 'ancillary') && notification.redirect_id) {
+			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+				bookingId: notification.redirect_id,
+			})
 		}
 	}
 

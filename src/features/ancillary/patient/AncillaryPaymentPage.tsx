@@ -120,9 +120,10 @@ export default function AncillaryPaymentPage() {
 				{ headers: { 'Idempotency-Key': idempotencyKey } }
 			)
 			setSubmitting(false)
-			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId: publicId,
-				status: 'SEARCHING',
+				serviceName: services[0]?.title || 'In-Home Care Service',
+				addressText: visit.address || 'User Location',
 				bookingPayload: {
 					...bookingPayload,
 					paymentMethod: selectedMethodId,
@@ -137,9 +138,10 @@ export default function AncillaryPaymentPage() {
 				setActiveTaskModalVisible(true)
 				return
 			}
-			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId: publicId,
-				status: 'SEARCHING',
+				serviceName: services[0]?.title || 'In-Home Care Service',
+				addressText: visit.address || 'User Location',
 				bookingPayload: {
 					...bookingPayload,
 					paymentMethod: selectedMethodId,

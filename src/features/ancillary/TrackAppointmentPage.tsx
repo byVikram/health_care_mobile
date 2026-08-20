@@ -78,6 +78,7 @@ export default function TrackAppointmentPage() {
 	)
 	const [liveStatus, setLiveStatus] = useState<string>(() => (bookingData.status || 'SEARCHING').toUpperCase())
 	const [liveNurse, setLiveNurse] = useState<any>(bookingData.provider || null)
+	const [liveOtp, setLiveOtp] = useState<string>(() => String(bookingData.verificationOtp || bookingData.otp || '4829'))
 
 	React.useEffect(() => {
 		const pollStatus = async () => {
@@ -89,6 +90,9 @@ export default function TrackAppointmentPage() {
 					setLiveStatus(st)
 					if (data.assignedProvider) {
 						setLiveNurse(data.assignedProvider)
+					}
+					if (data.verificationOtp) {
+						setLiveOtp(String(data.verificationOtp))
 					}
 					if (st === 'SEARCHING' || st === 'SEARCHING_FOR_NURSE') {
 						setActiveStageIndex(0)
@@ -114,7 +118,7 @@ export default function TrackAppointmentPage() {
 		return () => clearInterval(interval)
 	}, [bookingId])
 
-	const otp = String(bookingData.otp || '4829')
+	const otp = liveOtp
 	const isTravelling = activeStageIndex >= 1 && activeStageIndex <= 3
 	const isCompleted = activeStageIndex >= 5 || liveStatus === 'COMPLETED'
 
