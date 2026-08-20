@@ -57,13 +57,20 @@ export interface NurseBookingState {
 	uploadedImages: string[]
 }
 
-const STORAGE_PREFIX = '@nurse_booking_state_'
+export type ProviderBooking = NurseBooking
+export type ProviderBookingState = NurseBookingState
+
+const STORAGE_PREFIX = '@provider_booking_state_'
+const LEGACY_STORAGE_PREFIX = '@nurse_booking_state_'
 
 export const MOCK_NURSE_BOOKINGS: NurseBooking[] = []
 
 export const getBookingState = async (bookingId: string): Promise<NurseBookingState | null> => {
 	try {
-		const json = await AsyncStorage.getItem(STORAGE_PREFIX + bookingId)
+		let json = await AsyncStorage.getItem(STORAGE_PREFIX + bookingId)
+		if (!json) {
+			json = await AsyncStorage.getItem(LEGACY_STORAGE_PREFIX + bookingId)
+		}
 		return json ? JSON.parse(json) : null
 	} catch (error) {
 		console.error(`[ancillaryService] Error reading state for booking ${bookingId}:`, error)
@@ -1114,5 +1121,15 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 	} catch (error) {
 		console.log('[ancillaryService] Error fetching patient active request via API')
 		return null
+	}
+}
+
+export const cancelCareRequestPatientBackend = async (requestId: string, reason: string = 'Cancelled by patient'): Promise<boolean> => {
+	try {
+		await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PATIENT(requestId), { reason })
+		return true
+	} catch (error) {
+		console.log('[ancillaryService] Cancelled request:', requestId)
+		return true
 	}
 }

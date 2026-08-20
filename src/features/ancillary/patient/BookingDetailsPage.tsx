@@ -11,7 +11,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { getPatientDetails } from '../../profile/patient/PatientProfileService'
+import { getPatientDetails, getPatientAddresses } from '../../../features/profile/patient/PatientProfileService'
 import { ROUTES } from '../../../navigation/routes'
 import {
 	AppBottomSheet,
@@ -149,6 +149,10 @@ export default function BookingDetailsPage() {
 	const [tempPatientGender, setTempPatientGender] = useState(patient.gender)
 	const [tempPatientRel, setTempPatientRel] = useState(patient.relationship)
 
+	// Dynamic Saved Addresses State
+	const [savedAddressesList, setSavedAddressesList] = useState(SAVED_ADDRESSES)
+	const [addressOptions, setAddressOptions] = useState<AppSelectOption[]>(ADDRESS_SELECT_OPTIONS)
+
 	useEffect(() => {
 		const fetchProfile = async () => {
 			let loadedPatient = {
@@ -158,6 +162,35 @@ export default function BookingDetailsPage() {
 				bloodGroup: 'O+',
 				relationship: 'Self',
 				avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+			}
+
+			try {
+				const apiAddresses = await getPatientAddresses()
+				if (apiAddresses && apiAddresses.length > 0) {
+					const formattedList = apiAddresses.map((addr: any) => ({
+						id: String(addr.id),
+						label: addr.label || addr.title || 'Home',
+						address: addr.address_line ? `${addr.address_line}, ${addr.city || ''} ${addr.pincode || ''}` : `${addr.address_line_1 || ''}, ${addr.city || ''}`,
+						icon: (addr.label || addr.title || '').toLowerCase().includes('work') ? 'briefcase-outline' : 'home-outline',
+					}))
+					setSavedAddressesList(formattedList)
+
+					const selectOptions: AppSelectOption[] = formattedList.map((addr) => ({
+						label: `${addr.label} (${addr.address})`,
+						value: addr.id,
+					}))
+					setAddressOptions(selectOptions)
+
+					const firstAddr = formattedList[0]
+					setVisit((prev) => ({
+						...prev,
+						addressId: firstAddr.id,
+						addressLabel: firstAddr.label,
+						address: firstAddr.address,
+					}))
+				}
+			} catch (addrErr) {
+				console.log('[BookingDetailsPage] Saved addresses API notice:', addrErr)
 			}
 
 			try {
@@ -284,7 +317,7 @@ export default function BookingDetailsPage() {
 	const [selectedDateObj, setSelectedDateObj] = useState<Date>(new Date())
 
 	const handleSaveVisitDetails = (addressId: string, newDate: Date, timeSlot: string) => {
-		const selectedAddrObj = SAVED_ADDRESSES.find((a) => a.id === addressId)
+		const selectedAddrObj = savedAddressesList.find((a) => a.id === addressId) || SAVED_ADDRESSES.find((a) => a.id === addressId)
 		setSelectedDateObj(newDate)
 
 		const dayStr = `${newDate.getDate()} ${MONTH_NAMES[newDate.getMonth()]} ${newDate.getFullYear()}`
@@ -327,58 +360,55 @@ export default function BookingDetailsPage() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Progress Stepper */}
-				<BookingProgressStepper currentStep={2} style={styles.progressStepper} />
-
-				{/* 1. SECTION: SELECTED SERVICES */}
+				{/* 1. SECTION: SELECTED SERVICES SUMMARY */}
 				<View style={styles.sectionHeaderRow}>
 					<AppTypography variant="h3" style={styles.sectionHeading}>
-						Selected Services
+						Selected Procedures & Services ({services.length})
 					</AppTypography>
 					<TouchableOpacity style={styles.headerActionBtn} onPress={handleEditServices} activeOpacity={0.7}>
-						<MaterialCommunityIcons name="plus-circle-outline" size={16} color="#1F5F68" />
+						<MaterialCommunityIcons name="plus-circle-outline" size={15} color="#1F5F68" />
 						<AppTypography variant="caption" style={styles.actionBtnText}>
-							Add / Edit
+							Add / Change
 						</AppTypography>
 					</TouchableOpacity>
 				</View>
 
 				{services.length > 0 ? (
 					<View style={styles.servicesListContainer}>
-						{services.map((serviceItem, index) => (
-							<View key={serviceItem.id} style={styles.serviceItemFlat}>
+						{services.map((item, index) => (
+							<View key={item.id} style={styles.serviceItemFlat}>
 								{index > 0 && <View style={styles.itemDivider} />}
 								<View style={styles.serviceItemRow}>
-									<Image source={{ uri: serviceItem.image }} style={styles.serviceImage} resizeMode="cover" />
-
 									<View style={styles.serviceTextCol}>
 										<View style={styles.serviceTitleRow}>
 											<AppTypography variant="h4" style={styles.serviceTitle} numberOfLines={1}>
-												{serviceItem.title}
+												{item.title}
 											</AppTypography>
-											<TouchableOpacity
-												style={styles.removeBtn}
-												onPress={() => handleRemoveService(serviceItem.id)}
-												activeOpacity={0.7}
-											>
-												<Ionicons name="trash-outline" size={17} color="#D32F2F" />
-											</TouchableOpacity>
+											{services.length > 1 && (
+												<TouchableOpacity
+													style={styles.removeBtn}
+													onPress={() => handleRemoveService(item.id)}
+													activeOpacity={0.7}
+												>
+													<Ionicons name="trash-outline" size={17} color="#D32F2F" />
+												</TouchableOpacity>
+											)}
 										</View>
 										<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={2}>
-											{serviceItem.description}
+											{item.description}
 										</AppTypography>
 
 										<View style={styles.metaBadgeRow}>
 											<View style={styles.metaItem}>
 												<Ionicons name="time-outline" size={12} color="#526062" />
 												<AppTypography variant="caption" style={styles.metaText}>
-													{serviceItem.duration || '30 - 45 mins'}
+													{item.duration || '30-45 mins'}
 												</AppTypography>
 											</View>
 											<View style={styles.metaItem}>
-												<Ionicons name="home-outline" size={12} color="#526062" />
+												<Ionicons name="shield-checkmark" size={12} color="#1F5F68" />
 												<AppTypography variant="caption" style={styles.metaText}>
-													At Home
+													Verified Specialist
 												</AppTypography>
 											</View>
 										</View>
@@ -386,14 +416,8 @@ export default function BookingDetailsPage() {
 								</View>
 
 								<View style={styles.serviceFooterRow}>
-									<View style={styles.councilBadge}>
-										<Ionicons name="shield-checkmark" size={12} color="#1F5F68" />
-										<AppTypography variant="caption" style={styles.councilText}>
-											Recommended by Nursing Council
-										</AppTypography>
-									</View>
 									<AppTypography variant="h3" style={styles.priceVal}>
-										{serviceItem.price}
+										{item.price}
 									</AppTypography>
 								</View>
 							</View>
@@ -578,73 +602,66 @@ export default function BookingDetailsPage() {
 				<View style={styles.sectionDivider} />
 
 				{/* 4. SECTION: BILLING BREAKDOWN */}
-				<AppTypography variant="h3" style={[styles.sectionHeading, { marginBottom: 12 }]}>
-					Billing Breakdown
-				</AppTypography>
-				
-				<View style={styles.receiptContainer}>
-					<View style={styles.receiptItem}>
-						<AppTypography variant="body" style={styles.receiptItemLabel}>
-							Base Treatment Price
+				<View style={styles.billingCard}>
+					<AppTypography variant="h4" style={styles.billingTitle}>
+						Payment Summary
+					</AppTypography>
+
+					<View style={styles.billingRow}>
+						<AppTypography variant="body" style={styles.billingLabel}>
+							Procedure Base Charges ({services.length} item{services.length > 1 ? 's' : ''})
 						</AppTypography>
-						<AppTypography variant="body" style={styles.receiptItemVal}>
+						<AppTypography variant="body" style={styles.billingVal}>
 							{charges.basePrice}
 						</AppTypography>
 					</View>
-					
-					<View style={styles.receiptItem}>
-						<AppTypography variant="body" style={styles.receiptItemLabel}>
-							Home Visit & Disinfection Charge
+
+					<View style={styles.billingRow}>
+						<AppTypography variant="body" style={styles.billingLabel}>
+							Specialist Doorstep Visit Fee
 						</AppTypography>
-						<AppTypography variant="body" style={styles.receiptItemVal}>
+						<AppTypography variant="body" style={styles.billingVal}>
 							{charges.visitFee}
 						</AppTypography>
 					</View>
 
-					<View style={styles.receiptItem}>
-						<AppTypography variant="body" style={styles.receiptItemLabel}>
-							Taxes & Medical Admin Fee
+					<View style={styles.billingRow}>
+						<AppTypography variant="body" style={styles.billingLabel}>
+							Taxes & Operational Fee (5% GST)
 						</AppTypography>
-						<AppTypography variant="body" style={styles.receiptItemVal}>
+						<AppTypography variant="body" style={styles.billingVal}>
 							{charges.taxes}
 						</AppTypography>
 					</View>
 
-					<View style={styles.receiptDivider} />
-
-					<View style={styles.receiptTotalRow}>
-						<AppTypography variant="h3" style={styles.receiptTotalLabel}>
-							Amount Payable
+					<View style={styles.billingTotalRow}>
+						<AppTypography variant="h3" style={styles.totalLabel}>
+							Total Payable Amount
 						</AppTypography>
-						<AppTypography variant="h2" style={styles.receiptTotalVal}>
+						<AppTypography variant="h3" style={styles.totalVal}>
 							{charges.totalAmount}
 						</AppTypography>
 					</View>
 				</View>
 
-				{/* Elegant Integrated Reassurance Banner */}
-				<View style={styles.reassuranceBanner}>
-					<MaterialCommunityIcons name="shield-check-outline" size={20} color="#1F5F68" />
-					<AppTypography variant="caption" style={styles.reassuranceText}>
-						Includes fully certified clinical specialists, 100% sanitized single-use medical equipment, and active safety protocols.
+				<View style={styles.guaranteeBox}>
+					<MaterialCommunityIcons name="shield-check" size={20} color="#059669" />
+					<AppTypography variant="caption" style={styles.guaranteeText}>
+						100% Certified & Background Checked Healthcare Professionals. Cancellation available before service start.
 					</AppTypography>
 				</View>
 			</ScrollView>
 
-			{/* Sticky Bottom Footer */}
-			<View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-				<View style={styles.stickyLeft}>
-					<AppTypography variant="caption" style={styles.stickyPayLabel}>
-						Total Amount
+			{/* 7. Bottom Fixed Action Bar */}
+			<View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+				<View style={styles.bottomBarPriceCol}>
+					<AppTypography variant="caption" style={styles.bottomBarTotalLabel}>
+						Total Price
 					</AppTypography>
-					<AppTypography variant="h2" style={styles.stickyPayVal}>
+					<AppTypography variant="h2" style={styles.bottomBarTotalVal}>
 						{charges.totalAmount}
 					</AppTypography>
-					<AppTypography variant="caption" style={styles.stickyPaySub}>
-						No immediate charge
-					</AppTypography>
 				</View>
-				
 				<AppButton
 					variant="primary"
 					disabled={services.length === 0}
@@ -708,6 +725,7 @@ export default function BookingDetailsPage() {
 				currentAddressId={visit.addressId}
 				currentDate={selectedDateObj}
 				currentTimeSlot={visit.timeSlot}
+				addressOptions={addressOptions}
 				onClose={() => setEditVisitVisible(false)}
 				onSave={handleSaveVisitDetails}
 				onOpenMap={() => {
@@ -745,6 +763,7 @@ interface EditVisitModalProps {
 	currentAddressId: string
 	currentDate: Date
 	currentTimeSlot: string
+	addressOptions?: AppSelectOption[]
 	onClose: () => void
 	onSave: (addressId: string, selectedDate: Date, timeSlot: string) => void
 	onOpenMap: () => void
@@ -756,6 +775,7 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 	currentAddressId,
 	currentDate,
 	currentTimeSlot,
+	addressOptions,
 	onClose,
 	onSave,
 	onOpenMap,
@@ -790,7 +810,7 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 				</View>
 
 				<AppSelect
-					options={ADDRESS_SELECT_OPTIONS}
+					options={addressOptions || ADDRESS_SELECT_OPTIONS}
 					value={selectedAddrId}
 					onSelect={setSelectedAddrId}
 					size="form"
@@ -1471,5 +1491,90 @@ const styles = StyleSheet.create({
 		fontSize: 11.5,
 		color: '#065F46',
 		lineHeight: 16,
+	},
+	billingCard: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		padding: 16,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+		marginVertical: 12,
+		gap: 10,
+	},
+	billingTitle: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#0F172A',
+		marginBottom: 4,
+	},
+	billingRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+	},
+	billingLabel: {
+		fontSize: 12.5,
+		color: '#64748B',
+	},
+	billingVal: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#1E293B',
+	},
+	billingTotalRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingTop: 10,
+		borderTopWidth: 1,
+		borderTopColor: '#E2E8F0',
+		marginTop: 4,
+	},
+	totalLabel: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	totalVal: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#1F5F68',
+	},
+	guaranteeBox: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#ECFDF5',
+		borderRadius: 12,
+		padding: 12,
+		marginVertical: 12,
+		gap: 10,
+	},
+	guaranteeText: {
+		flex: 1,
+		fontSize: 11.5,
+		color: '#065F46',
+		lineHeight: 16,
+	},
+	bottomBar: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 20,
+		paddingTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#E2E8F0',
+	},
+	bottomBarPriceCol: {
+		justifyContent: 'center',
+	},
+	bottomBarTotalLabel: {
+		fontSize: 11,
+		color: '#64748B',
+	},
+	bottomBarTotalVal: {
+		fontSize: 18,
+		fontWeight: '700',
+		color: '#0F172A',
 	},
 })

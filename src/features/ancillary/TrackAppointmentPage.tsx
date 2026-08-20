@@ -66,18 +66,21 @@ export default function TrackAppointmentPage() {
 	const experienceYears = bookingData.experienceYears ?? 8
 	const etaMinutes = bookingData.etaMinutes ?? 15
 
-	const appointment = bookingData.appointment || {
-		service: 'Wound Dressing & Assessment',
-		dateTime: '12 Aug 2026 • 10:30 AM',
-		locationLabel: 'Home Visit',
-		address: '123 Horizon Lane, Apt 4B',
-	}
-
 	const [activeStageIndex, setActiveStageIndex] = useState<number>(
 		() => bookingData.activeStageIndex ?? 0
 	)
 	const [liveStatus, setLiveStatus] = useState<string>(() => (bookingData.status || 'SEARCHING').toUpperCase())
 	const [liveNurse, setLiveNurse] = useState<any>(bookingData.provider || null)
+	const [liveOtp, setLiveOtp] = useState<string>(() => String(bookingData.verificationOtp || bookingData.otp || '4829'))
+	const [liveAddress, setLiveAddress] = useState<string>(
+		() => bookingData.streetAddress || bookingData.address || bookingData.appointment?.address || 'Doorstep Visit Address'
+	)
+	const [liveDateTime, setLiveDateTime] = useState<string>(
+		() => bookingData.createdAt || bookingData.dateTime || bookingData.appointment?.dateTime || 'Today • Instant Care'
+	)
+	const [liveServiceTitle, setLiveServiceTitle] = useState<string>(
+		() => bookingData.serviceName || bookingData.service || bookingData.appointment?.service || 'In-Home Healthcare Service'
+	)
 
 	React.useEffect(() => {
 		const pollStatus = async () => {
@@ -89,6 +92,18 @@ export default function TrackAppointmentPage() {
 					setLiveStatus(st)
 					if (data.assignedProvider) {
 						setLiveNurse(data.assignedProvider)
+					}
+					if (data.verificationOtp) {
+						setLiveOtp(String(data.verificationOtp))
+					}
+					if (data.streetAddress) {
+						setLiveAddress(data.streetAddress)
+					}
+					if (data.createdAt) {
+						setLiveDateTime(data.createdAt)
+					}
+					if (data.serviceName) {
+						setLiveServiceTitle(data.serviceName)
 					}
 					if (st === 'SEARCHING' || st === 'SEARCHING_FOR_NURSE') {
 						setActiveStageIndex(0)
@@ -114,7 +129,7 @@ export default function TrackAppointmentPage() {
 		return () => clearInterval(interval)
 	}, [bookingId])
 
-	const otp = String(bookingData.otp || '4829')
+	const otp = liveOtp
 	const isTravelling = activeStageIndex >= 1 && activeStageIndex <= 3
 	const isCompleted = activeStageIndex >= 5 || liveStatus === 'COMPLETED'
 
@@ -140,7 +155,7 @@ export default function TrackAppointmentPage() {
 				bookingId,
 				providerId: nurse.id || 'n-prov-1',
 				providerName: nurse.name,
-				serviceName: appointment.service || 'Nursing Care',
+				serviceName: liveServiceTitle || 'Nursing Care',
 				rating: stars,
 				comment,
 				patientName: 'John Doe',
@@ -358,7 +373,7 @@ export default function TrackAppointmentPage() {
 				</View>
 				<View style={styles.detailTextCol}>
 					<Text style={styles.detailLabel}>Service</Text>
-					<Text style={styles.detailValue}>{appointment.service}</Text>
+					<Text style={styles.detailValue}>{liveServiceTitle}</Text>
 				</View>
 			</View>
 
@@ -368,7 +383,7 @@ export default function TrackAppointmentPage() {
 				</View>
 				<View style={styles.detailTextCol}>
 					<Text style={styles.detailLabel}>Date & Time</Text>
-					<Text style={styles.detailValue}>{appointment.dateTime}</Text>
+					<Text style={styles.detailValue}>{liveDateTime}</Text>
 				</View>
 			</View>
 
@@ -378,8 +393,8 @@ export default function TrackAppointmentPage() {
 				</View>
 				<View style={styles.detailTextCol}>
 					<Text style={styles.detailLabel}>Location</Text>
-					<Text style={styles.detailValue}>{appointment.locationLabel}</Text>
-					<Text style={styles.detailSubValue}>{appointment.address}</Text>
+					<Text style={styles.detailValue}>Home Visit</Text>
+					<Text style={styles.detailSubValue}>{liveAddress}</Text>
 				</View>
 			</View>
 		</View>
@@ -396,11 +411,11 @@ export default function TrackAppointmentPage() {
 
 	const modalBookingObj: AncillaryBooking = {
 		id: bookingId,
-		serviceName: appointment.service || 'Nursing Care',
+		serviceName: liveServiceTitle,
 		serviceKey: bookingData.serviceKey || 'nursing-care',
 		serviceLabel: bookingData.serviceLabel || 'Nursing Care',
 		status: 'completed',
-		date: appointment.dateTime || 'Today',
+		date: liveDateTime,
 		provider: {
 			id: nurse.id || 'n-prov-1',
 			name: nurse.name,
@@ -415,10 +430,10 @@ export default function TrackAppointmentPage() {
 	if (liveStatus === 'SEARCHING' || liveStatus === 'SEARCHING_FOR_NURSE') {
 		return (
 			<View style={styles.container}>
-				<AppScreenHeader title="Finding Nurse..." onBack={() => navigation.goBack()} />
+				<AppScreenHeader title="Finding Specialist..." onBack={() => navigation.goBack()} />
 				<NursePulseRadarView
-					patientAddress={appointment.address}
-					serviceName={appointment.service}
+					patientAddress={liveAddress}
+					serviceName={liveServiceTitle}
 					onCancelSearch={() => navigation.goBack()}
 				/>
 			</View>
