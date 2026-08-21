@@ -17,6 +17,7 @@ import ProfilePage from '../features/profile/ProfilePage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
 import AncillaryDashboard from '../features/ancillary/patient/AncillaryDashboard'
+import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
 import BookingsBottomSheet from '../features/bookings/BookingsBottomSheet'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
@@ -31,9 +32,9 @@ function HomeWithSidebar() {
 
 function AncillaryTabWrapper() {
 	return (
-		<ScrollView style={{ flex: 1, backgroundColor: '#F8FAFC' }} contentContainerStyle={{ paddingBottom: 100 }}>
+		<View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
 			<AncillaryDashboard />
-		</ScrollView>
+		</View>
 	)
 }
 
@@ -61,6 +62,8 @@ interface DockedTabBarProps extends BottomTabBarProps {
 function DockedTabBar({ state, descriptors, navigation, onBookingsPress }: DockedTabBarProps) {
 	const theme = useTheme()
 	const insets = useSafeAreaInsets()
+	const { role } = useAuth()
+	const isNurse = (role as any) === 'nurse' || (role as any) === 'ancillary'
 	const activeRoute = state.routes[state.index]
 
 	if (activeRoute?.name === ROUTES.MAIN.PROFILE) {
@@ -93,9 +96,15 @@ function DockedTabBar({ state, descriptors, navigation, onBookingsPress }: Docke
 
 					if (event.defaultPrevented) return
 
-					// The Bookings tab opens a bottom sheet instead of navigating to a screen,
-					// so the existing navigation for every other tab is left untouched.
+					// For Nurse persona, Bookings tab navigates directly to NurseBookingHistoryPage screen;
+					// for other personas, open the Bookings bottom sheet as normal.
 					if (isBookingsTab) {
+						if (isNurse) {
+							if (!focused) {
+								navigation.navigate(route.name, route.params)
+							}
+							return
+						}
 						onBookingsPress()
 						return
 					}
@@ -152,7 +161,9 @@ function DockedTabBar({ state, descriptors, navigation, onBookingsPress }: Docke
 export default function MainTabNavigator() {
 	const { role } = useAuth()
 	const navigation = useNavigation<any>()
+	const isNurse = (role as any) === 'nurse' || (role as any) === 'ancillary'
 	const shouldShowSearch = role !== 'doctor'
+	const shouldShowAncillary = !isNurse
 	const [bookingsSheetVisible, setBookingsSheetVisible] = useState(false)
 
 	return (
@@ -182,22 +193,26 @@ export default function MainTabNavigator() {
 						}}
 					/>
 				) : null}
-				{/* Portal route name is preserved so no existing navigation to it breaks;
-					the tab bar intercepts its press to open the Bookings sheet instead. */}
-				<Tab.Screen name={ROUTES.MAIN.PORTAL} component={PortalPage} />
+				{/* For Nurse persona, PORTAL tab renders NurseBookingHistoryPage directly */}
 				<Tab.Screen
-					name={ROUTES.MAIN.ANCILLARY}
-					component={AncillaryTabWrapper}
-					options={{
-						headerShown: !(role === 'ancillary' || role === 'nurse'),
-						header: () => (
-							<AppScreenHeader
-								title="Ancillary Dashboard"
-								onBack={() => navigation.navigate(ROUTES.MAIN.HOME)}
-							/>
-						),
-					}}
+					name={ROUTES.MAIN.PORTAL}
+					component={isNurse ? NurseBookingHistoryPage : PortalPage}
 				/>
+				{shouldShowAncillary ? (
+					<Tab.Screen
+						name={ROUTES.MAIN.ANCILLARY}
+						component={AncillaryTabWrapper}
+						options={{
+							headerShown: !isNurse,
+							header: () => (
+								<AppScreenHeader
+									title="Ancillary Dashboard"
+									onBack={() => navigation.navigate(ROUTES.MAIN.HOME)}
+								/>
+							),
+						}}
+					/>
+				) : null}
 				<Tab.Screen
 					name={ROUTES.MAIN.PROFILE}
 					component={ProfilePage}

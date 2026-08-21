@@ -389,7 +389,7 @@ export default function NursingCarePage() {
 				</View>
 
 				{/* 4. Recommended For You Section */}
-				<View style={styles.sectionContainer}>
+				{/* <View style={styles.sectionContainer}>
 					<View style={styles.recommendedHeaderRow}>
 						<MaterialCommunityIcons name="clock-outline" size={18} color="#1F5F68" style={styles.recommendedIcon} />
 						<AppTypography variant="h3" style={styles.sectionTitleNoMargin}>
@@ -408,8 +408,8 @@ export default function NursingCarePage() {
 								/>
 							</View>
 						))}
-					</View>
-				</View>
+					</View> */}
+				{/* </View> */}
 
 				{/* 5. All Nursing Services Section */}
 				<View style={styles.sectionContainer}>

@@ -13,6 +13,8 @@ import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
 
+import { BookingProgressStepper } from '../components/BookingProgressStepper'
+
 export default function AncillaryConfirmationPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
@@ -24,8 +26,9 @@ export default function AncillaryConfirmationPage() {
 	const bookingId = route.params?.bookingId || `BK-${Math.floor(100000 + Math.random() * 900000)}`
 	const patient = payload.patient || { name: 'John Doe', age: '34', gender: 'male', relationship: 'Self' }
 	const schedule = payload.schedule || { dateLabel: 'Today, Oct 14', timeSlot: '09:00 AM - 10:00 AM' }
-	const location = payload.location || '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi'
-	const serviceName = payload.serviceName || 'Wound Dressing & Care'
+	const location = payload.location || payload.visit?.address || '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi'
+	const serviceName = payload.serviceName || (payload.services ? payload.services.map((s: any) => s.title).join(', ') : 'Wound Dressing & Care')
+	const totalAmount = payload.charges?.totalAmount || '₹467'
 
 	const handleGoToBookings = () => {
 		if (ROUTES.STACK.APPOINTMENTS) {
@@ -51,6 +54,9 @@ export default function AncillaryConfirmationPage() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
+				{/* 3-Step Progress Indicator (Confirmed) */}
+				<BookingProgressStepper currentStep={3} style={styles.progressStepper} />
+
 				{/* 1. Confirmation Banner */}
 				<View style={styles.successCard}>
 					<View style={styles.checkCircle}>
@@ -117,10 +123,10 @@ export default function AncillaryConfirmationPage() {
 
 					<View style={styles.totalRow}>
 						<AppTypography variant="body" style={styles.totalLabel}>
-							Final Total Paid:
+							Total Amount:
 						</AppTypography>
 						<AppTypography variant="h3" style={styles.totalVal}>
-							₹794
+							{totalAmount}
 						</AppTypography>
 					</View>
 				</View>
@@ -164,6 +170,9 @@ const styles = StyleSheet.create({
 		alignSelf: 'center',
 		paddingHorizontal: 24,
 		paddingTop: 24,
+	},
+	progressStepper: {
+		marginBottom: 16,
 	},
 	successCard: {
 		backgroundColor: '#FFFFFF',

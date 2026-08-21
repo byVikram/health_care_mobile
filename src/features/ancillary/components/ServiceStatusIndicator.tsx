@@ -1,9 +1,10 @@
 import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { getStatusStyle } from '../../../constants/statusColors'
+import type { NurseBooking } from '../ancillaryService'
 
 interface ServiceStatusIndicatorProps {
-	status: 'assigned' | 'verification_pending' | 'in_progress' | 'completed' | 'ASSIGNED' | 'EN_ROUTE' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED'
+	status: NurseBooking['status'] | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED'
 }
 
 export default function ServiceStatusIndicator({ status }: ServiceStatusIndicatorProps) {
@@ -34,6 +35,10 @@ export default function ServiceStatusIndicator({ status }: ServiceStatusIndicato
 		case 'COMPLETED':
 			query = 'completed'
 			label = 'Completed'
+			break
+		case 'cancelled':
+			query = 'cancelled'
+			label = 'Cancelled'
 			break
 	}
 

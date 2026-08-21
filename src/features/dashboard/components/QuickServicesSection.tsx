@@ -28,7 +28,7 @@ import AncilaryIcon from '../../../assets/quick-services/ancilary.svg'
 import AlliedIcon from '../../../assets/quick-services/allied.png'
 import TherapeuticIcon from '../../../assets/quick-services/therapeutic.png'
 import ScanTypeSelectorModal from '../../radiology/component/Scantypeselectormodal'
-import AncillarySelectorModal from './AncillarySelectorModal'
+
 import AlliedSelectorModal from './AlliedSelcetorModel'
 import TherapeuticSelector from './TherapeuticSelector'
 
@@ -71,7 +71,7 @@ export default function QuickServicesSection({ role }: { role: Role }) {
 		: Math.max(12, (width - popupMenuWidth) / 2)
 
 	const [showScanTypeModal, setShowScanTypeModal] = useState(false)
-	const [showAncillaryModal, setShowAncillaryModal] = useState(false)
+
 	const [showAlliedModal, setShowAlliedModal] = useState(false)
 	const [showTherapeuticModal, setShowTherapeuticModal] = useState(false)
 	const [selectedScanTypeId, setSelectedScanTypeId] = useState<number | undefined>()
@@ -122,7 +122,11 @@ export default function QuickServicesSection({ role }: { role: Role }) {
 
 	const handleOtherServicePress = (title: string) => {
 		if (title === 'Ancillary') {
-			closeOthersModal(() => setShowAncillaryModal(true))
+			// Navigate straight to the existing Ancillary Dashboard tab instead of
+			// opening the old "which ancillary service" popup modal.
+			closeOthersModal(() =>
+				navigateRoot(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.ANCILLARY } as any),
+			)
 			return
 		}
 
@@ -333,10 +337,7 @@ export default function QuickServicesSection({ role }: { role: Role }) {
 					} as any)
 				}}
 			/>
-			<AncillarySelectorModal
-				open={showAncillaryModal}
-				onClose={() => setShowAncillaryModal(false)}
-			/>
+
 			<AlliedSelectorModal
 				open={showAlliedModal}
 				onClose={() => setShowAlliedModal(false)}

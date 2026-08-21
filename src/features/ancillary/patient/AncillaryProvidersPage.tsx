@@ -153,13 +153,13 @@ export default function AncillaryProvidersPage() {
 				</View>
 			</View>
 
-			{/* Subtitle summary */}
+			{/* Subtitle summary */} 
 			<View style={styles.summaryBar}>
 				<Text style={styles.summaryText}>{filteredProviders.length} clinicians available</Text>
-				<TouchableOpacity style={styles.mapBtn}>
+				{/* <TouchableOpacity style={styles.mapBtn}>
 					<Ionicons name="map-outline" size={16} color="#2B6F71" />
 					<Text style={styles.mapBtnText}>Map View</Text>
-				</TouchableOpacity>
+				</TouchableOpacity> */}
 			</View>
 
 			{/* Search */}

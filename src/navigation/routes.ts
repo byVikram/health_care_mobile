@@ -72,6 +72,7 @@ export const ROUTES = {
 		NURSE_SERVICE_IN_PROGRESS: 'NurseServiceInProgress',
 		NURSE_COMPLETE_SERVICE: 'NurseCompleteService',
 		NURSE_TODAY_OVERVIEW: 'NurseTodayOverviewPage',
+		NURSE_BOOKING_HISTORY: 'NurseBookingHistoryPage',
 		NURSE_VISITS: 'NurseVisitsPage',
 		NURSE_EARNINGS: 'NurseEarningsPage',
 		NURSE_HISTORY: 'NurseHistoryPage',

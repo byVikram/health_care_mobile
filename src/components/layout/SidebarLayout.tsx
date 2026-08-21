@@ -151,6 +151,27 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 								},
 							},
 						]
+					: (role as any) === 'nurse' || (role as any) === 'ancillary'
+					? [
+							{
+								id: 'medicine-orders',
+								label: 'Medicine Orders',
+								icon: <MaterialCommunityIcons name="pill" size={20} color="#1f5f68" />,
+								onPress: () => {
+									setIsSidebarOpen(false)
+									navigation.navigate(ROUTES.STACK.ORDER_LIST as any)
+								},
+							},
+							{
+								id: 'book-cab',
+								label: 'Book a Cab',
+								icon: <MaterialCommunityIcons name="car" size={20} color="#1f5f68" />,
+								onPress: () => {
+									setIsSidebarOpen(false)
+									navigation.navigate(ROUTES.STACK.TRANSPORTATION_LANDING as any)
+								},
+							},
+						]
 					: [
 							{
 								id: 'medicine-orders',

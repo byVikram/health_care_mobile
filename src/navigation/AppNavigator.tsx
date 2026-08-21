@@ -61,6 +61,7 @@ import PatientVerificationPage from '../features/ancillary/staff/PatientVerifica
 import ServiceInProgressPage from '../features/ancillary/staff/ServiceInProgressPage'
 import CompleteServicePage from '../features/ancillary/staff/CompleteServicePage'
 import NurseTodayOverviewPage from '../features/ancillary/staff/NurseTodayOverviewPage'
+import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
 import NurseVisitsPage from '../features/ancillary/staff/NurseVisitsPage'
 import NurseEarningsPage from '../features/ancillary/staff/NurseEarningsPage'
 import NurseHistoryPage from '../features/ancillary/staff/NurseHistoryPage'

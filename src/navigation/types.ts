@@ -135,6 +135,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS]: { bookingId: string }
 	[ROUTES.STACK.NURSE_COMPLETE_SERVICE]: { bookingId: string; elapsedSeconds: number }
 	[ROUTES.STACK.NURSE_TODAY_OVERVIEW]: { filter?: 'all' | 'accepted' | 'completed' | 'cancelled' } | undefined
+	[ROUTES.STACK.NURSE_BOOKING_HISTORY]: undefined
 	[ROUTES.STACK.NURSE_VISITS]: undefined
 	[ROUTES.STACK.NURSE_EARNINGS]: undefined
 	[ROUTES.STACK.NURSE_HISTORY]: undefined

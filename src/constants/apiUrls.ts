@@ -4,14 +4,12 @@
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	// const url = "http://192.168.4.20:8000"
+	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	const url = "http://192.168.4.75:8000"
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
-
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
 	}
-
 	return url
 }
 
@@ -21,7 +19,7 @@ export const API_ENDPOINTS = {
 	AUTH: {
 		SEND_OTP: `${BASE_URL}/api/auth/send-otp`,
 		VERIFY_OTP: `${BASE_URL}/api/auth/verify-otp`,
-		LOGOUT: `${BASE_URL}/api/auth/logout`,
+		LOGOUT: `${BASE_URL}/api/auth/logout`, 
 		GET_ROLES: `${BASE_URL}/api/auth/get-roles`,
 		CREATE_USER: `${BASE_URL}/api/auth/create-user`,
 		SESSIONS: `${BASE_URL}/api/auth/sessions`,

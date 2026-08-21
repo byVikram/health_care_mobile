@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
@@ -6,7 +6,7 @@ import { ROUTES } from '../../../navigation/routes'
 import {
 	AncillaryBooking,
 	AncillaryReviewData,
-	MOCK_ANCILLARY_BOOKINGS,
+	fetchMyPatientBookingsBackend,
 	getAncillaryReviewByBookingId,
 	submitAncillaryReview,
 } from '../ancillaryService'
@@ -30,7 +30,9 @@ const PAGE_SIZE = 10
 export default function MyBookingsPage() {
 	const navigation = useNavigation<any>()
 
-	const [bookings, setBookings] = useState<AncillaryBooking[]>(MOCK_ANCILLARY_BOOKINGS)
+	const [bookings, setBookings] = useState<AncillaryBooking[]>([])
+	const [isLoading, setIsLoading] = useState(true)
+	const [loadError, setLoadError] = useState<string | null>(null)
 	const [activeTab, setActiveTab] = useState<BookingTab>('upcoming')
 	const [searchQuery, setSearchQuery] = useState('')
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
@@ -48,6 +50,23 @@ export default function MyBookingsPage() {
 		title: string
 		description: string
 	} | null>(null)
+
+	const loadBookings = useCallback(async () => {
+		setIsLoading(true)
+		setLoadError(null)
+		try {
+			const data = await fetchMyPatientBookingsBackend()
+			setBookings(data)
+		} catch (error) {
+			setLoadError('Unable to load your ancillary orders right now. Please try again.')
+		} finally {
+			setIsLoading(false)
+		}
+	}, [])
+
+	useEffect(() => {
+		loadBookings()
+	}, [loadBookings])
 
 	const filteredBookings = useMemo(() => {
 		const query = searchQuery.trim().toLowerCase()
@@ -251,32 +270,48 @@ export default function MyBookingsPage() {
 				})}
 			</View>
 
-			<FlatList
-				data={pagedBookings}
-				renderItem={renderItem}
-				keyExtractor={(item) => item.id}
-				contentContainerStyle={styles.listContent}
-				showsVerticalScrollIndicator={false}
-				onEndReached={handleLoadMore}
-				onEndReachedThreshold={0.4}
-				ListEmptyComponent={
-					<View style={styles.emptyContainer}>
-						<Ionicons name="calendar-outline" size={48} color="#CBD5E1" />
-						<Text style={styles.emptyText}>
-							{searchQuery
-								? 'No bookings match your search.'
-								: `You have no ${activeTab} bookings yet.`}
-						</Text>
-					</View>
-				}
-				ListFooterComponent={
-					visibleCount < filteredBookings.length ? (
-						<View style={{ paddingVertical: 8, opacity: 0.6 }}>
-							<AppSkeleton width={'100%'} height={110} borderRadius={16} />
+			{isLoading ? (
+				<View style={styles.listContent}>
+					{Array.from({ length: 4 }).map((_, i) => (
+						<AppSkeleton key={i} width={'100%'} height={110} borderRadius={16} style={styles.loadingSkeletonCard} />
+					))}
+				</View>
+			) : loadError ? (
+				<View style={styles.emptyContainer}>
+					<Ionicons name="alert-circle-outline" size={48} color="#CBD5E1" />
+					<Text style={styles.emptyText}>{loadError}</Text>
+					<TouchableOpacity style={styles.retryButton} onPress={loadBookings} activeOpacity={0.85}>
+						<Text style={styles.retryButtonText}>Retry</Text>
+					</TouchableOpacity>
+				</View>
+			) : (
+				<FlatList
+					data={pagedBookings}
+					renderItem={renderItem}
+					keyExtractor={(item) => item.id}
+					contentContainerStyle={styles.listContent}
+					showsVerticalScrollIndicator={false}
+					onEndReached={handleLoadMore}
+					onEndReachedThreshold={0.4}
+					ListEmptyComponent={
+						<View style={styles.emptyContainer}>
+							<Ionicons name="calendar-outline" size={48} color="#CBD5E1" />
+							<Text style={styles.emptyText}>
+								{searchQuery
+									? 'No bookings match your search.'
+									: `You have no ${activeTab} bookings yet.`}
+							</Text>
 						</View>
-					) : null
-				}
-			/>
+					}
+					ListFooterComponent={
+						visibleCount < filteredBookings.length ? (
+							<View style={{ paddingVertical: 8, opacity: 0.6 }}>
+								<AppSkeleton width={'100%'} height={110} borderRadius={16} />
+							</View>
+						) : null
+					}
+				/>
+			)}
 
 			{/* Rating & Review Bottom Sheet Modal */}
 			<RateAncillaryReviewModal
@@ -396,5 +431,20 @@ const styles = StyleSheet.create({
 		color: '#94A3B8',
 		textAlign: 'center',
 		paddingHorizontal: 32,
+	},
+	loadingSkeletonCard: {
+		marginBottom: 16,
+	},
+	retryButton: {
+		marginTop: 16,
+		paddingHorizontal: 20,
+		paddingVertical: 10,
+		borderRadius: 999,
+		backgroundColor: '#2B6F71',
+	},
+	retryButtonText: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#FFFFFF',
 	},
 })

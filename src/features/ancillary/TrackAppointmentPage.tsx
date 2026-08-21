@@ -199,24 +199,6 @@ export default function TrackAppointmentPage() {
 		</View>
 	)
 
-	const renderDemoControl = () => {
-		return (
-			<View style={styles.demoBox}>
-				<View style={styles.demoHeader}>
-					<Ionicons name="construct-outline" size={13} color="#B45309" />
-					<Text style={styles.demoTitle}>Frontend Testing Control</Text>
-				</View>
-				<TouchableOpacity
-					style={styles.demoBtn}
-					onPress={() => setActiveStageIndex(5)}
-					activeOpacity={0.8}
-				>
-					<Ionicons name="checkmark-done-circle" size={16} color="#047857" />
-					<Text style={styles.demoBtnText}>Demo: Mark Service Completed</Text>
-				</TouchableOpacity>
-			</View>
-		)
-	}
 
 	const renderFeedbackCard = () => {
 		if (!isCompleted) return null
@@ -456,7 +438,6 @@ export default function TrackAppointmentPage() {
 					<View style={styles.tabletGrid}>
 						<View style={styles.tabletCol}>
 							{renderStatusBanner()}
-							{!isCompleted && renderDemoControl()}
 							{renderFeedbackCard()}
 							{!isCompleted && renderOtpCard()}
 							{isTravelling && (
@@ -477,7 +458,6 @@ export default function TrackAppointmentPage() {
 				) : (
 					<>
 						{renderStatusBanner()}
-						{!isCompleted && renderDemoControl()}
 						{renderFeedbackCard()}
 						{!isCompleted && renderOtpCard()}
 						{isTravelling && (
@@ -522,44 +502,6 @@ export default function TrackAppointmentPage() {
 }
 
 const styles = StyleSheet.create({
-	demoBox: {
-		backgroundColor: '#FFFBEB',
-		borderColor: '#FDE68A',
-		borderWidth: 1.5,
-		borderRadius: 14,
-		padding: 12,
-		marginBottom: 14,
-		gap: 8,
-	},
-	demoHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	demoTitle: {
-		fontSize: 11,
-		fontWeight: '800',
-		color: '#B45309',
-		textTransform: 'uppercase',
-		letterSpacing: 0.5,
-	},
-	demoBtn: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 6,
-		backgroundColor: '#ECFDF5',
-		borderColor: '#A7F3D0',
-		borderWidth: 1,
-		borderRadius: 10,
-		paddingVertical: 10,
-		paddingHorizontal: 12,
-	},
-	demoBtnText: {
-		fontSize: 13,
-		fontWeight: '800',
-		color: '#047857',
-	},
 	demoResetBtn: {
 		alignSelf: 'center',
 		paddingVertical: 6,

@@ -17,9 +17,12 @@ export default function AppointmentTrackingTimeline({ stages, activeIndex }: App
 	return (
 		<View>
 			{stages.map((stage, index) => {
-				const isCompleted = index < activeIndex
-				const isActive = index === activeIndex
 				const isLast = index === stages.length - 1
+				// The final stage has no subsequent stage to advance to, so once it's
+				// reached (activeIndex has caught up to it) it means that stage itself
+				// is done -- not "in progress" -- and should render as completed too.
+				const isCompleted = isLast ? index <= activeIndex : index < activeIndex
+				const isActive = !isCompleted && index === activeIndex
 
 				return (
 					<View key={stage.key} style={styles.row}>

@@ -79,7 +79,7 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 						style={styles.addBtn}
 						onPress={handleAdd}
 					>
-						Done
+						Book Service
 					</AppButton>
 				</View>
 			}
@@ -120,12 +120,12 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 
 				{/* 4. Duration & Price Summary Pill */}
 				<View style={styles.infoPillRow}>
-					<View style={styles.infoPill}>
+					{/* <View style={styles.infoPill}>
 						<Ionicons name="time-outline" size={16} color="#1F5F68" />
 						<AppTypography variant="caption" style={styles.infoPillText}>
 							{service.duration}
 						</AppTypography>
-					</View>
+					</View> */}
 
 					<View style={styles.infoPill}>
 						<Ionicons name="pricetag-outline" size={16} color="#1F5F68" />
