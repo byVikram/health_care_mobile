@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
 	ScrollView,
 	StyleSheet,
@@ -8,26 +8,15 @@ import {
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import { MOCK_NURSE_BOOKINGS } from '../ancillaryService'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
+import { AppSkeleton } from '../../../components/common'
 import { ROUTES } from '../../../navigation/routes'
+import { fetchAvailableRequestsBackend, fetchMyNurseAppointmentsBackend, NurseBooking } from '../ancillaryService'
 
 export type FilterOption = 'all' | 'accepted' | 'completed' | 'cancelled'
 
-const MOCK_CANCELLED_RECORDS = [
-	{
-		id: 'CANCEL-901',
-		patientName: 'Robert Vance',
-		serviceName: 'Post-Op Wound Inspection',
-		appointmentTime: '11:30 AM',
-		patientAddress: '742 Evergreen Terrace, CA',
-		cancellationReason: 'Patient requested cancellation',
-		cancelledTime: '11:15 AM',
-	},
-]
-
-import { fetchAvailableRequestsBackend, fetchMyNurseAppointmentsBackend, NurseBooking } from '../ancillaryService'
+const ACCEPTED_FAMILY_STATUSES = ['assigned', 'verification_pending', 'in_progress', 'EN_ROUTE', 'ARRIVED']
 
 export default function NurseTodayOverviewPage() {
 	const navigation = useNavigation<any>()
@@ -39,34 +28,49 @@ export default function NurseTodayOverviewPage() {
 	const [activeFilter, setActiveFilter] = useState<FilterOption>(initialFilter)
 	const [requestsReceivedCount, setRequestsReceivedCount] = useState<number>(0)
 	const [myBookings, setMyBookings] = useState<NurseBooking[]>([])
+	const [isLoading, setIsLoading] = useState(true)
+	const [loadError, setLoadError] = useState<string | null>(null)
 
-	React.useEffect(() => {
-		const loadData = async () => {
-			try {
-				const available = await fetchAvailableRequestsBackend()
-				setRequestsReceivedCount(available.length)
-			} catch (e) {
-				console.log('[NurseTodayOverviewPage] Available requests fetch error')
-			}
-
-			try {
-				const appointments = await fetchMyNurseAppointmentsBackend()
-				setMyBookings(appointments)
-			} catch (e) {
-				console.log('[NurseTodayOverviewPage] Appointments fetch error')
-			}
+	const loadBookings = useCallback(async () => {
+		setIsLoading(true)
+		setLoadError(null)
+		try {
+			const appointments = await fetchMyNurseAppointmentsBackend()
+			setMyBookings(appointments)
+		} catch (e) {
+			setLoadError('Unable to load today\'s activity right now. Please try again.')
+		} finally {
+			setIsLoading(false)
 		}
-		void loadData()
 	}, [])
 
-	const acceptedBookings = myBookings.filter(
-		(b) => b.status === 'assigned' || b.status === 'verification_pending' || b.status === 'in_progress' || b.status === 'EN_ROUTE' || b.status === 'ARRIVED'
+	useEffect(() => {
+		fetchAvailableRequestsBackend()
+			.then((available) => setRequestsReceivedCount(available.length))
+			.catch(() => console.log('[NurseTodayOverviewPage] Available requests fetch error'))
+
+		loadBookings()
+	}, [loadBookings])
+
+	const acceptedBookings = useMemo(
+		() => myBookings.filter((b) => ACCEPTED_FAMILY_STATUSES.includes(b.status)),
+		[myBookings]
 	)
-	const completedBookings = myBookings.filter((b) => b.status === 'completed')
+	const completedBookings = useMemo(() => myBookings.filter((b) => b.status === 'completed'), [myBookings])
+	const cancelledBookings = useMemo(() => myBookings.filter((b) => b.status === 'cancelled'), [myBookings])
 
 	const acceptedCount = acceptedBookings.length
 	const completedCount = completedBookings.length
 	const declinedCount = 0
+
+	// Single combined list the UI renders from -- 'all' keeps the API's own
+	// (most-recent-first) ordering instead of grouping by status under headers.
+	const visibleBookings = useMemo(() => {
+		if (activeFilter === 'accepted') return acceptedBookings
+		if (activeFilter === 'completed') return completedBookings
+		if (activeFilter === 'cancelled') return cancelledBookings
+		return myBookings
+	}, [activeFilter, myBookings, acceptedBookings, completedBookings, cancelledBookings])
 
 	const todayFormatted = new Date().toLocaleDateString('en-US', {
 		weekday: 'short',
@@ -189,49 +193,72 @@ export default function NurseTodayOverviewPage() {
 					})}
 				</View>
 
-				{/* Accepted Section */}
-				{(activeFilter === 'all' || activeFilter === 'accepted') && (
-					<View style={styles.sectionBlock}>
-						<View style={styles.sectionTitleRow}>
-							<AppTypography variant="caption" style={styles.sectionHeaderTitle}>
-								ACCEPTED APPOINTMENTS ({acceptedBookings.length})
+				{/* Unified Appointment List -- single continuous list for the active
+					filter (All / Accepted / Completed / Cancelled), driven entirely by
+					API data. Cards keep their per-status styling/badge inline instead
+					of being grouped under separate section headers. */}
+				{isLoading ? (
+					<View style={styles.cardColumn}>
+						{[0, 1, 2].map((key) => (
+							<View key={key} style={styles.activityCard}>
+								<AppSkeleton width={38} height={38} borderRadius={19} />
+								<View style={[styles.cardBody, { gap: 6 }]}>
+									<AppSkeleton width="60%" height={14} borderRadius={4} />
+									<AppSkeleton width="40%" height={11} borderRadius={4} />
+									<AppSkeleton width="80%" height={11} borderRadius={4} />
+								</View>
+							</View>
+						))}
+					</View>
+				) : loadError ? (
+					<View style={styles.stateCard}>
+						<Ionicons name="alert-circle-outline" size={28} color="#DC2626" />
+						<AppTypography variant="body" style={styles.stateTitle}>
+							Couldn't load your activity
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.stateSubtext}>
+							{loadError}
+						</AppTypography>
+						<TouchableOpacity style={styles.retryBtn} onPress={loadBookings} activeOpacity={0.8}>
+							<Ionicons name="refresh" size={14} color="#0C7C7C" />
+							<AppTypography variant="caption" style={styles.retryBtnText}>
+								Try Again
 							</AppTypography>
-							<TouchableOpacity
-								style={styles.viewAllBtn}
-								onPress={() => navigation.navigate(ROUTES.STACK.NURSE_VISITS, { filter: 'accepted' })}
-								activeOpacity={0.7}
-							>
-								<AppTypography variant="caption" style={styles.viewAllText}>
-									View all
-								</AppTypography>
-								<Ionicons name="chevron-forward" size={13} color="#0C7C7C" />
-							</TouchableOpacity>
-						</View>
+						</TouchableOpacity>
+					</View>
+				) : visibleBookings.length === 0 ? (
+					<View style={styles.stateCard}>
+						<Ionicons name="calendar-clear-outline" size={28} color="#94A3B8" />
+						<AppTypography variant="body" style={styles.stateTitle}>
+							No {activeFilter === 'all' ? '' : `${activeFilter} `}appointments yet
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.stateSubtext}>
+							{activeFilter === 'all'
+								? "You don't have any activity for today yet."
+								: `You don't have any ${activeFilter} visits for today.`}
+						</AppTypography>
+					</View>
+				) : (
+					<View style={isTablet ? styles.tabletGrid : styles.cardColumn}>
+						{visibleBookings.map((item, index) => {
+							const isCompleted = item.status === 'completed'
+							const isCancelled = item.status === 'cancelled'
+							const isAccepted = !isCompleted && !isCancelled
+							const isPurple = isAccepted && index % 2 === 1
 
-						<View style={isTablet ? styles.tabletGrid : styles.cardColumn}>
-							{acceptedBookings.map((item, index) => {
-								const isPurple = index % 2 === 1
+							if (isCancelled) {
 								return (
-									<TouchableOpacity
+									<View
 										key={item.id}
-										style={[styles.activityCard, isTablet && styles.activityCardTablet]}
-										onPress={() =>
-											navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: item.id })
-										}
-										activeOpacity={0.85}
+										style={[
+											styles.activityCard,
+											styles.activityCardCancelled,
+											isTablet && styles.activityCardTablet,
+										]}
 									>
 										{/* Left Avatar */}
-										<View
-											style={[
-												styles.avatarCircle,
-												{ backgroundColor: isPurple ? '#F3E8FF' : '#E6F4F1' },
-											]}
-										>
-											<Ionicons
-												name="person"
-												size={18}
-												color={isPurple ? '#7E22CE' : '#0C7C7C'}
-											/>
+										<View style={[styles.avatarCircle, { backgroundColor: '#FEE2E2' }]}>
+											<Ionicons name="person" size={18} color="#DC2626" />
 										</View>
 
 										{/* Content Body */}
@@ -240,9 +267,65 @@ export default function NurseTodayOverviewPage() {
 												<AppTypography variant="body" style={styles.patientName} numberOfLines={1}>
 													{item.patientName}
 												</AppTypography>
-												<View style={styles.tagAccepted}>
-													<AppTypography variant="caption" style={styles.tagTextAccepted}>
-														Assigned
+												<View style={styles.tagCancelled}>
+													<Ionicons name="close-circle" size={12} color="#DC2626" />
+													<AppTypography variant="caption" style={styles.tagTextCancelled}>
+														Cancelled
+													</AppTypography>
+												</View>
+											</View>
+
+											<AppTypography
+												variant="caption"
+												style={[styles.serviceName, styles.cancelledServiceName]}
+												numberOfLines={1}
+											>
+												{item.serviceName}
+											</AppTypography>
+
+											<View style={styles.metaRow}>
+												<Ionicons name="time-outline" size={13} color="#DC2626" />
+												<AppTypography variant="caption" style={styles.cancelledMetaText}>
+													Original Time: {item.appointmentTime}
+												</AppTypography>
+											</View>
+
+											<AppTypography variant="caption" style={styles.cancellationReasonText}>
+												Reason: {item.cancellationReason || 'Not specified'}
+											</AppTypography>
+										</View>
+
+										{/* Right Chevron */}
+										<Ionicons name="chevron-forward" size={16} color="#FCA5A5" />
+									</View>
+								)
+							}
+
+							if (isCompleted) {
+								return (
+									<TouchableOpacity
+										key={item.id}
+										style={[styles.activityCard, isTablet && styles.activityCardTablet]}
+										onPress={() =>
+											navigation.navigate(ROUTES.STACK.NURSE_COMPLETE_SERVICE, { bookingId: item.id })
+										}
+										activeOpacity={0.85}
+									>
+										{/* Left Avatar */}
+										<View style={[styles.avatarCircle, { backgroundColor: '#E0F2FE' }]}>
+											<Ionicons name="person" size={18} color="#0284C7" />
+										</View>
+
+										{/* Content Body */}
+										<View style={styles.cardBody}>
+											<View style={styles.cardHeaderRow}>
+												<AppTypography variant="body" style={styles.patientName} numberOfLines={1}>
+													{item.patientName}
+												</AppTypography>
+												<View style={styles.tagCompleted}>
+													<Ionicons name="checkmark-circle" size={12} color="#059669" />
+													<AppTypography variant="caption" style={styles.tagTextCompleted}>
+														Completed
 													</AppTypography>
 												</View>
 											</View>
@@ -252,61 +335,49 @@ export default function NurseTodayOverviewPage() {
 											</AppTypography>
 
 											<View style={styles.metaRow}>
-												<Ionicons name="time-outline" size={13} color="#64748B" />
-												<AppTypography variant="caption" style={styles.metaText}>
-													{item.appointmentTime}
-												</AppTypography>
-												<AppTypography variant="caption" style={styles.metaDot}>
-													•
-												</AppTypography>
-												<Ionicons name="location-outline" size={13} color="#64748B" />
-												<AppTypography variant="caption" style={styles.metaText} numberOfLines={1}>
-													{item.patientAddress}
+												<Ionicons name="checkmark-circle-outline" size={13} color="#059669" />
+												<AppTypography variant="caption" style={styles.metaTextCompleted}>
+													Completed today at {item.appointmentTime.split(' - ')[0]}
 												</AppTypography>
 											</View>
+
+											{item.amount != null && (
+												<View style={styles.earningsTagRow}>
+													<Ionicons name="cash-outline" size={13} color="#059669" />
+													<AppTypography variant="caption" style={styles.earningsTagText}>
+														+ ₹{item.amount} Earned
+													</AppTypography>
+												</View>
+											)}
 										</View>
 
 										{/* Right Chevron */}
 										<Ionicons name="chevron-forward" size={16} color="#94A3B8" />
 									</TouchableOpacity>
 								)
-							})}
-						</View>
-					</View>
-				)}
+							}
 
-				{/* Completed Section */}
-				{(activeFilter === 'all' || activeFilter === 'completed') && (
-					<View style={styles.sectionBlock}>
-						<View style={styles.sectionTitleRow}>
-							<AppTypography variant="caption" style={styles.sectionHeaderTitle}>
-								COMPLETED VISITS ({completedBookings.length})
-							</AppTypography>
-							<TouchableOpacity
-								style={styles.viewAllBtn}
-								onPress={() => navigation.navigate(ROUTES.STACK.NURSE_VISITS, { filter: 'completed' })}
-								activeOpacity={0.7}
-							>
-								<AppTypography variant="caption" style={styles.viewAllText}>
-									View all
-								</AppTypography>
-								<Ionicons name="chevron-forward" size={13} color="#0C7C7C" />
-							</TouchableOpacity>
-						</View>
-
-						<View style={isTablet ? styles.tabletGrid : styles.cardColumn}>
-							{completedBookings.map((item, idx) => (
+							return (
 								<TouchableOpacity
 									key={item.id}
 									style={[styles.activityCard, isTablet && styles.activityCardTablet]}
 									onPress={() =>
-										navigation.navigate(ROUTES.STACK.NURSE_COMPLETE_SERVICE, { bookingId: item.id })
+										navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: item.id })
 									}
 									activeOpacity={0.85}
 								>
 									{/* Left Avatar */}
-									<View style={[styles.avatarCircle, { backgroundColor: '#E0F2FE' }]}>
-										<Ionicons name="person" size={18} color="#0284C7" />
+									<View
+										style={[
+											styles.avatarCircle,
+											{ backgroundColor: isPurple ? '#F3E8FF' : '#E6F4F1' },
+										]}
+									>
+										<Ionicons
+											name="person"
+											size={18}
+											color={isPurple ? '#7E22CE' : '#0C7C7C'}
+										/>
 									</View>
 
 									{/* Content Body */}
@@ -315,10 +386,9 @@ export default function NurseTodayOverviewPage() {
 											<AppTypography variant="body" style={styles.patientName} numberOfLines={1}>
 												{item.patientName}
 											</AppTypography>
-											<View style={styles.tagCompleted}>
-												<Ionicons name="checkmark-circle" size={12} color="#059669" />
-												<AppTypography variant="caption" style={styles.tagTextCompleted}>
-													Completed
+											<View style={styles.tagAccepted}>
+												<AppTypography variant="caption" style={styles.tagTextAccepted}>
+													Assigned
 												</AppTypography>
 											</View>
 										</View>
@@ -328,16 +398,16 @@ export default function NurseTodayOverviewPage() {
 										</AppTypography>
 
 										<View style={styles.metaRow}>
-											<Ionicons name="checkmark-circle-outline" size={13} color="#059669" />
-											<AppTypography variant="caption" style={styles.metaTextCompleted}>
-												Completed today at {item.appointmentTime.split(' - ')[0]}
+											<Ionicons name="time-outline" size={13} color="#64748B" />
+											<AppTypography variant="caption" style={styles.metaText}>
+												{item.appointmentTime}
 											</AppTypography>
-										</View>
-
-										<View style={styles.earningsTagRow}>
-											<Ionicons name="cash-outline" size={13} color="#059669" />
-											<AppTypography variant="caption" style={styles.earningsTagText}>
-												+ ₹{idx === 0 ? 850 : 450} Earned
+											<AppTypography variant="caption" style={styles.metaDot}>
+												•
+											</AppTypography>
+											<Ionicons name="location-outline" size={13} color="#64748B" />
+											<AppTypography variant="caption" style={styles.metaText} numberOfLines={1}>
+												{item.patientAddress}
 											</AppTypography>
 										</View>
 									</View>
@@ -345,85 +415,8 @@ export default function NurseTodayOverviewPage() {
 									{/* Right Chevron */}
 									<Ionicons name="chevron-forward" size={16} color="#94A3B8" />
 								</TouchableOpacity>
-							))}
-						</View>
-					</View>
-				)}
-
-				{/* Cancelled Section */}
-				{(activeFilter === 'all' || activeFilter === 'cancelled') && (
-					<View style={styles.sectionBlock}>
-						<View style={styles.sectionTitleRow}>
-							<AppTypography variant="caption" style={styles.sectionHeaderTitle}>
-								CANCELLED VISITS ({MOCK_CANCELLED_RECORDS.length})
-							</AppTypography>
-							<TouchableOpacity
-								style={styles.viewAllBtn}
-								onPress={() => navigation.navigate(ROUTES.STACK.NURSE_VISITS, { filter: 'cancelled' })}
-								activeOpacity={0.7}
-							>
-								<AppTypography variant="caption" style={styles.viewAllText}>
-									View all
-								</AppTypography>
-								<Ionicons name="chevron-forward" size={13} color="#0C7C7C" />
-							</TouchableOpacity>
-						</View>
-
-						<View style={isTablet ? styles.tabletGrid : styles.cardColumn}>
-							{MOCK_CANCELLED_RECORDS.map((item) => (
-								<TouchableOpacity
-									key={item.id}
-									style={[
-										styles.activityCard,
-										styles.activityCardCancelled,
-										isTablet && styles.activityCardTablet,
-									]}
-									activeOpacity={0.85}
-								>
-									{/* Left Avatar */}
-									<View style={[styles.avatarCircle, { backgroundColor: '#FEE2E2' }]}>
-										<Ionicons name="person" size={18} color="#DC2626" />
-									</View>
-
-									{/* Content Body */}
-									<View style={styles.cardBody}>
-										<View style={styles.cardHeaderRow}>
-											<AppTypography variant="body" style={styles.patientName} numberOfLines={1}>
-												{item.patientName}
-											</AppTypography>
-											<View style={styles.tagCancelled}>
-												<Ionicons name="close-circle" size={12} color="#DC2626" />
-												<AppTypography variant="caption" style={styles.tagTextCancelled}>
-													Cancelled
-												</AppTypography>
-											</View>
-										</View>
-
-										<AppTypography
-											variant="caption"
-											style={[styles.serviceName, styles.cancelledServiceName]}
-											numberOfLines={1}
-										>
-											{item.serviceName}
-										</AppTypography>
-
-										<View style={styles.metaRow}>
-											<Ionicons name="time-outline" size={13} color="#DC2626" />
-											<AppTypography variant="caption" style={styles.cancelledMetaText}>
-												Original Time: {item.appointmentTime}
-											</AppTypography>
-										</View>
-
-										<AppTypography variant="caption" style={styles.cancellationReasonText}>
-											Reason: {item.cancellationReason}
-										</AppTypography>
-									</View>
-
-									{/* Right Chevron */}
-									<Ionicons name="chevron-forward" size={16} color="#FCA5A5" />
-								</TouchableOpacity>
-							))}
-						</View>
+							)
+						})}
 					</View>
 				)}
 
@@ -612,6 +605,52 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		gap: 10,
+	},
+	stateCard: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#FFFFFF',
+		borderColor: '#E2E8F0',
+		borderWidth: 1,
+		borderRadius: 12,
+		paddingHorizontal: 18,
+		paddingVertical: 24,
+		gap: 8,
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.02,
+		shadowRadius: 2,
+		elevation: 1,
+	},
+	stateTitle: {
+		fontSize: 14.5,
+		fontWeight: '700',
+		color: '#0F172A',
+		textAlign: 'center',
+	},
+	stateSubtext: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: '#64748B',
+		textAlign: 'center',
+		lineHeight: 17,
+	},
+	retryBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#F0FDFA',
+		borderColor: '#99F6E4',
+		borderWidth: 1,
+		borderRadius: 8,
+		paddingHorizontal: 11,
+		paddingVertical: 7,
+		gap: 5,
+		marginTop: 2,
+	},
+	retryBtnText: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#0C7C7C',
 	},
 
 	/* Activity Card with Left Highlight Border */

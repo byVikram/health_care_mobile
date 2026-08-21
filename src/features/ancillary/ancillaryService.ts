@@ -44,9 +44,11 @@ export interface NurseBooking {
 	appointmentDate: string
 	appointmentTime: string
 	patientAddress: string
-	status: 'assigned' | 'verification_pending' | 'in_progress' | 'completed' | 'EN_ROUTE' | 'ARRIVED'
+	status: 'assigned' | 'verification_pending' | 'in_progress' | 'completed' | 'cancelled' | 'EN_ROUTE' | 'ARRIVED'
 	otpCode: string
 	completePin: string
+	amount?: number
+	cancellationReason?: string
 }
 
 export interface NurseBookingState {
@@ -1052,6 +1054,13 @@ export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequest
 }
 
 /**
+ * Cancellation-family backend statuses that don't have their own dedicated
+ * lowercase NurseBooking status value -- these all collapse to 'cancelled'
+ * for the nurse-facing Today's Activity / Visits lists.
+ */
+const CANCELLED_FAMILY_STATUSES = ['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED']
+
+/**
  * Fetch all appointments assigned to the logged-in nurse via GET /api/ancillary/provider/requests/my
  */
 export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]> => {
@@ -1065,26 +1074,38 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 			: []
 
 		if (rawList.length > 0) {
-			return rawList.map((item: any) => ({
-				id: String(item.id || item.publicBookingId),
-				patientName: String(item.patientFullName || 'Patient'),
-				patientAge: 68,
-				patientGender: 'Female',
-				patientPhone: String(item.patientPhone || '+91 98765 43210'),
-				serviceName: String(item.serviceName || 'In-Home Nursing Care'),
-				serviceDescription: 'Aseptic Dressing & Patient Care',
-				appointmentDate: 'Today',
-				appointmentTime: String(item.createdAt || 'Today'),
-				patientAddress: String(item.streetAddress || 'Healthcare Location'),
-				status: (item.status || 'ASSIGNED').toLowerCase() as any,
-				otpCode: String(item.verificationOtp || '4829'),
-				completePin: String(item.completionPin || '9182'),
-			}))
+			return rawList.map((item: any) => {
+				const rawStatus = String(item.status || 'ASSIGNED').toUpperCase()
+				const status = CANCELLED_FAMILY_STATUSES.includes(rawStatus)
+					? 'cancelled'
+					: (item.status || 'ASSIGNED').toLowerCase()
+				const amount = item.totalAmount != null
+					? parseFloat(String(item.totalAmount).replace(/[^0-9.]/g, ''))
+					: undefined
+
+				return {
+					id: String(item.id || item.publicBookingId),
+					patientName: String(item.patientFullName || 'Patient'),
+					patientAge: 68,
+					patientGender: 'Female',
+					patientPhone: String(item.patientPhone || '+91 98765 43210'),
+					serviceName: String(item.serviceName || 'In-Home Nursing Care'),
+					serviceDescription: 'Aseptic Dressing & Patient Care',
+					appointmentDate: 'Today',
+					appointmentTime: String(item.createdAt || 'Today'),
+					patientAddress: String(item.streetAddress || 'Healthcare Location'),
+					status: status as any,
+					otpCode: String(item.verificationOtp || '4829'),
+					completePin: String(item.completionPin || '9182'),
+					amount: Number.isFinite(amount) ? amount : undefined,
+					cancellationReason: item.cancellationReason ? String(item.cancellationReason) : undefined,
+				}
+			})
 		}
 		return []
 	} catch (error) {
 		console.log('[ancillaryService] Fetching provider assigned appointments from API')
-		return []
+		throw error
 	}
 }
 
@@ -1124,6 +1145,80 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 	}
 }
 
+/**
+ * Maps a canonical backend request status (see CanonicalRequestStatus) to the
+ * simplified 'upcoming' | 'completed' | 'cancelled' tab grouping used by MyBookingsPage.
+ */
+const mapStatusToBookingTab = (status?: string): 'upcoming' | 'completed' | 'cancelled' => {
+	const upper = String(status || '').toUpperCase()
+	if (upper === 'COMPLETED') return 'completed'
+	if (['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED'].includes(upper)) return 'cancelled'
+	return 'upcoming'
+}
+
+/**
+ * Formats a MySQL-style "YYYY-MM-DD HH:MM:SS" createdAt string into the
+ * date / timeRange display strings used by the booking cards.
+ */
+const formatBookingDateTime = (createdAt?: string | null): { date: string; timeRange?: string } => {
+	if (!createdAt) return { date: 'Recently' }
+	const parsed = new Date(createdAt.replace(' ', 'T'))
+	if (Number.isNaN(parsed.getTime())) return { date: createdAt }
+	const date = parsed.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
+	const timeRange = parsed.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+	return { date, timeRange }
+}
+
+/**
+ * Fetch the logged-in patient's complete Ancillary Orders booking history
+ * (upcoming/in-progress, completed, and cancelled) via
+ * GET /api/ancillary/patient/requests/my.
+ *
+ * Unlike most functions in this file, this intentionally does NOT swallow
+ * errors into a silent empty-array fallback: MyBookingsPage needs to tell
+ * a genuine "no bookings yet" empty state apart from a failed request, so
+ * callers should catch this and surface an error state.
+ */
+export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[]> => {
+	const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.MY_REQUESTS)
+	const payload = res.data
+	const rawList: any[] = Array.isArray(payload)
+		? payload
+		: Array.isArray(payload?.data)
+		? payload.data
+		: []
+
+	return rawList.map((item: any) => {
+		const { date, timeRange } = formatBookingDateTime(item.createdAt)
+		const amountRaw = item.totalAmount
+		const amount =
+			typeof amountRaw === 'number'
+				? amountRaw
+				: parseFloat(String(amountRaw || '').replace(/[^0-9.]/g, '')) || undefined
+
+		return {
+			id: String(item.requestId || item.publicBookingId || item.id),
+			serviceName: String(item.serviceName || 'In-Home Healthcare Service'),
+			serviceKey: 'nursing-care',
+			serviceLabel: String(item.serviceName || 'Ancillary Care'),
+			status: mapStatusToBookingTab(item.status),
+			date,
+			timeRange,
+			provider: {
+				id: item.assignedProvider?.id ? String(item.assignedProvider.id) : undefined,
+				name: item.assignedProvider?.name ? String(item.assignedProvider.name) : 'Specialist Assigned Soon',
+				designation: item.assignedProvider?.credentials
+					? String(item.assignedProvider.credentials)
+					: 'Healthcare Provider',
+				avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=120',
+			},
+			amount,
+			verificationOtp: item.verificationOtp ? String(item.verificationOtp) : undefined,
+			completionPin: item.completionPin ? String(item.completionPin) : undefined,
+			bookingType: item.bookingType ? String(item.bookingType) : undefined,
+		}
+	})
+}
 export const cancelCareRequestPatientBackend = async (requestId: string, reason: string = 'Cancelled by patient'): Promise<boolean> => {
 	try {
 		await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PATIENT(requestId), { reason })

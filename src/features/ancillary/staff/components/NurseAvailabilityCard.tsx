@@ -86,7 +86,7 @@ export default function NurseAvailabilityCard({
 						value={isAvailable}
 						onValueChange={handleToggle}
 						showStatusText={false}
-						size="medium"
+						size="small"
 						activeColor="#0C7C7C"
 						inactiveColor="#CBD5E1"
 						accessibilityLabel="Toggle Nurse Availability Status"

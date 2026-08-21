@@ -27,7 +27,6 @@ import NurseAvailabilityCard from './components/NurseAvailabilityCard'
 import IncomingRequestNotificationOverlay, {
 	AcceptConfirmationModal,
 	DetailedReviewModal,
-	MOCK_SOFT_REQUEST,
 } from './components/IncomingRequestCard'
 import StatusModal from '../../../components/common/StatusModal'
 import { AppTypography } from '../../../components/common/AppTypography'
@@ -302,15 +301,6 @@ export default function StaffAncillaryDashboard() {
 		}
 	}
 
-	// -- Demo / Test Request Trigger ------------------------------------------
-	const handleSimulateRequest = () => {
-		const freshRequest: SoftReviewRequestData = {
-			...MOCK_SOFT_REQUEST,
-			expiresAt: Date.now() + 30 * 1000,
-		}
-		setIncomingRequest(freshRequest)
-		setRequestStep('request_card')
-	}
 
 	// -- Helper Sub-Components for Section Rendering --------------------------
 
@@ -820,26 +810,6 @@ export default function StaffAncillaryDashboard() {
 							{renderEarningsSection()}
 						</View>
 					</View>
-
-					{/* Demo / Test: Simulate Incoming Request Trigger (Tablet) */}
-					<TouchableOpacity
-						style={styles.demoTriggerButton}
-						onPress={handleSimulateRequest}
-						activeOpacity={0.85}
-					>
-						<View style={styles.demoTriggerIconBox}>
-							<Ionicons name="flash" size={16} color="#D97706" />
-						</View>
-						<View style={{ flex: 1 }}>
-							<AppTypography variant="body" style={styles.demoTriggerTitle}>
-								Simulate Incoming Request
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.demoTriggerSubtext}>
-								Demo only — triggers a sample on-demand care request
-							</AppTypography>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#D97706" />
-					</TouchableOpacity>
 				</View>
 			) : (
 				/* -- MOBILE RESPONSIVE 1-COLUMN COMPACT STACK ---------------- */
@@ -851,26 +821,6 @@ export default function StaffAncillaryDashboard() {
 					{renderTodaySection()}
 					{renderActiveCareSection()}
 					{renderEarningsSection()}
-
-					{/* Demo / Test: Simulate Incoming Request Trigger */}
-					<TouchableOpacity
-						style={styles.demoTriggerButton}
-						onPress={handleSimulateRequest}
-						activeOpacity={0.85}
-					>
-						<View style={styles.demoTriggerIconBox}>
-							<Ionicons name="flash" size={16} color="#D97706" />
-						</View>
-						<View style={{ flex: 1 }}>
-							<AppTypography variant="body" style={styles.demoTriggerTitle}>
-								Simulate Incoming Request
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.demoTriggerSubtext}>
-								Demo only — triggers a sample on-demand care request
-							</AppTypography>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#D97706" />
-					</TouchableOpacity>
 				</View>
 			)}
 
@@ -1356,38 +1306,4 @@ const styles = StyleSheet.create({
 		gap: 2,
 	},
 
-	/* Demo / Test Trigger Button */
-	demoTriggerButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#FFFBEB',
-		borderColor: '#FDE68A',
-		borderWidth: 1,
-		borderRadius: 12,
-		borderStyle: 'dashed',
-		paddingHorizontal: 14,
-		paddingVertical: 10,
-		gap: 10,
-	},
-	demoTriggerIconBox: {
-		width: 34,
-		height: 34,
-		borderRadius: 10,
-		backgroundColor: '#FEF3C7',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	demoTriggerTitle: {
-		fontSize: 13.5,
-		fontWeight: '700',
-		color: '#92400E',
-		lineHeight: 18,
-	},
-	demoTriggerSubtext: {
-		fontSize: 11,
-		color: '#B45309',
-		fontWeight: '500',
-		lineHeight: 15,
-	},
 })
-

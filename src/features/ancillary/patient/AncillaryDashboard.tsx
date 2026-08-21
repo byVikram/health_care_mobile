@@ -280,6 +280,7 @@ export default function AncillaryDashboard() {
 						backgroundColor: '#E0F2FE',
 						borderRadius: 14,
 						padding: 14,
+						marginHorizontal: 16,
 						marginBottom: 16,
 						borderWidth: 1,
 						borderColor: '#38BDF8',
@@ -350,45 +351,8 @@ export default function AncillaryDashboard() {
 				))}
 			</ScrollView>
 
-			{/* Popular Near You */}
-			<View style={styles.sectionHeaderRow}>
-				<Text style={styles.sectionTitle}>Popular Near You</Text>
-				<TouchableOpacity>
-					<Text style={styles.seeAllText}>See All</Text>
-				</TouchableOpacity>
-			</View>
-			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularScroll}>
-				{POPULAR_SERVICES.map((item) => (
-					<View key={item.id} style={styles.popularCard}>
-						<View style={styles.popularImageContainer}>
-							<Image source={{ uri: item.image }} style={styles.popularImg} />
-							<View style={styles.popularIconBadge}>
-								<MaterialCommunityIcons name={item.iconName} size={16} color="#2B6F71" />
-							</View>
-						</View>
-						<View style={styles.popularContent}>
-							<Text style={styles.popularTitle} numberOfLines={1}>{item.title}</Text>
-							<View style={styles.ratingRow}>
-								<Ionicons name="star" size={14} color="#F59E0B" />
-								<Text style={styles.ratingNum}>{item.rating}</Text>
-								<Text style={styles.reviewsText}> ({item.reviews} reviews)</Text>
-							</View>
-							<View style={styles.cardFooter}>
-								<View>
-									<Text style={styles.startsAtLabel}>Starts at</Text>
-									<Text style={styles.startsAtPrice}>{item.price}</Text>
-								</View>
-								<TouchableOpacity style={styles.cardBookBtn} onPress={() => handlePopularBook(item)}>
-									<Text style={styles.cardBookBtnText}>Book</Text>
-								</TouchableOpacity>
-							</View>
-						</View>
-					</View>
-				))}
-			</ScrollView>
-
-			{/* Based on Your Needs (Symptom-based) */}
-			<Text style={styles.sectionTitle}>Based on Your Needs</Text>
+			{/* Recommended For You */}
+			<Text style={styles.sectionTitle}>Recommended For You</Text>
 			<View style={styles.needsGrid}>
 				{NEEDS.map((item, idx) => (
 					<TouchableOpacity
@@ -457,12 +421,12 @@ export default function AncillaryDashboard() {
 							<View style={styles.nurseAssignedRow}>
 								<Image
 									source={{ uri: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120' }}
-									style={styles.nurseAvatarCircle}
+									// style={styles.nurseAvatarCircle}
 								/>
-								<View style={styles.nurseInfoCol}>
+								{/* <View style={styles.nurseInfoCol}>
 									<Text style={styles.nurseNameText}>Anita Sharma</Text>
 									<Text style={styles.nurseRoleText}>Registered Nurse</Text>
-								</View>
+								</View> */}
 							</View>
 						</View>
 						<View style={styles.packageIconCircle}>
@@ -567,7 +531,7 @@ const styles = StyleSheet.create({
 	},
 	content: {
 		paddingTop: 16,
-		paddingBottom: 24,
+		paddingBottom: 12,
 	},
 	scrollContentTablet: {
 		maxWidth: 1200,
@@ -986,7 +950,7 @@ const styles = StyleSheet.create({
 	packagesContainer: {
 		paddingHorizontal: 16,
 		gap: 12,
-		marginBottom: 24,
+		marginBottom: 8,
 	},
 	packagesContainerTablet: {
 		flexDirection: 'row',
