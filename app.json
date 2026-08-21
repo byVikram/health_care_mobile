@@ -67,7 +67,15 @@
           "locationWhenInUsePermission": "Allow KarolaHealth to access your location to help patients find you."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "useCkeartedworks": true
+          }
+        }
+      ]
     ],
     "assetBundlePatterns": [
       "**/*"
