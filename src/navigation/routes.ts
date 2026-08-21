@@ -72,6 +72,7 @@ export const ROUTES = {
 		NURSE_SERVICE_IN_PROGRESS: 'NurseServiceInProgress',
 		NURSE_COMPLETE_SERVICE: 'NurseCompleteService',
 		NURSE_TODAY_OVERVIEW: 'NurseTodayOverviewPage',
+		NURSE_BOOKING_HISTORY: 'NurseBookingHistoryPage',
 		NURSE_VISITS: 'NurseVisitsPage',
 		NURSE_EARNINGS: 'NurseEarningsPage',
 		NURSE_HISTORY: 'NurseHistoryPage',
@@ -87,6 +88,7 @@ export const ROUTES = {
 		ANCILLARY_BOOKING_STATUS: 'AncillaryBookingStatus',
 		ANCILLARY_TRACK_APPOINTMENT: 'AncillaryTrackAppointment',
 		ANCILLARY_MY_BOOKINGS: 'AncillaryMyBookings',
+		ANCILLARY_SERVICE_MATCHING: 'AncillaryServiceMatching',
 		LOCATION_SELECT: 'LocationSelect',
 	},
 } as const

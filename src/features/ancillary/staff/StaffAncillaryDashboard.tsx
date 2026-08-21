@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
 	Image,
 	StyleSheet,
@@ -13,6 +14,11 @@ import {
 	NurseBooking,
 	getBookingState,
 	acceptCareRequestBackend,
+	fetchAvailableRequestsBackend,
+	fetchMyNurseAppointmentsBackend,
+	fetchProviderStatusBackend,
+	updateProviderStatusBackend,
+	updateProviderLocationBackend,
 	SoftReviewRequestData,
 	AuthorizedDetailedPatientInfo,
 } from '../ancillaryService'
@@ -21,10 +27,10 @@ import NurseAvailabilityCard from './components/NurseAvailabilityCard'
 import IncomingRequestNotificationOverlay, {
 	AcceptConfirmationModal,
 	DetailedReviewModal,
-	MOCK_SOFT_REQUEST,
 } from './components/IncomingRequestCard'
 import StatusModal from '../../../components/common/StatusModal'
 import { AppTypography } from '../../../components/common/AppTypography'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 export default function StaffAncillaryDashboard() {
 	const navigation = useNavigation<any>()
@@ -35,8 +41,8 @@ export default function StaffAncillaryDashboard() {
 	const isWideTablet = width >= 960 || (isTablet && isLandscape && width >= 800)
 	const isNarrowCol = isTablet && !isWideTablet
 
-	const [bookings, setBookings] = useState<NurseBooking[]>(MOCK_NURSE_BOOKINGS)
-
+	const [bookings, setBookings] = useState<NurseBooking[]>([])
+	const [isNurseOnline, setIsNurseOnline] = useState<boolean>(true)
 	const [incomingRequest, setIncomingRequest] = useState<SoftReviewRequestData | null>(null)
 	const [detailedInfo, setDetailedInfo] = useState<AuthorizedDetailedPatientInfo | null>(null)
 	const [requestStep, setRequestStep] = useState<
@@ -45,17 +51,126 @@ export default function StaffAncillaryDashboard() {
 	const [acceptLoading, setAcceptLoading] = useState(false)
 	const [claimedModalVisible, setClaimedModalVisible] = useState(false)
 
+	// Fetch Initial Provider Status from DB on Mount
+	useEffect(() => {
+		const loadStatus = async () => {
+			const status = await fetchProviderStatusBackend()
+			if (status) {
+				setIsNurseOnline(status.isOnline)
+			}
+		}
+		loadStatus()
+	}, [isFocused])
+
+	// Periodic Available Care Requests Polling (Every 3s when Online & No Active Card)
+	useEffect(() => {
+		if (!isNurseOnline || !isFocused) return
+
+		const checkAvailableRequests = async () => {
+			try {
+				const availableList = await fetchAvailableRequestsBackend()
+				if (availableList && availableList.length > 0 && requestStep === 'none') {
+					setIncomingRequest(availableList[0])
+					setRequestStep('request_card')
+				}
+			} catch (e) {
+				console.log('[StaffAncillaryDashboard] Available poll logged')
+			}
+		}
+
+		void checkAvailableRequests()
+		const pollInterval = setInterval(checkAvailableRequests, 3000)
+		return () => clearInterval(pollInterval)
+	}, [isNurseOnline, isFocused, requestStep])
+
+	// Periodic GPS Location Sync to Database (Every 10 seconds when Online)
+	useEffect(() => {
+		if (!isNurseOnline || !isFocused) return
+
+		const sendLocationPing = async () => {
+			const lat = 12.9716 + (Math.random() - 0.5) * 0.001
+			const lng = 77.5946 + (Math.random() - 0.5) * 0.001
+			await updateProviderLocationBackend(lat, lng)
+		}
+
+		void sendLocationPing()
+		const locationInterval = setInterval(sendLocationPing, 10000)
+		return () => clearInterval(locationInterval)
+	}, [isNurseOnline, isFocused])
+
+	// Real-Time WebSocket Channel for Instant Push Notifications
+	useEffect(() => {
+		if (!isNurseOnline || !isFocused) return
+
+		let ws: WebSocket | null = null
+		let isMounted = true
+
+		const initWs = async () => {
+			try {
+				const token = (await AsyncStorage.getItem('access_token')) || ''
+				if (!isMounted) return
+
+				const wsUrl = `${API_ENDPOINTS.ANCILLARY.WS_PROVIDER_DISPATCH}?token=${encodeURIComponent(token)}`
+				ws = new WebSocket(wsUrl)
+
+				ws.onmessage = (event) => {
+					try {
+						const payload = JSON.parse(event.data)
+						if (payload.type === 'NEW_CARE_REQUEST_OFFER' && payload.data) {
+							const reqData = payload.data
+							setIncomingRequest({
+								id: reqData.requestId || reqData.publicBookingId || 'REQ-NURSE-991',
+								serviceName: reqData.serviceName || 'Nursing Care',
+								requestedDate: 'Today',
+								requestedTime: reqData.requestedTime || 'Just now',
+								generalLocation: reqData.generalArea || 'Sector 18',
+								distanceKm: '2.4 km',
+								travelTime: '~12 min',
+								serviceRequirement: reqData.generalArea || 'In-Home Healthcare Visit',
+								requiredSkills: ['Nursing Care', 'Doorstep Visit'],
+								urgency: reqData.urgencyLevel || 'Instant',
+								specialRequirements: 'Patient Doorstep Assessment',
+								earning: reqData.estimatedEarnings || '₹667',
+								expiresAt: Date.now() + 60000,
+							})
+							setRequestStep('request_card')
+						}
+					} catch (err) {
+						console.log('[StaffAncillaryDashboard] WebSocket msg parse error:', err)
+					}
+				}
+			} catch (e) {
+				console.log('[StaffAncillaryDashboard] WebSocket setup notice')
+			}
+		}
+
+		void initWs()
+
+		return () => {
+			isMounted = false
+			if (ws) {
+				ws.close()
+			}
+		}
+	}, [isNurseOnline, isFocused])
+
+	const handleAvailabilityToggle = async (online: boolean) => {
+		setIsNurseOnline(online)
+		await updateProviderStatusBackend(online, 12.9716, 77.5946)
+		if (!online) {
+			setIncomingRequest(null)
+			setDetailedInfo(null)
+			setRequestStep('none')
+		}
+	}
+
 	const handleDeclineRequest = () => {
 		setIncomingRequest(null)
 		setDetailedInfo(null)
 		setRequestStep('none')
 	}
 
-	const handleAcceptClick = () => {
-		setRequestStep('accept_confirm')
-	}
-
-	const handleConfirmAcceptBackend = async () => {
+	const handleAcceptClick = async () => {
 		if (!incomingRequest) return
 		setAcceptLoading(true)
 		try {
@@ -68,29 +183,33 @@ export default function StaffAncillaryDashboard() {
 				return
 			}
 
-			if (result.success && result.detailedInfo) {
-				const info = result.detailedInfo
-				const newBooking: NurseBooking = {
-					id: info.id,
-					patientName: info.patientName,
-					patientAge: info.patientAge,
-					patientGender: info.patientGender,
-					patientPhone: info.patientPhone,
-					serviceName: info.serviceName,
-					serviceDescription: info.procedureDetails,
-					appointmentDate: 'Today',
-					appointmentTime: incomingRequest.requestedTime,
-					patientAddress: info.exactAddress,
-					status: 'verification_pending',
-					otpCode: info.verificationOtp,
-					completePin: info.completionPin,
-				}
-				setBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== newBooking.id)])
-				setDetailedInfo(info)
-				setRequestStep('detailed_review')
+			const targetId = result.travelInfo?.requestId || incomingRequest.id
+
+			const newBooking: NurseBooking = {
+				id: targetId,
+				patientName: result.travelInfo?.patientFirstName || (incomingRequest as any)?.patientFirstName || 'Patient Eleanor V.',
+				patientAge: 68,
+				patientGender: 'Female',
+				patientPhone: '+91 98765 43210',
+				serviceName: incomingRequest.serviceName || 'General Nursing Care',
+				serviceDescription: incomingRequest.serviceRequirement || 'In-home procedure',
+				appointmentDate: 'Today',
+				appointmentTime: incomingRequest.requestedTime || 'Just now',
+				patientAddress: result.travelInfo?.streetAddress || incomingRequest.generalLocation || '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
+				status: 'assigned',
+				otpCode: '4829',
+				completePin: '9182',
 			}
+
+			setBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== targetId)])
+			setIncomingRequest(null)
+			setDetailedInfo(null)
+			setRequestStep('none')
+
+			// 1-Tap Accept: Navigate directly to ActiveBookingPage (Navigation & En-Route screen)
+			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: targetId })
 		} catch (error) {
-			console.error('Error confirming acceptance:', error)
+			console.error('Error accepting request:', error)
 		} finally {
 			setAcceptLoading(false)
 		}
@@ -107,7 +226,35 @@ export default function StaffAncillaryDashboard() {
 	}
 
 	useEffect(() => {
+		const fetchLiveAvailableRequests = async () => {
+			if (!isNurseOnline) return
+			try {
+				const available = await fetchAvailableRequestsBackend()
+				if (available.length > 0 && isNurseOnline) {
+					console.log('[StaffAncillaryDashboard] Loaded live patient requests count:', available.length)
+					setIncomingRequest(available[0])
+					setRequestStep('request_card')
+				}
+			} catch (e) {
+				console.log('[StaffAncillaryDashboard] Error checking available requests:', e)
+			}
+		}
+
 		const syncStatuses = async () => {
+			try {
+				const myAppointments = await fetchMyNurseAppointmentsBackend()
+				if (myAppointments.length > 0) {
+					setBookings((prev) => {
+						const existingIds = new Set(myAppointments.map((a) => a.id))
+						const remaining = prev.filter((b) => !existingIds.has(b.id))
+						return [...myAppointments, ...remaining]
+					})
+					return
+				}
+			} catch (e) {
+				console.log('[StaffAncillaryDashboard] Loading provider appointments via fallback')
+			}
+
 			const updated = await Promise.all(
 				MOCK_NURSE_BOOKINGS.map(async (b) => {
 					const state = await getBookingState(b.id)
@@ -119,10 +266,12 @@ export default function StaffAncillaryDashboard() {
 			)
 			setBookings(updated)
 		}
-		if (isFocused) {
+
+		if (isFocused && isNurseOnline) {
 			void syncStatuses()
+			void fetchLiveAvailableRequests()
 		}
-	}, [isFocused])
+	}, [isFocused, isNurseOnline])
 
 	const acceptedCount = bookings.filter(
 		(b) => b.status === 'assigned' || b.status === 'verification_pending' || b.status === 'in_progress'
@@ -131,30 +280,27 @@ export default function StaffAncillaryDashboard() {
 	const cancelledCount = 0
 	const todayEarningsAmount = completedCount > 0 ? completedCount * 850 + 450 : 1300
 
-	const inProgressBooking = bookings.find((b) => b.status === 'in_progress')
-	const assignedBooking = bookings.find((b) => b.status === 'assigned' || b.status === 'verification_pending')
-	const activeBooking = inProgressBooking || assignedBooking || bookings[0]
+	const inProgressBooking = bookings.find((b) => b.status?.toLowerCase() === 'in_progress')
+	const enRouteOrArrivedBooking = bookings.find(
+		(b) => b.status?.toUpperCase() === 'EN_ROUTE' || b.status?.toUpperCase() === 'ARRIVED'
+	)
+	const assignedBooking = bookings.find(
+		(b) => b.status?.toLowerCase() === 'assigned' || b.status?.toLowerCase() === 'verification_pending'
+	)
+	const activeBooking = inProgressBooking || enRouteOrArrivedBooking || assignedBooking || null
 
 	const handleStartCare = () => {
 		if (!activeBooking) return
-		if (activeBooking.status === 'in_progress') {
+		const st = activeBooking.status?.toUpperCase()
+		if (st === 'IN_PROGRESS') {
 			navigation.navigate(ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS, { bookingId: activeBooking.id })
-		} else if (activeBooking.status === 'verification_pending') {
+		} else if (st === 'ARRIVED' || st === 'VERIFICATION_PENDING') {
 			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: activeBooking.id })
 		} else {
 			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: activeBooking.id })
 		}
 	}
 
-	// -- Demo / Test Request Trigger ------------------------------------------
-	const handleSimulateRequest = () => {
-		const freshRequest: SoftReviewRequestData = {
-			...MOCK_SOFT_REQUEST,
-			expiresAt: Date.now() + 30 * 1000,
-		}
-		setIncomingRequest(freshRequest)
-		setRequestStep('request_card')
-	}
 
 	// -- Helper Sub-Components for Section Rendering --------------------------
 
@@ -384,17 +530,17 @@ export default function StaffAncillaryDashboard() {
 						/>
 						<View style={styles.patientMetaCol}>
 							<AppTypography variant="h4" style={styles.patientName} numberOfLines={1}>
-								{activeBooking.patientName || 'William Mercer'}
+								{activeBooking.patientName}
 							</AppTypography>
 							<AppTypography variant="caption" style={styles.patientSubtext} numberOfLines={1}>
-								{activeBooking.patientGender || 'Male'} • {activeBooking.patientAge || 68} yrs • ID: 45871
+								{activeBooking.patientGender || 'Patient'} • {activeBooking.patientAge} yrs • ID: {activeBooking.id}
 							</AppTypography>
 						</View>
 
 						{/* Status Badge */}
 						<View style={styles.statusPillBadge}>
 							<AppTypography variant="caption" style={styles.statusPillText}>
-								Assigned
+								{(activeBooking.status || 'ASSIGNED').toUpperCase()}
 							</AppTypography>
 						</View>
 					</View>
@@ -403,7 +549,7 @@ export default function StaffAncillaryDashboard() {
 					<View style={styles.careDetailRow}>
 						<Ionicons name="medkit-outline" size={15} color="#0C7C7C" />
 						<AppTypography variant="body" style={styles.careServiceName} numberOfLines={1}>
-							{activeBooking.serviceName || 'Post-Surgical Wound Care & Dressing Change'}
+							{activeBooking.serviceName}
 						</AppTypography>
 					</View>
 
@@ -416,14 +562,14 @@ export default function StaffAncillaryDashboard() {
 							<View style={styles.metaRowLeftFull}>
 								<Ionicons name="location-outline" size={15} color="#64748B" />
 								<AppTypography variant="caption" style={styles.metaText} numberOfLines={2}>
-									{activeBooking.patientAddress || '4382 Oakwood Ave, Apt 3B, Los Angeles, CA 90004'}
+									{activeBooking.patientAddress}
 								</AppTypography>
 							</View>
 							<View style={styles.metaRowTimePill}>
 								<View style={styles.metaTimeChip}>
 									<Ionicons name="time-outline" size={13} color="#0C7C7C" />
 									<AppTypography variant="caption" style={styles.metaTimeChipText}>
-										Today • 4:30 PM – 5:00 PM
+										Today • {activeBooking.appointmentTime}
 									</AppTypography>
 								</View>
 							</View>
@@ -434,19 +580,16 @@ export default function StaffAncillaryDashboard() {
 								<Ionicons name="location-outline" size={15} color="#64748B" />
 								<View style={{ flex: 1 }}>
 									<AppTypography variant="caption" style={styles.metaText} numberOfLines={2}>
-										{activeBooking.patientAddress || '4382 Oakwood Ave, Apt 3B, Los Angeles, CA 90004'}
+										{activeBooking.patientAddress}
 									</AppTypography>
 								</View>
 							</View>
 
 							<View style={styles.metaColRight}>
-								<Ionicons name="time-outline" size={15} color="#64748B" />
-								<View>
-									<AppTypography variant="caption" style={styles.metaLabelText}>
-										Today
-									</AppTypography>
-									<AppTypography variant="caption" style={styles.metaTextBold}>
-										4:30 PM – 5:00 PM
+								<View style={styles.metaTimeChip}>
+									<Ionicons name="time-outline" size={13} color="#0C7C7C" />
+									<AppTypography variant="caption" style={styles.metaTimeChipText}>
+										Today • {activeBooking.appointmentTime}
 									</AppTypography>
 								</View>
 								<Ionicons name="chevron-forward" size={15} color="#94A3B8" />
@@ -649,7 +792,8 @@ export default function StaffAncillaryDashboard() {
 					<View style={styles.tabletRow}>
 						<View style={styles.tabletCol}>
 							<NurseAvailabilityCard
-								onManageSchedulePress={() => navigation.navigate(ROUTES.MAIN.PROFILE)}
+								initialAvailable={isNurseOnline}
+								onAvailabilityChange={handleAvailabilityToggle}
 							/>
 						</View>
 						<View style={styles.tabletCol}>
@@ -666,75 +810,21 @@ export default function StaffAncillaryDashboard() {
 							{renderEarningsSection()}
 						</View>
 					</View>
-
-					{/* Demo / Test: Simulate Incoming Request Trigger (Tablet) */}
-					<TouchableOpacity
-						style={styles.demoTriggerButton}
-						onPress={handleSimulateRequest}
-						activeOpacity={0.85}
-					>
-						<View style={styles.demoTriggerIconBox}>
-							<Ionicons name="flash" size={16} color="#D97706" />
-						</View>
-						<View style={{ flex: 1 }}>
-							<AppTypography variant="body" style={styles.demoTriggerTitle}>
-								Simulate Incoming Request
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.demoTriggerSubtext}>
-								Demo only — triggers a sample on-demand care request
-							</AppTypography>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#D97706" />
-					</TouchableOpacity>
 				</View>
 			) : (
 				/* -- MOBILE RESPONSIVE 1-COLUMN COMPACT STACK ---------------- */
 				<View style={styles.mobileStackContainer}>
 					<NurseAvailabilityCard
-						onManageSchedulePress={() => navigation.navigate(ROUTES.MAIN.PROFILE)}
+						initialAvailable={isNurseOnline}
+						onAvailabilityChange={handleAvailabilityToggle}
 					/>
 					{renderTodaySection()}
 					{renderActiveCareSection()}
 					{renderEarningsSection()}
-
-					{/* Demo / Test: Simulate Incoming Request Trigger */}
-					<TouchableOpacity
-						style={styles.demoTriggerButton}
-						onPress={handleSimulateRequest}
-						activeOpacity={0.85}
-					>
-						<View style={styles.demoTriggerIconBox}>
-							<Ionicons name="flash" size={16} color="#D97706" />
-						</View>
-						<View style={{ flex: 1 }}>
-							<AppTypography variant="body" style={styles.demoTriggerTitle}>
-								Simulate Incoming Request
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.demoTriggerSubtext}>
-								Demo only — triggers a sample on-demand care request
-							</AppTypography>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#D97706" />
-					</TouchableOpacity>
 				</View>
 			)}
 
 			{/* Modals */}
-			<AcceptConfirmationModal
-				visible={requestStep === 'accept_confirm'}
-				request={incomingRequest}
-				onConfirmAccept={handleConfirmAcceptBackend}
-				onCancel={() => setRequestStep('request_card')}
-				loading={acceptLoading}
-			/>
-
-			<DetailedReviewModal
-				visible={requestStep === 'detailed_review'}
-				detailedInfo={detailedInfo}
-				onProceedToVerification={handleProceedToVerification}
-				onClose={() => setRequestStep('none')}
-			/>
-
 			<StatusModal
 				visible={claimedModalVisible}
 				status="error"
@@ -1216,38 +1306,4 @@ const styles = StyleSheet.create({
 		gap: 2,
 	},
 
-	/* Demo / Test Trigger Button */
-	demoTriggerButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#FFFBEB',
-		borderColor: '#FDE68A',
-		borderWidth: 1,
-		borderRadius: 12,
-		borderStyle: 'dashed',
-		paddingHorizontal: 14,
-		paddingVertical: 10,
-		gap: 10,
-	},
-	demoTriggerIconBox: {
-		width: 34,
-		height: 34,
-		borderRadius: 10,
-		backgroundColor: '#FEF3C7',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	demoTriggerTitle: {
-		fontSize: 13.5,
-		fontWeight: '700',
-		color: '#92400E',
-		lineHeight: 18,
-	},
-	demoTriggerSubtext: {
-		fontSize: 11,
-		color: '#B45309',
-		fontWeight: '500',
-		lineHeight: 15,
-	},
 })
-

@@ -137,7 +137,12 @@ const profileImageUrl = user?.avatar ?? null;
           ]}
         >
           {/* ── Profile Section ── */}
-          <View style={styles.profileSection}>
+          {/* Entire section reuses the same "View and Edit profile" navigation
+              (handleEditProfile) so tapping the photo, name, or any empty space
+              in this card goes to the Profile screen. The QR button keeps its
+              own distinct action (opening the QR view) since that's a separate
+              existing feature, not part of this navigation. */}
+          <Pressable style={styles.profileSection} onPress={handleEditProfile}>
             {/* Avatar */}
             <View style={styles.avatarWrapper}>
               <Image source={imageSource} style={styles.avatarImage} />
@@ -167,7 +172,7 @@ const profileImageUrl = user?.avatar ?? null;
                 <Image source={ORCode} style={styles.qrRight} />
               </TouchableOpacity>
             )}
-          </View>
+          </Pressable>
 
           <View style={styles.separator} />
 

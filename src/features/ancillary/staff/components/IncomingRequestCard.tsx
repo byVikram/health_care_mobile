@@ -595,7 +595,7 @@ export function DetailedReviewModal({
 					{/* Required Documents */}
 					<Text style={styles.detailedLabel}>Required Documents</Text>
 					<View style={styles.skillsTagWrap}>
-						{detailedInfo.requiredDocuments.map((doc, i) => (
+						{detailedInfo.requiredDocuments.map((doc: string, i: number) => (
 							<View key={i} style={styles.docChip}>
 								<Ionicons name="document-attach" size={13} color="#2563EB" />
 								<Text style={styles.docChipText}>{doc}</Text>

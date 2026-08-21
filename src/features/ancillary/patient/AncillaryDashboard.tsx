@@ -10,9 +10,12 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
+import ApiService from '../../../services/apiService'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
+import { fetchPatientActiveRequestBackend, AncillaryBooking } from '../ancillaryService'
 
 interface ServiceItem {
 	key: string
@@ -196,8 +199,27 @@ const TOP_PROFESSIONALS: ProfessionalItem[] = [
 
 export default function AncillaryDashboard() {
 	const navigation = useNavigation<any>()
+	const isFocused = useIsFocused()
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
+	const gridCardWidth = (width - 48 - 12) / 2
+
+	const [activeBooking, setActiveBooking] = useState<AncillaryBooking | null>(null)
+
+	React.useEffect(() => {
+		const loadActiveRequest = async () => {
+			try {
+				const active = await fetchPatientActiveRequestBackend()
+				setActiveBooking(active)
+			} catch (err) {
+				console.log('[AncillaryDashboard] Error loading active booking')
+			}
+		}
+
+		if (isFocused) {
+			void loadActiveRequest()
+		}
+	}, [isFocused])
 
 	const [searchQuery, setSearchQuery] = useState('')
 
@@ -251,6 +273,42 @@ export default function AncillaryDashboard() {
 			]}
 			showsVerticalScrollIndicator={false}
 		>
+			{/* Active Care Visit Tracker Card */}
+			{activeBooking && (
+				<TouchableOpacity
+					style={{
+						backgroundColor: '#E0F2FE',
+						borderRadius: 14,
+						padding: 14,
+						marginHorizontal: 16,
+						marginBottom: 16,
+						borderWidth: 1,
+						borderColor: '#38BDF8',
+					}}
+					onPress={() => navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: activeBooking.id, status: activeBooking.status })}
+					activeOpacity={0.88}
+				>
+					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+						<View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#0284C7', justifyContent: 'center', alignItems: 'center' }}>
+							<Ionicons name="pulse" size={22} color="#FFFFFF" />
+						</View>
+						<View style={{ flex: 1 }}>
+							<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+								<Text style={{ fontSize: 15, fontWeight: '700', color: '#0369A1' }}>Active Nurse Visit</Text>
+								<View style={{ backgroundColor: '#0284C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+									<Text style={{ fontSize: 10, fontWeight: '700', color: '#FFFFFF' }}>
+										{(activeBooking.status as string) === 'SEARCHING' ? 'SEARCHING FOR NURSE' : activeBooking.status}
+									</Text>
+								</View>
+							</View>
+							<Text style={{ fontSize: 12, color: '#0284C7', marginTop: 2 }} numberOfLines={1}>
+								{activeBooking.serviceName} • Tap to view tracking & details
+							</Text>
+						</View>
+						<Ionicons name="chevron-forward" size={20} color="#0284C7" />
+					</View>
+				</TouchableOpacity>
+			)}
 
 			{/* Promotional Banner */}
 			<ImageBackground
@@ -293,45 +351,8 @@ export default function AncillaryDashboard() {
 				))}
 			</ScrollView>
 
-			{/* Popular Near You */}
-			<View style={styles.sectionHeaderRow}>
-				<Text style={styles.sectionTitle}>Popular Near You</Text>
-				<TouchableOpacity>
-					<Text style={styles.seeAllText}>See All</Text>
-				</TouchableOpacity>
-			</View>
-			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularScroll}>
-				{POPULAR_SERVICES.map((item) => (
-					<View key={item.id} style={styles.popularCard}>
-						<View style={styles.popularImageContainer}>
-							<Image source={{ uri: item.image }} style={styles.popularImg} />
-							<View style={styles.popularIconBadge}>
-								<MaterialCommunityIcons name={item.iconName} size={16} color="#2B6F71" />
-							</View>
-						</View>
-						<View style={styles.popularContent}>
-							<Text style={styles.popularTitle} numberOfLines={1}>{item.title}</Text>
-							<View style={styles.ratingRow}>
-								<Ionicons name="star" size={14} color="#F59E0B" />
-								<Text style={styles.ratingNum}>{item.rating}</Text>
-								<Text style={styles.reviewsText}> ({item.reviews} reviews)</Text>
-							</View>
-							<View style={styles.cardFooter}>
-								<View>
-									<Text style={styles.startsAtLabel}>Starts at</Text>
-									<Text style={styles.startsAtPrice}>{item.price}</Text>
-								</View>
-								<TouchableOpacity style={styles.cardBookBtn} onPress={() => handlePopularBook(item)}>
-									<Text style={styles.cardBookBtnText}>Book</Text>
-								</TouchableOpacity>
-							</View>
-						</View>
-					</View>
-				))}
-			</ScrollView>
-
-			{/* Based on Your Needs (Symptom-based) */}
-			<Text style={styles.sectionTitle}>Based on Your Needs</Text>
+			{/* Recommended For You */}
+			<Text style={styles.sectionTitle}>Recommended For You</Text>
 			<View style={styles.needsGrid}>
 				{NEEDS.map((item, idx) => (
 					<TouchableOpacity
@@ -400,12 +421,12 @@ export default function AncillaryDashboard() {
 							<View style={styles.nurseAssignedRow}>
 								<Image
 									source={{ uri: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120' }}
-									style={styles.nurseAvatarCircle}
+									// style={styles.nurseAvatarCircle}
 								/>
-								<View style={styles.nurseInfoCol}>
+								{/* <View style={styles.nurseInfoCol}>
 									<Text style={styles.nurseNameText}>Anita Sharma</Text>
 									<Text style={styles.nurseRoleText}>Registered Nurse</Text>
-								</View>
+								</View> */}
 							</View>
 						</View>
 						<View style={styles.packageIconCircle}>
@@ -510,7 +531,7 @@ const styles = StyleSheet.create({
 	},
 	content: {
 		paddingTop: 16,
-		paddingBottom: 24,
+		paddingBottom: 12,
 	},
 	scrollContentTablet: {
 		maxWidth: 1200,
@@ -929,7 +950,7 @@ const styles = StyleSheet.create({
 	packagesContainer: {
 		paddingHorizontal: 16,
 		gap: 12,
-		marginBottom: 24,
+		marginBottom: 8,
 	},
 	packagesContainerTablet: {
 		flexDirection: 'row',

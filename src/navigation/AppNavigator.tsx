@@ -61,6 +61,7 @@ import PatientVerificationPage from '../features/ancillary/staff/PatientVerifica
 import ServiceInProgressPage from '../features/ancillary/staff/ServiceInProgressPage'
 import CompleteServicePage from '../features/ancillary/staff/CompleteServicePage'
 import NurseTodayOverviewPage from '../features/ancillary/staff/NurseTodayOverviewPage'
+import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
 import NurseVisitsPage from '../features/ancillary/staff/NurseVisitsPage'
 import NurseEarningsPage from '../features/ancillary/staff/NurseEarningsPage'
 import NurseHistoryPage from '../features/ancillary/staff/NurseHistoryPage'
@@ -75,6 +76,7 @@ import AncillaryConfirmationPage from '../features/ancillary/patient/AncillaryCo
 import AncillaryBookingStatusPage from '../features/ancillary/patient/AncillaryBookingStatusPage'
 import TrackAppointmentPage from '../features/ancillary/TrackAppointmentPage'
 import MyBookingsPage from '../features/ancillary/patient/MyBookingsPage'
+import ServiceMatchingPage from '../features/ancillary/patient/ServiceMatchingPage'
 
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
@@ -337,6 +339,11 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.ANCILLARY_MY_BOOKINGS}
 				component={MyBookingsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_SERVICE_MATCHING as keyof AppStackParamList}
+				component={ServiceMatchingPage}
 				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen

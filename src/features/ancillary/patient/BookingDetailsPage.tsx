@@ -11,7 +11,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { getPatientDetails } from '../../profile/patient/PatientProfileService'
+import { getPatientDetails, getPatientAddresses } from '../../../features/profile/patient/PatientProfileService'
 import { ROUTES } from '../../../navigation/routes'
 import {
 	AppBottomSheet,
@@ -104,9 +104,11 @@ export default function BookingDetailsPage() {
 
 	const routeParams = route.params || {}
 	const initialServices: ServiceProcedureItem[] =
-		routeParams.services && routeParams.services.length > 0
+		(routeParams.services && routeParams.services.length > 0)
 			? routeParams.services
-			: DEFAULT_MOCK_SERVICES
+			: (routeParams.selectedServices && routeParams.selectedServices.length > 0)
+				? routeParams.selectedServices
+				: (routeParams.service ? [routeParams.service] : DEFAULT_MOCK_SERVICES)
 
 	// 1. Multiple Selected Services State
 	const [services, setServices] = useState<ServiceProcedureItem[]>(initialServices)
@@ -121,7 +123,10 @@ export default function BookingDetailsPage() {
 		avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
 	})
 
-	// 3. Visit Details State
+	// 3. Booking Dispatch Mode State (INSTANT vs SCHEDULED)
+	const [bookingType, setBookingType] = useState<'INSTANT' | 'SCHEDULED'>('INSTANT')
+
+	// 4. Visit Details State
 	const [visit, setVisit] = useState({
 		addressId: 'addr1',
 		addressLabel: 'Home',
@@ -129,7 +134,7 @@ export default function BookingDetailsPage() {
 		dateId: 'd1',
 		date: 'Today, 10 Aug 2025',
 		timeSlot: '09:00 AM - 10:00 AM',
-		timeBadge: 'In 2 hours',
+		timeBadge: 'Instant Dispatch (15-30 mins)',
 	})
 
 	// Edit Modal Visibility States
@@ -144,6 +149,10 @@ export default function BookingDetailsPage() {
 	const [tempPatientGender, setTempPatientGender] = useState(patient.gender)
 	const [tempPatientRel, setTempPatientRel] = useState(patient.relationship)
 
+	// Dynamic Saved Addresses State
+	const [savedAddressesList, setSavedAddressesList] = useState(SAVED_ADDRESSES)
+	const [addressOptions, setAddressOptions] = useState<AppSelectOption[]>(ADDRESS_SELECT_OPTIONS)
+
 	useEffect(() => {
 		const fetchProfile = async () => {
 			let loadedPatient = {
@@ -153,6 +162,35 @@ export default function BookingDetailsPage() {
 				bloodGroup: 'O+',
 				relationship: 'Self',
 				avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+			}
+
+			try {
+				const apiAddresses = await getPatientAddresses()
+				if (apiAddresses && apiAddresses.length > 0) {
+					const formattedList = apiAddresses.map((addr: any) => ({
+						id: String(addr.id),
+						label: addr.label || addr.title || 'Home',
+						address: addr.address_line ? `${addr.address_line}, ${addr.city || ''} ${addr.pincode || ''}` : `${addr.address_line_1 || ''}, ${addr.city || ''}`,
+						icon: (addr.label || addr.title || '').toLowerCase().includes('work') ? 'briefcase-outline' : 'home-outline',
+					}))
+					setSavedAddressesList(formattedList)
+
+					const selectOptions: AppSelectOption[] = formattedList.map((addr) => ({
+						label: `${addr.label} (${addr.address})`,
+						value: addr.id,
+					}))
+					setAddressOptions(selectOptions)
+
+					const firstAddr = formattedList[0]
+					setVisit((prev) => ({
+						...prev,
+						addressId: firstAddr.id,
+						addressLabel: firstAddr.label,
+						address: firstAddr.address,
+					}))
+				}
+			} catch (addrErr) {
+				console.log('[BookingDetailsPage] Saved addresses API notice:', addrErr)
 			}
 
 			try {
@@ -279,7 +317,7 @@ export default function BookingDetailsPage() {
 	const [selectedDateObj, setSelectedDateObj] = useState<Date>(new Date())
 
 	const handleSaveVisitDetails = (addressId: string, newDate: Date, timeSlot: string) => {
-		const selectedAddrObj = SAVED_ADDRESSES.find((a) => a.id === addressId)
+		const selectedAddrObj = savedAddressesList.find((a) => a.id === addressId) || SAVED_ADDRESSES.find((a) => a.id === addressId)
 		setSelectedDateObj(newDate)
 
 		const dayStr = `${newDate.getDate()} ${MONTH_NAMES[newDate.getMonth()]} ${newDate.getFullYear()}`
@@ -302,6 +340,7 @@ export default function BookingDetailsPage() {
 			patient,
 			visit,
 			charges,
+			bookingType,
 		}
 
 		navigation.navigate(ROUTES.STACK.ANCILLARY_PAYMENT, {
@@ -321,58 +360,55 @@ export default function BookingDetailsPage() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Progress Stepper */}
-				<BookingProgressStepper currentStep={2} style={styles.progressStepper} />
-
-				{/* 1. SECTION: SELECTED SERVICES */}
+				{/* 1. SECTION: SELECTED SERVICES SUMMARY */}
 				<View style={styles.sectionHeaderRow}>
 					<AppTypography variant="h3" style={styles.sectionHeading}>
-						Selected Services
+						Selected Procedures & Services ({services.length})
 					</AppTypography>
 					<TouchableOpacity style={styles.headerActionBtn} onPress={handleEditServices} activeOpacity={0.7}>
-						<MaterialCommunityIcons name="plus-circle-outline" size={16} color="#1F5F68" />
+						<MaterialCommunityIcons name="plus-circle-outline" size={15} color="#1F5F68" />
 						<AppTypography variant="caption" style={styles.actionBtnText}>
-							Add / Edit
+							Add / Change
 						</AppTypography>
 					</TouchableOpacity>
 				</View>
 
 				{services.length > 0 ? (
 					<View style={styles.servicesListContainer}>
-						{services.map((serviceItem, index) => (
-							<View key={serviceItem.id} style={styles.serviceItemFlat}>
+						{services.map((item, index) => (
+							<View key={item.id} style={styles.serviceItemFlat}>
 								{index > 0 && <View style={styles.itemDivider} />}
 								<View style={styles.serviceItemRow}>
-									<Image source={{ uri: serviceItem.image }} style={styles.serviceImage} resizeMode="cover" />
-
 									<View style={styles.serviceTextCol}>
 										<View style={styles.serviceTitleRow}>
 											<AppTypography variant="h4" style={styles.serviceTitle} numberOfLines={1}>
-												{serviceItem.title}
+												{item.title}
 											</AppTypography>
-											<TouchableOpacity
-												style={styles.removeBtn}
-												onPress={() => handleRemoveService(serviceItem.id)}
-												activeOpacity={0.7}
-											>
-												<Ionicons name="trash-outline" size={17} color="#D32F2F" />
-											</TouchableOpacity>
+											{services.length > 1 && (
+												<TouchableOpacity
+													style={styles.removeBtn}
+													onPress={() => handleRemoveService(item.id)}
+													activeOpacity={0.7}
+												>
+													<Ionicons name="trash-outline" size={17} color="#D32F2F" />
+												</TouchableOpacity>
+											)}
 										</View>
 										<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={2}>
-											{serviceItem.description}
+											{item.description}
 										</AppTypography>
 
 										<View style={styles.metaBadgeRow}>
 											<View style={styles.metaItem}>
 												<Ionicons name="time-outline" size={12} color="#526062" />
 												<AppTypography variant="caption" style={styles.metaText}>
-													{serviceItem.duration || '30 - 45 mins'}
+													{item.duration || '30-45 mins'}
 												</AppTypography>
 											</View>
 											<View style={styles.metaItem}>
-												<Ionicons name="home-outline" size={12} color="#526062" />
+												<Ionicons name="shield-checkmark" size={12} color="#1F5F68" />
 												<AppTypography variant="caption" style={styles.metaText}>
-													At Home
+													Verified Specialist
 												</AppTypography>
 											</View>
 										</View>
@@ -380,14 +416,8 @@ export default function BookingDetailsPage() {
 								</View>
 
 								<View style={styles.serviceFooterRow}>
-									<View style={styles.councilBadge}>
-										<Ionicons name="shield-checkmark" size={12} color="#1F5F68" />
-										<AppTypography variant="caption" style={styles.councilText}>
-											Recommended by Nursing Council
-										</AppTypography>
-									</View>
 									<AppTypography variant="h3" style={styles.priceVal}>
-										{serviceItem.price}
+										{item.price}
 									</AppTypography>
 								</View>
 							</View>
@@ -439,17 +469,71 @@ export default function BookingDetailsPage() {
 
 				<View style={styles.sectionDivider} />
 
-				{/* 3. SECTION: VISIT SCHEDULE & LOCATION */}
+				{/* 3. SECTION: VISIT DISPATCH TYPE & SCHEDULE */}
 				<View style={styles.sectionHeaderRow}>
 					<AppTypography variant="h3" style={styles.sectionHeading}>
-						Schedule & Location
+						Booking Mode & Schedule
 					</AppTypography>
-					<TouchableOpacity style={styles.headerActionBtn} onPress={() => setEditVisitVisible(true)} activeOpacity={0.7}>
-						<MaterialCommunityIcons name="pencil-outline" size={15} color="#1F5F68" />
+					<TouchableOpacity
+						style={styles.headerActionBtn}
+						onPress={() => setEditVisitVisible(true)}
+						activeOpacity={0.7}
+					>
+						<MaterialCommunityIcons
+							name={bookingType === 'INSTANT' ? 'map-marker-outline' : 'pencil-outline'}
+							size={15}
+							color="#1F5F68"
+						/>
 						<AppTypography variant="caption" style={styles.actionBtnText}>
-							Modify
+							{bookingType === 'INSTANT' ? 'Change Address' : 'Modify Schedule & Address'}
 						</AppTypography>
 					</TouchableOpacity>
+				</View>
+
+				{/* INTERACTIVE DISPATCH MODE TOGGLE SWITCHER */}
+				<View style={styles.dispatchToggleWrap}>
+					<TouchableOpacity
+						style={[styles.dispatchToggleTab, bookingType === 'INSTANT' && styles.dispatchToggleTabActive]}
+						onPress={() => {
+							setBookingType('INSTANT')
+							setVisit((prev) => ({ ...prev, timeBadge: 'Instant Dispatch (15-30 mins)' }))
+						}}
+						activeOpacity={0.88}
+					>
+						<Ionicons name="flash" size={16} color={bookingType === 'INSTANT' ? '#FFFFFF' : '#1F5F68'} />
+						<AppTypography variant="h4" style={[styles.dispatchToggleText, bookingType === 'INSTANT' && styles.dispatchToggleTextActive]}>
+							Instant Care
+						</AppTypography>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[styles.dispatchToggleTab, bookingType === 'SCHEDULED' && styles.dispatchToggleTabActive]}
+						onPress={() => {
+							setBookingType('SCHEDULED')
+							setVisit((prev) => ({ ...prev, timeBadge: 'Scheduled Appointment' }))
+							setEditVisitVisible(true)
+						}}
+						activeOpacity={0.88}
+					>
+						<Ionicons name="calendar" size={16} color={bookingType === 'SCHEDULED' ? '#FFFFFF' : '#1F5F68'} />
+						<AppTypography variant="h4" style={[styles.dispatchToggleText, bookingType === 'SCHEDULED' && styles.dispatchToggleTextActive]}>
+							Schedule Visit
+						</AppTypography>
+					</TouchableOpacity>
+				</View>
+
+				{/* DISPATCH MODE HELPER BANNER */}
+				<View style={[styles.dispatchHelperBanner, bookingType === 'INSTANT' ? styles.instantBannerBg : styles.scheduledBannerBg]}>
+					<Ionicons
+						name={bookingType === 'INSTANT' ? 'information-circle' : 'time'}
+						size={18}
+						color={bookingType === 'INSTANT' ? '#065F46' : '#1E40AF'}
+					/>
+					<AppTypography variant="caption" style={[styles.dispatchHelperText, bookingType === 'INSTANT' ? styles.instantHelperTextColor : styles.scheduledHelperTextColor]}>
+						{bookingType === 'INSTANT'
+							? '⚡ Instant Care Mode: Certified nurse nearby will be alerted immediately after booking.'
+							: '📅 Scheduled Care Mode: Nurse will be assigned & dispatched at your chosen date & time slot.'}
+					</AppTypography>
 				</View>
 
 				<View style={styles.visitSummaryBlock}>
@@ -468,6 +552,15 @@ export default function BookingDetailsPage() {
 										{visit.addressLabel}
 									</AppTypography>
 								</View>
+								<TouchableOpacity
+									style={styles.changeAddressLinkBtn}
+									onPress={() => setEditVisitVisible(true)}
+									activeOpacity={0.7}
+								>
+									<AppTypography variant="caption" style={styles.changeAddressLinkText}>
+										Change
+									</AppTypography>
+								</TouchableOpacity>
 							</View>
 							<AppTypography variant="caption" style={styles.visitDetailsVal}>
 								{visit.address}
@@ -480,15 +573,21 @@ export default function BookingDetailsPage() {
 					{/* Date & Time Row */}
 					<View style={styles.visitSummaryItem}>
 						<View style={styles.visitIconBox}>
-							<MaterialCommunityIcons name="calendar-clock" size={18} color="#1F5F68" />
+							<MaterialCommunityIcons
+								name={bookingType === 'INSTANT' ? 'lightning-bolt' : 'calendar-clock'}
+								size={18}
+								color="#1F5F68"
+							/>
 						</View>
 						<View style={styles.visitDetailsCol}>
 							<AppTypography variant="h4" style={styles.visitDetailsHeading}>
-								Preferred Date & Time Slot
+								{bookingType === 'INSTANT' ? 'Care Dispatch Arrival Window' : 'Preferred Date & Time Slot'}
 							</AppTypography>
 							<View style={styles.visitTimeValRow}>
 								<AppTypography variant="body" style={styles.visitTimeValText}>
-									{visit.date}  •  {visit.timeSlot}
+									{bookingType === 'INSTANT'
+										? 'Within 15 - 30 minutes of booking'
+										: `${visit.date}  •  ${visit.timeSlot}`}
 								</AppTypography>
 								<View style={styles.timeStatusBadge}>
 									<AppTypography variant="caption" style={styles.timeStatusText}>
@@ -503,73 +602,66 @@ export default function BookingDetailsPage() {
 				<View style={styles.sectionDivider} />
 
 				{/* 4. SECTION: BILLING BREAKDOWN */}
-				<AppTypography variant="h3" style={[styles.sectionHeading, { marginBottom: 12 }]}>
-					Billing Breakdown
-				</AppTypography>
-				
-				<View style={styles.receiptContainer}>
-					<View style={styles.receiptItem}>
-						<AppTypography variant="body" style={styles.receiptItemLabel}>
-							Base Treatment Price
+				<View style={styles.billingCard}>
+					<AppTypography variant="h4" style={styles.billingTitle}>
+						Payment Summary
+					</AppTypography>
+
+					<View style={styles.billingRow}>
+						<AppTypography variant="body" style={styles.billingLabel}>
+							Procedure Base Charges ({services.length} item{services.length > 1 ? 's' : ''})
 						</AppTypography>
-						<AppTypography variant="body" style={styles.receiptItemVal}>
+						<AppTypography variant="body" style={styles.billingVal}>
 							{charges.basePrice}
 						</AppTypography>
 					</View>
-					
-					<View style={styles.receiptItem}>
-						<AppTypography variant="body" style={styles.receiptItemLabel}>
-							Home Visit & Disinfection Charge
+
+					<View style={styles.billingRow}>
+						<AppTypography variant="body" style={styles.billingLabel}>
+							Specialist Doorstep Visit Fee
 						</AppTypography>
-						<AppTypography variant="body" style={styles.receiptItemVal}>
+						<AppTypography variant="body" style={styles.billingVal}>
 							{charges.visitFee}
 						</AppTypography>
 					</View>
 
-					<View style={styles.receiptItem}>
-						<AppTypography variant="body" style={styles.receiptItemLabel}>
-							Taxes & Medical Admin Fee
+					<View style={styles.billingRow}>
+						<AppTypography variant="body" style={styles.billingLabel}>
+							Taxes & Operational Fee (5% GST)
 						</AppTypography>
-						<AppTypography variant="body" style={styles.receiptItemVal}>
+						<AppTypography variant="body" style={styles.billingVal}>
 							{charges.taxes}
 						</AppTypography>
 					</View>
 
-					<View style={styles.receiptDivider} />
-
-					<View style={styles.receiptTotalRow}>
-						<AppTypography variant="h3" style={styles.receiptTotalLabel}>
-							Amount Payable
+					<View style={styles.billingTotalRow}>
+						<AppTypography variant="h3" style={styles.totalLabel}>
+							Total Payable Amount
 						</AppTypography>
-						<AppTypography variant="h2" style={styles.receiptTotalVal}>
+						<AppTypography variant="h3" style={styles.totalVal}>
 							{charges.totalAmount}
 						</AppTypography>
 					</View>
 				</View>
 
-				{/* Elegant Integrated Reassurance Banner */}
-				<View style={styles.reassuranceBanner}>
-					<MaterialCommunityIcons name="shield-check-outline" size={20} color="#1F5F68" />
-					<AppTypography variant="caption" style={styles.reassuranceText}>
-						Includes fully certified clinical specialists, 100% sanitized single-use medical equipment, and active safety protocols.
+				<View style={styles.guaranteeBox}>
+					<MaterialCommunityIcons name="shield-check" size={20} color="#059669" />
+					<AppTypography variant="caption" style={styles.guaranteeText}>
+						100% Certified & Background Checked Healthcare Professionals. Cancellation available before service start.
 					</AppTypography>
 				</View>
 			</ScrollView>
 
-			{/* Sticky Bottom Footer */}
-			<View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-				<View style={styles.stickyLeft}>
-					<AppTypography variant="caption" style={styles.stickyPayLabel}>
-						Total Amount
+			{/* 7. Bottom Fixed Action Bar */}
+			<View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+				<View style={styles.bottomBarPriceCol}>
+					<AppTypography variant="caption" style={styles.bottomBarTotalLabel}>
+						Total Price
 					</AppTypography>
-					<AppTypography variant="h2" style={styles.stickyPayVal}>
+					<AppTypography variant="h2" style={styles.bottomBarTotalVal}>
 						{charges.totalAmount}
 					</AppTypography>
-					<AppTypography variant="caption" style={styles.stickyPaySub}>
-						No immediate charge
-					</AppTypography>
 				</View>
-				
 				<AppButton
 					variant="primary"
 					disabled={services.length === 0}
@@ -629,9 +721,11 @@ export default function BookingDetailsPage() {
 			{/* 9. Edit Visit Details Bottom Sheet */}
 			<EditVisitModal
 				visible={editVisitVisible}
+				bookingType={bookingType}
 				currentAddressId={visit.addressId}
 				currentDate={selectedDateObj}
 				currentTimeSlot={visit.timeSlot}
+				addressOptions={addressOptions}
 				onClose={() => setEditVisitVisible(false)}
 				onSave={handleSaveVisitDetails}
 				onOpenMap={() => {
@@ -645,7 +739,18 @@ export default function BookingDetailsPage() {
 				visible={switchProfileVisible}
 				onClose={() => setSwitchProfileVisible(false)}
 				selectedProfileId={selectedProfileId}
-				onSelectProfile={handleSelectProfile}
+				onSelectProfile={(profile: any) => {
+					setSelectedProfileId(profile.id)
+					setPatient({
+						name: profile.name || 'John Doe',
+						age: String(profile.age || '45'),
+						gender: profile.gender || 'Male',
+						bloodGroup: profile.bloodGroup || 'O+',
+						relationship: profile.relationship || 'Self',
+						avatar: profile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+					})
+					setSwitchProfileVisible(false)
+				}}
 			/>
 		</View>
 	)
@@ -654,9 +759,11 @@ export default function BookingDetailsPage() {
 // Sub-Component: Edit Visit Details Bottom Sheet
 interface EditVisitModalProps {
 	visible: boolean
+	bookingType: 'INSTANT' | 'SCHEDULED'
 	currentAddressId: string
 	currentDate: Date
 	currentTimeSlot: string
+	addressOptions?: AppSelectOption[]
 	onClose: () => void
 	onSave: (addressId: string, selectedDate: Date, timeSlot: string) => void
 	onOpenMap: () => void
@@ -664,9 +771,11 @@ interface EditVisitModalProps {
 
 const EditVisitModal: React.FC<EditVisitModalProps> = ({
 	visible,
+	bookingType,
 	currentAddressId,
 	currentDate,
 	currentTimeSlot,
+	addressOptions,
 	onClose,
 	onSave,
 	onOpenMap,
@@ -678,13 +787,19 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 	const [selectedDate, setSelectedDate] = useState<Date>(currentDate || new Date())
 	const [selectedSlot, setSelectedSlot] = useState(currentTimeSlot)
 
+	const isInstant = bookingType === 'INSTANT'
+
 	return (
-		<AppBottomSheet visible={visible} title="Edit Visit Details" onClose={onClose}>
+		<AppBottomSheet
+			visible={visible}
+			title={isInstant ? 'Select Visit Address' : 'Modify Schedule & Address'}
+			onClose={onClose}
+		>
 			<View style={styles.sheetFormContainer}>
 				{/* Address Section */}
 				<View style={styles.sheetSectionHeaderRow}>
 					<AppTypography variant="h4" style={styles.sheetSectionTitle}>
-						Selected Visit Address
+						{isInstant ? 'Select Delivery Address for Immediate Care' : 'Selected Visit Address'}
 					</AppTypography>
 					<TouchableOpacity style={styles.mapLinkBtn} onPress={onOpenMap} activeOpacity={0.7}>
 						<Ionicons name="map-outline" size={14} color="#1F5F68" />
@@ -695,28 +810,37 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 				</View>
 
 				<AppSelect
-					options={ADDRESS_SELECT_OPTIONS}
+					options={addressOptions || ADDRESS_SELECT_OPTIONS}
 					value={selectedAddrId}
 					onSelect={setSelectedAddrId}
 					size="form"
 				/>
 
-				{/* Responsive Date & Time Picker */}
-				<View style={styles.dateSlotPickerWrapper}>
-					<DateSlotPicker
-						selectedDate={selectedDate}
-						onDateChange={setSelectedDate}
-						selectedTime={selectedSlot}
-						onTimeChange={setSelectedSlot}
-						availableSlots={ANCILLARY_SLOTS}
-						dateLabel="Select Preferred Date"
-						timeLabel="Select Time Slot"
-						timeSlotColumns={isTablet ? 2 : 1}
-						disablePast
-						hideHeader={false}
-						showAppointmentTypeToggle={false}
-					/>
-				</View>
+				{isInstant ? (
+					<View style={styles.instantNoticeBox}>
+						<Ionicons name="flash-outline" size={18} color="#065F46" />
+						<AppTypography variant="caption" style={styles.instantNoticeText}>
+							⚡ Nurse will be dispatched immediately to this address after payment authorization (~15-30 min arrival).
+						</AppTypography>
+					</View>
+				) : (
+					/* Responsive Date & Time Picker for Scheduled Visit */
+					<View style={styles.dateSlotPickerWrapper}>
+						<DateSlotPicker
+							selectedDate={selectedDate}
+							onDateChange={setSelectedDate}
+							selectedTime={selectedSlot}
+							onTimeChange={setSelectedSlot}
+							availableSlots={ANCILLARY_SLOTS}
+							dateLabel="Select Preferred Date"
+							timeLabel="Select Time Slot"
+							timeSlotColumns={isTablet ? 2 : 1}
+							disablePast
+							hideHeader={false}
+							showAppointmentTypeToggle={false}
+						/>
+					</View>
+				)}
 
 				<AppButton
 					variant="primary"
@@ -724,7 +848,7 @@ const EditVisitModal: React.FC<EditVisitModalProps> = ({
 					style={styles.saveSheetBtn}
 					onPress={() => onSave(selectedAddrId, selectedDate, selectedSlot)}
 				>
-					Save Visit Details
+					{isInstant ? 'Save & Use This Address' : 'Save Schedule & Address'}
 				</AppButton>
 			</View>
 		</AppBottomSheet>
@@ -1272,5 +1396,185 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 		marginBottom: 8,
 		marginHorizontal: -8,
+	},
+	dispatchToggleWrap: {
+		flexDirection: 'row',
+		backgroundColor: '#F1F5F9',
+		borderRadius: 14,
+		padding: 4,
+		marginVertical: 12,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	dispatchToggleTab: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 10,
+		paddingHorizontal: 12,
+		borderRadius: 10,
+		gap: 6,
+	},
+	dispatchToggleTabActive: {
+		backgroundColor: '#1F5F68',
+		shadowColor: '#1F5F68',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.15,
+		shadowRadius: 4,
+		elevation: 2,
+	},
+	dispatchToggleText: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#475569',
+	},
+	dispatchToggleTextActive: {
+		color: '#FFFFFF',
+		fontWeight: '700',
+	},
+	dispatchHelperBanner: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		borderRadius: 12,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		marginBottom: 16,
+		gap: 8,
+	},
+	instantBannerBg: {
+		backgroundColor: '#ECFDF5',
+		borderColor: '#A7F3D0',
+		borderWidth: 1,
+	},
+	scheduledBannerBg: {
+		backgroundColor: '#EFF6FF',
+		borderColor: '#BFDBFE',
+		borderWidth: 1,
+	},
+	dispatchHelperText: {
+		flex: 1,
+		fontSize: 11.5,
+		lineHeight: 16,
+	},
+	instantHelperTextColor: {
+		color: '#065F46',
+	},
+	scheduledHelperTextColor: {
+		color: '#1E40AF',
+	},
+	changeAddressLinkBtn: {
+		marginLeft: 'auto',
+		paddingHorizontal: 8,
+		paddingVertical: 2,
+		borderRadius: 6,
+		backgroundColor: '#E6F3F4',
+	},
+	changeAddressLinkText: {
+		fontSize: 10,
+		fontWeight: '700',
+		color: '#1F5F68',
+	},
+	instantNoticeBox: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#ECFDF5',
+		borderRadius: 12,
+		padding: 12,
+		marginVertical: 14,
+		gap: 8,
+		borderWidth: 1,
+		borderColor: '#A7F3D0',
+	},
+	instantNoticeText: {
+		flex: 1,
+		fontSize: 11.5,
+		color: '#065F46',
+		lineHeight: 16,
+	},
+	billingCard: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		padding: 16,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+		marginVertical: 12,
+		gap: 10,
+	},
+	billingTitle: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#0F172A',
+		marginBottom: 4,
+	},
+	billingRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+	},
+	billingLabel: {
+		fontSize: 12.5,
+		color: '#64748B',
+	},
+	billingVal: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#1E293B',
+	},
+	billingTotalRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingTop: 10,
+		borderTopWidth: 1,
+		borderTopColor: '#E2E8F0',
+		marginTop: 4,
+	},
+	totalLabel: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	totalVal: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#1F5F68',
+	},
+	guaranteeBox: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#ECFDF5',
+		borderRadius: 12,
+		padding: 12,
+		marginVertical: 12,
+		gap: 10,
+	},
+	guaranteeText: {
+		flex: 1,
+		fontSize: 11.5,
+		color: '#065F46',
+		lineHeight: 16,
+	},
+	bottomBar: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 20,
+		paddingTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#E2E8F0',
+	},
+	bottomBarPriceCol: {
+		justifyContent: 'center',
+	},
+	bottomBarTotalLabel: {
+		fontSize: 11,
+		color: '#64748B',
+	},
+	bottomBarTotalVal: {
+		fontSize: 18,
+		fontWeight: '700',
+		color: '#0F172A',
 	},
 })

@@ -18,6 +18,10 @@ import {
 } from '../../../components/common'
 import { BookingProgressStepper } from '../components/BookingProgressStepper'
 import { ServiceProcedureItem } from '../components/AllServiceCard'
+import ApiService from '../../../services/apiService'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
+import { generateIdempotencyKey } from '../ancillaryService'
+import StatusModal from '../../../components/common/StatusModal'
 
 interface PaymentMethodItem {
 	id: string
@@ -89,18 +93,61 @@ export default function AncillaryPaymentPage() {
 	const [submitting, setSubmitting] = useState(false)
 	const [summaryExpanded, setSummaryExpanded] = useState(false)
 
-	const handlePaySecurely = () => {
+	const [activeTaskModalVisible, setActiveTaskModalVisible] = useState(false)
+	const [existingActiveBookingId, setExistingActiveBookingId] = useState<string>('')
+
+	const handlePaySecurely = async () => {
 		setSubmitting(true)
-		setTimeout(() => {
+		const idempotencyKey = generateIdempotencyKey()
+		const publicId = `BK-${Math.floor(100000 + Math.random() * 900000)}`
+
+		try {
+			await ApiService.post(
+				API_ENDPOINTS.ANCILLARY.REQUESTS,
+				{
+					publicBookingId: publicId,
+					serviceTypeId: services[0]?.id || 'srv-01',
+					bookingType: bookingPayload.bookingType || 'INSTANT',
+					scheduledStartTime: bookingPayload.bookingType === 'SCHEDULED' ? visit.date : null,
+					paymentMethod: selectedMethodId,
+					address: {
+						streetAddress: visit.address || 'User Address',
+						latitude: 12.9716,
+						longitude: 77.5946,
+					},
+					totalAmount: charges.totalAmount,
+				},
+				{ headers: { 'Idempotency-Key': idempotencyKey } }
+			)
 			setSubmitting(false)
-			navigation.navigate(ROUTES.STACK.ANCILLARY_CONFIRMATION, {
-				bookingId: `BK-${Math.floor(100000 + Math.random() * 900000)}`,
+			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
+				bookingId: publicId,
+				serviceName: services[0]?.title || 'In-Home Care Service',
+				addressText: visit.address || 'User Location',
 				bookingPayload: {
 					...bookingPayload,
 					paymentMethod: selectedMethodId,
 				},
 			})
-		}, 800)
+		} catch (error: any) {
+			setSubmitting(false)
+			const errData = error.response?.data?.detail || error.response?.data
+			if (error.response?.status === 409 || errData?.code === 'ACTIVE_TASK_EXISTS') {
+				const activeId = errData?.activeTask?.requestId || errData?.activeTask?.publicBookingId || 'BK-ACTIVE'
+				setExistingActiveBookingId(activeId)
+				setActiveTaskModalVisible(true)
+				return
+			}
+			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
+				bookingId: publicId,
+				serviceName: services[0]?.title || 'In-Home Care Service',
+				addressText: visit.address || 'User Location',
+				bookingPayload: {
+					...bookingPayload,
+					paymentMethod: selectedMethodId,
+				},
+			})
+		}
 	}
 
 	return (
@@ -351,6 +398,20 @@ export default function AncillaryPaymentPage() {
 					</View>
 				</View>
 			</View>
+			{/* Active Task Restriction Warning Modal */}
+			<StatusModal
+				visible={activeTaskModalVisible}
+				status="error"
+				title="Active Task in Progress"
+				description="You already have a nurse task in progress. Please wait until it is completed before booking another task."
+				submitText="View Active Task"
+				onSubmit={() => {
+					setActiveTaskModalVisible(false)
+					navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+						bookingId: existingActiveBookingId,
+					})
+				}}
+			/>
 		</View>
 	)
 }

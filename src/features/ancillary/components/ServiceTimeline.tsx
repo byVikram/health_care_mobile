@@ -1,11 +1,12 @@
 import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import type { NurseBooking } from '../ancillaryService'
 
-type StepStatus = 'assigned' | 'verification_pending' | 'in_progress' | 'completed'
+type StepStatus = Extract<NurseBooking['status'], 'assigned' | 'verification_pending' | 'in_progress' | 'completed'>
 
 interface ServiceTimelineProps {
-	currentStatus: StepStatus
+	currentStatus: NurseBooking['status']
 }
 
 export default function ServiceTimeline({ currentStatus }: ServiceTimelineProps) {
@@ -20,7 +21,11 @@ export default function ServiceTimeline({ currentStatus }: ServiceTimelineProps)
 		return steps.findIndex((step) => step.key === status)
 	}
 
-	const activeIndex = getStepIndex(currentStatus)
+	const normalizedStatus: StepStatus | null =
+		currentStatus === 'EN_ROUTE' || currentStatus === 'ARRIVED' ? 'verification_pending'
+		: currentStatus === 'cancelled' ? null
+		: currentStatus
+	const activeIndex = normalizedStatus ? getStepIndex(normalizedStatus) : -1
 
 	return (
 		<View style={styles.container}>

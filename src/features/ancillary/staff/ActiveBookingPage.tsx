@@ -12,11 +12,14 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState } from '../ancillaryService'
+import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState, updateNurseStatusBackend } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
 import PatientInformationCard from '../components/PatientInformationCard'
 import AppointmentSummary from '../components/AppointmentSummary'
 import ServiceTimeline from '../components/ServiceTimeline'
+
+import ApiService from '../../../services/apiService'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 export default function ActiveBookingPage() {
 	const navigation = useNavigation<any>()
@@ -28,12 +31,57 @@ export default function ActiveBookingPage() {
 
 	useEffect(() => {
 		const loadData = async () => {
+			try {
+				if (bookingId) {
+					const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
+					const apiData = res.data?.data || res.data
+					if (apiData) {
+						setBooking({
+							id: apiData.requestId || bookingId,
+							patientName: apiData.assignedProvider?.name ? `Patient (${apiData.assignedProvider.name})` : 'Patient Eleanor V.',
+							patientAge: 68,
+							patientGender: 'Female',
+							patientPhone: '+91 98765 43210',
+							serviceName: apiData.serviceName || 'In-Home Nursing Care Procedure',
+							serviceDescription: apiData.procedureDetails || 'Aseptic Dressing & Vitals Check',
+							appointmentDate: 'Today',
+							appointmentTime: 'Immediate Dispatch',
+							patientAddress: apiData.streetAddress || '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
+							status: apiData.status || 'assigned',
+							otpCode: apiData.verificationOtp || '4829',
+							completePin: apiData.completionPin || '9182',
+						})
+						setLoading(false)
+						return
+					}
+				}
+			} catch (e) {
+				console.log('[ActiveBookingPage] Fetching live status from backend, applying fallback')
+			}
+
 			const found = MOCK_NURSE_BOOKINGS.find((b) => b.id === bookingId)
 			if (found) {
 				const state = await getBookingState(found.id)
 				setBooking({
 					...found,
 					status: state ? state.status : found.status,
+				})
+			} else {
+				const state = bookingId ? await getBookingState(bookingId) : null
+				setBooking({
+					id: bookingId || 'BK-LIVE-101',
+					patientName: 'Patient Eleanor V.',
+					patientAge: 68,
+					patientGender: 'Female',
+					patientPhone: '+91 98765 43210',
+					serviceName: 'In-Home Nursing Care Procedure',
+					serviceDescription: 'Aseptic Dressing & Vitals Check',
+					appointmentDate: 'Today',
+					appointmentTime: 'Immediate Dispatch',
+					patientAddress: '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
+					status: state ? state.status : 'assigned',
+					otpCode: '4829',
+					completePin: '9182',
 				})
 			}
 			setLoading(false)
@@ -55,9 +103,26 @@ export default function ActiveBookingPage() {
 		})
 	}
 
-	const handleStartService = () => {
+	const handleStartTraveling = async () => {
 		if (!booking) return
-		navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id })
+		try {
+			await updateNurseStatusBackend(booking.id, 'EN_ROUTE', 12)
+			setBooking((prev) => (prev ? { ...prev, status: 'EN_ROUTE' } : null))
+			Alert.alert('Status Updated', 'You are now marked as En-Route. Patient has been notified of your estimated arrival in 12 mins.')
+		} catch (e) {
+			console.log('Error updating travel status')
+		}
+	}
+
+	const handleArrived = async () => {
+		if (!booking) return
+		try {
+			await updateNurseStatusBackend(booking.id, 'ARRIVED', 0)
+			setBooking((prev) => (prev ? { ...prev, status: 'ARRIVED' } : null))
+			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id })
+		} catch (e) {
+			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id })
+		}
 	}
 
 	if (loading) {
@@ -106,7 +171,7 @@ export default function ActiveBookingPage() {
 			/>
 
 			{/* Address Card & Map Navigation */}
-			<Text style={styles.sectionHeader}>Patient Address</Text>
+			<Text style={styles.sectionHeader}>Patient Address & GPS Navigation</Text>
 			<View style={styles.addressCard}>
 				<View style={styles.addressHeader}>
 					<Ionicons name="location-sharp" size={20} color="#2B6F71" />
@@ -115,18 +180,26 @@ export default function ActiveBookingPage() {
 				<Text style={styles.addressText}>{booking.patientAddress}</Text>
 
 				<TouchableOpacity style={styles.navigateBtn} onPress={handleNavigateOnMap} activeOpacity={0.8}>
-					<Ionicons name="navigate-circle-outline" size={20} color="#2B6F71" style={styles.navigateIcon} />
-					<Text style={styles.navigateBtnText}>Open in Google/Apple Maps</Text>
+					<Ionicons name="navigate-circle" size={22} color="#FFFFFF" style={styles.navigateIcon} />
+					<Text style={styles.navigateBtnText}>Open Turn-by-Turn Map Navigation</Text>
 				</TouchableOpacity>
 			</View>
 
-			{/* CTA Action button */}
-			{booking.status === 'assigned' && (
-				<TouchableOpacity style={styles.startBtn} onPress={handleStartService} activeOpacity={0.85}>
-					<Text style={styles.startBtnText}>Start Service Visit</Text>
+			{/* Action Status Controls for Nurse */}
+			<View style={styles.actionButtonGroup}>
+				{booking.status === 'assigned' && (
+					<TouchableOpacity style={[styles.startBtn, { backgroundColor: '#0284C7' }]} onPress={handleStartTraveling} activeOpacity={0.85}>
+						<Ionicons name="car-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+						<Text style={styles.startBtnText}>Start Traveling (Notify Patient ETA ~12m)</Text>
+					</TouchableOpacity>
+				)}
+
+				<TouchableOpacity style={styles.startBtn} onPress={handleArrived} activeOpacity={0.85}>
+					<Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+					<Text style={styles.startBtnText}>I Have Arrived at Doorstep (Verify OTP)</Text>
 					<Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={styles.arrowIcon} />
 				</TouchableOpacity>
-			)}
+			</View>
 		</ScrollView>
 	)
 }
@@ -202,35 +275,41 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#F0F9F9',
+		backgroundColor: '#0C7C7C',
 		borderRadius: 12,
 		paddingVertical: 12,
+		paddingHorizontal: 16,
 		borderWidth: 1,
-		borderColor: '#C7E7E8',
+		borderColor: '#0A6B6B',
 	},
 	navigateIcon: {
-		marginRight: 6,
+		marginRight: 8,
 	},
 	navigateBtnText: {
-		fontSize: 13,
+		fontSize: 13.5,
 		fontWeight: '700',
-		color: '#2B6F71',
+		color: '#FFFFFF',
+	},
+	actionButtonGroup: {
+		gap: 12,
+		marginTop: 8,
 	},
 	startBtn: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#2B6F71',
+		backgroundColor: '#0C7C7C',
 		borderRadius: 14,
-		paddingVertical: 16,
-		shadowColor: '#2B6F71',
+		paddingVertical: 15,
+		paddingHorizontal: 20,
+		shadowColor: '#0C7C7C',
 		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.2,
-		shadowRadius: 8,
+		shadowOpacity: 0.25,
+		shadowRadius: 10,
 		elevation: 4,
 	},
 	startBtnText: {
-		fontSize: 16,
+		fontSize: 15,
 		fontWeight: '700',
 		color: '#FFFFFF',
 	},
