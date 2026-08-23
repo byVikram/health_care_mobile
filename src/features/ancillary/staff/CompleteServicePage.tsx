@@ -5,17 +5,19 @@ import {
 	Platform,
 	ScrollView,
 	StyleSheet,
-	Text,
-	TouchableOpacity,
 	View,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MOCK_NURSE_BOOKINGS, NurseBooking, NurseBookingState, getBookingState, clearBookingState } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
 import OtpPinInput from '../components/OtpPinInput'
 import ServiceTimeline from '../components/ServiceTimeline'
 import StatusModal from '../../../components/common/StatusModal'
+import AppScreenHeader from '../../../components/common/AppScreenHeader'
+import { AppTypography } from '../../../components/common/AppTypography'
+import { AppButton } from '../../../components/common/AppButton'
 
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
@@ -23,6 +25,7 @@ import { API_ENDPOINTS } from '../../../constants/apiUrls'
 export default function CompleteServicePage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
+	const insets = useSafeAreaInsets()
 	const { bookingId, elapsedSeconds } = route.params || {}
 
 	const [booking, setBooking] = useState<NurseBooking | null>(null)
@@ -39,21 +42,40 @@ export default function CompleteServicePage() {
 
 	useEffect(() => {
 		const loadData = async () => {
+			let apiPatientData: any = null
+			try {
+				if (bookingId) {
+					const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
+					apiPatientData = res.data?.data || res.data
+				}
+			} catch (e) {
+				console.log('[CompleteServicePage] Live status notice')
+			}
+
 			const found = MOCK_NURSE_BOOKINGS.find((b) => b.id === bookingId)
-			const activeBooking: NurseBooking = found || {
-				id: bookingId || 'BK-LIVE-101',
-				patientName: 'Eleanor Vance',
-				patientAge: 68,
-				patientGender: 'Female',
-				patientPhone: '+91 98765 43210',
-				serviceName: 'In-Home Nursing Care Procedure',
-				serviceDescription: 'Aseptic Dressing & Vitals Check',
-				appointmentDate: 'Today',
-				appointmentTime: 'Completed',
-				patientAddress: '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
+			const pName = apiPatientData?.patientName || apiPatientData?.patient_name || apiPatientData?.patientUser?.name || apiPatientData?.patient?.name || (found ? found.patientName : 'Eleanor Vance')
+			const pAge = apiPatientData?.patientAge || apiPatientData?.patient_age || apiPatientData?.age || (found ? found.patientAge : 68)
+			const pGender = apiPatientData?.patientGender || apiPatientData?.patient_gender || apiPatientData?.gender || (found ? found.patientGender : 'Female')
+			const pPhone = apiPatientData?.patientPhone || apiPatientData?.patient_phone || apiPatientData?.phone || (found ? found.patientPhone : '+91 98765 43210')
+			const pAvatar = apiPatientData?.patientAvatar || apiPatientData?.patient_avatar || apiPatientData?.patient?.avatar || (found ? found.patientAvatar : undefined)
+			const sName = apiPatientData?.serviceName || apiPatientData?.service_name || apiPatientData?.procedure?.label || (found ? found.serviceName : 'Wound Dressing & Sterile Care')
+			const sDesc = apiPatientData?.procedureDetails || apiPatientData?.procedure_details || apiPatientData?.serviceDescription || (found ? found.serviceDescription : 'Sterile dressing, cleansing & vitals monitoring')
+
+			const activeBooking: NurseBooking = {
+				id: apiPatientData?.requestId || apiPatientData?.id || bookingId || 'BK-LIVE-101',
+				patientName: pName,
+				patientAge: pAge,
+				patientGender: pGender,
+				patientPhone: pPhone,
+				patientAvatar: pAvatar,
+				serviceName: sName,
+				serviceDescription: sDesc,
+				appointmentDate: apiPatientData?.appointmentDate || (found ? found.appointmentDate : 'Today'),
+				appointmentTime: apiPatientData?.appointmentTime || (found ? found.appointmentTime : 'Completed'),
+				patientAddress: apiPatientData?.streetAddress || apiPatientData?.street_address || apiPatientData?.patientAddress || (found ? found.patientAddress : '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi'),
 				status: 'in_progress',
-				otpCode: '4829',
-				completePin: '9182',
+				otpCode: apiPatientData?.verificationOtp || apiPatientData?.otp || '4829',
+				completePin: apiPatientData?.completionPin || apiPatientData?.pin || '9182',
 			}
 
 			setBooking(activeBooking)
@@ -121,7 +143,6 @@ export default function CompleteServicePage() {
 
 	const handleSuccessModalSubmit = () => {
 		setSuccessModalVisible(false)
-		// Reset routing back to the dashboard/appointments list
 		navigation.reset({
 			index: 0,
 			routes: [{ name: ROUTES.MAIN.TABS }],
@@ -139,285 +160,233 @@ export default function CompleteServicePage() {
 	if (!booking || !sessionState) {
 		return (
 			<View style={styles.errorContainer}>
-				<Text style={styles.errorText}>Booking session details not found.</Text>
+				<AppTypography variant="body" style={styles.errorText}>
+					No active service session found.
+				</AppTypography>
 			</View>
 		)
 	}
 
-	const completedProcedures = Object.keys(sessionState.checklist).filter(
-		(key) => !!sessionState.checklist[key]
-	)
-
 	return (
 		<KeyboardAvoidingView
-			style={styles.keyboardView}
+			style={styles.container}
 			behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 		>
-			<ScrollView style={styles.container} contentContainerStyle={styles.content}>
-				<ServiceTimeline currentStatus="completed" />
+			<AppScreenHeader title="Complete Care Visit" />
 
-				<View style={styles.summaryCard}>
-					<View style={styles.cardHeader}>
-						<Ionicons name="ribbon-outline" size={24} color="#10B981" />
-						<Text style={styles.cardTitle}>Visit Summary</Text>
-					</View>
+			<ScrollView
+				contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+				showsVerticalScrollIndicator={false}
+			>
+				{/* 1. TIMELINE & SUMMARY BLOCK */}
+				<View style={styles.sectionBlock}>
+					<ServiceTimeline currentStatus="completed" />
 
-					<View style={styles.summaryRow}>
-						<Text style={styles.summaryLabel}>Patient</Text>
-						<Text style={styles.summaryVal}>{booking.patientName}</Text>
-					</View>
-					<View style={styles.summaryRow}>
-						<Text style={styles.summaryLabel}>Total Duration</Text>
-						<Text style={styles.summaryVal}>{formatDuration(elapsedSeconds || 0)}</Text>
-					</View>
-
-					<Text style={styles.proceduresHeader}>Completed Procedures</Text>
-					<View style={styles.proceduresList}>
-						{completedProcedures.map((item, index) => (
-							<View key={index} style={styles.procedureItem}>
-								<Ionicons name="checkmark-circle" size={16} color="#10B981" style={styles.checkIcon} />
-								<Text style={styles.procedureText}>{item}</Text>
-							</View>
-						))}
-					</View>
-				</View>
-
-				{/* Patient complete validation form */}
-				<View style={styles.pinSection}>
-					<View style={styles.iconCircle}>
-						<Ionicons name="keypad" size={28} color="#2B6F71" />
-					</View>
-					<Text style={styles.pinTitle}>Patient Completion PIN</Text>
-					<Text style={styles.pinDesc}>
-						Ask the patient to input their 4-digit verification code to confirm the service visit has been completed successfully.
-					</Text>
-
-					<OtpPinInput value={pin} onChangeValue={(val) => {
-						setPin(val)
-						if (error) setError('')
-					}} />
-
-					{error !== '' && (
-						<View style={styles.errorAlert}>
-							<Ionicons name="alert-circle" size={16} color="#EF4444" style={styles.errorIcon} />
-							<Text style={styles.errorAlertText}>{error}</Text>
+					<View style={styles.summaryBar}>
+						<View style={styles.summaryCol}>
+							<AppTypography variant="caption" style={styles.summaryLabel}>
+								TOTAL VISIT DURATION
+							</AppTypography>
+							<AppTypography variant="h3" style={styles.summaryValue}>
+								{formatDuration(elapsedSeconds || 1800)}
+							</AppTypography>
 						</View>
-					)}
+					</View>
 				</View>
 
-				<TouchableOpacity
-					style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
-					onPress={handleConfirmCompletion}
-					disabled={submitting}
-					activeOpacity={0.85}
-				>
-					{submitting ? (
-						<ActivityIndicator size="small" color="#FFFFFF" />
-					) : (
-						<>
-							<Text style={styles.submitBtnText}>Complete Visit</Text>
-							<Ionicons name="checkmark-done" size={20} color="#FFFFFF" style={styles.arrowIcon} />
-						</>
-					)}
-				</TouchableOpacity>
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
 
-				<TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} disabled={submitting}>
-					<Text style={styles.backBtnText}>Resume Care Screen</Text>
-				</TouchableOpacity>
+				{/* 2. COMPLETION PIN INSTRUCTIONS BLOCK (CARD-FREE) */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.instructionRow}>
+						<View style={styles.iconCircle}>
+							<Ionicons name="checkmark-circle" size={24} color="#059669" />
+						</View>
+						<View style={styles.instructionCol}>
+							<AppTypography variant="h3" style={styles.sectionHeading}>
+								Enter Completion PIN
+							</AppTypography>
+							<AppTypography variant="caption" style={styles.descText}>
+								Ask patient <AppTypography variant="caption" style={styles.boldText}>{booking.patientName}</AppTypography> for the 4-digit completion PIN to finalize visit records.
+							</AppTypography>
+						</View>
+					</View>
 
-				{/* Complete Modal Success trigger */}
-				<StatusModal
-					visible={successModalVisible}
-					status="success"
-					title="Appointment Completed"
-					description="You have successfully verified and completed the clinical service visit. Details have been logged in the patient medical history chart."
-					submitText="Back to Visits"
-					onSubmit={handleSuccessModalSubmit}
-				/>
+					{/* 4-DIGIT PIN INPUT */}
+					<View style={styles.inputBox}>
+						<OtpPinInput
+							value={pin}
+							onChangeValue={(val) => {
+								setPin(val)
+								if (error) setError('')
+							}}
+						/>
+
+						{error !== '' && (
+							<View style={styles.errorAlert}>
+								<Ionicons name="alert-circle" size={16} color="#EF4444" />
+								<AppTypography variant="caption" style={styles.errorAlertText}>
+									{error}
+								</AppTypography>
+							</View>
+						)}
+					</View>
+				</View>
+
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
+
+				{/* 3. ACTION BUTTON BLOCK */}
+				<View style={styles.sectionBlock}>
+					<AppButton
+						variant="primary"
+						onPress={handleConfirmCompletion}
+						loading={submitting}
+						style={styles.completeBtn}
+					>
+						Finalize & Submit Care Record
+					</AppButton>
+				</View>
 			</ScrollView>
+
+			{/* SUCCESS POPUP MODAL */}
+			<StatusModal
+				visible={successModalVisible}
+				status="success"
+				title="Care Visit Completed!"
+				description={`Healthcare procedure for ${booking.patientName} has been successfully completed and recorded.`}
+				submitText="Return to Dashboard"
+				onSubmit={handleSuccessModalSubmit}
+			/>
 		</KeyboardAvoidingView>
 	)
 }
 
 const styles = StyleSheet.create({
-	keyboardView: {
-		flex: 1,
-		backgroundColor: '#F8FAFC',
-	},
 	container: {
 		flex: 1,
+		backgroundColor: '#FFFFFF',
 	},
-	content: {
-		padding: 16,
-		paddingBottom: 40,
+	scrollContent: {
+		paddingHorizontal: 0,
+		paddingTop: 12,
 	},
 	loadingContainer: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#FFFFFF',
 	},
 	errorContainer: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#FFFFFF',
 		padding: 24,
 	},
 	errorText: {
 		fontSize: 15,
 		color: '#EF4444',
 		fontWeight: '600',
-		textAlign: 'center',
 	},
-	summaryCard: {
+
+	/* SECTION BLOCK & DIVIDERS */
+	sectionBlock: {
 		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#E6EDF2',
-		shadowColor: '#12373E',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.04,
-		shadowRadius: 8,
-		elevation: 2,
-		marginBottom: 20,
+		paddingHorizontal: 16,
+		paddingVertical: 16,
+		gap: 14,
 	},
-	cardHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 16,
-		paddingBottom: 10,
+	sectionDividerBar: {
+		height: 8,
+		backgroundColor: '#F4F6F9',
+		borderTopWidth: 1,
 		borderBottomWidth: 1,
-		borderBottomColor: '#F1F5F9',
+		borderColor: '#E2E8F0',
 	},
-	cardTitle: {
-		fontSize: 15,
+	sectionHeading: {
+		fontSize: 16.5,
 		fontWeight: '700',
-		color: '#16324A',
-		marginLeft: 8,
+		color: '#0F172A',
+		letterSpacing: -0.2,
 	},
-	summaryRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		paddingVertical: 6,
+
+	/* SUMMARY BAR */
+	summaryBar: {
+		backgroundColor: '#F8FAFC',
+		padding: 14,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	summaryCol: {
+		gap: 2,
 	},
 	summaryLabel: {
-		fontSize: 13,
+		fontSize: 10.5,
+		fontWeight: '800',
 		color: '#64748B',
-		fontWeight: '500',
+		letterSpacing: 0.5,
 	},
-	summaryVal: {
-		fontSize: 13,
-		color: '#1E293B',
-		fontWeight: '700',
+	summaryValue: {
+		fontSize: 18,
+		fontWeight: '800',
+		color: '#0F172A',
 	},
-	proceduresHeader: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#16324A',
-		marginTop: 16,
-		marginBottom: 8,
-	},
-	proceduresList: {
-		gap: 6,
-	},
-	procedureItem: {
+
+	/* INSTRUCTIONS */
+	instructionRow: {
 		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	checkIcon: {
-		marginRight: 6,
-	},
-	procedureText: {
-		fontSize: 13,
-		color: '#475569',
-		fontWeight: '500',
-	},
-	pinSection: {
-		alignItems: 'center',
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#E6EDF2',
-		shadowColor: '#12373E',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.04,
-		shadowRadius: 8,
-		elevation: 2,
-		marginBottom: 24,
+		alignItems: 'flex-start',
+		gap: 12,
 	},
 	iconCircle: {
-		width: 56,
-		height: 56,
-		borderRadius: 28,
-		backgroundColor: '#EAF6F6',
-		justifyContent: 'center',
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: 'rgba(5, 150, 105, 0.12)',
 		alignItems: 'center',
-		marginBottom: 12,
+		justifyContent: 'center',
 	},
-	pinTitle: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#16324A',
-		marginBottom: 6,
-		textAlign: 'center',
+	instructionCol: {
+		flex: 1,
+		gap: 4,
 	},
-	pinDesc: {
-		fontSize: 12,
+	descText: {
+		fontSize: 13,
 		color: '#64748B',
-		textAlign: 'center',
-		lineHeight: 16,
-		marginBottom: 10,
-		paddingHorizontal: 8,
+		lineHeight: 18,
+	},
+	boldText: {
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+
+	/* OTP INPUT */
+	inputBox: {
+		alignItems: 'center',
+		marginTop: 8,
+		gap: 12,
 	},
 	errorAlert: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'center',
-		marginTop: 8,
-	},
-	errorIcon: {
-		marginRight: 4,
+		backgroundColor: '#FEF2F2',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 8,
+		gap: 6,
 	},
 	errorAlertText: {
 		fontSize: 12,
 		color: '#EF4444',
 		fontWeight: '600',
 	},
-	submitBtn: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
+
+	/* ACTION BUTTON */
+	completeBtn: {
 		backgroundColor: '#2B6F71',
-		borderRadius: 14,
-		paddingVertical: 16,
-		shadowColor: '#2B6F71',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.2,
-		shadowRadius: 8,
-		elevation: 4,
-	},
-	submitBtnDisabled: {
-		opacity: 0.8,
-	},
-	submitBtnText: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#FFFFFF',
-	},
-	arrowIcon: {
-		marginLeft: 8,
-	},
-	backBtn: {
-		alignItems: 'center',
-		marginTop: 16,
-		paddingVertical: 12,
-	},
-	backBtnText: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#64748B',
+		borderRadius: 12,
 	},
 })

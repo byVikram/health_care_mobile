@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
 	Image,
 	ScrollView,
@@ -21,7 +21,6 @@ import {
 	AppSelect,
 	AppSelectOption,
 	AppTypography,
-	CommonCard,
 	PatientProfileSelectorBottomSheet,
 } from '../../../components/common'
 import DateSlotPicker from '../../../components/common/DateSlotPicker'
@@ -114,23 +113,44 @@ export default function BookingDetailsPage() {
 	const [services, setServices] = useState<ServiceProcedureItem[]>(initialServices)
 
 	// 2. Patient Details State
-	const [patient, setPatient] = useState({
-		name: 'John Doe',
-		age: '45',
-		gender: 'Male',
-		bloodGroup: 'O+',
+	const [patient, setPatient] = useState<{
+		publicId?: string
+		name: string
+		age: string
+		gender: string
+		bloodGroup: string
+		relationship: string
+		avatar?: string
+	}>({
+		publicId: undefined,
+		name: 'Patient Account Holder',
+		age: '',
+		gender: '',
+		bloodGroup: '',
 		relationship: 'Self',
-		avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+		avatar: undefined,
 	})
 
 	// 3. Booking Dispatch Mode State (INSTANT vs SCHEDULED)
 	const [bookingType, setBookingType] = useState<'INSTANT' | 'SCHEDULED'>('INSTANT')
 
 	// 4. Visit Details State
-	const [visit, setVisit] = useState({
+	const [visit, setVisit] = useState<{
+		addressId: string
+		addressLabel: string
+		address: string
+		latitude?: number
+		longitude?: number
+		dateId: string
+		date: string
+		timeSlot: string
+		timeBadge: string
+	}>({
 		addressId: 'addr1',
 		addressLabel: 'Home',
 		address: '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi - 110001',
+		latitude: undefined,
+		longitude: undefined,
 		dateId: 'd1',
 		date: 'Today, 10 Aug 2025',
 		timeSlot: '09:00 AM - 10:00 AM',
@@ -156,12 +176,13 @@ export default function BookingDetailsPage() {
 	useEffect(() => {
 		const fetchProfile = async () => {
 			let loadedPatient = {
-				name: 'John Doe',
-				age: '45',
-				gender: 'Male',
-				bloodGroup: 'O+',
+				publicId: undefined as string | undefined,
+				name: 'Patient Account Holder',
+				age: '',
+				gender: '',
+				bloodGroup: '',
 				relationship: 'Self',
-				avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+				avatar: undefined as string | undefined,
 			}
 
 			try {
@@ -171,6 +192,8 @@ export default function BookingDetailsPage() {
 						id: String(addr.id),
 						label: addr.label || addr.title || 'Home',
 						address: addr.address_line ? `${addr.address_line}, ${addr.city || ''} ${addr.pincode || ''}` : `${addr.address_line_1 || ''}, ${addr.city || ''}`,
+						latitude: addr.latitude != null ? Number(addr.latitude) : undefined,
+						longitude: addr.longitude != null ? Number(addr.longitude) : undefined,
 						icon: (addr.label || addr.title || '').toLowerCase().includes('work') ? 'briefcase-outline' : 'home-outline',
 					}))
 					setSavedAddressesList(formattedList)
@@ -187,6 +210,8 @@ export default function BookingDetailsPage() {
 						addressId: firstAddr.id,
 						addressLabel: firstAddr.label,
 						address: firstAddr.address,
+						latitude: firstAddr.latitude,
+						longitude: firstAddr.longitude,
 					}))
 				}
 			} catch (addrErr) {
@@ -198,7 +223,7 @@ export default function BookingDetailsPage() {
 				if (response.success && response.data) {
 					const personal = response.data.personal
 					if (personal) {
-						let parsedAge = '45'
+						let parsedAge = ''
 						if (personal.date_of_birth) {
 							const dob = new Date(personal.date_of_birth)
 							const diff = Date.now() - dob.getTime()
@@ -206,12 +231,13 @@ export default function BookingDetailsPage() {
 						}
 
 						loadedPatient = {
-							name: personal.name || 'John Doe',
+							publicId: response.data.public_id || personal.public_id || response.data.id,
+							name: personal.name || 'Patient Account Holder',
 							age: parsedAge,
-							gender: personal.gender || 'Male',
-							bloodGroup: personal.blood_group || 'O+',
+							gender: personal.gender || '',
+							bloodGroup: personal.blood_group || '',
 							relationship: 'Self',
-							avatar: personal.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+							avatar: personal.avatar,
 						}
 						setPatient(loadedPatient)
 						setTempPatientName(loadedPatient.name)
@@ -230,12 +256,13 @@ export default function BookingDetailsPage() {
 				if (userRaw) {
 					const userData = JSON.parse(userRaw)
 					loadedPatient = {
+						publicId: userData.public_id || userData.publicId,
 						name: userData.name || 'John Doe',
 						age: userData.age || '45',
 						gender: userData.gender || 'Male',
 						bloodGroup: userData.bloodGroup || 'O+',
 						relationship: 'Self',
-						avatar: userData.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+						avatar: userData.avatar || undefined,
 					}
 					setPatient(loadedPatient)
 					setTempPatientName(loadedPatient.name)
@@ -251,21 +278,23 @@ export default function BookingDetailsPage() {
 		fetchProfile()
 	}, [])
 
+	// Dynamic Charges Calculation
+	const procedureBaseFee = useMemo(() => {
+		return services.reduce((total, item) => {
+			const num = parseInt(item.price.replace(/[^\d]/g, ''), 10)
+			return total + (isNaN(num) ? 0 : num)
+		}, 0)
+	}, [services])
 
-	// Dynamic Charges Calculation based on ALL selected services
-	const basePriceSum = services.reduce((sum, item) => {
-		const numeric = parseInt(item.price.replace(/[^0-9]/g, '')) || 499
-		return sum + numeric
-	}, 0)
-	const visitFee = 150
-	const taxes = 18
-	const totalAmount = basePriceSum + visitFee + taxes
+	const homeVisitFee = 150
+	const taxes = Math.round((procedureBaseFee + homeVisitFee) * 0.03)
+	const grandTotal = procedureBaseFee + homeVisitFee + taxes
 
 	const charges = {
-		basePrice: `₹${basePriceSum}`,
-		visitFee: `₹${visitFee}`,
+		basePrice: `₹${procedureBaseFee}`,
+		visitFee: `₹${homeVisitFee}`,
 		taxes: `₹${taxes}`,
-		totalAmount: `₹${totalAmount}`,
+		totalAmount: `₹${grandTotal}`,
 	}
 
 	const handleRemoveService = (serviceId: string) => {
@@ -285,22 +314,16 @@ export default function BookingDetailsPage() {
 
 	const handleSelectProfile = (selected: any) => {
 		setSelectedProfileId(selected.id)
+		const targetPublicId = selected.publicId || selected.public_id || selected.id
 		setPatient({
+			publicId: targetPublicId,
 			name: selected.name,
 			age: String(selected.age),
 			gender: selected.gender,
-			bloodGroup: selected.bloodGroup || 'O+',
-			relationship: selected.relationship,
-			avatar: selected.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+			bloodGroup: selected.bloodGroup || '',
+			relationship: selected.relationship || selected.relation || 'Family Member',
+			avatar: selected.avatar,
 		})
-	}
-
-	const handleOpenPatientEdit = () => {
-		setTempPatientName(patient.name)
-		setTempPatientAge(patient.age)
-		setTempPatientGender(patient.gender)
-		setTempPatientRel(patient.relationship)
-		setEditPatientVisible(true)
 	}
 
 	const handleSavePatientDetails = () => {
@@ -326,6 +349,8 @@ export default function BookingDetailsPage() {
 			addressId,
 			addressLabel: selectedAddrObj?.label || 'Home',
 			address: selectedAddrObj?.address || visit.address,
+			latitude: (selectedAddrObj as any)?.latitude,
+			longitude: (selectedAddrObj as any)?.longitude,
 			dateId: 'custom',
 			date: dayStr,
 			timeSlot: timeSlot || '09:00 AM - 10:00 AM',
@@ -360,498 +385,343 @@ export default function BookingDetailsPage() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* 1. SECTION: SELECTED SERVICES SUMMARY */}
-				<View style={styles.sectionHeaderRow}>
-					<AppTypography variant="h3" style={styles.sectionHeading}>
-						Selected Procedures & Services ({services.length})
-					</AppTypography>
-					<TouchableOpacity style={styles.headerActionBtn} onPress={handleEditServices} activeOpacity={0.7}>
-						<MaterialCommunityIcons name="plus-circle-outline" size={15} color="#1F5F68" />
-						<AppTypography variant="caption" style={styles.actionBtnText}>
-							Add / Change
-						</AppTypography>
-					</TouchableOpacity>
+				{/* STEP PROGRESS INDICATOR */}
+				<View style={styles.stepperContainer}>
+					<BookingProgressStepper currentStep={2} />
 				</View>
 
-				{services.length > 0 ? (
-					<View style={styles.servicesListContainer}>
-						{services.map((item, index) => (
-							<View key={item.id} style={styles.serviceItemFlat}>
-								{index > 0 && <View style={styles.itemDivider} />}
-								<View style={styles.serviceItemRow}>
+				{/* 1. SECTION: SELECTED PROCEDURES */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Selected Procedures ({services.length})
+						</AppTypography>
+						<TouchableOpacity style={styles.actionBtn} onPress={handleEditServices} activeOpacity={0.7}>
+							<AppTypography variant="caption" style={styles.actionBtnText}>
+								+ Add Services
+							</AppTypography>
+						</TouchableOpacity>
+					</View>
+
+					{services.length > 0 ? (
+						<View style={styles.servicesList}>
+							{services.map((item, index) => (
+								<View key={item.id} style={[styles.serviceRow, index > 0 && styles.serviceRowBorder]}>
+									<Image source={{ uri: item.image }} style={styles.serviceThumb} resizeMode="cover" />
 									<View style={styles.serviceTextCol}>
-										<View style={styles.serviceTitleRow}>
+										<View style={styles.titleRow}>
 											<AppTypography variant="h4" style={styles.serviceTitle} numberOfLines={1}>
 												{item.title}
 											</AppTypography>
 											{services.length > 1 && (
-												<TouchableOpacity
-													style={styles.removeBtn}
-													onPress={() => handleRemoveService(item.id)}
-													activeOpacity={0.7}
-												>
+												<TouchableOpacity onPress={() => handleRemoveService(item.id)} activeOpacity={0.7}>
 													<Ionicons name="trash-outline" size={17} color="#D32F2F" />
 												</TouchableOpacity>
 											)}
 										</View>
-										<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={2}>
+										<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={1}>
 											{item.description}
 										</AppTypography>
-
-										<View style={styles.metaBadgeRow}>
-											<View style={styles.metaItem}>
-												<Ionicons name="time-outline" size={12} color="#526062" />
-												<AppTypography variant="caption" style={styles.metaText}>
+										<View style={styles.serviceMetaRow}>
+											<View style={styles.durationPill}>
+												<Ionicons name="time-outline" size={12} color="#546E7A" />
+												<AppTypography variant="caption" style={styles.durationText}>
 													{item.duration || '30-45 mins'}
 												</AppTypography>
 											</View>
-											<View style={styles.metaItem}>
-												<Ionicons name="shield-checkmark" size={12} color="#1F5F68" />
-												<AppTypography variant="caption" style={styles.metaText}>
-													Verified Specialist
-												</AppTypography>
-											</View>
+											<AppTypography variant="h4" style={styles.servicePrice}>
+												{item.price}
+											</AppTypography>
 										</View>
 									</View>
 								</View>
+							))}
+						</View>
+					) : (
+						<View style={styles.emptyBox}>
+							<AppTypography variant="caption" style={styles.emptyText}>
+								No services selected. Tap Add Services to configure.
+							</AppTypography>
+						</View>
+					)}
+				</View>
 
-								<View style={styles.serviceFooterRow}>
-									<AppTypography variant="h3" style={styles.priceVal}>
-										{item.price}
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
+
+				{/* 2. SECTION: PATIENT RECIPIENT PROFILE */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Patient Recipient
+						</AppTypography>
+						<TouchableOpacity style={styles.actionBtn} onPress={() => setSwitchProfileVisible(true)} activeOpacity={0.7}>
+							<AppTypography variant="caption" style={styles.actionBtnText}>
+								Switch Profile
+							</AppTypography>
+						</TouchableOpacity>
+					</View>
+
+					<View style={styles.patientProfileBox}>
+						<Image source={{ uri: patient.avatar }} style={styles.patientAvatar} resizeMode="cover" />
+						<View style={styles.patientInfoCol}>
+							<View style={styles.patientNameRow}>
+								<AppTypography variant="h3" style={styles.patientName}>
+									{patient.name}
+								</AppTypography>
+								<View style={styles.relationChip}>
+									<AppTypography variant="caption" style={styles.relationText}>
+										{patient.relationship}
 									</AppTypography>
 								</View>
 							</View>
-						))}
-					</View>
-				) : (
-					<View style={styles.emptyBox}>
-						<MaterialCommunityIcons name="medical-bag" size={32} color="#94A3B8" />
-						<AppTypography variant="caption" style={styles.emptyText}>
-							No services selected. Add services to configure your appointment.
-						</AppTypography>
-					</View>
-				)}
-
-				<View style={styles.sectionDivider} />
-
-				{/* 2. SECTION: PATIENT PROFILE */}
-				<View style={styles.sectionHeaderRow}>
-					<AppTypography variant="h3" style={styles.sectionHeading}>
-						Patient Profile
-					</AppTypography>
-					<TouchableOpacity style={styles.headerActionBtn} onPress={() => setSwitchProfileVisible(true)} activeOpacity={0.7}>
-						<MaterialCommunityIcons name="account-switch-outline" size={15} color="#1F5F68" />
-						<AppTypography variant="caption" style={styles.actionBtnText}>
-							Switch Profile
-						</AppTypography>
-					</TouchableOpacity>
-				</View>
-
-
-				<View style={styles.patientProfileContainer}>
-					<Image source={{ uri: patient.avatar }} style={styles.patientAvatar} resizeMode="cover" />
-					<View style={styles.patientInfoCol}>
-						<View style={styles.patientNameRow}>
-							<AppTypography variant="h3" style={styles.patientName}>
-								{patient.name}
+							<AppTypography variant="caption" style={styles.patientMetaText}>
+								{patient.age} Yrs  •  {patient.gender}  •  Blood Group: {patient.bloodGroup}
 							</AppTypography>
-							<View style={styles.relationshipChip}>
-								<AppTypography variant="caption" style={styles.relationshipText}>
-									{patient.relationship}
-								</AppTypography>
-							</View>
 						</View>
-						<AppTypography variant="caption" style={styles.patientMeta}>
-							{patient.age} Yrs  •  {patient.gender}  •  Blood Group: {patient.bloodGroup}
-						</AppTypography>
 					</View>
 				</View>
 
-				<View style={styles.sectionDivider} />
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
 
-				{/* 3. SECTION: VISIT DISPATCH TYPE & SCHEDULE */}
-				<View style={styles.sectionHeaderRow}>
-					<AppTypography variant="h3" style={styles.sectionHeading}>
-						Booking Mode & Schedule
-					</AppTypography>
-					<TouchableOpacity
-						style={styles.headerActionBtn}
-						onPress={() => setEditVisitVisible(true)}
-						activeOpacity={0.7}
-					>
-						<MaterialCommunityIcons
-							name={bookingType === 'INSTANT' ? 'map-marker-outline' : 'pencil-outline'}
-							size={15}
-							color="#1F5F68"
-						/>
-						<AppTypography variant="caption" style={styles.actionBtnText}>
-							{bookingType === 'INSTANT' ? 'Change Address' : 'Modify Schedule & Address'}
+				{/* 3. SECTION: CARE DISPATCH MODE & LOCATION */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Care Mode & Location
 						</AppTypography>
-					</TouchableOpacity>
-				</View>
+					</View>
 
-				{/* INTERACTIVE DISPATCH MODE TOGGLE SWITCHER */}
-				<View style={styles.dispatchToggleWrap}>
-					<TouchableOpacity
-						style={[styles.dispatchToggleTab, bookingType === 'INSTANT' && styles.dispatchToggleTabActive]}
-						onPress={() => {
-							setBookingType('INSTANT')
-							setVisit((prev) => ({ ...prev, timeBadge: 'Instant Dispatch (15-30 mins)' }))
-						}}
-						activeOpacity={0.88}
-					>
-						<Ionicons name="flash" size={16} color={bookingType === 'INSTANT' ? '#FFFFFF' : '#1F5F68'} />
-						<AppTypography variant="h4" style={[styles.dispatchToggleText, bookingType === 'INSTANT' && styles.dispatchToggleTextActive]}>
-							Instant Care
-						</AppTypography>
-					</TouchableOpacity>
+					{/* CARE MODE SEGMENTED CONTROL */}
+					<View style={styles.modeToggleRow}>
+						<TouchableOpacity
+							style={[styles.modeTab, bookingType === 'INSTANT' && styles.modeTabActive]}
+							onPress={() => {
+								setBookingType('INSTANT')
+								setVisit((prev) => ({ ...prev, timeBadge: 'Instant Dispatch (15-30 mins)' }))
+							}}
+							activeOpacity={0.88}
+						>
+							<Ionicons name="flash" size={15} color={bookingType === 'INSTANT' ? '#FFFFFF' : '#2B6F71'} />
+							<AppTypography variant="h4" style={[styles.modeTabText, bookingType === 'INSTANT' && styles.modeTabTextActive]}>
+								Instant Care
+							</AppTypography>
+						</TouchableOpacity>
 
-					<TouchableOpacity
-						style={[styles.dispatchToggleTab, bookingType === 'SCHEDULED' && styles.dispatchToggleTabActive]}
-						onPress={() => {
-							setBookingType('SCHEDULED')
-							setVisit((prev) => ({ ...prev, timeBadge: 'Scheduled Appointment' }))
-							setEditVisitVisible(true)
-						}}
-						activeOpacity={0.88}
-					>
-						<Ionicons name="calendar" size={16} color={bookingType === 'SCHEDULED' ? '#FFFFFF' : '#1F5F68'} />
-						<AppTypography variant="h4" style={[styles.dispatchToggleText, bookingType === 'SCHEDULED' && styles.dispatchToggleTextActive]}>
-							Schedule Visit
-						</AppTypography>
-					</TouchableOpacity>
-				</View>
+						<TouchableOpacity
+							style={[styles.modeTab, bookingType === 'SCHEDULED' && styles.modeTabActive]}
+							onPress={() => {
+								setBookingType('SCHEDULED')
+								setVisit((prev) => ({ ...prev, timeBadge: 'Scheduled Appointment' }))
+								setEditVisitVisible(true)
+							}}
+							activeOpacity={0.88}
+						>
+							<Ionicons name="calendar" size={15} color={bookingType === 'SCHEDULED' ? '#FFFFFF' : '#2B6F71'} />
+							<AppTypography variant="h4" style={[styles.modeTabText, bookingType === 'SCHEDULED' && styles.modeTabTextActive]}>
+								Schedule Visit
+							</AppTypography>
+						</TouchableOpacity>
+					</View>
 
-				{/* DISPATCH MODE HELPER BANNER */}
-				<View style={[styles.dispatchHelperBanner, bookingType === 'INSTANT' ? styles.instantBannerBg : styles.scheduledBannerBg]}>
-					<Ionicons
-						name={bookingType === 'INSTANT' ? 'information-circle' : 'time'}
-						size={18}
-						color={bookingType === 'INSTANT' ? '#065F46' : '#1E40AF'}
-					/>
-					<AppTypography variant="caption" style={[styles.dispatchHelperText, bookingType === 'INSTANT' ? styles.instantHelperTextColor : styles.scheduledHelperTextColor]}>
-						{bookingType === 'INSTANT'
-							? '⚡ Instant Care Mode: Certified nurse nearby will be alerted immediately after booking.'
-							: '📅 Scheduled Care Mode: Nurse will be assigned & dispatched at your chosen date & time slot.'}
-					</AppTypography>
-				</View>
 
-				<View style={styles.visitSummaryBlock}>
-					{/* Address Row */}
-					<View style={styles.visitSummaryItem}>
-						<View style={styles.visitIconBox}>
-							<MaterialCommunityIcons name="map-marker" size={18} color="#1F5F68" />
-						</View>
-						<View style={styles.visitDetailsCol}>
-							<View style={styles.addressLabelRow}>
-								<AppTypography variant="h4" style={styles.visitDetailsHeading}>
-									Selected Visit Address
-								</AppTypography>
-								<View style={styles.addressTypeBadge}>
-									<AppTypography variant="caption" style={styles.addressTypeText}>
-										{visit.addressLabel}
+					{/* ADDRESS BLOCK */}
+					<View style={styles.locationSummaryBox}>
+						<View style={styles.locationItem}>
+							<View style={styles.locationIconWrap}>
+								<Ionicons name="location-outline" size={18} color="#2B6F71" />
+							</View>
+							<View style={styles.locationTextCol}>
+								<View style={styles.locationHeaderRow}>
+									<AppTypography variant="h4" style={styles.locationTitle}>
+										Visit Address ({visit.addressLabel})
 									</AppTypography>
+									<TouchableOpacity onPress={() => setEditVisitVisible(true)} activeOpacity={0.7}>
+										<AppTypography variant="caption" style={styles.changeLinkText}>
+											Change
+										</AppTypography>
+									</TouchableOpacity>
 								</View>
-								<TouchableOpacity
-									style={styles.changeAddressLinkBtn}
-									onPress={() => setEditVisitVisible(true)}
-									activeOpacity={0.7}
-								>
-									<AppTypography variant="caption" style={styles.changeAddressLinkText}>
-										Change
-									</AppTypography>
-								</TouchableOpacity>
+								<AppTypography variant="caption" style={styles.locationAddressText}>
+									{visit.address}
+								</AppTypography>
 							</View>
-							<AppTypography variant="caption" style={styles.visitDetailsVal}>
-								{visit.address}
-							</AppTypography>
 						</View>
-					</View>
 
-					<View style={styles.visitItemSeparator} />
+						<View style={styles.locationDivider} />
 
-					{/* Date & Time Row */}
-					<View style={styles.visitSummaryItem}>
-						<View style={styles.visitIconBox}>
-							<MaterialCommunityIcons
-								name={bookingType === 'INSTANT' ? 'lightning-bolt' : 'calendar-clock'}
-								size={18}
-								color="#1F5F68"
-							/>
-						</View>
-						<View style={styles.visitDetailsCol}>
-							<AppTypography variant="h4" style={styles.visitDetailsHeading}>
-								{bookingType === 'INSTANT' ? 'Care Dispatch Arrival Window' : 'Preferred Date & Time Slot'}
-							</AppTypography>
-							<View style={styles.visitTimeValRow}>
-								<AppTypography variant="body" style={styles.visitTimeValText}>
+						{/* SLOT / ARRIVAL WINDOW */}
+						<View style={styles.locationItem}>
+							<View style={styles.locationIconWrap}>
+								<Ionicons name="time-outline" size={18} color="#2B6F71" />
+							</View>
+							<View style={styles.locationTextCol}>
+								<AppTypography variant="h4" style={styles.locationTitle}>
+									{bookingType === 'INSTANT' ? 'Estimated Arrival Window' : 'Scheduled Date & Time'}
+								</AppTypography>
+								<AppTypography variant="body" style={styles.locationTimeVal}>
 									{bookingType === 'INSTANT'
 										? 'Within 15 - 30 minutes of booking'
-										: `${visit.date}  •  ${visit.timeSlot}`}
+										: `${visit.date} • ${visit.timeSlot}`}
 								</AppTypography>
-								<View style={styles.timeStatusBadge}>
-									<AppTypography variant="caption" style={styles.timeStatusText}>
-										{visit.timeBadge}
-									</AppTypography>
-								</View>
 							</View>
 						</View>
 					</View>
 				</View>
 
-				<View style={styles.sectionDivider} />
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
 
-				{/* 4. SECTION: BILLING BREAKDOWN */}
-				<View style={styles.billingCard}>
-					<AppTypography variant="h4" style={styles.billingTitle}>
-						Payment Summary
-					</AppTypography>
-
-					<View style={styles.billingRow}>
-						<AppTypography variant="body" style={styles.billingLabel}>
-							Procedure Base Charges ({services.length} item{services.length > 1 ? 's' : ''})
-						</AppTypography>
-						<AppTypography variant="body" style={styles.billingVal}>
-							{charges.basePrice}
+				{/* 4. SECTION: PAYMENT SUMMARY */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Payment Breakdown
 						</AppTypography>
 					</View>
 
-					<View style={styles.billingRow}>
-						<AppTypography variant="body" style={styles.billingLabel}>
-							Specialist Doorstep Visit Fee
-						</AppTypography>
-						<AppTypography variant="body" style={styles.billingVal}>
-							{charges.visitFee}
-						</AppTypography>
+					<View style={styles.billingList}>
+						<View style={styles.billingRow}>
+							<AppTypography variant="body" style={styles.billingLabel}>
+								Procedure Charges ({services.length} item{services.length > 1 ? 's' : ''})
+							</AppTypography>
+							<AppTypography variant="body" style={styles.billingVal}>
+								{charges.basePrice}
+							</AppTypography>
+						</View>
+
+						<View style={styles.billingRow}>
+							<AppTypography variant="body" style={styles.billingLabel}>
+								Specialist Doorstep Visit Fee
+							</AppTypography>
+							<AppTypography variant="body" style={styles.billingVal}>
+								{charges.visitFee}
+							</AppTypography>
+						</View>
+
+						<View style={styles.billingRow}>
+							<AppTypography variant="body" style={styles.billingLabel}>
+								Taxes & Operational Fee (5% GST)
+							</AppTypography>
+							<AppTypography variant="body" style={styles.billingVal}>
+								{charges.taxes}
+							</AppTypography>
+						</View>
+
+						<View style={styles.totalDivider} />
+
+						<View style={styles.totalRow}>
+							<AppTypography variant="h3" style={styles.totalLabel}>
+								Total Payable Amount
+							</AppTypography>
+							<AppTypography variant="h3" style={styles.totalVal}>
+								{charges.totalAmount}
+							</AppTypography>
+						</View>
 					</View>
 
-					<View style={styles.billingRow}>
-						<AppTypography variant="body" style={styles.billingLabel}>
-							Taxes & Operational Fee (5% GST)
-						</AppTypography>
-						<AppTypography variant="body" style={styles.billingVal}>
-							{charges.taxes}
-						</AppTypography>
-					</View>
-
-					<View style={styles.billingTotalRow}>
-						<AppTypography variant="h3" style={styles.totalLabel}>
-							Total Payable Amount
-						</AppTypography>
-						<AppTypography variant="h3" style={styles.totalVal}>
-							{charges.totalAmount}
+					{/* GUARANTEE BADGE */}
+					<View style={styles.guaranteeBox}>
+						<Ionicons name="shield-checkmark-outline" size={18} color="#059669" />
+						<AppTypography variant="caption" style={styles.guaranteeText}>
+							100% Certified Nurses • Sanitized Equipment
 						</AppTypography>
 					</View>
-				</View>
-
-				<View style={styles.guaranteeBox}>
-					<MaterialCommunityIcons name="shield-check" size={20} color="#059669" />
-					<AppTypography variant="caption" style={styles.guaranteeText}>
-						100% Certified & Background Checked Healthcare Professionals. Cancellation available before service start.
-					</AppTypography>
 				</View>
 			</ScrollView>
 
-			{/* 7. Bottom Fixed Action Bar */}
+			{/* FIXED BOTTOM CHECKOUT FOOTER */}
 			<View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
 				<View style={styles.bottomBarPriceCol}>
 					<AppTypography variant="caption" style={styles.bottomBarTotalLabel}>
-						Total Price
+						Total Amount
 					</AppTypography>
-					<AppTypography variant="h2" style={styles.bottomBarTotalVal}>
+					<AppTypography variant="h3" style={styles.bottomBarTotalVal}>
 						{charges.totalAmount}
 					</AppTypography>
 				</View>
+
 				<AppButton
 					variant="primary"
-					disabled={services.length === 0}
 					onPress={handleContinueToPayment}
+					disabled={services.length === 0}
 					style={styles.continueBtn}
 				>
-					Confirm & Proceed →
+					Proceed to Payment ➔
 				</AppButton>
 			</View>
 
-			{/* 8. Edit Patient Details Bottom Sheet */}
+			{/* EDIT PATIENT MODAL SHEET */}
 			<AppBottomSheet
 				visible={editPatientVisible}
-				title="Edit Patient Details"
 				onClose={() => setEditPatientVisible(false)}
+				title="Edit Patient Details"
 			>
-				<View style={styles.sheetFormContainer}>
-					<AppInput
-						label="Patient Full Name"
-						value={tempPatientName}
-						onChangeText={setTempPatientName}
-						fieldSize="form"
-					/>
-					<AppInput
-						label="Age"
-						keyboardType="numeric"
-						value={tempPatientAge}
-						onChangeText={setTempPatientAge}
-						fieldSize="form"
-					/>
-					<AppSelect
-						label="Gender"
-						options={GENDER_OPTIONS}
-						value={tempPatientGender}
-						onSelect={setTempPatientGender}
-						size="form"
-					/>
-					<AppSelect
-						label="Relationship"
-						options={RELATIONSHIP_OPTIONS}
-						value={tempPatientRel}
-						onSelect={setTempPatientRel}
-						size="form"
-					/>
+				<View style={styles.modalFormContent}>
+					<AppInput label="Full Name" value={tempPatientName} onChangeText={setTempPatientName} placeholder="Enter name" />
+					<AppInput label="Age (Years)" value={tempPatientAge} onChangeText={setTempPatientAge} keyboardType="numeric" placeholder="Enter age" />
+					<AppSelect label="Gender" value={tempPatientGender} options={GENDER_OPTIONS} onSelect={(val) => setTempPatientGender(val as string)} />
+					<AppSelect label="Relationship" value={tempPatientRel} options={RELATIONSHIP_OPTIONS} onSelect={(val) => setTempPatientRel(val as string)} />
 
-					<AppButton
-						variant="primary"
-						formAction
-						style={styles.saveSheetBtn}
-						onPress={handleSavePatientDetails}
-					>
+					<AppButton variant="primary" onPress={handleSavePatientDetails} style={styles.modalSaveBtn}>
 						Save Patient Details
 					</AppButton>
 				</View>
 			</AppBottomSheet>
 
-			{/* 9. Edit Visit Details Bottom Sheet */}
-			<EditVisitModal
+			{/* EDIT VISIT ADDRESS & SCHEDULE MODAL SHEET */}
+			<AppBottomSheet
 				visible={editVisitVisible}
-				bookingType={bookingType}
-				currentAddressId={visit.addressId}
-				currentDate={selectedDateObj}
-				currentTimeSlot={visit.timeSlot}
-				addressOptions={addressOptions}
 				onClose={() => setEditVisitVisible(false)}
-				onSave={handleSaveVisitDetails}
-				onOpenMap={() => {
-					setEditVisitVisible(false)
-					navigation.navigate(ROUTES.STACK.LOCATION_SELECT)
-				}}
-			/>
+				title={bookingType === 'INSTANT' ? 'Change Visit Address' : 'Configure Schedule & Address'}
+			>
+				<View style={styles.modalFormContent}>
+					<AppSelect
+						label="Select Visit Address"
+						value={visit.addressId}
+						options={addressOptions}
+						onSelect={(id) => {
+							const selected = savedAddressesList.find((a) => a.id === id)
+							if (selected) {
+								setVisit((prev) => ({
+									...prev,
+									addressId: selected.id,
+									addressLabel: selected.label,
+									address: selected.address,
+								}))
+							}
+						}}
+					/>
 
-			{/* 10. Patient Profile Selector Bottom Sheet */}
+					{bookingType === 'SCHEDULED' && (
+						<DateSlotPicker
+							selectedDate={selectedDateObj}
+							onDateChange={(newDate: Date) => setSelectedDateObj(newDate)}
+							selectedTime={visit.timeSlot}
+							onTimeChange={(timeStr: any) => {
+								handleSaveVisitDetails(visit.addressId, selectedDateObj, String(timeStr || '09:00 AM - 10:00 AM'))
+							}}
+							availableSlots={ANCILLARY_SLOTS}
+						/>
+					)}
+
+					{bookingType === 'INSTANT' && (
+						<AppButton variant="primary" onPress={() => setEditVisitVisible(false)} style={styles.modalSaveBtn}>
+							Confirm Location
+						</AppButton>
+					)}
+				</View>
+			</AppBottomSheet>
+
+			{/* PATIENT PROFILE SELECTOR BOTTOM SHEET */}
 			<PatientProfileSelectorBottomSheet
 				visible={switchProfileVisible}
 				onClose={() => setSwitchProfileVisible(false)}
+				onSelectProfile={handleSelectProfile}
 				selectedProfileId={selectedProfileId}
-				onSelectProfile={(profile: any) => {
-					setSelectedProfileId(profile.id)
-					setPatient({
-						name: profile.name || 'John Doe',
-						age: String(profile.age || '45'),
-						gender: profile.gender || 'Male',
-						bloodGroup: profile.bloodGroup || 'O+',
-						relationship: profile.relationship || 'Self',
-						avatar: profile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-					})
-					setSwitchProfileVisible(false)
-				}}
 			/>
 		</View>
-	)
-}
-
-// Sub-Component: Edit Visit Details Bottom Sheet
-interface EditVisitModalProps {
-	visible: boolean
-	bookingType: 'INSTANT' | 'SCHEDULED'
-	currentAddressId: string
-	currentDate: Date
-	currentTimeSlot: string
-	addressOptions?: AppSelectOption[]
-	onClose: () => void
-	onSave: (addressId: string, selectedDate: Date, timeSlot: string) => void
-	onOpenMap: () => void
-}
-
-const EditVisitModal: React.FC<EditVisitModalProps> = ({
-	visible,
-	bookingType,
-	currentAddressId,
-	currentDate,
-	currentTimeSlot,
-	addressOptions,
-	onClose,
-	onSave,
-	onOpenMap,
-}) => {
-	const { width } = useWindowDimensions()
-	const isTablet = width >= 768
-
-	const [selectedAddrId, setSelectedAddrId] = useState(currentAddressId)
-	const [selectedDate, setSelectedDate] = useState<Date>(currentDate || new Date())
-	const [selectedSlot, setSelectedSlot] = useState(currentTimeSlot)
-
-	const isInstant = bookingType === 'INSTANT'
-
-	return (
-		<AppBottomSheet
-			visible={visible}
-			title={isInstant ? 'Select Visit Address' : 'Modify Schedule & Address'}
-			onClose={onClose}
-		>
-			<View style={styles.sheetFormContainer}>
-				{/* Address Section */}
-				<View style={styles.sheetSectionHeaderRow}>
-					<AppTypography variant="h4" style={styles.sheetSectionTitle}>
-						{isInstant ? 'Select Delivery Address for Immediate Care' : 'Selected Visit Address'}
-					</AppTypography>
-					<TouchableOpacity style={styles.mapLinkBtn} onPress={onOpenMap} activeOpacity={0.7}>
-						<Ionicons name="map-outline" size={14} color="#1F5F68" />
-						<AppTypography variant="caption" style={styles.mapLinkText}>
-							Choose on Map
-						</AppTypography>
-					</TouchableOpacity>
-				</View>
-
-				<AppSelect
-					options={addressOptions || ADDRESS_SELECT_OPTIONS}
-					value={selectedAddrId}
-					onSelect={setSelectedAddrId}
-					size="form"
-				/>
-
-				{isInstant ? (
-					<View style={styles.instantNoticeBox}>
-						<Ionicons name="flash-outline" size={18} color="#065F46" />
-						<AppTypography variant="caption" style={styles.instantNoticeText}>
-							⚡ Nurse will be dispatched immediately to this address after payment authorization (~15-30 min arrival).
-						</AppTypography>
-					</View>
-				) : (
-					/* Responsive Date & Time Picker for Scheduled Visit */
-					<View style={styles.dateSlotPickerWrapper}>
-						<DateSlotPicker
-							selectedDate={selectedDate}
-							onDateChange={setSelectedDate}
-							selectedTime={selectedSlot}
-							onTimeChange={setSelectedSlot}
-							availableSlots={ANCILLARY_SLOTS}
-							dateLabel="Select Preferred Date"
-							timeLabel="Select Time Slot"
-							timeSlotColumns={isTablet ? 2 : 1}
-							disablePast
-							hideHeader={false}
-							showAppointmentTypeToggle={false}
-						/>
-					</View>
-				)}
-
-				<AppButton
-					variant="primary"
-					formAction
-					style={styles.saveSheetBtn}
-					onPress={() => onSave(selectedAddrId, selectedDate, selectedSlot)}
-				>
-					{isInstant ? 'Save & Use This Address' : 'Save Schedule & Address'}
-				</AppButton>
-			</View>
-		</AppBottomSheet>
 	)
 }
 
@@ -861,701 +731,345 @@ const styles = StyleSheet.create({
 		backgroundColor: '#FFFFFF',
 	},
 	scrollContent: {
-		paddingHorizontal: 16,
-		paddingTop: 16,
+		paddingHorizontal: 0,
+		paddingTop: 12,
 	},
 	scrollContentTablet: {
-		maxWidth: 720,
-		width: '100%',
+		maxWidth: 640,
 		alignSelf: 'center',
-		paddingHorizontal: 24,
-		paddingTop: 20,
+		width: '100%',
 	},
-	progressStepper: {
-		marginBottom: 20,
+	stepperContainer: {
+		paddingHorizontal: 16,
+		marginBottom: 4,
+	},
+
+	/* MOBILE-FIRST FULL-WIDTH SECTION BLOCKS */
+	sectionBlock: {
+		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 16,
+		paddingVertical: 16,
+		gap: 14,
+	},
+	sectionDividerBar: {
+		height: 8,
+		backgroundColor: '#F4F6F9',
+		borderTopWidth: 1,
+		borderBottomWidth: 1,
+		borderColor: '#E2E8F0',
 	},
 	sectionHeaderRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginTop: 8,
-		marginBottom: 12,
 	},
-	patientActionRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-
 	sectionHeading: {
-		fontSize: 15,
-		fontWeight: '800',
-		color: '#1A2E35',
-		letterSpacing: 0.1,
+		fontSize: 16.5,
+		fontWeight: '700',
+		color: '#0F172A',
+		letterSpacing: -0.2,
 	},
-	headerActionBtn: {
+	actionBtn: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 4,
-		paddingVertical: 4,
-		paddingHorizontal: 8,
-		borderRadius: 8,
-		backgroundColor: '#F0F9F9',
 	},
 	actionBtnText: {
-		fontSize: 12,
-		fontWeight: '700',
-		color: '#1F5F68',
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#2B6F71',
+		letterSpacing: 0.1,
 	},
-	servicesListContainer: {
-		marginBottom: 8,
+
+	/* SERVICES LIST */
+	servicesList: {
+		gap: 12,
 	},
-	serviceItemFlat: {
-		paddingVertical: 12,
-	},
-	itemDivider: {
-		height: 1,
-		backgroundColor: '#ECEFF1',
-		marginBottom: 12,
-	},
-	serviceItemRow: {
+	serviceRow: {
 		flexDirection: 'row',
-		alignItems: 'flex-start',
-		marginBottom: 10,
+		gap: 14,
+		alignItems: 'center',
 	},
-	serviceImage: {
-		width: 60,
-		height: 60,
+	serviceRowBorder: {
+		paddingTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#F1F5F9',
+	},
+	serviceThumb: {
+		width: 72,
+		height: 72,
 		borderRadius: 12,
 		backgroundColor: '#F1F5F9',
 	},
 	serviceTextCol: {
 		flex: 1,
-		marginLeft: 12,
+		gap: 4,
 	},
-	serviceTitleRow: {
+	titleRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
 	},
 	serviceTitle: {
-		fontSize: 14,
-		fontWeight: '800',
-		color: '#1A2E35',
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#0F172A',
 		flex: 1,
 	},
-	removeBtn: {
-		padding: 4,
-		marginLeft: 8,
-	},
 	serviceDesc: {
-		fontSize: 11,
-		color: '#546E7A',
-		marginTop: 2,
-		lineHeight: 15,
+		fontSize: 12.5,
+		color: '#64748B',
+		lineHeight: 17,
 	},
-	metaBadgeRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		marginTop: 6,
-	},
-	metaItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-	},
-	metaText: {
-		fontSize: 10,
-		color: '#607D8B',
-		fontWeight: '600',
-	},
-	serviceFooterRow: {
+	serviceMetaRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginTop: 2,
+		marginTop: 4,
 	},
-	councilBadge: {
+	durationPill: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 8,
-		paddingVertical: 2,
-		borderRadius: 6,
 		gap: 4,
+		backgroundColor: '#F1F5F9',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 6,
 	},
-	councilText: {
-		fontSize: 9,
+	durationText: {
+		fontSize: 11.5,
+		color: '#475569',
+		fontWeight: '500',
+	},
+	servicePrice: {
+		fontSize: 16,
 		fontWeight: '700',
-		color: '#1F5F68',
-	},
-	priceVal: {
-		fontSize: 15,
-		fontWeight: '800',
-		color: '#1F5F68',
+		color: '#0F172A',
 	},
 	emptyBox: {
-		paddingVertical: 24,
-		paddingHorizontal: 16,
 		alignItems: 'center',
-		backgroundColor: '#F8FAFC',
-		borderRadius: 16,
-		borderWidth: 1,
-		borderColor: '#ECEFF1',
-		gap: 8,
-		marginBottom: 16,
+		justifyContent: 'center',
+		paddingVertical: 20,
+		gap: 6,
 	},
 	emptyText: {
-		fontSize: 12,
-		color: '#78909C',
-		textAlign: 'center',
-		lineHeight: 16,
+		fontSize: 13,
+		color: '#64748B',
 	},
-	sectionDivider: {
-		height: 1,
-		backgroundColor: '#ECEFF1',
-		marginVertical: 16,
-	},
-	patientProfileContainer: {
+
+	/* PATIENT RECIPIENT PROFILE */
+	patientProfileBox: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#F8FAFC',
-		borderRadius: 16,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#ECEFF1',
+		borderRadius: 12,
+		padding: 14,
+		gap: 14,
 	},
 	patientAvatar: {
-		width: 50,
-		height: 50,
-		borderRadius: 25,
-		backgroundColor: '#CFD8DC',
+		width: 48,
+		height: 48,
+		borderRadius: 24,
 	},
 	patientInfoCol: {
 		flex: 1,
-		marginLeft: 14,
+		gap: 3,
 	},
 	patientNameRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
-		marginBottom: 4,
 	},
 	patientName: {
-		fontSize: 15,
-		fontWeight: '800',
-		color: '#1A2E35',
+		fontSize: 15.5,
+		fontWeight: '700',
+		color: '#0F172A',
 	},
-	relationshipChip: {
-		backgroundColor: '#ECEFF1',
-		paddingHorizontal: 6,
-		paddingVertical: 1.5,
+	relationChip: {
+		backgroundColor: 'rgba(43, 111, 113, 0.12)',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
 		borderRadius: 6,
 	},
-	relationshipText: {
-		fontSize: 10,
+	relationText: {
+		fontSize: 11.5,
 		fontWeight: '700',
-		color: '#546E7A',
-		textTransform: 'uppercase',
+		color: '#2B6F71',
 	},
-	patientMeta: {
-		fontSize: 12,
-		color: '#546E7A',
-		fontWeight: '500',
-	},
-	visitSummaryBlock: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		borderWidth: 1,
-		borderColor: '#ECEFF1',
-		paddingVertical: 8,
-		paddingHorizontal: 14,
-		elevation: 1,
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.03,
-		shadowRadius: 2,
-	},
-	visitSummaryItem: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		paddingVertical: 12,
-	},
-	visitIconBox: {
-		width: 32,
-		height: 32,
-		borderRadius: 16,
-		backgroundColor: '#E6F3F4',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginTop: 2,
-	},
-	visitDetailsCol: {
-		flex: 1,
-		marginLeft: 12,
-	},
-	addressLabelRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		marginBottom: 4,
-	},
-	visitDetailsHeading: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#546E7A',
-	},
-	addressTypeBadge: {
-		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 6,
-		paddingVertical: 1.5,
-		borderRadius: 6,
-	},
-	addressTypeText: {
-		fontSize: 9,
-		fontWeight: '700',
-		color: '#1F5F68',
-	},
-	visitDetailsVal: {
-		fontSize: 12,
-		color: '#1A2E35',
-		lineHeight: 16,
-	},
-	visitItemSeparator: {
-		height: 1,
-		backgroundColor: '#ECEFF1',
-	},
-	visitTimeValRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		flexWrap: 'wrap',
-		gap: 8,
-		marginTop: 4,
-	},
-	visitTimeValText: {
-		fontSize: 12,
-		fontWeight: '700',
-		color: '#1A2E35',
-	},
-	timeStatusBadge: {
-		backgroundColor: '#FFECB3',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 6,
-	},
-	timeStatusText: {
-		fontSize: 9,
-		fontWeight: '700',
-		color: '#B7791F',
-	},
-	receiptContainer: {
-		backgroundColor: '#F8FAFC',
-		borderRadius: 16,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#ECEFF1',
-	},
-	receiptItem: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginVertical: 4,
-	},
-	receiptItemLabel: {
-		fontSize: 12,
-		color: '#546E7A',
-	},
-	receiptItemVal: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#1A2E35',
-	},
-	receiptDivider: {
-		height: 1,
-		backgroundColor: '#ECEFF1',
-		marginVertical: 10,
-	},
-	receiptTotalRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-	},
-	receiptTotalLabel: {
-		fontSize: 14,
-		fontWeight: '800',
-		color: '#1A2E35',
-	},
-	receiptTotalVal: {
-		fontSize: 18,
-		fontWeight: '800',
-		color: '#1F5F68',
-	},
-	reassuranceBanner: {
-		flexDirection: 'row',
-		backgroundColor: '#F0F9F9',
-		borderRadius: 12,
-		padding: 12,
-		marginTop: 20,
-		marginBottom: 10,
-		alignItems: 'center',
-		gap: 10,
-	},
-	reassuranceText: {
-		flex: 1,
-		fontSize: 10.5,
-		color: '#1F5F68',
-		lineHeight: 14,
-		fontWeight: '500',
-	},
-	stickyFooter: {
-		position: 'absolute',
-		bottom: 0,
-		left: 0,
-		right: 0,
-		backgroundColor: '#FFFFFF',
-		borderTopWidth: 1,
-		borderTopColor: '#ECEFF1',
-		paddingHorizontal: 16,
-		paddingTop: 12,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		elevation: 8,
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: -3 },
-		shadowOpacity: 0.08,
-		shadowRadius: 6,
-	},
-	stickyLeft: {
-		flex: 1,
-		marginRight: 16,
-	},
-	stickyPayLabel: {
-		fontSize: 10,
-		color: '#78909C',
-		fontWeight: '700',
-		textTransform: 'uppercase',
-	},
-	stickyPayVal: {
-		fontSize: 20,
-		fontWeight: '800',
-		color: '#1F5F68',
-		lineHeight: 24,
-	},
-	stickyPaySub: {
-		fontSize: 10,
-		color: '#78909C',
-		marginTop: 1,
-	},
-	continueBtn: {
-		backgroundColor: '#1F5F68',
-		borderRadius: 12,
-		minWidth: 180,
-		height: 48,
-		justifyContent: 'center',
-	},
-	sheetFormContainer: {
-		paddingVertical: 12,
-	},
-	saveSheetBtn: {
-		marginTop: 16,
-		borderRadius: 12,
-	},
-	sheetSectionHeaderRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginBottom: 10,
-	},
-	sheetSectionTitle: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#191C1D',
-	},
-	sheetSectionTitleMargin: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#191C1D',
-		marginTop: 16,
-		marginBottom: 10,
-	},
-	mapLinkBtn: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-	},
-	mapLinkText: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#1F5F68',
-	},
-	sheetAddrItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#F8FAFC',
-		borderRadius: 12,
-		padding: 12,
-		marginBottom: 8,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-	},
-	sheetAddrItemSelected: {
-		backgroundColor: '#F0F9F9',
-		borderColor: '#1F5F68',
-	},
-	radioCircle: {
-		width: 18,
-		height: 18,
-		borderRadius: 9,
-		borderWidth: 1.5,
-		borderColor: '#1F5F68',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginRight: 10,
-	},
-	radioDot: {
-		width: 10,
-		height: 10,
-		borderRadius: 5,
-		backgroundColor: '#1F5F68',
-	},
-	sheetAddrTextCol: {
-		flex: 1,
-	},
-	sheetAddrLabel: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#191C1D',
-	},
-	sheetAddrSub: {
-		fontSize: 11,
-		color: '#526062',
-		marginTop: 2,
-	},
-	dateRowScroll: {
-		gap: 8,
-		paddingRight: 12,
-	},
-	dateChip: {
-		backgroundColor: '#F8FAFC',
-		borderRadius: 10,
-		paddingHorizontal: 14,
-		paddingVertical: 8,
-		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		minWidth: 70,
-	},
-	dateChipSelected: {
-		backgroundColor: '#1F5F68',
-		borderColor: '#1F5F68',
-	},
-	dateChipText: {
-		fontSize: 10,
+	patientMetaText: {
+		fontSize: 12.5,
 		color: '#64748B',
-		fontWeight: '600',
-	},
-	dateChipTextSelected: {
-		color: 'rgba(255,255,255,0.85)',
-	},
-	dateChipDate: {
-		fontSize: 12,
-		fontWeight: '700',
-		color: '#191C1D',
 		marginTop: 2,
 	},
-	dateChipDateSelected: {
-		color: '#FFFFFF',
-	},
-	slotGrid: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 8,
-	},
-	slotItem: {
-		backgroundColor: '#F8FAFC',
-		borderRadius: 10,
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-	},
-	slotItemSelected: {
-		backgroundColor: '#1F5F68',
-		borderColor: '#1F5F68',
-	},
-	slotItemText: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#1F5F68',
-	},
-	slotItemTextSelected: {
-		color: '#FFFFFF',
-	},
-	dateSlotPickerWrapper: {
-		marginTop: 8,
-		marginBottom: 8,
-		marginHorizontal: -8,
-	},
-	dispatchToggleWrap: {
+
+	/* DISPATCH MODE TOGGLE CONTROL */
+	modeToggleRow: {
 		flexDirection: 'row',
 		backgroundColor: '#F1F5F9',
-		borderRadius: 14,
+		borderRadius: 12,
 		padding: 4,
-		marginVertical: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
+		gap: 4,
 	},
-	dispatchToggleTab: {
+	modeTab: {
 		flex: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
 		paddingVertical: 10,
-		paddingHorizontal: 12,
 		borderRadius: 10,
 		gap: 6,
 	},
-	dispatchToggleTabActive: {
-		backgroundColor: '#1F5F68',
-		shadowColor: '#1F5F68',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.15,
-		shadowRadius: 4,
-		elevation: 2,
+	modeTabActive: {
+		backgroundColor: '#2B6F71',
 	},
-	dispatchToggleText: {
-		fontSize: 13,
+	modeTabText: {
+		fontSize: 13.5,
 		fontWeight: '600',
-		color: '#475569',
+		color: '#2B6F71',
 	},
-	dispatchToggleTextActive: {
+	modeTabTextActive: {
 		color: '#FFFFFF',
 		fontWeight: '700',
 	},
-	dispatchHelperBanner: {
+	helperBanner: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		borderRadius: 12,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
-		marginBottom: 16,
+		borderRadius: 10,
+		padding: 10,
 		gap: 8,
 	},
 	instantBannerBg: {
-		backgroundColor: '#ECFDF5',
-		borderColor: '#A7F3D0',
-		borderWidth: 1,
+		backgroundColor: 'rgba(6, 95, 70, 0.08)',
 	},
 	scheduledBannerBg: {
-		backgroundColor: '#EFF6FF',
-		borderColor: '#BFDBFE',
-		borderWidth: 1,
+		backgroundColor: 'rgba(30, 64, 175, 0.08)',
 	},
-	dispatchHelperText: {
-		flex: 1,
+	helperText: {
 		fontSize: 11.5,
+		flex: 1,
 		lineHeight: 16,
 	},
-	instantHelperTextColor: {
+	instantHelperColor: {
 		color: '#065F46',
 	},
-	scheduledHelperTextColor: {
+	scheduledHelperColor: {
 		color: '#1E40AF',
 	},
-	changeAddressLinkBtn: {
-		marginLeft: 'auto',
-		paddingHorizontal: 8,
-		paddingVertical: 2,
-		borderRadius: 6,
-		backgroundColor: '#E6F3F4',
+
+	/* LOCATION BLOCK */
+	locationSummaryBox: {
+		backgroundColor: '#F8FAFC',
+		borderRadius: 12,
+		padding: 14,
+		gap: 12,
 	},
-	changeAddressLinkText: {
-		fontSize: 10,
-		fontWeight: '700',
-		color: '#1F5F68',
+	locationItem: {
+		flexDirection: 'row',
+		gap: 12,
+		alignItems: 'flex-start',
 	},
-	instantNoticeBox: {
+	locationIconWrap: {
+		width: 34,
+		height: 34,
+		borderRadius: 17,
+		backgroundColor: '#E6F4F4',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	locationTextCol: {
+		flex: 1,
+		gap: 3,
+	},
+	locationHeaderRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#ECFDF5',
-		borderRadius: 12,
-		padding: 12,
-		marginVertical: 14,
-		gap: 8,
-		borderWidth: 1,
-		borderColor: '#A7F3D0',
+		justifyContent: 'space-between',
 	},
-	instantNoticeText: {
-		flex: 1,
-		fontSize: 11.5,
-		color: '#065F46',
-		lineHeight: 16,
-	},
-	billingCard: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		marginVertical: 12,
-		gap: 10,
-	},
-	billingTitle: {
-		fontSize: 15,
+	locationTitle: {
+		fontSize: 13.5,
 		fontWeight: '700',
 		color: '#0F172A',
-		marginBottom: 4,
+	},
+	changeLinkText: {
+		fontSize: 12.5,
+		fontWeight: '600',
+		color: '#2B6F71',
+	},
+	locationAddressText: {
+		fontSize: 12.5,
+		color: '#64748B',
+		lineHeight: 18,
+	},
+	locationDivider: {
+		height: 1,
+		backgroundColor: '#E2E8F0',
+	},
+	locationTimeVal: {
+		fontSize: 13,
+		color: '#2B6F71',
+		fontWeight: '700',
+	},
+
+	/* PAYMENT SUMMARY */
+	billingList: {
+		gap: 10,
 	},
 	billingRow: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
 		alignItems: 'center',
+		justifyContent: 'space-between',
 	},
 	billingLabel: {
-		fontSize: 12.5,
-		color: '#64748B',
+		fontSize: 13.5,
+		color: '#475569',
 	},
 	billingVal: {
-		fontSize: 13,
+		fontSize: 13.5,
 		fontWeight: '600',
-		color: '#1E293B',
+		color: '#0F172A',
 	},
-	billingTotalRow: {
+	totalDivider: {
+		height: 1,
+		backgroundColor: '#E2E8F0',
+		marginVertical: 4,
+	},
+	totalRow: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingTop: 10,
-		borderTopWidth: 1,
-		borderTopColor: '#E2E8F0',
-		marginTop: 4,
+		justifyContent: 'space-between',
 	},
 	totalLabel: {
-		fontSize: 14,
+		fontSize: 16,
 		fontWeight: '700',
 		color: '#0F172A',
 	},
 	totalVal: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#1F5F68',
+		fontSize: 19,
+		fontWeight: '800',
+		color: '#2B6F71',
 	},
 	guaranteeBox: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#ECFDF5',
+		backgroundColor: 'rgba(5, 150, 105, 0.08)',
 		borderRadius: 12,
 		padding: 12,
-		marginVertical: 12,
 		gap: 10,
+		marginTop: 6,
 	},
 	guaranteeText: {
+		fontSize: 12,
+		color: '#047857',
+		fontWeight: '600',
 		flex: 1,
-		fontSize: 11.5,
-		color: '#065F46',
-		lineHeight: 16,
+		lineHeight: 17,
 	},
+
+	/* STICKY BOTTOM CHECKOUT FOOTER */
 	bottomBar: {
+		position: 'absolute',
+		bottom: 0,
+		left: 0,
+		right: 0,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
@@ -1564,17 +1078,36 @@ const styles = StyleSheet.create({
 		paddingTop: 12,
 		borderTopWidth: 1,
 		borderTopColor: '#E2E8F0',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: -3 },
+		shadowOpacity: 0.06,
+		shadowRadius: 6,
+		elevation: 8,
 	},
 	bottomBarPriceCol: {
 		justifyContent: 'center',
 	},
 	bottomBarTotalLabel: {
 		fontSize: 11,
+		fontWeight: '600',
 		color: '#64748B',
+		letterSpacing: 0.5,
 	},
 	bottomBarTotalVal: {
-		fontSize: 18,
-		fontWeight: '700',
+		fontSize: 20,
+		fontWeight: '800',
 		color: '#0F172A',
+	},
+	continueBtn: {
+		minWidth: 180,
+	},
+
+	/* MODALS */
+	modalFormContent: {
+		gap: 12,
+		paddingTop: 8,
+	},
+	modalSaveBtn: {
+		marginTop: 8,
 	},
 })

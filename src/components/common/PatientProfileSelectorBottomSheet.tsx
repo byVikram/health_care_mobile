@@ -16,6 +16,7 @@ import { getFamilyMembers } from '../../features/profile/patient/PatientProfileS
 
 export interface PatientProfile {
 	id: string
+	publicId?: string
 	name: string
 	age: string | number
 	gender: string
@@ -35,39 +36,11 @@ interface PatientProfileSelectorBottomSheetProps {
 const FALLBACK_MOCK_PROFILES: PatientProfile[] = [
 	{
 		id: 'self-1',
-		name: 'John Doe',
-		age: '45',
-		gender: 'Male',
+		name: 'Patient Account Holder',
+		age: '',
+		gender: '',
 		relationship: 'Self',
-		avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-		bloodGroup: 'O+',
-	},
-	{
-		id: 'spouse-2',
-		name: 'Jane Doe',
-		age: '42',
-		gender: 'Female',
-		relationship: 'Spouse',
-		avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
-		bloodGroup: 'O+',
-	},
-	{
-		id: 'child-3',
-		name: 'Tommy Doe',
-		age: '12',
-		gender: 'Male',
-		relationship: 'Child',
-		avatar: 'https://images.unsplash.com/photo-1503919545889-aef636e10ad4?auto=format&fit=crop&w=200&q=80',
-		bloodGroup: 'O-',
-	},
-	{
-		id: 'parent-4',
-		name: 'Mary Doe',
-		age: '70',
-		gender: 'Female',
-		relationship: 'Parent',
-		avatar: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=200&q=80',
-		bloodGroup: 'B+',
+		bloodGroup: '',
 	},
 ]
 
@@ -78,7 +51,7 @@ const calculateAge = (dobString: string): string => {
 		const ageDate = new Date(diffMs)
 		return String(Math.abs(ageDate.getUTCFullYear() - 1970))
 	} catch {
-		return '30'
+		return ''
 	}
 }
 
@@ -109,18 +82,19 @@ export const PatientProfileSelectorBottomSheet: React.FC<PatientProfileSelectorB
 						await AsyncStorage.setItem('family_members', JSON.stringify(apiMembers))
 
 						// Map them to PatientProfile array
-						const selfObj = apiMembers.find(m => m.is_self)
-						const familyObjs = apiMembers.filter(m => !m.is_self)
+						const selfObj = apiMembers.find(m => m.is_self || m.relation === 'SELF' || m.relationship === 'Self')
+						const familyObjs = apiMembers.filter(m => !(m.is_self || m.relation === 'SELF' || m.relationship === 'Self'))
 
 						if (selfObj) {
 							list.push({
-								id: String(selfObj.id),
+								id: selfObj.publicId || selfObj.public_id || String(selfObj.id),
+								publicId: selfObj.publicId || selfObj.public_id,
 								name: selfObj.name,
-								age: selfObj.age || '45',
-								gender: selfObj.gender || 'Male',
+								age: selfObj.age || '',
+								gender: selfObj.gender || '',
 								relationship: 'Self',
-								avatar: selfObj.avatar_s3_key || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-								bloodGroup: selfObj.blood_group || 'O+',
+								avatar: selfObj.avatar_s3_key || undefined,
+								bloodGroup: selfObj.blood_group || undefined,
 							})
 						} else {
 							// fallback Self from user profile in AsyncStorage or mock
@@ -128,13 +102,14 @@ export const PatientProfileSelectorBottomSheet: React.FC<PatientProfileSelectorB
 							if (userRaw) {
 								const userData = JSON.parse(userRaw)
 								list.push({
-									id: userData.id || 'self-1',
+									id: userData.publicId || userData.public_id || userData.id || 'self-1',
+									publicId: userData.publicId || userData.public_id,
 									name: userData.name || userData.full_name || 'Self',
-									age: userData.age || '45',
-									gender: userData.gender || 'Male',
+									age: userData.age || '',
+									gender: userData.gender || '',
 									relationship: 'Self',
-									avatar: userData.avatar || userData.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-									bloodGroup: userData.bloodGroup || userData.blood_group || 'O+',
+									avatar: userData.avatar || userData.photo_url || undefined,
+									bloodGroup: userData.bloodGroup || userData.blood_group || undefined,
 								})
 							} else {
 								list.push(FALLBACK_MOCK_PROFILES[0])
@@ -142,12 +117,13 @@ export const PatientProfileSelectorBottomSheet: React.FC<PatientProfileSelectorB
 						}
 
 						// Add mapped family profiles
-						const mappedFamily = familyObjs.map((item, idx) => ({
-							id: String(item.id),
+						const mappedFamily: PatientProfile[] = familyObjs.map((item) => ({
+							id: item.publicId || item.public_id || String(item.id),
+							publicId: item.publicId || item.public_id,
 							name: item.name,
-							age: item.age || '30',
-							gender: item.gender || 'Female',
-							relationship: item.relation || 'Family Member',
+							age: item.age || '',
+							gender: item.gender || '',
+							relationship: item.relation || item.relationship || 'Family Member',
 							avatar: item.avatar_s3_key || undefined,
 							bloodGroup: item.blood_group || undefined,
 						}))

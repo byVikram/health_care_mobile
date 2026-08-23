@@ -35,8 +35,8 @@ interface PaymentMethodItem {
 const PAYMENT_METHODS: PaymentMethodItem[] = [
 	{
 		id: 'upi',
-		title: 'UPI',
-		subtitle: 'Pay via GPay, PhonePe, or Paytm',
+		title: 'UPI Payment',
+		subtitle: 'Instant pay via GPay, PhonePe, or Paytm',
 		iconName: 'qrcode-scan',
 		brandIcons: ['GPay', 'PhonePe', 'Paytm'],
 		badge: 'Recommended',
@@ -49,23 +49,17 @@ const PAYMENT_METHODS: PaymentMethodItem[] = [
 		brandIcons: ['Visa', 'Mastercard', 'RuPay'],
 	},
 	{
+		id: 'cash',
+		title: 'Cash / Pay After Service',
+		subtitle: 'Pay practitioner directly upon visit completion',
+		iconName: 'cash-multiple',
+		badge: 'No Extra Fee',
+	},
+	{
 		id: 'netbanking',
 		title: 'Net Banking',
 		subtitle: 'All major Indian banks supported',
 		iconName: 'bank-outline',
-	},
-	{
-		id: 'wallet',
-		title: 'Digital Wallets',
-		subtitle: 'Amazon Pay, Paytm Wallet & more',
-		iconName: 'wallet-outline',
-	},
-	{
-		id: 'cash',
-		title: 'Cash After Service',
-		subtitle: 'Pay cash to the practitioner at visit completion',
-		iconName: 'cash-multiple',
-		badge: 'No Extra Fee',
 	},
 ]
 
@@ -87,7 +81,18 @@ export default function AncillaryPaymentPage() {
 		},
 	]
 	const charges = bookingPayload.charges || { totalAmount: '₹667', basePrice: '₹499', visitFee: '₹150', taxes: '₹18' }
-	const visit = bookingPayload.visit || { date: 'Today, Aug 10, 2025', timeSlot: '09:00 AM - 10:00 AM' }
+	const isInstant = bookingPayload.bookingType === 'INSTANT' || (!bookingPayload.bookingType && !bookingPayload.visit?.date)
+
+	const todayDynamic = `Today, ${new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`
+	const visit = bookingPayload.visit || {
+		date: todayDynamic,
+		timeSlot: '09:00 AM - 10:00 AM',
+		address: 'User Selected Location',
+	}
+
+	const scheduleDisplayText = isInstant
+		? "Instant Care: Dispatch within 15 - 30 minutes"
+		: `${visit.date} • ${visit.timeSlot}`
 
 	const [selectedMethodId, setSelectedMethodId] = useState('upi')
 	const [submitting, setSubmitting] = useState(false)
@@ -96,29 +101,52 @@ export default function AncillaryPaymentPage() {
 	const [activeTaskModalVisible, setActiveTaskModalVisible] = useState(false)
 	const [existingActiveBookingId, setExistingActiveBookingId] = useState<string>('')
 
+	const patientInfo = bookingPayload.patient || {
+		publicId: bookingPayload.patientPublicId,
+		name: 'Patient Recipient',
+		age: 0,
+		gender: '',
+		relationship: 'Self',
+	}
+
 	const handlePaySecurely = async () => {
 		setSubmitting(true)
 		const idempotencyKey = generateIdempotencyKey()
 		const publicId = `BK-${Math.floor(100000 + Math.random() * 900000)}`
 
+		const targetPublicId = patientInfo?.publicId || patientInfo?.id || bookingPayload.patientPublicId
+
+		const requestPayload = {
+			publicBookingId: publicId,
+			serviceTypeId: services[0]?.id || 'srv-01',
+			bookingType: bookingPayload.bookingType || 'INSTANT',
+			scheduledStartTime: bookingPayload.bookingType === 'SCHEDULED' ? visit.date : null,
+			paymentMethod: selectedMethodId,
+			patientPublicId: targetPublicId,
+			address: {
+				streetAddress: visit.address || 'User Address',
+				...(visit?.latitude != null ? { latitude: visit.latitude } : {}),
+				...(visit?.longitude != null ? { longitude: visit.longitude } : {}),
+			},
+			totalAmount: charges.totalAmount,
+		}
+
+		console.log('\n========================================')
+		console.log('🚀 [ANCILLARY_ORDER_FRONTEND] SUBMITTING ORDER PAYLOAD:')
+		console.log(JSON.stringify(requestPayload, null, 2))
+		console.log('========================================\n')
+
 		try {
-			await ApiService.post(
+			const res = await ApiService.post(
 				API_ENDPOINTS.ANCILLARY.REQUESTS,
-				{
-					publicBookingId: publicId,
-					serviceTypeId: services[0]?.id || 'srv-01',
-					bookingType: bookingPayload.bookingType || 'INSTANT',
-					scheduledStartTime: bookingPayload.bookingType === 'SCHEDULED' ? visit.date : null,
-					paymentMethod: selectedMethodId,
-					address: {
-						streetAddress: visit.address || 'User Address',
-						latitude: 12.9716,
-						longitude: 77.5946,
-					},
-					totalAmount: charges.totalAmount,
-				},
+				requestPayload,
 				{ headers: { 'Idempotency-Key': idempotencyKey } }
 			)
+			console.log('\n========================================')
+			console.log('✅ [ANCILLARY_ORDER_FRONTEND] ORDER RESPONSE RECEIVED:')
+			console.log(JSON.stringify(res.data, null, 2))
+			console.log('========================================\n')
+
 			setSubmitting(false)
 			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId: publicId,
@@ -132,6 +160,9 @@ export default function AncillaryPaymentPage() {
 		} catch (error: any) {
 			setSubmitting(false)
 			const errData = error.response?.data?.detail || error.response?.data
+			console.log('\n========================================')
+			console.log('❌ [ANCILLARY_ORDER_FRONTEND] ORDER FAILED:', errData || error.message)
+			console.log('========================================\n')
 			if (error.response?.status === 409 || errData?.code === 'ACTIVE_TASK_EXISTS') {
 				const activeId = errData?.activeTask?.requestId || errData?.activeTask?.publicBookingId || 'BK-ACTIVE'
 				setExistingActiveBookingId(activeId)
@@ -152,7 +183,7 @@ export default function AncillaryPaymentPage() {
 
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader title="Complete Your Booking" />
+			<AppScreenHeader title="Complete Payment" />
 
 			<ScrollView
 				contentContainerStyle={[
@@ -162,91 +193,88 @@ export default function AncillaryPaymentPage() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Booking Stage Progress */}
-				<BookingProgressStepper currentStep={3} style={styles.progressStepper} />
+				{/* STEP PROGRESS INDICATOR */}
+				<View style={styles.stepperContainer}>
+					<BookingProgressStepper currentStep={3} />
+				</View>
 
-				{/* SECTION 1: DYNAMIC ORDER OVERVIEW */}
-				<View style={styles.overviewContainer}>
-					<View style={styles.overviewHeaderRow}>
-						<View style={styles.overviewSummaryCol}>
-							<AppTypography variant="h3" style={styles.overviewTitle}>
-								Booking Overview
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.overviewSub}>
-								{services.length} Service{services.length > 1 ? 's' : ''}  •  {charges.totalAmount}
-							</AppTypography>
+				{/* 1. SECTION: ORDER SUMMARY BLOCK */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.summaryHeaderRow}>
+						<View style={styles.summaryTitleGroup}>
+							<MaterialCommunityIcons name="receipt-text-outline" size={20} color="#2B6F71" />
+							<View>
+								<AppTypography variant="h3" style={styles.sectionHeading}>
+									Order Summary
+								</AppTypography>
+								<AppTypography variant="caption" style={styles.summarySub}>
+									{services.length} Procedure{services.length > 1 ? 's' : ''} • {charges.totalAmount}
+								</AppTypography>
+							</View>
 						</View>
 						<TouchableOpacity
-							style={styles.expandToggleBtn}
+							style={styles.expandBtn}
 							onPress={() => setSummaryExpanded((prev) => !prev)}
 							activeOpacity={0.7}
 						>
-							<AppTypography variant="caption" style={styles.expandToggleText}>
-								{summaryExpanded ? 'Hide Details' : 'Show Details'}
+							<AppTypography variant="caption" style={styles.expandText}>
+								{summaryExpanded ? 'Hide' : 'Details'}
 							</AppTypography>
-							<Ionicons
-								name={summaryExpanded ? 'chevron-up' : 'chevron-down'}
-								size={14}
-								color="#1F5F68"
-							/>
+							<Ionicons name={summaryExpanded ? 'chevron-up' : 'chevron-down'} size={14} color="#2B6F71" />
 						</TouchableOpacity>
 					</View>
 
-					{/* Booking Date/Time Schedule row */}
-					<View style={styles.scheduleRow}>
-						<MaterialCommunityIcons name="calendar-clock" size={16} color="#1F5F68" />
-						<AppTypography variant="body" style={styles.scheduleText}>
-							{visit.date}  •  {visit.timeSlot}
+					{/* Schedule Info Bar */}
+					<View style={styles.scheduleBar}>
+						<AppTypography variant="caption" style={styles.scheduleText}>
+							{scheduleDisplayText}
 						</AppTypography>
 					</View>
 
-					{/* Expandable Services list */}
+					{/* Expandable Procedure Details */}
 					{summaryExpanded && (
-						<View style={styles.expandedListContainer}>
-							<View style={styles.horizontalLine} />
+						<View style={styles.expandedDetailsWrap}>
+							<View style={styles.dividerLine} />
 							{services.map((item, idx) => (
-								<View key={item.id || idx} style={styles.compactServiceItem}>
-									<View style={styles.compactServiceItemRow}>
-										<Image source={{ uri: item.image }} style={styles.compactServiceImg} />
-										<View style={styles.compactServiceTextCol}>
-											<AppTypography variant="h4" style={styles.compactServiceTitle} numberOfLines={1}>
-												{item.title}
-											</AppTypography>
-											<AppTypography variant="caption" style={styles.compactServiceDuration}>
-												{item.duration || '30 - 45 mins'} • At Home
-											</AppTypography>
-										</View>
-										<AppTypography variant="h4" style={styles.compactServicePrice}>
-											{item.price}
+								<View key={item.id || idx} style={styles.procedureItemRow}>
+									<Image source={{ uri: item.image }} style={styles.procedureItemImg} resizeMode="cover" />
+									<View style={styles.procedureItemTextCol}>
+										<AppTypography variant="h4" style={styles.procedureItemTitle} numberOfLines={1}>
+											{item.title}
+										</AppTypography>
+										<AppTypography variant="caption" style={styles.procedureItemMeta}>
+											{item.duration || '30 - 45 mins'} • Home Visit
 										</AppTypography>
 									</View>
+									<AppTypography variant="h4" style={styles.procedureItemPrice}>
+										{item.price}
+									</AppTypography>
 								</View>
 							))}
 
-							<View style={styles.horizontalLine} />
-							{/* Cost breakdown */}
-							<View style={styles.pricingBreakdown}>
-								<View style={styles.pricingRow}>
-									<AppTypography variant="caption" style={styles.pricingLabel}>
-										Treatment Fee
+							<View style={styles.dividerLine} />
+							<View style={styles.costBreakdownList}>
+								<View style={styles.costRow}>
+									<AppTypography variant="caption" style={styles.costLabel}>
+										Base Procedure Charges
 									</AppTypography>
-									<AppTypography variant="caption" style={styles.pricingVal}>
+									<AppTypography variant="caption" style={styles.costVal}>
 										{charges.basePrice}
 									</AppTypography>
 								</View>
-								<View style={styles.pricingRow}>
-									<AppTypography variant="caption" style={styles.pricingLabel}>
-										Home Visit & Sanitization
+								<View style={styles.costRow}>
+									<AppTypography variant="caption" style={styles.costLabel}>
+										Specialist Doorstep Visit Fee
 									</AppTypography>
-									<AppTypography variant="caption" style={styles.pricingVal}>
+									<AppTypography variant="caption" style={styles.costVal}>
 										{charges.visitFee}
 									</AppTypography>
 								</View>
-								<View style={styles.pricingRow}>
-									<AppTypography variant="caption" style={styles.pricingLabel}>
-										Taxes & Medical Admin
+								<View style={styles.costRow}>
+									<AppTypography variant="caption" style={styles.costLabel}>
+										Taxes & GST (5%)
 									</AppTypography>
-									<AppTypography variant="caption" style={styles.pricingVal}>
+									<AppTypography variant="caption" style={styles.costVal}>
 										{charges.taxes}
 									</AppTypography>
 								</View>
@@ -255,79 +283,49 @@ export default function AncillaryPaymentPage() {
 					)}
 				</View>
 
-				{/* SECTION 2: CHOOSE PAYMENT METHOD */}
-				<AppTypography variant="h3" style={styles.sectionHeading}>
-					Select Payment Method
-				</AppTypography>
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
 
-				<View style={styles.paymentSelectorContainer}>
-					{/* Group 1: Cash Options */}
-					<View style={styles.paymentGroup}>
-						<AppTypography variant="caption" style={styles.groupLabel}>
-							Pay After Visit
-						</AppTypography>
-						{PAYMENT_METHODS.filter((m) => m.id === 'cash').map((method) => {
-							const isSelected = selectedMethodId === method.id
-							return (
-								<TouchableOpacity
-									key={method.id}
-									style={[styles.methodRow, isSelected && styles.methodRowSelected]}
-									onPress={() => setSelectedMethodId(method.id)}
-									activeOpacity={0.8}
-								>
-									<View style={styles.methodIconBox}>
-										<MaterialCommunityIcons name={method.iconName} size={20} color={isSelected ? '#1F5F68' : '#607D8B'} />
-									</View>
-									<View style={styles.methodDetailsCol}>
-										<View style={styles.methodHeaderRow}>
-											<AppTypography variant="h4" style={styles.methodTitle}>
-												{method.title}
-											</AppTypography>
-											{method.badge && (
-												<View style={styles.badgeChip}>
-													<AppTypography variant="caption" style={styles.badgeChipText}>
-														{method.badge}
-													</AppTypography>
-												</View>
-											)}
-										</View>
-										<AppTypography variant="caption" style={styles.methodSub}>
-											{method.subtitle}
-										</AppTypography>
-									</View>
-									<View style={[styles.radioButton, isSelected && styles.radioButtonSelected]}>
-										{isSelected && <View style={styles.radioDot} />}
-									</View>
-								</TouchableOpacity>
-							)
-						})}
+				{/* 2. SECTION: PAYMENT METHOD SELECTOR */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<View style={styles.summaryTitleGroup}>
+							<MaterialCommunityIcons name="credit-card-settings-outline" size={20} color="#2B6F71" />
+							<AppTypography variant="h3" style={styles.sectionHeading}>
+								Select Payment Option
+							</AppTypography>
+						</View>
 					</View>
 
-					{/* Group 2: Online Options (Simulated) */}
-					<View style={styles.paymentGroup}>
-						<AppTypography variant="caption" style={styles.groupLabel}>
-							Prepay Online (Simulated)
-						</AppTypography>
-						{PAYMENT_METHODS.filter((m) => m.id !== 'cash').map((method) => {
+					<View style={styles.paymentMethodsList}>
+						{PAYMENT_METHODS.map((method) => {
 							const isSelected = selectedMethodId === method.id
 							return (
 								<TouchableOpacity
 									key={method.id}
-									style={[styles.methodRow, isSelected && styles.methodRowSelected]}
+									style={[styles.methodCard, isSelected && styles.methodCardSelected]}
 									onPress={() => setSelectedMethodId(method.id)}
-									activeOpacity={0.8}
+									activeOpacity={0.88}
 								>
-									<View style={styles.methodIconBox}>
-										<MaterialCommunityIcons name={method.iconName} size={20} color={isSelected ? '#1F5F68' : '#607D8B'} />
+									<View style={styles.methodIconWrap}>
+										<MaterialCommunityIcons
+											name={method.iconName}
+											size={22}
+											color={isSelected ? '#2B6F71' : '#64748B'}
+										/>
 									</View>
-									<View style={styles.methodDetailsCol}>
-										<View style={styles.methodHeaderRow}>
+
+									<View style={styles.methodTextCol}>
+										<View style={styles.methodTitleRow}>
 											<AppTypography variant="h4" style={styles.methodTitle}>
 												{method.title}
 											</AppTypography>
 											{method.badge && (
-												<View style={styles.recommendChip}>
-													<AppTypography variant="caption" style={styles.recommendChipText}>
+												<View style={[styles.badgeChip, method.id === 'cash' ? styles.cashBadge : styles.recommendedBadge]}>
+													<AppTypography
+														variant="caption"
+														style={method.id === 'cash' ? styles.cashBadgeText : styles.recommendedBadgeText}
+													>
 														{method.badge}
 													</AppTypography>
 												</View>
@@ -336,19 +334,22 @@ export default function AncillaryPaymentPage() {
 										<AppTypography variant="caption" style={styles.methodSub}>
 											{method.subtitle}
 										</AppTypography>
+
 										{method.brandIcons && (
-											<View style={styles.brandLogosRow}>
-												{method.brandIcons.map((brand) => (
-													<View key={brand} style={styles.brandLogoTag}>
-														<AppTypography variant="caption" style={styles.brandLogoText}>
-															{brand}
+											<View style={styles.brandRow}>
+												{method.brandIcons.map((b) => (
+													<View key={b} style={styles.brandChip}>
+														<AppTypography variant="caption" style={styles.brandChipText}>
+															{b}
 														</AppTypography>
 													</View>
 												))}
 											</View>
 										)}
 									</View>
-									<View style={[styles.radioButton, isSelected && styles.radioButtonSelected]}>
+
+									{/* Radio Selector Circle */}
+									<View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
 										{isSelected && <View style={styles.radioDot} />}
 									</View>
 								</TouchableOpacity>
@@ -357,54 +358,53 @@ export default function AncillaryPaymentPage() {
 					</View>
 				</View>
 
-				{/* Simulated Payment Notice Banner */}
-				<View style={styles.simulatedNoticeBox}>
-					<MaterialCommunityIcons name="information-outline" size={18} color="#0D9488" />
-					<AppTypography variant="caption" style={styles.simulatedNoticeText}>
-						You will not be billed immediately. Confirming now finalizes your scheduled nursing visit. Online payments can be completed at service conclusion.
-					</AppTypography>
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
+
+				{/* 3. SECTION: SECURITY & DISPATCH NOTICE */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.securityBox}>
+						<MaterialCommunityIcons name="shield-lock-outline" size={20} color="#2B6F71" />
+						<View style={styles.securityTextCol}>
+							<AppTypography variant="h4" style={styles.securityTitle}>
+								256-bit Encrypted Security & Guarantee
+							</AppTypography>
+							<AppTypography variant="caption" style={styles.securitySub}>
+								Your appointment will be confirmed immediately. Practitioner info and OTP tracking details will be generated upon confirmation.
+							</AppTypography>
+						</View>
+					</View>
 				</View>
 			</ScrollView>
 
-			{/* Sticky Bottom Footer */}
-			<View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-				<View style={styles.stickyLeft}>
-					<AppTypography variant="caption" style={styles.stickyPayLabel}>
+			{/* FIXED STICKY FOOTER ACTION BAR */}
+			<View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+				<View style={styles.bottomBarPriceCol}>
+					<AppTypography variant="caption" style={styles.bottomBarTotalLabel}>
 						Total Amount
 					</AppTypography>
-					<AppTypography variant="h2" style={styles.stickyPayVal}>
+					<AppTypography variant="h3" style={styles.bottomBarTotalVal}>
 						{charges.totalAmount}
-					</AppTypography>
-					<AppTypography variant="caption" style={styles.stickyPaySub}>
-						{selectedMethodId === 'cash' ? 'Pay after treatment' : 'Charged after visit'}
 					</AppTypography>
 				</View>
 
-				<View style={styles.stickyActionCol}>
-					<AppButton
-						variant="primary"
-						disabled={submitting}
-						onPress={handlePaySecurely}
-						style={styles.payBtn}
-					>
-						{submitting ? 'Confirming...' : selectedMethodId === 'cash' ? 'Confirm Booking' : 'Confirm & Proceed'}
-					</AppButton>
-					
-					<View style={styles.termsWrapper}>
-						<MaterialCommunityIcons name="shield-lock-outline" size={10} color="#78909C" />
-						<AppTypography variant="caption" style={styles.termsText}>
-							Secure Booking • Agreement to terms
-						</AppTypography>
-					</View>
-				</View>
+				<AppButton
+					variant="primary"
+					disabled={submitting}
+					onPress={handlePaySecurely}
+					style={styles.payBtn}
+				>
+					{submitting ? 'Confirming...' : 'Confirm & Dispatch Nurse ➔'}
+				</AppButton>
 			</View>
-			{/* Active Task Restriction Warning Modal */}
+
+			{/* ACTIVE TASK CONFLICT MODAL */}
 			<StatusModal
 				visible={activeTaskModalVisible}
 				status="error"
-				title="Active Task in Progress"
-				description="You already have a nurse task in progress. Please wait until it is completed before booking another task."
-				submitText="View Active Task"
+				title="Active Request in Progress"
+				description="You already have an active nursing request in progress. Please complete your current visit before booking another."
+				submitText="Track Active Request"
 				onSubmit={() => {
 					setActiveTaskModalVisible(false)
 					navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
@@ -422,326 +422,298 @@ const styles = StyleSheet.create({
 		backgroundColor: '#FFFFFF',
 	},
 	scrollContent: {
-		paddingHorizontal: 16,
-		paddingTop: 16,
+		paddingHorizontal: 0,
+		paddingTop: 12,
 	},
 	scrollContentTablet: {
-		maxWidth: 720,
-		width: '100%',
+		maxWidth: 640,
 		alignSelf: 'center',
-		paddingHorizontal: 24,
-		paddingTop: 20,
+		width: '100%',
 	},
-	progressStepper: {
-		marginBottom: 20,
+	stepperContainer: {
+		paddingHorizontal: 16,
+		marginBottom: 4,
 	},
-	overviewContainer: {
-		backgroundColor: '#F8FAFC',
-		borderRadius: 16,
-		borderWidth: 1,
-		borderColor: '#ECEFF1',
-		padding: 16,
-		marginBottom: 20,
+
+	/* MOBILE SECTION BLOCKS */
+	sectionBlock: {
+		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 16,
+		paddingVertical: 14,
+		gap: 12,
 	},
-	overviewHeaderRow: {
+	sectionDividerBar: {
+		height: 8,
+		backgroundColor: '#F4F6F9',
+		borderTopWidth: 1,
+		borderBottomWidth: 1,
+		borderColor: '#E0E7EF',
+	},
+	sectionHeaderRow: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
 		alignItems: 'center',
+		justifyContent: 'space-between',
 	},
-	overviewSummaryCol: {
-		flex: 1,
+	summaryHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
 	},
-	overviewTitle: {
-		fontSize: 15,
-		fontWeight: '800',
-		color: '#1A2E35',
+	summaryTitleGroup: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
 	},
-	overviewSub: {
+	sectionHeading: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#181C1D',
+	},
+	summarySub: {
 		fontSize: 12,
 		color: '#546E7A',
-		fontWeight: '600',
-		marginTop: 2,
+		marginTop: 1,
 	},
-	expandToggleBtn: {
+	expandBtn: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 2,
-		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 10,
-		paddingVertical: 5,
-		borderRadius: 8,
 	},
-	expandToggleText: {
-		fontSize: 11,
-		fontWeight: '700',
-		color: '#1F5F68',
+	expandText: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#2B6F71',
 	},
-	scheduleRow: {
+	scheduleBar: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
-		marginTop: 12,
+		backgroundColor: '#F7FAFA',
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 8,
+		gap: 6,
 	},
 	scheduleText: {
 		fontSize: 12,
-		fontWeight: '700',
-		color: '#1A2E35',
-	},
-	horizontalLine: {
-		height: 1,
-		backgroundColor: '#ECEFF1',
-		marginVertical: 12,
-	},
-	expandedListContainer: {
-		marginTop: 2,
-	},
-	compactServiceItem: {
-		paddingVertical: 4,
-	},
-	compactServiceItemRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	compactServiceImg: {
-		width: 32,
-		height: 32,
-		borderRadius: 6,
-		backgroundColor: '#E2E8F0',
-	},
-	compactServiceTextCol: {
-		flex: 1,
-		marginLeft: 10,
-	},
-	compactServiceTitle: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#1A2E35',
-	},
-	compactServiceDuration: {
-		fontSize: 10.5,
-		color: '#78909C',
-		marginTop: 1,
-	},
-	compactServicePrice: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#1A2E35',
-		marginLeft: 8,
-	},
-	pricingBreakdown: {
-		gap: 6,
-	},
-	pricingRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-	},
-	pricingLabel: {
-		fontSize: 11.5,
-		color: '#78909C',
-	},
-	pricingVal: {
-		fontSize: 12,
 		fontWeight: '600',
+		color: '#2B6F71',
+	},
+
+	/* EXPANDED ORDER DETAILS */
+	expandedDetailsWrap: {
+		gap: 10,
+	},
+	dividerLine: {
+		height: 1,
+		backgroundColor: '#E0E7EF',
+	},
+	procedureItemRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+	},
+	procedureItemImg: {
+		width: 44,
+		height: 44,
+		borderRadius: 8,
+		backgroundColor: '#F1F4F4',
+	},
+	procedureItemTextCol: {
+		flex: 1,
+		gap: 2,
+	},
+	procedureItemTitle: {
+		fontSize: 13.5,
+		fontWeight: '700',
+		color: '#181C1D',
+	},
+	procedureItemMeta: {
+		fontSize: 11.5,
 		color: '#546E7A',
 	},
-	sectionHeading: {
-		fontSize: 15,
-		fontWeight: '800',
-		color: '#1A2E35',
-		marginBottom: 12,
+	procedureItemPrice: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#181C1D',
 	},
-	paymentSelectorContainer: {
-		gap: 16,
-		marginBottom: 16,
+	costBreakdownList: {
+		gap: 6,
 	},
-	paymentGroup: {
-		gap: 8,
+	costRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
 	},
-	groupLabel: {
-		fontSize: 11,
-		fontWeight: '800',
-		color: '#78909C',
-		textTransform: 'uppercase',
-		letterSpacing: 0.5,
-		marginBottom: 2,
+	costLabel: {
+		fontSize: 12.5,
+		color: '#546E7A',
 	},
-	methodRow: {
+	costVal: {
+		fontSize: 12.5,
+		fontWeight: '600',
+		color: '#181C1D',
+	},
+
+	/* PAYMENT METHOD CARDS */
+	paymentMethodsList: {
+		gap: 10,
+	},
+	methodCard: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 14,
+		borderRadius: 12,
+		padding: 12,
 		borderWidth: 1,
-		borderColor: '#ECEFF1',
+		borderColor: '#E0E7EF',
+		gap: 12,
 	},
-	methodRowSelected: {
-		backgroundColor: '#F0F9F9',
-		borderColor: '#1F5F68',
+	methodCardSelected: {
+		borderColor: '#2B6F71',
+		backgroundColor: 'rgba(43, 111, 113, 0.06)',
 	},
-	methodIconBox: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		backgroundColor: '#ECEFF1',
-		alignItems: 'center',
+	methodIconWrap: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: '#F7FAFA',
 		justifyContent: 'center',
-		marginRight: 12,
+		alignItems: 'center',
+		borderWidth: 1,
+		borderColor: '#E0E7EF',
 	},
-	methodDetailsCol: {
+	methodTextCol: {
 		flex: 1,
-		marginRight: 8,
+		gap: 2,
 	},
-	methodHeaderRow: {
+	methodTitleRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 6,
 	},
 	methodTitle: {
 		fontSize: 14,
-		fontWeight: '800',
-		color: '#1A2E35',
+		fontWeight: '700',
+		color: '#181C1D',
 	},
 	methodSub: {
-		fontSize: 11,
-		color: '#607D8B',
-		marginTop: 1,
-		lineHeight: 14,
+		fontSize: 11.5,
+		color: '#546E7A',
 	},
 	badgeChip: {
-		backgroundColor: '#E6F3F4',
 		paddingHorizontal: 6,
-		paddingVertical: 1.5,
+		paddingVertical: 1,
 		borderRadius: 6,
 	},
-	badgeChipText: {
-		fontSize: 9,
+	recommendedBadge: {
+		backgroundColor: 'rgba(43, 111, 113, 0.12)',
+	},
+	recommendedBadgeText: {
+		fontSize: 10,
 		fontWeight: '700',
-		color: '#1F5F68',
+		color: '#2B6F71',
 	},
-	recommendChip: {
-		backgroundColor: '#FFE0B2',
-		paddingHorizontal: 6,
-		paddingVertical: 1.5,
-		borderRadius: 6,
+	cashBadge: {
+		backgroundColor: '#E0F2FE',
 	},
-	recommendChipText: {
-		fontSize: 9,
+	cashBadgeText: {
+		fontSize: 10,
 		fontWeight: '700',
-		color: '#E65100',
+		color: '#0369A1',
 	},
-	brandLogosRow: {
+	brandRow: {
 		flexDirection: 'row',
-		alignItems: 'center',
 		gap: 4,
 		marginTop: 4,
 	},
-	brandLogoTag: {
-		backgroundColor: '#ECEFF1',
-		paddingHorizontal: 5,
-		paddingVertical: 1.5,
+	brandChip: {
+		backgroundColor: '#F1F4F4',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
 		borderRadius: 4,
 	},
-	brandLogoText: {
-		fontSize: 9,
-		fontWeight: '700',
-		color: '#546E7A',
+	brandChipText: {
+		fontSize: 10,
+		fontWeight: '600',
+		color: '#475569',
 	},
-	radioButton: {
-		width: 18,
-		height: 18,
-		borderRadius: 9,
-		borderWidth: 1.5,
-		borderColor: '#CFD8DC',
-		alignItems: 'center',
+
+	/* RADIO BUTTON */
+	radioCircle: {
+		width: 20,
+		height: 20,
+		borderRadius: 10,
+		borderWidth: 2,
+		borderColor: '#CBD5E1',
 		justifyContent: 'center',
+		alignItems: 'center',
 	},
-	radioButtonSelected: {
-		borderColor: '#1F5F68',
+	radioCircleSelected: {
+		borderColor: '#2B6F71',
 	},
 	radioDot: {
 		width: 10,
 		height: 10,
 		borderRadius: 5,
-		backgroundColor: '#1F5F68',
+		backgroundColor: '#2B6F71',
 	},
-	simulatedNoticeBox: {
+
+	/* SECURITY NOTICE */
+	securityBox: {
 		flexDirection: 'row',
-		backgroundColor: '#F0F9F9',
+		backgroundColor: 'rgba(43, 111, 113, 0.06)',
 		borderRadius: 12,
 		padding: 12,
-		marginTop: 12,
-		marginBottom: 24,
-		alignItems: 'center',
 		gap: 10,
+		alignItems: 'center',
 	},
-	simulatedNoticeText: {
+	securityTextCol: {
 		flex: 1,
-		fontSize: 10.5,
-		color: '#1F5F68',
-		lineHeight: 14.5,
-		fontWeight: '500',
+		gap: 2,
 	},
-	stickyFooter: {
+	securityTitle: {
+		fontSize: 13,
+		fontWeight: '700',
+		color: '#2B6F71',
+	},
+	securitySub: {
+		fontSize: 11.5,
+		color: '#475569',
+		lineHeight: 16,
+	},
+
+	/* STICKY BOTTOM ACTION FOOTER */
+	bottomBar: {
 		position: 'absolute',
 		bottom: 0,
 		left: 0,
 		right: 0,
-		backgroundColor: '#FFFFFF',
-		borderTopWidth: 1,
-		borderTopColor: '#ECEFF1',
-		paddingHorizontal: 16,
-		paddingTop: 12,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		elevation: 8,
-		shadowColor: '#000000',
+		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 20,
+		paddingTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#E0E7EF',
+		shadowColor: '#000',
 		shadowOffset: { width: 0, height: -3 },
-		shadowOpacity: 0.08,
+		shadowOpacity: 0.06,
 		shadowRadius: 6,
+		elevation: 8,
 	},
-	stickyLeft: {
-		flex: 1,
-		marginRight: 12,
-	},
-	stickyPayLabel: {
-		fontSize: 10,
-		color: '#78909C',
-		fontWeight: '700',
-		textTransform: 'uppercase',
-	},
-	stickyPayVal: {
-		fontSize: 20,
-		fontWeight: '800',
-		color: '#1F5F68',
-		lineHeight: 24,
-	},
-	stickyPaySub: {
-		fontSize: 10.5,
-		color: '#78909C',
-		marginTop: 1,
-	},
-	stickyActionCol: {
-		alignItems: 'center',
-		gap: 4,
-	},
-	payBtn: {
-		backgroundColor: '#1F5F68',
-		borderRadius: 12,
-		minWidth: 180,
-		height: 48,
+	bottomBarPriceCol: {
 		justifyContent: 'center',
 	},
-	termsWrapper: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 3,
-		marginTop: 2,
+	bottomBarTotalLabel: {
+		fontSize: 11,
+		color: '#64748B',
 	},
-	termsText: {
-		fontSize: 9.5,
-		color: '#78909C',
-		fontWeight: '500',
+	bottomBarTotalVal: {
+		fontSize: 19,
+		fontWeight: '800',
+		color: '#181C1D',
+	},
+	payBtn: {
+		minWidth: 200,
 	},
 })

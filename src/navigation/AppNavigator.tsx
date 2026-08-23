@@ -249,22 +249,22 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.NURSE_ACTIVE_BOOKING}
 				component={ActiveBookingPage}
-				options={{ headerShown: true, title: 'Active Booking' }}
+				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.NURSE_PATIENT_VERIFICATION}
 				component={PatientVerificationPage}
-				options={{ headerShown: true, title: 'Patient Verification' }}
+				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS}
 				component={ServiceInProgressPage}
-				options={{ headerShown: true, title: 'Service In Progress' }}
+				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.NURSE_COMPLETE_SERVICE}
 				component={CompleteServicePage}
-				options={{ headerShown: true, title: 'Complete Service' }}
+				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.NURSE_TODAY_OVERVIEW}
@@ -328,7 +328,7 @@ function AuthenticatedNavigator() {
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.ANCILLARY_BOOKING_STATUS}
-				component={AncillaryBookingStatusPage}
+				component={TrackAppointmentPage}
 				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen

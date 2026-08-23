@@ -516,205 +516,13 @@ export interface AncillaryBooking {
 	bookingType?: string
 }
 
-export const MOCK_ANCILLARY_BOOKINGS: AncillaryBooking[] = [
-	{
-		id: 'book-1',
-		serviceName: 'Nursing Care',
-		serviceKey: 'nursing-care',
-		serviceLabel: 'Nursing Care',
-		status: 'upcoming',
-		date: 'Tomorrow',
-		timeRange: '09:00 AM - 11:00 AM',
-		provider: {
-			name: 'Anita Sharma',
-			designation: 'Registered Nurse',
-			avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
-		},
-	},
-	{
-		id: 'book-1b',
-		serviceName: 'Physiotherapy Session',
-		serviceKey: 'physiotherapy',
-		serviceLabel: 'Physiotherapy',
-		status: 'upcoming',
-		date: '12 Aug 2026',
-		timeRange: '04:00 PM - 05:00 PM',
-		provider: {
-			name: 'Dr. James Wilson',
-			designation: 'Physiotherapist',
-			avatar: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=120',
-		},
-	},
-	{
-		id: 'book-1c',
-		serviceName: 'Elderly Care Visit',
-		serviceKey: 'elderly-care',
-		serviceLabel: 'Elderly Care',
-		status: 'upcoming',
-		date: '14 Aug 2026',
-		timeRange: '10:00 AM - 12:00 PM',
-		provider: {
-			name: 'Michael Thorne',
-			designation: 'Caregiver',
-			avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=120',
-		},
-	},
-	{
-		id: 'book-4',
-		serviceName: 'Intravenous (IV) Infusion & Monitoring',
-		serviceKey: 'nursing-care',
-		serviceLabel: 'Nursing Care',
-		status: 'completed',
-		date: 'Today, 18 Aug 2026',
-		provider: {
-			id: 'n-prov-2',
-			name: 'David Chen',
-			designation: 'Registered Nurse',
-			avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=120',
-		},
-		amount: 699,
-		hasReview: false,
-	},
-	{
-		id: 'book-2',
-		serviceName: 'Wound Dressing & Care',
-		serviceKey: 'nursing-care',
-		serviceLabel: 'Nursing Care',
-		status: 'completed',
-		date: '12 Oct 2023',
-		provider: {
-			id: 'n-prov-1',
-			name: 'Anita Sharma',
-			designation: 'Registered Nurse',
-			avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
-		},
-		amount: 549,
-		rating: 5,
-		hasReview: true,
-		review: {
-			id: 'rev-001',
-			bookingId: 'book-2',
-			providerId: 'n-prov-1',
-			providerName: 'Anita Sharma',
-			serviceName: 'Wound Dressing & Care',
-			rating: 5,
-			comment: 'Nurse Anita was very punctual and sterile with the dressing change. Explained every step clearly.',
-			createdAt: '12 Oct 2023',
-			patientName: 'John D.',
-		},
-	},
-	{
-		id: 'book-3',
-		serviceName: 'Physiotherapy Session',
-		serviceKey: 'physiotherapy',
-		serviceLabel: 'Physiotherapy',
-		status: 'cancelled',
-		date: '05 Oct 2023',
-		provider: {
-			id: 'p-prov-1',
-			name: 'Dr. Sarah Jenkins',
-			designation: 'Physiotherapist',
-			avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=120',
-		},
-		cancellationReason: 'Provider unavailable due to emergency.',
-		refundStatus: 'Refund Initiated',
-		refundReferenceId: '#RF9832K',
-	},
-]
+export const MOCK_ANCILLARY_BOOKINGS: AncillaryBooking[] = []
 
 // Global in-memory review map to maintain consistency across all screens
 const REVIEW_STORE = new Map<string, AncillaryReviewData>()
 
-// Seed initial review
-REVIEW_STORE.set('book-2', {
-	id: 'rev-001',
-	bookingId: 'book-2',
-	providerId: 'n-prov-1',
-	providerName: 'Anita Sharma',
-	serviceName: 'Wound Dressing & Care',
-	rating: 5,
-	comment: 'Nurse Anita was very punctual and sterile with the dressing change. Explained every step clearly.',
-	createdAt: '12 Oct 2023',
-	patientName: 'John D.',
-})
-
 // Provider initial reviews
-const PROVIDER_REVIEWS_MOCK: Record<string, AncillaryReviewData[]> = {
-	'n-prov-1': [
-		{
-			id: 'rev-001',
-			bookingId: 'book-2',
-			providerId: 'n-prov-1',
-			providerName: 'Anita Sharma',
-			serviceName: 'Wound Dressing & Care',
-			rating: 5,
-			comment: 'Nurse Anita was very punctual and sterile with the dressing change. Explained every step clearly.',
-			createdAt: '12 Oct 2023',
-			patientName: 'John D.',
-		},
-		{
-			id: 'rev-002',
-			bookingId: 'prev-102',
-			providerId: 'n-prov-1',
-			providerName: 'Anita Sharma',
-			serviceName: 'Injection Administration',
-			rating: 5,
-			comment: 'Quick and painless IV administration. Extremely gentle and professional.',
-			createdAt: '28 Sep 2023',
-			patientName: 'Sunita R.',
-		},
-		{
-			id: 'rev-003',
-			bookingId: 'prev-103',
-			providerId: 'n-prov-1',
-			providerName: 'Anita Sharma',
-			serviceName: 'Post-Op Vital Monitoring',
-			rating: 4,
-			comment: 'Very polite and knowledgeable. Checked vitals before starting the procedure.',
-			createdAt: '15 Sep 2023',
-			patientName: 'Kavita M.',
-		},
-	],
-	'n-prov-2': [
-		{
-			id: 'rev-004',
-			bookingId: 'prev-104',
-			providerId: 'n-prov-2',
-			providerName: 'David Chen',
-			serviceName: 'IV Drip Setup',
-			rating: 5,
-			comment: 'Excellent service. Arrived on time with full sterile PPE kit.',
-			createdAt: '10 Aug 2026',
-			patientName: 'Ravi T.',
-		},
-	],
-	'p-prov-1': [
-		{
-			id: 'rev-005',
-			bookingId: 'prev-105',
-			providerId: 'p-prov-1',
-			providerName: 'Dr. Sarah Jenkins',
-			serviceName: 'Post-Op Knee Rehab',
-			rating: 5,
-			comment: 'Dr. Sarah helped restore my walking posture after knee surgery. Highly skilled!',
-			createdAt: '01 Aug 2026',
-			patientName: 'Arjun K.',
-		},
-	],
-	'e-prov-1': [
-		{
-			id: 'rev-006',
-			bookingId: 'prev-106',
-			providerId: 'e-prov-1',
-			providerName: 'Michael Thorne',
-			serviceName: 'Elderly Care Visit',
-			rating: 5,
-			comment: 'Very patient and kind with my elderly mother. Organized her medicines perfectly.',
-			createdAt: '18 Jul 2026',
-			patientName: 'Meera S.',
-		},
-	],
-}
+const PROVIDER_REVIEWS_MOCK: Record<string, AncillaryReviewData[]> = {}
 
 /**
  * Submit or update a rating & review for a completed ancillary booking.
@@ -824,6 +632,9 @@ export interface Tier2TravelInfo {
 	destinationLat: number
 	destinationLng: number
 	callProxyToken: string
+	patientPhone?: string
+	verificationOtp?: string
+	completionPin?: string
 }
 
 /** TIER 3: Post-OTP Verification Clinical Details (Full PHI - Requires Hard Backend Authorization) */
@@ -1085,15 +896,16 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 
 				return {
 					id: String(item.id || item.publicBookingId),
-					patientName: String(item.patientFullName || 'Patient'),
-					patientAge: 68,
-					patientGender: 'Female',
-					patientPhone: String(item.patientPhone || '+91 98765 43210'),
-					serviceName: String(item.serviceName || 'In-Home Nursing Care'),
-					serviceDescription: 'Aseptic Dressing & Patient Care',
+					patientName: String(item.patientName || item.patientFullName || 'Patient Recipient'),
+					patientAge: item.patientAge || 45,
+					patientGender: item.patientGender || 'Not Specified',
+					patientPhone: String(item.patientPhone || ''),
+					patientAvatar: item.patientAvatar ? String(item.patientAvatar) : undefined,
+					serviceName: String(item.serviceName || 'In-Home Healthcare Service'),
+					serviceDescription: String(item.procedureDetails || item.serviceDescription || 'Healthcare Procedure'),
 					appointmentDate: 'Today',
 					appointmentTime: String(item.createdAt || 'Today'),
-					patientAddress: String(item.streetAddress || 'Healthcare Location'),
+					patientAddress: String(item.patientAddress || item.streetAddress || 'Healthcare Location'),
 					status: status as any,
 					otpCode: String(item.verificationOtp || '4829'),
 					completePin: String(item.completionPin || '9182'),
@@ -1205,12 +1017,12 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 			date,
 			timeRange,
 			provider: {
-				id: item.assignedProvider?.id ? String(item.assignedProvider.id) : undefined,
-				name: item.assignedProvider?.name ? String(item.assignedProvider.name) : 'Specialist Assigned Soon',
-				designation: item.assignedProvider?.credentials
-					? String(item.assignedProvider.credentials)
+				id: (item.provider?.id || item.assignedProvider?.id) ? String(item.provider?.id || item.assignedProvider?.id) : undefined,
+				name: (item.provider?.name || item.assignedProvider?.name) ? String(item.provider?.name || item.assignedProvider?.name) : 'Specialist Assigned Soon',
+				designation: (item.provider?.designation || item.assignedProvider?.credentials)
+					? String(item.provider?.designation || item.assignedProvider?.credentials)
 					: 'Healthcare Provider',
-				avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=120',
+				avatar: item.provider?.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=120',
 			},
 			amount,
 			verificationOtp: item.verificationOtp ? String(item.verificationOtp) : undefined,

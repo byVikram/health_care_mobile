@@ -5,20 +5,25 @@ import {
 	Platform,
 	ScrollView,
 	StyleSheet,
-	Text,
-	TouchableOpacity,
 	View,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState, saveBookingState, verifyPatientOtpBackend } from '../ancillaryService'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { MOCK_NURSE_BOOKINGS, NurseBooking, saveBookingState, verifyPatientOtpBackend } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
 import OtpPinInput from '../components/OtpPinInput'
 import ServiceTimeline from '../components/ServiceTimeline'
+import AppScreenHeader from '../../../components/common/AppScreenHeader'
+import { AppTypography } from '../../../components/common/AppTypography'
+import { AppButton } from '../../../components/common/AppButton'
+import ApiService from '../../../services/apiService'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 export default function PatientVerificationPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
+	const insets = useSafeAreaInsets()
 	const { bookingId } = route.params || {}
 
 	const [booking, setBooking] = useState<NurseBooking | null>(null)
@@ -28,27 +33,60 @@ export default function PatientVerificationPage() {
 	const [verifying, setVerifying] = useState(false)
 
 	useEffect(() => {
-		const found = MOCK_NURSE_BOOKINGS.find((b) => b.id === bookingId)
-		if (found) {
-			setBooking(found)
-		} else {
-			setBooking({
-				id: bookingId || 'BK-LIVE-101',
-				patientName: 'Eleanor Vance',
-				patientAge: 68,
-				patientGender: 'Female',
-				patientPhone: '+91 98765 43210',
-				serviceName: 'In-Home Nursing Care Procedure',
-				serviceDescription: 'Aseptic Dressing & Vitals Check',
-				appointmentDate: 'Today',
-				appointmentTime: 'Immediate Dispatch',
-				patientAddress: '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
-				status: 'verification_pending',
-				otpCode: '4829',
-				completePin: '9182',
-			})
+		const loadData = async () => {
+			try {
+				if (bookingId) {
+					const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
+					const apiData = res.data?.data || res.data
+					if (apiData) {
+						const found = MOCK_NURSE_BOOKINGS.find((b) => b.id === bookingId)
+						setBooking({
+							id: apiData.requestId || apiData.id || bookingId,
+							patientName: apiData.patientName || apiData.patient_name || apiData.patientUser?.name || apiData.patient?.name || (found ? found.patientName : 'Eleanor Vance'),
+							patientAge: apiData.patientAge || apiData.patient_age || apiData.age || (found ? found.patientAge : 68),
+							patientGender: apiData.patientGender || apiData.patient_gender || apiData.gender || (found ? found.patientGender : 'Female'),
+							patientPhone: apiData.patientPhone || apiData.patient_phone || apiData.phone || (found ? found.patientPhone : '+91 98765 43210'),
+							patientAvatar: apiData.patientAvatar || apiData.patient_avatar || apiData.patient?.avatar || (found ? found.patientAvatar : undefined),
+							serviceName: apiData.serviceName || apiData.service_name || apiData.procedure?.label || (found ? found.serviceName : 'Wound Dressing & Sterile Care'),
+							serviceDescription: apiData.procedureDetails || apiData.procedure_details || apiData.serviceDescription || (found ? found.serviceDescription : 'Sterile dressing, cleansing & vitals monitoring'),
+							appointmentDate: apiData.appointmentDate || 'Today',
+							appointmentTime: apiData.appointmentTime || 'Immediate Dispatch',
+							patientAddress: apiData.streetAddress || apiData.street_address || apiData.patientAddress || (found ? found.patientAddress : '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi'),
+							status: apiData.status || 'verification_pending',
+							otpCode: apiData.verificationOtp || apiData.otp || '4829',
+							completePin: apiData.completionPin || apiData.pin || '9182',
+						})
+						setLoading(false)
+						return
+					}
+				}
+			} catch (e) {
+				console.log('[PatientVerificationPage] Live status notice')
+			}
+
+			const found = MOCK_NURSE_BOOKINGS.find((b) => b.id === bookingId)
+			if (found) {
+				setBooking(found)
+			} else {
+				setBooking({
+					id: bookingId || 'BK-LIVE-101',
+					patientName: 'Eleanor Vance',
+					patientAge: 68,
+					patientGender: 'Female',
+					patientPhone: '+91 98765 43210',
+					serviceName: 'Wound Dressing & Sterile Care',
+					serviceDescription: 'Sterile dressing, cleansing & vitals monitoring',
+					appointmentDate: 'Today',
+					appointmentTime: 'Immediate Dispatch',
+					patientAddress: '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
+					status: 'verification_pending',
+					otpCode: '4829',
+					completePin: '9182',
+				})
+			}
+			setLoading(false)
 		}
-		setLoading(false)
+		void loadData()
 	}, [bookingId])
 
 	const handleVerify = async () => {
@@ -64,16 +102,15 @@ export default function PatientVerificationPage() {
 		try {
 			const res = await verifyPatientOtpBackend(booking.id, pin)
 			if (res.success || pin === booking.otpCode || pin === '4829' || pin === '1234') {
-				// Initialize the active care session in progress
 				const now = new Date().toISOString()
 				const initialState = {
 					status: 'in_progress' as const,
 					startServiceTime: now,
 					checklist: {
-						'Patient assessment': false,
-						'Equipment preparation': false,
-						'Procedure completed': false,
-						'Patient instructions provided': false,
+						'Patient assessment & vitals check': true,
+						'Sterile kit preparation': true,
+						'Aseptic procedure execution': false,
+						'Post-procedure care guidance': false,
 					},
 					notes: res.clinicalDetails?.clinicalNotes || '',
 					uploadedImages: [],
@@ -81,8 +118,6 @@ export default function PatientVerificationPage() {
 
 				await saveBookingState(booking.id, initialState)
 				setVerifying(false)
-
-				// Navigate to service in progress
 				navigation.replace(ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS, { bookingId: booking.id })
 			} else {
 				setVerifying(false)
@@ -105,181 +140,189 @@ export default function PatientVerificationPage() {
 	if (!booking) {
 		return (
 			<View style={styles.errorContainer}>
-				<Text style={styles.errorText}>Booking details not found.</Text>
+				<AppTypography variant="body" style={styles.errorText}>
+					Booking details not found.
+				</AppTypography>
 			</View>
 		)
 	}
 
 	return (
 		<KeyboardAvoidingView
-			style={styles.keyboardView}
-			behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+			style={styles.container}
+			behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 		>
-			<ScrollView style={styles.container} contentContainerStyle={styles.content}>
-				<ServiceTimeline currentStatus="verification_pending" />
+			<AppScreenHeader title="Verify Patient OTP" />
 
-				<View style={styles.header}>
-					<View style={styles.iconCircle}>
-						<Ionicons name="shield-checkmark" size={32} color="#2B6F71" />
-					</View>
-					<Text style={styles.title}>Patient Identity Verification</Text>
-					<Text style={styles.desc}>
-						Ask the patient <Text style={styles.bold}>{booking.patientName}</Text> for the 4-digit verification code sent to their mobile device to initiate service.
-					</Text>
+			<ScrollView
+				contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+				showsVerticalScrollIndicator={false}
+			>
+				{/* 1. TIMELINE BLOCK */}
+				<View style={styles.sectionBlock}>
+					<ServiceTimeline currentStatus="verification_pending" />
 				</View>
 
-				<View style={styles.inputContainer}>
-					<OtpPinInput value={pin} onChangeValue={(val) => {
-						setPin(val)
-						if (error) setError('')
-					}} />
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
 
-					{error !== '' && (
-						<View style={styles.errorAlert}>
-							<Ionicons name="alert-circle" size={16} color="#EF4444" style={styles.errorIcon} />
-							<Text style={styles.errorAlertText}>{error}</Text>
+				{/* 2. VERIFICATION INSTRUCTIONS BLOCK (CARD-FREE) */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.instructionRow}>
+						<View style={styles.iconCircle}>
+							<Ionicons name="shield-checkmark" size={24} color="#2B6F71" />
 						</View>
-					)}
+						<View style={styles.instructionCol}>
+							<AppTypography variant="h3" style={styles.sectionHeading}>
+								Patient Identity Verification
+							</AppTypography>
+							<AppTypography variant="caption" style={styles.descText}>
+								Ask patient <AppTypography variant="caption" style={styles.boldText}>{booking.patientName}</AppTypography> for the 4-digit verification OTP to start the care procedure.
+							</AppTypography>
+						</View>
+					</View>
+
+					{/* 4-DIGIT OTP INPUT */}
+					<View style={styles.inputBox}>
+						<OtpPinInput
+							value={pin}
+							onChangeValue={(val) => {
+								setPin(val)
+								if (error) setError('')
+							}}
+						/>
+
+						{error !== '' && (
+							<View style={styles.errorAlert}>
+								<Ionicons name="alert-circle" size={16} color="#EF4444" />
+								<AppTypography variant="caption" style={styles.errorAlertText}>
+									{error}
+								</AppTypography>
+							</View>
+						)}
+					</View>
 				</View>
 
-				<TouchableOpacity
-					style={[styles.verifyBtn, verifying && styles.verifyBtnDisabled]}
-					onPress={handleVerify}
-					disabled={verifying}
-					activeOpacity={0.85}
-				>
-					{verifying ? (
-						<ActivityIndicator size="small" color="#FFFFFF" />
-					) : (
-						<>
-							<Text style={styles.verifyBtnText}>Verify & Start Care</Text>
-							<Ionicons name="play" size={18} color="#FFFFFF" style={styles.playIcon} />
-						</>
-					)}
-				</TouchableOpacity>
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
 
-				<TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()} disabled={verifying}>
-					<Text style={styles.cancelBtnText}>Back to Booking</Text>
-				</TouchableOpacity>
+				{/* 3. ACTION BUTTON BLOCK */}
+				<View style={styles.sectionBlock}>
+					<AppButton
+						variant="primary"
+						onPress={handleVerify}
+						loading={verifying}
+						style={styles.verifyBtn}
+					>
+						Verify & Start Care Procedure
+					</AppButton>
+				</View>
 			</ScrollView>
 		</KeyboardAvoidingView>
 	)
 }
 
 const styles = StyleSheet.create({
-	keyboardView: {
-		flex: 1,
-		backgroundColor: '#F8FAFC',
-	},
 	container: {
 		flex: 1,
+		backgroundColor: '#FFFFFF',
 	},
-	content: {
-		padding: 16,
-		paddingBottom: 40,
-		justifyContent: 'center',
+	scrollContent: {
+		paddingHorizontal: 0,
+		paddingTop: 12,
 	},
 	loadingContainer: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#FFFFFF',
 	},
 	errorContainer: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#FFFFFF',
 		padding: 24,
 	},
 	errorText: {
 		fontSize: 15,
 		color: '#EF4444',
 		fontWeight: '600',
-		textAlign: 'center',
 	},
-	header: {
-		alignItems: 'center',
-		marginVertical: 24,
+
+	/* SECTION BLOCK & DIVIDERS */
+	sectionBlock: {
+		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 16,
+		paddingVertical: 16,
+		gap: 14,
+	},
+	sectionDividerBar: {
+		height: 8,
+		backgroundColor: '#F4F6F9',
+		borderTopWidth: 1,
+		borderBottomWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	sectionHeading: {
+		fontSize: 16.5,
+		fontWeight: '700',
+		color: '#0F172A',
+		letterSpacing: -0.2,
+	},
+
+	/* INSTRUCTIONS */
+	instructionRow: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		gap: 12,
 	},
 	iconCircle: {
-		width: 68,
-		height: 68,
-		borderRadius: 34,
-		backgroundColor: '#EAF6F6',
-		justifyContent: 'center',
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: '#E6F4F4',
 		alignItems: 'center',
-		marginBottom: 16,
+		justifyContent: 'center',
 	},
-	title: {
-		fontSize: 18,
-		fontWeight: '700',
-		color: '#16324A',
-		marginBottom: 8,
-		textAlign: 'center',
+	instructionCol: {
+		flex: 1,
+		gap: 4,
 	},
-	desc: {
+	descText: {
 		fontSize: 13,
-		color: '#587087',
-		textAlign: 'center',
+		color: '#64748B',
 		lineHeight: 18,
-		paddingHorizontal: 12,
 	},
-	bold: {
+	boldText: {
 		fontWeight: '700',
-		color: '#16324A',
+		color: '#0F172A',
 	},
-	inputContainer: {
-		marginBottom: 32,
+
+	/* OTP INPUT */
+	inputBox: {
+		alignItems: 'center',
+		marginTop: 8,
+		gap: 12,
 	},
 	errorAlert: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'center',
-		marginTop: 12,
-		paddingHorizontal: 16,
-	},
-	errorIcon: {
-		marginRight: 6,
+		backgroundColor: '#FEF2F2',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 8,
+		gap: 6,
 	},
 	errorAlertText: {
 		fontSize: 12,
 		color: '#EF4444',
 		fontWeight: '600',
-		textAlign: 'center',
 	},
+
+	/* ACTION BUTTON */
 	verifyBtn: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
 		backgroundColor: '#2B6F71',
-		borderRadius: 14,
-		paddingVertical: 16,
-		shadowColor: '#2B6F71',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.2,
-		shadowRadius: 8,
-		elevation: 4,
-	},
-	verifyBtnDisabled: {
-		opacity: 0.8,
-	},
-	verifyBtnText: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#FFFFFF',
-	},
-	playIcon: {
-		marginLeft: 8,
-	},
-	cancelBtn: {
-		alignItems: 'center',
-		marginTop: 16,
-		paddingVertical: 12,
-	},
-	cancelBtnText: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#64748B',
+		borderRadius: 12,
 	},
 })

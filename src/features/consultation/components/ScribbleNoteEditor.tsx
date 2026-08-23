@@ -18,6 +18,7 @@ import {
 import { Text, Divider } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import SignatureCanvas, { SignatureViewRef } from 'react-native-signature-canvas'
+import { WebView } from 'react-native-webview'
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -36,95 +37,9 @@ const FONT_SIZE = 15
 const LINE_HEIGHT = FONT_SIZE + 8
 const TEXT_PAD = 16
 
-const customHtml = (script: string) => `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Signature Canvas</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
-    body { font-family: Helvetica, Sans-Serif; -moz-user-select: none; -webkit-user-select: none; -ms-user-select: none; }
-    .rotated-true { transform: rotate(90deg); transform-origin: bottom left; position: absolute; top: -100vw; left: 0; height: 100vw; width: 100vh; overflow: auto; }
-    .rotated-false { width: 100%; height: 100%; }
-    .m-signature-pad { font-size: 10px; width: 100%; height: 100%; border: 1px solid #e8e8e8; background-color: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.27), 0 0 40px rgba(0, 0, 0, 0.08) inset; }
-    .m-signature-pad--body { position: relative; width: 100%; height: 100%; border: 1px solid #f4f4f4; }
-    .m-signature-pad--body canvas { display: block; position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 4px; box-shadow: 0 0 5px rgba(0, 0, 0, 0.02) inset; }
-    .m-signature-pad--footer { display: none; }
-    <%style%>
-  </style>
-</head>
-<body onselectstart="return false">
-  <div class="rotated-<%orientation%>">
-    <div id="signature-pad" class="m-signature-pad">
-      <div class="m-signature-pad--body">
-        <img style="position: absolute; top: 0; left: 0; pointer-events: none;" src=<%bgSrc%> width=<%bgWidth%> height=<%bgHeight%> />
-        <canvas></canvas>
-        <img style="position: absolute; top: 0; left: 0; pointer-events: none;" src=<%overlaySrc%> width=<%overlayWidth%> height=<%overlayHeight%> />
-      </div>
-      <div class="m-signature-pad--footer">
-        <button type="button" class="button clear" data-action="clear"><%clear%></button>
-        <div class="description"><%description%></div>
-        <button type="button" class="button save" data-action="save"><%confirm%></button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    ${script}
-
-    // Bridge for injecting recognized speech text into canvas
-    var _origChangePenColor = window.changePenColor;
-    window.changePenColor = function(color) {
-      if (typeof color === 'string' && color.indexOf('__INJECT_TEXT__:') === 0) {
-        try {
-          var payload = JSON.parse(color.substring(16));
-          var canvas = document.querySelector('canvas');
-          if (canvas && signaturePad) {
-            var ctx = canvas.getContext('2d');
-            ctx.save();
-            ctx.font = 'italic ' + (payload.fontSize || 15) + 'px sans-serif';
-            ctx.fillStyle = payload.color || '${SPEECH_TEXT_COLOR}';
-            var maxW = (canvas.clientWidth || (canvas.width / (window.devicePixelRatio || 1))) - (payload.textPad || 16) * 2;
-            if (maxW <= 0) maxW = 300;
-            var lh = payload.lineHeight || 23;
-            var x = payload.textPad || 16;
-            var y = payload.y || 24;
-            var words = (payload.text || '').split(' ');
-            var line = '';
-            for (var i = 0; i < words.length; i++) {
-              var test = line + words[i] + ' ';
-              if (ctx.measureText(test).width > maxW && i > 0) {
-                ctx.fillText(line.trim(), x, y);
-                y += lh;
-                line = words[i] + ' ';
-              } else {
-                line = test;
-              }
-            }
-            if (line.trim()) ctx.fillText(line.trim(), x, y);
-            ctx.restore();
-            signaturePad._isEmpty = false;
-            readSignature();
-          }
-        } catch(e) {
-          console.error('Speech text injection error:', e);
-        }
-        return;
-      }
-      if (_origChangePenColor) {
-        _origChangePenColor(color);
-      }
-    };
-  </script>
-</body>
-</html>`
-
 export default function ScribbleNoteEditor({ onChange, accentColor = '#00796b' }: Props) {
   const sigRef = useRef<SignatureViewRef>(null)
+  const webRef = useRef<WebView>(null)
 
   const [mode, setMode]         = useState<Mode>('draw')
   const [penColor, setPenColor] = useState('#1a237e')
@@ -192,49 +107,58 @@ export default function ScribbleNoteEditor({ onChange, accentColor = '#00796b' }
     }
   })
 
-  // ── Inject text onto the canvas via customHtml bridge ─────────────────────
+  // ── Inject text onto the canvas via WebView ref ───────────────────────────
 
   const injectText = useCallback((text: string) => {
+    const wv = webRef.current
+    if (!wv) {
+      console.log('[ScribbleNoteEditor] webRef not ready')
+      return
+    }
+
     const y = textCursorY.current
     const estimatedLines = Math.max(1, Math.ceil(text.length / 28))
     textCursorY.current = y + estimatedLines * LINE_HEIGHT + 4
 
-    const payload = JSON.stringify({
-      text,
-      y,
-      fontSize: FONT_SIZE,
-      lineHeight: LINE_HEIGHT,
-      textPad: TEXT_PAD,
-      color: SPEECH_TEXT_COLOR,
-    })
-
-    sigRef.current?.changePenColor(`__INJECT_TEXT__:${payload}`)
+    const js = `
+      (function() {
+        try {
+          var canvas = document.querySelector('canvas');
+          if (!canvas) { console.log('canvas not found'); return; }
+          var ctx = canvas.getContext('2d');
+          ctx.save();
+          ctx.font = 'italic ${FONT_SIZE}px sans-serif';
+          ctx.fillStyle = '${SPEECH_TEXT_COLOR}';
+          var maxW = canvas.width - ${TEXT_PAD * 2};
+          var lh   = ${LINE_HEIGHT};
+          var x    = ${TEXT_PAD};
+          var y    = ${y};
+          var words = ${JSON.stringify(text)}.split(' ');
+          var line  = '';
+          for (var i = 0; i < words.length; i++) {
+            var test = line + words[i] + ' ';
+            if (ctx.measureText(test).width > maxW && i > 0) {
+              ctx.fillText(line.trim(), x, y);
+              y += lh;
+              line = words[i] + ' ';
+            } else {
+              line = test;
+            }
+          }
+          if (line.trim()) ctx.fillText(line.trim(), x, y);
+          ctx.restore();
+        } catch(e) { console.log('inject error: ' + e.message); }
+      })();
+      true;
+    `
+    wv.injectJavaScript(js)
+    sigRef.current?.readSignature()
   }, [])
 
   // ── Draw helpers ───────────────────────────────────────────────────────────
 
-  const selectColor = (c: string) => {
-    setPenColor(c)
-    setIsEraser(false)
-    sigRef.current?.draw()
-    sigRef.current?.changePenColor(c)
-  }
-  const selectPenSize = (s: number) => {
-    setPenSize(s)
-    sigRef.current?.changePenSize(s, s + 1)
-  }
-  const toggleEraser = () => {
-    setIsEraser(e => {
-      const next = !e
-      if (next) {
-        sigRef.current?.erase()
-      } else {
-        sigRef.current?.draw()
-        sigRef.current?.changePenColor(penColor)
-      }
-      return next
-    })
-  }
+  const selectColor = (c: string) => { setPenColor(c); setIsEraser(false) }
+  const toggleEraser = () => setIsEraser(e => !e)
   const handleUndo  = () => sigRef.current?.undo()
   const handleClear = () => {
     sigRef.current?.clearSignature()
@@ -319,7 +243,7 @@ export default function ScribbleNoteEditor({ onChange, accentColor = '#00796b' }
           ))}
           <View style={styles.sep} />
           {[{ s: 2, d: 6 }, { s: 4, d: 10 }, { s: 7, d: 14 }].map(({ s, d }) => (
-            <TouchableOpacity key={s} onPress={() => selectPenSize(s)} style={styles.tbBtn}>
+            <TouchableOpacity key={s} onPress={() => setPenSize(s)} style={styles.tbBtn}>
               <View style={{
                 width: d, height: d, borderRadius: d / 2,
                 backgroundColor: isEraser ? '#ccc' : penColor,
@@ -395,7 +319,6 @@ export default function ScribbleNoteEditor({ onChange, accentColor = '#00796b' }
           descriptionText=""
           clearText=""
           confirmText=""
-          customHtml={customHtml}
           webStyle={webStyle}
           penColor={isEraser ? '#ffffff' : penColor}
           minWidth={penSize}
@@ -404,6 +327,7 @@ export default function ScribbleNoteEditor({ onChange, accentColor = '#00796b' }
           backgroundColor="#fafafa"
           autoClear={false}
           dataURL=""
+          webviewProps={{ ref: webRef } as any}
         />
 
         {mode === 'speech' && (

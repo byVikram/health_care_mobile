@@ -6,24 +6,28 @@ import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
 
 interface ViewCartFloatingBarProps {
-	selectedCount: number
+	selectedCount?: number
+	itemCount?: number
+	totalAmount?: string
 	onViewCart: () => void
 }
 
 export const ViewCartFloatingBar: React.FC<ViewCartFloatingBarProps> = ({
 	selectedCount,
+	itemCount,
+	totalAmount,
 	onViewCart,
 }) => {
-	if (selectedCount <= 0) return null
+	const count = itemCount ?? selectedCount ?? 0
+	if (count <= 0) return null
 
 	return (
 		<View style={styles.container}>
 			<View style={styles.content}>
 				<View style={styles.selection}>
-
 					<AppTypography style={styles.countText}>
-						{selectedCount} Service
-						{selectedCount > 1 ? 's' : ''} Selected
+						{count} Procedure{count > 1 ? 's' : ''} Selected
+						{totalAmount ? ` • ${totalAmount}` : ''}
 					</AppTypography>
 				</View>
 

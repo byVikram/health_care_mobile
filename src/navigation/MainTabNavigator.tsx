@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -16,9 +16,10 @@ import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
-import AncillaryDashboard from '../features/ancillary/patient/AncillaryDashboard'
+import NursingCarePage from '../features/ancillary/patient/NursingCarePage'
 import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
 import BookingsBottomSheet from '../features/bookings/BookingsBottomSheet'
+import AncillaryServicesBottomSheet from '../features/ancillary/components/AncillaryServicesBottomSheet'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
@@ -32,8 +33,8 @@ function HomeWithSidebar() {
 
 function AncillaryTabWrapper() {
 	return (
-		<View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
-			<AncillaryDashboard />
+		<View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+			<NursingCarePage />
 		</View>
 	)
 }
@@ -57,9 +58,10 @@ function getTabConfig(routeName: string) {
 
 interface DockedTabBarProps extends BottomTabBarProps {
 	onBookingsPress: () => void
+	onAncillaryPress: () => void
 }
 
-function DockedTabBar({ state, descriptors, navigation, onBookingsPress }: DockedTabBarProps) {
+function DockedTabBar({ state, descriptors, navigation, onBookingsPress, onAncillaryPress }: DockedTabBarProps) {
 	const theme = useTheme()
 	const insets = useSafeAreaInsets()
 	const { role } = useAuth()
@@ -86,6 +88,7 @@ function DockedTabBar({ state, descriptors, navigation, onBookingsPress }: Docke
 				const { iconName, label } = getTabConfig(route.name)
 				const color = focused ? '#0C7C7C' : '#94a3b8'
 				const isBookingsTab = route.name === ROUTES.MAIN.PORTAL
+				const isAncillaryTab = route.name === ROUTES.MAIN.ANCILLARY
 
 				const onPress = () => {
 					const event = navigation.emit({
@@ -96,8 +99,6 @@ function DockedTabBar({ state, descriptors, navigation, onBookingsPress }: Docke
 
 					if (event.defaultPrevented) return
 
-					// For Nurse persona, Bookings tab navigates directly to NurseBookingHistoryPage screen;
-					// for other personas, open the Bookings bottom sheet as normal.
 					if (isBookingsTab) {
 						if (isNurse) {
 							if (!focused) {
@@ -106,6 +107,11 @@ function DockedTabBar({ state, descriptors, navigation, onBookingsPress }: Docke
 							return
 						}
 						onBookingsPress()
+						return
+					}
+
+					if (isAncillaryTab) {
+						onAncillaryPress()
 						return
 					}
 
@@ -165,12 +171,17 @@ export default function MainTabNavigator() {
 	const shouldShowSearch = role !== 'doctor'
 	const shouldShowAncillary = !isNurse
 	const [bookingsSheetVisible, setBookingsSheetVisible] = useState(false)
+	const [ancillarySheetVisible, setAncillarySheetVisible] = useState(false)
 
 	return (
 		<>
 			<Tab.Navigator
 				tabBar={(props) => (
-					<DockedTabBar {...props} onBookingsPress={() => setBookingsSheetVisible(true)} />
+					<DockedTabBar
+						{...props}
+						onBookingsPress={() => setBookingsSheetVisible(true)}
+						onAncillaryPress={() => setAncillarySheetVisible(true)}
+					/>
 				)}
 				screenOptions={{
 					headerShown: false,
@@ -203,13 +214,7 @@ export default function MainTabNavigator() {
 						name={ROUTES.MAIN.ANCILLARY}
 						component={AncillaryTabWrapper}
 						options={{
-							headerShown: !isNurse,
-							header: () => (
-								<AppScreenHeader
-									title="Ancillary Dashboard"
-									onBack={() => navigation.navigate(ROUTES.MAIN.HOME)}
-								/>
-							),
+							headerShown: false,
 						}}
 					/>
 				) : null}
@@ -223,9 +228,16 @@ export default function MainTabNavigator() {
 				/>
 			</Tab.Navigator>
 
+			{/* BOOKINGS BOTTOM SHEET */}
 			<BookingsBottomSheet
 				visible={bookingsSheetVisible}
 				onClose={() => setBookingsSheetVisible(false)}
+			/>
+
+			{/* ANCILLARY SERVICES SELECTION BOTTOM SHEET */}
+			<AncillaryServicesBottomSheet
+				visible={ancillarySheetVisible}
+				onClose={() => setAncillarySheetVisible(false)}
 			/>
 		</>
 	)
@@ -233,49 +245,39 @@ export default function MainTabNavigator() {
 
 const styles = StyleSheet.create({
 	tabBar: {
-		backgroundColor: '#ffffff',
-		borderTopWidth: 1,
-		borderTopColor: '#f1f5f9',
 		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		width: '100%',
+		backgroundColor: '#FFFFFF',
+		borderTopWidth: 1,
+		borderTopColor: '#E2E8F0',
+		elevation: 8,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: -2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
 	},
-
 	tabBarItem: {
 		flex: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
-		height: '100%',
 	},
-
 	tabButton: {
 		alignItems: 'center',
 		justifyContent: 'center',
-		gap: 3,
 	},
-
 	iconActiveCapsule: {
-		width: 52,
-		height: 30,
-		borderRadius: 15,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: 'transparent',
+		paddingHorizontal: 12,
+		paddingVertical: 4,
+		borderRadius: 16,
 	},
-
 	iconActiveCapsuleFocused: {
-		backgroundColor: '#eef8f8',
+		backgroundColor: 'rgba(12, 124, 124, 0.1)',
 	},
-
 	tabLabel: {
-		fontSize: 10.5,
-		lineHeight: 12,
-		textAlign: 'center',
+		fontSize: 11,
 		fontWeight: '500',
+		marginTop: 2,
 	},
-
 	tabLabelFocused: {
-		fontWeight: '600',
+		fontWeight: '700',
 	},
 })

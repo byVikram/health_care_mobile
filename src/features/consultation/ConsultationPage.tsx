@@ -21,7 +21,7 @@ import * as FileSystem from 'expo-file-system/legacy'
 import DicomViewer from './components/DicomViewer'
 import VitalsTab from './components/VitalsTab'
 import FollowUpModal from './components/FollowUpModal'
-import ScribbleNoteEditor from './components/ScribbleNoteEditor'
+// import ScribbleNoteEditor from './components/ScribbleNoteEditor'
 import Prescription from '../../assets/icons/consultation/prescription.svg'
 import LaboratoryIcon from '../../assets/icons/consultation/lab.svg'
 import RadiologyTabIcon from '../../assets/icons/consultation/radiology.svg'
@@ -1412,10 +1412,10 @@ export default function ConsultationPage() {
 							<Divider />
 
 							{/* Scribble + Speech editor – replaces the old NativeInput */}
-							<ScribbleNoteEditor
+							{/* <ScribbleNoteEditor
 								accentColor={theme.colors.primary}
 								onChange={(base64) => setNoteCanvasData(base64)}
-							/>
+							/> */}
 						</Card>
 
 						{/* Share With */}

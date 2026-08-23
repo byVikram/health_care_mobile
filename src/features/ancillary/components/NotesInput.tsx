@@ -1,5 +1,5 @@
 import React from 'react'
-import { StyleSheet, Text, TextInput, View } from 'react-native'
+import { StyleSheet, TextInput, View } from 'react-native'
 
 interface NotesInputProps {
 	value: string
@@ -13,8 +13,7 @@ export default function NotesInput({
 	placeholder = 'Add clinical notes, observations, or special instructions...',
 }: NotesInputProps) {
 	return (
-		<View style={styles.card}>
-			<Text style={styles.title}>Clinical Observation Notes</Text>
+		<View style={styles.container}>
 			<TextInput
 				style={styles.input}
 				multiline
@@ -30,34 +29,18 @@ export default function NotesInput({
 }
 
 const styles = StyleSheet.create({
-	card: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#E6EDF2',
-		shadowColor: '#12373E',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.04,
-		shadowRadius: 8,
-		elevation: 2,
-		marginBottom: 16,
-	},
-	title: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#16324A',
-		marginBottom: 12,
+	container: {
+		width: '100%',
 	},
 	input: {
-		minHeight: 100,
+		minHeight: 96,
 		backgroundColor: '#F8FAFC',
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
 		borderRadius: 12,
 		padding: 12,
-		fontSize: 14,
-		color: '#1E293B',
-		lineHeight: 20,
+		fontSize: 13.5,
+		color: '#0F172A',
+		lineHeight: 19,
 	},
 })

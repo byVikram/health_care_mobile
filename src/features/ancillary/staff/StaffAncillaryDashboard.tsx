@@ -14,7 +14,6 @@ import {
 	NurseBooking,
 	getBookingState,
 	acceptCareRequestBackend,
-	fetchAvailableRequestsBackend,
 	fetchMyNurseAppointmentsBackend,
 	fetchProviderStatusBackend,
 	updateProviderStatusBackend,
@@ -31,6 +30,8 @@ import IncomingRequestNotificationOverlay, {
 import StatusModal from '../../../components/common/StatusModal'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
+
+import { getCurrentLocation } from '../../../services/locationService'
 
 export default function StaffAncillaryDashboard() {
 	const navigation = useNavigation<any>()
@@ -62,35 +63,25 @@ export default function StaffAncillaryDashboard() {
 		loadStatus()
 	}, [isFocused])
 
-	// Periodic Available Care Requests Polling (Every 3s when Online & No Active Card)
-	useEffect(() => {
-		if (!isNurseOnline || !isFocused) return
+	// NOTE: HTTP polling removed — order notifications are delivered exclusively
+	// via the authenticated WebSocket channel (ws/provider/dispatch).
 
-		const checkAvailableRequests = async () => {
-			try {
-				const availableList = await fetchAvailableRequestsBackend()
-				if (availableList && availableList.length > 0 && requestStep === 'none') {
-					setIncomingRequest(availableList[0])
-					setRequestStep('request_card')
-				}
-			} catch (e) {
-				console.log('[StaffAncillaryDashboard] Available poll logged')
-			}
-		}
-
-		void checkAvailableRequests()
-		const pollInterval = setInterval(checkAvailableRequests, 3000)
-		return () => clearInterval(pollInterval)
-	}, [isNurseOnline, isFocused, requestStep])
-
-	// Periodic GPS Location Sync to Database (Every 10 seconds when Online)
+	// Periodic Real Device GPS Location Sync to Database (Every 10 seconds when Online)
 	useEffect(() => {
 		if (!isNurseOnline || !isFocused) return
 
 		const sendLocationPing = async () => {
-			const lat = 12.9716 + (Math.random() - 0.5) * 0.001
-			const lng = 77.5946 + (Math.random() - 0.5) * 0.001
-			await updateProviderLocationBackend(lat, lng)
+			try {
+				const loc = await getCurrentLocation()
+				if (loc && loc.latitude != null && loc.longitude != null) {
+					await updateProviderLocationBackend(loc.latitude, loc.longitude)
+				}
+			} catch (err) {
+				// Fallback if permission not granted or location unavailable
+				const defaultLat = 12.9716
+				const defaultLng = 77.5946
+				await updateProviderLocationBackend(defaultLat, defaultLng)
+			}
 		}
 
 		void sendLocationPing()
@@ -98,24 +89,34 @@ export default function StaffAncillaryDashboard() {
 		return () => clearInterval(locationInterval)
 	}, [isNurseOnline, isFocused])
 
-	// Real-Time WebSocket Channel for Instant Push Notifications
+	// Real-Time WebSocket Channel for Instant Push Notifications (with auto-reconnect)
 	useEffect(() => {
 		if (!isNurseOnline || !isFocused) return
 
 		let ws: WebSocket | null = null
 		let isMounted = true
+		let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+		let reconnectDelay = 2000 // start at 2s, back off up to 30s
 
 		const initWs = async () => {
+			if (!isMounted) return
 			try {
 				const token = (await AsyncStorage.getItem('access_token')) || ''
 				if (!isMounted) return
 
 				const wsUrl = `${API_ENDPOINTS.ANCILLARY.WS_PROVIDER_DISPATCH}?token=${encodeURIComponent(token)}`
+				console.log('[WS] Connecting to:', wsUrl)
 				ws = new WebSocket(wsUrl)
+
+				ws.onopen = () => {
+					console.log('[WS] ✅ Connected to provider dispatch')
+					reconnectDelay = 2000 // reset backoff on successful connect
+				}
 
 				ws.onmessage = (event) => {
 					try {
 						const payload = JSON.parse(event.data)
+						console.log('[WS] 📨 Message received:', payload.type)
 						if (payload.type === 'NEW_CARE_REQUEST_OFFER' && payload.data) {
 							const reqData = payload.data
 							setIncomingRequest({
@@ -124,8 +125,8 @@ export default function StaffAncillaryDashboard() {
 								requestedDate: 'Today',
 								requestedTime: reqData.requestedTime || 'Just now',
 								generalLocation: reqData.generalArea || 'Sector 18',
-								distanceKm: '2.4 km',
-								travelTime: '~12 min',
+								distanceKm: reqData.distanceKm !== undefined ? `${reqData.distanceKm} km` : '-- km',
+								travelTime: reqData.travelTime || '~12 min',
 								serviceRequirement: reqData.generalArea || 'In-Home Healthcare Visit',
 								requiredSkills: ['Nursing Care', 'Doorstep Visit'],
 								urgency: reqData.urgencyLevel || 'Instant',
@@ -136,11 +137,29 @@ export default function StaffAncillaryDashboard() {
 							setRequestStep('request_card')
 						}
 					} catch (err) {
-						console.log('[StaffAncillaryDashboard] WebSocket msg parse error:', err)
+						console.log('[WS] Message parse error:', err)
+					}
+				}
+
+				ws.onerror = (err) => {
+					console.log('[WS] ❌ Error:', err)
+				}
+
+				ws.onclose = (event) => {
+					console.log(`[WS] 🔌 Disconnected — code=${event.code} reason="${event.reason}" wasClean=${event.wasClean}`)
+					if (isMounted && isNurseOnline) {
+						console.log(`[WS] Reconnecting in ${reconnectDelay / 1000}s...`)
+						reconnectTimer = setTimeout(() => {
+							reconnectDelay = Math.min(reconnectDelay * 2, 30000)
+							void initWs()
+						}, reconnectDelay)
 					}
 				}
 			} catch (e) {
-				console.log('[StaffAncillaryDashboard] WebSocket setup notice')
+				console.log('[WS] Setup error:', e)
+				if (isMounted) {
+					reconnectTimer = setTimeout(() => void initWs(), reconnectDelay)
+				}
 			}
 		}
 
@@ -148,7 +167,9 @@ export default function StaffAncillaryDashboard() {
 
 		return () => {
 			isMounted = false
+			if (reconnectTimer) clearTimeout(reconnectTimer)
 			if (ws) {
+				ws.onclose = null // prevent reconnect on intentional close
 				ws.close()
 			}
 		}
@@ -156,7 +177,16 @@ export default function StaffAncillaryDashboard() {
 
 	const handleAvailabilityToggle = async (online: boolean) => {
 		setIsNurseOnline(online)
-		await updateProviderStatusBackend(online, 12.9716, 77.5946)
+		let lat = 0
+		let lng = 0
+		try {
+			const loc = await getCurrentLocation()
+			lat = loc.latitude
+			lng = loc.longitude
+		} catch (_) {
+			// Permission denied or unavailable — backend will use last known location
+		}
+		await updateProviderStatusBackend(online, lat, lng)
 		if (!online) {
 			setIncomingRequest(null)
 			setDetailedInfo(null)
@@ -187,18 +217,18 @@ export default function StaffAncillaryDashboard() {
 
 			const newBooking: NurseBooking = {
 				id: targetId,
-				patientName: result.travelInfo?.patientFirstName || (incomingRequest as any)?.patientFirstName || 'Patient Eleanor V.',
-				patientAge: 68,
-				patientGender: 'Female',
-				patientPhone: '+91 98765 43210',
-				serviceName: incomingRequest.serviceName || 'General Nursing Care',
-				serviceDescription: incomingRequest.serviceRequirement || 'In-home procedure',
+				patientName: result.travelInfo?.patientFirstName || (incomingRequest as any)?.patientName || (incomingRequest as any)?.patientFirstName || 'Patient Recipient',
+				patientAge: (incomingRequest as any)?.patientAge || 45,
+				patientGender: (incomingRequest as any)?.patientGender || 'Not Specified',
+				patientPhone: result.travelInfo?.patientPhone || (incomingRequest as any)?.patientPhone || '',
+				serviceName: incomingRequest.serviceName || 'General Healthcare Service',
+				serviceDescription: incomingRequest.serviceRequirement || 'In-home healthcare visit',
 				appointmentDate: 'Today',
 				appointmentTime: incomingRequest.requestedTime || 'Just now',
-				patientAddress: result.travelInfo?.streetAddress || incomingRequest.generalLocation || '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
+				patientAddress: result.travelInfo?.streetAddress || incomingRequest.generalLocation || 'Healthcare Doorstep Address',
 				status: 'assigned',
-				otpCode: '4829',
-				completePin: '9182',
+				otpCode: result.travelInfo?.verificationOtp || '4829',
+				completePin: result.travelInfo?.completionPin || '9182',
 			}
 
 			setBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== targetId)])
@@ -226,50 +256,19 @@ export default function StaffAncillaryDashboard() {
 	}
 
 	useEffect(() => {
-		const fetchLiveAvailableRequests = async () => {
-			if (!isNurseOnline) return
-			try {
-				const available = await fetchAvailableRequestsBackend()
-				if (available.length > 0 && isNurseOnline) {
-					console.log('[StaffAncillaryDashboard] Loaded live patient requests count:', available.length)
-					setIncomingRequest(available[0])
-					setRequestStep('request_card')
-				}
-			} catch (e) {
-				console.log('[StaffAncillaryDashboard] Error checking available requests:', e)
-			}
-		}
-
 		const syncStatuses = async () => {
 			try {
 				const myAppointments = await fetchMyNurseAppointmentsBackend()
-				if (myAppointments.length > 0) {
-					setBookings((prev) => {
-						const existingIds = new Set(myAppointments.map((a) => a.id))
-						const remaining = prev.filter((b) => !existingIds.has(b.id))
-						return [...myAppointments, ...remaining]
-					})
-					return
+				if (myAppointments) {
+					setBookings(myAppointments)
 				}
 			} catch (e) {
-				console.log('[StaffAncillaryDashboard] Loading provider appointments via fallback')
+				console.log('[StaffAncillaryDashboard] Loading provider appointments notice:', e)
 			}
-
-			const updated = await Promise.all(
-				MOCK_NURSE_BOOKINGS.map(async (b) => {
-					const state = await getBookingState(b.id)
-					if (state) {
-						return { ...b, status: state.status }
-					}
-					return b
-				})
-			)
-			setBookings(updated)
 		}
 
 		if (isFocused && isNurseOnline) {
 			void syncStatuses()
-			void fetchLiveAvailableRequests()
 		}
 	}, [isFocused, isNurseOnline])
 

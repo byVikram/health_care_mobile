@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react'
 import {
-	View,
+	Animated,
+	BackHandler,
+	Easing,
 	StyleSheet,
 	Text,
-	Animated,
-	Easing,
+	View,
 	useWindowDimensions,
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
@@ -16,6 +17,7 @@ import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
 import { fetchPatientActiveRequestBackend, cancelCareRequestPatientBackend } from '../ancillaryService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
+import CancellationDetailsModal from './CancellationDetailsModal'
 
 export default function ServiceMatchingPage() {
 	const navigation = useNavigation<any>()
@@ -24,28 +26,29 @@ export default function ServiceMatchingPage() {
 	const { width } = useWindowDimensions()
 
 	const routeParams = route.params || {}
-	const bookingId = routeParams.bookingId || 'ANC-REQ-991'
-	const serviceName = routeParams.serviceName || 'In-Home Healthcare Service'
+	const bookingId = routeParams.bookingId || routeParams.publicBookingId || routeParams.id || 'active'
+	const serviceName = routeParams.serviceName || 'Wound Dressing & Care'
 	const addressText = routeParams.addressText || '42 Healthcare Avenue, Flat 3B'
 
 	const [searchStatus, setSearchStatus] = useState<'SEARCHING' | 'ASSIGNED' | 'FAILED'>('SEARCHING')
 	const [assignedProvider, setAssignedProvider] = useState<any>(null)
 	const [isCancelling, setIsCancelling] = useState(false)
+	const [cancelModalVisible, setCancelModalVisible] = useState(false)
 
 	// Radar Animation Values
 	const pulse1 = useRef(new Animated.Value(0)).current
 	const pulse2 = useRef(new Animated.Value(0)).current
+	const pulse3 = useRef(new Animated.Value(0)).current
 
 	useEffect(() => {
-		// Start pulsing animation
 		const createPulseAnimation = (anim: Animated.Value, delay: number) => {
 			return Animated.loop(
 				Animated.sequence([
 					Animated.delay(delay),
 					Animated.timing(anim, {
 						toValue: 1,
-						duration: 2000,
-						easing: Easing.out(Easing.ease),
+						duration: 2400,
+						easing: Easing.out(Easing.quad),
 						useNativeDriver: true,
 					}),
 					Animated.timing(anim, {
@@ -58,18 +61,21 @@ export default function ServiceMatchingPage() {
 		}
 
 		const anim1 = createPulseAnimation(pulse1, 0)
-		const anim2 = createPulseAnimation(pulse2, 1000)
+		const anim2 = createPulseAnimation(pulse2, 800)
+		const anim3 = createPulseAnimation(pulse3, 1600)
 
 		anim1.start()
 		anim2.start()
+		anim3.start()
 
 		return () => {
 			anim1.stop()
 			anim2.stop()
+			anim3.stop()
 		}
-	}, [pulse1, pulse2])
+	}, [pulse1, pulse2, pulse3])
 
-	// Real-Time WebSocket Channel for Instant Assignment Push
+	// WebSocket Channel for Instant Push Assignment
 	useEffect(() => {
 		let ws: WebSocket | null = null
 		try {
@@ -96,7 +102,7 @@ export default function ServiceMatchingPage() {
 						}
 					}
 				} catch (e) {
-					console.log('[ServiceMatchingPage] WS parse error:', e)
+					console.log('[ServiceMatchingPage] WS parse notice:', e)
 				}
 			}
 		} catch (e) {
@@ -108,69 +114,67 @@ export default function ServiceMatchingPage() {
 		}
 	}, [bookingId, navigation])
 
-	// Polling Backend Status
+	// Initial Status Check via HTTP
 	useEffect(() => {
 		let isMounted = true
-		const pollInterval = setInterval(async () => {
+		const checkInitialStatus = async () => {
 			try {
 				const activeReq = await fetchPatientActiveRequestBackend()
 				if (isMounted && activeReq) {
 					if (activeReq.status === 'ASSIGNED' || activeReq.status === 'EN_ROUTE') {
 						setSearchStatus('ASSIGNED')
 						setAssignedProvider(activeReq.provider)
-						clearInterval(pollInterval)
-						// Transition to tracking page
 						setTimeout(() => {
 							navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
 								bookingId: activeReq.id,
 								bookingData: activeReq,
 							})
-						}, 1200)
+						}, 800)
 					}
 				}
 			} catch (e) {
-				console.log('[ServiceMatchingPage] Polling check:', e)
+				console.log('[ServiceMatchingPage] Initial check:', e)
 			}
-		}, 3000)
+		}
 
-		// Timeout fallback after 12 seconds for demonstration matching
-		const timeoutTimer = setTimeout(() => {
-			if (isMounted && searchStatus === 'SEARCHING') {
-				setSearchStatus('ASSIGNED')
-				setAssignedProvider({
-					name: 'Anita Sharma',
-					designation: 'Registered Specialist Nurse',
-					rating: 4.9,
-				})
-				setTimeout(() => {
-					navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
-						bookingId,
-						status: 'ASSIGNED',
-					})
-				}, 1200)
-			}
-		}, 12000)
+		void checkInitialStatus()
 
 		return () => {
 			isMounted = false
-			clearInterval(pollInterval)
-			clearTimeout(timeoutTimer)
 		}
-	}, [bookingId, navigation, searchStatus])
+	}, [bookingId, navigation])
 
-	const handleCancelRequest = async () => {
+	const handleNavigateToServices = () => {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
+			serviceKey: routeParams.serviceKey || 'nursing-care',
+			serviceLabel: routeParams.serviceLabel || 'Nursing Care',
+		})
+	}
+
+	useEffect(() => {
+		const onBackPress = () => {
+			handleNavigateToServices()
+			return true
+		}
+
+		const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress)
+		return () => subscription.remove()
+	}, [navigation, routeParams])
+
+	const handleCancelRequestWithReason = async (reason: string) => {
 		setIsCancelling(true)
-		await cancelCareRequestPatientBackend(bookingId, 'Patient cancelled search')
+		await cancelCareRequestPatientBackend(bookingId, reason)
 		setIsCancelling(false)
+		setCancelModalVisible(false)
 		navigation.navigate(ROUTES.MAIN.TABS)
 	}
 
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
-			<AppScreenHeader title="Matching Specialist" />
+		<View style={styles.container}>
+			<AppScreenHeader title="Matching Specialist" onBack={handleNavigateToServices} />
 
 			<View style={styles.content}>
-				{/* Radar Animation Area */}
+				{/* 1. RADAR SCANNER ANIMATION AREA */}
 				<View style={styles.radarWrapper}>
 					<Animated.View
 						style={[
@@ -180,13 +184,13 @@ export default function ServiceMatchingPage() {
 									{
 										scale: pulse1.interpolate({
 											inputRange: [0, 1],
-											outputRange: [1, 2.8],
+											outputRange: [1, 2.9],
 										}),
 									},
 								],
 								opacity: pulse1.interpolate({
 									inputRange: [0, 1],
-									outputRange: [0.6, 0],
+									outputRange: [0.5, 0],
 								}),
 							},
 						]}
@@ -199,13 +203,32 @@ export default function ServiceMatchingPage() {
 									{
 										scale: pulse2.interpolate({
 											inputRange: [0, 1],
-											outputRange: [1, 2.8],
+											outputRange: [1, 2.9],
 										}),
 									},
 								],
 								opacity: pulse2.interpolate({
 									inputRange: [0, 1],
-									outputRange: [0.6, 0],
+									outputRange: [0.5, 0],
+								}),
+							},
+						]}
+					/>
+					<Animated.View
+						style={[
+							styles.pulseRing,
+							{
+								transform: [
+									{
+										scale: pulse3.interpolate({
+											inputRange: [0, 1],
+											outputRange: [1, 2.9],
+										}),
+									},
+								],
+								opacity: pulse3.interpolate({
+									inputRange: [0, 1],
+									outputRange: [0.5, 0],
 								}),
 							},
 						]}
@@ -220,48 +243,90 @@ export default function ServiceMatchingPage() {
 					</View>
 				</View>
 
-				{/* Status Message */}
+				{/* 2. STATUS & INSTRUCTION */}
 				<View style={styles.statusBox}>
+					<View style={styles.liveSearchingChip}>
+						<View style={styles.searchingDot} />
+						<AppTypography variant="caption" style={styles.searchingChipText}>
+							{searchStatus === 'ASSIGNED' ? 'MATCH FOUND' : 'SEARCHING NEARBY RNs'}
+						</AppTypography>
+					</View>
+
 					<AppTypography variant="h2" style={styles.titleText}>
-						{searchStatus === 'ASSIGNED' ? 'Specialist Assigned!' : 'Finding Nearest Specialist...'}
+						{searchStatus === 'ASSIGNED' ? 'Specialist Assigned!' : 'Matching Nearest Nurse...'}
 					</AppTypography>
+
 					<AppTypography variant="subtitle" style={styles.subtitleText}>
 						{searchStatus === 'ASSIGNED'
 							? `${assignedProvider?.name || 'Specialist'} has accepted your care request.`
-							: 'Broadcasting your request to qualified, verified healthcare professionals nearby.'}
+							: 'Broadcasting your care request to certified registered nurses within 5 km...'}
 					</AppTypography>
 				</View>
 
-				{/* Request Details Card */}
+				{/* 3. REQUEST SUMMARY CARD */}
 				<View style={styles.detailsCard}>
 					<View style={styles.detailRow}>
-						<MaterialCommunityIcons name="medical-bag" size={20} color="#1F5F68" />
-						<Text style={styles.detailText}>{serviceName}</Text>
+						<View style={styles.iconCircle}>
+							<MaterialCommunityIcons name="medical-bag" size={18} color="#2B6F71" />
+						</View>
+						<View style={styles.detailTextCol}>
+							<AppTypography variant="caption" style={styles.detailLabel}>
+								Procedure
+							</AppTypography>
+							<AppTypography variant="body" style={styles.detailVal}>
+								{serviceName}
+							</AppTypography>
+						</View>
 					</View>
+
 					<View style={styles.detailRow}>
-						<Ionicons name="location-outline" size={20} color="#1F5F68" />
-						<Text style={styles.detailText} numberOfLines={2}>
-							{addressText}
-						</Text>
+						<View style={styles.iconCircle}>
+							<Ionicons name="location" size={18} color="#2B6F71" />
+						</View>
+						<View style={styles.detailTextCol}>
+							<AppTypography variant="caption" style={styles.detailLabel}>
+								Doorstep Location
+							</AppTypography>
+							<AppTypography variant="body" style={styles.detailVal} numberOfLines={2}>
+								{addressText}
+							</AppTypography>
+						</View>
 					</View>
+
 					<View style={styles.detailRow}>
-						<Ionicons name="flash-outline" size={20} color="#059669" />
-						<Text style={styles.instantTagText}>Instant Platform Dispatch (ETA ~15 mins)</Text>
+						<View style={styles.iconCircle}>
+							<Ionicons name="flash" size={18} color="#059669" />
+						</View>
+						<View style={styles.detailTextCol}>
+							<AppTypography variant="caption" style={styles.detailLabel}>
+								Care Dispatch
+							</AppTypography>
+							<AppTypography variant="body" style={styles.instantTagText}>
+								Instant Care: ETA ~15 - 30 minutes
+							</AppTypography>
+						</View>
 					</View>
 				</View>
 			</View>
 
-			{/* Bottom Action Footer */}
+			{/* BOTTOM ACTION FOOTER */}
 			<View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
 				<AppButton
 					variant="outline"
-					onPress={handleCancelRequest}
+					onPress={() => setCancelModalVisible(true)}
 					loading={isCancelling}
 					style={styles.cancelBtn}
 				>
-					Cancel Request
+					Cancel Care Request
 				</AppButton>
 			</View>
+
+			<CancellationDetailsModal
+				visible={cancelModalVisible}
+				onClose={() => setCancelModalVisible(false)}
+				onConfirmCancel={handleCancelRequestWithReason}
+				isCancelling={isCancelling}
+			/>
 		</View>
 	)
 }
@@ -269,7 +334,7 @@ export default function ServiceMatchingPage() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#FFFFFF',
 	},
 	content: {
 		flex: 1,
@@ -277,56 +342,83 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		paddingHorizontal: 24,
 	},
+
+	/* RADAR ANIMATION */
 	radarWrapper: {
 		width: 140,
 		height: 140,
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginBottom: 36,
+		marginBottom: 32,
 	},
 	pulseRing: {
 		position: 'absolute',
 		width: 100,
 		height: 100,
 		borderRadius: 50,
-		backgroundColor: 'rgba(31, 95, 104, 0.25)',
+		backgroundColor: 'rgba(43, 111, 113, 0.18)',
 		borderWidth: 1.5,
-		borderColor: '#1F5F68',
+		borderColor: '#2B6F71',
 	},
 	centerAvatar: {
 		width: 80,
 		height: 80,
 		borderRadius: 40,
-		backgroundColor: '#1F5F68',
+		backgroundColor: '#2B6F71',
 		alignItems: 'center',
 		justifyContent: 'center',
-		shadowColor: '#1F5F68',
+		elevation: 6,
+		shadowColor: '#2B6F71',
 		shadowOffset: { width: 0, height: 4 },
 		shadowOpacity: 0.3,
 		shadowRadius: 8,
-		elevation: 6,
 	},
+
+	/* STATUS TEXT */
 	statusBox: {
 		alignItems: 'center',
 		marginBottom: 28,
+		gap: 8,
+	},
+	liveSearchingChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#E6F4F4',
+		paddingHorizontal: 10,
+		paddingVertical: 3,
+		borderRadius: 12,
+		gap: 6,
+	},
+	searchingDot: {
+		width: 6,
+		height: 6,
+		borderRadius: 3,
+		backgroundColor: '#2B6F71',
+	},
+	searchingChipText: {
+		fontSize: 10.5,
+		fontWeight: '800',
+		color: '#2B6F71',
+		letterSpacing: 0.4,
 	},
 	titleText: {
-		fontSize: 20,
-		fontWeight: '700',
+		fontSize: 21,
+		fontWeight: '800',
 		color: '#0F172A',
 		textAlign: 'center',
-		marginBottom: 8,
 	},
 	subtitleText: {
 		fontSize: 13,
 		color: '#64748B',
 		textAlign: 'center',
 		lineHeight: 18,
-		paddingHorizontal: 16,
+		paddingHorizontal: 12,
 	},
+
+	/* DETAILS SUMMARY CARD */
 	detailsCard: {
 		width: '100%',
-		backgroundColor: '#FFFFFF',
+		backgroundColor: '#F8FAFC',
 		borderRadius: 16,
 		padding: 16,
 		borderWidth: 1,
@@ -336,21 +428,41 @@ const styles = StyleSheet.create({
 	detailRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 10,
+		gap: 12,
 	},
-	detailText: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: '#1E293B',
+	iconCircle: {
+		width: 36,
+		height: 36,
+		borderRadius: 10,
+		backgroundColor: '#FFFFFF',
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	detailTextCol: {
 		flex: 1,
 	},
-	instantTagText: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#059669',
+	detailLabel: {
+		fontSize: 11.5,
+		color: '#64748B',
 	},
+	detailVal: {
+		fontSize: 13.5,
+		fontWeight: '600',
+		color: '#0F172A',
+		marginTop: 1,
+	},
+	instantTagText: {
+		fontSize: 13,
+		fontWeight: '700',
+		color: '#059669',
+		marginTop: 1,
+	},
+
+	/* FOOTER */
 	footer: {
-		paddingHorizontal: 24,
+		paddingHorizontal: 20,
 		paddingTop: 12,
 		backgroundColor: '#FFFFFF',
 		borderTopWidth: 1,
@@ -358,5 +470,6 @@ const styles = StyleSheet.create({
 	},
 	cancelBtn: {
 		borderColor: '#EF4444',
+		borderRadius: 12,
 	},
 })

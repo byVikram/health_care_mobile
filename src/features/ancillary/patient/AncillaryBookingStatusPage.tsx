@@ -3,14 +3,13 @@ import {
 	Image,
 	ScrollView,
 	StyleSheet,
-	Text,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import { Ionicons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
@@ -25,6 +24,9 @@ import {
 	submitAncillaryReview,
 } from '../ancillaryService'
 
+import ApiService from '../../../services/apiService'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
+
 export default function AncillaryBookingStatusPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
@@ -33,19 +35,61 @@ export default function AncillaryBookingStatusPage() {
 	const isTablet = width >= 768
 
 	const bookingData = route.params?.bookingData || {}
-	const bookingId = route.params?.bookingId || bookingData.bookingId || 'BK-882419'
+	const bookingId = route.params?.bookingId || bookingData.bookingId
 
-	// Mock / Data fallback structures
-	const statusLabel = bookingData.status || 'Assigned'
-	const isCompleted = statusLabel.toLowerCase() === 'completed' || bookingData.status === 'completed'
-	const serviceName = bookingData.serviceName || 'Wound Dressing & Care'
+	const [liveData, setLiveData] = useState<any>(null)
+
+	React.useEffect(() => {
+		const loadLiveBooking = async () => {
+			if (!bookingId) return
+			try {
+				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
+				const data = res.data?.data || res.data
+				if (data) {
+					setLiveData(data)
+				}
+			} catch (e) {
+				console.log('[AncillaryBookingStatusPage] Live status fetch notice')
+			}
+		}
+		void loadLiveBooking()
+	}, [bookingId])
+
+	// Status & Data fallbacks
+	const rawStatus = liveData?.status || bookingData.status || 'Assigned'
+	const statusLabel = rawStatus.toUpperCase()
+	const isCompleted = statusLabel.toLowerCase() === 'completed' || rawStatus.toLowerCase() === 'completed'
+
+	const serviceName = liveData?.serviceName || bookingData.serviceName || 'Healthcare Visit'
 	const serviceDesc =
+		liveData?.procedureDetails ||
 		bookingData.serviceDesc ||
-		'Sterile dressing, cleansing, and post-surgical wound management by certified nurses.'
+		'Sterile dressing, cleansing, and doorstep healthcare management.'
 	const duration = bookingData.duration || '30 - 45 mins'
 	const serviceImage =
 		bookingData.serviceImage ||
 		'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=80'
+
+	// Assigned Practitioner data
+	const provider = liveData?.assignedProvider
+		? {
+				id: liveData.assignedProvider.id || 'n-prov-1',
+				name: liveData.assignedProvider.name || 'Nurse Specialist',
+				designation: liveData.assignedProvider.credentials || 'Certified Senior RN',
+				rating: String(liveData.assignedProvider.rating || '4.9'),
+				reviews: '142',
+				phone: liveData.assignedProvider.phone || '',
+				avatar: liveData.assignedProvider.avatar || 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=200',
+		  }
+		: bookingData.provider || {
+				id: 'n-prov-1',
+				name: 'Nurse Specialist',
+				designation: 'Certified Senior RN',
+				rating: '4.9',
+				reviews: '142',
+				phone: '',
+				avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=200',
+		  }
 
 	// Review state
 	const [reviewData, setReviewData] = useState<AncillaryReviewData | null>(() =>
@@ -59,52 +103,37 @@ export default function AncillaryBookingStatusPage() {
 		description: string
 	} | null>(null)
 
-	const patient = bookingData.patient || {
-		name: 'John Doe',
-		age: '34',
-		gender: 'Male',
-		relationship: 'Self',
+	const patient = {
+		name: liveData?.patientName || bookingData.patient?.name || 'Patient Recipient',
+		age: String(liveData?.patientAge || bookingData.patient?.age || '45'),
+		gender: liveData?.patientGender || bookingData.patient?.gender || 'Not Specified',
+		relationship: bookingData.patient?.relationship || 'Self',
+		bloodGroup: bookingData.patient?.bloodGroup || 'O+',
 	}
 
-	const medical = bookingData.medical || {
-		condition: 'Post-surgical wound dressing',
-		notes: 'Sterile handling requested for chronic wound care.',
-		prescription: '1 Document Uploaded (prescription.pdf)',
-	}
-
-	const appointment = bookingData.appointment || {
-		address: '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
-		date: 'Today, Oct 14',
-		timeSlot: '09:00 AM - 10:00 AM',
+	const appointment = {
+		address: liveData?.streetAddress || bookingData.appointment?.address || 'Doorstep Delivery Address',
+		addressLabel: bookingData.appointment?.addressLabel || 'Home',
+		date: liveData?.createdAt || bookingData.scheduledStartTime || 'Today',
+		timeSlot: bookingData.appointment?.timeSlot || 'Immediate Dispatch',
 	}
 
 	const pricing = bookingData.pricing || {
-		basePrice: '₹499',
-		severityAdjustment: '₹100',
+		basePrice: liveData?.totalAmount ? `₹${liveData.totalAmount}` : '₹499',
 		visitFee: '₹150',
-		taxes: '₹45',
-		totalAmount: '₹794',
+		taxes: '₹18',
+		totalAmount: liveData?.totalAmount ? `₹${liveData.totalAmount}` : '₹667',
 	}
 
-	const handleGoToHistory = () => {
-		if (ROUTES.STACK.APPOINTMENTS) {
-			navigation.navigate(ROUTES.STACK.APPOINTMENTS)
-		} else {
-			navigation.navigate(ROUTES.MAIN.TABS)
-		}
-	}
-
-	const handleBackToHome = () => {
-		navigation.navigate(ROUTES.MAIN.TABS)
-	}
+	const otpCode = liveData?.verificationOtp || bookingData.otpCode || '4892'
 
 	const handleSubmitReview = async (stars: number, comment: string) => {
 		setIsSubmittingReview(true)
 		try {
 			const saved = await submitAncillaryReview({
 				bookingId,
-				providerId: bookingData.provider?.id || 'n-prov-1',
-				providerName: bookingData.provider?.name || 'Healthcare Clinician',
+				providerId: provider.id,
+				providerName: provider.name,
 				serviceName,
 				rating: stars,
 				comment,
@@ -115,7 +144,7 @@ export default function AncillaryBookingStatusPage() {
 			setStatusFeedbackModal({
 				visible: true,
 				title: 'Thank You!',
-				description: 'Your rating and feedback have been successfully submitted.',
+				description: 'Your rating and review have been submitted successfully.',
 			})
 		} finally {
 			setIsSubmittingReview(false)
@@ -129,14 +158,7 @@ export default function AncillaryBookingStatusPage() {
 		serviceLabel: bookingData.serviceLabel || 'Nursing Care',
 		status: 'completed',
 		date: appointment.date || 'Today',
-		provider: {
-			id: bookingData.provider?.id || 'n-prov-1',
-			name: bookingData.provider?.name || 'Anita Sharma',
-			designation: bookingData.provider?.designation || 'Registered Nurse',
-			avatar:
-				bookingData.provider?.avatar ||
-				'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
-		},
+		provider,
 		hasReview: !!reviewData,
 		rating: reviewData?.rating,
 		review: reviewData || undefined,
@@ -144,292 +166,299 @@ export default function AncillaryBookingStatusPage() {
 
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader title="Booking Details & Status" />
+			<AppScreenHeader title="Track Visit & Appointment" />
 
 			<ScrollView
 				contentContainerStyle={[
 					styles.scrollContent,
 					isTablet && styles.scrollContentTablet,
-					{ paddingBottom: insets.bottom + 24 },
+					{ paddingBottom: insets.bottom + 40 },
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* 1. Booking Status Header Banner */}
-				<View style={styles.statusHeaderCard}>
-					<View style={styles.statusRow}>
-						<View style={styles.statusBadge}>
-							<View style={styles.statusDot} />
-							<AppTypography variant="caption" style={styles.statusBadgeText}>
-								{statusLabel.toUpperCase()}
+				{/* 1. STATUS BANNER BLOCK */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.statusBannerRow}>
+						<View style={[styles.statusBadge, isCompleted ? styles.completedBadge : styles.activeBadge]}>
+							<View style={[styles.statusDot, isCompleted ? styles.completedDot : styles.activeDot]} />
+							<AppTypography variant="caption" style={[styles.statusBadgeText, isCompleted ? styles.completedBadgeText : styles.activeBadgeText]}>
+								{statusLabel}
 							</AppTypography>
 						</View>
 
-						<AppTypography variant="caption" style={styles.bookingIdText}>
-							Ref: {bookingId}
+						<AppTypography variant="caption" style={styles.bookingRefText}>
+							Ref ID: {bookingId}
 						</AppTypography>
 					</View>
 
 					<AppTypography variant="h2" style={styles.statusTitle}>
-						{isCompleted ? 'Service Completed' : 'Appointment Confirmed'}
+						{isCompleted ? 'Visit Completed' : 'Practitioner Assigned & En Route'}
 					</AppTypography>
-					<AppTypography variant="caption" style={styles.statusSubtitle}>
+
+					<AppTypography variant="caption" style={styles.statusSub}>
 						{isCompleted
-							? 'Your home care visit has been successfully completed.'
-							: 'Your appointment has been scheduled for a home visit.'}
+							? 'Your home care visit has been completed successfully.'
+							: 'Certified practitioner is en route to your location.'}
 					</AppTypography>
 				</View>
 
-				{/* 1b. Post-Service Rating Prompt (Only when Completed) */}
-				{isCompleted && (
-					<View style={styles.feedbackCard}>
-						<View style={styles.feedbackHeaderRow}>
-							<View style={styles.feedbackIconWrap}>
-								<Ionicons name="star" size={18} color="#D97706" />
-							</View>
-							<View style={styles.feedbackTextCol}>
-								<AppTypography variant="h4" style={styles.feedbackTitle}>
-									How was your care experience?
-								</AppTypography>
-								<AppTypography variant="caption" style={styles.feedbackSubtitle}>
-									Your rating helps us improve clinical service quality.
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
+
+				{/* 2. ASSIGNED PRACTITIONER BLOCK */}
+				{!isCompleted && (
+					<>
+						<View style={styles.sectionBlock}>
+							<View style={styles.sectionHeaderRow}>
+								<AppTypography variant="h3" style={styles.sectionHeading}>
+									Assigned Practitioner
 								</AppTypography>
 							</View>
-						</View>
 
-						{reviewData ? (
-							<TouchableOpacity
-								style={styles.feedbackActionBtnReviewed}
-								onPress={() => setReviewModalVisible(true)}
-								activeOpacity={0.8}
-							>
-								<RatingStars rating={reviewData.rating} size={14} />
-								<Text style={styles.feedbackActionTextReviewed}>
-									★ {reviewData.rating}.0 • View Your Submitted Review
-								</Text>
-								<Ionicons name="chevron-forward" size={14} color="#0C7C7C" />
-							</TouchableOpacity>
-						) : (
-							<AppButton
-								variant="primary"
-								onPress={() => setReviewModalVisible(true)}
-								style={{ width: '100%', borderRadius: 12, marginTop: 4 }}
-							>
-								Rate & Review Service
-							</AppButton>
-						)}
-					</View>
-				)}
+							<View style={styles.nurseRow}>
+								<Image source={{ uri: provider.avatar }} style={styles.nurseAvatar} resizeMode="cover" />
+								<View style={styles.nurseInfoCol}>
+									<View style={styles.nurseNameRow}>
+										<AppTypography variant="h4" style={styles.nurseName}>
+											{provider.name}
+										</AppTypography>
+										<View style={styles.verifiedChip}>
+											<Ionicons name="checkmark-circle" size={12} color="#059669" />
+											<AppTypography variant="caption" style={styles.verifiedChipText}>
+												VERIFIED RN
+											</AppTypography>
+										</View>
+									</View>
 
+									<AppTypography variant="caption" style={styles.nurseDesig}>
+										{provider.designation}
+									</AppTypography>
 
-				{/* 2. Healthcare Service Details */}
-				<View style={styles.card}>
-					<AppTypography variant="h3" style={styles.cardSectionTitle}>
-						Healthcare Service Details
-					</AppTypography>
+									<View style={styles.nurseRatingRow}>
+										<Ionicons name="star" size={13} color="#D97706" />
+										<AppTypography variant="caption" style={styles.nurseRatingText}>
+											{provider.rating} ({provider.reviews} visits)
+										</AppTypography>
+									</View>
+								</View>
 
-					<View style={styles.serviceRow}>
-						{serviceImage ? (
-							<Image source={{ uri: serviceImage }} style={styles.serviceImg} resizeMode="cover" />
-						) : null}
-						<View style={styles.serviceTextCol}>
-							<AppTypography variant="h4" style={styles.serviceNameText}>
-								{serviceName}
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.serviceDescText} numberOfLines={2}>
-								{serviceDesc}
-							</AppTypography>
-							{duration && (
-								<View style={styles.durationRow}>
-									<Ionicons name="time-outline" size={12} color="#1F5F68" />
-									<AppTypography variant="caption" style={styles.durationText}>
-										{duration}
+								<TouchableOpacity style={styles.callBtn} activeOpacity={0.8}>
+									<Ionicons name="call" size={18} color="#FFFFFF" />
+								</TouchableOpacity>
+							</View>
+
+							{/* OTP START VISIT BOX */}
+							<View style={styles.otpBox}>
+								<View style={styles.otpLeftCol}>
+									<AppTypography variant="caption" style={styles.otpLabel}>
+										Start Visit OTP
+									</AppTypography>
+									<AppTypography variant="h2" style={styles.otpValue}>
+										{otpCode}
 									</AppTypography>
 								</View>
-							)}
+								<AppTypography variant="caption" style={styles.otpNote}>
+									Share this OTP code with your nurse upon arrival to verify visit start.
+								</AppTypography>
+							</View>
+						</View>
+
+						<View style={styles.sectionDividerBar} />
+					</>
+				)}
+
+				{/* 3. POST-SERVICE RATING CARD (IF COMPLETED) */}
+				{isCompleted && (
+					<>
+						<View style={styles.sectionBlock}>
+							<View style={styles.feedbackBox}>
+								<View style={styles.feedbackHeaderRow}>
+									<Ionicons name="star" size={20} color="#D97706" />
+									<View style={styles.feedbackTextCol}>
+										<AppTypography variant="h4" style={styles.feedbackTitle}>
+											How was your care experience?
+										</AppTypography>
+										<AppTypography variant="caption" style={styles.feedbackSub}>
+											Your review helps maintain clinical healthcare standards.
+										</AppTypography>
+									</View>
+								</View>
+
+								{reviewData ? (
+									<TouchableOpacity
+										style={styles.reviewedBtn}
+										onPress={() => setReviewModalVisible(true)}
+										activeOpacity={0.8}
+									>
+										<RatingStars rating={reviewData.rating} size={14} />
+										<AppTypography variant="caption" style={styles.reviewedText}>
+											★ {reviewData.rating}.0 • View Your Submitted Review
+										</AppTypography>
+									</TouchableOpacity>
+								) : (
+									<AppButton
+										variant="primary"
+										onPress={() => setReviewModalVisible(true)}
+										style={styles.rateBtn}
+									>
+										Rate & Review Visit
+									</AppButton>
+								)}
+							</View>
+						</View>
+
+						<View style={styles.sectionDividerBar} />
+					</>
+				)}
+
+				{/* 4. SECTION: SELECTED PROCEDURES */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Service Details
+						</AppTypography>
+					</View>
+
+					<View style={styles.serviceRow}>
+						<Image source={{ uri: serviceImage }} style={styles.serviceThumb} resizeMode="cover" />
+						<View style={styles.serviceTextCol}>
+							<AppTypography variant="h4" style={styles.serviceTitle} numberOfLines={1}>
+								{serviceName}
+							</AppTypography>
+							<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={2}>
+								{serviceDesc}
+							</AppTypography>
+							<View style={styles.durationPill}>
+								<Ionicons name="time-outline" size={12} color="#475569" />
+								<AppTypography variant="caption" style={styles.durationText}>
+									{duration}
+								</AppTypography>
+							</View>
 						</View>
 					</View>
 				</View>
 
-				{/* 3. Patient Information (Read-Only) */}
-				<View style={styles.card}>
-					<AppTypography variant="h3" style={styles.cardSectionTitle}>
-						Patient Information
-					</AppTypography>
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
 
-					<View style={styles.infoRow}>
-						<AppTypography variant="caption" style={styles.infoLabel}>
-							Full Name:
-						</AppTypography>
-						<AppTypography variant="body" style={styles.infoVal}>
-							{patient.name}
+				{/* 5. SECTION: PATIENT RECIPIENT */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Patient Recipient
 						</AppTypography>
 					</View>
 
-					<View style={styles.infoRow}>
-						<AppTypography variant="caption" style={styles.infoLabel}>
-							Age / Gender:
-						</AppTypography>
-						<AppTypography variant="body" style={styles.infoVal}>
-							{patient.age} yrs • {patient.gender}
-						</AppTypography>
-					</View>
-
-					<View style={styles.infoRow}>
-						<AppTypography variant="caption" style={styles.infoLabel}>
-							Relationship:
-						</AppTypography>
-						<AppTypography variant="body" style={styles.infoVal}>
-							{patient.relationship}
-						</AppTypography>
+					<View style={styles.infoList}>
+						<View style={styles.infoRow}>
+							<AppTypography variant="caption" style={styles.infoLabel}>
+								Name
+							</AppTypography>
+							<AppTypography variant="body" style={styles.infoVal}>
+								{patient.name} ({patient.relationship})
+							</AppTypography>
+						</View>
+						<View style={styles.infoRow}>
+							<AppTypography variant="caption" style={styles.infoLabel}>
+								Age / Gender
+							</AppTypography>
+							<AppTypography variant="body" style={styles.infoVal}>
+								{patient.age} Yrs • {patient.gender} • Blood Group: {patient.bloodGroup || 'O+'}
+							</AppTypography>
+						</View>
 					</View>
 				</View>
 
-				{/* 5. Medical Information (Read-Only) */}
-				<View style={styles.card}>
-					<AppTypography variant="h3" style={styles.cardSectionTitle}>
-						Medical Information
-					</AppTypography>
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
 
-					<View style={styles.infoRow}>
-						<AppTypography variant="caption" style={styles.infoLabel}>
-							Condition:
-						</AppTypography>
-						<AppTypography variant="body" style={styles.infoVal}>
-							{medical.condition || 'None specified'}
+				{/* 6. SECTION: VISIT LOCATION & SCHEDULE */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Visit Location & Schedule
 						</AppTypography>
 					</View>
 
-					<View style={styles.infoRow}>
-						<AppTypography variant="caption" style={styles.infoLabel}>
-							Notes:
-						</AppTypography>
-						<AppTypography variant="body" style={styles.infoVal}>
-							{medical.notes || 'None'}
-						</AppTypography>
-					</View>
-
-					<View style={styles.infoRow}>
-						<AppTypography variant="caption" style={styles.infoLabel}>
-							Prescription:
-						</AppTypography>
-						<AppTypography variant="body" style={styles.infoVal}>
-							{medical.prescription || 'No document attached'}
-						</AppTypography>
+					<View style={styles.infoList}>
+						<View style={styles.infoRow}>
+							<AppTypography variant="caption" style={styles.infoLabel}>
+								Address
+							</AppTypography>
+							<AppTypography variant="body" style={styles.infoVal} numberOfLines={2}>
+								{appointment.address}
+							</AppTypography>
+						</View>
+						<View style={styles.infoRow}>
+							<AppTypography variant="caption" style={styles.infoLabel}>
+								Time Slot
+							</AppTypography>
+							<AppTypography variant="body" style={styles.infoVal}>
+								{appointment.date} • {appointment.timeSlot}
+							</AppTypography>
+						</View>
 					</View>
 				</View>
 
-				{/* 6. Appointment Details */}
-				<View style={styles.card}>
-					<AppTypography variant="h3" style={styles.cardSectionTitle}>
-						Appointment Details
-					</AppTypography>
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
 
-					<View style={styles.infoRow}>
-						<AppTypography variant="caption" style={styles.infoLabel}>
-							Visit Address:
-						</AppTypography>
-						<AppTypography variant="body" style={styles.infoVal} numberOfLines={2}>
-							{appointment.address}
+				{/* 7. SECTION: PAYMENT BREAKDOWN */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Payment Summary
 						</AppTypography>
 					</View>
 
-					<View style={styles.infoRow}>
-						<AppTypography variant="caption" style={styles.infoLabel}>
-							Date & Time:
-						</AppTypography>
-						<AppTypography variant="body" style={styles.infoVal}>
-							{appointment.date}, {appointment.timeSlot}
-						</AppTypography>
+					<View style={styles.billingList}>
+						<View style={styles.billingRow}>
+							<AppTypography variant="body" style={styles.billingLabel}>
+								Base Treatment Charges
+							</AppTypography>
+							<AppTypography variant="body" style={styles.billingVal}>
+								{pricing.basePrice}
+							</AppTypography>
+						</View>
+						<View style={styles.billingRow}>
+							<AppTypography variant="body" style={styles.billingLabel}>
+								Doorstep Visit Fee
+							</AppTypography>
+							<AppTypography variant="body" style={styles.billingVal}>
+								{pricing.visitFee}
+							</AppTypography>
+						</View>
+						<View style={styles.billingRow}>
+							<AppTypography variant="body" style={styles.billingLabel}>
+								Taxes & GST (5%)
+							</AppTypography>
+							<AppTypography variant="body" style={styles.billingVal}>
+								{pricing.taxes}
+							</AppTypography>
+						</View>
+						<View style={styles.totalDivider} />
+						<View style={styles.totalRow}>
+							<AppTypography variant="h3" style={styles.totalLabel}>
+								Total Paid
+							</AppTypography>
+							<AppTypography variant="h3" style={styles.totalVal}>
+								{pricing.totalAmount}
+							</AppTypography>
+						</View>
 					</View>
-				</View>
-
-				{/* 7. Pricing Summary (Backend Data) */}
-				<View style={styles.pricingCard}>
-					<AppTypography variant="h3" style={styles.pricingTitle}>
-						Pricing Summary
-					</AppTypography>
-
-					<View style={styles.lineItemRow}>
-						<AppTypography variant="body" style={styles.lineItemLabel}>
-							Service Base Price
-						</AppTypography>
-						<AppTypography variant="body" style={styles.lineItemVal}>
-							{pricing.basePrice}
-						</AppTypography>
-					</View>
-
-					<View style={styles.lineItemRow}>
-						<AppTypography variant="body" style={styles.lineItemLabel}>
-							Case Severity Adjustment
-						</AppTypography>
-						<AppTypography variant="body" style={styles.lineItemVal}>
-							{pricing.severityAdjustment}
-						</AppTypography>
-					</View>
-
-					<View style={styles.lineItemRow}>
-						<AppTypography variant="body" style={styles.lineItemLabel}>
-							Home Visit & Sanitization
-						</AppTypography>
-						<AppTypography variant="body" style={styles.lineItemVal}>
-							{pricing.visitFee}
-						</AppTypography>
-					</View>
-
-					<View style={styles.lineItemRow}>
-						<AppTypography variant="body" style={styles.lineItemLabel}>
-							Taxes & Admin Fee
-						</AppTypography>
-						<AppTypography variant="body" style={styles.lineItemVal}>
-							{pricing.taxes}
-						</AppTypography>
-					</View>
-
-					<View style={styles.divider} />
-
-					<View style={styles.totalRow}>
-						<AppTypography variant="h3" style={styles.totalLabel}>
-							Final Total Paid
-						</AppTypography>
-						<AppTypography variant="h2" style={styles.totalVal}>
-							{pricing.totalAmount}
-						</AppTypography>
-					</View>
-				</View>
-
-				{/* 8. Available Actions */}
-				<View style={styles.buttonWrapper}>
-					<AppButton
-						variant="primary"
-						formAction
-						style={styles.actionBtn}
-						onPress={handleGoToHistory}
-					>
-						View Booking History
-					</AppButton>
-
-					<AppButton
-						variant="outline"
-						formAction
-						style={[styles.actionBtn, styles.secondaryBtn]}
-						onPress={handleBackToHome}
-					>
-						Back to Home
-					</AppButton>
 				</View>
 			</ScrollView>
 
-			{/* Rating & Review Bottom Sheet */}
+			{/* REVIEW MODAL */}
 			<RateAncillaryReviewModal
 				visible={reviewModalVisible}
 				onClose={() => setReviewModalVisible(false)}
 				booking={modalBookingObj}
-				existingReview={reviewData}
 				onSubmit={handleSubmitReview}
 				isSubmitting={isSubmittingReview}
 			/>
 
-			{/* Status Feedback Confirmation */}
+			{/* STATUS FEEDBACK MODAL */}
 			{statusFeedbackModal && (
 				<StatusModal
 					visible={statusFeedbackModal.visible}
@@ -438,7 +467,6 @@ export default function AncillaryBookingStatusPage() {
 					description={statusFeedbackModal.description}
 					submitText="Done"
 					onSubmit={() => setStatusFeedbackModal(null)}
-					onCancel={() => setStatusFeedbackModal(null)}
 				/>
 			)}
 		</View>
@@ -446,18 +474,310 @@ export default function AncillaryBookingStatusPage() {
 }
 
 const styles = StyleSheet.create({
-	feedbackCard: {
+	container: {
+		flex: 1,
 		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		marginBottom: 16,
-		borderWidth: 1.5,
-		borderColor: '#FDE68A',
-		shadowColor: '#F59E0B',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.08,
-		shadowRadius: 6,
-		elevation: 2,
+	},
+	scrollContent: {
+		paddingHorizontal: 0,
+		paddingTop: 12,
+	},
+	scrollContentTablet: {
+		maxWidth: 640,
+		alignSelf: 'center',
+		width: '100%',
+	},
+
+	/* SECTION BLOCK & DIVIDERS */
+	sectionBlock: {
+		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 16,
+		paddingVertical: 16,
+		gap: 14,
+	},
+	sectionDividerBar: {
+		height: 8,
+		backgroundColor: '#F4F6F9',
+		borderTopWidth: 1,
+		borderBottomWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	sectionHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	sectionHeading: {
+		fontSize: 16.5,
+		fontWeight: '700',
+		color: '#0F172A',
+		letterSpacing: -0.2,
+	},
+
+	/* STATUS HEADER BANNER */
+	statusBannerRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	statusBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 6,
+		gap: 6,
+	},
+	activeBadge: {
+		backgroundColor: 'rgba(43, 111, 113, 0.12)',
+	},
+	completedBadge: {
+		backgroundColor: 'rgba(5, 150, 105, 0.12)',
+	},
+	statusDot: {
+		width: 6,
+		height: 6,
+		borderRadius: 3,
+	},
+	activeDot: {
+		backgroundColor: '#2B6F71',
+	},
+	completedDot: {
+		backgroundColor: '#059669',
+	},
+	statusBadgeText: {
+		fontSize: 11,
+		fontWeight: '700',
+		letterSpacing: 0.3,
+	},
+	activeBadgeText: {
+		color: '#2B6F71',
+	},
+	completedBadgeText: {
+		color: '#059669',
+	},
+	bookingRefText: {
+		fontSize: 12,
+		color: '#64748B',
+		fontWeight: '500',
+	},
+	statusTitle: {
+		fontSize: 18,
+		fontWeight: '800',
+		color: '#0F172A',
+	},
+	statusSub: {
+		fontSize: 12.5,
+		color: '#64748B',
+		lineHeight: 17,
+	},
+
+	/* ASSIGNED NURSE ROW */
+	nurseRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#F8FAFC',
+		borderRadius: 12,
+		padding: 12,
+		gap: 12,
+	},
+	nurseAvatar: {
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+	},
+	nurseInfoCol: {
+		flex: 1,
+		gap: 2,
+	},
+	nurseNameRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	nurseName: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	verifiedChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#ECFDF5',
+		paddingHorizontal: 6,
+		paddingVertical: 1,
+		borderRadius: 4,
+		gap: 3,
+	},
+	verifiedChipText: {
+		fontSize: 9.5,
+		fontWeight: '700',
+		color: '#047857',
+	},
+	nurseDesig: {
+		fontSize: 12,
+		color: '#64748B',
+	},
+	nurseRatingRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		marginTop: 2,
+	},
+	nurseRatingText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#334155',
+	},
+	callBtn: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: '#2B6F71',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+
+	/* OTP START VISIT BOX */
+	otpBox: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#F1F5F9',
+		borderRadius: 12,
+		padding: 12,
+		gap: 12,
+	},
+	otpLeftCol: {
+		alignItems: 'center',
+		paddingRight: 12,
+		borderRightWidth: 1,
+		borderRightColor: '#CBD5E1',
+	},
+	otpLabel: {
+		fontSize: 10.5,
+		color: '#475569',
+		fontWeight: '600',
+	},
+	otpValue: {
+		fontSize: 20,
+		fontWeight: '800',
+		color: '#2B6F71',
+		letterSpacing: 2,
+	},
+	otpNote: {
+		fontSize: 11.5,
+		color: '#475569',
+		flex: 1,
+		lineHeight: 16,
+	},
+
+	/* SERVICE DETAILS */
+	serviceRow: {
+		flexDirection: 'row',
+		gap: 14,
+		alignItems: 'center',
+	},
+	serviceThumb: {
+		width: 72,
+		height: 72,
+		borderRadius: 12,
+		backgroundColor: '#F1F5F9',
+	},
+	serviceTextCol: {
+		flex: 1,
+		gap: 4,
+	},
+	serviceTitle: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	serviceDesc: {
+		fontSize: 12.5,
+		color: '#64748B',
+		lineHeight: 17,
+	},
+	durationPill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		backgroundColor: '#F1F5F9',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 6,
+		alignSelf: 'flex-start',
+	},
+	durationText: {
+		fontSize: 11.5,
+		color: '#475569',
+		fontWeight: '500',
+	},
+	infoList: {
+		gap: 10,
+	},
+	infoRow: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		justifyContent: 'space-between',
+	},
+	infoLabel: {
+		fontSize: 13,
+		color: '#64748B',
+	},
+	infoVal: {
+		fontSize: 13.5,
+		fontWeight: '600',
+		color: '#0F172A',
+		flex: 1,
+		textAlign: 'right',
+	},
+
+	/* BILLING SUMMARY */
+	billingList: {
+		gap: 10,
+	},
+	billingRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	billingLabel: {
+		fontSize: 13.5,
+		color: '#475569',
+	},
+	billingVal: {
+		fontSize: 13.5,
+		fontWeight: '600',
+		color: '#0F172A',
+	},
+	totalDivider: {
+		height: 1,
+		backgroundColor: '#E2E8F0',
+		marginVertical: 4,
+	},
+	totalRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	totalLabel: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	totalVal: {
+		fontSize: 19,
+		fontWeight: '800',
+		color: '#2B6F71',
+	},
+
+	/* FEEDBACK CARD */
+	feedbackBox: {
+		backgroundColor: '#FFFBEB',
+		borderRadius: 14,
+		padding: 14,
+		borderWidth: 1,
+		borderColor: '#FCD34D',
 		gap: 12,
 	},
 	feedbackHeaderRow: {
@@ -465,238 +785,37 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		gap: 10,
 	},
-	feedbackIconWrap: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		backgroundColor: '#FEF3C7',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
 	feedbackTextCol: {
 		flex: 1,
+		gap: 2,
 	},
 	feedbackTitle: {
 		fontSize: 14.5,
 		fontWeight: '700',
-		color: '#191C1D',
+		color: '#92400E',
 	},
-	feedbackSubtitle: {
-		fontSize: 11.5,
-		color: '#64748B',
-		marginTop: 1,
+	feedbackSub: {
+		fontSize: 12,
+		color: '#B45309',
 	},
-	feedbackActionBtnReviewed: {
+	rateBtn: {
+		width: '100%',
+		borderRadius: 10,
+	},
+	reviewedBtn: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		backgroundColor: '#F0FDFA',
-		borderColor: '#CCFBF1',
-		borderWidth: 1,
+		backgroundColor: '#FFFFFF',
 		paddingHorizontal: 12,
 		paddingVertical: 10,
-		borderRadius: 12,
-	},
-	feedbackActionTextReviewed: {
-		fontSize: 12.5,
-		fontWeight: '700',
-		color: '#0C7C7C',
-		flex: 1,
-		marginLeft: 8,
-	},
-	container: {
-		flex: 1,
-		backgroundColor: '#F8FAFC',
-	},
-
-	scrollContent: {
-		paddingHorizontal: 16,
-		paddingTop: 16,
-	},
-	scrollContentTablet: {
-		maxWidth: 720,
-		width: '100%',
-		alignSelf: 'center',
-		paddingHorizontal: 24,
-		paddingTop: 24,
-	},
-	statusHeaderCard: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		marginBottom: 16,
-		borderWidth: 1,
-		borderColor: '#E8ECEC',
-		elevation: 1,
-	},
-	statusRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginBottom: 10,
-	},
-	statusBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 12,
-		gap: 6,
-	},
-	statusDot: {
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-		backgroundColor: '#1F5F68',
-	},
-	statusBadgeText: {
-		fontSize: 11,
-		fontWeight: '700',
-		color: '#1F5F68',
-		letterSpacing: 0.5,
-	},
-	bookingIdText: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#64748B',
-	},
-	statusTitle: {
-		fontSize: 20,
-		fontWeight: '700',
-		color: '#191C1D',
-	},
-	statusSubtitle: {
-		fontSize: 12,
-		color: '#526062',
-		marginTop: 2,
-	},
-	card: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		marginBottom: 16,
-		borderWidth: 1,
-		borderColor: '#E8ECEC',
-		elevation: 1,
-	},
-	cardSectionTitle: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#191C1D',
-		marginBottom: 12,
-	},
-	serviceRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	serviceImg: {
-		width: 64,
-		height: 64,
 		borderRadius: 10,
-		backgroundColor: '#F1F5F9',
+		borderWidth: 1,
+		borderColor: '#FDE68A',
 	},
-	serviceTextCol: {
-		flex: 1,
-		marginLeft: 12,
-	},
-	serviceNameText: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#191C1D',
-	},
-	serviceDescText: {
-		fontSize: 12,
-		color: '#526062',
-		marginTop: 2,
-		lineHeight: 16,
-	},
-	durationRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 4,
-		gap: 4,
-	},
-	durationText: {
-		fontSize: 11,
-		color: '#1F5F68',
+	reviewedText: {
+		fontSize: 12.5,
 		fontWeight: '600',
-	},
-	infoRow: {
-		flexDirection: 'row',
-		marginBottom: 8,
-	},
-	infoLabel: {
-		width: 105,
-		fontSize: 12,
-		color: '#64748B',
-		fontWeight: '600',
-	},
-	infoVal: {
-		flex: 1,
-		fontSize: 13,
-		color: '#191C1D',
-		fontWeight: '500',
-	},
-	pricingCard: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		marginBottom: 20,
-		borderWidth: 1.5,
-		borderColor: '#1F5F68',
-		elevation: 2,
-	},
-	pricingTitle: {
-		fontSize: 17,
-		fontWeight: '700',
-		color: '#1F5F68',
-		marginBottom: 14,
-	},
-	lineItemRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginBottom: 10,
-	},
-	lineItemLabel: {
-		fontSize: 13,
-		color: '#526062',
-	},
-	lineItemVal: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: '#191C1D',
-	},
-	divider: {
-		height: 1,
-		backgroundColor: '#E8ECEC',
-		marginVertical: 12,
-	},
-	totalRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-	},
-	totalLabel: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#191C1D',
-	},
-	totalVal: {
-		fontSize: 20,
-		fontWeight: '700',
-		color: '#1F5F68',
-	},
-	buttonWrapper: {
-		gap: 10,
-		marginBottom: 16,
-	},
-	actionBtn: {
-		width: '100%',
-		borderRadius: 14,
-	},
-	secondaryBtn: {
-		marginTop: 4,
+		color: '#0C7C7C',
 	},
 })

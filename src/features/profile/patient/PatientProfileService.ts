@@ -212,8 +212,11 @@ export const getPatientTreatmentHistory = async (userId: string): Promise<Treatm
 
 export interface FamilyMember {
 	id: string
+	publicId?: string
+	public_id?: string
 	name: string
 	relation: string
+	relationship?: string
 	avatar_s3_key?: string | null
 	is_self: boolean
 	age?: string | number

@@ -7,7 +7,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography, AppButton, CommonCard } from '../../../components/common'
+import { AppTypography } from '../../../components/common'
 
 export interface ServiceProcedureItem {
 	id: string
@@ -44,8 +44,8 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 	onSelectService,
 }) => {
 	const { width } = useWindowDimensions()
-	const isTablet = width >= 768
 	const isCustomPrice = item.price.toLowerCase().includes('custom') || item.actionLabel === 'Enquire'
+	const isAdded = quantity > 0
 
 	const handleCardClick = () => {
 		if (onCardPress) {
@@ -55,7 +55,8 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 		}
 	}
 
-	const handleIncrementClick = () => {
+	const handleIncrementClick = (e: any) => {
+		e?.stopPropagation?.()
 		if (onIncrement) {
 			onIncrement(item)
 		} else if (onSelectService) {
@@ -63,541 +64,287 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 		}
 	}
 
-	const handleDecrementClick = () => {
+	const handleDecrementClick = (e: any) => {
+		e?.stopPropagation?.()
 		if (onDecrement) {
 			onDecrement(item)
 		}
 	}
 
-	const renderActionControlsTablet = () => {
-		if (quantity > 0) {
-			return (
-				<View style={styles.stepperContainerTablet}>
-					<TouchableOpacity
-						style={styles.stepperBtnTablet}
-						onPress={handleDecrementClick}
-						activeOpacity={0.7}
-					>
-						<MaterialCommunityIcons name="minus" size={16} color="#1F5F68" />
-					</TouchableOpacity>
-					<AppTypography variant="h4" style={styles.quantityTextTablet}>
-						{quantity}
-					</AppTypography>
-					<TouchableOpacity
-						style={styles.stepperBtnTablet}
-						onPress={handleIncrementClick}
-						activeOpacity={0.7}
-					>
-						<MaterialCommunityIcons name="plus" size={16} color="#1F5F68" />
-					</TouchableOpacity>
-				</View>
-			)
-		}
-
-		return (
-			<AppButton
-				compact={true}
-				variant={item.actionVariant || 'primary'}
-				style={styles.actionBtnTablet}
-				labelStyle={styles.actionBtnLabelTablet}
-				contentStyle={styles.actionBtnContentTablet}
-				onPress={handleIncrementClick}
-			>
-				{item.actionLabel || 'Select'}
-			</AppButton>
-		)
-	}
-
-	const renderActionControlsMobile = () => {
-		if (quantity > 0) {
-			return (
-				<View style={styles.stepperContainerMobile}>
-					<TouchableOpacity
-						style={styles.stepperBtnMobile}
-						onPress={handleDecrementClick}
-						activeOpacity={0.7}
-					>
-						<MaterialCommunityIcons name="minus" size={14} color="#1F5F68" />
-					</TouchableOpacity>
-					<AppTypography variant="h4" style={styles.quantityTextMobile}>
-						{quantity}
-					</AppTypography>
-					<TouchableOpacity
-						style={styles.stepperBtnMobile}
-						onPress={handleIncrementClick}
-						activeOpacity={0.7}
-					>
-						<MaterialCommunityIcons name="plus" size={14} color="#1F5F68" />
-					</TouchableOpacity>
-				</View>
-			)
-		}
-
-		return (
-			<AppButton
-				compact={true}
-				variant={item.actionVariant || 'primary'}
-				style={styles.actionBtnMobile}
-				labelStyle={styles.actionBtnLabelMobile}
-				contentStyle={styles.actionBtnContentMobile}
-				onPress={handleIncrementClick}
-			>
-				{item.actionLabel || 'Select'}
-			</AppButton>
-		)
-	}
-
-	if (isTablet) {
-		return (
-			<CommonCard
-				style={[styles.cardTablet, cardWidth ? { width: cardWidth } : undefined, style]}
-				onPress={handleCardClick}
-			>
-				<Image source={{ uri: item.image }} style={styles.imageTablet} resizeMode="cover" />
-
-				<View style={styles.contentColTablet}>
-					<View style={styles.headerRowTablet}>
-						<AppTypography variant="h3" style={styles.titleTablet} numberOfLines={2}>
-							{item.title}
-						</AppTypography>
-					</View>
-
-					<AppTypography variant="caption" style={styles.descriptionTablet} numberOfLines={3}>
-						{item.description}
-					</AppTypography>
-
-					{/* Prominent View Details Badge */}
-					<TouchableOpacity onPress={handleCardClick} activeOpacity={0.7} style={styles.viewDetailsHelperTablet}>
-						<Ionicons name="information-circle-outline" size={14} color="#1F5F68" />
-						<AppTypography variant="caption" style={styles.viewDetailsHelperText}>
-							View Details
-						</AppTypography>
-					</TouchableOpacity>
-
-					{/* Metadata Chips Row */}
-					<View style={styles.metaBadgeRowTablet}>
-						<View style={styles.durationChipTablet}>
-							<Ionicons name="time-outline" size={13} color="#546E7A" />
-							<AppTypography variant="caption" style={styles.durationTextTablet}>
-								{item.duration}
-							</AppTypography>
-						</View>
-
-						{item.verified && (
-							<View style={styles.verifiedChipTablet}>
-								<Ionicons name="checkmark-circle-outline" size={13} color="#1F5F68" />
-								<AppTypography variant="caption" style={styles.verifiedTextTablet}>
-									Verified
-								</AppTypography>
-							</View>
-						)}
-
-						{item.premiumBadgeText && (
-							<View style={styles.premiumChipTablet}>
-								<Ionicons name="star-outline" size={13} color="#D4AF37" />
-								<AppTypography variant="caption" style={styles.premiumTextTablet}>
-									{item.premiumBadgeText}
-								</AppTypography>
-							</View>
-						)}
-					</View>
-
-					<View style={styles.footerRowTablet}>
-						<AppTypography
-							variant={isCustomPrice ? 'caption' : 'body'}
-							style={isCustomPrice ? styles.customPriceLabelTablet : styles.priceTablet}
-							numberOfLines={1}
-						>
-							{item.price}
-						</AppTypography>
-						{renderActionControlsTablet()}
-					</View>
-				</View>
-			</CommonCard>
-		)
-	}
-
-	// Mobile Layout
 	return (
-		<CommonCard
-			style={[styles.cardMobile, cardWidth ? { width: cardWidth } : undefined, style]}
+		<TouchableOpacity
+			style={[
+				styles.cardContainer,
+				isAdded && styles.cardActive,
+				cardWidth ? { width: cardWidth } : null,
+				style,
+			]}
 			onPress={handleCardClick}
+			activeOpacity={0.9}
 		>
-			<Image source={{ uri: item.image }} style={styles.imageMobile} resizeMode="cover" />
-
-			<View style={styles.contentColMobile}>
-				<View style={styles.headerRowMobile}>
-					<AppTypography variant="h4" style={styles.titleMobile} numberOfLines={1}>
-						{item.title}
-					</AppTypography>
-				</View>
-
-				<AppTypography variant="caption" style={styles.descriptionMobile} numberOfLines={2}>
-					{item.description}
+			{/* Left Column: Procedure Details */}
+			<View style={styles.leftCol}>
+				{/* Title (Bold Heading) */}
+				<AppTypography variant="h3" style={styles.title} numberOfLines={2}>
+					{item.title}
 				</AppTypography>
 
-				{/* Prominent View Details Badge */}
-				<TouchableOpacity onPress={handleCardClick} activeOpacity={0.7} style={styles.viewDetailsHelperMobile}>
-					<Ionicons name="information-circle-outline" size={13} color="#1F5F68" />
-					<AppTypography variant="caption" style={styles.viewDetailsHelperText}>
-						View Details
+				{/* Rating Row (Medium 500 & Soft Regular 400) */}
+				<View style={styles.ratingRow}>
+					<Ionicons name="star" size={13} color="#F59E0B" />
+					<AppTypography variant="caption" style={styles.ratingScore}>
+						4.8
+					</AppTypography>
+					<AppTypography variant="caption" style={styles.ratingCount}>
+						(120+ reviews)
+					</AppTypography>
+				</View>
+
+				{/* Price & Duration */}
+				<View style={styles.priceRow}>
+					<AppTypography variant="h3" style={[styles.priceText, isCustomPrice && styles.customPriceText]}>
+						{item.price}
+					</AppTypography>
+					<View style={styles.dotSeparator} />
+					<AppTypography variant="caption" style={styles.durationText}>
+						{item.duration || '30 - 45 mins'}
+					</AppTypography>
+				</View>
+
+				{/* View Details Link */}
+				<TouchableOpacity style={styles.viewDetailsBtn} onPress={handleCardClick} activeOpacity={0.7}>
+					<AppTypography variant="caption" style={styles.viewDetailsText}>
+						View details
 					</AppTypography>
 				</TouchableOpacity>
+			</View>
 
-				{/* Metadata Chips Row */}
-				<View style={styles.metaBadgeRowMobile}>
-					<View style={styles.durationChipMobile}>
-						<Ionicons name="time-outline" size={11} color="#607D8B" />
-						<AppTypography variant="caption" style={styles.durationTextMobile}>
-							{item.duration}
+			{/* Right Column: Image Box + Top RN Badge + Overlapping ADD Button */}
+			<View style={styles.rightCol}>
+				<View style={styles.imageBox}>
+					{/* Top Verified RN Overlay Banner */}
+					<View style={styles.topBadgeBanner}>
+						<AppTypography variant="caption" style={styles.topBadgeText}>
+							{item.premiumBadgeText || 'Verified RN'}
 						</AppTypography>
 					</View>
 
-					{item.verified && (
-						<View style={styles.verifiedChipMobile}>
-							<Ionicons name="checkmark-circle-outline" size={11} color="#1F5F68" />
-							<AppTypography variant="caption" style={styles.verifiedTextMobile}>
-								Verified
-							</AppTypography>
-						</View>
-					)}
-
-					{item.premiumBadgeText && (
-						<View style={styles.premiumChipMobile}>
-							<AppTypography variant="caption" style={styles.premiumTextMobile}>
-								{item.premiumBadgeText}
-							</AppTypography>
+					{item.image ? (
+						<Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+					) : (
+						<View style={styles.fallbackWrap}>
+							<MaterialCommunityIcons name="medical-bag" size={32} color="#BFC8C8" />
 						</View>
 					)}
 				</View>
 
-				<View style={styles.footerRowMobile}>
-					<AppTypography
-						variant={isCustomPrice ? 'caption' : 'body'}
-						style={isCustomPrice ? styles.customPriceLabelMobile : styles.priceMobile}
-						numberOfLines={1}
-					>
-						{item.price}
-					</AppTypography>
-					{renderActionControlsMobile()}
+				{/* Overlapping ADD / Stepper Button */}
+				<View style={styles.actionButtonWrapper}>
+					{isAdded ? (
+						<View style={styles.stepperBox}>
+							<TouchableOpacity style={styles.stepperBtn} onPress={handleDecrementClick} activeOpacity={0.7}>
+								<MaterialCommunityIcons name="minus" size={14} color="#2B6F71" />
+							</TouchableOpacity>
+							<AppTypography variant="caption" style={styles.stepperQty}>
+								{quantity}
+							</AppTypography>
+							<TouchableOpacity style={styles.stepperBtn} onPress={handleIncrementClick} activeOpacity={0.7}>
+								<MaterialCommunityIcons name="plus" size={14} color="#2B6F71" />
+							</TouchableOpacity>
+						</View>
+					) : (
+						<TouchableOpacity
+							style={[styles.addBtn, isCustomPrice && styles.enquireBtn]}
+							onPress={handleIncrementClick}
+							activeOpacity={0.85}
+						>
+							<AppTypography
+								variant="caption"
+								style={[styles.addBtnText, isCustomPrice && styles.enquireBtnText]}
+							>
+								{item.actionLabel || (isCustomPrice ? 'Enquire' : 'Add')}
+							</AppTypography>
+						</TouchableOpacity>
+					)}
 				</View>
 			</View>
-		</CommonCard>
+		</TouchableOpacity>
 	)
 }
 
 const styles = StyleSheet.create({
-	// Tablet Layout Styles
-	cardTablet: {
+	cardContainer: {
 		flexDirection: 'row',
+		paddingVertical: 18,
+		paddingHorizontal: 0,
+		borderBottomWidth: 1,
+		borderBottomColor: '#E0E7EF',
 		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		marginBottom: 16,
-		borderWidth: 1,
-		borderColor: '#ECEFF1',
-		elevation: 1,
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.03,
-		shadowRadius: 4,
-	},
-	imageTablet: {
-		width: 120,
-		height: 120,
-		borderRadius: 12,
-		backgroundColor: '#F1F5F9',
-	},
-	contentColTablet: {
-		flex: 1,
-		marginLeft: 16,
-		justifyContent: 'space-between',
-	},
-	headerRowTablet: {
-		flexDirection: 'row',
 		alignItems: 'flex-start',
-		justifyContent: 'space-between',
 	},
-	titleTablet: {
-		fontSize: 16,
-		fontWeight: '800',
-		color: '#1A2E35',
+	cardActive: {
+		backgroundColor: 'rgba(43, 111, 113, 0.03)',
+	},
+	leftCol: {
 		flex: 1,
-		marginRight: 12,
+		paddingRight: 14,
+		gap: 5,
+	},
+	title: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#181C1D',
 		lineHeight: 22,
 	},
-	viewDetailsHelperTablet: {
+	ratingRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
-		alignSelf: 'flex-start',
-		marginTop: 6,
 	},
-	metaBadgeRowTablet: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		marginVertical: 4,
-	},
-	durationChipTablet: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#F1F5F9',
-		paddingHorizontal: 8,
-		paddingVertical: 3,
-		borderRadius: 8,
-		gap: 4,
-	},
-	durationTextTablet: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#546E7A',
-	},
-	verifiedChipTablet: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 8,
-		paddingVertical: 3,
-		borderRadius: 8,
-		gap: 4,
-	},
-	verifiedTextTablet: {
-		fontSize: 11,
-		fontWeight: '700',
-		color: '#1F5F68',
-	},
-	premiumChipTablet: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#FFF8E1',
-		paddingHorizontal: 8,
-		paddingVertical: 3,
-		borderRadius: 8,
-		gap: 4,
-	},
-	premiumTextTablet: {
-		fontSize: 10.5,
-		fontWeight: '700',
-		color: '#B7791F',
-	},
-	descriptionTablet: {
+	ratingScore: {
 		fontSize: 13,
-		color: '#546E7A',
-		lineHeight: 18,
-		marginVertical: 4,
+		fontWeight: '500',
+		color: '#181C1D',
 	},
-	footerRowTablet: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginTop: 6,
-	},
-	priceTablet: {
-		fontSize: 16,
-		fontWeight: '800',
-		color: '#1F5F68',
-	},
-	customPriceLabelTablet: {
+	ratingCount: {
 		fontSize: 13,
-		fontWeight: '700',
-		color: '#78909C',
-	},
-	actionBtnTablet: {
-		minWidth: 90,
-		borderRadius: 10,
-		paddingVertical: 0,
-		backgroundColor: '#1F5F68',
-	},
-	actionBtnLabelTablet: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#FFFFFF',
-		marginVertical: 0,
-		paddingVertical: 0,
-	},
-	actionBtnContentTablet: {
-		paddingHorizontal: 16,
-		height: 36,
-	},
-	stepperContainerTablet: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#F0F9F9',
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: '#1F5F68',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		gap: 8,
-	},
-	stepperBtnTablet: {
-		padding: 4,
-	},
-	quantityTextTablet: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#1F5F68',
-		minWidth: 16,
-		textAlign: 'center',
-	},
-
-	// Mobile Layout Styles
-	cardMobile: {
-		flexDirection: 'row',
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 12,
-		marginBottom: 12,
-		borderWidth: 1,
-		borderColor: '#ECEFF1',
-		elevation: 1,
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.02,
-		shadowRadius: 3,
-	},
-	imageMobile: {
-		width: 84,
-		height: 84,
-		borderRadius: 12,
-		backgroundColor: '#F1F5F9',
-		alignSelf: 'center',
-	},
-	contentColMobile: {
-		flex: 1,
-		marginLeft: 12,
-		justifyContent: 'space-between',
-	},
-	headerRowMobile: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	titleMobile: {
-		fontSize: 14.5,
-		fontWeight: '800',
-		color: '#1A2E35',
-		flex: 1,
-		marginRight: 6,
-	},
-	viewDetailsHelperMobile: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		alignSelf: 'flex-start',
-		marginTop: 6,
-	},
-	viewDetailsHelperText: {
-		fontSize: 10.5,
-		fontWeight: '700',
-		color: '#1F5F68',
+		fontWeight: '400',
+		color: '#64748B',
 		textDecorationLine: 'underline',
+		textDecorationStyle: 'dotted',
 	},
-	metaBadgeRowMobile: {
+	priceRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 6,
-		marginTop: 6,
-		marginBottom: 2,
-	},
-	durationChipMobile: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#F1F5F9',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 6,
-		gap: 2,
-	},
-	durationTextMobile: {
-		fontSize: 10,
-		fontWeight: '600',
-		color: '#546E7A',
-	},
-	verifiedChipMobile: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 6,
-		gap: 2,
-	},
-	verifiedTextMobile: {
-		fontSize: 10,
-		fontWeight: '700',
-		color: '#1F5F68',
-	},
-	premiumChipMobile: {
-		backgroundColor: '#FFF8E1',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 6,
-	},
-	premiumTextMobile: {
-		fontSize: 9.5,
-		fontWeight: '700',
-		color: '#B7791F',
-	},
-	descriptionMobile: {
-		fontSize: 11.5,
-		color: '#546E7A',
-		lineHeight: 15.5,
+		gap: 8,
 		marginTop: 2,
 	},
-	footerRowMobile: {
-		flexDirection: 'row',
+	priceText: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#181C1D',
+	},
+	customPriceText: {
+		fontSize: 13,
+		color: '#2B6F71',
+	},
+	dotSeparator: {
+		width: 4,
+		height: 4,
+		borderRadius: 2,
+		backgroundColor: '#CBD5E1',
+	},
+	durationText: {
+		fontSize: 13,
+		fontWeight: '400',
+		color: '#64748B',
+	},
+	viewDetailsBtn: {
+		marginTop: 4,
+		alignSelf: 'flex-start',
+	},
+	viewDetailsText: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#2B6F71',
+	},
+
+	/* Right Column (110px aspect-[4/3] Image + Overlapping ADD Pill) */
+	rightCol: {
+		width: 110,
 		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginTop: 8,
+		position: 'relative',
 	},
-	priceMobile: {
-		fontSize: 14.5,
-		fontWeight: '800',
-		color: '#1F5F68',
+	imageBox: {
+		width: 110,
+		height: 82,
+		borderRadius: 12,
+		overflow: 'hidden',
+		backgroundColor: '#F1F4F4',
+		position: 'relative',
 	},
-	customPriceLabelMobile: {
-		fontSize: 11.5,
-		fontWeight: '700',
-		color: '#78909C',
+	topBadgeBanner: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		backgroundColor: '#055759',
+		paddingVertical: 3,
+		paddingHorizontal: 2,
+		alignItems: 'center',
+		justifyContent: 'center',
+		zIndex: 10,
 	},
-	actionBtnMobile: {
-		minWidth: 72,
-		borderRadius: 8,
-		paddingVertical: 0,
-		backgroundColor: '#1F5F68',
-	},
-	actionBtnLabelMobile: {
-		fontSize: 11.5,
-		fontWeight: '700',
+	topBadgeText: {
+		fontSize: 9.5,
+		fontWeight: '600',
 		color: '#FFFFFF',
-		marginVertical: 0,
-		paddingVertical: 0,
+		textTransform: 'uppercase',
+		letterSpacing: 0.3,
 	},
-	actionBtnContentMobile: {
-		paddingHorizontal: 12,
-		height: 32,
+	image: {
+		width: '100%',
+		height: '100%',
+		marginTop: 14,
 	},
-	stepperContainerMobile: {
+	fallbackWrap: {
+		width: '100%',
+		height: '100%',
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginTop: 10,
+	},
+	actionButtonWrapper: {
+		marginTop: -14,
+		zIndex: 20,
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.08,
+		shadowRadius: 4,
+		elevation: 3,
+	},
+	addBtn: {
+		backgroundColor: '#FFFFFF',
+		borderWidth: 1,
+		borderColor: '#BFC8C8',
+		borderRadius: 8,
+		paddingHorizontal: 22,
+		paddingVertical: 6,
+		alignItems: 'center',
+		justifyContent: 'center',
+		minWidth: 80,
+	},
+	addBtnText: {
+		fontSize: 13.5,
+		fontWeight: '700',
+		color: '#2B6F71',
+	},
+	enquireBtn: {
+		paddingHorizontal: 14,
+	},
+	enquireBtnText: {
+		fontSize: 12,
+		color: '#64748B',
+	},
+	stepperBox: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#F0F9F9',
-		borderRadius: 8,
+		backgroundColor: '#FFFFFF',
 		borderWidth: 1,
-		borderColor: '#1F5F68',
-		paddingHorizontal: 4,
-		paddingVertical: 1,
-		gap: 6,
+		borderColor: '#2B6F71',
+		borderRadius: 8,
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		gap: 10,
+		minWidth: 80,
+		justifyContent: 'space-between',
 	},
-	stepperBtnMobile: {
+	stepperBtn: {
 		padding: 2,
 	},
-	quantityTextMobile: {
-		fontSize: 12,
+	stepperQty: {
+		fontSize: 13,
 		fontWeight: '700',
-		color: '#1F5F68',
-		minWidth: 14,
-		textAlign: 'center',
+		color: '#2B6F71',
 	},
 })
