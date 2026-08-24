@@ -16,41 +16,33 @@ import {
 	AppInput,
 	AppSelect,
 	AppSelectOption,
-	AppMultiSelect,
 	AppTypography,
 	StatusModal,
 } from '../../../../components/common'
+import { fetchProviderStatusBackend, updateProviderLocationBackend } from '../../../ancillary/ancillaryService'
 
 type Option = AppSelectOption
 
 type ProfessionalFormData = {
-	specialtyLabel: string
-	license: string
-	licensingAuthority: string
-	registrationProof: string
+	specialty: string
 	qualification: string
 	currentDesignation: string
 	experience: string
-	location: string
-	serviceArea: string
-	areasOfExpertise: string[]
+	nursingRegistrationNumber: string
+	stateNursingCouncil: string
+	registrationProof: string
 	verificationStatus: string
 	about: string
+	location: string
+	latitude: string
+	longitude: string
 }
 
 const SPECIALTY_OPTIONS: Option[] = [
-	{ label: 'Nursing Care', value: 'nursing-care' },
-	{ label: 'Physiotherapy', value: 'physiotherapy' },
-	{ label: 'Rehab Care', value: 'rehab-care' },
-	{ label: 'Elder Day Care', value: 'elder-day-care' },
-]
-
-const LOCATION_OPTIONS: Option[] = [
-	{ label: 'Bangalore', value: 'Bangalore' },
-	{ label: 'Mumbai', value: 'Mumbai' },
-	{ label: 'Delhi', value: 'Delhi' },
-	{ label: 'Chennai', value: 'Chennai' },
-	{ label: 'Hyderabad', value: 'Hyderabad' },
+	{ label: 'Nursing Care', value: 'Nursing Care' },
+	{ label: 'Physiotherapy', value: 'Physiotherapy' },
+	{ label: 'Rehabilitation', value: 'Rehabilitation' },
+	{ label: 'Elderly Care', value: 'Elderly Care' },
 ]
 
 const EXPERIENCE_OPTIONS: Option[] = [
@@ -61,14 +53,12 @@ const EXPERIENCE_OPTIONS: Option[] = [
 	{ label: '10+ years', value: '10+' },
 ]
 
-const EXPERTISE_OPTIONS: Option[] = [
-	{ label: 'Wound Dressing & Management', value: 'Wound Dressing & Management' },
-	{ label: 'Injection & IV Therapy', value: 'Injection & IV Therapy' },
-	{ label: 'Catheter Care', value: 'Catheter Care' },
-	{ label: 'Geriatric & Elderly Care', value: 'Geriatric & Elderly Care' },
-	{ label: 'Post-Surgical Rehabilitation', value: 'Post-Surgical Rehabilitation' },
-	{ label: 'Vital Signs & Health Monitoring', value: 'Vital Signs & Health Monitoring' },
-	{ label: 'Palliative Care', value: 'Palliative Care' },
+const LOCATION_OPTIONS: Option[] = [
+	{ label: 'Bangalore', value: 'Bangalore' },
+	{ label: 'Mumbai', value: 'Mumbai' },
+	{ label: 'Delhi', value: 'Delhi' },
+	{ label: 'Chennai', value: 'Chennai' },
+	{ label: 'Hyderabad', value: 'Hyderabad' },
 ]
 
 const VERIFICATION_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -208,37 +198,6 @@ function SelectDropdown({
 	)
 }
 
-function MultiSelectDropdown({
-	label,
-	values,
-	placeholder,
-	options,
-	onChange,
-	required = false,
-}: {
-	label: string
-	values: string[]
-	placeholder: string
-	options: Option[]
-	onChange: (values: string[]) => void
-	required?: boolean
-}) {
-	return (
-		<View style={styles.fieldGroup}>
-			{label ? <FieldLabel label={label} required={required} /> : null}
-			<AppMultiSelect
-				values={values}
-				placeholder={placeholder}
-				options={options}
-				onChange={onChange}
-				borderRadius={10}
-				size="form"
-				noMargin
-			/>
-		</View>
-	)
-}
-
 function UploadBox({
 	label,
 	fileName,
@@ -270,6 +229,18 @@ function UploadBox({
 	)
 }
 
+const isValidLatitude = (value: string) => {
+	if (!value.trim()) return true
+	const num = Number(value)
+	return Number.isFinite(num) && num >= -90 && num <= 90
+}
+
+const isValidLongitude = (value: string) => {
+	if (!value.trim()) return true
+	const num = Number(value)
+	return Number.isFinite(num) && num >= -180 && num <= 180
+}
+
 export default function ProfessionalDetailsTab() {
 	const { width } = useWindowDimensions()
 
@@ -279,18 +250,18 @@ export default function ProfessionalDetailsTab() {
 	const useTwoColumns = width >= 768
 
 	const [formData, setFormData] = useState<ProfessionalFormData>({
-		specialtyLabel: 'nursing-care',
-		license: '',
-		licensingAuthority: '',
-		registrationProof: '',
+		specialty: 'Nursing Care',
 		qualification: '',
 		currentDesignation: '',
 		experience: '',
-		location: 'Hyderabad',
-		serviceArea: '',
-		areasOfExpertise: [],
+		nursingRegistrationNumber: '',
+		stateNursingCouncil: '',
+		registrationProof: '',
 		verificationStatus: 'pending',
 		about: '',
+		location: 'Hyderabad',
+		latitude: '',
+		longitude: '',
 	})
 
 	const [loading, setLoading] = useState(false)
@@ -311,33 +282,35 @@ export default function ProfessionalDetailsTab() {
 		const loadDetails = async () => {
 			try {
 				setLoading(true)
-				const spec = await AsyncStorage.getItem('user_specialty')
-				const lic = await AsyncStorage.getItem('ancillary_license')
-				const authority = await AsyncStorage.getItem('ancillary_licensing_authority')
-				const proof = await AsyncStorage.getItem('ancillary_registration_proof')
+				const spec = await AsyncStorage.getItem('ancillary_specialty')
 				const qual = await AsyncStorage.getItem('ancillary_qualification')
 				const desig = await AsyncStorage.getItem('ancillary_designation')
 				const exp = await AsyncStorage.getItem('ancillary_experience')
-				const loc = await AsyncStorage.getItem('ancillary_location')
-				const area = await AsyncStorage.getItem('ancillary_service_area')
-				const expList = await AsyncStorage.getItem('ancillary_expertise')
+				const regNo = await AsyncStorage.getItem('ancillary_license')
+				const council = await AsyncStorage.getItem('ancillary_licensing_authority')
+				const proof = await AsyncStorage.getItem('ancillary_registration_proof')
 				const verification = await AsyncStorage.getItem('ancillary_verification_status')
 				const abt = await AsyncStorage.getItem('ancillary_about')
+				const loc = await AsyncStorage.getItem('ancillary_location')
+
+				// Latitude / Longitude are backed by the ancillary_providers.current_lat /
+				// current_lng columns via GET /api/ancillary/provider/status.
+				const providerStatus = await fetchProviderStatusBackend()
 
 				setFormData((prev) => ({
 					...prev,
-					specialtyLabel: spec || 'nursing-care',
-					license: lic || '',
-					licensingAuthority: authority || '',
-					registrationProof: proof || '',
+					specialty: spec || 'Nursing Care',
 					qualification: qual || '',
 					currentDesignation: desig || '',
 					experience: exp || '',
-					location: loc || 'Hyderabad',
-					serviceArea: area || '',
-					areasOfExpertise: expList ? JSON.parse(expList) : [],
+					nursingRegistrationNumber: regNo || '',
+					stateNursingCouncil: council || '',
+					registrationProof: proof || '',
 					verificationStatus: verification || 'pending',
 					about: abt || '',
+					location: loc || 'Hyderabad',
+					latitude: providerStatus ? String(providerStatus.latitude) : prev.latitude,
+					longitude: providerStatus ? String(providerStatus.longitude) : prev.longitude,
 				}))
 			} catch (e) {
 				console.log('[ProfessionalDetailsTab] load error:', e)
@@ -371,26 +344,42 @@ export default function ProfessionalDetailsTab() {
 	}
 
 	const handleSave = async () => {
-		if (!formData.license.trim()) {
-			Alert.alert('Validation', 'Registration / License Number is required.')
+		if (!formData.nursingRegistrationNumber.trim()) {
+			Alert.alert('Validation', 'Nursing Registration Number is required.')
+			return
+		}
+
+		if (!isValidLatitude(formData.latitude)) {
+			Alert.alert('Validation', 'Please enter a valid latitude between -90 and 90.')
+			return
+		}
+
+		if (!isValidLongitude(formData.longitude)) {
+			Alert.alert('Validation', 'Please enter a valid longitude between -180 and 180.')
 			return
 		}
 
 		try {
 			setIsSaving(true)
 			await AsyncStorage.multiSet([
-				['user_specialty', formData.specialtyLabel],
-				['ancillary_license', formData.license.trim()],
-				['ancillary_licensing_authority', formData.licensingAuthority.trim()],
-				['ancillary_registration_proof', formData.registrationProof],
+				['ancillary_specialty', formData.specialty],
 				['ancillary_qualification', formData.qualification.trim()],
 				['ancillary_designation', formData.currentDesignation.trim()],
 				['ancillary_experience', formData.experience],
-				['ancillary_location', formData.location],
-				['ancillary_service_area', formData.serviceArea.trim()],
-				['ancillary_expertise', JSON.stringify(formData.areasOfExpertise)],
+				['ancillary_license', formData.nursingRegistrationNumber.trim()],
+				['ancillary_licensing_authority', formData.stateNursingCouncil.trim()],
+				['ancillary_registration_proof', formData.registrationProof],
 				['ancillary_about', formData.about.trim()],
+				['ancillary_location', formData.location],
 			])
+
+			// Latitude / Longitude persist to the backend (ancillary_providers.current_lat /
+			// current_lng) via the existing POST /api/ancillary/provider/location endpoint.
+			const trimmedLat = formData.latitude.trim()
+			const trimmedLng = formData.longitude.trim()
+			if (trimmedLat && trimmedLng) {
+				await updateProviderLocationBackend(Number(trimmedLat), Number(trimmedLng))
+			}
 
 			setStatusModal({
 				visible: true,
@@ -460,23 +449,21 @@ export default function ProfessionalDetailsTab() {
 						</AppTypography>
 					</View>
 
-					{/* Specialty Selection */}
+					{/* Specialty / Clinical Practice */}
 					<View style={{ marginBottom: rowSpacing }}>
 						<SectionTitle>Specialty / Clinical Practice</SectionTitle>
 						<SelectDropdown
 							label="Primary Specialty"
-							value={formData.specialtyLabel}
+							value={formData.specialty}
 							placeholder="Select specialty"
 							options={SPECIALTY_OPTIONS}
-							onSelect={(val) => updateFormData('specialtyLabel', val)}
+							onSelect={(val) => updateFormData('specialty', val)}
 							required
 						/>
 					</View>
 
-					<View style={styles.sectionDivider} />
-
 					{/* Professional Information */}
-					<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
+					<View style={{ marginBottom: rowSpacing }}>
 						<SectionTitle>Professional Information</SectionTitle>
 						<View style={{ gap: 18 }}>
 							<FormRow stacked={!useTwoColumns} compact={isTablet}>
@@ -484,7 +471,7 @@ export default function ProfessionalDetailsTab() {
 									label="Highest Qualification"
 									value={formData.qualification}
 									onChangeText={(val) => updateFormData('qualification', val)}
-									placeholder="e.g. B.Sc Nursing, MPT"
+									placeholder="e.g. B.Sc Nursing, GNM"
 								/>
 								<InputField
 									label="Current Designation"
@@ -512,26 +499,36 @@ export default function ProfessionalDetailsTab() {
 								/>
 							</FormRow>
 
-							<InputField
-								label="Service Area Radius"
-								value={formData.serviceArea}
-								onChangeText={(val) => updateFormData('serviceArea', val)}
-								placeholder="e.g. Indiranagar, Koramangala (5 km radius)"
-							/>
+							<FormRow stacked={!useTwoColumns} compact={isTablet}>
+								<InputField
+									label="Latitude"
+									value={formData.latitude}
+									onChangeText={(val) => updateFormData('latitude', val)}
+									placeholder="e.g. 17.3850"
+									keyboardType="numbers-and-punctuation"
+								/>
+								<InputField
+									label="Longitude"
+									value={formData.longitude}
+									onChangeText={(val) => updateFormData('longitude', val)}
+									placeholder="e.g. 78.4867"
+									keyboardType="numbers-and-punctuation"
+								/>
+							</FormRow>
 
 							<FormRow stacked={!useTwoColumns} compact={isTablet}>
 								<InputField
-									label="Registration / License Number"
-									value={formData.license}
-									onChangeText={(val) => updateFormData('license', val)}
-									placeholder="License Code (e.g. RN-12930)"
+									label="Nursing Registration Number"
+									value={formData.nursingRegistrationNumber}
+									onChangeText={(val) => updateFormData('nursingRegistrationNumber', val)}
+									placeholder="e.g. RN-12930"
 									required
 								/>
 								<InputField
-									label="Licensing Authority"
-									value={formData.licensingAuthority}
-									onChangeText={(val) => updateFormData('licensingAuthority', val)}
-									placeholder="e.g. Indian Nursing Council"
+									label="State Nursing Council"
+									value={formData.stateNursingCouncil}
+									onChangeText={(val) => updateFormData('stateNursingCouncil', val)}
+									placeholder="e.g. Karnataka State Nursing Council"
 								/>
 							</FormRow>
 
@@ -540,14 +537,6 @@ export default function ProfessionalDetailsTab() {
 								label="Registration Proof / Certification Document"
 								fileName={formData.registrationProof}
 								onUpload={handleUploadDocument}
-							/>
-
-							<MultiSelectDropdown
-								label="Areas of Expertise"
-								values={formData.areasOfExpertise}
-								onChange={(val) => updateFormData('areasOfExpertise', val)}
-								options={EXPERTISE_OPTIONS}
-								placeholder="Select areas of expertise"
 							/>
 						</View>
 					</View>

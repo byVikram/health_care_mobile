@@ -26,7 +26,7 @@ export default function ProfilePage() {
 		return <LaboratoryProfileLayout />
 	}
 
-	if (role === 'ancillary') {
+	if (role === 'ancillary' || (role as any) === 'nurse') {
 		return <AncillaryProfileLayout />
 	}
 
