@@ -4,7 +4,6 @@ import {
 	Image,
 	ScrollView,
 	StyleSheet,
-	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
@@ -13,7 +12,7 @@ import { useNavigation } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from '../../../navigation/routes'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { AppTypography, AppInput } from '../../../components/common'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
 
 import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCard'
@@ -256,21 +255,30 @@ export default function NursingCarePage() {
 				showsVerticalScrollIndicator={false}
 			>
 				{/* 1. Search Bar */}
-				<View style={styles.searchBar}>
-					<Ionicons name="search" size={19} color="#2B6F71" />
-					<TextInput
-						style={styles.searchInput}
-						placeholder="Search procedures e.g. Dressing, IV, Injection..."
-						placeholderTextColor="#546E7A"
-						value={searchQuery}
-						onChangeText={setSearchQuery}
-					/>
-					{searchQuery.length > 0 && (
-						<TouchableOpacity onPress={() => setSearchQuery('')}>
-							<Ionicons name="close-circle" size={18} color="#E0E7EF" />
-						</TouchableOpacity>
-					)}
-				</View>
+				<AppInput
+					isSearch
+					noMargin
+					fieldSize="form"
+					borderRadius={12}
+					placeholder="Search procedures e.g. Dressing, IV, Injection..."
+					placeholderTextColor="#546E7A"
+					value={searchQuery}
+					onChangeText={setSearchQuery}
+					outlineColor="#E0E7EF"
+					activeOutlineColor="#2B6F71"
+					textColor="#1A2B3C"
+					style={styles.searchInput}
+					right={
+						searchQuery.length > 0 ? (
+							<AppInput.Icon
+								icon="close-circle"
+								size={18}
+								color="#546E7A"
+								onPress={() => setSearchQuery('')}
+							/>
+						) : undefined
+					}
+				/>
 
 				{/* 2. Dispatch Banner */}
 				<View style={styles.dispatchBanner}>
@@ -365,6 +373,19 @@ export default function NursingCarePage() {
 						<AppTypography variant="caption" style={styles.emptySub}>
 							Try searching with another term or reset your category filter.
 						</AppTypography>
+						{(searchQuery.length > 0 || activeCategory !== 'all') && (
+							<TouchableOpacity
+								style={styles.resetSearchBtn}
+								onPress={() => {
+									setSearchQuery('')
+									setActiveCategory('all')
+								}}
+							>
+								<AppTypography variant="caption" style={styles.resetSearchBtnText}>
+									Reset Search & Filters
+								</AppTypography>
+							</TouchableOpacity>
+						)}
 					</View>
 				)}
 			</ScrollView>
@@ -401,21 +422,20 @@ const styles = StyleSheet.create({
 	},
 
 	/* 1. Search Bar */
-	searchBar: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#E0E7EF',
-		borderRadius: 12,
-		paddingHorizontal: 14,
-		height: 48,
-		gap: 10,
-	},
 	searchInput: {
-		flex: 1,
+		backgroundColor: '#FFFFFF',
 		fontSize: 14,
-		color: '#1A2B3C',
+	},
+	resetSearchBtn: {
+		marginTop: 6,
+		paddingVertical: 8,
+		paddingHorizontal: 16,
+		borderRadius: 8,
+		backgroundColor: 'rgba(43, 111, 113, 0.1)',
+	},
+	resetSearchBtnText: {
+		color: '#2B6F71',
+		fontWeight: '600',
 	},
 
 	/* 2. Dispatch Banner */
