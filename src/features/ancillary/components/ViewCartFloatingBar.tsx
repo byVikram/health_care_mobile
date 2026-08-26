@@ -1,9 +1,8 @@
 
 import React from 'react'
-import { StyleSheet, View } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { StyleSheet, TouchableOpacity, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppTypography } from '../../../components/common/AppTypography'
-import { AppButton } from '../../../components/common/AppButton'
 
 interface ViewCartFloatingBarProps {
 	selectedCount?: number
@@ -18,11 +17,12 @@ export const ViewCartFloatingBar: React.FC<ViewCartFloatingBarProps> = ({
 	totalAmount,
 	onViewCart,
 }) => {
+	const insets = useSafeAreaInsets()
 	const count = itemCount ?? selectedCount ?? 0
 	if (count <= 0) return null
 
 	return (
-		<View style={styles.container}>
+		<View style={[styles.container, { paddingBottom: Math.max(insets.bottom + 12, 24) }]}>
 			<View style={styles.content}>
 				<View style={styles.selection}>
 					<AppTypography style={styles.countText}>
@@ -31,20 +31,15 @@ export const ViewCartFloatingBar: React.FC<ViewCartFloatingBarProps> = ({
 					</AppTypography>
 				</View>
 
-				<AppButton
-					variant="secondary"
-					compact
+				<TouchableOpacity
 					style={styles.button}
-					contentStyle={styles.buttonContent}
-					labelStyle={styles.buttonLabel}
 					onPress={onViewCart}
+					activeOpacity={0.8}
 				>
-					<View style={styles.buttonInner}>
-						<AppTypography style={styles.buttonText}>
-							Review Booking
-						</AppTypography>
-					</View>
-				</AppButton>
+					<AppTypography style={styles.buttonText}>
+						Proceed
+					</AppTypography>
+				</TouchableOpacity>
 			</View>
 		</View>
 	)
@@ -54,67 +49,54 @@ const styles = StyleSheet.create({
 	container: {
 		backgroundColor: '#FFFFFF',
 		borderTopWidth: 1,
-		borderTopColor: '#E6EEEE',
-		paddingHorizontal: 16,
-		paddingTop: 10,
-		paddingBottom: 20
+		borderTopColor: '#E2E8F0',
+		paddingHorizontal: 20,
+		paddingTop: 16,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: -4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 8,
+		elevation: 10,
 	},
 
 	content: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
+		minHeight: 50,
 	},
 
 	selection: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		flex: 1,
-		marginRight: 12,
-	},
-
-	icon: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
-		backgroundColor: '#EAF5F3',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginRight: 8,
+		marginRight: 16,
 	},
 
 	countText: {
-		color: '#183F43',
-		fontSize: 13,
+		color: '#0F172A',
+		fontSize: 15,
 		fontWeight: '700',
 	},
 
 	button: {
-		backgroundColor: '#1F5F68',
-		borderRadius: 10,
-		minHeight: 40,
-	},
-
-	buttonContent: {
-		minHeight: 40,
-		paddingHorizontal: 12,
-		paddingVertical: 0,
+		backgroundColor: '#2B6F71',
+		borderRadius: 12,
+		height: 50,
+		paddingHorizontal: 28,
 		justifyContent: 'center',
-	},
-
-	buttonLabel: {
-		margin: 0,
-	},
-
-	buttonInner: {
-		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 6,
+		elevation: 3,
+		shadowColor: '#2B6F71',
+		shadowOffset: { width: 0, height: 3 },
+		shadowOpacity: 0.2,
+		shadowRadius: 5,
 	},
 
 	buttonText: {
 		color: '#FFFFFF',
-		fontSize: 12,
+		fontSize: 15,
 		fontWeight: '700',
+		letterSpacing: 0.3,
 	},
 })

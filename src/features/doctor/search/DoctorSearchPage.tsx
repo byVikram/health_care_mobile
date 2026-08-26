@@ -119,7 +119,23 @@ export default function DoctorSearchPage() {
 
 	const [showFilters, setShowFilters] = useState(false)
 
-	// Load specialities on mount
+	// Sync route.params with filter states on route param changes
+	useEffect(() => {
+		if (route.params?.specialityId) {
+			const specId = String(route.params.specialityId)
+			setSpecialityFilter(specId)
+			setDraftSpecialityFilter(specId)
+		}
+		if (route.params?.query !== undefined) {
+			setSearchQuery(route.params.query)
+		}
+		if (route.params?.mode) {
+			setConsultationTypeFilter(route.params.mode)
+			setDraftConsultationType(route.params.mode)
+		}
+	}, [route.params?.specialityId, route.params?.specialityName, route.params?.query, route.params?.mode])
+
+	// Load specialities on mount or when specialityId changes
 	useEffect(() => {
 		const loadSpecialities = async () => {
 			try {
@@ -133,9 +149,18 @@ export default function DoctorSearchPage() {
 					setSpecialities([{ label: 'All Specialities', value: 'all' }, ...mapped])
 
 					if (route.params?.specialityId) {
-						const found = res.data.find((s) => String(s.id) === String(route.params?.specialityId))
+						const found = res.data.find(
+							(s) =>
+								String(s.id) === String(route.params?.specialityId) ||
+								(route.params?.specialityName &&
+									s.label.toLowerCase().trim() === route.params.specialityName.toLowerCase().trim())
+						)
 						if (found) {
 							const val = String(found.id)
+							setSpecialityFilter(val)
+							setDraftSpecialityFilter(val)
+						} else {
+							const val = String(route.params.specialityId)
 							setSpecialityFilter(val)
 							setDraftSpecialityFilter(val)
 						}
@@ -148,7 +173,7 @@ export default function DoctorSearchPage() {
 			}
 		}
 		loadSpecialities()
-	}, [route.params?.specialityId])
+	}, [route.params?.specialityId, route.params?.specialityName])
 
 	// Fetch doctor list
 	const fetchDoctorsList = async (targetPage = 1, isRefresh = false, isLoadMore = false) => {
@@ -383,7 +408,7 @@ export default function DoctorSearchPage() {
 					showMicrophone
 					value={searchQuery}
 					onChangeText={setSearchQuery}
-					placeholder="Search Doctors/Symptoms"
+					placeholder={route.params?.specialityName || "Search Doctors/Symptoms"}
 					noMargin
 					borderRadius={10}
 					style={styles.searchBar}

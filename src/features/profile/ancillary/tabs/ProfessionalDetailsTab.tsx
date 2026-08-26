@@ -19,7 +19,12 @@ import {
 	AppTypography,
 	StatusModal,
 } from '../../../../components/common'
-import { fetchProviderStatusBackend, updateProviderLocationBackend } from '../../../ancillary/ancillaryService'
+import {
+	fetchProviderStatusBackend,
+	updateProviderLocationBackend,
+	fetchProviderProfileBackend,
+	updateProviderProfileBackend,
+} from '../../../ancillary/ancillaryService'
 
 type Option = AppSelectOption
 
@@ -33,9 +38,9 @@ type ProfessionalFormData = {
 	registrationProof: string
 	verificationStatus: string
 	about: string
-	location: string
-	latitude: string
-	longitude: string
+	geofenceRadius: string
+	// latitude: string
+	// longitude: string
 }
 
 const SPECIALTY_OPTIONS: Option[] = [
@@ -53,12 +58,14 @@ const EXPERIENCE_OPTIONS: Option[] = [
 	{ label: '10+ years', value: '10+' },
 ]
 
-const LOCATION_OPTIONS: Option[] = [
-	{ label: 'Bangalore', value: 'Bangalore' },
-	{ label: 'Mumbai', value: 'Mumbai' },
-	{ label: 'Delhi', value: 'Delhi' },
-	{ label: 'Chennai', value: 'Chennai' },
-	{ label: 'Hyderabad', value: 'Hyderabad' },
+const GEOFENCE_RADIUS_OPTIONS: Option[] = [
+	{ label: '5 km', value: '5' },
+	{ label: '10 km', value: '10' },
+	{ label: '15 km', value: '15' },
+	{ label: '20 km', value: '20' },
+	{ label: '25 km', value: '25' },
+	{ label: '30 km', value: '30' },
+	{ label: '50 km', value: '50' },
 ]
 
 const VERIFICATION_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -229,17 +236,17 @@ function UploadBox({
 	)
 }
 
-const isValidLatitude = (value: string) => {
-	if (!value.trim()) return true
-	const num = Number(value)
-	return Number.isFinite(num) && num >= -90 && num <= 90
-}
+// const isValidLatitude = (value: string) => {
+// 	if (!value.trim()) return true
+// 	const num = Number(value)
+// 	return Number.isFinite(num) && num >= -90 && num <= 90
+// }
 
-const isValidLongitude = (value: string) => {
-	if (!value.trim()) return true
-	const num = Number(value)
-	return Number.isFinite(num) && num >= -180 && num <= 180
-}
+// const isValidLongitude = (value: string) => {
+// 	if (!value.trim()) return true
+// 	const num = Number(value)
+// 	return Number.isFinite(num) && num >= -180 && num <= 180
+// }
 
 export default function ProfessionalDetailsTab() {
 	const { width } = useWindowDimensions()
@@ -259,9 +266,9 @@ export default function ProfessionalDetailsTab() {
 		registrationProof: '',
 		verificationStatus: 'pending',
 		about: '',
-		location: 'Hyderabad',
-		latitude: '',
-		longitude: '',
+		geofenceRadius: '10',
+	// 	latitude: '',
+	// 	longitude: '',
 	})
 
 	const [loading, setLoading] = useState(false)
@@ -291,27 +298,33 @@ export default function ProfessionalDetailsTab() {
 				const proof = await AsyncStorage.getItem('ancillary_registration_proof')
 				const verification = await AsyncStorage.getItem('ancillary_verification_status')
 				const abt = await AsyncStorage.getItem('ancillary_about')
-				const loc = await AsyncStorage.getItem('ancillary_location')
+				const savedRadius = await AsyncStorage.getItem('ancillary_geofence_radius')
 
-				// Latitude / Longitude are backed by the ancillary_providers.current_lat /
-				// current_lng columns via GET /api/ancillary/provider/status.
-				const providerStatus = await fetchProviderStatusBackend()
+				// Load profile from backend to get geofence_radius and credentials
+				const backendProfile = await fetchProviderProfileBackend()
+				const backendRadius = backendProfile?.geofence_radius ?? backendProfile?.geofence_radius_km
+
+				const resolvedRadius = backendRadius != null
+					? String(Math.round(backendRadius))
+					: (savedRadius || '10')
 
 				setFormData((prev) => ({
 					...prev,
 					specialty: spec || 'Nursing Care',
-					qualification: qual || '',
+					qualification: backendProfile?.qualifications || qual || '',
 					currentDesignation: desig || '',
 					experience: exp || '',
-					nursingRegistrationNumber: regNo || '',
+					nursingRegistrationNumber: backendProfile?.license_number || regNo || '',
 					stateNursingCouncil: council || '',
 					registrationProof: proof || '',
 					verificationStatus: verification || 'pending',
 					about: abt || '',
-					location: loc || 'Hyderabad',
-					latitude: providerStatus ? String(providerStatus.latitude) : prev.latitude,
-					longitude: providerStatus ? String(providerStatus.longitude) : prev.longitude,
+					geofenceRadius: resolvedRadius,
 				}))
+
+				if (backendRadius != null) {
+					await AsyncStorage.setItem('ancillary_geofence_radius', String(Math.round(backendRadius)))
+				}
 			} catch (e) {
 				console.log('[ProfessionalDetailsTab] load error:', e)
 			} finally {
@@ -349,16 +362,6 @@ export default function ProfessionalDetailsTab() {
 			return
 		}
 
-		if (!isValidLatitude(formData.latitude)) {
-			Alert.alert('Validation', 'Please enter a valid latitude between -90 and 90.')
-			return
-		}
-
-		if (!isValidLongitude(formData.longitude)) {
-			Alert.alert('Validation', 'Please enter a valid longitude between -180 and 180.')
-			return
-		}
-
 		try {
 			setIsSaving(true)
 			await AsyncStorage.multiSet([
@@ -370,16 +373,16 @@ export default function ProfessionalDetailsTab() {
 				['ancillary_licensing_authority', formData.stateNursingCouncil.trim()],
 				['ancillary_registration_proof', formData.registrationProof],
 				['ancillary_about', formData.about.trim()],
-				['ancillary_location', formData.location],
+				['ancillary_geofence_radius', formData.geofenceRadius],
 			])
 
-			// Latitude / Longitude persist to the backend (ancillary_providers.current_lat /
-			// current_lng) via the existing POST /api/ancillary/provider/location endpoint.
-			const trimmedLat = formData.latitude.trim()
-			const trimmedLng = formData.longitude.trim()
-			if (trimmedLat && trimmedLng) {
-				await updateProviderLocationBackend(Number(trimmedLat), Number(trimmedLng))
-			}
+			// Persist geofence radius & credentials to backend database (ancillary_providers.geofence_radius_km)
+			const numRadius = Number(formData.geofenceRadius)
+			await updateProviderProfileBackend({
+				license_number: formData.nursingRegistrationNumber.trim(),
+				qualifications: formData.qualification.trim(),
+				geofence_radius: Number.isFinite(numRadius) ? numRadius : 10,
+			})
 
 			setStatusModal({
 				visible: true,
@@ -491,15 +494,16 @@ export default function ProfessionalDetailsTab() {
 									required
 								/>
 								<SelectDropdown
-									label="Practice Location Base"
-									value={formData.location}
-									placeholder="Select location"
-									options={LOCATION_OPTIONS}
-									onSelect={(val) => updateFormData('location', val)}
+									label="Work Radius / Geofence Radius"
+									value={formData.geofenceRadius}
+									placeholder="Select work radius"
+									options={GEOFENCE_RADIUS_OPTIONS}
+									onSelect={(val) => updateFormData('geofenceRadius', val)}
+									required
 								/>
 							</FormRow>
 
-							<FormRow stacked={!useTwoColumns} compact={isTablet}>
+							{/* <FormRow stacked={!useTwoColumns} compact={isTablet}>
 								<InputField
 									label="Latitude"
 									value={formData.latitude}
@@ -513,8 +517,8 @@ export default function ProfessionalDetailsTab() {
 									onChangeText={(val) => updateFormData('longitude', val)}
 									placeholder="e.g. 78.4867"
 									keyboardType="numbers-and-punctuation"
-								/>
-							</FormRow>
+								/> */}
+							{/* </FormRow> */}
 
 							<FormRow stacked={!useTwoColumns} compact={isTablet}>
 								<InputField
@@ -524,12 +528,12 @@ export default function ProfessionalDetailsTab() {
 									placeholder="e.g. RN-12930"
 									required
 								/>
-								<InputField
+								{/* <InputField
 									label="State Nursing Council"
 									value={formData.stateNursingCouncil}
 									onChangeText={(val) => updateFormData('stateNursingCouncil', val)}
 									placeholder="e.g. Karnataka State Nursing Council"
-								/>
+								/> */}
 							</FormRow>
 
 							{/* Document Upload Component */}
@@ -543,7 +547,7 @@ export default function ProfessionalDetailsTab() {
 
 					<View style={styles.sectionDivider} />
 
-					{/* About / Bio */}
+					{/* About / Bio
 					<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
 						<SectionTitle>About / Bio</SectionTitle>
 						<InputField
@@ -552,7 +556,7 @@ export default function ProfessionalDetailsTab() {
 							onChangeText={(val) => updateFormData('about', val)}
 							placeholder="Write a short professional bio describing your experience and care approach"
 						/>
-					</View>
+					</View> */}
 				</View>
 			</ScrollView>
 
