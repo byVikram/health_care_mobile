@@ -1,10 +1,12 @@
-import React from 'react'
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, useWindowDimensions } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity, useWindowDimensions, ActivityIndicator } from 'react-native'
 import { Text, Button, useTheme } from 'react-native-paper'
 import { useNavigation } from '@react-navigation/native'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { getSpecialities } from '../../doctor/doctorService'
+import { SpecialityItem } from '../../../types/speciality'
 
 // ─────────────────────────────────────────────
 // Types
@@ -52,30 +54,37 @@ function ConsultCard({ image, title, description, cardWidth, cardImageHeight, ca
 // ─────────────────────────────────────────────
 // Data
 // ─────────────────────────────────────────────
+// Each card maps to the real specialty by its DB label -- this is only used
+// to pick the right illustration/description; the id used for navigation
+// always comes from the fetched specialty record, never from here.
 const consults = [
 	{
 		id: 1,
 		title: 'Dentist',
 		description: 'Teething troubles? Schedule a dental checkup',
 		image: require('../../../assets/specialties/dentist.png'),
+		specialityLabel: 'Dentistry',
 	},
 	{
 		id: 2,
 		title: 'Gynecologist',
 		description: "Explore for women's health, pregnancy & infertility treatments",
 		image: require('../../../assets/specialties/gynocologist.png'),
+		specialityLabel: 'Gynecology',
 	},
 	{
 		id: 3,
 		title: 'Dietitian/Nutrition',
 		description: 'Get guidance on eating right, weight management & sports nutrition',
 		image: require('../../../assets/specialties/nutrition.png'),
+		specialityLabel: 'Nutrition & Dietetics',
 	},
 	{
 		id: 4,
 		title: 'Physiotherapist',
 		description: 'Pulled a muscle? Get it treated by a trained physiotherapist',
 		image: require('../../../assets/specialties/physiotherapist.png'),
+		specialityLabel: 'Physiotherapy',
 	},
 ]
 
@@ -86,6 +95,27 @@ function ConsultSection() {
 	const theme = useTheme()
 	const { width } = useWindowDimensions()
 	const navigation = useNavigation<NavigationProp>()
+	const [specialities, setSpecialities] = useState<SpecialityItem[]>([])
+	const [loading, setLoading] = useState(true)
+
+	useEffect(() => {
+		let active = true
+		setLoading(true)
+		getSpecialities()
+			.then((res) => {
+				if (!active) return
+				if (res.success && res.data) setSpecialities(res.data)
+			})
+			.catch((error) => {
+				console.error('Error fetching specialities:', error)
+			})
+			.finally(() => {
+				if (active) setLoading(false)
+			})
+		return () => {
+			active = false
+		}
+	}, [])
 
 	const isTablet = width >= 768
 
@@ -99,6 +129,47 @@ function ConsultSection() {
 		(width - HORIZONTAL_PADDING * 2 - CARD_GAP * totalGaps) / visibleCards,
 	)
 	const cardImageHeight = Math.floor(cardWidth * 0.68)
+
+	const handleConsult = async (specialityLabel: string) => {
+		const match = specialities.find(
+			(s) =>
+				s.label.toLowerCase().trim() === specialityLabel.toLowerCase().trim() ||
+				s.label.toLowerCase().includes(specialityLabel.toLowerCase()) ||
+				specialityLabel.toLowerCase().includes(s.label.toLowerCase())
+		)
+		if (match) {
+			navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
+				specialityId: String(match.id),
+				specialityName: match.label,
+			})
+			return
+		}
+
+		try {
+			const res = await getSpecialities()
+			if (res.success && res.data) {
+				const retryMatch = res.data.find(
+					(s) =>
+						s.label.toLowerCase().trim() === specialityLabel.toLowerCase().trim() ||
+						s.label.toLowerCase().includes(specialityLabel.toLowerCase()) ||
+						specialityLabel.toLowerCase().includes(s.label.toLowerCase())
+				)
+				if (retryMatch) {
+					navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
+						specialityId: String(retryMatch.id),
+						specialityName: retryMatch.label,
+					})
+					return
+				}
+			}
+		} catch (error) {
+			console.error('Error fetching specialities in ConsultSection:', error)
+		}
+
+		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
+			specialityName: specialityLabel,
+		})
+	}
 
 	return (
 		<View style={styles.sectionContainer}>
@@ -127,31 +198,33 @@ function ConsultSection() {
 			</View>
 
 			{/* CARDS */}
-			<ScrollView
-				horizontal
-				showsHorizontalScrollIndicator={false}
-				contentContainerStyle={[
-					styles.scrollContent,
-					{ paddingHorizontal: HORIZONTAL_PADDING },
-				]}
-			>
-				{consults.map((s, index) => (
-					<ConsultCard
-						key={s.id}
-						title={s.title}
-						description={s.description}
-						image={s.image}
-						cardWidth={cardWidth}
-						cardImageHeight={cardImageHeight}
-						cardGap={index < consults.length - 1 ? CARD_GAP : 0}
-						onConsult={() =>
-							navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
-								query: s.title,
-							})
-						}
-					/>
-				))}
-			</ScrollView>
+			{loading ? (
+				<View style={{ paddingVertical: 24, alignItems: 'center' }}>
+					<ActivityIndicator size="small" color={theme.colors.primary} />
+				</View>
+			) : (
+				<ScrollView
+					horizontal
+					showsHorizontalScrollIndicator={false}
+					contentContainerStyle={[
+						styles.scrollContent,
+						{ paddingHorizontal: HORIZONTAL_PADDING },
+					]}
+				>
+					{consults.map((s, index) => (
+						<ConsultCard
+							key={s.id}
+							title={s.title}
+							description={s.description}
+							image={s.image}
+							cardWidth={cardWidth}
+							cardImageHeight={cardImageHeight}
+							cardGap={index < consults.length - 1 ? CARD_GAP : 0}
+							onConsult={() => handleConsult(s.specialityLabel)}
+						/>
+					))}
+				</ScrollView>
+			)}
 		</View>
 	)
 }

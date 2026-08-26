@@ -5,7 +5,7 @@
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	const url = 'http://172.20.10.2:8000'
+	const url = 'http://192.168.4.60:8000'
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
@@ -48,6 +48,7 @@ export const API_ENDPOINTS = {
 	},
 	SPECIALITIES: {
 		LIST: `${BASE_URL}/api/specialities`,
+		SYMPTOMS: `${BASE_URL}/api/specialities/symptoms`,
 	},
 	AREA_OF_EXPERTISE: {
 		LIST: `${BASE_URL}/api/area-of-expertise`,
@@ -205,6 +206,7 @@ export const API_ENDPOINTS = {
 		DELETE: (id: string) => `${BASE_URL}/api/events/${id}`,
 	},
 	ANCILLARY: {
+		PROFILE: `${BASE_URL}/api/ancillary/me/profile`,
 		CATEGORIES: `${BASE_URL}/api/ancillary/categories`,
 		SERVICES: `${BASE_URL}/api/ancillary/services`,
 		REQUESTS: `${BASE_URL}/api/ancillary/patient/requests`,

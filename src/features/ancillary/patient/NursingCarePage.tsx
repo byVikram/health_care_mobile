@@ -250,7 +250,7 @@ export default function NursingCarePage() {
 			<ScrollView
 				contentContainerStyle={[
 					styles.scrollContent,
-					{ paddingBottom: insets.bottom + (selectedItemsList.length > 0 ? 110 : 40) },
+					{ paddingBottom: insets.bottom + (selectedItemsList.length > 0 ? 130 : 40) },
 				]}
 				showsVerticalScrollIndicator={false}
 			>
@@ -515,6 +515,7 @@ const styles = StyleSheet.create({
 	categoryCardTextCol: {
 		flex: 1,
 		paddingHorizontal: 10,
+		justifyContent: 'center',
 		paddingVertical: 4,
 		gap: 2,
 	},

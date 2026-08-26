@@ -1068,4 +1068,44 @@ export const updateProviderStatusBackend = async (isOnline: boolean, latitude?: 
 		console.log('[ancillaryService] Updated provider status:', isOnline)
 		return true
 	}
+}
+
+export interface AncillaryProfileBackendResponse {
+	public_id: string
+	license_number: string
+	qualifications?: string
+	specialty?: {
+		id?: string
+		label: string
+		description?: string
+	}
+	checked_procedures?: string[]
+	geofence_radius?: number
+	geofence_radius_km?: number
+}
+
+export const fetchProviderProfileBackend = async (): Promise<AncillaryProfileBackendResponse | null> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROFILE)
+		const data = res.data?.data || res.data
+		return data || null
+	} catch (error) {
+		console.log('[ancillaryService] fetchProviderProfileBackend error:', error)
+		return null
+	}
+}
+
+export const updateProviderProfileBackend = async (payload: {
+	license_number?: string
+	qualifications?: string
+	geofence_radius?: number
+	geofence_radius_km?: number
+}): Promise<boolean> => {
+	try {
+		await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, payload)
+		return true
+	} catch (error) {
+		console.log('[ancillaryService] updateProviderProfileBackend error:', error)
+		return false
+	}
 }
