@@ -14,6 +14,7 @@ export type RoleParams = {
 export type AuthStackParamList = {
 	[ROUTES.AUTH.LOGIN]: undefined
 	[ROUTES.AUTH.ROLE_SELECTION]: undefined
+	[ROUTES.AUTH.SPECIALTY_SELECTION]: RoleParams | undefined
 	[ROUTES.AUTH.ONBOARDING]: RoleParams | undefined
 	[ROUTES.AUTH.REGISTER]: RoleParams | undefined
 }

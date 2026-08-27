@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
 	ActivityIndicator,
 	Alert,
@@ -11,101 +11,106 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppButton, AppTypography } from '../../../../components/common'
+import {
+	fetchAncillaryServicesBackend,
+	updateAncillaryCapabilitiesBackend,
+	fetchAncillaryProfileBackend,
+	AncillaryServiceItem,
+} from '../../../ancillary/ancillaryService'
 
-interface CapabilityItem {
+interface ProcedureItem {
 	id: string
 	label: string
 	subtitle?: string
+	rate: string
+	price: number
+	specialtyKey: string
 }
 
-interface CapabilityCategory {
-	key: string
-	title: string
-	icon: keyof typeof MaterialCommunityIcons.glyphMap
-	items: CapabilityItem[]
-}
-
-type CapabilityCardProps = {
-	item: CapabilityItem
+type ProcedureCardProps = {
+	item: ProcedureItem
 	selected: boolean
 	onPress: () => void
 }
 
-const CAPABILITIES_CATEGORIES: CapabilityCategory[] = [
+const SPECIALTY_META: Record<
+	string,
 	{
-		key: 'general_nursing',
-		title: 'General Nursing',
+		label: string
+		icon: keyof typeof MaterialCommunityIcons.glyphMap
+		subtitle: string
+		fallbackProcedures: ProcedureItem[]
+	}
+> = {
+	'nursing-care': {
+		label: 'Nursing Care',
 		icon: 'medical-bag',
-		items: [
-			{ id: 'vitals', label: 'Vital Signs Monitoring', subtitle: 'Standard vitals check' },
-			{ id: 'elderly', label: 'Elderly Care', subtitle: 'Assisted living support' },
-			{ id: 'catheter', label: 'Catheter Care', subtitle: 'Maintenance & changing' },
+		subtitle: 'Select the clinical nursing procedures you are certified to provide.',
+		fallbackProcedures: [
+			{ id: 'proc-nurs-001', label: 'Injection Administration', subtitle: 'IM, SC, IV Push (20 mins)', rate: '₹299', price: 299, specialtyKey: 'nursing-care' },
+			{ id: 'proc-nurs-002', label: 'IV Drip Setup', subtitle: 'Continuous infusion management (45 mins)', rate: '₹799', price: 799, specialtyKey: 'nursing-care' },
+			{ id: 'proc-nurs-003', label: 'Bandage Dressing', subtitle: 'Basic & advanced wound care (30 mins)', rate: '₹499', price: 499, specialtyKey: 'nursing-care' },
+			{ id: 'proc-nurs-004', label: 'ICU Care at Home', subtitle: 'Advanced critical care support', rate: 'Custom Pricing', price: 0, specialtyKey: 'nursing-care' },
+			{ id: 'proc-nurs-005', label: 'Vitals & Sugar Check', subtitle: 'Standard vitals monitoring (20 mins)', rate: '₹199', price: 199, specialtyKey: 'nursing-care' },
+			{ id: 'proc-nurs-006', label: 'Catheterization Care', subtitle: 'Maintenance & catheter changing (45 mins)', rate: '₹599', price: 599, specialtyKey: 'nursing-care' },
+			{ id: 'proc-nurs-007', label: 'Tracheostomy Care', subtitle: 'Airway hygiene and suctioning (60 mins)', rate: '₹999', price: 999, specialtyKey: 'nursing-care' },
+			{ id: 'proc-nurs-008', label: "Ryle's Tube Feeding & Care", subtitle: 'Nasogastric feeding & tube maintenance (45 mins)', rate: '₹699', price: 699, specialtyKey: 'nursing-care' },
 		],
 	},
-	{
-		key: 'medication_iv',
-		title: 'Medication & IV Care',
-		icon: 'needle',
-		items: [
-			{ id: 'injection', label: 'Injection Administration', subtitle: 'IM, SC, IV Push' },
-			{ id: 'iv_drip', label: 'IV Drip Setup', subtitle: 'Continuous infusion management' },
-			{ id: 'iv_cannula', label: 'IV Cannulation', subtitle: 'Peripheral line insertion' },
-			{ id: 'med_admin', label: 'Medication Administration', subtitle: 'Oral, topical, inhaled' },
+	'physiotherapy': {
+		label: 'Physiotherapy',
+		icon: 'run',
+		subtitle: 'Select the physiotherapy and rehabilitation therapies you provide.',
+		fallbackProcedures: [
+			{ id: 'proc-phys-001', label: 'Post-Op Physiotherapy', subtitle: 'Surgical recovery & mobility restoration (60 mins)', rate: '₹799', price: 799, specialtyKey: 'physiotherapy' },
+			{ id: 'proc-phys-002', label: 'Back & Neck Pain Therapy', subtitle: 'Spinal decompression & pain management (45 mins)', rate: '₹699', price: 699, specialtyKey: 'physiotherapy' },
+			{ id: 'proc-phys-003', label: 'Sports Injury Rehabilitation', subtitle: 'Joint mobilization & muscle conditioning (50 mins)', rate: '₹899', price: 899, specialtyKey: 'physiotherapy' },
+			{ id: 'proc-phys-004', label: 'Joint Mobilization Therapy', subtitle: 'Passive & active range-of-motion therapy (45 mins)', rate: '₹749', price: 749, specialtyKey: 'physiotherapy' },
+			{ id: 'proc-phys-005', label: 'Therapeutic Exercise Regimen', subtitle: 'Custom strengthening sequences (40 mins)', rate: '₹649', price: 649, specialtyKey: 'physiotherapy' },
 		],
 	},
-	{
-		key: 'wound_care',
-		title: 'Wound & Specialized Care',
-		icon: 'bandage',
-		items: [
-			{ id: 'wound_dress', label: 'Wound Dressing', subtitle: 'Basic & advanced care' },
-			{ id: 'bandage_dress', label: 'Bandage Dressing' },
-			{ id: 'post_op', label: 'Post-Operative Care', subtitle: 'Surgical site monitoring' },
-			{ id: 'diabetes', label: 'Diabetes Care', subtitle: 'Insulin management' },
-			{ id: 'ryles_tube', label: "Ryle's Tube Care", subtitle: 'Nasogastric feeding' },
+	'rehab-care': {
+		label: 'Rehabilitation Care',
+		icon: 'wheelchair-accessibility',
+		subtitle: 'Select the rehabilitation procedures and specialized therapies you deliver.',
+		fallbackProcedures: [
+			{ id: 'proc-rehab-001', label: 'Post-Stroke Movement Therapy', subtitle: 'Motor recovery & neuro-rehab session (60 mins)', rate: '₹999', price: 999, specialtyKey: 'rehab-care' },
+			{ id: 'proc-rehab-002', label: 'Cognitive & Functional Rehab', subtitle: 'Daily task re-training & independence support (45 mins)', rate: '₹849', price: 849, specialtyKey: 'rehab-care' },
+			{ id: 'proc-rehab-003', label: 'Gait Training & Balance Therapy', subtitle: 'Assisted walking & fall prevention (50 mins)', rate: '₹799', price: 799, specialtyKey: 'rehab-care' },
+			{ id: 'proc-rehab-004', label: 'Occupational Therapy Session', subtitle: 'Adaptive motor skills for daily living (60 mins)', rate: '₹899', price: 899, specialtyKey: 'rehab-care' },
 		],
 	},
-	{
-		key: 'critical_care',
-		title: 'Critical Care',
-		icon: 'heart-pulse',
-		items: [
-			{ id: 'icu_home', label: 'ICU Care at Home', subtitle: 'Advanced life support' },
-			{ id: 'tracheostomy', label: 'Tracheostomy Care', subtitle: 'Airway management' },
-			{ id: 'bedridden', label: 'Bedridden Patient Care', subtitle: 'Immobility support' },
+	'elder-day-care': {
+		label: 'Elder Day Care',
+		icon: 'human-cane',
+		subtitle: 'Select the elder care, daily assistance, and vital monitoring services you provide.',
+		fallbackProcedures: [
+			{ id: 'proc-elder-001', label: 'Elder Care Visit & Vitals Check', subtitle: 'Comprehensive senior wellness check (60 mins)', rate: '₹599', price: 599, specialtyKey: 'elder-day-care' },
+			{ id: 'proc-elder-002', label: 'Assisted Living & Mobility Support', subtitle: 'Personal assistance & safe movement support (90 mins)', rate: '₹799', price: 799, specialtyKey: 'elder-day-care' },
+			{ id: 'proc-elder-003', label: 'Home Safety & Routine Check', subtitle: 'Environment hazard check & lifestyle care (45 mins)', rate: '₹499', price: 499, specialtyKey: 'elder-day-care' },
+			{ id: 'proc-elder-004', label: 'Senior Companionship & Meal Support', subtitle: 'Attentive companionship and nutrition check (60 mins)', rate: '₹549', price: 549, specialtyKey: 'elder-day-care' },
 		],
 	},
-]
-
-const DEFAULT_SELECTED_LABELS = [
-	'Vital Signs Monitoring',
-	'Injection Administration',
-	'IV Drip Setup',
-	'Medication Administration',
-	'Wound Dressing',
-	'Diabetes Care',
-]
-
-function CategoryHeader({ category }: { category: CapabilityCategory }) {
-	return (
-		<View style={styles.categoryHeader}>
-			<MaterialCommunityIcons name={category.icon} size={18} color="#2B6F71" />
-			<AppTypography variant="h3" style={styles.categoryTitle}>
-				{category.title}
-			</AppTypography>
-		</View>
-	)
 }
 
-function CapabilityCard({ item, selected, onPress }: CapabilityCardProps) {
+function normalizeSpecialtyKey(key?: string | null): string {
+	if (!key) return 'nursing-care'
+	const lower = key.toLowerCase().trim()
+	if (lower.includes('physio')) return 'physiotherapy'
+	if (lower.includes('rehab')) return 'rehab-care'
+	if (lower.includes('elder')) return 'elder-day-care'
+	return 'nursing-care'
+}
+
+function ProcedureCard({ item, selected, onPress }: ProcedureCardProps) {
 	return (
 		<TouchableOpacity
 			activeOpacity={0.8}
 			onPress={onPress}
-			style={[styles.capabilityCard, selected && styles.capabilityCardSelected]}
+			style={[styles.procedureCard, selected && styles.procedureCardSelected]}
 		>
 			<View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-				{selected && <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" />}
+				{selected && <MaterialCommunityIcons name="check" size={13} color="#FFFFFF" />}
 			</View>
 
 			<View style={styles.textContainer}>
@@ -120,90 +125,228 @@ function CapabilityCard({ item, selected, onPress }: CapabilityCardProps) {
 					<AppTypography
 						variant="caption"
 						style={[styles.itemSubtitle, selected && styles.itemSubtitleSelected]}
-						numberOfLines={1}
+						numberOfLines={2}
 					>
 						{item.subtitle}
 					</AppTypography>
 				) : null}
 			</View>
 
+			{/* Clinic-Defined Read-Only Price Tag */}
+			<View style={styles.priceTag}>
+				<AppTypography variant="caption" style={styles.priceText}>
+					{item.rate}
+				</AppTypography>
+			</View>
 		</TouchableOpacity>
 	)
 }
 
-function CapabilityCategorySection({
-	category,
-	selectedLabels,
-	onToggleItem,
+export default function CapabilitiesTab({
+	isActive = true,
+	onNextTab,
 }: {
-	category: CapabilityCategory
-	selectedLabels: string[]
-	onToggleItem: (label: string) => void
+	isActive?: boolean
+	onNextTab?: () => void
 }) {
-	return (
-		<View style={styles.categorySection}>
-			<CategoryHeader category={category} />
-
-			<View style={styles.cardsList}>
-				{category.items.map((item) => (
-					<CapabilityCard
-						key={item.id}
-						item={item}
-						selected={selectedLabels.includes(item.label)}
-						onPress={() => onToggleItem(item.label)}
-					/>
-				))}
-			</View>
-		</View>
-	)
-}
-
-export default function CapabilitiesTab() {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
 	const contentWidth = isTablet ? 600 : '100%'
 
-	const [selected, setSelected] = useState<string[]>(DEFAULT_SELECTED_LABELS)
+	const [activeSpecialtyKey, setActiveSpecialtyKey] = useState<string>('nursing-care')
+	const [procedures, setProcedures] = useState<ProcedureItem[]>([])
+	const [selected, setSelected] = useState<string[]>([])
 	const [loading, setLoading] = useState(false)
 	const [saving, setSaving] = useState(false)
 
+	const specialtyMeta = useMemo(
+		() => SPECIALTY_META[activeSpecialtyKey] || SPECIALTY_META['nursing-care'],
+		[activeSpecialtyKey]
+	)
+
 	useEffect(() => {
-		const loadCapabilities = async () => {
+		let isMounted = true
+		const loadData = async () => {
 			try {
 				setLoading(true)
-				const stored = await AsyncStorage.getItem('ancillary_capabilities')
-				if (stored) {
-					const parsed = JSON.parse(stored)
-					if (Array.isArray(parsed)) {
-						setSelected(parsed)
+
+				// 1. Determine active specialty
+				const storedSpecialty = await AsyncStorage.getItem('user_specialty')
+				let resolvedSpecialty = normalizeSpecialtyKey(storedSpecialty)
+
+				// 2. Fetch live profile and capabilities
+				const profile = await fetchAncillaryProfileBackend()
+				if (profile?.specialty?.id || profile?.specialty?.label) {
+					resolvedSpecialty = normalizeSpecialtyKey(profile.specialty.id || profile.specialty.label)
+				}
+
+				if (isMounted) {
+					setActiveSpecialtyKey(resolvedSpecialty)
+				}
+
+				// 3. Fetch all services from backend API
+				const allServices = await fetchAncillaryServicesBackend()
+
+				let matchedProcedures: ProcedureItem[] = []
+
+				if (allServices && allServices.length > 0) {
+					// Filter procedures strictly by the selected specialty
+					const filtered = allServices.filter((s) => {
+						const cat = (s.categoryName || '').toLowerCase()
+						const specId = (s.specialtyId || '').toLowerCase()
+						const title = (s.title || '').toLowerCase()
+
+						if (resolvedSpecialty === 'nursing-care') {
+							return (
+								cat.includes('nurs') ||
+								specId.includes('nurs') ||
+								title.includes('wound') ||
+								title.includes('iv') ||
+								title.includes('injection') ||
+								title.includes('dressing') ||
+								title.includes('catheter') ||
+								title.includes('vitals') ||
+								title.includes('tracheostomy') ||
+								title.includes('ryle')
+							)
+						}
+						if (resolvedSpecialty === 'physiotherapy') {
+							return (
+								cat.includes('physio') ||
+								specId.includes('physio') ||
+								title.includes('physio') ||
+								title.includes('pain') ||
+								title.includes('sports') ||
+								title.includes('joint') ||
+								title.includes('mobilization') ||
+								title.includes('exercise')
+							)
+						}
+						if (resolvedSpecialty === 'rehab-care') {
+							return (
+								cat.includes('rehab') ||
+								specId.includes('rehab') ||
+								title.includes('stroke') ||
+								title.includes('cognitive') ||
+								title.includes('gait') ||
+								title.includes('occupational')
+							)
+						}
+						if (resolvedSpecialty === 'elder-day-care') {
+							return (
+								cat.includes('elder') ||
+								specId.includes('elder') ||
+								cat.includes('senior') ||
+								title.includes('elder') ||
+								title.includes('senior') ||
+								title.includes('assisted') ||
+								title.includes('safety') ||
+								title.includes('companionship')
+							)
+						}
+						return false
+					})
+
+					if (filtered.length > 0) {
+						matchedProcedures = filtered.map((s) => ({
+							id: s.id,
+							label: s.title,
+							subtitle: s.description || (s.duration ? `Duration: ${s.duration}` : undefined),
+							rate: s.price > 0 ? `₹${Math.round(s.price)}` : 'Custom Pricing',
+							price: s.price,
+							specialtyKey: resolvedSpecialty,
+						}))
+					}
+				}
+
+				// If no backend procedures matched for this specialty, use the specialty fallback procedures
+				if (matchedProcedures.length === 0) {
+					matchedProcedures = SPECIALTY_META[resolvedSpecialty]?.fallbackProcedures || SPECIALTY_META['nursing-care'].fallbackProcedures
+				}
+
+				if (isMounted) {
+					setProcedures(matchedProcedures)
+				}
+
+				// 4. Load saved capabilities (Source of truth: Backend Profile)
+				let savedList: string[] = []
+				if (profile) {
+					if (Array.isArray(profile.checked_procedures)) {
+						savedList = profile.checked_procedures
+					} else if (Array.isArray(profile.capabilities)) {
+						savedList = profile.capabilities.map((c: any) => c.public_id || c.procedure_id || c.id || c.name || c)
+					}
+				} else {
+					// Fallback to local storage only if backend profile couldn't be loaded (e.g. offline)
+					const stored = await AsyncStorage.getItem('ancillary_capabilities')
+					if (stored) {
+						try {
+							const parsed = JSON.parse(stored)
+							if (Array.isArray(parsed)) {
+								savedList = parsed
+							}
+						} catch (_) {}
+					}
+				}
+
+				if (isMounted) {
+					if (savedList.length > 0) {
+						// Filter savedList to keep only those relevant to current specialty procedures
+						const matchedIds = matchedProcedures.map((p) => p.id)
+						const matchedLabels = matchedProcedures.map((p) => p.label)
+						const filteredSaved = savedList.filter((item) => matchedIds.includes(item) || matchedLabels.includes(item))
+						setSelected(filteredSaved)
+					} else {
+						// New provider or no capabilities saved: NONE selected by default
+						setSelected([])
 					}
 				}
 			} catch (e) {
-				console.log('[CapabilitiesTab] Failed to load capabilities:', e)
+				console.log('[CapabilitiesTab] Error loading data:', e)
 			} finally {
-				setLoading(false)
+				if (isMounted) setLoading(false)
 			}
 		}
-		loadCapabilities()
-	}, [])
+
+		loadData()
+
+		return () => {
+			isMounted = false
+		}
+	}, [isActive])
 
 	const handleSave = async () => {
 		try {
 			setSaving(true)
+
+			// 1. Call Backend PUT capabilities API
+			await updateAncillaryCapabilitiesBackend(selected)
+
+			// 2. Persist in AsyncStorage
 			await AsyncStorage.setItem('ancillary_capabilities', JSON.stringify(selected))
-			Alert.alert('Saved', 'Service capabilities saved successfully')
+
+			Alert.alert('Saved', 'Clinical capabilities saved successfully.')
+
+			if (onNextTab) {
+				onNextTab()
+			}
 		} catch (e) {
 			console.log('[CapabilitiesTab] Failed to save capabilities:', e)
-			Alert.alert('Error', 'Failed to save capabilities')
+			Alert.alert('Error', 'Failed to save capabilities.')
 		} finally {
 			setSaving(false)
 		}
 	}
 
-	const toggleItem = (label: string) => {
-		setSelected((prev) =>
-			prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
-		)
+	const toggleItem = (id: string, label: string) => {
+		setSelected((prev) => {
+			const hasId = prev.includes(id)
+			const hasLabel = prev.includes(label)
+			if (hasId || hasLabel) {
+				return prev.filter((item) => item !== id && item !== label)
+			}
+			return [...prev, id]
+		})
 	}
 
 	const handleClearAll = () => {
@@ -226,24 +369,35 @@ export default function CapabilitiesTab() {
 				showsVerticalScrollIndicator={true}
 			>
 				<View style={[styles.contentShell, { width: contentWidth }]}>
-					{/* Section Header */}
+					{/* Specialty Header Card */}
 					<View style={styles.headerBlock}>
-						<AppTypography variant="h2" style={styles.mainTitle}>
-							Clinical Capabilities
-						</AppTypography>
+						<View style={styles.specialtyBadgeRow}>
+							<View style={styles.specialtyIconWrap}>
+								<MaterialCommunityIcons name={specialtyMeta.icon} size={20} color="#2B6F71" />
+							</View>
+							<AppTypography variant="h3" style={styles.specialtyTitle}>
+								{specialtyMeta.label}
+							</AppTypography>
+						</View>
 						<AppTypography variant="body" style={styles.subtitle}>
-							Select the services you are certified to provide for patient matching.
+							{specialtyMeta.subtitle}
 						</AppTypography>
 					</View>
 
-					{CAPABILITIES_CATEGORIES.map((category) => (
-						<CapabilityCategorySection
-							key={category.key}
-							category={category}
-							selectedLabels={selected}
-							onToggleItem={toggleItem}
-						/>
-					))}
+					{/* Procedures List for ONLY this specialty */}
+					<View style={styles.cardsList}>
+						{procedures.map((proc) => {
+							const isSelected = selected.includes(proc.id) || selected.includes(proc.label)
+							return (
+								<ProcedureCard
+									key={proc.id}
+									item={proc}
+									selected={isSelected}
+									onPress={() => toggleItem(proc.id, proc.label)}
+								/>
+							)
+						})}
+					</View>
 				</View>
 			</ScrollView>
 
@@ -254,7 +408,7 @@ export default function CapabilitiesTab() {
 						<View style={styles.counterBadge}>
 							<View style={styles.activeDot} />
 							<AppTypography variant="caption" style={styles.selectionCountText}>
-								{selected.length} capability{selected.length === 1 ? '' : 'ies'} selected
+								{selected.length} procedure{selected.length === 1 ? '' : 's'} selected
 							</AppTypography>
 						</View>
 						<TouchableOpacity onPress={handleClearAll} activeOpacity={0.7}>
@@ -304,36 +458,41 @@ const styles = StyleSheet.create({
 	},
 	headerBlock: {
 		marginBottom: 18,
+		backgroundColor: '#FFFFFF',
+		padding: 16,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
 	},
-	mainTitle: {
-		color: '#111827',
-		fontSize: 20,
-		fontWeight: '700',
-		marginBottom: 2,
-	},
-	subtitle: {
-		fontSize: 12,
-		color: '#4B5563',
-		lineHeight: 17,
-	},
-	categorySection: {
-		marginBottom: 22,
-	},
-	categoryHeader: {
+	specialtyBadgeRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
-		marginBottom: 10,
+		gap: 10,
+		marginBottom: 6,
 	},
-	categoryTitle: {
-		fontSize: 14,
+	specialtyIconWrap: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		backgroundColor: 'rgba(43, 111, 113, 0.1)',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	specialtyTitle: {
+		color: '#111827',
+		fontSize: 18,
 		fontWeight: '700',
-		color: '#253136',
+	},
+	subtitle: {
+		fontSize: 13,
+		color: '#4B5563',
+		lineHeight: 18,
+		marginTop: 4,
 	},
 	cardsList: {
-		gap: 10,
+		gap: 12,
 	},
-	capabilityCard: {
+	procedureCard: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#FFFFFF',
@@ -349,10 +508,10 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.03,
 		shadowRadius: 3,
 	},
-	capabilityCardSelected: {
+	procedureCardSelected: {
 		borderColor: '#2B6F71',
-		backgroundColor: '#C6D9DA',
-		shadowOpacity: 0.03,
+		backgroundColor: '#F0FDF4',
+		shadowOpacity: 0.04,
 		elevation: 1,
 	},
 	checkbox: {
@@ -386,14 +545,28 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		lineHeight: 16,
 		color: '#4B5F66',
-		marginTop: 1,
+		marginTop: 2,
 	},
 	itemSubtitleSelected: {
 		color: '#334E55',
 	},
+	priceTag: {
+		backgroundColor: '#E6F4F2',
+		paddingHorizontal: 10,
+		paddingVertical: 5,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#B2DFDB',
+	},
+	priceText: {
+		fontSize: 13,
+		fontWeight: '700',
+		color: '#00695C',
+	},
 	stickyFooterContainer: {
 		backgroundColor: '#FFFFFF',
-		borderTopWidth: 0,
+		borderTopWidth: 1,
+		borderTopColor: '#F1F5F9',
 		paddingHorizontal: 16,
 		paddingTop: 12,
 		paddingBottom: 16,
@@ -440,3 +613,4 @@ const styles = StyleSheet.create({
 		marginTop: 0,
 	},
 })
+

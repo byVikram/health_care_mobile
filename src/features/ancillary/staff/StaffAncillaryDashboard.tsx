@@ -18,6 +18,7 @@ import {
 	fetchProviderStatusBackend,
 	updateProviderStatusBackend,
 	updateProviderLocationBackend,
+	fetchAncillaryProfileBackend,
 	SoftReviewRequestData,
 	AuthorizedDetailedPatientInfo,
 } from '../ancillaryService'
@@ -43,7 +44,8 @@ export default function StaffAncillaryDashboard() {
 	const isNarrowCol = isTablet && !isWideTablet
 
 	const [bookings, setBookings] = useState<NurseBooking[]>([])
-	const [isNurseOnline, setIsNurseOnline] = useState<boolean>(true)
+	const [isNurseOnline, setIsNurseOnline] = useState<boolean>(false)
+	const [isVerified, setIsVerified] = useState<boolean>(false)
 	const [incomingRequest, setIncomingRequest] = useState<SoftReviewRequestData | null>(null)
 	const [detailedInfo, setDetailedInfo] = useState<AuthorizedDetailedPatientInfo | null>(null)
 	const [requestStep, setRequestStep] = useState<
@@ -52,23 +54,37 @@ export default function StaffAncillaryDashboard() {
 	const [acceptLoading, setAcceptLoading] = useState(false)
 	const [claimedModalVisible, setClaimedModalVisible] = useState(false)
 
-	// Fetch Initial Provider Status from DB on Mount
+	// Fetch Initial Provider Status & Verification from DB on Mount
 	useEffect(() => {
+		let isMounted = true
 		const loadStatus = async () => {
-			const status = await fetchProviderStatusBackend()
-			if (status) {
-				setIsNurseOnline(status.isOnline)
+			try {
+				const profile = await fetchAncillaryProfileBackend()
+				if (!isMounted) return
+				const verified = Boolean(profile?.is_verified || profile?.verification_status === 'approved')
+				setIsVerified(verified)
+
+				if (verified) {
+					const status = await fetchProviderStatusBackend()
+					if (status && isMounted) {
+						setIsNurseOnline(status.isOnline)
+					}
+				} else {
+					setIsNurseOnline(false)
+				}
+			} catch (e) {
+				console.log('[StaffAncillaryDashboard] Load status error:', e)
 			}
 		}
 		loadStatus()
+		return () => {
+			isMounted = false
+		}
 	}, [isFocused])
 
-	// NOTE: HTTP polling removed — order notifications are delivered exclusively
-	// via the authenticated WebSocket channel (ws/provider/dispatch).
-
-	// Periodic Real Device GPS Location Sync to Database (Every 10 seconds when Online)
+	// Periodic Real Device GPS Location Sync to Database (Every 10 seconds when Online and Verified)
 	useEffect(() => {
-		if (!isNurseOnline || !isFocused) return
+		if (!isNurseOnline || !isFocused || !isVerified) return
 
 		const sendLocationPing = async () => {
 			try {
@@ -87,11 +103,11 @@ export default function StaffAncillaryDashboard() {
 		void sendLocationPing()
 		const locationInterval = setInterval(sendLocationPing, 10000)
 		return () => clearInterval(locationInterval)
-	}, [isNurseOnline, isFocused])
+	}, [isNurseOnline, isFocused, isVerified])
 
 	// Real-Time WebSocket Channel for Instant Push Notifications (with auto-reconnect)
 	useEffect(() => {
-		if (!isNurseOnline || !isFocused) return
+		if (!isNurseOnline || !isFocused || !isVerified) return
 
 		let ws: WebSocket | null = null
 		let isMounted = true

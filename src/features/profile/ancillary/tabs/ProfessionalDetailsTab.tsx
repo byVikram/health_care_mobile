@@ -270,7 +270,15 @@ function UploadBox({
 	)
 }
 
-export default function ProfessionalDetailsTab() {
+import { updateAncillaryProfileBackend } from '../../../ancillary/ancillaryService'
+
+export default function ProfessionalDetailsTab({
+	isActive,
+	onNextTab,
+}: {
+	isActive?: boolean
+	onNextTab?: () => void
+}) {
 	const { width } = useWindowDimensions()
 
 	const isTablet = width >= 768 && width < 1024
@@ -378,6 +386,12 @@ export default function ProfessionalDetailsTab() {
 
 		try {
 			setIsSaving(true)
+			await updateAncillaryProfileBackend({
+				license_number: formData.license.trim(),
+				qualifications: formData.qualification.trim(),
+				specialty_id: formData.specialtyLabel,
+			})
+
 			await AsyncStorage.multiSet([
 				['user_specialty', formData.specialtyLabel],
 				['ancillary_license', formData.license.trim()],
@@ -578,7 +592,13 @@ export default function ProfessionalDetailsTab() {
 					title={statusModal.title}
 					description={statusModal.description}
 					submitText={statusModal.submitText}
-					onSubmit={() => setStatusModal(null)}
+					onSubmit={() => {
+						const isSuccess = statusModal.status === 'success'
+						setStatusModal(null)
+						if (isSuccess && onNextTab) {
+							onNextTab()
+						}
+					}}
 					onCancel={() => setStatusModal(null)}
 				/>
 			)}

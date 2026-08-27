@@ -21,10 +21,18 @@ type Role = {
 	label: string
 }
 
+const DEFAULT_ROLES: Role[] = [
+	{ id: 'patient', label: 'Patient' },
+	{ id: 'doctor', label: 'Doctor' },
+	{ id: 'laboratory', label: 'Laboratory' },
+	{ id: 'radiology', label: 'Radiology' },
+	{ id: 'ancillary', label: 'Ancillary' },
+]
+
 type RoleSelectionProps = AuthScreenProps<typeof ROUTES.AUTH.ROLE_SELECTION>
 
 export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) {
-	const [roles, setRoles] = useState<Role[]>([])
+	const [roles, setRoles] = useState<Role[]>(DEFAULT_ROLES)
 	const [loading, setLoading] = useState(true)
 	const { width, height } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
@@ -44,25 +52,39 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 	const fetchRoles = async () => {
 		try {
 			const res = await getRoles()
-			console.log(res)
-
-			if (res.success && Array.isArray(res.data)) {
-				setRoles(res.data)
+			if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+				const fetchedRoles = [...res.data]
+				const hasAncillary = fetchedRoles.some(
+					(r) => r.label?.toLowerCase() === 'ancillary' || r.id?.toLowerCase() === 'ancillary'
+				)
+				if (!hasAncillary) {
+					fetchedRoles.push({ id: 'ancillary', label: 'Ancillary' })
+				}
+				setRoles(fetchedRoles)
 			}
 		} catch (error) {
 			console.error('Error fetching roles:', error)
+			setRoles(DEFAULT_ROLES)
 		} finally {
 			setLoading(false)
 		}
 	}
-const handleRoleSelect = (role: Role) => {
-	console.log('Selected role:', role)
+	const handleRoleSelect = (role: Role) => {
+		console.log('Selected role:', role)
+		const isAncillary = role.label?.toLowerCase() === 'ancillary' || role.id?.toLowerCase() === 'ancillary'
 
-	navigation.navigate(ROUTES.AUTH.ONBOARDING, {
-		roleLabel: role.label,
-		roleId: role.id,
-	})
-}
+		if (isAncillary) {
+			navigation.navigate(ROUTES.AUTH.SPECIALTY_SELECTION, {
+				roleLabel: role.label,
+				roleId: role.id,
+			})
+		} else {
+			navigation.navigate(ROUTES.AUTH.ONBOARDING, {
+				roleLabel: role.label,
+				roleId: role.id,
+			})
+		}
+	}
 	const handleClose = () => {
 		navigation.navigate(ROUTES.AUTH.LOGIN)
 	}

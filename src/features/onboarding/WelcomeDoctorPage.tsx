@@ -10,10 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  TextInput, // ✅ Added for license input
-  Text, // ✅ Added for checklist text
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import ProfileIcon from "../../assets/Register/profile.svg";
@@ -21,12 +18,14 @@ import ConsultIcon from "../../assets/Register/Consult.svg";
 import FeedbackIcon from "../../assets/Register/Feedback.svg";
 import DoctorTabletImage from "../../assets/Register/Welcome.svg";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppSelect, AppSelectOption, AppTypography } from "../../components/common";
 import { useAuth } from "../../context/AuthContext";
 import { ROUTES } from "../../navigation/routes";
 import type { AppStackScreenProps } from "../../navigation/types";
 import { getSpecialities } from "../doctor/doctorService";
 import { doctorService } from "../consultation/ConsultationService";
+import { fetchAncillaryProfileBackend } from "../ancillary/ancillaryService";
 
 type Speciality = {
   id: string;
@@ -34,27 +33,118 @@ type Speciality = {
   icon_key: string;
 };
 
-const SPECIALTY_PROCEDURES = {
-  "nursing-care": [
-    { label: "Injection Administration", rate: "₹299" },
-    { label: "IV Drip Setup", rate: "₹799" },
-    { label: "Bandage Dressing", rate: "₹499" },
-    { label: "ICU Care at Home", rate: "Custom Pricing" },
-  ],
-  "physiotherapy": [
-    { label: "Manual Therapy Session", rate: "₹799" },
-    { label: "Therapeutic Exercise Guidance", rate: "₹599" },
-    { label: "Post-Op Knee Rehab", rate: "₹899" },
-  ],
-  "rehab-care": [
-    { label: "Cognitive Rehabilitation", rate: "₹699" },
-    { label: "Cardiac Rehabilitation", rate: "₹899" },
-  ],
-  "elder-day-care": [
-    { label: "Daily Activity Monitoring", rate: "₹599" },
-    { label: "Safety Assessment Check", rate: "₹499" },
-  ],
+type FeatureHighlight = {
+  Icon: React.ComponentType<{ width?: number | string; height?: number | string }>;
+  title: string;
+  description: string;
 };
+
+type WelcomeScreenConfig = {
+  title: string;
+  subtitle: string;
+  buttonLabel: string;
+  features: FeatureHighlight[];
+};
+
+const ANCILLARY_WELCOME_CONFIGS: Record<string, WelcomeScreenConfig> = {
+  "nursing-care": {
+    title: "Welcome Nurse Specialist! 🩺",
+    subtitle: "Let's help you get set up to start accepting doorstep clinical and home nursing visits.",
+    buttonLabel: "Set Up Nursing Profile",
+    features: [
+      {
+        Icon: ProfileIcon,
+        title: "Doorstep Schedule",
+        description: "Receive nearby patient care requests, locations, and visit directions.",
+      },
+      {
+        Icon: ConsultIcon,
+        title: "Patient Verification",
+        description: "Securely start visits with doorstep OTP verification and access care instructions.",
+      },
+      {
+        Icon: FeedbackIcon,
+        title: "Clinical Procedures",
+        description: "Administer prescribed IVs, dressings, injections, and log clinical vitals.",
+      },
+    ],
+  },
+  physiotherapy: {
+    title: "Welcome Physiotherapist! 🏃",
+    subtitle: "Let's help you get set up to deliver mobile physical therapy and rehabilitation at home.",
+    buttonLabel: "Set Up Physiotherapy Profile",
+    features: [
+      {
+        Icon: ProfileIcon,
+        title: "Therapy Schedule",
+        description: "Manage in-home movement sessions, patient locations, and appointment times.",
+      },
+      {
+        Icon: ConsultIcon,
+        title: "Patient Verification",
+        description: "Verify doorstep arrivals with secure OTP and review patient mobility history.",
+      },
+      {
+        Icon: FeedbackIcon,
+        title: "Therapy Regimens",
+        description: "Conduct manual therapy, post-op exercises, and record recovery progress.",
+      },
+    ],
+  },
+  "rehab-care": {
+    title: "Welcome Rehab Specialist! ♿",
+    subtitle: "Let's help you get set up to provide neurological, stroke, and functional recovery at home.",
+    buttonLabel: "Set Up Rehab Profile",
+    features: [
+      {
+        Icon: ProfileIcon,
+        title: "Rehab Schedule",
+        description: "Coordinate functional re-training visits and assisted living therapy sessions.",
+      },
+      {
+        Icon: ConsultIcon,
+        title: "Patient Verification",
+        description: "Confirm patient arrival with OTP verification and review functional goals.",
+      },
+      {
+        Icon: FeedbackIcon,
+        title: "Recovery Logs",
+        description: "Track motor recovery milestones, gait training, and cognitive exercises.",
+      },
+    ],
+  },
+  "elder-day-care": {
+    title: "Welcome Elder Care Assistant! 🤝",
+    subtitle: "Let's help you get set up to assist seniors with daily activities, safety checks, and companionship.",
+    buttonLabel: "Set Up Elder Care Profile",
+    features: [
+      {
+        Icon: ProfileIcon,
+        title: "Care Schedule",
+        description: "View daily senior assistance bookings, home addresses, and shift times.",
+      },
+      {
+        Icon: ConsultIcon,
+        title: "Patient Verification",
+        description: "Safely begin check-ins with caregiver OTP verification and emergency contacts.",
+      },
+      {
+        Icon: FeedbackIcon,
+        title: "Daily Wellness Log",
+        description: "Record vitals, mobility assistance, meals, and home safety assessments.",
+      },
+    ],
+  },
+};
+
+function normalizeSpecialtyKey(key?: string | null): string {
+  if (!key) return "nursing-care";
+  const lower = key.toLowerCase().trim();
+  if (lower.includes("physio")) return "physiotherapy";
+  if (lower.includes("rehab")) return "rehab-care";
+  if (lower.includes("elder")) return "elder-day-care";
+  return "nursing-care";
+}
 
 const MOCK_LOCATIONS: AppSelectOption[] = [
   { label: "Bangalore", value: "Bangalore" },
@@ -75,6 +165,7 @@ const pharmacistImage = require("../../assets/Banner/pharmacy.png");
 
 export default function WelcomeDoctorPage({
   navigation,
+  route,
 }: AppStackScreenProps<typeof ROUTES.STACK.DOCTOR_WELCOME>) {
   const { role } = useAuth();
   const [showAccountDetails, setShowAccountDetails] = useState(false);
@@ -85,6 +176,7 @@ export default function WelcomeDoctorPage({
   const [isSaving, setIsSaving] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [specialityError, setSpecialityError] = useState("");
+  const [ancillarySpecialty, setAncillarySpecialty] = useState<string>("nursing-care");
   const { width, height } = useWindowDimensions();
 
   const isSmallPhone = width < 380;
@@ -111,50 +203,45 @@ export default function WelcomeDoctorPage({
   const isPharmacist = role === "pharmacy";
   const isAncillary = role === "ancillary";
 
-  const [licenseNumber, setLicenseNumber] = useState("");
-  const [selectedProcedures, setSelectedProcedures] = useState<string[]>([]);
-  const [providerSpecialty, setProviderSpecialty] = useState<string>("nursing-care");
-
-  // Load specialty from AsyncStorage if available
+  // Resolve specialty for ancillary welcome screen customization
   useEffect(() => {
-    const loadSpecialty = async () => {
+    if (!isAncillary) return;
+
+    let isMounted = true;
+    const resolveSpecialty = async () => {
+      const paramSpecialty = (route?.params as any)?.specialty;
+      if (paramSpecialty) {
+        if (isMounted) setAncillarySpecialty(normalizeSpecialtyKey(paramSpecialty));
+        return;
+      }
+
+      const stored = await AsyncStorage.getItem("user_specialty");
+      if (stored && isMounted) {
+        setAncillarySpecialty(normalizeSpecialtyKey(stored));
+      }
+
       try {
-        const stored = await AsyncStorage.getItem("user_specialty");
-        if (stored) setProviderSpecialty(stored);
+        const profile = await fetchAncillaryProfileBackend();
+        if (profile?.specialty?.id || profile?.specialty?.label) {
+          const key = profile.specialty.id || profile.specialty.label;
+          if (isMounted) setAncillarySpecialty(normalizeSpecialtyKey(key));
+        }
       } catch (e) {
-        console.log(e);
+        console.log("[WelcomeDoctorPage] Error resolving specialty:", e);
       }
     };
-    if (isAncillary) loadSpecialty();
-  }, [isAncillary]);
 
-  const canContinue = isAncillary
-    ? Boolean(selectedLocation && licenseNumber && selectedProcedures.length > 0) && !isSaving
-    : Boolean(selectedLocation && selectedSpeciality) && !loadingSpecialities && !isSaving;
+    resolveSpecialty();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAncillary, route?.params]);
+
+  const canContinue = Boolean(selectedLocation && selectedSpeciality) && !loadingSpecialities && !isSaving;
 
   const welcomeConfig = isAncillary
-    ? {
-        title: "Welcome Specialist! 👋",
-        subtitle: "Let's help you get set up to start accepting home visits.",
-        buttonLabel: "Set Up Profile",
-        features: [
-          {
-            Icon: ProfileIcon,
-            title: "Schedule",
-            description: "View daily patient bookings, locations, and directions.",
-          },
-          {
-            Icon: ConsultIcon,
-            title: "Verify",
-            description: "Verify in-person visits using secure OTP verification pins.",
-          },
-          {
-            Icon: FeedbackIcon,
-            title: "Clinical Reports",
-            description: "Log procedures checklist, vital results, and treatment summaries.",
-          },
-        ],
-      }
+    ? (ANCILLARY_WELCOME_CONFIGS[normalizeSpecialtyKey(ancillarySpecialty)] || ANCILLARY_WELCOME_CONFIGS["nursing-care"])
     : isPharmacist
     ? {
         title: "Welcome Pharmacist👋",
@@ -195,17 +282,22 @@ export default function WelcomeDoctorPage({
           },
           {
             Icon: FeedbackIcon,
-            title: "Feedback",
-            description: "You can view and reply to patients' feedback here",
+            title: "Feedbacks",
+            description: "Read what hundreds of patients have to say about their experience with you",
           },
         ],
       };
-  const welcomeTitleSize = (isPharmacist || isAncillary) && isTablet ? 44 : titleSize;
+  const welcomeTitleSize = (isPharmacist || isAncillary) && isTablet ? 38 : titleSize;
   const welcomeSubtitleSize = (isPharmacist || isAncillary) && isTablet ? 18 : subtitleSize;
   const welcomeBodySize = (isPharmacist || isAncillary) && isTablet ? 17 : bodySize;
   const welcomeButtonWidth = (isPharmacist || isAncillary) && useSplitLayout ? 430 : useSplitLayout ? 360 : 420;
 
   useEffect(() => {
+    if (role !== "doctor") {
+      setLoadingSpecialities(false);
+      return;
+    }
+
     const fetchSpecialities = async () => {
       try {
         setLoadingSpecialities(true);
@@ -226,53 +318,10 @@ export default function WelcomeDoctorPage({
     };
 
     fetchSpecialities();
-  }, []);
+  }, [role]);
 
   const handleContinue = async () => {
     let hasError = false;
-
-    if (isAncillary) {
-      if (!selectedLocation) {
-        setLocationError("Please select a location");
-        hasError = true;
-      } else {
-        setLocationError("");
-      }
-
-      if (!licenseNumber) {
-        Alert.alert("Error", "Please input your professional license number");
-        hasError = true;
-      }
-
-      if (selectedProcedures.length === 0) {
-        Alert.alert("Error", "Please select at least one capability service");
-        hasError = true;
-      }
-
-      if (hasError) return;
-
-      try {
-        setIsSaving(true);
-        await AsyncStorage.setItem("ancillary_license", licenseNumber);
-        await AsyncStorage.setItem("ancillary_location", selectedLocation);
-        await AsyncStorage.setItem("ancillary_capabilities", JSON.stringify(selectedProcedures));
-
-        navigation.reset({
-          index: 0,
-          routes: [
-            {
-              name: ROUTES.MAIN.TABS,
-              params: { screen: ROUTES.PORTAL.PROFILE },
-            },
-          ],
-        });
-      } catch (error) {
-        console.error("Ancillary welcome profile save error:", error);
-      } finally {
-        setIsSaving(false);
-      }
-      return;
-    }
 
     if (!selectedLocation) {
       setLocationError("Please select a location");
@@ -317,6 +366,19 @@ export default function WelcomeDoctorPage({
   };
 
   const handleWelcomeCta = () => {
+    if (isAncillary) {
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: ROUTES.MAIN.TABS,
+            params: { screen: ROUTES.MAIN.PROFILE },
+          },
+        ],
+      });
+      return;
+    }
+
     if (isPharmacist) {
       navigation.reset({
         index: 0,
@@ -403,53 +465,7 @@ export default function WelcomeDoctorPage({
                 bottomOffset={accountDropdownBottomOffset}
               />
 
-              {isAncillary ? (
-                <View style={styles.ancillaryFields}>
-                  <TextInput
-                    style={styles.licenseInput}
-                    placeholder="Enter License Number (e.g. RN-12345)"
-                    placeholderTextColor="#6f7979"
-                    value={licenseNumber}
-                    onChangeText={setLicenseNumber}
-                  />
-
-                  <AppTypography variant="body" style={styles.checklistTitle}>
-                    Select services you can provide:
-                  </AppTypography>
-
-                  <View style={styles.checklistContainer}>
-                    {((SPECIALTY_PROCEDURES as any)[providerSpecialty] || SPECIALTY_PROCEDURES["nursing-care"]).map((item: any) => {
-                      const isChecked = selectedProcedures.includes(item.label);
-                      return (
-                        <TouchableOpacity
-                          key={item.label}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            if (isChecked) {
-                              setSelectedProcedures(selectedProcedures.filter((p) => p !== item.label));
-                            } else {
-                              setSelectedProcedures([...selectedProcedures, item.label]);
-                            }
-                          }}
-                          style={[styles.checkRow, isChecked && styles.checkRowActive]}
-                        >
-                          <MaterialCommunityIcons
-                            name={isChecked ? "checkbox-marked" : "checkbox-blank-outline"}
-                            size={22}
-                            color={isChecked ? "#2b6f71" : "#6f7979"}
-                          />
-                          <View style={styles.checkRowText}>
-                            <Text style={[styles.checkLabel, isChecked && styles.checkLabelActive]}>
-                              {item.label}
-                            </Text>
-                            <Text style={styles.checkRate}>{item.rate}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              ) : loadingSpecialities ? (
+              {loadingSpecialities ? (
                 <View style={styles.fieldLoadingWrapper}>
                   <ActivityIndicator size="small" color="#2e7d74" />
                   <AppTypography variant="caption" style={styles.fieldLoadingText}>
@@ -487,7 +503,7 @@ export default function WelcomeDoctorPage({
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
                   <AppTypography variant="body" style={styles.continueButtonText}>
-                    Continue
+                    {isAncillary ? "Confirm & Continue" : "Continue"}
                   </AppTypography>
                 )}
               </TouchableOpacity>

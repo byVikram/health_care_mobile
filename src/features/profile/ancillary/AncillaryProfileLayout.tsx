@@ -8,21 +8,19 @@ import {
 	TouchableOpacity,
 	useWindowDimensions,
 } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
 import { AppTypography } from '../../../components/common'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import CapabilitiesTab from './tabs/CapabilitiesTab'
 import AvailabilityTab from './tabs/AvailabilityTab'
-import SessionsTab from '../SessionsTab'
+import { fetchAncillaryProfileBackend } from '../../ancillary/ancillaryService'
 
 type TabDefinition = {
 	key: string
 	label: string
-	// Components may ignore this, but CapabilitiesTab uses it to know when it
-	// has lost focus (all tabs stay mounted inside the pager below) so it can
-	// discard any unsaved edits instead of letting them look saved.
-	Component: React.ComponentType<{ isActive?: boolean }>
+	Component: React.ComponentType<{ isActive?: boolean; onNextTab?: () => void }>
 }
 
 const TABS: TabDefinition[] = [
@@ -30,7 +28,6 @@ const TABS: TabDefinition[] = [
 	{ key: 'professional', label: 'Professional details', Component: ProfessionalDetailsTab },
 	{ key: 'capabilities', label: 'Capabilities', Component: CapabilitiesTab },
 	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
-	// { key: 'sessions', label: 'Sessions', Component: SessionsTab },
 ]
 
 export default function AncillaryProfileLayout() {
@@ -39,6 +36,40 @@ export default function AncillaryProfileLayout() {
 	const pagerRef = useRef<ScrollView>(null)
 	const tabScrollRef = useRef<ScrollView>(null)
 	const [activeTab, setActiveTab] = useState('personal')
+	const [isSetupCompleted, setIsSetupCompleted] = useState<boolean>(false)
+	const [unlockedTabIndex, setUnlockedTabIndex] = useState<number>(0)
+
+	// Check if the provider has already completed initial profile setup
+	useEffect(() => {
+		let isMounted = true
+		const checkCompletion = async () => {
+			try {
+				const local = await AsyncStorage.getItem('ancillary_setup_completed')
+				if (local === 'true' && isMounted) {
+					setIsSetupCompleted(true)
+					setUnlockedTabIndex(TABS.length - 1)
+					return
+				}
+
+				const profile = await fetchAncillaryProfileBackend()
+				if (profile && isMounted) {
+					const hasCaps = Array.isArray(profile.checked_procedures) && profile.checked_procedures.length > 0
+					const hasProf = Boolean(profile.license_number || profile.qualifications)
+					if (hasCaps && hasProf) {
+						setIsSetupCompleted(true)
+						setUnlockedTabIndex(TABS.length - 1)
+						await AsyncStorage.setItem('ancillary_setup_completed', 'true')
+					}
+				}
+			} catch (e) {
+				console.log('[AncillaryProfileLayout] error checking setup status:', e)
+			}
+		}
+		checkCompletion()
+		return () => {
+			isMounted = false
+		}
+	}, [])
 
 	const activeTabIndex = useMemo(() => {
 		const index = TABS.findIndex((tab) => tab.key === activeTab)
@@ -76,6 +107,22 @@ export default function AncillaryProfileLayout() {
 		[width]
 	)
 
+	const handleTabProgress = useCallback(
+		async (currentIndex: number) => {
+			const nextIndex = currentIndex + 1
+			if (nextIndex < TABS.length) {
+				setUnlockedTabIndex((prev) => Math.max(prev, nextIndex))
+				goToTab(TABS[nextIndex].key)
+			} else {
+				// Final tab (Availability) completed
+				setIsSetupCompleted(true)
+				setUnlockedTabIndex(TABS.length - 1)
+				await AsyncStorage.setItem('ancillary_setup_completed', 'true')
+			}
+		},
+		[goToTab]
+	)
+
 	return (
 		<View style={styles.container}>
 			{/* Tabs scroll selector */}
@@ -86,17 +133,27 @@ export default function AncillaryProfileLayout() {
 					showsHorizontalScrollIndicator={false}
 					contentContainerStyle={styles.tabScrollContainer}
 				>
-					{TABS.map((tab) => {
+					{TABS.map((tab, index) => {
 						const isActive = activeTab === tab.key
+						const isUnlocked = isSetupCompleted || index <= unlockedTabIndex
 						return (
 							<TouchableOpacity
 								key={tab.key}
-								style={[styles.tabButton, isActive && styles.tabButtonActive]}
-								onPress={() => goToTab(tab.key)}
+								disabled={!isUnlocked}
+								style={[
+									styles.tabButton,
+									isActive && styles.tabButtonActive,
+									!isUnlocked && styles.tabButtonDisabled,
+								]}
+								onPress={() => isUnlocked && goToTab(tab.key)}
 							>
 								<AppTypography
 									variant="subtitle"
-									style={[styles.tabLabel, isActive && styles.tabLabelActive]}
+									style={[
+										styles.tabLabel,
+										isActive && styles.tabLabelActive,
+										!isUnlocked && styles.tabLabelDisabled,
+									]}
 								>
 									{tab.label}
 								</AppTypography>
@@ -113,6 +170,7 @@ export default function AncillaryProfileLayout() {
 					style={styles.pager}
 					horizontal
 					pagingEnabled
+					scrollEnabled={isSetupCompleted}
 					bounces={false}
 					alwaysBounceHorizontal={false}
 					overScrollMode="never"
@@ -122,11 +180,14 @@ export default function AncillaryProfileLayout() {
 					onMomentumScrollEnd={handlePagerMomentumEnd}
 					keyboardShouldPersistTaps="handled"
 				>
-					{TABS.map((tab) => {
+					{TABS.map((tab, index) => {
 						const TabComponent = tab.Component
 						return (
 							<View key={tab.key} style={[styles.pagerPage, { width }]}>
-								<TabComponent isActive={activeTab === tab.key} />
+								<TabComponent
+									isActive={activeTab === tab.key}
+									onNextTab={() => handleTabProgress(index)}
+								/>
 							</View>
 						)
 					})}
@@ -161,6 +222,9 @@ const styles = StyleSheet.create({
 	tabButtonActive: {
 		borderBottomColor: '#0c7c7c',
 	},
+	tabButtonDisabled: {
+		opacity: 0.35,
+	},
 	tabLabel: {
 		color: '#62707a',
 		fontWeight: '500',
@@ -169,6 +233,9 @@ const styles = StyleSheet.create({
 	tabLabelActive: {
 		color: '#0c7c7c',
 		fontWeight: 'bold',
+	},
+	tabLabelDisabled: {
+		color: '#a0aab0',
 	},
 	contentContainer: {
 		flex: 1,

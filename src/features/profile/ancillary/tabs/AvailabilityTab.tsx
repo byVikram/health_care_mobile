@@ -42,7 +42,13 @@ const DEFAULT_DATA: NurseAvailabilityData = {
 }
 
 
-export default function AvailabilityTab({ isActive = true }: { isActive?: boolean }) {
+export default function AvailabilityTab({
+	isActive = true,
+	onNextTab,
+}: {
+	isActive?: boolean
+	onNextTab?: () => void
+}) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768 && width < 1024
 	const isMobile = width < 768
@@ -178,6 +184,9 @@ export default function AvailabilityTab({ isActive = true }: { isActive?: boolea
 			await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
 			savedDataRef.current = payload
 			Alert.alert('Saved', 'Availability saved successfully')
+			if (onNextTab) {
+				onNextTab()
+			}
 		} catch (e) {
 			console.log('[Nurse AvailabilityTab] failed to save availability:', e)
 			Alert.alert('Error', 'Failed to save availability')

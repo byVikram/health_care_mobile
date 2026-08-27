@@ -10,9 +10,9 @@ import {
 	TextStyle,
 	useWindowDimensions,
 	View,
-	TouchableOpacity, // ✅ Added
 } from 'react-native'
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons' // ✅ Added MaterialCommunityIcons
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { Ionicons } from '@expo/vector-icons'
 import type { RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -38,20 +38,23 @@ type Slide = {
 	}>
 }
 
+type SpecialtyKey = 'nursing-care' | 'physiotherapy' | 'rehab-care' | 'elder-day-care'
+
 export default function OnboardingPage({ navigation, route }: OnboardingPageProps) {
 	const { accessToken } = useAuth()
-	const { width } = useWindowDimensions()
+	const { width, height } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
 	const isTablet = width >= 768
-	const backButtonOffset = insets.top + 22
+	const isLandscape = width > height
+	const backButtonOffset = insets.top + (isTablet ? 44 : isLandscape ? 24 : 22)
 
 	const flatListRef = useRef<FlatList<Slide>>(null)
 	const [activeIndex, setActiveIndex] = useState(0)
 
-	const { roleId, roleLabel } = route.params || {}
+	const { roleId, roleLabel, specialty } = route.params || {}
 
-const resolvedRoleId = roleId?.toLowerCase() ?? ''
-const resolvedRoleLabel = roleLabel ?? ''
+	const resolvedRoleId = roleId?.toLowerCase() ?? ''
+	const resolvedRoleLabel = roleLabel ?? ''
 
 	// 🚨 Redirect if no role
 	useEffect(() => {
@@ -60,28 +63,47 @@ const resolvedRoleLabel = roleLabel ?? ''
 		}
 	}, [accessToken, roleId, navigation])
 
-	const isAncillary = resolvedRoleLabel.toLowerCase() === 'ancillary' || resolvedRoleId === 'ancillary'
-	const [selectedSpecialty, setSelectedSpecialty] = useState<'nursing-care' | 'physiotherapy' | 'rehab-care' | 'elder-day-care'>('nursing-care')
+	const isAncillary =
+		resolvedRoleLabel.toLowerCase() === 'ancillary' || resolvedRoleId === 'ancillary'
 
-	// ✅ Dynamic slides based on role
+	const [activeSpecialty, setActiveSpecialty] = useState<SpecialtyKey>(
+		(specialty as SpecialtyKey) || 'nursing-care'
+	)
+
+	// Load persisted specialty if previously stored
+	useEffect(() => {
+		if (isAncillary) {
+			if (specialty) {
+				setActiveSpecialty(specialty as SpecialtyKey)
+			} else {
+				AsyncStorage.getItem('user_specialty').then((stored) => {
+					if (
+						stored &&
+						(stored === 'nursing-care' ||
+							stored === 'physiotherapy' ||
+							stored === 'rehab-care' ||
+							stored === 'elder-day-care')
+					) {
+						setActiveSpecialty(stored as SpecialtyKey)
+					}
+				})
+			}
+		}
+	}, [isAncillary, specialty])
+
+	// ==========================================
+	// SLIDES CONSTRUCTION
+	// ==========================================
 	const slides: Slide[] = useMemo(() => {
 		if (!resolvedRoleId) return []
 
 		if (isAncillary) {
-			const firstSlide: Slide = {
-				key: 'specialty-selector',
-				description: 'Select your clinical discipline to continue',
-				Illustration: () => null,
-			}
-
-			const specialtyData = onboardingData[selectedSpecialty] || onboardingData['nursing-care']
-			const specialtySlides = specialtyData.screens.map((screen, index) => ({
-				key: `${selectedSpecialty}-${index}`,
+			const specialtyScreens = onboardingData[activeSpecialty]?.screens || []
+			return specialtyScreens.map((screen, index) => ({
+				key: `ancillary-${activeSpecialty}-${index}`,
 				description: screen.description,
 				Illustration: screen.Illustration,
 			}))
-
-			return [firstSlide, ...specialtySlides]
 		}
 
 		const roleKey = resolvedRoleId as UserRole
@@ -94,139 +116,86 @@ const resolvedRoleLabel = roleLabel ?? ''
 			description: screen.description,
 			Illustration: screen.Illustration,
 		}))
-	}, [resolvedRoleId, isAncillary, selectedSpecialty])
+	}, [resolvedRoleId, isAncillary, activeSpecialty])
 
 	// 🚨 Prevent crash if no slides
 	if (!slides.length) return null
 
-	const cardWidth = useMemo(() => Math.max(width, 320), [width])
+	const cardWidth = Math.max(width, 320)
+	const illustrationSize = Math.min(cardWidth * 0.62, 250)
 
-	const illustrationSize = useMemo(() => Math.min(cardWidth * 0.62, 250), [cardWidth])
+	const finishOnboarding = useCallback(async () => {
+		if (isAncillary) {
+			try {
+				await AsyncStorage.setItem('user_specialty', activeSpecialty)
+			} catch (e) {
+				console.log('[OnboardingPage] Failed to save specialty:', e)
+			}
+		}
 
-	const finishOnboarding = useCallback(() => {
 		if (accessToken) {
 			navigation.replace(ROUTES.MAIN.TABS)
 		} else {
 			navigation.replace(ROUTES.AUTH.REGISTER, {
 				roleId: resolvedRoleId,
 				roleLabel: resolvedRoleLabel,
-				specialty: isAncillary ? selectedSpecialty : undefined,
+				...(isAncillary ? { specialty: activeSpecialty } : {}),
 			})
 		}
-	}, [accessToken, navigation, resolvedRoleId, resolvedRoleLabel, isAncillary, selectedSpecialty])
+	}, [accessToken, navigation, resolvedRoleId, resolvedRoleLabel, isAncillary, activeSpecialty])
 
-	const scrollToIndex = useCallback((index: number) => {
+	const scrollToIndex = (index: number) => {
 		flatListRef.current?.scrollToIndex({
 			index,
 			animated: true,
 		})
 		setActiveIndex(index)
-	}, [])
+	}
 
-	const handleNext = useCallback(() => {
+	const handleNext = () => {
 		if (activeIndex === slides.length - 1) {
 			finishOnboarding()
 			return
 		}
 
 		scrollToIndex(activeIndex + 1)
-	}, [activeIndex, slides.length, finishOnboarding, scrollToIndex])
+	}
 
-	const handleSkip = useCallback(() => {
-		if (activeIndex === slides.length - 1) {
-			finishOnboarding()
-			return
-		}
-
-		scrollToIndex(slides.length - 1)
-	}, [activeIndex, slides.length, finishOnboarding, scrollToIndex])
+	const handleSkip = () => {
+		finishOnboarding()
+	}
 
 	const handleBack = useCallback(() => {
-		if (navigation.canGoBack()) {
+		if (activeIndex > 0) {
+			scrollToIndex(activeIndex - 1)
+		} else if (navigation.canGoBack()) {
 			navigation.goBack()
 		} else {
 			navigation.replace(ROUTES.AUTH.ROLE_SELECTION)
 		}
-	}, [navigation])
+	}, [activeIndex, navigation])
 
-	const handleMomentumScrollEnd = useCallback(
-		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth)
+	const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+		const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth)
 
-			if (nextIndex !== activeIndex) {
-				setActiveIndex(nextIndex)
-			}
-		},
-		[activeIndex, cardWidth]
-	)
+		if (nextIndex !== activeIndex) {
+			setActiveIndex(nextIndex)
+		}
+	}
 
-	const renderSpecialtySelector = () => {
-		const options = [
-			{ key: 'nursing-care', label: 'Nursing Care', sub: 'Home injections, IV drip setups, vitals logging', icon: 'medical-bag' },
-			{ key: 'physiotherapy', label: 'Physiotherapy', sub: 'Joint mobilization, sports injury & stroke rehab', icon: 'run' },
-			{ key: 'rehab-care', label: 'Rehabilitation', sub: 'Post-op recovery support & cognitive therapies', icon: 'wheelchair-accessibility' },
-			{ key: 'elder-day-care', label: 'Elder Day Care', sub: 'Daily activities logs, meals, safety checks', icon: 'human-cane' },
-		] as const
+	const renderItem = ({ item }: { item: Slide }) => {
+		const { Illustration } = item
 
 		return (
-			<View style={[styles.slide, { width: cardWidth, justifyContent: 'flex-start', paddingTop: 64 }]}>
-				<Text style={styles.selectorTitle}>Choose Specialty</Text>
-				<Text style={styles.selectorSub}>Select your clinical discipline to continue</Text>
-
-				<View style={styles.selectorGrid}>
-					{options.map((opt) => {
-						const isSelected = selectedSpecialty === opt.key
-						return (
-							<TouchableOpacity
-								key={opt.key}
-								activeOpacity={0.8}
-								onPress={() => setSelectedSpecialty(opt.key)}
-								style={[styles.selectorCard, isSelected && styles.selectorCardSelected]}
-							>
-								<View style={[styles.selectorIconBox, isSelected && styles.selectorIconBoxSelected]}>
-									<MaterialCommunityIcons
-										name={opt.icon as any}
-										size={24}
-										color={isSelected ? '#ffffff' : '#1f5d65'}
-									/>
-								</View>
-								<View style={styles.selectorTextCol}>
-									<Text style={[styles.selectorCardLabel, isSelected && styles.selectorLabelSelected]}>
-										{opt.label}
-									</Text>
-									<Text style={styles.selectorCardSub}>{opt.sub}</Text>
-								</View>
-								{isSelected && (
-									<Ionicons name="checkmark-circle" size={20} color="#ffffff" style={styles.checkIcon} />
-								)}
-							</TouchableOpacity>
-						)
-					})}
+			<View style={[styles.slide, { width: cardWidth }]}>
+				<View style={styles.illustrationArea}>
+					<Illustration width={illustrationSize} height={illustrationSize} />
 				</View>
+
+				<TextLabel text={item.description} style={styles.description} />
 			</View>
 		)
 	}
-
-	const renderItem = useCallback(
-		({ item }: { item: Slide }) => {
-			if (item.key === 'specialty-selector') {
-				return renderSpecialtySelector()
-			}
-
-			const { Illustration } = item
-
-			return (
-				<View style={[styles.slide, { width: cardWidth }]}>
-					<View style={styles.illustrationArea}>
-						<Illustration width={illustrationSize} height={illustrationSize} />
-					</View>
-
-					<TextLabel text={item.description} style={styles.description} />
-				</View>
-			)
-		},
-		[cardWidth, illustrationSize, roleLabel, selectedSpecialty]
-	)
 
 	return (
 		<SafeAreaView style={styles.safeArea}>
@@ -366,12 +335,6 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		marginBottom: 20,
 	},
-	roleBadge: {
-		textAlign: 'center',
-		color: '#fff',
-		fontSize: 15,
-		fontWeight: '600',
-	},
 	footer: {
 		paddingHorizontal: 20,
 		paddingBottom: 28,
@@ -404,67 +367,5 @@ const styles = StyleSheet.create({
 		color: '#1f5d65',
 		fontSize: 18,
 		fontWeight: '500',
-	},
-	selectorTitle: {
-		fontSize: 24,
-		fontWeight: '800',
-		color: '#ffffff',
-		textAlign: 'center',
-		marginBottom: 6,
-	},
-	selectorSub: {
-		fontSize: 14,
-		color: '#d7e7e8',
-		textAlign: 'center',
-		marginBottom: 24,
-	},
-	selectorGrid: {
-		gap: 12,
-		width: '100%',
-	},
-	selectorCard: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: 'rgba(255, 255, 255, 0.08)',
-		borderWidth: 1.5,
-		borderColor: 'rgba(255, 255, 255, 0.15)',
-		borderRadius: 12,
-		padding: 14,
-		gap: 14,
-	},
-	selectorCardSelected: {
-		backgroundColor: '#ffffff',
-		borderColor: '#ffffff',
-	},
-	selectorIconBox: {
-		width: 44,
-		height: 44,
-		borderRadius: 8,
-		backgroundColor: 'rgba(255, 255, 255, 0.15)',
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	selectorIconBoxSelected: {
-		backgroundColor: 'rgba(31, 93, 101, 0.1)',
-	},
-	selectorTextCol: {
-		flex: 1,
-	},
-	selectorCardLabel: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#ffffff',
-		marginBottom: 2,
-	},
-	selectorLabelSelected: {
-		color: '#1f5d65',
-	},
-	selectorCardSub: {
-		fontSize: 11,
-		color: '#b0d1d4',
-	},
-	checkIcon: {
-		marginLeft: 'auto',
-		color: '#1f5d65',
 	},
 })

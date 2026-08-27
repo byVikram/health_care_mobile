@@ -1068,4 +1068,74 @@ export const updateProviderStatusBackend = async (isOnline: boolean, latitude?: 
 		console.log('[ancillaryService] Updated provider status:', isOnline)
 		return true
 	}
+}
+
+export interface AncillaryServiceItem {
+	id: string
+	title: string
+	description?: string
+	price: number
+	duration?: string
+	categoryName?: string
+	specialtyId?: string
+	isInstantEligible?: boolean
+}
+
+export const fetchAncillaryServicesBackend = async (): Promise<AncillaryServiceItem[]> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.SERVICES)
+		const list = res.data?.data || res.data || []
+		if (Array.isArray(list)) {
+			return list.map((item: any) => ({
+				id: item.id || item.public_id,
+				title: item.title || item.label || '',
+				description: item.description || '',
+				price: typeof item.price === 'number' ? item.price : Number(item.default_price || 0),
+				duration: item.duration || item.estimated_duration || '30 mins',
+				categoryName: item.categoryName || '',
+				specialtyId: item.specialtyId || item.specialty_id || '',
+				isInstantEligible: !!item.isInstantEligible,
+			}))
+		}
+		return []
+	} catch (error) {
+		console.log('[ancillaryService] Error fetching ancillary services:', error)
+		return []
+	}
+}
+
+export const updateAncillaryProfileBackend = async (data: {
+	license_number?: string
+	qualifications?: string
+	specialty_id?: string
+}): Promise<boolean> => {
+	try {
+		await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, data)
+		return true
+	} catch (error) {
+		console.log('[ancillaryService] Error updating ancillary profile:', error)
+		return false
+	}
+}
+
+export const updateAncillaryCapabilitiesBackend = async (procedureIds: string[]): Promise<boolean> => {
+	try {
+		await ApiService.put(API_ENDPOINTS.ANCILLARY.CAPABILITIES, {
+			procedure_ids: procedureIds,
+		})
+		return true
+	} catch (error) {
+		console.log('[ancillaryService] Error updating ancillary capabilities:', error)
+		return false
+	}
+}
+
+export const fetchAncillaryProfileBackend = async (): Promise<any | null> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROFILE)
+		return res.data?.data || res.data || null
+	} catch (error) {
+		console.log('[ancillaryService] Error fetching ancillary profile:', error)
+		return null
+	}
 }
