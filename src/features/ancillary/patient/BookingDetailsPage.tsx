@@ -390,7 +390,43 @@ export default function BookingDetailsPage() {
 					<BookingProgressStepper currentStep={2} />
 				</View>
 
-				{/* 1. SECTION: SELECTED PROCEDURES */}
+				{/* 1. SECTION: PATIENT RECIPIENT PROFILE */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Patient Recipient
+						</AppTypography>
+						<TouchableOpacity style={styles.actionBtn} onPress={() => setSwitchProfileVisible(true)} activeOpacity={0.7}>
+							<AppTypography variant="caption" style={styles.actionBtnText}>
+								Switch Profile
+							</AppTypography>
+						</TouchableOpacity>
+					</View>
+
+					<View style={styles.patientProfileBox}>
+						<Image source={{ uri: patient.avatar }} style={styles.patientAvatar} resizeMode="cover" />
+						<View style={styles.patientInfoCol}>
+							<View style={styles.patientNameRow}>
+								<AppTypography variant="h3" style={styles.patientName}>
+									{patient.name}
+								</AppTypography>
+								<View style={styles.relationChip}>
+									<AppTypography variant="caption" style={styles.relationText}>
+										{patient.relationship}
+									</AppTypography>
+								</View>
+							</View>
+							<AppTypography variant="caption" style={styles.patientMetaText}>
+								{patient.age} Yrs  •  {patient.gender}  •  Blood Group: {patient.bloodGroup}
+							</AppTypography>
+						</View>
+					</View>
+				</View>
+
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
+
+				{/* 2. SECTION: SELECTED PROCEDURES */}
 				<View style={styles.sectionBlock}>
 					<View style={styles.sectionHeaderRow}>
 						<AppTypography variant="h3" style={styles.sectionHeading}>
@@ -444,42 +480,6 @@ export default function BookingDetailsPage() {
 							</AppTypography>
 						</View>
 					)}
-				</View>
-
-				{/* 8px GREY SECTION DIVIDER BAR */}
-				<View style={styles.sectionDividerBar} />
-
-				{/* 2. SECTION: PATIENT RECIPIENT PROFILE */}
-				<View style={styles.sectionBlock}>
-					<View style={styles.sectionHeaderRow}>
-						<AppTypography variant="h3" style={styles.sectionHeading}>
-							Patient Recipient
-						</AppTypography>
-						<TouchableOpacity style={styles.actionBtn} onPress={() => setSwitchProfileVisible(true)} activeOpacity={0.7}>
-							<AppTypography variant="caption" style={styles.actionBtnText}>
-								Switch Profile
-							</AppTypography>
-						</TouchableOpacity>
-					</View>
-
-					<View style={styles.patientProfileBox}>
-						<Image source={{ uri: patient.avatar }} style={styles.patientAvatar} resizeMode="cover" />
-						<View style={styles.patientInfoCol}>
-							<View style={styles.patientNameRow}>
-								<AppTypography variant="h3" style={styles.patientName}>
-									{patient.name}
-								</AppTypography>
-								<View style={styles.relationChip}>
-									<AppTypography variant="caption" style={styles.relationText}>
-										{patient.relationship}
-									</AppTypography>
-								</View>
-							</View>
-							<AppTypography variant="caption" style={styles.patientMetaText}>
-								{patient.age} Yrs  •  {patient.gender}  •  Blood Group: {patient.bloodGroup}
-							</AppTypography>
-						</View>
-					</View>
 				</View>
 
 				{/* 8px GREY SECTION DIVIDER BAR */}

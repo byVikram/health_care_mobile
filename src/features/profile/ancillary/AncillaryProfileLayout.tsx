@@ -14,7 +14,6 @@ import { AppTypography } from '../../../components/common'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import CapabilitiesTab from './tabs/CapabilitiesTab'
-import AvailabilityTab from './tabs/AvailabilityTab'
 import { fetchAncillaryProfileBackend } from '../../ancillary/ancillaryService'
 
 type TabDefinition = {
@@ -24,10 +23,10 @@ type TabDefinition = {
 }
 
 const TABS: TabDefinition[] = [
-	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
-	{ key: 'professional', label: 'Professional details', Component: ProfessionalDetailsTab },
-	{ key: 'capabilities', label: 'Capabilities', Component: CapabilitiesTab },
-	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
+	{ key: 'personal', label: 'Personal Details', Component: PersonalDetailsTab },
+	{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
+	{ key: 'categories', label: 'Capabilities', Component: CapabilitiesTab },
+	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
 ]
 
 export default function AncillaryProfileLayout() {

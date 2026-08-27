@@ -125,6 +125,58 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				setIsSidebarOpen(false)
 				navigation.navigate(ROUTES.STACK.APPOINTMENTS)
 			}
+		// Nurse/Ancillary drawer prioritizes the actions a nurse needs day-to-day
+	// (bookings, earnings) over general account items --
+		// Profile lives in the header above and Log out below, so neither repeats here.
+		if ((role as any) === 'nurse' || (role as any) === 'ancillary') {
+			return [
+				{
+				id: 'bookings',
+				label: 'Bookings',
+					icon: <AppointmentsIcon width={24} height={24} />,
+					onPress: () => {
+						setIsSidebarOpen(false)
+						navigation.navigate(ROUTES.MAIN.TABS, {
+							screen: ROUTES.MAIN.PORTAL,
+						})
+					},
+				},
+				{
+					id: 'earnings-payments',
+					label: 'Earnings & Payments',
+					icon: <PaymentsIcon width={20} height={20} />,
+					onPress: () => {
+						setIsSidebarOpen(false)
+						navigation.navigate(ROUTES.STACK.NURSE_EARNINGS as any)
+					},
+				},
+				{
+					id: 'notifications',
+					label: 'Notifications',
+					icon: <MaterialCommunityIcons name="bell-outline" size={20} color="#1f5f68" />,
+					onPress: () => {
+						setIsSidebarOpen(false)
+						navigation.navigate(ROUTES.STACK.NOTIFICATION)
+					},
+				},
+				{
+					id: 'help',
+					label: 'Help Center',
+					icon: <HelpCenterIcon width={20} height={20} />,
+					onPress: () =>
+						navigation.navigate(ROUTES.MAIN.TABS, {
+							screen: ROUTES.MAIN.PROFILE,
+						}),
+				},
+				{
+					id: 'settings',
+					label: 'Settings',
+					icon: <SettingsIcon width={20} height={20} />,
+					onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
+				},
+			]
+		}
+
 
 			const roleItems: AppSidebarItem[] =
 				role === 'doctor'
@@ -148,27 +200,6 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 								onPress: () => {
 									setIsSidebarOpen(false)
 									navigation.navigate(ROUTES.STACK.DOCTOR_EVENTS as any)
-								},
-							},
-						]
-					: (role as any) === 'nurse' || (role as any) === 'ancillary'
-					? [
-							{
-								id: 'medicine-orders',
-								label: 'Medicine Orders',
-								icon: <MaterialCommunityIcons name="pill" size={20} color="#1f5f68" />,
-								onPress: () => {
-									setIsSidebarOpen(false)
-									navigation.navigate(ROUTES.STACK.ORDER_LIST as any)
-								},
-							},
-							{
-								id: 'book-cab',
-								label: 'Book a Cab',
-								icon: <MaterialCommunityIcons name="car" size={20} color="#1f5f68" />,
-								onPress: () => {
-									setIsSidebarOpen(false)
-									navigation.navigate(ROUTES.STACK.TRANSPORTATION_LANDING as any)
 								},
 							},
 						]

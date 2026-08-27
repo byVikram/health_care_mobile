@@ -1070,72 +1070,42 @@ export const updateProviderStatusBackend = async (isOnline: boolean, latitude?: 
 	}
 }
 
-export interface AncillaryServiceItem {
-	id: string
-	title: string
-	description?: string
-	price: number
-	duration?: string
-	categoryName?: string
-	specialtyId?: string
-	isInstantEligible?: boolean
-}
-
-export const fetchAncillaryServicesBackend = async (): Promise<AncillaryServiceItem[]> => {
-	try {
-		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.SERVICES)
-		const list = res.data?.data || res.data || []
-		if (Array.isArray(list)) {
-			return list.map((item: any) => ({
-				id: item.id || item.public_id,
-				title: item.title || item.label || '',
-				description: item.description || '',
-				price: typeof item.price === 'number' ? item.price : Number(item.default_price || 0),
-				duration: item.duration || item.estimated_duration || '30 mins',
-				categoryName: item.categoryName || '',
-				specialtyId: item.specialtyId || item.specialty_id || '',
-				isInstantEligible: !!item.isInstantEligible,
-			}))
-		}
-		return []
-	} catch (error) {
-		console.log('[ancillaryService] Error fetching ancillary services:', error)
-		return []
-	}
-}
-
-export const updateAncillaryProfileBackend = async (data: {
-	license_number?: string
+export interface AncillaryProfileBackendResponse {
+	public_id: string
+	license_number: string
 	qualifications?: string
-	specialty_id?: string
-}): Promise<boolean> => {
-	try {
-		await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, data)
-		return true
-	} catch (error) {
-		console.log('[ancillaryService] Error updating ancillary profile:', error)
-		return false
+	specialty?: {
+		id?: string
+		label: string
+		description?: string
 	}
+	checked_procedures?: string[]
+	geofence_radius?: number
+	geofence_radius_km?: number
 }
 
-export const updateAncillaryCapabilitiesBackend = async (procedureIds: string[]): Promise<boolean> => {
-	try {
-		await ApiService.put(API_ENDPOINTS.ANCILLARY.CAPABILITIES, {
-			procedure_ids: procedureIds,
-		})
-		return true
-	} catch (error) {
-		console.log('[ancillaryService] Error updating ancillary capabilities:', error)
-		return false
-	}
-}
-
-export const fetchAncillaryProfileBackend = async (): Promise<any | null> => {
+export const fetchProviderProfileBackend = async (): Promise<AncillaryProfileBackendResponse | null> => {
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROFILE)
-		return res.data?.data || res.data || null
+		const data = res.data?.data || res.data
+		return data || null
 	} catch (error) {
-		console.log('[ancillaryService] Error fetching ancillary profile:', error)
+		console.log('[ancillaryService] fetchProviderProfileBackend error:', error)
 		return null
 	}
-}
+}
+
+export const updateProviderProfileBackend = async (payload: {
+	license_number?: string
+	qualifications?: string
+	geofence_radius?: number
+	geofence_radius_km?: number
+}): Promise<boolean> => {
+	try {
+		await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, payload)
+		return true
+	} catch (error) {
+		console.log('[ancillaryService] updateProviderProfileBackend error:', error)
+		return false
+	}
+}
