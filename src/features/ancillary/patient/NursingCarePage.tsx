@@ -1,82 +1,61 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
-	View,
+	BackHandler,
+	Image,
+	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
-	ScrollView,
-	Platform,
+	View,
 	useWindowDimensions,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from '../../../navigation/routes'
-import { AppTypography } from '../../../components/common/AppTypography'
-import { AppButton } from '../../../components/common/AppButton'
+import { AppTypography, AppInput } from '../../../components/common'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
 
-import { PopularService, PopularServiceCard } from '../components/PopularServiceCard'
-import { RecommendationItem, RecommendationCard } from '../components/RecommendationCard'
 import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCard'
 import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
-import ApiService from '../../../services/apiService'
-import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 interface CategoryGroup {
+	id: string
 	categoryName: string
 	procedures: ServiceProcedureItem[]
 }
 
-const POPULAR_SERVICES: PopularService[] = [
+const CATEGORY_CARDS = [
 	{
-		id: '1',
-		title: 'Injection at Home',
-		description: 'Safe IV/IM injection administration by certified nurses',
-		price: '₹299',
-		image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
+		id: 'all',
+		label: 'All Services',
+		sublabel: '8 Available',
+		image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=300&q=80',
 	},
 	{
-		id: '2',
-		title: 'Wound Dressing',
-		description: 'Sterile surgical & chronic wound care dressing',
-		price: '₹499',
-		image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=80',
+		id: 'gen',
+		label: 'General Care',
+		sublabel: '4 Available',
+		image: 'https://images.unsplash.com/photo-1631815588090-d4bfec5b1cdb?auto=format&fit=crop&w=300&q=80',
 	},
 	{
-		id: '3',
-		title: 'IV Therapy',
-		description: 'Hydration & medication IV drip administration',
-		price: '₹799',
-		image: 'https://images.unsplash.com/photo-1631815588090-d4bfec5b1cdb?auto=format&fit=crop&w=500&q=80',
+		id: 'wound',
+		label: 'Wound Care',
+		sublabel: '2 Available',
+		image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=300&q=80',
 	},
 	{
-		id: '4',
-		title: 'Elder Care Visit',
-		description: 'Comprehensive health monitoring & vitals check',
-		price: '₹999',
-		image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=500&q=80',
-	},
-]
-
-const RECOMMENDED_SERVICES: RecommendationItem[] = [
-	{
-		id: 'rec1',
-		title: 'Post-Surgical Care',
-		description: '24/7 recovery monitoring & medication management',
-		iconName: 'heart-pulse',
-	},
-	{
-		id: 'rec2',
-		title: 'Catheterization Care',
-		description: 'Hygienic insertion, maintenance & bag removal',
-		iconName: 'medical-bag',
+		id: 'spec',
+		label: 'Specialized Care',
+		sublabel: '2 Available',
+		image: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=300&q=80',
 	},
 ]
 
 const ALL_NURSING_CATEGORIES: CategoryGroup[] = [
 	{
-		categoryName: 'General Nursing Procedures (Medical Procedures)',
+		id: 'gen',
+		categoryName: 'General Nursing Procedures',
 		procedures: [
 			{
 				id: 'gen1',
@@ -89,7 +68,7 @@ const ALL_NURSING_CATEGORIES: CategoryGroup[] = [
 			},
 			{
 				id: 'gen2',
-				title: 'IV Fluids & Medication Drip',
+				title: 'IV Fluids & Saline Drip',
 				description: 'Intravenous fluid infusion & saline drip under doctor prescription',
 				duration: '45 - 60 mins',
 				price: '₹799',
@@ -98,50 +77,70 @@ const ALL_NURSING_CATEGORIES: CategoryGroup[] = [
 			},
 			{
 				id: 'gen3',
-				title: 'Vitals & Sugar Check',
-				description: 'Blood pressure, pulse ox, blood glucose & temperature recording',
+				title: 'Vitals & Blood Sugar Check',
+				description: 'Blood pressure, pulse, glucose & temperature check at home',
 				duration: '20 mins',
 				price: '₹199',
 				image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
 			},
+			{
+				id: 'gen4',
+				title: 'Injection Administration (IM/IV)',
+				description: 'Safe injection administration by certified nursing specialists',
+				duration: '15 - 30 mins',
+				price: '₹299',
+				image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
+				verified: true,
+			},
 		],
 	},
 	{
+		id: 'wound',
 		categoryName: 'Wound & Recovery Care',
 		procedures: [
 			{
 				id: 'wound1',
-				title: 'Post-Surgical Surgical Dressing',
+				title: 'Post-Surgical Dressing',
 				description: 'Advanced wound debridement & sterile bandage change',
 				duration: '40 mins',
 				price: '₹599',
 				image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
 				verified: true,
 			},
+			{
+				id: 'wound2',
+				title: 'Suture & Staple Removal',
+				description: 'Safe removal of surgical sutures or staples by trained nurses',
+				duration: '30 mins',
+				price: '₹449',
+				image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=80',
+				verified: true,
+			},
 		],
 	},
 	{
-		categoryName: 'Specialized Nursing Care (Special Care)',
+		id: 'spec',
+		categoryName: 'Specialized High Dependency Care',
 		procedures: [
 			{
 				id: 'spec1',
-				title: 'Tracheostomy Care',
+				title: 'Tracheostomy Care & Hygiene',
 				description: 'Suctioning, tube cleaning, and airway hygiene maintenance',
 				duration: '60 mins',
 				price: 'Custom Pricing',
 				image: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=500&q=80',
 				premiumBadgeText: 'PREMIUM',
-				actionLabel: 'Select',
+				actionLabel: 'Enquire',
 			},
 			{
 				id: 'spec2',
-				title: 'Ryle’s Tube Feeding & Care',
+				title: 'Ryle’s Tube Insertion & Care',
 				description: 'Nasogastric tube insertion, feeding assistance & monitoring',
 				duration: '45 mins',
 				price: 'Custom Pricing',
 				image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
 				verified: true,
-				actionLabel: 'Select',
+				actionLabel: 'Enquire',
 			},
 		],
 	},
@@ -152,307 +151,261 @@ export default function NursingCarePage() {
 	const insets = useSafeAreaInsets()
 	const { width } = useWindowDimensions()
 
-	// Cart State mapping serviceId -> { item, quantity }
-	const [cartItems, setCartItems] = useState<
-		Record<string, { item: ServiceProcedureItem; quantity: number }>
-	>({})
+	const [searchQuery, setSearchQuery] = useState('')
+	const [activeCategory, setActiveCategory] = useState('all')
+	const [selectedServicesMap, setSelectedServicesMap] = useState<Record<string, { item: ServiceProcedureItem; qty: number }>>({})
+	const [detailSheetItem, setDetailSheetItem] = useState<ServiceProcedureItem | null>(null)
 
-	const [activeServiceForSheet, setActiveServiceForSheet] = useState<ServiceProcedureItem | null>(null)
-	const [sheetVisible, setSheetVisible] = useState(false)
-
-	let numColumns = 1
-	let paddingHorizontal = 16
-	const gap = 16
-
-	if (width >= 1024) {
-		numColumns = 3
-		paddingHorizontal = 32
-	} else if (width >= 768) {
-		numColumns = 2
-		paddingHorizontal = 24
-	}
-
-	const isTablet = width >= 768
-	const contentWidth = width - paddingHorizontal * 2
-	const gridCardWidth = numColumns > 1
-		? Math.floor((contentWidth - gap * (numColumns - 1)) / numColumns)
-		: undefined
-
-	const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>(ALL_NURSING_CATEGORIES)
-	const [popularServices, setPopularServices] = useState<PopularService[]>(POPULAR_SERVICES)
-
-	React.useEffect(() => {
-		const fetchBackendServices = async () => {
-			try {
-				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.SERVICES)
-				// Handle FastAPI success_response format ({ status: 'success', data: [...] })
-				const payload = res.data
-				const apiData: any[] = Array.isArray(payload)
-					? payload
-					: Array.isArray(payload?.data)
-					? payload.data
-					: Array.isArray(res)
-					? res
-					: []
-
-				console.log('[NursingCarePage] Fetched live DB procedures count:', apiData.length)
-
-				if (apiData.length > 0) {
-					// Group by categoryName returned from backend API
-					const groupsMap: { [key: string]: ServiceProcedureItem[] } = {}
-
-					apiData.forEach((item: any) => {
-						const catName = item.categoryName || 'General Nursing & In-Home Procedures'
-						if (!groupsMap[catName]) {
-							groupsMap[catName] = []
-						}
-						groupsMap[catName].push({
-							id: item.id || `srv-${Math.random()}`,
-							title: item.title || item.label || 'Ancillary Procedure',
-							description: item.description || 'Professional in-home medical procedure',
-							duration: item.duration || '45 mins',
-							price: typeof item.price === 'number' ? `₹${item.price}` : (item.price || '₹499'),
-							image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
-							verified: true,
-						})
-					})
-
-					const liveGroups: CategoryGroup[] = Object.keys(groupsMap).map((catName) => ({
-						categoryName: `${catName} (Live DB Services)`,
-						procedures: groupsMap[catName],
-					}))
-
-					setCategoryGroups(liveGroups)
-
-					// Dynamic Popular Services derived from DB
-					const popMapped: PopularService[] = apiData.slice(0, 4).map((item: any) => ({
-						id: item.id,
-						title: item.title || item.label,
-						description: item.description || 'Certified in-home procedure',
-						price: typeof item.price === 'number' ? `₹${item.price}` : (item.price || '₹499'),
-						image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
-					}))
-					setPopularServices(popMapped)
-				}
-			} catch (err) {
-				console.log('[NursingCarePage] Failed to load services from API, using fallback', err)
+	// Filtered Procedure Groups
+	const filteredCategories = useMemo(() => {
+		return ALL_NURSING_CATEGORIES.map((cat) => {
+			if (activeCategory !== 'all' && cat.id !== activeCategory) {
+				return null
 			}
-		}
+			const matchingProcedures = cat.procedures.filter((p) => {
+				const matchesSearch =
+					p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+					p.description.toLowerCase().includes(searchQuery.toLowerCase())
+				return matchesSearch
+			})
 
-		fetchBackendServices()
-	}, [])
+			if (matchingProcedures.length === 0) return null
 
-	const handleBack = () => {
-		if (navigation.canGoBack()) {
-			navigation.goBack()
-		}
-	}
+			return {
+				...cat,
+				procedures: matchingProcedures,
+			}
+		}).filter(Boolean) as CategoryGroup[]
+	}, [searchQuery, activeCategory])
 
-	const getItemQuantity = (serviceId: string) => {
-		return cartItems[serviceId]?.quantity || 0
-	}
+	// Total Cart Computations
+	const selectedItemsList = useMemo(() => {
+		return Object.values(selectedServicesMap).filter((x) => x.qty > 0).map((x) => x.item)
+	}, [selectedServicesMap])
 
-	const totalCartCount = Object.values(cartItems).reduce((sum, entry) => sum + entry.quantity, 0)
+	const totalItemsCount = useMemo(() => {
+		return Object.values(selectedServicesMap).reduce((sum, x) => sum + x.qty, 0)
+	}, [selectedServicesMap])
 
-	const handleIncrement = (service: ServiceProcedureItem) => {
-		setCartItems((prev) => {
-			const existing = prev[service.id]
-			const currentQty = existing ? existing.quantity : 0
+	const totalPriceAmount = useMemo(() => {
+		return Object.values(selectedServicesMap).reduce((sum, x) => {
+			const rawPrice = parseInt(x.item.price.replace(/[^0-9]/g, '') || '0', 10)
+			return sum + rawPrice * x.qty
+		}, 0)
+	}, [selectedServicesMap])
+
+	const handleIncrement = (item: ServiceProcedureItem) => {
+		setSelectedServicesMap((prev) => {
+			const current = prev[item.id]?.qty || 0
 			return {
 				...prev,
-				[service.id]: { item: service, quantity: currentQty + 1 },
+				[item.id]: { item, qty: current + 1 },
 			}
 		})
 	}
 
-	const handleDecrement = (service: ServiceProcedureItem) => {
-		setCartItems((prev) => {
-			const existing = prev[service.id]
-			if (!existing) return prev
-			if (existing.quantity <= 1) {
+	const handleDecrement = (item: ServiceProcedureItem) => {
+		setSelectedServicesMap((prev) => {
+			const current = prev[item.id]?.qty || 0
+			if (current <= 1) {
 				const next = { ...prev }
-				delete next[service.id]
+				delete next[item.id]
 				return next
 			}
 			return {
 				...prev,
-				[service.id]: { item: service, quantity: existing.quantity - 1 },
+				[item.id]: { item, qty: current - 1 },
 			}
 		})
 	}
 
-	const handleCardPress = (service: ServiceProcedureItem) => {
-		setActiveServiceForSheet(service)
-		setSheetVisible(true)
-	}
-
-	const handleRecommendationPress = (rec: RecommendationItem) => {
-		for (const category of categoryGroups) {
-			const found = category.procedures.find(
-				(p) =>
-					p.title.toLowerCase() === rec.title.toLowerCase() ||
-					p.title.toLowerCase().includes(rec.title.toLowerCase())
-			)
-			if (found) {
-				handleCardPress(found)
-				return
-			}
-		}
-		const fallbackProcedure: ServiceProcedureItem = {
-			id: rec.id,
-			title: rec.title,
-			description: rec.description,
-			duration: '30 - 45 mins',
-			price: '₹399',
-			image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=80',
-		}
-		handleCardPress(fallbackProcedure)
-	}
-
-	const handleAddToBookingFromSheet = (service: ServiceProcedureItem) => {
-		handleIncrement(service)
-	}
-
-	const handleViewCart = () => {
-		const selectedServices: ServiceProcedureItem[] = []
-		Object.values(cartItems).forEach((entry) => {
-			for (let i = 0; i < entry.quantity; i++) {
-				selectedServices.push(entry.item)
-			}
-		})
-
+	const handleProceedToBooking = () => {
+		if (selectedItemsList.length === 0) return
 		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
-			services: selectedServices,
+			services: selectedItemsList,
+			selectedServices: selectedItemsList,
 		})
 	}
+
+	const handleGoHome = () => {
+		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME })
+	}
+
+	React.useEffect(() => {
+		const onBackPress = () => {
+			handleGoHome()
+			return true
+		}
+
+		const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress)
+		return () => subscription.remove()
+	}, [navigation])
 
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader title="Nursing Care" onBack={handleBack} />
+			{/* App Bar / Header */}
+			<AppScreenHeader title="Nursing Care & Procedures" onBack={handleGoHome} />
 
+			{/* Main Scroll Content */}
 			<ScrollView
 				contentContainerStyle={[
 					styles.scrollContent,
-					isTablet && styles.scrollContentTablet,
-					{ paddingHorizontal },
+					{ paddingBottom: insets.bottom + (selectedItemsList.length > 0 ? 130 : 40) },
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-
-				{/* 2. Emergency Assistance Banner */}
-				<View style={[styles.emergencyBanner, isTablet && styles.emergencyBannerTablet]}>
-					<View style={[styles.emergencyContentCol, isTablet && styles.emergencyContentColTablet]}>
-						<View style={styles.emergencyIconContainer}>
-							<MaterialCommunityIcons name="octagram" size={28} color="#D32F2F" />
-						</View>
-						<View style={styles.emergencyTextContainer}>
-							<AppTypography variant="h4" style={styles.emergencyHeading}>
-								Need urgent nursing assistance?
-							</AppTypography>
-							<AppTypography variant="caption" style={styles.emergencySubtext}>
-								Available 24/7 for medical emergencies at home.
-							</AppTypography>
-						</View>
-					</View>
-					<AppButton
-						variant="primary"
-						style={[styles.findNurseBtn, isTablet && styles.findNurseBtnTablet]}
-						labelStyle={styles.findNurseBtnLabel}
-						contentStyle={styles.findNurseBtnContent}
-					>
-						Find Nurse Now
-					</AppButton>
-				</View>
-
-				{/* 3. Popular Nursing Services Section */}
-				<View style={styles.sectionContainer}>
-					<AppTypography variant="h3" style={styles.sectionTitle}>
-						Popular Nursing Services
-					</AppTypography>
-					<ScrollView
-						horizontal
-						showsHorizontalScrollIndicator={false}
-						style={{ marginHorizontal: -paddingHorizontal }}
-						contentContainerStyle={{ paddingHorizontal }}
-					>
-						{popularServices.map((service) => (
-							<PopularServiceCard
-								key={service.id}
-								item={service}
-								quantity={getItemQuantity(service.id)}
-								onIncrement={handleIncrement}
-								onDecrement={handleDecrement}
-								onCardPress={handleCardPress}
+				{/* 1. Search Bar */}
+				<AppInput
+					isSearch
+					noMargin
+					fieldSize="form"
+					borderRadius={12}
+					placeholder="Search procedures e.g. Dressing, IV, Injection..."
+					placeholderTextColor="#546E7A"
+					value={searchQuery}
+					onChangeText={setSearchQuery}
+					outlineColor="#E0E7EF"
+					activeOutlineColor="#2B6F71"
+					textColor="#1A2B3C"
+					style={styles.searchInput}
+					right={
+						searchQuery.length > 0 ? (
+							<AppInput.Icon
+								icon="close-circle"
+								size={18}
+								color="#546E7A"
+								onPress={() => setSearchQuery('')}
 							/>
-						))}
-					</ScrollView>
+						) : undefined
+					}
+				/>
+
+				{/* 2. Dispatch Banner */}
+				<View style={styles.dispatchBanner}>
+					<View style={styles.boltIconWrap}>
+						<MaterialCommunityIcons name="flash" size={18} color="#FFFFFF" />
+					</View>
+					<View style={styles.bannerTextCol}>
+						<AppTypography variant="h4" style={styles.bannerTitle}>
+							Instant Home Nurse Dispatch (~25 mins)
+						</AppTypography>
+						<View style={styles.bulletRow}>
+							<AppTypography variant="caption" style={styles.bulletText}>
+								Verified RNs
+							</AppTypography>
+							<View style={styles.bulletDot} />
+							<AppTypography variant="caption" style={styles.bulletText}>
+								Sterile Medical Equipment
+							</AppTypography>
+							<View style={styles.bulletDot} />
+							<AppTypography variant="caption" style={styles.bulletText}>
+								24/7 Availability
+							</AppTypography>
+						</View>
+					</View>
 				</View>
 
-				{/* 4. Recommended For You Section */}
-				{/* <View style={styles.sectionContainer}>
-					<View style={styles.recommendedHeaderRow}>
-						<MaterialCommunityIcons name="clock-outline" size={18} color="#1F5F68" style={styles.recommendedIcon} />
-						<AppTypography variant="h3" style={styles.sectionTitleNoMargin}>
-							Recommended For You
-						</AppTypography>
-					</View>
-					<AppTypography variant="caption" style={styles.recommendedSubText}>
-						BASED ON PREVIOUS SEARCHES
-					</AppTypography>
-					<View style={[styles.recommendedList, isTablet && styles.gridRow]}>
-						{RECOMMENDED_SERVICES.map((rec) => (
-							<View key={rec.id} style={gridCardWidth ? { width: gridCardWidth } : undefined}>
-								<RecommendationCard
-									item={rec}
-									onPress={() => handleRecommendationPress(rec)}
-								/>
+				{/* 3. Category Filter Cards Grid (2-Column Layout with Image Thumbnails) */}
+				<View style={styles.categoryGrid}>
+					{CATEGORY_CARDS.map((cat) => {
+						const isActive = cat.id === activeCategory
+						return (
+							<TouchableOpacity
+								key={cat.id}
+								style={[styles.categoryCard, isActive && styles.categoryCardActive]}
+								onPress={() => setActiveCategory(cat.id)}
+								activeOpacity={0.85}
+							>
+								<Image source={{ uri: cat.image }} style={styles.categoryCardImg} resizeMode="cover" />
+								<View style={styles.categoryCardTextCol}>
+									<AppTypography
+										variant="h4"
+										style={[styles.categoryCardTitle, isActive && styles.categoryCardTitleActive]}
+										numberOfLines={1}
+									>
+										{cat.label}
+									</AppTypography>
+									<AppTypography
+										variant="caption"
+										style={[styles.categoryCardSub, isActive && styles.categoryCardSubActive]}
+									>
+										{cat.sublabel}
+									</AppTypography>
+								</View>
+							</TouchableOpacity>
+						)
+					})}
+				</View>
+
+				{/* 4. Procedure Lists */}
+				{filteredCategories.length > 0 ? (
+					filteredCategories.map((group) => (
+						<View key={group.id} style={styles.categoryGroup}>
+							<View style={styles.listHeaderRow}>
+								<AppTypography variant="h2" style={styles.listHeaderTitle}>
+									{group.categoryName}
+								</AppTypography>
+								<AppTypography variant="caption" style={styles.listHeaderCount}>
+									{group.procedures.length} available
+								</AppTypography>
 							</View>
-						))}
-					</View> */}
-				{/* </View> */}
 
-				{/* 5. All Nursing Services Section */}
-				<View style={styles.sectionContainer}>
-					<AppTypography variant="h2" style={styles.mainSectionTitle}>
-						All Nursing Services
-					</AppTypography>
-
-					{categoryGroups.map((category) => (
-						<View key={category.categoryName} style={styles.categoryContainer}>
-							<AppTypography variant="h3" style={styles.categoryTitle}>
-								{category.categoryName}
-							</AppTypography>
-							<View style={[styles.procedureList, isTablet && styles.gridRow]}>
-								{category.procedures.map((proc) => (
+							<View style={styles.cardsDividerList}>
+								{group.procedures.map((proc) => (
 									<AllServiceCard
 										key={proc.id}
 										item={proc}
-										cardWidth={gridCardWidth}
-										quantity={getItemQuantity(proc.id)}
+										quantity={selectedServicesMap[proc.id]?.qty || 0}
 										onIncrement={handleIncrement}
 										onDecrement={handleDecrement}
-										onCardPress={handleCardPress}
+										onCardPress={setDetailSheetItem}
 									/>
 								))}
 							</View>
 						</View>
-					))}
-				</View>
+					))
+				) : (
+					<View style={styles.emptyWrap}>
+						<MaterialCommunityIcons name="medical-bag" size={40} color="#E0E7EF" />
+						<AppTypography variant="h3" style={styles.emptyTitle}>
+							No Procedures Found
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.emptySub}>
+							Try searching with another term or reset your category filter.
+						</AppTypography>
+						{(searchQuery.length > 0 || activeCategory !== 'all') && (
+							<TouchableOpacity
+								style={styles.resetSearchBtn}
+								onPress={() => {
+									setSearchQuery('')
+									setActiveCategory('all')
+								}}
+							>
+								<AppTypography variant="caption" style={styles.resetSearchBtnText}>
+									Reset Search & Filters
+								</AppTypography>
+							</TouchableOpacity>
+						)}
+					</View>
+				)}
 			</ScrollView>
 
-			{/* 6. Persistent View Cart Floating Bar */}
-			<ViewCartFloatingBar
-				selectedCount={totalCartCount}
-				onViewCart={handleViewCart}
+			{/* Procedure Detail Bottom Sheet */}
+			<ServiceDetailsBottomSheet
+				visible={detailSheetItem !== null}
+				service={detailSheetItem}
+				onClose={() => setDetailSheetItem(null)}
+				onAddToBooking={handleIncrement}
 			/>
 
-			{/* 7. Service Details Bottom Sheet */}
-			<ServiceDetailsBottomSheet
-				visible={sheetVisible}
-				service={activeServiceForSheet}
-				onClose={() => setSheetVisible(false)}
-				onAddToBooking={handleAddToBookingFromSheet}
-			/>
+			{/* Sticky Bottom Cart Bar */}
+			{selectedItemsList.length > 0 && (
+				<ViewCartFloatingBar
+					itemCount={totalItemsCount}
+					totalAmount={`₹${totalPriceAmount}`}
+					onViewCart={handleProceedToBooking}
+				/>
+			)}
 		</View>
 	)
 }
@@ -464,197 +417,164 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingHorizontal: 16,
-		paddingBottom: 80,
-	},
-	scrollContentTablet: {
-		maxWidth: 1080,
-		width: '100%',
-		alignSelf: 'center',
-	},
-	headerContainer: {
-		paddingTop: 8,
-		paddingBottom: 16,
-	},
-	headerTopRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		justifyContent: 'space-between',
-	},
-	backButton: {
-		padding: 4,
-		marginRight: 8,
-	},
-	titleContainer: {
-		flex: 1,
-	},
-	pageTitle: {
-		fontSize: 22,
-		fontWeight: '700',
-		color: '#191C1D',
-		lineHeight: 28,
-	},
-	pageSubtitle: {
-		fontSize: 13,
-		color: '#526062',
-		marginTop: 2,
-	},
-	notificationButton: {
-		padding: 6,
-		borderRadius: 20,
-		backgroundColor: '#F4F7F8',
-	},
-	emergencyBanner: {
-		backgroundColor: '#FFF2F2',
-		borderRadius: 14,
-		padding: 16,
-		marginBottom: 20,
-		borderWidth: 1,
-		borderColor: '#FFD6D6',
-	},
-	emergencyBannerTablet: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		padding: 20,
-		borderRadius: 16,
-	},
-	emergencyContentCol: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		marginBottom: 14,
-	},
-	emergencyContentColTablet: {
-		flex: 1,
-		marginBottom: 0,
-		marginRight: 16,
-		alignItems: 'center',
-	},
-	emergencyIconContainer: {
-		marginRight: 12,
-		marginTop: 2,
-	},
-	emergencyTextContainer: {
-		flex: 1,
-	},
-	emergencyHeading: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#D32F2F',
-		lineHeight: 20,
-	},
-	emergencySubtext: {
-		fontSize: 12,
-		color: '#7F1D1D',
-		marginTop: 3,
-		lineHeight: 16,
-	},
-	findNurseBtn: {
-		backgroundColor: '#D32F2F',
-		borderRadius: 10,
-		width: '100%',
-		paddingVertical: 0,
-		marginVertical: 0,
-	},
-	findNurseBtnTablet: {
-		width: 'auto',
-		minWidth: 160,
-		alignSelf: 'center',
-	},
-	findNurseBtnLabel: {
-		color: '#FFFFFF',
-		fontSize: 14,
-		fontWeight: '700',
-		marginVertical: 0,
-	},
-	findNurseBtnContent: {
-		height: 42,
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	sectionContainer: {
-		marginBottom: 24,
-	},
-	sectionTitle: {
-		fontSize: 17,
-		fontWeight: '700',
-		color: '#191C1D',
-		marginBottom: 12,
-	},
-	sectionTitleNoMargin: {
-		fontSize: 17,
-		fontWeight: '700',
-		color: '#191C1D',
-	},
-	horizontalScrollContent: {
-		paddingRight: 16,
-	},
-	recommendedHeaderRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	recommendedIcon: {
-		marginRight: 6,
-	},
-	recommendedSubText: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#526062',
-		letterSpacing: 0.5,
-		marginTop: 2,
-		marginBottom: 12,
-	},
-	recommendedList: {
-		marginTop: 4,
-	},
-	gridRow: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
+		paddingTop: 16,
 		gap: 16,
 	},
-	mainSectionTitle: {
-		fontSize: 20,
-		fontWeight: '700',
-		color: '#191C1D',
-		marginBottom: 16,
+
+	/* 1. Search Bar */
+	searchInput: {
+		backgroundColor: '#FFFFFF',
+		fontSize: 14,
 	},
-	categoryContainer: {
-		marginBottom: 20,
+	resetSearchBtn: {
+		marginTop: 6,
+		paddingVertical: 8,
+		paddingHorizontal: 16,
+		borderRadius: 8,
+		backgroundColor: 'rgba(43, 111, 113, 0.1)',
 	},
-	categoryTitle: {
-		fontSize: 16,
+	resetSearchBtnText: {
+		color: '#2B6F71',
 		fontWeight: '600',
-		color: '#191C1D',
-		marginBottom: 12,
 	},
-	procedureList: {
+
+	/* 2. Dispatch Banner */
+	dispatchBanner: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		backgroundColor: 'rgba(43, 111, 113, 0.08)',
+		borderWidth: 1,
+		borderColor: 'rgba(43, 111, 113, 0.2)',
+		borderRadius: 14,
+		padding: 14,
+		gap: 12,
+	},
+	boltIconWrap: {
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		backgroundColor: '#2B6F71',
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginTop: 2,
+	},
+	bannerTextCol: {
+		flex: 1,
+	},
+	bannerTitle: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#2B6F71',
+		lineHeight: 18,
+	},
+	bulletRow: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		alignItems: 'center',
+		gap: 6,
 		marginTop: 4,
 	},
-	tabsContainer: {
-		marginBottom: 16,
-	},
-	tabsScrollContent: {
-		gap: 8,
-		paddingRight: 16,
-	},
-	tabChip: {
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		borderRadius: 20,
-		backgroundColor: '#F1F5F9',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-	},
-	tabChipActive: {
-		backgroundColor: '#1F5F68',
-		borderColor: '#1F5F68',
-	},
-	tabChipText: {
+	bulletText: {
 		fontSize: 12,
-		fontWeight: '600',
-		color: '#64748B',
+		color: '#546E7A',
 	},
-	tabChipTextActive: {
-		color: '#FFFFFF',
+	bulletDot: {
+		width: 4,
+		height: 4,
+		borderRadius: 2,
+		backgroundColor: '#E0E7EF',
+	},
+
+	/* 3. Category Filter Cards Grid (2-Column with Images) */
+	categoryGrid: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		justifyContent: 'space-between',
+		gap: 10,
+	},
+	categoryCard: {
+		width: '48.5%',
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FFFFFF',
+		borderRadius: 12,
+		overflow: 'hidden',
+		borderWidth: 1,
+		borderColor: '#E0E7EF',
+		height: 52,
+	},
+	categoryCardActive: {
+		borderColor: '#2B6F71',
+		backgroundColor: 'rgba(43, 111, 113, 0.08)',
+	},
+	categoryCardImg: {
+		width: 52,
+		height: 52,
+		backgroundColor: '#F4F6F9',
+	},
+	categoryCardTextCol: {
+		flex: 1,
+		paddingHorizontal: 10,
+		justifyContent: 'center',
+		paddingVertical: 4,
+		gap: 2,
+	},
+	categoryCardTitle: {
+		fontSize: 12.5,
 		fontWeight: '700',
+		color: '#1A2B3C',
+	},
+	categoryCardTitleActive: {
+		color: '#2B6F71',
+	},
+	categoryCardSub: {
+		fontSize: 10.5,
+		color: '#546E7A',
+	},
+	categoryCardSubActive: {
+		color: '#2B6F71',
+		fontWeight: '600',
+	},
+
+	/* 4. List Sections */
+	categoryGroup: {
+		marginTop: 4,
+	},
+	listHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'flex-end',
+		justifyContent: 'space-between',
+		marginBottom: 4,
+	},
+	listHeaderTitle: {
+		fontSize: 18,
+		fontWeight: '700',
+		color: '#1A2B3C',
+	},
+	listHeaderCount: {
+		fontSize: 13,
+		color: '#546E7A',
+	},
+	cardsDividerList: {
+		marginTop: 2,
+	},
+
+	/* Empty State */
+	emptyWrap: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 60,
+		paddingHorizontal: 20,
+		gap: 8,
+	},
+	emptyTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#1A2B3C',
+	},
+	emptySub: {
+		fontSize: 13,
+		color: '#546E7A',
+		textAlign: 'center',
 	},
 })

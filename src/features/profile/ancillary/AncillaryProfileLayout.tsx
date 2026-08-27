@@ -8,12 +8,11 @@ import {
 	TouchableOpacity,
 	useWindowDimensions,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
 import { AppTypography } from '../../../components/common'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
+import BankDetailsTab from './tabs/BankDetailsTab'
 import CapabilitiesTab from './tabs/CapabilitiesTab'
-import AvailabilityTab from './tabs/AvailabilityTab'
 import SessionsTab from '../SessionsTab'
 
 type TabDefinition = {
@@ -26,15 +25,14 @@ type TabDefinition = {
 }
 
 const TABS: TabDefinition[] = [
-	{ key: 'personal', label: 'Personal details', Component: PersonalDetailsTab },
-	{ key: 'professional', label: 'Professional details', Component: ProfessionalDetailsTab },
-	{ key: 'capabilities', label: 'Capabilities', Component: CapabilitiesTab },
-	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
-	// { key: 'sessions', label: 'Sessions', Component: SessionsTab },
+	{ key: 'personal', label: 'Personal Details', Component: PersonalDetailsTab },
+	{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
+	{ key: 'bank', label: 'Bank Details', Component: BankDetailsTab },
+	{ key: 'categories', label: 'Capabilities', Component: CapabilitiesTab },
+	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
 ]
 
 export default function AncillaryProfileLayout() {
-	const navigation = useNavigation<any>()
 	const { width } = useWindowDimensions()
 	const pagerRef = useRef<ScrollView>(null)
 	const tabScrollRef = useRef<ScrollView>(null)
