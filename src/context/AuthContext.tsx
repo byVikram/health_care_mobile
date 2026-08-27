@@ -164,6 +164,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			'refresh_token',
 			'notification_prompt_shown',
 			'current_location',
+			'ancillary_capabilities',
+			'ancillary_license',
+			'ancillary_location',
+			'user_specialty',
+			'ancillary_verification_status',
 		])
 
 		clearAuthState()

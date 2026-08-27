@@ -2,6 +2,7 @@ export const ROUTES = {
 	AUTH: {
 		LOGIN: 'Login',
 		ROLE_SELECTION: 'RoleSelection',
+		SPECIALTY_SELECTION: 'SpecialtySelection',
 		ONBOARDING: 'Onboarding',
 		REGISTER: 'Register',
 	},

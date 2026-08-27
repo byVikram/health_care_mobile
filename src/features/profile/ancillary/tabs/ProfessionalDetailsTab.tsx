@@ -236,18 +236,6 @@ function UploadBox({
 	)
 }
 
-// const isValidLatitude = (value: string) => {
-// 	if (!value.trim()) return true
-// 	const num = Number(value)
-// 	return Number.isFinite(num) && num >= -90 && num <= 90
-// }
-
-// const isValidLongitude = (value: string) => {
-// 	if (!value.trim()) return true
-// 	const num = Number(value)
-// 	return Number.isFinite(num) && num >= -180 && num <= 180
-// }
-
 export default function ProfessionalDetailsTab() {
 	const { width } = useWindowDimensions()
 
@@ -364,6 +352,12 @@ export default function ProfessionalDetailsTab() {
 
 		try {
 			setIsSaving(true)
+			await updateAncillaryProfileBackend({
+				license_number: formData.license.trim(),
+				qualifications: formData.qualification.trim(),
+				specialty_id: formData.specialtyLabel,
+			})
+
 			await AsyncStorage.multiSet([
 				['ancillary_specialty', formData.specialty],
 				['ancillary_qualification', formData.qualification.trim()],
@@ -571,7 +565,13 @@ export default function ProfessionalDetailsTab() {
 					title={statusModal.title}
 					description={statusModal.description}
 					submitText={statusModal.submitText}
-					onSubmit={() => setStatusModal(null)}
+					onSubmit={() => {
+						const isSuccess = statusModal.status === 'success'
+						setStatusModal(null)
+						if (isSuccess && onNextTab) {
+							onNextTab()
+						}
+					}}
 					onCancel={() => setStatusModal(null)}
 				/>
 			)}

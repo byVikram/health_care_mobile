@@ -124,11 +124,17 @@ axiosInstance.interceptors.response.use(
 			}
 		} else if (status === 403) {
 			console.log('403 RESPONSE:', error.response?.data)
+			const errorDetail = error.response?.data?.detail
+			const isVerificationRequired =
+				typeof errorDetail === 'object' && errorDetail?.code === 'NURSE_VERIFICATION_REQUIRED'
 
-			Alert.alert(
-				'Access Denied',
-				error.response?.data?.message || 'You do not have permission to perform this action.'
-			)
+			if (!isVerificationRequired) {
+				Alert.alert(
+					'Access Denied',
+					error.response?.data?.message ||
+						(typeof errorDetail === 'string' ? errorDetail : 'You do not have permission to perform this action.')
+				)
+			}
 		} else {
 			// Replace react-toastify with Alert in RN
 			Alert.alert('API Error', message)

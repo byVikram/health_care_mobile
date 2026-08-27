@@ -23,6 +23,7 @@ type RegisterFormData = {
 interface RegisterFormProps {
 	roleId: string
 	roleLabel?: string
+	specialty?: string
 	formData: RegisterFormData
 	onFormDataChange: React.Dispatch<React.SetStateAction<RegisterFormData>>
 	autoFocusMobile?: boolean
@@ -33,6 +34,7 @@ interface RegisterFormProps {
 export default function RegisterForm({
 	roleId,
 	roleLabel,
+	specialty,
 	formData,
 	onFormDataChange,
 	autoFocusMobile = false,
@@ -66,6 +68,7 @@ export default function RegisterForm({
 			name,
 			email,
 			mobile,
+			specialty,
 		})
 
 		setFormError('')
@@ -103,6 +106,7 @@ export default function RegisterForm({
 				name,
 				email,
 				contact_number: mobile,
+				specialty_id: specialty,
 			})
 
 			const hasResponseData = typeof res === 'object' && res !== null && 'data' in res

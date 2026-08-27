@@ -298,7 +298,13 @@ const formatDobForStorage = (value: string) => {
 	return match ? `${match[3]}-${match[2]}-${match[1]}` : value
 }
 
-export default function PersonalDetailsTab() {
+export default function PersonalDetailsTab({
+	isActive,
+	onNextTab,
+}: {
+	isActive?: boolean
+	onNextTab?: () => void
+}) {
 	const { user, updateUser } = useAuth()
 	const { width } = useWindowDimensions()
 
@@ -701,7 +707,13 @@ export default function PersonalDetailsTab() {
 					title={statusModal.title}
 					description={statusModal.description}
 					submitText={statusModal.submitText}
-					onSubmit={() => setStatusModal(null)}
+					onSubmit={() => {
+						const isSuccess = statusModal.status === 'success'
+						setStatusModal(null)
+						if (isSuccess && onNextTab) {
+							onNextTab()
+						}
+					}}
 					onCancel={() => setStatusModal(null)}
 				/>
 			)}

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { useState, useEffect } from 'react'
 import { StyleSheet, View, useWindowDimensions } from 'react-native'
 import RegisterForm from './components/RegisterForm'
@@ -33,6 +34,17 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 
 	const roleId = route.params?.roleId ?? ''
 	const roleLabel = route.params?.roleLabel ?? ''
+	const [activeSpecialty, setActiveSpecialty] = useState<string | undefined>(route.params?.specialty)
+
+	useEffect(() => {
+		if (route.params?.specialty) {
+			setActiveSpecialty(route.params.specialty)
+		} else if (roleLabel.toLowerCase() === 'ancillary' || roleId === 'ancillary') {
+			AsyncStorage.getItem('user_specialty').then((stored) => {
+				if (stored) setActiveSpecialty(stored)
+			})
+		}
+	}, [route.params?.specialty, roleLabel, roleId])
 
 	useEffect(() => {
 		if (!roleId) {
@@ -46,6 +58,7 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 				<RegisterForm
 					roleId={roleId}
 					roleLabel={roleLabel}
+					specialty={activeSpecialty}
 					formData={registerDraft}
 					onFormDataChange={setRegisterDraft}
 					autoFocusMobile={focusMobileOnRegister}

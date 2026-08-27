@@ -1108,4 +1108,4 @@ export const updateProviderProfileBackend = async (payload: {
 		console.log('[ancillaryService] updateProviderProfileBackend error:', error)
 		return false
 	}
-}
+}
