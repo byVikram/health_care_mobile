@@ -236,7 +236,7 @@ function UploadBox({
 	)
 }
 
-export default function ProfessionalDetailsTab() {
+export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () => void } = {}) {
 	const { width } = useWindowDimensions()
 
 	const isTablet = width >= 768 && width < 1024
@@ -352,11 +352,7 @@ export default function ProfessionalDetailsTab() {
 
 		try {
 			setIsSaving(true)
-			await updateAncillaryProfileBackend({
-				license_number: formData.license.trim(),
-				qualifications: formData.qualification.trim(),
-				specialty_id: formData.specialtyLabel,
-			})
+			// Persist minimal profile to backend via existing provider update function
 
 			await AsyncStorage.multiSet([
 				['ancillary_specialty', formData.specialty],
@@ -375,6 +371,8 @@ export default function ProfessionalDetailsTab() {
 			await updateProviderProfileBackend({
 				license_number: formData.nursingRegistrationNumber.trim(),
 				qualifications: formData.qualification.trim(),
+				// Send specialty as provided string (backend expects id or name depending on API)
+				specialty: formData.specialty,
 				geofence_radius: Number.isFinite(numRadius) ? numRadius : 10,
 			})
 

@@ -19,6 +19,8 @@ export type AuthStackParamList = {
 	[ROUTES.AUTH.REGISTER]: RoleParams | undefined
 }
 
+export type BookingsFilterKey = 'doctor' | 'ancillary' | 'lab' | 'medicine' | 'radiology'
+
 export type MainTabParamList = {
 	[ROUTES.MAIN.HOME]: undefined
 	[ROUTES.MAIN.SEARCH]:
@@ -26,7 +28,7 @@ export type MainTabParamList = {
 				mode?: 'clinic' | 'video'
 		  }
 		| undefined
-	[ROUTES.MAIN.PORTAL]: undefined
+	[ROUTES.MAIN.PORTAL]: { filter?: BookingsFilterKey } | undefined
 	[ROUTES.MAIN.PROFILE]: undefined
 	[ROUTES.MAIN.ANCILLARY]: undefined
 }

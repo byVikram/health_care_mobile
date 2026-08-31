@@ -9,7 +9,6 @@ import {
 	ScrollView,
 	StyleSheet,
 	Text,
-	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
@@ -20,13 +19,14 @@ import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
-import { AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
+import { AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
 import { getLabBookings } from './laboratoryService'
 import { getStatusStyle } from '../../constants/statusColors'
 import type { LabBooking } from './laboratory'
 import { formatDateForApi, formatGroupDateDisplay, formatShortDateDisplay } from '../../utils/date'
+import BookingsSearchBar from '../bookings/components/BookingsSearchBar'
 
 // ─────────────────────────────────────────────
 // Types
@@ -60,7 +60,6 @@ type BookingRow = {
 // ─────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────
-
 
 const DATE_OPTIONS: AppSelectOption[] = [
 	{ label: 'All', value: 'all' },
@@ -291,7 +290,23 @@ const BookingCard = React.memo(function BookingCard({ booking, onPress, isLabVie
 // Main screen
 // ─────────────────────────────────────────────
 
-export default function OrderListLaboratoryPage() {
+interface OrderListLaboratoryPageProps {
+	embedded?: boolean
+	searchQuery?: string
+	statusFilter?: string
+	dateFilter?: string
+	fromDateFilter?: string
+	toDateFilter?: string
+}
+
+export default function OrderListLaboratoryPage({
+	embedded = false,
+	searchQuery: propSearchQuery,
+	statusFilter: propStatusFilter,
+	dateFilter: propDateFilter,
+	fromDateFilter: propFromDateFilter,
+	toDateFilter: propToDateFilter,
+}: OrderListLaboratoryPageProps = {}) {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
@@ -308,12 +323,12 @@ export default function OrderListLaboratoryPage() {
 	const PAGE_SIZE = 10
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
-	const [searchQuery, setSearchQuery] = useState('')
-	const [debouncedSearch, setDebouncedSearch] = useState('')
-	const [statusFilter, setStatusFilter] = useState(route.params?.status ?? 'all')
-	const [dateFilter, setDateFilter] = useState('all')
-	const [fromDateFilter, setFromDateFilter] = useState('')
-	const [toDateFilter, setToDateFilter] = useState('')
+	const [searchQuery, setSearchQuery] = useState(propSearchQuery ?? '')
+	const [debouncedSearch, setDebouncedSearch] = useState(propSearchQuery ?? '')
+	const [statusFilter, setStatusFilter] = useState(propStatusFilter ?? route.params?.status ?? 'all')
+	const [dateFilter, setDateFilter] = useState(propDateFilter ?? 'all')
+	const [fromDateFilter, setFromDateFilter] = useState(propFromDateFilter ?? '')
+	const [toDateFilter, setToDateFilter] = useState(propToDateFilter ?? '')
 
 	const [draftStatusFilter, setDraftStatusFilter] = useState('all')
 	const [draftDateFilter, setDraftDateFilter] = useState('all')
@@ -326,9 +341,23 @@ export default function OrderListLaboratoryPage() {
 	const filterSheetAnim = useRef(new Animated.Value(0)).current
 	const filterBackdropAnim = useRef(new Animated.Value(0)).current
 
+	// Sync controlled props when embedded
 	useEffect(() => {
-		if (route.params?.status) setStatusFilter(route.params.status)
-	}, [route.params?.status])
+		if (!embedded) return
+		if (propSearchQuery !== undefined) {
+			setSearchQuery(propSearchQuery)
+			setDebouncedSearch(propSearchQuery)
+		}
+		if (propStatusFilter !== undefined) setStatusFilter(propStatusFilter)
+		if (propDateFilter !== undefined) setDateFilter(propDateFilter)
+		if (propFromDateFilter !== undefined) setFromDateFilter(propFromDateFilter)
+		if (propToDateFilter !== undefined) setToDateFilter(propToDateFilter)
+		setVisibleCount(PAGE_SIZE)
+	}, [embedded, propSearchQuery, propStatusFilter, propDateFilter, propFromDateFilter, propToDateFilter])
+
+	useEffect(() => {
+		if (!embedded && route.params?.status) setStatusFilter(route.params.status)
+	}, [embedded, route.params?.status])
 
 	// Debounce search input; reset page in the same timeout so page 1 is
 	// always active by the time the new debouncedSearch reaches filteredRows.
@@ -663,99 +692,21 @@ export default function OrderListLaboratoryPage() {
 		)
 	}
 
-	// ── Inline filters (tablet) ────────────────────────────────────────
-
-	const searchInput = (
-		<View style={[styles.searchBox, !isTablet && styles.searchBoxMobile, isTablet && styles.searchBoxWide]}>
-			<MaterialCommunityIcons name="magnify" size={21} color="#9aa0a6" />
-			<TextInput
-				value={searchQuery}
-				onChangeText={setSearchQuery}
-				placeholder={isLabViewer ? 'Search Patient, Reference...' : 'Search Lab, Test, Reference...'}
-				placeholderTextColor="#9aa4af"
-				style={styles.searchInput}
-			/>
-			{searchQuery.length > 0 && (
-				<TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
-					<MaterialCommunityIcons name="close-circle" size={18} color="#8b9aa2" />
-				</TouchableOpacity>
-			)}
-		</View>
-	)
-
-	const mobileFilterButton = (
-		<TouchableOpacity
-			style={[
-				styles.filterIconButton,
-				(statusFilter !== 'all' || dateFilter !== 'all') && styles.filterIconButtonActive,
-			]}
-			onPress={openFilterModal}
-			activeOpacity={0.84}
-		>
-			<MaterialCommunityIcons name="tune" size={23} color="#2B6F71" />
-		</TouchableOpacity>
-	)
-
-	const renderInlineFilter = (label: string, child: React.ReactNode, style?: any) => (
-		<View style={[styles.outlinedFilterWrap, style]}>
-			<View pointerEvents="none" style={styles.outlinedFilterLabel}>
-				<AppTypography style={styles.outlinedFilterLabelText}>{label}</AppTypography>
-			</View>
-			{child}
-		</View>
-	)
-
-	const statusSelect = renderInlineFilter(
-		'Status',
-		<AppSelect
-			options={STATUS_OPTIONS}
-			value={statusFilter}
-			onSelect={(value) => { setVisibleCount(PAGE_SIZE); setStatusFilter(value) }}
-			placeholder="Status"
-			size="small"
-			style={styles.inlineSelectFill}
-			customCardStyle={styles.inlineFilterSelect}
-			borderColor="#c8ced6"
-			maxDropdownHeight={220}
-		/>,
-		styles.compactFilterSelectWrap
-	)
-
-	const dateSelect = renderInlineFilter(
-		'Date',
-		<AppSelect
-			options={DATE_OPTIONS}
-			value={dateFilter}
-			onSelect={(value) => { setVisibleCount(PAGE_SIZE); setDateFilter(value) }}
-			placeholder="Date"
-			size="small"
-			style={styles.inlineSelectFill}
-			customCardStyle={styles.inlineFilterSelect}
-			borderColor="#c8ced6"
-			maxDropdownHeight={220}
-		/>,
-		styles.compactFilterSelectWrap
-	)
-
 	// ── Render ─────────────────────────────────────────────────────────
 
 	return (
 		<View style={styles.safeArea}>
-			<View style={[styles.content, isTablet && styles.contentTablet]}>
-				<View style={styles.filtersSection}>
-					{isTablet ? (
-						<View style={styles.filterRowWide}>
-							{dateSelect}
-							{statusSelect}
-							{searchInput}
-						</View>
-					) : (
-						<View style={styles.mobileSearchRow}>
-							<View style={{ flex: 1 }}>{searchInput}</View>
-							{mobileFilterButton}
-						</View>
-					)}
-				</View>
+			<View style={styles.content}>
+				{!embedded && (
+					<BookingsSearchBar
+						value={searchQuery}
+						onChangeText={setSearchQuery}
+						placeholder={isLabViewer ? 'Search Patient, Reference...' : 'Search Lab, Test, Reference...'}
+						onFilterPress={openFilterModal}
+						filterActive={statusFilter !== 'all' || dateFilter !== 'all'}
+						accessibilityLabel="Filter lab orders"
+					/>
+				)}
 
 				{loading && !refreshing ? (
 					<ScrollView
@@ -799,7 +750,7 @@ export default function OrderListLaboratoryPage() {
 					</View>
 				)}
 			</View>
-			{!isTablet && renderFilterModal()}
+			{renderFilterModal()}
 		</View>
 	)
 }
@@ -809,10 +760,10 @@ export default function OrderListLaboratoryPage() {
 // ─────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-	safeArea: { flex: 1, backgroundColor: '#f4f4f4' },
-	content: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+	safeArea: { flex: 1, backgroundColor: '#F8FAFA' },
+	content: { flex: 1 },
 	contentTablet: { paddingHorizontal: 24, paddingTop: 20 },
-	listContent: { paddingBottom: 30 },
+	listContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 30 },
 	groupTitle: { color: '#9aa1a5', fontSize: 12, fontWeight: '500', marginBottom: 8, marginTop: 4 },
 	orderCard: {
 		backgroundColor: '#ffffff',
@@ -877,7 +828,6 @@ const styles = StyleSheet.create({
 	emptyState: { alignItems: 'center', paddingVertical: 40, gap: 8 },
 	emptyTitle: { color: '#536167', fontSize: 16, fontWeight: '700' },
 	emptyText: { color: '#8b969b', fontSize: 12, textAlign: 'center' },
-	filtersSection: { marginBottom: 10 },
 	filterRowWide: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -885,29 +835,6 @@ const styles = StyleSheet.create({
 		gap: 12,
 		width: '100%',
 	},
-	mobileSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-	searchBox: {
-		height: 48,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#e5eaef',
-		backgroundColor: '#ffffff',
-		paddingHorizontal: 16,
-		flexDirection: 'row',
-		alignItems: 'center',
-		width: '100%',
-	},
-	searchBoxWide: {
-		height: 50,
-		flexGrow: 2.2,
-		flexShrink: 1,
-		flexBasis: 190,
-		minWidth: 170,
-		borderColor: '#d8dee6',
-		borderRadius: 8,
-	},
-	searchBoxMobile: { height: 44, width: '100%', borderRadius: 8, paddingHorizontal: 12 },
-	searchInput: { flex: 1, height: '100%', paddingHorizontal: 12, fontSize: 16, color: '#111827' },
 	outlinedFilterWrap: { height: 56, justifyContent: 'center', position: 'relative', flexShrink: 1 },
 	outlinedFilterLabel: {
 		position: 'absolute',
@@ -921,18 +848,6 @@ const styles = StyleSheet.create({
 	inlineSelectFill: { width: '100%', marginBottom: 0 },
 	inlineFilterSelect: { height: 50, borderRadius: 8, backgroundColor: '#ffffff' },
 	compactFilterSelectWrap: { flexGrow: 1, flexShrink: 1, flexBasis: 112, minWidth: 104 },
-	filterIconButton: {
-		width: 48,
-		height: 44,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#e5eaef',
-		backgroundColor: '#ffffff',
-		alignItems: 'center',
-		justifyContent: 'center',
-		flexShrink: 0,
-	},
-	filterIconButtonActive: { backgroundColor: '#e8f5f5', borderColor: '#2B6F71' },
 	filterModalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
 	filterBackdrop: { ...StyleSheet.absoluteFillObject },
 	filterDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.34)' },

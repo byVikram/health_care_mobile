@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import { Ionicons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
 import {
 	AncillaryBooking,
@@ -16,6 +16,7 @@ import CancelledBookingCard from '../components/CancelledBookingCard'
 import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
 import { AppScreenHeader, AppSkeleton } from '../../../components/common'
 import StatusModal from '../../../components/common/StatusModal'
+import BookingsSearchBar from '../../bookings/components/BookingsSearchBar'
 
 type BookingTab = 'upcoming' | 'completed' | 'cancelled'
 
@@ -27,16 +28,44 @@ const TABS: { key: BookingTab; label: string }[] = [
 
 const PAGE_SIZE = 10
 
-export default function MyBookingsPage() {
+interface MyBookingsPageProps {
+	showHeader?: boolean
+	embedded?: boolean
+	searchQuery?: string
+	activeTab?: BookingTab
+}
+
+export default function MyBookingsPage({
+	showHeader = true,
+	embedded = false,
+	searchQuery: propSearchQuery,
+	activeTab: propActiveTab,
+}: MyBookingsPageProps = {}) {
 	const navigation = useNavigation<any>()
 
 	const [bookings, setBookings] = useState<AncillaryBooking[]>([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [loadError, setLoadError] = useState<string | null>(null)
-	const [activeTab, setActiveTab] = useState<BookingTab>('upcoming')
-	const [searchQuery, setSearchQuery] = useState('')
+	const [activeTab, setActiveTab] = useState<BookingTab>(propActiveTab ?? 'upcoming')
+	const [draftActiveTab, setDraftActiveTab] = useState<BookingTab>(propActiveTab ?? 'upcoming')
+	const [searchQuery, setSearchQuery] = useState(propSearchQuery ?? '')
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-	const [filterActive, setFilterActive] = useState(false)
+	const [filterModalVisible, setFilterModalVisible] = useState(false)
+
+	useEffect(() => {
+		if (embedded && propSearchQuery !== undefined) {
+			setSearchQuery(propSearchQuery)
+			setVisibleCount(PAGE_SIZE)
+		}
+	}, [embedded, propSearchQuery])
+
+	useEffect(() => {
+		if (embedded && propActiveTab !== undefined) {
+			setActiveTab(propActiveTab)
+			setDraftActiveTab(propActiveTab)
+			setVisibleCount(PAGE_SIZE)
+		}
+	}, [embedded, propActiveTab])
 
 	// Rating & Review Modal State
 	const [reviewBooking, setReviewBooking] = useState<AncillaryBooking | null>(null)
@@ -186,8 +215,78 @@ export default function MyBookingsPage() {
 	}
 
 	const handleFilterPress = () => {
-		setFilterActive((prev) => !prev)
+		setDraftActiveTab(activeTab)
+		setFilterModalVisible(true)
 	}
+
+	const applyFilters = () => {
+		setActiveTab(draftActiveTab)
+		setVisibleCount(PAGE_SIZE)
+		setFilterModalVisible(false)
+	}
+
+	const resetFilters = () => {
+		setDraftActiveTab('upcoming')
+		setActiveTab('upcoming')
+		setVisibleCount(PAGE_SIZE)
+	}
+
+	const renderFilterModal = () => (
+		<Modal
+			visible={filterModalVisible}
+			transparent
+			animationType="fade"
+			onRequestClose={() => setFilterModalVisible(false)}
+		>
+			<View style={styles.filterModalRoot}>
+				<Pressable style={styles.filterBackdrop} onPress={() => setFilterModalVisible(false)} />
+				<View style={styles.filterSheet}>
+					<View style={styles.filterSheetHandle} />
+					<View style={styles.filterSheetHeader}>
+						<Text style={styles.filterSheetTitle}>Filters</Text>
+						<TouchableOpacity style={styles.filterCloseButton} onPress={() => setFilterModalVisible(false)}>
+							<Ionicons name="close" size={22} color="#64748B" />
+						</TouchableOpacity>
+					</View>
+
+					<View style={styles.filterGroup}>
+						<Text style={styles.filterGroupLabel}>Booking Status</Text>
+						<ScrollView
+							horizontal
+							showsHorizontalScrollIndicator={false}
+							contentContainerStyle={styles.filterChipRow}
+							keyboardShouldPersistTaps="handled"
+						>
+							{TABS.map((tab) => {
+								const selected = draftActiveTab === tab.key
+								return (
+									<TouchableOpacity
+										key={tab.key}
+										style={[styles.filterChip, selected && styles.filterChipActive]}
+										onPress={() => setDraftActiveTab(tab.key)}
+										activeOpacity={0.82}
+									>
+										<Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>
+											{tab.label}
+										</Text>
+									</TouchableOpacity>
+								)
+							})}
+						</ScrollView>
+					</View>
+
+					<View style={styles.filterSheetActions}>
+						<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
+							<Text style={styles.resetButtonText}>Reset</Text>
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
+							<Text style={styles.applyButtonText}>Apply Filters</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+			</View>
+		</Modal>
+	)
 
 	const renderItem = ({ item }: { item: AncillaryBooking }) => {
 		if (item.status === 'upcoming') {
@@ -215,60 +314,26 @@ export default function MyBookingsPage() {
 
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader
-				title="Ancillary Orders"
-				rightElement={null}
-			/>
+			{showHeader && (
+				<AppScreenHeader
+					title="Ancillary Orders"
+					rightElement={null}
+				/>
+			)}
 
-			<View style={styles.searchSectionContainer}>
-				<View style={styles.searchRow}>
-					<View style={styles.searchBar}>
-						<Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
-						<TextInput
-							style={styles.searchInput}
-							placeholder="Search provider, service or date..."
-							placeholderTextColor="#94A3B8"
-							value={searchQuery}
-							onChangeText={(text) => {
-								setSearchQuery(text)
-								setVisibleCount(PAGE_SIZE)
-							}}
-						/>
-						{searchQuery.length > 0 && (
-							<TouchableOpacity onPress={() => setSearchQuery('')}>
-								<Ionicons name="close-circle" size={18} color="#94A3B8" />
-							</TouchableOpacity>
-						)}
-					</View>
-					<TouchableOpacity
-						style={[styles.filterIconButton, filterActive && styles.filterIconButtonActive]}
-						onPress={handleFilterPress}
-						activeOpacity={0.84}
-					>
-						<MaterialCommunityIcons name="tune" size={22} color={filterActive ? '#ffffff' : '#2B6F71'} />
-					</TouchableOpacity>
-				</View>
-			</View>
-
-			<View style={styles.tabsRow}>
-				{TABS.map((tab) => {
-					const isActive = tab.key === activeTab
-					return (
-						<TouchableOpacity
-							key={tab.key}
-							style={styles.tabItem}
-							onPress={() => {
-								setActiveTab(tab.key)
-								setVisibleCount(PAGE_SIZE)
-							}}
-							activeOpacity={0.8}
-						>
-							<Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
-							{isActive ? <View style={styles.tabIndicator} /> : null}
-						</TouchableOpacity>
-					)
-				})}
-			</View>
+			{!embedded && (
+				<BookingsSearchBar
+					value={searchQuery}
+					onChangeText={(text) => {
+						setSearchQuery(text)
+						setVisibleCount(PAGE_SIZE)
+					}}
+					placeholder="Search provider, service or date..."
+					onFilterPress={handleFilterPress}
+					filterActive={activeTab !== 'upcoming' || filterModalVisible}
+					accessibilityLabel="Filter ancillary bookings"
+				/>
+			)}
 
 			{isLoading ? (
 				<View style={styles.listContent}>
@@ -339,6 +404,7 @@ export default function MyBookingsPage() {
 					onCancel={() => setStatusModal(null)}
 				/>
 			)}
+			{renderFilterModal()}
 		</View>
 	)
 }
@@ -348,48 +414,132 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#F8FAFA',
 	},
-	searchSectionContainer: {
-		paddingHorizontal: 16,
-		paddingVertical: 12,
+	filterModalRoot: {
+		flex: 1,
+		justifyContent: 'flex-end',
+		alignItems: 'center',
+		backgroundColor: 'rgba(15, 23, 42, 0.34)',
+	},
+	filterBackdrop: {
+		...StyleSheet.absoluteFillObject,
+	},
+	filterSheet: {
+		width: '100%',
+		maxWidth: 520,
 		backgroundColor: '#FFFFFF',
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
+		paddingTop: 8,
+		paddingBottom: 26,
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: -10 },
+		shadowOpacity: 0.14,
+		shadowRadius: 24,
+		elevation: 18,
 	},
-	searchRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 10,
-	},
-	searchBar: {
-		flex: 1,
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#F8FAFC',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
+	filterSheetHandle: {
+		width: 44,
+		height: 4,
 		borderRadius: 999,
-		paddingHorizontal: 14,
-		height: 48,
+		backgroundColor: '#D7DEE6',
+		alignSelf: 'center',
+		marginBottom: 10,
 	},
-	searchIcon: {
-		marginRight: 8,
+	filterSheetHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 18,
+		paddingBottom: 12,
 	},
-	searchInput: {
-		flex: 1,
-		fontSize: 14,
-		color: '#1E293B',
+	filterSheetTitle: {
+		fontSize: 18,
+		lineHeight: 24,
+		fontWeight: '700',
+		color: '#111827',
 	},
-	filterIconButton: {
-		width: 48,
-		height: 48,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		backgroundColor: '#F8FAFC',
+	filterCloseButton: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	filterIconButtonActive: {
+	filterGroup: {
+		gap: 10,
+		paddingHorizontal: 18,
+		paddingTop: 4,
+		paddingBottom: 20,
+	},
+	filterGroupLabel: {
+		fontSize: 11,
+		lineHeight: 14,
+		fontWeight: '800',
+		color: '#64748B',
+		textTransform: 'uppercase',
+	},
+	filterChipRow: {
+		flexDirection: 'row',
+		gap: 10,
+		paddingVertical: 1,
+	},
+	filterChip: {
+		minHeight: 38,
+		minWidth: 74,
+		borderRadius: 19,
+		paddingHorizontal: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#F2F6FB',
+		flexShrink: 0,
+	},
+	filterChipActive: {
 		backgroundColor: '#2B6F71',
-		borderColor: '#2B6F71',
+	},
+	filterChipText: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+		color: '#64748B',
+	},
+	filterChipTextActive: {
+		color: '#FFFFFF',
+	},
+	filterSheetActions: {
+		flexDirection: 'row',
+		paddingHorizontal: 18,
+		paddingTop: 12,
+		gap: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#E2E8F0',
+	},
+	resetButton: {
+		flex: 1,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+		backgroundColor: '#FFFFFF',
+	},
+	resetButtonText: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#64748B',
+	},
+	applyButton: {
+		flex: 2,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#2B6F71',
+	},
+	applyButtonText: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#FFFFFF',
 	},
 	tabsRow: {
 		flexDirection: 'row',

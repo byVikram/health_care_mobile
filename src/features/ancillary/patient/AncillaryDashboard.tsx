@@ -55,8 +55,9 @@ const EXPLORE_SERVICES: ServiceItem[] = [
 		key: 'medical-equipment',
 		title: 'Medical\nEquipment',
 		image: 'https://images.unsplash.com/photo-1576671081837-49000212a370?auto=format&fit=crop&q=80&w=150',
-		routeType: 'main',
-		route: ROUTES.MAIN.PORTAL,
+		routeType: 'stack',
+		route: ROUTES.STACK.ANCILLARY_SERVICES,
+		params: { serviceKey: 'medical-equipment', serviceLabel: 'Medical Equipment' },
 	},
 ]
 

@@ -14,7 +14,8 @@ import { AppTypography } from '../../../components/common'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import CapabilitiesTab from './tabs/CapabilitiesTab'
-import { fetchAncillaryProfileBackend } from '../../ancillary/ancillaryService'
+import AvailabilityTab from './tabs/AvailabilityTab'
+import { fetchProviderProfileBackend } from '../../ancillary/ancillaryService'
 
 type TabDefinition = {
 	key: string
@@ -26,7 +27,7 @@ const TABS: TabDefinition[] = [
 	{ key: 'personal', label: 'Personal Details', Component: PersonalDetailsTab },
 	{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
 	{ key: 'categories', label: 'Capabilities', Component: CapabilitiesTab },
-	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
+	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
 ]
 
 export default function AncillaryProfileLayout() {
@@ -50,7 +51,7 @@ export default function AncillaryProfileLayout() {
 					return
 				}
 
-				const profile = await fetchAncillaryProfileBackend()
+				const profile = await fetchProviderProfileBackend()
 				if (profile && isMounted) {
 					const hasCaps = Array.isArray(profile.checked_procedures) && profile.checked_procedures.length > 0
 					const hasProf = Boolean(profile.license_number || profile.qualifications)
