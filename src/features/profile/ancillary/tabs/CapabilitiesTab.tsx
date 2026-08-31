@@ -251,7 +251,7 @@ export default function CapabilitiesTab({
 						matchedProcedures = filtered.map((s) => ({
 							id: s.id,
 							label: s.title,
-							subtitle: s.description || (s.duration ? `Duration: ${s.duration}` : undefined),
+							subtitle: s.description || ((s as any).duration ? `Duration: ${(s as any).duration}` : undefined),
 							rate: s.price > 0 ? `₹${Math.round(s.price)}` : 'Custom Pricing',
 							price: s.price,
 							specialtyKey: resolvedSpecialty,
@@ -273,8 +273,8 @@ export default function CapabilitiesTab({
 				if (profile) {
 					if (Array.isArray(profile.checked_procedures)) {
 						savedList = profile.checked_procedures
-					} else if (Array.isArray(profile.capabilities)) {
-						savedList = profile.capabilities.map((c: any) => c.public_id || c.procedure_id || c.id || c.name || c)
+					} else if (Array.isArray((profile as any).capabilities)) {
+						savedList = (profile as any).capabilities.map((c: any) => c.public_id || c.procedure_id || c.id || c.name || c)
 					}
 				} else {
 					// Fallback to local storage only if backend profile couldn't be loaded (e.g. offline)

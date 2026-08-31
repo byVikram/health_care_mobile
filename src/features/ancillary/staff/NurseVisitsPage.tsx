@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import { fetchMyNurseAppointmentsBackend, NurseBooking } from '../ancillaryService'
+import { getNurseAppointments, NurseBooking } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
 import ServiceStatusIndicator from '../components/ServiceStatusIndicator'
 
@@ -14,7 +14,7 @@ export default function NurseVisitsPage() {
 	React.useEffect(() => {
 		const loadData = async () => {
 			try {
-				const items = await fetchMyNurseAppointmentsBackend()
+				const items = await getNurseAppointments()
 				setBookings(items)
 			} catch (e) {
 				console.log('Error loading visits')

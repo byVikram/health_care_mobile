@@ -13,7 +13,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState, updateNurseStatusBackend } from '../ancillaryService'
+import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState, updateNurseStatus } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
 import ServiceTimeline from '../components/ServiceTimeline'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
@@ -120,7 +120,7 @@ export default function ActiveBookingPage() {
 	const handleStartTraveling = async () => {
 		if (!booking) return
 		try {
-			await updateNurseStatusBackend(booking.id, 'EN_ROUTE', 12)
+			await updateNurseStatus(booking.id, 'EN_ROUTE', 12)
 			setBooking((prev) => (prev ? { ...prev, status: 'EN_ROUTE' } : null))
 			Alert.alert('Status Updated', 'You are now marked as En-Route. Patient has been notified of your estimated arrival in 12 mins.')
 		} catch (e) {
@@ -131,7 +131,7 @@ export default function ActiveBookingPage() {
 	const handleArrived = async () => {
 		if (!booking) return
 		try {
-			await updateNurseStatusBackend(booking.id, 'ARRIVED', 0)
+			await updateNurseStatus(booking.id, 'ARRIVED', 0)
 			setBooking((prev) => (prev ? { ...prev, status: 'ARRIVED' } : null))
 			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id })
 		} catch (e) {

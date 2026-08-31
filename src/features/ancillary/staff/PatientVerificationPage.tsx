@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { MOCK_NURSE_BOOKINGS, NurseBooking, saveBookingState, verifyPatientOtpBackend } from '../ancillaryService'
+import { MOCK_NURSE_BOOKINGS, NurseBooking, saveBookingState, verifyPatientOtp } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
 import OtpPinInput from '../components/OtpPinInput'
 import ServiceTimeline from '../components/ServiceTimeline'
@@ -100,7 +100,7 @@ export default function PatientVerificationPage() {
 
 		setVerifying(true)
 		try {
-			const res = await verifyPatientOtpBackend(booking.id, pin)
+			const res = await verifyPatientOtp(booking.id, pin)
 			if (res.success || pin === booking.otpCode || pin === '4829' || pin === '1234') {
 				const now = new Date().toISOString()
 				const initialState = {

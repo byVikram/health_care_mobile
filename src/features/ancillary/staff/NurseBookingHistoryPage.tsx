@@ -12,7 +12,7 @@ import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppSkeleton } from '../../../components/common'
 import { ROUTES } from '../../../navigation/routes'
-import { fetchMyNurseAppointmentsBackend, NurseBooking } from '../ancillaryService'
+import { getNurseAppointments, NurseBooking } from '../ancillaryService'
 
 export type HistoryFilterOption = 'all' | 'accepted' | 'rejected' | 'completed'
 
@@ -20,7 +20,7 @@ const ACCEPTED_FAMILY_STATUSES = ['assigned', 'verification_pending', 'in_progre
 
 /**
  * Nurse Bookings (complete history) -- reached from the bottom-nav Bookings tab
- * for the Nurse persona. Reuses the same fetchMyNurseAppointmentsBackend API,
+ * for the Nurse persona. Reuses the same getNurseAppointments API,
  * card design, and loading/error/empty-state pattern as Today's Activity, but
  * surfaces the nurse's entire booking history (the API already returns every
  * request ever assigned to the provider, most-recent-first) instead of just
@@ -46,7 +46,7 @@ export default function NurseBookingHistoryPage() {
 		setIsLoading(true)
 		setLoadError(null)
 		try {
-			const appointments = await fetchMyNurseAppointmentsBackend()
+			const appointments = await getNurseAppointments()
 			setMyBookings(appointments)
 		} catch (e) {
 			setLoadError('Unable to load your bookings right now. Please try again.')

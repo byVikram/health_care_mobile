@@ -15,7 +15,7 @@ import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-ic
 import { ROUTES } from '../../../navigation/routes'
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
-import { fetchPatientActiveRequestBackend, AncillaryBooking } from '../ancillaryService'
+import { getActivePatientRequest, AncillaryBooking } from '../ancillaryService'
 
 interface ServiceItem {
 	key: string
@@ -210,7 +210,7 @@ export default function AncillaryDashboard() {
 	React.useEffect(() => {
 		const loadActiveRequest = async () => {
 			try {
-				const active = await fetchPatientActiveRequestBackend()
+				const active = await getActivePatientRequest()
 				setActiveBooking(active)
 			} catch (err) {
 				console.log('[AncillaryDashboard] Error loading active booking')

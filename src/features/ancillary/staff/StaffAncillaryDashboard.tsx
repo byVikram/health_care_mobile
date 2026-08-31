@@ -13,12 +13,12 @@ import {
 	MOCK_NURSE_BOOKINGS,
 	NurseBooking,
 	getBookingState,
-	acceptCareRequestBackend,
-	fetchMyNurseAppointmentsBackend,
-	fetchProviderStatusBackend,
-	updateProviderStatusBackend,
-	updateProviderLocationBackend,
-	fetchAncillaryProfileBackend,
+	acceptCareRequest,
+	getNurseAppointments,
+	fetchProviderStatus,
+	updateProviderStatus,
+	updateProviderLocation,
+	fetchProviderProfile,
 	SoftReviewRequestData,
 	AuthorizedDetailedPatientInfo,
 } from '../ancillaryService'
@@ -59,13 +59,13 @@ export default function StaffAncillaryDashboard() {
 		let isMounted = true
 		const loadStatus = async () => {
 			try {
-				const profile = await fetchAncillaryProfileBackend()
+				const profile = await fetchProviderProfile()
 				if (!isMounted) return
-				const verified = Boolean(profile?.is_verified || profile?.verification_status === 'approved')
+				const verified = Boolean((profile as any)?.is_verified || (profile as any)?.verification_status === 'approved')
 				setIsVerified(verified)
 
 				if (verified) {
-					const status = await fetchProviderStatusBackend()
+					const status = await fetchProviderStatus()
 					if (status && isMounted) {
 						setIsNurseOnline(status.isOnline)
 					}
@@ -90,13 +90,13 @@ export default function StaffAncillaryDashboard() {
 			try {
 				const loc = await getCurrentLocation()
 				if (loc && loc.latitude != null && loc.longitude != null) {
-					await updateProviderLocationBackend(loc.latitude, loc.longitude)
+					await updateProviderLocation(loc.latitude, loc.longitude)
 				}
 			} catch (err) {
 				// Fallback if permission not granted or location unavailable
 				const defaultLat = 12.9716
 				const defaultLng = 77.5946
-				await updateProviderLocationBackend(defaultLat, defaultLng)
+				await updateProviderLocation(defaultLat, defaultLng)
 			}
 		}
 
@@ -202,7 +202,7 @@ export default function StaffAncillaryDashboard() {
 		} catch (_) {
 			// Permission denied or unavailable — backend will use last known location
 		}
-		await updateProviderStatusBackend(online, lat, lng)
+		await updateProviderStatus(online, lat, lng)
 		if (!online) {
 			setIncomingRequest(null)
 			setDetailedInfo(null)
@@ -220,7 +220,7 @@ export default function StaffAncillaryDashboard() {
 		if (!incomingRequest) return
 		setAcceptLoading(true)
 		try {
-			const result = await acceptCareRequestBackend(incomingRequest.id, false)
+			const result = await acceptCareRequest(incomingRequest.id, false)
 			if (result.alreadyClaimed || !result.success) {
 				setIncomingRequest(null)
 				setDetailedInfo(null)
@@ -274,7 +274,7 @@ export default function StaffAncillaryDashboard() {
 	useEffect(() => {
 		const syncStatuses = async () => {
 			try {
-				const myAppointments = await fetchMyNurseAppointmentsBackend()
+				const myAppointments = await getNurseAppointments()
 				if (myAppointments) {
 					setBookings(myAppointments)
 				}

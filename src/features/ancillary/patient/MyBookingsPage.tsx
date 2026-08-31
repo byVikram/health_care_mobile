@@ -6,7 +6,7 @@ import { ROUTES } from '../../../navigation/routes'
 import {
 	AncillaryBooking,
 	AncillaryReviewData,
-	fetchMyPatientBookingsBackend,
+	fetchMyPatientBookings,
 	getAncillaryReviewByBookingId,
 	submitAncillaryReview,
 } from '../ancillaryService'
@@ -84,7 +84,7 @@ export default function MyBookingsPage({
 		setIsLoading(true)
 		setLoadError(null)
 		try {
-			const data = await fetchMyPatientBookingsBackend()
+			const data = await fetchMyPatientBookings()
 			setBookings(data)
 		} catch (error) {
 			setLoadError('Unable to load your ancillary orders right now. Please try again.')

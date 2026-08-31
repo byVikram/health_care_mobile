@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { fetchMyNurseAppointmentsBackend, NurseBooking } from '../ancillaryService'
+import { getNurseAppointments, NurseBooking } from '../ancillaryService'
 
 export default function NurseHistoryPage() {
 	const [searchQuery, setSearchQuery] = useState('')
@@ -10,7 +10,7 @@ export default function NurseHistoryPage() {
 	React.useEffect(() => {
 		const loadData = async () => {
 			try {
-				const items = await fetchMyNurseAppointmentsBackend()
+				const items = await getNurseAppointments()
 				setVisits(items.filter((b: NurseBooking) => b.status === 'completed'))
 			} catch (e) {
 				console.log('Error loading history')

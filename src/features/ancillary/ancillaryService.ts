@@ -1156,6 +1156,7 @@ export const updateProviderProfileBackend = async (payload: {
 	specialty?: string | { id?: string; label?: string }
 	geofence_radius?: number
 	geofence_radius_km?: number
+	checked_procedures?: string[]
 }): Promise<boolean> => {
 	try {
 		await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, payload)
@@ -1166,5 +1167,27 @@ export const updateProviderProfileBackend = async (payload: {
 	}
 }
 
+export const updateAncillaryCapabilitiesBackend = async (checkedProcedures: string[]): Promise<boolean> => {
+	return updateProviderProfileBackend({ checked_procedures: checkedProcedures })
+}
+
 
 export const fetchAncillaryProfileBackend = fetchProviderProfileBackend;
+
+// --- Clean Function Aliases (without Backend suffix) ---
+export const fetchAncillaryCategories = fetchAncillaryCategoriesBackend
+export const fetchAncillaryServices = fetchAncillaryServicesBackend
+export const acceptCareRequest = acceptCareRequestBackend
+export const verifyPatientOtp = verifyPatientOtpBackend
+export const updateNurseStatus = updateNurseStatusBackend
+export const fetchAvailableRequests = fetchAvailableRequestsBackend
+export const getNurseAppointments = fetchMyNurseAppointmentsBackend
+export const getActivePatientRequest = fetchPatientActiveRequestBackend
+export const updateProviderLocation = updateProviderLocationBackend
+export const cancelCareRequestPatient = cancelCareRequestPatientBackend
+export const fetchProviderStatus = fetchProviderStatusBackend
+export const updateProviderStatus = updateProviderStatusBackend
+export const fetchMyPatientBookings = fetchMyPatientBookingsBackend
+export const fetchProviderProfile = fetchProviderProfileBackend
+export const updateProviderProfile = updateProviderProfileBackend
+export const fetchAncillaryProfile = fetchAncillaryProfileBackend

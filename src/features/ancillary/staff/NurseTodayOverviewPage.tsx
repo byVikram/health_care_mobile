@@ -12,7 +12,7 @@ import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppSkeleton } from '../../../components/common'
 import { ROUTES } from '../../../navigation/routes'
-import { fetchAvailableRequestsBackend, fetchMyNurseAppointmentsBackend, NurseBooking } from '../ancillaryService'
+import { fetchAvailableRequests, getNurseAppointments, NurseBooking } from '../ancillaryService'
 
 export type FilterOption = 'all' | 'accepted' | 'completed' | 'cancelled'
 
@@ -35,7 +35,7 @@ export default function NurseTodayOverviewPage() {
 		setIsLoading(true)
 		setLoadError(null)
 		try {
-			const appointments = await fetchMyNurseAppointmentsBackend()
+			const appointments = await getNurseAppointments()
 			setMyBookings(appointments)
 		} catch (e) {
 			setLoadError('Unable to load today\'s activity right now. Please try again.')
@@ -45,7 +45,7 @@ export default function NurseTodayOverviewPage() {
 	}, [])
 
 	useEffect(() => {
-		fetchAvailableRequestsBackend()
+		fetchAvailableRequests()
 			.then((available) => setRequestsReceivedCount(available.length))
 			.catch(() => console.log('[NurseTodayOverviewPage] Available requests fetch error'))
 
