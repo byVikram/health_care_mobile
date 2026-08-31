@@ -1,15 +1,15 @@
-import React, { useState, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
+	ActivityIndicator,
 	BackHandler,
 	Image,
 	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
 	View,
-	useWindowDimensions,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from '../../../navigation/routes'
 import { AppTypography, AppInput } from '../../../components/common'
@@ -18,6 +18,12 @@ import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCard'
 import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
+import {
+	AncillaryCategoryApiItem,
+	AncillaryServiceItem,
+	fetchAncillaryCategoriesBackend,
+	fetchAncillaryServicesBackend,
+} from '../ancillaryService'
 
 interface CategoryGroup {
 	id: string
@@ -25,160 +31,186 @@ interface CategoryGroup {
 	procedures: ServiceProcedureItem[]
 }
 
-const CATEGORY_CARDS = [
-	{
-		id: 'all',
-		label: 'All Services',
-		sublabel: '8 Available',
+interface NursingCarePageProps {
+	serviceKey?: string
+	serviceLabel?: string
+}
+
+const SERVICE_UI = {
+	'nursing-care': {
+		title: 'Nursing Care & Procedures',
+		searchPlaceholder: 'Search procedures e.g. Dressing, IV, Injection...',
+		featuredTitle: 'Instant Home Nurse Dispatch (~25 mins)',
+		urgentTitle: 'Need Urgent Nursing',
+		bullets: ['Verified RNs', 'Sterile Medical Equipment', '24/7 Availability'],
+		emptyTitle: 'No Procedures Found',
+		emptySub: 'Try searching with another term or reset your category filter.',
+		badge: 'Verified RN',
 		image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=300&q=80',
 	},
-	{
-		id: 'gen',
-		label: 'General Care',
-		sublabel: '4 Available',
-		image: 'https://images.unsplash.com/photo-1631815588090-d4bfec5b1cdb?auto=format&fit=crop&w=300&q=80',
+	physiotherapy: {
+		title: 'Physiotherapy',
+		searchPlaceholder: 'Search physiotherapy e.g. Back pain, Mobility, Rehab...',
+		featuredTitle: 'Instant Home Physiotherapy (~25 mins)',
+		urgentTitle: 'Need Urgent Physiotherapy',
+		bullets: ['Verified Physiotherapists', 'Guided Recovery Plans', 'Home Sessions'],
+		emptyTitle: 'No Physiotherapy Services Found',
+		emptySub: 'Try searching with another term or reset your category filter.',
+		badge: 'Verified PT',
+		image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=300&q=80',
 	},
-	{
-		id: 'wound',
-		label: 'Wound Care',
-		sublabel: '2 Available',
-		image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=300&q=80',
+	'rehab-care': {
+		title: 'Rehab Care',
+		searchPlaceholder: 'Search rehab care e.g. Stroke, Cardiac, Occupational...',
+		featuredTitle: 'Instant Rehab Care Support (~25 mins)',
+		urgentTitle: 'Need Urgent Rehab Support',
+		bullets: ['Verified Rehab Specialists', 'Recovery Programs', 'At-home Support'],
+		emptyTitle: 'No Rehab Services Found',
+		emptySub: 'Try searching with another term or reset your category filter.',
+		badge: 'Verified Rehab',
+		image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=300&q=80',
 	},
-	{
-		id: 'spec',
-		label: 'Specialized Care',
-		sublabel: '2 Available',
-		image: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=300&q=80',
+	'medical-equipment': {
+		title: 'Medical Equipment',
+		searchPlaceholder: 'Search equipment e.g. Bed, Oxygen, Wheelchair...',
+		featuredTitle: 'Instant Medical Equipment Delivery (~25 mins)',
+		urgentTitle: 'Need Urgent Medical Equipment',
+		bullets: ['Sanitized Equipment', 'Home Delivery', 'Setup Support'],
+		emptyTitle: 'No Equipment Found',
+		emptySub: 'Try searching with another term or reset your category filter.',
+		badge: 'Sanitized',
+		image: 'https://images.unsplash.com/photo-1584515933487-779824d29309?auto=format&fit=crop&w=300&q=80',
 	},
-]
+} as const
 
-const ALL_NURSING_CATEGORIES: CategoryGroup[] = [
-	{
-		id: 'gen',
-		categoryName: 'General Nursing Procedures',
-		procedures: [
-			{
-				id: 'gen1',
-				title: 'Wound Dressing & Care',
-				description: 'Sterile dressing for surgical, burn, or chronic diabetic wounds',
-				duration: '30 - 45 mins',
-				price: '₹499',
-				image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=80',
-				verified: true,
-			},
-			{
-				id: 'gen2',
-				title: 'IV Fluids & Saline Drip',
-				description: 'Intravenous fluid infusion & saline drip under doctor prescription',
-				duration: '45 - 60 mins',
-				price: '₹799',
-				image: 'https://images.unsplash.com/photo-1631815588090-d4bfec5b1cdb?auto=format&fit=crop&w=500&q=80',
-				verified: true,
-			},
-			{
-				id: 'gen3',
-				title: 'Vitals & Blood Sugar Check',
-				description: 'Blood pressure, pulse, glucose & temperature check at home',
-				duration: '20 mins',
-				price: '₹199',
-				image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
-			},
-			{
-				id: 'gen4',
-				title: 'Injection Administration (IM/IV)',
-				description: 'Safe injection administration by certified nursing specialists',
-				duration: '15 - 30 mins',
-				price: '₹299',
-				image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
-				verified: true,
-			},
-		],
-	},
-	{
-		id: 'wound',
-		categoryName: 'Wound & Recovery Care',
-		procedures: [
-			{
-				id: 'wound1',
-				title: 'Post-Surgical Dressing',
-				description: 'Advanced wound debridement & sterile bandage change',
-				duration: '40 mins',
-				price: '₹599',
-				image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
-				verified: true,
-			},
-			{
-				id: 'wound2',
-				title: 'Suture & Staple Removal',
-				description: 'Safe removal of surgical sutures or staples by trained nurses',
-				duration: '30 mins',
-				price: '₹449',
-				image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=80',
-				verified: true,
-			},
-		],
-	},
-	{
-		id: 'spec',
-		categoryName: 'Specialized High Dependency Care',
-		procedures: [
-			{
-				id: 'spec1',
-				title: 'Tracheostomy Care & Hygiene',
-				description: 'Suctioning, tube cleaning, and airway hygiene maintenance',
-				duration: '60 mins',
-				price: 'Custom Pricing',
-				image: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=500&q=80',
-				premiumBadgeText: 'PREMIUM',
-				actionLabel: 'Enquire',
-			},
-			{
-				id: 'spec2',
-				title: 'Ryle’s Tube Insertion & Care',
-				description: 'Nasogastric tube insertion, feeding assistance & monitoring',
-				duration: '45 mins',
-				price: 'Custom Pricing',
-				image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=500&q=80',
-				verified: true,
-				actionLabel: 'Enquire',
-			},
-		],
-	},
-]
+const formatPrice = (price: unknown) => {
+	const numeric = Number(price)
+	if (!Number.isFinite(numeric) || numeric <= 0) return 'Custom Pricing'
+	return `₹${numeric}`
+}
 
-export default function NursingCarePage() {
+const readValue = (item: any, keys: string[], fallback = '') => {
+	for (const key of keys) {
+		const value = item?.[key]
+		if (value !== undefined && value !== null && String(value).trim().length > 0) {
+			return String(value)
+		}
+	}
+	return fallback
+}
+
+const mapBackendService = (
+	item: AncillaryServiceItem,
+	ui: (typeof SERVICE_UI)[keyof typeof SERVICE_UI]
+): ServiceProcedureItem => {
+	const priceValue = (item as any).price ?? (item as any).basePrice ?? (item as any).startingPrice
+	const price = formatPrice(priceValue)
+
+	return {
+		id: readValue(item, ['id', 'publicId', 'public_id', 'serviceId'], `service-${Date.now()}`),
+		title: readValue(item, ['title', 'name', 'serviceName', 'label'], 'Healthcare Service'),
+		description: readValue(item, ['description', 'subtitle', 'details'], 'Professional care service at your doorstep.'),
+		duration: readValue(item, ['duration', 'estimatedDuration', 'estimated_duration', 'time'], '30 - 45 mins'),
+		price,
+		image: readValue(item, ['image', 'imageUrl', 'image_url', 'thumbnailUrl', 'thumbnail'], ui.image),
+		verified: true,
+		premiumBadgeText: ui.badge,
+		actionLabel: price === 'Custom Pricing' ? 'Enquire' : 'Select',
+	}
+}
+
+export default function NursingCarePage({ serviceKey = 'nursing-care', serviceLabel }: NursingCarePageProps) {
 	const navigation = useNavigation<any>()
 	const insets = useSafeAreaInsets()
-	const { width } = useWindowDimensions()
+	const ui = SERVICE_UI[serviceKey as keyof typeof SERVICE_UI] || {
+		...SERVICE_UI['nursing-care'],
+		title: serviceLabel || SERVICE_UI['nursing-care'].title,
+	}
 
 	const [searchQuery, setSearchQuery] = useState('')
 	const [activeCategory, setActiveCategory] = useState('all')
+	const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([])
+	const [isLoading, setIsLoading] = useState(true)
+	const [loadError, setLoadError] = useState('')
 	const [selectedServicesMap, setSelectedServicesMap] = useState<Record<string, { item: ServiceProcedureItem; qty: number }>>({})
 	const [detailSheetItem, setDetailSheetItem] = useState<ServiceProcedureItem | null>(null)
 
-	// Filtered Procedure Groups
-	const filteredCategories = useMemo(() => {
-		return ALL_NURSING_CATEGORIES.map((cat) => {
-			if (activeCategory !== 'all' && cat.id !== activeCategory) {
-				return null
+	useEffect(() => {
+		let isMounted = true
+
+		const loadServices = async () => {
+			setIsLoading(true)
+			setLoadError('')
+			try {
+				const [categories, services] = await Promise.all([
+					fetchAncillaryCategoriesBackend(serviceKey),
+					fetchAncillaryServicesBackend({ specialtyId: serviceKey }),
+				])
+
+				if (!isMounted) return
+
+				const categoryMap = new Map<string, AncillaryCategoryApiItem>()
+				categories.forEach((cat) => categoryMap.set(String(cat.id), cat))
+
+				const grouped = services.reduce<Record<string, CategoryGroup>>((acc, service) => {
+					const categoryId = readValue(service, ['categoryId', 'category_id'], 'available')
+					const categoryName =
+						readValue(service, ['categoryName', 'category_name']) ||
+						categoryMap.get(categoryId)?.label ||
+						'Available Services'
+
+					if (!acc[categoryId]) {
+						acc[categoryId] = { id: categoryId, categoryName, procedures: [] }
+					}
+					acc[categoryId].procedures.push(mapBackendService(service, ui))
+					return acc
+				}, {})
+
+				setCategoryGroups(Object.values(grouped))
+			} catch (error) {
+				if (isMounted) {
+					setLoadError('Unable to load services right now.')
+					setCategoryGroups([])
+				}
+			} finally {
+				if (isMounted) setIsLoading(false)
 			}
+		}
+
+		loadServices()
+
+		return () => {
+			isMounted = false
+		}
+	}, [serviceKey])
+
+	const filteredCategories = useMemo(() => {
+		return categoryGroups.map((cat) => {
+			if (activeCategory !== 'all' && cat.id !== activeCategory) return null
+
 			const matchingProcedures = cat.procedures.filter((p) => {
-				const matchesSearch =
-					p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					p.description.toLowerCase().includes(searchQuery.toLowerCase())
-				return matchesSearch
+				const query = searchQuery.toLowerCase()
+				return p.title.toLowerCase().includes(query) || p.description.toLowerCase().includes(query)
 			})
 
 			if (matchingProcedures.length === 0) return null
-
-			return {
-				...cat,
-				procedures: matchingProcedures,
-			}
+			return { ...cat, procedures: matchingProcedures }
 		}).filter(Boolean) as CategoryGroup[]
-	}, [searchQuery, activeCategory])
+	}, [searchQuery, activeCategory, categoryGroups])
 
-	// Total Cart Computations
+	const categoryCards = useMemo(() => {
+		const totalCount = categoryGroups.reduce((sum, group) => sum + group.procedures.length, 0)
+		return [
+			{ id: 'all', label: 'All Services', sublabel: `${totalCount} Available`, image: ui.image },
+			...categoryGroups.map((group) => ({
+				id: group.id,
+				label: group.categoryName,
+				sublabel: `${group.procedures.length} Available`,
+				image: group.procedures[0]?.image || ui.image,
+			})),
+		].slice(0, 4)
+	}, [categoryGroups, ui.image])
+
 	const selectedItemsList = useMemo(() => {
 		return Object.values(selectedServicesMap).filter((x) => x.qty > 0).map((x) => x.item)
 	}, [selectedServicesMap])
@@ -197,10 +229,7 @@ export default function NursingCarePage() {
 	const handleIncrement = (item: ServiceProcedureItem) => {
 		setSelectedServicesMap((prev) => {
 			const current = prev[item.id]?.qty || 0
-			return {
-				...prev,
-				[item.id]: { item, qty: current + 1 },
-			}
+			return { ...prev, [item.id]: { item, qty: current + 1 } }
 		})
 	}
 
@@ -212,10 +241,7 @@ export default function NursingCarePage() {
 				delete next[item.id]
 				return next
 			}
-			return {
-				...prev,
-				[item.id]: { item, qty: current - 1 },
-			}
+			return { ...prev, [item.id]: { item, qty: current - 1 } }
 		})
 	}
 
@@ -224,6 +250,8 @@ export default function NursingCarePage() {
 		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
 			services: selectedItemsList,
 			selectedServices: selectedItemsList,
+			serviceKey,
+			serviceLabel: serviceLabel || ui.title,
 		})
 	}
 
@@ -231,7 +259,7 @@ export default function NursingCarePage() {
 		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME })
 	}
 
-	React.useEffect(() => {
+	useEffect(() => {
 		const onBackPress = () => {
 			handleGoHome()
 			return true
@@ -243,10 +271,8 @@ export default function NursingCarePage() {
 
 	return (
 		<View style={styles.container}>
-			{/* App Bar / Header */}
-			<AppScreenHeader title="Nursing Care & Procedures" onBack={handleGoHome} />
+			<AppScreenHeader title={ui.title} onBack={handleGoHome} />
 
-			{/* Main Scroll Content */}
 			<ScrollView
 				contentContainerStyle={[
 					styles.scrollContent,
@@ -254,13 +280,12 @@ export default function NursingCarePage() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* 1. Search Bar */}
 				<AppInput
 					isSearch
 					noMargin
 					fieldSize="form"
 					borderRadius={12}
-					placeholder="Search procedures e.g. Dressing, IV, Injection..."
+					placeholder={ui.searchPlaceholder}
 					placeholderTextColor="#546E7A"
 					value={searchQuery}
 					onChangeText={setSearchQuery}
@@ -280,34 +305,31 @@ export default function NursingCarePage() {
 					}
 				/>
 
-				{/* 2. Dispatch Banner */}
-				<View style={styles.dispatchBanner}>
-					<View style={styles.boltIconWrap}>
-						<MaterialCommunityIcons name="flash" size={18} color="#FFFFFF" />
-					</View>
-					<View style={styles.bannerTextCol}>
-						<AppTypography variant="h4" style={styles.bannerTitle}>
-							Instant Home Nurse Dispatch (~25 mins)
-						</AppTypography>
-						<View style={styles.bulletRow}>
-							<AppTypography variant="caption" style={styles.bulletText}>
-								Verified RNs
+				{[ui.featuredTitle, ui.urgentTitle].map((title) => (
+					<View key={title} style={styles.dispatchBanner}>
+						<View style={styles.boltIconWrap}>
+							<MaterialCommunityIcons name="flash" size={18} color="#FFFFFF" />
+						</View>
+						<View style={styles.bannerTextCol}>
+							<AppTypography variant="h4" style={styles.bannerTitle}>
+								{title}
 							</AppTypography>
-							<View style={styles.bulletDot} />
-							<AppTypography variant="caption" style={styles.bulletText}>
-								Sterile Medical Equipment
-							</AppTypography>
-							<View style={styles.bulletDot} />
-							<AppTypography variant="caption" style={styles.bulletText}>
-								24/7 Availability
-							</AppTypography>
+							<View style={styles.bulletRow}>
+								{ui.bullets.map((bullet, index) => (
+									<React.Fragment key={`${title}-${bullet}`}>
+										{index > 0 && <View style={styles.bulletDot} />}
+										<AppTypography variant="caption" style={styles.bulletText}>
+											{bullet}
+										</AppTypography>
+									</React.Fragment>
+								))}
+							</View>
 						</View>
 					</View>
-				</View>
+				))}
 
-				{/* 3. Category Filter Cards Grid (2-Column Layout with Image Thumbnails) */}
 				<View style={styles.categoryGrid}>
-					{CATEGORY_CARDS.map((cat) => {
+					{categoryCards.map((cat) => {
 						const isActive = cat.id === activeCategory
 						return (
 							<TouchableOpacity
@@ -337,8 +359,14 @@ export default function NursingCarePage() {
 					})}
 				</View>
 
-				{/* 4. Procedure Lists */}
-				{filteredCategories.length > 0 ? (
+				{isLoading ? (
+					<View style={styles.loadingWrap}>
+						<ActivityIndicator color="#2B6F71" />
+						<AppTypography variant="caption" style={styles.emptySub}>
+							Loading services...
+						</AppTypography>
+					</View>
+				) : filteredCategories.length > 0 ? (
 					filteredCategories.map((group) => (
 						<View key={group.id} style={styles.categoryGroup}>
 							<View style={styles.listHeaderRow}>
@@ -368,10 +396,10 @@ export default function NursingCarePage() {
 					<View style={styles.emptyWrap}>
 						<MaterialCommunityIcons name="medical-bag" size={40} color="#E0E7EF" />
 						<AppTypography variant="h3" style={styles.emptyTitle}>
-							No Procedures Found
+							{loadError || ui.emptyTitle}
 						</AppTypography>
 						<AppTypography variant="caption" style={styles.emptySub}>
-							Try searching with another term or reset your category filter.
+							{loadError ? 'Please try again in a moment.' : ui.emptySub}
 						</AppTypography>
 						{(searchQuery.length > 0 || activeCategory !== 'all') && (
 							<TouchableOpacity
@@ -390,7 +418,6 @@ export default function NursingCarePage() {
 				)}
 			</ScrollView>
 
-			{/* Procedure Detail Bottom Sheet */}
 			<ServiceDetailsBottomSheet
 				visible={detailSheetItem !== null}
 				service={detailSheetItem}
@@ -398,7 +425,6 @@ export default function NursingCarePage() {
 				onAddToBooking={handleIncrement}
 			/>
 
-			{/* Sticky Bottom Cart Bar */}
 			{selectedItemsList.length > 0 && (
 				<ViewCartFloatingBar
 					itemCount={totalItemsCount}
@@ -420,8 +446,6 @@ const styles = StyleSheet.create({
 		paddingTop: 16,
 		gap: 16,
 	},
-
-	/* 1. Search Bar */
 	searchInput: {
 		backgroundColor: '#FFFFFF',
 		fontSize: 14,
@@ -437,8 +461,6 @@ const styles = StyleSheet.create({
 		color: '#2B6F71',
 		fontWeight: '600',
 	},
-
-	/* 2. Dispatch Banner */
 	dispatchBanner: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
@@ -484,8 +506,6 @@ const styles = StyleSheet.create({
 		borderRadius: 2,
 		backgroundColor: '#E0E7EF',
 	},
-
-	/* 3. Category Filter Cards Grid (2-Column with Images) */
 	categoryGrid: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
@@ -535,8 +555,6 @@ const styles = StyleSheet.create({
 		color: '#2B6F71',
 		fontWeight: '600',
 	},
-
-	/* 4. List Sections */
 	categoryGroup: {
 		marginTop: 4,
 	},
@@ -558,8 +576,12 @@ const styles = StyleSheet.create({
 	cardsDividerList: {
 		marginTop: 2,
 	},
-
-	/* Empty State */
+	loadingWrap: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 48,
+		gap: 10,
+	},
 	emptyWrap: {
 		alignItems: 'center',
 		justifyContent: 'center',

@@ -4,7 +4,7 @@
 // All business logic (fetching, sorting, status labels, action handling,
 // reschedule flow) is preserved exactly. UI uses React Native primitives.
 
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import React, { useEffect, useState, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from 'react'
 import {
   View,
   Text,
@@ -30,11 +30,12 @@ import { Appointment } from '../../types/appointment'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
 import { getReviewForAppointment, createReview, DoctorReview } from '../../services/reviewService'
 import { AppBottomSheet } from '../../components/common/AppBottomSheet'
-import { AppInput } from '../../components/common/AppInput'
 import { AppSelect, AppSelectOption, AppTypography, AppCalendar, AppButton } from '../../components/common'
 import StatusModal from '../../components/common/StatusModal'
 import AppointmentHistoryTab from './components/AppointmentHistoryTab'
 import RescheduleModal, { type RescheduleResult } from './components/RescheduleModal'
+import type { BookingsChildControlledProps, BookingsChildHandle } from '../bookings/types'
+import BookingsSearchBar from '../bookings/components/BookingsSearchBar'
 
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -542,14 +543,31 @@ function AppointmentCard({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-interface AppointmentListProps {
+interface AppointmentListProps extends BookingsChildControlledProps {
   viewAs?: 'doctor' | 'patient'
   route?: any
+  searchQuery?: string
+  filterHospital?: string
+  filterMode?: string
+  onHospitalsLoaded?: (options: AppSelectOption[]) => void
 }
 
 const PAGE_SIZE = 10
 
-export default function AppointmentList({ viewAs: viewAsProp, route }: AppointmentListProps) {
+function AppointmentListImpl(
+  {
+    viewAs: viewAsProp,
+    route,
+    embedded = false,
+    searchValue,
+    searchQuery,
+    filterHospital: propFilterHospital,
+    filterMode: propFilterMode,
+    onHospitalsLoaded,
+    onFilterActiveChange,
+  }: AppointmentListProps,
+  ref: React.Ref<BookingsChildHandle>
+) {
   const [viewAs, setViewAs] = useState<'doctor' | 'patient'>('patient')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -662,6 +680,7 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
             options.push({ value: h.hospital_id, label: h.hospital_name })
           })
           setHospitalOptions(options)
+          onHospitalsLoaded?.(options)
         }
       } else {
         const res = await ApiService.get<{ data: { hospital: { id: string; name: string } }[] }>(
@@ -675,6 +694,7 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
             }
           })
           setHospitalOptions(options)
+          onHospitalsLoaded?.(options)
         }
       }
     } catch (err) {
@@ -921,6 +941,33 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
     setFilterSheetOpen(false)
   }
 
+  useImperativeHandle(ref, () => ({ openFilterSheet }))
+
+  useEffect(() => {
+    onFilterActiveChange?.(hasActiveFilters)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasActiveFilters])
+
+  useEffect(() => {
+    if (!embedded) return
+    const activeSearch = searchQuery !== undefined ? searchQuery : searchValue
+    if (activeSearch !== undefined) {
+      setSearch(activeSearch)
+      setPage(1)
+    }
+    if (propFilterHospital !== undefined) {
+      setFilterHospital(propFilterHospital)
+      setDraftFilterHospital(propFilterHospital)
+      setPage(1)
+    }
+    if (propFilterMode !== undefined) {
+      setFilterMode(propFilterMode)
+      setDraftFilterMode(propFilterMode)
+      setPage(1)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, searchQuery, searchValue, propFilterHospital, propFilterMode])
+
   const applyFilters = () => {
     setFilterHospital(draftFilterHospital)
     setFilterMode(draftFilterMode)
@@ -963,40 +1010,22 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
   return (
     <View style={styles.container}>
       {/* ── Search bar ─────────────────────────────────────────────────── */}
-      <View style={styles.searchRow}>
-        <View style={styles.searchInputWrap}>
-          <AppInput
-            isSearch
-            showMicrophone
-            value={search}
-            onChangeText={(text) => {
-              setSearch(text)
-              setPage(1)
-            }}
-            placeholder={viewAs === 'doctor' ? 'Search Patient ID, Name...' : 'Search Doctor ID, Name...'}
-            placeholderTextColor="#98a1aa"
-            containerStyle={styles.searchInputContainer}
-            style={styles.searchInput}
-            contentStyle={styles.searchInputContent}
-            outlineStyle={styles.searchInputOutline}
-            outlineColor="#2e7b7d"
-            activeOutlineColor="#2e7b7d"
-            textColor="#1b2d3c"
-            autoCorrect={false}
-            returnKeyType="search"
-            noMargin
-          />
-        </View>
-        <TouchableOpacity
-          style={[styles.filterIconButton, hasActiveFilters && styles.filterIconButtonActive]}
-          onPress={openFilterSheet}
-          activeOpacity={0.8}
-          accessibilityRole="button"
+      {/* Hidden when embedded inside BookingsPage, which renders a single
+          parent-owned search bar + filter icon instead (see openFilterSheet
+          exposed via ref, and the searchValue sync effect above). */}
+      {!embedded && (
+        <BookingsSearchBar
+          value={search}
+          onChangeText={(text) => {
+            setSearch(text)
+            setPage(1)
+          }}
+          placeholder={viewAs === 'doctor' ? 'Search Patient ID, Name...' : 'Search Doctor ID, Name...'}
+          onFilterPress={openFilterSheet}
+          filterActive={hasActiveFilters}
           accessibilityLabel="Filter appointments"
-        >
-          <MaterialCommunityIcons name="tune" size={22} color="#1f5f68" />
-        </TouchableOpacity>
-      </View>
+        />
+      )}
 
       {/* ── List ───────────────────────────────────────────────────────── */}
       {loading ? (
@@ -1007,7 +1036,7 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
         <FlatList
           data={filteredRows}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
+          renderItem={renderItem} 
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
@@ -1130,58 +1159,15 @@ export default function AppointmentList({ viewAs: viewAsProp, route }: Appointme
   )
 }
 
+const AppointmentList = forwardRef<BookingsChildHandle, AppointmentListProps>(AppointmentListImpl)
+export default AppointmentList
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
-  },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginLeft: 22,
-    marginRight: 12,
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  searchInputWrap: {
-    flex: 1,
-  },
-  searchInputContainer: {
-    width: '100%',
-  },
-  searchInput: {
-    backgroundColor: '#ffffff',
-  },
-  searchInputContent: {
-    height: 48,
-    minHeight: 48,
-    paddingVertical: 0,
-    fontSize: 14,
-  },
-  searchInputOutline: {
-    borderRadius: 12,
-  },
-  filterIconButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#EAECF0',
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  filterIconButtonActive: {
-    backgroundColor: '#eaf8f9',
-    borderColor: '#1f5f68',
   },
   filterSheetBody: {
     paddingHorizontal: 18,

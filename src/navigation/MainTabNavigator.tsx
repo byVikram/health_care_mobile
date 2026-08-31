@@ -12,13 +12,13 @@ import { AppScreenHeader, LocationSelector } from '../components/common'
 
 import DashboardPage from '../features/dashboard/DashboardPage'
 import SearchPage from '../features/doctor/search/SearchPage'
+import BookingsPage from '../features/bookings/BookingsPage'
 import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
 import NursingCarePage from '../features/ancillary/patient/NursingCarePage'
 import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
-import BookingsBottomSheet from '../features/bookings/BookingsBottomSheet'
 import AncillaryServicesBottomSheet from '../features/ancillary/components/AncillaryServicesBottomSheet'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
@@ -57,15 +57,12 @@ function getTabConfig(routeName: string) {
 }
 
 interface DockedTabBarProps extends BottomTabBarProps {
-	onBookingsPress: () => void
 	onAncillaryPress: () => void
 }
 
-function DockedTabBar({ state, descriptors, navigation, onBookingsPress, onAncillaryPress }: DockedTabBarProps) {
+function DockedTabBar({ state, descriptors, navigation, onAncillaryPress }: DockedTabBarProps) {
 	const theme = useTheme()
 	const insets = useSafeAreaInsets()
-	const { role } = useAuth()
-	const isNurse = (role as any) === 'nurse' || (role as any) === 'ancillary'
 	const activeRoute = state.routes[state.index]
 
 	if (activeRoute?.name === ROUTES.MAIN.PROFILE) {
@@ -87,7 +84,6 @@ function DockedTabBar({ state, descriptors, navigation, onBookingsPress, onAncil
 				const { options } = descriptors[route.key]
 				const { iconName, label } = getTabConfig(route.name)
 				const color = focused ? '#0C7C7C' : '#94a3b8'
-				const isBookingsTab = route.name === ROUTES.MAIN.PORTAL
 				const isAncillaryTab = route.name === ROUTES.MAIN.ANCILLARY
 
 				const onPress = () => {
@@ -98,17 +94,6 @@ function DockedTabBar({ state, descriptors, navigation, onBookingsPress, onAncil
 					})
 
 					if (event.defaultPrevented) return
-
-					if (isBookingsTab) {
-						if (isNurse) {
-							if (!focused) {
-								navigation.navigate(route.name, route.params)
-							}
-							return
-						}
-						onBookingsPress()
-						return
-					}
 
 					if (isAncillaryTab) {
 						onAncillaryPress()
@@ -168,9 +153,9 @@ export default function MainTabNavigator() {
 	const { role } = useAuth()
 	const navigation = useNavigation<any>()
 	const isNurse = (role as any) === 'nurse' || (role as any) === 'ancillary'
+	const isDoctor = (role as any) === 'doctor'
 	const shouldShowSearch = role !== 'doctor'
 	const shouldShowAncillary = !isNurse
-	const [bookingsSheetVisible, setBookingsSheetVisible] = useState(false)
 	const [ancillarySheetVisible, setAncillarySheetVisible] = useState(false)
 
 	return (
@@ -179,7 +164,6 @@ export default function MainTabNavigator() {
 				tabBar={(props) => (
 					<DockedTabBar
 						{...props}
-						onBookingsPress={() => setBookingsSheetVisible(true)}
 						onAncillaryPress={() => setAncillarySheetVisible(true)}
 					/>
 				)}
@@ -204,10 +188,12 @@ export default function MainTabNavigator() {
 						}}
 					/>
 				) : null}
-				{/* For Nurse persona, PORTAL tab renders NurseBookingHistoryPage directly */}
+				{/* Nurse persona: PORTAL tab renders NurseBookingHistoryPage directly. */}
+				{/* Doctor persona: PORTAL tab keeps the existing PortalPage (unaffected by the patient Bookings consolidation). */}
+				{/* Patient persona: PORTAL tab renders the consolidated BookingsPage (Doctor Appointments page + category filters). */}
 				<Tab.Screen
 					name={ROUTES.MAIN.PORTAL}
-					component={isNurse ? NurseBookingHistoryPage : PortalPage}
+					component={isNurse ? NurseBookingHistoryPage : isDoctor ? PortalPage : BookingsPage}
 				/>
 				{shouldShowAncillary ? (
 					<Tab.Screen
@@ -227,12 +213,6 @@ export default function MainTabNavigator() {
 					}}
 				/>
 			</Tab.Navigator>
-
-			{/* BOOKINGS BOTTOM SHEET */}
-			<BookingsBottomSheet
-				visible={bookingsSheetVisible}
-				onClose={() => setBookingsSheetVisible(false)}
-			/>
 
 			{/* ANCILLARY SERVICES SELECTION BOTTOM SHEET */}
 			<AncillaryServicesBottomSheet

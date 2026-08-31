@@ -31,6 +31,61 @@ export const generateIdempotencyKey = (): string => {
 	return `idemp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 }
 
+export interface AncillaryServiceItem {
+	id: string
+	title: string
+	description: string
+	price: number
+	categoryId?: string | null
+	categoryName?: string
+	specialtyId?: string | null
+	isInstantEligible?: boolean
+}
+
+export interface AncillaryCategoryApiItem {
+	id: string
+	specialtyId?: string
+	label: string
+}
+
+const unwrapList = <T>(payload: any): T[] => {
+	if (Array.isArray(payload)) return payload
+	if (Array.isArray(payload?.data)) return payload.data
+	if (Array.isArray(payload?.data?.data)) return payload.data.data
+	return []
+}
+
+export const fetchAncillaryCategoriesBackend = async (
+	specialtyId?: string
+): Promise<AncillaryCategoryApiItem[]> => {
+	try {
+		const res = await ApiService.getWithParams<any>(
+			API_ENDPOINTS.ANCILLARY.CATEGORIES,
+			specialtyId ? { specialty_id: specialtyId } : {}
+		)
+		return unwrapList<AncillaryCategoryApiItem>(res.data)
+	} catch (error) {
+		console.log('[ancillaryService] fetchAncillaryCategoriesBackend error:', error)
+		return []
+	}
+}
+
+export const fetchAncillaryServicesBackend = async (params?: {
+	categoryId?: string
+	specialtyId?: string
+}): Promise<AncillaryServiceItem[]> => {
+	try {
+		const query: Record<string, string> = {}
+		if (params?.categoryId) query.category_id = params.categoryId
+		if (params?.specialtyId) query.specialty_id = params.specialtyId
+		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.SERVICES, query)
+		return unwrapList<AncillaryServiceItem>(res.data)
+	} catch (error) {
+		console.log('[ancillaryService] fetchAncillaryServicesBackend error:', error)
+		return []
+	}
+}
+
 // --- Staff-Facing Active Booking Interfaces ---
 export interface NurseBooking {
 	id: string
@@ -1098,6 +1153,7 @@ export const fetchProviderProfileBackend = async (): Promise<AncillaryProfileBac
 export const updateProviderProfileBackend = async (payload: {
 	license_number?: string
 	qualifications?: string
+	specialty?: string | { id?: string; label?: string }
 	geofence_radius?: number
 	geofence_radius_km?: number
 }): Promise<boolean> => {

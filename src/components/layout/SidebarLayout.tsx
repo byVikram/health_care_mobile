@@ -125,6 +125,17 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				setIsSidebarOpen(false)
 				navigation.navigate(ROUTES.STACK.APPOINTMENTS)
 			}
+
+			// Patients: land on the consolidated Bookings page (the Doctor
+			// Appointments page) with the corresponding filter pre-selected,
+			// instead of navigating to the standalone category screen directly.
+			const openBookingsFilter = (filter: 'doctor' | 'ancillary' | 'lab' | 'medicine' | 'radiology') => {
+				setIsSidebarOpen(false)
+				navigation.navigate(ROUTES.MAIN.TABS, {
+					screen: ROUTES.MAIN.PORTAL,
+					params: { filter },
+				} as any)
+			}
 		// Nurse/Ancillary drawer prioritizes the actions a nurse needs day-to-day
 	// (bookings, earnings) over general account items --
 		// Profile lives in the header above and Log out below, so neither repeats here.
@@ -208,37 +219,25 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 								id: 'medicine-orders',
 								label: 'Medicine Orders',
 								icon: <MaterialCommunityIcons name="pill" size={20} color="#1f5f68" />,
-								onPress: () => {
-									setIsSidebarOpen(false)
-									navigation.navigate(ROUTES.STACK.ORDER_LIST as any)
-								},
+								onPress: () => openBookingsFilter('medicine'),
 							},
 							{
 								id: 'lab booking',
 								label: 'Lab Bookings',
 								icon: <MaterialCommunityIcons name="clipboard-text-play-outline" size={20} color="#1f5f68" />,
-								onPress: () => {
-									setIsSidebarOpen(false)
-									navigation.navigate(ROUTES.STACK.LABORATORY_ORDERS as any)
-								},
+								onPress: () => openBookingsFilter('lab'),
 							},
 							{
 								id: 'radiology-bookings',
 								label: 'Radiology Bookings',
 								icon: <MaterialCommunityIcons name="clipboard-text-play-outline" size={20} color="#1f5f68" />,
-								onPress: () => {
-									setIsSidebarOpen(false)
-									navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS as any)
-								},
+								onPress: () => openBookingsFilter('radiology'),
 							},
 							{
 								id: 'ancillary-orders',
 								label: 'Ancillary Orders',
 								icon: <MaterialCommunityIcons name="medical-bag" size={20} color="#1f5f68" />,
-								onPress: () => {
-									setIsSidebarOpen(false)
-									navigation.navigate(ROUTES.STACK.ANCILLARY_MY_BOOKINGS as any)
-								},
+								onPress: () => openBookingsFilter('ancillary'),
 							},
 							{
 								id: 'book-cab',
@@ -256,7 +255,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 					id: 'appointments',
 					label: 'My Appointments',
 					icon: <AppointmentsIcon width={24} height={24} />,
-					onPress: openAppointments,
+					onPress: role === 'doctor' ? openAppointments : () => openBookingsFilter('doctor'),
 				},
 				...roleItems,
 				{

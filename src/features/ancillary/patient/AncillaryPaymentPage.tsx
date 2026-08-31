@@ -118,6 +118,11 @@ export default function AncillaryPaymentPage() {
 
 		const requestPayload = {
 			publicBookingId: publicId,
+			// Send every selected service/procedure so the backend creates one
+			// parent request with a child ancillary_request_procedures row per
+			// procedure. serviceTypeId is kept as a single-item fallback for any
+			// older path that only reads the singular field.
+			serviceTypeIds: services.map((s) => s.id),
 			serviceTypeId: services[0]?.id || 'srv-01',
 			bookingType: bookingPayload.bookingType || 'INSTANT',
 			scheduledStartTime: bookingPayload.bookingType === 'SCHEDULED' ? visit.date : null,
@@ -150,7 +155,7 @@ export default function AncillaryPaymentPage() {
 			setSubmitting(false)
 			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId: publicId,
-				serviceName: services[0]?.title || 'In-Home Care Service',
+				serviceName: services.map((s) => s.title).filter(Boolean).join(', ') || 'In-Home Care Service',
 				addressText: visit.address || 'User Location',
 				bookingPayload: {
 					...bookingPayload,
@@ -171,7 +176,7 @@ export default function AncillaryPaymentPage() {
 			}
 			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId: publicId,
-				serviceName: services[0]?.title || 'In-Home Care Service',
+				serviceName: services.map((s) => s.title).filter(Boolean).join(', ') || 'In-Home Care Service',
 				addressText: visit.address || 'User Location',
 				bookingPayload: {
 					...bookingPayload,
