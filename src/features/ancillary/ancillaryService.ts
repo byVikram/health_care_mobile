@@ -1165,3 +1165,6 @@ export const updateProviderProfileBackend = async (payload: {
 		return false
 	}
 }
+
+
+export const fetchAncillaryProfileBackend = fetchProviderProfileBackend;
