@@ -102,15 +102,31 @@ export default function BookingDetailsPage() {
 	const isTablet = width >= 768
 
 	const routeParams = route.params || {}
-	const initialServices: ServiceProcedureItem[] =
-		(routeParams.services && routeParams.services.length > 0)
-			? routeParams.services
-			: (routeParams.selectedServices && routeParams.selectedServices.length > 0)
-				? routeParams.selectedServices
-				: (routeParams.service ? [routeParams.service] : DEFAULT_MOCK_SERVICES)
+	const payloadObj = routeParams.bookingPayload || routeParams.payload || {}
+	const initialServices: ServiceProcedureItem[] = useMemo(() => {
+		if (payloadObj.services && Array.isArray(payloadObj.services) && payloadObj.services.length > 0) {
+			return payloadObj.services
+		}
+		if (routeParams.services && Array.isArray(routeParams.services) && routeParams.services.length > 0) {
+			return routeParams.services
+		}
+		if (routeParams.selectedServices && Array.isArray(routeParams.selectedServices) && routeParams.selectedServices.length > 0) {
+			return routeParams.selectedServices
+		}
+		if (routeParams.service) {
+			return [routeParams.service]
+		}
+		return DEFAULT_MOCK_SERVICES
+	}, [route.params])
 
 	// 1. Multiple Selected Services State
 	const [services, setServices] = useState<ServiceProcedureItem[]>(initialServices)
+
+	useEffect(() => {
+		if (initialServices && initialServices.length > 0) {
+			setServices(initialServices)
+		}
+	}, [initialServices])
 
 	// 2. Patient Details State
 	const [patient, setPatient] = useState<{

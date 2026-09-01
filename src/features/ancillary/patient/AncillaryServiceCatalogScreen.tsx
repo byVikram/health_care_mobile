@@ -151,9 +151,15 @@ export default function AncillaryServiceCatalogScreen() {
 	}
 
 	const handleInstantDispatch = (item?: ServiceProcedureItem) => {
-		const targetService = item || cart[0] || procedureItems[0]
-		const itemsToBook = cart.length > 0 ? cart : targetService ? [targetService] : []
+		let itemsToBook: ServiceProcedureItem[] = []
+		if (item) {
+			itemsToBook = cart.some((c) => c.id === item.id) ? cart : [...cart, item]
+		} else {
+			itemsToBook = cart.length > 0 ? cart : procedureItems[0] ? [procedureItems[0]] : []
+		}
 		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
+			services: itemsToBook,
+			selectedServices: itemsToBook,
 			bookingPayload: {
 				bookingType: 'INSTANT',
 				serviceKey,

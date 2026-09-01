@@ -45,10 +45,15 @@ export default function BookingSummaryPage() {
 	const isTablet = width >= 768
 
 	const routeParams = route.params || {}
-	const initialServices =
-		routeParams.services && routeParams.services.length > 0
-			? routeParams.services
-			: DEFAULT_MOCK_SERVICES
+	const payloadObj = routeParams.bookingPayload || routeParams.payload || {}
+	const initialServices: ServiceProcedureItem[] =
+		(payloadObj.services && Array.isArray(payloadObj.services) && payloadObj.services.length > 0)
+			? payloadObj.services
+			: (routeParams.services && Array.isArray(routeParams.services) && routeParams.services.length > 0)
+				? routeParams.services
+				: (routeParams.selectedServices && Array.isArray(routeParams.selectedServices) && routeParams.selectedServices.length > 0)
+					? routeParams.selectedServices
+					: (routeParams.service ? [routeParams.service] : DEFAULT_MOCK_SERVICES)
 
 	const [services, setServices] = useState<ServiceProcedureItem[]>(initialServices)
 
