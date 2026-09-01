@@ -70,17 +70,16 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 	const renderActionControls = () => {
 		if (quantity > 0) {
 			return (
-				<View style={[styles.stepperContainer, isTablet && styles.stepperContainerTablet]}>
-					<TouchableOpacity style={styles.stepperBtn} onPress={handleDecrementClick} activeOpacity={0.7}>
-						<MaterialCommunityIcons name="minus" size={14} color="#1F5F68" />
-					</TouchableOpacity>
-					<AppTypography variant="h4" style={[styles.quantityText, isTablet && styles.quantityTextTablet]}>
-						{quantity}
+				<TouchableOpacity
+					style={[styles.selectBtn, styles.addedBtn, isTablet && styles.selectBtnTablet]}
+					onPress={handleDecrementClick}
+					activeOpacity={0.85}
+				>
+					<Ionicons name="checkmark" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+					<AppTypography variant="caption" style={styles.addedBtnText}>
+						ADDED
 					</AppTypography>
-					<TouchableOpacity style={styles.stepperBtn} onPress={handleIncrementClick} activeOpacity={0.7}>
-						<MaterialCommunityIcons name="plus" size={14} color="#1F5F68" />
-					</TouchableOpacity>
-				</View>
+				</TouchableOpacity>
 			)
 		}
 
@@ -244,6 +243,19 @@ const styles = StyleSheet.create({
 	},
 	selectBtnLabelTablet: {
 		fontSize: 14,
+	},
+	addedBtn: {
+		backgroundColor: '#0C7C7C',
+		borderColor: '#0C7C7C',
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	addedBtnText: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#FFFFFF',
+		letterSpacing: 0.4,
 	},
 	stepperContainer: {
 		flexDirection: 'row',

@@ -144,10 +144,15 @@ export default function AncillaryServiceCatalogScreen() {
 		]
 	}, [procedureItems, searchQuery, activeUi.title])
 
-	const handleAddProcedure = (item: ServiceProcedureItem) => {
-		if (!cart.some((c) => c.id === item.id)) {
-			setCart((prev) => [...prev, item])
-		}
+	const handleToggleProcedure = (item: ServiceProcedureItem) => {
+		setCart((prev) => {
+			const exists = prev.some((c) => c.id === item.id)
+			if (exists) {
+				return prev.filter((c) => c.id !== item.id)
+			} else {
+				return [...prev, item]
+			}
+		})
 	}
 
 	const handleInstantDispatch = (item?: ServiceProcedureItem) => {
@@ -226,14 +231,20 @@ export default function AncillaryServiceCatalogScreen() {
 								{group.categoryName}
 							</AppTypography>
 
-							{group.procedures.map((item) => (
-								<AllServiceCard
-									key={item.id}
-									item={item}
-									onSelectService={() => handleAddProcedure(item)}
-									onCardPress={() => setSelectedProcedure(item)}
-								/>
-							))}
+							{group.procedures.map((item) => {
+								const isInCart = cart.some((c) => c.id === item.id)
+								return (
+									<AllServiceCard
+										key={item.id}
+										item={item}
+										quantity={isInCart ? 1 : 0}
+										onIncrement={() => handleToggleProcedure(item)}
+										onDecrement={() => handleToggleProcedure(item)}
+										onSelectService={() => handleToggleProcedure(item)}
+										onCardPress={() => setSelectedProcedure(item)}
+									/>
+								)
+							})}
 						</View>
 					))
 				)}
@@ -254,7 +265,7 @@ export default function AncillaryServiceCatalogScreen() {
 				service={selectedProcedure}
 				onClose={() => setSelectedProcedure(null)}
 				onAddToBooking={(p: ServiceProcedureItem) => {
-					handleAddProcedure(p)
+					handleToggleProcedure(p)
 					setSelectedProcedure(null)
 				}}
 			/>
