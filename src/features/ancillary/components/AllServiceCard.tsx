@@ -139,20 +139,19 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 					)}
 				</View>
 
-				{/* Overlapping ADD / Stepper Button */}
+				{/* Overlapping ADD / ADDED Button */}
 				<View style={styles.actionButtonWrapper}>
 					{isAdded ? (
-						<View style={styles.stepperBox}>
-							<TouchableOpacity style={styles.stepperBtn} onPress={handleDecrementClick} activeOpacity={0.7}>
-								<MaterialCommunityIcons name="minus" size={14} color="#2B6F71" />
-							</TouchableOpacity>
-							<AppTypography variant="caption" style={styles.stepperQty}>
-								{quantity}
+						<TouchableOpacity
+							style={[styles.addBtn, styles.addedBtn]}
+							onPress={handleDecrementClick}
+							activeOpacity={0.85}
+						>
+							<Ionicons name="checkmark" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+							<AppTypography variant="caption" style={styles.addedBtnText}>
+								ADDED
 							</AppTypography>
-							<TouchableOpacity style={styles.stepperBtn} onPress={handleIncrementClick} activeOpacity={0.7}>
-								<MaterialCommunityIcons name="plus" size={14} color="#2B6F71" />
-							</TouchableOpacity>
-						</View>
+						</TouchableOpacity>
 					) : (
 						<TouchableOpacity
 							style={[styles.addBtn, isCustomPrice && styles.enquireBtn]}
@@ -163,7 +162,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 								variant="caption"
 								style={[styles.addBtnText, isCustomPrice && styles.enquireBtnText]}
 							>
-								{item.actionLabel || (isCustomPrice ? 'Enquire' : 'Add')}
+								{item.actionLabel || (isCustomPrice ? 'Enquire' : 'ADD +')}
 							</AppTypography>
 						</TouchableOpacity>
 					)}
@@ -319,6 +318,19 @@ const styles = StyleSheet.create({
 		fontSize: 13.5,
 		fontWeight: '700',
 		color: '#2B6F71',
+	},
+	addedBtn: {
+		backgroundColor: '#0C7C7C',
+		borderColor: '#0C7C7C',
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	addedBtnText: {
+		fontSize: 12.5,
+		fontWeight: '700',
+		color: '#FFFFFF',
+		letterSpacing: 0.4,
 	},
 	enquireBtn: {
 		paddingHorizontal: 14,

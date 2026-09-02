@@ -42,18 +42,37 @@ const RELATIONSHIP_OPTIONS: AppSelectOption[] = [
 	{ label: 'Other', value: 'Other' },
 ]
 
-const SAVED_ADDRESSES = [
+interface AddressItem {
+	id: string
+	label: string
+	address: string
+	icon: string
+	isCurrentLocation: boolean
+	latitude?: number
+	longitude?: number
+}
+
+const SAVED_ADDRESSES: AddressItem[] = [
+	{
+		id: 'current_loc',
+		label: 'Use Current Location',
+		address: 'GPS Location (Detecting current address...)',
+		icon: 'navigate-outline',
+		isCurrentLocation: true,
+	},
 	{
 		id: 'addr1',
 		label: 'Home',
 		address: '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi - 110001',
 		icon: 'home-outline',
+		isCurrentLocation: false,
 	},
 	{
 		id: 'addr2',
 		label: 'Work',
 		address: 'Tech Park Tower B, 5th Floor, Cyber City, Gurugram - 122002',
 		icon: 'briefcase-outline',
+		isCurrentLocation: false,
 	},
 ]
 
@@ -102,15 +121,31 @@ export default function BookingDetailsPage() {
 	const isTablet = width >= 768
 
 	const routeParams = route.params || {}
-	const initialServices: ServiceProcedureItem[] =
-		(routeParams.services && routeParams.services.length > 0)
-			? routeParams.services
-			: (routeParams.selectedServices && routeParams.selectedServices.length > 0)
-				? routeParams.selectedServices
-				: (routeParams.service ? [routeParams.service] : DEFAULT_MOCK_SERVICES)
+	const payloadObj = routeParams.bookingPayload || routeParams.payload || {}
+	const initialServices: ServiceProcedureItem[] = useMemo(() => {
+		if (payloadObj.services && Array.isArray(payloadObj.services) && payloadObj.services.length > 0) {
+			return payloadObj.services
+		}
+		if (routeParams.services && Array.isArray(routeParams.services) && routeParams.services.length > 0) {
+			return routeParams.services
+		}
+		if (routeParams.selectedServices && Array.isArray(routeParams.selectedServices) && routeParams.selectedServices.length > 0) {
+			return routeParams.selectedServices
+		}
+		if (routeParams.service) {
+			return [routeParams.service]
+		}
+		return DEFAULT_MOCK_SERVICES
+	}, [route.params])
 
 	// 1. Multiple Selected Services State
 	const [services, setServices] = useState<ServiceProcedureItem[]>(initialServices)
+
+	useEffect(() => {
+		if (initialServices && initialServices.length > 0) {
+			setServices(initialServices)
+		}
+	}, [initialServices])
 
 	// 2. Patient Details State
 	const [patient, setPatient] = useState<{
@@ -188,14 +223,18 @@ export default function BookingDetailsPage() {
 			try {
 				const apiAddresses = await getPatientAddresses()
 				if (apiAddresses && apiAddresses.length > 0) {
-					const formattedList = apiAddresses.map((addr: any) => ({
-						id: String(addr.id),
-						label: addr.label || addr.title || 'Home',
-						address: addr.address_line ? `${addr.address_line}, ${addr.city || ''} ${addr.pincode || ''}` : `${addr.address_line_1 || ''}, ${addr.city || ''}`,
-						latitude: addr.latitude != null ? Number(addr.latitude) : undefined,
-						longitude: addr.longitude != null ? Number(addr.longitude) : undefined,
-						icon: (addr.label || addr.title || '').toLowerCase().includes('work') ? 'briefcase-outline' : 'home-outline',
-					}))
+					const formattedList = [
+						SAVED_ADDRESSES[0],
+						...apiAddresses.map((addr: any) => ({
+							id: String(addr.id),
+							label: addr.label || addr.title || 'Home',
+							address: addr.address_line ? `${addr.address_line}, ${addr.city || ''} ${addr.pincode || ''}` : `${addr.address_line_1 || ''}, ${addr.city || ''}`,
+							latitude: addr.latitude != null ? Number(addr.latitude) : undefined,
+							longitude: addr.longitude != null ? Number(addr.longitude) : undefined,
+							icon: (addr.label || addr.title || '').toLowerCase().includes('work') ? 'briefcase-outline' : 'home-outline',
+							isCurrentLocation: false,
+						})),
+					]
 					setSavedAddressesList(formattedList)
 
 					const selectOptions: AppSelectOption[] = formattedList.map((addr) => ({
@@ -510,17 +549,13 @@ export default function BookingDetailsPage() {
 						</TouchableOpacity>
 
 						<TouchableOpacity
-							style={[styles.modeTab, bookingType === 'SCHEDULED' && styles.modeTabActive]}
-							onPress={() => {
-								setBookingType('SCHEDULED')
-								setVisit((prev) => ({ ...prev, timeBadge: 'Scheduled Appointment' }))
-								setEditVisitVisible(true)
-							}}
-							activeOpacity={0.88}
+							style={[styles.modeTab, { opacity: 0.5, backgroundColor: '#F1F5F9' }]}
+							disabled={true}
+							activeOpacity={1}
 						>
-							<Ionicons name="calendar" size={15} color={bookingType === 'SCHEDULED' ? '#FFFFFF' : '#2B6F71'} />
-							<AppTypography variant="h4" style={[styles.modeTabText, bookingType === 'SCHEDULED' && styles.modeTabTextActive]}>
-								Schedule Visit
+							<Ionicons name="calendar-outline" size={15} color="#94A3B8" />
+							<AppTypography variant="h4" style={[styles.modeTabText, { color: '#94A3B8' }]}>
+								Schedule (Soon)
 							</AppTypography>
 						</TouchableOpacity>
 					</View>
@@ -674,43 +709,71 @@ export default function BookingDetailsPage() {
 			<AppBottomSheet
 				visible={editVisitVisible}
 				onClose={() => setEditVisitVisible(false)}
-				title={bookingType === 'INSTANT' ? 'Change Visit Address' : 'Configure Schedule & Address'}
+				title="Select Visit Address"
 			>
 				<View style={styles.modalFormContent}>
-					<AppSelect
-						label="Select Visit Address"
-						value={visit.addressId}
-						options={addressOptions}
-						onSelect={(id) => {
-							const selected = savedAddressesList.find((a) => a.id === id)
-							if (selected) {
-								setVisit((prev) => ({
-									...prev,
-									addressId: selected.id,
-									addressLabel: selected.label,
-									address: selected.address,
-								}))
-							}
-						}}
-					/>
+					<AppTypography variant="caption" style={styles.addressSectionSubtitle}>
+						SELECT DELIVERY ADDRESS
+					</AppTypography>
 
-					{bookingType === 'SCHEDULED' && (
-						<DateSlotPicker
-							selectedDate={selectedDateObj}
-							onDateChange={(newDate: Date) => setSelectedDateObj(newDate)}
-							selectedTime={visit.timeSlot}
-							onTimeChange={(timeStr: any) => {
-								handleSaveVisitDetails(visit.addressId, selectedDateObj, String(timeStr || '09:00 AM - 10:00 AM'))
-							}}
-							availableSlots={ANCILLARY_SLOTS}
-						/>
-					)}
+					<View style={styles.addressListContainer}>
+						{savedAddressesList.map((addr) => {
+							const isSelected = visit.addressId === addr.id
+							return (
+								<TouchableOpacity
+									key={addr.id}
+									style={[
+										styles.addressCardItem,
+										isSelected && styles.addressCardItemSelected,
+										addr.isCurrentLocation && styles.addressCardItemCurrent,
+									]}
+									onPress={() => {
+										setVisit((prev) => ({
+											...prev,
+											addressId: addr.id,
+											addressLabel: addr.label,
+											address: addr.address,
+										}))
+									}}
+									activeOpacity={0.8}
+								>
+									<View style={[styles.addressIconWrap, isSelected && styles.addressIconWrapSelected]}>
+										<Ionicons
+											name={(addr.icon as any) || 'location-outline'}
+											size={18}
+											color={isSelected ? '#FFFFFF' : addr.isCurrentLocation ? '#0C7C7C' : '#475569'}
+										/>
+									</View>
 
-					{bookingType === 'INSTANT' && (
-						<AppButton variant="primary" onPress={() => setEditVisitVisible(false)} style={styles.modalSaveBtn}>
-							Confirm Location
-						</AppButton>
-					)}
+									<View style={styles.addressTextCol}>
+										<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+											<AppTypography variant="h4" style={[styles.addressLabelText, isSelected && styles.addressLabelTextSelected]}>
+												{addr.label}
+											</AppTypography>
+											{addr.isCurrentLocation && (
+												<View style={styles.gpsPill}>
+													<AppTypography variant="caption" style={styles.gpsPillText}>
+														GPS DETECTED
+													</AppTypography>
+												</View>
+											)}
+										</View>
+										<AppTypography variant="caption" style={styles.addressValText} numberOfLines={2}>
+											{addr.address}
+										</AppTypography>
+									</View>
+
+									<View style={[styles.radioDotOuter, isSelected && styles.radioDotOuterSelected]}>
+										{isSelected && <View style={styles.radioDotInner} />}
+									</View>
+								</TouchableOpacity>
+							)
+						})}
+					</View>
+
+					<AppButton variant="primary" onPress={() => setEditVisitVisible(false)} style={styles.modalSaveBtn}>
+						Confirm Address
+					</AppButton>
 				</View>
 			</AppBottomSheet>
 
@@ -1109,5 +1172,89 @@ const styles = StyleSheet.create({
 	},
 	modalSaveBtn: {
 		marginTop: 8,
+	},
+	addressSectionSubtitle: {
+		fontSize: 11,
+		fontWeight: '700',
+		color: '#64748B',
+		letterSpacing: 0.5,
+		marginBottom: 2,
+	},
+	addressListContainer: {
+		gap: 10,
+	},
+	addressCardItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		padding: 12,
+		borderRadius: 14,
+		backgroundColor: '#F8FAFC',
+		borderWidth: 1.5,
+		borderColor: '#E2E8F0',
+		gap: 12,
+	},
+	addressCardItemSelected: {
+		backgroundColor: '#F0F9F9',
+		borderColor: '#0C7C7C',
+	},
+	addressCardItemCurrent: {
+		borderStyle: 'dashed',
+	},
+	addressIconWrap: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		backgroundColor: '#E2E8F0',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	addressIconWrapSelected: {
+		backgroundColor: '#0C7C7C',
+	},
+	addressTextCol: {
+		flex: 1,
+		gap: 2,
+	},
+	addressLabelText: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	addressLabelTextSelected: {
+		color: '#0C7C7C',
+	},
+	addressValText: {
+		fontSize: 12,
+		color: '#64748B',
+		lineHeight: 16,
+	},
+	gpsPill: {
+		backgroundColor: '#E6F4F4',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 4,
+	},
+	gpsPillText: {
+		fontSize: 9.5,
+		fontWeight: '800',
+		color: '#0C7C7C',
+	},
+	radioDotOuter: {
+		width: 20,
+		height: 20,
+		borderRadius: 10,
+		borderWidth: 2,
+		borderColor: '#CBD5E1',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	radioDotOuterSelected: {
+		borderColor: '#0C7C7C',
+	},
+	radioDotInner: {
+		width: 10,
+		height: 10,
+		borderRadius: 5,
+		backgroundColor: '#0C7C7C',
 	},
 })

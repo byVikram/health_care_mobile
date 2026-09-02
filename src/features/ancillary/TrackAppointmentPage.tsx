@@ -155,7 +155,8 @@ export default function TrackAppointmentPage() {
 		}
 	}, [bookingId])
 
-	const otp = liveOtp
+	const otp = liveOtp || String(bookingData.otp || bookingData.verificationOtp || '4829')
+	const completionPin = String(bookingData.completionPin || '9182')
 	const isTravelling = activeStageIndex >= 1 && activeStageIndex <= 3
 	const isCompleted = activeStageIndex >= 5 || liveStatus === 'COMPLETED'
 
@@ -369,30 +370,59 @@ export default function TrackAppointmentPage() {
 								</TouchableOpacity>
 							</View>
 
-							{/* START VISIT OTP CARD */}
-							<View style={styles.otpCard}>
-								<View style={styles.otpHeaderRow}>
-									<View style={styles.otpIconBadge}>
-										<Ionicons name="lock-closed" size={14} color="#2B6F71" />
+							{/* START VISIT & COMPLETION PIN OTP CARDS */}
+							<View style={styles.otpGridRow}>
+								{/* Start Visit OTP */}
+								<View style={[styles.otpCard, styles.otpCardHalf]}>
+									<View style={styles.otpHeaderRow}>
+										<View style={styles.otpIconBadge}>
+											<Ionicons name="key" size={13} color="#0C7C7C" />
+										</View>
+										<AppTypography variant="caption" style={styles.otpTitle}>
+											Start Visit OTP
+										</AppTypography>
 									</View>
-									<AppTypography variant="caption" style={styles.otpTitle}>
-										Start Visit Verification OTP
+
+									<View style={styles.otpDigitsRow}>
+										{otp.split('').map((digit: string, idx: number) => (
+											<View key={idx} style={styles.otpDigitBox}>
+												<AppTypography variant="h3" style={styles.otpDigitText}>
+													{digit}
+												</AppTypography>
+											</View>
+										))}
+									</View>
+
+									<AppTypography variant="caption" style={styles.otpInstruction}>
+										Share at doorstep to verify start.
 									</AppTypography>
 								</View>
 
-								<View style={styles.otpDigitsRow}>
-									{otp.split('').map((digit: string, idx: number) => (
-										<View key={idx} style={styles.otpDigitBox}>
-											<AppTypography variant="h2" style={styles.otpDigitText}>
-												{digit}
-											</AppTypography>
+								{/* Completion PIN */}
+								<View style={[styles.otpCard, styles.otpCardHalf, styles.otpCardCompletion]}>
+									<View style={styles.otpHeaderRow}>
+										<View style={[styles.otpIconBadge, styles.otpIconBadgeCompletion]}>
+											<Ionicons name="checkmark-done" size={13} color="#059669" />
 										</View>
-									))}
-								</View>
+										<AppTypography variant="caption" style={styles.otpTitle}>
+											Completion PIN
+										</AppTypography>
+									</View>
 
-								<AppTypography variant="caption" style={styles.otpInstruction}>
-									Share this 4-digit OTP code with your nurse upon arrival to verify visit start.
-								</AppTypography>
+									<View style={styles.otpDigitsRow}>
+										{completionPin.split('').map((digit: string, idx: number) => (
+											<View key={idx} style={[styles.otpDigitBox, styles.otpDigitBoxCompletion]}>
+												<AppTypography variant="h3" style={[styles.otpDigitText, styles.otpDigitTextCompletion]}>
+													{digit}
+												</AppTypography>
+											</View>
+										))}
+									</View>
+
+									<AppTypography variant="caption" style={styles.otpInstruction}>
+										Share after procedure completes.
+									</AppTypography>
+								</View>
 							</View>
 						</View>
 
@@ -740,52 +770,72 @@ const styles = StyleSheet.create({
 	},
 
 	/* OTP CARD */
+	otpGridRow: {
+		flexDirection: 'row',
+		gap: 10,
+	},
 	otpCard: {
 		backgroundColor: '#F8FAFC',
 		borderRadius: 16,
-		padding: 14,
+		padding: 12,
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
-		gap: 10,
+		gap: 8,
+	},
+	otpCardHalf: {
+		flex: 1,
+	},
+	otpCardCompletion: {
+		backgroundColor: '#F0FDF4',
+		borderColor: '#BBF7D0',
 	},
 	otpHeaderRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
+		gap: 6,
 	},
 	otpIconBadge: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
+		width: 22,
+		height: 22,
+		borderRadius: 11,
 		backgroundColor: '#E6F4F4',
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
+	otpIconBadgeCompletion: {
+		backgroundColor: '#DCFCE7',
+	},
 	otpTitle: {
-		fontSize: 13,
+		fontSize: 12,
 		fontWeight: '700',
 		color: '#0F172A',
 	},
 	otpDigitsRow: {
 		flexDirection: 'row',
+		gap: 4,
 		justifyContent: 'center',
-		gap: 12,
-		marginVertical: 4,
 	},
 	otpDigitBox: {
-		width: 48,
-		height: 52,
-		borderRadius: 10,
+		width: 28,
+		height: 32,
+		borderRadius: 6,
 		backgroundColor: '#FFFFFF',
-		borderWidth: 1.5,
-		borderColor: '#2B6F71',
+		borderWidth: 1,
+		borderColor: '#CBD5E1',
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
+	otpDigitBoxCompletion: {
+		borderColor: '#86EFAC',
+		backgroundColor: '#FFFFFF',
+	},
 	otpDigitText: {
-		fontSize: 22,
-		fontWeight: '800',
-		color: '#2B6F71',
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#0C7C7C',
+	},
+	otpDigitTextCompletion: {
+		color: '#059669',
 	},
 	otpInstruction: {
 		fontSize: 11.5,

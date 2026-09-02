@@ -154,16 +154,27 @@ export default function AncillaryServiceCatalogScreen() {
 		]
 	}, [procedureItems, searchQuery, activeUi.title, activeCategory, categoryPills])
 
-	const handleAddProcedure = (item: ServiceProcedureItem) => {
-		if (!cart.some((c) => c.id === item.id)) {
-			setCart((prev) => [...prev, item])
-		}
+	const handleToggleProcedure = (item: ServiceProcedureItem) => {
+		setCart((prev) => {
+			const exists = prev.some((c) => c.id === item.id)
+			if (exists) {
+				return prev.filter((c) => c.id !== item.id)
+			} else {
+				return [...prev, item]
+			}
+		})
 	}
 
 	const handleInstantDispatch = (item?: ServiceProcedureItem) => {
-		const targetService = item || cart[0] || procedureItems[0]
-		const itemsToBook = cart.length > 0 ? cart : targetService ? [targetService] : []
+		let itemsToBook: ServiceProcedureItem[] = []
+		if (item) {
+			itemsToBook = cart.some((c) => c.id === item.id) ? cart : [...cart, item]
+		} else {
+			itemsToBook = cart.length > 0 ? cart : procedureItems[0] ? [procedureItems[0]] : []
+		}
 		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
+			services: itemsToBook,
+			selectedServices: itemsToBook,
 			bookingPayload: {
 				bookingType: 'INSTANT',
 				serviceKey,
@@ -232,14 +243,20 @@ export default function AncillaryServiceCatalogScreen() {
 								{group.categoryName}
 							</AppTypography>
 
-							{group.procedures.map((item) => (
-								<AllServiceCard
-									key={item.id}
-									item={item}
-									onSelectService={() => handleAddProcedure(item)}
-									onCardPress={() => setSelectedProcedure(item)}
-								/>
-							))}
+							{group.procedures.map((item) => {
+								const isInCart = cart.some((c) => c.id === item.id)
+								return (
+									<AllServiceCard
+										key={item.id}
+										item={item}
+										quantity={isInCart ? 1 : 0}
+										onIncrement={() => handleToggleProcedure(item)}
+										onDecrement={() => handleToggleProcedure(item)}
+										onSelectService={() => handleToggleProcedure(item)}
+										onCardPress={() => setSelectedProcedure(item)}
+									/>
+								)
+							})}
 						</View>
 					))
 				)}
@@ -260,7 +277,7 @@ export default function AncillaryServiceCatalogScreen() {
 				service={selectedProcedure}
 				onClose={() => setSelectedProcedure(null)}
 				onAddToBooking={(p: ServiceProcedureItem) => {
-					handleAddProcedure(p)
+					handleToggleProcedure(p)
 					setSelectedProcedure(null)
 				}}
 			/>
