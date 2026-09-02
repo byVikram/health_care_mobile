@@ -1,7 +1,8 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useState, useEffect, useContext } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { setUnauthorizedHandler } from '../services/apiService'
+import { setUnauthorizedHandler, setStatusModalHandler, StatusModalData } from '../services/apiService'
+import StatusModal from '../components/common/StatusModal'
 
 export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | 'nurse'
 
@@ -57,6 +58,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	const [selectedHospital, setSelectedHospitalState] = useState<string | null>(null)
 	const [selectedHospitalId, setSelectedHospitalIdState] = useState<string | null>(null)
 	const [currentLocation, setCurrentLocationState] = useState<LocationData | null>(null)
+	const [statusModal, setStatusModal] = useState<StatusModalData | null>(null)
 
 	const clearAuthState = () => {
 		setRole(null)
@@ -122,7 +124,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 	useEffect(() => {
 		setUnauthorizedHandler(clearAuthState)
-		return () => setUnauthorizedHandler(null)
+		setStatusModalHandler(setStatusModal)
+		return () => {
+			setUnauthorizedHandler(null)
+			setStatusModalHandler(null)
+		}
 	}, [])
 
 	const setAuth = async (
