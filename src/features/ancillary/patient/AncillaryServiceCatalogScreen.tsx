@@ -17,6 +17,7 @@ import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCard'
 import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
+import { NursingQuickActionCards } from '../components/NursingQuickActionCards'
 import {
 	AncillaryCategoryApiItem,
 	AncillaryServiceItem,
@@ -80,7 +81,7 @@ export default function AncillaryServiceCatalogScreen() {
 				setLoading(true)
 				const [cats, srvs] = await Promise.all([
 					fetchAncillaryCategories(serviceKey),
-					fetchAncillaryServices(serviceKey),
+					fetchAncillaryServices({ specialtyId: serviceKey }),
 				])
 				if (isMounted) {
 					setCategories(cats)
@@ -117,6 +118,7 @@ export default function AncillaryServiceCatalogScreen() {
 	const procedureItems = useMemo<ServiceProcedureItem[]>(() => {
 		return rawServices.map((s) => ({
 			id: s.id,
+			categoryId: s.categoryId ?? null,
 			title: s.title,
 			description: s.description,
 			price: typeof s.price === 'number' ? `₹${s.price}` : String(s.price || '₹499'),
@@ -128,6 +130,10 @@ export default function AncillaryServiceCatalogScreen() {
 	const displayGroups = useMemo<CategoryGroup[]>(() => {
 		let filtered = procedureItems
 
+		if (activeCategory !== 'all') {
+			filtered = filtered.filter((p) => p.categoryId === activeCategory)
+		}
+
 		if (searchQuery.trim()) {
 			const q = searchQuery.toLowerCase().trim()
 			filtered = filtered.filter(
@@ -135,14 +141,18 @@ export default function AncillaryServiceCatalogScreen() {
 			)
 		}
 
+		const activeCategoryLabel = activeCategory === 'all'
+			? activeUi.title
+			: categoryPills.find((c) => c.id === activeCategory)?.label || activeUi.title
+
 		return [
 			{
 				id: 'group-all',
-				categoryName: activeUi.title,
+				categoryName: activeCategoryLabel,
 				procedures: filtered,
 			},
 		]
-	}, [procedureItems, searchQuery, activeUi.title])
+	}, [procedureItems, searchQuery, activeUi.title, activeCategory, categoryPills])
 
 	const handleToggleProcedure = (item: ServiceProcedureItem) => {
 		setCart((prev) => {
@@ -187,6 +197,8 @@ export default function AncillaryServiceCatalogScreen() {
 						onChangeText={setSearchQuery}
 					/>
 				</View>
+
+				{serviceKey === 'nursing-care' && <NursingQuickActionCards />}
 
 				{/* Categories Pill Bar */}
 				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesBar}>
