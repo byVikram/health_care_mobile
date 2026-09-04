@@ -55,9 +55,7 @@ const unwrapList = <T>(payload: any): T[] => {
 	return []
 }
 
-export const fetchAncillaryCategoriesBackend = async (
-	specialtyId?: string
-): Promise<AncillaryCategoryApiItem[]> => {
+export const fetchAncillaryCategoriesBackend = async (specialtyId?: string): Promise<AncillaryCategoryApiItem[]> => {
 	try {
 		const res = await ApiService.getWithParams<any>(
 			API_ENDPOINTS.ANCILLARY.CATEGORIES,
@@ -103,6 +101,10 @@ export interface NurseBooking {
 	otpCode: string
 	completePin: string
 	amount?: number
+	/** Provider's actual earning for this booking (backend providerPrice/estimatedEarnings), distinct from the patient's total amount. */
+	providerEarning?: number
+	/** Raw backend createdAt ("YYYY-MM-DD HH:MM:SS"), kept alongside the display-formatted appointmentTime so earnings screens can group by real calendar day/week/month instead of assuming everything is 'Today'. */
+	createdAtRaw?: string
 	cancellationReason?: string
 }
 
@@ -150,7 +152,6 @@ export const clearBookingState = async (bookingId: string): Promise<void> => {
 		console.error(`[ancillaryService] Error clearing state for booking ${bookingId}:`, error)
 	}
 }
-
 
 // --- Patient-Facing Browse & Booking Interfaces ---
 export interface ServiceProcedure {
@@ -229,14 +230,16 @@ export const ANCILLARY_MOCK_DATA: Record<string, AncillaryCategoryData> = {
 				title: 'Injection at Home',
 				description: 'Safe medication administration by certified RNs.',
 				price: 299,
-				imageUrl: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=260',
+				imageUrl:
+					'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=260',
 			},
 			{
 				id: 'n-pop-2',
 				title: 'Wound Dressing',
 				description: 'Professional cleaning and dressing of acute or chronic wounds.',
 				price: 499,
-				imageUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&q=80&w=260',
+				imageUrl:
+					'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&q=80&w=260',
 			},
 		],
 		recommended: [
@@ -318,7 +321,7 @@ export const ANCILLARY_MOCK_DATA: Record<string, AncillaryCategoryData> = {
 			},
 		],
 	},
-	'physiotherapy': {
+	physiotherapy: {
 		subtitle: 'Professional physiotherapy at the comfort of your home',
 		searchPlaceholder: 'Search physiotherapy (e.g., Back pain, Joint mobilization...)',
 		urgentBannerText: 'Experiencing acute pain or stiffness?\nSchedule an expert emergency home assessment.',
@@ -329,14 +332,16 @@ export const ANCILLARY_MOCK_DATA: Record<string, AncillaryCategoryData> = {
 				title: 'Post-Stroke Physio',
 				description: 'Targeted mobility rehab to rebuild motor control.',
 				price: 799,
-				imageUrl: 'https://images.unsplash.com/photo-1576091160607-21c38dba92c6?auto=format&fit=crop&q=80&w=260',
+				imageUrl:
+					'https://images.unsplash.com/photo-1576091160607-21c38dba92c6?auto=format&fit=crop&q=80&w=260',
 			},
 			{
 				id: 'p-pop-2',
 				title: 'Sports Injury Rehab',
 				description: 'Strengthening and recovery drills for athletes.',
 				price: 699,
-				imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=260',
+				imageUrl:
+					'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=260',
 			},
 		],
 		recommended: [
@@ -421,14 +426,16 @@ export const ANCILLARY_MOCK_DATA: Record<string, AncillaryCategoryData> = {
 				title: 'Cardiac Rehabilitation',
 				description: 'Controlled cardiac exercise post-bypass/stroke.',
 				price: 899,
-				imageUrl: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&q=80&w=260',
+				imageUrl:
+					'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&q=80&w=260',
 			},
 			{
 				id: 'r-pop-2',
 				title: 'Occupational Therapy',
 				description: 'Re-learn fine motor skills and daily tasks at home.',
 				price: 799,
-				imageUrl: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&q=80&w=260',
+				imageUrl:
+					'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&q=80&w=260',
 			},
 		],
 		recommended: [
@@ -492,7 +499,8 @@ export const ANCILLARY_MOCK_DATA: Record<string, AncillaryCategoryData> = {
 				title: 'Assisted Living Support',
 				description: 'Companionship, meal prep, and light housekeeping.',
 				price: 399,
-				imageUrl: 'https://images.unsplash.com/photo-1516627145497-ae6968895b74?auto=format&fit=crop&q=80&w=260',
+				imageUrl:
+					'https://images.unsplash.com/photo-1516627145497-ae6968895b74?auto=format&fit=crop&q=80&w=260',
 			},
 		],
 		recommended: [
@@ -541,7 +549,6 @@ export const ANCILLARY_MOCK_DATA: Record<string, AncillaryCategoryData> = {
 	},
 }
 
-
 // --- Patient-Facing "My Bookings" Interfaces ---
 export interface AncillaryBookingProvider {
 	name: string
@@ -555,7 +562,16 @@ export interface AncillaryBooking {
 	serviceName: string
 	serviceKey: string
 	serviceLabel: string
-	status: 'upcoming' | 'completed' | 'cancelled' | 'SEARCHING' | 'ASSIGNED' | 'EN_ROUTE' | 'ARRIVED' | 'IN_PROGRESS' | string
+	status:
+		| 'upcoming'
+		| 'completed'
+		| 'cancelled'
+		| 'SEARCHING'
+		| 'ASSIGNED'
+		| 'EN_ROUTE'
+		| 'ARRIVED'
+		| 'IN_PROGRESS'
+		| string
 	rawStatus?: string
 	date: string
 	timeRange?: string
@@ -658,8 +674,6 @@ export const getProviderReviews = (providerIdOrName: string): AncillaryReviewDat
 	return []
 }
 
-
-
 // --- Nurse Instant Care Request Interfaces & Tiered Security Models ---
 
 /** TIER 1: Pre-Assignment Soft Review (Non-PHI operational info) */
@@ -669,8 +683,8 @@ export interface SoftReviewRequestData {
 	requestedDate: string
 	requestedTime: string
 	generalLocation: string
-	distanceKm: string
-	travelTime: string
+	distanceKm?: string
+	travelTime?: string
 	serviceRequirement: string
 	requiredSkills: string[]
 	urgency: string
@@ -732,26 +746,33 @@ export interface VerifyOtpResponse {
 
 export const fetchSoftReviewRequest = async (requestId: string): Promise<SoftReviewRequestData> => {
 	try {
-		const res = await ApiService.get<SoftReviewRequestData>(`${API_ENDPOINTS.ANCILLARY.REQUESTS}/${requestId}/soft-review`)
-		return res.data
-	} catch (error) {
-		console.log('[ancillaryService] Using soft-review request fallback data')
-		const expiresAt = Date.now() + 30 * 1000
-		return {
-			id: requestId || 'REQ-NURSE-991',
-			serviceName: 'Wound Care',
-			requestedDate: '18 Aug 2026',
-			requestedTime: '10:00 AM',
-			generalLocation: 'Whitefield, Bengaluru',
-			distanceKm: '4.2 km',
-			travelTime: '~18 min',
-			serviceRequirement: 'Post-surgical wound dressing',
-			requiredSkills: ['Wound Care', 'Sterile Dressing'],
-			urgency: 'Routine',
-			specialRequirements: 'Sterile dressing required',
-			earning: '₹850',
-			expiresAt,
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.SOFT_REVIEW(requestId))
+		const payload = res.data
+		const data = payload?.data !== undefined ? payload.data : payload
+		if (!data) {
+			throw new Error('No soft review data returned from server')
 		}
+		return {
+			id: String(data.id || requestId),
+			serviceName: String(data.serviceName || ''),
+			requestedDate: String(data.requestedDate || 'Today'),
+			requestedTime: String(data.requestedTime || 'Just now'),
+			generalLocation: String(data.generalLocation || data.generalArea || ''),
+			distanceKm: data.distanceKm ? String(data.distanceKm) : '',
+			travelTime: data.travelTime ? String(data.travelTime) : '',
+			serviceRequirement: String(data.serviceRequirement || ''),
+			requiredSkills: Array.isArray(data.requiredSkills) ? data.requiredSkills : [],
+			urgency: String(data.urgency || data.urgencyLevel || 'ROUTINE'),
+			specialRequirements: String(data.specialRequirements || ''),
+			earning:
+				typeof data.earning === 'number'
+					? `₹${data.earning}`
+					: String(data.earning || data.estimatedEarnings || ''),
+			expiresAt: typeof data.expiresAt === 'number' ? data.expiresAt : Date.now() + 60000,
+		}
+	} catch (error) {
+		console.log('[ancillaryService] Error fetching soft-review request:', error)
+		throw error
 	}
 }
 
@@ -787,7 +808,10 @@ export const acceptCareRequestBackend = async (
 		}
 		return {
 			success: false,
-			message: error.response?.data?.message || error.response?.data?.detail || 'Failed to accept care request. Please try again.',
+			message:
+				error.response?.data?.message ||
+				error.response?.data?.detail ||
+				'Failed to accept care request. Please try again.',
 		}
 	}
 }
@@ -837,7 +861,10 @@ export const verifyPatientOtpBackend = async (
 	} catch (error: any) {
 		return {
 			success: false,
-			message: error.response?.data?.message || error.response?.data?.detail || 'Invalid verification OTP. Please ask the patient for the 4-digit code.',
+			message:
+				error.response?.data?.message ||
+				error.response?.data?.detail ||
+				'Invalid verification OTP. Please ask the patient for the 4-digit code.',
 		}
 	}
 }
@@ -862,31 +889,66 @@ export const updateProviderLocationBackend = async (
 /**
  * Fetch live active patient care requests from MySQL database for nurse offer discovery.
  */
+// export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequestData[]> => {
+// 	try {
+// 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABLE)
+// 		const payload = res.data
+// 		const rawList: any[] = Array.isArray(payload)
+// 			? payload
+// 			: Array.isArray(payload?.data)
+// 			? payload.data
+// 			: []
+
+// 		if (rawList.length > 0) {
+// 			return rawList.map((item: any) => ({
+// 				id: String(item.id || item.publicBookingId || 'REQ-101'),
+// 				serviceName: String(item.serviceName || 'General Nursing Care Procedure'),
+// 				requestedDate: 'Today',
+// 				requestedTime: String(item.requestedTime || 'Just now'),
+// 				generalLocation: String(item.generalArea || 'Healthcare Sector, Area 4'),
+// 				distanceKm: `${item.distanceKm || 1.8} km`,
+// 				travelTime: '~8 mins',
+// 				serviceRequirement: 'Aseptic Dressing & Vitals Check',
+// 				requiredSkills: Array.isArray(item.requiredSkills) ? item.requiredSkills : ['RN Certification', 'Wound Dressing'],
+// 				urgency: String(item.urgencyLevel || 'HIGH'),
+// 				specialRequirements: 'Sanitized Single-Use Medical Kit Required',
+// 				earning: typeof item.estimatedEarnings === 'number' ? `₹${item.estimatedEarnings}` : String(item.estimatedEarnings || '₹499'),
+// 				expiresAt: Date.now() + 60 * 1000,
+// 			}))
+// 		}
+// 		return []
+// 	} catch (error) {
+// 		console.log('[ancillaryService] Provider requests ready via API service')
+// 		return []
+// 	}
+// }
+
 export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequestData[]> => {
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABLE)
 		const payload = res.data
-		const rawList: any[] = Array.isArray(payload)
-			? payload
-			: Array.isArray(payload?.data)
-			? payload.data
-			: []
+		const rawList: any[] = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
 
 		if (rawList.length > 0) {
 			return rawList.map((item: any) => ({
-				id: String(item.id || item.publicBookingId || 'REQ-101'),
-				serviceName: String(item.serviceName || 'General Nursing Care Procedure'),
-				requestedDate: 'Today',
-				requestedTime: String(item.requestedTime || 'Just now'),
-				generalLocation: String(item.generalArea || 'Healthcare Sector, Area 4'),
-				distanceKm: `${item.distanceKm || 1.8} km`,
-				travelTime: '~8 mins',
-				serviceRequirement: 'Aseptic Dressing & Vitals Check',
-				requiredSkills: ['RN Certification', 'Wound Dressing'],
-				urgency: String(item.urgencyLevel || 'HIGH'),
-				specialRequirements: 'Sanitized Single-Use Medical Kit Required',
-				earning: typeof item.estimatedEarnings === 'number' ? `₹${item.estimatedEarnings}` : String(item.estimatedEarnings || '₹499'),
-				expiresAt: Date.now() + 60 * 1000,
+				id: String(item.id || item.publicBookingId),
+				serviceName: String(item.serviceName),
+				requestedDate: item.requestedDate || item.requestedDateTime,
+				requestedTime: String(item.requestedTime),
+				generalLocation: String(item.generalLocation || item.generalArea),
+				distanceKm: item.distanceKm !== undefined ? `${item.distanceKm} km` : undefined,
+				travelTime: item.travelTime,
+				serviceRequirement: item.serviceRequirement,
+				requiredSkills: Array.isArray(item.requiredSkills) ? item.requiredSkills : undefined,
+				urgency: String(item.urgency || item.urgencyLevel),
+				specialRequirements: item.specialRequirements,
+				earning:
+					typeof item.providerEarning === 'number'
+						? `₹${item.providerEarning}`
+						: typeof item.estimatedEarnings === 'number'
+							? `₹${item.estimatedEarnings}`
+							: item.estimatedEarnings,
+				expiresAt: item.expiresAt || Date.now() + 60 * 1000,
 			}))
 		}
 		return []
@@ -910,11 +972,7 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.MY_APPOINTMENTS)
 		const payload = res.data
-		const rawList: any[] = Array.isArray(payload)
-			? payload
-			: Array.isArray(payload?.data)
-			? payload.data
-			: []
+		const rawList: any[] = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
 
 		if (rawList.length > 0) {
 			return rawList.map((item: any) => {
@@ -922,9 +980,17 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 				const status = CANCELLED_FAMILY_STATUSES.includes(rawStatus)
 					? 'cancelled'
 					: (item.status || 'ASSIGNED').toLowerCase()
-				const amount = item.totalAmount != null
-					? parseFloat(String(item.totalAmount).replace(/[^0-9.]/g, ''))
-					: undefined
+				const amount =
+					item.totalAmount != null ? parseFloat(String(item.totalAmount).replace(/[^0-9.]/g, '')) : undefined
+				// Prefer the backend's providerPrice (the provider's actual cut) for
+				// earnings displays; estimatedEarnings is a formatted 'INR xxx' fallback,
+				// and totalAmount (the patient's full charge) is the last resort.
+				const providerEarning =
+					item.providerPrice != null
+						? parseFloat(String(item.providerPrice).replace(/[^0-9.]/g, ''))
+						: item.estimatedEarnings != null
+							? parseFloat(String(item.estimatedEarnings).replace(/[^0-9.]/g, ''))
+							: amount
 
 				return {
 					id: String(item.id || item.publicBookingId),
@@ -934,7 +1000,9 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 					patientPhone: String(item.patientPhone || ''),
 					patientAvatar: item.patientAvatar ? String(item.patientAvatar) : undefined,
 					serviceName: String(item.serviceName || 'In-Home Healthcare Service'),
-					serviceDescription: String(item.procedureDetails || item.serviceDescription || 'Healthcare Procedure'),
+					serviceDescription: String(
+						item.procedureDetails || item.serviceDescription || 'Healthcare Procedure'
+					),
 					appointmentDate: 'Today',
 					appointmentTime: String(item.createdAt || 'Today'),
 					patientAddress: String(item.patientAddress || item.streetAddress || 'Healthcare Location'),
@@ -942,6 +1010,8 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 					otpCode: String(item.verificationOtp || '4829'),
 					completePin: String(item.completionPin || '9182'),
 					amount: Number.isFinite(amount) ? amount : undefined,
+					providerEarning: Number.isFinite(providerEarning) ? providerEarning : undefined,
+					createdAtRaw: item.createdAt ? String(item.createdAt) : undefined,
 					cancellationReason: item.cancellationReason ? String(item.cancellationReason) : undefined,
 				}
 			})
@@ -973,7 +1043,10 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 			rawStatus: String(data.status || 'SEARCHING').toUpperCase(),
 			date: 'Today',
 			timeRange: 'Instant Dispatch',
-			amount: typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(String(data.totalAmount || '667').replace('₹', '')),
+			amount:
+				typeof data.totalAmount === 'number'
+					? data.totalAmount
+					: parseFloat(String(data.totalAmount || '667').replace(/[^0-9.]/g, '')),
 			provider: {
 				id: data.assignedProvider ? String(data.assignedProvider.id) : 'n-prov-1',
 				name: data.assignedProvider ? String(data.assignedProvider.name) : 'Nurse Specialist',
@@ -1027,11 +1100,7 @@ const formatBookingDateTime = (createdAt?: string | null): { date: string; timeR
 export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[]> => {
 	const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.MY_REQUESTS)
 	const payload = res.data
-	const rawList: any[] = Array.isArray(payload)
-		? payload
-		: Array.isArray(payload?.data)
-		? payload.data
-		: []
+	const rawList: any[] = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
 
 	return rawList.map((item: any) => {
 		const { date, timeRange } = formatBookingDateTime(item.createdAt)
@@ -1051,12 +1120,21 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 			date,
 			timeRange,
 			provider: {
-				id: (item.provider?.id || item.assignedProvider?.id) ? String(item.provider?.id || item.assignedProvider?.id) : undefined,
-				name: (item.provider?.name || item.assignedProvider?.name) ? String(item.provider?.name || item.assignedProvider?.name) : 'Specialist Assigned Soon',
-				designation: (item.provider?.designation || item.assignedProvider?.credentials)
-					? String(item.provider?.designation || item.assignedProvider?.credentials)
-					: 'Healthcare Provider',
-				avatar: item.provider?.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=120',
+				id:
+					item.provider?.id || item.assignedProvider?.id
+						? String(item.provider?.id || item.assignedProvider?.id)
+						: undefined,
+				name:
+					item.provider?.name || item.assignedProvider?.name
+						? String(item.provider?.name || item.assignedProvider?.name)
+						: 'Specialist Assigned Soon',
+				designation:
+					item.provider?.designation || item.assignedProvider?.credentials
+						? String(item.provider?.designation || item.assignedProvider?.credentials)
+						: 'Healthcare Provider',
+				avatar:
+					item.provider?.avatar ||
+					'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=120',
 			},
 			amount,
 			verificationOtp: item.verificationOtp ? String(item.verificationOtp) : undefined,
@@ -1071,10 +1149,7 @@ export const cancelCareRequestProviderBackend = async (
 	reason: string = 'Cancelled by nurse'
 ): Promise<{ success: boolean; message: string }> => {
 	try {
-		const res = await ApiService.post<any>(
-			API_ENDPOINTS.ANCILLARY.CANCEL_PROVIDER(requestId),
-			{ reason }
-		)
+		const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.CANCEL_PROVIDER(requestId), { reason })
 		await clearBookingState(requestId)
 		const foundIndex = MOCK_NURSE_BOOKINGS.findIndex((b) => b.id === requestId)
 		if (foundIndex !== -1) {
@@ -1093,7 +1168,10 @@ export const cancelCareRequestProviderBackend = async (
 	}
 }
 
-export const cancelCareRequestPatientBackend = async (requestId: string, reason: string = 'Cancelled by patient'): Promise<boolean> => {
+export const cancelCareRequestPatientBackend = async (
+	requestId: string,
+	reason: string = 'Cancelled by patient'
+): Promise<boolean> => {
 	try {
 		await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PATIENT(requestId), { reason })
 		return true
@@ -1103,7 +1181,11 @@ export const cancelCareRequestPatientBackend = async (requestId: string, reason:
 	}
 }
 
-export const fetchProviderStatusBackend = async (): Promise<{ isOnline: boolean; latitude: number; longitude: number } | null> => {
+export const fetchProviderStatusBackend = async (): Promise<{
+	isOnline: boolean
+	latitude: number
+	longitude: number
+} | null> => {
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_STATUS)
 		const data = res.data?.data || res.data
@@ -1118,7 +1200,11 @@ export const fetchProviderStatusBackend = async (): Promise<{ isOnline: boolean;
 	}
 }
 
-export const updateProviderStatusBackend = async (isOnline: boolean, latitude?: number, longitude?: number): Promise<boolean> => {
+export const updateProviderStatusBackend = async (
+	isOnline: boolean,
+	latitude?: number,
+	longitude?: number
+): Promise<boolean> => {
 	try {
 		await ApiService.post(API_ENDPOINTS.ANCILLARY.PROVIDER_STATUS, {
 			isOnline,
@@ -1174,12 +1260,81 @@ export const updateProviderProfileBackend = async (payload: {
 	}
 }
 
-export const updateAncillaryCapabilitiesBackend = async (checkedProcedures: string[]): Promise<boolean> => {
-	return updateProviderProfileBackend({ checked_procedures: checkedProcedures })
+export interface ProviderEarningsVisit {
+	id: string
+	patientName: string
+	serviceName: string
+	earning: number
+	completedAt?: string
 }
 
+export interface ProviderEarningsData {
+	todayTotal: number
+	weekTotal: number
+	monthTotal: number
+	allTimeTotal: number
+	recentVisits: ProviderEarningsVisit[]
+}
 
-export const fetchAncillaryProfileBackend = fetchProviderProfileBackend;
+export const fetchProviderEarningsBackend = async (): Promise<ProviderEarningsData | null> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_EARNINGS)
+		const payload = res.data
+		const data = payload?.data !== undefined ? payload.data : payload
+		if (!data) return null
+		return {
+			todayTotal: Number(data.todayTotal) || 0,
+			weekTotal: Number(data.weekTotal) || 0,
+			monthTotal: Number(data.monthTotal) || 0,
+			allTimeTotal: Number(data.allTimeTotal) || 0,
+			recentVisits: Array.isArray(data.recentVisits)
+				? data.recentVisits.map((v: any) => ({
+						id: String(v.id || ''),
+						patientName: String(v.patientName || 'Patient'),
+						serviceName: String(v.serviceName || 'Healthcare Service'),
+						earning: Number(v.earning) || 0,
+						completedAt: v.completedAt ? String(v.completedAt) : undefined,
+					}))
+				: [],
+		}
+	} catch (error) {
+		console.log('[ancillaryService] fetchProviderEarningsBackend error:', error)
+		return null
+	}
+}
+
+export interface ProviderDashboardMetrics {
+	acceptedCount: number
+	completedCount: number
+	cancelledCount: number
+	todayEarnings: number
+	weekEarnings: number
+}
+
+export const fetchProviderDashboardMetricsBackend = async (): Promise<ProviderDashboardMetrics | null> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_DASHBOARD_METRICS)
+		const payload = res.data
+		const data = payload?.data !== undefined ? payload.data : payload
+		if (!data) return null
+		return {
+			acceptedCount: Number(data.acceptedCount) || 0,
+			completedCount: Number(data.completedCount) || 0,
+			cancelledCount: Number(data.cancelledCount) || 0,
+			todayEarnings: Number(data.todayEarnings) || 0,
+			weekEarnings: Number(data.weekEarnings) || 0,
+		}
+	} catch (error) {
+		console.log('[ancillaryService] fetchProviderDashboardMetricsBackend error:', error)
+		return null
+	}
+}
+
+export const updateAncillaryCapabilitiesBackend = async (checked_procedures: string[]): Promise<boolean> => {
+	return updateProviderProfileBackend({ checked_procedures })
+}
+
+export const fetchAncillaryProfileBackend = fetchProviderProfileBackend
 
 // --- Clean Function Aliases (without Backend suffix) ---
 export const fetchAncillaryCategories = fetchAncillaryCategoriesBackend
@@ -1198,4 +1353,7 @@ export const updateProviderStatus = updateProviderStatusBackend
 export const fetchMyPatientBookings = fetchMyPatientBookingsBackend
 export const fetchProviderProfile = fetchProviderProfileBackend
 export const updateProviderProfile = updateProviderProfileBackend
+export const updateAncillaryCapabilities = updateAncillaryCapabilitiesBackend
 export const fetchAncillaryProfile = fetchAncillaryProfileBackend
+export const fetchProviderEarnings = fetchProviderEarningsBackend
+export const fetchProviderDashboardMetrics = fetchProviderDashboardMetricsBackend

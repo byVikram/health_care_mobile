@@ -1,12 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import {
-	ActivityIndicator,
-	KeyboardAvoidingView,
-	Platform,
-	ScrollView,
-	StyleSheet,
-	View,
-} from 'react-native'
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -41,20 +34,49 @@ export default function PatientVerificationPage() {
 				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
 				const apiData = res.data?.data || res.data
 				if (apiData) {
-					const pName = apiData.patientName || apiData.patient_name || apiData.patientUser?.name || apiData.patient?.name
-					if (pName && typeof pName === 'string' && pName.trim() !== '' && !['Eleanor Vance', 'Patient Account Holder', 'John Doe', 'Patient Recipient', 'Patient'].includes(pName.trim())) {
+					const pName =
+						apiData.patientName ||
+						apiData.patient_name ||
+						apiData.patientUser?.name ||
+						apiData.patient?.name
+					if (
+						pName &&
+						typeof pName === 'string' &&
+						pName.trim() !== '' &&
+						![
+							'Eleanor Vance',
+							'Patient Account Holder',
+							'John Doe',
+							'Patient Recipient',
+							'Patient',
+						].includes(pName.trim())
+					) {
 						setBooking({
 							id: apiData.requestId || apiData.id || bookingId,
 							patientName: pName,
 							patientAge: apiData.patientAge || apiData.patient_age || apiData.age || 0,
-							patientGender: apiData.patientGender || apiData.patient_gender || apiData.gender || 'Not Specified',
+							patientGender:
+								apiData.patientGender || apiData.patient_gender || apiData.gender || 'Not Specified',
 							patientPhone: apiData.patientPhone || apiData.patient_phone || apiData.phone || '',
-							patientAvatar: apiData.patientAvatar || apiData.patient_avatar || apiData.patient?.avatar || undefined,
-							serviceName: apiData.serviceName || apiData.service_name || apiData.procedure?.label || 'General Nursing Care',
-							serviceDescription: apiData.procedureDetails || apiData.procedure_details || apiData.serviceDescription || 'Doorstep clinical care',
+							patientAvatar:
+								apiData.patientAvatar || apiData.patient_avatar || apiData.patient?.avatar || undefined,
+							serviceName:
+								apiData.serviceName ||
+								apiData.service_name ||
+								apiData.procedure?.label ||
+								'General Nursing Care',
+							serviceDescription:
+								apiData.procedureDetails ||
+								apiData.procedure_details ||
+								apiData.serviceDescription ||
+								'Doorstep clinical care',
 							appointmentDate: apiData.appointmentDate || 'Today',
 							appointmentTime: apiData.appointmentTime || 'Immediate Dispatch',
-							patientAddress: apiData.streetAddress || apiData.street_address || apiData.patientAddress || 'Address on file',
+							patientAddress:
+								apiData.streetAddress ||
+								apiData.street_address ||
+								apiData.patientAddress ||
+								'Address on file',
 							status: apiData.status || 'verification_pending',
 							otpCode: apiData.verificationOtp || apiData.otp || '',
 							completePin: apiData.completionPin || apiData.pin || '',
@@ -88,7 +110,9 @@ export default function PatientVerificationPage() {
 		setVerifying(true)
 		try {
 			const res = await verifyPatientOtp(booking.id, pin)
-			if (res.success || (booking.otpCode && pin === booking.otpCode)) {
+			// Trust only the backend's verification result -- never a locally
+			// held/mock OTP value, or entering the code becomes optional.
+			if (res.success) {
 				const now = new Date().toISOString()
 				const initialState = {
 					status: 'in_progress' as const,
@@ -135,10 +159,7 @@ export default function PatientVerificationPage() {
 	}
 
 	return (
-		<KeyboardAvoidingView
-			style={styles.container}
-			behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-		>
+		<KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 			<AppScreenHeader title="Verify Patient OTP" />
 
 			<ScrollView
@@ -164,7 +185,11 @@ export default function PatientVerificationPage() {
 								Patient Identity Verification
 							</AppTypography>
 							<AppTypography variant="caption" style={styles.descText}>
-								Ask patient <AppTypography variant="caption" style={styles.boldText}>{booking.patientName}</AppTypography> for the 4-digit verification OTP to start the care procedure.
+								Ask patient{' '}
+								<AppTypography variant="caption" style={styles.boldText}>
+									{booking.patientName}
+								</AppTypography>{' '}
+								for the 4-digit verification OTP to start the care procedure.
 							</AppTypography>
 						</View>
 					</View>
@@ -195,19 +220,10 @@ export default function PatientVerificationPage() {
 
 				{/* 3. ACTION BUTTON BLOCK */}
 				<View style={styles.sectionBlock}>
-					<AppButton
-						variant="primary"
-						onPress={handleVerify}
-						loading={verifying}
-						style={styles.verifyBtn}
-					>
+					<AppButton variant="primary" onPress={handleVerify} loading={verifying} style={styles.verifyBtn}>
 						Verify & Start Care Procedure
 					</AppButton>
-					<AppButton
-						variant="outline"
-						onPress={() => setCancelModalVisible(true)}
-						style={styles.cancelBtn}
-					>
+					<AppButton variant="outline" onPress={() => setCancelModalVisible(true)} style={styles.cancelBtn}>
 						Cancel Visit
 					</AppButton>
 				</View>

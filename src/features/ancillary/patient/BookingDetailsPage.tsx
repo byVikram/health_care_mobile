@@ -52,6 +52,7 @@ interface AddressItem {
 	isCurrentLocation: boolean
 	latitude?: number
 	longitude?: number
+	isDefault?: boolean
 }
 
 const SAVED_ADDRESSES: AddressItem[] = [
@@ -222,6 +223,7 @@ export default function BookingDetailsPage() {
 							longitude: addr.longitude != null ? Number(addr.longitude) : undefined,
 							icon: (addr.label || addr.title || '').toLowerCase().includes('work') ? 'briefcase-outline' : 'home-outline',
 							isCurrentLocation: false,
+							isDefault: !!addr.is_default,
 						})),
 					]
 					setSavedAddressesList(formattedList)
@@ -232,14 +234,19 @@ export default function BookingDetailsPage() {
 					}))
 					setAddressOptions(selectOptions)
 
-					const firstAddr = formattedList[0]
+					// AC1: auto-select the patient's saved default/primary address
+					// (falling back to the first saved address if none is marked
+					// default) rather than always selecting the hardcoded
+					// "Use Current Location" placeholder at index 0.
+					const realAddrs = formattedList.slice(1)
+					const defaultAddr = realAddrs.find((a: any) => a.isDefault) || realAddrs[0]
 					setVisit((prev) => ({
 						...prev,
-						addressId: firstAddr.id,
-						addressLabel: firstAddr.label,
-						address: firstAddr.address,
-						latitude: firstAddr.latitude,
-						longitude: firstAddr.longitude,
+						addressId: defaultAddr.id,
+						addressLabel: defaultAddr.label,
+						address: defaultAddr.address,
+						latitude: defaultAddr.latitude,
+						longitude: defaultAddr.longitude,
 					}))
 				}
 			} catch (addrErr) {
@@ -354,14 +361,17 @@ export default function BookingDetailsPage() {
 	}
 
 	const handleEditServices = () => {
-		if (navigation.canGoBack()) {
-			navigation.goBack()
-		} else {
-			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
-				serviceKey: 'nursing',
-				serviceLabel: 'Nursing Care',
-			})
-		}
+		// Pass the current (post-deletion) services list back to the catalog
+		// screen so its own selection state stays in sync -- a plain goBack()
+		// would leave the catalog's cart state stale, still showing services
+		// that were removed here.
+		const editServiceKey = payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care'
+		const editServiceLabel = payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care'
+		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
+			serviceKey: editServiceKey,
+			serviceLabel: editServiceLabel,
+			updatedCart: services,
+		})
 	}
 
 	const handleSelectProfile = (selected: any) => {

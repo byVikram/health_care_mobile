@@ -16,6 +16,7 @@ export interface ServiceProcedureItem {
 	duration: string
 	price: string
 	image: string
+	categoryId?: string | null
 	verified?: boolean
 	premiumBadgeText?: string
 	actionLabel?: 'Select' | 'Enquire'
