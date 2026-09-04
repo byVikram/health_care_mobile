@@ -7,7 +7,7 @@ import {
 	StyleSheet,
 	View,
 } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MOCK_NURSE_BOOKINGS, NurseBooking, NurseBookingState, getBookingState, clearBookingState } from '../ancillaryService'
@@ -15,6 +15,7 @@ import { ROUTES } from '../../../navigation/routes'
 import OtpPinInput from '../components/OtpPinInput'
 import ServiceTimeline from '../components/ServiceTimeline'
 import StatusModal from '../../../components/common/StatusModal'
+import CancelVisitModal from '../components/CancelVisitModal'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
@@ -39,43 +40,37 @@ export default function CompleteServicePage() {
 
 	// StatusModal completion popup
 	const [successModalVisible, setSuccessModalVisible] = useState(false)
+	const [cancelModalVisible, setCancelModalVisible] = useState(false)
 
-	useEffect(() => {
-		const loadData = async () => {
-			let apiPatientData: any = null
-			try {
-				if (bookingId) {
-					const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
-					apiPatientData = res.data?.data || res.data
-				}
-			} catch (e) {
-				console.log('[CompleteServicePage] Live status notice')
+	const loadData = async () => {
+		setLoading(true)
+		let apiPatientData: any = null
+		try {
+			if (bookingId) {
+				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
+				apiPatientData = res.data?.data || res.data
 			}
+		} catch (e) {
+			console.log('[CompleteServicePage] Live status notice', e)
+		}
 
-			const found = MOCK_NURSE_BOOKINGS.find((b) => b.id === bookingId)
-			const pName = apiPatientData?.patientName || apiPatientData?.patient_name || apiPatientData?.patientUser?.name || apiPatientData?.patient?.name || (found ? found.patientName : 'Eleanor Vance')
-			const pAge = apiPatientData?.patientAge || apiPatientData?.patient_age || apiPatientData?.age || (found ? found.patientAge : 68)
-			const pGender = apiPatientData?.patientGender || apiPatientData?.patient_gender || apiPatientData?.gender || (found ? found.patientGender : 'Female')
-			const pPhone = apiPatientData?.patientPhone || apiPatientData?.patient_phone || apiPatientData?.phone || (found ? found.patientPhone : '+91 98765 43210')
-			const pAvatar = apiPatientData?.patientAvatar || apiPatientData?.patient_avatar || apiPatientData?.patient?.avatar || (found ? found.patientAvatar : undefined)
-			const sName = apiPatientData?.serviceName || apiPatientData?.service_name || apiPatientData?.procedure?.label || (found ? found.serviceName : 'Wound Dressing & Sterile Care')
-			const sDesc = apiPatientData?.procedureDetails || apiPatientData?.procedure_details || apiPatientData?.serviceDescription || (found ? found.serviceDescription : 'Sterile dressing, cleansing & vitals monitoring')
-
+		const pName = apiPatientData?.patientName || apiPatientData?.patient_name || apiPatientData?.patientUser?.name || apiPatientData?.patient?.name
+		if (pName && typeof pName === 'string' && pName.trim() !== '' && !['Eleanor Vance', 'Patient Account Holder', 'John Doe', 'Patient Recipient', 'Patient'].includes(pName.trim())) {
 			const activeBooking: NurseBooking = {
-				id: apiPatientData?.requestId || apiPatientData?.id || bookingId || 'BK-LIVE-101',
+				id: apiPatientData?.requestId || apiPatientData?.id || bookingId,
 				patientName: pName,
-				patientAge: pAge,
-				patientGender: pGender,
-				patientPhone: pPhone,
-				patientAvatar: pAvatar,
-				serviceName: sName,
-				serviceDescription: sDesc,
-				appointmentDate: apiPatientData?.appointmentDate || (found ? found.appointmentDate : 'Today'),
-				appointmentTime: apiPatientData?.appointmentTime || (found ? found.appointmentTime : 'Completed'),
-				patientAddress: apiPatientData?.streetAddress || apiPatientData?.street_address || apiPatientData?.patientAddress || (found ? found.patientAddress : '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi'),
+				patientAge: apiPatientData?.patientAge || apiPatientData?.patient_age || apiPatientData?.age || 0,
+				patientGender: apiPatientData?.patientGender || apiPatientData?.patient_gender || apiPatientData?.gender || 'Not Specified',
+				patientPhone: apiPatientData?.patientPhone || apiPatientData?.patient_phone || apiPatientData?.phone || '',
+				patientAvatar: apiPatientData?.patientAvatar || apiPatientData?.patient_avatar || apiPatientData?.patient?.avatar || undefined,
+				serviceName: apiPatientData?.serviceName || apiPatientData?.service_name || apiPatientData?.procedure?.label || 'General Nursing Care',
+				serviceDescription: apiPatientData?.procedureDetails || apiPatientData?.procedure_details || apiPatientData?.serviceDescription || 'Doorstep clinical care',
+				appointmentDate: apiPatientData?.appointmentDate || 'Today',
+				appointmentTime: apiPatientData?.appointmentTime || 'Completed',
+				patientAddress: apiPatientData?.streetAddress || apiPatientData?.street_address || apiPatientData?.patientAddress || 'Address on file',
 				status: 'in_progress',
-				otpCode: apiPatientData?.verificationOtp || apiPatientData?.otp || '4829',
-				completePin: apiPatientData?.completionPin || apiPatientData?.pin || '9182',
+				otpCode: apiPatientData?.verificationOtp || apiPatientData?.otp || '',
+				completePin: apiPatientData?.completionPin || apiPatientData?.pin || '',
 			}
 
 			setBooking(activeBooking)
@@ -88,7 +83,15 @@ export default function CompleteServicePage() {
 				uploadedImages: [],
 			})
 			setLoading(false)
+			return
 		}
+
+		setBooking(null)
+		setSessionState(null)
+		setLoading(false)
+	}
+
+	useEffect(() => {
 		void loadData()
 	}, [bookingId])
 
@@ -152,10 +155,21 @@ export default function CompleteServicePage() {
 
 	if (!booking || !sessionState) {
 		return (
-			<View style={styles.errorContainer}>
-				<AppTypography variant="body" style={styles.errorText}>
-					No active service session found.
-				</AppTypography>
+			<View style={styles.container}>
+				<AppScreenHeader title="Complete Care Visit" />
+				<View style={styles.errorContainer}>
+					<MaterialCommunityIcons name="account-alert-outline" size={54} color="#D9534F" style={{ marginBottom: 14 }} />
+					<AppTypography variant="h3" style={{ color: '#1B2A32', fontWeight: '700', marginBottom: 8, textAlign: 'center' }}>
+						Unable to Load Patient Information
+					</AppTypography>
+					<AppTypography variant="body" style={styles.errorText}>
+						We couldn't retrieve the patient details for this booking. Please try again.
+					</AppTypography>
+					<View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%', justifyContent: 'center' }}>
+						<AppButton variant="primary" onPress={() => loadData()} style={{ minWidth: 120 }}>Try Again</AppButton>
+						<AppButton variant="outline" onPress={() => navigation.goBack()} style={{ minWidth: 120 }}>Go Back</AppButton>
+					</View>
+				</View>
 			</View>
 		)
 	}
@@ -240,9 +254,32 @@ export default function CompleteServicePage() {
 					>
 						Finalize & Submit Care Record
 					</AppButton>
+
+					<AppButton
+						variant="outline"
+						onPress={() => setCancelModalVisible(true)}
+						style={styles.cancelBtn}
+					>
+						Cancel Visit
+					</AppButton>
 				</View>
 			</ScrollView>
 
+						{booking && (
+				<CancelVisitModal
+					visible={cancelModalVisible}
+					bookingId={booking.id}
+					patientName={booking.patientName}
+					onClose={() => setCancelModalVisible(false)}
+					onCancelled={() => {
+						setCancelModalVisible(false)
+						navigation.reset({
+							index: 0,
+							routes: [{ name: ROUTES.MAIN.TABS }],
+						})
+					}}
+				/>
+			)}
 			{/* SUCCESS POPUP MODAL */}
 			<StatusModal
 				visible={successModalVisible}
@@ -378,6 +415,11 @@ const styles = StyleSheet.create({
 	},
 
 	/* ACTION BUTTON */
+	cancelBtn: {
+		borderColor: '#EF4444',
+		borderRadius: 12,
+		marginTop: 10,
+	},
 	completeBtn: {
 		backgroundColor: '#2B6F71',
 		borderRadius: 12,

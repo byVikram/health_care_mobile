@@ -272,11 +272,13 @@ export default function StaffAncillaryDashboard() {
 			const newBooking: NurseBooking = {
 				id: targetId,
 				patientName:
-					result.travelInfo?.patientFirstName ||
+					(result.travelInfo as any)?.patientFullName ||
+					(result.travelInfo as any)?.patientName ||
+					(result.travelInfo as any)?.patientFirstName ||
 					(incomingRequest as any)?.patientName ||
 					(incomingRequest as any)?.patientFirstName ||
-					'Patient Recipient',
-				patientAge: (incomingRequest as any)?.patientAge || 45,
+					'',
+				patientAge: (result.travelInfo as any)?.patientAge || (incomingRequest as any)?.patientAge || 0,
 				patientGender: (incomingRequest as any)?.patientGender || 'Not Specified',
 				patientPhone: result.travelInfo?.patientPhone || (incomingRequest as any)?.patientPhone || '',
 				serviceName: incomingRequest.serviceName || 'General Healthcare Service',
@@ -334,10 +336,10 @@ export default function StaffAncillaryDashboard() {
 			}
 		}
 
-		if (isFocused && isNurseOnline) {
+		if (isFocused) {
 			void syncStatuses()
 		}
-	}, [isFocused, isNurseOnline])
+	}, [isFocused])
 
 	const acceptedCount = metrics?.acceptedCount ?? 0
 	const completedCount = metrics?.completedCount ?? 0
@@ -345,13 +347,15 @@ export default function StaffAncillaryDashboard() {
 	const todayEarningsAmount = metrics?.todayEarnings ?? 0
 	const weekEarningsAmount = metrics?.weekEarnings ?? 0
 
-	const inProgressBooking = bookings.find((b) => b.status?.toLowerCase() === 'in_progress')
-	const enRouteOrArrivedBooking = bookings.find(
-		(b) => b.status?.toUpperCase() === 'EN_ROUTE' || b.status?.toUpperCase() === 'ARRIVED'
-	)
-	const assignedBooking = bookings.find(
-		(b) => b.status?.toLowerCase() === 'assigned' || b.status?.toLowerCase() === 'verification_pending'
-	)
+	const inProgressBooking = bookings.find((b) => (b.status || '').toLowerCase() === 'in_progress')
+	const enRouteOrArrivedBooking = bookings.find((b) => {
+		const st = (b.status || '').toLowerCase()
+		return st === 'en_route' || st === 'arrived'
+	})
+	const assignedBooking = bookings.find((b) => {
+		const st = (b.status || '').toLowerCase()
+		return st === 'assigned' || st === 'nurse_assigned' || st === 'verification_pending'
+	})
 	const activeBooking = inProgressBooking || enRouteOrArrivedBooking || assignedBooking || null
 
 	const handleStartCare = () => {

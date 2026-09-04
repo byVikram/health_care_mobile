@@ -3,10 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
-import {
-	fetchProviderEarnings,
-	ProviderEarningsData,
-} from '../ancillaryService'
+import { fetchProviderEarnings, ProviderEarningsData } from '../ancillaryService'
 
 /**
  * Earnings & Payouts screen, shared by every ancillary provider role

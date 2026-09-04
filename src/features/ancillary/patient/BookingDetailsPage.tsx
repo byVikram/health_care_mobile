@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
+	ActivityIndicator,
 	Image,
 	ScrollView,
 	StyleSheet,
@@ -22,6 +23,7 @@ import {
 	AppSelectOption,
 	AppTypography,
 	PatientProfileSelectorBottomSheet,
+	StatusModal,
 } from '../../../components/common'
 import DateSlotPicker from '../../../components/common/DateSlotPicker'
 import { SlotGroup } from '../../doctor/doctorService'
@@ -157,15 +159,11 @@ export default function BookingDetailsPage() {
 		bloodGroup: string
 		relationship: string
 		avatar?: string
-	}>({
-		publicId: undefined,
-		name: 'Patient Account Holder',
-		age: '',
-		gender: '',
-		bloodGroup: '',
-		relationship: 'Self',
-		avatar: undefined,
-	})
+	} | null>(null)
+	const [loadingPatient, setLoadingPatient] = useState<boolean>(true)
+	const [patientErrorModalVisible, setPatientErrorModalVisible] = useState<boolean>(false)
+	const [validationModalTitle, setValidationModalTitle] = useState<string>('Unable to Book')
+	const [validationModalMessage, setValidationModalMessage] = useState<string>('We couldn\'t retrieve the patient details required to complete this booking. Please try again.')
 
 	// 3. Booking Dispatch Mode State (INSTANT vs SCHEDULED)
 	const [bookingType, setBookingType] = useState<'INSTANT' | 'SCHEDULED'>('INSTANT')
@@ -200,26 +198,17 @@ export default function BookingDetailsPage() {
 	const [selectedProfileId, setSelectedProfileId] = useState<string>('self-1')
 
 	// Temporary Form States for Patient Edit Sheet
-	const [tempPatientName, setTempPatientName] = useState(patient.name)
-	const [tempPatientAge, setTempPatientAge] = useState(patient.age)
-	const [tempPatientGender, setTempPatientGender] = useState(patient.gender)
-	const [tempPatientRel, setTempPatientRel] = useState(patient.relationship)
+	const [tempPatientName, setTempPatientName] = useState('')
+	const [tempPatientAge, setTempPatientAge] = useState('')
+	const [tempPatientGender, setTempPatientGender] = useState('')
+	const [tempPatientRel, setTempPatientRel] = useState('Self')
 
 	// Dynamic Saved Addresses State
 	const [savedAddressesList, setSavedAddressesList] = useState(SAVED_ADDRESSES)
 	const [addressOptions, setAddressOptions] = useState<AppSelectOption[]>(ADDRESS_SELECT_OPTIONS)
 
-	useEffect(() => {
-		const fetchProfile = async () => {
-			let loadedPatient = {
-				publicId: undefined as string | undefined,
-				name: 'Patient Account Holder',
-				age: '',
-				gender: '',
-				bloodGroup: '',
-				relationship: 'Self',
-				avatar: undefined as string | undefined,
-			}
+	const fetchProfile = async () => {
+			setLoadingPatient(true)
 
 			try {
 				const apiAddresses = await getPatientAddresses()
@@ -265,63 +254,87 @@ export default function BookingDetailsPage() {
 			}
 
 			try {
-				const response = await getPatientDetails()
-				if (response.success && response.data) {
-					const personal = response.data.personal
-					if (personal) {
-						let parsedAge = ''
-						if (personal.date_of_birth) {
-							const dob = new Date(personal.date_of_birth)
+				let resolvedName = ''
+				let resolvedPublicId = ''
+				let personalData: any = null
+
+				// 1. Try to get full details from getPatientDetails API
+				try {
+					const response = await getPatientDetails()
+					if (response && response.success && response.data) {
+						personalData = response.data.personal
+						resolvedName = personalData?.name || response.data.name || ''
+						resolvedPublicId = response.data.public_id || response.data.id || personalData?.public_id || personalData?.id || ''
+					}
+				} catch (detailsErr) {
+					console.log('[BookingDetailsPage] Notice: getPatientDetails API call failed:', detailsErr)
+				}
+
+
+
+				// 3. If still missing, check logged-in user in AsyncStorage
+				if (!resolvedPublicId || !resolvedName || resolvedName.trim() === '') {
+					try {
+						const userRaw = await AsyncStorage.getItem('user')
+						if (userRaw) {
+							const userData = JSON.parse(userRaw)
+							if (!resolvedPublicId) {
+								resolvedPublicId = userData.publicId || userData.public_id || userData.id || ''
+							}
+							if (!resolvedName || resolvedName.trim() === '') {
+								resolvedName = userData.name || userData.full_name || ''
+							}
+						}
+					} catch (storageErr) {
+						console.log('[BookingDetailsPage] Notice: reading AsyncStorage user failed:', storageErr)
+					}
+				}
+
+				// Validate resolved real patient
+				const isBlockedPlaceholder = ['Patient Account Holder', 'John Doe', 'Eleanor Vance', 'Patient Recipient', 'Patient'].includes(resolvedName.trim())
+				if (resolvedName && typeof resolvedName === 'string' && resolvedName.trim() !== '' && !isBlockedPlaceholder && resolvedPublicId) {
+					let parsedAge = ''
+					if (personalData?.date_of_birth) {
+						const dob = new Date(personalData.date_of_birth)
+						if (!isNaN(dob.getTime())) {
 							const diff = Date.now() - dob.getTime()
 							parsedAge = String(Math.abs(new Date(diff).getUTCFullYear() - 1970))
 						}
-
-						loadedPatient = {
-							publicId: response.data.public_id || personal.public_id || response.data.id,
-							name: personal.name || 'Patient Account Holder',
-							age: parsedAge,
-							gender: personal.gender || '',
-							bloodGroup: personal.blood_group || '',
-							relationship: 'Self',
-							avatar: personal.avatar,
-						}
-						setPatient(loadedPatient)
-						setTempPatientName(loadedPatient.name)
-						setTempPatientAge(loadedPatient.age)
-						setTempPatientGender(loadedPatient.gender)
-						setTempPatientRel(loadedPatient.relationship)
-						return
+					} else if (personalData?.age) {
+						parsedAge = String(personalData.age)
 					}
-				}
-			} catch (e) {
-				console.error('Failed to fetch patient profile details from API', e)
-			}
 
-			try {
-				const userRaw = await AsyncStorage.getItem('user')
-				if (userRaw) {
-					const userData = JSON.parse(userRaw)
-					loadedPatient = {
-						publicId: userData.public_id || userData.publicId,
-						name: userData.name || 'John Doe',
-						age: userData.age || '45',
-						gender: userData.gender || 'Male',
-						bloodGroup: userData.bloodGroup || 'O+',
-						relationship: 'Self',
-						avatar: userData.avatar || undefined,
+					const loadedPatient = {
+						publicId: resolvedPublicId,
+						name: resolvedName.trim(),
+						age: parsedAge,
+						gender: personalData?.gender || '',
+						bloodGroup: personalData?.blood_group || '',
+						relationship: personalData?.relation || 'Self',
+						avatar: personalData?.avatar,
 					}
 					setPatient(loadedPatient)
 					setTempPatientName(loadedPatient.name)
 					setTempPatientAge(loadedPatient.age)
 					setTempPatientGender(loadedPatient.gender)
 					setTempPatientRel(loadedPatient.relationship)
+					setLoadingPatient(false)
+					return
 				}
-			} catch (err) {
-				console.error('Failed to load user profile from AsyncStorage', err)
+			} catch (e) {
+				console.error('Failed to fetch patient profile details from API', e)
 			}
-		}
 
-		fetchProfile()
+			// If genuine patient details are not available, STOP booking and show error modal
+			setPatient(null)
+			setLoadingPatient(false)
+			setValidationModalTitle('Unable to Book')
+			setValidationModalMessage("We couldn't retrieve the patient details required to complete this booking. Please try again.")
+			setPatientErrorModalVisible(true)
+	}
+
+	useEffect(() => {
+		void fetchProfile()
 	}, [])
 
 	// Dynamic Charges Calculation
@@ -376,13 +389,16 @@ export default function BookingDetailsPage() {
 	}
 
 	const handleSavePatientDetails = () => {
-		setPatient((prev) => ({
-			...prev,
-			name: tempPatientName || prev.name,
-			age: tempPatientAge || prev.age,
-			gender: tempPatientGender || prev.gender,
-			relationship: tempPatientRel || prev.relationship,
-		}))
+		setPatient((prev) => {
+			if (!prev) return null
+			return {
+				...prev,
+				name: tempPatientName || prev.name,
+				age: tempPatientAge || prev.age,
+				gender: tempPatientGender || prev.gender,
+				relationship: tempPatientRel || prev.relationship,
+			}
+		})
 		setEditPatientVisible(false)
 	}
 
@@ -409,6 +425,38 @@ export default function BookingDetailsPage() {
 	}
 
 	const handleContinueToPayment = () => {
+		// 1. Validate Patient Details
+		if (!patient || !patient.name || typeof patient.name !== 'string' || patient.name.trim() === '' || !patient.publicId || ['Patient Account Holder', 'John Doe', 'Eleanor Vance', 'Patient Recipient', 'Patient'].includes(patient.name.trim())) {
+			setValidationModalTitle('Unable to Book')
+			setValidationModalMessage("We couldn't retrieve the patient details required to complete this booking. Please try again.")
+			setPatientErrorModalVisible(true)
+			return
+		}
+
+		// 2. Validate Selected Services/Procedures
+		if (!services || services.length === 0) {
+			setValidationModalTitle('Unable to Book')
+			setValidationModalMessage("Please select at least one healthcare service or procedure to continue with your booking.")
+			setPatientErrorModalVisible(true)
+			return
+		}
+
+		// 3. Validate Delivery Address
+		if (!visit || !visit.address || typeof visit.address !== 'string' || visit.address.trim() === '' || visit.address.includes('Detecting')) {
+			setValidationModalTitle('Unable to Book')
+			setValidationModalMessage("A valid delivery address is required for doorstep care. Please select or provide your address.")
+			setPatientErrorModalVisible(true)
+			return
+		}
+
+		// 4. Validate Scheduled Date & Time (if Scheduled)
+		if (bookingType === 'SCHEDULED' && (!visit.date || !visit.timeSlot || visit.date.trim() === '')) {
+			setValidationModalTitle('Unable to Book')
+			setValidationModalMessage("Please select an appointment date and time slot for your scheduled care visit.")
+			setPatientErrorModalVisible(true)
+			return
+		}
+
 		const bookingPayload = {
 			services,
 			patient,
@@ -452,24 +500,48 @@ export default function BookingDetailsPage() {
 						</TouchableOpacity>
 					</View>
 
-					<View style={styles.patientProfileBox}>
-						<Image source={{ uri: patient.avatar }} style={styles.patientAvatar} resizeMode="cover" />
-						<View style={styles.patientInfoCol}>
-							<View style={styles.patientNameRow}>
-								<AppTypography variant="h3" style={styles.patientName}>
-									{patient.name}
-								</AppTypography>
-								<View style={styles.relationChip}>
-									<AppTypography variant="caption" style={styles.relationText}>
-										{patient.relationship}
-									</AppTypography>
-								</View>
-							</View>
-							<AppTypography variant="caption" style={styles.patientMetaText}>
-								{patient.age} Yrs  •  {patient.gender}  •  Blood Group: {patient.bloodGroup}
+					{loadingPatient ? (
+						<View style={[styles.patientProfileBox, { justifyContent: 'center', paddingVertical: 20 }]}>
+							<ActivityIndicator size="small" color="#2B6F71" />
+							<AppTypography variant="caption" style={{ color: '#546E7A', marginLeft: 8 }}>
+								Retrieving patient details...
 							</AppTypography>
 						</View>
-					</View>
+					) : patient ? (
+						<View style={styles.patientProfileBox}>
+							<Image source={{ uri: patient.avatar }} style={styles.patientAvatar} resizeMode="cover" />
+							<View style={styles.patientInfoCol}>
+								<View style={styles.patientNameRow}>
+									<AppTypography variant="h3" style={styles.patientName}>
+										{patient.name}
+									</AppTypography>
+									<View style={styles.relationChip}>
+										<AppTypography variant="caption" style={styles.relationText}>
+											{patient.relationship}
+										</AppTypography>
+									</View>
+								</View>
+								<AppTypography variant="caption" style={styles.patientMetaText}>
+									{patient.age ? `${patient.age} Yrs` : ''} {patient.gender ? ` •  ${patient.gender}` : ''} {patient.bloodGroup ? ` •  Blood Group: ${patient.bloodGroup}` : ''}
+								</AppTypography>
+							</View>
+						</View>
+					) : (
+						<View style={[styles.patientProfileBox, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', borderWidth: 1 }]}>
+							<Ionicons name="alert-circle-outline" size={24} color="#DC2626" />
+							<View style={{ flex: 1 }}>
+								<AppTypography variant="h4" style={{ color: '#991B1B' }}>
+									Patient Details Unavailable
+								</AppTypography>
+								<AppTypography variant="caption" style={{ color: '#B91C1C', marginTop: 2 }}>
+									Unable to retrieve recipient details. Please try again.
+								</AppTypography>
+							</View>
+							<TouchableOpacity onPress={fetchProfile} style={{ backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}>
+								<AppTypography variant="caption" style={{ color: '#FFFFFF', fontWeight: '700' }}>Retry</AppTypography>
+							</TouchableOpacity>
+						</View>
+					)}
 				</View>
 
 				{/* 8px GREY SECTION DIVIDER BAR */}
@@ -793,6 +865,20 @@ export default function BookingDetailsPage() {
 				onClose={() => setSwitchProfileVisible(false)}
 				onSelectProfile={handleSelectProfile}
 				selectedProfileId={selectedProfileId}
+			/>
+			{/* PATIENT ERROR MODAL */}
+			<StatusModal
+				visible={patientErrorModalVisible}
+				status="error"
+				title={validationModalTitle}
+				description={validationModalMessage}
+				submitText="Try Again"
+				onSubmit={() => {
+					setPatientErrorModalVisible(false)
+					void fetchProfile()
+				}}
+				cancelText="Close"
+				onCancel={() => setPatientErrorModalVisible(false)}
 			/>
 		</View>
 	)

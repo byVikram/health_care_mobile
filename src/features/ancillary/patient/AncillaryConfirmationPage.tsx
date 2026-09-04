@@ -24,7 +24,7 @@ export default function AncillaryConfirmationPage() {
 
 	const payload = route.params?.bookingPayload || {}
 	const bookingId = route.params?.bookingId || `BK-${Math.floor(100000 + Math.random() * 900000)}`
-	const patient = payload.patient || { name: 'John Doe', age: '34', gender: 'male', relationship: 'Self' }
+	const patient = payload.patient || { name: '', age: '', gender: '', relationship: '' }
 	const schedule = payload.schedule || { dateLabel: 'Today, Oct 14', timeSlot: '09:00 AM - 10:00 AM' }
 	const location = payload.location || payload.visit?.address || '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi'
 	const serviceName = payload.serviceName || (payload.services ? payload.services.map((s: any) => s.title).join(', ') : 'Wound Dressing & Care')
