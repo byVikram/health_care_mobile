@@ -556,6 +556,7 @@ export interface AncillaryBooking {
 	serviceKey: string
 	serviceLabel: string
 	status: 'upcoming' | 'completed' | 'cancelled' | 'SEARCHING' | 'ASSIGNED' | 'EN_ROUTE' | 'ARRIVED' | 'IN_PROGRESS' | string
+	rawStatus?: string
 	date: string
 	timeRange?: string
 	provider: AncillaryBookingProvider
@@ -601,7 +602,7 @@ export const submitAncillaryReview = async (
 		rating: data.rating,
 		comment: data.comment?.trim() || undefined,
 		createdAt: existing?.createdAt || todayStr,
-		patientName: data.patientName || 'Verified Patient',
+		patientName: data.patientName || '',
 	}
 
 	// Save to in-memory store
@@ -784,18 +785,9 @@ export const acceptCareRequestBackend = async (
 				message: 'This care request has already been assigned to another nurse.',
 			}
 		}
-		// Fallback for offline demo
 		return {
-			success: true,
-			travelInfo: {
-				requestId: requestId || 'REQ-NURSE-991',
-				status: 'ASSIGNED',
-				patientFirstName: 'Eleanor V.',
-				streetAddress: '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
-				destinationLat: 12.9716,
-				destinationLng: 77.5946,
-				callProxyToken: 'tok-proxy-8821',
-			},
+			success: false,
+			message: error.response?.data?.message || error.response?.data?.detail || 'Failed to accept care request. Please try again.',
 		}
 	}
 }
@@ -843,24 +835,9 @@ export const verifyPatientOtpBackend = async (
 			clinicalDetails: data?.clinicalDetails || data,
 		}
 	} catch (error: any) {
-		if (otp === '4829' || otp === '1234') {
-			return {
-				success: true,
-				clinicalDetails: {
-					patientFullName: 'Eleanor Vance',
-					patientAge: 68,
-					patientGender: 'Female',
-					patientPhone: '+91 98765 43210',
-					procedureDetails: 'Abdominal surgical incision dressing change, aseptic cleaning, and topical antibiotic application.',
-					clinicalNotes: 'Post-laparoscopic surgery Day 5. Mild serous drainage. Patient resting comfortably at home.',
-					requiredDocuments: ['Sterile Dressing Kit Prescription', 'Nurse Care Chart Note'],
-					completionPin: '9182',
-				},
-			}
-		}
 		return {
 			success: false,
-			message: 'Invalid verification OTP. Please ask the patient for the 4-digit code.',
+			message: error.response?.data?.message || error.response?.data?.detail || 'Invalid verification OTP. Please ask the patient for the 4-digit code.',
 		}
 	}
 }
@@ -951,8 +928,8 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 
 				return {
 					id: String(item.id || item.publicBookingId),
-					patientName: String(item.patientName || item.patientFullName || 'Patient Recipient'),
-					patientAge: item.patientAge || 45,
+					patientName: String(item.patientName || item.patientFullName || item.patient?.name || ''),
+					patientAge: item.patientAge || '',
 					patientGender: item.patientGender || 'Not Specified',
 					patientPhone: String(item.patientPhone || ''),
 					patientAvatar: item.patientAvatar ? String(item.patientAvatar) : undefined,
@@ -993,6 +970,7 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 			serviceKey: 'nursing-care',
 			serviceLabel: 'Nursing Care',
 			status: String(data.status || 'SEARCHING').toUpperCase() as any,
+			rawStatus: String(data.status || 'SEARCHING').toUpperCase(),
 			date: 'Today',
 			timeRange: 'Instant Dispatch',
 			amount: typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(String(data.totalAmount || '667').replace('₹', '')),
@@ -1069,6 +1047,7 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 			serviceKey: 'nursing-care',
 			serviceLabel: String(item.serviceName || 'Ancillary Care'),
 			status: mapStatusToBookingTab(item.status),
+			rawStatus: String(item.status || item.rawStatus || '').toUpperCase(),
 			date,
 			timeRange,
 			provider: {
@@ -1086,6 +1065,34 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 		}
 	})
 }
+
+export const cancelCareRequestProviderBackend = async (
+	requestId: string,
+	reason: string = 'Cancelled by nurse'
+): Promise<{ success: boolean; message: string }> => {
+	try {
+		const res = await ApiService.post<any>(
+			API_ENDPOINTS.ANCILLARY.CANCEL_PROVIDER(requestId),
+			{ reason }
+		)
+		await clearBookingState(requestId)
+		const foundIndex = MOCK_NURSE_BOOKINGS.findIndex((b) => b.id === requestId)
+		if (foundIndex !== -1) {
+			MOCK_NURSE_BOOKINGS[foundIndex].status = 'cancelled'
+			MOCK_NURSE_BOOKINGS[foundIndex].cancellationReason = reason
+		}
+		return { success: true, message: res.data?.message || 'Care assignment cancelled successfully' }
+	} catch (error: any) {
+		console.log('[ancillaryService] Provider cancel error, clearing local state:', error)
+		await clearBookingState(requestId)
+		const foundIndex = MOCK_NURSE_BOOKINGS.findIndex((b) => b.id === requestId)
+		if (foundIndex !== -1) {
+			MOCK_NURSE_BOOKINGS[foundIndex].status = 'cancelled'
+		}
+		return { success: true, message: 'Care assignment cancelled' }
+	}
+}
+
 export const cancelCareRequestPatientBackend = async (requestId: string, reason: string = 'Cancelled by patient'): Promise<boolean> => {
 	try {
 		await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PATIENT(requestId), { reason })
@@ -1185,6 +1192,7 @@ export const getNurseAppointments = fetchMyNurseAppointmentsBackend
 export const getActivePatientRequest = fetchPatientActiveRequestBackend
 export const updateProviderLocation = updateProviderLocationBackend
 export const cancelCareRequestPatient = cancelCareRequestPatientBackend
+export const cancelCareRequestProvider = cancelCareRequestProviderBackend
 export const fetchProviderStatus = fetchProviderStatusBackend
 export const updateProviderStatus = updateProviderStatusBackend
 export const fetchMyPatientBookings = fetchMyPatientBookingsBackend

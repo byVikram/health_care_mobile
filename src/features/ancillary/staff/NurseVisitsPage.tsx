@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { getNurseAppointments, NurseBooking } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
@@ -8,10 +8,12 @@ import ServiceStatusIndicator from '../components/ServiceStatusIndicator'
 
 export default function NurseVisitsPage() {
 	const navigation = useNavigation<any>()
+	const isFocused = useIsFocused()
 	const [activeFilter, setActiveFilter] = useState<'all' | 'assigned' | 'in_progress' | 'completed'>('all')
 	const [bookings, setBookings] = useState<NurseBooking[]>([])
 
 	React.useEffect(() => {
+		if (!isFocused) return
 		const loadData = async () => {
 			try {
 				const items = await getNurseAppointments()
@@ -21,13 +23,14 @@ export default function NurseVisitsPage() {
 			}
 		}
 		void loadData()
-	}, [])
+	}, [isFocused])
 
 	const filteredBookings = bookings.filter((b: NurseBooking) => {
+		const st = (b.status || '').toLowerCase()
 		if (activeFilter === 'all') return true
-		if (activeFilter === 'assigned') return b.status === 'assigned' || b.status === 'verification_pending' || b.status === 'EN_ROUTE' || b.status === 'ARRIVED'
-		if (activeFilter === 'in_progress') return b.status === 'in_progress'
-		if (activeFilter === 'completed') return b.status === 'completed'
+		if (activeFilter === 'assigned') return st === 'assigned' || st === 'nurse_assigned' || st === 'verification_pending' || st === 'en_route' || st === 'arrived'
+		if (activeFilter === 'in_progress') return st === 'in_progress'
+		if (activeFilter === 'completed') return st === 'completed'
 		return true
 	})
 

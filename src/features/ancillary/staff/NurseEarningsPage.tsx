@@ -57,27 +57,14 @@ export default function NurseEarningsPage() {
 
 					<View style={styles.earningItem}>
 						<View style={styles.itemRow}>
-							<Text style={styles.patientName}>Eleanor Vance</Text>
+							<Text style={styles.patientName}>Completed Care Visit</Text>
 							<Text style={styles.itemAmount}>+ ₹850</Text>
 						</View>
 						<Text style={styles.serviceName} numberOfLines={1}>
 							Vital Monitoring & IV Infusion
 						</Text>
 						<Text style={styles.itemMeta}>
-							Today • 01:30 PM • Completed & Verified
-						</Text>
-					</View>
-
-					<View style={styles.earningItem}>
-						<View style={styles.itemRow}>
-							<Text style={styles.patientName}>Arthur Pendelton</Text>
-							<Text style={styles.itemAmount}>+ ₹450</Text>
-						</View>
-						<Text style={styles.serviceName} numberOfLines={1}>
-							Routine Dressing Change
-						</Text>
-						<Text style={styles.itemMeta}>
-							Today • 09:15 AM • Completed & Verified
+							Today • Completed & Verified
 						</Text>
 					</View>
 				</View>

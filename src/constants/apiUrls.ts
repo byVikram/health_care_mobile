@@ -5,7 +5,7 @@
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	const url = 'http://192.168.4.47:8000'
+	const url = 'http://192.168.4.42:8000'
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
@@ -214,6 +214,8 @@ export const API_ENDPOINTS = {
 		PATIENT_ACTIVE_REQUEST: `${BASE_URL}/api/ancillary/patient/requests/active`,
 		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
 		CANCEL_PATIENT: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/cancel`,
+		CANCEL_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/cancel`,
+		REJECT_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/reject`,
 		MY_REQUESTS: `${BASE_URL}/api/ancillary/patient/requests/my`,
 		PROVIDER_STATUS: `${BASE_URL}/api/ancillary/provider/status`,
 		PROVIDER_LOCATION: `${BASE_URL}/api/ancillary/provider/location`,

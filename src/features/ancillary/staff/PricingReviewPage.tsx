@@ -23,7 +23,7 @@ export default function PricingReviewPage() {
 	const isTablet = width >= 768
 
 	const payload = route.params?.bookingPayload || {}
-	const patient = payload.patient || { name: 'Patient Recipient', age: '', gender: '', relationship: 'Self' }
+	const patient = payload.patient || { name: '', age: '', gender: '', relationship: '' }
 	const medical = payload.medical || { condition: 'Post-surgical wound dressing', notes: 'Gentle handling requested', uploadedFiles: [] }
 	const schedule = payload.schedule || { dateLabel: 'Today, Oct 14', timeSlot: '09:00 AM - 10:00 AM' }
 	const location = payload.location || '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi'
