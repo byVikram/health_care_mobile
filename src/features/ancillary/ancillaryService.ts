@@ -103,6 +103,10 @@ export interface NurseBooking {
 	otpCode: string
 	completePin: string
 	amount?: number
+	/** Provider's actual earning for this booking (backend providerPrice/estimatedEarnings), distinct from the patient's total amount. */
+	providerEarning?: number
+	/** Raw backend createdAt ("YYYY-MM-DD HH:MM:SS"), kept alongside the display-formatted appointmentTime so earnings screens can group by real calendar day/week/month instead of assuming everything is 'Today'. */
+	createdAtRaw?: string
 	cancellationReason?: string
 }
 
@@ -748,7 +752,7 @@ export const fetchSoftReviewRequest = async (requestId: string): Promise<SoftRev
 			requiredSkills: ['Wound Care', 'Sterile Dressing'],
 			urgency: 'Routine',
 			specialRequirements: 'Sterile dressing required',
-			earning: '₹850',
+			earning: 'â‚¹850',
 			expiresAt,
 		}
 	}
@@ -843,24 +847,13 @@ export const verifyPatientOtpBackend = async (
 			clinicalDetails: data?.clinicalDetails || data,
 		}
 	} catch (error: any) {
-		if (otp === '4829' || otp === '1234') {
-			return {
-				success: true,
-				clinicalDetails: {
-					patientFullName: 'Eleanor Vance',
-					patientAge: 68,
-					patientGender: 'Female',
-					patientPhone: '+91 98765 43210',
-					procedureDetails: 'Abdominal surgical incision dressing change, aseptic cleaning, and topical antibiotic application.',
-					clinicalNotes: 'Post-laparoscopic surgery Day 5. Mild serous drainage. Patient resting comfortably at home.',
-					requiredDocuments: ['Sterile Dressing Kit Prescription', 'Nurse Care Chart Note'],
-					completionPin: '9182',
-				},
-			}
-		}
+		// Never fabricate a success response locally -- doorstep identity
+		// verification only means something if a wrong/guessed code is
+		// actually rejected. Surface the backend's real error instead.
+		const backendMessage = error?.response?.data?.detail?.message
 		return {
 			success: false,
-			message: 'Invalid verification OTP. Please ask the patient for the 4-digit code.',
+			message: backendMessage || 'Invalid verification OTP. Please ask the patient for the 4-digit code.',
 		}
 	}
 }
@@ -908,7 +901,7 @@ export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequest
 				requiredSkills: ['RN Certification', 'Wound Dressing'],
 				urgency: String(item.urgencyLevel || 'HIGH'),
 				specialRequirements: 'Sanitized Single-Use Medical Kit Required',
-				earning: typeof item.estimatedEarnings === 'number' ? `₹${item.estimatedEarnings}` : String(item.estimatedEarnings || '₹499'),
+				earning: typeof item.estimatedEarnings === 'number' ? `â‚¹${item.estimatedEarnings}` : String(item.estimatedEarnings || 'â‚¹499'),
 				expiresAt: Date.now() + 60 * 1000,
 			}))
 		}
@@ -948,6 +941,14 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 				const amount = item.totalAmount != null
 					? parseFloat(String(item.totalAmount).replace(/[^0-9.]/g, ''))
 					: undefined
+				// Prefer the backend's providerPrice (the provider's actual cut) for
+				// earnings displays; estimatedEarnings is a formatted '`INR`xxx' fallback,
+				// and totalAmount (the patient's full charge) is the last resort.
+				const providerEarning = item.providerPrice != null
+					? parseFloat(String(item.providerPrice).replace(/[^0-9.]/g, ''))
+					: item.estimatedEarnings != null
+					? parseFloat(String(item.estimatedEarnings).replace(/[^0-9.]/g, ''))
+					: amount
 
 				return {
 					id: String(item.id || item.publicBookingId),
@@ -965,6 +966,8 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 					otpCode: String(item.verificationOtp || '4829'),
 					completePin: String(item.completionPin || '9182'),
 					amount: Number.isFinite(amount) ? amount : undefined,
+					providerEarning: Number.isFinite(providerEarning) ? providerEarning : undefined,
+					createdAtRaw: item.createdAt ? String(item.createdAt) : undefined,
 					cancellationReason: item.cancellationReason ? String(item.cancellationReason) : undefined,
 				}
 			})
@@ -995,7 +998,7 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 			status: String(data.status || 'SEARCHING').toUpperCase() as any,
 			date: 'Today',
 			timeRange: 'Instant Dispatch',
-			amount: typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(String(data.totalAmount || '667').replace('₹', '')),
+			amount: typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(String(data.totalAmount || '667').replace('â‚¹', '')),
 			provider: {
 				id: data.assignedProvider ? String(data.assignedProvider.id) : 'n-prov-1',
 				name: data.assignedProvider ? String(data.assignedProvider.name) : 'Nurse Specialist',

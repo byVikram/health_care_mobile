@@ -101,7 +101,9 @@ export default function PatientVerificationPage() {
 		setVerifying(true)
 		try {
 			const res = await verifyPatientOtp(booking.id, pin)
-			if (res.success || pin === booking.otpCode || pin === '4829' || pin === '1234') {
+			// Trust only the backend's verification result -- never a locally
+			// held/mock OTP value, or entering the code becomes optional.
+			if (res.success) {
 				const now = new Date().toISOString()
 				const initialState = {
 					status: 'in_progress' as const,

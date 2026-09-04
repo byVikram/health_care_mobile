@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
 	Image,
@@ -15,6 +15,7 @@ import {
 	getBookingState,
 	acceptCareRequest,
 	getNurseAppointments,
+	fetchAvailableRequests,
 	fetchProviderStatus,
 	updateProviderStatus,
 	updateProviderLocation,
@@ -53,6 +54,10 @@ export default function StaffAncillaryDashboard() {
 	>('none')
 	const [acceptLoading, setAcceptLoading] = useState(false)
 	const [claimedModalVisible, setClaimedModalVisible] = useState(false)
+	// Logged-in provider's own specialty (e.g. 'Physiotherapy', 'Nursing Care'), fetched from
+	// their profile -- used so offer-card fallback text and default labels reflect this
+	// provider's real specialty instead of being hardcoded to Nursing Care for everyone.
+	const [specialtyLabel, setSpecialtyLabel] = useState<string>('Home Healthcare')
 
 	// Fetch Initial Provider Status & Verification from DB on Mount
 	useEffect(() => {
@@ -63,6 +68,8 @@ export default function StaffAncillaryDashboard() {
 				if (!isMounted) return
 				const verified = Boolean((profile as any)?.is_verified || (profile as any)?.verification_status === 'approved')
 				setIsVerified(verified)
+				const label = (profile as any)?.specialty?.label
+				if (label) setSpecialtyLabel(String(label))
 
 				if (verified) {
 					const status = await fetchProviderStatus()
@@ -136,15 +143,15 @@ export default function StaffAncillaryDashboard() {
 						if (payload.type === 'NEW_CARE_REQUEST_OFFER' && payload.data) {
 							const reqData = payload.data
 							setIncomingRequest({
-								id: reqData.requestId || reqData.publicBookingId || 'REQ-NURSE-991',
-								serviceName: reqData.serviceName || 'Nursing Care',
+								id: reqData.requestId || reqData.publicBookingId || 'REQ-OFFER-991',
+								serviceName: reqData.serviceName || specialtyLabel,
 								requestedDate: 'Today',
 								requestedTime: reqData.requestedTime || 'Just now',
 								generalLocation: reqData.generalArea || 'Sector 18',
 								distanceKm: reqData.distanceKm !== undefined ? `${reqData.distanceKm} km` : '-- km',
 								travelTime: reqData.travelTime || '~12 min',
 								serviceRequirement: reqData.generalArea || 'In-Home Healthcare Visit',
-								requiredSkills: ['Nursing Care', 'Doorstep Visit'],
+								requiredSkills: [specialtyLabel, 'Doorstep Visit'],
 								urgency: reqData.urgencyLevel || 'Instant',
 								specialRequirements: 'Patient Doorstep Assessment',
 								earning: reqData.estimatedEarnings || '₹667',
@@ -190,6 +197,44 @@ export default function StaffAncillaryDashboard() {
 			}
 		}
 	}, [isNurseOnline, isFocused])
+
+	// Keep a ref of the latest requestStep so the polling loop below can read
+	// it without needing to restart its interval every time an offer is shown.
+	const requestStepRef = useRef(requestStep)
+	useEffect(() => {
+		requestStepRef.current = requestStep
+	}, [requestStep])
+
+	// 3-Second HTTP Polling Fallback (AC4) -- guarantees incoming-request
+	// delivery even if the WebSocket is down or still reconnecting. The
+	// WebSocket channel above remains the primary low-latency delivery path;
+	// this loop only surfaces an offer if nothing is already on screen.
+	useEffect(() => {
+		if (!isNurseOnline || !isFocused || !isVerified) return
+
+		let isMounted = true
+
+		const pollAvailableRequests = async () => {
+			if (requestStepRef.current !== 'none') return // an offer is already showing
+			try {
+				const available = await fetchAvailableRequests()
+				if (!isMounted || !available || available.length === 0) return
+				if (requestStepRef.current !== 'none') return // re-check after the await
+				console.log('[Poll] \ud83d\udce1 New request via 3s polling fallback')
+				setIncomingRequest(available[0])
+				setRequestStep('request_card')
+			} catch (err) {
+				console.log('[Poll] Available requests fetch error:', err)
+			}
+		}
+
+		void pollAvailableRequests()
+		const pollInterval = setInterval(pollAvailableRequests, 3000)
+		return () => {
+			isMounted = false
+			clearInterval(pollInterval)
+		}
+	}, [isNurseOnline, isFocused, isVerified])
 
 	const handleAvailabilityToggle = async (online: boolean) => {
 		setIsNurseOnline(online)
@@ -291,9 +336,17 @@ export default function StaffAncillaryDashboard() {
 	const acceptedCount = bookings.filter(
 		(b) => b.status === 'assigned' || b.status === 'verification_pending' || b.status === 'in_progress'
 	).length
-	const completedCount = bookings.filter((b) => b.status === 'completed').length
-	const cancelledCount = 0
-	const todayEarningsAmount = completedCount > 0 ? completedCount * 850 + 450 : 1300
+	const completedBookings = bookings.filter((b) => b.status === 'completed')
+	const completedCount = completedBookings.length
+	const cancelledCount = bookings.filter((b) => b.status === 'cancelled').length
+	// Real earnings from this provider's own completed bookings only (getNurseAppointments
+	// is already scoped server-side to the logged-in provider's assignments, so this can
+	// never include another provider's or another specialty's earnings). Previously this
+	// was a fabricated formula (completedCount * 850 + 450) unrelated to actual data.
+	const todayEarningsAmount = completedBookings.reduce(
+		(sum, b) => sum + (b.providerEarning ?? b.amount ?? 0),
+		0
+	)
 
 	const inProgressBooking = bookings.find((b) => b.status?.toLowerCase() === 'in_progress')
 	const enRouteOrArrivedBooking = bookings.find(
@@ -844,7 +897,7 @@ export default function StaffAncillaryDashboard() {
 				visible={claimedModalVisible}
 				status="error"
 				title="Request no longer available"
-				description="This care request has already been assigned to another nurse."
+				description="This care request has already been assigned to another provider."
 				onSubmit={() => setClaimedModalVisible(false)}
 			/>
 		</View>
