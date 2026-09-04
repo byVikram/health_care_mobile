@@ -672,8 +672,8 @@ export interface SoftReviewRequestData {
 	requestedDate: string
 	requestedTime: string
 	generalLocation: string
-	distanceKm: string
-	travelTime: string
+	distanceKm?: string
+	travelTime?: string
 	serviceRequirement: string
 	requiredSkills: string[]
 	urgency: string
@@ -735,26 +735,34 @@ export interface VerifyOtpResponse {
 
 export const fetchSoftReviewRequest = async (requestId: string): Promise<SoftReviewRequestData> => {
 	try {
-		const res = await ApiService.get<SoftReviewRequestData>(`${API_ENDPOINTS.ANCILLARY.REQUESTS}/${requestId}/soft-review`)
-		return res.data
-	} catch (error) {
-		console.log('[ancillaryService] Using soft-review request fallback data')
-		const expiresAt = Date.now() + 30 * 1000
-		return {
-			id: requestId || 'REQ-NURSE-991',
-			serviceName: 'Wound Care',
-			requestedDate: '18 Aug 2026',
-			requestedTime: '10:00 AM',
-			generalLocation: 'Whitefield, Bengaluru',
-			distanceKm: '4.2 km',
-			travelTime: '~18 min',
-			serviceRequirement: 'Post-surgical wound dressing',
-			requiredSkills: ['Wound Care', 'Sterile Dressing'],
-			urgency: 'Routine',
-			specialRequirements: 'Sterile dressing required',
-			earning: 'â‚¹850',
-			expiresAt,
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.SOFT_REVIEW(requestId))
+		const payload = res.data
+		const data = payload?.data !== undefined ? payload.data : payload
+		if (!data) {
+			throw new Error('No soft review data returned from server')
 		}
+		return {
+			id: String(data.id || requestId),
+			serviceName: String(data.serviceName || ''),
+			requestedDate: String(data.requestedDate || 'Today'),
+			requestedTime: String(data.requestedTime || 'Just now'),
+			generalLocation: String(data.generalLocation || data.generalArea || ''),
+			distanceKm: data.distanceKm ? String(data.distanceKm) : '',
+			travelTime: data.travelTime ? String(data.travelTime) : '',
+			serviceRequirement: String(data.serviceRequirement || ''),
+			requiredSkills: Array.isArray(data.requiredSkills) ? data.requiredSkills : [],
+			urgency: String(data.urgency || data.urgencyLevel || 'ROUTINE'),
+			specialRequirements: String(data.specialRequirements || ''),
+			earning: typeof data.earning === 'number'
+				? `₹${data.earning}`
+				: String(data.earning || data.estimatedEarnings || ''),
+			expiresAt: typeof data.expiresAt === 'number'
+				? data.expiresAt
+				: Date.now() + 60000,
+		}
+	} catch (error) {
+		console.log('[ancillaryService] Error fetching soft-review request:', error)
+		throw error
 	}
 }
 
@@ -878,6 +886,40 @@ export const updateProviderLocationBackend = async (
 /**
  * Fetch live active patient care requests from MySQL database for nurse offer discovery.
  */
+// export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequestData[]> => {
+// 	try {
+// 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABLE)
+// 		const payload = res.data
+// 		const rawList: any[] = Array.isArray(payload)
+// 			? payload
+// 			: Array.isArray(payload?.data)
+// 			? payload.data
+// 			: []
+
+// 		if (rawList.length > 0) {
+// 			return rawList.map((item: any) => ({
+// 				id: String(item.id || item.publicBookingId || 'REQ-101'),
+// 				serviceName: String(item.serviceName || 'General Nursing Care Procedure'),
+// 				requestedDate: 'Today',
+// 				requestedTime: String(item.requestedTime || 'Just now'),
+// 				generalLocation: String(item.generalArea || 'Healthcare Sector, Area 4'),
+// 				distanceKm: `${item.distanceKm || 1.8} km`,
+// 				travelTime: '~8 mins',
+// 				serviceRequirement: 'Aseptic Dressing & Vitals Check',
+// 				requiredSkills: Array.isArray(item.requiredSkills) ? item.requiredSkills : ['RN Certification', 'Wound Dressing'],
+// 				urgency: String(item.urgencyLevel || 'HIGH'),
+// 				specialRequirements: 'Sanitized Single-Use Medical Kit Required',
+// 				earning: typeof item.estimatedEarnings === 'number' ? `₹${item.estimatedEarnings}` : String(item.estimatedEarnings || '₹499'),
+// 				expiresAt: Date.now() + 60 * 1000,
+// 			}))
+// 		}
+// 		return []
+// 	} catch (error) {
+// 		console.log('[ancillaryService] Provider requests ready via API service')
+// 		return []
+// 	}
+// }
+
 export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequestData[]> => {
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABLE)
@@ -888,21 +930,23 @@ export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequest
 			? payload.data
 			: []
 
-		if (rawList.length > 0) {
+		if (rawList.length > 0){
 			return rawList.map((item: any) => ({
-				id: String(item.id || item.publicBookingId || 'REQ-101'),
-				serviceName: String(item.serviceName || 'General Nursing Care Procedure'),
-				requestedDate: 'Today',
-				requestedTime: String(item.requestedTime || 'Just now'),
-				generalLocation: String(item.generalArea || 'Healthcare Sector, Area 4'),
-				distanceKm: `${item.distanceKm || 1.8} km`,
-				travelTime: '~8 mins',
-				serviceRequirement: 'Aseptic Dressing & Vitals Check',
-				requiredSkills: ['RN Certification', 'Wound Dressing'],
-				urgency: String(item.urgencyLevel || 'HIGH'),
-				specialRequirements: 'Sanitized Single-Use Medical Kit Required',
-				earning: typeof item.estimatedEarnings === 'number' ? `â‚¹${item.estimatedEarnings}` : String(item.estimatedEarnings || 'â‚¹499'),
-				expiresAt: Date.now() + 60 * 1000,
+				id: String(item.id || item.publicBookingId),
+				serviceName: String(item.serviceName),
+				requestedDate: item.requestedDate || item.requestedDateTime,
+				requestedTime: String(item.requestedTime),
+				generalLocation: String(item.generalLocation || item.generalArea),
+				distanceKm: item.distanceKm !== undefined ? `${item.distanceKm} km` : undefined,
+				travelTime: item.travelTime,
+				serviceRequirement: item.serviceRequirement,
+				requiredSkills: Array.isArray(item.requiredSkills) ? item.requiredSkills : undefined,
+				urgency: String(item.urgency || item.urgencyLevel),
+				specialRequirements: item.specialRequirements,
+				earning: typeof item.providerEarning === 'number' ? `₹${item.providerEarning}` : 
+					typeof item.estimatedEarnings === 'number' ? `₹${item.estimatedEarnings}` : 
+					item.estimatedEarnings,
+				expiresAt: item.expiresAt || Date.now() + 60 * 1000,
 			}))
 		}
 		return []
@@ -942,7 +986,7 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 					? parseFloat(String(item.totalAmount).replace(/[^0-9.]/g, ''))
 					: undefined
 				// Prefer the backend's providerPrice (the provider's actual cut) for
-				// earnings displays; estimatedEarnings is a formatted '`INR`xxx' fallback,
+				// earnings displays; estimatedEarnings is a formatted 'INR xxx' fallback,
 				// and totalAmount (the patient's full charge) is the last resort.
 				const providerEarning = item.providerPrice != null
 					? parseFloat(String(item.providerPrice).replace(/[^0-9.]/g, ''))
@@ -998,7 +1042,7 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 			status: String(data.status || 'SEARCHING').toUpperCase() as any,
 			date: 'Today',
 			timeRange: 'Instant Dispatch',
-			amount: typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(String(data.totalAmount || '667').replace('â‚¹', '')),
+			amount: typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(String(data.totalAmount || '667').replace(/[^0-9.]/g, '')),
 			provider: {
 				id: data.assignedProvider ? String(data.assignedProvider.id) : 'n-prov-1',
 				name: data.assignedProvider ? String(data.assignedProvider.name) : 'Nurse Specialist',
@@ -1170,10 +1214,79 @@ export const updateProviderProfileBackend = async (payload: {
 	}
 }
 
-export const updateAncillaryCapabilitiesBackend = async (checkedProcedures: string[]): Promise<boolean> => {
-	return updateProviderProfileBackend({ checked_procedures: checkedProcedures })
+export interface ProviderEarningsVisit {
+	id: string
+	patientName: string
+	serviceName: string
+	earning: number
+	completedAt?: string
 }
 
+export interface ProviderEarningsData {
+	todayTotal: number
+	weekTotal: number
+	monthTotal: number
+	allTimeTotal: number
+	recentVisits: ProviderEarningsVisit[]
+}
+
+export const fetchProviderEarningsBackend = async (): Promise<ProviderEarningsData | null> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_EARNINGS)
+		const payload = res.data
+		const data = payload?.data !== undefined ? payload.data : payload
+		if (!data) return null
+		return {
+			todayTotal: Number(data.todayTotal) || 0,
+			weekTotal: Number(data.weekTotal) || 0,
+			monthTotal: Number(data.monthTotal) || 0,
+			allTimeTotal: Number(data.allTimeTotal) || 0,
+			recentVisits: Array.isArray(data.recentVisits)
+				? data.recentVisits.map((v: any) => ({
+						id: String(v.id || ''),
+						patientName: String(v.patientName || 'Patient'),
+						serviceName: String(v.serviceName || 'Healthcare Service'),
+						earning: Number(v.earning) || 0,
+						completedAt: v.completedAt ? String(v.completedAt) : undefined,
+				  }))
+				: [],
+		}
+	} catch (error) {
+		console.log('[ancillaryService] fetchProviderEarningsBackend error:', error)
+		return null
+	}
+}
+
+export interface ProviderDashboardMetrics {
+	acceptedCount: number
+	completedCount: number
+	cancelledCount: number
+	todayEarnings: number
+	weekEarnings: number
+}
+
+export const fetchProviderDashboardMetricsBackend = async (): Promise<ProviderDashboardMetrics | null> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_DASHBOARD_METRICS)
+		const payload = res.data
+		const data = payload?.data !== undefined ? payload.data : payload
+		if (!data) return null
+		return {
+			acceptedCount: Number(data.acceptedCount) || 0,
+			completedCount: Number(data.completedCount) || 0,
+			cancelledCount: Number(data.cancelledCount) || 0,
+			todayEarnings: Number(data.todayEarnings) || 0,
+			weekEarnings: Number(data.weekEarnings) || 0,
+		}
+	} catch (error) {
+		console.log('[ancillaryService] fetchProviderDashboardMetricsBackend error:', error)
+		return null
+	}
+}
+
+export const updateAncillaryCapabilitiesBackend = async (checked_procedures: string[]): Promise<boolean> => {
+	return updateProviderProfileBackend({ checked_procedures })
+}
 
 export const fetchAncillaryProfileBackend = fetchProviderProfileBackend;
 
@@ -1193,4 +1306,8 @@ export const updateProviderStatus = updateProviderStatusBackend
 export const fetchMyPatientBookings = fetchMyPatientBookingsBackend
 export const fetchProviderProfile = fetchProviderProfileBackend
 export const updateProviderProfile = updateProviderProfileBackend
+export const updateAncillaryCapabilities = updateAncillaryCapabilitiesBackend
 export const fetchAncillaryProfile = fetchAncillaryProfileBackend
+export const fetchProviderEarnings = fetchProviderEarningsBackend
+export const fetchProviderDashboardMetrics = fetchProviderDashboardMetricsBackend
+

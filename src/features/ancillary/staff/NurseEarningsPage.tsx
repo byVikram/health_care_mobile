@@ -1,60 +1,47 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
-import { getNurseAppointments, NurseBooking } from '../ancillaryService'
+import {
+	fetchProviderEarnings,
+	ProviderEarningsData,
+} from '../ancillaryService'
 
 /**
  * Earnings & Payouts screen, shared by every ancillary provider role
- * (Nurse, Physiotherapist, etc). This used to render fully hardcoded
- * mock figures and mock patient/visit rows (e.g. a static Rs.1,300
- * "Today's Earnings" and two invented "Eleanor Vance" / "Arthur
- * Pendelton" nursing visits) to WHOEVER opened the screen, regardless
- * of their actual role or real completed appointments -- which is
- * exactly how a Physiotherapist ended up seeing what looked like a
- * Nurse's completed visits and earnings.
+ * (Nurse, Physiotherapist, etc).
  *
- * getNurseAppointments() hits GET /api/ancillary/provider/requests/my,
- * which the backend scopes to AncillaryAssignment.provider_id for the
- * logged-in provider only -- so every figure and row below is this
- * provider's own data and cannot include another provider's, or
- * another specialty's, bookings.
+ * All earnings metrics (Today, This Week, This Month, Total Earned,
+ * and recent completed visits) are fetched directly from the backend API
+ * (GET /api/ancillary/provider/earnings), which calculates authoritative
+ * figures server-side scoped to the logged-in provider.
  */
 
 const formatInr = (amount: number): string => `₹${Math.round(amount).toLocaleString('en-IN')}`
 
-const parseCreatedAt = (raw?: string): Date | null => {
-	if (!raw) return null
+const formatVisitDateTime = (raw?: string): string => {
+	if (!raw) return 'Recently'
 	const parsed = new Date(raw.replace(' ', 'T'))
-	return Number.isNaN(parsed.getTime()) ? null : parsed
+	if (Number.isNaN(parsed.getTime())) return raw
+	return `${parsed.toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} • ${parsed.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
 }
-
-const earningOf = (b: NurseBooking): number => b.providerEarning ?? b.amount ?? 0
-
-const isSameCalendarDay = (a: Date, b: Date) =>
-	a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-
-const isSameCalendarMonth = (a: Date, b: Date) =>
-	a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
-
-const daysBetween = (a: Date, b: Date) => Math.abs(a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24)
 
 export default function NurseEarningsPage() {
 	const navigation = useNavigation<any>()
 	const isFocused = useIsFocused()
 
-	const [bookings, setBookings] = useState<NurseBooking[]>([])
+	const [earningsData, setEarningsData] = useState<ProviderEarningsData | null>(null)
 	const [isLoading, setIsLoading] = useState(true)
 	const [loadError, setLoadError] = useState<string | null>(null)
 
-	const loadAppointments = useCallback(async () => {
+	const loadEarnings = useCallback(async () => {
 		try {
 			setLoadError(null)
-			const appointments = await getNurseAppointments()
-			setBookings(appointments || [])
+			const data = await fetchProviderEarnings()
+			setEarningsData(data)
 		} catch (e) {
-			console.log('[NurseEarningsPage] Failed to load appointments:', e)
+			console.log('[NurseEarningsPage] Failed to load earnings:', e)
 			setLoadError('Could not load your earnings right now.')
 		} finally {
 			setIsLoading(false)
@@ -63,48 +50,15 @@ export default function NurseEarningsPage() {
 
 	useEffect(() => {
 		if (isFocused) {
-			void loadAppointments()
+			void loadEarnings()
 		}
-	}, [isFocused, loadAppointments])
+	}, [isFocused, loadEarnings])
 
-	const completedBookings = useMemo(
-		() => bookings.filter((b) => b.status === 'completed'),
-		[bookings]
-	)
-
-	const { todayTotal, weekTotal, monthTotal, allTimeTotal, recentVisits } = useMemo(() => {
-		const now = new Date()
-		let today = 0
-		let week = 0
-		let month = 0
-		let allTime = 0
-
-		const withDates = completedBookings.map((b) => ({
-			booking: b,
-			date: parseCreatedAt(b.createdAtRaw),
-			earning: earningOf(b),
-		}))
-
-		for (const { date, earning } of withDates) {
-			allTime += earning
-			if (!date) continue
-			if (isSameCalendarDay(date, now)) today += earning
-			if (daysBetween(date, now) <= 7) week += earning
-			if (isSameCalendarMonth(date, now)) month += earning
-		}
-
-		const recent = [...withDates]
-			.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0))
-			.slice(0, 10)
-
-		return {
-			todayTotal: today,
-			weekTotal: week,
-			monthTotal: month,
-			allTimeTotal: allTime,
-			recentVisits: recent,
-		}
-	}, [completedBookings])
+	const todayTotal = earningsData?.todayTotal ?? 0
+	const weekTotal = earningsData?.weekTotal ?? 0
+	const monthTotal = earningsData?.monthTotal ?? 0
+	const allTimeTotal = earningsData?.allTimeTotal ?? 0
+	const recentVisits = earningsData?.recentVisits ?? []
 
 	if (isLoading) {
 		return (
@@ -167,20 +121,17 @@ export default function NurseEarningsPage() {
 							</Text>
 						</View>
 					) : (
-						recentVisits.map(({ booking, date, earning }) => (
-							<View key={booking.id} style={styles.earningItem}>
+						recentVisits.map((visit) => (
+							<View key={visit.id} style={styles.earningItem}>
 								<View style={styles.itemRow}>
-									<Text style={styles.patientName}>{booking.patientName}</Text>
-									<Text style={styles.itemAmount}>+ {formatInr(earning)}</Text>
+									<Text style={styles.patientName}>{visit.patientName}</Text>
+									<Text style={styles.itemAmount}>+ {formatInr(visit.earning)}</Text>
 								</View>
 								<Text style={styles.serviceName} numberOfLines={1}>
-									{booking.serviceName}
+									{visit.serviceName}
 								</Text>
 								<Text style={styles.itemMeta}>
-									{date
-										? `${date.toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} • ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
-										: 'Recently'}{' '}
-									• Completed
+									{formatVisitDateTime(visit.completedAt)} • Completed
 								</Text>
 							</View>
 						))
