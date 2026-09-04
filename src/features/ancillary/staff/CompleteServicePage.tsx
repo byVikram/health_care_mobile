@@ -125,19 +125,12 @@ export default function CompleteServicePage() {
 			setSubmitting(false)
 			setSuccessModalVisible(true)
 		} catch (err: any) {
-			if (pin === booking.completePin || pin === '9182' || pin === '1234') {
-				const foundIndex = MOCK_NURSE_BOOKINGS.findIndex((b) => b.id === bookingId)
-				if (foundIndex !== -1) {
-					MOCK_NURSE_BOOKINGS[foundIndex].status = 'completed'
-				}
-				await clearBookingState(booking.id)
-				setSubmitting(false)
-				setSuccessModalVisible(true)
-			} else {
-				setSubmitting(false)
-				setError('Invalid completion PIN. Please check code with the patient and try again.')
-				setPin('')
-			}
+			// Never mark the visit complete locally on a caught error -- a wrong
+			// PIN must actually fail, or completion verification is pointless.
+			setSubmitting(false)
+			const backendMessage = err?.response?.data?.detail?.message
+			setError(backendMessage || 'Invalid completion PIN. Please check code with the patient and try again.')
+			setPin('')
 		}
 	}
 

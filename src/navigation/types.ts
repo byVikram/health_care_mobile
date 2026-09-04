@@ -142,7 +142,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.NURSE_VISITS]: undefined
 	[ROUTES.STACK.NURSE_EARNINGS]: undefined
 	[ROUTES.STACK.NURSE_HISTORY]: undefined
-	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string }
+	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string; updatedCart?: any[] }
 	[ROUTES.STACK.ANCILLARY_PROVIDERS]: { serviceKey: string; serviceLabel: string; procedureName?: string }
 	[ROUTES.STACK.ANCILLARY_BOOKING_CART]: {
 		services?: any[]

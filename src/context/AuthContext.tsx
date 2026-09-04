@@ -6,6 +6,15 @@ import StatusModal from '../components/common/StatusModal'
 
 export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | 'nurse'
 
+// Canonical specialty IDs from lookup_ancillary_specialties.public_id
+export type AncillarySpecialty =
+	| 'nursing-care'
+	| 'physiotherapy'
+	| 'rehab-care'
+	| 'elder-day-care'
+	| 'medical-equipment'
+	| string
+
 export interface AuthUser {
 	id?: string
 	name: string
@@ -28,6 +37,12 @@ export interface AuthState {
 	notificationPromptShown: boolean
 	setNotificationPromptShown: (val: boolean) => Promise<void>
 	isLoading: boolean
+
+	// Ancillary specialty — persisted to AsyncStorage so it survives reload/restart
+	// Format: matches lookup_ancillary_specialties.public_id (e.g. "physiotherapy", "nursing-care")
+	// null = not an ancillary user, or specialty not yet loaded
+	ancillarySpecialty: AncillarySpecialty | null
+	setAncillarySpecialty: (specialty: AncillarySpecialty | null) => Promise<void>
 
 	selectedHospital: string | null
 	setSelectedHospital: (hospital: string) => void
@@ -54,6 +69,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	const [refreshToken, setRefreshToken] = useState<string | null>(null)
 	const [notificationPromptShown, setNotificationPromptShownState] = useState<boolean>(false)
 	const [isLoading, setIsLoading] = useState(true)
+	const [ancillarySpecialty, setAncillarySpecialtyState] = useState<AncillarySpecialty | null>(null)
 
 	const [selectedHospital, setSelectedHospitalState] = useState<string | null>(null)
 	const [selectedHospitalId, setSelectedHospitalIdState] = useState<string | null>(null)
@@ -69,6 +85,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		setSelectedHospitalState(null)
 		setSelectedHospitalIdState(null)
 		setCurrentLocationState(null)
+		setAncillarySpecialtyState(null)
 	}
 
 	const setSelectedHospital = (hospital: string) => {
@@ -93,22 +110,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		setNotificationPromptShownState(val)
 	}
 
+	/**
+	 * Persist and update ancillary specialty in both AsyncStorage and React state.
+	 * This is the source of truth for the dashboard — it must be called after
+	 * the provider profile is fetched at login so specialty survives app restarts.
+	 */
+	const setAncillarySpecialty = async (specialty: AncillarySpecialty | null) => {
+		if (specialty) {
+			await AsyncStorage.setItem('user_specialty', specialty)
+		} else {
+			await AsyncStorage.removeItem('user_specialty')
+		}
+		setAncillarySpecialtyState(specialty)
+	}
+
 	useEffect(() => {
 		const load = async () => {
-			const role = await AsyncStorage.getItem('role')
-			console.log('[AuthContext] active role:', role)
-			const user = await AsyncStorage.getItem('user')
+			const savedRole = await AsyncStorage.getItem('role')
+			console.log('[AuthContext] active role:', savedRole)
+			const savedUser = await AsyncStorage.getItem('user')
 			const token = await AsyncStorage.getItem('access_token')
 			const refresh = await AsyncStorage.getItem('refresh_token')
 			const nps = await AsyncStorage.getItem('notification_prompt_shown')
 			const savedLocation = await AsyncStorage.getItem('current_location')
+			// Load persisted specialty (survives restarts)
+			const savedSpecialty = await AsyncStorage.getItem('user_specialty')
 
-			setRole(role as UserRole)
-			setUser(user ? JSON.parse(user) : null)
+			setRole(savedRole as UserRole)
+			setUser(savedUser ? JSON.parse(savedUser) : null)
 			setAccessToken(token)
 			setRefreshToken(refresh)
 			setNotificationPromptShownState(nps === 'true')
-			
+			if (savedSpecialty) {
+				setAncillarySpecialtyState(savedSpecialty as AncillarySpecialty)
+				console.log('[AuthContext] restored ancillary specialty:', savedSpecialty)
+			}
+
 			if (savedLocation) {
 				try {
 					setCurrentLocationState(JSON.parse(savedLocation))
@@ -190,6 +227,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 				notificationPromptShown,
 				setNotificationPromptShown,
 				isLoading,
+				ancillarySpecialty,
+				setAncillarySpecialty,
 				selectedHospital,
 				setSelectedHospital,
 				selectedHospitalId,
@@ -207,3 +246,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 }
 
 export const useAuth = () => useContext(AuthContext)
+
+/**
+ * Convenience hook for ancillary staff — returns specialty-aware labels.
+ * e.g. { specialtyLabel: 'Physiotherapist', specialtyPossessive: 'Physiotherapy', specialtyId: 'physiotherapy' }
+ */
+export const useAncillarySpecialty = () => {
+	const { ancillarySpecialty } = useContext(AuthContext)
+
+	const specialtyId = ancillarySpecialty || 'nursing-care'
+
+	const labelMap: Record<string, { role: string; adjective: string; icon: string }> = {
+		'nursing-care':      { role: 'Nurse',            adjective: 'Nursing',        icon: 'medical-bag' },
+		'physiotherapy':     { role: 'Physiotherapist',  adjective: 'Physiotherapy',  icon: 'run-fast' },
+		'rehab-care':        { role: 'Rehab Therapist',  adjective: 'Rehab',          icon: 'wheelchair-accessibility' },
+		'elder-day-care':    { role: 'Care Worker',      adjective: 'Elder Day Care', icon: 'account-heart' },
+		'medical-equipment': { role: 'Technician',       adjective: 'Equipment',      icon: 'toolbox' },
+	}
+
+	const info = labelMap[specialtyId] ?? labelMap['nursing-care']
+
+	return {
+		specialtyId,
+		/** e.g. "Physiotherapist" or "Nurse" */
+		roleLabel: info.role,
+		/** e.g. "Physiotherapy" or "Nursing" — for "X Appointments", "X Earnings" */
+		adjective: info.adjective,
+		/** e.g. "Physiotherapy Appointments" */
+		appointments: `${info.adjective} Appointments`,
+		/** e.g. "Physiotherapy Earnings" */
+		earnings: `${info.adjective} Earnings`,
+		/** e.g. "Physiotherapy Booking History" */
+		history: `${info.adjective} Booking History`,
+		/** e.g. "Physiotherapy Orders" */
+		orders: `${info.adjective} Orders`,
+		icon: info.icon,
+		isNursing: specialtyId === 'nursing-care',
+		isPhysio: specialtyId === 'physiotherapy',
+	}
+}
