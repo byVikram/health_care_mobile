@@ -42,8 +42,6 @@ import {
   HospitalAppointmentCard,
   MOCK_ACHIEVEMENTS,
   MOCK_CERTIFICATIONS,
-  MOCK_MEMBERSHIPS,
-  MOCK_SPECIALIZATIONS,
 } from "./components";
 import type {
   AchievementItem,
@@ -166,6 +164,7 @@ const normalizeAvailabilityByMode = (
 export default function DoctorDetailPage() {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_DETAIL>>();
+  const referralId = route.params?.referralId;
   const { width } = useWindowDimensions();
 
   const [doctor, setDoctor] = useState<DoctorDetailData | null>(null);
@@ -691,18 +690,20 @@ export default function DoctorDetailPage() {
                     />
                     <BackgroundSubsection
                       icon="stethoscope"
-                      title="Specializations"
-                      items={MOCK_SPECIALIZATIONS}
+                      title="Area of Expertise"
+                      items={doctor.additionalDetail?.areas_of_expertise || []}
+                      emptyText="No area of expertise available"
+                    />
+                    <BackgroundSubsection
+                      icon="medical-bag"
+                      title="Treatment Offerings"
+                      items={doctor.additionalDetail?.treatments || []}
+                      emptyText="No treatment offerings available"
                     />
                     <BackgroundSubsection
                       icon="certificate-outline"
                       title="Certifications"
                       items={MOCK_CERTIFICATIONS}
-                    />
-                    <BackgroundSubsection
-                      icon="account-group-outline"
-                      title="Memberships"
-                      items={MOCK_MEMBERSHIPS}
                     />
                   </View>
                 )}
@@ -809,6 +810,7 @@ export default function DoctorDetailPage() {
                 appointmentMode: apptType === "offline" ? "offline" : "online",
                 consultationTypeLabel: apptType === "offline" ? "Clinic Visit" : "Video Call",
                 fee: fee,
+                referralId: referralId,
               },
             });
           }}

@@ -12,8 +12,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 type StatusModalProps = {
   visible: boolean;
 
-  // status type (better than boolean)
-  status?: "success" | "error";
+  // status type
+  status?: "success" | "error" | "info";
 
   title: string;
   description: string;
@@ -35,7 +35,29 @@ const StatusModal: React.FC<StatusModalProps> = ({
   cancelText,
   onCancel,
 }) => {
-  const isSuccess = status === "success";
+  const getIconMeta = () => {
+    if (status === "info") {
+      return {
+        bg: "#EBF3FF",
+        icon: "bell-outline" as const,
+        color: "#1976D2",
+      };
+    }
+    if (status === "error") {
+      return {
+        bg: "#FDECEA",
+        icon: "close" as const,
+        color: "#D32F2F",
+      };
+    }
+    return {
+      bg: "#E6F4EA",
+      icon: "check" as const,
+      color: "#2E7D32",
+    };
+  };
+
+  const meta = getIconMeta();
 
   return (
     <Modal transparent visible={visible} animationType="fade">
@@ -50,14 +72,14 @@ const StatusModal: React.FC<StatusModalProps> = ({
             style={[
               styles.iconContainer,
               {
-                backgroundColor: isSuccess ? "#E6F4EA" : "#FDECEA",
+                backgroundColor: meta.bg,
               },
             ]}
           >
             <MaterialCommunityIcons
-              name={isSuccess ? "check" : "close"}
+              name={meta.icon}
               size={32}
-              color={isSuccess ? "#2E7D32" : "#D32F2F"}
+              color={meta.color}
             />
           </View>
 
@@ -102,9 +124,10 @@ const styles = StyleSheet.create({
 
   card: {
     width: "85%",
+    maxWidth: 420,
     backgroundColor: "#fff",
     borderRadius: 16,
-    padding: 20,
+    padding: 24,
     alignItems: "center",
   },
 
@@ -129,6 +152,7 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
     marginBottom: 20,
+    lineHeight: 18,
   },
 
   buttonContainer: {

@@ -5,7 +5,7 @@ import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { AppointmentsResponse } from '../../types/appointment'
 import { DoctorSearchResponse } from '../../types/doctor-search'
 import { DoctorDetailResponse } from '../../types/doctor-detail'
-import { SpecialitiesResponse } from '../../types/speciality'
+import { SpecialitiesResponse, SymptomsResponse } from '../../types/speciality'
 import { DoctorProfileApiResponse, DoctorProfileApiData } from '../../types/doctor-profile-api'
 import { DoctorProfile, DoctorDegree } from '../../types/doctor-profile'
 
@@ -62,6 +62,8 @@ export interface CreateAppointmentPayload {
 	appointment_date: string
 	start_time: string
 	end_time?: string
+	referral_id?: string
+	consent_version_id?: string
 }
 
 export interface CreateAppointmentResponse {
@@ -90,22 +92,26 @@ export const updatePreIntake = async (appointmentId: string, payload: PreIntakeP
 
 export const updateAppointmentsStatus = async (
 	appointmentId: string,
-	statusId: string
+	statusId: string,
+	reason?: string
 ): Promise<AppointmentResponse> => {
 	console.log('PAYLOAD 👉', {
 		appointment_id: appointmentId,
 		status_id: statusId,
+		...(reason ? { reason } : {}),
 	})
 
 	const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
 		appointment_id: appointmentId,
 		status_id: statusId,
+		...(reason ? { reason } : {}),
 	})
 
 	console.log('RESPONSE 👉', res.data)
 
 	return res.data
 }
+
 
 export interface RescheduleAppointmentPayload {
 	appointment_id: string
@@ -122,17 +128,6 @@ export const rescheduleAppointment = async (payload: RescheduleAppointmentPayloa
 	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, payload)
 	return res.data
 }
-
-export interface ReferAppointmentPayload {
-	appointment_id: string
-	doctor_id: string
-}
-
-export const referAppointment = async (payload: ReferAppointmentPayload): Promise<AppointmentResponse> => {
-	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.REFER, payload)
-	return res.data
-}
-
 export const startConsultation = async (appointmentId: string): Promise<{ success: boolean }> => {
 	const res = await ApiService.post<{ success: boolean }>(
 		`${API_ENDPOINTS.APPOINTMENTS.GET_BY_ID(appointmentId)}/start-consultation`,
@@ -147,6 +142,34 @@ export const getAppointments = async (params?: AppointmentParams): Promise<Appoi
 		(params ?? {}) as Record<string, unknown>
 	)
 	return res.data
+}
+
+export interface ActiveConsentResponse {
+	success: boolean
+	data: {
+		id: string
+		version: string
+		content: { points: string[] } | string
+		is_active: boolean
+	}
+}
+
+export const getActiveConsent = async (): Promise<ActiveConsentResponse['data']> => {
+	const res = await ApiService.get<ActiveConsentResponse>(API_ENDPOINTS.APPOINTMENTS.ACTIVE_CONSENT)
+	return res.data.data
+}
+
+export interface DoctorStatusResponse {
+	success: boolean
+	data: {
+		profile_completed: boolean
+		is_verified: boolean
+	}
+}
+
+export const getDoctorStatus = async (): Promise<DoctorStatusResponse['data']> => {
+	const res = await ApiService.get<DoctorStatusResponse>(API_ENDPOINTS.DOCTOR_PROFILE.STATUS)
+	return res.data.data
 }
 
 export const createAppointment = async (payload: CreateAppointmentPayload): Promise<CreateAppointmentResponse> => {
@@ -247,13 +270,14 @@ export interface SlotOverridePayload {
 }
 
 export interface SlotOverrideBatchPayload {
-	hospital_id?: string | null
+	hospital_id?: string | number | null
 	date: string
 	slots: Array<{
 		start_time: string
 		end_time: string
 		is_blocked: boolean
 	}>
+	appointment_mode?: 'clinic_visit' | 'video_call'
 	reason?: string
 }
 
@@ -274,6 +298,21 @@ export const getDoctorById = async (id: string): Promise<DoctorDetailResponse> =
 
 export const getSpecialities = async (): Promise<SpecialitiesResponse> => {
 	const res = await ApiService.get<SpecialitiesResponse>(API_ENDPOINTS.SPECIALITIES.LIST)
+	return res.data
+}
+
+export const getSymptoms = async (): Promise<SymptomsResponse> => {
+	const res = await ApiService.get<SymptomsResponse>(API_ENDPOINTS.SPECIALITIES.SYMPTOMS)
+	return res.data
+}
+
+export const getAreasOfExpertise = async (): Promise<any> => {
+	const res = await ApiService.get<any>(API_ENDPOINTS.AREA_OF_EXPERTISE.LIST)
+	return res.data
+}
+
+export const getTreatmentsOffering = async (): Promise<any> => {
+	const res = await ApiService.get<any>(API_ENDPOINTS.TREATMENTS_OFFERING.LIST)
 	return res.data
 }
 
@@ -363,6 +402,9 @@ export interface DoctorProfessionalUpdatePayload {
 	registration_proof_s3_key: string | null
 	about: string
 	current_designation?: string
+}
+
+export interface DoctorAdditionalDetailsUpdatePayload {
 	areas_of_expertise?: string[]
 	treatments?: string[]
 }
@@ -423,6 +465,11 @@ export const updateDoctorPersonalDetails = async (data: DoctorPersonalUpdatePayl
 
 export const updateDoctorProfessionalDetails = async (data: DoctorProfessionalUpdatePayload) => {
 	const res = await ApiService.patch(API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS, data)
+	return res.data
+}
+
+export const updateDoctorAdditionalDetails = async (data: DoctorAdditionalDetailsUpdatePayload) => {
+	const res = await ApiService.patch(API_ENDPOINTS.DOCTOR_PROFILE.ADDITIONAL_DETAILS, data)
 	return res.data
 }
 
@@ -538,6 +585,9 @@ export const mapDoctorProfileApi = (data: DoctorProfileApiData): DoctorProfile =
 			registrationNumber: prof?.registration_number ?? '',
 			registrationProof: prof?.registration_proof_s3_key ?? '',
 			about: prof?.about ?? '',
+			currentDesignation: prof?.current_designation ?? '',
+			areasOfExpertise: (data.additionalDetail?.areas_of_expertise ?? []).map((a: any) => a.id ?? a.public_id ?? a),
+			treatments: (data.additionalDetail?.treatments ?? []).map((t: any) => t.id ?? t.public_id ?? t),
 		},
 		hospitals,
 		availability,

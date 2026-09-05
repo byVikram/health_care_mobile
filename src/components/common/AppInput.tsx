@@ -8,6 +8,9 @@ interface AppInputProps extends React.ComponentProps<typeof PaperTextInput> {
 	fieldSize?: 'default' | 'compact' | 'form'
 	noMargin?: boolean
 	borderRadius?: number
+	isSearch?: boolean
+	showMicrophone?: boolean
+	onMicrophonePress?: () => void
 }
 
 type AppInputComponent = React.FC<AppInputProps> & {
@@ -37,11 +40,17 @@ export const AppInput: AppInputComponent = ({
 	noMargin = false,
 	borderRadius,
 	multiline,
+	isSearch,
+	showMicrophone,
+	onMicrophonePress,
 	...props
 }: AppInputProps) => {
 	const theme = useTheme()
 	const fieldHeight = fieldSize === 'default' ? undefined : FIELD_HEIGHTS[fieldSize]
 	const fieldRadius = fieldSize === 'default' ? undefined : borderRadius ?? FIELD_RADII[fieldSize]
+
+	const leftIcon = isSearch && !props.left ? <PaperTextInput.Icon icon="magnify" size={24} color="#26727a" /> : props.left
+	const rightIcon = isSearch && showMicrophone && !props.right ? <PaperTextInput.Icon icon="microphone-outline" size={24} color="#26727a" onPress={onMicrophonePress} /> : props.right
 
 	return (
 		<View style={[styles.container, noMargin && styles.containerNoMargin, containerStyle]}>
@@ -65,6 +74,8 @@ export const AppInput: AppInputComponent = ({
 				activeOutlineColor={activeOutlineColor ?? (fieldSize !== 'default' ? '#1f8a8f' : undefined)}
 				textColor={textColor ?? (fieldSize !== 'default' ? '#2f2f2f' : undefined)}
 				multiline={multiline}
+				left={leftIcon}
+				right={rightIcon}
 				{...props}
 			/>
 			{errorText ? <Text style={[styles.errorText, { color: theme.colors.error }]}>{errorText}</Text> : null}

@@ -10,7 +10,8 @@ import { ROUTES } from './routes'
 import type { AppStackParamList } from './types'
 import AuthNavigator from './AuthNavigator'
 import MainTabNavigator from './MainTabNavigator'
-import { AppScreenHeader } from '../components/common'
+import { AppScreenHeader, LocationSelector, NotificationPermissionPopup } from '../components/common'
+import LocationScreen from '../components/common/LocationScreen'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
@@ -45,10 +46,43 @@ import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage
 import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
 import PlaceLabOrderPage from '../features/laboratory/PlaceLabOrderPage'
 
+import TransportationLandingPage from '../features/transportation/TransportationLandingPage'
+import BookRidePage from '../features/transportation/BookRidePage'
+import RideTrackingPage from '../features/transportation/RideTrackingPage'
+
+import DoctorEventListPage from '../features/doctor/events/DoctorEventListPage'
+import DoctorEventFormPage from '../features/doctor/events/DoctorEventFormPage'
+
+import AllEventsPage from '../features/events/AllEventsPage'
+import EventDetailsPage from '../features/events/EventDetailsPage'
+
+import ActiveBookingPage from '../features/ancillary/staff/ActiveBookingPage'
+import PatientVerificationPage from '../features/ancillary/staff/PatientVerificationPage'
+import ServiceInProgressPage from '../features/ancillary/staff/ServiceInProgressPage'
+import CompleteServicePage from '../features/ancillary/staff/CompleteServicePage'
+import NurseTodayOverviewPage from '../features/ancillary/staff/NurseTodayOverviewPage'
+import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
+import NurseVisitsPage from '../features/ancillary/staff/NurseVisitsPage'
+import NurseEarningsPage from '../features/ancillary/staff/NurseEarningsPage'
+import NurseHistoryPage from '../features/ancillary/staff/NurseHistoryPage'
+import AncillaryServicesPage from '../features/ancillary/patient/AncillaryServicesPage'
+import AncillaryProvidersPage from '../features/ancillary/patient/AncillaryProvidersPage'
+import BookingCartPage from '../features/ancillary/patient/BookingCartPage'
+import BookingSummaryPage from '../features/ancillary/patient/BookingSummaryPage'
+import BookingDetailsPage from '../features/ancillary/patient/BookingDetailsPage'
+import AncillaryPaymentPage from '../features/ancillary/patient/AncillaryPaymentPage'
+import PricingReviewPage from '../features/ancillary/staff/PricingReviewPage'
+import AncillaryConfirmationPage from '../features/ancillary/patient/AncillaryConfirmationPage'
+import AncillaryBookingStatusPage from '../features/ancillary/patient/AncillaryBookingStatusPage'
+import TrackAppointmentPage from '../features/ancillary/TrackAppointmentPage'
+import MyBookingsPage from '../features/ancillary/patient/MyBookingsPage'
+import ServiceMatchingPage from '../features/ancillary/patient/ServiceMatchingPage'
+
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
 	return (
+		<>
 		<AppStack.Navigator
 			screenOptions={{
 				headerShown: false,
@@ -63,6 +97,7 @@ function AuthenticatedNavigator() {
 				component={SearchPage}
 				options={{ headerShown: true, title: 'Find Doctors' }}
 			/>
+
 
 			<AppStack.Screen
 				name={ROUTES.STACK.PATIENT_QUESTIONS_LIST as keyof AppStackParamList}
@@ -176,7 +211,149 @@ function AuthenticatedNavigator() {
 				options={{ presentation: 'transparentModal' }}
 			/>
 			<AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
+			<AppStack.Screen
+				name={ROUTES.STACK.TRANSPORTATION_LANDING}
+				component={TransportationLandingPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.BOOK_RIDE}
+				component={BookRidePage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.RIDE_TRACKING}
+				component={RideTrackingPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.DOCTOR_EVENTS}
+				component={DoctorEventListPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.DOCTOR_EVENT_FORM}
+				component={DoctorEventFormPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ALL_EVENTS}
+				component={AllEventsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.EVENT_DETAILS}
+				component={EventDetailsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_ACTIVE_BOOKING}
+				component={ActiveBookingPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_PATIENT_VERIFICATION}
+				component={PatientVerificationPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS}
+				component={ServiceInProgressPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_COMPLETE_SERVICE}
+				component={CompleteServicePage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_TODAY_OVERVIEW}
+				component={NurseTodayOverviewPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_VISITS}
+				component={NurseVisitsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_EARNINGS}
+				component={NurseEarningsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.NURSE_HISTORY}
+				component={NurseHistoryPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_SERVICES}
+				component={AncillaryServicesPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_PROVIDERS}
+				component={AncillaryProvidersPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_BOOKING_CART}
+				component={BookingCartPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_BOOKING_SUMMARY}
+				component={BookingSummaryPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_BOOKING_DETAILS}
+				component={BookingDetailsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_PAYMENT}
+				component={AncillaryPaymentPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_PRICING_REVIEW}
+				component={PricingReviewPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_CONFIRMATION}
+				component={AncillaryConfirmationPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_BOOKING_STATUS}
+				component={TrackAppointmentPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT}
+				component={TrackAppointmentPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_MY_BOOKINGS}
+				component={MyBookingsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.ANCILLARY_SERVICE_MATCHING as keyof AppStackParamList}
+				component={ServiceMatchingPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.LOCATION_SELECT as keyof AppStackParamList}
+				component={LocationScreen}
+				options={{ headerShown: false }}
+			/>
 		</AppStack.Navigator>
+		<NotificationPermissionPopup />
+		</>
 	)
 }
 

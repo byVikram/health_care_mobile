@@ -8,14 +8,18 @@ import type { DoctorDetailData } from '../types/doctor-detail'
 export type RoleParams = {
 	roleId: string
 	roleLabel: string
+	specialty?: string
 }
 
 export type AuthStackParamList = {
 	[ROUTES.AUTH.LOGIN]: undefined
 	[ROUTES.AUTH.ROLE_SELECTION]: undefined
+	[ROUTES.AUTH.SPECIALTY_SELECTION]: RoleParams | undefined
 	[ROUTES.AUTH.ONBOARDING]: RoleParams | undefined
 	[ROUTES.AUTH.REGISTER]: RoleParams | undefined
 }
+
+export type BookingsFilterKey = 'doctor' | 'ancillary' | 'lab' | 'medicine' | 'radiology'
 
 export type MainTabParamList = {
 	[ROUTES.MAIN.HOME]: undefined
@@ -24,8 +28,9 @@ export type MainTabParamList = {
 				mode?: 'clinic' | 'video'
 		  }
 		| undefined
-	[ROUTES.MAIN.PORTAL]: undefined
+	[ROUTES.MAIN.PORTAL]: { filter?: BookingsFilterKey } | undefined
 	[ROUTES.MAIN.PROFILE]: undefined
+	[ROUTES.MAIN.ANCILLARY]: undefined
 }
 
 export type ConsultationParams = {
@@ -52,6 +57,8 @@ export type PatientPaymentParams = {
 	appointmentMode: 'offline' | 'online'
 	consultationTypeLabel: string
 	fee: number
+	referralId?: string
+	consentVersionId: string
 }
 
 export type AppStackParamList = {
@@ -60,7 +67,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.DOCTOR_SEARCH]:
 		| { query?: string; specialityId?: string; specialityName?: string; mode?: 'all' | 'video' | 'clinic' }
 		| undefined
-	[ROUTES.STACK.DOCTOR_DETAIL]: { id: string }
+	[ROUTES.STACK.DOCTOR_DETAIL]: { id: string; referralId?: string }
 	[ROUTES.STACK.FAVOURITE_DOCTOR]: undefined
 	[ROUTES.STACK.NOTIFICATION]: undefined
 	[ROUTES.STACK.CONSULTATION]: ConsultationParams | undefined
@@ -69,10 +76,10 @@ export type AppStackParamList = {
 	[ROUTES.STACK.SCREEN_CAPTURE_TEST]: undefined
 	[ROUTES.STACK.DOCTOR_WELCOME]: undefined
 	[ROUTES.STACK.ACCOUNT]: undefined
-	[ROUTES.STACK.APPOINTMENTS]: undefined
+	[ROUTES.STACK.APPOINTMENTS]: { appointmentId?: string } | undefined
 	[ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
-	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: PatientPaymentParams }
+	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: Omit<PatientPaymentParams, 'consentVersionId'> }
 	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
 	[ROUTES.STACK.ORDER_LIST]: undefined
 	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
@@ -108,26 +115,70 @@ export type AppStackParamList = {
 	[ROUTES.STACK.LABORATORY_LIST]: undefined
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
-	[ROUTES.STACK.PATIENT_PAYMENT]:
-		| {
-				doctor: DoctorDetailData
-				hospitalId: string
-				hospitalName: string
-				appointmentDate: string // YYYY-MM-DD
-				appointmentDateDisplay: string // e.g. "Wed Oct 11 2025"
-				startTime: string // HH:MM (24h format)
-				startTimeDisplay: string // e.g. "01:00 PM"
-				appointmentMode: 'offline' | 'online'
-				consultationTypeLabel: string
-				fee: number
-		  }
-		| undefined
-	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: undefined
-	[ROUTES.STACK.PATIENT_QUESTION_DETAIL]: { questionId: string } | undefined
+	[ROUTES.STACK.PATIENT_PAYMENT]: PatientPaymentParams | undefined
+	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: { openAskModal?: boolean } | undefined
+	[ROUTES.STACK.PATIENT_QUESTION_DETAIL]: { questionId?: string; question?: any } | undefined
 	[ROUTES.STACK.RADIOLOGY_LIST]: { scanTypeId?: number; scanTypeName?: string } | undefined
 	[ROUTES.STACK.RADIOLOGY_ORDERS]: undefined
 	[ROUTES.STACK.RADIOLOGY_ORDER_DETAIL]: { publicId: string; booking?: any }
 	[ROUTES.STACK.RADIOLOGY_SCAN_TYPES]: undefined
+	[ROUTES.STACK.COMMUNITY_FORUM]: undefined
+	[ROUTES.STACK.COMMUNITY_THREAD]: { threadId: string }
+	[ROUTES.STACK.BLOG_LIST]: undefined
+	[ROUTES.STACK.BLOG_ARTICLE]: { slug: string }
+	[ROUTES.STACK.TRANSPORTATION_LANDING]: undefined
+	[ROUTES.STACK.BOOK_RIDE]: { appointmentId: string; type?: 'onward' | 'return' }
+	[ROUTES.STACK.RIDE_TRACKING]: { appointmentId: string; type?: 'onward' | 'return' }
+	[ROUTES.STACK.DOCTOR_EVENTS]: undefined
+	[ROUTES.STACK.DOCTOR_EVENT_FORM]: { eventId?: string }
+	[ROUTES.STACK.ALL_EVENTS]: undefined
+	[ROUTES.STACK.EVENT_DETAILS]: { eventId: string }
+	[ROUTES.STACK.NURSE_ACTIVE_BOOKING]: { bookingId: string }
+	[ROUTES.STACK.NURSE_PATIENT_VERIFICATION]: { bookingId: string }
+	[ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS]: { bookingId: string }
+	[ROUTES.STACK.NURSE_COMPLETE_SERVICE]: { bookingId: string; elapsedSeconds: number }
+	[ROUTES.STACK.NURSE_TODAY_OVERVIEW]: { filter?: 'all' | 'accepted' | 'completed' | 'cancelled' } | undefined
+	[ROUTES.STACK.NURSE_BOOKING_HISTORY]: undefined
+	[ROUTES.STACK.NURSE_VISITS]: undefined
+	[ROUTES.STACK.NURSE_EARNINGS]: undefined
+	[ROUTES.STACK.NURSE_HISTORY]: undefined
+	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string; updatedCart?: any[] }
+	[ROUTES.STACK.ANCILLARY_PROVIDERS]: { serviceKey: string; serviceLabel: string; procedureName?: string }
+	[ROUTES.STACK.ANCILLARY_BOOKING_CART]: {
+		services?: any[]
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_SUMMARY]: {
+		services?: any[]
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_DETAILS]: {
+		serviceId?: string
+		serviceName?: string
+		description?: string
+		image?: string
+		price?: string
+		duration?: string
+		services?: any[]
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_PAYMENT]: {
+		bookingPayload?: any
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_PRICING_REVIEW]: {
+		bookingPayload?: any
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_CONFIRMATION]: {
+		bookingId?: string
+		bookingPayload?: any
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_STATUS]: {
+		bookingId?: string
+		bookingData?: any
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT]: {
+		bookingId?: string
+		bookingData?: any
+	} | undefined
+	[ROUTES.STACK.ANCILLARY_MY_BOOKINGS]: undefined
+	[ROUTES.STACK.LOCATION_SELECT]: undefined
 }
 
 export type RootStackParamList = AuthStackParamList & AppStackParamList

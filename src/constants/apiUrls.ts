@@ -4,14 +4,12 @@
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' and 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	// const url = "http:// 192.168.4.27:8000"
+	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	const url = 'http://192.168.4.42:8000'
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
-
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
 	}
-
 	return url
 }
 
@@ -39,15 +37,24 @@ export const API_ENDPOINTS = {
 		TOGGLE: (publicId: string) => `${BASE_URL}/api/doctors/favourites/${publicId}`,
 	},
 	DOCTOR_PROFILE: {
+		STATUS: `${BASE_URL}/api/doctors/me/status`,
 		DETAILS: `${BASE_URL}/api/doctors/details`,
 		PERSONAL_DETAILS: `${BASE_URL}/api/doctors/personal-details`,
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
+		ADDITIONAL_DETAILS: `${BASE_URL}/api/doctors/profile/additional-details`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
 		ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
 		DELETE_ACCOUNT: `${BASE_URL}/api/doctors/profile`,
 	},
 	SPECIALITIES: {
 		LIST: `${BASE_URL}/api/specialities`,
+		SYMPTOMS: `${BASE_URL}/api/specialities/symptoms`,
+	},
+	AREA_OF_EXPERTISE: {
+		LIST: `${BASE_URL}/api/area-of-expertise`,
+	},
+	TREATMENTS_OFFERING: {
+		LIST: `${BASE_URL}/api/treatments-offering`,
 	},
 	USERS: {
 		GET: `${BASE_URL}/api/users`,
@@ -69,13 +76,30 @@ export const API_ENDPOINTS = {
 		PRE_INTAKE: (id: string) => `${BASE_URL}/api/appointments/${id}/pre-intake`,
 		UPDATE: `${BASE_URL}/api/appointments/update-status`,
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
+		ACTIVE_CONSENT: `${BASE_URL}/api/appointments/active/consent`,
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
-		REFER: `${BASE_URL}/api/appointments/refer`,
+	},
+	REVIEWS: {
+		CREATE: `${BASE_URL}/api/reviews`,
+		BY_DOCTOR: (doctorId: string | number) => `${BASE_URL}/api/reviews/doctor/${doctorId}`,
+		BY_APPOINTMENT: (appointmentId: string | number) => `${BASE_URL}/api/reviews/appointment/${appointmentId}`,
+	},
+	REFERRALS: {
+		CREATE: `${BASE_URL}/api/referrals`,
+		SENT: `${BASE_URL}/api/referrals/sent`,
+		RECEIVED: `${BASE_URL}/api/referrals/received`,
+		DETAIL: (id: string) => `${BASE_URL}/api/referrals/${id}`,
+		SHARE: `${BASE_URL}/api/referrals/share`,
+	},
+	NOTIFICATIONS: {
+		LIST: `${BASE_URL}/api/notifications`,
+		MARK_READ: (id: string) => `${BASE_URL}/api/notifications/${id}/read`,
 	},
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
 
 	PATIENT: {
 		ME: `${BASE_URL}/api/patients/me`,
+		APPOINTMENT_HOSPITALS: `${BASE_URL}/api/patients/appointments/hospitals`,
 		DETAILS: `${BASE_URL}/api/patients/me/details`,
 		GET_BY_PUBLIC_ID: (publicId: string) => `${BASE_URL}/api/patients/${publicId}/details`,
 		GET_BY_ID: (id: string) => `${BASE_URL}/api/patients/${id}/details`,
@@ -89,6 +113,7 @@ export const API_ENDPOINTS = {
 		ADDRESSES: `${BASE_URL}/api/patients/me/addresses`,
 		TREATMENT_HISTORY: (id: string) => `${BASE_URL}/api/treatments/patient/${id}/history`,
 		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
+		FAMILY_MEMBERS: `${BASE_URL}/api/patients/family-members`,
 	},
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,
@@ -147,5 +172,65 @@ export const API_ENDPOINTS = {
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {
 		LIST: `${BASE_URL}/api/locations`,
+	},
+	FOLLOW_UPS: {
+		CREATE: `${BASE_URL}/api/follow-ups`,
+		CANCEL: (id: string) => `${BASE_URL}/api/follow-ups/${id}/cancel`,
+	},
+	COMMUNITIES: {
+		LIST: `${BASE_URL}/api/communities`,
+		POSTS: (groupId: string) => `${BASE_URL}/api/communities/${groupId}/posts`,
+		POST_DETAIL: (postId: string) => `${BASE_URL}/api/communities/threads/${postId}`,
+		COMMENTS: (postId: string) => `${BASE_URL}/api/communities/threads/${postId}/comments`,
+	},
+	BLOGS: {
+		LIST: `${BASE_URL}/api/blogs`,
+		DETAIL: (slug: string) => `${BASE_URL}/api/blogs/${slug}`,
+		COMMENTS: (slug: string) => `${BASE_URL}/api/blogs/${slug}/comments`,
+	},
+	QA: {
+		LIST: `${BASE_URL}/api/qa`,
+		DETAIL: (id: string) => `${BASE_URL}/api/qa/${id}`,
+		SUBMIT_QUESTION: `${BASE_URL}/api/qa/questions`,
+		SUBMIT_ANSWER: (questionId: string) => `${BASE_URL}/api/qa/questions/${questionId}/answers`,
+		SUBMIT_REPLY: (answerId: string) => `${BASE_URL}/api/qa/answers/${answerId}/replies`,
+		LIKE_ANSWER: (answerId: string) => `${BASE_URL}/api/qa/answers/${answerId}/like`,
+	},
+	EVENTS: {
+		PUBLIC: `${BASE_URL}/api/events/public`,
+		PUBLIC_DETAIL: (id: string) => `${BASE_URL}/api/events/public/${id}`,
+		LIST: `${BASE_URL}/api/events`,
+		CREATE: `${BASE_URL}/api/events`,
+		DETAIL: (id: string) => `${BASE_URL}/api/events/${id}`,
+		UPDATE: (id: string) => `${BASE_URL}/api/events/${id}`,
+		DELETE: (id: string) => `${BASE_URL}/api/events/${id}`,
+	},
+	ANCILLARY: {
+		PROFILE: `${BASE_URL}/api/ancillary/me/profile`,
+		CAPABILITIES: `${BASE_URL}/api/ancillary/me/capabilities`,
+		CATEGORIES: `${BASE_URL}/api/ancillary/categories`,
+		SERVICES: `${BASE_URL}/api/ancillary/services`,
+		REQUESTS: `${BASE_URL}/api/ancillary/patient/requests`,
+		PATIENT_ACTIVE_REQUEST: `${BASE_URL}/api/ancillary/patient/requests/active`,
+		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
+		CANCEL_PATIENT: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/cancel`,
+		CANCEL_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/cancel`,
+		REJECT_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/reject`,
+		MY_REQUESTS: `${BASE_URL}/api/ancillary/patient/requests/my`,
+		PROVIDER_STATUS: `${BASE_URL}/api/ancillary/provider/status`,
+		PROVIDER_LOCATION: `${BASE_URL}/api/ancillary/provider/location`,
+		PROVIDER_AVAILABLE: `${BASE_URL}/api/ancillary/provider/requests/available`,
+		MY_APPOINTMENTS: `${BASE_URL}/api/ancillary/provider/requests/my`,
+		ACCEPT_OFFER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/accept`,
+		UPDATE_STATUS: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/status`,
+		EN_ROUTE: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/en-route`,
+		ARRIVE: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/arrive`,
+		VERIFY_OTP: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/verify-otp`,
+		COMPLETE_SERVICE: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/complete`,
+		CLINICAL_DETAILS: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/clinical-details`,
+		PAYMENTS_AUTHORIZE: `${BASE_URL}/api/ancillary/payments/authorize`,
+		REVIEWS: `${BASE_URL}/api/ancillary/reviews`,
+		WS_PATIENT_REQUEST: (id: string) => `${BASE_URL.replace('http', 'ws')}/api/ancillary/ws/patient/requests/${id}`,
+		WS_PROVIDER_DISPATCH: `${BASE_URL.replace('http', 'ws')}/api/ancillary/ws/provider/dispatch`,
 	},
 }

@@ -112,7 +112,8 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 					email: response.data.user?.email,
 				},
 				response.data.access_token,
-				response.data.refresh_token
+				response.data.refresh_token,
+				response.data.notification_prompt_shown ?? false
 			)
 
 			onVerify()

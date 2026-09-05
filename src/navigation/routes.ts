@@ -2,6 +2,7 @@ export const ROUTES = {
 	AUTH: {
 		LOGIN: 'Login',
 		ROLE_SELECTION: 'RoleSelection',
+		SPECIALTY_SELECTION: 'SpecialtySelection',
 		ONBOARDING: 'Onboarding',
 		REGISTER: 'Register',
 	},
@@ -11,6 +12,7 @@ export const ROUTES = {
 		SEARCH: 'Search',
 		PORTAL: 'Portal',
 		PROFILE: 'Profile',
+		ANCILLARY: 'Ancillary',
 	},
 	PORTAL: {
 		PROFILE: 'Profile',
@@ -39,6 +41,11 @@ export const ROUTES = {
 		ORDER_DETAILS: 'OrderDetails',
 		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
 
+		COMMUNITY_FORUM: 'CommunityForum',
+		COMMUNITY_THREAD: 'CommunityThread',
+		BLOG_LIST: 'BlogList',
+		BLOG_ARTICLE: 'BlogArticle',
+
 		PATIENT_QUESTIONS_LIST: 'PatientQuestionsList',
 		PATIENT_QUESTION_DETAIL: 'PatientQuestionDetail',
 
@@ -52,5 +59,37 @@ export const ROUTES = {
 		PLACE_LABORATORY_TEST: 'PlaceLabOrderPage',
 		LABORATORY_ORDERS: 'Orderlistlaboratorypage',
 		LABORATORY_ORDER_DETAILS: 'Bookingdetailslaboratorypage',
+
+		TRANSPORTATION_LANDING: 'TransportationLanding',
+		BOOK_RIDE: 'BookRide',
+		RIDE_TRACKING: 'RideTracking',
+		DOCTOR_EVENTS: 'DoctorEvents',
+		DOCTOR_EVENT_FORM: 'DoctorEventForm',
+		ALL_EVENTS: 'AllEvents',
+		EVENT_DETAILS: 'EventDetails',
+
+		NURSE_ACTIVE_BOOKING: 'NurseActiveBooking',
+		NURSE_PATIENT_VERIFICATION: 'NursePatientVerification',
+		NURSE_SERVICE_IN_PROGRESS: 'NurseServiceInProgress',
+		NURSE_COMPLETE_SERVICE: 'NurseCompleteService',
+		NURSE_TODAY_OVERVIEW: 'NurseTodayOverviewPage',
+		NURSE_BOOKING_HISTORY: 'NurseBookingHistoryPage',
+		NURSE_VISITS: 'NurseVisitsPage',
+		NURSE_EARNINGS: 'NurseEarningsPage',
+		NURSE_HISTORY: 'NurseHistoryPage',
+
+		ANCILLARY_SERVICES: 'AncillaryServices',
+		ANCILLARY_PROVIDERS: 'AncillaryProviders',
+		ANCILLARY_BOOKING_CART: 'AncillaryBookingCart',
+		ANCILLARY_BOOKING_SUMMARY: 'AncillaryBookingSummary',
+		ANCILLARY_BOOKING_DETAILS: 'AncillaryBookingDetails',
+		ANCILLARY_PAYMENT: 'AncillaryPayment',
+		ANCILLARY_PRICING_REVIEW: 'AncillaryPricingReview',
+		ANCILLARY_CONFIRMATION: 'AncillaryConfirmation',
+		ANCILLARY_BOOKING_STATUS: 'AncillaryBookingStatus',
+		ANCILLARY_TRACK_APPOINTMENT: 'AncillaryTrackAppointment',
+		ANCILLARY_MY_BOOKINGS: 'AncillaryMyBookings',
+		ANCILLARY_SERVICE_MATCHING: 'AncillaryServiceMatching',
+		LOCATION_SELECT: 'LocationSelect',
 	},
 } as const

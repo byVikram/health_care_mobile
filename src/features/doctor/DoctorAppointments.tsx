@@ -4,7 +4,7 @@
 // All business logic (status helpers, confirm/reject/reschedule flow,
 // local state overrides) is preserved exactly.
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import {
   Platform,
   useWindowDimensions,
   ActivityIndicator,
+  Image,
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
@@ -30,7 +31,7 @@ import { updateAppointmentsStatus } from '../../services/appointmentService'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import DateSlotPicker from '../../components/common/DateSlotPicker'
-import { AppInput } from '../../components/common'
+import { AppInput, AppModal } from '../../components/common'
 import FavouriteDoctorList, { type FavouriteDoctorListItem } from './search/components/FavouriteDoctorList'
 import {
   getDoctorAvailability,
@@ -39,10 +40,11 @@ import {
   startConsultation,
   getFavouriteDoctors,
   toggleFavouriteDoctor,
-  referAppointment,
+  getDoctors,
   type SlotGroup,
   type FavouriteDoctor,
 } from './doctorService'
+import { createReferral } from '../referrals/referralService'
 
 // ── Action icons ──────────────────────────────────────────────────────────────
 
@@ -96,39 +98,105 @@ function getStatusChipStyle(
   isConfirmed: boolean,
   isWaitingPatient: boolean
 ): { bg: string; color: string } {
-  if (isCancelled) return { bg: '#ffeeee', color: '#e53935' }
-  if (isConfirmed) return { bg: '#e8f5e9', color: '#4caf50' }
-  if (isWaitingPatient) return { bg: '#fff3e0', color: '#e65100' }
-  return { bg: '#fff8e8', color: '#f59e0b' }
+  if (isCancelled) return { bg: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }
+  if (isConfirmed) return { bg: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }
+  if (isWaitingPatient) return { bg: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }
+  return { bg: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }
 }
 
 // ── Reject confirm modal ──────────────────────────────────────────────────────
 
+export const REJECTION_REASONS = [
+  'Doctor is unavailable at the requested time.',
+  'The requested appointment slot is no longer available.',
+  'The appointment request is not suitable for this specialty.',
+  'Required medical information is incomplete.',
+] as const
+
 interface RejectModalProps {
   visible: boolean
   onCancel: () => void
-  onConfirm: () => void
+  onConfirm: (reason: string) => void
+  submitting?: boolean
 }
 
-function RejectConfirmModal({ visible, onCancel, onConfirm }: RejectModalProps) {
+function RejectConfirmModal({ visible, onCancel, onConfirm, submitting = false }: RejectModalProps) {
+  const [selectedReason, setSelectedReason] = useState('')
+
+  useEffect(() => {
+    if (visible) setSelectedReason('')
+  }, [visible])
+
+  const handleConfirmClick = () => {
+    if (!selectedReason || submitting) return
+    onConfirm(selectedReason)
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.rejectBackdrop} onPress={onCancel} />
-      <View style={styles.rejectCard}>
-        <Text style={styles.rejectTitle}>Are you sure?</Text>
-        <Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
-        <View style={styles.rejectButtons}>
-          <TouchableOpacity style={styles.rejectCancelBtn} onPress={onCancel} activeOpacity={0.8}>
-            <Text style={styles.rejectCancelText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.rejectConfirmBtn} onPress={onConfirm} activeOpacity={0.8}>
-            <Text style={styles.rejectConfirmText}>Yes, Reject</Text>
-          </TouchableOpacity>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={submitting ? undefined : onCancel}>
+      <Pressable style={styles.rejectBackdrop} onPress={submitting ? undefined : onCancel} />
+      <View style={styles.modalCenteredView}>
+        <View style={styles.rejectCard}>
+          <Text style={styles.rejectTitle}>Are you sure?</Text>
+          <Text style={styles.rejectSubtitle}>You want to reject this appointment</Text>
+
+          <Text style={styles.rejectSectionTitle}>Select a reason for rejection</Text>
+          <View style={styles.reasonsList}>
+            {REJECTION_REASONS.map((reason) => {
+              const isSelected = selectedReason === reason
+              return (
+                <TouchableOpacity
+                  key={reason}
+                  style={[styles.reasonRow, isSelected && styles.reasonRowSelected]}
+                  onPress={() => setSelectedReason(reason)}
+                  disabled={submitting}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons
+                    name={isSelected ? 'radiobox-marked' : 'radiobox-blank'}
+                    size={18}
+                    color={isSelected ? '#0c7c7c' : '#9ca3af'}
+                    style={styles.radioIcon}
+                  />
+                  <Text style={[styles.reasonText, isSelected && styles.reasonTextSelected]}>
+                    {reason}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+
+          <View style={styles.rejectButtons}>
+            <TouchableOpacity
+              style={styles.rejectCancelBtn}
+              onPress={onCancel}
+              disabled={submitting}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.rejectCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.rejectConfirmBtn,
+                (!selectedReason || submitting) && styles.rejectConfirmBtnDisabled,
+              ]}
+              onPress={handleConfirmClick}
+              disabled={!selectedReason || submitting}
+              activeOpacity={0.8}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.rejectConfirmText}>Yes, Reject</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
   )
 }
+
 
 // ── Week day selector ─────────────────────────────────────────────────────────
 
@@ -286,6 +354,8 @@ export function DoctorAppointments({
   // Reject confirmation modal state
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [pendingRejectId, setPendingRejectId] = useState<string | null>(null)
+  const [rejectSubmitting, setRejectSubmitting] = useState(false)
+
 
   // Reschedule state
   const [rescheduleAppt, setRescheduleAppt] = useState<Appointment | null>(null)
@@ -307,7 +377,18 @@ export function DoctorAppointments({
   const [favouriteDoctorIds, setFavouriteDoctorIds] = useState<Set<string>>(new Set())
   const [referLoading, setReferLoading] = useState(false)
   const [referSearchQuery, setReferSearchQuery] = useState('')
+  const [referSearchResults, setReferSearchResults] = useState<FavouriteDoctorListItem[]>([])
+  const [referSearchLoading, setReferSearchLoading] = useState(false)
   const [bookmarkingIds, setBookmarkingIds] = useState<Set<string>>(new Set())
+  const [referNotesOpen, setReferNotesOpen] = useState(false)
+  const [referSelectedDoctor, setReferSelectedDoctor] = useState<FavouriteDoctorListItem | null>(null)
+  const [referNotes, setReferNotes] = useState('')
+  const [referSubmitting, setReferSubmitting] = useState(false)
+  const [referDetail, setReferDetail] = useState<{
+    doctorName: string
+    avatar?: string | null
+    notes?: string
+  } | null>(null)
 
   const { width, height } = useWindowDimensions()
   const isTablet = width >= 768
@@ -443,16 +524,52 @@ export function DoctorAppointments({
     }
   }, [referOpen])
 
-  const filteredReferDoctors = useMemo(() => {
-    const query = referSearchQuery.trim().toLowerCase()
-    if (!query) return favouriteDoctors
-    return favouriteDoctors.filter(
-      (doctor) =>
-        doctor.name.toLowerCase().includes(query) ||
-        (doctor.specialities[0]?.toLowerCase().includes(query) ?? false)
-    )
-  }, [favouriteDoctors, referSearchQuery])
+  const isReferSearching = referSearchQuery.trim().length > 0
 
+  useEffect(() => {
+    if (!referOpen) return
+
+    const trimmed = referSearchQuery.trim()
+    if (!trimmed) {
+      setReferSearchResults([])
+      setReferSearchLoading(false)
+      return
+    }
+
+    let mounted = true
+    const timer = setTimeout(async () => {
+      setReferSearchLoading(true)
+      try {
+        const res = await getDoctors({ search: trimmed, limit: 20 })
+        if (mounted && res.success) {
+          const mapped = (res.data ?? []).map((doctor) => ({
+            id: doctor.id,
+            name: doctor.name,
+            avatar_s3_key: doctor.avatar_s3_key ?? null,
+            location: doctor.location ?? '',
+            experience_years: doctor.experience_years ?? null,
+            specialities: doctor.specialities ?? [],
+            is_verified: doctor.is_verified,
+          }))
+          setReferSearchResults(mapped)
+        } else if (mounted) {
+          setReferSearchResults([])
+        }
+      } catch (error) {
+        console.log('[DoctorAppointments] refer search error:', error)
+        if (mounted) setReferSearchResults([])
+      } finally {
+        if (mounted) setReferSearchLoading(false)
+      }
+    }, 400)
+
+    return () => {
+      mounted = false
+      clearTimeout(timer)
+    }
+  }, [referOpen, referSearchQuery])
+
+  const filteredReferDoctors = isReferSearching ? referSearchResults : favouriteDoctors
   const handleToggleBookmark = async (doctor: FavouriteDoctorListItem) => {
     if (bookmarkingIds.has(doctor.id)) return
 
@@ -531,31 +648,41 @@ export function DoctorAppointments({
   const handleReferClick = (appointmentId: string) => {
     setReferApptId(appointmentId)
     setReferSearchQuery('')
+    setReferSearchResults([])
     setReferOpen(true)
   }
 
-  const handleReferConfirm = async (doctor: FavouriteDoctorListItem) => {
+  const handleReferSelectDoctor = (doctor: FavouriteDoctorListItem) => {
     if (!referApptId) return
+    setReferSelectedDoctor(doctor)
+    setReferNotes('')
+    setReferNotesOpen(true)
+  }
 
+  const handleReferSubmit = async () => {
+    if (!referApptId || !referSelectedDoctor) return
+    setReferSubmitting(true)
     try {
-      const res = await referAppointment({
+      await createReferral({
         appointment_id: referApptId,
-        doctor_id: doctor.id,
+        referred_doctor_id: referSelectedDoctor.id,
+        notes: referNotes.trim() || undefined,
       })
-
-      if (res.success) {
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: `Referred appointment to Dr. ${doctor.name}`,
-        })
-        setReferOpen(false)
-      } else {
-        Alert.alert('Error', res.message || 'Failed to refer appointment.')
-      }
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: `Patient successfully referred to ${referSelectedDoctor.name}`,
+      })
+      setReferNotesOpen(false)
+      setReferOpen(false)
+      setReferSelectedDoctor(null)
+      setReferNotes('')
+      setReferApptId(null)
     } catch (error) {
       console.log('[DoctorAppointments] refer error:', error)
-      Alert.alert('Error', 'Something went wrong. Please try again.')
+      Alert.alert('Error', 'Failed to refer appointment. Please try again.')
+    } finally {
+      setReferSubmitting(false)
     }
   }
 
@@ -598,27 +725,32 @@ export function DoctorAppointments({
   }
 
   const handleCancelReject = () => {
+    if (rejectSubmitting) return
     setRejectModalVisible(false)
     setPendingRejectId(null)
   }
 
-  const handleConfirmReject = async () => {
+  const handleConfirmReject = async (reason: string) => {
     if (!pendingRejectId) return
-    setRejectModalVisible(false)
+    const rowId = pendingRejectId
+    setRejectSubmitting(true)
     try {
-      const res = await updateAppointmentsStatus(pendingRejectId, 'a7d4e1c2-9f6b-4c83-b2e1-6f3a9d8c7b12')
+      const res = await updateAppointmentsStatus(rowId, 'a7d4e1c2-9f6b-4c83-b2e1-6f3a9d8c7b12', reason)
       if (res.success) {
         // Rejection uses a visually distinct toast (red left border) while
         // still reusing the shared BaseToast styling from the design system.
         Toast.show({ type: 'rejectSuccess', text1: res.message })
-        setLocalStatuses((prev) => ({ ...prev, [pendingRejectId!]: 'cancelled' }))
+        setLocalStatuses((prev) => ({ ...prev, [rowId]: 'cancelled' }))
       }
     } catch {
       Toast.show({ type: 'error', text1: 'Something went wrong. Please try again.' })
     } finally {
+      setRejectSubmitting(false)
+      setRejectModalVisible(false)
       setPendingRejectId(null)
     }
   }
+
 
   const handleRescheduleDateChange = (date: Date) => {
     setRescheduleDate(date)
@@ -759,9 +891,11 @@ export function DoctorAppointments({
       >
         {/* Mode icon */}
         <View style={[styles.modeIcon, { backgroundColor: isCancelled ? '#f5f5f5' : '#e8f4f0' }]}>
-          <Text style={[styles.modeIconText, { color: isCancelled ? '#b0b0b0' : '#0c7c7c' }]}>
-            {video ? '📹' : '🏠'}
-          </Text>
+          {video ? (
+            <MaterialCommunityIcons name="video" size={18} color={isCancelled ? '#b0b0b0' : '#0c7c7c'} />
+          ) : (
+            <MaterialCommunityIcons name="home" size={18} color={isCancelled ? '#b0b0b0' : '#0c7c7c'} />
+          )}
         </View>
 
         {/* Content */}
@@ -771,6 +905,29 @@ export function DoctorAppointments({
             <Text style={[styles.aptName, isCancelled && styles.aptNameMuted]} numberOfLines={1}>
               {apt.patient?.name ?? 'Unknown Patient'}
             </Text>
+            {apt.referral && (
+              <TouchableOpacity
+                style={styles.referralBadge}
+                onPress={() => {
+                  const ref = apt.referral!
+                  const avatar = ref.referring_doctor.avatar_s3_key || 
+                                 ref.referring_doctor.avatar_url || 
+                                 ref.referring_doctor.avatar || 
+                                 ref.referring_doctor.profile_picture || 
+                                 ref.referring_doctor.photo_url || 
+                                 ref.referring_doctor.image_url;
+                  setReferDetail({
+                    doctorName: ref.referring_doctor.name,
+                    avatar: avatar ?? undefined,
+                    notes: ref.notes ?? undefined,
+                  })
+                }}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              >
+                <MaterialCommunityIcons name="call-made" size={10} color="#0c7c7c" />
+                <Text style={styles.referralBadgeText}>referred</Text>
+              </TouchableOpacity>
+            )}
             <View style={[styles.aptChip, { backgroundColor: chipStyle.bg }]}>
               <Text style={[styles.aptChipText, { color: chipStyle.color }]} numberOfLines={1}>
                 {statusLabel}
@@ -913,75 +1070,139 @@ export function DoctorAppointments({
         visible={rejectModalVisible}
         onCancel={handleCancelReject}
         onConfirm={handleConfirmReject}
+        submitting={rejectSubmitting}
       />
 
+
       {/* Refer modal */}
-      <Modal
+      <AppModal
         visible={referOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setReferOpen(false)}
+        onDismiss={() => setReferOpen(false)}
+        title="Refer to Doctor"
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, isTablet && styles.modalCardTablet]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Refer to Doctor</Text>
-              <TouchableOpacity
-                onPress={() => setReferOpen(false)}
-                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-              >
-                <Ionicons name="close" size={22} color="#526173" />
-              </TouchableOpacity>
-            </View>
+        <View style={{ maxHeight: 450 }}>
+          <View style={{ paddingBottom: 16 }}>
+            <AppInput
+              value={referSearchQuery}
+              onChangeText={setReferSearchQuery}
+              placeholder="Search doctor..."
+              placeholderTextColor="#98a1aa"
+              textColor="#1b2d3c"
+              left={<AppInput.Icon icon="magnify" size={20} color="#9b9b9b" />}
+              autoCorrect={false}
+              noMargin
+            />
+          </View>
 
-            <View style={{ padding: 16 }}>
-              <AppInput
-                value={referSearchQuery}
-                onChangeText={setReferSearchQuery}
-                placeholder="Search doctor..."
-                placeholderTextColor="#98a1aa"
-                textColor="#1b2d3c"
-                left={<AppInput.Icon icon="magnify" size={20} color="#9b9b9b" />}
-                autoCorrect={false}
-                noMargin
-              />
+          {(referLoading || (isReferSearching && referSearchLoading)) ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <ActivityIndicator color="#0c7c7c" />
             </View>
-
-            {referLoading ? (
-              <View style={{ padding: 40, alignItems: 'center' }}>
-                <ActivityIndicator color="#0c7c7c" />
-              </View>
-            ) : (
-              <FlatList
-                data={filteredReferDoctors}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-                renderItem={({ item }) => (
-                  <FavouriteDoctorList
-                    doctor={item}
-                    isCompact={true}
-                    showShare={true}
-                    onShare={() => handleReferConfirm(item)}
-                    isBookmarked={favouriteDoctorIds.has(item.id)}
-                    isBookmarking={bookmarkingIds.has(item.id)}
-                    onToggleBookmark={handleToggleBookmark}
-                    placeholderImage={require('../../assets/Banner/doctor.png')}
-                    primaryColor="#0c7c7c"
+          ) : (
+            <FlatList
+              data={filteredReferDoctors}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: 24 }}
+              renderItem={({ item }) => (
+                <FavouriteDoctorList
+                  doctor={item}
+                  isCompact={true}
+                  showShare={true}
+                  onShare={() => handleReferSelectDoctor(item)}
+                  isBookmarked={favouriteDoctorIds.has(item.id)}
+                  isBookmarking={bookmarkingIds.has(item.id)}
+                  onToggleBookmark={handleToggleBookmark}
+                  placeholderImage={require('../../assets/Banner/doctor.png')}
+                  primaryColor="#0c7c7c"
+                  onPress={(doc) => {
+                    setReferOpen(false)
+                    navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doc.id })
+                  }}
+                />
+              )}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                  <MaterialCommunityIcons
+                    name={isReferSearching ? 'account-search-outline' : 'bookmark-outline'}
+                    size={40}
+                    color="#8ca0a9"
                   />
-                )}
-                ListEmptyComponent={
-                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                    <MaterialCommunityIcons name="bookmark-outline" size={40} color="#8ca0a9" />
-                    <Text style={{ color: '#7f98a3', fontSize: 13, marginTop: 10, textAlign: 'center' }}>
-                      No favourite doctors yet
-                    </Text>
-                  </View>
-                }
-              />
-            )}
+                  <Text style={{ color: '#7f98a3', fontSize: 13, marginTop: 10, textAlign: 'center' }}>
+                    {isReferSearching ? 
+                      'No doctors found'
+                      : 'No favourite doctors yet'}
+                  </Text>
+                </View>
+              }
+            />
+          )}
+        </View>
+      </AppModal>
+
+      {/* Referral notes modal — step 2, mirrors web ReferralNotesDialog */}
+      <AppModal
+        visible={referNotesOpen}
+        onDismiss={() => {
+          if (referSubmitting) return
+          setReferNotesOpen(false)
+        }}
+        title="Refer Patient"
+        dismissable={!referSubmitting}
+      >
+        <View>
+          {referSelectedDoctor && (
+            <View style={styles.referSelectedDoctorCard}>
+              <View style={styles.referSelectedDoctorAvatar}>
+                <Text style={styles.referSelectedDoctorInitial}>
+                  {referSelectedDoctor.name.charAt(0)}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.referSelectedDoctorName} numberOfLines={1}>
+                  {referSelectedDoctor.name}
+                </Text>
+                <Text style={styles.referSelectedDoctorSpecialty} numberOfLines={1}>
+                  {referSelectedDoctor.specialities?.[0] ?? 'General Physician'}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <Text style={styles.referNotesLabel}>Referral Notes (optional)</Text>
+          <AppInput
+            value={referNotes}
+            onChangeText={(text: string) => setReferNotes(text.slice(0, 500))}
+            placeholder="Add any clinical notes, reason for referral..."
+            placeholderTextColor="#98a1aa"
+            textColor="#1b2d3c"
+            multiline
+            numberOfLines={4}
+            noMargin
+          />
+          <Text style={styles.referNotesCount}>{referNotes.length}/500</Text>
+
+          <View style={styles.referNotesActions}>
+            <TouchableOpacity
+              style={[styles.referNotesButton, styles.referNotesButtonOutline]}
+              disabled={referSubmitting}
+              onPress={() => setReferNotesOpen(false)}
+            >
+              <Text style={styles.referNotesButtonOutlineText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.referNotesButton, styles.referNotesButtonFilled]}
+              disabled={referSubmitting}
+              onPress={handleReferSubmit}
+            >
+              {referSubmitting ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.referNotesButtonFilledText}>Refer</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </AppModal>
 
       {/* Reschedule confirm modal */}
       <Modal
@@ -1105,6 +1326,47 @@ export function DoctorAppointments({
           </View>
         </View>
       </Modal>
+
+      {/* Referral detail modal */}
+      <AppModal
+        visible={referDetail !== null}
+        onDismiss={() => setReferDetail(null)}
+        title="Referral Details"
+      >
+        {referDetail && (
+          <View style={{ paddingVertical: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 }}>
+              <Image
+                source={referDetail.avatar ? { uri: referDetail.avatar } : require('../../assets/Banner/doctor.png')}
+                style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#f3f4f6' }}
+                resizeMode="cover"
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#172838' }}>
+                  {referDetail.doctorName}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#0c7c7c', fontWeight: '600', marginTop: 2 }}>
+                  Referring Doctor
+                </Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#526b7a', marginBottom: 6 }}>
+              Referral Notes
+            </Text>
+            {referDetail.notes ? (
+              <View style={{ backgroundColor: '#f3f4f6', borderRadius: 8, padding: 12 }}>
+                <Text style={{ fontSize: 13, color: '#374151', lineHeight: 18 }}>
+                  {referDetail.notes}
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>
+                No referral notes provided.
+              </Text>
+            )}
+          </View>
+        )}
+      </AppModal>
     </View>
   )
 }
@@ -1361,19 +1623,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  // Reject modal
+  modalCenteredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   rejectBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   rejectCard: {
-    position: 'absolute',
-    alignSelf: 'center',
-    top: '40%',
-    width: 280,
+    width: 320,
     backgroundColor: '#ffffff',
     borderRadius: 20,
-    padding: 24,
+    padding: 20,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -1386,13 +1649,50 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     marginBottom: 6,
+    textAlign: 'center',
   },
   rejectSubtitle: {
     fontSize: 14,
     color: '#374151',
     fontWeight: '500',
-    marginBottom: 24,
+    marginBottom: 16,
     textAlign: 'center',
+  },
+  rejectSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  reasonsList: {
+    gap: 8,
+    marginBottom: 20,
+    width: '100%',
+  },
+  reasonRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+  },
+  reasonRowSelected: {
+    backgroundColor: 'rgba(12, 124, 124, 0.06)',
+  },
+  radioIcon: {
+    marginRight: 8,
+    marginTop: 1,
+  },
+  reasonText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 18,
+  },
+  reasonTextSelected: {
+    color: '#0c7c7c',
+    fontWeight: '500',
   },
   rejectButtons: {
     flexDirection: 'row',
@@ -1406,6 +1706,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#0c7c7c',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   rejectCancelText: {
     fontSize: 13,
@@ -1418,12 +1719,17 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     backgroundColor: '#e53935',
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rejectConfirmBtnDisabled: {
+    opacity: 0.5,
   },
   rejectConfirmText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#ffffff',
   },
+
   // Reschedule Modal styles
   modalOverlay: {
     flex: 1,
@@ -1564,5 +1870,94 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5,
+  },
+  referSelectedDoctorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#f0f9f9',
+    borderWidth: 1,
+    borderColor: 'rgba(12,124,124,0.2)',
+    marginBottom: 16,
+  },
+  referSelectedDoctorAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#0c7c7c',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  referSelectedDoctorInitial: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  referSelectedDoctorName: {
+    color: '#1D2B36',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  referSelectedDoctorSpecialty: {
+    color: '#6b7c86',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  referNotesLabel: {
+    color: '#1D2B36',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  referNotesCount: {
+    color: '#98a1aa',
+    fontSize: 11,
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  referNotesActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  referNotesButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  referNotesButtonOutline: {
+    borderWidth: 1.5,
+    borderColor: '#0c7c7c',
+  },
+  referNotesButtonOutlineText: {
+    color: '#0c7c7c',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  referNotesButtonFilled: {
+    backgroundColor: '#0c7c7c',
+  },
+  referNotesButtonFilledText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  referralBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#e8f4f8',
+  },
+  referralBadgeText: {
+    color: '#0c7c7c',
+    fontSize: 9,
+    fontWeight: '600',
   },
 })

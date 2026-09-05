@@ -27,6 +27,7 @@ export interface VerifyOtpResponse {
 		refresh_token: string
 		token_type: string
 		expires_in: number
+		notification_prompt_shown?: boolean
 	}
 }
 
@@ -44,6 +45,9 @@ export interface CreateUserRequest {
 	email: string
 	name: string
 	role_id: string
+	specialty_id?: string
+	license_number?: string
+	procedure_ids?: string[]
 }
 
 export interface VerifyUserCreationResponse {

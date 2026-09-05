@@ -17,7 +17,7 @@ type OnboardingScreen = {
 	description: string
 }
 
-type OnboardingConfig = Record<UserRole, { screens: OnboardingScreen[] }>
+type OnboardingConfig = Record<string, { screens: OnboardingScreen[] }>
 
 // 🔁 Reusable common screens
 const commonScreens: OnboardingScreen[] = [
@@ -97,6 +97,80 @@ export const onboardingData: OnboardingConfig = {
 				description: 'Upload scan reports and imaging results securely',
 			},
 			...commonScreens,
+		],
+	},
+
+	// Ancillary Specialties Dedicated Onboarding Content
+	'nursing-care': {
+		screens: [
+			{
+				Illustration: Onboarding1,
+				description: 'Provide dedicated home nursing care and personalized clinical support.',
+			},
+			{
+				Illustration: Onboarding2,
+				description: 'Administer prescribed injections, IV drip setups, and specialized wound dressings.',
+			},
+			{
+				Illustration: Onboarding3,
+				description: 'Track vital signs, maintain daily observation charts, and update patient recovery notes.',
+			},
+			{
+				Illustration: Onboarding4,
+				description: 'Coordinate seamless home visit schedules and deliver reliable, compassionate nursing care.',
+			},
+		],
+	},
+	'physiotherapy': {
+		screens: [
+			{
+				Illustration: Onboarding1,
+				description: 'Perform comprehensive physical assessments and evaluate patient mobility needs.',
+			},
+			{
+				Illustration: Onboarding2,
+				description: 'Deliver specialized joint mobilization, pain management, and therapeutic movement sessions.',
+			},
+			{
+				Illustration: Onboarding3,
+				description: 'Guide patients through personalized exercise regimens and post-op recovery sequences.',
+			},
+			{
+				Illustration: Onboarding4,
+				description: 'Track recovery milestones and help patients regain strength and functional movement.',
+			},
+		],
+	},
+	'rehab-care': {
+		screens: [
+			{
+				Illustration: Onboarding1,
+				description: 'Assess rehabilitation requirements for post-operative recovery and functional therapy.',
+			},
+			{
+				Illustration: Onboarding2,
+				description: 'Deliver personalized cognitive and physical rehabilitation therapy programs.',
+			},
+			{
+				Illustration: Onboarding3,
+				description: 'Track patient therapy progress and empower individuals toward long-term independence.',
+			},
+		],
+	},
+	'elder-day-care': {
+		screens: [
+			{
+				Illustration: Onboarding1,
+				description: 'Monitor daily activities, lifestyle routines, and vital wellbeing for senior patients.',
+			},
+			{
+				Illustration: Onboarding2,
+				description: 'Conduct regular home safety checks and provide attentive personal care support.',
+			},
+			{
+				Illustration: Onboarding3,
+				description: 'Assist with daily schedules, meals, and compassionate companionship for elder care.',
+			},
 		],
 	},
 }

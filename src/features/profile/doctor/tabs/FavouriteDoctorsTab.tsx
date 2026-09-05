@@ -9,6 +9,8 @@ import {
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { useNavigation } from '@react-navigation/native'
+import type { NavigationProp } from '@react-navigation/native'
 
 import {
 	FavouriteDoctor,
@@ -19,6 +21,8 @@ import { AppInput } from '../../../../components/common'
 import FavouriteDoctorList, {
 	type FavouriteDoctorListItem,
 } from '../../../doctor/search/components/FavouriteDoctorList'
+import { ROUTES } from '../../../../navigation/routes'
+import type { AppStackParamList } from '../../../../navigation/types'
 
 const TEAL = '#0d8585'
 const DOCTOR_IMAGE_PLACEHOLDER = require('../../../../assets/Banner/doctor.png')
@@ -34,6 +38,7 @@ const mapFavouriteDoctor = (doctor: FavouriteDoctor): FavouriteDoctorListItem =>
 })
 
 export default function FavouriteDoctorsTab() {
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 	const { width } = useWindowDimensions()
 	const isCompact = width < 520
 	const [favouriteDoctors, setFavouriteDoctors] = useState<FavouriteDoctorListItem[]>([])
@@ -219,6 +224,7 @@ export default function FavouriteDoctorsTab() {
 						onToggleBookmark={handleToggleBookmark}
 						placeholderImage={DOCTOR_IMAGE_PLACEHOLDER}
 						primaryColor={TEAL}
+						onPress={(doc) => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doc.id })}
 					/>
 				)}
 				ListEmptyComponent={

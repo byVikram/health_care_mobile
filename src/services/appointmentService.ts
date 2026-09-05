@@ -26,11 +26,16 @@ export async function getAppointmentById(id: string): Promise<Appointment> {
  */
 export async function updateAppointmentsStatus(
   appointmentId: string,
-  statusId: string
+  statusId: string,
+  reason?: string
 ): Promise<{ success: boolean; message: string }> {
   const res = await ApiService.patch<{ success: boolean; message: string }>(
     API_ENDPOINTS.APPOINTMENTS.UPDATE,
-    { appointment_id: appointmentId, status_id: statusId }
+    {
+      appointment_id: appointmentId,
+      status_id: statusId,
+      ...(reason ? { reason } : {}),
+    }
   )
   return res.data
 }

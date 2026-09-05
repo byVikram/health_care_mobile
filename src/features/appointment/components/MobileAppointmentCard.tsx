@@ -16,6 +16,11 @@ import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { useAuth } from '../../../context/AuthContext'
 import { AppModal } from '../../../components/common/AppModal'
+import { getStatusStyle } from '../../../constants/statusColors'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
+import { ROUTES } from '../../../navigation/routes'
+import type { RootStackParamList } from '../../../navigation/types'
+import { getRideState } from '../../transportation/transportationService'
 import AppointmentHistoryTab from './AppointmentHistoryTab'
 import RescheduleModal, { type RescheduleResult } from './RescheduleModal'
 
@@ -55,18 +60,6 @@ type MobileAppointmentCardProps<TAppointment extends MobileAppointmentRow = Mobi
 	horizontalInset?: number
 }
 
-const STATUS_STYLES: Record<string, { color: string; bgColor: string; text: string }> = {
-	confirmed: { color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.1)', text: 'Confirmed' },
-	pending: { color: '#f59e0b', bgColor: 'rgba(245, 158, 11, 0.1)', text: 'Pending' },
-	cancelled: { color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)', text: 'Cancelled' },
-	completed: { color: '#6366f1', bgColor: 'rgba(99, 102, 241, 0.1)', text: 'Completed' },
-	rescheduled: { color: '#8b5cf6', bgColor: 'rgba(139, 92, 246, 0.1)', text: 'Rescheduled' },
-}
-
-const getStatusStyle = (status: string) => {
-	const normalized = status?.trim().toLowerCase()
-	return STATUS_STYLES[normalized] ?? { color: '#64748b', bgColor: '#f1f5f9', text: status || 'Pending' }
-}
 
 const parseDateOnly = (value?: string) => {
 	if (!value) return null
@@ -164,6 +157,7 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 	const status = localRow.status || 'pending'
 	const normalizedStatus = status.trim().toLowerCase()
 	const statusStyle = getStatusStyle(status)
+	const displayStatusText = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
 	const displayMode = getModeLabel(localRow)
 	const isVirtual = displayMode === 'Virtual'
 	const displayName = role === 'doctor'
@@ -177,6 +171,25 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 	const canAct = isAppointmentUpcoming(localRow) && normalizedStatus !== 'cancelled' && normalizedStatus !== 'completed'
 	const rescheduleDoctorId = localRow.doctorId || localRow.raw?.doctor?.id
 	const rescheduleHospitalId = localRow.hospitalId || localRow.raw?.hospital?.id
+
+	const navigation = useNavigation<NavigationProp<RootStackParamList>>()
+	const [hasBookedCab, setHasBookedCab] = useState(false)
+
+	useEffect(() => {
+		if (localRow.id) {
+			getRideState(String(localRow.id))
+				.then((state) => setHasBookedCab(state.hasOnward || state.hasReturn))
+				.catch(() => setHasBookedCab(false))
+		}
+	}, [localRow.id])
+
+	const handleCabAction = () => {
+		if (hasBookedCab) {
+			navigation.navigate(ROUTES.STACK.RIDE_TRACKING, { appointmentId: localRow.id })
+		} else {
+			navigation.navigate(ROUTES.STACK.BOOK_RIDE, { appointmentId: localRow.id, type: 'onward' })
+		}
+	}
 
 	const openReschedule = () => {
 		if (!rescheduleDoctorId) {
@@ -255,7 +268,10 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 	return (
 		<View style={[styles.card, horizontalInset > 0 && { marginHorizontal: horizontalInset }]}>
 			<View style={styles.headerRow}>
-				<View style={[styles.avatar, { borderColor: statusStyle.color }]}>
+				<View style={[styles.avatar, 
+					// { borderColor: statusStyle.color }
+					{ borderColor: 'transparent' }
+					]}>
 					{displayAvatar ? (
 						<Image source={{ uri: displayAvatar }} style={styles.avatarImage} resizeMode="cover" />
 					) : (
@@ -269,7 +285,7 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 							{displayName}
 						</Text>
 						<View style={[styles.statusBadge, { backgroundColor: statusStyle.bgColor }]}>
-							<Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.text}</Text>
+							<Text style={[styles.statusText, { color: statusStyle.color }]}>{displayStatusText}</Text>
 						</View>
 					</View>
 					<Text style={styles.consultationType}>{localRow.consultationType || 'Consultation'}</Text>
@@ -316,7 +332,19 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 						style={[styles.actionButton, styles.secondaryButton]}
 						onPress={openReschedule}
 					>
-						<Text style={styles.secondaryButtonText}>Reschedule</Text>
+						<Text style={styles.secondaryButtonText} numberOfLines={1} adjustsFontSizeToFit>
+							Reschedule
+						</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						activeOpacity={0.88}
+						style={[styles.actionButton, styles.cabButton]}
+						onPress={handleCabAction}
+					>
+						<Text style={styles.cabButtonText} numberOfLines={1} adjustsFontSizeToFit>
+							{hasBookedCab ? 'Track Cab' : 'Book a Cab'}
+						</Text>
 					</TouchableOpacity>
 
 					<TouchableOpacity
@@ -324,7 +352,9 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 						style={[styles.actionButton, styles.dangerButton]}
 						onPress={openCancel}
 					>
-						<Text style={styles.dangerButtonText}>Cancel</Text>
+						<Text style={styles.dangerButtonText} numberOfLines={1} adjustsFontSizeToFit>
+							Cancel
+						</Text>
 					</TouchableOpacity>
 				</View>
 			) : null}
@@ -517,16 +547,17 @@ const styles = StyleSheet.create({
 	},
 	actionsRow: {
 		flexDirection: 'row',
-		gap: 10,
+		alignItems: 'center',
+		gap: 6,
 	},
 	actionButton: {
 		flex: 1,
 		minWidth: 0,
 		minHeight: 38,
-		borderRadius: 14,
+		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
-		paddingHorizontal: 10,
+		paddingHorizontal: 4,
 	},
 	secondaryButton: {
 		backgroundColor: '#FFFFFF',
@@ -535,8 +566,18 @@ const styles = StyleSheet.create({
 	},
 	secondaryButtonText: {
 		color: '#1A2A38',
-		fontSize: 15,
-		fontWeight: '500',
+		fontSize: 12.5,
+		fontWeight: '700',
+	},
+	cabButton: {
+		backgroundColor: '#EAF6F6',
+		borderWidth: 1,
+		borderColor: '#0c7c7c',
+	},
+	cabButtonText: {
+		color: '#0c7c7c',
+		fontSize: 12.5,
+		fontWeight: '700',
 	},
 	dangerButton: {
 		backgroundColor: '#FFFFFF',
@@ -545,8 +586,8 @@ const styles = StyleSheet.create({
 	},
 	dangerButtonText: {
 		color: '#FF3B30',
-		fontSize: 15,
-		fontWeight: '500',
+		fontSize: 12.5,
+		fontWeight: '700',
 	},
 	modalOverlay: {
 		flex: 1,

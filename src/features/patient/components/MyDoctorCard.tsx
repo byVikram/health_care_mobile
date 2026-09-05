@@ -23,6 +23,7 @@ type MyDoctorCardProps = DoctorCardItem & {
     saved?: boolean;
     disabled?: boolean;
     onToggleSaved?: () => void;
+    onPress?: () => void;
 };
 
 const FALLBACK_DOCTOR_IMAGE = require('../../../assets/Banner/doctor.png');
@@ -36,12 +37,13 @@ export default function MyDoctorCard({
     saved = false,
     disabled = false,
     onToggleSaved,
+    onPress,
 }: MyDoctorCardProps) {
     const imageSource =
         typeof image === 'string' ? { uri: image } : image || FALLBACK_DOCTOR_IMAGE;
 
     return (
-        <View style={styles.card}>
+        <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
             <View style={styles.imageFrame}>
                 <Image
                     source={imageSource}
@@ -97,7 +99,7 @@ export default function MyDoctorCard({
                     color={saved ? '#245f67' : '#8ca0a9'}
                 />
             </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
     );
 }
 

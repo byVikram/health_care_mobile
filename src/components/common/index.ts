@@ -20,7 +20,20 @@ export { default as SplashScreen } from "./SplashScreen";
 export { default as DateSlotPicker } from './DateSlotPicker';
 export type { PickProps as DateSlotPickerProps } from './DateSlotPicker';
 export { default as AppScreenHeader } from "./AppScreenHeader";
+export { default as AppAvatar } from "./AppAvatar";
 export { default as StatusModal } from "./StatusModal";
 export { default as AppStickyFooter, StickyFooter } from "./AppStickyFooter";
 export { default as ProviderDetailsCard } from "./ProviderDetailsCard";
 export type { ProviderDetailsCardProps, ProviderHoursRow } from "./ProviderDetailsCard";
+export { default as LocationSelector } from "./LocationSelector";
+export { default as NotificationPermissionPopup } from "./NotificationPermissionPopup";
+export { default as EventCard } from "./EventCard";
+export { default as CommonCard } from "./CommonCard";
+export * from "./PatientProfileSelectorBottomSheet";
+export { default as WorkingHoursSection } from "./WorkingHoursSection";
+export type { WorkingHoursSectionProps, WorkingDayKey, AppointmentType, TimeSlot as WorkingHoursTimeSlot, SectionSlots, WorkingHoursState } from "./WorkingHoursSection";
+export { WORKING_DAYS, SECTION_META, durationOptions as workingHoursDurationOptions, makeTimeOptions, snapToStep, createWorkingHoursState, DropdownSelect as WorkingHoursDropdownSelect } from "./WorkingHoursSection";
+
+
+
+

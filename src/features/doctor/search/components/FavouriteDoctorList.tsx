@@ -31,6 +31,7 @@ type FavouriteDoctorListProps = {
 	onToggleBookmark: (doctor: FavouriteDoctorListItem) => void
 	placeholderImage: ImageSourcePropType
 	primaryColor?: string
+	onPress?: (doctor: FavouriteDoctorListItem) => void
 }
 
 export default function FavouriteDoctorList({
@@ -44,6 +45,7 @@ export default function FavouriteDoctorList({
 	onToggleBookmark,
 	placeholderImage,
 	primaryColor = '#0d8585',
+	onPress,
 }: FavouriteDoctorListProps) {
 	const speciality = doctor.specialities?.[0] || 'General Physician'
 	const experience =
@@ -56,7 +58,11 @@ export default function FavouriteDoctorList({
 		: placeholderImage
 
 	return (
-		<View style={[styles.row, isCompact && styles.rowCompact]}>
+		<TouchableOpacity
+			style={[styles.row, isCompact && styles.rowCompact]}
+			onPress={() => onPress?.(doctor)}
+			activeOpacity={onPress ? 0.8 : 1}
+		>
 			<Image
 				source={imageSource}
 				style={[styles.image, isCompact && styles.imageCompact]}
@@ -146,7 +152,7 @@ export default function FavouriteDoctorList({
 					)}
 				</TouchableOpacity>
 			</View>
-		</View>
+		</TouchableOpacity>
 	)
 }
 

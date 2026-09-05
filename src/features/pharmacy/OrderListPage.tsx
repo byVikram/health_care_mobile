@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-	ActivityIndicator,
 	Animated,
 	FlatList,
 	Image,
@@ -10,7 +9,6 @@ import {
 	ScrollView,
 	StyleSheet,
 	Text,
-	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
@@ -21,12 +19,12 @@ import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
-import { AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
-import PaginationBar from '../../components/common/AppPagination'
+import { AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
 
-import Card from '../../components/common/CommonCard'
 import { getPharmacyOrders } from '../profile/pharmacy/pharmacyService'
 import { useAuth } from '../../context/AuthContext'
+import { getStatusStyle } from '../../constants/statusColors'
+import BookingsSearchBar from '../bookings/components/BookingsSearchBar'
 
 // ─────────────────────────────────────────────
 // Types
@@ -77,13 +75,6 @@ type OrderItem = {
 // ─────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────
-
-const STATUS_STYLES: Record<NormalizedStatus, { bg: string; text: string }> = {
-	Pending: { bg: '#FFF1D9', text: '#F0A018' },
-	Collected: { bg: '#DFF5E4', text: '#43A047' },
-	Rejected: { bg: '#FFE3E7', text: '#E74B5B' },
-	Packed: { bg: '#DEE9FF', text: '#3F7EE8' },
-}
 
 const DATE_OPTIONS: AppSelectOption[] = [
 	{ label: 'All', value: 'all' },
@@ -250,7 +241,7 @@ interface OrderCardProps {
 }
 
 const OrderCard = React.memo(function OrderCard({ order, onPress, isPatient, isPharmacy }: OrderCardProps) {
-	const statusStyle = STATUS_STYLES[order.status] ?? STATUS_STYLES.Pending
+	const statusStyle = getStatusStyle(order.status)
 
 	// Fixed: case-insensitive check for home delivery
 	const isHomeDelivery = order.raw?.delivery_type?.toUpperCase() === 'HOME_DELIVERY'
@@ -363,7 +354,23 @@ const OrderCard = React.memo(function OrderCard({ order, onPress, isPatient, isP
 // Main screen
 // ─────────────────────────────────────────────
 
-export default function OrderListPage() {
+interface OrderListPageProps {
+	embedded?: boolean
+	searchQuery?: string
+	statusFilter?: string
+	dateFilter?: string
+	fromDateFilter?: string
+	toDateFilter?: string
+}
+
+export default function OrderListPage({
+	embedded = false,
+	searchQuery: propSearchQuery,
+	statusFilter: propStatusFilter,
+	dateFilter: propDateFilter,
+	fromDateFilter: propFromDateFilter,
+	toDateFilter: propToDateFilter,
+}: OrderListPageProps = {}) {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
@@ -380,18 +387,16 @@ export default function OrderListPage() {
 	const [loading, setLoading] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
 
-	// Pagination
-	const [page, setPage] = useState(1)
-	const [pageSize, setPageSize] = useState(10)
-	const [apiMeta, setApiMeta] = useState<{ total: number; page: number; limit: number; pages: number } | null>(null)
+	const PAGE_SIZE = 10
+	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
 	// Filters
-	const [searchQuery, setSearchQuery] = useState('')
-	const [debouncedSearch, setDebouncedSearch] = useState('')
-	const [statusFilter, setStatusFilter] = useState(route.params?.status ?? 'all')
-	const [dateFilter, setDateFilter] = useState('all')
-	const [fromDateFilter, setFromDateFilter] = useState('')
-	const [toDateFilter, setToDateFilter] = useState('')
+	const [searchQuery, setSearchQuery] = useState(propSearchQuery ?? '')
+	const [debouncedSearch, setDebouncedSearch] = useState(propSearchQuery ?? '')
+	const [statusFilter, setStatusFilter] = useState(propStatusFilter ?? route.params?.status ?? 'all')
+	const [dateFilter, setDateFilter] = useState(propDateFilter ?? 'all')
+	const [fromDateFilter, setFromDateFilter] = useState(propFromDateFilter ?? '')
+	const [toDateFilter, setToDateFilter] = useState(propToDateFilter ?? '')
 
 	// Draft (mobile filter sheet)
 	const [draftStatusFilter, setDraftStatusFilter] = useState('all')
@@ -405,21 +410,30 @@ export default function OrderListPage() {
 	const filterSheetAnim = useRef(new Animated.Value(0)).current
 	const filterBackdropAnim = useRef(new Animated.Value(0)).current
 
+	// Sync controlled props when embedded
+	useEffect(() => {
+		if (!embedded) return
+		if (propSearchQuery !== undefined) setSearchQuery(propSearchQuery)
+		if (propStatusFilter !== undefined) setStatusFilter(propStatusFilter)
+		if (propDateFilter !== undefined) setDateFilter(propDateFilter)
+		if (propFromDateFilter !== undefined) setFromDateFilter(propFromDateFilter)
+		if (propToDateFilter !== undefined) setToDateFilter(propToDateFilter)
+		setVisibleCount(PAGE_SIZE)
+	}, [embedded, propSearchQuery, propStatusFilter, propDateFilter, propFromDateFilter, propToDateFilter])
+
 	// Sync route param status
 	useEffect(() => {
-		if (route.params?.status) setStatusFilter(route.params.status)
-	}, [route.params?.status])
+		if (!embedded && route.params?.status) setStatusFilter(route.params.status)
+	}, [embedded, route.params?.status])
 
 	// Debounce search
 	useEffect(() => {
-		const t = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+		const t = setTimeout(() => {
+			setDebouncedSearch(searchQuery)
+			setVisibleCount(PAGE_SIZE)
+		}, 300)
 		return () => clearTimeout(t)
 	}, [searchQuery])
-
-	// Reset page on filter change
-	useEffect(() => {
-		setPage(1)
-	}, [debouncedSearch, statusFilter, dateFilter, fromDateFilter, toDateFilter, pageSize])
 
 	// ── Fetch ──────────────────────────────────────────────────────────
 
@@ -427,7 +441,7 @@ export default function OrderListPage() {
 		async (isRefresh = false) => {
 			try {
 				isRefresh ? setRefreshing(true) : setLoading(true)
-				const params: Record<string, any> = { page, limit: pageSize }
+				const params: Record<string, any> = { limit: 50 }
 				if (statusFilter !== 'all') params.status = statusFilter
 				if (debouncedSearch.trim().length > 0) params.search = debouncedSearch.trim()
 				applyDateFilterParams(params, dateFilter, fromDateFilter, toDateFilter)
@@ -435,17 +449,6 @@ export default function OrderListPage() {
 				const response = (await getPharmacyOrders(params)) as any
 				const apiOrders = extractOrders(response)
 				setOrders(apiOrders.map(mapOrderToItem))
-
-				if (response?.meta) {
-					setApiMeta({
-						total: response.meta.total ?? apiOrders.length,
-						page: response.meta.page ?? page,
-						limit: response.meta.limit ?? pageSize,
-						pages: response.meta.pages ?? 1,
-					})
-				} else {
-					setApiMeta(null)
-				}
 			} catch (error) {
 				console.error('[OrderListPage] fetchOrders error:', error)
 				Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load pharmacy orders' })
@@ -453,12 +456,21 @@ export default function OrderListPage() {
 				isRefresh ? setRefreshing(false) : setLoading(false)
 			}
 		},
-		[page, pageSize, statusFilter, debouncedSearch, dateFilter, fromDateFilter, toDateFilter]
+		[statusFilter, debouncedSearch, dateFilter, fromDateFilter, toDateFilter]
 	)
 
 	useEffect(() => {
 		fetchOrders()
 	}, [fetchOrders])
+
+	const pagedOrders = useMemo(
+		() => orders.slice(0, visibleCount),
+		[orders, visibleCount]
+	)
+
+	const handleLoadMore = useCallback(() => {
+		setVisibleCount((prev) => (prev >= orders.length ? prev : Math.min(prev + PAGE_SIZE, orders.length)))
+	}, [orders.length])
 
 	// ── Navigate ───────────────────────────────────────────────────────
 
@@ -686,99 +698,21 @@ export default function OrderListPage() {
 		)
 	}
 
-	// ── Search box & filter controls ───────────────────────────────────
-
-	const searchInput = (
-		<View style={[styles.searchBox, !isTablet && styles.searchBoxMobile, isTablet && styles.searchBoxWide]}>
-			<MaterialCommunityIcons name="magnify" size={21} color="#9aa0a6" />
-			<TextInput
-				value={searchQuery}
-				onChangeText={setSearchQuery}
-				placeholder={isPatient ? 'Search Order ID...' : 'Search Patient, Order ID...'}
-				placeholderTextColor="#9aa4af"
-				style={styles.searchInput}
-			/>
-			{searchQuery.length > 0 && (
-				<TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
-					<MaterialCommunityIcons name="close-circle" size={18} color="#8b9aa2" />
-				</TouchableOpacity>
-			)}
-		</View>
-	)
-
-	const mobileFilterButton = (
-		<TouchableOpacity
-			style={[
-				styles.filterIconButton,
-				(statusFilter !== 'all' || dateFilter !== 'all') && styles.filterIconButtonActive,
-			]}
-			onPress={openFilterModal}
-			activeOpacity={0.84}
-		>
-			<MaterialCommunityIcons name="tune" size={23} color="#1f5f68" />
-		</TouchableOpacity>
-	)
-
-	const renderInlineFilter = (label: string, child: React.ReactNode, style?: any) => (
-		<View style={[styles.outlinedFilterWrap, style]}>
-			<View pointerEvents="none" style={styles.outlinedFilterLabel}>
-				<AppTypography style={styles.outlinedFilterLabelText}>{label}</AppTypography>
-			</View>
-			{child}
-		</View>
-	)
-
-	const statusSelect = renderInlineFilter(
-		'Status',
-		<AppSelect
-			options={STATUS_OPTIONS}
-			value={statusFilter}
-			onSelect={(value) => setStatusFilter(value)}
-			placeholder="Status"
-			size="small"
-			style={styles.inlineSelectFill}
-			customCardStyle={styles.inlineFilterSelect}
-			borderColor="#c8ced6"
-			maxDropdownHeight={220}
-		/>,
-		styles.compactFilterSelectWrap
-	)
-
-	const dateSelect = renderInlineFilter(
-		'Date',
-		<AppSelect
-			options={DATE_OPTIONS}
-			value={dateFilter}
-			onSelect={(value) => setDateFilter(value)}
-			placeholder="Date"
-			size="small"
-			style={styles.inlineSelectFill}
-			customCardStyle={styles.inlineFilterSelect}
-			borderColor="#c8ced6"
-			maxDropdownHeight={220}
-		/>,
-		styles.compactFilterSelectWrap
-	)
-
 	// ── Render ─────────────────────────────────────────────────────────
 
 	return (
 		<View style={styles.safeArea}>
-			<View style={[styles.content, isTablet && styles.contentTablet]}>
-				<View style={styles.filtersSection}>
-					{isTablet ? (
-						<View style={styles.filterRowWide}>
-							{dateSelect}
-							{statusSelect}
-							{searchInput}
-						</View>
-					) : (
-						<View style={styles.mobileSearchRow}>
-							<View style={{ flex: 1 }}>{searchInput}</View>
-							{mobileFilterButton}
-						</View>
-					)}
-				</View>
+			<View style={styles.content}>
+				{!embedded && (
+					<BookingsSearchBar
+						value={searchQuery}
+						onChangeText={setSearchQuery}
+						placeholder={isPatient ? 'Search Order ID...' : 'Search Patient, Order ID...'}
+						onFilterPress={openFilterModal}
+						filterActive={statusFilter !== 'all' || dateFilter !== 'all'}
+						accessibilityLabel="Filter medicine orders"
+					/>
+				)}
 
 				{loading && !refreshing ? (
 					<ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
@@ -789,14 +723,16 @@ export default function OrderListPage() {
 				) : (
 					<View style={{ flex: 1 }}>
 						<FlatList
-							data={orders}
+							data={pagedOrders}
 							keyExtractor={(item) => item.id}
 							renderItem={renderItem}
-							contentContainerStyle={styles.listContent}
+							contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 16, 30) }]}
 							showsVerticalScrollIndicator={false}
 							keyboardShouldPersistTaps="always"
 							onRefresh={() => fetchOrders(true)}
 							refreshing={refreshing}
+							onEndReached={handleLoadMore}
+							onEndReachedThreshold={0.4}
 							ListEmptyComponent={
 								<View style={styles.emptyState}>
 									<MaterialCommunityIcons name="pill" size={40} color="#b0bec5" />
@@ -804,32 +740,18 @@ export default function OrderListPage() {
 									<Text style={styles.emptyText}>Try adjusting the search or filter settings.</Text>
 								</View>
 							}
+							ListFooterComponent={
+								visibleCount < orders.length ? (
+									<View style={{ paddingVertical: 6, opacity: 0.6 }}>
+										<AppSkeleton width={'100%'} height={90} borderRadius={16} />
+									</View>
+								) : null
+							}
 						/>
-						{apiMeta && apiMeta.total > 0 ? (
-							<View
-								style={[
-									styles.paginationWrap,
-									!isTablet && styles.mobilePaginationWrap,
-									{ paddingBottom: Math.max(insets.bottom + 8, 16) },
-								]}
-							>
-								<PaginationBar
-									page={page}
-									pageSize={pageSize}
-									totalRows={apiMeta.total}
-									pageSizeOptions={[10, 20, 50]}
-									onPageChange={(nextPage) => setPage(nextPage)}
-									onPageSizeChange={(nextSize) => {
-										setPageSize(nextSize)
-										setPage(1)
-									}}
-								/>
-							</View>
-						) : null}
 					</View>
 				)}
 			</View>
-			{!isTablet && renderFilterModal()}
+			{renderFilterModal()}
 		</View>
 	)
 }
@@ -839,11 +761,11 @@ export default function OrderListPage() {
 // ─────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-	safeArea: { flex: 1, backgroundColor: '#f4f4f4' },
-	content: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+	safeArea: { flex: 1, backgroundColor: '#F8FAFA' },
+	content: { flex: 1 },
 	contentTablet: { paddingHorizontal: 24, paddingTop: 20 },
 	centeredFull: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-	listContent: { paddingBottom: 30 },
+	listContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 30 },
 	groupTitle: {
 		color: '#9aa1a5',
 		fontSize: 12,
@@ -927,32 +849,8 @@ const styles = StyleSheet.create({
 	emptyTitle: { color: '#536167', fontSize: 16, fontWeight: '700' },
 	emptyText: { color: '#8b969b', fontSize: 12, textAlign: 'center' },
 	// Filter section
-	filtersSection: { marginBottom: 10 },
 	filterRowWide: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap', gap: 12, width: '100%' },
 	filterGridMobile: { gap: 8 },
-	mobileSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-	searchBox: {
-		height: 48,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#e5eaef',
-		backgroundColor: '#ffffff',
-		paddingHorizontal: 16,
-		flexDirection: 'row',
-		alignItems: 'center',
-		width: '100%',
-	},
-	searchBoxWide: {
-		height: 50,
-		flexGrow: 2.2,
-		flexShrink: 1,
-		flexBasis: 190,
-		minWidth: 170,
-		borderColor: '#d8dee6',
-		borderRadius: 8,
-	},
-	searchBoxMobile: { height: 44, width: '100%', borderRadius: 8, paddingHorizontal: 12 },
-	searchInput: { flex: 1, height: '100%', paddingHorizontal: 12, fontSize: 16, color: '#111827' },
 	outlinedFilterWrap: { height: 56, justifyContent: 'center', position: 'relative', flexShrink: 1 },
 	outlinedFilterLabel: {
 		position: 'absolute',
@@ -966,19 +864,6 @@ const styles = StyleSheet.create({
 	inlineSelectFill: { width: '100%', marginBottom: 0 },
 	inlineFilterSelect: { height: 50, borderRadius: 8, backgroundColor: '#ffffff' },
 	compactFilterSelectWrap: { flexGrow: 1, flexShrink: 1, flexBasis: 112, minWidth: 104 },
-	filterIconButton: {
-		width: 48,
-		height: 44,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#e5eaef',
-		backgroundColor: '#ffffff',
-		alignItems: 'center',
-		justifyContent: 'center',
-		flexShrink: 0,
-		padding: 0,
-	},
-	filterIconButtonActive: { backgroundColor: '#e9f8f7', borderColor: '#1f5f68' },
 	// Filter modal
 	filterModalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
 	filterBackdrop: { ...StyleSheet.absoluteFillObject },

@@ -4,12 +4,13 @@ import {
 	RefreshControl,
 	ScrollView,
 	StyleSheet,
-	TouchableOpacity,
-	Text,
 	View,
 	useWindowDimensions,
 	Animated,
+	Text,
+	TouchableOpacity,
 } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import QuickServicesSection from './components/QuickServicesSection'
@@ -20,16 +21,15 @@ import ConsultSection from './components/ConsultSection'
 import PatientQuestionsSection from './components/PatientQuestionsSection'
 import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
 
-import PatientUpcomingAppointments from '../../components/common/PatientUpcomingAppointments'
+import PatientUpcomingAppointments from './components/PatientUpcomingAppointments'
 import CommunitySection from './components/CommunitySection'
-import LocationScreen from '../../components/common/LocationScreen'
-import { GPSLocationCard } from '../../components/common/GPSLocationCard'
 import BlogsSection from './components/BlogsSection'
 import ArticleSection from './components/ArticleSection'
 import UpcomingEventsSection from './components/EventSection'
 import PodcastsSection from './components/PodcastsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
 import { getAppointments } from '../doctor/doctorService'
+import StaffAncillaryDashboard from '../ancillary/staff/StaffAncillaryDashboard'
 
 import { formatDateForApi } from '../../utils/date'
 import { USER_ROLES } from '../../constants/constants'
@@ -38,13 +38,13 @@ import StatusModal from '../../components/common/StatusModal'
 import { useScroll } from '../../context/ScrollContext'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import TreatmentHistoryIcon from '../../assets/icons/treatmenthistory.svg'
-import TreatmentHistoryArrowIcon from '../../assets/icons/treatmenthistory-icon.svg'
 import { ROUTES } from '../../navigation/routes'
 import type { AppNavigationParamList } from '../../navigation/types'
 
 import PatientHealthQuestionsList from '../dashboard/components/PatientHealthQuestionsList'
-import { AppButton } from '../../components/common'
+import { AppButton, AppModal, AppTypography } from '../../components/common'
+import { getDoctorStatus, DoctorStatusResponse } from '../doctor/doctorService'
+
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
@@ -62,7 +62,10 @@ export default function DashboardPage() {
 	const insets = useSafeAreaInsets()
 	const { role } = useAuth()
 	const isDoctor = role === USER_ROLES.DOCTOR
-	const headerHeight = isDoctor ? insets.top + 84 : insets.top + 146
+	const isNurse = role === USER_ROLES.ANCILLARY
+	const isStaffRole = isDoctor || isNurse
+	const defaultHeaderHeight = isStaffRole ? insets.top + 84 : insets.top + 146
+	const headerHeight = (scrollData?.headerHeight && scrollData.headerHeight > 0) ? scrollData.headerHeight : defaultHeaderHeight
 	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
 
 	const [appointments, setAppointments] = useState<any[]>([])
@@ -74,6 +77,10 @@ export default function DashboardPage() {
 
 	const [selectedDate, setSelectedDate] = useState(0)
 	const [doctorAppointmentSearch, setDoctorAppointmentSearch] = useState('')
+
+	// ----- Doctor Status Fetch effect -----
+	const [doctorStatus, setDoctorStatus] = useState<DoctorStatusResponse['data'] | null>(null)
+	const [showUnverifiedBanner, setShowUnverifiedBanner] = useState(false)
 
 	// ---------------- WEEK DAYS ----------------
 	const buildWeekDays = () => {
@@ -98,6 +105,25 @@ export default function DashboardPage() {
 	// ---------------- DOCTOR API ----------------
 	useEffect(() => {
 		if (role !== USER_ROLES.DOCTOR) return
+
+		const fetchStatus = async () => {
+			try {
+				const status = await getDoctorStatus()
+				console.log("DOCTOR STATUS IN DASHBOARD:", status)
+				setDoctorStatus(status)
+				
+				if (status.profile_completed && !status.is_verified) {
+					console.log("SETTING SHOW UNVERIFIED BANNER TO TRUE")
+					setShowUnverifiedBanner(true)
+				} else {
+					console.log("BANNER NOT SHOWN. profile_completed:", status.profile_completed, "is_verified:", status.is_verified)
+				}
+			} catch (error) {
+				console.error('Failed to fetch doctor status:', error)
+			}
+		}
+
+		fetchStatus()
 
 		const fetchAppointments = async () => {
 			try {
@@ -160,7 +186,24 @@ export default function DashboardPage() {
 	}
 
 	const renderDoctorPanel = () => (
-		<DoctorAppointments
+		<>
+			{showUnverifiedBanner && (
+				<View style={styles.verificationBannerContainer}>
+					<View style={styles.verificationBannerIconBox}>
+						<MaterialCommunityIcons name="clock-outline" size={18} color="#F57C00" />
+					</View>
+					<View style={styles.verificationBannerTextContainer}>
+						<AppTypography style={styles.verificationBannerTitle}>Verification Pending</AppTypography>
+						<AppTypography style={styles.verificationBannerDesc} numberOfLines={3}>
+							Your profile is under review. You'll get full access once your account is verified.
+						</AppTypography>
+					</View>
+					<TouchableOpacity style={styles.verificationBannerButton}>
+						<AppTypography style={styles.verificationBannerButtonText} numberOfLines={1}>Learn More</AppTypography>
+					</TouchableOpacity>
+				</View>
+			)}
+			<DoctorAppointments
 			selectedDate={selectedDate}
 			setSelectedDate={setSelectedDate}
 			appointments={appointments}
@@ -171,27 +214,22 @@ export default function DashboardPage() {
 			searchQuery={doctorAppointmentSearch}
 			setSearchQuery={setDoctorAppointmentSearch}
 		/>
+		</>
 	)
 
 	const renderUserPanel = () => (
 		<>
-			<TouchableOpacity style={styles.treatmentHistoryCard}>
-				<View style={styles.treatmentHistoryLeft}>
-					<TreatmentHistoryIcon width={52} height={52} />
-					<Text style={styles.treatmentHistoryTitle}>Treatment History</Text>
-				</View>
-				<TreatmentHistoryArrowIcon width={26} height={26} />
-			</TouchableOpacity>
-
-			<PatientUpcomingAppointments
-				refreshToken={refreshToken}
-				onRefreshComplete={() => setRefreshing(false)}
-				onJoin={() =>
-					navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
-						mode: 'video',
-					})
-				}
-			/>
+			<View style={styles.upcomingAppointmentsWrapper}>
+				<PatientUpcomingAppointments
+					refreshToken={refreshToken}
+					onRefreshComplete={() => setRefreshing(false)}
+					onJoin={() =>
+						navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
+							mode: 'video',
+						})
+					}
+				/>
+			</View>
 
 			<SpecialitySection />
 			<ConsultSection />
@@ -199,18 +237,12 @@ export default function DashboardPage() {
 		</>
 	)
 
-	const renderPharmacyPanel = () => (
-		<>
-			<LocationScreen />
-			<GPSLocationCard />
-		</>
-	)
-	const renderRadiologyPanel = () => (
-		<>
-			<GPSLocationCard />
-		</>
-	)
+	const renderPharmacyPanel = () => <></>
+	const renderRadiologyPanel = () => <></>
 	const renderLaboratoryPanel = () => <></>
+	const renderAncillaryPanel = () => (
+		<StaffAncillaryDashboard />
+	)
 	const renderQuickServicesSection = () => (
 		<View style={isDoctor && styles.doctorQuickServicesSpacing}>
 			<QuickServicesSection role={role} />
@@ -230,12 +262,19 @@ export default function DashboardPage() {
 			case USER_ROLES.LABORATORY:
 				return renderLaboratoryPanel()
 
+			case USER_ROLES.ANCILLARY:
+				return renderAncillaryPanel()
+
 			default:
 				return renderUserPanel()
 		}
 	}
 
 	const renderMainContent = () => {
+		if (isNurse) {
+			return renderRoleBasedPanel()
+		}
+
 		if (
 			role !== USER_ROLES.DOCTOR &&
 			role !== USER_ROLES.PHARMACY &&
@@ -306,25 +345,19 @@ export default function DashboardPage() {
 
 				{renderMainContent()}
 
-				{/* New dashboard sections inserted before the existing community/blog sections. */}
-				<ArticleSection />
-				<UpcomingEventsSection />
-
-				{/* Existing common sections */}
-				<CommunitySection />
-				<BlogsSection />
-				<PodcastsSection />
-
-				{role !== USER_ROLES.PHARMACY && (
+				{!isNurse && (
 					<>
-						<PatientHealthQuestionsList showViewAll={true} />
+						{/* New dashboard sections inserted before the existing community/blog sections. */}
+						<ArticleSection />
+						<UpcomingEventsSection />
 
-						{role === USER_ROLES.PATIENT && (
-							<View style={styles.askQuestionContainer}>
-								<AppButton onPress={() => navigation.navigate(ROUTES.STACK.PATIENT_QUESTIONS_LIST)}>
-									Ask a Free Question
-								</AppButton>
-							</View>
+						{/* Existing common sections */}
+						<CommunitySection />
+						<BlogsSection />
+						<PodcastsSection />
+
+						{role !== USER_ROLES.PHARMACY && (
+							<PatientHealthQuestionsList showViewAll={true} />
 						)}
 					</>
 				)}
@@ -338,6 +371,22 @@ export default function DashboardPage() {
 				submitText={modalType === 'success' ? 'Go Home' : 'Try Again'}
 				onSubmit={() => setModalType(null)}
 			/>
+
+			{/* Doctor Status Modals */}
+			{/* Complete Profile Blocking Modal */}
+			<AppModal 
+				visible={role === USER_ROLES.DOCTOR && !!doctorStatus && !doctorStatus.profile_completed} 
+				dismissable={false}
+				onDismiss={() => {}}
+				title="Complete Your Profile"
+			>
+				<AppTypography variant="body" style={{ marginBottom: 16 }}>
+					Your profile is incomplete. Please complete your profile to continue using the application.
+				</AppTypography>
+				<AppButton onPress={() => navigation.navigate(ROUTES.MAIN.PROFILE as any)}>
+					Complete Profile
+				</AppButton>
+			</AppModal>
 		</>
 	)
 }
@@ -404,31 +453,57 @@ const styles = StyleSheet.create({
 		flex: 0.5,
 	},
 
-	treatmentHistoryCard: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		gap: 12,
-		marginHorizontal: 16,
+	upcomingAppointmentsWrapper: {
 		marginTop: 8,
-		padding: 14,
-		borderWidth: 1,
-		borderColor: '#CFDBDD',
-		borderRadius: 10,
-		backgroundColor: '#fff',
 	},
-
-	treatmentHistoryLeft: {
-		flex: 1,
+	verificationBannerContainer: {
+		backgroundColor: '#FFF8E1',
+		borderWidth: 1,
+		borderColor: '#FFE082',
+		borderRadius: 12,
+		padding: 12,
+		marginHorizontal: 16,
+		marginBottom: 16,
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 12,
 	},
-
-	treatmentHistoryTitle: {
+	verificationBannerIconBox: {
+		backgroundColor: '#FFECB3',
+		borderRadius: 8,
+		width: 32,
+		height: 32,
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginRight: 8,
+	},
+	verificationBannerTextContainer: {
 		flex: 1,
-		fontSize: 16,
-		fontWeight: '500',
-		color: '#30353A',
+		marginRight: 8,
+	},
+	verificationBannerTitle: {
+		fontWeight: '700',
+		fontSize: 14,
+		color: '#212121',
+		marginBottom: 2,
+	},
+	verificationBannerDesc: {
+		fontSize: 12,
+		color: '#616161',
+		lineHeight: 16,
+	},
+	verificationBannerButton: {
+		borderWidth: 1,
+		borderColor: '#F57C00',
+		borderRadius: 24,
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	verificationBannerButtonText: {
+		color: '#F57C00',
+		fontWeight: '600',
+		fontSize: 12,
 	},
 })
+

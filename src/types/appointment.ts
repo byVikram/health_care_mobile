@@ -10,7 +10,7 @@ export interface AppointmentHistoryEntry {
   created_at: string      // ISO timestamp
 }
 
-export type AppointmentStatusValue = 'pending' | 'confirmed' | 'completed' | 'cancelled' | string
+export type AppointmentStatusValue = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rescheduled' | 'reschedule_required' | string
 
 export interface AppointmentStatus {
   id: string
@@ -64,6 +64,22 @@ export interface Appointment {
   } | null
   history?: AppointmentHistoryEntry[]
   rescheduled_by?: string | null
+  reason?: string | null
+  referral?: {
+    id: string
+    referring_doctor: {
+      id: string
+      name: string
+      avatar_s3_key?: string | null
+      avatar_url?: string | null
+      avatar?: string | null
+      profile_picture?: string | null
+      photo_url?: string | null
+      image_url?: string | null
+    }
+    notes: string | null
+    status: string
+  } | null
 }
 
 export interface AppointmentsResponse {

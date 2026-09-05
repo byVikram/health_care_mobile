@@ -1,14 +1,34 @@
 // src/services/apiService.ts
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
-import { Alert } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+
+export interface StatusModalData {
+	status?: 'success' | 'error' | 'info'
+	title: string
+	description: string
+	submitText?: string
+	onSubmit?: () => void
+	cancelText?: string
+	onCancel?: () => void
+}
+
+type StatusModalHandler = (data: StatusModalData | null) => void
 
 const axiosInstance = axios.create()
 let unauthorizedHandler: (() => void) | null = null
+let statusModalHandler: StatusModalHandler | null = null
 let hasShownSessionExpiredAlert = false
 
 export const setUnauthorizedHandler = (handler: (() => void) | null) => {
 	unauthorizedHandler = handler
+}
+
+export const setStatusModalHandler = (handler: StatusModalHandler | null) => {
+	statusModalHandler = handler
+}
+
+export const showStatusModal = (data: StatusModalData | null) => {
+	statusModalHandler?.(data)
 }
 
 const normalizeHeadersForLog = (headers: unknown) => {
@@ -113,25 +133,44 @@ axiosInstance.interceptors.response.use(
 			unauthorizedHandler?.()
 			if (!hasShownSessionExpiredAlert) {
 				hasShownSessionExpiredAlert = true
-				Alert.alert('Session Expired', 'Please log in again.', [
-					{
-						text: 'OK',
-						onPress: () => {
-							hasShownSessionExpiredAlert = false
-						},
+				showStatusModal({
+					status: 'error',
+					title: 'Session Expired',
+					description: 'Please log in again.',
+					submitText: 'OK',
+					onSubmit: () => {
+						hasShownSessionExpiredAlert = false
 					},
-				])
+					onCancel: () => {
+						hasShownSessionExpiredAlert = false
+					},
+				})
 			}
 		} else if (status === 403) {
 			console.log('403 RESPONSE:', error.response?.data)
+			const errorDetail = error.response?.data?.detail
+			const isVerificationRequired =
+				typeof errorDetail === 'object' && (errorDetail?.code === 'ANCILLARY_VERIFICATION_REQUIRED' || errorDetail?.code === 'NURSE_VERIFICATION_REQUIRED')
 
-			Alert.alert(
-				'Access Denied',
-				error.response?.data?.message || 'You do not have permission to perform this action.'
-			)
+			if (!isVerificationRequired) {
+				showStatusModal({
+					status: 'error',
+					title: 'Access Denied',
+					description:
+						error.response?.data?.message ||
+						(typeof errorDetail === 'string'
+							? errorDetail
+							: 'You do not have permission to perform this action.'),
+					submitText: 'OK',
+				})
+			}
 		} else {
-			// Replace react-toastify with Alert in RN
-			Alert.alert('API Error', message)
+			showStatusModal({
+				status: 'error',
+				title: 'API Error',
+				description: message,
+				submitText: 'OK',
+			})
 		}
 
 		return Promise.reject(error)

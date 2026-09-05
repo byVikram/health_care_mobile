@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
@@ -8,14 +8,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { MainTabParamList } from './types'
 import { ROUTES } from './routes'
-import { AppScreenHeader } from '../components/common'
+import { AppScreenHeader, LocationSelector } from '../components/common'
 
 import DashboardPage from '../features/dashboard/DashboardPage'
 import SearchPage from '../features/doctor/search/SearchPage'
+import BookingsPage from '../features/bookings/BookingsPage'
 import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
+import NursingCarePage from '../features/ancillary/patient/NursingCarePage'
+import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
+import AncillaryServicesBottomSheet from '../features/ancillary/components/AncillaryServicesBottomSheet'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
@@ -27,21 +31,36 @@ function HomeWithSidebar() {
 	)
 }
 
+function AncillaryTabWrapper() {
+	return (
+		<View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+			<NursingCarePage />
+		</View>
+	)
+}
+
 function getTabConfig(routeName: string) {
 	if (routeName === ROUTES.MAIN.SEARCH) {
 		return { iconName: 'magnify' as const, label: 'Search' }
 	}
 	if (routeName === ROUTES.MAIN.PORTAL) {
-		return { iconName: 'calendar-clock' as const, label: 'Portal' }
+		return { iconName: 'calendar-multiple-check' as const, label: 'Bookings' }
 	}
 	if (routeName === ROUTES.MAIN.PROFILE) {
 		return { iconName: 'account' as const, label: 'Profile' }
+	}
+	if (routeName === ROUTES.MAIN.ANCILLARY) {
+		return { iconName: 'medical-bag' as const, label: 'Ancillary' }
 	}
 
 	return { iconName: 'home' as const, label: 'Home' }
 }
 
-function DockedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+interface DockedTabBarProps extends BottomTabBarProps {
+	onAncillaryPress: () => void
+}
+
+function DockedTabBar({ state, descriptors, navigation, onAncillaryPress }: DockedTabBarProps) {
 	const theme = useTheme()
 	const insets = useSafeAreaInsets()
 	const activeRoute = state.routes[state.index]
@@ -65,6 +84,7 @@ function DockedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 				const { options } = descriptors[route.key]
 				const { iconName, label } = getTabConfig(route.name)
 				const color = focused ? '#0C7C7C' : '#94a3b8'
+				const isAncillaryTab = route.name === ROUTES.MAIN.ANCILLARY
 
 				const onPress = () => {
 					const event = navigation.emit({
@@ -73,7 +93,14 @@ function DockedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 						canPreventDefault: true,
 					})
 
-					if (!focused && !event.defaultPrevented) {
+					if (event.defaultPrevented) return
+
+					if (isAncillaryTab) {
+						onAncillaryPress()
+						return
+					}
+
+					if (!focused) {
 						navigation.navigate(route.name, route.params)
 					}
 				}
@@ -125,84 +152,112 @@ function DockedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 export default function MainTabNavigator() {
 	const { role } = useAuth()
 	const navigation = useNavigation<any>()
+	const isNurse = (role as any) === 'nurse' || (role as any) === 'ancillary'
+	const isDoctor = (role as any) === 'doctor'
 	const shouldShowSearch = role !== 'doctor'
+	const shouldShowAncillary = !isNurse
+	const [ancillarySheetVisible, setAncillarySheetVisible] = useState(false)
 
 	return (
-		<Tab.Navigator
-			tabBar={(props) => <DockedTabBar {...props} />}
-			screenOptions={{
-				headerShown: false,
-			}}
-		>
-			<Tab.Screen name={ROUTES.MAIN.HOME} component={HomeWithSidebar} />
-			{shouldShowSearch ? (
+		<>
+			<Tab.Navigator
+				tabBar={(props) => (
+					<DockedTabBar
+						{...props}
+						onAncillaryPress={() => setAncillarySheetVisible(true)}
+					/>
+				)}
+				screenOptions={{
+					headerShown: false,
+				}}
+			>
+				<Tab.Screen name={ROUTES.MAIN.HOME} component={HomeWithSidebar} />
+				{shouldShowSearch ? (
+					<Tab.Screen
+						name={ROUTES.MAIN.SEARCH}
+						component={SearchPage}
+						options={{
+							headerShown: true,
+							header: () => (
+								<AppScreenHeader 
+									title="Find Doctors" 
+									onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} 
+									rightElement={<LocationSelector />}
+								/>
+							),
+						}}
+					/>
+				) : null}
+				{/* Nurse persona: PORTAL tab renders NurseBookingHistoryPage directly. */}
+				{/* Doctor persona: PORTAL tab keeps the existing PortalPage (unaffected by the patient Bookings consolidation). */}
+				{/* Patient persona: PORTAL tab renders the consolidated BookingsPage (Doctor Appointments page + category filters). */}
 				<Tab.Screen
-					name={ROUTES.MAIN.SEARCH}
-					component={SearchPage}
+					name={ROUTES.MAIN.PORTAL}
+					component={isNurse ? NurseBookingHistoryPage : isDoctor ? PortalPage : BookingsPage}
+				/>
+				{shouldShowAncillary ? (
+					<Tab.Screen
+						name={ROUTES.MAIN.ANCILLARY}
+						component={AncillaryTabWrapper}
+						options={{
+							headerShown: false,
+						}}
+					/>
+				) : null}
+				<Tab.Screen
+					name={ROUTES.MAIN.PROFILE}
+					component={ProfilePage}
 					options={{
 						headerShown: true,
-						header: () => <AppScreenHeader title="Find Doctors" onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} />,
+						header: ({ navigation: screenNavigation }) => <AppScreenHeader title="My Profile" onBack={() => (screenNavigation.canGoBack() ? screenNavigation.goBack() : navigation.navigate(ROUTES.MAIN.HOME))} />,
 					}}
 				/>
-			) : null}
-			<Tab.Screen name={ROUTES.MAIN.PORTAL} component={PortalPage} />
-			<Tab.Screen
-				name={ROUTES.MAIN.PROFILE}
-				component={ProfilePage}
-				options={{
-					headerShown: true,
-					header: () => <AppScreenHeader title="My Profile" onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} />,
-				}}
+			</Tab.Navigator>
+
+			{/* ANCILLARY SERVICES SELECTION BOTTOM SHEET */}
+			<AncillaryServicesBottomSheet
+				visible={ancillarySheetVisible}
+				onClose={() => setAncillarySheetVisible(false)}
 			/>
-		</Tab.Navigator>
+		</>
 	)
 }
 
 const styles = StyleSheet.create({
 	tabBar: {
-		backgroundColor: '#ffffff',
-		borderTopWidth: 1,
-		borderTopColor: '#f1f5f9',
 		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		width: '100%',
+		backgroundColor: '#FFFFFF',
+		borderTopWidth: 1,
+		borderTopColor: '#E2E8F0',
+		elevation: 8,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: -2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
 	},
-
 	tabBarItem: {
 		flex: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
-		height: '100%',
 	},
-
 	tabButton: {
 		alignItems: 'center',
 		justifyContent: 'center',
-		gap: 3,
 	},
-
 	iconActiveCapsule: {
-		width: 52,
-		height: 30,
-		borderRadius: 15,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: 'transparent',
+		paddingHorizontal: 12,
+		paddingVertical: 4,
+		borderRadius: 16,
 	},
-
 	iconActiveCapsuleFocused: {
-		backgroundColor: '#eef8f8',
+		backgroundColor: 'rgba(12, 124, 124, 0.1)',
 	},
-
 	tabLabel: {
-		fontSize: 10.5,
-		lineHeight: 12,
-		textAlign: 'center',
+		fontSize: 11,
 		fontWeight: '500',
+		marginTop: 2,
 	},
-
 	tabLabelFocused: {
-		fontWeight: '600',
+		fontWeight: '700',
 	},
 })

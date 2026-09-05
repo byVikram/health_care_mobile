@@ -1,5 +1,5 @@
 // SidebarLayout.tsx
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
@@ -11,10 +11,6 @@ import { useAuth } from '../../context/AuthContext'
 import { ScrollProvider } from '../../context/ScrollContext'
 
 import AppointmentsIcon from '../../assets/quick-services/appointments.svg'
-import PharmacyIcon from '../../assets/icons/pharmacy.svg'
-import LabIcon from '../../assets/icons/lab.svg'
-import RadiologyIcon from '../../assets/icons/radiology.svg'
-import AncillaryIcon from '../../assets/icons/ancillary.svg'
 import TreatmentIcon from '../../assets/icons/treatment.svg'
 import RemindersIcon from '../../assets/icons/reminders.svg'
 import PaymentsIcon from '../../assets/icons/payments.svg'
@@ -22,6 +18,8 @@ import HelpCenterIcon from '../../assets/icons/help-center.svg'
 import SettingsIcon from '../../assets/icons/settings.svg'
 
 import { ROUTES } from '../../navigation/routes'
+import { getPatientDetails } from '../../features/profile/patient/PatientProfileService'
+import { getDoctorProfile, mapDoctorProfileApi } from '../../features/doctor/doctorService'
 import type { AppStackParamList } from '../../navigation/types'
 
 const MOCK_USER = {
@@ -61,13 +59,45 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
-	const { clearAuth, user: authUser, role } = useAuth()
+	const { clearAuth, user: authUser, role, updateUser } = useAuth()
 
 	const user = {
 		name: authUser?.name ?? MOCK_USER.name,
 		avatar: authUser?.avatar ?? MOCK_USER.avatar,
 		profileCompletion: authUser?.profileCompletion ?? MOCK_USER.profileCompletion,
 	}
+
+	// Sync the real profile photo from the API so the dashboard header
+	// and sidebar show the latest uploaded image.
+	useEffect(() => {
+		if (role !== 'patient' && role !== 'doctor') return
+
+		let cancelled = false
+		const syncAvatar = async () => {
+			try {
+				if (role === 'doctor') {
+					const res = await getDoctorProfile()
+					if (!cancelled && res.success && res.data) {
+						const profile = mapDoctorProfileApi(res.data)
+						if (profile.personal.avatar) {
+							updateUser({ avatar: profile.personal.avatar })
+						}
+					}
+					return
+				}
+
+				const res = await getPatientDetails()
+				if (!cancelled && res.success && res.data?.personal?.avatar) {
+					updateUser({ avatar: res.data.personal.avatar })
+				}
+			} catch {
+				// Silently ignore; the existing avatar (or default) will show.
+			}
+		}
+
+		syncAvatar()
+		return () => { cancelled = true }
+	}, [role])
 
 	const handleEditProfile = () => {
 		setIsSidebarOpen(false)
@@ -90,136 +120,186 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 	}
 
 	const menuItems = useMemo<AppSidebarItem[]>(
-		() => [
-			{
-				id: 'appointments',
-				label: 'My Appointments',
-				icon: <AppointmentsIcon width={24} height={24} />,
-				onPress: () => {
-					setIsSidebarOpen(false)
-					navigation.navigate(ROUTES.STACK.APPOINTMENTS)
-				},
-			},
-			{
-				id: 'pharmacy',
-				label: 'Pharmacy',
-				icon: <PharmacyIcon width={20} height={20} />,
-				onPress: () => {
-					setIsSidebarOpen(false)
-					navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
-				},
-			},
-			{
-				id: 'medicine-orders',
-				label: 'Medicine Orders',
-				icon: <MaterialCommunityIcons name="pill" size={20} color="#1f5f68" />,
-				onPress: () => {
-					setIsSidebarOpen(false)
-					navigation.navigate(ROUTES.STACK.ORDER_LIST as any)
-				},
-			},
-			{
-				id: 'lab',
-				label: 'Lab',
-				icon: <LabIcon width={20} height={20} />,
-				onPress: () => {
-					setIsSidebarOpen(false)
-					navigation.navigate(ROUTES.STACK.LABORATORY_LIST as any)
-				},
-			},
+		() => {
+			const openAppointments = () => {
+				setIsSidebarOpen(false)
+				navigation.navigate(ROUTES.STACK.APPOINTMENTS)
+			}
 
-			{
-				id: 'lab booking',
-				label: 'Lab Bookings',
-				icon: <MaterialCommunityIcons name="clipboard-text-play-outline" size={20} color="#1f5f68" />,
-				onPress: () => {
-					setIsSidebarOpen(false)
-					navigation.navigate(ROUTES.STACK.LABORATORY_ORDERS as any)
+			// Patients: land on the consolidated Bookings page (the Doctor
+			// Appointments page) with the corresponding filter pre-selected,
+			// instead of navigating to the standalone category screen directly.
+			const openBookingsFilter = (filter: 'doctor' | 'ancillary' | 'lab' | 'medicine' | 'radiology') => {
+				setIsSidebarOpen(false)
+				navigation.navigate(ROUTES.MAIN.TABS, {
+					screen: ROUTES.MAIN.PORTAL,
+					params: { filter },
+				} as any)
+			}
+		// Nurse/Ancillary drawer prioritizes the actions a nurse needs day-to-day
+	// (bookings, earnings) over general account items --
+		// Profile lives in the header above and Log out below, so neither repeats here.
+		if ((role as any) === 'nurse' || (role as any) === 'ancillary') {
+			return [
+				{
+				id: 'bookings',
+				label: 'Bookings',
+					icon: <AppointmentsIcon width={24} height={24} />,
+					onPress: () => {
+						setIsSidebarOpen(false)
+						navigation.navigate(ROUTES.MAIN.TABS, {
+							screen: ROUTES.MAIN.PORTAL,
+						})
+					},
 				},
-			},
-			// {
-			// 	id: 'radiology',
-			// 	label: 'Radiology',
-			// 	icon: <RadiologyIcon width={20} height={20} />,
-			// 	onPress: () =>
-			// 		navigation.navigate(ROUTES.MAIN.TABS, {
-			// 			screen: ROUTES.MAIN.HOME,
-			// 		}),
-			// },
-			{
-				id: 'radiology',
-				label: 'Radiology',
-				icon: <RadiologyIcon width={20} height={20} />,
-				onPress: () => {
-					setIsSidebarOpen(false)
-					navigation.navigate(ROUTES.STACK.RADIOLOGY_LIST as any)
+				{
+					id: 'earnings-payments',
+					label: 'Earnings & Payments',
+					icon: <PaymentsIcon width={20} height={20} />,
+					onPress: () => {
+						setIsSidebarOpen(false)
+						navigation.navigate(ROUTES.STACK.NURSE_EARNINGS as any)
+					},
 				},
-			},
-			{
-				id: 'radiology-bookings',
-				label: 'Radiology Bookings',
-				icon: <MaterialCommunityIcons name="clipboard-text-play-outline" size={20} color="#1f5f68" />,
-				onPress: () => {
-					setIsSidebarOpen(false)
-					navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS as any)
+				{
+					id: 'notifications',
+					label: 'Notifications',
+					icon: <MaterialCommunityIcons name="bell-outline" size={20} color="#1f5f68" />,
+					onPress: () => {
+						setIsSidebarOpen(false)
+						navigation.navigate(ROUTES.STACK.NOTIFICATION)
+					},
 				},
-			},
-			{
-				id: 'ancillary',
-				label: 'Ancillary',
-				icon: <AncillaryIcon width={20} height={20} />,
-				onPress: () =>
-					navigation.navigate(ROUTES.MAIN.TABS, {
-						screen: ROUTES.MAIN.HOME,
-					}),
-			},
-			{
-				id: 'treatment-history',
-				label: 'Treatment History',
-				icon: <TreatmentIcon width={20} height={20} />,
-				onPress: () =>
-					navigation.navigate(ROUTES.MAIN.TABS, {
-						screen: ROUTES.MAIN.HOME,
-					}),
-			},
-			{
-				id: 'reminders',
-				label: 'Reminders',
-				icon: <RemindersIcon width={20} height={20} />,
-				onPress: () =>
-					navigation.navigate(ROUTES.MAIN.TABS, {
-						screen: ROUTES.MAIN.HOME,
-					}),
-			},
-			{
-				id: 'payments',
-				label: 'Payments',
-				icon: <PaymentsIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.STACK.PATIENT_PAYMENT),
-			},
-			{
-				id: 'help',
-				label: 'Help Center',
-				icon: <HelpCenterIcon width={20} height={20} />,
-				onPress: () =>
-					navigation.navigate(ROUTES.MAIN.TABS, {
-						screen: ROUTES.MAIN.PROFILE,
-					}),
-			},
-			{
-				id: 'settings',
-				label: 'Settings',
-				icon: <SettingsIcon width={20} height={20} />,
-				onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
-			},
-			{
-				id: 'screencapturetest',
-				label: 'Screen Capture Test',
-				icon: <MaterialCommunityIcons name="camera" size={20} color="#1f5f68" />,
-				onPress: () => navigation.navigate(ROUTES.STACK.SCREEN_CAPTURE_TEST),
-			},
-		],
-		[navigation]
+				{
+					id: 'help',
+					label: 'Help Center',
+					icon: <HelpCenterIcon width={20} height={20} />,
+					onPress: () =>
+						navigation.navigate(ROUTES.MAIN.TABS, {
+							screen: ROUTES.MAIN.PROFILE,
+						}),
+				},
+				{
+					id: 'settings',
+					label: 'Settings',
+					icon: <SettingsIcon width={20} height={20} />,
+					onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
+				},
+			]
+		}
+
+
+			const roleItems: AppSidebarItem[] =
+				role === 'doctor'
+					? [
+							{
+								id: 'my-patients',
+								label: 'My Patients',
+								icon: <MaterialCommunityIcons name="account-group-outline" size={20} color="#1f5f68" />,
+								onPress: openAppointments,
+							},
+							{
+								id: 'my-consultations',
+								label: 'My Consultations',
+								icon: <MaterialCommunityIcons name="stethoscope" size={20} color="#1f5f68" />,
+								onPress: openAppointments,
+							},
+							{
+								id: 'create-event',
+								label: 'Create Event',
+								icon: <MaterialCommunityIcons name="calendar-plus" size={20} color="#1f5f68" />,
+								onPress: () => {
+									setIsSidebarOpen(false)
+									navigation.navigate(ROUTES.STACK.DOCTOR_EVENTS as any)
+								},
+							},
+						]
+					: [
+							{
+								id: 'medicine-orders',
+								label: 'Medicine Orders',
+								icon: <MaterialCommunityIcons name="pill" size={20} color="#1f5f68" />,
+								onPress: () => openBookingsFilter('medicine'),
+							},
+							{
+								id: 'lab booking',
+								label: 'Lab Bookings',
+								icon: <MaterialCommunityIcons name="clipboard-text-play-outline" size={20} color="#1f5f68" />,
+								onPress: () => openBookingsFilter('lab'),
+							},
+							{
+								id: 'radiology-bookings',
+								label: 'Radiology Bookings',
+								icon: <MaterialCommunityIcons name="clipboard-text-play-outline" size={20} color="#1f5f68" />,
+								onPress: () => openBookingsFilter('radiology'),
+							},
+							{
+								id: 'ancillary-orders',
+								label: 'Ancillary Orders',
+								icon: <MaterialCommunityIcons name="medical-bag" size={20} color="#1f5f68" />,
+								onPress: () => openBookingsFilter('ancillary'),
+							},
+							{
+								id: 'book-cab',
+								label: 'Book a Cab',
+								icon: <MaterialCommunityIcons name="car" size={20} color="#1f5f68" />,
+								onPress: () => {
+									setIsSidebarOpen(false)
+									navigation.navigate(ROUTES.STACK.TRANSPORTATION_LANDING as any)
+								},
+							},
+						]
+
+			return [
+				{
+					id: 'appointments',
+					label: 'My Appointments',
+					icon: <AppointmentsIcon width={24} height={24} />,
+					onPress: role === 'doctor' ? openAppointments : () => openBookingsFilter('doctor'),
+				},
+				...roleItems,
+				{
+					id: 'treatment-history',
+					label: 'Treatment History',
+					icon: <TreatmentIcon width={20} height={20} />,
+					onPress: () =>
+						navigation.navigate(ROUTES.MAIN.TABS, {
+							screen: ROUTES.MAIN.HOME,
+						}),
+				},
+				{
+					id: 'reminders',
+					label: 'Reminders',
+					icon: <RemindersIcon width={20} height={20} />,
+					onPress: () =>
+						navigation.navigate(ROUTES.MAIN.TABS, {
+							screen: ROUTES.MAIN.HOME,
+						}),
+				},
+				{
+					id: 'payments',
+					label: 'Payments',
+					icon: <PaymentsIcon width={20} height={20} />,
+					onPress: () => navigation.navigate(ROUTES.STACK.PATIENT_PAYMENT),
+				},
+				{
+					id: 'help',
+					label: 'Help Center',
+					icon: <HelpCenterIcon width={20} height={20} />,
+					onPress: () =>
+						navigation.navigate(ROUTES.MAIN.TABS, {
+							screen: ROUTES.MAIN.PROFILE,
+						}),
+				},
+				{
+					id: 'settings',
+					label: 'Settings',
+					icon: <SettingsIcon width={20} height={20} />,
+					onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
+				},
+			]
+		},
+		[navigation, role]
 	)
 
 	return (

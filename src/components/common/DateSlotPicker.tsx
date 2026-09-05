@@ -21,13 +21,19 @@ function startOfDay(date: Date) {
 	return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
+function getSundayOfWeek(d: Date) {
+	const result = new Date(d)
+	result.setDate(result.getDate() - result.getDay())
+	return startOfDay(result)
+}
+
 function getFocusedRangeStart(selectedDate: Date | null, today: Date, disablePast: boolean) {
 	const todayStart = startOfDay(today)
 	const selectedStart = selectedDate ? startOfDay(selectedDate) : todayStart
 
-	if (disablePast && selectedStart < todayStart) return todayStart
+	const focalDate = (disablePast && selectedStart < todayStart) ? todayStart : selectedStart
 
-	return selectedStart
+	return getSundayOfWeek(focalDate)
 }
 
 export type PickProps = {
@@ -45,6 +51,7 @@ export type PickProps = {
 	disableBookedSlots?: boolean
 	onSelectAll?: () => void
 	onUnselectAll?: () => void
+	onClearSelection?: () => void
 	showTimeSlots?: boolean
 	hideHeader?: boolean
 	hideNavigation?: boolean
@@ -54,6 +61,7 @@ export type PickProps = {
 	onAppointmentTypeChange?: (type: 'clinic' | 'video') => void
 	/** Availability screen only: shows left-side status strip on each slot + legend */
 	showAvailabilityMode?: boolean
+	showAppointmentTypeToggle?: boolean
 }
 
 export default function DateSlotPicker(props: PickProps) {
@@ -76,6 +84,7 @@ export default function DateSlotPicker(props: PickProps) {
 		disableBookedSlots = true,
 		onSelectAll,
 		onUnselectAll,
+		onClearSelection,
 		showTimeSlots = true,
 		hideHeader = false,
 		hideNavigation = false,
@@ -84,24 +93,19 @@ export default function DateSlotPicker(props: PickProps) {
 		selectedAppointmentType,
 		onAppointmentTypeChange,
 		showAvailabilityMode = false,
+		showAppointmentTypeToggle = true,
 	} = props
 
 	const today = new Date()
 	const [weekStart, setWeekStart] = useState(() => {
-	return disablePast
-		? startOfDay(today)
-		: getFocusedRangeStart(selectedDate, today, disablePast)
+		return getFocusedRangeStart(selectedDate, today, disablePast)
 	})
 	const weekDates = getWeekDates(weekStart)
 	const monthLabel = `${MONTHS[weekDates[0].getMonth()]} ${weekDates[0].getFullYear()}`
 
 	useEffect(() => {
-		if (disablePast && !selectedDate) {
-			setWeekStart(startOfDay(new Date()))
-		} else {
-			setWeekStart(getFocusedRangeStart(selectedDate, new Date(), disablePast))
-		}
-		}, [selectedDate?.toDateString(), disablePast])
+		setWeekStart(getFocusedRangeStart(selectedDate, new Date(), disablePast))
+	}, [selectedDate?.toDateString(), disablePast])
 
 	const isSameDay = (a: Date, b: Date) =>
 		a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
@@ -276,7 +280,7 @@ export default function DateSlotPicker(props: PickProps) {
 			{showTimeSlots ? (
 				<>
 					{/* Time Header */}
-					{hideHeader ? null : (
+					{hideHeader || !showAppointmentTypeToggle ? null : (
 						<View style={styles.toggleContainer}>
 							<Text style={styles.toggleTitle}>Type of Appointment</Text>
 
@@ -325,7 +329,7 @@ export default function DateSlotPicker(props: PickProps) {
 									{timeLabel}
 								</AppTypography>
 							)}
-							{multiSelect && (onSelectAll || onUnselectAll) ? (
+							{multiSelect && (onSelectAll || onUnselectAll || onClearSelection) ? (
 								<View style={styles.bulkActions}>
 									{onSelectAll ? (
 										<TouchableOpacity style={styles.bulkButton} onPress={onSelectAll}>
@@ -338,6 +342,13 @@ export default function DateSlotPicker(props: PickProps) {
 										<TouchableOpacity style={styles.bulkButton} onPress={onUnselectAll}>
 											<AppTypography variant="caption" style={styles.bulkButtonText}>
 												Unselect All
+											</AppTypography>
+										</TouchableOpacity>
+									) : null}
+									{onClearSelection ? (
+										<TouchableOpacity style={styles.bulkButton} onPress={onClearSelection}>
+											<AppTypography variant="caption" style={styles.bulkButtonText}>
+												Clear Selection
 											</AppTypography>
 										</TouchableOpacity>
 									) : null}
@@ -370,21 +381,47 @@ export default function DateSlotPicker(props: PickProps) {
 						</View>
 					) : null}
 					{/* ───────────────────────────────────────────────────── */}
+					{/* ───────────────────────────────────────────────────── */}
 
-					{loading ? (
-						<AppSkeleton height={100} style={{ marginTop: 8 }} />
-					) : availableSlots.length === 0 ? (
-						<AppTypography variant="caption" style={styles.greyText}>
-							No slots available for this date.
-						</AppTypography>
-					) : (
-						<View style={styles.timeGridContainer}>
-							{availableSlots.map((group, groupIdx) => (
-								<View key={`group-${groupIdx}`} style={styles.timeGroupContainer}>
-									<AppTypography variant="subtitle" style={styles.timeGroupLabel}>
-										{group.label}
-									</AppTypography>
-									<View style={styles.slotsGridFlex}>
+					{(() => {
+						const displaySlots = showAvailabilityMode
+							? availableSlots
+							: availableSlots
+									.map((group) => {
+										const filteredSlots = group.slots.filter((slot) => {
+											const isAvailable = slot.status === 'AVAILABLE' || slot.status === ('' as any)
+											const isBlocked = slot.status === 'BLOCKED' || slot.is_enabled === false
+											const isBooked =
+												slot.is_booked ||
+												slot.status === 'BOOKED' ||
+												slot.status === 'OCCUPIED' ||
+												slot.status === 'UNAVAILABLE'
+											return isAvailable && !isBlocked && !isBooked
+										})
+										return { ...group, slots: filteredSlots }
+									})
+									.filter((group) => group.slots.length > 0)
+
+						if (loading) {
+							return <AppSkeleton height={100} style={{ marginTop: 8 }} />
+						}
+
+						if (displaySlots.length === 0) {
+							return (
+								<AppTypography variant="caption" style={styles.greyText}>
+									No slots available for the selected date.
+								</AppTypography>
+							)
+						}
+
+						return (
+							<View style={styles.timeGridContainer}>
+								{displaySlots.map((group, groupIdx) => (
+									<View key={`group-${groupIdx}`} style={styles.timeGroupContainer}>
+										<AppTypography variant="subtitle" style={styles.timeGroupLabel}>
+											{group.label}
+										</AppTypography>
+										<View style={styles.slotsGridFlex}>
 										{group.slots.map((slot, idx) => {
 											const isSelected = selectedTimes.includes(slot.start_time)
 											const isAvailable =
@@ -396,8 +433,7 @@ export default function DateSlotPicker(props: PickProps) {
 												slot.status === 'OCCUPIED' ||
 												slot.status === 'UNAVAILABLE'
 											const canSelect =
-												slot.can_toggle !== false &&
-												!slot.is_booked &&
+												(slot.can_toggle !== false || !disableBookedSlots) &&
 												(isAvailable || isBlocked || !disableBookedSlots || !isBooked)
 											// const statusLabel =
 												// slot.status === 'OCCUPIED' || slot.is_booked
@@ -444,6 +480,8 @@ export default function DateSlotPicker(props: PickProps) {
 
 													<AppTypography
 														variant="caption"
+														numberOfLines={1}
+														adjustsFontSizeToFit
 														style={[
 															styles.timeText,
 															isSelected && !showAvailabilityMode && styles.timeTextSelected,
@@ -474,7 +512,7 @@ export default function DateSlotPicker(props: PickProps) {
 								</View>
 							))}
 						</View>
-					)}
+					)})()}
 				</>
 			) : null}
 		</View>
@@ -644,12 +682,11 @@ const styles = StyleSheet.create({
 	timeBox: {
 		borderWidth: 1.5,
 		borderColor: '#dde3e8',
-		borderRadius: 8,
+		borderRadius: 10,
 		paddingVertical: 10,
-		paddingHorizontal: 10,
+		paddingHorizontal: 12,
 		marginBottom: 10,
-		height: 44,
-		minHeight: 44,
+		minHeight: 48,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#fff',
@@ -662,7 +699,7 @@ const styles = StyleSheet.create({
 		overflow: 'hidden',
 	},
 	timeBoxSingleLine: {
-		height: 44,
+		minHeight: 48,
 		paddingVertical: 0,
 	},
 	timeBoxSpacingRight: {
@@ -692,13 +729,14 @@ const styles = StyleSheet.create({
 		
 	},
 	timeBoxSelectedAvailability: {
-		borderColor: '#0c7c7c',
+		borderColor: '#dde3e8',
 		backgroundColor: '#fff',
 	},
 	timeText: {
-		fontSize: 13,
+		fontSize: 13.5,
 		fontWeight: '600',
 		color: '#42525d',
+		textAlign: 'center',
 	},
 	timeTextSelected: {
 		color: '#fff',

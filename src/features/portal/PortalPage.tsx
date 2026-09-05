@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
-import { Text, Card, useTheme, Button } from 'react-native-paper';
+import { Text, Card, useTheme, Button, Portal, Dialog, Paragraph } from 'react-native-paper';
 import { useAuth, UserRole } from '../../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ROUTES } from '../../navigation/routes';
@@ -21,6 +21,7 @@ const StatBox = ({ label, value }: StatsProps) => (
 export default function PortalPage() {
     const { role, user } = useAuth();
     const theme = useTheme();
+
 
     const openAppointments = () => {
         if (role === 'doctor') {
@@ -98,12 +99,37 @@ export default function PortalPage() {
                     </Card>
                 </TouchableOpacity>
 
+                {/* Transportation & Book Cab Section */}
+                {role !== 'doctor' && (
+                    <TouchableOpacity
+                        onPress={() => navigateRoot(ROUTES.STACK.TRANSPORTATION_LANDING)}
+                        activeOpacity={0.8}
+                        style={{ marginTop: 16 }}
+                    >
+                        <Card style={[styles.appointmentCard, { backgroundColor: '#e0f2f1', borderColor: '#0c7c7c', borderWidth: 1 }]}>
+                            <Card.Content style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#0c7c7c', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                                    <MaterialCommunityIcons name="car-side" size={24} color="#ffffff" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text variant="titleMedium" style={{ fontWeight: 'bold', color: '#004d40' }}>
+                                        Book a Cab
+                                    </Text>
+                                    <Text variant="bodySmall" style={{ color: '#00695c', marginTop: 2 }}>
+                                        Schedule or track safe rides for your hospital & clinic visits.
+                                    </Text>
+                                </View>
+                                <MaterialCommunityIcons name="chevron-right" size={24} color="#0c7c7c" />
+                            </Card.Content>
+                        </Card>
+                    </TouchableOpacity>
+                )}
+
                 {/* Mock Empty State for others */}
                 <View style={styles.emptyState}>
                     <MaterialCommunityIcons name="calendar-blank" size={48} color="#ccc" />
                     <Text variant="bodyMedium" style={{ color: '#666', marginTop: 8 }}>No other appointments scheduled.</Text>
                 </View>
-
             </View>
 
         </ScrollView>

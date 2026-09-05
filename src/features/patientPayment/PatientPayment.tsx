@@ -241,7 +241,9 @@ export default function BookingDetailsScreen() {
 	const appointmentMode = params?.appointmentMode || 'offline'
 	const consultationTypeLabel = params?.consultationTypeLabel || 'Clinic Visit'
 	const fee = params?.fee || 0
-	const isPayLaterDisabled = appointmentMode === 'online'
+	const referralId = params?.referralId
+	const consentVersionId = params?.consentVersionId
+	const isPayLaterDisabled = appointmentMode !== 'offline'
 
 	const [paymentType, setPaymentType] = useState<'now' | 'later'>('now')
 	const [selectedMethod, setSelectedMethod] = useState('phonepe')
@@ -315,6 +317,8 @@ export default function BookingDetailsScreen() {
 				appointment_mode: appointmentMode === 'offline' ? 'clinic_visit' : 'video_call',
 				appointment_date: appointmentDate,
 				start_time: startTime,
+				referral_id: referralId,
+				consent_version_id: consentVersionId,
 			})
 			console.log('[PatientPayment] booking API response', res)
 			const bookingResponse = mapBookAppointmentResponse(res)

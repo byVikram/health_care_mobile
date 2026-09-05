@@ -65,6 +65,12 @@ export interface PatientProfileResponse {
 	data: any
 }
 
+// GET /api/patients/me -> basic profile
+export const getPatientProfile = async (): Promise<PatientProfileResponse> => {
+	const res = await ApiService.get<PatientProfileResponse>(API_ENDPOINTS.PATIENT.ME)
+	return res.data
+}
+
 // GET /api/patients/me/details -> full profile
 export const getPatientDetails = async (): Promise<PatientProfileResponse> => {
 	const res = await ApiService.get<PatientProfileResponse>(API_ENDPOINTS.PATIENT.DETAILS)
@@ -209,3 +215,25 @@ export const getPatientTreatmentHistory = async (userId: string): Promise<Treatm
 	)
 	return res.data?.data ?? []
 }
+
+export interface FamilyMember {
+	id: string
+	publicId?: string
+	public_id?: string
+	name: string
+	relation: string
+	relationship?: string
+	avatar_s3_key?: string | null
+	is_self: boolean
+	age?: string | number
+	gender?: string
+	blood_group?: string
+}
+
+export const getFamilyMembers = async (): Promise<FamilyMember[]> => {
+	const res = await ApiService.get<{ success: boolean; data: FamilyMember[] }>(
+		API_ENDPOINTS.PATIENT.FAMILY_MEMBERS
+	)
+	return res.data?.data ?? []
+}
+

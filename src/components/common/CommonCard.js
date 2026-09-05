@@ -6,8 +6,8 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
  * Reusable Card Component
  * @param {object} props
  * @param {React.ReactNode} props.children - Content inside the card
- * @param {object} props.style - Additional custom styles
- * @param {function} props.onPress - Optional press handler (makes card touchable)
+ * @param {object} [props.style] - Additional custom styles
+ * @param {function} [props.onPress] - Optional press handler (makes card touchable)
  */
 const Card = ({ children, style, onPress }) => {
   const Container = onPress ? TouchableOpacity : View;
