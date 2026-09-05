@@ -18,6 +18,7 @@ import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCa
 import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
 import { NursingQuickActionCards } from '../components/NursingQuickActionCards'
+import { PhysiotherapyConditionsGrid, PHYSIOTHERAPY_CONDITIONS } from '../components/PhysiotherapyConditionsGrid'
 import {
 	AncillaryCategoryApiItem,
 	AncillaryServiceItem,
@@ -35,6 +36,7 @@ const SERVICE_UI: Record<string, {
 	title: string
 	searchPlaceholder: string
 	image: string
+	premiumBadgeText?: string
 }> = {
 	'nursing-care': {
 		title: 'Nursing Care & Procedures',
@@ -43,8 +45,9 @@ const SERVICE_UI: Record<string, {
 	},
 	physiotherapy: {
 		title: 'Physiotherapy & Rehab',
-		searchPlaceholder: 'Search physiotherapy e.g. Back pain, Mobility...',
+		searchPlaceholder: 'Search physiotherapy e.g. Back pain, Knee pain...',
 		image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=300&q=80',
+		premiumBadgeText: 'Verified PT',
 	},
 	'rehab-care': {
 		title: 'Rehab Care Support',
@@ -65,6 +68,7 @@ export default function AncillaryServiceCatalogScreen() {
 	const serviceKey = route.params?.serviceKey || 'nursing-care'
 	const serviceLabel = route.params?.serviceLabel || 'Nursing Care'
 	const activeUi = SERVICE_UI[serviceKey] || SERVICE_UI['nursing-care']
+	const isPhysiotherapy = serviceKey === 'physiotherapy'
 
 	const [categories, setCategories] = useState<AncillaryCategoryApiItem[]>([])
 	const [rawServices, setRawServices] = useState<AncillaryServiceItem[]>([])
@@ -73,6 +77,7 @@ export default function AncillaryServiceCatalogScreen() {
 	const [searchQuery, setSearchQuery] = useState('')
 	const [selectedProcedure, setSelectedProcedure] = useState<ServiceProcedureItem | null>(null)
 	const [cart, setCart] = useState<ServiceProcedureItem[]>([])
+	const [activeCondition, setActiveCondition] = useState<string | null>(isPhysiotherapy ? 'knee' : null)
 
 	useEffect(() => {
 		let isMounted = true
@@ -115,17 +120,38 @@ export default function AncillaryServiceCatalogScreen() {
 		return [{ id: 'all', label: 'All Services' }, ...categories]
 	}, [categories])
 
+	const activeConditionMeta = useMemo(() => {
+		if (!isPhysiotherapy || !activeCondition) return null
+		return PHYSIOTHERAPY_CONDITIONS.find((c) => c.id === activeCondition) || null
+	}, [isPhysiotherapy, activeCondition])
+
 	const procedureItems = useMemo<ServiceProcedureItem[]>(() => {
-		return rawServices.map((s) => ({
-			id: s.id,
-			categoryId: s.categoryId ?? null,
-			title: s.title,
-			description: s.description,
-			price: typeof s.price === 'number' ? `₹${s.price}` : String(s.price || '₹499'),
-			duration: '30-45 mins',
-			image: activeUi.image,
-		}))
-	}, [rawServices, activeUi.image])
+		return rawServices.map((s) => {
+			const title = s.title || ''
+			const description = s.description || ''
+			let recommendedLabel: string | undefined
+
+			if (activeConditionMeta) {
+				const haystack = `${title} ${description}`.toLowerCase()
+				const isMatch = activeConditionMeta.keywords.some((kw) => haystack.includes(kw))
+				if (isMatch) {
+					recommendedLabel = `Recommended for ${activeConditionMeta.label}`
+				}
+			}
+
+			return {
+				id: s.id,
+				categoryId: s.categoryId ?? null,
+				title,
+				description,
+				price: typeof s.price === 'number' ? `₹${s.price}` : String(s.price || '₹499'),
+				duration: '30-45 mins',
+				image: activeUi.image,
+				premiumBadgeText: activeUi.premiumBadgeText,
+				recommendedLabel,
+			}
+		})
+	}, [rawServices, activeUi.image, activeUi.premiumBadgeText, activeConditionMeta])
 
 	const displayGroups = useMemo<CategoryGroup[]>(() => {
 		let filtered = procedureItems
@@ -141,6 +167,14 @@ export default function AncillaryServiceCatalogScreen() {
 			)
 		}
 
+		if (activeConditionMeta) {
+			filtered = [...filtered].sort((a, b) => {
+				const aRec = a.recommendedLabel ? 1 : 0
+				const bRec = b.recommendedLabel ? 1 : 0
+				return bRec - aRec
+			})
+		}
+
 		const activeCategoryLabel = activeCategory === 'all'
 			? activeUi.title
 			: categoryPills.find((c) => c.id === activeCategory)?.label || activeUi.title
@@ -148,11 +182,11 @@ export default function AncillaryServiceCatalogScreen() {
 		return [
 			{
 				id: 'group-all',
-				categoryName: activeCategoryLabel,
+				categoryName: isPhysiotherapy ? 'Popular Physiotherapy Services' : activeCategoryLabel,
 				procedures: filtered,
 			},
 		]
-	}, [procedureItems, searchQuery, activeUi.title, activeCategory, categoryPills])
+	}, [procedureItems, searchQuery, activeUi.title, activeCategory, categoryPills, activeConditionMeta, isPhysiotherapy])
 
 	const handleToggleProcedure = (item: ServiceProcedureItem) => {
 		setCart((prev) => {
@@ -182,6 +216,10 @@ export default function AncillaryServiceCatalogScreen() {
 				services: itemsToBook,
 			},
 		})
+	}
+
+	const handleSelectCondition = (id: string) => {
+		setActiveCondition((prev) => (prev === id ? prev : id))
 	}
 
 	return (
@@ -218,6 +256,13 @@ export default function AncillaryServiceCatalogScreen() {
 						)
 					})}
 				</ScrollView>
+
+				{isPhysiotherapy && (
+					<PhysiotherapyConditionsGrid
+						activeConditionId={activeCondition}
+						onSelectCondition={handleSelectCondition}
+					/>
+				)}
 
 				{loading ? (
 					<View style={styles.loadingContainer}>

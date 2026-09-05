@@ -19,6 +19,8 @@ import {
 	updateProviderStatus,
 	updateProviderLocation,
 	fetchProviderProfile,
+	fetchProviderDashboardMetrics,
+	ProviderDashboardMetrics,
 	SoftReviewRequestData,
 	AuthorizedDetailedPatientInfo,
 } from '../ancillaryService'
@@ -34,6 +36,9 @@ import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 import { getCurrentLocation } from '../../../services/locationService'
 
+const formatInr = (amount: number): string =>
+	`₹${Math.round(amount).toLocaleString('en-IN')}`
+
 export default function StaffAncillaryDashboard() {
 	const navigation = useNavigation<any>()
 	const isFocused = useIsFocused()
@@ -44,6 +49,7 @@ export default function StaffAncillaryDashboard() {
 	const isNarrowCol = isTablet && !isWideTablet
 
 	const [bookings, setBookings] = useState<NurseBooking[]>([])
+	const [metrics, setMetrics] = useState<ProviderDashboardMetrics | null>(null)
 	const [isNurseOnline, setIsNurseOnline] = useState<boolean>(false)
 	const [isVerified, setIsVerified] = useState<boolean>(false)
 	const [incomingRequest, setIncomingRequest] = useState<SoftReviewRequestData | null>(null)
@@ -274,12 +280,20 @@ export default function StaffAncillaryDashboard() {
 	useEffect(() => {
 		const syncStatuses = async () => {
 			try {
-				const myAppointments = await getNurseAppointments()
+				const [myAppointments, dashboardMetrics] = await Promise.all([
+					getNurseAppointments(),
+					fetchProviderDashboardMetrics(),
+				])
+
 				if (myAppointments) {
 					setBookings(myAppointments)
 				}
+
+				if (dashboardMetrics) {
+					setMetrics(dashboardMetrics)
+				}
 			} catch (e) {
-				console.log('[StaffAncillaryDashboard] Loading provider appointments notice:', e)
+				console.log('[StaffAncillaryDashboard] Loading provider appointments/metrics notice:', e)
 			}
 		}
 
@@ -288,12 +302,11 @@ export default function StaffAncillaryDashboard() {
 		}
 	}, [isFocused, isNurseOnline])
 
-	const acceptedCount = bookings.filter(
-		(b) => b.status === 'assigned' || b.status === 'verification_pending' || b.status === 'in_progress'
-	).length
-	const completedCount = bookings.filter((b) => b.status === 'completed').length
-	const cancelledCount = 0
-	const todayEarningsAmount = completedCount > 0 ? completedCount * 850 + 450 : 1300
+	const acceptedCount = metrics?.acceptedCount ?? 0
+	const completedCount = metrics?.completedCount ?? 0
+	const cancelledCount = metrics?.cancelledCount ?? 0
+	const todayEarningsAmount = metrics?.todayEarnings ?? 0
+	const weekEarningsAmount = metrics?.weekEarnings ?? 0
 
 	const inProgressBooking = bookings.find((b) => b.status?.toLowerCase() === 'in_progress')
 	const enRouteOrArrivedBooking = bookings.find(
@@ -419,7 +432,7 @@ export default function StaffAncillaryDashboard() {
 									<Ionicons name="wallet-outline" size={14} color="#0C7C7C" />
 								</View>
 								<AppTypography variant="h3" style={styles.kpiEarningsValueText} numberOfLines={1}>
-									₹{todayEarningsAmount.toLocaleString()}
+									{formatInr(todayEarningsAmount)}
 								</AppTypography>
 							</View>
 							<AppTypography variant="caption" style={styles.kpiLabelText}>
@@ -505,7 +518,7 @@ export default function StaffAncillaryDashboard() {
 								<Ionicons name="wallet-outline" size={13} color="#0C7C7C" />
 							</View>
 							<AppTypography variant="h3" style={styles.kpiEarningsValueText} numberOfLines={1}>
-								₹{todayEarningsAmount.toLocaleString()}
+								{formatInr(todayEarningsAmount)}
 							</AppTypography>
 						</View>
 						<AppTypography variant="caption" style={styles.kpiLabelText}>
@@ -674,7 +687,7 @@ export default function StaffAncillaryDashboard() {
 										Today
 									</AppTypography>
 									<AppTypography variant="h2" style={styles.earningsValueTeal} numberOfLines={1}>
-										₹{todayEarningsAmount.toLocaleString()}
+										{formatInr(todayEarningsAmount)}
 									</AppTypography>
 									<AppTypography variant="caption" style={styles.trendGreenText} numberOfLines={1}>
 										↑ ₹300 vs yesterday
@@ -691,7 +704,7 @@ export default function StaffAncillaryDashboard() {
 										This Week
 									</AppTypography>
 									<AppTypography variant="h2" style={styles.earningsValueDark} numberOfLines={1}>
-										₹6,850
+										{formatInr(weekEarningsAmount)}
 									</AppTypography>
 									<AppTypography variant="caption" style={styles.trendGreenText} numberOfLines={1}>
 										↑ 12% vs last week
@@ -742,7 +755,7 @@ export default function StaffAncillaryDashboard() {
 									Today
 								</AppTypography>
 								<AppTypography variant="h2" style={styles.earningsValueTeal}>
-									₹{todayEarningsAmount.toLocaleString()}
+									{formatInr(todayEarningsAmount)}
 								</AppTypography>
 								<AppTypography variant="caption" style={styles.trendGreenText}>
 									↑ ₹300 vs yesterday
@@ -758,7 +771,7 @@ export default function StaffAncillaryDashboard() {
 								This Week
 							</AppTypography>
 							<AppTypography variant="h2" style={styles.earningsValueDark}>
-								₹6,850
+								{formatInr(weekEarningsAmount)}
 							</AppTypography>
 							<AppTypography variant="caption" style={styles.trendGreenText}>
 								↑ 12% vs last week
