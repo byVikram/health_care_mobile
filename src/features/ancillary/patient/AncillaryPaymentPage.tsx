@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { useState } from 'react'
 import {
 	Image,
@@ -99,64 +100,103 @@ export default function AncillaryPaymentPage() {
 	const [summaryExpanded, setSummaryExpanded] = useState(false)
 
 	const [activeTaskModalVisible, setActiveTaskModalVisible] = useState(false)
+	const [bookingErrorModalVisible, setBookingErrorModalVisible] = useState(false)
+	const [bookingErrorTitle, setBookingErrorTitle] = useState('Unable to Book')
+	const [bookingErrorMessage, setBookingErrorMessage] = useState('We couldn\'t retrieve the patient details required to complete this booking. Please try again.')
 	const [existingActiveBookingId, setExistingActiveBookingId] = useState<string>('')
 
-	const patientInfo = bookingPayload.patient || {
-		publicId: bookingPayload.patientPublicId,
-		name: 'Patient Recipient',
-		age: 0,
-		gender: '',
-		relationship: 'Self',
-	}
+	const patientInfo = bookingPayload.patient || null
 
 	const handlePaySecurely = async () => {
+		if (submitting) return
+
+		// 1. Strict Patient Validation Guard
+		let targetPublicId = patientInfo?.publicId || patientInfo?.id || bookingPayload.patientPublicId
+		let patientName = patientInfo?.name
+
+		if ((!targetPublicId || !patientName || patientName.trim() === '') && typeof AsyncStorage !== 'undefined') {
+			try {
+				const userRaw = await AsyncStorage.getItem('user')
+				if (userRaw) {
+					const userData = JSON.parse(userRaw)
+					if (!targetPublicId) {
+						targetPublicId = userData.publicId || userData.public_id || userData.id
+					}
+					if (!patientName || patientName.trim() === '') {
+						patientName = userData.name || userData.full_name
+					}
+				}
+			} catch (e) {
+				console.log('[AncillaryPaymentPage] User storage fallback notice:', e)
+			}
+		}
+
+		if (!patientName || typeof patientName !== 'string' || patientName.trim() === '' || !targetPublicId || ['Patient Account Holder', 'John Doe', 'Patient Recipient', 'Patient', 'Eleanor Vance'].includes(patientName.trim())) {
+			setBookingErrorTitle('Unable to Book')
+			setBookingErrorMessage("We couldn't retrieve the patient details required to complete this booking. Please try again.")
+			setBookingErrorModalVisible(true)
+			return
+		}
+
+		// 2. Strict Service / Procedure Guard
+		if (!services || services.length === 0) {
+			setBookingErrorTitle('Unable to Book')
+			setBookingErrorMessage("Please select at least one healthcare service or procedure to continue.")
+			setBookingErrorModalVisible(true)
+			return
+		}
+
+		// 3. Strict Address Guard
+		if (!visit || !visit.address || typeof visit.address !== 'string' || visit.address.trim() === '' || visit.address.includes('Detecting')) {
+			setBookingErrorTitle('Unable to Book')
+			setBookingErrorMessage("A valid delivery address is required for doorstep care. Please select your address.")
+			setBookingErrorModalVisible(true)
+			return
+		}
+
+		// 4. Strict Schedule Guard (if Scheduled)
+		if (bookingPayload.bookingType === 'SCHEDULED' && (!visit.date || !visit.timeSlot || visit.date.trim() === '')) {
+			setBookingErrorTitle('Unable to Book')
+			setBookingErrorMessage("Please select an appointment date and time slot for your scheduled visit.")
+			setBookingErrorModalVisible(true)
+			return
+		}
+
 		setSubmitting(true)
 		const idempotencyKey = generateIdempotencyKey()
 		const publicId = `BK-${Math.floor(100000 + Math.random() * 900000)}`
 
-		const targetPublicId = patientInfo?.publicId || patientInfo?.id || bookingPayload.patientPublicId
-
 		const requestPayload = {
 			publicBookingId: publicId,
-			// Send every selected service/procedure so the backend creates one
-			// parent request with a child ancillary_request_procedures row per
-			// procedure. serviceTypeId is kept as a single-item fallback for any
-			// older path that only reads the singular field.
 			serviceTypeIds: services.map((s) => s.id),
 			serviceTypeId: services[0]?.id || 'srv-01',
 			bookingType: bookingPayload.bookingType || 'INSTANT',
-			scheduledStartTime: bookingPayload.bookingType === 'SCHEDULED' ? visit.date : null,
+			scheduledStartTime: bookingPayload.bookingType === 'SCHEDULED' ? `${visit.date} ${visit.timeSlot || ''}`.trim() : null,
 			paymentMethod: selectedMethodId,
 			patientPublicId: targetPublicId,
 			address: {
-				streetAddress: visit.address || 'User Address',
+				streetAddress: visit.address,
 				...(visit?.latitude != null ? { latitude: visit.latitude } : {}),
 				...(visit?.longitude != null ? { longitude: visit.longitude } : {}),
 			},
 			totalAmount: charges.totalAmount,
 		}
 
-		console.log('\n========================================')
-		console.log('🚀 [ANCILLARY_ORDER_FRONTEND] SUBMITTING ORDER PAYLOAD:')
-		console.log(JSON.stringify(requestPayload, null, 2))
-		console.log('========================================\n')
-
 		try {
-			const res = await ApiService.post(
+			const res = await ApiService.post<any>(
 				API_ENDPOINTS.ANCILLARY.REQUESTS,
 				requestPayload,
 				{ headers: { 'Idempotency-Key': idempotencyKey } }
 			)
-			console.log('\n========================================')
-			console.log('✅ [ANCILLARY_ORDER_FRONTEND] ORDER RESPONSE RECEIVED:')
-			console.log(JSON.stringify(res.data, null, 2))
-			console.log('========================================\n')
+
+			const resData = res.data?.data || res.data
+			const createdBookingId = resData?.publicBookingId || resData?.requestId || resData?.id || publicId
 
 			setSubmitting(false)
 			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
-				bookingId: publicId,
-				serviceName: services.map((s) => s.title).filter(Boolean).join(', ') || 'In-Home Care Service',
-				addressText: visit.address || 'User Location',
+				bookingId: createdBookingId,
+				serviceName: services.map((s) => s.title).filter(Boolean).join(', ') || 'In-Home Healthcare Service',
+				addressText: visit.address,
 				bookingPayload: {
 					...bookingPayload,
 					paymentMethod: selectedMethodId,
@@ -164,27 +204,42 @@ export default function AncillaryPaymentPage() {
 			})
 		} catch (error: any) {
 			setSubmitting(false)
-			const errData = error.response?.data?.detail || error.response?.data
-			console.log('\n========================================')
-			console.log('❌ [ANCILLARY_ORDER_FRONTEND] ORDER FAILED:', errData || error.message)
-			console.log('========================================\n')
-			if (error.response?.status === 409 || errData?.code === 'ACTIVE_TASK_EXISTS') {
-				const activeId = errData?.activeTask?.requestId || errData?.activeTask?.publicBookingId || 'BK-ACTIVE'
+			const errDetail = error.response?.data?.detail || error.response?.data
+
+			// Conflict / Active Task Case
+			if (error.response?.status === 409 || errDetail?.code === 'ACTIVE_TASK_EXISTS') {
+				const activeId = errDetail?.activeTask?.requestId || errDetail?.activeTask?.publicBookingId || 'BK-ACTIVE'
 				setExistingActiveBookingId(activeId)
 				setActiveTaskModalVisible(true)
 				return
 			}
-			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
-				bookingId: publicId,
-				serviceName: services.map((s) => s.title).filter(Boolean).join(', ') || 'In-Home Care Service',
-				addressText: visit.address || 'User Location',
-				bookingPayload: {
-					...bookingPayload,
-					paymentMethod: selectedMethodId,
-				},
-			})
+
+			// Format Meaningful User-Friendly Message
+			let userMessage = "We're unable to complete your booking right now. Please try again."
+			if (errDetail?.code === 'PATIENT_NOT_FOUND') {
+				userMessage = "We couldn't retrieve the patient details required to complete this booking. Please try again."
+			} else if (errDetail?.code === 'PATIENT_NAME_REQUIRED') {
+				userMessage = "Patient name is required to complete this booking. Please update your patient profile and try again."
+			} else if (errDetail?.code === 'ADDRESS_REQUIRED') {
+				userMessage = "A valid delivery address is required for doorstep care. Please provide your address."
+			} else if (errDetail?.code === 'SCHEDULE_DATE_REQUIRED') {
+				userMessage = "Scheduled care bookings require a valid appointment date and time slot."
+			} else if (errDetail?.message && typeof errDetail.message === 'string') {
+				userMessage = errDetail.message
+			} else if (error.response?.status === 401) {
+				userMessage = "Your session has expired. Please log in again to complete your booking."
+			} else if (error.response?.status === 500) {
+				userMessage = "Our booking service is temporarily unavailable. Please try again in a few moments."
+			} else if (!error.response) {
+				userMessage = "Unable to connect to the server. Please check your internet connection and try again."
+			}
+
+			setBookingErrorTitle('Unable to Book')
+			setBookingErrorMessage(userMessage)
+			setBookingErrorModalVisible(true)
 		}
 	}
+
 
 	return (
 		<View style={styles.container}>
@@ -416,6 +471,20 @@ export default function AncillaryPaymentPage() {
 						bookingId: existingActiveBookingId,
 					})
 				}}
+			/>
+			{/* BOOKING ERROR MODAL */}
+			<StatusModal
+				visible={bookingErrorModalVisible}
+				status="error"
+				title={bookingErrorTitle}
+				description={bookingErrorMessage}
+				submitText="Try Again"
+				onSubmit={() => {
+					setBookingErrorModalVisible(false)
+					handlePaySecurely()
+				}}
+				cancelText="Close"
+				onCancel={() => setBookingErrorModalVisible(false)}
 			/>
 		</View>
 	)

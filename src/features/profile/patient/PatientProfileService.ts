@@ -65,6 +65,12 @@ export interface PatientProfileResponse {
 	data: any
 }
 
+// GET /api/patients/me -> basic profile
+export const getPatientProfile = async (): Promise<PatientProfileResponse> => {
+	const res = await ApiService.get<PatientProfileResponse>(API_ENDPOINTS.PATIENT.ME)
+	return res.data
+}
+
 // GET /api/patients/me/details -> full profile
 export const getPatientDetails = async (): Promise<PatientProfileResponse> => {
 	const res = await ApiService.get<PatientProfileResponse>(API_ENDPOINTS.PATIENT.DETAILS)

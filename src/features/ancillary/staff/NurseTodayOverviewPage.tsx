@@ -16,7 +16,7 @@ import { fetchAvailableRequests, getNurseAppointments, NurseBooking } from '../a
 
 export type FilterOption = 'all' | 'accepted' | 'completed' | 'cancelled'
 
-const ACCEPTED_FAMILY_STATUSES = ['assigned', 'verification_pending', 'in_progress', 'EN_ROUTE', 'ARRIVED']
+const ACCEPTED_FAMILY_STATUSES = ['assigned', 'nurse_assigned', 'verification_pending', 'in_progress', 'en_route', 'arrived', 'EN_ROUTE', 'ARRIVED']
 
 export default function NurseTodayOverviewPage() {
 	const navigation = useNavigation<any>()

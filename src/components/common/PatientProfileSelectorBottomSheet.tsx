@@ -33,16 +33,7 @@ interface PatientProfileSelectorBottomSheetProps {
 	customProfiles?: PatientProfile[]
 }
 
-const FALLBACK_MOCK_PROFILES: PatientProfile[] = [
-	{
-		id: 'self-1',
-		name: 'Patient Account Holder',
-		age: '',
-		gender: '',
-		relationship: 'Self',
-		bloodGroup: '',
-	},
-]
+const FALLBACK_MOCK_PROFILES: PatientProfile[] = []
 
 const calculateAge = (dobString: string): string => {
 	try {
@@ -112,7 +103,7 @@ export const PatientProfileSelectorBottomSheet: React.FC<PatientProfileSelectorB
 									bloodGroup: userData.bloodGroup || userData.blood_group || undefined,
 								})
 							} else {
-								list.push(FALLBACK_MOCK_PROFILES[0])
+								// no mock fallback
 							}
 						}
 
@@ -154,10 +145,10 @@ export const PatientProfileSelectorBottomSheet: React.FC<PatientProfileSelectorB
 							bloodGroup: userData.bloodGroup || userData.blood_group || 'O+',
 						})
 					} catch {
-						list.push(FALLBACK_MOCK_PROFILES[0])
+						// no mock fallback
 					}
 				} else {
-					list.push(FALLBACK_MOCK_PROFILES[0])
+					// no mock fallback
 				}
 
 				// Add Family members if in AsyncStorage
@@ -191,20 +182,20 @@ export const PatientProfileSelectorBottomSheet: React.FC<PatientProfileSelectorB
 							}))
 							list = [...list, ...mappedList]
 						} else {
-							list = [...list, ...FALLBACK_MOCK_PROFILES.slice(1)]
+							
 						}
 					} catch (parseErr) {
 						console.error('Failed to parse family members JSON', parseErr)
-						list = [...list, ...FALLBACK_MOCK_PROFILES.slice(1)]
+						
 					}
 				} else {
-					list = [...list, ...FALLBACK_MOCK_PROFILES.slice(1)]
+					
 				}
 
 				setProfiles(list)
 			} catch (e) {
 				console.error('Failed to load patient profiles', e)
-				setProfiles(FALLBACK_MOCK_PROFILES)
+				setProfiles([])
 			}
 		}
 

@@ -27,8 +27,8 @@ export default function ServiceMatchingPage() {
 
 	const routeParams = route.params || {}
 	const bookingId = routeParams.bookingId || routeParams.publicBookingId || routeParams.id || 'active'
-	const serviceName = routeParams.serviceName || 'Wound Dressing & Care'
-	const addressText = routeParams.addressText || '42 Healthcare Avenue, Flat 3B'
+	const serviceName = routeParams.serviceName || 'In-Home Healthcare Service'
+	const addressText = routeParams.addressText || 'Selected Delivery Location'
 
 	const [searchStatus, setSearchStatus] = useState<'SEARCHING' | 'ASSIGNED' | 'FAILED'>('SEARCHING')
 	const [assignedProvider, setAssignedProvider] = useState<any>(null)
@@ -145,10 +145,11 @@ export default function ServiceMatchingPage() {
 	}, [bookingId, navigation])
 
 	const handleNavigateToServices = () => {
-		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
-			serviceKey: routeParams.serviceKey || 'nursing-care',
-			serviceLabel: routeParams.serviceLabel || 'Nursing Care',
-		})
+		if (navigation.canGoBack()) {
+			navigation.goBack()
+		} else {
+			navigation.navigate(ROUTES.MAIN.TABS)
+		}
 	}
 
 	useEffect(() => {

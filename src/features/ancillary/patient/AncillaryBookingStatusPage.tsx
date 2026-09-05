@@ -104,7 +104,7 @@ export default function AncillaryBookingStatusPage() {
 	} | null>(null)
 
 	const patient = {
-		name: liveData?.patientName || bookingData.patient?.name || 'Patient Recipient',
+		name: liveData?.patientName || bookingData.patient?.name || '',
 		age: String(liveData?.patientAge || bookingData.patient?.age || '45'),
 		gender: liveData?.patientGender || bookingData.patient?.gender || 'Not Specified',
 		relationship: bookingData.patient?.relationship || 'Self',
@@ -137,7 +137,7 @@ export default function AncillaryBookingStatusPage() {
 				serviceName,
 				rating: stars,
 				comment,
-				patientName: patient.name || 'John Doe',
+				patientName: patient?.name || liveData?.patientName || 'Patient',
 			})
 			setReviewData(saved)
 			setReviewModalVisible(false)

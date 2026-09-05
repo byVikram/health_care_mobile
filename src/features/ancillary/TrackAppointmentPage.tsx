@@ -26,7 +26,9 @@ import {
 	AncillaryReviewData,
 	getAncillaryReviewByBookingId,
 	submitAncillaryReview,
+	cancelCareRequestPatientBackend,
 } from './ancillaryService'
+import CancellationDetailsModal from './patient/CancellationDetailsModal'
 import NursePulseRadarView from './components/NursePulseRadarView'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
@@ -56,6 +58,8 @@ export default function TrackAppointmentPage() {
 	)
 	const [reviewModalVisible, setReviewModalVisible] = useState(false)
 	const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+	const [cancelModalVisible, setCancelModalVisible] = useState(false)
+	const [isCancelling, setIsCancelling] = useState(false)
 	const [statusModal, setStatusModal] = useState<{
 		visible: boolean
 		title: string
@@ -106,6 +110,11 @@ export default function TrackAppointmentPage() {
 
 			if (st === 'SEARCHING' || st === 'SEARCHING_FOR_NURSE') {
 				setActiveStageIndex(0)
+				navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
+					bookingId,
+					serviceName: data.serviceName || liveServiceTitle,
+					addressText: data.streetAddress || liveAddress,
+				})
 			} else if (st === 'ASSIGNED' || st === 'NURSE_ASSIGNED') {
 				setActiveStageIndex(1)
 			} else if (st === 'EN_ROUTE') {
@@ -164,6 +173,18 @@ export default function TrackAppointmentPage() {
 		Linking.openURL(`tel:${nurse.phone || '+919876543210'}`)
 	}
 
+	const handleCancelRequestWithReason = async (reason: string) => {
+		setIsCancelling(true)
+		await cancelCareRequestPatientBackend(bookingId, reason)
+		setIsCancelling(false)
+		setCancelModalVisible(false)
+		if (navigation.canGoBack()) {
+			navigation.goBack()
+		} else {
+			navigation.navigate(ROUTES.MAIN.TABS)
+		}
+	}
+
 	const handleMessage = () => {
 		navigation.navigate(ROUTES.STACK.NOTIFICATION)
 	}
@@ -178,7 +199,7 @@ export default function TrackAppointmentPage() {
 				serviceName: liveServiceTitle || 'Nursing Care',
 				rating: stars,
 				comment,
-				patientName: 'John Doe',
+				patientName: '',
 			})
 			setReviewData(saved)
 			setReviewModalVisible(false)
@@ -212,7 +233,34 @@ export default function TrackAppointmentPage() {
 
 	if (liveStatus === 'SEARCHING' || liveStatus === 'SEARCHING_FOR_NURSE') {
 		return (
-			<ServiceMatchingPage />
+			<View style={styles.container}>
+				<AppScreenHeader title="Searching for Nurse" onBack={() => {
+					if (navigation.canGoBack()) navigation.goBack()
+					else navigation.navigate(ROUTES.MAIN.TABS)
+				}} />
+				<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
+					<MaterialCommunityIcons name="account-search" size={56} color="#2B6F71" />
+					<AppTypography variant="h3" style={{ textAlign: 'center', color: '#0F172A' }}>
+						Searching for Available Nurse...
+					</AppTypography>
+					<AppTypography variant="caption" style={{ textAlign: 'center', color: '#64748B' }}>
+						Broadcasting your request to qualified nurses nearby.
+					</AppTypography>
+					<AppButton
+						variant="outline"
+						onPress={() => setCancelModalVisible(true)}
+						style={{ marginTop: 24, borderColor: '#EF4444', width: '100%' }}
+					>
+						Cancel Care Request
+					</AppButton>
+				</View>
+				<CancellationDetailsModal
+					visible={cancelModalVisible}
+					onClose={() => setCancelModalVisible(false)}
+					onConfirmCancel={handleCancelRequestWithReason}
+					isCancelling={isCancelling}
+				/>
+			</View>
 		)
 	}
 
@@ -513,6 +561,21 @@ export default function TrackAppointmentPage() {
 
 					<AppointmentTrackingTimeline stages={TRACKING_STAGES} activeIndex={activeStageIndex} />
 				</View>
+
+				{!isCompleted && liveStatus !== 'CANCELLED_BY_PATIENT' && liveStatus !== 'CANCELLED_BY_PROVIDER' && (
+					<>
+						<View style={styles.sectionDividerBar} />
+						<View style={styles.sectionBlock}>
+							<AppButton
+								variant="outline"
+								onPress={() => setCancelModalVisible(true)}
+								style={{ borderColor: '#EF4444' }}
+							>
+								Cancel Care Request
+							</AppButton>
+						</View>
+					</>
+				)}
 			</ScrollView>
 
 			{/* Review Bottom Sheet */}

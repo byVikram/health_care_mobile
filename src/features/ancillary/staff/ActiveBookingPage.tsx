@@ -17,6 +17,7 @@ import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState, updateNurseStatus }
 import { ROUTES } from '../../../navigation/routes'
 import ServiceTimeline from '../components/ServiceTimeline'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
+import CancelVisitModal from '../components/CancelVisitModal'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
 
@@ -31,23 +32,25 @@ export default function ActiveBookingPage() {
 
 	const [booking, setBooking] = useState<NurseBooking | null>(null)
 	const [loading, setLoading] = useState(true)
+	const [cancelModalVisible, setCancelModalVisible] = useState(false)
 
-	useEffect(() => {
-		const loadData = async () => {
-			try {
-				if (bookingId) {
-					const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
-					const apiData = res.data?.data || res.data
-					if (apiData) {
-						const found = MOCK_NURSE_BOOKINGS.find((b) => b.id === bookingId)
-						const pName = apiData.patientName || apiData.patient_name || apiData.patientUser?.name || apiData.patient?.name || (found ? found.patientName : 'Eleanor Vance')
-						const pAge = apiData.patientAge || apiData.patient_age || apiData.age || (found ? found.patientAge : 68)
-						const pGender = apiData.patientGender || apiData.patient_gender || apiData.gender || (found ? found.patientGender : 'Female')
-						const pPhone = apiData.patientPhone || apiData.patient_phone || apiData.phone || (found ? found.patientPhone : '+91 98765 43210')
-						const pAvatar = apiData.patientAvatar || apiData.patient_avatar || apiData.patient?.avatar || (found ? found.patientAvatar : undefined)
-						const pAddress = apiData.streetAddress || apiData.street_address || apiData.patientAddress || apiData.patient_address || apiData.address || (found ? found.patientAddress : '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi')
-						const sName = apiData.serviceName || apiData.service_name || apiData.procedure?.label || (found ? found.serviceName : 'Wound Dressing & Sterile Care')
-						const sDesc = apiData.procedureDetails || apiData.procedure_details || apiData.serviceDescription || (found ? found.serviceDescription : 'Sterile dressing, cleansing & vitals monitoring')
+	const loadData = async () => {
+		setLoading(true)
+		try {
+			if (bookingId) {
+				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
+				const apiData = res.data?.data || res.data
+				if (apiData) {
+					const pName = apiData.patientName || apiData.patient_name || apiData.patientUser?.name || apiData.patient?.name
+					// Strictly validate that patient name is valid and not a fallback
+					if (pName && typeof pName === 'string' && pName.trim() !== '' && !['Eleanor Vance', 'Patient Account Holder', 'John Doe', 'Patient Recipient', 'Patient'].includes(pName.trim())) {
+						const pAge = apiData.patientAge || apiData.patient_age || apiData.age || 0
+						const pGender = apiData.patientGender || apiData.patient_gender || apiData.gender || 'Not Specified'
+						const pPhone = apiData.patientPhone || apiData.patient_phone || apiData.phone || ''
+						const pAvatar = apiData.patientAvatar || apiData.patient_avatar || apiData.patient?.avatar || undefined
+						const pAddress = apiData.streetAddress || apiData.street_address || apiData.patientAddress || apiData.patient_address || apiData.address || 'Address on file'
+						const sName = apiData.serviceName || apiData.service_name || apiData.procedure?.label || 'General Nursing Care'
+						const sDesc = apiData.procedureDetails || apiData.procedure_details || apiData.serviceDescription || 'Doorstep clinical care'
 
 						setBooking({
 							id: apiData.requestId || apiData.id || bookingId,
@@ -62,44 +65,24 @@ export default function ActiveBookingPage() {
 							appointmentTime: apiData.appointmentTime || 'Immediate Dispatch',
 							patientAddress: pAddress,
 							status: apiData.status || 'assigned',
-							otpCode: apiData.verificationOtp || apiData.otp || '4829',
-							completePin: apiData.completionPin || apiData.pin || '9182',
+							otpCode: apiData.verificationOtp || apiData.otp || '',
+							completePin: apiData.completionPin || apiData.pin || '',
 						})
 						setLoading(false)
 						return
 					}
 				}
-			} catch (e) {
-				console.log('[ActiveBookingPage] Fetching live status notice')
 			}
-
-			const found = MOCK_NURSE_BOOKINGS.find((b) => b.id === bookingId)
-			if (found) {
-				const state = await getBookingState(found.id)
-				setBooking({
-					...found,
-					status: state ? state.status : found.status,
-				})
-			} else {
-				const state = bookingId ? await getBookingState(bookingId) : null
-				setBooking({
-					id: bookingId || 'BK-LIVE-101',
-					patientName: 'Eleanor Vance',
-					patientAge: 68,
-					patientGender: 'Female',
-					patientPhone: '+91 98765 43210',
-					serviceName: 'Wound Dressing & Sterile Care',
-					serviceDescription: 'Sterile dressing, cleansing & vitals monitoring',
-					appointmentDate: 'Today',
-					appointmentTime: 'Immediate Dispatch',
-					patientAddress: '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi',
-					status: state ? state.status : 'assigned',
-					otpCode: '4829',
-					completePin: '9182',
-				})
-			}
-			setLoading(false)
+		} catch (e) {
+			console.log('[ActiveBookingPage] Error fetching booking status', e)
 		}
+
+		// If API data is unavailable, do NOT substitute fake patient names
+		setBooking(null)
+		setLoading(false)
+	}
+
+	useEffect(() => {
 		void loadData()
 	}, [bookingId])
 
@@ -149,10 +132,21 @@ export default function ActiveBookingPage() {
 
 	if (!booking) {
 		return (
-			<View style={styles.errorContainer}>
-				<AppTypography variant="body" style={styles.errorText}>
-					Active booking details not found.
-				</AppTypography>
+			<View style={styles.container}>
+				<AppScreenHeader title="Active Visit Dispatch" />
+				<View style={styles.errorContainer}>
+					<MaterialCommunityIcons name="account-alert-outline" size={54} color="#D9534F" style={{ marginBottom: 14 }} />
+					<AppTypography variant="h3" style={{ color: '#1B2A32', fontWeight: '700', marginBottom: 8, textAlign: 'center' }}>
+						Unable to Load Patient Information
+					</AppTypography>
+					<AppTypography variant="body" style={styles.errorText}>
+						We couldn't retrieve the patient details for this booking. Please try again.
+					</AppTypography>
+					<View style={{ flexDirection: 'row', gap: 12, marginTop: 24, width: '100%', justifyContent: 'center' }}>
+						<AppButton variant="primary" onPress={() => loadData()} style={{ minWidth: 120 }}>Try Again</AppButton>
+						<AppButton variant="outline" onPress={() => navigation.goBack()} style={{ minWidth: 120 }}>Go Back</AppButton>
+					</View>
+				</View>
 			</View>
 		)
 	}
@@ -323,9 +317,32 @@ export default function ActiveBookingPage() {
 						>
 							Confirm Doorstep Arrival & Verify OTP
 						</AppButton>
+
+						<AppButton
+							variant="outline"
+							onPress={() => setCancelModalVisible(true)}
+							style={styles.cancelBtn}
+						>
+							Cancel Visit
+						</AppButton>
 					</View>
 				</View>
 			</ScrollView>
+			{booking && (
+				<CancelVisitModal
+					visible={cancelModalVisible}
+					bookingId={booking.id}
+					patientName={booking.patientName}
+					onClose={() => setCancelModalVisible(false)}
+					onCancelled={() => {
+						setCancelModalVisible(false)
+						navigation.reset({
+							index: 0,
+							routes: [{ name: ROUTES.MAIN.TABS }],
+						})
+					}}
+				/>
+			)}
 		</View>
 	)
 }
@@ -548,6 +565,10 @@ const styles = StyleSheet.create({
 	},
 	travelBtn: {
 		backgroundColor: '#0284C7',
+		borderRadius: 12,
+	},
+	cancelBtn: {
+		borderColor: '#EF4444',
 		borderRadius: 12,
 	},
 	arrivedBtn: {
