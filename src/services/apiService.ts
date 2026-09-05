@@ -150,7 +150,7 @@ axiosInstance.interceptors.response.use(
 			console.log('403 RESPONSE:', error.response?.data)
 			const errorDetail = error.response?.data?.detail
 			const isVerificationRequired =
-				typeof errorDetail === 'object' && errorDetail?.code === 'NURSE_VERIFICATION_REQUIRED'
+				typeof errorDetail === 'object' && (errorDetail?.code === 'ANCILLARY_VERIFICATION_REQUIRED' || errorDetail?.code === 'NURSE_VERIFICATION_REQUIRED')
 
 			if (!isVerificationRequired) {
 				showStatusModal({

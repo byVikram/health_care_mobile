@@ -104,6 +104,16 @@ export default function AncillaryServiceCatalogScreen() {
 		}
 	}, [serviceKey])
 
+	// Sync selection state when returning from Booking Details. If a service
+	// was removed there (via "Add Services"), the updated list is passed back
+	// via route.params.updatedCart so the cart here doesn't stay stale.
+	useEffect(() => {
+		if (route.params?.updatedCart) {
+			setCart(route.params.updatedCart)
+			navigation.setParams({ updatedCart: undefined })
+		}
+	}, [route.params?.updatedCart])
+
 	useEffect(() => {
 		const onBackPress = () => {
 			if (selectedProcedure) {

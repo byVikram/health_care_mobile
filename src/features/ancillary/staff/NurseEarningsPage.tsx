@@ -1,11 +1,72 @@
-import React from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import React, { useCallback, useEffect, useState } from 'react'
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
+import { fetchProviderEarnings, ProviderEarningsData } from '../ancillaryService'
+
+/**
+ * Earnings & Payouts screen, shared by every ancillary provider role
+ * (Nurse, Physiotherapist, etc).
+ *
+ * All earnings metrics (Today, This Week, This Month, Total Earned,
+ * and recent completed visits) are fetched directly from the backend API
+ * (GET /api/ancillary/provider/earnings), which calculates authoritative
+ * figures server-side scoped to the logged-in provider.
+ */
+
+const formatInr = (amount: number): string => `₹${Math.round(amount).toLocaleString('en-IN')}`
+
+const formatVisitDateTime = (raw?: string): string => {
+	if (!raw) return 'Recently'
+	const parsed = new Date(raw.replace(' ', 'T'))
+	if (Number.isNaN(parsed.getTime())) return raw
+	return `${parsed.toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} • ${parsed.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+}
 
 export default function NurseEarningsPage() {
 	const navigation = useNavigation<any>()
+	const isFocused = useIsFocused()
+
+	const [earningsData, setEarningsData] = useState<ProviderEarningsData | null>(null)
+	const [isLoading, setIsLoading] = useState(true)
+	const [loadError, setLoadError] = useState<string | null>(null)
+
+	const loadEarnings = useCallback(async () => {
+		try {
+			setLoadError(null)
+			const data = await fetchProviderEarnings()
+			setEarningsData(data)
+		} catch (e) {
+			console.log('[NurseEarningsPage] Failed to load earnings:', e)
+			setLoadError('Could not load your earnings right now.')
+		} finally {
+			setIsLoading(false)
+		}
+	}, [])
+
+	useEffect(() => {
+		if (isFocused) {
+			void loadEarnings()
+		}
+	}, [isFocused, loadEarnings])
+
+	const todayTotal = earningsData?.todayTotal ?? 0
+	const weekTotal = earningsData?.weekTotal ?? 0
+	const monthTotal = earningsData?.monthTotal ?? 0
+	const allTimeTotal = earningsData?.allTimeTotal ?? 0
+	const recentVisits = earningsData?.recentVisits ?? []
+
+	if (isLoading) {
+		return (
+			<View style={styles.container}>
+				<AppScreenHeader title="Earnings & Payouts" onBack={() => navigation.goBack()} />
+				<View style={styles.centerState}>
+					<ActivityIndicator color="#0C7C7C" />
+				</View>
+			</View>
+		)
+	}
 
 	return (
 		<View style={styles.container}>
@@ -13,73 +74,65 @@ export default function NurseEarningsPage() {
 			<AppScreenHeader title="Earnings & Payouts" onBack={() => navigation.goBack()} />
 
 			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+				{loadError ? (
+					<View style={styles.errorBanner}>
+						<Ionicons name="alert-circle-outline" size={16} color="#B91C1C" />
+						<Text style={styles.errorText}>{loadError}</Text>
+					</View>
+				) : null}
+
 				{/* Primary Hero Earnings Card */}
 				<View style={styles.heroCard}>
 					<Text style={styles.heroLabel}>Today's Earnings</Text>
-					<Text style={styles.heroValue}>₹1,300</Text>
+					<Text style={styles.heroValue}>{formatInr(todayTotal)}</Text>
 
 					{/* Sub-Metrics Row */}
 					<View style={styles.subMetricsRow}>
 						<View style={styles.subMetricCol}>
 							<Text style={styles.subMetricLabel}>This Week</Text>
-							<Text style={styles.subMetricVal}>₹8,400</Text>
+							<Text style={styles.subMetricVal}>{formatInr(weekTotal)}</Text>
 						</View>
 						<View style={styles.subMetricDivider} />
 						<View style={styles.subMetricCol}>
 							<Text style={styles.subMetricLabel}>This Month</Text>
-							<Text style={styles.subMetricVal}>₹24,400</Text>
+							<Text style={styles.subMetricVal}>{formatInr(monthTotal)}</Text>
 						</View>
 						<View style={styles.subMetricDivider} />
 						<View style={styles.subMetricCol}>
 							<Text style={styles.subMetricLabel}>Total Earned</Text>
-							<Text style={styles.subMetricVal}>₹98,200</Text>
+							<Text style={styles.subMetricVal}>{formatInr(allTimeTotal)}</Text>
 						</View>
 					</View>
-				</View>
-
-				{/* Payout Status Banner */}
-				<View style={styles.payoutCard}>
-					<View style={styles.payoutHeaderRow}>
-						<View style={styles.payoutLeft}>
-							<Ionicons name="wallet-outline" size={16} color="#0C7C7C" />
-							<Text style={styles.payoutTitle}>Next Scheduled Payout</Text>
-						</View>
-						<Text style={styles.payoutVal}>₹5,850</Text>
-					</View>
-					<Text style={styles.payoutSub}>
-						Scheduled for Friday • Direct Bank Deposit (Active)
-					</Text>
 				</View>
 
 				{/* Itemized Recent Visit Earnings */}
 				<View style={styles.sectionBlock}>
 					<Text style={styles.sectionTitle}>COMPLETED VISIT EARNINGS</Text>
 
-					<View style={styles.earningItem}>
-						<View style={styles.itemRow}>
-							<Text style={styles.patientName}>Eleanor Vance</Text>
-							<Text style={styles.itemAmount}>+ ₹850</Text>
+					{recentVisits.length === 0 ? (
+						<View style={styles.emptyState}>
+							<Ionicons name="wallet-outline" size={22} color="#94A3B8" />
+							<Text style={styles.emptyText}>No completed visits yet</Text>
+							<Text style={styles.emptySubtext}>
+								Your completed bookings and their earnings will show up here.
+							</Text>
 						</View>
-						<Text style={styles.serviceName} numberOfLines={1}>
-							Vital Monitoring & IV Infusion
-						</Text>
-						<Text style={styles.itemMeta}>
-							Today • 01:30 PM • Completed & Verified
-						</Text>
-					</View>
-
-					<View style={styles.earningItem}>
-						<View style={styles.itemRow}>
-							<Text style={styles.patientName}>Arthur Pendelton</Text>
-							<Text style={styles.itemAmount}>+ ₹450</Text>
-						</View>
-						<Text style={styles.serviceName} numberOfLines={1}>
-							Routine Dressing Change
-						</Text>
-						<Text style={styles.itemMeta}>
-							Today • 09:15 AM • Completed & Verified
-						</Text>
-					</View>
+					) : (
+						recentVisits.map((visit) => (
+							<View key={visit.id} style={styles.earningItem}>
+								<View style={styles.itemRow}>
+									<Text style={styles.patientName}>{visit.patientName}</Text>
+									<Text style={styles.itemAmount}>+ {formatInr(visit.earning)}</Text>
+								</View>
+								<Text style={styles.serviceName} numberOfLines={1}>
+									{visit.serviceName}
+								</Text>
+								<Text style={styles.itemMeta}>
+									{formatVisitDateTime(visit.completedAt)} • Completed
+								</Text>
+							</View>
+						))
+					)}
 				</View>
 			</ScrollView>
 		</View>
@@ -91,9 +144,29 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#F8FAFC',
 	},
+	centerState: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
 	scrollContent: {
 		padding: 16,
 		gap: 14,
+	},
+	errorBanner: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		backgroundColor: '#FEF2F2',
+		borderColor: '#FECACA',
+		borderWidth: 1,
+		borderRadius: 10,
+		padding: 10,
+	},
+	errorText: {
+		fontSize: 12.5,
+		color: '#B91C1C',
+		flexShrink: 1,
 	},
 	heroCard: {
 		backgroundColor: '#FFFFFF',
@@ -142,38 +215,6 @@ const styles = StyleSheet.create({
 		height: 22,
 		backgroundColor: '#E2E8F0',
 	},
-	payoutCard: {
-		backgroundColor: '#F0FDFA',
-		borderColor: '#CCFBF1',
-		borderWidth: 1,
-		borderRadius: 14,
-		padding: 14,
-		gap: 4,
-	},
-	payoutHeaderRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	payoutLeft: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	payoutTitle: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#0F172A',
-	},
-	payoutVal: {
-		fontSize: 14,
-		fontWeight: '800',
-		color: '#0C7C7C',
-	},
-	payoutSub: {
-		fontSize: 11.5,
-		color: '#64748B',
-	},
 	sectionBlock: {
 		gap: 10,
 		marginTop: 4,
@@ -215,5 +256,25 @@ const styles = StyleSheet.create({
 	itemMeta: {
 		fontSize: 12,
 		color: '#64748B',
+	},
+	emptyState: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#FFFFFF',
+		borderColor: '#E2E8F0',
+		borderWidth: 1,
+		borderRadius: 14,
+		padding: 28,
+		gap: 6,
+	},
+	emptyText: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#334155',
+	},
+	emptySubtext: {
+		fontSize: 12.5,
+		color: '#94A3B8',
+		textAlign: 'center',
 	},
 })

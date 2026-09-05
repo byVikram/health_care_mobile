@@ -134,20 +134,30 @@ export default function MyBookingsPage({
 	}
 
 	const handleTrack = (booking: AncillaryBooking) => {
-		navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
-			bookingId: booking.id,
-			bookingData: {
-				provider: booking.provider,
-				serviceKey: booking.serviceKey,
-				serviceLabel: booking.serviceLabel,
-				appointment: {
-					service: booking.serviceName,
-					dateTime: [booking.date, booking.timeRange].filter(Boolean).join('  •  '),
-					locationLabel: 'Home Visit',
-					address: '',
+		const rawSt = String(booking.rawStatus || booking.status || '').toUpperCase()
+		if (rawSt === 'SEARCHING' || rawSt === 'SEARCHING_FOR_NURSE' || rawSt === 'REQUESTED') {
+			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
+				bookingId: booking.id,
+				serviceName: booking.serviceName,
+				addressText: 'Selected Delivery Location',
+			})
+		} else {
+			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+				bookingId: booking.id,
+				bookingData: {
+					provider: booking.provider,
+					serviceKey: booking.serviceKey,
+					serviceLabel: booking.serviceLabel,
+					status: booking.rawStatus || booking.status,
+					appointment: {
+						service: booking.serviceName,
+						dateTime: [booking.date, booking.timeRange].filter(Boolean).join('  •  '),
+						locationLabel: 'Home Visit',
+						address: '',
+					},
 				},
-			},
-		})
+			})
+		}
 	}
 
 	const handleViewInvoice = (booking: AncillaryBooking) => {
@@ -180,7 +190,7 @@ export default function MyBookingsPage({
 				serviceName: reviewBooking.serviceName,
 				rating,
 				comment,
-				patientName: 'John Doe',
+				patientName: '',
 			})
 
 			// Update in-place in local state array immediately

@@ -1,12 +1,6 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import {
-	Image,
-	StyleSheet,
-	TouchableOpacity,
-	View,
-	useWindowDimensions,
-} from 'react-native'
+import { Image, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import {
@@ -37,7 +31,7 @@ import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { getCurrentLocation } from '../../../services/locationService'
 
 const formatInr = (amount: number): string =>
-	`₹${Math.round(amount).toLocaleString('en-IN')}`
+	`â‚¹${Math.round(amount).toLocaleString('en-IN')}`
 
 export default function StaffAncillaryDashboard() {
 	const navigation = useNavigation<any>()
@@ -54,11 +48,15 @@ export default function StaffAncillaryDashboard() {
 	const [isVerified, setIsVerified] = useState<boolean>(false)
 	const [incomingRequest, setIncomingRequest] = useState<SoftReviewRequestData | null>(null)
 	const [detailedInfo, setDetailedInfo] = useState<AuthorizedDetailedPatientInfo | null>(null)
-	const [requestStep, setRequestStep] = useState<
-		'none' | 'request_card' | 'accept_confirm' | 'detailed_review'
-	>('none')
+	const [requestStep, setRequestStep] = useState<'none' | 'request_card' | 'accept_confirm' | 'detailed_review'>(
+		'none'
+	)
 	const [acceptLoading, setAcceptLoading] = useState(false)
 	const [claimedModalVisible, setClaimedModalVisible] = useState(false)
+	// Logged-in provider's own specialty (e.g. 'Physiotherapy', 'Nursing Care'), fetched from
+	// their profile -- used so offer-card fallback text and default labels reflect this
+	// provider's real specialty instead of being hardcoded to Nursing Care for everyone.
+	const [specialtyLabel, setSpecialtyLabel] = useState<string>('Home Healthcare')
 
 	// Fetch Initial Provider Status & Verification from DB on Mount
 	useEffect(() => {
@@ -67,8 +65,12 @@ export default function StaffAncillaryDashboard() {
 			try {
 				const profile = await fetchProviderProfile()
 				if (!isMounted) return
-				const verified = Boolean((profile as any)?.is_verified || (profile as any)?.verification_status === 'approved')
+				const verified = Boolean(
+					(profile as any)?.is_verified || (profile as any)?.verification_status === 'approved'
+				)
 				setIsVerified(verified)
+				const label = (profile as any)?.specialty?.label
+				if (label) setSpecialtyLabel(String(label))
 
 				if (verified) {
 					const status = await fetchProviderStatus()
@@ -131,30 +133,33 @@ export default function StaffAncillaryDashboard() {
 				ws = new WebSocket(wsUrl)
 
 				ws.onopen = () => {
-					console.log('[WS] ✅ Connected to provider dispatch')
+					console.log('[WS] âœ… Connected to provider dispatch')
 					reconnectDelay = 2000 // reset backoff on successful connect
 				}
 
 				ws.onmessage = (event) => {
 					try {
 						const payload = JSON.parse(event.data)
-						console.log('[WS] 📨 Message received:', payload.type)
+						console.log('[WS] ðŸ“¨ Message received:', payload.type)
 						if (payload.type === 'NEW_CARE_REQUEST_OFFER' && payload.data) {
 							const reqData = payload.data
 							setIncomingRequest({
-								id: reqData.requestId || reqData.publicBookingId || 'REQ-NURSE-991',
-								serviceName: reqData.serviceName || 'Nursing Care',
-								requestedDate: 'Today',
-								requestedTime: reqData.requestedTime || 'Just now',
-								generalLocation: reqData.generalArea || 'Sector 18',
-								distanceKm: reqData.distanceKm !== undefined ? `${reqData.distanceKm} km` : '-- km',
-								travelTime: reqData.travelTime || '~12 min',
-								serviceRequirement: reqData.generalArea || 'In-Home Healthcare Visit',
-								requiredSkills: ['Nursing Care', 'Doorstep Visit'],
-								urgency: reqData.urgencyLevel || 'Instant',
-								specialRequirements: 'Patient Doorstep Assessment',
-								earning: reqData.estimatedEarnings || '₹667',
-								expiresAt: Date.now() + 60000,
+								id: reqData.requestId || reqData.publicBookingId,
+								serviceName: reqData.serviceName,
+								requestedDate: reqData.requestedDate || reqData.requestedDateTime,
+								requestedTime: reqData.requestedTime,
+								generalLocation: reqData.generalLocation || reqData.generalArea,
+								distanceKm: reqData.distanceKm !== undefined ? `${reqData.distanceKm} km` : undefined,
+								travelTime: reqData.travelTime,
+								serviceRequirement: reqData.serviceRequirement,
+								requiredSkills: reqData.requiredSkills,
+								urgency: reqData.urgency || reqData.urgencyLevel,
+								specialRequirements: reqData.specialRequirements,
+								earning:
+									reqData.providerEarning !== undefined
+										? `â‚¹${reqData.providerEarning}`
+										: reqData.estimatedEarnings,
+								expiresAt: reqData.expiresAt || Date.now() + 60000,
 							})
 							setRequestStep('request_card')
 						}
@@ -163,12 +168,42 @@ export default function StaffAncillaryDashboard() {
 					}
 				}
 
+				// ws.onmessage = (event) => {
+				// 	try {
+				// 		const payload = JSON.parse(event.data)
+				// 		console.log('[WS] ðŸ“¨ Message received:', payload.type)
+				// 		if (payload.type === 'NEW_CARE_REQUEST_OFFER' && payload.data) {
+				// 			const reqData = payload.data
+				// 			setIncomingRequest({
+				// 				id: reqData.requestId || reqData.publicBookingId || 'REQ-OFFER-991',
+				// 				serviceName: reqData.serviceName || specialtyLabel,
+				// 				requestedDate: 'Today',
+				// 				requestedTime: reqData.requestedTime || 'Just now',
+				// 				generalLocation: reqData.generalArea || 'Sector 18',
+				// 				distanceKm: reqData.distanceKm !== undefined ? `${reqData.distanceKm} km` : '-- km',
+				// 				travelTime: reqData.travelTime || '~12 min',
+				// 				serviceRequirement: reqData.generalArea || 'In-Home Healthcare Visit',
+				// 				requiredSkills: [specialtyLabel, 'Doorstep Visit'],
+				// 				urgency: reqData.urgencyLevel || 'Instant',
+				// 				specialRequirements: 'Patient Doorstep Assessment',
+				// 				earning: reqData.estimatedEarnings || 'â‚¹667',
+				// 				expiresAt: Date.now() + 60000,
+				// 			})
+				// 			setRequestStep('request_card')
+				// 		}
+				// 	} catch (err) {
+				// 		console.log('[WS] Message parse error:', err)
+				// 	}
+				// }
+
 				ws.onerror = (err) => {
-					console.log('[WS] ❌ Error:', err)
+					console.log('[WS] âŒ Error:', err)
 				}
 
 				ws.onclose = (event) => {
-					console.log(`[WS] 🔌 Disconnected — code=${event.code} reason="${event.reason}" wasClean=${event.wasClean}`)
+					console.log(
+						`[WS] ðŸ”Œ Disconnected â€” code=${event.code} reason="${event.reason}" wasClean=${event.wasClean}`
+					)
 					if (isMounted && isNurseOnline) {
 						console.log(`[WS] Reconnecting in ${reconnectDelay / 1000}s...`)
 						reconnectTimer = setTimeout(() => {
@@ -195,7 +230,7 @@ export default function StaffAncillaryDashboard() {
 				ws.close()
 			}
 		}
-	}, [isNurseOnline, isFocused])
+	}, [isNurseOnline, isFocused, isVerified])
 
 	const handleAvailabilityToggle = async (online: boolean) => {
 		setIsNurseOnline(online)
@@ -206,7 +241,7 @@ export default function StaffAncillaryDashboard() {
 			lat = loc.latitude
 			lng = loc.longitude
 		} catch (_) {
-			// Permission denied or unavailable — backend will use last known location
+			// Permission denied or unavailable â€” backend will use last known location
 		}
 		await updateProviderStatus(online, lat, lng)
 		if (!online) {
@@ -239,15 +274,24 @@ export default function StaffAncillaryDashboard() {
 
 			const newBooking: NurseBooking = {
 				id: targetId,
-				patientName: result.travelInfo?.patientFirstName || (incomingRequest as any)?.patientName || (incomingRequest as any)?.patientFirstName || 'Patient Recipient',
-				patientAge: (incomingRequest as any)?.patientAge || 45,
+				patientName:
+					(result.travelInfo as any)?.patientFullName ||
+					(result.travelInfo as any)?.patientName ||
+					(result.travelInfo as any)?.patientFirstName ||
+					(incomingRequest as any)?.patientName ||
+					(incomingRequest as any)?.patientFirstName ||
+					'',
+				patientAge: (result.travelInfo as any)?.patientAge || (incomingRequest as any)?.patientAge || 0,
 				patientGender: (incomingRequest as any)?.patientGender || 'Not Specified',
 				patientPhone: result.travelInfo?.patientPhone || (incomingRequest as any)?.patientPhone || '',
 				serviceName: incomingRequest.serviceName || 'General Healthcare Service',
 				serviceDescription: incomingRequest.serviceRequirement || 'In-home healthcare visit',
 				appointmentDate: 'Today',
 				appointmentTime: incomingRequest.requestedTime || 'Just now',
-				patientAddress: result.travelInfo?.streetAddress || incomingRequest.generalLocation || 'Healthcare Doorstep Address',
+				patientAddress:
+					result.travelInfo?.streetAddress ||
+					incomingRequest.generalLocation ||
+					'Healthcare Doorstep Address',
 				status: 'assigned',
 				otpCode: result.travelInfo?.verificationOtp || '4829',
 				completePin: result.travelInfo?.completionPin || '9182',
@@ -297,10 +341,10 @@ export default function StaffAncillaryDashboard() {
 			}
 		}
 
-		if (isFocused && isNurseOnline) {
+		if (isFocused) {
 			void syncStatuses()
 		}
-	}, [isFocused, isNurseOnline])
+	}, [isFocused])
 
 	const acceptedCount = metrics?.acceptedCount ?? 0
 	const completedCount = metrics?.completedCount ?? 0
@@ -308,13 +352,15 @@ export default function StaffAncillaryDashboard() {
 	const todayEarningsAmount = metrics?.todayEarnings ?? 0
 	const weekEarningsAmount = metrics?.weekEarnings ?? 0
 
-	const inProgressBooking = bookings.find((b) => b.status?.toLowerCase() === 'in_progress')
-	const enRouteOrArrivedBooking = bookings.find(
-		(b) => b.status?.toUpperCase() === 'EN_ROUTE' || b.status?.toUpperCase() === 'ARRIVED'
-	)
-	const assignedBooking = bookings.find(
-		(b) => b.status?.toLowerCase() === 'assigned' || b.status?.toLowerCase() === 'verification_pending'
-	)
+	const inProgressBooking = bookings.find((b) => (b.status || '').toLowerCase() === 'in_progress')
+	const enRouteOrArrivedBooking = bookings.find((b) => {
+		const st = (b.status || '').toLowerCase()
+		return st === 'en_route' || st === 'arrived'
+	})
+	const assignedBooking = bookings.find((b) => {
+		const st = (b.status || '').toLowerCase()
+		return st === 'assigned' || st === 'nurse_assigned' || st === 'verification_pending'
+	})
 	const activeBooking = inProgressBooking || enRouteOrArrivedBooking || assignedBooking || null
 
 	const handleStartCare = () => {
@@ -328,7 +374,6 @@ export default function StaffAncillaryDashboard() {
 			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: activeBooking.id })
 		}
 	}
-
 
 	// -- Helper Sub-Components for Section Rendering --------------------------
 
@@ -358,7 +403,9 @@ export default function StaffAncillaryDashboard() {
 						{/* KPI 1: Accepted */}
 						<TouchableOpacity
 							style={styles.kpiGridCell}
-							onPress={() => navigation.navigate(ROUTES.STACK.NURSE_TODAY_OVERVIEW, { filter: 'accepted' })}
+							onPress={() =>
+								navigation.navigate(ROUTES.STACK.NURSE_TODAY_OVERVIEW, { filter: 'accepted' })
+							}
 							activeOpacity={0.8}
 						>
 							<View style={styles.kpiTopRow}>
@@ -379,7 +426,9 @@ export default function StaffAncillaryDashboard() {
 						{/* KPI 2: Completed */}
 						<TouchableOpacity
 							style={styles.kpiGridCell}
-							onPress={() => navigation.navigate(ROUTES.STACK.NURSE_TODAY_OVERVIEW, { filter: 'completed' })}
+							onPress={() =>
+								navigation.navigate(ROUTES.STACK.NURSE_TODAY_OVERVIEW, { filter: 'completed' })
+							}
 							activeOpacity={0.8}
 						>
 							<View style={styles.kpiTopRow}>
@@ -403,7 +452,9 @@ export default function StaffAncillaryDashboard() {
 						{/* KPI 3: Cancelled */}
 						<TouchableOpacity
 							style={styles.kpiGridCell}
-							onPress={() => navigation.navigate(ROUTES.STACK.NURSE_TODAY_OVERVIEW, { filter: 'cancelled' })}
+							onPress={() =>
+								navigation.navigate(ROUTES.STACK.NURSE_TODAY_OVERVIEW, { filter: 'cancelled' })
+							}
 							activeOpacity={0.8}
 						>
 							<View style={styles.kpiTopRow}>
@@ -552,16 +603,14 @@ export default function StaffAncillaryDashboard() {
 				<View style={styles.activeCareCard}>
 					{/* Patient Header Row */}
 					<View style={styles.patientRow}>
-						<Image
-							source={require('../../../assets/Banner/patient.png')}
-							style={styles.patientAvatar}
-						/>
+						<Image source={require('../../../assets/Banner/patient.png')} style={styles.patientAvatar} />
 						<View style={styles.patientMetaCol}>
 							<AppTypography variant="h4" style={styles.patientName} numberOfLines={1}>
 								{activeBooking.patientName}
 							</AppTypography>
 							<AppTypography variant="caption" style={styles.patientSubtext} numberOfLines={1}>
-								{activeBooking.patientGender || 'Patient'} • {activeBooking.patientAge} yrs • ID: {activeBooking.id}
+								{activeBooking.patientGender || 'Patient'} â€¢ {activeBooking.patientAge} yrs â€¢ ID:{' '}
+								{activeBooking.id}
 							</AppTypography>
 						</View>
 
@@ -597,7 +646,7 @@ export default function StaffAncillaryDashboard() {
 								<View style={styles.metaTimeChip}>
 									<Ionicons name="time-outline" size={13} color="#0C7C7C" />
 									<AppTypography variant="caption" style={styles.metaTimeChipText}>
-										Today • {activeBooking.appointmentTime}
+										Today â€¢ {activeBooking.appointmentTime}
 									</AppTypography>
 								</View>
 							</View>
@@ -617,7 +666,7 @@ export default function StaffAncillaryDashboard() {
 								<View style={styles.metaTimeChip}>
 									<Ionicons name="time-outline" size={13} color="#0C7C7C" />
 									<AppTypography variant="caption" style={styles.metaTimeChipText}>
-										Today • {activeBooking.appointmentTime}
+										Today â€¢ {activeBooking.appointmentTime}
 									</AppTypography>
 								</View>
 								<Ionicons name="chevron-forward" size={15} color="#94A3B8" />
@@ -626,11 +675,7 @@ export default function StaffAncillaryDashboard() {
 					)}
 
 					{/* Full Width Primary Action Button */}
-					<TouchableOpacity
-						style={styles.primaryActionButton}
-						onPress={handleStartCare}
-						activeOpacity={0.88}
-					>
+					<TouchableOpacity style={styles.primaryActionButton} onPress={handleStartCare} activeOpacity={0.88}>
 						<AppTypography variant="body" style={styles.primaryActionText}>
 							{activeBooking.status === 'in_progress'
 								? 'Resume Ongoing Care'
@@ -690,7 +735,7 @@ export default function StaffAncillaryDashboard() {
 										{formatInr(todayEarningsAmount)}
 									</AppTypography>
 									<AppTypography variant="caption" style={styles.trendGreenText} numberOfLines={1}>
-										↑ ₹300 vs yesterday
+										â†‘ â‚¹300 vs yesterday
 									</AppTypography>
 								</View>
 							</View>
@@ -707,7 +752,7 @@ export default function StaffAncillaryDashboard() {
 										{formatInr(weekEarningsAmount)}
 									</AppTypography>
 									<AppTypography variant="caption" style={styles.trendGreenText} numberOfLines={1}>
-										↑ 12% vs last week
+										â†‘ 12% vs last week
 									</AppTypography>
 								</View>
 							</View>
@@ -758,7 +803,7 @@ export default function StaffAncillaryDashboard() {
 									{formatInr(todayEarningsAmount)}
 								</AppTypography>
 								<AppTypography variant="caption" style={styles.trendGreenText}>
-									↑ ₹300 vs yesterday
+									â†‘ â‚¹300 vs yesterday
 								</AppTypography>
 							</View>
 						</View>
@@ -774,7 +819,7 @@ export default function StaffAncillaryDashboard() {
 								{formatInr(weekEarningsAmount)}
 							</AppTypography>
 							<AppTypography variant="caption" style={styles.trendGreenText}>
-								↑ 12% vs last week
+								â†‘ 12% vs last week
 							</AppTypography>
 						</View>
 
@@ -807,7 +852,9 @@ export default function StaffAncillaryDashboard() {
 		<View style={[styles.screenWrapper, isTablet && styles.screenWrapperTablet]}>
 			{/* Incoming Request Notification Overlay */}
 			<IncomingRequestNotificationOverlay
-				visible={incomingRequest !== null && (requestStep === 'request_card' || requestStep === 'accept_confirm')}
+				visible={
+					incomingRequest !== null && (requestStep === 'request_card' || requestStep === 'accept_confirm')
+				}
 				request={incomingRequest}
 				onAccept={handleAcceptClick}
 				onDecline={handleDeclineRequest}
@@ -824,19 +871,13 @@ export default function StaffAncillaryDashboard() {
 								onAvailabilityChange={handleAvailabilityToggle}
 							/>
 						</View>
-						<View style={styles.tabletCol}>
-							{renderTodaySection()}
-						</View>
+						<View style={styles.tabletCol}>{renderTodaySection()}</View>
 					</View>
 
 					{/* Row 2: Active Care (Left) + Earnings (Right) */}
 					<View style={styles.tabletRow}>
-						<View style={styles.tabletCol}>
-							{renderActiveCareSection()}
-						</View>
-						<View style={styles.tabletCol}>
-							{renderEarningsSection()}
-						</View>
+						<View style={styles.tabletCol}>{renderActiveCareSection()}</View>
+						<View style={styles.tabletCol}>{renderEarningsSection()}</View>
 					</View>
 				</View>
 			) : (
@@ -857,7 +898,7 @@ export default function StaffAncillaryDashboard() {
 				visible={claimedModalVisible}
 				status="error"
 				title="Request no longer available"
-				description="This care request has already been assigned to another nurse."
+				description="This care request has already been assigned to another provider."
 				onSubmit={() => setClaimedModalVisible(false)}
 			/>
 		</View>
@@ -1333,5 +1374,4 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		gap: 2,
 	},
-
 })
