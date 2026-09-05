@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Image, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { useNavigation, useIsFocused } from '@react-navigation/native'
@@ -10,10 +10,10 @@ import {
 	acceptCareRequest,
 	getNurseAppointments,
 	fetchProviderStatus,
-	updateProviderStatus,
-	updateProviderLocation,
 	fetchProviderProfile,
+	updateProviderLocation,
 	fetchProviderDashboardMetrics,
+	updateProviderStatus,
 	ProviderDashboardMetrics,
 	SoftReviewRequestData,
 	AuthorizedDetailedPatientInfo,
@@ -29,6 +29,9 @@ import { AppTypography } from '../../../components/common/AppTypography'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 import { getCurrentLocation } from '../../../services/locationService'
+
+const formatInr = (amount: number): string =>
+	`â‚¹${Math.round(amount).toLocaleString('en-IN')}`
 
 export default function StaffAncillaryDashboard() {
 	const navigation = useNavigation<any>()
@@ -130,14 +133,14 @@ export default function StaffAncillaryDashboard() {
 				ws = new WebSocket(wsUrl)
 
 				ws.onopen = () => {
-					console.log('[WS] ✅ Connected to provider dispatch')
+					console.log('[WS] âœ… Connected to provider dispatch')
 					reconnectDelay = 2000 // reset backoff on successful connect
 				}
 
 				ws.onmessage = (event) => {
 					try {
 						const payload = JSON.parse(event.data)
-						console.log('[WS] 📨 Message received:', payload.type)
+						console.log('[WS] ðŸ“¨ Message received:', payload.type)
 						if (payload.type === 'NEW_CARE_REQUEST_OFFER' && payload.data) {
 							const reqData = payload.data
 							setIncomingRequest({
@@ -154,7 +157,7 @@ export default function StaffAncillaryDashboard() {
 								specialRequirements: reqData.specialRequirements,
 								earning:
 									reqData.providerEarning !== undefined
-										? `₹${reqData.providerEarning}`
+										? `â‚¹${reqData.providerEarning}`
 										: reqData.estimatedEarnings,
 								expiresAt: reqData.expiresAt || Date.now() + 60000,
 							})
@@ -168,7 +171,7 @@ export default function StaffAncillaryDashboard() {
 				// ws.onmessage = (event) => {
 				// 	try {
 				// 		const payload = JSON.parse(event.data)
-				// 		console.log('[WS] 📨 Message received:', payload.type)
+				// 		console.log('[WS] ðŸ“¨ Message received:', payload.type)
 				// 		if (payload.type === 'NEW_CARE_REQUEST_OFFER' && payload.data) {
 				// 			const reqData = payload.data
 				// 			setIncomingRequest({
@@ -183,7 +186,7 @@ export default function StaffAncillaryDashboard() {
 				// 				requiredSkills: [specialtyLabel, 'Doorstep Visit'],
 				// 				urgency: reqData.urgencyLevel || 'Instant',
 				// 				specialRequirements: 'Patient Doorstep Assessment',
-				// 				earning: reqData.estimatedEarnings || '₹667',
+				// 				earning: reqData.estimatedEarnings || 'â‚¹667',
 				// 				expiresAt: Date.now() + 60000,
 				// 			})
 				// 			setRequestStep('request_card')
@@ -194,12 +197,12 @@ export default function StaffAncillaryDashboard() {
 				// }
 
 				ws.onerror = (err) => {
-					console.log('[WS] ❌ Error:', err)
+					console.log('[WS] âŒ Error:', err)
 				}
 
 				ws.onclose = (event) => {
 					console.log(
-						`[WS] 🔌 Disconnected — code=${event.code} reason="${event.reason}" wasClean=${event.wasClean}`
+						`[WS] ðŸ”Œ Disconnected â€” code=${event.code} reason="${event.reason}" wasClean=${event.wasClean}`
 					)
 					if (isMounted && isNurseOnline) {
 						console.log(`[WS] Reconnecting in ${reconnectDelay / 1000}s...`)
@@ -238,7 +241,7 @@ export default function StaffAncillaryDashboard() {
 			lat = loc.latitude
 			lng = loc.longitude
 		} catch (_) {
-			// Permission denied or unavailable — backend will use last known location
+			// Permission denied or unavailable â€” backend will use last known location
 		}
 		await updateProviderStatus(online, lat, lng)
 		if (!online) {
@@ -325,13 +328,16 @@ export default function StaffAncillaryDashboard() {
 					getNurseAppointments(),
 					fetchProviderDashboardMetrics(),
 				])
+
 				if (myAppointments) {
 					setBookings(myAppointments)
 				}
+
 				if (dashboardMetrics) {
 					setMetrics(dashboardMetrics)
 				}
 			} catch (e) {
+				console.log('[StaffAncillaryDashboard] Loading provider appointments/metrics notice:', e)
 				console.log('[StaffAncillaryDashboard] Loading provider appointments/metrics notice:', e)
 			}
 		}
@@ -344,8 +350,13 @@ export default function StaffAncillaryDashboard() {
 	const acceptedCount = metrics?.acceptedCount ?? 0
 	const completedCount = metrics?.completedCount ?? 0
 	const cancelledCount = metrics?.cancelledCount ?? 0
-	const todayEarningsAmount = metrics?.todayEarnings ?? 0
+	// const todayEarningsAmount = metrics?.todayEarnings ?? 0
 	const weekEarningsAmount = metrics?.weekEarnings ?? 0
+	// const acceptedCount = metrics?.acceptedCount ?? 0
+// /	const completedCount = metrics?.completedCount ?? 0
+	// const cancelledCount = metrics?.cancelledCount ?? 0
+	const todayEarningsAmount = metrics?.todayEarnings ?? 0
+	// const weekEarningsAmount = metrics?.weekEarnings ?? 0
 
 	const inProgressBooking = bookings.find((b) => (b.status || '').toLowerCase() === 'in_progress')
 	const enRouteOrArrivedBooking = bookings.find((b) => {
@@ -478,7 +489,7 @@ export default function StaffAncillaryDashboard() {
 									<Ionicons name="wallet-outline" size={14} color="#0C7C7C" />
 								</View>
 								<AppTypography variant="h3" style={styles.kpiEarningsValueText} numberOfLines={1}>
-									₹{todayEarningsAmount.toLocaleString()}
+									{formatInr(todayEarningsAmount)}
 								</AppTypography>
 							</View>
 							<AppTypography variant="caption" style={styles.kpiLabelText}>
@@ -564,7 +575,7 @@ export default function StaffAncillaryDashboard() {
 								<Ionicons name="wallet-outline" size={13} color="#0C7C7C" />
 							</View>
 							<AppTypography variant="h3" style={styles.kpiEarningsValueText} numberOfLines={1}>
-								₹{todayEarningsAmount.toLocaleString()}
+								{formatInr(todayEarningsAmount)}
 							</AppTypography>
 						</View>
 						<AppTypography variant="caption" style={styles.kpiLabelText}>
@@ -604,7 +615,7 @@ export default function StaffAncillaryDashboard() {
 								{activeBooking.patientName}
 							</AppTypography>
 							<AppTypography variant="caption" style={styles.patientSubtext} numberOfLines={1}>
-								{activeBooking.patientGender || 'Patient'} • {activeBooking.patientAge} yrs • ID:{' '}
+								{activeBooking.patientGender || 'Patient'} â€¢ {activeBooking.patientAge} yrs â€¢ ID:{' '}
 								{activeBooking.id}
 							</AppTypography>
 						</View>
@@ -641,7 +652,7 @@ export default function StaffAncillaryDashboard() {
 								<View style={styles.metaTimeChip}>
 									<Ionicons name="time-outline" size={13} color="#0C7C7C" />
 									<AppTypography variant="caption" style={styles.metaTimeChipText}>
-										Today • {activeBooking.appointmentTime}
+										Today â€¢ {activeBooking.appointmentTime}
 									</AppTypography>
 								</View>
 							</View>
@@ -661,7 +672,7 @@ export default function StaffAncillaryDashboard() {
 								<View style={styles.metaTimeChip}>
 									<Ionicons name="time-outline" size={13} color="#0C7C7C" />
 									<AppTypography variant="caption" style={styles.metaTimeChipText}>
-										Today • {activeBooking.appointmentTime}
+										Today â€¢ {activeBooking.appointmentTime}
 									</AppTypography>
 								</View>
 								<Ionicons name="chevron-forward" size={15} color="#94A3B8" />
@@ -727,10 +738,10 @@ export default function StaffAncillaryDashboard() {
 										Today
 									</AppTypography>
 									<AppTypography variant="h2" style={styles.earningsValueTeal} numberOfLines={1}>
-										₹{todayEarningsAmount.toLocaleString()}
+										{formatInr(todayEarningsAmount)}
 									</AppTypography>
 									<AppTypography variant="caption" style={styles.trendGreenText} numberOfLines={1}>
-										↑ ₹300 vs yesterday
+										â†‘ â‚¹300 vs yesterday
 									</AppTypography>
 								</View>
 							</View>
@@ -744,10 +755,10 @@ export default function StaffAncillaryDashboard() {
 										This Week
 									</AppTypography>
 									<AppTypography variant="h2" style={styles.earningsValueDark} numberOfLines={1}>
-										₹{weekEarningsAmount.toLocaleString()}
+										{formatInr(weekEarningsAmount)}
 									</AppTypography>
 									<AppTypography variant="caption" style={styles.trendGreenText} numberOfLines={1}>
-										↑ 12% vs last week
+										â†‘ 12% vs last week
 									</AppTypography>
 								</View>
 							</View>
@@ -795,10 +806,10 @@ export default function StaffAncillaryDashboard() {
 									Today
 								</AppTypography>
 								<AppTypography variant="h2" style={styles.earningsValueTeal}>
-									₹{todayEarningsAmount.toLocaleString()}
+									{formatInr(todayEarningsAmount)}
 								</AppTypography>
 								<AppTypography variant="caption" style={styles.trendGreenText}>
-									↑ ₹300 vs yesterday
+									â†‘ â‚¹300 vs yesterday
 								</AppTypography>
 							</View>
 						</View>
@@ -811,10 +822,10 @@ export default function StaffAncillaryDashboard() {
 								This Week
 							</AppTypography>
 							<AppTypography variant="h2" style={styles.earningsValueDark}>
-								₹{weekEarningsAmount.toLocaleString()}
+								{formatInr(weekEarningsAmount)}
 							</AppTypography>
 							<AppTypography variant="caption" style={styles.trendGreenText}>
-								↑ 12% vs last week
+								â†‘ 12% vs last week
 							</AppTypography>
 						</View>
 

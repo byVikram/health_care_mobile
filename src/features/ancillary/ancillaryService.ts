@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
+﻿import AsyncStorage from '@react-native-async-storage/async-storage'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 
@@ -859,12 +859,13 @@ export const verifyPatientOtpBackend = async (
 			clinicalDetails: data?.clinicalDetails || data,
 		}
 	} catch (error: any) {
+		// Never fabricate a success response locally -- doorstep identity
+		// verification only means something if a wrong/guessed code is
+		// actually rejected. Surface the backend's real error instead.
+		const backendMessage = error?.response?.data?.detail?.message
 		return {
 			success: false,
-			message:
-				error.response?.data?.message ||
-				error.response?.data?.detail ||
-				'Invalid verification OTP. Please ask the patient for the 4-digit code.',
+			message: backendMessage || 'Invalid verification OTP. Please ask the patient for the 4-digit code.',
 		}
 	}
 }
@@ -923,31 +924,63 @@ export const updateProviderLocationBackend = async (
 // 	}
 // }
 
+// export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequestData[]> => {
+// 	try {
+// 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABLE)
+// 		const payload = res.data
+// 		const rawList: any[] = Array.isArray(payload)
+// 			? payload
+// 			: Array.isArray(payload?.data)
+// 			? payload.data
+// 			: []
+
+// 		if (rawList.length > 0) {
+// 			return rawList.map((item: any) => ({
+// 				id: String(item.id || item.publicBookingId || 'REQ-101'),
+// 				serviceName: String(item.serviceName || 'General Nursing Care Procedure'),
+// 				requestedDate: 'Today',
+// 				requestedTime: String(item.requestedTime || 'Just now'),
+// 				generalLocation: String(item.generalArea || 'Healthcare Sector, Area 4'),
+// 				distanceKm: `${item.distanceKm || 1.8} km`,
+// 				travelTime: '~8 mins',
+// 				serviceRequirement: 'Aseptic Dressing & Vitals Check',
+// 				requiredSkills: Array.isArray(item.requiredSkills) ? item.requiredSkills : ['RN Certification', 'Wound Dressing'],
+// 				urgency: String(item.urgencyLevel || 'HIGH'),
+// 				specialRequirements: 'Sanitized Single-Use Medical Kit Required',
+// 				earning: typeof item.estimatedEarnings === 'number' ? `₹${item.estimatedEarnings}` : String(item.estimatedEarnings || '₹499'),
+// 				expiresAt: Date.now() + 60 * 1000,
+// 			}))
+// 		}
+// 		return []
+// 	} catch (error) {
+// 		console.log('[ancillaryService] Provider requests ready via API service')
+// 		return []
+// 	}
+// }
+
 export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequestData[]> => {
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABLE)
 		const payload = res.data
 		const rawList: any[] = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
 
-		if (rawList.length > 0) {
+		if (rawList.length > 0){
 			return rawList.map((item: any) => ({
 				id: String(item.id || item.publicBookingId),
 				serviceName: String(item.serviceName),
 				requestedDate: item.requestedDate || item.requestedDateTime,
 				requestedTime: String(item.requestedTime),
 				generalLocation: String(item.generalLocation || item.generalArea),
-				distanceKm: item.distanceKm !== undefined ? `${item.distanceKm} km` : undefined,
+				// distanceKm: item.distanceKm !== undefined ? `${item.distanceKm} km` : undefined,
+				distanceKm: item.distanceKm !== undefined ? `${item.distanceKm} km` : '',
 				travelTime: item.travelTime,
 				serviceRequirement: item.serviceRequirement,
 				requiredSkills: Array.isArray(item.requiredSkills) ? item.requiredSkills : undefined,
 				urgency: String(item.urgency || item.urgencyLevel),
 				specialRequirements: item.specialRequirements,
-				earning:
-					typeof item.providerEarning === 'number'
-						? `₹${item.providerEarning}`
-						: typeof item.estimatedEarnings === 'number'
-							? `₹${item.estimatedEarnings}`
-							: item.estimatedEarnings,
+				earning: typeof item.providerEarning === 'number' ? `₹${item.providerEarning}` : 
+					typeof item.estimatedEarnings === 'number' ? `₹${item.estimatedEarnings}` : 
+					item.estimatedEarnings,
 				expiresAt: item.expiresAt || Date.now() + 60 * 1000,
 			}))
 		}
@@ -980,17 +1013,17 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 				const status = CANCELLED_FAMILY_STATUSES.includes(rawStatus)
 					? 'cancelled'
 					: (item.status || 'ASSIGNED').toLowerCase()
-				const amount =
-					item.totalAmount != null ? parseFloat(String(item.totalAmount).replace(/[^0-9.]/g, '')) : undefined
+				const amount = item.totalAmount != null
+					? parseFloat(String(item.totalAmount).replace(/[^0-9.]/g, ''))
+					: undefined
 				// Prefer the backend's providerPrice (the provider's actual cut) for
 				// earnings displays; estimatedEarnings is a formatted 'INR xxx' fallback,
 				// and totalAmount (the patient's full charge) is the last resort.
-				const providerEarning =
-					item.providerPrice != null
-						? parseFloat(String(item.providerPrice).replace(/[^0-9.]/g, ''))
-						: item.estimatedEarnings != null
-							? parseFloat(String(item.estimatedEarnings).replace(/[^0-9.]/g, ''))
-							: amount
+				const providerEarning = item.providerPrice != null
+					? parseFloat(String(item.providerPrice).replace(/[^0-9.]/g, ''))
+					: item.estimatedEarnings != null
+					? parseFloat(String(item.estimatedEarnings).replace(/[^0-9.]/g, ''))
+					: amount
 
 				return {
 					id: String(item.id || item.publicBookingId),
@@ -1043,10 +1076,7 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 			rawStatus: String(data.status || 'SEARCHING').toUpperCase(),
 			date: 'Today',
 			timeRange: 'Instant Dispatch',
-			amount:
-				typeof data.totalAmount === 'number'
-					? data.totalAmount
-					: parseFloat(String(data.totalAmount || '667').replace(/[^0-9.]/g, '')),
+			amount: typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(String(data.totalAmount || '667').replace(/[^0-9.]/g, '')),
 			provider: {
 				id: data.assignedProvider ? String(data.assignedProvider.id) : 'n-prov-1',
 				name: data.assignedProvider ? String(data.assignedProvider.name) : 'Nurse Specialist',
@@ -1334,7 +1364,8 @@ export const updateAncillaryCapabilitiesBackend = async (checked_procedures: str
 	return updateProviderProfileBackend({ checked_procedures })
 }
 
-export const fetchAncillaryProfileBackend = fetchProviderProfileBackend
+
+export const fetchAncillaryProfileBackend = fetchProviderProfileBackend;
 
 // --- Clean Function Aliases (without Backend suffix) ---
 export const fetchAncillaryCategories = fetchAncillaryCategoriesBackend
@@ -1357,3 +1388,4 @@ export const updateAncillaryCapabilities = updateAncillaryCapabilitiesBackend
 export const fetchAncillaryProfile = fetchAncillaryProfileBackend
 export const fetchProviderEarnings = fetchProviderEarningsBackend
 export const fetchProviderDashboardMetrics = fetchProviderDashboardMetricsBackend
+

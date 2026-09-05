@@ -21,6 +21,8 @@ export interface ServiceProcedureItem {
 	premiumBadgeText?: string
 	actionLabel?: 'Select' | 'Enquire'
 	actionVariant?: 'primary' | 'secondary' | 'outline'
+	/** Optional small badge rendered above the title, e.g. "Recommended for Knee Pain" */
+	recommendedLabel?: string
 }
 
 interface AllServiceCardProps {
@@ -47,6 +49,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 	const { width } = useWindowDimensions()
 	const isCustomPrice = item.price.toLowerCase().includes('custom') || item.actionLabel === 'Enquire'
 	const isAdded = quantity > 0
+	const isRecommended = !!item.recommendedLabel
 
 	const handleCardClick = () => {
 		if (onCardPress) {
@@ -77,6 +80,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 			style={[
 				styles.cardContainer,
 				isAdded && styles.cardActive,
+				isRecommended && styles.cardRecommended,
 				cardWidth ? { width: cardWidth } : null,
 				style,
 			]}
@@ -85,6 +89,15 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 		>
 			{/* Left Column: Procedure Details */}
 			<View style={styles.leftCol}>
+				{/* Recommended Badge (optional) */}
+				{isRecommended && (
+					<View style={styles.recommendedBadge}>
+						<AppTypography variant="caption" style={styles.recommendedBadgeText} numberOfLines={1}>
+							{item.recommendedLabel}
+						</AppTypography>
+					</View>
+				)}
+
 				{/* Title (Bold Heading) */}
 				<AppTypography variant="h3" style={styles.title} numberOfLines={2}>
 					{item.title}
@@ -184,6 +197,30 @@ const styles = StyleSheet.create({
 	},
 	cardActive: {
 		backgroundColor: 'rgba(43, 111, 113, 0.03)',
+	},
+	cardRecommended: {
+		backgroundColor: 'rgba(12, 124, 124, 0.035)',
+		borderRadius: 14,
+		borderWidth: 1,
+		borderColor: 'rgba(12, 124, 124, 0.18)',
+		paddingHorizontal: 10,
+		marginHorizontal: -10,
+		marginVertical: 4,
+	},
+	recommendedBadge: {
+		alignSelf: 'flex-start',
+		backgroundColor: 'rgba(12, 124, 124, 0.12)',
+		borderRadius: 4,
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		marginBottom: 4,
+	},
+	recommendedBadgeText: {
+		fontSize: 10,
+		fontWeight: '700',
+		color: '#0C5F60',
+		textTransform: 'uppercase',
+		letterSpacing: 0.2,
 	},
 	leftCol: {
 		flex: 1,

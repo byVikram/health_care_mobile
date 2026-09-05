@@ -232,5 +232,8 @@ export const API_ENDPOINTS = {
 		REVIEWS: `${BASE_URL}/api/ancillary/reviews`,
 		WS_PATIENT_REQUEST: (id: string) => `${BASE_URL.replace('http', 'ws')}/api/ancillary/ws/patient/requests/${id}`,
 		WS_PROVIDER_DISPATCH: `${BASE_URL.replace('http', 'ws')}/api/ancillary/ws/provider/dispatch`,
+		SOFT_REVIEW: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/soft-review`,
+		PROVIDER_EARNINGS: `${BASE_URL}/api/ancillary/provider/earnings`,
+		PROVIDER_DASHBOARD_METRICS: `${BASE_URL}/api/ancillary/provider/dashboard-metrics`,
 	},
 }
