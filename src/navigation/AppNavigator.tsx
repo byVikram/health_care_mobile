@@ -12,6 +12,10 @@ import AuthNavigator from './AuthNavigator'
 import MainTabNavigator from './MainTabNavigator'
 import { AppScreenHeader, LocationSelector, NotificationPermissionPopup } from '../components/common'
 import LocationScreen from '../components/common/LocationScreen'
+import { WalletScreen } from '../features/wallet/WalletScreen'
+import { WalletTransactionsScreen } from '../features/wallet/WalletTransactionsScreen'
+import { WalletTransactionDetailScreen } from '../features/wallet/WalletTransactionDetailScreen'
+
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
@@ -349,6 +353,22 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.LOCATION_SELECT as keyof AppStackParamList}
 				component={LocationScreen}
+				options={{ headerShown: false }}
+			/>
+		
+			<AppStack.Screen
+				name={ROUTES.STACK.WALLET}
+				component={WalletScreen}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.WALLET_TRANSACTIONS}
+				component={WalletTransactionsScreen}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.WALLET_TRANSACTION_DETAIL}
+				component={WalletTransactionDetailScreen}
 				options={{ headerShown: false }}
 			/>
 		</AppStack.Navigator>

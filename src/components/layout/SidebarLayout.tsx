@@ -277,6 +277,15 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 						}),
 				},
 				{
+					id: 'my-wallet',
+					label: 'My Wallet',
+					icon: <MaterialCommunityIcons name="wallet-outline" size={20} color="#1f5f68" />,
+					onPress: () => {
+						setIsSidebarOpen(false)
+						navigation.navigate(ROUTES.STACK.WALLET)
+					},
+				},
+				{
 					id: 'payments',
 					label: 'Payments',
 					icon: <PaymentsIcon width={20} height={20} />,

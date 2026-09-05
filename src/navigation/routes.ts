@@ -13,6 +13,7 @@ export const ROUTES = {
 		PORTAL: 'Portal',
 		PROFILE: 'Profile',
 		ANCILLARY: 'Ancillary',
+		WALLET: 'Wallet',
 	},
 	PORTAL: {
 		PROFILE: 'Profile',
@@ -91,5 +92,9 @@ export const ROUTES = {
 		ANCILLARY_MY_BOOKINGS: 'AncillaryMyBookings',
 		ANCILLARY_SERVICE_MATCHING: 'AncillaryServiceMatching',
 		LOCATION_SELECT: 'LocationSelect',
+		WALLET: 'Wallet',
+		WALLET_TOPUP: 'WalletTopUp',
+		WALLET_TRANSACTIONS: 'WalletTransactions',
+		WALLET_TRANSACTION_DETAIL: 'WalletTransactionDetail',
 	},
 } as const

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { ROUTES } from '../../navigation/routes'
 import {
 	SafeAreaView,
 	View,
@@ -22,7 +23,7 @@ import VectorIcon from '../../assets/Settings/Vector.svg'
 import { useAuth } from '../../context/AuthContext'
 
 const SettingPage = () => {
-	const navigation = useNavigation()
+	const navigation = useNavigation<any>()
 	const insets = useSafeAreaInsets()
 	const { clearAuth } = useAuth()
 	const [showLogoutModal, setShowLogoutModal] = useState(false)
@@ -60,6 +61,12 @@ const SettingPage = () => {
 	}
 
 	const menuItems = [
+		{
+			label: 'My Wallet',
+			icon: <MaterialCommunityIcons name="wallet-outline" size={22} color="#0c7c7c" />,
+			onPress: () => navigation.navigate(ROUTES.STACK.WALLET as any),
+			destructive: false,
+		},
 		{
 			label: 'About whisper ai',
 			icon: <FrameIcon width={22} height={22} />,
