@@ -101,8 +101,11 @@ function DockedTabBar({ state, descriptors, navigation, onAncillaryPress }: Dock
 				},
 			]}
 		>
-			{state.routes.map((route, index) => {
-				const focused = state.index === index
+			{state.routes
+				.filter((route) => route.name !== ROUTES.MAIN.PROFILE)
+				.map((route) => {
+					const index = state.routes.findIndex((r) => r.key === route.key)
+					const focused = state.index === index
 				const { options } = descriptors[route.key]
 				const { iconName, label } = getTabConfig(route.name, focused)
 				const color = focused ? '#0C7C7C' : '#64748B'
@@ -231,6 +234,19 @@ export default function MainTabNavigator() {
 					component={WalletScreen}
 					options={{
 						headerShown: false,
+					}}
+				/>
+				<Tab.Screen
+					name={ROUTES.MAIN.PROFILE}
+					component={ProfilePage}
+					options={{
+						headerShown: true,
+						header: () => (
+							<AppScreenHeader
+								title="My Profile"
+								onBack={() => navigation.navigate(ROUTES.MAIN.HOME)}
+							/>
+						),
 					}}
 				/>
 			</Tab.Navigator>
