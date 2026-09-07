@@ -180,6 +180,15 @@ export default function AncillaryPaymentPage() {
 				...(visit?.longitude != null ? { longitude: visit.longitude } : {}),
 			},
 			totalAmount: charges.totalAmount,
+			// Numeric/raw breakdown so the backend persists the exact same
+			// figures the patient reviewed on this screen instead of a value
+			// recomputed server-side (see ancillary_service_requests amount fix).
+			charges: {
+				procedureOrServiceFee: charges.basePrice,
+				transportFee: charges.visitFee,
+				tax: charges.taxes,
+				totalAmount: charges.totalAmount,
+			},
 		}
 
 		try {
@@ -332,7 +341,7 @@ export default function AncillaryPaymentPage() {
 								</View>
 								<View style={styles.costRow}>
 									<AppTypography variant="caption" style={styles.costLabel}>
-										Taxes & GST (5%)
+										Taxes & GST (3%)
 									</AppTypography>
 									<AppTypography variant="caption" style={styles.costVal}>
 										{charges.taxes}

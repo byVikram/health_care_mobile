@@ -719,7 +719,7 @@ export default function BookingDetailsPage() {
 
 						<View style={styles.billingRow}>
 							<AppTypography variant="body" style={styles.billingLabel}>
-								Taxes & Operational Fee (5% GST)
+								Taxes & Operational Fee (3% GST)
 							</AppTypography>
 							<AppTypography variant="body" style={styles.billingVal}>
 								{charges.taxes}
