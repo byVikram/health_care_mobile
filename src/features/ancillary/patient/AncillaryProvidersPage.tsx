@@ -5,7 +5,6 @@ import {
 	Image,
 	ScrollView,
 	StyleSheet,
-	Text,
 	TextInput,
 	TouchableOpacity,
 	View,
@@ -14,15 +13,14 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { ANCILLARY_MOCK_DATA, AncillaryProvider } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
-import StatusModal from '../../../components/common/StatusModal'
-import { AppModal } from '../../../components/common/AppModal'
+import { AppBottomSheet, AppButton, AppScreenHeader, AppTypography, StatusModal } from '../../../components/common'
 
 const FILTERS = ['Available Now', 'Today', 'Tomorrow', 'Distance', 'Experience', 'Rating 4.9+']
 
 export default function AncillaryProvidersPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
-	const { serviceKey, serviceLabel, procedureName } = route.params || {}
+	const { serviceKey, serviceLabel, procedureName, isSelectionMode, selectedNurseId } = route.params || {}
 
 	const [searchQuery, setSearchQuery] = useState('')
 	const [activeFilters, setActiveFilters] = useState<string[]>(['Available Now'])
@@ -43,6 +41,14 @@ export default function AncillaryProvidersPage() {
 	}
 
 	const handleBookNow = (provider: AncillaryProvider) => {
+		if (isSelectionMode) {
+			navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
+				selectedNurse: provider,
+				assignmentMode: 'SELECT_NURSE',
+			})
+			return
+		}
+
 		setSelectedProvider(provider)
 		setShowSuccessModal(true)
 	}
@@ -65,45 +71,47 @@ export default function AncillaryProvidersPage() {
 	)
 
 	const renderProviderCard = ({ item }: { item: AncillaryProvider }) => {
+		const isSelected = isSelectionMode && item.id === selectedNurseId
+
 		return (
-			<View style={styles.card}>
+			<View style={[styles.card, isSelected && styles.cardSelected]}>
 				<View style={styles.cardHeader}>
 					<Image source={{ uri: item.avatar }} style={styles.avatar} resizeMode="cover" />
 					<View style={styles.providerInfo}>
 						<View style={styles.nameRow}>
-							<Text style={styles.name}>{item.name}</Text>
+							<AppTypography variant="subtitle" style={styles.name}>{item.name}</AppTypography>
 							<View style={styles.credentialsBadge}>
-								<Text style={styles.credentialsText}>{item.credentials}</Text>
+								<AppTypography variant="caption" style={styles.credentialsText}>{item.credentials}</AppTypography>
 							</View>
 						</View>
-						<Text style={styles.experience}>{item.experience} years experience</Text>
+						<AppTypography variant="caption" style={styles.experience}>
+							{item.experience} yrs exp • {item.distance} km away
+						</AppTypography>
 						<View style={styles.ratingRow}>
-							<Ionicons name="star" size={14} color="#F59E0B" />
-							<Text style={styles.rating}>{item.rating}</Text>
-							<Text style={styles.reviewsCount}>({item.reviewsCount})</Text>
+							<Ionicons name="star" size={13} color="#F59E0B" />
+							<AppTypography variant="caption" style={styles.rating}>{item.rating}</AppTypography>
+							<AppTypography variant="caption" style={styles.reviewsCount}>({item.reviewsCount})</AppTypography>
 						</View>
 					</View>
 					<View style={styles.rateCol}>
-						<Text style={styles.rateLabel}>Starting</Text>
-						<Text style={styles.ratePrice}>₹{item.startingPrice}</Text>
+						<AppTypography variant="caption" style={styles.rateLabel}>Starting at</AppTypography>
+						<AppTypography variant="h4" style={styles.ratePrice}>₹{item.startingPrice}</AppTypography>
 					</View>
 				</View>
 
 				{/* Metadata details list */}
 				<View style={styles.metaBox}>
 					<View style={styles.metaRow}>
-						<Ionicons name="briefcase-outline" size={14} color="#64748B" />
-						<Text style={styles.metaText} numberOfLines={1}>
+						<Ionicons name="medkit-outline" size={13} color="#0C7C7C" />
+						<AppTypography variant="caption" style={styles.metaText} numberOfLines={1}>
 							{item.procedures.join(' • ')}
-						</Text>
+						</AppTypography>
 					</View>
 					<View style={styles.metaRow}>
-						<Ionicons name="language-outline" size={14} color="#64748B" />
-						<Text style={styles.metaText}>{item.languages.join(', ')}</Text>
-					</View>
-					<View style={styles.metaRow}>
-						<Ionicons name="location-outline" size={14} color="#64748B" />
-						<Text style={styles.metaText}>{item.distance} km away</Text>
+						<Ionicons name="language-outline" size={13} color="#64748B" />
+						<AppTypography variant="caption" style={styles.metaText}>
+							Languages: {item.languages.join(', ')}
+						</AppTypography>
 					</View>
 				</View>
 
@@ -111,20 +119,30 @@ export default function AncillaryProvidersPage() {
 				<View style={styles.badgeRow}>
 					{item.badges.map((badge, idx) => (
 						<View key={idx} style={styles.badge}>
-							<Ionicons name="checkmark" size={10} color="#047857" style={styles.badgeIcon} />
-							<Text style={styles.badgeText}>{badge}</Text>
+							<Ionicons name="checkmark-circle" size={12} color="#047857" style={styles.badgeIcon} />
+							<AppTypography variant="caption" style={styles.badgeText}>{badge}</AppTypography>
 						</View>
 					))}
 				</View>
 
-				{/* Action rows buttons */}
+				{/* Action rows buttons using AppButton component */}
 				<View style={styles.actions}>
-					<TouchableOpacity style={styles.profileBtn} onPress={() => handleViewProfile(item)}>
-						<Text style={styles.profileBtnText}>View Profile</Text>
-					</TouchableOpacity>
-					<TouchableOpacity style={styles.bookBtn} onPress={() => handleBookNow(item)}>
-						<Text style={styles.bookBtnText}>Book Now</Text>
-					</TouchableOpacity>
+					<AppButton
+						variant="outline"
+						onPress={() => handleViewProfile(item)}
+						style={styles.profileBtn}
+						labelStyle={styles.profileBtnLabel}
+					>
+						View Profile
+					</AppButton>
+					<AppButton
+						variant="primary"
+						onPress={() => handleBookNow(item)}
+						style={[styles.bookBtn, isSelected && styles.bookBtnSelected]}
+						labelStyle={styles.bookBtnLabel}
+					>
+						{isSelectionMode ? (isSelected ? 'Selected Nurse ✓' : 'Select Nurse') : 'Book Now'}
+					</AppButton>
 				</View>
 			</View>
 		)
@@ -133,33 +151,14 @@ export default function AncillaryProvidersPage() {
 	return (
 		<View style={styles.container}>
 			{/* Header */}
-			<View style={styles.header}>
-				<TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-					<Ionicons name="chevron-back" size={24} color="#16324A" />
-				</TouchableOpacity>
-				<View style={styles.titleContainer}>
-					<Text style={styles.title}>Available Near You</Text>
-					<View style={styles.headerSubRow}>
-						{procedureName && (
-							<View style={styles.filterPill}>
-								<Text style={styles.filterPillText}>{procedureName}</Text>
-							</View>
-						)}
-						<View style={styles.locationPill}>
-							<Ionicons name="location-sharp" size={12} color="#64748B" />
-							<Text style={styles.locationPillText}>Hyderabad, Telangana</Text>
-						</View>
-					</View>
-				</View>
-			</View>
+			<AppScreenHeader
+				title={isSelectionMode ? 'Select a Preferred Nurse' : (serviceLabel ? `Clinicians: ${serviceLabel}` : 'Available Clinicians')}
+				onBack={() => navigation.goBack()}
+			/>
 
 			{/* Subtitle summary */} 
 			<View style={styles.summaryBar}>
-				<Text style={styles.summaryText}>{filteredProviders.length} clinicians available</Text>
-				{/* <TouchableOpacity style={styles.mapBtn}>
-					<Ionicons name="map-outline" size={16} color="#2B6F71" />
-					<Text style={styles.mapBtnText}>Map View</Text>
-				</TouchableOpacity> */}
+				<AppTypography variant="caption" style={styles.summaryText}>{filteredProviders.length} clinicians available</AppTypography>
 			</View>
 
 			{/* Search */}
@@ -187,9 +186,9 @@ export default function AncillaryProvidersPage() {
 								style={[styles.filterTag, isActive && styles.filterTagActive]}
 								onPress={() => handleFilterPress(filter)}
 							>
-								<Text style={[styles.filterTagText, isActive && styles.filterTagTextActive]}>
+								<AppTypography variant="caption" style={[styles.filterTagText, isActive && styles.filterTagTextActive]}>
 									{filter}
-								</Text>
+								</AppTypography>
 								{isActive && <Ionicons name="close" size={12} color="#FFFFFF" style={styles.filterTagClose} />}
 							</TouchableOpacity>
 						)
@@ -206,7 +205,7 @@ export default function AncillaryProvidersPage() {
 				ListEmptyComponent={
 					<View style={styles.emptyContainer}>
 						<Ionicons name="people-outline" size={48} color="#CBD5E1" />
-						<Text style={styles.emptyText}>No available clinicians found matching your criteria.</Text>
+						<AppTypography variant="body" style={styles.emptyText}>No available clinicians found matching your criteria.</AppTypography>
 					</View>
 				}
 			/>
@@ -221,38 +220,124 @@ export default function AncillaryProvidersPage() {
 				onSubmit={handleSuccessModalSubmit}
 			/>
 
-			{/* Provider Profile details info popup */}
-			<AppModal
+			{/* Provider Profile Details Bottom Sheet */}
+			<AppBottomSheet
 				visible={showProfileModal}
-				onDismiss={() => setShowProfileModal(false)}
+				onClose={() => setShowProfileModal(false)}
 				title="Clinician Information Profile"
+				maxHeightRatio={0.85}
+				footer={
+					selectedProvider ? (
+						<View style={styles.sheetFooterRow}>
+							<AppButton
+								variant="primary"
+								formAction
+								style={styles.sheetBookBtn}
+								onPress={() => {
+									setShowProfileModal(false)
+									handleBookNow(selectedProvider)
+								}}
+							>
+								{isSelectionMode ? 'Select Preferred Nurse' : 'Book Appointment'}
+							</AppButton>
+						</View>
+					) : undefined
+				}
 			>
 				{selectedProvider && (
 					<View style={styles.modalProfileContent}>
-						<Image source={{ uri: selectedProvider.avatar }} style={styles.modalAvatar} />
-						<Text style={styles.modalName}>{selectedProvider.name}, {selectedProvider.credentials}</Text>
-						<Text style={styles.modalExperience}>{selectedProvider.experience} Years Physical Practice</Text>
-
-						<View style={styles.modalRatingRow}>
-							<Ionicons name="star" size={16} color="#F59E0B" />
-							<Text style={styles.modalRatingText}>{selectedProvider.rating} ({selectedProvider.reviewsCount} Patient Reviews)</Text>
+						{/* Top Avatar & Name */}
+						<View style={styles.modalHeaderBlock}>
+							<Image source={{ uri: selectedProvider.avatar }} style={styles.modalAvatar} />
+							<AppTypography variant="h3" style={styles.modalName}>
+								{selectedProvider.name}
+							</AppTypography>
+							<View style={styles.modalCredentialsBadge}>
+								<AppTypography variant="caption" style={styles.modalCredentialsText}>
+									{selectedProvider.credentials} • Verified Clinician
+								</AppTypography>
+							</View>
 						</View>
 
-						<Text style={styles.modalSectionTitle}>Procedures Offered</Text>
-						<Text style={styles.modalDescText}>{selectedProvider.procedures.join(', ')}</Text>
+						{/* Quick 3-metric stats row */}
+						<View style={styles.modalStatsRow}>
+							<View style={styles.modalStatBox}>
+								<AppTypography variant="subtitle" style={styles.modalStatVal}>
+									{selectedProvider.experience} Yrs
+								</AppTypography>
+								<AppTypography variant="caption" style={styles.modalStatLabel}>
+									Experience
+								</AppTypography>
+							</View>
+							<View style={styles.modalStatDivider} />
+							<View style={styles.modalStatBox}>
+								<View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+									<Ionicons name="star" size={14} color="#F59E0B" />
+									<AppTypography variant="subtitle" style={styles.modalStatVal}>
+										{selectedProvider.rating}
+									</AppTypography>
+								</View>
+								<AppTypography variant="caption" style={styles.modalStatLabel}>
+									{selectedProvider.reviewsCount} Reviews
+								</AppTypography>
+							</View>
+							<View style={styles.modalStatDivider} />
+							<View style={styles.modalStatBox}>
+								<AppTypography variant="subtitle" style={styles.modalStatVal}>
+									{selectedProvider.distance} km
+								</AppTypography>
+								<AppTypography variant="caption" style={styles.modalStatLabel}>
+									Distance
+								</AppTypography>
+							</View>
+						</View>
 
-						<Text style={styles.modalSectionTitle}>Languages Spoken</Text>
-						<Text style={styles.modalDescText}>{selectedProvider.languages.join(', ')}</Text>
+						{/* Procedures Offered */}
+						<View style={styles.modalSection}>
+							<AppTypography variant="caption" style={styles.modalSectionTitle}>
+								Procedures Offered
+							</AppTypography>
+							<View style={styles.modalPillsContainer}>
+								{selectedProvider.procedures.map((p, idx) => (
+									<View key={idx} style={styles.modalPill}>
+										<Ionicons name="medkit-outline" size={12} color="#0C7C7C" />
+										<AppTypography variant="caption" style={styles.modalPillText}>
+											{p}
+										</AppTypography>
+									</View>
+								))}
+							</View>
+						</View>
 
-						<TouchableOpacity style={styles.modalBookBtn} onPress={() => {
-							setShowProfileModal(false)
-							handleBookNow(selectedProvider)
-						}}>
-							<Text style={styles.modalBookBtnText}>Book Appointment now (₹{selectedProvider.startingPrice})</Text>
-						</TouchableOpacity>
+						{/* Languages Spoken */}
+						<View style={styles.modalSection}>
+							<AppTypography variant="caption" style={styles.modalSectionTitle}>
+								Languages Spoken
+							</AppTypography>
+							<View style={styles.modalPillsContainer}>
+								{selectedProvider.languages.map((lang, idx) => (
+									<View key={idx} style={[styles.modalPill, { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' }]}>
+										<Ionicons name="chatbubble-outline" size={12} color="#64748B" />
+										<AppTypography variant="caption" style={[styles.modalPillText, { color: '#475569' }]}>
+											{lang}
+										</AppTypography>
+									</View>
+								))}
+							</View>
+						</View>
+
+						{/* Pricing Info */}
+						<View style={styles.modalPriceBox}>
+							<AppTypography variant="caption" style={styles.modalPriceLabel}>
+								Starting Consultation / Procedure Rate:
+							</AppTypography>
+							<AppTypography variant="h3" style={styles.modalPriceValue}>
+								₹{selectedProvider.startingPrice}
+							</AppTypography>
+						</View>
 					</View>
 				)}
-			</AppModal>
+			</AppBottomSheet>
 		</View>
 	)
 }
@@ -262,89 +347,21 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#F8FAFC',
 	},
-	header: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingTop: 56,
-		paddingBottom: 16,
-		paddingHorizontal: 16,
-		backgroundColor: '#FFFFFF',
-		borderBottomWidth: 1,
-		borderBottomColor: '#F1F5F9',
-	},
-	backBtn: {
-		padding: 4,
-		marginRight: 12,
-	},
-	titleContainer: {
-		flex: 1,
-	},
-	title: {
-		fontSize: 18,
-		fontWeight: '800',
-		color: '#16324A',
-		marginBottom: 4,
-	},
-	headerSubRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	filterPill: {
-		backgroundColor: '#EAF6F6',
-		paddingHorizontal: 8,
-		paddingVertical: 2,
-		borderRadius: 6,
-	},
-	filterPillText: {
-		fontSize: 10,
-		fontWeight: '700',
-		color: '#2B6F71',
-	},
-	locationPill: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 2,
-	},
-	locationPillText: {
-		fontSize: 11,
-		color: '#64748B',
-		fontWeight: '600',
-	},
 	summaryBar: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
 		paddingHorizontal: 16,
-		paddingVertical: 12,
+		paddingVertical: 10,
 		borderBottomWidth: 1,
 		borderBottomColor: '#F1F5F9',
 		backgroundColor: '#FFFFFF',
 	},
 	summaryText: {
-		fontSize: 13,
-		fontWeight: '700',
+		fontSize: 12.5,
+		fontWeight: '600',
 		color: '#475569',
-	},
-	mapBtn: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		borderWidth: 1,
-		borderColor: '#C7E7E8',
-		backgroundColor: '#F0F9F9',
-		paddingHorizontal: 10,
-		paddingVertical: 6,
-		borderRadius: 8,
-	},
-	mapBtnText: {
-		fontSize: 11,
-		fontWeight: '700',
-		color: '#2B6F71',
 	},
 	searchBarContainer: {
 		paddingHorizontal: 16,
-		paddingVertical: 12,
+		paddingVertical: 10,
 		backgroundColor: '#FFFFFF',
 	},
 	searchBar: {
@@ -355,7 +372,7 @@ const styles = StyleSheet.create({
 		borderColor: '#E2E8F0',
 		borderRadius: 12,
 		paddingHorizontal: 12,
-		height: 44,
+		height: 42,
 	},
 	searchIcon: {
 		marginRight: 8,
@@ -367,7 +384,7 @@ const styles = StyleSheet.create({
 	},
 	filterContainer: {
 		backgroundColor: '#FFFFFF',
-		paddingBottom: 12,
+		paddingBottom: 10,
 		borderBottomWidth: 1,
 		borderBottomColor: '#E2E8F0',
 	},
@@ -380,17 +397,17 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		backgroundColor: '#F1F5F9',
 		paddingHorizontal: 12,
-		paddingVertical: 8,
-		borderRadius: 20,
+		paddingVertical: 6,
+		borderRadius: 16,
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
 	},
 	filterTagActive: {
-		backgroundColor: '#2B6F71',
-		borderColor: '#2B6F71',
+		backgroundColor: '#0C7C7C',
+		borderColor: '#0C7C7C',
 	},
 	filterTagText: {
-		fontSize: 12,
+		fontSize: 11.5,
 		fontWeight: '600',
 		color: '#475569',
 	},
@@ -402,30 +419,34 @@ const styles = StyleSheet.create({
 	},
 	listContent: {
 		padding: 16,
-		gap: 16,
+		gap: 12,
 		paddingBottom: 40,
 	},
 	card: {
 		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
+		borderRadius: 14,
+		padding: 14,
 		borderWidth: 1,
-		borderColor: '#E6EDF2',
-		shadowColor: '#12373E',
+		borderColor: '#E2E8F0',
+		shadowColor: '#0F172A',
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.04,
-		shadowRadius: 8,
-		elevation: 2,
+		shadowRadius: 6,
+		elevation: 1.5,
+	},
+	cardSelected: {
+		borderColor: '#0C7C7C',
+		backgroundColor: '#F0FDFA',
 	},
 	cardHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 14,
+		marginBottom: 12,
 	},
 	avatar: {
-		width: 56,
-		height: 56,
-		borderRadius: 28,
+		width: 52,
+		height: 52,
+		borderRadius: 16,
 		backgroundColor: '#F1F5F9',
 	},
 	providerInfo: {
@@ -439,34 +460,33 @@ const styles = StyleSheet.create({
 		marginBottom: 2,
 	},
 	name: {
-		fontSize: 15,
+		fontSize: 14.5,
 		fontWeight: '700',
-		color: '#16324A',
+		color: '#0F172A',
 	},
 	credentialsBadge: {
-		backgroundColor: '#EAF6F6',
+		backgroundColor: '#CCFBF1',
 		paddingHorizontal: 6,
-		paddingVertical: 2,
+		paddingVertical: 1.5,
 		borderRadius: 4,
 	},
 	credentialsText: {
 		fontSize: 10,
 		fontWeight: '700',
-		color: '#2B6F71',
+		color: '#0F766E',
 	},
 	experience: {
-		fontSize: 12,
+		fontSize: 11.5,
 		color: '#64748B',
-		fontWeight: '500',
-		marginBottom: 4,
+		marginBottom: 3,
 	},
 	ratingRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 4,
+		gap: 3,
 	},
 	rating: {
-		fontSize: 12,
+		fontSize: 11.5,
 		fontWeight: '700',
 		color: '#1E293B',
 	},
@@ -478,39 +498,39 @@ const styles = StyleSheet.create({
 		alignItems: 'flex-end',
 	},
 	rateLabel: {
-		fontSize: 10,
+		fontSize: 9.5,
 		color: '#64748B',
-		fontWeight: '600',
-		marginBottom: 2,
+		fontWeight: '500',
+		marginBottom: 1,
 	},
 	ratePrice: {
-		fontSize: 16,
+		fontSize: 15,
 		fontWeight: '800',
-		color: '#2B6F71',
+		color: '#0C7C7C',
 	},
 	metaBox: {
 		backgroundColor: '#F8FAFC',
-		borderRadius: 12,
-		padding: 10,
-		gap: 6,
-		marginBottom: 12,
+		borderRadius: 10,
+		padding: 8,
+		gap: 5,
+		marginBottom: 10,
 	},
 	metaRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
+		gap: 6,
 	},
 	metaText: {
-		fontSize: 12,
+		fontSize: 11.5,
 		color: '#475569',
-		fontWeight: '600',
+		fontWeight: '500',
 		flex: 1,
 	},
 	badgeRow: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		gap: 8,
-		marginBottom: 16,
+		gap: 6,
+		marginBottom: 12,
 	},
 	badge: {
 		flexDirection: 'row',
@@ -518,49 +538,47 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ECFDF5',
 		borderWidth: 1,
 		borderColor: '#D1FAE5',
-		paddingHorizontal: 8,
-		paddingVertical: 4,
+		paddingHorizontal: 7,
+		paddingVertical: 3,
 		borderRadius: 6,
 	},
 	badgeIcon: {
-		marginRight: 4,
+		marginRight: 3,
 	},
 	badgeText: {
-		fontSize: 10,
+		fontSize: 9.5,
 		fontWeight: '700',
 		color: '#065F46',
 	},
 	actions: {
 		flexDirection: 'row',
-		gap: 12,
+		gap: 10,
+		alignItems: 'center',
 	},
 	profileBtn: {
 		flex: 1,
-		height: 42,
 		borderRadius: 10,
-		borderWidth: 1.5,
 		borderColor: '#CBD5E1',
-		justifyContent: 'center',
-		alignItems: 'center',
-		backgroundColor: '#FFFFFF',
 	},
-	profileBtnText: {
-		fontSize: 13,
-		fontWeight: '700',
+	profileBtnLabel: {
+		fontSize: 12.5,
+		fontWeight: '600',
 		color: '#475569',
+		marginHorizontal: 0,
 	},
 	bookBtn: {
-		flex: 1.2,
-		height: 42,
+		flex: 1.3,
 		borderRadius: 10,
-		backgroundColor: '#2B6F71',
-		justifyContent: 'center',
-		alignItems: 'center',
+		backgroundColor: '#0C7C7C',
 	},
-	bookBtnText: {
-		fontSize: 13,
+	bookBtnSelected: {
+		backgroundColor: '#047857',
+	},
+	bookBtnLabel: {
+		fontSize: 12.5,
 		fontWeight: '700',
 		color: '#FFFFFF',
+		marginHorizontal: 0,
 	},
 	emptyContainer: {
 		paddingVertical: 60,
@@ -573,68 +591,134 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		paddingHorizontal: 24,
 	},
+	/* Profile Modal Content Styles */
 	modalProfileContent: {
+		paddingVertical: 4,
+	},
+	modalHeaderBlock: {
 		alignItems: 'center',
-		paddingVertical: 12,
+		paddingBottom: 14,
+		borderBottomWidth: 1,
+		borderBottomColor: '#F1F5F9',
 	},
 	modalAvatar: {
-		width: 80,
-		height: 80,
-		borderRadius: 40,
-		marginBottom: 12,
+		width: 64,
+		height: 64,
+		borderRadius: 32,
+		borderWidth: 2,
+		borderColor: '#E2E8F0',
+		marginBottom: 8,
+		backgroundColor: '#F1F5F9',
 	},
 	modalName: {
-		fontSize: 18,
-		fontWeight: '800',
-		color: '#16324A',
-		marginBottom: 4,
+		fontSize: 16.5,
+		fontWeight: '700',
+		color: '#0F172A',
+		marginBottom: 3,
 	},
-	modalExperience: {
-		fontSize: 14,
-		color: '#64748B',
-		fontWeight: '600',
-		marginBottom: 8,
+	modalCredentialsBadge: {
+		backgroundColor: '#CCFBF1',
+		paddingHorizontal: 8,
+		paddingVertical: 2.5,
+		borderRadius: 6,
 	},
-	modalRatingRow: {
+	modalCredentialsText: {
+		fontSize: 11,
+		fontWeight: '700',
+		color: '#0F766E',
+	},
+	modalStatsRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 6,
-		marginBottom: 20,
-	},
-	modalRatingText: {
-		fontSize: 13,
-		color: '#1E293B',
-		fontWeight: '700',
-	},
-	modalSectionTitle: {
-		fontSize: 13,
-		fontWeight: '800',
-		color: '#16324A',
-		alignSelf: 'flex-start',
-		marginTop: 12,
-		marginBottom: 4,
-		textTransform: 'uppercase',
-		letterSpacing: 0.5,
-	},
-	modalDescText: {
-		fontSize: 13,
-		color: '#475569',
-		alignSelf: 'flex-start',
-		lineHeight: 18,
-		marginBottom: 12,
-	},
-	modalBookBtn: {
-		backgroundColor: '#2B6F71',
-		width: '100%',
-		height: 48,
+		justifyContent: 'space-around',
+		backgroundColor: '#F8FAFC',
 		borderRadius: 12,
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginTop: 24,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+		paddingVertical: 10,
+		paddingHorizontal: 6,
+		marginVertical: 12,
 	},
-	modalBookBtnText: {
-		color: '#FFFFFF',
+	modalStatBox: {
+		alignItems: 'center',
+		flex: 1,
+	},
+	modalStatDivider: {
+		width: 1,
+		height: 24,
+		backgroundColor: '#E2E8F0',
+	},
+	modalStatVal: {
 		fontSize: 14,
 		fontWeight: '700',
+		color: '#0F172A',
+		marginBottom: 1,
+	},
+	modalStatLabel: {
+		fontSize: 10.5,
+		color: '#64748B',
+	},
+	modalSection: {
+		marginBottom: 12,
+	},
+	modalSectionTitle: {
+		fontSize: 11,
+		fontWeight: '700',
+		color: '#64748B',
+		textTransform: 'uppercase',
+		letterSpacing: 0.5,
+		marginBottom: 6,
+	},
+	modalPillsContainer: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 6,
+	},
+	modalPill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		backgroundColor: '#F0FDFA',
+		borderWidth: 1,
+		borderColor: '#CCFBF1',
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 6,
+	},
+	modalPillText: {
+		fontSize: 11,
+		fontWeight: '600',
+		color: '#0F766E',
+	},
+	modalPriceBox: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#F8FAFC',
+		borderRadius: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		marginTop: 4,
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	modalPriceLabel: {
+		fontSize: 11.5,
+		color: '#475569',
+		fontWeight: '500',
+	},
+	modalPriceValue: {
+		fontSize: 16,
+		fontWeight: '800',
+		color: '#0C7C7C',
+	},
+	sheetFooterRow: {
+		width: '100%',
+	},
+	sheetBookBtn: {
+		width: '100%',
+		borderRadius: 10,
+		marginTop: 0,
 	},
 })
