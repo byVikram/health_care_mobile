@@ -4,6 +4,7 @@ import {
 	Image,
 	ScrollView,
 	StyleSheet,
+	Text,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
@@ -29,6 +30,7 @@ import DateSlotPicker from '../../../components/common/DateSlotPicker'
 import { SlotGroup } from '../../doctor/doctorService'
 import { ServiceProcedureItem } from '../components/AllServiceCard'
 import { BookingProgressStepper } from '../components/BookingProgressStepper'
+import { AncillaryProvider } from '../ancillaryService'
 
 const GENDER_OPTIONS: AppSelectOption[] = [
 	{ label: 'Male', value: 'Male' },
@@ -203,6 +205,11 @@ export default function BookingDetailsPage() {
 	const [tempPatientGender, setTempPatientGender] = useState('')
 	const [tempPatientRel, setTempPatientRel] = useState('Self')
 
+	// Nurse Assignment Preference State
+	const [assignmentMode, setAssignmentMode] = useState<'SYSTEM_MATCH' | 'SELECT_NURSE'>('SYSTEM_MATCH')
+	const [selectedNurse, setSelectedNurse] = useState<AncillaryProvider | null>(null)
+	const [nurseBottomSheetVisible, setNurseBottomSheetVisible] = useState(false)
+
 	// Dynamic Saved Addresses State
 	const [savedAddressesList, setSavedAddressesList] = useState(SAVED_ADDRESSES)
 	const [addressOptions, setAddressOptions] = useState<AppSelectOption[]>(ADDRESS_SELECT_OPTIONS)
@@ -337,6 +344,13 @@ export default function BookingDetailsPage() {
 		void fetchProfile()
 	}, [])
 
+	useEffect(() => {
+		if (routeParams.selectedNurse) {
+			setSelectedNurse(routeParams.selectedNurse)
+			setAssignmentMode('SELECT_NURSE')
+		}
+	}, [routeParams.selectedNurse])
+
 	// Dynamic Charges Calculation
 	const procedureBaseFee = useMemo(() => {
 		return services.reduce((total, item) => {
@@ -463,6 +477,8 @@ export default function BookingDetailsPage() {
 			visit,
 			charges,
 			bookingType,
+			assignmentMode,
+			selectedNurse,
 		}
 
 		navigation.navigate(ROUTES.STACK.ANCILLARY_PAYMENT, {
@@ -690,7 +706,227 @@ export default function BookingDetailsPage() {
 				{/* 8px GREY SECTION DIVIDER BAR */}
 				<View style={styles.sectionDividerBar} />
 
-				{/* 4. SECTION: PAYMENT SUMMARY */}
+				{/* 4. SECTION: NURSE ASSIGNMENT PREFERENCE */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							How would you like to choose your nurse?
+						</AppTypography>
+					</View>
+					<AppTypography variant="caption" style={styles.sectionSubheading}>
+						Choose auto-matching for fastest dispatch or browse and pick your preferred nurse.
+					</AppTypography>
+
+					<View style={styles.nurseChoiceContainer}>
+						{/* OPTION 1: Let the System Select */}
+						<TouchableOpacity
+							style={[
+								styles.nursePrefOptionCard,
+								assignmentMode === 'SYSTEM_MATCH' && styles.nursePrefOptionCardSelected,
+							]}
+							onPress={() => {
+								setAssignmentMode('SYSTEM_MATCH')
+								setSelectedNurse(null)
+							}}
+							activeOpacity={0.85}
+						>
+							<View
+								style={[
+									styles.nursePrefIconWrap,
+									assignmentMode === 'SYSTEM_MATCH' && styles.nursePrefIconWrapSelected,
+								]}
+							>
+								<Ionicons
+									name="flash"
+									size={20}
+									color={assignmentMode === 'SYSTEM_MATCH' ? '#FFFFFF' : '#0C7C7C'}
+								/>
+							</View>
+							<View style={styles.nursePrefTextCol}>
+								<View style={styles.optionHeaderRow}>
+									<AppTypography
+										variant="subtitle"
+										style={[
+											styles.nursePrefTitle,
+											assignmentMode === 'SYSTEM_MATCH' && styles.nursePrefTitleSelected,
+										]}
+									>
+										Let the System Select
+									</AppTypography>
+									<View style={styles.recommendedBadge}>
+										<AppTypography variant="caption" style={styles.recommendedBadgeText}>
+											RECOMMENDED
+										</AppTypography>
+									</View>
+								</View>
+								<AppTypography variant="caption" style={styles.nursePrefSub}>
+									Fastest dispatch • Automatically matches the nearest qualified nurse to your location (15-30 mins).
+								</AppTypography>
+							</View>
+							<View
+								style={[
+									styles.prefRadio,
+									assignmentMode === 'SYSTEM_MATCH' && styles.prefRadioSelected,
+								]}
+							>
+								{assignmentMode === 'SYSTEM_MATCH' && <View style={styles.prefRadioInner} />}
+							</View>
+						</TouchableOpacity>
+
+						{/* OPTION 2: Select a Nurse */}
+						<TouchableOpacity
+							style={[
+								styles.nursePrefOptionCard,
+								assignmentMode === 'SELECT_NURSE' && styles.nursePrefOptionCardSelected,
+							]}
+							onPress={() => {
+								setAssignmentMode('SELECT_NURSE')
+								if (!selectedNurse) {
+									navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+										isSelectionMode: true,
+									})
+								}
+							}}
+							activeOpacity={0.85}
+						>
+							<View
+								style={[
+									styles.nursePrefIconWrap,
+									assignmentMode === 'SELECT_NURSE' && styles.nursePrefIconWrapSelected,
+								]}
+							>
+								<Ionicons
+									name="person"
+									size={20}
+									color={assignmentMode === 'SELECT_NURSE' ? '#FFFFFF' : '#0C7C7C'}
+								/>
+							</View>
+							<View style={styles.nursePrefTextCol}>
+								<View style={styles.optionHeaderRow}>
+									<AppTypography
+										variant="subtitle"
+										style={[
+											styles.nursePrefTitle,
+											assignmentMode === 'SELECT_NURSE' && styles.nursePrefTitleSelected,
+										]}
+									>
+										Select a Nurse
+									</AppTypography>
+								</View>
+								<AppTypography variant="caption" style={styles.nursePrefSub}>
+									Browse clinician profiles, verified credentials, ratings, and select your preferred nurse.
+								</AppTypography>
+							</View>
+							<View
+								style={[
+									styles.prefRadio,
+									assignmentMode === 'SELECT_NURSE' && styles.prefRadioSelected,
+								]}
+							>
+								{assignmentMode === 'SELECT_NURSE' && <View style={styles.prefRadioInner} />}
+							</View>
+						</TouchableOpacity>
+					</View>
+
+					{/* WHEN SELECT_NURSE IS ACTIVE */}
+					{assignmentMode === 'SELECT_NURSE' && (
+						selectedNurse ? (
+							<View style={styles.selectedNurseCardContainer}>
+								<View style={styles.selectedNurseCardHeader}>
+									<View style={styles.selectedBadgeRow}>
+										<Ionicons name="checkmark-circle" size={15} color="#047857" />
+										<AppTypography variant="caption" style={styles.selectedBadgeLabel}>
+											Preferred Nurse Selected
+										</AppTypography>
+									</View>
+									<TouchableOpacity
+										style={styles.changeNurseBtn}
+										onPress={() => {
+											navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+												isSelectionMode: true,
+												selectedNurseId: selectedNurse?.id,
+											})
+										}}
+										activeOpacity={0.7}
+									>
+										<Ionicons name="swap-horizontal" size={14} color="#0C7C7C" />
+										<AppTypography variant="caption" style={styles.changeNurseBtnText}>
+											Change Nurse
+										</AppTypography>
+									</TouchableOpacity>
+								</View>
+
+								<View style={styles.selectedNurseRow}>
+									<Image source={{ uri: selectedNurse.avatar }} style={styles.selectedNurseAvatar} />
+									<View style={styles.selectedNurseInfo}>
+										<View style={styles.nameAndBadge}>
+											<AppTypography variant="subtitle" style={styles.selectedNurseName}>
+												{selectedNurse.name}
+											</AppTypography>
+											<View style={styles.rnChip}>
+												<AppTypography variant="caption" style={styles.rnChipText}>
+													{selectedNurse.credentials}
+												</AppTypography>
+											</View>
+										</View>
+										<View style={styles.selectedNurseStats}>
+											<View style={styles.statItem}>
+												<Ionicons name="star" size={12} color="#F59E0B" />
+												<AppTypography variant="caption" style={styles.statTextBold}>
+													{selectedNurse.rating}
+												</AppTypography>
+												<AppTypography variant="caption" style={styles.statTextMuted}>
+													({selectedNurse.reviewsCount})
+												</AppTypography>
+											</View>
+											<AppTypography variant="caption" style={styles.statDot}>•</AppTypography>
+											<AppTypography variant="caption" style={styles.statText}>
+												{selectedNurse.experience} yrs exp
+											</AppTypography>
+											<AppTypography variant="caption" style={styles.statDot}>•</AppTypography>
+											<AppTypography variant="caption" style={styles.statText}>
+												{selectedNurse.distance} km away
+											</AppTypography>
+										</View>
+									</View>
+								</View>
+							</View>
+						) : (
+							<TouchableOpacity
+								style={styles.browsePromptCard}
+								onPress={() => {
+									navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+										isSelectionMode: true,
+									})
+								}}
+								activeOpacity={0.8}
+							>
+								<View style={styles.browsePromptLeft}>
+									<View style={styles.browseIconCircle}>
+										<Ionicons name="search" size={18} color="#0C7C7C" />
+									</View>
+									<View style={styles.browsePromptTextCol}>
+										<AppTypography variant="subtitle" style={styles.browsePromptTitle}>
+											Choose Your Preferred Nurse
+										</AppTypography>
+										<AppTypography variant="caption" style={styles.browsePromptSub}>
+											Tap here to browse profiles, credentials, and distance
+										</AppTypography>
+									</View>
+								</View>
+								<View style={styles.browsePromptCta}>
+									<AppTypography variant="caption" style={styles.browsePromptCtaText}>Browse</AppTypography>
+									<Ionicons name="chevron-forward" size={14} color="#0C7C7C" />
+								</View>
+							</TouchableOpacity>
+						)
+					)}
+				</View>
+
+				{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
+
+				{/* 5. SECTION: PAYMENT SUMMARY */}
 				<View style={styles.sectionBlock}>
 					<View style={styles.sectionHeaderRow}>
 						<AppTypography variant="h3" style={styles.sectionHeading}>
@@ -866,6 +1102,7 @@ export default function BookingDetailsPage() {
 				onSelectProfile={handleSelectProfile}
 				selectedProfileId={selectedProfileId}
 			/>
+
 			{/* PATIENT ERROR MODAL */}
 			<StatusModal
 				visible={patientErrorModalVisible}
@@ -885,6 +1122,263 @@ export default function BookingDetailsPage() {
 }
 
 const styles = StyleSheet.create({
+	/* Nurse Assignment Preference Styles */
+	sectionSubheading: {
+		fontSize: 12.5,
+		color: '#64748B',
+		marginTop: -8,
+		marginBottom: 2,
+		lineHeight: 18,
+	},
+	nurseChoiceContainer: {
+		gap: 10,
+	},
+	nursePrefOptionCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FFFFFF',
+		borderWidth: 1.5,
+		borderColor: '#E2E8F0',
+		borderRadius: 14,
+		padding: 14,
+	},
+	nursePrefOptionCardSelected: {
+		borderColor: '#0C7C7C',
+		backgroundColor: '#F0FDFA',
+	},
+	nursePrefIconWrap: {
+		width: 42,
+		height: 42,
+		borderRadius: 12,
+		backgroundColor: '#E6F4F4',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: 12,
+	},
+	nursePrefIconWrapSelected: {
+		backgroundColor: '#0C7C7C',
+	},
+	nursePrefTextCol: {
+		flex: 1,
+		paddingRight: 6,
+	},
+	optionHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginBottom: 3,
+	},
+	nursePrefTitle: {
+		fontSize: 14.5,
+		fontWeight: '600',
+		color: '#1E293B',
+	},
+	nursePrefTitleSelected: {
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	recommendedBadge: {
+		backgroundColor: '#CCFBF1',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 4,
+	},
+	recommendedBadgeText: {
+		fontSize: 9.5,
+		fontWeight: '800',
+		color: '#0F766E',
+		letterSpacing: 0.5,
+	},
+	nursePrefSub: {
+		fontSize: 12,
+		lineHeight: 16.5,
+		color: '#64748B',
+	},
+	prefRadio: {
+		width: 22,
+		height: 22,
+		borderRadius: 11,
+		borderWidth: 2,
+		borderColor: '#CBD5E1',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#FFFFFF',
+	},
+	prefRadioSelected: {
+		borderColor: '#0C7C7C',
+	},
+	prefRadioInner: {
+		width: 10,
+		height: 10,
+		borderRadius: 5,
+		backgroundColor: '#0C7C7C',
+	},
+	selectedNurseCardContainer: {
+		marginTop: 8,
+		backgroundColor: '#FFFFFF',
+		borderWidth: 1.5,
+		borderColor: '#0C7C7C',
+		borderRadius: 14,
+		padding: 12,
+		shadowColor: '#0C7C7C',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 6,
+		elevation: 2,
+	},
+	selectedNurseCardHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingBottom: 10,
+		marginBottom: 10,
+		borderBottomWidth: 1,
+		borderBottomColor: '#F1F5F9',
+	},
+	selectedBadgeRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 5,
+	},
+	selectedBadgeLabel: {
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#047857',
+	},
+	changeNurseBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		backgroundColor: '#F0FDFA',
+		borderWidth: 1,
+		borderColor: '#CCFBF1',
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderRadius: 8,
+	},
+	changeNurseBtnText: {
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#0C7C7C',
+	},
+	selectedNurseRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	selectedNurseAvatar: {
+		width: 46,
+		height: 46,
+		borderRadius: 23,
+		marginRight: 12,
+		backgroundColor: '#F1F5F9',
+	},
+	selectedNurseInfo: {
+		flex: 1,
+	},
+	nameAndBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		marginBottom: 3,
+	},
+	selectedNurseName: {
+		fontSize: 14.5,
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	rnChip: {
+		backgroundColor: '#CCFBF1',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 4,
+	},
+	rnChipText: {
+		fontSize: 10.5,
+		fontWeight: '700',
+		color: '#0F766E',
+	},
+	selectedNurseStats: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 5,
+	},
+	statItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 2,
+	},
+	statTextBold: {
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#1E293B',
+	},
+	statTextMuted: {
+		fontSize: 11,
+		color: '#64748B',
+	},
+	statDot: {
+		fontSize: 10,
+		color: '#CBD5E1',
+	},
+	statText: {
+		fontSize: 11.5,
+		color: '#64748B',
+	},
+	browsePromptCard: {
+		marginTop: 8,
+		backgroundColor: '#F0FDFA',
+		borderWidth: 1.5,
+		borderColor: '#99F6E4',
+		borderStyle: 'dashed',
+		borderRadius: 14,
+		padding: 12,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	browsePromptLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+	},
+	browseIconCircle: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		backgroundColor: '#CCFBF1',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: 10,
+	},
+	browsePromptTextCol: {
+		flex: 1,
+	},
+	browsePromptTitle: {
+		fontSize: 13.5,
+		fontWeight: '700',
+		color: '#0F766E',
+	},
+	browsePromptSub: {
+		fontSize: 11.5,
+		color: '#115E59',
+		marginTop: 1,
+	},
+	browsePromptCta: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 2,
+		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#CCFBF1',
+	},
+	browsePromptCtaText: {
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#0F766E',
+	},
 	container: {
 		flex: 1,
 		backgroundColor: '#FFFFFF',
