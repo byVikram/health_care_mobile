@@ -15,6 +15,7 @@ import SearchPage from '../features/doctor/search/SearchPage'
 import BookingsPage from '../features/bookings/BookingsPage'
 import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
+import { WalletScreen } from '../features/wallet/WalletScreen'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
 import NursingCarePage from '../features/ancillary/patient/NursingCarePage'
@@ -39,21 +40,42 @@ function AncillaryTabWrapper() {
 	)
 }
 
-function getTabConfig(routeName: string) {
+function getTabConfig(routeName: string, focused: boolean) {
 	if (routeName === ROUTES.MAIN.SEARCH) {
-		return { iconName: 'magnify' as const, label: 'Search' }
+		return {
+			iconName: 'magnify' as const,
+			label: 'Search',
+		}
 	}
 	if (routeName === ROUTES.MAIN.PORTAL) {
-		return { iconName: 'calendar-multiple-check' as const, label: 'Bookings' }
+		return {
+			iconName: focused ? ('calendar-month' as const) : ('calendar-month-outline' as const),
+			label: 'Bookings',
+		}
+	}
+	if (routeName === ROUTES.MAIN.WALLET) {
+		return {
+			iconName: focused ? ('wallet' as const) : ('wallet-outline' as const),
+			label: 'Wallet',
+		}
 	}
 	if (routeName === ROUTES.MAIN.PROFILE) {
-		return { iconName: 'account' as const, label: 'Profile' }
+		return {
+			iconName: focused ? ('account-circle' as const) : ('account-circle-outline' as const),
+			label: 'Profile',
+		}
 	}
 	if (routeName === ROUTES.MAIN.ANCILLARY) {
-		return { iconName: 'medical-bag' as const, label: 'Ancillary' }
+		return {
+			iconName: focused ? ('plus-box' as const) : ('plus-box-outline' as const),
+			label: 'Ancillary',
+		}
 	}
 
-	return { iconName: 'home' as const, label: 'Home' }
+	return {
+		iconName: focused ? ('home' as const) : ('home-outline' as const),
+		label: 'Home',
+	}
 }
 
 interface DockedTabBarProps extends BottomTabBarProps {
@@ -79,11 +101,14 @@ function DockedTabBar({ state, descriptors, navigation, onAncillaryPress }: Dock
 				},
 			]}
 		>
-			{state.routes.map((route, index) => {
-				const focused = state.index === index
+			{state.routes
+				.filter((route) => route.name !== ROUTES.MAIN.PROFILE)
+				.map((route) => {
+					const index = state.routes.findIndex((r) => r.key === route.key)
+					const focused = state.index === index
 				const { options } = descriptors[route.key]
-				const { iconName, label } = getTabConfig(route.name)
-				const color = focused ? '#0C7C7C' : '#94a3b8'
+				const { iconName, label } = getTabConfig(route.name, focused)
+				const color = focused ? '#0C7C7C' : '#64748B'
 				const isAncillaryTab = route.name === ROUTES.MAIN.ANCILLARY
 
 				const onPress = () => {
@@ -205,11 +230,23 @@ export default function MainTabNavigator() {
 					/>
 				) : null}
 				<Tab.Screen
+					name={ROUTES.MAIN.WALLET}
+					component={WalletScreen}
+					options={{
+						headerShown: false,
+					}}
+				/>
+				<Tab.Screen
 					name={ROUTES.MAIN.PROFILE}
 					component={ProfilePage}
 					options={{
 						headerShown: true,
-						header: ({ navigation: screenNavigation }) => <AppScreenHeader title="My Profile" onBack={() => (screenNavigation.canGoBack() ? screenNavigation.goBack() : navigation.navigate(ROUTES.MAIN.HOME))} />,
+						header: () => (
+							<AppScreenHeader
+								title="My Profile"
+								onBack={() => navigation.navigate(ROUTES.MAIN.HOME)}
+							/>
+						),
 					}}
 				/>
 			</Tab.Navigator>
@@ -228,12 +265,12 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		backgroundColor: '#FFFFFF',
 		borderTopWidth: 1,
-		borderTopColor: '#E2E8F0',
-		elevation: 8,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: -2 },
-		shadowOpacity: 0.05,
-		shadowRadius: 4,
+		borderTopColor: '#F1F5F9',
+		elevation: 12,
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: -4 },
+		shadowOpacity: 0.06,
+		shadowRadius: 8,
 	},
 	tabBarItem: {
 		flex: 1,
@@ -243,21 +280,25 @@ const styles = StyleSheet.create({
 	tabButton: {
 		alignItems: 'center',
 		justifyContent: 'center',
+		paddingVertical: 2,
 	},
 	iconActiveCapsule: {
-		paddingHorizontal: 12,
-		paddingVertical: 4,
-		borderRadius: 16,
+		paddingHorizontal: 0,
+		paddingVertical: 0,
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 	iconActiveCapsuleFocused: {
-		backgroundColor: 'rgba(12, 124, 124, 0.1)',
+		backgroundColor: 'transparent',
 	},
 	tabLabel: {
 		fontSize: 11,
 		fontWeight: '500',
-		marginTop: 2,
+		marginTop: 3,
+		letterSpacing: 0.1,
 	},
 	tabLabelFocused: {
 		fontWeight: '700',
+		color: '#0C7C7C',
 	},
 })

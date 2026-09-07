@@ -30,6 +30,7 @@ export type MainTabParamList = {
 		| undefined
 	[ROUTES.MAIN.PORTAL]: { filter?: BookingsFilterKey } | undefined
 	[ROUTES.MAIN.PROFILE]: undefined
+	[ROUTES.MAIN.WALLET]: undefined
 	[ROUTES.MAIN.ANCILLARY]: undefined
 }
 
@@ -62,6 +63,10 @@ export type PatientPaymentParams = {
 }
 
 export type AppStackParamList = {
+	[ROUTES.STACK.WALLET]: undefined
+	[ROUTES.STACK.WALLET_TOPUP]: undefined
+	[ROUTES.STACK.WALLET_TRANSACTIONS]: undefined
+	[ROUTES.STACK.WALLET_TRANSACTION_DETAIL]: { id: string }
 	[ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
 	[ROUTES.STACK.SEARCH]: undefined
 	[ROUTES.STACK.DOCTOR_SEARCH]:

@@ -1,4 +1,4 @@
-﻿// src/features/laboratory/LaboratorySearchPage.tsx
+// src/features/laboratory/LaboratorySearchPage.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,

@@ -5,7 +5,7 @@
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT
-	const url = 'http://192.168.4.42:8000'
+	const url = 'http://192.168.0.128:8000'
 	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
@@ -235,5 +235,12 @@ export const API_ENDPOINTS = {
 		SOFT_REVIEW: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/soft-review`,
 		PROVIDER_EARNINGS: `${BASE_URL}/api/ancillary/provider/earnings`,
 		PROVIDER_DASHBOARD_METRICS: `${BASE_URL}/api/ancillary/provider/dashboard-metrics`,
+	},
+	WALLET: {
+		GET: `${BASE_URL}/api/wallet`,
+		TRANSACTIONS: `${BASE_URL}/api/wallet/transactions`,
+		TRANSACTION_DETAIL: (id: string) => `${BASE_URL}/api/wallet/transactions/${id}`,
+		TOPUP: `${BASE_URL}/api/wallet/topup`,
+		PAY: `${BASE_URL}/api/wallet/pay`,
 	},
 }

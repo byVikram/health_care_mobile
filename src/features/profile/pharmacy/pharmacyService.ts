@@ -1,4 +1,4 @@
-﻿import ApiService from '../../../services/apiService'
+import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import {
 	PharmacyProfileApiResponse,
