@@ -1,25 +1,26 @@
 import React from 'react'
 import { StyleSheet, TouchableOpacity, View } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../../../components/common'
 
 export interface PhysiotherapyCondition {
 	id: string
 	label: string
-	emoji: string
+	icon: keyof typeof MaterialCommunityIcons.glyphMap
 	/** Lowercase keywords matched against a service's title/description to flag it as recommended */
 	keywords: string[]
 }
 
 export const PHYSIOTHERAPY_CONDITIONS: PhysiotherapyCondition[] = [
-	{ id: 'knee', label: 'Knee Pain', emoji: '🦵', keywords: ['knee'] },
-	{ id: 'back', label: 'Back Pain', emoji: '🧍', keywords: ['back', 'spine', 'lumbar'] },
-	{ id: 'neck', label: 'Neck Pain', emoji: '🧣', keywords: ['neck', 'cervical'] },
-	{ id: 'shoulder', label: 'Shoulder Pain', emoji: '🦾', keywords: ['shoulder'] },
-	{ id: 'hand', label: 'Hand Pain', emoji: '✋', keywords: ['hand', 'wrist'] },
-	{ id: 'leg', label: 'Leg Pain', emoji: '🏃', keywords: ['leg'] },
-	{ id: 'sports', label: 'Sports Injury', emoji: '⚽', keywords: ['sport', 'injury'] },
-	{ id: 'stroke', label: 'Stroke Rehab', emoji: '🧠', keywords: ['stroke'] },
-	{ id: 'postsurg', label: 'Post Surgery', emoji: '🩹', keywords: ['surgery', 'post-op', 'post op'] },
+	{ id: 'knee', label: 'Knee Pain', icon: 'bone', keywords: ['knee'] },
+	{ id: 'back', label: 'Back Pain', icon: 'human-male-height', keywords: ['back', 'spine', 'lumbar'] },
+	{ id: 'neck', label: 'Neck Pain', icon: 'head-alert-outline', keywords: ['neck', 'cervical'] },
+	{ id: 'shoulder', label: 'Shoulder Pain', icon: 'arm-flex-outline', keywords: ['shoulder'] },
+	{ id: 'hand', label: 'Hand Pain', icon: 'hand-back-right-outline', keywords: ['hand', 'wrist'] },
+	{ id: 'leg', label: 'Leg Pain', icon: 'walk', keywords: ['leg'] },
+	{ id: 'sports', label: 'Sports Injury', icon: 'dumbbell', keywords: ['sport', 'injury'] },
+	{ id: 'stroke', label: 'Stroke Rehab', icon: 'brain', keywords: ['stroke'] },
+	{ id: 'postsurg', label: 'Post Surgery', icon: 'bandage', keywords: ['surgery', 'post-op', 'post op'] },
 ]
 
 interface PhysiotherapyConditionsGridProps {
@@ -65,7 +66,11 @@ export const PhysiotherapyConditionsGrid: React.FC<PhysiotherapyConditionsGridPr
 						>
 							{isActive && <View style={styles.activeDot} />}
 							<View style={[styles.iconCircle, isActive && styles.iconCircleActive]}>
-								<AppTypography style={styles.emoji}>{condition.emoji}</AppTypography>
+								<MaterialCommunityIcons
+									name={condition.icon}
+									size={20}
+									color={isActive ? '#0C7C7C' : '#475569'}
+								/>
 							</View>
 							<AppTypography
 								variant="caption"
@@ -159,10 +164,6 @@ const styles = StyleSheet.create({
 	},
 	iconCircleActive: {
 		backgroundColor: '#FFFFFF',
-	},
-	emoji: {
-		fontSize: 18,
-		lineHeight: 22,
 	},
 	cardLabel: {
 		fontSize: 12,

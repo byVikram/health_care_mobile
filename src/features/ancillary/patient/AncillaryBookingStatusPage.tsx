@@ -430,7 +430,7 @@ export default function AncillaryBookingStatusPage() {
 						</View>
 						<View style={styles.billingRow}>
 							<AppTypography variant="body" style={styles.billingLabel}>
-								Taxes & GST (5%)
+								Taxes & GST (3%)
 							</AppTypography>
 							<AppTypography variant="body" style={styles.billingVal}>
 								{pricing.taxes}

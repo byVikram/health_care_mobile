@@ -690,6 +690,8 @@ export interface SoftReviewRequestData {
 	urgency: string
 	specialRequirements: string
 	earning: string
+	/** Patient-facing total for this booking (backend totalAmount), distinct from ` earning ` (this provider's payout). Optional -- older payloads may omit it. */
+	patientAmount?: string
 	expiresAt: number // Timestamp in ms for 30-second response window
 }
 
@@ -765,9 +767,16 @@ export const fetchSoftReviewRequest = async (requestId: string): Promise<SoftRev
 			urgency: String(data.urgency || data.urgencyLevel || 'ROUTINE'),
 			specialRequirements: String(data.specialRequirements || ''),
 			earning:
-				typeof data.earning === 'number'
+				typeof data.providerEarning === 'number'
+					? `₹${data.providerEarning}`
+					: typeof data.earning === 'number'
 					? `₹${data.earning}`
 					: String(data.earning || data.estimatedEarnings || ''),
+			// Patient's full charge for this booking, kept separate from `earning`
+			// (this provider's payout) -- see business requirement for the
+			// patient price / provider payout separation.
+			patientAmount:
+				typeof data.totalAmount === 'number' ? `₹${data.totalAmount}` : undefined,
 			expiresAt: typeof data.expiresAt === 'number' ? data.expiresAt : Date.now() + 60000,
 		}
 	} catch (error) {
@@ -981,6 +990,8 @@ export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequest
 				earning: typeof item.providerEarning === 'number' ? `₹${item.providerEarning}` : 
 					typeof item.estimatedEarnings === 'number' ? `₹${item.estimatedEarnings}` : 
 					item.estimatedEarnings,
+				// Patient's full charge, distinct from `earning` (this provider's payout).
+				patientAmount: typeof item.totalAmount === 'number' ? `₹${item.totalAmount}` : undefined,
 				expiresAt: item.expiresAt || Date.now() + 60 * 1000,
 			}))
 		}
@@ -1099,8 +1110,8 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
  */
 const mapStatusToBookingTab = (status?: string): 'upcoming' | 'completed' | 'cancelled' => {
 	const upper = String(status || '').toUpperCase()
-	if (upper === 'COMPLETED') return 'completed'
-	if (['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED'].includes(upper)) return 'cancelled'
+	if (upper === 'COMPLETED' || upper === 'COMPLETE' || upper === 'VISIT_COMPLETED') return 'completed'
+	if (['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'CANCELLED', 'EXPIRED', 'FAILED'].includes(upper)) return 'cancelled'
 	return 'upcoming'
 }
 

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
 import {
@@ -18,9 +18,10 @@ import { AppScreenHeader, AppSkeleton } from '../../../components/common'
 import StatusModal from '../../../components/common/StatusModal'
 import BookingsSearchBar from '../../bookings/components/BookingsSearchBar'
 
-type BookingTab = 'upcoming' | 'completed' | 'cancelled'
+type BookingTab = 'all' | 'upcoming' | 'completed' | 'cancelled'
 
 const TABS: { key: BookingTab; label: string }[] = [
+	{ key: 'all', label: 'All' },
 	{ key: 'upcoming', label: 'Upcoming' },
 	{ key: 'completed', label: 'Completed' },
 	{ key: 'cancelled', label: 'Cancelled' },
@@ -46,8 +47,8 @@ export default function MyBookingsPage({
 	const [bookings, setBookings] = useState<AncillaryBooking[]>([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [loadError, setLoadError] = useState<string | null>(null)
-	const [activeTab, setActiveTab] = useState<BookingTab>(propActiveTab ?? 'upcoming')
-	const [draftActiveTab, setDraftActiveTab] = useState<BookingTab>(propActiveTab ?? 'upcoming')
+	const [activeTab, setActiveTab] = useState<BookingTab>(propActiveTab ?? 'all')
+	const [draftActiveTab, setDraftActiveTab] = useState<BookingTab>(propActiveTab ?? 'all')
 	const [searchQuery, setSearchQuery] = useState(propSearchQuery ?? '')
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
@@ -93,15 +94,21 @@ export default function MyBookingsPage({
 		}
 	}, [])
 
-	useEffect(() => {
-		loadBookings()
-	}, [loadBookings])
+	// Refetch on focus (not just mount) so a booking's status -- e.g. moving
+	// to COMPLETED after the provider finishes the visit -- is reflected as
+	// soon as the user returns to this list, instead of showing stale
+	// Track Order / Reschedule actions from the last fetch.
+	useFocusEffect(
+		useCallback(() => {
+			loadBookings()
+		}, [loadBookings])
+	)
 
 	const filteredBookings = useMemo(() => {
 		const query = searchQuery.trim().toLowerCase()
 
 		return bookings.filter((booking) => {
-			const matchesTab = booking.status === activeTab
+			const matchesTab = activeTab === 'all' || booking.status === activeTab
 			if (!matchesTab) return false
 			if (!query) return true
 
@@ -236,8 +243,8 @@ export default function MyBookingsPage({
 	}
 
 	const resetFilters = () => {
-		setDraftActiveTab('upcoming')
-		setActiveTab('upcoming')
+		setDraftActiveTab('all')
+		setActiveTab('all')
 		setVisibleCount(PAGE_SIZE)
 	}
 
@@ -316,6 +323,7 @@ export default function MyBookingsPage({
 					onViewInvoice={handleViewInvoice}
 					onBookAgain={handleBookAgain}
 					onRateReview={handleRateReview}
+					onViewDetails={handleTrack}
 				/>
 			)
 		}
@@ -340,7 +348,7 @@ export default function MyBookingsPage({
 					}}
 					placeholder="Search provider, service or date..."
 					onFilterPress={handleFilterPress}
-					filterActive={activeTab !== 'upcoming' || filterModalVisible}
+					filterActive={activeTab !== 'all' || filterModalVisible}
 					accessibilityLabel="Filter ancillary bookings"
 				/>
 			)}
@@ -374,7 +382,9 @@ export default function MyBookingsPage({
 							<Text style={styles.emptyText}>
 								{searchQuery
 									? 'No bookings match your search.'
-									: `You have no ${activeTab} bookings yet.`}
+									: activeTab === 'all'
+									? 'You have no ancillary orders yet.'
+									: `You have no ${activeTab} orders yet.`}
 							</Text>
 						</View>
 					}

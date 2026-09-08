@@ -180,6 +180,15 @@ export default function AncillaryPaymentPage() {
 				...(visit?.longitude != null ? { longitude: visit.longitude } : {}),
 			},
 			totalAmount: charges.totalAmount,
+			// Numeric/raw breakdown so the backend persists the exact same
+			// figures the patient reviewed on this screen instead of a value
+			// recomputed server-side (see ancillary_service_requests amount fix).
+			charges: {
+				procedureOrServiceFee: charges.basePrice,
+				transportFee: charges.visitFee,
+				tax: charges.taxes,
+				totalAmount: charges.totalAmount,
+			},
 		}
 
 		try {
@@ -291,6 +300,21 @@ export default function AncillaryPaymentPage() {
 						</AppTypography>
 					</View>
 
+					{/* Preferred Nurse Summary Bar */}
+					{bookingPayload.selectedNurse && (
+						<View style={styles.preferredNurseBar}>
+							<Image source={{ uri: bookingPayload.selectedNurse.avatar }} style={styles.preferredNurseAvatar} />
+							<View style={{ flex: 1 }}>
+								<AppTypography variant="caption" style={{ fontWeight: '700', color: '#0F766E' }}>
+									Preferred Nurse: {bookingPayload.selectedNurse.name} ({bookingPayload.selectedNurse.credentials})
+								</AppTypography>
+								<AppTypography variant="caption" style={{ color: '#0F766E', fontSize: 11, marginTop: 1 }}>
+									{bookingPayload.selectedNurse.experience} yrs exp • {bookingPayload.selectedNurse.rating} ★ • {bookingPayload.selectedNurse.distance} km away
+								</AppTypography>
+							</View>
+						</View>
+					)}
+
 					{/* Expandable Procedure Details */}
 					{summaryExpanded && (
 						<View style={styles.expandedDetailsWrap}>
@@ -332,7 +356,7 @@ export default function AncillaryPaymentPage() {
 								</View>
 								<View style={styles.costRow}>
 									<AppTypography variant="caption" style={styles.costLabel}>
-										Taxes & GST (5%)
+										Taxes & GST (3%)
 									</AppTypography>
 									<AppTypography variant="caption" style={styles.costVal}>
 										{charges.taxes}
@@ -559,13 +583,28 @@ const styles = StyleSheet.create({
 		color: '#2B6F71',
 	},
 	scheduleBar: {
+		backgroundColor: '#F1F5F9',
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		borderRadius: 8,
+		marginTop: 10,
+	},
+	preferredNurseBar: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#F7FAFA',
-		paddingHorizontal: 10,
-		paddingVertical: 6,
+		backgroundColor: '#CCFBF1',
+		borderWidth: 1,
+		borderColor: '#99F6E4',
+		paddingHorizontal: 12,
+		paddingVertical: 8,
 		borderRadius: 8,
-		gap: 6,
+		marginTop: 8,
+	},
+	preferredNurseAvatar: {
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		marginRight: 10,
 	},
 	scheduleText: {
 		fontSize: 12,

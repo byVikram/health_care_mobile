@@ -254,13 +254,19 @@ export default function ServiceMatchingPage() {
 					</View>
 
 					<AppTypography variant="h2" style={styles.titleText}>
-						{searchStatus === 'ASSIGNED' ? 'Specialist Assigned!' : 'Matching Nearest Nurse...'}
+						{searchStatus === 'ASSIGNED'
+							? 'Specialist Assigned!'
+							: routeParams.bookingPayload?.selectedNurse
+								? `Notifying ${routeParams.bookingPayload.selectedNurse.name}...`
+								: 'Matching Nearest Nurse...'}
 					</AppTypography>
 
 					<AppTypography variant="subtitle" style={styles.subtitleText}>
 						{searchStatus === 'ASSIGNED'
 							? `${assignedProvider?.name || 'Specialist'} has accepted your care request.`
-							: 'Broadcasting your care request to certified registered nurses within 5 km...'}
+							: routeParams.bookingPayload?.selectedNurse
+								? `Connecting with preferred nurse ${routeParams.bookingPayload.selectedNurse.name} (${routeParams.bookingPayload.selectedNurse.credentials})`
+								: 'Broadcasting your care request to certified registered nurses within 5 km...'}
 					</AppTypography>
 				</View>
 

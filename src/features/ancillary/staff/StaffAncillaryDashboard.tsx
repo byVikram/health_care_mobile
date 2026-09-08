@@ -159,6 +159,11 @@ export default function StaffAncillaryDashboard() {
 									reqData.providerEarning !== undefined
 										? `₹${reqData.providerEarning}`
 										: reqData.estimatedEarnings,
+								// Patient's full charge, distinct from `earning` (this
+								// provider's payout) -- see patient price / provider
+								// payout separation requirement.
+								patientAmount:
+									reqData.totalAmount !== undefined ? `₹${reqData.totalAmount}` : undefined,
 								expiresAt: reqData.expiresAt || Date.now() + 60000,
 							})
 							setRequestStep('request_card')

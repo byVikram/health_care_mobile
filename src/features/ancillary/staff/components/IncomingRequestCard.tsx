@@ -255,7 +255,10 @@ export function IncomingRequestNotificationOverlay({
 
 						{/* Visually Prominent Payout Box on Right */}
 						<View style={styles.payoutProminentBox}>
-							<Text style={styles.payoutBoxLabel}>ESTIMATED PAYOUT</Text>
+							{request.patientAmount ? (
+								<Text style={styles.patientPaysLabel}>Patient pays {request.patientAmount}</Text>
+							) : null}
+							<Text style={styles.payoutBoxLabel}>YOUR PAYOUT</Text>
 							<Text style={styles.payoutBoxValue}>{request.earning}</Text>
 						</View>
 					</View>
@@ -380,8 +383,13 @@ export function IncomingRequestNotificationOverlay({
 										<Text style={styles.expandedInfoVal}>{request.specialRequirements}</Text>
 									</View>
 
+									<View style={styles.expandedInfoRow}>
+										<Text style={styles.expandedInfoLabel}>Patient Pays</Text>
+										<Text style={styles.expandedInfoValBold}>{request.patientAmount || '—'}</Text>
+									</View>
+
 									<View style={[styles.expandedInfoRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
-										<Text style={styles.expandedInfoLabel}>Estimated Payout</Text>
+										<Text style={styles.expandedInfoLabel}>Your Payout</Text>
 										<Text style={styles.payoutBigValue}>{request.earning}</Text>
 									</View>
 								</View>
@@ -470,8 +478,12 @@ export function AcceptConfirmationModal({
 						<Text style={styles.summaryLabel}>Distance:</Text>
 						<Text style={styles.summaryValue}>{request.distanceKm}</Text>
 					</View>
+					<View style={styles.summaryRow}>
+						<Text style={styles.summaryLabel}>Patient Pays:</Text>
+						<Text style={styles.summaryValue}>{request.patientAmount || '—'}</Text>
+					</View>
 					<View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
-						<Text style={styles.summaryLabel}>Estimated Payout:</Text>
+						<Text style={styles.summaryLabel}>Your Payout:</Text>
 						<Text style={styles.summaryValuePayout}>{request.earning}</Text>
 					</View>
 				</View>
@@ -717,6 +729,13 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		minWidth: 92,
 		flexShrink: 0,
+	},
+	patientPaysLabel: {
+		fontSize: 9.5,
+		fontWeight: '600',
+		color: '#5B7B7C',
+		marginBottom: 3,
+		textAlign: 'center',
 	},
 	payoutBoxLabel: {
 		fontSize: 8.5,
