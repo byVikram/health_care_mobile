@@ -12,6 +12,8 @@ interface CompletedBookingCardProps {
 	onViewInvoice: (booking: AncillaryBooking) => void
 	onBookAgain: (booking: AncillaryBooking) => void
 	onRateReview: (booking: AncillaryBooking) => void
+	/** Opens the existing Track Appointment page in its completed (read-only) view. */
+	onViewDetails: (booking: AncillaryBooking) => void
 }
 
 export default function CompletedBookingCard({
@@ -19,12 +21,13 @@ export default function CompletedBookingCard({
 	onViewInvoice,
 	onBookAgain,
 	onRateReview,
+	onViewDetails,
 }: CompletedBookingCardProps) {
 	const hasReview = booking.hasReview || (booking.rating != null && booking.rating > 0)
 	const ratingValue = booking.rating || 5
 
 	return (
-		<CommonCard style={styles.card}>
+		<CommonCard style={styles.card} onPress={() => onViewDetails(booking)}>
 			{/* Top Header Row: Service Name + Status + Amount */}
 			<View style={styles.headerRow}>
 				<View style={styles.headerLeft}>

@@ -44,7 +44,7 @@ const SERVICE_UI: Record<string, {
 		image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=300&q=80',
 	},
 	physiotherapy: {
-		title: 'Physiotherapy & Rehab',
+		title: 'Physiotherapy',
 		searchPlaceholder: 'Search physiotherapy e.g. Back pain, Knee pain...',
 		image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=300&q=80',
 		premiumBadgeText: 'Verified PT',
