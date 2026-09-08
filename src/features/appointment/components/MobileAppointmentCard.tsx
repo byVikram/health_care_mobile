@@ -17,10 +17,6 @@ import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { useAuth } from '../../../context/AuthContext'
 import { AppModal } from '../../../components/common/AppModal'
 import { getStatusStyle } from '../../../constants/statusColors'
-import { useNavigation, type NavigationProp } from '@react-navigation/native'
-import { ROUTES } from '../../../navigation/routes'
-import type { RootStackParamList } from '../../../navigation/types'
-import { getRideState } from '../../transportation/transportationService'
 import AppointmentHistoryTab from './AppointmentHistoryTab'
 import RescheduleModal, { type RescheduleResult } from './RescheduleModal'
 
@@ -172,25 +168,6 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 	const rescheduleDoctorId = localRow.doctorId || localRow.raw?.doctor?.id
 	const rescheduleHospitalId = localRow.hospitalId || localRow.raw?.hospital?.id
 
-	const navigation = useNavigation<NavigationProp<RootStackParamList>>()
-	const [hasBookedCab, setHasBookedCab] = useState(false)
-
-	useEffect(() => {
-		if (localRow.id) {
-			getRideState(String(localRow.id))
-				.then((state) => setHasBookedCab(state.hasOnward || state.hasReturn))
-				.catch(() => setHasBookedCab(false))
-		}
-	}, [localRow.id])
-
-	const handleCabAction = () => {
-		if (hasBookedCab) {
-			navigation.navigate(ROUTES.STACK.RIDE_TRACKING, { appointmentId: localRow.id })
-		} else {
-			navigation.navigate(ROUTES.STACK.BOOK_RIDE, { appointmentId: localRow.id, type: 'onward' })
-		}
-	}
-
 	const openReschedule = () => {
 		if (!rescheduleDoctorId) {
 			Alert.alert('Unable to reschedule', 'Doctor details are missing for this appointment.')
@@ -334,16 +311,6 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 					>
 						<Text style={styles.secondaryButtonText} numberOfLines={1} adjustsFontSizeToFit>
 							Reschedule
-						</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						activeOpacity={0.88}
-						style={[styles.actionButton, styles.cabButton]}
-						onPress={handleCabAction}
-					>
-						<Text style={styles.cabButtonText} numberOfLines={1} adjustsFontSizeToFit>
-							{hasBookedCab ? 'Track Cab' : 'Book a Cab'}
 						</Text>
 					</TouchableOpacity>
 
@@ -566,16 +533,6 @@ const styles = StyleSheet.create({
 	},
 	secondaryButtonText: {
 		color: '#1A2A38',
-		fontSize: 12.5,
-		fontWeight: '700',
-	},
-	cabButton: {
-		backgroundColor: '#EAF6F6',
-		borderWidth: 1,
-		borderColor: '#0c7c7c',
-	},
-	cabButtonText: {
-		color: '#0c7c7c',
 		fontSize: 12.5,
 		fontWeight: '700',
 	},
