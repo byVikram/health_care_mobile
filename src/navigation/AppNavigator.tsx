@@ -39,8 +39,8 @@ import LaboratorySearchPage from '../features/laboratory/LaboratorySearchPage'
 import LaboratoryOrderPage from '../features/laboratory/Orderlistlaboratorypage'
 import LaboratoryBookingDetail from '../features/laboratory/Bookingdetailslaboratorypage'
 
-import PatientHealthQuestionsList from '../features/dashboard/components/PatientHealthQuestionsList'
-import PatientHealthQuestionDetail from '../features/dashboard/components/PatientHealthQuestionDetail'
+import PatientQuestionsListPage from '../features/patient/PatientQuestionsListPage'
+import PatientQuestionDetailPage from '../features/patient/PatientQuestionDetailPage'
 import RadiologyBookingPage from '../features/radiology/RadiologyBookingPage'
 import RadiologyBookingDetailsPage from '../features/radiology/RadiologyBookingDetailsPage'
 import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
@@ -101,12 +101,12 @@ function AuthenticatedNavigator() {
 
 			<AppStack.Screen
 				name={ROUTES.STACK.PATIENT_QUESTIONS_LIST as keyof AppStackParamList}
-				component={PatientHealthQuestionsList}
-				options={{ headerShown: true, title: 'Patient Questions' }}
+				component={PatientQuestionsListPage}
+				options={{ headerShown: true, title: 'Health Questions' }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.PATIENT_QUESTION_DETAIL as keyof AppStackParamList}
-				component={PatientHealthQuestionDetail}
+				component={PatientQuestionDetailPage}
 				options={{ headerShown: true, title: 'Question Detail' }}
 			/>
 

@@ -9,6 +9,7 @@ import {
 	RefreshControl,
 	Modal,
 	Alert,
+	useWindowDimensions,
 } from 'react-native'
 import { Text, Card, Chip, Button } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -29,6 +30,8 @@ type QuestionsListRouteProp = RouteProp<AppStackParamList, typeof ROUTES.STACK.P
 export default function PatientQuestionsListPage() {
 	const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>()
 	const route = useRoute<QuestionsListRouteProp>()
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
 
 	const [questions, setQuestions] = useState<PatientQuestion[]>([])
 	const [loading, setLoading] = useState(true)
@@ -137,7 +140,7 @@ export default function PatientQuestionsListPage() {
 	return (
 		<View style={styles.container}>
 			<ScrollView
-				contentContainerStyle={styles.scrollContent}
+				contentContainerStyle={[styles.scrollContent, isTablet && styles.scrollContentTablet]}
 				refreshControl={
 					<RefreshControl
 						refreshing={refreshing}
@@ -240,7 +243,7 @@ export default function PatientQuestionsListPage() {
 			{/* Ask Question Modal */}
 			<Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
 				<View style={styles.modalOverlay}>
-					<View style={styles.modalContent}>
+					<View style={[styles.modalContent, isTablet && styles.modalContentTablet]}>
 						<View style={styles.modalHeader}>
 							<Text style={styles.modalTitle}>Ask a Medical Question</Text>
 							<TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -335,6 +338,12 @@ const styles = StyleSheet.create({
 	scrollContent: {
 		padding: 16,
 		paddingBottom: 90,
+	},
+	scrollContentTablet: {
+		maxWidth: 840,
+		width: '100%',
+		alignSelf: 'center',
+		paddingHorizontal: 24,
 	},
 	headerBox: {
 		marginBottom: 14,
@@ -468,6 +477,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: 'rgba(15, 23, 42, 0.5)',
 		justifyContent: 'center',
+		alignItems: 'center',
 		padding: 16,
 	},
 	modalContent: {
@@ -475,6 +485,12 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		padding: 20,
 		maxHeight: '85%',
+		width: '100%',
+		maxWidth: 580,
+	},
+	modalContentTablet: {
+		padding: 28,
+		borderRadius: 20,
 	},
 	modalHeader: {
 		flexDirection: 'row',
