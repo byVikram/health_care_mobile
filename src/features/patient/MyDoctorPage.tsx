@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, FlatList, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native'
+import {
+	ActivityIndicator,
+	FlatList,
+	StyleSheet,
+	TextInput,
+	TouchableOpacity,
+	View,
+	useWindowDimensions,
+} from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import Toast from 'react-native-toast-message'
 import { useNavigation } from '@react-navigation/native'
@@ -64,36 +72,63 @@ const DoctorsListHeader = React.memo(function DoctorsListHeader({
 		<View style={styles.headerContent}>
 			<View style={styles.searchSection}>
 				<View style={styles.searchBar}>
-					<MaterialCommunityIcons name="magnify" size={22} color="#7d8b94" />
+					<MaterialCommunityIcons name="magnify" size={20} color="#64748b" style={styles.searchIcon} />
 					<TextInput
 						value={searchQuery}
 						onChangeText={onSearchChange}
-						placeholder="Search doctor by name"
-						placeholderTextColor="#8b9aa2"
+						placeholder="Search doctor by name, speciality..."
+						placeholderTextColor="#94a3b8"
 						style={styles.searchInput}
 						autoCorrect={false}
 						returnKeyType="search"
 					/>
-					<TouchableOpacity style={styles.micButton} activeOpacity={0.75}>
-						<MaterialCommunityIcons name="microphone-outline" size={22} color="#245f67" />
-					</TouchableOpacity>
+					{searchQuery.length > 0 ? (
+						<TouchableOpacity
+							style={styles.clearButton}
+							onPress={() => onSearchChange('')}
+							activeOpacity={0.7}
+							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+						>
+							<MaterialCommunityIcons name="close-circle" size={18} color="#94a3b8" />
+						</TouchableOpacity>
+					) : (
+						<View style={styles.searchBarEnd} />
+					)}
 				</View>
 			</View>
 
 			{isSearching && (
 				<View style={styles.resultsSection}>
-					<AppTypography variant="caption" style={styles.sectionTitle}>
-						SEARCH RESULTS
-					</AppTypography>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="caption" style={styles.sectionTitle}>
+							SEARCH RESULTS
+						</AppTypography>
+						{!searchLoading && (
+							<View style={styles.countBadge}>
+								<AppTypography variant="caption" style={styles.countBadgeText}>
+									{searchResults.length}
+								</AppTypography>
+							</View>
+						)}
+					</View>
 
 					{searchLoading ? (
 						<View style={styles.loadingBlock}>
-							<ActivityIndicator size="small" color="#245f67" />
+							<ActivityIndicator size="small" color="#1f5f68" />
+							<AppTypography variant="caption" style={styles.loadingText}>
+								Searching doctors...
+							</AppTypography>
 						</View>
 					) : searchResults.length === 0 ? (
-						<AppTypography variant="caption" style={styles.emptyText}>
-							No doctors found
-						</AppTypography>
+						<View style={styles.searchEmptyCard}>
+							<MaterialCommunityIcons name="account-search-outline" size={36} color="#94a3b8" />
+							<AppTypography variant="caption" style={styles.searchEmptyTitle}>
+								No doctors found
+							</AppTypography>
+							<AppTypography variant="caption" style={styles.searchEmptySub}>
+								No matches found for "{searchQuery.trim()}"
+							</AppTypography>
+						</View>
 					) : (
 						<View style={styles.inlineList}>
 							{searchResults.map((doctor, index) => (
@@ -110,34 +145,42 @@ const DoctorsListHeader = React.memo(function DoctorsListHeader({
 							))}
 						</View>
 					)}
+					<View style={styles.searchDivider} />
 				</View>
 			)}
 
 			<View style={styles.savedHeader}>
-				<AppTypography variant="caption" style={styles.sectionTitle}>
-					SAVED
-				</AppTypography>
-				<View style={styles.savedBadge}>
-					<AppTypography variant="caption" style={styles.savedBadgeText}>
-						{favouritesCount}
+				<View style={styles.sectionHeaderRow}>
+					<AppTypography variant="caption" style={styles.sectionTitle}>
+						SAVED DOCTORS
 					</AppTypography>
+					<View style={styles.savedBadge}>
+						<AppTypography variant="caption" style={styles.savedBadgeText}>
+							{favouritesCount}
+						</AppTypography>
+					</View>
 				</View>
 			</View>
 
 			{favLoading && (
 				<View style={styles.loadingBlock}>
-					<ActivityIndicator size="small" color="#245f67" />
+					<ActivityIndicator size="small" color="#1f5f68" />
+					<AppTypography variant="caption" style={styles.loadingText}>
+						Loading saved doctors...
+					</AppTypography>
 				</View>
 			)}
 
 			{!favLoading && !hasFavourites && (
 				<View style={styles.emptyBlock}>
-					<MaterialCommunityIcons name="bookmark-outline" size={38} color="#8ca0a9" />
-					<AppTypography variant="caption" style={styles.emptyText}>
-						No favourite doctors yet
+					<View style={styles.emptyIconCircle}>
+						<MaterialCommunityIcons name="heart-outline" size={32} color="#1f5f68" />
+					</View>
+					<AppTypography variant="h4" style={styles.emptyTitle}>
+						No Favorite Doctors Yet
 					</AppTypography>
 					<AppTypography variant="caption" style={styles.emptySubText}>
-						Use the search bar above to find and save doctors
+						Doctors you mark as favorite will appear here for fast access and direct booking.
 					</AppTypography>
 				</View>
 			)}
@@ -147,6 +190,9 @@ const DoctorsListHeader = React.memo(function DoctorsListHeader({
 
 export default function MyDoctorPage() {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
+
 	const [searchQuery, setSearchQuery] = useState('')
 	const [searchResults, setSearchResults] = useState<DoctorRow[]>([])
 	const [searchLoading, setSearchLoading] = useState(false)
@@ -376,7 +422,7 @@ export default function MyDoctorPage() {
 				renderItem={renderDoctorCard}
 				ListHeaderComponent={listHeader}
 				ItemSeparatorComponent={() => <View style={styles.cardGap} />}
-				contentContainerStyle={styles.listContent}
+				contentContainerStyle={[styles.listContent, isTablet && styles.listContentTablet]}
 				keyboardShouldPersistTaps="always"
 				showsVerticalScrollIndicator={false}
 			/>
@@ -391,102 +437,181 @@ const styles = StyleSheet.create({
 	},
 	listContent: {
 		paddingHorizontal: 16,
-		paddingTop: 8,
-		paddingBottom: 0,
+		paddingTop: 16,
+		paddingBottom: 28,
+	},
+	listContentTablet: {
+		maxWidth: 760,
+		alignSelf: 'center',
+		width: '100%',
 	},
 	headerContent: {
 		paddingBottom: 0,
 	},
 	searchSection: {
-		paddingBottom: 12,
-		backgroundColor: '#f5f9fa',
+		paddingBottom: 14,
 	},
 	searchBar: {
-		minHeight: 48,
+		height: 48,
 		borderRadius: 14,
 		borderWidth: 1,
-		borderColor: '#d9e6eb',
+		borderColor: '#e2e8f0',
 		backgroundColor: '#ffffff',
-		paddingLeft: 14,
-		paddingRight: 8,
+		paddingHorizontal: 14,
 		flexDirection: 'row',
 		alignItems: 'center',
-		shadowColor: '#12343b',
+		shadowColor: '#0f172a',
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.05,
-		shadowRadius: 8,
+		shadowRadius: 6,
 		elevation: 2,
+	},
+	searchIcon: {
+		marginRight: 8,
 	},
 	searchInput: {
 		flex: 1,
-		minHeight: 48,
-		paddingHorizontal: 10,
-		color: '#22343d',
+		height: 48,
+		paddingVertical: 0,
+		color: '#1e293b',
 		fontSize: 14,
 	},
-	micButton: {
-		width: 38,
-		height: 38,
-		borderRadius: 19,
+	clearButton: {
+		padding: 4,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	resultsSection: {
-		paddingTop: 4,
-		paddingBottom: 16,
+	searchBarEnd: {
+		width: 4,
 	},
-	savedHeader: {
+	resultsSection: {
+		paddingTop: 2,
+		paddingBottom: 4,
+	},
+	sectionHeaderRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginTop: 4,
-		marginBottom: 12,
 	},
 	sectionTitle: {
-		color: '#4e6670',
+		color: '#1f5f68',
 		fontSize: 12,
 		fontWeight: '700',
-		letterSpacing: 0,
+		letterSpacing: 0.5,
+	},
+	countBadge: {
+		minWidth: 22,
+		height: 20,
+		borderRadius: 10,
+		paddingHorizontal: 6,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#e2e8f0',
+		marginLeft: 8,
+	},
+	countBadgeText: {
+		color: '#475569',
+		fontSize: 11,
+		fontWeight: '700',
+	},
+	searchEmptyCard: {
+		backgroundColor: '#ffffff',
+		borderRadius: 14,
+		paddingVertical: 24,
+		paddingHorizontal: 16,
+		alignItems: 'center',
+		marginTop: 10,
+		borderWidth: 1,
+		borderColor: '#e2e8f0',
+	},
+	searchEmptyTitle: {
+		color: '#334155',
+		fontSize: 14,
+		fontWeight: '600',
+		marginTop: 8,
+	},
+	searchEmptySub: {
+		color: '#64748b',
+		fontSize: 12,
+		textAlign: 'center',
+		marginTop: 4,
+	},
+	searchDivider: {
+		height: 1,
+		backgroundColor: '#e2e8f0',
+		marginTop: 16,
+		marginBottom: 6,
+	},
+	savedHeader: {
+		marginTop: 4,
+		marginBottom: 12,
 	},
 	savedBadge: {
 		minWidth: 24,
 		height: 22,
 		borderRadius: 11,
-		paddingHorizontal: 7,
+		paddingHorizontal: 8,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#dcecee',
+		backgroundColor: '#e6f3f4',
 		marginLeft: 8,
 	},
 	savedBadgeText: {
-		color: '#245f67',
+		color: '#1f5f68',
 		fontSize: 12,
 		fontWeight: '700',
 	},
 	inlineList: {
-		marginTop: 12,
+		marginTop: 10,
 	},
 	cardGap: {
-		height: 14,
+		height: 12,
 	},
 	loadingBlock: {
-		paddingVertical: 18,
+		paddingVertical: 20,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	emptyBlock: {
-		alignItems: 'center',
-		paddingVertical: 30,
-	},
-	emptyText: {
-		color: '#7f98a3',
+	loadingText: {
+		color: '#64748b',
 		fontSize: 12,
+		marginTop: 6,
+	},
+	emptyBlock: {
+		backgroundColor: '#ffffff',
+		borderRadius: 16,
+		paddingVertical: 36,
+		paddingHorizontal: 24,
+		alignItems: 'center',
+		marginTop: 4,
+		borderWidth: 1,
+		borderColor: '#e2e8f0',
+		shadowColor: '#0f172a',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.04,
+		shadowRadius: 8,
+		elevation: 1,
+	},
+	emptyIconCircle: {
+		width: 64,
+		height: 64,
+		borderRadius: 32,
+		backgroundColor: '#e6f3f4',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: 14,
+	},
+	emptyTitle: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#1e293b',
+		marginBottom: 6,
 		textAlign: 'center',
-		marginTop: 8,
 	},
 	emptySubText: {
-		color: '#8b9aa2',
-		fontSize: 11,
+		color: '#64748b',
+		fontSize: 13,
 		textAlign: 'center',
-		marginTop: 4,
+		lineHeight: 19,
+		maxWidth: 280,
 	},
 })

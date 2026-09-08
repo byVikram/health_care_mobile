@@ -84,6 +84,53 @@ export const fetchAncillaryServicesBackend = async (params?: {
 	}
 }
 
+export interface FetchVerifiedNursesParams {
+	procedureId?: string
+	procedureName?: string
+	search?: string
+	latitude?: number
+	longitude?: number
+}
+
+export const fetchVerifiedNursesBackend = async (
+	params?: FetchVerifiedNursesParams
+): Promise<AncillaryProvider[]> => {
+	try {
+		const query: Record<string, string> = {}
+		if (params?.procedureId) query.procedure_id = params.procedureId
+		if (params?.procedureName) query.procedure_name = params.procedureName
+		if (params?.search) query.search = params.search
+		if (params?.latitude != null) query.latitude = String(params.latitude)
+		if (params?.longitude != null) query.longitude = String(params.longitude)
+
+		console.log('[ancillaryService] fetchVerifiedNursesBackend request params:', params)
+		console.log('[ancillaryService] fetchVerifiedNursesBackend query URL/params:', API_ENDPOINTS.ANCILLARY.VERIFIED_NURSES, query)
+
+		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.VERIFIED_NURSES, query)
+		console.log('[ancillaryService] fetchVerifiedNursesBackend raw API response:', res.data)
+
+		const list = unwrapList<any>(res.data)
+		console.log('[ancillaryService] fetchVerifiedNursesBackend unwrapList items count:', list.length)
+
+		const mapped = list.map((item: any) => ({
+			id: String(item.id || item.public_id || item.publicId),
+			name: String(item.name || 'Specialist Nurse'),
+			avatar: String(item.avatar || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=260'),
+			credentials: String(item.credentials || 'Registered Nurse (RN)'),
+			experience: item.experience != null ? Number(item.experience) : undefined,
+			procedures: Array.isArray(item.procedures) ? item.procedures : [],
+			languages: Array.isArray(item.languages) ? item.languages : ['English', 'Hindi'],
+			distance: Number(item.distance != null ? item.distance : 0),
+			badges: Array.isArray(item.badges) ? item.badges : ['Verified Nurse'],
+		}))
+		console.log('[ancillaryService] fetchVerifiedNursesBackend mapped providers:', mapped)
+		return mapped
+	} catch (error) {
+		console.log('[ancillaryService] fetchVerifiedNursesBackend error:', error)
+		throw error
+	}
+}
+
 // --- Staff-Facing Active Booking Interfaces ---
 export interface NurseBooking {
 	id: string
@@ -195,10 +242,10 @@ export interface AncillaryProvider {
 	id: string
 	name: string
 	credentials: string
-	rating: number
-	reviewsCount: number
-	experience: number
-	startingPrice: number
+	rating?: number
+	reviewsCount?: number
+	experience?: number
+	startingPrice?: number
 	procedures: string[]
 	languages: string[]
 	distance: number

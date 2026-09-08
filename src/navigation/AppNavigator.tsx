@@ -39,8 +39,8 @@ import LaboratorySearchPage from '../features/laboratory/LaboratorySearchPage'
 import LaboratoryOrderPage from '../features/laboratory/Orderlistlaboratorypage'
 import LaboratoryBookingDetail from '../features/laboratory/Bookingdetailslaboratorypage'
 
-import PatientHealthQuestionsList from '../features/dashboard/components/PatientHealthQuestionsList'
-import PatientHealthQuestionDetail from '../features/dashboard/components/PatientHealthQuestionDetail'
+import PatientQuestionsListPage from '../features/patient/PatientQuestionsListPage'
+import PatientQuestionDetailPage from '../features/patient/PatientQuestionDetailPage'
 import RadiologyBookingPage from '../features/radiology/RadiologyBookingPage'
 import RadiologyBookingDetailsPage from '../features/radiology/RadiologyBookingDetailsPage'
 import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
@@ -49,10 +49,6 @@ import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage
 
 import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
 import PlaceLabOrderPage from '../features/laboratory/PlaceLabOrderPage'
-
-import TransportationLandingPage from '../features/transportation/TransportationLandingPage'
-import BookRidePage from '../features/transportation/BookRidePage'
-import RideTrackingPage from '../features/transportation/RideTrackingPage'
 
 import DoctorEventListPage from '../features/doctor/events/DoctorEventListPage'
 import DoctorEventFormPage from '../features/doctor/events/DoctorEventFormPage'
@@ -90,7 +86,12 @@ function AuthenticatedNavigator() {
 		<AppStack.Navigator
 			screenOptions={{
 				headerShown: false,
-				header: ({ options, route }) => <AppScreenHeader title={options.title || route.name} />,
+				header: ({ options, route }) => (
+					<AppScreenHeader
+						title={options.title || route.name}
+						rightElement={options.headerRight ? options.headerRight({ canGoBack: true }) : undefined}
+					/>
+				),
 			}}
 			initialRouteName={ROUTES.MAIN.TABS}
 		>
@@ -105,12 +106,12 @@ function AuthenticatedNavigator() {
 
 			<AppStack.Screen
 				name={ROUTES.STACK.PATIENT_QUESTIONS_LIST as keyof AppStackParamList}
-				component={PatientHealthQuestionsList}
-				options={{ headerShown: true, title: 'Patient Questions' }}
+				component={PatientQuestionsListPage}
+				options={{ headerShown: true, title: 'Health Questions' }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.PATIENT_QUESTION_DETAIL as keyof AppStackParamList}
-				component={PatientHealthQuestionDetail}
+				component={PatientQuestionDetailPage}
 				options={{ headerShown: true, title: 'Question Detail' }}
 			/>
 
@@ -193,7 +194,14 @@ function AuthenticatedNavigator() {
 				options={{ headerShown: true, title: 'Search Doctors' }}
 			/>
 			<AppStack.Screen name={ROUTES.STACK.DOCTOR_DETAIL} component={DoctorDetailPage} />
-			<AppStack.Screen name={ROUTES.STACK.FAVOURITE_DOCTOR} component={MyDoctorPage} />
+			<AppStack.Screen
+				name={ROUTES.STACK.FAVOURITE_DOCTOR}
+				component={MyDoctorPage}
+				options={{
+					headerShown: true,
+					title: 'Favorite Doctors',
+				}}
+			/>
 			<AppStack.Screen name={ROUTES.STACK.NOTIFICATION} component={NotificationPage} />
 			<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
 			<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
@@ -215,21 +223,6 @@ function AuthenticatedNavigator() {
 				options={{ presentation: 'transparentModal' }}
 			/>
 			<AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
-			<AppStack.Screen
-				name={ROUTES.STACK.TRANSPORTATION_LANDING}
-				component={TransportationLandingPage}
-				options={{ headerShown: false }}
-			/>
-			<AppStack.Screen
-				name={ROUTES.STACK.BOOK_RIDE}
-				component={BookRidePage}
-				options={{ headerShown: false }}
-			/>
-			<AppStack.Screen
-				name={ROUTES.STACK.RIDE_TRACKING}
-				component={RideTrackingPage}
-				options={{ headerShown: false }}
-			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.DOCTOR_EVENTS}
 				component={DoctorEventListPage}

@@ -131,9 +131,6 @@ export type AppStackParamList = {
 	[ROUTES.STACK.COMMUNITY_THREAD]: { threadId: string }
 	[ROUTES.STACK.BLOG_LIST]: undefined
 	[ROUTES.STACK.BLOG_ARTICLE]: { slug: string }
-	[ROUTES.STACK.TRANSPORTATION_LANDING]: undefined
-	[ROUTES.STACK.BOOK_RIDE]: { appointmentId: string; type?: 'onward' | 'return' }
-	[ROUTES.STACK.RIDE_TRACKING]: { appointmentId: string; type?: 'onward' | 'return' }
 	[ROUTES.STACK.DOCTOR_EVENTS]: undefined
 	[ROUTES.STACK.DOCTOR_EVENT_FORM]: { eventId?: string }
 	[ROUTES.STACK.ALL_EVENTS]: undefined

@@ -182,6 +182,8 @@ export interface PatientAddress {
 	city: string
 	state: string
 	pincode: string
+	latitude?: number
+	longitude?: number
 	is_default: boolean
 }
 

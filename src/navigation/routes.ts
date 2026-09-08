@@ -61,9 +61,6 @@ export const ROUTES = {
 		LABORATORY_ORDERS: 'Orderlistlaboratorypage',
 		LABORATORY_ORDER_DETAILS: 'Bookingdetailslaboratorypage',
 
-		TRANSPORTATION_LANDING: 'TransportationLanding',
-		BOOK_RIDE: 'BookRide',
-		RIDE_TRACKING: 'RideTracking',
 		DOCTOR_EVENTS: 'DoctorEvents',
 		DOCTOR_EVENT_FORM: 'DoctorEventForm',
 		ALL_EVENTS: 'AllEvents',
