@@ -86,7 +86,12 @@ function AuthenticatedNavigator() {
 		<AppStack.Navigator
 			screenOptions={{
 				headerShown: false,
-				header: ({ options, route }) => <AppScreenHeader title={options.title || route.name} />,
+				header: ({ options, route }) => (
+					<AppScreenHeader
+						title={options.title || route.name}
+						rightElement={options.headerRight ? options.headerRight({ canGoBack: true }) : undefined}
+					/>
+				),
 			}}
 			initialRouteName={ROUTES.MAIN.TABS}
 		>
@@ -189,7 +194,14 @@ function AuthenticatedNavigator() {
 				options={{ headerShown: true, title: 'Search Doctors' }}
 			/>
 			<AppStack.Screen name={ROUTES.STACK.DOCTOR_DETAIL} component={DoctorDetailPage} />
-			<AppStack.Screen name={ROUTES.STACK.FAVOURITE_DOCTOR} component={MyDoctorPage} />
+			<AppStack.Screen
+				name={ROUTES.STACK.FAVOURITE_DOCTOR}
+				component={MyDoctorPage}
+				options={{
+					headerShown: true,
+					title: 'Favorite Doctors',
+				}}
+			/>
 			<AppStack.Screen name={ROUTES.STACK.NOTIFICATION} component={NotificationPage} />
 			<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
 			<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />

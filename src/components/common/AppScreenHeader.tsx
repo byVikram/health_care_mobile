@@ -1,5 +1,5 @@
 import React from 'react'
-import { StyleSheet, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -14,6 +14,8 @@ interface AppScreenHeaderProps {
 export default function AppScreenHeader({ title, onBack, rightElement }: AppScreenHeaderProps) {
 	const navigation = useNavigation<any>()
 	const insets = useSafeAreaInsets()
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
 
 	const handleBack = () => {
 		if (onBack) {
@@ -26,17 +28,24 @@ export default function AppScreenHeader({ title, onBack, rightElement }: AppScre
 	}
 
 	return (
-		<View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+		<View style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 14 }]}>
 			{/* Background Waves */}
 			<View style={styles.waveOne} />
 			<View style={styles.waveTwo} />
 
-			<View style={styles.headerContent}>
-				<TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.8}>
+			<View style={[styles.headerContent, isTablet && styles.headerContentTablet]}>
+				<TouchableOpacity
+					style={styles.backButton}
+					onPress={handleBack}
+					activeOpacity={0.75}
+					hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+				>
 					<MaterialCommunityIcons name="chevron-left" size={28} color="#ffffff" />
 				</TouchableOpacity>
 				<View style={styles.headerText}>
-					<AppTypography style={styles.title}>{title}</AppTypography>
+					<AppTypography style={styles.title} numberOfLines={1}>
+						{title}
+					</AppTypography>
 				</View>
 				{rightElement && (
 					<View style={styles.rightElementContainer}>
@@ -82,6 +91,11 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		zIndex: 10,
+	},
+	headerContentTablet: {
+		maxWidth: 800,
+		alignSelf: 'center',
+		width: '100%',
 	},
 	backButton: {
 		width: 40,
