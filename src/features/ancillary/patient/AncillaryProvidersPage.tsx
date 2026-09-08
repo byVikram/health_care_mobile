@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
 	ActivityIndicator,
 	FlatList,
@@ -11,26 +11,96 @@ import {
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import { ANCILLARY_MOCK_DATA, AncillaryProvider } from '../ancillaryService'
+import { ANCILLARY_MOCK_DATA, AncillaryProvider, fetchVerifiedNursesBackend } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
 import { AppBottomSheet, AppButton, AppScreenHeader, AppTypography, StatusModal } from '../../../components/common'
 
-const FILTERS = ['Available Now', 'Today', 'Tomorrow', 'Distance', 'Experience', 'Rating 4.9+']
+const FILTERS = ['Available Now', 'Within 5 km', 'Within 10 km', 'Experience 5+ yrs']
 
 export default function AncillaryProvidersPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
-	const { serviceKey, serviceLabel, procedureName, isSelectionMode, selectedNurseId } = route.params || {}
+	const {
+		serviceKey,
+		serviceLabel,
+		procedureName,
+		procedureId,
+		isSelectionMode,
+		selectedNurseId,
+		latitude,
+		longitude,
+	} = route.params || {}
+
+	const hasCoordinates =
+		latitude != null &&
+		longitude != null &&
+		!isNaN(Number(latitude)) &&
+		!isNaN(Number(longitude)) &&
+		Number(latitude) !== 0 &&
+		Number(longitude) !== 0
 
 	const [searchQuery, setSearchQuery] = useState('')
-	const [activeFilters, setActiveFilters] = useState<string[]>(['Available Now'])
+	const [activeFilters, setActiveFilters] = useState<string[]>([])
 
 	const [selectedProvider, setSelectedProvider] = useState<AncillaryProvider | null>(null)
 	const [showSuccessModal, setShowSuccessModal] = useState(false)
 	const [showProfileModal, setShowProfileModal] = useState(false)
 
+	const isNursingFlow =
+		isSelectionMode ||
+		serviceKey === 'nursing-care' ||
+		!serviceKey ||
+		(serviceLabel && serviceLabel.toLowerCase().includes('nurs'))
+
 	const categoryData = ANCILLARY_MOCK_DATA[serviceKey] || ANCILLARY_MOCK_DATA['nursing-care']
-	const providers = categoryData.providers
+
+	const [nurses, setNurses] = useState<AncillaryProvider[]>([])
+	const [loading, setLoading] = useState<boolean>(isNursingFlow && hasCoordinates)
+	const [error, setError] = useState<string | null>(null)
+
+	const loadNurses = useCallback(async () => {
+		if (!isNursingFlow) return
+
+		console.log('[AncillaryProvidersPage] loadNurses invoked:', {
+			serviceKey,
+			serviceLabel,
+			procedureName,
+			procedureId,
+			latitude,
+			longitude,
+			hasCoordinates,
+		})
+
+		if (!hasCoordinates) {
+			console.log('[AncillaryProvidersPage] Missing patient coordinates, displaying location required UI state.')
+			setLoading(false)
+			return
+		}
+
+		setLoading(true)
+		setError(null)
+		try {
+			const data = await fetchVerifiedNursesBackend({
+				procedureId: procedureId ? String(procedureId) : undefined,
+				procedureName: procedureName ? String(procedureName) : undefined,
+				latitude: Number(latitude),
+				longitude: Number(longitude),
+			})
+			console.log('[AncillaryProvidersPage] Loaded verified nurses from API:', data.length, data)
+			setNurses(data)
+		} catch (err: any) {
+			console.log('[AncillaryProvidersPage] Failed to fetch verified nurses:', err)
+			setError('Unable to load verified nurses. Please check your connection and try again.')
+		} finally {
+			setLoading(false)
+		}
+	}, [isNursingFlow, procedureId, procedureName, latitude, longitude, hasCoordinates])
+
+	useEffect(() => {
+		void loadNurses()
+	}, [loadNurses])
+
+	const providers = isNursingFlow ? nurses : categoryData.providers
 
 	const handleFilterPress = (filter: string) => {
 		if (activeFilters.includes(filter)) {
@@ -53,11 +123,6 @@ export default function AncillaryProvidersPage() {
 		setShowSuccessModal(true)
 	}
 
-	const handleViewProfile = (provider: AncillaryProvider) => {
-		setSelectedProvider(provider)
-		setShowProfileModal(true)
-	}
-
 	const handleSuccessModalSubmit = () => {
 		setShowSuccessModal(false)
 		navigation.reset({
@@ -66,9 +131,33 @@ export default function AncillaryProvidersPage() {
 		})
 	}
 
-	const filteredProviders = providers.filter((p) =>
-		p.name.toLowerCase().includes(searchQuery.toLowerCase())
-	)
+	const filteredProviders = providers.filter((p) => {
+		const q = searchQuery.toLowerCase().trim()
+		const matchesSearch =
+			!q ||
+			p.name.toLowerCase().includes(q) ||
+			p.credentials.toLowerCase().includes(q) ||
+			p.procedures.some((proc) => proc.toLowerCase().includes(q))
+
+		if (!matchesSearch) return false
+
+		// In real nurse flow, backend already guarantees distance <= 10.0 KM
+		if (isNursingFlow && typeof p.distance === 'number' && p.distance > 10.0) {
+			return false
+		}
+
+		if (activeFilters.includes('Within 5 km')) {
+			if (typeof p.distance === 'number' && p.distance > 5.0) return false
+		}
+		if (activeFilters.includes('Within 10 km')) {
+			if (typeof p.distance === 'number' && p.distance > 10.0) return false
+		}
+		if (activeFilters.includes('Experience 5+ yrs')) {
+			if (!p.experience || p.experience < 5) return false
+		}
+
+		return true
+	})
 
 	const renderProviderCard = ({ item }: { item: AncillaryProvider }) => {
 		const isSelected = isSelectionMode && item.id === selectedNurseId
@@ -85,39 +174,34 @@ export default function AncillaryProvidersPage() {
 							</View>
 						</View>
 						<AppTypography variant="caption" style={styles.experience}>
-							{item.experience} yrs exp • {item.distance} km away
+							{item.experience != null ? `${item.experience} yrs exp • ` : ''}{item.distance} km away
 						</AppTypography>
-						<View style={styles.ratingRow}>
-							<Ionicons name="star" size={13} color="#F59E0B" />
-							<AppTypography variant="caption" style={styles.rating}>{item.rating}</AppTypography>
-							<AppTypography variant="caption" style={styles.reviewsCount}>({item.reviewsCount})</AppTypography>
-						</View>
-					</View>
-					<View style={styles.rateCol}>
-						<AppTypography variant="caption" style={styles.rateLabel}>Starting at</AppTypography>
-						<AppTypography variant="h4" style={styles.ratePrice}>₹{item.startingPrice}</AppTypography>
 					</View>
 				</View>
 
 				{/* Metadata details list */}
-				<View style={styles.metaBox}>
-					<View style={styles.metaRow}>
-						<Ionicons name="medkit-outline" size={13} color="#0C7C7C" />
-						<AppTypography variant="caption" style={styles.metaText} numberOfLines={1}>
-							{item.procedures.join(' • ')}
-						</AppTypography>
+				{item.procedures && item.procedures.length > 0 && (
+					<View style={styles.metaBox}>
+						<View style={styles.metaRow}>
+							<Ionicons name="medkit-outline" size={13} color="#0C7C7C" />
+							<AppTypography variant="caption" style={styles.metaText} numberOfLines={1}>
+								{item.procedures.join(' • ')}
+							</AppTypography>
+						</View>
+						{item.languages && item.languages.length > 0 && (
+							<View style={styles.metaRow}>
+								<Ionicons name="language-outline" size={13} color="#64748B" />
+								<AppTypography variant="caption" style={styles.metaText}>
+									Languages: {item.languages.join(', ')}
+								</AppTypography>
+							</View>
+						)}
 					</View>
-					<View style={styles.metaRow}>
-						<Ionicons name="language-outline" size={13} color="#64748B" />
-						<AppTypography variant="caption" style={styles.metaText}>
-							Languages: {item.languages.join(', ')}
-						</AppTypography>
-					</View>
-				</View>
+				)}
 
 				{/* Verifications tags list */}
 				<View style={styles.badgeRow}>
-					{item.badges.map((badge, idx) => (
+					{(item.badges && item.badges.length > 0 ? item.badges : ['Verified Nurse']).map((badge, idx) => (
 						<View key={idx} style={styles.badge}>
 							<Ionicons name="checkmark-circle" size={12} color="#047857" style={styles.badgeIcon} />
 							<AppTypography variant="caption" style={styles.badgeText}>{badge}</AppTypography>
@@ -129,9 +213,9 @@ export default function AncillaryProvidersPage() {
 				<View style={styles.actions}>
 					<AppButton
 						variant="outline"
-						onPress={() => handleViewProfile(item)}
-						style={styles.profileBtn}
-						labelStyle={styles.profileBtnLabel}
+						disabled={true}
+						style={styles.profileBtnDisabled}
+						labelStyle={styles.profileBtnLabelDisabled}
 					>
 						View Profile
 					</AppButton>
@@ -152,13 +236,27 @@ export default function AncillaryProvidersPage() {
 		<View style={styles.container}>
 			{/* Header */}
 			<AppScreenHeader
-				title={isSelectionMode ? 'Select a Preferred Nurse' : (serviceLabel ? `Clinicians: ${serviceLabel}` : 'Available Clinicians')}
+				title={
+					isSelectionMode
+						? 'Select a Preferred Nurse'
+						: serviceLabel
+						? `Clinicians: ${serviceLabel}`
+						: 'Available Clinicians'
+				}
 				onBack={() => navigation.goBack()}
 			/>
 
 			{/* Subtitle summary */} 
 			<View style={styles.summaryBar}>
-				<AppTypography variant="caption" style={styles.summaryText}>{filteredProviders.length} clinicians available</AppTypography>
+				<AppTypography variant="caption" style={styles.summaryText}>
+					{!hasCoordinates
+						? 'Location coordinates required to find nurses near you'
+						: loading
+						? 'Checking verified clinicians within 10 km...'
+						: `${filteredProviders.length} ${
+								isNursingFlow ? 'verified nurses within 10 km' : 'clinicians'
+						  } available`}
+				</AppTypography>
 			</View>
 
 			{/* Search */}
@@ -196,19 +294,85 @@ export default function AncillaryProvidersPage() {
 				</ScrollView>
 			</View>
 
-			{/* Providers list */}
-			<FlatList
-				data={filteredProviders}
-				renderItem={renderProviderCard}
-				keyExtractor={(item) => item.id}
-				contentContainerStyle={styles.listContent}
-				ListEmptyComponent={
-					<View style={styles.emptyContainer}>
-						<Ionicons name="people-outline" size={48} color="#CBD5E1" />
-						<AppTypography variant="body" style={styles.emptyText}>No available clinicians found matching your criteria.</AppTypography>
-					</View>
-				}
-			/>
+			{/* Providers list with proper states */}
+			{!hasCoordinates ? (
+				<View style={styles.centerStateBox}>
+					<Ionicons name="location-outline" size={48} color="#0C7C7C" />
+					<AppTypography variant="h4" style={styles.stateTitle}>
+						Location Required
+					</AppTypography>
+					<AppTypography variant="caption" style={styles.stateSubtitle}>
+						To view verified nurses within a 10 km radius, we need your visit address coordinates. Please select an address with GPS coordinates.
+					</AppTypography>
+					<AppButton
+						variant="primary"
+						onPress={() => navigation.goBack()}
+						style={styles.retryBtn}
+						labelStyle={styles.retryBtnLabel}
+					>
+						Choose Address
+					</AppButton>
+				</View>
+			) : loading ? (
+				<View style={styles.centerStateBox}>
+					<ActivityIndicator size="large" color="#0C7C7C" />
+					<AppTypography variant="subtitle" style={styles.stateTitle}>
+						Finding Verified Nurses...
+					</AppTypography>
+					<AppTypography variant="caption" style={styles.stateSubtitle}>
+						Checking active credentials and available nurses within 10 km
+					</AppTypography>
+				</View>
+			) : error ? (
+				<View style={styles.centerStateBox}>
+					<Ionicons name="alert-circle-outline" size={44} color="#DC2626" />
+					<AppTypography variant="h4" style={[styles.stateTitle, { color: '#DC2626' }]}>
+						Unable to Load Clinicians
+					</AppTypography>
+					<AppTypography variant="caption" style={styles.stateSubtitle}>
+						{error}
+					</AppTypography>
+					<AppButton
+						variant="primary"
+						onPress={() => void loadNurses()}
+						style={styles.retryBtn}
+						labelStyle={styles.retryBtnLabel}
+					>
+						Retry
+					</AppButton>
+				</View>
+			) : (
+				<FlatList
+					data={filteredProviders}
+					renderItem={renderProviderCard}
+					keyExtractor={(item) => item.id}
+					contentContainerStyle={styles.listContent}
+					ListEmptyComponent={
+						<View style={styles.emptyContainer}>
+							<Ionicons name="people-outline" size={48} color="#CBD5E1" />
+							<AppTypography variant="body" style={styles.emptyText}>
+								{isNursingFlow
+									? 'No verified nurses currently available within 10 km of your location.'
+									: 'No available clinicians found matching your criteria.'}
+							</AppTypography>
+							{(activeFilters.length > 0 || searchQuery.length > 0) && (
+								<TouchableOpacity
+									onPress={() => {
+										setActiveFilters([])
+										setSearchQuery('')
+									}}
+									style={styles.resetFiltersBtn}
+									activeOpacity={0.7}
+								>
+									<AppTypography variant="caption" style={styles.resetFiltersText}>
+										Reset Filters & Search
+									</AppTypography>
+								</TouchableOpacity>
+							)}
+						</View>
+					}
+				/>
+			)}
 
 			{/* Book Success status modal overlay */}
 			<StatusModal
@@ -566,6 +730,19 @@ const styles = StyleSheet.create({
 		color: '#475569',
 		marginHorizontal: 0,
 	},
+	profileBtnDisabled: {
+		flex: 1,
+		borderRadius: 10,
+		borderColor: '#E2E8F0',
+		backgroundColor: '#F8FAFC',
+		opacity: 0.6,
+	},
+	profileBtnLabelDisabled: {
+		fontSize: 12.5,
+		fontWeight: '600',
+		color: '#94A3B8',
+		marginHorizontal: 0,
+	},
 	bookBtn: {
 		flex: 1.3,
 		borderRadius: 10,
@@ -720,5 +897,46 @@ const styles = StyleSheet.create({
 		width: '100%',
 		borderRadius: 10,
 		marginTop: 0,
+	},
+	centerStateBox: {
+		paddingVertical: 64,
+		paddingHorizontal: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	stateTitle: {
+		marginTop: 14,
+		color: '#0F172A',
+		fontWeight: '700',
+		textAlign: 'center',
+	},
+	stateSubtitle: {
+		marginTop: 6,
+		color: '#64748B',
+		textAlign: 'center',
+		lineHeight: 18,
+	},
+	retryBtn: {
+		marginTop: 16,
+		paddingHorizontal: 24,
+		borderRadius: 8,
+	},
+	retryBtnLabel: {
+		fontSize: 13,
+		fontWeight: '700',
+	},
+	resetFiltersBtn: {
+		marginTop: 12,
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+		backgroundColor: '#F0FDFA',
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#CCFBF1',
+	},
+	resetFiltersText: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#0F766E',
 	},
 })

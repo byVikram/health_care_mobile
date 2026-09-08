@@ -782,8 +782,20 @@ export default function BookingDetailsPage() {
 							onPress={() => {
 								setAssignmentMode('SELECT_NURSE')
 								if (!selectedNurse) {
+									console.log('[BookingDetailsPage] Option 2 pressed. Navigating to ANCILLARY_PROVIDERS with coords:', {
+										latitude: visit.latitude,
+										longitude: visit.longitude,
+										address: visit.address,
+									})
 									navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
 										isSelectionMode: true,
+										serviceKey: payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care',
+										serviceLabel: payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care',
+										procedureName: services[0]?.title,
+										procedureId: services[0]?.id,
+										latitude: visit.latitude,
+										longitude: visit.longitude,
+										selectedNurseId: undefined,
 									})
 								}
 							}}
@@ -842,8 +854,18 @@ export default function BookingDetailsPage() {
 									<TouchableOpacity
 										style={styles.changeNurseBtn}
 										onPress={() => {
+											console.log('[BookingDetailsPage] Change Nurse pressed. Navigating with coords:', {
+												latitude: visit.latitude,
+												longitude: visit.longitude,
+											})
 											navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
 												isSelectionMode: true,
+												serviceKey: payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care',
+												serviceLabel: payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care',
+												procedureName: services[0]?.title,
+												procedureId: services[0]?.id,
+												latitude: visit.latitude,
+												longitude: visit.longitude,
 												selectedNurseId: selectedNurse?.id,
 											})
 										}}
@@ -870,20 +892,14 @@ export default function BookingDetailsPage() {
 											</View>
 										</View>
 										<View style={styles.selectedNurseStats}>
-											<View style={styles.statItem}>
-												<Ionicons name="star" size={12} color="#F59E0B" />
-												<AppTypography variant="caption" style={styles.statTextBold}>
-													{selectedNurse.rating}
-												</AppTypography>
-												<AppTypography variant="caption" style={styles.statTextMuted}>
-													({selectedNurse.reviewsCount})
-												</AppTypography>
-											</View>
-											<AppTypography variant="caption" style={styles.statDot}>•</AppTypography>
-											<AppTypography variant="caption" style={styles.statText}>
-												{selectedNurse.experience} yrs exp
-											</AppTypography>
-											<AppTypography variant="caption" style={styles.statDot}>•</AppTypography>
+											{selectedNurse.experience != null && (
+												<>
+													<AppTypography variant="caption" style={styles.statText}>
+														{selectedNurse.experience} yrs exp
+													</AppTypography>
+													<AppTypography variant="caption" style={styles.statDot}>•</AppTypography>
+												</>
+											)}
 											<AppTypography variant="caption" style={styles.statText}>
 												{selectedNurse.distance} km away
 											</AppTypography>
@@ -895,8 +911,19 @@ export default function BookingDetailsPage() {
 							<TouchableOpacity
 								style={styles.browsePromptCard}
 								onPress={() => {
+									console.log('[BookingDetailsPage] Browse Prompt pressed. Navigating with coords:', {
+										latitude: visit.latitude,
+										longitude: visit.longitude,
+									})
 									navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
 										isSelectionMode: true,
+										serviceKey: payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care',
+										serviceLabel: payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care',
+										procedureName: services[0]?.title,
+										procedureId: services[0]?.id,
+										latitude: visit.latitude,
+										longitude: visit.longitude,
+										selectedNurseId: undefined,
 									})
 								}}
 								activeOpacity={0.8}
@@ -1046,11 +1073,17 @@ export default function BookingDetailsPage() {
 										addr.isCurrentLocation && styles.addressCardItemCurrent,
 									]}
 									onPress={() => {
+										console.log('[BookingDetailsPage] Address selected:', addr.id, addr.label, addr.address, {
+											latitude: addr.latitude,
+											longitude: addr.longitude,
+										})
 										setVisit((prev) => ({
 											...prev,
 											addressId: addr.id,
 											addressLabel: addr.label,
 											address: addr.address,
+											latitude: addr.latitude,
+											longitude: addr.longitude,
 										}))
 									}}
 									activeOpacity={0.8}

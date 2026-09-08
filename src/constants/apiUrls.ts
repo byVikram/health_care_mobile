@@ -235,6 +235,7 @@ export const API_ENDPOINTS = {
 		SOFT_REVIEW: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/soft-review`,
 		PROVIDER_EARNINGS: `${BASE_URL}/api/ancillary/provider/earnings`,
 		PROVIDER_DASHBOARD_METRICS: `${BASE_URL}/api/ancillary/provider/dashboard-metrics`,
+		VERIFIED_NURSES: `${BASE_URL}/api/ancillary/nurses`,
 	},
 	WALLET: {
 		GET: `${BASE_URL}/api/wallet`,
