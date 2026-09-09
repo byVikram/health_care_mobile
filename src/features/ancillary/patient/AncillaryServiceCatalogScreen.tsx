@@ -77,7 +77,10 @@ export default function AncillaryServiceCatalogScreen() {
 	const [searchQuery, setSearchQuery] = useState('')
 	const [selectedProcedure, setSelectedProcedure] = useState<ServiceProcedureItem | null>(null)
 	const [cart, setCart] = useState<ServiceProcedureItem[]>([])
-	const [activeCondition, setActiveCondition] = useState<string | null>(isPhysiotherapy ? 'knee' : null)
+	// For Physiotherapy, this holds the selected condition's category public_id
+	// (e.g. "phys-knee"), which doubles as the lookup_ancillary_category.public_id
+	// used to filter procedures fetched from the backend.
+	const [activeCondition, setActiveCondition] = useState<string | null>(isPhysiotherapy ? 'phys-knee' : null)
 
 	useEffect(() => {
 		let isMounted = true
@@ -139,15 +142,6 @@ export default function AncillaryServiceCatalogScreen() {
 		return rawServices.map((s) => {
 			const title = s.title || ''
 			const description = s.description || ''
-			let recommendedLabel: string | undefined
-
-			if (activeConditionMeta) {
-				const haystack = `${title} ${description}`.toLowerCase()
-				const isMatch = activeConditionMeta.keywords.some((kw) => haystack.includes(kw))
-				if (isMatch) {
-					recommendedLabel = `Recommended for ${activeConditionMeta.label}`
-				}
-			}
 
 			return {
 				id: s.id,
@@ -158,16 +152,27 @@ export default function AncillaryServiceCatalogScreen() {
 				duration: '30-45 mins',
 				image: activeUi.image,
 				premiumBadgeText: activeUi.premiumBadgeText,
-				recommendedLabel,
 			}
 		})
-	}, [rawServices, activeUi.image, activeUi.premiumBadgeText, activeConditionMeta])
+	}, [rawServices, activeUi.image, activeUi.premiumBadgeText])
 
 	const displayGroups = useMemo<CategoryGroup[]>(() => {
 		let filtered = procedureItems
+		let groupTitle = activeUi.title
 
-		if (activeCategory !== 'all') {
+		if (isPhysiotherapy) {
+			// The 9 "Find Physiotherapy for" cards are the patient-facing
+			// filters here -- filter the backend-fetched procedures by the
+			// selected condition's category public_id (lookup_ancillary_category.public_id).
+			if (activeConditionMeta) {
+				filtered = filtered.filter((p) => p.categoryId === activeConditionMeta.id)
+				groupTitle = `${activeConditionMeta.label} Services`
+			} else {
+				groupTitle = 'Popular Physiotherapy Services'
+			}
+		} else if (activeCategory !== 'all') {
 			filtered = filtered.filter((p) => p.categoryId === activeCategory)
+			groupTitle = categoryPills.find((c) => c.id === activeCategory)?.label || activeUi.title
 		}
 
 		if (searchQuery.trim()) {
@@ -177,22 +182,10 @@ export default function AncillaryServiceCatalogScreen() {
 			)
 		}
 
-		if (activeConditionMeta) {
-			filtered = [...filtered].sort((a, b) => {
-				const aRec = a.recommendedLabel ? 1 : 0
-				const bRec = b.recommendedLabel ? 1 : 0
-				return bRec - aRec
-			})
-		}
-
-		const activeCategoryLabel = activeCategory === 'all'
-			? activeUi.title
-			: categoryPills.find((c) => c.id === activeCategory)?.label || activeUi.title
-
 		return [
 			{
 				id: 'group-all',
-				categoryName: isPhysiotherapy ? 'Popular Physiotherapy Services' : activeCategoryLabel,
+				categoryName: groupTitle,
 				procedures: filtered,
 			},
 		]
@@ -248,24 +241,28 @@ export default function AncillaryServiceCatalogScreen() {
 
 				{serviceKey === 'nursing-care' && <NursingQuickActionCards />}
 
-				{/* Categories Pill Bar */}
-				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesBar}>
-					{categoryPills.map((cat) => {
-						const isActive = activeCategory === cat.id
-						return (
-							<TouchableOpacity
-								key={cat.id}
-								style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-								onPress={() => setActiveCategory(cat.id)}
-								activeOpacity={0.8}
-							>
-								<AppTypography variant="caption" style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}>
-									{cat.label}
-								</AppTypography>
-							</TouchableOpacity>
-						)
-					})}
-				</ScrollView>
+				{/* Categories Pill Bar -- Physiotherapy no longer uses this row; its
+				    filtering is handled by the "Find Physiotherapy for" condition
+				    cards below instead. */}
+				{!isPhysiotherapy && (
+					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesBar}>
+						{categoryPills.map((cat) => {
+							const isActive = activeCategory === cat.id
+							return (
+								<TouchableOpacity
+									key={cat.id}
+									style={[styles.categoryChip, isActive && styles.categoryChipActive]}
+									onPress={() => setActiveCategory(cat.id)}
+									activeOpacity={0.8}
+								>
+									<AppTypography variant="caption" style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}>
+										{cat.label}
+									</AppTypography>
+								</TouchableOpacity>
+							)
+						})}
+					</ScrollView>
+				)}
 
 				{isPhysiotherapy && (
 					<PhysiotherapyConditionsGrid
