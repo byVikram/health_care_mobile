@@ -20,7 +20,7 @@ import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
 import {
 	AncillaryBooking,
 	AncillaryReviewData,
-	getAncillaryReviewByBookingId,
+	fetchAncillaryReviewByBooking,
 	submitAncillaryReview,
 } from '../ancillaryService'
 
@@ -92,16 +92,31 @@ export default function AncillaryBookingStatusPage() {
 		  }
 
 	// Review state
-	const [reviewData, setReviewData] = useState<AncillaryReviewData | null>(() =>
-		getAncillaryReviewByBookingId(bookingId)
-	)
+	const [reviewData, setReviewData] = useState<AncillaryReviewData | null>(() => bookingData.review || null)
 	const [reviewModalVisible, setReviewModalVisible] = useState(false)
 	const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 	const [statusFeedbackModal, setStatusFeedbackModal] = useState<{
 		visible: boolean
+		status?: 'success' | 'error' | 'info'
 		title: string
 		description: string
 	} | null>(null)
+
+	React.useEffect(() => {
+		const loadBookingReview = async () => {
+			if (!bookingId || !isCompleted) return
+			if (reviewData) return
+			try {
+				const res = await fetchAncillaryReviewByBooking(bookingId)
+				if (res) {
+					setReviewData(res)
+				}
+			} catch (e) {
+				// ignore
+			}
+		}
+		void loadBookingReview()
+	}, [bookingId, isCompleted])
 
 	const patient = {
 		name: liveData?.patientName || bookingData.patient?.name || '',
@@ -143,6 +158,7 @@ export default function AncillaryBookingStatusPage() {
 			setReviewModalVisible(false)
 			setStatusFeedbackModal({
 				visible: true,
+				status: 'success',
 				title: 'Thank You!',
 				description: 'Your rating and review have been submitted successfully.',
 			})
@@ -152,7 +168,12 @@ export default function AncillaryBookingStatusPage() {
 				error?.response?.data?.message ||
 				error?.message ||
 				'Unable to submit review. Please try again.'
-			alert(errorMsg)
+			setStatusFeedbackModal({
+				visible: true,
+				status: 'error',
+				title: 'Review Submission Failed',
+				description: errorMsg,
+			})
 		} finally {
 			setIsSubmittingReview(false)
 		}
@@ -469,11 +490,12 @@ export default function AncillaryBookingStatusPage() {
 			{statusFeedbackModal && (
 				<StatusModal
 					visible={statusFeedbackModal.visible}
-					status="success"
+					status={statusFeedbackModal.status || 'success'}
 					title={statusFeedbackModal.title}
 					description={statusFeedbackModal.description}
-					submitText="Done"
+					submitText={statusFeedbackModal.status === 'error' ? 'OK' : 'Done'}
 					onSubmit={() => setStatusFeedbackModal(null)}
+					onCancel={() => setStatusFeedbackModal(null)}
 				/>
 			)}
 		</View>

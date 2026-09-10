@@ -567,11 +567,11 @@ export default function BookingDetailsPage() {
 				<View style={styles.sectionBlock}>
 					<View style={styles.sectionHeaderRow}>
 						<AppTypography variant="h3" style={styles.sectionHeading}>
-							Selected Procedures ({services.length})
+							Selected Services & Procedures ({services.length})
 						</AppTypography>
 						<TouchableOpacity style={styles.actionBtn} onPress={handleEditServices} activeOpacity={0.7}>
 							<AppTypography variant="caption" style={styles.actionBtnText}>
-								+ Add Services
+								+ Add More
 							</AppTypography>
 						</TouchableOpacity>
 					</View>
@@ -613,7 +613,7 @@ export default function BookingDetailsPage() {
 					) : (
 						<View style={styles.emptyBox}>
 							<AppTypography variant="caption" style={styles.emptyText}>
-								No services selected. Tap Add Services to configure.
+								No services selected. Tap Add More to add a care procedure.
 							</AppTypography>
 						</View>
 					)}
@@ -626,7 +626,7 @@ export default function BookingDetailsPage() {
 				<View style={styles.sectionBlock}>
 					<View style={styles.sectionHeaderRow}>
 						<AppTypography variant="h3" style={styles.sectionHeading}>
-							Care Mode & Location
+							Care Mode & Visit Address
 						</AppTypography>
 					</View>
 
@@ -668,7 +668,7 @@ export default function BookingDetailsPage() {
 							<View style={styles.locationTextCol}>
 								<View style={styles.locationHeaderRow}>
 									<AppTypography variant="h4" style={styles.locationTitle}>
-										Visit Address ({visit.addressLabel})
+										Home Visit Address ({visit.addressLabel})
 									</AppTypography>
 									<TouchableOpacity onPress={() => setEditVisitVisible(true)} activeOpacity={0.7}>
 										<AppTypography variant="caption" style={styles.changeLinkText}>
@@ -714,11 +714,11 @@ export default function BookingDetailsPage() {
 						</AppTypography>
 					</View>
 					<AppTypography variant="caption" style={styles.sectionSubheading}>
-						Choose auto-matching for fastest dispatch or browse and pick your preferred nurse.
+						Choose auto-matching for the fastest arrival, or select a nurse you have previously consulted with.
 					</AppTypography>
 
 					<View style={styles.nurseChoiceContainer}>
-						{/* OPTION 1: Let the System Select */}
+						{/* OPTION 1: Auto-Match Nurse */}
 						<TouchableOpacity
 							style={[
 								styles.nursePrefOptionCard,
@@ -751,7 +751,7 @@ export default function BookingDetailsPage() {
 											assignmentMode === 'SYSTEM_MATCH' && styles.nursePrefTitleSelected,
 										]}
 									>
-										Let the System Select
+										Auto-Match Nurse
 									</AppTypography>
 									<View style={styles.recommendedBadge}>
 										<AppTypography variant="caption" style={styles.recommendedBadgeText}>
@@ -760,7 +760,7 @@ export default function BookingDetailsPage() {
 									</View>
 								</View>
 								<AppTypography variant="caption" style={styles.nursePrefSub}>
-									Fastest dispatch • Automatically matches the nearest qualified nurse to your location (15-30 mins).
+									Fastest arrival • We will automatically assign the nearest certified nurse to your address (15–30 mins).
 								</AppTypography>
 							</View>
 							<View
@@ -773,7 +773,7 @@ export default function BookingDetailsPage() {
 							</View>
 						</TouchableOpacity>
 
-						{/* OPTION 2: Select a Nurse */}
+						{/* OPTION 2: Select a Previous Nurse */}
 						<TouchableOpacity
 							style={[
 								styles.nursePrefOptionCard,
@@ -822,11 +822,11 @@ export default function BookingDetailsPage() {
 											assignmentMode === 'SELECT_NURSE' && styles.nursePrefTitleSelected,
 										]}
 									>
-										Select a Nurse
+										Select a Previous Nurse
 									</AppTypography>
 								</View>
 								<AppTypography variant="caption" style={styles.nursePrefSub}>
-									Browse clinician profiles, verified credentials, ratings, and select your preferred nurse.
+									Choose a nurse you have previously consulted with for personalized continuing care.
 								</AppTypography>
 							</View>
 							<View
@@ -848,7 +848,7 @@ export default function BookingDetailsPage() {
 									<View style={styles.selectedBadgeRow}>
 										<Ionicons name="checkmark-circle" size={15} color="#047857" />
 										<AppTypography variant="caption" style={styles.selectedBadgeLabel}>
-											Preferred Nurse Selected
+											Selected Nurse
 										</AppTypography>
 									</View>
 									<TouchableOpacity
@@ -900,8 +900,8 @@ export default function BookingDetailsPage() {
 													<AppTypography variant="caption" style={styles.statDot}>•</AppTypography>
 												</>
 											)}
-											<AppTypography variant="caption" style={styles.statText}>
-												{selectedNurse.distance} km away
+											<AppTypography variant="caption" style={[styles.statText, { color: '#047857', fontWeight: '600' }]}>
+												Previously Consulted
 											</AppTypography>
 										</View>
 									</View>
@@ -934,15 +934,15 @@ export default function BookingDetailsPage() {
 									</View>
 									<View style={styles.browsePromptTextCol}>
 										<AppTypography variant="subtitle" style={styles.browsePromptTitle}>
-											Choose Your Preferred Nurse
+											Choose a Previous Nurse
 										</AppTypography>
 										<AppTypography variant="caption" style={styles.browsePromptSub}>
-											Tap here to browse profiles, credentials, and distance
+											Tap here to view nurses you have previously consulted
 										</AppTypography>
 									</View>
 								</View>
 								<View style={styles.browsePromptCta}>
-									<AppTypography variant="caption" style={styles.browsePromptCtaText}>Browse</AppTypography>
+									<AppTypography variant="caption" style={styles.browsePromptCtaText}>Select Nurse</AppTypography>
 									<Ionicons name="chevron-forward" size={14} color="#0C7C7C" />
 								</View>
 							</TouchableOpacity>
@@ -957,7 +957,7 @@ export default function BookingDetailsPage() {
 				<View style={styles.sectionBlock}>
 					<View style={styles.sectionHeaderRow}>
 						<AppTypography variant="h3" style={styles.sectionHeading}>
-							Payment Breakdown
+							Payment Summary
 						</AppTypography>
 					</View>
 
@@ -973,7 +973,7 @@ export default function BookingDetailsPage() {
 
 						<View style={styles.billingRow}>
 							<AppTypography variant="body" style={styles.billingLabel}>
-								Specialist Doorstep Visit Fee
+								Doorstep Home Visit Fee
 							</AppTypography>
 							<AppTypography variant="body" style={styles.billingVal}>
 								{charges.visitFee}
@@ -982,7 +982,7 @@ export default function BookingDetailsPage() {
 
 						<View style={styles.billingRow}>
 							<AppTypography variant="body" style={styles.billingLabel}>
-								Taxes & Operational Fee (3% GST)
+								Applicable Taxes & Fees (GST)
 							</AppTypography>
 							<AppTypography variant="body" style={styles.billingVal}>
 								{charges.taxes}
@@ -1005,7 +1005,7 @@ export default function BookingDetailsPage() {
 					<View style={styles.guaranteeBox}>
 						<Ionicons name="shield-checkmark-outline" size={18} color="#059669" />
 						<AppTypography variant="caption" style={styles.guaranteeText}>
-							100% Certified Nurses • Sanitized Equipment
+							100% Certified Nurses • Sanitized Medical Equipment
 						</AppTypography>
 					</View>
 				</View>
@@ -1058,7 +1058,7 @@ export default function BookingDetailsPage() {
 			>
 				<View style={styles.modalFormContent}>
 					<AppTypography variant="caption" style={styles.addressSectionSubtitle}>
-						SELECT DELIVERY ADDRESS
+						Choose where you would like the nurse to visit
 					</AppTypography>
 
 					<View style={styles.addressListContainer}>

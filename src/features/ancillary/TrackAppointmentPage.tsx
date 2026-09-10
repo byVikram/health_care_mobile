@@ -24,7 +24,7 @@ import ServiceMatchingPage from './patient/ServiceMatchingPage'
 import {
 	AncillaryBooking,
 	AncillaryReviewData,
-	getAncillaryReviewByBookingId,
+	fetchAncillaryReviewByBooking,
 	submitAncillaryReview,
 	cancelCareRequestPatientBackend,
 } from './ancillaryService'
@@ -53,15 +53,14 @@ export default function TrackAppointmentPage() {
 	const bookingId = String(route.params?.bookingId || bookingData.id || 'BK-882419')
 
 	// Review state
-	const [reviewData, setReviewData] = useState<AncillaryReviewData | null>(() =>
-		getAncillaryReviewByBookingId(bookingId)
-	)
+	const [reviewData, setReviewData] = useState<AncillaryReviewData | null>(() => bookingData.review || null)
 	const [reviewModalVisible, setReviewModalVisible] = useState(false)
 	const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 	const [cancelModalVisible, setCancelModalVisible] = useState(false)
 	const [isCancelling, setIsCancelling] = useState(false)
 	const [statusModal, setStatusModal] = useState<{
 		visible: boolean
+		status?: 'success' | 'error' | 'info'
 		title: string
 		description: string
 	} | null>(null)
@@ -169,6 +168,22 @@ export default function TrackAppointmentPage() {
 	const isTravelling = activeStageIndex >= 1 && activeStageIndex <= 3
 	const isCompleted = activeStageIndex >= 5 || liveStatus === 'COMPLETED'
 
+	React.useEffect(() => {
+		const loadBookingReview = async () => {
+			if (!bookingId || !isCompleted) return
+			if (reviewData) return
+			try {
+				const res = await fetchAncillaryReviewByBooking(bookingId)
+				if (res) {
+					setReviewData(res)
+				}
+			} catch (e) {
+				// ignore
+			}
+		}
+		void loadBookingReview()
+	}, [bookingId, isCompleted])
+
 	const handleCallNurse = () => {
 		Linking.openURL(`tel:${nurse.phone || '+919876543210'}`)
 	}
@@ -214,7 +229,12 @@ export default function TrackAppointmentPage() {
 				error?.response?.data?.message ||
 				error?.message ||
 				'Unable to submit review. Please try again.'
-			alert(errorMsg)
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Review Submission Failed',
+				description: errorMsg,
+			})
 		} finally {
 			setIsSubmittingReview(false)
 		}
@@ -599,10 +619,10 @@ export default function TrackAppointmentPage() {
 			{statusModal && (
 				<StatusModal
 					visible={statusModal.visible}
-					status="success"
+					status={statusModal.status || 'success'}
 					title={statusModal.title}
 					description={statusModal.description}
-					submitText="Done"
+					submitText={statusModal.status === 'error' ? 'OK' : 'Done'}
 					onSubmit={() => setStatusModal(null)}
 					onCancel={() => setStatusModal(null)}
 				/>

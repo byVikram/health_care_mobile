@@ -1,231 +1,182 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import {
-	ActivityIndicator,
-	FlatList,
-	Image,
-	ScrollView,
-	StyleSheet,
-	TextInput,
-	TouchableOpacity,
 	View,
+	ScrollView,
+	TouchableOpacity,
+	Image,
+	StyleSheet,
+	StatusBar,
+	TextInput,
+	useWindowDimensions,
 } from 'react-native'
-import { useNavigation, useRoute } from '@react-navigation/native'
-import { Ionicons } from '@expo/vector-icons'
-import { ANCILLARY_MOCK_DATA, AncillaryProvider, fetchVerifiedNursesBackend } from '../ancillaryService'
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import {
+	AppScreenHeader,
+	AppTypography,
+	AppButton,
+	AppSkeleton,
+} from '../../../components/common'
+import {
+	AncillaryProvider,
+	fetchConsultedNursesBackend,
+} from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
-import { AppBottomSheet, AppButton, AppScreenHeader, AppTypography, StatusModal } from '../../../components/common'
 
-const FILTERS = ['Available Now', 'Within 5 km', 'Within 10 km', 'Experience 5+ yrs']
+type RouteParams = {
+	AncillaryProviders: {
+		serviceKey?: string
+		serviceLabel?: string
+		procedureId?: string | number
+		procedureName?: string
+		isSelectionMode?: boolean
+		selectedNurseId?: string
+	}
+}
 
-export default function AncillaryProvidersPage() {
+export const AncillaryProvidersPage = () => {
 	const navigation = useNavigation<any>()
-	const route = useRoute<any>()
-	const {
-		serviceKey,
-		serviceLabel,
-		procedureName,
-		procedureId,
-		isSelectionMode,
-		selectedNurseId,
-		latitude,
-		longitude,
-	} = route.params || {}
+	const route = useRoute<RouteProp<RouteParams, 'AncillaryProviders'>>()
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
 
-	const hasCoordinates =
-		latitude != null &&
-		longitude != null &&
-		!isNaN(Number(latitude)) &&
-		!isNaN(Number(longitude)) &&
-		Number(latitude) !== 0 &&
-		Number(longitude) !== 0
+	const isSelectionMode = Boolean(route.params?.isSelectionMode)
+	const selectedNurseId = route.params?.selectedNurseId
 
-	const [searchQuery, setSearchQuery] = useState('')
-	const [activeFilters, setActiveFilters] = useState<string[]>([])
-
-	const [selectedProvider, setSelectedProvider] = useState<AncillaryProvider | null>(null)
-	const [showSuccessModal, setShowSuccessModal] = useState(false)
-	const [showProfileModal, setShowProfileModal] = useState(false)
-
-	const isNursingFlow =
-		isSelectionMode ||
-		serviceKey === 'nursing-care' ||
-		!serviceKey ||
-		(serviceLabel && serviceLabel.toLowerCase().includes('nurs'))
-
-	const categoryData = ANCILLARY_MOCK_DATA[serviceKey] || ANCILLARY_MOCK_DATA['nursing-care']
-
-	const [nurses, setNurses] = useState<AncillaryProvider[]>([])
-	const [loading, setLoading] = useState<boolean>(isNursingFlow && hasCoordinates)
+	const [consultedNurses, setConsultedNurses] = useState<AncillaryProvider[]>([])
+	const [loading, setLoading] = useState<boolean>(true)
 	const [error, setError] = useState<string | null>(null)
+	const [searchQuery, setSearchQuery] = useState('')
 
-	const loadNurses = useCallback(async () => {
-		if (!isNursingFlow) return
-
-		console.log('[AncillaryProvidersPage] loadNurses invoked:', {
-			serviceKey,
-			serviceLabel,
-			procedureName,
-			procedureId,
-			latitude,
-			longitude,
-			hasCoordinates,
-		})
-
-		if (!hasCoordinates) {
-			console.log('[AncillaryProvidersPage] Missing patient coordinates, displaying location required UI state.')
-			setLoading(false)
-			return
-		}
-
+	const loadConsultedNurses = useCallback(async () => {
 		setLoading(true)
 		setError(null)
 		try {
-			const data = await fetchVerifiedNursesBackend({
-				procedureId: procedureId ? String(procedureId) : undefined,
-				procedureName: procedureName ? String(procedureName) : undefined,
-				latitude: Number(latitude),
-				longitude: Number(longitude),
-			})
-			console.log('[AncillaryProvidersPage] Loaded verified nurses from API:', data.length, data)
-			setNurses(data)
+			console.log('[AncillaryProvidersPage] Fetching previously consulted nurses...')
+			const data = await fetchConsultedNursesBackend()
+			console.log('[AncillaryProvidersPage] Consulted nurses loaded:', data.length)
+			setConsultedNurses(data)
 		} catch (err: any) {
-			console.log('[AncillaryProvidersPage] Failed to fetch verified nurses:', err)
-			setError('Unable to load verified nurses. Please check your connection and try again.')
+			console.log('[AncillaryProvidersPage] Failed to fetch consulted nurses:', err)
+			setError('Unable to load your previous nurses. Please check your connection and try again.')
 		} finally {
 			setLoading(false)
 		}
-	}, [isNursingFlow, procedureId, procedureName, latitude, longitude, hasCoordinates])
+	}, [])
 
 	useEffect(() => {
-		void loadNurses()
-	}, [loadNurses])
+		void loadConsultedNurses()
+	}, [loadConsultedNurses])
 
-	const providers = isNursingFlow ? nurses : categoryData.providers
+	const filteredNurses = useMemo(() => {
+		const q = searchQuery.toLowerCase().trim()
+		if (!q) return consultedNurses
+		return consultedNurses.filter((n) => {
+			const nameMatch = n.name.toLowerCase().includes(q)
+			const credsMatch = n.credentials?.toLowerCase().includes(q)
+			const procMatch = n.procedures?.some((proc: string) => proc.toLowerCase().includes(q))
+			return nameMatch || credsMatch || procMatch
+		})
+	}, [consultedNurses, searchQuery])
 
-	const handleFilterPress = (filter: string) => {
-		if (activeFilters.includes(filter)) {
-			setActiveFilters(activeFilters.filter((f) => f !== filter))
-		} else {
-			setActiveFilters([...activeFilters, filter])
-		}
-	}
-
-	const handleBookNow = (provider: AncillaryProvider) => {
-		if (isSelectionMode) {
-			navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
-				selectedNurse: provider,
-				assignmentMode: 'SELECT_NURSE',
-			})
-			return
-		}
-
-		setSelectedProvider(provider)
-		setShowSuccessModal(true)
-	}
-
-	const handleSuccessModalSubmit = () => {
-		setShowSuccessModal(false)
-		navigation.reset({
-			index: 0,
-			routes: [{ name: ROUTES.MAIN.TABS }],
+	const handleSelectNurse = (provider: AncillaryProvider) => {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
+			selectedNurse: provider,
+			assignmentMode: 'SELECT_NURSE',
 		})
 	}
 
-	const filteredProviders = providers.filter((p) => {
-		const q = searchQuery.toLowerCase().trim()
-		const matchesSearch =
-			!q ||
-			p.name.toLowerCase().includes(q) ||
-			p.credentials.toLowerCase().includes(q) ||
-			p.procedures.some((proc) => proc.toLowerCase().includes(q))
+	const renderSkeleton = () => (
+		<View style={styles.cardsContainer}>
+			{[1, 2, 3].map((itemKey) => (
+				<View key={itemKey} style={styles.skeletonCard}>
+					<View style={styles.skeletonHeader}>
+						<AppSkeleton width={56} height={56} borderRadius={28} />
+						<View style={styles.skeletonInfo}>
+							<AppSkeleton width="65%" height={16} borderRadius={4} style={{ marginBottom: 6 }} />
+							<AppSkeleton width="45%" height={12} borderRadius={4} style={{ marginBottom: 6 }} />
+							<AppSkeleton width="35%" height={12} borderRadius={4} />
+						</View>
+					</View>
+					<AppSkeleton width={140} height={22} borderRadius={6} style={{ marginTop: 12 }} />
+					<AppSkeleton width="100%" height={26} borderRadius={6} style={{ marginTop: 10 }} />
+					<AppSkeleton width="100%" height={44} borderRadius={10} style={{ marginTop: 14 }} />
+				</View>
+			))}
+		</View>
+	)
 
-		if (!matchesSearch) return false
-
-		// In real nurse flow, backend already guarantees distance <= 10.0 KM
-		if (isNursingFlow && typeof p.distance === 'number' && p.distance > 10.0) {
-			return false
-		}
-
-		if (activeFilters.includes('Within 5 km')) {
-			if (typeof p.distance === 'number' && p.distance > 5.0) return false
-		}
-		if (activeFilters.includes('Within 10 km')) {
-			if (typeof p.distance === 'number' && p.distance > 10.0) return false
-		}
-		if (activeFilters.includes('Experience 5+ yrs')) {
-			if (!p.experience || p.experience < 5) return false
-		}
-
-		return true
-	})
-
-	const renderProviderCard = ({ item }: { item: AncillaryProvider }) => {
-		const isSelected = isSelectionMode && item.id === selectedNurseId
+	const renderNurseCard = (nurse: AncillaryProvider) => {
+		const isSelected = isSelectionMode && nurse.id === selectedNurseId
+		const expText =
+			nurse.experience != null
+				? `${nurse.experience} ${nurse.experience === 1 ? 'year' : 'years'} experience`
+				: 'Experienced Registered Nurse'
 
 		return (
-			<View style={[styles.card, isSelected && styles.cardSelected]}>
+			<View
+				key={nurse.id}
+				style={[
+					styles.card,
+					isSelected && styles.cardSelected,
+					isTablet && styles.cardTablet,
+				]}
+			>
+				{/* Top Profile Header */}
 				<View style={styles.cardHeader}>
-					<Image source={{ uri: item.avatar }} style={styles.avatar} resizeMode="cover" />
-					<View style={styles.providerInfo}>
-						<View style={styles.nameRow}>
-							<AppTypography variant="subtitle" style={styles.name}>{item.name}</AppTypography>
-							<View style={styles.credentialsBadge}>
-								<AppTypography variant="caption" style={styles.credentialsText}>{item.credentials}</AppTypography>
-							</View>
+					<View style={styles.avatarWrap}>
+						<Image
+							source={{ uri: nurse.avatar }}
+							style={styles.avatar}
+							resizeMode="cover"
+						/>
+					</View>
+					<View style={styles.nurseInfo}>
+						<AppTypography variant="h4" style={styles.name} numberOfLines={1}>
+							{nurse.name}
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.credentials} numberOfLines={1}>
+							{nurse.credentials || 'Registered Nurse (RN)'}
+						</AppTypography>
+						<View style={styles.experienceRow}>
+							<MaterialCommunityIcons name="briefcase-outline" size={13} color="#64748B" />
+							<AppTypography variant="caption" style={styles.experienceText}>
+								{expText}
+							</AppTypography>
 						</View>
-						<AppTypography variant="caption" style={styles.experience}>
-							{item.experience != null ? `${item.experience} yrs exp • ` : ''}{item.distance} km away
+					</View>
+				</View>
+
+				{/* Trust Indicator: Subtle Healthcare Badge */}
+				<View style={styles.badgeWrap}>
+					<View style={styles.consultedBadge}>
+						<Ionicons name="checkmark-circle" size={13} color="#059669" style={styles.badgeIcon} />
+						<AppTypography variant="caption" style={styles.consultedBadgeText}>
+							Previously Consulted
 						</AppTypography>
 					</View>
 				</View>
 
-				{/* Metadata details list */}
-				{item.procedures && item.procedures.length > 0 && (
-					<View style={styles.metaBox}>
-						<View style={styles.metaRow}>
-							<Ionicons name="medkit-outline" size={13} color="#0C7C7C" />
-							<AppTypography variant="caption" style={styles.metaText} numberOfLines={1}>
-								{item.procedures.join(' • ')}
-							</AppTypography>
-						</View>
-						{item.languages && item.languages.length > 0 && (
-							<View style={styles.metaRow}>
-								<Ionicons name="language-outline" size={13} color="#64748B" />
-								<AppTypography variant="caption" style={styles.metaText}>
-									Languages: {item.languages.join(', ')}
-								</AppTypography>
-							</View>
-						)}
+				{/* Relevant Procedures */}
+				{nurse.procedures && nurse.procedures.length > 0 && (
+					<View style={styles.proceduresBox}>
+						<MaterialCommunityIcons name="medical-bag" size={14} color="#0C7C7C" />
+						<AppTypography variant="caption" style={styles.proceduresText} numberOfLines={2}>
+							{nurse.procedures.join(' • ')}
+						</AppTypography>
 					</View>
 				)}
 
-				{/* Verifications tags list */}
-				<View style={styles.badgeRow}>
-					{(item.badges && item.badges.length > 0 ? item.badges : ['Verified Nurse']).map((badge, idx) => (
-						<View key={idx} style={styles.badge}>
-							<Ionicons name="checkmark-circle" size={12} color="#047857" style={styles.badgeIcon} />
-							<AppTypography variant="caption" style={styles.badgeText}>{badge}</AppTypography>
-						</View>
-					))}
-				</View>
-
-				{/* Action rows buttons using AppButton component */}
-				<View style={styles.actions}>
-					<AppButton
-						variant="outline"
-						disabled={true}
-						style={styles.profileBtnDisabled}
-						labelStyle={styles.profileBtnLabelDisabled}
-					>
-						View Profile
-					</AppButton>
+				{/* Primary CTA Button */}
+				<View style={styles.cardFooter}>
 					<AppButton
 						variant="primary"
-						onPress={() => handleBookNow(item)}
-						style={[styles.bookBtn, isSelected && styles.bookBtnSelected]}
-						labelStyle={styles.bookBtnLabel}
+						onPress={() => handleSelectNurse(nurse)}
+						style={[styles.selectBtn, isSelected && styles.selectBtnActive]}
+						contentStyle={styles.selectBtnContent}
+						labelStyle={styles.selectBtnLabel}
 					>
-						{isSelectionMode ? (isSelected ? 'Selected Nurse ✓' : 'Select Nurse') : 'Book Now'}
+						{isSelected ? 'Selected Nurse ✓' : 'Select Nurse'}
 					</AppButton>
 				</View>
 			</View>
@@ -234,369 +185,234 @@ export default function AncillaryProvidersPage() {
 
 	return (
 		<View style={styles.container}>
-			{/* Header */}
+			<StatusBar barStyle="light-content" backgroundColor="#1F5F68" />
+
+			{/* Shared AppScreenHeader */}
 			<AppScreenHeader
-				title={
-					isSelectionMode
-						? 'Select a Preferred Nurse'
-						: serviceLabel
-						? `Clinicians: ${serviceLabel}`
-						: 'Available Clinicians'
-				}
+				title="Previously Consulted Nurses"
 				onBack={() => navigation.goBack()}
 			/>
 
-			{/* Subtitle summary */} 
-			<View style={styles.summaryBar}>
-				<AppTypography variant="caption" style={styles.summaryText}>
-					{!hasCoordinates
-						? 'Location coordinates required to find nurses near you'
-						: loading
-						? 'Checking verified clinicians within 10 km...'
-						: `${filteredProviders.length} ${
-								isNursingFlow ? 'verified nurses within 10 km' : 'clinicians'
-						  } available`}
-				</AppTypography>
-			</View>
+			<ScrollView
+				contentContainerStyle={styles.scrollList}
+				showsVerticalScrollIndicator={false}
+			>
+				{/* Contextual Sub-header / Supporting text */}
+				<View style={[styles.subHeaderSection, isTablet && styles.sectionTablet]}>
+					<AppTypography variant="h3" style={styles.pageHeading}>
+						Previously Consulted Nurses
+					</AppTypography>
+					<AppTypography variant="subtitle" style={styles.pageDescription}>
+						Choose a nurse you've consulted before for your next care appointment.
+					</AppTypography>
+				</View>
 
-			{/* Search */}
-			<View style={styles.searchBarContainer}>
-				<View style={styles.searchBar}>
-					<Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
-					<TextInput
-						style={styles.searchInput}
-						placeholder="Search by clinician name or specialty..."
-						placeholderTextColor="#94A3B8"
-						value={searchQuery}
-						onChangeText={setSearchQuery}
-					/>
-				</View>
-			</View>
-
-			{/* Horizontal filter pills */}
-			<View style={styles.filterContainer}>
-				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-					{FILTERS.map((filter) => {
-						const isActive = activeFilters.includes(filter)
-						return (
-							<TouchableOpacity
-								key={filter}
-								style={[styles.filterTag, isActive && styles.filterTagActive]}
-								onPress={() => handleFilterPress(filter)}
-							>
-								<AppTypography variant="caption" style={[styles.filterTagText, isActive && styles.filterTagTextActive]}>
-									{filter}
-								</AppTypography>
-								{isActive && <Ionicons name="close" size={12} color="#FFFFFF" style={styles.filterTagClose} />}
-							</TouchableOpacity>
-						)
-					})}
-				</ScrollView>
-			</View>
-
-			{/* Providers list with proper states */}
-			{!hasCoordinates ? (
-				<View style={styles.centerStateBox}>
-					<Ionicons name="location-outline" size={48} color="#0C7C7C" />
-					<AppTypography variant="h4" style={styles.stateTitle}>
-						Location Required
-					</AppTypography>
-					<AppTypography variant="caption" style={styles.stateSubtitle}>
-						To view verified nurses within a 10 km radius, we need your visit address coordinates. Please select an address with GPS coordinates.
-					</AppTypography>
-					<AppButton
-						variant="primary"
-						onPress={() => navigation.goBack()}
-						style={styles.retryBtn}
-						labelStyle={styles.retryBtnLabel}
-					>
-						Choose Address
-					</AppButton>
-				</View>
-			) : loading ? (
-				<View style={styles.centerStateBox}>
-					<ActivityIndicator size="large" color="#0C7C7C" />
-					<AppTypography variant="subtitle" style={styles.stateTitle}>
-						Finding Verified Nurses...
-					</AppTypography>
-					<AppTypography variant="caption" style={styles.stateSubtitle}>
-						Checking active credentials and available nurses within 10 km
-					</AppTypography>
-				</View>
-			) : error ? (
-				<View style={styles.centerStateBox}>
-					<Ionicons name="alert-circle-outline" size={44} color="#DC2626" />
-					<AppTypography variant="h4" style={[styles.stateTitle, { color: '#DC2626' }]}>
-						Unable to Load Clinicians
-					</AppTypography>
-					<AppTypography variant="caption" style={styles.stateSubtitle}>
-						{error}
-					</AppTypography>
-					<AppButton
-						variant="primary"
-						onPress={() => void loadNurses()}
-						style={styles.retryBtn}
-						labelStyle={styles.retryBtnLabel}
-					>
-						Retry
-					</AppButton>
-				</View>
-			) : (
-				<FlatList
-					data={filteredProviders}
-					renderItem={renderProviderCard}
-					keyExtractor={(item) => item.id}
-					contentContainerStyle={styles.listContent}
-					ListEmptyComponent={
-						<View style={styles.emptyContainer}>
-							<Ionicons name="people-outline" size={48} color="#CBD5E1" />
-							<AppTypography variant="body" style={styles.emptyText}>
-								{isNursingFlow
-									? 'No verified nurses currently available within 10 km of your location.'
-									: 'No available clinicians found matching your criteria.'}
-							</AppTypography>
-							{(activeFilters.length > 0 || searchQuery.length > 0) && (
+				{/* Search Bar - only shown if consulted nurses exist */}
+				{!loading && consultedNurses.length > 0 && (
+					<View style={[styles.searchSection, isTablet && styles.sectionTablet]}>
+						<View style={styles.searchBar}>
+							<Ionicons name="search-outline" size={18} color="#64748B" />
+							<TextInput
+								placeholder="Search by nurse name, credentials, or procedure..."
+								placeholderTextColor="#94A3B8"
+								value={searchQuery}
+								onChangeText={setSearchQuery}
+								style={styles.searchInput}
+								returnKeyType="search"
+							/>
+							{searchQuery.length > 0 && (
 								<TouchableOpacity
-									onPress={() => {
-										setActiveFilters([])
-										setSearchQuery('')
-									}}
-									style={styles.resetFiltersBtn}
-									activeOpacity={0.7}
+									onPress={() => setSearchQuery('')}
+									hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
 								>
-									<AppTypography variant="caption" style={styles.resetFiltersText}>
-										Reset Filters & Search
-									</AppTypography>
+									<Ionicons name="close-circle" size={18} color="#94A3B8" />
 								</TouchableOpacity>
 							)}
 						</View>
-					}
-				/>
-			)}
+					</View>
+				)}
 
-			{/* Book Success status modal overlay */}
-			<StatusModal
-				visible={showSuccessModal}
-				status="success"
-				title="Booking Confirmed!"
-				description={`Your appointment with ${selectedProvider?.name || 'the clinician'} has been successfully scheduled. Details have been logged in your Portal history.`}
-				submitText="Go Home"
-				onSubmit={handleSuccessModalSubmit}
-			/>
-
-			{/* Provider Profile Details Bottom Sheet */}
-			<AppBottomSheet
-				visible={showProfileModal}
-				onClose={() => setShowProfileModal(false)}
-				title="Clinician Information Profile"
-				maxHeightRatio={0.85}
-				footer={
-					selectedProvider ? (
-						<View style={styles.sheetFooterRow}>
-							<AppButton
-								variant="primary"
-								formAction
-								style={styles.sheetBookBtn}
-								onPress={() => {
-									setShowProfileModal(false)
-									handleBookNow(selectedProvider)
-								}}
-							>
-								{isSelectionMode ? 'Select Preferred Nurse' : 'Book Appointment'}
-							</AppButton>
+				{/* Main Content State Rendering */}
+				{loading ? (
+					<View style={isTablet ? styles.sectionTablet : undefined}>
+						{renderSkeleton()}
+					</View>
+				) : error ? (
+					<View style={[styles.errorContainer, isTablet && styles.sectionTablet]}>
+						<View style={styles.errorIconWrap}>
+							<Ionicons name="alert-circle-outline" size={36} color="#DC2626" />
 						</View>
-					) : undefined
-				}
-			>
-				{selectedProvider && (
-					<View style={styles.modalProfileContent}>
-						{/* Top Avatar & Name */}
-						<View style={styles.modalHeaderBlock}>
-							<Image source={{ uri: selectedProvider.avatar }} style={styles.modalAvatar} />
-							<AppTypography variant="h3" style={styles.modalName}>
-								{selectedProvider.name}
+						<AppTypography variant="h3" style={styles.errorTitle}>
+							Unable to Load Previous Nurses
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.errorSubtitle}>
+							{error}
+						</AppTypography>
+						<AppButton
+							variant="primary"
+							onPress={() => void loadConsultedNurses()}
+							style={styles.retryBtn}
+							contentStyle={styles.retryBtnContent}
+							labelStyle={styles.retryBtnLabel}
+						>
+							Retry
+						</AppButton>
+					</View>
+				) : consultedNurses.length === 0 ? (
+					<View style={[styles.emptyContainer, isTablet && styles.sectionTablet]}>
+						<View style={styles.emptyIconCircle}>
+							<MaterialCommunityIcons name="account-clock-outline" size={38} color="#0C7C7C" />
+						</View>
+						<AppTypography variant="h3" style={styles.emptyTitle}>
+							No Previous Nurses
+						</AppTypography>
+						<AppTypography variant="body" style={styles.emptySubtitle}>
+							You haven't consulted a nurse through our service yet.
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.emptyHelper}>
+							Once you complete an ancillary appointment, your previously consulted nurses will appear here for fast rebooking.
+						</AppTypography>
+					</View>
+				) : filteredNurses.length === 0 ? (
+					<View style={[styles.emptyContainer, isTablet && styles.sectionTablet]}>
+						<Ionicons name="search-outline" size={40} color="#94A3B8" />
+						<AppTypography variant="h4" style={styles.noSearchTitle}>
+							No Matching Nurses
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.noSearchSubtitle}>
+							No previously consulted nurses match "{searchQuery}".
+						</AppTypography>
+						<TouchableOpacity
+							onPress={() => setSearchQuery('')}
+							style={styles.clearSearchBtn}
+							activeOpacity={0.7}
+						>
+							<AppTypography variant="caption" style={styles.clearSearchText}>
+								Clear Search
 							</AppTypography>
-							<View style={styles.modalCredentialsBadge}>
-								<AppTypography variant="caption" style={styles.modalCredentialsText}>
-									{selectedProvider.credentials} • Verified Clinician
-								</AppTypography>
-							</View>
-						</View>
-
-						{/* Quick 3-metric stats row */}
-						<View style={styles.modalStatsRow}>
-							<View style={styles.modalStatBox}>
-								<AppTypography variant="subtitle" style={styles.modalStatVal}>
-									{selectedProvider.experience} Yrs
-								</AppTypography>
-								<AppTypography variant="caption" style={styles.modalStatLabel}>
-									Experience
-								</AppTypography>
-							</View>
-							<View style={styles.modalStatDivider} />
-							<View style={styles.modalStatBox}>
-								<View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-									<Ionicons name="star" size={14} color="#F59E0B" />
-									<AppTypography variant="subtitle" style={styles.modalStatVal}>
-										{selectedProvider.rating}
-									</AppTypography>
-								</View>
-								<AppTypography variant="caption" style={styles.modalStatLabel}>
-									{selectedProvider.reviewsCount} Reviews
-								</AppTypography>
-							</View>
-							<View style={styles.modalStatDivider} />
-							<View style={styles.modalStatBox}>
-								<AppTypography variant="subtitle" style={styles.modalStatVal}>
-									{selectedProvider.distance} km
-								</AppTypography>
-								<AppTypography variant="caption" style={styles.modalStatLabel}>
-									Distance
+						</TouchableOpacity>
+					</View>
+				) : (
+					<View style={isTablet ? styles.sectionTablet : undefined}>
+						{/* List Summary Bar */}
+						<View style={styles.summaryRow}>
+							<AppTypography variant="subtitle" style={styles.summaryTitle}>
+								Available for Rebooking
+							</AppTypography>
+							<View style={styles.countBadge}>
+								<AppTypography variant="caption" style={styles.countBadgeText}>
+									{filteredNurses.length} {filteredNurses.length === 1 ? 'Nurse' : 'Nurses'}
 								</AppTypography>
 							</View>
 						</View>
 
-						{/* Procedures Offered */}
-						<View style={styles.modalSection}>
-							<AppTypography variant="caption" style={styles.modalSectionTitle}>
-								Procedures Offered
-							</AppTypography>
-							<View style={styles.modalPillsContainer}>
-								{selectedProvider.procedures.map((p, idx) => (
-									<View key={idx} style={styles.modalPill}>
-										<Ionicons name="medkit-outline" size={12} color="#0C7C7C" />
-										<AppTypography variant="caption" style={styles.modalPillText}>
-											{p}
-										</AppTypography>
-									</View>
-								))}
-							</View>
-						</View>
-
-						{/* Languages Spoken */}
-						<View style={styles.modalSection}>
-							<AppTypography variant="caption" style={styles.modalSectionTitle}>
-								Languages Spoken
-							</AppTypography>
-							<View style={styles.modalPillsContainer}>
-								{selectedProvider.languages.map((lang, idx) => (
-									<View key={idx} style={[styles.modalPill, { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' }]}>
-										<Ionicons name="chatbubble-outline" size={12} color="#64748B" />
-										<AppTypography variant="caption" style={[styles.modalPillText, { color: '#475569' }]}>
-											{lang}
-										</AppTypography>
-									</View>
-								))}
-							</View>
-						</View>
-
-						{/* Pricing Info */}
-						<View style={styles.modalPriceBox}>
-							<AppTypography variant="caption" style={styles.modalPriceLabel}>
-								Starting Consultation / Procedure Rate:
-							</AppTypography>
-							<AppTypography variant="h3" style={styles.modalPriceValue}>
-								₹{selectedProvider.startingPrice}
-							</AppTypography>
+						{/* Nurse Cards List */}
+						<View style={styles.cardsContainer}>
+							{filteredNurses.map((nurse) => renderNurseCard(nurse))}
 						</View>
 					</View>
 				)}
-			</AppBottomSheet>
+			</ScrollView>
 		</View>
 	)
 }
+
+export default AncillaryProvidersPage
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: '#F8FAFC',
 	},
-	summaryBar: {
+	scrollList: {
 		paddingHorizontal: 16,
-		paddingVertical: 10,
-		borderBottomWidth: 1,
-		borderBottomColor: '#F1F5F9',
-		backgroundColor: '#FFFFFF',
+		paddingTop: 16,
+		paddingBottom: 40,
 	},
-	summaryText: {
-		fontSize: 12.5,
-		fontWeight: '600',
-		color: '#475569',
+	sectionTablet: {
+		maxWidth: 720,
+		alignSelf: 'center',
+		width: '100%',
 	},
-	searchBarContainer: {
-		paddingHorizontal: 16,
-		paddingVertical: 10,
-		backgroundColor: '#FFFFFF',
+	subHeaderSection: {
+		marginBottom: 16,
+	},
+	pageHeading: {
+		color: '#0F172A',
+		fontWeight: '700',
+		fontSize: 18,
+	},
+	pageDescription: {
+		color: '#64748B',
+		marginTop: 4,
+		fontSize: 13,
+		lineHeight: 18,
+	},
+	searchSection: {
+		marginBottom: 16,
 	},
 	searchBar: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#FFFFFF',
+		borderRadius: 12,
+		paddingHorizontal: 14,
+		height: 44,
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
-		borderRadius: 12,
-		paddingHorizontal: 12,
-		height: 42,
-	},
-	searchIcon: {
-		marginRight: 8,
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.03,
+		shadowRadius: 3,
+		elevation: 1,
 	},
 	searchInput: {
 		flex: 1,
-		fontSize: 13,
-		color: '#1E293B',
+		marginLeft: 8,
+		fontSize: 13.5,
+		color: '#0F172A',
+		paddingVertical: 0,
 	},
-	filterContainer: {
-		backgroundColor: '#FFFFFF',
-		paddingBottom: 10,
-		borderBottomWidth: 1,
-		borderBottomColor: '#E2E8F0',
-	},
-	filterScroll: {
-		paddingHorizontal: 16,
-		gap: 8,
-	},
-	filterTag: {
+	summaryRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#F1F5F9',
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 16,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
+		justifyContent: 'space-between',
+		marginBottom: 12,
+		paddingHorizontal: 2,
 	},
-	filterTagActive: {
-		backgroundColor: '#0C7C7C',
-		borderColor: '#0C7C7C',
-	},
-	filterTagText: {
-		fontSize: 11.5,
+	summaryTitle: {
+		fontSize: 14,
 		fontWeight: '600',
-		color: '#475569',
+		color: '#334155',
 	},
-	filterTagTextActive: {
-		color: '#FFFFFF',
+	countBadge: {
+		backgroundColor: '#E6F4F4',
+		paddingHorizontal: 10,
+		paddingVertical: 3,
+		borderRadius: 12,
 	},
-	filterTagClose: {
-		marginLeft: 4,
+	countBadgeText: {
+		color: '#0C7C7C',
+		fontWeight: '700',
+		fontSize: 11.5,
 	},
-	listContent: {
-		padding: 16,
-		gap: 12,
-		paddingBottom: 40,
+	cardsContainer: {
+		gap: 14,
 	},
 	card: {
 		backgroundColor: '#FFFFFF',
-		borderRadius: 14,
-		padding: 14,
+		borderRadius: 16,
+		padding: 16,
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
 		shadowColor: '#0F172A',
 		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.04,
-		shadowRadius: 6,
-		elevation: 1.5,
+		shadowOpacity: 0.05,
+		shadowRadius: 8,
+		elevation: 2,
+	},
+	cardTablet: {
+		padding: 20,
 	},
 	cardSelected: {
 		borderColor: '#0C7C7C',
@@ -605,338 +421,224 @@ const styles = StyleSheet.create({
 	cardHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 12,
+	},
+	avatarWrap: {
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		backgroundColor: '#E2E8F0',
+		overflow: 'hidden',
+		borderWidth: 1.5,
+		borderColor: '#CCECEB',
 	},
 	avatar: {
-		width: 52,
-		height: 52,
-		borderRadius: 16,
-		backgroundColor: '#F1F5F9',
+		width: '100%',
+		height: '100%',
 	},
-	providerInfo: {
+	nurseInfo: {
 		flex: 1,
-		marginLeft: 12,
-	},
-	nameRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		marginBottom: 2,
+		marginLeft: 14,
 	},
 	name: {
-		fontSize: 14.5,
 		fontWeight: '700',
-		color: '#0F172A',
+		color: '#082B45',
+		fontSize: 16,
+		lineHeight: 20,
 	},
-	credentialsBadge: {
-		backgroundColor: '#CCFBF1',
-		paddingHorizontal: 6,
-		paddingVertical: 1.5,
-		borderRadius: 4,
-	},
-	credentialsText: {
-		fontSize: 10,
-		fontWeight: '700',
-		color: '#0F766E',
-	},
-	experience: {
-		fontSize: 11.5,
-		color: '#64748B',
-		marginBottom: 3,
-	},
-	ratingRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 3,
-	},
-	rating: {
-		fontSize: 11.5,
-		fontWeight: '700',
-		color: '#1E293B',
-	},
-	reviewsCount: {
-		fontSize: 11,
-		color: '#64748B',
-	},
-	rateCol: {
-		alignItems: 'flex-end',
-	},
-	rateLabel: {
-		fontSize: 9.5,
-		color: '#64748B',
-		fontWeight: '500',
-		marginBottom: 1,
-	},
-	ratePrice: {
-		fontSize: 15,
-		fontWeight: '800',
+	credentials: {
 		color: '#0C7C7C',
+		fontWeight: '600',
+		fontSize: 12.5,
+		marginTop: 2,
 	},
-	metaBox: {
-		backgroundColor: '#F8FAFC',
-		borderRadius: 10,
-		padding: 8,
-		gap: 5,
-		marginBottom: 10,
-	},
-	metaRow: {
+	experienceRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 6,
+		marginTop: 3,
+		gap: 4,
 	},
-	metaText: {
-		fontSize: 11.5,
-		color: '#475569',
-		fontWeight: '500',
-		flex: 1,
+	experienceText: {
+		color: '#64748B',
+		fontSize: 12,
 	},
-	badgeRow: {
+	badgeWrap: {
 		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 6,
-		marginBottom: 12,
+		marginTop: 10,
 	},
-	badge: {
+	consultedBadge: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#ECFDF5',
-		borderWidth: 1,
-		borderColor: '#D1FAE5',
-		paddingHorizontal: 7,
-		paddingVertical: 3,
+		paddingHorizontal: 8,
+		paddingVertical: 3.5,
 		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#A7F3D0',
 	},
 	badgeIcon: {
-		marginRight: 3,
+		marginRight: 4,
 	},
-	badgeText: {
-		fontSize: 9.5,
-		fontWeight: '700',
+	consultedBadgeText: {
 		color: '#065F46',
-	},
-	actions: {
-		flexDirection: 'row',
-		gap: 10,
-		alignItems: 'center',
-	},
-	profileBtn: {
-		flex: 1,
-		borderRadius: 10,
-		borderColor: '#CBD5E1',
-	},
-	profileBtnLabel: {
-		fontSize: 12.5,
+		fontSize: 11.5,
 		fontWeight: '600',
-		color: '#475569',
-		marginHorizontal: 0,
 	},
-	profileBtnDisabled: {
-		flex: 1,
-		borderRadius: 10,
-		borderColor: '#E2E8F0',
-		backgroundColor: '#F8FAFC',
-		opacity: 0.6,
-	},
-	profileBtnLabelDisabled: {
-		fontSize: 12.5,
-		fontWeight: '600',
-		color: '#94A3B8',
-		marginHorizontal: 0,
-	},
-	bookBtn: {
-		flex: 1.3,
-		borderRadius: 10,
-		backgroundColor: '#0C7C7C',
-	},
-	bookBtnSelected: {
-		backgroundColor: '#047857',
-	},
-	bookBtnLabel: {
-		fontSize: 12.5,
-		fontWeight: '700',
-		color: '#FFFFFF',
-		marginHorizontal: 0,
-	},
-	emptyContainer: {
-		paddingVertical: 60,
-		alignItems: 'center',
-	},
-	emptyText: {
-		fontSize: 13,
-		color: '#94A3B8',
-		marginTop: 8,
-		textAlign: 'center',
-		paddingHorizontal: 24,
-	},
-	/* Profile Modal Content Styles */
-	modalProfileContent: {
-		paddingVertical: 4,
-	},
-	modalHeaderBlock: {
-		alignItems: 'center',
-		paddingBottom: 14,
-		borderBottomWidth: 1,
-		borderBottomColor: '#F1F5F9',
-	},
-	modalAvatar: {
-		width: 64,
-		height: 64,
-		borderRadius: 32,
-		borderWidth: 2,
-		borderColor: '#E2E8F0',
-		marginBottom: 8,
-		backgroundColor: '#F1F5F9',
-	},
-	modalName: {
-		fontSize: 16.5,
-		fontWeight: '700',
-		color: '#0F172A',
-		marginBottom: 3,
-	},
-	modalCredentialsBadge: {
-		backgroundColor: '#CCFBF1',
-		paddingHorizontal: 8,
-		paddingVertical: 2.5,
-		borderRadius: 6,
-	},
-	modalCredentialsText: {
-		fontSize: 11,
-		fontWeight: '700',
-		color: '#0F766E',
-	},
-	modalStatsRow: {
+	proceduresBox: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'space-around',
-		backgroundColor: '#F8FAFC',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		paddingVertical: 10,
-		paddingHorizontal: 6,
-		marginVertical: 12,
-	},
-	modalStatBox: {
-		alignItems: 'center',
-		flex: 1,
-	},
-	modalStatDivider: {
-		width: 1,
-		height: 24,
-		backgroundColor: '#E2E8F0',
-	},
-	modalStatVal: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#0F172A',
-		marginBottom: 1,
-	},
-	modalStatLabel: {
-		fontSize: 10.5,
-		color: '#64748B',
-	},
-	modalSection: {
-		marginBottom: 12,
-	},
-	modalSectionTitle: {
-		fontSize: 11,
-		fontWeight: '700',
-		color: '#64748B',
-		textTransform: 'uppercase',
-		letterSpacing: 0.5,
-		marginBottom: 6,
-	},
-	modalPillsContainer: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
+		marginTop: 12,
+		paddingTop: 10,
+		borderTopWidth: 1,
+		borderTopColor: '#F1F5F9',
 		gap: 6,
 	},
-	modalPill: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		backgroundColor: '#F0FDFA',
-		borderWidth: 1,
-		borderColor: '#CCFBF1',
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 6,
+	proceduresText: {
+		color: '#475569',
+		fontSize: 12,
+		flex: 1,
+		lineHeight: 16,
 	},
-	modalPillText: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#0F766E',
+	cardFooter: {
+		marginTop: 14,
 	},
-	modalPriceBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		backgroundColor: '#F8FAFC',
+	selectBtn: {
 		borderRadius: 10,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
-		marginTop: 4,
-		marginBottom: 16,
+		backgroundColor: '#1D7473',
+	},
+	selectBtnActive: {
+		backgroundColor: '#095C5C',
+	},
+	selectBtnContent: {
+		minHeight: 44,
+		justifyContent: 'center',
+	},
+	selectBtnLabel: {
+		fontSize: 14,
+		lineHeight: 18,
+		fontWeight: '600',
+		marginVertical: 0,
+	},
+	skeletonCard: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		padding: 16,
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
 	},
-	modalPriceLabel: {
-		fontSize: 11.5,
-		color: '#475569',
-		fontWeight: '500',
+	skeletonHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
 	},
-	modalPriceValue: {
-		fontSize: 16,
-		fontWeight: '800',
-		color: '#0C7C7C',
+	skeletonInfo: {
+		flex: 1,
+		marginLeft: 14,
 	},
-	sheetFooterRow: {
-		width: '100%',
-	},
-	sheetBookBtn: {
-		width: '100%',
-		borderRadius: 10,
-		marginTop: 0,
-	},
-	centerStateBox: {
-		paddingVertical: 64,
-		paddingHorizontal: 24,
+	emptyContainer: {
 		alignItems: 'center',
 		justifyContent: 'center',
+		paddingHorizontal: 24,
+		paddingVertical: 48,
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+		marginTop: 8,
 	},
-	stateTitle: {
-		marginTop: 14,
+	emptyIconCircle: {
+		width: 68,
+		height: 68,
+		borderRadius: 34,
+		backgroundColor: '#E6F4F4',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: 16,
+	},
+	emptyTitle: {
 		color: '#0F172A',
 		fontWeight: '700',
 		textAlign: 'center',
+		fontSize: 17,
 	},
-	stateSubtitle: {
+	emptySubtitle: {
+		marginTop: 8,
+		color: '#475569',
+		textAlign: 'center',
+		fontSize: 13.5,
+		lineHeight: 20,
+	},
+	emptyHelper: {
+		marginTop: 8,
+		color: '#94A3B8',
+		textAlign: 'center',
+		fontSize: 12,
+		lineHeight: 18,
+		maxWidth: 280,
+	},
+	noSearchTitle: {
+		marginTop: 12,
+		color: '#0F172A',
+		textAlign: 'center',
+	},
+	noSearchSubtitle: {
+		marginTop: 4,
+		color: '#64748B',
+		textAlign: 'center',
+	},
+	clearSearchBtn: {
+		marginTop: 12,
+		paddingVertical: 6,
+		paddingHorizontal: 16,
+		backgroundColor: '#E6F4F4',
+		borderRadius: 8,
+	},
+	clearSearchText: {
+		color: '#0C7C7C',
+		fontWeight: '600',
+	},
+	errorContainer: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingHorizontal: 24,
+		paddingVertical: 40,
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#FEE2E2',
+		marginTop: 8,
+	},
+	errorIconWrap: {
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		backgroundColor: '#FEF2F2',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: 12,
+	},
+	errorTitle: {
+		color: '#991B1B',
+		fontWeight: '700',
+		textAlign: 'center',
+	},
+	errorSubtitle: {
 		marginTop: 6,
 		color: '#64748B',
 		textAlign: 'center',
 		lineHeight: 18,
+		maxWidth: 280,
 	},
 	retryBtn: {
 		marginTop: 16,
-		paddingHorizontal: 24,
-		borderRadius: 8,
+		borderRadius: 10,
+		backgroundColor: '#1D7473',
+		minWidth: 120,
+	},
+	retryBtnContent: {
+		minHeight: 40,
+		paddingHorizontal: 16,
 	},
 	retryBtnLabel: {
 		fontSize: 13,
-		fontWeight: '700',
-	},
-	resetFiltersBtn: {
-		marginTop: 12,
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		backgroundColor: '#F0FDFA',
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#CCFBF1',
-	},
-	resetFiltersText: {
-		fontSize: 12,
-		fontWeight: '700',
-		color: '#0F766E',
+		fontWeight: '600',
 	},
 })

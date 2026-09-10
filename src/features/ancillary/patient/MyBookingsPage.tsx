@@ -8,7 +8,6 @@ import {
 	AncillaryReviewData,
 	fetchMyPatientBookings,
 	fetchAncillaryReviewByBooking,
-	getAncillaryReviewByBookingId,
 	submitAncillaryReview,
 } from '../ancillaryService'
 import UpcomingBookingCard from '../components/UpcomingBookingCard'
@@ -75,9 +74,10 @@ export default function MyBookingsPage({
 	const [reviewModalVisible, setReviewModalVisible] = useState(false)
 	const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 
-	// Success Feedback Modal
+	// Success / Error Feedback Modal
 	const [statusModal, setStatusModal] = useState<{
 		visible: boolean
+		status?: 'success' | 'error' | 'info'
 		title: string
 		description: string
 	} | null>(null)
@@ -180,12 +180,12 @@ export default function MyBookingsPage({
 	}
 
 	const handleRateReview = async (booking: AncillaryBooking) => {
-		let review = booking.review || getAncillaryReviewByBookingId(booking.id) || null
+		let review = booking.review || null
 		if (!review && (booking.hasReview || (booking.rating != null && booking.rating > 0))) {
 			try {
 				review = await fetchAncillaryReviewByBooking(booking.id)
 			} catch (e) {
-				// fallback to local null
+				// fallback to null
 			}
 		}
 		setReviewBooking(booking)
@@ -238,7 +238,12 @@ export default function MyBookingsPage({
 				error?.response?.data?.message ||
 				error?.message ||
 				'Unable to submit review. Please try again.'
-			Alert.alert('Review Submission Failed', errorMsg)
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Review Submission Failed',
+				description: errorMsg,
+			})
 		} finally {
 			setIsSubmittingReview(false)
 		}
@@ -429,10 +434,10 @@ export default function MyBookingsPage({
 			{statusModal && (
 				<StatusModal
 					visible={statusModal.visible}
-					status="success"
+					status={statusModal.status || 'success'}
 					title={statusModal.title}
 					description={statusModal.description}
-					submitText="Done"
+					submitText={statusModal.status === 'error' ? 'OK' : 'Done'}
 					onSubmit={() => setStatusModal(null)}
 					onCancel={() => setStatusModal(null)}
 				/>
