@@ -16,7 +16,7 @@ import {
 	UIManager,
 	Vibration,
 } from 'react-native'
-import { Audio } from 'expo-av'
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { AppModal } from '../../../../components/common'
@@ -69,6 +69,7 @@ export function IncomingRequestNotificationOverlay({
 	const translateY = useRef(new Animated.Value(-400)).current
 	const opacity = useRef(new Animated.Value(0)).current
 	const lastPlayedIdRef = useRef<string | null>(null)
+	const audioPlayer = useAudioPlayer('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
 
 	// Incoming audio & haptic alert on new request arrival
 	useEffect(() => {
@@ -90,25 +91,15 @@ export function IncomingRequestNotificationOverlay({
 		// Trigger Audio Chime Alert
 		const playAudioChime = async () => {
 			try {
-				await Audio.setAudioModeAsync({
-					playsInSilentModeIOS: true,
-					shouldDuckAndroid: true,
-					staysActiveInBackground: false,
+				await setAudioModeAsync({
+					playsInSilentMode: true,
+					interruptionMode: 'duckOthers',
+					shouldPlayInBackground: false,
 				})
 
-				// Universal MP3 chime compatible across iOS, Android, and Web
-				const { sound } = await Audio.Sound.createAsync(
-					{ uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
-					{ shouldPlay: true, volume: 0.8 }
-				)
-
-				sound.setOnPlaybackStatusUpdate((status) => {
-					if (status.isLoaded && status.didJustFinish) {
-						sound.unloadAsync().catch(() => {})
-					}
-				})
-
-				await sound.playAsync()
+				audioPlayer.volume = 0.8
+				await audioPlayer.seekTo(0)
+				audioPlayer.play()
 			} catch (error) {
 				console.warn('[IncomingRequestCard] Audio playback notice:', error)
 			}
