@@ -8,6 +8,7 @@ import {
 } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../../../components/common'
+import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
 
 export interface ServiceProcedureItem {
 	id: string
@@ -15,7 +16,9 @@ export interface ServiceProcedureItem {
 	description: string
 	duration: string
 	price: string
-	image: string
+	image?: string
+	image_url?: string | null
+	imageUrl?: string | null
 	categoryId?: string | null
 	verified?: boolean
 	premiumBadgeText?: string
@@ -23,6 +26,10 @@ export interface ServiceProcedureItem {
 	actionVariant?: 'primary' | 'secondary' | 'outline'
 	/** Optional small badge rendered above the title, e.g. "Recommended for Knee Pain" */
 	recommendedLabel?: string
+	about_service?: string | null
+	whats_included?: string[] | string | null
+	aboutService?: string | null
+	whatsIncluded?: string[] | string | null
 }
 
 interface AllServiceCardProps {
@@ -136,20 +143,11 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 			{/* Right Column: Image Box + Top RN Badge + Overlapping ADD Button */}
 			<View style={styles.rightCol}>
 				<View style={styles.imageBox}>
-					{/* Top Verified RN Overlay Banner */}
-					<View style={styles.topBadgeBanner}>
-						<AppTypography variant="caption" style={styles.topBadgeText}>
-							{item.premiumBadgeText || 'Verified RN'}
-						</AppTypography>
-					</View>
-
-					{item.image ? (
-						<Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
-					) : (
-						<View style={styles.fallbackWrap}>
-							<MaterialCommunityIcons name="medical-bag" size={32} color="#BFC8C8" />
-						</View>
-					)}
+					<Image
+						source={getAncillaryImageSource(item.image_url || item.imageUrl || item.image)}
+						style={styles.image}
+						resizeMode="cover"
+					/>
 				</View>
 
 				{/* Overlapping ADD / ADDED Button */}
@@ -300,29 +298,9 @@ const styles = StyleSheet.create({
 		backgroundColor: '#F1F4F4',
 		position: 'relative',
 	},
-	topBadgeBanner: {
-		position: 'absolute',
-		top: 0,
-		left: 0,
-		right: 0,
-		backgroundColor: '#055759',
-		paddingVertical: 3,
-		paddingHorizontal: 2,
-		alignItems: 'center',
-		justifyContent: 'center',
-		zIndex: 10,
-	},
-	topBadgeText: {
-		fontSize: 9.5,
-		fontWeight: '600',
-		color: '#FFFFFF',
-		textTransform: 'uppercase',
-		letterSpacing: 0.3,
-	},
 	image: {
 		width: '100%',
 		height: '100%',
-		marginTop: 14,
 	},
 	fallbackWrap: {
 		width: '100%',

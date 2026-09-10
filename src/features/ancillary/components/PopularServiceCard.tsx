@@ -11,6 +11,10 @@ export interface PopularService {
 	description: string
 	price: string
 	image: string
+	about_service?: string | null
+	whats_included?: string[] | string | null
+	aboutService?: string | null
+	whatsIncluded?: string[] | string | null
 }
 
 interface PopularServiceCardProps {
@@ -40,6 +44,8 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 		duration: '45 mins',
 		price: item.price,
 		image: item.image,
+		about_service: item.about_service ?? item.aboutService ?? null,
+		whats_included: item.whats_included ?? item.whatsIncluded ?? null,
 	})
 
 	const handleCardClick = () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+﻿import React, { useState, useEffect, useMemo } from 'react'
 import {
 	ActivityIndicator,
 	Image,
@@ -30,6 +30,11 @@ import DateSlotPicker from '../../../components/common/DateSlotPicker'
 import { SlotGroup } from '../../doctor/doctorService'
 import { ServiceProcedureItem } from '../components/AllServiceCard'
 import { BookingProgressStepper } from '../components/BookingProgressStepper'
+import {
+	createDefaultRecurringSchedule,
+	RecurringVisitSchedule,
+} from '../components/RecurringVisitCalendar'
+import SelectedProcedureCard from '../components/SelectedProcedureCard'
 import { AncillaryProvider } from '../ancillaryService'
 
 const GENDER_OPTIONS: AppSelectOption[] = [
@@ -92,16 +97,16 @@ const ANCILLARY_SLOTS: SlotGroup[] = [
 	{
 		label: 'Morning Slots',
 		slots: [
-			{ id: 's1', start_time: '9:00 AM – 10:00 AM', end_time: '', status: 'AVAILABLE' },
-			{ id: 's2', start_time: '11:00 AM – 12:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's1', start_time: '9:00 AM - 10:00 AM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's2', start_time: '11:00 AM - 12:00 PM', end_time: '', status: 'AVAILABLE' },
 		],
 	},
 	{
 		label: 'Afternoon & Evening Slots',
 		slots: [
-			{ id: 's3', start_time: '2:00 PM – 3:00 PM', end_time: '', status: 'AVAILABLE' },
-			{ id: 's4', start_time: '5:00 PM – 6:00 PM', end_time: '', status: 'AVAILABLE' },
-			{ id: 's5', start_time: '7:00 PM – 8:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's3', start_time: '2:00 PM - 3:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's4', start_time: '5:00 PM - 6:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's5', start_time: '7:00 PM - 8:00 PM', end_time: '', status: 'AVAILABLE' },
 		],
 	},
 ]
@@ -151,6 +156,21 @@ export default function BookingDetailsPage() {
 			setServices(initialServices)
 		}
 	}, [initialServices])
+
+	// 1b. Per-Service Recurring Visit Scheduling State (independent per selected service)
+	const [expandedServiceIds, setExpandedServiceIds] = useState<Record<string, boolean>>({})
+	const [serviceSchedules, setServiceSchedules] = useState<Record<string, RecurringVisitSchedule>>({})
+
+	const toggleServiceExpanded = (serviceId: string) => {
+		setExpandedServiceIds((prev) => ({ ...prev, [serviceId]: !prev[serviceId] }))
+	}
+
+	const getServiceSchedule = (serviceId: string): RecurringVisitSchedule =>
+		serviceSchedules[serviceId] ?? createDefaultRecurringSchedule()
+
+	const updateServiceSchedule = (serviceId: string, next: RecurringVisitSchedule) => {
+		setServiceSchedules((prev) => ({ ...prev, [serviceId]: next }))
+	}
 
 	// 2. Patient Details State
 	const [patient, setPatient] = useState<{
@@ -348,8 +368,11 @@ export default function BookingDetailsPage() {
 		if (routeParams.selectedNurse) {
 			setSelectedNurse(routeParams.selectedNurse)
 			setAssignmentMode('SELECT_NURSE')
+		} else if (routeParams.clearSelectedNurse) {
+			setSelectedNurse(null)
+			setAssignmentMode('SYSTEM_MATCH')
 		}
-	}, [routeParams.selectedNurse])
+	}, [routeParams.selectedNurse, routeParams.clearSelectedNurse])
 
 	// Dynamic Charges Calculation
 	const procedureBaseFee = useMemo(() => {
@@ -563,101 +586,13 @@ export default function BookingDetailsPage() {
 				{/* 8px GREY SECTION DIVIDER BAR */}
 				<View style={styles.sectionDividerBar} />
 
-				{/* 2. SECTION: SELECTED PROCEDURES */}
+				{/* 2. SECTION: LOCATION */}
 				<View style={styles.sectionBlock}>
 					<View style={styles.sectionHeaderRow}>
 						<AppTypography variant="h3" style={styles.sectionHeading}>
-							Selected Services & Procedures ({services.length})
-						</AppTypography>
-						<TouchableOpacity style={styles.actionBtn} onPress={handleEditServices} activeOpacity={0.7}>
-							<AppTypography variant="caption" style={styles.actionBtnText}>
-								+ Add More
-							</AppTypography>
-						</TouchableOpacity>
-					</View>
-
-					{services.length > 0 ? (
-						<View style={styles.servicesList}>
-							{services.map((item, index) => (
-								<View key={item.id} style={[styles.serviceRow, index > 0 && styles.serviceRowBorder]}>
-									<Image source={{ uri: item.image }} style={styles.serviceThumb} resizeMode="cover" />
-									<View style={styles.serviceTextCol}>
-										<View style={styles.titleRow}>
-											<AppTypography variant="h4" style={styles.serviceTitle} numberOfLines={1}>
-												{item.title}
-											</AppTypography>
-											{services.length > 1 && (
-												<TouchableOpacity onPress={() => handleRemoveService(item.id)} activeOpacity={0.7}>
-													<Ionicons name="trash-outline" size={17} color="#D32F2F" />
-												</TouchableOpacity>
-											)}
-										</View>
-										<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={1}>
-											{item.description}
-										</AppTypography>
-										<View style={styles.serviceMetaRow}>
-											<View style={styles.durationPill}>
-												<Ionicons name="time-outline" size={12} color="#546E7A" />
-												<AppTypography variant="caption" style={styles.durationText}>
-													{item.duration || '30-45 mins'}
-												</AppTypography>
-											</View>
-											<AppTypography variant="h4" style={styles.servicePrice}>
-												{item.price}
-											</AppTypography>
-										</View>
-									</View>
-								</View>
-							))}
-						</View>
-					) : (
-						<View style={styles.emptyBox}>
-							<AppTypography variant="caption" style={styles.emptyText}>
-								No services selected. Tap Add More to add a care procedure.
-							</AppTypography>
-						</View>
-					)}
-				</View>
-
-				{/* 8px GREY SECTION DIVIDER BAR */}
-				<View style={styles.sectionDividerBar} />
-
-				{/* 3. SECTION: CARE DISPATCH MODE & LOCATION */}
-				<View style={styles.sectionBlock}>
-					<View style={styles.sectionHeaderRow}>
-						<AppTypography variant="h3" style={styles.sectionHeading}>
-							Care Mode & Visit Address
+							Location
 						</AppTypography>
 					</View>
-
-					{/* CARE MODE SEGMENTED CONTROL */}
-					<View style={styles.modeToggleRow}>
-						<TouchableOpacity
-							style={[styles.modeTab, bookingType === 'INSTANT' && styles.modeTabActive]}
-							onPress={() => {
-								setBookingType('INSTANT')
-								setVisit((prev) => ({ ...prev, timeBadge: 'Instant Dispatch (15-30 mins)' }))
-							}}
-							activeOpacity={0.88}
-						>
-							<Ionicons name="flash" size={15} color={bookingType === 'INSTANT' ? '#FFFFFF' : '#2B6F71'} />
-							<AppTypography variant="h4" style={[styles.modeTabText, bookingType === 'INSTANT' && styles.modeTabTextActive]}>
-								Instant Care
-							</AppTypography>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={[styles.modeTab, { opacity: 0.5, backgroundColor: '#F1F5F9' }]}
-							disabled={true}
-							activeOpacity={1}
-						>
-							<Ionicons name="calendar-outline" size={15} color="#94A3B8" />
-							<AppTypography variant="h4" style={[styles.modeTabText, { color: '#94A3B8' }]}>
-								Schedule (Soon)
-							</AppTypography>
-						</TouchableOpacity>
-					</View>
-
 
 					{/* ADDRESS BLOCK */}
 					<View style={styles.locationSummaryBox}>
@@ -668,7 +603,7 @@ export default function BookingDetailsPage() {
 							<View style={styles.locationTextCol}>
 								<View style={styles.locationHeaderRow}>
 									<AppTypography variant="h4" style={styles.locationTitle}>
-										Home Visit Address ({visit.addressLabel})
+										Visit Address ({visit.addressLabel})
 									</AppTypography>
 									<TouchableOpacity onPress={() => setEditVisitVisible(true)} activeOpacity={0.7}>
 										<AppTypography variant="caption" style={styles.changeLinkText}>
@@ -703,7 +638,47 @@ export default function BookingDetailsPage() {
 					</View>
 				</View>
 
-				{/* 8px GREY SECTION DIVIDER BAR */}
+{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
+
+				{/* 3. SECTION: SELECTED PROCEDURES */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Selected Procedures ({services.length})
+						</AppTypography>
+						<TouchableOpacity style={styles.actionBtn} onPress={handleEditServices} activeOpacity={0.7}>
+							<AppTypography variant="caption" style={styles.actionBtnText}>
+								+ Add Services
+							</AppTypography>
+						</TouchableOpacity>
+					</View>
+
+					{services.length > 0 ? (
+						<View style={styles.servicesList}>
+							{services.map((item) => (
+								<SelectedProcedureCard
+									key={item.id}
+									service={item}
+									showDelete={services.length > 1}
+									onRemove={() => handleRemoveService(item.id)}
+									expanded={!!expandedServiceIds[item.id]}
+									onToggleExpand={() => toggleServiceExpanded(item.id)}
+									schedule={getServiceSchedule(item.id)}
+									onScheduleChange={(next) => updateServiceSchedule(item.id, next)}
+								/>
+							))}
+						</View>
+					) : (
+						<View style={styles.emptyBox}>
+							<AppTypography variant="caption" style={styles.emptyText}>
+								No services selected. Tap Add Services to configure.
+							</AppTypography>
+						</View>
+					)}
+				</View>
+
+								{/* 8px GREY SECTION DIVIDER BAR */}
 				<View style={styles.sectionDividerBar} />
 
 				{/* 4. SECTION: NURSE ASSIGNMENT PREFERENCE */}
@@ -714,11 +689,11 @@ export default function BookingDetailsPage() {
 						</AppTypography>
 					</View>
 					<AppTypography variant="caption" style={styles.sectionSubheading}>
-						Choose auto-matching for the fastest arrival, or select a nurse you have previously consulted with.
+						Choose auto-matching for fastest dispatch or browse and pick your preferred nurse.
 					</AppTypography>
 
 					<View style={styles.nurseChoiceContainer}>
-						{/* OPTION 1: Auto-Match Nurse */}
+						{/* OPTION 1: Let the System Select */}
 						<TouchableOpacity
 							style={[
 								styles.nursePrefOptionCard,
@@ -751,7 +726,7 @@ export default function BookingDetailsPage() {
 											assignmentMode === 'SYSTEM_MATCH' && styles.nursePrefTitleSelected,
 										]}
 									>
-										Auto-Match Nurse
+										Let the System Select
 									</AppTypography>
 									<View style={styles.recommendedBadge}>
 										<AppTypography variant="caption" style={styles.recommendedBadgeText}>
@@ -760,7 +735,7 @@ export default function BookingDetailsPage() {
 									</View>
 								</View>
 								<AppTypography variant="caption" style={styles.nursePrefSub}>
-									Fastest arrival • We will automatically assign the nearest certified nurse to your address (15–30 mins).
+									Fastest dispatch • Automatically matches the nearest qualified nurse to your location (15-30 mins).
 								</AppTypography>
 							</View>
 							<View
@@ -773,7 +748,7 @@ export default function BookingDetailsPage() {
 							</View>
 						</TouchableOpacity>
 
-						{/* OPTION 2: Select a Previous Nurse */}
+						{/* OPTION 2: Select a Nurse */}
 						<TouchableOpacity
 							style={[
 								styles.nursePrefOptionCard,
@@ -793,6 +768,7 @@ export default function BookingDetailsPage() {
 										serviceLabel: payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care',
 										procedureName: services[0]?.title,
 										procedureId: services[0]?.id,
+										services,
 										latitude: visit.latitude,
 										longitude: visit.longitude,
 										selectedNurseId: undefined,
@@ -864,6 +840,7 @@ export default function BookingDetailsPage() {
 												serviceLabel: payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care',
 												procedureName: services[0]?.title,
 												procedureId: services[0]?.id,
+												services,
 												latitude: visit.latitude,
 												longitude: visit.longitude,
 												selectedNurseId: selectedNurse?.id,
@@ -921,6 +898,7 @@ export default function BookingDetailsPage() {
 										serviceLabel: payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care',
 										procedureName: services[0]?.title,
 										procedureId: services[0]?.id,
+										services,
 										latitude: visit.latitude,
 										longitude: visit.longitude,
 										selectedNurseId: undefined,
@@ -957,7 +935,7 @@ export default function BookingDetailsPage() {
 				<View style={styles.sectionBlock}>
 					<View style={styles.sectionHeaderRow}>
 						<AppTypography variant="h3" style={styles.sectionHeading}>
-							Payment Summary
+							Payment Breakdown
 						</AppTypography>
 					</View>
 
@@ -973,7 +951,7 @@ export default function BookingDetailsPage() {
 
 						<View style={styles.billingRow}>
 							<AppTypography variant="body" style={styles.billingLabel}>
-								Doorstep Home Visit Fee
+								Specialist Doorstep Visit Fee
 							</AppTypography>
 							<AppTypography variant="body" style={styles.billingVal}>
 								{charges.visitFee}
@@ -982,7 +960,7 @@ export default function BookingDetailsPage() {
 
 						<View style={styles.billingRow}>
 							<AppTypography variant="body" style={styles.billingLabel}>
-								Applicable Taxes & Fees (GST)
+								Taxes & Operational Fee (3% GST)
 							</AppTypography>
 							<AppTypography variant="body" style={styles.billingVal}>
 								{charges.taxes}
@@ -1005,7 +983,7 @@ export default function BookingDetailsPage() {
 					<View style={styles.guaranteeBox}>
 						<Ionicons name="shield-checkmark-outline" size={18} color="#059669" />
 						<AppTypography variant="caption" style={styles.guaranteeText}>
-							100% Certified Nurses • Sanitized Medical Equipment
+							100% Certified Nurses • Sanitized Equipment
 						</AppTypography>
 					</View>
 				</View>
@@ -1028,7 +1006,7 @@ export default function BookingDetailsPage() {
 					disabled={services.length === 0}
 					style={styles.continueBtn}
 				>
-					Proceed to Payment ➔
+					Proceed to Payment
 				</AppButton>
 			</View>
 
@@ -1058,7 +1036,7 @@ export default function BookingDetailsPage() {
 			>
 				<View style={styles.modalFormContent}>
 					<AppTypography variant="caption" style={styles.addressSectionSubtitle}>
-						Choose where you would like the nurse to visit
+						SELECT DELIVERY ADDRESS
 					</AppTypography>
 
 					<View style={styles.addressListContainer}>
@@ -1469,67 +1447,6 @@ const styles = StyleSheet.create({
 	/* SERVICES LIST */
 	servicesList: {
 		gap: 12,
-	},
-	serviceRow: {
-		flexDirection: 'row',
-		gap: 14,
-		alignItems: 'center',
-	},
-	serviceRowBorder: {
-		paddingTop: 12,
-		borderTopWidth: 1,
-		borderTopColor: '#F1F5F9',
-	},
-	serviceThumb: {
-		width: 72,
-		height: 72,
-		borderRadius: 12,
-		backgroundColor: '#F1F5F9',
-	},
-	serviceTextCol: {
-		flex: 1,
-		gap: 4,
-	},
-	titleRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	serviceTitle: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#0F172A',
-		flex: 1,
-	},
-	serviceDesc: {
-		fontSize: 12.5,
-		color: '#64748B',
-		lineHeight: 17,
-	},
-	serviceMetaRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginTop: 4,
-	},
-	durationPill: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		backgroundColor: '#F1F5F9',
-		paddingHorizontal: 8,
-		paddingVertical: 3,
-		borderRadius: 6,
-	},
-	durationText: {
-		fontSize: 11.5,
-		color: '#475569',
-		fontWeight: '500',
-	},
-	servicePrice: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#0F172A',
 	},
 	emptyBox: {
 		alignItems: 'center',
