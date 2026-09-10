@@ -208,6 +208,13 @@ export default function TrackAppointmentPage() {
 				title: 'Thank You!',
 				description: `Your feedback for ${nurse.name} has been recorded.`,
 			})
+		} catch (error: any) {
+			const errorMsg =
+				error?.response?.data?.detail ||
+				error?.response?.data?.message ||
+				error?.message ||
+				'Unable to submit review. Please try again.'
+			alert(errorMsg)
 		} finally {
 			setIsSubmittingReview(false)
 		}

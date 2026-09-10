@@ -7,6 +7,7 @@ import {
 	AncillaryBooking,
 	AncillaryReviewData,
 	fetchMyPatientBookings,
+	fetchAncillaryReviewByBooking,
 	getAncillaryReviewByBookingId,
 	submitAncillaryReview,
 } from '../ancillaryService'
@@ -178,8 +179,15 @@ export default function MyBookingsPage({
 		})
 	}
 
-	const handleRateReview = (booking: AncillaryBooking) => {
-		const review = getAncillaryReviewByBookingId(booking.id) || booking.review || null
+	const handleRateReview = async (booking: AncillaryBooking) => {
+		let review = booking.review || getAncillaryReviewByBookingId(booking.id) || null
+		if (!review && (booking.hasReview || (booking.rating != null && booking.rating > 0))) {
+			try {
+				review = await fetchAncillaryReviewByBooking(booking.id)
+			} catch (e) {
+				// fallback to local null
+			}
+		}
 		setReviewBooking(booking)
 		setExistingReview(review)
 		setReviewModalVisible(true)
@@ -224,8 +232,13 @@ export default function MyBookingsPage({
 				title: 'Feedback Submitted!',
 				description: `Thank you for reviewing ${reviewBooking.provider.name}. Your rating helps us maintain top healthcare quality.`,
 			})
-		} catch (error) {
-			Alert.alert('Error', 'Unable to submit review. Please try again.')
+		} catch (error: any) {
+			const errorMsg =
+				error?.response?.data?.detail ||
+				error?.response?.data?.message ||
+				error?.message ||
+				'Unable to submit review. Please try again.'
+			Alert.alert('Review Submission Failed', errorMsg)
 		} finally {
 			setIsSubmittingReview(false)
 		}

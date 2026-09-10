@@ -146,6 +146,13 @@ export default function AncillaryBookingStatusPage() {
 				title: 'Thank You!',
 				description: 'Your rating and review have been submitted successfully.',
 			})
+		} catch (error: any) {
+			const errorMsg =
+				error?.response?.data?.detail ||
+				error?.response?.data?.message ||
+				error?.message ||
+				'Unable to submit review. Please try again.'
+			alert(errorMsg)
 		} finally {
 			setIsSubmittingReview(false)
 		}

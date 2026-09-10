@@ -649,54 +649,105 @@ const PROVIDER_REVIEWS_MOCK: Record<string, AncillaryReviewData[]> = {}
 export const submitAncillaryReview = async (
 	data: Omit<AncillaryReviewData, 'id' | 'createdAt'>
 ): Promise<AncillaryReviewData> => {
-	const todayStr = new Date().toLocaleDateString('en-US', {
-		day: 'numeric',
-		month: 'short',
-		year: 'numeric',
-	})
+	try {
+		const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.REVIEWS, {
+			booking_id: data.bookingId,
+			rating: data.rating,
+			comment: data.comment?.trim() || undefined,
+		})
 
-	const existing = REVIEW_STORE.get(data.bookingId)
-	const reviewItem: AncillaryReviewData = {
-		id: existing?.id || `rev-${Date.now()}`,
-		bookingId: data.bookingId,
-		providerId: data.providerId || 'n-prov-1',
-		providerName: data.providerName,
-		serviceName: data.serviceName,
-		rating: data.rating,
-		comment: data.comment?.trim() || undefined,
-		createdAt: existing?.createdAt || todayStr,
-		patientName: data.patientName || '',
+		const payload = res.data
+		const item = payload?.data !== undefined ? payload.data : payload
+
+		const reviewItem: AncillaryReviewData = {
+			id: String(item?.id || item?.public_id || `rev-${Date.now()}`),
+			bookingId: String(item?.booking_id || data.bookingId),
+			providerId: String(item?.provider_id || data.providerId || 'n-prov-1'),
+			providerName: String(item?.provider_name || data.providerName || 'Healthcare Professional'),
+			serviceName: String(data.serviceName || 'Healthcare Service'),
+			rating: Number(item?.rating ?? data.rating),
+			comment: item?.comment ?? (data.comment?.trim() || undefined),
+			createdAt: item?.created_at
+				? new Date(item.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+				: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+			patientName: String(item?.patient_name || data.patientName || ''),
+		}
+
+		// Save to local in-memory store for instantaneous lookup across screens
+		REVIEW_STORE.set(data.bookingId, reviewItem)
+
+		// Update mock bookings list if present
+		const bIdx = MOCK_ANCILLARY_BOOKINGS.findIndex((b) => b.id === data.bookingId)
+		if (bIdx !== -1) {
+			MOCK_ANCILLARY_BOOKINGS[bIdx].rating = reviewItem.rating
+			MOCK_ANCILLARY_BOOKINGS[bIdx].hasReview = true
+			MOCK_ANCILLARY_BOOKINGS[bIdx].review = reviewItem
+		}
+
+		// Add to provider review cache
+		const provKey = data.providerId || 'n-prov-1'
+		if (!PROVIDER_REVIEWS_MOCK[provKey]) {
+			PROVIDER_REVIEWS_MOCK[provKey] = []
+		}
+		const existingIdx = PROVIDER_REVIEWS_MOCK[provKey].findIndex((r) => r.bookingId === data.bookingId)
+		if (existingIdx !== -1) {
+			PROVIDER_REVIEWS_MOCK[provKey][existingIdx] = reviewItem
+		} else {
+			PROVIDER_REVIEWS_MOCK[provKey].unshift(reviewItem)
+		}
+
+		return reviewItem
+	} catch (error: any) {
+		console.log('[ancillaryService] Error submitting review:', error)
+		const detailMsg =
+			error?.response?.data?.detail ||
+			error?.response?.data?.message ||
+			error?.message ||
+			'Failed to submit review. Please try again.'
+		throw new Error(detailMsg)
 	}
-
-	// Save to in-memory store
-	REVIEW_STORE.set(data.bookingId, reviewItem)
-
-	// Update mock bookings list
-	const bIdx = MOCK_ANCILLARY_BOOKINGS.findIndex((b) => b.id === data.bookingId)
-	if (bIdx !== -1) {
-		MOCK_ANCILLARY_BOOKINGS[bIdx].rating = data.rating
-		MOCK_ANCILLARY_BOOKINGS[bIdx].hasReview = true
-		MOCK_ANCILLARY_BOOKINGS[bIdx].review = reviewItem
-	}
-
-	// Add to provider review list
-	const provKey = data.providerId || 'n-prov-1'
-	if (!PROVIDER_REVIEWS_MOCK[provKey]) {
-		PROVIDER_REVIEWS_MOCK[provKey] = []
-	}
-	const existingIdx = PROVIDER_REVIEWS_MOCK[provKey].findIndex((r) => r.bookingId === data.bookingId)
-	if (existingIdx !== -1) {
-		PROVIDER_REVIEWS_MOCK[provKey][existingIdx] = reviewItem
-	} else {
-		PROVIDER_REVIEWS_MOCK[provKey].unshift(reviewItem)
-	}
-
-	return reviewItem
 }
 
 /**
  * Get review for a specific booking.
  */
+export const fetchAncillaryReviewByBookingBackend = async (
+	bookingId: string | number
+): Promise<AncillaryReviewData | null> => {
+	try {
+		const endpoint = API_ENDPOINTS.ANCILLARY.REVIEW_BY_BOOKING
+			? API_ENDPOINTS.ANCILLARY.REVIEW_BY_BOOKING(bookingId)
+			: `${API_ENDPOINTS.ANCILLARY.REVIEWS}/booking/${bookingId}`
+		const res = await ApiService.get<any>(endpoint)
+		const payload = res.data
+		const item = payload?.data !== undefined ? payload.data : payload
+
+		if (!item || !item.id) {
+			return null
+		}
+
+		const reviewItem: AncillaryReviewData = {
+			id: String(item.id || item.public_id),
+			bookingId: String(item.booking_id || bookingId),
+			providerId: String(item.provider_id || ''),
+			providerName: String(item.provider_name || 'Healthcare Professional'),
+			serviceName: 'Healthcare Service',
+			rating: Number(item.rating || 5),
+			comment: item.comment || undefined,
+			createdAt: item.created_at
+				? new Date(item.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+				: 'Recently',
+			patientName: String(item.patient_name || ''),
+		}
+
+		REVIEW_STORE.set(String(bookingId), reviewItem)
+		return reviewItem
+	} catch (error) {
+		console.log('[ancillaryService] Error fetching review for booking:', bookingId, error)
+		return null
+	}
+}
+
 export const getAncillaryReviewByBookingId = (bookingId: string): AncillaryReviewData | null => {
 	if (REVIEW_STORE.has(bookingId)) {
 		return REVIEW_STORE.get(bookingId)!
@@ -1198,8 +1249,30 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 				? amountRaw
 				: parseFloat(String(amountRaw || '').replace(/[^0-9.]/g, '')) || undefined
 
+		const bookingIdStr = String(item.requestId || item.publicBookingId || item.id)
+		const hasReview = Boolean(item.hasReview || item.review != null || item.rating != null)
+		const ratingVal = item.rating != null ? Number(item.rating) : (item.review?.rating != null ? Number(item.review.rating) : undefined)
+
+		let reviewObj: AncillaryReviewData | undefined = undefined
+		if (item.review) {
+			reviewObj = {
+				id: String(item.review.id || item.review.public_id || `rev-${bookingIdStr}`),
+				bookingId: bookingIdStr,
+				providerId: String(item.review.provider_id || item.provider?.id || item.assignedProvider?.id || ''),
+				providerName: String(item.review.provider_name || item.provider?.name || item.assignedProvider?.name || 'Healthcare Professional'),
+				serviceName: String(item.serviceName || 'In-Home Healthcare Service'),
+				rating: Number(item.review.rating || ratingVal || 5),
+				comment: item.review.comment || undefined,
+				createdAt: item.review.created_at
+					? new Date(item.review.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+					: 'Recently',
+				patientName: String(item.review.patient_name || ''),
+			}
+			REVIEW_STORE.set(bookingIdStr, reviewObj)
+		}
+
 		return {
-			id: String(item.requestId || item.publicBookingId || item.id),
+			id: bookingIdStr,
 			serviceName: String(item.serviceName || 'In-Home Healthcare Service'),
 			serviceKey: 'nursing-care',
 			serviceLabel: String(item.serviceName || 'Ancillary Care'),
@@ -1207,6 +1280,9 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 			rawStatus: String(item.status || item.rawStatus || '').toUpperCase(),
 			date,
 			timeRange,
+			hasReview,
+			rating: ratingVal,
+			review: reviewObj,
 			provider: {
 				id:
 					item.provider?.id || item.assignedProvider?.id
@@ -1447,3 +1523,5 @@ export const fetchAncillaryProfile = fetchAncillaryProfileBackend
 export const fetchProviderEarnings = fetchProviderEarningsBackend
 export const fetchProviderDashboardMetrics = fetchProviderDashboardMetricsBackend
 
+
+export const fetchAncillaryReviewByBooking = fetchAncillaryReviewByBookingBackend
