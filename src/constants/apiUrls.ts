@@ -5,6 +5,8 @@
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
 	const url = process.env.EXPO_PUBLIC_API_ENDPOINT
+	// const url = 'http://192.168.4.50:8000'
+	// const url = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim() || 'http://10.0.2.2:8000'
 	if (!url) {
 		throw new Error('API URL not found. Check .env file')
 	}
@@ -228,12 +230,15 @@ export const API_ENDPOINTS = {
 		CLINICAL_DETAILS: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/clinical-details`,
 		PAYMENTS_AUTHORIZE: `${BASE_URL}/api/ancillary/payments/authorize`,
 		REVIEWS: `${BASE_URL}/api/ancillary/reviews`,
+		REVIEW_BY_BOOKING: (id: string | number) => `${BASE_URL}/api/ancillary/reviews/booking/${id}`,
+		PROVIDER_REVIEWS: (id: string | number) => `${BASE_URL}/api/ancillary/reviews/provider/${id}`,
 		WS_PATIENT_REQUEST: (id: string) => `${BASE_URL.replace('http', 'ws')}/api/ancillary/ws/patient/requests/${id}`,
 		WS_PROVIDER_DISPATCH: `${BASE_URL.replace('http', 'ws')}/api/ancillary/ws/provider/dispatch`,
 		SOFT_REVIEW: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/soft-review`,
 		PROVIDER_EARNINGS: `${BASE_URL}/api/ancillary/provider/earnings`,
 		PROVIDER_DASHBOARD_METRICS: `${BASE_URL}/api/ancillary/provider/dashboard-metrics`,
 		VERIFIED_NURSES: `${BASE_URL}/api/ancillary/nurses`,
+		CONSULTED_NURSES: `${BASE_URL}/api/ancillary/nurses/consulted`,
 	},
 	WALLET: {
 		GET: `${BASE_URL}/api/wallet`,

@@ -98,6 +98,48 @@ export interface FetchVerifiedNursesParams {
 	longitude?: number
 }
 
+export const fetchConsultedNursesBackend = async (): Promise<AncillaryProvider[]> => {
+	try {
+		console.log('[ancillaryService] fetchConsultedNursesBackend calling:', API_ENDPOINTS.ANCILLARY.CONSULTED_NURSES)
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.CONSULTED_NURSES)
+		console.log('[ancillaryService] fetchConsultedNursesBackend raw API response:', res.data)
+
+		const payload = res.data
+		const list: any[] = Array.isArray(payload)
+			? payload
+			: Array.isArray(payload?.data)
+			? payload.data
+			: Array.isArray(payload?.data?.nurses)
+			? payload.data.nurses
+			: Array.isArray(payload?.nurses)
+			? payload.nurses
+			: []
+
+		const mapped: AncillaryProvider[] = list.map((item: any) => ({
+			id: String(item.id || item.nurse_id || item.public_id || item.publicId),
+			name: String(item.name || 'Specialist Nurse'),
+			avatar: String(
+				item.avatar ||
+				item.profile_image ||
+				'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=260'
+			),
+			credentials: String(item.credentials || item.specialization || 'Registered Nurse (RN)'),
+			experience: item.experience != null ? Number(item.experience) : undefined,
+			procedures: Array.isArray(item.procedures) ? item.procedures : [],
+			languages: Array.isArray(item.languages) ? item.languages : ['English', 'Hindi'],
+			distance: item.distance != null ? Number(item.distance) : undefined,
+			badges: Array.isArray(item.badges) && item.badges.length > 0
+				? item.badges
+				: ['Verified Nurse', 'Previously Consulted'],
+		}))
+		console.log('[ancillaryService] fetchConsultedNursesBackend mapped providers:', mapped)
+		return mapped
+	} catch (error) {
+		console.log('[ancillaryService] fetchConsultedNursesBackend error:', error)
+		return []
+	}
+}
+
 export const fetchVerifiedNursesBackend = async (
 	params?: FetchVerifiedNursesParams
 ): Promise<AncillaryProvider[]> => {
@@ -254,7 +296,7 @@ export interface AncillaryProvider {
 	startingPrice?: number
 	procedures: string[]
 	languages: string[]
-	distance: number
+	distance?: number
 	avatar: string
 	badges: string[]
 	reviews?: AncillaryReviewData[]
@@ -641,90 +683,89 @@ export interface AncillaryBooking {
 	bookingType?: string
 }
 
-export const MOCK_ANCILLARY_BOOKINGS: AncillaryBooking[] = []
-
-// Global in-memory review map to maintain consistency across all screens
-const REVIEW_STORE = new Map<string, AncillaryReviewData>()
-
-// Provider initial reviews
-const PROVIDER_REVIEWS_MOCK: Record<string, AncillaryReviewData[]> = {}
-
 /**
  * Submit or update a rating & review for a completed ancillary booking.
  */
 export const submitAncillaryReview = async (
 	data: Omit<AncillaryReviewData, 'id' | 'createdAt'>
 ): Promise<AncillaryReviewData> => {
-	const todayStr = new Date().toLocaleDateString('en-US', {
-		day: 'numeric',
-		month: 'short',
-		year: 'numeric',
-	})
+	try {
+		const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.REVIEWS, {
+			booking_id: data.bookingId,
+			rating: data.rating,
+			comment: data.comment?.trim() || undefined,
+		})
 
-	const existing = REVIEW_STORE.get(data.bookingId)
-	const reviewItem: AncillaryReviewData = {
-		id: existing?.id || `rev-${Date.now()}`,
-		bookingId: data.bookingId,
-		providerId: data.providerId || 'n-prov-1',
-		providerName: data.providerName,
-		serviceName: data.serviceName,
-		rating: data.rating,
-		comment: data.comment?.trim() || undefined,
-		createdAt: existing?.createdAt || todayStr,
-		patientName: data.patientName || '',
-	}
+		const payload = res.data
+		const item = payload?.data !== undefined ? payload.data : payload
 
-	// Save to in-memory store
-	REVIEW_STORE.set(data.bookingId, reviewItem)
-
-	// Update mock bookings list
-	const bIdx = MOCK_ANCILLARY_BOOKINGS.findIndex((b) => b.id === data.bookingId)
-	if (bIdx !== -1) {
-		MOCK_ANCILLARY_BOOKINGS[bIdx].rating = data.rating
-		MOCK_ANCILLARY_BOOKINGS[bIdx].hasReview = true
-		MOCK_ANCILLARY_BOOKINGS[bIdx].review = reviewItem
-	}
-
-	// Add to provider review list
-	const provKey = data.providerId || 'n-prov-1'
-	if (!PROVIDER_REVIEWS_MOCK[provKey]) {
-		PROVIDER_REVIEWS_MOCK[provKey] = []
-	}
-	const existingIdx = PROVIDER_REVIEWS_MOCK[provKey].findIndex((r) => r.bookingId === data.bookingId)
-	if (existingIdx !== -1) {
-		PROVIDER_REVIEWS_MOCK[provKey][existingIdx] = reviewItem
-	} else {
-		PROVIDER_REVIEWS_MOCK[provKey].unshift(reviewItem)
-	}
-
-	return reviewItem
-}
-
-/**
- * Get review for a specific booking.
- */
-export const getAncillaryReviewByBookingId = (bookingId: string): AncillaryReviewData | null => {
-	if (REVIEW_STORE.has(bookingId)) {
-		return REVIEW_STORE.get(bookingId)!
-	}
-	const b = MOCK_ANCILLARY_BOOKINGS.find((item) => item.id === bookingId)
-	return b?.review || null
-}
-
-/**
- * Get all reviews for a provider.
- */
-export const getProviderReviews = (providerIdOrName: string): AncillaryReviewData[] => {
-	if (PROVIDER_REVIEWS_MOCK[providerIdOrName]) {
-		return PROVIDER_REVIEWS_MOCK[providerIdOrName]
-	}
-	// Fallback lookup by provider name
-	for (const reviews of Object.values(PROVIDER_REVIEWS_MOCK)) {
-		if (reviews.length > 0 && reviews[0].providerName === providerIdOrName) {
-			return reviews
+		const reviewItem: AncillaryReviewData = {
+			id: String(item?.id || item?.public_id || `rev-${Date.now()}`),
+			bookingId: String(item?.booking_id || item?.bookingId || data.bookingId),
+			providerId: String(item?.provider_id || item?.providerId || data.providerId || 'n-prov-1'),
+			providerName: String(item?.provider_name || item?.providerName || data.providerName || 'Healthcare Professional'),
+			serviceName: String(item?.service_name || item?.serviceName || data.serviceName || 'Healthcare Service'),
+			rating: Number(item?.rating ?? data.rating),
+			comment: item?.comment ?? (data.comment?.trim() || undefined),
+			createdAt: item?.created_at || item?.createdAt
+				? (typeof item?.createdAt === 'string' ? item.createdAt : new Date(item.created_at || item.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }))
+				: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+			patientName: String(item?.patient_name || item?.patientName || data.patientName || ''),
 		}
+
+		return reviewItem
+	} catch (error: any) {
+		console.log('[ancillaryService] Error submitting review:', error)
+		const detailMsg =
+			error?.response?.data?.detail ||
+			error?.response?.data?.message ||
+			error?.message ||
+			'Failed to submit review. Please try again.'
+		throw new Error(detailMsg)
 	}
-	return []
+}
+
+/**
+ * Get review for a specific booking directly from backend API.
+ */
+export const fetchAncillaryReviewByBooking = async (
+	bookingId: string | number
+): Promise<AncillaryReviewData | null> => {
+	try {
+		const endpoint = API_ENDPOINTS.ANCILLARY.REVIEW_BY_BOOKING
+			? API_ENDPOINTS.ANCILLARY.REVIEW_BY_BOOKING(bookingId)
+			: `${API_ENDPOINTS.ANCILLARY.REVIEWS}/booking/${bookingId}`
+		const res = await ApiService.get<any>(endpoint)
+		const payload = res.data
+		const item = payload?.data !== undefined ? payload.data : payload
+
+		if (!item || !item.id) {
+			return null
+		}
+
+		const reviewItem: AncillaryReviewData = {
+			id: String(item.id || item.public_id),
+			bookingId: String(item.booking_id || item.bookingId || bookingId),
+			providerId: String(item.provider_id || item.providerId || ''),
+			providerName: String(item.provider_name || item.providerName || 'Healthcare Professional'),
+			serviceName: String(item.service_name || item.serviceName || 'Healthcare Service'),
+			rating: Number(item.rating || 5),
+			comment: item.comment || undefined,
+			createdAt: item.created_at || item.createdAt
+				? (typeof item.createdAt === 'string' ? item.createdAt : new Date(item.created_at || item.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }))
+				: 'Recently',
+			patientName: String(item.patient_name || item.patientName || ''),
+		}
+
+		return reviewItem
+	} catch (error) {
+		console.log('[ancillaryService] Error fetching review for booking:', bookingId, error)
+		return null
+	}
+}
+
+export const getAncillaryReviewByBookingId = (_bookingId: string): AncillaryReviewData | null => {
+	return null
 }
 
 // --- Nurse Instant Care Request Interfaces & Tiered Security Models ---
@@ -1204,8 +1245,29 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 				? amountRaw
 				: parseFloat(String(amountRaw || '').replace(/[^0-9.]/g, '')) || undefined
 
+		const bookingIdStr = String(item.requestId || item.publicBookingId || item.id)
+		const hasReview = Boolean(item.hasReview || item.review != null || item.rating != null)
+		const ratingVal = item.rating != null ? Number(item.rating) : (item.review?.rating != null ? Number(item.review.rating) : undefined)
+
+		let reviewObj: AncillaryReviewData | undefined = undefined
+		if (item.review) {
+			reviewObj = {
+				id: String(item.review.id || item.review.public_id || `rev-${bookingIdStr}`),
+				bookingId: bookingIdStr,
+				providerId: String(item.review.provider_id || item.provider?.id || item.assignedProvider?.id || ''),
+				providerName: String(item.review.provider_name || item.provider?.name || item.assignedProvider?.name || 'Healthcare Professional'),
+				serviceName: String(item.serviceName || 'In-Home Healthcare Service'),
+				rating: Number(item.review.rating || ratingVal || 5),
+				comment: item.review.comment || undefined,
+				createdAt: item.review.created_at
+					? new Date(item.review.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+					: 'Recently',
+				patientName: String(item.review.patient_name || ''),
+			}
+		}
+
 		return {
-			id: String(item.requestId || item.publicBookingId || item.id),
+			id: bookingIdStr,
 			serviceName: String(item.serviceName || 'In-Home Healthcare Service'),
 			serviceKey: 'nursing-care',
 			serviceLabel: String(item.serviceName || 'Ancillary Care'),
@@ -1213,6 +1275,9 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 			rawStatus: String(item.status || item.rawStatus || '').toUpperCase(),
 			date,
 			timeRange,
+			hasReview,
+			rating: ratingVal,
+			review: reviewObj,
 			provider: {
 				id:
 					item.provider?.id || item.assignedProvider?.id
@@ -1453,3 +1518,5 @@ export const fetchAncillaryProfile = fetchAncillaryProfileBackend
 export const fetchProviderEarnings = fetchProviderEarningsBackend
 export const fetchProviderDashboardMetrics = fetchProviderDashboardMetricsBackend
 
+
+export const fetchConsultedNurses = fetchConsultedNursesBackend

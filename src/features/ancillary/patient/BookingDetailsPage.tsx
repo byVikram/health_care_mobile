@@ -798,11 +798,11 @@ export default function BookingDetailsPage() {
 											assignmentMode === 'SELECT_NURSE' && styles.nursePrefTitleSelected,
 										]}
 									>
-										Select a Nurse
+										Select a Previous Nurse
 									</AppTypography>
 								</View>
 								<AppTypography variant="caption" style={styles.nursePrefSub}>
-									Browse clinician profiles, verified credentials, ratings, and select your preferred nurse.
+									Choose a nurse you have previously consulted with for personalized continuing care.
 								</AppTypography>
 							</View>
 							<View
@@ -824,7 +824,7 @@ export default function BookingDetailsPage() {
 									<View style={styles.selectedBadgeRow}>
 										<Ionicons name="checkmark-circle" size={15} color="#047857" />
 										<AppTypography variant="caption" style={styles.selectedBadgeLabel}>
-											Preferred Nurse Selected
+											Selected Nurse
 										</AppTypography>
 									</View>
 									<TouchableOpacity
@@ -877,8 +877,8 @@ export default function BookingDetailsPage() {
 													<AppTypography variant="caption" style={styles.statDot}>•</AppTypography>
 												</>
 											)}
-											<AppTypography variant="caption" style={styles.statText}>
-												{selectedNurse.distance} km away
+											<AppTypography variant="caption" style={[styles.statText, { color: '#047857', fontWeight: '600' }]}>
+												Previously Consulted
 											</AppTypography>
 										</View>
 									</View>
@@ -912,15 +912,15 @@ export default function BookingDetailsPage() {
 									</View>
 									<View style={styles.browsePromptTextCol}>
 										<AppTypography variant="subtitle" style={styles.browsePromptTitle}>
-											Choose Your Preferred Nurse
+											Choose a Previous Nurse
 										</AppTypography>
 										<AppTypography variant="caption" style={styles.browsePromptSub}>
-											Tap here to browse profiles, credentials, and distance
+											Tap here to view nurses you have previously consulted
 										</AppTypography>
 									</View>
 								</View>
 								<View style={styles.browsePromptCta}>
-									<AppTypography variant="caption" style={styles.browsePromptCtaText}>Browse</AppTypography>
+									<AppTypography variant="caption" style={styles.browsePromptCtaText}>Select Nurse</AppTypography>
 									<Ionicons name="chevron-forward" size={14} color="#0C7C7C" />
 								</View>
 							</TouchableOpacity>

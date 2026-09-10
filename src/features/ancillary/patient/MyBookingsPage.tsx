@@ -7,7 +7,7 @@ import {
 	AncillaryBooking,
 	AncillaryReviewData,
 	fetchMyPatientBookings,
-	getAncillaryReviewByBookingId,
+	fetchAncillaryReviewByBooking,
 	submitAncillaryReview,
 } from '../ancillaryService'
 import UpcomingBookingCard from '../components/UpcomingBookingCard'
@@ -74,9 +74,10 @@ export default function MyBookingsPage({
 	const [reviewModalVisible, setReviewModalVisible] = useState(false)
 	const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 
-	// Success Feedback Modal
+	// Success / Error Feedback Modal
 	const [statusModal, setStatusModal] = useState<{
 		visible: boolean
+		status?: 'success' | 'error' | 'info'
 		title: string
 		description: string
 	} | null>(null)
@@ -178,8 +179,15 @@ export default function MyBookingsPage({
 		})
 	}
 
-	const handleRateReview = (booking: AncillaryBooking) => {
-		const review = getAncillaryReviewByBookingId(booking.id) || booking.review || null
+	const handleRateReview = async (booking: AncillaryBooking) => {
+		let review = booking.review || null
+		if (!review && (booking.hasReview || (booking.rating != null && booking.rating > 0))) {
+			try {
+				review = await fetchAncillaryReviewByBooking(booking.id)
+			} catch (e) {
+				// fallback to null
+			}
+		}
 		setReviewBooking(booking)
 		setExistingReview(review)
 		setReviewModalVisible(true)
@@ -224,8 +232,18 @@ export default function MyBookingsPage({
 				title: 'Feedback Submitted!',
 				description: `Thank you for reviewing ${reviewBooking.provider.name}. Your rating helps us maintain top healthcare quality.`,
 			})
-		} catch (error) {
-			Alert.alert('Error', 'Unable to submit review. Please try again.')
+		} catch (error: any) {
+			const errorMsg =
+				error?.response?.data?.detail ||
+				error?.response?.data?.message ||
+				error?.message ||
+				'Unable to submit review. Please try again.'
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Review Submission Failed',
+				description: errorMsg,
+			})
 		} finally {
 			setIsSubmittingReview(false)
 		}
@@ -416,10 +434,10 @@ export default function MyBookingsPage({
 			{statusModal && (
 				<StatusModal
 					visible={statusModal.visible}
-					status="success"
+					status={statusModal.status || 'success'}
 					title={statusModal.title}
 					description={statusModal.description}
-					submitText="Done"
+					submitText={statusModal.status === 'error' ? 'OK' : 'Done'}
 					onSubmit={() => setStatusModal(null)}
 					onCancel={() => setStatusModal(null)}
 				/>
