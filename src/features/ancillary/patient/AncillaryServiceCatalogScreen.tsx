@@ -18,7 +18,7 @@ import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCa
 import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
 import { NursingQuickActionCards } from '../components/NursingQuickActionCards'
-import { PhysiotherapyConditionsGrid, PHYSIOTHERAPY_CONDITIONS } from '../components/PhysiotherapyConditionsGrid'
+import { PhysiotherapyConditionsGrid, PHYSIOTHERAPY_CONDITIONS, PHYSIOTHERAPY_ALL_CONDITION_ID } from '../components/PhysiotherapyConditionsGrid'
 import {
 	AncillaryCategoryApiItem,
 	AncillaryServiceItem,
@@ -82,10 +82,12 @@ export default function AncillaryServiceCatalogScreen() {
 	const [searchQuery, setSearchQuery] = useState('')
 	const [selectedProcedure, setSelectedProcedure] = useState<ServiceProcedureItem | null>(null)
 	const [cart, setCart] = useState<ServiceProcedureItem[]>([])
-	// For Physiotherapy, this holds the selected condition's category public_id
-	// (e.g. "phys-knee"), which doubles as the lookup_ancillary_category.public_id
-	// used to filter procedures fetched from the backend.
-	const [activeCondition, setActiveCondition] = useState<string | null>(isPhysiotherapy ? 'phys-knee' : null)
+	// For Physiotherapy, this holds the id of the selected "Find Physiotherapy for"
+	// card. It is either a lookup_ancillary_category.public_id (e.g. "phys-knee"),
+	// used to filter the already-fetched procedures, or the PHYSIOTHERAPY_ALL_CONDITION_ID
+	// sentinel meaning "show every fetched service, unfiltered" -- which is also
+	// the default selection when the screen opens.
+	const [activeCondition, setActiveCondition] = useState<string | null>(isPhysiotherapy ? PHYSIOTHERAPY_ALL_CONDITION_ID : null)
 
 	useEffect(() => {
 		let isMounted = true
@@ -169,14 +171,16 @@ export default function AncillaryServiceCatalogScreen() {
 		let groupTitle = activeUi.title
 
 		if (isPhysiotherapy) {
-			// The 9 "Find Physiotherapy for" cards are the patient-facing
-			// filters here -- filter the backend-fetched procedures by the
-			// selected condition's category public_id (lookup_ancillary_category.public_id).
-			if (activeConditionMeta) {
+			// The "Find Physiotherapy for" cards are the patient-facing filters
+			// here. "All Services" (and no selection) show every service already
+			// fetched for this specialty with no extra API call; any specific
+			// condition filters the same already-fetched list by that condition's
+			// category public_id (lookup_ancillary_category.public_id).
+			if (activeConditionMeta && activeConditionMeta.id !== PHYSIOTHERAPY_ALL_CONDITION_ID) {
 				filtered = filtered.filter((p) => p.categoryId === activeConditionMeta.id)
 				groupTitle = `${activeConditionMeta.label} Services`
 			} else {
-				groupTitle = 'Popular Physiotherapy Services'
+				groupTitle = 'All Physiotherapy Services'
 			}
 		} else if (activeCategory !== 'all') {
 			filtered = filtered.filter((p) => p.categoryId === activeCategory)
@@ -229,8 +233,17 @@ export default function AncillaryServiceCatalogScreen() {
 		})
 	}
 
+	// Tapping the already-active condition card unselects it and falls back to
+	// "All Services" (PHYSIOTHERAPY_ALL_CONDITION_ID) rather than leaving the
+	// card selected with no way to turn it off. Tapping any other card (or the
+	// "All Services" chip itself) just selects that id as usual.
 	const handleSelectCondition = (id: string) => {
-		setActiveCondition((prev) => (prev === id ? prev : id))
+		setActiveCondition((prev) => {
+			if (prev === id && id !== PHYSIOTHERAPY_ALL_CONDITION_ID) {
+				return PHYSIOTHERAPY_ALL_CONDITION_ID
+			}
+			return id
+		})
 	}
 
 	return (

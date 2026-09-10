@@ -4,19 +4,28 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../../../components/common'
 
 export interface PhysiotherapyCondition {
-	/** Matches lookup_ancillary_category.public_id for this condition under the Physiotherapy specialty (specialty_id = 2) */
+	/** Matches lookup_ancillary_category.public_id for this condition under the Physiotherapy specialty (specialty_id = 2). */
 	id: string
 	label: string
 	icon: keyof typeof MaterialCommunityIcons.glyphMap
 }
 
 /**
+ * Sentinel id for the "All Services" chip. It does not correspond to a
+ * lookup_ancillary_category row -- selecting it means "show every service
+ * already fetched for this specialty", so the screen skips the categoryId
+ * filter entirely instead of calling a different endpoint or parameter.
+ */
+export const PHYSIOTHERAPY_ALL_CONDITION_ID = 'phys-all'
+
+/**
  * The 9 "Find Physiotherapy for" condition cards. These map 1:1 to the
  * lookup_ancillary_category rows seeded for the Physiotherapy specialty
  * (public_id values phys-knee, phys-back, ... phys-post-surgery). Selecting
- * a card filters services by that category's public_id via the existing
- * /api/ancillary/services?category_id= endpoint -- no service data is
- * hardcoded here, only the condition labels/icons used to drive the picker.
+ * a card filters the already-fetched services by that category's public_id
+ * via the existing /api/ancillary/services?category_id= support -- no
+ * service data is hardcoded here, only the condition labels/icons used to
+ * drive the picker.
  */
 export const PHYSIOTHERAPY_CONDITIONS: PhysiotherapyCondition[] = [
 	{ id: 'phys-knee', label: 'Knee Pain', icon: 'bone' },
@@ -36,19 +45,25 @@ interface PhysiotherapyConditionsGridProps {
 }
 
 /**
- * "Find Physiotherapy for" condition-discovery grid.
+ * "Find Physiotherapy for" condition-discovery section.
  * Physiotherapy-only presentational section for AncillaryServiceCatalogScreen --
  * rendered when serviceKey === 'physiotherapy'. Mirrors the styling conventions
  * already used by NursingQuickActionCards / AllServiceCard in this module.
  *
- * These 9 cards are the patient-facing service filters for Physiotherapy
- * (replacing the old All Services / Pain Management / Mobility & Rehab /
- * Sports Recovery pill row, which has been removed for this specialty).
+ * A small, icon-less "All Services" chip sits at the top-right of the
+ * heading row (where the condition count used to be) and selects
+ * PHYSIOTHERAPY_ALL_CONDITION_ID, showing every fetched Physiotherapy
+ * service unfiltered. Below it is the 9-condition grid, the patient-facing
+ * service filter for Physiotherapy. The selected option -- chip or card --
+ * is shown via the existing highlighted styling only (border + tint) -- no
+ * selection dot.
  */
 export const PhysiotherapyConditionsGrid: React.FC<PhysiotherapyConditionsGridProps> = ({
 	activeConditionId,
 	onSelectCondition,
 }) => {
+	const isAllActive = activeConditionId === PHYSIOTHERAPY_ALL_CONDITION_ID
+
 	return (
 		<View style={styles.container}>
 			<View style={styles.headerRow}>
@@ -60,9 +75,19 @@ export const PhysiotherapyConditionsGrid: React.FC<PhysiotherapyConditionsGridPr
 						Select your affected area or goal
 					</AppTypography>
 				</View>
-				<AppTypography variant="caption" style={styles.countLabel}>
-					{PHYSIOTHERAPY_CONDITIONS.length} conditions
-				</AppTypography>
+
+				<TouchableOpacity
+					style={[styles.allServicesChip, isAllActive && styles.allServicesChipActive]}
+					onPress={() => onSelectCondition(PHYSIOTHERAPY_ALL_CONDITION_ID)}
+					activeOpacity={0.85}
+				>
+					<AppTypography
+						variant="caption"
+						style={[styles.allServicesChipText, isAllActive && styles.allServicesChipTextActive]}
+					>
+						All Services
+					</AppTypography>
+				</TouchableOpacity>
 			</View>
 
 			<View style={styles.grid}>
@@ -75,7 +100,6 @@ export const PhysiotherapyConditionsGrid: React.FC<PhysiotherapyConditionsGridPr
 							onPress={() => onSelectCondition(condition.id)}
 							activeOpacity={0.85}
 						>
-							{isActive && <View style={styles.activeDot} />}
 							<View style={[styles.iconCircle, isActive && styles.iconCircleActive]}>
 								<MaterialCommunityIcons
 									name={condition.icon}
@@ -128,9 +152,27 @@ const styles = StyleSheet.create({
 		color: '#64748B',
 		marginTop: 2,
 	},
-	countLabel: {
-		fontSize: 12,
+	allServicesChip: {
+		paddingHorizontal: 10,
+		paddingVertical: 5,
+		borderRadius: 14,
+		borderWidth: 1,
+		borderColor: 'rgba(226, 232, 240, 0.8)',
+		backgroundColor: '#FFFFFF',
+		marginTop: 1,
+	},
+	allServicesChipActive: {
+		borderWidth: 1.5,
+		borderColor: '#0C7C7C',
+		backgroundColor: 'rgba(12, 124, 124, 0.06)',
+	},
+	allServicesChipText: {
+		fontSize: 11,
 		fontWeight: '600',
+		color: '#475569',
+	},
+	allServicesChipTextActive: {
+		fontWeight: '700',
 		color: '#0C7C7C',
 	},
 	grid: {
@@ -154,15 +196,6 @@ const styles = StyleSheet.create({
 		borderWidth: 2,
 		borderColor: '#0C7C7C',
 		backgroundColor: 'rgba(12, 124, 124, 0.06)',
-	},
-	activeDot: {
-		position: 'absolute',
-		top: 6,
-		right: 6,
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-		backgroundColor: '#0C7C7C',
 	},
 	iconCircle: {
 		width: 40,
