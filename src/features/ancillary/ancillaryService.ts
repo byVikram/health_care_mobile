@@ -40,6 +40,12 @@ export interface AncillaryServiceItem {
 	categoryName?: string
 	specialtyId?: string | null
 	isInstantEligible?: boolean
+	about_service?: string | null
+	whats_included?: string[] | string | null
+	aboutService?: string | null
+	whatsIncluded?: string[] | string | null
+	image_url?: string | null
+	imageUrl?: string | null
 }
 
 export interface AncillaryCategoryApiItem {

@@ -4,23 +4,30 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../../../components/common'
 
 export interface PhysiotherapyCondition {
+	/** Matches lookup_ancillary_category.public_id for this condition under the Physiotherapy specialty (specialty_id = 2) */
 	id: string
 	label: string
 	icon: keyof typeof MaterialCommunityIcons.glyphMap
-	/** Lowercase keywords matched against a service's title/description to flag it as recommended */
-	keywords: string[]
 }
 
+/**
+ * The 9 "Find Physiotherapy for" condition cards. These map 1:1 to the
+ * lookup_ancillary_category rows seeded for the Physiotherapy specialty
+ * (public_id values phys-knee, phys-back, ... phys-post-surgery). Selecting
+ * a card filters services by that category's public_id via the existing
+ * /api/ancillary/services?category_id= endpoint -- no service data is
+ * hardcoded here, only the condition labels/icons used to drive the picker.
+ */
 export const PHYSIOTHERAPY_CONDITIONS: PhysiotherapyCondition[] = [
-	{ id: 'knee', label: 'Knee Pain', icon: 'bone', keywords: ['knee'] },
-	{ id: 'back', label: 'Back Pain', icon: 'human-male-height', keywords: ['back', 'spine', 'lumbar'] },
-	{ id: 'neck', label: 'Neck Pain', icon: 'head-alert-outline', keywords: ['neck', 'cervical'] },
-	{ id: 'shoulder', label: 'Shoulder Pain', icon: 'arm-flex-outline', keywords: ['shoulder'] },
-	{ id: 'hand', label: 'Hand Pain', icon: 'hand-back-right-outline', keywords: ['hand', 'wrist'] },
-	{ id: 'leg', label: 'Leg Pain', icon: 'walk', keywords: ['leg'] },
-	{ id: 'sports', label: 'Sports Injury', icon: 'dumbbell', keywords: ['sport', 'injury'] },
-	{ id: 'stroke', label: 'Stroke Rehab', icon: 'brain', keywords: ['stroke'] },
-	{ id: 'postsurg', label: 'Post Surgery', icon: 'bandage', keywords: ['surgery', 'post-op', 'post op'] },
+	{ id: 'phys-knee', label: 'Knee Pain', icon: 'bone' },
+	{ id: 'phys-back', label: 'Back Pain', icon: 'human-male-height' },
+	{ id: 'phys-neck', label: 'Neck Pain', icon: 'head-alert-outline' },
+	{ id: 'phys-shoulder', label: 'Shoulder Pain', icon: 'arm-flex-outline' },
+	{ id: 'phys-hand', label: 'Hand Pain', icon: 'hand-back-right-outline' },
+	{ id: 'phys-leg', label: 'Leg Pain', icon: 'walk' },
+	{ id: 'phys-sports-injury', label: 'Sports Injury', icon: 'dumbbell' },
+	{ id: 'phys-stroke', label: 'Stroke Rehab', icon: 'brain' },
+	{ id: 'phys-post-surgery', label: 'Post Surgery', icon: 'bandage' },
 ]
 
 interface PhysiotherapyConditionsGridProps {
@@ -33,6 +40,10 @@ interface PhysiotherapyConditionsGridProps {
  * Physiotherapy-only presentational section for AncillaryServiceCatalogScreen --
  * rendered when serviceKey === 'physiotherapy'. Mirrors the styling conventions
  * already used by NursingQuickActionCards / AllServiceCard in this module.
+ *
+ * These 9 cards are the patient-facing service filters for Physiotherapy
+ * (replacing the old All Services / Pain Management / Mobility & Rehab /
+ * Sports Recovery pill row, which has been removed for this specialty).
  */
 export const PhysiotherapyConditionsGrid: React.FC<PhysiotherapyConditionsGridProps> = ({
 	activeConditionId,

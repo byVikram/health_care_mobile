@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+﻿import React, { useState, useEffect, useCallback } from 'react'
 import {
 	ActivityIndicator,
 	FlatList,
@@ -25,6 +25,7 @@ export default function AncillaryProvidersPage() {
 		serviceLabel,
 		procedureName,
 		procedureId,
+		services,
 		isSelectionMode,
 		selectedNurseId,
 		latitude,
@@ -115,12 +116,24 @@ export default function AncillaryProvidersPage() {
 			navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
 				selectedNurse: provider,
 				assignmentMode: 'SELECT_NURSE',
+				...(services && services.length > 0 ? { services } : {}),
+				procedureName,
+				procedureId,
 			})
 			return
 		}
 
 		setSelectedProvider(provider)
 		setShowSuccessModal(true)
+	}
+
+	const handleUnselectNurse = () => {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
+			clearSelectedNurse: true,
+			...(services && services.length > 0 ? { services } : {}),
+			procedureName,
+			procedureId,
+		})
 	}
 
 	const handleSuccessModalSubmit = () => {
@@ -213,19 +226,24 @@ export default function AncillaryProvidersPage() {
 				<View style={styles.actions}>
 					<AppButton
 						variant="outline"
-						disabled={true}
-						style={styles.profileBtnDisabled}
-						labelStyle={styles.profileBtnLabelDisabled}
+						onPress={() => {
+							setSelectedProvider(item)
+							setShowProfileModal(true)
+						}}
+						// style={styles.profileBtn}
+						// labelStyle={styles.profileBtnLabel}
+						style={[styles.bookBtn, isSelected && styles.bookBtnSelected]}
+						labelStyle={styles.bookBtnLabel}
 					>
 						View Profile
 					</AppButton>
 					<AppButton
 						variant="primary"
-						onPress={() => handleBookNow(item)}
+						onPress={() => (isSelectionMode && isSelected ? handleUnselectNurse() : handleBookNow(item))}
 						style={[styles.bookBtn, isSelected && styles.bookBtnSelected]}
 						labelStyle={styles.bookBtnLabel}
 					>
-						{isSelectionMode ? (isSelected ? 'Selected Nurse ✓' : 'Select Nurse') : 'Book Now'}
+						{isSelectionMode ? (isSelected ? 'Selected Nurse' : 'Select Nurse') : 'Book Now'}
 					</AppButton>
 				</View>
 			</View>
@@ -388,10 +406,10 @@ export default function AncillaryProvidersPage() {
 			<AppBottomSheet
 				visible={showProfileModal}
 				onClose={() => setShowProfileModal(false)}
-				title="Clinician Information Profile"
+				title="Nurse Profile"
 				maxHeightRatio={0.85}
 				footer={
-					selectedProvider ? (
+					selectedProvider && !isSelectionMode ? (
 						<View style={styles.sheetFooterRow}>
 							<AppButton
 								variant="primary"
@@ -402,7 +420,7 @@ export default function AncillaryProvidersPage() {
 									handleBookNow(selectedProvider)
 								}}
 							>
-								{isSelectionMode ? 'Select Preferred Nurse' : 'Book Appointment'}
+								Book Appointment
 							</AppButton>
 						</View>
 					) : undefined
@@ -425,27 +443,37 @@ export default function AncillaryProvidersPage() {
 
 						{/* Quick 3-metric stats row */}
 						<View style={styles.modalStatsRow}>
-							<View style={styles.modalStatBox}>
-								<AppTypography variant="subtitle" style={styles.modalStatVal}>
-									{selectedProvider.experience} Yrs
-								</AppTypography>
-								<AppTypography variant="caption" style={styles.modalStatLabel}>
-									Experience
-								</AppTypography>
-							</View>
-							<View style={styles.modalStatDivider} />
-							<View style={styles.modalStatBox}>
-								<View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-									<Ionicons name="star" size={14} color="#F59E0B" />
-									<AppTypography variant="subtitle" style={styles.modalStatVal}>
-										{selectedProvider.rating}
-									</AppTypography>
-								</View>
-								<AppTypography variant="caption" style={styles.modalStatLabel}>
-									{selectedProvider.reviewsCount} Reviews
-								</AppTypography>
-							</View>
-							<View style={styles.modalStatDivider} />
+							{selectedProvider.experience != null && (
+								<>
+									<View style={styles.modalStatBox}>
+										<AppTypography variant="subtitle" style={styles.modalStatVal}>
+											{selectedProvider.experience} Yrs
+										</AppTypography>
+										<AppTypography variant="caption" style={styles.modalStatLabel}>
+											Experience
+										</AppTypography>
+									</View>
+									<View style={styles.modalStatDivider} />
+								</>
+							)}
+							{selectedProvider.rating != null && (
+								<>
+									<View style={styles.modalStatBox}>
+										<View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+											<Ionicons name="star" size={14} color="#F59E0B" />
+											<AppTypography variant="subtitle" style={styles.modalStatVal}>
+												{selectedProvider.rating}
+											</AppTypography>
+										</View>
+										{selectedProvider.reviewsCount != null && (
+											<AppTypography variant="caption" style={styles.modalStatLabel}>
+												{selectedProvider.reviewsCount} Reviews
+											</AppTypography>
+										)}
+									</View>
+									<View style={styles.modalStatDivider} />
+								</>
+							)}
 							<View style={styles.modalStatBox}>
 								<AppTypography variant="subtitle" style={styles.modalStatVal}>
 									{selectedProvider.distance} km
@@ -455,8 +483,7 @@ export default function AncillaryProvidersPage() {
 								</AppTypography>
 							</View>
 						</View>
-
-						{/* Procedures Offered */}
+												{/* Procedures Offered */}
 						<View style={styles.modalSection}>
 							<AppTypography variant="caption" style={styles.modalSectionTitle}>
 								Procedures Offered
@@ -491,15 +518,17 @@ export default function AncillaryProvidersPage() {
 						</View>
 
 						{/* Pricing Info */}
-						<View style={styles.modalPriceBox}>
-							<AppTypography variant="caption" style={styles.modalPriceLabel}>
-								Starting Consultation / Procedure Rate:
-							</AppTypography>
-							<AppTypography variant="h3" style={styles.modalPriceValue}>
-								₹{selectedProvider.startingPrice}
-							</AppTypography>
-						</View>
-					</View>
+						{selectedProvider.startingPrice != null && (
+							<View style={styles.modalPriceBox}>
+								<AppTypography variant="caption" style={styles.modalPriceLabel}>
+									Starting Consultation / Procedure Rate:
+								</AppTypography>
+								<AppTypography variant="h3" style={styles.modalPriceValue}>
+									₹{selectedProvider.startingPrice}
+								</AppTypography>
+							</View>
+						)}
+											</View>
 				)}
 			</AppBottomSheet>
 		</View>

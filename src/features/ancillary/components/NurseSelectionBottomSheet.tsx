@@ -100,7 +100,7 @@ export default function NurseSelectionBottomSheet({
 										<View style={styles.nurseInfo}>
 											<View style={styles.nameRow}>
 												<AppTypography variant="h4" style={styles.nurseName}>
-													{nurse.name}
+													{nurse.name} 
 												</AppTypography>
 												<View style={styles.credentialsBadge}>
 													<AppTypography variant="caption" style={styles.credentialsText}>{nurse.credentials}</AppTypography>

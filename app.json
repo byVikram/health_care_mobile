@@ -75,7 +75,12 @@
             "useCkeartedworks": true
           }
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-audio",
+      "expo-splash-screen",
+      "expo-status-bar",
+      "expo-video"
     ],
     "assetBundlePatterns": [
       "**/*"
