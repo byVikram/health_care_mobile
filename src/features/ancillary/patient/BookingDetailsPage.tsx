@@ -97,16 +97,16 @@ const ANCILLARY_SLOTS: SlotGroup[] = [
 	{
 		label: 'Morning Slots',
 		slots: [
-			{ id: 's1', start_time: '9:00 AM â€“ 10:00 AM', end_time: '', status: 'AVAILABLE' },
-			{ id: 's2', start_time: '11:00 AM â€“ 12:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's1', start_time: '9:00 AM - 10:00 AM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's2', start_time: '11:00 AM - 12:00 PM', end_time: '', status: 'AVAILABLE' },
 		],
 	},
 	{
 		label: 'Afternoon & Evening Slots',
 		slots: [
-			{ id: 's3', start_time: '2:00 PM â€“ 3:00 PM', end_time: '', status: 'AVAILABLE' },
-			{ id: 's4', start_time: '5:00 PM â€“ 6:00 PM', end_time: '', status: 'AVAILABLE' },
-			{ id: 's5', start_time: '7:00 PM â€“ 8:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's3', start_time: '2:00 PM - 3:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's4', start_time: '5:00 PM - 6:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's5', start_time: '7:00 PM - 8:00 PM', end_time: '', status: 'AVAILABLE' },
 		],
 	},
 ]

@@ -3,7 +3,8 @@ import { Image, StyleSheet, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { AppTypography } from '../../../components/common'
 import { ServiceProcedureItem } from './AllServiceCard'
-import RecurringVisitCalendar, { RecurringVisitSchedule } from './RecurringVisitCalendar'
+import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
+import RecurringVisitCalendar, { AvailableTimeSlotsSource, RecurringVisitSchedule } from './RecurringVisitCalendar'
 
 export interface SelectedProcedureCardProps {
 	service: ServiceProcedureItem
@@ -13,6 +14,12 @@ export interface SelectedProcedureCardProps {
 	onToggleExpand: () => void
 	schedule: RecurringVisitSchedule
 	onScheduleChange: (next: RecurringVisitSchedule) => void
+	/**
+	 * Optional pass-through for real/date-aware time-slot availability once
+	 * a backend source exists. Falls back to RecurringVisitCalendar's own
+	 * mock slots when omitted.
+	 */
+	availableTimeSlots?: AvailableTimeSlotsSource
 }
 
 /**
@@ -32,11 +39,12 @@ export default function SelectedProcedureCard({
 	onToggleExpand,
 	schedule,
 	onScheduleChange,
+	availableTimeSlots,
 }: SelectedProcedureCardProps) {
 	return (
 		<View style={styles.card}>
 			<View style={styles.row}>
-				<Image source={{ uri: service.image }} style={styles.thumb} resizeMode="cover" />
+				<Image source={getAncillaryImageSource(service.image_url || service.imageUrl || service.image)} style={styles.thumb} resizeMode="cover" />
 
 				<View style={styles.textCol}>
 					<AppTypography variant="h4" style={styles.title} numberOfLines={1}>
@@ -91,7 +99,7 @@ export default function SelectedProcedureCard({
 
 			{expanded ? (
 				<View style={styles.expandedSection}>
-					<RecurringVisitCalendar schedule={schedule} onChange={onScheduleChange} />
+					<RecurringVisitCalendar schedule={schedule} onChange={onScheduleChange} availableTimeSlots={availableTimeSlots} />
 				</View>
 			) : null}
 		</View>

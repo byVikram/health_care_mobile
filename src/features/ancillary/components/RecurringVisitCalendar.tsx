@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { StyleSheet, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common'
+import { AppSelect, AppTypography } from '../../../components/common'
 
 export interface RecurringVisitSchedule {
 	/** ISO date keys, e.g. '2026-08-14' */
@@ -12,12 +12,62 @@ export interface RecurringVisitSchedule {
 	perDateTimes: Record<string, string>
 }
 
-export const TIME_SLOT_OPTIONS = ['09:00 AM', '02:00 PM', '05:00 PM']
+const pad2 = (value: number) => String(value).padStart(2, '0')
+
+// ── TEMPORARY MOCK DATA -- NOT A REAL BUSINESS RULE ────────────────────
+// There is currently no backend availability API, configured appointment
+// duration, or slot interval for *ancillary recurring visits* anywhere in
+// the project:
+//   - `ancillaryService.ts` / `API_ENDPOINTS.ANCILLARY` expose no
+//     slots/availability endpoint.
+//   - The only "working hours" concept in the codebase (`WorkingHoursSection`,
+//     `SECTION_META`, `createWorkingHoursState` in
+//     `src/components/common/WorkingHoursSection.tsx`) belongs to a
+//     different feature entirely: an individual nurse/doctor's own
+//     optional profile settings, saved locally per-provider. It is never
+//     read by the patient-facing booking flow, isn't tied to any specific
+//     service or date, and a nurse isn't even assigned until after a
+//     recurring visit is booked -- so it is intentionally NOT reused here;
+//     doing so would fabricate a link between one provider's personal
+//     settings and every patient's booking options.
+// The constants below are therefore an arbitrary, clearly-labeled UI
+// placeholder ONLY, picked purely to make the time-slot picker usable
+// during development. They do not represent real clinic hours, nurse
+// availability, or any approved business rule.
+// TODO(backend): once an ancillary/recurring-visit availability endpoint
+// exists, delete `MOCK_TIME_SLOT_OPTIONS` and have callers pass real slots
+// (optionally per-date) via the `availableTimeSlots` prop instead.
+const MOCK_SLOT_WINDOW = { startHour: 8, endHour: 18, stepMinutes: 30 } as const
+
+/** Formats one generated slot as a zero-padded 12-hour label, e.g. '09:00 AM'. */
+function formatTimeSlotLabel(totalMinutes: number): string {
+	const hour24 = Math.floor(totalMinutes / 60)
+	const minute = totalMinutes % 60
+	const period = hour24 >= 12 ? 'PM' : 'AM'
+	const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+	return `${pad2(hour12)}:${pad2(minute)} ${period}`
+}
+
+function generateMockTimeSlots({ startHour, endHour, stepMinutes }: typeof MOCK_SLOT_WINDOW): string[] {
+	const slots: string[] = []
+	for (let minutes = startHour * 60; minutes <= endHour * 60; minutes += stepMinutes) {
+		slots.push(formatTimeSlotLabel(minutes))
+	}
+	return slots
+}
+
+/**
+ * Placeholder/mock time-slot list used only when a caller doesn't supply
+ * `availableTimeSlots`. See the block comment above -- this is temporary UI
+ * data, not sourced from any real availability rule, and must be replaced
+ * once ancillary recurring-visit availability exists on the backend.
+ */
+export const MOCK_TIME_SLOT_OPTIONS: string[] = generateMockTimeSlots(MOCK_SLOT_WINDOW)
 
 export const createDefaultRecurringSchedule = (): RecurringVisitSchedule => ({
 	dates: [],
 	sameTimeForAll: true,
-	sharedTime: TIME_SLOT_OPTIONS[0],
+	sharedTime: '09:00 AM',
 	perDateTimes: {},
 })
 
@@ -25,8 +75,10 @@ const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 const WEEKDAY_SHORT = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const pad2 = (value: number) => String(value).padStart(2, '0')
 const toDateKey = (date: Date) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+
+/** Turns a flat list of time-slot strings into AppSelect's {label, value} shape. */
+const toSelectOptions = (slots: string[]) => slots.map((slot) => ({ label: slot, value: slot }))
 
 interface CalendarCell {
 	key: string
@@ -60,12 +112,35 @@ function formatSelectedDateLabel(dateKey: string) {
 	return `${WEEKDAY_ABBR[date.getDay()]}, ${MONTH_NAMES[month - 1]} ${day}`
 }
 
+/**
+ * Source of bookable time slots -- the single source of truth this
+ * component renders from. Pass a plain array when availability is the same
+ * for every date, or a function of the ISO date key (e.g. '2026-08-14')
+ * when availability should vary by date, once a real backend availability
+ * API is wired in for ancillary recurring visits.
+ */
+export type AvailableTimeSlotsSource = string[] | ((dateKey: string) => string[])
+
 export interface RecurringVisitCalendarProps {
 	schedule: RecurringVisitSchedule
 	onChange: (next: RecurringVisitSchedule) => void
+	/**
+	 * Available time slots to offer for booking. Defaults to
+	 * `MOCK_TIME_SLOT_OPTIONS` -- temporary placeholder UI data, not a real
+	 * availability rule (see the comment above that constant). Pass real
+	 * slots from a backend availability response here (a flat list, or a
+	 * `(dateKey) => string[]` lookup for date-specific availability) as
+	 * soon as that endpoint exists; no other change to this component
+	 * should be required.
+	 */
+	availableTimeSlots?: AvailableTimeSlotsSource
 }
 
-export default function RecurringVisitCalendar({ schedule, onChange }: RecurringVisitCalendarProps) {
+export default function RecurringVisitCalendar({
+	schedule,
+	onChange,
+	availableTimeSlots = MOCK_TIME_SLOT_OPTIONS,
+}: RecurringVisitCalendarProps) {
 	const [visibleMonth, setVisibleMonth] = useState<Date>(() => {
 		const now = new Date()
 		return new Date(now.getFullYear(), now.getMonth(), 1)
@@ -73,6 +148,24 @@ export default function RecurringVisitCalendar({ schedule, onChange }: Recurring
 
 	const calendarCells = useMemo(() => buildCalendarCells(visibleMonth), [visibleMonth])
 	const sortedDates = useMemo(() => [...schedule.dates].sort(), [schedule.dates])
+
+	// Single availability source shared by both the "same time for all
+	// dates" selector and the per-date selector below, so the two never
+	// drift out of sync.
+	const resolveSlotsForDate = useCallback(
+		(dateKey: string): string[] =>
+			typeof availableTimeSlots === 'function' ? availableTimeSlots(dateKey) : availableTimeSlots,
+		[availableTimeSlots]
+	)
+
+	// The shared selector isn't bound to one specific date, so it resolves
+	// against the earliest selected date (falling back to today) when
+	// availability is date-dependent.
+	const sharedSlots = useMemo(
+		() => resolveSlotsForDate(sortedDates[0] ?? toDateKey(new Date())),
+		[resolveSlotsForDate, sortedDates]
+	)
+	const sharedSlotOptions = useMemo(() => toSelectOptions(sharedSlots), [sharedSlots])
 
 	const goToPreviousMonth = () => {
 		setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
@@ -200,29 +293,23 @@ export default function RecurringVisitCalendar({ schedule, onChange }: Recurring
 					</View>
 				</View>
 
-				<AppTypography variant="caption" style={styles.fieldLabel}>
-					Preferred Time Slot
-				</AppTypography>
-				<View style={styles.timeSlotRow}>
-					{TIME_SLOT_OPTIONS.map((time) => {
-						const isActive = schedule.sharedTime === time
-						return (
-							<TouchableOpacity
-								key={time}
-								style={[styles.timeSlotBtn, isActive && styles.timeSlotBtnActive]}
-								onPress={() => setSharedTime(time)}
-								activeOpacity={0.85}
-							>
-								<AppTypography
-									variant="caption"
-									style={[styles.timeSlotBtnText, isActive && styles.timeSlotBtnTextActive]}
-								>
-									{time}
-								</AppTypography>
-							</TouchableOpacity>
-						)
-					})}
-				</View>
+				{schedule.sameTimeForAll ? (
+					<>
+						<AppTypography variant="caption" style={styles.fieldLabel}>
+							Preferred Time Slot
+						</AppTypography>
+						<AppSelect
+							options={sharedSlotOptions}
+							value={schedule.sharedTime}
+							onSelect={setSharedTime}
+							size="compact"
+							borderRadius={10}
+							borderColor="#E2E8F0"
+							noMargin
+							maxDropdownHeight={240}
+						/>
+					</>
+				) : null}
 
 				{dateCount > 0 ? (
 					<View style={styles.selectedDatesSection}>
@@ -236,7 +323,11 @@ export default function RecurringVisitCalendar({ schedule, onChange }: Recurring
 									: schedule.perDateTimes[dateKey] || schedule.sharedTime
 								return (
 									<View key={dateKey} style={styles.selectedDateRow}>
-										<AppTypography variant="caption" style={styles.selectedDateText}>
+										<AppTypography
+											variant="caption"
+											style={styles.selectedDateText}
+											numberOfLines={1}
+										>
 											{formatSelectedDateLabel(dateKey)}
 										</AppTypography>
 										{schedule.sameTimeForAll ? (
@@ -246,29 +337,17 @@ export default function RecurringVisitCalendar({ schedule, onChange }: Recurring
 												</AppTypography>
 											</View>
 										) : (
-											<View style={styles.perDateTimeOptions}>
-												{TIME_SLOT_OPTIONS.map((t) => {
-													const active = time === t
-													return (
-														<TouchableOpacity
-															key={t}
-															style={[styles.perDateTimeChip, active && styles.perDateTimeChipActive]}
-															onPress={() => setDateTime(dateKey, t)}
-															activeOpacity={0.8}
-														>
-															<AppTypography
-																variant="caption"
-																style={[
-																	styles.perDateTimeChipText,
-																	active && styles.perDateTimeChipTextActive,
-																]}
-															>
-																{t}
-															</AppTypography>
-														</TouchableOpacity>
-													)
-												})}
-											</View>
+											<AppSelect
+												options={toSelectOptions(resolveSlotsForDate(dateKey))}
+												value={time}
+												onSelect={(t) => setDateTime(dateKey, t)}
+												size="small"
+												borderRadius={8}
+												borderColor="#E2E8F0"
+												noMargin
+												style={styles.perDateSelect}
+												maxDropdownHeight={220}
+											/>
 										)}
 									</View>
 								)
@@ -435,32 +514,6 @@ const styles = StyleSheet.create({
 		color: '#475569',
 		letterSpacing: 0.5,
 	},
-	timeSlotRow: {
-		flexDirection: 'row',
-		gap: 8,
-	},
-	timeSlotBtn: {
-		flex: 1,
-		paddingVertical: 8,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		backgroundColor: '#FFFFFF',
-		alignItems: 'center',
-	},
-	timeSlotBtnActive: {
-		backgroundColor: '#2B6F71',
-		borderColor: '#2B6F71',
-	},
-	timeSlotBtnText: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#475569',
-	},
-	timeSlotBtnTextActive: {
-		color: '#FFFFFF',
-		fontWeight: '700',
-	},
 	selectedDatesSection: {
 		gap: 8,
 	},
@@ -483,6 +536,7 @@ const styles = StyleSheet.create({
 		fontSize: 11.5,
 		fontWeight: '600',
 		color: '#334155',
+		flexShrink: 1,
 	},
 	dateTimeTag: {
 		backgroundColor: '#F1F5F9',
@@ -495,33 +549,8 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#0F172A',
 	},
-	perDateTimeOptions: {
-		flexDirection: 'row',
-		gap: 4,
-		flexShrink: 1,
-		flexWrap: 'wrap',
-		justifyContent: 'flex-end',
-	},
-	perDateTimeChip: {
-		paddingHorizontal: 6,
-		paddingVertical: 3,
-		borderRadius: 6,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		backgroundColor: '#F8FAFC',
-	},
-	perDateTimeChipActive: {
-		backgroundColor: '#2B6F71',
-		borderColor: '#2B6F71',
-	},
-	perDateTimeChipText: {
-		fontSize: 9.5,
-		fontWeight: '600',
-		color: '#64748B',
-	},
-	perDateTimeChipTextActive: {
-		color: '#FFFFFF',
-		fontWeight: '700',
+	perDateSelect: {
+		width: 132,
 	},
 	summaryBar: {
 		backgroundColor: '#F0FDFA',

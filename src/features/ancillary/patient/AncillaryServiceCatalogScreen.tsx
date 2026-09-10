@@ -54,6 +54,11 @@ const SERVICE_UI: Record<string, {
 		searchPlaceholder: 'Search rehab care e.g. Stroke, Cardiac...',
 		image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=300&q=80',
 	},
+	'medical-equipment': {
+		title: 'Medical Equipment',
+		searchPlaceholder: 'Search medical equipment e.g. Wheelchair, Oxygen...',
+		image: 'https://images.unsplash.com/photo-1576671081837-49000212a370?auto=format&fit=crop&w=300&q=80',
+	},
 	'elder-day-care': {
 		title: 'Elder Day Care & Assistance',
 		searchPlaceholder: 'Search elder care e.g. Companion, Mobility...',
@@ -151,7 +156,10 @@ export default function AncillaryServiceCatalogScreen() {
 				price: typeof s.price === 'number' ? `₹${s.price}` : String(s.price || '₹499'),
 				duration: '30-45 mins',
 				image: activeUi.image,
+				image_url: s.image_url ?? s.imageUrl ?? null,
 				premiumBadgeText: activeUi.premiumBadgeText,
+				about_service: s.about_service ?? s.aboutService ?? null,
+				whats_included: s.whats_included ?? s.whatsIncluded ?? null,
 			}
 		})
 	}, [rawServices, activeUi.image, activeUi.premiumBadgeText])
