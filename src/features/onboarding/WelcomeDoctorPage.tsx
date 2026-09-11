@@ -113,15 +113,15 @@ const ANCILLARY_WELCOME_CONFIGS: Record<string, WelcomeScreenConfig> = {
       },
     ],
   },
-  "elder-day-care": {
-    title: "Welcome Elder Care Assistant! 🤝",
-    subtitle: "Let's help you get set up to assist seniors with daily activities, safety checks, and companionship.",
-    buttonLabel: "Set Up Elder Care Profile",
+  "home-care": {
+    title: "Welcome Home Care Specialist! 🤝",
+    subtitle: "Let's help you get set up to assist clients with daily activities, safety checks, and companionship at home.",
+    buttonLabel: "Set Up Home Care Profile",
     features: [
       {
         Icon: ProfileIcon,
         title: "Care Schedule",
-        description: "View daily senior assistance bookings, home addresses, and shift times.",
+        description: "View daily home assistance bookings, addresses, and shift times.",
       },
       {
         Icon: ConsultIcon,
@@ -142,7 +142,7 @@ function normalizeSpecialtyKey(key?: string | null): string {
   const lower = key.toLowerCase().trim();
   if (lower.includes("physio")) return "physiotherapy";
   if (lower.includes("rehab")) return "rehab-care";
-  if (lower.includes("elder")) return "elder-day-care";
+  if (lower.includes("home")) return "home-care";
   return "nursing-care";
 }
 

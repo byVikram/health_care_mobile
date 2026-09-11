@@ -47,7 +47,7 @@ const SPECIALTY_OPTIONS: Option[] = [
 	{ label: 'Nursing Care', value: 'Nursing Care' },
 	{ label: 'Physiotherapy', value: 'Physiotherapy' },
 	{ label: 'Rehabilitation', value: 'Rehabilitation' },
-	{ label: 'Elderly Care', value: 'Elderly Care' },
+	{ label: 'Home Care', value: 'Home Care' },
 ]
 
 const EXPERIENCE_OPTIONS: Option[] = [
@@ -345,7 +345,8 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 	}
 
 	const handleSave = async () => {
-		if (!formData.nursingRegistrationNumber.trim()) {
+		const isHomeCare = formData.specialty?.toLowerCase().includes('home')
+		if (!isHomeCare && !formData.nursingRegistrationNumber.trim()) {
 			Alert.alert('Validation', 'Nursing Registration Number is required.')
 			return
 		}
@@ -369,7 +370,7 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 			// Persist geofence radius & credentials to backend database (ancillary_providers.geofence_radius_km)
 			const numRadius = Number(formData.geofenceRadius)
 			await updateProviderProfileBackend({
-				license_number: formData.nursingRegistrationNumber.trim(),
+				...(isHomeCare && !formData.nursingRegistrationNumber.trim() ? {} : { license_number: formData.nursingRegistrationNumber.trim() }),
 				qualifications: formData.qualification.trim(),
 				// Send specialty as provided string (backend expects id or name depending on API)
 				specialty: formData.specialty,
@@ -512,21 +513,23 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 								/> */}
 							{/* </FormRow> */}
 
-							<FormRow stacked={!useTwoColumns} compact={isTablet}>
-								<InputField
-									label="Nursing Registration Number"
-									value={formData.nursingRegistrationNumber}
-									onChangeText={(val) => updateFormData('nursingRegistrationNumber', val)}
-									placeholder="e.g. RN-12930"
-									required
-								/>
-								{/* <InputField
-									label="State Nursing Council"
-									value={formData.stateNursingCouncil}
-									onChangeText={(val) => updateFormData('stateNursingCouncil', val)}
-									placeholder="e.g. Karnataka State Nursing Council"
-								/> */}
-							</FormRow>
+							{!formData.specialty?.toLowerCase().includes('home') && (
+								<FormRow stacked={!useTwoColumns} compact={isTablet}>
+									<InputField
+										label="Nursing Registration Number"
+										value={formData.nursingRegistrationNumber}
+										onChangeText={(val) => updateFormData('nursingRegistrationNumber', val)}
+										placeholder="e.g. RN-12930"
+										required
+									/>
+									{/* <InputField
+										label="State Nursing Council"
+										value={formData.stateNursingCouncil}
+										onChangeText={(val) => updateFormData('stateNursingCouncil', val)}
+										placeholder="e.g. Karnataka State Nursing Council"
+									/> */}
+								</FormRow>
+							)}
 
 							{/* Document Upload Component */}
 							<UploadBox
