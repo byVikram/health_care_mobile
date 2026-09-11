@@ -157,11 +157,11 @@ export const onboardingData: OnboardingConfig = {
 			},
 		],
 	},
-	'elder-day-care': {
+	'home-care': {
 		screens: [
 			{
 				Illustration: Onboarding1,
-				description: 'Monitor daily activities, lifestyle routines, and vital wellbeing for senior patients.',
+				description: 'Monitor daily activities, lifestyle routines, and vital wellbeing for home care clients.',
 			},
 			{
 				Illustration: Onboarding2,
@@ -169,7 +169,7 @@ export const onboardingData: OnboardingConfig = {
 			},
 			{
 				Illustration: Onboarding3,
-				description: 'Assist with daily schedules, meals, and compassionate companionship for elder care.',
+				description: 'Assist with daily schedules, meals, and compassionate companionship for home care.',
 			},
 		],
 	},

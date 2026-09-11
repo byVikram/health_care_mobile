@@ -11,7 +11,7 @@ export type AncillarySpecialty =
 	| 'nursing-care'
 	| 'physiotherapy'
 	| 'rehab-care'
-	| 'elder-day-care'
+	| 'home-care'
 	| 'medical-equipment'
 	| string
 
@@ -260,7 +260,7 @@ export const useAncillarySpecialty = () => {
 		'nursing-care':      { role: 'Nurse',            adjective: 'Nursing',        icon: 'medical-bag' },
 		'physiotherapy':     { role: 'Physiotherapist',  adjective: 'Physiotherapy',  icon: 'run-fast' },
 		'rehab-care':        { role: 'Rehab Therapist',  adjective: 'Rehab',          icon: 'wheelchair-accessibility' },
-		'elder-day-care':    { role: 'Care Worker',      adjective: 'Elder Day Care', icon: 'account-heart' },
+		'home-care':         { role: 'Care Worker',      adjective: 'Home Care',      icon: 'account-heart' },
 		'medical-equipment': { role: 'Technician',       adjective: 'Equipment',      icon: 'toolbox' },
 	}
 

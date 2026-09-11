@@ -38,7 +38,7 @@ type Slide = {
 	}>
 }
 
-type SpecialtyKey = 'nursing-care' | 'physiotherapy' | 'rehab-care' | 'elder-day-care'
+type SpecialtyKey = 'nursing-care' | 'physiotherapy' | 'rehab-care' | 'home-care'
 
 export default function OnboardingPage({ navigation, route }: OnboardingPageProps) {
 	const { accessToken } = useAuth()
@@ -82,7 +82,7 @@ export default function OnboardingPage({ navigation, route }: OnboardingPageProp
 						(stored === 'nursing-care' ||
 							stored === 'physiotherapy' ||
 							stored === 'rehab-care' ||
-							stored === 'elder-day-care')
+							stored === 'home-care')
 					) {
 						setActiveSpecialty(stored as SpecialtyKey)
 					}
