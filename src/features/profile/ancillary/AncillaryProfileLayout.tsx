@@ -15,6 +15,7 @@ import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import CapabilitiesTab from './tabs/CapabilitiesTab'
 import AvailabilityTab from './tabs/AvailabilityTab'
+import SessionsTab from '../SessionsTab'
 import { fetchProviderProfileBackend } from '../../ancillary/ancillaryService'
 
 type TabDefinition = {
@@ -28,7 +29,14 @@ const TABS: TabDefinition[] = [
 	{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
 	{ key: 'categories', label: 'Capabilities', Component: CapabilitiesTab },
 	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
+	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
 ]
+
+// Onboarding (profile-setup) completion is tied to finishing this specific tab,
+// not to reaching the end of the TABS array -- this lets tabs such as Sessions be
+// appended after Availability without re-triggering or blocking the existing
+// 'ancillary_setup_completed' flow.
+const LAST_ONBOARDING_TAB_KEY = 'availability'
 
 export default function AncillaryProfileLayout() {
 	const navigation = useNavigation<any>()
