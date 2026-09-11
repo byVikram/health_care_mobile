@@ -414,8 +414,9 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 	}
 
 	const handleSave = async () => {
-		if (!formData.nursingRegistrationNumber.trim()) {
-			Alert.alert('Validation', `${fieldConfig.registrationLabel} is required.`)
+		const isHomeCare = formData.specialty?.toLowerCase().includes('home')
+		if (!isHomeCare && !formData.nursingRegistrationNumber.trim()) {
+			Alert.alert('Validation', 'Nursing Registration Number is required.')
 			return
 		}
 
@@ -438,7 +439,7 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 			// Persist geofence radius & credentials to backend database (ancillary_providers.geofence_radius_km)
 			const numRadius = Number(formData.geofenceRadius)
 			await updateProviderProfileBackend({
-				license_number: formData.nursingRegistrationNumber.trim(),
+				...(isHomeCare && !formData.nursingRegistrationNumber.trim() ? {} : { license_number: formData.nursingRegistrationNumber.trim() }),
 				qualifications: formData.qualification.trim(),
 				// Send specialty as provided string (backend expects id or name depending on API)
 				specialty: formData.specialty,
