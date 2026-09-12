@@ -39,6 +39,73 @@ type ProfessionalFormData = {
 	geofenceRadius: string
 }
 
+const SPECIALTY_OPTIONS: Option[] = [
+	{ label: 'Nursing Care', value: 'Nursing Care' },
+	{ label: 'Physiotherapy', value: 'Physiotherapy' },
+	{ label: 'Rehabilitation', value: 'Rehabilitation' },
+	{ label: 'Elderly Care', value: 'Elderly Care' },
+]
+
+// Role-specific Professional Details terminology.
+// NOTE: This only changes what is DISPLAYED (labels/placeholders). The
+// underlying form field (`nursingRegistrationNumber`) and the backend
+// payload key (`license_number`) are unchanged for every role -- see
+// handleSave() below, which always sends `license_number`.
+type SpecialtyFieldConfig = {
+	registrationLabel: string
+	registrationPlaceholder: string
+	qualificationPlaceholder: string
+	designationPlaceholder: string
+}
+
+const DEFAULT_FIELD_CONFIG: SpecialtyFieldConfig = {
+	registrationLabel: 'Professional Registration Number',
+	registrationPlaceholder: 'e.g. Registration No.',
+	qualificationPlaceholder: 'e.g. Relevant professional qualification',
+	designationPlaceholder: 'e.g. Relevant professional designation',
+}
+
+const NURSING_FIELD_CONFIG: SpecialtyFieldConfig = {
+	registrationLabel: 'Nursing Registration Number',
+	registrationPlaceholder: 'e.g. RN-12930',
+	qualificationPlaceholder: 'e.g. B.Sc Nursing, GNM',
+	designationPlaceholder: 'e.g. Senior Staff Nurse',
+}
+
+const PHYSIOTHERAPY_FIELD_CONFIG: SpecialtyFieldConfig = {
+	registrationLabel: 'Physiotherapy Registration Number',
+	registrationPlaceholder: 'e.g. Registration No.',
+	qualificationPlaceholder: 'e.g. BPT, MPT',
+	designationPlaceholder: 'e.g. Physiotherapist, Senior Physiotherapist',
+}
+
+const REHAB_FIELD_CONFIG: SpecialtyFieldConfig = {
+	registrationLabel: 'Rehabilitation Registration Number',
+	registrationPlaceholder: 'e.g. RCI-45210',
+	qualificationPlaceholder: 'e.g. BOT, MOT, DRT',
+	designationPlaceholder: 'e.g. Rehabilitation Therapist, Senior Rehabilitation Therapist',
+}
+
+const ELDER_CARE_FIELD_CONFIG: SpecialtyFieldConfig = {
+	registrationLabel: 'Caregiver Registration Number',
+	registrationPlaceholder: 'e.g. EC-1023',
+	qualificationPlaceholder: 'e.g. Certified Caregiver, Diploma in Geriatric Care',
+	designationPlaceholder: 'e.g. Senior Caregiver',
+}
+
+// Matches by keyword rather than exact label so this stays correct even if a
+// specialty's backend label (e.g. "Rehab Care", "Elder Day Care") differs
+// slightly from the dropdown's display label (e.g. "Rehabilitation",
+// "Elderly Care") -- Physiotherapy-specific text only ever matches "physio".
+function getFieldConfigForSpecialty(specialty: string): SpecialtyFieldConfig {
+	const normalized = (specialty || '').toLowerCase()
+	if (normalized.includes('physio')) return PHYSIOTHERAPY_FIELD_CONFIG
+	if (normalized.includes('rehab')) return REHAB_FIELD_CONFIG
+	if (normalized.includes('elder') || normalized.includes('geriatric')) return ELDER_CARE_FIELD_CONFIG
+	if (normalized.includes('nurs')) return NURSING_FIELD_CONFIG
+	return DEFAULT_FIELD_CONFIG
+}
+
 const EXPERIENCE_OPTIONS: Option[] = [
 	{ label: 'Less than 1 year', value: '<1' },
 	{ label: '1 - 3 years', value: '1-3' },
@@ -307,7 +374,11 @@ export default function ProfessionalDetailsTab({
 		setFormData((prev) => ({ ...prev, [key]: value }))
 	}
 
-	// Synchronize when propSpecialtyKey changes
+	// Role-specific labels/placeholders derived from the currently selected
+	// specialty. Re-derived whenever the specialty changes (either from the
+	// initial load below, or the Primary Specialty dropdown in this screen).
+	const fieldConfig = useMemo(() => getFieldConfigForSpecialty(resolvedSpecialtyLabel), [resolvedSpecialtyLabel])
+
 	useEffect(() => {
 		if (propSpecialtyKey) {
 			const key = normalizeSpecialtyKey(propSpecialtyKey)
@@ -383,17 +454,23 @@ export default function ProfessionalDetailsTab({
 						await AsyncStorage.setItem('user_specialty', resolvedKey)
 					}
 
-					setFormData((prev) => ({
-						...prev,
-						qualification: typeof backendProfile.qualifications === 'string'
-							? backendProfile.qualifications
-							: prev.qualification,
-						experience: backendProfile.experience_years || prev.experience,
-						qualificationProof: backendProfile.qualification_proof_s3_key || map['ancillary_qualification_proof'] || prev.qualificationProof,
-						registrationProof: backendProfile.license_proof_s3_key || prev.registrationProof,
-						nursingRegistrationNumber: backendProfile.license_number || prev.nursingRegistrationNumber,
-						geofenceRadius: resolvedRadius,
-					}))
+				setFormData((prev) => ({
+					...prev,
+					// Prefer the backend's own specialty (set at registration / via the
+					// Primary Specialty dropdown save) over the locally cached copy, so
+					// role-specific terminology below is correct even if this device's
+					// AsyncStorage is stale or was never populated.
+					specialty: backendProfile?.specialty?.label || spec || 'Nursing Care',
+					qualification: backendProfile?.qualifications || qual || '',
+					currentDesignation: desig || '',
+					experience: exp || '',
+					nursingRegistrationNumber: backendProfile?.license_number || regNo || '',
+					stateNursingCouncil: council || '',
+					registrationProof: proof || '',
+					verificationStatus: verification || 'pending',
+					about: abt || '',
+					geofenceRadius: resolvedRadius,
+				}))
 
 					if (backendRadius != null) {
 						await AsyncStorage.setItem('ancillary_geofence_radius', String(Math.round(backendRadius)))
@@ -593,92 +670,76 @@ export default function ProfessionalDetailsTab({
 					<View style={{ marginBottom: rowSpacing }}>
 						<SectionTitle>Professional Information</SectionTitle>
 						<View style={{ gap: 18 }}>
-							{isHomeCare ? (
-								<>
-									<InputField
-										label="Highest Qualification"
-										value={formData.qualification}
-										onChangeText={(val) => updateFormData('qualification', val)}
-										placeholder="e.g. 10th, 12th, Caregiver Certificate, GNA"
-									/>
-									<UploadBox
-										label="Qualification / Training Certificate"
-										placeholder="Upload Qualification / Certificate"
-										hint="Tap to choose certificate / proof document (JPG or PNG)"
-										fileName={formData.qualificationProof}
-										onUpload={handleUploadQualificationDocument}
-									/>
-									<SelectDropdown
-										label="Caregiving Experience"
-										value={formData.experience}
-										placeholder="Select caregiving experience"
-										options={HOME_CARE_EXPERIENCE_OPTIONS}
-										onSelect={(val) => updateFormData('experience', val)}
-										required
-									/>
-									<SelectDropdown
-										label="Work Radius / Geofence Radius"
-										value={formData.geofenceRadius}
-										placeholder="Select work radius"
-										options={GEOFENCE_RADIUS_OPTIONS}
-										onSelect={(val) => updateFormData('geofenceRadius', val)}
-										required
-									/>
-								</>
-							) : (
-								<>
-									<FormRow stacked={!useTwoColumns} compact={isTablet}>
-										<InputField
-											label="Highest Qualification"
-											value={formData.qualification}
-											onChangeText={(val) => updateFormData('qualification', val)}
-											placeholder="e.g. B.Sc Nursing, GNM"
-										/>
-										<InputField
-											label="Current Designation"
-											value={formData.currentDesignation}
-											onChangeText={(val) => updateFormData('currentDesignation', val)}
-											placeholder="e.g. Senior Staff Nurse"
-										/>
-									</FormRow>
+							<FormRow stacked={!useTwoColumns} compact={isTablet}>
+								<InputField
+									label="Highest Qualification"
+									value={formData.qualification}
+									onChangeText={(val) => updateFormData('qualification', val)}
+									placeholder={fieldConfig.qualificationPlaceholder}
+								/>
+								<InputField
+									label="Current Designation"
+									value={formData.currentDesignation}
+									onChangeText={(val) => updateFormData('currentDesignation', val)}
+									placeholder={fieldConfig.designationPlaceholder}
+								/>
+							</FormRow>
 
-									<FormRow stacked={!useTwoColumns} compact={isTablet}>
-										<SelectDropdown
-											label="Total Years of Experience"
-											value={formData.experience}
-											placeholder="Select experience range"
-											options={EXPERIENCE_OPTIONS}
-											onSelect={(val) => updateFormData('experience', val)}
-											required
-										/>
-										<SelectDropdown
-											label="Work Radius / Geofence Radius"
-											value={formData.geofenceRadius}
-											placeholder="Select work radius"
-											options={GEOFENCE_RADIUS_OPTIONS}
-											onSelect={(val) => updateFormData('geofenceRadius', val)}
-											required
-										/>
-									</FormRow>
+							<FormRow stacked={!useTwoColumns} compact={isTablet}>
+								<SelectDropdown
+									label="Total Years of Experience"
+									value={formData.experience}
+									placeholder="Select experience range"
+									options={EXPERIENCE_OPTIONS}
+									onSelect={(val) => updateFormData('experience', val)}
+									required
+								/>
+								<SelectDropdown
+									label="Work Radius / Geofence Radius"
+									value={formData.geofenceRadius}
+									placeholder="Select work radius"
+									options={GEOFENCE_RADIUS_OPTIONS}
+									onSelect={(val) => updateFormData('geofenceRadius', val)}
+									required
+								/>
+							</FormRow>
 
-									<FormRow stacked={!useTwoColumns} compact={isTablet}>
-										<InputField
-											label="Registration Number"
-											value={formData.nursingRegistrationNumber}
-											onChangeText={(val) => updateFormData('nursingRegistrationNumber', val)}
-											placeholder="e.g. RN-12930"
-											required
-										/>
-									</FormRow>
+							{/* <FormRow stacked={!useTwoColumns} compact={isTablet}>
+								<InputField
+									label="Latitude"
+									value={formData.latitude}
+									onChangeText={(val) => updateFormData('latitude', val)}
+									placeholder="e.g. 17.3850"
+									keyboardType="numbers-and-punctuation"
+								/>
+								<InputField
+									label="Longitude"
+									value={formData.longitude}
+									onChangeText={(val) => updateFormData('longitude', val)}
+									placeholder="e.g. 78.4867"
+									keyboardType="numbers-and-punctuation"
+								/> */}
+							{/* </FormRow> */}
 
-									{/* Document Upload Component */}
-									<UploadBox
-										label="Registration Proof / Certification Document"
-										fileName={formData.registrationProof}
-										onUpload={handleUploadDocument}
-									/>
-								</>
-							)}
+							<FormRow stacked={!useTwoColumns} compact={isTablet}>
+								<InputField
+									// NOTE: field name kept as nursingRegistrationNumber and mapped to
+									// the license_number API field on save regardless of specialty --
+									// only the label/placeholder shown to the user change per role.
+									label={fieldConfig.registrationLabel}
+									value={formData.nursingRegistrationNumber}
+									onChangeText={(val) => updateFormData('nursingRegistrationNumber', val)}
+									placeholder={fieldConfig.registrationPlaceholder}
+									required
+								/>
+							</FormRow>
+
+							{/* Document Upload Component */}
+							<UploadBox
+								label="Registration Proof / Certification Document"
+								fileName={formData.registrationProof}
+								onUpload={handleUploadDocument}
+							/>
 						</View>
 					</View>
 
