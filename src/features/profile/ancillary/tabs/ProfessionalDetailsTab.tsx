@@ -456,19 +456,14 @@ export default function ProfessionalDetailsTab({
 
 				setFormData((prev) => ({
 					...prev,
-					// Prefer the backend's own specialty (set at registration / via the
-					// Primary Specialty dropdown save) over the locally cached copy, so
-					// role-specific terminology below is correct even if this device's
-					// AsyncStorage is stale or was never populated.
-					specialty: backendProfile?.specialty?.label || spec || 'Nursing Care',
-					qualification: backendProfile?.qualifications || qual || '',
-					currentDesignation: desig || '',
-					experience: exp || '',
-					nursingRegistrationNumber: backendProfile?.license_number || regNo || '',
-					stateNursingCouncil: council || '',
-					registrationProof: proof || '',
-					verificationStatus: verification || 'pending',
-					about: abt || '',
+					qualification: backendProfile?.qualifications || prev.qualification,
+					currentDesignation: prev.currentDesignation,
+					experience: prev.experience,
+					nursingRegistrationNumber: backendProfile?.license_number || prev.nursingRegistrationNumber,
+					stateNursingCouncil: prev.stateNursingCouncil,
+					registrationProof: prev.registrationProof,
+					verificationStatus: prev.verificationStatus || 'pending',
+					about: prev.about,
 					geofenceRadius: resolvedRadius,
 				}))
 
