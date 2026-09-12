@@ -125,19 +125,19 @@ export const onboardingData: OnboardingConfig = {
 		screens: [
 			{
 				Illustration: Onboarding1,
-				description: 'Perform comprehensive physical assessments and evaluate patient mobility needs.',
+				description: 'Conduct comprehensive physical assessments and evaluate patients mobility and functional needs.',
 			},
 			{
 				Illustration: Onboarding2,
-				description: 'Deliver specialized joint mobilization, pain management, and therapeutic movement sessions.',
+				description: 'Provide personalized physiotherapy sessions focused on mobility, pain management, and therapeutic exercise.',
 			},
 			{
 				Illustration: Onboarding3,
-				description: 'Guide patients through personalized exercise regimens and post-op recovery sequences.',
+				description: 'Guide patients through personalized exercise programs and post-operative rehabilitation.',
 			},
 			{
 				Illustration: Onboarding4,
-				description: 'Track recovery milestones and help patients regain strength and functional movement.',
+				description: 'Track patients recovery milestones and help them regain strength, mobility, and functional movement.',
 			},
 		],
 	},
