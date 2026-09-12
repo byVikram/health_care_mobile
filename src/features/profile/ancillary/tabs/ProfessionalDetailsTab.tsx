@@ -20,8 +20,6 @@ import {
 	StatusModal,
 } from '../../../../components/common'
 import {
-	fetchProviderStatusBackend,
-	updateProviderLocationBackend,
 	fetchProviderProfileBackend,
 	updateProviderProfileBackend,
 } from '../../../ancillary/ancillaryService'
@@ -29,26 +27,17 @@ import {
 type Option = AppSelectOption
 
 type ProfessionalFormData = {
-	specialty: string
 	qualification: string
 	currentDesignation: string
 	experience: string
 	nursingRegistrationNumber: string
 	stateNursingCouncil: string
 	registrationProof: string
+	qualificationProof: string
 	verificationStatus: string
 	about: string
 	geofenceRadius: string
-	// latitude: string
-	// longitude: string
 }
-
-const SPECIALTY_OPTIONS: Option[] = [
-	{ label: 'Nursing Care', value: 'Nursing Care' },
-	{ label: 'Physiotherapy', value: 'Physiotherapy' },
-	{ label: 'Rehabilitation', value: 'Rehabilitation' },
-	{ label: 'Home Care', value: 'Home Care' },
-]
 
 const EXPERIENCE_OPTIONS: Option[] = [
 	{ label: 'Less than 1 year', value: '<1' },
@@ -56,6 +45,13 @@ const EXPERIENCE_OPTIONS: Option[] = [
 	{ label: '3 - 5 years', value: '3-5' },
 	{ label: '5 - 10 years', value: '5-10' },
 	{ label: '10+ years', value: '10+' },
+]
+
+const HOME_CARE_EXPERIENCE_OPTIONS: Option[] = [
+	{ label: 'Less than 1 year', value: '<1' },
+	{ label: '1 - 2 years', value: '1-2' },
+	{ label: '3 - 5 years', value: '3-5' },
+	{ label: '5+ years', value: '5+' },
 ]
 
 const GEOFENCE_RADIUS_OPTIONS: Option[] = [
@@ -72,6 +68,25 @@ const VERIFICATION_STATUS_META: Record<string, { label: string; color: string; b
 	verified: { label: 'Verified', color: '#1e7e34', bg: 'rgba(30, 126, 52, 0.08)' },
 	pending: { label: 'Pending Verification', color: '#9a6b00', bg: 'rgba(154, 107, 0, 0.08)' },
 	rejected: { label: 'Verification Rejected', color: '#c0392b', bg: 'rgba(192, 57, 43, 0.08)' },
+}
+
+function normalizeSpecialtyKey(key?: string | null): string {
+	if (!key) return ''
+	const lower = key.toLowerCase().trim()
+	if (lower.includes('home')) return 'home-care'
+	if (lower.includes('physio')) return 'physiotherapy'
+	if (lower.includes('rehab')) return 'rehab-care'
+	if (lower.includes('nurs')) return 'nursing-care'
+	return lower
+}
+
+function normalizeSpecialtyToLabel(key?: string | null): string {
+	const normalizedKey = normalizeSpecialtyKey(key)
+	if (normalizedKey === 'home-care') return 'Home Care'
+	if (normalizedKey === 'physiotherapy') return 'Physiotherapy'
+	if (normalizedKey === 'rehab-care') return 'Rehabilitation'
+	if (normalizedKey === 'nursing-care') return 'Nursing Care'
+	return key || 'Healthcare Provider'
 }
 
 function FormRow({
@@ -141,6 +156,7 @@ function InputField({
 	keyboardType = 'default',
 	maxLength,
 	required = false,
+	editable = true,
 }: {
 	label: string
 	value: string
@@ -149,6 +165,7 @@ function InputField({
 	keyboardType?: React.ComponentProps<typeof AppInput>['keyboardType']
 	maxLength?: number
 	required?: boolean
+	editable?: boolean
 }) {
 	const isAboutField = label === 'About / Bio'
 
@@ -167,6 +184,7 @@ function InputField({
 				multiline={isAboutField}
 				textAlignVertical={isAboutField ? 'top' : 'center'}
 				fieldSize="form"
+				editable={editable}
 				noMargin
 				dense
 			/>
@@ -210,11 +228,15 @@ function UploadBox({
 	fileName,
 	onUpload,
 	required = false,
+	placeholder = 'Upload Registration Proof / Document',
+	hint = 'Tap to choose image / proof document (JPG or PNG)',
 }: {
 	label: string
 	fileName?: string
 	onUpload: () => void
 	required?: boolean
+	placeholder?: string
+	hint?: string
 }) {
 	return (
 		<View style={styles.fieldGroup}>
@@ -225,10 +247,10 @@ function UploadBox({
 				</View>
 				<View style={styles.uploadTextContainer}>
 					<AppTypography variant="body" style={styles.uploadTitle}>
-						{fileName ? 'Document Selected' : 'Upload Registration Proof / Document'}
+						{fileName ? 'Document Selected' : placeholder}
 					</AppTypography>
 					<AppTypography variant="caption" style={styles.uploadHint} numberOfLines={1}>
-						{fileName || 'Tap to choose image / proof document (JPG or PNG)'}
+						{fileName || hint}
 					</AppTypography>
 				</View>
 			</TouchableOpacity>
@@ -236,7 +258,15 @@ function UploadBox({
 	)
 }
 
-export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () => void } = {}) {
+export default function ProfessionalDetailsTab({
+	onNextTab,
+	specialtyKey: propSpecialtyKey,
+	specialtyLabel: propSpecialtyLabel,
+}: {
+	onNextTab?: () => void
+	specialtyKey?: string
+	specialtyLabel?: string
+} = {}) {
 	const { width } = useWindowDimensions()
 
 	const isTablet = width >= 768 && width < 1024
@@ -244,22 +274,26 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 	const isLandscape = width > 900
 	const useTwoColumns = width >= 768
 
+	const [resolvedSpecialtyKey, setResolvedSpecialtyKey] = useState<string>(
+		normalizeSpecialtyKey(propSpecialtyKey)
+	)
+	const [resolvedSpecialtyLabel, setResolvedSpecialtyLabel] = useState<string>(
+		propSpecialtyLabel || normalizeSpecialtyToLabel(propSpecialtyKey)
+	)
+
 	const [formData, setFormData] = useState<ProfessionalFormData>({
-		specialty: 'Nursing Care',
 		qualification: '',
 		currentDesignation: '',
 		experience: '',
 		nursingRegistrationNumber: '',
 		stateNursingCouncil: '',
 		registrationProof: '',
+		qualificationProof: '',
 		verificationStatus: 'pending',
 		about: '',
 		geofenceRadius: '10',
-	// 	latitude: '',
-	// 	longitude: '',
 	})
 
-	const [loading, setLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [statusModal, setStatusModal] = useState<{
 		visible: boolean
@@ -273,54 +307,108 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 		setFormData((prev) => ({ ...prev, [key]: value }))
 	}
 
+	// Synchronize when propSpecialtyKey changes
 	useEffect(() => {
+		if (propSpecialtyKey) {
+			const key = normalizeSpecialtyKey(propSpecialtyKey)
+			setResolvedSpecialtyKey(key)
+			setResolvedSpecialtyLabel(propSpecialtyLabel || normalizeSpecialtyToLabel(key))
+		}
+	}, [propSpecialtyKey, propSpecialtyLabel])
+
+	// Load stored details immediately from AsyncStorage and sync with backend in background
+	useEffect(() => {
+		let isMounted = true
+
 		const loadDetails = async () => {
 			try {
-				setLoading(true)
-				const spec = await AsyncStorage.getItem('ancillary_specialty')
-				const qual = await AsyncStorage.getItem('ancillary_qualification')
-				const desig = await AsyncStorage.getItem('ancillary_designation')
-				const exp = await AsyncStorage.getItem('ancillary_experience')
-				const regNo = await AsyncStorage.getItem('ancillary_license')
-				const council = await AsyncStorage.getItem('ancillary_licensing_authority')
-				const proof = await AsyncStorage.getItem('ancillary_registration_proof')
-				const verification = await AsyncStorage.getItem('ancillary_verification_status')
-				const abt = await AsyncStorage.getItem('ancillary_about')
-				const savedRadius = await AsyncStorage.getItem('ancillary_geofence_radius')
+				const keys = [
+					'user_specialty',
+					'ancillary_qualification',
+					'ancillary_qualification_proof',
+					'ancillary_designation',
+					'ancillary_experience',
+					'ancillary_license',
+					'ancillary_licensing_authority',
+					'ancillary_registration_proof',
+					'ancillary_verification_status',
+					'ancillary_about',
+					'ancillary_geofence_radius',
+				]
+				const pairs = await AsyncStorage.multiGet(keys)
+				const map: Record<string, string> = {}
+				pairs.forEach(([k, v]) => {
+					if (v) map[k] = v
+				})
 
-				// Load profile from backend to get geofence_radius and credentials
+				if (map['user_specialty'] && isMounted) {
+					const key = normalizeSpecialtyKey(map['user_specialty'])
+					if (key) {
+						setResolvedSpecialtyKey(key)
+						setResolvedSpecialtyLabel(normalizeSpecialtyToLabel(key))
+					}
+				}
+
+				if (isMounted) {
+					setFormData((prev) => ({
+						...prev,
+						qualification: map['ancillary_qualification'] || prev.qualification,
+						currentDesignation: map['ancillary_designation'] || prev.currentDesignation,
+						experience: map['ancillary_experience'] || prev.experience,
+						nursingRegistrationNumber: map['ancillary_license'] || prev.nursingRegistrationNumber,
+						stateNursingCouncil: map['ancillary_licensing_authority'] || prev.stateNursingCouncil,
+						registrationProof: map['ancillary_registration_proof'] || prev.registrationProof,
+						verificationStatus: map['ancillary_verification_status'] || prev.verificationStatus,
+						about: map['ancillary_about'] || prev.about,
+						geofenceRadius: map['ancillary_geofence_radius'] || prev.geofenceRadius,
+					}))
+				}
+
+				// Sync with backend profile in background without blocking UI
 				const backendProfile = await fetchProviderProfileBackend()
-				const backendRadius = backendProfile?.geofence_radius ?? backendProfile?.geofence_radius_km
+				if (backendProfile && isMounted) {
+					const backendRadius = backendProfile?.geofence_radius ?? backendProfile?.geofence_radius_km
+					const resolvedRadius =
+						backendRadius != null
+							? String(Math.round(backendRadius))
+							: (map['ancillary_geofence_radius'] || '10')
 
-				const resolvedRadius = backendRadius != null
-					? String(Math.round(backendRadius))
-					: (savedRadius || '10')
+					// Extract authoritative specialty from backend
+					const spec = backendProfile.specialty_id || backendProfile.specialty?.id || backendProfile.specialty_name || backendProfile.specialty?.label
+					const resolvedKey = normalizeSpecialtyKey(spec)
+					if (resolvedKey) {
+						setResolvedSpecialtyKey(resolvedKey)
+						const label = backendProfile.specialty_name || backendProfile.specialty?.label || normalizeSpecialtyToLabel(resolvedKey)
+						setResolvedSpecialtyLabel(label)
+						await AsyncStorage.setItem('user_specialty', resolvedKey)
+					}
 
-				setFormData((prev) => ({
-					...prev,
-					specialty: spec || 'Nursing Care',
-					qualification: backendProfile?.qualifications || qual || '',
-					currentDesignation: desig || '',
-					experience: exp || '',
-					nursingRegistrationNumber: backendProfile?.license_number || regNo || '',
-					stateNursingCouncil: council || '',
-					registrationProof: proof || '',
-					verificationStatus: verification || 'pending',
-					about: abt || '',
-					geofenceRadius: resolvedRadius,
-				}))
+					setFormData((prev) => ({
+						...prev,
+						qualification: typeof backendProfile.qualifications === 'string'
+							? backendProfile.qualifications
+							: prev.qualification,
+						experience: backendProfile.experience_years || prev.experience,
+						qualificationProof: backendProfile.qualification_proof_s3_key || map['ancillary_qualification_proof'] || prev.qualificationProof,
+						registrationProof: backendProfile.license_proof_s3_key || prev.registrationProof,
+						nursingRegistrationNumber: backendProfile.license_number || prev.nursingRegistrationNumber,
+						geofenceRadius: resolvedRadius,
+					}))
 
-				if (backendRadius != null) {
-					await AsyncStorage.setItem('ancillary_geofence_radius', String(Math.round(backendRadius)))
+					if (backendRadius != null) {
+						await AsyncStorage.setItem('ancillary_geofence_radius', String(Math.round(backendRadius)))
+					}
 				}
 			} catch (e) {
-				console.log('[ProfessionalDetailsTab] load error:', e)
-			} finally {
-				setLoading(false)
+				console.log('[ProfessionalDetailsTab] background load error:', e)
 			}
 		}
 
 		loadDetails()
+
+		return () => {
+			isMounted = false
+		}
 	}, [])
 
 	const handleUploadDocument = async () => {
@@ -344,38 +432,76 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 		updateFormData('registrationProof', documentName)
 	}
 
+	const handleUploadQualificationDocument = async () => {
+		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+		if (!permission.granted) {
+			Alert.alert('Permission needed', 'Please allow photo library access to upload qualification certificate.')
+			return
+		}
+
+		const result = await ImagePicker.launchImageLibraryAsync({
+			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			allowsMultipleSelection: false,
+			quality: 0.8,
+		})
+
+		if (result.canceled || !result.assets.length) return
+
+		const asset = result.assets[0]
+		const documentName = asset.fileName || asset.uri.split('/').pop() || 'Qualification Certificate.jpg'
+		updateFormData('qualificationProof', documentName)
+	}
+
+	const isHomeCare = resolvedSpecialtyKey === 'home-care'
+
 	const handleSave = async () => {
-		const isHomeCare = formData.specialty?.toLowerCase().includes('home')
 		if (!isHomeCare && !formData.nursingRegistrationNumber.trim()) {
-			Alert.alert('Validation', 'Nursing Registration Number is required.')
+			Alert.alert('Validation', 'Registration Number is required.')
 			return
 		}
 
 		try {
 			setIsSaving(true)
-			// Persist minimal profile to backend via existing provider update function
 
-			await AsyncStorage.multiSet([
-				['ancillary_specialty', formData.specialty],
-				['ancillary_qualification', formData.qualification.trim()],
-				['ancillary_designation', formData.currentDesignation.trim()],
-				['ancillary_experience', formData.experience],
-				['ancillary_license', formData.nursingRegistrationNumber.trim()],
-				['ancillary_licensing_authority', formData.stateNursingCouncil.trim()],
-				['ancillary_registration_proof', formData.registrationProof],
-				['ancillary_about', formData.about.trim()],
-				['ancillary_geofence_radius', formData.geofenceRadius],
-			])
+			if (isHomeCare) {
+				await AsyncStorage.multiSet([
+					['ancillary_qualification', formData.qualification.trim()],
+					['ancillary_qualification_proof', formData.qualificationProof],
+					['ancillary_experience', formData.experience],
+					['ancillary_geofence_radius', formData.geofenceRadius],
+				])
+			} else {
+				await AsyncStorage.multiSet([
+					['ancillary_qualification', formData.qualification.trim()],
+					['ancillary_designation', formData.currentDesignation.trim()],
+					['ancillary_experience', formData.experience],
+					['ancillary_license', formData.nursingRegistrationNumber.trim()],
+					['ancillary_licensing_authority', formData.stateNursingCouncil.trim()],
+					['ancillary_registration_proof', formData.registrationProof],
+					['ancillary_about', formData.about.trim()],
+					['ancillary_geofence_radius', formData.geofenceRadius],
+				])
+			}
 
-			// Persist geofence radius & credentials to backend database (ancillary_providers.geofence_radius_km)
+			// Persist geofence radius & credentials to backend database
 			const numRadius = Number(formData.geofenceRadius)
-			await updateProviderProfileBackend({
-				...(isHomeCare && !formData.nursingRegistrationNumber.trim() ? {} : { license_number: formData.nursingRegistrationNumber.trim() }),
-				qualifications: formData.qualification.trim(),
-				// Send specialty as provided string (backend expects id or name depending on API)
-				specialty: formData.specialty,
-				geofence_radius: Number.isFinite(numRadius) ? numRadius : 10,
-			})
+			if (isHomeCare) {
+				await updateProviderProfileBackend({
+					qualifications: formData.qualification.trim(),
+					qualification_proof_s3_key: formData.qualificationProof,
+					experience_years: formData.experience,
+					geofence_radius: Number.isFinite(numRadius) ? numRadius : 10,
+				})
+			} else {
+				await updateProviderProfileBackend({
+					license_number: formData.nursingRegistrationNumber.trim(),
+					license_proof_s3_key: formData.registrationProof,
+					qualifications: formData.qualification.trim(),
+					experience_years: formData.experience,
+					geofence_radius: Number.isFinite(numRadius) ? numRadius : 10,
+				})
+			}
 
 			setStatusModal({
 				visible: true,
@@ -409,14 +535,6 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 	const rowSpacing = isMobile ? 18 : isLandscape ? 22 : 20
 	const statusMeta = VERIFICATION_STATUS_META[formData.verificationStatus] || VERIFICATION_STATUS_META.pending
 
-	if (loading) {
-		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="small" color="#0c7c7c" />
-			</View>
-		)
-	}
-
 	return (
 		<View style={{ flex: 1 }}>
 			<ScrollView
@@ -433,125 +551,138 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 				showsVerticalScrollIndicator={false}
 			>
 				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-					{/* Verification status badge */}
-					<View style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}>
-						<MaterialCommunityIcons
-							name={formData.verificationStatus === 'verified' ? 'check-decagram' : 'clock-outline'}
-							size={16}
-							color={statusMeta.color}
-						/>
-						<AppTypography variant="caption" style={[styles.statusText, { color: statusMeta.color }]}>
-							{statusMeta.label}
-						</AppTypography>
-					</View>
+					{/* Verification status badge - for clinical specialties */}
+					{!isHomeCare && (
+						<View style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}>
+							<MaterialCommunityIcons
+								name={formData.verificationStatus === 'verified' ? 'check-decagram' : 'clock-outline'}
+								size={16}
+								color={statusMeta.color}
+							/>
+							<AppTypography variant="caption" style={[styles.statusText, { color: statusMeta.color }]}>
+								{statusMeta.label}
+							</AppTypography>
+						</View>
+					)}
 
-					{/* Specialty / Clinical Practice */}
+					{/* Specialty / Clinical Practice Display (Read-Only) */}
 					<View style={{ marginBottom: rowSpacing }}>
-						<SectionTitle>Specialty / Clinical Practice</SectionTitle>
-						<SelectDropdown
-							label="Primary Specialty"
-							value={formData.specialty}
-							placeholder="Select specialty"
-							options={SPECIALTY_OPTIONS}
-							onSelect={(val) => updateFormData('specialty', val)}
-							required
-						/>
+						<SectionTitle>Specialty / Practice Area</SectionTitle>
+						<View style={styles.specialtyDisplayCard}>
+							<View style={styles.specialtyIconWrap}>
+								<MaterialCommunityIcons
+									name={isHomeCare ? 'home-heart' : 'medical-bag'}
+									size={22}
+									color="#0c7c7c"
+								/>
+							</View>
+							<View style={{ flex: 1 }}>
+								<AppTypography variant="subtitle" style={styles.specialtyDisplayTitle}>
+									{resolvedSpecialtyLabel || (isHomeCare ? 'Home Care' : 'Clinical Practice')}
+								</AppTypography>
+								<AppTypography variant="caption" style={styles.specialtyDisplaySubtitle}>
+									{isHomeCare
+										? 'General Caregiver / Home Attendant'
+										: 'Registered Healthcare Provider'}
+								</AppTypography>
+							</View>
+						</View>
 					</View>
 
 					{/* Professional Information */}
 					<View style={{ marginBottom: rowSpacing }}>
 						<SectionTitle>Professional Information</SectionTitle>
 						<View style={{ gap: 18 }}>
-							<FormRow stacked={!useTwoColumns} compact={isTablet}>
-								<InputField
-									label="Highest Qualification"
-									value={formData.qualification}
-									onChangeText={(val) => updateFormData('qualification', val)}
-									placeholder="e.g. B.Sc Nursing, GNM"
-								/>
-								<InputField
-									label="Current Designation"
-									value={formData.currentDesignation}
-									onChangeText={(val) => updateFormData('currentDesignation', val)}
-									placeholder="e.g. Senior Staff Nurse"
-								/>
-							</FormRow>
-
-							<FormRow stacked={!useTwoColumns} compact={isTablet}>
-								<SelectDropdown
-									label="Total Years of Experience"
-									value={formData.experience}
-									placeholder="Select experience range"
-									options={EXPERIENCE_OPTIONS}
-									onSelect={(val) => updateFormData('experience', val)}
-									required
-								/>
-								<SelectDropdown
-									label="Work Radius / Geofence Radius"
-									value={formData.geofenceRadius}
-									placeholder="Select work radius"
-									options={GEOFENCE_RADIUS_OPTIONS}
-									onSelect={(val) => updateFormData('geofenceRadius', val)}
-									required
-								/>
-							</FormRow>
-
-							{/* <FormRow stacked={!useTwoColumns} compact={isTablet}>
-								<InputField
-									label="Latitude"
-									value={formData.latitude}
-									onChangeText={(val) => updateFormData('latitude', val)}
-									placeholder="e.g. 17.3850"
-									keyboardType="numbers-and-punctuation"
-								/>
-								<InputField
-									label="Longitude"
-									value={formData.longitude}
-									onChangeText={(val) => updateFormData('longitude', val)}
-									placeholder="e.g. 78.4867"
-									keyboardType="numbers-and-punctuation"
-								/> */}
-							{/* </FormRow> */}
-
-							{!formData.specialty?.toLowerCase().includes('home') && (
-								<FormRow stacked={!useTwoColumns} compact={isTablet}>
+							{isHomeCare ? (
+								<>
 									<InputField
-										label="Nursing Registration Number"
-										value={formData.nursingRegistrationNumber}
-										onChangeText={(val) => updateFormData('nursingRegistrationNumber', val)}
-										placeholder="e.g. RN-12930"
+										label="Highest Qualification"
+										value={formData.qualification}
+										onChangeText={(val) => updateFormData('qualification', val)}
+										placeholder="e.g. 10th, 12th, Caregiver Certificate, GNA"
+									/>
+									<UploadBox
+										label="Qualification / Training Certificate"
+										placeholder="Upload Qualification / Certificate"
+										hint="Tap to choose certificate / proof document (JPG or PNG)"
+										fileName={formData.qualificationProof}
+										onUpload={handleUploadQualificationDocument}
+									/>
+									<SelectDropdown
+										label="Caregiving Experience"
+										value={formData.experience}
+										placeholder="Select caregiving experience"
+										options={HOME_CARE_EXPERIENCE_OPTIONS}
+										onSelect={(val) => updateFormData('experience', val)}
 										required
 									/>
-									{/* <InputField
-										label="State Nursing Council"
-										value={formData.stateNursingCouncil}
-										onChangeText={(val) => updateFormData('stateNursingCouncil', val)}
-										placeholder="e.g. Karnataka State Nursing Council"
-									/> */}
-								</FormRow>
-							)}
+									<SelectDropdown
+										label="Work Radius / Geofence Radius"
+										value={formData.geofenceRadius}
+										placeholder="Select work radius"
+										options={GEOFENCE_RADIUS_OPTIONS}
+										onSelect={(val) => updateFormData('geofenceRadius', val)}
+										required
+									/>
+								</>
+							) : (
+								<>
+									<FormRow stacked={!useTwoColumns} compact={isTablet}>
+										<InputField
+											label="Highest Qualification"
+											value={formData.qualification}
+											onChangeText={(val) => updateFormData('qualification', val)}
+											placeholder="e.g. B.Sc Nursing, GNM"
+										/>
+										<InputField
+											label="Current Designation"
+											value={formData.currentDesignation}
+											onChangeText={(val) => updateFormData('currentDesignation', val)}
+											placeholder="e.g. Senior Staff Nurse"
+										/>
+									</FormRow>
 
-							{/* Document Upload Component */}
-							<UploadBox
-								label="Registration Proof / Certification Document"
-								fileName={formData.registrationProof}
-								onUpload={handleUploadDocument}
-							/>
+									<FormRow stacked={!useTwoColumns} compact={isTablet}>
+										<SelectDropdown
+											label="Total Years of Experience"
+											value={formData.experience}
+											placeholder="Select experience range"
+											options={EXPERIENCE_OPTIONS}
+											onSelect={(val) => updateFormData('experience', val)}
+											required
+										/>
+										<SelectDropdown
+											label="Work Radius / Geofence Radius"
+											value={formData.geofenceRadius}
+											placeholder="Select work radius"
+											options={GEOFENCE_RADIUS_OPTIONS}
+											onSelect={(val) => updateFormData('geofenceRadius', val)}
+											required
+										/>
+									</FormRow>
+
+									<FormRow stacked={!useTwoColumns} compact={isTablet}>
+										<InputField
+											label="Registration Number"
+											value={formData.nursingRegistrationNumber}
+											onChangeText={(val) => updateFormData('nursingRegistrationNumber', val)}
+											placeholder="e.g. RN-12930"
+											required
+										/>
+									</FormRow>
+
+									{/* Document Upload Component */}
+									<UploadBox
+										label="Registration Proof / Certification Document"
+										fileName={formData.registrationProof}
+										onUpload={handleUploadDocument}
+									/>
+								</>
+							)}
 						</View>
 					</View>
 
 					<View style={styles.sectionDivider} />
-
-					{/* About / Bio
-					<View style={{ marginTop: isMobile ? 20 : 24, marginBottom: rowSpacing }}>
-						<SectionTitle>About / Bio</SectionTitle>
-						<InputField
-							label="About / Bio"
-							value={formData.about}
-							onChangeText={(val) => updateFormData('about', val)}
-							placeholder="Write a short professional bio describing your experience and care approach"
-						/>
-					</View> */}
 				</View>
 			</ScrollView>
 
@@ -583,12 +714,6 @@ export default function ProfessionalDetailsTab({ onNextTab }: { onNextTab?: () =
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#ffffff',
-	},
-	loadingContainer: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
 		backgroundColor: '#ffffff',
 	},
 	contentContainer: {
@@ -623,6 +748,35 @@ const styles = StyleSheet.create({
 	statusText: {
 		fontWeight: '700',
 		fontSize: 12,
+	},
+	specialtyDisplayCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#F0F9F9',
+		borderRadius: 12,
+		paddingHorizontal: 16,
+		paddingVertical: 14,
+		gap: 12,
+		borderWidth: 1,
+		borderColor: '#D4ECEC',
+	},
+	specialtyIconWrap: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: 'rgba(12, 124, 124, 0.12)',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	specialtyDisplayTitle: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#0A5C5C',
+	},
+	specialtyDisplaySubtitle: {
+		fontSize: 12,
+		color: '#527B7B',
+		marginTop: 2,
 	},
 	formRow: {
 		flexDirection: 'row',

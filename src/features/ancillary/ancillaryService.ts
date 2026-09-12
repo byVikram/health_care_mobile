@@ -1380,12 +1380,17 @@ export const updateProviderStatusBackend = async (
 export interface AncillaryProfileBackendResponse {
 	public_id: string
 	license_number: string
+	license_proof_s3_key?: string
+	qualification_proof_s3_key?: string
 	qualifications?: string
+	experience_years?: string
 	specialty?: {
 		id?: string
 		label: string
 		description?: string
 	}
+	specialty_id?: string
+	specialty_name?: string
 	checked_procedures?: string[]
 	geofence_radius?: number
 	geofence_radius_km?: number
@@ -1404,7 +1409,12 @@ export const fetchProviderProfileBackend = async (): Promise<AncillaryProfileBac
 
 export const updateProviderProfileBackend = async (payload: {
 	license_number?: string
+	license_proof_s3_key?: string
+	license_proof?: string
+	qualification_proof_s3_key?: string
+	qualification_proof?: string
 	qualifications?: string
+	experience_years?: string
 	specialty?: string | { id?: string; label?: string }
 	geofence_radius?: number
 	geofence_radius_km?: number

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 // features/auth/components/OtpForm.tsx
 import React, { useRef, useState, useEffect } from 'react'
 import {
@@ -115,6 +116,14 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 				response.data.refresh_token,
 				response.data.notification_prompt_shown ?? false
 			)
+
+			const returnedSpecialty =
+				(response.data.user as any)?.specialty_id ||
+				(response.data.user as any)?.specialty ||
+				(response.data.user as any)?.specialty_name
+			if (returnedSpecialty) {
+				await AsyncStorage.setItem('user_specialty', String(returnedSpecialty))
+			}
 
 			onVerify()
 		} catch (err: any) {
