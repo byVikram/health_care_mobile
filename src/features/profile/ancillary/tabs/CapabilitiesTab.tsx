@@ -80,15 +80,15 @@ const SPECIALTY_META: Record<
 			{ id: 'proc-rehab-004', label: 'Occupational Therapy Session', subtitle: 'Adaptive motor skills for daily living (60 mins)', rate: '₹899', price: 899, specialtyKey: 'rehab-care' },
 		],
 	},
-	'elder-day-care': {
-		label: 'Elder Day Care',
-		icon: 'human-cane',
-		subtitle: 'Select the elder care, daily assistance, and vital monitoring services you provide.',
+	'home-care': {
+		label: 'Home Care',
+		icon: 'home-heart',
+		subtitle: 'Select the home care, daily assistance, and vital monitoring services you provide.',
 		fallbackProcedures: [
-			{ id: 'proc-elder-001', label: 'Elder Care Visit & Vitals Check', subtitle: 'Comprehensive senior wellness check (60 mins)', rate: '₹599', price: 599, specialtyKey: 'elder-day-care' },
-			{ id: 'proc-elder-002', label: 'Assisted Living & Mobility Support', subtitle: 'Personal assistance & safe movement support (90 mins)', rate: '₹799', price: 799, specialtyKey: 'elder-day-care' },
-			{ id: 'proc-elder-003', label: 'Home Safety & Routine Check', subtitle: 'Environment hazard check & lifestyle care (45 mins)', rate: '₹499', price: 499, specialtyKey: 'elder-day-care' },
-			{ id: 'proc-elder-004', label: 'Senior Companionship & Meal Support', subtitle: 'Attentive companionship and nutrition check (60 mins)', rate: '₹549', price: 549, specialtyKey: 'elder-day-care' },
+			{ id: 'proc-home-001', label: 'Home Care Visit & Vitals Check', subtitle: 'Comprehensive wellness check (60 mins)', rate: '₹599', price: 599, specialtyKey: 'home-care' },
+			{ id: 'proc-home-002', label: 'Assisted Living & Mobility Support', subtitle: 'Personal assistance & safe movement support (90 mins)', rate: '₹799', price: 799, specialtyKey: 'home-care' },
+			{ id: 'proc-home-003', label: 'Home Safety & Routine Check', subtitle: 'Environment hazard check & lifestyle care (45 mins)', rate: '₹499', price: 499, specialtyKey: 'home-care' },
+			{ id: 'proc-home-004', label: 'Senior Companionship & Meal Support', subtitle: 'Attentive companionship and nutrition check (60 mins)', rate: '₹549', price: 549, specialtyKey: 'home-care' },
 		],
 	},
 }
@@ -98,7 +98,7 @@ function normalizeSpecialtyKey(key?: string | null): string {
 	const lower = key.toLowerCase().trim()
 	if (lower.includes('physio')) return 'physiotherapy'
 	if (lower.includes('rehab')) return 'rehab-care'
-	if (lower.includes('elder')) return 'elder-day-care'
+	if (lower.includes('home')) return 'home-care'
 	return 'nursing-care'
 }
 
@@ -232,8 +232,10 @@ export default function CapabilitiesTab({
 								title.includes('occupational')
 							)
 						}
-						if (resolvedSpecialty === 'elder-day-care') {
+						if (resolvedSpecialty === 'home-care') {
 							return (
+								cat.includes('home') ||
+								specId.includes('home') ||
 								cat.includes('elder') ||
 								specId.includes('elder') ||
 								cat.includes('senior') ||
@@ -613,4 +615,4 @@ const styles = StyleSheet.create({
 		marginTop: 0,
 	},
 })
-
+

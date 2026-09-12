@@ -16,7 +16,7 @@ import { ROUTES } from '../../navigation/routes'
 
 type SpecialtySelectionProps = AuthScreenProps<typeof ROUTES.AUTH.SPECIALTY_SELECTION>
 
-export type SpecialtyKey = 'nursing-care' | 'physiotherapy' | 'rehab-care' | 'elder-day-care'
+export type SpecialtyKey = 'nursing-care' | 'physiotherapy' | 'rehab-care' | 'home-care'
 
 export interface SpecialtyOption {
 	key: SpecialtyKey
@@ -41,9 +41,9 @@ const SPECIALTY_OPTIONS: SpecialtyOption[] = [
 		image: require('../../assets/therapeutic/rehabilitation.png'),
 	},
 	{
-		key: 'elder-day-care',
-		label: 'Elder Day Care',
-		image: require('../../assets/ancillary/elder-day-care.png'),
+		key: 'home-care',
+		label: 'Home Care',
+		image: require('../../assets/ancillary/home-care.png'),
 	},
 ]
 

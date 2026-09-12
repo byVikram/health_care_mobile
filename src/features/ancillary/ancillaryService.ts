@@ -1379,7 +1379,7 @@ export const updateProviderStatusBackend = async (
 
 export interface AncillaryProfileBackendResponse {
 	public_id: string
-	license_number: string
+	license_number: string | null
 	qualifications?: string
 	specialty?: {
 		id?: string

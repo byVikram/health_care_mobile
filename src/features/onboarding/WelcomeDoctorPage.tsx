@@ -70,25 +70,25 @@ const ANCILLARY_WELCOME_CONFIGS: Record<string, WelcomeScreenConfig> = {
     ],
   },
   physiotherapy: {
-    title: "Welcome Physiotherapist! 🏃",
+    title: "Welcome Physiotherapist!🏃",
     subtitle: "Let's help you get set up to deliver mobile physical therapy and rehabilitation at home.",
     buttonLabel: "Set Up Physiotherapy Profile",
     features: [
       {
         Icon: ProfileIcon,
         title: "Therapy Schedule",
-        description: "Manage in-home movement sessions, patient locations, and appointment times.",
+        description: "Manage in-home physiotherapy sessions, patient locations, and appointment times.",
       },
       {
         Icon: ConsultIcon,
         title: "Patient Verification",
-        description: "Verify doorstep arrivals with secure OTP and review patient mobility history.",
+        description: "Verify patient arrivals with secure OTP and review relevant patient details.",
       },
       {
         Icon: FeedbackIcon,
         title: "Therapy Regimens",
-        description: "Conduct manual therapy, post-op exercises, and record recovery progress.",
-      },
+        description: "Provide manual therapy, therapeutic exercises, and rehabilitation programs while tracking recovery progress.",
+       },
     ],
   },
   "rehab-care": {
@@ -113,15 +113,15 @@ const ANCILLARY_WELCOME_CONFIGS: Record<string, WelcomeScreenConfig> = {
       },
     ],
   },
-  "elder-day-care": {
-    title: "Welcome Elder Care Assistant! 🤝",
-    subtitle: "Let's help you get set up to assist seniors with daily activities, safety checks, and companionship.",
-    buttonLabel: "Set Up Elder Care Profile",
+  "home-care": {
+    title: "Welcome Home Care Specialist! 🤝",
+    subtitle: "Let's help you get set up to assist clients with daily activities, safety checks, and companionship at home.",
+    buttonLabel: "Set Up Home Care Profile",
     features: [
       {
         Icon: ProfileIcon,
         title: "Care Schedule",
-        description: "View daily senior assistance bookings, home addresses, and shift times.",
+        description: "View daily home assistance bookings, addresses, and shift times.",
       },
       {
         Icon: ConsultIcon,
@@ -142,7 +142,7 @@ function normalizeSpecialtyKey(key?: string | null): string {
   const lower = key.toLowerCase().trim();
   if (lower.includes("physio")) return "physiotherapy";
   if (lower.includes("rehab")) return "rehab-care";
-  if (lower.includes("elder")) return "elder-day-care";
+  if (lower.includes("home")) return "home-care";
   return "nursing-care";
 }
 
