@@ -12,19 +12,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppButton, AppTypography } from '../../../../components/common'
 import {
+	fetchAncillaryCategoriesBackend,
 	fetchAncillaryServicesBackend,
 	updateAncillaryCapabilitiesBackend,
-	fetchAncillaryProfileBackend,
+	fetchProviderProfileBackend,
 	AncillaryServiceItem,
 } from '../../../ancillary/ancillaryService'
 
-interface ProcedureItem {
+export interface ProcedureItem {
 	id: string
 	label: string
 	subtitle?: string
 	rate: string
 	price: number
 	specialtyKey: string
+	categoryId?: string
+	categoryName?: string
 }
 
 type ProcedureCardProps = {
@@ -33,6 +36,34 @@ type ProcedureCardProps = {
 	onPress: () => void
 }
 
+const HOME_CARE_ALL_PROCEDURE_IDS = [
+	'proc-home-001',
+	'proc-home-002',
+	'proc-home-003',
+	'proc-home-004',
+	'proc-home-005',
+	'proc-home-006',
+	'proc-home-007',
+	'proc-home-008',
+	'proc-home-009',
+	'proc-home-010',
+	'proc-home-011',
+	'proc-home-012',
+	'proc-home-013',
+	'proc-home-014',
+	'proc-home-015',
+	'proc-home-016',
+	'proc-home-017',
+	'proc-home-018',
+]
+
+const HOME_CARE_CATEGORIES = [
+	{ id: 'cat-home-personal', label: 'Personal Care' },
+	{ id: 'cat-home-mobility', label: 'Mobility & Physical Assistance' },
+	{ id: 'cat-home-daily', label: 'Daily Care Assistance' },
+	{ id: 'cat-home-companionship', label: 'Companionship & Support' },
+]
+
 const SPECIALTY_META: Record<
 	string,
 	{
@@ -40,6 +71,7 @@ const SPECIALTY_META: Record<
 		icon: keyof typeof MaterialCommunityIcons.glyphMap
 		subtitle: string
 		fallbackProcedures: ProcedureItem[]
+		fallbackCategories?: { id: string; label: string }[]
 	}
 > = {
 	'nursing-care': {
@@ -83,56 +115,65 @@ const SPECIALTY_META: Record<
 	'home-care': {
 		label: 'Home Care',
 		icon: 'home-heart',
-		subtitle: 'Select the home care, daily assistance, and vital monitoring services you provide.',
+		subtitle: 'Review the complete 18-service Home Care package provided by General Caregivers.',
+		fallbackCategories: HOME_CARE_CATEGORIES,
 		fallbackProcedures: [
-			{ id: 'proc-home-001', label: 'Home Care Visit & Vitals Check', subtitle: 'Comprehensive wellness check (60 mins)', rate: '₹599', price: 599, specialtyKey: 'home-care' },
-			{ id: 'proc-home-002', label: 'Assisted Living & Mobility Support', subtitle: 'Personal assistance & safe movement support (90 mins)', rate: '₹799', price: 799, specialtyKey: 'home-care' },
-			{ id: 'proc-home-003', label: 'Home Safety & Routine Check', subtitle: 'Environment hazard check & lifestyle care (45 mins)', rate: '₹499', price: 499, specialtyKey: 'home-care' },
-			{ id: 'proc-home-004', label: 'Senior Companionship & Meal Support', subtitle: 'Attentive companionship and nutrition check (60 mins)', rate: '₹549', price: 549, specialtyKey: 'home-care' },
+			{ id: 'proc-home-001', label: 'Bathing & Hygiene Assistance', subtitle: 'Personal Care', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-personal', categoryName: 'Personal Care' },
+			{ id: 'proc-home-002', label: 'Toileting Assistance', subtitle: 'Personal Care', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-personal', categoryName: 'Personal Care' },
+			{ id: 'proc-home-003', label: 'Dressing & Undressing', subtitle: 'Personal Care', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-personal', categoryName: 'Personal Care' },
+			{ id: 'proc-home-004', label: 'Grooming Assistance', subtitle: 'Personal Care', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-personal', categoryName: 'Personal Care' },
+			{ id: 'proc-home-005', label: 'Feeding Assistance', subtitle: 'Personal Care', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-personal', categoryName: 'Personal Care' },
+			{ id: 'proc-home-006', label: 'Diaper / Incontinence Care', subtitle: 'Personal Care', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-personal', categoryName: 'Personal Care' },
+			{ id: 'proc-home-007', label: 'Bed Bath', subtitle: 'Personal Care', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-personal', categoryName: 'Personal Care' },
+			{ id: 'proc-home-008', label: 'Walking Assistance', subtitle: 'Mobility & Physical Assistance', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-mobility', categoryName: 'Mobility & Physical Assistance' },
+			{ id: 'proc-home-009', label: 'Wheelchair Assistance', subtitle: 'Mobility & Physical Assistance', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-mobility', categoryName: 'Mobility & Physical Assistance' },
+			{ id: 'proc-home-010', label: 'Bed-to-Chair Transfer', subtitle: 'Mobility & Physical Assistance', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-mobility', categoryName: 'Mobility & Physical Assistance' },
+			{ id: 'proc-home-011', label: 'Positioning / Repositioning', subtitle: 'Mobility & Physical Assistance', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-mobility', categoryName: 'Mobility & Physical Assistance' },
+			{ id: 'proc-home-012', label: 'Bedridden Patient Care', subtitle: 'Mobility & Physical Assistance', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-mobility', categoryName: 'Mobility & Physical Assistance' },
+			{ id: 'proc-home-013', label: 'Medication Reminders', subtitle: 'Daily Care Assistance', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-daily', categoryName: 'Daily Care Assistance' },
+			{ id: 'proc-home-014', label: 'Assistance with Daily Activities', subtitle: 'Daily Care Assistance', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-daily', categoryName: 'Daily Care Assistance' },
+			{ id: 'proc-home-015', label: 'Patient Escort / Accompaniment', subtitle: 'Daily Care Assistance', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-daily', categoryName: 'Daily Care Assistance' },
+			{ id: 'proc-home-016', label: 'Companionship', subtitle: 'Companionship & Support', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-companionship', categoryName: 'Companionship & Support' },
+			{ id: 'proc-home-017', label: 'Patient Exercise / Mobility Assistance', subtitle: 'Companionship & Support', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-companionship', categoryName: 'Companionship & Support' },
+			{ id: 'proc-home-018', label: 'Basic Patient Observation & Reporting', subtitle: 'Companionship & Support', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-companionship', categoryName: 'Companionship & Support' },
 		],
 	},
 }
 
 function normalizeSpecialtyKey(key?: string | null): string {
-	if (!key) return 'nursing-care'
+	if (!key) return ''
 	const lower = key.toLowerCase().trim()
+	if (lower.includes('home')) return 'home-care'
 	if (lower.includes('physio')) return 'physiotherapy'
 	if (lower.includes('rehab')) return 'rehab-care'
-	if (lower.includes('home')) return 'home-care'
-	return 'nursing-care'
+	if (lower.includes('nurs')) return 'nursing-care'
+	return lower
 }
 
+// Interactive card for clinical specialties
 function ProcedureCard({ item, selected, onPress }: ProcedureCardProps) {
 	return (
 		<TouchableOpacity
-			activeOpacity={0.8}
+			activeOpacity={0.75}
 			onPress={onPress}
 			style={[styles.procedureCard, selected && styles.procedureCardSelected]}
 		>
 			<View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-				{selected && <MaterialCommunityIcons name="check" size={13} color="#FFFFFF" />}
+				{selected && <MaterialCommunityIcons name="check" size={14} color="#FFFFFF" />}
 			</View>
-
 			<View style={styles.textContainer}>
-				<AppTypography
-					variant="h4"
-					style={[styles.itemLabel, selected && styles.itemLabelSelected]}
-					numberOfLines={1}
-				>
+				<AppTypography variant="body" style={[styles.itemLabel, selected && styles.itemLabelSelected]}>
 					{item.label}
 				</AppTypography>
 				{item.subtitle ? (
 					<AppTypography
 						variant="caption"
 						style={[styles.itemSubtitle, selected && styles.itemSubtitleSelected]}
-						numberOfLines={2}
 					>
 						{item.subtitle}
 					</AppTypography>
 				) : null}
 			</View>
-
-			{/* Clinic-Defined Read-Only Price Tag */}
 			<View style={styles.priceTag}>
 				<AppTypography variant="caption" style={styles.priceText}>
 					{item.rate}
@@ -142,171 +183,184 @@ function ProcedureCard({ item, selected, onPress }: ProcedureCardProps) {
 	)
 }
 
+// Display row for Home Care package services
+function HomeCareServiceRow({ item }: { item: ProcedureItem }) {
+	return (
+		<View style={styles.homeCareServiceRow}>
+			<View style={styles.homeCareIconBadge}>
+				<MaterialCommunityIcons name="check-circle" size={18} color="#2B6F71" />
+			</View>
+			<View style={styles.textContainer}>
+				<AppTypography variant="body" style={styles.homeCareServiceLabel}>
+					{item.label}
+				</AppTypography>
+			</View>
+			<View style={styles.homeCareIncludedBadge}>
+				<AppTypography variant="caption" style={styles.homeCareIncludedText}>
+					Included
+				</AppTypography>
+			</View>
+		</View>
+	)
+}
+
 export default function CapabilitiesTab({
 	isActive = true,
 	onNextTab,
+	specialtyKey: propSpecialtyKey,
 }: {
 	isActive?: boolean
 	onNextTab?: () => void
+	specialtyKey?: string
 }) {
 	const { width } = useWindowDimensions()
-	const isTablet = width >= 768
-	const contentWidth = isTablet ? 600 : '100%'
+	const isTablet = width >= 768 && width < 1024
 
-	const [activeSpecialtyKey, setActiveSpecialtyKey] = useState<string>('nursing-care')
-	const [procedures, setProcedures] = useState<ProcedureItem[]>([])
+	const contentWidth = useMemo(() => {
+		if (width >= 1024) return 680
+		if (isTablet) return 600
+		return '100%'
+	}, [width, isTablet])
+
+	const [specialtyKey, setSpecialtyKey] = useState<string>(normalizeSpecialtyKey(propSpecialtyKey))
+	const [procedures, setProcedures] = useState<ProcedureItem[]>(() => {
+		const initKey = normalizeSpecialtyKey(propSpecialtyKey)
+		return (SPECIALTY_META[initKey] || SPECIALTY_META['home-care']).fallbackProcedures
+	})
+	const [categories, setCategories] = useState<{ id: string; label: string }[]>([])
 	const [selected, setSelected] = useState<string[]>([])
-	const [loading, setLoading] = useState(false)
+	const [isPackageConfirmed, setIsPackageConfirmed] = useState<boolean>(false)
 	const [saving, setSaving] = useState(false)
 
-	const specialtyMeta = useMemo(
-		() => SPECIALTY_META[activeSpecialtyKey] || SPECIALTY_META['nursing-care'],
-		[activeSpecialtyKey]
-	)
+	const specialtyMeta = useMemo(() => {
+		return SPECIALTY_META[specialtyKey] || SPECIALTY_META['home-care']
+	}, [specialtyKey])
+
+	const isHomeCare = specialtyKey === 'home-care'
 
 	useEffect(() => {
+		if (propSpecialtyKey) {
+			const key = normalizeSpecialtyKey(propSpecialtyKey)
+			if (key) {
+				setSpecialtyKey(key)
+				const meta = SPECIALTY_META[key]
+				if (meta) {
+					setProcedures(meta.fallbackProcedures)
+					if (meta.fallbackCategories) setCategories(meta.fallbackCategories)
+				}
+			}
+		}
+	}, [propSpecialtyKey])
+
+	// Load specialty, procedures, categories, and saved capabilities concurrently on mount
+	useEffect(() => {
 		let isMounted = true
+
 		const loadData = async () => {
 			try {
-				setLoading(true)
+				// 1. Get stored specialty first for fast local render
+				const stored = await AsyncStorage.getItem('user_specialty')
+				let resolvedSpecialty = normalizeSpecialtyKey(stored) || normalizeSpecialtyKey(propSpecialtyKey)
 
-				// 1. Determine active specialty
-				const storedSpecialty = await AsyncStorage.getItem('user_specialty')
-				let resolvedSpecialty = normalizeSpecialtyKey(storedSpecialty)
-
-				// 2. Fetch live profile and capabilities
-				const profile = await fetchAncillaryProfileBackend()
-				if (profile?.specialty?.id || profile?.specialty?.label) {
-					resolvedSpecialty = normalizeSpecialtyKey(profile.specialty.id || profile.specialty.label)
-				}
-
-				if (isMounted) {
-					setActiveSpecialtyKey(resolvedSpecialty)
-				}
-
-				// 3. Fetch all services from backend API
-				const allServices = await fetchAncillaryServicesBackend()
-
-				let matchedProcedures: ProcedureItem[] = []
-
-				if (allServices && allServices.length > 0) {
-					// Filter procedures strictly by the selected specialty
-					const filtered = allServices.filter((s) => {
-						const cat = (s.categoryName || '').toLowerCase()
-						const specId = (s.specialtyId || '').toLowerCase()
-						const title = (s.title || '').toLowerCase()
-
-						if (resolvedSpecialty === 'nursing-care') {
-							return (
-								cat.includes('nurs') ||
-								specId.includes('nurs') ||
-								title.includes('wound') ||
-								title.includes('iv') ||
-								title.includes('injection') ||
-								title.includes('dressing') ||
-								title.includes('catheter') ||
-								title.includes('vitals') ||
-								title.includes('tracheostomy') ||
-								title.includes('ryle')
-							)
-						}
-						if (resolvedSpecialty === 'physiotherapy') {
-							return (
-								cat.includes('physio') ||
-								specId.includes('physio') ||
-								title.includes('physio') ||
-								title.includes('pain') ||
-								title.includes('sports') ||
-								title.includes('joint') ||
-								title.includes('mobilization') ||
-								title.includes('exercise')
-							)
-						}
-						if (resolvedSpecialty === 'rehab-care') {
-							return (
-								cat.includes('rehab') ||
-								specId.includes('rehab') ||
-								title.includes('stroke') ||
-								title.includes('cognitive') ||
-								title.includes('gait') ||
-								title.includes('occupational')
-							)
-						}
-						if (resolvedSpecialty === 'home-care') {
-							return (
-								cat.includes('home') ||
-								specId.includes('home') ||
-								cat.includes('elder') ||
-								specId.includes('elder') ||
-								cat.includes('senior') ||
-								title.includes('elder') ||
-								title.includes('senior') ||
-								title.includes('assisted') ||
-								title.includes('safety') ||
-								title.includes('companionship')
-							)
-						}
-						return false
-					})
-
-					if (filtered.length > 0) {
-						matchedProcedures = filtered.map((s) => ({
-							id: s.id,
-							label: s.title,
-							subtitle: s.description || ((s as any).duration ? `Duration: ${(s as any).duration}` : undefined),
-							rate: s.price > 0 ? `₹${Math.round(s.price)}` : 'Custom Pricing',
-							price: s.price,
-							specialtyKey: resolvedSpecialty,
-						}))
+				if (resolvedSpecialty && isMounted) {
+					setSpecialtyKey(resolvedSpecialty)
+					const initialMeta = SPECIALTY_META[resolvedSpecialty] || SPECIALTY_META['home-care']
+					setProcedures(initialMeta.fallbackProcedures)
+					if (initialMeta.fallbackCategories) {
+						setCategories(initialMeta.fallbackCategories)
 					}
 				}
 
-				// If no backend procedures matched for this specialty, use the specialty fallback procedures
-				if (matchedProcedures.length === 0) {
-					matchedProcedures = SPECIALTY_META[resolvedSpecialty]?.fallbackProcedures || SPECIALTY_META['nursing-care'].fallbackProcedures
-				}
-
-				if (isMounted) {
-					setProcedures(matchedProcedures)
-				}
-
-				// 4. Load saved capabilities (Source of truth: Backend Profile)
+				// 2. Fetch backend profile to get definitive specialty and saved capabilities
+				const profResult = await fetchProviderProfileBackend()
 				let savedList: string[] = []
-				if (profile) {
-					if (Array.isArray(profile.checked_procedures)) {
-						savedList = profile.checked_procedures
-					} else if (Array.isArray((profile as any).capabilities)) {
-						savedList = (profile as any).capabilities.map((c: any) => c.public_id || c.procedure_id || c.id || c.name || c)
+
+				if (profResult && isMounted) {
+					const backendSpec =
+						profResult.specialty_id ||
+						profResult.specialty?.id ||
+						profResult.specialty_name ||
+						profResult.specialty?.label
+					const backendSpecKey = normalizeSpecialtyKey(backendSpec)
+
+					if (backendSpecKey) {
+						resolvedSpecialty = backendSpecKey
+						setSpecialtyKey(resolvedSpecialty)
+						await AsyncStorage.setItem('user_specialty', resolvedSpecialty)
+					}
+
+					if (Array.isArray(profResult.checked_procedures)) {
+						savedList = profResult.checked_procedures
+					} else if (Array.isArray((profResult as any).capabilities)) {
+						savedList = (profResult as any).capabilities.map(
+							(c: any) => c.public_id || c.procedure_id || c.id || c.name || c
+						)
 					}
 				} else {
-					// Fallback to local storage only if backend profile couldn't be loaded (e.g. offline)
-					const stored = await AsyncStorage.getItem('ancillary_capabilities')
-					if (stored) {
+					const storedCaps = await AsyncStorage.getItem('ancillary_capabilities')
+					if (storedCaps) {
 						try {
-							const parsed = JSON.parse(stored)
-							if (Array.isArray(parsed)) {
-								savedList = parsed
-							}
+							const parsed = JSON.parse(storedCaps)
+							if (Array.isArray(parsed)) savedList = parsed
 						} catch (_) {}
 					}
 				}
 
-				if (isMounted) {
+				if (!resolvedSpecialty) {
+					resolvedSpecialty = 'home-care'
+					if (isMounted) setSpecialtyKey('home-care')
+				}
+
+				// 3. Concurrently fetch categories and services for resolved specialty
+				const [catResult, srvResult] = await Promise.allSettled([
+					fetchAncillaryCategoriesBackend(resolvedSpecialty),
+					fetchAncillaryServicesBackend({ specialtyId: resolvedSpecialty }),
+				])
+
+				if (!isMounted) return
+
+				// Update categories if available
+				if (catResult.status === 'fulfilled' && Array.isArray(catResult.value) && catResult.value.length > 0) {
+					setCategories(catResult.value)
+				}
+
+				// Update procedures if backend returned items
+				let activeProcedures = (SPECIALTY_META[resolvedSpecialty] || SPECIALTY_META['home-care']).fallbackProcedures
+				if (srvResult.status === 'fulfilled' && Array.isArray(srvResult.value) && srvResult.value.length > 0) {
+					activeProcedures = srvResult.value.map((item: AncillaryServiceItem) => ({
+						id: item.id,
+						label: item.title,
+						subtitle: item.description,
+						rate: item.price ? `₹${item.price}` : (resolvedSpecialty === 'home-care' ? 'Included in package' : 'Custom Pricing'),
+						price: item.price || 0,
+						specialtyKey: resolvedSpecialty,
+						categoryId: item.categoryId || undefined,
+						categoryName: item.categoryName,
+					}))
+					setProcedures(activeProcedures)
+				}
+
+				if (resolvedSpecialty === 'home-care') {
+					// For Home Care, if all 18 Home Care procedures are associated with the provider, show package as confirmed
+					const all18Confirmed =
+						HOME_CARE_ALL_PROCEDURE_IDS.length > 0 &&
+						HOME_CARE_ALL_PROCEDURE_IDS.every((id) => savedList.includes(id))
+					setIsPackageConfirmed(all18Confirmed)
+					setSelected(all18Confirmed ? HOME_CARE_ALL_PROCEDURE_IDS : [])
+				} else {
 					if (savedList.length > 0) {
-						// Filter savedList to keep only those relevant to current specialty procedures
-						const matchedIds = matchedProcedures.map((p) => p.id)
-						const matchedLabels = matchedProcedures.map((p) => p.label)
-						const filteredSaved = savedList.filter((item) => matchedIds.includes(item) || matchedLabels.includes(item))
+						const matchedIds = activeProcedures.map((p) => p.id)
+						const matchedLabels = activeProcedures.map((p) => p.label)
+						const filteredSaved = savedList.filter(
+							(item) => matchedIds.includes(item) || matchedLabels.includes(item)
+						)
 						setSelected(filteredSaved)
 					} else {
-						// New provider or no capabilities saved: NONE selected by default
 						setSelected([])
 					}
 				}
 			} catch (e) {
 				console.log('[CapabilitiesTab] Error loading data:', e)
-			} finally {
-				if (isMounted) setLoading(false)
 			}
 		}
 
@@ -315,19 +369,55 @@ export default function CapabilitiesTab({
 		return () => {
 			isMounted = false
 		}
-	}, [isActive])
+	}, [])
+
+	// Group procedures by category if categories exist
+	const categoryGroups = useMemo(() => {
+		if (!categories || categories.length === 0) return []
+		return categories
+			.map((cat) => {
+				const groupProcs = procedures.filter(
+					(p) => p.categoryId === cat.id || p.categoryName?.toLowerCase() === cat.label.toLowerCase()
+				)
+				return {
+					id: cat.id,
+					label: cat.label,
+					procedures: groupProcs,
+				}
+			})
+			.filter((group) => group.procedures.length > 0)
+	}, [categories, procedures])
 
 	const handleSave = async () => {
 		try {
 			setSaving(true)
 
-			// 1. Call Backend PUT capabilities API
-			await updateAncillaryCapabilitiesBackend(selected)
+			if (isHomeCare) {
+				if (!isPackageConfirmed) {
+					Alert.alert(
+						'Confirmation Required',
+						'Please confirm that you can provide all Home Care services listed in the package.'
+					)
+					return
+				}
 
-			// 2. Persist in AsyncStorage
-			await AsyncStorage.setItem('ancillary_capabilities', JSON.stringify(selected))
+				// 1. Call Backend PUT capabilities API with all 18 procedure IDs
+				await updateAncillaryCapabilitiesBackend(HOME_CARE_ALL_PROCEDURE_IDS)
 
-			Alert.alert('Saved', 'Clinical capabilities saved successfully.')
+				// 2. Persist in AsyncStorage
+				await AsyncStorage.setItem('ancillary_capabilities', JSON.stringify(HOME_CARE_ALL_PROCEDURE_IDS))
+				setSelected(HOME_CARE_ALL_PROCEDURE_IDS)
+
+				Alert.alert('Saved', 'Home Care complete package confirmed successfully.')
+			} else {
+				// 1. Call Backend PUT capabilities API for clinical specialty
+				await updateAncillaryCapabilitiesBackend(selected)
+
+				// 2. Persist in AsyncStorage
+				await AsyncStorage.setItem('ancillary_capabilities', JSON.stringify(selected))
+
+				Alert.alert('Saved', 'Clinical capabilities saved successfully.')
+			}
 
 			if (onNextTab) {
 				onNextTab()
@@ -355,14 +445,6 @@ export default function CapabilitiesTab({
 		setSelected([])
 	}
 
-	if (loading) {
-		return (
-			<View style={styles.center}>
-				<ActivityIndicator size="small" color="#2B6F71" />
-			</View>
-		)
-	}
-
 	return (
 		<View style={styles.root}>
 			<ScrollView
@@ -386,39 +468,122 @@ export default function CapabilitiesTab({
 						</AppTypography>
 					</View>
 
-					{/* Procedures List for ONLY this specialty */}
-					<View style={styles.cardsList}>
-						{procedures.map((proc) => {
-							const isSelected = selected.includes(proc.id) || selected.includes(proc.label)
-							return (
-								<ProcedureCard
-									key={proc.id}
-									item={proc}
-									selected={isSelected}
-									onPress={() => toggleItem(proc.id, proc.label)}
-								/>
-							)
-						})}
-					</View>
+					{/* HOME CARE PACKAGE UI */}
+					{isHomeCare ? (
+						<View style={styles.packageContainer}>
+							<View style={styles.packageIntroBanner}>
+								<MaterialCommunityIcons name="shield-check" size={22} color="#0c7c7c" />
+								<View style={{ flex: 1 }}>
+									<AppTypography variant="subtitle" style={styles.packageBannerTitle}>
+										Complete Home Caregiver Package
+									</AppTypography>
+									<AppTypography variant="caption" style={styles.packageBannerText}>
+										As a Home Care Caregiver / Home Attendant, you will provide all 18 care services
+										listed below across 4 categories.
+									</AppTypography>
+								</View>
+							</View>
+
+							{/* 4 Categories with 18 Services */}
+							<View style={styles.categorySections}>
+								{categoryGroups.length > 0
+									? categoryGroups.map((group) => (
+											<View key={group.id} style={styles.categoryBlock}>
+												<View style={styles.categoryTitleRow}>
+													<AppTypography variant="h4" style={styles.categoryHeaderTitle}>
+														{group.label}
+													</AppTypography>
+													<AppTypography variant="caption" style={styles.categoryCountBadge}>
+														{group.procedures.length} services
+													</AppTypography>
+												</View>
+												<View style={styles.homeCareServicesList}>
+													{group.procedures.map((proc) => (
+														<HomeCareServiceRow key={proc.id} item={proc} />
+													))}
+												</View>
+											</View>
+										))
+									: procedures.map((proc) => (
+											<HomeCareServiceRow key={proc.id} item={proc} />
+										))}
+							</View>
+
+							{/* Package Confirmation Card */}
+							<TouchableOpacity
+								style={[
+									styles.packageConfirmCard,
+									isPackageConfirmed && styles.packageConfirmCardActive,
+								]}
+								onPress={() => setIsPackageConfirmed((prev) => !prev)}
+								activeOpacity={0.8}
+							>
+								<View
+									style={[
+										styles.packageCheckbox,
+										isPackageConfirmed && styles.packageCheckboxActive,
+									]}
+								>
+									{isPackageConfirmed && (
+										<MaterialCommunityIcons name="check" size={16} color="#FFFFFF" />
+									)}
+								</View>
+								<View style={{ flex: 1 }}>
+									<AppTypography variant="body" style={styles.packageConfirmTitle}>
+										I confirm that I can provide all Home Care services listed above.
+									</AppTypography>
+									<AppTypography variant="caption" style={styles.packageConfirmSubtitle}>
+										By confirming, you agree to provide the complete 18-service caregiver package.
+									</AppTypography>
+								</View>
+							</TouchableOpacity>
+						</View>
+					) : (
+						/* CLINICAL SPECIALTIES (NURSING, PHYSIO, REHAB) UI */
+						<View style={styles.cardsList}>
+							{procedures.map((proc) => {
+								const isSelected = selected.includes(proc.id) || selected.includes(proc.label)
+								return (
+									<ProcedureCard
+										key={proc.id}
+										item={proc}
+										selected={isSelected}
+										onPress={() => toggleItem(proc.id, proc.label)}
+									/>
+								)
+							})}
+						</View>
+					)}
 				</View>
 			</ScrollView>
 
 			{/* Sticky Bottom Action Bar */}
 			<View style={styles.stickyFooterContainer}>
 				<View style={[styles.stickyFooterContent, { maxWidth: isTablet ? 600 : '100%' }]}>
-					<View style={styles.selectionInfoRow}>
-						<View style={styles.counterBadge}>
-							<View style={styles.activeDot} />
-							<AppTypography variant="caption" style={styles.selectionCountText}>
-								{selected.length} procedure{selected.length === 1 ? '' : 's'} selected
-							</AppTypography>
+					{isHomeCare ? (
+						<View style={styles.selectionInfoRow}>
+							<View style={styles.counterBadge}>
+								<View style={[styles.activeDot, isPackageConfirmed && styles.activeDotConfirmed]} />
+								<AppTypography variant="caption" style={styles.selectionCountText}>
+									{isPackageConfirmed ? 'Complete package confirmed (18 services)' : 'Confirmation required'}
+								</AppTypography>
+							</View>
 						</View>
-						<TouchableOpacity onPress={handleClearAll} activeOpacity={0.7}>
-							<AppTypography variant="caption" style={styles.clearAllText}>
-								Clear all
-							</AppTypography>
-						</TouchableOpacity>
-					</View>
+					) : (
+						<View style={styles.selectionInfoRow}>
+							<View style={styles.counterBadge}>
+								<View style={styles.activeDot} />
+								<AppTypography variant="caption" style={styles.selectionCountText}>
+									{selected.length} procedure{selected.length === 1 ? '' : 's'} selected
+								</AppTypography>
+							</View>
+							<TouchableOpacity onPress={handleClearAll} activeOpacity={0.7}>
+								<AppTypography variant="caption" style={styles.clearAllText}>
+									Clear all
+								</AppTypography>
+							</TouchableOpacity>
+						</View>
+					)}
 
 					<AppButton
 						variant="primary"
@@ -427,7 +592,7 @@ export default function CapabilitiesTab({
 						onPress={handleSave}
 						loading={saving}
 					>
-						{'Save Preferences ->'}
+						{isHomeCare ? 'Confirm & Save Package ->' : 'Save Preferences ->'}
 					</AppButton>
 				</View>
 			</View>
@@ -451,12 +616,6 @@ const styles = StyleSheet.create({
 	},
 	contentShell: {
 		alignSelf: 'center',
-	},
-	center: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		backgroundColor: '#F8FAFA',
 	},
 	headerBlock: {
 		marginBottom: 18,
@@ -490,6 +649,135 @@ const styles = StyleSheet.create({
 		color: '#4B5563',
 		lineHeight: 18,
 		marginTop: 4,
+	},
+	packageContainer: {
+		gap: 18,
+	},
+	packageIntroBanner: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		backgroundColor: '#E6F4F2',
+		borderRadius: 12,
+		padding: 14,
+		gap: 12,
+		borderWidth: 1,
+		borderColor: '#B2DFDB',
+	},
+	packageBannerTitle: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#00695C',
+	},
+	packageBannerText: {
+		fontSize: 12,
+		color: '#34495E',
+		marginTop: 2,
+		lineHeight: 16,
+	},
+	categorySections: {
+		gap: 20,
+	},
+	categoryBlock: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 12,
+		padding: 16,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+		gap: 10,
+	},
+	categoryTitleRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingBottom: 8,
+		borderBottomWidth: 1,
+		borderBottomColor: '#F0F4F8',
+	},
+	categoryHeaderTitle: {
+		color: '#1F2933',
+		fontSize: 15,
+		fontWeight: '700',
+	},
+	categoryCountBadge: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#0c7c7c',
+		backgroundColor: 'rgba(12, 124, 124, 0.08)',
+		paddingHorizontal: 8,
+		paddingVertical: 2,
+		borderRadius: 10,
+	},
+	homeCareServicesList: {
+		gap: 8,
+	},
+	homeCareServiceRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 8,
+		paddingHorizontal: 10,
+		backgroundColor: '#F8FAFB',
+		borderRadius: 8,
+		gap: 10,
+	},
+	homeCareIconBadge: {
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	homeCareServiceLabel: {
+		fontSize: 14,
+		color: '#1F2933',
+		fontWeight: '600',
+	},
+	homeCareIncludedBadge: {
+		backgroundColor: '#E8F5E9',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 6,
+	},
+	homeCareIncludedText: {
+		fontSize: 11,
+		fontWeight: '600',
+		color: '#2E7D32',
+	},
+	packageConfirmCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FFFFFF',
+		borderWidth: 2,
+		borderColor: '#CBD5E1',
+		borderRadius: 12,
+		padding: 16,
+		gap: 14,
+		marginTop: 8,
+	},
+	packageConfirmCardActive: {
+		borderColor: '#0c7c7c',
+		backgroundColor: '#F0FDF4',
+	},
+	packageCheckbox: {
+		width: 24,
+		height: 24,
+		borderRadius: 6,
+		borderWidth: 2,
+		borderColor: '#94A3B8',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#FFFFFF',
+	},
+	packageCheckboxActive: {
+		backgroundColor: '#0c7c7c',
+		borderColor: '#0c7c7c',
+	},
+	packageConfirmTitle: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#0F172A',
+		lineHeight: 20,
+	},
+	packageConfirmSubtitle: {
+		fontSize: 12,
+		color: '#64748B',
+		marginTop: 2,
 	},
 	cardsList: {
 		gap: 12,
@@ -599,6 +887,9 @@ const styles = StyleSheet.create({
 		borderRadius: 4,
 		backgroundColor: '#2B6F71',
 	},
+	activeDotConfirmed: {
+		backgroundColor: '#0c7c7c',
+	},
 	selectionCountText: {
 		fontSize: 12,
 		fontWeight: '600',
@@ -615,4 +906,3 @@ const styles = StyleSheet.create({
 		marginTop: 0,
 	},
 })
-
