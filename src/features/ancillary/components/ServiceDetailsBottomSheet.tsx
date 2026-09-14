@@ -128,7 +128,7 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 
 				{/* 2. Service Name */}
 				<AppTypography variant="h2" style={styles.title}>
-					{service.title}
+					{service.title || (service as any).label || (service as any).name || ''}
 				</AppTypography>
 
 				{/* 3. Price Summary Pill */}

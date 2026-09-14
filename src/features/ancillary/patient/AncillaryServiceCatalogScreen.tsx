@@ -147,8 +147,8 @@ export default function AncillaryServiceCatalogScreen() {
 
 	const procedureItems = useMemo<ServiceProcedureItem[]>(() => {
 		return rawServices.map((s) => {
-			const title = s.title || ''
-			const description = s.description || ''
+			const title = s.title || (s as any).label || (s as any).name || ''
+			const description = s.description || s.about_service || s.aboutService || ''
 
 			return {
 				id: s.id,

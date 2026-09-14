@@ -48,7 +48,7 @@ export default function SelectedProcedureCard({
 
 				<View style={styles.textCol}>
 					<AppTypography variant="h4" style={styles.title} numberOfLines={1}>
-						{service.title}
+						{service.title || (service as any).label || (service as any).name || ''}
 					</AppTypography>
 					<AppTypography variant="caption" style={styles.desc} numberOfLines={2}>
 						{service.description}

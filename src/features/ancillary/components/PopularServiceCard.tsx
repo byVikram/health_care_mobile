@@ -113,7 +113,7 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 					style={[styles.title, isTablet && styles.titleTablet]}
 					numberOfLines={1}
 				>
-					{item.title}
+					{item.title || (item as any).label || (item as any).name || ''}
 				</AppTypography>
 				<AppTypography
 					variant="caption"
