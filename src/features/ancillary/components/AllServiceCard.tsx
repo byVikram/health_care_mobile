@@ -107,7 +107,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 
 				{/* Title (Bold Heading) */}
 				<AppTypography variant="h3" style={styles.title} numberOfLines={2}>
-					{item.title}
+					{item.title || (item as any).label || (item as any).name || ''}
 				</AppTypography>
 
 				{/* Rating Row (Medium 500 & Soft Regular 400) */}

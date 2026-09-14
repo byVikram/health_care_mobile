@@ -69,7 +69,7 @@ export const PhysiotherapyConditionsGrid: React.FC<PhysiotherapyConditionsGridPr
 			<View style={styles.headerRow}>
 				<View style={styles.headerTextWrap}>
 					<AppTypography variant="h4" style={styles.headerTitle}>
-						Find Physiotherapy for
+						Physiotherapy For?
 					</AppTypography>
 					<AppTypography variant="caption" style={styles.headerSubtitle}>
 						Select your affected area or goal

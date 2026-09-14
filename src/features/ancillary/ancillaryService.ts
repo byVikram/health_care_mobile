@@ -75,6 +75,32 @@ export const fetchAncillaryCategoriesBackend = async (specialtyId?: string): Pro
 	}
 }
 
+// Backend (AncillaryProcedureResponse) returns `label` / `aboutService` /
+// `whatsIncluded` / `categoryId` / `imageUrl` -- it never returns `title` or
+// `description`. AncillaryServiceItem uses `title`/`description` for display
+// (see AllServiceCard / AncillaryServiceCatalogScreen), so raw API records
+// must be mapped here or every service card renders with a blank name.
+const mapRawServiceToItem = (raw: any): AncillaryServiceItem => {
+	const whatsIncludedRaw = raw?.whatsIncluded ?? raw?.whats_included ?? null
+	const aboutServiceRaw = raw?.aboutService ?? raw?.about_service ?? null
+	return {
+		id: raw?.id,
+		title: raw?.title || raw?.label || raw?.name || '',
+		description: raw?.description || aboutServiceRaw || '',
+		price: typeof raw?.price === 'number' ? raw.price : Number(raw?.price) || 0,
+		categoryId: raw?.categoryId ?? raw?.category_id ?? null,
+		categoryName: raw?.categoryName ?? raw?.category_name,
+		specialtyId: raw?.specialtyId ?? raw?.specialty_id ?? null,
+		isInstantEligible: raw?.isInstantEligible,
+		about_service: aboutServiceRaw,
+		aboutService: aboutServiceRaw,
+		whats_included: whatsIncludedRaw,
+		whatsIncluded: whatsIncludedRaw,
+		image_url: raw?.image_url ?? raw?.imageUrl ?? null,
+		imageUrl: raw?.imageUrl ?? raw?.image_url ?? null,
+	}
+}
+
 export const fetchAncillaryServicesBackend = async (params?: {
 	categoryId?: string
 	specialtyId?: string
@@ -84,7 +110,7 @@ export const fetchAncillaryServicesBackend = async (params?: {
 		if (params?.categoryId) query.category_id = params.categoryId
 		if (params?.specialtyId) query.specialty_id = params.specialtyId
 		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.SERVICES, query)
-		return unwrapList<AncillaryServiceItem>(res.data)
+		return unwrapList<any>(res.data).map(mapRawServiceToItem)
 	} catch (error) {
 		console.log('[ancillaryService] fetchAncillaryServicesBackend error:', error)
 		return []
