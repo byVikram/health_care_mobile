@@ -32,6 +32,7 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import DateSlotPicker from '../../components/common/DateSlotPicker'
 import { AppInput, AppModal } from '../../components/common'
+import { RejectReasonModal } from './components/RejectReasonModal'
 import FavouriteDoctorList, { type FavouriteDoctorListItem } from './search/components/FavouriteDoctorList'
 import {
   getDoctorAvailability,

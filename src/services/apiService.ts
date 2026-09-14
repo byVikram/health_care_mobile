@@ -36,14 +36,9 @@ export const showStatusModal = (data: StatusModalData | null) => {
 axiosInstance.interceptors.request.use(
 	async (config) => {
 		const token = await secureStorage.getItem('access_token')
-		config.headers = config.headers || {}
-		const headers = config.headers as any
-		const explicitAuthorization = headers?.Authorization || headers?.authorization
-
-		if (token && !explicitAuthorization) {
-			headers.Authorization = `Bearer ${token}`
+		if (token && config.headers && !config.headers.Authorization && !config.headers.authorization) {
+			config.headers.Authorization = `Bearer ${token}`
 		}
-
 		return config
 	},
 	(error) => Promise.reject(error)

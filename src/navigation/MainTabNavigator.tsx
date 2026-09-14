@@ -175,10 +175,10 @@ function DockedTabBar({ state, descriptors, navigation, onAncillaryPress }: Dock
 }
 
 export default function MainTabNavigator() {
-	const { role } = useAuth()
 	const navigation = useNavigation<any>()
-	const isNurse = (role as any) === 'nurse' || (role as any) === 'ancillary'
-	const isDoctor = (role as any) === 'doctor'
+	const { role } = useAuth()
+	const isNurse = role === 'nurse' || role === 'ancillary'
+	const isDoctor = role === 'doctor'
 	const shouldShowSearch = role !== 'doctor'
 	const shouldShowAncillary = !isNurse
 	const [ancillarySheetVisible, setAncillarySheetVisible] = useState(false)

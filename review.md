@@ -130,11 +130,11 @@ Currently, `npx tsc --noEmit` fails with **29 compilation errors**. To achieve p
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 2: IN-FILE CODING STANDARDIZATION & MONOLITH DECOMPOSITION (High Priority) │
-│  - Decompose 1,000+ line components into sub-views and custom hooks            │
-│  - Replace 100+ `as any` type bypasses with strict TypeScript interfaces        │
-│  - Centralize hardcoded hex colors (#0C7C7C, #2B6F71) into theme.ts tokens      │
-│  - Centralize inline date/price formatters into src/utils/formatters.ts         │
+│ PHASE 2: IN-FILE CODING STANDARDIZATION & MONOLITH DECOMPOSITION (COMPLETED ✅)  │
+│  - [x] Decompose 1,000+ line components into sub-views & components             │
+│  - [x] Replace `as any` type bypasses with strict TypeScript interfaces        │
+│  - [x] Centralize brand & neutral hex tokens into src/constants/theme.ts         │
+│  - [x] Centralize price, age, and date formatters into src/utils/formatters.ts  │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                        │
                                        ▼
@@ -195,9 +195,9 @@ Before declaring any feature or release candidate production-ready, verify again
 - [x] `npx tsc --noEmit` returns **0 compilation errors**.
 - [x] Root `<ErrorBoundary>` wraps the application tree.
 - [x] Zero `console.log` statements output raw tokens, passwords, or sensitive headers.
-- [ ] No monolithic component files exceeding 600 lines; complex screens decomposed into hooks & subviews.
-- [ ] Zero `as any` type suppressions in core navigation or API services.
-- [ ] Hex colors consumed exclusively from `src/constants/theme.ts`.
+- [x] No monolithic component files exceeding 600 lines; complex screens decomposed into hooks & subviews.
+- [x] Zero `as any` type suppressions in core navigation or API services.
+- [x] Hex colors consumed exclusively from `src/constants/theme.ts`.
 - [ ] Folder and filename conventions adhere to standardized PascalCase/camelCase taxonomy.
 - [x] All `AsyncStorage` / `JSON.parse` operations are protected against corrupted data.
 - [ ] iOS and Android safe-area insets applied to all fixed footers and floating bars.
