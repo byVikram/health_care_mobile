@@ -32,8 +32,9 @@ export const generateIdempotencyKey = (): string => {
 }
 
 export interface AncillaryServiceItem {
+
 	id: string
-	title: string
+	label: string
 	description: string
 	price: number
 	categoryId?: string | null
@@ -134,12 +135,12 @@ export const fetchConsultedNursesBackend = async (): Promise<AncillaryProvider[]
 		const list: any[] = Array.isArray(payload)
 			? payload
 			: Array.isArray(payload?.data)
-			? payload.data
-			: Array.isArray(payload?.data?.nurses)
-			? payload.data.nurses
-			: Array.isArray(payload?.nurses)
-			? payload.nurses
-			: []
+				? payload.data
+				: Array.isArray(payload?.data?.nurses)
+					? payload.data.nurses
+					: Array.isArray(payload?.nurses)
+						? payload.nurses
+						: []
 
 		const mapped: AncillaryProvider[] = list.map((item: any) => ({
 			id: String(item.id || item.nurse_id || item.public_id || item.publicId),
@@ -684,15 +685,15 @@ export interface AncillaryBooking {
 	serviceKey: string
 	serviceLabel: string
 	status:
-		| 'upcoming'
-		| 'completed'
-		| 'cancelled'
-		| 'SEARCHING'
-		| 'ASSIGNED'
-		| 'EN_ROUTE'
-		| 'ARRIVED'
-		| 'IN_PROGRESS'
-		| string
+	| 'upcoming'
+	| 'completed'
+	| 'cancelled'
+	| 'SEARCHING'
+	| 'ASSIGNED'
+	| 'EN_ROUTE'
+	| 'ARRIVED'
+	| 'IN_PROGRESS'
+	| string
 	rawStatus?: string
 	date: string
 	timeRange?: string
@@ -890,8 +891,8 @@ export const fetchSoftReviewRequest = async (requestId: string): Promise<SoftRev
 				typeof data.providerEarning === 'number'
 					? `₹${data.providerEarning}`
 					: typeof data.earning === 'number'
-					? `₹${data.earning}`
-					: String(data.earning || data.estimatedEarnings || ''),
+						? `₹${data.earning}`
+						: String(data.earning || data.estimatedEarnings || ''),
 			// Patient's full charge for this booking, kept separate from `earning`
 			// (this provider's payout) -- see business requirement for the
 			// patient price / provider payout separation.
@@ -1093,7 +1094,7 @@ export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequest
 		const payload = res.data
 		const rawList: any[] = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
 
-		if (rawList.length > 0){
+		if (rawList.length > 0) {
 			return rawList.map((item: any) => ({
 				id: String(item.id || item.publicBookingId),
 				serviceName: String(item.serviceName),
@@ -1107,9 +1108,9 @@ export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequest
 				requiredSkills: Array.isArray(item.requiredSkills) ? item.requiredSkills : undefined,
 				urgency: String(item.urgency || item.urgencyLevel),
 				specialRequirements: item.specialRequirements,
-				earning: typeof item.providerEarning === 'number' ? `₹${item.providerEarning}` : 
-					typeof item.estimatedEarnings === 'number' ? `₹${item.estimatedEarnings}` : 
-					item.estimatedEarnings,
+				earning: typeof item.providerEarning === 'number' ? `₹${item.providerEarning}` :
+					typeof item.estimatedEarnings === 'number' ? `₹${item.estimatedEarnings}` :
+						item.estimatedEarnings,
 				// Patient's full charge, distinct from `earning` (this provider's payout).
 				patientAmount: typeof item.totalAmount === 'number' ? `₹${item.totalAmount}` : undefined,
 				expiresAt: item.expiresAt || Date.now() + 60 * 1000,
@@ -1153,8 +1154,8 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 				const providerEarning = item.providerPrice != null
 					? parseFloat(String(item.providerPrice).replace(/[^0-9.]/g, ''))
 					: item.estimatedEarnings != null
-					? parseFloat(String(item.estimatedEarnings).replace(/[^0-9.]/g, ''))
-					: amount
+						? parseFloat(String(item.estimatedEarnings).replace(/[^0-9.]/g, ''))
+						: amount
 
 				return {
 					id: String(item.id || item.publicBookingId),
@@ -1484,12 +1485,12 @@ export const fetchProviderEarningsBackend = async (): Promise<ProviderEarningsDa
 			allTimeTotal: Number(data.allTimeTotal) || 0,
 			recentVisits: Array.isArray(data.recentVisits)
 				? data.recentVisits.map((v: any) => ({
-						id: String(v.id || ''),
-						patientName: String(v.patientName || 'Patient'),
-						serviceName: String(v.serviceName || 'Healthcare Service'),
-						earning: Number(v.earning) || 0,
-						completedAt: v.completedAt ? String(v.completedAt) : undefined,
-					}))
+					id: String(v.id || ''),
+					patientName: String(v.patientName || 'Patient'),
+					serviceName: String(v.serviceName || 'Healthcare Service'),
+					earning: Number(v.earning) || 0,
+					completedAt: v.completedAt ? String(v.completedAt) : undefined,
+				}))
 				: [],
 		}
 	} catch (error) {
