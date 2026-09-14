@@ -23,6 +23,7 @@ import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { generateIdempotencyKey } from '../ancillaryService'
 import StatusModal from '../../../components/common/StatusModal'
+import { safeJsonParse } from '../../../utils/jsonUtils'
 
 interface PaymentMethodItem {
 	id: string
@@ -117,8 +118,8 @@ export default function AncillaryPaymentPage() {
 		if ((!targetPublicId || !patientName || patientName.trim() === '') && typeof AsyncStorage !== 'undefined') {
 			try {
 				const userRaw = await AsyncStorage.getItem('user')
-				if (userRaw) {
-					const userData = JSON.parse(userRaw)
+				const userData = safeJsonParse<any>(userRaw, null)
+				if (userData) {
 					if (!targetPublicId) {
 						targetPublicId = userData.publicId || userData.public_id || userData.id
 					}

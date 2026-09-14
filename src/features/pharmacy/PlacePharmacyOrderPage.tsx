@@ -1089,7 +1089,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	viewerBackdrop: {
-		...StyleSheet.absoluteFillObject,
+		...StyleSheet.absoluteFill,
 	},
 	viewerCloseBtn: {
 		position: 'absolute',

@@ -6,15 +6,18 @@ import AppNavigator from './src/navigation/AppNavigator'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import { toastConfig } from './src/config/toastConfig'
+import ErrorBoundary from './src/components/common/ErrorBoundary'
 
 export default function App() {
 	return (
 		<SafeAreaProvider>
 			<PaperProvider theme={theme}>
-				<AuthProvider>
-					<AppNavigator />
-					<Toast config={toastConfig} />
-				</AuthProvider>
+				<ErrorBoundary>
+					<AuthProvider>
+						<AppNavigator />
+						<Toast config={toastConfig} />
+					</AuthProvider>
+				</ErrorBoundary>
 			</PaperProvider>
 		</SafeAreaProvider>
 	)

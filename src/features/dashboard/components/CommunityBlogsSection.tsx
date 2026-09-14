@@ -91,7 +91,7 @@ function CommunityBlogsSection() {
 				{blogs.map((blog) => (
 					<Card key={blog.id} style={styles.blogCard}>
 						<View style={styles.blogImageContainer}>
-							<View style={StyleSheet.absoluteFillObject}>
+							<View style={StyleSheet.absoluteFill}>
 								<blog.ImageComponent width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
 							</View>
 						</View>

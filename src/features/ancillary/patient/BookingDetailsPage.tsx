@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
 	ActivityIndicator,
 	Image,
@@ -13,6 +13,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { safeJsonParse } from '../../../utils/jsonUtils'
 import { getPatientDetails, getPatientAddresses } from '../../../features/profile/patient/PatientProfileService'
 import { ROUTES } from '../../../navigation/routes'
 import {
@@ -304,12 +305,14 @@ export default function BookingDetailsPage() {
 					try {
 						const userRaw = await AsyncStorage.getItem('user')
 						if (userRaw) {
-							const userData = JSON.parse(userRaw)
-							if (!resolvedPublicId) {
-								resolvedPublicId = userData.publicId || userData.public_id || userData.id || ''
-							}
-							if (!resolvedName || resolvedName.trim() === '') {
-								resolvedName = userData.name || userData.full_name || ''
+							const userData = safeJsonParse<any>(userRaw)
+							if (userData) {
+								if (!resolvedPublicId) {
+									resolvedPublicId = userData.publicId || userData.public_id || userData.id || ''
+								}
+								if (!resolvedName || resolvedName.trim() === '') {
+									resolvedName = userData.name || userData.full_name || ''
+								}
 							}
 						}
 					} catch (storageErr) {

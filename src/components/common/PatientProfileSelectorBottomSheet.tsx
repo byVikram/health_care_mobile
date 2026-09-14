@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { safeJsonParse } from '../../utils/jsonUtils'
 import AppBottomSheet from './AppBottomSheet'
 import { AppTypography } from './AppTypography'
 import { AppButton } from './AppButton'
@@ -91,19 +92,19 @@ export const PatientProfileSelectorBottomSheet: React.FC<PatientProfileSelectorB
 							// fallback Self from user profile in AsyncStorage or mock
 							const userRaw = await AsyncStorage.getItem('user')
 							if (userRaw) {
-								const userData = JSON.parse(userRaw)
-								list.push({
-									id: userData.publicId || userData.public_id || userData.id || 'self-1',
-									publicId: userData.publicId || userData.public_id,
-									name: userData.name || userData.full_name || 'Self',
-									age: userData.age || '',
-									gender: userData.gender || '',
-									relationship: 'Self',
-									avatar: userData.avatar || userData.photo_url || undefined,
-									bloodGroup: userData.bloodGroup || userData.blood_group || undefined,
-								})
-							} else {
-								// no mock fallback
+								const userData = safeJsonParse<any>(userRaw)
+								if (userData) {
+									list.push({
+										id: userData.publicId || userData.public_id || userData.id || 'self-1',
+										publicId: userData.publicId || userData.public_id,
+										name: userData.name || userData.full_name || 'Self',
+										age: userData.age || '',
+										gender: userData.gender || '',
+										relationship: 'Self',
+										avatar: userData.avatar || userData.photo_url || undefined,
+										bloodGroup: userData.bloodGroup || userData.blood_group || undefined,
+									})
+								}
 							}
 						}
 
@@ -134,16 +135,18 @@ export const PatientProfileSelectorBottomSheet: React.FC<PatientProfileSelectorB
 				// Add Self profile from user context if exists
 				if (userRaw) {
 					try {
-						const userData = JSON.parse(userRaw)
-						list.push({
-							id: userData.id || 'self-1',
-							name: userData.name || userData.full_name || 'Self',
-							age: userData.age || '45',
-							gender: userData.gender || 'Male',
-							relationship: 'Self',
-							avatar: userData.avatar || userData.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-							bloodGroup: userData.bloodGroup || userData.blood_group || 'O+',
-						})
+						const userData = safeJsonParse<any>(userRaw)
+						if (userData) {
+							list.push({
+								id: userData.id || 'self-1',
+								name: userData.name || userData.full_name || 'Self',
+								age: userData.age || '45',
+								gender: userData.gender || 'Male',
+								relationship: 'Self',
+								avatar: userData.avatar || userData.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+								bloodGroup: userData.bloodGroup || userData.blood_group || 'O+',
+							})
+						}
 					} catch {
 						// no mock fallback
 					}
@@ -154,7 +157,7 @@ export const PatientProfileSelectorBottomSheet: React.FC<PatientProfileSelectorB
 				// Add Family members if in AsyncStorage
 				if (familyRaw) {
 					try {
-						const parsed = JSON.parse(familyRaw)
+						const parsed = safeJsonParse<any>(familyRaw)
 						let familyList: any[] = []
 
 						if (Array.isArray(parsed)) {

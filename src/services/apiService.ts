@@ -1,6 +1,7 @@
 // src/services/apiService.ts
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { secureStorage } from '../utils/secureStorage'
 
 export interface StatusModalData {
 	status?: 'success' | 'error' | 'info'
@@ -31,65 +32,16 @@ export const showStatusModal = (data: StatusModalData | null) => {
 	statusModalHandler?.(data)
 }
 
-const normalizeHeadersForLog = (headers: unknown) => {
-	const maybeHeaders = headers as {
-		toJSON?: () => unknown
-		Authorization?: unknown
-		authorization?: unknown
-	}
-
-	if (typeof maybeHeaders?.toJSON === 'function') {
-		return maybeHeaders.toJSON()
-	}
-
-	return headers
-}
-
 // Request interceptor
 axiosInstance.interceptors.request.use(
 	async (config) => {
-		// Use AsyncStorage in React Native
-		const token = await AsyncStorage.getItem('access_token')
-		console.log('[API TOKEN]', token)
-		const requestUrl = String(config.url || '')
-		const isBookingRequest = requestUrl.includes('/appointments') || requestUrl.includes('appointments')
+		const token = await secureStorage.getItem('access_token')
 		config.headers = config.headers || {}
 		const headers = config.headers as any
 		const explicitAuthorization = headers?.Authorization || headers?.authorization
 
-		if (isBookingRequest) {
-			console.log('[ApiService interceptor][RN booking] before', {
-				url: requestUrl,
-				method: config.method,
-				asyncStorageAccessToken: token,
-				explicitAuthorization,
-				headers: normalizeHeadersForLog(config.headers),
-			})
-		}
-
 		if (token && !explicitAuthorization) {
 			headers.Authorization = `Bearer ${token}`
-		}
-
-		if (isBookingRequest) {
-			const finalAuthorization = (config.headers as any)?.Authorization || (config.headers as any)?.authorization
-			console.log('[ApiService interceptor][RN booking] after', {
-				url: requestUrl,
-				method: config.method,
-				authorizationWasOverwritten: Boolean(token && !explicitAuthorization),
-				authorizationWasRemoved: Boolean(explicitAuthorization && !finalAuthorization),
-				finalAuthorization,
-				headers: normalizeHeadersForLog(config.headers),
-				headerComparisonWithWeb: {
-					reactWebSource:
-						'C:\\Health_Care\\health_care_frontend\\src\\services\\apiService.ts uses localStorage.getItem("access_token")',
-					reactWebExpectedAuthorization: token ? `Bearer ${token}` : null,
-					reactNativeActualAuthorization: finalAuthorization,
-					sameAuthorizationShape:
-						Boolean(finalAuthorization) && String(finalAuthorization).startsWith('Bearer '),
-					sameTokenAsRnAccessToken: finalAuthorization === (token ? `Bearer ${token}` : null),
-				},
-			})
 		}
 
 		return config
@@ -99,37 +51,16 @@ axiosInstance.interceptors.request.use(
 
 // Response interceptor
 axiosInstance.interceptors.response.use(
-	(response) => {
-		const requestUrl = String(response.config?.url || '')
-		if (requestUrl.includes('/appointments') || requestUrl.includes('appointments')) {
-			console.log('[ApiService response][RN booking] success', {
-				url: requestUrl,
-				status: response.status,
-				requestHeaders: normalizeHeadersForLog(response.config?.headers),
-				data: response.data,
-			})
-		}
-
-		return response
-	},
+	(response) => response,
 	async (error) => {
 		const status = error.response?.status
 		const message = error.response?.data?.message || 'Something went wrong'
-		const requestUrl = String(error.config?.url || error.response?.config?.url || '')
-
-		if (requestUrl.includes('/appointments') || requestUrl.includes('appointments')) {
-			console.log('[ApiService response][RN booking] error', {
-				url: requestUrl,
-				status,
-				requestHeaders: normalizeHeadersForLog(error.config?.headers || error.response?.config?.headers),
-				responseData: error.response?.data,
-				message: error.message,
-			})
-		}
 
 		if (status === 401) {
 			// Clear storage locally to avoid circular dependencies
-			await AsyncStorage.multiRemove(['role', 'user', 'access_token', 'refresh_token'])
+			await secureStorage.deleteItem('access_token')
+			await secureStorage.deleteItem('refresh_token')
+			await AsyncStorage.multiRemove(['role', 'user'])
 			unauthorizedHandler?.()
 			if (!hasShownSessionExpiredAlert) {
 				hasShownSessionExpiredAlert = true

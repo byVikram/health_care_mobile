@@ -16,6 +16,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { secureStorage } from '../../utils/secureStorage'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import PhonePeSvg from '../../assets/Payment/phonepe.svg'
@@ -151,16 +152,17 @@ const paymentMethods = [
 ]
 
 const getPatientToken = async () => {
-	const entries = await AsyncStorage.multiGet(['patient_token', 'access_token', 'role', 'user'])
-	const [source, token] = entries
-		.filter(([key]) => key === 'patient_token' || key === 'access_token')
-		.find(([, value]) => Boolean(value)) || [null, null]
-	const storedRole = entries.find(([key]) => key === 'role')?.[1] || null
-	const storedUser = entries.find(([key]) => key === 'user')?.[1] || null
+	const accessToken = await secureStorage.getItem('access_token')
+	const patientToken = await AsyncStorage.getItem('patient_token')
+	const storedRole = await AsyncStorage.getItem('role')
+	const storedUser = await AsyncStorage.getItem('user')
 
-	console.log('[PatientPayment] AsyncStorage token values', {
-		patient_token: entries.find(([key]) => key === 'patient_token')?.[1] || null,
-		access_token: entries.find(([key]) => key === 'access_token')?.[1] || null,
+	const source = patientToken ? 'patient_token' : (accessToken ? 'access_token' : null)
+	const token = patientToken || accessToken || null
+
+	console.log('[PatientPayment] token values', {
+		patient_token: patientToken,
+		access_token: accessToken,
 		role: storedRole,
 		user: storedUser,
 		selectedSource: source,

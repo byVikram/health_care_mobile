@@ -270,8 +270,8 @@ export default function QuickServicesSection({ role }: { role: Role }) {
 
 			<Modal visible={showOthersModal} transparent animationType="none" onRequestClose={() => closeOthersModal()}>
 				<Pressable style={styles.overlay} onPress={() => closeOthersModal()}>
-					<Animated.View style={[StyleSheet.absoluteFillObject, { opacity: popupOpacity }]}>
-						<BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFillObject} />
+					<Animated.View style={[StyleSheet.absoluteFill, { opacity: popupOpacity }]}>
+						<BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
 					</Animated.View>
 
 					<Animated.View

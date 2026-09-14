@@ -3,6 +3,8 @@ import React, { createContext, useState, useEffect, useContext } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { setUnauthorizedHandler, setStatusModalHandler, StatusModalData } from '../services/apiService'
 import StatusModal from '../components/common/StatusModal'
+import { safeJsonParse } from '../utils/jsonUtils'
+import { secureStorage } from '../utils/secureStorage'
 
 export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | 'nurse'
 
@@ -129,29 +131,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			const savedRole = await AsyncStorage.getItem('role')
 			console.log('[AuthContext] active role:', savedRole)
 			const savedUser = await AsyncStorage.getItem('user')
-			const token = await AsyncStorage.getItem('access_token')
-			const refresh = await AsyncStorage.getItem('refresh_token')
+			const token = await secureStorage.getItem('access_token')
+			const refresh = await secureStorage.getItem('refresh_token')
 			const nps = await AsyncStorage.getItem('notification_prompt_shown')
 			const savedLocation = await AsyncStorage.getItem('current_location')
 			// Load persisted specialty (survives restarts)
 			const savedSpecialty = await AsyncStorage.getItem('user_specialty')
 
 			setRole(savedRole as UserRole)
-			setUser(savedUser ? JSON.parse(savedUser) : null)
+			setUser(safeJsonParse(savedUser, null))
 			setAccessToken(token)
 			setRefreshToken(refresh)
 			setNotificationPromptShownState(nps === 'true')
 			if (savedSpecialty) {
 				setAncillarySpecialtyState(savedSpecialty as AncillarySpecialty)
-				console.log('[AuthContext] restored ancillary specialty:', savedSpecialty)
 			}
 
 			if (savedLocation) {
-				try {
-					setCurrentLocationState(JSON.parse(savedLocation))
-				} catch (e) {
-					console.error("Failed to parse saved location", e)
-				}
+				setCurrentLocationState(safeJsonParse(savedLocation, null))
 			}
 
 			setIsLoading(false)
@@ -177,8 +174,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	) => {
 		await AsyncStorage.setItem('role', role)
 		await AsyncStorage.setItem('user', JSON.stringify(user))
-		await AsyncStorage.setItem('access_token', accessToken)
-		await AsyncStorage.setItem('refresh_token', refreshToken)
+		await secureStorage.setItem('access_token', accessToken)
+		await secureStorage.setItem('refresh_token', refreshToken)
 		await AsyncStorage.setItem('notification_prompt_shown', String(nps))
 
 		setRole(role)
@@ -200,11 +197,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	}
 
 	const clearAuth = async () => {
+		await secureStorage.deleteItem('access_token')
+		await secureStorage.deleteItem('refresh_token')
 		await AsyncStorage.multiRemove([
 			'role',
 			'user',
-			'access_token',
-			'refresh_token',
 			'notification_prompt_shown',
 			'current_location',
 			'ancillary_capabilities',

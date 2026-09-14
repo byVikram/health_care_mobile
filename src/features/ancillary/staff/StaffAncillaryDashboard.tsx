@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { secureStorage } from '../../../utils/secureStorage'
 import { Image, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
@@ -125,10 +126,10 @@ export default function StaffAncillaryDashboard() {
 		const initWs = async () => {
 			if (!isMounted) return
 			try {
-				const token = (await AsyncStorage.getItem('access_token')) || ''
+				const token = (await secureStorage.getItem('access_token')) || ''
 				if (!isMounted) return
 				if (!token) {
-					console.log('[WS] Cannot connect: access_token is empty in AsyncStorage')
+					console.log('[WS] Cannot connect: access_token is empty in secureStorage')
 					return
 				}
 

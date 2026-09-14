@@ -584,8 +584,8 @@ const styles = StyleSheet.create({
 	},
 	// Filter modal
 	filterModalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
-	filterBackdrop: { ...StyleSheet.absoluteFillObject },
-	filterDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
+	filterBackdrop: { ...StyleSheet.absoluteFill },
+	filterDim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
 	filterSheet: {
 		backgroundColor: '#ffffff',
 		borderTopLeftRadius: 24,

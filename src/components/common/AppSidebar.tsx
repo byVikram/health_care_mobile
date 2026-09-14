@@ -339,7 +339,7 @@ const profileImageUrl = user?.avatar ?? null;
 
 const styles = StyleSheet.create({
   modalRoot: { flex: 1, flexDirection: "row" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.35)" },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.35)" },
   sidebar: {
     width: SIDEBAR_WIDTH,
     backgroundColor: "#ffffff",

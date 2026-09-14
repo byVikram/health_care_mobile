@@ -849,8 +849,8 @@ const styles = StyleSheet.create({
 	inlineFilterSelect: { height: 50, borderRadius: 8, backgroundColor: '#ffffff' },
 	compactFilterSelectWrap: { flexGrow: 1, flexShrink: 1, flexBasis: 112, minWidth: 104 },
 	filterModalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
-	filterBackdrop: { ...StyleSheet.absoluteFillObject },
-	filterDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
+	filterBackdrop: { ...StyleSheet.absoluteFill },
+	filterDim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
 	filterSheet: {
 		backgroundColor: '#ffffff',
 		borderTopLeftRadius: 24,

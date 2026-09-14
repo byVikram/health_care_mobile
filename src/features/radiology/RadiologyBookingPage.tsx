@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
 		elevation: 8,
 	},
 	viewerOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.95)', justifyContent: 'center', alignItems: 'center' },
-	viewerBackdrop: { ...StyleSheet.absoluteFillObject },
+	viewerBackdrop: { ...StyleSheet.absoluteFill },
 	viewerCloseBtn: {
 		position: 'absolute',
 		right: 24,

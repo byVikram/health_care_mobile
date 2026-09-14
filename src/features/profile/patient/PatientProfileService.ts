@@ -1,6 +1,7 @@
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { formatApiDateForDisplay, formatDateStringForApi } from '../../../utils/date'
+import { safeJsonParse } from '../../../utils/jsonUtils'
 
 export interface PatientProfileState {
 	// Personal
@@ -126,12 +127,9 @@ export const mapApiToLocalState = (apiData: any): PatientProfileState => {
 	const parseArray = (val: any): string[] => {
 		if (Array.isArray(val)) return val
 		if (typeof val === 'string' && val) {
-			try {
-				const parsed = JSON.parse(val)
-				if (Array.isArray(parsed)) return parsed
-			} catch {
-				return [val]
-			}
+			const parsed = safeJsonParse<any>(val)
+			if (Array.isArray(parsed)) return parsed
+			return [val]
 		}
 		return []
 	}
