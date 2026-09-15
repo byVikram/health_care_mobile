@@ -1,4 +1,4 @@
-// src/features/wallet/WalletScreen.tsx
+// src/features/wallet/WalletPage.tsx
 import React, { useEffect, useState, useCallback } from 'react'
 import {
 	View,
@@ -17,7 +17,7 @@ import { ROUTES } from '../../navigation/routes'
 import { getWallet, getWalletTransactions, WalletData, WalletTransactionData } from './walletService'
 import { WalletTopUpModal } from './WalletTopUpModal'
 
-export const WalletScreen: React.FC = () => {
+export const WalletPage: React.FC = () => {
 	const navigation = useNavigation<any>()
 
 	const [wallet, setWallet] = useState<WalletData | null>(null)

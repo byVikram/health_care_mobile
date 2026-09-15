@@ -2,6 +2,7 @@
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { formatDateForApi } from '../../utils/date'
+export * from './laboratory'
 import type {
 	LaboratoryItem,
 	LabTestType,

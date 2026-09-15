@@ -881,7 +881,7 @@ export default function ConsultationPage() {
 	const route = useRoute<any>()
 	const { width: pageWidth } = useWindowDimensions()
 	const pagerRef = useRef<ScrollView>(null)
-	const { selectedHospitalId } = useAuth() as any
+	const { selectedHospitalId } = useAuth()
 	const insets = useSafeAreaInsets()
 
 	const [patient, setPatient] = useState<PatientDetails | null>(null)
@@ -900,7 +900,19 @@ export default function ConsultationPage() {
 	const [followUpSlotsLoading, setFollowUpSlotsLoading] = useState(false)
 	const [followUpHospitalId, setFollowUpHospitalId] = useState<string>('')
 
-	const params = route.params as any
+	const params = (route.params || {}) as {
+		appointmentId?: string
+		appointment_id?: string
+		id?: string
+		patient_id?: string
+		patientId?: string
+		patient?: { id?: string }
+		doctor_id?: string
+		doctorID?: string
+		doctor?: any
+		appointment?: any
+		hospital?: any
+	}
 	useEffect(() => {
 		if (pageWidth <= 0) return
 		pagerRef.current?.scrollTo({ x: pageWidth * activeTab, animated: false })

@@ -12,9 +12,9 @@ import AuthNavigator from './AuthNavigator'
 import MainTabNavigator from './MainTabNavigator'
 import { AppScreenHeader, LocationSelector, NotificationPermissionPopup } from '../components/common'
 import LocationScreen from '../components/common/LocationScreen'
-import { WalletScreen } from '../features/wallet/WalletScreen'
-import { WalletTransactionsScreen } from '../features/wallet/WalletTransactionsScreen'
-import { WalletTransactionDetailScreen } from '../features/wallet/WalletTransactionDetailScreen'
+import { WalletPage } from '../features/wallet/WalletPage'
+import { WalletTransactionsPage } from '../features/wallet/WalletTransactionsPage'
+import { WalletTransactionDetailPage } from '../features/wallet/WalletTransactionDetailPage'
 
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
@@ -22,7 +22,7 @@ import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
 import ConsultationPage from '../features/consultation/ConsultationPage'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
-import SettingPage from '../features/setting/SettingPage'
+import SettingPage from '../features/settings/SettingPage'
 // import ScreenCaptureTest from '../features/doctor/search/components/ScreenCaptureTest'
 import AccountPage from '../features/auth/AccountPage'
 import PatientPayment from '../features/patient-payment/PatientPayment'
@@ -32,7 +32,7 @@ import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 import AppointmentList from '../features/appointment/AppointmentList'
 import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
 import OrderListPage from '../features/pharmacy/OrderListPage'
-import OrderDetailsScreen from '../features/pharmacy/OrderDetailsScreen'
+import PharmacyOrderDetailsPage from '../features/pharmacy/PharmacyOrderDetailsPage'
 import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 
 import LaboratorySearchPage from '../features/laboratory/LaboratorySearchPage'
@@ -132,7 +132,7 @@ function AuthenticatedNavigator() {
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.ORDER_DETAILS}
-				component={OrderDetailsScreen}
+				component={PharmacyOrderDetailsPage}
 				options={{ headerShown: true, title: 'Order Details' }}
 			/>
 			<AppStack.Screen
@@ -351,17 +351,17 @@ function AuthenticatedNavigator() {
 		
 			<AppStack.Screen
 				name={ROUTES.STACK.WALLET}
-				component={WalletScreen}
+				component={WalletPage}
 				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.WALLET_TRANSACTIONS}
-				component={WalletTransactionsScreen}
+				component={WalletTransactionsPage}
 				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.WALLET_TRANSACTION_DETAIL}
-				component={WalletTransactionDetailScreen}
+				component={WalletTransactionDetailPage}
 				options={{ headerShown: false }}
 			/>
 		</AppStack.Navigator>

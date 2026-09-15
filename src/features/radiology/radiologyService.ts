@@ -1,6 +1,7 @@
-// src/features/radiology/RadiologyService.ts
+// src/features/radiology/radiologyService.ts
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
+export * from './radiology'
 import {
 	RadiologyItem,
 	RadiologySearchItem,
