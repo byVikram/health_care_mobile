@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import AppBottomSheet from '../../../components/common/AppBottomSheet'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
+import { safeJsonParse } from '../../../utils/jsonUtils'
 import { ServiceProcedureItem } from './AllServiceCard'
 import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
 
@@ -51,15 +52,11 @@ const parseWhatsIncluded = (raw: any): string[] => {
 	if (typeof raw === 'string') {
 		const trimmed = raw.trim()
 		if (!trimmed) return []
-		try {
-			const parsed = JSON.parse(trimmed)
-			if (Array.isArray(parsed)) {
-				return parsed
-					.map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
-					.filter(Boolean)
-			}
-		} catch {
-			// not JSON string
+		const parsed = safeJsonParse<any>(trimmed)
+		if (Array.isArray(parsed)) {
+			return parsed
+				.map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+				.filter(Boolean)
 		}
 		if (trimmed.includes('\n')) {
 			return trimmed

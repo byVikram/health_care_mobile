@@ -15,7 +15,7 @@ import SearchPage from '../features/doctor/search/SearchPage'
 import BookingsPage from '../features/bookings/BookingsPage'
 import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
-import { WalletScreen } from '../features/wallet/WalletScreen'
+import { WalletPage } from '../features/wallet/WalletPage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
 import NursingCarePage from '../features/ancillary/patient/NursingCarePage'
@@ -175,10 +175,10 @@ function DockedTabBar({ state, descriptors, navigation, onAncillaryPress }: Dock
 }
 
 export default function MainTabNavigator() {
-	const { role } = useAuth()
 	const navigation = useNavigation<any>()
-	const isNurse = (role as any) === 'nurse' || (role as any) === 'ancillary'
-	const isDoctor = (role as any) === 'doctor'
+	const { role } = useAuth()
+	const isNurse = role === 'nurse' || role === 'ancillary'
+	const isDoctor = role === 'doctor'
 	const shouldShowSearch = role !== 'doctor'
 	const shouldShowAncillary = !isNurse
 	const [ancillarySheetVisible, setAncillarySheetVisible] = useState(false)
@@ -231,7 +231,7 @@ export default function MainTabNavigator() {
 				) : null}
 				<Tab.Screen
 					name={ROUTES.MAIN.WALLET}
-					component={WalletScreen}
+					component={WalletPage}
 					options={{
 						headerShown: false,
 					}}

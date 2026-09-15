@@ -38,14 +38,15 @@ export default function NursePulseRadarView({
 
 	useEffect(() => {
 		// Continuous pulsing animation
-		Animated.loop(
+		const pulseLoop = Animated.loop(
 			Animated.timing(pulseAnim, {
 				toValue: 1,
 				duration: 2200,
 				easing: Easing.out(Easing.ease),
 				useNativeDriver: true,
 			})
-		).start()
+		)
+		pulseLoop.start()
 
 		// Ticker interval
 		const interval = setInterval(() => {
@@ -53,14 +54,19 @@ export default function NursePulseRadarView({
 		}, 4000)
 
 		// Progress bar animation over 30s
-		Animated.timing(progressAnim, {
+		const progressAnimation = Animated.timing(progressAnim, {
 			toValue: 1,
 			duration: 30000,
 			easing: Easing.linear,
 			useNativeDriver: false,
-		}).start()
+		})
+		progressAnimation.start()
 
-		return () => clearInterval(interval)
+		return () => {
+			clearInterval(interval)
+			pulseLoop.stop()
+			progressAnimation.stop()
+		}
 	}, [])
 
 	const scaleRing1 = pulseAnim.interpolate({

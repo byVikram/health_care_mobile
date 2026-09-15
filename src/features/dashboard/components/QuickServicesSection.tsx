@@ -27,7 +27,7 @@ import RadiologyIcon from '../../../assets/quick-services/radiology.svg'
 import AncilaryIcon from '../../../assets/quick-services/ancilary.svg'
 import AlliedIcon from '../../../assets/quick-services/allied.png'
 import TherapeuticIcon from '../../../assets/quick-services/therapeutic.png'
-import ScanTypeSelectorModal from '../../radiology/component/Scantypeselectormodal'
+import ScanTypeSelectorModal from '../../radiology/components/ScanTypeSelectorModal'
 
 import AlliedSelectorModal from './AlliedSelcetorModel'
 import TherapeuticSelector from './TherapeuticSelector'
@@ -270,8 +270,8 @@ export default function QuickServicesSection({ role }: { role: Role }) {
 
 			<Modal visible={showOthersModal} transparent animationType="none" onRequestClose={() => closeOthersModal()}>
 				<Pressable style={styles.overlay} onPress={() => closeOthersModal()}>
-					<Animated.View style={[StyleSheet.absoluteFillObject, { opacity: popupOpacity }]}>
-						<BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFillObject} />
+					<Animated.View style={[StyleSheet.absoluteFill, { opacity: popupOpacity }]}>
+						<BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
 					</Animated.View>
 
 					<Animated.View

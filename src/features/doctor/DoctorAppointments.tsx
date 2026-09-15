@@ -32,6 +32,8 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import DateSlotPicker from '../../components/common/DateSlotPicker'
 import { AppInput, AppModal } from '../../components/common'
+import { RejectReasonModal } from './components/RejectReasonModal'
+import { WeekSelector, type WeekDay } from './components/WeekSelector'
 import FavouriteDoctorList, { type FavouriteDoctorListItem } from './search/components/FavouriteDoctorList'
 import {
   getDoctorAvailability,
@@ -197,62 +199,6 @@ function RejectConfirmModal({ visible, onCancel, onConfirm, submitting = false }
   )
 }
 
-
-// ── Week day selector ─────────────────────────────────────────────────────────
-
-interface WeekDay {
-  day: string
-  date: string
-  red: boolean
-  dateObj: Date
-}
-
-interface WeekSelectorProps {
-  weekDays: WeekDay[]
-  selectedDate: number
-  onSelectDate: (i: number) => void
-  selectedDateObj: Date
-}
-
-function WeekSelector({ weekDays, selectedDate, onSelectDate, selectedDateObj }: WeekSelectorProps) {
-  return (
-    <View>
-      <View style={styles.weekHeader}>
-        <Text style={styles.weekHeaderTitle}>Today's Appointments</Text>
-        <Text style={styles.weekMonth}>
-          {selectedDateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-        </Text>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weekDayRow}>
-        {weekDays.map((d, i) => (
-          <TouchableOpacity
-            key={i}
-            style={[
-              styles.dayCell,
-              selectedDate === i && styles.dayCellSelected,
-            ]}
-            onPress={() => onSelectDate(i)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.dayLabel, selectedDate === i && styles.dayLabelSelected]}>
-              {d.day}
-            </Text>
-            <Text
-              style={[
-                styles.dateLabel,
-                selectedDate === i && styles.dateLabelSelected,
-                !selectedDate && d.red && styles.dateLabelRed,
-              ]}
-            >
-              {d.date}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-      <View style={styles.divider} />
-    </View>
-  )
-}
 
 // ── Reschedule Helpers ────────────────────────────────────────────────────────
 
@@ -1629,7 +1575,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rejectBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   rejectCard: {

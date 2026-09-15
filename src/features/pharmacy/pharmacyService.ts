@@ -1,5 +1,6 @@
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
+export * from './pharmacy'
 
 export interface PatientAddress {
 	id: string

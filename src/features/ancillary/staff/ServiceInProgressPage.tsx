@@ -118,7 +118,7 @@ export default function ServiceInProgressPage() {
 
 	// Tick timer effect
 	useEffect(() => {
-		let timer: NodeJS.Timeout
+		let timer: ReturnType<typeof setInterval> | null = null
 		if (sessionState?.startServiceTime) {
 			timer = setInterval(() => {
 				const start = new Date(sessionState.startServiceTime!).getTime()

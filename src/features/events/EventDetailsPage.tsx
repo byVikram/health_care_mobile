@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 
 import { AppScreenHeader, AppTypography, AppButton } from '../../components/common'
@@ -44,6 +45,7 @@ export default function EventDetailsPage() {
 	const route = useRoute<EventDetailsRouteProp>()
 	const navigation = useNavigation()
 	const { eventId } = route.params
+	const insets = useSafeAreaInsets()
 
 	const [event, setEvent] = useState<EventItem | null>(null)
 	const [loading, setLoading] = useState(true)
@@ -199,7 +201,7 @@ export default function EventDetailsPage() {
 				</View>
 			</ScrollView>
 
-			<View style={styles.bottomBar}>
+			<View style={[styles.bottomBar, { paddingBottom: 16 + insets.bottom }]}>
 				<AppButton
 					variant="primary"
 					onPress={handleRegister}
@@ -322,7 +324,6 @@ const styles = StyleSheet.create({
 		backgroundColor: '#fff',
 		paddingHorizontal: 20,
 		paddingTop: 16,
-		paddingBottom: Platform.OS === 'ios' ? 32 : 16,
 		borderTopWidth: 1,
 		borderTopColor: '#e2e8f0',
 	},

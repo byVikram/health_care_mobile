@@ -7,6 +7,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { safeJsonParse } from '../../../../utils/jsonUtils'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppCalendar,
@@ -388,7 +389,7 @@ export default function PersonalDetailsTab({
 					mobile: num || '',
 					gender: normalizeGenderValue(gndr || ''),
 					dob: formatDobForDisplay(dobVal || ''),
-					languages: langs ? normalizeLanguageValues(JSON.parse(langs)) : [],
+					languages: langs ? normalizeLanguageValues(safeJsonParse<string[]>(langs) || []) : [],
 					location: loc || '',
 					instagram: insta || '',
 					facebook: fb || '',

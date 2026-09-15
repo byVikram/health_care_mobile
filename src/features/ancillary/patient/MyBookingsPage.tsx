@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useFocusEffect } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
 import {
@@ -43,6 +44,7 @@ export default function MyBookingsPage({
 	activeTab: propActiveTab,
 }: MyBookingsPageProps = {}) {
 	const navigation = useNavigation<any>()
+	const insets = useSafeAreaInsets()
 
 	const [bookings, setBookings] = useState<AncillaryBooking[]>([])
 	const [isLoading, setIsLoading] = useState(true)
@@ -275,7 +277,7 @@ export default function MyBookingsPage({
 		>
 			<View style={styles.filterModalRoot}>
 				<Pressable style={styles.filterBackdrop} onPress={() => setFilterModalVisible(false)} />
-				<View style={styles.filterSheet}>
+				<View style={[styles.filterSheet, { paddingBottom: Math.max(insets.bottom, 26) }]}>
 					<View style={styles.filterSheetHandle} />
 					<View style={styles.filterSheetHeader}>
 						<Text style={styles.filterSheetTitle}>Filters</Text>
@@ -459,7 +461,7 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(15, 23, 42, 0.34)',
 	},
 	filterBackdrop: {
-		...StyleSheet.absoluteFillObject,
+		...StyleSheet.absoluteFill,
 	},
 	filterSheet: {
 		width: '100%',

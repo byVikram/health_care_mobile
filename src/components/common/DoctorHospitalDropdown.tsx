@@ -10,6 +10,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import axios from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { secureStorage } from '../../utils/secureStorage'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { useAuth } from '../../context/AuthContext'
 import AppBottomSheet from './AppBottomSheet'
@@ -38,7 +39,7 @@ export default function DoctorHospitalDropdown() {
   const fetchHospitals = async () => {
     try {
       setLoading(true)
-      const token = await AsyncStorage.getItem('access_token')
+      const token = await secureStorage.getItem('access_token')
       if (!token) return
 
       const response = await axios.get(API_ENDPOINTS.DOCTORS.HOSPITALS, {

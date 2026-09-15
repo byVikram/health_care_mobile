@@ -22,7 +22,7 @@ import PatientQR from "../../assets/icons/PatientQR.svg";
 import LogoutIcon from "../../assets/icons/logout.svg";
 const ORCode = require("../../assets/icons/QrCode.png");
 
-import PatientQr from "../../features/patientQr/PatientQr";
+import PatientQr from "../../features/patient-qr/PatientQr";
 import { USER_ROLES } from "../../constants/constants"; // adjust path if needed
 
 export interface AppSidebarItem {
@@ -339,7 +339,7 @@ const profileImageUrl = user?.avatar ?? null;
 
 const styles = StyleSheet.create({
   modalRoot: { flex: 1, flexDirection: "row" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.35)" },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.35)" },
   sidebar: {
     width: SIDEBAR_WIDTH,
     backgroundColor: "#ffffff",

@@ -9,6 +9,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { safeJsonParse } from '../../../../utils/jsonUtils'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppButton, AppTypography } from '../../../../components/common'
 import {
@@ -299,10 +300,8 @@ export default function CapabilitiesTab({
 				} else {
 					const storedCaps = await AsyncStorage.getItem('ancillary_capabilities')
 					if (storedCaps) {
-						try {
-							const parsed = JSON.parse(storedCaps)
-							if (Array.isArray(parsed)) savedList = parsed
-						} catch (_) {}
+						const parsed = safeJsonParse<any>(storedCaps)
+						if (Array.isArray(parsed)) savedList = parsed
 					}
 				}
 
@@ -329,7 +328,7 @@ export default function CapabilitiesTab({
 				if (srvResult.status === 'fulfilled' && Array.isArray(srvResult.value) && srvResult.value.length > 0) {
 					activeProcedures = srvResult.value.map((item: AncillaryServiceItem) => ({
 						id: item.id,
-						label: item.title,
+						label: item.title || item.label || '',
 						subtitle: item.description,
 						rate: item.price ? `₹${item.price}` : (resolvedSpecialty === 'home-care' ? 'Included in package' : 'Custom Pricing'),
 						price: item.price || 0,

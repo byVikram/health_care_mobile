@@ -1,6 +1,8 @@
 // src/services/apiService.ts
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { secureStorage } from '../utils/secureStorage'
+import { isKnownOffline } from '../utils/networkState'
 
 export interface StatusModalData {
 	status?: 'success' | 'error' | 'info'
@@ -18,6 +20,17 @@ const axiosInstance = axios.create()
 let unauthorizedHandler: (() => void) | null = null
 let statusModalHandler: StatusModalHandler | null = null
 let hasShownSessionExpiredAlert = false
+// Synthetic error used to short-circuit a request we already know will fail
+// because the device is offline (see isKnownOffline() below), so we don't
+// waste time waiting on a doomed request. Tagged the same way a real Axios
+// network error is (no .response, code 'ERR_NETWORK') so the response
+// interceptor's error-classification logic below handles both identically.
+const createOfflineError = (): Error & { code: string; isOfflineError: true } => {
+	const err = new Error('No internet connection') as Error & { code: string; isOfflineError: true }
+	err.code = 'ERR_NETWORK'
+	err.isOfflineError = true
+	return err
+}
 
 export const setUnauthorizedHandler = (handler: (() => void) | null) => {
 	unauthorizedHandler = handler
@@ -31,67 +44,16 @@ export const showStatusModal = (data: StatusModalData | null) => {
 	statusModalHandler?.(data)
 }
 
-const normalizeHeadersForLog = (headers: unknown) => {
-	const maybeHeaders = headers as {
-		toJSON?: () => unknown
-		Authorization?: unknown
-		authorization?: unknown
-	}
-
-	if (typeof maybeHeaders?.toJSON === 'function') {
-		return maybeHeaders.toJSON()
-	}
-
-	return headers
-}
-
 // Request interceptor
 axiosInstance.interceptors.request.use(
 	async (config) => {
-		// Use AsyncStorage in React Native
-		const token = await AsyncStorage.getItem('access_token')
-		console.log('[API TOKEN]', token)
-		const requestUrl = String(config.url || '')
-		const isBookingRequest = requestUrl.includes('/appointments') || requestUrl.includes('appointments')
-		config.headers = config.headers || {}
-		const headers = config.headers as any
-		const explicitAuthorization = headers?.Authorization || headers?.authorization
-
-		if (isBookingRequest) {
-			console.log('[ApiService interceptor][RN booking] before', {
-				url: requestUrl,
-				method: config.method,
-				asyncStorageAccessToken: token,
-				explicitAuthorization,
-				headers: normalizeHeadersForLog(config.headers),
-			})
+		if (isKnownOffline()) {
+			return Promise.reject(createOfflineError())
 		}
-
-		if (token && !explicitAuthorization) {
-			headers.Authorization = `Bearer ${token}`
+		const token = await secureStorage.getItem('access_token')
+		if (token && config.headers && !config.headers.Authorization && !config.headers.authorization) {
+			config.headers.Authorization = `Bearer ${token}`
 		}
-
-		if (isBookingRequest) {
-			const finalAuthorization = (config.headers as any)?.Authorization || (config.headers as any)?.authorization
-			console.log('[ApiService interceptor][RN booking] after', {
-				url: requestUrl,
-				method: config.method,
-				authorizationWasOverwritten: Boolean(token && !explicitAuthorization),
-				authorizationWasRemoved: Boolean(explicitAuthorization && !finalAuthorization),
-				finalAuthorization,
-				headers: normalizeHeadersForLog(config.headers),
-				headerComparisonWithWeb: {
-					reactWebSource:
-						'C:\\Health_Care\\health_care_frontend\\src\\services\\apiService.ts uses localStorage.getItem("access_token")',
-					reactWebExpectedAuthorization: token ? `Bearer ${token}` : null,
-					reactNativeActualAuthorization: finalAuthorization,
-					sameAuthorizationShape:
-						Boolean(finalAuthorization) && String(finalAuthorization).startsWith('Bearer '),
-					sameTokenAsRnAccessToken: finalAuthorization === (token ? `Bearer ${token}` : null),
-				},
-			})
-		}
-
 		return config
 	},
 	(error) => Promise.reject(error)
@@ -99,37 +61,43 @@ axiosInstance.interceptors.request.use(
 
 // Response interceptor
 axiosInstance.interceptors.response.use(
-	(response) => {
-		const requestUrl = String(response.config?.url || '')
-		if (requestUrl.includes('/appointments') || requestUrl.includes('appointments')) {
-			console.log('[ApiService response][RN booking] success', {
-				url: requestUrl,
-				status: response.status,
-				requestHeaders: normalizeHeadersForLog(response.config?.headers),
-				data: response.data,
-			})
+	(response) => response,
+	async (error) => {
+		const isAxiosErr = axios.isAxiosError(error)
+		const hasResponse = Boolean(error?.response)
+
+		// No response at all: either a real Axios network/timeout failure, or the
+		// synthetic offline error from the request interceptor above. Distinguish
+		// this from a genuine server/auth/validation error (which always has a
+		// response) so we don't show a confusing 'Something went wrong' when the
+		// real problem is connectivity.
+		if (!hasResponse) {
+			const isTimeout = isAxiosErr && error.code === 'ECONNABORTED'
+			// Deliberately do NOT call showStatusModal here (Task 9 correction).
+			// The global OfflineBanner already communicates connectivity loss, and
+			// the calling screen's own catch block is responsible for any request-
+			// specific UI (local StatusModal, Toast, inline error, etc). Showing a
+			// second global modal here would duplicate that message. 401/403 and
+			// the other HTTP-status branches below are unaffected.
+			//
+			// We still overwrite .message with a clean, user-safe string so that
+			// screen-level catches reading err.message (e.g. err?.message ||
+			// 'Something went wrong') never surface raw Axios/network internals
+			// such as 'Network Error' or 'timeout of 30000ms exceeded'.
+			error.message = isTimeout
+				? 'The request took too long. Please try again.'
+				: 'No internet connection. Please check your network and try again.'
+			return Promise.reject(error)
 		}
 
-		return response
-	},
-	async (error) => {
 		const status = error.response?.status
 		const message = error.response?.data?.message || 'Something went wrong'
-		const requestUrl = String(error.config?.url || error.response?.config?.url || '')
-
-		if (requestUrl.includes('/appointments') || requestUrl.includes('appointments')) {
-			console.log('[ApiService response][RN booking] error', {
-				url: requestUrl,
-				status,
-				requestHeaders: normalizeHeadersForLog(error.config?.headers || error.response?.config?.headers),
-				responseData: error.response?.data,
-				message: error.message,
-			})
-		}
 
 		if (status === 401) {
 			// Clear storage locally to avoid circular dependencies
-			await AsyncStorage.multiRemove(['role', 'user', 'access_token', 'refresh_token'])
+			await secureStorage.deleteItem('access_token')
+			await secureStorage.deleteItem('refresh_token')
+			await AsyncStorage.multiRemove(['role', 'user'])
 			unauthorizedHandler?.()
 			if (!hasShownSessionExpiredAlert) {
 				hasShownSessionExpiredAlert = true

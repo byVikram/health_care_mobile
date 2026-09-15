@@ -1239,7 +1239,7 @@ const styles = StyleSheet.create({
 
 	// Diagnosis document viewer (Step 1)
 	viewerOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.95)', justifyContent: 'center', alignItems: 'center' },
-	viewerBackdrop: { ...StyleSheet.absoluteFillObject },
+	viewerBackdrop: { ...StyleSheet.absoluteFill },
 	viewerCloseBtn: {
 		position: 'absolute',
 		right: 24,

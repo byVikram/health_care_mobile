@@ -13,12 +13,15 @@ import axios from 'axios'
 import { createUser } from '../authService'
 import { AppInput } from '../../../components/common'
 import { ROUTES } from '../../../navigation/routes'
+import { registrationSchema, getFieldErrors } from '../../../validation/authSchemas'
 
 type RegisterFormData = {
 	name: string
 	email: string
 	mobile: string
 }
+
+type RegisterFieldErrors = Partial<Record<keyof RegisterFormData, string>>
 
 interface RegisterFormProps {
 	roleId: string
@@ -43,6 +46,7 @@ export default function RegisterForm({
 }: RegisterFormProps) {
 	const [loading, setLoading] = useState(false)
 	const [formError, setFormError] = useState('')
+	const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({})
 
 	const { width, height } = useWindowDimensions()
 
@@ -56,6 +60,9 @@ export default function RegisterForm({
 			...prev,
 			[field]: value,
 		}))
+		if (fieldErrors[field]) {
+			setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
+		}
 	}
 
 	const handleRegister = async () => {
@@ -63,38 +70,17 @@ export default function RegisterForm({
 		const email = formData.email.trim()
 		const mobile = formData.mobile
 
-		console.log('Registering with:', {
-			roleId,
-			name,
-			email,
-			mobile,
-			specialty,
-		})
-
 		setFormError('')
+		setFieldErrors({})
 
 		if (!roleId) {
 			setFormError('Role ID missing')
 			return
 		}
 
-		if (!name.trim()) {
-			setFormError('Name is required')
-			return
-		}
-
-		if (!email.trim()) {
-			setFormError('Email is required')
-			return
-		}
-
-		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-			setFormError('Invalid email')
-			return
-		}
-
-		if (!/^[6-9]\d{9}$/.test(mobile)) {
-			setFormError('Enter valid 10-digit mobile number')
+		const result = registrationSchema.safeParse({ name, email, mobile })
+		if (!result.success) {
+			setFieldErrors(getFieldErrors(registrationSchema, { name, email, mobile }) as RegisterFieldErrors)
 			return
 		}
 
@@ -103,9 +89,9 @@ export default function RegisterForm({
 
 			const res = await createUser({
 				role_id: roleId,
-				name,
-				email,
-				contact_number: mobile,
+				name: result.data.name,
+				email: result.data.email,
+				contact_number: result.data.mobile,
 				specialty_id: specialty,
 			})
 
@@ -117,8 +103,6 @@ export default function RegisterForm({
 				setFormError(res?.message || 'Registration failed')
 			}
 		} catch (err) {
-			console.log(err)
-
 			if (axios.isAxiosError(err)) {
 				setFormError(err.response?.data?.message || 'Server error')
 			} else {
@@ -153,6 +137,7 @@ export default function RegisterForm({
 					value={formData.name}
 					onChangeText={(value) => updateField('name', value)}
 					style={styles.input}
+					errorText={fieldErrors.name}
 				/>
 
 				<AppInput
@@ -162,6 +147,7 @@ export default function RegisterForm({
 					keyboardType="email-address"
 					autoCapitalize="none"
 					style={styles.input}
+					errorText={fieldErrors.email}
 				/>
 
 				<AppInput
@@ -172,6 +158,7 @@ export default function RegisterForm({
 					maxLength={10}
 					autoFocus={autoFocusMobile}
 					style={styles.input}
+					errorText={fieldErrors.mobile}
 				/>
 
 				<TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>

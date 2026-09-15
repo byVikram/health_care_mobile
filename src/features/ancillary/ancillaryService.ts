@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
+import { safeJsonParse } from '../../utils/jsonUtils'
 
 // --- Canonical 13-State Machine Status Vocabulary ---
 export type CanonicalRequestStatus =
@@ -32,9 +33,9 @@ export const generateIdempotencyKey = (): string => {
 }
 
 export interface AncillaryServiceItem {
-
 	id: string
-	label: string
+	title?: string
+	label?: string
 	description: string
 	price: number
 	categoryId?: string | null
@@ -86,6 +87,7 @@ const mapRawServiceToItem = (raw: any): AncillaryServiceItem => {
 	return {
 		id: raw?.id,
 		title: raw?.title || raw?.label || raw?.name || '',
+		label: raw?.label || raw?.title || raw?.name || '',
 		description: raw?.description || aboutServiceRaw || '',
 		price: typeof raw?.price === 'number' ? raw.price : Number(raw?.price) || 0,
 		categoryId: raw?.categoryId ?? raw?.category_id ?? null,
@@ -252,7 +254,7 @@ export const getBookingState = async (bookingId: string): Promise<NurseBookingSt
 		if (!json) {
 			json = await AsyncStorage.getItem(LEGACY_STORAGE_PREFIX + bookingId)
 		}
-		return json ? JSON.parse(json) : null
+		return json ? safeJsonParse<NurseBookingState>(json) : null
 	} catch (error) {
 		console.error(`[ancillaryService] Error reading state for booking ${bookingId}:`, error)
 		return null

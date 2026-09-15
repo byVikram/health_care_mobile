@@ -21,10 +21,10 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { BlurView } from 'expo-blur'
 import Toast from 'react-native-toast-message'
 
-import RadiologyCard from './component/RadiologyCard'
-import RadiologyFilter from './component/RadiologyFilter'
+import RadiologyCard from './components/RadiologyCard'
+import RadiologyFilter from './components/RadiologyFilter'
 import { RadiologyItem, RadiologyFilters, DEFAULT_RADIOLOGY_FILTERS } from './radiology'
-import { fetchRadiologyCatalog, applyRadiologyFilters, clearRadiologyCache } from './RadiologyService'
+import { fetchRadiologyCatalog, applyRadiologyFilters, clearRadiologyCache } from './radiologyService'
 import { AppBottomSheet, AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
 import { ROUTES } from '../../navigation/routes'
 
@@ -582,8 +582,8 @@ const styles = StyleSheet.create({
 		gap: 12,
 	},
 	filterModalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
-	filterBackdrop: { ...StyleSheet.absoluteFillObject },
-	filterDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
+	filterBackdrop: { ...StyleSheet.absoluteFill },
+	filterDim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
 	filterSheet: {
 		backgroundColor: '#ffffff',
 		borderTopLeftRadius: 24,
