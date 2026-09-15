@@ -5,6 +5,7 @@ import OtpForm from './components/OtpForm';
 import { sendOtp } from './authService';
 import { ROUTES } from '../../navigation/routes';
 import type { AuthScreenProps } from '../../navigation/types';
+import { loginSchema, getFieldErrors } from '../../validation/authSchemas';
 
 // ✅ Import SVG
 import OnboardingImage from '../../assets/Onboarding/onboarding-4.svg';
@@ -19,22 +20,26 @@ export default function LoginPage({
     const [focusContactOnLogin, setFocusContactOnLogin] = useState(false);
 
     const handleContinue = async () => {
-        if (contactNumber.length > 0) {
-            setLoading(true);
-            setError('');
-            try {
-                const res = await sendOtp(contactNumber);
-                if (res.success !== false) {
-                    setFocusContactOnLogin(false);
-                    setStep('otp');
-                } else {
-                    setError(res.message || 'Failed to send OTP');
-                }
-            } catch (err: any) {
-                setError(err.response?.data?.message || 'Failed to send OTP');
-            } finally {
-                setLoading(false);
+        const fieldErrors = getFieldErrors(loginSchema, { contactNumber });
+        if (fieldErrors.contactNumber) {
+            setError(fieldErrors.contactNumber);
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+        try {
+            const res = await sendOtp(contactNumber);
+            if (res.success !== false) {
+                setFocusContactOnLogin(false);
+                setStep('otp');
+            } else {
+                setError(res.message || 'Failed to send OTP');
             }
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Failed to send OTP');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -64,7 +69,10 @@ export default function LoginPage({
                         <AppInput
                             label="Contact Number"
                             value={contactNumber}
-                            onChangeText={setContactNumber}
+                            onChangeText={(value) => {
+                                setContactNumber(value);
+                                if (error) setError('');
+                            }}
                             keyboardType="phone-pad"
                             autoFocus={focusContactOnLogin}
                             style={styles.input}

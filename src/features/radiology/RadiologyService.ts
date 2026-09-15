@@ -8,123 +8,29 @@ import {
 	ScanType,
 	PricingModel,
 	RadiologyScanOffering,
+	RadiologyBookingPayload,
+	RadiologyBookingItem,
+	PatientShort,
+	ClinicShort,
+	RadiologyShort,
+	RadiologyBooking,
+	UpdateRadiologyBookingPayload,
+	QuoteItemPayload,
+	SubmitQuotePayload,
+	RadiologyReportCreatePayload,
 } from './radiology'
 
-export interface RadiologyBookingPayload {
-	radiology_id: string
-	scan_ids: number[]
-	booking_date: string // YYYY-MM-DD
-	booking_time: string
-	treatment_id: string
-	external_prescription_s3_key: string | null
-	notes: string | null
-}
-
-export interface RadiologyBookingItem {
-	id: number
-	radiology_scan: {
-		id: number
-		scan_type: { id: number; name: string; description?: string }
-		pricing_model: string
-		base_price: number | null
-		price_details?: string
-		is_available: boolean
-	}
-	custom_scan_name?: string | null
-	quoted_price?: number | null
-}
-
-export interface PatientShort {
-	id: string
-	name: string
-	phone?: string | null
-	age?: number | null
-	gender?: string | null
-}
-
-export interface ClinicShort {
-	name?: string | null
-	phone?: string | null
-	address?: string | null
-}
-
-export interface RadiologyShort {
-	id: string
-	name: string
-	phone?: string | null
-	address?: string | null
-}
-
-export interface RadiologyBooking {
-	// Flat phone helpers (backward compat)
-	doctor_phone: string
-	radiology_phone: string
-	patient_phone: string
-	// Nested participant details
-	patient?: PatientShort | null
-	clinic?: ClinicShort | null
-	radiology?: RadiologyShort | null
-	id: number
-	public_id: string
-	patient_id: number
-	patient_name: string
-	radiology_name: string
-	radiology_public_id: string
-	booking_date: string
-	booking_time: string
-	status: string
-	payment_status: string
-	prescription_verified: boolean
-	verified_by_user_id: number | null
-	verified_by_name?: string | null
-	verified_at: string | null
-	total_price: number | null
-	notes?: string | null
-	external_prescription_s3_key?: string | null
-	booking_items: RadiologyBookingItem[]
-	report?: {
-    report_pdf_s3_key?: string
-    dicom_images_s3_keys?: string[]
-    scan_images_s3_keys?: string[]
-    summary_findings?: string
-}
-
-consultation?: {
-	doctor_name?: string
-	chief_complaint?: string
-	clinical_history?: string
-	notes?: string
-	recommendation?: string
-	follow_up?: string
-}
-	created_at: string
-}
-
-export interface UpdateRadiologyBookingPayload {
-	status?: string
-	total_price?: number
-	prescription_verified?: boolean
-	notes?: string
-}
-
-export interface QuoteItemPayload {
-	booking_item_id?: number | null
-	radiology_scan_id?: number | null
-	custom_scan_name?: string | null
-	quoted_price: number
-}
-
-export interface SubmitQuotePayload {
-	items: QuoteItemPayload[]
-	prescription_verified?: boolean
-	notes?: string | null
-}
-
-export interface RadiologyReportCreatePayload {
-	report_pdf_s3_key: string
-	dicom_images_s3_keys?: string[]
-	scan_images_s3_keys?: string[]
-	summary_findings?: string
+export type {
+	RadiologyBookingPayload,
+	RadiologyBookingItem,
+	PatientShort,
+	ClinicShort,
+	RadiologyShort,
+	RadiologyBooking,
+	UpdateRadiologyBookingPayload,
+	QuoteItemPayload,
+	SubmitQuotePayload,
+	RadiologyReportCreatePayload,
 }
 
 // Cache management
@@ -542,5 +448,3 @@ export function clearRadiologyCache() {
 	scanTypesCache = null
 	radiologyCache.clear()
 }
-export { ScanType }
-

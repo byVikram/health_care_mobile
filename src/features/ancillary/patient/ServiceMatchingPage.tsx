@@ -78,6 +78,7 @@ export default function ServiceMatchingPage() {
 	// WebSocket Channel for Instant Push Assignment
 	useEffect(() => {
 		let ws: WebSocket | null = null
+		let navigateTimeout: ReturnType<typeof setTimeout> | null = null
 		try {
 			const targetId = String(bookingId || 'active')
 			const wsUrl = API_ENDPOINTS.ANCILLARY.WS_PATIENT_REQUEST(targetId)
@@ -93,7 +94,7 @@ export default function ServiceMatchingPage() {
 							if (payload.data.assignedProvider) {
 								setAssignedProvider(payload.data.assignedProvider)
 							}
-							setTimeout(() => {
+							navigateTimeout = setTimeout(() => {
 								navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
 									bookingId: targetId,
 									bookingData: payload.data,
@@ -110,6 +111,7 @@ export default function ServiceMatchingPage() {
 		}
 
 		return () => {
+			if (navigateTimeout) clearTimeout(navigateTimeout)
 			if (ws) ws.close()
 		}
 	}, [bookingId, navigation])
@@ -117,6 +119,7 @@ export default function ServiceMatchingPage() {
 	// Initial Status Check via HTTP
 	useEffect(() => {
 		let isMounted = true
+		let navigateTimeout: ReturnType<typeof setTimeout> | null = null
 		const checkInitialStatus = async () => {
 			try {
 				const activeReq = await fetchPatientActiveRequestBackend()
@@ -124,7 +127,7 @@ export default function ServiceMatchingPage() {
 					if (activeReq.status === 'ASSIGNED' || activeReq.status === 'EN_ROUTE') {
 						setSearchStatus('ASSIGNED')
 						setAssignedProvider(activeReq.provider)
-						setTimeout(() => {
+						navigateTimeout = setTimeout(() => {
 							navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
 								bookingId: activeReq.id,
 								bookingData: activeReq,
@@ -141,6 +144,7 @@ export default function ServiceMatchingPage() {
 
 		return () => {
 			isMounted = false
+			if (navigateTimeout) clearTimeout(navigateTimeout)
 		}
 	}, [bookingId, navigation])
 

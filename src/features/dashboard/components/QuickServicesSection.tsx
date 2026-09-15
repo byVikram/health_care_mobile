@@ -27,7 +27,7 @@ import RadiologyIcon from '../../../assets/quick-services/radiology.svg'
 import AncilaryIcon from '../../../assets/quick-services/ancilary.svg'
 import AlliedIcon from '../../../assets/quick-services/allied.png'
 import TherapeuticIcon from '../../../assets/quick-services/therapeutic.png'
-import ScanTypeSelectorModal from '../../radiology/component/Scantypeselectormodal'
+import ScanTypeSelectorModal from '../../radiology/components/ScanTypeSelectorModal'
 
 import AlliedSelectorModal from './AlliedSelcetorModel'
 import TherapeuticSelector from './TherapeuticSelector'

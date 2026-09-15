@@ -38,7 +38,8 @@ import { useAuth } from '../../context/AuthContext'
 import Toast from 'react-native-toast-message'
 import { getPharmacies } from '../profile/pharmacy/pharmacyService'
 import { getLaboratories } from '../laboratory/laboratoryService'
-import { fetchRadiologyCatalog } from '../radiology/RadiologyService'
+import { fetchRadiologyCatalog } from '../radiology/radiologyService'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const SAMPLE_DICOM_MODULE = require('../../assets/dicon/sample-dicon.dcm')
 
@@ -881,6 +882,7 @@ export default function ConsultationPage() {
 	const { width: pageWidth } = useWindowDimensions()
 	const pagerRef = useRef<ScrollView>(null)
 	const { selectedHospitalId } = useAuth() as any
+	const insets = useSafeAreaInsets()
 
 	const [patient, setPatient] = useState<PatientDetails | null>(null)
 	const [doctor, setDoctor] = useState<DocterDetails | null>(null)
@@ -1119,7 +1121,7 @@ export default function ConsultationPage() {
 
 				</ScrollView>
 
-				<View style={styles.stickyFooter}>
+				<View style={[styles.stickyFooter, { paddingBottom: 12 + insets.bottom }]}>
 					<AppSkeleton width="100%" height={48} borderRadius={24} />
 				</View>
 			</View>
@@ -1424,7 +1426,7 @@ export default function ConsultationPage() {
 					</View>
 				</ScrollView>
 
-				<View style={styles.stickyFooter}>
+				<View style={[styles.stickyFooter, { paddingBottom: 12 + insets.bottom }]}>
 					<Button
 						mode="contained"
 						loading={saving}

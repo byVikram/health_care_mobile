@@ -22,7 +22,7 @@ import PatientQR from "../../assets/icons/PatientQR.svg";
 import LogoutIcon from "../../assets/icons/logout.svg";
 const ORCode = require("../../assets/icons/QrCode.png");
 
-import PatientQr from "../../features/patientQr/PatientQr";
+import PatientQr from "../../features/patient-qr/PatientQr";
 import { USER_ROLES } from "../../constants/constants"; // adjust path if needed
 
 export interface AppSidebarItem {

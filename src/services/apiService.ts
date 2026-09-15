@@ -2,6 +2,7 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { secureStorage } from '../utils/secureStorage'
+import { isKnownOffline } from '../utils/networkState'
 
 export interface StatusModalData {
 	status?: 'success' | 'error' | 'info'
@@ -19,6 +20,17 @@ const axiosInstance = axios.create()
 let unauthorizedHandler: (() => void) | null = null
 let statusModalHandler: StatusModalHandler | null = null
 let hasShownSessionExpiredAlert = false
+// Synthetic error used to short-circuit a request we already know will fail
+// because the device is offline (see isKnownOffline() below), so we don't
+// waste time waiting on a doomed request. Tagged the same way a real Axios
+// network error is (no .response, code 'ERR_NETWORK') so the response
+// interceptor's error-classification logic below handles both identically.
+const createOfflineError = (): Error & { code: string; isOfflineError: true } => {
+	const err = new Error('No internet connection') as Error & { code: string; isOfflineError: true }
+	err.code = 'ERR_NETWORK'
+	err.isOfflineError = true
+	return err
+}
 
 export const setUnauthorizedHandler = (handler: (() => void) | null) => {
 	unauthorizedHandler = handler
@@ -35,6 +47,9 @@ export const showStatusModal = (data: StatusModalData | null) => {
 // Request interceptor
 axiosInstance.interceptors.request.use(
 	async (config) => {
+		if (isKnownOffline()) {
+			return Promise.reject(createOfflineError())
+		}
 		const token = await secureStorage.getItem('access_token')
 		if (token && config.headers && !config.headers.Authorization && !config.headers.authorization) {
 			config.headers.Authorization = `Bearer ${token}`
@@ -48,6 +63,33 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
 	(response) => response,
 	async (error) => {
+		const isAxiosErr = axios.isAxiosError(error)
+		const hasResponse = Boolean(error?.response)
+
+		// No response at all: either a real Axios network/timeout failure, or the
+		// synthetic offline error from the request interceptor above. Distinguish
+		// this from a genuine server/auth/validation error (which always has a
+		// response) so we don't show a confusing 'Something went wrong' when the
+		// real problem is connectivity.
+		if (!hasResponse) {
+			const isTimeout = isAxiosErr && error.code === 'ECONNABORTED'
+			// Deliberately do NOT call showStatusModal here (Task 9 correction).
+			// The global OfflineBanner already communicates connectivity loss, and
+			// the calling screen's own catch block is responsible for any request-
+			// specific UI (local StatusModal, Toast, inline error, etc). Showing a
+			// second global modal here would duplicate that message. 401/403 and
+			// the other HTTP-status branches below are unaffected.
+			//
+			// We still overwrite .message with a clean, user-safe string so that
+			// screen-level catches reading err.message (e.g. err?.message ||
+			// 'Something went wrong') never surface raw Axios/network internals
+			// such as 'Network Error' or 'timeout of 30000ms exceeded'.
+			error.message = isTimeout
+				? 'The request took too long. Please try again.'
+				: 'No internet connection. Please check your network and try again.'
+			return Promise.reject(error)
+		}
+
 		const status = error.response?.status
 		const message = error.response?.data?.message || 'Something went wrong'
 

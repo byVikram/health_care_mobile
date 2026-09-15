@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import { AppButton, AppCalendar, AppInput, AppSelect, AppTypography, ProviderDetailsCard, StatusModal } from '../../components/common'
-import { createRadiologyBooking, fetchRadiologyScans, RadiologyBookingPayload } from './RadiologyService'
+import { createRadiologyBooking, fetchRadiologyScans, RadiologyBookingPayload } from './radiologyService'
 import { getPatientTreatmentHistory} from '../profile/pharmacy/pharmacyService'
 import {TreatmentRecord } from '../pharmacy/pharmacyService'
 
