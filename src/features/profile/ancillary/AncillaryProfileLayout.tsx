@@ -29,16 +29,23 @@ type TabDefinition = {
 	}>
 }
 
-const TABS: TabDefinition[] = [
-	{ key: 'personal', label: 'Personal Details', Component: PersonalDetailsTab },
-	{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
-	{ key: 'capabilities', label: 'Capabilities', Component: CapabilitiesTab },
-	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
-	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
-]
+const getTabsForSpecialty = (specialtyKey: string): TabDefinition[] => {
+	const isPhysio = specialtyKey === 'physiotherapy'
+	return [
+		{ key: 'personal', label: 'Personal Details', Component: PersonalDetailsTab },
+		{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
+		{
+			key: 'capabilities',
+			label: isPhysio ? 'Services & Procedures' : 'Capabilities',
+			Component: CapabilitiesTab,
+		},
+		{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
+		{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
+	]
+}
 
 // Onboarding (profile-setup) completion is tied to finishing this specific tab,
-// not to reaching the end of the TABS array -- this lets tabs such as Sessions be
+// not to reaching the end of the tabs array -- this lets tabs such as Sessions be
 // appended after Availability without re-triggering or blocking the existing
 // 'ancillary_setup_completed' flow.
 const LAST_ONBOARDING_TAB_KEY = 'availability'
@@ -51,7 +58,9 @@ export default function AncillaryProfileLayout() {
 	const [specialtyKey, setSpecialtyKey] = useState<string>('')
 	const [specialtyLabel, setSpecialtyLabel] = useState<string>('')
 
-	// Load authenticated provider specialty once on layout mount
+	const tabs = useMemo(() => getTabsForSpecialty(specialtyKey), [specialtyKey])
+
+	// Load authenticated provider specialty on layout mount and when tab changes
 	useEffect(() => {
 		let isMounted = true
 
@@ -89,12 +98,12 @@ export default function AncillaryProfileLayout() {
 		return () => {
 			isMounted = false
 		}
-	}, [])
+	}, [activeTab])
 
 	const activeTabIndex = useMemo(() => {
-		const index = TABS.findIndex((tab) => tab.key === activeTab)
+		const index = tabs.findIndex((tab) => tab.key === activeTab)
 		return index >= 0 ? index : 0
-	}, [activeTab])
+	}, [activeTab, tabs])
 
 	useEffect(() => {
 		pagerRef.current?.scrollTo({ x: activeTabIndex * width, animated: false })
@@ -109,34 +118,34 @@ export default function AncillaryProfileLayout() {
 
 	const goToTab = useCallback(
 		(tabKey: string, animated = true) => {
-			const nextIndex = TABS.findIndex((tab) => tab.key === tabKey)
+			const nextIndex = tabs.findIndex((tab) => tab.key === tabKey)
 			if (nextIndex < 0) return
 
 			setActiveTab(tabKey)
 			pagerRef.current?.scrollTo({ x: nextIndex * width, animated })
 		},
-		[width]
+		[width, tabs]
 	)
 
 	const handlePagerMomentumEnd = useCallback(
 		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
 			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
-			const clampedIndex = Math.max(0, Math.min(TABS.length - 1, nextIndex))
-			setActiveTab(TABS[clampedIndex].key)
+			const clampedIndex = Math.max(0, Math.min(tabs.length - 1, nextIndex))
+			setActiveTab(tabs[clampedIndex].key)
 		},
-		[width]
+		[width, tabs]
 	)
 
 	const handleTabProgress = useCallback(
 		async (currentIndex: number) => {
 			const nextIndex = currentIndex + 1
-			if (nextIndex < TABS.length) {
-				goToTab(TABS[nextIndex].key)
+			if (nextIndex < tabs.length) {
+				goToTab(tabs[nextIndex].key)
 			} else {
 				await AsyncStorage.setItem('ancillary_setup_completed', 'true')
 			}
 		},
-		[goToTab]
+		[goToTab, tabs]
 	)
 
 	return (
@@ -149,7 +158,7 @@ export default function AncillaryProfileLayout() {
 					showsHorizontalScrollIndicator={false}
 					contentContainerStyle={styles.tabScrollContainer}
 				>
-					{TABS.map((tab) => {
+					{tabs.map((tab) => {
 						const isActive = activeTab === tab.key
 						return (
 							<TouchableOpacity
@@ -187,7 +196,7 @@ export default function AncillaryProfileLayout() {
 					onMomentumScrollEnd={handlePagerMomentumEnd}
 					keyboardShouldPersistTaps="handled"
 				>
-					{TABS.map((tab, index) => {
+					{tabs.map((tab, index) => {
 						const TabComponent = tab.Component
 						return (
 							<View key={tab.key} style={[styles.pagerPage, { width }]}>
