@@ -18,23 +18,35 @@ export default function PatientVerificationPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
-	const { bookingId } = route.params || {}
+	const { bookingId, initialBooking } = route.params || {}
 
-	const [booking, setBooking] = useState<NurseBooking | null>(null)
-	const [loading, setLoading] = useState(true)
+	const [booking, setBooking] = useState<NurseBooking | null>(() => {
+		if (
+			initialBooking &&
+			initialBooking.patientName &&
+			typeof initialBooking.patientName === 'string' &&
+			initialBooking.patientName.trim() !== '' &&
+			!['Eleanor Vance', 'Patient Account Holder', 'John Doe', 'Patient Recipient', 'Patient'].includes(initialBooking.patientName.trim())
+		) {
+			return initialBooking
+		}
+		return null
+	})
+	const [loading, setLoading] = useState(() => !initialBooking)
 	const [pin, setPin] = useState('')
 	const [error, setError] = useState('')
 	const [verifying, setVerifying] = useState(false)
 	const [cancelModalVisible, setCancelModalVisible] = useState(false)
 
 	const loadData = async () => {
-		setLoading(true)
+		if (!booking) setLoading(true)
 		try {
 			if (bookingId) {
 				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
 				const apiData = res.data?.data || res.data
 				if (apiData) {
 					const pName =
+						apiData.patientFullName ||
 						apiData.patientName ||
 						apiData.patient_name ||
 						apiData.patientUser?.name ||
@@ -90,7 +102,9 @@ export default function PatientVerificationPage() {
 			console.log('[PatientVerificationPage] Error fetching status', e)
 		}
 
-		setBooking(null)
+		if (!initialBooking || !initialBooking.patientName) {
+			setBooking(null)
+		}
 		setLoading(false)
 	}
 
@@ -129,7 +143,7 @@ export default function PatientVerificationPage() {
 
 				await saveBookingState(booking.id, initialState)
 				setVerifying(false)
-				navigation.replace(ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS, { bookingId: booking.id })
+				navigation.replace(ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS, { bookingId: booking.id, initialBooking: booking })
 			} else {
 				setVerifying(false)
 				setError(res.message || 'Invalid verification code. Please check with the patient.')

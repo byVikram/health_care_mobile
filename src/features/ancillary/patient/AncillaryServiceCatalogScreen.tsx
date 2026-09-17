@@ -18,7 +18,7 @@ import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCa
 import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
 import { NursingQuickActionCards } from '../components/NursingQuickActionCards'
-import { PhysiotherapyConditionsGrid, PHYSIOTHERAPY_CONDITIONS, PHYSIOTHERAPY_ALL_CONDITION_ID } from '../components/PhysiotherapyConditionsGrid'
+import { ConditionGrid, ConditionGridItem } from '../components/ConditionGrid'
 import {
 	AncillaryCategoryApiItem,
 	AncillaryServiceItem,
@@ -66,6 +66,72 @@ const SERVICE_UI: Record<string, {
 	},
 }
 
+// Icon lookup for the Nursing filter cards (reusing ConditionGrid --
+// see below). Categories themselves still come from the API (fetchAncillaryCategories),
+// this only supplies an icon per known label so the reused card UI has something to
+// show; any future/unknown category label falls back to NURSING_DEFAULT_ICON so the
+// screen never breaks if the backend adds a new nursing category.
+const NURSING_CATEGORY_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+	'general nursing procedures': 'needle',
+	'wound & recovery care': 'bandage',
+	'specialized high dependency care': 'hospital-box-outline',
+}
+const NURSING_ALL_ICON: keyof typeof MaterialCommunityIcons.glyphMap = 'view-grid-outline'
+const NURSING_DEFAULT_ICON: keyof typeof MaterialCommunityIcons.glyphMap = 'clipboard-text-outline'
+
+// Sentinel id for the Nursing "All Services" chip/selection -- matches the
+// existing `activeCategory` default of 'all' used by the category pill bar
+// for other specialties, kept here so the toggle-handler factory below can
+// treat Nursing and Physiotherapy identically.
+const NURSING_ALL_CATEGORY_ID = 'all'
+
+// Sentinel id for the Physiotherapy "All Services" chip/selection -- not a real
+// lookup_ancillary_category.public_id, just means "show every fetched service,
+// unfiltered". This is also the default selection when the screen opens.
+// Lives here (not in ConditionGrid.tsx) because it's Physiotherapy-specific
+// business data, same as PHYSIOTHERAPY_CONDITIONS below.
+export const PHYSIOTHERAPY_ALL_CONDITION_ID = 'phys-all'
+
+// The 9 "Find Physiotherapy for" condition cards. `id` values are the real
+// lookup_ancillary_category.public_id rows used to filter already-fetched
+// Physiotherapy services client-side (see displayGroups below) -- this array
+// is the single source of truth for that data; ConditionGrid.tsx only renders
+// whatever list of { id, label, icon } it's given.
+// Icons restored from the original PhysiotherapyConditionsGrid.tsx implementation
+// (recovered from git history, commit 99206c0) rather than newly invented ones.
+const PHYSIOTHERAPY_CONDITIONS: ConditionGridItem[] = [
+	{ id: 'phys-knee', label: 'Knee Pain', icon: 'bone' },
+	{ id: 'phys-back', label: 'Back Pain', icon: 'human-male-height' },
+	{ id: 'phys-neck', label: 'Neck Pain', icon: 'head-alert-outline' },
+	{ id: 'phys-shoulder', label: 'Shoulder Pain', icon: 'arm-flex-outline' },
+	{ id: 'phys-hand', label: 'Hand Pain', icon: 'hand-back-right-outline' },
+	{ id: 'phys-leg', label: 'Leg Pain', icon: 'walk' },
+	{ id: 'phys-sports-injury', label: 'Sports Injury', icon: 'dumbbell' },
+	{ id: 'phys-stroke', label: 'Stroke Rehab', icon: 'brain' },
+	{ id: 'phys-post-surgery', label: 'Post Surgery', icon: 'bandage' },
+]
+
+// Shared toggle-select behavior for any ConditionGrid usage on this screen:
+// tapping the already-active card unselects it and falls back to that grid's
+// "All Services" sentinel, instead of leaving the card stuck selected with no
+// way to turn it off. Tapping any other card (or the "All Services" chip
+// itself) just selects that id as usual. This is the exact behavior
+// Physiotherapy already had; Nursing now reuses the same factory instead of
+// duplicating the logic.
+function createConditionToggleHandler(
+	setActiveId: (updater: (prev: string) => string) => void,
+	allServicesId: string
+) {
+	return (id: string) => {
+		setActiveId((prev) => {
+			if (prev === id && id !== allServicesId) {
+				return allServicesId
+			}
+			return id
+		})
+	}
+}
+
 export default function AncillaryServiceCatalogScreen() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
@@ -74,6 +140,9 @@ export default function AncillaryServiceCatalogScreen() {
 	const serviceLabel = route.params?.serviceLabel || 'Nursing Care'
 	const activeUi = SERVICE_UI[serviceKey] || SERVICE_UI['nursing-care']
 	const isPhysiotherapy = serviceKey === 'physiotherapy'
+	// Reuses the same ConditionGrid card UI for its filters (see
+	// nursingConditions below / render block) -- functionality/state is unchanged.
+	const isNursing = serviceKey === 'nursing-care'
 
 	const [categories, setCategories] = useState<AncillaryCategoryApiItem[]>([])
 	const [rawServices, setRawServices] = useState<AncillaryServiceItem[]>([])
@@ -139,6 +208,22 @@ export default function AncillaryServiceCatalogScreen() {
 	const categoryPills = useMemo(() => {
 		return [{ id: 'all', label: 'All Services' }, ...categories]
 	}, [categories])
+
+	// Nursing filter cards, reusing ConditionGrid's card UI.
+	// Only the 3 real categories go into the grid -- "All Services" is now the
+	// existing top-right header chip (allChipId="all" in the render below)
+	// instead of a card, so it isn't included here. Categories/ids/labels are
+	// still exactly what the API returns via fetchAncillaryCategories -- only
+	// an icon is attached here for display; the existing activeCategory state
+	// and filtering in displayGroups below are completely unchanged.
+	const nursingConditions = useMemo<ConditionGridItem[]>(() => {
+		if (!isNursing) return []
+		return categories.map((cat) => ({
+			id: cat.id,
+			label: cat.label,
+			icon: NURSING_CATEGORY_ICONS[cat.label.trim().toLowerCase()] || NURSING_DEFAULT_ICON,
+		}))
+	}, [isNursing, categories])
 
 	const activeConditionMeta = useMemo(() => {
 		if (!isPhysiotherapy || !activeCondition) return null
@@ -233,18 +318,25 @@ export default function AncillaryServiceCatalogScreen() {
 		})
 	}
 
-	// Tapping the already-active condition card unselects it and falls back to
-	// "All Services" (PHYSIOTHERAPY_ALL_CONDITION_ID) rather than leaving the
-	// card selected with no way to turn it off. Tapping any other card (or the
-	// "All Services" chip itself) just selects that id as usual.
-	const handleSelectCondition = (id: string) => {
-		setActiveCondition((prev) => {
-			if (prev === id && id !== PHYSIOTHERAPY_ALL_CONDITION_ID) {
-				return PHYSIOTHERAPY_ALL_CONDITION_ID
-			}
-			return id
-		})
-	}
+	// Physiotherapy condition-card toggle: tapping the active card falls back
+	// to PHYSIOTHERAPY_ALL_CONDITION_ID ("All Services"); tapping any other
+	// card (or the "All Services" chip) just selects that id. Unchanged from
+	// before -- now built from the shared factory above.
+	const handleSelectCondition = useMemo(
+		() => createConditionToggleHandler(setActiveCondition as (updater: (prev: string) => string) => void, PHYSIOTHERAPY_ALL_CONDITION_ID),
+		[]
+	)
+
+	// Nursing category-card toggle: exactly the same behavior as Physiotherapy
+	// above, reusing the same factory instead of new logic -- tapping the
+	// active category card falls back to NURSING_ALL_CATEGORY_ID ('all'),
+	// which is also what the top-right "All Services" chip already sets, so
+	// displayGroups' existing `activeCategory !== 'all'` filtering needs no
+	// changes.
+	const handleSelectNursingCategory = useMemo(
+		() => createConditionToggleHandler(setActiveCategory, NURSING_ALL_CATEGORY_ID),
+		[]
+	)
 
 	return (
 		<View style={styles.container}>
@@ -262,10 +354,10 @@ export default function AncillaryServiceCatalogScreen() {
 
 				{serviceKey === 'nursing-care' && <NursingQuickActionCards />}
 
-				{/* Categories Pill Bar -- Physiotherapy no longer uses this row; its
-				    filtering is handled by the "Find Physiotherapy for" condition
-				    cards below instead. */}
-				{!isPhysiotherapy && (
+				{/* Categories Pill Bar -- Physiotherapy and Nursing no longer use this
+				    row; their filtering is handled by the reusable card-grid UI below
+				    instead (ConditionGrid, reused for both). */}
+				{!isPhysiotherapy && !isNursing && (
 					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesBar}>
 						{categoryPills.map((cat) => {
 							const isActive = activeCategory === cat.id
@@ -285,10 +377,43 @@ export default function AncillaryServiceCatalogScreen() {
 					</ScrollView>
 				)}
 
+				{/* Physiotherapy filters: conditions/labels/icons and the "All
+				    Services" sentinel are all defined above in this file
+				    (PHYSIOTHERAPY_CONDITIONS / PHYSIOTHERAPY_ALL_CONDITION_ID) --
+				    ConditionGrid only renders whatever list + chip id it's given. */}
 				{isPhysiotherapy && (
-					<PhysiotherapyConditionsGrid
+					<ConditionGrid
 						activeConditionId={activeCondition}
 						onSelectCondition={handleSelectCondition}
+						conditions={PHYSIOTHERAPY_CONDITIONS}
+						title="Find Physiotherapy for"
+						allChipId={PHYSIOTHERAPY_ALL_CONDITION_ID}
+					/>
+				)}
+
+				{/* Nursing filters: same card UI as Physiotherapy above, reusing
+				    ConditionGrid with Nursing's category data and its own
+				    Nursing-specific title/subtitle. Only the 3 real categories
+				    (General Nursing Procedures, Wound & Recovery Care, Specialized
+				    High Dependency Care) go into the grid -- "All Services" is
+				    NOT one of the cards; it lives on the header's top-right chip
+				    (allChipId="all") only. Tapping an already-active category card
+				    now toggles it off back to "All Services" via
+				    handleSelectNursingCategory, exactly like Physiotherapy's
+				    handleSelectCondition -- the chip itself still just selects
+				    'all' directly either way. Selection wiring otherwise still
+				    just sets the existing activeCategory state, exactly like the
+				    pill bar it replaced -- so displayGroups' filtering logic below
+				    needs no changes. */}
+				{isNursing && (
+					<ConditionGrid
+						activeConditionId={activeCategory}
+						onSelectCondition={handleSelectNursingCategory}
+						conditions={nursingConditions}
+						title="Nursing Care For?"
+						subtitle="Select a care category"
+						allChipId={NURSING_ALL_CATEGORY_ID}
+						cardWidthPercent="48%"
 					/>
 				)}
 

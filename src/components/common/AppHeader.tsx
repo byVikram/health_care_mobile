@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Image, Pressable, StyleSheet, Text, TextInput, View, Alert, Animated } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -40,9 +40,15 @@ export default function AppHeader({
 }: AppHeaderProps) {
 	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
-	const { user, role } = useAuth()
+	const { user, role, ancillarySpecialty } = useAuth()
 	const scrollData = useScroll()
 	const scrollY = scrollData?.scrollY
+
+	const [avatarError, setAvatarError] = useState(false)
+
+	useEffect(() => {
+		setAvatarError(false)
+	}, [avatarUri])
 
 	const isDoctor = role === 'doctor'
 	const isPharmacy = role === 'pharmacy'
@@ -50,6 +56,16 @@ export default function AppHeader({
 	const isRadiology = role === USER_ROLES.RADIOLOGY
 	const isLaboratory = role === USER_ROLES.LABORATORY
 	const isPatient = !isDoctor && !isPharmacy && !isRadiology && !isLaboratory
+
+	const isPhysiotherapy =
+		(role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE) &&
+		(ancillarySpecialty === 'physiotherapy' || !ancillarySpecialty)
+
+	const defaultAvatar = isPhysiotherapy
+		? require('../../assets/physiotherapy/physiotherapist.png')
+		: isDoctor
+			? require('../../assets/Banner/doctor.png')
+			: require('../../assets/Banner/patient.png')
 
 	// Option B GPU animation values
 	const maxScroll = 60
@@ -228,7 +244,8 @@ export default function AppHeader({
 			>
 				<Pressable onPress={onAvatarPress} style={styles.profileRow}>
 					<Image
-						source={avatarUri ? { uri: avatarUri } : require('../../assets/Banner/patient.png')}
+						source={avatarUri && !avatarError ? { uri: avatarUri } : defaultAvatar}
+						onError={() => setAvatarError(true)}
 						style={styles.avatar}
 					/>
 					<View>

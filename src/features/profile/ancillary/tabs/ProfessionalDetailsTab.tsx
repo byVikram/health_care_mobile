@@ -23,12 +23,13 @@ import {
 	fetchProviderProfileBackend,
 	updateProviderProfileBackend,
 } from '../../../ancillary/ancillaryService'
+import { normalizeSpecialtyKey, normalizeSpecialtyToLabel } from '../specialtyConfig'
 
 type Option = AppSelectOption
 
 type ProfessionalFormData = {
 	qualification: string
-	currentDesignation: string
+	specialization: string
 	experience: string
 	nursingRegistrationNumber: string
 	stateNursingCouncil: string
@@ -48,49 +49,49 @@ const SPECIALTY_OPTIONS: Option[] = [
 
 // Role-specific Professional Details terminology.
 // NOTE: This only changes what is DISPLAYED (labels/placeholders). The
-// underlying form field (`nursingRegistrationNumber`) and the backend
-// payload key (`license_number`) are unchanged for every role -- see
-// handleSave() below, which always sends `license_number`.
+// underlying form field (nursingRegistrationNumber) and the backend
+// payload key (license_number) are unchanged for every role -- see
+// handleSave() below, which always sends license_number.
 type SpecialtyFieldConfig = {
 	registrationLabel: string
 	registrationPlaceholder: string
 	qualificationPlaceholder: string
-	designationPlaceholder: string
+	specializationPlaceholder: string
 }
 
 const DEFAULT_FIELD_CONFIG: SpecialtyFieldConfig = {
 	registrationLabel: 'Professional Registration Number',
 	registrationPlaceholder: 'e.g. Registration No.',
 	qualificationPlaceholder: 'e.g. Relevant professional qualification',
-	designationPlaceholder: 'e.g. Relevant professional designation',
+	specializationPlaceholder: 'e.g. Relevant area of specialization/practice',
 }
 
 const NURSING_FIELD_CONFIG: SpecialtyFieldConfig = {
 	registrationLabel: 'Nursing Registration Number',
 	registrationPlaceholder: 'e.g. RN-12930',
 	qualificationPlaceholder: 'e.g. B.Sc Nursing, GNM',
-	designationPlaceholder: 'e.g. Senior Staff Nurse',
+	specializationPlaceholder: 'e.g. Critical Care Nursing, Pediatric Nursing',
 }
 
 const PHYSIOTHERAPY_FIELD_CONFIG: SpecialtyFieldConfig = {
 	registrationLabel: 'Physiotherapy Registration Number',
 	registrationPlaceholder: 'e.g. Registration No.',
 	qualificationPlaceholder: 'e.g. BPT, MPT',
-	designationPlaceholder: 'e.g. Physiotherapist, Senior Physiotherapist',
+	specializationPlaceholder: 'e.g. Orthopedic Physiotherapy, Sports Physiotherapy',
 }
 
 const REHAB_FIELD_CONFIG: SpecialtyFieldConfig = {
 	registrationLabel: 'Rehabilitation Registration Number',
 	registrationPlaceholder: 'e.g. RCI-45210',
 	qualificationPlaceholder: 'e.g. BOT, MOT, DRT',
-	designationPlaceholder: 'e.g. Rehabilitation Therapist, Senior Rehabilitation Therapist',
+	specializationPlaceholder: 'e.g. Neurological Rehabilitation, Cardiopulmonary Rehabilitation',
 }
 
 const ELDER_CARE_FIELD_CONFIG: SpecialtyFieldConfig = {
 	registrationLabel: 'Caregiver Registration Number',
 	registrationPlaceholder: 'e.g. EC-1023',
 	qualificationPlaceholder: 'e.g. Certified Caregiver, Diploma in Geriatric Care',
-	designationPlaceholder: 'e.g. Senior Caregiver',
+	specializationPlaceholder: 'e.g. Geriatric Care, Palliative Caregiving',
 }
 
 // Matches by keyword rather than exact label so this stays correct even if a
@@ -135,25 +136,6 @@ const VERIFICATION_STATUS_META: Record<string, { label: string; color: string; b
 	verified: { label: 'Verified', color: '#1e7e34', bg: 'rgba(30, 126, 52, 0.08)' },
 	pending: { label: 'Pending Verification', color: '#9a6b00', bg: 'rgba(154, 107, 0, 0.08)' },
 	rejected: { label: 'Verification Rejected', color: '#c0392b', bg: 'rgba(192, 57, 43, 0.08)' },
-}
-
-function normalizeSpecialtyKey(key?: string | null): string {
-	if (!key) return ''
-	const lower = key.toLowerCase().trim()
-	if (lower.includes('home')) return 'home-care'
-	if (lower.includes('physio')) return 'physiotherapy'
-	if (lower.includes('rehab')) return 'rehab-care'
-	if (lower.includes('nurs')) return 'nursing-care'
-	return lower
-}
-
-function normalizeSpecialtyToLabel(key?: string | null): string {
-	const normalizedKey = normalizeSpecialtyKey(key)
-	if (normalizedKey === 'home-care') return 'Home Care'
-	if (normalizedKey === 'physiotherapy') return 'Physiotherapy'
-	if (normalizedKey === 'rehab-care') return 'Rehabilitation'
-	if (normalizedKey === 'nursing-care') return 'Nursing Care'
-	return key || 'Healthcare Provider'
 }
 
 function FormRow({
@@ -350,7 +332,7 @@ export default function ProfessionalDetailsTab({
 
 	const [formData, setFormData] = useState<ProfessionalFormData>({
 		qualification: '',
-		currentDesignation: '',
+		specialization: '',
 		experience: '',
 		nursingRegistrationNumber: '',
 		stateNursingCouncil: '',
@@ -397,7 +379,7 @@ export default function ProfessionalDetailsTab({
 					'user_specialty',
 					'ancillary_qualification',
 					'ancillary_qualification_proof',
-					'ancillary_designation',
+					'ancillary_specialization',
 					'ancillary_experience',
 					'ancillary_license',
 					'ancillary_licensing_authority',
@@ -424,7 +406,7 @@ export default function ProfessionalDetailsTab({
 					setFormData((prev) => ({
 						...prev,
 						qualification: map['ancillary_qualification'] || prev.qualification,
-						currentDesignation: map['ancillary_designation'] || prev.currentDesignation,
+						specialization: map['ancillary_specialization'] || prev.specialization,
 						experience: map['ancillary_experience'] || prev.experience,
 						nursingRegistrationNumber: map['ancillary_license'] || prev.nursingRegistrationNumber,
 						stateNursingCouncil: map['ancillary_licensing_authority'] || prev.stateNursingCouncil,
@@ -457,7 +439,7 @@ export default function ProfessionalDetailsTab({
 				setFormData((prev) => ({
 					...prev,
 					qualification: backendProfile?.qualifications || prev.qualification,
-					currentDesignation: prev.currentDesignation,
+				specialization: backendProfile?.specialization || prev.specialization,
 					experience: prev.experience,
 					nursingRegistrationNumber: backendProfile?.license_number || prev.nursingRegistrationNumber,
 					stateNursingCouncil: prev.stateNursingCouncil,
@@ -546,7 +528,7 @@ export default function ProfessionalDetailsTab({
 			} else {
 				await AsyncStorage.multiSet([
 					['ancillary_qualification', formData.qualification.trim()],
-					['ancillary_designation', formData.currentDesignation.trim()],
+					['ancillary_specialization', formData.specialization.trim()],
 					['ancillary_experience', formData.experience],
 					['ancillary_license', formData.nursingRegistrationNumber.trim()],
 					['ancillary_licensing_authority', formData.stateNursingCouncil.trim()],
@@ -556,7 +538,11 @@ export default function ProfessionalDetailsTab({
 				])
 			}
 
-			// Persist geofence radius & credentials to backend database
+			// Persist geofence radius, credentials & specialization to backend database.
+			// NOTE: `specialization` (free-text area of practice, e.g. "Orthopedic
+			// Physiotherapy") must be sent here in both branches -- previously it was
+			// only ever written to AsyncStorage, so it never reached the database and
+			// wouldn't survive a reinstall or show up on another device.
 			const numRadius = Number(formData.geofenceRadius)
 			if (isHomeCare) {
 				await updateProviderProfileBackend({
@@ -564,6 +550,7 @@ export default function ProfessionalDetailsTab({
 					qualification_proof_s3_key: formData.qualificationProof,
 					experience_years: formData.experience,
 					geofence_radius: Number.isFinite(numRadius) ? numRadius : 10,
+					specialization: formData.specialization.trim(),
 				})
 			} else {
 				await updateProviderProfileBackend({
@@ -572,6 +559,7 @@ export default function ProfessionalDetailsTab({
 					qualifications: formData.qualification.trim(),
 					experience_years: formData.experience,
 					geofence_radius: Number.isFinite(numRadius) ? numRadius : 10,
+					specialization: formData.specialization.trim(),
 				})
 			}
 
@@ -673,10 +661,10 @@ export default function ProfessionalDetailsTab({
 									placeholder={fieldConfig.qualificationPlaceholder}
 								/>
 								<InputField
-									label="Current Designation"
-									value={formData.currentDesignation}
-									onChangeText={(val) => updateFormData('currentDesignation', val)}
-									placeholder={fieldConfig.designationPlaceholder}
+									label="Specialization"
+									value={formData.specialization}
+									onChangeText={(val) => updateFormData('specialization', val)}
+									placeholder={fieldConfig.specializationPlaceholder}
 								/>
 							</FormRow>
 

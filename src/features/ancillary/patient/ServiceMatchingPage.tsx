@@ -16,8 +16,19 @@ import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
 import { fetchPatientActiveRequestBackend, cancelCareRequestPatientBackend } from '../ancillaryService'
+import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import CancellationDetailsModal from './CancellationDetailsModal'
+
+const ASSIGNED_STATUSES = new Set([
+	'ASSIGNED',
+	'NURSE_ASSIGNED',
+	'EN_ROUTE',
+	'ARRIVED',
+	'IN_PROGRESS',
+	'VERIFICATION_PENDING',
+	'COMPLETED',
+])
 
 export default function ServiceMatchingPage() {
 	const navigation = useNavigation<any>()
@@ -89,17 +100,18 @@ export default function ServiceMatchingPage() {
 					const payload = JSON.parse(event.data)
 					if (payload.type === 'CARE_REQUEST_STATUS_CHANGE' && payload.data) {
 						const st = String(payload.data.status || '').toUpperCase()
-						if (st === 'ASSIGNED' || st === 'NURSE_ASSIGNED' || st === 'EN_ROUTE') {
+						if (ASSIGNED_STATUSES.has(st)) {
 							setSearchStatus('ASSIGNED')
 							if (payload.data.assignedProvider) {
 								setAssignedProvider(payload.data.assignedProvider)
 							}
+							if (navigateTimeout) clearTimeout(navigateTimeout)
 							navigateTimeout = setTimeout(() => {
 								navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
-									bookingId: targetId,
+									bookingId: payload.data.requestId || payload.data.id || targetId,
 									bookingData: payload.data,
 								})
-							}, 800)
+							}, 400)
 						}
 					}
 				} catch (e) {
@@ -116,34 +128,71 @@ export default function ServiceMatchingPage() {
 		}
 	}, [bookingId, navigation])
 
-	// Initial Status Check via HTTP
+	// Active Real-Time Polling via Backend Status API
 	useEffect(() => {
 		let isMounted = true
 		let navigateTimeout: ReturnType<typeof setTimeout> | null = null
-		const checkInitialStatus = async () => {
+
+		const checkStatus = async () => {
+			if (!isMounted) return
 			try {
-				const activeReq = await fetchPatientActiveRequestBackend()
-				if (isMounted && activeReq) {
-					if (activeReq.status === 'ASSIGNED' || activeReq.status === 'EN_ROUTE') {
+				let data: any = null
+				const targetBookingId = bookingId && bookingId !== 'active' ? String(bookingId) : ''
+
+				// 1. Primary: Fetch specific booking status directly
+				if (targetBookingId) {
+					try {
+						const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(targetBookingId))
+						data = res.data?.data || res.data
+					} catch (e) {
+						// Fallback to active request
+					}
+				}
+
+				// 2. Secondary: Fallback to active request endpoint
+				if (!data || !data.status) {
+					const activeReq = await fetchPatientActiveRequestBackend()
+					if (activeReq) {
+						data = {
+							...activeReq,
+							requestId: activeReq.id,
+							assignedProvider: activeReq.provider?.id ? activeReq.provider : null,
+						}
+					}
+				}
+
+				if (isMounted && data && data.status) {
+					const st = String(data.status).toUpperCase()
+					if (ASSIGNED_STATUSES.has(st)) {
 						setSearchStatus('ASSIGNED')
-						setAssignedProvider(activeReq.provider)
-						navigateTimeout = setTimeout(() => {
-							navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
-								bookingId: activeReq.id,
-								bookingData: activeReq,
-							})
-						}, 800)
+						if (data.assignedProvider || data.provider) {
+							setAssignedProvider(data.assignedProvider || data.provider)
+						}
+						if (!navigateTimeout) {
+							navigateTimeout = setTimeout(() => {
+								if (isMounted) {
+									navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+										bookingId: data.requestId || data.id || targetBookingId || 'active',
+										bookingData: data,
+									})
+								}
+							}, 400)
+						}
 					}
 				}
 			} catch (e) {
-				console.log('[ServiceMatchingPage] Initial check:', e)
+				console.log('[ServiceMatchingPage] Status check notice:', e)
 			}
 		}
 
-		void checkInitialStatus()
+		void checkStatus()
+		const pollInterval = setInterval(() => {
+			void checkStatus()
+		}, 2000)
 
 		return () => {
 			isMounted = false
+			clearInterval(pollInterval)
 			if (navigateTimeout) clearTimeout(navigateTimeout)
 		}
 	}, [bookingId, navigation])

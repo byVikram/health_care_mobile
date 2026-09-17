@@ -274,8 +274,8 @@ export default function StaffAncillaryDashboard() {
 					incomingRequest.generalLocation ||
 					'Healthcare Doorstep Address',
 				status: 'assigned',
-				otpCode: result.travelInfo?.verificationOtp || '4829',
-				completePin: result.travelInfo?.completionPin || '9182',
+				otpCode: result.travelInfo?.verificationOtp || '',
+				completePin: result.travelInfo?.completionPin || '',
 			}
 
 			setBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== targetId)])
@@ -284,7 +284,7 @@ export default function StaffAncillaryDashboard() {
 			setRequestStep('none')
 
 			// 1-Tap Accept: Navigate directly to ActiveBookingPage (Navigation & En-Route screen)
-			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: targetId })
+			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: targetId, initialBooking: newBooking })
 		} catch (error) {
 			console.error('Error accepting request:', error)
 		} finally {
@@ -349,11 +349,11 @@ export default function StaffAncillaryDashboard() {
 		if (!activeBooking) return
 		const st = activeBooking.status?.toUpperCase()
 		if (st === 'IN_PROGRESS') {
-			navigation.navigate(ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS, { bookingId: activeBooking.id })
+			navigation.navigate(ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS, { bookingId: activeBooking.id, initialBooking: activeBooking })
 		} else if (st === 'ARRIVED' || st === 'VERIFICATION_PENDING') {
-			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: activeBooking.id })
+			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: activeBooking.id, initialBooking: activeBooking })
 		} else {
-			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: activeBooking.id })
+			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: activeBooking.id, initialBooking: activeBooking })
 		}
 	}
 

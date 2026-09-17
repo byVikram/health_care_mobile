@@ -218,7 +218,7 @@ export default function AncillaryPaymentPage() {
 
 			// Conflict / Active Task Case
 			if (error.response?.status === 409 || errDetail?.code === 'ACTIVE_TASK_EXISTS') {
-				const activeId = errDetail?.activeTask?.requestId || errDetail?.activeTask?.publicBookingId || 'BK-ACTIVE'
+				const activeId = errDetail?.activeTask?.requestId || errDetail?.activeTask?.publicBookingId || ''
 				setExistingActiveBookingId(activeId)
 				setActiveTaskModalVisible(true)
 				return
@@ -492,7 +492,7 @@ export default function AncillaryPaymentPage() {
 				submitText="Track Active Request"
 				onSubmit={() => {
 					setActiveTaskModalVisible(false)
-					navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+					navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 						bookingId: existingActiveBookingId,
 					})
 				}}
