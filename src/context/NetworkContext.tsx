@@ -9,6 +9,7 @@
 // so no extra AppState handling is needed here.
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
+import { Platform } from 'react-native'
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo'
 import { setNetworkState } from '../utils/networkState'
 
@@ -29,9 +30,19 @@ const NetworkContext = createContext<NetworkContextValue>({
 })
 
 const applyState = (state: NetInfoState) => {
-	// A device can be "connected" to a network (e.g. Wi-Fi with no internet)
-	// but not actually have internet access. Treat explicit `false` on
-	// either flag as offline; anything else (true or unresolved/null) is
+	// On web, NetInfo's `isInternetReachable` is a reachability probe (its own
+	// fetch to a check URL) that is unreliable in browser environments — CORS,
+	// ad blockers, or dev proxies can make it report `false` even though the
+	// browser is genuinely online. `isConnected` on web mirrors
+	// `navigator.onLine`, which is reliable enough on its own, so on web we
+	// don't let `isInternetReachable` downgrade `isConnected` to false.
+	if (Platform.OS === 'web') {
+		return { isConnected: state.isConnected, isInternetReachable: state.isInternetReachable }
+	}
+
+	// Native: a device can be "connected" to a network (e.g. Wi-Fi with no
+	// internet) but not actually have internet access. Treat explicit `false`
+	// on either flag as offline; anything else (true or unresolved/null) is
 	// treated as connected/unknown so we never show a false offline state.
 	const isConnected = state.isConnected === false || state.isInternetReachable === false ? false : state.isConnected
 	return { isConnected, isInternetReachable: state.isInternetReachable }

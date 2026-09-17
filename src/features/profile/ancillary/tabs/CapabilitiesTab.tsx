@@ -19,6 +19,7 @@ import {
 	fetchProviderProfileBackend,
 	AncillaryServiceItem,
 } from '../../../ancillary/ancillaryService'
+import { normalizeSpecialtyKey } from '../specialtyConfig'
 
 export interface ProcedureItem {
 	id: string
@@ -139,16 +140,6 @@ const SPECIALTY_META: Record<
 			{ id: 'proc-home-018', label: 'Basic Patient Observation & Reporting', subtitle: 'Companionship & Support', rate: 'Included in package', price: 0, specialtyKey: 'home-care', categoryId: 'cat-home-companionship', categoryName: 'Companionship & Support' },
 		],
 	},
-}
-
-function normalizeSpecialtyKey(key?: string | null): string {
-	if (!key) return ''
-	const lower = key.toLowerCase().trim()
-	if (lower.includes('home')) return 'home-care'
-	if (lower.includes('physio')) return 'physiotherapy'
-	if (lower.includes('rehab')) return 'rehab-care'
-	if (lower.includes('nurs')) return 'nursing-care'
-	return lower
 }
 
 // Interactive card for clinical specialties
@@ -586,12 +577,12 @@ export default function CapabilitiesTab({
 
 					<AppButton
 						variant="primary"
-						formAction
+						formAction 
 						style={styles.saveButton}
 						onPress={handleSave}
 						loading={saving}
 					>
-						{isHomeCare ? 'Confirm & Save Package ->' : 'Save Preferences ->'}
+						{isHomeCare ? 'Confirm & Save Package ->' : 'Save Preferences'}
 					</AppButton>
 				</View>
 			</View>

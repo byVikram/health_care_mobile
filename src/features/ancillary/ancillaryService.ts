@@ -1174,8 +1174,8 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 					appointmentTime: String(item.createdAt || 'Today'),
 					patientAddress: String(item.patientAddress || item.streetAddress || 'Healthcare Location'),
 					status: status as any,
-					otpCode: String(item.verificationOtp || '4829'),
-					completePin: String(item.completionPin || '9182'),
+					otpCode: String(item.verificationOtp || ''),
+					completePin: String(item.completionPin || ''),
 					amount: Number.isFinite(amount) ? amount : undefined,
 					providerEarning: Number.isFinite(providerEarning) ? providerEarning : undefined,
 					createdAtRaw: item.createdAt ? String(item.createdAt) : undefined,
@@ -1198,28 +1198,40 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PATIENT_ACTIVE_REQUEST)
 		const payload = res.data
 		const data = payload?.data !== undefined ? payload.data : payload
-		if (!data || !data.requestId) {
+		const activeReq = data?.activeRequest || data
+		if (!activeReq || (!activeReq.requestId && !activeReq.id && !activeReq.publicBookingId)) {
 			return null
 		}
 		return {
-			id: String(data.requestId || data.publicBookingId),
-			serviceName: String(data.serviceName || 'In-Home Nursing Care'),
+			id: String(activeReq.requestId || activeReq.publicBookingId || activeReq.id),
+			serviceName: String(activeReq.serviceName || 'In-Home Nursing Care'),
 			serviceKey: 'nursing-care',
 			serviceLabel: 'Nursing Care',
-			status: String(data.status || 'SEARCHING').toUpperCase() as any,
-			rawStatus: String(data.status || 'SEARCHING').toUpperCase(),
+			status: String(activeReq.status || 'SEARCHING').toUpperCase() as any,
+			rawStatus: String(activeReq.status || 'SEARCHING').toUpperCase(),
 			date: 'Today',
 			timeRange: 'Instant Dispatch',
-			amount: typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(String(data.totalAmount || '667').replace(/[^0-9.]/g, '')),
-			provider: {
-				id: data.assignedProvider ? String(data.assignedProvider.id) : 'n-prov-1',
-				name: data.assignedProvider ? String(data.assignedProvider.name) : 'Nurse Specialist',
-				designation: data.assignedProvider ? String(data.assignedProvider.credentials) : 'RN Certification',
-				avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
-			},
-			verificationOtp: String(data.verificationOtp || '4829'),
-			completionPin: String(data.completionPin || '9182'),
-			bookingType: String(data.bookingType || 'INSTANT'),
+			amount: typeof activeReq.totalAmount === 'number' ? activeReq.totalAmount : parseFloat(String(activeReq.totalAmount || '667').replace(/[^0-9.]/g, '')),
+			provider: activeReq.assignedProvider
+				? {
+						id: String(activeReq.assignedProvider.id),
+						name: String(activeReq.assignedProvider.name || ''),
+						designation:
+							activeReq.assignedProvider.qualifications ||
+							activeReq.assignedProvider.credentials ||
+							activeReq.assignedProvider.specialization ||
+							'',
+						avatar: activeReq.assignedProvider.avatar || '',
+				  }
+				: {
+						id: undefined,
+						name: '',
+						designation: '',
+						avatar: '',
+				  },
+			verificationOtp: activeReq.verificationOtp ? String(activeReq.verificationOtp) : undefined,
+			completionPin: activeReq.completionPin ? String(activeReq.completionPin) : undefined,
+			bookingType: String(activeReq.bookingType || 'INSTANT'),
 		}
 	} catch (error) {
 		console.log('[ancillaryService] Error fetching patient active request via API')
@@ -1248,7 +1260,7 @@ const formatBookingDateTime = (createdAt?: string | null): { date: string; timeR
 	if (Number.isNaN(parsed.getTime())) return { date: createdAt }
 	const date = parsed.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
 	const timeRange = parsed.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-	return { date, timeRange }
+	return { date, timeRange: timeRange || undefined }
 }
 
 /**
@@ -1264,19 +1276,29 @@ const formatBookingDateTime = (createdAt?: string | null): { date: string; timeR
 export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[]> => {
 	const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.MY_REQUESTS)
 	const payload = res.data
-	const rawList: any[] = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
+	const items: any[] = Array.isArray(payload?.data)
+		? payload.data
+		: Array.isArray(payload)
+		? payload
+		: []
 
-	return rawList.map((item: any) => {
+	return items.map((item) => {
+		const bookingIdStr = String(item.requestId || item.publicBookingId || item.id || '')
 		const { date, timeRange } = formatBookingDateTime(item.createdAt)
-		const amountRaw = item.totalAmount
 		const amount =
-			typeof amountRaw === 'number'
-				? amountRaw
-				: parseFloat(String(amountRaw || '').replace(/[^0-9.]/g, '')) || undefined
+			typeof item.totalAmount === 'number'
+				? item.totalAmount
+				: typeof item.amount === 'number'
+				? item.amount
+				: parseFloat(String(item.totalAmount || item.amount || '0').replace(/[^0-9.]/g, '')) || 0
 
-		const bookingIdStr = String(item.requestId || item.publicBookingId || item.id)
-		const hasReview = Boolean(item.hasReview || item.review != null || item.rating != null)
-		const ratingVal = item.rating != null ? Number(item.rating) : (item.review?.rating != null ? Number(item.review.rating) : undefined)
+		const hasReview = Boolean(item.hasReview || item.review !== null && item.review !== undefined)
+		const ratingVal =
+			typeof item.rating === 'number'
+				? item.rating
+				: typeof item.review?.rating === 'number'
+				? item.review.rating
+				: undefined
 
 		let reviewObj: AncillaryReviewData | undefined = undefined
 		if (item.review) {
@@ -1295,6 +1317,9 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 			}
 		}
 
+		const assignedProvId = item.provider?.id || item.assignedProvider?.id
+		const assignedProvName = item.provider?.name || item.assignedProvider?.name
+
 		return {
 			id: bookingIdStr,
 			serviceName: String(item.serviceName || 'In-Home Healthcare Service'),
@@ -1307,23 +1332,24 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 			hasReview,
 			rating: ratingVal,
 			review: reviewObj,
-			provider: {
-				id:
-					item.provider?.id || item.assignedProvider?.id
-						? String(item.provider?.id || item.assignedProvider?.id)
-						: undefined,
-				name:
-					item.provider?.name || item.assignedProvider?.name
-						? String(item.provider?.name || item.assignedProvider?.name)
-						: 'Specialist Assigned Soon',
-				designation:
-					item.provider?.designation || item.assignedProvider?.credentials
-						? String(item.provider?.designation || item.assignedProvider?.credentials)
-						: 'Healthcare Provider',
-				avatar:
-					item.provider?.avatar ||
-					'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=120',
-			},
+			provider: assignedProvId
+				? {
+						id: String(assignedProvId),
+						name: String(assignedProvName || ''),
+						designation:
+							item.provider?.designation ||
+							item.assignedProvider?.credentials ||
+							item.assignedProvider?.qualifications ||
+							item.assignedProvider?.specialization ||
+							'',
+						avatar: item.provider?.avatar || item.assignedProvider?.avatar || '',
+				  }
+				: {
+						id: undefined,
+						name: '',
+						designation: '',
+						avatar: '',
+				  },
 			amount,
 			verificationOtp: item.verificationOtp ? String(item.verificationOtp) : undefined,
 			completionPin: item.completionPin ? String(item.completionPin) : undefined,
@@ -1423,6 +1449,12 @@ export interface AncillaryProfileBackendResponse {
 	checked_procedures?: string[]
 	geofence_radius?: number
 	geofence_radius_km?: number
+	name?: string
+	email?: string
+	contact_number?: string
+	// Free-text area of practice, e.g. "Orthopedic Physiotherapy" -- distinct from the specialty category above.
+	specialization?: string
+	avatar_s3_key?: string
 }
 
 export const fetchProviderProfileBackend = async (): Promise<AncillaryProfileBackendResponse | null> => {
@@ -1448,6 +1480,12 @@ export const updateProviderProfileBackend = async (payload: {
 	geofence_radius?: number
 	geofence_radius_km?: number
 	checked_procedures?: string[]
+	name?: string
+	email?: string
+	// Sent as mobile_number to match the backend AncillaryProfileUpdate schema; maps to users.contact_number.
+	mobile_number?: string
+	specialization?: string
+	avatar_s3_key?: string
 }): Promise<boolean> => {
 	try {
 		await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, payload)

@@ -22,6 +22,11 @@ import {
 	StatusModal,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
+import {
+	fetchProviderProfileBackend,
+	updateProviderProfileBackend,
+} from '../../../ancillary/ancillaryService'
+import { NEW_PHYSIOTHERAPIST_IMAGE_URL } from '../specialtyConfig'
 
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say']
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Marathi', 'Bengali']
@@ -30,6 +35,7 @@ const GENDER_SELECT_OPTIONS: AppSelectOption[] = GENDER_OPTIONS.map((option) => 
 const LANGUAGE_SELECT_OPTIONS: AppSelectOption[] = LANGUAGE_OPTIONS.map((option) => ({ label: option, value: option }))
 
 const DEFAULT_PROFILE_IMAGE = require('../../../../assets/Banner/doctor.png')
+const PHYSIOTHERAPY_PROFILE_IMAGE = require('../../../../assets/physiotherapy/physiotherapist.png')
 
 type InputFieldProps = {
 	label: string
@@ -302,12 +308,15 @@ const formatDobForStorage = (value: string) => {
 export default function PersonalDetailsTab({
 	isActive,
 	onNextTab,
+	specialtyKey,
 }: {
 	isActive?: boolean
 	onNextTab?: () => void
+	specialtyKey?: string
 }) {
-	const { user, updateUser } = useAuth()
+	const { user, updateUser, ancillarySpecialty } = useAuth()
 	const { width } = useWindowDimensions()
+	const currentSpecialty = specialtyKey || ancillarySpecialty
 
 	const isTablet = width >= 768 && width < 1024
 	const isMobile = width < 768
@@ -367,6 +376,10 @@ export default function PersonalDetailsTab({
 		}))
 	}
 
+	// Backend (users.contact_number / users.email / ancillary_providers.avatar_s3_key,
+	// via GET /ancillary/profile) is the single source of truth for name, email,
+	// mobile number, and avatar. AsyncStorage is only used here for fields the
+	// ancillary backend schema doesn't carry yet (gender, dob, languages, socials).
 	useEffect(() => {
 		const loadAncillaryProfile = async () => {
 			try {
@@ -380,13 +393,20 @@ export default function PersonalDetailsTab({
 				const fb = await AsyncStorage.getItem('ancillary_facebook')
 				const tw = await AsyncStorage.getItem('ancillary_twitter')
 
-				setProfilePhotoUri(user?.avatar || '')
+				const backendProfile = await fetchProviderProfileBackend()
+				const backendMobile = backendProfile?.contact_number || num || ''
+				const backendEmail = backendProfile?.email || user?.email || ''
+				const backendName = backendProfile?.name || user?.name || ''
+				const defaultAvatar = (currentSpecialty === 'physiotherapy' ? NEW_PHYSIOTHERAPIST_IMAGE_URL : '')
+				const backendAvatar = backendProfile?.avatar_s3_key || user?.avatar || defaultAvatar || ''
+
+				setProfilePhotoUri(backendAvatar)
 				setProfilePhotoUpload(null)
 				setIsProfilePhotoRemoved(false)
 				setFormData({
-					name: user?.name || '',
-					email: user?.email || '',
-					mobile: num || '',
+					name: backendName,
+					email: backendEmail,
+					mobile: backendMobile,
 					gender: normalizeGenderValue(gndr || ''),
 					dob: formatDobForDisplay(dobVal || ''),
 					languages: langs ? normalizeLanguageValues(safeJsonParse<string[]>(langs) || []) : [],
@@ -395,6 +415,16 @@ export default function PersonalDetailsTab({
 					facebook: fb || '',
 					twitter: tw || '',
 				})
+
+				// Keep the local cache/AuthContext in sync with what the backend actually
+				// has, so the dashboard avatar (AppSidebar, via user.avatar) and any
+				// screen reading AsyncStorage['contact_number'] reflect the real value.
+				if (backendMobile && backendMobile !== num) {
+					await AsyncStorage.setItem('contact_number', backendMobile)
+				}
+				if (backendAvatar && backendAvatar !== user?.avatar) {
+					await updateUser({ avatar: backendAvatar })
+				}
 			} catch (error) {
 				console.error('[PersonalDetailsTab] failed to load ancillary personal details:', error)
 			} finally {
@@ -403,7 +433,9 @@ export default function PersonalDetailsTab({
 		}
 
 		loadAncillaryProfile()
-	}, [user])
+		// Run once on mount -- the backend fetch reads current user context internally.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [])
 
 	const handleSave = async () => {
 		const trimmedName = formData.name.trim()
@@ -458,9 +490,28 @@ export default function PersonalDetailsTab({
 		try {
 			setIsSaving(true)
 
+			// Persist to backend database (users.contact_number / users.email /
+			// ancillary_providers.avatar_s3_key / ancillary_providers.name).
+			// This fixes the bug where mobile number was never sent to the backend!
+			const photoToSave = isProfilePhotoRemoved
+				? ''
+				: (profilePhotoUpload?.uri ?? profilePhotoUri ?? (currentSpecialty === 'physiotherapy' ? NEW_PHYSIOTHERAPIST_IMAGE_URL : '') ?? '')
+
+			const backendSaveOk = await updateProviderProfileBackend({
+				name: trimmedName,
+				email: trimmedEmail,
+				mobile_number: normalizedMobile,
+				avatar_s3_key: photoToSave,
+			})
+
+			if (!backendSaveOk) {
+				throw new Error('Backend profile update failed')
+			}
+
 			await updateUser({
 				name: trimmedName,
-				...(profilePhotoUpload ? { avatar: profilePhotoUpload.uri } : isProfilePhotoRemoved ? { avatar: undefined } : {}),
+				email: trimmedEmail || user?.email,
+				avatar: isProfilePhotoRemoved ? undefined : (photoToSave || undefined),
 			})
 
 			await AsyncStorage.multiSet([
@@ -545,7 +596,7 @@ export default function PersonalDetailsTab({
 				<KeyboardAvoidingView style={[styles.contentShell, { maxWidth: contentWidth }]}>
 					<AppPhotoPicker
 						imageUri={profilePhotoUri}
-						fallbackSource={DEFAULT_PROFILE_IMAGE}
+						fallbackSource={currentSpecialty === 'physiotherapy' ? PHYSIOTHERAPY_PROFILE_IMAGE : DEFAULT_PROFILE_IMAGE}
 						fileNamePrefix="ancillary-profile"
 						onChange={({ uri, upload, removed }) => {
 							setProfilePhotoUri(uri)

@@ -145,7 +145,11 @@ export default function MyBookingsPage({
 
 	const handleTrack = (booking: AncillaryBooking) => {
 		const rawSt = String(booking.rawStatus || booking.status || '').toUpperCase()
-		if (rawSt === 'SEARCHING' || rawSt === 'SEARCHING_FOR_NURSE' || rawSt === 'REQUESTED') {
+		const isAssigned =
+			Boolean(booking.provider?.id) &&
+			['ASSIGNED', 'NURSE_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED'].includes(rawSt)
+
+		if (!isAssigned) {
 			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId: booking.id,
 				serviceName: booking.serviceName,

@@ -16,6 +16,7 @@ import CapabilitiesTab from './tabs/CapabilitiesTab'
 import AvailabilityTab from './tabs/AvailabilityTab'
 import SessionsTab from '../SessionsTab'
 import { fetchProviderProfileBackend } from '../../ancillary/ancillaryService'
+import { normalizeSpecialtyKey, normalizeSpecialtyToLabel } from './specialtyConfig'
 
 type TabDefinition = {
 	key: string
@@ -41,25 +42,6 @@ const TABS: TabDefinition[] = [
 // appended after Availability without re-triggering or blocking the existing
 // 'ancillary_setup_completed' flow.
 const LAST_ONBOARDING_TAB_KEY = 'availability'
-
-function normalizeSpecialtyKey(key?: string | null): string {
-	if (!key) return ''
-	const lower = key.toLowerCase().trim()
-	if (lower.includes('home')) return 'home-care'
-	if (lower.includes('physio')) return 'physiotherapy'
-	if (lower.includes('rehab')) return 'rehab-care'
-	if (lower.includes('nurs')) return 'nursing-care'
-	return lower
-}
-
-function normalizeSpecialtyToLabel(key?: string | null): string {
-	const normalizedKey = normalizeSpecialtyKey(key)
-	if (normalizedKey === 'home-care') return 'Home Care'
-	if (normalizedKey === 'physiotherapy') return 'Physiotherapy'
-	if (normalizedKey === 'rehab-care') return 'Rehabilitation'
-	if (normalizedKey === 'nursing-care') return 'Nursing Care'
-	return key || ''
-}
 
 export default function AncillaryProfileLayout() {
 	const { width } = useWindowDimensions()
