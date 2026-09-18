@@ -10,8 +10,7 @@ import {
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
-import { ROUTES } from '../../../navigation/routes'
-import { AppTypography, AppInput, AppScreenHeader } from '../../../components/common'
+import { AppTypography, AppInput, AppScreenHeader, StatusModal } from '../../../components/common'
 import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCard'
 import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
@@ -48,6 +47,7 @@ export default function HomeCareServiceCatalogScreen() {
 	const [searchQuery, setSearchQuery] = useState('')
 	const [selectedProcedure, setSelectedProcedure] = useState<ServiceProcedureItem | null>(null)
 	const [cart, setCart] = useState<ServiceProcedureItem[]>([])
+	const [confirmModalVisible, setConfirmModalVisible] = useState(false)
 
 	useEffect(() => {
 		let isMounted = true
@@ -74,17 +74,12 @@ export default function HomeCareServiceCatalogScreen() {
 		}
 	}, [])
 
-	// Sync selection state if returning from Booking Details
 	useEffect(() => {
 		if (route.params?.updatedCart) {
 			setCart(route.params.updatedCart)
 			navigation.setParams({ updatedCart: undefined })
 		}
-		if (route.params?.careBookingMode) {
-			setSelectedCareMode(route.params.careBookingMode)
-			navigation.setParams({ careBookingMode: undefined })
-		}
-	}, [route.params?.updatedCart, route.params?.careBookingMode])
+	}, [route.params?.updatedCart])
 
 	useEffect(() => {
 		const onBackPress = () => {
@@ -174,10 +169,7 @@ export default function HomeCareServiceCatalogScreen() {
 
 	const handleProceedToBooking = () => {
 		if (cart.length === 0) return
-		navigation.navigate(ROUTES.STACK.HOME_CARE_BOOKING_DETAILS, {
-			selectedServices: cart,
-			careBookingMode: selectedCareMode,
-		})
+		setConfirmModalVisible(true)
 	}
 
 	return (
@@ -236,7 +228,7 @@ export default function HomeCareServiceCatalogScreen() {
 										color={allSelected ? '#2B6F71' : '#64748B'}
 									/>
 									<Text style={[styles.quickSelectAllText, allSelected && styles.quickSelectAllTextActive]}>
-										{allSelected ? 'All 18 activities selected' : 'Select all 18 care activities'}
+										{allSelected ? `All ${procedureItems.length} activities selected` : `Select all ${procedureItems.length} care activities`}
 									</Text>
 								</TouchableOpacity>
 							)}
@@ -263,7 +255,7 @@ export default function HomeCareServiceCatalogScreen() {
 								Book dedicated caregiver support by the hour (1h – 12h) for your selected activities.
 							</Text>
 							<Text style={styles.modeHint}>
-								Select activities below to form your visit care scope. Duration is configured during booking.
+								Select activities below to form your visit care scope.
 							</Text>
 						</TouchableOpacity>
 					</View>
@@ -373,6 +365,19 @@ export default function HomeCareServiceCatalogScreen() {
 				onAddToBooking={(service) => {
 					handleAddProcedure(service)
 					setSelectedProcedure(null)
+				}}
+			/>
+
+			{/* Selection Confirmation Modal */}
+			<StatusModal
+				visible={confirmModalVisible}
+				status="success"
+				title="Activities Selected"
+				description={`You have selected ${cart.length} Home Care ${cart.length === 1 ? 'activity' : 'activities'} (${selectedCareMode === 'COMPLETE_CARE' ? 'Complete Care' : 'Hourly Care'}).`}
+				submitText="Done"
+				onSubmit={() => {
+					setConfirmModalVisible(false)
+					navigation.goBack()
 				}}
 			/>
 		</View>

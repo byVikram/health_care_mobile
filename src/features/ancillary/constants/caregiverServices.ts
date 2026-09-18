@@ -1,8 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
-export type CareTypeKey = 'DAY_CARE' | 'NIGHT_CARE' | 'FULL_DAY_CARE' | 'HOURLY_CARE' | 'TRAVEL_ATTENDANT'
+export type CareTypeKey = 'DAY_CARE' | 'NIGHT_CARE' | 'FULL_DAY_CARE' | 'HOURLY_CARE'
 
-export type SchedulingMode = 'FIXED_WINDOW' | 'FLEXIBLE_START_24H' | 'CUSTOM_WINDOW' | 'TRAVEL_WINDOW'
+export type SchedulingMode = 'FIXED_WINDOW' | 'FLEXIBLE_START_24H' | 'CUSTOM_WINDOW'
 
 export interface CareTypeMetadata {
 	id: CareTypeKey
@@ -31,7 +31,7 @@ export const CAREGIVER_TIME_SERVICES: Record<CareTypeKey, CareTypeMetadata> = {
 		schedulingMode: 'FIXED_WINDOW',
 		fixedStartTime: '09:00',
 		fixedEndTime: '18:00',
-		fixedHoursFormatted: '09:00 AM — 06:00 PM',
+		fixedHoursFormatted: '09:00 AM – 06:00 PM',
 		fixedDurationLabel: '9 hours',
 		fixedDurationHours: 9,
 		isOvernightFixed: false,
@@ -47,7 +47,7 @@ export const CAREGIVER_TIME_SERVICES: Record<CareTypeKey, CareTypeMetadata> = {
 		schedulingMode: 'FIXED_WINDOW',
 		fixedStartTime: '20:00',
 		fixedEndTime: '08:00',
-		fixedHoursFormatted: '08:00 PM → 08:00 AM next day',
+		fixedHoursFormatted: '08:00 PM – 08:00 AM next day',
 		fixedDurationLabel: '12 hours',
 		fixedDurationHours: 12,
 		isOvernightFixed: true,
@@ -76,32 +76,19 @@ export const CAREGIVER_TIME_SERVICES: Record<CareTypeKey, CareTypeMetadata> = {
 		windowNote: 'Customizable care window',
 		badgeText: 'Hourly Duration',
 	},
-	TRAVEL_ATTENDANT: {
-		id: 'TRAVEL_ATTENDANT',
-		title: 'Travel Attendant',
-		tagline: 'Transit & travel companionship',
-		explanation: 'Dedicated caregiver companion to assist during hospital visits, medical travel, or transit.',
-		icon: 'car-side',
-		schedulingMode: 'TRAVEL_WINDOW',
-		fixedDurationLabel: 'Journey Duration',
-		windowNote: 'Travel & transit companion window',
-		badgeText: 'Travel Companion',
-	},
 }
 
 export interface CareCapabilityItem {
 	id: string
 	label: string
 	icon: keyof typeof MaterialCommunityIcons.glyphMap
-	bgColor: string
-	iconColor: string
 }
 
 export const CAREGIVER_INCLUDED_CAPABILITIES: CareCapabilityItem[] = [
-	{ id: 'personal', label: 'Personal Care & Hygiene', icon: 'account-outline', bgColor: '#E6F4F4', iconColor: '#0D9488' },
-	{ id: 'mobility', label: 'Mobility & Walking Support', icon: 'walk', bgColor: '#E0F2FE', iconColor: '#0284C7' },
-	{ id: 'meals', label: 'Meal Assistance', icon: 'silverware-fork-knife', bgColor: '#FEF3C7', iconColor: '#D97706' },
-	{ id: 'meds', label: 'Medication Reminders', icon: 'pill', bgColor: '#F3E8FF', iconColor: '#9333EA' },
-	{ id: 'companion', label: 'Companionship', icon: 'account-group-outline', bgColor: '#FEE2E2', iconColor: '#DC2626' },
-	{ id: 'daily', label: 'Help with Daily Activities', icon: 'home-heart', bgColor: '#CCFBF1', iconColor: '#0D9488' },
+	{ id: 'personal', label: 'Personal Care & Hygiene', icon: 'account-outline' },
+	{ id: 'mobility', label: 'Mobility & Walking Support', icon: 'walk' },
+	{ id: 'meals', label: 'Meal Assistance', icon: 'silverware-fork-knife' },
+	{ id: 'meds', label: 'Medication Reminders', icon: 'pill' },
+	{ id: 'companion', label: 'Companionship', icon: 'account-group-outline' },
+	{ id: 'daily', label: 'Help with Daily Activities', icon: 'home-heart' },
 ]
