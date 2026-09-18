@@ -1,9 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../../components/common'
+import { AppButton, AppTypography } from '../../../../components/common'
 import {
 	fetchAncillaryHierarchyBackend,
+	fetchProviderProfileBackend,
 	AncillaryHierarchySubspecialty,
 } from '../../../ancillary/ancillaryService'
 
@@ -22,47 +24,67 @@ import {
  */
 
 export interface ServicesAndProceduresViewProps {
-	specialtyKey: string
+	specialtyKey?: string
 	subspecialtyId?: string
-	/** Refetch trigger -- pass active tab state so it reloads when navigating back */
 	refreshToken?: string | number | boolean
+	isActive?: boolean
+	onNextTab?: () => void
+	specialtyLabel?: string
 }
 
 export default function ServicesAndProceduresView({
-	specialtyKey,
+	specialtyKey = 'physiotherapy',
 	subspecialtyId,
 	refreshToken,
+	isActive,
+	onNextTab,
 }: ServicesAndProceduresViewProps) {
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [subspecialtyNode, setSubspecialtyNode] = useState<AncillaryHierarchySubspecialty | null>(null)
+	const [activeSubId, setActiveSubId] = useState<string | undefined>(subspecialtyId)
 
 	useEffect(() => {
 		let isMounted = true
 
 		const load = async () => {
-			if (!specialtyKey) {
-				if (isMounted) {
-					setLoading(false)
-					setSubspecialtyNode(null)
-				}
-				return
-			}
-
+			const resolvedKey = specialtyKey || 'physiotherapy'
 			setLoading(true)
 			setError(null)
 
 			try {
+				let targetSubId = subspecialtyId
+				if (!targetSubId) {
+					try {
+						targetSubId = (await AsyncStorage.getItem('ancillary_subspecialty_id')) || undefined
+					} catch (e) {}
+				}
+				if (!targetSubId) {
+					try {
+						const prof = await fetchProviderProfileBackend()
+						targetSubId =
+							prof?.subspecialty_id ||
+							(prof as any)?.sub_specialty_id ||
+							prof?.subspecialty?.id ||
+							(prof as any)?.sub_specialty?.id ||
+							undefined
+					} catch (e) {}
+				}
+
+				if (isMounted) {
+					setActiveSubId(targetSubId)
+				}
+
 				// Fetch dynamic hierarchy from backend using selected specialty and subspecialty
-				const specialties = await fetchAncillaryHierarchyBackend(specialtyKey, subspecialtyId)
+				const specialties = await fetchAncillaryHierarchyBackend(resolvedKey, targetSubId)
 				if (!isMounted) return
 
 				const specialtyNode = specialties[0] || null
-				const subList = specialtyNode?.sub_specialties || []
+				const subList = specialtyNode?.sub_specialties || (specialtyNode as any)?.subspecialties || []
 
 				let matched: AncillaryHierarchySubspecialty | null = null
-				if (subspecialtyId) {
-					matched = subList.find((s) => s.id === subspecialtyId) || subList[0] || null
+				if (targetSubId) {
+					matched = subList.find((s: any) => s.id === targetSubId || (s as any).public_id === targetSubId) || null
 				} else if (subList.length > 0) {
 					matched = subList[0]
 				}
@@ -81,7 +103,7 @@ export default function ServicesAndProceduresView({
 		return () => {
 			isMounted = false
 		}
-	}, [specialtyKey, subspecialtyId, refreshToken])
+	}, [specialtyKey, subspecialtyId, refreshToken, isActive])
 
 	if (loading) {
 		return (
@@ -105,7 +127,7 @@ export default function ServicesAndProceduresView({
 		)
 	}
 
-	if (!subspecialtyId) {
+	if (!activeSubId && !subspecialtyNode) {
 		return (
 			<View style={styles.centerBlock}>
 				<MaterialCommunityIcons name="information-outline" size={26} color="#64748B" />
@@ -122,14 +144,31 @@ export default function ServicesAndProceduresView({
 
 	if (!subspecialtyNode || subspecialtyNode.categories.length === 0) {
 		return (
-			<View style={styles.centerBlock}>
-				<MaterialCommunityIcons name="clipboard-text-outline" size={26} color="#64748B" />
-				<AppTypography variant="body" style={styles.emptyTitle}>
-					No Procedures Configured
-				</AppTypography>
-				<AppTypography variant="caption" style={styles.centerText}>
-					No clinical procedures are configured yet for this specialization.
-				</AppTypography>
+			<View style={styles.container}>
+				{subspecialtyNode ? (
+					<View style={styles.subspecialtyBanner}>
+						<View style={styles.bannerIconWrap}>
+							<MaterialCommunityIcons name="stethoscope" size={20} color="#0c7c7c" />
+						</View>
+						<View style={{ flex: 1 }}>
+							<AppTypography variant="caption" style={styles.subspecialtyHeaderTag}>
+								Selected Specialization
+							</AppTypography>
+							<AppTypography variant="subtitle" style={styles.subspecialtyBannerText}>
+								{subspecialtyNode.label}
+							</AppTypography>
+						</View>
+					</View>
+				) : null}
+				<View style={styles.centerBlock}>
+					<MaterialCommunityIcons name="clipboard-text-outline" size={26} color="#64748B" />
+					<AppTypography variant="body" style={styles.emptyTitle}>
+						No Procedures Configured
+					</AppTypography>
+					<AppTypography variant="caption" style={styles.centerText}>
+						No clinical procedures are configured yet for this specialization.
+					</AppTypography>
+				</View>
 			</View>
 		)
 	}
@@ -188,6 +227,18 @@ export default function ServicesAndProceduresView({
 					</View>
 				))}
 			</View>
+
+			{onNextTab ? (
+				<View style={styles.footerRow}>
+					<AppButton
+						variant="primary"
+						onPress={onNextTab}
+						style={styles.continueBtn}
+					>
+						Continue to Availability -&gt;
+					</AppButton>
+				</View>
+			) : null}
 		</View>
 	)
 }
@@ -195,6 +246,13 @@ export default function ServicesAndProceduresView({
 const styles = StyleSheet.create({
 	container: {
 		gap: 18,
+	},
+	footerRow: {
+		marginTop: 10,
+		marginBottom: 24,
+	},
+	continueBtn: {
+		backgroundColor: '#2B6F71',
 	},
 	centerBlock: {
 		alignItems: 'center',

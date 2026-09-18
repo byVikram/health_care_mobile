@@ -274,8 +274,16 @@ export default function CapabilitiesTab({
 				// 2. Fetch backend profile to get definitive specialty and saved capabilities
 				const profResult = await fetchProviderProfileBackend()
 				let savedList: string[] = []
+				let backendSubspecialtyId = ''
 
 				if (profResult && isMounted) {
+					backendSubspecialtyId =
+						profResult.subspecialty_id ||
+						(profResult as any).sub_specialty_id ||
+						profResult.subspecialty?.id ||
+						(profResult as any).sub_specialty?.id ||
+						''
+
 					const backendSpec =
 						profResult.specialty_id ||
 						profResult.specialty?.id ||
@@ -288,7 +296,6 @@ export default function CapabilitiesTab({
 						setSpecialtyKey(resolvedSpecialty)
 						await AsyncStorage.setItem('user_specialty', resolvedSpecialty)
 
-						const backendSubspecialtyId = profResult.subspecialty_id || profResult.subspecialty?.id
 						if (backendSubspecialtyId && isMounted) {
 							setSubspecialtyId(backendSubspecialtyId)
 							await AsyncStorage.setItem('ancillary_subspecialty_id', backendSubspecialtyId)
@@ -315,10 +322,12 @@ export default function CapabilitiesTab({
 					if (isMounted) setSpecialtyKey('home-care')
 				}
 
-				// 3. Concurrently fetch categories and services for resolved specialty
+				const activeSubId = storedSubspecialtyId || backendSubspecialtyId
+
+				// 3. Concurrently fetch categories and services for resolved specialty & subspecialty
 				const [catResult, srvResult] = await Promise.allSettled([
-					fetchAncillaryCategoriesBackend(resolvedSpecialty),
-					fetchAncillaryServicesBackend({ specialtyId: resolvedSpecialty }),
+					fetchAncillaryCategoriesBackend(resolvedSpecialty, activeSubId),
+					fetchAncillaryServicesBackend({ specialtyId: resolvedSpecialty, subspecialtyId: activeSubId }),
 				])
 
 				if (!isMounted) return

@@ -13,6 +13,7 @@ import { AppTypography } from '../../../components/common'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import CapabilitiesTab from './tabs/CapabilitiesTab'
+import ServicesAndProceduresView from './tabs/ServicesAndProceduresView'
 import AvailabilityTab from './tabs/AvailabilityTab'
 import SessionsTab from '../SessionsTab'
 import { fetchProviderProfileBackend } from '../../ancillary/ancillaryService'
@@ -21,23 +22,19 @@ import { normalizeSpecialtyKey, normalizeSpecialtyToLabel } from './specialtyCon
 type TabDefinition = {
 	key: string
 	label: string
-	Component: React.ComponentType<{
-		isActive?: boolean
-		onNextTab?: () => void
-		specialtyKey?: string
-		specialtyLabel?: string
-	}>
+	Component: React.ComponentType<any>
 }
 
 const getTabsForSpecialty = (specialtyKey: string): TabDefinition[] => {
-	const isPhysio = specialtyKey === 'physiotherapy'
+	const normalized = normalizeSpecialtyKey(specialtyKey)
+	const isPhysio = !specialtyKey || normalized === 'physiotherapy' || specialtyKey.toLowerCase().includes('physio')
 	return [
 		{ key: 'personal', label: 'Personal Details', Component: PersonalDetailsTab },
 		{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
 		{
-			key: 'capabilities',
+			key: isPhysio ? 'services' : 'capabilities',
 			label: isPhysio ? 'Services & Procedures' : 'Capabilities',
-			Component: CapabilitiesTab,
+			Component: isPhysio ? (ServicesAndProceduresView as any) : CapabilitiesTab,
 		},
 		{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
 		{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
@@ -57,6 +54,7 @@ export default function AncillaryProfileLayout() {
 	const [activeTab, setActiveTab] = useState('personal')
 	const [specialtyKey, setSpecialtyKey] = useState<string>('')
 	const [specialtyLabel, setSpecialtyLabel] = useState<string>('')
+	const [subspecialtyId, setSubspecialtyId] = useState<string>('')
 
 	const tabs = useMemo(() => getTabsForSpecialty(specialtyKey), [specialtyKey])
 
@@ -76,16 +74,36 @@ export default function AncillaryProfileLayout() {
 					}
 				}
 
+				const storedSub = await AsyncStorage.getItem('ancillary_subspecialty_id')
+				if (storedSub && isMounted) {
+					setSubspecialtyId(storedSub)
+				}
+
 				// 2. Fetch authoritative backend profile
 				const profile = await fetchProviderProfileBackend()
 				if (profile && isMounted) {
-					const spec = profile.specialty_id || profile.specialty?.id || profile.specialty_name || profile.specialty?.label
+					const spec =
+						profile.specialty_id ||
+						profile.specialty?.id ||
+						profile.specialty_name ||
+						profile.specialty?.label ||
+						profile.subspecialty?.specialtyId
 					const resolved = normalizeSpecialtyKey(spec)
 					if (resolved) {
 						setSpecialtyKey(resolved)
 						const label = profile.specialty_name || profile.specialty?.label || normalizeSpecialtyToLabel(resolved)
 						setSpecialtyLabel(label)
 						await AsyncStorage.setItem('user_specialty', resolved)
+					}
+
+					const backendSub =
+						profile.subspecialty_id ||
+						profile.sub_specialty_id ||
+						profile.subspecialty?.id ||
+						profile.sub_specialty?.id
+					if (backendSub && isMounted) {
+						setSubspecialtyId(backendSub)
+						await AsyncStorage.setItem('ancillary_subspecialty_id', backendSub)
 					}
 				}
 			} catch (e) {
@@ -205,6 +223,9 @@ export default function AncillaryProfileLayout() {
 									onNextTab={() => handleTabProgress(index)}
 									specialtyKey={specialtyKey}
 									specialtyLabel={specialtyLabel}
+									subspecialtyId={subspecialtyId}
+									onSubspecialtyChange={(id: string) => setSubspecialtyId(id)}
+									refreshToken={activeTab === tab.key}
 								/>
 							</View>
 						)

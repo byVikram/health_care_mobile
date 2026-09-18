@@ -23,6 +23,7 @@ import {
 	fetchProviderProfileBackend,
 	fetchAncillarySubspecialtiesBackend,
 	updateProviderProfileBackend,
+	DEFAULT_PHYSIOTHERAPY_SUBSPECIALTIES,
 } from '../../../ancillary/ancillaryService'
 import { normalizeSpecialtyKey, normalizeSpecialtyToLabel } from '../specialtyConfig'
 
@@ -312,10 +313,12 @@ export default function ProfessionalDetailsTab({
 	onNextTab,
 	specialtyKey: propSpecialtyKey,
 	specialtyLabel: propSpecialtyLabel,
+	onSubspecialtyChange,
 }: {
 	onNextTab?: () => void
 	specialtyKey?: string
 	specialtyLabel?: string
+	onSubspecialtyChange?: (id: string) => void
 } = {}) {
 	const { width } = useWindowDimensions()
 
@@ -345,7 +348,13 @@ export default function ProfessionalDetailsTab({
 	})
 
 	const [isSaving, setIsSaving] = useState(false)
-	const [subspecialtyOptions, setSubspecialtyOptions] = useState<Option[]>([])
+	const [subspecialtyOptions, setSubspecialtyOptions] = useState<Option[]>(() => {
+		const key = normalizeSpecialtyKey(propSpecialtyKey) || 'physiotherapy'
+		if (key.toLowerCase().includes('physio')) {
+			return DEFAULT_PHYSIOTHERAPY_SUBSPECIALTIES.map((s) => ({ label: s.label, value: s.id }))
+		}
+		return []
+	})
 	const [statusModal, setStatusModal] = useState<{
 		visible: boolean
 		status: 'success' | 'error'
@@ -411,8 +420,8 @@ function extractQualificationString(val: any): string {
 
 		const loadSubspecialties = async () => {
 			const items = await fetchAncillarySubspecialtiesBackend(targetKey)
-			if (isMounted) {
-				setSubspecialtyOptions(items.map((item) => ({ label: item.label, value: item.id || item.public_id || '' })))
+			if (isMounted && items && items.length > 0) {
+				setSubspecialtyOptions(items.map((item: any) => ({ label: item.label, value: item.id || item.public_id || '' })))
 			}
 		}
 
@@ -483,23 +492,34 @@ function extractQualificationString(val: any): string {
 							: (map['ancillary_geofence_radius'] || '10')
 
 					// Extract authoritative specialty from backend
-					const spec = backendProfile.specialty_id || backendProfile.specialty?.id || backendProfile.specialty_name || backendProfile.specialty?.label
+					const spec =
+						backendProfile.specialty_id ||
+						backendProfile.specialty?.id ||
+						backendProfile.specialty_name ||
+						backendProfile.specialty?.label ||
+						backendProfile.subspecialty?.specialtyId
 					const resolvedKey = normalizeSpecialtyKey(spec)
 					if (resolvedKey) {
 						setResolvedSpecialtyKey(resolvedKey)
 						const label = backendProfile.specialty_name || backendProfile.specialty?.label || normalizeSpecialtyToLabel(resolvedKey)
 						setResolvedSpecialtyLabel(label)
 						await AsyncStorage.setItem('user_specialty', resolvedKey)
-						fetchAncillarySubspecialtiesBackend(resolvedKey).then((items) => {
-							if (isMounted) {
-								setSubspecialtyOptions(items.map((item) => ({ label: item.label, value: item.id || item.public_id || '' })))
+						fetchAncillarySubspecialtiesBackend(resolvedKey).then((items: any) => {
+							if (isMounted && items && items.length > 0) {
+								setSubspecialtyOptions(items.map((item: any) => ({ label: item.label, value: item.id || item.public_id || '' })))
 							}
 						})
 					}
 
 					const rawQual = backendProfile?.qualifications_list ?? backendProfile?.qualifications
 					const resolvedQual = extractQualificationString(rawQual) || cachedQual || ''
-					const backendSubspecialtyId = backendProfile?.subspecialty_id || backendProfile?.subspecialty?.id || map['ancillary_subspecialty_id'] || ''
+					const backendSubspecialtyId =
+						backendProfile?.subspecialty_id ||
+						backendProfile?.sub_specialty_id ||
+						backendProfile?.subspecialty?.id ||
+						backendProfile?.sub_specialty?.id ||
+						map['ancillary_subspecialty_id'] ||
+						''
 
 					setFormData((prev) => ({
 						...prev,
@@ -604,10 +624,8 @@ function extractQualificationString(val: any): string {
 			}
 
 			// Persist geofence radius, credentials & subspecialty to backend database.
-			// NOTE: `subspecialty_id` (a lookup_ancillary_subspecialties public_id, e.g.
-			// `phys-sub-orthopedic`) replaces the old free-text specialization field -- it
-			// must be sent here in both branches so it reaches the database and survives
-			// a reinstall / shows up on another device.
+			// NOTE: `subspecialty_id` and `sub_specialty_id` (a lookup_ancillary_sub_specialties public_id, e.g.
+			// `phys-sub-orthopedic`) replace free-text specialization field.
 			const numRadius = Number(formData.geofenceRadius)
 			if (isHomeCare) {
 				await updateProviderProfileBackend({
@@ -616,6 +634,7 @@ function extractQualificationString(val: any): string {
 					experience_years: formData.experience,
 					geofence_radius: Number.isFinite(numRadius) ? numRadius : 10,
 					subspecialty_id: formData.subspecialtyId,
+					sub_specialty_id: formData.subspecialtyId,
 				})
 			} else {
 				await updateProviderProfileBackend({
@@ -625,6 +644,7 @@ function extractQualificationString(val: any): string {
 					experience_years: formData.experience,
 					geofence_radius: Number.isFinite(numRadius) ? numRadius : 10,
 					subspecialty_id: formData.subspecialtyId,
+					sub_specialty_id: formData.subspecialtyId,
 				})
 			}
 
@@ -731,7 +751,11 @@ function extractQualificationString(val: any): string {
 									value={formData.subspecialtyId}
 									placeholder={subspecialtyOptions.length ? 'Select specialization' : 'No specializations available'}
 									options={subspecialtyOptions}
-									onSelect={(val) => updateFormData('subspecialtyId', val)}
+									onSelect={(val) => {
+										updateFormData('subspecialtyId', val)
+										AsyncStorage.setItem('ancillary_subspecialty_id', val)
+										onSubspecialtyChange?.(val)
+									}}
 								/>
 							</FormRow>
 
