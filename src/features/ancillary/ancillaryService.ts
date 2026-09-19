@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import ApiService from '../../services/apiService'
-import { API_ENDPOINTS } from '../../constants/apiUrls'
+import { API_ENDPOINTS, BASE_URL } from '../../constants/apiUrls'
 import { safeJsonParse } from '../../utils/jsonUtils'
 
 // --- Canonical 13-State Machine Status Vocabulary ---
@@ -63,11 +63,20 @@ const unwrapList = <T>(payload: any): T[] => {
 	return []
 }
 
-export const fetchAncillaryCategoriesBackend = async (specialtyId?: string): Promise<AncillaryCategoryApiItem[]> => {
+export const fetchAncillaryCategoriesBackend = async (
+	specialtyId?: string,
+	subspecialtyId?: string
+): Promise<AncillaryCategoryApiItem[]> => {
 	try {
+		const params: Record<string, string> = {}
+		if (specialtyId) params.specialty_id = specialtyId
+		if (subspecialtyId) {
+			params.subspecialty_id = subspecialtyId
+			params.sub_specialty_id = subspecialtyId
+		}
 		const res = await ApiService.getWithParams<any>(
 			API_ENDPOINTS.ANCILLARY.CATEGORIES,
-			specialtyId ? { specialty_id: specialtyId } : {}
+			params
 		)
 		return unwrapList<AncillaryCategoryApiItem>(res.data)
 	} catch (error) {
@@ -75,6 +84,62 @@ export const fetchAncillaryCategoriesBackend = async (specialtyId?: string): Pro
 		return []
 	}
 }
+
+export interface AncillarySubspecialtyApiItem {
+	id: string
+	public_id?: string
+	label: string
+	specialty_id?: string
+	specialtyId?: string
+	sub_specialty_id?: string
+	description?: string
+}
+
+export const DEFAULT_PHYSIOTHERAPY_SUBSPECIALTIES: AncillarySubspecialtyApiItem[] = [
+	{ id: 'phys-sub-orthopedic', public_id: 'phys-sub-orthopedic', label: 'Orthopedic Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-neurological', public_id: 'phys-sub-neurological', label: 'Neurological Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-sports', public_id: 'phys-sub-sports', label: 'Sports Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-pediatric', public_id: 'phys-sub-pediatric', label: 'Pediatric Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-geriatric', public_id: 'phys-sub-geriatric', label: 'Geriatric Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-cardiopulmonary', public_id: 'phys-sub-cardiopulmonary', label: 'Cardiopulmonary Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-womens-health', public_id: 'phys-sub-womens-health', label: "Women's Health Physiotherapy", specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-vestibular', public_id: 'phys-sub-vestibular', label: 'Vestibular Physiotherapy', specialtyId: 'physiotherapy' },
+]
+
+export const fetchAncillarySubspecialtiesBackend = async (specialtyId?: string): Promise<AncillarySubspecialtyApiItem[]> => {
+	try {
+		const endpoint =
+			API_ENDPOINTS?.ANCILLARY?.SUB_SPECIALTIES ||
+			API_ENDPOINTS?.ANCILLARY?.SUBSPECIALTIES ||
+			`${BASE_URL}/api/ancillary/sub_specialties`
+		const res = await ApiService.getWithParams<any>(
+			endpoint,
+			specialtyId ? { specialty_id: specialtyId } : {}
+		)
+		const list = unwrapList<any>(res.data)
+		if (Array.isArray(list) && list.length > 0) {
+			return list.map((item) => ({
+				id: item.id || item.public_id || '',
+				public_id: item.public_id || item.id || '',
+				label: item.label || item.name || '',
+				specialty_id: item.specialty_id || item.specialtyId,
+				specialtyId: item.specialtyId || item.specialty_id,
+				sub_specialty_id: item.sub_specialty_id || item.subspecialty_id || item.id || item.public_id,
+				description: item.description || '',
+			}))
+		}
+	} catch (error) {
+		console.log('[ancillaryService] fetchAncillarySubspecialtiesBackend error:', error)
+	}
+
+	if (!specialtyId || specialtyId.toLowerCase().includes('physio')) {
+		return DEFAULT_PHYSIOTHERAPY_SUBSPECIALTIES
+	}
+	return []
+}
+
+export const fetchAncillarySubSpecialtiesBackend = fetchAncillarySubspecialtiesBackend
+
 
 // Backend (AncillaryProcedureResponse) returns `label` / `aboutService` /
 // `whatsIncluded` / `categoryId` / `imageUrl` -- it never returns `title` or
@@ -106,11 +171,18 @@ const mapRawServiceToItem = (raw: any): AncillaryServiceItem => {
 export const fetchAncillaryServicesBackend = async (params?: {
 	categoryId?: string
 	specialtyId?: string
+	subspecialtyId?: string
+	sub_specialty_id?: string
 }): Promise<AncillaryServiceItem[]> => {
 	try {
 		const query: Record<string, string> = {}
 		if (params?.categoryId) query.category_id = params.categoryId
 		if (params?.specialtyId) query.specialty_id = params.specialtyId
+		const subId = params?.subspecialtyId || params?.sub_specialty_id
+		if (subId) {
+			query.subspecialty_id = subId
+			query.sub_specialty_id = subId
+		}
 		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.SERVICES, query)
 		return unwrapList<any>(res.data).map(mapRawServiceToItem)
 	} catch (error) {
@@ -119,6 +191,65 @@ export const fetchAncillaryServicesBackend = async (params?: {
 	}
 }
 
+export interface AncillaryHierarchyProcedure {
+	id: string
+	specialtyId?: string
+	subspecialtyId?: string
+	categoryId?: string
+	label: string
+	price: number
+	providerPrice?: number
+	aboutService?: string
+	whatsIncluded?: string[]
+	imageUrl?: string | null
+}
+
+export interface AncillaryHierarchyCategory {
+	id: string
+	label: string
+	procedures: AncillaryHierarchyProcedure[]
+}
+
+export interface AncillaryHierarchySubspecialty {
+	id: string
+	label: string
+	categories: AncillaryHierarchyCategory[]
+}
+
+export interface AncillaryHierarchySpecialty {
+	id: string
+	label: string
+	sub_specialties: AncillaryHierarchySubspecialty[]
+}
+
+// Fetches the full read-only 4-tier hierarchy -- Specialty -> Sub-specialty ->
+// Category -> Procedures -- for the given specialty (e.g. 'physiotherapy') in a
+// single call, straight from the existing GET ``-style
+// /api/ancillary/hierarchy endpoint (see backend app/ancillary/router.py).
+// Used by the read-only Services overview shown after a provider selects their
+// specialization in Professional Details -- never used to drive
+// select/deselect capability UI.
+export const fetchAncillaryHierarchyBackend = async (
+	specialtyId?: string,
+	subspecialtyId?: string
+): Promise<AncillaryHierarchySpecialty[]> => {
+	try {
+		const params: Record<string, string> = {}
+		if (specialtyId) params.specialty_id = specialtyId
+		if (subspecialtyId) {
+			params.subspecialty_id = subspecialtyId
+			params.sub_specialty_id = subspecialtyId
+		}
+		const res = await ApiService.getWithParams<any>(
+			API_ENDPOINTS.ANCILLARY.HIERARCHY,
+			params
+		)
+		return unwrapList<AncillaryHierarchySpecialty>(res.data)
+	} catch (error) {
+		console.log('[ancillaryService] fetchAncillaryHierarchyBackend error:', error)
+		return []
+	}
+}
 export interface FetchVerifiedNursesParams {
 	procedureId?: string
 	procedureName?: string
@@ -1437,7 +1568,8 @@ export interface AncillaryProfileBackendResponse {
 	license_number: string
 	license_proof_s3_key?: string
 	qualification_proof_s3_key?: string
-	qualifications?: string
+	qualifications?: string | any[] | any
+	qualifications_list?: any[]
 	experience_years?: string
 	specialty?: {
 		id?: string
@@ -1446,14 +1578,26 @@ export interface AncillaryProfileBackendResponse {
 	}
 	specialty_id?: string
 	specialty_name?: string
+	subspecialty_id?: string
+	sub_specialty_id?: string
+	subspecialty?: {
+		id?: string
+		specialtyId?: string
+		label: string
+		description?: string
+	}
+	sub_specialty?: {
+		id?: string
+		specialtyId?: string
+		label: string
+		description?: string
+	}
 	checked_procedures?: string[]
 	geofence_radius?: number
 	geofence_radius_km?: number
 	name?: string
 	email?: string
 	contact_number?: string
-	// Free-text area of practice, e.g. "Orthopedic Physiotherapy" -- distinct from the specialty category above.
-	specialization?: string
 	avatar_s3_key?: string
 }
 
@@ -1484,7 +1628,9 @@ export const updateProviderProfileBackend = async (payload: {
 	email?: string
 	// Sent as mobile_number to match the backend AncillaryProfileUpdate schema; maps to users.contact_number.
 	mobile_number?: string
-	specialization?: string
+	// subspecialty_id (public_id) replacing the old free-text specialization field; matches AncillaryProfileUpdate.subspecialtyId alias.
+	subspecialty_id?: string
+	sub_specialty_id?: string
 	avatar_s3_key?: string
 }): Promise<boolean> => {
 	try {
