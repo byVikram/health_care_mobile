@@ -278,10 +278,8 @@ export default function CapabilitiesTab({
 
 				if (profResult && isMounted) {
 					backendSubspecialtyId =
-						profResult.subspecialty_id ||
-						(profResult as any).sub_specialty_id ||
-						profResult.subspecialty?.id ||
-						(profResult as any).sub_specialty?.id ||
+						profResult.sub_specialty_id ||
+						profResult.sub_specialty?.id ||
 						''
 
 					const backendSpec =
@@ -410,7 +408,7 @@ export default function CapabilitiesTab({
 					await AsyncStorage.setItem('user_specialty', backendSpecKey)
 				}
 
-				const backendSubspecialtyId = profResult.subspecialty_id || profResult.subspecialty?.id || ''
+				const backendSubspecialtyId = profResult.sub_specialty_id || profResult.sub_specialty?.id || ''
 				if (backendSubspecialtyId) {
 					setSubspecialtyId(backendSubspecialtyId)
 					await AsyncStorage.setItem('ancillary_subspecialty_id', backendSubspecialtyId)

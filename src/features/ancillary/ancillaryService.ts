@@ -1570,7 +1570,6 @@ export interface AncillaryProfileBackendResponse {
 	qualification_proof_s3_key?: string
 	qualifications?: string | any[] | any
 	qualifications_list?: any[]
-	experience_years?: string
 	specialty?: {
 		id?: string
 		label: string
@@ -1578,14 +1577,7 @@ export interface AncillaryProfileBackendResponse {
 	}
 	specialty_id?: string
 	specialty_name?: string
-	subspecialty_id?: string
 	sub_specialty_id?: string
-	subspecialty?: {
-		id?: string
-		specialtyId?: string
-		label: string
-		description?: string
-	}
 	sub_specialty?: {
 		id?: string
 		specialtyId?: string
@@ -1595,19 +1587,32 @@ export interface AncillaryProfileBackendResponse {
 	checked_procedures?: string[]
 	geofence_radius?: number
 	geofence_radius_km?: number
+	experience_years?: number
+	date_of_birth?: string
+	gender?: string
+	location?: string
+	languages?: string[]
+	about?: string
 	name?: string
 	email?: string
 	contact_number?: string
+	mobile_number?: string
 	avatar_s3_key?: string
+	verification_status?: string
 }
 
 export const fetchProviderProfileBackend = async (): Promise<AncillaryProfileBackendResponse | null> => {
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROFILE)
+		console.log('PROFILE endpoint =', API_ENDPOINTS.ANCILLARY.PROFILE)
 		const data = res.data?.data || res.data
-		return data || null
+		if (data) {
+			console.log('[fetchProviderProfileBackend] Provider Profile fetched:', data)
+			return data
+		}
+		return null
 	} catch (error) {
-		console.log('[ancillaryService] fetchProviderProfileBackend error:', error)
+		console.log('[ancillaryService] Error fetching provider profile:', error)
 		return null
 	}
 }
@@ -1619,7 +1624,12 @@ export const updateProviderProfileBackend = async (payload: {
 	qualification_proof_s3_key?: string
 	qualification_proof?: string
 	qualifications?: string
-	experience_years?: string
+	experience_years?: number
+	date_of_birth?: string
+	gender?: string
+	location?: string
+	languages?: string[]
+	about?: string
 	specialty?: string | { id?: string; label?: string }
 	geofence_radius?: number
 	geofence_radius_km?: number
@@ -1628,17 +1638,25 @@ export const updateProviderProfileBackend = async (payload: {
 	email?: string
 	// Sent as mobile_number to match the backend AncillaryProfileUpdate schema; maps to users.contact_number.
 	mobile_number?: string
-	// subspecialty_id (public_id) replacing the old free-text specialization field; matches AncillaryProfileUpdate.subspecialtyId alias.
-	subspecialty_id?: string
 	sub_specialty_id?: string
 	avatar_s3_key?: string
 }): Promise<boolean> => {
 	try {
-		await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, payload)
+		console.log('[Ancillary Profile] FINAL UPDATE PAYLOAD:', JSON.stringify(payload, null, 2))
+		const res = await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, payload)
+		console.log('[Ancillary Profile] UPDATE RESPONSE:', JSON.stringify(res?.data || res, null, 2))
 		return true
-	} catch (error) {
-		console.log('[ancillaryService] updateProviderProfileBackend error:', error)
-		return false
+	} catch (error: any) {
+		console.error('[PROFILE SAVE] error:', error)
+		console.error('[PROFILE SAVE] status:', error?.response?.status)
+		console.error('[PROFILE SAVE] response:', error?.response?.data)
+		console.error('[PROFILE SAVE] request:', error?.config?.data)
+		console.error('[PROFILE SAVE] URL:', error?.config?.url)
+		console.error('[Ancillary Profile] Backend update failed:', error)
+		console.error('[Ancillary Profile] Status:', error?.response?.status)
+		console.error('[Ancillary Profile] Response:', error?.response?.data)
+		console.error('[Ancillary Profile] Request:', error?.config?.data)
+		throw error
 	}
 }
 
@@ -1946,6 +1964,38 @@ export const respondToRescheduleProposal = async (
 		success: data?.success !== false,
 		status: data?.status || (action === 'ACCEPT' ? 'SCHEDULED_CONFIRMED' : 'CANCELLED_BY_PATIENT'),
 		message: data?.message || (action === 'ACCEPT' ? 'Reschedule accepted and booking confirmed.' : 'Reschedule declined.'),
+	}
+}
+
+/**
+ * Provider action: Fetch weekly working hours and break schedules.
+ */
+export const fetchProviderWeeklyAvailabilityBackend = async (): Promise<ProviderAvailabilityDay[]> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY)
+		const data = res.data?.data || res.data
+		const list = Array.isArray(data) ? data : Array.isArray(data?.schedules) ? data.schedules : []
+		const intToDay: Record<number, ProviderAvailabilityDay['day_of_week']> = {
+			0: 'SUNDAY',
+			1: 'MONDAY',
+			2: 'TUESDAY',
+			3: 'WEDNESDAY',
+			4: 'THURSDAY',
+			5: 'FRIDAY',
+			6: 'SATURDAY',
+		}
+		return list.map((item: any) => ({
+			day_of_week: typeof item.day_of_week === 'number' ? intToDay[item.day_of_week] || 'MONDAY' : item.day_of_week,
+			is_available: item.is_active !== false,
+			start_time: item.start_time,
+			end_time: item.end_time,
+			slot_duration_mins: item.slot_duration_mins || 30,
+			break_start_time: item.break_start_time,
+			break_end_time: item.break_end_time,
+		}))
+	} catch (error) {
+		console.log('[ancillaryService] fetchProviderWeeklyAvailabilityBackend error:', error)
+		return []
 	}
 }
 

@@ -58,52 +58,27 @@ export default function AncillaryProfileLayout() {
 
 	const tabs = useMemo(() => getTabsForSpecialty(specialtyKey), [specialtyKey])
 
-	// Load authenticated provider specialty on layout mount and when tab changes
+	// Load authenticated provider specialty from authoritative backend on layout mount and when tab changes
 	useEffect(() => {
 		let isMounted = true
 
 		const resolveSpecialty = async () => {
 			try {
-				// 1. Check local storage first
-				const stored = await AsyncStorage.getItem('user_specialty')
-				if (stored && isMounted) {
-					const resolved = normalizeSpecialtyKey(stored)
-					if (resolved) {
-						setSpecialtyKey(resolved)
-						setSpecialtyLabel(normalizeSpecialtyToLabel(resolved))
-					}
-				}
-
-				const storedSub = await AsyncStorage.getItem('ancillary_subspecialty_id')
-				if (storedSub && isMounted) {
-					setSubspecialtyId(storedSub)
-				}
-
-				// 2. Fetch authoritative backend profile
+				// 1. Fetch authoritative backend profile first (backend is single source of truth)
 				const profile = await fetchProviderProfileBackend()
 				if (profile && isMounted) {
-					const spec =
-						profile.specialty_id ||
-						profile.specialty?.id ||
-						profile.specialty_name ||
-						profile.specialty?.label ||
-						profile.subspecialty?.specialtyId
+					// 2. Canonical backend fields: profile.specialty_id and profile.sub_specialty_id
+					const spec = profile.specialty_id
 					const resolved = normalizeSpecialtyKey(spec)
 					if (resolved) {
 						setSpecialtyKey(resolved)
-						const label = profile.specialty_name || profile.specialty?.label || normalizeSpecialtyToLabel(resolved)
+						const label = profile.specialty?.label || normalizeSpecialtyToLabel(resolved)
 						setSpecialtyLabel(label)
-						await AsyncStorage.setItem('user_specialty', resolved)
 					}
 
-					const backendSub =
-						profile.subspecialty_id ||
-						profile.sub_specialty_id ||
-						profile.subspecialty?.id ||
-						profile.sub_specialty?.id
-					if (backendSub && isMounted) {
+					const backendSub = profile.sub_specialty_id
+					if (backendSub) {
 						setSubspecialtyId(backendSub)
-						await AsyncStorage.setItem('ancillary_subspecialty_id', backendSub)
 					}
 				}
 			} catch (e) {

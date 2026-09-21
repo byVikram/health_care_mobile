@@ -4,20 +4,20 @@
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' anrd 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
-	if (typeof window !== 'undefined' && window.location) {
-		const host = window.location.hostname
-		if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-			return 'http://localhost:8000'
-		}
-		if (host) {
-			return `${window.location.protocol}//${host}:8000`
-		}
-	}
-	const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
-	if (envUrl && envUrl.length > 0) {
-		return envUrl.replace(/\/+$/, '')
-	}
-	return 'http://localhost:8000'
+	// if (typeof window !== 'undefined' && window.location) {
+	// 	const host = window.location.hostname
+	// 	if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+	// 		return 'http://localhost:8000'
+	// 	}
+	// 	if (host) {
+	// 		return `${window.location.protocol}//${host}:8000`
+	// 	}
+	// }
+	// const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
+	// if (envUrl && envUrl.length > 0) {
+	// 	return envUrl.replace(/\/+$/, '')
+	// }
+	return 'http://172.20.10.3:8000'
 }
 
 export const BASE_URL = getBaseUrl()

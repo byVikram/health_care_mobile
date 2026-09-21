@@ -3,7 +3,6 @@ import { ActivityIndicator, ScrollView, StyleSheet, View, useWindowDimensions } 
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
 	AppStickyFooter,
-	AppToggle,
 	AppTypography,
 	StatusModal,
 	WorkingHoursSection,
@@ -16,6 +15,7 @@ import {
 import {
 	saveProviderWeeklyAvailability,
 	saveProviderDateOverride,
+	fetchProviderWeeklyAvailabilityBackend,
 	ProviderAvailabilityDay,
 } from '../../../ancillary/ancillaryService'
 
@@ -82,17 +82,62 @@ export default function AvailabilityTab({
 		const loadAvailability = async () => {
 			try {
 				setLoading(true)
-				const stored = await AsyncStorage.getItem(STORAGE_KEY)
-				const parsed: NurseAvailabilityData = stored ? JSON.parse(stored) : DEFAULT_DATA
-				// Guard against a stored payload missing a day (e.g. schema changed).
-				const normalized: NurseAvailabilityData = {
-					isAvailable: parsed.isAvailable ?? true,
-					weeklyWorkingHours: {
-						...createWeeklyWorkingHours(),
-						...parsed.weeklyWorkingHours,
-					},
+
+				// 1. Initial cached/fallback values
+				let initialHours = createWeeklyWorkingHours()
+				try {
+					const stored = await AsyncStorage.getItem(STORAGE_KEY)
+					if (stored) {
+						const parsed: NurseAvailabilityData = JSON.parse(stored)
+						initialHours = {
+							...initialHours,
+							...parsed.weeklyWorkingHours,
+						}
+					}
+				} catch (e) {}
+
+				// 2. Fetch authoritative schedules from Backend API
+				try {
+					const backendSchedules = await fetchProviderWeeklyAvailabilityBackend()
+					if (Array.isArray(backendSchedules) && backendSchedules.length > 0) {
+						const dayMap: Record<ProviderAvailabilityDay['day_of_week'], WorkingDayKey> = {
+							MONDAY: 'monday',
+							TUESDAY: 'tuesday',
+							WEDNESDAY: 'wednesday',
+							THURSDAY: 'thursday',
+							FRIDAY: 'friday',
+							SATURDAY: 'saturday',
+							SUNDAY: 'sunday',
+						}
+
+						backendSchedules.forEach((item) => {
+							const dayKey = dayMap[item.day_of_week]
+							if (dayKey && item.is_available) {
+								const sTime = item.start_time || '08:00'
+								const eTime = item.end_time || '17:00'
+								const startH = Number(sTime.split(':')[0]) || 8
+								if (startH < 12) {
+									initialHours[dayKey].sections.morning = [{ start: sTime, end: eTime }]
+								} else if (startH < 17) {
+									initialHours[dayKey].sections.afternoon = [{ start: sTime, end: eTime }]
+								} else {
+									initialHours[dayKey].sections.evening = [{ start: sTime, end: eTime }]
+								}
+								if (item.slot_duration_mins) {
+									initialHours[dayKey].slotDuration = item.slot_duration_mins
+								}
+							}
+						})
+					}
+				} catch (e) {
+					console.log('[Nurse AvailabilityTab] backend fetch error:', e)
 				}
-				setIsAvailable(normalized.isAvailable)
+
+				const normalized: NurseAvailabilityData = {
+					isAvailable: true,
+					weeklyWorkingHours: initialHours,
+				}
+				setIsAvailable(true)
 				setWeeklyWorkingHours(normalized.weeklyWorkingHours)
 				savedDataRef.current = normalized
 			} catch (e) {
@@ -214,11 +259,10 @@ export default function AvailabilityTab({
 					dayData?.sections.afternoon?.length ||
 					dayData?.sections.evening?.length
 				)
-				const isDayAvail = isAvailable && hasSlots
 				const morningSlot = dayData.sections.morning?.[0]
 				return {
 					day_of_week: daysMap[dayKey],
-					is_available: isDayAvail,
+					is_available: hasSlots,
 					start_time: morningSlot?.start || '09:00',
 					end_time: morningSlot?.end || '17:00',
 					slot_duration_mins: dayData.slotDuration || 30,
@@ -268,37 +312,10 @@ export default function AvailabilityTab({
 				keyboardShouldPersistTaps="handled"
 			>
 				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-					{/* ── Availability status ── */}
+					{/* ── Working hours ── */}
 					<View style={styles.card}>
 						<AppTypography variant="h4" style={styles.title}>
-							Availability
-						</AppTypography>
-
-						<AppTypography variant="body" style={styles.subtitle}>
-							Set your availability status to let patients know whether you are currently available for
-							bookings.
-						</AppTypography>
-
-						<View style={styles.toggleRow}>
-							<AppTypography variant="body" style={styles.toggleLabel}>
-								{isAvailable ? "I'm Available" : "I'm not Available"}
-							</AppTypography>
-							<AppToggle
-								value={isAvailable}
-								onValueChange={setIsAvailable}
-								showStatusText={false}
-								size="small"
-								activeColor={PRIMARY}
-								inactiveColor="#d8e0ea"
-								accessibilityLabel="I'm Available"
-							/>
-						</View>
-					</View>
-
-					{/* ── Optional working hours (reuses the doctor-profile working-hours UI) ── */}
-					<View style={styles.card}>
-						<AppTypography variant="h4" style={styles.title}>
-							Working Hours (Optional)
+							Working Hours
 						</AppTypography>
 						<AppTypography variant="body" style={styles.subtitle}>
 							Define specific days and time intervals when you are available. This is optional if you
@@ -391,15 +408,5 @@ const styles = StyleSheet.create({
 	},
 	footerContent: {
 		width: '100%',
-	},
-	toggleRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		gap: 12,
-	},
-	toggleLabel: {
-		color: '#1f2b33',
-		fontWeight: '600',
 	},
 })
