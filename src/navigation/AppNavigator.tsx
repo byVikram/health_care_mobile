@@ -35,9 +35,9 @@ import OrderListPage from '../features/pharmacy/OrderListPage'
 import PharmacyOrderDetailsPage from '../features/pharmacy/PharmacyOrderDetailsPage'
 import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 
-import LaboratorySearchPage from '../features/laboratory/LaboratorySearchPage'
-import LaboratoryOrderPage from '../features/laboratory/OrderListLaboratoryPage'
-import LaboratoryBookingDetail from '../features/laboratory/BookingDetailsLaboratoryPage'
+import LaboratorySearchPage from '../features/laboratory_duplicated/LaboratorySearchPage'
+import LaboratoryOrderPage from '../features/laboratory_duplicated/OrderListLaboratoryPage'
+import LaboratoryBookingDetail from '../features/laboratory_duplicated/BookingDetailsLaboratoryPage'
 
 import PatientQuestionsListPage from '../features/patient/PatientQuestionsListPage'
 import PatientQuestionDetailPage from '../features/patient/PatientQuestionDetailPage'
@@ -48,7 +48,7 @@ import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage
 
 
 import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
-import PlaceLabOrderPage from '../features/laboratory/PlaceLabOrderPage'
+import PlaceLabOrderPage from '../features/laboratory_duplicated/PlaceLabOrderPage'
 
 import DoctorEventListPage from '../features/doctor/events/DoctorEventListPage'
 import DoctorEventFormPage from '../features/doctor/events/DoctorEventFormPage'
