@@ -1751,14 +1751,24 @@ export const fetchConsultedNurses = fetchConsultedNursesBackend
 export interface AvailableSlot {
 	start_time: string
 	end_time: string
+	duration_mins?: number
+	is_available?: boolean
 }
 
 export interface ProviderWithSlots {
 	provider_public_id: string
-	provider_name: string
+	provider_name?: string
+	name?: string
 	specialty_name?: string
+	specialty?: string
+	subspecialty?: string
+	avatar_url?: string
+	avatar?: string
+	credentials?: string
+	experience?: number
 	rating?: number
 	distance_km?: number
+	transit_buffer_mins?: number
 	street_address?: string
 	available_slots: AvailableSlot[]
 }
@@ -1789,6 +1799,7 @@ export interface CreateScheduledBookingPayload {
 	latitude: number
 	longitude: number
 	payment_method?: string
+	transport_fee?: number
 }
 
 export interface CreateScheduledBookingResponse {
@@ -1869,11 +1880,36 @@ export const fetchAvailableAncillarySlots = async (
 		procedure_ids: params.procedure_ids,
 		radius_km: params.radius_km || 15.0,
 	})
-	const data = res.data?.data || res.data
+	const rawData = res.data?.data ?? res.data
+	const providersList: ProviderWithSlots[] = Array.isArray(rawData)
+		? rawData
+		: Array.isArray(rawData?.providers)
+		? rawData.providers
+		: []
+
 	return {
-		target_date: data?.target_date || params.target_date,
-		providers_found: Number(data?.providers_found || (Array.isArray(data?.providers) ? data.providers.length : 0)),
-		providers: Array.isArray(data?.providers) ? data.providers : [],
+		target_date: rawData?.target_date || params.target_date,
+		providers_found: providersList.length,
+		providers: providersList.map((p: any) => ({
+			provider_public_id: p.provider_public_id || p.id || '',
+			provider_name: p.name || p.provider_name || 'Healthcare Nurse',
+			name: p.name || p.provider_name || 'Healthcare Nurse',
+			specialty: p.specialty || p.specialty_name || 'Nursing Care',
+			specialty_name: p.specialty_name || p.specialty || 'Nursing Care',
+			subspecialty: p.subspecialty || '',
+			avatar_url: p.avatar_url || p.avatar || '',
+			avatar: p.avatar || p.avatar_url || '',
+			distance_km: p.distance_km != null ? Number(p.distance_km) : undefined,
+			transit_buffer_mins: p.transit_buffer_mins != null ? Number(p.transit_buffer_mins) : 15,
+			available_slots: Array.isArray(p.available_slots)
+				? p.available_slots.map((s: any) => ({
+						start_time: s.start_time || '',
+						end_time: s.end_time || '',
+						duration_mins: s.duration_mins != null ? Number(s.duration_mins) : 30,
+						is_available: s.is_available !== false,
+				  }))
+				: [],
+		})),
 	}
 }
 
