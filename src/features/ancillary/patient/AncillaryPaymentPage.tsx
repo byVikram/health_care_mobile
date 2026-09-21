@@ -21,7 +21,7 @@ import { BookingProgressStepper } from '../components/BookingProgressStepper'
 import { ServiceProcedureItem } from '../components/AllServiceCard'
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
-import { generateIdempotencyKey } from '../ancillaryService'
+import { generateIdempotencyKey, createScheduledAncillaryBooking } from '../ancillaryService'
 import StatusModal from '../../../components/common/StatusModal'
 import { safeJsonParse } from '../../../utils/jsonUtils'
 
@@ -193,20 +193,40 @@ export default function AncillaryPaymentPage() {
 		}
 
 		try {
-			const res = await ApiService.post<any>(
-				API_ENDPOINTS.ANCILLARY.REQUESTS,
-				requestPayload,
-				{ headers: { 'Idempotency-Key': idempotencyKey } }
-			)
-
-			const resData = res.data?.data || res.data
-			const createdBookingId = resData?.publicBookingId || resData?.requestId || resData?.id || publicId
+			let createdBookingId = publicId
+			if (bookingPayload?.scheduledDate && bookingPayload?.scheduledStartTime && bookingPayload?.providerId) {
+				const scheduledRes = await createScheduledAncillaryBooking({
+					provider_public_id: bookingPayload.providerId,
+					scheduled_date: bookingPayload.scheduledDate,
+					scheduled_start_time: bookingPayload.scheduledStartTime,
+					scheduled_end_time: bookingPayload.scheduledEndTime || '10:30',
+					procedure_ids: services.map((s) => String(s.id)),
+					medical_notes: bookingPayload.notes || '',
+					chief_complaint: bookingPayload.chiefComplaint || 'Scheduled Healthcare Service',
+					street_address: visit.address || 'Selected Location',
+					latitude: visit.latitude || 12.9716,
+					longitude: visit.longitude || 77.5946,
+					payment_method: selectedMethodId,
+				})
+				createdBookingId = scheduledRes.request_public_id || publicId
+			} else {
+				const res = await ApiService.post<any>(
+					API_ENDPOINTS.ANCILLARY.REQUESTS,
+					requestPayload,
+					{ headers: { 'Idempotency-Key': idempotencyKey } }
+				)
+				const resData = res.data?.data || res.data
+				createdBookingId = resData?.publicBookingId || resData?.requestId || resData?.id || publicId
+			}
 
 			setSubmitting(false)
 			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId: createdBookingId,
 				serviceName: services.map((s) => s.title).filter(Boolean).join(', ') || 'In-Home Healthcare Service',
 				addressText: visit.address,
+				isScheduled: Boolean(bookingPayload?.scheduledDate),
+				scheduledDate: bookingPayload?.scheduledDate,
+				scheduledStartTime: bookingPayload?.scheduledStartTime,
 				bookingPayload: {
 					...bookingPayload,
 					paymentMethod: selectedMethodId,

@@ -1743,3 +1743,271 @@ export const fetchProviderDashboardMetrics = fetchProviderDashboardMetricsBacken
 
 
 export const fetchConsultedNurses = fetchConsultedNursesBackend
+
+// ─────────────────────────────────────────────
+// Phase 1 Slot-Based Booking System API Contracts
+// ─────────────────────────────────────────────
+
+export interface AvailableSlot {
+	start_time: string
+	end_time: string
+}
+
+export interface ProviderWithSlots {
+	provider_public_id: string
+	provider_name: string
+	specialty_name?: string
+	rating?: number
+	distance_km?: number
+	street_address?: string
+	available_slots: AvailableSlot[]
+}
+
+export interface FetchAvailableSlotsParams {
+	latitude: number
+	longitude: number
+	target_date: string
+	procedure_ids?: string[]
+	radius_km?: number
+}
+
+export interface AvailableSlotsResponse {
+	target_date: string
+	providers_found: number
+	providers: ProviderWithSlots[]
+}
+
+export interface CreateScheduledBookingPayload {
+	provider_public_id: string
+	scheduled_date: string
+	scheduled_start_time: string
+	scheduled_end_time: string
+	procedure_ids: string[]
+	medical_notes?: string
+	chief_complaint?: string
+	street_address: string
+	latitude: number
+	longitude: number
+	payment_method?: string
+}
+
+export interface CreateScheduledBookingResponse {
+	message: string
+	request_public_id: string
+	status: string
+	booking_type: string
+	scheduled_date: string
+	scheduled_start_time: string
+	scheduled_end_time: string
+	total_amount: number
+}
+
+export interface ProviderAvailabilityDay {
+	day_of_week: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'
+	is_available: boolean
+	start_time?: string
+	end_time?: string
+	slot_duration_mins?: number
+	break_start_time?: string
+	break_end_time?: string
+}
+
+export interface SaveProviderAvailabilityPayload {
+	availabilities: ProviderAvailabilityDay[]
+}
+
+export interface SaveProviderDateOverridePayload {
+	override_date: string
+	is_unavailable: boolean
+	reason?: string
+}
+
+export interface ScheduledOrder {
+	request_public_id: string
+	patient_name: string
+	patient_contact_number?: string
+	status: string
+	booking_type: string
+	scheduled_date: string
+	scheduled_start_time: string
+	scheduled_end_time: string
+	rescheduled_date?: string | null
+	rescheduled_start_time?: string | null
+	rescheduled_end_time?: string | null
+	reschedule_reason?: string | null
+	rescheduled_by?: string | null
+	reschedule_count: number
+	street_address: string
+	total_amount: number
+	procedures: string[]
+	chief_complaint?: string
+	medical_notes?: string
+}
+
+export interface ScheduledOrdersResponse {
+	count: number
+	orders: ScheduledOrder[]
+}
+
+export interface RescheduleProposalPayload {
+	rescheduled_date: string
+	rescheduled_start_time: string
+	rescheduled_end_time: string
+	reason?: string
+}
+
+/**
+ * Fetch available ancillary providers and open 30-min slots for a given date.
+ */
+export const fetchAvailableAncillarySlots = async (
+	params: FetchAvailableSlotsParams
+): Promise<AvailableSlotsResponse> => {
+	const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.AVAILABLE_SLOTS, {
+		latitude: params.latitude,
+		longitude: params.longitude,
+		target_date: params.target_date,
+		procedure_ids: params.procedure_ids,
+		radius_km: params.radius_km || 15.0,
+	})
+	const data = res.data?.data || res.data
+	return {
+		target_date: data?.target_date || params.target_date,
+		providers_found: Number(data?.providers_found || (Array.isArray(data?.providers) ? data.providers.length : 0)),
+		providers: Array.isArray(data?.providers) ? data.providers : [],
+	}
+}
+
+/**
+ * Create a scheduled ancillary booking request.
+ */
+export const createScheduledAncillaryBooking = async (
+	payload: CreateScheduledBookingPayload
+): Promise<CreateScheduledBookingResponse> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.REQUESTS_SCHEDULED, payload)
+	const data = res.data?.data || res.data
+	return {
+		message: data?.message || 'Scheduled service request created successfully.',
+		request_public_id: data?.request_public_id || data?.requestId || '',
+		status: data?.status || 'SCHEDULED_PENDING',
+		booking_type: data?.booking_type || 'SCHEDULED',
+		scheduled_date: data?.scheduled_date || payload.scheduled_date,
+		scheduled_start_time: data?.scheduled_start_time || payload.scheduled_start_time,
+		scheduled_end_time: data?.scheduled_end_time || payload.scheduled_end_time,
+		total_amount: Number(data?.total_amount) || 0,
+	}
+}
+
+/**
+ * Patient action: Accept or Reject a provider's proposed reschedule slot.
+ */
+export const respondToRescheduleProposal = async (
+	requestPublicId: string,
+	action: 'ACCEPT' | 'REJECT'
+): Promise<{ success: boolean; status: string; message: string }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.RESPOND_RESCHEDULE(requestPublicId), { action })
+	const data = res.data?.data || res.data
+	return {
+		success: data?.success !== false,
+		status: data?.status || (action === 'ACCEPT' ? 'SCHEDULED_CONFIRMED' : 'CANCELLED_BY_PATIENT'),
+		message: data?.message || (action === 'ACCEPT' ? 'Reschedule accepted and booking confirmed.' : 'Reschedule declined.'),
+	}
+}
+
+/**
+ * Provider action: Save weekly working hours and break schedules.
+ */
+export const saveProviderWeeklyAvailability = async (
+	payload: SaveProviderAvailabilityPayload
+): Promise<{ message: string; updated_count: number }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY, payload)
+	const data = res.data?.data || res.data
+	return {
+		message: data?.message || 'Successfully updated availability schedule.',
+		updated_count: Number(data?.updated_count || payload.availabilities.length),
+	}
+}
+
+/**
+ * Provider action: Set custom date override / holiday.
+ */
+export const saveProviderDateOverride = async (
+	payload: SaveProviderDateOverridePayload
+): Promise<{ message: string; override_date: string; is_unavailable: boolean }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_OVERRIDES, payload)
+	const data = res.data?.data || res.data
+	return {
+		message: data?.message || `Slot override saved for date ${payload.override_date}.`,
+		override_date: data?.override_date || payload.override_date,
+		is_unavailable: data?.is_unavailable !== false,
+	}
+}
+
+/**
+ * Provider action: Fetch scheduled orders queue with status filter.
+ */
+export const fetchProviderScheduledOrders = async (
+	statusFilter: 'PENDING_ACTION' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'ALL' = 'ALL'
+): Promise<ScheduledOrdersResponse> => {
+	const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_SCHEDULED_ORDERS, {
+		status_filter: statusFilter,
+	})
+	const data = res.data?.data || res.data
+	const orders: ScheduledOrder[] = Array.isArray(data?.orders)
+		? data.orders
+		: Array.isArray(data)
+		? data
+		: []
+	return {
+		count: Number(data?.count || orders.length),
+		orders,
+	}
+}
+
+/**
+ * Provider action: Accept scheduled order.
+ */
+export const acceptScheduledOrder = async (
+	requestPublicId: string
+): Promise<{ success: boolean; status: string; message: string }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.ACCEPT_SCHEDULED(requestPublicId), {})
+	const data = res.data?.data || res.data
+	return {
+		success: data?.success !== false,
+		status: data?.status || 'SCHEDULED_CONFIRMED',
+		message: data?.message || 'Scheduled order successfully accepted.',
+	}
+}
+
+/**
+ * Provider action: Decline scheduled order.
+ */
+export const declineScheduledOrder = async (
+	requestPublicId: string,
+	reason: string = 'Schedule conflict'
+): Promise<{ success: boolean; status: string; message: string }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.DECLINE_SCHEDULED(requestPublicId), { reason })
+	const data = res.data?.data || res.data
+	return {
+		success: data?.success !== false,
+		status: data?.status || 'CANCELLED_BY_PROVIDER',
+		message: data?.message || 'Scheduled order declined.',
+	}
+}
+
+/**
+ * Provider action: Propose a reschedule slot to the patient (Max 2 proposals per order).
+ */
+export const proposeRescheduleSlot = async (
+	requestPublicId: string,
+	payload: RescheduleProposalPayload
+): Promise<{ success: boolean; status: string; reschedule_count: number; message: string }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.RESCHEDULE_PROPOSAL(requestPublicId), payload)
+	const data = res.data?.data || res.data
+	return {
+		success: data?.success !== false,
+		status: data?.status || 'RESCHEDULE_PROPOSED',
+		reschedule_count: Number(data?.reschedule_count || 1),
+		message: data?.message || `Reschedule proposal sent to patient.`,
+	}
+}
+

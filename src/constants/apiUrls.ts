@@ -249,6 +249,17 @@ export const API_ENDPOINTS = {
 		PROVIDER_DASHBOARD_METRICS: `${BASE_URL}/api/ancillary/provider/dashboard-metrics`,
 		VERIFIED_NURSES: `${BASE_URL}/api/ancillary/nurses`,
 		CONSULTED_NURSES: `${BASE_URL}/api/ancillary/nurses/consulted`,
+		// Phase 1 Slot-Based Booking Endpoints
+		AVAILABLE_SLOTS: `${BASE_URL}/api/ancillary/available-slots`,
+		REQUESTS_SCHEDULED: `${BASE_URL}/api/ancillary/requests/scheduled`,
+		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/respond-reschedule`,
+		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/availability`,
+		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/overrides`,
+		PROVIDER_SCHEDULED_ORDERS: `${BASE_URL}/api/ancillary/provider/orders/scheduled`,
+		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/accept-scheduled`,
+		DECLINE_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/decline-scheduled`,
+		RESCHEDULE_PROPOSAL: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/reschedule-proposal`,
+		WS_ANCILLARY: (token: string) => `${BASE_URL.replace('http', 'ws')}/ws/ancillary?token=${token}`,
 	},
 	WALLET: {
 		GET: `${BASE_URL}/api/wallet`,
