@@ -72,6 +72,12 @@ export default function StaffAncillaryDashboard() {
 	const [scheduledLoading, setScheduledLoading] = useState<boolean>(false)
 	const [rescheduleModalVisible, setRescheduleModalVisible] = useState<boolean>(false)
 	const [selectedRescheduleOrder, setSelectedRescheduleOrder] = useState<ScheduledOrder | null>(null)
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		status: 'success' | 'error' | 'info'
+		title: string
+		description: string
+	} | null>(null)
 
 	const loadScheduledOrders = async () => {
 		try {
@@ -217,7 +223,7 @@ export default function StaffAncillaryDashboard() {
 				}
 
 				ws.onerror = (err) => {
-					console.log('[WS] âŒ Error:', err)
+					console.log('[WS] Error:', err)
 				}
 
 				ws.onclose = (event) => {
@@ -872,20 +878,40 @@ export default function StaffAncillaryDashboard() {
 	const handleAcceptScheduled = async (orderId: string) => {
 		try {
 			await acceptScheduledOrder(orderId)
-			Toast.show({ type: 'success', text1: 'Order Accepted', text2: 'Scheduled booking confirmed successfully.' })
+			setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Order Accepted',
+				description: 'Scheduled booking confirmed successfully.',
+			})
 			loadScheduledOrders()
 		} catch (e: any) {
-			Toast.show({ type: 'error', text1: 'Action Failed', text2: e?.message || 'Could not accept order.' })
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Action Failed',
+				description: e?.message || 'Could not accept order.',
+			})
 		}
 	}
 
 	const handleDeclineScheduled = async (orderId: string) => {
 		try {
 			await declineScheduledOrder(orderId, 'Schedule conflict')
-			Toast.show({ type: 'info', text1: 'Order Declined', text2: 'Scheduled booking request declined.' })
+			setStatusModal({
+				visible: true,
+				status: 'info',
+				title: 'Order Declined',
+				description: 'Scheduled booking request declined.',
+			})
 			loadScheduledOrders()
 		} catch (e: any) {
-			Toast.show({ type: 'error', text1: 'Action Failed', text2: e?.message || 'Could not decline order.' })
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Action Failed',
+				description: e?.message || 'Could not decline order.',
+			})
 		}
 	}
 
@@ -1065,11 +1091,28 @@ export default function StaffAncillaryDashboard() {
 						setSelectedRescheduleOrder(null)
 					}}
 					onSuccess={(msg) => {
-						Toast.show({ type: 'info', text1: 'Reschedule Proposal', text2: msg })
+						setStatusModal({
+							visible: true,
+							status: 'info',
+							title: 'Reschedule Proposal',
+							description: msg,
+						})
 						loadScheduledOrders()
 					}}
 				/>
 			) : null}
+
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status={statusModal.status}
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText="OK"
+					onSubmit={() => setStatusModal(null)}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
 		</View>
 	)
 }
