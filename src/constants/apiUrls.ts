@@ -17,7 +17,7 @@ const getBaseUrl = () => {
 	// if (envUrl && envUrl.length > 0) {
 	// 	return envUrl.replace(/\/+$/, '')
 	// }
-	return 'http://172.20.10.3:8000'
+	return 'http://192.168.4.50:8000'
 }
 
 export const BASE_URL = getBaseUrl()
@@ -32,7 +32,7 @@ export const API_ENDPOINTS = {
 		SESSIONS: `${BASE_URL}/api/auth/sessions`,
 		SESSION_LOGOUT: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}`,
 	},
-	DOCTORS: {
+	DOCTORS: {  
 		SEARCH: `${BASE_URL}/api/doctors`,
 		DETAIL: (id: string) => `${BASE_URL}/api/doctors/${id}`,
 		AVAILABILITY: `${BASE_URL}/api/doctors/availability`,
@@ -253,7 +253,7 @@ export const API_ENDPOINTS = {
 		AVAILABLE_SLOTS: `${BASE_URL}/api/ancillary/available-slots`,
 		REQUESTS_SCHEDULED: `${BASE_URL}/api/ancillary/requests/scheduled`,
 		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/respond-reschedule`,
-		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/availability`,
+		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/me/availability`,
 		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/overrides`,
 		PROVIDER_SCHEDULED_ORDERS: `${BASE_URL}/api/ancillary/provider/orders/scheduled`,
 		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/accept-scheduled`,

@@ -1842,7 +1842,8 @@ export interface ProviderAvailabilityDay {
 }
 
 export interface SaveProviderAvailabilityPayload {
-	availabilities: ProviderAvailabilityDay[]
+	availabilities?: ProviderAvailabilityDay[]
+	schedules?: any[]
 }
 
 export interface SaveProviderDateOverridePayload {
@@ -2005,11 +2006,21 @@ export const fetchProviderWeeklyAvailabilityBackend = async (): Promise<Provider
 export const saveProviderWeeklyAvailability = async (
 	payload: SaveProviderAvailabilityPayload
 ): Promise<{ message: string; updated_count: number }> => {
-	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY, payload)
+	const rawList = payload.schedules || payload.availabilities || []
+	const schedules = rawList.map((item: any) => ({
+		day_of_week: item.day_of_week,
+		start_time: item.start_time,
+		end_time: item.end_time,
+		slot_duration_mins: item.slot_duration_mins || 30,
+		break_start_time: item.break_start_time,
+		break_end_time: item.break_end_time,
+		is_active: item.is_active !== undefined ? item.is_active : item.is_available !== false,
+	}))
+	const res = await ApiService.put<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY, { schedules })
 	const data = res.data?.data || res.data
 	return {
 		message: data?.message || 'Successfully updated availability schedule.',
-		updated_count: Number(data?.updated_count || payload.availabilities.length),
+		updated_count: Number(data?.updated_count || schedules.length),
 	}
 }
 
