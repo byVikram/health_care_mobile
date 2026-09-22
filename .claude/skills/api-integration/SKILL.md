@@ -32,4 +32,4 @@ export const myFeatureAction = async (payload: any): Promise<MyFeatureResponse> 
 }
 ```
 
-Reminder: `src/constants/apiUrls.ts`'s `BASE_URL` currently does not read `EXPO_PUBLIC_API_ENDPOINT` from `.env` — it's hardcoded. Check that file before assuming an env change takes effect.
+Note: `src/constants/apiUrls.ts`'s `BASE_URL` reads `EXPO_PUBLIC_API_ENDPOINT` from `.env` and throws at import time if it's unset — make sure `.env` is configured before running the app.

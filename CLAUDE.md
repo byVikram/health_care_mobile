@@ -9,7 +9,7 @@ Part of the [healthcare2](../CLAUDE.md) monorepo. See root CLAUDE.md for cross-s
 - UI: React Native Paper v5 (`PaperProvider`)
 - HTTP: axios (custom instance with interceptors)
 - Validation: Zod (`src/validation/authSchemas.ts`)
-- Storage: `@react-native-async-storage/async-storage` + a `secureStorage` wrapper
+- Storage: `secureStorage.ts` wraps `expo-secure-store` for tokens (`access_token`/`refresh_token`); `@react-native-async-storage/async-storage` used for non-sensitive data. Network: `@react-native-community/netinfo` (backs `NetworkContext`/`OfflineBanner`)
 - Native/Expo modules: camera, location, audio, video, speech-recognition, image-picker, file-system, device, screen-capture, maps, webview, signature-canvas, svg (+ svg-transformer), reanimated v4
 - Firebase: `@react-native-firebase/app` + `messaging` (push notifications), `google-services.json` for Android — no iOS Firebase config found
 - No ESLint config (Prettier only); no `eas.json` (no EAS Build/Submit configured yet)
@@ -48,7 +48,7 @@ No `test`, `lint`, `build`, or `typecheck` npm scripts are defined. `metro.confi
 
 ## Env vars
 
-- `EXPO_PUBLIC_API_ENDPOINT` is defined in `.env`, **but `src/constants/apiUrls.ts` currently hardcodes the base URL instead of reading it** (the `process.env.EXPO_PUBLIC_API_ENDPOINT` read is commented out). Changing `.env` alone has no effect until that's un-commented — check this file directly rather than assuming the env var is wired up.
+- `EXPO_PUBLIC_API_ENDPOINT` — **backend base URL**, read in `src/constants/apiUrls.ts` (fixed in commit `0b691ea`; previously hardcoded). `BASE_URL` now throws at import time if the var is missing/blank — set it before running the app.
 - No `.env.example` committed.
 
 ## Skills
@@ -63,4 +63,4 @@ No `test`, `lint`, `build`, or `typecheck` npm scripts are defined. `metro.confi
 - Screens mostly suffixed `Page.tsx` (not `Screen.tsx`, except a handful of onboarding/common files); services suffixed `Service.ts`; context providers suffixed `Context.tsx` and export a paired `useX` hook
 - Route names as string constants in `src/navigation/routes.ts`, not hardcoded in navigators
 - `android/` exists on disk despite being gitignored as a "generated" folder — don't assume it's disposable without checking with the user first
-- Root-level scratch files (`review.md`, `gemini.md`, `tsc_full_output.txt`) are dev notes/leftover compiler output, not maintained docs. `review.md` documents known issues (plaintext token logging, unencrypted token storage, hardcoded IP fallback, ~29 TS compile errors as of its last update) — treat its specifics as dated, verify against current code before acting on them.
+- Root-level scratch files (`review.md`, `gemini.md`, `tsc_full_output.txt`) are dev notes/leftover compiler output, not maintained docs. `review.md` tracks a phased remediation plan; Phases 1–3 (secure token storage, no plaintext token logging, safe JSON parsing, error boundary, the API URL env fix above, folder/naming standardization) are marked complete and verified against current code as of 2026-09-22. Phase 4/5 items (console-stripping in babel, FlatList conversion, a real Jest suite) are still open — verify against the doc before assuming something in the later phases is done.
