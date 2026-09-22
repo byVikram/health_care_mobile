@@ -1601,13 +1601,13 @@ export interface AncillaryProfileBackendResponse {
 	verification_status?: string
 }
 
-export const fetchProviderProfileBackend = async (): Promise<AncillaryProfileBackendResponse | null> => {
+export const fetchProviderProfile = async (): Promise<AncillaryProfileBackendResponse | null> => {
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROFILE)
 		console.log('PROFILE endpoint =', API_ENDPOINTS.ANCILLARY.PROFILE)
 		const data = res.data?.data || res.data
 		if (data) {
-			console.log('[fetchProviderProfileBackend] Provider Profile fetched:', data)
+			console.log('[fetchProviderProfile] Provider Profile fetched:', data)
 			return data
 		}
 		return null
@@ -1735,7 +1735,7 @@ export const updateAncillaryCapabilitiesBackend = async (checked_procedures: str
 }
 
 
-export const fetchAncillaryProfileBackend = fetchProviderProfileBackend;
+export const fetchAncillaryProfileBackend = fetchProviderProfile;
 
 // --- Clean Function Aliases (without Backend suffix) ---
 export const fetchAncillaryCategories = fetchAncillaryCategoriesBackend
@@ -1752,7 +1752,6 @@ export const cancelCareRequestProvider = cancelCareRequestProviderBackend
 export const fetchProviderStatus = fetchProviderStatusBackend
 export const updateProviderStatus = updateProviderStatusBackend
 export const fetchMyPatientBookings = fetchMyPatientBookingsBackend
-export const fetchProviderProfile = fetchProviderProfileBackend
 export const updateProviderProfile = updateProviderProfileBackend
 export const updateAncillaryCapabilities = updateAncillaryCapabilitiesBackend
 export const fetchAncillaryProfile = fetchAncillaryProfileBackend
@@ -1833,7 +1832,7 @@ export interface CreateScheduledBookingResponse {
 
 export interface ProviderAvailabilityDay {
 	day_of_week: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'
-	is_available: boolean
+	is_available?: boolean
 	start_time?: string
 	end_time?: string
 	slot_duration_mins?: number

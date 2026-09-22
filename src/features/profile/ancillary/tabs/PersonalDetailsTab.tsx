@@ -22,7 +22,7 @@ import {
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import {
-	fetchProviderProfileBackend,
+	fetchProviderProfile,
 	updateProviderProfileBackend,
 } from '../../../ancillary/ancillaryService'
 import {
@@ -387,14 +387,14 @@ export default function PersonalDetailsTab({
 				setIsLoadingProfile(true)
 
 				// 1. Fetch authoritative profile from backend
-				const backendProfile = await fetchProviderProfileBackend()
+				const backendProfile = await fetchProviderProfile()
 				console.log(
 					'[Ancillary Profile] GET PROFILE RESPONSE:',
 					JSON.stringify(backendProfile, null, 2)
 				)
 
 				if (!backendProfile) {
-					console.warn('[PersonalDetailsTab] fetchProviderProfileBackend returned null, retaining existing form data')
+					console.warn('[PersonalDetailsTab] fetchProviderProfile returned null, retaining existing form data')
 					return
 				}
 
@@ -492,7 +492,7 @@ export default function PersonalDetailsTab({
 			)
 
 			// Re-fetch backend profile to confirm and strictly populate UI from backend response
-			const updatedProfile = await fetchProviderProfileBackend()
+			const updatedProfile = await fetchProviderProfile()
 			console.log('[PersonalDetails] Refetched profile:', updatedProfile)
 
 			const authoritativeName = updatedProfile?.name || ''

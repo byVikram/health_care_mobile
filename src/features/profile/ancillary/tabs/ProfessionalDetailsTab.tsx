@@ -20,7 +20,7 @@ import {
 	StatusModal,
 } from '../../../../components/common'
 import {
-	fetchProviderProfileBackend,
+	fetchProviderProfile,
 	fetchAncillarySubspecialtiesBackend,
 	updateProviderProfileBackend,
 	DEFAULT_PHYSIOTHERAPY_SUBSPECIALTIES,
@@ -542,7 +542,7 @@ function resolveQualificationFromProfile(profile: any): string {
 				setIsLoadingProfile(true)
 
 				// 1. Fetch authoritative profile from backend
-				const backendProfile = await fetchProviderProfileBackend()
+				const backendProfile = await fetchProviderProfile()
 				console.log(
 					'[ProfessionalDetailsTab] GET PROFILE RESPONSE:',
 					JSON.stringify(backendProfile, null, 2)
@@ -723,7 +723,7 @@ function resolveQualificationFromProfile(profile: any): string {
 
 			// Re-fetch backend profile to confirm and strictly populate UI from backend response
 			// Do NOT fall back to old form state if the backend response does not contain a value.
-			const updatedProfile = await fetchProviderProfileBackend()
+			const updatedProfile = await fetchProviderProfile()
 			console.log('[ProfessionalDetails] Refetched profile:', updatedProfile)
 
 			const authoritativeQual = resolveQualificationFromProfile(updatedProfile)

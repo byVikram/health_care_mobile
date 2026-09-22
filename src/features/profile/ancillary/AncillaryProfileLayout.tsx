@@ -16,7 +16,7 @@ import CapabilitiesTab from './tabs/CapabilitiesTab'
 import ServicesAndProceduresView from './tabs/ServicesAndProceduresView'
 import AvailabilityTab from './tabs/AvailabilityTab'
 import SessionsTab from '../SessionsTab'
-import { fetchProviderProfileBackend } from '../../ancillary/ancillaryService'
+import { fetchProviderProfile } from '../../ancillary/ancillaryService'
 import { normalizeSpecialtyKey, normalizeSpecialtyToLabel } from './specialtyConfig'
 
 type TabDefinition = {
@@ -65,7 +65,7 @@ export default function AncillaryProfileLayout() {
 		const resolveSpecialty = async () => {
 			try {
 				// 1. Fetch authoritative backend profile first (backend is single source of truth)
-				const profile = await fetchProviderProfileBackend()
+				const profile = await fetchProviderProfile()
 				if (profile && isMounted) {
 					// 2. Canonical backend fields: profile.specialty_id and profile.sub_specialty_id
 					const spec = profile.specialty_id

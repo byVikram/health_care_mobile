@@ -11,7 +11,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppButton, AppTypography } from '../../../../components/common'
 import {
 	fetchAncillaryHierarchyBackend,
-	fetchProviderProfileBackend,
+	fetchProviderProfile,
 	AncillaryHierarchySubspecialty,
 } from '../../../ancillary/ancillaryService'
 
@@ -70,11 +70,8 @@ export default function ServicesAndProceduresView({
 				}
 				if (!targetSubId) {
 					try {
-						const prof = await fetchProviderProfileBackend()
-						targetSubId =
-							prof?.sub_specialty_id ||
-							prof?.sub_specialty?.id ||
-							undefined
+						const prof = await fetchProviderProfile()
+						targetSubId = prof?.sub_specialty_id ?? undefined
 					} catch (e) {}
 				}
 
