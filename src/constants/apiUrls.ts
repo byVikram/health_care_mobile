@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
 	AUTH: {
 		SEND_OTP: `${BASE_URL}/api/auth/send-otp`,
 		VERIFY_OTP: `${BASE_URL}/api/auth/verify-otp`,
+		REFRESH: `${BASE_URL}/api/auth/refresh`,
 		LOGOUT: `${BASE_URL}/api/auth/logout`,
 		GET_ROLES: `${BASE_URL}/api/auth/get-roles`,
 		CREATE_USER: `${BASE_URL}/api/auth/create-user`,

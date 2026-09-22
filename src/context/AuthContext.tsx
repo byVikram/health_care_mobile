@@ -1,10 +1,16 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useState, useEffect, useContext } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { setUnauthorizedHandler, setStatusModalHandler, StatusModalData } from '../services/apiService'
+import {
+	setUnauthorizedHandler,
+	setStatusModalHandler,
+	setTokenRefreshedHandler,
+	StatusModalData,
+} from '../services/apiService'
 import StatusModal from '../components/common/StatusModal'
 import { safeJsonParse } from '../utils/jsonUtils'
 import { secureStorage } from '../utils/secureStorage'
+import { logout as logoutRequest } from '../features/auth/authService'
 
 export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | 'nurse'
 
@@ -129,7 +135,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	useEffect(() => {
 		const load = async () => {
 			const savedRole = await AsyncStorage.getItem('role')
-			console.log('[AuthContext] active role:', savedRole)
+			if (__DEV__) console.log('[AuthContext] active role:', savedRole)
 			const savedUser = await AsyncStorage.getItem('user')
 			const token = await secureStorage.getItem('access_token')
 			const refresh = await secureStorage.getItem('refresh_token')
@@ -159,9 +165,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	useEffect(() => {
 		setUnauthorizedHandler(clearAuthState)
 		setStatusModalHandler(setStatusModal)
+		// apiService silently refreshes the access token in the background on a
+		// 401 -- it already persists the new tokens to secureStorage itself,
+		// this just keeps in-memory React state (accessToken/refreshToken) from
+		// going stale so anything reading useAuth() directly sees the new value.
+		setTokenRefreshedHandler((newAccessToken, newRefreshToken) => {
+			setAccessToken(newAccessToken)
+			setRefreshToken(newRefreshToken)
+		})
 		return () => {
 			setUnauthorizedHandler(null)
 			setStatusModalHandler(null)
+			setTokenRefreshedHandler(null)
 		}
 	}, [])
 
@@ -197,6 +212,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	}
 
 	const clearAuth = async () => {
+		const currentRefreshToken = await secureStorage.getItem('refresh_token')
+		if (currentRefreshToken) {
+			// Best-effort: invalidate the refresh token server-side so this
+			// device's session can't be used again after logout. Never block
+			// (or fail) the local logout on this -- e.g. offline, or the token
+			// was already invalid -- clearing local state below is what
+			// actually matters for the user in front of the app right now.
+			try {
+				await logoutRequest(currentRefreshToken)
+			} catch {
+				// ignore
+			}
+		}
+
 		await secureStorage.deleteItem('access_token')
 		await secureStorage.deleteItem('refresh_token')
 		await AsyncStorage.multiRemove([

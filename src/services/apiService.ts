@@ -3,6 +3,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { secureStorage } from '../utils/secureStorage'
 import { isKnownOffline } from '../utils/networkState'
+import { API_ENDPOINTS } from '../constants/apiUrls'
 
 export interface StatusModalData {
 	status?: 'success' | 'error' | 'info'
@@ -20,6 +21,11 @@ const axiosInstance = axios.create()
 let unauthorizedHandler: (() => void) | null = null
 let statusModalHandler: StatusModalHandler | null = null
 let hasShownSessionExpiredAlert = false
+type TokenRefreshedHandler = (accessToken: string, refreshToken: string) => void
+let tokenRefreshedHandler: TokenRefreshedHandler | null = null
+// Shared in-flight refresh call -- concurrent 401s all await this same
+// promise instead of each firing their own /api/auth/refresh request.
+let refreshPromise: Promise<string | null> | null = null
 // Synthetic error used to short-circuit a request we already know will fail
 // because the device is offline (see isKnownOffline() below), so we don't
 // waste time waiting on a doomed request. Tagged the same way a real Axios
@@ -34,6 +40,41 @@ const createOfflineError = (): Error & { code: string; isOfflineError: true } =>
 
 export const setUnauthorizedHandler = (handler: (() => void) | null) => {
 	unauthorizedHandler = handler
+}
+
+export const setTokenRefreshedHandler = (handler: TokenRefreshedHandler | null) => {
+	tokenRefreshedHandler = handler
+}
+
+/**
+ * Exchange the stored refresh token for a new access/refresh pair.
+ * Deliberately uses a raw, unintercepted axios.post -- not `axiosInstance`
+ * -- so a 401 on the refresh call itself doesn't recurse back into this
+ * same response interceptor.
+ * Returns the new access token, or null if there was nothing to refresh
+ * with or the refresh call failed (both mean: fall back to a hard logout).
+ */
+const performTokenRefresh = async (): Promise<string | null> => {
+	const currentRefreshToken = await secureStorage.getItem('refresh_token')
+	if (!currentRefreshToken) return null
+
+	try {
+		const response = await axios.post(API_ENDPOINTS.AUTH.REFRESH, {
+			refresh_token: currentRefreshToken,
+		})
+		const data = response.data?.data
+		const newAccessToken: string | undefined = data?.access_token
+		const newRefreshToken: string | undefined = data?.refresh_token
+		if (!newAccessToken || !newRefreshToken) return null
+
+		await secureStorage.setItem('access_token', newAccessToken)
+		await secureStorage.setItem('refresh_token', newRefreshToken)
+		tokenRefreshedHandler?.(newAccessToken, newRefreshToken)
+
+		return newAccessToken
+	} catch {
+		return null
+	}
 }
 
 export const setStatusModalHandler = (handler: StatusModalHandler | null) => {
@@ -94,7 +135,33 @@ axiosInstance.interceptors.response.use(
 		const message = error.response?.data?.message || 'Something went wrong'
 
 		if (status === 401) {
-			// Clear storage locally to avoid circular dependencies
+			const originalRequest = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined
+
+			// Try exactly one silent refresh-and-retry before giving up. Requests
+			// already retried once (_retry) skip straight to the hard logout below
+			// -- this also covers the case where the refresh itself succeeded but
+			// the freshly-issued token is STILL rejected, which should not loop.
+			if (originalRequest && !originalRequest._retry) {
+				originalRequest._retry = true
+
+				if (!refreshPromise) {
+					refreshPromise = performTokenRefresh().finally(() => {
+						refreshPromise = null
+					})
+				}
+				const newAccessToken = await refreshPromise
+
+				if (newAccessToken) {
+					originalRequest.headers = {
+						...originalRequest.headers,
+						Authorization: `Bearer ${newAccessToken}`,
+					}
+					return axiosInstance(originalRequest)
+				}
+			}
+
+			// No refresh token, or the refresh call failed -- fall back to a hard
+			// logout, same as before this retry logic existed.
 			await secureStorage.deleteItem('access_token')
 			await secureStorage.deleteItem('refresh_token')
 			await AsyncStorage.multiRemove(['role', 'user'])
@@ -115,7 +182,7 @@ axiosInstance.interceptors.response.use(
 				})
 			}
 		} else if (status === 403) {
-			console.log('403 RESPONSE:', error.response?.data)
+			if (__DEV__) console.log('403 RESPONSE:', error.response?.data)
 			const errorDetail = error.response?.data?.detail
 			const isVerificationRequired =
 				typeof errorDetail === 'object' && (errorDetail?.code === 'ANCILLARY_VERIFICATION_REQUIRED' || errorDetail?.code === 'NURSE_VERIFICATION_REQUIRED')
