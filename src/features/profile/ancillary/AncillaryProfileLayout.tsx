@@ -13,53 +13,39 @@ import { AppTypography } from '../../../components/common'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import CapabilitiesTab from './tabs/CapabilitiesTab'
+import ServicesAndProceduresView from './tabs/ServicesAndProceduresView'
 import AvailabilityTab from './tabs/AvailabilityTab'
 import SessionsTab from '../SessionsTab'
 import { fetchProviderProfileBackend } from '../../ancillary/ancillaryService'
+import { normalizeSpecialtyKey, normalizeSpecialtyToLabel } from './specialtyConfig'
 
 type TabDefinition = {
 	key: string
 	label: string
-	Component: React.ComponentType<{
-		isActive?: boolean
-		onNextTab?: () => void
-		specialtyKey?: string
-		specialtyLabel?: string
-	}>
+	Component: React.ComponentType<any>
 }
 
-const TABS: TabDefinition[] = [
-	{ key: 'personal', label: 'Personal Details', Component: PersonalDetailsTab },
-	{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
-	{ key: 'capabilities', label: 'Capabilities', Component: CapabilitiesTab },
-	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
-	{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
-]
+const getTabsForSpecialty = (specialtyKey: string): TabDefinition[] => {
+	const normalized = normalizeSpecialtyKey(specialtyKey)
+	const isPhysio = !specialtyKey || normalized === 'physiotherapy' || specialtyKey.toLowerCase().includes('physio')
+	return [
+		{ key: 'personal', label: 'Personal Details', Component: PersonalDetailsTab },
+		{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
+		{
+			key: isPhysio ? 'services' : 'capabilities',
+			label: isPhysio ? 'Services & Procedures' : 'Capabilities',
+			Component: isPhysio ? (ServicesAndProceduresView as any) : CapabilitiesTab,
+		},
+		{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
+		{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
+	]
+}
 
 // Onboarding (profile-setup) completion is tied to finishing this specific tab,
-// not to reaching the end of the TABS array -- this lets tabs such as Sessions be
+// not to reaching the end of the tabs array -- this lets tabs such as Sessions be
 // appended after Availability without re-triggering or blocking the existing
 // 'ancillary_setup_completed' flow.
 const LAST_ONBOARDING_TAB_KEY = 'availability'
-
-function normalizeSpecialtyKey(key?: string | null): string {
-	if (!key) return ''
-	const lower = key.toLowerCase().trim()
-	if (lower.includes('home')) return 'home-care'
-	if (lower.includes('physio')) return 'physiotherapy'
-	if (lower.includes('rehab')) return 'rehab-care'
-	if (lower.includes('nurs')) return 'nursing-care'
-	return lower
-}
-
-function normalizeSpecialtyToLabel(key?: string | null): string {
-	const normalizedKey = normalizeSpecialtyKey(key)
-	if (normalizedKey === 'home-care') return 'Home Care'
-	if (normalizedKey === 'physiotherapy') return 'Physiotherapy'
-	if (normalizedKey === 'rehab-care') return 'Rehabilitation'
-	if (normalizedKey === 'nursing-care') return 'Nursing Care'
-	return key || ''
-}
 
 export default function AncillaryProfileLayout() {
 	const { width } = useWindowDimensions()
@@ -68,8 +54,11 @@ export default function AncillaryProfileLayout() {
 	const [activeTab, setActiveTab] = useState('personal')
 	const [specialtyKey, setSpecialtyKey] = useState<string>('')
 	const [specialtyLabel, setSpecialtyLabel] = useState<string>('')
+	const [subspecialtyId, setSubspecialtyId] = useState<string>('')
 
-	// Load authenticated provider specialty once on layout mount
+	const tabs = useMemo(() => getTabsForSpecialty(specialtyKey), [specialtyKey])
+
+	// Load authenticated provider specialty on layout mount and when tab changes
 	useEffect(() => {
 		let isMounted = true
 
@@ -85,16 +74,36 @@ export default function AncillaryProfileLayout() {
 					}
 				}
 
+				const storedSub = await AsyncStorage.getItem('ancillary_subspecialty_id')
+				if (storedSub && isMounted) {
+					setSubspecialtyId(storedSub)
+				}
+
 				// 2. Fetch authoritative backend profile
 				const profile = await fetchProviderProfileBackend()
 				if (profile && isMounted) {
-					const spec = profile.specialty_id || profile.specialty?.id || profile.specialty_name || profile.specialty?.label
+					const spec =
+						profile.specialty_id ||
+						profile.specialty?.id ||
+						profile.specialty_name ||
+						profile.specialty?.label ||
+						profile.subspecialty?.specialtyId
 					const resolved = normalizeSpecialtyKey(spec)
 					if (resolved) {
 						setSpecialtyKey(resolved)
 						const label = profile.specialty_name || profile.specialty?.label || normalizeSpecialtyToLabel(resolved)
 						setSpecialtyLabel(label)
 						await AsyncStorage.setItem('user_specialty', resolved)
+					}
+
+					const backendSub =
+						profile.subspecialty_id ||
+						profile.sub_specialty_id ||
+						profile.subspecialty?.id ||
+						profile.sub_specialty?.id
+					if (backendSub && isMounted) {
+						setSubspecialtyId(backendSub)
+						await AsyncStorage.setItem('ancillary_subspecialty_id', backendSub)
 					}
 				}
 			} catch (e) {
@@ -107,12 +116,12 @@ export default function AncillaryProfileLayout() {
 		return () => {
 			isMounted = false
 		}
-	}, [])
+	}, [activeTab])
 
 	const activeTabIndex = useMemo(() => {
-		const index = TABS.findIndex((tab) => tab.key === activeTab)
+		const index = tabs.findIndex((tab) => tab.key === activeTab)
 		return index >= 0 ? index : 0
-	}, [activeTab])
+	}, [activeTab, tabs])
 
 	useEffect(() => {
 		pagerRef.current?.scrollTo({ x: activeTabIndex * width, animated: false })
@@ -127,34 +136,34 @@ export default function AncillaryProfileLayout() {
 
 	const goToTab = useCallback(
 		(tabKey: string, animated = true) => {
-			const nextIndex = TABS.findIndex((tab) => tab.key === tabKey)
+			const nextIndex = tabs.findIndex((tab) => tab.key === tabKey)
 			if (nextIndex < 0) return
 
 			setActiveTab(tabKey)
 			pagerRef.current?.scrollTo({ x: nextIndex * width, animated })
 		},
-		[width]
+		[width, tabs]
 	)
 
 	const handlePagerMomentumEnd = useCallback(
 		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
 			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
-			const clampedIndex = Math.max(0, Math.min(TABS.length - 1, nextIndex))
-			setActiveTab(TABS[clampedIndex].key)
+			const clampedIndex = Math.max(0, Math.min(tabs.length - 1, nextIndex))
+			setActiveTab(tabs[clampedIndex].key)
 		},
-		[width]
+		[width, tabs]
 	)
 
 	const handleTabProgress = useCallback(
 		async (currentIndex: number) => {
 			const nextIndex = currentIndex + 1
-			if (nextIndex < TABS.length) {
-				goToTab(TABS[nextIndex].key)
+			if (nextIndex < tabs.length) {
+				goToTab(tabs[nextIndex].key)
 			} else {
 				await AsyncStorage.setItem('ancillary_setup_completed', 'true')
 			}
 		},
-		[goToTab]
+		[goToTab, tabs]
 	)
 
 	return (
@@ -167,7 +176,7 @@ export default function AncillaryProfileLayout() {
 					showsHorizontalScrollIndicator={false}
 					contentContainerStyle={styles.tabScrollContainer}
 				>
-					{TABS.map((tab) => {
+					{tabs.map((tab) => {
 						const isActive = activeTab === tab.key
 						return (
 							<TouchableOpacity
@@ -205,7 +214,7 @@ export default function AncillaryProfileLayout() {
 					onMomentumScrollEnd={handlePagerMomentumEnd}
 					keyboardShouldPersistTaps="handled"
 				>
-					{TABS.map((tab, index) => {
+					{tabs.map((tab, index) => {
 						const TabComponent = tab.Component
 						return (
 							<View key={tab.key} style={[styles.pagerPage, { width }]}>
@@ -214,6 +223,9 @@ export default function AncillaryProfileLayout() {
 									onNextTab={() => handleTabProgress(index)}
 									specialtyKey={specialtyKey}
 									specialtyLabel={specialtyLabel}
+									subspecialtyId={subspecialtyId}
+									onSubspecialtyChange={(id: string) => setSubspecialtyId(id)}
+									refreshToken={activeTab === tab.key}
 								/>
 							</View>
 						)

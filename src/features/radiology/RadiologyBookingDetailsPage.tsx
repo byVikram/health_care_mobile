@@ -29,10 +29,10 @@ import {
 	confirmRadiologyPayment,
 	fetchRadiologyScans,
 	type RadiologyBooking,
-} from './RadiologyService'
+} from './radiologyService'
 import { useAuth } from '../../context/AuthContext'
-import ImageViewerModal from './component/ImageViewerModal'
-import DocumentCarousel from './component/DocumentCarousel'
+import ImageViewerModal from './components/ImageViewerModal'
+import DocumentCarousel from './components/DocumentCarousel'
 
 
 type RouteParams = {

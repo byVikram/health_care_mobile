@@ -15,6 +15,7 @@ import {
 } from 'react-native'
 import { verifyOtp, sendOtp } from '../authService'
 import { useAuth, UserRole } from '../../../context/AuthContext'
+import { otpSchema, getFieldErrors } from '../../../validation/authSchemas'
 import * as Device from 'expo-device'
 
 interface Props {
@@ -70,8 +71,9 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 
 	const handleVerify = async () => {
 		const code = otp.join('')
-		if (code.length < OTP_LENGTH) {
-			setError('Please enter the complete 6-digit OTP')
+		const fieldErrors = getFieldErrors(otpSchema, { otp: code })
+		if (fieldErrors.otp) {
+			setError(fieldErrors.otp)
 			return
 		}
 

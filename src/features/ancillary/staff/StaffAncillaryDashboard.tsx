@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { secureStorage } from '../../../utils/secureStorage'
-import { Image, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
+import Toast from 'react-native-toast-message'
 import {
 	MOCK_NURSE_BOOKINGS,
 	NurseBooking,
@@ -18,7 +19,13 @@ import {
 	ProviderDashboardMetrics,
 	SoftReviewRequestData,
 	AuthorizedDetailedPatientInfo,
+	fetchProviderScheduledOrders,
+	acceptScheduledOrder,
+	declineScheduledOrder,
+	ScheduledOrder,
 } from '../ancillaryService'
+import { RescheduleProposalModal } from '../components/RescheduleProposalModal'
+import { useAncillaryWebSocket } from '../hooks/useAncillaryWebSocket'
 import { ROUTES } from '../../../navigation/routes'
 import NurseAvailabilityCard from './components/NurseAvailabilityCard'
 import IncomingRequestNotificationOverlay, {
@@ -58,6 +65,44 @@ export default function StaffAncillaryDashboard() {
 	// their profile -- used so offer-card fallback text and default labels reflect this
 	// provider's real specialty instead of being hardcoded to Nursing Care for everyone.
 	const [specialtyLabel, setSpecialtyLabel] = useState<string>('Home Healthcare')
+
+	// Scheduled Orders Queue State
+	const [scheduledOrders, setScheduledOrders] = useState<ScheduledOrder[]>([])
+	const [scheduledFilter, setScheduledFilter] = useState<'PENDING_ACTION' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'ALL'>('ALL')
+	const [scheduledLoading, setScheduledLoading] = useState<boolean>(false)
+	const [rescheduleModalVisible, setRescheduleModalVisible] = useState<boolean>(false)
+	const [selectedRescheduleOrder, setSelectedRescheduleOrder] = useState<ScheduledOrder | null>(null)
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		status: 'success' | 'error' | 'info'
+		title: string
+		description: string
+	} | null>(null)
+
+	const loadScheduledOrders = async () => {
+		try {
+			setScheduledLoading(true)
+			const res = await fetchProviderScheduledOrders(scheduledFilter)
+			setScheduledOrders(res.orders)
+		} catch (e) {
+			console.log('[StaffAncillaryDashboard] Error loading scheduled orders:', e)
+		} finally {
+			setScheduledLoading(false)
+		}
+	}
+
+	useEffect(() => {
+		if (isFocused) {
+			loadScheduledOrders()
+		}
+	}, [isFocused, scheduledFilter])
+
+	useAncillaryWebSocket({
+		enabled: isNurseOnline,
+		onScheduledRequest: () => {
+			loadScheduledOrders()
+		},
+	})
 
 	// Fetch Initial Provider Status & Verification from DB on Mount
 	useEffect(() => {
@@ -178,7 +223,7 @@ export default function StaffAncillaryDashboard() {
 				}
 
 				ws.onerror = (err) => {
-					console.log('[WS] âŒ Error:', err)
+					console.log('[WS] Error:', err)
 				}
 
 				ws.onclose = (event) => {
@@ -274,8 +319,8 @@ export default function StaffAncillaryDashboard() {
 					incomingRequest.generalLocation ||
 					'Healthcare Doorstep Address',
 				status: 'assigned',
-				otpCode: result.travelInfo?.verificationOtp || '4829',
-				completePin: result.travelInfo?.completionPin || '9182',
+				otpCode: result.travelInfo?.verificationOtp || '',
+				completePin: result.travelInfo?.completionPin || '',
 			}
 
 			setBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== targetId)])
@@ -284,7 +329,7 @@ export default function StaffAncillaryDashboard() {
 			setRequestStep('none')
 
 			// 1-Tap Accept: Navigate directly to ActiveBookingPage (Navigation & En-Route screen)
-			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: targetId })
+			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: targetId, initialBooking: newBooking })
 		} catch (error) {
 			console.error('Error accepting request:', error)
 		} finally {
@@ -349,11 +394,11 @@ export default function StaffAncillaryDashboard() {
 		if (!activeBooking) return
 		const st = activeBooking.status?.toUpperCase()
 		if (st === 'IN_PROGRESS') {
-			navigation.navigate(ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS, { bookingId: activeBooking.id })
+			navigation.navigate(ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS, { bookingId: activeBooking.id, initialBooking: activeBooking })
 		} else if (st === 'ARRIVED' || st === 'VERIFICATION_PENDING') {
-			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: activeBooking.id })
+			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: activeBooking.id, initialBooking: activeBooking })
 		} else {
-			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: activeBooking.id })
+			navigation.navigate(ROUTES.STACK.NURSE_ACTIVE_BOOKING, { bookingId: activeBooking.id, initialBooking: activeBooking })
 		}
 	}
 
@@ -830,6 +875,153 @@ export default function StaffAncillaryDashboard() {
 		</View>
 	)
 
+	const handleAcceptScheduled = async (orderId: string) => {
+		try {
+			await acceptScheduledOrder(orderId)
+			setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Order Accepted',
+				description: 'Scheduled booking confirmed successfully.',
+			})
+			loadScheduledOrders()
+		} catch (e: any) {
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Action Failed',
+				description: e?.message || 'Could not accept order.',
+			})
+		}
+	}
+
+	const handleDeclineScheduled = async (orderId: string) => {
+		try {
+			await declineScheduledOrder(orderId, 'Schedule conflict')
+			setStatusModal({
+				visible: true,
+				status: 'info',
+				title: 'Order Declined',
+				description: 'Scheduled booking request declined.',
+			})
+			loadScheduledOrders()
+		} catch (e: any) {
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Action Failed',
+				description: e?.message || 'Could not decline order.',
+			})
+		}
+	}
+
+	const renderScheduledOrdersSection = () => (
+		<View style={styles.sectionContainer}>
+			<View style={styles.sectionHeaderRow}>
+				<AppTypography variant="h3" style={styles.sectionTitle}>
+					Scheduled Booking Queue
+				</AppTypography>
+			</View>
+
+			{/* Filter Pills */}
+			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+				{(['ALL', 'PENDING_ACTION', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] as const).map((filter) => {
+					const isActive = scheduledFilter === filter
+					return (
+						<TouchableOpacity
+							key={filter}
+							style={[styles.filterChip, isActive && styles.filterChipActive]}
+							onPress={() => setScheduledFilter(filter)}
+						>
+							<AppTypography variant="caption" style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+								{filter.replace('_', ' ')}
+							</AppTypography>
+						</TouchableOpacity>
+					)
+				})}
+			</ScrollView>
+
+			{scheduledOrders.length > 0 ? (
+				<View style={{ gap: 10 }}>
+					{scheduledOrders.map((order) => (
+						<View key={order.request_public_id} style={styles.card}>
+							<View style={styles.cardHeaderRow}>
+								<View style={{ flex: 1 }}>
+									<AppTypography variant="h4" style={styles.patientNameText}>
+										{order.patient_name}
+									</AppTypography>
+									<AppTypography variant="caption" style={styles.subtext}>
+										{order.procedures?.join(', ') || 'Scheduled Ancillary Service'}
+									</AppTypography>
+								</View>
+								<View style={[styles.statusBadge, order.status === 'SCHEDULED_PENDING' && styles.statusBadgePending]}>
+									<AppTypography variant="caption" style={styles.statusBadgeText}>
+										{order.status}
+									</AppTypography>
+								</View>
+							</View>
+
+							<View style={styles.cardDivider} />
+
+							<View style={styles.metaRowContainer}>
+								<View style={styles.metaColLeft}>
+									<Ionicons name="calendar-outline" size={15} color="#0C7C7C" />
+									<AppTypography variant="caption" style={styles.metaText}>
+										{order.scheduled_date} • {order.scheduled_start_time} - {order.scheduled_end_time}
+									</AppTypography>
+								</View>
+								<AppTypography variant="h4" style={{ color: '#0C7C7C', fontWeight: '700' }}>
+									₹{order.total_amount}
+								</AppTypography>
+							</View>
+
+							{order.status === 'SCHEDULED_PENDING' || order.status === 'PENDING_ACTION' ? (
+								<View style={styles.actionRow}>
+									<TouchableOpacity
+										style={[styles.smallBtn, styles.btnDecline]}
+										onPress={() => handleDeclineScheduled(order.request_public_id)}
+									>
+										<AppTypography variant="caption" style={styles.btnDeclineText}>
+											Decline
+										</AppTypography>
+									</TouchableOpacity>
+
+									<TouchableOpacity
+										style={[styles.smallBtn, styles.btnReschedule]}
+										onPress={() => {
+											setSelectedRescheduleOrder(order)
+											setRescheduleModalVisible(true)
+										}}
+									>
+										<AppTypography variant="caption" style={styles.btnRescheduleText}>
+											Reschedule
+										</AppTypography>
+									</TouchableOpacity>
+
+									<TouchableOpacity
+										style={[styles.smallBtn, styles.btnAccept]}
+										onPress={() => handleAcceptScheduled(order.request_public_id)}
+									>
+										<AppTypography variant="caption" style={styles.btnAcceptText}>
+											Accept
+										</AppTypography>
+									</TouchableOpacity>
+								</View>
+							) : null}
+						</View>
+					))}
+				</View>
+			) : (
+				<View style={styles.emptyCard}>
+					<Ionicons name="calendar-outline" size={28} color="#94A3B8" />
+					<AppTypography variant="caption" style={styles.emptySubtext}>
+						No scheduled booking orders in this category.
+					</AppTypography>
+				</View>
+			)}
+		</View>
+	)
+
 	return (
 		<View style={[styles.screenWrapper, isTablet && styles.screenWrapperTablet]}>
 			{/* Incoming Request Notification Overlay */}
@@ -856,9 +1048,13 @@ export default function StaffAncillaryDashboard() {
 						<View style={styles.tabletCol}>{renderTodaySection()}</View>
 					</View>
 
-					{/* Row 2: Active Care (Left) + Earnings (Right) */}
+					{/* Row 2: Active Care (Left) + Scheduled Orders (Right) */}
 					<View style={styles.tabletRow}>
 						<View style={styles.tabletCol}>{renderActiveCareSection()}</View>
+						<View style={styles.tabletCol}>{renderScheduledOrdersSection()}</View>
+					</View>
+
+					<View style={styles.tabletRow}>
 						<View style={styles.tabletCol}>{renderEarningsSection()}</View>
 					</View>
 				</View>
@@ -870,6 +1066,7 @@ export default function StaffAncillaryDashboard() {
 						onAvailabilityChange={handleAvailabilityToggle}
 					/>
 					{renderTodaySection()}
+					{renderScheduledOrdersSection()}
 					{renderActiveCareSection()}
 					{renderEarningsSection()}
 				</View>
@@ -883,6 +1080,39 @@ export default function StaffAncillaryDashboard() {
 				description="This care request has already been assigned to another provider."
 				onSubmit={() => setClaimedModalVisible(false)}
 			/>
+
+			{selectedRescheduleOrder ? (
+				<RescheduleProposalModal
+					visible={rescheduleModalVisible}
+					requestPublicId={selectedRescheduleOrder.request_public_id}
+					rescheduleCount={selectedRescheduleOrder.reschedule_count}
+					onClose={() => {
+						setRescheduleModalVisible(false)
+						setSelectedRescheduleOrder(null)
+					}}
+					onSuccess={(msg) => {
+						setStatusModal({
+							visible: true,
+							status: 'info',
+							title: 'Reschedule Proposal',
+							description: msg,
+						})
+						loadScheduledOrders()
+					}}
+				/>
+			) : null}
+
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status={statusModal.status}
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText="OK"
+					onSubmit={() => setStatusModal(null)}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
 		</View>
 	)
 }
@@ -1355,5 +1585,119 @@ const styles = StyleSheet.create({
 	barChartContainerWide: {
 		alignItems: 'center',
 		gap: 2,
+	},
+	filterScroll: {
+		gap: 8,
+		marginBottom: 12,
+	},
+	filterChip: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 20,
+		backgroundColor: '#F1F5F9',
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	filterChipActive: {
+		backgroundColor: '#0C7C7C',
+		borderColor: '#0C7C7C',
+	},
+	filterChipText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#64748B',
+	},
+	filterChipTextActive: {
+		color: '#FFFFFF',
+	},
+	statusBadgePending: {
+		backgroundColor: '#FEF3C7',
+	},
+	actionRow: {
+		flexDirection: 'row',
+		gap: 8,
+		marginTop: 12,
+	},
+	smallBtn: {
+		flex: 1,
+		paddingVertical: 8,
+		borderRadius: 8,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	btnAccept: {
+		backgroundColor: '#0C7C7C',
+	},
+	btnAcceptText: {
+		color: '#FFFFFF',
+		fontWeight: '700',
+		fontSize: 12,
+	},
+	btnDecline: {
+		backgroundColor: '#FEE2E2',
+	},
+	btnDeclineText: {
+		color: '#EF4444',
+		fontWeight: '700',
+		fontSize: 12,
+	},
+	btnReschedule: {
+		backgroundColor: '#F0FDFA',
+		borderWidth: 1,
+		borderColor: '#0C7C7C',
+	},
+	btnRescheduleText: {
+		color: '#0C7C7C',
+		fontWeight: '700',
+		fontSize: 12,
+	},
+	sectionContainer: {
+		gap: 6,
+		flex: 1,
+	},
+	sectionHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginTop: 2,
+	},
+	card: {
+		backgroundColor: '#FFFFFF',
+		borderColor: '#E2E8F0',
+		borderWidth: 1,
+		borderRadius: 14,
+		padding: 12,
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.02,
+		shadowRadius: 2,
+		elevation: 1,
+	},
+	cardHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 8,
+	},
+	patientNameText: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	subtext: {
+		fontSize: 12,
+		color: '#64748B',
+		marginTop: 2,
+	},
+	statusBadge: {
+		backgroundColor: '#E2E8F0',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 10,
+	},
+	statusBadgeText: {
+		fontSize: 11,
+		fontWeight: '700',
+		color: '#334155',
 	},
 })

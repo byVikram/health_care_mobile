@@ -4,11 +4,20 @@
 // If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' anrd 'http://localhost:8000'
 // to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
 const getBaseUrl = () => {
+	if (typeof window !== 'undefined' && window.location) {
+		const host = window.location.hostname
+		if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+			return 'http://localhost:8000'
+		}
+		if (host) {
+			return `${window.location.protocol}//${host}:8000`
+		}
+	}
 	const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
 	if (envUrl && envUrl.length > 0) {
 		return envUrl.replace(/\/+$/, '')
 	}
-	return 'http://10.205.226.49:8000'
+	return 'http://localhost:8000'
 }
 
 export const BASE_URL = getBaseUrl()
@@ -207,7 +216,10 @@ export const API_ENDPOINTS = {
 		PROFILE: `${BASE_URL}/api/ancillary/me/profile`,
 		CAPABILITIES: `${BASE_URL}/api/ancillary/me/capabilities`,
 		CATEGORIES: `${BASE_URL}/api/ancillary/categories`,
+		SUB_SPECIALTIES: `${BASE_URL}/api/ancillary/sub_specialties`,
+		SUBSPECIALTIES: `${BASE_URL}/api/ancillary/sub_specialties`,
 		SERVICES: `${BASE_URL}/api/ancillary/services`,
+		HIERARCHY: `${BASE_URL}/api/ancillary/hierarchy`,
 		REQUESTS: `${BASE_URL}/api/ancillary/patient/requests`,
 		PATIENT_ACTIVE_REQUEST: `${BASE_URL}/api/ancillary/patient/requests/active`,
 		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
@@ -237,6 +249,17 @@ export const API_ENDPOINTS = {
 		PROVIDER_DASHBOARD_METRICS: `${BASE_URL}/api/ancillary/provider/dashboard-metrics`,
 		VERIFIED_NURSES: `${BASE_URL}/api/ancillary/nurses`,
 		CONSULTED_NURSES: `${BASE_URL}/api/ancillary/nurses/consulted`,
+		// Phase 1 Slot-Based Booking Endpoints
+		AVAILABLE_SLOTS: `${BASE_URL}/api/ancillary/available-slots`,
+		REQUESTS_SCHEDULED: `${BASE_URL}/api/ancillary/requests/scheduled`,
+		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/respond-reschedule`,
+		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/availability`,
+		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/overrides`,
+		PROVIDER_SCHEDULED_ORDERS: `${BASE_URL}/api/ancillary/provider/orders/scheduled`,
+		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/accept-scheduled`,
+		DECLINE_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/decline-scheduled`,
+		RESCHEDULE_PROPOSAL: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/reschedule-proposal`,
+		WS_ANCILLARY: (token: string) => `${BASE_URL.replace('http', 'ws')}/ws/ancillary?token=${token}`,
 	},
 	WALLET: {
 		GET: `${BASE_URL}/api/wallet`,

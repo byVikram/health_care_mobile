@@ -286,7 +286,25 @@ export default function AncillaryDashboard() {
 						borderWidth: 1,
 						borderColor: '#38BDF8',
 					}}
-					onPress={() => navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: activeBooking.id, status: activeBooking.status })}
+					onPress={() => {
+						const rawSt = String(activeBooking.rawStatus || activeBooking.status || '').toUpperCase()
+						const isAssigned =
+							Boolean(activeBooking.provider?.id) &&
+							['ASSIGNED', 'NURSE_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED'].includes(rawSt)
+						if (isAssigned) {
+							navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+								bookingId: activeBooking.id,
+								status: activeBooking.status,
+								bookingData: activeBooking,
+							})
+						} else {
+							navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
+								bookingId: activeBooking.id,
+								serviceName: activeBooking.serviceName,
+								addressText: 'Selected Delivery Location',
+							})
+						}
+					}}
 					activeOpacity={0.88}
 				>
 					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

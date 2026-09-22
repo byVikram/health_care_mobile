@@ -1,4 +1,4 @@
-// src/features/wallet/WalletTransactionsScreen.tsx
+// src/features/wallet/WalletTransactionsPage.tsx
 import React, { useEffect, useState, useCallback } from 'react'
 import {
 	View,
@@ -18,7 +18,7 @@ import { getWalletTransactions, WalletTransactionData } from './walletService'
 
 type FilterType = 'ALL' | 'CREDIT' | 'DEBIT'
 
-export const WalletTransactionsScreen: React.FC = () => {
+export const WalletTransactionsPage: React.FC = () => {
 	const navigation = useNavigation<any>()
 
 	const [transactions, setTransactions] = useState<WalletTransactionData[]>([])

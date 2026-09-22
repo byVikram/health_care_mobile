@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useFocusEffect } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
 import {
@@ -43,6 +44,7 @@ export default function MyBookingsPage({
 	activeTab: propActiveTab,
 }: MyBookingsPageProps = {}) {
 	const navigation = useNavigation<any>()
+	const insets = useSafeAreaInsets()
 
 	const [bookings, setBookings] = useState<AncillaryBooking[]>([])
 	const [isLoading, setIsLoading] = useState(true)
@@ -143,7 +145,11 @@ export default function MyBookingsPage({
 
 	const handleTrack = (booking: AncillaryBooking) => {
 		const rawSt = String(booking.rawStatus || booking.status || '').toUpperCase()
-		if (rawSt === 'SEARCHING' || rawSt === 'SEARCHING_FOR_NURSE' || rawSt === 'REQUESTED') {
+		const isAssigned =
+			Boolean(booking.provider?.id) &&
+			['ASSIGNED', 'NURSE_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED'].includes(rawSt)
+
+		if (!isAssigned) {
 			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId: booking.id,
 				serviceName: booking.serviceName,
@@ -275,7 +281,7 @@ export default function MyBookingsPage({
 		>
 			<View style={styles.filterModalRoot}>
 				<Pressable style={styles.filterBackdrop} onPress={() => setFilterModalVisible(false)} />
-				<View style={styles.filterSheet}>
+				<View style={[styles.filterSheet, { paddingBottom: Math.max(insets.bottom, 26) }]}>
 					<View style={styles.filterSheetHandle} />
 					<View style={styles.filterSheetHeader}>
 						<Text style={styles.filterSheetTitle}>Filters</Text>

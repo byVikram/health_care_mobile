@@ -4,15 +4,21 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 
 interface NurseMapTrackerProps {
 	nurseAvatar?: string
+	providerAvatar?: string
 	etaText?: string
 	distanceText?: string
 }
 
 export default function NurseMapTracker({
 	nurseAvatar,
-	etaText = 'Arriving in ~15 mins',
-	distanceText = '1.5 km away',
+	providerAvatar,
+	etaText,
+	distanceText,
 }: NurseMapTrackerProps) {
+	const avatarUri = providerAvatar || nurseAvatar
+	const badgeParts = [distanceText, etaText].filter(Boolean)
+	const badgeLabel = badgeParts.length > 0 ? badgeParts.join(' • ') : 'Live Location Tracking'
+
 	return (
 		<View style={styles.mapCard}>
 			{/* Decorative map background grid */}
@@ -38,12 +44,12 @@ export default function NurseMapTracker({
 				</View>
 			</View>
 
-			{/* Nurse caregiver location pin */}
+			{/* Caregiver location pin */}
 			<View style={styles.nursePin}>
 				<View style={styles.pulseRing} />
 				<View style={styles.nursePinCircle}>
-					{nurseAvatar ? (
-						<Image source={{ uri: nurseAvatar }} style={styles.nurseAvatarImg} />
+					{avatarUri ? (
+						<Image source={{ uri: avatarUri }} style={styles.nurseAvatarImg} />
 					) : (
 						<Ionicons name="person" size={18} color="#ffffff" />
 					)}
@@ -57,7 +63,7 @@ export default function NurseMapTracker({
 			<View style={styles.mapBadgeOverlay}>
 				<View style={styles.liveDot} />
 				<Ionicons name="navigate-outline" size={14} color="#2B6F71" />
-				<Text style={styles.mapBadgeText}>{distanceText} • {etaText}</Text>
+				<Text style={styles.mapBadgeText}>{badgeLabel}</Text>
 			</View>
 		</View>
 	)

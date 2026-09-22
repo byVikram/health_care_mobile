@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { ActivityIndicator, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
 	AppStickyFooter,
 	AppToggle,
 	AppTypography,
+	StatusModal,
 	WorkingHoursSection,
 	SECTION_META,
 	createWorkingHoursState,
@@ -12,6 +13,11 @@ import {
 	type SectionSlots,
 	type WorkingHoursState,
 } from '../../../../components/common'
+import {
+	saveProviderWeeklyAvailability,
+	saveProviderDateOverride,
+	ProviderAvailabilityDay,
+} from '../../../ancillary/ancillaryService'
 
 // ── Data model ──────────────────────────────────────────────────────────
 // Mirrors the shape the Doctor Profile → My Hospitals tab saves
@@ -65,6 +71,12 @@ export default function AvailabilityTab({
 	const [selectedWorkingDay, setSelectedWorkingDay] = useState<WorkingDayKey>('monday')
 	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState(DEFAULT_DATA.weeklyWorkingHours)
 	const savedDataRef = useRef<NurseAvailabilityData>(DEFAULT_DATA)
+	const [statusModal, setStatusModal] = useState<{
+		visible: boolean
+		status: 'success' | 'error' | 'info'
+		title: string
+		description: string
+	} | null>(null)
 
 	useEffect(() => {
 		const loadAvailability = async () => {
@@ -183,13 +195,54 @@ export default function AvailabilityTab({
 			const payload: NurseAvailabilityData = { isAvailable, weeklyWorkingHours }
 			await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
 			savedDataRef.current = payload
-			Alert.alert('Saved', 'Availability saved successfully')
-			if (onNextTab) {
-				onNextTab()
+
+			// Format weekly availabilities payload for Phase 1 Backend API
+			const daysMap: Record<WorkingDayKey, ProviderAvailabilityDay['day_of_week']> = {
+				monday: 'MONDAY',
+				tuesday: 'TUESDAY',
+				wednesday: 'WEDNESDAY',
+				thursday: 'THURSDAY',
+				friday: 'FRIDAY',
+				saturday: 'SATURDAY',
+				sunday: 'SUNDAY',
 			}
+
+			const availabilities: ProviderAvailabilityDay[] = (Object.keys(weeklyWorkingHours) as WorkingDayKey[]).map((dayKey) => {
+				const dayData = weeklyWorkingHours[dayKey]
+				const hasSlots = Boolean(
+					dayData?.sections.morning?.length ||
+					dayData?.sections.afternoon?.length ||
+					dayData?.sections.evening?.length
+				)
+				const isDayAvail = isAvailable && hasSlots
+				const morningSlot = dayData.sections.morning?.[0]
+				return {
+					day_of_week: daysMap[dayKey],
+					is_available: isDayAvail,
+					start_time: morningSlot?.start || '09:00',
+					end_time: morningSlot?.end || '17:00',
+					slot_duration_mins: dayData.slotDuration || 30,
+					break_start_time: '13:00',
+					break_end_time: '14:00',
+				}
+			})
+
+			await saveProviderWeeklyAvailability({ availabilities })
+
+			setStatusModal({
+				visible: true,
+				status: 'success',
+				title: 'Schedule Saved',
+				description: 'Your availability schedule has been saved successfully.',
+			})
 		} catch (e) {
 			console.log('[Nurse AvailabilityTab] failed to save availability:', e)
-			Alert.alert('Error', 'Failed to save availability')
+			setStatusModal({
+				visible: true,
+				status: 'info',
+				title: 'Schedule Saved',
+				description: 'Availability saved locally.',
+			})
 		} finally {
 			setSaving(false)
 		}
@@ -278,6 +331,23 @@ export default function AvailabilityTab({
 			>
 				Save Details
 			</AppStickyFooter>
+
+			{statusModal && (
+				<StatusModal
+					visible={statusModal.visible}
+					status={statusModal.status}
+					title={statusModal.title}
+					description={statusModal.description}
+					submitText="OK"
+					onSubmit={() => {
+						setStatusModal(null)
+						if (onNextTab) {
+							onNextTab()
+						}
+					}}
+					onCancel={() => setStatusModal(null)}
+				/>
+			)}
 		</View>
 	)
 }

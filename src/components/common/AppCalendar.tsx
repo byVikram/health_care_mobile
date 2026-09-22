@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { Modal, Platform, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { useTheme } from 'react-native-paper'
 import { AppTypography } from './AppTypography'
 
 export interface AppCalendarProps {
@@ -46,6 +47,38 @@ const getDateFromDisplayValue = (value: string) => {
 
 const formatDisplayValue = (date: Date) =>
 	`${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`
+
+const toIsoDate = (val: string): string => {
+	if (!val) return ''
+	if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val
+	const match = val.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+	if (match) {
+		const day = match[1].padStart(2, '0')
+		const month = match[2].padStart(2, '0')
+		const year = match[3]
+		return `${year}-${month}-${day}`
+	}
+	return ''
+}
+
+const fromIsoDate = (isoVal: string): string => {
+	if (!isoVal) return ''
+	const match = isoVal.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+	if (match) {
+		const year = match[1]
+		const month = match[2].padStart(2, '0')
+		const day = match[3].padStart(2, '0')
+		return `${day}-${month}-${year}`
+	}
+	return isoVal
+}
+
+const formatDateToIso = (date: Date): string => {
+	const year = date.getFullYear()
+	const month = String(date.getMonth() + 1).padStart(2, '0')
+	const day = String(date.getDate()).padStart(2, '0')
+	return `${year}-${month}-${day}`
+}
 
 export const AppCalendar = ({
 	label,
@@ -136,6 +169,116 @@ export const AppCalendar = ({
 			onChange={handleDateChange}
 		/>
 	)
+
+	const theme = useTheme()
+	const appFontFamily = (theme as any)?.fonts?.bodyMedium?.fontFamily || (theme as any)?.fonts?.bodyLarge?.fontFamily || 'Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif'
+
+	if (Platform.OS === 'web') {
+		const maxIso = resolvedMaxDate ? formatDateToIso(resolvedMaxDate) : undefined
+		const minIso = resolvedMinDate ? formatDateToIso(resolvedMinDate) : undefined
+		const isoValue = toIsoDate(value)
+		const dateInputStyleId = 'app-calendar-web-date-style'
+
+		if (typeof document !== 'undefined' && !document.getElementById(dateInputStyleId)) {
+			const styleTag = document.createElement('style')
+			styleTag.id = dateInputStyleId
+			styleTag.textContent = `
+				.app-calendar-date-input {
+					font-family: ${appFontFamily}, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+					font-size: 14px !important;
+					font-weight: 400 !important;
+					line-height: 20px !important;
+					color: #2f2f2f;
+					box-sizing: border-box;
+				}
+				.app-calendar-date-input::-webkit-datetime-edit,
+				.app-calendar-date-input::-webkit-datetime-edit-fields-wrapper,
+				.app-calendar-date-input::-webkit-datetime-edit-text,
+				.app-calendar-date-input::-webkit-datetime-edit-month-field,
+				.app-calendar-date-input::-webkit-datetime-edit-day-field,
+				.app-calendar-date-input::-webkit-datetime-edit-year-field {
+					font-family: inherit !important;
+					font-size: 14px !important;
+					font-weight: 400 !important;
+					line-height: 20px !important;
+				}
+				.app-calendar-date-input.is-placeholder,
+				.app-calendar-date-input.is-placeholder::-webkit-datetime-edit,
+				.app-calendar-date-input.is-placeholder::-webkit-datetime-edit-fields-wrapper,
+				.app-calendar-date-input.is-placeholder::-webkit-datetime-edit-text,
+				.app-calendar-date-input.is-placeholder::-webkit-datetime-edit-month-field,
+				.app-calendar-date-input.is-placeholder::-webkit-datetime-edit-day-field,
+				.app-calendar-date-input.is-placeholder::-webkit-datetime-edit-year-field {
+					color: #9a9a9a !important;
+				}
+				.app-calendar-date-input:not(.is-placeholder),
+				.app-calendar-date-input:not(.is-placeholder)::-webkit-datetime-edit,
+				.app-calendar-date-input:not(.is-placeholder)::-webkit-datetime-edit-fields-wrapper,
+				.app-calendar-date-input:not(.is-placeholder)::-webkit-datetime-edit-text,
+				.app-calendar-date-input:not(.is-placeholder)::-webkit-datetime-edit-month-field,
+				.app-calendar-date-input:not(.is-placeholder)::-webkit-datetime-edit-day-field,
+				.app-calendar-date-input:not(.is-placeholder)::-webkit-datetime-edit-year-field {
+					color: #2f2f2f !important;
+				}
+				.app-calendar-date-input::-webkit-calendar-picker-indicator {
+					cursor: pointer;
+					opacity: 0.65;
+				}
+				.app-calendar-date-input::-webkit-calendar-picker-indicator:hover {
+					opacity: 1;
+				}
+			`
+			document.head.appendChild(styleTag)
+		}
+
+		return (
+			<View style={styles.fieldGroup}>
+				{label ? (
+					<AppTypography variant="caption" style={styles.fieldLabel}>
+						{label}
+						{required ? (
+							<AppTypography variant="caption" style={styles.requiredMark}>
+								{' '}
+								*
+							</AppTypography>
+						) : null}
+					</AppTypography>
+				) : null}
+				<View style={styles.inputShell}>
+					{React.createElement('input', {
+						type: 'date',
+						value: isoValue,
+						max: maxIso,
+						min: minIso,
+						className: `app-calendar-date-input ${!value ? 'is-placeholder' : ''}`,
+						onChange: (e: any) => {
+							const next = e?.target?.value
+							if (next) {
+								onChange(fromIsoDate(next))
+							} else {
+								onChange('')
+							}
+						},
+						style: {
+							width: '100%',
+							height: 38,
+							border: 'none',
+							outline: 'none',
+							backgroundColor: 'transparent',
+							padding: 0,
+							margin: 0,
+							fontSize: 14,
+							fontFamily: `${appFontFamily}, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`,
+							fontWeight: '400',
+							lineHeight: '20px',
+							color: value ? '#2f2f2f' : '#9a9a9a',
+							cursor: 'pointer',
+						},
+					})}
+				</View>
+			</View>
+		)
+	}
 
 	return (
 		<View style={styles.fieldGroup}>

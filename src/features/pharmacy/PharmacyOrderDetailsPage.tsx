@@ -519,7 +519,7 @@ const STATUS_OPTIONS = [
 ]
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-const OrderDetailsScreen = () => {
+const PharmacyOrderDetailsPage = () => {
 	const navigation = useNavigation<any>()
 	const route = useRoute<RouteProp<RootStackParamList, 'OrderDetails'>>()
 	const { width: screenWidth, height: screenHeight } = useWindowDimensions()
@@ -1564,4 +1564,4 @@ const scrollTableStyles = StyleSheet.create({
 	},
 })
 
-export default OrderDetailsScreen
+export default PharmacyOrderDetailsPage

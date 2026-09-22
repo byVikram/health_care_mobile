@@ -20,6 +20,8 @@ import SettingsIcon from '../../assets/icons/settings.svg'
 import { ROUTES } from '../../navigation/routes'
 import { getPatientDetails } from '../../features/profile/patient/PatientProfileService'
 import { getDoctorProfile, mapDoctorProfileApi } from '../../features/doctor/doctorService'
+import { fetchProviderProfileBackend } from '../../features/ancillary/ancillaryService'
+import { NEW_PHYSIOTHERAPIST_IMAGE_URL } from '../../features/profile/ancillary/specialtyConfig'
 import type { AppStackParamList } from '../../navigation/types'
 
 const MOCK_USER = {
@@ -59,7 +61,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
-	const { clearAuth, user: authUser, role, updateUser } = useAuth()
+	const { clearAuth, user: authUser, role, updateUser, ancillarySpecialty } = useAuth()
 
 	const user = {
 		name: authUser?.name ?? MOCK_USER.name,
@@ -70,7 +72,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 	// Sync the real profile photo from the API so the dashboard header
 	// and sidebar show the latest uploaded image.
 	useEffect(() => {
-		if (role !== 'patient' && role !== 'doctor') return
+		if (role !== 'patient' && role !== 'doctor' && role !== 'ancillary' && role !== 'nurse') return
 
 		let cancelled = false
 		const syncAvatar = async () => {
@@ -81,6 +83,19 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 						const profile = mapDoctorProfileApi(res.data)
 						if (profile.personal.avatar) {
 							updateUser({ avatar: profile.personal.avatar })
+						}
+					}
+					return
+				}
+
+				if (role === 'ancillary' || role === 'nurse') {
+					const profile = await fetchProviderProfileBackend()
+					if (!cancelled) {
+						const resolvedAvatar =
+							profile?.avatar_s3_key ||
+							(ancillarySpecialty === 'physiotherapy' ? NEW_PHYSIOTHERAPIST_IMAGE_URL : '')
+						if (resolvedAvatar && resolvedAvatar !== authUser?.avatar) {
+							updateUser({ avatar: resolvedAvatar })
 						}
 					}
 					return
@@ -97,7 +112,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
 		syncAvatar()
 		return () => { cancelled = true }
-	}, [role])
+	}, [role, ancillarySpecialty, authUser?.avatar, updateUser])
 
 	const handleEditProfile = () => {
 		setIsSidebarOpen(false)
