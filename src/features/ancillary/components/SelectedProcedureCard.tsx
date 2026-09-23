@@ -2,7 +2,7 @@ import React from 'react'
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { AppTypography } from '../../../components/common'
-import { ServiceProcedureItem } from './AllServiceCard'
+import { ServiceProcedureItem } from '../../../components/common'
 import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
 import RecurringVisitCalendar, { AvailableTimeSlotsSource, RecurringVisitSchedule } from './RecurringVisitCalendar'
 

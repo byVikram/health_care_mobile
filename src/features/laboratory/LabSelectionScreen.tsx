@@ -16,7 +16,7 @@ import { AppInput } from '../../components/common/AppInput'
 import { AppSkeleton } from '../../components/common/AppSkeleton'
 import { ROUTES } from '../../navigation/routes'
 import { LaboratoryResultCard } from './components/LaboratoryResultCard'
-import { LabBookingProgressHeader } from './components/LabBookingProgressHeader'
+import { BookingProgressStepper, DateStrip, SlotChipGrid } from '../../components/common'
 import { getLaboratories } from '../laboratory_duplicated/laboratoryService'
 import type { LaboratoryItem } from '../laboratory_duplicated/laboratory'
 import type { LabBookingDraft } from './types'
@@ -34,13 +34,6 @@ const formatDisplayDate = (d: Date): string => {
 	return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
 }
 
-const formatDateIso = (d: Date): string => {
-	const year = d.getFullYear()
-	const month = String(d.getMonth() + 1).padStart(2, '0')
-	const day = String(d.getDate()).padStart(2, '0')
-	return `${year}-${month}-${day}`
-}
-
 const isSameCalendarDay = (a: Date, b: Date) =>
 	a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 
@@ -50,7 +43,10 @@ const isSlotPast = (d: Date, endHour: number): boolean => {
 	return now.getHours() >= endHour
 }
 
-const PROGRESS_STEPS = ['Details', 'Lab & Slot', 'Summary']
+// Includes the Payment step that only actually happens on a later screen —
+// shown here too so the stepper never grows/shrinks a step between screens,
+// only `currentIndex` moves.
+const PROGRESS_STEPS = ['Details', 'Lab & Slot', 'Summary', 'Payment']
 
 export const LabSelectionScreen: React.FC = () => {
 	const insets = useSafeAreaInsets()
@@ -84,15 +80,6 @@ export const LabSelectionScreen: React.FC = () => {
 	useEffect(() => {
 		loadLabs()
 	}, [loadLabs])
-
-	// 7 upcoming dates matching Nursing Care date strip
-	const upcomingDates = useMemo(() => {
-		return Array.from({ length: 7 }, (_, i) => {
-			const d = new Date()
-			d.setDate(d.getDate() + i)
-			return d
-		})
-	}, [])
 
 	const filteredLabs = useMemo(() => {
 		const q = query.trim().toLowerCase()
@@ -158,7 +145,7 @@ export const LabSelectionScreen: React.FC = () => {
 
 	return (
 		<View style={styles.container}>
-			<LabBookingProgressHeader steps={PROGRESS_STEPS} currentIndex={1} />
+			<BookingProgressStepper steps={PROGRESS_STEPS.map((label) => ({ label }))} currentIndex={1} />
 			<ScrollView
 				contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 16) + 96 }]}
 				showsVerticalScrollIndicator={false}
@@ -271,28 +258,7 @@ export const LabSelectionScreen: React.FC = () => {
 								Choose your preferred visit date
 							</AppTypography>
 
-							<View style={styles.dateStripContainer}>
-								<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateScrollContent}>
-									{upcomingDates.map((d) => {
-										const isSelected = formatDateIso(d) === formatDateIso(selectedDate)
-										return (
-											<TouchableOpacity
-												key={d.toISOString()}
-												style={[styles.dateChip, isSelected && styles.dateChipSelected]}
-												onPress={() => handleChangeDate(d)}
-												activeOpacity={0.8}
-											>
-												<AppTypography variant="caption" style={[styles.dateChipDay, isSelected && styles.dateChipTextSelected]}>
-													{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]}
-												</AppTypography>
-												<AppTypography variant="h4" style={[styles.dateChipNum, isSelected && styles.dateChipTextSelected]}>
-													{d.getDate()}
-												</AppTypography>
-											</TouchableOpacity>
-										)
-									})}
-								</ScrollView>
-							</View>
+							<DateStrip selectedDate={selectedDate} onSelectDate={handleChangeDate} style={styles.dateStripContainer} />
 						</View>
 
 						<View style={styles.sectionDividerBar} />
@@ -306,32 +272,15 @@ export const LabSelectionScreen: React.FC = () => {
 								Choose a slot for your center walk-in
 							</AppTypography>
 
-							<View style={styles.slotsGridFlex}>
-								{TIME_SLOTS.map((slot) => {
-									const isSelected = timeSlot === slot.value
-									const disabled = isSlotPast(selectedDate, slot.endHour)
-									return (
-										<TouchableOpacity
-											key={slot.value}
-											style={[styles.slotChip, isSelected && styles.slotChipSelected, disabled && styles.slotChipDisabled]}
-											onPress={() => !disabled && setTimeSlot(slot.value)}
-											disabled={disabled}
-											activeOpacity={0.8}
-										>
-											<AppTypography
-												variant="caption"
-												style={[
-													styles.slotChipText,
-													isSelected && styles.slotChipTextSelected,
-													disabled && styles.slotChipTextDisabled,
-												]}
-											>
-												{slot.label} ({slot.hint})
-											</AppTypography>
-										</TouchableOpacity>
-									)
-								})}
-							</View>
+							<SlotChipGrid
+								slots={TIME_SLOTS.map((slot) => ({
+									value: slot.value,
+									label: `${slot.label} (${slot.hint})`,
+									disabled: isSlotPast(selectedDate, slot.endHour),
+								}))}
+								selectedValue={timeSlot}
+								onSelectValue={setTimeSlot}
+							/>
 						</View>
 					</>
 				)}
@@ -429,70 +378,6 @@ const styles = StyleSheet.create({
 	},
 	dateStripContainer: {
 		marginBottom: 6,
-	},
-	dateScrollContent: {
-		gap: 8,
-		paddingHorizontal: 2,
-	},
-	dateChip: {
-		width: 54,
-		paddingVertical: 8,
-		borderRadius: 10,
-		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	dateChipSelected: {
-		backgroundColor: '#0C7C7C',
-		borderColor: '#0C7C7C',
-	},
-	dateChipDay: {
-		fontSize: 11,
-		color: '#64748B',
-	},
-	dateChipNum: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#0F172A',
-		marginTop: 2,
-	},
-	dateChipTextSelected: {
-		color: '#FFFFFF',
-	},
-	slotsGridFlex: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 8,
-	},
-	slotChip: {
-		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#CBD5E1',
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-	},
-	slotChipSelected: {
-		backgroundColor: '#0C7C7C',
-		borderColor: '#0C7C7C',
-	},
-	slotChipDisabled: {
-		backgroundColor: '#F1F5F9',
-		borderColor: '#E2E8F0',
-		opacity: 0.6,
-	},
-	slotChipText: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#334155',
-	},
-	slotChipTextSelected: {
-		color: '#FFFFFF',
-	},
-	slotChipTextDisabled: {
-		color: '#94A3B8',
 	},
 	bottomBar: {
 		position: 'absolute',

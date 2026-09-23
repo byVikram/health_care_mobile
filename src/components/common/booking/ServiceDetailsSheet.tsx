@@ -1,14 +1,13 @@
 import React from 'react'
-import { Image, StyleSheet, View, useWindowDimensions } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import AppBottomSheet from '../../../components/common/AppBottomSheet'
-import { AppTypography } from '../../../components/common/AppTypography'
-import { AppButton } from '../../../components/common/AppButton'
+import { Image, ImageSourcePropType, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import AppBottomSheet from '../AppBottomSheet'
+import { AppTypography } from '../AppTypography'
+import { AppButton } from '../AppButton'
 import { safeJsonParse } from '../../../utils/jsonUtils'
-import { ServiceProcedureItem } from './AllServiceCard'
-import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
+import { ServiceProcedureItem } from './ServiceCatalogCard'
 
-interface ServiceDetailsBottomSheetProps {
+interface ServiceDetailsSheetProps {
 	visible: boolean
 	service: ServiceProcedureItem | null
 	onClose: () => void
@@ -19,6 +18,15 @@ interface ServiceDetailsBottomSheetProps {
 	 *  `true` so every existing caller (Nursing, Physiotherapy, ...) is
 	 *  unaffected. */
 	showReviews?: boolean
+	/** Resolves a raw `image_url`/`imageUrl`/`image` string into a displayable
+	 *  `ImageSourcePropType` (e.g. a domain-specific bundled-asset registry).
+	 *  Kept out of this shared component so `common/booking` has no
+	 *  dependency on any feature folder — pass your feature's own resolver
+	 *  (e.g. Ancillary's `getAncillaryImageSource`) to reproduce that
+	 *  feature's current image behavior. When omitted (or when it returns
+	 *  nothing and `service.imageSource` is also unset), a generic
+	 *  placeholder icon is shown instead. */
+	resolveImageSource?: (raw?: string | null) => ImageSourcePropType | undefined
 }
 
 interface ReviewItem {
@@ -75,12 +83,13 @@ const parseWhatsIncluded = (raw: any): string[] => {
 	return []
 }
 
-export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps> = ({
+export const ServiceDetailsSheet: React.FC<ServiceDetailsSheetProps> = ({
 	visible,
 	service,
 	onClose,
 	onAddToBooking,
 	showReviews = true,
+	resolveImageSource,
 }) => {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
@@ -103,6 +112,9 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 	// Select matching reviews or fallback
 	const reviewsList = MOCK_REVIEWS_POOL[service.id] || DEFAULT_REVIEWS
 
+	const resolvedImageSource =
+		service.imageSource || resolveImageSource?.(service.image_url || service.imageUrl || service.image)
+
 	return (
 		<AppBottomSheet
 			visible={visible}
@@ -124,11 +136,17 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 		>
 			<View style={[styles.mainWrapper, isTablet && styles.containerTablet]}>
 				{/* 1. Service Image */}
-				<Image
-					source={getAncillaryImageSource(service.image_url || service.imageUrl || service.image)}
-					style={[styles.image, isTablet && styles.imageTablet]}
-					resizeMode="cover"
-				/>
+				{resolvedImageSource ? (
+					<Image
+						source={resolvedImageSource}
+						style={[styles.image, isTablet && styles.imageTablet]}
+						resizeMode="cover"
+					/>
+				) : (
+					<View style={[styles.image, styles.imageFallback, isTablet && styles.imageTablet]}>
+						<MaterialCommunityIcons name="flask-outline" size={32} color="#0C7C7C" />
+					</View>
+				)}
 
 				{/* 2. Service Name */}
 				<AppTypography variant="h2" style={styles.title}>
@@ -246,6 +264,10 @@ const styles = StyleSheet.create({
 		borderRadius: 14,
 		marginBottom: 14,
 		backgroundColor: '#F1F5F9',
+	},
+	imageFallback: {
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 	imageTablet: {
 		height: 180,

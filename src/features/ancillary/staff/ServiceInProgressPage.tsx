@@ -18,7 +18,7 @@ import { MOCK_NURSE_BOOKINGS, NurseBooking, NurseBookingState, getBookingState, 
 import { ROUTES } from '../../../navigation/routes'
 import ServiceTimeline from '../components/ServiceTimeline'
 import CareChecklist from '../components/CareChecklist'
-import NotesInput from '../components/NotesInput'
+import { NotesInput } from '../../../components/common'
 import UploadSection from '../components/UploadSection'
 import CancelVisitModal from '../components/CancelVisitModal'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'

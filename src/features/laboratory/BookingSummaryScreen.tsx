@@ -1,10 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import {
-	Image,
 	ScrollView,
 	StyleSheet,
 	Text,
-	TouchableOpacity,
 	View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -13,9 +11,15 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
 import { AppTypography } from '../../components/common/AppTypography'
 import { AppButton } from '../../components/common/AppButton'
+import {
+	BillingSummaryCard,
+	BookingProgressStepper,
+	PatientDetailsCard,
+	SelectedItemCard,
+	SummaryEmptyState,
+} from '../../components/common'
 import { ROUTES } from '../../navigation/routes'
 import { HEALTH_CHECKUP_PACKAGES, POPULAR_DIAGNOSTIC_TESTS } from './data/laboratoryMockData'
-import { LabBookingProgressHeader } from './components/LabBookingProgressHeader'
 import type { LabBookingDraft } from './types'
 
 interface RouteParams {
@@ -164,7 +168,24 @@ export const BookingSummaryScreen: React.FC = () => {
 			},
 		}
 
-		navigation.navigate(ROUTES.STACK.ANCILLARY_PAYMENT, { bookingPayload })
+		// Carried alongside `bookingPayload` (not inside it) so the payment
+		// page's standardized payload shape stays Nursing/Laboratory-agnostic —
+		// these are only what the payment page's own Laboratory-mode stepper
+		// and `LABORATORY_BOOKING_TRACKING` need to render correctly.
+		const labTrackingParams = {
+			draft,
+			labId,
+			labName,
+			labAddress,
+			labCity,
+			date: appointmentDate,
+			timeSlot: appointmentTimeSlot,
+			// Same step vocabulary this screen's own progress header shows,
+			// with "Payment" appended for the next screen in the flow.
+			progressSteps: [...progressSteps, 'Payment'],
+		}
+
+		navigation.navigate(ROUTES.STACK.ANCILLARY_PAYMENT, { bookingPayload, labTrackingParams })
 	}
 
 	if (!draft) {
@@ -188,7 +209,18 @@ export const BookingSummaryScreen: React.FC = () => {
 
 	return (
 		<View style={styles.container}>
-			<LabBookingProgressHeader steps={progressSteps} currentIndex={progressCurrentIndex} />
+			<BookingProgressStepper
+				// Payment hasn't happened yet on this screen, but it's shown as an
+				// upcoming step here too (matching the earlier screens) so the full
+				// journey is always visible, not just what's been completed so far.
+				steps={[...progressSteps, 'Payment'].map((label) => ({ label }))}
+				currentIndex={progressCurrentIndex}
+				// This screen's own page background is #F8FAFC (unlike the other
+				// Laboratory screens, which are #FFFFFF) — pinned to white here so
+				// the stepper itself looks identical across every Laboratory screen
+				// regardless of each page's own background.
+				style={styles.progressStepperBg}
+			/>
 
 			<ScrollView
 				contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 16) + 110 }]}
@@ -218,101 +250,61 @@ export const BookingSummaryScreen: React.FC = () => {
 									const expanded = expandedItemIds[item.id] ?? false
 
 									return (
-										<View key={item.id} style={styles.serviceCard}>
-											{item.image ? (
-												<Image source={{ uri: item.image }} style={styles.serviceImage} resizeMode="cover" />
-											) : (
-												<View style={styles.serviceIconPlaceholder}>
-													<MaterialCommunityIcons
-														name={item.testCount ? 'shield-check-outline' : 'flask-outline'}
-														size={26}
-														color="#0C7C7C"
-													/>
-												</View>
-											)}
-
-											<View style={styles.serviceContent}>
-												<View style={styles.cardHeaderRow}>
-													<AppTypography variant="h4" style={styles.serviceName} numberOfLines={1}>
-														{item.name}
-													</AppTypography>
-													{selectedItems.length > 1 && (
-														<TouchableOpacity
-															style={styles.removeBtn}
-															onPress={() => handleRemoveItem(item.id)}
-															activeOpacity={0.7}
-														>
-															<Ionicons name="trash-outline" size={18} color="#D32F2F" />
-														</TouchableOpacity>
-													)}
-												</View>
-
-												{/* Badges Row */}
-												<View style={styles.badgeRow}>
-													<View style={styles.verifiedBadge}>
-														<Ionicons name="checkmark-circle" size={11} color="#0C7C7C" />
-														<AppTypography variant="caption" style={styles.verifiedText}>
-															NABL Accredited
-														</AppTypography>
-													</View>
-													{item.testCount ? (
-														<View style={styles.countBadge}>
-															<AppTypography variant="caption" style={styles.countBadgeText}>
-																{item.testCount} Tests Included
-															</AppTypography>
-														</View>
-													) : null}
-												</View>
-
-												{item.description ? (
-													<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={2}>
-														{item.description}
-													</AppTypography>
-												) : null}
-
-												{/* Included Tests Expandable Link */}
-												{includedTests.length > 0 && (
-													<TouchableOpacity
-														onPress={() => toggleIncludedTests(item.id)}
-														style={styles.viewIncludedLink}
-														hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-													>
-														<Text style={styles.viewIncludedLinkText}>
-															{expanded ? 'Hide Included Tests' : 'View Included Tests'}
-														</Text>
-														<MaterialCommunityIcons
-															name={expanded ? 'chevron-up' : 'chevron-down'}
-															size={14}
-															color="#0C7C7C"
-														/>
-													</TouchableOpacity>
-												)}
-
-												{expanded && includedTests.length > 0 && (
-													<View style={styles.includedList}>
-														{includedTests.map((testName, idx) => (
-															<View key={`${testName}-${idx}`} style={styles.includedRow}>
-																<MaterialCommunityIcons name="check-circle" size={13} color="#059669" />
-																<Text style={styles.includedText}>{testName}</Text>
-															</View>
-														))}
-													</View>
-												)}
-
-												{/* Footer with Turnaround and Price */}
-												<View style={styles.cardFooterRow}>
-													<View style={styles.durationRow}>
-														<Ionicons name="time-outline" size={13} color="#64748B" />
-														<AppTypography variant="caption" style={styles.durationText}>
-															{item.turnaroundTime}
-														</AppTypography>
-													</View>
-													<AppTypography variant="body" style={styles.priceText}>
-														{formatCurrency(item.price)}
-													</AppTypography>
-												</View>
-											</View>
-										</View>
+										<SelectedItemCard
+											key={item.id}
+											image={item.image}
+											imageFallbackIcon={
+												<MaterialCommunityIcons
+													name={item.testCount ? 'shield-check-outline' : 'flask-outline'}
+													size={26}
+													color="#0C7C7C"
+												/>
+											}
+											imageSize={72}
+											title={item.name}
+											description={item.description}
+											durationLabel={item.turnaroundTime}
+											price={formatCurrency(item.price)}
+											priceStyle={styles.priceText}
+											onRemove={selectedItems.length > 1 ? () => handleRemoveItem(item.id) : undefined}
+											badges={[
+												{
+													icon: <Ionicons name="checkmark-circle" size={11} color="#0C7C7C" />,
+													text: 'NABL Accredited',
+													backgroundColor: '#F0F9F9',
+													textColor: '#0C7C7C',
+												},
+												...(item.testCount
+													? [
+															{
+																text: `${item.testCount} Tests Included`,
+																backgroundColor: '#EFF6FF',
+																textColor: '#1D4ED8',
+															},
+														]
+													: []),
+											]}
+											expandable={
+												includedTests.length > 0
+													? {
+															expanded,
+															onToggle: () => toggleIncludedTests(item.id),
+															labelExpanded: 'Hide Included Tests',
+															labelCollapsed: 'View Included Tests',
+															content: (
+																<>
+																	{includedTests.map((testName, idx) => (
+																		<View key={`${testName}-${idx}`} style={styles.includedRow}>
+																			<MaterialCommunityIcons name="check-circle" size={13} color="#059669" />
+																			<Text style={styles.includedText}>{testName}</Text>
+																		</View>
+																	))}
+																</>
+															),
+														}
+													: undefined
+											}
+										/>
 									)
 								})}
 							</View>
@@ -329,28 +321,14 @@ export const BookingSummaryScreen: React.FC = () => {
 							</View>
 
 							<View style={styles.patientProfileBox}>
-								<View style={styles.patientAvatarWrap}>
-									{draft.patient?.avatar ? (
-										<Image source={{ uri: draft.patient.avatar }} style={styles.patientAvatarImg} />
-									) : (
-										<MaterialCommunityIcons name="account" size={22} color="#0C7C7C" />
-									)}
-								</View>
-								<View style={styles.patientInfoCol}>
-									<View style={styles.patientNameRow}>
-										<AppTypography variant="h4" style={styles.patientName}>
-											{draft.patient?.name}
-										</AppTypography>
-										<View style={styles.relationChip}>
-											<AppTypography variant="caption" style={styles.relationText}>
-												{draft.patient?.relationship}
-											</AppTypography>
-										</View>
-									</View>
-									<AppTypography variant="caption" style={styles.patientMetaText}>
-										{draft.patient?.age} Yrs • {draft.patient?.gender}
-									</AppTypography>
-								</View>
+								<PatientDetailsCard
+									name={draft.patient?.name}
+									age={draft.patient?.age}
+									gender={draft.patient?.gender}
+									avatarUrl={draft.patient?.avatar}
+									relationship={draft.patient?.relationship}
+									metaLine={`${draft.patient?.age} Yrs • ${draft.patient?.gender}`}
+								/>
 							</View>
 						</View>
 
@@ -424,58 +402,46 @@ export const BookingSummaryScreen: React.FC = () => {
 								</AppTypography>
 							</View>
 
-							<View style={styles.summaryCard}>
-								<View style={styles.billingList}>
-									<View style={styles.billingRow}>
-										<AppTypography variant="body" style={styles.billingLabel}>
-											Item Total ({selectedItems.length} {selectedItems.length === 1 ? 'test' : 'tests'})
-										</AppTypography>
-										<AppTypography variant="body" style={styles.billingVal}>
-											{formatCurrency(totalMrp)}
-										</AppTypography>
-									</View>
-
-									{discount > 0 && (
-										<View style={styles.billingRow}>
-											<AppTypography variant="body" style={styles.billingLabel}>
-												Special Discount
-											</AppTypography>
-											<AppTypography variant="body" style={styles.billingDiscount}>
-												-{formatCurrency(discount)}
-											</AppTypography>
-										</View>
-									)}
-
-									<View style={styles.billingRow}>
-										<AppTypography variant="body" style={styles.billingLabel}>
-											{isHomeCollection ? 'Phlebotomist Doorstep Visit Fee' : 'Center Walk-in & Handling Fee'}
-										</AppTypography>
-										<AppTypography variant="body" style={styles.billingVal}>
-											{isHomeCollection ? '₹150' : 'FREE'}
-										</AppTypography>
-									</View>
-
-									<View style={styles.billingRow}>
-										<AppTypography variant="body" style={styles.billingLabel}>
-											Taxes & Sanitized Sample Kit
-										</AppTypography>
-										<AppTypography variant="body" style={styles.billingVal}>
-											₹0
-										</AppTypography>
-									</View>
-
-									<View style={styles.totalDivider} />
-
-									<View style={styles.totalRow}>
-										<AppTypography variant="h3" style={styles.totalLabel}>
-											Total Payable Amount
-										</AppTypography>
-										<AppTypography variant="h3" style={styles.totalVal}>
-											{formatCurrency(finalPayable)}
-										</AppTypography>
-									</View>
-								</View>
-							</View>
+							<BillingSummaryCard
+								style={styles.summaryCard}
+								rows={[
+									{
+										label: `Item Total (${selectedItems.length} ${selectedItems.length === 1 ? 'test' : 'tests'})`,
+										value: formatCurrency(totalMrp),
+										labelStyle: styles.billingLabel,
+										valueStyle: styles.billingVal,
+									},
+									...(discount > 0
+										? [
+												{
+													label: 'Special Discount',
+													value: `-${formatCurrency(discount)}`,
+													labelStyle: styles.billingLabel,
+													valueStyle: styles.billingDiscount,
+												},
+											]
+										: []),
+									{
+										label: isHomeCollection ? 'Phlebotomist Doorstep Visit Fee' : 'Center Walk-in & Handling Fee',
+										value: isHomeCollection ? '₹150' : 'FREE',
+										labelStyle: styles.billingLabel,
+										valueStyle: styles.billingVal,
+									},
+									{
+										label: 'Taxes & Sanitized Sample Kit',
+										value: '₹0',
+										labelStyle: styles.billingLabel,
+										valueStyle: styles.billingVal,
+									},
+									{
+										label: 'Total Payable Amount',
+										value: formatCurrency(finalPayable),
+										labelStyle: styles.totalLabel,
+										valueStyle: styles.totalVal,
+										dividerBefore: true,
+									},
+								]}
+							/>
 
 							{/* GUARANTEE BADGE */}
 							<View style={styles.guaranteeBox}>
@@ -488,24 +454,17 @@ export const BookingSummaryScreen: React.FC = () => {
 					</>
 				) : (
 					/* Empty State when all items are removed */
-					<View style={styles.emptyContainer}>
-						<View style={styles.emptyIconCircle}>
-							<MaterialCommunityIcons name="flask-empty-outline" size={48} color="#0C7C7C" />
-						</View>
-						<AppTypography variant="h2" style={styles.emptyTitle}>
-							No Tests Selected
-						</AppTypography>
-						<AppTypography variant="body" style={styles.emptySubtitle}>
-							Your booking summary is currently empty. Please browse our diagnostic catalog and select tests to proceed.
-						</AppTypography>
-						<AppButton
-							variant="primary"
-							style={styles.browseBtn}
-							onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_LIST)}
-						>
-							Browse Diagnostic Catalog
-						</AppButton>
-					</View>
+					<SummaryEmptyState
+						icon={<MaterialCommunityIcons name="flask-empty-outline" size={48} color="#0C7C7C" />}
+						iconCircleSize={68}
+						iconCircleBackgroundColor="#E6F4F4"
+						title="No Tests Selected"
+						subtitle="Your booking summary is currently empty. Please browse our diagnostic catalog and select tests to proceed."
+						ctaLabel="Browse Diagnostic Catalog"
+						onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_LIST)}
+						ctaFormAction={false}
+						style={styles.emptyContainer}
+					/>
 				)}
 			</ScrollView>
 
@@ -537,6 +496,9 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: '#F8FAFC',
+	},
+	progressStepperBg: {
+		backgroundColor: '#FFFFFF',
 	},
 	scrollContent: {
 		paddingTop: 4,
@@ -580,111 +542,6 @@ const styles = StyleSheet.create({
 	servicesList: {
 		gap: 12,
 	},
-	serviceCard: {
-		flexDirection: 'row',
-		backgroundColor: '#FFFFFF',
-		borderRadius: 14,
-		padding: 12,
-		borderWidth: 1,
-		borderColor: '#E8ECEC',
-		shadowColor: '#0F172A',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.04,
-		shadowRadius: 3,
-		elevation: 1,
-	},
-	serviceImage: {
-		width: 72,
-		height: 72,
-		borderRadius: 10,
-		backgroundColor: '#F1F5F9',
-	},
-	serviceIconPlaceholder: {
-		width: 72,
-		height: 72,
-		borderRadius: 10,
-		backgroundColor: '#E6F4F4',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	serviceContent: {
-		flex: 1,
-		marginLeft: 12,
-		justifyContent: 'space-between',
-	},
-	cardHeaderRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	serviceName: {
-		fontSize: 14.5,
-		fontWeight: '700',
-		color: '#0F172A',
-		flex: 1,
-		lineHeight: 19,
-	},
-	removeBtn: {
-		padding: 4,
-		marginLeft: 8,
-	},
-	badgeRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		marginTop: 3,
-		marginBottom: 3,
-		flexWrap: 'wrap',
-	},
-	verifiedBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		backgroundColor: '#F0F9F9',
-		paddingHorizontal: 7,
-		paddingVertical: 2,
-		borderRadius: 5,
-	},
-	verifiedText: {
-		fontSize: 10.5,
-		fontWeight: '600',
-		color: '#0C7C7C',
-	},
-	countBadge: {
-		backgroundColor: '#EFF6FF',
-		paddingHorizontal: 7,
-		paddingVertical: 2,
-		borderRadius: 5,
-	},
-	countBadgeText: {
-		fontSize: 10.5,
-		fontWeight: '600',
-		color: '#1D4ED8',
-	},
-	serviceDesc: {
-		fontSize: 12,
-		color: '#64748B',
-		lineHeight: 16,
-		marginTop: 2,
-	},
-	viewIncludedLink: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		marginTop: 4,
-	},
-	viewIncludedLinkText: {
-		fontSize: 11.5,
-		fontWeight: '700',
-		color: '#0C7C7C',
-	},
-	includedList: {
-		marginTop: 6,
-		paddingTop: 6,
-		borderTopWidth: 1,
-		borderTopColor: '#F1F5F9',
-		gap: 4,
-	},
 	includedRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -694,24 +551,6 @@ const styles = StyleSheet.create({
 		fontSize: 11.5,
 		color: '#334155',
 		flex: 1,
-	},
-	cardFooterRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginTop: 8,
-		paddingTop: 6,
-		borderTopWidth: 1,
-		borderTopColor: '#F8FAFC',
-	},
-	durationRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-	},
-	durationText: {
-		fontSize: 11.5,
-		color: '#64748B',
 	},
 	priceText: {
 		fontSize: 14.5,
@@ -727,48 +566,6 @@ const styles = StyleSheet.create({
 		borderColor: '#E2E8F0',
 		padding: 12,
 		gap: 12,
-	},
-	patientAvatarWrap: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		backgroundColor: '#E6F4F4',
-		alignItems: 'center',
-		justifyContent: 'center',
-		overflow: 'hidden',
-	},
-	patientAvatarImg: {
-		width: '100%',
-		height: '100%',
-	},
-	patientInfoCol: {
-		flex: 1,
-		gap: 2,
-	},
-	patientNameRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	patientName: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#0F172A',
-	},
-	relationChip: {
-		backgroundColor: '#E6F4F4',
-		paddingHorizontal: 8,
-		paddingVertical: 2,
-		borderRadius: 6,
-	},
-	relationText: {
-		fontSize: 11,
-		fontWeight: '700',
-		color: '#0C7C7C',
-	},
-	patientMetaText: {
-		fontSize: 12,
-		color: '#64748B',
 	},
 	locationSummaryBox: {
 		backgroundColor: '#F8FAFC',
@@ -842,14 +639,6 @@ const styles = StyleSheet.create({
 		borderColor: '#E2E8F0',
 		padding: 14,
 	},
-	billingList: {
-		gap: 10,
-	},
-	billingRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
 	billingLabel: {
 		fontSize: 13,
 		color: '#64748B',
@@ -863,16 +652,6 @@ const styles = StyleSheet.create({
 		fontSize: 13.5,
 		fontWeight: '700',
 		color: '#059669',
-	},
-	totalDivider: {
-		height: 1,
-		backgroundColor: '#E2E8F0',
-		marginVertical: 4,
-	},
-	totalRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
 	},
 	totalLabel: {
 		fontSize: 15,
@@ -950,14 +729,12 @@ const styles = StyleSheet.create({
 		borderColor: '#E2E8F0',
 		marginTop: 8,
 	},
-	emptyIconCircle: {
-		width: 68,
-		height: 68,
-		borderRadius: 34,
-		backgroundColor: '#E6F4F4',
+	emptyState: {
+		flex: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginBottom: 16,
+		paddingHorizontal: 24,
+		gap: 12,
 	},
 	emptyTitle: {
 		color: '#0F172A',
@@ -972,17 +749,6 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 		lineHeight: 19,
 		maxWidth: 290,
-	},
-	browseBtn: {
-		marginTop: 20,
-		minWidth: 190,
-	},
-	emptyState: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingHorizontal: 24,
-		gap: 12,
 	},
 })
 

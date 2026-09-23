@@ -1,46 +1,42 @@
 import React from 'react'
-import { StyleSheet, TouchableOpacity, View } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native'
+import { AppTypography } from '../AppTypography'
 
-interface SampleCollectionMethodCardProps {
+interface SelectionRowCardProps {
+	/** A pre-rendered icon element (e.g. `<Ionicons name="flash" size={20}
+	 *  color={selected ? '#FFFFFF' : '#0C7C7C'} />`) — kept as a node rather
+	 *  than an icon-set + name pair so this component has no dependency on
+	 *  any one icon library. Callers own the selected-state color. */
+	icon: React.ReactNode
 	title: string
-	description: string
-	icon: React.ComponentProps<typeof MaterialCommunityIcons>['name']
+	subtitle?: string
 	badgeText?: string
 	selected: boolean
 	onPress: () => void
+	style?: StyleProp<ViewStyle>
+	accessibilityLabel?: string
 }
 
-/**
- * Bordered, rounded radio-selection card for choosing a sample collection
- * method — mirrors Nursing Care's own binary assignment-choice pattern
- * (`nursePrefOptionCard` in `BookingDetailsPage.tsx`, used there for "Let
- * the System Select" vs "Select an Available Nurse"): a 42px icon-wrap
- * circle, title + optional badge, a subtitle line, and a 22px radio circle
- * on the trailing edge. Selected state uses the same teal border + tint
- * Nursing Care uses, not a new treatment.
- */
-export const SampleCollectionMethodCard: React.FC<SampleCollectionMethodCardProps> = ({
-	title,
-	description,
+export default function SelectionRowCard({
 	icon,
+	title,
+	subtitle,
 	badgeText,
 	selected,
 	onPress,
-}) => {
+	style,
+	accessibilityLabel,
+}: SelectionRowCardProps) {
 	return (
 		<TouchableOpacity
-			style={[styles.card, selected && styles.cardSelected]}
+			style={[styles.card, selected && styles.cardSelected, style]}
 			onPress={onPress}
 			activeOpacity={0.85}
 			accessibilityRole="radio"
 			accessibilityState={{ checked: selected }}
-			accessibilityLabel={`${title}. ${description}`}
+			accessibilityLabel={accessibilityLabel ?? `${title}${subtitle ? `. ${subtitle}` : ''}`}
 		>
-			<View style={[styles.iconWrap, selected && styles.iconWrapSelected]}>
-				<MaterialCommunityIcons name={icon} size={20} color={selected ? '#FFFFFF' : '#0C7C7C'} />
-			</View>
+			<View style={[styles.iconWrap, selected && styles.iconWrapSelected]}>{icon}</View>
 
 			<View style={styles.textCol}>
 				<View style={styles.headerRow}>
@@ -55,12 +51,16 @@ export const SampleCollectionMethodCard: React.FC<SampleCollectionMethodCardProp
 						</View>
 					) : null}
 				</View>
-				<AppTypography variant="caption" style={styles.description}>
-					{description}
-				</AppTypography>
+				{subtitle ? (
+					<AppTypography variant="caption" style={styles.subtitle}>
+						{subtitle}
+					</AppTypography>
+				) : null}
 			</View>
 
-			<View style={[styles.radio, selected && styles.radioSelected]}>{selected && <View style={styles.radioInner} />}</View>
+			<View style={[styles.radio, selected && styles.radioSelected]}>
+				{selected && <View style={styles.radioInner} />}
+			</View>
 		</TouchableOpacity>
 	)
 }
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
 		color: '#0F766E',
 		letterSpacing: 0.5,
 	},
-	description: {
+	subtitle: {
 		fontSize: 12,
 		lineHeight: 16.5,
 		color: '#64748B',
@@ -148,5 +148,3 @@ const styles = StyleSheet.create({
 		backgroundColor: '#0C7C7C',
 	},
 })
-
-export default SampleCollectionMethodCard

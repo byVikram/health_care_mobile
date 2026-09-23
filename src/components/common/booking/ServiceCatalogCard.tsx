@@ -6,10 +6,10 @@ import {
 	TouchableOpacity,
 	useWindowDimensions,
 	DimensionValue,
+	ImageSourcePropType,
 } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common'
-import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
+import { AppTypography } from '../AppTypography'
 
 export interface ServiceProcedureItem {
 	id: string
@@ -40,7 +40,7 @@ export interface ServiceProcedureItem {
 	whatsIncluded?: string[] | string | null
 }
 
-interface AllServiceCardProps {
+interface ServiceCatalogCardProps {
 	item: ServiceProcedureItem
 	cardWidth?: DimensionValue
 	style?: any
@@ -49,9 +49,18 @@ interface AllServiceCardProps {
 	onDecrement?: (item: ServiceProcedureItem) => void
 	onCardPress?: (item: ServiceProcedureItem) => void
 	onSelectService?: (item: ServiceProcedureItem) => void
+	/** Resolves a raw `image_url`/`imageUrl`/`image` string into a displayable
+	 *  `ImageSourcePropType` (e.g. a domain-specific bundled-asset registry).
+	 *  This is deliberately NOT baked into the shared component so
+	 *  `common/booking` has no dependency on any feature folder — pass your
+	 *  feature's own resolver (e.g. Ancillary's `getAncillaryImageSource`) to
+	 *  reproduce that feature's current image behavior. When omitted, items
+	 *  without a pre-resolved `imageSource`/`image` simply show the generic
+	 *  placeholder icon below. */
+	resolveImageSource?: (raw?: string | null) => ImageSourcePropType | undefined
 }
 
-export const AllServiceCard: React.FC<AllServiceCardProps> = ({
+export const ServiceCatalogCard: React.FC<ServiceCatalogCardProps> = ({
 	item,
 	cardWidth,
 	style,
@@ -60,6 +69,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 	onDecrement,
 	onCardPress,
 	onSelectService,
+	resolveImageSource,
 }) => {
 	const { width } = useWindowDimensions()
 	const isCustomPrice = item.price.toLowerCase().includes('custom') || item.actionLabel === 'Enquire'
@@ -94,7 +104,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 		item.imageSource ||
 		(typeof item.image === 'number' || (item.image && typeof item.image === 'object' && ('uri' in item.image || 'default' in item.image))
 			? item.image
-			: getAncillaryImageSource(item.image_url || item.imageUrl || item.image))
+			: resolveImageSource?.(item.image_url || item.imageUrl || item.image))
 
 	return (
 		<TouchableOpacity

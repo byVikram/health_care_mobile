@@ -13,7 +13,12 @@ import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
 
-import { BookingProgressStepper } from '../components/BookingProgressStepper'
+import { BookingProgressStepper } from '../../../components/common'
+import {
+	ANCILLARY_BOOKING_STEPS,
+	ANCILLARY_STEPPER_THEME,
+	navigateAncillaryStep,
+} from '../utils/bookingProgressStepperConfig'
 
 export default function AncillaryConfirmationPage() {
 	const navigation = useNavigation<any>()
@@ -55,7 +60,13 @@ export default function AncillaryConfirmationPage() {
 				showsVerticalScrollIndicator={false}
 			>
 				{/* 3-Step Progress Indicator (Confirmed) */}
-				<BookingProgressStepper currentStep={3} style={styles.progressStepper} />
+				<BookingProgressStepper
+					steps={ANCILLARY_BOOKING_STEPS}
+					currentIndex={2}
+					theme={ANCILLARY_STEPPER_THEME}
+					onStepPress={(index) => navigateAncillaryStep(navigation, 2, index)}
+					style={styles.progressStepper}
+				/>
 
 				{/* 1. Confirmation Banner */}
 				<View style={styles.successCard}>

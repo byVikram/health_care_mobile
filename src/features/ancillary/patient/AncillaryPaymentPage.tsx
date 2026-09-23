@@ -16,9 +16,14 @@ import {
 	AppButton,
 	AppScreenHeader,
 	AppTypography,
+	BookingProgressStepper,
+	ServiceProcedureItem,
 } from '../../../components/common'
-import { BookingProgressStepper } from '../components/BookingProgressStepper'
-import { ServiceProcedureItem } from '../components/AllServiceCard'
+import {
+	ANCILLARY_BOOKING_STEPS,
+	ANCILLARY_STEPPER_THEME,
+	navigateAncillaryStep,
+} from '../utils/bookingProgressStepperConfig'
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { generateIdempotencyKey, createScheduledAncillaryBooking } from '../ancillaryService'
@@ -73,6 +78,27 @@ export default function AncillaryPaymentPage() {
 	const isTablet = width >= 768
 
 	const bookingPayload = route.params?.bookingPayload || {}
+	// See `BookingSummaryScreen.tsx` — only present for Laboratory bookings,
+	// carried alongside `bookingPayload` rather than inside it so the
+	// standardized payload shape stays feature-agnostic.
+	const labTrackingParams = route.params?.labTrackingParams
+	const isLaboratory = bookingPayload.serviceType === 'LABORATORY'
+	const isHomeCollection = isLaboratory && labTrackingParams?.draft?.collectionType === 'home_collection'
+
+	// Copy that must not leak Nursing-specific wording ("Home Visit",
+	// "Specialist", "Practitioner"/"OTP tracking", "Dispatch Nurse") into the
+	// Laboratory flow, or vice versa. Nursing's values below are exactly what
+	// this page already showed before Laboratory started reusing it.
+	const orderSummaryUnitLabel = isLaboratory ? 'Test' : 'Procedure'
+	const itemMetaSuffix = isLaboratory ? '' : ' • Home Visit'
+	const visitFeeLabel = isLaboratory
+		? isHomeCollection
+			? 'Phlebotomist Doorstep Visit Fee'
+			: 'Center Walk-in & Handling Fee'
+		: 'Specialist Doorstep Visit Fee'
+	const securityNoticeText = isLaboratory
+		? 'Your booking will be confirmed immediately. You will receive updates on your sample collection or center visit status.'
+		: 'Your appointment will be confirmed immediately. Practitioner info and OTP tracking details will be generated upon confirmation.'
 	const services: ServiceProcedureItem[] = bookingPayload.services || [
 		{
 			id: 'gen1',
@@ -194,7 +220,19 @@ export default function AncillaryPaymentPage() {
 
 		try {
 			let createdBookingId = publicId
-			if (bookingPayload?.scheduledDate && bookingPayload?.scheduledStartTime && bookingPayload?.providerId) {
+
+			if (isLaboratory) {
+				// Laboratory has no backend booking API wired up yet (see
+				// `laboratory_duplicated/laboratoryService.ts`'s `placeLabOrder` /
+				// the real `/api/laboratory/bookings` endpoint — neither is
+				// connected to this catalog/flow today). Laboratory must not
+				// call the Ancillary request API or touch `ancillary_service_requests`
+				// at all — that table's active-task check has no concept of
+				// service type and would incorrectly block a Lab booking behind
+				// an unrelated active Nursing visit (or vice versa). Until a real
+				// Laboratory booking backend is wired in, this stays a local,
+				// UI-only confirmation using the client-generated reference.
+			} else if (bookingPayload?.scheduledDate && bookingPayload?.scheduledStartTime && bookingPayload?.providerId) {
 				const scheduledRes = await createScheduledAncillaryBooking({
 					provider_public_id: bookingPayload.providerId,
 					scheduled_date: bookingPayload.scheduledDate,
@@ -220,6 +258,25 @@ export default function AncillaryPaymentPage() {
 			}
 
 			setSubmitting(false)
+
+			if (isLaboratory) {
+				// Laboratory bookings have no "matching specialist" concept —
+				// that flow is Nursing-specific (dispatching/matching a nurse).
+				// Route to Laboratory's own post-payment tracking screen instead.
+				navigation.navigate(ROUTES.STACK.LABORATORY_BOOKING_TRACKING, {
+					bookingReference: createdBookingId,
+					draft: labTrackingParams?.draft,
+					labId: labTrackingParams?.labId,
+					labName: labTrackingParams?.labName,
+					labAddress: labTrackingParams?.labAddress,
+					labCity: labTrackingParams?.labCity,
+					date: labTrackingParams?.date,
+					timeSlot: labTrackingParams?.timeSlot,
+					totalAmount: Number(String(charges.totalAmount).replace(/[^0-9.]/g, '')) || 0,
+				})
+				return
+			}
+
 			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId: createdBookingId,
 				serviceName: services.map((s) => s.title).filter(Boolean).join(', ') || 'In-Home Healthcare Service',
@@ -284,9 +341,27 @@ export default function AncillaryPaymentPage() {
 				showsVerticalScrollIndicator={false}
 			>
 				{/* STEP PROGRESS INDICATOR */}
-				<View style={styles.stepperContainer}>
-					<BookingProgressStepper currentStep={3} />
-				</View>
+				{isLaboratory ? (
+					// No extra wrapper here — the shared stepper's own default
+					// padding already matches every other Laboratory screen
+					// exactly (SampleCollectionScreen, LabSelectionScreen,
+					// BookingSummaryScreen all render it with zero wrapper too).
+					// Wrapping it in `stepperContainer` (below) would double its
+					// horizontal inset only on this screen.
+					<BookingProgressStepper
+						steps={(labTrackingParams?.progressSteps || ['Payment']).map((label: string) => ({ label }))}
+						currentIndex={(labTrackingParams?.progressSteps?.length || 1) - 1}
+					/>
+				) : (
+					<View style={styles.stepperContainer}>
+						<BookingProgressStepper
+							steps={ANCILLARY_BOOKING_STEPS}
+							currentIndex={2}
+							theme={ANCILLARY_STEPPER_THEME}
+							onStepPress={(index) => navigateAncillaryStep(navigation, 2, index)}
+						/>
+					</View>
+				)}
 
 				{/* 1. SECTION: ORDER SUMMARY BLOCK */}
 				<View style={styles.sectionBlock}>
@@ -298,7 +373,7 @@ export default function AncillaryPaymentPage() {
 									Order Summary
 								</AppTypography>
 								<AppTypography variant="caption" style={styles.summarySub}>
-									{services.length} Procedure{services.length > 1 ? 's' : ''} • {charges.totalAmount}
+									{services.length} {orderSummaryUnitLabel}{services.length > 1 ? 's' : ''} • {charges.totalAmount}
 								</AppTypography>
 							</View>
 						</View>
@@ -321,8 +396,8 @@ export default function AncillaryPaymentPage() {
 						</AppTypography>
 					</View>
 
-					{/* Preferred Nurse Summary Bar */}
-					{bookingPayload.selectedNurse && (
+					{/* Preferred Nurse Summary Bar (Nursing only) */}
+					{!isLaboratory && bookingPayload.selectedNurse && (
 						<View style={styles.preferredNurseBar}>
 							<Image source={{ uri: bookingPayload.selectedNurse.avatar }} style={styles.preferredNurseAvatar} />
 							<View style={{ flex: 1 }}>
@@ -348,7 +423,7 @@ export default function AncillaryPaymentPage() {
 											{item.title}
 										</AppTypography>
 										<AppTypography variant="caption" style={styles.procedureItemMeta}>
-											{item.duration || '30 - 45 mins'} • Home Visit
+											{item.duration || '30 - 45 mins'}{itemMetaSuffix}
 										</AppTypography>
 									</View>
 									<AppTypography variant="h4" style={styles.procedureItemPrice}>
@@ -369,7 +444,7 @@ export default function AncillaryPaymentPage() {
 								</View>
 								<View style={styles.costRow}>
 									<AppTypography variant="caption" style={styles.costLabel}>
-										Specialist Doorstep Visit Fee
+										{visitFeeLabel}
 									</AppTypography>
 									<AppTypography variant="caption" style={styles.costVal}>
 										{charges.visitFee}
@@ -475,7 +550,7 @@ export default function AncillaryPaymentPage() {
 								256-bit Encrypted Security & Guarantee
 							</AppTypography>
 							<AppTypography variant="caption" style={styles.securitySub}>
-								Your appointment will be confirmed immediately. Practitioner info and OTP tracking details will be generated upon confirmation.
+								{securityNoticeText}
 							</AppTypography>
 						</View>
 					</View>
@@ -499,7 +574,7 @@ export default function AncillaryPaymentPage() {
 					onPress={handlePaySecurely}
 					style={styles.payBtn}
 				>
-					{submitting ? 'Confirming...' : 'Confirm & Dispatch Nurse ➔'}
+					{submitting ? 'Confirming...' : isLaboratory ? 'Confirm & Pay ➔' : 'Confirm & Dispatch Nurse ➔'}
 				</AppButton>
 			</View>
 
@@ -507,11 +582,19 @@ export default function AncillaryPaymentPage() {
 			<StatusModal
 				visible={activeTaskModalVisible}
 				status="error"
-				title="Active Request in Progress"
-				description="You already have an active nursing request in progress. Please complete your current visit before booking another."
-				submitText="Track Active Request"
+				title={isLaboratory ? 'Booking In Progress' : 'Active Request in Progress'}
+				description={
+					isLaboratory
+						? 'You already have an active booking in progress. Please complete it before booking another.'
+						: 'You already have an active nursing request in progress. Please complete your current visit before booking another.'
+				}
+				submitText={isLaboratory ? 'View My Bookings' : 'Track Active Request'}
 				onSubmit={() => {
 					setActiveTaskModalVisible(false)
+					if (isLaboratory) {
+						navigation.navigate(ROUTES.STACK.LABORATORY_LIST)
+						return
+					}
 					navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 						bookingId: existingActiveBookingId,
 					})

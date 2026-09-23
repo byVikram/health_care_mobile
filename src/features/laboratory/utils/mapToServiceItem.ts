@@ -2,18 +2,18 @@
 //
 // Maps Laboratory's own data shapes (`DiagnosticTestItem` / `HealthPackageItem`
 // — see `../data/laboratoryMockData.ts`) onto `ServiceProcedureItem`, the
-// shared card data shape the Nursing Care / ancillary service listing
-// (`AllServiceCard` in `../../ancillary/components/AllServiceCard.tsx`)
-// already uses. This is the one shared place this mapping lives — it was
-// previously duplicated three times (inline in `LaboratoryHomeScreen.tsx`,
-// and again inside the `DiagnosticTestCard.tsx` / `HealthPackageCard.tsx`
-// wrapper components); all three now import it from here instead.
+// shared card data shape the common `ServiceCatalogCard`
+// (`src/components/common/booking/ServiceCatalogCard.tsx`) uses. This is the
+// one shared place this mapping lives — it was previously duplicated three
+// times (inline in `LaboratoryHomeScreen.tsx`, and again inside the
+// `DiagnosticTestCard.tsx` / `HealthPackageCard.tsx` wrapper components);
+// all three now import it from here instead.
 //
 // `duration` is left unset and `hideRating: true` is always set, which is
-// what keeps `AllServiceCard` from ever rendering Nursing-only
+// what keeps `ServiceCatalogCard` from ever rendering Nursing-only
 // duration/rating UI for a Laboratory item.
 
-import { ServiceProcedureItem } from '../../ancillary/components/AllServiceCard'
+import { ServiceProcedureItem } from '../../../components/common'
 import { DiagnosticTestItem, HealthPackageItem } from '../data/laboratoryMockData'
 
 const LAB_IMAGES = [
@@ -48,7 +48,7 @@ export const toTestProcedureItem = (test: DiagnosticTestItem): ServiceProcedureI
 		originalPrice: test.originalPrice && test.originalPrice > test.price ? `₹${test.originalPrice}` : undefined,
 		discountText: discountPercent ? `${discountPercent}% off` : undefined,
 		imageSource: image,
-		// No `recommendedLabel`: `AllServiceCard` wraps any item that has one in
+		// No `recommendedLabel`: `ServiceCatalogCard` wraps any item that has one in
 		// its own bordered/tinted `cardRecommended` box. Nearly every mock test is
 		// tagged `category: 'popular'`, so this must stay unset or almost every
 		// row renders individually boxed — Nursing Care never sets it either.

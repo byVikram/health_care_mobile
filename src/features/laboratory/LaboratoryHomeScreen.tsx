@@ -20,8 +20,7 @@ import {
 	POPULAR_DIAGNOSTIC_TESTS,
 	DiagnosticTestItem,
 } from './data/laboratoryMockData'
-import { AllServiceCard, ServiceProcedureItem } from '../ancillary/components/AllServiceCard'
-import { ServiceDetailsBottomSheet } from '../ancillary/components/ServiceDetailsBottomSheet'
+import { ServiceCatalogCard, ServiceProcedureItem, ServiceDetailsSheet } from '../../components/common'
 import { PackageCategoryTabs } from './components/PackageCategoryTabs'
 import { SectionSeeAllLink } from './components/SectionSeeAllLink'
 import { toPackageProcedureItem, toTestProcedureItem } from './utils/mapToServiceItem'
@@ -136,7 +135,7 @@ export const LaboratoryHomeScreen: React.FC = () => {
 		})
 	}
 
-	// Data converters to the Nursing Care `AllServiceCard` interface —
+	// Data converters to the common `ServiceCatalogCard` interface —
 	// `toTestProcedureItem` / `toPackageProcedureItem`, imported above, are
 	// shared with `AllDiagnosticTestsScreen.tsx` / `AllHealthPackagesScreen.tsx`
 	// via `./utils/mapToServiceItem` rather than redefined per screen.
@@ -309,7 +308,7 @@ export const LaboratoryHomeScreen: React.FC = () => {
 									</View>
 
 									{visibleDiagnosticTests.map((test) => (
-										<AllServiceCard
+										<ServiceCatalogCard
 											key={test.id}
 											item={toTestProcedureItem(test)}
 											quantity={0}
@@ -358,7 +357,7 @@ export const LaboratoryHomeScreen: React.FC = () => {
 									)}
 
 									{filteredPackages.map((pkg) => (
-										<AllServiceCard
+										<ServiceCatalogCard
 											key={pkg.id}
 											item={toPackageProcedureItem(pkg)}
 											quantity={0}
@@ -374,7 +373,7 @@ export const LaboratoryHomeScreen: React.FC = () => {
 			</ScrollView>
 
 			{/* Half Bottom Sheet for Service Details */}
-			<ServiceDetailsBottomSheet
+			<ServiceDetailsSheet
 				visible={!!detailsService}
 				service={detailsService}
 				onClose={() => setDetailsService(null)}

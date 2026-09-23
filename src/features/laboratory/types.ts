@@ -33,8 +33,8 @@ export interface LabBookingDraft {
 	collectionAddressId: string | null
 	/** Full address record for `collectionAddressId`, kept alongside the id so
 	 *  later steps (Booking Summary) can show the address text without an
-	 *  extra fetch — same real `PatientAddress` shape `CollectionAddressSection`
-	 *  already loads, nothing invented. */
+	 *  extra fetch — same real `PatientAddress` shape the shared
+	 *  `AddressSelectionSheet` already loads, nothing invented. */
 	collectionAddress: PatientAddress | null
 	notes: string
 	testIds: string[]

@@ -10,9 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import Toast from 'react-native-toast-message'
-import { safeJsonParse } from '../../utils/jsonUtils'
 import { AppTypography } from '../../components/common/AppTypography'
 import { AppButton } from '../../components/common/AppButton'
 import { AppInput } from '../../components/common/AppInput'
@@ -20,12 +18,11 @@ import {
 	PatientProfile,
 	PatientProfileSelectorBottomSheet,
 } from '../../components/common/PatientProfileSelectorBottomSheet'
-import { getPatientDetails, type PatientAddress } from '../profile/patient/PatientProfileService'
+import { type PatientAddress } from '../profile/patient/PatientProfileService'
+import { resolveSelfPatientIdentity } from '../../utils/resolvePatientIdentity'
 import { ROUTES } from '../../navigation/routes'
 import { HEALTH_CHECKUP_PACKAGES, POPULAR_DIAGNOSTIC_TESTS } from './data/laboratoryMockData'
-import { SampleCollectionMethodCard } from './components/SampleCollectionMethodCard'
-import { CollectionAddressSection } from './components/CollectionAddressSection'
-import { LabBookingProgressHeader } from './components/LabBookingProgressHeader'
+import { AddressSelectionSheet, BookingProgressStepper, DateStrip, SelectionRowCard, SlotChipGrid } from '../../components/common'
 import type { CollectionMethod, LabBookingDraft } from './types'
 
 const HOME_TIME_SLOTS = [
@@ -38,13 +35,6 @@ const formatDisplayDate = (d: Date): string => {
 	const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 	const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 	return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
-}
-
-const formatDateIso = (d: Date): string => {
-	const year = d.getFullYear()
-	const month = String(d.getMonth() + 1).padStart(2, '0')
-	const day = String(d.getDate()).padStart(2, '0')
-	return `${year}-${month}-${day}`
 }
 
 export const SampleCollectionScreen: React.FC = () => {
@@ -81,57 +71,31 @@ export const SampleCollectionScreen: React.FC = () => {
 
 	const [notes, setNotes] = useState<string>(draftParam?.notes || '')
 
-	// Auto-fetch profile if not provided
+	// Auto-fetch profile if not provided. Never fabricates a placeholder name/
+	// age/gender when resolution fails — if `resolveSelfPatientIdentity`
+	// can't find a genuine identity, `selectedProfile` stays unset and the
+	// existing "Select Profile" prompt below is shown instead, matching how
+	// Ancillary's booking flow refuses to proceed with an unresolved patient
+	// rather than silently booking under a fake name.
 	const fetchInitialProfile = useCallback(async () => {
 		if (selectedProfile) return
-		try {
-			const res = await getPatientDetails()
-			if (res && res.data) {
-				setSelectedProfile({
-					id: res.data.id || 'pt_primary',
-					publicId: res.data.public_id || res.data.id,
-					name: res.data.full_name || res.data.name || 'Rahul Sharma',
-					relationship: 'Self',
-					age: res.data.age ? String(res.data.age) : '32',
-					gender: res.data.gender || 'Male',
-					avatar: res.data.avatar,
-				})
-				return
-			}
-		} catch {
-			// fall back to AsyncStorage
-		}
-
-		try {
-			const userRaw = await AsyncStorage.getItem('user')
-			const userData = safeJsonParse<any>(userRaw, null)
-			if (userData) {
-				setSelectedProfile({
-					id: userData.id || 'pt_primary',
-					publicId: userData.publicId || userData.public_id || userData.id,
-					name: userData.name || userData.full_name || 'Rahul Sharma',
-					relationship: 'Self',
-					age: userData.age ? String(userData.age) : '30',
-					gender: userData.gender || 'Male',
-				})
-			}
-		} catch {
-			// ignore
+		const identity = await resolveSelfPatientIdentity()
+		if (identity) {
+			setSelectedProfile({
+				id: identity.publicId,
+				publicId: identity.publicId,
+				name: identity.name,
+				relationship: identity.relationship,
+				age: identity.age,
+				gender: identity.gender,
+				avatar: identity.avatar,
+			})
 		}
 	}, [selectedProfile])
 
 	useEffect(() => {
 		void fetchInitialProfile()
 	}, [fetchInitialProfile])
-
-	// Upcoming 7 days for Home Collection date picker
-	const upcomingDates = useMemo(() => {
-		return Array.from({ length: 7 }, (_, i) => {
-			const d = new Date()
-			d.setDate(d.getDate() + i)
-			return d
-		})
-	}, [])
 
 	const selectedTests = useMemo(
 		() => POPULAR_DIAGNOSTIC_TESTS.filter((t) => testIds.includes(t.id)),
@@ -154,7 +118,13 @@ export const SampleCollectionScreen: React.FC = () => {
 	}, [selectedTests, selectedPackages])
 
 	// Dynamic step progress indicator
-	const progressSteps = method === 'home_collection' ? ['Details', 'Summary'] : ['Details', 'Lab & Slot', 'Summary']
+	// The full journey, including the Payment step that only actually happens
+	// on a later screen — shown from the very first screen so the stepper
+	// never grows/shrinks a step between screens, only `currentIndex` moves.
+	const progressSteps =
+		method === 'home_collection'
+			? ['Details', 'Summary', 'Payment']
+			: ['Details', 'Lab & Slot', 'Summary', 'Payment']
 
 	const handleContinue = () => {
 		if (!hasSelection) {
@@ -238,7 +208,7 @@ export const SampleCollectionScreen: React.FC = () => {
 
 	return (
 		<View style={styles.container}>
-			<LabBookingProgressHeader steps={progressSteps} currentIndex={0} />
+			<BookingProgressStepper steps={progressSteps.map((label) => ({ label }))} currentIndex={0} />
 
 			<ScrollView
 				contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 16) + 96 }]}
@@ -286,18 +256,30 @@ export const SampleCollectionScreen: React.FC = () => {
 					</AppTypography>
 
 					<View style={styles.methodChoiceContainer}>
-						<SampleCollectionMethodCard
+						<SelectionRowCard
+							icon={
+								<MaterialCommunityIcons
+									name="home-outline"
+									size={20}
+									color={method === 'home_collection' ? '#FFFFFF' : '#0C7C7C'}
+								/>
+							}
 							title="Home Sample Collection"
-							description="A certified phlebotomist visits your doorstep to collect samples."
-							icon="home-outline"
+							subtitle="A certified phlebotomist visits your doorstep to collect samples."
 							badgeText="Convenient"
 							selected={method === 'home_collection'}
 							onPress={() => setMethod('home_collection')}
 						/>
-						<SampleCollectionMethodCard
+						<SelectionRowCard
+							icon={
+								<MaterialCommunityIcons
+									name="hospital-building"
+									size={20}
+									color={method === 'walk_in' ? '#FFFFFF' : '#0C7C7C'}
+								/>
+							}
 							title="Diagnostic Center Visit"
-							description="Visit an accredited diagnostic laboratory at your chosen time slot."
-							icon="hospital-building"
+							subtitle="Visit an accredited diagnostic laboratory at your chosen time slot."
 							selected={method === 'walk_in'}
 							onPress={() => setMethod('walk_in')}
 						/>
@@ -380,7 +362,7 @@ export const SampleCollectionScreen: React.FC = () => {
 								Where should our certified phlebotomist visit?
 							</AppTypography>
 
-							<CollectionAddressSection
+							<AddressSelectionSheet
 								selectedAddressId={selectedAddress?.id ?? null}
 								onSelectAddress={setSelectedAddress}
 							/>
@@ -390,51 +372,18 @@ export const SampleCollectionScreen: React.FC = () => {
 								<AppTypography variant="subtitle" style={styles.subsectionTitle}>
 									Preferred Visit Date
 								</AppTypography>
-								<View style={styles.dateStripContainer}>
-									<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateScrollContent}>
-										{upcomingDates.map((d) => {
-											const isSelectedDate = formatDateIso(d) === formatDateIso(selectedDate)
-											return (
-												<TouchableOpacity
-													key={d.toISOString()}
-													style={[styles.dateChip, isSelectedDate && styles.dateChipSelected]}
-													onPress={() => setSelectedDate(d)}
-													activeOpacity={0.8}
-												>
-													<AppTypography variant="caption" style={[styles.dateChipDay, isSelectedDate && styles.dateChipTextSelected]}>
-														{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]}
-													</AppTypography>
-													<AppTypography variant="h4" style={[styles.dateChipNum, isSelectedDate && styles.dateChipTextSelected]}>
-														{d.getDate()}
-													</AppTypography>
-												</TouchableOpacity>
-											)
-										})}
-									</ScrollView>
-								</View>
+								<DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} style={styles.dateStripContainer} />
 							</View>
 
 							<View style={styles.subsection}>
 								<AppTypography variant="subtitle" style={styles.subsectionTitle}>
 									Preferred Time Window
 								</AppTypography>
-								<View style={styles.slotsGridFlex}>
-									{HOME_TIME_SLOTS.map((slot) => {
-										const isSelected = selectedSlot === slot.value
-										return (
-											<TouchableOpacity
-												key={slot.value}
-												style={[styles.slotChip, isSelected && styles.slotChipSelected]}
-												onPress={() => setSelectedSlot(slot.value)}
-												activeOpacity={0.8}
-											>
-												<AppTypography variant="caption" style={[styles.slotChipText, isSelected && styles.slotChipTextSelected]}>
-													{slot.label} ({slot.hint})
-												</AppTypography>
-											</TouchableOpacity>
-										)
-									})}
-								</View>
+								<SlotChipGrid
+									slots={HOME_TIME_SLOTS.map((slot) => ({ value: slot.value, label: `${slot.label} (${slot.hint})` }))}
+									selectedValue={selectedSlot}
+									onSelectValue={setSelectedSlot}
+								/>
 							</View>
 						</View>
 					</>
@@ -658,62 +607,6 @@ const styles = StyleSheet.create({
 	},
 	dateStripContainer: {
 		marginBottom: 6,
-	},
-	dateScrollContent: {
-		gap: 8,
-		paddingHorizontal: 2,
-	},
-	dateChip: {
-		width: 54,
-		paddingVertical: 8,
-		borderRadius: 10,
-		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	dateChipSelected: {
-		backgroundColor: '#0C7C7C',
-		borderColor: '#0C7C7C',
-	},
-	dateChipDay: {
-		fontSize: 11,
-		color: '#64748B',
-	},
-	dateChipNum: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#0F172A',
-		marginTop: 2,
-	},
-	dateChipTextSelected: {
-		color: '#FFFFFF',
-	},
-	slotsGridFlex: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 8,
-	},
-	slotChip: {
-		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#CBD5E1',
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-	},
-	slotChipSelected: {
-		backgroundColor: '#0C7C7C',
-		borderColor: '#0C7C7C',
-	},
-	slotChipText: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#334155',
-	},
-	slotChipTextSelected: {
-		color: '#FFFFFF',
 	},
 	infoBox: {
 		flexDirection: 'row',

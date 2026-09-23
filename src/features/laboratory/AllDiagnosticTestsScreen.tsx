@@ -7,8 +7,7 @@ import { AppTypography } from '../../components/common/AppTypography'
 import { AppInput } from '../../components/common/AppInput'
 import { ROUTES } from '../../navigation/routes'
 import { DiagnosticTestItem, POPULAR_DIAGNOSTIC_TESTS } from './data/laboratoryMockData'
-import { AllServiceCard, ServiceProcedureItem } from '../ancillary/components/AllServiceCard'
-import { ServiceDetailsBottomSheet } from '../ancillary/components/ServiceDetailsBottomSheet'
+import { ServiceCatalogCard, ServiceDetailsSheet, ServiceProcedureItem } from '../../components/common'
 import { toTestProcedureItem } from './utils/mapToServiceItem'
 
 export const AllDiagnosticTestsScreen: React.FC = () => {
@@ -88,7 +87,7 @@ export const AllDiagnosticTestsScreen: React.FC = () => {
 					</View>
 				}
 				renderItem={({ item }) => (
-					<AllServiceCard
+					<ServiceCatalogCard
 						item={toTestProcedureItem(item)}
 						quantity={0}
 						onSelectService={() => handleSelectTest(item)}
@@ -97,7 +96,7 @@ export const AllDiagnosticTestsScreen: React.FC = () => {
 				)}
 			/>
 
-			<ServiceDetailsBottomSheet
+			<ServiceDetailsSheet
 				visible={!!detailsService}
 				service={detailsService}
 				onClose={() => setDetailsService(null)}

@@ -8,8 +8,7 @@ import { AppInput } from '../../components/common/AppInput'
 import { ROUTES } from '../../navigation/routes'
 import { HEALTH_CHECKUP_PACKAGES, HealthPackageItem, PACKAGE_CATEGORIES } from './data/laboratoryMockData'
 import { PackageCategoryTabs } from './components/PackageCategoryTabs'
-import { ServiceDetailsBottomSheet } from '../ancillary/components/ServiceDetailsBottomSheet'
-import { AllServiceCard, ServiceProcedureItem } from '../ancillary/components/AllServiceCard'
+import { ServiceCatalogCard, ServiceDetailsSheet, ServiceProcedureItem } from '../../components/common'
 import { toPackageProcedureItem } from './utils/mapToServiceItem'
 
 const ALL_CATEGORY_ID = 'all'
@@ -106,7 +105,7 @@ export const AllHealthPackagesScreen: React.FC = () => {
 					</View>
 				}
 				renderItem={({ item }) => (
-					<AllServiceCard
+					<ServiceCatalogCard
 						item={toPackageProcedureItem(item)}
 						quantity={0}
 						onSelectService={() => handleSelectPackage(item)}
@@ -115,7 +114,7 @@ export const AllHealthPackagesScreen: React.FC = () => {
 				)}
 			/>
 
-			<ServiceDetailsBottomSheet
+			<ServiceDetailsSheet
 				visible={!!detailsService}
 				service={detailsService}
 				onClose={() => setDetailsService(null)}
