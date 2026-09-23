@@ -45,6 +45,7 @@ interface ServiceCatalogCardProps {
 	cardWidth?: DimensionValue
 	style?: any
 	quantity?: number
+	showStepper?: boolean
 	onIncrement?: (item: ServiceProcedureItem) => void
 	onDecrement?: (item: ServiceProcedureItem) => void
 	onCardPress?: (item: ServiceProcedureItem) => void
@@ -65,6 +66,7 @@ export const ServiceCatalogCard: React.FC<ServiceCatalogCardProps> = ({
 	cardWidth,
 	style,
 	quantity = 0,
+	showStepper = false,
 	onIncrement,
 	onDecrement,
 	onCardPress,
@@ -72,7 +74,7 @@ export const ServiceCatalogCard: React.FC<ServiceCatalogCardProps> = ({
 	resolveImageSource,
 }) => {
 	const { width } = useWindowDimensions()
-	const isCustomPrice = item.price.toLowerCase().includes('custom') || item.actionLabel === 'Enquire'
+	const isCustomPrice = (item.price || '').toLowerCase().includes('custom') || item.actionLabel === 'Enquire'
 	const isAdded = quantity > 0
 	const isRecommended = !!item.recommendedLabel
 
@@ -102,7 +104,8 @@ export const ServiceCatalogCard: React.FC<ServiceCatalogCardProps> = ({
 
 	const imageSource =
 		item.imageSource ||
-		(typeof item.image === 'number' || (item.image && typeof item.image === 'object' && ('uri' in item.image || 'default' in item.image))
+		(typeof item.image === 'number' ||
+		(item.image && typeof item.image === 'object' && ('uri' in item.image || 'default' in item.image))
 			? item.image
 			: resolveImageSource?.(item.image_url || item.imageUrl || item.image))
 
@@ -207,9 +210,39 @@ export const ServiceCatalogCard: React.FC<ServiceCatalogCardProps> = ({
 					)}
 				</View>
 
-				{/* Overlapping ADD / ADDED Button */}
+				{/* Overlapping Action / Stepper Button */}
 				<View style={styles.actionButtonWrapper}>
-					{isAdded ? (
+					{showStepper ? (
+						isAdded ? (
+							<View style={styles.stepperBox}>
+								<TouchableOpacity
+									style={styles.stepperBtn}
+									onPress={handleDecrementClick}
+									activeOpacity={0.7}
+									hitSlop={8}
+								>
+									<Ionicons name="remove" size={16} color="#0C7C7C" />
+								</TouchableOpacity>
+								<AppTypography variant="caption" style={styles.stepperQty}>
+									{quantity}
+								</AppTypography>
+								<TouchableOpacity
+									style={styles.stepperBtn}
+									onPress={handleIncrementClick}
+									activeOpacity={0.7}
+									hitSlop={8}
+								>
+									<Ionicons name="add" size={16} color="#0C7C7C" />
+								</TouchableOpacity>
+							</View>
+						) : (
+							<TouchableOpacity style={styles.addBtn} onPress={handleIncrementClick} activeOpacity={0.85}>
+								<AppTypography variant="caption" style={styles.addBtnText}>
+									{item.actionLabel || '+ Add'}
+								</AppTypography>
+							</TouchableOpacity>
+						)
+					) : isAdded ? (
 						<TouchableOpacity
 							style={[styles.addBtn, styles.addedBtn]}
 							onPress={handleDecrementClick}
@@ -303,6 +336,11 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 		color: '#64748B',
 		lineHeight: 16,
+	},
+	cardDesc: {
+		fontSize: 12.5,
+		color: '#64748B',
+		lineHeight: 17,
 	},
 	ratingRow: {
 		flexDirection: 'row',
@@ -459,6 +497,8 @@ const styles = StyleSheet.create({
 	},
 	stepperBtn: {
 		padding: 2,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	stepperQty: {
 		fontSize: 12,

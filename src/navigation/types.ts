@@ -214,6 +214,21 @@ export type AppStackParamList = {
 		bookingData?: any
 	} | undefined
 	[ROUTES.STACK.ANCILLARY_MY_BOOKINGS]: undefined
+	[ROUTES.STACK.HOME_CARE_CATALOG]: { updatedCart?: any[] } | undefined
+	[ROUTES.STACK.HOME_CARE_BOOKING_DETAILS]: {
+		selectedServices?: any[]
+		careType?: string
+		careBookingMode?: 'COMPLETE_CARE' | 'FIXED_DURATION' | string
+		initialDurationHours?: number
+		title?: string
+		selectedDate?: string
+		selectedTimeSlot?: string
+		careRequirements?: string[]
+	} | undefined
+	[ROUTES.STACK.CAREGIVER_SERVICES]: undefined
+	[ROUTES.STACK.CAREGIVER_TIME_CONFIG]: {
+		careType: 'DAY_CARE' | 'NIGHT_CARE' | 'FULL_DAY_CARE' | 'CUSTOM_CARE'
+	}
 	[ROUTES.STACK.LOCATION_SELECT]: undefined
 }
 

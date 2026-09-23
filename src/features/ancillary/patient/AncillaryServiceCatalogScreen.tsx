@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from '../../../navigation/routes'
 import { AppTypography, AppInput } from '../../../components/common'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
+import CaregiverServicesScreen from './CaregiverServicesScreen'
 
 import { ServiceProcedureItem, ServiceCatalogCard, ServiceDetailsSheet } from '../../../components/common'
 import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
@@ -138,6 +139,10 @@ export default function AncillaryServiceCatalogScreen() {
 
 	const serviceKey = route.params?.serviceKey || 'nursing-care'
 	const serviceLabel = route.params?.serviceLabel || 'Nursing Care'
+	if (serviceKey === 'home-care' || serviceKey === 'caregiver-services' || serviceKey === 'elder-day-care') {
+		return <CaregiverServicesScreen />
+	}
+
 	const activeUi = SERVICE_UI[serviceKey] || SERVICE_UI['nursing-care']
 	const isPhysiotherapy = serviceKey === 'physiotherapy'
 	// Reuses the same ConditionGrid card UI for its filters (see

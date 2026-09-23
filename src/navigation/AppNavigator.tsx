@@ -77,6 +77,10 @@ import AncillaryProvidersPage from '../features/ancillary/patient/AncillaryProvi
 import BookingCartPage from '../features/ancillary/patient/BookingCartPage'
 import BookingSummaryPage from '../features/ancillary/patient/BookingSummaryPage'
 import BookingDetailsPage from '../features/ancillary/patient/BookingDetailsPage'
+import HomeCareServiceCatalogScreen from '../features/ancillary/patient/HomeCareServiceCatalogScreen'
+import HomeCareBookingDetailsPage from '../features/ancillary/patient/HomeCareBookingDetailsPage'
+import CaregiverServicesScreen from '../features/ancillary/patient/CaregiverServicesScreen'
+import CaregiverCareTypeOverviewScreen from '../features/ancillary/patient/CaregiverCareTypeOverviewScreen'
 import AncillaryPaymentPage from '../features/ancillary/patient/AncillaryPaymentPage'
 import PricingReviewPage from '../features/ancillary/staff/PricingReviewPage'
 import AncillaryConfirmationPage from '../features/ancillary/patient/AncillaryConfirmationPage'
@@ -329,6 +333,26 @@ function AuthenticatedNavigator() {
 			<AppStack.Screen
 				name={ROUTES.STACK.ANCILLARY_BOOKING_DETAILS}
 				component={BookingDetailsPage}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.CAREGIVER_SERVICES}
+				component={CaregiverServicesScreen}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.CAREGIVER_TIME_CONFIG}
+				component={CaregiverCareTypeOverviewScreen}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.HOME_CARE_CATALOG}
+				component={HomeCareServiceCatalogScreen}
+				options={{ headerShown: false }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.HOME_CARE_BOOKING_DETAILS}
+				component={HomeCareBookingDetailsPage}
 				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen

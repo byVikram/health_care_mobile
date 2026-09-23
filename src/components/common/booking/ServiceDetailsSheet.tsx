@@ -36,32 +36,70 @@ interface ReviewItem {
 	text: string
 }
 
-// Simulated reviews database mapped by service IDs or fallback reviews
 const MOCK_REVIEWS_POOL: Record<string, ReviewItem[]> = {
-	'gen1': [
-		{ name: 'Rohan D.', rating: '5.0', time: '2 days ago', text: 'Highly professional wound care. The nurse disinfected everything before start.' },
-		{ name: 'Sneha P.', rating: '4.8', time: '1 week ago', text: 'The dressing was done with extreme care. Highly recommend this service for diabetic patients.' }
+	'gen-inj': [
+		{
+			name: 'Pooja K.',
+			rating: '5.0',
+			time: '2 days ago',
+			text: 'Nurse was extremely gentle and professional with the injection. Arrived on time!',
+		},
+		{
+			name: 'Rohan S.',
+			rating: '4.9',
+			time: '1 week ago',
+			text: 'Zero pain, clean disposal kit used. Very comforting bedside manner.',
+		},
 	],
-	'gen2': [
-		{ name: 'Amit K.', rating: '5.0', time: '3 days ago', text: 'Prompt IV administration. Nurse was very skilled and found the vein in one go.' },
-		{ name: 'Meera S.', rating: '4.5', time: '2 weeks ago', text: 'Extremely polite nurse. Checked my vitals before and after the IV infusion.' }
+	'gen-wound': [
+		{
+			name: 'Amit G.',
+			rating: '5.0',
+			time: 'Yesterday',
+			text: 'Sterile surgical dressing done with great care. Saved us a clinic visit.',
+		},
+		{
+			name: 'Meera P.',
+			rating: '4.8',
+			time: '3 days ago',
+			text: 'Very thorough diabetic foot ulcer care. Highly recommend.',
+		},
 	],
-	'gen3': [
-		{ name: 'Karan A.', rating: '5.0', time: 'Yesterday', text: 'Quick vitals and sugar check. Very convenient for elderly parents at home.' }
-	]
+	'hc-bath': [
+		{
+			name: 'Sunita M.',
+			rating: '5.0',
+			time: '3 days ago',
+			text: 'Caregiver was very patient and gentle with my elderly mother.',
+		},
+		{
+			name: 'Ramesh T.',
+			rating: '4.9',
+			time: '1 week ago',
+			text: 'Excellent hygiene assistance, very polite and punctual.',
+		},
+	],
 }
 
 const DEFAULT_REVIEWS: ReviewItem[] = [
-	{ name: 'Rajesh S.', rating: '5.0', time: '3 days ago', text: 'Excellent healthcare professional. Very thorough and answered all our questions patiently.' },
-	{ name: 'Anjali V.', rating: '4.8', time: '1 week ago', text: 'Highly satisfied with the treatment. Safe and hygienic protocols were followed.' }
+	{
+		name: 'Priya Sharma',
+		rating: '5.0',
+		time: '2 days ago',
+		text: 'Caregiver arrived right on time and provided excellent, respectful care.',
+	},
+	{
+		name: 'Anjali V.',
+		rating: '4.8',
+		time: '1 week ago',
+		text: 'Highly satisfied with the treatment. Safe and hygienic protocols were followed.',
+	},
 ]
 
 const parseWhatsIncluded = (raw: any): string[] => {
 	if (!raw) return []
 	if (Array.isArray(raw)) {
-		return raw
-			.map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
-			.filter(Boolean)
+		return raw.map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim())).filter(Boolean)
 	}
 	if (typeof raw === 'string') {
 		const trimmed = raw.trim()
@@ -101,11 +139,7 @@ export const ServiceDetailsSheet: React.FC<ServiceDetailsSheetProps> = ({
 		onClose()
 	}
 
-	const aboutText =
-		service.about_service?.trim() ||
-		service.aboutService?.trim() ||
-		service.description?.trim() ||
-		''
+	const aboutText = service.about_service?.trim() || service.aboutService?.trim() || service.description?.trim() || ''
 
 	const includedList = parseWhatsIncluded(service.whats_included ?? service.whatsIncluded)
 
@@ -123,13 +157,8 @@ export const ServiceDetailsSheet: React.FC<ServiceDetailsSheetProps> = ({
 			maxHeightRatio={0.85}
 			footer={
 				<View style={[styles.ctaContainer, isTablet && styles.containerTablet]}>
-					<AppButton
-						variant="primary"
-						formAction
-						style={styles.addBtn}
-						onPress={handleAdd}
-					>
-						Book Service
+					<AppButton variant="primary" formAction style={styles.addBtn} onPress={handleAdd}>
+						{actionButtonText}
 					</AppButton>
 				</View>
 			}
@@ -153,15 +182,17 @@ export const ServiceDetailsSheet: React.FC<ServiceDetailsSheetProps> = ({
 					{service.title || (service as any).label || (service as any).name || ''}
 				</AppTypography>
 
-				{/* 3. Price Summary Pill */}
-				<View style={styles.infoPillRow}>
-					<View style={styles.infoPill}>
-						<Ionicons name="pricetag-outline" size={16} color="#1F5F68" />
-						<AppTypography variant="caption" style={styles.infoPillText}>
-							{service.price}
-						</AppTypography>
+				{/* 3. Price Summary Pill (Only if non-empty price exists) */}
+				{Boolean(service.price && service.price.trim()) && (
+					<View style={styles.infoPillRow}>
+						<View style={styles.infoPill}>
+							<Ionicons name="pricetag-outline" size={16} color="#1F5F68" />
+							<AppTypography variant="caption" style={styles.infoPillText}>
+								{service.price}
+							</AppTypography>
+						</View>
 					</View>
-				</View>
+				)}
 
 				{/* 4. About Service */}
 				{aboutText ? (
