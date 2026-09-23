@@ -88,6 +88,55 @@ export const getRoles = async (): Promise<VerifyRolesResponse> => {
 	return res.data
 }
 
+export interface RefreshTokenResponse {
+	success: boolean
+	message: string
+	data: {
+		user: VerifyOtpUser
+		access_token: string
+		refresh_token: string
+		token_type: string
+		expires_in: number
+		notification_prompt_shown?: boolean
+	}
+}
+
+/**
+ * Exchange a refresh token for a new access/refresh token pair. The backend
+ * rotates the refresh token on every use (the old one is invalidated), so
+ * callers must persist BOTH tokens from the response, not just the access
+ * token.
+ *
+ * For manual/explicit calls only -- apiService.ts's own 401-retry logic
+ * makes an unintercepted raw request instead, to avoid recursing back into
+ * this same response interceptor if the refresh call itself gets a 401.
+ */
+export const refreshAccessToken = async (
+	refreshToken: string
+): Promise<RefreshTokenResponse> => {
+	const res = await ApiService.post<RefreshTokenResponse>(API_ENDPOINTS.AUTH.REFRESH, {
+		refresh_token: refreshToken,
+	})
+	return res.data
+}
+
+export interface LogoutResponse {
+	success: boolean
+	message: string
+}
+
+/**
+ * Invalidate the current session's refresh token server-side. Callers
+ * should still clear local auth state even if this fails (e.g. offline) --
+ * losing the ability to revoke server-side shouldn't block a local logout.
+ */
+export const logout = async (refreshToken: string): Promise<LogoutResponse> => {
+	const res = await ApiService.post<LogoutResponse>(API_ENDPOINTS.AUTH.LOGOUT, {
+		refresh_token: refreshToken,
+	})
+	return res.data
+}
+
 export const createUser = async (data: CreateUserRequest): Promise<VerifyUserCreationResponse> => {
 	const res = await ApiService.post<VerifyUserCreationResponse>(API_ENDPOINTS.AUTH.CREATE_USER, data)
 	return res.data

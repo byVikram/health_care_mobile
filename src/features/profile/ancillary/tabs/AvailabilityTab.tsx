@@ -1,21 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
 	AppStickyFooter,
-	AppToggle,
 	AppTypography,
 	StatusModal,
 	WorkingHoursSection,
 	SECTION_META,
-	createWorkingHoursState,
 	type WorkingDayKey,
 	type SectionSlots,
 	type WorkingHoursState,
 } from '../../../../components/common'
 import {
 	saveProviderWeeklyAvailability,
-	saveProviderDateOverride,
+	fetchProviderWeeklyAvailabilityBackend,
 	ProviderAvailabilityDay,
 } from '../../../ancillary/ancillaryService'
 
@@ -28,25 +25,26 @@ interface NurseAvailabilityData {
 	weeklyWorkingHours: Record<WorkingDayKey, WorkingHoursState>
 }
 
-const STORAGE_KEY = 'ancillary_availability_v2'
-
 const PRIMARY = '#2B6F71'
 
-const createWeeklyWorkingHours = (): Record<WorkingDayKey, WorkingHoursState> => ({
-	sunday: createWorkingHoursState(),
-	monday: createWorkingHoursState(),
-	tuesday: createWorkingHoursState(),
-	wednesday: createWorkingHoursState(),
-	thursday: createWorkingHoursState(),
-	friday: createWorkingHoursState(),
-	saturday: createWorkingHoursState(),
+const createEmptyWorkingHoursState = (): WorkingHoursState => ({
+	sections: {
+		morning: [],
+		afternoon: [],
+		evening: [],
+	},
+	slotDuration: 30,
 })
 
-const DEFAULT_DATA: NurseAvailabilityData = {
-	isAvailable: true,
-	weeklyWorkingHours: createWeeklyWorkingHours(),
-}
-
+const createEmptyWeeklyWorkingHours = (): Record<WorkingDayKey, WorkingHoursState> => ({
+	sunday: createEmptyWorkingHoursState(),
+	monday: createEmptyWorkingHoursState(),
+	tuesday: createEmptyWorkingHoursState(),
+	wednesday: createEmptyWorkingHoursState(),
+	thursday: createEmptyWorkingHoursState(),
+	friday: createEmptyWorkingHoursState(),
+	saturday: createEmptyWorkingHoursState(),
+})
 
 export default function AvailabilityTab({
 	isActive = true,
@@ -67,10 +65,15 @@ export default function AvailabilityTab({
 
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
-	const [isAvailable, setIsAvailable] = useState(DEFAULT_DATA.isAvailable)
+	const [isAvailable, setIsAvailable] = useState(false)
 	const [selectedWorkingDay, setSelectedWorkingDay] = useState<WorkingDayKey>('monday')
-	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState(DEFAULT_DATA.weeklyWorkingHours)
-	const savedDataRef = useRef<NurseAvailabilityData>(DEFAULT_DATA)
+	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState<Record<WorkingDayKey, WorkingHoursState>>(
+		createEmptyWeeklyWorkingHours
+	)
+	const savedDataRef = useRef<NurseAvailabilityData>({
+		isAvailable: false,
+		weeklyWorkingHours: createEmptyWeeklyWorkingHours(),
+	})
 	const [statusModal, setStatusModal] = useState<{
 		visible: boolean
 		status: 'success' | 'error' | 'info'
@@ -82,21 +85,69 @@ export default function AvailabilityTab({
 		const loadAvailability = async () => {
 			try {
 				setLoading(true)
-				const stored = await AsyncStorage.getItem(STORAGE_KEY)
-				const parsed: NurseAvailabilityData = stored ? JSON.parse(stored) : DEFAULT_DATA
-				// Guard against a stored payload missing a day (e.g. schema changed).
-				const normalized: NurseAvailabilityData = {
-					isAvailable: parsed.isAvailable ?? true,
-					weeklyWorkingHours: {
-						...createWeeklyWorkingHours(),
-						...parsed.weeklyWorkingHours,
-					},
+
+				// Initialize UI with empty working hours without fabricating default slots
+				const initialHours = createEmptyWeeklyWorkingHours()
+
+				// Fetch authoritative schedules from Backend API
+				const backendSchedules = await fetchProviderWeeklyAvailabilityBackend()
+
+				const dayMap: Record<ProviderAvailabilityDay['day_of_week'], WorkingDayKey> = {
+					MONDAY: 'monday',
+					TUESDAY: 'tuesday',
+					WEDNESDAY: 'wednesday',
+					THURSDAY: 'thursday',
+					FRIDAY: 'friday',
+					SATURDAY: 'saturday',
+					SUNDAY: 'sunday',
 				}
-				setIsAvailable(normalized.isAvailable)
-				setWeeklyWorkingHours(normalized.weeklyWorkingHours)
-				savedDataRef.current = normalized
+
+				if (Array.isArray(backendSchedules)) {
+					backendSchedules.forEach((item) => {
+						const dayKey = dayMap[item.day_of_week]
+						const isDayAvailable = item.is_available
+
+						if (dayKey && isDayAvailable && item.start_time && item.end_time) {
+							const sTime = item.start_time
+							const eTime = item.end_time
+							const startHour = Number(sTime.split(':')[0])
+
+							if (!Number.isNaN(startHour)) {
+								if (startHour < 12) {
+									initialHours[dayKey].sections.morning = [{ start: sTime, end: eTime }]
+								} else if (startHour < 17) {
+									initialHours[dayKey].sections.afternoon = [{ start: sTime, end: eTime }]
+								} else {
+									initialHours[dayKey].sections.evening = [{ start: sTime, end: eTime }]
+								}
+							}
+
+							if (typeof item.slot_duration_mins === 'number' && item.slot_duration_mins > 0) {
+								initialHours[dayKey].slotDuration = item.slot_duration_mins
+							}
+						}
+					})
+				}
+
+				const hasAvailability =
+					Array.isArray(backendSchedules) &&
+					backendSchedules.some((item) => item.is_available && item.start_time && item.end_time)
+
+				const authoritativeData: NurseAvailabilityData = {
+					isAvailable: hasAvailability,
+					weeklyWorkingHours: initialHours,
+				}
+				setIsAvailable(hasAvailability)
+				setWeeklyWorkingHours(authoritativeData.weeklyWorkingHours)
+				savedDataRef.current = authoritativeData
 			} catch (e) {
 				console.log('[Nurse AvailabilityTab] failed to load availability:', e)
+				setStatusModal({
+					visible: true,
+					status: 'error',
+					title: 'Load Failed',
+					description: 'Unable to load availability schedule. Please try again.',
+				})
 			} finally {
 				setLoading(false)
 			}
@@ -192,9 +243,6 @@ export default function AvailabilityTab({
 	const handleSave = async () => {
 		try {
 			setSaving(true)
-			const payload: NurseAvailabilityData = { isAvailable, weeklyWorkingHours }
-			await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-			savedDataRef.current = payload
 
 			// Format weekly availabilities payload for Phase 1 Backend API
 			const daysMap: Record<WorkingDayKey, ProviderAvailabilityDay['day_of_week']> = {
@@ -207,27 +255,36 @@ export default function AvailabilityTab({
 				sunday: 'SUNDAY',
 			}
 
-			const availabilities: ProviderAvailabilityDay[] = (Object.keys(weeklyWorkingHours) as WorkingDayKey[]).map((dayKey) => {
+			const availabilities: ProviderAvailabilityDay[] = []
+
+			for (const dayKey of Object.keys(weeklyWorkingHours) as WorkingDayKey[]) {
 				const dayData = weeklyWorkingHours[dayKey]
-				const hasSlots = Boolean(
-					dayData?.sections.morning?.length ||
-					dayData?.sections.afternoon?.length ||
-					dayData?.sections.evening?.length
-				)
-				const isDayAvail = isAvailable && hasSlots
-				const morningSlot = dayData.sections.morning?.[0]
-				return {
-					day_of_week: daysMap[dayKey],
-					is_available: isDayAvail,
-					start_time: morningSlot?.start || '09:00',
-					end_time: morningSlot?.end || '17:00',
-					slot_duration_mins: dayData.slotDuration || 30,
-					break_start_time: '13:00',
-					break_end_time: '14:00',
+				const allSlots = [
+					...(dayData?.sections.morning || []),
+					...(dayData?.sections.afternoon || []),
+					...(dayData?.sections.evening || []),
+				]
+
+				if (allSlots.length > 0) {
+					const firstSlot = allSlots[0]
+					const lastSlot = allSlots[allSlots.length - 1]
+					if (firstSlot?.start && lastSlot?.end) {
+						availabilities.push({
+							day_of_week: daysMap[dayKey],
+							start_time: firstSlot.start,
+							end_time: lastSlot.end,
+							slot_duration_mins: dayData?.slotDuration || 30,
+						})
+					}
 				}
-			})
+			}
 
 			await saveProviderWeeklyAvailability({ availabilities })
+
+			// Update savedDataRef only after backend save succeeds
+			const hasSavedSlots = availabilities.length > 0
+			setIsAvailable(hasSavedSlots)
+			savedDataRef.current = { isAvailable: hasSavedSlots, weeklyWorkingHours }
 
 			setStatusModal({
 				visible: true,
@@ -239,9 +296,9 @@ export default function AvailabilityTab({
 			console.log('[Nurse AvailabilityTab] failed to save availability:', e)
 			setStatusModal({
 				visible: true,
-				status: 'info',
-				title: 'Schedule Saved',
-				description: 'Availability saved locally.',
+				status: 'error',
+				title: 'Save Failed',
+				description: 'Unable to save availability. Please try again.',
 			})
 		} finally {
 			setSaving(false)
@@ -268,37 +325,10 @@ export default function AvailabilityTab({
 				keyboardShouldPersistTaps="handled"
 			>
 				<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
-					{/* ── Availability status ── */}
+					{/* ── Working hours ── */}
 					<View style={styles.card}>
 						<AppTypography variant="h4" style={styles.title}>
-							Availability
-						</AppTypography>
-
-						<AppTypography variant="body" style={styles.subtitle}>
-							Set your availability status to let patients know whether you are currently available for
-							bookings.
-						</AppTypography>
-
-						<View style={styles.toggleRow}>
-							<AppTypography variant="body" style={styles.toggleLabel}>
-								{isAvailable ? "I'm Available" : "I'm not Available"}
-							</AppTypography>
-							<AppToggle
-								value={isAvailable}
-								onValueChange={setIsAvailable}
-								showStatusText={false}
-								size="small"
-								activeColor={PRIMARY}
-								inactiveColor="#d8e0ea"
-								accessibilityLabel="I'm Available"
-							/>
-						</View>
-					</View>
-
-					{/* ── Optional working hours (reuses the doctor-profile working-hours UI) ── */}
-					<View style={styles.card}>
-						<AppTypography variant="h4" style={styles.title}>
-							Working Hours (Optional)
+							Working Hours
 						</AppTypography>
 						<AppTypography variant="body" style={styles.subtitle}>
 							Define specific days and time intervals when you are available. This is optional if you
@@ -391,15 +421,5 @@ const styles = StyleSheet.create({
 	},
 	footerContent: {
 		width: '100%',
-	},
-	toggleRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		gap: 12,
-	},
-	toggleLabel: {
-		color: '#1f2b33',
-		fontWeight: '600',
 	},
 })

@@ -31,27 +31,11 @@ const defaultDate = () => {
 	return date
 }
 
-const getDateFromDisplayValue = (value: string) => {
-	const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/)
-	if (!match) return null
-
-	const day = Number(match[1])
-	const month = Number(match[2]) - 1
-	const year = Number(match[3])
-	const date = new Date(year, month, day, 12, 0, 0, 0)
-
-	if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null
-
-	return date
-}
-
-const formatDisplayValue = (date: Date) =>
-	`${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`
-
 const toIsoDate = (val: string): string => {
 	if (!val) return ''
-	if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val
-	const match = val.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+	const trimmed = val.trim()
+	if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+	const match = trimmed.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
 	if (match) {
 		const day = match[1].padStart(2, '0')
 		const month = match[2].padStart(2, '0')
@@ -63,15 +47,44 @@ const toIsoDate = (val: string): string => {
 
 const fromIsoDate = (isoVal: string): string => {
 	if (!isoVal) return ''
-	const match = isoVal.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
-	if (match) {
-		const year = match[1]
-		const month = match[2].padStart(2, '0')
-		const day = match[3].padStart(2, '0')
+	const trimmed = isoVal.trim()
+	const matchIso = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+	if (matchIso) {
+		const year = matchIso[1]
+		const month = matchIso[2].padStart(2, '0')
+		const day = matchIso[3].padStart(2, '0')
+		return `${day}-${month}-${year}`
+	}
+	const matchDisplay = trimmed.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+	if (matchDisplay) {
+		const day = matchDisplay[1].padStart(2, '0')
+		const month = matchDisplay[2].padStart(2, '0')
+		const year = matchDisplay[3]
 		return `${day}-${month}-${year}`
 	}
 	return isoVal
 }
+
+const getDateFromDisplayValue = (value: string) => {
+	if (!value) return null
+	const iso = toIsoDate(value)
+	if (!iso) return null
+
+	const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+	if (!match) return null
+
+	const year = Number(match[1])
+	const month = Number(match[2]) - 1
+	const day = Number(match[3])
+	const date = new Date(year, month, day, 12, 0, 0, 0)
+
+	if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null
+
+	return date
+}
+
+const formatDisplayValue = (date: Date) =>
+	`${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`
 
 const formatDateToIso = (date: Date): string => {
 	const year = date.getFullYear()
@@ -126,9 +139,11 @@ export const AppCalendar = ({
 		}
 		return resolvedDefaultDate
 	})
-	const displayValue = value || placeholder
+	const displayValue = value ? fromIsoDate(value) || value : placeholder
 
 	const openPicker = () => {
+		console.log('[DOB] Current state:', value)
+		console.log('[DOB] Calendar opened')
 		const parsed = getDateFromDisplayValue(value)
 		let nextDate = parsed || resolvedDefaultDate
 		if (resolvedMaxDate && nextDate > resolvedMaxDate) nextDate = resolvedMaxDate
@@ -146,6 +161,7 @@ export const AppCalendar = ({
 
 		if (event.type === 'dismissed' || !selectedDate) return
 
+		console.log('[DOB] Selected date:', selectedDate)
 		let normalizedDate = new Date(selectedDate)
 		normalizedDate.setHours(12, 0, 0, 0)
 		if (resolvedMaxDate && normalizedDate > resolvedMaxDate) {
@@ -155,8 +171,10 @@ export const AppCalendar = ({
 			normalizedDate = resolvedMinDate
 		}
 
+		const formatted = formatDisplayValue(normalizedDate)
+		console.log('[DOB] New DOB:', formatted)
 		setPickerDate(normalizedDate)
-		onChange(formatDisplayValue(normalizedDate))
+		onChange(formatted)
 	}
 
 	const picker = (
@@ -251,11 +269,24 @@ export const AppCalendar = ({
 						max: maxIso,
 						min: minIso,
 						className: `app-calendar-date-input ${!value ? 'is-placeholder' : ''}`,
+						onClick: (e: any) => {
+							console.log('[DOB] Current state:', value)
+							console.log('[DOB] Calendar opened')
+							try {
+								e?.currentTarget?.showPicker?.()
+							} catch {}
+						},
 						onChange: (e: any) => {
 							const next = e?.target?.value
+							console.log('[DOB] Web input changed:', next)
+							console.log('[DOB] Selected date:', next)
 							if (next) {
-								onChange(fromIsoDate(next))
-							} else {
+								const formatted = fromIsoDate(next)
+								console.log('[DOB] New DOB:', formatted)
+								onChange(formatted)
+							} else if (e?.target?.value === '') {
+								// User explicitly cleared the date field
+								console.log('[DOB] New DOB: (cleared)')
 								onChange('')
 							}
 						},

@@ -1,11 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import {
+	ActivityIndicator,
+	ScrollView,
+	StyleSheet,
+	View,
+	useWindowDimensions,
+} from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppButton, AppTypography } from '../../../../components/common'
 import {
 	fetchAncillaryHierarchyBackend,
-	fetchProviderProfileBackend,
+	fetchProviderProfile,
 	AncillaryHierarchySubspecialty,
 } from '../../../ancillary/ancillaryService'
 
@@ -39,6 +45,9 @@ export default function ServicesAndProceduresView({
 	isActive,
 	onNextTab,
 }: ServicesAndProceduresViewProps) {
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
+
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [subspecialtyNode, setSubspecialtyNode] = useState<AncillaryHierarchySubspecialty | null>(null)
@@ -61,13 +70,8 @@ export default function ServicesAndProceduresView({
 				}
 				if (!targetSubId) {
 					try {
-						const prof = await fetchProviderProfileBackend()
-						targetSubId =
-							prof?.subspecialty_id ||
-							(prof as any)?.sub_specialty_id ||
-							prof?.subspecialty?.id ||
-							(prof as any)?.sub_specialty?.id ||
-							undefined
+						const prof = await fetchProviderProfile()
+						targetSubId = prof?.sub_specialty_id ?? undefined
 					} catch (e) {}
 				}
 
@@ -108,7 +112,7 @@ export default function ServicesAndProceduresView({
 	if (loading) {
 		return (
 			<View style={styles.centerBlock}>
-				<ActivityIndicator size="small" color="#2B6F71" />
+				<ActivityIndicator size="small" color="#004D40" />
 				<AppTypography variant="caption" style={styles.centerText}>
 					Loading services and procedures...
 				</AppTypography>
@@ -118,9 +122,9 @@ export default function ServicesAndProceduresView({
 
 	if (error) {
 		return (
-			<View style={styles.centerBlock}>
-				<MaterialCommunityIcons name="alert-circle-outline" size={24} color="#B45309" />
-				<AppTypography variant="caption" style={styles.centerText}>
+			<View style={[styles.centerBlock, styles.errorBlock]}>
+				<MaterialCommunityIcons name="alert-circle-outline" size={26} color="#DC2626" />
+				<AppTypography variant="caption" style={styles.errorText}>
 					{error}
 				</AppTypography>
 			</View>
@@ -130,7 +134,9 @@ export default function ServicesAndProceduresView({
 	if (!activeSubId && !subspecialtyNode) {
 		return (
 			<View style={styles.centerBlock}>
-				<MaterialCommunityIcons name="information-outline" size={26} color="#64748B" />
+				<View style={styles.emptyIconWrap}>
+					<MaterialCommunityIcons name="information-outline" size={28} color="#0D9488" />
+				</View>
 				<AppTypography variant="body" style={styles.emptyTitle}>
 					No Specialization Selected
 				</AppTypography>
@@ -144,230 +150,411 @@ export default function ServicesAndProceduresView({
 
 	if (!subspecialtyNode || subspecialtyNode.categories.length === 0) {
 		return (
-			<View style={styles.container}>
-				{subspecialtyNode ? (
-					<View style={styles.subspecialtyBanner}>
-						<View style={styles.bannerIconWrap}>
-							<MaterialCommunityIcons name="stethoscope" size={20} color="#0c7c7c" />
+			<ScrollView
+				style={styles.scrollContainer}
+				contentContainerStyle={styles.contentContainer}
+				showsVerticalScrollIndicator={false}
+			>
+				<View style={[styles.innerContainer, isTablet && styles.innerContainerTablet]}>
+					{subspecialtyNode ? (
+						<View style={styles.specializationCard}>
+							<View style={styles.specializationLeft}>
+								<View style={styles.specializationIconWrapper}>
+									<MaterialCommunityIcons name="stethoscope" size={26} color="#004D40" />
+								</View>
+								<View style={styles.specializationInfo}>
+									<View style={styles.specializationTagRow}>
+										<AppTypography variant="caption" style={styles.specializationHeaderTag}>
+											SELECTED SPECIALIZATION
+										</AppTypography>
+										<View style={styles.primaryPill}>
+											<AppTypography variant="caption" style={styles.primaryPillText}>
+												Primary
+											</AppTypography>
+										</View>
+									</View>
+									<AppTypography variant="h3" style={styles.specializationTitle}>
+										{subspecialtyNode.label}
+									</AppTypography>
+								</View>
+							</View>
 						</View>
-						<View style={{ flex: 1 }}>
-							<AppTypography variant="caption" style={styles.subspecialtyHeaderTag}>
-								Selected Specialization
-							</AppTypography>
-							<AppTypography variant="subtitle" style={styles.subspecialtyBannerText}>
-								{subspecialtyNode.label}
-							</AppTypography>
+					) : null}
+					<View style={styles.centerBlock}>
+						<View style={styles.emptyIconWrap}>
+							<MaterialCommunityIcons name="clipboard-text-outline" size={28} color="#64748B" />
 						</View>
+						<AppTypography variant="body" style={styles.emptyTitle}>
+							No Procedures Configured
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.centerText}>
+							No clinical procedures are configured yet for this specialization.
+						</AppTypography>
 					</View>
-				) : null}
-				<View style={styles.centerBlock}>
-					<MaterialCommunityIcons name="clipboard-text-outline" size={26} color="#64748B" />
-					<AppTypography variant="body" style={styles.emptyTitle}>
-						No Procedures Configured
-					</AppTypography>
-					<AppTypography variant="caption" style={styles.centerText}>
-						No clinical procedures are configured yet for this specialization.
-					</AppTypography>
 				</View>
-			</View>
+			</ScrollView>
 		)
 	}
 
 	return (
-		<View style={styles.container}>
-			{/* Specialization / Sub-specialty Banner */}
-			<View style={styles.subspecialtyBanner}>
-				<View style={styles.bannerIconWrap}>
-					<MaterialCommunityIcons name="stethoscope" size={20} color="#0c7c7c" />
-				</View>
-				<View style={{ flex: 1 }}>
-					<AppTypography variant="caption" style={styles.subspecialtyHeaderTag}>
-						Selected Specialization
-					</AppTypography>
-					<AppTypography variant="subtitle" style={styles.subspecialtyBannerText}>
-						{subspecialtyNode.label}
-					</AppTypography>
-				</View>
-			</View>
-
-			{/* Categories and Procedures */}
-			<View style={styles.categorySections}>
-				{subspecialtyNode.categories.map((category) => (
-					<View key={category.id} style={styles.categoryBlock}>
-						<View style={styles.categoryTitleRow}>
-							<View style={{ flex: 1 }}>
-								<AppTypography variant="h4" style={styles.categoryHeaderTitle}>
-									{category.label}
+		<ScrollView
+			style={styles.scrollContainer}
+			contentContainerStyle={styles.contentContainer}
+			showsVerticalScrollIndicator={false}
+		>
+			<View style={[styles.innerContainer, isTablet && styles.innerContainerTablet]}>
+				{/* Selected Specialization Card */}
+				<View style={styles.specializationCard}>
+					<View style={styles.specializationLeft}>
+						<View style={styles.specializationIconWrapper}>
+							<MaterialCommunityIcons name="stethoscope" size={26} color="#004D40" />
+						</View>
+						<View style={styles.specializationInfo}>
+							<View style={styles.specializationTagRow}>
+								<AppTypography variant="caption" style={styles.specializationHeaderTag}>
+									SELECTED SPECIALIZATION
 								</AppTypography>
+								<View style={styles.primaryPill}>
+									<AppTypography variant="caption" style={styles.primaryPillText}>
+										Primary
+									</AppTypography>
+								</View>
 							</View>
-							<AppTypography variant="caption" style={styles.categoryCountBadge}>
-								{category.procedures.length} procedure{category.procedures.length === 1 ? '' : 's'}
+							<AppTypography variant="h3" style={styles.specializationTitle}>
+								{subspecialtyNode.label}
 							</AppTypography>
 						</View>
+					</View>
+				</View>
 
-						<View style={styles.proceduresList}>
-							{category.procedures.map((proc) => (
-								<View key={proc.id} style={styles.procedureRow}>
-									<View style={styles.procedureIconBadge}>
-										<MaterialCommunityIcons name="check-circle-outline" size={18} color="#2B6F71" />
-									</View>
-									<View style={styles.procedureTextContainer}>
-										<AppTypography variant="body" style={styles.procedureLabel}>
-											{proc.label}
+				{/* Categories and Procedures Section */}
+				<View style={styles.categorySections}>
+					{subspecialtyNode.categories.map((category) => (
+						<View key={category.id} style={styles.categoryCard}>
+							{/* Category Header */}
+							<View style={styles.categoryHeader}>
+								<View style={styles.categoryHeaderLeft}>
+									<View style={styles.categoryDot} />
+									<View style={styles.categoryTitleContainer}>
+										<AppTypography variant="h4" style={styles.categoryHeaderTitle}>
+											{category.label}
 										</AppTypography>
-										{proc.aboutService ? (
-											<AppTypography variant="caption" style={styles.procedureSubtitle}>
-												{proc.aboutService}
-											</AppTypography>
-										) : null}
+										<AppTypography variant="caption" style={styles.categorySubtitle}>
+											Standard clinical procedures and modalities covered under this specialty.
+										</AppTypography>
 									</View>
 								</View>
-							))}
-						</View>
-					</View>
-				))}
-			</View>
+								<View style={styles.categoryCountBadge}>
+									<View style={styles.countBadgeDot} />
+									<AppTypography variant="caption" style={styles.categoryCountText}>
+										{category.procedures.length} procedure{category.procedures.length === 1 ? '' : 's'} included
+									</AppTypography>
+								</View>
+							</View>
 
-			{onNextTab ? (
-				<View style={styles.footerRow}>
-					<AppButton
-						variant="primary"
-						onPress={onNextTab}
-						style={styles.continueBtn}
-					>
-						Continue to Availability -&gt;
-					</AppButton>
+							<View style={styles.categoryDivider} />
+
+							{/* Procedures Interactive/Read-only List */}
+							<View style={styles.proceduresList}>
+								{category.procedures.map((proc) => (
+									<View key={proc.id} style={styles.procedureCard}>
+										<View style={styles.procedureIconBadge}>
+											<MaterialCommunityIcons name="shield-check-outline" size={16} color="#0D9488" />
+										</View>
+										<View style={styles.procedureTextContainer}>
+											<AppTypography variant="body" style={styles.procedureLabel}>
+												{proc.label}
+											</AppTypography>
+											{proc.aboutService ? (
+												<AppTypography variant="caption" style={styles.procedureSubtitle}>
+													{proc.aboutService}
+												</AppTypography>
+											) : null}
+										</View>
+									</View>
+								))}
+							</View>
+						</View>
+					))}
 				</View>
-			) : null}
-		</View>
+
+				{onNextTab ? (
+					<View style={styles.footerRow}>
+						<AppButton
+							variant="primary"
+							onPress={onNextTab}
+							style={styles.continueBtn}
+							labelStyle={styles.continueBtnLabel}
+						>
+							Continue
+						</AppButton>
+					</View>
+				) : null}
+			</View>
+		</ScrollView>
 	)
 }
 
 const styles = StyleSheet.create({
-	container: {
-		gap: 18,
+	scrollContainer: {
+		flex: 1,
+		backgroundColor: '#F8FAFC',
+	},
+	contentContainer: {
+		paddingHorizontal: 16,
+		paddingVertical: 20,
+		flexGrow: 1,
+	},
+	innerContainer: {
+		gap: 20,
+		width: '100%',
+	},
+	innerContainerTablet: {
+		maxWidth: 820,
+		alignSelf: 'center',
 	},
 	footerRow: {
-		marginTop: 10,
-		marginBottom: 24,
+		marginTop: 8,
+		marginBottom: 32,
 	},
 	continueBtn: {
 		backgroundColor: '#2B6F71',
+		borderRadius: 12,
+		height: 48,
+		justifyContent: 'center',
+	},
+	continueBtnLabel: {
+		fontSize: 15,
+		fontWeight: '600',
+		color: '#FFFFFF',
+		letterSpacing: 0.3,
 	},
 	centerBlock: {
 		alignItems: 'center',
 		justifyContent: 'center',
 		paddingVertical: 48,
 		paddingHorizontal: 24,
-		gap: 8,
-		backgroundColor: '#F8FAFB',
-		borderRadius: 12,
+		gap: 12,
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
-		marginVertical: 12,
+		marginVertical: 16,
+	},
+	errorBlock: {
+		backgroundColor: '#FEF2F2',
+		borderColor: '#FECACA',
+	},
+	emptyIconWrap: {
+		width: 48,
+		height: 48,
+		borderRadius: 24,
+		backgroundColor: '#F0FDFA',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: 4,
 	},
 	emptyTitle: {
 		fontWeight: '700',
-		color: '#1F2933',
-		fontSize: 15,
+		color: '#0F172A',
+		fontSize: 16,
 	},
 	centerText: {
 		textAlign: 'center',
-		color: '#4B5563',
+		color: '#64748B',
+		fontSize: 13,
+		lineHeight: 19,
+	},
+	errorText: {
+		textAlign: 'center',
+		color: '#DC2626',
 		fontSize: 13,
 		lineHeight: 18,
+		fontWeight: '500',
 	},
-	subspecialtyBanner: {
+	specializationCard: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 12,
-		backgroundColor: '#E6F4F2',
-		borderRadius: 12,
-		padding: 14,
+		justifyContent: 'space-between',
+		backgroundColor: '#F0FDFA',
+		borderRadius: 16,
+		padding: 18,
 		borderWidth: 1,
-		borderColor: '#B2DFDB',
+		borderColor: '#CCFBF1',
 	},
-	bannerIconWrap: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
+	specializationLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+		gap: 14,
+	},
+	specializationIconWrapper: {
+		width: 50,
+		height: 50,
+		borderRadius: 14,
 		backgroundColor: '#FFFFFF',
+		borderWidth: 1,
+		borderColor: '#CCFBF1',
 		alignItems: 'center',
 		justifyContent: 'center',
+		shadowColor: '#0D9488',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.06,
+		shadowRadius: 3,
+		elevation: 1,
 	},
-	subspecialtyHeaderTag: {
+	specializationInfo: {
+		flex: 1,
+	},
+	specializationTagRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginBottom: 4,
+	},
+	specializationHeaderTag: {
 		fontSize: 11,
-		color: '#00695C',
-		fontWeight: '600',
-		textTransform: 'uppercase',
-		letterSpacing: 0.5,
-	},
-	subspecialtyBannerText: {
-		fontSize: 15,
+		color: '#0F766E',
 		fontWeight: '700',
-		color: '#004D40',
+		textTransform: 'uppercase',
+		letterSpacing: 0.6,
+	},
+	primaryPill: {
+		backgroundColor: '#CCFBF1',
+		borderWidth: 1,
+		borderColor: '#99F6E4',
+		borderRadius: 10,
+		paddingHorizontal: 7,
+		paddingVertical: 1.5,
+	},
+	primaryPillText: {
+		fontSize: 10,
+		fontWeight: '700',
+		color: '#115E59',
+	},
+	specializationTitle: {
+		fontSize: 20,
+		fontWeight: '700',
+		color: '#0F172A',
+		letterSpacing: -0.2,
 	},
 	categorySections: {
 		gap: 20,
 	},
-	categoryBlock: {
+	categoryCard: {
 		backgroundColor: '#FFFFFF',
-		borderRadius: 12,
-		padding: 16,
+		borderRadius: 18,
+		padding: 20,
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.04,
+		shadowRadius: 6,
+		elevation: 1,
+	},
+	categoryHeader: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		justifyContent: 'space-between',
+		gap: 12,
+		flexWrap: 'wrap',
+	},
+	categoryHeaderLeft: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		flex: 1,
+		minWidth: 220,
 		gap: 10,
 	},
-	categoryTitleRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingBottom: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: '#F0F4F8',
+	categoryDot: {
+		width: 10,
+		height: 10,
+		borderRadius: 5,
+		backgroundColor: '#0D9488',
+		marginTop: 6,
+	},
+	categoryTitleContainer: {
+		flex: 1,
 	},
 	categoryHeaderTitle: {
-		color: '#1F2933',
-		fontSize: 15,
+		color: '#0F172A',
+		fontSize: 18,
 		fontWeight: '700',
+		letterSpacing: -0.2,
+	},
+	categorySubtitle: {
+		fontSize: 13,
+		color: '#64748B',
+		marginTop: 3,
+		lineHeight: 18,
 	},
 	categoryCountBadge: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#0c7c7c',
-		backgroundColor: 'rgba(12, 124, 124, 0.08)',
-		paddingHorizontal: 8,
-		paddingVertical: 2,
-		borderRadius: 10,
-	},
-	proceduresList: {
-		gap: 8,
-	},
-	procedureRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 10,
-		paddingHorizontal: 12,
-		backgroundColor: '#F8FAFB',
-		borderRadius: 8,
+		backgroundColor: '#F0FDFA',
+		borderWidth: 1,
+		borderColor: '#CCFBF1',
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderRadius: 14,
+		gap: 6,
+		alignSelf: 'flex-start',
+	},
+	countBadgeDot: {
+		width: 6,
+		height: 6,
+		borderRadius: 3,
+		backgroundColor: '#0D9488',
+	},
+	categoryCountText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#0F766E',
+	},
+	categoryDivider: {
+		height: 1,
+		backgroundColor: '#F1F5F9',
+		marginVertical: 16,
+	},
+	proceduresList: {
 		gap: 10,
 	},
+	procedureCard: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		paddingVertical: 14,
+		paddingHorizontal: 16,
+		backgroundColor: '#F8FAFC',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+		gap: 12,
+	},
 	procedureIconBadge: {
+		width: 26,
+		height: 26,
+		borderRadius: 13,
+		backgroundColor: '#F0FDFA',
+		borderWidth: 1,
+		borderColor: '#99F6E4',
 		alignItems: 'center',
 		justifyContent: 'center',
+		marginTop: 1,
 	},
 	procedureTextContainer: {
 		flex: 1,
 	},
 	procedureLabel: {
-		fontSize: 14,
-		color: '#1F2933',
+		fontSize: 15,
+		color: '#0F172A',
 		fontWeight: '600',
 	},
 	procedureSubtitle: {
-		fontSize: 12,
-		lineHeight: 16,
-		color: '#4B5F66',
-		marginTop: 2,
+		fontSize: 13,
+		lineHeight: 19,
+		color: '#475569',
+		marginTop: 3,
 	},
 })
+
