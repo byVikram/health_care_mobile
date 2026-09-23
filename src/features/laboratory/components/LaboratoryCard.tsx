@@ -1,6 +1,6 @@
 import React from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, ImageSourcePropType } from 'react-native'
-import { LaboratoryItem } from '../../laboratory/laboratory'
+import { LaboratoryItem } from '../laboratory'
 
 // Replace with your actual lab images
 import lab1 from '../../../assets/Laboratory/lab1.jpg'

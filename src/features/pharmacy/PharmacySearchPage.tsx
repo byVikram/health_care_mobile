@@ -12,8 +12,8 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
-import PharmacySearchCard from './component/PharmacyCard'
-import PharmacyFilters, { PharmacyFilterState } from './component/PharmacyFilters'
+import PharmacySearchCard from './components/PharmacyCard'
+import PharmacyFilters, { PharmacyFilterState } from './components/PharmacyFilters'
 import { PharmacyItem } from './pharmacy'
 import { getPharmacies } from '../profile/pharmacy/pharmacyService'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'

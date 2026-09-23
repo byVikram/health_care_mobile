@@ -375,7 +375,24 @@ export default function BookingDetailsPage() {
 			setSelectedNurse(null)
 			setAssignmentMode('SYSTEM_MATCH')
 		}
-	}, [routeParams.selectedNurse, routeParams.clearSelectedNurse])
+
+		if (routeParams.bookingType === 'SCHEDULED' && routeParams.scheduledStartTime) {
+			setBookingType('SCHEDULED')
+			setVisit((prev) => ({
+				...prev,
+				date: routeParams.scheduledDate || prev.date,
+				timeSlot: `${routeParams.scheduledStartTime} - ${routeParams.scheduledEndTime || ''}`,
+				timeBadge: 'Scheduled Slot Confirmed',
+			}))
+		}
+	}, [
+		routeParams.selectedNurse,
+		routeParams.clearSelectedNurse,
+		routeParams.bookingType,
+		routeParams.scheduledStartTime,
+		routeParams.scheduledDate,
+		routeParams.scheduledEndTime,
+	])
 
 	// Dynamic Charges Calculation
 	const procedureBaseFee = useMemo(() => {
@@ -801,11 +818,11 @@ export default function BookingDetailsPage() {
 											assignmentMode === 'SELECT_NURSE' && styles.nursePrefTitleSelected,
 										]}
 									>
-										Select a Previous Nurse
+										Select an Available Nurse
 									</AppTypography>
 								</View>
 								<AppTypography variant="caption" style={styles.nursePrefSub}>
-									Choose a nurse you have previously consulted with for personalized continuing care.
+									Browse nearby certified nurses and select a 30-minute booking slot.
 								</AppTypography>
 							</View>
 							<View

@@ -6,41 +6,155 @@ import {
 	StyleSheet,
 	TouchableOpacity,
 	View,
+	ActivityIndicator,
 	useWindowDimensions,
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { ROUTES } from '../../navigation/routes'
-import AppScreenHeader from '../../components/common/AppScreenHeader'
-import { AppTypography } from '../../components/common/AppTypography'
-import { AppButton } from '../../components/common/AppButton'
-import StatusModal from '../../components/common/StatusModal'
-import NurseMapTracker from './components/NurseMapTracker'
-import AppointmentTrackingTimeline, { TrackingStage } from './components/AppointmentTrackingTimeline'
-import RatingStars from './components/RatingStars'
-import RateAncillaryReviewModal from './components/RateAncillaryReviewModal'
-import ServiceMatchingPage from './patient/ServiceMatchingPage'
+import { ROUTES } from '../../../navigation/routes'
+import AppScreenHeader from '../../../components/common/AppScreenHeader'
+import { AppTypography } from '../../../components/common/AppTypography'
+import { AppButton } from '../../../components/common/AppButton'
+import StatusModal from '../../../components/common/StatusModal'
+import NurseMapTracker from '../components/NurseMapTracker'
+import AppointmentTrackingTimeline, { TrackingStage } from '../components/AppointmentTrackingTimeline'
+import RatingStars from '../components/RatingStars'
+import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
+import ServiceMatchingPage from './ServiceMatchingPage'
 import {
 	AncillaryBooking,
 	AncillaryReviewData,
 	fetchAncillaryReviewByBooking,
 	submitAncillaryReview,
 	cancelCareRequestPatientBackend,
-} from './ancillaryService'
-import CancellationDetailsModal from './patient/CancellationDetailsModal'
-import NursePulseRadarView from './components/NursePulseRadarView'
-import ApiService from '../../services/apiService'
-import { API_ENDPOINTS } from '../../constants/apiUrls'
+} from '../ancillaryService'
+import CancellationDetailsModal from './CancellationDetailsModal'
+import NursePulseRadarView from '../components/NursePulseRadarView'
+import ApiService from '../../../services/apiService'
+import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
+// ---------------------------------------------------------------------------
+// Types -- mirror the real backend response from
+// GET /api/ancillary/patient/requests/{id}/status (see
+// dispatch_service.get_service_request_status), which is also what every
+// WebSocket CARE_REQUEST_STATUS_CHANGE payload carries. Every field is
+// optional/nullable because the backend only fills them in once real data
+// exists (e.g. no provider fields until a provider is actually assigned).
+// ---------------------------------------------------------------------------
+export interface AncillaryProviderInfo {
+	id: string
+	name: string
+	role: string | null
+	specialization: string | null
+	licenseNumber: string | null
+	qualifications: string | null
+	experienceYears: number | null
+	rating: number | null
+	totalVisits: number | null
+	avatar: string | null
+	phone: string | null
+	currentLat: number | null
+	currentLng: number | null
+	heading?: number
+}
+
+export interface AncillaryProviderLocation {
+	latitude: number
+	longitude: number
+	heading?: number
+}
+
+export interface AncillaryTrackingResponse {
+	requestId?: string
+	status?: string
+	bookingType?: string
+	serviceName?: string
+	procedureDetails?: string
+	assignedProvider?: AncillaryProviderInfo | null
+	patientPublicId?: string | null
+	patientName?: string
+	patientPhone?: string
+	patientAge?: number
+	patientGender?: string
+	patientRelationship?: string
+	patientAvatar?: string | null
+	providerLocation?: AncillaryProviderLocation | null
+	streetAddress?: string
+	createdAt?: string
+	verificationOtp?: string | null
+	completionPin?: string | null
+	totalAmount?: number
+	etaMinutes?: number | null
+}
+
+// Role-neutral tracking stages -- Ancillary now covers Nursing, Physiotherapy,
+// and future specialties, so these must never say "Nurse". No fabricated
+// timestamps either: the backend does not currently persist per-stage
+// timestamps, so `time` is intentionally omitted rather than invented.
 const TRACKING_STAGES: TrackingStage[] = [
-	{ key: 'confirmed', label: 'Booking Confirmed', time: '09:00 AM' },
-	{ key: 'assigned', label: 'Nurse Assigned', time: '09:15 AM' },
-	{ key: 'on_the_way', label: 'Nurse En Route', time: 'Expected 10:30 AM' },
-	{ key: 'arrived', label: 'Nurse Arrived' },
+	{ key: 'confirmed', label: 'Booking Confirmed' },
+	{ key: 'assigned', label: 'Provider Assigned' },
+	{ key: 'on_the_way', label: 'Provider En Route' },
+	{ key: 'arrived', label: 'Provider Arrived' },
 	{ key: 'started', label: 'Service Started' },
 	{ key: 'completed', label: 'Service Completed' },
 ]
+
+// Mirrors the canonical status vocabulary defined by the backend
+// (app/models/ancillary.py AncillaryRequestStatus / *_STATUSES groups).
+const ASSIGNED_STATUSES = new Set([
+	'ASSIGNED',
+	'NURSE_ASSIGNED',
+	'EN_ROUTE',
+	'ARRIVED',
+	'IN_PROGRESS',
+	'VERIFICATION_PENDING',
+	'COMPLETED',
+])
+
+const SEARCHING_STATUSES = new Set([
+	'SEARCHING',
+	'SEARCHING_FOR_NURSE',
+	'SCHEDULED_PENDING',
+	'REQUESTED',
+	'OFFERED',
+	'PENDING',
+])
+const CANCELLED_STATUSES = new Set(['CANCELLED', 'CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED'])
+
+const hasConfirmedProvider = (prov?: AncillaryProviderInfo | null, st?: string): boolean => {
+	const statusUpper = String(st || '').toUpperCase()
+	return Boolean(prov?.id) && ASSIGNED_STATUSES.has(statusUpper)
+}
+
+const STAGE_INDEX_BY_STATUS: Record<string, number> = {
+	SEARCHING: 0,
+	SEARCHING_FOR_NURSE: 0,
+	SCHEDULED_PENDING: 0,
+	REQUESTED: 0,
+	OFFERED: 0,
+	ASSIGNED: 1,
+	NURSE_ASSIGNED: 1,
+	EN_ROUTE: 2,
+	ARRIVED: 3,
+	IN_PROGRESS: 4,
+	VERIFICATION_PENDING: 4,
+	COMPLETED: 5,
+}
+
+const STATUS_HEADLINES: Record<string, string> = {
+	ASSIGNED: 'Provider Assigned',
+	NURSE_ASSIGNED: 'Provider Assigned',
+	EN_ROUTE: 'Provider On The Way',
+	ARRIVED: 'Provider Has Arrived',
+	IN_PROGRESS: 'Service In Progress',
+	VERIFICATION_PENDING: 'Verifying Your Visit',
+}
+
+const statusHeadline = (status: string): string => STATUS_HEADLINES[status] || 'Tracking Your Appointment'
+
+const displayOrFallback = (value?: string | null): string => (value && value.trim() ? value : 'Not available')
 
 export default function TrackAppointmentPage() {
 	const navigation = useNavigation<any>()
@@ -50,7 +164,7 @@ export default function TrackAppointmentPage() {
 	const isTablet = width >= 768
 
 	const bookingData = route.params?.bookingData || {}
-	const bookingId = String(route.params?.bookingId || bookingData.id || 'BK-882419')
+	const bookingId = String(route.params?.bookingId || bookingData.id || bookingData.requestId || '')
 
 	// Review state
 	const [reviewData, setReviewData] = useState<AncillaryReviewData | null>(() => bookingData.review || null)
@@ -65,65 +179,89 @@ export default function TrackAppointmentPage() {
 		description: string
 	} | null>(null)
 
-	const [activeStageIndex, setActiveStageIndex] = useState<number>(
-		() => bookingData.activeStageIndex ?? 2
+	const initialHasConfirmed = hasConfirmedProvider(
+		bookingData.assignedProvider || bookingData.provider,
+		bookingData.status
 	)
-	const [liveStatus, setLiveStatus] = useState<string>(() => (bookingData.status || 'EN_ROUTE').toUpperCase())
-	const [liveNurse, setLiveNurse] = useState<any>(bookingData.provider || null)
-	const [liveOtp, setLiveOtp] = useState<string>(() => String(bookingData.verificationOtp || bookingData.otp || '4892'))
+
+	// True until the first HTTP status fetch resolves and verifies real backend provider
+	// assignment. If bookingData passed in already contains a confirmed assigned provider,
+	// we skip the spinner and render immediately.
+	const [isInitializing, setIsInitializing] = useState<boolean>(() => !initialHasConfirmed)
+
+	const [activeStageIndex, setActiveStageIndex] = useState<number>(() =>
+		bookingData.status ? STAGE_INDEX_BY_STATUS[String(bookingData.status).toUpperCase()] ?? 0 : 0
+	)
+	const [liveStatus, setLiveStatus] = useState<string>(() => String(bookingData.status || '').toUpperCase())
+	const liveStatusRef = React.useRef(liveStatus)
+	React.useEffect(() => {
+		liveStatusRef.current = liveStatus
+	}, [liveStatus])
+
+	const [liveProvider, setLiveProvider] = useState<AncillaryProviderInfo | null>(
+		bookingData.assignedProvider || bookingData.provider || null
+	)
+	const [liveOtp, setLiveOtp] = useState<string>(() => String(bookingData.verificationOtp || bookingData.otp || ''))
+	const [liveCompletionPin, setLiveCompletionPin] = useState<string>(() => String(bookingData.completionPin || ''))
+	const [liveEtaMinutes, setLiveEtaMinutes] = useState<number | null>(
+		() => (typeof bookingData.etaMinutes === 'number' ? bookingData.etaMinutes : null)
+	)
 	const [liveAddress, setLiveAddress] = useState<string>(
-		() => bookingData.streetAddress || bookingData.address || bookingData.appointment?.address || '42 Healthcare Avenue, Flat 3B, Sector 18'
+		() => bookingData.streetAddress || bookingData.address || bookingData.patientAddress || bookingData.appointment?.address || ''
 	)
 	const [liveDateTime, setLiveDateTime] = useState<string>(
-		() => bookingData.createdAt || bookingData.dateTime || bookingData.appointment?.dateTime || 'Today • 09:00 AM - 10:00 AM'
+		() => bookingData.createdAt || (bookingData.appointmentDate ? `${bookingData.appointmentDate} • ${bookingData.appointmentTime || ''}` : '') || bookingData.dateTime || bookingData.appointment?.dateTime || ''
 	)
 	const [liveServiceTitle, setLiveServiceTitle] = useState<string>(
-		() => bookingData.serviceName || bookingData.service || bookingData.appointment?.service || 'Wound Dressing & Sterile Care'
+		() => bookingData.serviceName || bookingData.service || bookingData.appointment?.service || ''
 	)
 
-	const nurse = liveNurse || bookingData.assignedProvider || bookingData.provider || {
-		id: 'n-prov-1',
-		name: 'Healthcare Specialist',
-		designation: 'Certified Care Professional',
-		avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=200',
-		phone: '+91 98765 43210',
-	}
+	// Dynamic, backend-driven provider -- never a fabricated placeholder
+	// object. `null` genuinely means "no assigned provider data available".
+	const provider: AncillaryProviderInfo | null =
+		liveProvider || bookingData.assignedProvider || bookingData.provider || null
 
-	const rating = Number(bookingData.rating ?? 4.9)
-	const reviewsCount = bookingData.reviewsCount ?? 142
-	const experienceYears = bookingData.experienceYears ?? 8
-	const etaMinutes = bookingData.etaMinutes ?? 15
+	const isAssigned = hasConfirmedProvider(provider, liveStatus)
 
 	React.useEffect(() => {
 		let ws: WebSocket | null = null
+		let isMounted = true
 
-		const updateStatusFromData = (data: any) => {
-			if (!data) return
+		const updateStatusFromData = (data: AncillaryTrackingResponse) => {
+			if (!data || !isMounted) return
 			const st = String(data.status || '').toUpperCase()
-			if (st) setLiveStatus(st)
-			if (data.assignedProvider) setLiveNurse(data.assignedProvider)
-			if (data.verificationOtp) setLiveOtp(String(data.verificationOtp))
-			if (data.streetAddress) setLiveAddress(data.streetAddress)
-			if (data.createdAt) setLiveDateTime(data.createdAt)
-			if (data.serviceName) setLiveServiceTitle(data.serviceName)
+			const currentProv = data.assignedProvider !== undefined ? data.assignedProvider : liveProvider
 
-			if (st === 'SEARCHING' || st === 'SEARCHING_FOR_NURSE') {
-				setActiveStageIndex(0)
+			if (!hasConfirmedProvider(currentProv, st) && st !== 'COMPLETED') {
 				navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 					bookingId,
 					serviceName: data.serviceName || liveServiceTitle,
 					addressText: data.streetAddress || liveAddress,
+					bookingPayload: bookingData,
 				})
-			} else if (st === 'ASSIGNED' || st === 'NURSE_ASSIGNED') {
-				setActiveStageIndex(1)
-			} else if (st === 'EN_ROUTE') {
-				setActiveStageIndex(2)
-			} else if (st === 'ARRIVED') {
-				setActiveStageIndex(3)
-			} else if (st === 'IN_PROGRESS') {
-				setActiveStageIndex(4)
-			} else if (st === 'COMPLETED') {
-				setActiveStageIndex(5)
+				return
+			}
+
+			if (st) {
+				setLiveStatus(st)
+				liveStatusRef.current = st
+			}
+			if (data.assignedProvider !== undefined) setLiveProvider(data.assignedProvider ?? null)
+			if (data.verificationOtp) setLiveOtp(String(data.verificationOtp))
+			else if ((data as any).otp) setLiveOtp(String((data as any).otp))
+			if (data.completionPin) setLiveCompletionPin(String(data.completionPin))
+			else if ((data as any).pin) setLiveCompletionPin(String((data as any).pin))
+			if (data.streetAddress) setLiveAddress(data.streetAddress)
+			else if ((data as any).address) setLiveAddress((data as any).address)
+			else if ((data as any).patientAddress) setLiveAddress((data as any).patientAddress)
+			if (data.createdAt) setLiveDateTime(data.createdAt)
+			else if ((data as any).appointmentDate) setLiveDateTime(`${(data as any).appointmentDate} • ${(data as any).appointmentTime || ''}`)
+			if (data.serviceName) setLiveServiceTitle(data.serviceName)
+			if (typeof data.etaMinutes === 'number') setLiveEtaMinutes(data.etaMinutes)
+			else if (data.etaMinutes === null) setLiveEtaMinutes(null)
+
+			if (st in STAGE_INDEX_BY_STATUS) {
+				setActiveStageIndex(STAGE_INDEX_BY_STATUS[st])
 			}
 		}
 
@@ -145,28 +283,69 @@ export default function TrackAppointmentPage() {
 			console.log('[TrackAppointmentPage] WS setup notice')
 		}
 
-		// Fetch Initial Status via HTTP on Mount
-		const fetchInitialStatus = async () => {
+		// Fetch Status via HTTP
+		const fetchStatus = async () => {
 			try {
 				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
-				const data = res.data?.data || res.data
+				const data: AncillaryTrackingResponse = res.data?.data || res.data
+				const st = String(data?.status || '').toUpperCase()
+				const prov = data?.assignedProvider || null
+
+				if (!hasConfirmedProvider(prov, st) && st !== 'COMPLETED') {
+					// Provider is NOT assigned yet according to backend.
+					// Route back to the existing provider search/selection page.
+					navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
+						bookingId,
+						serviceName: data?.serviceName || liveServiceTitle,
+						addressText: data?.streetAddress || liveAddress,
+						bookingPayload: bookingData,
+					})
+					return
+				}
+
 				updateStatusFromData(data)
 			} catch (e) {
-				console.log('[TrackAppointmentPage] Initial status fetch notice')
+				console.log('[TrackAppointmentPage] Status fetch notice:', e)
+			} finally {
+				if (isMounted) {
+					setIsInitializing(false)
+				}
 			}
 		}
 
-		void fetchInitialStatus()
+		if (bookingId && bookingId !== 'BK-ACTIVE') {
+			void fetchStatus()
+		} else {
+			navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
+				bookingId: '',
+				serviceName: liveServiceTitle,
+				addressText: liveAddress,
+				bookingPayload: bookingData,
+			})
+			setIsInitializing(false)
+		}
+
+		// Periodic background polling every 2.0 seconds until COMPLETED
+		const pollInterval = setInterval(() => {
+			if (isMounted && bookingId && bookingId !== 'BK-ACTIVE' && liveStatusRef.current !== 'COMPLETED') {
+				void fetchStatus()
+			}
+		}, 2000)
 
 		return () => {
+			isMounted = false
+			clearInterval(pollInterval)
 			if (ws) ws.close()
 		}
 	}, [bookingId])
 
-	const otp = liveOtp || String(bookingData.otp || bookingData.verificationOtp || '4829')
-	const completionPin = String(bookingData.completionPin || '9182')
-	const isTravelling = activeStageIndex >= 1 && activeStageIndex <= 3
-	const isCompleted = activeStageIndex >= 5 || liveStatus === 'COMPLETED'
+	const otp = liveOtp
+	const completionPin = liveCompletionPin
+	const etaMinutes = liveEtaMinutes
+	const isSearching = SEARCHING_STATUSES.has(liveStatus)
+	const isCancelled = CANCELLED_STATUSES.has(liveStatus)
+	const isTravelling = ['EN_ROUTE', 'ARRIVED', 'ASSIGNED', 'NURSE_ASSIGNED'].includes(liveStatus)
+	const isCompleted = liveStatus === 'COMPLETED'
 
 	React.useEffect(() => {
 		const loadBookingReview = async () => {
@@ -184,8 +363,20 @@ export default function TrackAppointmentPage() {
 		void loadBookingReview()
 	}, [bookingId, isCompleted])
 
-	const handleCallNurse = () => {
-		Linking.openURL(`tel:${nurse.phone || '+919876543210'}`)
+	React.useEffect(() => {
+		if (!isInitializing && !isAssigned && !isCompleted) {
+			navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
+				bookingId,
+				serviceName: liveServiceTitle || bookingData.serviceName,
+				addressText: liveAddress || bookingData.streetAddress,
+				bookingPayload: bookingData,
+			})
+		}
+	}, [isInitializing, isAssigned, isCompleted, bookingId, liveServiceTitle, liveAddress, navigation])
+
+	const handleCallProvider = () => {
+		if (!provider?.phone) return
+		Linking.openURL(`tel:${provider.phone}`)
 	}
 
 	const handleCancelRequestWithReason = async (reason: string) => {
@@ -205,13 +396,22 @@ export default function TrackAppointmentPage() {
 	}
 
 	const handleSubmitReview = async (stars: number, comment: string) => {
+		if (!provider?.id) {
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Unable to Submit Review',
+				description: 'We could not find the assigned provider for this booking, so a review cannot be submitted.',
+			})
+			return
+		}
 		setIsSubmittingReview(true)
 		try {
 			const saved = await submitAncillaryReview({
 				bookingId,
-				providerId: nurse.id || 'n-prov-1',
-				providerName: nurse.name,
-				serviceName: liveServiceTitle || 'Nursing Care',
+				providerId: provider.id,
+				providerName: provider.name,
+				serviceName: liveServiceTitle,
 				rating: stars,
 				comment,
 				patientName: '',
@@ -221,7 +421,7 @@ export default function TrackAppointmentPage() {
 			setStatusModal({
 				visible: true,
 				title: 'Thank You!',
-				description: `Your feedback for ${nurse.name} has been recorded.`,
+				description: `Your feedback for ${provider.name} has been recorded.`,
 			})
 		} catch (error: any) {
 			const errorMsg =
@@ -243,50 +443,31 @@ export default function TrackAppointmentPage() {
 	const modalBookingObj: AncillaryBooking = {
 		id: bookingId,
 		serviceName: liveServiceTitle,
-		serviceKey: bookingData.serviceKey || 'nursing-care',
-		serviceLabel: bookingData.serviceLabel || 'Nursing Care',
+		serviceKey: bookingData.serviceKey || '',
+		serviceLabel: liveServiceTitle,
 		status: 'completed',
 		date: liveDateTime,
 		provider: {
-			id: nurse.id || 'n-prov-1',
-			name: nurse.name,
-			designation: nurse.designation || 'Registered Nurse',
-			avatar: nurse.avatar,
+			id: provider?.id,
+			name: provider?.name || '',
+			designation: provider?.role || provider?.specialization || '',
+			avatar: provider?.avatar || '',
 		},
 		hasReview: !!reviewData,
 		rating: reviewData?.rating,
 		review: reviewData || undefined,
 	}
 
-	if (liveStatus === 'SEARCHING' || liveStatus === 'SEARCHING_FOR_NURSE') {
+	if (isInitializing || !isAssigned) {
 		return (
 			<View style={styles.container}>
-				<AppScreenHeader title="Searching for Nurse" onBack={() => {
+				<AppScreenHeader title="Track Appointment" onBack={() => {
 					if (navigation.canGoBack()) navigation.goBack()
 					else navigation.navigate(ROUTES.MAIN.TABS)
 				}} />
-				<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
-					<MaterialCommunityIcons name="account-search" size={56} color="#2B6F71" />
-					<AppTypography variant="h3" style={{ textAlign: 'center', color: '#0F172A' }}>
-						Searching for Available Nurse...
-					</AppTypography>
-					<AppTypography variant="caption" style={{ textAlign: 'center', color: '#64748B' }}>
-						Broadcasting your request to qualified nurses nearby.
-					</AppTypography>
-					<AppButton
-						variant="outline"
-						onPress={() => setCancelModalVisible(true)}
-						style={{ marginTop: 24, borderColor: '#EF4444', width: '100%' }}
-					>
-						Cancel Care Request
-					</AppButton>
+				<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+					<ActivityIndicator size="large" color="#2B6F71" />
 				</View>
-				<CancellationDetailsModal
-					visible={cancelModalVisible}
-					onClose={() => setCancelModalVisible(false)}
-					onConfirmCancel={handleCancelRequestWithReason}
-					isCancelling={isCancelling}
-				/>
 			</View>
 		)
 	}
@@ -299,7 +480,7 @@ export default function TrackAppointmentPage() {
 					<View style={[styles.topHeaderChip, isCompleted ? styles.topHeaderChipCompleted : styles.topHeaderChipActive]}>
 						<Ionicons name={isCompleted ? "checkmark-circle" : "car"} size={12} color="#FFFFFF" />
 						<AppTypography variant="caption" style={styles.topHeaderChipText}>
-							{isCompleted ? 'COMPLETED' : 'EN ROUTE'}
+							{isCompleted ? 'COMPLETED' : liveStatus.replace(/_/g, ' ')}
 						</AppTypography>
 					</View>
 				}
@@ -319,7 +500,7 @@ export default function TrackAppointmentPage() {
 						<View style={[styles.statusBadge, isCompleted ? styles.completedBadge : styles.activeBadge]}>
 							<View style={[styles.statusDot, isCompleted ? styles.completedDot : styles.activeDot]} />
 							<AppTypography variant="caption" style={[styles.statusBadgeText, isCompleted ? styles.completedBadgeText : styles.activeBadgeText]}>
-								{isCompleted ? 'COMPLETED' : 'EN ROUTE'}
+								{isCompleted ? 'COMPLETED' : liveStatus.replace(/_/g, ' ')}
 							</AppTypography>
 						</View>
 
@@ -331,13 +512,29 @@ export default function TrackAppointmentPage() {
 					<AppTypography variant="h2" style={styles.statusTitle}>
 						{isCompleted
 							? 'Service Completed'
-							: `Arriving in ${etaMinutes} mins`}
+							: liveStatus === 'IN_PROGRESS' || liveStatus === 'VERIFICATION_PENDING' || liveStatus === 'ARRIVED'
+								? statusHeadline(liveStatus)
+								: etaMinutes != null
+									? `Arriving in ${etaMinutes} mins`
+									: statusHeadline(liveStatus)}
 					</AppTypography>
 
 					<AppTypography variant="caption" style={styles.statusSub}>
 						{isCompleted
-							? `Home care visit with ${nurse.name} has concluded successfully.`
-							: `${nurse.name} is on the way to your doorstep address.`}
+							? provider?.name
+								? `Home care visit with ${provider.name} has concluded successfully.`
+								: 'Your home care visit has concluded successfully.'
+							: liveStatus === 'IN_PROGRESS'
+								? provider?.name
+									? `${provider.name} is currently administering your requested care.`
+									: 'Your healthcare specialist is currently administering your requested care.'
+								: liveStatus === 'ARRIVED'
+									? provider?.name
+										? `${provider.name} has arrived at your doorstep.`
+										: 'Your assigned provider has arrived at your doorstep.'
+									: provider?.name
+										? `${provider.name} is on the way to your doorstep address.`
+										: 'Your assigned provider is on the way to your doorstep address.'}
 					</AppTypography>
 				</View>
 
@@ -353,7 +550,7 @@ export default function TrackAppointmentPage() {
 									<Ionicons name="star" size={22} color="#D97706" />
 									<View style={styles.feedbackTextCol}>
 										<AppTypography variant="h4" style={styles.feedbackTitle}>
-											How was your visit with {nurse.name}?
+											{provider?.name ? `How was your visit with ${provider.name}?` : 'How was your visit?'}
 										</AppTypography>
 										<AppTypography variant="caption" style={styles.feedbackSub}>
 											Help us maintain clinical care quality by rating your visit.
@@ -377,6 +574,7 @@ export default function TrackAppointmentPage() {
 										variant="primary"
 										onPress={() => setReviewModalVisible(true)}
 										style={styles.rateBtn}
+										disabled={!provider?.id}
 									>
 										Rate & Review Visit
 									</AppButton>
@@ -396,54 +594,84 @@ export default function TrackAppointmentPage() {
 								Assigned Practitioner
 							</AppTypography>
 
-							<View style={styles.nurseProfileCard}>
-								<View style={styles.nurseAvatarWrap}>
-									<Image source={{ uri: nurse.avatar }} style={styles.nurseAvatar} resizeMode="cover" />
-									<View style={styles.onlineBadgeDot} />
-								</View>
+							{provider ? (
+								<>
+									<View style={styles.nurseProfileCard}>
+										<View style={styles.nurseAvatarWrap}>
+											{provider.avatar ? (
+												<Image source={{ uri: provider.avatar }} style={styles.nurseAvatar} resizeMode="cover" />
+											) : (
+												<View style={[styles.nurseAvatar, styles.nurseAvatarPlaceholder]}>
+													<Ionicons name="person" size={26} color="#94A3B8" />
+												</View>
+											)}
+											<View style={styles.onlineBadgeDot} />
+										</View>
 
-								<View style={styles.nurseDetailsCol}>
-									<View style={styles.nurseNameRow}>
-										<AppTypography variant="h4" style={styles.nurseName}>
-											{nurse.name}
-										</AppTypography>
-										<View style={styles.rnChip}>
-											<Ionicons name="shield-checkmark" size={11} color="#047857" />
-											<AppTypography variant="caption" style={styles.rnChipText}>
-												VERIFIED RN
+										<View style={styles.nurseDetailsCol}>
+											<View style={styles.nurseNameRow}>
+												<AppTypography variant="h4" style={styles.nurseName}>
+													{provider.name}
+												</AppTypography>
+												<View style={styles.rnChip}>
+													<Ionicons name="shield-checkmark" size={11} color="#047857" />
+													<AppTypography variant="caption" style={styles.rnChipText}>
+														VERIFIED
+													</AppTypography>
+												</View>
+											</View>
+
+											<AppTypography variant="caption" style={styles.nurseDesig}>
+												{displayOrFallback(provider.role || provider.specialization)}
 											</AppTypography>
+
+											{(provider.rating != null || provider.totalVisits != null || provider.experienceYears != null) && (
+												<View style={styles.ratingRow}>
+													<Ionicons name="star" size={13} color="#D97706" />
+													<AppTypography variant="caption" style={styles.ratingText}>
+														{[
+															provider.rating != null ? provider.rating.toFixed(1) : null,
+															provider.totalVisits != null ? `${provider.totalVisits} visits` : null,
+															provider.experienceYears != null ? `${provider.experienceYears} yrs exp` : null,
+														]
+															.filter(Boolean)
+															.join(' • ')}
+													</AppTypography>
+												</View>
+											)}
 										</View>
 									</View>
 
-									<AppTypography variant="caption" style={styles.nurseDesig}>
-										{nurse.designation || 'Registered Nurse'}
-									</AppTypography>
+									{/* 2-BUTTON QUICK ACTION BAR */}
+									<View style={styles.actionButtonsRow}>
+										<TouchableOpacity
+											style={[styles.primaryCallBtn, !provider.phone && styles.primaryCallBtnDisabled]}
+											onPress={handleCallProvider}
+											activeOpacity={provider.phone ? 0.85 : 1}
+											disabled={!provider.phone}
+										>
+											<Ionicons name="call" size={16} color="#FFFFFF" />
+											<AppTypography variant="caption" style={styles.primaryCallText}>
+												{provider.role ? `Call ${provider.role}` : 'Call Provider'}
+											</AppTypography>
+										</TouchableOpacity>
 
-									<View style={styles.ratingRow}>
-										<Ionicons name="star" size={13} color="#D97706" />
-										<AppTypography variant="caption" style={styles.ratingText}>
-											{rating.toFixed(1)} ({reviewsCount} visits) • {experienceYears} yrs exp
-										</AppTypography>
+										<TouchableOpacity style={styles.secondaryMsgBtn} onPress={handleMessage} activeOpacity={0.85}>
+											<Ionicons name="chatbubble-ellipses-outline" size={16} color="#2B6F71" />
+											<AppTypography variant="caption" style={styles.secondaryMsgText}>
+												Message
+											</AppTypography>
+										</TouchableOpacity>
 									</View>
+								</>
+							) : (
+								<View style={styles.providerUnavailableBox}>
+									<Ionicons name="information-circle-outline" size={18} color="#64748B" />
+									<AppTypography variant="caption" style={styles.providerUnavailableText}>
+										Provider details are currently unavailable.
+									</AppTypography>
 								</View>
-							</View>
-
-							{/* 2-BUTTON QUICK ACTION BAR */}
-							<View style={styles.actionButtonsRow}>
-								<TouchableOpacity style={styles.primaryCallBtn} onPress={handleCallNurse} activeOpacity={0.85}>
-									<Ionicons name="call" size={16} color="#FFFFFF" />
-									<AppTypography variant="caption" style={styles.primaryCallText}>
-										Call Nurse
-									</AppTypography>
-								</TouchableOpacity>
-
-								<TouchableOpacity style={styles.secondaryMsgBtn} onPress={handleMessage} activeOpacity={0.85}>
-									<Ionicons name="chatbubble-ellipses-outline" size={16} color="#2B6F71" />
-									<AppTypography variant="caption" style={styles.secondaryMsgText}>
-										Message
-									</AppTypography>
-								</TouchableOpacity>
-							</View>
+							)}
 
 							{/* START VISIT & COMPLETION PIN OTP CARDS */}
 							<View style={styles.otpGridRow}>
@@ -458,15 +686,21 @@ export default function TrackAppointmentPage() {
 										</AppTypography>
 									</View>
 
-									<View style={styles.otpDigitsRow}>
-										{otp.split('').map((digit: string, idx: number) => (
-											<View key={idx} style={styles.otpDigitBox}>
-												<AppTypography variant="h3" style={styles.otpDigitText}>
-													{digit}
-												</AppTypography>
-											</View>
-										))}
-									</View>
+									{otp ? (
+										<View style={styles.otpDigitsRow}>
+											{otp.split('').map((digit: string, idx: number) => (
+												<View key={idx} style={styles.otpDigitBox}>
+													<AppTypography variant="h3" style={styles.otpDigitText}>
+														{digit}
+													</AppTypography>
+												</View>
+											))}
+										</View>
+									) : (
+										<AppTypography variant="caption" style={styles.otpInstruction}>
+											Not available yet.
+										</AppTypography>
+									)}
 
 									<AppTypography variant="caption" style={styles.otpInstruction}>
 										Share at doorstep to verify start.
@@ -484,15 +718,21 @@ export default function TrackAppointmentPage() {
 										</AppTypography>
 									</View>
 
-									<View style={styles.otpDigitsRow}>
-										{completionPin.split('').map((digit: string, idx: number) => (
-											<View key={idx} style={[styles.otpDigitBox, styles.otpDigitBoxCompletion]}>
-												<AppTypography variant="h3" style={[styles.otpDigitText, styles.otpDigitTextCompletion]}>
-													{digit}
-												</AppTypography>
-											</View>
-										))}
-									</View>
+									{completionPin ? (
+										<View style={styles.otpDigitsRow}>
+											{completionPin.split('').map((digit: string, idx: number) => (
+												<View key={idx} style={[styles.otpDigitBox, styles.otpDigitBoxCompletion]}>
+													<AppTypography variant="h3" style={[styles.otpDigitText, styles.otpDigitTextCompletion]}>
+														{digit}
+													</AppTypography>
+												</View>
+											))}
+										</View>
+									) : (
+										<AppTypography variant="caption" style={styles.otpInstruction}>
+											Not available yet.
+										</AppTypography>
+									)}
 
 									<AppTypography variant="caption" style={styles.otpInstruction}>
 										Share after procedure completes.
@@ -515,9 +755,8 @@ export default function TrackAppointmentPage() {
 
 							<View style={styles.mapWrap}>
 								<NurseMapTracker
-									nurseAvatar={nurse.avatar}
-									etaText={`Arriving in ${etaMinutes} mins`}
-									distanceText="1.5 km away"
+									providerAvatar={provider?.avatar || undefined}
+									etaText={etaMinutes != null ? `Arriving in ~${etaMinutes} mins` : undefined}
 								/>
 							</View>
 						</View>
@@ -542,7 +781,7 @@ export default function TrackAppointmentPage() {
 									Selected Procedure
 								</AppTypography>
 								<AppTypography variant="body" style={styles.detailVal}>
-									{liveServiceTitle}
+									{displayOrFallback(liveServiceTitle)}
 								</AppTypography>
 							</View>
 						</View>
@@ -556,7 +795,7 @@ export default function TrackAppointmentPage() {
 									Date & Schedule
 								</AppTypography>
 								<AppTypography variant="body" style={styles.detailVal}>
-									{liveDateTime}
+									{displayOrFallback(liveDateTime)}
 								</AppTypography>
 							</View>
 						</View>
@@ -570,7 +809,7 @@ export default function TrackAppointmentPage() {
 									Doorstep Visit Address
 								</AppTypography>
 								<AppTypography variant="body" style={styles.detailVal} numberOfLines={2}>
-									{liveAddress}
+									{displayOrFallback(liveAddress)}
 								</AppTypography>
 							</View>
 						</View>
@@ -589,7 +828,7 @@ export default function TrackAppointmentPage() {
 					<AppointmentTrackingTimeline stages={TRACKING_STAGES} activeIndex={activeStageIndex} />
 				</View>
 
-				{!isCompleted && liveStatus !== 'CANCELLED_BY_PATIENT' && liveStatus !== 'CANCELLED_BY_PROVIDER' && (
+				{!isCompleted && !isCancelled && (
 					<>
 						<View style={styles.sectionDividerBar} />
 						<View style={styles.sectionBlock}>
@@ -627,6 +866,13 @@ export default function TrackAppointmentPage() {
 					onCancel={() => setStatusModal(null)}
 				/>
 			)}
+
+			<CancellationDetailsModal
+				visible={cancelModalVisible}
+				onClose={() => setCancelModalVisible(false)}
+				onConfirmCancel={handleCancelRequestWithReason}
+				isCancelling={isCancelling}
+			/>
 		</View>
 	)
 }
@@ -765,6 +1011,10 @@ const styles = StyleSheet.create({
 		borderRadius: 28,
 		backgroundColor: '#E2E8F0',
 	},
+	nurseAvatarPlaceholder: {
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
 	onlineBadgeDot: {
 		position: 'absolute',
 		bottom: 2,
@@ -821,6 +1071,23 @@ const styles = StyleSheet.create({
 		color: '#334155',
 	},
 
+	/* PROVIDER UNAVAILABLE NOTICE */
+	providerUnavailableBox: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		backgroundColor: '#F8FAFC',
+		borderRadius: 12,
+		padding: 12,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	providerUnavailableText: {
+		fontSize: 12.5,
+		color: '#64748B',
+		flex: 1,
+	},
+
 	/* ACTION BUTTONS ROW */
 	actionButtonsRow: {
 		flexDirection: 'row',
@@ -835,6 +1102,9 @@ const styles = StyleSheet.create({
 		height: 44,
 		borderRadius: 12,
 		gap: 8,
+	},
+	primaryCallBtnDisabled: {
+		backgroundColor: '#94A3B8',
 	},
 	primaryCallText: {
 		fontSize: 13.5,

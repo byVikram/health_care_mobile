@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
 import { AppSelect, AppToggle } from '../../../components/common'
 import { RadiologyFilters, PricingModel, ScanType } from '../radiology'
-import { fetchScanTypes } from '../RadiologyService'
+import { fetchScanTypes } from '../radiologyService'
 
 interface RadiologyFilterProps {
 	filters: RadiologyFilters
@@ -140,7 +140,13 @@ export default function RadiologyFilter({ filters, onChange, resultCount }: Radi
 			</View> */}
 
 			{/* Reset */}
-			<TouchableOpacity style={styles.resetButton} onPress={reset}>
+			<TouchableOpacity
+				style={styles.resetButton}
+				onPress={reset}
+				hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+				accessibilityRole="button"
+				accessibilityLabel="Reset filters"
+			>
 				<Text style={styles.resetText}>Reset filters</Text>
 			</TouchableOpacity>
 
@@ -187,6 +193,9 @@ const styles = StyleSheet.create({
 	resetButton: {
 		marginTop: 12,
 		alignItems: 'flex-end',
+		justifyContent: 'center',
+		minHeight: 44,
+		paddingHorizontal: 4,
 	},
 	resetText: {
 		fontSize: 13,

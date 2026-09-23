@@ -1,29 +1,23 @@
-// src/constants/apiUrls.ts
+const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
 
-// Replace Vite's import.meta.env with Expo's process.env.EXPO_PUBLIC_
-// If testing on a PHYSICAL device, change 'http://10.0.2.2:8000' anrd 'http://localhost:8000'
-// to your computer's local IPv4 network address (e.g., 'http://192.168.1.100:8000')
-const getBaseUrl = () => {
-	const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
-	if (envUrl && envUrl.length > 0) {
-		return envUrl.replace(/\/+$/, '')
-	}
-	return 'http://10.205.226.49:8000'
+if (!envUrl) {
+	throw new Error('EXPO_PUBLIC_API_ENDPOINT is not configured')
 }
 
-export const BASE_URL = getBaseUrl()
+export const BASE_URL = envUrl.replace(/\/+$/, '')
 
 export const API_ENDPOINTS = {
 	AUTH: {
 		SEND_OTP: `${BASE_URL}/api/auth/send-otp`,
 		VERIFY_OTP: `${BASE_URL}/api/auth/verify-otp`,
+		REFRESH: `${BASE_URL}/api/auth/refresh`,
 		LOGOUT: `${BASE_URL}/api/auth/logout`,
 		GET_ROLES: `${BASE_URL}/api/auth/get-roles`,
 		CREATE_USER: `${BASE_URL}/api/auth/create-user`,
 		SESSIONS: `${BASE_URL}/api/auth/sessions`,
 		SESSION_LOGOUT: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}`,
 	},
-	DOCTORS: {
+	DOCTORS: {  
 		SEARCH: `${BASE_URL}/api/doctors`,
 		DETAIL: (id: string) => `${BASE_URL}/api/doctors/${id}`,
 		AVAILABILITY: `${BASE_URL}/api/doctors/availability`,
@@ -207,7 +201,10 @@ export const API_ENDPOINTS = {
 		PROFILE: `${BASE_URL}/api/ancillary/me/profile`,
 		CAPABILITIES: `${BASE_URL}/api/ancillary/me/capabilities`,
 		CATEGORIES: `${BASE_URL}/api/ancillary/categories`,
+		SUB_SPECIALTIES: `${BASE_URL}/api/ancillary/sub_specialties`,
+		SUBSPECIALTIES: `${BASE_URL}/api/ancillary/sub_specialties`,
 		SERVICES: `${BASE_URL}/api/ancillary/services`,
+		HIERARCHY: `${BASE_URL}/api/ancillary/hierarchy`,
 		REQUESTS: `${BASE_URL}/api/ancillary/patient/requests`,
 		PATIENT_ACTIVE_REQUEST: `${BASE_URL}/api/ancillary/patient/requests/active`,
 		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
@@ -230,13 +227,24 @@ export const API_ENDPOINTS = {
 		REVIEWS: `${BASE_URL}/api/ancillary/reviews`,
 		REVIEW_BY_BOOKING: (id: string | number) => `${BASE_URL}/api/ancillary/reviews/booking/${id}`,
 		PROVIDER_REVIEWS: (id: string | number) => `${BASE_URL}/api/ancillary/reviews/provider/${id}`,
-		WS_PATIENT_REQUEST: (id: string) => `${BASE_URL.replace('http', 'ws')}/api/ancillary/ws/patient/requests/${id}`,
-		WS_PROVIDER_DISPATCH: `${BASE_URL.replace('http', 'ws')}/api/ancillary/ws/provider/dispatch`,
+		WS_PATIENT_REQUEST: (id: string) => `${BASE_URL.replace(/^http/, 'ws')}/api/ancillary/ws/patient/requests/${id}`,
+		WS_PROVIDER_DISPATCH: `${BASE_URL.replace(/^http/, 'ws')}/api/ancillary/ws/provider/dispatch`,
 		SOFT_REVIEW: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/soft-review`,
 		PROVIDER_EARNINGS: `${BASE_URL}/api/ancillary/provider/earnings`,
 		PROVIDER_DASHBOARD_METRICS: `${BASE_URL}/api/ancillary/provider/dashboard-metrics`,
 		VERIFIED_NURSES: `${BASE_URL}/api/ancillary/nurses`,
 		CONSULTED_NURSES: `${BASE_URL}/api/ancillary/nurses/consulted`,
+		// Phase 1 Slot-Based Booking Endpoints
+		AVAILABLE_SLOTS: `${BASE_URL}/api/ancillary/available-slots`,
+		REQUESTS_SCHEDULED: `${BASE_URL}/api/ancillary/requests/scheduled`,
+		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/respond-reschedule`,
+		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/me/availability`,
+		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/overrides`,
+		PROVIDER_SCHEDULED_ORDERS: `${BASE_URL}/api/ancillary/provider/orders/scheduled`,
+		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/accept-scheduled`,
+		DECLINE_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/decline-scheduled`,
+		RESCHEDULE_PROPOSAL: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/reschedule-proposal`,
+		WS_ANCILLARY: (token: string) => `${BASE_URL.replace(/^http/, 'ws')}/ws/ancillary?token=${token}`,
 	},
 	WALLET: {
 		GET: `${BASE_URL}/api/wallet`,

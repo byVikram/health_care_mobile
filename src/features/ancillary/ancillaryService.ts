@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import ApiService from '../../services/apiService'
-import { API_ENDPOINTS } from '../../constants/apiUrls'
+import { API_ENDPOINTS, BASE_URL } from '../../constants/apiUrls'
 import { safeJsonParse } from '../../utils/jsonUtils'
 
 // --- Canonical 13-State Machine Status Vocabulary ---
@@ -63,11 +63,20 @@ const unwrapList = <T>(payload: any): T[] => {
 	return []
 }
 
-export const fetchAncillaryCategoriesBackend = async (specialtyId?: string): Promise<AncillaryCategoryApiItem[]> => {
+export const fetchAncillaryCategoriesBackend = async (
+	specialtyId?: string,
+	subspecialtyId?: string
+): Promise<AncillaryCategoryApiItem[]> => {
 	try {
+		const params: Record<string, string> = {}
+		if (specialtyId) params.specialty_id = specialtyId
+		if (subspecialtyId) {
+			params.subspecialty_id = subspecialtyId
+			params.sub_specialty_id = subspecialtyId
+		}
 		const res = await ApiService.getWithParams<any>(
 			API_ENDPOINTS.ANCILLARY.CATEGORIES,
-			specialtyId ? { specialty_id: specialtyId } : {}
+			params
 		)
 		return unwrapList<AncillaryCategoryApiItem>(res.data)
 	} catch (error) {
@@ -75,6 +84,62 @@ export const fetchAncillaryCategoriesBackend = async (specialtyId?: string): Pro
 		return []
 	}
 }
+
+export interface AncillarySubspecialtyApiItem {
+	id: string
+	public_id?: string
+	label: string
+	specialty_id?: string
+	specialtyId?: string
+	sub_specialty_id?: string
+	description?: string
+}
+
+export const DEFAULT_PHYSIOTHERAPY_SUBSPECIALTIES: AncillarySubspecialtyApiItem[] = [
+	{ id: 'phys-sub-orthopedic', public_id: 'phys-sub-orthopedic', label: 'Orthopedic Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-neurological', public_id: 'phys-sub-neurological', label: 'Neurological Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-sports', public_id: 'phys-sub-sports', label: 'Sports Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-pediatric', public_id: 'phys-sub-pediatric', label: 'Pediatric Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-geriatric', public_id: 'phys-sub-geriatric', label: 'Geriatric Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-cardiopulmonary', public_id: 'phys-sub-cardiopulmonary', label: 'Cardiopulmonary Physiotherapy', specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-womens-health', public_id: 'phys-sub-womens-health', label: "Women's Health Physiotherapy", specialtyId: 'physiotherapy' },
+	{ id: 'phys-sub-vestibular', public_id: 'phys-sub-vestibular', label: 'Vestibular Physiotherapy', specialtyId: 'physiotherapy' },
+]
+
+export const fetchAncillarySubspecialtiesBackend = async (specialtyId?: string): Promise<AncillarySubspecialtyApiItem[]> => {
+	try {
+		const endpoint =
+			API_ENDPOINTS?.ANCILLARY?.SUB_SPECIALTIES ||
+			API_ENDPOINTS?.ANCILLARY?.SUBSPECIALTIES ||
+			`${BASE_URL}/api/ancillary/sub_specialties`
+		const res = await ApiService.getWithParams<any>(
+			endpoint,
+			specialtyId ? { specialty_id: specialtyId } : {}
+		)
+		const list = unwrapList<any>(res.data)
+		if (Array.isArray(list) && list.length > 0) {
+			return list.map((item) => ({
+				id: item.id || item.public_id || '',
+				public_id: item.public_id || item.id || '',
+				label: item.label || item.name || '',
+				specialty_id: item.specialty_id || item.specialtyId,
+				specialtyId: item.specialtyId || item.specialty_id,
+				sub_specialty_id: item.sub_specialty_id || item.subspecialty_id || item.id || item.public_id,
+				description: item.description || '',
+			}))
+		}
+	} catch (error) {
+		console.log('[ancillaryService] fetchAncillarySubspecialtiesBackend error:', error)
+	}
+
+	if (!specialtyId || specialtyId.toLowerCase().includes('physio')) {
+		return DEFAULT_PHYSIOTHERAPY_SUBSPECIALTIES
+	}
+	return []
+}
+
+export const fetchAncillarySubSpecialtiesBackend = fetchAncillarySubspecialtiesBackend
+
 
 // Backend (AncillaryProcedureResponse) returns `label` / `aboutService` /
 // `whatsIncluded` / `categoryId` / `imageUrl` -- it never returns `title` or
@@ -106,11 +171,18 @@ const mapRawServiceToItem = (raw: any): AncillaryServiceItem => {
 export const fetchAncillaryServicesBackend = async (params?: {
 	categoryId?: string
 	specialtyId?: string
+	subspecialtyId?: string
+	sub_specialty_id?: string
 }): Promise<AncillaryServiceItem[]> => {
 	try {
 		const query: Record<string, string> = {}
 		if (params?.categoryId) query.category_id = params.categoryId
 		if (params?.specialtyId) query.specialty_id = params.specialtyId
+		const subId = params?.subspecialtyId || params?.sub_specialty_id
+		if (subId) {
+			query.subspecialty_id = subId
+			query.sub_specialty_id = subId
+		}
 		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.SERVICES, query)
 		return unwrapList<any>(res.data).map(mapRawServiceToItem)
 	} catch (error) {
@@ -119,6 +191,65 @@ export const fetchAncillaryServicesBackend = async (params?: {
 	}
 }
 
+export interface AncillaryHierarchyProcedure {
+	id: string
+	specialtyId?: string
+	subspecialtyId?: string
+	categoryId?: string
+	label: string
+	price: number
+	providerPrice?: number
+	aboutService?: string
+	whatsIncluded?: string[]
+	imageUrl?: string | null
+}
+
+export interface AncillaryHierarchyCategory {
+	id: string
+	label: string
+	procedures: AncillaryHierarchyProcedure[]
+}
+
+export interface AncillaryHierarchySubspecialty {
+	id: string
+	label: string
+	categories: AncillaryHierarchyCategory[]
+}
+
+export interface AncillaryHierarchySpecialty {
+	id: string
+	label: string
+	sub_specialties: AncillaryHierarchySubspecialty[]
+}
+
+// Fetches the full read-only 4-tier hierarchy -- Specialty -> Sub-specialty ->
+// Category -> Procedures -- for the given specialty (e.g. 'physiotherapy') in a
+// single call, straight from the existing GET ``-style
+// /api/ancillary/hierarchy endpoint (see backend app/ancillary/router.py).
+// Used by the read-only Services overview shown after a provider selects their
+// specialization in Professional Details -- never used to drive
+// select/deselect capability UI.
+export const fetchAncillaryHierarchyBackend = async (
+	specialtyId?: string,
+	subspecialtyId?: string
+): Promise<AncillaryHierarchySpecialty[]> => {
+	try {
+		const params: Record<string, string> = {}
+		if (specialtyId) params.specialty_id = specialtyId
+		if (subspecialtyId) {
+			params.subspecialty_id = subspecialtyId
+			params.sub_specialty_id = subspecialtyId
+		}
+		const res = await ApiService.getWithParams<any>(
+			API_ENDPOINTS.ANCILLARY.HIERARCHY,
+			params
+		)
+		return unwrapList<AncillaryHierarchySpecialty>(res.data)
+	} catch (error) {
+		console.log('[ancillaryService] fetchAncillaryHierarchyBackend error:', error)
+		return []
+	}
+}
 export interface FetchVerifiedNursesParams {
 	procedureId?: string
 	procedureName?: string
@@ -1174,8 +1305,8 @@ export const fetchMyNurseAppointmentsBackend = async (): Promise<NurseBooking[]>
 					appointmentTime: String(item.createdAt || 'Today'),
 					patientAddress: String(item.patientAddress || item.streetAddress || 'Healthcare Location'),
 					status: status as any,
-					otpCode: String(item.verificationOtp || '4829'),
-					completePin: String(item.completionPin || '9182'),
+					otpCode: String(item.verificationOtp || ''),
+					completePin: String(item.completionPin || ''),
 					amount: Number.isFinite(amount) ? amount : undefined,
 					providerEarning: Number.isFinite(providerEarning) ? providerEarning : undefined,
 					createdAtRaw: item.createdAt ? String(item.createdAt) : undefined,
@@ -1198,28 +1329,40 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PATIENT_ACTIVE_REQUEST)
 		const payload = res.data
 		const data = payload?.data !== undefined ? payload.data : payload
-		if (!data || !data.requestId) {
+		const activeReq = data?.activeRequest || data
+		if (!activeReq || (!activeReq.requestId && !activeReq.id && !activeReq.publicBookingId)) {
 			return null
 		}
 		return {
-			id: String(data.requestId || data.publicBookingId),
-			serviceName: String(data.serviceName || 'In-Home Nursing Care'),
+			id: String(activeReq.requestId || activeReq.publicBookingId || activeReq.id),
+			serviceName: String(activeReq.serviceName || 'In-Home Nursing Care'),
 			serviceKey: 'nursing-care',
 			serviceLabel: 'Nursing Care',
-			status: String(data.status || 'SEARCHING').toUpperCase() as any,
-			rawStatus: String(data.status || 'SEARCHING').toUpperCase(),
+			status: String(activeReq.status || 'SEARCHING').toUpperCase() as any,
+			rawStatus: String(activeReq.status || 'SEARCHING').toUpperCase(),
 			date: 'Today',
 			timeRange: 'Instant Dispatch',
-			amount: typeof data.totalAmount === 'number' ? data.totalAmount : parseFloat(String(data.totalAmount || '667').replace(/[^0-9.]/g, '')),
-			provider: {
-				id: data.assignedProvider ? String(data.assignedProvider.id) : 'n-prov-1',
-				name: data.assignedProvider ? String(data.assignedProvider.name) : 'Nurse Specialist',
-				designation: data.assignedProvider ? String(data.assignedProvider.credentials) : 'RN Certification',
-				avatar: 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
-			},
-			verificationOtp: String(data.verificationOtp || '4829'),
-			completionPin: String(data.completionPin || '9182'),
-			bookingType: String(data.bookingType || 'INSTANT'),
+			amount: typeof activeReq.totalAmount === 'number' ? activeReq.totalAmount : parseFloat(String(activeReq.totalAmount || '667').replace(/[^0-9.]/g, '')),
+			provider: activeReq.assignedProvider
+				? {
+						id: String(activeReq.assignedProvider.id),
+						name: String(activeReq.assignedProvider.name || ''),
+						designation:
+							activeReq.assignedProvider.qualifications ||
+							activeReq.assignedProvider.credentials ||
+							activeReq.assignedProvider.specialization ||
+							'',
+						avatar: activeReq.assignedProvider.avatar || '',
+				  }
+				: {
+						id: undefined,
+						name: '',
+						designation: '',
+						avatar: '',
+				  },
+			verificationOtp: activeReq.verificationOtp ? String(activeReq.verificationOtp) : undefined,
+			completionPin: activeReq.completionPin ? String(activeReq.completionPin) : undefined,
+			bookingType: String(activeReq.bookingType || 'INSTANT'),
 		}
 	} catch (error) {
 		console.log('[ancillaryService] Error fetching patient active request via API')
@@ -1248,7 +1391,7 @@ const formatBookingDateTime = (createdAt?: string | null): { date: string; timeR
 	if (Number.isNaN(parsed.getTime())) return { date: createdAt }
 	const date = parsed.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
 	const timeRange = parsed.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-	return { date, timeRange }
+	return { date, timeRange: timeRange || undefined }
 }
 
 /**
@@ -1264,19 +1407,29 @@ const formatBookingDateTime = (createdAt?: string | null): { date: string; timeR
 export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[]> => {
 	const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.MY_REQUESTS)
 	const payload = res.data
-	const rawList: any[] = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
+	const items: any[] = Array.isArray(payload?.data)
+		? payload.data
+		: Array.isArray(payload)
+		? payload
+		: []
 
-	return rawList.map((item: any) => {
+	return items.map((item) => {
+		const bookingIdStr = String(item.requestId || item.publicBookingId || item.id || '')
 		const { date, timeRange } = formatBookingDateTime(item.createdAt)
-		const amountRaw = item.totalAmount
 		const amount =
-			typeof amountRaw === 'number'
-				? amountRaw
-				: parseFloat(String(amountRaw || '').replace(/[^0-9.]/g, '')) || undefined
+			typeof item.totalAmount === 'number'
+				? item.totalAmount
+				: typeof item.amount === 'number'
+				? item.amount
+				: parseFloat(String(item.totalAmount || item.amount || '0').replace(/[^0-9.]/g, '')) || 0
 
-		const bookingIdStr = String(item.requestId || item.publicBookingId || item.id)
-		const hasReview = Boolean(item.hasReview || item.review != null || item.rating != null)
-		const ratingVal = item.rating != null ? Number(item.rating) : (item.review?.rating != null ? Number(item.review.rating) : undefined)
+		const hasReview = Boolean(item.hasReview || item.review !== null && item.review !== undefined)
+		const ratingVal =
+			typeof item.rating === 'number'
+				? item.rating
+				: typeof item.review?.rating === 'number'
+				? item.review.rating
+				: undefined
 
 		let reviewObj: AncillaryReviewData | undefined = undefined
 		if (item.review) {
@@ -1295,6 +1448,9 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 			}
 		}
 
+		const assignedProvId = item.provider?.id || item.assignedProvider?.id
+		const assignedProvName = item.provider?.name || item.assignedProvider?.name
+
 		return {
 			id: bookingIdStr,
 			serviceName: String(item.serviceName || 'In-Home Healthcare Service'),
@@ -1307,23 +1463,24 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 			hasReview,
 			rating: ratingVal,
 			review: reviewObj,
-			provider: {
-				id:
-					item.provider?.id || item.assignedProvider?.id
-						? String(item.provider?.id || item.assignedProvider?.id)
-						: undefined,
-				name:
-					item.provider?.name || item.assignedProvider?.name
-						? String(item.provider?.name || item.assignedProvider?.name)
-						: 'Specialist Assigned Soon',
-				designation:
-					item.provider?.designation || item.assignedProvider?.credentials
-						? String(item.provider?.designation || item.assignedProvider?.credentials)
-						: 'Healthcare Provider',
-				avatar:
-					item.provider?.avatar ||
-					'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=120',
-			},
+			provider: assignedProvId
+				? {
+						id: String(assignedProvId),
+						name: String(assignedProvName || ''),
+						designation:
+							item.provider?.designation ||
+							item.assignedProvider?.credentials ||
+							item.assignedProvider?.qualifications ||
+							item.assignedProvider?.specialization ||
+							'',
+						avatar: item.provider?.avatar || item.assignedProvider?.avatar || '',
+				  }
+				: {
+						id: undefined,
+						name: '',
+						designation: '',
+						avatar: '',
+				  },
 			amount,
 			verificationOtp: item.verificationOtp ? String(item.verificationOtp) : undefined,
 			completionPin: item.completionPin ? String(item.completionPin) : undefined,
@@ -1411,8 +1568,8 @@ export interface AncillaryProfileBackendResponse {
 	license_number: string
 	license_proof_s3_key?: string
 	qualification_proof_s3_key?: string
-	qualifications?: string
-	experience_years?: string
+	qualifications?: string | any[] | any
+	qualifications_list?: any[]
 	specialty?: {
 		id?: string
 		label: string
@@ -1420,18 +1577,42 @@ export interface AncillaryProfileBackendResponse {
 	}
 	specialty_id?: string
 	specialty_name?: string
+	sub_specialty_id?: string
+	sub_specialty?: {
+		id?: string
+		specialtyId?: string
+		label: string
+		description?: string
+	}
 	checked_procedures?: string[]
 	geofence_radius?: number
 	geofence_radius_km?: number
+	experience_years?: number
+	date_of_birth?: string
+	gender?: string
+	location?: string
+	languages?: string[]
+	about?: string
+	name?: string
+	email?: string
+	contact_number?: string
+	mobile_number?: string
+	avatar_s3_key?: string
+	verification_status?: string
 }
 
-export const fetchProviderProfileBackend = async (): Promise<AncillaryProfileBackendResponse | null> => {
+export const fetchProviderProfile = async (): Promise<AncillaryProfileBackendResponse | null> => {
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROFILE)
+		console.log('PROFILE endpoint =', API_ENDPOINTS.ANCILLARY.PROFILE)
 		const data = res.data?.data || res.data
-		return data || null
+		if (data) {
+			console.log('[fetchProviderProfile] Provider Profile fetched:', data)
+			return data
+		}
+		return null
 	} catch (error) {
-		console.log('[ancillaryService] fetchProviderProfileBackend error:', error)
+		console.log('[ancillaryService] Error fetching provider profile:', error)
 		return null
 	}
 }
@@ -1443,18 +1624,39 @@ export const updateProviderProfileBackend = async (payload: {
 	qualification_proof_s3_key?: string
 	qualification_proof?: string
 	qualifications?: string
-	experience_years?: string
+	experience_years?: number
+	date_of_birth?: string
+	gender?: string
+	location?: string
+	languages?: string[]
+	about?: string
 	specialty?: string | { id?: string; label?: string }
 	geofence_radius?: number
 	geofence_radius_km?: number
 	checked_procedures?: string[]
+	name?: string
+	email?: string
+	// Sent as mobile_number to match the backend AncillaryProfileUpdate schema; maps to users.contact_number.
+	mobile_number?: string
+	sub_specialty_id?: string
+	avatar_s3_key?: string
 }): Promise<boolean> => {
 	try {
-		await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, payload)
+		console.log('[Ancillary Profile] FINAL UPDATE PAYLOAD:', JSON.stringify(payload, null, 2))
+		const res = await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, payload)
+		console.log('[Ancillary Profile] UPDATE RESPONSE:', JSON.stringify(res?.data || res, null, 2))
 		return true
-	} catch (error) {
-		console.log('[ancillaryService] updateProviderProfileBackend error:', error)
-		return false
+	} catch (error: any) {
+		console.error('[PROFILE SAVE] error:', error)
+		console.error('[PROFILE SAVE] status:', error?.response?.status)
+		console.error('[PROFILE SAVE] response:', error?.response?.data)
+		console.error('[PROFILE SAVE] request:', error?.config?.data)
+		console.error('[PROFILE SAVE] URL:', error?.config?.url)
+		console.error('[Ancillary Profile] Backend update failed:', error)
+		console.error('[Ancillary Profile] Status:', error?.response?.status)
+		console.error('[Ancillary Profile] Response:', error?.response?.data)
+		console.error('[Ancillary Profile] Request:', error?.config?.data)
+		throw error
 	}
 }
 
@@ -1533,7 +1735,7 @@ export const updateAncillaryCapabilitiesBackend = async (checked_procedures: str
 }
 
 
-export const fetchAncillaryProfileBackend = fetchProviderProfileBackend;
+export const fetchAncillaryProfileBackend = fetchProviderProfile;
 
 // --- Clean Function Aliases (without Backend suffix) ---
 export const fetchAncillaryCategories = fetchAncillaryCategoriesBackend
@@ -1550,7 +1752,6 @@ export const cancelCareRequestProvider = cancelCareRequestProviderBackend
 export const fetchProviderStatus = fetchProviderStatusBackend
 export const updateProviderStatus = updateProviderStatusBackend
 export const fetchMyPatientBookings = fetchMyPatientBookingsBackend
-export const fetchProviderProfile = fetchProviderProfileBackend
 export const updateProviderProfile = updateProviderProfileBackend
 export const updateAncillaryCapabilities = updateAncillaryCapabilitiesBackend
 export const fetchAncillaryProfile = fetchAncillaryProfileBackend
@@ -1559,3 +1760,350 @@ export const fetchProviderDashboardMetrics = fetchProviderDashboardMetricsBacken
 
 
 export const fetchConsultedNurses = fetchConsultedNursesBackend
+
+// ─────────────────────────────────────────────
+// Phase 1 Slot-Based Booking System API Contracts
+// ─────────────────────────────────────────────
+
+export interface AvailableSlot {
+	start_time: string
+	end_time: string
+	duration_mins?: number
+	is_available?: boolean
+}
+
+export interface ProviderWithSlots {
+	provider_public_id: string
+	provider_name?: string
+	name?: string
+	specialty_name?: string
+	specialty?: string
+	subspecialty?: string
+	avatar_url?: string
+	avatar?: string
+	credentials?: string
+	experience?: number
+	rating?: number
+	distance_km?: number
+	transit_buffer_mins?: number
+	street_address?: string
+	available_slots: AvailableSlot[]
+}
+
+export interface FetchAvailableSlotsParams {
+	latitude: number
+	longitude: number
+	target_date: string
+	procedure_ids?: string[]
+	radius_km?: number
+}
+
+export interface AvailableSlotsResponse {
+	target_date: string
+	providers_found: number
+	providers: ProviderWithSlots[]
+}
+
+export interface CreateScheduledBookingPayload {
+	provider_public_id: string
+	scheduled_date: string
+	scheduled_start_time: string
+	scheduled_end_time: string
+	procedure_ids: string[]
+	medical_notes?: string
+	chief_complaint?: string
+	street_address: string
+	latitude: number
+	longitude: number
+	payment_method?: string
+	transport_fee?: number
+}
+
+export interface CreateScheduledBookingResponse {
+	message: string
+	request_public_id: string
+	status: string
+	booking_type: string
+	scheduled_date: string
+	scheduled_start_time: string
+	scheduled_end_time: string
+	total_amount: number
+}
+
+export interface ProviderAvailabilityDay {
+	day_of_week: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'
+	is_available?: boolean
+	start_time?: string
+	end_time?: string
+	slot_duration_mins?: number
+	break_start_time?: string
+	break_end_time?: string
+}
+
+export interface SaveProviderAvailabilityPayload {
+	availabilities?: ProviderAvailabilityDay[]
+	schedules?: any[]
+}
+
+export interface SaveProviderDateOverridePayload {
+	override_date: string
+	is_unavailable: boolean
+	reason?: string
+}
+
+export interface ScheduledOrder {
+	request_public_id: string
+	patient_name: string
+	patient_contact_number?: string
+	status: string
+	booking_type: string
+	scheduled_date: string
+	scheduled_start_time: string
+	scheduled_end_time: string
+	rescheduled_date?: string | null
+	rescheduled_start_time?: string | null
+	rescheduled_end_time?: string | null
+	reschedule_reason?: string | null
+	rescheduled_by?: string | null
+	reschedule_count: number
+	street_address: string
+	total_amount: number
+	procedures: string[]
+	chief_complaint?: string
+	medical_notes?: string
+}
+
+export interface ScheduledOrdersResponse {
+	count: number
+	orders: ScheduledOrder[]
+}
+
+export interface RescheduleProposalPayload {
+	rescheduled_date: string
+	rescheduled_start_time: string
+	rescheduled_end_time: string
+	reason?: string
+}
+
+/**
+ * Fetch available ancillary providers and open 30-min slots for a given date.
+ */
+export const fetchAvailableAncillarySlots = async (
+	params: FetchAvailableSlotsParams
+): Promise<AvailableSlotsResponse> => {
+	const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.AVAILABLE_SLOTS, {
+		latitude: params.latitude,
+		longitude: params.longitude,
+		target_date: params.target_date,
+		procedure_ids: params.procedure_ids,
+		radius_km: params.radius_km || 15.0,
+	})
+	const rawData = res.data?.data ?? res.data
+	const providersList: ProviderWithSlots[] = Array.isArray(rawData)
+		? rawData
+		: Array.isArray(rawData?.providers)
+		? rawData.providers
+		: []
+
+	return {
+		target_date: rawData?.target_date || params.target_date,
+		providers_found: providersList.length,
+		providers: providersList.map((p: any) => ({
+			provider_public_id: p.provider_public_id || p.id || '',
+			provider_name: p.name || p.provider_name || 'Healthcare Nurse',
+			name: p.name || p.provider_name || 'Healthcare Nurse',
+			specialty: p.specialty || p.specialty_name || 'Nursing Care',
+			specialty_name: p.specialty_name || p.specialty || 'Nursing Care',
+			subspecialty: p.subspecialty || '',
+			avatar_url: p.avatar_url || p.avatar || '',
+			avatar: p.avatar || p.avatar_url || '',
+			distance_km: p.distance_km != null ? Number(p.distance_km) : undefined,
+			transit_buffer_mins: p.transit_buffer_mins != null ? Number(p.transit_buffer_mins) : 15,
+			available_slots: Array.isArray(p.available_slots)
+				? p.available_slots.map((s: any) => ({
+						start_time: s.start_time || '',
+						end_time: s.end_time || '',
+						duration_mins: s.duration_mins != null ? Number(s.duration_mins) : 30,
+						is_available: s.is_available !== false,
+				  }))
+				: [],
+		})),
+	}
+}
+
+/**
+ * Create a scheduled ancillary booking request.
+ */
+export const createScheduledAncillaryBooking = async (
+	payload: CreateScheduledBookingPayload
+): Promise<CreateScheduledBookingResponse> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.REQUESTS_SCHEDULED, payload)
+	const data = res.data?.data || res.data
+	return {
+		message: data?.message || 'Scheduled service request created successfully.',
+		request_public_id: data?.request_public_id || data?.requestId || '',
+		status: data?.status || 'SCHEDULED_PENDING',
+		booking_type: data?.booking_type || 'SCHEDULED',
+		scheduled_date: data?.scheduled_date || payload.scheduled_date,
+		scheduled_start_time: data?.scheduled_start_time || payload.scheduled_start_time,
+		scheduled_end_time: data?.scheduled_end_time || payload.scheduled_end_time,
+		total_amount: Number(data?.total_amount) || 0,
+	}
+}
+
+/**
+ * Patient action: Accept or Reject a provider's proposed reschedule slot.
+ */
+export const respondToRescheduleProposal = async (
+	requestPublicId: string,
+	action: 'ACCEPT' | 'REJECT'
+): Promise<{ success: boolean; status: string; message: string }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.RESPOND_RESCHEDULE(requestPublicId), { action })
+	const data = res.data?.data || res.data
+	return {
+		success: data?.success !== false,
+		status: data?.status || (action === 'ACCEPT' ? 'SCHEDULED_CONFIRMED' : 'CANCELLED_BY_PATIENT'),
+		message: data?.message || (action === 'ACCEPT' ? 'Reschedule accepted and booking confirmed.' : 'Reschedule declined.'),
+	}
+}
+
+/**
+ * Provider action: Fetch weekly working hours and break schedules.
+ */
+export const fetchProviderWeeklyAvailabilityBackend = async (): Promise<ProviderAvailabilityDay[]> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY)
+		const data = res.data?.data || res.data
+		const list = Array.isArray(data) ? data : Array.isArray(data?.schedules) ? data.schedules : []
+		const intToDay: Record<number, ProviderAvailabilityDay['day_of_week']> = {
+			0: 'SUNDAY',
+			1: 'MONDAY',
+			2: 'TUESDAY',
+			3: 'WEDNESDAY',
+			4: 'THURSDAY',
+			5: 'FRIDAY',
+			6: 'SATURDAY',
+		}
+		return list.map((item: any) => ({
+			day_of_week: typeof item.day_of_week === 'number' ? intToDay[item.day_of_week] || 'MONDAY' : item.day_of_week,
+			is_available: item.is_active !== false,
+			start_time: item.start_time,
+			end_time: item.end_time,
+			slot_duration_mins: item.slot_duration_mins || 30,
+			break_start_time: item.break_start_time,
+			break_end_time: item.break_end_time,
+		}))
+	} catch (error) {
+		console.log('[ancillaryService] fetchProviderWeeklyAvailabilityBackend error:', error)
+		return []
+	}
+}
+
+/**
+ * Provider action: Save weekly working hours and break schedules.
+ */
+export const saveProviderWeeklyAvailability = async (
+	payload: SaveProviderAvailabilityPayload
+): Promise<{ message: string; updated_count: number }> => {
+	const rawList = payload.schedules || payload.availabilities || []
+	const schedules = rawList.map((item: any) => ({
+		day_of_week: item.day_of_week,
+		start_time: item.start_time,
+		end_time: item.end_time,
+		slot_duration_mins: item.slot_duration_mins || 30,
+		break_start_time: item.break_start_time,
+		break_end_time: item.break_end_time,
+		is_active: item.is_active !== undefined ? item.is_active : item.is_available !== false,
+	}))
+	const res = await ApiService.put<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY, { schedules })
+	const data = res.data?.data || res.data
+	return {
+		message: data?.message || 'Successfully updated availability schedule.',
+		updated_count: Number(data?.updated_count || schedules.length),
+	}
+}
+
+/**
+ * Provider action: Set custom date override / holiday.
+ */
+export const saveProviderDateOverride = async (
+	payload: SaveProviderDateOverridePayload
+): Promise<{ message: string; override_date: string; is_unavailable: boolean }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_OVERRIDES, payload)
+	const data = res.data?.data || res.data
+	return {
+		message: data?.message || `Slot override saved for date ${payload.override_date}.`,
+		override_date: data?.override_date || payload.override_date,
+		is_unavailable: data?.is_unavailable !== false,
+	}
+}
+
+/**
+ * Provider action: Fetch scheduled orders queue with status filter.
+ */
+export const fetchProviderScheduledOrders = async (
+	statusFilter: 'PENDING_ACTION' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'ALL' = 'ALL'
+): Promise<ScheduledOrdersResponse> => {
+	const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_SCHEDULED_ORDERS, {
+		status_filter: statusFilter,
+	})
+	const data = res.data?.data || res.data
+	const orders: ScheduledOrder[] = Array.isArray(data?.orders)
+		? data.orders
+		: Array.isArray(data)
+		? data
+		: []
+	return {
+		count: Number(data?.count || orders.length),
+		orders,
+	}
+}
+
+/**
+ * Provider action: Accept scheduled order.
+ */
+export const acceptScheduledOrder = async (
+	requestPublicId: string
+): Promise<{ success: boolean; status: string; message: string }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.ACCEPT_SCHEDULED(requestPublicId), {})
+	const data = res.data?.data || res.data
+	return {
+		success: data?.success !== false,
+		status: data?.status || 'SCHEDULED_CONFIRMED',
+		message: data?.message || 'Scheduled order successfully accepted.',
+	}
+}
+
+/**
+ * Provider action: Decline scheduled order.
+ */
+export const declineScheduledOrder = async (
+	requestPublicId: string,
+	reason: string = 'Schedule conflict'
+): Promise<{ success: boolean; status: string; message: string }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.DECLINE_SCHEDULED(requestPublicId), { reason })
+	const data = res.data?.data || res.data
+	return {
+		success: data?.success !== false,
+		status: data?.status || 'CANCELLED_BY_PROVIDER',
+		message: data?.message || 'Scheduled order declined.',
+	}
+}
+
+/**
+ * Provider action: Propose a reschedule slot to the patient (Max 2 proposals per order).
+ */
+export const proposeRescheduleSlot = async (
+	requestPublicId: string,
+	payload: RescheduleProposalPayload
+): Promise<{ success: boolean; status: string; reschedule_count: number; message: string }> => {
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.RESCHEDULE_PROPOSAL(requestPublicId), payload)
+	const data = res.data?.data || res.data
+	return {
+		success: data?.success !== false,
+		status: data?.status || 'RESCHEDULE_PROPOSED',
+		reschedule_count: Number(data?.reschedule_count || 1),
+		message: data?.message || `Reschedule proposal sent to patient.`,
+	}
+}
+

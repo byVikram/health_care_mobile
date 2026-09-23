@@ -22,7 +22,7 @@ import { BlurView } from 'expo-blur'
 import Toast from 'react-native-toast-message'
 
 import { AppBottomSheet, AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
-import LaboratoryCard from './component/LaboratoryCard'
+import LaboratoryCard from './components/LaboratoryCard'
 import { getLaboratories, clearLaboratoryCache } from './laboratoryService'
 import type { LaboratoryItem } from './laboratory'
 import { ROUTES } from '../../navigation/routes'

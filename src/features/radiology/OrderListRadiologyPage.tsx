@@ -21,7 +21,7 @@ import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
 
-import { fetchRadiologyBookings, RadiologyBooking } from './RadiologyService'
+import { fetchRadiologyBookings, RadiologyBooking } from './radiologyService'
 import { useAuth } from '../../context/AuthContext'
 import { getStatusStyle } from '../../constants/statusColors'
 import { ROUTES } from '../../navigation/routes'

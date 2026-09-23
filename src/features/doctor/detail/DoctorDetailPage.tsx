@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NavigationProp, RouteProp } from "@react-navigation/native";
 import {
   AppBottomSheet,
@@ -166,6 +167,7 @@ export default function DoctorDetailPage() {
   const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_DETAIL>>();
   const referralId = route.params?.referralId;
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const [doctor, setDoctor] = useState<DoctorDetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -782,7 +784,7 @@ export default function DoctorDetailPage() {
       </AppBottomSheet>
 
       {/* Bottom Sticky Button */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: 16 + insets.bottom }]}>
         <AppButton
           variant="primary"
           style={styles.bookButton}
@@ -1060,7 +1062,6 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: "#fff",
     padding: 16,
-    paddingBottom: Platform.OS === "ios" ? 32 : 16,
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
   },

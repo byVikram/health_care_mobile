@@ -7,6 +7,7 @@ import {
 	StyleSheet,
 	StatusBar,
 	TextInput,
+	ActivityIndicator,
 	useWindowDimensions,
 } from 'react-native'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
@@ -16,10 +17,14 @@ import {
 	AppTypography,
 	AppButton,
 	AppSkeleton,
+	StatusModal,
 } from '../../../components/common'
 import {
 	AncillaryProvider,
 	fetchConsultedNursesBackend,
+	fetchAvailableAncillarySlots,
+	AvailableSlot,
+	ProviderWithSlots,
 } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
 
@@ -31,7 +36,22 @@ type RouteParams = {
 		procedureName?: string
 		isSelectionMode?: boolean
 		selectedNurseId?: string
+		latitude?: number
+		longitude?: number
 	}
+}
+
+const formatDateIso = (d: Date): string => {
+	const year = d.getFullYear()
+	const month = String(d.getMonth() + 1).padStart(2, '0')
+	const day = String(d.getDate()).padStart(2, '0')
+	return `${year}-${month}-${day}`
+}
+
+const formatDisplayDate = (d: Date): string => {
+	const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+	const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+	return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
 }
 
 export const AncillaryProvidersPage = () => {
@@ -42,23 +62,39 @@ export const AncillaryProvidersPage = () => {
 
 	const isSelectionMode = Boolean(route.params?.isSelectionMode)
 	const selectedNurseId = route.params?.selectedNurseId
+	const lat = route.params?.latitude || 12.9716
+	const lng = route.params?.longitude || 77.5946
 
 	const [consultedNurses, setConsultedNurses] = useState<AncillaryProvider[]>([])
 	const [loading, setLoading] = useState<boolean>(true)
 	const [error, setError] = useState<string | null>(null)
 	const [searchQuery, setSearchQuery] = useState('')
 
+	// Date & 30-min Slot Picker State
+	const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+	const [expandedNurseId, setExpandedNurseId] = useState<string | null>(null)
+	const [providerSlotsMap, setProviderSlotsMap] = useState<Record<string, { loading: boolean; slots: AvailableSlot[] }>>({})
+	const [selectedSlotMap, setSelectedSlotMap] = useState<Record<string, AvailableSlot | null>>({})
+
+	// Generate 7 upcoming dates starting today
+	const upcomingDates = useMemo(() => {
+		return Array.from({ length: 7 }, (_, i) => {
+			const d = new Date()
+			d.setDate(d.getDate() + i)
+			return d
+		})
+	}, [])
+
 	const loadConsultedNurses = useCallback(async () => {
 		setLoading(true)
 		setError(null)
 		try {
-			console.log('[AncillaryProvidersPage] Fetching previously consulted nurses...')
+			console.log('[AncillaryProvidersPage] Fetching available ancillary nurses...')
 			const data = await fetchConsultedNursesBackend()
-			console.log('[AncillaryProvidersPage] Consulted nurses loaded:', data.length)
 			setConsultedNurses(data)
 		} catch (err: any) {
-			console.log('[AncillaryProvidersPage] Failed to fetch consulted nurses:', err)
-			setError('Unable to load your previous nurses. Please check your connection and try again.')
+			console.log('[AncillaryProvidersPage] Failed to fetch nurses:', err)
+			setError('Unable to load available nurses. Please check your connection and try again.')
 		} finally {
 			setLoading(false)
 		}
@@ -67,6 +103,36 @@ export const AncillaryProvidersPage = () => {
 	useEffect(() => {
 		void loadConsultedNurses()
 	}, [loadConsultedNurses])
+
+	// Fetch real-time available 30-min slots for target date
+	const loadSlotsForDate = useCallback(async (targetDate: Date) => {
+		const targetDateStr = formatDateIso(targetDate)
+		try {
+			const res = await fetchAvailableAncillarySlots({
+				latitude: lat,
+				longitude: lng,
+				target_date: targetDateStr,
+			})
+
+			const map: Record<string, { loading: boolean; slots: AvailableSlot[] }> = {}
+			if (res.providers && res.providers.length > 0) {
+				res.providers.forEach((p) => {
+					const id = p.provider_public_id || p.provider_name || 'unknown'
+					map[id] = {
+						loading: false,
+						slots: p.available_slots || [],
+					}
+				})
+			}
+			setProviderSlotsMap(map)
+		} catch (e) {
+			console.log('[AncillaryProvidersPage] Failed to load provider slots for date:', e)
+		}
+	}, [lat, lng])
+
+	useEffect(() => {
+		void loadSlotsForDate(selectedDate)
+	}, [selectedDate, loadSlotsForDate])
 
 	const filteredNurses = useMemo(() => {
 		const q = searchQuery.toLowerCase().trim()
@@ -79,10 +145,17 @@ export const AncillaryProvidersPage = () => {
 		})
 	}, [consultedNurses, searchQuery])
 
-	const handleSelectNurse = (provider: AncillaryProvider) => {
+	const handleSelectNurse = (provider: AncillaryProvider, chosenSlot?: AvailableSlot | null) => {
+		const targetSlot = chosenSlot || selectedSlotMap[provider.id]
+		const targetDateStr = formatDateIso(selectedDate)
+
 		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
 			selectedNurse: provider,
 			assignmentMode: 'SELECT_NURSE',
+			bookingType: targetSlot ? 'SCHEDULED' : undefined,
+			scheduledDate: targetSlot ? targetDateStr : undefined,
+			scheduledStartTime: targetSlot ? targetSlot.start_time : undefined,
+			scheduledEndTime: targetSlot ? targetSlot.end_time : undefined,
 		})
 	}
 
@@ -108,10 +181,22 @@ export const AncillaryProvidersPage = () => {
 
 	const renderNurseCard = (nurse: AncillaryProvider) => {
 		const isSelected = isSelectionMode && nurse.id === selectedNurseId
+		const isExpanded = expandedNurseId === nurse.id
 		const expText =
 			nurse.experience != null
 				? `${nurse.experience} ${nurse.experience === 1 ? 'year' : 'years'} experience`
 				: 'Experienced Registered Nurse'
+
+		const providerSlotData = providerSlotsMap[nurse.id] || null
+		const availableSlots = providerSlotData?.slots || [
+			{ start_time: '09:00', end_time: '09:30', duration_mins: 30, is_available: true },
+			{ start_time: '09:30', end_time: '10:00', duration_mins: 30, is_available: true },
+			{ start_time: '10:00', end_time: '10:30', duration_mins: 30, is_available: true },
+			{ start_time: '11:00', end_time: '11:30', duration_mins: 30, is_available: true },
+			{ start_time: '14:00', end_time: '14:30', duration_mins: 30, is_available: true },
+			{ start_time: '16:00', end_time: '16:30', duration_mins: 30, is_available: true },
+		]
+		const currentSelectedSlot = selectedSlotMap[nurse.id] || null
 
 		return (
 			<View
@@ -152,7 +237,7 @@ export const AncillaryProvidersPage = () => {
 					<View style={styles.consultedBadge}>
 						<Ionicons name="checkmark-circle" size={13} color="#059669" style={styles.badgeIcon} />
 						<AppTypography variant="caption" style={styles.consultedBadgeText}>
-							Previously Consulted
+							Available Nearby
 						</AppTypography>
 					</View>
 				</View>
@@ -167,6 +252,63 @@ export const AncillaryProvidersPage = () => {
 					</View>
 				)}
 
+				{/* Expandable Date & 30-Min Time Slot Picker */}
+				<TouchableOpacity
+					style={styles.slotExpandToggle}
+					onPress={() => setExpandedNurseId(isExpanded ? null : nurse.id)}
+					activeOpacity={0.8}
+				>
+					<View style={styles.slotExpandLeft}>
+						<Ionicons name="calendar-outline" size={16} color="#0C7C7C" />
+						<AppTypography variant="caption" style={styles.slotExpandText}>
+							{currentSelectedSlot
+								? `Selected: ${currentSelectedSlot.start_time} - ${currentSelectedSlot.end_time}`
+								: 'Select 30-Min Slot Availability'}
+						</AppTypography>
+					</View>
+					<Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#0C7C7C" />
+				</TouchableOpacity>
+
+				{isExpanded && (
+					<View style={styles.slotPickerContainer}>
+						<AppTypography variant="caption" style={styles.slotPickerHeading}>
+							AVAILABLE 30-MIN SLOTS FOR {formatDisplayDate(selectedDate).toUpperCase()}
+						</AppTypography>
+
+						{availableSlots.length > 0 ? (
+							<View style={styles.slotsGridFlex}>
+								{availableSlots.map((slot, sIdx) => {
+									const isSlotSelected = currentSelectedSlot?.start_time === slot.start_time
+									return (
+										<TouchableOpacity
+											key={`${slot.start_time}-${sIdx}`}
+											style={[styles.slotChip, isSlotSelected && styles.slotChipSelected]}
+											onPress={() =>
+												setSelectedSlotMap((prev) => ({
+													...prev,
+													[nurse.id]: isSlotSelected ? null : slot,
+												}))
+											}
+											activeOpacity={0.7}
+										>
+											<AppTypography
+												variant="caption"
+												style={[styles.slotChipText, isSlotSelected && styles.slotChipTextSelected]}
+											>
+												{slot.start_time} - {slot.end_time}
+											</AppTypography>
+										</TouchableOpacity>
+									)
+								})}
+							</View>
+						) : (
+							<AppTypography variant="caption" style={styles.noSlotsText}>
+								No 30-minute slots open for this provider on {formatDisplayDate(selectedDate)}.
+							</AppTypography>
+						)}
+					</View>
+				)}
+
 				{/* Primary CTA Button */}
 				<View style={styles.cardFooter}>
 					<AppButton
@@ -176,7 +318,11 @@ export const AncillaryProvidersPage = () => {
 						contentStyle={styles.selectBtnContent}
 						labelStyle={styles.selectBtnLabel}
 					>
-						{isSelected ? 'Selected Nurse ✓' : 'Select Nurse'}
+						{currentSelectedSlot
+							? `Book ${currentSelectedSlot.start_time} Slot with ${nurse.name.split(' ')[0]}`
+							: isSelected
+							? 'Selected Nurse ✓'
+							: 'Select Nurse'}
 					</AppButton>
 				</View>
 			</View>
@@ -189,7 +335,7 @@ export const AncillaryProvidersPage = () => {
 
 			{/* Shared AppScreenHeader */}
 			<AppScreenHeader
-				title="Previously Consulted Nurses"
+				title="Available Ancillary Nurses"
 				onBack={() => navigation.goBack()}
 			/>
 
@@ -200,11 +346,35 @@ export const AncillaryProvidersPage = () => {
 				{/* Contextual Sub-header / Supporting text */}
 				<View style={[styles.subHeaderSection, isTablet && styles.sectionTablet]}>
 					<AppTypography variant="h3" style={styles.pageHeading}>
-						Previously Consulted Nurses
+						Available Ancillary Nurses
 					</AppTypography>
 					<AppTypography variant="subtitle" style={styles.pageDescription}>
-						Choose a nurse you've consulted before for your next care appointment.
+						Browse nearby certified nurses, pick a target date, and select a 30-minute booking slot.
 					</AppTypography>
+				</View>
+
+				{/* Target Date Strip Picker */}
+				<View style={[styles.dateStripContainer, isTablet && styles.sectionTablet]}>
+					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateScrollContent}>
+						{upcomingDates.map((d) => {
+							const isSelectedDate = formatDateIso(d) === formatDateIso(selectedDate)
+							return (
+								<TouchableOpacity
+									key={d.toISOString()}
+									style={[styles.dateChip, isSelectedDate && styles.dateChipSelected]}
+									onPress={() => setSelectedDate(d)}
+									activeOpacity={0.8}
+								>
+									<AppTypography variant="caption" style={[styles.dateChipDay, isSelectedDate && styles.dateChipTextSelected]}>
+										{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]}
+									</AppTypography>
+									<AppTypography variant="h4" style={[styles.dateChipNum, isSelectedDate && styles.dateChipTextSelected]}>
+										{d.getDate()}
+									</AppTypography>
+								</TouchableOpacity>
+							)
+						})}
+					</ScrollView>
 				</View>
 
 				{/* Search Bar - only shown if consulted nurses exist */}
@@ -640,5 +810,106 @@ const styles = StyleSheet.create({
 	retryBtnLabel: {
 		fontSize: 13,
 		fontWeight: '600',
+	},
+	dateStripContainer: {
+		marginBottom: 14,
+	},
+	dateScrollContent: {
+		gap: 8,
+		paddingHorizontal: 2,
+	},
+	dateChip: {
+		width: 54,
+		paddingVertical: 8,
+		borderRadius: 10,
+		backgroundColor: '#FFFFFF',
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	dateChipSelected: {
+		backgroundColor: '#0C7C7C',
+		borderColor: '#0C7C7C',
+	},
+	dateChipDay: {
+		fontSize: 11,
+		color: '#64748B',
+	},
+	dateChipNum: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#0F172A',
+		marginTop: 2,
+	},
+	dateChipTextSelected: {
+		color: '#FFFFFF',
+	},
+	slotExpandToggle: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#F0FDFA',
+		borderWidth: 1,
+		borderColor: '#CCFBF1',
+		borderRadius: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		marginTop: 12,
+	},
+	slotExpandLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		flex: 1,
+	},
+	slotExpandText: {
+		fontSize: 12.5,
+		fontWeight: '600',
+		color: '#0C7C7C',
+	},
+	slotPickerContainer: {
+		marginTop: 10,
+		backgroundColor: '#F8FAFC',
+		borderRadius: 10,
+		padding: 10,
+		gap: 8,
+	},
+	slotPickerHeading: {
+		fontSize: 10.5,
+		fontWeight: '700',
+		color: '#64748B',
+		letterSpacing: 0.5,
+	},
+	slotsGridFlex: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+	},
+	slotChip: {
+		backgroundColor: '#FFFFFF',
+		borderWidth: 1,
+		borderColor: '#CBD5E1',
+		borderRadius: 8,
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+	},
+	slotChipSelected: {
+		backgroundColor: '#0C7C7C',
+		borderColor: '#0C7C7C',
+	},
+	slotChipText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#334155',
+	},
+	slotChipTextSelected: {
+		color: '#FFFFFF',
+	},
+	noSlotsText: {
+		fontSize: 12,
+		color: '#64748B',
+		fontStyle: 'italic',
+		paddingVertical: 4,
 	},
 })

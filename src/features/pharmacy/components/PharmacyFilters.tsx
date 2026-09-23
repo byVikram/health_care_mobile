@@ -5,6 +5,7 @@ import {
 	Text,
 	StyleSheet,
 	Platform,
+	Pressable,
 } from 'react-native'
 import { AppSelect, AppToggle } from '../../../components/common'
 
@@ -92,8 +93,20 @@ function FilterToggle({
 	onValueChange: (val: boolean) => void
 	last?: boolean
 }) {
+	// The whole row is made pressable (not just the small AppToggle switch)
+	// so the effective tappable area comfortably meets the ~44dp minimum
+	// touch target, without resizing the visible switch itself. AppToggle's
+	// own Pressable still captures taps landing directly on it first, so
+	// tapping the switch does not double-toggle the value.
 	return (
-		<View style={[styles.toggleRow, last && styles.toggleRowLast]}>
+		<Pressable
+			style={[styles.toggleRow, last && styles.toggleRowLast]}
+			onPress={() => onValueChange(!value)}
+			hitSlop={{ left: 4, right: 4 }}
+			accessibilityRole="switch"
+			accessibilityState={{ checked: value }}
+			accessibilityLabel={label}
+		>
 			<Text style={styles.toggleLabel}>{label}</Text>
 			<AppToggle
 				value={value}
@@ -102,8 +115,9 @@ function FilterToggle({
 				size="small"
 				activeColor="#2B6F71"
 				inactiveColor="#D0D5DD"
+				accessibilityLabel={label}
 			/>
-		</View>
+		</Pressable>
 	)
 }
 
@@ -158,6 +172,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
+		minHeight: 44,
 		paddingVertical: 10,
 		borderBottomWidth: 1,
 		borderBottomColor: '#F2F4F7',

@@ -1,4 +1,4 @@
-// src/features/wallet/WalletTransactionDetailScreen.tsx
+// src/features/wallet/WalletTransactionDetailPage.tsx
 import React, { useEffect, useState } from 'react'
 import {
 	View,
@@ -13,7 +13,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import AppScreenHeader from '../../components/common/AppScreenHeader'
 import { getWalletTransactionDetail, WalletTransactionData } from './walletService'
 
-export const WalletTransactionDetailScreen: React.FC = () => {
+export const WalletTransactionDetailPage: React.FC = () => {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 

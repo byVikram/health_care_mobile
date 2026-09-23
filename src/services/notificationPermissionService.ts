@@ -2,6 +2,8 @@
 import { PermissionsAndroid, Platform } from 'react-native'
 import ApiService from './apiService'
 
+let backendPromptMarked = false
+
 export async function requestNativeOSPermission(): Promise<boolean> {
 	try {
 		console.log('[NOTIFICATION PERMISSION] Requesting native OS notification permission...')
@@ -22,7 +24,12 @@ export async function requestNativeOSPermission(): Promise<boolean> {
 }
 
 export async function markNotificationPromptShownOnBackend(): Promise<boolean> {
+	if (backendPromptMarked) {
+		console.log('[NOTIFICATION PERMISSION] Backend already updated in this session, skipping call.')
+		return true
+	}
 	try {
+		backendPromptMarked = true
 		console.log('[NOTIFICATION PERMISSION] Updating notification_prompt_shown = true on backend...')
 		await ApiService.patch('/api/auth/session/notification-prompt', undefined)
 		console.log('[NOTIFICATION PERMISSION SUCCESS] Session notification_prompt_shown updated.')
