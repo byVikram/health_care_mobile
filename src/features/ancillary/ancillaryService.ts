@@ -1968,6 +1968,69 @@ export const respondToRescheduleProposal = async (
 }
 
 /**
+ * Helper to extract human-readable error messages from backend API responses.
+ * Follows the FastAPI backend error formats:
+ * - AppException: { success: false, code: string, message: string }
+ * - RequestValidationError: { success: false, code: "VALIDATION_ERROR", message: string, errors: [...] }
+ * - HTTPException: { detail: string | { message: string } | Array<{ msg: string }> }
+ * - Generic error: { message: string } or Axios network error message
+ */
+export const extractApiErrorMessage = (
+	error: unknown,
+	fallback = 'An unexpected error occurred. Please try again.'
+): string => {
+	if (!error) return fallback
+
+	const err = error as any
+	const data = err.response?.data
+
+	if (typeof data === 'string' && data.trim()) {
+		return data.trim()
+	}
+
+	if (data && typeof data === 'object') {
+		// 1. Backend AppException or structured message
+		if (typeof data.message === 'string' && data.message.trim()) {
+			return data.message.trim()
+		}
+
+		// 2. FastAPI HTTPException detail field
+		if (typeof data.detail === 'string' && data.detail.trim()) {
+			return data.detail.trim()
+		}
+		if (data.detail && typeof data.detail === 'object') {
+			if (typeof data.detail.message === 'string' && data.detail.message.trim()) {
+				return data.detail.message.trim()
+			}
+			if (Array.isArray(data.detail) && data.detail.length > 0) {
+				const first = data.detail[0]
+				if (typeof first === 'string' && first.trim()) return first.trim()
+				if (typeof first?.msg === 'string' && first.msg.trim()) return first.msg.trim()
+			}
+		}
+
+		// 3. RequestValidationError errors list
+		if (Array.isArray(data.errors) && data.errors.length > 0) {
+			const first = data.errors[0]
+			if (typeof first === 'string' && first.trim()) return first.trim()
+			if (typeof first?.message === 'string' && first.message.trim()) return first.message.trim()
+		}
+
+		// 4. Custom error field
+		if (typeof data.error === 'string' && data.error.trim()) {
+			return data.error.trim()
+		}
+	}
+
+	// 5. Network / Axios error message (e.g. from ApiService interceptor)
+	if (typeof err.message === 'string' && err.message.trim()) {
+		return err.message.trim()
+	}
+
+	return fallback
+}
+
+/**
  * Provider action: Fetch weekly working hours and break schedules.
  */
 export const fetchProviderWeeklyAvailabilityBackend = async (): Promise<ProviderAvailabilityDay[]> => {
@@ -1995,7 +2058,7 @@ export const fetchProviderWeeklyAvailabilityBackend = async (): Promise<Provider
 		}))
 	} catch (error) {
 		console.log('[ancillaryService] fetchProviderWeeklyAvailabilityBackend error:', error)
-		return []
+		throw error
 	}
 }
 
@@ -2005,21 +2068,26 @@ export const fetchProviderWeeklyAvailabilityBackend = async (): Promise<Provider
 export const saveProviderWeeklyAvailability = async (
 	payload: SaveProviderAvailabilityPayload
 ): Promise<{ message: string; updated_count: number }> => {
-	const rawList = payload.schedules || payload.availabilities || []
-	const schedules = rawList.map((item: any) => ({
-		day_of_week: item.day_of_week,
-		start_time: item.start_time,
-		end_time: item.end_time,
-		slot_duration_mins: item.slot_duration_mins || 30,
-		break_start_time: item.break_start_time,
-		break_end_time: item.break_end_time,
-		is_active: item.is_active !== undefined ? item.is_active : item.is_available !== false,
-	}))
-	const res = await ApiService.put<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY, { schedules })
-	const data = res.data?.data || res.data
-	return {
-		message: data?.message || 'Successfully updated availability schedule.',
-		updated_count: Number(data?.updated_count || schedules.length),
+	try {
+		const rawList = payload.schedules || payload.availabilities || []
+		const schedules = rawList.map((item: any) => ({
+			day_of_week: item.day_of_week,
+			start_time: item.start_time,
+			end_time: item.end_time,
+			slot_duration_mins: item.slot_duration_mins || 30,
+			break_start_time: item.break_start_time,
+			break_end_time: item.break_end_time,
+			is_active: item.is_active !== undefined ? item.is_active : item.is_available !== false,
+		}))
+		const res = await ApiService.put<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY, { schedules })
+		const data = res.data?.data || res.data
+		return {
+			message: res.data?.message || data?.message || '',
+			updated_count: Number(data?.updated_count || schedules.length),
+		}
+	} catch (error) {
+		console.log('[ancillaryService] saveProviderWeeklyAvailability error:', error)
+		throw error
 	}
 }
 
@@ -2107,3 +2175,58 @@ export const proposeRescheduleSlot = async (
 	}
 }
 
+
+// ---------------------------------------------------------------------------
+// Ancillary Service Packages (admin-curated procedure bundles)
+// ---------------------------------------------------------------------------
+
+export interface AncillaryPackageListItem {
+	id: string
+	specialtyId: string
+	label: string
+	description?: string | null
+	imageUrl?: string | null
+	packagePrice: number
+	procedureCount: number
+}
+
+export interface AncillaryPackageProcedure {
+	id: string
+	label: string
+	price: number
+	aboutService?: string | null
+	whatsIncluded?: string[] | null
+	imageUrl?: string | null
+}
+
+export interface AncillaryPackageDetail {
+	id: string
+	specialtyId: string
+	label: string
+	description?: string | null
+	imageUrl?: string | null
+	packagePrice: number
+	procedures: AncillaryPackageProcedure[]
+}
+
+export const fetchAncillaryPackages = async (specialtyId: string): Promise<AncillaryPackageListItem[]> => {
+	try {
+		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.PACKAGES, {
+			specialty_id: specialtyId,
+		})
+		return unwrapList<AncillaryPackageListItem>(res.data)
+	} catch (error) {
+		console.log('[ancillaryService] fetchAncillaryPackages error:', error)
+		throw error
+	}
+}
+
+export const fetchAncillaryPackageDetail = async (packageId: string): Promise<AncillaryPackageDetail | null> => {
+	try {
+		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PACKAGE_DETAIL(packageId))
+		return res.data?.data ?? null
+	} catch (error) {
+		console.log('[ancillaryService] fetchAncillaryPackageDetail error:', error)
+		return null
+	}
+}

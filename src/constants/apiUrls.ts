@@ -198,6 +198,8 @@ export const API_ENDPOINTS = {
 		DELETE: (id: string) => `${BASE_URL}/api/events/${id}`,
 	},
 	ANCILLARY: {
+		PACKAGES: `${BASE_URL}/api/ancillary/packages`,
+		PACKAGE_DETAIL: (id: string | number) => `${BASE_URL}/api/ancillary/packages/${id}`,
 		PROFILE: `${BASE_URL}/api/ancillary/me/profile`,
 		CAPABILITIES: `${BASE_URL}/api/ancillary/me/capabilities`,
 		CATEGORIES: `${BASE_URL}/api/ancillary/categories`,
