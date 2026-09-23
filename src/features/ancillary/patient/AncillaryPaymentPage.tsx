@@ -169,6 +169,8 @@ export default function AncillaryPaymentPage() {
 
 		const requestPayload = {
 			publicBookingId: publicId,
+			specialtyId: bookingPayload.specialtyId,
+			careBookingMode: bookingPayload.careBookingMode,
 			serviceTypeIds: services.map((s) => s.id),
 			serviceTypeId: services[0]?.id || 'srv-01',
 			bookingType: bookingPayload.bookingType || 'INSTANT',
@@ -190,6 +192,9 @@ export default function AncillaryPaymentPage() {
 				tax: charges.taxes,
 				totalAmount: charges.totalAmount,
 			},
+			visitDurationHours: bookingPayload.visitDurationHours,
+			careInstructions: bookingPayload.careInstructions,
+			criticalFlags: bookingPayload.criticalFlags,
 		}
 
 		try {

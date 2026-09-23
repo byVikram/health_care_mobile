@@ -22,7 +22,7 @@ export interface ServiceProcedureItem {
 	categoryId?: string | null
 	verified?: boolean
 	premiumBadgeText?: string
-	actionLabel?: 'Select' | 'Enquire'
+	actionLabel?: 'Select' | 'Enquire' | '+ Add' | 'ADD +'
 	actionVariant?: 'primary' | 'secondary' | 'outline'
 	/** Optional small badge rendered above the title, e.g. "Recommended for Knee Pain" */
 	recommendedLabel?: string
@@ -37,6 +37,7 @@ interface AllServiceCardProps {
 	cardWidth?: number | string
 	style?: any
 	quantity?: number
+	showStepper?: boolean
 	onIncrement?: (item: ServiceProcedureItem) => void
 	onDecrement?: (item: ServiceProcedureItem) => void
 	onCardPress?: (item: ServiceProcedureItem) => void
@@ -48,13 +49,14 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 	cardWidth,
 	style,
 	quantity = 0,
+	showStepper = false,
 	onIncrement,
 	onDecrement,
 	onCardPress,
 	onSelectService,
 }) => {
 	const { width } = useWindowDimensions()
-	const isCustomPrice = item.price.toLowerCase().includes('custom') || item.actionLabel === 'Enquire'
+	const isCustomPrice = (item.price || '').toLowerCase().includes('custom') || item.actionLabel === 'Enquire'
 	const isAdded = quantity > 0
 	const isRecommended = !!item.recommendedLabel
 
@@ -110,27 +112,29 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 					{item.title || (item as any).label || (item as any).name || ''}
 				</AppTypography>
 
-				{/* Rating Row (Medium 500 & Soft Regular 400) */}
-				<View style={styles.ratingRow}>
-					<Ionicons name="star" size={13} color="#F59E0B" />
-					<AppTypography variant="caption" style={styles.ratingScore}>
-						4.8
+				{/* Short Description */}
+				{item.description ? (
+					<AppTypography variant="caption" style={styles.cardDesc} numberOfLines={2}>
+						{item.description}
 					</AppTypography>
-					<AppTypography variant="caption" style={styles.ratingCount}>
-						(120+ reviews)
-					</AppTypography>
-				</View>
+				) : null}
 
-				{/* Price & Duration */}
-				<View style={styles.priceRow}>
-					<AppTypography variant="h3" style={[styles.priceText, isCustomPrice && styles.customPriceText]}>
-						{item.price}
-					</AppTypography>
-					<View style={styles.dotSeparator} />
-					<AppTypography variant="caption" style={styles.durationText}>
-						{item.duration || '30 - 45 mins'}
-					</AppTypography>
-				</View>
+				{/* Price & Duration (Only rendered if item has non-empty price) */}
+				{Boolean(item.price && item.price.trim()) && (
+					<View style={styles.priceRow}>
+						<AppTypography variant="h3" style={[styles.priceText, isCustomPrice && styles.customPriceText]}>
+							{item.price}
+						</AppTypography>
+						{Boolean(item.duration && item.duration.trim()) && (
+							<>
+								<View style={styles.dotSeparator} />
+								<AppTypography variant="caption" style={styles.durationText}>
+									{item.duration}
+								</AppTypography>
+							</>
+						)}
+					</View>
+				)}
 
 				{/* View Details Link */}
 				<TouchableOpacity style={styles.viewDetailsBtn} onPress={handleCardClick} activeOpacity={0.7}>
@@ -140,7 +144,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 				</TouchableOpacity>
 			</View>
 
-			{/* Right Column: Image Box + Top RN Badge + Overlapping ADD Button */}
+			{/* Right Column: Image Box + Overlapping Action / Stepper Button */}
 			<View style={styles.rightCol}>
 				<View style={styles.imageBox}>
 					<Image
@@ -150,9 +154,43 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 					/>
 				</View>
 
-				{/* Overlapping ADD / ADDED Button */}
+				{/* Overlapping Action / Stepper Button */}
 				<View style={styles.actionButtonWrapper}>
-					{isAdded ? (
+					{showStepper ? (
+						isAdded ? (
+							<View style={styles.stepperBox}>
+								<TouchableOpacity
+									style={styles.stepperBtn}
+									onPress={handleDecrementClick}
+									activeOpacity={0.7}
+									hitSlop={8}
+								>
+									<Ionicons name="remove" size={16} color="#0C7C7C" />
+								</TouchableOpacity>
+								<AppTypography variant="caption" style={styles.stepperQty}>
+									{quantity}
+								</AppTypography>
+								<TouchableOpacity
+									style={styles.stepperBtn}
+									onPress={handleIncrementClick}
+									activeOpacity={0.7}
+									hitSlop={8}
+								>
+									<Ionicons name="add" size={16} color="#0C7C7C" />
+								</TouchableOpacity>
+							</View>
+						) : (
+							<TouchableOpacity
+								style={styles.addBtn}
+								onPress={handleIncrementClick}
+								activeOpacity={0.85}
+							>
+								<AppTypography variant="caption" style={styles.addBtnText}>
+									{item.actionLabel || '+ Add'}
+								</AppTypography>
+							</TouchableOpacity>
+						)
+					) : isAdded ? (
 						<TouchableOpacity
 							style={[styles.addBtn, styles.addedBtn]}
 							onPress={handleDecrementClick}
@@ -231,6 +269,11 @@ const styles = StyleSheet.create({
 		color: '#181C1D',
 		lineHeight: 22,
 	},
+	cardDesc: {
+		fontSize: 12.5,
+		color: '#64748B',
+		lineHeight: 17,
+	},
 	ratingRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -284,7 +327,7 @@ const styles = StyleSheet.create({
 		color: '#2B6F71',
 	},
 
-	/* Right Column (110px aspect-[4/3] Image + Overlapping ADD Pill) */
+	/* Right Column (110px aspect-[4/3] Image + Overlapping ADD / Stepper Pill) */
 	rightCol: {
 		width: 110,
 		alignItems: 'center',
@@ -302,13 +345,6 @@ const styles = StyleSheet.create({
 		width: '100%',
 		height: '100%',
 	},
-	fallbackWrap: {
-		width: '100%',
-		height: '100%',
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginTop: 10,
-	},
 	actionButtonWrapper: {
 		marginTop: -14,
 		zIndex: 20,
@@ -323,7 +359,7 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: '#BFC8C8',
 		borderRadius: 8,
-		paddingHorizontal: 22,
+		paddingHorizontal: 20,
 		paddingVertical: 6,
 		alignItems: 'center',
 		justifyContent: 'center',
@@ -358,21 +394,24 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#2B6F71',
+		borderWidth: 1.5,
+		borderColor: '#0C7C7C',
 		borderRadius: 8,
 		paddingHorizontal: 8,
 		paddingVertical: 4,
-		gap: 10,
-		minWidth: 80,
+		minWidth: 82,
 		justifyContent: 'space-between',
 	},
 	stepperBtn: {
 		padding: 2,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	stepperQty: {
-		fontSize: 13,
+		fontSize: 13.5,
 		fontWeight: '700',
-		color: '#2B6F71',
+		color: '#0C7C7C',
+		minWidth: 16,
+		textAlign: 'center',
 	},
 })
