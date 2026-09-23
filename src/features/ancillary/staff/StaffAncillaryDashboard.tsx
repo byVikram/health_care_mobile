@@ -1048,12 +1048,17 @@ export default function StaffAncillaryDashboard() {
 						<View style={styles.tabletCol}>{renderTodaySection()}</View>
 					</View>
 
-					{/* Row 2: Active Care (Left) + Scheduled Orders (Right) */}
+					{/* Row 2: Active Care (Full Width) */}
 					<View style={styles.tabletRow}>
 						<View style={styles.tabletCol}>{renderActiveCareSection()}</View>
+					</View>
+
+					{/* Row 3: Scheduled Booking Queue (Full Width) */}
+					<View style={styles.tabletRow}>
 						<View style={styles.tabletCol}>{renderScheduledOrdersSection()}</View>
 					</View>
 
+					{/* Row 4: Earnings (Full Width) */}
 					<View style={styles.tabletRow}>
 						<View style={styles.tabletCol}>{renderEarningsSection()}</View>
 					</View>
@@ -1066,8 +1071,8 @@ export default function StaffAncillaryDashboard() {
 						onAvailabilityChange={handleAvailabilityToggle}
 					/>
 					{renderTodaySection()}
-					{renderScheduledOrdersSection()}
 					{renderActiveCareSection()}
+					{renderScheduledOrdersSection()}
 					{renderEarningsSection()}
 				</View>
 			)}

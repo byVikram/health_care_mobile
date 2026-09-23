@@ -16,7 +16,7 @@ import {
 	fetchAncillaryCategoriesBackend,
 	fetchAncillaryServicesBackend,
 	updateAncillaryCapabilitiesBackend,
-	fetchProviderProfileBackend,
+	fetchProviderProfile,
 	AncillaryServiceItem,
 } from '../../../ancillary/ancillaryService'
 import { normalizeSpecialtyKey } from '../specialtyConfig'
@@ -272,17 +272,12 @@ export default function CapabilitiesTab({
 				}
 
 				// 2. Fetch backend profile to get definitive specialty and saved capabilities
-				const profResult = await fetchProviderProfileBackend()
+				const profResult = await fetchProviderProfile()
 				let savedList: string[] = []
 				let backendSubspecialtyId = ''
 
 				if (profResult && isMounted) {
-					backendSubspecialtyId =
-						profResult.subspecialty_id ||
-						(profResult as any).sub_specialty_id ||
-						profResult.subspecialty?.id ||
-						(profResult as any).sub_specialty?.id ||
-						''
+					backendSubspecialtyId = profResult.sub_specialty_id ?? ''
 
 					const backendSpec =
 						profResult.specialty_id ||
@@ -396,7 +391,7 @@ export default function CapabilitiesTab({
 
 		const refreshSpecialization = async () => {
 			try {
-				const profResult = await fetchProviderProfileBackend()
+				const profResult = await fetchProviderProfile()
 				if (!profResult || cancelled) return
 
 				const backendSpec =
@@ -410,7 +405,7 @@ export default function CapabilitiesTab({
 					await AsyncStorage.setItem('user_specialty', backendSpecKey)
 				}
 
-				const backendSubspecialtyId = profResult.subspecialty_id || profResult.subspecialty?.id || ''
+				const backendSubspecialtyId = profResult.sub_specialty_id ?? ''
 				if (backendSubspecialtyId) {
 					setSubspecialtyId(backendSubspecialtyId)
 					await AsyncStorage.setItem('ancillary_subspecialty_id', backendSubspecialtyId)

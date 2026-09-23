@@ -20,7 +20,7 @@ import SettingsIcon from '../../assets/icons/settings.svg'
 import { ROUTES } from '../../navigation/routes'
 import { getPatientDetails } from '../../features/profile/patient/PatientProfileService'
 import { getDoctorProfile, mapDoctorProfileApi } from '../../features/doctor/doctorService'
-import { fetchProviderProfileBackend } from '../../features/ancillary/ancillaryService'
+import { fetchProviderProfile } from '../../features/ancillary/ancillaryService'
 import { NEW_PHYSIOTHERAPIST_IMAGE_URL } from '../../features/profile/ancillary/specialtyConfig'
 import type { AppStackParamList } from '../../navigation/types'
 
@@ -89,7 +89,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				}
 
 				if (role === 'ancillary' || role === 'nurse') {
-					const profile = await fetchProviderProfileBackend()
+					const profile = await fetchProviderProfile()
 					if (!cancelled) {
 						const resolvedAvatar =
 							profile?.avatar_s3_key ||
