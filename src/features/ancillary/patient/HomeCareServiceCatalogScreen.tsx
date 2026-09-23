@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+﻿import React, { useEffect, useMemo, useState } from 'react'
 import {
 	ActivityIndicator,
 	BackHandler,
@@ -254,13 +254,13 @@ export default function HomeCareServiceCatalogScreen() {
 								</View>
 								<View style={[styles.modeBadge, selectedCareMode === 'FIXED_DURATION' && styles.modeBadgeActive]}>
 									<Text style={[styles.modeBadgeText, selectedCareMode === 'FIXED_DURATION' && styles.modeBadgeTextActive]}>
-										₹250/hr Standard
+										â‚¹250/hr Standard
 									</Text>
 								</View>
 							</View>
 							<Text style={styles.modeTitle}>Hourly Care</Text>
 							<Text style={styles.modeDescription}>
-								Book dedicated caregiver support by the hour (1h – 12h) for your selected activities.
+								Book dedicated caregiver support by the hour (1h â€“ 12h) for your selected activities.
 							</Text>
 							<Text style={styles.modeHint}>
 								Select activities below to form your visit care scope. Duration is configured during booking.
@@ -360,7 +360,7 @@ export default function HomeCareServiceCatalogScreen() {
 				<ViewCartFloatingBar
 					itemCount={cart.length}
 					itemLabel="Activity"
-					totalAmount={selectedCareMode === 'COMPLETE_CARE' ? 'Complete Care' : '₹250/hr Standard'}
+					totalAmount={selectedCareMode === 'COMPLETE_CARE' ? 'Complete Care' : 'â‚¹250/hr Standard'}
 					onViewCart={handleProceedToBooking}
 				/>
 			)}
@@ -370,7 +370,7 @@ export default function HomeCareServiceCatalogScreen() {
 				visible={!!selectedProcedure}
 				service={selectedProcedure}
 				onClose={() => setSelectedProcedure(null)}
-				onAddToBooking={(service) => {
+				onAddToBooking={(service: ServiceProcedureItem) => {
 					handleAddProcedure(service)
 					setSelectedProcedure(null)
 				}}
@@ -590,3 +590,4 @@ const styles = StyleSheet.create({
 		marginTop: 4,
 	},
 })
+

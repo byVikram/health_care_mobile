@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { Image, ImageSourcePropType, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import AppBottomSheet from '../AppBottomSheet'
@@ -11,8 +11,9 @@ interface ServiceDetailsSheetProps {
 	visible: boolean
 	service: ServiceProcedureItem | null
 	onClose: () => void
-	onAddToBooking: (service: ServiceProcedureItem) => void
-	/** Set to `false` to hide the "Patient Reviews" section entirely — for
+	/** When omitted, the sheet is view-only and the footer action button is not rendered. */
+	onAddToBooking?: (service: ServiceProcedureItem) => void
+	/** Set to `false` to hide the "Patient Reviews" section entirely â€” for
 	 *  callers (e.g. Laboratory) whose services have no real rating/review
 	 *  data, rather than showing simulated reviews for them. Defaults to
 	 *  `true` so every existing caller (Nursing, Physiotherapy, ...) is
@@ -21,12 +22,13 @@ interface ServiceDetailsSheetProps {
 	/** Resolves a raw `image_url`/`imageUrl`/`image` string into a displayable
 	 *  `ImageSourcePropType` (e.g. a domain-specific bundled-asset registry).
 	 *  Kept out of this shared component so `common/booking` has no
-	 *  dependency on any feature folder — pass your feature's own resolver
+	 *  dependency on any feature folder â€” pass your feature's own resolver
 	 *  (e.g. Ancillary's `getAncillaryImageSource`) to reproduce that
 	 *  feature's current image behavior. When omitted (or when it returns
 	 *  nothing and `service.imageSource` is also unset), a generic
 	 *  placeholder icon is shown instead. */
 	resolveImageSource?: (raw?: string | null) => ImageSourcePropType | undefined
+	actionButtonText?: string
 }
 
 interface ReviewItem {
@@ -113,7 +115,7 @@ const parseWhatsIncluded = (raw: any): string[] => {
 		if (trimmed.includes('\n')) {
 			return trimmed
 				.split('\n')
-				.map((line) => line.trim().replace(/^[-•*]\s*/, ''))
+				.map((line) => line.trim().replace(/^[-â€¢*]\s*/, ''))
 				.filter(Boolean)
 		}
 		return [trimmed]
@@ -128,6 +130,7 @@ export const ServiceDetailsSheet: React.FC<ServiceDetailsSheetProps> = ({
 	onAddToBooking,
 	showReviews = true,
 	resolveImageSource,
+	actionButtonText = 'Add to Booking',
 }) => {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
@@ -135,7 +138,7 @@ export const ServiceDetailsSheet: React.FC<ServiceDetailsSheetProps> = ({
 	if (!service) return null
 
 	const handleAdd = () => {
-		onAddToBooking(service)
+		onAddToBooking?.(service)
 		onClose()
 	}
 
@@ -156,11 +159,13 @@ export const ServiceDetailsSheet: React.FC<ServiceDetailsSheetProps> = ({
 			onClose={onClose}
 			maxHeightRatio={0.85}
 			footer={
-				<View style={[styles.ctaContainer, isTablet && styles.containerTablet]}>
-					<AppButton variant="primary" formAction style={styles.addBtn} onPress={handleAdd}>
-						{actionButtonText}
-					</AppButton>
-				</View>
+				onAddToBooking ? (
+					<View style={[styles.ctaContainer, isTablet && styles.containerTablet]}>
+						<AppButton variant="primary" formAction style={styles.addBtn} onPress={handleAdd}>
+							{actionButtonText}
+						</AppButton>
+					</View>
+				) : undefined
 			}
 		>
 			<View style={[styles.mainWrapper, isTablet && styles.containerTablet]}>
@@ -457,3 +462,4 @@ const styles = StyleSheet.create({
 		borderRadius: 14,
 	},
 })
+
