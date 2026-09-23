@@ -13,6 +13,12 @@ interface ServiceDetailsBottomSheetProps {
 	service: ServiceProcedureItem | null
 	onClose: () => void
 	onAddToBooking: (service: ServiceProcedureItem) => void
+	/** Set to `false` to hide the "Patient Reviews" section entirely — for
+	 *  callers (e.g. Laboratory) whose services have no real rating/review
+	 *  data, rather than showing simulated reviews for them. Defaults to
+	 *  `true` so every existing caller (Nursing, Physiotherapy, ...) is
+	 *  unaffected. */
+	showReviews?: boolean
 }
 
 interface ReviewItem {
@@ -74,6 +80,7 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 	service,
 	onClose,
 	onAddToBooking,
+	showReviews = true,
 }) => {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
@@ -169,53 +176,55 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 					</View>
 				) : null}
 
-				{/* 6. Patient Reviews */}
-				<View style={styles.section}>
-					<View style={styles.reviewsHeaderRow}>
-						<AppTypography variant="h4" style={styles.sectionHeading}>
-							Patient Reviews
-						</AppTypography>
-						<View style={styles.starBadge}>
-							<Ionicons name="star" size={12} color="#F59E0B" />
-							<AppTypography variant="caption" style={styles.starText}>
-								4.8 Rating
+				{/* 6. Patient Reviews (omitted for callers with no real review data) */}
+				{showReviews ? (
+					<View style={styles.section}>
+						<View style={styles.reviewsHeaderRow}>
+							<AppTypography variant="h4" style={styles.sectionHeading}>
+								Patient Reviews
 							</AppTypography>
-						</View>
-					</View>
-
-					<View style={styles.reviewsList}>
-						{reviewsList.map((review, index) => (
-							<View key={index} style={styles.reviewCard}>
-								<View style={styles.reviewHeader}>
-									<View style={styles.avatarCircle}>
-										<AppTypography variant="caption" style={styles.avatarLetter}>
-											{review.name.charAt(0)}
-										</AppTypography>
-									</View>
-									<View style={styles.reviewUserCol}>
-										<View style={styles.nameStarRow}>
-											<AppTypography variant="h4" style={styles.reviewName}>
-												{review.name}
-											</AppTypography>
-											<View style={styles.miniStars}>
-												<Ionicons name="star" size={10} color="#F59E0B" />
-												<AppTypography variant="caption" style={styles.miniStarText}>
-													{review.rating}
-												</AppTypography>
-											</View>
-										</View>
-										<AppTypography variant="caption" style={styles.reviewTime}>
-											{review.time}
-										</AppTypography>
-									</View>
-								</View>
-								<AppTypography variant="caption" style={styles.reviewContent}>
-									"{review.text}"
+							<View style={styles.starBadge}>
+								<Ionicons name="star" size={12} color="#F59E0B" />
+								<AppTypography variant="caption" style={styles.starText}>
+									4.8 Rating
 								</AppTypography>
 							</View>
-						))}
+						</View>
+
+						<View style={styles.reviewsList}>
+							{reviewsList.map((review, index) => (
+								<View key={index} style={styles.reviewCard}>
+									<View style={styles.reviewHeader}>
+										<View style={styles.avatarCircle}>
+											<AppTypography variant="caption" style={styles.avatarLetter}>
+												{review.name.charAt(0)}
+											</AppTypography>
+										</View>
+										<View style={styles.reviewUserCol}>
+											<View style={styles.nameStarRow}>
+												<AppTypography variant="h4" style={styles.reviewName}>
+													{review.name}
+												</AppTypography>
+												<View style={styles.miniStars}>
+													<Ionicons name="star" size={10} color="#F59E0B" />
+													<AppTypography variant="caption" style={styles.miniStarText}>
+														{review.rating}
+													</AppTypography>
+												</View>
+											</View>
+											<AppTypography variant="caption" style={styles.reviewTime}>
+												{review.time}
+											</AppTypography>
+										</View>
+									</View>
+									<AppTypography variant="caption" style={styles.reviewContent}>
+										"{review.text}"
+									</AppTypography>
+								</View>
+							))}
+						</View>
 					</View>
-				</View>
+				) : null}
 			</View>
 		</AppBottomSheet>
 	)

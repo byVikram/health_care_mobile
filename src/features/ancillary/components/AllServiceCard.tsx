@@ -5,6 +5,7 @@ import {
 	Image,
 	TouchableOpacity,
 	useWindowDimensions,
+	DimensionValue,
 } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../../../components/common'
@@ -14,18 +15,25 @@ export interface ServiceProcedureItem {
 	id: string
 	title: string
 	description: string
-	duration: string
+	duration?: string
 	price: string
-	image?: string
+	originalPrice?: string
+	discountText?: string
+	subtitle?: string
+	metadataLine?: string
+	image?: any
 	image_url?: string | null
 	imageUrl?: string | null
+	imageSource?: any
 	categoryId?: string | null
 	verified?: boolean
 	premiumBadgeText?: string
-	actionLabel?: 'Select' | 'Enquire'
+	actionLabel?: 'Select' | 'Enquire' | string
 	actionVariant?: 'primary' | 'secondary' | 'outline'
-	/** Optional small badge rendered above the title, e.g. "Recommended for Knee Pain" */
 	recommendedLabel?: string
+	rating?: number
+	reviewCount?: string
+	hideRating?: boolean
 	about_service?: string | null
 	whats_included?: string[] | string | null
 	aboutService?: string | null
@@ -34,7 +42,7 @@ export interface ServiceProcedureItem {
 
 interface AllServiceCardProps {
 	item: ServiceProcedureItem
-	cardWidth?: number | string
+	cardWidth?: DimensionValue
 	style?: any
 	quantity?: number
 	onIncrement?: (item: ServiceProcedureItem) => void
@@ -82,6 +90,12 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 		}
 	}
 
+	const imageSource =
+		item.imageSource ||
+		(typeof item.image === 'number' || (item.image && typeof item.image === 'object' && ('uri' in item.image || 'default' in item.image))
+			? item.image
+			: getAncillaryImageSource(item.image_url || item.imageUrl || item.image))
+
 	return (
 		<TouchableOpacity
 			style={[
@@ -110,26 +124,57 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 					{item.title || (item as any).label || (item as any).name || ''}
 				</AppTypography>
 
-				{/* Rating Row (Medium 500 & Soft Regular 400) */}
-				<View style={styles.ratingRow}>
-					<Ionicons name="star" size={13} color="#F59E0B" />
-					<AppTypography variant="caption" style={styles.ratingScore}>
-						4.8
+				{/* Subtitle / Also Known As (optional) */}
+				{item.subtitle ? (
+					<AppTypography variant="caption" style={styles.subtitleText} numberOfLines={2}>
+						{item.subtitle}
 					</AppTypography>
-					<AppTypography variant="caption" style={styles.ratingCount}>
-						(120+ reviews)
-					</AppTypography>
-				</View>
+				) : null}
 
-				{/* Price & Duration */}
+				{/* Metadata Line or Rating Row */}
+				{item.metadataLine ? (
+					<View style={styles.metaRow}>
+						<AppTypography variant="caption" style={styles.metaLineText} numberOfLines={2}>
+							{item.metadataLine}
+						</AppTypography>
+					</View>
+				) : !item.hideRating ? (
+					<View style={styles.ratingRow}>
+						<Ionicons name="star" size={13} color="#F59E0B" />
+						<AppTypography variant="caption" style={styles.ratingScore}>
+							{item.rating ? item.rating.toFixed(1) : '4.8'}
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.ratingCount}>
+							{item.reviewCount || '(120+ reviews)'}
+						</AppTypography>
+					</View>
+				) : null}
+
+				{/* Price, Original Price, Discount, and Duration */}
 				<View style={styles.priceRow}>
 					<AppTypography variant="h3" style={[styles.priceText, isCustomPrice && styles.customPriceText]}>
 						{item.price}
 					</AppTypography>
-					<View style={styles.dotSeparator} />
-					<AppTypography variant="caption" style={styles.durationText}>
-						{item.duration || '30 - 45 mins'}
-					</AppTypography>
+					{item.originalPrice ? (
+						<AppTypography variant="caption" style={styles.originalPriceText}>
+							{item.originalPrice}
+						</AppTypography>
+					) : null}
+					{item.discountText ? (
+						<View style={styles.discountBadge}>
+							<AppTypography variant="caption" style={styles.discountBadgeText}>
+								{item.discountText}
+							</AppTypography>
+						</View>
+					) : null}
+					{item.duration ? (
+						<>
+							<View style={styles.dotSeparator} />
+							<AppTypography variant="caption" style={styles.durationText}>
+								{item.duration}
+							</AppTypography>
+						</>
+					) : null}
 				</View>
 
 				{/* View Details Link */}
@@ -140,14 +185,16 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 				</TouchableOpacity>
 			</View>
 
-			{/* Right Column: Image Box + Top RN Badge + Overlapping ADD Button */}
+			{/* Right Column: Image Box + Overlapping ADD Button */}
 			<View style={styles.rightCol}>
 				<View style={styles.imageBox}>
-					<Image
-						source={getAncillaryImageSource(item.image_url || item.imageUrl || item.image)}
-						style={styles.image}
-						resizeMode="cover"
-					/>
+					{imageSource ? (
+						<Image source={imageSource} style={styles.image} resizeMode="cover" />
+					) : (
+						<View style={styles.fallbackWrap}>
+							<MaterialCommunityIcons name="flask-outline" size={28} color="#0C7C7C" />
+						</View>
+					)}
 				</View>
 
 				{/* Overlapping ADD / ADDED Button */}
@@ -158,7 +205,7 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 							onPress={handleDecrementClick}
 							activeOpacity={0.85}
 						>
-							<Ionicons name="checkmark" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+							<Ionicons name="checkmark" size={13} color="#FFFFFF" style={{ marginRight: 3 }} />
 							<AppTypography variant="caption" style={styles.addedBtnText}>
 								ADDED
 							</AppTypography>
@@ -186,10 +233,10 @@ export const AllServiceCard: React.FC<AllServiceCardProps> = ({
 const styles = StyleSheet.create({
 	cardContainer: {
 		flexDirection: 'row',
-		paddingVertical: 18,
+		paddingVertical: 14,
 		paddingHorizontal: 0,
 		borderBottomWidth: 1,
-		borderBottomColor: '#E0E7EF',
+		borderBottomColor: '#E2E8F0',
 		backgroundColor: '#FFFFFF',
 		alignItems: 'flex-start',
 	},
@@ -198,11 +245,11 @@ const styles = StyleSheet.create({
 	},
 	cardRecommended: {
 		backgroundColor: 'rgba(12, 124, 124, 0.035)',
-		borderRadius: 14,
+		borderRadius: 12,
 		borderWidth: 1,
 		borderColor: 'rgba(12, 124, 124, 0.18)',
-		paddingHorizontal: 10,
-		marginHorizontal: -10,
+		paddingHorizontal: 8,
+		marginHorizontal: -8,
 		marginVertical: 4,
 	},
 	recommendedBadge: {
@@ -222,14 +269,30 @@ const styles = StyleSheet.create({
 	},
 	leftCol: {
 		flex: 1,
-		paddingRight: 14,
-		gap: 5,
+		paddingRight: 12,
+		gap: 4,
 	},
 	title: {
-		fontSize: 16,
+		fontSize: 15,
 		fontWeight: '700',
 		color: '#181C1D',
-		lineHeight: 22,
+		lineHeight: 20,
+	},
+	subtitleText: {
+		fontSize: 12,
+		color: '#64748B',
+		lineHeight: 16,
+	},
+	metaRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 1,
+	},
+	metaLineText: {
+		fontSize: 11.5,
+		fontWeight: '500',
+		color: '#64748B',
+		lineHeight: 16,
 	},
 	ratingRow: {
 		flexDirection: 'row',
@@ -237,12 +300,12 @@ const styles = StyleSheet.create({
 		gap: 4,
 	},
 	ratingScore: {
-		fontSize: 13,
+		fontSize: 12.5,
 		fontWeight: '500',
 		color: '#181C1D',
 	},
 	ratingCount: {
-		fontSize: 13,
+		fontSize: 12,
 		fontWeight: '400',
 		color: '#64748B',
 		textDecorationLine: 'underline',
@@ -251,11 +314,12 @@ const styles = StyleSheet.create({
 	priceRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
+		flexWrap: 'wrap',
+		gap: 6,
 		marginTop: 2,
 	},
 	priceText: {
-		fontSize: 16,
+		fontSize: 15,
 		fontWeight: '700',
 		color: '#181C1D',
 	},
@@ -263,37 +327,53 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 		color: '#2B6F71',
 	},
+	originalPriceText: {
+		fontSize: 12,
+		color: '#94A3B8',
+		textDecorationLine: 'line-through',
+	},
+	discountBadge: {
+		backgroundColor: 'rgba(12, 124, 124, 0.08)',
+		paddingHorizontal: 5,
+		paddingVertical: 1.5,
+		borderRadius: 4,
+	},
+	discountBadgeText: {
+		fontSize: 10.5,
+		fontWeight: '700',
+		color: '#0C7C7C',
+	},
 	dotSeparator: {
-		width: 4,
-		height: 4,
-		borderRadius: 2,
+		width: 3,
+		height: 3,
+		borderRadius: 1.5,
 		backgroundColor: '#CBD5E1',
 	},
 	durationText: {
-		fontSize: 13,
+		fontSize: 12,
 		fontWeight: '400',
 		color: '#64748B',
 	},
 	viewDetailsBtn: {
-		marginTop: 4,
+		marginTop: 3,
 		alignSelf: 'flex-start',
 	},
 	viewDetailsText: {
-		fontSize: 13,
+		fontSize: 12.5,
 		fontWeight: '600',
-		color: '#2B6F71',
+		color: '#0C7C7C',
 	},
 
-	/* Right Column (110px aspect-[4/3] Image + Overlapping ADD Pill) */
+	/* Right Column (96px aspect-[4/3] Image + Overlapping ADD Pill) */
 	rightCol: {
-		width: 110,
+		width: 96,
 		alignItems: 'center',
 		position: 'relative',
 	},
 	imageBox: {
-		width: 110,
-		height: 82,
-		borderRadius: 12,
+		width: 96,
+		height: 72,
+		borderRadius: 10,
 		overflow: 'hidden',
 		backgroundColor: '#F1F4F4',
 		position: 'relative',
@@ -307,32 +387,32 @@ const styles = StyleSheet.create({
 		height: '100%',
 		justifyContent: 'center',
 		alignItems: 'center',
-		marginTop: 10,
 	},
 	actionButtonWrapper: {
-		marginTop: -14,
+		marginTop: -12,
 		zIndex: 20,
 		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.08,
-		shadowRadius: 4,
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.1,
+		shadowRadius: 3,
 		elevation: 3,
 	},
 	addBtn: {
 		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#BFC8C8',
-		borderRadius: 8,
-		paddingHorizontal: 22,
-		paddingVertical: 6,
+		borderWidth: 1.5,
+		borderColor: '#0C7C7C',
+		borderRadius: 6,
+		paddingHorizontal: 14,
+		paddingVertical: 4.5,
 		alignItems: 'center',
 		justifyContent: 'center',
-		minWidth: 80,
+		minWidth: 70,
 	},
 	addBtnText: {
-		fontSize: 13.5,
+		fontSize: 12,
 		fontWeight: '700',
-		color: '#2B6F71',
+		color: '#0C7C7C',
+		letterSpacing: 0.2,
 	},
 	addedBtn: {
 		backgroundColor: '#0C7C7C',
@@ -342,16 +422,16 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	addedBtnText: {
-		fontSize: 12.5,
+		fontSize: 11.5,
 		fontWeight: '700',
 		color: '#FFFFFF',
-		letterSpacing: 0.4,
+		letterSpacing: 0.3,
 	},
 	enquireBtn: {
-		paddingHorizontal: 14,
+		paddingHorizontal: 12,
 	},
 	enquireBtnText: {
-		fontSize: 12,
+		fontSize: 11.5,
 		color: '#64748B',
 	},
 	stepperBox: {
@@ -359,20 +439,20 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		backgroundColor: '#FFFFFF',
 		borderWidth: 1,
-		borderColor: '#2B6F71',
-		borderRadius: 8,
+		borderColor: '#0C7C7C',
+		borderRadius: 6,
 		paddingHorizontal: 8,
-		paddingVertical: 4,
-		gap: 10,
-		minWidth: 80,
+		paddingVertical: 3,
+		gap: 8,
+		minWidth: 70,
 		justifyContent: 'space-between',
 	},
 	stepperBtn: {
 		padding: 2,
 	},
 	stepperQty: {
-		fontSize: 13,
+		fontSize: 12,
 		fontWeight: '700',
-		color: '#2B6F71',
+		color: '#0C7C7C',
 	},
 })
