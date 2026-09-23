@@ -37,7 +37,7 @@ import { APPOINTMENT_STATUS } from '../../constants/constants'
 import { useAuth } from '../../context/AuthContext'
 import Toast from 'react-native-toast-message'
 import { getPharmacies } from '../profile/pharmacy/pharmacyService'
-import { getLaboratories } from '../laboratory/laboratoryService'
+import { getLaboratories } from '../laboratory_duplicated/laboratoryService'
 import { fetchRadiologyCatalog } from '../radiology/radiologyService'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 

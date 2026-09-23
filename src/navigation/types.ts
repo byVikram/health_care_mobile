@@ -4,6 +4,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs'
 import { ROUTES } from './routes'
 
 import type { DoctorDetailData } from '../types/doctor-detail'
+import type { LabBookingDraft } from '../features/laboratory/types'
 
 export type RoleParams = {
 	roleId: string
@@ -118,6 +119,39 @@ export type AppStackParamList = {
 		labIs24x7?: boolean
 	}
 	[ROUTES.STACK.LABORATORY_LIST]: undefined
+	[ROUTES.STACK.LABORATORY_ALL_TESTS]: undefined
+	[ROUTES.STACK.LABORATORY_ALL_PACKAGES]: undefined
+	// Selection lives in LaboratoryCartContext (shared across the Laboratory
+	// stack), not route params — this screen just reads it.
+	[ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION]: undefined
+	[ROUTES.STACK.LABORATORY_SELECT_LAB]: { draft: LabBookingDraft }
+	// Lab + appointment fields are only present when `draft.requiresLabSelection`
+	// is true (Diagnostic Center Visit tests, and every Package) — Home
+	// Sample Collection for individual tests reaches this screen straight
+	// from Patient Details with just `draft`, no lab ever chosen.
+	[ROUTES.STACK.LABORATORY_BOOKING_SUMMARY]: {
+		draft: LabBookingDraft
+		labId?: string
+		labName?: string
+		labAddress?: string
+		labCity?: string
+		labAvatarKey?: string | null
+		labOperatingHours?: { open: string; close: string }
+		labIs24x7?: boolean
+		date?: string
+		timeSlot?: string
+	}
+	[ROUTES.STACK.LABORATORY_BOOKING_TRACKING]: {
+		bookingReference: string
+		draft: LabBookingDraft
+		labId?: string
+		labName?: string
+		labAddress?: string
+		labCity?: string
+		date?: string
+		timeSlot?: string
+		totalAmount: number
+	}
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
 	[ROUTES.STACK.PATIENT_PAYMENT]: PatientPaymentParams | undefined

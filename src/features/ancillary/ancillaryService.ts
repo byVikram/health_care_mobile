@@ -144,7 +144,7 @@ export const fetchAncillarySubSpecialtiesBackend = fetchAncillarySubspecialtiesB
 // Backend (AncillaryProcedureResponse) returns `label` / `aboutService` /
 // `whatsIncluded` / `categoryId` / `imageUrl` -- it never returns `title` or
 // `description`. AncillaryServiceItem uses `title`/`description` for display
-// (see AllServiceCard / AncillaryServiceCatalogScreen), so raw API records
+// (see ServiceCatalogCard / AncillaryServiceCatalogScreen), so raw API records
 // must be mapped here or every service card renders with a blank name.
 const mapRawServiceToItem = (raw: any): AncillaryServiceItem => {
 	const whatsIncludedRaw = raw?.whatsIncluded ?? raw?.whats_included ?? null

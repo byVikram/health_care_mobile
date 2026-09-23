@@ -3,7 +3,7 @@ import { View, StyleSheet, Image, TouchableOpacity, useWindowDimensions } from '
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
 import { AppTypography, CommonCard } from '../../../components/common'
 import { AppButton } from '../../../components/common/AppButton'
-import { ServiceProcedureItem } from './AllServiceCard'
+import { ServiceProcedureItem } from '../../../components/common'
 
 export interface PopularService {
 	id: string
