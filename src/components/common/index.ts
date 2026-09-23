@@ -35,6 +35,27 @@ export { default as WorkingHoursSection } from "./WorkingHoursSection";
 export type { WorkingHoursSectionProps, WorkingDayKey, AppointmentType, TimeSlot as WorkingHoursTimeSlot, SectionSlots, WorkingHoursState } from "./WorkingHoursSection";
 export { WORKING_DAYS, SECTION_META, durationOptions as workingHoursDurationOptions, makeTimeOptions, snapToStep, createWorkingHoursState, DropdownSelect as WorkingHoursDropdownSelect } from "./WorkingHoursSection";
 
+// Shared booking-flow components (used by Ancillary/Nursing and Laboratory) — see src/components/common/booking/
+export * from "./booking/ServiceCatalogCard";
+export * from "./booking/ServiceDetailsSheet";
+export { default as NotesInput } from "./booking/NotesInput";
+export { default as PatientDetailsCard } from "./booking/PatientDetailsCard";
+export { default as SelectionRowCard } from "./booking/SelectionRowCard";
+export { default as BookingProgressStepper } from "./booking/BookingProgressStepper";
+export type { BookingProgressStepperProps, BookingStepperTheme } from "./booking/BookingProgressStepper";
+export { default as AddressSelectionSheet } from "./booking/AddressSelection/AddressSelectionSheet";
+export type { AddressRowRenderContext } from "./booking/AddressSelection/AddressSelectionSheet";
+export { default as AddressCardItem } from "./booking/AddressSelection/AddressCardItem";
+export type { AddressCardItemProps } from "./booking/AddressSelection/AddressCardItem";
+export { DateStrip, SlotChipGrid } from "./booking/RollingDateSlotPicker";
+export type { DateStripProps, SlotChipItem, SlotChipGridProps } from "./booking/RollingDateSlotPicker";
+export { SelectedItemCard } from "./booking/BookingSummary/SelectedItemCard";
+export type { SelectedItemCardProps, SelectedItemBadge, SelectedItemExpandable } from "./booking/BookingSummary/SelectedItemCard";
+export { SummaryEmptyState } from "./booking/BookingSummary/SummaryEmptyState";
+export type { SummaryEmptyStateProps } from "./booking/BookingSummary/SummaryEmptyState";
+export { BillingSummaryCard } from "./booking/BookingSummary/BillingSummaryCard";
+export type { BillingSummaryCardProps, BillingRow, BillingSummaryCardNote } from "./booking/BookingSummary/BillingSummaryCard";
+
 
 
 

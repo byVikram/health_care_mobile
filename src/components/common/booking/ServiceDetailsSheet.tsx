@@ -1,17 +1,32 @@
 import React from 'react'
-import { Image, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import { AppBottomSheet, AppButton, AppTypography } from '../../../components/common'
-import { ServiceProcedureItem } from './AllServiceCard'
-import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
+import { Image, ImageSourcePropType, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import AppBottomSheet from '../AppBottomSheet'
+import { AppTypography } from '../AppTypography'
+import { AppButton } from '../AppButton'
 import { safeJsonParse } from '../../../utils/jsonUtils'
+import { ServiceProcedureItem } from './ServiceCatalogCard'
 
-interface ServiceDetailsBottomSheetProps {
+interface ServiceDetailsSheetProps {
 	visible: boolean
 	service: ServiceProcedureItem | null
 	onClose: () => void
 	onAddToBooking: (service: ServiceProcedureItem) => void
-	actionButtonText?: string
+	/** Set to `false` to hide the "Patient Reviews" section entirely — for
+	 *  callers (e.g. Laboratory) whose services have no real rating/review
+	 *  data, rather than showing simulated reviews for them. Defaults to
+	 *  `true` so every existing caller (Nursing, Physiotherapy, ...) is
+	 *  unaffected. */
+	showReviews?: boolean
+	/** Resolves a raw `image_url`/`imageUrl`/`image` string into a displayable
+	 *  `ImageSourcePropType` (e.g. a domain-specific bundled-asset registry).
+	 *  Kept out of this shared component so `common/booking` has no
+	 *  dependency on any feature folder — pass your feature's own resolver
+	 *  (e.g. Ancillary's `getAncillaryImageSource`) to reproduce that
+	 *  feature's current image behavior. When omitted (or when it returns
+	 *  nothing and `service.imageSource` is also unset), a generic
+	 *  placeholder icon is shown instead. */
+	resolveImageSource?: (raw?: string | null) => ImageSourcePropType | undefined
 }
 
 interface ReviewItem {
@@ -23,30 +38,68 @@ interface ReviewItem {
 
 const MOCK_REVIEWS_POOL: Record<string, ReviewItem[]> = {
 	'gen-inj': [
-		{ name: 'Pooja K.', rating: '5.0', time: '2 days ago', text: 'Nurse was extremely gentle and professional with the injection. Arrived on time!' },
-		{ name: 'Rohan S.', rating: '4.9', time: '1 week ago', text: 'Zero pain, clean disposal kit used. Very comforting bedside manner.' },
+		{
+			name: 'Pooja K.',
+			rating: '5.0',
+			time: '2 days ago',
+			text: 'Nurse was extremely gentle and professional with the injection. Arrived on time!',
+		},
+		{
+			name: 'Rohan S.',
+			rating: '4.9',
+			time: '1 week ago',
+			text: 'Zero pain, clean disposal kit used. Very comforting bedside manner.',
+		},
 	],
 	'gen-wound': [
-		{ name: 'Amit G.', rating: '5.0', time: 'Yesterday', text: 'Sterile surgical dressing done with great care. Saved us a clinic visit.' },
-		{ name: 'Meera P.', rating: '4.8', time: '3 days ago', text: 'Very thorough diabetic foot ulcer care. Highly recommend.' },
+		{
+			name: 'Amit G.',
+			rating: '5.0',
+			time: 'Yesterday',
+			text: 'Sterile surgical dressing done with great care. Saved us a clinic visit.',
+		},
+		{
+			name: 'Meera P.',
+			rating: '4.8',
+			time: '3 days ago',
+			text: 'Very thorough diabetic foot ulcer care. Highly recommend.',
+		},
 	],
 	'hc-bath': [
-		{ name: 'Sunita M.', rating: '5.0', time: '3 days ago', text: 'Caregiver was very patient and gentle with my elderly mother.' },
-		{ name: 'Ramesh T.', rating: '4.9', time: '1 week ago', text: 'Excellent hygiene assistance, very polite and punctual.' },
+		{
+			name: 'Sunita M.',
+			rating: '5.0',
+			time: '3 days ago',
+			text: 'Caregiver was very patient and gentle with my elderly mother.',
+		},
+		{
+			name: 'Ramesh T.',
+			rating: '4.9',
+			time: '1 week ago',
+			text: 'Excellent hygiene assistance, very polite and punctual.',
+		},
 	],
 }
 
 const DEFAULT_REVIEWS: ReviewItem[] = [
-	{ name: 'Priya Sharma', rating: '5.0', time: '2 days ago', text: 'Caregiver arrived right on time and provided excellent, respectful care.' },
-	{ name: 'Anjali V.', rating: '4.8', time: '1 week ago', text: 'Highly satisfied with the treatment. Safe and hygienic protocols were followed.' }
+	{
+		name: 'Priya Sharma',
+		rating: '5.0',
+		time: '2 days ago',
+		text: 'Caregiver arrived right on time and provided excellent, respectful care.',
+	},
+	{
+		name: 'Anjali V.',
+		rating: '4.8',
+		time: '1 week ago',
+		text: 'Highly satisfied with the treatment. Safe and hygienic protocols were followed.',
+	},
 ]
 
 const parseWhatsIncluded = (raw: any): string[] => {
 	if (!raw) return []
 	if (Array.isArray(raw)) {
-		return raw
-			.map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
-			.filter(Boolean)
+		return raw.map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim())).filter(Boolean)
 	}
 	if (typeof raw === 'string') {
 		const trimmed = raw.trim()
@@ -68,12 +121,13 @@ const parseWhatsIncluded = (raw: any): string[] => {
 	return []
 }
 
-export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps> = ({
+export const ServiceDetailsSheet: React.FC<ServiceDetailsSheetProps> = ({
 	visible,
 	service,
 	onClose,
 	onAddToBooking,
-	actionButtonText = 'Book Service',
+	showReviews = true,
+	resolveImageSource,
 }) => {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
@@ -85,16 +139,15 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 		onClose()
 	}
 
-	const aboutText =
-		service.about_service?.trim() ||
-		service.aboutService?.trim() ||
-		service.description?.trim() ||
-		''
+	const aboutText = service.about_service?.trim() || service.aboutService?.trim() || service.description?.trim() || ''
 
 	const includedList = parseWhatsIncluded(service.whats_included ?? service.whatsIncluded)
 
 	// Select matching reviews or fallback
 	const reviewsList = MOCK_REVIEWS_POOL[service.id] || DEFAULT_REVIEWS
+
+	const resolvedImageSource =
+		service.imageSource || resolveImageSource?.(service.image_url || service.imageUrl || service.image)
 
 	return (
 		<AppBottomSheet
@@ -104,12 +157,7 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 			maxHeightRatio={0.85}
 			footer={
 				<View style={[styles.ctaContainer, isTablet && styles.containerTablet]}>
-					<AppButton
-						variant="primary"
-						formAction
-						style={styles.addBtn}
-						onPress={handleAdd}
-					>
+					<AppButton variant="primary" formAction style={styles.addBtn} onPress={handleAdd}>
 						{actionButtonText}
 					</AppButton>
 				</View>
@@ -117,11 +165,17 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 		>
 			<View style={[styles.mainWrapper, isTablet && styles.containerTablet]}>
 				{/* 1. Service Image */}
-				<Image
-					source={getAncillaryImageSource(service.image_url || service.imageUrl || service.image)}
-					style={[styles.image, isTablet && styles.imageTablet]}
-					resizeMode="cover"
-				/>
+				{resolvedImageSource ? (
+					<Image
+						source={resolvedImageSource}
+						style={[styles.image, isTablet && styles.imageTablet]}
+						resizeMode="cover"
+					/>
+				) : (
+					<View style={[styles.image, styles.imageFallback, isTablet && styles.imageTablet]}>
+						<MaterialCommunityIcons name="flask-outline" size={32} color="#0C7C7C" />
+					</View>
+				)}
 
 				{/* 2. Service Name */}
 				<AppTypography variant="h2" style={styles.title}>
@@ -171,53 +225,55 @@ export const ServiceDetailsBottomSheet: React.FC<ServiceDetailsBottomSheetProps>
 					</View>
 				) : null}
 
-				{/* 6. Patient Reviews */}
-				<View style={styles.section}>
-					<View style={styles.reviewsHeaderRow}>
-						<AppTypography variant="h4" style={styles.sectionHeading}>
-							Patient Reviews
-						</AppTypography>
-						<View style={styles.starBadge}>
-							<Ionicons name="star" size={12} color="#F59E0B" />
-							<AppTypography variant="caption" style={styles.starText}>
-								4.8 Rating
+				{/* 6. Patient Reviews (omitted for callers with no real review data) */}
+				{showReviews ? (
+					<View style={styles.section}>
+						<View style={styles.reviewsHeaderRow}>
+							<AppTypography variant="h4" style={styles.sectionHeading}>
+								Patient Reviews
 							</AppTypography>
-						</View>
-					</View>
-
-					<View style={styles.reviewsList}>
-						{reviewsList.map((review, index) => (
-							<View key={index} style={styles.reviewCard}>
-								<View style={styles.reviewHeader}>
-									<View style={styles.avatarCircle}>
-										<AppTypography variant="caption" style={styles.avatarLetter}>
-											{review.name.charAt(0)}
-										</AppTypography>
-									</View>
-									<View style={styles.reviewUserCol}>
-										<View style={styles.nameStarRow}>
-											<AppTypography variant="h4" style={styles.reviewName}>
-												{review.name}
-											</AppTypography>
-											<View style={styles.miniStars}>
-												<Ionicons name="star" size={10} color="#F59E0B" />
-												<AppTypography variant="caption" style={styles.miniStarText}>
-													{review.rating}
-												</AppTypography>
-											</View>
-										</View>
-										<AppTypography variant="caption" style={styles.reviewTime}>
-											{review.time}
-										</AppTypography>
-									</View>
-								</View>
-								<AppTypography variant="caption" style={styles.reviewContent}>
-									"{review.text}"
+							<View style={styles.starBadge}>
+								<Ionicons name="star" size={12} color="#F59E0B" />
+								<AppTypography variant="caption" style={styles.starText}>
+									4.8 Rating
 								</AppTypography>
 							</View>
-						))}
+						</View>
+
+						<View style={styles.reviewsList}>
+							{reviewsList.map((review, index) => (
+								<View key={index} style={styles.reviewCard}>
+									<View style={styles.reviewHeader}>
+										<View style={styles.avatarCircle}>
+											<AppTypography variant="caption" style={styles.avatarLetter}>
+												{review.name.charAt(0)}
+											</AppTypography>
+										</View>
+										<View style={styles.reviewUserCol}>
+											<View style={styles.nameStarRow}>
+												<AppTypography variant="h4" style={styles.reviewName}>
+													{review.name}
+												</AppTypography>
+												<View style={styles.miniStars}>
+													<Ionicons name="star" size={10} color="#F59E0B" />
+													<AppTypography variant="caption" style={styles.miniStarText}>
+														{review.rating}
+													</AppTypography>
+												</View>
+											</View>
+											<AppTypography variant="caption" style={styles.reviewTime}>
+												{review.time}
+											</AppTypography>
+										</View>
+									</View>
+									<AppTypography variant="caption" style={styles.reviewContent}>
+										"{review.text}"
+									</AppTypography>
+								</View>
+							))}
+						</View>
 					</View>
-				</View>
+				) : null}
 			</View>
 		</AppBottomSheet>
 	)
@@ -239,6 +295,10 @@ const styles = StyleSheet.create({
 		borderRadius: 14,
 		marginBottom: 14,
 		backgroundColor: '#F1F5F9',
+	},
+	imageFallback: {
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 	imageTablet: {
 		height: 180,

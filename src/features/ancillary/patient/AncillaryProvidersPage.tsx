@@ -17,6 +17,8 @@ import {
 	AppTypography,
 	AppButton,
 	AppSkeleton,
+	DateStrip,
+	SlotChipGrid,
 	StatusModal,
 } from '../../../components/common'
 import {
@@ -75,15 +77,6 @@ export const AncillaryProvidersPage = () => {
 	const [expandedNurseId, setExpandedNurseId] = useState<string | null>(null)
 	const [providerSlotsMap, setProviderSlotsMap] = useState<Record<string, { loading: boolean; slots: AvailableSlot[] }>>({})
 	const [selectedSlotMap, setSelectedSlotMap] = useState<Record<string, AvailableSlot | null>>({})
-
-	// Generate 7 upcoming dates starting today
-	const upcomingDates = useMemo(() => {
-		return Array.from({ length: 7 }, (_, i) => {
-			const d = new Date()
-			d.setDate(d.getDate() + i)
-			return d
-		})
-	}, [])
 
 	const loadConsultedNurses = useCallback(async () => {
 		setLoading(true)
@@ -275,37 +268,22 @@ export const AncillaryProvidersPage = () => {
 							AVAILABLE 30-MIN SLOTS FOR {formatDisplayDate(selectedDate).toUpperCase()}
 						</AppTypography>
 
-						{availableSlots.length > 0 ? (
-							<View style={styles.slotsGridFlex}>
-								{availableSlots.map((slot, sIdx) => {
-									const isSlotSelected = currentSelectedSlot?.start_time === slot.start_time
-									return (
-										<TouchableOpacity
-											key={`${slot.start_time}-${sIdx}`}
-											style={[styles.slotChip, isSlotSelected && styles.slotChipSelected]}
-											onPress={() =>
-												setSelectedSlotMap((prev) => ({
-													...prev,
-													[nurse.id]: isSlotSelected ? null : slot,
-												}))
-											}
-											activeOpacity={0.7}
-										>
-											<AppTypography
-												variant="caption"
-												style={[styles.slotChipText, isSlotSelected && styles.slotChipTextSelected]}
-											>
-												{slot.start_time} - {slot.end_time}
-											</AppTypography>
-										</TouchableOpacity>
-									)
-								})}
-							</View>
-						) : (
-							<AppTypography variant="caption" style={styles.noSlotsText}>
-								No 30-minute slots open for this provider on {formatDisplayDate(selectedDate)}.
-							</AppTypography>
-						)}
+						<SlotChipGrid
+							slots={availableSlots.map((slot) => ({
+								value: slot.start_time,
+								label: `${slot.start_time} - ${slot.end_time}`,
+							}))}
+							selectedValue={currentSelectedSlot?.start_time ?? null}
+							onSelectValue={(value) => {
+								const slot = availableSlots.find((s) => s.start_time === value)
+								if (!slot) return
+								setSelectedSlotMap((prev) => ({
+									...prev,
+									[nurse.id]: currentSelectedSlot?.start_time === value ? null : slot,
+								}))
+							}}
+							emptyLabel={`No 30-minute slots open for this provider on ${formatDisplayDate(selectedDate)}.`}
+						/>
 					</View>
 				)}
 
@@ -354,28 +332,11 @@ export const AncillaryProvidersPage = () => {
 				</View>
 
 				{/* Target Date Strip Picker */}
-				<View style={[styles.dateStripContainer, isTablet && styles.sectionTablet]}>
-					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateScrollContent}>
-						{upcomingDates.map((d) => {
-							const isSelectedDate = formatDateIso(d) === formatDateIso(selectedDate)
-							return (
-								<TouchableOpacity
-									key={d.toISOString()}
-									style={[styles.dateChip, isSelectedDate && styles.dateChipSelected]}
-									onPress={() => setSelectedDate(d)}
-									activeOpacity={0.8}
-								>
-									<AppTypography variant="caption" style={[styles.dateChipDay, isSelectedDate && styles.dateChipTextSelected]}>
-										{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]}
-									</AppTypography>
-									<AppTypography variant="h4" style={[styles.dateChipNum, isSelectedDate && styles.dateChipTextSelected]}>
-										{d.getDate()}
-									</AppTypography>
-								</TouchableOpacity>
-							)
-						})}
-					</ScrollView>
-				</View>
+				<DateStrip
+					selectedDate={selectedDate}
+					onSelectDate={setSelectedDate}
+					style={[styles.dateStripContainer, isTablet && styles.sectionTablet]}
+				/>
 
 				{/* Search Bar - only shown if consulted nurses exist */}
 				{!loading && consultedNurses.length > 0 && (
@@ -814,37 +775,6 @@ const styles = StyleSheet.create({
 	dateStripContainer: {
 		marginBottom: 14,
 	},
-	dateScrollContent: {
-		gap: 8,
-		paddingHorizontal: 2,
-	},
-	dateChip: {
-		width: 54,
-		paddingVertical: 8,
-		borderRadius: 10,
-		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	dateChipSelected: {
-		backgroundColor: '#0C7C7C',
-		borderColor: '#0C7C7C',
-	},
-	dateChipDay: {
-		fontSize: 11,
-		color: '#64748B',
-	},
-	dateChipNum: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#0F172A',
-		marginTop: 2,
-	},
-	dateChipTextSelected: {
-		color: '#FFFFFF',
-	},
 	slotExpandToggle: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -880,36 +810,5 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#64748B',
 		letterSpacing: 0.5,
-	},
-	slotsGridFlex: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 8,
-	},
-	slotChip: {
-		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#CBD5E1',
-		borderRadius: 8,
-		paddingHorizontal: 10,
-		paddingVertical: 6,
-	},
-	slotChipSelected: {
-		backgroundColor: '#0C7C7C',
-		borderColor: '#0C7C7C',
-	},
-	slotChipText: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#334155',
-	},
-	slotChipTextSelected: {
-		color: '#FFFFFF',
-	},
-	noSlotsText: {
-		fontSize: 12,
-		color: '#64748B',
-		fontStyle: 'italic',
-		paddingVertical: 4,
 	},
 })

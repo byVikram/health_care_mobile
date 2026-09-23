@@ -15,8 +15,8 @@ import { AppTypography, AppInput } from '../../../components/common'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import CaregiverServicesScreen from './CaregiverServicesScreen'
 
-import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCard'
-import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
+import { ServiceProcedureItem, ServiceCatalogCard, ServiceDetailsSheet } from '../../../components/common'
+import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
 import { NursingQuickActionCards } from '../components/NursingQuickActionCards'
 import { ConditionGrid, ConditionGridItem } from '../components/ConditionGrid'
@@ -449,7 +449,7 @@ export default function AncillaryServiceCatalogScreen() {
 							{group.procedures.map((item) => {
 								const isInCart = cart.some((c) => c.id === item.id)
 								return (
-									<AllServiceCard
+									<ServiceCatalogCard
 										key={item.id}
 										item={item}
 										quantity={isInCart ? 1 : 0}
@@ -457,6 +457,7 @@ export default function AncillaryServiceCatalogScreen() {
 										onDecrement={() => handleToggleProcedure(item)}
 										onSelectService={() => handleToggleProcedure(item)}
 										onCardPress={() => setSelectedProcedure(item)}
+										resolveImageSource={getAncillaryImageSource}
 									/>
 								)
 							})}
@@ -475,7 +476,7 @@ export default function AncillaryServiceCatalogScreen() {
 			)}
 
 			{/* Procedure Details Bottom Sheet */}
-			<ServiceDetailsBottomSheet
+			<ServiceDetailsSheet
 				visible={!!selectedProcedure}
 				service={selectedProcedure}
 				onClose={() => setSelectedProcedure(null)}
@@ -483,6 +484,7 @@ export default function AncillaryServiceCatalogScreen() {
 					handleToggleProcedure(p)
 					setSelectedProcedure(null)
 				}}
+				resolveImageSource={getAncillaryImageSource}
 			/>
 		</View>
 	)

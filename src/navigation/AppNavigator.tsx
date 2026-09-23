@@ -35,9 +35,17 @@ import OrderListPage from '../features/pharmacy/OrderListPage'
 import PharmacyOrderDetailsPage from '../features/pharmacy/PharmacyOrderDetailsPage'
 import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 
-import LaboratorySearchPage from '../features/laboratory/LaboratorySearchPage'
-import LaboratoryOrderPage from '../features/laboratory/OrderListLaboratoryPage'
-import LaboratoryBookingDetail from '../features/laboratory/BookingDetailsLaboratoryPage'
+import LaboratoryHomeScreen from '../features/laboratory/LaboratoryHomeScreen'
+import AllDiagnosticTestsScreen from '../features/laboratory/AllDiagnosticTestsScreen'
+import AllHealthPackagesScreen from '../features/laboratory/AllHealthPackagesScreen'
+import SampleCollectionScreen from '../features/laboratory/SampleCollectionScreen'
+// Lab selection + date/time slot selection are merged into one screen —
+// see the doc comment on `LabSelectionScreen.tsx`. The old
+// `SlotSelectionScreen` is superseded and intentionally not imported here.
+import LabSelectionScreen from '../features/laboratory/LabSelectionScreen'
+import BookingSummaryScreen from '../features/laboratory/BookingSummaryScreen'
+import BookingTrackingScreen from '../features/laboratory/BookingTrackingScreen'
+
 
 import PatientQuestionsListPage from '../features/patient/PatientQuestionsListPage'
 import PatientQuestionDetailPage from '../features/patient/PatientQuestionDetailPage'
@@ -48,7 +56,6 @@ import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage
 
 
 import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
-import PlaceLabOrderPage from '../features/laboratory/PlaceLabOrderPage'
 
 import DoctorEventListPage from '../features/doctor/events/DoctorEventListPage'
 import DoctorEventFormPage from '../features/doctor/events/DoctorEventFormPage'
@@ -161,26 +168,42 @@ function AuthenticatedNavigator() {
 
 			<AppStack.Screen
 				name={ROUTES.STACK.LABORATORY_LIST as keyof AppStackParamList}
-				component={LaboratorySearchPage}
-				options={{ headerShown: true, title: 'Laboratory list' }}
+				component={LaboratoryHomeScreen}
+				options={{ headerShown: true, title: 'Laboratory' }}
 			/>
 			<AppStack.Screen
-				name={ROUTES.STACK.PLACE_LABORATORY_TEST as keyof AppStackParamList}
-				component={PlaceLabOrderPage}
-				options={{ headerShown: true, title: 'Place Laboratory Test' }}
+				name={ROUTES.STACK.LABORATORY_ALL_TESTS as keyof AppStackParamList}
+				component={AllDiagnosticTestsScreen}
+				options={{ headerShown: true, title: 'All Diagnostic Tests' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.LABORATORY_ALL_PACKAGES as keyof AppStackParamList}
+				component={AllHealthPackagesScreen}
+				options={{ headerShown: true, title: 'Health Checkup Packages' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION as keyof AppStackParamList}
+				component={SampleCollectionScreen}
+				options={{ headerShown: true, title: 'Booking Details' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.LABORATORY_SELECT_LAB as keyof AppStackParamList}
+				component={LabSelectionScreen}
+				options={{ headerShown: true, title: 'Lab & Slot Selection' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.LABORATORY_BOOKING_SUMMARY as keyof AppStackParamList}
+				component={BookingSummaryScreen}
+				options={{ headerShown: true, title: 'Booking Summary' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.LABORATORY_BOOKING_TRACKING as keyof AppStackParamList}
+				component={BookingTrackingScreen}
+				options={{ headerShown: true, title: 'Booking Status' }}
 			/>
 
-			<AppStack.Screen
-				name={ROUTES.STACK.LABORATORY_ORDERS as keyof AppStackParamList}
-				component={LaboratoryOrderPage}
-				options={{ headerShown: true, title: 'laboratory order list' }}
-			/>
 
-			<AppStack.Screen
-				name={ROUTES.STACK.LABORATORY_ORDER_DETAILS as keyof AppStackParamList}
-				component={LaboratoryBookingDetail}
-				options={{ headerShown: true, title: 'laboratory detail' }}
-			/>
+			
 
 			<AppStack.Screen
 				name={ROUTES.STACK.ALL_SPECIALITIES}
