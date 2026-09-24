@@ -64,6 +64,7 @@ export const ROUTES = {
 		// `LabSelectionScreen.tsx`) — there is no separate slot-selection route.
 		LABORATORY_SELECT_LAB: 'LaboratorySelectLabPage',
 		LABORATORY_BOOKING_SUMMARY: 'LaboratoryBookingSummaryPage',
+		LABORATORY_PAYMENT: 'LaboratoryPaymentPage',
 		LABORATORY_BOOKING_TRACKING: 'LaboratoryBookingTrackingPage',
 		PLACE_LABORATORY_TEST: 'PlaceLabOrderPage',
 		LABORATORY_ORDERS: 'Orderlistlaboratorypage',

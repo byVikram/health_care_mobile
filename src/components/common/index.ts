@@ -57,6 +57,16 @@ export { BillingSummaryCard } from "./booking/BookingSummary/BillingSummaryCard"
 export type { BillingSummaryCardProps, BillingRow, BillingSummaryCardNote } from "./booking/BookingSummary/BillingSummaryCard";
 export { PackageSectionCard } from "./booking/PackageSectionCard";
 export type { PackageListItem } from "./booking/PackageSectionCard";
+export { BookingPaymentPage, isActiveTaskConflictError } from "./booking/BookingPaymentPage";
+export type {
+	BookingPaymentPageConfig,
+	BookingPaymentStepperConfig,
+	BookingPaymentSubmitContext,
+	BookingPaymentSuccessContext,
+	BookingPaymentActiveTaskError,
+	BookingPaymentCharges,
+	BookingPaymentVisit,
+} from "./booking/BookingPaymentPage";
 
 
 
