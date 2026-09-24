@@ -21,10 +21,12 @@ export interface CaregiverServiceCardProps {
 
 /**
  * Healthcare service option card for the Caregiver & Attendant module.
- * Visual design language strictly follows the established Physiotherapy
- * and Ancillary service card conventions:
+ * Visual design language follows the shared common/booking convention used
+ * throughout Nursing and Laboratory (SelectionRowCard, PatientDetailsCard,
+ * AddressCardItem, ...):
  *  - Crisp #E2E8F0 borders
- *  - Subtle circular icon treatment (#F1F5F9 / #F0FDFA)
+ *  - #0C7C7C teal icon on an #E6F4F4 circular tint (the app's canonical
+ *    accent pairing, not a separate palette)
  *  - High-contrast typography (#0F172A heading, #64748B subtitle)
  *  - Clean touch targets with standard elevation and press feedback
  */
@@ -49,7 +51,7 @@ export const CaregiverServiceCard: React.FC<CaregiverServiceCardProps> = ({
 				accessibilityLabel={`${title}, ${description}`}
 			>
 				<View style={styles.iconCircleFull}>
-					<MaterialCommunityIcons name={iconName} size={24} color="#1F5F68" />
+					<MaterialCommunityIcons name={iconName} size={24} color="#0C7C7C" />
 				</View>
 
 				<View style={styles.textWrapFull}>
@@ -75,7 +77,7 @@ export const CaregiverServiceCard: React.FC<CaregiverServiceCardProps> = ({
 			accessibilityLabel={`${title}, ${description}`}
 		>
 			<View style={styles.iconCircleGrid}>
-				<MaterialCommunityIcons name={iconName} size={22} color="#1F5F68" />
+				<MaterialCommunityIcons name={iconName} size={22} color="#0C7C7C" />
 			</View>
 
 			<View style={styles.textWrapGrid}>
@@ -114,7 +116,7 @@ const styles = StyleSheet.create({
 		width: 40,
 		height: 40,
 		borderRadius: 20,
-		backgroundColor: '#F0FDFA',
+		backgroundColor: '#E6F4F4',
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginBottom: 10,
@@ -162,7 +164,7 @@ const styles = StyleSheet.create({
 		width: 44,
 		height: 44,
 		borderRadius: 22,
-		backgroundColor: '#F0FDFA',
+		backgroundColor: '#E6F4F4',
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginRight: 14,

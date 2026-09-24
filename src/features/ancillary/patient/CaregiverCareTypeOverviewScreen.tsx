@@ -14,8 +14,8 @@ import {
 	AppCalendar,
 	AppTimePicker,
 	AppStickyFooter,
-	StatusModal,
 } from '../../../components/common'
+import { ROUTES } from '../../../navigation/routes'
 import {
 	CAREGIVER_TIME_SERVICES,
 	CAREGIVER_INCLUDED_CAPABILITIES,
@@ -77,7 +77,7 @@ function calcHourlyInfo(startTimeStr?: string, endTimeStr?: string) {
 
 	const sFormatted = formatTimeTo12h(startTimeStr)
 	const eFormatted = formatTimeTo12h(endTimeStr)
-	const rangeLabel = `${sFormatted} — ${eFormatted}`
+	const rangeLabel = `${sFormatted} – ${eFormatted}`
 
 	return { durationLabel, rangeLabel, isValid: diffMin > 0 }
 }
@@ -94,7 +94,6 @@ export default function CaregiverCareTypeOverviewScreen() {
 	if (rawCareType === 'NIGHT_CARE') normalizedCareType = 'NIGHT_CARE'
 	else if (rawCareType === 'FULL_DAY_CARE' || rawCareType === '24_HOUR_CARE') normalizedCareType = 'FULL_DAY_CARE'
 	else if (rawCareType === 'HOURLY_CARE' || rawCareType === 'CUSTOM_CARE') normalizedCareType = 'HOURLY_CARE'
-	else if (rawCareType === 'TRAVEL_ATTENDANT') normalizedCareType = 'TRAVEL_ATTENDANT'
 
 	const metadata = CAREGIVER_TIME_SERVICES[normalizedCareType] || CAREGIVER_TIME_SERVICES.DAY_CARE
 
@@ -111,7 +110,6 @@ export default function CaregiverCareTypeOverviewScreen() {
 	const [selectedDate, setSelectedDate] = useState<string>(todayDateStr)
 	const [startTime, setStartTime] = useState<string>('')
 	const [endTime, setEndTime] = useState<string>('')
-	const [confirmModalVisible, setConfirmModalVisible] = useState<boolean>(false)
 
 	const handleBack = () => {
 		if (navigation.canGoBack()) {
@@ -133,7 +131,7 @@ export default function CaregiverCareTypeOverviewScreen() {
 
 	const isFormValid = useMemo(() => {
 		if (!selectedDate) return false
-		if (normalizedCareType === 'DAY_CARE' || normalizedCareType === 'NIGHT_CARE' || normalizedCareType === 'TRAVEL_ATTENDANT') {
+		if (normalizedCareType === 'DAY_CARE' || normalizedCareType === 'NIGHT_CARE') {
 			return true
 		}
 		if (normalizedCareType === 'FULL_DAY_CARE') {
@@ -147,7 +145,63 @@ export default function CaregiverCareTypeOverviewScreen() {
 
 	const handleProceed = () => {
 		if (!isFormValid) return
-		setConfirmModalVisible(true)
+
+		// Same "pre-filled schedule" route-param contract Nursing's own
+		// AncillaryProvidersPage -> BookingDetailsPage hand-off already uses
+		// (see BookingDetailsPage.tsx's routeParams.bookingType === 'SCHEDULED'
+		// effect) -- Time-Based Care collects its own fixed/calculated care
+		// window here (Home Care-specific), then carries it forward as a
+		// single synthetic service item so Booking Details, Booking Summary,
+		// and Payment all work exactly as they do for any other ancillary
+		// specialty's selected services.
+		let scheduledStartTime = ''
+		let scheduledEndTime = ''
+		if (normalizedCareType === 'DAY_CARE') {
+			scheduledStartTime = '09:00 AM'
+			scheduledEndTime = '06:00 PM'
+		} else if (normalizedCareType === 'NIGHT_CARE') {
+			scheduledStartTime = '08:00 PM'
+			scheduledEndTime = '08:00 AM next day'
+		} else if (normalizedCareType === 'FULL_DAY_CARE') {
+			scheduledStartTime = formatTimeTo12h(startTime)
+			scheduledEndTime = calc24hEndTimeFormatted(startTime)
+		} else if (normalizedCareType === 'HOURLY_CARE') {
+			scheduledStartTime = formatTimeTo12h(startTime)
+			scheduledEndTime = formatTimeTo12h(endTime)
+		}
+
+		const durationLabel =
+			normalizedCareType === 'HOURLY_CARE'
+				? hourlyInfo.durationLabel || metadata.fixedDurationLabel || ''
+				: metadata.fixedDurationLabel || ''
+
+		const syntheticServiceItem = {
+			id: `caregiver-${normalizedCareType.toLowerCase()}`,
+			title: metadata.title,
+			description: metadata.explanation,
+			duration: durationLabel,
+			// Time-Based Care has no per-visit price model yet (see
+			// CAREGIVER_TIME_SERVICES) -- 'Custom Pricing' is the same
+			// non-numeric sentinel the catalog cards already recognize
+			// elsewhere in this app for variable-priced items.
+			price: 'Custom Pricing',
+		}
+
+		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
+			services: [syntheticServiceItem],
+			selectedServices: [syntheticServiceItem],
+			bookingType: 'SCHEDULED',
+			scheduledDate: selectedDate,
+			scheduledStartTime,
+			scheduledEndTime,
+			bookingPayload: {
+				bookingType: 'SCHEDULED',
+				serviceKey: 'home-care-time',
+				serviceLabel: metadata.title,
+				careType: normalizedCareType,
+				services: [syntheticServiceItem],
+			},
+		})
 	}
 
 	let primaryDurationText = ''
@@ -155,20 +209,20 @@ export default function CaregiverCareTypeOverviewScreen() {
 	let isHoursComplete = false
 
 	if (normalizedCareType === 'DAY_CARE') {
-		primaryDurationText = '9 hours'
-		hoursSubtext = '09:00 AM — 06:00 PM (Fixed Daytime)'
+		primaryDurationText = 'Fixed 9 Hours'
+		hoursSubtext = '09:00 AM – 06:00 PM (Fixed Daytime)'
 		isHoursComplete = true
 	} else if (normalizedCareType === 'NIGHT_CARE') {
-		primaryDurationText = '12 hours'
-		hoursSubtext = '08:00 PM ? 08:00 AM next day (Fixed Overnight)'
+		primaryDurationText = 'Fixed 12 Hours'
+		hoursSubtext = '08:00 PM – 08:00 AM next day (Fixed Overnight)'
 		isHoursComplete = true
 	} else if (normalizedCareType === 'FULL_DAY_CARE') {
-		primaryDurationText = '24 hours'
+		primaryDurationText = 'Continuous 24 Hours'
 		if (startTime && calculated24hEnd) {
-			hoursSubtext = `${formatTimeTo12h(startTime)} ? ${calculated24hEnd}`
+			hoursSubtext = `${formatTimeTo12h(startTime)} – ${calculated24hEnd}`
 			isHoursComplete = true
 		} else {
-			hoursSubtext = 'Select a start time to see when care ends.'
+			hoursSubtext = 'Select a start time to calculate the end time.'
 			isHoursComplete = false
 		}
 	} else if (normalizedCareType === 'HOURLY_CARE') {
@@ -177,14 +231,10 @@ export default function CaregiverCareTypeOverviewScreen() {
 			hoursSubtext = hourlyInfo.rangeLabel
 			isHoursComplete = true
 		} else {
-			primaryDurationText = 'Flexible Duration'
-			hoursSubtext = 'Select your start and end time to see the total duration.'
+			primaryDurationText = 'Flexible Hours'
+			hoursSubtext = 'Select start and end time to set duration.'
 			isHoursComplete = false
 		}
-	} else if (normalizedCareType === 'TRAVEL_ATTENDANT') {
-		primaryDurationText = 'Transit Support'
-		hoursSubtext = 'Full journey companion care during medical travel'
-		isHoursComplete = true
 	}
 
 	return (
@@ -203,21 +253,28 @@ export default function CaregiverCareTypeOverviewScreen() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* 1. Care Hours & Duration Summary Section */}
+				{/* Care Explanation Description */}
+				<View style={styles.overviewHeaderCard}>
+					<AppTypography variant="body" style={styles.careExplanation}>
+						{metadata.explanation}
+					</AppTypography>
+				</View>
+
+				{/* Care Hours Box */}
 				<View style={[styles.hoursBox, isHoursComplete ? styles.hoursBoxComplete : styles.hoursBoxPending]}>
 					<View style={styles.hoursHeaderRow}>
 						<View style={styles.hoursIconCircle}>
 							<MaterialCommunityIcons
 								name="clock-outline"
-								size={22}
-								color={isHoursComplete ? '#0D9488' : '#64748B'}
+								size={20}
+								color={isHoursComplete ? '#0C7C7C' : '#64748B'}
 							/>
 						</View>
 						<View style={styles.hoursTitleCol}>
 							<AppTypography variant="caption" style={styles.hoursLabelTitle}>
 								CARE HOURS & DURATION
 							</AppTypography>
-							<AppTypography variant="h3" style={styles.hoursDurationVal}>
+							<AppTypography variant="h4" style={styles.hoursDurationVal}>
 								{primaryDurationText}
 							</AppTypography>
 						</View>
@@ -229,16 +286,16 @@ export default function CaregiverCareTypeOverviewScreen() {
 						<MaterialCommunityIcons
 							name={isHoursComplete ? 'calendar-check-outline' : 'information-outline'}
 							size={16}
-							color={isHoursComplete ? '#0F766E' : '#475569'}
+							color={isHoursComplete ? '#0C7C7C' : '#64748B'}
 							style={styles.hoursSubIcon}
 						/>
-						<AppTypography variant="caption" style={[styles.hoursSubText, isHoursComplete ? styles.hoursSubTextComplete : styles.hoursSubTextPending]}>
+						<AppTypography variant="caption" style={styles.hoursSubText}>
 							{hoursSubtext}
 						</AppTypography>
 					</View>
 				</View>
 
-				{/* 2. Schedule Inputs Section */}
+				{/* Schedule Details Form */}
 				<View style={styles.sectionCard}>
 					<AppTypography variant="h4" style={styles.sectionTitle}>
 						Schedule Details
@@ -266,9 +323,9 @@ export default function CaregiverCareTypeOverviewScreen() {
 							/>
 							{startTime ? (
 								<View style={styles.calcEndBox}>
-									<MaterialCommunityIcons name="clock-check-outline" size={16} color="#0D9488" />
+									<MaterialCommunityIcons name="clock-check-outline" size={16} color="#0C7C7C" />
 									<AppTypography variant="caption" style={styles.calcEndText}>
-										Care will end automatically at: {formatTimeTo12h(startTime)} next day
+										Calculated End Time: {calc24hEndTimeFormatted(startTime)}
 									</AppTypography>
 								</View>
 							) : null}
@@ -299,9 +356,9 @@ export default function CaregiverCareTypeOverviewScreen() {
 							</View>
 							{startTime && endTime && hourlyInfo.isValid ? (
 								<View style={styles.calcEndBox}>
-									<MaterialCommunityIcons name="check-circle-outline" size={16} color="#0D9488" />
+									<MaterialCommunityIcons name="check-circle-outline" size={16} color="#0C7C7C" />
 									<AppTypography variant="caption" style={styles.calcEndText}>
-										Total Duration: {hourlyInfo.durationLabel} ({hourlyInfo.rangeLabel})
+										Calculated Duration: {hourlyInfo.durationLabel} ({hourlyInfo.rangeLabel})
 									</AppTypography>
 								</View>
 							) : null}
@@ -309,22 +366,22 @@ export default function CaregiverCareTypeOverviewScreen() {
 					)}
 				</View>
 
-				{/* 3. Read-Only "What's Included" Section */}
-				<View style={[styles.sectionCard, styles.whatsIncludedSection]}>
+				{/* What's Included */}
+				<View style={styles.sectionCard}>
 					<AppTypography variant="h4" style={styles.sectionTitle}>
 						What's Included
 					</AppTypography>
 					<AppTypography variant="caption" style={styles.sectionSubtext}>
-						Standard caregiving capabilities included with this plan:
+						Standard caregiving support provided with this care option:
 					</AppTypography>
 
-					<View style={styles.capabilitiesGrid}>
+					<View style={styles.capabilitiesList}>
 						{CAREGIVER_INCLUDED_CAPABILITIES.map((cap) => (
-							<View key={cap.id} style={styles.capabilityItem}>
-								<View style={[styles.capabilityIconCircle, { backgroundColor: cap.bgColor }]}>
-									<MaterialCommunityIcons name={cap.icon} size={20} color={cap.iconColor} />
+							<View key={cap.id} style={styles.capabilityRow}>
+								<View style={styles.capabilityIconWrap}>
+									<MaterialCommunityIcons name={cap.icon} size={18} color="#0C7C7C" />
 								</View>
-								<AppTypography variant="body" style={styles.capabilityLabel}>
+								<AppTypography variant="body" style={styles.capabilityText}>
 									{cap.label}
 								</AppTypography>
 							</View>
@@ -339,18 +396,6 @@ export default function CaregiverCareTypeOverviewScreen() {
 			>
 				Confirm Care Schedule
 			</AppStickyFooter>
-
-			<StatusModal
-				visible={confirmModalVisible}
-				status="success"
-				title="Caregiver Selection Configured"
-				description={`Your ${metadata.title} request for ${selectedDate} has been configured in the prototype.`}
-				submitText="Done"
-				onSubmit={() => {
-					setConfirmModalVisible(false)
-					handleBack()
-				}}
-			/>
 		</View>
 	)
 }
@@ -365,35 +410,43 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingHorizontal: 16,
-		paddingTop: 12,
+		paddingTop: 16,
 	},
 	scrollContentTablet: {
 		maxWidth: 800,
 		alignSelf: 'center',
 		width: '100%',
 	},
+	overviewHeaderCard: {
+		marginBottom: 12,
+	},
+	careExplanation: {
+		fontSize: 14,
+		color: '#475569',
+		lineHeight: 20,
+	},
 	hoursBox: {
-		borderRadius: 14,
-		padding: 16,
-		marginVertical: 12,
+		borderRadius: 12,
+		padding: 14,
+		marginBottom: 16,
 		borderWidth: 1,
 	},
 	hoursBoxPending: {
-		backgroundColor: '#F8FAFC',
-		borderColor: '#CBD5E1',
+		backgroundColor: '#FFFFFF',
+		borderColor: '#E2E8F0',
 	},
 	hoursBoxComplete: {
-		backgroundColor: '#F0FDFA',
-		borderColor: '#99F6E4',
+		backgroundColor: '#E6F4F4',
+		borderColor: '#CCFBF1',
 	},
 	hoursHeaderRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
 	hoursIconCircle: {
-		width: 42,
-		height: 42,
-		borderRadius: 21,
+		width: 36,
+		height: 36,
+		borderRadius: 18,
 		backgroundColor: '#E6F4F4',
 		alignItems: 'center',
 		justifyContent: 'center',
@@ -406,19 +459,19 @@ const styles = StyleSheet.create({
 		fontSize: 11,
 		fontWeight: '700',
 		color: '#64748B',
-		letterSpacing: 0.6,
+		letterSpacing: 0.5,
 		textTransform: 'uppercase',
 	},
 	hoursDurationVal: {
-		fontSize: 18,
-		fontWeight: '800',
+		fontSize: 16,
+		fontWeight: '700',
 		color: '#0F172A',
-		marginTop: 2,
+		marginTop: 1,
 	},
 	hoursDivider: {
 		height: 1,
 		backgroundColor: '#E2E8F0',
-		marginVertical: 12,
+		marginVertical: 10,
 	},
 	hoursSubRow: {
 		flexDirection: 'row',
@@ -429,27 +482,20 @@ const styles = StyleSheet.create({
 	},
 	hoursSubText: {
 		fontSize: 13,
-		lineHeight: 18,
+		color: '#334155',
 		flex: 1,
-	},
-	hoursSubTextPending: {
-		color: '#475569',
-		fontWeight: '400',
-	},
-	hoursSubTextComplete: {
-		color: '#0F766E',
-		fontWeight: '600',
+		lineHeight: 18,
 	},
 	sectionCard: {
 		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 18,
+		borderRadius: 14,
+		padding: 16,
 		marginBottom: 16,
 		borderWidth: 1,
 		borderColor: '#E2E8F0',
 	},
 	sectionTitle: {
-		fontSize: 16,
+		fontSize: 15,
 		fontWeight: '700',
 		color: '#0F172A',
 		marginBottom: 4,
@@ -457,15 +503,15 @@ const styles = StyleSheet.create({
 	sectionSubtext: {
 		fontSize: 13,
 		color: '#64748B',
-		marginBottom: 14,
+		marginBottom: 12,
 	},
 	fieldContainer: {
-		marginTop: 12,
+		marginTop: 10,
 	},
 	rowFields: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
-		marginTop: 12,
+		marginTop: 10,
 		gap: 12,
 	},
 	halfField: {
@@ -474,42 +520,39 @@ const styles = StyleSheet.create({
 	calcEndBox: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#F0FDFA',
+		backgroundColor: '#E6F4F4',
 		paddingHorizontal: 12,
 		paddingVertical: 10,
-		borderRadius: 10,
+		borderRadius: 8,
 		marginTop: 10,
 		borderWidth: 1,
 		borderColor: '#CCFBF1',
 	},
 	calcEndText: {
 		marginLeft: 8,
-		color: '#0F766E',
+		color: '#0C7C7C',
 		fontWeight: '600',
 		fontSize: 13,
 		flex: 1,
 	},
-	whatsIncludedSection: {
+	capabilitiesList: {
 		marginTop: 4,
+		gap: 10,
 	},
-	capabilitiesGrid: {
-		gap: 12,
-		marginTop: 8,
-	},
-	capabilityItem: {
+	capabilityRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 6,
 	},
-	capabilityIconCircle: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
+	capabilityIconWrap: {
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		backgroundColor: '#E6F4F4',
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginRight: 12,
+		marginRight: 10,
 	},
-	capabilityLabel: {
+	capabilityText: {
 		fontSize: 14,
 		fontWeight: '500',
 		color: '#334155',

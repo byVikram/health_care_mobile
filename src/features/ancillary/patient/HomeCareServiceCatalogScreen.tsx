@@ -10,17 +10,39 @@ import {
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
-import { ROUTES } from '../../../navigation/routes'
-import { AppTypography, AppInput, AppScreenHeader } from '../../../components/common'
-import { ServiceProcedureItem, AllServiceCard } from '../components/AllServiceCard'
-import { ServiceDetailsBottomSheet } from '../components/ServiceDetailsBottomSheet'
+import {
+	AppTypography,
+	AppInput,
+	AppScreenHeader,
+	ServiceProcedureItem,
+	ServiceCatalogCard,
+	ServiceDetailsSheet,
+	SelectionRowCard,
+} from '../../../components/common'
+import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
+import { ConditionGrid, ConditionGridItem } from '../components/ConditionGrid'
+import { ROUTES } from '../../../navigation/routes'
 import {
 	AncillaryCategoryApiItem,
 	AncillaryServiceItem,
 	fetchAncillaryCategoriesBackend,
 	fetchAncillaryServicesBackend,
 } from '../ancillaryService'
+
+// Icon lookup for the Home Care category grid (reusing ConditionGrid, the
+// same pattern Nursing Care and Physiotherapy already use in
+// AncillaryServiceCatalogScreen.tsx) -- categories still come from the API;
+// this only supplies an icon per known label so the shared grid has
+// something to show. Any unknown/future category label falls back to
+// HOME_CARE_DEFAULT_ICON.
+const HOME_CARE_CATEGORY_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+	'personal care': 'account-heart-outline',
+	'mobility support': 'walk',
+	'companionship': 'account-group-outline',
+}
+const HOME_CARE_DEFAULT_ICON: keyof typeof MaterialCommunityIcons.glyphMap = 'clipboard-text-outline'
+const HOME_CARE_ALL_CATEGORY_ID = 'all'
 
 export type CareBookingMode = 'COMPLETE_CARE' | 'FIXED_DURATION'
 
@@ -74,17 +96,12 @@ export default function HomeCareServiceCatalogScreen() {
 		}
 	}, [])
 
-	// Sync selection state if returning from Booking Details
 	useEffect(() => {
 		if (route.params?.updatedCart) {
 			setCart(route.params.updatedCart)
 			navigation.setParams({ updatedCart: undefined })
 		}
-		if (route.params?.careBookingMode) {
-			setSelectedCareMode(route.params.careBookingMode)
-			navigation.setParams({ careBookingMode: undefined })
-		}
-	}, [route.params?.updatedCart, route.params?.careBookingMode])
+	}, [route.params?.updatedCart])
 
 	useEffect(() => {
 		const onBackPress = () => {
@@ -100,6 +117,18 @@ export default function HomeCareServiceCatalogScreen() {
 
 	const categoryPills = useMemo(() => {
 		return [{ id: 'all', label: 'All Activities' }, ...categories]
+	}, [categories])
+
+	// Home Care category filters, reusing the exact same ConditionGrid card UI
+	// Nursing Care and Physiotherapy already use in AncillaryServiceCatalogScreen.tsx
+	// (see NURSING_CATEGORY_ICONS there) -- categories/ids/labels are still exactly
+	// what the API returns; only an icon is attached here for display.
+	const homeCareConditions = useMemo<ConditionGridItem[]>(() => {
+		return categories.map((cat) => ({
+			id: cat.id,
+			label: cat.label,
+			icon: HOME_CARE_CATEGORY_ICONS[cat.label.trim().toLowerCase()] || HOME_CARE_DEFAULT_ICON,
+		}))
 	}, [categories])
 
 	const procedureItems = useMemo<ServiceProcedureItem[]>(() => {
@@ -174,9 +203,23 @@ export default function HomeCareServiceCatalogScreen() {
 
 	const handleProceedToBooking = () => {
 		if (cart.length === 0) return
-		navigation.navigate(ROUTES.STACK.HOME_CARE_BOOKING_DETAILS, {
+		// Same continuation Nursing/Physiotherapy already use from
+		// AncillaryServiceCatalogScreen.tsx's handleInstantDispatch --
+		// Home Care activities are ServiceProcedureItem[] from the same
+		// ancillary catalog API, so they carry into Booking Details, the
+		// Booking Summary/Payment flow, and (for "Select a Caregiver")
+		// AncillaryProvidersPage exactly the same way any other ancillary
+		// specialty's selected services do.
+		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
+			services: cart,
 			selectedServices: cart,
-			careBookingMode: selectedCareMode,
+			bookingPayload: {
+				bookingType: 'INSTANT',
+				serviceKey: 'home-care',
+				serviceLabel: 'Home Care & Daily Living',
+				careBookingMode: selectedCareMode,
+				services: cart,
+			},
 		})
 	}
 
@@ -197,114 +240,81 @@ export default function HomeCareServiceCatalogScreen() {
 				{/* 1. CARE MODE SELECTION SECTION */}
 				<View style={styles.careModeSection}>
 					<View style={styles.modeSectionHeader}>
-						<Ionicons name="options-outline" size={18} color="#2B6F71" />
+						<Ionicons name="options-outline" size={18} color="#0C7C7C" />
 						<AppTypography variant="subtitle" style={styles.modeSectionTitle}>
 							Choose Care Type
 						</AppTypography>
 					</View>
 
 					<View style={styles.modeOptionsContainer}>
-						{/* Complete Care Option Card */}
-						<TouchableOpacity
-							style={[styles.modeCard, selectedCareMode === 'COMPLETE_CARE' && styles.modeCardActive]}
+						<SelectionRowCard
+							icon={
+								<MaterialCommunityIcons
+									name="clipboard-pulse-outline"
+									size={20}
+									color={selectedCareMode === 'COMPLETE_CARE' ? '#FFFFFF' : '#0C7C7C'}
+								/>
+							}
+							title="Complete Care"
+							subtitle="I need comprehensive home care support. Caregiver evaluates needs on-site to determine required daily hours."
+							badgeText="Assessment-Based"
+							selected={selectedCareMode === 'COMPLETE_CARE'}
 							onPress={() => setSelectedCareMode('COMPLETE_CARE')}
-							activeOpacity={0.85}
-						>
-							<View style={styles.modeCardTopRow}>
-								<View style={[styles.modeRadio, selectedCareMode === 'COMPLETE_CARE' && styles.modeRadioActive]}>
-									{selectedCareMode === 'COMPLETE_CARE' && <View style={styles.modeRadioDot} />}
-								</View>
-								<View style={[styles.modeBadge, selectedCareMode === 'COMPLETE_CARE' && styles.modeBadgeActive]}>
-									<Text style={[styles.modeBadgeText, selectedCareMode === 'COMPLETE_CARE' && styles.modeBadgeTextActive]}>
-										Assessment-Based
-									</Text>
-								</View>
-							</View>
-							<Text style={styles.modeTitle}>Complete Care</Text>
-							<Text style={styles.modeDescription}>
-								I need comprehensive home care support. Caregiver evaluates needs on-site to determine required daily hours.
-							</Text>
-							{selectedCareMode === 'COMPLETE_CARE' && (
-								<TouchableOpacity
-									style={[styles.quickSelectAllRow, allSelected && styles.quickSelectAllRowActive]}
-									onPress={handleToggleSelectAll}
-									activeOpacity={0.8}
-								>
-									<Ionicons
-										name={allSelected ? 'checkmark-circle' : 'checkmark-circle-outline'}
-										size={16}
-										color={allSelected ? '#2B6F71' : '#64748B'}
-									/>
-									<Text style={[styles.quickSelectAllText, allSelected && styles.quickSelectAllTextActive]}>
-										{allSelected ? 'All 18 activities selected' : 'Select all 18 care activities'}
-									</Text>
-								</TouchableOpacity>
-							)}
-						</TouchableOpacity>
+						/>
+						{selectedCareMode === 'COMPLETE_CARE' && (
+							<TouchableOpacity
+								style={[styles.quickSelectAllRow, allSelected && styles.quickSelectAllRowActive]}
+								onPress={handleToggleSelectAll}
+								activeOpacity={0.8}
+							>
+								<Ionicons
+									name={allSelected ? 'checkmark-circle' : 'checkmark-circle-outline'}
+									size={16}
+									color={allSelected ? '#0C7C7C' : '#64748B'}
+								/>
+								<Text style={[styles.quickSelectAllText, allSelected && styles.quickSelectAllTextActive]}>
+									{allSelected ? `All ${procedureItems.length} activities selected` : `Select all ${procedureItems.length} care activities`}
+								</Text>
+							</TouchableOpacity>
+						)}
 
-						{/* Hourly Care Option Card */}
-						<TouchableOpacity
-							style={[styles.modeCard, selectedCareMode === 'FIXED_DURATION' && styles.modeCardActive]}
+						<SelectionRowCard
+							icon={
+								<MaterialCommunityIcons
+									name="clock-time-four-outline"
+									size={20}
+									color={selectedCareMode === 'FIXED_DURATION' ? '#FFFFFF' : '#0C7C7C'}
+								/>
+							}
+							title="Hourly Care"
+							subtitle="Book dedicated caregiver support by the hour (1h – 12h) for your selected activities."
+							badgeText="₹250/hr Standard"
+							selected={selectedCareMode === 'FIXED_DURATION'}
 							onPress={() => setSelectedCareMode('FIXED_DURATION')}
-							activeOpacity={0.85}
-						>
-							<View style={styles.modeCardTopRow}>
-								<View style={[styles.modeRadio, selectedCareMode === 'FIXED_DURATION' && styles.modeRadioActive]}>
-									{selectedCareMode === 'FIXED_DURATION' && <View style={styles.modeRadioDot} />}
-								</View>
-								<View style={[styles.modeBadge, selectedCareMode === 'FIXED_DURATION' && styles.modeBadgeActive]}>
-									<Text style={[styles.modeBadgeText, selectedCareMode === 'FIXED_DURATION' && styles.modeBadgeTextActive]}>
-										â‚¹250/hr Standard
-									</Text>
-								</View>
-							</View>
-							<Text style={styles.modeTitle}>Hourly Care</Text>
-							<Text style={styles.modeDescription}>
-								Book dedicated caregiver support by the hour (1h â€“ 12h) for your selected activities.
-							</Text>
-							<Text style={styles.modeHint}>
-								Select activities below to form your visit care scope. Duration is configured during booking.
-							</Text>
-						</TouchableOpacity>
+						/>
+						{selectedCareMode === 'FIXED_DURATION' && (
+							<Text style={styles.modeHint}>Select activities below to form your visit care scope.</Text>
+						)}
 					</View>
 				</View>
 
-				{/* 2. CATEGORIES PILL BAR */}
-				<View style={styles.categoriesHeader}>
-					<AppTypography variant="caption" style={styles.sectionHeadingLabel}>
-						BROWSE CARE ACTIVITIES ({procedureItems.length})
-					</AppTypography>
-				</View>
-
-				<ScrollView
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					contentContainerStyle={styles.categoriesBar}
-				>
-					{categoryPills.map((cat) => {
-						const isActive = activeCategory === cat.id
-						return (
-							<TouchableOpacity
-								key={cat.id}
-								style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-								onPress={() => setActiveCategory(cat.id)}
-								activeOpacity={0.8}
-							>
-								<AppTypography
-									variant="caption"
-									style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}
-								>
-									{cat.label}
-								</AppTypography>
-							</TouchableOpacity>
-						)
-					})}
-				</ScrollView>
+				{/* 2. CATEGORY FILTER GRID */}
+				<ConditionGrid
+					activeConditionId={activeCategory}
+					onSelectCondition={(id) =>
+						setActiveCategory((prev) => (prev === id && id !== HOME_CARE_ALL_CATEGORY_ID ? HOME_CARE_ALL_CATEGORY_ID : id))
+					}
+					conditions={homeCareConditions}
+					title="Home Care For?"
+					subtitle={`${procedureItems.length} activities available`}
+					allChipId={HOME_CARE_ALL_CATEGORY_ID}
+					cardWidthPercent="48%"
+				/>
 
 				{/* 3. ACTIVITY LIST */}
 				{loading ? (
 					<View style={styles.loadingContainer}>
-						<ActivityIndicator size="large" color="#2B6F71" />
+						<ActivityIndicator size="large" color="#0C7C7C" />
 						<AppTypography variant="caption" style={styles.loadingText}>
 							Loading Home Care activities...
 						</AppTypography>
@@ -329,13 +339,12 @@ export default function HomeCareServiceCatalogScreen() {
 							{group.procedures.map((item) => {
 								const isInCart = cart.some((c) => c.id === item.id)
 								return (
-									<AllServiceCard
+									<ServiceCatalogCard
 										key={item.id}
 										item={{
 											...item,
 											actionLabel: '+ Add',
 										}}
-										showStepper={false}
 										quantity={isInCart ? 1 : 0}
 										onIncrement={() => handleAddProcedure(item)}
 										onDecrement={() => handleRemoveProcedure(item)}
@@ -347,6 +356,7 @@ export default function HomeCareServiceCatalogScreen() {
 											}
 										}}
 										onCardPress={() => setSelectedProcedure(item)}
+										resolveImageSource={getAncillaryImageSource}
 									/>
 								)
 							})}
@@ -366,7 +376,7 @@ export default function HomeCareServiceCatalogScreen() {
 			)}
 
 			{/* Activity Details Bottom Sheet */}
-			<ServiceDetailsBottomSheet
+			<ServiceDetailsSheet
 				visible={!!selectedProcedure}
 				service={selectedProcedure}
 				onClose={() => setSelectedProcedure(null)}
@@ -374,6 +384,9 @@ export default function HomeCareServiceCatalogScreen() {
 					handleAddProcedure(service)
 					setSelectedProcedure(null)
 				}}
+				showReviews={false}
+				actionButtonText="Add Activity"
+				resolveImageSource={getAncillaryImageSource}
 			/>
 		</View>
 	)
@@ -411,82 +424,12 @@ const styles = StyleSheet.create({
 	modeOptionsContainer: {
 		gap: 10,
 	},
-	modeCard: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 14,
-		padding: 14,
-		borderWidth: 1.5,
-		borderColor: '#E2E8F0',
-		gap: 6,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.04,
-		shadowRadius: 3,
-		elevation: 1,
-	},
-	modeCardActive: {
-		backgroundColor: '#F0F9F9',
-		borderColor: '#2B6F71',
-		shadowColor: '#2B6F71',
-		shadowOpacity: 0.08,
-		shadowRadius: 6,
-		elevation: 2,
-	},
-	modeCardTopRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	modeRadio: {
-		width: 18,
-		height: 18,
-		borderRadius: 9,
-		borderWidth: 2,
-		borderColor: '#94A3B8',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	modeRadioActive: {
-		borderColor: '#2B6F71',
-	},
-	modeRadioDot: {
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-		backgroundColor: '#2B6F71',
-	},
-	modeBadge: {
-		backgroundColor: '#F1F5F9',
-		paddingHorizontal: 8,
-		paddingVertical: 3,
-		borderRadius: 6,
-	},
-	modeBadgeActive: {
-		backgroundColor: '#E6F4F4',
-	},
-	modeBadgeText: {
-		fontSize: 11,
-		fontWeight: '700',
-		color: '#475569',
-	},
-	modeBadgeTextActive: {
-		color: '#2B6F71',
-	},
-	modeTitle: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#0F172A',
-	},
-	modeDescription: {
-		fontSize: 12.5,
-		color: '#475569',
-		lineHeight: 17,
-	},
 	modeHint: {
 		fontSize: 11,
-		color: '#2B6F71',
+		color: '#0C7C7C',
 		fontWeight: '600',
 		marginTop: 2,
+		marginLeft: 2,
 	},
 	quickSelectAllRow: {
 		flexDirection: 'row',
@@ -502,7 +445,7 @@ const styles = StyleSheet.create({
 		marginTop: 4,
 	},
 	quickSelectAllRowActive: {
-		borderColor: '#2B6F71',
+		borderColor: '#0C7C7C',
 		backgroundColor: '#E6F4F4',
 	},
 	quickSelectAllText: {
@@ -511,44 +454,7 @@ const styles = StyleSheet.create({
 		color: '#475569',
 	},
 	quickSelectAllTextActive: {
-		color: '#2B6F71',
-		fontWeight: '700',
-	},
-	categoriesHeader: {
-		paddingHorizontal: 16,
-		marginTop: 10,
-		marginBottom: 2,
-	},
-	sectionHeadingLabel: {
-		fontSize: 11.5,
-		fontWeight: '700',
-		color: '#64748B',
-		letterSpacing: 0.5,
-	},
-	categoriesBar: {
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		gap: 8,
-	},
-	categoryChip: {
-		paddingHorizontal: 14,
-		paddingVertical: 8,
-		borderRadius: 20,
-		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-	},
-	categoryChipActive: {
-		backgroundColor: '#2B6F71',
-		borderColor: '#2B6F71',
-	},
-	categoryChipText: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: '#475569',
-	},
-	categoryChipTextActive: {
-		color: '#FFFFFF',
+		color: '#0C7C7C',
 		fontWeight: '700',
 	},
 	groupSection: {

@@ -9,7 +9,6 @@ import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from '../../../navigation/routes'
 import { AppTypography, AppScreenHeader } from '../../../components/common'
-import CaregiverSectionHeader from '../components/CaregiverSectionHeader'
 import CaregiverServiceCard from '../components/CaregiverServiceCard'
 
 export default function CaregiverServicesScreen() {
@@ -50,13 +49,7 @@ export default function CaregiverServicesScreen() {
 		})
 	}
 
-	const handleSelectTravelAttendant = () => {
-		navigation.navigate(ROUTES.STACK.CAREGIVER_TIME_CONFIG, {
-			careType: 'TRAVEL_ATTENDANT',
-		})
-	}
-
-	const handleSelectServiceBasedCare = () => {
+	const handleSelectActivitiesAndTasks = () => {
 		navigation.navigate(ROUTES.STACK.HOME_CARE_CATALOG, {
 			careBookingMode: 'FIXED_DURATION',
 		})
@@ -78,64 +71,70 @@ export default function CaregiverServicesScreen() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Section 1: Time-Based Care */}
+				{/* Concise Page Intro */}
+				<AppTypography variant="body" style={styles.pageIntro}>
+					Choose the type of caregiver support you need.
+				</AppTypography>
+
+				{/* SECTION 1: TIME-BASED CARE */}
 				<View style={styles.sectionContainer}>
-					<CaregiverSectionHeader
-						title="TIME-BASED CARE"
-						supportingText="Book a caregiver for a specific period of time or hourly duration."
-					/>
+					<View style={styles.sectionHeaderWrap}>
+						<AppTypography variant="h4" style={styles.sectionTitle}>
+							TIME-BASED CARE
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.sectionSubtext}>
+							Choose care based on the duration of support you need.
+						</AppTypography>
+					</View>
 
 					<View style={styles.gridRow}>
 						<CaregiverServiceCard
 							title="Day Care"
-							description="Daytime caregiver support (09:00 AM — 06:00 PM)"
+							description="Daytime caregiver support"
 							iconName="white-balance-sunny"
 							onPress={handleSelectDayCare}
 						/>
 
 						<CaregiverServiceCard
 							title="Night Care"
-							description="Overnight caregiver support (08:00 PM — 08:00 AM)"
+							description="Overnight caregiver support"
 							iconName="weather-night"
 							onPress={handleSelectNightCare}
 						/>
 
 						<CaregiverServiceCard
 							title="24-Hour Care"
-							description="Continuous care for a full 24-hour period"
+							description="Continuous caregiver support"
 							iconName="clock-time-four-outline"
 							onPress={handleSelect24HourCare}
 						/>
 
 						<CaregiverServiceCard
 							title="Hourly Care"
-							description="Choose your start and end time according to your needs"
+							description="Flexible caregiver hours"
 							iconName="calendar-clock-outline"
 							onPress={handleSelectHourlyCare}
-						/>
-
-						<CaregiverServiceCard
-							title="Travel Attendant"
-							description="Companion care during transit, appointments or hospital visits"
-							iconName="car-side"
-							onPress={handleSelectTravelAttendant}
 						/>
 					</View>
 				</View>
 
-				{/* Section 2: Service-Based Care */}
-				<View style={[styles.sectionContainer, styles.sectionSpacing]}>
-					<CaregiverSectionHeader
-						title="ACTIVITIES & TASK-BASED CARE"
-						supportingText="Choose specific caregiver-assisted activities based on patient needs."
-					/>
+				{/* SECTION 2: ACTIVITIES & TASK-BASED CARE */}
+				<View style={[styles.sectionContainer, styles.secondSectionSpacing]}>
+					<View style={styles.sectionHeaderWrap}>
+						<AppTypography variant="h4" style={styles.sectionTitle}>
+							ACTIVITIES & TASK-BASED CARE
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.sectionSubtext}>
+							Choose specific activities where caregiver assistance is required.
+						</AppTypography>
+					</View>
 
 					<CaregiverServiceCard
 						variant="fullWidth"
-						title="Browse Care Activities Catalog"
-						description="Explore individual activities, meal support, hygiene, and daily care tasks"
+						title="Activities & Tasks"
+						description="Select specific caregiver-assisted activities based on your needs."
 						iconName="hand-heart-outline"
-						onPress={handleSelectServiceBasedCare}
+						onPress={handleSelectActivitiesAndTasks}
 					/>
 				</View>
 			</ScrollView>
@@ -153,18 +152,40 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingHorizontal: 16,
-		paddingTop: 18,
+		paddingTop: 16,
 	},
 	scrollContentTablet: {
 		maxWidth: 800,
 		alignSelf: 'center',
 		width: '100%',
 	},
-	sectionContainer: {
-		marginBottom: 6,
+	pageIntro: {
+		fontSize: 14,
+		color: '#475569',
+		marginBottom: 20,
+		lineHeight: 20,
 	},
-	sectionSpacing: {
-		marginTop: 18,
+	sectionContainer: {
+		marginBottom: 8,
+	},
+	secondSectionSpacing: {
+		marginTop: 20,
+	},
+	sectionHeaderWrap: {
+		marginBottom: 12,
+	},
+	sectionTitle: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#0F172A',
+		letterSpacing: 0.5,
+		textTransform: 'uppercase',
+	},
+	sectionSubtext: {
+		fontSize: 13,
+		color: '#64748B',
+		marginTop: 3,
+		lineHeight: 18,
 	},
 	gridRow: {
 		flexDirection: 'row',

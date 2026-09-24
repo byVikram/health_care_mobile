@@ -97,7 +97,6 @@ export const ROUTES = {
 		ANCILLARY_MY_BOOKINGS: 'AncillaryMyBookings',
 		ANCILLARY_SERVICE_MATCHING: 'AncillaryServiceMatching',
 		HOME_CARE_CATALOG: 'HomeCareCatalog',
-		HOME_CARE_BOOKING_DETAILS: 'HomeCareBookingDetails',
 		CAREGIVER_SERVICES: 'CaregiverServices',
 		CAREGIVER_TIME_CONFIG: 'CaregiverTimeConfig',
 		LOCATION_SELECT: 'LocationSelect',

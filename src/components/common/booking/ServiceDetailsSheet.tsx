@@ -28,6 +28,9 @@ interface ServiceDetailsSheetProps {
 	 *  nothing and `service.imageSource` is also unset), a generic
 	 *  placeholder icon is shown instead. */
 	resolveImageSource?: (raw?: string | null) => ImageSourcePropType | undefined
+	/** Label for the footer CTA button. Defaults to "Book Service" — every
+	 *  existing caller (Nursing, Physiotherapy, Laboratory) already expects
+	 *  this exact default. */
 	actionButtonText?: string
 }
 
@@ -130,7 +133,7 @@ export const ServiceDetailsSheet: React.FC<ServiceDetailsSheetProps> = ({
 	onAddToBooking,
 	showReviews = true,
 	resolveImageSource,
-	actionButtonText = 'Add to Booking',
+	actionButtonText = 'Book Service',
 }) => {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
