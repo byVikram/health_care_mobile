@@ -15,11 +15,10 @@ import { AppTypography, AppInput } from '../../../components/common'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import CaregiverServicesScreen from './CaregiverServicesScreen'
 
-import { ServiceProcedureItem, ServiceCatalogCard, ServiceDetailsSheet } from '../../../components/common'
+import { ServiceProcedureItem, ServiceCatalogCard, ServiceDetailsSheet, PackageSectionCard } from '../../../components/common'
 import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
 import { NursingQuickActionCards } from '../components/NursingQuickActionCards'
-import { PackageSectionCard } from '../components/PackageSectionCard'
 import { PackageDetailsBottomSheet } from '../components/PackageDetailsBottomSheet'
 import { ConditionGrid, ConditionGridItem } from '../components/ConditionGrid'
 import {
@@ -488,7 +487,12 @@ export default function AncillaryServiceCatalogScreen() {
 							</View>
 						) : (
 							packages.map((pkg) => (
-								<PackageSectionCard key={pkg.id} item={pkg} onPress={setSelectedPackage} />
+								<PackageSectionCard
+									key={pkg.id}
+									item={pkg}
+									onPress={() => setSelectedPackage(pkg)}
+									resolveImageSource={getAncillaryImageSource}
+								/>
 							))
 						)}
 					</View>

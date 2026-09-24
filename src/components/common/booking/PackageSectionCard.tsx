@@ -1,26 +1,38 @@
 import React from 'react'
-import { View, StyleSheet, Image, TouchableOpacity } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common'
-import { AncillaryPackageListItem } from '../ancillaryService'
-import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
+import { View, StyleSheet, Image, TouchableOpacity, ImageSourcePropType } from 'react-native'
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import { AppTypography } from '../AppTypography'
+
+export interface PackageListItem {
+	id: string
+	label: string
+	description?: string | null
+	imageUrl?: string | null
+	packagePrice: number
+	procedureCount: number
+}
 
 interface PackageSectionCardProps {
-	item: AncillaryPackageListItem
-	onPress: (item: AncillaryPackageListItem) => void
+	item: PackageListItem
+	onPress: (item: PackageListItem) => void
+	/** Resolves a raw `imageUrl` string into a displayable `ImageSourcePropType`
+	 *  (e.g. a domain-specific bundled-asset registry). Kept out of this shared
+	 *  component so `common/booking` has no dependency on any feature folder —
+	 *  pass your feature's own resolver (e.g. Ancillary's `getAncillaryImageSource`)
+	 *  to reproduce that feature's current image behavior. When omitted (or when
+	 *  it returns nothing), a generic placeholder icon is shown instead. */
+	resolveImageSource?: (raw?: string | null) => ImageSourcePropType | undefined
 }
 
 /**
- * Row-style card for the "Packages" section of the service catalog screen,
- * matching the layout of the individual-service cards (ServiceCatalogCard):
+ * Row-style card for a "Packages" section on a service catalog screen,
+ * matching the layout of the individual-service cards (`ServiceCatalogCard`):
  * title + "N Services Included" + price on the left with a "View details"
  * link, and an image with an overlapping "ADD +" button on the right.
- * Package booking isn't wired yet, so both "View details" and "ADD +" open
- * the same package-details sheet via onPress.
  */
-export const PackageSectionCard: React.FC<PackageSectionCardProps> = ({ item, onPress }) => {
+export const PackageSectionCard: React.FC<PackageSectionCardProps> = ({ item, onPress, resolveImageSource }) => {
 	const count = item.procedureCount ?? 0
-	const imageSource = getAncillaryImageSource(item.imageUrl)
+	const imageSource = resolveImageSource?.(item.imageUrl)
 
 	const handlePress = () => onPress(item)
 
@@ -62,7 +74,13 @@ export const PackageSectionCard: React.FC<PackageSectionCardProps> = ({ item, on
 			{/* Right Column: Image Box + Overlapping ADD Button */}
 			<View style={styles.rightCol}>
 				<View style={styles.imageBox}>
-					<Image source={imageSource} style={styles.image} resizeMode="cover" />
+					{imageSource ? (
+						<Image source={imageSource} style={styles.image} resizeMode="cover" />
+					) : (
+						<View style={styles.fallbackWrap}>
+							<MaterialCommunityIcons name="flask-outline" size={28} color="#0C7C7C" />
+						</View>
+					)}
 				</View>
 
 				<View style={styles.actionButtonWrapper}>
@@ -76,6 +94,8 @@ export const PackageSectionCard: React.FC<PackageSectionCardProps> = ({ item, on
 		</TouchableOpacity>
 	)
 }
+
+export default PackageSectionCard
 
 const styles = StyleSheet.create({
 	cardContainer: {
@@ -123,7 +143,7 @@ const styles = StyleSheet.create({
 	includedText: {
 		fontSize: 12.5,
 		fontWeight: '500',
-		color: '#1F5F68',
+		color: '#0C7C7C',
 	},
 	priceRow: {
 		flexDirection: 'row',
@@ -162,6 +182,12 @@ const styles = StyleSheet.create({
 	image: {
 		width: '100%',
 		height: '100%',
+	},
+	fallbackWrap: {
+		width: '100%',
+		height: '100%',
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 	actionButtonWrapper: {
 		marginTop: -12,
