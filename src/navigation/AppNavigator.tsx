@@ -44,6 +44,7 @@ import SampleCollectionScreen from '../features/laboratory/SampleCollectionScree
 // `SlotSelectionScreen` is superseded and intentionally not imported here.
 import LabSelectionScreen from '../features/laboratory/LabSelectionScreen'
 import BookingSummaryScreen from '../features/laboratory/BookingSummaryScreen'
+import LaboratoryPaymentPage from '../features/laboratory/LaboratoryPaymentPage'
 import BookingTrackingScreen from '../features/laboratory/BookingTrackingScreen'
 
 
@@ -195,6 +196,11 @@ function AuthenticatedNavigator() {
 				name={ROUTES.STACK.LABORATORY_BOOKING_SUMMARY as keyof AppStackParamList}
 				component={BookingSummaryScreen}
 				options={{ headerShown: true, title: 'Booking Summary' }}
+			/>
+			<AppStack.Screen
+				name={ROUTES.STACK.LABORATORY_PAYMENT as keyof AppStackParamList}
+				component={LaboratoryPaymentPage}
+				options={{ headerShown: false }}
 			/>
 			<AppStack.Screen
 				name={ROUTES.STACK.LABORATORY_BOOKING_TRACKING as keyof AppStackParamList}

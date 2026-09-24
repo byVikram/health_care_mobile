@@ -45,7 +45,7 @@ const formatCurrency = (amount: number) => `₹${amount.toLocaleString('en-IN')}
  * - Soft-tinted recipient and location boxes
  * - Itemized billing breakdown and guarantee box
  * - Fixed bottom checkout bar
- * - Seamless navigation to ROUTES.STACK.ANCILLARY_PAYMENT with standardized bookingPayload
+ * - Seamless navigation to ROUTES.STACK.LABORATORY_PAYMENT with standardized bookingPayload
  */
 export const BookingSummaryScreen: React.FC = () => {
 	const insets = useSafeAreaInsets()
@@ -130,7 +130,8 @@ export const BookingSummaryScreen: React.FC = () => {
 			return
 		}
 
-		// Standardized bookingPayload structure accepted by AncillaryPaymentPage.tsx
+		// Standardized bookingPayload structure accepted by the shared
+		// BookingPaymentPage (rendered here via LaboratoryPaymentPage.tsx)
 		const bookingPayload = {
 			serviceType: 'LABORATORY',
 			bookingType: 'SCHEDULED',
@@ -185,7 +186,7 @@ export const BookingSummaryScreen: React.FC = () => {
 			progressSteps: [...progressSteps, 'Payment'],
 		}
 
-		navigation.navigate(ROUTES.STACK.ANCILLARY_PAYMENT, { bookingPayload, labTrackingParams })
+		navigation.navigate(ROUTES.STACK.LABORATORY_PAYMENT, { bookingPayload, labTrackingParams })
 	}
 
 	if (!draft) {
