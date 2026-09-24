@@ -19,11 +19,15 @@ import { ServiceProcedureItem, ServiceCatalogCard, ServiceDetailsSheet } from '.
 import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
 import { NursingQuickActionCards } from '../components/NursingQuickActionCards'
+import { PackageSectionCard } from '../components/PackageSectionCard'
+import { PackageDetailsBottomSheet } from '../components/PackageDetailsBottomSheet'
 import { ConditionGrid, ConditionGridItem } from '../components/ConditionGrid'
 import {
 	AncillaryCategoryApiItem,
 	AncillaryServiceItem,
 	fetchAncillaryCategories,
+	AncillaryPackageListItem,
+	fetchAncillaryPackages,
 	fetchAncillaryServices,
 } from '../ancillaryService'
 
@@ -156,6 +160,13 @@ export default function AncillaryServiceCatalogScreen() {
 	const [searchQuery, setSearchQuery] = useState('')
 	const [selectedProcedure, setSelectedProcedure] = useState<ServiceProcedureItem | null>(null)
 	const [cart, setCart] = useState<ServiceProcedureItem[]>([])
+	// Packages section (bundled services) -- kept fully separate from the
+	// individual procedure list/cart above.
+	const [packages, setPackages] = useState<AncillaryPackageListItem[]>([])
+	const [packagesLoading, setPackagesLoading] = useState(true)
+	const [packagesError, setPackagesError] = useState(false)
+	const [packagesReloadKey, setPackagesReloadKey] = useState(0)
+	const [selectedPackage, setSelectedPackage] = useState<AncillaryPackageListItem | null>(null)
 	// For Physiotherapy, this holds the id of the selected "Find Physiotherapy for"
 	// card. It is either a lookup_ancillary_category.public_id (e.g. "phys-knee"),
 	// used to filter the already-fetched procedures, or the PHYSIOTHERAPY_ALL_CONDITION_ID
@@ -187,6 +198,32 @@ export default function AncillaryServiceCatalogScreen() {
 			isMounted = false
 		}
 	}, [serviceKey])
+
+	// Load packages for the current specialty (same serviceKey the services
+	// fetch above uses -- nothing hardcoded).
+	useEffect(() => {
+		let isMounted = true
+		const loadPackages = async () => {
+			try {
+				setPackagesLoading(true)
+				setPackagesError(false)
+				const list = await fetchAncillaryPackages(serviceKey)
+				if (isMounted) setPackages(list)
+			} catch (e) {
+				console.log('[AncillaryServiceCatalogScreen] Packages load error:', e)
+				if (isMounted) {
+					setPackages([])
+					setPackagesError(true)
+				}
+			} finally {
+				if (isMounted) setPackagesLoading(false)
+			}
+		}
+		void loadPackages()
+		return () => {
+			isMounted = false
+		}
+	}, [serviceKey, packagesReloadKey])
 
 	// Sync selection state when returning from Booking Details. If a service
 	// was removed there (via "Add Services"), the updated list is passed back
@@ -422,6 +459,41 @@ export default function AncillaryServiceCatalogScreen() {
 					/>
 				)}
 
+				{/* Packages -- separate section shown right after the filters ("Nursing Care For?"), above the services list.
+				    Rendered only when there is something to show (loading, error,
+				    or real packages from the backend). */}
+				{(packagesLoading || packagesError || packages.length > 0) && (
+					<View style={styles.packagesSection}>
+						<AppTypography variant="h4" style={styles.groupTitle}>
+							Packages
+						</AppTypography>
+						<AppTypography variant="caption" style={styles.packagesSubtitle}>
+							Care packages with multiple services included
+						</AppTypography>
+
+						{packagesLoading ? (
+							<View style={styles.packagesStateBox}>
+								<ActivityIndicator size="small" color="#0C7C7C" />
+							</View>
+						) : packagesError ? (
+							<View style={styles.packagesStateBox}>
+								<AppTypography variant="caption" style={styles.emptySub}>
+									Unable to load packages right now.
+								</AppTypography>
+								<TouchableOpacity onPress={() => setPackagesReloadKey((k) => k + 1)} activeOpacity={0.8}>
+									<AppTypography variant="caption" style={styles.packagesRetry}>
+										Try again
+									</AppTypography>
+								</TouchableOpacity>
+							</View>
+						) : (
+							packages.map((pkg) => (
+								<PackageSectionCard key={pkg.id} item={pkg} onPress={setSelectedPackage} />
+							))
+						)}
+					</View>
+				)}
+
 				{loading ? (
 					<View style={styles.loadingContainer}>
 						<ActivityIndicator size="large" color="#0C7C7C" />
@@ -485,6 +557,12 @@ export default function AncillaryServiceCatalogScreen() {
 					setSelectedProcedure(null)
 				}}
 				resolveImageSource={getAncillaryImageSource}
+			/>
+			{/* Package Details Bottom Sheet (details only -- no booking wiring yet) */}
+			<PackageDetailsBottomSheet
+				visible={!!selectedPackage}
+				pkg={selectedPackage}
+				onClose={() => setSelectedPackage(null)}
 			/>
 		</View>
 	)
@@ -562,5 +640,24 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#0F172A',
 		marginBottom: 12,
+	},
+	packagesSection: {
+		paddingHorizontal: 16,
+		marginTop: 24,
+	},
+	packagesSubtitle: {
+		color: '#64748B',
+		marginTop: -8,
+		marginBottom: 12,
+	},
+	packagesStateBox: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 24,
+		gap: 8,
+	},
+	packagesRetry: {
+		color: '#0C7C7C',
+		fontWeight: '700',
 	},
 })

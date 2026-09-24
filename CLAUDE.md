@@ -1,4 +1,4 @@
-# gemini-mobile-app/ — Mobile App (React Native + Expo)
+# health_care_mobile/ — Mobile App (React Native + Expo)
 
 Part of the [healthcare2](../CLAUDE.md) monorepo. See root CLAUDE.md for cross-service context. App name: "KarolaHealth" (`app.json` slug `karola-health`, Android package `com.anonymous.KarolaHealth`). Has its own `.git` repo, separate from the rest of `healthcare2`.
 
@@ -29,7 +29,7 @@ Part of the [healthcare2](../CLAUDE.md) monorepo. See root CLAUDE.md for cross-s
 - `src/config/` — `theme.ts` (Paper theme), `toastConfig.tsx`
 - `src/types/` — domain type defs + `assets.d.ts`, `react-native-vector-icons.d.ts`
 - `src/utils/` — `date.ts`, `formatters.ts`, `jsonUtils.ts`, `networkState.ts`, `s3Utils.ts`, `secureStorage.ts`
-- `src/assets/` — images by domain, mirrors `health-care/src/assets/` structure
+- `src/assets/` — images by domain, mirrors `health_care_frontend/src/assets/` structure
 - Top-level `assets/` (outside `src/`) — Expo app icons/splash, referenced from `app.json`
 
 ## Running / building

@@ -13,6 +13,7 @@ import {
 import {
 	saveProviderWeeklyAvailability,
 	fetchProviderWeeklyAvailabilityBackend,
+	extractApiErrorMessage,
 	ProviderAvailabilityDay,
 } from '../../../ancillary/ancillaryService'
 
@@ -146,7 +147,7 @@ export default function AvailabilityTab({
 					visible: true,
 					status: 'error',
 					title: 'Load Failed',
-					description: 'Unable to load availability schedule. Please try again.',
+					description: extractApiErrorMessage(e),
 				})
 			} finally {
 				setLoading(false)
@@ -279,7 +280,7 @@ export default function AvailabilityTab({
 				}
 			}
 
-			await saveProviderWeeklyAvailability({ availabilities })
+			const saveResult = await saveProviderWeeklyAvailability({ availabilities })
 
 			// Update savedDataRef only after backend save succeeds
 			const hasSavedSlots = availabilities.length > 0
@@ -290,7 +291,7 @@ export default function AvailabilityTab({
 				visible: true,
 				status: 'success',
 				title: 'Schedule Saved',
-				description: 'Your availability schedule has been saved successfully.',
+				description: saveResult?.message || '',
 			})
 		} catch (e) {
 			console.log('[Nurse AvailabilityTab] failed to save availability:', e)
@@ -298,7 +299,7 @@ export default function AvailabilityTab({
 				visible: true,
 				status: 'error',
 				title: 'Save Failed',
-				description: 'Unable to save availability. Please try again.',
+				description: extractApiErrorMessage(e),
 			})
 		} finally {
 			setSaving(false)

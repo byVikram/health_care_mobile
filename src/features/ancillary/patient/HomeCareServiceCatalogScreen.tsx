@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+﻿import React, { useEffect, useMemo, useState } from 'react'
 import {
 	ActivityIndicator,
 	BackHandler,
@@ -370,7 +370,7 @@ export default function HomeCareServiceCatalogScreen() {
 				<ViewCartFloatingBar
 					itemCount={cart.length}
 					itemLabel="Activity"
-					totalAmount={selectedCareMode === 'COMPLETE_CARE' ? 'Complete Care' : '₹250/hr Standard'}
+					totalAmount={selectedCareMode === 'COMPLETE_CARE' ? 'Complete Care' : 'â‚¹250/hr Standard'}
 					onViewCart={handleProceedToBooking}
 				/>
 			)}
@@ -380,7 +380,7 @@ export default function HomeCareServiceCatalogScreen() {
 				visible={!!selectedProcedure}
 				service={selectedProcedure}
 				onClose={() => setSelectedProcedure(null)}
-				onAddToBooking={(service) => {
+				onAddToBooking={(service: ServiceProcedureItem) => {
 					handleAddProcedure(service)
 					setSelectedProcedure(null)
 				}}
@@ -496,3 +496,4 @@ const styles = StyleSheet.create({
 		marginTop: 4,
 	},
 })
+
