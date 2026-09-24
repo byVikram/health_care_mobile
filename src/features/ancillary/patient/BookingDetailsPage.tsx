@@ -117,6 +117,8 @@ export default function BookingDetailsPage() {
 
 	const routeParams = route.params || {}
 	const payloadObj = routeParams.bookingPayload || routeParams.payload || {}
+	const currentServiceKey = payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care'
+	const isHomeCare = currentServiceKey === 'home-care' || currentServiceKey === 'home-care-time'
 	const initialServices: ServiceProcedureItem[] = useMemo(() => {
 		if (payloadObj.services && Array.isArray(payloadObj.services) && payloadObj.services.length > 0) {
 			return payloadObj.services
@@ -361,6 +363,18 @@ export default function BookingDetailsPage() {
 		// that were removed here.
 		const editServiceKey = payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care'
 		const editServiceLabel = payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care'
+		// Home Care's "Activities & Tasks" catalog is its own screen
+		// (HomeCareServiceCatalogScreen, HOME_CARE_CATALOG route) -- unlike
+		// Nursing/Physiotherapy/Rehab Care/etc., which all share
+		// AncillaryServiceCatalogScreen under ANCILLARY_SERVICES with a
+		// different serviceKey each. Routing 'home-care' there would land on
+		// the Caregiver launcher menu instead of the catalog with this cart.
+		if (editServiceKey === 'home-care') {
+			navigation.navigate(ROUTES.STACK.HOME_CARE_CATALOG, {
+				updatedCart: services,
+			})
+			return
+		}
 		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
 			serviceKey: editServiceKey,
 			serviceLabel: editServiceLabel,
@@ -619,9 +633,12 @@ export default function BookingDetailsPage() {
 				</View>
 
 								{/* 8px GREY SECTION DIVIDER BAR */}
-				<View style={styles.sectionDividerBar} />
+				{!isHomeCare && <View style={styles.sectionDividerBar} />}
 
-				{/* 4. SECTION: NURSE ASSIGNMENT PREFERENCE */}
+				{/* 4. SECTION: NURSE ASSIGNMENT PREFERENCE (Nursing/Physiotherapy/etc. only —
+					Home Care always dispatches via the default SYSTEM_MATCH assignment mode,
+					so this choice is not shown for that service) */}
+				{!isHomeCare && (
 				<View style={styles.sectionBlock}>
 					<View style={styles.sectionHeaderRow}>
 						<AppTypography variant="h3" style={styles.sectionHeading}>
@@ -799,6 +816,7 @@ export default function BookingDetailsPage() {
 						)
 					)}
 				</View>
+				)}
 
 				{/* 8px GREY SECTION DIVIDER BAR */}
 				<View style={styles.sectionDividerBar} />
