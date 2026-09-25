@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { MainTabParamList } from './types'
 import { ROUTES } from './routes'
-import { AppScreenHeader, LocationSelector } from '../components/common'
+import { AppScreenHeader } from '../components/common'
 
 import DashboardPage from '../features/dashboard/DashboardPage'
 import SearchPage from '../features/doctor/search/SearchPage'
@@ -201,16 +201,6 @@ export default function MainTabNavigator() {
 					<Tab.Screen
 						name={ROUTES.MAIN.SEARCH}
 						component={SearchPage}
-						options={{
-							headerShown: true,
-							header: () => (
-								<AppScreenHeader 
-									title="Find Doctors" 
-									onBack={() => navigation.navigate(ROUTES.MAIN.HOME)} 
-									rightElement={<LocationSelector />}
-								/>
-							),
-						}}
 					/>
 				) : null}
 				{/* Nurse persona: PORTAL tab renders NurseBookingHistoryPage directly. */}

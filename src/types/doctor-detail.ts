@@ -37,6 +37,16 @@ export interface DoctorDetailDegree {
 	year_of_passing: string
 }
 
+export interface DoctorAchievementItem {
+	id: string
+	title: string
+	achievement_type: string | null
+	organization: string | null
+	achievement_date: string | null
+	description: string | null
+	document_s3_key: string | null
+}
+
 export interface DoctorDetailData {
 	id: string
 	name: string
@@ -58,6 +68,7 @@ export interface DoctorDetailData {
 		treatments?: { id: string; label: string }[]
 	}
 	specialities: string[]
+	achievements?: DoctorAchievementItem[]
 	hospitals: DoctorDetailHospital[]
 	availability: DoctorAvailability[]
 }
@@ -68,9 +79,8 @@ export interface DoctorDetailResponse {
 	data: DoctorDetailData
 }
 
-
 export interface AppointmentType {
-	id: "clinic" | "video"
+	id: 'clinic' | 'video'
 	label: string
 	description: string
 	price: number

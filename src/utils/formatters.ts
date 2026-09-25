@@ -62,3 +62,12 @@ export function capitalize(str: string | null | undefined): string {
 	if (!str) return ''
 	return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
+
+/**
+ * Capitalize every word, treating underscores as spaces
+ * ("clinic_visit" -> "Clinic Visit")
+ */
+export function capitaliseWords(str: string | null | undefined): string {
+	if (!str) return ''
+	return str.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}

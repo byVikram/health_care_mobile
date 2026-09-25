@@ -28,6 +28,15 @@ import {
 	type TimeSlot,
 } from '../../doctor/doctorService'
 
+// Design tokens matching the rest of the booking flow (Screens 1/2/3/5/7's
+// teal family) -- no mockup screen depicts this modal directly, so only
+// color tokens are aligned here for consistency; layout/logic is unchanged.
+const PRIMARY = '#2B6F71'
+const PRIMARY_TINT = '#E3EFEF'
+const INK = '#12373E'
+const INK_MUTED = '#5B6B6E'
+const DIVIDER = '#D5E1E2'
+
 export type RescheduleAppointmentMode = 'clinic' | 'video'
 
 export type RescheduleResult = {
@@ -335,7 +344,7 @@ export default function RescheduleModal({
 							disabled={rescheduleSubmitting}
 							hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
 						>
-							<Ionicons name="close" size={22} color="#526173" />
+							<Ionicons name="close" size={22} color={INK_MUTED} />
 						</TouchableOpacity>
 					</View>
 
@@ -361,7 +370,7 @@ export default function RescheduleModal({
 										<Ionicons
 											name={hospitalDropdownOpen ? 'chevron-up' : 'chevron-down'}
 											size={18}
-											color="#526173"
+											color={INK_MUTED}
 										/>
 									</TouchableOpacity>
 
@@ -390,7 +399,7 @@ export default function RescheduleModal({
 															>
 																{hospital.label}
 															</Text>
-															{selected ? <Ionicons name="checkmark-circle" size={18} color="#0c7c7c" /> : null}
+															{selected ? <Ionicons name="checkmark-circle" size={18} color={PRIMARY} /> : null}
 														</TouchableOpacity>
 													)
 												})}
@@ -469,11 +478,11 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 18,
 		paddingVertical: 14,
 		borderBottomWidth: 1,
-		borderBottomColor: '#edf2f5',
+		borderBottomColor: DIVIDER,
 	},
 	modalTitle: {
 		flex: 1,
-		color: '#1D2B36',
+		color: INK,
 		fontSize: 17,
 		fontWeight: '700',
 		paddingRight: 12,
@@ -492,7 +501,7 @@ const styles = StyleSheet.create({
 		zIndex: 20,
 	},
 	modalLabel: {
-		color: '#536672',
+		color: INK_MUTED,
 		fontSize: 13,
 		fontWeight: '700',
 		marginBottom: 10,
@@ -500,7 +509,7 @@ const styles = StyleSheet.create({
 	hospitalSelectTrigger: {
 		minHeight: 48,
 		borderWidth: 1,
-		borderColor: '#d7e2e8',
+		borderColor: DIVIDER,
 		borderRadius: 12,
 		paddingHorizontal: 14,
 		backgroundColor: '#ffffff',
@@ -511,12 +520,12 @@ const styles = StyleSheet.create({
 	},
 	hospitalSelectValue: {
 		flex: 1,
-		color: '#1D2B36',
+		color: INK,
 		fontSize: 14,
 		fontWeight: '600',
 	},
 	hospitalSelectPlaceholder: {
-		color: '#8a9aa6',
+		color: INK_MUTED,
 	},
 	hospitalDropdown: {
 		position: 'absolute',
@@ -526,7 +535,7 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 		maxHeight: 190,
 		borderWidth: 1,
-		borderColor: '#d7e2e8',
+		borderColor: DIVIDER,
 		borderRadius: 12,
 		backgroundColor: '#ffffff',
 		overflow: 'hidden',
@@ -542,45 +551,45 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 14,
 		paddingVertical: 11,
 		borderBottomWidth: 1,
-		borderBottomColor: '#eef3f5',
+		borderBottomColor: DIVIDER,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
 		gap: 10,
 	},
 	hospitalDropdownItemSelected: {
-		backgroundColor: '#eefafa',
+		backgroundColor: PRIMARY_TINT,
 	},
 	hospitalDropdownText: {
 		flex: 1,
-		color: '#526173',
+		color: INK_MUTED,
 		fontSize: 14,
 		fontWeight: '600',
 		lineHeight: 18,
 	},
 	hospitalDropdownTextSelected: {
-		color: '#0c7c7c',
+		color: PRIMARY,
 	},
 	modalActions: {
 		flexDirection: 'row',
 		gap: 10,
 		padding: 16,
 		borderTopWidth: 1,
-		borderTopColor: '#edf2f5',
+		borderTopColor: DIVIDER,
 	},
 	modalSecondaryButton: {
 		flex: 1,
 		minHeight: 44,
 		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: '#d7e2e8',
+		borderColor: DIVIDER,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#ffffff',
 		paddingHorizontal: 12,
 	},
 	modalSecondaryButtonText: {
-		color: '#526173',
+		color: INK_MUTED,
 		fontSize: 14,
 		fontWeight: '700',
 	},
@@ -590,7 +599,7 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#0c7c7c',
+		backgroundColor: PRIMARY,
 		paddingHorizontal: 12,
 	},
 	modalPrimaryButtonText: {
