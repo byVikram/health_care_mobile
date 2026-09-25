@@ -112,7 +112,11 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
 		syncAvatar()
 		return () => { cancelled = true }
-	}, [role, ancillarySpecialty, authUser?.avatar, updateUser])
+		// authUser/updateUser deliberately excluded: this effect calls
+		// updateUser(), which would otherwise change authUser and re-trigger
+		// itself on every sync. It only needs to run once per role/specialty.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [role, ancillarySpecialty])
 
 	const handleEditProfile = () => {
 		setIsSidebarOpen(false)
