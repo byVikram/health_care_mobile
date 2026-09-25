@@ -40,6 +40,19 @@ import BookingsSearchBar from '../bookings/components/BookingsSearchBar'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+// Design tokens matching the rest of the booking flow (Screens 1/2/3/5/7's
+// teal family). No mockup screen depicts this list/card, so only the brand
+// teal + neutral text/border colors are aligned here for consistency --
+// the semantic status colors (getStatusColor, action button backgrounds,
+// star ratings) are intentionally left as-is since they carry meaning
+// (green=confirm, red=reject/danger, amber=reschedule/pending).
+const PRIMARY = '#2B6F71'
+const PRIMARY_TINT = '#E3EFEF'
+const INK = '#12373E'
+const INK_MUTED = '#5B6B6E'
+const DIVIDER = '#D5E1E2'
+const SURFACE_MUTED = '#F5F8F8'
+
 const FALLBACK_CONFIRMED_STATUS_ID = '3f9a2c8e-7b61-4d2a-9a3f-5c8e1b2d4f90'
 const FALLBACK_REJECTED_STATUS_ID = 'a7d4e1c2-9f6b-4c83-b2e1-6f3a9d8c7b12'
 const TERMINAL_STATUSES = new Set(['cancelled'])
@@ -212,7 +225,7 @@ function RejectConfirmModal({ visible, onCancel, onConfirm, submitting = false }
                   <MaterialCommunityIcons
                     name={isSelected ? 'radiobox-marked' : 'radiobox-blank'}
                     size={18}
-                    color={isSelected ? '#0c7c7c' : '#9ca3af'}
+                    color={isSelected ? PRIMARY : INK_MUTED}
                     style={styles.radioIcon}
                   />
                   <Text style={[styles.reasonText, isSelected && styles.reasonTextSelected]}>
@@ -301,8 +314,8 @@ function GiveReviewModal({
 
           {loadingExisting ? (
             <View style={{ paddingVertical: 30, alignItems: 'center' }}>
-              <ActivityIndicator size="small" color="#0c7c7c" />
-              <Text style={{ marginTop: 8, fontSize: 13, color: '#6b7280' }}>Loading review...</Text>
+              <ActivityIndicator size="small" color={PRIMARY} />
+              <Text style={{ marginTop: 8, fontSize: 13, color: INK_MUTED }}>Loading review...</Text>
             </View>
           ) : existingReview ? (
             <View style={styles.existingReviewBox}>
@@ -318,7 +331,7 @@ function GiveReviewModal({
                   ))}
                 </View>
                 {existingReview.created_at && (
-                  <Text style={{ fontSize: 11, color: '#9ca3af' }}>
+                  <Text style={{ fontSize: 11, color: INK_MUTED }}>
                     {new Date(existingReview.created_at).toLocaleDateString()}
                   </Text>
                 )}
@@ -336,7 +349,7 @@ function GiveReviewModal({
             </View>
           ) : (
             <View style={{ width: '100%', marginTop: 12 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151', textAlign: 'center', marginBottom: 10 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: INK, textAlign: 'center', marginBottom: 10 }}>
                 Tap to Rate
               </Text>
               <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
@@ -345,17 +358,17 @@ function GiveReviewModal({
                     <MaterialCommunityIcons
                       name={star <= rating ? 'star' : 'star-outline'}
                       size={32}
-                      color={star <= rating ? '#f59e0b' : '#d1d5db'}
+                      color={star <= rating ? '#f59e0b' : DIVIDER}
                     />
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 }}>Write Review</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: INK, marginBottom: 6 }}>Write Review</Text>
               <TextInput
                 style={styles.reviewTextInput}
                 placeholder="Share your experience..."
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={INK_MUTED}
                 value={comment}
                 onChangeText={setComment}
                 multiline
@@ -452,17 +465,17 @@ function AppointmentCard({
         {/* Date / time / mode row */}
         <View style={styles.cardMeta}>
           <View style={styles.metaIconGroup}>
-            <MaterialCommunityIcons name="calendar-blank-outline" size={13} color="#6b7280" />
+            <MaterialCommunityIcons name="calendar-blank-outline" size={13} color={INK_MUTED} />
             <Text style={styles.cardMetaText}>{row.appointmentDate}</Text>
           </View>
           <View style={[styles.metaIconGroup, styles.metaIconGroupSpaced]}>
-            <MaterialCommunityIcons name="clock-outline" size={13} color="#6b7280" />
+            <MaterialCommunityIcons name="clock-outline" size={13} color={INK_MUTED} />
             <Text style={styles.cardMetaText}>{formatTime(row.startTime)}{row.endTime ? ' – ' + formatTime(row.endTime) : ''}</Text>
           </View>
         </View>
         <View style={styles.cardMeta}>
           <View style={styles.metaIconGroup}>
-            <MaterialCommunityIcons name="hospital-box-outline" size={13} color="#6b7280" />
+            <MaterialCommunityIcons name="hospital-box-outline" size={13} color={INK_MUTED} />
             <Text style={styles.cardMetaText} numberOfLines={1}>
               {row.appointmentMode?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
             </Text>
@@ -475,7 +488,7 @@ function AppointmentCard({
         {/* Hospital */}
         {row.hospitalName && (
           <View style={styles.cardHospitalRow}>
-            <MaterialCommunityIcons name="map-marker-outline" size={13} color="#6b7280" />
+            <MaterialCommunityIcons name="map-marker-outline" size={13} color={INK_MUTED} />
             <Text style={styles.cardHospital} numberOfLines={1}>
               {row.hospitalName}
             </Text>
@@ -494,8 +507,8 @@ function AppointmentCard({
                 }}
                 activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name="star-outline" size={14} color="#0c7c7c" style={{ marginRight: 4 }} />
-                <Text style={[styles.actionBtnText, { color: '#0c7c7c' }]}>Review</Text>
+                <MaterialCommunityIcons name="star-outline" size={14} color={PRIMARY} style={{ marginRight: 4 }} />
+                <Text style={[styles.actionBtnText, { color: PRIMARY }]}>Review</Text>
               </TouchableOpacity>
             ) : (
               <>
@@ -912,7 +925,7 @@ function AppointmentListImpl(
   const renderFooter = () =>
     loadingMore ? (
       <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#0c7c7c" />
+        <ActivityIndicator size="small" color={PRIMARY} />
       </View>
     ) : null
 
@@ -1107,7 +1120,7 @@ function AppointmentListImpl(
               size="medium"
               borderRadius={16}
               customCardStyle={styles.filterSelectCard}
-              borderColor="#c1e0de"
+              borderColor={PRIMARY}
               style={styles.filterSelectFill}
             />
           </View>
@@ -1185,7 +1198,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '600',
-    color: '#333333',
+    color: INK,
     alignSelf: 'flex-start',
     marginLeft: 4,
   },
@@ -1209,20 +1222,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0f7f7',
+    backgroundColor: PRIMARY_TINT,
   },
   filterChipActive: {
-    backgroundColor: '#eef8f7',
+    backgroundColor: PRIMARY_TINT,
     borderWidth: 1,
-    borderColor: '#c1e0de',
+    borderColor: PRIMARY,
   },
   filterChipText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#64707d',
+    color: INK_MUTED,
   },
   filterChipTextActive: {
-    color: '#2e7d74',
+    color: PRIMARY,
     fontWeight: '600',
   },
   filterSheetActions: {
@@ -1231,7 +1244,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: DIVIDER,
   },
   filterActionBtn: {
     height: 48,
@@ -1242,17 +1255,17 @@ const styles = StyleSheet.create({
   filterResetButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#c1e0de',
+    borderColor: PRIMARY,
     backgroundColor: '#ffffff',
   },
   filterResetText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#2e7d74',
+    color: PRIMARY,
   },
   filterApplyButton: {
     flex: 2,
-    backgroundColor: '#1f6e71',
+    backgroundColor: PRIMARY,
   },
   filterApplyText: {
     fontSize: 15,
@@ -1278,14 +1291,14 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: DIVIDER,
   },
   skeletonContent: {
     flex: 1,
   },
   skeletonLine: {
     height: 14,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: DIVIDER,
     borderRadius: 4,
   },
   // List
@@ -1302,7 +1315,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: INK_MUTED,
   },
   // Card
   card: {
@@ -1315,7 +1328,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: DIVIDER,
   },
 
   cardBody: {
@@ -1335,7 +1348,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   cardAvatarPlaceholder: {
-    backgroundColor: '#0c7c7c',
+    backgroundColor: PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1351,7 +1364,7 @@ const styles = StyleSheet.create({
   cardName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
+    color: INK,
   },
   statusPill: {
     alignSelf: 'flex-start',
@@ -1367,14 +1380,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#e8eaf6',
+    backgroundColor: PRIMARY_TINT,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   infoBtnText: {
     fontSize: 14,
-    color: '#3949ab',
+    color: PRIMARY,
     fontWeight: '700',
   },
   cardMeta: {
@@ -1391,11 +1404,11 @@ const styles = StyleSheet.create({
   },
   cardMetaText: {
     fontSize: 12,
-    color: '#6b7280',
+    color: INK_MUTED,
   },
   cardFee: {
     fontSize: 12,
-    color: '#6b7280',
+    color: INK_MUTED,
   },
   cardHospitalRow: {
     flexDirection: 'row',
@@ -1405,7 +1418,7 @@ const styles = StyleSheet.create({
   },
   cardHospital: {
     fontSize: 12,
-    color: '#6b7280',
+    color: INK_MUTED,
   },
   // Action buttons
   actionRow: {
@@ -1469,13 +1482,13 @@ const styles = StyleSheet.create({
   rejectTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#111827',
+    color: INK,
     marginBottom: 6,
     textAlign: 'center',
   },
   rejectSubtitle: {
     fontSize: 14,
-    color: '#374151',
+    color: INK,
     fontWeight: '500',
     marginBottom: 16,
     textAlign: 'center',
@@ -1483,7 +1496,7 @@ const styles = StyleSheet.create({
   rejectSectionTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6b7280',
+    color: INK_MUTED,
     marginBottom: 10,
   },
   reasonsList: {
@@ -1507,11 +1520,11 @@ const styles = StyleSheet.create({
   reasonText: {
     flex: 1,
     fontSize: 13,
-    color: '#374151',
+    color: INK,
     lineHeight: 18,
   },
   reasonTextSelected: {
-    color: '#0c7c7c',
+    color: PRIMARY,
     fontWeight: '500',
   },
   rejectButtons: {
@@ -1524,14 +1537,14 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: 50,
     borderWidth: 2,
-    borderColor: '#0c7c7c',
+    borderColor: PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rejectCancelText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0c7c7c',
+    color: PRIMARY,
   },
   rejectConfirmBtn: {
     flex: 1,
@@ -1550,17 +1563,17 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   actionBtnReview: {
-    borderColor: '#0c7c7c',
+    borderColor: PRIMARY,
     backgroundColor: '#f0fdf4',
   },
   existingReviewBox: {
     width: '100%',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: DIVIDER,
     borderRadius: 10,
     padding: 14,
     marginTop: 12,
-    backgroundColor: '#f9fafb',
+    backgroundColor: SURFACE_MUTED,
   },
   existingReviewHeader: {
     flexDirection: 'row',
@@ -1569,18 +1582,18 @@ const styles = StyleSheet.create({
   },
   existingReviewComment: {
     fontSize: 13,
-    color: '#374151',
+    color: INK,
     marginTop: 8,
     lineHeight: 18,
   },
   reviewTextInput: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: DIVIDER,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
-    color: '#1f2937',
+    color: INK,
     minHeight: 80,
     textAlignVertical: 'top',
     backgroundColor: '#ffffff',

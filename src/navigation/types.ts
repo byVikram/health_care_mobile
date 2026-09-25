@@ -63,6 +63,21 @@ export type PatientPaymentParams = {
 	consentVersionId: string
 }
 
+export type AppointmentConfirmedParams = {
+	appointmentId: string
+	doctorName: string
+	doctorAvatar?: string | null
+	doctorSpecialty?: string
+	appointmentMode: 'clinic_visit' | 'video_call'
+	dateDisplay: string
+	timeDisplay: string
+	hospitalName: string
+	hospitalAddress?: string
+	patientName: string
+	fee: number
+	paymentMethodLabel: string
+}
+
 export type AppStackParamList = {
 	[ROUTES.STACK.WALLET]: undefined
 	[ROUTES.STACK.WALLET_TOPUP]: undefined
@@ -85,6 +100,9 @@ export type AppStackParamList = {
 	[ROUTES.STACK.APPOINTMENTS]: { appointmentId?: string } | undefined
 	[ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
+	[ROUTES.STACK.VISIT_SUMMARY]: { appointmentId: string }
+	[ROUTES.STACK.APPOINTMENT_CONFIRMED]: AppointmentConfirmedParams
+	[ROUTES.STACK.APPOINTMENT_DETAILS]: { appointmentId: string }
 	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: Omit<PatientPaymentParams, 'consentVersionId'> }
 	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
 	[ROUTES.STACK.ORDER_LIST]: undefined
@@ -180,39 +198,55 @@ export type AppStackParamList = {
 	[ROUTES.STACK.NURSE_HISTORY]: undefined
 	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string; updatedCart?: any[] }
 	[ROUTES.STACK.ANCILLARY_PROVIDERS]: { serviceKey: string; serviceLabel: string; procedureName?: string }
-	[ROUTES.STACK.ANCILLARY_BOOKING_CART]: {
-		services?: any[]
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_BOOKING_SUMMARY]: {
-		services?: any[]
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_BOOKING_DETAILS]: {
-		serviceId?: string
-		serviceName?: string
-		description?: string
-		image?: string
-		price?: string
-		duration?: string
-		services?: any[]
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_PAYMENT]: {
-		bookingPayload?: any
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_PRICING_REVIEW]: {
-		bookingPayload?: any
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_CONFIRMATION]: {
-		bookingId?: string
-		bookingPayload?: any
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_BOOKING_STATUS]: {
-		bookingId?: string
-		bookingData?: any
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT]: {
-		bookingId?: string
-		bookingData?: any
-	} | undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_CART]:
+		| {
+				services?: any[]
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_SUMMARY]:
+		| {
+				services?: any[]
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_DETAILS]:
+		| {
+				serviceId?: string
+				serviceName?: string
+				description?: string
+				image?: string
+				price?: string
+				duration?: string
+				services?: any[]
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_PAYMENT]:
+		| {
+				bookingPayload?: any
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_PRICING_REVIEW]:
+		| {
+				bookingPayload?: any
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_CONFIRMATION]:
+		| {
+				bookingId?: string
+				bookingPayload?: any
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_STATUS]:
+		| {
+				bookingId?: string
+				bookingData?: any
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT]:
+		| {
+				bookingId?: string
+				bookingData?: any
+		  }
+		| undefined
 	[ROUTES.STACK.ANCILLARY_MY_BOOKINGS]: undefined
 	[ROUTES.STACK.HOME_CARE_CATALOG]: { updatedCart?: any[] } | undefined
 	[ROUTES.STACK.CAREGIVER_SERVICES]: undefined

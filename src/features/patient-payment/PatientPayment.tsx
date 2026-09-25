@@ -10,7 +10,6 @@ import {
 	Image,
 	Alert,
 	ActivityIndicator,
-	useWindowDimensions,
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
@@ -25,17 +24,22 @@ import PaytmSvg from '../../assets/Payment/paytm.svg'
 import AmazonPaySvg from '../../assets/Payment/amazonpay.svg'
 import CreditCardSvg from '../../assets/Payment/creditcard.svg'
 import WhatsappSvg from '../../assets/Payment/whatsapp.svg'
-import DateSvg from '../../assets/Payment/date.svg'
-import ClockSvg from '../../assets/Payment/clock.svg'
-import HomeSvg from '../../assets/Payment/home.svg'
-import LocationSvg from '../../assets/Payment/location.svg'
-import ArrowIcon from '../../assets/Settings/arrow.svg'
 import AppPayment from '../../components/common/AppPayment'
-import { AppModal } from '../../components/common/AppModal'
+import { useAuth } from '../../context/AuthContext'
 import { createAppointment, updatePreIntake } from '../doctor/doctorService'
 import PreIntakeModal, { type PreIntakeSeverity } from '../patient/components/PreIntakeModal'
 import type { AppStackParamList } from '../../navigation/types'
 import { ROUTES } from '../../navigation/routes'
+
+// Design tokens matching the "Payment" HTML design (same teal family as
+// Screens 1-3; #2B6F71 already matches this app's existing DETAIL_PRIMARY).
+const PRIMARY = '#2B6F71'
+const PRIMARY_DARK = '#276668'
+const INK = '#12373E'
+const INK_MUTED = '#5B6B6E'
+const DIVIDER = '#D5E1E2'
+const TICKET_TINT = '#E3EFEF'
+const SPEC_TONE = '#6A4BB5'
 
 type PaymentIconProps = {
 	SvgComponent: any
@@ -157,7 +161,7 @@ const getPatientToken = async () => {
 	const storedRole = await AsyncStorage.getItem('role')
 	const storedUser = await AsyncStorage.getItem('user')
 
-	const source = patientToken ? 'patient_token' : (accessToken ? 'access_token' : null)
+	const source = patientToken ? 'patient_token' : accessToken ? 'access_token' : null
 	const token = patientToken || accessToken || null
 
 	console.log('[PatientPayment] token values', {
@@ -178,7 +182,7 @@ const decodeBase64Url = (value: string) => {
 	const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=')
 	let output = ''
 
-	for (let block = 0, charCode = 0, idx = 0, map = chars; padded.charAt(idx | 0); ) {
+	for (let block = 0, charCode = 0, idx = 0, map = chars; padded.charAt(idx | 0);) {
 		const currentChar = padded.charAt(idx++)
 		const currentValue = map.indexOf(currentChar)
 		if (currentValue < 0) continue
@@ -226,10 +230,9 @@ const getTokenDiagnostics = (token: string) => {
 
 export default function BookingDetailsScreen() {
 	const insets = useSafeAreaInsets()
-	const { width } = useWindowDimensions()
-	const isTablet = width >= 768
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.PATIENT_PAYMENT>>()
+	const { user } = useAuth()
 
 	// Get booking params (passed from DoctorDetailPage)
 	const params = route.params
@@ -252,7 +255,6 @@ export default function BookingDetailsScreen() {
 	const [whatsappNotify, setWhatsappNotify] = useState(false)
 	const [isBooking, setIsBooking] = useState(false)
 	const [bookedAppointment, setBookedAppointment] = useState<BookedAppointment | null>(null)
-	const [successOpen, setSuccessOpen] = useState(false)
 	const [symptomsOpen, setSymptomsOpen] = useState(false)
 	const [symptoms, setSymptoms] = useState('')
 	const [duration, setDuration] = useState('')
@@ -271,6 +273,19 @@ export default function BookingDetailsScreen() {
 	const bookingFee = bookedAppointment?.fees ?? fee
 	const bookingStatus = bookedAppointment?.status || ''
 	const totalPayable = bookingFee // assuming no extra tax/fee
+
+	// Presentation-only derived values (real data, nothing fabricated).
+	const patientDisplayName = bookedAppointment?.patient.name || user?.name || 'You'
+	const patientInitials =
+		patientDisplayName
+			.split(/\s+/)
+			.filter(Boolean)
+			.slice(0, 2)
+			.map((part) => part[0]?.toUpperCase())
+			.join('') || 'ME'
+	const doctorExperienceText =
+		doctor?.details?.experience_years != null ? `${doctor.details.experience_years} yrs` : ''
+	const ctaLabel = paymentType === 'later' ? `Confirm ${bookingType}` : `Pay ₹${totalPayable}`
 
 	const handleConfirm = async () => {
 		if (!doctor || !hospitalId || !appointmentDate || !startTime) {
@@ -328,7 +343,10 @@ export default function BookingDetailsScreen() {
 			if (bookingResponse.success) {
 				const appointment = bookingResponse.data
 				setBookedAppointment(appointment)
-				setSuccessOpen(true)
+				// Skip the old "just a popup" success modal -- go straight into the
+				// real pre-intake step, then on to the full Appointment Confirmed
+				// screen (see closeSymptomsForm below).
+				setSymptomsOpen(true)
 			} else {
 				Alert.alert('Error', bookingResponse.message || 'Failed to book appointment')
 			}
@@ -350,18 +368,36 @@ export default function BookingDetailsScreen() {
 		}
 	}
 
-	const openSymptomsForm = () => {
-		setSuccessOpen(false)
-		setSymptomsOpen(true)
-	}
-
 	const closeSymptomsForm = () => {
 		setSymptomsOpen(false)
-		navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor?.id ?? '' })
+		if (!bookedAppointment) {
+			navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor?.id ?? '' })
+			return
+		}
+
+		const selectedMethodLabel =
+			paymentType === 'later'
+				? 'Pay at clinic'
+				: paymentMethods.find((m) => m.id === selectedMethod)?.name || 'Online payment'
+
+		navigation.navigate(ROUTES.STACK.APPOINTMENT_CONFIRMED, {
+			appointmentId: bookedAppointment.id,
+			doctorName: bookingDoctorName,
+			doctorAvatar: doctor?.details?.avatar_s3_key ?? null,
+			doctorSpecialty: doctor?.specialities?.[0],
+			appointmentMode: bookedAppointment.appointment_mode,
+			dateDisplay: bookingDate,
+			timeDisplay: bookingTime,
+			hospitalName: bookingHospitalName,
+			hospitalAddress: bookingHospitalAddress,
+			patientName: patientDisplayName,
+			fee: bookingFee,
+			paymentMethodLabel: selectedMethodLabel,
+		})
 	}
 
 	const handleSubmitSymptoms = async () => {
-    console.log("Submit clicked")
+		console.log('Submit clicked')
 		try {
 			if (!bookedAppointment) {
 				Alert.alert('Error', 'No appointment found to submit symptoms for.')
@@ -393,171 +429,182 @@ export default function BookingDetailsScreen() {
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<StatusBar barStyle="light-content" backgroundColor="#2B7A78" />
+			<StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
 
 			{/* Header */}
 			<View style={[styles.headerWrapper, { paddingTop: insets.top + 8 }]}>
-				<TouchableOpacity onPress={() => navigation.goBack()}>
-					<ArrowIcon width={22} height={22} />
+				<TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBackBtn}>
+					<MaterialCommunityIcons name="chevron-left" size={26} color="#FFFFFF" />
 				</TouchableOpacity>
 
-				<Text style={styles.headerTitle}>Booking Details</Text>
-				<View style={{ width: 22 }} />
+				<Image source={{ uri: avatarUrl }} style={styles.headerAvatar} defaultSource={doctorImagePlaceholder} />
+
+				<View style={styles.headerTextCol}>
+					<Text style={styles.headerDoctorName} numberOfLines={1}>
+						{bookingDoctorName}
+					</Text>
+					<Text style={styles.headerDoctorMeta} numberOfLines={1}>
+						{[doctor.specialities?.[0], doctorExperienceText, fee ? `₹${fee}` : '']
+							.filter(Boolean)
+							.join(' · ')}
+					</Text>
+				</View>
+
+				<View style={styles.stepBadge}>
+					<Text style={styles.stepBadgeText}>Step 2 of 2</Text>
+				</View>
 			</View>
 
 			<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
-				{/* Booking Card */}
-				<View style={styles.card}>
-					<View style={styles.doctorRow}>
-						<Image
-							source={{ uri: avatarUrl }}
-							style={styles.doctorImage}
-							resizeMode="cover"
-							defaultSource={doctorImagePlaceholder}
-						/>
-						<View style={{ marginLeft: 12 }}>
-							<Text style={styles.doctorName}>{bookingDoctorName}</Text>
-							<Text style={styles.speciality}>{doctor.specialities?.[0] || 'Consultation'}</Text>
-						</View>
-					</View>
-
-					<View style={styles.infoRow}>
-						<View style={styles.infoLeft}>
-							<DateSvg width={14} height={14} />
-							<Text style={styles.infoLabel}> Date :</Text>
-						</View>
-						<Text style={styles.infoValue}>{bookingDate}</Text>
-					</View>
-
-					<View style={styles.infoRow}>
-						<View style={styles.infoLeft}>
-							<ClockSvg width={14} height={14} />
-							<Text style={styles.infoLabel}> Time :</Text>
-						</View>
-						<Text style={styles.infoValue}>{bookingTime}</Text>
-					</View>
-
-					<View style={styles.infoRow}>
-						<View style={styles.infoLeft}>
-							<HomeSvg width={14} height={14} />
-							<Text style={styles.infoLabel}> Type :</Text>
-						</View>
-						<Text style={styles.infoValue}>{bookingType}</Text>
-					</View>
-
-					{bookedAppointment ? (
-						<>
-							<View style={styles.infoRow}>
-								<View style={styles.infoLeft}>
-									<ClockSvg width={14} height={14} />
-									<Text style={styles.infoLabel}> Status :</Text>
-								</View>
-								<Text style={[styles.infoValue, styles.statusText]}>{bookingStatus}</Text>
-							</View>
-
-							<View style={styles.infoRow}>
-								<View style={styles.infoLeft}>
-									<ClockSvg width={14} height={14} />
-									<Text style={styles.infoLabel}> Booking ID :</Text>
-								</View>
-								<Text style={styles.infoValue} numberOfLines={1}>
-									{bookedAppointment.id}
+				{/* Appointment ticket card */}
+				<View style={styles.section}>
+					<View style={styles.ticketCard}>
+						<View style={styles.ticketTopRow}>
+							<Image
+								source={{ uri: avatarUrl }}
+								style={styles.ticketAvatar}
+								resizeMode="cover"
+								defaultSource={doctorImagePlaceholder}
+							/>
+							<View style={{ flex: 1 }}>
+								<Text style={styles.ticketDoctorName} numberOfLines={1}>
+									{bookingDoctorName}
+								</Text>
+								<Text style={styles.ticketDoctorSpec} numberOfLines={1}>
+									{[doctor.specialities?.[0], doctorExperienceText].filter(Boolean).join(' · ')}
 								</Text>
 							</View>
-						</>
-					) : null}
-
-					<View style={styles.infoRow}>
-						<View style={styles.infoLeft}>
-							<LocationSvg width={14} height={14} />
-							<Text style={styles.infoLabel}> Location :</Text>
+							<TouchableOpacity onPress={() => navigation.goBack()}>
+								<Text style={styles.changeLink}>Change</Text>
+							</TouchableOpacity>
 						</View>
-						<View style={styles.divider} />
-						<Text style={styles.infoValue}>
-							{bookingHospitalAddress
-								? `${bookingHospitalName}, ${bookingHospitalAddress}`
-								: bookingHospitalName}
-						</Text>
-					</View>
 
-					<Text style={styles.sectionTitle}>Bill Details</Text>
+						<View style={styles.ticketDivider} />
+
+						<View style={styles.ticketGrid}>
+							<View style={styles.ticketGridCol}>
+								<Text style={styles.ticketLabel}>WHEN</Text>
+								<Text style={styles.ticketValueBig}>{bookingTime}</Text>
+								<Text style={styles.ticketSub}>{bookingDate}</Text>
+							</View>
+							<View style={styles.ticketGridCol}>
+								<Text style={styles.ticketLabel}>WHERE</Text>
+								<Text style={styles.ticketValue} numberOfLines={1}>
+									{bookingHospitalName}
+								</Text>
+								<Text style={styles.ticketSub} numberOfLines={1}>
+									{bookingType}
+									{bookingHospitalAddress ? ` · ${bookingHospitalAddress}` : ''}
+								</Text>
+							</View>
+
+							<View style={styles.ticketPatientRow}>
+								<View style={styles.ticketPatientAvatar}>
+									<Text style={styles.ticketPatientInitials}>{patientInitials}</Text>
+								</View>
+								<Text style={styles.ticketPatientText}>
+									For <Text style={styles.ticketPatientName}>{patientDisplayName}</Text> (Self)
+								</Text>
+							</View>
+
+							{bookedAppointment ? (
+								<View style={styles.ticketPatientRow}>
+									<MaterialCommunityIcons name="check-circle" size={16} color="#1E7A4E" />
+									<Text style={styles.ticketPatientText}>
+										{bookingStatus} ·{' '}
+										<Text style={styles.ticketPatientName}>{bookedAppointment.id}</Text>
+									</Text>
+								</View>
+							) : null}
+						</View>
+					</View>
+				</View>
+
+				{/* Bill details */}
+				<View style={styles.section}>
+					<Text style={styles.sectionTitle}>Bill details</Text>
 
 					<View style={styles.billRow}>
-						<Text style={styles.billText}>Consultation fee :</Text>
-						<View style={styles.divider} />
-						<Text style={styles.billText}>₹ {bookingFee}</Text>
+						<Text style={styles.billText}>Consultation fee</Text>
+						<Text style={styles.billText}>₹{bookingFee}</Text>
 					</View>
 
 					<View style={styles.billRow}>
-						<Text style={styles.billText}>Service Fee & Tax</Text>
+						<Text style={styles.billText}>Service Fee &amp; Tax</Text>
 						<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-							<Text style={styles.strikeText}>₹ 30 </Text>
+							<Text style={styles.strikeText}>₹30 </Text>
 							<View style={styles.freeBadge}>
 								<Text style={styles.freeText}>FREE</Text>
 							</View>
 						</View>
 					</View>
 
-					<View style={styles.divider} />
+					<View style={styles.billDividerDashed} />
 
 					<View style={styles.billRow}>
-						<Text style={styles.totalText}>Total Payable</Text>
-						<Text style={styles.totalText}>₹ {totalPayable}</Text>
+						<Text style={styles.totalLabel}>To pay</Text>
+						<Text style={styles.totalValue}>₹{totalPayable}</Text>
 					</View>
 				</View>
 
-				{/* Payment Methods */}
-				<View style={styles.card}>
-					<Text style={styles.sectionTitle}>Payment Method</Text>
+				{/* Pay with */}
+				<View style={styles.section}>
+					<Text style={styles.sectionTitle}>Pay with</Text>
 
-					{/* Pay Later */}
-					<TouchableOpacity
-						style={[styles.paymentRow, isPayLaterDisabled && styles.paymentRowDisabled]}
-						onPress={() => {
-							if (isPayLaterDisabled) return
-							setPaymentType('later')
-							setSelectedMethod('')
-						}}
-						disabled={isPayLaterDisabled}
-					>
-						<Text style={[styles.paymentText, isPayLaterDisabled && styles.paymentTextDisabled]}>
-							Pay Later
-						</Text>
-						<View style={[styles.radioOuter, isPayLaterDisabled && styles.radioOuterDisabled]}>
-							{paymentType === 'later' && <View style={styles.radioInner} />}
-						</View>
-					</TouchableOpacity>
-
-					{/* Pay Now */}
-					<TouchableOpacity style={styles.paymentRow} onPress={() => setPaymentType('now')}>
-						<Text style={styles.paymentText}>Pay Now</Text>
-						<View style={styles.radioOuter}>
-							{paymentType === 'now' && <View style={styles.radioInner} />}
-						</View>
-					</TouchableOpacity>
-
-					{paymentType === 'now' && (
-						<>
-							{paymentMethods.map((item) => (
+					<View style={styles.payListCard}>
+						{paymentMethods.map((item) => (
+							<View key={item.id} style={styles.payRowWrap}>
 								<TouchableOpacity
-									key={item.id}
-									style={styles.paymentRow}
-									onPress={() => setSelectedMethod(item.id)}
+									style={styles.payRow}
+									onPress={() => {
+										setPaymentType('now')
+										setSelectedMethod(item.id)
+									}}
+									activeOpacity={0.8}
 								>
-									<View style={styles.paymentLeft}>
+									<View style={styles.payIconBox}>
 										<PaymentIcon SvgComponent={item.Svg} bordered={item.bordered} />
-										<Text style={styles.paymentText}>{item.name}</Text>
 									</View>
-
+									<View style={{ flex: 1 }}>
+										<Text style={styles.payTitle}>{item.name}</Text>
+									</View>
 									<View style={styles.radioOuter}>
-										{selectedMethod === item.id && <View style={styles.radioInner} />}
+										{paymentType === 'now' && selectedMethod === item.id && (
+											<View style={styles.radioInner} />
+										)}
 									</View>
 								</TouchableOpacity>
-							))}
+							</View>
+						))}
 
-							<AppPayment />
-						</>
-					)}
+						<View style={[styles.payRowWrap, isPayLaterDisabled && styles.paymentRowDisabled]}>
+							<TouchableOpacity
+								style={styles.payRow}
+								onPress={() => {
+									if (isPayLaterDisabled) return
+									setPaymentType('later')
+									setSelectedMethod('')
+								}}
+								disabled={isPayLaterDisabled}
+								activeOpacity={0.8}
+							>
+								<View style={styles.payIconBox}>
+									<MaterialCommunityIcons name="home-city-outline" size={20} color={PRIMARY} />
+								</View>
+								<View style={{ flex: 1 }}>
+									<Text style={[styles.payTitle, isPayLaterDisabled && styles.paymentTextDisabled]}>
+										Pay at clinic
+									</Text>
+									<Text style={styles.paySubtitle}>Cash, card or UPI at the front desk</Text>
+								</View>
+								<View style={[styles.radioOuter, isPayLaterDisabled && styles.radioOuterDisabled]}>
+									{paymentType === 'later' && <View style={styles.radioInner} />}
+								</View>
+							</TouchableOpacity>
+						</View>
+					</View>
+
+					{paymentType === 'now' && <AppPayment />}
 
 					{/* WhatsApp Notification */}
 					<View style={styles.whatsappBox}>
@@ -581,40 +628,32 @@ export default function BookingDetailsScreen() {
 						<Text style={styles.legalText}>• You can pre-pay by selecting an online option</Text>
 					</View>
 				</View>
+
+				<View style={styles.encryptionRow}>
+					<MaterialCommunityIcons name="shield-check-outline" size={16} color={PRIMARY} />
+					<Text style={styles.encryptionText}>Payments are encrypted. We never store your CVV.</Text>
+				</View>
 			</ScrollView>
 
 			{/* Bottom Bar */}
 			<View style={styles.bottomBar}>
-				<View>
-					<Text style={styles.payNowAmount}>₹ {totalPayable}</Text>
-					<Text style={styles.payNowLabel}>Pay Now</Text>
-				</View>
-
-				<TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} disabled={isBooking}>
+				<TouchableOpacity
+					style={styles.confirmBtn}
+					onPress={handleConfirm}
+					disabled={isBooking}
+					activeOpacity={0.88}
+				>
 					{isBooking ? (
 						<ActivityIndicator color="#fff" />
 					) : (
-						<Text style={styles.confirmText}>Confirm {bookingType}</Text>
+						<>
+							<MaterialCommunityIcons name="lock-outline" size={18} color="#fff" />
+							<Text style={styles.confirmText}>{ctaLabel}</Text>
+						</>
 					)}
 				</TouchableOpacity>
+				<Text style={styles.termsText}>By continuing you agree to the booking terms</Text>
 			</View>
-
-			<AppModal visible={successOpen} onDismiss={openSymptomsForm}>
-				<View style={[styles.successContent, isTablet && styles.successContentTablet]}>
-					<View style={styles.successIconCircle}>
-						<MaterialCommunityIcons name="check-circle-outline" size={34} color="#fff" />
-					</View>
-
-					<Text style={styles.successTitle}>Your appointment is successfully booked</Text>
-					{/* <Text style={styles.successDescription}>
-            The update will appear in your profile.
-          </Text> */}
-
-					<TouchableOpacity style={styles.successDoneButton} onPress={openSymptomsForm} activeOpacity={0.85}>
-						<Text style={styles.successDoneText}>Done</Text>
-					</TouchableOpacity>
-				</View>
-			</AppModal>
 
 			<PreIntakeModal
 				visible={symptomsOpen}
@@ -634,85 +673,197 @@ export default function BookingDetailsScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#F6F8FA',
+		backgroundColor: '#F5F8F8',
 	},
-	doctorImage: {
-		width: 52,
-		height: 52,
-		borderRadius: 26,
-	},
+
+	// Header
 	headerWrapper: {
-		backgroundColor: '#2B7A78',
+		backgroundColor: PRIMARY,
 		flexDirection: 'row',
-		justifyContent: 'space-between',
 		alignItems: 'center',
+		gap: 10,
 		paddingHorizontal: 16,
 		paddingBottom: 14,
 	},
-	headerTitle: {
+	headerBackBtn: {
+		width: 40,
+		height: 40,
+		marginLeft: -8,
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderRadius: 9999,
+	},
+	headerAvatar: {
+		width: 36,
+		height: 36,
+		borderRadius: 9999,
+		backgroundColor: '#ECE6FA',
+		borderWidth: 2,
+		borderColor: '#FFFFFF',
+	},
+	headerTextCol: {
+		flex: 1,
+		minWidth: 0,
+	},
+	headerDoctorName: {
 		color: '#fff',
-		fontSize: 20,
+		fontSize: 16,
+		lineHeight: 20,
 		fontWeight: '700',
+	},
+	headerDoctorMeta: {
+		color: '#E3EFEF',
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '500',
+	},
+	stepBadge: {
+		flexShrink: 0,
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderRadius: 8,
+		backgroundColor: PRIMARY_DARK,
+	},
+	stepBadgeText: {
+		color: '#fff',
+		fontSize: 12,
+		fontWeight: '700',
+	},
+
+	section: {
+		backgroundColor: '#fff',
+		padding: 16,
+		marginTop: 8,
 	},
 	card: {
 		backgroundColor: '#fff',
 		padding: 16,
 		marginTop: 8,
 	},
-	doctorRow: {
+
+	// Appointment ticket card
+	ticketCard: {
+		borderRadius: 16,
+		backgroundColor: TICKET_TINT,
+		overflow: 'hidden',
+	},
+	ticketTopRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 16,
+		gap: 12,
+		padding: 16,
 	},
-	doctorName: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#222',
+	ticketAvatar: {
+		width: 56,
+		height: 56,
+		borderRadius: 9999,
+		backgroundColor: '#ECE6FA',
+		borderWidth: 3,
+		borderColor: '#FFFFFF',
 	},
-	speciality: {
+	ticketDoctorName: {
+		fontSize: 17,
+		lineHeight: 22,
+		fontWeight: '800',
+		color: INK,
+	},
+	ticketDoctorSpec: {
 		fontSize: 13,
-		color: '#777',
-		marginTop: 2,
+		lineHeight: 18,
+		fontWeight: '600',
+		color: SPEC_TONE,
 	},
-	infoRow: {
+	changeLink: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: PRIMARY,
+	},
+	ticketDivider: {
+		height: 0,
+		borderTopWidth: 2,
+		borderTopColor: '#9FD3D1',
+		borderStyle: 'dashed',
+		marginHorizontal: 20,
+	},
+	ticketGrid: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
-		marginBottom: 10,
+		flexWrap: 'wrap',
+		padding: 16,
+		gap: 12,
 	},
-	infoLeft: {
+	ticketGridCol: {
+		width: '46%',
+		flexGrow: 1,
+		gap: 2,
+	},
+	ticketLabel: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+		letterSpacing: 0.48,
+		color: PRIMARY,
+	},
+	ticketValueBig: {
+		fontSize: 20,
+		lineHeight: 26,
+		fontWeight: '800',
+		color: INK,
+	},
+	ticketValue: {
+		fontSize: 15,
+		lineHeight: 22,
+		fontWeight: '700',
+		color: INK,
+	},
+	ticketSub: {
+		fontSize: 13,
+		lineHeight: 18,
+		color: INK_MUTED,
+	},
+	ticketPatientRow: {
+		width: '100%',
 		flexDirection: 'row',
 		alignItems: 'center',
+		gap: 8,
 	},
-	infoLabel: {
+	ticketPatientAvatar: {
+		width: 24,
+		height: 24,
+		borderRadius: 9999,
+		backgroundColor: '#FFFFFF',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	ticketPatientInitials: {
+		fontSize: 10,
+		fontWeight: '800',
+		color: PRIMARY,
+	},
+	ticketPatientText: {
 		fontSize: 13,
-		color: '#666',
+		lineHeight: 18,
+		color: INK,
 	},
-	infoValue: {
-		fontSize: 13,
-		color: '#222',
-		flexShrink: 1,
-		marginLeft: 12,
-		textAlign: 'right',
-	},
-	statusText: {
-		color: '#B26A00',
+	ticketPatientName: {
 		fontWeight: '700',
 	},
+
 	sectionTitle: {
-		fontSize: 16,
+		fontSize: 18,
+		lineHeight: 26,
 		fontWeight: '700',
-		color: '#222',
-		marginTop: 14,
-		marginBottom: 14,
+		color: INK,
+		marginBottom: 4,
 	},
 	billRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
-		marginBottom: 10,
+		marginTop: 8,
 	},
 	billText: {
 		fontSize: 14,
-		color: '#444',
+		lineHeight: 20,
+		color: INK,
 	},
 	strikeText: {
 		fontSize: 12,
@@ -730,21 +881,62 @@ const styles = StyleSheet.create({
 		color: '#2E7D32',
 		fontWeight: '700',
 	},
-	divider: {
+	billDividerDashed: {
 		borderTopWidth: 1,
-		borderTopColor: '#eee',
-		marginVertical: 10,
+		borderTopColor: '#7A8B8E',
+		borderStyle: 'dashed',
+		marginTop: 8,
+		paddingTop: 4,
 	},
-	totalText: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#222',
+	totalLabel: {
+		fontSize: 18,
+		lineHeight: 26,
+		fontWeight: '800',
+		color: INK,
 	},
-	paymentRow: {
+	totalValue: {
+		fontSize: 22,
+		fontWeight: '800',
+		color: INK,
+	},
+
+	// Pay with
+	payListCard: {
+		borderRadius: 12,
+		backgroundColor: '#fff',
+		borderWidth: 1,
+		borderColor: DIVIDER,
+		overflow: 'hidden',
+	},
+	payRowWrap: {
+		borderBottomWidth: 1,
+		borderBottomColor: DIVIDER,
+	},
+	payRow: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingVertical: 12,
+		gap: 12,
+		minHeight: 64,
+		paddingHorizontal: 12,
+	},
+	payIconBox: {
+		width: 40,
+		height: 40,
+		borderRadius: 8,
+		backgroundColor: TICKET_TINT,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	payTitle: {
+		fontSize: 16,
+		lineHeight: 24,
+		fontWeight: '600',
+		color: INK,
+	},
+	paySubtitle: {
+		fontSize: 13,
+		lineHeight: 18,
+		color: INK_MUTED,
 	},
 	paymentRowDisabled: {
 		opacity: 0.45,
@@ -773,11 +965,11 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 	},
 	radioOuter: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
+		width: 22,
+		height: 22,
+		borderRadius: 11,
 		borderWidth: 2,
-		borderColor: '#2B7A78',
+		borderColor: PRIMARY,
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
@@ -785,10 +977,23 @@ const styles = StyleSheet.create({
 		borderColor: '#9aa5ad',
 	},
 	radioInner: {
-		width: 12,
-		height: 12,
+		width: 11,
+		height: 11,
 		borderRadius: 6,
-		backgroundColor: '#2B7A78',
+		backgroundColor: PRIMARY,
+	},
+	encryptionRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 6,
+		marginTop: 12,
+		paddingHorizontal: 16,
+	},
+	encryptionText: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: INK_MUTED,
 	},
 	whatsappBox: {
 		borderWidth: 1,
@@ -842,32 +1047,29 @@ const styles = StyleSheet.create({
 		backgroundColor: '#fff',
 		paddingHorizontal: 16,
 		paddingVertical: 12,
-		flexDirection: 'row',
-		alignItems: 'center',
+		gap: 8,
 		borderTopWidth: 1,
-		borderTopColor: '#EAEAEA',
-	},
-	payNowAmount: {
-		fontSize: 20,
-		fontWeight: '700',
-		color: '#2B7A78',
-	},
-	payNowLabel: {
-		fontSize: 13,
-		color: '#888',
+		borderTopColor: DIVIDER,
 	},
 	confirmBtn: {
-		flex: 1,
-		marginLeft: 16,
-		backgroundColor: '#2B7A78',
+		height: 52,
+		backgroundColor: PRIMARY,
 		borderRadius: 12,
-		paddingVertical: 16,
+		flexDirection: 'row',
 		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 8,
 	},
 	confirmText: {
 		color: '#fff',
 		fontSize: 16,
-		fontWeight: '700',
+		fontWeight: '600',
+	},
+	termsText: {
+		textAlign: 'center',
+		fontSize: 12,
+		lineHeight: 16,
+		color: INK_MUTED,
 	},
 	errorContainer: {
 		flex: 1,
@@ -883,56 +1085,5 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: '#2B7A78',
 		textDecorationLine: 'underline',
-	},
-	successContent: {
-		width: '100%',
-		maxWidth: 360,
-		alignItems: 'center',
-	},
-	successContentTablet: {
-		maxWidth: 420,
-	},
-	successIconCircle: {
-		width: 68,
-		height: 68,
-		borderRadius: 34,
-		backgroundColor: '#2B6F71',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginBottom: 20,
-		shadowColor: '#2B6F71',
-		shadowOpacity: 0.34,
-		shadowRadius: 16,
-		shadowOffset: { width: 0, height: 8 },
-		elevation: 8,
-	},
-	successTitle: {
-		color: '#222',
-		fontSize: 20,
-		lineHeight: 26,
-		fontWeight: '700',
-		textAlign: 'center',
-		marginBottom: 12,
-	},
-	// successDescription: {
-	//   color: "#667085",
-	//   fontSize: 14,
-	//   lineHeight: 23,
-	//   textAlign: "center",
-	//   marginBottom: 24,
-	// },
-	successDoneButton: {
-		width: '100%',
-		maxWidth: 280,
-		minHeight: 46,
-		borderRadius: 10,
-		backgroundColor: '#2B7A78',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	successDoneText: {
-		color: '#fff',
-		fontSize: 15,
-		fontWeight: '700',
 	},
 })
