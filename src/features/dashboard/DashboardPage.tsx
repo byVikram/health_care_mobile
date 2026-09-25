@@ -1,5 +1,5 @@
 // src/features/dashboard/screens/DashboardPage.tsx
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
 	RefreshControl,
 	ScrollView,
@@ -74,6 +74,11 @@ export default function DashboardPage() {
 	const [refreshing, setRefreshing] = useState(false)
 	const [refreshToken, setRefreshToken] = useState(0)
 	const [modalType, setModalType] = useState<'success' | 'error' | null>(null)
+
+	// Stable reference: PatientUpcomingAppointments has this in its fetch
+	// effect's dependency array, so a new function identity on every render
+	// (e.g. from an unrelated parent re-render) would re-trigger the fetch.
+	const handleAppointmentsRefreshComplete = useCallback(() => setRefreshing(false), [])
 
 	const [selectedDate, setSelectedDate] = useState(0)
 	const [doctorAppointmentSearch, setDoctorAppointmentSearch] = useState('')
@@ -222,7 +227,7 @@ export default function DashboardPage() {
 			<View style={styles.upcomingAppointmentsWrapper}>
 				<PatientUpcomingAppointments
 					refreshToken={refreshToken}
-					onRefreshComplete={() => setRefreshing(false)}
+					onRefreshComplete={handleAppointmentsRefreshComplete}
 					onJoin={() =>
 						navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
 							mode: 'video',
