@@ -1,17 +1,24 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { Button as PaperButton, useTheme } from 'react-native-paper';
+import { APP_COLORS } from '../../config/theme';
 
 type PaperButtonProps = React.ComponentProps<typeof PaperButton>;
 
 interface AppButtonProps extends PaperButtonProps {
-    variant?: 'primary' | 'secondary' | 'outline' | 'text';
+    variant?: 'primary' | 'secondary' | 'outline' | 'text' | 'danger';
     formAction?: boolean;
+    /**
+     * Opt-in KarolaHealth design sizing. 'lg' = 52 high, radius 12, 16/600 label (footer CTAs);
+     * 'md' = 44 high, radius 12, 14/700 label. Omit to keep the existing Paper sizing.
+     */
+    size?: 'md' | 'lg';
 }
 
 export const AppButton = ({
     variant = 'primary',
     formAction = false,
+    size,
     style,
     labelStyle,
     contentStyle,
@@ -37,6 +44,11 @@ export const AppButton = ({
         case 'text':
             mode = 'text';
             break;
+        case 'danger':
+            mode = 'contained';
+            customBackgroundColor = APP_COLORS.danger;
+            customTextColor = '#FFFFFF';
+            break;
         case 'primary':
         default:
             mode = 'contained';
@@ -51,9 +63,27 @@ export const AppButton = ({
             buttonColor={customBackgroundColor}
             textColor={customTextColor}
             disabled={disabled}
-            style={[styles.button, formAction && styles.formActionButton, formAction && disabled && styles.disabledButton, style]}
-            contentStyle={[formAction && styles.formActionContent, contentStyle]}
-            labelStyle={[styles.label, formAction && styles.formActionLabel, labelStyle]}
+            style={[
+                styles.button,
+                formAction && styles.formActionButton,
+                formAction && disabled && styles.disabledButton,
+                size && styles.sizedButton,
+                size && variant === 'outline' && styles.sizedOutline,
+                style,
+            ]}
+            contentStyle={[
+                formAction && styles.formActionContent,
+                size === 'lg' && styles.lgContent,
+                size === 'md' && styles.mdContent,
+                contentStyle,
+            ]}
+            labelStyle={[
+                styles.label,
+                formAction && styles.formActionLabel,
+                size === 'lg' && styles.lgLabel,
+                size === 'md' && styles.mdLabel,
+                labelStyle,
+            ]}
             {...props}
         >
             {children}
@@ -87,5 +117,31 @@ const styles = StyleSheet.create({
     },
     disabledButton: {
         opacity: 0.7,
+    },
+    sizedButton: {
+        borderRadius: 12,
+        paddingVertical: 0,
+    },
+    sizedOutline: {
+        borderWidth: 1.5,
+        borderColor: APP_COLORS.primary,
+    },
+    lgContent: {
+        height: 52,
+    },
+    mdContent: {
+        height: 44,
+    },
+    lgLabel: {
+        fontSize: 16,
+        lineHeight: 22,
+        fontWeight: '600',
+        marginVertical: 0,
+    },
+    mdLabel: {
+        fontSize: 14,
+        lineHeight: 20,
+        fontWeight: '700',
+        marginVertical: 0,
     },
 });

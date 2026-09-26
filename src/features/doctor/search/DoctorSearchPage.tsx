@@ -9,19 +9,23 @@ import {
 	DimensionValue,
 	TouchableOpacity,
 	ScrollView,
+	TextInput,
 } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useRoute, useNavigation } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import DoctorSearchCard from './components/DoctorSearchCard'
 import {
-	AppTypography,
-	AppSkeleton,
+	AppBottomSheet,
+	AppButton,
+	AppChip,
+	AppRadio,
+	AppScreenHeader,
 	AppSelect,
 	AppSelectOption,
-	AppBottomSheet,
-	AppInput,
-	AppScreenHeader,
+	AppSkeleton,
+	AppTypography,
+	AppIcon,
 } from '../../../components/common'
 import { useAuth } from '../../../context/AuthContext'
 import { getDoctors, getSpecialities } from '../doctorService'
@@ -29,14 +33,10 @@ import { DoctorSearchItem } from '../../../types/doctor-search'
 import type { RouteProp } from '@react-navigation/native'
 import type { AppStackParamList } from '../../../navigation/types'
 import { ROUTES } from '../../../navigation/routes'
+import { APP_COLORS } from '../../../config/theme'
 
 const PAGE_LIMIT = 5
-
-const INK = '#12373E'
-const INK_MUTED = '#5B6B6E'
-const DIVIDER = '#D5E1E2'
-const PAGE_BG = '#F5F8F8'
-const HEADER_BG = '#2B6F71'
+const SEARCH_DEBOUNCE_MS = 300
 
 const RATING_OPTIONS: AppSelectOption[] = [
 	{ label: 'All Ratings', value: 'all' },
@@ -45,11 +45,23 @@ const RATING_OPTIONS: AppSelectOption[] = [
 	{ label: '3.5+ Stars', value: '3.5' },
 ]
 
-type SortKey = 'relevance' | 'experience'
-const SORT_OPTIONS: AppSelectOption[] = [
-	{ label: 'Sort: Relevance', value: 'relevance' },
-	{ label: 'Most experienced', value: 'experience' },
+// The search API has no sort param, so every option is a client-side sort over
+// the pages loaded so far, using real fields only (distance, offline fee, experience).
+type SortKey = 'rel' | 'near' | 'fee' | 'exp'
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+	{ value: 'rel', label: 'Sort: Relevance' },
+	{ value: 'near', label: 'Nearest first' },
+	{ value: 'fee', label: 'Fee: low to high' },
+	{ value: 'exp', label: 'Most experienced' },
 ]
+
+/** Ascending numeric compare that keeps missing values at the end. */
+function compareNullableAsc(a: number | null | undefined, b: number | null | undefined) {
+	const aMissing = a == null
+	const bMissing = b == null
+	if (aMissing || bMissing) return aMissing === bMissing ? 0 : aMissing ? 1 : -1
+	return a - b
+}
 
 // ─── Doctor Card Skeleton ─────────────────────────────────────────────────
 function DoctorCardSkeleton() {
@@ -75,6 +87,7 @@ export default function DoctorSearchPage() {
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
 	const { currentLocation } = useAuth()
 	const { width } = useWindowDimensions()
+	const insets = useSafeAreaInsets()
 
 	const isMobile = width < 600
 	const numColumns = isMobile ? 1 : width >= 900 ? 4 : 3
@@ -84,8 +97,10 @@ export default function DoctorSearchPage() {
 	const initialMode = route.params?.mode || 'all'
 	const initialSpecialityId = route.params?.specialityId ? String(route.params.specialityId) : 'all'
 
+	const [searchInput, setSearchInput] = useState(initialQuery)
 	const [searchQuery, setSearchQuery] = useState(initialQuery)
 	const [doctors, setDoctors] = useState<DoctorSearchItem[]>([])
+	const [total, setTotal] = useState<number | null>(null)
 	const [loading, setLoading] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
 	const [page, setPage] = useState(1)
@@ -98,7 +113,8 @@ export default function DoctorSearchPage() {
 	const [specialityName, setSpecialityName] = useState(route.params?.specialityName || '')
 	const [consultationTypeFilter, setConsultationTypeFilter] = useState<string>(initialMode)
 	const [minRatingFilter, setMinRatingFilter] = useState('all')
-	const [sortBy, setSortBy] = useState<SortKey>('relevance')
+	const [sortBy, setSortBy] = useState<SortKey>('rel')
+	const [showSort, setShowSort] = useState(false)
 	// "Available today" / "Female doctor" have no backing field on DoctorSearchItem
 	// yet (no `is_available_today` / `gender` from the API) -- kept as inert UI
 	// toggles matching the design, not wired to any real filter, so they never
@@ -120,6 +136,13 @@ export default function DoctorSearchPage() {
 
 	const [showFilters, setShowFilters] = useState(false)
 
+	// Debounce typing so every keystroke doesn't fire a search request.
+	useEffect(() => {
+		if (searchInput === searchQuery) return
+		const t = setTimeout(() => setSearchQuery(searchInput), SEARCH_DEBOUNCE_MS)
+		return () => clearTimeout(t)
+	}, [searchInput, searchQuery])
+
 	// Sync route.params with filter states on route param changes
 	useEffect(() => {
 		if (route.params?.specialityId) {
@@ -129,6 +152,7 @@ export default function DoctorSearchPage() {
 			if (route.params?.specialityName) setSpecialityName(route.params.specialityName)
 		}
 		if (route.params?.query !== undefined) {
+			setSearchInput(route.params.query)
 			setSearchQuery(route.params.query)
 		}
 		if (route.params?.mode) {
@@ -209,15 +233,22 @@ export default function DoctorSearchPage() {
 			if (res.success && res.data) {
 				const newData = res.data
 				setDoctors((prev) => (targetPage === 1 ? newData : [...prev, ...newData]))
+				setTotal(typeof res.total === 'number' ? res.total : null)
 				setPage(targetPage)
 				setHasMore(newData.length >= PAGE_LIMIT)
 			} else {
-				if (targetPage === 1) setDoctors([])
+				if (targetPage === 1) {
+					setDoctors([])
+					setTotal(0)
+				}
 				setHasMore(false)
 			}
 		} catch (error) {
 			console.error('Error fetching doctors:', error)
-			if (targetPage === 1) setDoctors([])
+			if (targetPage === 1) {
+				setDoctors([])
+				setTotal(0)
+			}
 		} finally {
 			setLoading(false)
 			setRefreshing(false)
@@ -254,13 +285,15 @@ export default function DoctorSearchPage() {
 		minRatingFilter,
 	])
 
-	// Client-side sort over the already-fetched page -- "experience" is the
-	// only sort key backed by a real field (`experience_years`); "nearest"/
-	// "fee" from the design have no real distance/fee data to sort by, so
-	// they're intentionally not offered here.
+	// Client-side sort over the already-fetched pages (the API has no sort param).
 	const sortedDoctors = useMemo(() => {
-		if (sortBy !== 'experience') return doctors
-		return [...doctors].sort((a, b) => (b.experience_years || 0) - (a.experience_years || 0))
+		if (sortBy === 'near') return [...doctors].sort((a, b) => compareNullableAsc(a.distance, b.distance))
+		if (sortBy === 'fee')
+			return [...doctors].sort((a, b) =>
+				compareNullableAsc(a.hospital?.offline_consultation_fee, b.hospital?.offline_consultation_fee)
+			)
+		if (sortBy === 'exp') return [...doctors].sort((a, b) => (b.experience_years || 0) - (a.experience_years || 0))
+		return doctors
 	}, [doctors, sortBy])
 
 	// Modal handlers
@@ -290,12 +323,22 @@ export default function DoctorSearchPage() {
 		setMinRatingFilter('all')
 	}
 
+	// Empty-state "Clear filters" (design: resets speciality, query and every toggle; keeps sort).
+	const clearAll = () => {
+		resetFilters()
+		setSearchInput('')
+		setSearchQuery('')
+		setConsultationTypeFilter('all')
+		setAvailableTodayOn(false)
+		setFemaleDoctorOn(false)
+	}
+
 	// Render item for FlatList
 	const renderItem = useCallback(
 		({ item }: { item: DoctorSearchItem }) => {
 			const itemWidth: DimensionValue = `${100 / numColumns}%`
 			return (
-				<View style={[styles.cardListItem, { width: itemWidth }]}>
+				<View style={{ width: itemWidth }}>
 					<DoctorSearchCard doctor={item} />
 				</View>
 			)
@@ -304,13 +347,14 @@ export default function DoctorSearchPage() {
 	)
 
 	// Skeleton placeholder list when loading
-	const listData = loading && !refreshing ? Array(6).fill({}) : sortedDoctors
+	const isInitialLoading = loading && !refreshing
+	const listData = isInitialLoading ? Array(6).fill({}) : sortedDoctors
 	const keyExtractor = (item: any, index: number) => (item.id ? String(item.id) : `skeleton-${index}`)
 
 	const renderFooter = () =>
 		loadingMore ? (
 			<View style={styles.footerLoader}>
-				<ActivityIndicator size="small" color={HEADER_BG} />
+				<ActivityIndicator size="small" color={APP_COLORS.primary} />
 			</View>
 		) : null
 
@@ -332,7 +376,7 @@ export default function DoctorSearchPage() {
 							size="medium"
 							borderRadius={10}
 							customCardStyle={styles.inlineFilterSelect}
-							borderColor="#EAECF0"
+							borderColor={APP_COLORS.divider}
 							maxDropdownHeight={240}
 							style={styles.inlineSelectFill}
 						/>
@@ -344,18 +388,14 @@ export default function DoctorSearchPage() {
 							{RATING_OPTIONS.map((option) => {
 								const selected = option.value === draftMinRating
 								return (
-									<TouchableOpacity
+									<AppChip
 										key={option.value}
-										style={[styles.filterChip, selected && styles.filterChipActive]}
+										label={option.label}
+										selected={selected}
 										onPress={() => setDraftMinRating(option.value)}
-										activeOpacity={0.82}
-									>
-										<AppTypography
-											style={[styles.filterChipText, selected && styles.filterChipTextActive]}
-										>
-											{option.label}
-										</AppTypography>
-									</TouchableOpacity>
+										style={[styles.filterChip, selected && styles.filterChipActive]}
+										textStyle={[styles.filterChipText, selected && styles.filterChipTextActive]}
+									/>
 								)
 							})}
 						</View>
@@ -374,143 +414,173 @@ export default function DoctorSearchPage() {
 		)
 	}
 
-	const resultLabel =
-		loading && !refreshing
-			? ''
-			: `${sortedDoctors.length} ${sortedDoctors.length === 1 ? 'doctor' : 'doctors'} near you`
+	const resultCount = total ?? sortedDoctors.length
+	const resultLabel = isInitialLoading ? '' : `${resultCount} ${resultCount === 1 ? 'doctor' : 'doctors'} near you`
+	const sortLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label ?? 'Sort: Relevance'
+
+	const handleBack = () => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate(ROUTES.MAIN.SEARCH))
 
 	return (
 		<View style={styles.container}>
-			{/* HEADER — common structure/back/styling comes from AppScreenHeader;
-			    this screen only supplies its own title, colour and content. */}
+			{/* HEADER */}
 			<AppScreenHeader
+				variant="bar"
 				title="Find a doctor"
-				backgroundColor={HEADER_BG}
-				onBack={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate(ROUTES.MAIN.SEARCH))}
+				subtitle={`In-clinic or video consultation${currentLocation?.address ? ` · ${currentLocation.address}` : ''}`}
+				titleStyle={styles.headerTitle}
+				onBack={handleBack}
+				backAccessibilityLabel="Back to specialities"
+				style={styles.header}
 			>
-				<View style={{ gap: 8 }}>
-					<AppTypography style={styles.headerSubtitle} numberOfLines={1}>
-						In-clinic or video consultation{currentLocation?.address ? ` · ${currentLocation.address}` : ''}
-					</AppTypography>
-					<View style={styles.searchBarWrap}>
-						<AppInput
-							isSearch
-							value={searchQuery}
-							onChangeText={setSearchQuery}
-							placeholder="Doctor, speciality or symptom"
-							noMargin
-							borderRadius={8}
-							style={styles.searchBar}
-							containerStyle={{ flex: 1 }}
-						/>
-					</View>
+				<View style={styles.searchBox}>
+					<AppIcon name="search" size={20} color={APP_COLORS.inkMuted} />
+					<TextInput
+						value={searchInput}
+						onChangeText={setSearchInput}
+						onSubmitEditing={() => setSearchQuery(searchInput)}
+						placeholder="Doctor, speciality or symptom"
+						placeholderTextColor={APP_COLORS.inkMuted}
+						style={styles.searchInput}
+						returnKeyType="search"
+						autoCorrect={false}
+						clearButtonMode="while-editing"
+						accessibilityLabel="Search doctors"
+					/>
 				</View>
 			</AppScreenHeader>
 
-			{/* INLINE FILTER / SORT BAR — wraps to a new line instead of scrolling
-			    horizontally, matching the shared HTML design. */}
+			{/* FILTER / SORT BAR — wraps onto a second line like the design. */}
 			<View style={styles.filterBarWrap}>
 				<View style={styles.filterBarContent}>
 					<TouchableOpacity style={styles.specialityChip} onPress={openFilterModal} activeOpacity={0.82}>
-						<MaterialCommunityIcons name="stethoscope" size={16} color={HEADER_BG} />
+						<AppIcon name="steth" size={16} color={APP_COLORS.primary} />
 						<AppTypography style={styles.specialityChipText} numberOfLines={1}>
 							{specialityName || 'All specialities'}
 						</AppTypography>
-						<MaterialCommunityIcons name="chevron-down" size={16} color={INK} />
+						<AppIcon name="chevronRight" size={16} color={APP_COLORS.ink} strokeWidth={2.2} />
 					</TouchableOpacity>
 
-					<AppSelect
-						options={SORT_OPTIONS}
-						value={sortBy}
-						onSelect={(value) => setSortBy(value as SortKey)}
-						size="small"
-						borderRadius={8}
-						customCardStyle={styles.sortSelect}
-						borderColor="#7A8B8E"
-						style={styles.sortSelectWrap}
-					/>
-
 					<TouchableOpacity
-						style={[styles.toggleChip, consultationTypeFilter === 'video' && styles.toggleChipActive]}
-						onPress={() => setConsultationTypeFilter((prev) => (prev === 'video' ? 'all' : 'video'))}
+						style={styles.sortPill}
+						onPress={() => setShowSort(true)}
 						activeOpacity={0.82}
+						accessibilityRole="button"
+						accessibilityLabel={`Sort doctors, ${sortLabel}`}
 					>
-						<AppTypography
-							style={[
-								styles.toggleChipText,
-								consultationTypeFilter === 'video' && styles.toggleChipTextActive,
-							]}
-						>
-							Video consult
+						<AppTypography style={styles.sortPillText} numberOfLines={1}>
+							{sortLabel}
 						</AppTypography>
+						<View style={styles.sortPillChevron} pointerEvents="none">
+							<AppIcon name="chevronDown" size={16} color={APP_COLORS.ink} strokeWidth={2.2} />
+						</View>
 					</TouchableOpacity>
 
-					<TouchableOpacity
-						style={[styles.toggleChip, availableTodayOn && styles.toggleChipActive]}
+					<AppChip
+						label="Available today"
+						selected={availableTodayOn}
 						onPress={() => setAvailableTodayOn((v) => !v)}
-						activeOpacity={0.82}
-					>
-						<AppTypography style={[styles.toggleChipText, availableTodayOn && styles.toggleChipTextActive]}>
-							Available today
-						</AppTypography>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={[styles.toggleChip, femaleDoctorOn && styles.toggleChipActive]}
+						variant="soft"
+						shape="rounded"
+						size="sm"
+						checkmark
+					/>
+					<AppChip
+						label="Video consult"
+						selected={consultationTypeFilter === 'video'}
+						onPress={() => setConsultationTypeFilter((prev) => (prev === 'video' ? 'all' : 'video'))}
+						variant="soft"
+						shape="rounded"
+						size="sm"
+						checkmark
+					/>
+					<AppChip
+						label="Female doctor"
+						selected={femaleDoctorOn}
 						onPress={() => setFemaleDoctorOn((v) => !v)}
-						activeOpacity={0.82}
-					>
-						<AppTypography style={[styles.toggleChipText, femaleDoctorOn && styles.toggleChipTextActive]}>
-							Female doctor
-						</AppTypography>
-					</TouchableOpacity>
+						variant="soft"
+						shape="rounded"
+						size="sm"
+						checkmark
+					/>
 				</View>
 			</View>
 
-			{/* Results or empty state */}
-			{!loading && !refreshing && doctors.length === 0 ? (
-				<View style={styles.emptyContainer}>
-					<MaterialCommunityIcons name="magnify-close" size={48} color="#ccc" />
-					<AppTypography variant="body" style={styles.emptyText}>
-						No doctors found
-					</AppTypography>
-					<AppTypography variant="caption" style={styles.emptySubtext}>
-						Try a different name, symptom, or speciality
-					</AppTypography>
-				</View>
-			) : (
-				<FlatList
-					key={isMobile ? 'mobile-list' : `grid-${numColumns}`}
-					data={listData}
-					keyExtractor={keyExtractor}
-					numColumns={numColumns}
-					columnWrapperStyle={
-						numColumns > 1 ? { paddingHorizontal: 12, justifyContent: 'space-between' } : undefined
-					}
-					ListHeaderComponent={
-						resultLabel ? <AppTypography style={styles.resultLabel}>{resultLabel}</AppTypography> : null
-					}
-					renderItem={({ item }) =>
-						loading && !refreshing && !item.id ? (
-							<View style={[styles.cardListItem, { width: `${100 / numColumns}%` }]}>
-								<DoctorCardSkeleton />
-							</View>
-						) : (
-							renderItem({ item: item as DoctorSearchItem })
-						)
-					}
-					contentContainerStyle={[styles.resultsList, isMobile && { paddingHorizontal: 0 }]}
-					refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-					onEndReached={handleEndReached}
-					onEndReachedThreshold={0.6}
-					ListFooterComponent={renderFooter}
-					removeClippedSubviews={true}
-					maxToRenderPerBatch={6}
-					initialNumToRender={6}
-				/>
-			)}
+			<FlatList
+				key={isMobile ? 'mobile-list' : `grid-${numColumns}`}
+				style={styles.list}
+				data={listData}
+				keyExtractor={keyExtractor}
+				numColumns={numColumns}
+				columnWrapperStyle={numColumns > 1 ? { paddingHorizontal: 12, gap: 8 } : undefined}
+				ListHeaderComponent={<AppTypography style={styles.resultLabel}>{resultLabel}</AppTypography>}
+				ItemSeparatorComponent={() => <View style={styles.separator} />}
+				renderItem={({ item }) =>
+					isInitialLoading && !item.id ? (
+						<View style={{ width: `${100 / numColumns}%` }}>
+							<DoctorCardSkeleton />
+						</View>
+					) : (
+						renderItem({ item: item as DoctorSearchItem })
+					)
+				}
+				ListEmptyComponent={
+					isInitialLoading ? null : (
+						<View style={styles.emptyContainer}>
+							<AppTypography style={styles.emptyTitle}>No doctors match</AppTypography>
+							<AppTypography style={styles.emptySubtext}>
+								Try another search or remove a filter.
+							</AppTypography>
+							<AppButton
+								size="md"
+								variant="outline"
+								onPress={clearAll}
+								style={styles.clearButton}
+								labelStyle={styles.clearButtonLabel}
+							>
+								Clear filters
+							</AppButton>
+						</View>
+					)
+				}
+				contentContainerStyle={[styles.resultsList, { paddingBottom: 8 + insets.bottom }]}
+				keyboardShouldPersistTaps="handled"
+				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+				onEndReached={handleEndReached}
+				onEndReachedThreshold={0.6}
+				ListFooterComponent={renderFooter}
+				removeClippedSubviews={true}
+				maxToRenderPerBatch={6}
+				initialNumToRender={6}
+			/>
+
 			<AppBottomSheet visible={showFilters} title="Filters" onClose={closeFilterModal}>
 				{renderFilterContent()}
+			</AppBottomSheet>
+
+			<AppBottomSheet visible={showSort} title="Sort by" onClose={() => setShowSort(false)} appearance="modern">
+				<View style={styles.sortSheetList}>
+					{SORT_OPTIONS.map((option) => {
+						const selected = option.value === sortBy
+						return (
+							<TouchableOpacity
+								key={option.value}
+								style={styles.sortRow}
+								onPress={() => {
+									setSortBy(option.value)
+									setShowSort(false)
+								}}
+								activeOpacity={0.82}
+								accessibilityRole="radio"
+								accessibilityState={{ selected }}
+							>
+								<AppTypography style={[styles.sortRowText, selected && styles.sortRowTextActive]}>
+									{option.value === 'rel' ? 'Relevance' : option.label}
+								</AppTypography>
+								<AppRadio checked={selected} />
+							</TouchableOpacity>
+						)
+					})}
+				</View>
 			</AppBottomSheet>
 		</View>
 	)
@@ -518,29 +588,43 @@ export default function DoctorSearchPage() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: PAGE_BG },
+	container: { flex: 1, backgroundColor: APP_COLORS.pageBg },
 
-	headerSubtitle: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '500',
-		letterSpacing: 0.24,
-		color: '#E3EFEF',
+	// Header (design: #2B6F71, padding 4 16 16, gap 8). The 'bar' header is a 64px row + 12px children
+	// padding, so +4 bottom and +4 above the search box restore the design's 56px row / 8 gap / 16 bottom.
+	header: {
+		paddingBottom: 4,
 	},
-	searchBarWrap: {
+	// 'bar' drops the title to 16/20 700 when a subtitle is shown; this screen keeps 18/26 600.
+	headerTitle: {
+		fontSize: 18,
+		lineHeight: 26,
+		fontWeight: '600',
+	},
+	searchBox: {
+		marginTop: 4,
 		flexDirection: 'row',
 		alignItems: 'center',
-	},
-	searchBar: {
-		backgroundColor: '#FFFFFF',
+		gap: 8,
 		height: 48,
+		paddingHorizontal: 12,
+		backgroundColor: APP_COLORS.surface,
+		borderRadius: 8,
+	},
+	searchInput: {
+		flex: 1,
+		minWidth: 0,
+		height: 44,
+		paddingVertical: 0,
+		fontSize: 16,
+		color: APP_COLORS.ink,
 	},
 
-	// Inline filter/sort bar
+	// Filter/sort bar
 	filterBarWrap: {
-		backgroundColor: '#FFFFFF',
+		backgroundColor: APP_COLORS.surface,
 		borderBottomWidth: 1,
-		borderBottomColor: DIVIDER,
+		borderBottomColor: APP_COLORS.divider,
 		paddingVertical: 12,
 	},
 	filterBarContent: {
@@ -551,82 +635,88 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 	},
 	specialityChip: {
-		flexShrink: 0,
 		height: 36,
 		paddingLeft: 12,
 		paddingRight: 10,
 		borderRadius: 8,
 		borderWidth: 1,
-		borderColor: HEADER_BG,
-		backgroundColor: '#E3EFEF',
+		borderColor: APP_COLORS.primary,
+		backgroundColor: APP_COLORS.mint,
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
-		maxWidth: 180,
+		maxWidth: 200,
 	},
 	specialityChipText: {
 		fontSize: 13,
 		fontWeight: '600',
-		color: INK,
+		color: APP_COLORS.ink,
 		flexShrink: 1,
 	},
-	sortSelectWrap: {
-		flexShrink: 0,
-		marginBottom: 0,
-		width: 168,
-	},
-	sortSelect: {
+	sortPill: {
 		height: 36,
-		borderRadius: 8,
-		backgroundColor: '#FFFFFF',
-	},
-	toggleChip: {
-		flexShrink: 0,
-		height: 36,
-		paddingHorizontal: 12,
+		paddingLeft: 12,
+		paddingRight: 30,
 		borderRadius: 8,
 		borderWidth: 1,
-		borderColor: '#7A8B8E',
-		backgroundColor: '#FFFFFF',
-		alignItems: 'center',
+		borderColor: APP_COLORS.border,
+		backgroundColor: APP_COLORS.surface,
 		justifyContent: 'center',
 	},
-	toggleChipActive: {
-		backgroundColor: '#E3EFEF',
-		borderColor: HEADER_BG,
-	},
-	toggleChipText: {
+	sortPillText: {
 		fontSize: 13,
 		fontWeight: '600',
-		color: INK,
+		color: APP_COLORS.ink,
 	},
-	toggleChipTextActive: {
-		color: INK,
+	sortPillChevron: {
+		position: 'absolute',
+		right: 10,
+		top: 9,
 	},
 
+	// Results
+	list: { flex: 1, backgroundColor: APP_COLORS.pageBg },
 	resultLabel: {
 		paddingHorizontal: 16,
 		paddingTop: 12,
-		paddingBottom: 4,
+		paddingBottom: 8,
 		fontSize: 13,
 		lineHeight: 18,
 		fontWeight: '600',
-		color: INK_MUTED,
+		color: APP_COLORS.inkMuted,
 	},
-	resultsList: { paddingBottom: 24 },
-	cardListItem: {
-		borderBottomWidth: 1,
-		borderBottomColor: '#EEF2F2',
-	},
+	resultsList: { flexGrow: 1 },
+	separator: { height: 8 },
 	emptyContainer: {
-		flex: 1,
+		paddingVertical: 40,
+		paddingHorizontal: 24,
 		alignItems: 'center',
-		justifyContent: 'center',
 		gap: 8,
-		paddingTop: 80,
 	},
-	emptyText: { fontWeight: '600', color: '#888' },
-	emptySubtext: { color: '#aaa', textAlign: 'center', paddingHorizontal: 40 },
+	emptyTitle: {
+		fontSize: 18,
+		lineHeight: 26,
+		fontWeight: '600',
+		color: APP_COLORS.ink,
+		textAlign: 'center',
+	},
+	emptySubtext: {
+		fontSize: 14,
+		lineHeight: 20,
+		color: APP_COLORS.inkMuted,
+		textAlign: 'center',
+	},
+	// AppButton md outline is r12 / 1.5px border / 700; the empty-state design is r8 / 1px / 600.
+	clearButton: {
+		marginTop: 4,
+		borderWidth: 1,
+		borderRadius: 8,
+		backgroundColor: APP_COLORS.surface,
+	},
+	clearButtonLabel: {
+		fontWeight: '600',
+		marginHorizontal: 16,
+	},
 	footerLoader: {
 		paddingVertical: 16,
 		alignItems: 'center',
@@ -634,7 +724,7 @@ const styles = StyleSheet.create({
 	},
 
 	skeletonCard: {
-		backgroundColor: '#FFFFFF',
+		backgroundColor: APP_COLORS.surface,
 		padding: 16,
 	},
 	skeletonTopRow: {
@@ -642,6 +732,30 @@ const styles = StyleSheet.create({
 		gap: 12,
 	},
 
+	// Sort sheet
+	sortSheetList: {
+		paddingHorizontal: 18,
+		paddingBottom: 12,
+	},
+	sortRow: {
+		minHeight: 52,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		borderBottomWidth: 1,
+		borderBottomColor: APP_COLORS.divider,
+	},
+	sortRowText: {
+		fontSize: 15,
+		lineHeight: 22,
+		fontWeight: '500',
+		color: APP_COLORS.ink,
+	},
+	sortRowTextActive: {
+		fontWeight: '700',
+	},
+
+	// Filter sheet
 	filterSheetContentWrapper: {
 		width: '100%',
 		alignSelf: 'center',
@@ -662,7 +776,7 @@ const styles = StyleSheet.create({
 		fontSize: 11,
 		lineHeight: 14,
 		fontWeight: '800',
-		color: '#64707d',
+		color: APP_COLORS.inkMuted,
 		textTransform: 'uppercase',
 	},
 	filterChipRow: {
@@ -670,27 +784,26 @@ const styles = StyleSheet.create({
 		flexWrap: 'wrap',
 		gap: 10,
 	},
+	// Rating chips: AppChip (solid pill) restyled to the sheet's borderless 38px grey chips.
 	filterChip: {
-		minHeight: 38,
+		height: 38,
 		minWidth: 74,
-		borderRadius: 19,
+		borderWidth: 0,
 		paddingHorizontal: 18,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#f2f6fb',
+		backgroundColor: APP_COLORS.pageBg,
 		flexShrink: 0,
 	},
 	filterChipActive: {
-		backgroundColor: HEADER_BG,
+		backgroundColor: APP_COLORS.primary,
 	},
 	filterChipText: {
 		fontSize: 12,
 		lineHeight: 16,
 		fontWeight: '700',
-		color: '#64707d',
+		color: APP_COLORS.inkMuted,
 	},
 	filterChipTextActive: {
-		color: '#ffffff',
+		color: APP_COLORS.surface,
 	},
 	filterSheetActions: {
 		flexDirection: 'row',
@@ -698,7 +811,7 @@ const styles = StyleSheet.create({
 		paddingTop: 12,
 		gap: 12,
 		borderTopWidth: 1,
-		borderTopColor: '#EAECF0',
+		borderTopColor: APP_COLORS.divider,
 	},
 	resetButton: {
 		flex: 1,
@@ -707,13 +820,13 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		borderWidth: 1,
-		borderColor: '#EAECF0',
-		backgroundColor: '#ffffff',
+		borderColor: APP_COLORS.divider,
+		backgroundColor: APP_COLORS.surface,
 	},
 	resetButtonText: {
 		fontSize: 14,
 		fontWeight: '700',
-		color: '#64707d',
+		color: APP_COLORS.inkMuted,
 	},
 	applyButton: {
 		flex: 2,
@@ -721,12 +834,12 @@ const styles = StyleSheet.create({
 		borderRadius: 24,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: HEADER_BG,
+		backgroundColor: APP_COLORS.primary,
 	},
 	applyButtonText: {
 		fontSize: 14,
 		fontWeight: '700',
-		color: '#ffffff',
+		color: APP_COLORS.surface,
 	},
 	inlineSelectFill: {
 		width: '100%',
@@ -735,6 +848,6 @@ const styles = StyleSheet.create({
 	inlineFilterSelect: {
 		height: 50,
 		borderRadius: 8,
-		backgroundColor: '#ffffff',
+		backgroundColor: APP_COLORS.surface,
 	},
 })

@@ -110,7 +110,7 @@ const getSlotStatus = (slot: AvailabilityApiSlot): TimeSlot['status'] => {
 	return 'AVAILABLE'
 }
 
-const normalizeAvailabilitySlots = (
+export const normalizeAvailabilitySlots = (
 	response: SlotGroup[] | { data?: AvailabilityApiModeGroup[] } | null | undefined,
 	appointmentType: RescheduleAppointmentMode
 ): SlotGroup[] => {

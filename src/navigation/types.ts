@@ -61,6 +61,19 @@ export type PatientPaymentParams = {
 	fee: number
 	referralId?: string
 	consentVersionId: string
+	/** Family member (patient public id) the appointment is booked for; omitted = self */
+	patientId?: string
+	patientName?: string
+	patientRelation?: string
+	/** Optional "Reason for visit" typed on the slot step; prefills pre-intake symptoms */
+	reasonForVisit?: string
+}
+
+export type DoctorBookSlotParams = {
+	doctor: DoctorDetailData
+	hospitalId?: string
+	mode?: 'clinic' | 'video'
+	referralId?: string
 }
 
 export type AppointmentConfirmedParams = {
@@ -89,6 +102,7 @@ export type AppStackParamList = {
 		| { query?: string; specialityId?: string; specialityName?: string; mode?: 'all' | 'video' | 'clinic' }
 		| undefined
 	[ROUTES.STACK.DOCTOR_DETAIL]: { id: string; referralId?: string }
+	[ROUTES.STACK.DOCTOR_BOOK_SLOT]: DoctorBookSlotParams
 	[ROUTES.STACK.FAVOURITE_DOCTOR]: undefined
 	[ROUTES.STACK.NOTIFICATION]: undefined
 	[ROUTES.STACK.CONSULTATION]: ConsultationParams | undefined

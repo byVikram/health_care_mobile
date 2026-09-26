@@ -57,6 +57,31 @@ export { BillingSummaryCard } from "./booking/BookingSummary/BillingSummaryCard"
 export type { BillingSummaryCardProps, BillingRow, BillingSummaryCardNote } from "./booking/BookingSummary/BillingSummaryCard";
 export { PackageSectionCard } from "./booking/PackageSectionCard";
 export type { PackageListItem } from "./booking/PackageSectionCard";
+// KarolaHealth design-language primitives (tokens in src/config/theme.ts)
+export { AppIcon, AppPathIcon } from './AppIcon'
+export type { AppIconName, AppIconProps, AppPathIconProps } from './AppIcon'
+export { AppDashedDivider } from './AppDashedDivider'
+export type { AppDashedDividerProps } from './AppDashedDivider'
+export { AppRadio } from './AppRadio'
+export type { AppRadioProps } from './AppRadio'
+export { AppIconTile } from './AppIconTile'
+export type { AppIconTileProps } from './AppIconTile'
+export { AppChip } from './AppChip'
+export type { AppChipProps } from './AppChip'
+export { AppActionChip } from './AppActionChip'
+export type { AppActionChipProps } from './AppActionChip'
+export { AppInfoBanner, INFO_BANNER_TONES } from './AppInfoBanner'
+export type { AppInfoBannerProps, AppInfoBannerTone, AppInfoBannerAction } from './AppInfoBanner'
+export { AppDetailRow } from './AppDetailRow'
+export type { AppDetailRowProps, AppDetailRowAction } from './AppDetailRow'
+export { AppSection } from './AppSection'
+export type { AppSectionProps } from './AppSection'
+export { AppStatusTimeline } from './AppStatusTimeline'
+export type { AppStatusTimelineProps, AppTimelineStep, AppTimelineState } from './AppStatusTimeline'
+export { AppNumberedSteps } from './AppNumberedSteps'
+export type { AppNumberedStepsProps, AppNumberedStep } from './AppNumberedSteps'
+export { AppFooterBar } from './AppFooterBar'
+export type { AppFooterBarProps } from './AppFooterBar'
 export { BookingPaymentPage, isActiveTaskConflictError } from "./booking/BookingPaymentPage";
 export type {
 	BookingPaymentPageConfig,

@@ -22,6 +22,7 @@ export const ROUTES = {
 		SEARCH: 'SearchPage',
 		DOCTOR_SEARCH: 'DoctorSearch',
 		DOCTOR_DETAIL: 'DoctorDetail',
+		DOCTOR_BOOK_SLOT: 'DoctorBookSlot',
 		FAVOURITE_DOCTOR: 'FavouriteDoctor',
 		NOTIFICATION: 'Notification',
 		CONSULTATION: 'Consultation',

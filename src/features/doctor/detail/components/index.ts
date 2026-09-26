@@ -2,7 +2,6 @@ export { AchievementDetailsContent } from "./AchievementDetailsContent";
 export { AchievementsSubsection } from "./AchievementsSubsection";
 export { BackgroundSubsection } from "./BackgroundSubsection";
 export { DoctorHospitalDropdown } from "./DoctorHospitalDropdown";
-export { HospitalAppointmentCard } from "./HospitalAppointmentCard";
 export {
   DETAIL_PRIMARY,
   MOCK_ACHIEVEMENTS,

@@ -18,6 +18,7 @@ import { WalletTransactionDetailPage } from '../features/wallet/WalletTransactio
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
+import BookSlotPage from '../features/doctor/book-slot/BookSlotPage'
 import ConsultationPage from '../features/consultation/ConsultationPage'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
@@ -220,6 +221,7 @@ function AuthenticatedNavigator() {
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen name={ROUTES.STACK.DOCTOR_DETAIL} component={DoctorDetailPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_BOOK_SLOT} component={BookSlotPage} />
 				<AppStack.Screen
 					name={ROUTES.STACK.FAVOURITE_DOCTOR}
 					component={MyDoctorPage}

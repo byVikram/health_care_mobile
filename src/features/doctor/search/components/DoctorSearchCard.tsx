@@ -1,35 +1,39 @@
 import React, { useMemo } from 'react'
-import { View, Image, StyleSheet, TouchableOpacity } from 'react-native'
+import { View, StyleSheet, TouchableOpacity } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import { DoctorSearchItem } from '../../../../types/doctor-search'
-import { AppTypography } from '../../../../components/common'
+import { AppAvatar, AppButton, AppDashedDivider, AppTypography, AppIcon } from '../../../../components/common'
 import { ROUTES } from '../../../../navigation/routes'
 import type { AppStackParamList } from '../../../../navigation/types'
+import { APP_COLORS, formatInr, toneAt } from '../../../../config/theme'
 
 interface DoctorProps {
 	doctor: DoctorSearchItem
 }
 
-const INK = '#12373E'
-const INK_MUTED = '#5B6B6E'
-const DIVIDER = '#D5E1E2'
-
-const TONES = [
-	{ bg: '#ECE6FA', ink: '#6A4BB5' }, // lilac
-	{ bg: '#DDEBFA', ink: '#2463A8' }, // sky
-	{ bg: '#FDE8DC', ink: '#B4532A' }, // peach
-	{ bg: '#FBEFD5', ink: '#8A5300' }, // sand
-	{ bg: '#E3EFEF', ink: '#2B6F71' }, // mint
-]
-
 /** Deterministic tone per speciality name, so the same speciality always gets
- *  the same color across cards without needing a fixed lookup table. */
+ *  the same colour across cards without needing a fixed lookup table. */
 function toneForSpeciality(label: string) {
 	let hash = 0
 	for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) >>> 0
-	return TONES[hash % TONES.length]
+	return toneAt(hash)
+}
+
+/** "Dr. Asha K Rao" -> "Asha Rao": AppAvatar takes the initials of the first two words, so hand it
+ *  the first + last name (without the "Dr." prefix) to keep the card's first/last initials. */
+function initialsName(name: string) {
+	const parts = name
+		.replace(/^dr\.?\s+/i, '')
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean)
+	return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : (parts[0] ?? '')
+}
+
+function formatKm(distance: number) {
+	return Number.isInteger(distance) ? String(distance) : distance.toFixed(1)
 }
 
 export default function DoctorSearchCard({ doctor }: DoctorProps) {
@@ -45,7 +49,7 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 		: null
 
 	const clinicName = doctor.hospital?.name || doctor.location || ''
-	const distanceText = doctor.distance != null ? `${doctor.distance} km` : null
+	const distanceText = doctor.distance != null ? `${formatKm(doctor.distance)} km` : null
 
 	const offersVideo = (doctor.hospital?.video_consultation_fee ?? 0) > 0
 	const fee = doctor.hospital?.offline_consultation_fee ?? doctor.hospital?.video_consultation_fee ?? null
@@ -53,15 +57,19 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 	return (
 		<View style={styles.card}>
 			<TouchableOpacity style={styles.topRow} onPress={goToDetail} activeOpacity={0.85}>
-				<View style={[styles.avatarWrap, { backgroundColor: tone.bg }]}>
-					{doctor.avatar_s3_key ? (
-						<Image source={{ uri: doctor.avatar_s3_key }} style={styles.avatarImg} resizeMode="cover" />
-					) : (
-						<MaterialCommunityIcons name="account" size={34} color={tone.ink} />
-					)}
+				<View style={styles.avatarWrap}>
+					<AppAvatar
+						uri={doctor.avatar_s3_key}
+						name={initialsName(doctor.name)}
+						size={76}
+						radius={20}
+						backgroundColor={tone.bg}
+						initialsColor={tone.ink}
+						initialsStyle={styles.initials}
+					/>
 					{offersVideo && (
 						<View style={styles.videoBadge}>
-							<MaterialCommunityIcons name="video" size={12} color="#FFFFFF" />
+							<AppIcon name="video" size={12} color={APP_COLORS.surface} strokeWidth={2.4} />
 						</View>
 					)}
 				</View>
@@ -72,7 +80,7 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 							{doctor.name}
 						</AppTypography>
 						{doctor.is_verified && (
-							<MaterialCommunityIcons name="check-decagram" size={15} color="#1E7A4E" />
+							<MaterialCommunityIcons name="check-decagram" size={15} color={APP_COLORS.success} />
 						)}
 					</View>
 
@@ -83,14 +91,14 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 					</View>
 
 					<AppTypography style={styles.metaText} numberOfLines={1}>
-						{doctor.experience_years} yrs experience
+						{doctor.experience_years ?? 0} yrs experience
 						{qualificationsText ? ` · ${qualificationsText}` : ''}
 					</AppTypography>
 
 					{!!clinicName && (
 						<View style={styles.locationRow}>
-							<MaterialCommunityIcons name="map-marker-outline" size={14} color={INK_MUTED} />
-							<AppTypography style={styles.metaText} numberOfLines={1}>
+							<AppIcon name="pin" size={14} color={APP_COLORS.inkMuted} />
+							<AppTypography style={[styles.metaText, styles.locationText]} numberOfLines={1}>
 								{clinicName}
 								{distanceText ? ` · ${distanceText}` : ''}
 							</AppTypography>
@@ -99,17 +107,21 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 				</View>
 			</TouchableOpacity>
 
-			<View style={styles.bottomRow}>
-				{fee != null ? (
-					<AppTypography style={styles.feeText}>
-						₹{fee} <AppTypography style={styles.feeSuffix}>per visit</AppTypography>
-					</AppTypography>
-				) : (
-					<View />
-				)}
-				<TouchableOpacity style={styles.bookBtn} onPress={goToDetail} activeOpacity={0.85}>
-					<AppTypography style={styles.bookBtnText}>Book</AppTypography>
-				</TouchableOpacity>
+			<View>
+				<AppDashedDivider />
+				<View style={styles.bottomRow}>
+					{/* The design's next-availability pill is omitted: DoctorSearchItem has no availability field. */}
+					{fee != null ? (
+						<AppTypography style={styles.feeText}>
+							{formatInr(fee)} <AppTypography style={styles.feeSuffix}>per visit</AppTypography>
+						</AppTypography>
+					) : (
+						<View />
+					)}
+					<AppButton size="md" onPress={goToDetail} labelStyle={styles.bookBtnLabel}>
+						Book
+					</AppButton>
+				</View>
 			</View>
 		</View>
 	)
@@ -117,7 +129,7 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 
 const styles = StyleSheet.create({
 	card: {
-		backgroundColor: '#FFFFFF',
+		backgroundColor: APP_COLORS.surface,
 		padding: 16,
 		gap: 14,
 	},
@@ -129,14 +141,11 @@ const styles = StyleSheet.create({
 	avatarWrap: {
 		width: 76,
 		height: 76,
-		borderRadius: 20,
-		alignItems: 'center',
-		justifyContent: 'center',
 	},
-	avatarImg: {
-		width: 76,
-		height: 76,
-		borderRadius: 20,
+	initials: {
+		fontSize: 24,
+		lineHeight: 30,
+		fontWeight: '700',
 	},
 	videoBadge: {
 		position: 'absolute',
@@ -146,8 +155,8 @@ const styles = StyleSheet.create({
 		height: 24,
 		borderRadius: 9999,
 		borderWidth: 2,
-		borderColor: '#FFFFFF',
-		backgroundColor: '#2B6F71',
+		borderColor: APP_COLORS.surface,
+		backgroundColor: APP_COLORS.primary,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
@@ -165,7 +174,7 @@ const styles = StyleSheet.create({
 		fontSize: 17,
 		lineHeight: 24,
 		fontWeight: '700',
-		color: INK,
+		color: APP_COLORS.ink,
 		flexShrink: 1,
 	},
 	specBadge: {
@@ -173,7 +182,6 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 8,
 		paddingVertical: 2,
 		borderRadius: 9999,
-		marginTop: 2,
 	},
 	specBadgeText: {
 		fontSize: 12,
@@ -183,12 +191,15 @@ const styles = StyleSheet.create({
 	metaText: {
 		fontSize: 13,
 		lineHeight: 18,
-		color: INK_MUTED,
+		color: APP_COLORS.inkMuted,
 	},
 	locationRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
+	},
+	locationText: {
+		flexShrink: 1,
 	},
 	bottomRow: {
 		flexDirection: 'row',
@@ -196,32 +207,21 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 		gap: 12,
 		paddingTop: 12,
-		borderTopWidth: 1,
-		borderTopColor: DIVIDER,
-		borderStyle: 'dashed',
 	},
 	feeText: {
 		fontSize: 18,
 		lineHeight: 24,
 		fontWeight: '800',
-		color: INK,
+		color: APP_COLORS.ink,
 	},
 	feeSuffix: {
 		fontSize: 12,
 		fontWeight: '500',
-		color: INK_MUTED,
+		color: APP_COLORS.inkMuted,
 	},
-	bookBtn: {
-		height: 44,
-		paddingHorizontal: 22,
-		borderRadius: 12,
-		backgroundColor: '#2B6F71',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	bookBtnText: {
-		fontSize: 14,
+	// AppButton size="md" is 14/20 700 with Paper's 24px label margin; the design's Book button is 600 / 22px.
+	bookBtnLabel: {
 		fontWeight: '600',
-		color: '#FFFFFF',
+		marginHorizontal: 22,
 	},
 })
