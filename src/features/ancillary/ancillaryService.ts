@@ -258,48 +258,6 @@ export interface FetchVerifiedNursesParams {
 	longitude?: number
 }
 
-export const fetchConsultedNursesBackend = async (): Promise<AncillaryProvider[]> => {
-	try {
-		console.log('[ancillaryService] fetchConsultedNursesBackend calling:', API_ENDPOINTS.ANCILLARY.CONSULTED_NURSES)
-		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.CONSULTED_NURSES)
-		console.log('[ancillaryService] fetchConsultedNursesBackend raw API response:', res.data)
-
-		const payload = res.data
-		const list: any[] = Array.isArray(payload)
-			? payload
-			: Array.isArray(payload?.data)
-				? payload.data
-				: Array.isArray(payload?.data?.nurses)
-					? payload.data.nurses
-					: Array.isArray(payload?.nurses)
-						? payload.nurses
-						: []
-
-		const mapped: AncillaryProvider[] = list.map((item: any) => ({
-			id: String(item.id || item.nurse_id || item.public_id || item.publicId),
-			name: String(item.name || 'Specialist Nurse'),
-			avatar: String(
-				item.avatar ||
-				item.profile_image ||
-				'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=260'
-			),
-			credentials: String(item.credentials || item.specialization || 'Registered Nurse (RN)'),
-			experience: item.experience != null ? Number(item.experience) : undefined,
-			procedures: Array.isArray(item.procedures) ? item.procedures : [],
-			languages: Array.isArray(item.languages) ? item.languages : ['English', 'Hindi'],
-			distance: item.distance != null ? Number(item.distance) : undefined,
-			badges: Array.isArray(item.badges) && item.badges.length > 0
-				? item.badges
-				: ['Verified Nurse', 'Previously Consulted'],
-		}))
-		console.log('[ancillaryService] fetchConsultedNursesBackend mapped providers:', mapped)
-		return mapped
-	} catch (error) {
-		console.log('[ancillaryService] fetchConsultedNursesBackend error:', error)
-		return []
-	}
-}
-
 export const fetchVerifiedNursesBackend = async (
 	params?: FetchVerifiedNursesParams
 ): Promise<AncillaryProvider[]> => {
@@ -1759,8 +1717,6 @@ export const fetchProviderEarnings = fetchProviderEarningsBackend
 export const fetchProviderDashboardMetrics = fetchProviderDashboardMetricsBackend
 
 
-export const fetchConsultedNurses = fetchConsultedNursesBackend
-
 // ─────────────────────────────────────────────
 // Phase 1 Slot-Based Booking System API Contracts
 // ─────────────────────────────────────────────
@@ -1830,11 +1786,21 @@ export interface CreateScheduledBookingResponse {
 	total_amount: number
 }
 
+export interface AncillaryTimeInterval {
+	start: string
+	end: string
+}
+
+export interface AncillaryAvailabilitySections {
+	morning: AncillaryTimeInterval[]
+	afternoon: AncillaryTimeInterval[]
+	evening: AncillaryTimeInterval[]
+}
+
 export interface ProviderAvailabilityDay {
 	day_of_week: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'
 	is_available?: boolean
-	start_time?: string
-	end_time?: string
+	sections: AncillaryAvailabilitySections
 	slot_duration_mins?: number
 	break_start_time?: string
 	break_end_time?: string
@@ -2050,8 +2016,11 @@ export const fetchProviderWeeklyAvailabilityBackend = async (): Promise<Provider
 		return list.map((item: any) => ({
 			day_of_week: typeof item.day_of_week === 'number' ? intToDay[item.day_of_week] || 'MONDAY' : item.day_of_week,
 			is_available: item.is_active !== false,
-			start_time: item.start_time,
-			end_time: item.end_time,
+			sections: {
+				morning: Array.isArray(item.sections?.morning) ? item.sections.morning : [],
+				afternoon: Array.isArray(item.sections?.afternoon) ? item.sections.afternoon : [],
+				evening: Array.isArray(item.sections?.evening) ? item.sections.evening : [],
+			},
 			slot_duration_mins: item.slot_duration_mins || 30,
 			break_start_time: item.break_start_time,
 			break_end_time: item.break_end_time,
@@ -2072,8 +2041,11 @@ export const saveProviderWeeklyAvailability = async (
 		const rawList = payload.schedules || payload.availabilities || []
 		const schedules = rawList.map((item: any) => ({
 			day_of_week: item.day_of_week,
-			start_time: item.start_time,
-			end_time: item.end_time,
+			sections: {
+				morning: Array.isArray(item.sections?.morning) ? item.sections.morning : [],
+				afternoon: Array.isArray(item.sections?.afternoon) ? item.sections.afternoon : [],
+				evening: Array.isArray(item.sections?.evening) ? item.sections.evening : [],
+			},
 			slot_duration_mins: item.slot_duration_mins || 30,
 			break_start_time: item.break_start_time,
 			break_end_time: item.break_end_time,

@@ -17,7 +17,26 @@ export interface StatusModalData {
 
 type StatusModalHandler = (data: StatusModalData | null) => void
 
-const axiosInstance = axios.create()
+// Axios's default query-param serializer encodes arrays as repeated
+// `key[]=value` pairs. FastAPI's `Query(None)` for a `List[str]` param only
+// recognizes repeated `key=value` pairs (no brackets), so any endpoint taking
+// an array query param (e.g. `procedure_ids`) silently receives an empty list
+// instead of a 422 -- there is no error to catch, so the request "succeeds"
+// with an empty/wrong result. Serialize arrays as repeated keys to match.
+const serializeParams = (params: Record<string, unknown>): string => {
+	const parts: string[] = []
+	Object.entries(params).forEach(([key, value]) => {
+		if (value === undefined || value === null) return
+		const values = Array.isArray(value) ? value : [value]
+		values.forEach((v) => {
+			if (v === undefined || v === null) return
+			parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`)
+		})
+	})
+	return parts.join('&')
+}
+
+const axiosInstance = axios.create({ paramsSerializer: serializeParams })
 let unauthorizedHandler: (() => void) | null = null
 let statusModalHandler: StatusModalHandler | null = null
 let hasShownSessionExpiredAlert = false

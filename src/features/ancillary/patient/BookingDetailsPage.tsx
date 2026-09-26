@@ -767,7 +767,7 @@ export default function BookingDetailsPage() {
 												</>
 											)}
 											<AppTypography variant="caption" style={[styles.statText, { color: '#047857', fontWeight: '600' }]}>
-												Previously Consulted
+												Available Nearby
 											</AppTypography>
 										</View>
 									</View>
@@ -801,10 +801,10 @@ export default function BookingDetailsPage() {
 									</View>
 									<View style={styles.browsePromptTextCol}>
 										<AppTypography variant="subtitle" style={styles.browsePromptTitle}>
-											Choose a Previous Nurse
+											Browse Available Nurses
 										</AppTypography>
 										<AppTypography variant="caption" style={styles.browsePromptSub}>
-											Tap here to view nurses you have previously consulted
+											Tap here to view nurses available near you
 										</AppTypography>
 									</View>
 								</View>

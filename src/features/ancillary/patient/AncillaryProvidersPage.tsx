@@ -23,7 +23,6 @@ import {
 } from '../../../components/common'
 import {
 	AncillaryProvider,
-	fetchConsultedNursesBackend,
 	fetchAvailableAncillarySlots,
 	AvailableSlot,
 	ProviderWithSlots,
@@ -40,6 +39,7 @@ type RouteParams = {
 		selectedNurseId?: string
 		latitude?: number
 		longitude?: number
+		services?: Array<{ id?: string | number }>
 	}
 }
 
@@ -67,7 +67,16 @@ export const AncillaryProvidersPage = () => {
 	const lat = route.params?.latitude || 12.9716
 	const lng = route.params?.longitude || 77.5946
 
-	const [consultedNurses, setConsultedNurses] = useState<AncillaryProvider[]>([])
+	const procedureIds = useMemo(() => {
+		const services = route.params?.services
+		if (Array.isArray(services) && services.length > 0) {
+			return services.map((s) => (s?.id != null ? String(s.id) : '')).filter(Boolean)
+		}
+		if (route.params?.procedureId != null) return [String(route.params.procedureId)]
+		return undefined
+	}, [route.params?.services, route.params?.procedureId])
+
+	const [providers, setProviders] = useState<ProviderWithSlots[]>([])
 	const [loading, setLoading] = useState<boolean>(true)
 	const [error, setError] = useState<string | null>(null)
 	const [searchQuery, setSearchQuery] = useState('')
@@ -75,75 +84,64 @@ export const AncillaryProvidersPage = () => {
 	// Date & 30-min Slot Picker State
 	const [selectedDate, setSelectedDate] = useState<Date>(new Date())
 	const [expandedNurseId, setExpandedNurseId] = useState<string | null>(null)
-	const [providerSlotsMap, setProviderSlotsMap] = useState<Record<string, { loading: boolean; slots: AvailableSlot[] }>>({})
 	const [selectedSlotMap, setSelectedSlotMap] = useState<Record<string, AvailableSlot | null>>({})
 
-	const loadConsultedNurses = useCallback(async () => {
+	// Fetch real available nurses + their real saved availability slots for the target date
+	const loadProviders = useCallback(async (targetDate: Date) => {
 		setLoading(true)
 		setError(null)
 		try {
-			console.log('[AncillaryProvidersPage] Fetching available ancillary nurses...')
-			const data = await fetchConsultedNursesBackend()
-			setConsultedNurses(data)
-		} catch (err: any) {
-			console.log('[AncillaryProvidersPage] Failed to fetch nurses:', err)
-			setError('Unable to load available nurses. Please check your connection and try again.')
-		} finally {
-			setLoading(false)
-		}
-	}, [])
-
-	useEffect(() => {
-		void loadConsultedNurses()
-	}, [loadConsultedNurses])
-
-	// Fetch real-time available 30-min slots for target date
-	const loadSlotsForDate = useCallback(async (targetDate: Date) => {
-		const targetDateStr = formatDateIso(targetDate)
-		try {
+			const targetDateStr = formatDateIso(targetDate)
 			const res = await fetchAvailableAncillarySlots({
 				latitude: lat,
 				longitude: lng,
 				target_date: targetDateStr,
+				procedure_ids: procedureIds,
 			})
-
-			const map: Record<string, { loading: boolean; slots: AvailableSlot[] }> = {}
-			if (res.providers && res.providers.length > 0) {
-				res.providers.forEach((p) => {
-					const id = p.provider_public_id || p.provider_name || 'unknown'
-					map[id] = {
-						loading: false,
-						slots: p.available_slots || [],
-					}
-				})
-			}
-			setProviderSlotsMap(map)
-		} catch (e) {
-			console.log('[AncillaryProvidersPage] Failed to load provider slots for date:', e)
+			setProviders(res.providers || [])
+		} catch (err: any) {
+			console.log('[AncillaryProvidersPage] Failed to fetch available nurses:', err)
+			setError('Unable to load available nurses. Please check your connection and try again.')
+			setProviders([])
+		} finally {
+			setLoading(false)
 		}
-	}, [lat, lng])
+	}, [lat, lng, procedureIds])
 
 	useEffect(() => {
-		void loadSlotsForDate(selectedDate)
-	}, [selectedDate, loadSlotsForDate])
+		void loadProviders(selectedDate)
+	}, [selectedDate, loadProviders])
 
 	const filteredNurses = useMemo(() => {
 		const q = searchQuery.toLowerCase().trim()
-		if (!q) return consultedNurses
-		return consultedNurses.filter((n) => {
-			const nameMatch = n.name.toLowerCase().includes(q)
-			const credsMatch = n.credentials?.toLowerCase().includes(q)
-			const procMatch = n.procedures?.some((proc: string) => proc.toLowerCase().includes(q))
-			return nameMatch || credsMatch || procMatch
+		if (!q) return providers
+		return providers.filter((p) => {
+			const nameMatch = (p.name || '').toLowerCase().includes(q)
+			const specialtyMatch = (p.specialty || '').toLowerCase().includes(q)
+			const subspecialtyMatch = (p.subspecialty || '').toLowerCase().includes(q)
+			return nameMatch || specialtyMatch || subspecialtyMatch
 		})
-	}, [consultedNurses, searchQuery])
+	}, [providers, searchQuery])
 
-	const handleSelectNurse = (provider: AncillaryProvider, chosenSlot?: AvailableSlot | null) => {
-		const targetSlot = chosenSlot || selectedSlotMap[provider.id]
+	const handleSelectNurse = (provider: ProviderWithSlots, chosenSlot?: AvailableSlot | null) => {
+		const providerId = provider.provider_public_id
+		const targetSlot = chosenSlot || selectedSlotMap[providerId]
 		const targetDateStr = formatDateIso(selectedDate)
 
+		const selectedNurse: AncillaryProvider = {
+			id: providerId,
+			name: provider.name || provider.provider_name || 'Healthcare Nurse',
+			credentials: provider.specialty || 'Registered Nurse (RN)',
+			experience: undefined,
+			procedures: [provider.subspecialty].filter((v): v is string => Boolean(v)),
+			languages: [],
+			distance: provider.distance_km,
+			avatar: provider.avatar_url || provider.avatar || '',
+			badges: [],
+		}
+
 		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
-			selectedNurse: provider,
+			selectedNurse,
 			assignmentMode: 'SELECT_NURSE',
 			bookingType: targetSlot ? 'SCHEDULED' : undefined,
 			scheduledDate: targetSlot ? targetDateStr : undefined,
@@ -172,28 +170,23 @@ export const AncillaryProvidersPage = () => {
 		</View>
 	)
 
-	const renderNurseCard = (nurse: AncillaryProvider) => {
-		const isSelected = isSelectionMode && nurse.id === selectedNurseId
-		const isExpanded = expandedNurseId === nurse.id
-		const expText =
-			nurse.experience != null
-				? `${nurse.experience} ${nurse.experience === 1 ? 'year' : 'years'} experience`
-				: 'Experienced Registered Nurse'
+	const renderNurseCard = (provider: ProviderWithSlots) => {
+		const nurseId = provider.provider_public_id
+		const nurseName = provider.name || provider.provider_name || 'Healthcare Nurse'
+		const isSelected = isSelectionMode && nurseId === selectedNurseId
+		const isExpanded = expandedNurseId === nurseId
+		const professionalInfoText = [provider.specialty, provider.subspecialty].filter(Boolean).join(' • ')
+		const distanceText =
+			provider.distance_km != null
+				? `${provider.distance_km} km away${provider.transit_buffer_mins != null ? ` • ~${provider.transit_buffer_mins} min travel buffer` : ''}`
+				: null
 
-		const providerSlotData = providerSlotsMap[nurse.id] || null
-		const availableSlots = providerSlotData?.slots || [
-			{ start_time: '09:00', end_time: '09:30', duration_mins: 30, is_available: true },
-			{ start_time: '09:30', end_time: '10:00', duration_mins: 30, is_available: true },
-			{ start_time: '10:00', end_time: '10:30', duration_mins: 30, is_available: true },
-			{ start_time: '11:00', end_time: '11:30', duration_mins: 30, is_available: true },
-			{ start_time: '14:00', end_time: '14:30', duration_mins: 30, is_available: true },
-			{ start_time: '16:00', end_time: '16:30', duration_mins: 30, is_available: true },
-		]
-		const currentSelectedSlot = selectedSlotMap[nurse.id] || null
+		const availableSlots = provider.available_slots || []
+		const currentSelectedSlot = selectedSlotMap[nurseId] || null
 
 		return (
 			<View
-				key={nurse.id}
+				key={nurseId}
 				style={[
 					styles.card,
 					isSelected && styles.cardSelected,
@@ -204,24 +197,28 @@ export const AncillaryProvidersPage = () => {
 				<View style={styles.cardHeader}>
 					<View style={styles.avatarWrap}>
 						<Image
-							source={{ uri: nurse.avatar }}
+							source={{ uri: provider.avatar_url || provider.avatar }}
 							style={styles.avatar}
 							resizeMode="cover"
 						/>
 					</View>
 					<View style={styles.nurseInfo}>
 						<AppTypography variant="h4" style={styles.name} numberOfLines={1}>
-							{nurse.name}
+							{nurseName}
 						</AppTypography>
-						<AppTypography variant="caption" style={styles.credentials} numberOfLines={1}>
-							{nurse.credentials || 'Registered Nurse (RN)'}
-						</AppTypography>
-						<View style={styles.experienceRow}>
-							<MaterialCommunityIcons name="briefcase-outline" size={13} color="#64748B" />
-							<AppTypography variant="caption" style={styles.experienceText}>
-								{expText}
+						{!!professionalInfoText && (
+							<AppTypography variant="caption" style={styles.credentials} numberOfLines={1}>
+								{professionalInfoText}
 							</AppTypography>
-						</View>
+						)}
+						{!!distanceText && (
+							<View style={styles.experienceRow}>
+								<MaterialCommunityIcons name="map-marker-distance" size={13} color="#64748B" />
+								<AppTypography variant="caption" style={styles.experienceText}>
+									{distanceText}
+								</AppTypography>
+							</View>
+						)}
 					</View>
 				</View>
 
@@ -235,20 +232,10 @@ export const AncillaryProvidersPage = () => {
 					</View>
 				</View>
 
-				{/* Relevant Procedures */}
-				{nurse.procedures && nurse.procedures.length > 0 && (
-					<View style={styles.proceduresBox}>
-						<MaterialCommunityIcons name="medical-bag" size={14} color="#0C7C7C" />
-						<AppTypography variant="caption" style={styles.proceduresText} numberOfLines={2}>
-							{nurse.procedures.join(' • ')}
-						</AppTypography>
-					</View>
-				)}
-
 				{/* Expandable Date & 30-Min Time Slot Picker */}
 				<TouchableOpacity
 					style={styles.slotExpandToggle}
-					onPress={() => setExpandedNurseId(isExpanded ? null : nurse.id)}
+					onPress={() => setExpandedNurseId(isExpanded ? null : nurseId)}
 					activeOpacity={0.8}
 				>
 					<View style={styles.slotExpandLeft}>
@@ -279,7 +266,7 @@ export const AncillaryProvidersPage = () => {
 								if (!slot) return
 								setSelectedSlotMap((prev) => ({
 									...prev,
-									[nurse.id]: currentSelectedSlot?.start_time === value ? null : slot,
+									[nurseId]: currentSelectedSlot?.start_time === value ? null : slot,
 								}))
 							}}
 							emptyLabel={`No 30-minute slots open for this provider on ${formatDisplayDate(selectedDate)}.`}
@@ -291,13 +278,13 @@ export const AncillaryProvidersPage = () => {
 				<View style={styles.cardFooter}>
 					<AppButton
 						variant="primary"
-						onPress={() => handleSelectNurse(nurse)}
+						onPress={() => handleSelectNurse(provider)}
 						style={[styles.selectBtn, isSelected && styles.selectBtnActive]}
 						contentStyle={styles.selectBtnContent}
 						labelStyle={styles.selectBtnLabel}
 					>
 						{currentSelectedSlot
-							? `Book ${currentSelectedSlot.start_time} Slot with ${nurse.name.split(' ')[0]}`
+							? `Book ${currentSelectedSlot.start_time} Slot with ${nurseName.split(' ')[0]}`
 							: isSelected
 							? 'Selected Nurse ✓'
 							: 'Select Nurse'}
@@ -338,13 +325,13 @@ export const AncillaryProvidersPage = () => {
 					style={[styles.dateStripContainer, isTablet && styles.sectionTablet]}
 				/>
 
-				{/* Search Bar - only shown if consulted nurses exist */}
-				{!loading && consultedNurses.length > 0 && (
+				{/* Search Bar - only shown once available nurses have loaded */}
+				{!loading && !error && providers.length > 0 && (
 					<View style={[styles.searchSection, isTablet && styles.sectionTablet]}>
 						<View style={styles.searchBar}>
 							<Ionicons name="search-outline" size={18} color="#64748B" />
 							<TextInput
-								placeholder="Search by nurse name, credentials, or procedure..."
+								placeholder="Search by nurse name or specialty..."
 								placeholderTextColor="#94A3B8"
 								value={searchQuery}
 								onChangeText={setSearchQuery}
@@ -374,14 +361,14 @@ export const AncillaryProvidersPage = () => {
 							<Ionicons name="alert-circle-outline" size={36} color="#DC2626" />
 						</View>
 						<AppTypography variant="h3" style={styles.errorTitle}>
-							Unable to Load Previous Nurses
+							Unable to Load Nurses
 						</AppTypography>
 						<AppTypography variant="caption" style={styles.errorSubtitle}>
 							{error}
 						</AppTypography>
 						<AppButton
 							variant="primary"
-							onPress={() => void loadConsultedNurses()}
+							onPress={() => void loadProviders(selectedDate)}
 							style={styles.retryBtn}
 							contentStyle={styles.retryBtnContent}
 							labelStyle={styles.retryBtnLabel}
@@ -389,19 +376,16 @@ export const AncillaryProvidersPage = () => {
 							Retry
 						</AppButton>
 					</View>
-				) : consultedNurses.length === 0 ? (
+				) : providers.length === 0 ? (
 					<View style={[styles.emptyContainer, isTablet && styles.sectionTablet]}>
 						<View style={styles.emptyIconCircle}>
 							<MaterialCommunityIcons name="account-clock-outline" size={38} color="#0C7C7C" />
 						</View>
 						<AppTypography variant="h3" style={styles.emptyTitle}>
-							No Previous Nurses
+							No Available Nurses
 						</AppTypography>
 						<AppTypography variant="body" style={styles.emptySubtitle}>
-							You haven't consulted a nurse through our service yet.
-						</AppTypography>
-						<AppTypography variant="caption" style={styles.emptyHelper}>
-							Once you complete an ancillary appointment, your previously consulted nurses will appear here for fast rebooking.
+							No nurses are currently available for the selected date and time. Please try another date or time.
 						</AppTypography>
 					</View>
 				) : filteredNurses.length === 0 ? (
@@ -411,7 +395,7 @@ export const AncillaryProvidersPage = () => {
 							No Matching Nurses
 						</AppTypography>
 						<AppTypography variant="caption" style={styles.noSearchSubtitle}>
-							No previously consulted nurses match "{searchQuery}".
+							No available nurses match "{searchQuery}".
 						</AppTypography>
 						<TouchableOpacity
 							onPress={() => setSearchQuery('')}
@@ -428,7 +412,7 @@ export const AncillaryProvidersPage = () => {
 						{/* List Summary Bar */}
 						<View style={styles.summaryRow}>
 							<AppTypography variant="subtitle" style={styles.summaryTitle}>
-								Available for Rebooking
+								Available Nurses Near You
 							</AppTypography>
 							<View style={styles.countBadge}>
 								<AppTypography variant="caption" style={styles.countBadgeText}>
@@ -439,7 +423,7 @@ export const AncillaryProvidersPage = () => {
 
 						{/* Nurse Cards List */}
 						<View style={styles.cardsContainer}>
-							{filteredNurses.map((nurse) => renderNurseCard(nurse))}
+							{filteredNurses.map((provider) => renderNurseCard(provider))}
 						</View>
 					</View>
 				)}
@@ -614,21 +598,6 @@ const styles = StyleSheet.create({
 		fontSize: 11.5,
 		fontWeight: '600',
 	},
-	proceduresBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 12,
-		paddingTop: 10,
-		borderTopWidth: 1,
-		borderTopColor: '#F1F5F9',
-		gap: 6,
-	},
-	proceduresText: {
-		color: '#475569',
-		fontSize: 12,
-		flex: 1,
-		lineHeight: 16,
-	},
 	cardFooter: {
 		marginTop: 14,
 	},
@@ -696,14 +665,6 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		fontSize: 13.5,
 		lineHeight: 20,
-	},
-	emptyHelper: {
-		marginTop: 8,
-		color: '#94A3B8',
-		textAlign: 'center',
-		fontSize: 12,
-		lineHeight: 18,
-		maxWidth: 280,
 	},
 	noSearchTitle: {
 		marginTop: 12,
