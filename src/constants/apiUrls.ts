@@ -235,7 +235,6 @@ export const API_ENDPOINTS = {
 		PROVIDER_EARNINGS: `${BASE_URL}/api/ancillary/provider/earnings`,
 		PROVIDER_DASHBOARD_METRICS: `${BASE_URL}/api/ancillary/provider/dashboard-metrics`,
 		VERIFIED_NURSES: `${BASE_URL}/api/ancillary/nurses`,
-		CONSULTED_NURSES: `${BASE_URL}/api/ancillary/nurses/consulted`,
 		// Phase 1 Slot-Based Booking Endpoints
 		AVAILABLE_SLOTS: `${BASE_URL}/api/ancillary/available-slots`,
 		REQUESTS_SCHEDULED: `${BASE_URL}/api/ancillary/requests/scheduled`,
