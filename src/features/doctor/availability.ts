@@ -1,7 +1,23 @@
 // Shared normalisation of the /api/doctors/availability response.
 // Extracted verbatim from DoctorDetailPage so the Doctor profile ("next
 // available") and the Clinic & slot step read slots the same way.
-import type { SlotGroup, TimeSlot } from './doctorService'
+import type { SlotGroup } from './doctorService'
+
+// Generic date / slot helpers now live in src/utils; re-exported here so
+// existing importers (e.g. BookSlotPage) keep compiling unchanged.
+export {
+	DOW_KEYS,
+	DOW_LABELS,
+	MONTH_LONG,
+	MONTH_SHORT,
+	fullDayLabel,
+	isClosedDay,
+	isSameDay,
+	nextSevenDays,
+	relativeDayLabel,
+	startOfDay,
+} from '../../utils/date'
+export { firstOpenSlot, isSlotBooked, isSlotSelectable } from '../../utils/slots'
 
 export type AppointmentModeKey = 'clinic' | 'video'
 
@@ -95,71 +111,3 @@ export const normalizeAvailabilityByMode = (response: unknown): Record<Appointme
 
 	return grouped
 }
-
-export const isSlotBooked = (slot: TimeSlot) =>
-	!!slot.is_booked || slot.status === 'BOOKED' || slot.status === 'OCCUPIED'
-
-export const isSlotSelectable = (slot: TimeSlot) =>
-	!isSlotBooked(slot) && slot.status !== 'BLOCKED' && slot.status !== 'UNAVAILABLE'
-
-/** First selectable slot across all groups, or null. */
-export const firstOpenSlot = (groups: SlotGroup[]): TimeSlot | null => {
-	for (const g of groups) {
-		const s = g.slots.find(isSlotSelectable)
-		if (s) return s
-	}
-	return null
-}
-
-// ---- Date helpers for the 7-day strip ----
-
-export const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-export const DOW_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-export const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-export const MONTH_LONG = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December',
-]
-
-export const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
-
-export const isSameDay = (a: Date, b: Date) =>
-	a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-
-export const nextSevenDays = (): Date[] => {
-	const today = startOfDay(new Date())
-	return Array.from({ length: 7 }, (_, i) => {
-		const d = new Date(today)
-		d.setDate(today.getDate() + i)
-		return d
-	})
-}
-
-/** "Today" / "Tomorrow" / "Fri 26 Sep" */
-export const relativeDayLabel = (d: Date) => {
-	const today = startOfDay(new Date())
-	const diff = Math.round((startOfDay(d).getTime() - today.getTime()) / 86400000)
-	if (diff === 0) return 'Today'
-	if (diff === 1) return 'Tomorrow'
-	return `${DOW_LABELS[d.getDay()]} ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`
-}
-
-/** "Today, Thu 24 Sep" / "Fri 25 Sep" */
-export const fullDayLabel = (d: Date) => {
-	const base = `${DOW_LABELS[d.getDay()]} ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`
-	return isSameDay(d, new Date()) ? `Today, ${base}` : base
-}
-
-/** Is the hospital closed on this weekday? Unknown available_days = never closed. */
-export const isClosedDay = (d: Date, availableDays?: string[]) =>
-	Array.isArray(availableDays) && availableDays.length > 0 && !availableDays.includes(DOW_KEYS[d.getDay()])

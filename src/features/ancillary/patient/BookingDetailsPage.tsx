@@ -23,15 +23,16 @@ import {
 	AppInput,
 	AppScreenHeader,
 	AppSelect,
+	AppFamilyMemberSheet,
 	AppSelectOption,
 	AppTypography,
 	BookingProgressStepper,
-	PatientProfileSelectorBottomSheet,
 	SelectionRowCard,
 	ServiceProcedureItem,
 	StatusModal,
 } from '../../../components/common'
 import DateSlotPicker from '../../../components/common/inputs/DateSlotPicker'
+import { FamilyMemberOption, useFamilyMembers } from '../../../hooks/useFamilyMembers'
 import { SlotGroup } from '../../doctor/doctorService'
 import {
 	ANCILLARY_BOOKING_STEPS,
@@ -204,7 +205,8 @@ export default function BookingDetailsPage() {
 	const [editPatientVisible, setEditPatientVisible] = useState(false)
 	const [editVisitVisible, setEditVisitVisible] = useState(false)
 	const [switchProfileVisible, setSwitchProfileVisible] = useState(false)
-	const [selectedProfileId, setSelectedProfileId] = useState<string>('self-1')
+	const [selectedProfileKey, setSelectedProfileKey] = useState<string>('self')
+	const { members: familyMembers } = useFamilyMembers()
 
 	// Temporary Form States for Patient Edit Sheet
 	const [tempPatientName, setTempPatientName] = useState('')
@@ -382,18 +384,19 @@ export default function BookingDetailsPage() {
 		})
 	}
 
-	const handleSelectProfile = (selected: any) => {
-		setSelectedProfileId(selected.id)
-		const targetPublicId = selected.publicId || selected.public_id || selected.id
-		setPatient({
-			publicId: targetPublicId,
+	// Same patient fields the old profile picker produced (id = public id, API relation, '' fallbacks).
+	const handleSelectProfile = (selected: FamilyMemberOption) => {
+		setSelectedProfileKey(selected.key)
+		setPatient((prev) => ({
+			// Self without a known public id keeps the one already resolved for the caller.
+			publicId: selected.publicId ?? (selected.key === 'self' ? prev?.publicId : undefined),
 			name: selected.name,
-			age: String(selected.age),
-			gender: selected.gender,
+			age: String(selected.age ?? ''),
+			gender: selected.gender ?? '',
 			bloodGroup: selected.bloodGroup || '',
-			relationship: selected.relationship || selected.relation || 'Family Member',
-			avatar: selected.avatar,
-		})
+			relationship: selected.apiRelation || selected.relation || 'Family Member',
+			avatar: selected.avatar ?? undefined,
+		}))
 	}
 
 	const handleSavePatientDetails = () => {
@@ -1056,11 +1059,14 @@ export default function BookingDetailsPage() {
 			</AppBottomSheet>
 
 			{/* PATIENT PROFILE SELECTOR BOTTOM SHEET */}
-			<PatientProfileSelectorBottomSheet
+			<AppFamilyMemberSheet
 				visible={switchProfileVisible}
 				onClose={() => setSwitchProfileVisible(false)}
-				onSelectProfile={handleSelectProfile}
-				selectedProfileId={selectedProfileId}
+				members={familyMembers}
+				selectedKey={selectedProfileKey}
+				onSelect={handleSelectProfile}
+				title="Who is this booking for?"
+				subtitle="Pick yourself or a family member"
 			/>
 
 			{/* PATIENT ERROR MODAL */}

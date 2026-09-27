@@ -9,8 +9,19 @@
 // `PLACE_LABORATORY_TEST` / `PLACE_RADIOLOGY_ORDER` already carry booking
 // context via params (see `navigation/types.ts`).
 
-import type { PatientProfile } from '../../components/common/booking/PatientProfileSelectorBottomSheet'
 import type { PatientAddress } from '../profile/patient/PatientProfileService'
+
+/** Who the lab booking is for (the caller or a family member), as carried in the draft. */
+export interface PatientProfile {
+	id: string
+	publicId?: string
+	name: string
+	age: string | number
+	gender: string
+	relationship: string
+	avatar?: string
+	bloodGroup?: string
+}
 
 // Mirrors `CollectionType` in `features/laboratory_duplicated/laboratory.ts`
 // (the real, already-integrated lab-booking payload) so this flow's choice

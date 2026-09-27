@@ -43,37 +43,8 @@ import { Appointment, AppointmentDoctor } from '../../types/appointment'
 import { ROUTES } from '../../navigation/routes'
 import { formatTimeSlot, capitaliseWords } from '../../utils/formatters'
 import { buildS3Url } from '../../utils/s3Utils'
+import { formatFullDate, formatInterval, fullDayLabel, parseDateOnly } from '../../utils/date'
 import { APP_COLORS, TONES, formatInr } from '../../config/theme'
-
-const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-/** Parses 'YYYY-MM-DD' as a local date (avoids UTC shift); falls back to Date parsing. */
-function parseDate(d?: string | null): Date | null {
-	if (!d) return null
-	const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d)
-	const date = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(d)
-	return isNaN(date.getTime()) ? null : date
-}
-
-/** "Fri 5 Sep" */
-const formatDayLabel = (date: Date) => `${DOW[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}`
-/** "5 Dec 2026" */
-const formatFullDate = (date: Date) => `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`
-
-/** "3 months" / "2 weeks" / "5 days" between the visit and the follow-up date. */
-function formatInterval(from: Date | null, to: Date): string | null {
-	if (!from) return null
-	const days = Math.round((to.getTime() - from.getTime()) / 86400000)
-	if (days <= 0) return null
-	if (days < 14) return `${days} day${days === 1 ? '' : 's'}`
-	if (days < 60) {
-		const w = Math.round(days / 7)
-		return `${w} week${w === 1 ? '' : 's'}`
-	}
-	const mo = Math.round(days / 30)
-	return `${mo} month${mo === 1 ? '' : 's'}`
-}
 
 function modeLabel(mode?: string | null, hospital?: string | null): string {
 	const m = (mode || '').toLowerCase()
@@ -222,15 +193,15 @@ export default function VisitSummaryPage() {
 		? doctor?.qualifications.join(', ')
 		: (doctor?.qualifications ?? doctor?.degree ?? null)
 	const avatarUri = buildS3Url(doctor?.avatar_s3_key)
-	const visitDate = parseDate(appt.appointment_date)
+	const visitDate = parseDateOnly(appt.appointment_date, { ignoreTime: false })
 	const timeLabel = appt.start_time ? formatTimeSlot(appt.start_time) : ''
-	const whenLabel = [visitDate ? formatDayLabel(visitDate) : appt.appointment_date, timeLabel]
+	const whenLabel = [visitDate ? fullDayLabel(visitDate, { markToday: false }) : appt.appointment_date, timeLabel]
 		.filter(Boolean)
 		.join(', ')
 	const whereLabel = modeLabel(appt.appointment_mode, appt.hospital?.name)
-	const followUp = parseDate(treatment?.follow_up_date)
+	const followUp = parseDateOnly(treatment?.follow_up_date, { ignoreTime: false })
 	const followUpInterval = followUp ? formatInterval(visitDate, followUp) : null
-	const prescriptionDate = parseDate(treatment?.created_at?.slice(0, 10))
+	const prescriptionDate = parseDateOnly(treatment?.created_at?.slice(0, 10), { ignoreTime: false })
 	const hasFee = appt.fees != null && Number(appt.fees) > 0
 	const shownRating = review ? review.rating : rating
 

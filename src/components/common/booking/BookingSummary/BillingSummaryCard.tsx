@@ -1,6 +1,10 @@
 import React from 'react'
-import { StyleProp, StyleSheet, TextStyle, View, ViewStyle } from 'react-native'
+import { StyleProp, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { APP_COLORS } from '../../../../config/theme'
 import { AppTypography } from '../../display/AppTypography'
+import { AppDashedDivider } from '../../display/AppDashedDivider'
+import { AppIcon } from '../../display/AppIcon'
 
 export interface BillingRow {
 	label: string
@@ -9,6 +13,8 @@ export interface BillingRow {
 	valueStyle?: StyleProp<TextStyle>
 	/** Renders a divider above this row — e.g. before a final total row. */
 	dividerBefore?: boolean
+	/** 'free' = green value ("Free"); 'total' = large bold label + value. Defaults to 'default'. */
+	tone?: 'default' | 'free' | 'total'
 }
 
 export interface BillingSummaryCardNote {
@@ -29,38 +35,111 @@ export interface BillingSummaryCardProps {
 	 *  box is a visually distinct element outside this card entirely and is
 	 *  not represented here — its caller renders it separately. */
 	note?: BillingSummaryCardNote
+	/** 'card' (default) = bordered white card with its own padding (booking-summary screens).
+	 *  'flat' = no card chrome, KarolaHealth design-language text styles — for use inside an AppSection. */
+	variant?: 'card' | 'flat'
+	/** Draw row dividers as AppDashedDivider instead of a solid 1px line. */
+	dashedDividers?: boolean
+	/** Divider colour. Defaults to APP_COLORS.border (dashed) / #E8ECEC (solid). */
+	dividerColor?: string
+	/** Vertical space above and below each row divider (on top of `rowGap`). Defaults to 4. */
+	dividerSpacing?: number | { top: number; bottom: number }
+	/** Gap between rows. Defaults to 10. */
+	rowGap?: number
+	/** Rendered after the rows (e.g. an AppBillStatusLine: paid / pending line + Receipt link). */
+	footer?: React.ReactNode
 	style?: StyleProp<ViewStyle>
 }
 
-export function BillingSummaryCard({ title, rows, note, style }: BillingSummaryCardProps) {
+/** 'card' keeps the legacy AppTypography (Paper) text; 'flat' uses plain Text with design-language tokens. */
+function RowText({ flat, style, children }: { flat: boolean; style: StyleProp<TextStyle>; children: string }) {
+	return flat ? (
+		<Text style={style}>{children}</Text>
+	) : (
+		<AppTypography variant="body" style={style}>
+			{children}
+		</AppTypography>
+	)
+}
+
+export function BillingSummaryCard({
+	title,
+	rows,
+	note,
+	variant = 'card',
+	dashedDividers = false,
+	dividerColor,
+	dividerSpacing = 4,
+	rowGap = 10,
+	footer,
+	style,
+}: BillingSummaryCardProps) {
+	const flat = variant === 'flat'
+	const dividerMargin =
+		typeof dividerSpacing === 'number'
+			? { marginVertical: dividerSpacing }
+			: { marginTop: dividerSpacing.top, marginBottom: dividerSpacing.bottom }
+
+	const renderDivider = () =>
+		dashedDividers ? (
+			<AppDashedDivider color={dividerColor ?? APP_COLORS.border} style={dividerMargin} />
+		) : (
+			<View style={[styles.divider, dividerMargin, dividerColor ? { backgroundColor: dividerColor } : null]} />
+		)
+
 	return (
-		<View style={[styles.card, style]}>
+		<View style={[flat ? null : styles.card, style]}>
 			{title ? (
 				<AppTypography variant="h3" style={styles.title}>
 					{title}
 				</AppTypography>
 			) : null}
 
-			<View style={styles.rowList}>
-				{rows.map((row, i) => (
-					<React.Fragment key={i}>
-						{row.dividerBefore && <View style={styles.divider} />}
-						<View style={styles.row}>
-							<AppTypography variant="body" style={[styles.label, row.labelStyle]}>
-								{row.label}
-							</AppTypography>
-							<AppTypography variant="body" style={[styles.value, row.valueStyle]}>
-								{row.value}
-							</AppTypography>
-						</View>
-					</React.Fragment>
-				))}
+			<View style={{ gap: rowGap }}>
+				{rows.map((row, i) => {
+					const tone = row.tone ?? 'default'
+					return (
+						<React.Fragment key={i}>
+							{row.dividerBefore && renderDivider()}
+							<View style={[styles.row, tone === 'total' && styles.rowTotal]}>
+								<RowText
+									flat={flat}
+									style={[
+										flat ? styles.flatText : styles.label,
+										tone === 'total' && styles.totalLabel,
+										row.labelStyle,
+									]}
+								>
+									{row.label}
+								</RowText>
+								<RowText
+									flat={flat}
+									style={[
+										flat ? styles.flatText : styles.value,
+										tone === 'free' && styles.freeValue,
+										tone === 'total' && styles.totalValue,
+										row.valueStyle,
+									]}
+								>
+									{row.value}
+								</RowText>
+							</View>
+						</React.Fragment>
+					)
+				})}
 			</View>
+
+			{footer ? <View style={rows.length ? { marginTop: rowGap } : null}>{footer}</View> : null}
 
 			{note ? (
 				<>
-					<View style={styles.divider} />
-					<View style={[styles.noteRow, note.backgroundColor ? { backgroundColor: note.backgroundColor } : null]}>
+					{renderDivider()}
+					<View
+						style={[
+							styles.noteRow,
+							note.backgroundColor ? { backgroundColor: note.backgroundColor } : null,
+						]}
+					>
 						<View style={styles.noteIcon}>{note.icon}</View>
 						<AppTypography
 							variant="caption"
@@ -70,6 +149,58 @@ export function BillingSummaryCard({ title, rows, note, style }: BillingSummaryC
 						</AppTypography>
 					</View>
 				</>
+			) : null}
+		</View>
+	)
+}
+
+/** Design-language alias of BillingSummaryCard (bill details / payment sections). */
+export const AppBillSummary = BillingSummaryCard
+
+export interface AppBillStatusLineProps {
+	text: string
+	/** Text colour: 'paid' = success, 'pending' = warning, 'default' = ink. Defaults to 'default'. */
+	tone?: 'default' | 'paid' | 'pending'
+	/** 'sm' = 12/16 bold line with a compact link (Appointment details); 'md' = 14/20 line with a
+	 *  44px-tall download link (Appointment confirmed). Defaults to 'sm'. */
+	size?: 'sm' | 'md'
+	/** Shows the "Receipt" link when given. */
+	onReceiptPress?: () => void
+	style?: StyleProp<ViewStyle>
+}
+
+/** Footer line for AppBillSummary: payment status text + optional Receipt link. */
+export function AppBillStatusLine({
+	text,
+	tone = 'default',
+	size = 'sm',
+	onReceiptPress,
+	style,
+}: AppBillStatusLineProps) {
+	const md = size === 'md'
+	const color = tone === 'paid' ? APP_COLORS.success : tone === 'pending' ? APP_COLORS.warning : APP_COLORS.ink
+	return (
+		<View style={[styles.statusRow, md && styles.statusRowMd, style]}>
+			<Text
+				style={[md ? styles.statusTextMd : styles.statusTextSm, { color }]}
+				numberOfLines={md ? undefined : 1}
+			>
+				{text}
+			</Text>
+			{onReceiptPress ? (
+				<TouchableOpacity
+					onPress={onReceiptPress}
+					style={[styles.receiptLink, md && styles.receiptLinkMd]}
+					activeOpacity={md ? 0.7 : undefined}
+					accessibilityRole="button"
+				>
+					{md ? (
+						<AppIcon name="download" size={18} color={APP_COLORS.primary} />
+					) : (
+						<MaterialCommunityIcons name="chevron-down" size={16} color={APP_COLORS.primary} />
+					)}
+					<Text style={md ? styles.receiptTextMd : styles.receiptTextSm}>Receipt</Text>
+				</TouchableOpacity>
 			) : null}
 		</View>
 	)
@@ -96,13 +227,13 @@ const styles = StyleSheet.create({
 		color: '#191C1D',
 		marginBottom: 14,
 	},
-	rowList: {
-		gap: 10,
-	},
 	row: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
+	},
+	rowTotal: {
+		alignItems: 'baseline',
 	},
 	label: {
 		fontSize: 13,
@@ -113,10 +244,30 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#191C1D',
 	},
+	flatText: {
+		fontSize: 14,
+		lineHeight: 20,
+		color: APP_COLORS.ink,
+	},
+	freeValue: {
+		color: APP_COLORS.success,
+		fontWeight: '600',
+	},
+	totalLabel: {
+		fontSize: 18,
+		lineHeight: 26,
+		fontWeight: '800',
+		color: APP_COLORS.ink,
+	},
+	totalValue: {
+		fontSize: 22,
+		lineHeight: 26,
+		fontWeight: '800',
+		color: APP_COLORS.ink,
+	},
 	divider: {
 		height: 1,
 		backgroundColor: '#E8ECEC',
-		marginVertical: 4,
 	},
 	noteRow: {
 		flexDirection: 'row',
@@ -135,5 +286,47 @@ const styles = StyleSheet.create({
 		fontSize: 11,
 		color: '#1F5F68',
 		lineHeight: 15,
+	},
+
+	// AppBillStatusLine
+	statusRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 8,
+	},
+	statusRowMd: {
+		gap: 12,
+	},
+	statusTextSm: {
+		flex: 1,
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+	},
+	statusTextMd: {
+		flex: 1,
+		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '600',
+	},
+	receiptLink: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	receiptLinkMd: {
+		minHeight: 44,
+	},
+	receiptTextSm: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+		color: APP_COLORS.primary,
+	},
+	receiptTextMd: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: APP_COLORS.primary,
 	},
 })

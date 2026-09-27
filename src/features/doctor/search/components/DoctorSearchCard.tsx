@@ -7,40 +7,18 @@ import { DoctorSearchItem } from '../../../../types/doctor-search'
 import { AppAvatar, AppButton, AppDashedDivider, AppTypography, AppIcon } from '../../../../components/common'
 import { ROUTES } from '../../../../navigation/routes'
 import type { AppStackParamList } from '../../../../navigation/types'
-import { APP_COLORS, formatInr, toneAt } from '../../../../config/theme'
+import { APP_COLORS, formatInr, toneForString } from '../../../../config/theme'
+import { formatKm, initialsOf } from '../../../../utils/formatters'
 
 interface DoctorProps {
 	doctor: DoctorSearchItem
-}
-
-/** Deterministic tone per speciality name, so the same speciality always gets
- *  the same colour across cards without needing a fixed lookup table. */
-function toneForSpeciality(label: string) {
-	let hash = 0
-	for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) >>> 0
-	return toneAt(hash)
-}
-
-/** "Dr. Asha K Rao" -> "Asha Rao": AppAvatar takes the initials of the first two words, so hand it
- *  the first + last name (without the "Dr." prefix) to keep the card's first/last initials. */
-function initialsName(name: string) {
-	const parts = name
-		.replace(/^dr\.?\s+/i, '')
-		.trim()
-		.split(/\s+/)
-		.filter(Boolean)
-	return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : (parts[0] ?? '')
-}
-
-function formatKm(distance: number) {
-	return Number.isInteger(distance) ? String(distance) : distance.toFixed(1)
 }
 
 export default function DoctorSearchCard({ doctor }: DoctorProps) {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
 	const speciality = doctor.specialities?.[0] || 'General physician'
-	const tone = useMemo(() => toneForSpeciality(speciality), [speciality])
+	const tone = useMemo(() => toneForString(speciality), [speciality])
 
 	const goToDetail = () => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })
 
@@ -60,7 +38,7 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 				<View style={styles.avatarWrap}>
 					<AppAvatar
 						uri={doctor.avatar_s3_key}
-						name={initialsName(doctor.name)}
+						name={initialsOf(doctor.name)}
 						size={76}
 						radius={20}
 						backgroundColor={tone.bg}

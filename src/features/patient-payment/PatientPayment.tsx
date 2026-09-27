@@ -32,14 +32,45 @@ import type { AppStackParamList } from '../../navigation/types'
 import { ROUTES } from '../../navigation/routes'
 import {
 	AppAvatar,
+	AppBillSummary,
 	AppButton,
-	AppDashedDivider,
 	AppFooterBar,
+	AppIcon,
+	AppPaymentMethodList,
 	AppScreenHeader,
 	AppSection,
-	AppIcon,
+	AppSecurePaymentNote,
+	AppTicketCard,
+	type AppPaymentMethod,
 } from '../../components/common'
-import PaymentMethodList, { PAYMENT_METHOD_LABELS, type PaymentMethodId } from './components/PaymentMethodList'
+
+type PaymentMethodId = 'upi' | 'card' | 'netbank' | 'later'
+
+/** Short label forwarded to the Confirmed screen ("₹x paid via {label}"). */
+const PAYMENT_METHOD_LABELS: Record<PaymentMethodId, string> = {
+	upi: 'UPI',
+	card: 'Card',
+	netbank: 'Net banking',
+	later: 'Pay at clinic',
+}
+
+/** "Pay with" methods. No payment gateway yet -- the UPI / card fields are UI-only (see AppPaymentMethodList). */
+const buildPaymentMethods = (payAtClinicDisabled: boolean): AppPaymentMethod<PaymentMethodId>[] => [
+	{ id: 'upi', title: 'UPI', subtitle: 'Pay from any UPI app', icon: 'phone', expand: 'upi' },
+	{ id: 'card', title: 'Credit or debit card', subtitle: 'Visa, Mastercard, RuPay', icon: 'card', expand: 'card' },
+	{ id: 'netbank', title: 'Net banking', subtitle: 'All major Indian banks', icon: 'bank' },
+	{
+		id: 'later',
+		title: 'Pay at clinic',
+		subtitle: 'Cash, card or UPI at the front desk',
+		icon: 'clinic',
+		// Pay at clinic is only offered for in-clinic visits
+		disabled: payAtClinicDisabled,
+		disabledReason: 'Available for in-clinic visits only',
+		expand: 'note',
+		note: 'Your slot is held. Please arrive 10 minutes early to pay and check in.',
+	},
+]
 
 type BookedAppointmentMode = 'clinic_visit' | 'video_call'
 
@@ -189,6 +220,7 @@ export default function BookingDetailsScreen() {
 	const speciality = doctor?.specialities?.[0] || ''
 	const experienceText = doctor?.details?.experience_years != null ? `${doctor.details.experience_years} yrs` : ''
 	const ctaLabel = method === 'later' ? 'Confirm appointment' : `Pay ${feeText}`
+	const paymentMethods = buildPaymentMethods(isPayLaterDisabled)
 
 	const handleConfirm = async () => {
 		if (!doctor || !hospitalId || !appointmentDate || !startTime) {
@@ -316,106 +348,69 @@ export default function BookingDetailsScreen() {
 				>
 					{/* Appointment ticket */}
 					<AppSection marginTop={0} gap={0}>
-						<View style={styles.ticketCard}>
-							<View style={styles.ticketTopRow}>
-								<AppAvatar
-									uri={avatarUri}
-									name={bookingDoctorName}
-									size={56}
-									borderWidth={3}
-									borderColor="#FFFFFF"
-									backgroundColor={TONES.lilac.bg}
-									initialsColor={TONES.lilac.ink}
-									fallbackIcon="account"
-								/>
-								<View style={styles.flex}>
-									<Text style={styles.ticketDoctorName} numberOfLines={1}>
-										{bookingDoctorName}
-									</Text>
-									<Text style={styles.ticketDoctorSpec} numberOfLines={1}>
-										{[speciality, experienceText].filter(Boolean).join(' · ')}
-									</Text>
-								</View>
-								<TouchableOpacity
-									onPress={() => navigation.goBack()}
-									style={styles.changeBtn}
-									accessibilityRole="link"
-								>
-									<Text style={styles.changeLink}>Change</Text>
-								</TouchableOpacity>
-							</View>
-
-							<AppDashedDivider variant="ticket" color={APP_COLORS.mintAccent} cutoutColor={APP_COLORS.surface} />
-
-							<View style={styles.ticketGrid}>
-								<View style={styles.ticketGridCol}>
-									<Text style={styles.ticketLabel}>WHEN</Text>
-									<Text style={styles.ticketValueBig}>{bookingTime}</Text>
-									<Text style={styles.ticketSub}>{bookingDate}</Text>
-								</View>
-								<View style={styles.ticketGridCol}>
-									<Text style={styles.ticketLabel}>WHERE</Text>
-									<Text style={styles.ticketValue} numberOfLines={1}>
-										{isVideo ? 'Video consultation' : bookingHospitalName}
-									</Text>
-									<Text style={styles.ticketSub} numberOfLines={1}>
-										{isVideo
-											? 'Video call'
-											: ['In-clinic', distanceText].filter(Boolean).join(' · ')}
-									</Text>
-								</View>
-
-								<View style={styles.ticketPatientRow}>
+						<AppTicketCard
+							tint="mint"
+							cutoutColor={APP_COLORS.surface}
+							header={{
+								leading: (
 									<AppAvatar
-										name={patientDisplayName}
-										size={24}
-										backgroundColor="#FFFFFF"
-										initialsColor={APP_COLORS.primary}
-										initialsStyle={styles.ticketPatientInitials}
+										uri={avatarUri}
+										name={bookingDoctorName}
+										size={56}
+										borderWidth={3}
+										borderColor="#FFFFFF"
+										backgroundColor={TONES.lilac.bg}
+										initialsColor={TONES.lilac.ink}
+										fallbackIcon="account"
 									/>
-									<Text style={styles.ticketPatientText} numberOfLines={1}>
-										For <Text style={styles.ticketPatientName}>{patientDisplayName}</Text>
-										{patientRelation ? ` (${patientRelation})` : ''}
-									</Text>
-								</View>
-							</View>
-						</View>
+								),
+								title: bookingDoctorName,
+								titleSize: 17,
+								subtitle: [speciality, experienceText].filter(Boolean).join(' · '),
+								trailing: (
+									<TouchableOpacity
+										onPress={() => navigation.goBack()}
+										style={styles.changeBtn}
+										accessibilityRole="link"
+									>
+										<Text style={styles.changeLink}>Change</Text>
+									</TouchableOpacity>
+								),
+							}}
+							fields={[
+								{ label: 'When', value: bookingTime, sub: bookingDate, emphasis: true },
+								{
+									label: 'Where',
+									value: isVideo ? 'Video consultation' : bookingHospitalName,
+									sub: isVideo
+										? 'Video call'
+										: ['In-clinic', distanceText].filter(Boolean).join(' · '),
+								},
+							]}
+							forPatient={{ name: patientDisplayName, relation: patientRelation }}
+						/>
 					</AppSection>
 
 					{/* Bill details */}
 					<AppSection title="Bill details" marginTop={0} gap={12}>
-						<View style={styles.billRows}>
-							<View style={styles.billRow}>
-								<Text style={styles.billText}>Consultation fee</Text>
-								<Text style={styles.billText}>{feeText}</Text>
-							</View>
-							<View style={styles.billRow}>
-								<Text style={styles.billText}>Booking fee</Text>
-								<Text style={[styles.billText, styles.freeText]}>Free</Text>
-							</View>
-							<View style={styles.totalWrap}>
-								<AppDashedDivider color={APP_COLORS.border} />
-								<View style={[styles.billRow, styles.totalRow]}>
-									<Text style={styles.totalLabel}>To pay</Text>
-									<Text style={styles.totalValue}>{feeText}</Text>
-								</View>
-							</View>
-						</View>
+						<AppBillSummary
+							variant="flat"
+							dashedDividers
+							rowGap={8}
+							rows={[
+								{ label: 'Consultation fee', value: feeText },
+								{ label: 'Booking fee', value: 'Free', tone: 'free' },
+								{ label: 'To pay', value: feeText, tone: 'total', dividerBefore: true },
+							]}
+						/>
 					</AppSection>
 
 					{/* Pay with */}
 					<AppSection title="Pay with" marginTop={0} gap={4} style={styles.paySection}>
-						<PaymentMethodList
-							value={method}
-							onChange={setMethod}
-							payAtClinicDisabled={isPayLaterDisabled}
-						/>
+						<AppPaymentMethodList methods={paymentMethods} value={method} onChange={setMethod} />
 					</AppSection>
 
-					<View style={styles.encryptionRow}>
-						<AppIcon name="shield" size={16} color={APP_COLORS.primary} />
-						<Text style={styles.encryptionText}>Payments are encrypted. We never store your CVV.</Text>
-					</View>
+					<AppSecurePaymentNote style={styles.encryptionRow} />
 				</ScrollView>
 
 				{/* Footer */}
@@ -469,29 +464,6 @@ const styles = StyleSheet.create({
 	},
 
 	// Appointment ticket
-	ticketCard: {
-		borderRadius: 16,
-		backgroundColor: APP_COLORS.mint,
-		overflow: 'hidden',
-	},
-	ticketTopRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		padding: 16,
-	},
-	ticketDoctorName: {
-		fontSize: 17,
-		lineHeight: 22,
-		fontWeight: '800',
-		color: APP_COLORS.ink,
-	},
-	ticketDoctorSpec: {
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '600',
-		color: TONES.lilac.ink,
-	},
 	changeBtn: {
 		minHeight: 44,
 		justifyContent: 'center',
@@ -501,116 +473,13 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: APP_COLORS.primary,
 	},
-	ticketGrid: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		padding: 16,
-		rowGap: 12,
-		columnGap: 12,
-	},
-	ticketGridCol: {
-		flexBasis: '40%',
-		flexGrow: 1,
-		minWidth: 0,
-	},
-	ticketLabel: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		letterSpacing: 0.48,
-		color: APP_COLORS.primary,
-	},
-	ticketValueBig: {
-		fontSize: 20,
-		lineHeight: 26,
-		fontWeight: '800',
-		color: APP_COLORS.ink,
-	},
-	ticketValue: {
-		fontSize: 15,
-		lineHeight: 22,
-		fontWeight: '700',
-		color: APP_COLORS.ink,
-	},
-	ticketSub: {
-		fontSize: 13,
-		lineHeight: 18,
-		color: APP_COLORS.inkMuted,
-	},
-	ticketPatientRow: {
-		width: '100%',
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	ticketPatientInitials: {
-		fontSize: 10,
-		fontWeight: '800',
-	},
-	ticketPatientText: {
-		flex: 1,
-		fontSize: 13,
-		lineHeight: 18,
-		color: APP_COLORS.ink,
-	},
-	ticketPatientName: {
-		fontWeight: '700',
-	},
-
-	// Bill details
-	billRows: {
-		gap: 8,
-	},
-	billRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-	},
-	billText: {
-		fontSize: 14,
-		lineHeight: 20,
-		color: APP_COLORS.ink,
-	},
-	freeText: {
-		color: APP_COLORS.success,
-		fontWeight: '600',
-	},
-	totalWrap: {
-		marginTop: 4,
-	},
-	totalRow: {
-		paddingTop: 12,
-	},
-	totalLabel: {
-		fontSize: 18,
-		lineHeight: 26,
-		fontWeight: '800',
-		color: APP_COLORS.ink,
-	},
-	totalValue: {
-		fontSize: 22,
-		lineHeight: 26,
-		fontWeight: '800',
-		color: APP_COLORS.ink,
-	},
-
 	// Pay with
 	paySection: {
 		paddingBottom: 0,
 	},
 	encryptionRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 6,
 		marginTop: 4,
 		marginHorizontal: 16,
-	},
-	encryptionText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '500',
-		color: APP_COLORS.inkMuted,
 	},
 
 	// Footer

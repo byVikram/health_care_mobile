@@ -2,22 +2,7 @@ import React from 'react'
 import { ScrollView, StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native'
 import { AppTypography } from '../display/AppTypography'
 import { APP_COLORS } from '../../../config/theme'
-
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const MONTH_LONG = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December',
-]
+import { DOW_LABELS, MONTH_LONG, formatDateForApi } from '../../../utils/date'
 
 /** This intentionally does NOT reuse `common/DateSlotPicker.tsx` — that
  *  component's date model is a navigable calendar week (Sun-Sat containing
@@ -46,13 +31,6 @@ export interface DateStripProps {
 	disabledAccessibilityHint?: string
 }
 
-const formatDateIso = (d: Date): string => {
-	const year = d.getFullYear()
-	const month = String(d.getMonth() + 1).padStart(2, '0')
-	const day = String(d.getDate()).padStart(2, '0')
-	return `${year}-${month}-${day}`
-}
-
 export function DateStrip({
 	selectedDate,
 	onSelectDate,
@@ -71,14 +49,14 @@ export function DateStrip({
 		})
 	}, [dayCount])
 
-	const selectedIso = formatDateIso(selectedDate)
+	const selectedIso = formatDateForApi(selectedDate)
 
 	if (variant === 'grid') {
-		const todayIso = formatDateIso(new Date())
+		const todayIso = formatDateForApi(new Date())
 		return (
 			<View style={[styles.dateGrid, style]} accessibilityRole="radiogroup">
 				{upcomingDates.map((d) => {
-					const iso = formatDateIso(d)
+					const iso = formatDateForApi(d)
 					const disabled = !!isDateDisabled?.(d)
 					const on = iso === selectedIso && !disabled
 					const hint = disabled && disabledAccessibilityHint ? `, ${disabledAccessibilityHint}` : ''
@@ -90,11 +68,11 @@ export function DateStrip({
 							activeOpacity={0.8}
 							accessibilityRole="radio"
 							accessibilityState={{ checked: on, disabled }}
-							accessibilityLabel={`${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_LONG[d.getMonth()]}${hint}`}
+							accessibilityLabel={`${DOW_LABELS[d.getDay()]} ${d.getDate()} ${MONTH_LONG[d.getMonth()]}${hint}`}
 							style={[styles.gridCell, on && styles.cellOn, disabled && styles.gridCellOff]}
 						>
 							<AppTypography style={[styles.gridDow, on && styles.textOn, disabled && styles.textOff]}>
-								{iso === todayIso ? 'Today' : DAY_NAMES[d.getDay()]}
+								{iso === todayIso ? 'Today' : DOW_LABELS[d.getDay()]}
 							</AppTypography>
 							<AppTypography
 								style={[
@@ -121,7 +99,7 @@ export function DateStrip({
 				contentContainerStyle={styles.dateScrollContent}
 			>
 				{upcomingDates.map((d) => {
-					const isSelected = formatDateIso(d) === selectedIso
+					const isSelected = formatDateForApi(d) === selectedIso
 					// Only set when the caller passes isDateDisabled — existing callers are unaffected.
 					const disabled = !!isDateDisabled?.(d)
 					return (
@@ -144,7 +122,7 @@ export function DateStrip({
 									disabled && styles.textOff,
 								]}
 							>
-								{DAY_NAMES[d.getDay()]}
+								{DOW_LABELS[d.getDay()]}
 							</AppTypography>
 							<AppTypography
 								variant="h4"

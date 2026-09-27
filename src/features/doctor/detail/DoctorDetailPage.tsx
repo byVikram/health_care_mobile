@@ -32,6 +32,7 @@ import { formatDateForApi } from '../../../utils/date'
 import { capitalize } from '../../../utils/formatters'
 import { openOnMap } from '../../../utils/maps'
 import { AppointmentModeKey, firstOpenSlot, normalizeAvailabilityByMode } from '../availability'
+import { shortClinic } from '../doctorFormatters'
 import { APP_COLORS, TONES, formatInr, toneAt } from '../../../config/theme'
 import { DOCTOR_PROFILE_GOOD_TO_KNOW_MOCK } from './doctorProfileMockData'
 
@@ -266,12 +267,6 @@ export default function DoctorDetailPage() {
 		}
 		return null
 	})()
-
-	const shortClinic = (name?: string) => {
-		if (!name) return 'Clinic'
-		const parts = name.split(',')
-		return parts.length > 1 ? `${parts[parts.length - 1].trim()} clinic` : name
-	}
 
 	const specialitiesText = (specialities || []).filter(Boolean).join(' · ')
 

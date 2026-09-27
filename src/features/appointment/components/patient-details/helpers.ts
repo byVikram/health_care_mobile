@@ -1,10 +1,19 @@
 // src/features/appointment/components/patient-details/helpers.ts
 //
 // Pure helpers for the patient appointment-details screen (design 7 / 7a):
-// status → variant mapping, date/time labels and the status-timeline builder.
+// status → variant mapping and the status-timeline builder (generic date/time
+// labels live in utils/date).
 
 import type { Appointment, AppointmentHistoryEntry } from '../../../../types/appointment'
-import { formatTimeSlot } from '../../../../utils/formatters'
+import type { AppTimelineStep } from '../../../../components/common'
+import {
+	combineDateTime,
+	formatClock,
+	fullDayLabel,
+	relativeDayLabel,
+	slotLabel,
+	stampLabel,
+} from '../../../../utils/date'
 
 // Backend `GET /api/appointments/:id` returns a few keys the shared
 // Appointment type doesn't declare (doctor.degree / doctor.speciality) and
@@ -67,97 +76,22 @@ export const getPaymentState = (appt: PatientAppointment, variant: AppointmentVa
 }
 
 // ── Dates ────────────────────────────────────────────────────────────────────
+// Generic date/time labels live in utils/date; re-exported here so existing
+// importers of './helpers' keep compiling.
 
-const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+export {
+	combineDateTime,
+	dayDiff,
+	durationMinutes,
+	parseDateOnly,
+	slotLabel,
+	startsInLabel,
+} from '../../../../utils/date'
 
-export const parseDateOnly = (value?: string | null): Date | null => {
-	if (!value) return null
-	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.split('T')[0])
-	if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-	const parsed = new Date(value)
-	return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-export const combineDateTime = (date?: string | null, time?: string | null): Date | null => {
-	const d = parseDateOnly(date)
-	if (!d) return null
-	const m = /^(\d{1,2}):(\d{2})/.exec(time ?? '')
-	if (m) d.setHours(Number(m[1]), Number(m[2]), 0, 0)
-	return d
-}
-
-export const toApiDate = (date: Date) =>
-	`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-
-const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
-
-export const dayDiff = (d: Date, from = new Date()) =>
-	Math.round((startOfDay(d).getTime() - startOfDay(from).getTime()) / 86400000)
-
-export const dowShort = (d: Date) => DOW[d.getDay()]
-export const monthShort = (d: Date) => MONTHS[d.getMonth()]
-
-/** "Thu 25 Sep" */
-export const fullDay = (d: Date) => `${DOW[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`
-
-/** "Today" / "Tomorrow" / "Sat 27 Sep" */
-export const relativeDay = (d: Date) => {
-	const diff = dayDiff(d)
-	if (diff === 0) return 'Today'
-	if (diff === 1) return 'Tomorrow'
-	return fullDay(d)
-}
-
-export const formatClock = (d: Date) => {
-	const h = d.getHours()
-	return `${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
-}
-
-export const timeLabel = (t?: string | null) => (t ? formatTimeSlot(t) : '')
-
-/** "Today, 5:30 PM" for a date + HH:mm:ss pair. */
-export const slotLabel = (date?: string | null, time?: string | null) => {
-	const d = parseDateOnly(date)
-	if (!d) return '—'
-	const t = timeLabel(time)
-	return t ? `${relativeDay(d)}, ${t}` : relativeDay(d)
-}
-
-/** "Wed 24 Sep, 6:12 PM" / "Today, 10:05 AM" for an ISO timestamp. */
-export const stampLabel = (iso?: string | null) => {
-	if (!iso) return ''
-	const d = new Date(iso)
-	if (Number.isNaN(d.getTime())) return ''
-	return `${relativeDay(d)}, ${formatClock(d)}`
-}
-
-export const startsInLabel = (target: Date | null): string | null => {
-	if (!target) return null
-	const ms = target.getTime() - Date.now()
-	if (ms <= 0) return null
-	const mins = Math.round(ms / 60000)
-	if (mins < 60) return `starts in ${mins} min`
-	const days = dayDiff(target)
-	if (days >= 1) return `starts in ${days} ${days === 1 ? 'day' : 'days'}`
-	const hrs = Math.floor(mins / 60)
-	const rem = mins % 60
-	return `starts in ${hrs} ${hrs === 1 ? 'hr' : 'hrs'}${rem ? ` ${rem} min` : ''}`
-}
-
-export const durationMinutes = (start?: string | null, end?: string | null) => {
-	const s = /^(\d{1,2}):(\d{2})/.exec(start ?? '')
-	const e = /^(\d{1,2}):(\d{2})/.exec(end ?? '')
-	if (!s || !e) return null
-	const diff = Number(e[1]) * 60 + Number(e[2]) - (Number(s[1]) * 60 + Number(s[2]))
-	return diff > 0 ? diff : null
-}
+/** "Thu 25 Sep" (never prefixed with "Today, "). */
+export const fullDay = (d: Date) => fullDayLabel(d, { markToday: false })
 
 // ── Status timeline ──────────────────────────────────────────────────────────
-
-export type TimelineState = 'done' | 'current' | 'future' | 'failed'
-
-export type TimelineStep = { key: string; title: string; sub?: string; state: TimelineState }
 
 const HISTORY_TITLES: Record<string, string> = {
 	booked: 'Booked',
@@ -190,9 +124,9 @@ type BuildTimelineArgs = {
 	isPast: boolean
 }
 
-export function buildTimeline({ appt, variant, isVideo, payment, isPast }: BuildTimelineArgs): TimelineStep[] {
+export function buildTimeline({ appt, variant, isVideo, payment, isPast }: BuildTimelineArgs): AppTimelineStep[] {
 	const history: AppointmentHistoryEntry[] = Array.isArray(appt.history) ? appt.history : []
-	const steps: TimelineStep[] = []
+	const steps: AppTimelineStep[] = []
 
 	if (history.length) {
 		history.forEach((h, i) => {
@@ -216,7 +150,7 @@ export function buildTimeline({ appt, variant, isVideo, payment, isPast }: Build
 	const checkInFrom = start ? new Date(start.getTime() - 10 * 60000) : null
 	const hasPaymentStep = steps.some((s) => /payment/i.test(s.title))
 
-	const future: TimelineStep[] = []
+	const future: AppTimelineStep[] = []
 	if (payment === 'pending' && !hasPaymentStep) {
 		future.push({ key: 'payment', title: 'Payment', sub: 'Pending', state: 'future' })
 	}
@@ -226,7 +160,7 @@ export function buildTimeline({ appt, variant, isVideo, payment, isPast }: Build
 		future.push({
 			key: 'checkin',
 			title: 'Check in at clinic',
-			sub: checkInFrom ? `${relativeDay(checkInFrom)}, from ${formatClock(checkInFrom)}` : undefined,
+			sub: checkInFrom ? `${relativeDayLabel(checkInFrom)}, from ${formatClock(checkInFrom)}` : undefined,
 			state: 'future',
 		})
 		future.push({ key: 'consult', title: 'Consultation', sub: when, state: 'future' })
@@ -246,7 +180,7 @@ export function buildTimeline({ appt, variant, isVideo, payment, isPast }: Build
 			...steps,
 			...doneFuture
 				.filter((s) => !(alreadyHasConsult && (s.key === 'consult' || s.key === 'call')))
-				.map((s): TimelineStep =>
+				.map((s): AppTimelineStep =>
 					s.key === 'rx' ? { ...s, sub: 'See your visit summary', state: 'current' } : { ...s, state: 'done' }
 				),
 		]

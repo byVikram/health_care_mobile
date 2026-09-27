@@ -4,21 +4,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../display/AppTypography'
 import { AppSkeleton } from '../display/AppSkeleton'
 import { SlotGroup } from '../../../features/doctor/doctorService'
+import { DOW_LABELS, MONTH_SHORT, startOfDay } from '../../../utils/date'
 
 // import { View, , TouchableOpacity, StyleSheet } from "react-native";
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 function getWeekDates(start: Date) {
 	return Array.from({ length: 7 }, (_, i) => {
 		const d = new Date(start)
 		d.setDate(start.getDate() + i)
 		return d
 	})
-}
-
-function startOfDay(date: Date) {
-	return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
 function getSundayOfWeek(d: Date) {
@@ -101,7 +96,7 @@ export default function DateSlotPicker(props: PickProps) {
 		return getFocusedRangeStart(selectedDate, today, disablePast)
 	})
 	const weekDates = getWeekDates(weekStart)
-	const monthLabel = `${MONTHS[weekDates[0].getMonth()]} ${weekDates[0].getFullYear()}`
+	const monthLabel = `${MONTH_SHORT[weekDates[0].getMonth()]} ${weekDates[0].getFullYear()}`
 
 	useEffect(() => {
 		setWeekStart(getFocusedRangeStart(selectedDate, new Date(), disablePast))
@@ -249,7 +244,7 @@ export default function DateSlotPicker(props: PickProps) {
 										past && styles.textDisabled,
 									]}
 								>
-									{DAYS[date.getDay()]}
+									{DOW_LABELS[date.getDay()]}
 								</AppTypography>
 								<AppTypography
 									variant="body"

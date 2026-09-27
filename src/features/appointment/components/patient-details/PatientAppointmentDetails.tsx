@@ -14,8 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import {
 	AppAvatar,
+	AppBillStatusLine,
+	AppBillSummary,
 	AppButton,
-	AppDashedDivider,
 	AppDetailRow,
 	AppFooterBar,
 	AppIconTile,
@@ -52,21 +53,10 @@ import {
 	startsInLabel,
 	type PatientAppointment,
 } from './helpers'
+import { getPrepSteps, getPrepStepsTitle } from '../../prepSteps'
 
 // Wrapped so press events are never forwarded as showComingSoon's `text2`.
 const comingSoon = () => showComingSoon()
-
-const CLINIC_STEPS = [
-	{ title: 'Bring your reports', body: 'Recent lab results, including HbA1c, and your medicine list.' },
-	{ title: 'Arrive 10 minutes early', body: 'Show the QR code at the front desk to check in.' },
-	{ title: 'Fasting not needed', body: 'Eat as usual unless the doctor told you otherwise.' },
-]
-
-const VIDEO_STEPS = [
-	{ title: 'Find a quiet, well-lit spot', body: 'The doctor needs to see and hear you clearly.' },
-	{ title: 'Keep reports and medicines handy', body: 'You can share photos of reports during the call.' },
-	{ title: 'Check your internet', body: 'Wi-Fi or strong mobile data works best.' },
-]
 
 // ── Loading skeleton ─────────────────────────────────────────────────────────
 
@@ -341,7 +331,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 		)
 	}
 
-	const steps = isVideo ? VIDEO_STEPS : CLINIC_STEPS
+	const steps = getPrepSteps(isVideo, 'details')
 	const totalLabel = payment === 'pending' ? 'To pay' : payment === 'paid' ? 'Paid' : 'Total'
 	const paidMethod = appt.payment_method || appt.payment?.method || ''
 	const paidTxn = appt.transaction_id || appt.payment?.transaction_id || ''
@@ -515,47 +505,41 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 
 				{/* Prep steps */}
 				{canAct && (
-					<AppSection
-						title={isVideo ? 'Get ready for the call' : 'Before your visit'}
-						titleSize="sm"
-						marginTop={0}
-					>
+					<AppSection title={getPrepStepsTitle(isVideo)} titleSize="sm" marginTop={0}>
 						<AppNumberedSteps steps={steps} />
 					</AppSection>
 				)}
 
 				{/* Payment */}
 				<AppSection title="Payment" titleSize="sm" marginTop={0}>
-					<View style={styles.payRow}>
-						<Text style={styles.payText}>Consultation fee</Text>
-						<Text style={styles.payText}>{feeLabel}</Text>
-					</View>
-					<View style={styles.payRow}>
-						<Text style={styles.payText}>Booking fee</Text>
-						<Text style={[styles.payText, styles.payFree]}>Free</Text>
-					</View>
-					<AppDashedDivider color={APP_COLORS.border} style={styles.dash} />
-					<View style={styles.payTotalRow}>
-						<Text style={styles.payTotalLabel}>{totalLabel}</Text>
-						<Text style={styles.payTotalValue}>{feeLabel}</Text>
-					</View>
-					{payment === 'pending' && <Text style={styles.payPending}>Not paid yet</Text>}
-					{payment === 'paid' && (
-						<View style={styles.payMetaRow}>
-							<Text style={styles.payPaid} numberOfLines={1}>
-								{['Paid', paidMethod ? `via ${paidMethod}` : ''].filter(Boolean).join(' ')}
-								{paidTxn ? ` · ${paidTxn}` : ''}
-							</Text>
-							<TouchableOpacity
-								onPress={comingSoon}
-								style={styles.receiptLink}
-								accessibilityRole="button"
-							>
-								<MaterialCommunityIcons name="chevron-down" size={16} color={APP_COLORS.primary} />
-								<Text style={styles.receiptText}>Receipt</Text>
-							</TouchableOpacity>
-						</View>
-					)}
+					<AppBillSummary
+						variant="flat"
+						dashedDividers
+						dividerSpacing={{ top: 2, bottom: 0 }}
+						rows={[
+							{ label: 'Consultation fee', value: feeLabel },
+							{ label: 'Booking fee', value: 'Free', tone: 'free', valueStyle: styles.payFree },
+							{
+								label: totalLabel,
+								value: feeLabel,
+								tone: 'total',
+								dividerBefore: true,
+								labelStyle: styles.payTotalLabel,
+								valueStyle: styles.payTotalValue,
+							},
+						]}
+						footer={
+							payment === 'pending' ? (
+								<AppBillStatusLine tone="pending" text="Not paid yet" />
+							) : payment === 'paid' ? (
+								<AppBillStatusLine
+									tone="paid"
+									text={`${['Paid', paidMethod ? `via ${paidMethod}` : ''].filter(Boolean).join(' ')}${paidTxn ? ` · ${paidTxn}` : ''}`}
+									onReceiptPress={comingSoon}
+								/>
+							) : undefined
+						}
+					/>
 				</AppSection>
 
 				{/* Status */}
@@ -721,19 +705,10 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 
-	// Payment
-	payRow: { flexDirection: 'row', justifyContent: 'space-between' },
-	payText: { fontSize: 14, lineHeight: 20, color: APP_COLORS.ink },
-	payFree: { color: APP_COLORS.success, fontWeight: '700' },
-	dash: { marginTop: 2 },
-	payTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-	payTotalLabel: { fontSize: 15, fontWeight: '800', color: APP_COLORS.ink },
-	payTotalValue: { fontSize: 20, lineHeight: 26, fontWeight: '800', color: APP_COLORS.ink },
-	payPending: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.warning },
-	payMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-	payPaid: { flex: 1, fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.success },
-	receiptLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-	receiptText: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.primary },
+	// Payment (base bill styling comes from AppBillSummary's 'flat' variant; these match this screen's spec)
+	payFree: { fontWeight: '700' },
+	payTotalLabel: { fontSize: 15 },
+	payTotalValue: { fontSize: 20 },
 
 	// Cancel link
 	cancelLinkWrap: { paddingTop: 4, paddingHorizontal: 16, alignItems: 'center' },

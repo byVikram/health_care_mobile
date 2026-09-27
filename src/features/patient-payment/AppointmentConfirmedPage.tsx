@@ -24,8 +24,19 @@ import type { AppStackParamList } from '../../navigation/types'
 import { openOnMap } from '../../utils/maps'
 import { buildS3Url } from '../../utils/s3Utils'
 import { showComingSoon } from '../../utils/toast'
-import { APP_COLORS, CARD_SHADOW, TONES, formatInr } from '../../config/theme'
-import { AppAvatar, AppButton, AppDashedDivider, AppFooterBar, AppIcon } from '../../components/common'
+import { APP_COLORS, TONES, formatInr } from '../../config/theme'
+import {
+	AppAvatar,
+	AppBillStatusLine,
+	AppBillSummary,
+	AppButton,
+	AppFooterBar,
+	AppIcon,
+	AppNumberedSteps,
+	AppSection,
+	AppTicketCard,
+} from '../../components/common'
+import { getPrepSteps, getPrepStepsTitle } from '../appointment/prepSteps'
 
 const DESIGN_WIDTH = 390
 
@@ -39,21 +50,6 @@ const CONFETTI: { left: number; top: number; size: number; radius: number; color
 	{ left: 345, top: 112, size: 8, radius: 2, color: APP_COLORS.mintAccent, rotate: 45 },
 	{ left: 250, top: 30, size: 7, radius: 9999, color: TONES.sand.bg, rotate: 0 },
 	{ left: 120, top: 24, size: 6, radius: 2, color: TONES.lilac.bg, rotate: 30 },
-]
-
-// Static checklist copy from the designs (6 · Confirmed and 7a · Video pending).
-const CLINIC_STEPS = [
-	{ title: 'Bring your reports', description: 'Recent lab results and a list of your medicines.' },
-	{ title: 'Arrive 10 minutes early', description: 'Show your booking ID at the front desk to check in.' },
-	{
-		title: 'Prescription in the app',
-		description: "We'll add the doctor's notes and prescription to your records after the visit.",
-	},
-]
-const VIDEO_STEPS = [
-	{ title: 'Find a quiet, well-lit spot', description: 'The doctor needs to see and hear you clearly.' },
-	{ title: 'Keep reports and medicines handy', description: 'You can share photos of reports during the call.' },
-	{ title: 'Check your internet', description: 'Wi-Fi or strong mobile data works best.' },
 ]
 
 function addToCalendar(params: { title: string; dateDisplay: string; location: string }) {
@@ -87,7 +83,7 @@ export default function AppointmentConfirmedPage() {
 	const isPayAtClinic = params.paymentMethodLabel === 'Pay at clinic'
 	const feeText = formatInr(params.fee) === '--' ? `₹${params.fee}` : formatInr(params.fee)
 	const avatarUri = buildS3Url(params.doctorAvatar)
-	const steps = isVideo ? VIDEO_STEPS : CLINIC_STEPS
+	const steps = getPrepSteps(isVideo, 'confirmed')
 	const doctorInitial = params.doctorName?.replace(/^Dr\.?\s*/i, '').charAt(0) || 'D'
 
 	const dayPhrase = relativeDayPhrase(params.dateDisplay)
@@ -143,9 +139,11 @@ export default function AppointmentConfirmedPage() {
 				</View>
 
 				{/* Ticket card -- overlaps the hero */}
-				<View style={styles.card}>
-					<View style={styles.cardInner}>
-						<View style={styles.cardTopRow}>
+				<AppTicketCard
+					elevated
+					style={styles.card}
+					header={{
+						leading: (
 							<AppAvatar
 								uri={avatarUri}
 								name={doctorInitial}
@@ -154,52 +152,34 @@ export default function AppointmentConfirmedPage() {
 								initialsColor={TONES.lilac.ink}
 								initialsStyle={styles.avatarInitial}
 							/>
-							<View style={styles.flex}>
-								<Text style={styles.doctorName} numberOfLines={1}>
-									{params.doctorName}
-								</Text>
-								<Text style={styles.doctorMeta} numberOfLines={1}>
-									{[params.doctorSpecialty, isVideo ? 'Video call' : 'In-clinic']
-										.filter(Boolean)
-										.join(' · ')}
-								</Text>
-							</View>
+						),
+						title: params.doctorName,
+						subtitle: [params.doctorSpecialty, isVideo ? 'Video call' : 'In-clinic']
+							.filter(Boolean)
+							.join(' · '),
+						trailing: (
 							<View style={styles.confirmedPill}>
 								<Text style={styles.confirmedPillText}>Confirmed</Text>
 							</View>
-						</View>
-
-						<AppDashedDivider variant="ticket" color={APP_COLORS.divider} cutoutColor={APP_COLORS.pageBg} />
-
-						<View style={styles.grid}>
-							<View style={styles.gridCol}>
-								<Text style={styles.gridLabel}>WHEN</Text>
-								<Text style={styles.gridValueBig}>{params.timeDisplay}</Text>
-								<Text style={styles.gridSub}>{params.dateDisplay}</Text>
-							</View>
-							<View style={styles.gridCol}>
-								<Text style={styles.gridLabel}>BOOKING ID</Text>
-								<Text style={styles.gridValue} numberOfLines={1} ellipsizeMode="middle">
-									{params.appointmentId}
-								</Text>
-								<Text style={styles.gridSub} numberOfLines={1}>
-									For {params.patientName}
-								</Text>
-							</View>
-							<View style={styles.gridFull}>
-								<Text style={styles.gridLabel}>WHERE</Text>
-								<Text style={styles.gridValue}>
-									{isVideo ? 'Video consultation' : params.hospitalName}
-								</Text>
-								{isVideo ? (
-									<Text style={styles.gridSub}>In the Karolahealth app</Text>
-								) : params.hospitalAddress ? (
-									<Text style={styles.gridSub}>{params.hospitalAddress}</Text>
-								) : null}
-							</View>
-						</View>
-
-						<View style={styles.cardActionsRow}>
+						),
+					}}
+					fields={[
+						{ label: 'When', value: params.timeDisplay, sub: params.dateDisplay, emphasis: true },
+						{
+							label: 'Booking ID',
+							value: params.appointmentId,
+							sub: `For ${params.patientName}`,
+							ellipsize: 'middle',
+						},
+						{
+							label: 'Where',
+							value: isVideo ? 'Video consultation' : params.hospitalName,
+							sub: isVideo ? 'In the Karolahealth app' : params.hospitalAddress || undefined,
+							full: true,
+						},
+					]}
+					actions={
+						<>
 							<TouchableOpacity
 								style={[styles.cardActionBtn, { backgroundColor: APP_COLORS.mint }]}
 								activeOpacity={0.8}
@@ -226,51 +206,43 @@ export default function AppointmentConfirmedPage() {
 									<Text style={styles.cardActionText}>Directions</Text>
 								</TouchableOpacity>
 							)}
-						</View>
-					</View>
-				</View>
+						</>
+					}
+				/>
 
 				{/* Before your visit / Get ready for the call */}
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle} accessibilityRole="header">
-						{isVideo ? 'Get ready for the call' : 'Before your visit'}
-					</Text>
-					{steps.map((step, idx) => {
-						const isLast = idx === steps.length - 1
-						return (
-							<View key={step.title} style={styles.timelineRow}>
-								<View style={styles.timelineMarkerCol}>
-									<View style={styles.timelineNumberCircle}>
-										<Text style={styles.timelineNumberText}>{idx + 1}</Text>
-									</View>
-									{!isLast && <View style={styles.timelineLine} />}
-								</View>
-								<View style={[styles.timelineBody, !isLast && styles.timelineBodyGap]}>
-									<Text style={styles.timelineTitle}>{step.title}</Text>
-									<Text style={styles.timelineDescription}>{step.description}</Text>
-								</View>
-							</View>
-						)
-					})}
-				</View>
+				<AppSection title={getPrepStepsTitle(isVideo)} marginTop={0} gap={12}>
+					<AppNumberedSteps
+						steps={steps}
+						numberSize={28}
+						numberWeight="700"
+						connector
+						connectorSpacing={4}
+						gap={16}
+						markerGap={12}
+						textGap={2}
+						titleStyle={styles.stepTitle}
+						bodyStyle={styles.stepBody}
+					/>
+				</AppSection>
 
 				{/* Payment -- real fee + selected method; no transaction id exists yet */}
-				<View style={styles.paymentRow}>
-					<Text style={styles.paymentAmount}>
-						{isPayAtClinic
-							? `${feeText} to pay at the clinic`
-							: `${feeText} paid via ${params.paymentMethodLabel}`}
-					</Text>
-					<TouchableOpacity
-						style={styles.receiptBtn}
-						activeOpacity={0.7}
-						accessibilityRole="button"
-						onPress={() => showComingSoon()}
-					>
-						<AppIcon name="download" size={18} color={APP_COLORS.primary} />
-						<Text style={styles.receiptText}>Receipt</Text>
-					</TouchableOpacity>
-				</View>
+				<AppBillSummary
+					variant="flat"
+					rows={[]}
+					style={styles.paymentRow}
+					footer={
+						<AppBillStatusLine
+							size="md"
+							text={
+								isPayAtClinic
+									? `${feeText} to pay at the clinic`
+									: `${feeText} paid via ${params.paymentMethodLabel}`
+							}
+							onReceiptPress={() => showComingSoon()}
+						/>
+					}
+				/>
 			</ScrollView>
 
 			<AppFooterBar>
@@ -379,35 +351,10 @@ const styles = StyleSheet.create({
 	card: {
 		marginTop: -48 - 12, // -48 overlap; cancels the scroll content's 12px gap
 		marginHorizontal: 16,
-		borderRadius: 16,
-		backgroundColor: APP_COLORS.surface,
-		...CARD_SHADOW,
-	},
-	cardInner: {
-		borderRadius: 16,
-		overflow: 'hidden',
-	},
-	cardTopRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		padding: 16,
 	},
 	avatarInitial: {
 		fontSize: 18,
 		fontWeight: '700',
-	},
-	doctorName: {
-		fontSize: 16,
-		lineHeight: 22,
-		fontWeight: '800',
-		color: APP_COLORS.ink,
-	},
-	doctorMeta: {
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '600',
-		color: TONES.lilac.ink,
 	},
 	confirmedPill: {
 		paddingHorizontal: 10,
@@ -419,51 +366,6 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		fontWeight: '800',
 		color: APP_COLORS.success,
-	},
-	grid: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		rowGap: 12,
-		columnGap: 12,
-		padding: 16,
-	},
-	gridCol: {
-		flexBasis: '40%',
-		flexGrow: 1,
-		minWidth: 0,
-	},
-	gridFull: {
-		width: '100%',
-	},
-	gridLabel: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		letterSpacing: 0.48,
-		color: APP_COLORS.primary,
-	},
-	gridValueBig: {
-		fontSize: 20,
-		lineHeight: 26,
-		fontWeight: '800',
-		color: APP_COLORS.ink,
-	},
-	gridValue: {
-		fontSize: 15,
-		lineHeight: 22,
-		fontWeight: '700',
-		color: APP_COLORS.ink,
-	},
-	gridSub: {
-		fontSize: 13,
-		lineHeight: 18,
-		color: APP_COLORS.inkMuted,
-	},
-	cardActionsRow: {
-		flexDirection: 'row',
-		gap: 8,
-		paddingHorizontal: 16,
-		paddingBottom: 16,
 	},
 	cardActionBtn: {
 		flex: 1,
@@ -481,60 +383,14 @@ const styles = StyleSheet.create({
 	},
 
 	// Before your visit
-	section: {
-		backgroundColor: APP_COLORS.surface,
-		padding: 16,
-	},
-	sectionTitle: {
-		fontSize: 18,
-		lineHeight: 26,
-		fontWeight: '700',
-		color: APP_COLORS.ink,
-		marginBottom: 12,
-	},
-	timelineRow: {
-		flexDirection: 'row',
-		gap: 12,
-	},
-	timelineMarkerCol: {
-		alignItems: 'center',
-	},
-	timelineNumberCircle: {
-		width: 28,
-		height: 28,
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.mint,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	timelineNumberText: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: APP_COLORS.primary,
-	},
-	timelineLine: {
-		flex: 1,
-		width: 2,
-		backgroundColor: APP_COLORS.divider,
-		marginVertical: 4,
-	},
-	timelineBody: {
-		flex: 1,
-		gap: 2,
-	},
-	timelineBodyGap: {
-		paddingBottom: 16,
-	},
-	timelineTitle: {
+	stepTitle: {
 		fontSize: 15,
 		lineHeight: 22,
 		fontWeight: '600',
-		color: APP_COLORS.ink,
 	},
-	timelineDescription: {
+	stepBody: {
 		fontSize: 14,
 		lineHeight: 20,
-		color: APP_COLORS.inkMuted,
 	},
 
 	// Payment
@@ -542,27 +398,5 @@ const styles = StyleSheet.create({
 		backgroundColor: APP_COLORS.surface,
 		paddingVertical: 12,
 		paddingHorizontal: 16,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		gap: 12,
-	},
-	paymentAmount: {
-		flex: 1,
-		fontSize: 14,
-		lineHeight: 20,
-		fontWeight: '600',
-		color: APP_COLORS.ink,
-	},
-	receiptBtn: {
-		minHeight: 44,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-	},
-	receiptText: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: APP_COLORS.primary,
 	},
 })

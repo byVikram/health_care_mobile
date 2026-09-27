@@ -71,6 +71,13 @@ export const TONE_ORDER: ToneKey[] = ['mint', 'sky', 'lilac', 'peach', 'sand']
 /** Deterministic tone for list items without their own colour (e.g. by index or id). */
 export const toneAt = (index: number) => TONES[TONE_ORDER[Math.abs(index) % TONE_ORDER.length]]
 
+/** Deterministic tone per label (e.g. a speciality name): the same string always gets the same tone. */
+export const toneForString = (label: string) => {
+	let hash = 0
+	for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) >>> 0
+	return toneAt(hash)
+}
+
 /** Card shadow used by floating tickets / sheets: 0 8px 24px #12373E29 */
 export const CARD_SHADOW = {
 	shadowColor: APP_COLORS.shadow,

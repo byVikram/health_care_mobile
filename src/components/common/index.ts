@@ -30,7 +30,18 @@ export { default as LocationSelector } from "./location/LocationSelector";
 export { default as NotificationPermissionPopup } from "./feedback/NotificationPermissionPopup";
 export { default as EventCard } from "./display/EventCard";
 export { default as CommonCard } from "./display/CommonCard";
-export * from "./booking/PatientProfileSelectorBottomSheet";
+export {
+	AppFamilyMemberSheet,
+	AppFamilyMemberAvatar,
+	familyMemberFirstName,
+	FAMILY_RELATIONS,
+	FAMILY_GENDERS,
+} from './booking/AppFamilyMemberSheet'
+export type { AppFamilyMemberSheetProps, AppFamilyMemberAvatarProps, FamilyMemberDraft } from './booking/AppFamilyMemberSheet'
+export { AppPatientRow } from './booking/AppPatientRow'
+export type { AppPatientRowProps } from './booking/AppPatientRow'
+export { AppSegmentedControl } from './inputs/AppSegmentedControl'
+export type { AppSegmentedControlProps, AppSegmentedOption } from './inputs/AppSegmentedControl'
 export { default as WorkingHoursSection } from "./booking/WorkingHoursSection";
 export type { WorkingHoursSectionProps, WorkingDayKey, AppointmentType, TimeSlot as WorkingHoursTimeSlot, SectionSlots, WorkingHoursState } from "./booking/WorkingHoursSection";
 export { WORKING_DAYS, SECTION_META, durationOptions as workingHoursDurationOptions, makeTimeOptions, snapToStep, createWorkingHoursState, DropdownSelect as WorkingHoursDropdownSelect } from "./booking/WorkingHoursSection";
@@ -53,8 +64,12 @@ export { SelectedItemCard } from "./booking/BookingSummary/SelectedItemCard";
 export type { SelectedItemCardProps, SelectedItemBadge, SelectedItemExpandable } from "./booking/BookingSummary/SelectedItemCard";
 export { SummaryEmptyState } from "./booking/BookingSummary/SummaryEmptyState";
 export type { SummaryEmptyStateProps } from "./booking/BookingSummary/SummaryEmptyState";
-export { BillingSummaryCard } from "./booking/BookingSummary/BillingSummaryCard";
-export type { BillingSummaryCardProps, BillingRow, BillingSummaryCardNote } from "./booking/BookingSummary/BillingSummaryCard";
+export { BillingSummaryCard, AppBillSummary, AppBillStatusLine } from "./booking/BookingSummary/BillingSummaryCard";
+export type { BillingSummaryCardProps, BillingRow, BillingSummaryCardNote, AppBillStatusLineProps } from "./booking/BookingSummary/BillingSummaryCard";
+export { AppPaymentMethodList, AppSecurePaymentNote } from './booking/AppPaymentMethodList'
+export type { AppPaymentMethod, AppPaymentMethodListProps, AppSecurePaymentNoteProps } from './booking/AppPaymentMethodList'
+export { AppTicketCard } from './booking/AppTicketCard'
+export type { AppTicketCardProps, AppTicketHeader, AppTicketField } from './booking/AppTicketCard'
 export { PackageSectionCard } from "./booking/PackageSectionCard";
 export type { PackageListItem } from "./booking/PackageSectionCard";
 // KarolaHealth design-language primitives (tokens in src/config/theme.ts)

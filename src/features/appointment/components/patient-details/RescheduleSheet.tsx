@@ -20,7 +20,8 @@ import {
 } from '../../../doctor/doctorService'
 import { APP_COLORS } from '../../../../config/theme'
 import { normalizeAvailabilitySlots } from '../RescheduleModal'
-import { monthShort, parseDateOnly, relativeDay, timeLabel, toApiDate } from './helpers'
+import { formatDateForApi, monthRangeLabel, nextDays, parseDateOnly, relativeDayLabel } from '../../../../utils/date'
+import { formatTimeSlot } from '../../../../utils/formatters'
 
 const COLS = 3
 
@@ -42,25 +43,6 @@ type RescheduleSheetProps = {
 
 const hhmm = (t?: string | null) => (t ?? '').slice(0, 5)
 
-const buildDays = () => {
-	const today = new Date()
-	today.setHours(0, 0, 0, 0)
-	return Array.from({ length: 7 }, (_, i) => {
-		const d = new Date(today)
-		d.setDate(today.getDate() + i)
-		return d
-	})
-}
-
-const monthRangeLabel = (days: Date[]) => {
-	const first = days[0]
-	const last = days[days.length - 1]
-	const a = monthShort(first)
-	const b = monthShort(last)
-	if (a === b) return `${first.toLocaleString('en-US', { month: 'long' })} ${first.getFullYear()}`
-	return `${a} – ${b} ${last.getFullYear()}`
-}
-
 export default function RescheduleSheet({
 	visible,
 	appointmentId,
@@ -75,7 +57,7 @@ export default function RescheduleSheet({
 	onClose,
 	onRescheduled,
 }: RescheduleSheetProps) {
-	const [days, setDays] = useState<Date[]>(buildDays)
+	const [days, setDays] = useState<Date[]>(() => nextDays())
 	const [dayIdx, setDayIdx] = useState(0)
 	const [selected, setSelected] = useState<TimeSlot | null>(null)
 	const [groups, setGroups] = useState<SlotGroup[]>([])
@@ -85,14 +67,14 @@ export default function RescheduleSheet({
 	const [resolvedHospitalId, setResolvedHospitalId] = useState<string | null>(hospitalId ?? null)
 
 	const currentDay = parseDateOnly(currentDate)
-	const currentKey = currentDay ? toApiDate(currentDay) : ''
+	const currentKey = currentDay ? formatDateForApi(currentDay) : ''
 
 	// Reset each time the sheet opens -- start on the current appointment's day if it's in the strip.
 	useEffect(() => {
 		if (!visible) return
-		const fresh = buildDays()
+		const fresh = nextDays()
 		setDays(fresh)
-		const idx = fresh.findIndex((d) => toApiDate(d) === currentKey)
+		const idx = fresh.findIndex((d) => formatDateForApi(d) === currentKey)
 		setDayIdx(idx >= 0 ? idx : 0)
 		setSelected(null)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,7 +105,7 @@ export default function RescheduleSheet({
 	}, [visible, hospitalId, doctorId])
 
 	const activeDay = days[dayIdx]
-	const activeKey = activeDay ? toApiDate(activeDay) : ''
+	const activeKey = activeDay ? formatDateForApi(activeDay) : ''
 
 	useEffect(() => {
 		if (!visible || !doctorId || !resolvedHospitalId || !activeKey) return
@@ -161,11 +143,11 @@ export default function RescheduleSheet({
 	const isToday = dayIdx === 0
 	const visibleGroups = groups.filter((g) => g.slots.length > 0)
 	const currentLabel = currentDay
-		? `${relativeDay(currentDay)}${currentStart ? `, ${timeLabel(currentStart)}` : ''}`
+		? `${relativeDayLabel(currentDay)}${currentStart ? `, ${formatTimeSlot(currentStart)}` : ''}`
 		: '—'
 	const btnLabel =
 		selected && activeDay
-			? `Confirm · ${relativeDay(activeDay)}, ${timeLabel(selected.start_time)}`
+			? `Confirm · ${relativeDayLabel(activeDay)}, ${formatTimeSlot(selected.start_time)}`
 			: 'Select a new time'
 	const canConfirm = !!selected && !submitting && !!resolvedHospitalId
 
@@ -202,7 +184,7 @@ export default function RescheduleSheet({
 			const isCurrent = activeKey === currentKey && start === hhmm(currentStart)
 			const isPast = isToday && h * 60 + m <= nowMinutes
 			const off = isCurrent || isPast || slot.status !== 'AVAILABLE'
-			const label = timeLabel(slot.start_time)
+			const label = formatTimeSlot(slot.start_time)
 			return {
 				value: slot.start_time,
 				label: isCurrent ? `${label} · now` : label,
@@ -260,7 +242,7 @@ export default function RescheduleSheet({
 							dayCount={days.length}
 							selectedDate={activeDay}
 							onSelectDate={(d) => {
-								const idx = days.findIndex((day) => toApiDate(day) === toApiDate(d))
+								const idx = days.findIndex((day) => formatDateForApi(day) === formatDateForApi(d))
 								if (idx >= 0) setDayIdx(idx)
 							}}
 						/>

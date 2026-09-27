@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react'
 import {
 	Animated,
 	Easing,
+	Keyboard,
+	KeyboardEvent,
+	LayoutChangeEvent,
 	Modal,
 	NativeScrollEvent,
 	NativeSyntheticEvent,
@@ -62,6 +65,11 @@ const OPEN_BACKDROP_MS = 220
 // iOS: pulling scrollable content this far past the top (rubber-band) also closes the sheet.
 const PULL_TO_DISMISS = 60
 const CLOSE_MS = 200
+// Keyboard lift animation. iOS passes the keyboard's own duration; Android has no "will" events.
+const KEYBOARD_ANDROID_MS = 180
+const KEYBOARD_FALLBACK_MS = 250
+// Gap kept between the top of a keyboard-lifted sheet and the status bar.
+const KEYBOARD_TOP_GAP = 8
 
 export function AppBottomSheet({
 	visible,
@@ -83,7 +91,24 @@ export function AppBottomSheet({
 	const { width, height } = useWindowDimensions()
 	const isTablet = width >= 768
 	const closedOffset = height
-	const maxSheetHeight = height * maxHeightRatio
+
+	// Keyboard avoidance: while the keyboard is up, a spacer under the sheet grows by `keyboardLift`
+	// (animated), and the sheet's max height shrinks so it still fits between the keyboard and the
+	// status bar; the content ScrollView then becomes scrollable if it no longer fits.
+	// Full keyboard height while it's up (0 when hidden), for the sheet's max height.
+	const [keyboardSpace, setKeyboardSpace] = useState(0)
+	const keyboardLift = useRef(new Animated.Value(0)).current
+	const keyboardLiftRef = useRef(0)
+	const keyboardHeightRef = useRef(0)
+	// Android may also resize the modal window for the keyboard; the overlay height it had with the
+	// keyboard hidden lets us subtract that shrink so the sheet isn't lifted twice.
+	const overlayBaseHeightRef = useRef(0)
+	const overlayHeightRef = useRef(0)
+
+	const maxSheetHeight =
+		keyboardSpace > 0
+			? Math.min(height * maxHeightRatio, height - keyboardSpace - insets.top - KEYBOARD_TOP_GAP)
+			: height * maxHeightRatio
 
 	const headerAndHandleHeight = 74 + (subtitle ? 18 : 0)
 	const footerHeight = footer ? 64 : 0
@@ -108,7 +133,45 @@ export function AppBottomSheet({
 	dismissibleRef.current = dismissible
 	scrollEnabledRef.current = scrollEnabled
 
-	const getHiddenOffset = () => sheetHeightRef.current + insets.bottom + 24
+	const getHiddenOffset = () => sheetHeightRef.current + insets.bottom + 24 + keyboardLiftRef.current
+
+	const setKeyboardLift = (lift: number, duration: number) => {
+		setKeyboardSpace(keyboardHeightRef.current)
+		if (lift === keyboardLiftRef.current) return
+		keyboardLiftRef.current = lift
+		keyboardLift.stopAnimation()
+		if (duration <= 0) {
+			keyboardLift.setValue(lift)
+			return
+		}
+		Animated.timing(keyboardLift, {
+			toValue: lift,
+			duration,
+			easing: Easing.out(Easing.cubic),
+			// Animates a layout height (the spacer), so it can't run on the native driver.
+			useNativeDriver: false,
+		}).start()
+	}
+
+	/** Keyboard height minus whatever the OS already took off the modal window (Android adjustResize). */
+	const computeKeyboardLift = () => {
+		const keyboardHeight = keyboardHeightRef.current
+		if (keyboardHeight <= 0) return 0
+		const shrink = Math.max(0, overlayBaseHeightRef.current - overlayHeightRef.current)
+		return Math.max(0, Math.round(keyboardHeight - shrink))
+	}
+
+	const handleOverlayLayout = (e: LayoutChangeEvent) => {
+		const overlayHeight = e.nativeEvent.layout.height
+		overlayHeightRef.current = overlayHeight
+		if (keyboardHeightRef.current <= 0) {
+			// Max, not latest: on Android the window can shrink a moment before keyboardDidShow arrives.
+			overlayBaseHeightRef.current = Math.max(overlayBaseHeightRef.current, overlayHeight)
+			return
+		}
+		// Window resized while the keyboard is up: re-balance the lift.
+		setKeyboardLift(computeKeyboardLift(), Platform.OS === 'ios' ? 0 : KEYBOARD_ANDROID_MS)
+	}
 
 	const animateSheetOpen = () => {
 		closingRef.current = false
@@ -136,6 +199,7 @@ export function AppBottomSheet({
 	const closeSheet = (notifyParent: boolean) => {
 		if (closingRef.current) return
 		closingRef.current = true
+		Keyboard.dismiss()
 
 		Animated.parallel([
 			Animated.timing(sheetTranslateY, {
@@ -279,6 +343,50 @@ export function AppBottomSheet({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [visible])
 
+	// Keyboard avoidance (both platforms). Listeners live only while the modal is mounted.
+	useEffect(() => {
+		if (!modalVisible) {
+			keyboardHeightRef.current = 0
+			overlayBaseHeightRef.current = 0
+			setKeyboardLift(0, 0)
+			return
+		}
+
+		const handleShow = (e: KeyboardEvent) => {
+			keyboardHeightRef.current = e.endCoordinates.height
+			const duration = Platform.OS === 'ios' ? e.duration || KEYBOARD_FALLBACK_MS : KEYBOARD_ANDROID_MS
+			setKeyboardLift(computeKeyboardLift(), duration)
+		}
+		const handleHide = (e?: KeyboardEvent) => {
+			keyboardHeightRef.current = 0
+			const duration = Platform.OS === 'ios' ? e?.duration || KEYBOARD_FALLBACK_MS : KEYBOARD_ANDROID_MS
+			setKeyboardLift(0, duration)
+		}
+
+		const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+		const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+		const showSub = Keyboard.addListener(showEvent, handleShow)
+		const hideSub = Keyboard.addListener(hideEvent, handleHide)
+
+		// Keyboard already up when the sheet opens (e.g. a field on the screen behind was focused).
+		const metrics = Keyboard.isVisible() ? Keyboard.metrics() : undefined
+		if (metrics && metrics.height > 0) {
+			keyboardHeightRef.current = metrics.height
+			setKeyboardLift(computeKeyboardLift(), 0)
+		}
+
+		return () => {
+			showSub.remove()
+			hideSub.remove()
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [modalVisible])
+
+	// Rotation / window resize with the keyboard hidden: re-measure the overlay's base height.
+	useEffect(() => {
+		if (keyboardHeightRef.current <= 0) overlayBaseHeightRef.current = 0
+	}, [width, height])
+
 	return (
 		<Modal
 			visible={modalVisible}
@@ -293,6 +401,7 @@ export function AppBottomSheet({
 					styles.sheetOverlay,
 					isTablet && styles.sheetOverlayTablet,
 				]}
+				onLayout={handleOverlayLayout}
 			>
 				{/* Backdrop: fades with the sheet (and while dragging); tap to dismiss */}
 				<Animated.View
@@ -456,6 +565,9 @@ export function AppBottomSheet({
 						)}
 					</View>
 				</Animated.View>
+
+				{/* Keyboard spacer: lifts the sheet (and its footer) above the keyboard */}
+				<Animated.View style={{ height: keyboardLift }} pointerEvents="none" />
 			</View>
 		</Modal>
 	)

@@ -1,39 +1,30 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import {
-	ActivityIndicator,
-	Keyboard,
-	Platform,
-	Pressable,
-	StyleSheet,
-	TextInput,
-	TouchableOpacity,
-	View,
-	ScrollView,
-} from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, TouchableOpacity, View, ScrollView } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import {
 	AppAvatar,
-	AppBottomSheet,
 	AppButton,
-	AppChip,
+	AppFamilyMemberSheet,
 	AppFooterBar,
 	AppIconTile,
+	AppPatientRow,
 	AppRadio,
 	AppScreenHeader,
 	AppSection,
+	AppSegmentedControl,
 	AppTypography,
 	DateStrip,
+	familyMemberFirstName,
 	SlotChipGrid,
 } from '../../../components/common'
-import { useAuth } from '../../../context/AuthContext'
+import { useFamilyMembers } from '../../../hooks/useFamilyMembers'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
 import { formatDateDisplay, formatDateForApi, formatTimeForApi } from '../../../utils/date'
 import { openOnMap } from '../../../utils/maps'
 import { showComingSoon } from '../../../utils/toast'
-import { getFamilyMembers } from '../../profile/patient/PatientProfileService'
 import {
 	AppointmentModeKey,
 	emptyAvailabilityByMode,
@@ -59,73 +50,12 @@ import { getDoctorAvailability, SlotGroup } from '../doctorService'
 // entry, and Continue hands off to CONSENT_FORM with the same paymentParams
 // shape PatientPayment expects (plus the optional patient / reason fields).
 
-interface Member {
-	/** Patient public id; undefined for "self" so the backend books for the caller */
-	id?: string
-	key: string
-	name: string
-	relation: string
-	avatar?: string | null
-}
-
-const RELATIONS = ['Spouse', 'Child', 'Parent', 'Sibling', 'Other']
-const GENDERS = ['Female', 'Male', 'Other', 'Prefer not to say']
-
-const firstNameOf = (m: Member) => (m.relation === 'Self' ? 'yourself' : m.name.split(' ')[0])
-
 const cleanGroupLabel = (label: string) => label.replace(/\s*\(.*\)\s*$/, '')
-
-/** Family-member avatar: photo, or initials on the member's soft tone (design 16-17/22 700). */
-const MemberAvatar = ({
-	member,
-	index,
-	size,
-	ring,
-}: {
-	member: Member
-	index: number
-	size: number
-	ring?: boolean
-}) => {
-	const tone = toneAt(index)
-	return (
-		<AppAvatar
-			uri={member.avatar}
-			name={member.name}
-			size={size}
-			backgroundColor={tone.bg}
-			initialsColor={tone.ink}
-			initialsStyle={{ fontSize: size > 50 ? 17 : 16, lineHeight: 22, fontWeight: '700' }}
-			ring={ring}
-		/>
-	)
-}
-
-/**
- * iOS keyboard height. AppBottomSheet has no built-in keyboard avoidance, so the sheet footer
- * grows by this much while the keyboard is up, lifting the sheet like the old
- * KeyboardAvoidingView (behavior="padding", iOS only) did.
- */
-const useIosKeyboardHeight = () => {
-	const [height, setHeight] = useState(0)
-	useEffect(() => {
-		if (Platform.OS !== 'ios') return
-		const show = Keyboard.addListener('keyboardWillShow', (e) => setHeight(e.endCoordinates.height))
-		const hide = Keyboard.addListener('keyboardWillHide', () => setHeight(0))
-		return () => {
-			show.remove()
-			hide.remove()
-		}
-	}, [])
-	return height
-}
 
 export default function BookSlotPage() {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_BOOK_SLOT>>()
 	const { doctor, referralId } = route.params
-	const { user } = useAuth()
-	const keyboardHeight = useIosKeyboardHeight()
 
 	const hospitals = doctor.hospitals || []
 	const primary = hospitals.find((h) => h.is_primary) || hospitals[0]
@@ -144,48 +74,9 @@ export default function BookSlotPage() {
 	// (matches the design's switchTo()). A manual date pick clears the time instead.
 	const autoPickRef = useRef(true)
 
-	const selfMember: Member = { key: 'self', name: user?.name || 'Myself', relation: 'Self', avatar: user?.avatar }
-	const [members, setMembers] = useState<Member[]>([selfMember])
+	const { members } = useFamilyMembers()
 	const [patientKey, setPatientKey] = useState('self')
-	const [sheet, setSheet] = useState<null | 'list' | 'add'>(null)
-	const [newName, setNewName] = useState('')
-	const [newRel, setNewRel] = useState('Spouse')
-	const [newGender, setNewGender] = useState(GENDERS[0])
-
-	useEffect(() => {
-		let active = true
-		const fetchMembers = async () => {
-			try {
-				const list = await getFamilyMembers()
-				if (!active || !list.length) return
-				const self = list.find((m) => m.is_self || m.relation === 'SELF')
-				const mapped: Member[] = [
-					self ? { key: 'self', name: self.name, relation: 'Self', avatar: self.avatar_s3_key } : selfMember,
-					...list
-						.filter((m) => m !== self)
-						.map((m) => {
-							const id = m.public_id || m.publicId || String(m.id)
-							const rel = m.relationship || m.relation || 'Family member'
-							return {
-								id,
-								key: id,
-								name: m.name,
-								relation: rel.charAt(0).toUpperCase() + rel.slice(1).toLowerCase(),
-								avatar: m.avatar_s3_key,
-							}
-						}),
-				]
-				setMembers(mapped)
-			} catch {
-				// Fall back to "self" only; the picker still works.
-			}
-		}
-		fetchMembers()
-		return () => {
-			active = false
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [])
+	const [patientSheetVisible, setPatientSheetVisible] = useState(false)
 
 	useEffect(() => {
 		if (!doctor.id || !selectedHospital) return
@@ -317,43 +208,6 @@ export default function BookSlotPage() {
 		showComingSoon('Add family members from your profile for now.')
 	}
 
-	const nameOk = newName.trim().length > 1
-
-	// Last open sheet view, so the title/content don't flip while the sheet animates closed.
-	const sheetViewRef = useRef<'list' | 'add'>('list')
-	if (sheet) sheetViewRef.current = sheet
-	const sheetView = sheetViewRef.current
-
-	const sheetFooter =
-		sheetView === 'add' ? (
-			<AppButton
-				size="lg"
-				disabled={!nameOk}
-				onPress={saveMember}
-				style={!nameOk && styles.btnDisabledSoft}
-				labelStyle={[styles.btnLabelBold, !nameOk && { color: APP_COLORS.inkMuted }]}
-			>
-				Save and select
-			</AppButton>
-		) : (
-			<View style={{ gap: 8 }}>
-				<TouchableOpacity
-					style={styles.addMemberBtn}
-					onPress={() => {
-						setNewName('')
-						setNewRel('Spouse')
-						setSheet('add')
-					}}
-				>
-					<MaterialCommunityIcons name="plus" size={18} color={APP_COLORS.primary} />
-					<AppTypography style={styles.addMemberText}>Add family member</AppTypography>
-				</TouchableOpacity>
-				<AppButton size="lg" onPress={() => setSheet(null)} labelStyle={styles.btnLabelBold}>
-					{`Book for ${firstNameOf(patient)}`}
-				</AppButton>
-			</View>
-		)
-
 	return (
 		<View style={styles.container}>
 			{/* Header */}
@@ -410,33 +264,23 @@ export default function BookSlotPage() {
 
 				{/* Consultation type (sticky) -- the outer View is the sticky child (RN replaces its style) */}
 				<View style={styles.segmentWrap}>
-					<View style={styles.segmentGroup} accessibilityRole="radiogroup">
-						{(['clinic', 'video'] as AppointmentModeKey[]).map((m) => {
-							const on = mode === m
-							const disabled = m === 'video' && !videoFee
-							return (
-								<TouchableOpacity
-									key={m}
-									accessibilityRole="radio"
-									accessibilityState={{ checked: on, disabled }}
-									disabled={disabled}
-									onPress={() => switchMode(m)}
-									style={[styles.segment, on && styles.segmentOn, disabled && { opacity: 0.5 }]}
-								>
-									<MaterialCommunityIcons
-										name={m === 'clinic' ? 'home-outline' : 'video-outline'}
-										size={16}
-										color={on ? APP_COLORS.ink : APP_COLORS.inkMuted}
-									/>
-									<AppTypography style={[styles.segmentText, on && { color: APP_COLORS.ink }]}>
-										{m === 'clinic'
-											? `In-clinic${clinicFee ? ` · ${formatInr(clinicFee)}` : ''}`
-											: `Video${videoFee ? ` · ${formatInr(videoFee)}` : ''}`}
-									</AppTypography>
-								</TouchableOpacity>
-							)
-						})}
-					</View>
+					<AppSegmentedControl<AppointmentModeKey>
+						value={mode}
+						onChange={switchMode}
+						options={[
+							{
+								value: 'clinic',
+								label: `In-clinic${clinicFee ? ` · ${formatInr(clinicFee)}` : ''}`,
+								icon: 'home-outline',
+							},
+							{
+								value: 'video',
+								label: `Video${videoFee ? ` · ${formatInr(videoFee)}` : ''}`,
+								icon: 'video-outline',
+								disabled: !videoFee,
+							},
+						]}
+					/>
 				</View>
 
 				{mode === 'clinic' ? (
@@ -554,23 +398,12 @@ export default function BookSlotPage() {
 
 				{/* Patient details */}
 				<AppSection gap={12} style={{ paddingTop: 8 }}>
-					<View style={styles.patientRow}>
-						<MemberAvatar member={patient} index={members.indexOf(patient)} size={48} />
-						<View style={{ flex: 1, minWidth: 0 }}>
-							<AppTypography style={styles.eyebrow}>APPOINTMENT FOR</AppTypography>
-							<AppTypography style={styles.patientName}>{patient.name}</AppTypography>
-							<AppTypography style={styles.muted13}>{patient.relation}</AppTypography>
-						</View>
-						<AppButton
-							size="md"
-							icon="swap-horizontal"
-							onPress={() => setSheet('list')}
-							accessibilityLabel="Change patient"
-							style={styles.changeBtn}
-						>
-							Change
-						</AppButton>
-					</View>
+					<AppPatientRow
+						member={patient}
+						toneIndex={members.indexOf(patient)}
+						label="APPOINTMENT FOR"
+						onChange={() => setPatientSheetVisible(true)}
+					/>
 					<View style={{ gap: 6 }}>
 						<AppTypography style={styles.label}>
 							Reason for visit <AppTypography style={styles.labelOptional}>(optional)</AppTypography>
@@ -612,111 +445,15 @@ export default function BookSlotPage() {
 			</AppFooterBar>
 
 			{/* Who is this appointment for? */}
-			<AppBottomSheet
-				visible={!!sheet}
-				onClose={() => setSheet(null)}
-				appearance="modern"
-				showHeaderDivider={false}
-				maxHeightRatio={0.9}
-				title={sheetView === 'add' ? 'Add family member' : 'Who is this appointment for?'}
-				subtitle={sheetView === 'add' ? undefined : 'Pick a family member or add someone new'}
-				onBack={sheetView === 'add' ? () => setSheet('list') : undefined}
-				backAccessibilityLabel="Back to family members"
-				footer={
-					<>
-						{sheetFooter}
-						{keyboardHeight > 0 && <View style={{ height: keyboardHeight }} />}
-					</>
-				}
-			>
-				{sheetView === 'add' ? (
-					<View style={{ gap: 16 }}>
-						<View style={{ gap: 6 }}>
-							<AppTypography style={styles.label}>Full name</AppTypography>
-							<TextInput
-								value={newName}
-								onChangeText={setNewName}
-								placeholder="As on their ID"
-								placeholderTextColor={APP_COLORS.inkMuted}
-								autoComplete="name"
-								style={styles.input}
-							/>
-						</View>
-						<View style={{ gap: 8 }}>
-							<AppTypography style={styles.label}>Relationship</AppTypography>
-							<View style={styles.chipWrap} accessibilityRole="radiogroup">
-								{RELATIONS.map((r) => (
-									<AppChip
-										key={r}
-										label={r}
-										selected={r === newRel}
-										onPress={() => setNewRel(r)}
-										variant="solid"
-										shape="pill"
-										accessibilityRole="radio"
-									/>
-								))}
-							</View>
-						</View>
-						<View style={{ flexDirection: 'row', gap: 12 }}>
-							<View style={{ flex: 1, gap: 6 }}>
-								<AppTypography style={styles.label}>Date of birth</AppTypography>
-								<TextInput
-									placeholder="DD/MM/YYYY"
-									placeholderTextColor={APP_COLORS.inkMuted}
-									keyboardType="numbers-and-punctuation"
-									style={styles.input}
-								/>
-							</View>
-							<View style={{ flex: 1, gap: 6 }}>
-								<AppTypography style={styles.label}>Gender</AppTypography>
-								<TouchableOpacity
-									style={[styles.input, styles.selectInput]}
-									onPress={() =>
-										setNewGender((g) => GENDERS[(GENDERS.indexOf(g) + 1) % GENDERS.length])
-									}
-								>
-									<AppTypography style={styles.selectText} numberOfLines={1}>
-										{newGender}
-									</AppTypography>
-									<MaterialCommunityIcons name="chevron-down" size={18} color={APP_COLORS.ink} />
-								</TouchableOpacity>
-							</View>
-						</View>
-						<View style={{ gap: 6 }}>
-							<AppTypography style={styles.label}>
-								Mobile number <AppTypography style={styles.labelOptional}>(optional)</AppTypography>
-							</AppTypography>
-							<TextInput
-								keyboardType="phone-pad"
-								placeholder="For appointment reminders"
-								placeholderTextColor={APP_COLORS.inkMuted}
-								style={styles.input}
-							/>
-						</View>
-					</View>
-				) : (
-					members.map((m, i) => {
-						const on = m.key === patientKey
-						return (
-							<Pressable
-								key={m.key}
-								onPress={() => setPatientKey(m.key)}
-								accessibilityRole="radio"
-								accessibilityState={{ checked: on }}
-								style={styles.memberRow}
-							>
-								<MemberAvatar member={m} index={i} size={52} ring={on} />
-								<View style={{ flex: 1, minWidth: 0 }}>
-									<AppTypography style={styles.patientName}>{m.name}</AppTypography>
-									<AppTypography style={styles.muted13}>{m.relation}</AppTypography>
-								</View>
-								<AppRadio checked={on} />
-							</Pressable>
-						)
-					})
-				)}
-			</AppBottomSheet>
+			<AppFamilyMemberSheet
+				visible={patientSheetVisible}
+				onClose={() => setPatientSheetVisible(false)}
+				members={members}
+				selectedKey={patient.key}
+				onSelect={(m) => setPatientKey(m.key)}
+				confirmLabel={(m) => `Book for ${familyMemberFirstName(m)}`}
+				onSave={saveMember}
+			/>
 		</View>
 	)
 }
@@ -761,38 +498,10 @@ const styles = StyleSheet.create({
 		shadowRadius: 4,
 		elevation: 2,
 	},
-	segmentGroup: {
-		flexDirection: 'row',
-		gap: 4,
-		padding: 4,
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.pageBg,
-		borderWidth: 1,
-		borderColor: APP_COLORS.divider,
-	},
-	segment: {
-		flex: 1,
-		height: 40,
-		borderRadius: 9999,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 6,
-	},
-	segmentOn: {
-		backgroundColor: '#fff',
-		shadowColor: APP_COLORS.shadow,
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 1,
-	},
-	segmentText: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: APP_COLORS.inkMuted },
 
 	muted13: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
 	muted14: { fontSize: 14, lineHeight: 20, color: APP_COLORS.inkMuted },
 	rowTitle: { fontSize: 15, lineHeight: 22, fontWeight: '600', color: APP_COLORS.ink },
-	eyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.5, color: APP_COLORS.inkMuted },
 
 	clinicCard: {
 		flexDirection: 'row',
@@ -822,23 +531,6 @@ const styles = StyleSheet.create({
 
 	groupLabel: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: APP_COLORS.inkMuted },
 
-	patientRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		minHeight: 72,
-		borderBottomWidth: 1,
-		borderBottomColor: APP_COLORS.divider,
-		paddingBottom: 8,
-	},
-	patientName: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: APP_COLORS.ink },
-	changeBtn: {
-		shadowColor: APP_COLORS.shadow,
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.16,
-		shadowRadius: 6,
-		elevation: 2,
-	},
 	label: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: APP_COLORS.ink },
 	labelOptional: { fontSize: 14, lineHeight: 20, fontWeight: '400', color: APP_COLORS.inkMuted },
 	input: {
@@ -854,35 +546,9 @@ const styles = StyleSheet.create({
 
 	summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 	summaryText: { flex: 1, fontSize: 13, lineHeight: 18, color: APP_COLORS.ink },
-	btnLabelBold: { fontWeight: '700' },
 	// Design's soft disabled CTA (Paper's own disabled colours would be grey)
 	btnDisabledSoft: { backgroundColor: APP_COLORS.disabledBtn },
 	// "Pick a time" placeholder keeps its original 48h / radius 8
 	pickTimeBtn: { borderRadius: 8 },
 	pickTimeBtnContent: { height: 48 },
-
-	memberRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		minHeight: 72,
-		borderBottomWidth: 1,
-		borderBottomColor: APP_COLORS.divider,
-	},
-	addMemberBtn: {
-		height: 48,
-		borderRadius: 12,
-		borderWidth: 1.5,
-		borderStyle: 'dashed',
-		borderColor: APP_COLORS.primary,
-		backgroundColor: APP_COLORS.mint,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 6,
-	},
-	addMemberText: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: APP_COLORS.primary },
-	chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-	selectInput: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-	selectText: { flex: 1, fontSize: 16, lineHeight: 22, color: APP_COLORS.ink },
 })

@@ -17,48 +17,40 @@ import { AppTypography } from '../display/AppTypography'
 import { BookingProgressStepper, BookingStepperTheme } from './BookingProgressStepper'
 import { ServiceProcedureItem } from './ServiceCatalogCard'
 import StatusModal from '../feedback/StatusModal'
+import { AppPaymentMethodList, type AppPaymentMethod } from './AppPaymentMethodList'
 import { safeJsonParse } from '../../../utils/jsonUtils'
 
-interface PaymentMethodItem {
-	id: string
-	title: string
-	subtitle: string
-	iconName: keyof typeof MaterialCommunityIcons.glyphMap
-	badge?: string
-	brandIcons?: string[]
-}
-
-const PAYMENT_METHODS: PaymentMethodItem[] = [
+// Method ids are part of the contract with every caller: `selectedMethodId` is forwarded verbatim to
+// `config.onSubmit` / `config.onSuccess` (e.g. ancillaryPaymentConfig sends it as `payment_method`).
+const PAYMENT_METHODS: AppPaymentMethod[] = [
 	{
 		id: 'upi',
 		title: 'UPI Payment',
 		subtitle: 'Instant pay via GPay, PhonePe, or Paytm',
-		iconName: 'qrcode-scan',
-		brandIcons: ['GPay', 'PhonePe', 'Paytm'],
+		icon: 'qrcode-scan',
 		badge: 'Recommended',
 	},
 	{
 		id: 'card',
 		title: 'Credit / Debit Card',
 		subtitle: 'Visa, Mastercard, RuPay & more',
-		iconName: 'credit-card-outline',
-		brandIcons: ['Visa', 'Mastercard', 'RuPay'],
+		icon: 'credit-card-outline',
 	},
 	{
 		id: 'cash',
 		title: 'Cash / Pay After Service',
 		subtitle: 'Pay practitioner directly upon visit completion',
-		iconName: 'cash-multiple',
+		icon: 'cash-multiple',
 		badge: 'No Extra Fee',
+		badgeTone: 'sky',
 	},
 	{
 		id: 'netbanking',
 		title: 'Net Banking',
 		subtitle: 'All major Indian banks supported',
-		iconName: 'bank-outline',
+		icon: 'bank-outline',
 	},
 ]
-
 export interface BookingPaymentCharges {
 	totalAmount: string
 	basePrice: string
@@ -470,65 +462,11 @@ export const BookingPaymentPage: React.FC<{ config: BookingPaymentPageConfig }> 
 						</View>
 					</View>
 
-					<View style={styles.paymentMethodsList}>
-						{PAYMENT_METHODS.map((method) => {
-							const isSelected = selectedMethodId === method.id
-							return (
-								<TouchableOpacity
-									key={method.id}
-									style={[styles.methodCard, isSelected && styles.methodCardSelected]}
-									onPress={() => setSelectedMethodId(method.id)}
-									activeOpacity={0.88}
-								>
-									<View style={styles.methodIconWrap}>
-										<MaterialCommunityIcons
-											name={method.iconName}
-											size={22}
-											color={isSelected ? '#2B6F71' : '#64748B'}
-										/>
-									</View>
-
-									<View style={styles.methodTextCol}>
-										<View style={styles.methodTitleRow}>
-											<AppTypography variant="h4" style={styles.methodTitle}>
-												{method.title}
-											</AppTypography>
-											{method.badge && (
-												<View style={[styles.badgeChip, method.id === 'cash' ? styles.cashBadge : styles.recommendedBadge]}>
-													<AppTypography
-														variant="caption"
-														style={method.id === 'cash' ? styles.cashBadgeText : styles.recommendedBadgeText}
-													>
-														{method.badge}
-													</AppTypography>
-												</View>
-											)}
-										</View>
-										<AppTypography variant="caption" style={styles.methodSub}>
-											{method.subtitle}
-										</AppTypography>
-
-										{method.brandIcons && (
-											<View style={styles.brandRow}>
-												{method.brandIcons.map((b) => (
-													<View key={b} style={styles.brandChip}>
-														<AppTypography variant="caption" style={styles.brandChipText}>
-															{b}
-														</AppTypography>
-													</View>
-												))}
-											</View>
-										)}
-									</View>
-
-									{/* Radio Selector Circle */}
-									<View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-										{isSelected && <View style={styles.radioDot} />}
-									</View>
-								</TouchableOpacity>
-							)
-						})}
-					</View>
+					<AppPaymentMethodList
+						methods={PAYMENT_METHODS}
+						value={selectedMethodId}
+						onChange={setSelectedMethodId}
+					/>
 				</View>
 
 				{/* 8px GREY SECTION DIVIDER BAR */}
@@ -736,110 +674,6 @@ const styles = StyleSheet.create({
 		fontSize: 12.5,
 		fontWeight: '600',
 		color: '#181C1D',
-	},
-
-	/* PAYMENT METHOD CARDS */
-	paymentMethodsList: {
-		gap: 10,
-	},
-	methodCard: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#FFFFFF',
-		borderRadius: 12,
-		padding: 12,
-		borderWidth: 1,
-		borderColor: '#E0E7EF',
-		gap: 12,
-	},
-	methodCardSelected: {
-		borderColor: '#2B6F71',
-		backgroundColor: 'rgba(43, 111, 113, 0.06)',
-	},
-	methodIconWrap: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: '#F7FAFA',
-		justifyContent: 'center',
-		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#E0E7EF',
-	},
-	methodTextCol: {
-		flex: 1,
-		gap: 2,
-	},
-	methodTitleRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	methodTitle: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#181C1D',
-	},
-	methodSub: {
-		fontSize: 11.5,
-		color: '#546E7A',
-	},
-	badgeChip: {
-		paddingHorizontal: 6,
-		paddingVertical: 1,
-		borderRadius: 6,
-	},
-	recommendedBadge: {
-		backgroundColor: 'rgba(43, 111, 113, 0.12)',
-	},
-	recommendedBadgeText: {
-		fontSize: 10,
-		fontWeight: '700',
-		color: '#2B6F71',
-	},
-	cashBadge: {
-		backgroundColor: '#E0F2FE',
-	},
-	cashBadgeText: {
-		fontSize: 10,
-		fontWeight: '700',
-		color: '#0369A1',
-	},
-	brandRow: {
-		flexDirection: 'row',
-		gap: 4,
-		marginTop: 4,
-	},
-	brandChip: {
-		backgroundColor: '#F1F4F4',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 4,
-	},
-	brandChipText: {
-		fontSize: 10,
-		fontWeight: '600',
-		color: '#475569',
-	},
-
-	/* RADIO BUTTON */
-	radioCircle: {
-		width: 20,
-		height: 20,
-		borderRadius: 10,
-		borderWidth: 2,
-		borderColor: '#CBD5E1',
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	radioCircleSelected: {
-		borderColor: '#2B6F71',
-	},
-	radioDot: {
-		width: 10,
-		height: 10,
-		borderRadius: 5,
-		backgroundColor: '#2B6F71',
 	},
 
 	/* SECURITY NOTICE */
