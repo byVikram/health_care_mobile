@@ -10,14 +10,16 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { AppTypography, AppInput, AppButton } from '../../../components/common'
 import DateSlotPicker from '../../../components/common/inputs/DateSlotPicker'
-import { proposeRescheduleSlot } from '../ancillaryService'
+import { extractApiErrorMessage, proposeRescheduleSlot } from '../ancillaryService'
+import { formatDateForApi } from '../../../utils/date'
 
 interface RescheduleProposalModalProps {
 	visible: boolean
 	requestPublicId: string
 	rescheduleCount?: number
 	onClose: () => void
-	onSuccess: (message: string) => void
+	/** Called with the outcome message; `ok` is false when the proposal failed or was not allowed. */
+	onSuccess: (message: string, ok?: boolean) => void
 }
 
 export function RescheduleProposalModal({
@@ -36,7 +38,7 @@ export function RescheduleProposalModal({
 
 	const handlePropose = async () => {
 		if (isLimitReached) {
-			onSuccess('Maximum reschedule proposals (2) reached for this order.')
+			onSuccess('Maximum reschedule proposals (2) reached for this order.', false)
 			onClose()
 			return
 		}
@@ -47,7 +49,8 @@ export function RescheduleProposalModal({
 
 		try {
 			setSubmitting(true)
-			const dateStr = selectedDate.toISOString().split('T')[0]
+			// Local calendar date (toISOString would shift to UTC and can land on the previous day).
+			const dateStr = formatDateForApi(selectedDate)
 			const [hours, minutes] = selectedTime.split(':').map(Number)
 			const endMinutes = (minutes + 30) % 60
 			const endHours = hours + Math.floor((minutes + 30) / 60)
@@ -61,12 +64,11 @@ export function RescheduleProposalModal({
 			})
 
 			setSubmitting(false)
-			onSuccess(res.message || `Reschedule proposal (${dateStr} ${selectedTime}) sent to patient.`)
+			onSuccess(res.message || `Reschedule proposal (${dateStr} ${selectedTime}) sent to patient.`, true)
 			onClose()
-		} catch (error: any) {
+		} catch (error: unknown) {
 			setSubmitting(false)
-			const message = error?.response?.data?.detail?.message || error?.message || 'Failed to submit reschedule proposal.'
-			onSuccess(message)
+			onSuccess(extractApiErrorMessage(error, 'Failed to submit reschedule proposal.'), false)
 			onClose()
 		}
 	}

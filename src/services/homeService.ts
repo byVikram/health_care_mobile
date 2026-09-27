@@ -136,6 +136,8 @@ export interface AppConfig {
 	ambulance_number: string
 	support_phone: string
 	support_email?: string | null
+	/** Home-care "Need a nurse right now? · Call now" line. */
+	nursing_helpline_number?: string | null
 	app_min_version?: string | null
 }
 
@@ -146,7 +148,7 @@ export const getAppConfig = async (): Promise<AppConfig> => {
 
 // ---- Home-care starting prices ("From ₹199" on the Healthcare at home sheet) ----
 
-export interface HomeCareCategoryPrice {
+export interface AncillaryCategoryPrice {
 	id?: string | number
 	key?: string
 	slug?: string
@@ -156,8 +158,8 @@ export interface HomeCareCategoryPrice {
 }
 
 /** Map of category key/slug/name (lower-case) -> starting price, from the ancillary categories list. */
-export const getHomeCareStartingPrices = async (): Promise<Record<string, number>> => {
-	const res = await ApiService.get<Envelope<HomeCareCategoryPrice[]>>(API_ENDPOINTS.ANCILLARY.CATEGORIES)
+export const getAncillaryStartingPrices = async (): Promise<Record<string, number>> => {
+	const res = await ApiService.get<Envelope<AncillaryCategoryPrice[]>>(API_ENDPOINTS.ANCILLARY.CATEGORIES)
 	const map: Record<string, number> = {}
 	for (const c of res.data?.data ?? []) {
 		const price = Number(c.starting_price)

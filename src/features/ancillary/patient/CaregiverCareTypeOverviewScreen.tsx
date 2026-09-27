@@ -15,6 +15,7 @@ import {
 	AppTimePicker,
 	AppStickyFooter,
 } from '../../../components/common'
+import Toast from 'react-native-toast-message'
 import { ROUTES } from '../../../navigation/routes'
 import {
 	CAREGIVER_TIME_SERVICES,
@@ -145,63 +146,15 @@ export default function CaregiverCareTypeOverviewScreen() {
 
 	const handleProceed = () => {
 		if (!isFormValid) return
-
-		// Same "pre-filled schedule" route-param contract Nursing's own
-		// AncillaryProvidersPage -> BookingDetailsPage hand-off already uses
-		// (see BookingDetailsPage.tsx's routeParams.bookingType === 'SCHEDULED'
-		// effect) -- Time-Based Care collects its own fixed/calculated care
-		// window here (Home Care-specific), then carries it forward as a
-		// single synthetic service item so Booking Details, Booking Summary,
-		// and Payment all work exactly as they do for any other ancillary
-		// specialty's selected services.
-		let scheduledStartTime = ''
-		let scheduledEndTime = ''
-		if (normalizedCareType === 'DAY_CARE') {
-			scheduledStartTime = '09:00 AM'
-			scheduledEndTime = '06:00 PM'
-		} else if (normalizedCareType === 'NIGHT_CARE') {
-			scheduledStartTime = '08:00 PM'
-			scheduledEndTime = '08:00 AM next day'
-		} else if (normalizedCareType === 'FULL_DAY_CARE') {
-			scheduledStartTime = formatTimeTo12h(startTime)
-			scheduledEndTime = calc24hEndTimeFormatted(startTime)
-		} else if (normalizedCareType === 'HOURLY_CARE') {
-			scheduledStartTime = formatTimeTo12h(startTime)
-			scheduledEndTime = formatTimeTo12h(endTime)
-		}
-
-		const durationLabel =
-			normalizedCareType === 'HOURLY_CARE'
-				? hourlyInfo.durationLabel || metadata.fixedDurationLabel || ''
-				: metadata.fixedDurationLabel || ''
-
-		const syntheticServiceItem = {
-			id: `caregiver-${normalizedCareType.toLowerCase()}`,
-			title: metadata.title,
-			description: metadata.explanation,
-			duration: durationLabel,
-			// Time-Based Care has no per-visit price model yet (see
-			// CAREGIVER_TIME_SERVICES) -- 'Custom Pricing' is the same
-			// non-numeric sentinel the catalog cards already recognize
-			// elsewhere in this app for variable-priced items.
-			price: 'Custom Pricing',
-		}
-
-		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
-			services: [syntheticServiceItem],
-			selectedServices: [syntheticServiceItem],
-			bookingType: 'SCHEDULED',
-			scheduledDate: selectedDate,
-			scheduledStartTime,
-			scheduledEndTime,
-			bookingPayload: {
-				bookingType: 'SCHEDULED',
-				serviceKey: 'home-care-time',
-				serviceLabel: metadata.title,
-				careType: normalizedCareType,
-				services: [syntheticServiceItem],
-			},
+		// Time-based care has no bookable procedure / per-visit price on the backend yet, and the patient
+		// app only books scheduled visits with a chosen provider (Book visit flow, real procedure ids). Send
+		// the patient to the home-care activities catalogue, which books through that flow.
+		Toast.show({
+			type: 'info',
+			text1: `${metadata.title} is booked as care activities`,
+			text2: 'Pick the activities you need, then choose a caregiver and times.',
 		})
+		navigation.navigate(ROUTES.STACK.HOME_CARE_CATALOG, { careBookingMode: 'COMPLETE_CARE' })
 	}
 
 	let primaryDurationText = ''

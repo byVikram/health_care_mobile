@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Linking } from 'react-native'
 import {
 	getAppConfig,
-	getHomeCareStartingPrices,
+	getAncillaryStartingPrices,
 	getPatientSummary,
 	type AppConfig,
 	type PatientSummary,
@@ -65,7 +65,7 @@ registerSessionCache(() => {
 
 const fetchSummary = async () => (await getPatientSummary()) ?? null
 const fetchConfig = async () => (await getAppConfig()) ?? null
-const fetchPrices = async () => await getHomeCareStartingPrices()
+const fetchPrices = async () => await getAncillaryStartingPrices()
 const fetchWalletBalance = async () => {
 	const res = await getWallet()
 	const balance = Number(res?.data?.balance)
@@ -91,7 +91,7 @@ export const useWalletBalance = (enabled = true) => {
 }
 
 /** Home-care starting prices keyed by lower-case category key / slug / name. */
-export const useHomeCareStartingPrices = (enabled = true) => {
+export const useAncillaryStartingPrices = (enabled = true) => {
 	const { value } = useSoftFetch(fetchPrices, pricesCache, enabled)
 	return value ?? {}
 }

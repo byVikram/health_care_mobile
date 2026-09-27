@@ -101,6 +101,10 @@ export const ROUTES = {
 		ANCILLARY_TRACK_APPOINTMENT: 'AncillaryTrackAppointment',
 		ANCILLARY_MY_BOOKINGS: 'AncillaryMyBookings',
 		ANCILLARY_SERVICE_MATCHING: 'AncillaryServiceMatching',
+		// Home-care booking redesign (all home-care types)
+		ANCILLARY_BOOK_VISIT: 'AncillaryBookVisit',
+		ANCILLARY_REVIEW_PAY: 'AncillaryReviewPay',
+		ANCILLARY_REQUEST_SENT: 'AncillaryRequestSent',
 		HOME_CARE_CATALOG: 'HomeCareCatalog',
 		CAREGIVER_SERVICES: 'CaregiverServices',
 		CAREGIVER_TIME_CONFIG: 'CaregiverTimeConfig',

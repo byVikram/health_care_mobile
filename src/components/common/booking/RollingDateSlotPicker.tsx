@@ -13,8 +13,24 @@ import { DOW_LABELS, MONTH_LONG, formatDateForApi } from '../../../utils/date'
  *  date-computation logic those other screens depend on. This is a separate,
  *  purpose-built component for the rolling-window pattern only. */
 export interface DateStripProps {
-	selectedDate: Date
+	/** Single-select value. Optional when `selectedDates` is passed. */
+	selectedDate?: Date
 	onSelectDate: (date: Date) => void
+	/**
+	 * Opt-in multi-select: every 'YYYY-MM-DD' in this list is highlighted (overrides `selectedDate`).
+	 * `onSelectDate` still fires per tap -- the caller decides whether a tap adds, removes or replaces.
+	 */
+	selectedDates?: string[]
+	/**
+	 * 'grid' only, opt-in: wrap the days into rows of this many equal columns (e.g. 7 for a 14-day
+	 * two-week grid). Omit to keep the single row of flex cells.
+	 */
+	columns?: number
+	/**
+	 * 'grid' only, opt-in: 'compact' = the Book-visit design cell (52h, radius 10, 10/12 700 CAPS weekday
+	 * with "TODAY", 16/20 800 date). Defaults to 'regular' (existing 56h cell).
+	 */
+	density?: 'regular' | 'compact'
 	/** Number of upcoming days shown, starting today. Defaults to 7. */
 	dayCount?: number
 	style?: StyleProp<ViewStyle>
@@ -40,6 +56,9 @@ export function DateStrip({
 	isDateDisabled,
 	strikeDisabled = false,
 	disabledAccessibilityHint,
+	selectedDates,
+	columns,
+	density = 'regular',
 }: DateStripProps) {
 	const upcomingDates = React.useMemo(() => {
 		return Array.from({ length: dayCount }, (_, i) => {
@@ -48,35 +67,66 @@ export function DateStrip({
 			return d
 		})
 	}, [dayCount])
+	const [gridWidth, setGridWidth] = React.useState(0)
 
-	const selectedIso = formatDateForApi(selectedDate)
+	const selectedIso = selectedDate ? formatDateForApi(selectedDate) : ''
+	const isOn = (iso: string) => (selectedDates ? selectedDates.includes(iso) : iso === selectedIso)
 
 	if (variant === 'grid') {
 		const todayIso = formatDateForApi(new Date())
+		const multi = !!selectedDates
+		const compact = density === 'compact'
+		const cols = columns ?? 0
+		const wrap = cols > 0
+		const colGap = 4
+		// Wrapped grid: fixed cell width from the measured row (same approach as SlotChipGrid's `columns`).
+		const cellWidth: ViewStyle['width'] | undefined = wrap
+			? gridWidth > 0
+				? Math.floor((gridWidth - colGap * (cols - 1)) / cols)
+				: `${Math.floor(100 / cols) - 2}%`
+			: undefined
 		return (
-			<View style={[styles.dateGrid, style]} accessibilityRole="radiogroup">
+			<View
+				style={[styles.dateGrid, wrap && styles.dateGridWrap, style]}
+				onLayout={wrap ? (e) => setGridWidth(e.nativeEvent.layout.width) : undefined}
+				accessibilityRole={multi ? undefined : 'radiogroup'}
+			>
 				{upcomingDates.map((d) => {
 					const iso = formatDateForApi(d)
 					const disabled = !!isDateDisabled?.(d)
-					const on = iso === selectedIso && !disabled
+					const on = isOn(iso) && !disabled
 					const hint = disabled && disabledAccessibilityHint ? `, ${disabledAccessibilityHint}` : ''
+					const isToday = iso === todayIso
+					const dow = isToday ? 'Today' : DOW_LABELS[d.getDay()]
 					return (
 						<TouchableOpacity
 							key={iso}
 							disabled={disabled}
 							onPress={() => onSelectDate(d)}
 							activeOpacity={0.8}
-							accessibilityRole="radio"
+							accessibilityRole={multi ? 'checkbox' : 'radio'}
 							accessibilityState={{ checked: on, disabled }}
 							accessibilityLabel={`${DOW_LABELS[d.getDay()]} ${d.getDate()} ${MONTH_LONG[d.getMonth()]}${hint}`}
-							style={[styles.gridCell, on && styles.cellOn, disabled && styles.gridCellOff]}
+							style={[
+								styles.gridCell,
+								compact && styles.gridCellCompact,
+								wrap && { width: cellWidth, flex: 0 },
+								on && styles.cellOn,
+								disabled && styles.gridCellOff,
+							]}
 						>
-							<AppTypography style={[styles.gridDow, on && styles.textOn, disabled && styles.textOff]}>
-								{iso === todayIso ? 'Today' : DOW_LABELS[d.getDay()]}
+							<AppTypography
+								style={[
+									compact ? styles.gridDowCompact : styles.gridDow,
+									on && styles.textOn,
+									disabled && styles.textOff,
+								]}
+							>
+								{compact ? dow.toUpperCase() : dow}
 							</AppTypography>
 							<AppTypography
 								style={[
-									styles.gridNum,
+									compact ? styles.gridNumCompact : styles.gridNum,
 									on && styles.textOn,
 									disabled && styles.textOff,
 									disabled && strikeDisabled && styles.struck,
@@ -99,7 +149,7 @@ export function DateStrip({
 				contentContainerStyle={styles.dateScrollContent}
 			>
 				{upcomingDates.map((d) => {
-					const isSelected = formatDateForApi(d) === selectedIso
+					const isSelected = isOn(formatDateForApi(d))
 					// Only set when the caller passes isDateDisabled — existing callers are unaffected.
 					const disabled = !!isDateDisabled?.(d)
 					return (
@@ -340,6 +390,9 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		gap: 4,
 	},
+	dateGridWrap: {
+		flexWrap: 'wrap',
+	},
 	gridCell: {
 		flex: 1,
 		minWidth: 0,
@@ -352,6 +405,12 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		gap: 2,
 	},
+	gridCellCompact: {
+		height: 52,
+		borderRadius: 10,
+		borderColor: APP_COLORS.divider,
+		gap: 1,
+	},
 	gridCellOff: {
 		borderColor: APP_COLORS.divider,
 	},
@@ -359,6 +418,18 @@ const styles = StyleSheet.create({
 		fontSize: 11,
 		lineHeight: 14,
 		fontWeight: '600',
+		color: APP_COLORS.ink,
+	},
+	gridDowCompact: {
+		fontSize: 10,
+		lineHeight: 12,
+		fontWeight: '700',
+		color: APP_COLORS.ink,
+	},
+	gridNumCompact: {
+		fontSize: 16,
+		lineHeight: 20,
+		fontWeight: '800',
 		color: APP_COLORS.ink,
 	},
 	gridNum: {

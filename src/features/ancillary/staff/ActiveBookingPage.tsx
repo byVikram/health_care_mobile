@@ -13,7 +13,14 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { MOCK_NURSE_BOOKINGS, NurseBooking, getBookingState, updateNurseStatus } from '../ancillaryService'
+import Toast from 'react-native-toast-message'
+import {
+	MOCK_NURSE_BOOKINGS,
+	NurseBooking,
+	extractApiErrorMessage,
+	getBookingState,
+	updateNurseStatus,
+} from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
 import ServiceTimeline from '../components/ServiceTimeline'
 import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
@@ -125,7 +132,11 @@ export default function ActiveBookingPage() {
 			setBooking((prev) => (prev ? { ...prev, status: 'EN_ROUTE' } : null))
 			Alert.alert('Status Updated', 'You are now marked as En-Route. Patient has been notified of your estimated arrival in 12 mins.')
 		} catch (e) {
-			console.log('Error updating travel status')
+			Toast.show({
+				type: 'error',
+				text1: 'Could not update status',
+				text2: extractApiErrorMessage(e, 'The patient was not notified. Please try again.'),
+			})
 		}
 	}
 
@@ -134,10 +145,15 @@ export default function ActiveBookingPage() {
 		try {
 			await updateNurseStatus(booking.id, 'ARRIVED', 0)
 			setBooking((prev) => (prev ? { ...prev, status: 'ARRIVED' } : null))
-			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id, initialBooking: booking })
 		} catch (e) {
-			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id, initialBooking: booking })
+			// OTP verification doesn't depend on ARRIVED, so still continue to it.
+			Toast.show({
+				type: 'error',
+				text1: 'Arrival not recorded',
+				text2: extractApiErrorMessage(e, 'Continue with the start code; the status will update after verification.'),
+			})
 		}
+		navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id, initialBooking: booking })
 	}
 
 	if (loading) {

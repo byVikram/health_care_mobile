@@ -203,23 +203,23 @@ export default function HomeCareServiceCatalogScreen() {
 
 	const handleProceedToBooking = () => {
 		if (cart.length === 0) return
-		// Same continuation Nursing/Physiotherapy already use from
-		// AncillaryServiceCatalogScreen.tsx's handleInstantDispatch --
-		// Home Care activities are ServiceProcedureItem[] from the same
-		// ancillary catalog API, so they carry into Booking Details, the
-		// Booking Summary/Payment flow, and (for "Select a Caregiver")
-		// AncillaryProvidersPage exactly the same way any other ancillary
-		// specialty's selected services do.
-		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
-			services: cart,
-			selectedServices: cart,
-			bookingPayload: {
-				bookingType: 'INSTANT',
-				serviceKey: 'home-care',
-				serviceLabel: 'Home Care & Daily Living',
-				careBookingMode: selectedCareMode,
-				services: cart,
-			},
+		// Scheduled booking with a chosen provider (Book visit -> Review & pay -> Request sent), same as
+		// every other home-care type. Activities are ancillary procedures, so their ids go straight through.
+		const toNumber = (v?: string) => Number(String(v ?? '').replace(/[^0-9.]/g, '')) || 0
+		const firstMinutes = (v?: string) => {
+			const m = /\d+/.exec(v ?? '')
+			return m ? Number(m[0]) : null
+		}
+		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOK_VISIT, {
+			serviceKey: 'home-care',
+			serviceLabel: 'Home care',
+			items: cart.map((c) => ({
+				id: c.id,
+				kind: 'procedure' as const,
+				name: c.title,
+				price: toNumber(c.price),
+				durationMinutes: firstMinutes(c.duration),
+			})),
 		})
 	}
 

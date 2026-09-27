@@ -138,9 +138,7 @@ export type { AppTabsProps, AppTabItem } from './inputs/AppTabs'
 export { AppProviderCard, providerMetaLine } from './booking/AppProviderCard'
 export type { AppProviderCardProps, AppProviderAvailability } from './booking/AppProviderCard'
 export { AppProviderProfileSheet } from './booking/AppProviderProfileSheet'
-export type { AppProviderProfileSheetProps, AppProviderReview } from './booking/AppProviderProfileSheet'
-export { AppReviewItem } from './booking/AppReviewItem'
-export type { AppReviewItemProps } from './booking/AppReviewItem'
+export type { AppProviderProfileSheetProps } from './booking/AppProviderProfileSheet'
 export { AppRadioCard } from './booking/AppRadioCard'
 export type { AppRadioCardProps } from './booking/AppRadioCard'
 export { AppBookingCard, BOOKING_KINDS } from './booking/AppBookingCard'
@@ -156,3 +154,20 @@ export type { AppVisitListProps, AppVisitListItem } from './booking/AppVisitList
 export { AppCartFooter } from './booking/AppCartFooter'
 export type { AppCartFooterProps } from './booking/AppCartFooter'
 export type { AppSidebarSection, AppSidebarFamily } from './layout/AppSidebar'
+
+// Home-care catalogue (Nursing care at home): promo slides + media catalogue rows
+export { AppPromoCard } from './display/AppPromoCard'
+export type { AppPromoCardProps, AppPromoCardTone } from './display/AppPromoCard'
+export { AppCatalogItemRow } from './booking/AppCatalogItemRow'
+export type { AppCatalogItemRowProps } from './booking/AppCatalogItemRow'
+export { AppAddressSheet, ADDRESS_TAGS } from './booking/AddressSelection/AppAddressSheet'
+export type {
+	AppAddressSheetProps,
+	AppAddressOption,
+	AppAddressDraft,
+	AppAddressPrefill,
+} from './booking/AddressSelection/AppAddressSheet'
+
+// My bookings: category filter tile
+export { AppCategoryTile } from './inputs/AppCategoryTile'
+export type { AppCategoryTileProps } from './inputs/AppCategoryTile'

@@ -4,10 +4,10 @@
 //   card: radius 12, 2px APP_COLORS.divider border on white; selected = APP_COLORS.primary border on APP_COLORS.mint;
 //         disabled (e.g. not free on any of the picked days) = 0.55 opacity.
 //   row (padding 12 12 8, gap 12): 48px AppAvatar (initials on a TONES pair), name 15/20 800 + fee 15/20 800,
-//         "★ 4.8 (120+) · 6 yrs · 2.1 km" 12/16 muted, languages 12/16 muted, availability AppTag
+//         "6 yrs · 2.1 km" 12/16 muted, languages 12/16 muted, availability AppTag
 //         (11/16 700 — e.g. 'confirmed' "Free on all 3 days", 'pending' "Free on 2 of 3 days",
 //         'done' = APP_COLORS.neutralBg + inkMuted "Not free on your days"), trailing AppRadio.
-//   "View profile & reviews ›" AppTextLink indented under the text column (padding 0 12 10 72).
+//   "View profile ›" AppTextLink indented under the text column (padding 0 12 10 72).
 //   Optional `children` rendered inside the card below (e.g. the provider's time-slot SlotChipGrid).
 // Pure UI — all data comes in through props.
 
@@ -32,9 +32,6 @@ export type AppProviderCardProps = {
 	avatarTone?: ToneKey
 	/** e.g. "₹199/visit". */
 	feeLabel?: string
-	rating?: number | string
-	/** Review count, e.g. 120 or "120+". */
-	reviews?: number | string
 	/** e.g. "6 yrs" or "12 yrs · Senior". */
 	experienceLabel?: string
 	/** e.g. "2.1 km". */
@@ -47,7 +44,7 @@ export type AppProviderCardProps = {
 	disabled?: boolean
 	onPress?: () => void
 	onViewProfile?: () => void
-	/** Defaults to "View profile & reviews". */
+	/** Defaults to "View profile". */
 	viewProfileLabel?: string
 	/** Extra content inside the card, below the header (e.g. the time-slot grid when expanded). */
 	children?: React.ReactNode
@@ -55,25 +52,18 @@ export type AppProviderCardProps = {
 	style?: StyleProp<ViewStyle>
 }
 
-/** "★ 4.8 (120+) · 6 yrs · 2.1 km" — shared with AppProviderProfileSheet callers that need the same line. */
+/** "6 yrs · 2.1 km" — shared with callers that need the same line outside the card. */
 export const providerMetaLine = ({
-	rating,
-	reviews,
 	experienceLabel,
 	distanceLabel,
-}: Pick<AppProviderCardProps, 'rating' | 'reviews' | 'experienceLabel' | 'distanceLabel'>) => {
-	const ratingPart =
-		rating != null && rating !== '' ? `★ ${rating}${reviews != null && reviews !== '' ? ` (${reviews})` : ''}` : ''
-	return [ratingPart, experienceLabel, distanceLabel].filter(Boolean).join(' · ')
-}
+}: Pick<AppProviderCardProps, 'experienceLabel' | 'distanceLabel'>) =>
+	[experienceLabel, distanceLabel].filter(Boolean).join(' · ')
 
 export function AppProviderCard({
 	name,
 	avatarUri,
 	avatarTone,
 	feeLabel,
-	rating,
-	reviews,
 	experienceLabel,
 	distanceLabel,
 	languages,
@@ -82,25 +72,17 @@ export function AppProviderCard({
 	disabled = false,
 	onPress,
 	onViewProfile,
-	viewProfileLabel = 'View profile & reviews',
+	viewProfileLabel = 'View profile',
 	children,
 	accessibilityLabel,
 	style,
 }: AppProviderCardProps) {
 	const tone = avatarTone ? TONES[avatarTone] : toneForString(name)
-	const meta = providerMetaLine({ rating, reviews, experienceLabel, distanceLabel })
+	const meta = providerMetaLine({ experienceLabel, distanceLabel })
 	const langs = Array.isArray(languages) ? languages.join(', ') : languages
 	const a11y =
 		accessibilityLabel ??
-		[
-			name,
-			feeLabel,
-			rating != null && rating !== '' ? `rated ${rating}${reviews != null ? `, ${reviews} reviews` : ''}` : '',
-			experienceLabel,
-			distanceLabel,
-			langs ? `speaks ${langs}` : '',
-			availability?.label,
-		]
+		[name, feeLabel, experienceLabel, distanceLabel, langs ? `speaks ${langs}` : '', availability?.label]
 			.filter(Boolean)
 			.join(', ')
 

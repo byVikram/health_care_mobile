@@ -114,6 +114,7 @@ export const API_ENDPOINTS = {
 		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
 		FAMILY_MEMBERS: `${BASE_URL}/api/patients/family-members`,
 		SUMMARY: `${BASE_URL}/api/patients/me/summary`,
+		BOOKINGS: `${BASE_URL}/api/patients/me/bookings`,
 	},
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,
@@ -247,13 +248,14 @@ export const API_ENDPOINTS = {
 		// Phase 1 Slot-Based Booking Endpoints
 		AVAILABLE_SLOTS: `${BASE_URL}/api/ancillary/available-slots`,
 		REQUESTS_SCHEDULED: `${BASE_URL}/api/ancillary/requests/scheduled`,
-		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/respond-reschedule`,
+		PROVIDERS_AVAILABILITY: `${BASE_URL}/api/ancillary/providers/availability`,
+		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/reschedule/respond`,
 		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/me/availability`,
-		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/overrides`,
-		PROVIDER_SCHEDULED_ORDERS: `${BASE_URL}/api/ancillary/provider/orders/scheduled`,
-		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/accept-scheduled`,
-		DECLINE_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/decline-scheduled`,
-		RESCHEDULE_PROPOSAL: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/reschedule-proposal`,
+		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/me/availability/overrides`,
+		PROVIDER_SCHEDULED_ORDERS: `${BASE_URL}/api/ancillary/provider/me/orders`,
+		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/accept`,
+		DECLINE_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/decline`,
+		RESCHEDULE_PROPOSAL: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/reschedule/propose`,
 		WS_ANCILLARY: (token: string) => `${BASE_URL.replace(/^http/, 'ws')}/ws/ancillary?token=${token}`,
 	},
 	WALLET: {

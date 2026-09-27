@@ -214,7 +214,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 		return null
 	}
 
-	const careOpen = openSheet === 'homecare'
+	const careOpen = openSheet === 'ancillary'
 	const floating = FLOATING_TAB_ROUTES.includes(activeName)
 	const bottom = FLOATING_TAB_BAR_BOTTOM + insets.bottom
 
@@ -241,7 +241,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 
 						const onPress = () => {
 							if (!route) {
-								open('homecare')
+								open('ancillary')
 								return
 							}
 							const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
@@ -304,7 +304,7 @@ function MainTabs() {
 					isPatient ? (
 						<FloatingTabBar {...props} />
 					) : (
-						<DockedTabBar {...props} onAncillaryPress={() => open('homecare')} />
+						<DockedTabBar {...props} onAncillaryPress={() => open('ancillary')} />
 					)
 				}
 				screenOptions={{

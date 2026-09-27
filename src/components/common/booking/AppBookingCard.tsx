@@ -1,6 +1,6 @@
 // src/components/common/booking/AppBookingCard.tsx
 //
-// Cross-vertical booking card from "My bookings" (doctor / lab / home care / medicines / radiology):
+// Cross-vertical booking card from "My bookings" (doctor / lab / ancillary / medicines / radiology):
 //   card: white, 1px APP_COLORS.divider border, radius 12.
 //   head (padding 14 14 12, gap 12): 48px kind tile (radius 12, TONES pair per kind — or a photo), then
 //       kind label 11/14 800 caps in the tone ink + AppTag status (STATUS_TONES key), title 16/22 800, sub 13/18 muted.
@@ -23,13 +23,13 @@ import { AppActionChip } from '../buttons/AppActionChip'
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap
 
-export type BookingKind = 'doctor' | 'lab' | 'homecare' | 'medicine' | 'radiology'
+export type BookingKind = 'doctor' | 'lab' | 'ancillary' | 'medicine' | 'radiology'
 
 /** Default caps label, MaterialCommunityIcons glyph and TONES key per booking kind (My bookings design). */
 export const BOOKING_KINDS: Record<BookingKind, { label: string; icon: IconName; tone: ToneKey }> = {
 	doctor: { label: 'Doctor appointment', icon: 'stethoscope', tone: 'sky' },
 	lab: { label: 'Laboratory', icon: 'flask-outline', tone: 'lilac' },
-	homecare: { label: 'Ancillary · Home care', icon: 'hand-heart-outline', tone: 'peach' },
+	ancillary: { label: 'Ancillary', icon: 'hand-heart-outline', tone: 'peach' },
 	medicine: { label: 'Pharmacy order', icon: 'pill', tone: 'sand' },
 	radiology: { label: 'Radiology', icon: 'radiology-box-outline', tone: 'mint' },
 }
@@ -66,6 +66,8 @@ export type AppBookingCardProps = {
 	status?: { label: string; tone?: AppTagTone }
 	title: string
 	sub?: string
+	/** Who the booking is for when it isn't the signed-in user, e.g. "For Priya (Mother)" (12/16 700 primary). */
+	patientLabel?: string
 	when?: string
 	where?: string
 	/** AppIcon glyph for the where row. Defaults to 'pin'. Ignored when `whereGlyph` is set. */
@@ -100,6 +102,7 @@ export function AppBookingCard({
 	status,
 	title,
 	sub,
+	patientLabel,
 	when,
 	where,
 	whereIcon = 'pin',
@@ -119,7 +122,8 @@ export function AppBookingCard({
 	const noteObj: AppBookingCardNote | undefined = typeof note === 'string' ? { text: note } : note
 	const noteTone = NOTE_TONES[noteObj?.tone ?? 'warning']
 	const a11y =
-		accessibilityLabel ?? [label, title, status?.label, sub, when, where, noteObj?.text].filter(Boolean).join('. ')
+		accessibilityLabel ??
+		[label, title, status?.label, sub, patientLabel, when, where, noteObj?.text].filter(Boolean).join('. ')
 
 	const main = (
 		<>
@@ -163,6 +167,14 @@ export function AppBookingCard({
 						<Text style={styles.sub} numberOfLines={2}>
 							{sub}
 						</Text>
+					)}
+					{!!patientLabel && (
+						<View style={styles.patientRow}>
+							<MaterialCommunityIcons name="account-outline" size={14} color={APP_COLORS.primary} />
+							<Text style={styles.patient} numberOfLines={1}>
+								{patientLabel}
+							</Text>
+						</View>
 					)}
 				</View>
 			</View>
@@ -310,6 +322,19 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 		lineHeight: 18,
 		color: APP_COLORS.inkMuted,
+	},
+	patientRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		marginTop: 2,
+	},
+	patient: {
+		flex: 1,
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+		color: APP_COLORS.primary,
 	},
 	details: {
 		marginHorizontal: 14,

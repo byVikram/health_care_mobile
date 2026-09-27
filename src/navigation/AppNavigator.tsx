@@ -49,6 +49,8 @@ import LabSelectionScreen from '../features/laboratory/LabSelectionScreen'
 import BookingSummaryScreen from '../features/laboratory/BookingSummaryScreen'
 import LaboratoryPaymentPage from '../features/laboratory/LaboratoryPaymentPage'
 import BookingTrackingScreen from '../features/laboratory/BookingTrackingScreen'
+import OrderListLaboratoryPage from '../features/laboratory_duplicated/OrderListLaboratoryPage'
+import BookingDetailsLaboratoryPage from '../features/laboratory_duplicated/BookingDetailsLaboratoryPage'
 
 import PatientQuestionsListPage from '../features/patient/PatientQuestionsListPage'
 import PatientQuestionDetailPage from '../features/patient/PatientQuestionDetailPage'
@@ -75,20 +77,18 @@ import NurseVisitsPage from '../features/ancillary/staff/NurseVisitsPage'
 import NurseEarningsPage from '../features/ancillary/staff/NurseEarningsPage'
 import NurseHistoryPage from '../features/ancillary/staff/NurseHistoryPage'
 import AncillaryServicesPage from '../features/ancillary/patient/AncillaryServicesPage'
-import AncillaryProvidersPage from '../features/ancillary/patient/AncillaryProvidersPage'
-import BookingCartPage from '../features/ancillary/patient/BookingCartPage'
-import BookingSummaryPage from '../features/ancillary/patient/BookingSummaryPage'
-import BookingDetailsPage from '../features/ancillary/patient/BookingDetailsPage'
 import HomeCareServiceCatalogScreen from '../features/ancillary/patient/HomeCareServiceCatalogScreen'
 import CaregiverServicesScreen from '../features/ancillary/patient/CaregiverServicesScreen'
 import CaregiverCareTypeOverviewScreen from '../features/ancillary/patient/CaregiverCareTypeOverviewScreen'
-import AncillaryPaymentPage from '../features/ancillary/patient/AncillaryPaymentPage'
 import PricingReviewPage from '../features/ancillary/staff/PricingReviewPage'
 import AncillaryConfirmationPage from '../features/ancillary/patient/AncillaryConfirmationPage'
 import AncillaryBookingStatusPage from '../features/ancillary/patient/AncillaryBookingStatusPage'
 import TrackAppointmentPage from '../features/ancillary/patient/TrackAppointmentPage'
 import MyBookingsPage from '../features/ancillary/patient/MyBookingsPage'
 import ServiceMatchingPage from '../features/ancillary/patient/ServiceMatchingPage'
+import AncillaryBookVisitPage from '../features/ancillary/patient/AncillaryBookVisitPage'
+import AncillaryReviewPayPage from '../features/ancillary/patient/AncillaryReviewPayPage'
+import AncillaryRequestSentPage from '../features/ancillary/patient/AncillaryRequestSentPage'
 
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
@@ -203,6 +203,17 @@ function AuthenticatedNavigator() {
 					name={ROUTES.STACK.LABORATORY_BOOKING_TRACKING as keyof AppStackParamList}
 					component={BookingTrackingScreen}
 					options={{ headerShown: true, title: 'Booking Status' }}
+				/>
+				{/* Lab orders list + booking details (opened from the Bookings tab, the side drawer and AppHeader). */}
+				<AppStack.Screen
+					name={ROUTES.STACK.LABORATORY_ORDERS}
+					component={OrderListLaboratoryPage}
+					options={{ headerShown: true, title: 'Lab Orders' }}
+				/>
+				<AppStack.Screen
+					name={ROUTES.STACK.LABORATORY_ORDER_DETAILS}
+					component={BookingDetailsLaboratoryPage}
+					options={{ headerShown: true, title: 'Lab Booking Details' }}
 				/>
 
 				<AppStack.Screen
@@ -320,23 +331,18 @@ function AuthenticatedNavigator() {
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_PROVIDERS}
-					component={AncillaryProvidersPage}
+					name={ROUTES.STACK.ANCILLARY_BOOK_VISIT}
+					component={AncillaryBookVisitPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_BOOKING_CART}
-					component={BookingCartPage}
+					name={ROUTES.STACK.ANCILLARY_REVIEW_PAY}
+					component={AncillaryReviewPayPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_BOOKING_SUMMARY}
-					component={BookingSummaryPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_BOOKING_DETAILS}
-					component={BookingDetailsPage}
+					name={ROUTES.STACK.ANCILLARY_REQUEST_SENT}
+					component={AncillaryRequestSentPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
@@ -352,11 +358,6 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen
 					name={ROUTES.STACK.HOME_CARE_CATALOG}
 					component={HomeCareServiceCatalogScreen}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_PAYMENT}
-					component={AncillaryPaymentPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen

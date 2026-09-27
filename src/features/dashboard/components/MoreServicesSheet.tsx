@@ -76,7 +76,7 @@ export default function MoreServicesSheet({ visible, onClose }: MoreServicesShee
 			subtitle: 'Nurses, physio & more',
 			icon: 'homeCare',
 			colors: TONES.mint,
-			onPress: () => closeThen(() => open('homecare')),
+			onPress: () => closeThen(() => open('ancillary')),
 		},
 		{
 			key: 'ambulance',

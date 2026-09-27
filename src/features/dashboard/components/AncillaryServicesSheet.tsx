@@ -1,9 +1,9 @@
-// src/features/dashboard/components/HomeCareSheet.tsx
+// src/features/dashboard/components/AncillaryServicesSheet.tsx
 //
 // "Healthcare at home" sheet (design 1c): 2-column grid of tone cards (icon tile, title, subtitle) that
 // open the patient ancillary booking flow for that service key, plus "Lab tests at home" (laboratory
 // list) and a trust footer. Opened from the floating tab bar's middle button, the Ancillary tab and the
-// More services sheet via useHomeSheets().open('homecare'); rendered once by <HomeSheetsHost />.
+// More services sheet via useHomeSheets().open('ancillary'); rendered once by <HomeSheetsHost />.
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
@@ -12,9 +12,9 @@ import { APP_COLORS, TONES } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
 import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../homeChromeIcons'
-import { formatBalance, useHomeCareStartingPrices } from '../useHomeChromeData'
+import { formatBalance, useAncillaryStartingPrices } from '../useHomeChromeData'
 
-export interface HomeCareSheetProps {
+export interface AncillaryServicesSheetProps {
 	visible: boolean
 	onClose: () => void
 }
@@ -91,9 +91,9 @@ const priceFor = (prices: Record<string, number>, card: HomeCareCard) => {
 	return prices[serviceKey] ?? prices[serviceLabel.toLowerCase()] ?? prices[card.title.toLowerCase()]
 }
 
-export default function HomeCareSheet({ visible, onClose }: HomeCareSheetProps) {
+export default function AncillaryServicesSheet({ visible, onClose }: AncillaryServicesSheetProps) {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
-	const prices = useHomeCareStartingPrices(visible)
+	const prices = useAncillaryStartingPrices(visible)
 
 	const handlePress = (card: HomeCareCard) => {
 		onClose()

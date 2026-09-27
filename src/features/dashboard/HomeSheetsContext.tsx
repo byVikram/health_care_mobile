@@ -5,7 +5,7 @@
 // are rendered once by <HomeSheetsHost /> (mounted inside this provider).
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
 
-export type HomeSheetKey = 'more' | 'homecare' | 'qr'
+export type HomeSheetKey = 'more' | 'ancillary' | 'qr'
 
 interface HomeSheetsContextValue {
 	openSheet: HomeSheetKey | null

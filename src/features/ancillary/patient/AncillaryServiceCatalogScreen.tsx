@@ -1,178 +1,154 @@
-import React, { useEffect, useMemo, useState } from 'react'
+// src/features/ancillary/patient/AncillaryServiceCatalogScreen.tsx
+//
+// Home-care service catalogue (design "2 · Nursing care at home" + "2a · service details sheet open").
+// Generic across every home-care type (nursing-care, home-care, physiotherapy, rehab-care, medical-equipment):
+// the title / copy come from the serviceKey + serviceLabel route params (see ancillaryCatalogCopy.ts) and the
+// lists from the API -- categories (GET /ancillary/categories), procedures (GET /ancillary/services) and care
+// packages (GET /ancillary/packages), incl. the phase-4 detail fields (mrp, duration, includes, prep steps,
+// is_featured, ...). Anything the backend doesn't send is hidden rather than faked.
+//
+// Cart rule (backend): a booking holds EITHER one package OR one-or-more procedures of this speciality.
+// Adding a package over procedures (or procedures over a package, or a second package) asks to replace.
+// "Book visit" -> ROUTES.STACK.ANCILLARY_BOOK_VISIT { serviceKey, serviceLabel, items: AncillaryCartItem[] }.
+//
+// Reached via ROUTES.STACK.ANCILLARY_SERVICES (AncillaryServicesPage) and the Ancillary tab (NursingCarePage,
+// no params -> nursing-care).
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-	ActivityIndicator,
-	BackHandler,
+	Alert,
+	LayoutAnimation,
 	ScrollView,
 	StyleSheet,
+	Text,
+	TextInput,
 	TouchableOpacity,
 	View,
+	type NativeScrollEvent,
+	type NativeSyntheticEvent,
 } from 'react-native'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import {
+	AppBottomSheet,
+	AppCarousel,
+	AppCartFooter,
+	AppCatalogItemRow,
+	AppPathIcon,
+	AppPromoCard,
+	AppScreenHeader,
+	AppSkeleton,
+	AppTabs,
+	AppTextLink,
+	ServiceDetailsSheet,
+	type AppPromoCardProps,
+	type AppTabItem,
+} from '../../../components/common'
+import { APP_COLORS, toneForString } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
-import { AppTypography, AppInput } from '../../../components/common'
-import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
+import type { AncillaryCartItem, AppStackParamList } from '../../../navigation/types'
+import { useAuth } from '../../../context/AuthContext'
+import { openContactUrl, telUrl, useAppConfig } from '../../dashboard/useHomeChromeData'
 import CaregiverServicesScreen from './CaregiverServicesScreen'
-
-import { ServiceProcedureItem, ServiceCatalogCard, ServiceDetailsSheet, PackageSectionCard } from '../../../components/common'
-import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
-import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
-import { NursingQuickActionCards } from '../components/NursingQuickActionCards'
 import { PackageDetailsBottomSheet } from '../components/PackageDetailsBottomSheet'
-import { ConditionGrid, ConditionGridItem } from '../components/ConditionGrid'
+import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
 import {
 	AncillaryCategoryApiItem,
+	AncillaryPackageListItem,
 	AncillaryServiceItem,
 	fetchAncillaryCategories,
-	AncillaryPackageListItem,
 	fetchAncillaryPackages,
 	fetchAncillaryServices,
 } from '../ancillaryService'
+import {
+	CATALOG_ICONS,
+	categoryIconFor,
+	formatDurationMinutes,
+	getAncillaryCatalogCopy,
+	plural,
+	rupees,
+	type AncillaryCatalogCopy,
+	type CatalogIconPath,
+} from '../utils/ancillaryCatalogCopy'
+import {
+	buildProcedureSheetContent,
+	packageCartItem,
+	packageTone,
+	procedureAbout,
+	procedureCartItem,
+	procedureIcon,
+	procedureIncludes,
+	procedureName,
+	procedureTone,
+} from '../utils/ancillaryCatalogContent'
 
-interface CategoryGroup {
-	id: string
-	categoryName: string
-	procedures: ServiceProcedureItem[]
-}
+type CatalogRoute = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SERVICES>
+type CatalogNavigation = NavigationProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SERVICES>
 
-const SERVICE_UI: Record<string, {
-	title: string
-	searchPlaceholder: string
-	image: string
-	premiumBadgeText?: string
-}> = {
-	'nursing-care': {
-		title: 'Nursing Care & Procedures',
-		searchPlaceholder: 'Search procedures e.g. Dressing, IV, Injection...',
-		image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=300&q=80',
-	},
-	physiotherapy: {
-		title: 'Physiotherapy',
-		searchPlaceholder: 'Search physiotherapy e.g. Back pain, Knee pain...',
-		image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=300&q=80',
-		premiumBadgeText: 'Verified PT',
-	},
-	'rehab-care': {
-		title: 'Rehab Care Support',
-		searchPlaceholder: 'Search rehab care e.g. Stroke, Cardiac...',
-		image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=300&q=80',
-	},
-	'medical-equipment': {
-		title: 'Medical Equipment',
-		searchPlaceholder: 'Search medical equipment e.g. Wheelchair, Oxygen...',
-		image: 'https://images.unsplash.com/photo-1576671081837-49000212a370?auto=format&fit=crop&w=300&q=80',
-	},
-	'elder-day-care': {
-		title: 'Elder Day Care & Assistance',
-		searchPlaceholder: 'Search elder care e.g. Companion, Mobility...',
-		image: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&w=300&q=80',
-	},
-}
-
-// Icon lookup for the Nursing filter cards (reusing ConditionGrid --
-// see below). Categories themselves still come from the API (fetchAncillaryCategories),
-// this only supplies an icon per known label so the reused card UI has something to
-// show; any future/unknown category label falls back to NURSING_DEFAULT_ICON so the
-// screen never breaks if the backend adds a new nursing category.
-const NURSING_CATEGORY_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
-	'general nursing procedures': 'needle',
-	'wound & recovery care': 'bandage',
-	'specialized high dependency care': 'hospital-box-outline',
-}
-const NURSING_ALL_ICON: keyof typeof MaterialCommunityIcons.glyphMap = 'view-grid-outline'
-const NURSING_DEFAULT_ICON: keyof typeof MaterialCommunityIcons.glyphMap = 'clipboard-text-outline'
-
-// Sentinel id for the Nursing "All Services" chip/selection -- matches the
-// existing `activeCategory` default of 'all' used by the category pill bar
-// for other specialties, kept here so the toggle-handler factory below can
-// treat Nursing and Physiotherapy identically.
-const NURSING_ALL_CATEGORY_ID = 'all'
-
-// Sentinel id for the Physiotherapy "All Services" chip/selection -- not a real
-// lookup_ancillary_category.public_id, just means "show every fetched service,
-// unfiltered". This is also the default selection when the screen opens.
-// Lives here (not in ConditionGrid.tsx) because it's Physiotherapy-specific
-// business data, same as PHYSIOTHERAPY_CONDITIONS below.
-export const PHYSIOTHERAPY_ALL_CONDITION_ID = 'phys-all'
-
-// The 9 "Find Physiotherapy for" condition cards. `id` values are the real
-// lookup_ancillary_category.public_id rows used to filter already-fetched
-// Physiotherapy services client-side (see displayGroups below) -- this array
-// is the single source of truth for that data; ConditionGrid.tsx only renders
-// whatever list of { id, label, icon } it's given.
-// Icons restored from the original PhysiotherapyConditionsGrid.tsx implementation
-// (recovered from git history, commit 99206c0) rather than newly invented ones.
-const PHYSIOTHERAPY_CONDITIONS: ConditionGridItem[] = [
-	{ id: 'phys-knee', label: 'Knee Pain', icon: 'bone' },
-	{ id: 'phys-back', label: 'Back Pain', icon: 'human-male-height' },
-	{ id: 'phys-neck', label: 'Neck Pain', icon: 'head-alert-outline' },
-	{ id: 'phys-shoulder', label: 'Shoulder Pain', icon: 'arm-flex-outline' },
-	{ id: 'phys-hand', label: 'Hand Pain', icon: 'hand-back-right-outline' },
-	{ id: 'phys-leg', label: 'Leg Pain', icon: 'walk' },
-	{ id: 'phys-sports-injury', label: 'Sports Injury', icon: 'dumbbell' },
-	{ id: 'phys-stroke', label: 'Stroke Rehab', icon: 'brain' },
-	{ id: 'phys-post-surgery', label: 'Post Surgery', icon: 'bandage' },
-]
-
-// Shared toggle-select behavior for any ConditionGrid usage on this screen:
-// tapping the already-active card unselects it and falls back to that grid's
-// "All Services" sentinel, instead of leaving the card stuck selected with no
-// way to turn it off. Tapping any other card (or the "All Services" chip
-// itself) just selects that id as usual. This is the exact behavior
-// Physiotherapy already had; Nursing now reuses the same factory instead of
-// duplicating the logic.
-function createConditionToggleHandler(
-	setActiveId: (updater: (prev: string) => string) => void,
-	allServicesId: string
-) {
-	return (id: string) => {
-		setActiveId((prev) => {
-			if (prev === id && id !== allServicesId) {
-				return allServicesId
-			}
-			return id
-		})
-	}
-}
+// Caregiver launcher keys keep their own screen (day / night care modes); every other key uses this catalogue.
+const CAREGIVER_KEYS = new Set(['caregiver-services', 'elder-day-care'])
 
 export default function AncillaryServiceCatalogScreen() {
-	const navigation = useNavigation<any>()
-	const route = useRoute<any>()
-
+	const route = useRoute<CatalogRoute>()
 	const serviceKey = route.params?.serviceKey || 'nursing-care'
 	const serviceLabel = route.params?.serviceLabel || 'Nursing Care'
-	if (serviceKey === 'home-care' || serviceKey === 'caregiver-services' || serviceKey === 'elder-day-care') {
-		return <CaregiverServicesScreen />
-	}
+	if (CAREGIVER_KEYS.has(serviceKey)) return <CaregiverServicesScreen />
+	// Keyed so switching speciality resets the cart / filters.
+	return <HomeCareCatalog key={serviceKey} serviceKey={serviceKey} serviceLabel={serviceLabel} />
+}
 
-	const activeUi = SERVICE_UI[serviceKey] || SERVICE_UI['nursing-care']
-	const isPhysiotherapy = serviceKey === 'physiotherapy'
-	// Reuses the same ConditionGrid card UI for its filters (see
-	// nursingConditions below / render block) -- functionality/state is unchanged.
-	const isNursing = serviceKey === 'nursing-care'
+type TypeTab = 'all' | 'packages' | 'procedures'
+
+type DetailTarget =
+	| { kind: 'procedure'; item: AncillaryServiceItem }
+	| { kind: 'package'; item: AncillaryPackageListItem }
+	| null
+
+const MAIN_TILES = 5
+const SHEET_TILES = 4
+
+const matchesQuery = (q: string, parts: (string | null | undefined)[]) =>
+	!q || parts.some((p) => !!p && p.toLowerCase().includes(q))
+
+/** Cart handed back by the booking pages (new AncillaryCartItem[] or the old ServiceProcedureItem[]). */
+const normalizeReturnedCart = (raw: unknown[]): AncillaryCartItem[] => {
+	const items = raw
+		.map((x: any): AncillaryCartItem | null => {
+			if (!x?.id) return null
+			if (x.kind === 'procedure' || x.kind === 'package') return x as AncillaryCartItem
+			const price = typeof x.price === 'number' ? x.price : parseFloat(String(x.price ?? '').replace(/[^0-9.]/g, ''))
+			return { id: String(x.id), kind: 'procedure', name: String(x.title ?? x.name ?? ''), price: price || 0 }
+		})
+		.filter((x): x is AncillaryCartItem => !!x)
+	const pkg = items.find((i) => i.kind === 'package')
+	return pkg ? [pkg] : items
+}
+
+function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; serviceLabel: string }) {
+	const navigation = useNavigation<CatalogNavigation>()
+	const route = useRoute<CatalogRoute>()
+	const { user } = useAuth()
+	const copy = useMemo(() => getAncillaryCatalogCopy(serviceKey, serviceLabel), [serviceKey, serviceLabel])
+	const appConfig = useAppConfig(copy.isNursing)
+	const helpline = copy.isNursing ? appConfig?.nursing_helpline_number?.trim() || '' : ''
 
 	const [categories, setCategories] = useState<AncillaryCategoryApiItem[]>([])
-	const [rawServices, setRawServices] = useState<AncillaryServiceItem[]>([])
+	const [services, setServices] = useState<AncillaryServiceItem[]>([])
 	const [loading, setLoading] = useState(true)
-	const [activeCategory, setActiveCategory] = useState<string>('all')
-	const [searchQuery, setSearchQuery] = useState('')
-	const [selectedProcedure, setSelectedProcedure] = useState<ServiceProcedureItem | null>(null)
-	const [cart, setCart] = useState<ServiceProcedureItem[]>([])
-	// Packages section (bundled services) -- kept fully separate from the
-	// individual procedure list/cart above.
 	const [packages, setPackages] = useState<AncillaryPackageListItem[]>([])
 	const [packagesLoading, setPackagesLoading] = useState(true)
 	const [packagesError, setPackagesError] = useState(false)
 	const [packagesReloadKey, setPackagesReloadKey] = useState(0)
-	const [selectedPackage, setSelectedPackage] = useState<AncillaryPackageListItem | null>(null)
-	// For Physiotherapy, this holds the id of the selected "Find Physiotherapy for"
-	// card. It is either a lookup_ancillary_category.public_id (e.g. "phys-knee"),
-	// used to filter the already-fetched procedures, or the PHYSIOTHERAPY_ALL_CONDITION_ID
-	// sentinel meaning "show every fetched service, unfiltered" -- which is also
-	// the default selection when the screen opens.
-	const [activeCondition, setActiveCondition] = useState<string | null>(isPhysiotherapy ? PHYSIOTHERAPY_ALL_CONDITION_ID : null)
 
+	const [tab, setTab] = useState<TypeTab>('all')
+	const [categoryId, setCategoryId] = useState<string | null>(null)
+	const [query, setQuery] = useState('')
+	const [cart, setCart] = useState<AncillaryCartItem[]>([])
+	const [detail, setDetail] = useState<DetailTarget>(null)
+	const [careForOpen, setCareForOpen] = useState(false)
+	const [compact, setCompact] = useState(false)
+	const compactRef = useRef(false)
+
+	// ---- data ----
 	useEffect(() => {
 		let isMounted = true
 		const loadCatalog = async () => {
@@ -184,7 +160,7 @@ export default function AncillaryServiceCatalogScreen() {
 				])
 				if (isMounted) {
 					setCategories(cats)
-					setRawServices(srvs)
+					setServices(srvs)
 				}
 			} catch (e) {
 				console.log('[AncillaryServiceCatalogScreen] Catalog load error:', e)
@@ -198,8 +174,6 @@ export default function AncillaryServiceCatalogScreen() {
 		}
 	}, [serviceKey])
 
-	// Load packages for the current specialty (same serviceKey the services
-	// fetch above uses -- nothing hardcoded).
 	useEffect(() => {
 		let isMounted = true
 		const loadPackages = async () => {
@@ -224,349 +198,692 @@ export default function AncillaryServiceCatalogScreen() {
 		}
 	}, [serviceKey, packagesReloadKey])
 
-	// Sync selection state when returning from Booking Details. If a service
-	// was removed there (via "Add Services"), the updated list is passed back
-	// via route.params.updatedCart so the cart here doesn't stay stale.
+	// Cart edited on a booking page and handed back via params.
+	const returnedCart = route.params?.updatedCart
 	useEffect(() => {
-		if (route.params?.updatedCart) {
-			setCart(route.params.updatedCart)
-			navigation.setParams({ updatedCart: undefined })
-		}
-	}, [route.params?.updatedCart])
+		if (!returnedCart) return
+		setCart(normalizeReturnedCart(returnedCart))
+		navigation.setParams({ updatedCart: undefined })
+	}, [returnedCart, navigation])
 
-	useEffect(() => {
-		const onBackPress = () => {
-			if (selectedProcedure) {
-				setSelectedProcedure(null)
-				return true
-			}
-			return false
-		}
-		const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress)
-		return () => subscription.remove()
-	}, [selectedProcedure])
+	// ---- cart ----
+	const isInCart = useCallback(
+		(id: string, kind: AncillaryCartItem['kind']) => cart.some((c) => c.id === id && c.kind === kind),
+		[cart]
+	)
 
-	const categoryPills = useMemo(() => {
-		return [{ id: 'all', label: 'All Services' }, ...categories]
-	}, [categories])
+	const confirmReplace = (title: string, message: string, onReplace: () => void) => {
+		Alert.alert(title, message, [
+			{ text: 'Cancel', style: 'cancel' },
+			{ text: 'Replace', onPress: onReplace },
+		])
+	}
 
-	// Nursing filter cards, reusing ConditionGrid's card UI.
-	// Only the 3 real categories go into the grid -- "All Services" is now the
-	// existing top-right header chip (allChipId="all" in the render below)
-	// instead of a card, so it isn't included here. Categories/ids/labels are
-	// still exactly what the API returns via fetchAncillaryCategories -- only
-	// an icon is attached here for display; the existing activeCategory state
-	// and filtering in displayGroups below are completely unchanged.
-	const nursingConditions = useMemo<ConditionGridItem[]>(() => {
-		if (!isNursing) return []
-		return categories.map((cat) => ({
-			id: cat.id,
-			label: cat.label,
-			icon: NURSING_CATEGORY_ICONS[cat.label.trim().toLowerCase()] || NURSING_DEFAULT_ICON,
-		}))
-	}, [isNursing, categories])
-
-	const activeConditionMeta = useMemo(() => {
-		if (!isPhysiotherapy || !activeCondition) return null
-		return PHYSIOTHERAPY_CONDITIONS.find((c) => c.id === activeCondition) || null
-	}, [isPhysiotherapy, activeCondition])
-
-	const procedureItems = useMemo<ServiceProcedureItem[]>(() => {
-		return rawServices.map((s) => {
-			const title = s.title || (s as any).label || (s as any).name || ''
-			const description = s.description || s.about_service || s.aboutService || ''
-
-			return {
-				id: s.id,
-				categoryId: s.categoryId ?? null,
-				title,
-				description,
-				price: typeof s.price === 'number' ? `₹${s.price}` : String(s.price || '₹499'),
-				duration: '30-45 mins',
-				image: activeUi.image,
-				image_url: s.image_url ?? s.imageUrl ?? null,
-				premiumBadgeText: activeUi.premiumBadgeText,
-				about_service: s.about_service ?? s.aboutService ?? null,
-				whats_included: s.whats_included ?? s.whatsIncluded ?? null,
-			}
-		})
-	}, [rawServices, activeUi.image, activeUi.premiumBadgeText])
-
-	const displayGroups = useMemo<CategoryGroup[]>(() => {
-		let filtered = procedureItems
-		let groupTitle = activeUi.title
-
-		if (isPhysiotherapy) {
-			// The "Find Physiotherapy for" cards are the patient-facing filters
-			// here. "All Services" (and no selection) show every service already
-			// fetched for this specialty with no extra API call; any specific
-			// condition filters the same already-fetched list by that condition's
-			// category public_id (lookup_ancillary_category.public_id).
-			if (activeConditionMeta && activeConditionMeta.id !== PHYSIOTHERAPY_ALL_CONDITION_ID) {
-				filtered = filtered.filter((p) => p.categoryId === activeConditionMeta.id)
-				groupTitle = `${activeConditionMeta.label} Services`
-			} else {
-				groupTitle = 'All Physiotherapy Services'
-			}
-		} else if (activeCategory !== 'all') {
-			filtered = filtered.filter((p) => p.categoryId === activeCategory)
-			groupTitle = categoryPills.find((c) => c.id === activeCategory)?.label || activeUi.title
-		}
-
-		if (searchQuery.trim()) {
-			const q = searchQuery.toLowerCase().trim()
-			filtered = filtered.filter(
-				(p) => p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
+	const addProcedure = (s: AncillaryServiceItem, onAdded?: () => void) => {
+		const item = procedureCartItem(s)
+		const current = cart.find((c) => c.kind === 'package')
+		if (current) {
+			confirmReplace(
+				'Replace your package?',
+				`A booking can have one package or single services, not both. Adding “${item.name}” removes “${current.name}”.`,
+				() => {
+					setCart([item])
+					onAdded?.()
+				}
 			)
+			return
 		}
+		setCart((prev) => (prev.some((c) => c.id === item.id) ? prev : [...prev, item]))
+		onAdded?.()
+	}
 
-		return [
-			{
-				id: 'group-all',
-				categoryName: groupTitle,
-				procedures: filtered,
-			},
-		]
-	}, [procedureItems, searchQuery, activeUi.title, activeCategory, categoryPills, activeConditionMeta, isPhysiotherapy])
-
-	const handleToggleProcedure = (item: ServiceProcedureItem) => {
-		setCart((prev) => {
-			const exists = prev.some((c) => c.id === item.id)
-			if (exists) {
-				return prev.filter((c) => c.id !== item.id)
-			} else {
-				return [...prev, item]
+	const addPackage = (p: AncillaryPackageListItem, onAdded?: () => void) => {
+		const item = packageCartItem(p)
+		if (cart.length === 0) {
+			setCart([item])
+			onAdded?.()
+			return
+		}
+		const current = cart[0]
+		if (current.kind === 'package') {
+			if (current.id === item.id) {
+				onAdded?.()
+				return
 			}
-		})
-	}
-
-	const handleInstantDispatch = (item?: ServiceProcedureItem) => {
-		let itemsToBook: ServiceProcedureItem[] = []
-		if (item) {
-			itemsToBook = cart.some((c) => c.id === item.id) ? cart : [...cart, item]
-		} else {
-			itemsToBook = cart.length > 0 ? cart : procedureItems[0] ? [procedureItems[0]] : []
+			confirmReplace(
+				'Replace your package?',
+				`A booking can have one package. Adding “${item.name}” replaces “${current.name}”.`,
+				() => {
+					setCart([item])
+					onAdded?.()
+				}
+			)
+			return
 		}
-		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOKING_DETAILS, {
-			services: itemsToBook,
-			selectedServices: itemsToBook,
-			bookingPayload: {
-				bookingType: 'INSTANT',
-				serviceKey,
-				serviceLabel,
-				services: itemsToBook,
-			},
+		confirmReplace(
+			'Replace your services?',
+			`A booking can have one package or single services, not both. Adding “${item.name}” removes the ${plural(cart.length, 'service', 'services')} you added.`,
+			() => {
+				setCart([item])
+				onAdded?.()
+			}
+		)
+	}
+
+	const removeFromCart = (id: string, kind: AncillaryCartItem['kind']) =>
+		setCart((prev) => prev.filter((c) => !(c.id === id && c.kind === kind)))
+
+	const toggleProcedure = (s: AncillaryServiceItem) =>
+		isInCart(s.id, 'procedure') ? removeFromCart(s.id, 'procedure') : addProcedure(s)
+	const togglePackage = (p: AncillaryPackageListItem) =>
+		isInCart(p.id, 'package') ? removeFromCart(p.id, 'package') : addPackage(p)
+
+	const total = cart.reduce((sum, c) => sum + (c.price || 0), 0)
+	const savings = cart.reduce((sum, c) => sum + (c.mrp != null && c.mrp > c.price ? c.mrp - c.price : 0), 0)
+	const countLabel =
+		cart[0]?.kind === 'package' ? '1 package added' : `${plural(cart.length, 'service', 'services')} added`
+
+	const handleBook = () => {
+		if (cart.length === 0) return
+		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOK_VISIT, { serviceKey, serviceLabel, items: cart })
+	}
+
+	const callHelpline = async () => {
+		if (!helpline) return
+		const opened = await openContactUrl(telUrl(helpline))
+		if (!opened) Alert.alert('Could not open the dialer', `Please call ${helpline}.`)
+	}
+
+	// ---- filtering ----
+	const q = query.trim().toLowerCase()
+	const toneIndex = useMemo(() => {
+		const map = new Map<string, number>()
+		services.forEach((s, i) => map.set(`s:${s.id}`, i))
+		packages.forEach((p, i) => map.set(`p:${p.id}`, i))
+		return map
+	}, [services, packages])
+
+	const filteredProcedures = useMemo(
+		() =>
+			services.filter(
+				(s) =>
+					(!categoryId || s.categoryId === categoryId) &&
+					matchesQuery(q, [procedureName(s), procedureAbout(s), s.good_for, ...procedureIncludes(s)])
+			),
+		[services, categoryId, q]
+	)
+	const filteredPackages = useMemo(
+		() => packages.filter((p) => matchesQuery(q, [p.label, p.description, p.good_for, ...(p.includes ?? [])])),
+		[packages, q]
+	)
+
+	// Packages have no category, so a "Care for" filter narrows the list to procedures.
+	const packagesAllowed = tab !== 'procedures' && !categoryId
+	const showPackages =
+		packagesAllowed && (packagesLoading || (packagesError && !q) || filteredPackages.length > 0)
+	const showProcedures = tab !== 'packages' && (loading || filteredProcedures.length > 0)
+	const noResults = !showPackages && !showProcedures
+	const filtersActive = !!q || !!categoryId || tab !== 'all'
+
+	const resetFilters = () => {
+		setTab('all')
+		setCategoryId(null)
+		setQuery('')
+	}
+
+	const pickTab = (next: TypeTab) => {
+		setTab(next)
+		setCategoryId(null)
+	}
+
+	const pickCategory = (id: string) => {
+		setCategoryId((prev) => (prev === id ? null : id))
+		setTab('all')
+		setCareForOpen(false)
+	}
+
+	// ---- featured slides ----
+	const featuredPackage = useMemo(() => packages.find((p) => p.is_featured), [packages])
+	const featuredProcedure = useMemo(() => services.find((s) => s.is_featured), [services])
+
+	const slides: (AppPromoCardProps & { key: string })[] = []
+	if (helpline) {
+		slides.push({
+			key: 'emergency',
+			tone: 'ink',
+			eyebrow: 'PRIORITY · 24/7',
+			title: 'Need a nurse right now?',
+			subtitle: 'Emergency nurse at home, day or night',
+			ctaLabel: 'Call now',
+			iconPath: CATALOG_ICONS.kit,
+			accessibilityHint: `Calls ${helpline}`,
+			onPress: () => void callHelpline(),
+		})
+	}
+	if (featuredPackage) {
+		slides.push({
+			key: `pkg-${featuredPackage.id}`,
+			tone: 'lilac',
+			eyebrow: 'CARE PLAN',
+			title: featuredPackage.label,
+			subtitle: featuredPackage.visits_count ? plural(featuredPackage.visits_count, 'visit', 'visits') : undefined,
+			priceLabel: rupees(featuredPackage.packagePrice),
+			mrpLabel:
+				featuredPackage.mrp && featuredPackage.mrp > featuredPackage.packagePrice
+					? rupees(featuredPackage.mrp)
+					: undefined,
+			ctaLabel: 'View package',
+			iconPath: CATALOG_ICONS.bandage,
+			onPress: () => setDetail({ kind: 'package', item: featuredPackage }),
+		})
+	}
+	if (featuredProcedure) {
+		const added = isInCart(featuredProcedure.id, 'procedure')
+		const sub = procedureIncludes(featuredProcedure).slice(0, 3).join(', ') || featuredProcedure.good_for || undefined
+		slides.push({
+			key: `srv-${featuredProcedure.id}`,
+			tone: 'peach',
+			eyebrow: 'FIRST VISIT',
+			title: procedureName(featuredProcedure),
+			subtitle: sub,
+			priceLabel: rupees(featuredProcedure.price),
+			mrpLabel:
+				featuredProcedure.mrp && featuredProcedure.mrp > featuredProcedure.price
+					? rupees(featuredProcedure.mrp)
+					: undefined,
+			ctaLabel: added ? 'Added ✓' : 'Add to booking',
+			ctaChevron: false,
+			iconPath: CATALOG_ICONS.vitals,
+			onPress: () =>
+				added ? setDetail({ kind: 'procedure', item: featuredProcedure }) : addProcedure(featuredProcedure),
 		})
 	}
 
-	// Physiotherapy condition-card toggle: tapping the active card falls back
-	// to PHYSIOTHERAPY_ALL_CONDITION_ID ("All Services"); tapping any other
-	// card (or the "All Services" chip) just selects that id. Unchanged from
-	// before -- now built from the shared factory above.
-	const handleSelectCondition = useMemo(
-		() => createConditionToggleHandler(setActiveCondition as (updater: (prev: string) => string) => void, PHYSIOTHERAPY_ALL_CONDITION_ID),
-		[]
-	)
+	// ---- header collapse ----
+	const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+		const y = e.nativeEvent.contentOffset.y
+		const next = compactRef.current ? y > 4 : y > 24
+		if (next === compactRef.current) return
+		compactRef.current = next
+		LayoutAnimation.configureNext(LayoutAnimation.create(200, 'easeInEaseOut', 'opacity'))
+		setCompact(next)
+	}
 
-	// Nursing category-card toggle: exactly the same behavior as Physiotherapy
-	// above, reusing the same factory instead of new logic -- tapping the
-	// active category card falls back to NURSING_ALL_CATEGORY_ID ('all'),
-	// which is also what the top-right "All Services" chip already sets, so
-	// displayGroups' existing `activeCategory !== 'all'` filtering needs no
-	// changes.
-	const handleSelectNursingCategory = useMemo(
-		() => createConditionToggleHandler(setActiveCategory, NURSING_ALL_CATEGORY_ID),
-		[]
+	const firstName = (user?.name ?? '').trim().split(/\s+/)[0] ?? ''
+	const typeTabs: AppTabItem<TypeTab>[] = [
+		{ key: 'all', label: 'All' },
+		{ key: 'packages', label: 'Packages' },
+		{ key: 'procedures', label: copy.servicesTabLabel },
+	]
+
+	// ---- sheet content ----
+	const procedureDetail = detail?.kind === 'procedure' ? detail.item : null
+	const packageDetail = detail?.kind === 'package' ? detail.item : null
+	const procedureSheet = useMemo(
+		() =>
+			procedureDetail
+				? buildProcedureSheetContent(
+						procedureDetail,
+						copy,
+						procedureTone(toneIndex.get(`s:${procedureDetail.id}`) ?? 0)
+					)
+				: null,
+		[procedureDetail, copy, toneIndex]
 	)
+	const closeDetail = () => setDetail(null)
 
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader title={activeUi.title} onBack={() => navigation.goBack()} />
-
-			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-				{/* Search Bar */}
-				<View style={styles.searchContainer}>
-					<AppInput
-						placeholder={activeUi.searchPlaceholder}
-						value={searchQuery}
-						onChangeText={setSearchQuery}
+			<AppScreenHeader
+				variant="bar"
+				backgroundColor={APP_COLORS.ink}
+				showBack={navigation.canGoBack()}
+				backAccessibilityLabel="Back"
+				style={compact ? styles.headerCompact : undefined}
+				titleNode={
+					<Text
+						style={[styles.miniTitle, { opacity: compact ? 1 : 0 }]}
+						numberOfLines={1}
+						accessibilityElementsHidden={!compact}
+						importantForAccessibility={compact ? 'auto' : 'no-hide-descendants'}
+					>
+						{copy.title}
+					</Text>
+				}
+				rightElement={
+					<TouchableOpacity
+						style={styles.cartBtn}
+						onPress={handleBook}
+						disabled={cart.length === 0}
+						activeOpacity={0.75}
+						accessibilityRole="button"
+						accessibilityLabel={`Booking, ${cart.length === 0 ? 'no services added' : countLabel}`}
+					>
+						<MaterialCommunityIcons name="cart-outline" size={24} color={APP_COLORS.surface} />
+						{cart.length > 0 && (
+							<View style={styles.cartBadge}>
+								<Text style={styles.cartBadgeText}>{cart.length}</Text>
+							</View>
+						)}
+					</TouchableOpacity>
+				}
+			>
+				{!compact && (
+					<View style={styles.intro}>
+						{!!firstName && <Text style={styles.hi}>{`HI ${firstName.toUpperCase()}`}</Text>}
+						<Text style={styles.h1} accessibilityRole="header">
+							{copy.title}
+						</Text>
+						<Text style={styles.introSub}>{copy.subtitle}</Text>
+					</View>
+				)}
+				<View style={styles.search}>
+					<MaterialCommunityIcons name="magnify" size={20} color={APP_COLORS.inkMuted} />
+					<TextInput
+						value={query}
+						onChangeText={setQuery}
+						placeholder={copy.searchPlaceholder}
+						placeholderTextColor={APP_COLORS.inkMuted}
+						style={styles.searchInput}
+						returnKeyType="search"
+						autoCorrect={false}
+						accessibilityLabel={copy.searchAccessibilityLabel}
 					/>
+					{!!query && (
+						<TouchableOpacity
+							onPress={() => setQuery('')}
+							style={styles.searchClear}
+							accessibilityRole="button"
+							accessibilityLabel="Clear search"
+						>
+							<MaterialCommunityIcons name="close-circle" size={18} color={APP_COLORS.inkMuted} />
+						</TouchableOpacity>
+					)}
+				</View>
+			</AppScreenHeader>
+
+			<ScrollView
+				style={styles.scroll}
+				contentContainerStyle={styles.scrollContent}
+				showsVerticalScrollIndicator={false}
+				keyboardShouldPersistTaps="handled"
+				onScroll={handleScroll}
+				scrollEventThrottle={16}
+			>
+				<View style={styles.filters}>
+					<AppTabs tabs={typeTabs} value={tab} onChange={pickTab} accessibilityLabel="Show" />
+					{categories.length > 0 && (
+						<CareForGrid
+							categories={categories}
+							activeId={categoryId}
+							onPick={pickCategory}
+							onClear={() => setCategoryId(null)}
+							onMore={() => setCareForOpen(true)}
+						/>
+					)}
 				</View>
 
-				{serviceKey === 'nursing-care' && <NursingQuickActionCards />}
-
-				{/* Categories Pill Bar -- Physiotherapy and Nursing no longer use this
-				    row; their filtering is handled by the reusable card-grid UI below
-				    instead (ConditionGrid, reused for both). */}
-				{!isPhysiotherapy && !isNursing && (
-					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesBar}>
-						{categoryPills.map((cat) => {
-							const isActive = activeCategory === cat.id
-							return (
-								<TouchableOpacity
-									key={cat.id}
-									style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-									onPress={() => setActiveCategory(cat.id)}
-									activeOpacity={0.8}
-								>
-									<AppTypography variant="caption" style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}>
-										{cat.label}
-									</AppTypography>
-								</TouchableOpacity>
-							)
-						})}
-					</ScrollView>
-				)}
-
-				{/* Physiotherapy filters: conditions/labels/icons and the "All
-				    Services" sentinel are all defined above in this file
-				    (PHYSIOTHERAPY_CONDITIONS / PHYSIOTHERAPY_ALL_CONDITION_ID) --
-				    ConditionGrid only renders whatever list + chip id it's given. */}
-				{isPhysiotherapy && (
-					<ConditionGrid
-						activeConditionId={activeCondition}
-						onSelectCondition={handleSelectCondition}
-						conditions={PHYSIOTHERAPY_CONDITIONS}
-						title="Find Physiotherapy for"
-						allChipId={PHYSIOTHERAPY_ALL_CONDITION_ID}
+				{slides.length > 0 && (
+					<AppCarousel
+						data={slides}
+						autoPlay={slides.length > 1}
+						autoPlayInterval={4500}
+						accessibilityLabel="Offers"
+						keyExtractor={(s) => s.key}
+						renderItem={({ item }) => {
+							const { key: _key, ...cardProps } = item
+							return <AppPromoCard {...cardProps} />
+						}}
 					/>
 				)}
 
-				{/* Nursing filters: same card UI as Physiotherapy above, reusing
-				    ConditionGrid with Nursing's category data and its own
-				    Nursing-specific title/subtitle. Only the 3 real categories
-				    (General Nursing Procedures, Wound & Recovery Care, Specialized
-				    High Dependency Care) go into the grid -- "All Services" is
-				    NOT one of the cards; it lives on the header's top-right chip
-				    (allChipId="all") only. Tapping an already-active category card
-				    now toggles it off back to "All Services" via
-				    handleSelectNursingCategory, exactly like Physiotherapy's
-				    handleSelectCondition -- the chip itself still just selects
-				    'all' directly either way. Selection wiring otherwise still
-				    just sets the existing activeCategory state, exactly like the
-				    pill bar it replaced -- so displayGroups' filtering logic below
-				    needs no changes. */}
-				{isNursing && (
-					<ConditionGrid
-						activeConditionId={activeCategory}
-						onSelectCondition={handleSelectNursingCategory}
-						conditions={nursingConditions}
-						title="Nursing Care For?"
-						subtitle="Select a care category"
-						allChipId={NURSING_ALL_CATEGORY_ID}
-						cardWidthPercent="48%"
-					/>
-				)}
-
-				{/* Packages -- separate section shown right after the filters ("Nursing Care For?"), above the services list.
-				    Rendered only when there is something to show (loading, error,
-				    or real packages from the backend). */}
-				{(packagesLoading || packagesError || packages.length > 0) && (
-					<View style={styles.packagesSection}>
-						<AppTypography variant="h4" style={styles.groupTitle}>
-							Packages
-						</AppTypography>
-						<AppTypography variant="caption" style={styles.packagesSubtitle}>
-							Care packages with multiple services included
-						</AppTypography>
-
+				{showPackages && (
+					<View style={styles.listSection}>
+						<ListHeader
+							title={copy.packagesTitle}
+							count={packagesLoading ? '' : plural(filteredPackages.length, 'package', 'packages')}
+							subtitle={copy.packagesSubtitle}
+						/>
 						{packagesLoading ? (
-							<View style={styles.packagesStateBox}>
-								<ActivityIndicator size="small" color="#0C7C7C" />
-							</View>
-						) : packagesError ? (
-							<View style={styles.packagesStateBox}>
-								<AppTypography variant="caption" style={styles.emptySub}>
-									Unable to load packages right now.
-								</AppTypography>
-								<TouchableOpacity onPress={() => setPackagesReloadKey((k) => k + 1)} activeOpacity={0.8}>
-									<AppTypography variant="caption" style={styles.packagesRetry}>
-										Try again
-									</AppTypography>
-								</TouchableOpacity>
+							<RowSkeletons />
+						) : packagesError && filteredPackages.length === 0 ? (
+							<View style={styles.stateBox}>
+								<Text style={styles.stateText}>Unable to load packages right now.</Text>
+								<AppTextLink label="Try again" onPress={() => setPackagesReloadKey((k) => k + 1)} />
 							</View>
 						) : (
-							packages.map((pkg) => (
-								<PackageSectionCard
-									key={pkg.id}
-									item={pkg}
-									onPress={() => setSelectedPackage(pkg)}
-									resolveImageSource={getAncillaryImageSource}
+							filteredPackages.map((p, i) => (
+								<AppCatalogItemRow
+									key={p.id}
+									divider={i > 0}
+									name={p.label}
+									priceLabel={rupees(p.packagePrice)}
+									mrpLabel={p.mrp && p.mrp > p.packagePrice ? rupees(p.mrp) : undefined}
+									metaLabel={
+										p.visits_count
+											? plural(p.visits_count, 'visit', 'visits')
+											: p.procedureCount
+												? plural(p.procedureCount, 'service', 'services')
+												: undefined
+									}
+									points={packagePoints(p)}
+									imageSource={p.imageUrl ? getAncillaryImageSource(p.imageUrl) : undefined}
+									iconPath={CATALOG_ICONS.elder}
+									tone={packageTone(toneIndex.get(`p:${p.id}`) ?? i)}
+									added={isInCart(p.id, 'package')}
+									onToggle={() => togglePackage(p)}
+									onPress={() => setDetail({ kind: 'package', item: p })}
 								/>
 							))
 						)}
 					</View>
 				)}
 
-				{loading ? (
-					<View style={styles.loadingContainer}>
-						<ActivityIndicator size="large" color="#0C7C7C" />
-						<AppTypography variant="caption" style={styles.loadingText}>
-							Loading services catalog...
-						</AppTypography>
-					</View>
-				) : displayGroups.length === 0 || displayGroups[0].procedures.length === 0 ? (
-					<View style={styles.emptyContainer}>
-						<MaterialCommunityIcons name="clipboard-text-search-outline" size={48} color="#94A3B8" />
-						<AppTypography variant="h3" style={styles.emptyTitle}>
-							No Procedures Found
-						</AppTypography>
-						<AppTypography variant="caption" style={styles.emptySub}>
-							Try searching with another term or reset your category filter.
-						</AppTypography>
-					</View>
-				) : (
-					displayGroups.map((group) => (
-						<View key={group.id} style={styles.groupSection}>
-							<AppTypography variant="h4" style={styles.groupTitle}>
-								{group.categoryName}
-							</AppTypography>
+				<TrustStrip chips={copy.trustChips} />
 
-							{group.procedures.map((item) => {
-								const isInCart = cart.some((c) => c.id === item.id)
+				{showProcedures && (
+					<View style={styles.listSection}>
+						<ListHeader
+							title={copy.servicesTitle}
+							count={loading ? '' : plural(filteredProcedures.length, 'service', 'services')}
+							subtitle={copy.servicesSubtitle}
+						/>
+						{loading ? (
+							<RowSkeletons />
+						) : (
+							filteredProcedures.map((s, i) => {
+								const imageUrl = s.image_url ?? s.imageUrl
 								return (
-									<ServiceCatalogCard
-										key={item.id}
-										item={item}
-										quantity={isInCart ? 1 : 0}
-										onIncrement={() => handleToggleProcedure(item)}
-										onDecrement={() => handleToggleProcedure(item)}
-										onSelectService={() => handleToggleProcedure(item)}
-										onCardPress={() => setSelectedProcedure(item)}
-										resolveImageSource={getAncillaryImageSource}
+									<AppCatalogItemRow
+										key={s.id}
+										divider={i > 0}
+										name={procedureName(s)}
+										priceLabel={rupees(s.price)}
+										mrpLabel={s.mrp && s.mrp > s.price ? rupees(s.mrp) : undefined}
+										metaLabel={formatDurationMinutes(s.duration_minutes) || undefined}
+										points={procedurePoints(s)}
+										imageSource={imageUrl ? getAncillaryImageSource(imageUrl) : undefined}
+										iconPath={procedureIcon(s)}
+										tone={procedureTone(toneIndex.get(`s:${s.id}`) ?? i)}
+										added={isInCart(s.id, 'procedure')}
+										onToggle={() => toggleProcedure(s)}
+										onPress={() => setDetail({ kind: 'procedure', item: s })}
 									/>
 								)
-							})}
-						</View>
-					))
+							})
+						)}
+					</View>
+				)}
+
+				{noResults && (
+					<View style={styles.empty}>
+						<Text style={styles.emptyTitle}>{q ? 'No service matches your search' : 'No services here yet'}</Text>
+						<Text style={styles.emptySub}>
+							{q
+								? copy.emptySearchHint
+								: filtersActive
+									? 'Try another filter, or browse all services.'
+									: copy.emptyCatalogHint}
+						</Text>
+						{filtersActive && (
+							<TouchableOpacity
+								style={styles.emptyBtn}
+								onPress={resetFilters}
+								activeOpacity={0.8}
+								accessibilityRole="button"
+							>
+								<Text style={styles.emptyBtnText}>Show all</Text>
+							</TouchableOpacity>
+						)}
+					</View>
 				)}
 			</ScrollView>
 
-			{/* Floating Cart Bar */}
-			{cart.length > 0 && (
-				<ViewCartFloatingBar
-					itemCount={cart.length}
-					totalAmount={`₹${cart.reduce((sum, item) => sum + (parseFloat(item.price.replace('₹', '')) || 0), 0)}`}
-					onViewCart={() => handleInstantDispatch()}
-				/>
-			)}
-
-			{/* Procedure Details Bottom Sheet */}
-			<ServiceDetailsSheet
-				visible={!!selectedProcedure}
-				service={selectedProcedure}
-				onClose={() => setSelectedProcedure(null)}
-				onAddToBooking={(p: ServiceProcedureItem) => {
-					handleToggleProcedure(p)
-					setSelectedProcedure(null)
-				}}
-				resolveImageSource={getAncillaryImageSource}
+			<AppCartFooter
+				empty={cart.length === 0}
+				countLabel={countLabel}
+				totalLabel={rupees(total)}
+				savingsLabel={savings > 0 ? `You save ${rupees(savings)}` : undefined}
+				ctaLabel="Book visit"
+				onCtaPress={handleBook}
+				emptyHint={copy.emptyCartHint}
 			/>
-			{/* Package Details Bottom Sheet (details only -- no booking wiring yet) */}
+
+			<AppBottomSheet
+				visible={careForOpen}
+				title="Care for"
+				subtitle={copy.careForSubtitle}
+				onClose={() => setCareForOpen(false)}
+				appearance="modern"
+				showHeaderDivider={false}
+			>
+				<TileRows
+					categories={categories}
+					activeId={categoryId}
+					onPick={pickCategory}
+					perRow={SHEET_TILES}
+				/>
+			</AppBottomSheet>
+
+			<ServiceDetailsSheet
+				variant="modern"
+				visible={!!procedureDetail}
+				content={procedureSheet}
+				onClose={closeDetail}
+				added={procedureDetail ? isInCart(procedureDetail.id, 'procedure') : false}
+				onAdd={procedureDetail ? () => addProcedure(procedureDetail, closeDetail) : undefined}
+				onRemove={procedureDetail ? () => removeFromCart(procedureDetail.id, 'procedure') : undefined}
+			/>
 			<PackageDetailsBottomSheet
-				visible={!!selectedPackage}
-				pkg={selectedPackage}
-				onClose={() => setSelectedPackage(null)}
+				visible={!!packageDetail}
+				pkg={packageDetail}
+				onClose={closeDetail}
+				copy={copy}
+				toneIndex={packageDetail ? (toneIndex.get(`p:${packageDetail.id}`) ?? 0) : 0}
+				added={packageDetail ? isInCart(packageDetail.id, 'package') : false}
+				onAdd={packageDetail ? () => addPackage(packageDetail, closeDetail) : undefined}
+				onRemove={packageDetail ? () => removeFromCart(packageDetail.id, 'package') : undefined}
+			/>
+		</View>
+	)
+}
+
+const packagePoints = (p: AncillaryPackageListItem): string[] => {
+	if (p.includes && p.includes.length > 0) return p.includes.slice(0, 2)
+	return p.description?.trim() ? [p.description.trim()] : []
+}
+
+const procedurePoints = (s: AncillaryServiceItem): string[] => {
+	const about = procedureAbout(s)
+	const first = procedureIncludes(s)[0]
+	return [about, first].filter((x): x is string => !!x)
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Pieces
+// ---------------------------------------------------------------------------------------------------------
+
+function ListHeader({ title, count, subtitle }: { title: string; count: string; subtitle: string }) {
+	return (
+		<View style={styles.listHeader}>
+			<View style={styles.listTitleRow}>
+				<Text style={styles.listTitle} accessibilityRole="header">
+					{title}
+				</Text>
+				{!!count && <Text style={styles.listCount}>{count}</Text>}
+			</View>
+			<Text style={styles.listSub}>{subtitle}</Text>
+		</View>
+	)
+}
+
+function RowSkeletons() {
+	return (
+		<View style={styles.skeletons}>
+			{[0, 1].map((i) => (
+				<View key={i} style={styles.skeletonRow}>
+					<View style={styles.skeletonText}>
+						<AppSkeleton height={20} width="80%" borderRadius={6} color={APP_COLORS.divider} />
+						<AppSkeleton height={14} width="50%" borderRadius={6} color={APP_COLORS.divider} />
+						<AppSkeleton height={14} width="65%" borderRadius={6} color={APP_COLORS.divider} />
+					</View>
+					<AppSkeleton width={112} height={112} borderRadius={16} color={APP_COLORS.divider} />
+				</View>
+			))}
+		</View>
+	)
+}
+
+function TrustStrip({ chips }: { chips: AncillaryCatalogCopy['trustChips'] }) {
+	return (
+		<View style={styles.trust} accessibilityLabel="Why book with us">
+			{chips.map((c) => (
+				<View key={c.key} style={styles.trustItem} accessible accessibilityLabel={c.label}>
+					<View style={styles.trustIcon}>
+						<AppPathIcon d={c.icon} size={20} strokeWidth={2} color={APP_COLORS.primary} />
+					</View>
+					<Text style={styles.trustText}>{c.label}</Text>
+				</View>
+			))}
+		</View>
+	)
+}
+
+type TileCategory = { id: string; label: string }
+
+function CareTile({
+	label,
+	icon,
+	active,
+	onPress,
+}: {
+	label: string
+	icon: CatalogIconPath
+	active: boolean
+	onPress: () => void
+}) {
+	const tone = toneForString(label)
+	return (
+		<TouchableOpacity
+			onPress={onPress}
+			activeOpacity={0.8}
+			style={[
+				styles.tile,
+				{ borderColor: active ? tone.ink : APP_COLORS.divider, backgroundColor: active ? tone.bg : APP_COLORS.surface },
+			]}
+			accessibilityRole="button"
+			accessibilityState={{ selected: active }}
+			accessibilityLabel={label}
+		>
+			<View style={[styles.tileIcon, { backgroundColor: active ? tone.ink : tone.bg }]}>
+				<AppPathIcon d={icon} size={18} strokeWidth={2} color={active ? APP_COLORS.surface : tone.ink} />
+			</View>
+			<Text style={styles.tileLabel} numberOfLines={2}>
+				{label}
+			</Text>
+		</TouchableOpacity>
+	)
+}
+
+function TileRows({
+	categories,
+	activeId,
+	onPick,
+	perRow,
+	trailing,
+}: {
+	categories: TileCategory[]
+	activeId: string | null
+	onPick: (id: string) => void
+	perRow: number
+	/** Extra last tile (the "+N more" button). */
+	trailing?: React.ReactNode
+}) {
+	const cells: React.ReactNode[] = categories.map((c) => (
+		<CareTile
+			key={c.id}
+			label={c.label}
+			icon={categoryIconFor(c.label)}
+			active={c.id === activeId}
+			onPress={() => onPick(c.id)}
+		/>
+	))
+	if (trailing) cells.push(<React.Fragment key="more">{trailing}</React.Fragment>)
+	const rows: React.ReactNode[][] = []
+	for (let i = 0; i < cells.length; i += perRow) rows.push(cells.slice(i, i + perRow))
+	return (
+		<View style={styles.tileRows}>
+			{rows.map((row, r) => (
+				<View key={r} style={styles.tileRow}>
+					{row.map((cell, c) => (
+						<View key={c} style={styles.tileCell}>
+							{cell}
+						</View>
+					))}
+					{Array.from({ length: perRow - row.length }).map((_, k) => (
+						<View key={`pad-${k}`} style={styles.tileCell} />
+					))}
+				</View>
+			))}
+		</View>
+	)
+}
+
+function CareForGrid({
+	categories,
+	activeId,
+	onPick,
+	onClear,
+	onMore,
+}: {
+	categories: TileCategory[]
+	activeId: string | null
+	onPick: (id: string) => void
+	onClear: () => void
+	onMore: () => void
+}) {
+	const overflow = categories.length > MAIN_TILES
+	const shownCount = overflow ? MAIN_TILES - 1 : MAIN_TILES
+	// Keep the selected tile visible: move it into the last shown slot when it sits in the overflow.
+	const ordered = [...categories]
+	const idx = ordered.findIndex((c) => c.id === activeId)
+	if (idx >= shownCount) {
+		const [picked] = ordered.splice(idx, 1)
+		ordered.splice(shownCount - 1, 0, picked)
+	}
+	const hidden = categories.length - shownCount
+
+	return (
+		<View style={styles.careFor}>
+			<View style={styles.careForHead}>
+				<Text style={styles.careForTitle} accessibilityRole="header">
+					Care for
+				</Text>
+				{!!activeId && <AppTextLink label="Clear" size="sm" trailingIcon="none" onPress={onClear} />}
+			</View>
+			<TileRows
+				categories={ordered.slice(0, shownCount)}
+				activeId={activeId}
+				onPick={onPick}
+				perRow={MAIN_TILES}
+				trailing={
+					overflow ? (
+						<TouchableOpacity
+							onPress={onMore}
+							activeOpacity={0.8}
+							style={[styles.tile, styles.moreTile]}
+							accessibilityRole="button"
+							accessibilityLabel={`View all ${categories.length} care needs`}
+						>
+							<View style={[styles.tileIcon, { backgroundColor: APP_COLORS.ink }]}>
+								<AppPathIcon d={CATALOG_ICONS.grid} size={16} strokeWidth={2} color={APP_COLORS.surface} />
+							</View>
+							<Text style={styles.tileLabel} numberOfLines={1}>
+								{`+${hidden} more`}
+							</Text>
+						</TouchableOpacity>
+					) : undefined
+				}
 			/>
 		</View>
 	)
@@ -575,93 +892,286 @@ export default function AncillaryServiceCatalogScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#F8FAFC',
+		backgroundColor: APP_COLORS.pageBg,
+	},
+	headerCompact: {
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.16,
+		shadowRadius: 8,
+		elevation: 4,
+	},
+	miniTitle: {
+		fontSize: 18,
+		lineHeight: 26,
+		fontWeight: '700',
+		color: APP_COLORS.surface,
+	},
+	cartBtn: {
+		width: 44,
+		height: 44,
+		marginRight: -10,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	cartBadge: {
+		position: 'absolute',
+		top: 4,
+		right: 4,
+		minWidth: 18,
+		height: 18,
+		paddingHorizontal: 4,
+		borderRadius: 9,
+		backgroundColor: APP_COLORS.surface,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	cartBadgeText: {
+		fontSize: 12,
+		lineHeight: 18,
+		fontWeight: '600',
+		color: APP_COLORS.ink,
+	},
+	intro: {
+		gap: 4,
+		marginBottom: 12,
+	},
+	hi: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+		letterSpacing: 0.72,
+		color: APP_COLORS.mintAccent,
+	},
+	h1: {
+		fontSize: 26,
+		lineHeight: 32,
+		fontWeight: '700',
+		color: APP_COLORS.surface,
+	},
+	introSub: {
+		fontSize: 14,
+		lineHeight: 20,
+		color: APP_COLORS.mint,
+	},
+	search: {
+		height: 48,
+		paddingHorizontal: 12,
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.surface,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginBottom: 8,
+	},
+	searchInput: {
+		flex: 1,
+		minWidth: 0,
+		height: 44,
+		fontSize: 16,
+		color: APP_COLORS.ink,
+		paddingVertical: 0,
+	},
+	searchClear: {
+		width: 32,
+		height: 32,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: -6,
+	},
+	scroll: {
+		flex: 1,
 	},
 	scrollContent: {
-		paddingBottom: 100,
+		paddingVertical: 16,
+		gap: 16,
 	},
-	searchContainer: {
+	filters: {
 		paddingHorizontal: 16,
-		paddingTop: 12,
-		paddingBottom: 8,
+		gap: 12,
 	},
-	categoriesBar: {
-		paddingHorizontal: 16,
-		paddingVertical: 8,
+	careFor: {
 		gap: 8,
 	},
-	categoryChip: {
-		paddingHorizontal: 14,
-		paddingVertical: 8,
-		borderRadius: 20,
-		backgroundColor: '#F1F5F9',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
+	careForHead: {
+		flexDirection: 'row',
+		alignItems: 'baseline',
+		justifyContent: 'space-between',
 	},
-	categoryChipActive: {
-		backgroundColor: '#0C7C7C',
-		borderColor: '#0C7C7C',
-	},
-	categoryChipText: {
-		color: '#475569',
-		fontWeight: '600',
-		fontSize: 12,
-	},
-	categoryChipTextActive: {
-		color: '#FFFFFF',
-	},
-	loadingContainer: {
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingVertical: 60,
-	},
-	loadingText: {
-		marginTop: 12,
-		color: '#64748B',
-	},
-	emptyContainer: {
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingVertical: 60,
-		paddingHorizontal: 32,
-	},
-	emptyTitle: {
-		marginTop: 16,
-		color: '#1E293B',
+	careForTitle: {
+		fontSize: 15,
+		lineHeight: 22,
 		fontWeight: '700',
+		color: APP_COLORS.ink,
 	},
-	emptySub: {
-		marginTop: 6,
-		color: '#64748B',
+	tileRows: {
+		gap: 6,
+	},
+	tileRow: {
+		flexDirection: 'row',
+		gap: 6,
+	},
+	tileCell: {
+		flex: 1,
+		minWidth: 0,
+	},
+	tile: {
+		alignItems: 'center',
+		gap: 4,
+		paddingTop: 8,
+		paddingBottom: 6,
+		paddingHorizontal: 2,
+		borderRadius: 12,
+		borderWidth: 2,
+		minHeight: 76,
+	},
+	moreTile: {
+		borderStyle: 'dashed',
+		borderColor: APP_COLORS.border,
+		backgroundColor: APP_COLORS.pageBg,
+	},
+	tileIcon: {
+		width: 34,
+		height: 34,
+		borderRadius: 17,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	tileLabel: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+		color: APP_COLORS.ink,
 		textAlign: 'center',
 	},
-	groupSection: {
+	listSection: {
+		backgroundColor: APP_COLORS.surface,
+		borderTopWidth: 1,
+		borderBottomWidth: 1,
+		borderColor: APP_COLORS.divider,
+		paddingTop: 20,
 		paddingHorizontal: 16,
-		marginTop: 16,
 	},
-	groupTitle: {
-		fontSize: 16,
+	listHeader: {
+		gap: 4,
+	},
+	listTitleRow: {
+		flexDirection: 'row',
+		alignItems: 'baseline',
+		justifyContent: 'space-between',
+		gap: 12,
+	},
+	listTitle: {
+		flex: 1,
+		fontSize: 22,
+		lineHeight: 28,
 		fontWeight: '700',
-		color: '#0F172A',
-		marginBottom: 12,
+		color: APP_COLORS.ink,
 	},
-	packagesSection: {
-		paddingHorizontal: 16,
-		marginTop: 24,
+	listCount: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '500',
+		color: APP_COLORS.inkMuted,
 	},
-	packagesSubtitle: {
-		color: '#64748B',
-		marginTop: -8,
-		marginBottom: 12,
+	listSub: {
+		fontSize: 14,
+		lineHeight: 20,
+		color: APP_COLORS.inkMuted,
 	},
-	packagesStateBox: {
+	skeletons: {
+		paddingVertical: 8,
+	},
+	skeletonRow: {
+		flexDirection: 'row',
+		gap: 16,
+		paddingVertical: 16,
+	},
+	skeletonText: {
+		flex: 1,
+		gap: 8,
+	},
+	stateBox: {
 		alignItems: 'center',
-		justifyContent: 'center',
 		paddingVertical: 24,
 		gap: 8,
 	},
-	packagesRetry: {
-		color: '#0C7C7C',
+	stateText: {
+		fontSize: 14,
+		lineHeight: 20,
+		color: APP_COLORS.inkMuted,
+		textAlign: 'center',
+	},
+	trust: {
+		marginHorizontal: 16,
+		paddingVertical: 16,
+		paddingHorizontal: 12,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
+		backgroundColor: APP_COLORS.surface,
+		flexDirection: 'row',
+		gap: 8,
+	},
+	trustItem: {
+		flex: 1,
+		minWidth: 0,
+		alignItems: 'center',
+		gap: 8,
+	},
+	trustIcon: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: APP_COLORS.mint,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	trustText: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '600',
+		color: APP_COLORS.ink,
+		textAlign: 'center',
+	},
+	empty: {
+		marginHorizontal: 16,
+		paddingVertical: 32,
+		paddingHorizontal: 16,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
+		backgroundColor: APP_COLORS.surface,
+		alignItems: 'center',
+		gap: 8,
+	},
+	emptyTitle: {
+		fontSize: 18,
+		lineHeight: 26,
 		fontWeight: '700',
+		color: APP_COLORS.ink,
+		textAlign: 'center',
+	},
+	emptySub: {
+		fontSize: 14,
+		lineHeight: 20,
+		color: APP_COLORS.inkMuted,
+		textAlign: 'center',
+	},
+	emptyBtn: {
+		marginTop: 8,
+		height: 44,
+		paddingHorizontal: 16,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: APP_COLORS.primary,
+		backgroundColor: APP_COLORS.surface,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	emptyBtnText: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: APP_COLORS.primary,
 	},
 })

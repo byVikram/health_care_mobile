@@ -5,7 +5,7 @@
 import React from 'react'
 import { useHomeSheets } from '../HomeSheetsContext'
 import HealthQrSheet from './HealthQrSheet'
-import HomeCareSheet from './HomeCareSheet'
+import AncillaryServicesSheet from './AncillaryServicesSheet'
 import MoreServicesSheet from './MoreServicesSheet'
 
 export default function HomeSheetsHost() {
@@ -13,7 +13,7 @@ export default function HomeSheetsHost() {
 	return (
 		<>
 			<MoreServicesSheet visible={openSheet === 'more'} onClose={close} />
-			<HomeCareSheet visible={openSheet === 'homecare'} onClose={close} />
+			<AncillaryServicesSheet visible={openSheet === 'ancillary'} onClose={close} />
 			<HealthQrSheet visible={openSheet === 'qr'} onClose={close} />
 		</>
 	)

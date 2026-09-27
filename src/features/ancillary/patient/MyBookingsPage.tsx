@@ -137,7 +137,7 @@ export default function MyBookingsPage({
 	}
 
 	const handleReschedule = (booking: AncillaryBooking) => {
-		navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
 			serviceKey: booking.serviceKey,
 			serviceLabel: booking.serviceLabel,
 		})
@@ -179,7 +179,7 @@ export default function MyBookingsPage({
 	}
 
 	const handleBookAgain = (booking: AncillaryBooking) => {
-		navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
 			serviceKey: booking.serviceKey,
 			serviceLabel: booking.serviceLabel,
 		})
