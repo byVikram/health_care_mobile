@@ -1,14 +1,32 @@
 // SidebarLayout.tsx
-import React, { useEffect, useMemo, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+//
+// Home-tab chrome: the header plus the left drawer (AppSidebar). Patients get the redesigned drawer
+// (profile card with display id / QR / completion, FAMILY strip, grouped sections, wallet balance) from
+// <PatientSidebar />; every other role keeps its flat menu. useSidebarDrawer().open() opens the drawer
+// from anywhere under this layout (e.g. a header menu button).
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, StyleSheet, View } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
-import { AppSidebar } from '../common'
+import { AppPathIcon, AppSidebar, AppTag } from '../common'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import AppHeader from '../common/layout/AppHeader'
-import type { AppSidebarItem, AppSidebarProfile } from '../common'
+import type { AppSidebarItem, AppSidebarSection } from '../common'
 import { useAuth } from '../../context/AuthContext'
+import { isPatientRole } from '../../constants/constants'
 import { ScrollProvider } from '../../context/ScrollContext'
+import { APP_COLORS } from '../../config/theme'
+import { SELF_MEMBER_KEY, useFamilyMembers } from '../../hooks/useFamilyMembers'
+import { useHomeSheets } from '../../features/dashboard/HomeSheetsContext'
+import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../../features/dashboard/homeChromeIcons'
+import {
+	formatBalance,
+	openContactUrl,
+	telUrl,
+	useAppConfig,
+	usePatientSummary,
+	useWalletBalance,
+} from '../../features/dashboard/useHomeChromeData'
 
 import AppointmentsIcon from '../../assets/quick-services/appointments.svg'
 import TreatmentIcon from '../../assets/icons/treatment.svg'
@@ -18,6 +36,7 @@ import HelpCenterIcon from '../../assets/icons/help-center.svg'
 import SettingsIcon from '../../assets/icons/settings.svg'
 
 import { ROUTES } from '../../navigation/routes'
+import type { BookingsFilterKey } from '../../navigation/types'
 import { getPatientDetails } from '../../features/profile/patient/PatientProfileService'
 import { getDoctorProfile, mapDoctorProfileApi } from '../../features/doctor/doctorService'
 import { fetchProviderProfile } from '../../features/ancillary/ancillaryService'
@@ -30,27 +49,202 @@ const MOCK_USER = {
 	profileCompletion: 72,
 }
 
-const PROFILES: AppSidebarProfile[] = [
-	{
-		id: 'anjali',
-		label: 'Anjali',
-		variant: 'smile',
-		avatar: require('../../assets/Banner/patient.png'),
-	},
-	{
-		id: 'anjali-mom',
-		label: 'Anjali Mom',
-		variant: 'mom',
-		avatar: require('../../assets/Banner/doctor.png'),
-	},
-	{
-		id: 'anjali-dad',
-		label: 'Anjali’s Dad',
-		variant: 'dad',
-		avatar: require('../../assets/Banner/welcome-doctor.png'),
-	},
-	{ id: 'add', label: 'Add', variant: 'add' },
-]
+// Wait for the drawer's slide-out before presenting a sheet (iOS presents one modal at a time).
+const DRAWER_HANDOFF_MS = 260
+
+interface SidebarDrawerContextValue {
+	open: () => void
+	close: () => void
+}
+
+const SidebarDrawerContext = createContext<SidebarDrawerContextValue>({ open: () => {}, close: () => {} })
+
+/** Open / close the Home drawer from any screen rendered inside <SidebarLayout>. */
+export const useSidebarDrawer = () => useContext(SidebarDrawerContext)
+
+const drawerIcon = (name: HomeChromeIcon) => (
+	<AppPathIcon d={HOME_CHROME_PATHS[name]} size={18} color={APP_COLORS.primary} strokeWidth={2} />
+)
+
+interface PatientSidebarProps {
+	visible: boolean
+	onClose: () => void
+	onLogout: () => void
+	onViewProfile: () => void
+}
+
+/** Patient drawer content (design 1a). Every call soft-fails: the dependent line / row hides. */
+function PatientSidebar({ visible, onClose, onLogout, onViewProfile }: PatientSidebarProps) {
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
+	const { user } = useAuth()
+	const { open: openSheet } = useHomeSheets()
+	const { summary } = usePatientSummary(visible)
+	const walletBalance = useWalletBalance(visible)
+	const config = useAppConfig(visible)
+	const { members, reload: reloadFamily } = useFamilyMembers()
+	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+	useEffect(() => {
+		if (visible) void reloadFamily()
+	}, [visible, reloadFamily])
+
+	useEffect(
+		() => () => {
+			if (timerRef.current) clearTimeout(timerRef.current)
+		},
+		[]
+	)
+
+	const familyItems = useMemo(
+		() =>
+			members
+				.filter((m) => m.key !== SELF_MEMBER_KEY)
+				.map((m) => ({ uri: m.avatar, name: m.name, label: `${m.name}, ${m.relation}` })),
+		[members]
+	)
+
+	// No family-management screen exists yet: add / manage land on the patient profile.
+	const openProfile = useCallback(() => {
+		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PROFILE })
+	}, [navigation])
+
+	const handleOpenQr = () => {
+		onClose()
+		if (timerRef.current) clearTimeout(timerRef.current)
+		timerRef.current = setTimeout(() => openSheet('qr'), DRAWER_HANDOFF_MS)
+	}
+
+	const sections = useMemo<AppSidebarSection[]>(() => {
+		const openBookings = (filter: BookingsFilterKey) =>
+			navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL, params: { filter } })
+
+		const supportPhone = config?.support_phone || ''
+		const supportEmail = config?.support_email || ''
+		const openHelp = () => {
+			const call = () => void openContactUrl(telUrl(supportPhone))
+			const mail = () => void openContactUrl(`mailto:${supportEmail}`)
+			if (supportPhone && supportEmail) {
+				Alert.alert('Help centre', 'How would you like to reach Karolahealth support?', [
+					{ text: `Call ${supportPhone}`, onPress: call },
+					{ text: 'Email us', onPress: mail },
+					{ text: 'Cancel', style: 'cancel' },
+				])
+				return
+			}
+			if (supportPhone) call()
+			else mail()
+		}
+
+		return [
+			{
+				id: 'bookings',
+				title: 'BOOKINGS & ORDERS',
+				items: [
+					{
+						id: 'appointments',
+						label: 'Appointments',
+						icon: drawerIcon('appointments'),
+						onPress: () => openBookings('doctor'),
+					},
+					{
+						id: 'medicine-orders',
+						label: 'Medicine orders',
+						icon: drawerIcon('medicine'),
+						onPress: () => openBookings('medicine'),
+					},
+					{
+						id: 'lab-bookings',
+						label: 'Lab bookings',
+						icon: drawerIcon('lab'),
+						onPress: () => openBookings('lab'),
+					},
+					{
+						id: 'radiology-bookings',
+						label: 'Radiology bookings',
+						icon: drawerIcon('radiology'),
+						onPress: () => openBookings('radiology'),
+					},
+					{
+						id: 'home-care-orders',
+						label: 'Home care orders',
+						icon: drawerIcon('homeCare'),
+						onPress: () => openBookings('ancillary'),
+					},
+				],
+			},
+			{
+				id: 'health',
+				title: 'HEALTH',
+				// No standalone treatment-history screen or completed-status filter exists: the appointment
+				// history (each visit opens its summary) is the closest real target. "Reminders" has no
+				// target yet, so it's hidden.
+				items: [
+					{
+						id: 'treatment-history',
+						label: 'Treatment history',
+						icon: drawerIcon('treatment'),
+						onPress: () => openBookings('doctor'),
+					},
+				],
+			},
+			{
+				id: 'payments',
+				title: 'PAYMENTS',
+				items: [
+					{
+						id: 'my-wallet',
+						label: 'My wallet',
+						icon: drawerIcon('myWallet'),
+						value:
+							walletBalance != null ? <AppTag label={formatBalance(walletBalance)} tone="paid" /> : undefined,
+						accessibilityLabel:
+							walletBalance != null ? `My wallet, balance ${formatBalance(walletBalance)}` : 'My wallet',
+						onPress: () => navigation.navigate(ROUTES.STACK.WALLET),
+					},
+					{
+						id: 'payments',
+						label: 'Payments',
+						icon: drawerIcon('payments'),
+						onPress: () => navigation.navigate(ROUTES.STACK.WALLET_TRANSACTIONS),
+					},
+				],
+			},
+			{
+				id: 'support',
+				title: 'SUPPORT',
+				items: [
+					...(supportPhone || supportEmail
+						? [{ id: 'help', label: 'Help centre', icon: drawerIcon('help'), onPress: openHelp }]
+						: []),
+					{
+						id: 'settings',
+						label: 'Settings',
+						icon: drawerIcon('settings'),
+						onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
+					},
+				],
+			},
+		]
+	}, [navigation, walletBalance, config?.support_phone, config?.support_email])
+
+	return (
+		<AppSidebar
+			visible={visible}
+			onClose={onClose}
+			onLogout={onLogout}
+			onEditProfile={onViewProfile}
+			profileName={summary?.name || user?.name}
+			avatarUri={summary?.avatar_url || user?.avatar || null}
+			profileSubtitle={summary?.display_id ? `ID · ${summary.display_id}` : undefined}
+			profileCompletion={summary ? summary.profile_completion : null}
+			onCompleteProfile={openProfile}
+			onOpenQr={handleOpenQr}
+			qrValue={summary?.public_id}
+			family={{ members: familyItems, onAdd: openProfile, onManage: openProfile }}
+			sections={sections}
+		/>
+	)
+}
 
 interface SidebarLayoutProps {
 	children: React.ReactNode
@@ -321,31 +515,45 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 		[navigation, role]
 	)
 
+	const openSidebar = useCallback(() => setIsSidebarOpen(true), [])
+	const closeSidebar = useCallback(() => setIsSidebarOpen(false), [])
+	const drawerContext = useMemo(() => ({ open: openSidebar, close: closeSidebar }), [openSidebar, closeSidebar])
+
 	return (
-		<ScrollProvider>
-			<View style={styles.container}>
-				<AppSidebar
-					visible={isSidebarOpen}
-					profileCompletion={user.profileCompletion}
-					onClose={() => setIsSidebarOpen(false)}
-					onLogout={clearAuth}
-					onEditProfile={handleEditProfile}
-					menuItems={menuItems}
-					profiles={PROFILES}
-				/>
+		<SidebarDrawerContext.Provider value={drawerContext}>
+			<ScrollProvider>
+				<View style={styles.container}>
+					{isPatientRole(role) ? (
+						<PatientSidebar
+							visible={isSidebarOpen}
+							onClose={closeSidebar}
+							onLogout={clearAuth}
+							onViewProfile={handleEditProfile}
+						/>
+					) : (
+						<AppSidebar
+							visible={isSidebarOpen}
+							profileCompletion={user.profileCompletion}
+							onClose={closeSidebar}
+							onLogout={clearAuth}
+							onEditProfile={handleEditProfile}
+							menuItems={menuItems}
+						/>
+					)}
 
-				<AppHeader
-					variant="home"
-					userName={user.name}
-					avatarUri={user.avatar}
-					onAvatarPress={() => setIsSidebarOpen(true)}
-					isSearchEditable={false}
-					onSearchPress={handleSearchPress}
-				/>
+					<AppHeader
+						variant="home"
+						userName={user.name}
+						avatarUri={user.avatar}
+						onAvatarPress={openSidebar}
+						isSearchEditable={false}
+						onSearchPress={handleSearchPress}
+					/>
 
-				<View style={styles.content}>{children}</View>
-			</View>
-		</ScrollProvider>
+					<View style={styles.content}>{children}</View>
+				</View>
+			</ScrollProvider>
+		</SidebarDrawerContext.Provider>
 	)
 }
 

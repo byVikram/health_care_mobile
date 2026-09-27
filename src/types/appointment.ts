@@ -37,6 +37,8 @@ export interface AppointmentHospital {
   id: string
   name: string
   address: string
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export interface Appointment {

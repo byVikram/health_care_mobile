@@ -11,6 +11,7 @@ import StatusModal from '../components/common/feedback/StatusModal'
 import { safeJsonParse } from '../utils/jsonUtils'
 import { secureStorage } from '../utils/secureStorage'
 import { logout as logoutRequest } from '../features/auth/authService'
+import { clearSessionCaches } from '../utils/sessionCache'
 
 export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | 'nurse'
 
@@ -85,6 +86,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	const [statusModal, setStatusModal] = useState<StatusModalData | null>(null)
 
 	const clearAuthState = () => {
+		// In-memory per-user caches (patient summary, wallet balance, ...) -- see utils/sessionCache.ts
+		clearSessionCaches()
 		setRole(null)
 		setUser(null)
 		setAccessToken(null)
@@ -187,6 +190,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		refreshToken: string,
 		nps: boolean = false
 	) => {
+		// A new sign-in (possibly a different user, e.g. after a forced expiry) must not start from the
+		// previous user's in-memory caches.
+		clearSessionCaches()
 		await AsyncStorage.setItem('role', role)
 		await AsyncStorage.setItem('user', JSON.stringify(user))
 		await secureStorage.setItem('access_token', accessToken)
@@ -238,6 +244,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			'ancillary_location',
 			'user_specialty',
 			'ancillary_verification_status',
+			// Written by the old patient-profile picker; may still hold the previous user's family list.
+			'family_members',
 		])
 
 		clearAuthState()

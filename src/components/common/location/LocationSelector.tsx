@@ -1,5 +1,5 @@
 import React from 'react'
-import { View, StyleSheet, TouchableOpacity } from 'react-native'
+import { StyleSheet, TouchableOpacity, type StyleProp, type TextStyle } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import { AppTypography } from '../display/AppTypography'
 import { useNavigation } from '@react-navigation/native'
@@ -10,9 +10,13 @@ import { useAuth } from '../../../context/AuthContext'
 interface LocationSelectorProps {
 	location?: string
 	color?: string
+	/** Extra label style (e.g. the patient Home header's 13/600). */
+	textStyle?: StyleProp<TextStyle>
+	/** Pin / chevron glyph size. Defaults to 16. */
+	iconSize?: number
 }
 
-export default function LocationSelector({ location, color = '#f2f4f4' }: LocationSelectorProps) {
+export default function LocationSelector({ location, color = '#f2f4f4', textStyle, iconSize = 16 }: LocationSelectorProps) {
 	const navigation = useNavigation<any>()
 	const { currentLocation } = useAuth()
 
@@ -26,11 +30,11 @@ export default function LocationSelector({ location, color = '#f2f4f4' }: Locati
 			}} 
 			activeOpacity={0.7}
 		>
-			<MaterialCommunityIcons name="map-marker-outline" size={16} color={color} />
-			<AppTypography variant="body" style={[styles.locationText, { color }]} numberOfLines={1}>
+			<MaterialCommunityIcons name="map-marker-outline" size={iconSize} color={color} />
+			<AppTypography variant="body" style={[styles.locationText, { color }, textStyle]} numberOfLines={1}>
 				{displayLocation}
 			</AppTypography>
-			<MaterialCommunityIcons name="chevron-down" size={16} color={color} />
+			<MaterialCommunityIcons name="chevron-down" size={iconSize} color={color} />
 		</TouchableOpacity>
 	)
 }
