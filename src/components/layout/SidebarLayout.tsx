@@ -5,7 +5,7 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import { AppSidebar } from '../common'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import AppHeader from '../common/AppHeader'
+import AppHeader from '../common/layout/AppHeader'
 import type { AppSidebarItem, AppSidebarProfile } from '../common'
 import { useAuth } from '../../context/AuthContext'
 import { ScrollProvider } from '../../context/ScrollContext'

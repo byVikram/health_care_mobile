@@ -32,8 +32,8 @@ import IncomingRequestNotificationOverlay, {
 	AcceptConfirmationModal,
 	DetailedReviewModal,
 } from './components/IncomingRequestCard'
-import StatusModal from '../../../components/common/StatusModal'
-import { AppTypography } from '../../../components/common/AppTypography'
+import StatusModal from '../../../components/common/feedback/StatusModal'
+import { AppTypography } from '../../../components/common/display/AppTypography'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 import { getCurrentLocation } from '../../../services/locationService'

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 
-import AppScreenHeader from '../../components/common/AppScreenHeader'
+import AppScreenHeader from '../../components/common/layout/AppScreenHeader'
 import { ROUTES } from '../../navigation/routes'
 import type { BookingsFilterKey, MainTabParamList } from '../../navigation/types'
 

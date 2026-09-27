@@ -34,7 +34,7 @@ import StaffAncillaryDashboard from '../ancillary/staff/StaffAncillaryDashboard'
 import { formatDateForApi } from '../../utils/date'
 import { USER_ROLES } from '../../constants/constants'
 import { useAuth } from '../../context/AuthContext'
-import StatusModal from '../../components/common/StatusModal'
+import StatusModal from '../../components/common/feedback/StatusModal'
 import { useScroll } from '../../context/ScrollContext'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 

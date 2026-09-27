@@ -16,7 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
 
 import { AppScreenHeader, AppTypography, AppInput, EventCard } from '../../components/common'
-import type { EventItem } from '../../components/common/EventCard'
+import type { EventItem } from '../../components/common/display/EventCard'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { ROUTES } from '../../navigation/routes'

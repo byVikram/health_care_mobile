@@ -7,10 +7,10 @@ import {
 	View,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { AppBottomSheet } from '../../../components/common/AppBottomSheet'
-import { AppTypography } from '../../../components/common/AppTypography'
-import { AppButton } from '../../../components/common/AppButton'
-import AppAvatar from '../../../components/common/AppAvatar'
+import { AppBottomSheet } from '../../../components/common/layout/AppBottomSheet'
+import { AppTypography } from '../../../components/common/display/AppTypography'
+import { AppButton } from '../../../components/common/buttons/AppButton'
+import AppAvatar from '../../../components/common/display/AppAvatar'
 import RatingStars from './RatingStars'
 import { AncillaryBooking, AncillaryReviewData } from '../ancillaryService'
 

@@ -9,7 +9,7 @@
 // `PLACE_LABORATORY_TEST` / `PLACE_RADIOLOGY_ORDER` already carry booking
 // context via params (see `navigation/types.ts`).
 
-import type { PatientProfile } from '../../components/common/PatientProfileSelectorBottomSheet'
+import type { PatientProfile } from '../../components/common/booking/PatientProfileSelectorBottomSheet'
 import type { PatientAddress } from '../profile/patient/PatientProfileService'
 
 // Mirrors `CollectionType` in `features/laboratory_duplicated/laboratory.ts`

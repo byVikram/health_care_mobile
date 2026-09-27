@@ -11,13 +11,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
-import { AppTypography } from '../../components/common/AppTypography'
-import { AppButton } from '../../components/common/AppButton'
-import { AppInput } from '../../components/common/AppInput'
+import { AppTypography } from '../../components/common/display/AppTypography'
+import { AppButton } from '../../components/common/buttons/AppButton'
+import { AppInput } from '../../components/common/inputs/AppInput'
 import {
 	PatientProfile,
 	PatientProfileSelectorBottomSheet,
-} from '../../components/common/PatientProfileSelectorBottomSheet'
+} from '../../components/common/booking/PatientProfileSelectorBottomSheet'
 import { type PatientAddress } from '../profile/patient/PatientProfileService'
 import { resolveSelfPatientIdentity } from '../../utils/resolvePatientIdentity'
 import { ROUTES } from '../../navigation/routes'

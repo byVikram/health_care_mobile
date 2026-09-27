@@ -10,8 +10,8 @@ import {
 import { useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { AppTypography } from '../../components/common/AppTypography'
-import { AppInput } from '../../components/common/AppInput'
+import { AppTypography } from '../../components/common/display/AppTypography'
+import { AppInput } from '../../components/common/inputs/AppInput'
 import { ROUTES } from '../../navigation/routes'
 import {
 	HEALTH_CHECKUP_PACKAGES,

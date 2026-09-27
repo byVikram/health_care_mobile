@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
-import { AppTypography } from '../../AppTypography'
-import { AppButton } from '../../AppButton'
-import { AppInput } from '../../AppInput'
-import { AppBottomSheet } from '../../AppBottomSheet'
+import { AppTypography } from '../../display/AppTypography'
+import { AppButton } from '../../buttons/AppButton'
+import { AppInput } from '../../inputs/AppInput'
+import { AppBottomSheet } from '../../layout/AppBottomSheet'
 import {
 	PatientAddress,
 	createPatientAddress,

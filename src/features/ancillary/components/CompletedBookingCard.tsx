@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { AncillaryBooking } from '../ancillaryService'
 import BookingStatusBadge from './BookingStatusBadge'
 import RatingStars from './RatingStars'
-import AppAvatar from '../../../components/common/AppAvatar'
+import AppAvatar from '../../../components/common/display/AppAvatar'
 import { CommonCard } from '../../../components/common'
 
 interface CompletedBookingCardProps {

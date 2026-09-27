@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 import { View, StyleSheet, Text, TouchableOpacity, ScrollView } from 'react-native'
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
-import { AppModal } from '../../../components/common/AppModal'
-import { AppButton } from '../../../components/common/AppButton'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { AppModal } from '../../../components/common/layout/AppModal'
+import { AppButton } from '../../../components/common/buttons/AppButton'
+import { AppTypography } from '../../../components/common/display/AppTypography'
 
 export const CANCELLATION_REASONS = [
   { id: '1', label: 'Wait time is too long' },

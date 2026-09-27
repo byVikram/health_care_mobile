@@ -1,6 +1,6 @@
 import React from 'react'
 import { ScrollView, StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native'
-import { AppTypography } from '../AppTypography'
+import { AppTypography } from '../display/AppTypography'
 import { APP_COLORS } from '../../../config/theme'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']

@@ -1,7 +1,7 @@
 import React from 'react'
 import { StyleSheet, TouchableOpacity } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { AppTypography } from '../../../components/common/display/AppTypography'
 
 interface SectionSeeAllLinkProps {
 	label?: string

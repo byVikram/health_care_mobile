@@ -1,9 +1,9 @@
 ﻿import React from 'react'
 import { Image, ImageSourcePropType, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import AppBottomSheet from '../AppBottomSheet'
-import { AppTypography } from '../AppTypography'
-import { AppButton } from '../AppButton'
+import AppBottomSheet from '../layout/AppBottomSheet'
+import { AppTypography } from '../display/AppTypography'
+import { AppButton } from '../buttons/AppButton'
 import { safeJsonParse } from '../../../utils/jsonUtils'
 import { ServiceProcedureItem } from './ServiceCatalogCard'
 

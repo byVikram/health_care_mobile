@@ -12,7 +12,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from '../../../navigation/routes'
 import { AppTypography, AppInput } from '../../../components/common'
-import AppScreenHeader from '../../../components/common/AppScreenHeader'
+import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
 import CaregiverServicesScreen from './CaregiverServicesScreen'
 
 import { ServiceProcedureItem, ServiceCatalogCard, ServiceDetailsSheet, PackageSectionCard } from '../../../components/common'

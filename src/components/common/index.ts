@@ -1,39 +1,39 @@
-export * from "./AppButton";
-export * from "./AppInput";
-export * from "./AppTypography";
-export * from "./AppModal";
-export * from "./AppSelect";
-export * from "./AppMultiSelect";
-export * from "./AppTimePicker";
-export * from "./AppPhotoPicker";
-export * from "./AppBottomSheet";
-export * from "./AppCalendar";
-export * from "./AppSkeleton";
-export { default as AppToggle } from "./AppToggle";
-export type { AppToggleProps } from "./AppToggle";
-export { default as AppHeader } from "./AppHeader";
-export { default as AppSidebar } from "./AppSidebar";
-export type { AppSidebarItem, AppSidebarProfile } from "./AppSidebar";
-export { default as AppTable } from "./AppTable";
-export type { AppTableColumn, AppTableColumnOption, AppTableProps } from "./AppTable";
-export { default as SplashScreen } from "./SplashScreen";
-export { default as DateSlotPicker } from './DateSlotPicker';
-export type { PickProps as DateSlotPickerProps } from './DateSlotPicker';
-export { default as AppScreenHeader } from "./AppScreenHeader";
-export { default as AppAvatar } from "./AppAvatar";
-export { default as StatusModal } from "./StatusModal";
-export { default as OfflineBanner } from "./OfflineBanner";
-export { default as AppStickyFooter, StickyFooter } from "./AppStickyFooter";
-export { default as ProviderDetailsCard } from "./ProviderDetailsCard";
-export type { ProviderDetailsCardProps, ProviderHoursRow } from "./ProviderDetailsCard";
-export { default as LocationSelector } from "./LocationSelector";
-export { default as NotificationPermissionPopup } from "./NotificationPermissionPopup";
-export { default as EventCard } from "./EventCard";
-export { default as CommonCard } from "./CommonCard";
-export * from "./PatientProfileSelectorBottomSheet";
-export { default as WorkingHoursSection } from "./WorkingHoursSection";
-export type { WorkingHoursSectionProps, WorkingDayKey, AppointmentType, TimeSlot as WorkingHoursTimeSlot, SectionSlots, WorkingHoursState } from "./WorkingHoursSection";
-export { WORKING_DAYS, SECTION_META, durationOptions as workingHoursDurationOptions, makeTimeOptions, snapToStep, createWorkingHoursState, DropdownSelect as WorkingHoursDropdownSelect } from "./WorkingHoursSection";
+export * from "./buttons/AppButton";
+export * from "./inputs/AppInput";
+export * from "./display/AppTypography";
+export * from "./layout/AppModal";
+export * from "./inputs/AppSelect";
+export * from "./inputs/AppMultiSelect";
+export * from "./inputs/AppTimePicker";
+export * from "./inputs/AppPhotoPicker";
+export * from "./layout/AppBottomSheet";
+export * from "./inputs/AppCalendar";
+export * from "./display/AppSkeleton";
+export { default as AppToggle } from "./inputs/AppToggle";
+export type { AppToggleProps } from "./inputs/AppToggle";
+export { default as AppHeader } from "./layout/AppHeader";
+export { default as AppSidebar } from "./layout/AppSidebar";
+export type { AppSidebarItem, AppSidebarProfile } from "./layout/AppSidebar";
+export { default as AppTable } from "./display/AppTable";
+export type { AppTableColumn, AppTableColumnOption, AppTableProps } from "./display/AppTable";
+export { default as SplashScreen } from "./layout/SplashScreen";
+export { default as DateSlotPicker } from './inputs/DateSlotPicker';
+export type { PickProps as DateSlotPickerProps } from './inputs/DateSlotPicker';
+export { default as AppScreenHeader } from "./layout/AppScreenHeader";
+export { default as AppAvatar } from "./display/AppAvatar";
+export { default as StatusModal } from "./feedback/StatusModal";
+export { default as OfflineBanner } from "./feedback/OfflineBanner";
+export { default as AppStickyFooter, StickyFooter } from "./layout/AppStickyFooter";
+export { default as ProviderDetailsCard } from "./display/ProviderDetailsCard";
+export type { ProviderDetailsCardProps, ProviderHoursRow } from "./display/ProviderDetailsCard";
+export { default as LocationSelector } from "./location/LocationSelector";
+export { default as NotificationPermissionPopup } from "./feedback/NotificationPermissionPopup";
+export { default as EventCard } from "./display/EventCard";
+export { default as CommonCard } from "./display/CommonCard";
+export * from "./booking/PatientProfileSelectorBottomSheet";
+export { default as WorkingHoursSection } from "./booking/WorkingHoursSection";
+export type { WorkingHoursSectionProps, WorkingDayKey, AppointmentType, TimeSlot as WorkingHoursTimeSlot, SectionSlots, WorkingHoursState } from "./booking/WorkingHoursSection";
+export { WORKING_DAYS, SECTION_META, durationOptions as workingHoursDurationOptions, makeTimeOptions, snapToStep, createWorkingHoursState, DropdownSelect as WorkingHoursDropdownSelect } from "./booking/WorkingHoursSection";
 
 // Shared booking-flow components (used by Ancillary/Nursing and Laboratory) — see src/components/common/booking/
 export * from "./booking/ServiceCatalogCard";
@@ -58,30 +58,30 @@ export type { BillingSummaryCardProps, BillingRow, BillingSummaryCardNote } from
 export { PackageSectionCard } from "./booking/PackageSectionCard";
 export type { PackageListItem } from "./booking/PackageSectionCard";
 // KarolaHealth design-language primitives (tokens in src/config/theme.ts)
-export { AppIcon, AppPathIcon } from './AppIcon'
-export type { AppIconName, AppIconProps, AppPathIconProps } from './AppIcon'
-export { AppDashedDivider } from './AppDashedDivider'
-export type { AppDashedDividerProps } from './AppDashedDivider'
-export { AppRadio } from './AppRadio'
-export type { AppRadioProps } from './AppRadio'
-export { AppIconTile } from './AppIconTile'
-export type { AppIconTileProps } from './AppIconTile'
-export { AppChip } from './AppChip'
-export type { AppChipProps } from './AppChip'
-export { AppActionChip } from './AppActionChip'
-export type { AppActionChipProps } from './AppActionChip'
-export { AppInfoBanner, INFO_BANNER_TONES } from './AppInfoBanner'
-export type { AppInfoBannerProps, AppInfoBannerTone, AppInfoBannerAction } from './AppInfoBanner'
-export { AppDetailRow } from './AppDetailRow'
-export type { AppDetailRowProps, AppDetailRowAction } from './AppDetailRow'
-export { AppSection } from './AppSection'
-export type { AppSectionProps } from './AppSection'
-export { AppStatusTimeline } from './AppStatusTimeline'
-export type { AppStatusTimelineProps, AppTimelineStep, AppTimelineState } from './AppStatusTimeline'
-export { AppNumberedSteps } from './AppNumberedSteps'
-export type { AppNumberedStepsProps, AppNumberedStep } from './AppNumberedSteps'
-export { AppFooterBar } from './AppFooterBar'
-export type { AppFooterBarProps } from './AppFooterBar'
+export { AppIcon, AppPathIcon } from './display/AppIcon'
+export type { AppIconName, AppIconProps, AppPathIconProps } from './display/AppIcon'
+export { AppDashedDivider } from './display/AppDashedDivider'
+export type { AppDashedDividerProps } from './display/AppDashedDivider'
+export { AppRadio } from './inputs/AppRadio'
+export type { AppRadioProps } from './inputs/AppRadio'
+export { AppIconTile } from './display/AppIconTile'
+export type { AppIconTileProps } from './display/AppIconTile'
+export { AppChip } from './inputs/AppChip'
+export type { AppChipProps } from './inputs/AppChip'
+export { AppActionChip } from './buttons/AppActionChip'
+export type { AppActionChipProps } from './buttons/AppActionChip'
+export { AppInfoBanner, INFO_BANNER_TONES } from './display/AppInfoBanner'
+export type { AppInfoBannerProps, AppInfoBannerTone, AppInfoBannerAction } from './display/AppInfoBanner'
+export { AppDetailRow } from './display/AppDetailRow'
+export type { AppDetailRowProps, AppDetailRowAction } from './display/AppDetailRow'
+export { AppSection } from './layout/AppSection'
+export type { AppSectionProps } from './layout/AppSection'
+export { AppStatusTimeline } from './display/AppStatusTimeline'
+export type { AppStatusTimelineProps, AppTimelineStep, AppTimelineState } from './display/AppStatusTimeline'
+export { AppNumberedSteps } from './display/AppNumberedSteps'
+export type { AppNumberedStepsProps, AppNumberedStep } from './display/AppNumberedSteps'
+export { AppFooterBar } from './layout/AppFooterBar'
+export type { AppFooterBarProps } from './layout/AppFooterBar'
 export { BookingPaymentPage, isActiveTaskConflictError } from "./booking/BookingPaymentPage";
 export type {
 	BookingPaymentPageConfig,

@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { API_ENDPOINTS } from "../../constants/apiUrls";
 // import { AppSelect, AppSelectOption } from "../../components/AppSelect";
-import { AppSelect, AppSelectOption } from "../../components/common/AppSelect";
+import { AppSelect, AppSelectOption } from "../../components/common/inputs/AppSelect";
 import { ROUTES } from "../../navigation/routes";
 import type { AppStackScreenProps } from "../../navigation/types";
 

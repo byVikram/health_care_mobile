@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 
 import { AppScreenHeader, AppTypography, AppButton } from '../../components/common'
-import type { EventItem } from '../../components/common/EventCard'
+import type { EventItem } from '../../components/common/display/EventCard'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import type { AppStackParamList } from '../../navigation/types'

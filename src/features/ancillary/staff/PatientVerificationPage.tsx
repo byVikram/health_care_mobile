@@ -7,10 +7,10 @@ import { MOCK_NURSE_BOOKINGS, NurseBooking, saveBookingState, verifyPatientOtp }
 import { ROUTES } from '../../../navigation/routes'
 import OtpPinInput from '../components/OtpPinInput'
 import ServiceTimeline from '../components/ServiceTimeline'
-import AppScreenHeader from '../../../components/common/AppScreenHeader'
+import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
 import CancelVisitModal from '../components/CancelVisitModal'
-import { AppTypography } from '../../../components/common/AppTypography'
-import { AppButton } from '../../../components/common/AppButton'
+import { AppTypography } from '../../../components/common/display/AppTypography'
+import { AppButton } from '../../../components/common/buttons/AppButton'
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 

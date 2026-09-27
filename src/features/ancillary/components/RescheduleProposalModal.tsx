@@ -9,7 +9,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { AppTypography, AppInput, AppButton } from '../../../components/common'
-import DateSlotPicker from '../../../components/common/DateSlotPicker'
+import DateSlotPicker from '../../../components/common/inputs/DateSlotPicker'
 import { proposeRescheduleSlot } from '../ancillaryService'
 
 interface RescheduleProposalModalProps {

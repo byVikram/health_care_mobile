@@ -16,7 +16,7 @@ import CompletedBookingCard from '../components/CompletedBookingCard'
 import CancelledBookingCard from '../components/CancelledBookingCard'
 import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
 import { AppScreenHeader, AppSkeleton } from '../../../components/common'
-import StatusModal from '../../../components/common/StatusModal'
+import StatusModal from '../../../components/common/feedback/StatusModal'
 import BookingsSearchBar from '../../bookings/components/BookingsSearchBar'
 
 type BookingTab = 'all' | 'upcoming' | 'completed' | 'cancelled'

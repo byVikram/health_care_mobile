@@ -18,7 +18,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import DateSlotPicker from '../../../components/common/DateSlotPicker'
+import DateSlotPicker from '../../../components/common/inputs/DateSlotPicker'
 import { APPOINTMENT_STATUS } from '../../../constants/constants'
 import {
 	getDoctorAvailability,

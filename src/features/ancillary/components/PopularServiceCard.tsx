@@ -2,7 +2,7 @@ import React from 'react'
 import { View, StyleSheet, Image, TouchableOpacity, useWindowDimensions } from 'react-native'
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
 import { AppTypography, CommonCard } from '../../../components/common'
-import { AppButton } from '../../../components/common/AppButton'
+import { AppButton } from '../../../components/common/buttons/AppButton'
 import { ServiceProcedureItem } from '../../../components/common'
 
 export interface PopularService {

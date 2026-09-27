@@ -31,7 +31,7 @@ import {
 	ServiceProcedureItem,
 	StatusModal,
 } from '../../../components/common'
-import DateSlotPicker from '../../../components/common/DateSlotPicker'
+import DateSlotPicker from '../../../components/common/inputs/DateSlotPicker'
 import { SlotGroup } from '../../doctor/doctorService'
 import {
 	ANCILLARY_BOOKING_STEPS,

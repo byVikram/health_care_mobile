@@ -9,9 +9,9 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
-import AppScreenHeader from '../../../components/common/AppScreenHeader'
-import { AppTypography } from '../../../components/common/AppTypography'
-import { AppButton } from '../../../components/common/AppButton'
+import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
+import { AppTypography } from '../../../components/common/display/AppTypography'
+import { AppButton } from '../../../components/common/buttons/AppButton'
 import {
 	BillingSummaryCard,
 	SelectedItemCard,

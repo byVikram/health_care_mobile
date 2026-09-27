@@ -9,7 +9,7 @@ import {
 	ImageSourcePropType,
 } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../AppTypography'
+import { AppTypography } from '../display/AppTypography'
 
 export interface ServiceProcedureItem {
 	id: string

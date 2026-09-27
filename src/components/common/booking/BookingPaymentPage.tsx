@@ -11,12 +11,12 @@ import {
 import { useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppButton } from '../AppButton'
-import AppScreenHeader from '../AppScreenHeader'
-import { AppTypography } from '../AppTypography'
+import { AppButton } from '../buttons/AppButton'
+import AppScreenHeader from '../layout/AppScreenHeader'
+import { AppTypography } from '../display/AppTypography'
 import { BookingProgressStepper, BookingStepperTheme } from './BookingProgressStepper'
 import { ServiceProcedureItem } from './ServiceCatalogCard'
-import StatusModal from '../StatusModal'
+import StatusModal from '../feedback/StatusModal'
 import { safeJsonParse } from '../../../utils/jsonUtils'
 
 interface PaymentMethodItem {

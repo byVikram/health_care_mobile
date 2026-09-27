@@ -1,6 +1,6 @@
 import React from 'react'
 import { StyleProp, StyleSheet, TextStyle, View, ViewStyle } from 'react-native'
-import { AppTypography } from '../../AppTypography'
+import { AppTypography } from '../../display/AppTypography'
 
 export interface BillingRow {
 	label: string

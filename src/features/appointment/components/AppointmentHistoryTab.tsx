@@ -5,7 +5,7 @@
 // full-page counterpart using the same content component.
 
 import React from 'react'
-import { AppBottomSheet } from '../../../components/common/AppBottomSheet'
+import { AppBottomSheet } from '../../../components/common/layout/AppBottomSheet'
 import AppointmentDetailsContent from './AppointmentDetailsContent'
 
 interface AppointmentHistoryTabProps {

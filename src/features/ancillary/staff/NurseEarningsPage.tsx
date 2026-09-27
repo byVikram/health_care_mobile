@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import AppScreenHeader from '../../../components/common/AppScreenHeader'
+import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
 import { fetchProviderEarnings, ProviderEarningsData } from '../ancillaryService'
 
 /**

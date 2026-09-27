@@ -7,7 +7,7 @@ import {
 	setTokenRefreshedHandler,
 	StatusModalData,
 } from '../services/apiService'
-import StatusModal from '../components/common/StatusModal'
+import StatusModal from '../components/common/feedback/StatusModal'
 import { safeJsonParse } from '../utils/jsonUtils'
 import { secureStorage } from '../utils/secureStorage'
 import { logout as logoutRequest } from '../features/auth/authService'

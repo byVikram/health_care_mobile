@@ -1,7 +1,7 @@
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { AppTypography } from '../../../components/common/display/AppTypography'
 
 interface CareChecklistProps {
 	items: string[]
