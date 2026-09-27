@@ -86,7 +86,14 @@ export const API_ENDPOINTS = {
 	NOTIFICATIONS: {
 		LIST: `${BASE_URL}/api/notifications`,
 		MARK_READ: (id: string) => `${BASE_URL}/api/notifications/${id}/read`,
+		UNREAD_COUNT: `${BASE_URL}/api/notifications/unread-count`,
+		READ_ALL: `${BASE_URL}/api/notifications/read-all`,
 	},
+	ADS: {
+		ACTIVE: `${BASE_URL}/api/ads/active`,
+		TRACK: (publicId: string) => `${BASE_URL}/api/ads/${publicId}/track`,
+	},
+	APP_CONFIG: `${BASE_URL}/api/app-config`,
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
 
 	PATIENT: {
@@ -106,6 +113,7 @@ export const API_ENDPOINTS = {
 		TREATMENT_HISTORY: (id: string) => `${BASE_URL}/api/treatments/patient/${id}/history`,
 		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
 		FAMILY_MEMBERS: `${BASE_URL}/api/patients/family-members`,
+		SUMMARY: `${BASE_URL}/api/patients/me/summary`,
 	},
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,
@@ -174,6 +182,7 @@ export const API_ENDPOINTS = {
 		POSTS: (groupId: string) => `${BASE_URL}/api/communities/${groupId}/posts`,
 		POST_DETAIL: (postId: string) => `${BASE_URL}/api/communities/threads/${postId}`,
 		COMMENTS: (postId: string) => `${BASE_URL}/api/communities/threads/${postId}/comments`,
+		JOIN: (groupId: string) => `${BASE_URL}/api/communities/${groupId}/join`,
 	},
 	BLOGS: {
 		LIST: `${BASE_URL}/api/blogs`,

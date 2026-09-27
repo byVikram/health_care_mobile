@@ -8,6 +8,10 @@ export interface CommunityGroup {
 	category: string
 	icon_name?: string
 	is_featured: boolean
+	/** Current user's membership (false when not joined / anonymous). */
+	is_joined?: boolean
+	member_count?: number
+	group_type?: 'support_group' | 'forum'
 }
 
 export interface CommunityPost {
