@@ -40,6 +40,7 @@ import {
 	AppScreenHeader,
 	AppSection,
 	AppSecurePaymentNote,
+	AppTextLink,
 	AppTicketCard,
 	type AppPaymentMethod,
 } from '../../components/common'
@@ -368,13 +369,11 @@ export default function BookingDetailsScreen() {
 								titleSize: 17,
 								subtitle: [speciality, experienceText].filter(Boolean).join(' · '),
 								trailing: (
-									<TouchableOpacity
+									<AppTextLink
+										label="Change"
+										trailingIcon="none"
 										onPress={() => navigation.goBack()}
-										style={styles.changeBtn}
-										accessibilityRole="link"
-									>
-										<Text style={styles.changeLink}>Change</Text>
-									</TouchableOpacity>
+									/>
 								),
 							}}
 							fields={[
@@ -463,16 +462,6 @@ const styles = StyleSheet.create({
 		paddingBottom: 8,
 	},
 
-	// Appointment ticket
-	changeBtn: {
-		minHeight: 44,
-		justifyContent: 'center',
-	},
-	changeLink: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: APP_COLORS.primary,
-	},
 	// Pay with
 	paySection: {
 		paddingBottom: 0,

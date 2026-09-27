@@ -4,7 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import { DoctorSearchItem } from '../../../../types/doctor-search'
-import { AppAvatar, AppButton, AppDashedDivider, AppTypography, AppIcon } from '../../../../components/common'
+import { AppAvatar, AppButton, AppDashedDivider, AppTag, AppTypography, AppIcon } from '../../../../components/common'
 import { ROUTES } from '../../../../navigation/routes'
 import type { AppStackParamList } from '../../../../navigation/types'
 import { APP_COLORS, formatInr, toneForString } from '../../../../config/theme'
@@ -62,11 +62,7 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 						)}
 					</View>
 
-					<View style={[styles.specBadge, { backgroundColor: tone.bg }]}>
-						<AppTypography style={[styles.specBadgeText, { color: tone.ink }]} numberOfLines={1}>
-							{speciality}
-						</AppTypography>
-					</View>
+					<AppTag label={speciality} bg={tone.bg} ink={tone.ink} style={styles.specBadge} />
 
 					<AppTypography style={styles.metaText} numberOfLines={1}>
 						{doctor.experience_years ?? 0} yrs experience
@@ -155,16 +151,9 @@ const styles = StyleSheet.create({
 		color: APP_COLORS.ink,
 		flexShrink: 1,
 	},
+	// AppTag sm (2x8, 12/16 700) at the design's fully round corners
 	specBadge: {
-		alignSelf: 'flex-start',
-		paddingHorizontal: 8,
-		paddingVertical: 2,
 		borderRadius: 9999,
-	},
-	specBadgeText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
 	},
 	metaText: {
 		fontSize: 13,

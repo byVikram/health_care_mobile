@@ -13,15 +13,20 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import {
+	AppActionChip,
 	AppAvatar,
 	AppButton,
 	AppChip,
 	AppDashedDivider,
 	AppFooterBar,
+	AppIconButton,
 	AppIconTile,
 	AppScreenHeader,
 	AppSection,
 	AppSkeleton,
+	AppStatRow,
+	AppStatTile,
+	AppTag,
 	AppTypography,
 } from '../../../components/common'
 import { getDoctorById, getDoctorAvailability, TimeSlot } from '../doctorService'
@@ -45,9 +50,6 @@ const PAGE_BG = APP_COLORS.pageBg
 const SPEC_TONE = TONES.lilac.ink
 const SPEC_TONE_BG = TONES.lilac.bg
 const SUCCESS = APP_COLORS.success
-const SUCCESS_BG = APP_COLORS.successBg
-const SKY = TONES.sky.ink
-const SKY_BG = TONES.sky.bg
 
 type ProfileTabKey = 'about' | 'services' | 'clinics' | 'awards'
 const PROFILE_TABS: { key: ProfileTabKey; label: string }[] = [
@@ -131,8 +133,8 @@ export default function DoctorDetailPage() {
 		setActiveTab((prev) => (prev === next ? prev : next))
 	}
 
-	// Records a section's scroll offset for the tab scroll-spy. Sections sit in a wrapper
-	// that carries the 8px section margin, so the wrapper's y equals the section's own y.
+	// Records a section's scroll offset for the tab scroll-spy (AppSection passes onLayout
+	// through; the reported y is the section's own y, below its 8px margin).
 	const trackSection =
 		(key: ProfileTabKey, when = true) =>
 		(e: LayoutChangeEvent) => {
@@ -338,13 +340,14 @@ export default function DoctorDetailPage() {
 				backAccessibilityLabel="Back to doctors"
 				style={compact && styles.headerCompact}
 				rightElement={
-					<TouchableOpacity
+					<AppIconButton
+						icon="share-variant-outline"
+						variant="ghost"
+						size={44}
 						onPress={handleShare}
-						style={styles.headerShareBtn}
 						accessibilityLabel="Share profile"
-					>
-						<MaterialCommunityIcons name="share-variant-outline" size={22} color="#fff" />
-					</TouchableOpacity>
+						style={styles.headerShareBtn}
+					/>
 				}
 			/>
 
@@ -394,41 +397,33 @@ export default function DoctorDetailPage() {
 
 						<View style={styles.badgeRow}>
 							{availableToday && (
-								<View style={styles.availableBadge}>
-									<View style={styles.availableDot} />
-									<AppTypography style={styles.availableBadgeText}>Available today</AppTypography>
-								</View>
+								<AppTag
+									label="Available today"
+									tone="confirmed"
+									shape="pill"
+									dot
+									style={styles.availableBadge}
+								/>
 							)}
 							{hasVideoConsult && (
-								<View style={styles.videoBadge}>
-									<MaterialCommunityIcons name="video-outline" size={14} color={SKY} />
-									<AppTypography style={styles.videoBadgeText}>Video consult</AppTypography>
-								</View>
+								<AppTag label="Video consult" tone="sky" shape="pill" icon="video-outline" />
 							)}
 							{!!languagesText && (
-								<View style={styles.languageBadge}>
-									<AppTypography style={styles.languageBadgeText} numberOfLines={1}>
-										{languagesText}
-									</AppTypography>
-								</View>
+								<AppTag
+									label={languagesText}
+									tone="neutral"
+									shape="pill"
+									textStyle={styles.languageBadgeText}
+								/>
 							)}
 						</View>
 					</View>
 
-					<View style={styles.statsRow}>
-						<View style={[styles.statBox, { backgroundColor: SPEC_TONE_BG }]}>
-							<AppTypography style={[styles.statLabel, { color: SPEC_TONE }]}>Experience</AppTypography>
-							<AppTypography style={styles.statValue}>{experienceYearsText}</AppTypography>
-						</View>
-						<View style={[styles.statBox, { backgroundColor: APP_COLORS.mint }]}>
-							<AppTypography style={[styles.statLabel, { color: PRIMARY }]}>Clinic visit</AppTypography>
-							<AppTypography style={styles.statValue}>{formatInr(offlineFee)}</AppTypography>
-						</View>
-						<View style={[styles.statBox, { backgroundColor: SKY_BG }]}>
-							<AppTypography style={[styles.statLabel, { color: SKY }]}>Video call</AppTypography>
-							<AppTypography style={styles.statValue}>{formatInr(videoFee)}</AppTypography>
-						</View>
-					</View>
+					<AppStatRow style={styles.statsRow}>
+						<AppStatTile label="Experience" value={experienceYearsText} tone="lilac" />
+						<AppStatTile label="Clinic visit" value={formatInr(offlineFee)} tone="mint" />
+						<AppStatTile label="Video call" value={formatInr(videoFee)} tone="sky" />
+					</AppStatRow>
 
 					{/* Next available -- real first open slot today, else a plain entry into the slot step */}
 					<TouchableOpacity
@@ -498,219 +493,208 @@ export default function DoctorDetailPage() {
 				</View>
 
 				{/* About -- flat section, 2-line clamp + Read more/less */}
-				<View style={styles.sectionSlot} onLayout={trackSection('about')}>
-					<AppSection title="About" gap={8} marginTop={0}>
-						<AppTypography
-							variant="body"
-							style={styles.aboutBodyText}
-							numberOfLines={aboutExpanded ? undefined : 2}
-						>
-							{aboutText || "This doctor hasn't added a bio yet."}
-						</AppTypography>
-						{!!aboutText && (
-							<TouchableOpacity onPress={() => setAboutExpanded((v) => !v)} activeOpacity={0.7}>
-								<AppTypography variant="caption" style={styles.linkText}>
-									{aboutExpanded ? 'Show less' : 'Read more'}
-								</AppTypography>
-							</TouchableOpacity>
-						)}
-					</AppSection>
-				</View>
+				<AppSection title="About" gap={8} onLayout={trackSection('about')}>
+					<AppTypography
+						variant="body"
+						style={styles.aboutBodyText}
+						numberOfLines={aboutExpanded ? undefined : 2}
+					>
+						{aboutText || "This doctor hasn't added a bio yet."}
+					</AppTypography>
+					{!!aboutText && (
+						<TouchableOpacity onPress={() => setAboutExpanded((v) => !v)} activeOpacity={0.7}>
+							<AppTypography variant="caption" style={styles.linkText}>
+								{aboutExpanded ? 'Show less' : 'Read more'}
+							</AppTypography>
+						</TouchableOpacity>
+					)}
+				</AppSection>
 
 				{/* Areas of expertise -- flat chip row (Services tab) */}
 				{areasOfExpertise.length > 0 && (
-					<View style={styles.sectionSlot} onLayout={trackSection('services')}>
-						<AppSection title="Areas of expertise" gap={8} marginTop={0}>
-							<View style={styles.chipRow}>
-								{areasOfExpertise.map((item) => (
-									<View key={item.id} style={styles.expertiseChip}>
-										<AppTypography style={styles.expertiseChipText}>{item.label}</AppTypography>
-									</View>
-								))}
-							</View>
-						</AppSection>
-					</View>
+					<AppSection title="Areas of expertise" gap={8} onLayout={trackSection('services')}>
+						<View style={styles.chipRow}>
+							{areasOfExpertise.map((item) => (
+								<AppTag
+									key={item.id}
+									label={item.label}
+									size="md"
+									shape="pill"
+									tone="lilac"
+									ink={INK}
+									style={styles.expertiseChip}
+									textStyle={styles.expertiseChipText}
+								/>
+							))}
+						</View>
+					</AppSection>
 				)}
 
 				{/* Treatments & services -- checkmark list (Services tab) */}
 				{treatments.length > 0 && (
-					<View style={styles.sectionSlot} onLayout={trackSection('services', !areasOfExpertise.length)}>
-						<AppSection
-							title="Treatments & services"
-							gap={8}
-							marginTop={0}
-							right={
-								<AppTypography variant="caption" style={styles.mutedSmall}>
-									{treatments.length} offered
+					<AppSection
+						title="Treatments & services"
+						gap={8}
+						onLayout={trackSection('services', !areasOfExpertise.length)}
+						right={
+							<AppTypography variant="caption" style={styles.mutedSmall}>
+								{treatments.length} offered
+							</AppTypography>
+						}
+					>
+						<View style={{ marginTop: 4 }}>
+							{visibleTreatments.map((item, idx) => (
+								<View
+									key={item.id}
+									style={[
+										styles.treatmentRow,
+										idx !== visibleTreatments.length - 1 && styles.treatmentRowDivider,
+									]}
+								>
+									<MaterialCommunityIcons
+										name="check"
+										size={18}
+										color={SUCCESS}
+										style={{ marginTop: 2 }}
+									/>
+									<AppTypography style={styles.treatmentName}>{item.label}</AppTypography>
+								</View>
+							))}
+						</View>
+						{treatments.length > TREATMENTS_COLLAPSED_COUNT && (
+							<TouchableOpacity onPress={() => setTreatmentsExpanded((v) => !v)} activeOpacity={0.7}>
+								<AppTypography variant="caption" style={styles.linkText}>
+									{treatmentsExpanded ? 'Show fewer' : `Show all ${treatments.length} treatments`}
 								</AppTypography>
-							}
-						>
-							<View style={{ marginTop: 4 }}>
-								{visibleTreatments.map((item, idx) => (
-									<View
-										key={item.id}
-										style={[
-											styles.treatmentRow,
-											idx !== visibleTreatments.length - 1 && styles.treatmentRowDivider,
-										]}
-									>
-										<MaterialCommunityIcons
-											name="check"
-											size={18}
-											color={SUCCESS}
-											style={{ marginTop: 2 }}
-										/>
-										<AppTypography style={styles.treatmentName}>{item.label}</AppTypography>
-									</View>
-								))}
-							</View>
-							{treatments.length > TREATMENTS_COLLAPSED_COUNT && (
-								<TouchableOpacity onPress={() => setTreatmentsExpanded((v) => !v)} activeOpacity={0.7}>
-									<AppTypography variant="caption" style={styles.linkText}>
-										{treatmentsExpanded ? 'Show fewer' : `Show all ${treatments.length} treatments`}
-									</AppTypography>
-								</TouchableOpacity>
-							)}
-						</AppSection>
-					</View>
+							</TouchableOpacity>
+						)}
+					</AppSection>
 				)}
 
 				{/* Practises at -- one card per clinic + video; each Book goes to the slot step */}
-				<View style={styles.sectionSlot} onLayout={trackSection('clinics')}>
-					<AppSection
-						title="Practises at"
-						gap={12}
-						marginTop={0}
-						right={
-							practicesSubtitle ? (
-								<AppTypography variant="caption" style={styles.muted13}>
-									{practicesSubtitle}
-								</AppTypography>
-							) : undefined
-						}
-					>
-						{hospitals.map((entry, n) => {
-							const tone = n === 0 ? TONES.mint : toneAt(n + 2)
-							const slot = todaySlots?.[entry.hospital.id]?.clinic
-							return (
-								<PractiseCard
-									key={entry.hospital.id}
-									icon="hospital-building"
-									tone={tone}
-									title={entry.hospital.name}
-									subtitle={[
-										entry.hospital.address,
-										entry.hospital.distance ? `${entry.hospital.distance} km` : '',
-									]
-										.filter(Boolean)
-										.join(' · ')}
-									fee={formatInr(entry.offline_consultation_fee)}
-									feeUnit="per visit"
-									nextSlot={slot ? `Today, ${slot.start_time}` : slotsKnown ? 'See all slots' : '…'}
-									nextToday={!!slot}
-									onDirections={() => openOnMap(entry.hospital.address, entry.hospital.name)}
-									directionsLabel={`Directions to ${entry.hospital.name}`}
-									onBook={() => goToBookSlot(entry.hospital.id, 'clinic')}
-								/>
-							)
-						})}
-
-						{hasVideoConsult && videoHospital && (
-							<PractiseCard
-								icon="video-outline"
-								tone={TONES.sky}
-								title="Video consultation"
-								subtitle="Join from the app, no travel"
-								fee={formatInr(videoFee)}
-								feeUnit="per call"
-								nextSlot={
-									videoNextSlot
-										? `Today, ${videoNextSlot.start_time}`
-										: slotsKnown
-											? 'See all slots'
-											: '…'
-								}
-								nextToday={!!videoNextSlot}
-								onBook={() => goToBookSlot(videoHospital.hospital.id, 'video')}
-							/>
-						)}
-
-						{hospitals.length === 0 && (
-							<AppTypography variant="caption" style={styles.mutedSmall}>
-								No hospitals available for this doctor
+				<AppSection
+					title="Practises at"
+					gap={12}
+					onLayout={trackSection('clinics')}
+					right={
+						practicesSubtitle ? (
+							<AppTypography variant="caption" style={styles.muted13}>
+								{practicesSubtitle}
 							</AppTypography>
-						)}
-					</AppSection>
-				</View>
+						) : undefined
+					}
+				>
+					{hospitals.map((entry, n) => {
+						const tone = n === 0 ? TONES.mint : toneAt(n + 2)
+						const slot = todaySlots?.[entry.hospital.id]?.clinic
+						return (
+							<PractiseCard
+								key={entry.hospital.id}
+								icon="hospital-building"
+								tone={tone}
+								title={entry.hospital.name}
+								subtitle={[
+									entry.hospital.address,
+									entry.hospital.distance ? `${entry.hospital.distance} km` : '',
+								]
+									.filter(Boolean)
+									.join(' · ')}
+								fee={formatInr(entry.offline_consultation_fee)}
+								feeUnit="per visit"
+								nextSlot={slot ? `Today, ${slot.start_time}` : slotsKnown ? 'See all slots' : '…'}
+								nextToday={!!slot}
+								onDirections={() => openOnMap(entry.hospital.address, entry.hospital.name)}
+								directionsLabel={`Directions to ${entry.hospital.name}`}
+								onBook={() => goToBookSlot(entry.hospital.id, 'clinic')}
+							/>
+						)
+					})}
+
+					{hasVideoConsult && videoHospital && (
+						<PractiseCard
+							icon="video-outline"
+							tone={TONES.sky}
+							title="Video consultation"
+							subtitle="Join from the app, no travel"
+							fee={formatInr(videoFee)}
+							feeUnit="per call"
+							nextSlot={
+								videoNextSlot
+									? `Today, ${videoNextSlot.start_time}`
+									: slotsKnown
+										? 'See all slots'
+										: '…'
+							}
+							nextToday={!!videoNextSlot}
+							onBook={() => goToBookSlot(videoHospital.hospital.id, 'video')}
+						/>
+					)}
+
+					{hospitals.length === 0 && (
+						<AppTypography variant="caption" style={styles.mutedSmall}>
+							No hospitals available for this doctor
+						</AppTypography>
+					)}
+				</AppSection>
 
 				{/* Achievements & recognition -- real data, flat list (Awards tab) */}
 				{achievements.length > 0 && (
-					<View style={styles.sectionSlot} onLayout={trackSection('awards')}>
-						<AppSection title="Achievements & recognition" gap={8} marginTop={0}>
-							<View>
-								{achievements.map((item, idx) => {
-									const year = formatYear(item.achievement_date)
-									const sub = [item.organization, year].filter(Boolean).join(' · ')
-									return (
-										<View
-											key={item.id}
-											style={[
-												styles.achievementRow,
-												idx !== achievements.length - 1 && styles.treatmentRowDivider,
-											]}
-										>
-											<AppIconTile
-												icon="medal-outline"
-												tone="sand"
-												size={36}
-												circle
-												iconSize={18}
-											/>
-											<View style={{ flex: 1 }}>
-												<AppTypography style={styles.achievementTitle}>
-													{item.title}
-												</AppTypography>
-												{!!sub && <AppTypography style={styles.muted13}>{sub}</AppTypography>}
-											</View>
+					<AppSection title="Achievements & recognition" gap={8} onLayout={trackSection('awards')}>
+						<View>
+							{achievements.map((item, idx) => {
+								const year = formatYear(item.achievement_date)
+								const sub = [item.organization, year].filter(Boolean).join(' · ')
+								return (
+									<View
+										key={item.id}
+										style={[
+											styles.achievementRow,
+											idx !== achievements.length - 1 && styles.treatmentRowDivider,
+										]}
+									>
+										<AppIconTile icon="medal-outline" tone="sand" size={36} circle iconSize={18} />
+										<View style={{ flex: 1 }}>
+											<AppTypography style={styles.achievementTitle}>{item.title}</AppTypography>
+											{!!sub && <AppTypography style={styles.muted13}>{sub}</AppTypography>}
 										</View>
-									)
-								})}
-							</View>
-						</AppSection>
-					</View>
+									</View>
+								)
+							})}
+						</View>
+					</AppSection>
 				)}
 
 				{/* Education & training -- vertical timeline, real degrees data */}
 				{educationItems.length > 0 && (
-					<View style={styles.sectionSlot} onLayout={trackSection('awards', !achievements.length)}>
-						<AppSection title="Education & training" gap={8} marginTop={0}>
-							<View>
-								{educationItems.map((deg, idx) => (
-									<View key={deg.id ?? idx} style={styles.timelineRow}>
-										<View style={styles.timelineMarkerCol}>
-											<View style={styles.timelineDot} />
-											{idx !== educationItems.length - 1 && <View style={styles.timelineLine} />}
-										</View>
-										<View
-											style={{
-												paddingBottom: idx !== educationItems.length - 1 ? 14 : 0,
-												flex: 1,
-											}}
-										>
-											<AppTypography style={styles.timelineTitle}>
-												{deg.specialization
-													? `${deg.degree}, ${deg.specialization}`
-													: deg.degree}
-											</AppTypography>
-											<AppTypography style={styles.muted13}>
-												{[deg.college, deg.year_of_passing].filter(Boolean).join(' · ')}
-											</AppTypography>
-										</View>
+					<AppSection
+						title="Education & training"
+						gap={8}
+						onLayout={trackSection('awards', !achievements.length)}
+					>
+						<View>
+							{educationItems.map((deg, idx) => (
+								<View key={deg.id ?? idx} style={styles.timelineRow}>
+									<View style={styles.timelineMarkerCol}>
+										<View style={styles.timelineDot} />
+										{idx !== educationItems.length - 1 && <View style={styles.timelineLine} />}
 									</View>
-								))}
-							</View>
-						</AppSection>
-					</View>
+									<View
+										style={{
+											paddingBottom: idx !== educationItems.length - 1 ? 14 : 0,
+											flex: 1,
+										}}
+									>
+										<AppTypography style={styles.timelineTitle}>
+											{deg.specialization ? `${deg.degree}, ${deg.specialization}` : deg.degree}
+										</AppTypography>
+										<AppTypography style={styles.muted13}>
+											{[deg.college, deg.year_of_passing].filter(Boolean).join(' · ')}
+										</AppTypography>
+									</View>
+								</View>
+							))}
+						</View>
+					</AppSection>
 				)}
 
 				{/* Good to know -- static policy copy (see doctorProfileMockData.ts) */}
@@ -788,25 +772,28 @@ function PractiseCard(props: {
 			<View style={styles.practiseBottom}>
 				<View style={{ flex: 1, minWidth: 0 }}>
 					<AppTypography style={styles.nextSlotLabel}>NEXT SLOT</AppTypography>
-					<View style={[styles.nextSlotPill, props.nextToday && { backgroundColor: SUCCESS_BG }]}>
-						<AppTypography style={[styles.nextSlotText, props.nextToday && { color: SUCCESS }]}>
-							{props.nextSlot}
-						</AppTypography>
-					</View>
+					<AppTag
+						label={props.nextSlot}
+						size="md"
+						tone={props.nextToday ? 'confirmed' : 'neutral'}
+						style={styles.nextSlotPill}
+					/>
 				</View>
 				{!!props.onDirections && (
-					<TouchableOpacity
-						style={styles.directionsBtn}
+					<AppIconButton
+						icon="navigation-variant-outline"
 						onPress={props.onDirections}
-						accessibilityLabel={props.directionsLabel}
-					>
-						<MaterialCommunityIcons name="navigation-variant-outline" size={18} color={PRIMARY} />
-					</TouchableOpacity>
+						accessibilityLabel={props.directionsLabel ?? 'Directions'}
+					/>
 				)}
-				<TouchableOpacity style={styles.practiseBook} onPress={props.onBook} activeOpacity={0.85}>
-					<AppTypography style={styles.practiseBookText}>Book</AppTypography>
-					<MaterialCommunityIcons name="chevron-right" size={16} color="#fff" />
-				</TouchableOpacity>
+				<AppActionChip
+					label="Book"
+					trailingIcon="chevron-right"
+					variant="filled"
+					size="md"
+					onPress={props.onBook}
+					style={styles.practiseBook}
+				/>
 			</View>
 		</View>
 	)
@@ -894,76 +881,12 @@ const styles = StyleSheet.create({
 		gap: 6,
 		marginTop: 6,
 	},
-	availableBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 9999,
-		backgroundColor: SUCCESS_BG,
-	},
-	availableDot: {
-		width: 6,
-		height: 6,
-		borderRadius: 9999,
-		backgroundColor: SUCCESS,
-	},
-	availableBadgeText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		color: SUCCESS,
-	},
-	videoBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 9999,
-		backgroundColor: SKY_BG,
-	},
-	videoBadgeText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		color: SKY,
-	},
-	languageBadge: {
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 9999,
-		backgroundColor: PAGE_BG,
-	},
-	languageBadgeText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '600',
-		color: INK,
-	},
+	// AppTag pill (4x10, 12/16 700) with the design's 6px dot gap
+	availableBadge: { gap: 6 },
+	languageBadgeText: { fontWeight: '600' },
 	statsRow: {
-		flexDirection: 'row',
-		gap: 8,
 		marginTop: 16,
 		marginHorizontal: 16,
-	},
-	statBox: {
-		flex: 1,
-		borderRadius: 16,
-		padding: 12,
-		gap: 2,
-	},
-	statLabel: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '600',
-	},
-	statValue: {
-		fontSize: 18,
-		lineHeight: 24,
-		fontWeight: '800',
-		color: INK,
 	},
 
 	// Tabs
@@ -980,9 +903,6 @@ const styles = StyleSheet.create({
 	// Profile tabs keep their original zero side padding so labels never truncate
 	tabChip: { flex: 1, paddingHorizontal: 0 },
 
-	// Wrapper around each scroll-spied AppSection: carries the 8px section gap so its
-	// onLayout y is the section's own y
-	sectionSlot: { marginTop: 8 },
 	mutedSmall: { color: INK_MUTED, fontSize: 12 },
 
 	muted13: { color: INK_MUTED, fontSize: 13, lineHeight: 18 },
@@ -995,7 +915,7 @@ const styles = StyleSheet.create({
 		shadowRadius: 8,
 		elevation: 4,
 	},
-	headerShareBtn: { width: 44, height: 44, marginRight: -10, alignItems: 'center', justifyContent: 'center' },
+	headerShareBtn: { marginRight: -10 },
 
 	heroSection: { backgroundColor: '#fff', paddingBottom: 16 },
 
@@ -1038,35 +958,9 @@ const styles = StyleSheet.create({
 		gap: 8,
 	},
 	nextSlotLabel: { fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.4, color: INK_MUTED },
-	nextSlotPill: {
-		alignSelf: 'flex-start',
-		marginTop: 2,
-		paddingHorizontal: 8,
-		paddingVertical: 2,
-		borderRadius: 6,
-		backgroundColor: PAGE_BG,
-	},
-	nextSlotText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: INK },
-	directionsBtn: {
-		width: 40,
-		height: 40,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: APP_COLORS.border,
-		backgroundColor: '#fff',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	practiseBook: {
-		height: 40,
-		paddingHorizontal: 16,
-		borderRadius: 10,
-		backgroundColor: PRIMARY,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-	},
-	practiseBookText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: '#fff' },
+	nextSlotPill: { marginTop: 2 },
+	// AppActionChip's 1px (primary) border + 15 = the design's 16px side padding
+	practiseBook: { paddingHorizontal: 15 },
 
 	// Footer
 	feeFromLabel: { fontSize: 12, lineHeight: 16, color: INK_MUTED },
@@ -1093,18 +987,9 @@ const styles = StyleSheet.create({
 		flexWrap: 'wrap',
 		gap: 8,
 	},
-	expertiseChip: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 9999,
-		backgroundColor: SPEC_TONE_BG,
-	},
-	expertiseChipText: {
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '500',
-		color: INK,
-	},
+	// AppTag md pill (13/18) at the design's 6x12 padding and 500 weight
+	expertiseChip: { paddingHorizontal: 12, paddingVertical: 6 },
+	expertiseChipText: { fontWeight: '500' },
 
 	// Treatments & services
 	treatmentRow: {

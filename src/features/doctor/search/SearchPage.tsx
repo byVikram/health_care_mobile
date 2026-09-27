@@ -12,7 +12,15 @@ import {
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { AppIconTile, AppTypography, AppIcon, AppPathIcon } from '../../../components/common'
+import {
+	AppChip,
+	AppIconButton,
+	AppIconTile,
+	AppNavRow,
+	AppTypography,
+	AppIcon,
+	AppPathIcon,
+} from '../../../components/common'
 import { useAuth } from '../../../context/AuthContext'
 import { getSpecialities } from '../doctorService'
 import { ROUTES } from '../../../navigation/routes'
@@ -189,15 +197,16 @@ export default function SearchPage() {
 					<View style={[styles.decorCircle, styles.decorCircleBottom]} />
 
 					<View style={styles.heroTopRow}>
-						<TouchableOpacity
-							style={styles.backButton}
+						<AppIconButton
+							variant="ghost"
+							size={44}
+							circle
 							onPress={handleBack}
-							activeOpacity={0.7}
-							accessibilityRole="button"
 							accessibilityLabel="Back"
+							style={styles.backButton}
 						>
 							<AppIcon name="back" size={24} color={APP_COLORS.surface} />
-						</TouchableOpacity>
+						</AppIconButton>
 						<Animated.View
 							style={{ opacity: miniOpacity, transform: [{ translateY: miniShift }] }}
 							accessibilityElementsHidden={!compact}
@@ -277,15 +286,16 @@ export default function SearchPage() {
 								{SYMPTOM_CHIPS.map((symptom, i) => {
 									const tone = toneAt(i)
 									return (
-										<TouchableOpacity
+										<AppChip
 											key={symptom}
-											style={[styles.symptomChip, { backgroundColor: tone.bg }]}
+											label={symptom}
 											onPress={() => handleSymptomPress(symptom)}
-											activeOpacity={0.8}
-										>
-											<View style={[styles.symptomDot, { backgroundColor: tone.ink }]} />
-											<AppTypography style={styles.symptomChipText}>{symptom}</AppTypography>
-										</TouchableOpacity>
+											size="sm"
+											dot={tone.ink}
+											dotSize={8}
+											borderWidth={0}
+											style={[styles.symptomChip, { backgroundColor: tone.bg }]}
+										/>
 									)
 								})}
 							</View>
@@ -333,16 +343,19 @@ export default function SearchPage() {
 				</View>
 
 				{/* SEE ALL DOCTORS */}
-				<TouchableOpacity style={styles.seeAllRow} onPress={handleSeeAllDoctors} activeOpacity={0.8}>
-					<AppIconTile radius={8} backgroundColor={TONES.sky.bg}>
-						<AppIcon name="video" size={20} color={TONES.sky.ink} />
-					</AppIconTile>
-					<View style={styles.seeAllTextCol}>
-						<AppTypography style={styles.seeAllTitle}>See all doctors</AppTypography>
-						<AppTypography style={styles.seeAllSubtitle}>Browse every doctor near you</AppTypography>
-					</View>
-					<AppIcon name="chevronRight" size={20} color={APP_COLORS.inkMuted} />
-				</TouchableOpacity>
+				<AppNavRow
+					title="See all doctors"
+					subtitle="Browse every doctor near you"
+					onPress={handleSeeAllDoctors}
+					leading={
+						<AppIconTile radius={8} backgroundColor={TONES.sky.bg}>
+							<AppIcon name="video" size={20} color={TONES.sky.ink} />
+						</AppIconTile>
+					}
+					trailing={<AppIcon name="chevronRight" size={20} color={APP_COLORS.inkMuted} />}
+					style={styles.seeAllRow}
+					titleStyle={styles.seeAllTitle}
+				/>
 			</Animated.ScrollView>
 		</View>
 	)
@@ -390,12 +403,7 @@ const styles = StyleSheet.create({
 		height: 52,
 	},
 	backButton: {
-		width: 44,
-		height: 44,
 		marginLeft: -10,
-		alignItems: 'center',
-		justifyContent: 'center',
-		borderRadius: 9999,
 	},
 	miniTitle: {
 		fontSize: 18,
@@ -516,29 +524,14 @@ const styles = StyleSheet.create({
 		color: APP_COLORS.ink,
 	},
 
-	// Symptom chips — kept local: AppChip's `dot` is fixed at 6px, the design's is 8px.
+	// Symptom chips: AppChip sm pill (36h, 13/600, 8px dot) on the tone background, 14px side padding
 	symptomRow: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		gap: 8,
 	},
 	symptomChip: {
-		height: 36,
 		paddingHorizontal: 14,
-		borderRadius: 9999,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	symptomDot: {
-		width: 8,
-		height: 8,
-		borderRadius: 9999,
-	},
-	symptomChipText: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: APP_COLORS.ink,
 	},
 
 	// Speciality grid (3 cols, 16px row gap, 8px column gap)
@@ -581,25 +574,12 @@ const styles = StyleSheet.create({
 	},
 
 	// See all doctors row
+	// AppNavRow (gap 12, 15/600 ink title) as a padded white page row; the design's title is 15/22
 	seeAllRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
 		padding: 16,
 		backgroundColor: APP_COLORS.surface,
 	},
-	seeAllTextCol: {
-		flex: 1,
-	},
 	seeAllTitle: {
-		fontSize: 15,
 		lineHeight: 22,
-		fontWeight: '600',
-		color: APP_COLORS.ink,
-	},
-	seeAllSubtitle: {
-		fontSize: 13,
-		lineHeight: 18,
-		color: APP_COLORS.inkMuted,
 	},
 })

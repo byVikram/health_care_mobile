@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, TouchableOpacity, View, ScrollView } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View, ScrollView } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import {
@@ -8,12 +7,14 @@ import {
 	AppButton,
 	AppFamilyMemberSheet,
 	AppFooterBar,
+	AppIconButton,
 	AppIconTile,
 	AppPatientRow,
 	AppRadio,
 	AppScreenHeader,
 	AppSection,
 	AppSegmentedControl,
+	AppTag,
 	AppTypography,
 	DateStrip,
 	familyMemberFirstName,
@@ -256,9 +257,15 @@ export default function BookSlotPage() {
 								{doctor.name} · {where}
 							</AppTypography>
 						</View>
-						<View style={styles.feePill}>
-							<AppTypography style={styles.feePillText}>{formatInr(fee)}</AppTypography>
-						</View>
+						<AppTag
+							label={formatInr(fee)}
+							size="md"
+							shape="pill"
+							bg={APP_COLORS.mintAccent}
+							ink={APP_COLORS.ink}
+							style={styles.feePill}
+							textStyle={styles.feePillText}
+						/>
 					</View>
 				</View>
 
@@ -312,17 +319,13 @@ export default function BookSlotPage() {
 												{(h.hospital.address || '') + km}
 											</AppTypography>
 										</View>
-										<TouchableOpacity
+										<AppIconButton
+											icon="navigation-variant-outline"
+											size={36}
+											iconSize={16}
 											accessibilityLabel={`Directions to ${h.hospital.name}`}
 											onPress={() => openOnMap(h.hospital.address, h.hospital.name)}
-											style={styles.directionsBtn}
-										>
-											<MaterialCommunityIcons
-												name="navigation-variant-outline"
-												size={16}
-												color={APP_COLORS.primary}
-											/>
-										</TouchableOpacity>
+										/>
 										<AppRadio checked={on} />
 									</Pressable>
 								)
@@ -420,25 +423,13 @@ export default function BookSlotPage() {
 			</ScrollView>
 
 			{/* Footer */}
-			<AppFooterBar direction="column">
-				<View style={styles.summaryRow}>
-					<MaterialCommunityIcons name="calendar-blank-outline" size={16} color={APP_COLORS.primary} />
-					<AppTypography style={styles.summaryText} numberOfLines={1}>
-						{summary}
-					</AppTypography>
-				</View>
+			<AppFooterBar direction="column" summary={{ icon: 'calendar-blank-outline', text: summary }}>
 				{selectedTime ? (
 					<AppButton size="lg" onPress={handleContinue}>
 						{`Continue · ${formatInr(fee)}`}
 					</AppButton>
 				) : (
-					<AppButton
-						size="lg"
-						disabled
-						style={[styles.btnDisabledSoft, styles.pickTimeBtn]}
-						contentStyle={styles.pickTimeBtnContent}
-						labelStyle={{ color: APP_COLORS.ink }}
-					>
+					<AppButton size="lg" disabled softDisabled radius={8} contentStyle={styles.pickTimeBtnContent}>
 						Pick a time to continue
 					</AppButton>
 				)}
@@ -483,8 +474,9 @@ const styles = StyleSheet.create({
 	bookingEyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.5, color: APP_COLORS.mintAccent },
 	bookingBig: { fontSize: 20, lineHeight: 26, fontWeight: '800', color: '#fff' },
 	bookingSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.mint },
-	feePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999, backgroundColor: APP_COLORS.mintAccent },
-	feePillText: { fontSize: 13, lineHeight: 18, fontWeight: '800', color: APP_COLORS.ink },
+	// AppTag md pill (13/18) centred in the card at the design's 800 weight
+	feePill: { alignSelf: 'center' },
+	feePillText: { fontWeight: '800' },
 
 	segmentWrap: {
 		backgroundColor: '#fff',
@@ -515,17 +507,6 @@ const styles = StyleSheet.create({
 	},
 	clinicCardOn: { borderColor: APP_COLORS.primary, backgroundColor: APP_COLORS.mint },
 	clinicName: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: APP_COLORS.ink },
-	// Icon-only 36x36 button (AppActionChip always has a label)
-	directionsBtn: {
-		width: 36,
-		height: 36,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: APP_COLORS.border,
-		backgroundColor: '#fff',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
 
 	videoInfo: { flexDirection: 'row', alignItems: 'flex-start' },
 
@@ -544,11 +525,6 @@ const styles = StyleSheet.create({
 		backgroundColor: '#fff',
 	},
 
-	summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-	summaryText: { flex: 1, fontSize: 13, lineHeight: 18, color: APP_COLORS.ink },
-	// Design's soft disabled CTA (Paper's own disabled colours would be grey)
-	btnDisabledSoft: { backgroundColor: APP_COLORS.disabledBtn },
-	// "Pick a time" placeholder keeps its original 48h / radius 8
-	pickTimeBtn: { borderRadius: 8 },
+	// "Pick a time" placeholder keeps its original 48h (radius 8 via the radius prop)
 	pickTimeBtnContent: { height: 48 },
 })

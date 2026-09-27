@@ -452,28 +452,28 @@ export default function DoctorSearchPage() {
 			{/* FILTER / SORT BAR — wraps onto a second line like the design. */}
 			<View style={styles.filterBarWrap}>
 				<View style={styles.filterBarContent}>
-					<TouchableOpacity style={styles.specialityChip} onPress={openFilterModal} activeOpacity={0.82}>
-						<AppIcon name="steth" size={16} color={APP_COLORS.primary} />
-						<AppTypography style={styles.specialityChipText} numberOfLines={1}>
-							{specialityName || 'All specialities'}
-						</AppTypography>
-						<AppIcon name="chevronRight" size={16} color={APP_COLORS.ink} strokeWidth={2.2} />
-					</TouchableOpacity>
+					<AppChip
+						label={specialityName || 'All specialities'}
+						selected
+						onPress={openFilterModal}
+						variant="soft"
+						shape="rounded"
+						size="sm"
+						leading={<AppIcon name="steth" size={16} color={APP_COLORS.primary} />}
+						trailing={<AppIcon name="chevronRight" size={16} color={APP_COLORS.ink} strokeWidth={2.2} />}
+						style={styles.specialityChip}
+						textStyle={styles.specialityChipText}
+					/>
 
-					<TouchableOpacity
-						style={styles.sortPill}
+					<AppChip
+						label={sortLabel}
 						onPress={() => setShowSort(true)}
-						activeOpacity={0.82}
-						accessibilityRole="button"
+						shape="rounded"
+						size="sm"
+						trailing={<AppIcon name="chevronDown" size={16} color={APP_COLORS.ink} strokeWidth={2.2} />}
 						accessibilityLabel={`Sort doctors, ${sortLabel}`}
-					>
-						<AppTypography style={styles.sortPillText} numberOfLines={1}>
-							{sortLabel}
-						</AppTypography>
-						<View style={styles.sortPillChevron} pointerEvents="none">
-							<AppIcon name="chevronDown" size={16} color={APP_COLORS.ink} strokeWidth={2.2} />
-						</View>
-					</TouchableOpacity>
+						style={styles.sortPill}
+					/>
 
 					<AppChip
 						label="Available today"
@@ -634,44 +634,20 @@ const styles = StyleSheet.create({
 		gap: 8,
 		paddingHorizontal: 16,
 	},
+	// Speciality entry chip: AppChip soft/selected (mint + primary border) with the design's 4px gap,
+	// 10px right padding and 200px cap (the label truncates)
 	specialityChip: {
-		height: 36,
-		paddingLeft: 12,
 		paddingRight: 10,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: APP_COLORS.primary,
-		backgroundColor: APP_COLORS.mint,
-		flexDirection: 'row',
-		alignItems: 'center',
 		gap: 4,
 		maxWidth: 200,
 	},
 	specialityChipText: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: APP_COLORS.ink,
 		flexShrink: 1,
 	},
+	// Sort pill: 12 + label + 4 + 16px chevron + 10 = the design's 30px right padding around the chevron
 	sortPill: {
-		height: 36,
-		paddingLeft: 12,
-		paddingRight: 30,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: APP_COLORS.border,
-		backgroundColor: APP_COLORS.surface,
-		justifyContent: 'center',
-	},
-	sortPillText: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: APP_COLORS.ink,
-	},
-	sortPillChevron: {
-		position: 'absolute',
-		right: 10,
-		top: 9,
+		paddingRight: 10,
+		gap: 4,
 	},
 
 	// Results

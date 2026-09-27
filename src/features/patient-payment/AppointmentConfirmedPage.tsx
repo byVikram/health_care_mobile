@@ -6,16 +6,7 @@
 // the payment line and footer actions (home / Appointment Details).
 
 import React from 'react'
-import {
-	Linking,
-	ScrollView,
-	StatusBar,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
-	useWindowDimensions,
-} from 'react-native'
+import { Linking, ScrollView, StatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -26,6 +17,7 @@ import { buildS3Url } from '../../utils/s3Utils'
 import { showComingSoon } from '../../utils/toast'
 import { APP_COLORS, TONES, formatInr } from '../../config/theme'
 import {
+	AppActionChip,
 	AppAvatar,
 	AppBillStatusLine,
 	AppBillSummary,
@@ -34,6 +26,7 @@ import {
 	AppIcon,
 	AppNumberedSteps,
 	AppSection,
+	AppTag,
 	AppTicketCard,
 } from '../../components/common'
 import { getPrepSteps, getPrepStepsTitle } from '../appointment/prepSteps'
@@ -126,11 +119,14 @@ export default function AppointmentConfirmedPage() {
 						</View>
 					</View>
 
-					<View style={styles.successBadge}>
-						<Text style={styles.successBadgeText}>
-							{isPayAtClinic ? 'Pay at clinic' : 'Payment successful'} · {feeText}
-						</Text>
-					</View>
+					<AppTag
+						label={`${isPayAtClinic ? 'Pay at clinic' : 'Payment successful'} · ${feeText}`}
+						shape="pill"
+						bg={APP_COLORS.mintAccent}
+						ink={APP_COLORS.ink}
+						style={styles.successBadge}
+						textStyle={styles.pillTextHeavy}
+					/>
 
 					<Text style={styles.heroTitle} accessibilityRole="header">
 						You're all booked
@@ -158,9 +154,13 @@ export default function AppointmentConfirmedPage() {
 							.filter(Boolean)
 							.join(' · '),
 						trailing: (
-							<View style={styles.confirmedPill}>
-								<Text style={styles.confirmedPillText}>Confirmed</Text>
-							</View>
+							<AppTag
+								label="Confirmed"
+								tone="confirmed"
+								shape="pill"
+								style={styles.confirmedPill}
+								textStyle={styles.pillTextHeavy}
+							/>
 						),
 					}}
 					fields={[
@@ -180,10 +180,12 @@ export default function AppointmentConfirmedPage() {
 					]}
 					actions={
 						<>
-							<TouchableOpacity
-								style={[styles.cardActionBtn, { backgroundColor: APP_COLORS.mint }]}
-								activeOpacity={0.8}
-								accessibilityRole="button"
+							<AppActionChip
+								label="Add to calendar"
+								icon="calendar-blank-outline"
+								variant="tinted"
+								tone="mint"
+								style={styles.flex}
 								onPress={() =>
 									addToCalendar({
 										title: `Appointment with ${params.doctorName}`,
@@ -191,20 +193,16 @@ export default function AppointmentConfirmedPage() {
 										location: isVideo ? 'Video consultation' : params.hospitalName,
 									})
 								}
-							>
-								<AppIcon name="calendar" size={18} color={APP_COLORS.primary} />
-								<Text style={styles.cardActionText}>Add to calendar</Text>
-							</TouchableOpacity>
+							/>
 							{!isVideo && (
-								<TouchableOpacity
-									style={[styles.cardActionBtn, { backgroundColor: TONES.sky.bg }]}
-									activeOpacity={0.8}
-									accessibilityRole="button"
+								<AppActionChip
+									label="Directions"
+									icon="navigation-variant-outline"
+									variant="tinted"
+									tone="sky"
+									style={styles.flex}
 									onPress={() => openOnMap(params.hospitalAddress, params.hospitalName)}
-								>
-									<AppIcon name="directions" size={18} color={TONES.sky.ink} />
-									<Text style={styles.cardActionText}>Directions</Text>
-								</TouchableOpacity>
+								/>
 							)}
 						</>
 					}
@@ -319,18 +317,14 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
+	// AppTag pill (4x10, 12/16) centred in the hero at the design's 12px side padding
 	successBadge: {
+		alignSelf: 'center',
 		marginTop: 8,
 		paddingHorizontal: 12,
-		paddingVertical: 4,
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.mintAccent,
 	},
-	successBadgeText: {
-		fontSize: 12,
-		lineHeight: 16,
+	pillTextHeavy: {
 		fontWeight: '800',
-		color: APP_COLORS.ink,
 	},
 	heroTitle: {
 		fontSize: 26,
@@ -356,30 +350,9 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		fontWeight: '700',
 	},
+	// Vertically centred in the ticket header row (AppTag defaults to alignSelf: 'flex-start')
 	confirmedPill: {
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.successBg,
-	},
-	confirmedPillText: {
-		fontSize: 12,
-		fontWeight: '800',
-		color: APP_COLORS.success,
-	},
-	cardActionBtn: {
-		flex: 1,
-		height: 44,
-		borderRadius: 12,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 6,
-	},
-	cardActionText: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: APP_COLORS.ink,
+		alignSelf: 'center',
 	},
 
 	// Before your visit

@@ -11,16 +11,7 @@
 // entry point into the Laboratory search flow rather than a named test.
 
 import React, { useEffect, useState } from 'react'
-import {
-	View,
-	ScrollView,
-	StyleSheet,
-	TouchableOpacity,
-	ActivityIndicator,
-	Linking,
-	TextInput,
-	Share,
-} from 'react-native'
+import { View, ScrollView, StyleSheet, ActivityIndicator, Linking, TextInput, Share } from 'react-native'
 import { Text } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
@@ -30,10 +21,13 @@ import {
 	AppButton,
 	AppDashedDivider,
 	AppFooterBar,
+	AppIconButton,
 	AppIconTile,
 	AppInfoBanner,
+	AppNavRow,
 	AppScreenHeader,
 	AppSection,
+	AppTextLink,
 } from '../../components/common'
 import AppRatingStars from '../../components/common/display/AppRatingStars'
 import { showComingSoon } from '../../utils/toast'
@@ -237,16 +231,23 @@ export default function VisitSummaryPage() {
 				backAccessibilityLabel="Back to bookings"
 				rightElement={
 					<View style={styles.headerActions}>
-						<TouchableOpacity onPress={handleShare} style={styles.headerBtn} accessibilityLabel="Share">
-							<MaterialCommunityIcons name="share-variant-outline" size={22} color={APP_COLORS.surface} />
-						</TouchableOpacity>
-						<TouchableOpacity
+						<AppIconButton
+							icon="share-variant-outline"
+							variant="ghost"
+							size={44}
+							circle
+							onPress={handleShare}
+							accessibilityLabel="Share"
+						/>
+						<AppIconButton
+							icon="help-circle-outline"
+							variant="ghost"
+							size={44}
+							circle
 							onPress={comingSoon}
-							style={[styles.headerBtn, styles.headerBtnRight]}
 							accessibilityLabel="Help"
-						>
-							<MaterialCommunityIcons name="help-circle-outline" size={22} color={APP_COLORS.surface} />
-						</TouchableOpacity>
+							style={styles.headerBtnRight}
+						/>
 					</View>
 				}
 			/>
@@ -285,10 +286,12 @@ export default function VisitSummaryPage() {
 						<Text style={styles.doctorName}>{appt.doctor?.name ?? '—'}</Text>
 						{doctorSpecialty ? <Text style={styles.doctorSpecialty}>{doctorSpecialty}</Text> : null}
 						{quals ? <Text style={styles.doctorQuals}>{quals}</Text> : null}
-						<TouchableOpacity style={styles.viewProfileRow} onPress={openDoctor} hitSlop={8}>
-							<Text style={styles.linkText}>View profile</Text>
-							<MaterialCommunityIcons name="chevron-right" size={16} color={APP_COLORS.primary} />
-						</TouchableOpacity>
+						<AppTextLink
+							label="View profile"
+							size="sm"
+							onPress={openDoctor}
+							style={styles.viewProfileRow}
+						/>
 					</View>
 				</AppSection>
 
@@ -381,10 +384,15 @@ export default function VisitSummaryPage() {
 						</View>
 						<View style={styles.payMetaRow}>
 							<View style={{ flex: 1 }} />
-							<TouchableOpacity style={styles.receiptLink} onPress={comingSoon} hitSlop={8}>
-								<MaterialCommunityIcons name="chevron-down" size={14} color={APP_COLORS.primary} />
-								<Text style={styles.receiptText}>Receipt</Text>
-							</TouchableOpacity>
+							<AppTextLink
+								label="Receipt"
+								size="sm"
+								leadingIcon="chevron-down"
+								trailingIcon="none"
+								onPress={comingSoon}
+								style={styles.receiptLink}
+								textStyle={styles.receiptText}
+							/>
 						</View>
 					</AppSection>
 				) : null}
@@ -415,21 +423,14 @@ export default function VisitSummaryPage() {
 										style={styles.commentInput}
 										multiline
 									/>
-									{/* Local: AppActionChip has no loading state (spinner + label). */}
-									<TouchableOpacity
-										style={[
-											styles.smallBtnPrimary,
-											styles.submitBtn,
-											submittingReview && { opacity: 0.6 },
-										]}
-										disabled={submittingReview}
+									{/* `loading` shows spinner + label and blocks presses; the 0.6 dim is this screen's */}
+									<AppActionChip
+										label="Submit review"
+										filled
+										loading={submittingReview}
 										onPress={handleSubmitReview}
-									>
-										{submittingReview ? (
-											<ActivityIndicator size="small" color={APP_COLORS.surface} />
-										) : null}
-										<Text style={styles.smallBtnPrimaryText}>Submit review</Text>
-									</TouchableOpacity>
+										style={[styles.submitBtn, submittingReview && styles.submitBtnBusy]}
+									/>
 								</>
 							) : null}
 						</>
@@ -437,14 +438,15 @@ export default function VisitSummaryPage() {
 				</AppSection>
 
 				{/* Help */}
-				<TouchableOpacity style={styles.helpCard} onPress={comingSoon} activeOpacity={0.7}>
-					<AppIconTile icon="chat-question-outline" tone="lilac" size={36} iconSize={18} />
-					<View style={styles.flexCol}>
-						<Text style={styles.helpTitle}>Need help with this booking?</Text>
-						<Text style={styles.helpSub}>Chat with Karolahealth support</Text>
-					</View>
-					<MaterialCommunityIcons name="chevron-right" size={18} color={APP_COLORS.border} />
-				</TouchableOpacity>
+				<AppNavRow
+					title="Need help with this booking?"
+					subtitle="Chat with Karolahealth support"
+					onPress={comingSoon}
+					leading={{ icon: 'chat-question-outline', tone: 'lilac', size: 36, iconSize: 18 }}
+					trailing={<MaterialCommunityIcons name="chevron-right" size={18} color={APP_COLORS.border} />}
+					style={styles.helpCard}
+					titleStyle={styles.helpTitle}
+				/>
 			</ScrollView>
 
 			{/* Footer */}
@@ -492,13 +494,6 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
-	},
-	headerBtn: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		alignItems: 'center',
-		justifyContent: 'center',
 	},
 	headerBtnRight: {
 		marginRight: -10,
@@ -553,17 +548,8 @@ const styles = StyleSheet.create({
 		color: APP_COLORS.inkMuted,
 	},
 	viewProfileRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
 		alignSelf: 'flex-start',
-		gap: 2,
 		marginTop: 2,
-	},
-	linkText: {
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '700',
-		color: APP_COLORS.primary,
 	},
 
 	// Prescription block
@@ -606,22 +592,6 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 
-	// Small (36px) primary button -- review submit only (needs a loading spinner)
-	smallBtnPrimary: {
-		height: 36,
-		paddingHorizontal: 12,
-		borderRadius: 10,
-		backgroundColor: APP_COLORS.primary,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-	},
-	smallBtnPrimaryText: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: APP_COLORS.surface,
-	},
-
 	// Payment
 	payRow: {
 		flexDirection: 'row',
@@ -661,16 +631,13 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 		gap: 8,
 	},
+	// AppTextLink sm at the design's 4px icon gap and 12/16 label
 	receiptLink: {
-		flexDirection: 'row',
-		alignItems: 'center',
 		gap: 4,
 	},
 	receiptText: {
 		fontSize: 12,
 		lineHeight: 16,
-		fontWeight: '700',
-		color: APP_COLORS.primary,
 	},
 
 	// Rating
@@ -686,16 +653,19 @@ const styles = StyleSheet.create({
 		minHeight: 72,
 		textAlignVertical: 'top',
 	},
+	// AppActionChip filled: its 1px primary border + 11 = the design's 12px side padding
 	submitBtn: {
 		alignSelf: 'flex-start',
+		paddingHorizontal: 11,
+	},
+	submitBtnBusy: {
+		opacity: 0.6,
 	},
 
 	// Help
+	// AppNavRow restyled as the design's bordered card; title 14/20 700
 	helpCard: {
 		marginHorizontal: 16,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
 		paddingVertical: 12,
 		paddingHorizontal: 14,
 		borderRadius: 12,
@@ -705,14 +675,7 @@ const styles = StyleSheet.create({
 	},
 	helpTitle: {
 		fontSize: 14,
-		lineHeight: 20,
 		fontWeight: '700',
-		color: APP_COLORS.ink,
-	},
-	helpSub: {
-		fontSize: 12,
-		lineHeight: 16,
-		color: APP_COLORS.inkMuted,
 	},
 
 	// Footer

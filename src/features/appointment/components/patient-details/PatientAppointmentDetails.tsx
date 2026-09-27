@@ -6,7 +6,7 @@
 // using the shared AppointmentDetailsContent.
 
 import React, { useCallback, useEffect, useState } from 'react'
-import { Alert, Linking, ScrollView, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Linking, ScrollView, Share, StatusBar, StyleSheet, Text, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import type { NavigationProp } from '@react-navigation/native'
@@ -19,13 +19,16 @@ import {
 	AppButton,
 	AppDetailRow,
 	AppFooterBar,
+	AppIconButton,
 	AppIconTile,
 	AppInfoBanner,
+	AppNavRow,
 	AppNumberedSteps,
 	AppScreenHeader,
 	AppSection,
 	AppSkeleton,
 	AppStatusTimeline,
+	AppTextLink,
 } from '../../../../components/common'
 import { getAppointmentById } from '../../../../services/appointmentService'
 import { ROUTES } from '../../../../navigation/routes'
@@ -64,29 +67,29 @@ function DetailsSkeleton() {
 	return (
 		<View style={styles.skeleton}>
 			<AppSection marginTop={0} gap={12} style={styles.doctorCard}>
-				<AppSkeleton width={60} height={60} borderRadius={16} style={styles.skelTone} />
+				<AppSkeleton width={60} height={60} borderRadius={16} color={APP_COLORS.divider} />
 				<View style={styles.skeletonCol}>
-					<AppSkeleton width="60%" height={18} borderRadius={8} style={styles.skelTone} />
-					<AppSkeleton width="45%" height={14} borderRadius={8} style={styles.skelTone} />
-					<AppSkeleton width="70%" height={12} borderRadius={8} style={styles.skelTone} />
+					<AppSkeleton width="60%" height={18} borderRadius={8} color={APP_COLORS.divider} />
+					<AppSkeleton width="45%" height={14} borderRadius={8} color={APP_COLORS.divider} />
+					<AppSkeleton width="70%" height={12} borderRadius={8} color={APP_COLORS.divider} />
 				</View>
 			</AppSection>
 			<AppSection marginTop={0}>
-				<AppSkeleton width="30%" height={18} borderRadius={8} style={styles.skelTone} />
+				<AppSkeleton width="30%" height={18} borderRadius={8} color={APP_COLORS.divider} />
 				{Array.from({ length: 5 }).map((_, i) => (
 					<View key={i} style={styles.skeletonRow}>
-						<AppSkeleton width={36} height={36} borderRadius={10} style={styles.skelTone} />
+						<AppSkeleton width={36} height={36} borderRadius={10} color={APP_COLORS.divider} />
 						<View style={styles.skeletonCol}>
-							<AppSkeleton width="25%" height={10} borderRadius={8} style={styles.skelTone} />
-							<AppSkeleton width="60%" height={14} borderRadius={8} style={styles.skelTone} />
+							<AppSkeleton width="25%" height={10} borderRadius={8} color={APP_COLORS.divider} />
+							<AppSkeleton width="60%" height={14} borderRadius={8} color={APP_COLORS.divider} />
 						</View>
 					</View>
 				))}
 			</AppSection>
 			<AppSection marginTop={0}>
-				<AppSkeleton width="30%" height={18} borderRadius={8} style={styles.skelTone} />
-				<AppSkeleton width="100%" height={14} borderRadius={8} style={styles.skelTone} />
-				<AppSkeleton width="100%" height={14} borderRadius={8} style={styles.skelTone} />
+				<AppSkeleton width="30%" height={18} borderRadius={8} color={APP_COLORS.divider} />
+				<AppSkeleton width="100%" height={14} borderRadius={8} color={APP_COLORS.divider} />
+				<AppSkeleton width="100%" height={14} borderRadius={8} color={APP_COLORS.divider} />
 			</AppSection>
 		</View>
 	)
@@ -275,23 +278,24 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 				backAccessibilityLabel="Back to bookings"
 				rightElement={
 					<View style={styles.headerActions}>
-						<TouchableOpacity
-							style={styles.headerBtn}
-							onPress={handleShare}
-							disabled={!appt}
-							accessibilityRole="button"
+						{/* No onPress until loaded: inert like before, without the disabled prop's 0.5 opacity */}
+						<AppIconButton
+							icon="share-variant-outline"
+							variant="ghost"
+							size={44}
+							circle
+							onPress={appt ? handleShare : undefined}
 							accessibilityLabel="Share"
-						>
-							<MaterialCommunityIcons name="share-variant-outline" size={22} color="#FFFFFF" />
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={[styles.headerBtn, styles.headerBtnRight]}
+						/>
+						<AppIconButton
+							icon="help-circle-outline"
+							variant="ghost"
+							size={44}
+							circle
 							onPress={comingSoon}
-							accessibilityRole="button"
 							accessibilityLabel="Help"
-						>
-							<MaterialCommunityIcons name="help-circle-outline" size={22} color="#FFFFFF" />
-						</TouchableOpacity>
+							style={styles.headerBtnRight}
+						/>
 					</View>
 				}
 			/>
@@ -423,26 +427,18 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 							</Text>
 						)}
 						{!!doctorId && (
-							<TouchableOpacity
-								onPress={goDoctor}
-								style={styles.profileLink}
-								accessibilityRole="link"
-								hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-							>
-								<Text style={styles.profileLinkText}>View profile</Text>
-								<MaterialCommunityIcons name="chevron-right" size={16} color={APP_COLORS.primary} />
-							</TouchableOpacity>
+							<AppTextLink label="View profile" size="sm" onPress={goDoctor} style={styles.profileLink} />
 						)}
 					</View>
 					{!!phone && (
-						<TouchableOpacity
-							style={styles.callBtn}
+						<AppIconButton
+							icon="phone-outline"
+							size={44}
+							radius={12}
+							iconSize={20}
 							onPress={() => Linking.openURL(`tel:${phone}`)}
-							accessibilityRole="button"
 							accessibilityLabel="Call clinic"
-						>
-							<MaterialCommunityIcons name="phone-outline" size={20} color={APP_COLORS.primary} />
-						</TouchableOpacity>
+						/>
 					)}
 				</AppSection>
 
@@ -549,30 +545,26 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 
 				{canAct && (
 					<View style={styles.cancelLinkWrap}>
-						<TouchableOpacity
-							style={styles.cancelLink}
+						<AppTextLink
+							label="Cancel appointment"
+							tone="danger"
+							trailingIcon="none"
 							onPress={() => setCancelOpen(true)}
-							accessibilityRole="button"
-						>
-							<Text style={styles.cancelLinkText}>Cancel appointment</Text>
-						</TouchableOpacity>
+							style={styles.cancelLink}
+						/>
 					</View>
 				)}
 
 				{/* Help */}
-				<TouchableOpacity
-					style={styles.helpCard}
+				<AppNavRow
+					title="Need help with this booking?"
+					subtitle="Chat with Karolahealth support"
 					onPress={comingSoon}
-					activeOpacity={0.85}
-					accessibilityRole="button"
-				>
-					<AppIconTile icon="message-question-outline" tone="lilac" size={36} iconSize={18} />
-					<View style={styles.flexText}>
-						<Text style={styles.helpTitle}>Need help with this booking?</Text>
-						<Text style={styles.helpSub}>Chat with Karolahealth support</Text>
-					</View>
-					<MaterialCommunityIcons name="chevron-right" size={18} color={APP_COLORS.border} />
-				</TouchableOpacity>
+					leading={{ icon: 'message-question-outline', tone: 'lilac', size: 36, iconSize: 18 }}
+					trailing={<MaterialCommunityIcons name="chevron-right" size={18} color={APP_COLORS.border} />}
+					style={styles.helpCard}
+					titleStyle={styles.helpTitle}
+				/>
 			</ScrollView>
 
 			{/* Footer -- bottom padding stays max(20, inset) as in the design. */}
@@ -678,7 +670,6 @@ const styles = StyleSheet.create({
 	// Header (AppScreenHeader 'bar' defaults to 16/20 with a subtitle; the design uses 18/24 700)
 	headerTitle: { fontSize: 18, lineHeight: 24, fontWeight: '700' },
 	headerActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-	headerBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 	headerBtnRight: { marginRight: -10 },
 
 	main: { gap: 8, paddingBottom: 16 },
@@ -692,18 +683,7 @@ const styles = StyleSheet.create({
 	doctorName: { fontSize: 17, lineHeight: 22, fontWeight: '800', color: APP_COLORS.ink },
 	doctorSpec: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: TONES.lilac.ink },
 	doctorQuals: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
-	profileLink: { alignSelf: 'flex-start', marginTop: 2, flexDirection: 'row', alignItems: 'center', gap: 2 },
-	profileLinkText: { fontSize: 13, fontWeight: '700', color: APP_COLORS.primary },
-	callBtn: {
-		width: 44,
-		height: 44,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: APP_COLORS.border,
-		backgroundColor: APP_COLORS.surface,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
+	profileLink: { alignSelf: 'flex-start', marginTop: 2 },
 
 	// Payment (base bill styling comes from AppBillSummary's 'flat' variant; these match this screen's spec)
 	payFree: { fontWeight: '700' },
@@ -712,15 +692,12 @@ const styles = StyleSheet.create({
 
 	// Cancel link
 	cancelLinkWrap: { paddingTop: 4, paddingHorizontal: 16, alignItems: 'center' },
-	cancelLink: { height: 44, paddingHorizontal: 12, justifyContent: 'center' },
-	cancelLinkText: { fontSize: 14, fontWeight: '700', color: APP_COLORS.danger },
+	// Keeps the design's 44px-high, 12px-padded tap row around the AppTextLink
+	cancelLink: { height: 44, paddingHorizontal: 12 },
 
-	// Help
+	// Help (AppNavRow restyled as the design's bordered card; title 14/20 700)
 	helpCard: {
 		marginHorizontal: 16,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
 		paddingVertical: 12,
 		paddingHorizontal: 14,
 		borderRadius: 12,
@@ -728,15 +705,13 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: APP_COLORS.divider,
 	},
-	helpTitle: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: APP_COLORS.ink },
-	helpSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
+	helpTitle: { fontSize: 14, fontWeight: '700' },
 
 	// Footer
 	footerBtn: { flex: 1 },
 
 	// Loading / error
 	skeleton: { gap: 8, paddingTop: 16 },
-	skelTone: { backgroundColor: APP_COLORS.divider },
 	skeletonCol: { flex: 1, gap: 6 },
 	skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 	errorBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8 },

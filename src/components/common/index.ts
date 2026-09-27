@@ -133,3 +133,25 @@ export { AppOtpInput } from './inputs/AppOtpInput'
 export type { AppOtpInputProps } from './inputs/AppOtpInput'
 export { AppTabs } from './inputs/AppTabs'
 export type { AppTabsProps, AppTabItem } from './inputs/AppTabs'
+
+// Booking wave: provider picking, visits, bookings list, cart footer (see src/components/common/booking/)
+export { AppProviderCard, providerMetaLine } from './booking/AppProviderCard'
+export type { AppProviderCardProps, AppProviderAvailability } from './booking/AppProviderCard'
+export { AppProviderProfileSheet } from './booking/AppProviderProfileSheet'
+export type { AppProviderProfileSheetProps, AppProviderReview } from './booking/AppProviderProfileSheet'
+export { AppReviewItem } from './booking/AppReviewItem'
+export type { AppReviewItemProps } from './booking/AppReviewItem'
+export { AppRadioCard } from './booking/AppRadioCard'
+export type { AppRadioCardProps } from './booking/AppRadioCard'
+export { AppBookingCard, BOOKING_KINDS } from './booking/AppBookingCard'
+export type {
+	AppBookingCardProps,
+	AppBookingCardAction,
+	AppBookingCardNote,
+	AppBookingCardNoteTone,
+	BookingKind,
+} from './booking/AppBookingCard'
+export { AppVisitList } from './booking/AppVisitList'
+export type { AppVisitListProps, AppVisitListItem } from './booking/AppVisitList'
+export { AppCartFooter } from './booking/AppCartFooter'
+export type { AppCartFooterProps } from './booking/AppCartFooter'
