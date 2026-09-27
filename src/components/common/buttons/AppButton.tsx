@@ -10,23 +10,46 @@ interface AppButtonProps extends PaperButtonProps {
     formAction?: boolean;
     /**
      * Opt-in KarolaHealth design sizing. 'lg' = 52 high, radius 12, 16/600 label (footer CTAs);
-     * 'md' = 44 high, radius 12, 14/700 label. Omit to keep the existing Paper sizing.
+     * 'md' = 44 high, radius 12, 14/700 label; 'sm' = 40 high, radius 10, 14/20 700 label.
+     * Omit to keep the existing Paper sizing.
      */
-    size?: 'md' | 'lg';
+    size?: 'sm' | 'md' | 'lg';
+    /** Icon shown AFTER the label (Paper `icon` + row-reverse). Takes precedence over `icon`. */
+    trailingIcon?: PaperButtonProps['icon'];
+    /** Corner radius override (applied last, after size/formAction radii). */
+    radius?: number;
+    /**
+     * Design disabled look: APP_COLORS.disabledBtn background + inkMuted label instead of Paper's grey.
+     * Only affects the disabled state.
+     */
+    softDisabled?: boolean;
+    /**
+     * While `loading`: 'spinner-label' (Paper default, spinner + label) or 'spinner-only' (label hidden).
+     * Omit to keep the current behaviour.
+     */
+    loadingMode?: 'spinner-only' | 'spinner-label';
 }
 
 export const AppButton = ({
     variant = 'primary',
     formAction = false,
     size,
+    trailingIcon,
+    radius,
+    softDisabled = false,
+    loadingMode,
     style,
     labelStyle,
     contentStyle,
     children,
     disabled,
+    icon,
+    loading,
     ...props
 }: AppButtonProps) => {
     const theme = useTheme();
+    const soft = softDisabled && !!disabled;
+    const hideLabel = loadingMode === 'spinner-only' && !!loading;
 
     let mode: 'text' | 'outlined' | 'contained' | 'elevated' | 'contained-tonal' = 'contained';
     let customBackgroundColor;
@@ -63,18 +86,26 @@ export const AppButton = ({
             buttonColor={customBackgroundColor}
             textColor={customTextColor}
             disabled={disabled}
+            icon={trailingIcon ?? icon}
+            loading={loading}
             style={[
                 styles.button,
                 formAction && styles.formActionButton,
                 formAction && disabled && styles.disabledButton,
                 size && styles.sizedButton,
+                size === 'sm' && styles.smButton,
                 size && variant === 'outline' && styles.sizedOutline,
+                soft && styles.softDisabledButton,
+                soft && variant === 'outline' && styles.softDisabledOutline,
                 style,
+                radius != null && { borderRadius: radius },
             ]}
             contentStyle={[
                 formAction && styles.formActionContent,
                 size === 'lg' && styles.lgContent,
                 size === 'md' && styles.mdContent,
+                size === 'sm' && styles.smContent,
+                trailingIcon != null && styles.trailingContent,
                 contentStyle,
             ]}
             labelStyle={[
@@ -82,11 +113,14 @@ export const AppButton = ({
                 formAction && styles.formActionLabel,
                 size === 'lg' && styles.lgLabel,
                 size === 'md' && styles.mdLabel,
+                size === 'sm' && styles.mdLabel,
                 labelStyle,
+                soft && styles.softDisabledLabel,
+                hideLabel && styles.hiddenLabel,
             ]}
             {...props}
         >
-            {children}
+            {hideLabel ? '' : children}
         </PaperButton>
     );
 };
@@ -143,5 +177,27 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         fontWeight: '700',
         marginVertical: 0,
+    },
+    smButton: {
+        borderRadius: 10,
+    },
+    smContent: {
+        height: 40,
+    },
+    trailingContent: {
+        flexDirection: 'row-reverse',
+    },
+    softDisabledButton: {
+        backgroundColor: APP_COLORS.disabledBtn,
+    },
+    softDisabledOutline: {
+        borderColor: APP_COLORS.disabledBtn,
+    },
+    softDisabledLabel: {
+        color: APP_COLORS.inkMuted,
+    },
+    hiddenLabel: {
+        marginHorizontal: 0,
+        width: 0,
     },
 });

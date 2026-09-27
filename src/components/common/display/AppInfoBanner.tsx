@@ -7,9 +7,10 @@
 //                              optional 11/14 800 caps eyebrow, 17/22 800 ink title, 13/18 muted
 //                              subtitle ("CANCELLED" banner).
 // Optional action chip on the right (label + onPress), or any custom `right` node.
+// `onPress` makes the whole banner a button (`chevron` adds a trailing 20px chevron in the tone colour).
 
 import React from 'react'
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { APP_COLORS, TONES } from '../../../config/theme'
 import { AppActionChip } from '../buttons/AppActionChip'
@@ -56,6 +57,14 @@ export type AppInfoBannerProps = {
 	action?: AppInfoBannerAction
 	/** Custom right-hand node (overrides `action`). */
 	right?: React.ReactNode
+	/** Makes the whole banner pressable (accessibilityRole 'button'). */
+	onPress?: () => void
+	/** Trailing chevron-right when pressable. Defaults to false. */
+	chevron?: boolean
+	/** Accessibility label for the pressable banner. Defaults to title + subtitle. */
+	accessibilityLabel?: string
+	/** Title text override (applied after the size/tone styles). */
+	titleStyle?: StyleProp<TextStyle>
 	style?: StyleProp<ViewStyle>
 }
 
@@ -69,23 +78,25 @@ export function AppInfoBanner({
 	tileSize,
 	action,
 	right,
+	onPress,
+	chevron = false,
+	accessibilityLabel,
+	titleStyle,
 	style,
 }: AppInfoBannerProps) {
 	const { fg, bg } = INFO_BANNER_TONES[tone]
 	const prominent = size === 'prominent'
 	const tile = tileSize ?? (prominent ? 40 : 32)
 	const glyph = icon === undefined ? DEFAULT_ICON[tone] : icon
+	const bannerStyle = [
+		styles.banner,
+		prominent ? styles.bannerProminent : styles.bannerCompact,
+		{ backgroundColor: bg },
+		style,
+	]
 
-	return (
-		<View
-			style={[
-				styles.banner,
-				prominent ? styles.bannerProminent : styles.bannerCompact,
-				{ backgroundColor: bg },
-				style,
-			]}
-			accessibilityRole={tone === 'danger' || tone === 'warning' ? 'alert' : undefined}
-		>
+	const content = (
+		<>
 			{glyph && (
 				<View
 					style={[
@@ -107,7 +118,9 @@ export function AppInfoBanner({
 			)}
 			<View style={[styles.text, prominent && styles.textProminent]}>
 				{!!eyebrow && <Text style={[styles.eyebrow, { color: fg }]}>{eyebrow.toUpperCase()}</Text>}
-				<Text style={prominent ? styles.titleProminent : [styles.titleCompact, { color: fg }]}>{title}</Text>
+				<Text style={[prominent ? styles.titleProminent : [styles.titleCompact, { color: fg }], titleStyle]}>
+					{title}
+				</Text>
 				{!!subtitle && <Text style={prominent ? styles.subProminent : styles.subCompact}>{subtitle}</Text>}
 			</View>
 			{right ??
@@ -119,6 +132,31 @@ export function AppInfoBanner({
 						filled={action.filled ?? true}
 					/>
 				) : null)}
+			{!!onPress && chevron && <MaterialCommunityIcons name="chevron-right" size={20} color={fg} />}
+		</>
+	)
+
+	if (onPress) {
+		return (
+			<TouchableOpacity
+				onPress={onPress}
+				activeOpacity={0.85}
+				accessibilityRole="button"
+				accessibilityLabel={accessibilityLabel ?? [title, subtitle].filter(Boolean).join('. ')}
+				style={bannerStyle}
+			>
+				{content}
+			</TouchableOpacity>
+		)
+	}
+
+	return (
+		<View
+			style={bannerStyle}
+			accessibilityRole={tone === 'danger' || tone === 'warning' ? 'alert' : undefined}
+			accessibilityLabel={accessibilityLabel}
+		>
+			{content}
 		</View>
 	)
 }

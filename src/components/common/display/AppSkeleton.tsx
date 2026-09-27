@@ -5,6 +5,8 @@ interface AppSkeletonProps {
     width?: number | string;
     height?: number | string;
     borderRadius?: number;
+    /** Block colour. Defaults to the existing grey (#E0E0E0). */
+    color?: string;
     style?: ViewStyle | ViewStyle[];
 }
 
@@ -12,6 +14,7 @@ export const AppSkeleton = ({
     width = '100%', 
     height = 20, 
     borderRadius = 4, 
+    color,
     style 
 }: AppSkeletonProps) => {
     const opacity = useRef(new Animated.Value(0.3)).current;
@@ -46,6 +49,7 @@ export const AppSkeleton = ({
                     borderRadius,
                     opacity,
                 },
+                color ? { backgroundColor: color } : null,
                 style
             ]}
         />

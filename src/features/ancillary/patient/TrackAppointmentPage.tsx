@@ -19,7 +19,7 @@ import { AppButton } from '../../../components/common/buttons/AppButton'
 import StatusModal from '../../../components/common/feedback/StatusModal'
 import NurseMapTracker from '../components/NurseMapTracker'
 import AppointmentTrackingTimeline, { TrackingStage } from '../components/AppointmentTrackingTimeline'
-import RatingStars from '../components/RatingStars'
+import AppRatingStars from '../../../components/common/display/AppRatingStars'
 import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
 import ServiceMatchingPage from './ServiceMatchingPage'
 import {
@@ -564,7 +564,7 @@ export default function TrackAppointmentPage() {
 										onPress={() => setReviewModalVisible(true)}
 										activeOpacity={0.8}
 									>
-										<RatingStars rating={reviewData.rating} size={14} />
+										<AppRatingStars value={reviewData.rating} size={14} />
 										<AppTypography variant="caption" style={styles.reviewedText}>
 											★ {reviewData.rating}.0 • View Your Submitted Review
 										</AppTypography>

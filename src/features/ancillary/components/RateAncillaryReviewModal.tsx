@@ -11,7 +11,7 @@ import { AppBottomSheet } from '../../../components/common/layout/AppBottomSheet
 import { AppTypography } from '../../../components/common/display/AppTypography'
 import { AppButton } from '../../../components/common/buttons/AppButton'
 import AppAvatar from '../../../components/common/display/AppAvatar'
-import RatingStars from './RatingStars'
+import AppRatingStars from '../../../components/common/display/AppRatingStars'
 import { AncillaryBooking, AncillaryReviewData } from '../ancillaryService'
 
 interface RateAncillaryReviewModalProps {
@@ -129,7 +129,7 @@ export default function RateAncillaryReviewModal({
 
 						{/* Star Rating Display */}
 						<View style={styles.viewStarRow}>
-							<RatingStars rating={existingReview?.rating || 5} size={22} />
+							<AppRatingStars value={existingReview?.rating || 5} size={22} />
 							<AppTypography variant="h3" style={styles.viewStarScoreText}>
 								{existingReview?.rating}.0 / 5
 							</AppTypography>

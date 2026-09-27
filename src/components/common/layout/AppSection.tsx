@@ -6,10 +6,11 @@
 //   titleSize 'sm'           = 16/22 800 (Appointment details)
 
 import React from 'react'
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { StyleSheet, Text, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native'
 import { APP_COLORS } from '../../../config/theme'
 
-export type AppSectionProps = {
+/** Any other View prop (onLayout, testID, accessibility*, nativeID, ...) is passed to the section View. */
+export type AppSectionProps = Omit<ViewProps, 'style' | 'children'> & {
 	title?: string
 	titleSize?: 'md' | 'sm'
 	/** Node on the right of the title row (e.g. a month label or "See all" link). Baseline-aligned. */
@@ -33,10 +34,11 @@ export function AppSection({
 	flush = false,
 	children,
 	style,
+	...viewProps
 }: AppSectionProps) {
 	const hasHeader = !!title || !!right
 	return (
-		<View style={[styles.section, { gap, marginTop }, flush && styles.flush, style]}>
+		<View {...viewProps} style={[styles.section, { gap, marginTop }, flush && styles.flush, style]}>
 			{hasHeader && (
 				<View style={[styles.headerRow, flush && styles.headerFlush]}>
 					{!!title && (

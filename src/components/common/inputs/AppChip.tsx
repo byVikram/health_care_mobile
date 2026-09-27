@@ -35,6 +35,14 @@ export type AppChipProps = {
 	icon?: IconName
 	/** Leading 6px dot; `true` uses the current text colour, or pass a colour. */
 	dot?: boolean | string
+	/** Dot diameter. Defaults to 6. */
+	dotSize?: number
+	/** Custom node before the label (after dot / icon), e.g. an avatar or AppTag. */
+	leading?: React.ReactNode
+	/** Custom node after the label, e.g. a count or close icon. */
+	trailing?: React.ReactNode
+	/** Border width override. Defaults to 1. */
+	borderWidth?: number
 	/** Prefix "✓ " while selected (design search toggles). */
 	checkmark?: boolean
 	disabled?: boolean
@@ -57,6 +65,10 @@ export function AppChip({
 	radius,
 	icon,
 	dot,
+	dotSize,
+	leading,
+	trailing,
+	borderWidth,
 	checkmark = false,
 	disabled = false,
 	borderColor,
@@ -85,14 +97,24 @@ export function AppChip({
 				size === 'sm' ? styles.sm : styles.md,
 				{ borderRadius },
 				borderColor ? { borderColor } : null,
+				borderWidth != null ? { borderWidth } : null,
 				solidOn && styles.solidOn,
 				softOn && styles.softOn,
 				disabled && styles.disabled,
 				style,
 			]}
 		>
-			{!!dot && <View style={[styles.dot, { backgroundColor: typeof dot === 'string' ? dot : textColor }]} />}
+			{!!dot && (
+				<View
+					style={[
+						styles.dot,
+						dotSize != null && { width: dotSize, height: dotSize, borderRadius: dotSize / 2 },
+						{ backgroundColor: typeof dot === 'string' ? dot : textColor },
+					]}
+				/>
+			)}
 			{!!icon && <MaterialCommunityIcons name={icon} size={size === 'sm' ? 14 : 16} color={iconColor} />}
+			{leading}
 			<Text
 				style={[size === 'sm' ? styles.textSm : styles.textMd, { color: textColor }, textStyle]}
 				numberOfLines={1}
@@ -100,6 +122,7 @@ export function AppChip({
 				{checkmark && selected ? '✓ ' : ''}
 				{label}
 			</Text>
+			{trailing}
 		</TouchableOpacity>
 	)
 }

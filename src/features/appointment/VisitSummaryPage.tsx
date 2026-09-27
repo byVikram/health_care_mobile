@@ -35,6 +35,7 @@ import {
 	AppScreenHeader,
 	AppSection,
 } from '../../components/common'
+import AppRatingStars from '../../components/common/display/AppRatingStars'
 import { showComingSoon } from '../../utils/toast'
 import { getAppointmentById } from '../../services/appointmentService'
 import { getReviewForAppointment, createReview, DoctorReview } from '../../services/reviewService'
@@ -394,24 +395,12 @@ export default function VisitSummaryPage() {
 						<ActivityIndicator color={APP_COLORS.primary} style={{ alignSelf: 'flex-start' }} />
 					) : (
 						<>
-							<View style={styles.starRow} accessibilityRole="radiogroup" accessibilityLabel="Rating">
-								{[1, 2, 3, 4, 5].map((s) => (
-									<TouchableOpacity
-										key={s}
-										style={styles.starBtn}
-										disabled={!!review}
-										onPress={() => setRating(s)}
-										accessibilityLabel={`${s} star`}
-										accessibilityState={{ selected: s === shownRating }}
-									>
-										<MaterialCommunityIcons
-											name={s <= shownRating ? 'star' : 'star-outline'}
-											size={22}
-											color={APP_COLORS.star}
-										/>
-									</TouchableOpacity>
-								))}
-							</View>
+							<AppRatingStars
+								variant="buttons"
+								value={shownRating}
+								onChange={review ? undefined : setRating}
+								accessibilityLabel="Rating"
+							/>
 							{review ? (
 								review.comment ? (
 									<Text style={styles.bodyText}>{review.comment}</Text>
@@ -685,20 +674,6 @@ const styles = StyleSheet.create({
 	},
 
 	// Rating
-	starRow: {
-		flexDirection: 'row',
-		gap: 8,
-	},
-	starBtn: {
-		width: 44,
-		height: 44,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: APP_COLORS.divider,
-		backgroundColor: APP_COLORS.surface,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
 	commentInput: {
 		borderWidth: 1,
 		borderColor: APP_COLORS.divider,

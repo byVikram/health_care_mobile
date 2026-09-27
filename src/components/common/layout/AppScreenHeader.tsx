@@ -46,6 +46,12 @@ interface AppScreenHeaderProps {
 	 * subtitle is shown (the design's doctor-identity header).
 	 */
 	titleStyle?: StyleProp<TextStyle>
+	/** 'bar' only: subtitle text override (defaults to 12/16 500 APP_COLORS.mint). */
+	subtitleStyle?: StyleProp<TextStyle>
+	/** 'bar' only: subtitle truncation mode (single line). Defaults to 'tail'. */
+	subtitleEllipsizeMode?: 'head' | 'middle' | 'tail' | 'clip'
+	/** 'bar' only: replaces the default white 28px chevron-left inside the 44px back button. */
+	backIcon?: React.ReactNode
 	/**
 	 * Optional screen-specific content (subtitle, search bar, filter chips, ...)
 	 * rendered below the title row. AppScreenHeader stays generic — it only
@@ -68,6 +74,9 @@ export default function AppScreenHeader({
 	backAccessibilityLabel = 'Go back',
 	style,
 	titleStyle,
+	subtitleStyle,
+	subtitleEllipsizeMode,
+	backIcon,
 	children,
 }: AppScreenHeaderProps) {
 	const navigation = useNavigation<any>()
@@ -98,7 +107,7 @@ export default function AppScreenHeader({
 							accessibilityRole="button"
 							accessibilityLabel={backAccessibilityLabel}
 						>
-							<MaterialCommunityIcons name="chevron-left" size={28} color="#ffffff" />
+							{backIcon ?? <MaterialCommunityIcons name="chevron-left" size={28} color="#ffffff" />}
 						</TouchableOpacity>
 					)}
 					<View style={styles.barTitleWrap}>
@@ -116,7 +125,11 @@ export default function AppScreenHeader({
 										</AppTypography>
 									)}
 									{!!subtitle && (
-										<AppTypography style={styles.barSubtitle} numberOfLines={1}>
+										<AppTypography
+											style={[styles.barSubtitle, subtitleStyle]}
+											numberOfLines={1}
+											ellipsizeMode={subtitleEllipsizeMode}
+										>
 											{subtitle}
 										</AppTypography>
 									)}

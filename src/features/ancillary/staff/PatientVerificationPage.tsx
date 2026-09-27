@@ -5,7 +5,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MOCK_NURSE_BOOKINGS, NurseBooking, saveBookingState, verifyPatientOtp } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
-import OtpPinInput from '../components/OtpPinInput'
+import AppOtpInput from '../../../components/common/inputs/AppOtpInput'
 import ServiceTimeline from '../components/ServiceTimeline'
 import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
 import CancelVisitModal from '../components/CancelVisitModal'
@@ -210,9 +210,9 @@ export default function PatientVerificationPage() {
 
 					{/* 4-DIGIT OTP INPUT */}
 					<View style={styles.inputBox}>
-						<OtpPinInput
+						<AppOtpInput
 							value={pin}
-							onChangeValue={(val) => {
+							onChange={(val) => {
 								setPin(val)
 								if (error) setError('')
 							}}

@@ -96,7 +96,21 @@ export type { AppStatusTimelineProps, AppTimelineStep, AppTimelineState } from '
 export { AppNumberedSteps } from './display/AppNumberedSteps'
 export type { AppNumberedStepsProps, AppNumberedStep } from './display/AppNumberedSteps'
 export { AppFooterBar } from './layout/AppFooterBar'
-export type { AppFooterBarProps } from './layout/AppFooterBar'
+export type { AppFooterBarProps, AppFooterBarSummary } from './layout/AppFooterBar'
+export { AppIconButton } from './buttons/AppIconButton'
+export type { AppIconButtonProps, AppIconButtonVariant } from './buttons/AppIconButton'
+export { AppTextLink } from './buttons/AppTextLink'
+export type { AppTextLinkProps, AppTextLinkTone } from './buttons/AppTextLink'
+export { AppTag } from './display/AppTag'
+export type { AppTagProps, AppTagTone } from './display/AppTag'
+export { AppStatTile, AppStatRow } from './display/AppStatTile'
+export type { AppStatTileProps, AppStatRowProps } from './display/AppStatTile'
+export { AppProgressBar } from './display/AppProgressBar'
+export type { AppProgressBarProps } from './display/AppProgressBar'
+export { AppAvatarStack } from './display/AppAvatarStack'
+export type { AppAvatarStackProps, AppAvatarStackItem } from './display/AppAvatarStack'
+export { AppNavRow } from './layout/AppNavRow'
+export type { AppNavRowProps } from './layout/AppNavRow'
 export { BookingPaymentPage, isActiveTaskConflictError } from "./booking/BookingPaymentPage";
 export type {
 	BookingPaymentPageConfig,
@@ -108,6 +122,14 @@ export type {
 	BookingPaymentVisit,
 } from "./booking/BookingPaymentPage";
 
-
-
-
+// Phase 2: interactive display / input pieces
+export { AppRatingStars } from './display/AppRatingStars'
+export type { AppRatingStarsProps } from './display/AppRatingStars'
+export { AppCodeDisplay } from './display/AppCodeDisplay'
+export type { AppCodeDisplayProps, AppCodeDisplayTone } from './display/AppCodeDisplay'
+export { AppCarousel } from './display/AppCarousel'
+export type { AppCarouselProps, AppCarouselRenderInfo } from './display/AppCarousel'
+export { AppOtpInput } from './inputs/AppOtpInput'
+export type { AppOtpInputProps } from './inputs/AppOtpInput'
+export { AppTabs } from './inputs/AppTabs'
+export type { AppTabsProps, AppTabItem } from './inputs/AppTabs'

@@ -53,6 +53,12 @@ export const APP_COLORS = {
 	star: '#E8A200',
 	scrim: '#12373E66',
 	shadow: '#12373E',
+	/** Promo / offer tag background ("UP TO 32% OFF", "PRIORITY · 24/7"), white text. */
+	offer: '#C2410C',
+	/** Inactive carousel / pager dot. */
+	dotInactive: '#C9D6D7',
+	/** Neutral pill background (done / completed / archived states). */
+	neutralBg: '#F0F4F4',
 } as const
 
 export type ToneKey = 'mint' | 'sky' | 'lilac' | 'peach' | 'sand'
@@ -76,6 +82,37 @@ export const toneForString = (label: string) => {
 	let hash = 0
 	for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) >>> 0
 	return toneAt(hash)
+}
+
+export type StatusToneKey =
+	| 'confirmed'
+	| 'pending'
+	| 'scheduled'
+	| 'upcoming'
+	| 'onTheWay'
+	| 'inProgress'
+	| 'completed'
+	| 'done'
+	| 'paid'
+	| 'cancelled'
+	| 'failed'
+
+/**
+ * Background / ink pairs for booking & visit status pills (home-nursing visit pages: "Confirmed" =
+ * success on successBg, "In progress" / "Today" = primary on mint).
+ */
+export const STATUS_TONES: Record<StatusToneKey, { bg: string; ink: string }> = {
+	confirmed: { bg: APP_COLORS.successBg, ink: APP_COLORS.success },
+	pending: { bg: APP_COLORS.warningBg, ink: APP_COLORS.warning },
+	scheduled: { bg: TONES.sky.bg, ink: TONES.sky.ink },
+	upcoming: { bg: APP_COLORS.mint, ink: APP_COLORS.primary },
+	onTheWay: { bg: TONES.sky.bg, ink: TONES.sky.ink },
+	inProgress: { bg: APP_COLORS.mint, ink: APP_COLORS.primary },
+	completed: { bg: APP_COLORS.successBg, ink: APP_COLORS.success },
+	done: { bg: APP_COLORS.neutralBg, ink: APP_COLORS.inkMuted },
+	paid: { bg: APP_COLORS.successBg, ink: APP_COLORS.success },
+	cancelled: { bg: APP_COLORS.dangerBg, ink: APP_COLORS.danger },
+	failed: { bg: APP_COLORS.dangerBg, ink: APP_COLORS.danger },
 }
 
 /** Card shadow used by floating tickets / sheets: 0 8px 24px #12373E29 */
