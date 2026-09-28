@@ -21,7 +21,7 @@ import { BlurView } from 'expo-blur'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
 
-import { fetchRadiologyBookings, RadiologyBooking } from './RadiologyService'
+import { fetchRadiologyBookings, RadiologyBooking } from './radiologyService'
 import { useAuth } from '../../context/AuthContext'
 import { getStatusStyle } from '../../constants/statusColors'
 import { ROUTES } from '../../navigation/routes'
@@ -765,8 +765,8 @@ const styles = StyleSheet.create({
 	emptyTitle: { color: '#536167', fontSize: 16, fontWeight: '700' },
 	emptyText: { color: '#8b969b', fontSize: 12, textAlign: 'center' },
 	filterModalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
-	filterBackdrop: { ...StyleSheet.absoluteFillObject },
-	filterDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
+	filterBackdrop: { ...StyleSheet.absoluteFill },
+	filterDim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15, 23, 42, 0.34)' },
 	filterSheet: {
 		backgroundColor: '#ffffff',
 		borderTopLeftRadius: 24,

@@ -3,7 +3,7 @@ import { View, StyleSheet, Image, TouchableOpacity, useWindowDimensions } from '
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
 import { AppTypography, CommonCard } from '../../../components/common'
 import { AppButton } from '../../../components/common/AppButton'
-import { ServiceProcedureItem } from './AllServiceCard'
+import { ServiceProcedureItem } from '../../../components/common'
 
 export interface PopularService {
 	id: string
@@ -11,6 +11,10 @@ export interface PopularService {
 	description: string
 	price: string
 	image: string
+	about_service?: string | null
+	whats_included?: string[] | string | null
+	aboutService?: string | null
+	whatsIncluded?: string[] | string | null
 }
 
 interface PopularServiceCardProps {
@@ -40,6 +44,8 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 		duration: '45 mins',
 		price: item.price,
 		image: item.image,
+		about_service: item.about_service ?? item.aboutService ?? null,
+		whats_included: item.whats_included ?? item.whatsIncluded ?? null,
 	})
 
 	const handleCardClick = () => {
@@ -107,7 +113,7 @@ export const PopularServiceCard: React.FC<PopularServiceCardProps> = ({
 					style={[styles.title, isTablet && styles.titleTablet]}
 					numberOfLines={1}
 				>
-					{item.title}
+					{item.title || (item as any).label || (item as any).name || ''}
 				</AppTypography>
 				<AppTypography
 					variant="caption"

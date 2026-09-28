@@ -25,6 +25,13 @@ interface AncillaryCategoryItem {
 
 const CATEGORIES: AncillaryCategoryItem[] = [
 	{
+		key: 'home-care',
+		title: 'Home Care',
+		image: 'https://images.unsplash.com/photo-1581579438747-1dc8d17bbce4?auto=format&fit=crop&q=80&w=240',
+		serviceKey: 'home-care',
+		serviceLabel: 'Home Care',
+	},
+	{
 		key: 'nursing',
 		title: 'Nursing Care',
 		image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=240',
@@ -63,7 +70,7 @@ export default function AncillaryServicesBottomSheet({
 
 	const handleCategorySelect = (item: AncillaryCategoryItem) => {
 		onClose()
-		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
+			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
 			serviceKey: item.serviceKey,
 			serviceLabel: item.serviceLabel,
 		})

@@ -28,10 +28,10 @@ export default function AncillarySelectorModal({ open, onClose }: AncillarySelec
 				...card,
 				onClick: () => {
 					onClose()
-					navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
-						serviceKey: card.key,
-						serviceLabel: card.label,
-					})
+						navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
+							serviceKey: card.key,
+							serviceLabel: card.label,
+						})
 				},
 			})),
 		[onClose, navigation],

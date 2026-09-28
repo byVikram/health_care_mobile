@@ -6,7 +6,7 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { safeJsonParse } from '../../../../utils/jsonUtils'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppCalendar,
@@ -21,6 +21,15 @@ import {
 	StatusModal,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
+import {
+	fetchProviderProfile,
+	updateProviderProfileBackend,
+} from '../../../ancillary/ancillaryService'
+import {
+	personalDetailsSchema,
+	getFieldErrors,
+} from '../../../../validation/profileSchemas'
+import { NEW_PHYSIOTHERAPIST_IMAGE_URL } from '../specialtyConfig'
 
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say']
 const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Marathi', 'Bengali']
@@ -29,6 +38,7 @@ const GENDER_SELECT_OPTIONS: AppSelectOption[] = GENDER_OPTIONS.map((option) => 
 const LANGUAGE_SELECT_OPTIONS: AppSelectOption[] = LANGUAGE_OPTIONS.map((option) => ({ label: option, value: option }))
 
 const DEFAULT_PROFILE_IMAGE = require('../../../../assets/Banner/doctor.png')
+const PHYSIOTHERAPY_PROFILE_IMAGE = require('../../../../assets/physiotherapy/physiotherapist.png')
 
 type InputFieldProps = {
 	label: string
@@ -55,6 +65,7 @@ type SelectDropdownProps = {
 	options: AppSelectOption[]
 	onSelect: (value: string) => void
 	required?: boolean
+	errorText?: string
 }
 
 type MultiSelectDropdownProps = {
@@ -64,6 +75,7 @@ type MultiSelectDropdownProps = {
 	options: AppSelectOption[]
 	onChange: (values: string[]) => void
 	required?: boolean
+	errorText?: string
 }
 
 type DobPickerFieldProps = {
@@ -73,6 +85,7 @@ type DobPickerFieldProps = {
 	placeholder: string
 	isMobile: boolean
 	required?: boolean
+	errorText?: string
 }
 
 function FormRow({
@@ -164,7 +177,7 @@ function InputField({
 	)
 }
 
-function SelectDropdown({ label, value, placeholder, options, onSelect, required = false }: SelectDropdownProps) {
+function SelectDropdown({ label, value, placeholder, options, onSelect, required = false, errorText }: SelectDropdownProps) {
 	return (
 		<View style={styles.fieldGroup}>
 			<FieldLabel label={label} required={required} />
@@ -177,12 +190,13 @@ function SelectDropdown({ label, value, placeholder, options, onSelect, required
 				size="compact"
 				noMargin
 				style={styles.selectRightAligned}
+				errorText={errorText}
 			/>
 		</View>
 	)
 }
 
-function MultiSelectDropdown({ label, values, placeholder, options, onChange, required = false }: MultiSelectDropdownProps) {
+function MultiSelectDropdown({ label, values, placeholder, options, onChange, required = false, errorText }: MultiSelectDropdownProps) {
 	const selectedValues = useMemo(() => normalizeLanguageValues(values), [values])
 
 	return (
@@ -196,22 +210,30 @@ function MultiSelectDropdown({ label, values, placeholder, options, onChange, re
 				borderRadius={8}
 				size="compact"
 				noMargin
+				errorText={errorText}
 			/>
 		</View>
 	)
 }
 
-function DobPickerField({ label, value, onChange, placeholder, isMobile, required = false }: DobPickerFieldProps) {
+function DobPickerField({ label, value, onChange, placeholder, isMobile, required = false, errorText }: DobPickerFieldProps) {
 	return (
-		<AppCalendar
-			label={label}
-			value={value}
-			onChange={onChange}
-			placeholder={placeholder}
-			isMobile={isMobile}
-			required={required}
-			modalTitle="Select DOB"
-		/>
+		<View style={styles.fieldGroup}>
+			<AppCalendar
+				label={label}
+				value={value}
+				onChange={onChange}
+				placeholder={placeholder}
+				isMobile={isMobile}
+				required={required}
+				modalTitle="Select DOB"
+			/>
+			{errorText ? (
+				<AppTypography variant="caption" style={styles.fieldErrorText}>
+					{errorText}
+				</AppTypography>
+			) : null}
+		</View>
 	)
 }
 
@@ -234,9 +256,7 @@ const isValidProfileUrl = (value: string, allowedHosts: string[]) => {
 		return false
 	}
 }
-// const isValidInstagramUrl = (value: string) => isValidProfileUrl(value, ['instagram.com', 'www.instagram.com'])
-// const isValidFacebookUrl = (value: string) => isValidProfileUrl(value, ['facebook.com', 'www.facebook.com'])
-// const isValidTwitterUrl = (value: string) => isValidProfileUrl(value, ['twitter.com', 'www.twitter.com', 'x.com', 'www.x.com'])
+
 const matchOptionValue = (value: string, options: string[]) => {
 	const normalizedValue = value.trim().toLowerCase()
 	return options.find((option) => option.toLowerCase() === normalizedValue) ?? value.trim()
@@ -248,24 +268,6 @@ const normalizeLanguageValues = (value?: string[] | string | null) => {
 	return Array.from(new Set(languages.map((language) => matchOptionValue(language, LANGUAGE_OPTIONS)).filter(Boolean)))
 }
 
-const validateSocialUrl = (field: keyof SocialErrors, value: string) => {
-	const trimmedValue = value.trim()
-	if (!trimmedValue) return ''
-
-	// if (field === 'instagram' && !isValidInstagramUrl(trimmedValue)) {
-	// 	return 'Enter a valid Instagram profile URL.'
-	// }
-
-	// if (field === 'facebook' && !isValidFacebookUrl(trimmedValue)) {
-	// 	return 'Enter a valid Facebook profile URL.'
-	// }
-
-	// if (field === 'twitter' && !isValidTwitterUrl(trimmedValue)) {
-	// 	return 'Enter a valid Twitter profile URL.'
-	// }
-
-	return ''
-}
 
 type PersonalDetailsFormData = {
 	name: string
@@ -275,38 +277,49 @@ type PersonalDetailsFormData = {
 	dob: string
 	languages: string[]
 	location: string
-	instagram: string
-	facebook: string
-	twitter: string
+	
 }
 
-type SocialErrors = {
-	instagram?: string
-	facebook?: string
-	twitter?: string
-}
-
-const formatDobForDisplay = (value?: string) => {
+export const formatDobForDisplay = (value?: string): string => {
 	if (!value) return ''
-	if (/^\d{2}-\d{2}-\d{4}$/.test(value)) return value
-	const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-	return match ? `${match[3]}-${match[2]}-${match[1]}` : value
+	const trimmed = value.trim()
+	if (/^\d{2}-\d{2}-\d{4}$/.test(trimmed)) return trimmed
+	const match = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+	if (match) {
+		const year = match[1]
+		const month = match[2].padStart(2, '0')
+		const day = match[3].padStart(2, '0')
+		return `${day}-${month}-${year}`
+	}
+	return trimmed
 }
 
-const formatDobForStorage = (value: string) => {
-	const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/)
-	return match ? `${match[3]}-${match[2]}-${match[1]}` : value
+export const formatDobForStorage = (value: string): string => {
+	if (!value) return ''
+	const trimmed = value.trim()
+	if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+	const match = trimmed.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+	if (match) {
+		const day = match[1].padStart(2, '0')
+		const month = match[2].padStart(2, '0')
+		const year = match[3]
+		return `${year}-${month}-${day}`
+	}
+	return trimmed
 }
 
 export default function PersonalDetailsTab({
 	isActive,
 	onNextTab,
+	specialtyKey,
 }: {
 	isActive?: boolean
 	onNextTab?: () => void
+	specialtyKey?: string
 }) {
-	const { user, updateUser } = useAuth()
+	const { user, updateUser, ancillarySpecialty } = useAuth()
 	const { width } = useWindowDimensions()
+	const currentSpecialty = specialtyKey || ancillarySpecialty
 
 	const isTablet = width >= 768 && width < 1024
 	const isMobile = width < 768
@@ -320,13 +333,10 @@ export default function PersonalDetailsTab({
 		dob: '',
 		languages: [],
 		location: '',
-		instagram: '',
-		facebook: '',
-		twitter: '',
 	})
 
 	const [focusedField, setFocusedField] = useState('')
-	const [socialErrors, setSocialErrors] = useState<SocialErrors>({})
+	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [statusModal, setStatusModal] = useState<{
@@ -347,53 +357,75 @@ export default function PersonalDetailsTab({
 		}))
 	}
 
-	const updateSocialField = (field: keyof SocialErrors, value: string) => {
+	const handleFieldChange = <K extends keyof PersonalDetailsFormData>(
+		field: K,
+		value: PersonalDetailsFormData[K]
+	) => {
+		if (field === 'dob') {
+			console.log('[DOB] Current state:', formData.dob)
+			console.log('[DOB] New DOB:', value)
+		}
 		updateFormData(field, value)
-		if (socialErrors[field]) {
-			setSocialErrors((prev) => ({
-				...prev,
-				[field]: undefined,
-			}))
+		if (fieldErrors[field as string]) {
+			setFieldErrors((prev) => {
+				const next = { ...prev }
+				delete next[field as string]
+				return next
+			})
 		}
 	}
 
-	const handleSocialBlur = (field: keyof SocialErrors) => {
-		const trimmedValue = formData[field].trim()
-		updateFormData(field, trimmedValue)
-		setSocialErrors((prev) => ({
-			...prev,
-			[field]: validateSocialUrl(field, trimmedValue) || undefined,
-		}))
-	}
 
+	// Backend database (users.contact_number / users.email / ancillary_providers.avatar_s3_key /
+	// ancillary_providers.name / ancillary_providers.date_of_birth / ancillary_providers.gender /
+	// ancillary_providers.location / ancillary_providers.languages via GET /api/ancillary/me/profile)
+	// is the single source of truth for name, email, mobile number (contact_number), DOB, gender, location, languages, and avatar.
 	useEffect(() => {
 		const loadAncillaryProfile = async () => {
+			if (isActive === false) return
 			try {
 				setIsLoadingProfile(true)
-				const num = await AsyncStorage.getItem('contact_number')
-				const loc = await AsyncStorage.getItem('ancillary_location')
-				const gndr = await AsyncStorage.getItem('ancillary_gender')
-				const dobVal = await AsyncStorage.getItem('ancillary_dob')
-				const langs = await AsyncStorage.getItem('ancillary_languages')
-				const insta = await AsyncStorage.getItem('ancillary_instagram')
-				const fb = await AsyncStorage.getItem('ancillary_facebook')
-				const tw = await AsyncStorage.getItem('ancillary_twitter')
 
-				setProfilePhotoUri(user?.avatar || '')
+				// 1. Fetch authoritative profile from backend
+				const backendProfile = await fetchProviderProfile()
+				console.log(
+					'[Ancillary Profile] GET PROFILE RESPONSE:',
+					JSON.stringify(backendProfile, null, 2)
+				)
+
+				if (!backendProfile) {
+					console.warn('[PersonalDetailsTab] fetchProviderProfile returned null, retaining existing form data')
+					return
+				}
+
+				const rawMobile = backendProfile?.contact_number || backendProfile?.mobile_number || ''
+				const backendMobile = rawMobile.replace(/\D/g, '').slice(-10)
+				const backendEmail = backendProfile?.email || user?.email || ''
+				const backendName = backendProfile?.name || user?.name || ''
+				const backendDob = backendProfile?.date_of_birth || ''
+				const backendGender = backendProfile?.gender || ''
+				const backendLocation = backendProfile?.location || ''
+				const backendLanguages = backendProfile?.languages || []
+				const defaultAvatar = (currentSpecialty === 'physiotherapy' ? NEW_PHYSIOTHERAPIST_IMAGE_URL : '')
+				const backendAvatar = backendProfile?.avatar_s3_key || defaultAvatar || ''
+
+				setProfilePhotoUri(backendAvatar)
 				setProfilePhotoUpload(null)
 				setIsProfilePhotoRemoved(false)
 				setFormData({
-					name: user?.name || '',
-					email: user?.email || '',
-					mobile: num || '',
-					gender: normalizeGenderValue(gndr || ''),
-					dob: formatDobForDisplay(dobVal || ''),
-					languages: langs ? normalizeLanguageValues(JSON.parse(langs)) : [],
-					location: loc || '',
-					instagram: insta || '',
-					facebook: fb || '',
-					twitter: tw || '',
+					name: backendName,
+					email: backendEmail,
+					mobile: backendMobile,
+					gender: normalizeGenderValue(backendGender),
+					dob: formatDobForDisplay(backendDob),
+					languages: normalizeLanguageValues(backendLanguages),
+					location: backendLocation,
 				})
+
+				// Sync AuthContext user session so navigation/sidebar reflect real backend avatar & name
+				if (backendAvatar && backendAvatar !== user?.avatar) {
+					await updateUser({ avatar: backendAvatar, name: backendName || user?.name })
+				}
 			} catch (error) {
 				console.error('[PersonalDetailsTab] failed to load ancillary personal details:', error)
 			} finally {
@@ -402,9 +434,17 @@ export default function PersonalDetailsTab({
 		}
 
 		loadAncillaryProfile()
-	}, [user])
+	}, [isActive])
 
 	const handleSave = async () => {
+		// Complete form validation using shared Zod schema and getFieldErrors pattern
+		const errors = getFieldErrors(personalDetailsSchema, formData)
+		setFieldErrors(errors)
+
+		if (Object.keys(errors).length > 0) {
+			return
+		}
+
 		const trimmedName = formData.name.trim()
 		const trimmedEmail = formData.email.trim()
 		const trimmedLocation = formData.location.trim()
@@ -412,80 +452,75 @@ export default function PersonalDetailsTab({
 		const normalizedMobile = formData.mobile.replace(/\D/g, '')
 		const normalizedGender = normalizeGenderValue(formData.gender)
 		const normalizedLanguages = normalizeLanguageValues(formData.languages)
-		const trimmedInstagram = formData.instagram.trim()
-		const trimmedFacebook = formData.facebook.trim()
-		const trimmedTwitter = formData.twitter.trim()
-		const nextSocialErrors: SocialErrors = {}
-
-		if (!trimmedName) {
-			Alert.alert('Validation', 'Full name is required.')
-			return
-		}
-
-		if (trimmedEmail && !isValidEmail(trimmedEmail)) {
-			Alert.alert('Validation', 'Please enter a valid email address.')
-			return
-		}
-
-		if (normalizedMobile && !isValidPhone(normalizedMobile)) {
-			Alert.alert('Validation', 'Please enter a valid mobile number.')
-			return
-		}
-
-		if (formData.dob.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(formattedDob)) {
-			Alert.alert('Validation', 'Please enter DOB in DD-MM-YYYY format.')
-			return
-		}
-
-		// if (trimmedInstagram && !isValidInstagramUrl(trimmedInstagram)) {
-		// 	nextSocialErrors.instagram = 'Enter a valid Instagram profile URL.'
-		// }
-
-		// if (trimmedFacebook && !isValidFacebookUrl(trimmedFacebook)) {
-		// 	nextSocialErrors.facebook = 'Enter a valid Facebook profile URL.'
-		// }
-
-		// if (trimmedTwitter && !isValidTwitterUrl(trimmedTwitter)) {
-		// 	nextSocialErrors.twitter = 'Enter a valid Twitter profile URL.'
-		// }
-
-		setSocialErrors(nextSocialErrors)
-		if (Object.keys(nextSocialErrors).length > 0) {    
-			return
-		}
 
 		try {
 			setIsSaving(true)
 
-			await updateUser({
-				name: trimmedName,
-				...(profilePhotoUpload ? { avatar: profilePhotoUpload.uri } : isProfilePhotoRemoved ? { avatar: undefined } : {}),
-			})
+			const photoToSave = isProfilePhotoRemoved
+				? ''
+				: (profilePhotoUpload?.uri ?? profilePhotoUri ?? (currentSpecialty === 'physiotherapy' ? NEW_PHYSIOTHERAPIST_IMAGE_URL : '') ?? '')
 
-			await AsyncStorage.multiSet([
-				['contact_number', normalizedMobile],
-				['ancillary_location', trimmedLocation],
-				['ancillary_gender', normalizedGender],
-				['ancillary_dob', formattedDob],
-				['ancillary_languages', JSON.stringify(normalizedLanguages)],
-				['ancillary_instagram', trimmedInstagram],
-				['ancillary_facebook', trimmedFacebook],
-				['ancillary_twitter', trimmedTwitter],
-			])
-
-			setFormData((prev) => ({
-				...prev,
+			// Persist to backend database (authoritative source of truth).
+			// Explicit mapping:
+			// - formData.name -> payload.name -> backend AncillaryProvider.name
+			// - formData.email -> payload.email -> backend users.email
+			// - formData.mobile -> payload.mobile_number -> backend users.contact_number
+			// - formData.dob -> payload.date_of_birth -> backend AncillaryProvider.date_of_birth
+			// - formData.gender -> payload.gender -> backend AncillaryProvider.gender
+			// - formData.location -> payload.location -> backend AncillaryProvider.location
+			// - formData.languages -> payload.languages -> backend AncillaryProvider.languages
+			// - photoToSave -> payload.avatar_s3_key -> backend AncillaryProvider.avatar_s3_key
+			const payload = {
 				name: trimmedName,
 				email: trimmedEmail,
-				location: trimmedLocation,
-				mobile: normalizedMobile,
+				mobile_number: normalizedMobile,
+				date_of_birth: formattedDob,
 				gender: normalizedGender,
-				dob: formData.dob.trim(),
+				location: trimmedLocation,
 				languages: normalizedLanguages,
-				instagram: trimmedInstagram,
-				facebook: trimmedFacebook,
-				twitter: trimmedTwitter,
-			}))
+				avatar_s3_key: photoToSave,
+			}
+
+			console.log(
+				'[Ancillary Profile] FINAL UPDATE PAYLOAD:',
+				JSON.stringify(payload, null, 2)
+			)
+			const backendSaveRes = await updateProviderProfileBackend(payload)
+			console.log(
+				'[Ancillary Profile] UPDATE RESPONSE:',
+				JSON.stringify(backendSaveRes, null, 2)
+			)
+
+			// Re-fetch backend profile to confirm and strictly populate UI from backend response
+			const updatedProfile = await fetchProviderProfile()
+			console.log('[PersonalDetails] Refetched profile:', updatedProfile)
+
+			const authoritativeName = updatedProfile?.name || ''
+			const authoritativeEmail = updatedProfile?.email || ''
+			const rawAuthMobile = updatedProfile?.contact_number || updatedProfile?.mobile_number || ''
+			const authoritativeMobile = rawAuthMobile.replace(/\D/g, '').slice(-10)
+			const authoritativeDob = updatedProfile?.date_of_birth || ''
+			const authoritativeGender = updatedProfile?.gender || ''
+			const authoritativeLocation = updatedProfile?.location || ''
+			const authoritativeLanguages = updatedProfile?.languages || []
+			const authoritativeAvatar = updatedProfile?.avatar_s3_key || ''
+
+			// Sync AuthContext user session so navigation/sidebar reflect updated backend values
+			await updateUser({
+				name: authoritativeName,
+				email: authoritativeEmail || user?.email,
+				avatar: authoritativeAvatar || undefined,
+			})
+
+			setFormData({
+				name: authoritativeName,
+				email: authoritativeEmail,
+				mobile: authoritativeMobile,
+				location: authoritativeLocation,
+				gender: normalizeGenderValue(authoritativeGender),
+				dob: formatDobForDisplay(authoritativeDob),
+				languages: normalizeLanguageValues(authoritativeLanguages),
+			})
 
 			setStatusModal({
 				visible: true,
@@ -494,13 +529,21 @@ export default function PersonalDetailsTab({
 				description: 'Personal details saved successfully.',
 				submitText: 'Okay',
 			})
-		} catch (err) {
-			console.error('[PersonalDetailsTab] save error:', err)
+		} catch (err: any) {
+			console.error('[PROFILE SAVE] error:', err)
+			console.error('[PROFILE SAVE] status:', err?.response?.status)
+			console.error('[PROFILE SAVE] response:', err?.response?.data)
+			console.error('[PROFILE SAVE] request:', err?.config?.data)
+			console.error('[PROFILE SAVE] URL:', err?.config?.url)
+			console.error('[Ancillary Profile] Backend update failed:', err)
+			console.error('[Ancillary Profile] Status:', err?.response?.status)
+			console.error('[Ancillary Profile] Response:', err?.response?.data)
+			console.error('[Ancillary Profile] Request:', err?.config?.data)
 			setStatusModal({
 				visible: true,
 				status: 'error',
 				title: 'Error',
-				description: 'Unable to save personal details right now.',
+				description: err?.response?.data?.message || err?.response?.data?.detail || err?.message || 'Unable to save personal details right now.',
 				submitText: 'Okay',
 			})
 		} finally {
@@ -544,7 +587,7 @@ export default function PersonalDetailsTab({
 				<KeyboardAvoidingView style={[styles.contentShell, { maxWidth: contentWidth }]}>
 					<AppPhotoPicker
 						imageUri={profilePhotoUri}
-						fallbackSource={DEFAULT_PROFILE_IMAGE}
+						fallbackSource={currentSpecialty === 'physiotherapy' ? PHYSIOTHERAPY_PROFILE_IMAGE : DEFAULT_PROFILE_IMAGE}
 						fileNamePrefix="ancillary-profile"
 						onChange={({ uri, upload, removed }) => {
 							setProfilePhotoUri(uri)
@@ -557,11 +600,12 @@ export default function PersonalDetailsTab({
 						<InputField
 							label="Full name"
 							value={formData.name}
-							onChangeText={(value) => updateFormData('name', value)}
+							onChangeText={(value) => handleFieldChange('name', value)}
 							placeholder="Enter full name"
 							autoCapitalize="words"
 							onFocus={() => setFocusedField('fullName')}
 							onBlur={() => setFocusedField('')}
+							errorText={fieldErrors.name}
 							required
 						/>
 					</View>
@@ -570,11 +614,12 @@ export default function PersonalDetailsTab({
 						<InputField
 							label="Location / Residential Address"
 							value={formData.location}
-							onChangeText={(value) => updateFormData('location', value)}
+							onChangeText={(value) => handleFieldChange('location', value)}
 							placeholder="Enter location or residential address"
 							autoCapitalize="words"
 							onFocus={() => setFocusedField('location')}
 							onBlur={() => setFocusedField('')}
+							errorText={fieldErrors.location}
 							required
 						/>
 					</View>
@@ -584,7 +629,7 @@ export default function PersonalDetailsTab({
 							<InputField
 								label="Mobile Number"
 								value={formData.mobile}
-								onChangeText={(value) => updateFormData('mobile', value.replace(/\D/g, ''))}
+								onChangeText={(value) => handleFieldChange('mobile', value.replace(/\D/g, ''))}
 								placeholder="Enter mobile number"
 								keyboardType="phone-pad"
 								leftText="+91"
@@ -592,12 +637,13 @@ export default function PersonalDetailsTab({
 								rightIconColor="#24a148"
 								onFocus={() => setFocusedField('mobileNumber')}
 								onBlur={() => setFocusedField('')}
+								errorText={fieldErrors.mobile}
 								required
 							/>
 							<InputField
 								label="Email ID"
 								value={formData.email}
-								onChangeText={(value) => updateFormData('email', value)}
+								onChangeText={(value) => handleFieldChange('email', value)}
 								placeholder="Enter email"
 								keyboardType="email-address"
 								autoCapitalize="none"
@@ -605,6 +651,7 @@ export default function PersonalDetailsTab({
 								rightIconColor="#24a148"
 								onFocus={() => setFocusedField('email')}
 								onBlur={() => setFocusedField('')}
+								errorText={fieldErrors.email}
 								required
 							/>
 						</FormRow>
@@ -617,15 +664,17 @@ export default function PersonalDetailsTab({
 								value={formData.gender}
 								placeholder="Select your gender"
 								options={GENDER_SELECT_OPTIONS}
-								onSelect={(value) => updateFormData('gender', value)}
+								onSelect={(value) => handleFieldChange('gender', value)}
+								errorText={fieldErrors.gender}
 								required
 							/>
 							<DobPickerField
 								label="DOB"
 								value={formData.dob}
-								onChange={(value) => updateFormData('dob', value)}
+								onChange={(value) => handleFieldChange('dob', value)}
 								placeholder="DD-MM-YYYY"
 								isMobile={isMobile}
+								errorText={fieldErrors.dob}
 								required
 							/>
 						</FormRow>
@@ -637,62 +686,10 @@ export default function PersonalDetailsTab({
 							values={formData.languages}
 							placeholder="Select languages"
 							options={LANGUAGE_SELECT_OPTIONS}
-							onChange={(values) => updateFormData('languages', values)}
-							required
+							onChange={(values) => handleFieldChange('languages', values)}
+							errorText={fieldErrors.languages}
 						/>
 					</View>
-
-					{/* Social Media Section
-					<View style={[styles.socialSection, { marginBottom: rowSpacing }]}>
-						<SectionTitle>Social Media</SectionTitle>
-						<FormRow stacked={!useTwoColumns} compact={isTablet}>
-							<InputField
-								label="Instagram"
-								value={formData.instagram}
-								onChangeText={(value) => updateSocialField('instagram', value)}
-								placeholder="https://instagram.com/username"
-								keyboardType="url"
-								autoCapitalize="none"
-								rightIcon="instagram"
-								errorText={socialErrors.instagram}
-								onFocus={() => setFocusedField('instagram')}
-								onBlur={() => {
-									setFocusedField('')
-									handleSocialBlur('instagram')
-								}}
-							/>
-							<InputField
-								label="Facebook"
-								value={formData.facebook}
-								onChangeText={(value) => updateSocialField('facebook', value)}
-								placeholder="https://www.facebook.com/profile"
-								keyboardType="url"
-								autoCapitalize="none"
-								rightIcon="facebook"
-								errorText={socialErrors.facebook}
-								onFocus={() => setFocusedField('facebook')}
-								onBlur={() => {
-									setFocusedField('')
-									handleSocialBlur('facebook')
-								}}
-							/>
-							<InputField
-								label="Twitter"
-								value={formData.twitter}
-								onChangeText={(value) => updateSocialField('twitter', value)}
-								placeholder="https://twitter.com/username"
-								keyboardType="url"
-								autoCapitalize="none"
-								rightIcon="twitter"
-								errorText={socialErrors.twitter}
-								onFocus={() => setFocusedField('twitter')}
-								onBlur={() => {
-									setFocusedField('')
-									handleSocialBlur('twitter')
-								}}
-							/>
-						</FormRow>
-					</View> */}
 				</KeyboardAvoidingView>
 			</ScrollView>
 
@@ -807,5 +804,11 @@ const styles = StyleSheet.create({
 	readOnlyInput: {
 		backgroundColor: '#f2f4f4',
 		color: '#62707a',
+	},
+	fieldErrorText: {
+		color: '#d84545',
+		fontSize: 12,
+		marginTop: 4,
+		marginLeft: 4,
 	},
 })

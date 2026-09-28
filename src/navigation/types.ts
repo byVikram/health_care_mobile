@@ -4,6 +4,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs'
 import { ROUTES } from './routes'
 
 import type { DoctorDetailData } from '../types/doctor-detail'
+import type { LabBookingDraft } from '../features/laboratory/types'
 
 export type RoleParams = {
 	roleId: string
@@ -30,6 +31,7 @@ export type MainTabParamList = {
 		| undefined
 	[ROUTES.MAIN.PORTAL]: { filter?: BookingsFilterKey } | undefined
 	[ROUTES.MAIN.PROFILE]: undefined
+	[ROUTES.MAIN.WALLET]: undefined
 	[ROUTES.MAIN.ANCILLARY]: undefined
 }
 
@@ -61,7 +63,26 @@ export type PatientPaymentParams = {
 	consentVersionId: string
 }
 
+export type AppointmentConfirmedParams = {
+	appointmentId: string
+	doctorName: string
+	doctorAvatar?: string | null
+	doctorSpecialty?: string
+	appointmentMode: 'clinic_visit' | 'video_call'
+	dateDisplay: string
+	timeDisplay: string
+	hospitalName: string
+	hospitalAddress?: string
+	patientName: string
+	fee: number
+	paymentMethodLabel: string
+}
+
 export type AppStackParamList = {
+	[ROUTES.STACK.WALLET]: undefined
+	[ROUTES.STACK.WALLET_TOPUP]: undefined
+	[ROUTES.STACK.WALLET_TRANSACTIONS]: undefined
+	[ROUTES.STACK.WALLET_TRANSACTION_DETAIL]: { id: string }
 	[ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
 	[ROUTES.STACK.SEARCH]: undefined
 	[ROUTES.STACK.DOCTOR_SEARCH]:
@@ -79,6 +100,9 @@ export type AppStackParamList = {
 	[ROUTES.STACK.APPOINTMENTS]: { appointmentId?: string } | undefined
 	[ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
+	[ROUTES.STACK.VISIT_SUMMARY]: { appointmentId: string }
+	[ROUTES.STACK.APPOINTMENT_CONFIRMED]: AppointmentConfirmedParams
+	[ROUTES.STACK.APPOINTMENT_DETAILS]: { appointmentId: string }
 	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: Omit<PatientPaymentParams, 'consentVersionId'> }
 	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
 	[ROUTES.STACK.ORDER_LIST]: undefined
@@ -113,6 +137,39 @@ export type AppStackParamList = {
 		labIs24x7?: boolean
 	}
 	[ROUTES.STACK.LABORATORY_LIST]: undefined
+	[ROUTES.STACK.LABORATORY_ALL_TESTS]: undefined
+	[ROUTES.STACK.LABORATORY_ALL_PACKAGES]: undefined
+	// Selection lives in LaboratoryCartContext (shared across the Laboratory
+	// stack), not route params — this screen just reads it.
+	[ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION]: undefined
+	[ROUTES.STACK.LABORATORY_SELECT_LAB]: { draft: LabBookingDraft }
+	// Lab + appointment fields are only present when `draft.requiresLabSelection`
+	// is true (Diagnostic Center Visit tests, and every Package) — Home
+	// Sample Collection for individual tests reaches this screen straight
+	// from Patient Details with just `draft`, no lab ever chosen.
+	[ROUTES.STACK.LABORATORY_BOOKING_SUMMARY]: {
+		draft: LabBookingDraft
+		labId?: string
+		labName?: string
+		labAddress?: string
+		labCity?: string
+		labAvatarKey?: string | null
+		labOperatingHours?: { open: string; close: string }
+		labIs24x7?: boolean
+		date?: string
+		timeSlot?: string
+	}
+	[ROUTES.STACK.LABORATORY_BOOKING_TRACKING]: {
+		bookingReference: string
+		draft: LabBookingDraft
+		labId?: string
+		labName?: string
+		labAddress?: string
+		labCity?: string
+		date?: string
+		timeSlot?: string
+		totalAmount: number
+	}
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
 	[ROUTES.STACK.PATIENT_PAYMENT]: PatientPaymentParams | undefined
@@ -126,9 +183,6 @@ export type AppStackParamList = {
 	[ROUTES.STACK.COMMUNITY_THREAD]: { threadId: string }
 	[ROUTES.STACK.BLOG_LIST]: undefined
 	[ROUTES.STACK.BLOG_ARTICLE]: { slug: string }
-	[ROUTES.STACK.TRANSPORTATION_LANDING]: undefined
-	[ROUTES.STACK.BOOK_RIDE]: { appointmentId: string; type?: 'onward' | 'return' }
-	[ROUTES.STACK.RIDE_TRACKING]: { appointmentId: string; type?: 'onward' | 'return' }
 	[ROUTES.STACK.DOCTOR_EVENTS]: undefined
 	[ROUTES.STACK.DOCTOR_EVENT_FORM]: { eventId?: string }
 	[ROUTES.STACK.ALL_EVENTS]: undefined
@@ -144,40 +198,61 @@ export type AppStackParamList = {
 	[ROUTES.STACK.NURSE_HISTORY]: undefined
 	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string; updatedCart?: any[] }
 	[ROUTES.STACK.ANCILLARY_PROVIDERS]: { serviceKey: string; serviceLabel: string; procedureName?: string }
-	[ROUTES.STACK.ANCILLARY_BOOKING_CART]: {
-		services?: any[]
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_BOOKING_SUMMARY]: {
-		services?: any[]
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_BOOKING_DETAILS]: {
-		serviceId?: string
-		serviceName?: string
-		description?: string
-		image?: string
-		price?: string
-		duration?: string
-		services?: any[]
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_PAYMENT]: {
-		bookingPayload?: any
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_PRICING_REVIEW]: {
-		bookingPayload?: any
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_CONFIRMATION]: {
-		bookingId?: string
-		bookingPayload?: any
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_BOOKING_STATUS]: {
-		bookingId?: string
-		bookingData?: any
-	} | undefined
-	[ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT]: {
-		bookingId?: string
-		bookingData?: any
-	} | undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_CART]:
+		| {
+				services?: any[]
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_SUMMARY]:
+		| {
+				services?: any[]
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_DETAILS]:
+		| {
+				serviceId?: string
+				serviceName?: string
+				description?: string
+				image?: string
+				price?: string
+				duration?: string
+				services?: any[]
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_PAYMENT]:
+		| {
+				bookingPayload?: any
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_PRICING_REVIEW]:
+		| {
+				bookingPayload?: any
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_CONFIRMATION]:
+		| {
+				bookingId?: string
+				bookingPayload?: any
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_BOOKING_STATUS]:
+		| {
+				bookingId?: string
+				bookingData?: any
+		  }
+		| undefined
+	[ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT]:
+		| {
+				bookingId?: string
+				bookingData?: any
+		  }
+		| undefined
 	[ROUTES.STACK.ANCILLARY_MY_BOOKINGS]: undefined
+	[ROUTES.STACK.HOME_CARE_CATALOG]: { updatedCart?: any[] } | undefined
+	[ROUTES.STACK.CAREGIVER_SERVICES]: undefined
+	[ROUTES.STACK.CAREGIVER_TIME_CONFIG]: {
+		careType: 'DAY_CARE' | 'NIGHT_CARE' | 'FULL_DAY_CARE' | 'HOURLY_CARE'
+	}
 	[ROUTES.STACK.LOCATION_SELECT]: undefined
 }
 

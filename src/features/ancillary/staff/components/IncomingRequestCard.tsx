@@ -16,16 +16,20 @@ import {
 	UIManager,
 	Vibration,
 } from 'react-native'
-import { Audio } from 'expo-av'
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { AppModal } from '../../../../components/common'
 import { SoftReviewRequestData, AuthorizedDetailedPatientInfo } from '../../ancillaryService'
 
 // Enable LayoutAnimation for Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-	UIManager.setLayoutAnimationEnabledExperimental(true)
-}
+// if (Platform.OS === 'android' && typeof UIManager.setLayoutAnimationEnabledExperimental === 'function') {
+// 	try {
+// 		UIManager.setLayoutAnimationEnabledExperimental(true)
+// 	} catch (_) {
+// 		// LayoutAnimation handled automatically in React Native New Architecture
+// 	}
+// }
 
 export const MOCK_SOFT_REQUEST: SoftReviewRequestData = {
 	id: 'REQ-NURSE-991',
@@ -69,6 +73,9 @@ export function IncomingRequestNotificationOverlay({
 	const translateY = useRef(new Animated.Value(-400)).current
 	const opacity = useRef(new Animated.Value(0)).current
 	const lastPlayedIdRef = useRef<string | null>(null)
+	const hasDeclinedRef = useRef<boolean>(false)
+	const declineTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const audioPlayer = useAudioPlayer('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
 
 	// Incoming audio & haptic alert on new request arrival
 	useEffect(() => {
@@ -90,25 +97,23 @@ export function IncomingRequestNotificationOverlay({
 		// Trigger Audio Chime Alert
 		const playAudioChime = async () => {
 			try {
-				await Audio.setAudioModeAsync({
-					playsInSilentModeIOS: true,
-					shouldDuckAndroid: true,
-					staysActiveInBackground: false,
+				await setAudioModeAsync({
+					playsInSilentMode: true,
+					interruptionMode: 'duckOthers',
+					shouldPlayInBackground: false,
 				})
 
-				// Universal MP3 chime compatible across iOS, Android, and Web
-				const { sound } = await Audio.Sound.createAsync(
-					{ uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
-					{ shouldPlay: true, volume: 0.8 }
-				)
-
-				sound.setOnPlaybackStatusUpdate((status) => {
-					if (status.isLoaded && status.didJustFinish) {
-						sound.unloadAsync().catch(() => {})
+				if (audioPlayer) {
+					try {
+						audioPlayer.volume = 0.8
+						if (typeof audioPlayer.seekTo === 'function' && audioPlayer.currentTime > 0) {
+							await audioPlayer.seekTo(0)
+						}
+						audioPlayer.play()
+					} catch (playErr) {
+						console.warn('[IncomingRequestCard] Audio play error:', playErr)
 					}
-				})
-
-				await sound.playAsync()
+				}
 			} catch (error) {
 				console.warn('[IncomingRequestCard] Audio playback notice:', error)
 			}
@@ -124,6 +129,11 @@ export function IncomingRequestNotificationOverlay({
 		setIsExpanded(false)
 		translateY.setValue(-400)
 		opacity.setValue(0)
+		hasDeclinedRef.current = false
+		if (declineTimeoutRef.current) {
+			clearTimeout(declineTimeoutRef.current)
+			declineTimeoutRef.current = null
+		}
 
 		Animated.parallel([
 			Animated.timing(translateY, {
@@ -138,13 +148,27 @@ export function IncomingRequestNotificationOverlay({
 			}),
 		]).start()
 
+		const getExpiresTimestamp = (): number => {
+			if (typeof request.expiresAt === 'number') {
+				return isNaN(request.expiresAt) ? Date.now() + 30000 : request.expiresAt
+			}
+			if (typeof request.expiresAt === 'string') {
+				const parsed = new Date(request.expiresAt).getTime()
+				return isNaN(parsed) ? Date.now() + 30000 : parsed
+			}
+			return Date.now() + 30000
+		}
+
+		const expiresTimestamp = getExpiresTimestamp()
+
 		const updateTimer = () => {
-			const diffMs = request.expiresAt - Date.now()
+			const diffMs = expiresTimestamp - Date.now()
 			const secs = Math.max(0, Math.ceil(diffMs / 1000))
 			setSecondsLeft(secs)
 
-			if (secs <= 0) {
-				setTimeout(() => {
+			if (secs <= 0 && !hasDeclinedRef.current) {
+				hasDeclinedRef.current = true
+				declineTimeoutRef.current = setTimeout(() => {
 					onDecline()
 				}, 1500)
 			}
@@ -153,8 +177,14 @@ export function IncomingRequestNotificationOverlay({
 		updateTimer()
 		const interval = setInterval(updateTimer, 1000)
 
-		return () => clearInterval(interval)
-	}, [visible, request?.expiresAt])
+		return () => {
+			clearInterval(interval)
+			if (declineTimeoutRef.current) {
+				clearTimeout(declineTimeoutRef.current)
+				declineTimeoutRef.current = null
+			}
+		}
+	}, [visible, request?.expiresAt, request?.id])
 
 	if (!visible || !request) return null
 
@@ -248,14 +278,23 @@ export function IncomingRequestNotificationOverlay({
 							<View style={styles.compactDetailRow}>
 								<Ionicons name="location-outline" size={13} color="#0C7C7C" style={styles.compactDetailIcon} />
 								<Text style={styles.compactDetailText}>
-									{request.generalLocation} • {request.distanceKm} away • {request.travelTime}
+									{[
+										request.generalLocation,
+										request.distanceKm ? `${request.distanceKm} away` : null,
+										request.travelTime,
+									]
+										.filter(Boolean)
+										.join(' • ')}
 								</Text>
 							</View>
 						</View>
 
 						{/* Visually Prominent Payout Box on Right */}
 						<View style={styles.payoutProminentBox}>
-							<Text style={styles.payoutBoxLabel}>ESTIMATED PAYOUT</Text>
+							{request.patientAmount ? (
+								<Text style={styles.patientPaysLabel}>Patient pays {request.patientAmount}</Text>
+							) : null}
+							<Text style={styles.payoutBoxLabel}>YOUR PAYOUT</Text>
 							<Text style={styles.payoutBoxValue}>{request.earning}</Text>
 						</View>
 					</View>
@@ -339,7 +378,11 @@ export function IncomingRequestNotificationOverlay({
 										</View>
 										<View style={{ flex: 0.9, minWidth: 0 }}>
 											<Text style={styles.expandedInfoLabel}>Distance & Travel</Text>
-											<Text style={styles.expandedInfoVal}>{request.distanceKm} ({request.travelTime})</Text>
+											<Text style={styles.expandedInfoVal}>
+												{[request.distanceKm, request.travelTime ? `(${request.travelTime})` : null]
+													.filter(Boolean)
+													.join(' ') || '—'}
+											</Text>
 										</View>
 									</View>
 
@@ -351,12 +394,16 @@ export function IncomingRequestNotificationOverlay({
 									<View style={styles.expandedInfoRow}>
 										<Text style={styles.expandedInfoLabel}>Required Skills</Text>
 										<View style={styles.skillsTagWrap}>
-											{request.requiredSkills.map((skill, idx) => (
-												<View key={idx} style={styles.skillChip}>
-													<Ionicons name="checkmark-circle" size={12} color="#0C7C7C" />
-													<Text style={styles.skillChipText}>{skill}</Text>
-												</View>
-											))}
+											{Array.isArray(request.requiredSkills) && request.requiredSkills.length > 0 ? (
+												request.requiredSkills.map((skill, idx) => (
+													<View key={idx} style={styles.skillChip}>
+														<Ionicons name="checkmark-circle" size={12} color="#0C7C7C" />
+														<Text style={styles.skillChipText}>{skill}</Text>
+													</View>
+												))
+											) : (
+												<Text style={styles.expandedInfoVal}>Standard Care Protocol</Text>
+											)}
 										</View>
 									</View>
 
@@ -380,8 +427,13 @@ export function IncomingRequestNotificationOverlay({
 										<Text style={styles.expandedInfoVal}>{request.specialRequirements}</Text>
 									</View>
 
+									<View style={styles.expandedInfoRow}>
+										<Text style={styles.expandedInfoLabel}>Patient Pays</Text>
+										<Text style={styles.expandedInfoValBold}>{request.patientAmount || '—'}</Text>
+									</View>
+
 									<View style={[styles.expandedInfoRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
-										<Text style={styles.expandedInfoLabel}>Estimated Payout</Text>
+										<Text style={styles.expandedInfoLabel}>Your Payout</Text>
 										<Text style={styles.payoutBigValue}>{request.earning}</Text>
 									</View>
 								</View>
@@ -470,8 +522,12 @@ export function AcceptConfirmationModal({
 						<Text style={styles.summaryLabel}>Distance:</Text>
 						<Text style={styles.summaryValue}>{request.distanceKm}</Text>
 					</View>
+					<View style={styles.summaryRow}>
+						<Text style={styles.summaryLabel}>Patient Pays:</Text>
+						<Text style={styles.summaryValue}>{request.patientAmount || '—'}</Text>
+					</View>
 					<View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
-						<Text style={styles.summaryLabel}>Estimated Payout:</Text>
+						<Text style={styles.summaryLabel}>Your Payout:</Text>
 						<Text style={styles.summaryValuePayout}>{request.earning}</Text>
 					</View>
 				</View>
@@ -517,7 +573,8 @@ export function DetailedReviewModal({
 	if (!detailedInfo) return null
 
 	const handleOpenMaps = () => {
-		const query = encodeURIComponent(detailedInfo.exactAddress)
+		const address = detailedInfo.exactAddress || detailedInfo.patientName || ''
+		const query = encodeURIComponent(address)
 		const url = Platform.select({
 			ios: `maps:0,0?q=${query}`,
 			android: `geo:0,0?q=${query}`,
@@ -529,6 +586,10 @@ export function DetailedReviewModal({
 	}
 
 	const handleCallPatient = () => {
+		if (!detailedInfo.patientPhone) {
+			Alert.alert('Notice', 'Patient phone number is not available.')
+			return
+		}
 		Linking.openURL(`tel:${detailedInfo.patientPhone}`).catch(() => {
 			Alert.alert('Error', 'Unable to place call.')
 		})
@@ -566,8 +627,8 @@ export function DetailedReviewModal({
 
 					{/* Contact & Exact Address */}
 					<Text style={styles.detailedLabel}>Exact Care Location & Contact</Text>
-					<Text style={styles.detailedAddress}>{detailedInfo.exactAddress}</Text>
-					<Text style={styles.phoneText}>Phone: {detailedInfo.patientPhone}</Text>
+					<Text style={styles.detailedAddress}>{detailedInfo.exactAddress || 'Address on file'}</Text>
+					<Text style={styles.phoneText}>Phone: {detailedInfo.patientPhone || '—'}</Text>
 
 					<TouchableOpacity style={styles.mapNavBtn} onPress={handleOpenMaps} activeOpacity={0.85}>
 						<Ionicons name="navigate-circle" size={18} color="#0C7C7C" />
@@ -595,12 +656,16 @@ export function DetailedReviewModal({
 					{/* Required Documents */}
 					<Text style={styles.detailedLabel}>Required Documents</Text>
 					<View style={styles.skillsTagWrap}>
-						{detailedInfo.requiredDocuments.map((doc: string, i: number) => (
-							<View key={i} style={styles.docChip}>
-								<Ionicons name="document-attach" size={13} color="#2563EB" />
-								<Text style={styles.docChipText}>{doc}</Text>
-							</View>
-						))}
+						{Array.isArray(detailedInfo.requiredDocuments) && detailedInfo.requiredDocuments.length > 0 ? (
+							detailedInfo.requiredDocuments.map((doc: string, i: number) => (
+								<View key={i} style={styles.docChip}>
+									<Ionicons name="document-attach" size={13} color="#2563EB" />
+									<Text style={styles.docChipText}>{doc}</Text>
+								</View>
+							))
+						) : (
+							<Text style={styles.detailedNote}>No special documents required.</Text>
+						)}
 					</View>
 
 					<View style={styles.detailedDivider} />
@@ -717,6 +782,13 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		minWidth: 92,
 		flexShrink: 0,
+	},
+	patientPaysLabel: {
+		fontSize: 9.5,
+		fontWeight: '600',
+		color: '#5B7B7C',
+		marginBottom: 3,
+		textAlign: 'center',
 	},
 	payoutBoxLabel: {
 		fontSize: 8.5,

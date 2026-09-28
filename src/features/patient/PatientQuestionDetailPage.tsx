@@ -8,6 +8,7 @@ import {
 	TextInput,
 	Alert,
 	RefreshControl,
+	useWindowDimensions,
 } from 'react-native'
 import { Text, Card, Avatar, Chip, Button } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -94,6 +95,8 @@ export default function PatientQuestionDetailPage() {
 	const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>()
 	const { questionId } = route.params || {}
 	const { role } = useAuth()
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
 
 	const [q, setQ] = useState<PatientQuestion | null>(null)
 	const [loading, setLoading] = useState(true)
@@ -191,7 +194,7 @@ export default function PatientQuestionDetailPage() {
 	return (
 		<View style={styles.container}>
 			<ScrollView
-				contentContainerStyle={styles.scrollContent}
+				contentContainerStyle={[styles.scrollContent, isTablet && styles.scrollContentTablet]}
 				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchQuestionData() }} colors={['#0d9488']} />}
 			>
 				{/* Back Button */}
@@ -375,6 +378,12 @@ const styles = StyleSheet.create({
 	scrollContent: {
 		padding: 16,
 		paddingBottom: 90,
+	},
+	scrollContentTablet: {
+		maxWidth: 840,
+		width: '100%',
+		alignSelf: 'center',
+		paddingHorizontal: 24,
 	},
 	backBtn: {
 		flexDirection: 'row',

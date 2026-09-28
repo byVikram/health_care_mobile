@@ -28,20 +28,36 @@ export default function ActiveBookingPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
-	const { bookingId } = route.params || {}
+	const { bookingId, initialBooking } = route.params || {}
 
-	const [booking, setBooking] = useState<NurseBooking | null>(null)
-	const [loading, setLoading] = useState(true)
+	const [booking, setBooking] = useState<NurseBooking | null>(() => {
+		if (
+			initialBooking &&
+			initialBooking.patientName &&
+			typeof initialBooking.patientName === 'string' &&
+			initialBooking.patientName.trim() !== '' &&
+			!['Eleanor Vance', 'Patient Account Holder', 'John Doe', 'Patient Recipient', 'Patient'].includes(initialBooking.patientName.trim())
+		) {
+			return initialBooking
+		}
+		return null
+	})
+	const [loading, setLoading] = useState(() => !initialBooking)
 	const [cancelModalVisible, setCancelModalVisible] = useState(false)
 
 	const loadData = async () => {
-		setLoading(true)
+		if (!booking) setLoading(true)
 		try {
 			if (bookingId) {
 				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
 				const apiData = res.data?.data || res.data
 				if (apiData) {
-					const pName = apiData.patientName || apiData.patient_name || apiData.patientUser?.name || apiData.patient?.name
+					const pName =
+						apiData.patientFullName ||
+						apiData.patientName ||
+						apiData.patient_name ||
+						apiData.patientUser?.name ||
+						apiData.patient?.name
 					// Strictly validate that patient name is valid and not a fallback
 					if (pName && typeof pName === 'string' && pName.trim() !== '' && !['Eleanor Vance', 'Patient Account Holder', 'John Doe', 'Patient Recipient', 'Patient'].includes(pName.trim())) {
 						const pAge = apiData.patientAge || apiData.patient_age || apiData.age || 0
@@ -77,8 +93,10 @@ export default function ActiveBookingPage() {
 			console.log('[ActiveBookingPage] Error fetching booking status', e)
 		}
 
-		// If API data is unavailable, do NOT substitute fake patient names
-		setBooking(null)
+		// If API data is unavailable and no initial booking was passed, show error
+		if (!initialBooking || !initialBooking.patientName) {
+			setBooking(null)
+		}
 		setLoading(false)
 	}
 
@@ -116,9 +134,9 @@ export default function ActiveBookingPage() {
 		try {
 			await updateNurseStatus(booking.id, 'ARRIVED', 0)
 			setBooking((prev) => (prev ? { ...prev, status: 'ARRIVED' } : null))
-			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id })
+			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id, initialBooking: booking })
 		} catch (e) {
-			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id })
+			navigation.navigate(ROUTES.STACK.NURSE_PATIENT_VERIFICATION, { bookingId: booking.id, initialBooking: booking })
 		}
 	}
 

@@ -22,7 +22,7 @@ import PatientQR from "../../assets/icons/PatientQR.svg";
 import LogoutIcon from "../../assets/icons/logout.svg";
 const ORCode = require("../../assets/icons/QrCode.png");
 
-import PatientQr from "../../features/patientQr/PatientQr";
+import PatientQr from "../../features/patient-qr/PatientQr";
 import { USER_ROLES } from "../../constants/constants"; // adjust path if needed
 
 export interface AppSidebarItem {
@@ -78,13 +78,27 @@ export default function AppSidebar({
   const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { user, role } = useAuth();
+  const { user, role, ancillarySpecialty } = useAuth();
   const [showQR, setShowQR] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
- const userName = user?.name ?? "User";
+  const [imageError, setImageError] = useState(false);
+  const userName = user?.name ?? "User";
 
-const profileImageUrl = user?.avatar ?? null;
-  const imageSource = profileImageUrl ? { uri: profileImageUrl } : FALLBACK_IMAGE;
+  const profileImageUrl = user?.avatar ?? null;
+
+  useEffect(() => {
+    setImageError(false);
+  }, [profileImageUrl]);
+
+  const isPhysiotherapy =
+    (role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE) &&
+    (ancillarySpecialty === 'physiotherapy' || !ancillarySpecialty);
+
+  const fallbackAvatar = isPhysiotherapy
+    ? require("../../assets/physiotherapy/physiotherapist.png")
+    : FALLBACK_IMAGE;
+
+  const imageSource = profileImageUrl && !imageError ? { uri: profileImageUrl } : fallbackAvatar;
 
   const isPatient = role === USER_ROLES.PATIENT;
 
@@ -145,7 +159,11 @@ const profileImageUrl = user?.avatar ?? null;
           <Pressable style={styles.profileSection} onPress={handleEditProfile}>
             {/* Avatar */}
             <View style={styles.avatarWrapper}>
-              <Image source={imageSource} style={styles.avatarImage} />
+              <Image
+                source={imageSource}
+                onError={() => setImageError(true)}
+                style={styles.avatarImage}
+              />
             </View>
 
             {/* Center Info */}
@@ -339,7 +357,7 @@ const profileImageUrl = user?.avatar ?? null;
 
 const styles = StyleSheet.create({
   modalRoot: { flex: 1, flexDirection: "row" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.35)" },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.35)" },
   sidebar: {
     width: SIDEBAR_WIDTH,
     backgroundColor: "#ffffff",

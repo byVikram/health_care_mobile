@@ -6,13 +6,7 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "scheme": "karola-health",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#2B6F71"
-    },
     "updates": {
       "enabled": true,
       "fallbackToCacheTimeout": 0
@@ -30,7 +24,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
@@ -48,6 +41,14 @@
     "plugins": [
       "@react-native-firebase/app",
       "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#2B6F71"
+        }
+      ],
       [
         "expo-speech-recognition",
         {
@@ -68,14 +69,11 @@
         }
       ],
       "expo-font",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "useCkeartedworks": true
-          }
-        }
-      ]
+      "expo-build-properties",
+      "@react-native-community/datetimepicker",
+      "expo-audio",
+      "expo-status-bar",
+      "expo-video"
     ],
     "assetBundlePatterns": [
       "**/*"

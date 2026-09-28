@@ -72,7 +72,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 	return (
 		<SafeAreaView style={[styles.safeArea, { backgroundColor: gradientTop }]} edges={['top', 'bottom']}>
 			{/* ── Simulated gradient background ── */}
-			<View style={[StyleSheet.absoluteFillObject, { backgroundColor: gradientTop }]} />
+			<View style={[StyleSheet.absoluteFill, { backgroundColor: gradientTop }]} />
 			<View style={[styles.gradientOverlay, { backgroundColor: gradientBottom }]} />
 
 			{/* ── Subtle circle decorations (depth / atmosphere) ── */}
@@ -129,7 +129,7 @@ const makeStyles = (colors: typeof theme.colors) =>
 
 		// Gradient simulation (bottom half slightly lighter)
 		gradientOverlay: {
-			...StyleSheet.absoluteFillObject,
+			...StyleSheet.absoluteFill,
 			top: height * 0.45,
 			opacity: 0.55,
 			borderTopLeftRadius: width,

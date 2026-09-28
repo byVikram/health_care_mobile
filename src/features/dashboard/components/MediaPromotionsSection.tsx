@@ -6,7 +6,8 @@ import {
 	FlatList,
 	useWindowDimensions,
 } from 'react-native'
-import { Video, ResizeMode } from 'expo-av'
+import { useEvent, useEventListener } from 'expo'
+import { useVideoPlayer, VideoView } from 'expo-video'
 
 const VIDEO_SOURCE = require('../../../assets/blog-and-community/video.mp4')
 const AD_IMAGE = require('../../../assets/blog-and-community/ad-image.png')
@@ -26,41 +27,36 @@ const VideoSlide = React.memo(function VideoSlide({
 	onPlayStateChange?: (isPlaying: boolean) => void
 	onVideoFinish?: () => void
 }) {
-	const [isPlaying, setIsPlaying] = useState(false)
-	const videoRef = useRef<any>(null)
+	const videoPlayer = useVideoPlayer(VIDEO_SOURCE, (player) => {
+		player.loop = false
+		player.muted = false
+	})
+	const { isPlaying } = useEvent(videoPlayer, 'playingChange', { isPlaying: videoPlayer.playing })
 
-	const handlePlay = async () => {
-		setIsPlaying(true)
-		onPlayStateChange?.(true)
-		await videoRef.current?.playAsync()
-	}
+	useEffect(() => {
+		onPlayStateChange?.(isPlaying)
+	}, [isPlaying, onPlayStateChange])
 
-	const handlePause = async () => {
-		setIsPlaying(false)
+	useEventListener(videoPlayer, 'playToEnd', () => {
 		onPlayStateChange?.(false)
-		await videoRef.current?.pauseAsync()
+		onVideoFinish?.()
+	})
+
+	const handlePlay = () => {
+		videoPlayer.play()
 	}
 
-	const handlePlaybackStatusUpdate = (status: any) => {
-		if (status?.didJustFinish) {
-			setIsPlaying(false)
-			onPlayStateChange?.(false)
-			onVideoFinish?.()
-		}
+	const handlePause = () => {
+		videoPlayer.pause()
 	}
 
 	return (
 		<View style={[styles.videoImageWrapper, { width }]}>
-			<Video
-				ref={videoRef}
-				source={VIDEO_SOURCE}
+			<VideoView
+				player={videoPlayer}
 				style={styles.videoPlayer}
-				resizeMode={ResizeMode.COVER}
-				shouldPlay={isPlaying}
-				isLooping={false}
-				isMuted={false}
-				useNativeControls={false}
-				onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+				contentFit="cover"
+				nativeControls={false}
 			/>
 
 			{!isPlaying && (

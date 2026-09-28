@@ -1,6 +1,9 @@
 // src/services/apiService.ts
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { secureStorage } from '../utils/secureStorage'
+import { isKnownOffline } from '../utils/networkState'
+import { API_ENDPOINTS } from '../constants/apiUrls'
 
 export interface StatusModalData {
 	status?: 'success' | 'error' | 'info'
@@ -14,13 +17,83 @@ export interface StatusModalData {
 
 type StatusModalHandler = (data: StatusModalData | null) => void
 
-const axiosInstance = axios.create()
+// Axios's default query-param serializer encodes arrays as repeated
+// `key[]=value` pairs. FastAPI's `Query(None)` for a `List[str]` param only
+// recognizes repeated `key=value` pairs (no brackets), so any endpoint taking
+// an array query param (e.g. `procedure_ids`) silently receives an empty list
+// instead of a 422 -- there is no error to catch, so the request "succeeds"
+// with an empty/wrong result. Serialize arrays as repeated keys to match.
+const serializeParams = (params: Record<string, unknown>): string => {
+	const parts: string[] = []
+	Object.entries(params).forEach(([key, value]) => {
+		if (value === undefined || value === null) return
+		const values = Array.isArray(value) ? value : [value]
+		values.forEach((v) => {
+			if (v === undefined || v === null) return
+			parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`)
+		})
+	})
+	return parts.join('&')
+}
+
+const axiosInstance = axios.create({ paramsSerializer: serializeParams })
 let unauthorizedHandler: (() => void) | null = null
 let statusModalHandler: StatusModalHandler | null = null
 let hasShownSessionExpiredAlert = false
+type TokenRefreshedHandler = (accessToken: string, refreshToken: string) => void
+let tokenRefreshedHandler: TokenRefreshedHandler | null = null
+// Shared in-flight refresh call -- concurrent 401s all await this same
+// promise instead of each firing their own /api/auth/refresh request.
+let refreshPromise: Promise<string | null> | null = null
+// Synthetic error used to short-circuit a request we already know will fail
+// because the device is offline (see isKnownOffline() below), so we don't
+// waste time waiting on a doomed request. Tagged the same way a real Axios
+// network error is (no .response, code 'ERR_NETWORK') so the response
+// interceptor's error-classification logic below handles both identically.
+const createOfflineError = (): Error & { code: string; isOfflineError: true } => {
+	const err = new Error('No internet connection') as Error & { code: string; isOfflineError: true }
+	err.code = 'ERR_NETWORK'
+	err.isOfflineError = true
+	return err
+}
 
 export const setUnauthorizedHandler = (handler: (() => void) | null) => {
 	unauthorizedHandler = handler
+}
+
+export const setTokenRefreshedHandler = (handler: TokenRefreshedHandler | null) => {
+	tokenRefreshedHandler = handler
+}
+
+/**
+ * Exchange the stored refresh token for a new access/refresh pair.
+ * Deliberately uses a raw, unintercepted axios.post -- not `axiosInstance`
+ * -- so a 401 on the refresh call itself doesn't recurse back into this
+ * same response interceptor.
+ * Returns the new access token, or null if there was nothing to refresh
+ * with or the refresh call failed (both mean: fall back to a hard logout).
+ */
+const performTokenRefresh = async (): Promise<string | null> => {
+	const currentRefreshToken = await secureStorage.getItem('refresh_token')
+	if (!currentRefreshToken) return null
+
+	try {
+		const response = await axios.post(API_ENDPOINTS.AUTH.REFRESH, {
+			refresh_token: currentRefreshToken,
+		})
+		const data = response.data?.data
+		const newAccessToken: string | undefined = data?.access_token
+		const newRefreshToken: string | undefined = data?.refresh_token
+		if (!newAccessToken || !newRefreshToken) return null
+
+		await secureStorage.setItem('access_token', newAccessToken)
+		await secureStorage.setItem('refresh_token', newRefreshToken)
+		tokenRefreshedHandler?.(newAccessToken, newRefreshToken)
+
+		return newAccessToken
+	} catch {
+		return null
+	}
 }
 
 export const setStatusModalHandler = (handler: StatusModalHandler | null) => {
@@ -31,67 +104,16 @@ export const showStatusModal = (data: StatusModalData | null) => {
 	statusModalHandler?.(data)
 }
 
-const normalizeHeadersForLog = (headers: unknown) => {
-	const maybeHeaders = headers as {
-		toJSON?: () => unknown
-		Authorization?: unknown
-		authorization?: unknown
-	}
-
-	if (typeof maybeHeaders?.toJSON === 'function') {
-		return maybeHeaders.toJSON()
-	}
-
-	return headers
-}
-
 // Request interceptor
 axiosInstance.interceptors.request.use(
 	async (config) => {
-		// Use AsyncStorage in React Native
-		const token = await AsyncStorage.getItem('access_token')
-		console.log('[API TOKEN]', token)
-		const requestUrl = String(config.url || '')
-		const isBookingRequest = requestUrl.includes('/appointments') || requestUrl.includes('appointments')
-		config.headers = config.headers || {}
-		const headers = config.headers as any
-		const explicitAuthorization = headers?.Authorization || headers?.authorization
-
-		if (isBookingRequest) {
-			console.log('[ApiService interceptor][RN booking] before', {
-				url: requestUrl,
-				method: config.method,
-				asyncStorageAccessToken: token,
-				explicitAuthorization,
-				headers: normalizeHeadersForLog(config.headers),
-			})
+		if (isKnownOffline()) {
+			return Promise.reject(createOfflineError())
 		}
-
-		if (token && !explicitAuthorization) {
-			headers.Authorization = `Bearer ${token}`
+		const token = await secureStorage.getItem('access_token')
+		if (token && config.headers && !config.headers.Authorization && !config.headers.authorization) {
+			config.headers.Authorization = `Bearer ${token}`
 		}
-
-		if (isBookingRequest) {
-			const finalAuthorization = (config.headers as any)?.Authorization || (config.headers as any)?.authorization
-			console.log('[ApiService interceptor][RN booking] after', {
-				url: requestUrl,
-				method: config.method,
-				authorizationWasOverwritten: Boolean(token && !explicitAuthorization),
-				authorizationWasRemoved: Boolean(explicitAuthorization && !finalAuthorization),
-				finalAuthorization,
-				headers: normalizeHeadersForLog(config.headers),
-				headerComparisonWithWeb: {
-					reactWebSource:
-						'C:\\Health_Care\\health_care_frontend\\src\\services\\apiService.ts uses localStorage.getItem("access_token")',
-					reactWebExpectedAuthorization: token ? `Bearer ${token}` : null,
-					reactNativeActualAuthorization: finalAuthorization,
-					sameAuthorizationShape:
-						Boolean(finalAuthorization) && String(finalAuthorization).startsWith('Bearer '),
-					sameTokenAsRnAccessToken: finalAuthorization === (token ? `Bearer ${token}` : null),
-				},
-			})
-		}
-
 		return config
 	},
 	(error) => Promise.reject(error)
@@ -99,37 +121,69 @@ axiosInstance.interceptors.request.use(
 
 // Response interceptor
 axiosInstance.interceptors.response.use(
-	(response) => {
-		const requestUrl = String(response.config?.url || '')
-		if (requestUrl.includes('/appointments') || requestUrl.includes('appointments')) {
-			console.log('[ApiService response][RN booking] success', {
-				url: requestUrl,
-				status: response.status,
-				requestHeaders: normalizeHeadersForLog(response.config?.headers),
-				data: response.data,
-			})
+	(response) => response,
+	async (error) => {
+		const isAxiosErr = axios.isAxiosError(error)
+		const hasResponse = Boolean(error?.response)
+
+		// No response at all: either a real Axios network/timeout failure, or the
+		// synthetic offline error from the request interceptor above. Distinguish
+		// this from a genuine server/auth/validation error (which always has a
+		// response) so we don't show a confusing 'Something went wrong' when the
+		// real problem is connectivity.
+		if (!hasResponse) {
+			const isTimeout = isAxiosErr && error.code === 'ECONNABORTED'
+			// Deliberately do NOT call showStatusModal here (Task 9 correction).
+			// The global OfflineBanner already communicates connectivity loss, and
+			// the calling screen's own catch block is responsible for any request-
+			// specific UI (local StatusModal, Toast, inline error, etc). Showing a
+			// second global modal here would duplicate that message. 401/403 and
+			// the other HTTP-status branches below are unaffected.
+			//
+			// We still overwrite .message with a clean, user-safe string so that
+			// screen-level catches reading err.message (e.g. err?.message ||
+			// 'Something went wrong') never surface raw Axios/network internals
+			// such as 'Network Error' or 'timeout of 30000ms exceeded'.
+			error.message = isTimeout
+				? 'The request took too long. Please try again.'
+				: 'No internet connection. Please check your network and try again.'
+			return Promise.reject(error)
 		}
 
-		return response
-	},
-	async (error) => {
 		const status = error.response?.status
 		const message = error.response?.data?.message || 'Something went wrong'
-		const requestUrl = String(error.config?.url || error.response?.config?.url || '')
-
-		if (requestUrl.includes('/appointments') || requestUrl.includes('appointments')) {
-			console.log('[ApiService response][RN booking] error', {
-				url: requestUrl,
-				status,
-				requestHeaders: normalizeHeadersForLog(error.config?.headers || error.response?.config?.headers),
-				responseData: error.response?.data,
-				message: error.message,
-			})
-		}
 
 		if (status === 401) {
-			// Clear storage locally to avoid circular dependencies
-			await AsyncStorage.multiRemove(['role', 'user', 'access_token', 'refresh_token'])
+			const originalRequest = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined
+
+			// Try exactly one silent refresh-and-retry before giving up. Requests
+			// already retried once (_retry) skip straight to the hard logout below
+			// -- this also covers the case where the refresh itself succeeded but
+			// the freshly-issued token is STILL rejected, which should not loop.
+			if (originalRequest && !originalRequest._retry) {
+				originalRequest._retry = true
+
+				if (!refreshPromise) {
+					refreshPromise = performTokenRefresh().finally(() => {
+						refreshPromise = null
+					})
+				}
+				const newAccessToken = await refreshPromise
+
+				if (newAccessToken) {
+					originalRequest.headers = {
+						...originalRequest.headers,
+						Authorization: `Bearer ${newAccessToken}`,
+					}
+					return axiosInstance(originalRequest)
+				}
+			}
+
+			// No refresh token, or the refresh call failed -- fall back to a hard
+			// logout, same as before this retry logic existed.
+			await secureStorage.deleteItem('access_token')
+			await secureStorage.deleteItem('refresh_token')
+			await AsyncStorage.multiRemove(['role', 'user'])
 			unauthorizedHandler?.()
 			if (!hasShownSessionExpiredAlert) {
 				hasShownSessionExpiredAlert = true
@@ -147,7 +201,7 @@ axiosInstance.interceptors.response.use(
 				})
 			}
 		} else if (status === 403) {
-			console.log('403 RESPONSE:', error.response?.data)
+			if (__DEV__) console.log('403 RESPONSE:', error.response?.data)
 			const errorDetail = error.response?.data?.detail
 			const isVerificationRequired =
 				typeof errorDetail === 'object' && (errorDetail?.code === 'ANCILLARY_VERIFICATION_REQUIRED' || errorDetail?.code === 'NURSE_VERIFICATION_REQUIRED')

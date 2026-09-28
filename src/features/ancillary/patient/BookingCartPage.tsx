@@ -1,9 +1,7 @@
 import React, { useState } from 'react'
 import {
-	Image,
 	ScrollView,
 	StyleSheet,
-	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
@@ -14,7 +12,12 @@ import { ROUTES } from '../../../navigation/routes'
 import AppScreenHeader from '../../../components/common/AppScreenHeader'
 import { AppTypography } from '../../../components/common/AppTypography'
 import { AppButton } from '../../../components/common/AppButton'
-import { ServiceProcedureItem } from '../components/AllServiceCard'
+import {
+	BillingSummaryCard,
+	SelectedItemCard,
+	ServiceProcedureItem,
+	SummaryEmptyState,
+} from '../../../components/common'
 
 const DEFAULT_MOCK_SERVICES: ServiceProcedureItem[] = [
 	{
@@ -104,95 +107,55 @@ export default function BookingCartPage() {
 						{/* 2. Selected Services List */}
 						<View style={styles.servicesList}>
 							{services.map((item) => (
-								<View key={item.id} style={styles.serviceCard}>
-									{item.image ? (
-										<Image source={{ uri: item.image }} style={styles.serviceImage} resizeMode="cover" />
-									) : null}
-
-									<View style={styles.serviceContent}>
-										<View style={styles.cardHeaderRow}>
-											<AppTypography variant="h4" style={styles.serviceName} numberOfLines={1}>
-												{item.title}
-											</AppTypography>
-											<TouchableOpacity
-												style={styles.removeBtn}
-												onPress={() => handleRemoveService(item.id)}
-												activeOpacity={0.7}
-											>
-												<Ionicons name="trash-outline" size={18} color="#D32F2F" />
-											</TouchableOpacity>
-										</View>
-
-										{/* Badges Row */}
-										<View style={styles.badgeRow}>
-											{item.verified && (
-												<View style={styles.verifiedBadge}>
-													<Ionicons name="checkmark-circle" size={11} color="#1F5F68" />
-													<AppTypography variant="caption" style={styles.verifiedText}>
-														Verified
-													</AppTypography>
-												</View>
-											)}
-
-											{item.premiumBadgeText && (
-												<View style={styles.premiumBadge}>
-													<AppTypography variant="caption" style={styles.premiumText}>
-														{item.premiumBadgeText}
-													</AppTypography>
-												</View>
-											)}
-										</View>
-
-										<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={2}>
-											{item.description}
-										</AppTypography>
-
-										<View style={styles.cardFooterRow}>
-											<View style={styles.durationRow}>
-												<Ionicons name="time-outline" size={13} color="#64748B" />
-												<AppTypography variant="caption" style={styles.durationText}>
-													{item.duration || 'Flexible duration'}
-												</AppTypography>
-											</View>
-
-											<AppTypography variant="body" style={styles.pricePillText}>
-												{item.price}
-											</AppTypography>
-										</View>
-									</View>
-								</View>
+								<SelectedItemCard
+									key={item.id}
+									image={item.image}
+									title={item.title}
+									description={item.description}
+									durationLabel={item.duration || 'Flexible duration'}
+									price={item.price}
+									onRemove={() => handleRemoveService(item.id)}
+									badges={[
+										...(item.verified
+											? [
+													{
+														icon: <Ionicons name="checkmark-circle" size={11} color="#1F5F68" />,
+														text: 'Verified',
+														backgroundColor: '#E6F3F4',
+														textColor: '#1F5F68',
+													},
+												]
+											: []),
+										...(item.premiumBadgeText
+											? [
+													{
+														text: item.premiumBadgeText,
+														backgroundColor: '#CFF4F5',
+														textColor: '#0D474D',
+													},
+												]
+											: []),
+									]}
+								/>
 							))}
 						</View>
 
 						{/* 3. Cart Summary Card */}
-						<View style={styles.summaryCard}>
-							<AppTypography variant="h3" style={styles.summaryTitle}>
-								Selected Services Breakdown
-							</AppTypography>
-
-							<View style={styles.summaryRow}>
-								<AppTypography variant="body" style={styles.summaryLabel}>
-									Total Selected Services
-								</AppTypography>
-								<AppTypography variant="h4" style={styles.summaryValue}>
-									{services.length} Service{services.length > 1 ? 's' : ''}
-								</AppTypography>
-							</View>
-
-							<View style={styles.divider} />
-
-							<View style={styles.noteRow}>
-								<MaterialCommunityIcons
-									name="information-outline"
-									size={18}
-									color="#1F5F68"
-									style={styles.noteIcon}
-								/>
-								<AppTypography variant="caption" style={styles.noteText}>
-									Final pricing will be calculated after entering patient information, case severity details, visit location, date, and appointment time slot.
-								</AppTypography>
-							</View>
-						</View>
+						<BillingSummaryCard
+							title="Selected Services Breakdown"
+							style={styles.summaryCard}
+							rows={[
+								{
+									label: 'Total Selected Services',
+									value: `${services.length} Service${services.length > 1 ? 's' : ''}`,
+									valueStyle: styles.summaryValue,
+								},
+							]}
+							note={{
+								icon: <MaterialCommunityIcons name="information-outline" size={18} color="#1F5F68" />,
+								text: 'Final pricing will be calculated after entering patient information, case severity details, visit location, date, and appointment time slot.',
+							}}
+						/>
 
 						{/* 4. Continue Booking Button */}
 						<View style={styles.ctaWrapper}>
@@ -208,28 +171,15 @@ export default function BookingCartPage() {
 					</>
 				) : (
 					/* 5. Empty Cart State */
-					<View style={styles.emptyContainer}>
-						<View style={styles.emptyIconCircle}>
-							<MaterialCommunityIcons name="shopping-outline" size={48} color="#1F5F68" />
-						</View>
-
-						<AppTypography variant="h2" style={styles.emptyTitle}>
-							Booking Cart Empty
-						</AppTypography>
-
-						<AppTypography variant="body" style={styles.emptySubtitle}>
-							You currently have no services selected. Browse our nursing procedures to add a service to your booking.
-						</AppTypography>
-
-						<AppButton
-							variant="primary"
-							formAction
-							style={styles.browseBtn}
-							onPress={handleBrowseServices}
-						>
-							Browse Services
-						</AppButton>
-					</View>
+					<SummaryEmptyState
+						icon={<MaterialCommunityIcons name="shopping-outline" size={48} color="#1F5F68" />}
+						title="Booking Cart Empty"
+						subtitle="You currently have no services selected. Browse our nursing procedures to add a service to your booking."
+						ctaLabel="Browse Services"
+						onPress={handleBrowseServices}
+						ctaFormAction
+						style={styles.emptyContainer}
+					/>
 				)}
 			</ScrollView>
 		</View>
@@ -270,104 +220,6 @@ const styles = StyleSheet.create({
 		marginBottom: 16,
 		gap: 12,
 	},
-	serviceCard: {
-		flexDirection: 'row',
-		backgroundColor: '#FFFFFF',
-		borderRadius: 14,
-		padding: 12,
-		borderWidth: 1,
-		borderColor: '#E8ECEC',
-		elevation: 1,
-		shadowColor: '#000000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.04,
-		shadowRadius: 3,
-	},
-	serviceImage: {
-		width: 76,
-		height: 76,
-		borderRadius: 10,
-		backgroundColor: '#F1F5F9',
-	},
-	serviceContent: {
-		flex: 1,
-		marginLeft: 12,
-		justifyContent: 'space-between',
-	},
-	cardHeaderRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	serviceName: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#191C1D',
-		flex: 1,
-		lineHeight: 20,
-	},
-	removeBtn: {
-		padding: 4,
-		marginLeft: 8,
-	},
-	badgeRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		marginTop: 2,
-		marginBottom: 4,
-	},
-	verifiedBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#E6F3F4',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 10,
-		gap: 2,
-	},
-	verifiedText: {
-		fontSize: 10,
-		fontWeight: '600',
-		color: '#1F5F68',
-	},
-	premiumBadge: {
-		backgroundColor: '#CFF4F5',
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 10,
-	},
-	premiumText: {
-		fontSize: 9,
-		fontWeight: '700',
-		color: '#0D474D',
-		letterSpacing: 0.3,
-	},
-	serviceDesc: {
-		fontSize: 11,
-		color: '#5E6B70',
-		lineHeight: 15,
-	},
-	cardFooterRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginTop: 6,
-	},
-	durationRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-	},
-	durationText: {
-		fontSize: 11,
-		color: '#64748B',
-	},
-	pricePillText: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#1F5F68',
-	},
 	summaryCard: {
 		backgroundColor: '#FFFFFF',
 		borderRadius: 16,
@@ -381,48 +233,10 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.04,
 		shadowRadius: 4,
 	},
-	summaryTitle: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#191C1D',
-		marginBottom: 14,
-	},
-	summaryRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginBottom: 10,
-	},
-	summaryLabel: {
-		fontSize: 13,
-		color: '#526062',
-	},
 	summaryValue: {
 		fontSize: 15,
 		fontWeight: '700',
 		color: '#1F5F68',
-	},
-	divider: {
-		height: 1,
-		backgroundColor: '#E8ECEC',
-		marginVertical: 12,
-	},
-	noteRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		backgroundColor: '#F0F9F9',
-		borderRadius: 10,
-		padding: 10,
-	},
-	noteIcon: {
-		marginRight: 8,
-		marginTop: 1,
-	},
-	noteText: {
-		flex: 1,
-		fontSize: 11,
-		color: '#1F5F68',
-		lineHeight: 15,
 	},
 	ctaWrapper: {
 		marginTop: 4,
@@ -440,31 +254,5 @@ const styles = StyleSheet.create({
 		marginTop: 40,
 		borderWidth: 1,
 		borderColor: '#E8ECEC',
-	},
-	emptyIconCircle: {
-		width: 80,
-		height: 80,
-		borderRadius: 40,
-		backgroundColor: '#F0F9F9',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginBottom: 16,
-	},
-	emptyTitle: {
-		fontSize: 18,
-		fontWeight: '700',
-		color: '#191C1D',
-		marginBottom: 8,
-	},
-	emptySubtitle: {
-		fontSize: 13,
-		color: '#526062',
-		textAlign: 'center',
-		lineHeight: 18,
-		marginBottom: 24,
-	},
-	browseBtn: {
-		minWidth: 180,
-		borderRadius: 14,
 	},
 })

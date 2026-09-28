@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import { AppButton, AppCalendar, AppInput, AppSelect, AppTypography, ProviderDetailsCard, StatusModal } from '../../components/common'
-import { createRadiologyBooking, fetchRadiologyScans, RadiologyBookingPayload } from './RadiologyService'
+import { createRadiologyBooking, fetchRadiologyScans, RadiologyBookingPayload } from './radiologyService'
 import { getPatientTreatmentHistory} from '../profile/pharmacy/pharmacyService'
 import {TreatmentRecord } from '../pharmacy/pharmacyService'
 
@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
 		elevation: 8,
 	},
 	viewerOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.95)', justifyContent: 'center', alignItems: 'center' },
-	viewerBackdrop: { ...StyleSheet.absoluteFillObject },
+	viewerBackdrop: { ...StyleSheet.absoluteFill },
 	viewerCloseBtn: {
 		position: 'absolute',
 		right: 24,

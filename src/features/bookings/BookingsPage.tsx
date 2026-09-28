@@ -9,7 +9,7 @@ import type { BookingsFilterKey, MainTabParamList } from '../../navigation/types
 import AppointmentList from '../appointment/AppointmentList'
 import MyBookingsPage from '../ancillary/patient/MyBookingsPage'
 import OrderListPage from '../pharmacy/OrderListPage'
-import OrderListLaboratoryPage from '../laboratory/Orderlistlaboratorypage'
+import OrderListLaboratoryPage from '../laboratory_duplicated/OrderListLaboratoryPage'
 import OrderListRadiologyPage from '../radiology/OrderListRadiologyPage'
 
 const FILTERS: { key: BookingsFilterKey; label: string }[] = [

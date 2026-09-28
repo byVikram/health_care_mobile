@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
 import {
 	AncillaryBooking,
 	AncillaryReviewData,
 	fetchMyPatientBookings,
-	getAncillaryReviewByBookingId,
+	fetchAncillaryReviewByBooking,
 	submitAncillaryReview,
 } from '../ancillaryService'
 import UpcomingBookingCard from '../components/UpcomingBookingCard'
@@ -18,9 +19,10 @@ import { AppScreenHeader, AppSkeleton } from '../../../components/common'
 import StatusModal from '../../../components/common/StatusModal'
 import BookingsSearchBar from '../../bookings/components/BookingsSearchBar'
 
-type BookingTab = 'upcoming' | 'completed' | 'cancelled'
+type BookingTab = 'all' | 'upcoming' | 'completed' | 'cancelled'
 
 const TABS: { key: BookingTab; label: string }[] = [
+	{ key: 'all', label: 'All' },
 	{ key: 'upcoming', label: 'Upcoming' },
 	{ key: 'completed', label: 'Completed' },
 	{ key: 'cancelled', label: 'Cancelled' },
@@ -42,12 +44,13 @@ export default function MyBookingsPage({
 	activeTab: propActiveTab,
 }: MyBookingsPageProps = {}) {
 	const navigation = useNavigation<any>()
+	const insets = useSafeAreaInsets()
 
 	const [bookings, setBookings] = useState<AncillaryBooking[]>([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [loadError, setLoadError] = useState<string | null>(null)
-	const [activeTab, setActiveTab] = useState<BookingTab>(propActiveTab ?? 'upcoming')
-	const [draftActiveTab, setDraftActiveTab] = useState<BookingTab>(propActiveTab ?? 'upcoming')
+	const [activeTab, setActiveTab] = useState<BookingTab>(propActiveTab ?? 'all')
+	const [draftActiveTab, setDraftActiveTab] = useState<BookingTab>(propActiveTab ?? 'all')
 	const [searchQuery, setSearchQuery] = useState(propSearchQuery ?? '')
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 	const [filterModalVisible, setFilterModalVisible] = useState(false)
@@ -73,9 +76,10 @@ export default function MyBookingsPage({
 	const [reviewModalVisible, setReviewModalVisible] = useState(false)
 	const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 
-	// Success Feedback Modal
+	// Success / Error Feedback Modal
 	const [statusModal, setStatusModal] = useState<{
 		visible: boolean
+		status?: 'success' | 'error' | 'info'
 		title: string
 		description: string
 	} | null>(null)
@@ -93,15 +97,21 @@ export default function MyBookingsPage({
 		}
 	}, [])
 
-	useEffect(() => {
-		loadBookings()
-	}, [loadBookings])
+	// Refetch on focus (not just mount) so a booking's status -- e.g. moving
+	// to COMPLETED after the provider finishes the visit -- is reflected as
+	// soon as the user returns to this list, instead of showing stale
+	// Track Order / Reschedule actions from the last fetch.
+	useFocusEffect(
+		useCallback(() => {
+			loadBookings()
+		}, [loadBookings])
+	)
 
 	const filteredBookings = useMemo(() => {
 		const query = searchQuery.trim().toLowerCase()
 
 		return bookings.filter((booking) => {
-			const matchesTab = booking.status === activeTab
+			const matchesTab = activeTab === 'all' || booking.status === activeTab
 			if (!matchesTab) return false
 			if (!query) return true
 
@@ -135,7 +145,11 @@ export default function MyBookingsPage({
 
 	const handleTrack = (booking: AncillaryBooking) => {
 		const rawSt = String(booking.rawStatus || booking.status || '').toUpperCase()
-		if (rawSt === 'SEARCHING' || rawSt === 'SEARCHING_FOR_NURSE' || rawSt === 'REQUESTED') {
+		const isAssigned =
+			Boolean(booking.provider?.id) &&
+			['ASSIGNED', 'NURSE_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED'].includes(rawSt)
+
+		if (!isAssigned) {
 			navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId: booking.id,
 				serviceName: booking.serviceName,
@@ -171,8 +185,15 @@ export default function MyBookingsPage({
 		})
 	}
 
-	const handleRateReview = (booking: AncillaryBooking) => {
-		const review = getAncillaryReviewByBookingId(booking.id) || booking.review || null
+	const handleRateReview = async (booking: AncillaryBooking) => {
+		let review = booking.review || null
+		if (!review && (booking.hasReview || (booking.rating != null && booking.rating > 0))) {
+			try {
+				review = await fetchAncillaryReviewByBooking(booking.id)
+			} catch (e) {
+				// fallback to null
+			}
+		}
 		setReviewBooking(booking)
 		setExistingReview(review)
 		setReviewModalVisible(true)
@@ -217,8 +238,18 @@ export default function MyBookingsPage({
 				title: 'Feedback Submitted!',
 				description: `Thank you for reviewing ${reviewBooking.provider.name}. Your rating helps us maintain top healthcare quality.`,
 			})
-		} catch (error) {
-			Alert.alert('Error', 'Unable to submit review. Please try again.')
+		} catch (error: any) {
+			const errorMsg =
+				error?.response?.data?.detail ||
+				error?.response?.data?.message ||
+				error?.message ||
+				'Unable to submit review. Please try again.'
+			setStatusModal({
+				visible: true,
+				status: 'error',
+				title: 'Review Submission Failed',
+				description: errorMsg,
+			})
 		} finally {
 			setIsSubmittingReview(false)
 		}
@@ -236,8 +267,8 @@ export default function MyBookingsPage({
 	}
 
 	const resetFilters = () => {
-		setDraftActiveTab('upcoming')
-		setActiveTab('upcoming')
+		setDraftActiveTab('all')
+		setActiveTab('all')
 		setVisibleCount(PAGE_SIZE)
 	}
 
@@ -250,7 +281,7 @@ export default function MyBookingsPage({
 		>
 			<View style={styles.filterModalRoot}>
 				<Pressable style={styles.filterBackdrop} onPress={() => setFilterModalVisible(false)} />
-				<View style={styles.filterSheet}>
+				<View style={[styles.filterSheet, { paddingBottom: Math.max(insets.bottom, 26) }]}>
 					<View style={styles.filterSheetHandle} />
 					<View style={styles.filterSheetHeader}>
 						<Text style={styles.filterSheetTitle}>Filters</Text>
@@ -316,6 +347,7 @@ export default function MyBookingsPage({
 					onViewInvoice={handleViewInvoice}
 					onBookAgain={handleBookAgain}
 					onRateReview={handleRateReview}
+					onViewDetails={handleTrack}
 				/>
 			)
 		}
@@ -340,7 +372,7 @@ export default function MyBookingsPage({
 					}}
 					placeholder="Search provider, service or date..."
 					onFilterPress={handleFilterPress}
-					filterActive={activeTab !== 'upcoming' || filterModalVisible}
+					filterActive={activeTab !== 'all' || filterModalVisible}
 					accessibilityLabel="Filter ancillary bookings"
 				/>
 			)}
@@ -374,7 +406,9 @@ export default function MyBookingsPage({
 							<Text style={styles.emptyText}>
 								{searchQuery
 									? 'No bookings match your search.'
-									: `You have no ${activeTab} bookings yet.`}
+									: activeTab === 'all'
+									? 'You have no ancillary orders yet.'
+									: `You have no ${activeTab} orders yet.`}
 							</Text>
 						</View>
 					}
@@ -406,10 +440,10 @@ export default function MyBookingsPage({
 			{statusModal && (
 				<StatusModal
 					visible={statusModal.visible}
-					status="success"
+					status={statusModal.status || 'success'}
 					title={statusModal.title}
 					description={statusModal.description}
-					submitText="Done"
+					submitText={statusModal.status === 'error' ? 'OK' : 'Done'}
 					onSubmit={() => setStatusModal(null)}
 					onCancel={() => setStatusModal(null)}
 				/>
@@ -431,7 +465,7 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(15, 23, 42, 0.34)',
 	},
 	filterBackdrop: {
-		...StyleSheet.absoluteFillObject,
+		...StyleSheet.absoluteFill,
 	},
 	filterSheet: {
 		width: '100%',

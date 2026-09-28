@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
 	Alert,
 	Animated,
@@ -65,7 +65,12 @@ export function AppPhotoPicker({
 	showRemoveOption = true,
 }: AppPhotoPickerProps) {
 	const [sheetVisible, setSheetVisible] = useState(false)
+	const [imageLoadFailed, setImageLoadFailed] = useState(false)
 	const sheetTranslateY = useRef(new Animated.Value(SHEET_CLOSED_OFFSET)).current
+
+	useEffect(() => {
+		setImageLoadFailed(false)
+	}, [imageUri])
 
 	const animateSheetOpen = () => {
 		sheetTranslateY.setValue(SHEET_CLOSED_OFFSET)
@@ -185,7 +190,8 @@ export function AppPhotoPicker({
 		<View style={[styles.container, style]}>
 			<View style={styles.photoWrapper}>
 				<Image
-					source={imageUri ? { uri: imageUri } : fallbackSource}
+					source={imageUri && !imageLoadFailed ? { uri: imageUri } : fallbackSource}
+					onError={() => setImageLoadFailed(true)}
 					style={styles.photo}
 					resizeMode="cover"
 				/>

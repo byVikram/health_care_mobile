@@ -99,15 +99,20 @@ export const AppSelect = ({
   const textSize = SELECT_TEXT_SIZE[size];
   const requestedDropdownHeight = maxDropdownHeight ?? DEFAULT_DROPDOWN_HEIGHT;
   const reservedBottomSpace = Math.max(bottomOffset, insets.bottom + bottomOffset);
+  const spaceBelow = windowHeight - (anchorLayout.y + anchorLayout.height + DROPDOWN_GAP) - reservedBottomSpace;
+  const spaceAbove = anchorLayout.y - insets.top - DROPDOWN_GAP * 2;
+  const resolvedPosition =
+    dropdownPosition === "top" || (spaceBelow < 120 && spaceAbove > spaceBelow) ? "top" : "bottom";
+
   const dropdownTop =
-    dropdownPosition === "top"
-      ? Math.max(insets.top + DROPDOWN_GAP, anchorLayout.y - requestedDropdownHeight - DROPDOWN_GAP)
+    resolvedPosition === "top"
+      ? Math.max(insets.top + DROPDOWN_GAP, anchorLayout.y - Math.min(requestedDropdownHeight, Math.max(0, spaceAbove)) - DROPDOWN_GAP)
       : anchorLayout.y + anchorLayout.height + DROPDOWN_GAP;
   const availableDropdownHeight =
-    dropdownPosition === "top"
-      ? anchorLayout.y - insets.top - DROPDOWN_GAP * 2
-      : windowHeight - dropdownTop - reservedBottomSpace;
-  const dropdownHeight = Math.min(requestedDropdownHeight, Math.max(0, availableDropdownHeight));
+    resolvedPosition === "top"
+      ? spaceAbove
+      : spaceBelow;
+  const dropdownHeight = Math.min(requestedDropdownHeight, Math.max(48, availableDropdownHeight));
 
   return (
     <View style={[styles.container, noMargin && styles.containerNoMargin, floatingLabel && styles.containerFloatingLabel, style]}>
@@ -174,28 +179,36 @@ export const AppSelect = ({
               showsVerticalScrollIndicator
               style={styles.optionsList}
             >
-              {options.map((option) => {
-                const isSelected = option.value === value;
+              {options.length === 0 ? (
+                <View style={styles.optionRow}>
+                  <AppTypography variant="body" style={[styles.optionText, { color: "#9a9a9a" }]}>
+                    No options available
+                  </AppTypography>
+                </View>
+              ) : (
+                options.map((option) => {
+                  const isSelected = option.value === value;
 
-                return (
-                  <Pressable
-                    key={option.value}
-                    style={[styles.optionRow, isSelected && styles.optionRowSelected]}
-                    onPress={() => {
-                      onSelect(option.value);
-                      closeMenu();
-                    }}
-                  >
-                    <AppTypography
-                      variant="body"
-                      style={[styles.optionText, isSelected && styles.optionTextSelected]}
-                      numberOfLines={1}
+                  return (
+                    <Pressable
+                      key={option.value}
+                      style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+                      onPress={() => {
+                        onSelect(option.value);
+                        closeMenu();
+                      }}
                     >
-                      {option.label}
-                    </AppTypography>
-                  </Pressable>
-                );
-              })}
+                      <AppTypography
+                        variant="body"
+                        style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                        numberOfLines={1}
+                      >
+                        {option.label}
+                      </AppTypography>
+                    </Pressable>
+                  );
+                })
+              )}
             </ScrollView>
           </Pressable>
         </Pressable>

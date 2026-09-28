@@ -1,5 +1,14 @@
 // src/types/doctor-search.ts
 
+export interface DoctorSearchHospital {
+	name: string
+	address: string | null
+	latitude: number | null
+	longitude: number | null
+	offline_consultation_fee: number | null
+	video_consultation_fee: number | null
+}
+
 export interface DoctorSearchItem {
 	id: string
 	name: string
@@ -8,6 +17,9 @@ export interface DoctorSearchItem {
 	location: string
 	experience_years: number
 	specialities: string[]
+	qualifications: string[]
+	hospital: DoctorSearchHospital | null
+	distance: number | null
 }
 
 export interface DoctorSearchResponse {

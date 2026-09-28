@@ -27,9 +27,20 @@ export default function CompleteServicePage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
-	const { bookingId, elapsedSeconds } = route.params || {}
+	const { bookingId, initialBooking, elapsedSeconds } = route.params || {}
 
-	const [booking, setBooking] = useState<NurseBooking | null>(null)
+	const [booking, setBooking] = useState<NurseBooking | null>(() => {
+		if (
+			initialBooking &&
+			initialBooking.patientName &&
+			typeof initialBooking.patientName === 'string' &&
+			initialBooking.patientName.trim() !== '' &&
+			!['Eleanor Vance', 'Patient Account Holder', 'John Doe', 'Patient Recipient', 'Patient'].includes(initialBooking.patientName.trim())
+		) {
+			return initialBooking
+		}
+		return null
+	})
 	const [sessionState, setSessionState] = useState<NurseBookingState | null>(null)
 	const [loading, setLoading] = useState(true)
 
@@ -43,7 +54,7 @@ export default function CompleteServicePage() {
 	const [cancelModalVisible, setCancelModalVisible] = useState(false)
 
 	const loadData = async () => {
-		setLoading(true)
+		if (!booking) setLoading(true)
 		let apiPatientData: any = null
 		try {
 			if (bookingId) {
@@ -54,30 +65,38 @@ export default function CompleteServicePage() {
 			console.log('[CompleteServicePage] Live status notice', e)
 		}
 
-		const pName = apiPatientData?.patientName || apiPatientData?.patient_name || apiPatientData?.patientUser?.name || apiPatientData?.patient?.name
+		const pName =
+			apiPatientData?.patientFullName ||
+			apiPatientData?.patientName ||
+			apiPatientData?.patient_name ||
+			apiPatientData?.patientUser?.name ||
+			apiPatientData?.patient?.name ||
+			initialBooking?.patientName
+
 		if (pName && typeof pName === 'string' && pName.trim() !== '' && !['Eleanor Vance', 'Patient Account Holder', 'John Doe', 'Patient Recipient', 'Patient'].includes(pName.trim())) {
 			const activeBooking: NurseBooking = {
-				id: apiPatientData?.requestId || apiPatientData?.id || bookingId,
+				id: apiPatientData?.requestId || apiPatientData?.id || initialBooking?.id || bookingId,
 				patientName: pName,
-				patientAge: apiPatientData?.patientAge || apiPatientData?.patient_age || apiPatientData?.age || 0,
-				patientGender: apiPatientData?.patientGender || apiPatientData?.patient_gender || apiPatientData?.gender || 'Not Specified',
-				patientPhone: apiPatientData?.patientPhone || apiPatientData?.patient_phone || apiPatientData?.phone || '',
-				patientAvatar: apiPatientData?.patientAvatar || apiPatientData?.patient_avatar || apiPatientData?.patient?.avatar || undefined,
-				serviceName: apiPatientData?.serviceName || apiPatientData?.service_name || apiPatientData?.procedure?.label || 'General Nursing Care',
-				serviceDescription: apiPatientData?.procedureDetails || apiPatientData?.procedure_details || apiPatientData?.serviceDescription || 'Doorstep clinical care',
-				appointmentDate: apiPatientData?.appointmentDate || 'Today',
-				appointmentTime: apiPatientData?.appointmentTime || 'Completed',
-				patientAddress: apiPatientData?.streetAddress || apiPatientData?.street_address || apiPatientData?.patientAddress || 'Address on file',
+				patientAge: apiPatientData?.patientAge || apiPatientData?.patient_age || apiPatientData?.age || initialBooking?.patientAge || 0,
+				patientGender: apiPatientData?.patientGender || apiPatientData?.patient_gender || apiPatientData?.gender || initialBooking?.patientGender || 'Not Specified',
+				patientPhone: apiPatientData?.patientPhone || apiPatientData?.patient_phone || apiPatientData?.phone || initialBooking?.patientPhone || '',
+				patientAvatar: apiPatientData?.patientAvatar || apiPatientData?.patient_avatar || apiPatientData?.patient?.avatar || initialBooking?.patientAvatar || undefined,
+				serviceName: apiPatientData?.serviceName || apiPatientData?.service_name || apiPatientData?.procedure?.label || initialBooking?.serviceName || 'General Nursing Care',
+				serviceDescription: apiPatientData?.procedureDetails || apiPatientData?.procedure_details || apiPatientData?.serviceDescription || initialBooking?.serviceDescription || 'Doorstep clinical care',
+				appointmentDate: apiPatientData?.appointmentDate || initialBooking?.appointmentDate || 'Today',
+				appointmentTime: apiPatientData?.appointmentTime || initialBooking?.appointmentTime || 'Completed',
+				patientAddress: apiPatientData?.streetAddress || apiPatientData?.street_address || apiPatientData?.patientAddress || initialBooking?.patientAddress || 'Address on file',
 				status: 'in_progress',
-				otpCode: apiPatientData?.verificationOtp || apiPatientData?.otp || '',
-				completePin: apiPatientData?.completionPin || apiPatientData?.pin || '',
+				otpCode: apiPatientData?.verificationOtp || apiPatientData?.otp || initialBooking?.otpCode || '',
+				completePin: apiPatientData?.completionPin || apiPatientData?.pin || initialBooking?.completePin || '',
 			}
 
 			setBooking(activeBooking)
 			const state = await getBookingState(activeBooking.id)
+			const now = new Date().toISOString()
 			setSessionState(state || {
 				status: 'in_progress',
-				startServiceTime: new Date().toISOString(),
+				startServiceTime: now,
 				checklist: {},
 				notes: '',
 				uploadedImages: [],
@@ -86,8 +105,10 @@ export default function CompleteServicePage() {
 			return
 		}
 
-		setBooking(null)
-		setSessionState(null)
+		if (!initialBooking || !initialBooking.patientName) {
+			setBooking(null)
+			setSessionState(null)
+		}
 		setLoading(false)
 	}
 

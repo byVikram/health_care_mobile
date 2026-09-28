@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 // features/auth/components/OtpForm.tsx
 import React, { useRef, useState, useEffect } from 'react'
 import {
@@ -14,6 +15,7 @@ import {
 } from 'react-native'
 import { verifyOtp, sendOtp } from '../authService'
 import { useAuth, UserRole } from '../../../context/AuthContext'
+import { otpSchema, getFieldErrors } from '../../../validation/authSchemas'
 import * as Device from 'expo-device'
 
 interface Props {
@@ -69,8 +71,9 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 
 	const handleVerify = async () => {
 		const code = otp.join('')
-		if (code.length < OTP_LENGTH) {
-			setError('Please enter the complete 6-digit OTP')
+		const fieldErrors = getFieldErrors(otpSchema, { otp: code })
+		if (fieldErrors.otp) {
+			setError(fieldErrors.otp)
 			return
 		}
 
@@ -115,6 +118,14 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 				response.data.refresh_token,
 				response.data.notification_prompt_shown ?? false
 			)
+
+			const returnedSpecialty =
+				(response.data.user as any)?.specialty_id ||
+				(response.data.user as any)?.specialty ||
+				(response.data.user as any)?.specialty_name
+			if (returnedSpecialty) {
+				await AsyncStorage.setItem('user_specialty', String(returnedSpecialty))
+			}
 
 			onVerify()
 		} catch (err: any) {

@@ -1,191 +1,227 @@
-import React from 'react'
-import { View, Image, Pressable } from 'react-native'
+import React, { useMemo } from 'react'
+import { View, Image, StyleSheet, TouchableOpacity } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import { DoctorSearchItem } from '../../../../types/doctor-search'
-import { AppButton, AppTypography } from '../../../../components/common'
+import { AppTypography } from '../../../../components/common'
 import { ROUTES } from '../../../../navigation/routes'
 import type { AppStackParamList } from '../../../../navigation/types'
 
-import { doctorCardStyles as styles } from './DoctorCard.styles'
-
 interface DoctorProps {
 	doctor: DoctorSearchItem
-	mobile?: boolean
 }
 
-export default function DoctorSearchCard({ doctor, mobile = false }: DoctorProps) {
+const INK = '#12373E'
+const INK_MUTED = '#5B6B6E'
+const DIVIDER = '#D5E1E2'
+
+const TONES = [
+	{ bg: '#ECE6FA', ink: '#6A4BB5' }, // lilac
+	{ bg: '#DDEBFA', ink: '#2463A8' }, // sky
+	{ bg: '#FDE8DC', ink: '#B4532A' }, // peach
+	{ bg: '#FBEFD5', ink: '#8A5300' }, // sand
+	{ bg: '#E3EFEF', ink: '#2B6F71' }, // mint
+]
+
+/** Deterministic tone per speciality name, so the same speciality always gets
+ *  the same color across cards without needing a fixed lookup table. */
+function toneForSpeciality(label: string) {
+	let hash = 0
+	for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) >>> 0
+	return TONES[hash % TONES.length]
+}
+
+export default function DoctorSearchCard({ doctor }: DoctorProps) {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
-	// Using placeholder data matching the mockup where API doesn't provide it yet
-	const avatarUrl =
-		doctor.avatar_s3_key || 'https://tse4.mm.bing.net/th/id/OIP.JD5a5owVBjuj0w_D6PUYMwHaHJ?pid=Api&P=0&h=180' // fallback
-	const location = doctor.location || 'Bangalore'
-	const distance = '<0 km'
-	const earliestSlot = 'Earliest available slot (Today 2:00 PM)'
+	const speciality = doctor.specialities?.[0] || 'General physician'
+	const tone = useMemo(() => toneForSpeciality(speciality), [speciality])
+
+	const goToDetail = () => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })
+
+	const qualificationsText = doctor.qualifications?.length
+		? doctor.qualifications.map((q) => q.toUpperCase()).join(', ')
+		: null
+
+	const clinicName = doctor.hospital?.name || doctor.location || ''
+	const distanceText = doctor.distance != null ? `${doctor.distance} km` : null
+
+	const offersVideo = (doctor.hospital?.video_consultation_fee ?? 0) > 0
+	const fee = doctor.hospital?.offline_consultation_fee ?? doctor.hospital?.video_consultation_fee ?? null
 
 	return (
-		<Pressable
-			style={[styles.card, mobile && styles.mobileCard]}
-			onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })}
-		>
-			{/* Top Half - Image */}
-			<View style={[styles.imageContainer, mobile && styles.mobileImageContainer]}>
-				<Image source={{ uri: avatarUrl }} style={styles.image} resizeMode="cover" />
-				{/* <View style={styles.badge}>
-                    <MaterialCommunityIcons name="thumb-up" size={14} color="#fff" style={{ marginRight: 4 }} />
-                    <AppTypography variant="caption" style={styles.badgeText}>People Recommended</AppTypography>
-                </View> */}
-			</View>
-
-			{/* Bottom Half - Content */}
-			<View style={[styles.content, mobile && styles.mobileContent]}>
-				<AppTypography style={[styles.name, mobile && styles.mobileName]} numberOfLines={mobile ? 2 : 1}>
-					{doctor.name}
-				</AppTypography>
-				<AppTypography variant="caption" style={[styles.speciality, mobile && styles.mobileSpeciality]} numberOfLines={1}>
-					{doctor.specialities && doctor.specialities.length > 0
-						? doctor.specialities.join(', ')
-						: 'Cardiology'}
-				</AppTypography>
-
-				<AppTypography variant="caption" style={[styles.slotText, mobile && styles.mobileSlotText]} numberOfLines={1}>
-					Next: Today 2:00 PM
-				</AppTypography>
-
-				<View style={[styles.infoRow, mobile && styles.mobileInfoRow]}>
-					<View style={styles.infoLeft}>
-						<MaterialCommunityIcons name="briefcase" size={12} color="#5b7282" />
-						<AppTypography variant="caption" style={[styles.infoText, mobile && styles.mobileInfoText]}>
-							{doctor.experience_years}y
-						</AppTypography>
-					</View>
+		<View style={styles.card}>
+			<TouchableOpacity style={styles.topRow} onPress={goToDetail} activeOpacity={0.85}>
+				<View style={[styles.avatarWrap, { backgroundColor: tone.bg }]}>
+					{doctor.avatar_s3_key ? (
+						<Image source={{ uri: doctor.avatar_s3_key }} style={styles.avatarImg} resizeMode="cover" />
+					) : (
+						<MaterialCommunityIcons name="account" size={34} color={tone.ink} />
+					)}
+					{offersVideo && (
+						<View style={styles.videoBadge}>
+							<MaterialCommunityIcons name="video" size={12} color="#FFFFFF" />
+						</View>
+					)}
 				</View>
 
-				<View style={[styles.infoRow, mobile && styles.mobileInfoRow, !mobile && { marginBottom: 8 }]}>
-					<View style={styles.infoLeft}>
-						<MaterialCommunityIcons name="map-marker" size={12} color="#5b7282" />
-						<AppTypography variant="caption" style={[styles.infoText, mobile && styles.mobileInfoText]}>
-							{location}
+				<View style={styles.infoCol}>
+					<View style={styles.nameRow}>
+						<AppTypography style={styles.name} numberOfLines={1}>
+							{doctor.name}
 						</AppTypography>
+						{doctor.is_verified && (
+							<MaterialCommunityIcons name="check-decagram" size={15} color="#1E7A4E" />
+						)}
 					</View>
-					<View style={styles.infoRight}>
-						<AppTypography variant="caption" style={[styles.infoTextBoldTeal, mobile && styles.mobileInfoText]}>
-							{distance}
-						</AppTypography>
-					</View>
-				</View>
 
-				<AppButton
-					variant="primary"
-					onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })}
-					style={mobile ? [styles.bookButton, styles.mobileBookButton] : styles.bookButton}
-					labelStyle={
-						mobile
-							? [{ fontSize: 12, marginHorizontal: 0 }, styles.mobileBookButtonLabel]
-							: { fontSize: 12, marginHorizontal: 0 }
-					}
-				>
-					Book
-				</AppButton>
+					<View style={[styles.specBadge, { backgroundColor: tone.bg }]}>
+						<AppTypography style={[styles.specBadgeText, { color: tone.ink }]} numberOfLines={1}>
+							{speciality}
+						</AppTypography>
+					</View>
+
+					<AppTypography style={styles.metaText} numberOfLines={1}>
+						{doctor.experience_years} yrs experience
+						{qualificationsText ? ` · ${qualificationsText}` : ''}
+					</AppTypography>
+
+					{!!clinicName && (
+						<View style={styles.locationRow}>
+							<MaterialCommunityIcons name="map-marker-outline" size={14} color={INK_MUTED} />
+							<AppTypography style={styles.metaText} numberOfLines={1}>
+								{clinicName}
+								{distanceText ? ` · ${distanceText}` : ''}
+							</AppTypography>
+						</View>
+					)}
+				</View>
+			</TouchableOpacity>
+
+			<View style={styles.bottomRow}>
+				{fee != null ? (
+					<AppTypography style={styles.feeText}>
+						₹{fee} <AppTypography style={styles.feeSuffix}>per visit</AppTypography>
+					</AppTypography>
+				) : (
+					<View />
+				)}
+				<TouchableOpacity style={styles.bookBtn} onPress={goToDetail} activeOpacity={0.85}>
+					<AppTypography style={styles.bookBtnText}>Book</AppTypography>
+				</TouchableOpacity>
 			</View>
-		</Pressable>
+		</View>
 	)
 }
 
-// const styles = StyleSheet.create({
-//     card: {
-//         flex: 1,
-//         marginHorizontal: 8,
-//         marginBottom: 16,
-//         backgroundColor: '#fff',
-//         borderRadius: 12,
-//         overflow: 'hidden',
-//         borderWidth: 1,
-//         borderColor: '#e8edf0',
-//         elevation: 2,
-//         shadowColor: '#000',
-//         shadowOffset: { width: 0, height: 2 },
-//         shadowOpacity: 0.05,
-//         shadowRadius: 4,
-//     },
-//     imageContainer: {
-//         height: 120, // Reduced for 2-column
-//         backgroundColor: '#f0f4f8',
-//         position: 'relative',
-//     },
-//     image: {
-//         width: '100%',
-//         height: '100%',
-//     },
-//     badge: {
-//         position: 'absolute',
-//         top: 8,
-//         left: 8,
-//         backgroundColor: '#00a82d', // vibrant green
-//         flexDirection: 'row',
-//         alignItems: 'center',
-//         paddingHorizontal: 6,
-//         paddingVertical: 2,
-//         borderRadius: 4,
-//     },
-//     badgeText: {
-//         color: '#fff',
-//         fontWeight: 'bold',
-//         fontSize: 9,
-//     },
-//     content: {
-//         padding: 10,
-//     },
-//     name: {
-//         color: '#082b45',
-//         fontWeight: 'bold',
-//         fontSize: 14,
-//         marginBottom: 2,
-//     },
-//     speciality: {
-//         color: '#5b7282',
-//         marginBottom: 6,
-//     },
-//     slotText: {
-//         color: '#5b7282',
-//         marginBottom: 8,
-//     },
-//     infoRow: {
-//         flexDirection: 'row',
-//         justifyContent: 'space-between',
-//         alignItems: 'center',
-//         marginBottom: 8,
-//     },
-//     infoLeft: {
-//         flexDirection: 'row',
-//         alignItems: 'center',
-//         flex: 1,
-//     },
-//     infoText: {
-//         color: '#5b7282',
-//         marginLeft: 4,
-//         fontSize: 10,
-//     },
-//     infoRight: {
-//         flexDirection: 'row',
-//         alignItems: 'center',
-//     },
-//     infoTextBold: {
-//         color: '#082b45',
-//         fontWeight: 'bold',
-//         fontSize: 11,
-//     },
-//     infoTextBoldTeal: {
-//         color: '#287474',
-//         fontWeight: 'bold',
-//         fontSize: 11,
-//     },
-//     bookButton: {
-//         marginTop: 4,
-//         backgroundColor: '#2b7571',
-//         borderRadius: 8,
-//         paddingVertical: 2,
-//     }
-// });
+const styles = StyleSheet.create({
+	card: {
+		backgroundColor: '#FFFFFF',
+		padding: 16,
+		gap: 14,
+	},
+	topRow: {
+		flexDirection: 'row',
+		gap: 12,
+		alignItems: 'flex-start',
+	},
+	avatarWrap: {
+		width: 76,
+		height: 76,
+		borderRadius: 20,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	avatarImg: {
+		width: 76,
+		height: 76,
+		borderRadius: 20,
+	},
+	videoBadge: {
+		position: 'absolute',
+		right: -2,
+		bottom: -2,
+		width: 24,
+		height: 24,
+		borderRadius: 9999,
+		borderWidth: 2,
+		borderColor: '#FFFFFF',
+		backgroundColor: '#2B6F71',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	infoCol: {
+		flex: 1,
+		minWidth: 0,
+		gap: 2,
+	},
+	nameRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	name: {
+		fontSize: 17,
+		lineHeight: 24,
+		fontWeight: '700',
+		color: INK,
+		flexShrink: 1,
+	},
+	specBadge: {
+		alignSelf: 'flex-start',
+		paddingHorizontal: 8,
+		paddingVertical: 2,
+		borderRadius: 9999,
+		marginTop: 2,
+	},
+	specBadgeText: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+	},
+	metaText: {
+		fontSize: 13,
+		lineHeight: 18,
+		color: INK_MUTED,
+	},
+	locationRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	bottomRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 12,
+		paddingTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: DIVIDER,
+		borderStyle: 'dashed',
+	},
+	feeText: {
+		fontSize: 18,
+		lineHeight: 24,
+		fontWeight: '800',
+		color: INK,
+	},
+	feeSuffix: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: INK_MUTED,
+	},
+	bookBtn: {
+		height: 44,
+		paddingHorizontal: 22,
+		borderRadius: 12,
+		backgroundColor: '#2B6F71',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	bookBtnText: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#FFFFFF',
+	},
+})

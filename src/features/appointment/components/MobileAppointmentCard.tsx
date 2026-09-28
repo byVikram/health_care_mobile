@@ -17,12 +17,16 @@ import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { useAuth } from '../../../context/AuthContext'
 import { AppModal } from '../../../components/common/AppModal'
 import { getStatusStyle } from '../../../constants/statusColors'
-import { useNavigation, type NavigationProp } from '@react-navigation/native'
-import { ROUTES } from '../../../navigation/routes'
-import type { RootStackParamList } from '../../../navigation/types'
-import { getRideState } from '../../transportation/transportationService'
 import AppointmentHistoryTab from './AppointmentHistoryTab'
 import RescheduleModal, { type RescheduleResult } from './RescheduleModal'
+
+// Design tokens matching the rest of the booking flow (Screens 1/2/3/5/7's
+// teal family) -- no mockup screen depicts this card directly, so only
+// color tokens are aligned here for consistency; layout/logic is unchanged.
+const PRIMARY = '#2B6F71'
+const INK = '#12373E'
+const INK_MUTED = '#5B6B6E'
+const DIVIDER = '#D5E1E2'
 
 export type MobileAppointmentRow = {
 	id: string
@@ -172,25 +176,6 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 	const rescheduleDoctorId = localRow.doctorId || localRow.raw?.doctor?.id
 	const rescheduleHospitalId = localRow.hospitalId || localRow.raw?.hospital?.id
 
-	const navigation = useNavigation<NavigationProp<RootStackParamList>>()
-	const [hasBookedCab, setHasBookedCab] = useState(false)
-
-	useEffect(() => {
-		if (localRow.id) {
-			getRideState(String(localRow.id))
-				.then((state) => setHasBookedCab(state.hasOnward || state.hasReturn))
-				.catch(() => setHasBookedCab(false))
-		}
-	}, [localRow.id])
-
-	const handleCabAction = () => {
-		if (hasBookedCab) {
-			navigation.navigate(ROUTES.STACK.RIDE_TRACKING, { appointmentId: localRow.id })
-		} else {
-			navigation.navigate(ROUTES.STACK.BOOK_RIDE, { appointmentId: localRow.id, type: 'onward' })
-		}
-	}
-
 	const openReschedule = () => {
 		if (!rescheduleDoctorId) {
 			Alert.alert('Unable to reschedule', 'Doctor details are missing for this appointment.')
@@ -297,29 +282,29 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 					activeOpacity={0.75}
 					hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
 				>
-					<Ionicons name="information-circle-outline" size={22} color="#0c7c7c" />
+					<Ionicons name="information-circle-outline" size={22} color={PRIMARY} />
 				</TouchableOpacity>
 			</View>
 
 			<View style={styles.metaRow}>
 				<View style={styles.metaItem}>
-					<Ionicons name="calendar-outline" size={16} color="#667B8F" />
+					<Ionicons name="calendar-outline" size={16} color={INK_MUTED} />
 					<Text style={styles.metaText}>{localRow.dateLabel || formatDate(localRow.appointmentDate)}</Text>
 				</View>
 
 				<View style={styles.metaItem}>
-					<Ionicons name="time-outline" size={16} color="#667B8F" />
+					<Ionicons name="time-outline" size={16} color={INK_MUTED} />
 					<Text style={styles.metaText}>{localRow.timeLabel || formatTime(localRow.startTime)}</Text>
 				</View>
 
 				<View style={styles.metaItem}>
-					<MaterialIcons name={isVirtual ? 'videocam' : 'location-on'} size={16} color="#667B8F" />
+					<MaterialIcons name={isVirtual ? 'videocam' : 'location-on'} size={16} color={INK_MUTED} />
 					<Text style={styles.metaText}>{displayMode}</Text>
 				</View>
 			</View>
 
 			<View style={styles.locationPill}>
-				<Ionicons name="location-sharp" size={14} color="#667B8F" />
+				<Ionicons name="location-sharp" size={14} color={INK_MUTED} />
 				<Text style={styles.locationText} numberOfLines={2}>
 					{locationName} {'\u2022'} {locationAddress}
 				</Text>
@@ -334,16 +319,6 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 					>
 						<Text style={styles.secondaryButtonText} numberOfLines={1} adjustsFontSizeToFit>
 							Reschedule
-						</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						activeOpacity={0.88}
-						style={[styles.actionButton, styles.cabButton]}
-						onPress={handleCabAction}
-					>
-						<Text style={styles.cabButtonText} numberOfLines={1} adjustsFontSizeToFit>
-							{hasBookedCab ? 'Track Cab' : 'Book a Cab'}
 						</Text>
 					</TouchableOpacity>
 
@@ -379,7 +354,7 @@ export default function MobileAppointmentCard<TAppointment extends MobileAppoint
 								style={styles.closeButton}
 								hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
 							>
-								<Ionicons name="close" size={22} color="#526173" />
+								<Ionicons name="close" size={22} color={INK_MUTED} />
 							</TouchableOpacity>
 						</View>
 
@@ -452,7 +427,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#FFFFFF',
 		borderRadius: 16,
 		borderWidth: 1,
-		borderColor: '#E6EDF2',
+		borderColor: DIVIDER,
 	},
 	headerRow: {
 		flexDirection: 'row',
@@ -496,12 +471,12 @@ const styles = StyleSheet.create({
 		flex: 1,
 		fontSize: 17,
 		fontWeight: '700',
-		color: '#16324A',
+		color: INK,
 		marginBottom: 2,
 	},
 	consultationType: {
 		fontSize: 14,
-		color: '#587087',
+		color: INK_MUTED,
 	},
 	statusBadge: {
 		borderRadius: 10,
@@ -543,7 +518,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 		marginLeft: 6,
 		fontSize: 13,
-		color: '#567085',
+		color: INK_MUTED,
 	},
 	actionsRow: {
 		flexDirection: 'row',
@@ -562,20 +537,10 @@ const styles = StyleSheet.create({
 	secondaryButton: {
 		backgroundColor: '#FFFFFF',
 		borderWidth: 1,
-		borderColor: '#D8E1EA',
+		borderColor: DIVIDER,
 	},
 	secondaryButtonText: {
-		color: '#1A2A38',
-		fontSize: 12.5,
-		fontWeight: '700',
-	},
-	cabButton: {
-		backgroundColor: '#EAF6F6',
-		borderWidth: 1,
-		borderColor: '#0c7c7c',
-	},
-	cabButtonText: {
-		color: '#0c7c7c',
+		color: INK,
 		fontSize: 12.5,
 		fontWeight: '700',
 	},
@@ -609,7 +574,7 @@ const styles = StyleSheet.create({
 	},
 	modalTitle: {
 		flex: 1,
-		color: '#1D2B36',
+		color: INK,
 		fontSize: 17,
 		fontWeight: '700',
 		paddingRight: 12,
@@ -630,7 +595,7 @@ const styles = StyleSheet.create({
 		flexShrink: 0,
 	},
 	modalSecondaryButtonText: {
-		color: '#526173',
+		color: INK_MUTED,
 		fontSize: 14,
 		fontWeight: '700',
 	},
@@ -640,7 +605,7 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#0c7c7c',
+		backgroundColor: PRIMARY,
 		paddingHorizontal: 12,
 	},
 	modalPrimaryButtonText: {
@@ -661,7 +626,7 @@ const styles = StyleSheet.create({
 		minHeight: 44,
 		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: '#0c7c7c',
+		borderColor: PRIMARY,
 		alignItems: 'center',
 		justifyContent: 'center',
 		backgroundColor: '#ffffff',
@@ -671,11 +636,11 @@ const styles = StyleSheet.create({
 		marginTop: 16,
 		minHeight: 104,
 		borderWidth: 1,
-		borderColor: '#d7e2e8',
+		borderColor: DIVIDER,
 		borderRadius: 12,
 		paddingHorizontal: 12,
 		paddingVertical: 10,
-		color: '#1D2B36',
+		color: INK,
 		fontSize: 14,
 		lineHeight: 20,
 	},
@@ -698,7 +663,7 @@ const styles = StyleSheet.create({
 		marginBottom: 14,
 	},
 	successTitle: {
-		color: '#1D2B36',
+		color: INK,
 		fontSize: 18,
 		fontWeight: '700',
 		textAlign: 'center',
@@ -711,7 +676,7 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#0c7c7c',
+		backgroundColor: PRIMARY,
 		paddingHorizontal: 22,
 	},
 	successDoneText: {

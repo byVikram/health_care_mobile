@@ -1,4 +1,3 @@
-
 import React from 'react'
 import { StyleSheet, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -7,6 +6,7 @@ import { AppTypography } from '../../../components/common/AppTypography'
 interface ViewCartFloatingBarProps {
 	selectedCount?: number
 	itemCount?: number
+	itemLabel?: string
 	totalAmount?: string
 	onViewCart: () => void
 }
@@ -14,6 +14,7 @@ interface ViewCartFloatingBarProps {
 export const ViewCartFloatingBar: React.FC<ViewCartFloatingBarProps> = ({
 	selectedCount,
 	itemCount,
+	itemLabel,
 	totalAmount,
 	onViewCart,
 }) => {
@@ -21,12 +22,16 @@ export const ViewCartFloatingBar: React.FC<ViewCartFloatingBarProps> = ({
 	const count = itemCount ?? selectedCount ?? 0
 	if (count <= 0) return null
 
+	const noun = itemLabel
+		? (count > 1 ? (itemLabel.endsWith('y') ? `${itemLabel.slice(0, -1)}ies` : `${itemLabel}s`) : itemLabel)
+		: (count > 1 ? 'Procedures' : 'Procedure')
+
 	return (
 		<View style={[styles.container, { paddingBottom: Math.max(insets.bottom + 12, 24) }]}>
 			<View style={styles.content}>
 				<View style={styles.selection}>
 					<AppTypography style={styles.countText}>
-						{count} Procedure{count > 1 ? 's' : ''} Selected
+						{count} {noun} Selected
 						{totalAmount ? ` • ${totalAmount}` : ''}
 					</AppTypography>
 				</View>

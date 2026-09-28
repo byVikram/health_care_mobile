@@ -4,6 +4,7 @@ import {
 	Image,
 	ScrollView,
 	StyleSheet,
+	Text,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
@@ -12,9 +13,11 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { getPatientDetails, getPatientAddresses } from '../../../features/profile/patient/PatientProfileService'
+import { safeJsonParse } from '../../../utils/jsonUtils'
+import { getPatientDetails } from '../../../features/profile/patient/PatientProfileService'
 import { ROUTES } from '../../../navigation/routes'
 import {
+	AddressSelectionSheet,
 	AppBottomSheet,
 	AppButton,
 	AppInput,
@@ -22,13 +25,25 @@ import {
 	AppSelect,
 	AppSelectOption,
 	AppTypography,
+	BookingProgressStepper,
 	PatientProfileSelectorBottomSheet,
+	SelectionRowCard,
+	ServiceProcedureItem,
 	StatusModal,
 } from '../../../components/common'
 import DateSlotPicker from '../../../components/common/DateSlotPicker'
 import { SlotGroup } from '../../doctor/doctorService'
-import { ServiceProcedureItem } from '../components/AllServiceCard'
-import { BookingProgressStepper } from '../components/BookingProgressStepper'
+import {
+	ANCILLARY_BOOKING_STEPS,
+	ANCILLARY_STEPPER_THEME,
+	navigateAncillaryStep,
+} from '../utils/bookingProgressStepperConfig'
+import {
+	createDefaultRecurringSchedule,
+	RecurringVisitSchedule,
+} from '../components/RecurringVisitCalendar'
+import SelectedProcedureCard from '../components/SelectedProcedureCard'
+import { AncillaryProvider } from '../ancillaryService'
 
 const GENDER_OPTIONS: AppSelectOption[] = [
 	{ label: 'Male', value: 'Male' },
@@ -55,51 +70,28 @@ interface AddressItem {
 	isDefault?: boolean
 }
 
-const SAVED_ADDRESSES: AddressItem[] = [
-	{
-		id: 'current_loc',
-		label: 'Use Current Location',
-		address: 'GPS Location (Detecting current address...)',
-		icon: 'navigate-outline',
-		isCurrentLocation: true,
-	},
-	{
-		id: 'addr1',
-		label: 'Home',
-		address: '42 Healthcare Avenue, Flat 3B, Sector 18, New Delhi - 110001',
-		icon: 'home-outline',
-		isCurrentLocation: false,
-	},
-	{
-		id: 'addr2',
-		label: 'Work',
-		address: 'Tech Park Tower B, 5th Floor, Cyber City, Gurugram - 122002',
-		icon: 'briefcase-outline',
-		isCurrentLocation: false,
-	},
-]
-
-const ADDRESS_SELECT_OPTIONS: AppSelectOption[] = SAVED_ADDRESSES.map((addr) => ({
-	label: `${addr.label} (${addr.address})`,
-	value: addr.id,
-}))
-
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const CURRENT_LOCATION_ADDRESS: AddressItem = {
+	id: 'current_loc',
+	label: 'Use Current Location',
+	address: 'GPS Location (Detecting current address...)',
+	icon: 'navigate-outline',
+	isCurrentLocation: true,
+}
 
 const ANCILLARY_SLOTS: SlotGroup[] = [
 	{
 		label: 'Morning Slots',
 		slots: [
-			{ id: 's1', start_time: '9:00 AM – 10:00 AM', end_time: '', status: 'AVAILABLE' },
-			{ id: 's2', start_time: '11:00 AM – 12:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's1', start_time: '9:00 AM - 10:00 AM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's2', start_time: '11:00 AM - 12:00 PM', end_time: '', status: 'AVAILABLE' },
 		],
 	},
 	{
 		label: 'Afternoon & Evening Slots',
 		slots: [
-			{ id: 's3', start_time: '2:00 PM – 3:00 PM', end_time: '', status: 'AVAILABLE' },
-			{ id: 's4', start_time: '5:00 PM – 6:00 PM', end_time: '', status: 'AVAILABLE' },
-			{ id: 's5', start_time: '7:00 PM – 8:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's3', start_time: '2:00 PM - 3:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's4', start_time: '5:00 PM - 6:00 PM', end_time: '', status: 'AVAILABLE' },
+			{ id: 's5', start_time: '7:00 PM - 8:00 PM', end_time: '', status: 'AVAILABLE' },
 		],
 	},
 ]
@@ -125,6 +117,8 @@ export default function BookingDetailsPage() {
 
 	const routeParams = route.params || {}
 	const payloadObj = routeParams.bookingPayload || routeParams.payload || {}
+	const currentServiceKey = payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care'
+	const isHomeCare = currentServiceKey === 'home-care' || currentServiceKey === 'home-care-time'
 	const initialServices: ServiceProcedureItem[] = useMemo(() => {
 		if (payloadObj.services && Array.isArray(payloadObj.services) && payloadObj.services.length > 0) {
 			return payloadObj.services
@@ -149,6 +143,21 @@ export default function BookingDetailsPage() {
 			setServices(initialServices)
 		}
 	}, [initialServices])
+
+	// 1b. Per-Service Recurring Visit Scheduling State (independent per selected service)
+	const [expandedServiceIds, setExpandedServiceIds] = useState<Record<string, boolean>>({})
+	const [serviceSchedules, setServiceSchedules] = useState<Record<string, RecurringVisitSchedule>>({})
+
+	const toggleServiceExpanded = (serviceId: string) => {
+		setExpandedServiceIds((prev) => ({ ...prev, [serviceId]: !prev[serviceId] }))
+	}
+
+	const getServiceSchedule = (serviceId: string): RecurringVisitSchedule =>
+		serviceSchedules[serviceId] ?? createDefaultRecurringSchedule()
+
+	const updateServiceSchedule = (serviceId: string, next: RecurringVisitSchedule) => {
+		setServiceSchedules((prev) => ({ ...prev, [serviceId]: next }))
+	}
 
 	// 2. Patient Details State
 	const [patient, setPatient] = useState<{
@@ -203,55 +212,13 @@ export default function BookingDetailsPage() {
 	const [tempPatientGender, setTempPatientGender] = useState('')
 	const [tempPatientRel, setTempPatientRel] = useState('Self')
 
-	// Dynamic Saved Addresses State
-	const [savedAddressesList, setSavedAddressesList] = useState(SAVED_ADDRESSES)
-	const [addressOptions, setAddressOptions] = useState<AppSelectOption[]>(ADDRESS_SELECT_OPTIONS)
+	// Nurse Assignment Preference State
+	const [assignmentMode, setAssignmentMode] = useState<'SYSTEM_MATCH' | 'SELECT_NURSE'>('SYSTEM_MATCH')
+	const [selectedNurse, setSelectedNurse] = useState<AncillaryProvider | null>(null)
+	const [nurseBottomSheetVisible, setNurseBottomSheetVisible] = useState(false)
 
 	const fetchProfile = async () => {
 			setLoadingPatient(true)
-
-			try {
-				const apiAddresses = await getPatientAddresses()
-				if (apiAddresses && apiAddresses.length > 0) {
-					const formattedList = [
-						SAVED_ADDRESSES[0],
-						...apiAddresses.map((addr: any) => ({
-							id: String(addr.id),
-							label: addr.label || addr.title || 'Home',
-							address: addr.address_line ? `${addr.address_line}, ${addr.city || ''} ${addr.pincode || ''}` : `${addr.address_line_1 || ''}, ${addr.city || ''}`,
-							latitude: addr.latitude != null ? Number(addr.latitude) : undefined,
-							longitude: addr.longitude != null ? Number(addr.longitude) : undefined,
-							icon: (addr.label || addr.title || '').toLowerCase().includes('work') ? 'briefcase-outline' : 'home-outline',
-							isCurrentLocation: false,
-							isDefault: !!addr.is_default,
-						})),
-					]
-					setSavedAddressesList(formattedList)
-
-					const selectOptions: AppSelectOption[] = formattedList.map((addr) => ({
-						label: `${addr.label} (${addr.address})`,
-						value: addr.id,
-					}))
-					setAddressOptions(selectOptions)
-
-					// AC1: auto-select the patient's saved default/primary address
-					// (falling back to the first saved address if none is marked
-					// default) rather than always selecting the hardcoded
-					// "Use Current Location" placeholder at index 0.
-					const realAddrs = formattedList.slice(1)
-					const defaultAddr = realAddrs.find((a: any) => a.isDefault) || realAddrs[0]
-					setVisit((prev) => ({
-						...prev,
-						addressId: defaultAddr.id,
-						addressLabel: defaultAddr.label,
-						address: defaultAddr.address,
-						latitude: defaultAddr.latitude,
-						longitude: defaultAddr.longitude,
-					}))
-				}
-			} catch (addrErr) {
-				console.log('[BookingDetailsPage] Saved addresses API notice:', addrErr)
-			}
 
 			try {
 				let resolvedName = ''
@@ -277,12 +244,14 @@ export default function BookingDetailsPage() {
 					try {
 						const userRaw = await AsyncStorage.getItem('user')
 						if (userRaw) {
-							const userData = JSON.parse(userRaw)
-							if (!resolvedPublicId) {
-								resolvedPublicId = userData.publicId || userData.public_id || userData.id || ''
-							}
-							if (!resolvedName || resolvedName.trim() === '') {
-								resolvedName = userData.name || userData.full_name || ''
+							const userData = safeJsonParse<any>(userRaw)
+							if (userData) {
+								if (!resolvedPublicId) {
+									resolvedPublicId = userData.publicId || userData.public_id || userData.id || ''
+								}
+								if (!resolvedName || resolvedName.trim() === '') {
+									resolvedName = userData.name || userData.full_name || ''
+								}
 							}
 						}
 					} catch (storageErr) {
@@ -337,6 +306,33 @@ export default function BookingDetailsPage() {
 		void fetchProfile()
 	}, [])
 
+	useEffect(() => {
+		if (routeParams.selectedNurse) {
+			setSelectedNurse(routeParams.selectedNurse)
+			setAssignmentMode('SELECT_NURSE')
+		} else if (routeParams.clearSelectedNurse) {
+			setSelectedNurse(null)
+			setAssignmentMode('SYSTEM_MATCH')
+		}
+
+		if (routeParams.bookingType === 'SCHEDULED' && routeParams.scheduledStartTime) {
+			setBookingType('SCHEDULED')
+			setVisit((prev) => ({
+				...prev,
+				date: routeParams.scheduledDate || prev.date,
+				timeSlot: `${routeParams.scheduledStartTime} - ${routeParams.scheduledEndTime || ''}`,
+				timeBadge: 'Scheduled Slot Confirmed',
+			}))
+		}
+	}, [
+		routeParams.selectedNurse,
+		routeParams.clearSelectedNurse,
+		routeParams.bookingType,
+		routeParams.scheduledStartTime,
+		routeParams.scheduledDate,
+		routeParams.scheduledEndTime,
+	])
+
 	// Dynamic Charges Calculation
 	const procedureBaseFee = useMemo(() => {
 		return services.reduce((total, item) => {
@@ -367,6 +363,18 @@ export default function BookingDetailsPage() {
 		// that were removed here.
 		const editServiceKey = payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care'
 		const editServiceLabel = payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care'
+		// Home Care's "Activities & Tasks" catalog is its own screen
+		// (HomeCareServiceCatalogScreen, HOME_CARE_CATALOG route) -- unlike
+		// Nursing/Physiotherapy/Rehab Care/etc., which all share
+		// AncillaryServiceCatalogScreen under ANCILLARY_SERVICES with a
+		// different serviceKey each. Routing 'home-care' there would land on
+		// the Caregiver launcher menu instead of the catalog with this cart.
+		if (editServiceKey === 'home-care') {
+			navigation.navigate(ROUTES.STACK.HOME_CARE_CATALOG, {
+				updatedCart: services,
+			})
+			return
+		}
 		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
 			serviceKey: editServiceKey,
 			serviceLabel: editServiceLabel,
@@ -400,28 +408,6 @@ export default function BookingDetailsPage() {
 			}
 		})
 		setEditPatientVisible(false)
-	}
-
-	const [selectedDateObj, setSelectedDateObj] = useState<Date>(new Date())
-
-	const handleSaveVisitDetails = (addressId: string, newDate: Date, timeSlot: string) => {
-		const selectedAddrObj = savedAddressesList.find((a) => a.id === addressId) || SAVED_ADDRESSES.find((a) => a.id === addressId)
-		setSelectedDateObj(newDate)
-
-		const dayStr = `${newDate.getDate()} ${MONTH_NAMES[newDate.getMonth()]} ${newDate.getFullYear()}`
-
-		setVisit({
-			addressId,
-			addressLabel: selectedAddrObj?.label || 'Home',
-			address: selectedAddrObj?.address || visit.address,
-			latitude: (selectedAddrObj as any)?.latitude,
-			longitude: (selectedAddrObj as any)?.longitude,
-			dateId: 'custom',
-			date: dayStr,
-			timeSlot: timeSlot || '09:00 AM - 10:00 AM',
-			timeBadge: 'Confirmed',
-		})
-		setEditVisitVisible(false)
 	}
 
 	const handleContinueToPayment = () => {
@@ -463,6 +449,8 @@ export default function BookingDetailsPage() {
 			visit,
 			charges,
 			bookingType,
+			assignmentMode,
+			selectedNurse,
 		}
 
 		navigation.navigate(ROUTES.STACK.ANCILLARY_PAYMENT, {
@@ -484,7 +472,12 @@ export default function BookingDetailsPage() {
 			>
 				{/* STEP PROGRESS INDICATOR */}
 				<View style={styles.stepperContainer}>
-					<BookingProgressStepper currentStep={2} />
+					<BookingProgressStepper
+						steps={ANCILLARY_BOOKING_STEPS}
+						currentIndex={1}
+						theme={ANCILLARY_STEPPER_THEME}
+						onStepPress={(index) => navigateAncillaryStep(navigation, 1, index)}
+					/>
 				</View>
 
 				{/* 1. SECTION: PATIENT RECIPIENT PROFILE */}
@@ -547,101 +540,13 @@ export default function BookingDetailsPage() {
 				{/* 8px GREY SECTION DIVIDER BAR */}
 				<View style={styles.sectionDividerBar} />
 
-				{/* 2. SECTION: SELECTED PROCEDURES */}
+				{/* 2. SECTION: LOCATION */}
 				<View style={styles.sectionBlock}>
 					<View style={styles.sectionHeaderRow}>
 						<AppTypography variant="h3" style={styles.sectionHeading}>
-							Selected Procedures ({services.length})
-						</AppTypography>
-						<TouchableOpacity style={styles.actionBtn} onPress={handleEditServices} activeOpacity={0.7}>
-							<AppTypography variant="caption" style={styles.actionBtnText}>
-								+ Add Services
-							</AppTypography>
-						</TouchableOpacity>
-					</View>
-
-					{services.length > 0 ? (
-						<View style={styles.servicesList}>
-							{services.map((item, index) => (
-								<View key={item.id} style={[styles.serviceRow, index > 0 && styles.serviceRowBorder]}>
-									<Image source={{ uri: item.image }} style={styles.serviceThumb} resizeMode="cover" />
-									<View style={styles.serviceTextCol}>
-										<View style={styles.titleRow}>
-											<AppTypography variant="h4" style={styles.serviceTitle} numberOfLines={1}>
-												{item.title}
-											</AppTypography>
-											{services.length > 1 && (
-												<TouchableOpacity onPress={() => handleRemoveService(item.id)} activeOpacity={0.7}>
-													<Ionicons name="trash-outline" size={17} color="#D32F2F" />
-												</TouchableOpacity>
-											)}
-										</View>
-										<AppTypography variant="caption" style={styles.serviceDesc} numberOfLines={1}>
-											{item.description}
-										</AppTypography>
-										<View style={styles.serviceMetaRow}>
-											<View style={styles.durationPill}>
-												<Ionicons name="time-outline" size={12} color="#546E7A" />
-												<AppTypography variant="caption" style={styles.durationText}>
-													{item.duration || '30-45 mins'}
-												</AppTypography>
-											</View>
-											<AppTypography variant="h4" style={styles.servicePrice}>
-												{item.price}
-											</AppTypography>
-										</View>
-									</View>
-								</View>
-							))}
-						</View>
-					) : (
-						<View style={styles.emptyBox}>
-							<AppTypography variant="caption" style={styles.emptyText}>
-								No services selected. Tap Add Services to configure.
-							</AppTypography>
-						</View>
-					)}
-				</View>
-
-				{/* 8px GREY SECTION DIVIDER BAR */}
-				<View style={styles.sectionDividerBar} />
-
-				{/* 3. SECTION: CARE DISPATCH MODE & LOCATION */}
-				<View style={styles.sectionBlock}>
-					<View style={styles.sectionHeaderRow}>
-						<AppTypography variant="h3" style={styles.sectionHeading}>
-							Care Mode & Location
+							Location
 						</AppTypography>
 					</View>
-
-					{/* CARE MODE SEGMENTED CONTROL */}
-					<View style={styles.modeToggleRow}>
-						<TouchableOpacity
-							style={[styles.modeTab, bookingType === 'INSTANT' && styles.modeTabActive]}
-							onPress={() => {
-								setBookingType('INSTANT')
-								setVisit((prev) => ({ ...prev, timeBadge: 'Instant Dispatch (15-30 mins)' }))
-							}}
-							activeOpacity={0.88}
-						>
-							<Ionicons name="flash" size={15} color={bookingType === 'INSTANT' ? '#FFFFFF' : '#2B6F71'} />
-							<AppTypography variant="h4" style={[styles.modeTabText, bookingType === 'INSTANT' && styles.modeTabTextActive]}>
-								Instant Care
-							</AppTypography>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={[styles.modeTab, { opacity: 0.5, backgroundColor: '#F1F5F9' }]}
-							disabled={true}
-							activeOpacity={1}
-						>
-							<Ionicons name="calendar-outline" size={15} color="#94A3B8" />
-							<AppTypography variant="h4" style={[styles.modeTabText, { color: '#94A3B8' }]}>
-								Schedule (Soon)
-							</AppTypography>
-						</TouchableOpacity>
-					</View>
-
 
 					{/* ADDRESS BLOCK */}
 					<View style={styles.locationSummaryBox}>
@@ -687,10 +592,236 @@ export default function BookingDetailsPage() {
 					</View>
 				</View>
 
+{/* 8px GREY SECTION DIVIDER BAR */}
+				<View style={styles.sectionDividerBar} />
+
+				{/* 3. SECTION: SELECTED PROCEDURES */}
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							Selected Procedures ({services.length})
+						</AppTypography>
+						<TouchableOpacity style={styles.actionBtn} onPress={handleEditServices} activeOpacity={0.7}>
+							<AppTypography variant="caption" style={styles.actionBtnText}>
+								+ Add Services
+							</AppTypography>
+						</TouchableOpacity>
+					</View>
+
+					{services.length > 0 ? (
+						<View style={styles.servicesList}>
+							{services.map((item) => (
+								<SelectedProcedureCard
+									key={item.id}
+									service={item}
+									showDelete={services.length > 1}
+									onRemove={() => handleRemoveService(item.id)}
+									expanded={!!expandedServiceIds[item.id]}
+									onToggleExpand={() => toggleServiceExpanded(item.id)}
+									schedule={getServiceSchedule(item.id)}
+									onScheduleChange={(next) => updateServiceSchedule(item.id, next)}
+								/>
+							))}
+						</View>
+					) : (
+						<View style={styles.emptyBox}>
+							<AppTypography variant="caption" style={styles.emptyText}>
+								No services selected. Tap Add Services to configure.
+							</AppTypography>
+						</View>
+					)}
+				</View>
+
+								{/* 8px GREY SECTION DIVIDER BAR */}
+				{!isHomeCare && <View style={styles.sectionDividerBar} />}
+
+				{/* 4. SECTION: NURSE ASSIGNMENT PREFERENCE (Nursing/Physiotherapy/etc. only —
+					Home Care always dispatches via the default SYSTEM_MATCH assignment mode,
+					so this choice is not shown for that service) */}
+				{!isHomeCare && (
+				<View style={styles.sectionBlock}>
+					<View style={styles.sectionHeaderRow}>
+						<AppTypography variant="h3" style={styles.sectionHeading}>
+							How would you like to choose your nurse?
+						</AppTypography>
+					</View>
+					<AppTypography variant="caption" style={styles.sectionSubheading}>
+						Choose auto-matching for fastest dispatch or browse and pick your preferred nurse.
+					</AppTypography>
+
+					<View style={styles.nurseChoiceContainer}>
+						{/* OPTION 1: Let the System Select */}
+						<SelectionRowCard
+							icon={
+								<Ionicons
+									name="flash"
+									size={20}
+									color={assignmentMode === 'SYSTEM_MATCH' ? '#FFFFFF' : '#0C7C7C'}
+								/>
+							}
+							title="Let the System Select"
+							subtitle="Fastest dispatch • Automatically matches the nearest qualified nurse to your location (15-30 mins)."
+							badgeText="RECOMMENDED"
+							selected={assignmentMode === 'SYSTEM_MATCH'}
+							onPress={() => {
+								setAssignmentMode('SYSTEM_MATCH')
+								setSelectedNurse(null)
+							}}
+						/>
+
+						{/* OPTION 2: Select a Nurse */}
+						<SelectionRowCard
+							icon={
+								<Ionicons
+									name="person"
+									size={20}
+									color={assignmentMode === 'SELECT_NURSE' ? '#FFFFFF' : '#0C7C7C'}
+								/>
+							}
+							title="Select an Available Nurse"
+							subtitle="Browse nearby certified nurses and select a 30-minute booking slot."
+							selected={assignmentMode === 'SELECT_NURSE'}
+							onPress={() => {
+								setAssignmentMode('SELECT_NURSE')
+								if (!selectedNurse) {
+									console.log('[BookingDetailsPage] Option 2 pressed. Navigating to ANCILLARY_PROVIDERS with coords:', {
+										latitude: visit.latitude,
+										longitude: visit.longitude,
+										address: visit.address,
+									})
+									navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+										isSelectionMode: true,
+										serviceKey: payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care',
+										serviceLabel: payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care',
+										procedureName: services[0]?.title,
+										procedureId: services[0]?.id,
+										services,
+										latitude: visit.latitude,
+										longitude: visit.longitude,
+										selectedNurseId: undefined,
+									})
+								}
+							}}
+						/>
+					</View>
+
+					{/* WHEN SELECT_NURSE IS ACTIVE */}
+					{assignmentMode === 'SELECT_NURSE' && (
+						selectedNurse ? (
+							<View style={styles.selectedNurseCardContainer}>
+								<View style={styles.selectedNurseCardHeader}>
+									<View style={styles.selectedBadgeRow}>
+										<Ionicons name="checkmark-circle" size={15} color="#047857" />
+										<AppTypography variant="caption" style={styles.selectedBadgeLabel}>
+											Selected Nurse
+										</AppTypography>
+									</View>
+									<TouchableOpacity
+										style={styles.changeNurseBtn}
+										onPress={() => {
+											console.log('[BookingDetailsPage] Change Nurse pressed. Navigating with coords:', {
+												latitude: visit.latitude,
+												longitude: visit.longitude,
+											})
+											navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+												isSelectionMode: true,
+												serviceKey: payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care',
+												serviceLabel: payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care',
+												procedureName: services[0]?.title,
+												procedureId: services[0]?.id,
+												services,
+												latitude: visit.latitude,
+												longitude: visit.longitude,
+												selectedNurseId: selectedNurse?.id,
+											})
+										}}
+										activeOpacity={0.7}
+									>
+										<Ionicons name="swap-horizontal" size={14} color="#0C7C7C" />
+										<AppTypography variant="caption" style={styles.changeNurseBtnText}>
+											Change Nurse
+										</AppTypography>
+									</TouchableOpacity>
+								</View>
+
+								<View style={styles.selectedNurseRow}>
+									<Image source={{ uri: selectedNurse.avatar }} style={styles.selectedNurseAvatar} />
+									<View style={styles.selectedNurseInfo}>
+										<View style={styles.nameAndBadge}>
+											<AppTypography variant="subtitle" style={styles.selectedNurseName}>
+												{selectedNurse.name}
+											</AppTypography>
+											<View style={styles.rnChip}>
+												<AppTypography variant="caption" style={styles.rnChipText}>
+													{selectedNurse.credentials}
+												</AppTypography>
+											</View>
+										</View>
+										<View style={styles.selectedNurseStats}>
+											{selectedNurse.experience != null && (
+												<>
+													<AppTypography variant="caption" style={styles.statText}>
+														{selectedNurse.experience} yrs exp
+													</AppTypography>
+													<AppTypography variant="caption" style={styles.statDot}>•</AppTypography>
+												</>
+											)}
+											<AppTypography variant="caption" style={[styles.statText, { color: '#047857', fontWeight: '600' }]}>
+												Available Nearby
+											</AppTypography>
+										</View>
+									</View>
+								</View>
+							</View>
+						) : (
+							<TouchableOpacity
+								style={styles.browsePromptCard}
+								onPress={() => {
+									console.log('[BookingDetailsPage] Browse Prompt pressed. Navigating with coords:', {
+										latitude: visit.latitude,
+										longitude: visit.longitude,
+									})
+									navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+										isSelectionMode: true,
+										serviceKey: payloadObj.serviceKey || routeParams.serviceKey || 'nursing-care',
+										serviceLabel: payloadObj.serviceLabel || routeParams.serviceLabel || 'Nursing Care',
+										procedureName: services[0]?.title,
+										procedureId: services[0]?.id,
+										services,
+										latitude: visit.latitude,
+										longitude: visit.longitude,
+										selectedNurseId: undefined,
+									})
+								}}
+								activeOpacity={0.8}
+							>
+								<View style={styles.browsePromptLeft}>
+									<View style={styles.browseIconCircle}>
+										<Ionicons name="search" size={18} color="#0C7C7C" />
+									</View>
+									<View style={styles.browsePromptTextCol}>
+										<AppTypography variant="subtitle" style={styles.browsePromptTitle}>
+											Browse Available Nurses
+										</AppTypography>
+										<AppTypography variant="caption" style={styles.browsePromptSub}>
+											Tap here to view nurses available near you
+										</AppTypography>
+									</View>
+								</View>
+								<View style={styles.browsePromptCta}>
+									<AppTypography variant="caption" style={styles.browsePromptCtaText}>Select Nurse</AppTypography>
+									<Ionicons name="chevron-forward" size={14} color="#0C7C7C" />
+								</View>
+							</TouchableOpacity>
+						)
+					)}
+				</View>
+				)}
+
 				{/* 8px GREY SECTION DIVIDER BAR */}
 				<View style={styles.sectionDividerBar} />
 
-				{/* 4. SECTION: PAYMENT SUMMARY */}
+				{/* 5. SECTION: PAYMENT SUMMARY */}
 				<View style={styles.sectionBlock}>
 					<View style={styles.sectionHeaderRow}>
 						<AppTypography variant="h3" style={styles.sectionHeading}>
@@ -719,7 +850,7 @@ export default function BookingDetailsPage() {
 
 						<View style={styles.billingRow}>
 							<AppTypography variant="body" style={styles.billingLabel}>
-								Taxes & Operational Fee (5% GST)
+								Taxes & Operational Fee (3% GST)
 							</AppTypography>
 							<AppTypography variant="body" style={styles.billingVal}>
 								{charges.taxes}
@@ -765,7 +896,7 @@ export default function BookingDetailsPage() {
 					disabled={services.length === 0}
 					style={styles.continueBtn}
 				>
-					Proceed to Payment ➔
+					Proceed to Payment
 				</AppButton>
 			</View>
 
@@ -798,60 +929,125 @@ export default function BookingDetailsPage() {
 						SELECT DELIVERY ADDRESS
 					</AppTypography>
 
-					<View style={styles.addressListContainer}>
-						{savedAddressesList.map((addr) => {
-							const isSelected = visit.addressId === addr.id
-							return (
-								<TouchableOpacity
-									key={addr.id}
+					<AddressSelectionSheet
+						selectedAddressId={visit.addressId}
+						allowAddNew={false}
+						onSelectAddress={(addr) => {
+							const combinedAddress = `${addr.address_line}, ${addr.city} ${addr.pincode}`
+							console.log('[BookingDetailsPage] Address selected:', addr.id, addr.label, combinedAddress, {
+								latitude: addr.latitude,
+								longitude: addr.longitude,
+							})
+							setVisit((prev) => ({
+								...prev,
+								addressId: addr.id,
+								addressLabel: addr.label,
+								address: combinedAddress,
+								latitude: addr.latitude,
+								longitude: addr.longitude,
+							}))
+						}}
+						leadingItem={
+							<TouchableOpacity
+								style={[
+									styles.addressCardItem,
+									visit.addressId === CURRENT_LOCATION_ADDRESS.id && styles.addressCardItemSelected,
+									styles.addressCardItemCurrent,
+								]}
+								onPress={() => {
+									console.log(
+										'[BookingDetailsPage] Address selected:',
+										CURRENT_LOCATION_ADDRESS.id,
+										CURRENT_LOCATION_ADDRESS.label,
+										CURRENT_LOCATION_ADDRESS.address,
+										{ latitude: undefined, longitude: undefined },
+									)
+									setVisit((prev) => ({
+										...prev,
+										addressId: CURRENT_LOCATION_ADDRESS.id,
+										addressLabel: CURRENT_LOCATION_ADDRESS.label,
+										address: CURRENT_LOCATION_ADDRESS.address,
+										latitude: undefined,
+										longitude: undefined,
+									}))
+								}}
+								activeOpacity={0.8}
+							>
+								<View
 									style={[
-										styles.addressCardItem,
-										isSelected && styles.addressCardItemSelected,
-										addr.isCurrentLocation && styles.addressCardItemCurrent,
+										styles.addressIconWrap,
+										visit.addressId === CURRENT_LOCATION_ADDRESS.id && styles.addressIconWrapSelected,
 									]}
-									onPress={() => {
-										setVisit((prev) => ({
-											...prev,
-											addressId: addr.id,
-											addressLabel: addr.label,
-											address: addr.address,
-										}))
-									}}
-									activeOpacity={0.8}
 								>
-									<View style={[styles.addressIconWrap, isSelected && styles.addressIconWrapSelected]}>
-										<Ionicons
-											name={(addr.icon as any) || 'location-outline'}
-											size={18}
-											color={isSelected ? '#FFFFFF' : addr.isCurrentLocation ? '#0C7C7C' : '#475569'}
-										/>
-									</View>
+									<Ionicons
+										name={CURRENT_LOCATION_ADDRESS.icon as any}
+										size={18}
+										color={visit.addressId === CURRENT_LOCATION_ADDRESS.id ? '#FFFFFF' : '#0C7C7C'}
+									/>
+								</View>
 
-									<View style={styles.addressTextCol}>
-										<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-											<AppTypography variant="h4" style={[styles.addressLabelText, isSelected && styles.addressLabelTextSelected]}>
-												{addr.label}
-											</AppTypography>
-											{addr.isCurrentLocation && (
-												<View style={styles.gpsPill}>
-													<AppTypography variant="caption" style={styles.gpsPillText}>
-														GPS DETECTED
-													</AppTypography>
-												</View>
-											)}
-										</View>
-										<AppTypography variant="caption" style={styles.addressValText} numberOfLines={2}>
-											{addr.address}
+								<View style={styles.addressTextCol}>
+									<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+										<AppTypography
+											variant="h4"
+											style={[
+												styles.addressLabelText,
+												visit.addressId === CURRENT_LOCATION_ADDRESS.id && styles.addressLabelTextSelected,
+											]}
+										>
+											{CURRENT_LOCATION_ADDRESS.label}
 										</AppTypography>
+										<View style={styles.gpsPill}>
+											<AppTypography variant="caption" style={styles.gpsPillText}>
+												GPS DETECTED
+											</AppTypography>
+										</View>
 									</View>
+									<AppTypography variant="caption" style={styles.addressValText} numberOfLines={2}>
+										{CURRENT_LOCATION_ADDRESS.address}
+									</AppTypography>
+								</View>
 
-									<View style={[styles.radioDotOuter, isSelected && styles.radioDotOuterSelected]}>
-										{isSelected && <View style={styles.radioDotInner} />}
-									</View>
-								</TouchableOpacity>
-							)
-						})}
-					</View>
+								<View
+									style={[
+										styles.radioDotOuter,
+										visit.addressId === CURRENT_LOCATION_ADDRESS.id && styles.radioDotOuterSelected,
+									]}
+								>
+									{visit.addressId === CURRENT_LOCATION_ADDRESS.id && <View style={styles.radioDotInner} />}
+								</View>
+							</TouchableOpacity>
+						}
+						renderAddressRow={({ address: addr, selected, onPress }) => (
+							<TouchableOpacity
+								key={addr.id}
+								style={[styles.addressCardItem, selected && styles.addressCardItemSelected]}
+								onPress={onPress}
+								activeOpacity={0.8}
+							>
+								<View style={[styles.addressIconWrap, selected && styles.addressIconWrapSelected]}>
+									<Ionicons
+										name={addr.label.toLowerCase().includes('work') ? 'briefcase-outline' : 'home-outline'}
+										size={18}
+										color={selected ? '#FFFFFF' : '#475569'}
+									/>
+								</View>
+
+								<View style={styles.addressTextCol}>
+									<AppTypography variant="h4" style={[styles.addressLabelText, selected && styles.addressLabelTextSelected]}>
+										{addr.label}
+									</AppTypography>
+									<AppTypography variant="caption" style={styles.addressValText} numberOfLines={2}>
+										{`${addr.address_line}, ${addr.city} ${addr.pincode}`}
+									</AppTypography>
+								</View>
+
+								<View style={[styles.radioDotOuter, selected && styles.radioDotOuterSelected]}>
+									{selected && <View style={styles.radioDotInner} />}
+								</View>
+							</TouchableOpacity>
+						)}
+					/>
 
 					<AppButton variant="primary" onPress={() => setEditVisitVisible(false)} style={styles.modalSaveBtn}>
 						Confirm Address
@@ -866,6 +1062,7 @@ export default function BookingDetailsPage() {
 				onSelectProfile={handleSelectProfile}
 				selectedProfileId={selectedProfileId}
 			/>
+
 			{/* PATIENT ERROR MODAL */}
 			<StatusModal
 				visible={patientErrorModalVisible}
@@ -885,6 +1082,183 @@ export default function BookingDetailsPage() {
 }
 
 const styles = StyleSheet.create({
+	/* Nurse Assignment Preference Styles */
+	sectionSubheading: {
+		fontSize: 12.5,
+		color: '#64748B',
+		marginTop: -8,
+		marginBottom: 2,
+		lineHeight: 18,
+	},
+	nurseChoiceContainer: {
+		gap: 10,
+	},
+	selectedNurseCardContainer: {
+		marginTop: 8,
+		backgroundColor: '#FFFFFF',
+		borderWidth: 1.5,
+		borderColor: '#0C7C7C',
+		borderRadius: 14,
+		padding: 12,
+		shadowColor: '#0C7C7C',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 6,
+		elevation: 2,
+	},
+	selectedNurseCardHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingBottom: 10,
+		marginBottom: 10,
+		borderBottomWidth: 1,
+		borderBottomColor: '#F1F5F9',
+	},
+	selectedBadgeRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 5,
+	},
+	selectedBadgeLabel: {
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#047857',
+	},
+	changeNurseBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		backgroundColor: '#F0FDFA',
+		borderWidth: 1,
+		borderColor: '#CCFBF1',
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderRadius: 8,
+	},
+	changeNurseBtnText: {
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#0C7C7C',
+	},
+	selectedNurseRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	selectedNurseAvatar: {
+		width: 46,
+		height: 46,
+		borderRadius: 23,
+		marginRight: 12,
+		backgroundColor: '#F1F5F9',
+	},
+	selectedNurseInfo: {
+		flex: 1,
+	},
+	nameAndBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		marginBottom: 3,
+	},
+	selectedNurseName: {
+		fontSize: 14.5,
+		fontWeight: '700',
+		color: '#0F172A',
+	},
+	rnChip: {
+		backgroundColor: '#CCFBF1',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 4,
+	},
+	rnChipText: {
+		fontSize: 10.5,
+		fontWeight: '700',
+		color: '#0F766E',
+	},
+	selectedNurseStats: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 5,
+	},
+	statItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 2,
+	},
+	statTextBold: {
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#1E293B',
+	},
+	statTextMuted: {
+		fontSize: 11,
+		color: '#64748B',
+	},
+	statDot: {
+		fontSize: 10,
+		color: '#CBD5E1',
+	},
+	statText: {
+		fontSize: 11.5,
+		color: '#64748B',
+	},
+	browsePromptCard: {
+		marginTop: 8,
+		backgroundColor: '#F0FDFA',
+		borderWidth: 1.5,
+		borderColor: '#99F6E4',
+		borderStyle: 'dashed',
+		borderRadius: 14,
+		padding: 12,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	browsePromptLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+	},
+	browseIconCircle: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		backgroundColor: '#CCFBF1',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: 10,
+	},
+	browsePromptTextCol: {
+		flex: 1,
+	},
+	browsePromptTitle: {
+		fontSize: 13.5,
+		fontWeight: '700',
+		color: '#0F766E',
+	},
+	browsePromptSub: {
+		fontSize: 11.5,
+		color: '#115E59',
+		marginTop: 1,
+	},
+	browsePromptCta: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 2,
+		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#CCFBF1',
+	},
+	browsePromptCtaText: {
+		fontSize: 11.5,
+		fontWeight: '700',
+		color: '#0F766E',
+	},
 	container: {
 		flex: 1,
 		backgroundColor: '#FFFFFF',
@@ -942,67 +1316,6 @@ const styles = StyleSheet.create({
 	/* SERVICES LIST */
 	servicesList: {
 		gap: 12,
-	},
-	serviceRow: {
-		flexDirection: 'row',
-		gap: 14,
-		alignItems: 'center',
-	},
-	serviceRowBorder: {
-		paddingTop: 12,
-		borderTopWidth: 1,
-		borderTopColor: '#F1F5F9',
-	},
-	serviceThumb: {
-		width: 72,
-		height: 72,
-		borderRadius: 12,
-		backgroundColor: '#F1F5F9',
-	},
-	serviceTextCol: {
-		flex: 1,
-		gap: 4,
-	},
-	titleRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	serviceTitle: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#0F172A',
-		flex: 1,
-	},
-	serviceDesc: {
-		fontSize: 12.5,
-		color: '#64748B',
-		lineHeight: 17,
-	},
-	serviceMetaRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginTop: 4,
-	},
-	durationPill: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		backgroundColor: '#F1F5F9',
-		paddingHorizontal: 8,
-		paddingVertical: 3,
-		borderRadius: 6,
-	},
-	durationText: {
-		fontSize: 11.5,
-		color: '#475569',
-		fontWeight: '500',
-	},
-	servicePrice: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#0F172A',
 	},
 	emptyBox: {
 		alignItems: 'center',

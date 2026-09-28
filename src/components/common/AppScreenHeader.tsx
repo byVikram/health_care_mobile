@@ -1,5 +1,5 @@
 import React from 'react'
-import { StyleSheet, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -9,11 +9,39 @@ interface AppScreenHeaderProps {
 	title?: string
 	onBack?: () => void
 	rightElement?: React.ReactNode
+	/** Hide the back button entirely. Defaults to true (existing behaviour). */
+	showBack?: boolean
+	/** Override the header's background colour. Defaults to the standard teal. */
+	backgroundColor?: string
+	/**
+	 * 'hero' (default) is the existing rounded-corner header with decorative
+	 * wave circles, used across most screens. 'flat' is a plain rectangular
+	 * bar with no waves and no bottom radius, for screens whose reference
+	 * design calls for a simple compact bar instead of a hero-style header.
+	 */
+	variant?: 'hero' | 'flat'
+	/**
+	 * Optional screen-specific content (subtitle, search bar, filter chips, ...)
+	 * rendered below the title row. AppScreenHeader stays generic — it only
+	 * provides the slot; each screen decides what goes inside it.
+	 */
+	children?: React.ReactNode
 }
 
-export default function AppScreenHeader({ title, onBack, rightElement }: AppScreenHeaderProps) {
+export default function AppScreenHeader({
+	title,
+	onBack,
+	rightElement,
+	showBack = true,
+	backgroundColor,
+	variant = 'hero',
+	children,
+}: AppScreenHeaderProps) {
 	const navigation = useNavigation<any>()
 	const insets = useSafeAreaInsets()
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
+	const isFlat = variant === 'flat'
 
 	const handleBack = () => {
 		if (onBack) {
@@ -26,24 +54,42 @@ export default function AppScreenHeader({ title, onBack, rightElement }: AppScre
 	}
 
 	return (
-		<View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+		<View
+			style={[
+				styles.header,
+				{ paddingTop: Math.max(insets.top, 12) + (isFlat ? 4 : 14) },
+				isFlat && styles.headerFlat,
+				backgroundColor ? { backgroundColor } : null,
+			]}
+		>
 			{/* Background Waves */}
-			<View style={styles.waveOne} />
-			<View style={styles.waveTwo} />
+			{!isFlat && (
+				<>
+					<View style={styles.waveOne} />
+					<View style={styles.waveTwo} />
+				</>
+			)}
 
-			<View style={styles.headerContent}>
-				<TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.8}>
-					<MaterialCommunityIcons name="chevron-left" size={28} color="#ffffff" />
-				</TouchableOpacity>
-				<View style={styles.headerText}>
-					<AppTypography style={styles.title}>{title}</AppTypography>
-				</View>
-				{rightElement && (
-					<View style={styles.rightElementContainer}>
-						{rightElement}
-					</View>
+			<View style={[styles.headerContent, isTablet && styles.headerContentTablet]}>
+				{showBack && (
+					<TouchableOpacity
+						style={styles.backButton}
+						onPress={handleBack}
+						activeOpacity={0.75}
+						hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+					>
+						<MaterialCommunityIcons name="chevron-left" size={28} color="#ffffff" />
+					</TouchableOpacity>
 				)}
+				<View style={styles.headerText}>
+					<AppTypography style={styles.title} numberOfLines={1}>
+						{title}
+					</AppTypography>
+				</View>
+				{rightElement && <View style={styles.rightElementContainer}>{rightElement}</View>}
 			</View>
+
+			{children && <View style={styles.childrenSlot}>{children}</View>}
 		</View>
 	)
 }
@@ -57,6 +103,11 @@ const styles = StyleSheet.create({
 		borderBottomRightRadius: 20,
 		overflow: 'hidden',
 		position: 'relative',
+	},
+	headerFlat: {
+		paddingBottom: 6,
+		borderBottomLeftRadius: 0,
+		borderBottomRightRadius: 0,
 	},
 	waveOne: {
 		position: 'absolute',
@@ -83,6 +134,11 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		zIndex: 10,
 	},
+	headerContentTablet: {
+		maxWidth: 800,
+		alignSelf: 'center',
+		width: '100%',
+	},
 	backButton: {
 		width: 40,
 		height: 40,
@@ -106,5 +162,9 @@ const styles = StyleSheet.create({
 	rightElementContainer: {
 		justifyContent: 'center',
 		alignItems: 'flex-end',
+	},
+	childrenSlot: {
+		marginTop: 12,
+		zIndex: 10,
 	},
 })

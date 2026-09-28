@@ -89,6 +89,12 @@ export default function AccountPage({
 
     setSubmitting(true);
     try {
+      // FIXME: this save call is commented out, so selectedLocation/
+      // selectedSpeciality are validated, then silently discarded -- the
+      // user is navigated forward believing these were saved. Also uses raw
+      // fetch() instead of ApiService, so it bypasses auth-header injection
+      // and the shared error handling entirely; switch to ApiService.patch
+      // when wiring this up for real.
       // Uncomment when API is ready:
       // await fetch(API_ENDPOINTS.DOCTOR_PROFILE.DETAILS, {
       //   method: "PATCH",

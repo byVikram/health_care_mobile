@@ -9,72 +9,94 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useNavigation } from '@react-navigation/native'
 import { AppTypography } from '../../../components/common'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
 import ProfessionalDetailsTab from './tabs/ProfessionalDetailsTab'
 import CapabilitiesTab from './tabs/CapabilitiesTab'
+import ServicesAndProceduresView from './tabs/ServicesAndProceduresView'
 import AvailabilityTab from './tabs/AvailabilityTab'
-import { fetchProviderProfileBackend } from '../../ancillary/ancillaryService'
+import SessionsTab from '../SessionsTab'
+import { fetchProviderProfile } from '../../ancillary/ancillaryService'
+import { normalizeSpecialtyKey, normalizeSpecialtyToLabel } from './specialtyConfig'
 
 type TabDefinition = {
 	key: string
 	label: string
-	Component: React.ComponentType<{ isActive?: boolean; onNextTab?: () => void }>
+	Component: React.ComponentType<any>
 }
 
-const TABS: TabDefinition[] = [
-	{ key: 'personal', label: 'Personal Details', Component: PersonalDetailsTab },
-	{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
-	{ key: 'categories', label: 'Capabilities', Component: CapabilitiesTab },
-	{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
-]
+const getTabsForSpecialty = (specialtyKey: string): TabDefinition[] => {
+	const normalized = normalizeSpecialtyKey(specialtyKey)
+	const isPhysio = !specialtyKey || normalized === 'physiotherapy' || specialtyKey.toLowerCase().includes('physio')
+	return [
+		{ key: 'personal', label: 'Personal Details', Component: PersonalDetailsTab },
+		{ key: 'professional', label: 'Professional Details', Component: ProfessionalDetailsTab },
+		{
+			key: isPhysio ? 'services' : 'capabilities',
+			label: isPhysio ? 'Services & Procedures' : 'Capabilities',
+			Component: isPhysio ? (ServicesAndProceduresView as any) : CapabilitiesTab,
+		},
+		{ key: 'availability', label: 'Availability', Component: AvailabilityTab },
+		{ key: 'sessions', label: 'Sessions', Component: SessionsTab },
+	]
+}
+
+// Onboarding (profile-setup) completion is tied to finishing this specific tab,
+// not to reaching the end of the tabs array -- this lets tabs such as Sessions be
+// appended after Availability without re-triggering or blocking the existing
+// 'ancillary_setup_completed' flow.
+const LAST_ONBOARDING_TAB_KEY = 'availability'
 
 export default function AncillaryProfileLayout() {
-	const navigation = useNavigation<any>()
 	const { width } = useWindowDimensions()
 	const pagerRef = useRef<ScrollView>(null)
 	const tabScrollRef = useRef<ScrollView>(null)
 	const [activeTab, setActiveTab] = useState('personal')
-	const [isSetupCompleted, setIsSetupCompleted] = useState<boolean>(false)
-	const [unlockedTabIndex, setUnlockedTabIndex] = useState<number>(0)
+	const [specialtyKey, setSpecialtyKey] = useState<string>('')
+	const [specialtyLabel, setSpecialtyLabel] = useState<string>('')
+	const [subspecialtyId, setSubspecialtyId] = useState<string>('')
 
-	// Check if the provider has already completed initial profile setup
+	const tabs = useMemo(() => getTabsForSpecialty(specialtyKey), [specialtyKey])
+
+	// Load authenticated provider specialty from authoritative backend on layout mount and when tab changes
 	useEffect(() => {
 		let isMounted = true
-		const checkCompletion = async () => {
-			try {
-				const local = await AsyncStorage.getItem('ancillary_setup_completed')
-				if (local === 'true' && isMounted) {
-					setIsSetupCompleted(true)
-					setUnlockedTabIndex(TABS.length - 1)
-					return
-				}
 
-				const profile = await fetchProviderProfileBackend()
+		const resolveSpecialty = async () => {
+			try {
+				// 1. Fetch authoritative backend profile first (backend is single source of truth)
+				const profile = await fetchProviderProfile()
 				if (profile && isMounted) {
-					const hasCaps = Array.isArray(profile.checked_procedures) && profile.checked_procedures.length > 0
-					const hasProf = Boolean(profile.license_number || profile.qualifications)
-					if (hasCaps && hasProf) {
-						setIsSetupCompleted(true)
-						setUnlockedTabIndex(TABS.length - 1)
-						await AsyncStorage.setItem('ancillary_setup_completed', 'true')
+					// 2. Canonical backend fields: profile.specialty_id and profile.sub_specialty_id
+					const spec = profile.specialty_id
+					const resolved = normalizeSpecialtyKey(spec)
+					if (resolved) {
+						setSpecialtyKey(resolved)
+						const label = profile.specialty?.label || normalizeSpecialtyToLabel(resolved)
+						setSpecialtyLabel(label)
+					}
+
+					const backendSub = profile.sub_specialty_id
+					if (backendSub) {
+						setSubspecialtyId(backendSub)
 					}
 				}
 			} catch (e) {
-				console.log('[AncillaryProfileLayout] error checking setup status:', e)
+				console.log('[AncillaryProfileLayout] error resolving specialty:', e)
 			}
 		}
-		checkCompletion()
+
+		resolveSpecialty()
+
 		return () => {
 			isMounted = false
 		}
-	}, [])
+	}, [activeTab])
 
 	const activeTabIndex = useMemo(() => {
-		const index = TABS.findIndex((tab) => tab.key === activeTab)
+		const index = tabs.findIndex((tab) => tab.key === activeTab)
 		return index >= 0 ? index : 0
-	}, [activeTab])
+	}, [activeTab, tabs])
 
 	useEffect(() => {
 		pagerRef.current?.scrollTo({ x: activeTabIndex * width, animated: false })
@@ -89,38 +111,34 @@ export default function AncillaryProfileLayout() {
 
 	const goToTab = useCallback(
 		(tabKey: string, animated = true) => {
-			const nextIndex = TABS.findIndex((tab) => tab.key === tabKey)
+			const nextIndex = tabs.findIndex((tab) => tab.key === tabKey)
 			if (nextIndex < 0) return
 
 			setActiveTab(tabKey)
 			pagerRef.current?.scrollTo({ x: nextIndex * width, animated })
 		},
-		[width]
+		[width, tabs]
 	)
 
 	const handlePagerMomentumEnd = useCallback(
 		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
 			const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
-			const clampedIndex = Math.max(0, Math.min(TABS.length - 1, nextIndex))
-			setActiveTab(TABS[clampedIndex].key)
+			const clampedIndex = Math.max(0, Math.min(tabs.length - 1, nextIndex))
+			setActiveTab(tabs[clampedIndex].key)
 		},
-		[width]
+		[width, tabs]
 	)
 
 	const handleTabProgress = useCallback(
 		async (currentIndex: number) => {
 			const nextIndex = currentIndex + 1
-			if (nextIndex < TABS.length) {
-				setUnlockedTabIndex((prev) => Math.max(prev, nextIndex))
-				goToTab(TABS[nextIndex].key)
+			if (nextIndex < tabs.length) {
+				goToTab(tabs[nextIndex].key)
 			} else {
-				// Final tab (Availability) completed
-				setIsSetupCompleted(true)
-				setUnlockedTabIndex(TABS.length - 1)
 				await AsyncStorage.setItem('ancillary_setup_completed', 'true')
 			}
 		},
-		[goToTab]
+		[goToTab, tabs]
 	)
 
 	return (
@@ -133,27 +151,18 @@ export default function AncillaryProfileLayout() {
 					showsHorizontalScrollIndicator={false}
 					contentContainerStyle={styles.tabScrollContainer}
 				>
-					{TABS.map((tab, index) => {
+					{tabs.map((tab) => {
 						const isActive = activeTab === tab.key
-						const isUnlocked = isSetupCompleted || index <= unlockedTabIndex
 						return (
 							<TouchableOpacity
 								key={tab.key}
-								disabled={!isUnlocked}
-								style={[
-									styles.tabButton,
-									isActive && styles.tabButtonActive,
-									!isUnlocked && styles.tabButtonDisabled,
-								]}
-								onPress={() => isUnlocked && goToTab(tab.key)}
+								style={[styles.tabButton, isActive && styles.tabButtonActive]}
+								onPress={() => goToTab(tab.key)}
+								activeOpacity={0.7}
 							>
 								<AppTypography
 									variant="subtitle"
-									style={[
-										styles.tabLabel,
-										isActive && styles.tabLabelActive,
-										!isUnlocked && styles.tabLabelDisabled,
-									]}
+									style={[styles.tabLabel, isActive && styles.tabLabelActive]}
 								>
 									{tab.label}
 								</AppTypography>
@@ -170,7 +179,7 @@ export default function AncillaryProfileLayout() {
 					style={styles.pager}
 					horizontal
 					pagingEnabled
-					scrollEnabled={isSetupCompleted}
+					scrollEnabled={true}
 					bounces={false}
 					alwaysBounceHorizontal={false}
 					overScrollMode="never"
@@ -180,13 +189,18 @@ export default function AncillaryProfileLayout() {
 					onMomentumScrollEnd={handlePagerMomentumEnd}
 					keyboardShouldPersistTaps="handled"
 				>
-					{TABS.map((tab, index) => {
+					{tabs.map((tab, index) => {
 						const TabComponent = tab.Component
 						return (
 							<View key={tab.key} style={[styles.pagerPage, { width }]}>
 								<TabComponent
 									isActive={activeTab === tab.key}
 									onNextTab={() => handleTabProgress(index)}
+									specialtyKey={specialtyKey}
+									specialtyLabel={specialtyLabel}
+									subspecialtyId={subspecialtyId}
+									onSubspecialtyChange={(id: string) => setSubspecialtyId(id)}
+									refreshToken={activeTab === tab.key}
 								/>
 							</View>
 						)
@@ -222,9 +236,6 @@ const styles = StyleSheet.create({
 	tabButtonActive: {
 		borderBottomColor: '#0c7c7c',
 	},
-	tabButtonDisabled: {
-		opacity: 0.35,
-	},
 	tabLabel: {
 		color: '#62707a',
 		fontWeight: '500',
@@ -233,9 +244,6 @@ const styles = StyleSheet.create({
 	tabLabelActive: {
 		color: '#0c7c7c',
 		fontWeight: 'bold',
-	},
-	tabLabelDisabled: {
-		color: '#a0aab0',
 	},
 	contentContainer: {
 		flex: 1,

@@ -37,10 +37,22 @@ import { APPOINTMENT_STATUS } from '../../constants/constants'
 import { useAuth } from '../../context/AuthContext'
 import Toast from 'react-native-toast-message'
 import { getPharmacies } from '../profile/pharmacy/pharmacyService'
-import { getLaboratories } from '../laboratory/laboratoryService'
-import { fetchRadiologyCatalog } from '../radiology/RadiologyService'
+import { getLaboratories } from '../laboratory_duplicated/laboratoryService'
+import { fetchRadiologyCatalog } from '../radiology/radiologyService'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const SAMPLE_DICOM_MODULE = require('../../assets/dicon/sample-dicon.dcm')
+
+// This is the doctor's active-consultation workspace (patient details, medical history,
+// notes, follow-up, share-with pharmacy/lab/radiology) — no mockup screen depicts it, so
+// only the brand teal + neutral text/border colors are aligned here for consistency with
+// the rest of the app. theme.colors.primary already equals PRIMARY (config/theme.ts).
+const PRIMARY = '#2B6F71'
+const PRIMARY_TINT = '#E3EFEF'
+const INK = '#12373E'
+const INK_MUTED = '#5B6B6E'
+const DIVIDER = '#D5E1E2'
+const SURFACE_MUTED = '#F5F8F8'
 
 type TabItem = { id: string; Icon: React.FC<SvgProps> }
 
@@ -62,7 +74,7 @@ function RowItem({
 		<View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 2 }}>
 			<Text style={{ fontSize: 11, color: theme.colors.primary, marginRight: 4 }}>{label}</Text>
 			<Text
-				style={{ fontSize: 11, fontWeight: '500', color: '#333', flex: 1 }}
+				style={{ fontSize: 11, fontWeight: '500', color: INK, flex: 1 }}
 				numberOfLines={numberOfLines ?? 1}
 				ellipsizeMode={ellipsizeMode ?? 'tail'}
 			>
@@ -195,8 +207,8 @@ function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
 
 	const renderEmptyState = () => (
 		<View style={{ alignItems: 'center', paddingVertical: 24 }}>
-			<MaterialCommunityIcons name="emoticon-sad-outline" size={48} color="#ccc" />
-			<Text style={{ color: '#666', marginTop: 8, fontWeight: '500' }}>
+			<MaterialCommunityIcons name="emoticon-sad-outline" size={48} color={DIVIDER} />
+			<Text style={{ color: INK_MUTED, marginTop: 8, fontWeight: '500' }}>
 				No past {activeTab.toLowerCase()} history!
 			</Text>
 		</View>
@@ -279,7 +291,7 @@ function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
 							</Button>
 						</View>
 						<DicomViewer base64Data={dicomBase64} />
-						<Text style={{ fontSize: 10, color: '#999', marginTop: 8, textAlign: 'center' }}>
+						<Text style={{ fontSize: 10, color: INK_MUTED, marginTop: 8, textAlign: 'center' }}>
 							Drag to adjust Window/Level · Pinch or +/- to zoom · ⊙ resets view · ☀ inverts
 						</Text>
 					</View>
@@ -356,7 +368,7 @@ function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
 						flexDirection: 'row',
 						justifyContent: 'space-around',
 						borderBottomWidth: 1,
-						borderBottomColor: '#eee',
+						borderBottomColor: DIVIDER,
 						paddingBottom: 8,
 					}}
 				>
@@ -369,7 +381,7 @@ function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
 								<Text
 									style={{
 										fontSize: 10,
-										color: isActive ? theme.colors.primary : '#999',
+										color: isActive ? theme.colors.primary : INK_MUTED,
 										marginTop: 4,
 										fontWeight: isActive ? 'bold' : 'normal',
 									}}
@@ -393,7 +405,7 @@ function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
 				</View>
 
 				<View style={{ marginTop: 16, marginBottom: 8 }}>
-					<Text style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>Select date</Text>
+					<Text style={{ fontSize: 11, color: INK_MUTED, marginBottom: 8 }}>Select date</Text>
 					<Button
 						mode="outlined"
 						style={{ alignSelf: 'flex-start', borderRadius: 8 }}
@@ -430,7 +442,7 @@ function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
 				) : dicomLoading ? (
 					<View style={{ alignItems: 'center', paddingVertical: 24 }}>
 						<ActivityIndicator size="large" />
-						<Text style={{ color: '#666', marginTop: 8, fontSize: 12 }}>Loading DICOM image…</Text>
+						<Text style={{ color: INK_MUTED, marginTop: 8, fontSize: 12 }}>Loading DICOM image…</Text>
 					</View>
 				) : dicomError ? (
 					<View style={{ alignItems: 'center', paddingVertical: 24 }}>
@@ -650,7 +662,7 @@ function ShareWith({ appointmentId }: { appointmentId?: string }) {
 						flexDirection: 'row',
 						justifyContent: 'space-around',
 						borderBottomWidth: 1,
-						borderBottomColor: '#eee',
+						borderBottomColor: DIVIDER,
 						paddingBottom: 8,
 						marginBottom: 16,
 					}}
@@ -668,7 +680,7 @@ function ShareWith({ appointmentId }: { appointmentId?: string }) {
 								<Text
 									style={{
 										fontSize: 10,
-										color: isActive ? theme.colors.primary : '#999',
+										color: isActive ? theme.colors.primary : INK_MUTED,
 										marginTop: 4,
 										fontWeight: isActive ? 'bold' : 'normal',
 									}}
@@ -691,7 +703,7 @@ function ShareWith({ appointmentId }: { appointmentId?: string }) {
 					})}
 				</View>
 
-				<Text style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>Select address</Text>
+				<Text style={{ fontSize: 11, color: INK_MUTED, marginBottom: 8 }}>Select address</Text>
 				<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 8 }}>
 					<AppSelect
 						label="City"
@@ -741,12 +753,12 @@ function ShareWith({ appointmentId }: { appointmentId?: string }) {
 								style={{
 									paddingTop: 12,
 									borderTopWidth: i === 0 ? 0 : 1,
-									borderTopColor: '#eee',
+									borderTopColor: DIVIDER,
 									marginBottom: 12,
 								}}
 							>
 								<Text style={{ fontWeight: 'bold', fontSize: 13 }}>{place.name}</Text>
-								<Text style={{ color: '#666', fontSize: 11, marginVertical: 4 }}>{place.address}</Text>
+								<Text style={{ color: INK_MUTED, fontSize: 11, marginVertical: 4 }}>{place.address}</Text>
 								<View
 									style={{
 										flexDirection: 'row',
@@ -771,12 +783,12 @@ function ShareWith({ appointmentId }: { appointmentId?: string }) {
 											</>
 										) : null}
 										{place.phone && place.distance ? (
-											<Text style={{ fontSize: 11, color: '#ccc', marginRight: 8 }}>|</Text>
+											<Text style={{ fontSize: 11, color: DIVIDER, marginRight: 8 }}>|</Text>
 										) : null}
 										{place.distance ? (
 											<>
-												<MaterialCommunityIcons name="map-marker-outline" size={12} color="#666" />
-												<Text style={{ fontSize: 11, color: '#666', marginLeft: 2 }}>{place.distance}</Text>
+												<MaterialCommunityIcons name="map-marker-outline" size={12} color={INK_MUTED} />
+												<Text style={{ fontSize: 11, color: INK_MUTED, marginLeft: 2 }}>{place.distance}</Text>
 											</>
 										) : null}
 									</View>
@@ -795,10 +807,10 @@ function ShareWith({ appointmentId }: { appointmentId?: string }) {
 
 					// Dynamic Fallback Icon Logic
 					const colors = [
-						{ bg: '#e6f4f2', icon: '#0d7a6e' },
-						{ bg: '#fff6ed', icon: '#df7618' },
-						{ bg: '#edf7ff', icon: '#1879df' },
-						{ bg: '#fbf5ff', icon: '#8f18df' },
+						{ bg: PRIMARY_TINT, icon: PRIMARY },
+						{ bg: '#FDE8DC', icon: '#B4532A' },
+						{ bg: '#DDEBFA', icon: '#2463A8' },
+						{ bg: '#ECE6FA', icon: '#6A4BB5' },
 					]
 					const config = colors[i % colors.length]
 					let iconName = 'storefront'
@@ -835,7 +847,7 @@ function ShareWith({ appointmentId }: { appointmentId?: string }) {
 								</AppTypography>
 								
 								<View style={styles.providerInfoRow}>
-									<MaterialCommunityIcons name="map-marker-outline" size={14} color="#a0aec0" style={{ marginTop: 2 }} />
+									<MaterialCommunityIcons name="map-marker-outline" size={14} color={INK_MUTED} style={{ marginTop: 2 }} />
 									<AppTypography 
 										variant="body" 
 										numberOfLines={3} 
@@ -846,7 +858,7 @@ function ShareWith({ appointmentId }: { appointmentId?: string }) {
 								</View>
 
 								<View style={styles.providerInfoRow}>
-									<MaterialCommunityIcons name="phone" size={14} color="#0d7a6e" style={{ marginTop: 2 }} />
+									<MaterialCommunityIcons name="phone" size={14} color={PRIMARY} style={{ marginTop: 2 }} />
 									<AppTypography 
 										variant="body" 
 										style={styles.providerPhone}
@@ -880,7 +892,8 @@ export default function ConsultationPage() {
 	const route = useRoute<any>()
 	const { width: pageWidth } = useWindowDimensions()
 	const pagerRef = useRef<ScrollView>(null)
-	const { selectedHospitalId } = useAuth() as any
+	const { selectedHospitalId } = useAuth()
+	const insets = useSafeAreaInsets()
 
 	const [patient, setPatient] = useState<PatientDetails | null>(null)
 	const [doctor, setDoctor] = useState<DocterDetails | null>(null)
@@ -898,7 +911,19 @@ export default function ConsultationPage() {
 	const [followUpSlotsLoading, setFollowUpSlotsLoading] = useState(false)
 	const [followUpHospitalId, setFollowUpHospitalId] = useState<string>('')
 
-	const params = route.params as any
+	const params = (route.params || {}) as {
+		appointmentId?: string
+		appointment_id?: string
+		id?: string
+		patient_id?: string
+		patientId?: string
+		patient?: { id?: string }
+		doctor_id?: string
+		doctorID?: string
+		doctor?: any
+		appointment?: any
+		hospital?: any
+	}
 	useEffect(() => {
 		if (pageWidth <= 0) return
 		pagerRef.current?.scrollTo({ x: pageWidth * activeTab, animated: false })
@@ -1042,9 +1067,9 @@ export default function ConsultationPage() {
 	// ── Loading / error states ──────────────────────────────────────────────────
 	if (patientLoading) {
 		return (
-			<View style={[styles.container, { backgroundColor: '#f8fafc' }]}>
+			<View style={[styles.container, { backgroundColor: SURFACE_MUTED }]}>
 				{/* Skeleton Header */}
-				<View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 40, paddingBottom: 8, gap: 12, borderBottomWidth: 1, borderBottomColor: '#edf2f7' }}>
+				<View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 40, paddingBottom: 8, gap: 12, borderBottomWidth: 1, borderBottomColor: DIVIDER }}>
 					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
 						<AppSkeleton width={32} height={32} borderRadius={16} />
 						<AppSkeleton width={42} height={42} borderRadius={21} />
@@ -1064,7 +1089,7 @@ export default function ConsultationPage() {
 				{/* Skeleton Body Content */}
 				<ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} showsVerticalScrollIndicator={false}>
 					{/* Card 1: Details */}
-					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: '#edf2f7' }}>
+					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: DIVIDER }}>
 						<AppSkeleton width="40%" height={18} style={{ marginBottom: 8 }} />
 						<View style={{ flexDirection: 'row', gap: 16, marginBottom: 8 }}>
 							<AppSkeleton width={70} height={70} borderRadius={8} />
@@ -1090,7 +1115,7 @@ export default function ConsultationPage() {
 					</View>
 
 					{/* Card 2: History */}
-					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: '#edf2f7' }}>
+					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: DIVIDER }}>
 						<AppSkeleton width="50%" height={18} style={{ marginBottom: 8 }} />
 						<View style={{ gap: 10 }}>
 							<View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
@@ -1102,7 +1127,7 @@ export default function ConsultationPage() {
 					</View>
 
 					{/* Card 3: Consultation Notes */}
-					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: '#edf2f7' }}>
+					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: DIVIDER }}>
 						<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
 							<View style={{ gap: 6 }}>
 								<AppSkeleton width={80} height={14} />
@@ -1119,7 +1144,7 @@ export default function ConsultationPage() {
 
 				</ScrollView>
 
-				<View style={styles.stickyFooter}>
+				<View style={[styles.stickyFooter, { paddingBottom: 12 + insets.bottom }]}>
 					<AppSkeleton width="100%" height={48} borderRadius={24} />
 				</View>
 			</View>
@@ -1279,7 +1304,7 @@ export default function ConsultationPage() {
 												>
 													Phone:
 												</Text>
-												<Text style={{ fontSize: 11, fontWeight: '500', color: '#333' }}>
+												<Text style={{ fontSize: 11, fontWeight: '500', color: INK }}>
 													{patient.phone}
 												</Text>
 												<MaterialCommunityIcons
@@ -1294,7 +1319,7 @@ export default function ConsultationPage() {
 										<View
 											style={{
 												width: 1,
-												backgroundColor: '#e0e0e0',
+												backgroundColor: DIVIDER,
 												marginHorizontal: 8,
 											}}
 										/>
@@ -1319,7 +1344,7 @@ export default function ConsultationPage() {
 									<View
 										style={{
 											width: 1,
-											backgroundColor: '#e0e0e0',
+											backgroundColor: DIVIDER,
 											marginHorizontal: 8,
 										}}
 									/>
@@ -1330,7 +1355,7 @@ export default function ConsultationPage() {
 									<View
 										style={{
 											width: 1,
-											backgroundColor: '#e0e0e0',
+											backgroundColor: DIVIDER,
 											marginHorizontal: 8,
 										}}
 									/>
@@ -1341,7 +1366,7 @@ export default function ConsultationPage() {
 										<Text style={{ fontSize: 11, fontWeight: 'bold' }}>
 											{patient.emergency_contact?.name ?? '--'}
 										</Text>
-										<Text style={{ fontSize: 10, color: '#666' }}>
+										<Text style={{ fontSize: 10, color: INK_MUTED }}>
 											{patient.emergency_contact?.relation ?? '--'}
 										</Text>
 										<Text style={{ fontSize: 10, color: '#d32f2f' }}>
@@ -1424,7 +1449,7 @@ export default function ConsultationPage() {
 					</View>
 				</ScrollView>
 
-				<View style={styles.stickyFooter}>
+				<View style={[styles.stickyFooter, { paddingBottom: 12 + insets.bottom }]}>
 					<Button
 						mode="contained"
 						loading={saving}
@@ -1454,14 +1479,14 @@ export default function ConsultationPage() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#f5f7fa',
+		backgroundColor: SURFACE_MUTED,
 	},
 	stickyFooter: {
 		backgroundColor: '#ffffff',
 		paddingHorizontal: 16,
 		paddingVertical: 12,
 		borderTopWidth: 1,
-		borderTopColor: '#edf2f7',
+		borderTopColor: DIVIDER,
 	},
 	saveButton: {
 		borderRadius: 24,
@@ -1497,7 +1522,7 @@ const styles = StyleSheet.create({
 	tabContainer: {
 		flexDirection: 'row',
 		borderTopWidth: 1,
-		borderTopColor: '#f0f0f0',
+		borderTopColor: DIVIDER,
 	},
 	tab: {
 		flex: 1,
@@ -1505,7 +1530,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	tabText: {
-		color: '#666',
+		color: INK_MUTED,
 	},
 	content: {
 		paddingTop: 16,
@@ -1567,7 +1592,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		paddingVertical: 14,
 		borderBottomWidth: 1,
-		borderBottomColor: '#e5eaee',
+		borderBottomColor: DIVIDER,
 	},
 	drawerCloseBtn: {
 		width: 28,
@@ -1575,7 +1600,7 @@ const styles = StyleSheet.create({
 		borderRadius: 14,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#f3f6f8',
+		backgroundColor: SURFACE_MUTED,
 	},
 	drawerBody: {
 		flexShrink: 1,
@@ -1586,11 +1611,11 @@ const styles = StyleSheet.create({
 	drawerTitle: {
 		fontSize: 16,
 		fontWeight: '700',
-		color: '#233238',
+		color: INK,
 	},
 	drawerSubtitle: {
 		fontSize: 12,
-		color: '#62707a',
+		color: INK_MUTED,
 		marginTop: 2,
 	},
 	drawerActions: {
@@ -1600,25 +1625,25 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		paddingVertical: 12,
 		borderTopWidth: 1,
-		borderTopColor: '#e5eaee',
+		borderTopColor: DIVIDER,
 	},
 	drawerCancelBtn: {
 		borderRadius: 20,
 		borderWidth: 1,
-		borderColor: '#d5dde2',
+		borderColor: DIVIDER,
 		paddingHorizontal: 22,
 		paddingVertical: 10,
 		flex: 1,
 		alignItems: 'center',
 	},
 	drawerCancelBtnText: {
-		color: '#60717d',
+		color: INK_MUTED,
 		fontWeight: '600',
 		fontSize: 14,
 	},
 	drawerConfirmBtn: {
 		borderRadius: 20,
-		backgroundColor: '#3d7b7b',
+		backgroundColor: PRIMARY,
 		paddingHorizontal: 22,
 		paddingVertical: 10,
 		flex: 1,
@@ -1630,12 +1655,12 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 	},
 	historyItem: {
-		backgroundColor: '#f8fafc',
+		backgroundColor: SURFACE_MUTED,
 		borderRadius: 8,
 		padding: 12,
 		marginBottom: 12,
 		borderWidth: 1,
-		borderColor: '#edf2f7',
+		borderColor: DIVIDER,
 	},
 	historyHeader: {
 		flexDirection: 'row',
@@ -1644,16 +1669,16 @@ const styles = StyleSheet.create({
 	historyTitle: {
 		fontSize: 12,
 		fontWeight: 'bold',
-		color: '#2d3748',
+		color: INK,
 	},
 	historySubtitle: {
 		fontSize: 10,
-		color: '#718096',
+		color: INK_MUTED,
 		marginTop: 2,
 	},
 	historyNotes: {
 		fontSize: 11,
-		color: '#4a5568',
+		color: INK_MUTED,
 		marginTop: 8,
 		lineHeight: 16,
 	},
@@ -1661,7 +1686,7 @@ const styles = StyleSheet.create({
 		marginTop: 10,
 		paddingTop: 8,
 		borderTopWidth: 1,
-		borderTopColor: '#edf2f7',
+		borderTopColor: DIVIDER,
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		gap: 8,
@@ -1674,11 +1699,11 @@ const styles = StyleSheet.create({
 	resultLabel: {
 		fontSize: 10,
 		fontWeight: 'bold',
-		color: '#4a5568',
+		color: INK_MUTED,
 	},
 	resultValue: {
 		fontSize: 10,
-		color: '#2d3748',
+		color: INK,
 		marginLeft: 4,
 	},
 	providerItemCard: {
@@ -1711,7 +1736,7 @@ const styles = StyleSheet.create({
 	providerName: {
 		fontWeight: '700',
 		fontSize: 12,
-		color: '#1a202c',
+		color: INK,
 		marginBottom: 4,
 	},
 	providerInfoRow: {
@@ -1721,13 +1746,13 @@ const styles = StyleSheet.create({
 		gap: 6,
 	},
 	providerAddress: {
-		color: '#4a5568',
+		color: INK_MUTED,
 		fontSize: 11,
 		lineHeight: 15,
 		flex: 1,
 	},
 	providerPhone: {
-		color: '#0d7a6e',
+		color: PRIMARY,
 		fontSize: 11,
 		lineHeight: 15,
 		flex: 1,

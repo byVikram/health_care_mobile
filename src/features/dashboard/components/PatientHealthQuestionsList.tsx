@@ -1,6 +1,5 @@
-// src/features/dashboard/components/PatientHealthQuestionsList.tsx
 import React, { useEffect, useState } from 'react'
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useNavigation, useRoute } from '@react-navigation/native'
 
@@ -19,6 +18,8 @@ type Props = {
 export default function PatientHealthQuestionsList({ showViewAll = true, itemLimit = 6 }: Props) {
 	const navigation = useNavigation<NavigationProp>()
 	const route = useRoute()
+	const { width } = useWindowDimensions()
+	const isTablet = width >= 768
 
 	const isQuestionsListScreen = route.name === ROUTES.STACK.PATIENT_QUESTIONS_LIST
 
@@ -83,7 +84,7 @@ export default function PatientHealthQuestionsList({ showViewAll = true, itemLim
 	return (
 		<>
 			{/* Header outside card */}
-			<View style={styles.headerContainer}>
+			<View style={[styles.headerContainer, isTablet && styles.tabletContainer]}>
 				<Text style={styles.sectionTitle}>Health Expert Answers to Your Health Questions</Text>
 
 				{showViewAll && !isQuestionsListScreen && (
@@ -94,7 +95,7 @@ export default function PatientHealthQuestionsList({ showViewAll = true, itemLim
 			</View>
 
 			{/* Card */}
-			<View style={styles.container}>
+			<View style={[styles.container, isTablet && styles.tabletContainer]}>
 				<View style={styles.searchRow}>
 					<View style={styles.searchInputWrap}>
 						<AppInput
@@ -163,6 +164,11 @@ const styles = StyleSheet.create({
 		marginHorizontal: 16,
 		borderRadius: 12,
 		padding: 16,
+	},
+	tabletContainer: {
+		maxWidth: 840,
+		width: '100%',
+		alignSelf: 'center',
 	},
 	sectionTitle: {
 		fontWeight: '700',
