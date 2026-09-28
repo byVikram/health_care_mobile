@@ -61,6 +61,19 @@ export type PatientPaymentParams = {
 	fee: number
 	referralId?: string
 	consentVersionId: string
+	/** Family member (patient public id) the appointment is booked for; omitted = self */
+	patientId?: string
+	patientName?: string
+	patientRelation?: string
+	/** Optional "Reason for visit" typed on the slot step; prefills pre-intake symptoms */
+	reasonForVisit?: string
+}
+
+export type DoctorBookSlotParams = {
+	doctor: DoctorDetailData
+	hospitalId?: string
+	mode?: 'clinic' | 'video'
+	referralId?: string
 }
 
 export type AppointmentConfirmedParams = {
@@ -78,6 +91,42 @@ export type AppointmentConfirmedParams = {
 	paymentMethodLabel: string
 }
 
+/** A service in the home-care cart (procedure or package), as shown on the booking screens. */
+export type AncillaryCartItem = {
+	id: string // procedure public id, or package public id when kind === 'package'
+	kind: 'procedure' | 'package'
+	name: string
+	price: number
+	mrp?: number | null
+	durationMinutes?: number | null
+}
+
+/** Catalog -> Book visit: what is being booked (one home-care speciality at a time). */
+export type AncillaryBookVisitParams = {
+	serviceKey: string // speciality key, e.g. 'nursing-care'
+	serviceLabel: string // e.g. 'Nursing care'
+	/** Either one package, or one or more procedures -- never both (backend rule). */
+	items: AncillaryCartItem[]
+	/** Keep the days picked before (e.g. coming back after the provider declined). */
+	initialDates?: string[]
+	/** Provider to skip when re-picking (declined / expired). */
+	excludeProviderId?: string
+}
+
+/** Book visit -> Review & pay. */
+export type AncillaryReviewPayParams = AncillaryBookVisitParams & {
+	provider: {
+		provider_public_id: string
+		name: string
+		avatar_url?: string | null
+		specialty?: string | null
+		experience_years?: number | null
+		distance_km?: number | null
+		fee_per_visit: number
+	}
+	visits: { date: string; start_time: string; end_time: string }[]
+}
+
 export type AppStackParamList = {
 	[ROUTES.STACK.WALLET]: undefined
 	[ROUTES.STACK.WALLET_TOPUP]: undefined
@@ -89,6 +138,7 @@ export type AppStackParamList = {
 		| { query?: string; specialityId?: string; specialityName?: string; mode?: 'all' | 'video' | 'clinic' }
 		| undefined
 	[ROUTES.STACK.DOCTOR_DETAIL]: { id: string; referralId?: string }
+	[ROUTES.STACK.DOCTOR_BOOK_SLOT]: DoctorBookSlotParams
 	[ROUTES.STACK.FAVOURITE_DOCTOR]: undefined
 	[ROUTES.STACK.NOTIFICATION]: undefined
 	[ROUTES.STACK.CONSULTATION]: ConsultationParams | undefined
@@ -106,7 +156,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: Omit<PatientPaymentParams, 'consentVersionId'> }
 	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
 	[ROUTES.STACK.ORDER_LIST]: undefined
-	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown } | undefined
+	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown; orderId?: string } | undefined
 	[ROUTES.STACK.PLACE_PHARMACY_ORDER]: {
 		pharmacyId: string
 		pharmacyName: string
@@ -170,6 +220,8 @@ export type AppStackParamList = {
 		timeSlot?: string
 		totalAmount: number
 	}
+	[ROUTES.STACK.LABORATORY_ORDERS]: undefined
+	[ROUTES.STACK.LABORATORY_ORDER_DETAILS]: { publicId: string; booking?: unknown }
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
 	[ROUTES.STACK.PATIENT_PAYMENT]: PatientPaymentParams | undefined
@@ -197,6 +249,10 @@ export type AppStackParamList = {
 	[ROUTES.STACK.NURSE_EARNINGS]: undefined
 	[ROUTES.STACK.NURSE_HISTORY]: undefined
 	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string; updatedCart?: any[] }
+	[ROUTES.STACK.ANCILLARY_BOOK_VISIT]: AncillaryBookVisitParams
+	[ROUTES.STACK.ANCILLARY_REVIEW_PAY]: AncillaryReviewPayParams
+	/** `booking` omitted (e.g. opened from the Bookings tab) = the page rebuilds it from the order. */
+	[ROUTES.STACK.ANCILLARY_REQUEST_SENT]: { requestId: string; booking?: AncillaryBookVisitParams }
 	[ROUTES.STACK.ANCILLARY_PROVIDERS]: { serviceKey: string; serviceLabel: string; procedureName?: string }
 	[ROUTES.STACK.ANCILLARY_BOOKING_CART]:
 		| {

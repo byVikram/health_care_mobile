@@ -9,8 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
-import { AppTypography } from '../../components/common/AppTypography'
-import { AppButton } from '../../components/common/AppButton'
+import { AppTypography } from '../../components/common/display/AppTypography'
+import { AppButton } from '../../components/common/buttons/AppButton'
 import {
 	BillingSummaryCard,
 	BookingProgressStepper,

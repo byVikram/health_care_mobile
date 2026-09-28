@@ -11,19 +11,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
-import { AppTypography } from '../../components/common/AppTypography'
-import { AppButton } from '../../components/common/AppButton'
-import { AppInput } from '../../components/common/AppInput'
-import {
-	PatientProfile,
-	PatientProfileSelectorBottomSheet,
-} from '../../components/common/PatientProfileSelectorBottomSheet'
+import { AppTypography } from '../../components/common/display/AppTypography'
+import { AppButton } from '../../components/common/buttons/AppButton'
+import { AppInput } from '../../components/common/inputs/AppInput'
 import { type PatientAddress } from '../profile/patient/PatientProfileService'
 import { resolveSelfPatientIdentity } from '../../utils/resolvePatientIdentity'
 import { ROUTES } from '../../navigation/routes'
 import { HEALTH_CHECKUP_PACKAGES, POPULAR_DIAGNOSTIC_TESTS } from './data/laboratoryMockData'
-import { AddressSelectionSheet, BookingProgressStepper, DateStrip, SelectionRowCard, SlotChipGrid } from '../../components/common'
-import type { CollectionMethod, LabBookingDraft } from './types'
+import {
+	AddressSelectionSheet,
+	AppFamilyMemberSheet,
+	BookingProgressStepper,
+	DateStrip,
+	SelectionRowCard,
+	SlotChipGrid,
+} from '../../components/common'
+import { FamilyMemberOption, useFamilyMembers } from '../../hooks/useFamilyMembers'
+import type { CollectionMethod, LabBookingDraft, PatientProfile } from './types'
 
 const HOME_TIME_SLOTS = [
 	{ label: 'Morning', value: 'Morning (07:00 AM - 11:00 AM)', hint: '7 AM – 11 AM' },
@@ -36,6 +40,19 @@ const formatDisplayDate = (d: Date): string => {
 	const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 	return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
 }
+
+/** Family-picker member -> the PatientProfile shape the lab draft carries (same fields the old picker set). */
+const toPatientProfile = (m: FamilyMemberOption, current: PatientProfile | null): PatientProfile => ({
+	// Self without a known public id keeps the id already resolved for the caller.
+	id: m.publicId ?? (current?.relationship === 'Self' ? current.id : m.key),
+	publicId: m.publicId ?? (current?.relationship === 'Self' ? current.publicId : undefined),
+	name: m.name,
+	age: m.age ?? '',
+	gender: m.gender ?? '',
+	relationship: m.apiRelation ?? m.relation,
+	avatar: m.avatar ?? undefined,
+	bloodGroup: m.bloodGroup,
+})
 
 export const SampleCollectionScreen: React.FC = () => {
 	const insets = useSafeAreaInsets()
@@ -61,6 +78,11 @@ export const SampleCollectionScreen: React.FC = () => {
 	// Step 2: Patient Profile (auto-loaded from user profile or draft)
 	const [selectedProfile, setSelectedProfile] = useState<PatientProfile | null>(draftParam?.patient || null)
 	const [showProfileSheet, setShowProfileSheet] = useState(false)
+	const { members: familyMembers } = useFamilyMembers()
+	const selectedMemberKey = selectedProfile
+		? (familyMembers.find((m) => (m.publicId ?? m.key) === selectedProfile.id)?.key ??
+			(selectedProfile.relationship === 'Self' ? 'self' : undefined))
+		: undefined
 
 	// Step 3: Address (Home Collection only)
 	const [selectedAddress, setSelectedAddress] = useState<PatientAddress | null>(draftParam?.collectionAddress || null)
@@ -444,11 +466,14 @@ export const SampleCollectionScreen: React.FC = () => {
 				</AppButton>
 			</View>
 
-			<PatientProfileSelectorBottomSheet
+			<AppFamilyMemberSheet
 				visible={showProfileSheet}
 				onClose={() => setShowProfileSheet(false)}
-				selectedProfileId={selectedProfile?.id}
-				onSelectProfile={setSelectedProfile}
+				members={familyMembers}
+				selectedKey={selectedMemberKey}
+				onSelect={(m) => setSelectedProfile((current) => toPatientProfile(m, current))}
+				title="Who is this booking for?"
+				subtitle="Pick yourself or a family member"
 			/>
 		</View>
 	)

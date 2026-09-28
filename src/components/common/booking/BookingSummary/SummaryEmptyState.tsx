@@ -1,7 +1,7 @@
 import React from 'react'
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native'
-import { AppTypography } from '../../AppTypography'
-import { AppButton } from '../../AppButton'
+import { AppTypography } from '../../display/AppTypography'
+import { AppButton } from '../../buttons/AppButton'
 
 export interface SummaryEmptyStateProps {
 	/** Pre-rendered icon element. */

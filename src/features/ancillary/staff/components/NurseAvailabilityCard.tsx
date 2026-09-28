@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../../context/AuthContext'
 import { USER_ROLES } from '../../../../constants/constants'
 import { AppToggle } from '../../../../components/common'
-import { AppTypography } from '../../../../components/common/AppTypography'
+import { AppTypography } from '../../../../components/common/display/AppTypography'
 
 interface NurseAvailabilityCardProps {
 	initialAvailable?: boolean

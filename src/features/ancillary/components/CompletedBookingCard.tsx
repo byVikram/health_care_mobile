@@ -3,8 +3,8 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { AncillaryBooking } from '../ancillaryService'
 import BookingStatusBadge from './BookingStatusBadge'
-import RatingStars from './RatingStars'
-import AppAvatar from '../../../components/common/AppAvatar'
+import AppRatingStars from '../../../components/common/display/AppRatingStars'
+import AppAvatar from '../../../components/common/display/AppAvatar'
 import { CommonCard } from '../../../components/common'
 
 interface CompletedBookingCardProps {
@@ -59,7 +59,7 @@ export default function CompletedBookingCard({
 
 				{hasReview ? (
 					<View style={styles.reviewedChip}>
-						<RatingStars rating={ratingValue} size={12} />
+						<AppRatingStars value={ratingValue} size={12} />
 						<Text style={styles.reviewedScoreText}>{ratingValue.toFixed(1)}</Text>
 					</View>
 				) : (

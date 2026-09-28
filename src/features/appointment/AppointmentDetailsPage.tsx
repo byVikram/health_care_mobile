@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import AppointmentDetailsContent from './components/AppointmentDetailsContent'
+import PatientAppointmentDetails from './components/patient-details/PatientAppointmentDetails'
 
 const PRIMARY = '#2B6F71'
 const SURFACE_MUTED = '#F5F8F8'
@@ -24,6 +25,10 @@ export default function AppointmentDetailsPage() {
 	const { role } = useAuth()
 	const appointmentId = route.params?.appointmentId ?? null
 	const viewAs = role === 'doctor' ? 'doctor' : 'patient'
+
+	// Patients get the redesigned details screen (design 7 / 7a); the doctor
+	// view keeps the shared AppointmentDetailsContent exactly as before.
+	if (viewAs === 'patient') return <PatientAppointmentDetails appointmentId={appointmentId} />
 
 	return (
 		<View style={styles.container}>

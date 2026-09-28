@@ -1,142 +1,98 @@
-import React, { useEffect, useState } from 'react'
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, useWindowDimensions, ActivityIndicator } from 'react-native'
-import { Text, Button, useTheme } from 'react-native-paper'
+// src/features/dashboard/components/ConsultSection.tsx
+//
+// Patient Home "Book by speciality" ("1 · Home"): a 2x2 grid of bordered rows (40px tone tile, name,
+// short subtitle). Each row resolves to the real speciality from the specialities list by label and
+// opens doctor search; "View all" opens the specialities page.
+import React from 'react'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+
+import { AppIconTile, AppPathIcon, AppSection, AppTextLink } from '../../../components/common'
+import { APP_COLORS, TONES } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import type { SpecialityItem } from '../../../types/speciality'
 import { getSpecialities } from '../../doctor/doctorService'
-import { SpecialityItem } from '../../../types/speciality'
+import { HOME_ICONS, homeSectionProps } from '../homeTheme'
 
-// ─────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>
 
-// ─────────────────────────────────────────────
-// Card Component
-// ─────────────────────────────────────────────
-interface ConsultCardProps {
-	image: any
+type ConsultRow = {
+	key: string
 	title: string
-	description: string
-	cardWidth: number
-	cardImageHeight: number
-	cardGap: number
-	onConsult?: () => void
+	subtitle: string
+	bg: string
+	ink: string
+	icon: string
+	/** Matches the speciality label from the API (e.g. "Dentistry", "Gynecology", "General Medicine"). */
+	match: RegExp
+	/** Search fallback when no speciality matches. */
+	fallbackName: string
 }
 
-function ConsultCard({ image, title, description, cardWidth, cardImageHeight, cardGap, onConsult }: ConsultCardProps) {
-	return (
-		<TouchableOpacity
-			style={[
-				styles.cardContainer,
-				{ width: cardWidth, marginRight: cardGap },
-			]}
-			onPress={onConsult}
-			activeOpacity={0.8}
-		>
-			<Image source={image} style={[styles.cardImage, { height: cardImageHeight }]} resizeMode="cover" />
-
-			<View style={styles.cardBody}>
-				<Text variant="titleSmall" style={styles.cardTitle}>
-					{title}
-				</Text>
-
-				<Text numberOfLines={2} style={styles.cardDesc}>
-					{description}
-				</Text>
-			</View>
-		</TouchableOpacity>
-	)
-}
-
-// ─────────────────────────────────────────────
-// Data
-// ─────────────────────────────────────────────
-// Each card maps to the real specialty by its DB label -- this is only used
-// to pick the right illustration/description; the id used for navigation
-// always comes from the fetched specialty record, never from here.
-const consults = [
+const CONSULTS: ConsultRow[] = [
 	{
-		id: 1,
+		key: 'dentist',
 		title: 'Dentist',
-		description: 'Teething troubles? Schedule a dental checkup',
-		image: require('../../../assets/specialties/dentist.png'),
-		specialityLabel: 'Dentistry',
+		subtitle: 'Teeth & gums',
+		bg: TONES.sky.bg,
+		ink: TONES.sky.ink,
+		icon: HOME_ICONS.tooth,
+		match: /dent/i,
+		fallbackName: 'Dentistry',
 	},
 	{
-		id: 2,
-		title: 'Gynecologist',
-		description: "Explore for women's health, pregnancy & infertility treatments",
-		image: require('../../../assets/specialties/gynocologist.png'),
-		specialityLabel: 'Gynecology',
+		key: 'gynaecologist',
+		title: 'Gynaecologist',
+		subtitle: 'Women’s health',
+		bg: TONES.peach.bg,
+		ink: TONES.peach.ink,
+		icon: HOME_ICONS.female,
+		match: /gyn|obstetric/i,
+		fallbackName: 'Gynecology',
 	},
 	{
-		id: 3,
-		title: 'Dietitian/Nutrition',
-		description: 'Get guidance on eating right, weight management & sports nutrition',
-		image: require('../../../assets/specialties/nutrition.png'),
-		specialityLabel: 'Nutrition & Dietetics',
+		key: 'dietitian',
+		title: 'Dietitian',
+		subtitle: 'Diet & nutrition',
+		bg: APP_COLORS.successBg,
+		ink: APP_COLORS.success,
+		icon: HOME_ICONS.apple,
+		match: /diet|nutri/i,
+		fallbackName: 'Nutrition & Dietetics',
 	},
 	{
-		id: 4,
-		title: 'Physiotherapist',
-		description: 'Pulled a muscle? Get it treated by a trained physiotherapist',
-		image: require('../../../assets/specialties/physiotherapist.png'),
-		specialityLabel: 'Physiotherapy',
+		key: 'general',
+		title: 'General physician',
+		subtitle: 'Fever, cold, BP',
+		bg: TONES.mint.bg,
+		ink: TONES.mint.ink,
+		icon: HOME_ICONS.stethoscope,
+		match: /general|physician|internal medicine/i,
+		fallbackName: 'General Medicine',
 	},
 ]
 
-// ─────────────────────────────────────────────
-// Main Component
-// ─────────────────────────────────────────────
-function ConsultSection() {
-	const theme = useTheme()
-	const { width } = useWindowDimensions()
+type Props = {
+	/** Specialities fetched once by the Home page. */
+	specialities?: SpecialityItem[]
+}
+
+function ConsultSection({ specialities = [] }: Props) {
 	const navigation = useNavigation<NavigationProp>()
-	const [specialities, setSpecialities] = useState<SpecialityItem[]>([])
-	const [loading, setLoading] = useState(true)
 
-	useEffect(() => {
-		let active = true
-		setLoading(true)
-		getSpecialities()
-			.then((res) => {
-				if (!active) return
-				if (res.success && res.data) setSpecialities(res.data)
-			})
-			.catch((error) => {
-				console.error('Error fetching specialities:', error)
-			})
-			.finally(() => {
-				if (active) setLoading(false)
-			})
-		return () => {
-			active = false
+	const handleConsult = async (row: ConsultRow) => {
+		let list = specialities
+		if (list.length === 0) {
+			try {
+				const res = await getSpecialities()
+				if (res.success && res.data) list = res.data
+			} catch {
+				list = []
+			}
 		}
-	}, [])
-
-	const isTablet = width >= 768
-
-	// Calculate how many cards to show per visible window, with a peeking card
-	// to signal that the list is scrollable.
-	const HORIZONTAL_PADDING = 16 // container padding on each side
-	const CARD_GAP = 12
-	const visibleCards = isTablet ? 3.2 : 2.15
-	const totalGaps = Math.floor(visibleCards) // gaps between fully-visible cards
-	const cardWidth = Math.floor(
-		(width - HORIZONTAL_PADDING * 2 - CARD_GAP * totalGaps) / visibleCards,
-	)
-	const cardImageHeight = Math.floor(cardWidth * 0.68)
-
-	const handleConsult = async (specialityLabel: string) => {
-		const match = specialities.find(
-			(s) =>
-				s.label.toLowerCase().trim() === specialityLabel.toLowerCase().trim() ||
-				s.label.toLowerCase().includes(specialityLabel.toLowerCase()) ||
-				specialityLabel.toLowerCase().includes(s.label.toLowerCase())
-		)
+		const match = list.find((s) => row.match.test(s.label))
 		if (match) {
 			navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
 				specialityId: String(match.id),
@@ -144,157 +100,78 @@ function ConsultSection() {
 			})
 			return
 		}
-
-		try {
-			const res = await getSpecialities()
-			if (res.success && res.data) {
-				const retryMatch = res.data.find(
-					(s) =>
-						s.label.toLowerCase().trim() === specialityLabel.toLowerCase().trim() ||
-						s.label.toLowerCase().includes(specialityLabel.toLowerCase()) ||
-						specialityLabel.toLowerCase().includes(s.label.toLowerCase())
-				)
-				if (retryMatch) {
-					navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
-						specialityId: String(retryMatch.id),
-						specialityName: retryMatch.label,
-					})
-					return
-				}
-			}
-		} catch (error) {
-			console.error('Error fetching specialities in ConsultSection:', error)
-		}
-
-		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
-			specialityName: specialityLabel,
-		})
+		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, { specialityName: row.fallbackName })
 	}
 
 	return (
-		<View style={styles.sectionContainer}>
-
-			{/* HEADER */}
-			<View style={styles.headerRow}>
-				<View style={[styles.titleBorder, { borderLeftColor: theme.colors.primary }]}>
-					<Text variant="titleMedium" style={styles.mainTitle}>
-						Book an Appointment
-					</Text>
-
-					<Text variant="bodySmall">Find experienced doctors across all specialties</Text>
-				</View>
-
-				<Button
-					mode="outlined"
-					style={styles.viewAllBtn}
-					labelStyle={{ fontSize: 12 }}
-					onPress={() =>
-					navigation.navigate(ROUTES.STACK.ALL_SPECIALITIES as never)
-						}
-					
-				>
-					View All
-				</Button>
+		<AppSection
+			title="Book by speciality"
+			right={<AppTextLink label="View all" onPress={() => navigation.navigate(ROUTES.STACK.ALL_SPECIALITIES)} />}
+			{...homeSectionProps(12)}
+		>
+			<View style={styles.grid}>
+				{CONSULTS.map((row) => (
+					<TouchableOpacity
+						key={row.key}
+						style={styles.row}
+						activeOpacity={0.8}
+						onPress={() => handleConsult(row)}
+						accessibilityRole="button"
+						accessibilityLabel={`${row.title}, ${row.subtitle}`}
+					>
+						<AppIconTile size={40} radius={12} backgroundColor={row.bg}>
+							<AppPathIcon d={row.icon} size={20} strokeWidth={2} color={row.ink} />
+						</AppIconTile>
+						<View style={styles.textCol}>
+							<Text style={styles.title} numberOfLines={1}>
+								{row.title}
+							</Text>
+							<Text style={styles.subtitle} numberOfLines={1}>
+								{row.subtitle}
+							</Text>
+						</View>
+					</TouchableOpacity>
+				))}
 			</View>
-
-			{/* CARDS */}
-			{loading ? (
-				<View style={{ paddingVertical: 24, alignItems: 'center' }}>
-					<ActivityIndicator size="small" color={theme.colors.primary} />
-				</View>
-			) : (
-				<ScrollView
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					contentContainerStyle={[
-						styles.scrollContent,
-						{ paddingHorizontal: HORIZONTAL_PADDING },
-					]}
-				>
-					{consults.map((s, index) => (
-						<ConsultCard
-							key={s.id}
-							title={s.title}
-							description={s.description}
-							image={s.image}
-							cardWidth={cardWidth}
-							cardImageHeight={cardImageHeight}
-							cardGap={index < consults.length - 1 ? CARD_GAP : 0}
-							onConsult={() => handleConsult(s.specialityLabel)}
-						/>
-					))}
-				</ScrollView>
-			)}
-		</View>
+		</AppSection>
 	)
 }
 
 export default React.memo(ConsultSection)
 
-// ─────────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────────
 const styles = StyleSheet.create({
-	sectionContainer: {
-		marginVertical: 16,
-	},
-
-	headerRow: {
+	grid: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
+		flexWrap: 'wrap',
+		gap: 8,
 		paddingHorizontal: 16,
-		marginBottom: 16,
 	},
-
-	titleBorder: {
-		borderLeftWidth: 3,
-		paddingLeft: 12,
+	row: {
+		flexBasis: '47%',
+		flexGrow: 1,
+		minWidth: 0,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+		padding: 10,
+		borderRadius: 10,
+		backgroundColor: APP_COLORS.surface,
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
+	},
+	textCol: {
 		flex: 1,
-		marginRight: 16,
+		minWidth: 0,
 	},
-
-	mainTitle: {
-		fontWeight: 'bold',
-		marginBottom: 2,
+	title: {
+		fontSize: 14,
+		lineHeight: 18,
+		fontWeight: '700',
+		color: APP_COLORS.ink,
 	},
-
-	viewAllBtn: {
-		borderRadius: 20,
-	},
-
-	scrollContent: {
-		paddingBottom: 4,
-	},
-
-	cardContainer: {
-		marginBottom: 16,
-		backgroundColor: '#fff',
-		borderRadius: 16,
-		overflow: 'hidden',
-		elevation: 2,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.08,
-		shadowRadius: 6,
-	},
-
-	cardImage: {
-		width: '100%',
-		backgroundColor: '#f0f4f8',
-	},
-
-	cardBody: {
-		padding: 12,
-	},
-
-	cardTitle: {
-		fontWeight: 'bold',
-		marginBottom: 4,
-	},
-
-	cardDesc: {
-		color: '#666',
+	subtitle: {
 		fontSize: 12,
+		lineHeight: 16,
+		color: APP_COLORS.inkMuted,
 	},
 })

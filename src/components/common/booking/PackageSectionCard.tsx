@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, StyleSheet, Image, TouchableOpacity, ImageSourcePropType } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../AppTypography'
+import { AppTypography } from '../display/AppTypography'
 
 export interface PackageListItem {
 	id: string

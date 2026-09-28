@@ -18,7 +18,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import DateSlotPicker from '../../../components/common/DateSlotPicker'
+import DateSlotPicker from '../../../components/common/inputs/DateSlotPicker'
 import { APPOINTMENT_STATUS } from '../../../constants/constants'
 import {
 	getDoctorAvailability,
@@ -110,7 +110,7 @@ const getSlotStatus = (slot: AvailabilityApiSlot): TimeSlot['status'] => {
 	return 'AVAILABLE'
 }
 
-const normalizeAvailabilitySlots = (
+export const normalizeAvailabilitySlots = (
 	response: SlotGroup[] | { data?: AvailabilityApiModeGroup[] } | null | undefined,
 	appointmentType: RescheduleAppointmentMode
 ): SlotGroup[] => {

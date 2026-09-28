@@ -12,13 +12,13 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MOCK_NURSE_BOOKINGS, NurseBooking, NurseBookingState, getBookingState, clearBookingState } from '../ancillaryService'
 import { ROUTES } from '../../../navigation/routes'
-import OtpPinInput from '../components/OtpPinInput'
+import AppOtpInput from '../../../components/common/inputs/AppOtpInput'
 import ServiceTimeline from '../components/ServiceTimeline'
-import StatusModal from '../../../components/common/StatusModal'
+import StatusModal from '../../../components/common/feedback/StatusModal'
 import CancelVisitModal from '../components/CancelVisitModal'
-import AppScreenHeader from '../../../components/common/AppScreenHeader'
-import { AppTypography } from '../../../components/common/AppTypography'
-import { AppButton } from '../../../components/common/AppButton'
+import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
+import { AppTypography } from '../../../components/common/display/AppTypography'
+import { AppButton } from '../../../components/common/buttons/AppButton'
 
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
@@ -243,9 +243,9 @@ export default function CompleteServicePage() {
 
 					{/* 4-DIGIT PIN INPUT */}
 					<View style={styles.inputBox}>
-						<OtpPinInput
+						<AppOtpInput
 							value={pin}
-							onChangeValue={(val) => {
+							onChange={(val) => {
 								setPin(val)
 								if (error) setError('')
 							}}

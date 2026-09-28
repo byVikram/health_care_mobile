@@ -1,58 +1,61 @@
 // src/features/appointment/VisitSummaryPage.tsx
 //
-// Patient-facing "Visit summary" screen for a COMPLETED appointment — the real
-// equivalent of mockup Screen 7b. No such screen existed before; this is new.
-// Per the "keep visuals, wire only what's real" rule used across this restyle
-// pass: doctor's notes / prescription / follow-up only render when the
-// backing TreatmentRecord actually has that field. The mockup's specific
-// "Lipid profile — Book test" recommendation has no backing data anywhere in
-// the app (no field for a doctor-recommended test exists), so instead of
-// fabricating a test name we show a generic, always-real "Book a lab test"
-// entry point into the Laboratory search flow.
+// Patient-facing "Visit summary" screen for a COMPLETED appointment — port of
+// design Screen 7b (7b_visit_summary.html, 390x844). Per the "keep visuals,
+// wire only what's real" rule used across this restyle pass: doctor's notes /
+// prescription / follow-up only render when the backing TreatmentRecord
+// actually has that field. TreatmentRecord carries no structured medicine or
+// advised-test list (only notes / prescription_s3_key / follow_up_date), so the
+// prescription block shows the real prescription document instead of
+// fabricated medicine rows, and the lab-test row is a generic, always-real
+// entry point into the Laboratory search flow rather than a named test.
 
 import React, { useEffect, useState } from 'react'
-import { View, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Linking, TextInput } from 'react-native'
+import { View, ScrollView, StyleSheet, ActivityIndicator, Linking, TextInput, Share } from 'react-native'
 import { Text } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { AppButton } from '../../components/common'
+import {
+	AppActionChip,
+	AppAvatar,
+	AppButton,
+	AppDashedDivider,
+	AppFooterBar,
+	AppIconButton,
+	AppIconTile,
+	AppInfoBanner,
+	AppNavRow,
+	AppScreenHeader,
+	AppSection,
+	AppTextLink,
+} from '../../components/common'
+import AppRatingStars from '../../components/common/display/AppRatingStars'
+import { showComingSoon } from '../../utils/toast'
 import { getAppointmentById } from '../../services/appointmentService'
 import { getReviewForAppointment, createReview, DoctorReview } from '../../services/reviewService'
 import { patientService, TreatmentRecord } from '../consultation/ConsultationService'
-import { Appointment } from '../../types/appointment'
+import { Appointment, AppointmentDoctor } from '../../types/appointment'
 import { ROUTES } from '../../navigation/routes'
-import { formatShortDateDisplay } from '../../utils/date'
 import { formatTimeSlot, capitaliseWords } from '../../utils/formatters'
+import { buildS3Url } from '../../utils/s3Utils'
+import { formatFullDate, formatInterval, fullDayLabel, parseDateOnly } from '../../utils/date'
+import { APP_COLORS, TONES, formatInr } from '../../config/theme'
 
-const PRIMARY = '#2B6F71'
-const INK = '#12373E'
-const INK_MUTED = '#5B6B6E'
-const DIVIDER = '#D5E1E2'
-const SURFACE_MUTED = '#F5F8F8'
-const SUCCESS_BG = '#E6F4EC'
-const SUCCESS = '#1E7A4E'
-const PEACH_BG = '#FDE8DC'
-const PEACH = '#B4532A'
-const LILAC_BG = '#ECE6FA'
-const LILAC = '#6A4BB5'
-const SKY = '#2463A8'
-const AMBER = '#E8A200'
-
-function formatDate(d?: string | null): string {
-	if (!d) return '—'
-	const date = new Date(d)
-	if (isNaN(date.getTime())) return d
-	return formatShortDateDisplay(date)
+function modeLabel(mode?: string | null, hospital?: string | null): string {
+	const m = (mode || '').toLowerCase()
+	if (m.includes('video')) return 'Video call'
+	if (m.includes('clinic')) return `In-clinic visit${hospital ? ` · ${hospital}` : ''}`
+	return `${capitaliseWords(mode)}${hospital ? ` · ${hospital}` : ''}`
 }
 
-const formatTime = (t?: string | null): string => (t ? formatTimeSlot(t) : '')
-const capitalise = capitaliseWords
+// Wrapped so press events / errors are never forwarded as showComingSoon's `text2`.
+const comingSoon = () => showComingSoon()
+
+type DoctorWithQuals = AppointmentDoctor & { qualifications?: string | string[] | null; degree?: string | null }
 
 export default function VisitSummaryPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
-	const insets = useSafeAreaInsets()
 	const { appointmentId } = (route.params || {}) as { appointmentId: string }
 
 	const [appt, setAppt] = useState<Appointment | null>(null)
@@ -75,16 +78,17 @@ export default function VisitSummaryPage() {
 		let cancelled = false
 		setLoading(true)
 		setLoadError(false)
-		getAppointmentById(appointmentId)
-			.then((data) => {
+		const fetchAppointment = async () => {
+			try {
+				const data = await getAppointmentById(appointmentId)
 				if (!cancelled) setAppt(data)
-			})
-			.catch(() => {
+			} catch {
 				if (!cancelled) setLoadError(true)
-			})
-			.finally(() => {
+			} finally {
 				if (!cancelled) setLoading(false)
-			})
+			}
+		}
+		fetchAppointment()
 		return () => {
 			cancelled = true
 		}
@@ -94,16 +98,17 @@ export default function VisitSummaryPage() {
 		const patientId = appt?.patient?.id
 		if (!patientId) return
 		let cancelled = false
-		patientService
-			.getPatientTreatmentHistory(patientId)
-			.then((records) => {
+		const fetchTreatment = async () => {
+			try {
+				const records = await patientService.getPatientTreatmentHistory(patientId)
 				if (cancelled) return
 				const match = records.find((r) => String(r.appointment_id) === String(appt?.id)) ?? null
 				setTreatment(match)
-			})
-			.catch(() => {
+			} catch {
 				// No treatment record is a valid real state (e.g. notes not yet added) — not an error banner.
-			})
+			}
+		}
+		fetchTreatment()
 		return () => {
 			cancelled = true
 		}
@@ -113,13 +118,17 @@ export default function VisitSummaryPage() {
 		if (!appointmentId) return
 		let cancelled = false
 		setReviewLoading(true)
-		getReviewForAppointment(appointmentId)
-			.then((data) => {
+		const fetchReview = async () => {
+			try {
+				const data = await getReviewForAppointment(appointmentId)
 				if (!cancelled) setReview(data)
-			})
-			.finally(() => {
+			} catch {
+				// No review yet (or it failed to load) — the rating form still shows.
+			} finally {
 				if (!cancelled) setReviewLoading(false)
-			})
+			}
+		}
+		fetchReview()
 		return () => {
 			cancelled = true
 		}
@@ -152,7 +161,7 @@ export default function VisitSummaryPage() {
 	if (loading) {
 		return (
 			<View style={[styles.container, styles.centerContent]}>
-				<ActivityIndicator size="large" color={PRIMARY} />
+				<ActivityIndicator size="large" color={APP_COLORS.primary} />
 			</View>
 		)
 	}
@@ -160,8 +169,8 @@ export default function VisitSummaryPage() {
 	if (loadError || !appt) {
 		return (
 			<View style={[styles.container, styles.centerContent]}>
-				<MaterialCommunityIcons name="alert-circle-outline" size={48} color="#e53935" />
-				<Text style={{ marginTop: 16, color: '#e53935', textAlign: 'center' }}>
+				<MaterialCommunityIcons name="alert-circle-outline" size={48} color={APP_COLORS.danger} />
+				<Text style={{ marginTop: 16, color: APP_COLORS.danger, textAlign: 'center' }}>
 					Failed to load this visit summary.
 				</Text>
 				<AppButton variant="primary" style={{ marginTop: 20 }} onPress={goBack}>
@@ -171,225 +180,290 @@ export default function VisitSummaryPage() {
 		)
 	}
 
+	const bookingRef = appt.public_id ?? appt.id
 	const rawStatus = typeof appt.status === 'string' ? appt.status : appt.status?.label
-	const doctorSpecialty = appt.doctor?.specialty ?? appt.doctor?.specialization
+	const doctor = appt.doctor as DoctorWithQuals | undefined
+	const doctorSpecialty = doctor?.specialty ?? doctor?.specialization
+	const quals = Array.isArray(doctor?.qualifications)
+		? doctor?.qualifications.join(', ')
+		: (doctor?.qualifications ?? doctor?.degree ?? null)
+	const avatarUri = buildS3Url(doctor?.avatar_s3_key)
+	const visitDate = parseDateOnly(appt.appointment_date, { ignoreTime: false })
+	const timeLabel = appt.start_time ? formatTimeSlot(appt.start_time) : ''
+	const whenLabel = [visitDate ? fullDayLabel(visitDate, { markToday: false }) : appt.appointment_date, timeLabel]
+		.filter(Boolean)
+		.join(', ')
+	const whereLabel = modeLabel(appt.appointment_mode, appt.hospital?.name)
+	const followUp = parseDateOnly(treatment?.follow_up_date, { ignoreTime: false })
+	const followUpInterval = followUp ? formatInterval(visitDate, followUp) : null
+	const prescriptionDate = parseDateOnly(treatment?.created_at?.slice(0, 10), { ignoreTime: false })
+	const hasFee = appt.fees != null && Number(appt.fees) > 0
+	const shownRating = review ? review.rating : rating
+
+	const openDoctor = () => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: appt.doctor.id })
+
+	const handleShare = () => {
+		const lines = [
+			`Visit summary · Booking ${bookingRef}`,
+			appt.doctor?.name ? `${appt.doctor.name}${doctorSpecialty ? ` (${doctorSpecialty})` : ''}` : null,
+			whenLabel,
+			whereLabel,
+			treatment?.notes ? `Doctor's notes: ${treatment.notes}` : null,
+			followUp ? `Follow-up: around ${formatFullDate(followUp)}` : null,
+		].filter(Boolean)
+		Share.share({ message: lines.join('\n') }).catch(() => {})
+	}
+
+	const handleDownload = () => {
+		const url = buildS3Url(treatment?.prescription_s3_key)
+		if (!url) return comingSoon()
+		Linking.openURL(url).catch(comingSoon)
+	}
 
 	return (
 		<View style={styles.container}>
-			<View style={[styles.header, { paddingTop: 16 + insets.top }]}>
-				<TouchableOpacity onPress={goBack} style={styles.backBtn} hitSlop={10}>
-					<MaterialCommunityIcons name="arrow-left" size={22} color="#fff" />
-				</TouchableOpacity>
-				<View style={{ flex: 1 }}>
-					<Text style={styles.headerTitle}>Visit summary</Text>
-					<Text style={styles.headerSubtitle}>Booking #{appt.public_id ?? appt.id}</Text>
-				</View>
-			</View>
+			<AppScreenHeader
+				variant="bar"
+				title="Visit summary"
+				subtitle={`Booking ${bookingRef}`}
+				titleStyle={styles.headerTitle}
+				onBack={goBack}
+				backAccessibilityLabel="Back to bookings"
+				rightElement={
+					<View style={styles.headerActions}>
+						<AppIconButton
+							icon="share-variant-outline"
+							variant="ghost"
+							size={44}
+							circle
+							onPress={handleShare}
+							accessibilityLabel="Share"
+						/>
+						<AppIconButton
+							icon="help-circle-outline"
+							variant="ghost"
+							size={44}
+							circle
+							onPress={comingSoon}
+							accessibilityLabel="Help"
+							style={styles.headerBtnRight}
+						/>
+					</View>
+				}
+			/>
 
 			<ScrollView
-				contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}
+				style={styles.scroll}
+				contentContainerStyle={styles.scrollContent}
 				showsVerticalScrollIndicator={false}
+				keyboardShouldPersistTaps="handled"
 			>
 				{/* Status banner */}
-				<View style={styles.statusBanner}>
-					<View style={styles.statusIconCircle}>
-						<MaterialCommunityIcons name="check" size={22} color="#fff" />
-					</View>
-					<View style={{ flex: 1 }}>
-						<Text style={styles.statusLabel}>{(rawStatus || '').toUpperCase()}</Text>
-						<Text style={styles.statusDateTime}>
-							{formatDate(appt.appointment_date)}
-							{appt.start_time ? `, ${formatTime(appt.start_time)}` : ''}
-						</Text>
-						<Text style={styles.statusMeta}>
-							{capitalise(appt.appointment_mode)}
-							{appt.hospital?.name ? ` · ${appt.hospital.name}` : ''}
-						</Text>
-					</View>
-				</View>
+				<AppInfoBanner
+					tone="success"
+					size="prominent"
+					icon="check-bold"
+					tileSize={44}
+					eyebrow={rawStatus || 'completed'}
+					title={whenLabel}
+					subtitle={whereLabel}
+					style={styles.statusBanner}
+				/>
+				<View style={{ height: 8 }} />
 
 				{/* Doctor card */}
-				<View style={styles.card}>
-					<View style={styles.doctorRow}>
-						{appt.doctor?.avatar_s3_key ? (
-							<View style={styles.avatarWrap}>
-								<Text style={styles.avatarInitial}>{appt.doctor.name?.charAt(0) ?? 'D'}</Text>
-							</View>
-						) : (
-							<View style={styles.avatarWrap}>
-								<Text style={styles.avatarInitial}>{appt.doctor?.name?.charAt(0) ?? 'D'}</Text>
-							</View>
-						)}
-						<View style={{ flex: 1 }}>
-							<Text style={styles.doctorName}>{appt.doctor?.name ?? '—'}</Text>
-							{doctorSpecialty ? <Text style={styles.doctorSpecialty}>{doctorSpecialty}</Text> : null}
-							<TouchableOpacity
-								style={styles.viewProfileRow}
-								onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: appt.doctor.id })}
-							>
-								<Text style={styles.viewProfileText}>View profile</Text>
-								<MaterialCommunityIcons name="chevron-right" size={16} color={PRIMARY} />
-							</TouchableOpacity>
-						</View>
+				<AppSection marginTop={0} gap={12} style={styles.doctorRow}>
+					<AppAvatar
+						uri={avatarUri}
+						name={appt.doctor?.name?.replace(/^Dr\.?\s*/i, '').charAt(0) ?? 'D'}
+						size={60}
+						radius={16}
+						backgroundColor={TONES.lilac.bg}
+						initialsColor={TONES.lilac.ink}
+						initialsStyle={styles.avatarInitial}
+					/>
+					<View style={styles.flexCol}>
+						<Text style={styles.doctorName}>{appt.doctor?.name ?? '—'}</Text>
+						{doctorSpecialty ? <Text style={styles.doctorSpecialty}>{doctorSpecialty}</Text> : null}
+						{quals ? <Text style={styles.doctorQuals}>{quals}</Text> : null}
+						<AppTextLink
+							label="View profile"
+							size="sm"
+							onPress={openDoctor}
+							style={styles.viewProfileRow}
+						/>
 					</View>
-				</View>
+				</AppSection>
 
 				{/* Doctor's notes — only when real */}
 				{treatment?.notes ? (
-					<View style={styles.card}>
-						<Text style={styles.sectionTitle}>Doctor's notes</Text>
+					<AppSection title="Doctor’s notes" titleSize="sm" marginTop={0}>
 						<Text style={styles.bodyText}>{treatment.notes}</Text>
-					</View>
+					</AppSection>
 				) : null}
 
-				{/* Prescription — only when real */}
-				{treatment?.prescription_s3_key ? (
-					<View style={styles.card}>
-						<Text style={styles.sectionTitle}>Prescription</Text>
-						<View style={styles.prescriptionRow}>
-							<View style={[styles.iconBox, { backgroundColor: PEACH_BG }]}>
-								<MaterialCommunityIcons name="file-document-outline" size={20} color={PEACH} />
+				{/* Prescription — real prescription document + generic lab-test entry (see file header) */}
+				<AppSection
+					title={treatment?.prescription_s3_key ? 'Prescription' : 'Lab tests'}
+					titleSize="sm"
+					marginTop={0}
+				>
+					<View style={styles.rxBox}>
+						{treatment?.prescription_s3_key ? (
+							<View style={styles.rxRow}>
+								<AppIconTile icon="pill" tone="peach" size={40} radius={12} iconSize={20} />
+								<View style={styles.flexCol}>
+									<Text style={styles.rxName}>Prescription</Text>
+									<Text style={styles.rxMeta}>
+										{prescriptionDate
+											? `Issued ${formatFullDate(prescriptionDate)} · by ${appt.doctor?.name ?? 'your doctor'}`
+											: `Issued by ${appt.doctor?.name ?? 'your doctor'}`}
+									</Text>
+								</View>
 							</View>
-							<View style={{ flex: 1 }}>
-								<Text style={styles.prescriptionTitle}>Prescription</Text>
-								<Text style={styles.prescriptionMeta}>{formatDate(treatment.created_at)}</Text>
+						) : null}
+						<View style={[styles.rxRow, treatment?.prescription_s3_key ? styles.rxRowDivider : null]}>
+							<AppIconTile icon="flask-outline" tone="lilac" size={40} radius={12} iconSize={20} />
+							<View style={styles.flexCol}>
+								<Text style={styles.rxName}>Lab test</Text>
+								<Text style={styles.rxMeta}>Book any test your doctor advised</Text>
 							</View>
+							<AppActionChip
+								label="Book test"
+								onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_LIST)}
+							/>
 						</View>
-						<View style={styles.buttonRow}>
-							<AppButton
-								variant="outline"
-								style={{ flex: 1 }}
-								icon="tray-arrow-down"
-								onPress={() => Linking.openURL(treatment.prescription_s3_key as string)}
-							>
-								Download
-							</AppButton>
-							<AppButton
-								variant="primary"
-								style={{ flex: 1 }}
-								onPress={() => navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH_PAGE)}
-							>
-								Order medicines
-							</AppButton>
-						</View>
+						{treatment?.prescription_s3_key ? (
+							<View style={styles.rxFooter}>
+								<AppActionChip
+									label="Download"
+									icon="chevron-down"
+									onPress={handleDownload}
+									style={styles.rxFooterBtn}
+								/>
+								<AppActionChip
+									label="Order medicines"
+									icon="pill"
+									filled
+									onPress={() => navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH_PAGE)}
+									style={styles.rxFooterBtn}
+								/>
+							</View>
+						) : null}
 					</View>
-				) : null}
-
-				{/* Generic lab-test entry point (no fabricated recommendation — see file header note) */}
-				<View style={styles.card}>
-					<Text style={styles.sectionTitle}>Need a lab test?</Text>
-					<View style={styles.labRow}>
-						<View style={[styles.iconBox, { backgroundColor: LILAC_BG }]}>
-							<MaterialCommunityIcons name="flask-outline" size={20} color={LILAC} />
-						</View>
-						<Text style={[styles.bodyText, { flex: 1 }]}>
-							Book a lab test near you whenever your doctor advises one.
-						</Text>
-					</View>
-					<AppButton variant="outline" onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_LIST)}>
-						Book a lab test
-					</AppButton>
-				</View>
+				</AppSection>
 
 				{/* Follow-up — only when real */}
-				{treatment?.follow_up_date ? (
-					<View style={styles.card}>
-						<Text style={styles.sectionTitle}>Follow-up</Text>
-						<View style={styles.followUpRow}>
-							<View style={styles.followUpIconBox}>
-								<MaterialCommunityIcons name="calendar-month" size={18} color={SKY} />
-							</View>
-							<View style={{ flex: 1 }}>
-								<Text style={styles.followUpTitle}>Follow-up recommended</Text>
-								<Text style={styles.followUpDate}>{formatDate(treatment.follow_up_date)}</Text>
-							</View>
-							<AppButton
-								variant="primary"
-								compact
-								onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: appt.doctor.id })}
-							>
-								Book
-							</AppButton>
-						</View>
-					</View>
+				{followUp ? (
+					<AppSection title="Follow-up" titleSize="sm" marginTop={0}>
+						<AppInfoBanner
+							tone="sky"
+							icon="calendar-blank-outline"
+							title={followUpInterval ? `Review in ${followUpInterval}` : 'Follow-up recommended'}
+							subtitle={`Around ${formatFullDate(followUp)}`}
+							action={{ label: 'Book', onPress: openDoctor }}
+						/>
+					</AppSection>
 				) : null}
 
-				{/* Payment — only the real fee field, no fabricated breakdown */}
-				{appt.fees != null ? (
-					<View style={styles.card}>
-						<Text style={styles.sectionTitle}>Payment</Text>
-						<View style={styles.paymentRow}>
-							<Text style={styles.bodyText}>Consultation fee</Text>
-							<Text style={styles.paymentValue}>₹{appt.fees}</Text>
+				{/* Payment — only the real fee field */}
+				{hasFee ? (
+					<AppSection title="Payment" titleSize="sm" marginTop={0}>
+						<View style={styles.payRow}>
+							<Text style={styles.payText}>Consultation fee</Text>
+							<Text style={styles.payText}>{formatInr(appt.fees)}</Text>
 						</View>
-					</View>
+						<View style={styles.payRow}>
+							<Text style={styles.payText}>Booking fee</Text>
+							<Text style={[styles.payText, styles.payFree]}>Free</Text>
+						</View>
+						<AppDashedDivider color={APP_COLORS.border} style={styles.payDash} />
+						<View style={styles.payTotalRow}>
+							<Text style={styles.payTotalLabel}>Paid</Text>
+							<Text style={styles.payTotalValue}>{formatInr(appt.fees)}</Text>
+						</View>
+						<View style={styles.payMetaRow}>
+							<View style={{ flex: 1 }} />
+							<AppTextLink
+								label="Receipt"
+								size="sm"
+								leadingIcon="chevron-down"
+								trailingIcon="none"
+								onPress={comingSoon}
+								style={styles.receiptLink}
+								textStyle={styles.receiptText}
+							/>
+						</View>
+					</AppSection>
 				) : null}
 
 				{/* Rating — real getReviewForAppointment / createReview calls */}
-				<View style={styles.card}>
-					<Text style={styles.sectionTitle}>How was your visit?</Text>
+				<AppSection title="How was your visit?" titleSize="sm" marginTop={0}>
 					{reviewLoading ? (
-						<ActivityIndicator color={PRIMARY} style={{ marginTop: 8 }} />
-					) : review ? (
-						<View style={{ marginTop: 4 }}>
-							<View style={{ flexDirection: 'row', gap: 4 }}>
-								{[1, 2, 3, 4, 5].map((s) => (
-									<MaterialCommunityIcons
-										key={s}
-										name={s <= review.rating ? 'star' : 'star-outline'}
-										size={20}
-										color={AMBER}
-									/>
-								))}
-							</View>
-							{review.comment ? (
-								<Text style={[styles.bodyText, { marginTop: 8 }]}>{review.comment}</Text>
-							) : null}
-						</View>
+						<ActivityIndicator color={APP_COLORS.primary} style={{ alignSelf: 'flex-start' }} />
 					) : (
-						<View style={{ marginTop: 4 }}>
-							<View style={{ flexDirection: 'row', gap: 8 }}>
-								{[1, 2, 3, 4, 5].map((s) => (
-									<TouchableOpacity key={s} onPress={() => setRating(s)} hitSlop={6}>
-										<MaterialCommunityIcons
-											name={s <= rating ? 'star' : 'star-outline'}
-											size={26}
-											color={AMBER}
-										/>
-									</TouchableOpacity>
-								))}
-							</View>
-							<TextInput
-								placeholder="Add a comment (optional)"
-								placeholderTextColor={INK_MUTED}
-								value={comment}
-								onChangeText={setComment}
-								style={styles.commentInput}
-								multiline
+						<>
+							<AppRatingStars
+								variant="buttons"
+								value={shownRating}
+								onChange={review ? undefined : setRating}
+								accessibilityLabel="Rating"
 							/>
-							<AppButton
-								variant="primary"
-								loading={submittingReview}
-								disabled={!rating || submittingReview}
-								onPress={handleSubmitReview}
-								style={{ marginTop: 10, alignSelf: 'flex-start' }}
-							>
-								Submit review
-							</AppButton>
-						</View>
+							{review ? (
+								review.comment ? (
+									<Text style={styles.bodyText}>{review.comment}</Text>
+								) : null
+							) : rating > 0 ? (
+								<>
+									<TextInput
+										placeholder="Add a comment (optional)"
+										placeholderTextColor={APP_COLORS.inkMuted}
+										value={comment}
+										onChangeText={setComment}
+										style={styles.commentInput}
+										multiline
+									/>
+									{/* `loading` shows spinner + label and blocks presses; the 0.6 dim is this screen's */}
+									<AppActionChip
+										label="Submit review"
+										filled
+										loading={submittingReview}
+										onPress={handleSubmitReview}
+										style={[styles.submitBtn, submittingReview && styles.submitBtnBusy]}
+									/>
+								</>
+							) : null}
+						</>
 					)}
-				</View>
+				</AppSection>
+
+				{/* Help */}
+				<AppNavRow
+					title="Need help with this booking?"
+					subtitle="Chat with Karolahealth support"
+					onPress={comingSoon}
+					leading={{ icon: 'chat-question-outline', tone: 'lilac', size: 36, iconSize: 18 }}
+					trailing={<MaterialCommunityIcons name="chevron-right" size={18} color={APP_COLORS.border} />}
+					style={styles.helpCard}
+					titleStyle={styles.helpTitle}
+				/>
 			</ScrollView>
 
-			<View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+			{/* Footer */}
+			<AppFooterBar>
 				<AppButton
-					variant="primary"
-					style={styles.footerButton}
-					onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: appt.doctor.id })}
+					variant="outline"
+					size="lg"
+					icon="chevron-down"
+					style={styles.footerBtn}
+					onPress={comingSoon}
 				>
+					Invoice
+				</AppButton>
+				<AppButton size="lg" style={styles.footerBtn} onPress={openDoctor}>
 					Book follow-up
 				</AppButton>
-			</View>
+			</AppFooterBar>
 		</View>
 	)
 }
@@ -397,243 +471,215 @@ export default function VisitSummaryPage() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: SURFACE_MUTED,
+		backgroundColor: APP_COLORS.pageBg,
 	},
 	centerContent: {
 		justifyContent: 'center',
 		alignItems: 'center',
 		padding: 24,
 	},
-	header: {
-		backgroundColor: PRIMARY,
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: 8,
-		paddingBottom: 16,
-		gap: 4,
+	flexCol: {
+		flex: 1,
+		minWidth: 0,
+		flexDirection: 'column',
 	},
-	backBtn: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
+
+	// Header (AppScreenHeader 'bar' defaults to 16/20 with a subtitle; the design uses 18/24 700)
 	headerTitle: {
 		fontSize: 18,
 		lineHeight: 24,
 		fontWeight: '700',
-		color: '#fff',
 	},
-	headerSubtitle: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '500',
-		color: '#E3EFEF',
-	},
-
-	statusBanner: {
-		margin: 16,
-		marginBottom: 8,
-		padding: 16,
-		borderRadius: 16,
-		backgroundColor: SUCCESS_BG,
+	headerActions: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 12,
+		gap: 4,
 	},
-	statusIconCircle: {
-		width: 44,
-		height: 44,
-		borderRadius: 12,
-		backgroundColor: SUCCESS,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	statusLabel: {
-		fontSize: 11,
-		lineHeight: 14,
-		fontWeight: '800',
-		letterSpacing: 0.6,
-		color: SUCCESS,
-	},
-	statusDateTime: {
-		fontSize: 18,
-		lineHeight: 24,
-		fontWeight: '800',
-		color: INK,
-		marginTop: 2,
-	},
-	statusMeta: {
-		fontSize: 13,
-		lineHeight: 18,
-		color: INK_MUTED,
-		marginTop: 2,
+	headerBtnRight: {
+		marginRight: -10,
 	},
 
-	card: {
+	scroll: {
+		flex: 1,
+	},
+	scrollContent: {
+		gap: 8,
+		paddingBottom: 16,
+	},
+
+	// Status banner (prominent AppInfoBanner, centred with the design's 16 radius)
+	statusBanner: {
+		marginTop: 16,
 		marginHorizontal: 16,
-		marginBottom: 8,
-		padding: 16,
 		borderRadius: 16,
-		backgroundColor: '#fff',
+		alignItems: 'center',
 	},
-	sectionTitle: {
-		fontSize: 16,
-		lineHeight: 22,
-		fontWeight: '800',
-		color: INK,
-		marginBottom: 10,
-	},
+
 	bodyText: {
 		fontSize: 14,
 		lineHeight: 21,
-		color: INK,
+		color: APP_COLORS.ink,
 	},
 
+	// Doctor
 	doctorRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 12,
-	},
-	avatarWrap: {
-		width: 60,
-		height: 60,
-		borderRadius: 16,
-		backgroundColor: PRIMARY,
-		alignItems: 'center',
-		justifyContent: 'center',
 	},
 	avatarInitial: {
 		fontSize: 22,
-		fontWeight: '700',
-		color: '#fff',
+		fontWeight: '800',
 	},
 	doctorName: {
 		fontSize: 17,
 		lineHeight: 22,
 		fontWeight: '800',
-		color: INK,
+		color: APP_COLORS.ink,
 	},
 	doctorSpecialty: {
 		fontSize: 13,
 		lineHeight: 18,
 		fontWeight: '700',
-		color: LILAC,
-		marginTop: 1,
+		color: TONES.lilac.ink,
+	},
+	doctorQuals: {
+		fontSize: 12,
+		lineHeight: 16,
+		color: APP_COLORS.inkMuted,
 	},
 	viewProfileRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
 		alignSelf: 'flex-start',
-		marginTop: 4,
-	},
-	viewProfileText: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: PRIMARY,
+		marginTop: 2,
 	},
 
-	iconBox: {
-		width: 40,
-		height: 40,
+	// Prescription block
+	rxBox: {
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
 		borderRadius: 12,
-		alignItems: 'center',
-		justifyContent: 'center',
+		overflow: 'hidden',
 	},
-	prescriptionRow: {
+	rxRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 12,
 		padding: 12,
-		borderWidth: 1,
-		borderColor: DIVIDER,
-		borderRadius: 12,
 	},
-	prescriptionTitle: {
+	rxRowDivider: {
+		borderTopWidth: 1,
+		borderTopColor: APP_COLORS.divider,
+	},
+	rxName: {
 		fontSize: 15,
 		lineHeight: 20,
 		fontWeight: '800',
-		color: INK,
+		color: APP_COLORS.ink,
 	},
-	prescriptionMeta: {
+	rxMeta: {
 		fontSize: 13,
 		lineHeight: 18,
-		color: INK_MUTED,
+		color: APP_COLORS.inkMuted,
 	},
-	buttonRow: {
+	rxFooter: {
 		flexDirection: 'row',
 		gap: 8,
-		marginTop: 10,
-	},
-
-	labRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		marginBottom: 12,
-	},
-
-	followUpRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 10,
 		padding: 12,
-		borderRadius: 12,
-		backgroundColor: '#DDEBFA',
+		backgroundColor: APP_COLORS.pageBg,
 	},
-	followUpIconBox: {
-		width: 32,
-		height: 32,
-		borderRadius: 10,
-		backgroundColor: '#fff',
-		alignItems: 'center',
+	rxFooterBtn: {
+		flex: 1,
+		minWidth: 0,
 		justifyContent: 'center',
 	},
-	followUpTitle: {
-		fontSize: 14,
-		lineHeight: 20,
-		fontWeight: '800',
-		color: SKY,
-	},
-	followUpDate: {
-		fontSize: 12,
-		lineHeight: 16,
-		color: INK,
-	},
 
-	paymentRow: {
+	// Payment
+	payRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 	},
-	paymentValue: {
+	payText: {
 		fontSize: 14,
 		lineHeight: 20,
+		color: APP_COLORS.ink,
+	},
+	payFree: {
+		color: APP_COLORS.success,
 		fontWeight: '700',
-		color: INK,
+	},
+	payDash: {
+		marginTop: 2,
+	},
+	payTotalRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'baseline',
+	},
+	payTotalLabel: {
+		fontSize: 15,
+		fontWeight: '800',
+		color: APP_COLORS.ink,
+	},
+	payTotalValue: {
+		fontSize: 20,
+		lineHeight: 26,
+		fontWeight: '800',
+		color: APP_COLORS.ink,
+	},
+	payMetaRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 8,
+	},
+	// AppTextLink sm at the design's 4px icon gap and 12/16 label
+	receiptLink: {
+		gap: 4,
+	},
+	receiptText: {
+		fontSize: 12,
+		lineHeight: 16,
 	},
 
+	// Rating
 	commentInput: {
-		marginTop: 10,
 		borderWidth: 1,
-		borderColor: DIVIDER,
-		borderRadius: 10,
+		borderColor: APP_COLORS.divider,
+		borderRadius: 12,
 		paddingHorizontal: 12,
-		paddingVertical: 8,
-		fontSize: 13,
-		color: INK,
-		minHeight: 44,
+		paddingVertical: 10,
+		fontSize: 14,
+		lineHeight: 20,
+		color: APP_COLORS.ink,
+		minHeight: 72,
 		textAlignVertical: 'top',
 	},
-
-	footer: {
-		backgroundColor: '#fff',
-		borderTopWidth: 1,
-		borderTopColor: DIVIDER,
-		paddingHorizontal: 16,
-		paddingTop: 12,
+	// AppActionChip filled: its 1px primary border + 11 = the design's 12px side padding
+	submitBtn: {
+		alignSelf: 'flex-start',
+		paddingHorizontal: 11,
 	},
-	footerButton: {
+	submitBtnBusy: {
+		opacity: 0.6,
+	},
+
+	// Help
+	// AppNavRow restyled as the design's bordered card; title 14/20 700
+	helpCard: {
+		marginHorizontal: 16,
+		paddingVertical: 12,
+		paddingHorizontal: 14,
 		borderRadius: 12,
+		backgroundColor: APP_COLORS.surface,
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
+	},
+	helpTitle: {
+		fontSize: 14,
+		fontWeight: '700',
+	},
+
+	// Footer
+	footerBtn: {
+		flex: 1,
 	},
 })

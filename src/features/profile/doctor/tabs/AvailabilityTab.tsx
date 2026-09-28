@@ -10,8 +10,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
 
 import { AppSelect, AppStickyFooter, StatusModal } from '../../../../components/common'
-import { AppTypography } from '../../../../components/common/AppTypography'
-import DateSlotPicker from '../../../../components/common/DateSlotPicker'
+import { AppTypography } from '../../../../components/common/display/AppTypography'
+import DateSlotPicker from '../../../../components/common/inputs/DateSlotPicker'
 import {
 	getDoctorAvailability,
 	getDoctorProfile,

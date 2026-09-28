@@ -1,60 +1,39 @@
+// src/features/dashboard/components/SpecialitySection.tsx
+//
+// Patient Home "Not feeling well?" ("1 · Home"): the first four symptoms as 64px circular tone tiles
+// with short labels. A tap resolves the symptom to its speciality and opens doctor search (unchanged
+// logic); "All symptoms" opens the specialities page. Falls back to a built-in symptom list when the
+// symptoms API is empty or fails.
 import React, { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, ActivityIndicator } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
+
+import { AppIconTile, AppPathIcon, AppSection, AppSkeleton, AppTextLink } from '../../../components/common'
+import { APP_COLORS, TONES, toneForString, type ToneKey } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
+import type { SpecialityItem, SymptomItem } from '../../../types/speciality'
 import { getSpecialities, getSymptoms } from '../../doctor/doctorService'
-import { SpecialityItem, SymptomItem } from '../../../types/speciality'
+import { HOME_ICONS, homeSectionProps } from '../homeTheme'
 
-import pregnancyImage from '../../../assets/specialties/pregnancy.svg'
-import acneImage from '../../../assets/specialties/acne.svg'
-import performanceImage from '../../../assets/specialties/performance.svg'
-import coughImage from '../../../assets/specialties/cough.svg'
-import childImage from '../../../assets/specialties/child.svg'
-import depressionImage from '../../../assets/specialties/depression.svg'
-import { Button } from 'react-native-paper'
-
-const TEAL = '#0c7c7c'
-
-// icon_key (from the symptoms API) -> local illustration.
-const ICON_MAP: Record<string, React.ComponentType<{ width?: string | number; height?: string | number }>> = {
-	pregnancy: pregnancyImage,
-	acne: acneImage,
-	performance: performanceImage,
-	cough: coughImage,
-	child: childImage,
-	depression: depressionImage,
+/** icon_key (symptoms API) -> short Home label, tone and glyph. */
+const SYMPTOM_META: Record<string, { label: string; tone: ToneKey; icon: string }> = {
+	acne: { label: 'Skin & acne', tone: 'peach', icon: HOME_ICONS.skin },
+	child: { label: 'Child unwell', tone: 'sky', icon: HOME_ICONS.child },
+	cough: { label: 'Cold & fever', tone: 'mint', icon: HOME_ICONS.thermometer },
+	depression: { label: 'Stress & anxiety', tone: 'lilac', icon: HOME_ICONS.brain },
+	pregnancy: { label: 'Periods & pregnancy', tone: 'sand', icon: HOME_ICONS.female },
+	performance: { label: 'Sexual health', tone: 'sky', icon: HOME_ICONS.pulse },
 }
 
-// Fallback symptoms when symptoms API is empty or offline
+// Fallback symptoms when the symptoms API is empty or offline (design order first).
 const DEFAULT_SYMPTOMS: SymptomItem[] = [
-	{
-		id: 'sym-pregnancy',
-		label: 'Pregnancy or Period doubts',
-		icon_key: 'pregnancy',
-		speciality_id: null,
-		speciality_label: 'Gynecology',
-	},
 	{
 		id: 'sym-acne',
 		label: 'Acne, pimple or Skin Issues',
 		icon_key: 'acne',
 		speciality_id: null,
 		speciality_label: 'Dermatology',
-	},
-	{
-		id: 'sym-performance',
-		label: 'Performance issues in bed',
-		icon_key: 'performance',
-		speciality_id: null,
-		speciality_label: 'Urology',
-	},
-	{
-		id: 'sym-cough',
-		label: 'Cold, cough or fever',
-		icon_key: 'cough',
-		speciality_id: null,
-		speciality_label: 'General Medicine',
 	},
 	{
 		id: 'sym-child',
@@ -64,11 +43,32 @@ const DEFAULT_SYMPTOMS: SymptomItem[] = [
 		speciality_label: 'Pediatrics',
 	},
 	{
+		id: 'sym-cough',
+		label: 'Cold, cough or fever',
+		icon_key: 'cough',
+		speciality_id: null,
+		speciality_label: 'General Medicine',
+	},
+	{
 		id: 'sym-depression',
 		label: 'Depression or anxiety',
 		icon_key: 'depression',
 		speciality_id: null,
 		speciality_label: 'Psychiatry',
+	},
+	{
+		id: 'sym-pregnancy',
+		label: 'Pregnancy or Period doubts',
+		icon_key: 'pregnancy',
+		speciality_id: null,
+		speciality_label: 'Gynecology',
+	},
+	{
+		id: 'sym-performance',
+		label: 'Performance issues in bed',
+		icon_key: 'performance',
+		speciality_id: null,
+		speciality_label: 'Urology',
 	},
 ]
 
@@ -138,59 +138,50 @@ export function resolveSpecialityForSymptom(
 	return specialities.find((s) => s.label.length > 3 && symptomText.includes(s.label.toLowerCase()))
 }
 
-function SpecialitySection() {
+const symptomMeta = (s: SymptomItem) => {
+	const meta = s.icon_key ? SYMPTOM_META[s.icon_key] : undefined
+	if (meta) return { label: meta.label, pair: TONES[meta.tone], icon: meta.icon }
+	return { label: s.label, pair: toneForString(s.label), icon: HOME_ICONS.pulse }
+}
+
+type Props = {
+	/** Specialities fetched once by the Home page (used to resolve a symptom's speciality). */
+	specialities?: SpecialityItem[]
+	refreshToken?: number
+}
+
+function SpecialitySection({ specialities = [], refreshToken }: Props) {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
-	const { width } = useWindowDimensions()
 	const [symptoms, setSymptoms] = useState<SymptomItem[]>([])
-	const [specialities, setSpecialities] = useState<SpecialityItem[]>([])
 	const [loading, setLoading] = useState(true)
 
 	useEffect(() => {
 		let active = true
-		setLoading(true)
-		Promise.all([getSymptoms(), getSpecialities()])
-			.then(([symptomsRes, specialitiesRes]) => {
+		const load = async () => {
+			try {
+				const res = await getSymptoms()
 				if (!active) return
-				if (symptomsRes?.success && symptomsRes.data && symptomsRes.data.length > 0) {
-					setSymptoms(symptomsRes.data)
-				} else {
-					setSymptoms(DEFAULT_SYMPTOMS)
-				}
-				if (specialitiesRes?.success && specialitiesRes.data) {
-					setSpecialities(specialitiesRes.data)
-				}
-			})
-			.catch((error) => {
-				console.error('Error fetching symptoms/specialities:', error)
+				setSymptoms(res?.success && res.data && res.data.length > 0 ? res.data : DEFAULT_SYMPTOMS)
+			} catch {
 				if (active) setSymptoms(DEFAULT_SYMPTOMS)
-			})
-			.finally(() => {
+			} finally {
 				if (active) setLoading(false)
-			})
+			}
+		}
+		void load()
 		return () => {
 			active = false
 		}
-	}, [])
-
-	const isTablet = width >= 768
-	const isMiniTablet = width >= 600 && width < 768
-	const isWide = isTablet || isMiniTablet
-
-	const availableWidth = width - 32 - 8 * 5
-	const CARD_WIDTH = isWide ? availableWidth / 6 : 110
-	const BOX_SIZE = isWide ? Math.min(Math.floor(CARD_WIDTH) - 10, 120) : 100
+	}, [refreshToken])
 
 	const handleConsult = async (symptom: SymptomItem) => {
 		let currentSpecs = specialities
 		if (!currentSpecs || currentSpecs.length === 0) {
 			try {
 				const res = await getSpecialities()
-				if (res.success && res.data) {
-					currentSpecs = res.data
-					setSpecialities(res.data)
-				}
-			} catch (error) {
-				console.error('Error loading specialities:', error)
+				if (res.success && res.data) currentSpecs = res.data
+			} catch {
+				currentSpecs = []
 			}
 		}
 
@@ -203,172 +194,75 @@ function SpecialitySection() {
 			return
 		}
 
-		// If no specialty matched in currentSpecs, attempt fresh fetch
-		try {
-			const res = await getSpecialities()
-			if (res.success && res.data) {
-				const retrySpec = resolveSpecialityForSymptom(symptom, res.data)
-				if (retrySpec) {
-					navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
-						specialityId: String(retrySpec.id),
-						specialityName: retrySpec.label,
-					})
-					return
-				}
-			}
-		} catch (e) {
-			console.error('Error fetching specialities on retry:', e)
-		}
-
 		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
 			specialityName: symptom.speciality_label ?? undefined,
 		})
 	}
 
-	const renderCard = (s: SymptomItem, cardWidth: number, boxSize: number, isTab: boolean) => {
-		const Icon = (s.icon_key && ICON_MAP[s.icon_key]) || pregnancyImage
-		return (
-			<TouchableOpacity
-				key={s.id}
-				onPress={() => handleConsult(s)}
-				activeOpacity={0.7}
-				style={{ width: cardWidth, alignItems: 'center', paddingVertical: 4 }}
-			>
-				<View style={{ width: '100%', alignItems: 'center', gap: 6 }}>
-					<View style={[styles.iconBox, { width: boxSize, height: boxSize }]}>
-						<Icon width={'100%'} height={'100%'} />
-					</View>
-
-					<Text style={[styles.cardTitle, isTab && styles.cardTitleTablet]} numberOfLines={2}>
-						{s.label}
-					</Text>
-				</View>
-			</TouchableOpacity>
-		)
-	}
-
 	return (
-		<View style={styles.container}>
-			{/* ── Header ── */}
-			<View style={styles.headerRow}>
-				<TouchableOpacity
-					style={styles.headerLeft}
-					onPress={() => navigation.navigate(ROUTES.STACK.ALL_SPECIALITIES as never)}
-					activeOpacity={0.8}
-				>
-					<Text style={[styles.subHeading, isTablet && styles.subHeadingTablet]}>
-						Find experienced doctors across all specialties
-					</Text>
-				</TouchableOpacity>
-				<Button
-					mode="outlined"
-					style={styles.viewAllBtn}
-					labelStyle={{ fontSize: 12 }}
-					onPress={() => navigation.navigate(ROUTES.STACK.ALL_SPECIALITIES as never)}
-				>
-					View All
-				</Button>
+		<AppSection
+			title="Not feeling well?"
+			right={
+				<AppTextLink
+					label="All symptoms"
+					onPress={() => navigation.navigate(ROUTES.STACK.ALL_SPECIALITIES)}
+				/>
+			}
+			{...homeSectionProps(12)}
+		>
+			<View style={styles.grid}>
+				{loading
+					? [0, 1, 2, 3].map((i) => (
+							<View key={i} style={styles.item}>
+								<AppSkeleton width={64} height={64} borderRadius={32} color={APP_COLORS.divider} />
+								<AppSkeleton width={56} height={12} color={APP_COLORS.divider} />
+							</View>
+						))
+					: symptoms.slice(0, 4).map((s) => {
+							const meta = symptomMeta(s)
+							return (
+								<TouchableOpacity
+									key={s.id}
+									style={styles.item}
+									activeOpacity={0.8}
+									onPress={() => handleConsult(s)}
+									accessibilityRole="button"
+									accessibilityLabel={meta.label}
+									accessibilityHint="Find doctors for this symptom"
+								>
+									<AppIconTile size={64} circle backgroundColor={meta.pair.bg}>
+										<AppPathIcon d={meta.icon} size={28} strokeWidth={2} color={meta.pair.ink} />
+									</AppIconTile>
+									<Text style={styles.label} numberOfLines={2}>
+										{meta.label}
+									</Text>
+								</TouchableOpacity>
+							)
+						})}
 			</View>
-
-			{loading ? (
-				<View style={{ paddingVertical: 24, alignItems: 'center' }}>
-					<ActivityIndicator size="small" color={TEAL} />
-				</View>
-			) : isWide ? (
-				// TABLET / MINI-TABLET — all cards in one row
-				<View style={styles.tabletGrid}>
-					{symptoms.map((s) => renderCard(s, CARD_WIDTH, BOX_SIZE, isTablet))}
-				</View>
-			) : (
-				// MOBILE — horizontal scroll
-				<ScrollView
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					contentContainerStyle={styles.scrollContent}
-				>
-					{symptoms.map((s) => renderCard(s, CARD_WIDTH, BOX_SIZE, false))}
-				</ScrollView>
-			)}
-		</View>
+		</AppSection>
 	)
 }
 
 export default React.memo(SpecialitySection)
 
 const styles = StyleSheet.create({
-	container: {
-		paddingVertical: 16,
-		backgroundColor: '#fff',
-	},
-	headerRow: {
+	grid: {
 		flexDirection: 'row',
-		alignItems: 'flex-start',
-		justifyContent: 'space-between',
-		paddingHorizontal: 16,
-		marginBottom: 20,
-		gap: 12,
-	},
-	headerLeft: {
-		flex: 1,
-		borderLeftWidth: 3,
-		borderLeftColor: TEAL,
-		paddingLeft: 10,
-	},
-	heading: {
-		fontSize: 15,
-		fontWeight: '700',
-		color: '#111',
-		lineHeight: 21,
-		marginBottom: 3,
-	},
-	headingTablet: {
-		fontSize: 18,
-		lineHeight: 26,
-	},
-	subHeading: {
-		fontSize: 12,
-		color: '#777',
-		lineHeight: 17,
-	},
-	subHeadingTablet: {
-		fontSize: 14,
-		lineHeight: 20,
-	},
-	viewAllBtn: {
-		borderRadius: 20,
-	},
-	tabletGrid: {
-		flexDirection: 'row',
-		paddingHorizontal: 16,
 		gap: 8,
-		alignItems: 'flex-start',
-	},
-	scrollContent: {
 		paddingHorizontal: 16,
-		paddingBottom: 8,
-		gap: 10,
 	},
-	iconBox: {
-		borderRadius: 16,
-		overflow: 'hidden',
+	item: {
+		flex: 1,
+		minWidth: 0,
+		alignItems: 'center',
+		gap: 6,
 	},
-	cardTitle: {
+	label: {
 		fontSize: 12,
-		fontWeight: '500',
-		color: '#222',
+		lineHeight: 16,
+		fontWeight: '700',
+		color: APP_COLORS.ink,
 		textAlign: 'center',
-		lineHeight: 17,
-	},
-	cardTitleTablet: {
-		fontSize: 13,
-		lineHeight: 19,
-	},
-	consultText: {
-		fontSize: 13,
-		color: TEAL,
-		fontWeight: '600',
-	},
-	consultTextTablet: {
-		fontSize: 14,
 	},
 })

@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { AppTypography } from '../../../components/common/display/AppTypography'
 
 interface UploadSectionProps {
 	files: string[]

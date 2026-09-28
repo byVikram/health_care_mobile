@@ -64,6 +64,8 @@ export interface CreateAppointmentPayload {
 	end_time?: string
 	referral_id?: string
 	consent_version_id?: string
+	/** Public id of the (family-member) patient being booked for; omitted = the logged-in patient */
+	patient_id?: string
 }
 
 export interface CreateAppointmentResponse {
@@ -185,7 +187,6 @@ export const createAppointment = async (payload: CreateAppointmentPayload): Prom
 
 	console.log('[createAppointment][RN] response', {
 		status: res.status,
-		requestHeaders: res.config?.headers,
 		data: res.data,
 	})
 

@@ -7,8 +7,8 @@ import AppNavigator from './src/navigation/AppNavigator'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import { toastConfig } from './src/config/toastConfig'
-import ErrorBoundary from './src/components/common/ErrorBoundary'
-import OfflineBanner from './src/components/common/OfflineBanner'
+import ErrorBoundary from './src/components/common/feedback/ErrorBoundary'
+import OfflineBanner from './src/components/common/feedback/OfflineBanner'
 
 export default function App() {
 	return (

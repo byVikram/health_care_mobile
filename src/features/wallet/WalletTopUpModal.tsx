@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { topUpWallet } from './walletService'
-import StatusModal from '../../components/common/StatusModal'
+import StatusModal from '../../components/common/feedback/StatusModal'
 
 interface WalletTopUpModalProps {
 	visible: boolean

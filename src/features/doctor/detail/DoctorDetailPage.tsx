@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
 import {
-	Image,
+	LayoutChangeEvent,
 	NativeScrollEvent,
 	NativeSyntheticEvent,
 	ScrollView,
@@ -11,58 +11,45 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
-import { AppButton, AppScreenHeader, AppSkeleton, AppTypography } from '../../../components/common'
-import { getDoctorById, getDoctorAvailability, SlotGroup } from '../doctorService'
+import {
+	AppActionChip,
+	AppAvatar,
+	AppButton,
+	AppChip,
+	AppDashedDivider,
+	AppFooterBar,
+	AppIconButton,
+	AppIconTile,
+	AppScreenHeader,
+	AppSection,
+	AppSkeleton,
+	AppStatRow,
+	AppStatTile,
+	AppTag,
+	AppTypography,
+} from '../../../components/common'
+import { getDoctorById, getDoctorAvailability, TimeSlot } from '../doctorService'
 import { DoctorDetailData } from '../../../types/doctor-detail'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
-import { formatDateDisplay, formatDateForApi, formatTimeForApi } from '../../../utils/date'
+import { formatDateForApi } from '../../../utils/date'
 import { capitalize } from '../../../utils/formatters'
-import { DETAIL_PRIMARY, HospitalAppointmentCard } from './components'
-import type { AppointmentModeKey, HospitalEntry } from './components'
-import { DOCTOR_PROFILE_AVAILABLE_TODAY_MOCK, DOCTOR_PROFILE_GOOD_TO_KNOW_MOCK } from './doctorProfileMockData'
-
-type AvailabilityAppointmentMode = 'clinic_visit' | 'video_call' | 'offline' | 'online'
-
-interface AvailabilityApiSlot {
-	start_time: string
-	end_time: string
-	status?: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE' | 'BLOCKED' | 'OCCUPIED' | ''
-	is_enabled?: boolean
-	is_booked?: boolean
-	can_toggle?: boolean
-}
-
-interface AvailabilityApiSession {
-	label?: string
-	range?: string
-	period?: string
-	slots?: AvailabilityApiSlot[]
-}
-
-interface AvailabilityApiModeGroup {
-	appointment_mode?: AvailabilityAppointmentMode
-	sessions?: AvailabilityApiSession[]
-	label?: string
-	period?: string
-	range?: string
-	slots?: AvailabilityApiSlot[]
-}
+import { openOnMap } from '../../../utils/maps'
+import { AppointmentModeKey, firstOpenSlot, normalizeAvailabilityByMode } from '../availability'
+import { shortClinic } from '../doctorFormatters'
+import { APP_COLORS, TONES, formatInr, toneAt } from '../../../config/theme'
+import { DOCTOR_PROFILE_GOOD_TO_KNOW_MOCK } from './doctorProfileMockData'
 
 // Design tokens matching the "Doctor profile" HTML design exactly.
-const PRIMARY = DETAIL_PRIMARY // #2B6F71
-const INK = '#12373E'
-const INK_MUTED = '#5B6B6E'
-const DIVIDER = '#D5E1E2'
-const PAGE_BG = '#F5F8F8'
-const SPEC_TONE = '#6A4BB5'
-const SPEC_TONE_BG = '#ECE6FA'
-const SUCCESS = '#1E7A4E'
-const SUCCESS_BG = '#E6F4EC'
-const SKY = '#2463A8'
-const SKY_BG = '#DDEBFA'
+const PRIMARY = APP_COLORS.primary
+const INK = APP_COLORS.ink
+const INK_MUTED = APP_COLORS.inkMuted
+const DIVIDER = APP_COLORS.divider
+const PAGE_BG = APP_COLORS.pageBg
+const SPEC_TONE = TONES.lilac.ink
+const SPEC_TONE_BG = TONES.lilac.bg
+const SUCCESS = APP_COLORS.success
 
 type ProfileTabKey = 'about' | 'services' | 'clinics' | 'awards'
 const PROFILE_TABS: { key: ProfileTabKey; label: string }[] = [
@@ -73,70 +60,11 @@ const PROFILE_TABS: { key: ProfileTabKey; label: string }[] = [
 ]
 
 const TREATMENTS_COLLAPSED_COUNT = 4
+// Scroll offset after which the header swaps "Doctor profile" for the doctor's identity.
+const COMPACT_HEADER_AT = 150
 
-const emptyAvailabilityByMode: Record<AppointmentModeKey, SlotGroup[]> = {
-	clinic: [],
-	video: [],
-}
-
-const getModeKey = (mode?: string): AppointmentModeKey => {
-	if (mode === 'video_call' || mode === 'online' || mode === 'video') {
-		return 'video'
-	}
-	return 'clinic'
-}
-
-const normalizeSlotStatus = (slot: AvailabilityApiSlot) => {
-	if (slot.is_booked) return 'BOOKED'
-	if (slot.is_enabled === false) return 'UNAVAILABLE'
-	if (slot.status === 'OCCUPIED') return 'BOOKED'
-	return slot.status || 'AVAILABLE'
-}
-
-const normalizeAvailabilityByMode = (response: unknown): Record<AppointmentModeKey, SlotGroup[]> => {
-	const rawData = Array.isArray(response)
-		? response
-		: Array.isArray((response as { data?: unknown })?.data)
-			? (response as { data: AvailabilityApiModeGroup[] }).data
-			: []
-
-	const grouped: Record<AppointmentModeKey, SlotGroup[]> = {
-		clinic: [],
-		video: [],
-	}
-
-	rawData.forEach((item: AvailabilityApiModeGroup) => {
-		const modeKey = getModeKey(item.appointment_mode)
-		const sessions =
-			Array.isArray(item.sessions) && item.sessions.length > 0
-				? item.sessions
-				: [{ label: item.label, range: item.range, period: item.period, slots: item.slots }]
-
-		const normalizedSessions = sessions
-			.map((session, sessionIndex): SlotGroup => {
-				const range = session.range || session.period || ''
-				const label = session.label || `Session ${sessionIndex + 1}`
-
-				return {
-					label: range ? `${label} (${range})` : label,
-					period: range,
-					slots: (session.slots || []).map((slot, slotIndex) => ({
-						id: `${modeKey}-${label}-${slot.start_time}-${slotIndex}`,
-						start_time: slot.start_time,
-						end_time: slot.end_time,
-						status: normalizeSlotStatus(slot),
-						is_enabled: slot.is_enabled,
-						can_toggle: slot.can_toggle,
-					})),
-				}
-			})
-			.filter((session) => session.slots.length > 0)
-
-		grouped[modeKey] = [...grouped[modeKey], ...normalizedSessions]
-	})
-
-	return grouped
-}
+/** Today's first open slot per hospital, split by mode (null = none left today). */
+type TodaySlots = Record<string, Record<AppointmentModeKey, TimeSlot | null>>
 
 const formatYear = (dateStr?: string | null): string => {
 	if (!dateStr) return ''
@@ -145,44 +73,32 @@ const formatYear = (dateStr?: string | null): string => {
 }
 
 // ----------------------------------------------------------------------
-// Main Doctor Detail Page
+// Main Doctor Detail Page ("3 · Doctor profile")
 //
-// PROTECTED FUNCTIONALITY -- presentation-only changes past this point.
-// Do not change: fetchDetail/fetchAvailability effects, selectedHospital /
-// apptType / selectedDate / selectedTime / expandedHospitalId state,
-// handleAppointmentTypeChange, getSelectedFee, handleToggleExpand, the
-// availableSlotsByMode derivation, or the final booking AppButton's
-// onPress (CONSENT_FORM navigation + its paymentParams). These are the
-// real hospital-selection / availability-fetching / slot-selection /
-// fee-handling / payment-handoff logic and must keep working exactly as
-// before -- only their visual presentation changes in this pass.
+// Slot selection now lives on its own step (book-slot/BookSlotPage.tsx,
+// "4 · Clinic & slot"), which owns the availability fetch, fee handling and
+// the CONSENT_FORM handoff that used to be here. This screen only reads
+// today's availability to show real "Available today" / next-slot info and
+// routes every Book button to that step.
 // ----------------------------------------------------------------------
 export default function DoctorDetailPage() {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_DETAIL>>()
 	const referralId = route.params?.referralId
-	const insets = useSafeAreaInsets()
 
 	const [doctor, setDoctor] = useState<DoctorDetailData | null>(null)
 	const [loading, setLoading] = useState(true)
-
-	// Form States
-	const [selectedHospital, setSelectedHospital] = useState<string | null>(null)
-	const [apptType, setApptType] = useState<'offline' | 'video' | null>('offline')
-	const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-	const [selectedTime, setSelectedTime] = useState<string | null>(null)
-
-	// Tracks which hospital card is expanded inline (null = none expanded)
-	const [expandedHospitalId, setExpandedHospitalId] = useState<string | null>(null)
 
 	// About section "Read more/less" toggle (matches the HTML's 2-line clamp)
 	const [aboutExpanded, setAboutExpanded] = useState(false)
 	// Treatments & services "Show all / Show fewer" toggle
 	const [treatmentsExpanded, setTreatmentsExpanded] = useState(false)
 
-	const [availableSlotsByMode, setAvailableSlotsByMode] =
-		useState<Record<AppointmentModeKey, SlotGroup[]>>(emptyAvailabilityByMode)
-	const [slotsLoading, setSlotsLoading] = useState(false)
+	// Real "next slot today" per hospital (undefined = still loading)
+	const [todaySlots, setTodaySlots] = useState<TodaySlots | undefined>(undefined)
+
+	// Collapsing header: swap the title for the doctor's identity once scrolled past the hero
+	const [compact, setCompact] = useState(false)
 
 	// ---- Presentation-only: sticky tab scroll-spy (About/Services/Clinics/Awards) ----
 	const scrollRef = useRef<any>(null)
@@ -198,19 +114,32 @@ export default function DoctorDetailPage() {
 		jumpTimeoutRef.current = setTimeout(() => {
 			jumpingRef.current = false
 		}, 700)
-		scrollRef.current?.scrollTo?.({ y: Math.max(0, sectionOffsets.current[tab] - 8), animated: true })
+		// 52 = sticky tab bar height, so the section title lands just below it
+		scrollRef.current?.scrollTo?.({ y: Math.max(0, sectionOffsets.current[tab] - 52), animated: true })
 	}
 
 	const handleContentScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+		const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent
+		const y = contentOffset.y
+		const nextCompact = y > COMPACT_HEADER_AT
+		setCompact((prev) => (prev === nextCompact ? prev : nextCompact))
 		if (jumpingRef.current) return
-		const y = event.nativeEvent.contentOffset.y
 		const offsets = sectionOffsets.current
 		let next: ProfileTabKey = 'about'
 		;(Object.keys(offsets) as ProfileTabKey[]).forEach((key) => {
-			if (y + 80 >= offsets[key]) next = key
+			if (offsets[key] > 0 && y + 60 >= offsets[key]) next = key
 		})
+		if (y + layoutMeasurement.height >= contentSize.height - 2) next = 'awards'
 		setActiveTab((prev) => (prev === next ? prev : next))
 	}
+
+	// Records a section's scroll offset for the tab scroll-spy (AppSection passes onLayout
+	// through; the reported y is the section's own y, below its 8px margin).
+	const trackSection =
+		(key: ProfileTabKey, when = true) =>
+		(e: LayoutChangeEvent) => {
+			if (when) sectionOffsets.current[key] = e.nativeEvent.layout.y
+		}
 
 	React.useEffect(() => {
 		const fetchDetail = async () => {
@@ -219,12 +148,6 @@ export default function DoctorDetailPage() {
 				const res = await getDoctorById(route.params.id)
 				if (res.success && res.data) {
 					setDoctor(res.data)
-					if (res.data.hospitals?.length > 0) {
-						const primary = res.data.hospitals.find((h) => h.is_primary) || res.data.hospitals[0]
-						setSelectedHospital(primary.hospital.id)
-						// Auto-expand the primary hospital card by default
-						setExpandedHospitalId(primary.hospital.id)
-					}
 				}
 			} catch (error) {
 				console.error('Error fetching doctor details:', error)
@@ -235,69 +158,53 @@ export default function DoctorDetailPage() {
 		fetchDetail()
 	}, [route.params?.id])
 
+	// Today's availability for every clinic -> real "Available today" badge,
+	// "Next available" card and each clinic's NEXT SLOT pill.
 	React.useEffect(() => {
-		const id = route.params?.id
-		if (!id || !selectedHospital || !selectedDate) return
-		let active = true
-
-		const fetchAvailability = async () => {
-			try {
-				setSlotsLoading(true)
-				const res = await getDoctorAvailability({
-					doctor_id: id,
-					hospital_id: selectedHospital,
-					date: formatDateForApi(selectedDate),
-				})
-				if (!active) return
-				setAvailableSlotsByMode(normalizeAvailabilityByMode(res))
-			} catch (err) {
-				if (!active) return
-				setAvailableSlotsByMode(emptyAvailabilityByMode)
-			} finally {
-				if (active) {
-					setSlotsLoading(false)
-				}
-			}
+		if (!doctor?.id || !doctor.hospitals?.length) {
+			setTodaySlots({})
+			return
 		}
-
-		fetchAvailability()
+		let active = true
+		const today = formatDateForApi(new Date())
+		const fetchTodaySlots = async () => {
+			const entries = await Promise.all(
+				doctor.hospitals.map(async (h) => {
+					try {
+						const res = await getDoctorAvailability({
+							doctor_id: doctor.id,
+							hospital_id: h.hospital.id,
+							date: today,
+						})
+						const byMode = normalizeAvailabilityByMode(res)
+						return [
+							h.hospital.id,
+							{ clinic: firstOpenSlot(byMode.clinic), video: firstOpenSlot(byMode.video) },
+						] as const
+					} catch {
+						return [h.hospital.id, { clinic: null, video: null }] as const
+					}
+				})
+			)
+			if (active) setTodaySlots(Object.fromEntries(entries))
+		}
+		fetchTodaySlots()
 		return () => {
 			active = false
 		}
-	}, [route.params?.id, selectedHospital, selectedDate])
+	}, [doctor?.id, doctor?.hospitals])
 
 	const primaryHospital =
 		doctor?.hospitals.find((h) => h.is_primary) || (doctor?.hospitals.length ? doctor.hospitals[0] : null)
 
-	const selectedHospitalEntry = doctor?.hospitals.find((h) => h.hospital.id === selectedHospital) || primaryHospital
-
-	const selectedAppointmentType: AppointmentModeKey = apptType === 'video' ? 'video' : 'clinic'
-
-	const visibleSlotGroups = availableSlotsByMode[selectedAppointmentType] || []
-
-	const handleAppointmentTypeChange = (type: AppointmentModeKey) => {
-		setApptType(type === 'clinic' ? 'offline' : 'video')
-		setSelectedTime(null)
-	}
-
-	const getSelectedFee = () => {
-		if (apptType === 'offline') {
-			return Number(selectedHospitalEntry?.offline_consultation_fee) || 0
-		} else {
-			return Number(selectedHospitalEntry?.video_consultation_fee) || 0
-		}
-	}
-
-	// Toggle which hospital card is expanded; switching expands the new
-	// hospital, sets it as the booking target, and resets slot selection.
-	const handleToggleExpand = (hospitalId: string) => {
-		const isCurrentlyExpanded = expandedHospitalId === hospitalId
-		setExpandedHospitalId(isCurrentlyExpanded ? null : hospitalId)
-
-		if (!isCurrentlyExpanded) {
-			setSelectedHospital(hospitalId)
-			setSelectedTime(null)
-		}
+	const goToBookSlot = (hospitalId?: string, mode: AppointmentModeKey = 'clinic') => {
+		if (!doctor) return
+		navigation.navigate(ROUTES.STACK.DOCTOR_BOOK_SLOT, {
+			doctor,
+			hospitalId: hospitalId || primaryHospital?.hospital.id,
+			mode,
+			referralId,
+		})
 	}
 
 	const handleShare = () => {
@@ -335,11 +242,33 @@ export default function DoctorDetailPage() {
 	const avatarValue = details?.avatar_s3_key
 	const avatarUrl = typeof avatarValue === 'string' && avatarValue.trim() ? avatarValue : null
 
-	// Real fee figures (already used by getSelectedFee()/booking below) --
-	// surfaced in the stat pills, not fabricated.
-	const offlineFee = Number(selectedHospitalEntry?.offline_consultation_fee) || null
-	const videoFee = Number(selectedHospitalEntry?.video_consultation_fee) || null
+	// Fees shown on the profile come from the primary clinic (the design's
+	// "Clinic visit" / "Video call" tiles); each clinic card shows its own.
+	const offlineFee = Number(primaryHospital?.offline_consultation_fee) || null
+	const videoHospital = hospitals.find((h) => Number(h.video_consultation_fee) > 0) || null
+	const videoFee = Number(videoHospital?.video_consultation_fee) || null
 	const hasVideoConsult = !!videoFee && videoFee > 0
+	const allFees = hospitals
+		.flatMap((h) => [Number(h.offline_consultation_fee), Number(h.video_consultation_fee)])
+		.filter((n) => Number.isFinite(n) && n > 0)
+	const feeFrom = allFees.length ? Math.min(...allFees) : null
+
+	const slotsKnown = todaySlots !== undefined
+	const availableToday = !!todaySlots && Object.values(todaySlots).some((m) => m.clinic || m.video)
+	// First clinic (primary first) with a slot left today; in-clinic preferred over video
+	const nextAvailable = (() => {
+		if (!todaySlots) return null
+		const ordered = primaryHospital
+			? [primaryHospital, ...hospitals.filter((h) => h !== primaryHospital)]
+			: hospitals
+		for (const mode of ['clinic', 'video'] as AppointmentModeKey[]) {
+			for (const h of ordered) {
+				const slot = todaySlots[h.hospital.id]?.[mode]
+				if (slot) return { hospital: h, slot, mode }
+			}
+		}
+		return null
+	})()
 
 	const specialitiesText = (specialities || []).filter(Boolean).join(' · ')
 
@@ -377,131 +306,194 @@ export default function DoctorDetailPage() {
 		? `${hospitals.length} ${hospitals.length === 1 ? 'clinic' : 'clinics'}${hasVideoConsult ? ' · video' : ''}`
 		: ''
 
+	const headerSub = [
+		(specialities || [])[0],
+		details?.experience_years != null ? `${details.experience_years} yrs` : '',
+		offlineFee ? formatInr(offlineFee) : '',
+	]
+		.filter(Boolean)
+		.join(' · ')
+
+	const videoNextSlot = hospitals.map((h) => todaySlots?.[h.hospital.id]?.video).find(Boolean) || null
+
 	return (
 		<View style={styles.container}>
+			{/* Header -- "Doctor profile" collapses into the doctor's identity on scroll */}
 			<AppScreenHeader
-				title="Doctor profile"
-				backgroundColor={PRIMARY}
-				variant="flat"
+				variant="bar"
+				title={compact ? doctor.name : 'Doctor profile'}
+				subtitle={compact ? headerSub : undefined}
+				leading={
+					compact ? (
+						<AppAvatar
+							uri={avatarUrl}
+							size={36}
+							borderWidth={2}
+							borderColor="#fff"
+							backgroundColor={SPEC_TONE_BG}
+							fallbackIcon="account"
+							initialsColor={SPEC_TONE}
+						/>
+					) : undefined
+				}
 				onBack={() => navigation.goBack()}
+				backAccessibilityLabel="Back to doctors"
+				style={compact && styles.headerCompact}
 				rightElement={
-					<TouchableOpacity onPress={handleShare} hitSlop={8}>
-						<MaterialCommunityIcons name="share-variant" size={22} color="#fff" />
-					</TouchableOpacity>
+					<AppIconButton
+						icon="share-variant-outline"
+						variant="ghost"
+						size={44}
+						onPress={handleShare}
+						accessibilityLabel="Share profile"
+						style={styles.headerShareBtn}
+					/>
 				}
 			/>
 
 			<ScrollView
 				ref={scrollRef}
 				style={styles.scrollArea}
-				contentContainerStyle={{ paddingBottom: 100 }}
+				contentContainerStyle={{ paddingBottom: 8 }}
 				scrollEventThrottle={16}
 				onScroll={handleContentScroll}
+				stickyHeaderIndices={[1]}
 			>
-				{/* Hero / profile identity -- matches the HTML's avatar + name +
-            specialities + qualifications + badge row + stats grid. No
-            "next available slot" banner (explicitly excluded). */}
-				<View style={styles.heroBanner}>
-					<View style={styles.heroDecorCircleTop} />
-					<View style={styles.heroDecorCircleBottom} />
-				</View>
-				<View style={styles.profileCard}>
-					<View style={styles.profileAvatarWrap}>
-						{avatarUrl ? (
-							<Image source={{ uri: avatarUrl }} style={styles.profileAvatarImage} resizeMode="cover" />
-						) : (
-							<View style={[styles.profileAvatarImage, styles.profileAvatarPlaceholder]}>
-								<MaterialCommunityIcons name="account" size={48} color={SPEC_TONE} />
-							</View>
-						)}
-						<View style={styles.profileAvatarBadge} />
+				{/* Hero / profile identity */}
+				<View style={styles.heroSection}>
+					<View style={styles.heroBanner}>
+						<View style={styles.heroDecorCircleTop} />
+						<View style={styles.heroDecorCircleBottom} />
 					</View>
-
-					<AppTypography variant="h3" style={styles.doctorName} numberOfLines={2}>
-						{doctor.name}
-					</AppTypography>
-
-					{!!specialitiesText && (
-						<AppTypography variant="body" style={styles.doctorSpec} numberOfLines={1}>
-							{specialitiesText}
-						</AppTypography>
-					)}
-
-					{!!qualificationsText && (
-						<AppTypography variant="caption" style={styles.qualificationText} numberOfLines={1}>
-							{qualificationsText}
-						</AppTypography>
-					)}
-
-					<View style={styles.badgeRow}>
-						{DOCTOR_PROFILE_AVAILABLE_TODAY_MOCK && (
-							<View style={styles.availableBadge}>
-								<View style={styles.availableDot} />
-								<AppTypography style={styles.availableBadgeText}>Available today</AppTypography>
-							</View>
-						)}
-						{hasVideoConsult && (
-							<View style={styles.videoBadge}>
-								<MaterialCommunityIcons name="video-outline" size={13} color={SKY} />
-								<AppTypography style={styles.videoBadgeText}>Video consult</AppTypography>
-							</View>
-						)}
-						{!!languagesText && (
-							<View style={styles.languageBadge}>
-								<AppTypography style={styles.languageBadgeText} numberOfLines={1}>
-									{languagesText}
-								</AppTypography>
-							</View>
-						)}
-					</View>
-
-					<View style={styles.statsRow}>
-						<View style={[styles.statBox, { backgroundColor: SPEC_TONE_BG }]}>
-							<AppTypography style={[styles.statLabel, { color: SPEC_TONE }]}>Experience</AppTypography>
-							<AppTypography style={styles.statValue}>{experienceYearsText}</AppTypography>
+					<View style={styles.profileCard}>
+						<View style={styles.profileAvatarWrap}>
+							<AppAvatar
+								uri={avatarUrl}
+								size={112}
+								borderWidth={4}
+								borderColor="#FFFFFF"
+								backgroundColor={SPEC_TONE_BG}
+								fallbackIcon="account"
+								initialsColor={SPEC_TONE}
+							/>
+							{availableToday && <View style={styles.profileAvatarBadge} />}
 						</View>
-						<View style={[styles.statBox, { backgroundColor: '#E3EFEF' }]}>
-							<AppTypography style={[styles.statLabel, { color: PRIMARY }]}>Clinic visit</AppTypography>
-							<AppTypography style={styles.statValue}>
-								{offlineFee ? `₹${offlineFee}` : '--'}
+
+						<AppTypography variant="h3" style={styles.doctorName} numberOfLines={2}>
+							{doctor.name}
+						</AppTypography>
+
+						{!!specialitiesText && (
+							<AppTypography variant="body" style={styles.doctorSpec} numberOfLines={1}>
+								{specialitiesText}
+							</AppTypography>
+						)}
+
+						{!!qualificationsText && (
+							<AppTypography variant="caption" style={styles.qualificationText} numberOfLines={1}>
+								{qualificationsText}
+							</AppTypography>
+						)}
+
+						<View style={styles.badgeRow}>
+							{availableToday && (
+								<AppTag
+									label="Available today"
+									tone="confirmed"
+									shape="pill"
+									dot
+									style={styles.availableBadge}
+								/>
+							)}
+							{hasVideoConsult && (
+								<AppTag label="Video consult" tone="sky" shape="pill" icon="video-outline" />
+							)}
+							{!!languagesText && (
+								<AppTag
+									label={languagesText}
+									tone="neutral"
+									shape="pill"
+									textStyle={styles.languageBadgeText}
+								/>
+							)}
+						</View>
+					</View>
+
+					<AppStatRow style={styles.statsRow}>
+						<AppStatTile label="Experience" value={experienceYearsText} tone="lilac" />
+						<AppStatTile label="Clinic visit" value={formatInr(offlineFee)} tone="mint" />
+						<AppStatTile label="Video call" value={formatInr(videoFee)} tone="sky" />
+					</AppStatRow>
+
+					{/* Next available -- real first open slot today, else a plain entry into the slot step */}
+					<TouchableOpacity
+						style={styles.nextCard}
+						activeOpacity={0.85}
+						disabled={!hospitals.length}
+						onPress={() => goToBookSlot(nextAvailable?.hospital.hospital.id, nextAvailable?.mode)}
+					>
+						<AppIconTile
+							icon="calendar-blank-outline"
+							size={40}
+							radius={12}
+							iconSize={20}
+							backgroundColor={APP_COLORS.mintAccent}
+							iconColor={INK}
+						/>
+						<View style={{ flex: 1, minWidth: 0 }}>
+							<AppTypography style={styles.nextEyebrow}>NEXT AVAILABLE</AppTypography>
+							<AppTypography style={styles.nextTitle} numberOfLines={1}>
+								{nextAvailable
+									? `Today, ${nextAvailable.slot.start_time}`
+									: slotsKnown
+										? 'See upcoming slots'
+										: 'Checking slots…'}
+							</AppTypography>
+							<AppTypography style={styles.nextSub} numberOfLines={1}>
+								{nextAvailable
+									? nextAvailable.mode === 'video'
+										? 'Video consultation'
+										: `${shortClinic(nextAvailable.hospital.hospital.name)}${
+												nextAvailable.hospital.hospital.distance
+													? ` · ${nextAvailable.hospital.hospital.distance} km`
+													: ''
+											}`
+									: 'Pick a clinic, date and time'}
 							</AppTypography>
 						</View>
-						<View style={[styles.statBox, { backgroundColor: SKY_BG }]}>
-							<AppTypography style={[styles.statLabel, { color: SKY }]}>Video call</AppTypography>
-							<AppTypography style={styles.statValue}>{videoFee ? `₹${videoFee}` : '--'}</AppTypography>
+						<View style={styles.nextBookBtn}>
+							<AppTypography style={styles.nextBookText}>Book</AppTypography>
+							<MaterialCommunityIcons name="chevron-right" size={16} color={INK} />
 						</View>
+					</TouchableOpacity>
+				</View>
+
+				{/* Sticky tab nav -- wrapped because a sticky child's own style is moved onto RN's
+				    sticky wrapper (and replaced with flex: 1), which would drop flexDirection: 'row' */}
+				<View>
+					<View style={styles.tabsRow}>
+						{PROFILE_TABS.map((tab) => {
+							const isActive = activeTab === tab.key
+							return (
+								<AppChip
+									key={tab.key}
+									label={tab.label}
+									selected={isActive}
+									onPress={() => handleTabPress(tab.key)}
+									variant="solid"
+									size="sm"
+									radius={10}
+									borderColor={DIVIDER}
+									style={styles.tabChip}
+									textStyle={{ fontWeight: isActive ? '700' : '600' }}
+								/>
+							)
+						})}
 					</View>
 				</View>
 
-				{/* Sticky-feel tab nav */}
-				<View style={styles.tabsRow}>
-					{PROFILE_TABS.map((tab) => {
-						const isActive = activeTab === tab.key
-						return (
-							<TouchableOpacity
-								key={tab.key}
-								style={[styles.tabButton, isActive && styles.tabButtonActive]}
-								onPress={() => handleTabPress(tab.key)}
-								activeOpacity={0.8}
-							>
-								<AppTypography style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
-									{tab.label}
-								</AppTypography>
-							</TouchableOpacity>
-						)
-					})}
-				</View>
-
-				{/* About -- flat section, no card, 2-line clamp + Read more/less */}
-				<View
-					style={styles.section}
-					onLayout={(e) => {
-						sectionOffsets.current.about = e.nativeEvent.layout.y
-					}}
-				>
-					<AppTypography variant="h4" style={styles.sectionTitle}>
-						About
-					</AppTypography>
+				{/* About -- flat section, 2-line clamp + Read more/less */}
+				<AppSection title="About" gap={8} onLayout={trackSection('about')}>
 					<AppTypography
 						variant="body"
 						style={styles.aboutBodyText}
@@ -516,41 +508,41 @@ export default function DoctorDetailPage() {
 							</AppTypography>
 						</TouchableOpacity>
 					)}
-				</View>
+				</AppSection>
 
 				{/* Areas of expertise -- flat chip row (Services tab) */}
 				{areasOfExpertise.length > 0 && (
-					<View
-						style={styles.section}
-						onLayout={(e) => {
-							sectionOffsets.current.services = e.nativeEvent.layout.y
-						}}
-					>
-						<AppTypography variant="h4" style={styles.sectionTitle}>
-							Areas of expertise
-						</AppTypography>
+					<AppSection title="Areas of expertise" gap={8} onLayout={trackSection('services')}>
 						<View style={styles.chipRow}>
 							{areasOfExpertise.map((item) => (
-								<View key={item.id} style={styles.expertiseChip}>
-									<AppTypography style={styles.expertiseChipText}>{item.label}</AppTypography>
-								</View>
+								<AppTag
+									key={item.id}
+									label={item.label}
+									size="md"
+									shape="pill"
+									tone="lilac"
+									ink={INK}
+									style={styles.expertiseChip}
+									textStyle={styles.expertiseChipText}
+								/>
 							))}
 						</View>
-					</View>
+					</AppSection>
 				)}
 
 				{/* Treatments & services -- checkmark list (Services tab) */}
 				{treatments.length > 0 && (
-					<View style={styles.section}>
-						<View style={styles.rowBetween}>
-							<AppTypography variant="h4" style={styles.sectionTitle}>
-								Treatments &amp; services
-							</AppTypography>
+					<AppSection
+						title="Treatments & services"
+						gap={8}
+						onLayout={trackSection('services', !areasOfExpertise.length)}
+						right={
 							<AppTypography variant="caption" style={styles.mutedSmall}>
 								{treatments.length} offered
 							</AppTypography>
-						</View>
-						<View>
+						}
+					>
+						<View style={{ marginTop: 4 }}>
 							{visibleTreatments.map((item, idx) => (
 								<View
 									key={item.id}
@@ -571,71 +563,83 @@ export default function DoctorDetailPage() {
 						</View>
 						{treatments.length > TREATMENTS_COLLAPSED_COUNT && (
 							<TouchableOpacity onPress={() => setTreatmentsExpanded((v) => !v)} activeOpacity={0.7}>
-								<AppTypography variant="caption" style={[styles.linkText, { marginTop: 8 }]}>
+								<AppTypography variant="caption" style={styles.linkText}>
 									{treatmentsExpanded ? 'Show fewer' : `Show all ${treatments.length} treatments`}
 								</AppTypography>
 							</TouchableOpacity>
 						)}
-					</View>
+					</AppSection>
 				)}
 
-				{/* Practises at -- PROTECTED booking cards, restyled only */}
-				<View
-					style={styles.section}
-					onLayout={(e) => {
-						sectionOffsets.current.clinics = e.nativeEvent.layout.y
-					}}
-				>
-					<View style={styles.rowBetween}>
-						<AppTypography variant="h4" style={styles.sectionTitle}>
-							Practises at
-						</AppTypography>
-						{!!practicesSubtitle && (
-							<AppTypography variant="caption" style={styles.mutedSmall}>
+				{/* Practises at -- one card per clinic + video; each Book goes to the slot step */}
+				<AppSection
+					title="Practises at"
+					gap={12}
+					onLayout={trackSection('clinics')}
+					right={
+						practicesSubtitle ? (
+							<AppTypography variant="caption" style={styles.muted13}>
 								{practicesSubtitle}
 							</AppTypography>
-						)}
-					</View>
-
-					{hospitals.length > 0 ? (
-						hospitals.map((entry) => (
-							<HospitalAppointmentCard
+						) : undefined
+					}
+				>
+					{hospitals.map((entry, n) => {
+						const tone = n === 0 ? TONES.mint : toneAt(n + 2)
+						const slot = todaySlots?.[entry.hospital.id]?.clinic
+						return (
+							<PractiseCard
 								key={entry.hospital.id}
-								entry={entry as HospitalEntry}
-								isExpanded={expandedHospitalId === entry.hospital.id}
-								onToggleExpand={() => handleToggleExpand(entry.hospital.id)}
-								apptType={apptType}
-								onAppointmentTypeChange={handleAppointmentTypeChange}
-								selectedDate={selectedDate}
-								onDateChange={(date) => {
-									setSelectedDate(date)
-									setSelectedTime(null)
-								}}
-								selectedTime={selectedTime}
-								onTimeChange={setSelectedTime}
-								availableSlots={expandedHospitalId === entry.hospital.id ? visibleSlotGroups : []}
-								slotsLoading={expandedHospitalId === entry.hospital.id ? slotsLoading : false}
-								selectedAppointmentType={selectedAppointmentType}
+								icon="hospital-building"
+								tone={tone}
+								title={entry.hospital.name}
+								subtitle={[
+									entry.hospital.address,
+									entry.hospital.distance ? `${entry.hospital.distance} km` : '',
+								]
+									.filter(Boolean)
+									.join(' · ')}
+								fee={formatInr(entry.offline_consultation_fee)}
+								feeUnit="per visit"
+								nextSlot={slot ? `Today, ${slot.start_time}` : slotsKnown ? 'See all slots' : '…'}
+								nextToday={!!slot}
+								onDirections={() => openOnMap(entry.hospital.address, entry.hospital.name)}
+								directionsLabel={`Directions to ${entry.hospital.name}`}
+								onBook={() => goToBookSlot(entry.hospital.id, 'clinic')}
 							/>
-						))
-					) : (
+						)
+					})}
+
+					{hasVideoConsult && videoHospital && (
+						<PractiseCard
+							icon="video-outline"
+							tone={TONES.sky}
+							title="Video consultation"
+							subtitle="Join from the app, no travel"
+							fee={formatInr(videoFee)}
+							feeUnit="per call"
+							nextSlot={
+								videoNextSlot
+									? `Today, ${videoNextSlot.start_time}`
+									: slotsKnown
+										? 'See all slots'
+										: '…'
+							}
+							nextToday={!!videoNextSlot}
+							onBook={() => goToBookSlot(videoHospital.hospital.id, 'video')}
+						/>
+					)}
+
+					{hospitals.length === 0 && (
 						<AppTypography variant="caption" style={styles.mutedSmall}>
 							No hospitals available for this doctor
 						</AppTypography>
 					)}
-				</View>
+				</AppSection>
 
 				{/* Achievements & recognition -- real data, flat list (Awards tab) */}
 				{achievements.length > 0 && (
-					<View
-						style={styles.section}
-						onLayout={(e) => {
-							sectionOffsets.current.awards = e.nativeEvent.layout.y
-						}}
-					>
-						<AppTypography variant="h4" style={styles.sectionTitle}>
-							Achievements &amp; recognition
-						</AppTypography>
+					<AppSection title="Achievements & recognition" gap={8} onLayout={trackSection('awards')}>
 						<View>
 							{achievements.map((item, idx) => {
 								const year = formatYear(item.achievement_date)
@@ -648,26 +652,25 @@ export default function DoctorDetailPage() {
 											idx !== achievements.length - 1 && styles.treatmentRowDivider,
 										]}
 									>
-										<View style={styles.achievementIconBox}>
-											<MaterialCommunityIcons name="trophy-outline" size={18} color="#8A5300" />
-										</View>
+										<AppIconTile icon="medal-outline" tone="sand" size={36} circle iconSize={18} />
 										<View style={{ flex: 1 }}>
 											<AppTypography style={styles.achievementTitle}>{item.title}</AppTypography>
-											{!!sub && <AppTypography style={styles.mutedSmall}>{sub}</AppTypography>}
+											{!!sub && <AppTypography style={styles.muted13}>{sub}</AppTypography>}
 										</View>
 									</View>
 								)
 							})}
 						</View>
-					</View>
+					</AppSection>
 				)}
 
 				{/* Education & training -- vertical timeline, real degrees data */}
 				{educationItems.length > 0 && (
-					<View style={styles.section}>
-						<AppTypography variant="h4" style={styles.sectionTitle}>
-							Education &amp; training
-						</AppTypography>
+					<AppSection
+						title="Education & training"
+						gap={8}
+						onLayout={trackSection('awards', !achievements.length)}
+					>
 						<View>
 							{educationItems.map((deg, idx) => (
 								<View key={deg.id ?? idx} style={styles.timelineRow}>
@@ -675,67 +678,122 @@ export default function DoctorDetailPage() {
 										<View style={styles.timelineDot} />
 										{idx !== educationItems.length - 1 && <View style={styles.timelineLine} />}
 									</View>
-									<View style={{ paddingBottom: 14, flex: 1 }}>
+									<View
+										style={{
+											paddingBottom: idx !== educationItems.length - 1 ? 14 : 0,
+											flex: 1,
+										}}
+									>
 										<AppTypography style={styles.timelineTitle}>
 											{deg.specialization ? `${deg.degree}, ${deg.specialization}` : deg.degree}
 										</AppTypography>
-										<AppTypography style={styles.mutedSmall}>
+										<AppTypography style={styles.muted13}>
 											{[deg.college, deg.year_of_passing].filter(Boolean).join(' · ')}
 										</AppTypography>
 									</View>
 								</View>
 							))}
 						</View>
-					</View>
+					</AppSection>
 				)}
 
 				{/* Good to know -- static policy copy (see doctorProfileMockData.ts) */}
-				<View style={styles.section}>
-					<AppTypography variant="h4" style={styles.sectionTitle}>
-						Good to know
-					</AppTypography>
-					{DOCTOR_PROFILE_GOOD_TO_KNOW_MOCK.map((line, idx) => (
-						<View key={idx} style={styles.bulletRow}>
-							<View style={styles.bulletDot} />
-							<AppTypography style={styles.bulletText}>{line}</AppTypography>
-						</View>
-					))}
-				</View>
+				<AppSection title="Good to know" gap={8}>
+					<View>
+						{DOCTOR_PROFILE_GOOD_TO_KNOW_MOCK.map((line, idx) => (
+							<View key={idx} style={styles.bulletRow}>
+								<View style={styles.bulletDot} />
+								<AppTypography style={styles.bulletText}>{line}</AppTypography>
+							</View>
+						))}
+					</View>
+				</AppSection>
 			</ScrollView>
 
-			{/* Bottom Sticky Button -- PROTECTED: same booking/payment handoff as before */}
-			<View style={[styles.bottomBar, { paddingBottom: 16 + insets.bottom }]}>
+			{/* Footer -- "Fee from" + Book appointment (goes to the Clinic & slot step) */}
+			<AppFooterBar gap={12}>
+				<View>
+					<AppTypography style={styles.feeFromLabel}>Fee from</AppTypography>
+					<AppTypography style={styles.feeFromValue}>{formatInr(feeFrom)}</AppTypography>
+				</View>
 				<AppButton
-					variant="primary"
+					size="lg"
+					disabled={!hospitals.length}
+					onPress={() => goToBookSlot()}
 					style={styles.bookButton}
-					disabled={!selectedTime || !selectedHospital}
-					onPress={async () => {
-						if (!doctor || !selectedTime || !selectedHospital) return
-
-						const targetHospitalEntry = doctor?.hospitals.find((h) => h.hospital.id === selectedHospital)
-						const fee = getSelectedFee()
-						const formattedDate = formatDateForApi(selectedDate)
-						const formattedTime = formatTimeForApi(selectedTime)
-
-						navigation.navigate(ROUTES.STACK.CONSENT_FORM, {
-							paymentParams: {
-								doctor: doctor,
-								hospitalId: selectedHospital,
-								hospitalName: targetHospitalEntry?.hospital.name || '',
-								appointmentDate: formattedDate,
-								appointmentDateDisplay: formatDateDisplay(selectedDate),
-								startTime: formattedTime,
-								startTimeDisplay: selectedTime,
-								appointmentMode: apptType === 'offline' ? 'offline' : 'online',
-								consultationTypeLabel: apptType === 'offline' ? 'Clinic Visit' : 'Video Call',
-								fee: fee,
-								referralId: referralId,
-							},
-						})
-					}}
+					contentStyle={styles.bookButtonContent}
 				>
-					{selectedTime ? `Book at ${selectedTime}` : 'Select a Time Slot'}
+					Book appointment
 				</AppButton>
+			</AppFooterBar>
+		</View>
+	)
+}
+
+// Screen-specific clinic / video card, assembled from the shared icon tile and dashed divider.
+function PractiseCard(props: {
+	icon: React.ComponentProps<typeof MaterialCommunityIcons>['name']
+	tone: { bg: string; ink: string }
+	title: string
+	subtitle: string
+	fee: string
+	feeUnit: string
+	nextSlot: string
+	nextToday: boolean
+	onBook: () => void
+	onDirections?: () => void
+	directionsLabel?: string
+}) {
+	return (
+		<View style={styles.practiseCard}>
+			<View style={styles.practiseTop}>
+				<AppIconTile
+					icon={props.icon}
+					size={44}
+					radius={12}
+					iconSize={22}
+					backgroundColor={props.tone.bg}
+					iconColor={props.tone.ink}
+				/>
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<AppTypography style={styles.practiseTitle}>{props.title}</AppTypography>
+					{!!props.subtitle && (
+						<AppTypography style={styles.muted13} numberOfLines={2}>
+							{props.subtitle}
+						</AppTypography>
+					)}
+				</View>
+				<View style={{ alignItems: 'flex-end' }}>
+					<AppTypography style={styles.practiseFee}>{props.fee}</AppTypography>
+					<AppTypography style={styles.practiseFeeUnit}>{props.feeUnit}</AppTypography>
+				</View>
+			</View>
+			<AppDashedDivider />
+			<View style={styles.practiseBottom}>
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<AppTypography style={styles.nextSlotLabel}>NEXT SLOT</AppTypography>
+					<AppTag
+						label={props.nextSlot}
+						size="md"
+						tone={props.nextToday ? 'confirmed' : 'neutral'}
+						style={styles.nextSlotPill}
+					/>
+				</View>
+				{!!props.onDirections && (
+					<AppIconButton
+						icon="navigation-variant-outline"
+						onPress={props.onDirections}
+						accessibilityLabel={props.directionsLabel ?? 'Directions'}
+					/>
+				)}
+				<AppActionChip
+					label="Book"
+					trailingIcon="chevron-right"
+					variant="filled"
+					size="md"
+					onPress={props.onBook}
+					style={styles.practiseBook}
+				/>
 			</View>
 		</View>
 	)
@@ -779,25 +837,11 @@ const styles = StyleSheet.create({
 	profileCard: {
 		alignItems: 'center',
 		gap: 4,
-		paddingBottom: 16,
 		paddingHorizontal: 16,
 		marginTop: -60,
-		backgroundColor: '#fff',
 	},
 	profileAvatarWrap: {
 		position: 'relative',
-	},
-	profileAvatarImage: {
-		width: 112,
-		height: 112,
-		borderRadius: 9999,
-		backgroundColor: SPEC_TONE_BG,
-		borderWidth: 4,
-		borderColor: '#FFFFFF',
-	},
-	profileAvatarPlaceholder: {
-		alignItems: 'center',
-		justifyContent: 'center',
 	},
 	profileAvatarBadge: {
 		position: 'absolute',
@@ -837,76 +881,12 @@ const styles = StyleSheet.create({
 		gap: 6,
 		marginTop: 6,
 	},
-	availableBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 9999,
-		backgroundColor: SUCCESS_BG,
-	},
-	availableDot: {
-		width: 6,
-		height: 6,
-		borderRadius: 9999,
-		backgroundColor: SUCCESS,
-	},
-	availableBadgeText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		color: SUCCESS,
-	},
-	videoBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 9999,
-		backgroundColor: SKY_BG,
-	},
-	videoBadgeText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		color: SKY,
-	},
-	languageBadge: {
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 9999,
-		backgroundColor: PAGE_BG,
-	},
-	languageBadgeText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '600',
-		color: INK,
-	},
+	// AppTag pill (4x10, 12/16 700) with the design's 6px dot gap
+	availableBadge: { gap: 6 },
+	languageBadgeText: { fontWeight: '600' },
 	statsRow: {
-		flexDirection: 'row',
-		gap: 8,
-		marginTop: 14,
-		alignSelf: 'stretch',
-	},
-	statBox: {
-		flex: 1,
-		borderRadius: 16,
-		padding: 12,
-		gap: 2,
-	},
-	statLabel: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '600',
-	},
-	statValue: {
-		fontSize: 17,
-		lineHeight: 22,
-		fontWeight: '800',
-		color: INK,
+		marginTop: 16,
+		marginHorizontal: 16,
 	},
 
 	// Tabs
@@ -920,55 +900,74 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderColor: DIVIDER,
 	},
-	tabButton: {
-		flex: 1,
-		height: 36,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: DIVIDER,
-		backgroundColor: '#FFFFFF',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	tabButtonActive: {
-		backgroundColor: PRIMARY,
-		borderColor: PRIMARY,
-	},
-	tabButtonText: {
-		fontSize: 13,
-		fontWeight: '600',
-		color: INK,
-	},
-	tabButtonTextActive: {
-		color: '#FFFFFF',
-		fontWeight: '700',
-	},
+	// Profile tabs keep their original zero side padding so labels never truncate
+	tabChip: { flex: 1, paddingHorizontal: 0 },
 
-	section: {
-		backgroundColor: '#fff',
-		padding: 16,
-		marginTop: 8,
-	},
-	sectionTitle: { color: INK, fontWeight: '700', fontSize: 18, marginBottom: 8 },
-	rowBetween: {
-		flexDirection: 'row',
-		alignItems: 'baseline',
-		justifyContent: 'space-between',
-		marginBottom: 4,
-	},
 	mutedSmall: { color: INK_MUTED, fontSize: 12 },
 
-	bottomBar: {
-		position: 'absolute',
-		bottom: 0,
-		left: 0,
-		right: 0,
-		backgroundColor: '#fff',
-		padding: 16,
-		borderTopWidth: 1,
-		borderTopColor: DIVIDER,
+	muted13: { color: INK_MUTED, fontSize: 13, lineHeight: 18 },
+
+	// Header
+	headerCompact: {
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.16,
+		shadowRadius: 8,
+		elevation: 4,
 	},
-	bookButton: { backgroundColor: INK, borderRadius: 8, paddingVertical: 6 },
+	headerShareBtn: { marginRight: -10 },
+
+	heroSection: { backgroundColor: '#fff', paddingBottom: 16 },
+
+	// Next available
+	nextCard: {
+		marginTop: 12,
+		marginHorizontal: 16,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+		paddingVertical: 14,
+		paddingHorizontal: 16,
+		borderRadius: 16,
+		backgroundColor: INK,
+	},
+	nextEyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.5, color: APP_COLORS.mintAccent },
+	nextTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: '#fff' },
+	nextSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.mint },
+	nextBookBtn: {
+		height: 40,
+		paddingHorizontal: 16,
+		borderRadius: 10,
+		backgroundColor: '#fff',
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	nextBookText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: INK },
+
+	// Practises at cards
+	practiseCard: { borderRadius: 16, backgroundColor: PAGE_BG, padding: 14, gap: 12 },
+	practiseTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+	practiseTitle: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: INK },
+	practiseFee: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: INK },
+	practiseFeeUnit: { fontSize: 11, lineHeight: 14, fontWeight: '600', color: INK_MUTED },
+	// Dashed top rule is the AppDashedDivider above it (card gap 12 = the old paddingTop)
+	practiseBottom: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	nextSlotLabel: { fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.4, color: INK_MUTED },
+	nextSlotPill: { marginTop: 2 },
+	// AppActionChip's 1px (primary) border + 15 = the design's 16px side padding
+	practiseBook: { paddingHorizontal: 15 },
+
+	// Footer
+	feeFromLabel: { fontSize: 12, lineHeight: 16, color: INK_MUTED },
+	feeFromValue: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: INK },
+	// AppButton size="lg" label (16/22 600) at this screen's original 48h / radius 8
+	bookButton: { flex: 1, borderRadius: 8 },
+	bookButtonContent: { height: 48 },
 
 	// About
 	aboutBodyText: {
@@ -976,10 +975,10 @@ const styles = StyleSheet.create({
 		lineHeight: 21,
 		fontSize: 14,
 	},
+	// Spacing above comes from the AppSection gap (8)
 	linkText: {
 		color: PRIMARY,
 		fontWeight: '700',
-		marginTop: 8,
 	},
 
 	// Areas of expertise
@@ -988,18 +987,9 @@ const styles = StyleSheet.create({
 		flexWrap: 'wrap',
 		gap: 8,
 	},
-	expertiseChip: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 9999,
-		backgroundColor: SPEC_TONE_BG,
-	},
-	expertiseChipText: {
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '500',
-		color: INK,
-	},
+	// AppTag md pill (13/18) at the design's 6x12 padding and 500 weight
+	expertiseChip: { paddingHorizontal: 12, paddingVertical: 6 },
+	expertiseChipText: { fontWeight: '500' },
 
 	// Treatments & services
 	treatmentRow: {
@@ -1026,14 +1016,6 @@ const styles = StyleSheet.create({
 		gap: 12,
 		alignItems: 'center',
 		paddingVertical: 10,
-	},
-	achievementIconBox: {
-		width: 36,
-		height: 36,
-		borderRadius: 9999,
-		backgroundColor: '#FBEFD5',
-		alignItems: 'center',
-		justifyContent: 'center',
 	},
 	achievementTitle: {
 		fontSize: 14,

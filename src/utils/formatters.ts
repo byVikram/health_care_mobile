@@ -71,3 +71,23 @@ export function capitaliseWords(str: string | null | undefined): string {
 	if (!str) return ''
 	return str.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
+
+/**
+ * First + last name without a "Dr." prefix ("Dr. Asha K Rao" -> "Asha Rao"), for AppAvatar,
+ * which takes the initials of the first two words.
+ */
+export function initialsOf(name: string): string {
+	const parts = name
+		.replace(/^dr\.?\s+/i, '')
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean)
+	return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : (parts[0] ?? '')
+}
+
+/**
+ * Distance in km without a unit: integers as-is, otherwise one decimal (3 -> "3", 2.46 -> "2.5")
+ */
+export function formatKm(distance: number): string {
+	return Number.isInteger(distance) ? String(distance) : distance.toFixed(1)
+}

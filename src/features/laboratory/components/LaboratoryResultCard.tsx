@@ -1,7 +1,7 @@
 import React from 'react'
 import { StyleSheet, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { AppTypography } from '../../../components/common/display/AppTypography'
 import type { LaboratoryItem } from '../../laboratory_duplicated/laboratory'
 
 interface LaboratoryResultCardProps {

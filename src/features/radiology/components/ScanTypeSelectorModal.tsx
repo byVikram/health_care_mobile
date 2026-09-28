@@ -14,7 +14,7 @@ import {
 	Platform,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { AppSkeleton } from '../../../components/common/AppSkeleton'
+import { AppSkeleton } from '../../../components/common/display/AppSkeleton'
 
 import allScansIcon from '../../../assets/Radiology/All scans.png'
 import mriIcon from '../../../assets/Radiology/mri (2).png'

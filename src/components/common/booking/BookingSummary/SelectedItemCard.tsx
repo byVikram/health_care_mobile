@@ -1,7 +1,7 @@
 import React from 'react'
 import { Image, StyleProp, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { AppTypography } from '../../AppTypography'
+import { AppTypography } from '../../display/AppTypography'
 
 export interface SelectedItemBadge {
 	/** Pre-rendered icon element — kept as a node so this component has no

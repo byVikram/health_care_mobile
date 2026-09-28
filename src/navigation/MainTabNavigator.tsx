@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import React from 'react'
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { BlurView } from 'expo-blur'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -8,7 +9,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { MainTabParamList } from './types'
 import { ROUTES } from './routes'
-import { AppScreenHeader } from '../components/common'
+import { AppPathIcon, AppScreenHeader } from '../components/common'
+import { APP_COLORS } from '../config/theme'
+import { FLOATING_TAB_BAR_BOTTOM, FLOATING_TAB_BAR_HEIGHT, FLOATING_TAB_BAR_SIDE, FLOATING_TAB_ROUTES } from './tabBar'
 
 import DashboardPage from '../features/dashboard/DashboardPage'
 import SearchPage from '../features/doctor/search/SearchPage'
@@ -18,9 +21,12 @@ import ProfilePage from '../features/profile/ProfilePage'
 import { WalletPage } from '../features/wallet/WalletPage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
+import { isPatientRole } from '../constants/constants'
 import NursingCarePage from '../features/ancillary/patient/NursingCarePage'
 import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
-import AncillaryServicesBottomSheet from '../features/ancillary/components/AncillaryServicesBottomSheet'
+import { HomeSheetsProvider, useHomeSheets } from '../features/dashboard/HomeSheetsContext'
+import HomeSheetsHost from '../features/dashboard/components/HomeSheetsHost'
+import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../features/dashboard/homeChromeIcons'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
@@ -174,24 +180,133 @@ function DockedTabBar({ state, descriptors, navigation, onAncillaryPress }: Dock
 	)
 }
 
+interface FloatingTab {
+	key: string
+	/** Tab route to navigate to; null = opens the "Healthcare at home" sheet instead. */
+	route: string | null
+	label: string
+	icon: HomeChromeIcon
+}
+
+const PATIENT_TABS: FloatingTab[] = [
+	{ key: 'home', route: ROUTES.MAIN.HOME, label: 'Home', icon: 'home' },
+	{ key: 'search', route: ROUTES.MAIN.SEARCH, label: 'Search', icon: 'search' },
+	{ key: 'care', route: null, label: 'Healthcare at home', icon: 'careAtHome' },
+	{ key: 'bookings', route: ROUTES.MAIN.PORTAL, label: 'Bookings', icon: 'bookings' },
+	{ key: 'wallet', route: ROUTES.MAIN.WALLET, label: 'Wallet', icon: 'wallet' },
+]
+
+// Android's BlurView has no real blur without an experimental method, so the fill is more opaque there.
+const PILL_FILL = Platform.OS === 'ios' ? '#FFFFFF59' : '#FFFFFFE6'
+
+/**
+ * Patient tab bar (Home redesign): a floating blurred pill with five icon-only 48px buttons. The middle
+ * button opens the "Healthcare at home" sheet (highlighted while it's open) instead of navigating. On
+ * FLOATING_TAB_ROUTES the bar overlays the screen (content pads by TAB_BAR_CLEARANCE); on other tabs it
+ * sits in an in-flow band so their existing layouts aren't covered.
+ */
+function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
+	const insets = useSafeAreaInsets()
+	const { openSheet, open } = useHomeSheets()
+	const activeName = state.routes[state.index]?.name
+
+	if (activeName === ROUTES.MAIN.PROFILE) {
+		return null
+	}
+
+	const careOpen = openSheet === 'ancillary'
+	const floating = FLOATING_TAB_ROUTES.includes(activeName)
+	const bottom = FLOATING_TAB_BAR_BOTTOM + insets.bottom
+
+	return (
+		<View
+			pointerEvents="box-none"
+			style={[
+				floating ? styles.floatingWrapOverlay : styles.floatingWrapBand,
+				{ height: FLOATING_TAB_BAR_HEIGHT + bottom + (floating ? 0 : 8) },
+			]}
+		>
+			<View style={[styles.pillShadow, { bottom }]}>
+				<View style={styles.pill}>
+					<BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
+					<View style={[StyleSheet.absoluteFill, { backgroundColor: PILL_FILL }]} />
+					{PATIENT_TABS.map((tab) => {
+						const route = tab.route ? state.routes.find((r) => r.name === tab.route) : undefined
+						if (tab.route && !route) return null
+						const active = careOpen
+							? tab.route === null
+							: tab.route === null
+								? activeName === ROUTES.MAIN.ANCILLARY
+								: tab.route === activeName
+
+						const onPress = () => {
+							if (!route) {
+								open('ancillary')
+								return
+							}
+							const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
+							if (event.defaultPrevented) return
+							if (route.name !== activeName || careOpen) navigation.navigate(route.name, route.params)
+						}
+
+						return (
+							<Pressable
+								key={tab.key}
+								onPress={onPress}
+								onLongPress={
+									route ? () => navigation.emit({ type: 'tabLongPress', target: route.key }) : undefined
+								}
+								accessibilityRole="button"
+								accessibilityLabel={tab.label}
+								accessibilityState={{ selected: active }}
+								accessibilityHint={route ? undefined : 'Opens home healthcare services'}
+								style={[styles.pillButton, active && styles.pillButtonActive]}
+							>
+								<AppPathIcon
+									d={HOME_CHROME_PATHS[tab.icon]}
+									size={22}
+									strokeWidth={2.1}
+									color={active ? APP_COLORS.surface : APP_COLORS.ink}
+								/>
+								{active && <View style={styles.pillDot} />}
+							</Pressable>
+						)
+					})}
+				</View>
+			</View>
+		</View>
+	)
+}
+
 export default function MainTabNavigator() {
+	return (
+		<HomeSheetsProvider>
+			<MainTabs />
+			<HomeSheetsHost />
+		</HomeSheetsProvider>
+	)
+}
+
+function MainTabs() {
 	const navigation = useNavigation<any>()
 	const { role } = useAuth()
+	const { open } = useHomeSheets()
 	const isNurse = role === 'nurse' || role === 'ancillary'
 	const isDoctor = role === 'doctor'
+	const isPatient = isPatientRole(role)
 	const shouldShowSearch = role !== 'doctor'
 	const shouldShowAncillary = !isNurse
-	const [ancillarySheetVisible, setAncillarySheetVisible] = useState(false)
 
 	return (
 		<>
 			<Tab.Navigator
-				tabBar={(props) => (
-					<DockedTabBar
-						{...props}
-						onAncillaryPress={() => setAncillarySheetVisible(true)}
-					/>
-				)}
+				tabBar={(props) =>
+					isPatient ? (
+						<FloatingTabBar {...props} />
+					) : (
+						<DockedTabBar {...props} onAncillaryPress={() => open('ancillary')} />
+					)
+				}
 				screenOptions={{
 					headerShown: false,
 				}}
@@ -240,17 +355,61 @@ export default function MainTabNavigator() {
 					}}
 				/>
 			</Tab.Navigator>
-
-			{/* ANCILLARY SERVICES SELECTION BOTTOM SHEET */}
-			<AncillaryServicesBottomSheet
-				visible={ancillarySheetVisible}
-				onClose={() => setAncillarySheetVisible(false)}
-			/>
 		</>
 	)
 }
 
 const styles = StyleSheet.create({
+	floatingWrapOverlay: {
+		position: 'absolute',
+		left: 0,
+		right: 0,
+		bottom: 0,
+	},
+	floatingWrapBand: {
+		backgroundColor: APP_COLORS.pageBg,
+	},
+	pillShadow: {
+		position: 'absolute',
+		left: FLOATING_TAB_BAR_SIDE,
+		right: FLOATING_TAB_BAR_SIDE,
+		height: FLOATING_TAB_BAR_HEIGHT,
+		borderRadius: FLOATING_TAB_BAR_HEIGHT / 2,
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.15,
+		shadowRadius: 28,
+		elevation: 6,
+	},
+	pill: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 10,
+		borderRadius: FLOATING_TAB_BAR_HEIGHT / 2,
+		borderWidth: 1,
+		borderColor: '#FFFFFF99',
+		overflow: 'hidden',
+	},
+	pillButton: {
+		width: 48,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	pillButtonActive: {
+		backgroundColor: APP_COLORS.primary,
+	},
+	pillDot: {
+		position: 'absolute',
+		bottom: -7,
+		width: 5,
+		height: 5,
+		borderRadius: 2.5,
+		backgroundColor: APP_COLORS.primary,
+	},
 	tabBar: {
 		flexDirection: 'row',
 		backgroundColor: '#FFFFFF',

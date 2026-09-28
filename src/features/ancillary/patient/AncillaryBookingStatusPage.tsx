@@ -11,11 +11,11 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { ROUTES } from '../../../navigation/routes'
-import AppScreenHeader from '../../../components/common/AppScreenHeader'
-import { AppTypography } from '../../../components/common/AppTypography'
-import { AppButton } from '../../../components/common/AppButton'
-import StatusModal from '../../../components/common/StatusModal'
-import RatingStars from '../components/RatingStars'
+import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
+import { AppTypography } from '../../../components/common/display/AppTypography'
+import { AppButton } from '../../../components/common/buttons/AppButton'
+import StatusModal from '../../../components/common/feedback/StatusModal'
+import AppRatingStars from '../../../components/common/display/AppRatingStars'
 import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
 import {
 	AncillaryBooking,
@@ -318,7 +318,7 @@ export default function AncillaryBookingStatusPage() {
 										onPress={() => setReviewModalVisible(true)}
 										activeOpacity={0.8}
 									>
-										<RatingStars rating={reviewData.rating} size={14} />
+										<AppRatingStars value={reviewData.rating} size={14} />
 										<AppTypography variant="caption" style={styles.reviewedText}>
 											★ {reviewData.rating}.0 • View Your Submitted Review
 										</AppTypography>

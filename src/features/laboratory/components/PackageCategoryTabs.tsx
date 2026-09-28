@@ -8,7 +8,7 @@ import {
 	ViewStyle,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { AppTypography } from '../../../components/common/display/AppTypography'
 import { PackageCategoryTabItem } from '../data/laboratoryMockData'
 
 interface PackageCategoryTabsProps {
