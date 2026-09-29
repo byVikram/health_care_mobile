@@ -23,7 +23,7 @@ import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
 import { isPatientRole } from '../constants/constants'
 import NursingCarePage from '../features/ancillary/patient/NursingCarePage'
-import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
+import ProviderSchedulePage from '../features/ancillary/staff/ProviderSchedulePage'
 import { HomeSheetsProvider, useHomeSheets } from '../features/dashboard/HomeSheetsContext'
 import HomeSheetsHost from '../features/dashboard/components/HomeSheetsHost'
 import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../features/dashboard/homeChromeIcons'
@@ -196,16 +196,32 @@ const PATIENT_TABS: FloatingTab[] = [
 	{ key: 'wallet', route: ROUTES.MAIN.WALLET, label: 'Wallet', icon: 'wallet' },
 ]
 
+/** Ancillary provider tabs (ancillary-provider design): Today · Schedule · Earnings · Profile. */
+const PROVIDER_TABS: FloatingTab[] = [
+	{ key: 'today', route: ROUTES.MAIN.HOME, label: 'Today', icon: 'today' },
+	{ key: 'schedule', route: ROUTES.MAIN.PORTAL, label: 'Schedule', icon: 'appointments' },
+	{ key: 'earnings', route: ROUTES.MAIN.WALLET, label: 'Earnings', icon: 'myWallet' },
+	{ key: 'profile', route: ROUTES.MAIN.PROFILE, label: 'Profile', icon: 'profile' },
+]
+/** The 4-button provider pill sits 36 from the sides (design); the 5-button patient pill 20. */
+const PROVIDER_PILL_SIDE = 36
+
 // Android's BlurView has no real blur without an experimental method, so the fill is more opaque there.
 const PILL_FILL = Platform.OS === 'ios' ? '#FFFFFF59' : '#FFFFFFE6'
 
+interface FloatingTabBarProps extends BottomTabBarProps {
+	tabs: FloatingTab[]
+	/** Pill inset from the screen sides. Defaults to FLOATING_TAB_BAR_SIDE. */
+	side?: number
+}
+
 /**
- * Patient tab bar (Home redesign): a floating blurred pill with five icon-only 48px buttons. The middle
- * button opens the "Healthcare at home" sheet (highlighted while it's open) instead of navigating. On
- * FLOATING_TAB_ROUTES the bar overlays the screen (content pads by TAB_BAR_CLEARANCE); on other tabs it
- * sits in an in-flow band so their existing layouts aren't covered.
+ * Floating tab bar (Home redesign): a blurred pill of icon-only 48px buttons -- five for patients (the
+ * middle one opens the "Healthcare at home" sheet, highlighted while it's open, instead of navigating) and
+ * four for ancillary providers. On FLOATING_TAB_ROUTES the bar overlays the screen (content pads by
+ * TAB_BAR_CLEARANCE); on other tabs it sits in an in-flow band so their existing layouts aren't covered.
  */
-function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
+function FloatingTabBar({ state, navigation, tabs, side = FLOATING_TAB_BAR_SIDE }: FloatingTabBarProps) {
 	const insets = useSafeAreaInsets()
 	const { openSheet, open } = useHomeSheets()
 	const activeName = state.routes[state.index]?.name
@@ -226,11 +242,11 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 				{ height: FLOATING_TAB_BAR_HEIGHT + bottom + (floating ? 0 : 8) },
 			]}
 		>
-			<View style={[styles.pillShadow, { bottom }]}>
+			<View style={[styles.pillShadow, { bottom, left: side, right: side }]}>
 				<View style={styles.pill}>
 					<BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
 					<View style={[StyleSheet.absoluteFill, { backgroundColor: PILL_FILL }]} />
-					{PATIENT_TABS.map((tab) => {
+					{tabs.map((tab) => {
 						const route = tab.route ? state.routes.find((r) => r.name === tab.route) : undefined
 						if (tab.route && !route) return null
 						const active = careOpen
@@ -302,7 +318,9 @@ function MainTabs() {
 			<Tab.Navigator
 				tabBar={(props) =>
 					isPatient ? (
-						<FloatingTabBar {...props} />
+						<FloatingTabBar {...props} tabs={PATIENT_TABS} />
+					) : isNurse ? (
+						<FloatingTabBar {...props} tabs={PROVIDER_TABS} side={PROVIDER_PILL_SIDE} />
 					) : (
 						<DockedTabBar {...props} onAncillaryPress={() => open('ancillary')} />
 					)
@@ -318,12 +336,12 @@ function MainTabs() {
 						component={SearchPage}
 					/>
 				) : null}
-				{/* Nurse persona: PORTAL tab renders NurseBookingHistoryPage directly. */}
+				{/* Nurse persona: PORTAL tab is the provider Schedule (scheduled bookings). */}
 				{/* Doctor persona: PORTAL tab keeps the existing PortalPage (unaffected by the patient Bookings consolidation). */}
 				{/* Patient persona: PORTAL tab renders the consolidated BookingsPage (Doctor Appointments page + category filters). */}
 				<Tab.Screen
 					name={ROUTES.MAIN.PORTAL}
-					component={isNurse ? NurseBookingHistoryPage : isDoctor ? PortalPage : BookingsPage}
+					component={isNurse ? ProviderSchedulePage : isDoctor ? PortalPage : BookingsPage}
 				/>
 				{shouldShowAncillary ? (
 					<Tab.Screen

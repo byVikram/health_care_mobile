@@ -67,15 +67,10 @@ import DoctorEventFormPage from '../features/doctor/events/DoctorEventFormPage'
 import AllEventsPage from '../features/events/AllEventsPage'
 import EventDetailsPage from '../features/events/EventDetailsPage'
 
-import ActiveBookingPage from '../features/ancillary/staff/ActiveBookingPage'
-import PatientVerificationPage from '../features/ancillary/staff/PatientVerificationPage'
-import ServiceInProgressPage from '../features/ancillary/staff/ServiceInProgressPage'
-import CompleteServicePage from '../features/ancillary/staff/CompleteServicePage'
-import NurseTodayOverviewPage from '../features/ancillary/staff/NurseTodayOverviewPage'
-import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
-import NurseVisitsPage from '../features/ancillary/staff/NurseVisitsPage'
+import ProviderVisitDetailsPage from '../features/ancillary/staff/visit/ProviderVisitDetailsPage'
+import ProviderVisitInProgressPage from '../features/ancillary/staff/visit/ProviderVisitInProgressPage'
+import ProviderCompleteVisitPage from '../features/ancillary/staff/visit/ProviderCompleteVisitPage'
 import NurseEarningsPage from '../features/ancillary/staff/NurseEarningsPage'
-import NurseHistoryPage from '../features/ancillary/staff/NurseHistoryPage'
 import AncillaryServicesPage from '../features/ancillary/patient/AncillaryServicesPage'
 import HomeCareServiceCatalogScreen from '../features/ancillary/patient/HomeCareServiceCatalogScreen'
 import CaregiverServicesScreen from '../features/ancillary/patient/CaregiverServicesScreen'
@@ -286,43 +281,23 @@ function AuthenticatedNavigator() {
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_ACTIVE_BOOKING}
-					component={ActiveBookingPage}
+					name={ROUTES.STACK.PROVIDER_VISIT_DETAILS}
+					component={ProviderVisitDetailsPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_PATIENT_VERIFICATION}
-					component={PatientVerificationPage}
+					name={ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS}
+					component={ProviderVisitInProgressPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS}
-					component={ServiceInProgressPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_COMPLETE_SERVICE}
-					component={CompleteServicePage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_TODAY_OVERVIEW}
-					component={NurseTodayOverviewPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_VISITS}
-					component={NurseVisitsPage}
+					name={ROUTES.STACK.PROVIDER_VISIT_COMPLETE}
+					component={ProviderCompleteVisitPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
 					name={ROUTES.STACK.NURSE_EARNINGS}
 					component={NurseEarningsPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_HISTORY}
-					component={NurseHistoryPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen

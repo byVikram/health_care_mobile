@@ -34,7 +34,7 @@ import DoctorAppointments from '../doctor/DoctorAppointments'
 import { getAppointments, getSpecialities } from '../doctor/doctorService'
 import type { SpecialityItem } from '../../types/speciality'
 import { APP_COLORS } from '../../config/theme'
-import StaffAncillaryDashboard from '../ancillary/staff/StaffAncillaryDashboard'
+import ProviderTodayContent from '../ancillary/staff/today/ProviderTodayContent'
 
 import { formatDateForApi } from '../../utils/date'
 import { USER_ROLES, isPatientRole } from '../../constants/constants'
@@ -72,7 +72,7 @@ export default function DashboardPage() {
 	const isNurse = role === USER_ROLES.ANCILLARY
 	const isStaffRole = isDoctor || isNurse
 	const isPatientHome = isPatientRole(role)
-	// Patient Home header (expanded): 8 + 52 + 6 + 28 + 6 + 48 + 16.
+	// Patient Home header (expanded): 8 + 52 + 6 + 28 + 6 + 48 + 16. Provider Today header: 8 + 60 + 16.
 	const defaultHeaderHeight = isStaffRole ? insets.top + 84 : isPatientHome ? insets.top + 164 : insets.top + 146
 	const headerHeight = (scrollData?.headerHeight && scrollData.headerHeight > 0) ? scrollData.headerHeight : defaultHeaderHeight
 	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
@@ -281,7 +281,7 @@ export default function DashboardPage() {
 	const renderRadiologyPanel = () => <></>
 	const renderLaboratoryPanel = () => <></>
 	const renderAncillaryPanel = () => (
-		<StaffAncillaryDashboard />
+		<ProviderTodayContent refreshToken={refreshToken} onRefreshComplete={handleAppointmentsRefreshComplete} />
 	)
 	const renderQuickServicesSection = () => (
 		<View style={isDoctor && styles.doctorQuickServicesSpacing}>
@@ -351,13 +351,15 @@ export default function DashboardPage() {
 	return (
 		<>
 			<Animated.ScrollView
-				style={[styles.container, isPatientHome && styles.patientContainer]}
+				style={[styles.container, (isPatientHome || isNurse) && styles.patientContainer]}
 				contentContainerStyle={[
 					styles.content,
 					isPatientHome
 						? // Clears the floating tab bar (64 + 16 bottom offset + safe area) like the design's 104px.
 							{ paddingTop: headerHeight + 16, paddingBottom: tabBarClearance + 8 }
-						: {
+						: isNurse
+							? { paddingTop: headerHeight, paddingBottom: tabBarClearance + 8 }
+							: {
 								paddingTop: headerHeight,
 								paddingBottom: Math.max(insets.bottom + 96, 120),
 							},

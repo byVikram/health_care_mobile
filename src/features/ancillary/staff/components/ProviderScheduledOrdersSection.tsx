@@ -1,9 +1,9 @@
 // src/features/ancillary/staff/components/ProviderScheduledOrdersSection.tsx
 //
-// Provider's scheduled-order queue on the staff dashboard (GET /api/ancillary/provider/me/orders).
+// Provider's scheduled-order queue on the Schedule tab (GET /api/ancillary/provider/me/orders).
 // Patients book a SCHEDULED order with 1..7 visits (same provider); the provider must accept within 30 minutes
 // or it expires. Lists orders with a live countdown, Accept / Decline (reason sheet), and refreshes on focus,
-// on filter change, after every action, on the "new scheduled request" websocket event and when a countdown ends.
+// on filter change, after every action and when a countdown ends.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useIsFocused } from '@react-navigation/native'
@@ -16,7 +16,6 @@ import {
 	getProviderScheduledOrders,
 } from '../../ancillaryProviderBookingService'
 import { extractApiErrorMessage } from '../../ancillaryService'
-import { useAncillaryWebSocket } from '../../hooks/useAncillaryWebSocket'
 import { RescheduleProposalModal } from '../../components/RescheduleProposalModal'
 import {
 	firstVisitStart,
@@ -94,13 +93,6 @@ export function ProviderScheduledOrdersSection() {
 	useEffect(() => {
 		if (isFocused) void loadOrders()
 	}, [isFocused, filter, loadOrders])
-
-	const onScheduledRequest = useCallback(() => {
-		void loadOrders()
-	}, [loadOrders])
-
-	// Scheduled requests arrive whether or not the provider is online for instant dispatch.
-	useAncillaryWebSocket({ enabled: isFocused, onScheduledRequest })
 
 	// Tick once a second while any pending order is counting down to its expiry.
 	const hasCountdown = orders.some((o) => isPendingOrder(o) && !!o.expiresAt && o.expiresAt.getTime() > nowMs)
