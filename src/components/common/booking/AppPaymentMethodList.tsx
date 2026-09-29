@@ -39,6 +39,9 @@ const APP_ICON_NAMES: Record<AppIconName, true> = {
 	calendar: true,
 	directions: true,
 	download: true,
+	wifiOff: true,
+	refresh: true,
+	call: true,
 }
 
 const isAppIconName = (name: string): name is AppIconName => Object.prototype.hasOwnProperty.call(APP_ICON_NAMES, name)
