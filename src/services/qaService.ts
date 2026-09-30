@@ -52,10 +52,18 @@ export interface PaginatedQuestionsResponse {
 	}
 }
 
-export const listHealthQuestions = async (search?: string, page = 1, limit = 10): Promise<PaginatedQuestionsResponse> => {
+export const listHealthQuestions = async (
+	search?: string,
+	page = 1,
+	limit = 10,
+	answered?: boolean,
+): Promise<PaginatedQuestionsResponse> => {
 	const params: Record<string, unknown> = { page, limit }
 	if (search) {
 		params.search = search
+	}
+	if (answered !== undefined) {
+		params.answered = answered
 	}
 	const res = await ApiService.getWithParams<PaginatedQuestionsResponse>(API_ENDPOINTS.QA.LIST, params)
 	return res.data

@@ -16,7 +16,6 @@ import { FLOATING_TAB_BAR_BOTTOM, FLOATING_TAB_BAR_HEIGHT, FLOATING_TAB_BAR_SIDE
 import DashboardPage from '../features/dashboard/DashboardPage'
 import SearchPage from '../features/doctor/search/SearchPage'
 import BookingsPage from '../features/bookings/BookingsPage'
-import PortalPage from '../features/portal/PortalPage'
 import ProfilePage from '../features/profile/ProfilePage'
 import { WalletPage } from '../features/wallet/WalletPage'
 import SidebarLayout from '../components/layout/SidebarLayout'
@@ -24,6 +23,9 @@ import { useAuth } from '../context/AuthContext'
 import { isPatientRole } from '../constants/constants'
 import NursingCarePage from '../features/ancillary/patient/NursingCarePage'
 import ProviderSchedulePage from '../features/ancillary/staff/ProviderSchedulePage'
+import DoctorHomeScreen from '../features/doctor/dashboard/DoctorHomeScreen'
+import DoctorScheduleScreen from '../features/doctor/dashboard/DoctorScheduleScreen'
+import DoctorEngageScreen from '../features/doctor/dashboard/DoctorEngageScreen'
 import { HomeSheetsProvider, useHomeSheets } from '../features/dashboard/HomeSheetsContext'
 import HomeSheetsHost from '../features/dashboard/components/HomeSheetsHost'
 import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../features/dashboard/homeChromeIcons'
@@ -206,22 +208,37 @@ const PROVIDER_TABS: FloatingTab[] = [
 /** The 4-button provider pill sits 36 from the sides (design); the 5-button patient pill 20. */
 const PROVIDER_PILL_SIDE = 36
 
+/** Doctor dashboard tab bar: same floating-pill treatment as the patient tabs, different destinations. */
+const DOCTOR_TABS: FloatingTab[] = [
+	{ key: 'home', route: ROUTES.MAIN.HOME, label: 'Home', icon: 'home' },
+	{ key: 'schedule', route: ROUTES.MAIN.SCHEDULE, label: 'Schedule', icon: 'appointments' },
+	{ key: 'engage', route: ROUTES.MAIN.ENGAGE, label: 'Questions', icon: 'help' },
+	{ key: 'wallet', route: ROUTES.MAIN.WALLET, label: 'Wallet', icon: 'wallet' },
+	{ key: 'profile', route: ROUTES.MAIN.PROFILE, label: 'Profile', icon: 'profile' },
+]
+
 // Android's BlurView has no real blur without an experimental method, so the fill is more opaque there.
 const PILL_FILL = Platform.OS === 'ios' ? '#FFFFFF59' : '#FFFFFFE6'
 
 interface FloatingTabBarProps extends BottomTabBarProps {
-	tabs: FloatingTab[]
-	/** Pill inset from the screen sides. Defaults to FLOATING_TAB_BAR_SIDE. */
+	/** Which tab set to render. Defaults to the patient tabs (with the "Healthcare at home" sheet button). */
+	tabs?: FloatingTab[]
+	/** Pill inset from the screen sides. Defaults to FLOATING_TAB_BAR_SIDE (the ancillary provider's
+	 * 4-button pill sits closer to the edges than the 5-button patient/doctor pill). */
 	side?: number
+	/** Route names that should show a small notification dot (e.g. Engage while requests are pending). */
+	badgeRoutes?: readonly string[]
 }
 
 /**
- * Floating tab bar (Home redesign): a blurred pill of icon-only 48px buttons -- five for patients (the
- * middle one opens the "Healthcare at home" sheet, highlighted while it's open, instead of navigating) and
- * four for ancillary providers. On FLOATING_TAB_ROUTES the bar overlays the screen (content pads by
- * TAB_BAR_CLEARANCE); on other tabs it sits in an in-flow band so their existing layouts aren't covered.
+ * Floating blurred pill with icon-only 48px buttons — shared by the patient tab bar (Home redesign),
+ * the ancillary provider's nav, and the doctor dashboard's nav. For patients, the middle button opens
+ * the "Healthcare at home" sheet (highlighted while it's open) instead of navigating; every other tab,
+ * for any persona, just navigates to its route. On FLOATING_TAB_ROUTES the bar overlays the screen
+ * (content pads by TAB_BAR_CLEARANCE); on other tabs it sits in an in-flow band so their existing
+ * layouts aren't covered.
  */
-function FloatingTabBar({ state, navigation, tabs, side = FLOATING_TAB_BAR_SIDE }: FloatingTabBarProps) {
+function FloatingTabBar({ state, navigation, tabs = PATIENT_TABS, side = FLOATING_TAB_BAR_SIDE, badgeRoutes = [] }: FloatingTabBarProps) {
 	const insets = useSafeAreaInsets()
 	const { openSheet, open } = useHomeSheets()
 	const activeName = state.routes[state.index]?.name
@@ -285,6 +302,7 @@ function FloatingTabBar({ state, navigation, tabs, side = FLOATING_TAB_BAR_SIDE 
 									color={active ? APP_COLORS.surface : APP_COLORS.ink}
 								/>
 								{active && <View style={styles.pillDot} />}
+								{!active && tab.route && badgeRoutes.includes(tab.route) && <View style={styles.pillBadge} />}
 							</Pressable>
 						)
 					})}
@@ -310,15 +328,20 @@ function MainTabs() {
 	const isNurse = role === 'nurse' || role === 'ancillary'
 	const isDoctor = role === 'doctor'
 	const isPatient = isPatientRole(role)
+	// Doctor persona: Schedule + Engage replace Portal/Search/Ancillary (none of those apply to a
+	// doctor's own dashboard) — see DOCTOR_TABS / DoctorHomeScreen / DoctorScheduleScreen / DoctorEngageScreen.
 	const shouldShowSearch = role !== 'doctor'
-	const shouldShowAncillary = !isNurse
+	const shouldShowAncillary = !isNurse && !isDoctor
+	const shouldShowPortal = !isDoctor
 
 	return (
 		<>
 			<Tab.Navigator
 				tabBar={(props) =>
 					isPatient ? (
-						<FloatingTabBar {...props} tabs={PATIENT_TABS} />
+						<FloatingTabBar {...props} />
+					) : isDoctor ? (
+						<FloatingTabBar {...props} tabs={DOCTOR_TABS} badgeRoutes={[]} />
 					) : isNurse ? (
 						<FloatingTabBar {...props} tabs={PROVIDER_TABS} side={PROVIDER_PILL_SIDE} />
 					) : (
@@ -329,20 +352,23 @@ function MainTabs() {
 					headerShown: false,
 				}}
 			>
-				<Tab.Screen name={ROUTES.MAIN.HOME} component={HomeWithSidebar} />
+				<Tab.Screen name={ROUTES.MAIN.HOME} component={isDoctor ? DoctorHomeScreen : HomeWithSidebar} />
 				{shouldShowSearch ? (
 					<Tab.Screen
 						name={ROUTES.MAIN.SEARCH}
 						component={SearchPage}
 					/>
 				) : null}
+				{isDoctor ? <Tab.Screen name={ROUTES.MAIN.SCHEDULE} component={DoctorScheduleScreen} /> : null}
+				{isDoctor ? <Tab.Screen name={ROUTES.MAIN.ENGAGE} component={DoctorEngageScreen} /> : null}
 				{/* Nurse persona: PORTAL tab is the provider Schedule (scheduled bookings). */}
-				{/* Doctor persona: PORTAL tab keeps the existing PortalPage (unaffected by the patient Bookings consolidation). */}
 				{/* Patient persona: PORTAL tab renders the consolidated BookingsPage (Doctor Appointments page + category filters). */}
-				<Tab.Screen
-					name={ROUTES.MAIN.PORTAL}
-					component={isNurse ? ProviderSchedulePage : isDoctor ? PortalPage : BookingsPage}
-				/>
+				{shouldShowPortal ? (
+					<Tab.Screen
+						name={ROUTES.MAIN.PORTAL}
+						component={isNurse ? ProviderSchedulePage : BookingsPage}
+					/>
+				) : null}
 				{shouldShowAncillary ? (
 					<Tab.Screen
 						name={ROUTES.MAIN.ANCILLARY}
@@ -427,6 +453,17 @@ const styles = StyleSheet.create({
 		height: 5,
 		borderRadius: 2.5,
 		backgroundColor: APP_COLORS.primary,
+	},
+	pillBadge: {
+		position: 'absolute',
+		right: 8,
+		top: 8,
+		width: 9,
+		height: 9,
+		borderRadius: 4.5,
+		backgroundColor: APP_COLORS.offer,
+		borderWidth: 2,
+		borderColor: '#FFFFFF',
 	},
 	tabBar: {
 		flexDirection: 'row',

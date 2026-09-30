@@ -227,6 +227,46 @@ export const patientService = {
   },
 };
 
+export interface TreatmentSavePayload {
+  vitals?: Record<string, any> | null;
+  notes?: string | null;
+  prescription_s3_key?: string | null;
+  follow_up_date?: string | null; // "YYYY-MM-DD"
+}
+
+export const treatmentService = {
+  getByAppointment: async (appointmentId: string): Promise<TreatmentRecord | null> => {
+    try {
+      const response = await ApiService.get<{ success: boolean; data: TreatmentRecord }>(
+        API_ENDPOINTS.TREATMENTS.BY_APPOINTMENT(appointmentId),
+      );
+      return response.data?.data ?? null;
+    } catch (err: any) {
+      if (err?.response?.status === 404) return null;
+      throw err;
+    }
+  },
+
+  // Creates the treatment record if none exists yet for this appointment, otherwise updates
+  // the existing one -- the backend rejects a second create with 409 Conflict (one treatment
+  // record per appointment), so the caller always wants "save these fields" either way.
+  save: async (appointmentId: string, payload: TreatmentSavePayload): Promise<TreatmentRecord> => {
+    const existing = await treatmentService.getByAppointment(appointmentId);
+    if (existing) {
+      const response = await ApiService.patch<{ success: boolean; data: TreatmentRecord }>(
+        API_ENDPOINTS.TREATMENTS.BY_APPOINTMENT(appointmentId),
+        payload,
+      );
+      return response.data.data;
+    }
+    const response = await ApiService.post<{ success: boolean; data: TreatmentRecord }>(
+      API_ENDPOINTS.TREATMENTS.CREATE,
+      { appointment_id: appointmentId, ...payload },
+    );
+    return response.data.data;
+  },
+};
+
 export const doctorService = {
   getDoctorDetails: async (doctorId: string): Promise<DocterDetails> => {
     try {

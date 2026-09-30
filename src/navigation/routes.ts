@@ -14,6 +14,10 @@ export const ROUTES = {
 		PROFILE: 'Profile',
 		ANCILLARY: 'Ancillary',
 		WALLET: 'Wallet',
+		// Doctor-only tabs (the "DoctorDashboard" Schedule / Engage views) — see MainTabNavigator's
+		// DOCTOR_TABS. Kept in MAIN (not STACK) since they're real bottom-tab routes, not pushed screens.
+		SCHEDULE: 'Schedule',
+		ENGAGE: 'Engage',
 	},
 	PORTAL: {
 		PROFILE: 'Profile',
@@ -39,6 +43,9 @@ export const ROUTES = {
 		APPOINTMENT_CONFIRMED: 'AppointmentConfirmed',
 		APPOINTMENT_DETAILS: 'AppointmentDetails',
 		CONSENT_FORM: 'ConsentForm',
+		// Doctor-side patient-file access gate (OTP the patient reads out) — distinct from CONSENT_FORM
+		// above, which is the patient's own booking T&C modal.
+		VERIFY_ACCESS: 'VerifyAccess',
 		PATIENT_PAYMENT: 'PatientPayment',
 		PHARMACY_SEARCH_PAGE: 'PharmacySearchPage',
 		ORDER_LIST: 'OrderListPage',

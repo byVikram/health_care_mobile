@@ -40,7 +40,19 @@ export interface AppointmentParams {
 	page?: number
 	limit?: number
 	appointment_date?: string
-	status?: string
+	/**
+	 * Real backend param is a status UUID (see getStatusIdByLabel), not a semantic string --
+	 * there's no "pending"/"confirmed" string filter server-side. Filter appointment lists
+	 * client-side on the label instead (see statusLabelOf usages) and pass status_id only when you
+	 * actually have one of the real ids.
+	 */
+	status_id?: string
+	start_date?: string
+	end_date?: string
+	search?: string
+	appointment_mode?: string
+	hospital_id?: string
+	patient_id?: string
 	variant?: 'upcoming' | 'all'
 }
 
@@ -92,6 +104,25 @@ export const updatePreIntake = async (appointmentId: string, payload: PreIntakeP
 	return res.data
 }
 
+// Appointment status ids are a backend lookup-table UUID per environment (appointment_status.public_id
+// is `default=lambda: str(uuid.uuid4())` -- randomly generated whenever that row is seeded), NOT a
+// fixed value shared across dev/staging/prod. A previous version of this file hardcoded the two ids
+// this dev database happened to have for "confirmed"/"cancelled" -- that only worked here; any other
+// environment's appointment_status rows have different ids and accept/reject would silently 404 or
+// hit the wrong status. Resolve by label instead, every time, via the real GET_STATUSES endpoint.
+const statusIdCache = new Map<string, string>()
+
+export async function getStatusIdByLabel(label: string): Promise<string> {
+	const key = label.toLowerCase()
+	const cached = statusIdCache.get(key)
+	if (cached) return cached
+	const options = await getAppointmentStatuses()
+	options.forEach((o) => statusIdCache.set(o.label.toLowerCase(), o.id))
+	const match = statusIdCache.get(key)
+	if (!match) throw new Error(`Unknown appointment status label: ${label}`)
+	return match
+}
+
 export const updateAppointmentsStatus = async (
 	appointmentId: string,
 	statusId: string,
@@ -130,12 +161,70 @@ export const rescheduleAppointment = async (payload: RescheduleAppointmentPayloa
 	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, payload)
 	return res.data
 }
-export const startConsultation = async (appointmentId: string): Promise<{ success: boolean }> => {
-	const res = await ApiService.post<{ success: boolean }>(
+export interface StartConsultationResponse {
+	success: boolean
+	appointment_id?: string
+	// No `otp` field: the backend generates the code and emails it to the patient directly
+	// (app/appointments/service.py `start_consultation`) rather than returning it here — the doctor
+	// must get the code from the patient, not their own app. (There's no SMS provider in this
+	// backend yet, so delivery is by email for now; see the backend's own note on that.)
+}
+
+export const startConsultation = async (appointmentId: string): Promise<StartConsultationResponse> => {
+	const res = await ApiService.post<StartConsultationResponse>(
 		`${API_ENDPOINTS.APPOINTMENTS.GET_BY_ID(appointmentId)}/start-consultation`,
 		{}
 	)
 	return res.data
+}
+
+// ── Verify access (patient-file consent OTP) ────────────────────────────────
+// Real endpoint: POST /api/appointments/{id}/verify-otp. Like every endpoint on this backend, the
+// HTTP body is the standard {success, message, data} envelope (see app/core/responses.py), and the
+// {success, verified} pair this call actually cares about is INSIDE `data`, not at the top level --
+// `res.data.success` from axios is always true for any 2xx response regardless of the real outcome,
+// so reading it directly (as this used to) made every successful verify look like a failure (its own
+// "OTP verified successfully" envelope message rendered as the error text) since `verified` was
+// always undefined one level too high. There's no separate "resend" endpoint -- re-calling
+// startConsultation() above regenerates the code server-side (see VerifyAccessPage's handleResend).
+// This gates access to PHI, so it's always a real network call, never a client-side pass/fail sim.
+export interface VerifyAccessOtpResponse {
+	success: boolean
+	verified?: boolean
+	message?: string
+}
+
+export const verifyPatientAccessOtp = async (appointmentId: string, code: string): Promise<VerifyAccessOtpResponse> => {
+	const res = await ApiService.post<{ success: boolean; message?: string; data?: VerifyAccessOtpResponse }>(
+		API_ENDPOINTS.APPOINTMENTS.VERIFY_ACCESS_OTP(appointmentId),
+		{ otp: code }
+	)
+	return res.data?.data ?? { success: res.data?.success ?? false, message: res.data?.message }
+}
+
+export interface AppointmentStatusOption {
+	id: string
+	label: string
+}
+
+export interface CheckInResponse {
+	success: boolean
+	message?: string
+	data?: { appointment_id: string; status: string }
+}
+
+/** Doctor-only: not_arrived -> checked_in when the patient physically arrives (backend rejects any other current status). */
+export const checkInAppointment = async (appointmentId: string): Promise<CheckInResponse> => {
+	const res = await ApiService.post<CheckInResponse>(API_ENDPOINTS.APPOINTMENTS.CHECK_IN(appointmentId), {})
+	return res.data
+}
+
+export const getAppointmentStatuses = async (): Promise<AppointmentStatusOption[]> => {
+	const res = await ApiService.get<{ success: boolean; data: AppointmentStatusOption[] } | AppointmentStatusOption[]>(
+		API_ENDPOINTS.APPOINTMENTS.STATUSES,
+	)
+	const body = res.data as any
+	return Array.isArray(body) ? body : (body?.data ?? [])
 }
 
 export const getAppointments = async (params?: AppointmentParams): Promise<AppointmentsResponse> => {

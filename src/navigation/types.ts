@@ -33,6 +33,18 @@ export type MainTabParamList = {
 	[ROUTES.MAIN.PROFILE]: undefined
 	[ROUTES.MAIN.WALLET]: undefined
 	[ROUTES.MAIN.ANCILLARY]: undefined
+	[ROUTES.MAIN.SCHEDULE]: { segment?: 'today' | 'req' | 'up' | 'past' } | undefined
+	// Engage is Q&A only now (Requests moved to Schedule's own "req" tab) -- no segment param needed.
+	[ROUTES.MAIN.ENGAGE]: undefined
+}
+
+export type VerifyAccessParams = {
+	appointmentId?: string
+	patientId?: string
+	patientName?: string
+	patientMeta?: string
+	slotTime?: string
+	token?: string
 }
 
 export type ConsultationParams = {
@@ -154,6 +166,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.APPOINTMENT_CONFIRMED]: AppointmentConfirmedParams
 	[ROUTES.STACK.APPOINTMENT_DETAILS]: { appointmentId: string }
 	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: Omit<PatientPaymentParams, 'consentVersionId'> }
+	[ROUTES.STACK.VERIFY_ACCESS]: VerifyAccessParams | undefined
 	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
 	[ROUTES.STACK.ORDER_LIST]: undefined
 	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown; orderId?: string } | undefined

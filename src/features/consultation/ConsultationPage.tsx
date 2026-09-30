@@ -1,1764 +1,1393 @@
-import React, { useEffect, useState, useRef } from 'react'
+// src/features/consultation/ConsultationPage.tsx
+//
+// Doctor's active-consultation workspace (source: the "Doctor Dashboard" design's Consultation
+// screen — see Doctor Dashboard.html). Reached from VerifyAccessPage once the patient-consent OTP
+// is verified. Four tabs (Overview / History / Reports / Notes) exactly as in the mockup; the
+// mockup's own "Orders" (pharmacy/lab/radiology referral) destination isn't rendered in its export
+// and was dropped here per explicit product direction -- this screen no longer offers it.
+// Real data throughout: patient/appointment details, treatment history, lab/radiology/ancillary
+// reports, latest vitals, and a real treatment record (POST/PATCH /api/treatments) for notes,
+// diagnosis and follow-up -- nothing here is a client-side simulation, including the notes editor's
+// Scribble (react-native-signature-canvas) and Voice (expo-speech-recognition) modes.
+
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-	View,
-	StyleSheet,
-	ScrollView,
-	TouchableOpacity,
-	Alert,
 	ActivityIndicator,
-	Modal,
-	useWindowDimensions,
+	Animated,
 	Linking,
-	Image,
+	Modal,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	TouchableOpacity,
+	View,
 } from 'react-native'
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
-import { useTheme, Card, Avatar, Button, IconButton, Divider, Text } from 'react-native-paper'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import type { SvgProps } from 'react-native-svg'
 import { useNavigation, useRoute } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import SignatureCanvas, { SignatureViewRef } from 'react-native-signature-canvas'
+// Voice notes (expo-speech-recognition) are commented out for now -- the native module isn't
+// available in Expo Go (Android-only even in a dev build), and development is happening in Expo
+// Go. Re-enable by uncommenting this import and every "Voice mode" block below once a dev client
+// is available.
+// import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition'
 import { Asset } from 'expo-asset'
 import * as FileSystem from 'expo-file-system/legacy'
-import DicomViewer from './components/DicomViewer'
-import VitalsTab from './components/VitalsTab'
-import FollowUpModal from './components/FollowUpModal'
-// import ScribbleNoteEditor from './components/ScribbleNoteEditor'
-import Prescription from '../../assets/icons/consultation/prescription.svg'
-import LaboratoryIcon from '../../assets/icons/consultation/lab.svg'
-import RadiologyTabIcon from '../../assets/icons/consultation/radiology.svg'
-import AncillaryIcon from '../../assets/icons/consultation/ancillary.svg'
-import { patientService, PatientDetails, DocterDetails } from './ConsultationService'
+import Toast from 'react-native-toast-message'
+
+import { AppSegmentedControl, AppSkeleton, AppSoftCard } from '../../components/common'
+import { APP_COLORS, TONES } from '../../config/theme'
+import { ROUTES } from '../../navigation/routes'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
-import DateSlotPicker from '../../components/common/inputs/DateSlotPicker'
-import DoctorHospitalDropdown from '../../components/common/inputs/DoctorHospitalDropdown'
-import { AppSkeleton, AppSelect, AppTypography, AppButton } from '../../components/common'
-import { getDoctorAvailability, getDoctorById, getDoctorProfile, rescheduleAppointment } from '../doctor/doctorService'
-import { APPOINTMENT_STATUS } from '../../constants/constants'
-import { useAuth } from '../../context/AuthContext'
-import Toast from 'react-native-toast-message'
-import { getPharmacies } from '../profile/pharmacy/pharmacyService'
-import { getLaboratories } from '../laboratory_duplicated/laboratoryService'
-import { fetchRadiologyCatalog } from '../radiology/radiologyService'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import DicomViewer from './components/DicomViewer'
+import {
+	patientService,
+	treatmentService,
+	type DocterDetails,
+	type LaboratoryReportRecord,
+	type PatientDetails,
+	type RadiologyReportRecord,
+	type TreatmentRecord,
+} from './ConsultationService'
+import { getLatestVitals, type VitalRecord } from './VitalsService'
+import { buildS3Url } from '../../utils/s3Utils'
+import { toApiDate } from '../doctor/scheduleUtils'
 
 const SAMPLE_DICOM_MODULE = require('../../assets/dicon/sample-dicon.dcm')
 
-// This is the doctor's active-consultation workspace (patient details, medical history,
-// notes, follow-up, share-with pharmacy/lab/radiology) — no mockup screen depicts it, so
-// only the brand teal + neutral text/border colors are aligned here for consistency with
-// the rest of the app. theme.colors.primary already equals PRIMARY (config/theme.ts).
-const PRIMARY = '#2B6F71'
-const PRIMARY_TINT = '#E3EFEF'
-const INK = '#12373E'
-const INK_MUTED = '#5B6B6E'
-const DIVIDER = '#D5E1E2'
-const SURFACE_MUTED = '#F5F8F8'
+const INK = APP_COLORS.ink
+const INK_MUTED = APP_COLORS.inkMuted
+const DIVIDER = APP_COLORS.divider
+const PAGE_BG = APP_COLORS.pageBg
+const PRIMARY = APP_COLORS.primary
 
-type TabItem = { id: string; Icon: React.FC<SvgProps> }
+type TabId = 'overview' | 'history' | 'reports' | 'notes'
+type NoteMode = 'type' | 'scribble' | 'voice'
+type Phase = 'idle' | 'live' | 'sent'
+type FollowUpOption = '2wk' | '1month' | '3months' | 'none'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// "Above target" / "High" / "Low" thresholds for the Overview tab's vitals cards. Named and
+// centralized here (rather than inline magic numbers) so a future per-condition or per-patient
+// override doesn't need to go hunting through JSX -- these are plain adult resting reference
+// ranges, not tied to any specific diagnosis.
+const VITAL_THRESHOLDS = {
+	bpSystolicHigh: 130,
+	bpDiastolicHigh: 80,
+	glucoseHighMgDl: 140,
+	spo2LowPercent: 95,
+}
 
-function RowItem({
-	label,
-	value,
-	numberOfLines,
-	ellipsizeMode,
-}: {
-	label: string
-	value: string
-	numberOfLines?: number
-	ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip'
-}) {
-	const theme = useTheme()
-	return (
-		<View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 2 }}>
-			<Text style={{ fontSize: 11, color: theme.colors.primary, marginRight: 4 }}>{label}</Text>
-			<Text
-				style={{ fontSize: 11, fontWeight: '500', color: INK, flex: 1 }}
-				numberOfLines={numberOfLines ?? 1}
-				ellipsizeMode={ellipsizeMode ?? 'tail'}
-			>
-				{value || '--'}
-			</Text>
-		</View>
-	)
+const TABS: { id: TabId; label: string }[] = [
+	{ id: 'overview', label: 'Overview' },
+	{ id: 'history', label: 'History' },
+	{ id: 'reports', label: 'Reports' },
+	{ id: 'notes', label: 'Notes' },
+]
+
+const FOLLOW_UP_OPTIONS: { id: FollowUpOption; label: string; days: number | null }[] = [
+	{ id: '2wk', label: '2 wks', days: 14 },
+	{ id: '1month', label: '1 month', days: 30 },
+	{ id: '3months', label: '3 months', days: 90 },
+	{ id: 'none', label: 'None', days: null },
+]
+
+// ── Formatting helpers ──────────────────────────────────────────────────────
+
+function formatDate(dateString?: string | null): string {
+	if (!dateString) return '--'
+	const date = new Date(dateString)
+	if (isNaN(date.getTime())) return dateString
+	return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function formatTime12h(t?: string | null): string {
+	if (!t) return ''
+	const [h, m] = t.split(':').map(Number)
+	if (Number.isNaN(h)) return ''
+	const suffix = h >= 12 ? 'PM' : 'AM'
+	const hour = h > 12 ? h - 12 : h === 0 ? 12 : h
+	return `${hour}:${String(m ?? 0).padStart(2, '0')} ${suffix}`
 }
 
 function resolveAvatar(patient: PatientDetails | null): string | undefined {
 	if (!patient) return undefined
 	const key = patient.avatar ?? patient.avatar_s3_key
-	if (!key) return undefined
-	if (typeof key === 'string' && key.startsWith('http')) return key
-	return `https://your-cdn.example.com/${key}`
+	return buildS3Url(key) ?? undefined
 }
 
-// ---------- PastMedicalHistory (complete) ----------
-interface PastMedicalHistoryProps {
-	patientId: string
+function asText(v: unknown): string {
+	if (Array.isArray(v)) return v.filter(Boolean).join(', ')
+	return v ? String(v) : ''
 }
 
-const formatDate = (dateString?: string) => {
-	if (!dateString) return '--'
-	try {
-		const date = new Date(dateString)
-		if (isNaN(date.getTime())) return dateString
-		return date.toLocaleDateString('en-IN', {
-			day: '2-digit',
-			month: 'short',
-			year: 'numeric',
-		})
-	} catch {
-		return dateString
-	}
+function asList(v: unknown): string[] {
+	if (Array.isArray(v)) return v.filter(Boolean).map(String)
+	if (typeof v === 'string' && v.trim()) return [v.trim()]
+	return []
 }
 
-function PastMedicalHistory({ patientId }: PastMedicalHistoryProps) {
-	const theme = useTheme()
-	const [activeTab, setActiveTab] = useState('Laboratory')
-	const [dicomBase64, setDicomBase64] = useState<string | null>(null)
-	const [dicomLoading, setDicomLoading] = useState(false)
-	const [dicomError, setDicomError] = useState<string | null>(null)
-	const [isDicomExpanded, setIsDicomExpanded] = useState(false)
-
-	const [loading, setLoading] = useState(false)
-	const [treatmentHistory, setTreatmentHistory] = useState<any[]>([])
-	const [laboratoryReports, setLaboratoryReports] = useState<any[]>([])
-	const [radiologyReports, setRadiologyReports] = useState<any[]>([])
-	const [ancillaryReports, setAncillaryReports] = useState<any[]>([])
-
-	const tabs: TabItem[] = [
-		{ id: 'Prescription', Icon: Prescription },
-		{ id: 'Laboratory', Icon: LaboratoryIcon },
-		{ id: 'Radiology', Icon: RadiologyTabIcon },
-		{ id: 'Ancillary', Icon: AncillaryIcon },
-	]
-
-	useEffect(() => {
-		if (!patientId) return
-		const fetchHistory = async () => {
-			setLoading(true)
-			try {
-				const [treatments, labs, rads, ancilsRes] = await Promise.all([
-					patientService.getPatientTreatmentHistory(patientId),
-					patientService.getPatientLaboratoryReports(patientId),
-					patientService.getPatientRadiologyReports(patientId),
-					ApiService.get(API_ENDPOINTS.PATIENT.REPORTS(patientId)).catch(() => ({ data: { data: [] } }))
-				])
-				setTreatmentHistory(treatments)
-				setLaboratoryReports(labs)
-				setRadiologyReports(rads)
-
-				const rawReports = (ancilsRes as any)?.data?.data ?? (ancilsRes as any)?.data ?? []
-				const filteredAncillary = rawReports.filter(
-					(r: any) => r.report_type?.toLowerCase() === 'ancillary'
-				)
-				setAncillaryReports(filteredAncillary)
-			} catch (err) {
-				console.error('Failed to fetch past medical history:', err)
-			} finally {
-				setLoading(false)
-			}
-		}
-		fetchHistory()
-	}, [patientId])
-
-	const handleLoadDicomForReport = async (s3Key: string) => {
-		setDicomLoading(true)
-		setDicomError(null)
-		try {
-			const url = s3Key
-			if (url) {
-				const response = await fetch(url)
-				const blob = await response.blob()
-				const reader = new FileReader()
-				reader.onloadend = () => {
-					const base64data = reader.result as string
-					const base64 = base64data.split(',')[1] || base64data
-					setDicomBase64(base64)
-				}
-				reader.readAsDataURL(blob)
-			} else {
-				throw new Error('Invalid DICOM URL')
-			}
-		} catch (err: any) {
-			handleLoadSampleDicom()
-		} finally {
-			setDicomLoading(false)
-		}
-	}
-
-	const handleLoadSampleDicom = async () => {
-		setDicomLoading(true)
-		setDicomError(null)
-		try {
-			const asset = Asset.fromModule(SAMPLE_DICOM_MODULE)
-			await asset.downloadAsync()
-			if (!asset.localUri) throw new Error('Could not resolve local URI for DICOM asset.')
-			const base64 = await FileSystem.readAsStringAsync(asset.localUri, {
-				encoding: FileSystem.EncodingType.Base64,
-			})
-			setDicomBase64(base64)
-		} catch (err: any) {
-			setDicomError(err?.message ?? 'Failed to load DICOM file.')
-		} finally {
-			setDicomLoading(false)
-		}
-	}
-
-	const renderEmptyState = () => (
-		<View style={{ alignItems: 'center', paddingVertical: 24 }}>
-			<MaterialCommunityIcons name="emoticon-sad-outline" size={48} color={DIVIDER} />
-			<Text style={{ color: INK_MUTED, marginTop: 8, fontWeight: '500' }}>
-				No past {activeTab.toLowerCase()} history!
-			</Text>
-		</View>
-	)
-
-	const renderTabContent = () => {
-		if (activeTab === 'Prescription') {
-			if (treatmentHistory.length === 0) return renderEmptyState()
-			return treatmentHistory.map((item) => (
-				<View key={item.id} style={styles.historyItem}>
-					<View style={styles.historyHeader}>
-						<MaterialCommunityIcons name="file-document-outline" size={22} color={theme.colors.primary} />
-						<View style={{ flex: 1, marginLeft: 10 }}>
-							<Text style={styles.historyTitle}>Prescription - {formatDate(item.created_at)}</Text>
-							<Text style={styles.historySubtitle}>
-								{item.doctor_name ? `Dr. ${item.doctor_name}` : 'Doctor'} · {item.hospital_name || 'Hospital'}
-							</Text>
-						</View>
-						{item.prescription_s3_key ? (
-							<IconButton
-								icon="eye"
-								size={20}
-								iconColor={theme.colors.primary}
-								onPress={() => Linking.openURL(item.prescription_s3_key || '')}
-							/>
-						) : null}
-					</View>
-					{item.notes ? <Text style={styles.historyNotes}>{item.notes}</Text> : null}
-				</View>
-			))
-		}
-
-		if (activeTab === 'Laboratory') {
-			if (laboratoryReports.length === 0) return renderEmptyState()
-			return laboratoryReports.map((item) => (
-				<View key={item.id} style={styles.historyItem}>
-					<View style={styles.historyHeader}>
-						<MaterialCommunityIcons name="flask-outline" size={22} color={theme.colors.primary} />
-						<View style={{ flex: 1, marginLeft: 10 }}>
-							<Text style={styles.historyTitle}>Lab Report - {formatDate(item.uploaded_at)}</Text>
-							{item.summary_findings ? <Text style={styles.historySubtitle}>{item.summary_findings}</Text> : null}
-						</View>
-						{item.report_pdf_s3_key ? (
-							<IconButton
-								icon="eye"
-								size={20}
-								iconColor={theme.colors.primary}
-								onPress={() => Linking.openURL(item.report_pdf_s3_key || '')}
-							/>
-						) : null}
-					</View>
-					{item.result_values && Object.keys(item.result_values).length > 0 ? (
-						<View style={styles.resultsGrid}>
-							{Object.entries(item.result_values).map(([testName, testValue]) => (
-								<View key={testName} style={styles.resultRow}>
-									<Text style={styles.resultLabel}>{testName}:</Text>
-									<Text style={styles.resultValue}>{String(testValue)}</Text>
-								</View>
-							))}
-						</View>
-					) : null}
-				</View>
-			))
-		}
-
-		if (activeTab === 'Radiology') {
-			if (dicomBase64) {
-				return (
-					<View style={{ marginTop: 16 }}>
-						<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-							<MaterialCommunityIcons name="radioactive" size={16} color={theme.colors.primary} />
-							<Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: 'bold', marginLeft: 6 }}>
-								Radiology Scan DICOM Viewer
-							</Text>
-							<IconButton icon="close" size={16} style={{ marginLeft: 'auto' }} onPress={() => setDicomBase64(null)} />
-						</View>
-						<View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 }}>
-							<Button mode="outlined" compact icon="arrow-expand" onPress={() => setIsDicomExpanded(true)}>
-								Expand view
-							</Button>
-						</View>
-						<DicomViewer base64Data={dicomBase64} />
-						<Text style={{ fontSize: 10, color: INK_MUTED, marginTop: 8, textAlign: 'center' }}>
-							Drag to adjust Window/Level · Pinch or +/- to zoom · ⊙ resets view · ☀ inverts
-						</Text>
-					</View>
-				)
-			}
-			if (radiologyReports.length === 0) return renderEmptyState()
-			return radiologyReports.map((item) => (
-				<View key={item.id} style={styles.historyItem}>
-					<View style={styles.historyHeader}>
-						<MaterialCommunityIcons name="radioactive" size={22} color={theme.colors.primary} />
-						<View style={{ flex: 1, marginLeft: 10 }}>
-							<Text style={styles.historyTitle}>Radiology Scan - {formatDate(item.uploaded_at)}</Text>
-							{item.summary_findings ? <Text style={styles.historySubtitle}>{item.summary_findings}</Text> : null}
-						</View>
-						<View style={{ flexDirection: 'row' }}>
-							{item.report_pdf_s3_key ? (
-								<IconButton
-									icon="file-pdf-box"
-									size={20}
-									iconColor={theme.colors.primary}
-									onPress={() => Linking.openURL(item.report_pdf_s3_key || '')}
-								/>
-							) : null}
-							<IconButton
-								icon="television-play"
-								size={20}
-								iconColor={theme.colors.primary}
-								onPress={() => {
-									if (item.dicom_images_s3_keys && item.dicom_images_s3_keys.length > 0) {
-										handleLoadDicomForReport(item.dicom_images_s3_keys[0])
-									} else {
-										handleLoadSampleDicom()
-									}
-								}}
-							/>
-						</View>
-					</View>
-				</View>
-			))
-		}
-
-		if (activeTab === 'Ancillary') {
-			if (ancillaryReports.length === 0) return renderEmptyState()
-			return ancillaryReports.map((item) => (
-				<View key={item.id} style={styles.historyItem}>
-					<View style={styles.historyHeader}>
-						<MaterialCommunityIcons name="medical-bag" size={22} color={theme.colors.primary} />
-						<View style={{ flex: 1, marginLeft: 10 }}>
-							<Text style={styles.historyTitle}>Ancillary Report - {formatDate(item.created_at || item.uploaded_at)}</Text>
-							{item.notes ? <Text style={styles.historySubtitle}>{item.notes}</Text> : null}
-						</View>
-						{item.file_s3_key ? (
-							<IconButton
-								icon="eye"
-								size={20}
-								iconColor={theme.colors.primary}
-								onPress={() => Linking.openURL(item.file_s3_key || '')}
-							/>
-						) : null}
-					</View>
-				</View>
-			))
-		}
-	}
-
-	return (
-		<Card style={[styles.card, { marginTop: 0 }]}>
-			<Card.Content>
-				<Text variant="titleMedium" style={{ color: theme.colors.primary, fontWeight: 'bold', marginBottom: 16 }}>
-					Past medical history
-				</Text>
-				<View
-					style={{
-						flexDirection: 'row',
-						justifyContent: 'space-around',
-						borderBottomWidth: 1,
-						borderBottomColor: DIVIDER,
-						paddingBottom: 8,
-					}}
-				>
-					{tabs.map((tab) => {
-						const isActive = activeTab === tab.id
-						const TabIcon = tab.Icon
-						return (
-							<TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1 }}>
-								<TabIcon width={42} height={42} />
-								<Text
-									style={{
-										fontSize: 10,
-										color: isActive ? theme.colors.primary : INK_MUTED,
-										marginTop: 4,
-										fontWeight: isActive ? 'bold' : 'normal',
-									}}
-								>
-									{tab.id}
-								</Text>
-								{isActive && (
-									<View
-										style={{
-											position: 'absolute',
-											bottom: -10,
-											height: 3,
-											backgroundColor: theme.colors.primary,
-											width: '100%',
-										}}
-									/>
-								)}
-							</TouchableOpacity>
-						)
-					})}
-				</View>
-
-				<View style={{ marginTop: 16, marginBottom: 8 }}>
-					<Text style={{ fontSize: 11, color: INK_MUTED, marginBottom: 8 }}>Select date</Text>
-					<Button
-						mode="outlined"
-						style={{ alignSelf: 'flex-start', borderRadius: 8 }}
-						contentStyle={{ height: 36 }}
-						labelStyle={{ fontSize: 11 }}
-					>
-						All
-					</Button>
-				</View>
-
-				{loading ? (
-					<View style={{ marginTop: 8 }}>
-						<View style={styles.historyItem}>
-							<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-								<AppSkeleton width={22} height={22} borderRadius={11} />
-								<View style={{ flex: 1, gap: 4 }}>
-									<AppSkeleton width="60%" height={12} />
-									<AppSkeleton width="40%" height={10} />
-								</View>
-							</View>
-							<AppSkeleton width="100%" height={12} style={{ marginTop: 8 }} />
-						</View>
-						<View style={styles.historyItem}>
-							<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-								<AppSkeleton width={22} height={22} borderRadius={11} />
-								<View style={{ flex: 1, gap: 4 }}>
-									<AppSkeleton width="75%" height={12} />
-									<AppSkeleton width="30%" height={10} />
-								</View>
-							</View>
-							<AppSkeleton width="90%" height={12} style={{ marginTop: 8 }} />
-						</View>
-					</View>
-				) : dicomLoading ? (
-					<View style={{ alignItems: 'center', paddingVertical: 24 }}>
-						<ActivityIndicator size="large" />
-						<Text style={{ color: INK_MUTED, marginTop: 8, fontSize: 12 }}>Loading DICOM image…</Text>
-					</View>
-				) : dicomError ? (
-					<View style={{ alignItems: 'center', paddingVertical: 24 }}>
-						<MaterialCommunityIcons name="alert-circle-outline" size={40} color="#e53935" />
-						<Text style={{ color: '#e53935', marginTop: 8, fontSize: 12, textAlign: 'center' }}>
-							{dicomError}
-						</Text>
-					</View>
-				) : (
-					renderTabContent()
-				)}
-			</Card.Content>
-
-			<Modal visible={isDicomExpanded} animationType="slide" onRequestClose={() => setIsDicomExpanded(false)}>
-				<View style={styles.dicomModalContainer}>
-					<View style={styles.dicomModalHeader}>
-						<Text style={styles.dicomModalTitle}>Radiology Image</Text>
-						<IconButton icon="close" iconColor="#fff" onPress={() => setIsDicomExpanded(false)} />
-					</View>
-					<View style={styles.dicomModalBody}>
-						<DicomViewer base64Data={dicomBase64} fullScreen />
-					</View>
-				</View>
-			</Modal>
-		</Card>
-	)
+function parseNumeric(v?: string | null): number | null {
+	if (!v) return null
+	const n = parseFloat(String(v).replace(/[^\d.]/g, ''))
+	return Number.isFinite(n) ? n : null
 }
 
-// ---------- ShareWith (complete) ----------
-interface Place {
+function computeBmi(heightStr?: string | null, weightStr?: string | null): string | null {
+	const heightCm = parseNumeric(heightStr)
+	const weightKg = parseNumeric(weightStr)
+	if (!heightCm || !weightKg) return null
+	const bmi = weightKg / Math.pow(heightCm / 100, 2)
+	return bmi.toFixed(1)
+}
+
+function humanizeSeverity(s?: string | null): string {
+	if (!s) return ''
+	return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function ordinal(n: number): string {
+	const s = ['th', 'st', 'nd', 'rd']
+	const v = n % 100
+	return n + (s[(v - 20) % 10] || s[v] || s[0])
+}
+
+// ── Reports tab: merge lab / radiology / ancillary into one honest list ────
+
+interface ReportItem {
 	id: string
+	kind: 'lab' | 'radiology' | 'ancillary'
 	name: string
-	address: string
-	phone?: string
-	distance?: string
-	icon?: string
+	meta: string
+	statusLabel: string
+	statusTone: { bg: string; fg: string }
+	date: string
+	fileUrl?: string | null
+	dicomKeys?: string[] | null
 }
 
-const CITY_OPTIONS = [
-	{ value: 'bengaluru', label: 'Bengaluru' },
-	{ value: 'mysuru', label: 'Mysuru' },
-]
-const AREA_OPTIONS = [
-	{ value: 'kr_puram', label: 'KR Puram' },
-	{ value: 'whitefield', label: 'Whitefield' },
-	{ value: 'marathalli', label: 'Marathalli' },
-]
-
-const ANCILLARY_MOCK_PLACES: Place[] = [
-	{
-		id: '1',
-		name: 'Apollo Pharmacy, Chikpet - KR Puram',
-		address:
-			'1st Block, 318, 9th Main Rd, Kalyan Nagar, Bengaluru, Karnataka 560043',
-		phone: '+91 9876543250',
-		distance: '300m away',
-	},
-	{
-		id: '2',
-		name: 'Med plus, Chikpet - KR Puram',
-		address:
-			'1st Block, 318, 9th Main Rd, Kalyan Nagar, Bengaluru, Karnataka 560043',
-		phone: '+91 9876543250',
-		distance: '300m away',
-	},
-	{
-		id: '3',
-		name: 'jeevan medstore, Chikpet- KR Puram',
-		address:
-			'1st Block, 318, 9th Main Rd, Kalyan Nagar, Bengaluru, Karnataka 560043',
-		phone: '+91 9876543250',
-		distance: '300m away',
-	},
-]
-
-function toPlaces(items: any[]): Place[] {
-	const byId = new Map<string, Place>()
-	items.forEach((item) => {
-		if (byId.has(item.id)) return
-		byId.set(item.id, {
-			id: item.id,
-			name: item.name,
-			address: [item.address, item.city, item.state].filter(Boolean).join(', '),
-			phone: item.phone || undefined,
-			distance: item.distance || undefined,
-			icon: item.avatar_s3_key || item.avatar || item.logo_s3_key || undefined,
-		})
-	})
-	return Array.from(byId.values())
+const REPORT_TONES = {
+	green: { bg: APP_COLORS.successBg, fg: APP_COLORS.success },
+	amber: { bg: APP_COLORS.warningBg, fg: APP_COLORS.warning },
+	grey: { bg: '#F0F4F4', fg: INK_MUTED },
 }
 
-function toPharmacyPlaces(items: any[]): Place[] {
-	return items.map((item) => ({
-		id: item.id,
-		name: item.name || item.owner_name || 'Pharmacy',
-		address: [item.address, item.city].filter(Boolean).join(', ') || 'Address not available',
-		phone: item.phone || undefined,
-		distance: item.distance || undefined,
-		icon: item.avatar_s3_key || item.avatar || item.logo_s3_key || undefined,
-	}))
-}
-
-function ShareWith({ appointmentId }: { appointmentId?: string }) {
-	const theme = useTheme()
-	const [activeTab, setActiveTab] = useState('laboratory')
-	const [city, setCity] = useState('')
-	const [area, setArea] = useState('')
-
-	const [pharmacyPlaces, setPharmacyPlaces] = useState<Place[]>([])
-	const [laboratoryPlaces, setLaboratoryPlaces] = useState<Place[]>([])
-	const [radiologyPlaces, setRadiologyPlaces] = useState<Place[]>([])
-	const [placesLoading, setPlacesLoading] = useState(false)
-	const [placesError, setPlacesError] = useState<string | null>(null)
-
-	const isBackedTab = activeTab === 'pharmacy' || activeTab === 'laboratory' || activeTab === 'radiology'
-
-	useEffect(() => {
-		if (!isBackedTab) return
-
-		let cancelled = false
-
-		const fetchPlaces = async () => {
-			setPlacesLoading(true)
-			setPlacesError(null)
-
-			try {
-				if (activeTab === 'pharmacy') {
-					const res: any = await getPharmacies({ city: city || undefined, limit: 50 })
-					if (!cancelled) {
-						const items = res.data || res || []
-						setPharmacyPlaces(toPharmacyPlaces(Array.isArray(items) ? items : []))
-					}
-				} else if (activeTab === 'laboratory') {
-					const res: any = await getLaboratories({ city: city || undefined, limit: 50 })
-					if (!cancelled) {
-						const items = res.data || res || []
-						setLaboratoryPlaces(toPlaces(Array.isArray(items) ? items : []))
-					}
-				} else {
-					const res: any = await fetchRadiologyCatalog({ city: city || undefined, limit: 50 })
-					if (!cancelled) {
-						const items = res.data || res || []
-						setRadiologyPlaces(toPlaces(Array.isArray(items) ? items : []))
-					}
-				}
-			} catch (err) {
-				console.error('Error loading places:', err)
-				if (!cancelled) setPlacesError('Unable to load centers right now. Please try again.')
-			} finally {
-				if (!cancelled) setPlacesLoading(false)
-			}
-		}
-
-		fetchPlaces()
-
-		return () => {
-			cancelled = true
-		}
-	}, [activeTab, city])
-
-	const handleShare = async (place: Place) => {
-		if (!appointmentId) {
-			Toast.show({
-				type: 'error',
-				text1: 'Error',
-				text2: 'No active appointment context found.',
-			})
-			return
-		}
-		try {
-			await ApiService.post(API_ENDPOINTS.REFERRALS.SHARE, {
-				appointment_id: appointmentId,
-				target_type: activeTab,
-				target_id: place.id,
-			})
-			Toast.show({
-				type: 'success',
-				text1: 'Success',
-				text2: `Successfully shared prescription with ${place.name}!`,
-			})
-		} catch (err: any) {
-			Toast.show({
-				type: 'error',
-				text1: 'Error',
-				text2: 'Failed to share prescription with selected center.',
-			})
-		}
+function labToReportItem(r: LaboratoryReportRecord): ReportItem {
+	const hasResults = r.result_values && Object.keys(r.result_values).length > 0
+	return {
+		id: `lab-${r.id}`,
+		kind: 'lab',
+		name: r.summary_findings ? 'Lab report' : 'Lab report',
+		meta: `Karolahealth Labs · ${formatDate(r.uploaded_at)}`,
+		statusLabel: r.summary_findings ? r.summary_findings : hasResults ? 'Results available' : 'Pending review',
+		statusTone: r.summary_findings ? REPORT_TONES.amber : REPORT_TONES.grey,
+		date: r.uploaded_at,
+		fileUrl: r.report_pdf_s3_key,
 	}
-
-	const tabs = [
-		{ id: 'pharmacy', label: 'Pharmacy', Icon: Prescription },
-		{ id: 'laboratory', label: 'Laboratory', Icon: LaboratoryIcon },
-		{ id: 'radiology', label: 'Radiology', Icon: RadiologyTabIcon },
-		{ id: 'ancillary', label: 'Ancillary', Icon: AncillaryIcon },
-	]
-
-	const places: Place[] =
-		activeTab === 'pharmacy'
-			? pharmacyPlaces
-			: activeTab === 'laboratory'
-				? laboratoryPlaces
-				: activeTab === 'radiology'
-					? radiologyPlaces
-					: ANCILLARY_MOCK_PLACES
-
-	return (
-		<Card style={styles.card}>
-			<Card.Content>
-				<Text
-					variant="titleMedium"
-					style={{ color: theme.colors.primary, fontWeight: 'bold', marginBottom: 16 }}
-				>
-					Share with:
-				</Text>
-				<View
-					style={{
-						flexDirection: 'row',
-						justifyContent: 'space-around',
-						borderBottomWidth: 1,
-						borderBottomColor: DIVIDER,
-						paddingBottom: 8,
-						marginBottom: 16,
-					}}
-				>
-					{tabs.map((tab) => {
-						const isActive = activeTab === tab.id
-						const TabIcon = tab.Icon
-						return (
-							<TouchableOpacity
-								key={tab.id}
-								onPress={() => setActiveTab(tab.id)}
-								style={{ alignItems: 'center', flex: 1 }}
-							>
-								<TabIcon width={42} height={42} />
-								<Text
-									style={{
-										fontSize: 10,
-										color: isActive ? theme.colors.primary : INK_MUTED,
-										marginTop: 4,
-										fontWeight: isActive ? 'bold' : 'normal',
-									}}
-								>
-									{tab.label}
-								</Text>
-								{isActive && (
-									<View
-										style={{
-											position: 'absolute',
-											bottom: -10,
-											height: 3,
-											backgroundColor: theme.colors.primary,
-											width: '100%',
-										}}
-									/>
-								)}
-							</TouchableOpacity>
-						)
-					})}
-				</View>
-
-				<Text style={{ fontSize: 11, color: INK_MUTED, marginBottom: 8 }}>Select address</Text>
-				<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 8 }}>
-					<AppSelect
-						label="City"
-						value={city}
-						options={CITY_OPTIONS}
-						onSelect={(val) => setCity(val)}
-						size="small"
-						style={{ width: '48%' }}
-					/>
-					<AppSelect
-						label="Area"
-						value={area}
-						options={AREA_OPTIONS}
-						onSelect={(val) => setArea(val)}
-						size="small"
-						style={{ width: '48%' }}
-					/>
-				</View>
-
-				{placesLoading && (
-					<ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 20 }} />
-				)}
-
-				{!placesLoading && placesError && (
-					<Text style={{ color: 'red', textAlign: 'center', marginVertical: 12, fontSize: 12 }}>
-						{placesError}
-					</Text>
-				)}
-
-				{!placesLoading && !placesError && places.length === 0 && (
-					<Text style={{ color: '#888', textAlign: 'center', marginVertical: 20, fontSize: 12 }}>
-						{activeTab === 'pharmacy'
-							? 'No pharmacies found nearby.'
-							: activeTab === 'laboratory'
-								? 'No laboratories found nearby.'
-								: activeTab === 'radiology'
-									? 'No radiology centers found nearby.'
-									: 'No results found nearby.'}
-					</Text>
-				)}
-
-				{!placesLoading && !placesError && places.length > 0 && places.map((place, i) => {
-					if (activeTab === 'ancillary') {
-						return (
-							<View
-								key={place.id}
-								style={{
-									paddingTop: 12,
-									borderTopWidth: i === 0 ? 0 : 1,
-									borderTopColor: DIVIDER,
-									marginBottom: 12,
-								}}
-							>
-								<Text style={{ fontWeight: 'bold', fontSize: 13 }}>{place.name}</Text>
-								<Text style={{ color: INK_MUTED, fontSize: 11, marginVertical: 4 }}>{place.address}</Text>
-								<View
-									style={{
-										flexDirection: 'row',
-										justifyContent: 'space-between',
-										alignItems: 'center',
-									}}
-								>
-									<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-										{place.phone ? (
-											<>
-												<MaterialCommunityIcons name="phone" size={12} color={theme.colors.primary} />
-												<Text
-													style={{
-														fontSize: 11,
-														color: theme.colors.primary,
-														marginLeft: 2,
-														marginRight: 8,
-													}}
-												>
-													{place.phone}
-												</Text>
-											</>
-										) : null}
-										{place.phone && place.distance ? (
-											<Text style={{ fontSize: 11, color: DIVIDER, marginRight: 8 }}>|</Text>
-										) : null}
-										{place.distance ? (
-											<>
-												<MaterialCommunityIcons name="map-marker-outline" size={12} color={INK_MUTED} />
-												<Text style={{ fontSize: 11, color: INK_MUTED, marginLeft: 2 }}>{place.distance}</Text>
-											</>
-										) : null}
-									</View>
-									<Button 
-										mode="contained" 
-										compact 
-										style={{ borderRadius: 8 }}
-										onPress={() => handleShare(place)}
-									>
-										Share
-									</Button>
-								</View>
-							</View>
-						)
-					}
-
-					// Dynamic Fallback Icon Logic
-					const colors = [
-						{ bg: PRIMARY_TINT, icon: PRIMARY },
-						{ bg: '#FDE8DC', icon: '#B4532A' },
-						{ bg: '#DDEBFA', icon: '#2463A8' },
-						{ bg: '#ECE6FA', icon: '#6A4BB5' },
-					]
-					const config = colors[i % colors.length]
-					let iconName = 'storefront'
-					if (activeTab === 'laboratory') {
-						iconName = 'flask-outline'
-					} else if (activeTab === 'radiology') {
-						iconName = 'radiation'
-					}
-
-					return (
-						<View
-							key={place.id}
-							style={styles.providerItemCard}
-						>
-							<View style={[styles.providerIconBg, { backgroundColor: config.bg }]}>
-								{place.icon && (place.icon.startsWith('http://') || place.icon.startsWith('https://')) ? (
-									<Image 
-										source={{ uri: place.icon }} 
-										style={{ width: 26, height: 26, borderRadius: 4 }} 
-									/>
-								) : (
-									<MaterialCommunityIcons name={iconName as any} size={18} color={config.icon} />
-								)}
-							</View>
-
-							<View style={styles.providerDetails}>
-								<AppTypography 
-									variant="subtitle" 
-									color={theme.colors.onSurface} 
-									numberOfLines={1}
-									style={styles.providerName}
-								>
-									{place.name}
-								</AppTypography>
-								
-								<View style={styles.providerInfoRow}>
-									<MaterialCommunityIcons name="map-marker-outline" size={14} color={INK_MUTED} style={{ marginTop: 2 }} />
-									<AppTypography 
-										variant="body" 
-										numberOfLines={3} 
-										style={styles.providerAddress}
-									>
-										{place.address}
-									</AppTypography>
-								</View>
-
-								<View style={styles.providerInfoRow}>
-									<MaterialCommunityIcons name="phone" size={14} color={PRIMARY} style={{ marginTop: 2 }} />
-									<AppTypography 
-										variant="body" 
-										style={styles.providerPhone}
-									>
-										{place.phone || '+91 9876543210'}
-									</AppTypography>
-								</View>
-							</View>
-
-							<AppButton 
-								variant="primary" 
-								style={styles.providerShareBtn}
-								contentStyle={{ height: 36, paddingHorizontal: 16 }}
-								labelStyle={{ fontSize: 12, fontWeight: 'bold', marginHorizontal: 8 }}
-								onPress={() => handleShare(place)}
-							>
-								Share
-							</AppButton>
-						</View>
-					)
-				})}
-			</Card.Content>
-		</Card>
-	)
 }
 
-// ---------- Main ConsultationPage ----------
+function radToReportItem(r: RadiologyReportRecord): ReportItem {
+	return {
+		id: `rad-${r.id}`,
+		kind: 'radiology',
+		name: 'Radiology scan',
+		meta: `Karolahealth Radiology · ${formatDate(r.uploaded_at)}`,
+		statusLabel: r.summary_findings ? r.summary_findings : 'View images',
+		statusTone: REPORT_TONES.grey,
+		date: r.uploaded_at,
+		fileUrl: r.report_pdf_s3_key,
+		dicomKeys: r.dicom_images_s3_keys,
+	}
+}
+
+function ancillaryToReportItem(r: any, i: number): ReportItem {
+	return {
+		id: `anc-${r.id ?? i}`,
+		kind: 'ancillary',
+		name: r.title || 'Patient-uploaded file',
+		meta: `Uploaded by patient · ${formatDate(r.created_at || r.uploaded_at)}`,
+		statusLabel: 'Patient file',
+		statusTone: REPORT_TONES.grey,
+		date: r.created_at || r.uploaded_at || '',
+		fileUrl: r.file_s3_key,
+	}
+}
+
+// ── HbA1c trend: only rendered when >=2 real lab result points exist ───────
+
+function extractHbA1cSeries(labs: LaboratoryReportRecord[]): { date: string; value: number }[] {
+	const points: { date: string; value: number }[] = []
+	labs.forEach((r) => {
+		if (!r.result_values) return
+		const key = Object.keys(r.result_values).find((k) => k.toLowerCase().replace(/[^a-z0-9]/g, '').includes('hba1c'))
+		if (!key) return
+		const raw = r.result_values[key]
+		const value = parseNumeric(String(raw))
+		if (value !== null) points.push({ date: r.uploaded_at, value })
+	})
+	return points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
+
 export default function ConsultationPage() {
-	const theme = useTheme()
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
-	const { width: pageWidth } = useWindowDimensions()
-	const pagerRef = useRef<ScrollView>(null)
-	const { selectedHospitalId } = useAuth()
 	const insets = useSafeAreaInsets()
-
-	const [patient, setPatient] = useState<PatientDetails | null>(null)
-	const [doctor, setDoctor] = useState<DocterDetails | null>(null)
-	const [appointment, setAppointment] = useState<any>(null)
-	const [patientLoading, setPatientLoading] = useState(false)
-	const [doctorLoading, setDoctorLoading] = useState(false)
-	const [activeTab, setActiveTab] = useState(0)
-	// Stores the base64 PNG snapshot from the scribble canvas
-	const [noteCanvasData, setNoteCanvasData] = useState<string>('')
-	const [saving, setSaving] = useState(false)
-	const [followUpOpen, setFollowUpOpen] = useState(false)
-	const [followUpDate, setFollowUpDate] = useState<Date>(new Date())
-	const [followUpSelectedSlot, setFollowUpSelectedSlot] = useState('')
-	const [followUpSlots, setFollowUpSlots] = useState<any[]>([])
-	const [followUpSlotsLoading, setFollowUpSlotsLoading] = useState(false)
-	const [followUpHospitalId, setFollowUpHospitalId] = useState<string>('')
 
 	const params = (route.params || {}) as {
 		appointmentId?: string
 		appointment_id?: string
 		id?: string
-		patient_id?: string
 		patientId?: string
+		patient_id?: string
 		patient?: { id?: string }
-		doctor_id?: string
-		doctorID?: string
 		doctor?: any
-		appointment?: any
-		hospital?: any
 	}
-	useEffect(() => {
-		if (pageWidth <= 0) return
-		pagerRef.current?.scrollTo({ x: pageWidth * activeTab, animated: false })
-	}, [pageWidth, activeTab])
-
 	const appointmentId = params?.appointmentId ?? params?.appointment_id ?? params?.id ?? ''
-	const patientId = params?.patient_id ?? params?.patientId ?? params?.patient?.id ?? ''
-	const doctorID = params?.doctor_id ?? params?.doctorID ?? params?.doctor?.id ?? ''
+	const routePatientId = params?.patient_id ?? params?.patientId ?? params?.patient?.id ?? ''
 
-	console.log('Full params:', JSON.stringify(params, null, 2))
-	console.log('Extracted - appointmentId:', appointmentId, 'patientId:', patientId, 'doctorID:', doctorID)
+	// ── Data state ──
+	const [appointment, setAppointment] = useState<any>(null)
+	const [patient, setPatient] = useState<PatientDetails | null>(null)
+	const [doctor, setDoctor] = useState<DocterDetails | null>(null)
+	const [patientLoading, setPatientLoading] = useState(!!(routePatientId || appointmentId))
+	const [appointmentFetchDone, setAppointmentFetchDone] = useState(false)
 
-	// Set doctor directly from params without API call
+	const [treatmentHistory, setTreatmentHistory] = useState<TreatmentRecord[]>([])
+	const [labReports, setLabReports] = useState<LaboratoryReportRecord[]>([])
+	const [radReports, setRadReports] = useState<RadiologyReportRecord[]>([])
+	const [ancillaryReports, setAncillaryReports] = useState<any[]>([])
+	const [reportsLoading, setReportsLoading] = useState(false)
+
+	const [latestVitals, setLatestVitals] = useState<Record<string, VitalRecord | null>>({})
+
+	// ── UI state ──
+	const [activeTab, setActiveTab] = useState<TabId>('overview')
+	const [phase, setPhase] = useState<Phase>('idle')
+	const [saving, setSaving] = useState(false)
+
+	// ── Notes state ──
+	const [diagnosis, setDiagnosis] = useState('')
+	const [notes, setNotes] = useState('')
+	const [noteMode, setNoteMode] = useState<NoteMode>('type')
+	const [followUp, setFollowUp] = useState<FollowUpOption>('1month')
+
+	// Scribble
+	const sigRef = useRef<SignatureViewRef>(null)
+	const [sketch, setSketch] = useState<string | null>(null)
+
+	// Voice -- commented out along with the rest of the Voice mode (see the import note above)
+	// const [isListening, setIsListening] = useState(false)
+	// const [liveText, setLiveText] = useState('')
+	// const [transcript, setTranscript] = useState('')
+	// const [voiceDone, setVoiceDone] = useState(false)
+	// const isListeningRef = useRef(false)
+	// const pulseAnim = useRef(new Animated.Value(1)).current
+	// const pulseLoop = useRef<Animated.CompositeAnimation | null>(null)
+
+	// DICOM viewer
+	const [dicomBase64, setDicomBase64] = useState<string | null>(null)
+	const [dicomLoading, setDicomLoading] = useState(false)
+
+	// ── Fetch appointment ──
 	useEffect(() => {
-		const doctorFromParams = params?.doctor
-		const hospitalFromParams = params?.appointment?.hospital || params?.hospital
-
-		if (doctorFromParams) {
-			const doctorData: DocterDetails = {
-				name: doctorFromParams.name,
-				degree: '',
-				specialization: '',
-				clinicName: hospitalFromParams?.name || '',
-				clinicAddress: hospitalFromParams?.address || '',
-			}
-			setDoctor(doctorData)
-			setDoctorLoading(false)
-		}
-	}, [])
-
-	const fetchPatientData = async (id: string) => {
-		setPatientLoading(true)
-		try {
-			const data = await patientService.getPatientDetails(id)
-			setPatient(data)
-		} catch (err: any) {
-			Alert.alert('Error', err?.message ?? 'Failed to load patient details')
-		} finally {
-			setPatientLoading(false)
-		}
-	}
-
-	// Fetch appointment details
-	useEffect(() => {
-		const fetchAppointmentDetails = async () => {
-			if (appointmentId && !appointment) {
-				try {
-					const response = (await ApiService.get(API_ENDPOINTS.APPOINTMENTS.GET_BY_ID(appointmentId))) as any
-					const appointmentData = response?.data?.data || response?.data || response
-					setAppointment(appointmentData)
-
-					if (!patient && appointmentData?.patient?.id) {
-						fetchPatientData(appointmentData.patient.id)
-					}
-
-					if (!doctor && appointmentData?.doctor) {
-						const doctorData: DocterDetails = {
-							name: appointmentData.doctor.name,
-							degree: '',
-							specialization: '',
-							clinicName: appointmentData.hospital?.name,
-							clinicAddress: appointmentData.hospital?.address,
-						}
-						setDoctor(doctorData)
-						setDoctorLoading(false)
-					}
-				} catch (err) {
-					console.error('Failed to fetch appointment details:', err)
+		if (!appointmentId) return
+		;(async () => {
+			try {
+				const response = (await ApiService.get(API_ENDPOINTS.APPOINTMENTS.GET_BY_ID(appointmentId))) as any
+				const data = response?.data?.data || response?.data || response
+				setAppointment(data)
+				if (!doctor && data?.doctor) {
+					setDoctor({
+						name: data.doctor.name,
+						degree: data.doctor.degree ?? '',
+						specialization: data.doctor.speciality ?? data.doctor.specialty ?? '',
+						clinicName: data.hospital?.name ?? '',
+						clinicAddress: data.hospital?.address ?? '',
+					})
 				}
+			} catch (err) {
+				console.error('[ConsultationPage] failed to fetch appointment:', err)
+			} finally {
+				setAppointmentFetchDone(true)
 			}
-		}
-		fetchAppointmentDetails()
+		})()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [appointmentId])
 
-	// Fetch patient using patientId from params
+	// ── Fetch patient ──
+	const patientId = routePatientId || appointment?.patient?.id || ''
 	useEffect(() => {
-		if (patientId && !patient) {
-			fetchPatientData(patientId)
+		if (!patientId) {
+			// No patientId in the route params and none in the appointment either (or there was no
+			// appointmentId to fetch one from at all) -- nothing left to wait on, so stop spinning.
+			if (appointment || appointmentFetchDone || !appointmentId) setPatientLoading(false)
+			return
 		}
+		;(async () => {
+			setPatientLoading(true)
+			try {
+				const data = await patientService.getPatientDetails(patientId)
+				setPatient(data)
+			} catch (err: any) {
+				console.error('[ConsultationPage] failed to fetch patient:', err)
+			} finally {
+				setPatientLoading(false)
+			}
+		})()
+	}, [patientId, appointment])
+
+	// ── Fetch treatment history + reports ──
+	useEffect(() => {
+		if (!patientId) return
+		;(async () => {
+			setReportsLoading(true)
+			try {
+				const [treatments, labs, rads, ancilsRes] = await Promise.all([
+					patientService.getPatientTreatmentHistory(patientId),
+					patientService.getPatientLaboratoryReports(patientId),
+					patientService.getPatientRadiologyReports(patientId),
+					ApiService.get(API_ENDPOINTS.PATIENT.REPORTS(patientId)).catch(() => ({ data: { data: [] } })),
+				])
+				setTreatmentHistory(treatments)
+				setLabReports(labs)
+				setRadReports(rads)
+				const rawReports = (ancilsRes as any)?.data?.data ?? (ancilsRes as any)?.data ?? []
+				setAncillaryReports(rawReports.filter((r: any) => r.report_type?.toLowerCase() === 'ancillary'))
+			} catch (err) {
+				console.error('[ConsultationPage] failed to fetch history/reports:', err)
+			} finally {
+				setReportsLoading(false)
+			}
+		})()
 	}, [patientId])
 
-	const [followUpLoading, setFollowUpLoading] = useState(false)
-
-	const handleSaveFollowUpRecommendation = async (dueDate: Date, note: string) => {
-		if (!appointmentId || !patient?.id) {
-			Alert.alert('Error', 'Missing appointment or patient details.')
-			return
-		}
-		setFollowUpLoading(true)
-		try {
-			const due_date_str = dueDate.toISOString().split('T')[0]
-			const payload = {
-				appointment_id: appointmentId,
-				patient_id: patient.id,
-				due_date: due_date_str,
-				doctor_note: note || undefined,
+	// ── Fetch latest vitals ──
+	useEffect(() => {
+		if (!patientId) return
+		;(async () => {
+			try {
+				const data = await getLatestVitals(patientId)
+				setLatestVitals(data)
+			} catch (err) {
+				console.error('[ConsultationPage] failed to fetch vitals:', err)
 			}
-			const res = await ApiService.post<any>(API_ENDPOINTS.FOLLOW_UPS.CREATE, payload)
-			if (res.data?.success || res.status === 201 || res.status === 200) {
-				Alert.alert('Success', 'Follow-up recommendation saved successfully.')
-				setFollowUpOpen(false)
+		})()
+	}, [patientId])
+
+	// ── Load existing treatment record for this appointment, if any, into the editor ──
+	useEffect(() => {
+		if (!appointmentId) return
+		;(async () => {
+			try {
+				const existing = await treatmentService.getByAppointment(appointmentId)
+				if (existing) {
+					setNotes(existing.notes ?? '')
+					if (existing.follow_up_date) {
+						const days = Math.round((new Date(existing.follow_up_date).getTime() - Date.now()) / 86400000)
+						if (days <= 20) setFollowUp('2wk')
+						else if (days <= 45) setFollowUp('1month')
+						else setFollowUp('3months')
+					}
+				}
+			} catch (err) {
+				console.error('[ConsultationPage] failed to fetch existing treatment record:', err)
+			}
+		})()
+	}, [appointmentId])
+
+	// ── Voice mode (expo-speech-recognition) -- commented out for now: the native module isn't
+	// available in Expo Go, and development is currently happening in Expo Go. Uncomment this
+	// whole block, the import at the top of the file, the mode-switcher entry, and the render
+	// block further down once a dev client is available.
+	// useEffect(() => {
+	// 	if (isListening) {
+	// 		pulseLoop.current = Animated.loop(
+	// 			Animated.sequence([
+	// 				Animated.timing(pulseAnim, { toValue: 1.35, duration: 550, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+	// 				Animated.timing(pulseAnim, { toValue: 1, duration: 550, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+	// 			])
+	// 		)
+	// 		pulseLoop.current.start()
+	// 	} else {
+	// 		pulseLoop.current?.stop()
+	// 		pulseAnim.setValue(1)
+	// 	}
+	// 	return () => pulseLoop.current?.stop()
+	// }, [isListening])
+	//
+	// useSpeechRecognitionEvent('result', (event) => {
+	// 	const first = event.results?.[0]
+	// 	if (!first) return
+	// 	if (!event.isFinal) {
+	// 		setLiveText(first.transcript)
+	// 	} else {
+	// 		const chunk = first.transcript.trim()
+	// 		if (chunk) {
+	// 			setLiveText('')
+	// 			setTranscript((t) => (t ? `${t} ${chunk}` : chunk))
+	// 			setVoiceDone(true)
+	// 		}
+	// 	}
+	// })
+	// useSpeechRecognitionEvent('end', () => {
+	// 	if (isListeningRef.current) {
+	// 		setTimeout(() => {
+	// 			if (isListeningRef.current) ExpoSpeechRecognitionModule.start({ lang: 'en-US', interimResults: true, continuous: false })
+	// 		}, 250)
+	// 	}
+	// })
+	// useSpeechRecognitionEvent('error', (event) => {
+	// 	if (isListeningRef.current && ['no-speech', 'network', 'speech-timeout'].includes(event.error)) {
+	// 		setTimeout(() => {
+	// 			if (isListeningRef.current) ExpoSpeechRecognitionModule.start({ lang: 'en-US', interimResults: true, continuous: false })
+	// 		}, 400)
+	// 	}
+	// })
+	// useEffect(() => {
+	// 	return () => {
+	// 		isListeningRef.current = false
+	// 		ExpoSpeechRecognitionModule.stop()
+	// 	}
+	// }, [])
+	//
+	// const startListening = async () => {
+	// 	const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync()
+	// 	if (!perm.granted) {
+	// 		Toast.show({ type: 'error', text1: 'Microphone permission is needed to dictate' })
+	// 		return
+	// 	}
+	// 	isListeningRef.current = true
+	// 	setIsListening(true)
+	// 	ExpoSpeechRecognitionModule.start({ lang: 'en-US', interimResults: true, continuous: false })
+	// }
+	// const stopListening = () => {
+	// 	isListeningRef.current = false
+	// 	setIsListening(false)
+	// 	setLiveText('')
+	// 	ExpoSpeechRecognitionModule.stop()
+	// }
+	// const toggleMic = () => (isListening ? stopListening() : startListening())
+	// const insertVoiceIntoNotes = () => {
+	// 	setNotes((n) => (n.trim() ? `${n.trim()}\n${transcript}` : transcript))
+	// 	setTranscript('')
+	// 	setVoiceDone(false)
+	// }
+	// const discardVoice = () => {
+	// 	setTranscript('')
+	// 	setVoiceDone(false)
+	// }
+
+	const switchNoteMode = (m: NoteMode) => {
+		setNoteMode(m)
+	}
+
+	// ── DICOM ──
+	const openDicomFromKey = async (s3Key?: string | null) => {
+		setDicomLoading(true)
+		try {
+			if (s3Key) {
+				const response = await fetch(s3Key)
+				const blob = await response.blob()
+				const reader = new FileReader()
+				reader.onloadend = () => {
+					const base64data = reader.result as string
+					setDicomBase64(base64data.split(',')[1] || base64data)
+				}
+				reader.readAsDataURL(blob)
 			} else {
-				Alert.alert('Error', res.data?.message || 'Failed to save follow-up recommendation.')
+				await loadSampleDicom()
 			}
-		} catch (err: any) {
-			console.error('Save follow-up error:', err)
-			Alert.alert('Error', err?.response?.data?.message || 'Failed to save follow-up recommendation.')
+		} catch {
+			await loadSampleDicom()
 		} finally {
-			setFollowUpLoading(false)
+			setDicomLoading(false)
+		}
+	}
+	const loadSampleDicom = async () => {
+		try {
+			const asset = Asset.fromModule(SAMPLE_DICOM_MODULE)
+			await asset.downloadAsync()
+			if (!asset.localUri) return
+			const base64 = await FileSystem.readAsStringAsync(asset.localUri, { encoding: FileSystem.EncodingType.Base64 })
+			setDicomBase64(base64)
+		} catch (err) {
+			console.error('[ConsultationPage] failed to load sample DICOM:', err)
 		}
 	}
 
-	const handleTabPress = (idx: number) => {
-		setActiveTab(idx)
-		pagerRef.current?.scrollTo({ x: pageWidth * idx, animated: true })
-	}
-
-	const handlePagerMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-		const nextTab = Math.min(Math.max(Math.round(event.nativeEvent.contentOffset.x / pageWidth), 0), 1)
-		if (nextTab !== activeTab) setActiveTab(nextTab)
-	}
-
-	// ── Save notes ──────────────────────────────────────────────────────────────
-	const handleSaveNotes = async () => {
-		if (!noteCanvasData) {
-			Alert.alert('Info', 'Please add some consultation notes by drawing or speaking')
+	// ── Report tap ──
+	const handleReportPress = (item: ReportItem) => {
+		if (item.kind === 'radiology' && item.dicomKeys && item.dicomKeys.length > 0) {
+			openDicomFromKey(item.dicomKeys[0])
 			return
 		}
-		setSaving(true)
-		try {
-			// noteCanvasData is a base64 PNG – send to your API here
-			Alert.alert('Success', 'Consultation notes saved successfully')
-			navigation.goBack()
-		} catch {
-			Alert.alert('Error', 'Failed to save consultation notes')
-		} finally {
-			setSaving(false)
+		const url = buildS3Url(item.fileUrl)
+		if (url) {
+			Linking.openURL(url).catch(() => Toast.show({ type: 'error', text1: 'Could not open this file' }))
+			return
+		}
+		if (item.kind === 'radiology') {
+			openDicomFromKey(null)
 		}
 	}
 
-	// ── Loading / error states ──────────────────────────────────────────────────
+	// ── Save treatment record (notes / diagnosis / follow-up) ──
+	const buildFollowUpDate = (option: FollowUpOption): string | null => {
+		const opt = FOLLOW_UP_OPTIONS.find((f) => f.id === option)
+		if (!opt || opt.days === null) return null
+		// Local date arithmetic, not toISOString() -- that converts to UTC first, which silently
+		// shifts the date backward a day for anyone in a timezone ahead of UTC during early-morning
+		// hours (this app's users are IST, UTC+5:30). Same fix already established in
+		// scheduleUtils.toApiDate for exactly this reason.
+		const d = new Date()
+		d.setDate(d.getDate() + opt.days)
+		return toApiDate(d)
+	}
+
+	const saveTreatmentRecord = async () => {
+		if (!appointmentId) return
+		const combinedNotes = diagnosis.trim() ? `Diagnosis: ${diagnosis.trim()}${notes.trim() ? `\n\n${notes.trim()}` : ''}` : notes.trim()
+		await treatmentService.save(appointmentId, {
+			notes: combinedNotes || undefined,
+			follow_up_date: buildFollowUpDate(followUp) ?? undefined,
+		})
+	}
+
+	const handlePrimaryPress = async () => {
+		if (saving) return
+		if (phase === 'idle') {
+			setPhase('live')
+			return
+		}
+		if (phase === 'live') {
+			setSaving(true)
+			try {
+				await saveTreatmentRecord()
+				setPhase('sent')
+			} catch (err: any) {
+				Toast.show({ type: 'error', text1: err?.response?.data?.message || 'Failed to save consultation notes' })
+			} finally {
+				setSaving(false)
+			}
+			return
+		}
+		navigation.navigate(ROUTES.MAIN.SCHEDULE)
+	}
+
+	const primaryLabel = phase === 'idle' ? 'Start consultation' : phase === 'live' ? 'End & share notes' : 'Next patient'
+	const primaryBg = phase === 'idle' ? PRIMARY : phase === 'live' ? INK : PRIMARY
+
+	// ── Derived: header ──
+	const avatarUri = resolveAvatar(patient)
+	const modeLabel = appointment?.appointment_mode === 'video_call' ? 'Video' : 'In-clinic'
+	const timeLabel = formatTime12h(appointment?.start_time)
+	const bloodGroup = patient?.blood_group || '--'
+	const weightLabel = patient?.weight ? patient.weight.replace(/\s*kg$/i, '') : '--'
+	const bmi = computeBmi(patient?.height, patient?.weight) ?? '--'
+	const visitsLabel = treatmentHistory.length > 0 ? ordinal(treatmentHistory.length + 1) : '1st'
+
+	// ── Derived: allergy banner ──
+	const allergies = patient?.allergies ?? []
+
+	// ── Derived: reason for visit ──
+	const preIntake = appointment?.pre_intake || {}
+	const reasonText: string = preIntake?.symptoms || appointment?.symptoms || ''
+	const reasonTags: string[] = [
+		preIntake?.duration || appointment?.duration,
+		humanizeSeverity(preIntake?.severity || appointment?.severity),
+	].filter(Boolean)
+
+	// ── Derived: vitals today ──
+	const bpRecord = latestVitals.blood_pressure
+	const glucoseRecord = latestVitals.glucose_level
+	const spo2Record = latestVitals.spo2
+	const tempRecord = latestVitals.temperature
+	const othersRecord = latestVitals.others
+	// Pulse has no dedicated vital_type of its own -- it's commonly recorded alongside blood
+	// pressure (the real seeded convention: blood_pressure.value.pulse), but fall back to an
+	// "others" bundle's pulse_rate in case a future recording uses that shape instead.
+	const pulseValue = (bpRecord?.value as any)?.pulse ?? (othersRecord?.value as any)?.pulse_rate
+
+	const bpValue = bpRecord ? `${(bpRecord.value as any)?.systolic ?? '--'}/${(bpRecord.value as any)?.diastolic ?? '--'}` : null
+	const bpSystolic = bpRecord ? Number((bpRecord.value as any)?.systolic) : null
+	const bpDiastolic = bpRecord ? Number((bpRecord.value as any)?.diastolic) : null
+	const bpHigh =
+		(bpSystolic !== null && bpSystolic >= VITAL_THRESHOLDS.bpSystolicHigh) ||
+		(bpDiastolic !== null && bpDiastolic >= VITAL_THRESHOLDS.bpDiastolicHigh)
+
+	const glucoseValue = glucoseRecord
+		? String((glucoseRecord.value as any)?.random ?? (glucoseRecord.value as any)?.fasting ?? '--')
+		: null
+	const glucoseNum = glucoseValue ? Number(glucoseValue) : null
+	const glucoseHigh = glucoseNum !== null && glucoseNum >= VITAL_THRESHOLDS.glucoseHighMgDl
+
+	// The real seeded spo2 records use "value" as the key (not "spo2") -- fall back to "spo2" in
+	// case a future recording uses that shape instead.
+	const spo2Raw = (spo2Record?.value as any)?.value ?? (spo2Record?.value as any)?.spo2
+	const spo2Value = spo2Raw !== undefined && spo2Raw !== null ? String(spo2Raw) : null
+	const tempValue = tempRecord ? String((tempRecord.value as any)?.temperature ?? '--') : null
+	const spo2Low = spo2Value ? Number(spo2Value) < VITAL_THRESHOLDS.spo2LowPercent : false
+
+	const hasAnyVitals = !!(bpRecord || glucoseRecord || spo2Record || tempRecord || pulseValue)
+
+	// ── Derived: medical summary ──
+	const conditions = patient?.chronic_diseases ?? []
+	const medicines = asList(patient?.current_medications)
+	const familyHistory = asText(patient?.family_history)
+	const lifestyleBits = [
+		patient?.smoking_status ? `${patient.smoking_status} smoker` : '',
+		patient?.occupation,
+		patient?.activity_level ? `${patient.activity_level} activity` : '',
+	].filter(Boolean)
+
+	// ── Derived: reports ──
+	const reportItems: ReportItem[] = useMemo(() => {
+		const items = [
+			...labReports.map(labToReportItem),
+			...radReports.map(radToReportItem),
+			...ancillaryReports.map(ancillaryToReportItem),
+		]
+		return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+	}, [labReports, radReports, ancillaryReports])
+
+	const hba1cSeries = useMemo(() => extractHbA1cSeries(labReports), [labReports])
+
+	// ── Loading / not-found ──
 	if (patientLoading) {
 		return (
-			<View style={[styles.container, { backgroundColor: SURFACE_MUTED }]}>
-				{/* Skeleton Header */}
-				<View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 40, paddingBottom: 8, gap: 12, borderBottomWidth: 1, borderBottomColor: DIVIDER }}>
-					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-						<AppSkeleton width={32} height={32} borderRadius={16} />
-						<AppSkeleton width={42} height={42} borderRadius={21} />
-						<View style={{ flex: 1, gap: 6 }}>
-							<AppSkeleton width="60%" height={16} />
-							<AppSkeleton width="40%" height={12} />
-						</View>
-						<AppSkeleton width={85} height={32} borderRadius={16} />
-					</View>
-					{/* Skeleton Tabs */}
-					<View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
-						<AppSkeleton width={120} height={20} borderRadius={4} />
-						<AppSkeleton width={100} height={20} borderRadius={4} />
-					</View>
-				</View>
-
-				{/* Skeleton Body Content */}
-				<ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} showsVerticalScrollIndicator={false}>
-					{/* Card 1: Details */}
-					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: DIVIDER }}>
-						<AppSkeleton width="40%" height={18} style={{ marginBottom: 8 }} />
-						<View style={{ flexDirection: 'row', gap: 16, marginBottom: 8 }}>
-							<AppSkeleton width={70} height={70} borderRadius={8} />
-							<View style={{ flex: 1, gap: 8, justifyContent: 'center' }}>
-								<AppSkeleton width="80%" height={14} />
-								<AppSkeleton width="60%" height={12} />
-								<AppSkeleton width="50%" height={12} />
-							</View>
-						</View>
-						<Divider style={{ marginVertical: 4 }} />
-						<View style={{ flexDirection: 'row', gap: 16 }}>
-							<View style={{ flex: 1, gap: 8 }}>
-								<AppSkeleton width="90%" height={12} />
-								<AppSkeleton width="80%" height={12} />
-								<AppSkeleton width="75%" height={12} />
-							</View>
-							<View style={{ flex: 1, gap: 8 }}>
-								<AppSkeleton width="85%" height={12} />
-								<AppSkeleton width="70%" height={12} />
-								<AppSkeleton width="80%" height={12} />
-							</View>
-						</View>
-					</View>
-
-					{/* Card 2: History */}
-					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: DIVIDER }}>
-						<AppSkeleton width="50%" height={18} style={{ marginBottom: 8 }} />
-						<View style={{ gap: 10 }}>
-							<View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-								<AppSkeleton width={20} height={20} borderRadius={10} />
-								<AppSkeleton width="70%" height={14} />
-							</View>
-							<AppSkeleton width="100%" height={32} borderRadius={6} />
-						</View>
-					</View>
-
-					{/* Card 3: Consultation Notes */}
-					<View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12, borderWidth: 1, borderColor: DIVIDER }}>
-						<View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-							<View style={{ gap: 6 }}>
-								<AppSkeleton width={80} height={14} />
-								<AppSkeleton width={50} height={10} />
-							</View>
-							<View style={{ gap: 6, alignItems: 'flex-end' }}>
-								<AppSkeleton width={90} height={14} />
-								<AppSkeleton width={60} height={10} />
-							</View>
-						</View>
-						<Divider style={{ marginVertical: 4 }} />
-						<AppSkeleton width="100%" height={120} borderRadius={8} />
-					</View>
-
-				</ScrollView>
-
-				<View style={[styles.stickyFooter, { paddingBottom: 12 + insets.bottom }]}>
-					<AppSkeleton width="100%" height={48} borderRadius={24} />
+			<View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
+				<View style={{ paddingHorizontal: 16, gap: 12 }}>
+					<AppSkeleton width={44} height={44} borderRadius={12} />
+					<AppSkeleton width="70%" height={20} />
+					<AppSkeleton width="100%" height={90} borderRadius={14} />
+					<AppSkeleton width="100%" height={140} borderRadius={14} />
+					<AppSkeleton width="100%" height={140} borderRadius={14} />
 				</View>
 			</View>
 		)
 	}
-
 	if (!patient) {
 		return (
-			<View style={[styles.container, styles.centerContent]}>
-				<MaterialCommunityIcons name="alert-circle-outline" size={48} color="#e53935" />
-				<Text style={{ marginTop: 16, color: '#e53935', textAlign: 'center' }}>Patient not found</Text>
-				<Button mode="contained" onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>
-					Go Back
-				</Button>
+			<View style={[styles.screen, styles.centerContent]}>
+				<MaterialCommunityIcons name="alert-circle-outline" size={44} color={APP_COLORS.danger} />
+				<Text style={{ marginTop: 12, color: APP_COLORS.danger, textAlign: 'center' }}>Patient not found</Text>
+				<TouchableOpacity onPress={() => navigation.goBack()} style={styles.goBackBtn}>
+					<Text style={styles.goBackBtnText}>Go back</Text>
+				</TouchableOpacity>
 			</View>
 		)
 	}
 
-	const avatarUri = resolveAvatar(patient)
-
 	return (
-		<View style={styles.container}>
+		<View style={styles.screen}>
 			{/* ── Header ── */}
-			<View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
-				<View style={styles.headerTop}>
-					<IconButton
-						icon="arrow-left"
-						onPress={() => navigation.goBack()}
-						style={{ margin: 0, padding: 0 }}
-					/>
-					{avatarUri ? (
-						<Avatar.Image size={42} source={{ uri: avatarUri }} style={{ marginHorizontal: 12 }} />
-					) : (
-						<Avatar.Text
-							size={42}
-							label={patient.name?.slice(0, 2).toUpperCase() ?? '?'}
-							style={{ marginHorizontal: 12 }}
-						/>
-					)}
-					<View style={{ flex: 1 }}>
-						<Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
-							{patient.name}
+			<View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+				<View aria-hidden style={styles.headerBlob} />
+				<View style={styles.headerTopRow}>
+					<TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityLabel="Back to today">
+						<MaterialCommunityIcons name="chevron-left" size={26} color="#FFFFFF" />
+					</TouchableOpacity>
+					<View style={{ flex: 1, minWidth: 0 }}>
+						<Text style={styles.headerTitle}>Consultation</Text>
+						<Text style={styles.headerSubtitle}>
+							{modeLabel}
+							{timeLabel ? ` · ${timeLabel}` : ''}
 						</Text>
 					</View>
-					<Button
-						mode="contained"
-						compact
-						style={{ borderRadius: 20 }}
-						onPress={() => {
-							setFollowUpDate(new Date())
-							setFollowUpSelectedSlot('')
-							setFollowUpSlots([])
-							setFollowUpHospitalId('')
-							setFollowUpOpen(true)
-						}}
-					>
-						+ Follow up
-					</Button>
+					{phase === 'live' && (
+						<View style={styles.livePill}>
+							<View style={styles.liveDot} />
+							<Text style={styles.livePillText}>In session</Text>
+						</View>
+					)}
+					<TouchableOpacity style={styles.moreBtn} accessibilityLabel="More options">
+						<MaterialCommunityIcons name="dots-vertical" size={20} color="#FFFFFF" />
+					</TouchableOpacity>
 				</View>
 
-				{/* Tabs */}
-				<View style={styles.tabContainer}>
-					{['Info & Timeline', 'Vitals'].map((label, idx) => (
-						<TouchableOpacity
-							key={label}
-							style={[
-								styles.tab,
-								activeTab === idx && {
-									borderBottomColor: theme.colors.primary,
-									borderBottomWidth: 2,
-								},
-							]}
-							onPress={() => handleTabPress(idx)}
-						>
-							<Text
-								style={[
-									styles.tabText,
-									activeTab === idx && {
-										color: theme.colors.primary,
-										fontWeight: 'bold',
-									},
-								]}
-							>
-								{label}
-							</Text>
-						</TouchableOpacity>
+				<View style={styles.headerPatientRow}>
+					{avatarUri ? (
+						<Animated.Image source={{ uri: avatarUri }} style={styles.headerAvatar} />
+					) : (
+						<View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
+							<Text style={styles.headerAvatarFallbackText}>{patient.name?.slice(0, 2).toUpperCase() ?? '?'}</Text>
+						</View>
+					)}
+					<View style={{ flex: 1, minWidth: 0 }}>
+						<Text style={styles.headerPatientName} numberOfLines={1}>
+							{patient.name}
+						</Text>
+						<Text style={styles.headerPatientMeta} numberOfLines={1}>
+							{patient.age ? `${patient.age} yrs · ` : ''}
+							{patient.gender ?? ''}
+						</Text>
+					</View>
+				</View>
+
+				<View style={styles.headerStatGrid}>
+					{[
+						{ label: 'Blood', value: bloodGroup },
+						{ label: 'Weight', value: weightLabel !== '--' ? `${weightLabel} kg` : '--' },
+						{ label: 'BMI', value: bmi },
+						{ label: 'Visits', value: visitsLabel },
+					].map((s) => (
+						<View key={s.label} style={styles.headerStatCell}>
+							<Text style={styles.headerStatLabel}>{s.label}</Text>
+							<Text style={styles.headerStatValue}>{s.value}</Text>
+						</View>
 					))}
 				</View>
 			</View>
 
-			{/* ── Content ── */}
-			<ScrollView
-				ref={pagerRef}
-				style={styles.pager}
-				horizontal
-				pagingEnabled
-				showsHorizontalScrollIndicator={false}
-				onMomentumScrollEnd={handlePagerMomentumEnd}
-				scrollEventThrottle={16}
-			>
-				<View style={[styles.tabPage, { width: pageWidth }]}>
-					<ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
-						<View>
-						{/* Patient Details */}
-						<Card style={styles.card}>
-							<Card.Content>
-								<Text
-									variant="titleMedium"
-									style={{
-										color: theme.colors.primary,
-										fontWeight: 'bold',
-										marginBottom: 16,
-									}}
-								>
-									Patient Details
-								</Text>
+			{/* ── Tabs ── */}
+			<View style={styles.tabsWrap}>
+				<AppSegmentedControl
+					options={TABS.map((t) => ({ value: t.id, label: t.label }))}
+					value={activeTab}
+					onChange={(v) => setActiveTab(v as TabId)}
+					shape="rounded"
+					tabs
+					accessibilityLabel="Patient file"
+				/>
+			</View>
 
-								<View style={{ flexDirection: 'row', marginBottom: 12 }}>
-									<View style={{ marginRight: 16 }}>
-										{avatarUri ? (
-											<Avatar.Image
-												size={70}
-												source={{ uri: avatarUri }}
-												style={{ borderRadius: 8 }}
-											/>
-										) : (
-											<Avatar.Text
-												size={70}
-												label={patient.name?.slice(0, 2).toUpperCase() ?? '?'}
-												style={{ borderRadius: 8 }}
-											/>
+			{/* ── Content ── */}
+			<ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+				{activeTab === 'overview' && (
+					<View style={{ gap: 14 }}>
+						{allergies.length > 0 && (
+							<View style={styles.allergyBanner}>
+								<MaterialCommunityIcons name="alert-decagram-outline" size={20} color={APP_COLORS.danger} />
+								<Text style={styles.allergyBannerText}>
+									<Text style={{ fontWeight: '800' }}>Allergic to {allergies.join(', ')}</Text>
+								</Text>
+							</View>
+						)}
+
+						{!!reasonText && (
+							<AppSoftCard radius={14} style={{ gap: 10 }}>
+								<View style={styles.rowBetween}>
+									<Text style={styles.sectionTitle}>Reason for visit</Text>
+									<Text style={styles.mutedCaption}>Shared at booking</Text>
+								</View>
+								<Text style={styles.reasonText}>&ldquo;{reasonText}&rdquo;</Text>
+								{reasonTags.length > 0 && (
+									<View style={styles.tagRow}>
+										{reasonTags.map((tag) => (
+											<View key={tag} style={styles.tagChip}>
+												<Text style={styles.tagChipText}>{tag}</Text>
+											</View>
+										))}
+									</View>
+								)}
+							</AppSoftCard>
+						)}
+
+						<View style={{ gap: 8 }}>
+							<Text style={styles.sectionTitle}>Vitals today</Text>
+							{hasAnyVitals ? (
+								<View style={styles.vitalsGrid}>
+									<VitalCard label="Blood pressure" value={bpValue ? `${bpValue} ` : '-- '} unit="mmHg" tone={bpHigh ? 'amber' : 'green'} toneLabel={bpHigh ? 'Above target' : 'Normal'} show={!!bpValue} />
+									<VitalCard label="Random sugar" value={glucoseValue ? `${glucoseValue} ` : '-- '} unit="mg/dL" tone={glucoseHigh ? 'red' : 'green'} toneLabel={glucoseHigh ? 'High' : 'Normal'} show={!!glucoseValue} />
+									<VitalCard label="Pulse" value={pulseValue ? `${pulseValue} ` : '-- '} unit="bpm" tone="green" toneLabel="Normal" show={!!pulseValue} />
+									<VitalCard
+										label="SpO₂ · Temp"
+										value={`${spo2Value ?? '--'}% · ${tempValue ?? '--'}°F`}
+										unit=""
+										tone={spo2Low ? 'amber' : 'green'}
+										toneLabel={spo2Low ? 'Low' : 'Normal'}
+										show={!!(spo2Value || tempValue)}
+									/>
+								</View>
+							) : (
+								<Text style={styles.mutedCaption}>No vitals recorded yet</Text>
+							)}
+						</View>
+
+						<AppSoftCard radius={14} padding={16} style={{ gap: 14 }}>
+							{conditions.length > 0 && (
+								<View style={{ gap: 8 }}>
+									<Text style={styles.sectionTitle}>Conditions</Text>
+									{conditions.map((c, i) => (
+										<View key={`${c}-${i}`} style={styles.conditionRow}>
+											<View style={[styles.dot, { backgroundColor: TONES.sand.ink }]} />
+											<Text style={styles.conditionText}>{c}</Text>
+										</View>
+									))}
+								</View>
+							)}
+
+							{medicines.length > 0 && (
+								<>
+									<View style={styles.hr} />
+									<View style={{ gap: 10 }}>
+										<Text style={styles.sectionTitle}>Current medicines</Text>
+										{medicines.map((m, i) => (
+											<View key={`${m}-${i}`} style={styles.medicineRow}>
+												<View style={styles.medicineIconWrap}>
+													<MaterialCommunityIcons name="pill" size={18} color={TONES.lilac.ink} />
+												</View>
+												<Text style={styles.medicineText}>{m}</Text>
+											</View>
+										))}
+									</View>
+								</>
+							)}
+
+							{(familyHistory || lifestyleBits.length > 0) && (
+								<>
+									<View style={styles.hr} />
+									<View style={styles.summaryGrid}>
+										{!!familyHistory && (
+											<View style={{ flex: 1, gap: 2 }}>
+												<Text style={styles.summaryLabel}>FAMILY HISTORY</Text>
+												<Text style={styles.summaryValue}>{familyHistory}</Text>
+											</View>
+										)}
+										{lifestyleBits.length > 0 && (
+											<View style={{ flex: 1, gap: 2 }}>
+												<Text style={styles.summaryLabel}>LIFESTYLE</Text>
+												<Text style={styles.summaryValue}>{lifestyleBits.join(' · ')}</Text>
+											</View>
 										)}
 									</View>
-									<View style={{ flex: 1, flexDirection: 'row' }}>
-										<View style={{ flex: 1 }}>
-											<RowItem label="Name:" value={patient.name} />
-											<RowItem
-												label="Patient ID:"
-												value={patient.id}
-												numberOfLines={1}
-												ellipsizeMode="tail"
-											/>
-											<RowItem label="Age:" value={patient.age ? `${patient.age} years` : '-'} />
-											<View
-												style={{
-													flexDirection: 'row',
-													alignItems: 'center',
-													marginVertical: 2,
-												}}
+								</>
+							)}
+						</AppSoftCard>
+					</View>
+				)}
+
+				{activeTab === 'history' && (
+					<View style={{ gap: 4 }}>
+						<Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Past visits</Text>
+						{reportsLoading ? (
+							<AppSkeleton width="100%" height={120} borderRadius={12} />
+						) : treatmentHistory.length === 0 ? (
+							<EmptyState label="No past visits yet" />
+						) : (
+							treatmentHistory.map((h, i) => (
+								<View key={h.id} style={styles.historyRow}>
+									<View style={styles.historyRail}>
+										<View style={styles.historyDot} />
+										{i < treatmentHistory.length - 1 && <View style={styles.historyLine} />}
+									</View>
+									<View style={{ flex: 1, minWidth: 0, paddingBottom: 18, gap: 4 }}>
+										<Text style={styles.mutedCaption}>{formatDate((h as any).appointment_date || h.created_at)}</Text>
+										<Text style={styles.historyTitle}>{h.hospital_name || 'Consultation'}</Text>
+										{!!h.notes && <Text style={styles.historyNote}>{h.notes}</Text>}
+										{!!h.doctor_name && <Text style={styles.historyBy}>Dr. {h.doctor_name}</Text>}
+										{!!h.prescription_s3_key && (
+											<TouchableOpacity
+												onPress={() =>
+													Linking.openURL(buildS3Url(h.prescription_s3_key)!).catch(() =>
+														Toast.show({ type: 'error', text1: 'Could not open this file' })
+													)
+												}
 											>
-												<Text
-													style={{
-														fontSize: 11,
-														color: theme.colors.primary,
-														marginRight: 4,
-													}}
-												>
-													Phone:
-												</Text>
-												<Text style={{ fontSize: 11, fontWeight: '500', color: INK }}>
-													{patient.phone}
-												</Text>
-												<MaterialCommunityIcons
-													name="check-circle"
-													size={12}
-													color="green"
-													style={{ marginLeft: 4 }}
+												<Text style={styles.historyLink}>View prescription</Text>
+											</TouchableOpacity>
+										)}
+									</View>
+								</View>
+							))
+						)}
+					</View>
+				)}
+
+				{activeTab === 'reports' && (
+					<View style={{ gap: 14 }}>
+						{hba1cSeries.length >= 2 && (
+							<AppSoftCard radius={14} style={{ gap: 12 }}>
+								<Text style={styles.sectionTitle}>HbA1c trend</Text>
+								<View style={styles.barsRow}>
+									{hba1cSeries.map((p) => {
+										const high = p.value >= 7
+										return (
+											<View key={p.date} style={styles.barCol}>
+												<Text style={[styles.barValue, { color: high ? APP_COLORS.danger : INK_MUTED }]}>{p.value.toFixed(1)}</Text>
+												<View
+													style={[
+														styles.bar,
+														{ height: Math.max(8, Math.round((p.value - 5) * 26)), backgroundColor: high ? APP_COLORS.danger : APP_COLORS.success },
+													]}
 												/>
+												<Text style={styles.barMonth}>{formatDate(p.date)}</Text>
 											</View>
-										</View>
+										)
+									})}
+								</View>
+							</AppSoftCard>
+						)}
 
+						<View style={{ gap: 4 }}>
+							<View style={[styles.rowBetween, { marginBottom: 4 }]}>
+								<Text style={styles.sectionTitle}>Reports</Text>
+								<Text style={styles.mutedCaption}>{reportItems.length} files</Text>
+							</View>
+							{reportsLoading ? (
+								<AppSkeleton width="100%" height={100} borderRadius={12} />
+							) : dicomLoading ? (
+								<View style={{ alignItems: 'center', paddingVertical: 24 }}>
+									<ActivityIndicator size="large" color={PRIMARY} />
+									<Text style={styles.mutedCaption}>Loading scan…</Text>
+								</View>
+							) : reportItems.length === 0 ? (
+								<EmptyState label="No reports yet" />
+							) : (
+								reportItems.map((item, i) => (
+									<TouchableOpacity
+										key={item.id}
+										style={[styles.reportRow, i < reportItems.length - 1 && styles.reportRowDivider]}
+										onPress={() => handleReportPress(item)}
+									>
 										<View
-											style={{
-												width: 1,
-												backgroundColor: DIVIDER,
-												marginHorizontal: 8,
-											}}
-										/>
-
-										<View style={{ flex: 1 }}>
-											<RowItem label="Gender:" value={patient.gender} />
-											<RowItem label="Blood:" value={patient.blood_group} />
-											<RowItem label="Height:" value={patient.height} />
-											<RowItem label="Weight:" value={patient.weight} />
+											style={[
+												styles.reportIconWrap,
+												{ backgroundColor: item.kind === 'ancillary' ? '#F0F4F4' : APP_COLORS.mint },
+											]}
+										>
+											<MaterialCommunityIcons
+												name={item.kind === 'radiology' ? 'radioactive' : item.kind === 'lab' ? 'flask-outline' : 'file-document-outline'}
+												size={20}
+												color={item.kind === 'ancillary' ? INK_MUTED : PRIMARY}
+											/>
 										</View>
-									</View>
-								</View>
-
-								<Divider style={{ marginVertical: 12 }} />
-
-								<View style={{ flexDirection: 'row' }}>
-									<View style={{ flex: 1 }}>
-										<RowItem label="D.O.B:" value={patient.date_of_birth} />
-										<RowItem label="Marital:" value={patient.marital_status} />
-										<RowItem label="Email:" value={patient.email} />
-									</View>
-									<View
-										style={{
-											width: 1,
-											backgroundColor: DIVIDER,
-											marginHorizontal: 8,
-										}}
-									/>
-									<View style={{ flex: 1 }}>
-										<Text style={{ fontSize: 11, color: theme.colors.primary }}>Address:</Text>
-										<Text style={{ fontSize: 10, lineHeight: 14 }}>{patient.address}</Text>
-									</View>
-									<View
-										style={{
-											width: 1,
-											backgroundColor: DIVIDER,
-											marginHorizontal: 8,
-										}}
-									/>
-									<View style={{ flex: 1 }}>
-										<Text style={{ fontSize: 11, color: theme.colors.primary }}>
-											Emergency Contact:
-										</Text>
-										<Text style={{ fontSize: 11, fontWeight: 'bold' }}>
-											{patient.emergency_contact?.name ?? '--'}
-										</Text>
-										<Text style={{ fontSize: 10, color: INK_MUTED }}>
-											{patient.emergency_contact?.relation ?? '--'}
-										</Text>
-										<Text style={{ fontSize: 10, color: '#d32f2f' }}>
-											{patient.emergency_contact?.number ?? '--'}
-										</Text>
-									</View>
-								</View>
-
-								<Divider style={{ marginVertical: 12 }} />
-
-								<View style={{ flexDirection: 'row' }}>
-									<View style={{ flex: 1 }}>
-										<Text style={{ fontSize: 11, color: theme.colors.primary }}>
-											Chronic diseases:
-										</Text>
-										{(patient.chronic_diseases ?? []).map((d, i) => (
-											<Text key={i} style={{ fontSize: 10 }}>
-												{' '}
-												{d}
+										<View style={{ flex: 1, minWidth: 0 }}>
+											<Text style={styles.reportName} numberOfLines={1}>
+												{item.name}
 											</Text>
-										))}
-									</View>
-									<View style={{ flex: 1.5 }}>
-										<RowItem label="Occupation:" value={patient.occupation} />
-										<RowItem label="Smoking:" value={patient.smoking_status} />
-										<RowItem label="Alcohol:" value={patient.alcohol_consumption} />
-										<RowItem label="Diet:" value={patient.diet_type} />
-									</View>
-									<View style={{ flex: 1 }}>
-										<Text style={{ fontSize: 11, color: theme.colors.primary }}>Allergies:</Text>
-										{(patient.allergies ?? []).map((a, i) => (
-											<Text key={i} style={{ fontSize: 10 }}>
-												{' '}
-												{a}
+											<Text style={styles.mutedCaption} numberOfLines={1}>
+												{item.meta}
 											</Text>
-										))}
-									</View>
-								</View>
-							</Card.Content>
-						</Card>
+										</View>
+										<View style={[styles.reportStatusChip, { backgroundColor: item.statusTone.bg }]}>
+											<Text style={[styles.reportStatusText, { color: item.statusTone.fg }]} numberOfLines={1}>
+												{item.statusLabel}
+											</Text>
+										</View>
+									</TouchableOpacity>
+								))
+							)}
+						</View>
+					</View>
+				)}
 
-						{/* Past Medical History */}
-						<PastMedicalHistory patientId={patient.patient_public_id || patient.id || patientId} />
+				{activeTab === 'notes' && (
+					<View style={{ gap: 14 }}>
+						<AppSoftCard radius={14} style={{ gap: 6 }}>
+							<Text style={styles.fieldLabel}>Diagnosis</Text>
+							<TextInput
+								value={diagnosis}
+								onChangeText={setDiagnosis}
+								placeholder="e.g. Type 2 diabetes, suboptimal control"
+								placeholderTextColor={INK_MUTED}
+								style={styles.diagnosisInput}
+							/>
+						</AppSoftCard>
 
-						{/* ── Consultation Notes (Scribble + Speech) ── */}
-						<Card style={[styles.card, { borderColor: theme.colors.primary, borderWidth: 1 }]}>
-							{/* Doctor letterhead */}
-							<View style={styles.notesHeader}>
-								<View style={{ flex: 1 }}>
-									<Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 12 }}>
-										{doctor?.name ?? '--'}
-										{doctor?.degree ? `, ${doctor.degree}` : ''}
-									</Text>
-									<Text style={{ color: theme.colors.primary, fontSize: 10 }}>
-										{doctor?.specialization ?? ''}
-									</Text>
-								</View>
-								<View style={{ flex: 1, alignItems: 'flex-end' }}>
-									<Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 12 }}>
-										{doctor?.clinicName ?? ''}
-									</Text>
-									<Text style={{ color: theme.colors.primary, fontSize: 10 }}>
-										{doctor?.clinicAddress ?? ''}
-									</Text>
-								</View>
+						<AppSoftCard radius={14} padding={16} style={{ gap: 12 }}>
+							<View style={styles.rowBetween}>
+								<Text style={styles.sectionTitle}>Clinical notes</Text>
+								<Text style={styles.mutedCaption}>Auto-saved</Text>
 							</View>
 
-							<Divider />
+							<View style={styles.modeSwitch}>
+								{(
+									[
+										{ id: 'type', label: 'Type', icon: 'text' },
+										{ id: 'scribble', label: 'Scribble', icon: 'draw-pen' },
+										// Voice mode is commented out for now -- see the import note at the top of this file.
+										// { id: 'voice', label: 'Voice', icon: 'microphone-outline' },
+									] as { id: NoteMode; label: string; icon: any }[]
+								).map((m) => {
+									const on = noteMode === m.id
+									return (
+										<TouchableOpacity
+											key={m.id}
+											style={[styles.modeBtn, on && styles.modeBtnActive]}
+											onPress={() => switchNoteMode(m.id)}
+										>
+											<MaterialCommunityIcons name={m.icon} size={16} color={on ? INK : INK_MUTED} />
+											<Text style={[styles.modeBtnText, on && styles.modeBtnTextActive]}>{m.label}</Text>
+										</TouchableOpacity>
+									)
+								})}
+							</View>
 
-							{/* Scribble + Speech editor – replaces the old NativeInput */}
-							{/* <ScribbleNoteEditor
-								accentColor={theme.colors.primary}
-								onChange={(base64) => setNoteCanvasData(base64)}
-							/> */}
-						</Card>
+							{noteMode === 'type' && (
+								<TextInput
+									value={notes}
+									onChangeText={setNotes}
+									placeholder="Findings, advice, what you discussed"
+									placeholderTextColor={INK_MUTED}
+									multiline
+									numberOfLines={7}
+									style={styles.notesTextarea}
+								/>
+							)}
 
-						{/* Share With */}
-						<ShareWith appointmentId={appointmentId} />
+							{noteMode === 'scribble' && (
+								<View style={{ gap: 8 }}>
+									<View style={styles.canvasWrap}>
+										<SignatureCanvas
+											ref={sigRef}
+											onOK={(sig) => setSketch(sig)}
+											onEnd={() => sigRef.current?.readSignature()}
+											descriptionText=""
+											clearText=""
+											confirmText=""
+											webStyle=".m-signature-pad{box-shadow:none;border:none}.m-signature-pad--body{border:none}.m-signature-pad--footer{display:none}body{background:#FFFDF6;margin:0;padding:0}"
+											penColor="#12373E"
+											minWidth={2}
+											maxWidth={3}
+											style={{ flex: 1, height: 230 }}
+											backgroundColor="#FFFDF6"
+											autoClear={false}
+											dataURL=""
+										/>
+									</View>
+									<View style={{ flexDirection: 'row', gap: 8 }}>
+										<TouchableOpacity onPress={() => sigRef.current?.undo()} style={styles.canvasToolBtn}>
+											<MaterialCommunityIcons name="undo" size={18} color={INK} />
+										</TouchableOpacity>
+										<TouchableOpacity onPress={() => sigRef.current?.clearSignature()} style={styles.canvasClearBtn}>
+											<Text style={styles.canvasClearBtnText}>Clear</Text>
+										</TouchableOpacity>
+										<View style={{ flex: 1 }} />
+										<TouchableOpacity
+											disabled={!sketch}
+											onPress={() => {
+												sigRef.current?.clearSignature()
+											}}
+											style={[styles.saveSketchBtn, !sketch && { opacity: 0.5 }]}
+										>
+											<Text style={styles.saveSketchBtnText}>Save as sketch</Text>
+										</TouchableOpacity>
+									</View>
+								</View>
+							)}
 
+							{/* Voice mode is commented out for now -- see the import note at the top of this file.
+							{noteMode === 'voice' && (
+								<View style={{ gap: 10 }}>
+									<View style={[styles.voiceCard, { backgroundColor: isListening ? '#FDE8DC' : APP_COLORS.mint }]}>
+										<TouchableOpacity onPress={toggleMic} style={styles.micWrap}>
+											<Animated.View
+												style={[
+													styles.micRing,
+													{ transform: [{ scale: pulseAnim }], backgroundColor: isListening ? '#FFCDD2' : 'transparent' },
+												]}
+											/>
+											<View style={[styles.micBtn, { backgroundColor: isListening ? '#C2410C' : PRIMARY }]}>
+												<MaterialCommunityIcons name={isListening ? 'microphone' : 'microphone-outline'} size={28} color="#FFFFFF" />
+											</View>
+										</TouchableOpacity>
+										<Text style={styles.voiceLabel}>
+											{isListening ? 'Listening…' : voiceDone ? 'Tap to dictate more' : 'Tap to dictate'}
+										</Text>
+									</View>
+
+									{(!!liveText || !!transcript) && (
+										<View style={styles.transcriptCard}>
+											<Text style={styles.transcriptKicker}>{isListening ? 'LIVE TRANSCRIPT' : 'TRANSCRIPT · CHECK BEFORE SAVING'}</Text>
+											<Text style={styles.transcriptText}>
+												{transcript}
+												{liveText ? ` ${liveText}` : ''}
+											</Text>
+											{voiceDone && !isListening && (
+												<View style={{ flexDirection: 'row', gap: 8 }}>
+													<TouchableOpacity onPress={discardVoice} style={styles.canvasClearBtn}>
+														<Text style={styles.canvasClearBtnText}>Discard</Text>
+													</TouchableOpacity>
+													<TouchableOpacity onPress={insertVoiceIntoNotes} style={styles.insertVoiceBtn}>
+														<Text style={styles.insertVoiceBtnText}>Insert into notes</Text>
+													</TouchableOpacity>
+												</View>
+											)}
+										</View>
+									)}
+									<Text style={styles.voiceHint}>Only your voice is transcribed. Audio isn&apos;t stored after the text is saved.</Text>
+								</View>
+							)}
+							*/}
+
+							{noteMode !== 'type' && !!notes.trim() && (
+								<View style={styles.notesPreview}>
+									<View style={styles.rowBetween}>
+										<Text style={styles.summaryLabel}>NOTES SO FAR</Text>
+										<TouchableOpacity onPress={() => setNoteMode('type')}>
+											<Text style={styles.editAsTextLink}>Edit as text</Text>
+										</TouchableOpacity>
+									</View>
+									<Text style={styles.notesPreviewText}>{notes}</Text>
+								</View>
+							)}
+
+							{!!sketch && (
+								<View style={styles.sketchRow}>
+									<MaterialCommunityIcons name="image-outline" size={20} color={APP_COLORS.mintAccent} />
+									<Text style={styles.sketchRowText}>Sketch attached to notes</Text>
+									<TouchableOpacity onPress={() => setSketch(null)} accessibilityLabel="Remove sketch">
+										<MaterialCommunityIcons name="close" size={18} color={INK_MUTED} />
+									</TouchableOpacity>
+								</View>
+							)}
+						</AppSoftCard>
+
+						<View style={{ gap: 8 }}>
+							<Text style={styles.sectionTitle}>Follow-up</Text>
+							<View style={styles.followUpGrid}>
+								{FOLLOW_UP_OPTIONS.map((f) => {
+									const on = followUp === f.id
+									return (
+										<TouchableOpacity
+											key={f.id}
+											style={[styles.followUpBtn, { borderColor: on ? PRIMARY : DIVIDER, backgroundColor: on ? APP_COLORS.mint : '#FFFFFF' }]}
+											onPress={() => setFollowUp(f.id)}
+										>
+											<Text style={[styles.followUpBtnText, { color: on ? INK : INK_MUTED }]}>{f.label}</Text>
+										</TouchableOpacity>
+									)
+								})}
+							</View>
+						</View>
 					</View>
-				</ScrollView>
-
-				<View style={[styles.stickyFooter, { paddingBottom: 12 + insets.bottom }]}>
-					<Button
-						mode="contained"
-						loading={saving}
-						onPress={handleSaveNotes}
-						style={styles.saveButton}
-					>
-						Save
-					</Button>
-				</View>
-			</View>
-				<View style={[styles.tabPage, styles.vitalsContent, { width: pageWidth }]}>
-					<VitalsTab patientId={patient?.id || patientId} />
-				</View>
+				)}
 			</ScrollView>
 
-			<FollowUpModal
-				visible={followUpOpen}
-				onClose={() => setFollowUpOpen(false)}
-				onSave={handleSaveFollowUpRecommendation}
-				loading={followUpLoading}
-			/>
+			{/* ── Bottom action bar ── */}
+			<View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+				{phase === 'sent' && (
+					<View style={styles.sentBanner}>
+						<MaterialCommunityIcons name="check-circle" size={18} color={APP_COLORS.success} />
+						<Text style={styles.sentBannerText}>Consultation notes shared with {patient.name?.split(' ')[0]}</Text>
+					</View>
+				)}
+				<View style={{ flexDirection: 'row', gap: 8 }}>
+					{phase !== 'sent' && activeTab !== 'notes' && (
+						<TouchableOpacity style={styles.secondaryBtn} onPress={() => setActiveTab('notes')}>
+							<MaterialCommunityIcons name="note-edit-outline" size={18} color={PRIMARY} />
+							<Text style={styles.secondaryBtnText}>Notes</Text>
+						</TouchableOpacity>
+					)}
+					<TouchableOpacity style={[styles.primaryBtn, { backgroundColor: primaryBg }]} onPress={handlePrimaryPress} disabled={saving}>
+						{saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryBtnText}>{primaryLabel}</Text>}
+					</TouchableOpacity>
+				</View>
+			</View>
+
+			{/* ── DICOM expanded modal ── */}
+			<Modal visible={!!dicomBase64} animationType="slide" onRequestClose={() => setDicomBase64(null)}>
+				<View style={styles.dicomModal}>
+					<View style={[styles.dicomModalHeader, { paddingTop: insets.top + 8 }]}>
+						<Text style={styles.dicomModalTitle}>Radiology image</Text>
+						<TouchableOpacity onPress={() => setDicomBase64(null)}>
+							<MaterialCommunityIcons name="close" size={22} color="#FFFFFF" />
+						</TouchableOpacity>
+					</View>
+					<View style={{ flex: 1 }}>
+						<DicomViewer base64Data={dicomBase64} fullScreen />
+					</View>
+				</View>
+			</Modal>
 		</View>
 	)
 }
 
-// ---------- Styles ----------
+// ── Small presentational pieces ─────────────────────────────────────────────
+
+function VitalCard({
+	label,
+	value,
+	unit,
+	tone,
+	toneLabel,
+	show,
+}: {
+	label: string
+	value: string
+	unit: string
+	tone: 'green' | 'amber' | 'red'
+	toneLabel: string
+	show: boolean
+}) {
+	if (!show) return null
+	const pair = tone === 'green' ? REPORT_TONES.green : tone === 'amber' ? REPORT_TONES.amber : { bg: APP_COLORS.dangerBg, fg: APP_COLORS.danger }
+	return (
+		<View style={styles.vitalCard}>
+			<Text style={styles.vitalLabel}>{label}</Text>
+			<Text style={styles.vitalValue}>
+				{value}
+				{!!unit && <Text style={styles.vitalUnit}> {unit}</Text>}
+			</Text>
+			<View style={[styles.vitalToneChip, { backgroundColor: pair.bg }]}>
+				<Text style={[styles.vitalToneText, { color: pair.fg }]}>{toneLabel}</Text>
+			</View>
+		</View>
+	)
+}
+
+function EmptyState({ label }: { label: string }) {
+	return (
+		<View style={{ alignItems: 'center', paddingVertical: 32, gap: 8 }}>
+			<MaterialCommunityIcons name="emoticon-sad-outline" size={40} color={DIVIDER} />
+			<Text style={styles.mutedCaption}>{label}</Text>
+		</View>
+	)
+}
+
+// ── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: SURFACE_MUTED,
-	},
-	stickyFooter: {
-		backgroundColor: '#ffffff',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderTopWidth: 1,
-		borderTopColor: DIVIDER,
-	},
-	saveButton: {
-		borderRadius: 24,
-	},
-	centerContent: {
-		justifyContent: 'center',
-		alignItems: 'center',
-		padding: 24,
-	},
-	vitalsContent: {
-		flex: 1,
-	},
-	pager: {
-		flex: 1,
-	},
-	tabPage: {
-		flex: 1,
-	},
+	screen: { flex: 1, backgroundColor: PAGE_BG },
+	centerContent: { alignItems: 'center', justifyContent: 'center', padding: 24 },
+	goBackBtn: { marginTop: 20, height: 44, paddingHorizontal: 20, borderRadius: 10, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center' },
+	goBackBtnText: { color: '#FFFFFF', fontWeight: '700' },
+
 	header: {
-		paddingTop: 48,
-		elevation: 4,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-	},
-	headerTop: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: 8,
-		paddingBottom: 16,
-	},
-	tabContainer: {
-		flexDirection: 'row',
-		borderTopWidth: 1,
-		borderTopColor: DIVIDER,
-	},
-	tab: {
-		flex: 1,
-		paddingVertical: 12,
-		alignItems: 'center',
-	},
-	tabText: {
-		color: INK_MUTED,
-	},
-	content: {
-		paddingTop: 16,
-	},
-	card: {
-		marginHorizontal: 16,
-		marginBottom: 16,
-		backgroundColor: '#fff',
-		borderRadius: 12,
-	},
-	notesHeader: {
-		backgroundColor: '#e0f2f1',
-		padding: 12,
-		flexDirection: 'row',
-		borderTopLeftRadius: 10,
-		borderTopRightRadius: 10,
-	},
-	dicomModalContainer: {
-		flex: 1,
-		backgroundColor: '#000',
-	},
-	dicomModalHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingTop: 36,
-		paddingHorizontal: 8,
-		backgroundColor: '#000',
-	},
-	dicomModalTitle: {
-		color: '#fff',
-		fontSize: 14,
-		fontWeight: '700',
-		marginLeft: 12,
-	},
-	dicomModalBody: {
-		flex: 1,
-	},
-	drawerBackdrop: {
-		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.35)',
-		justifyContent: 'flex-end',
-		padding: 12,
-	},
-	drawerSheet: {
-		backgroundColor: '#fff',
-		borderRadius: 16,
-		maxHeight: '80%',
+		position: 'relative',
 		overflow: 'hidden',
-		borderWidth: 1,
-		borderColor: '#edf1f3',
-		width: '100%',
-		flexShrink: 1,
-	},
-	drawerHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
+		backgroundColor: INK,
 		paddingHorizontal: 16,
-		paddingVertical: 14,
-		borderBottomWidth: 1,
-		borderBottomColor: DIVIDER,
+		paddingBottom: 16,
+		gap: 12,
+		borderBottomLeftRadius: 24,
+		borderBottomRightRadius: 24,
 	},
-	drawerCloseBtn: {
-		width: 28,
-		height: 28,
-		borderRadius: 14,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: SURFACE_MUTED,
-	},
-	drawerBody: {
-		flexShrink: 1,
-	},
-	drawerBodyContent: {
-		paddingVertical: 14,
-	},
-	drawerTitle: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: INK,
-	},
-	drawerSubtitle: {
-		fontSize: 12,
-		color: INK_MUTED,
-		marginTop: 2,
-	},
-	drawerActions: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		gap: 10,
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderTopWidth: 1,
-		borderTopColor: DIVIDER,
-	},
-	drawerCancelBtn: {
-		borderRadius: 20,
-		borderWidth: 1,
-		borderColor: DIVIDER,
-		paddingHorizontal: 22,
-		paddingVertical: 10,
-		flex: 1,
-		alignItems: 'center',
-	},
-	drawerCancelBtnText: {
-		color: INK_MUTED,
-		fontWeight: '600',
-		fontSize: 14,
-	},
-	drawerConfirmBtn: {
-		borderRadius: 20,
-		backgroundColor: PRIMARY,
-		paddingHorizontal: 22,
-		paddingVertical: 10,
-		flex: 1,
-		alignItems: 'center',
-	},
-	drawerConfirmBtnText: {
-		color: '#fff',
-		fontWeight: '700',
-		fontSize: 14,
-	},
-	historyItem: {
-		backgroundColor: SURFACE_MUTED,
-		borderRadius: 8,
-		padding: 12,
-		marginBottom: 12,
-		borderWidth: 1,
-		borderColor: DIVIDER,
-	},
-	historyHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	historyTitle: {
-		fontSize: 12,
-		fontWeight: 'bold',
-		color: INK,
-	},
-	historySubtitle: {
-		fontSize: 10,
-		color: INK_MUTED,
-		marginTop: 2,
-	},
-	historyNotes: {
-		fontSize: 11,
-		color: INK_MUTED,
-		marginTop: 8,
-		lineHeight: 16,
-	},
-	resultsGrid: {
-		marginTop: 10,
-		paddingTop: 8,
-		borderTopWidth: 1,
-		borderTopColor: DIVIDER,
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 8,
-	},
-	resultRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		width: '48%',
-	},
-	resultLabel: {
-		fontSize: 10,
-		fontWeight: 'bold',
-		color: INK_MUTED,
-	},
-	resultValue: {
-		fontSize: 10,
-		color: INK,
-		marginLeft: 4,
-	},
-	providerItemCard: {
-		backgroundColor: '#ffffff',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#e8ecef',
-		padding: 12,
-		marginBottom: 12,
-		flexDirection: 'row',
-		alignItems: 'center',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.04,
-		shadowRadius: 3,
-		elevation: 1,
-	},
-	providerIconBg: {
-		width: 38,
-		height: 38,
-		borderRadius: 8,
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	providerDetails: {
-		flex: 1,
-		marginLeft: 10,
-		marginRight: 10,
-	},
-	providerName: {
-		fontWeight: '700',
-		fontSize: 12,
-		color: INK,
-		marginBottom: 4,
-	},
-	providerInfoRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		marginTop: 3,
-		gap: 6,
-	},
-	providerAddress: {
-		color: INK_MUTED,
-		fontSize: 11,
-		lineHeight: 15,
-		flex: 1,
-	},
-	providerPhone: {
-		color: PRIMARY,
-		fontSize: 11,
-		lineHeight: 15,
-		flex: 1,
-	},
-	providerShareBtn: {
-		borderRadius: 8,
-		minWidth: 88,
-	},
+	headerBlob: { position: 'absolute', right: -60, top: -80, width: 220, height: 220, borderRadius: 9999, backgroundColor: PRIMARY },
+	headerTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
+	backBtn: { width: 44, height: 44, marginLeft: -8, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+	headerTitle: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: '#FFFFFF' },
+	headerSubtitle: { fontSize: 12, lineHeight: 16, color: '#9FD3D1' },
+	livePill: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingHorizontal: 10, borderRadius: 9999, backgroundColor: '#FFFFFF1F' },
+	liveDot: { width: 8, height: 8, borderRadius: 9999, backgroundColor: '#F97A4A' },
+	livePillText: { fontSize: 12, fontWeight: '800', color: '#FFFFFF' },
+	moreBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF1F', alignItems: 'center', justifyContent: 'center' },
+
+	headerPatientRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+	headerAvatar: { width: 56, height: 56, borderRadius: 14, backgroundColor: APP_COLORS.mint, borderWidth: 2, borderColor: APP_COLORS.mintAccent },
+	headerAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
+	headerAvatarFallbackText: { color: INK, fontWeight: '800', fontSize: 16 },
+	headerPatientName: { fontSize: 20, lineHeight: 26, fontWeight: '800', color: '#FFFFFF' },
+	headerPatientMeta: { fontSize: 13, lineHeight: 18, color: '#E3EFEF' },
+
+	headerStatGrid: { flexDirection: 'row', gap: 6 },
+	headerStatCell: { flex: 1, padding: 8, borderRadius: 10, backgroundColor: '#FFFFFF14', gap: 2 },
+	headerStatLabel: { fontSize: 11, lineHeight: 14, color: '#9FD3D1', fontWeight: '700' },
+	headerStatValue: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: '#FFFFFF' },
+
+	tabsWrap: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, backgroundColor: PAGE_BG },
+
+	content: { padding: 16, paddingTop: 4, gap: 14, paddingBottom: 32 },
+
+	sectionTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800', color: INK },
+	mutedCaption: { fontSize: 12, lineHeight: 16, color: INK_MUTED },
+	rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+	hr: { height: 1, backgroundColor: DIVIDER },
+
+	allergyBanner: { padding: 10, borderRadius: 12, backgroundColor: APP_COLORS.dangerBg, flexDirection: 'row', alignItems: 'center', gap: 10 },
+	allergyBannerText: { flex: 1, fontSize: 13, lineHeight: 18, color: APP_COLORS.danger },
+
+	reasonText: { fontSize: 14, lineHeight: 20, color: INK },
+	tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+	tagChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999, backgroundColor: '#F0F4F4' },
+	tagChipText: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: INK },
+
+	vitalsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+	vitalCard: { width: '48%', padding: 12, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: DIVIDER, gap: 2 },
+	vitalLabel: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: INK_MUTED },
+	vitalValue: { fontSize: 18, lineHeight: 24, fontWeight: '800', color: INK },
+	vitalUnit: { fontSize: 12, fontWeight: '600', color: INK_MUTED },
+	vitalToneChip: { alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, marginTop: 4 },
+	vitalToneText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
+
+	conditionRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+	dot: { width: 8, height: 8, borderRadius: 9999 },
+	conditionText: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '700', color: INK },
+
+	medicineRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+	medicineIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: TONES.lilac.bg, alignItems: 'center', justifyContent: 'center' },
+	medicineText: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '700', color: INK },
+
+	summaryGrid: { flexDirection: 'row', gap: 12 },
+	summaryLabel: { fontSize: 11, lineHeight: 14, fontWeight: '800', letterSpacing: 0.6, color: INK_MUTED },
+	summaryValue: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: INK },
+
+	historyRow: { flexDirection: 'row', gap: 12 },
+	historyRail: { alignItems: 'center', width: 12 },
+	historyDot: { width: 12, height: 12, marginTop: 4, borderRadius: 9999, backgroundColor: PRIMARY },
+	historyLine: { flexGrow: 1, width: 2, marginVertical: 4, backgroundColor: DIVIDER },
+	historyTitle: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: INK },
+	historyNote: { fontSize: 13, lineHeight: 18, color: INK_MUTED },
+	historyBy: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: INK },
+	historyLink: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: PRIMARY },
+
+	barsRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-end', height: 120, paddingTop: 8 },
+	barCol: { flex: 1, alignItems: 'center', gap: 4 },
+	barValue: { fontSize: 11, lineHeight: 14, fontWeight: '800' },
+	bar: { width: '100%', borderRadius: 6 },
+	barMonth: { fontSize: 11, lineHeight: 14, fontWeight: '600', color: INK_MUTED },
+
+	reportRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+	reportRowDivider: { borderBottomWidth: 1, borderBottomColor: DIVIDER },
+	reportIconWrap: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+	reportName: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: INK },
+	reportStatusChip: { paddingHorizontal: 8, paddingVertical: 1, borderRadius: 6, maxWidth: 110 },
+	reportStatusText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
+
+	fieldLabel: { fontSize: 13, lineHeight: 18, fontWeight: '800', color: INK },
+	diagnosisInput: { height: 44, paddingHorizontal: 12, borderWidth: 1, borderColor: '#7A8B8E', borderRadius: 10, backgroundColor: '#FFFFFF', color: INK, fontSize: 15 },
+
+	modeSwitch: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 12, backgroundColor: '#F0F4F4' },
+	modeBtn: { flex: 1, height: 40, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
+	modeBtnActive: { backgroundColor: '#FFFFFF' },
+	modeBtnText: { fontSize: 13, fontWeight: '700', color: INK_MUTED },
+	modeBtnTextActive: { color: INK },
+
+	notesTextarea: { minHeight: 140, padding: 10, borderWidth: 1, borderColor: '#7A8B8E', borderRadius: 10, backgroundColor: '#FFFFFF', color: INK, fontSize: 15, lineHeight: 22, textAlignVertical: 'top' },
+
+	canvasWrap: { borderRadius: 12, borderWidth: 1, borderColor: '#7A8B8E', overflow: 'hidden', backgroundColor: '#FFFDF6', height: 230 },
+	canvasToolBtn: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: DIVIDER, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+	canvasClearBtn: { height: 44, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: DIVIDER, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+	canvasClearBtnText: { fontSize: 13, fontWeight: '700', color: INK },
+	saveSketchBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1.5, borderColor: PRIMARY, alignItems: 'center', justifyContent: 'center' },
+	saveSketchBtnText: { fontSize: 13, fontWeight: '700', color: PRIMARY },
+
+	voiceCard: { padding: 16, borderRadius: 14, alignItems: 'center', gap: 10 },
+	micWrap: { alignItems: 'center', justifyContent: 'center' },
+	micRing: { position: 'absolute', width: 72, height: 72, borderRadius: 9999 },
+	micBtn: { width: 72, height: 72, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+	voiceLabel: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: INK },
+	transcriptCard: { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: DIVIDER, gap: 8 },
+	transcriptKicker: { fontSize: 11, lineHeight: 14, fontWeight: '800', letterSpacing: 0.6, color: PRIMARY },
+	transcriptText: { fontSize: 15, lineHeight: 22, color: INK },
+	insertVoiceBtn: { flex: 1, height: 44, borderRadius: 10, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center' },
+	insertVoiceBtnText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
+	voiceHint: { fontSize: 12, lineHeight: 17, color: INK_MUTED },
+
+	notesPreview: { padding: 10, borderRadius: 10, backgroundColor: PAGE_BG, gap: 4 },
+	editAsTextLink: { fontSize: 12, fontWeight: '700', color: PRIMARY },
+	notesPreviewText: { fontSize: 14, lineHeight: 20, color: INK },
+
+	sketchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: APP_COLORS.mintAccent },
+	sketchRowText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700', color: INK },
+
+	followUpGrid: { flexDirection: 'row', gap: 6 },
+	followUpBtn: { flex: 1, height: 44, borderWidth: 1.5, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+	followUpBtnText: { fontSize: 13, fontWeight: '700' },
+
+	footer: { padding: 12, paddingTop: 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: DIVIDER, gap: 8 },
+	sentBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, borderRadius: 10, backgroundColor: APP_COLORS.successBg },
+	sentBannerText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.success },
+	secondaryBtn: { height: 52, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5, borderColor: PRIMARY, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 6 },
+	secondaryBtnText: { fontSize: 14, fontWeight: '700', color: PRIMARY },
+	primaryBtn: { flex: 1, height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+	primaryBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
+
+	dicomModal: { flex: 1, backgroundColor: '#000000' },
+	dicomModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, backgroundColor: INK },
+	dicomModalTitle: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
 })

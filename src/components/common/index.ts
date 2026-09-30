@@ -31,6 +31,14 @@ export { default as LocationSelector } from "./location/LocationSelector";
 export { default as NotificationPermissionPopup } from "./feedback/NotificationPermissionPopup";
 export { default as EventCard } from "./display/EventCard";
 export { default as CommonCard } from "./display/CommonCard";
+export { default as AppSoftCard } from "./display/AppSoftCard";
+export type { AppSoftCardProps } from "./display/AppSoftCard";
+export { default as AppAppointmentRow } from "./booking/AppAppointmentRow";
+export type { AppAppointmentRowProps } from "./booking/AppAppointmentRow";
+export { default as AppointmentActionCard } from "./booking/AppointmentActionCard";
+export type { AppointmentActionCardProps, AppointmentActionOutcome } from "./booking/AppointmentActionCard";
+export { default as AppointmentActionSheet } from "./booking/AppointmentActionSheet";
+export type { AppointmentActionSheetProps, ActionSheetMode, RejectReasonOption } from "./booking/AppointmentActionSheet";
 export {
 	AppFamilyMemberSheet,
 	AppFamilyMemberAvatar,
