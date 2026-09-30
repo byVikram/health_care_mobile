@@ -79,15 +79,11 @@ export const ROUTES = {
 		ALL_EVENTS: 'AllEvents',
 		EVENT_DETAILS: 'EventDetails',
 
-		NURSE_ACTIVE_BOOKING: 'NurseActiveBooking',
-		NURSE_PATIENT_VERIFICATION: 'NursePatientVerification',
-		NURSE_SERVICE_IN_PROGRESS: 'NurseServiceInProgress',
-		NURSE_COMPLETE_SERVICE: 'NurseCompleteService',
-		NURSE_TODAY_OVERVIEW: 'NurseTodayOverviewPage',
-		NURSE_BOOKING_HISTORY: 'NurseBookingHistoryPage',
-		NURSE_VISITS: 'NurseVisitsPage',
+		// Ancillary provider visit flow (one visit of an order at a time)
+		PROVIDER_VISIT_DETAILS: 'ProviderVisitDetails',
+		PROVIDER_VISIT_IN_PROGRESS: 'ProviderVisitInProgress',
+		PROVIDER_VISIT_COMPLETE: 'ProviderVisitComplete',
 		NURSE_EARNINGS: 'NurseEarningsPage',
-		NURSE_HISTORY: 'NurseHistoryPage',
 
 		ANCILLARY_SERVICES: 'AncillaryServices',
 		ANCILLARY_PROVIDERS: 'AncillaryProviders',

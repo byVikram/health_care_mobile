@@ -67,7 +67,8 @@ export const buildProcedureSheetContent = (
 ): ServiceDetailsContent => {
 	const duration = formatDurationMinutes(s.duration_minutes)
 	const facts: ServiceDetailsFact[] = []
-	if (duration) facts.push({ key: 'duration', label: 'Duration', value: duration, icon: CATALOG_ICONS.clock, tone: 'sky' })
+	if (duration)
+		facts.push({ key: 'duration', label: 'Duration', value: duration, icon: CATALOG_ICONS.clock, tone: 'sky' })
 	facts.push(visitByFact(copy), whereFact)
 	return {
 		id: s.id,

@@ -239,15 +239,10 @@ export type AppStackParamList = {
 	[ROUTES.STACK.DOCTOR_EVENT_FORM]: { eventId?: string }
 	[ROUTES.STACK.ALL_EVENTS]: undefined
 	[ROUTES.STACK.EVENT_DETAILS]: { eventId: string }
-	[ROUTES.STACK.NURSE_ACTIVE_BOOKING]: { bookingId: string }
-	[ROUTES.STACK.NURSE_PATIENT_VERIFICATION]: { bookingId: string }
-	[ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS]: { bookingId: string }
-	[ROUTES.STACK.NURSE_COMPLETE_SERVICE]: { bookingId: string; elapsedSeconds: number }
-	[ROUTES.STACK.NURSE_TODAY_OVERVIEW]: { filter?: 'all' | 'accepted' | 'completed' | 'cancelled' } | undefined
-	[ROUTES.STACK.NURSE_BOOKING_HISTORY]: undefined
-	[ROUTES.STACK.NURSE_VISITS]: undefined
+	[ROUTES.STACK.PROVIDER_VISIT_DETAILS]: { visitId: string }
+	[ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS]: { visitId: string }
+	[ROUTES.STACK.PROVIDER_VISIT_COMPLETE]: { visitId: string }
 	[ROUTES.STACK.NURSE_EARNINGS]: undefined
-	[ROUTES.STACK.NURSE_HISTORY]: undefined
 	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string; updatedCart?: any[] }
 	[ROUTES.STACK.ANCILLARY_BOOK_VISIT]: AncillaryBookVisitParams
 	[ROUTES.STACK.ANCILLARY_REVIEW_PAY]: AncillaryReviewPayParams

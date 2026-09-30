@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { USER_ROLES, isPatientRole } from '../../../constants/constants'
 import DoctorHospitalDropdown from '../inputs/DoctorHospitalDropdown'
 import LocationSelector from '../location/LocationSelector'
-import { useAuth } from '../../../context/AuthContext'
+import { useAncillarySpecialty, useAuth } from '../../../context/AuthContext'
 import { ROUTES } from '../../../navigation/routes'
 import { useScroll } from '../../../context/ScrollContext'
 import { AppInput } from '../inputs/AppInput'
@@ -33,13 +33,18 @@ interface AppHeaderProps {
 }
 
 /**
- * 'home' variant: patients get the redesigned Home header (PatientHomeHeader below); staff roles and
- * the 'search' variant keep the original header (RoleHomeHeader) unchanged.
+ * 'home' variant: patients get the redesigned Home header (PatientHomeHeader below) and ancillary providers
+ * the provider Today header (ProviderHomeHeader); other staff roles and the 'search' variant keep the
+ * original header (RoleHomeHeader) unchanged.
  */
 export default function AppHeader(props: AppHeaderProps) {
 	const { role } = useAuth()
-	if ((props.variant ?? 'home') === 'home' && isPatientRole(role)) {
+	const isHome = (props.variant ?? 'home') === 'home'
+	if (isHome && isPatientRole(role)) {
 		return <PatientHomeHeader {...props} />
+	}
+	if (isHome && (role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE)) {
+		return <ProviderHomeHeader {...props} />
 	}
 	return <RoleHomeHeader {...props} />
 }
@@ -370,6 +375,129 @@ const patientStyles = StyleSheet.create({
 		minWidth: 0,
 		fontSize: 16,
 		color: APP_COLORS.inkMuted,
+	},
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Provider Today header (ancillary-provider design): ink bar with a 24px bottom radius and one decorative
+// circle, round initials avatar (opens the drawer), time-of-day greeting, name, "<role> · Home visits",
+// bell with unread dot. Doesn't collapse.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProviderHomeHeader({ userName = 'there', avatarUri, onAvatarPress }: AppHeaderProps) {
+	const insets = useSafeAreaInsets()
+	const navigation = useNavigation<any>()
+	const { user } = useAuth()
+	const { roleLabel } = useAncillarySpecialty()
+	const scrollData = useScroll()
+	const setHeaderHeightRef = useRef(scrollData?.setHeaderHeight)
+	setHeaderHeightRef.current = scrollData?.setHeaderHeight
+
+	const [unread, setUnread] = useState(0)
+	const [greeting, setGreeting] = useState(() => DAY_PARTS(new Date().getHours()))
+	const displayName = user?.name || (user as any)?.full_name || userName
+
+	useFocusEffect(
+		useCallback(() => {
+			let active = true
+			setGreeting(DAY_PARTS(new Date().getHours()))
+			const load = async () => {
+				try {
+					const count = await getUnreadNotificationCount()
+					if (active) setUnread(count)
+				} catch {
+					// Soft-fail: keep the last known count.
+				}
+			}
+			void load()
+			return () => {
+				active = false
+			}
+		}, [])
+	)
+
+	const handleLayout = (e: LayoutChangeEvent) => {
+		const height = e.nativeEvent.layout.height
+		if (height > 0) setHeaderHeightRef.current?.(height)
+	}
+
+	return (
+		<View onLayout={handleLayout} style={providerStyles.shell}>
+			<View style={[patientStyles.bar, { paddingTop: insets.top + 8, paddingBottom: 16 }]}>
+				<View
+					style={[patientStyles.circleLarge, { top: insets.top - 80 }]}
+					importantForAccessibility="no-hide-descendants"
+				/>
+				<View style={patientStyles.topRow}>
+					<Pressable
+						onPress={onAvatarPress}
+						style={providerStyles.avatarButton}
+						accessibilityRole="button"
+						accessibilityLabel="Open menu and profile"
+					>
+						<AppAvatar
+							uri={avatarUri}
+							name={displayName}
+							size={44}
+							radius={22}
+							backgroundColor={APP_COLORS.mint}
+							initialsColor={APP_COLORS.primary}
+						/>
+						<View style={patientStyles.menuBadge} importantForAccessibility="no-hide-descendants">
+							<AppPathIcon d={HEADER_ICONS.menu} size={14} strokeWidth={2.6} color={APP_COLORS.ink} />
+						</View>
+					</Pressable>
+					<View style={patientStyles.nameCol}>
+						<Text style={patientStyles.greeting}>{greeting}</Text>
+						<Text style={patientStyles.name} numberOfLines={1}>
+							{displayName}
+						</Text>
+						<Text style={providerStyles.roleLine} numberOfLines={1}>
+							{`${roleLabel} · Home visits`}
+						</Text>
+					</View>
+					<AppIconButton
+						size={44}
+						radius={12}
+						variant="ghost"
+						backgroundColor={HEADER_BUTTON_BG}
+						badge={unread > 0}
+						accessibilityLabel={unread > 0 ? `Notifications, ${unread} new` : 'Notifications'}
+						onPress={() => navigation.navigate(ROUTES.STACK.NOTIFICATION)}
+					>
+						<AppPathIcon d={HEADER_ICONS.bell} size={22} strokeWidth={2} color={APP_COLORS.surface} />
+					</AppIconButton>
+				</View>
+			</View>
+		</View>
+	)
+}
+
+const providerStyles = StyleSheet.create({
+	shell: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		zIndex: 10,
+		borderBottomLeftRadius: 24,
+		borderBottomRightRadius: 24,
+		backgroundColor: APP_COLORS.ink,
+	},
+	avatarButton: {
+		width: 48,
+		height: 48,
+		borderRadius: 24,
+		borderWidth: 2,
+		borderColor: APP_COLORS.mintAccent,
+		backgroundColor: APP_COLORS.mint,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	roleLine: {
+		fontSize: 12,
+		lineHeight: 16,
+		color: APP_COLORS.mint,
 	},
 })
 

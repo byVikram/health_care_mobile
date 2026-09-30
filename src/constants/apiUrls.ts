@@ -1,4 +1,5 @@
 const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
+// const envUrl = 'http://192.168.4.129:8000'
 
 if (!envUrl) {
 	throw new Error('EXPO_PUBLIC_API_ENDPOINT is not configured')
@@ -17,7 +18,7 @@ export const API_ENDPOINTS = {
 		SESSIONS: `${BASE_URL}/api/auth/sessions`,
 		SESSION_LOGOUT: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}`,
 	},
-	DOCTORS: {  
+	DOCTORS: {
 		SEARCH: `${BASE_URL}/api/doctors`,
 		DETAIL: (id: string) => `${BASE_URL}/api/doctors/${id}`,
 		AVAILABILITY: `${BASE_URL}/api/doctors/availability`,
@@ -239,7 +240,8 @@ export const API_ENDPOINTS = {
 		REVIEWS: `${BASE_URL}/api/ancillary/reviews`,
 		REVIEW_BY_BOOKING: (id: string | number) => `${BASE_URL}/api/ancillary/reviews/booking/${id}`,
 		PROVIDER_REVIEWS: (id: string | number) => `${BASE_URL}/api/ancillary/reviews/provider/${id}`,
-		WS_PATIENT_REQUEST: (id: string) => `${BASE_URL.replace(/^http/, 'ws')}/api/ancillary/ws/patient/requests/${id}`,
+		WS_PATIENT_REQUEST: (id: string) =>
+			`${BASE_URL.replace(/^http/, 'ws')}/api/ancillary/ws/patient/requests/${id}`,
 		WS_PROVIDER_DISPATCH: `${BASE_URL.replace(/^http/, 'ws')}/api/ancillary/ws/provider/dispatch`,
 		SOFT_REVIEW: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/soft-review`,
 		PROVIDER_EARNINGS: `${BASE_URL}/api/ancillary/provider/earnings`,
@@ -256,7 +258,18 @@ export const API_ENDPOINTS = {
 		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/accept`,
 		DECLINE_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/decline`,
 		RESCHEDULE_PROPOSAL: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/reschedule/propose`,
-		WS_ANCILLARY: (token: string) => `${BASE_URL.replace(/^http/, 'ws')}/ws/ancillary?token=${token}`,
+		// Provider visit execution (Today / visit details / start / in progress / complete)
+		PROVIDER_TODAY: `${BASE_URL}/api/ancillary/provider/me/today`,
+		PROVIDER_VISIT: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}`,
+		PROVIDER_VISIT_ON_THE_WAY: (visitId: string) =>
+			`${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/on-the-way`,
+		PROVIDER_VISIT_START: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/start`,
+		PROVIDER_VISIT_PROGRESS: (visitId: string) =>
+			`${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/progress`,
+		PROVIDER_VISIT_UPDATES: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/updates`,
+		PROVIDER_VISIT_COMPLETE: (visitId: string) =>
+			`${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/complete`,
+		PROVIDER_VISIT_ISSUES: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/issues`,
 	},
 	WALLET: {
 		GET: `${BASE_URL}/api/wallet`,

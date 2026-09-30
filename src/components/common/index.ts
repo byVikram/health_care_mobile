@@ -94,6 +94,12 @@ export { AppSection } from './layout/AppSection'
 export type { AppSectionProps } from './layout/AppSection'
 export { AppStatusTimeline } from './display/AppStatusTimeline'
 export type { AppStatusTimelineProps, AppTimelineStep, AppTimelineState } from './display/AppStatusTimeline'
+export { AppScheduleTimeline } from './display/AppScheduleTimeline'
+export type {
+	AppScheduleTimelineProps,
+	AppScheduleTimelineItem,
+	AppScheduleTimelineDot,
+} from './display/AppScheduleTimeline'
 export { AppNumberedSteps } from './display/AppNumberedSteps'
 export type { AppNumberedStepsProps, AppNumberedStep } from './display/AppNumberedSteps'
 export { AppFooterBar } from './layout/AppFooterBar'
@@ -172,3 +178,13 @@ export type {
 // My bookings: category filter tile
 export { AppCategoryTile } from './inputs/AppCategoryTile'
 export type { AppCategoryTileProps } from './inputs/AppCategoryTile'
+export { AppCheckList } from './inputs/AppCheckList'
+export type { AppCheckListProps, AppCheckListItem } from './inputs/AppCheckList'
+export { AppScaleSelector } from './inputs/AppScaleSelector'
+export type { AppScaleSelectorProps } from './inputs/AppScaleSelector'
+export { AppMetricInput } from './inputs/AppMetricInput'
+export type { AppMetricInputProps } from './inputs/AppMetricInput'
+export { AppPersonRow } from './booking/AppPersonRow'
+export type { AppPersonRowProps } from './booking/AppPersonRow'
+export { AppTimerBadge, formatElapsed } from './display/AppTimerBadge'
+export type { AppTimerBadgeProps } from './display/AppTimerBadge'

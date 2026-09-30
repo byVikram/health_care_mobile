@@ -115,7 +115,8 @@ const normalizeReturnedCart = (raw: unknown[]): AncillaryCartItem[] => {
 		.map((x: any): AncillaryCartItem | null => {
 			if (!x?.id) return null
 			if (x.kind === 'procedure' || x.kind === 'package') return x as AncillaryCartItem
-			const price = typeof x.price === 'number' ? x.price : parseFloat(String(x.price ?? '').replace(/[^0-9.]/g, ''))
+			const price =
+				typeof x.price === 'number' ? x.price : parseFloat(String(x.price ?? '').replace(/[^0-9.]/g, ''))
 			return { id: String(x.id), kind: 'procedure', name: String(x.title ?? x.name ?? ''), price: price || 0 }
 		})
 		.filter((x): x is AncillaryCartItem => !!x)
@@ -319,8 +320,7 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 
 	// Packages have no category, so a "Care for" filter narrows the list to procedures.
 	const packagesAllowed = tab !== 'procedures' && !categoryId
-	const showPackages =
-		packagesAllowed && (packagesLoading || (packagesError && !q) || filteredPackages.length > 0)
+	const showPackages = packagesAllowed && (packagesLoading || (packagesError && !q) || filteredPackages.length > 0)
 	const showProcedures = tab !== 'packages' && (loading || filteredProcedures.length > 0)
 	const noResults = !showPackages && !showProcedures
 	const filtersActive = !!q || !!categoryId || tab !== 'all'
@@ -366,7 +366,9 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 			tone: 'lilac',
 			eyebrow: 'CARE PLAN',
 			title: featuredPackage.label,
-			subtitle: featuredPackage.visits_count ? plural(featuredPackage.visits_count, 'visit', 'visits') : undefined,
+			subtitle: featuredPackage.visits_count
+				? plural(featuredPackage.visits_count, 'visit', 'visits')
+				: undefined,
 			priceLabel: rupees(featuredPackage.packagePrice),
 			mrpLabel:
 				featuredPackage.mrp && featuredPackage.mrp > featuredPackage.packagePrice
@@ -379,7 +381,8 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 	}
 	if (featuredProcedure) {
 		const added = isInCart(featuredProcedure.id, 'procedure')
-		const sub = procedureIncludes(featuredProcedure).slice(0, 3).join(', ') || featuredProcedure.good_for || undefined
+		const sub =
+			procedureIncludes(featuredProcedure).slice(0, 3).join(', ') || featuredProcedure.good_for || undefined
 		slides.push({
 			key: `srv-${featuredProcedure.id}`,
 			tone: 'peach',
@@ -617,7 +620,9 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 
 				{noResults && (
 					<View style={styles.empty}>
-						<Text style={styles.emptyTitle}>{q ? 'No service matches your search' : 'No services here yet'}</Text>
+						<Text style={styles.emptyTitle}>
+							{q ? 'No service matches your search' : 'No services here yet'}
+						</Text>
 						<Text style={styles.emptySub}>
 							{q
 								? copy.emptySearchHint
@@ -657,12 +662,7 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 				appearance="modern"
 				showHeaderDivider={false}
 			>
-				<TileRows
-					categories={categories}
-					activeId={categoryId}
-					onPick={pickCategory}
-					perRow={SHEET_TILES}
-				/>
+				<TileRows categories={categories} activeId={categoryId} onPick={pickCategory} perRow={SHEET_TILES} />
 			</AppBottomSheet>
 
 			<ServiceDetailsSheet
@@ -769,7 +769,10 @@ function CareTile({
 			activeOpacity={0.8}
 			style={[
 				styles.tile,
-				{ borderColor: active ? tone.ink : APP_COLORS.divider, backgroundColor: active ? tone.bg : APP_COLORS.surface },
+				{
+					borderColor: active ? tone.ink : APP_COLORS.divider,
+					backgroundColor: active ? tone.bg : APP_COLORS.surface,
+				},
 			]}
 			accessibilityRole="button"
 			accessibilityState={{ selected: active }}
@@ -876,7 +879,12 @@ function CareForGrid({
 							accessibilityLabel={`View all ${categories.length} care needs`}
 						>
 							<View style={[styles.tileIcon, { backgroundColor: APP_COLORS.ink }]}>
-								<AppPathIcon d={CATALOG_ICONS.grid} size={16} strokeWidth={2} color={APP_COLORS.surface} />
+								<AppPathIcon
+									d={CATALOG_ICONS.grid}
+									size={16}
+									strokeWidth={2}
+									color={APP_COLORS.surface}
+								/>
 							</View>
 							<Text style={styles.tileLabel} numberOfLines={1}>
 								{`+${hidden} more`}
