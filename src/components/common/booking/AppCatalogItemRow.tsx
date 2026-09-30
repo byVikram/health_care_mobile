@@ -116,7 +116,11 @@ export function AppCatalogItemRow({
 					importantForAccessibility="no-hide-descendants"
 				>
 					{imageSource ? (
-						<Image source={imageSource} style={[styles.tile, { backgroundColor: pair.bg }]} resizeMode="cover" />
+						<Image
+							source={imageSource}
+							style={[styles.tile, { backgroundColor: pair.bg }]}
+							resizeMode="cover"
+						/>
 					) : (
 						<View style={[styles.tile, { backgroundColor: pair.bg }]}>
 							<View style={[styles.disc1, { backgroundColor: pair.ink }]} />
@@ -186,6 +190,11 @@ const styles = StyleSheet.create({
 		color: APP_COLORS.inkMuted,
 	},
 	points: {
+		// textCol uses alignItems: 'flex-start', which stops this view from
+		// stretching to the column's width by default -- without that width,
+		// pointText's flex: 1 below has nothing to grow against and Yoga
+		// collapses it to ~0 width (renders, but invisible/clipped).
+		alignSelf: 'stretch',
 		gap: 4,
 		marginTop: 4,
 	},

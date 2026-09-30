@@ -1,5 +1,5 @@
 const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
-// const envUrl = 'http://192.168.4.103:8000'
+// const envUrl = 'http://192.168.4.129:8000'
 
 if (!envUrl) {
 	throw new Error('EXPO_PUBLIC_API_ENDPOINT is not configured')
