@@ -71,6 +71,16 @@ export const API_ENDPOINTS = {
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
 		ACTIVE_CONSENT: `${BASE_URL}/api/appointments/active/consent`,
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
+		// Doctor-only: not_arrived -> checked_in when the patient physically arrives.
+		CHECK_IN: (id: string) => `${BASE_URL}/api/appointments/${id}/check-in`,
+		// Unauthenticated by design (external scheduler only) -- see backend's process-not-arrived
+		// docstring. Not called from the mobile app.
+		PROCESS_NOT_ARRIVED: `${BASE_URL}/api/appointments/process-not-arrived`,
+		// Doctor-side "Verify access" gate before opening a patient's file. `start-consultation`
+		// (doctorService.startConsultation) is what (re)generates the code — the backend returns it
+		// directly in that response rather than SMS-ing the patient (see VerifyAccessPage.tsx for why
+		// that matters).
+		VERIFY_ACCESS_OTP: (id: string) => `${BASE_URL}/api/appointments/${id}/verify-otp`,
 	},
 	REVIEWS: {
 		CREATE: `${BASE_URL}/api/reviews`,
@@ -116,6 +126,10 @@ export const API_ENDPOINTS = {
 		FAMILY_MEMBERS: `${BASE_URL}/api/patients/family-members`,
 		SUMMARY: `${BASE_URL}/api/patients/me/summary`,
 		BOOKINGS: `${BASE_URL}/api/patients/me/bookings`,
+	},
+	TREATMENTS: {
+		CREATE: `${BASE_URL}/api/treatments`,
+		BY_APPOINTMENT: (appointmentId: string) => `${BASE_URL}/api/treatments/appointment/${appointmentId}`,
 	},
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,

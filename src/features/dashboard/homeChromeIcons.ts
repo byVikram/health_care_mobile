@@ -37,8 +37,14 @@ export const HOME_CHROME_PATHS = {
 	rehab: 'M8 3h8M9 3v18M15 3v18M9 11h6M6 21h6M12 21h6',
 	equipment: 'M9 5.5a1.5 1.5 0 1 0 0-.01M9 8v5h6l3 6M9 10.5h5M14 17a5 5 0 1 1-6-6',
 	shield: 'M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-4.5',
-	profile: 'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21v-1a8 8 0 0 1 16 0v1',
+	/** Doctor dashboard bottom nav: Profile tab. */
+	profile: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
 	today: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6',
+	/** Doctor dashboard header: notification bell. */
+	bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
+	/** Doctor dashboard header: menu/hamburger overlay on the avatar button. */
+	hamburger: 'M5 7h14M5 12h14M5 17h9',
+	chevronRight: 'M9 6l6 6-6 6',
 } as const
 
 export type HomeChromeIcon = keyof typeof HOME_CHROME_PATHS

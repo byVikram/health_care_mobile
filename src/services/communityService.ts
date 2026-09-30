@@ -48,6 +48,16 @@ export interface PaginatedPostsResponse {
 	}
 }
 
+export const joinCommunityGroup = async (groupId: string): Promise<{ success: boolean; message?: string }> => {
+	const res = await ApiService.post<{ success: boolean; message?: string }>(API_ENDPOINTS.COMMUNITIES.JOIN(groupId), {})
+	return res.data
+}
+
+export const leaveCommunityGroup = async (groupId: string): Promise<{ success: boolean; message?: string }> => {
+	const res = await ApiService.delete<{ success: boolean; message?: string }>(API_ENDPOINTS.COMMUNITIES.JOIN(groupId))
+	return res.data
+}
+
 export const listCommunityGroups = async (isFeatured?: boolean): Promise<{ success: boolean; data: CommunityGroup[] }> => {
 	const params: Record<string, unknown> = {}
 	if (isFeatured !== undefined) {

@@ -14,8 +14,13 @@ export const FLOATING_TAB_BAR_BOTTOM = 16
 /** Bottom padding (excluding the safe-area inset) that keeps the last item clear of the floating pill. */
 export const TAB_BAR_CLEARANCE = FLOATING_TAB_BAR_HEIGHT + FLOATING_TAB_BAR_BOTTOM + 16
 
-/** Patient tab routes whose content scrolls underneath the pill (others get an in-flow band instead). */
-export const FLOATING_TAB_ROUTES: readonly string[] = [ROUTES.MAIN.HOME, ROUTES.MAIN.PORTAL]
+/** Tab routes whose content scrolls underneath the pill (others get an in-flow band instead). */
+export const FLOATING_TAB_ROUTES: readonly string[] = [
+	ROUTES.MAIN.HOME,
+	ROUTES.MAIN.PORTAL,
+	ROUTES.MAIN.SCHEDULE,
+	ROUTES.MAIN.ENGAGE,
+]
 
 /** TAB_BAR_CLEARANCE plus the device's bottom safe-area inset. */
 export function useTabBarClearance() {

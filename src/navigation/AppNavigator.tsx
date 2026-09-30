@@ -20,6 +20,7 @@ import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
 import BookSlotPage from '../features/doctor/book-slot/BookSlotPage'
 import ConsultationPage from '../features/consultation/ConsultationPage'
+import VerifyAccessPage from '../features/doctor/verify-access/VerifyAccessPage'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/settings/SettingPage'
@@ -237,6 +238,7 @@ function AuthenticatedNavigator() {
 					}}
 				/>
 				<AppStack.Screen name={ROUTES.STACK.NOTIFICATION} component={NotificationPage} />
+				<AppStack.Screen name={ROUTES.STACK.VERIFY_ACCESS} component={VerifyAccessPage} />
 				<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
 				<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
 				{/* <AppStack.Screen name={ROUTES.STACK.SCREEN_CAPTURE_TEST} component={ScreenCaptureTest} /> */}
