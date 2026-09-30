@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import * as ExpoSplashScreen from 'expo-splash-screen'
 
 interface Props {
 	children: ReactNode
@@ -23,6 +24,8 @@ export class ErrorBoundary extends Component<Props, State> {
 	}
 
 	public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+		// App.tsx holds the native splash until SplashScreen mounts; a crash before that would hide this fallback.
+		ExpoSplashScreen.hideAsync().catch(() => {})
 		if (__DEV__) {
 			console.error('[ErrorBoundary caught error]', error, errorInfo)
 		}

@@ -235,22 +235,24 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 				</Animated.View>
 
 				{/* Search (tap-through to the Search tab) */}
-				<Pressable
-					onPress={handleSearch}
-					style={patientStyles.search}
-					accessibilityRole="button"
-					accessibilityLabel="Search doctors, tests or symptoms"
-				>
-					<AppPathIcon d={HEADER_ICONS.search} size={20} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
-					<Text style={patientStyles.searchPlaceholder} numberOfLines={1}>
-						Search doctors, tests or symptoms
-					</Text>
+				<View style={patientStyles.search}>
+					<Pressable
+						onPress={handleSearch}
+						style={patientStyles.searchTapArea}
+						accessibilityRole="button"
+						accessibilityLabel="Search doctors, tests or symptoms"
+					>
+						<AppPathIcon d={HEADER_ICONS.search} size={20} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
+						<Text style={patientStyles.searchPlaceholder} numberOfLines={1}>
+							Search doctors, tests or symptoms
+						</Text>
+					</Pressable>
 					<Pressable onPress={handleSearch} accessibilityRole="button" accessibilityLabel="Search by voice">
 						<AppIconTile size={40} radius={10} tone="mint">
 							<AppPathIcon d={HEADER_ICONS.mic} size={20} strokeWidth={2} color={APP_COLORS.primary} />
 						</AppIconTile>
 					</Pressable>
-				</Pressable>
+				</View>
 			</Animated.View>
 		</Animated.View>
 	)
@@ -360,6 +362,13 @@ const patientStyles = StyleSheet.create({
 		gap: 8,
 		paddingLeft: 14,
 		paddingRight: 4,
+	},
+	searchTapArea: {
+		flex: 1,
+		minWidth: 0,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
 	},
 	searchPlaceholder: {
 		flex: 1,

@@ -19,7 +19,7 @@ export const ROUTES = {
 		PROFILE: 'Profile',
 	},
 	STACK: {
-		SEARCH: 'SearchPage',
+		SEARCH: 'SplashScreen',
 		DOCTOR_SEARCH: 'DoctorSearch',
 		DOCTOR_DETAIL: 'DoctorDetail',
 		DOCTOR_BOOK_SLOT: 'DoctorBookSlot',

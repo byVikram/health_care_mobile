@@ -28,6 +28,10 @@ export type AppIconName =
 	| 'calendar'
 	| 'directions'
 	| 'download'
+	// system states set (Offline & Models.html)
+	| 'wifiOff'
+	| 'refresh'
+	| 'call'
 
 /** Glyphs that come from the payment designs, which use SVG default (butt) caps. */
 const BUTT_CAP_ICONS: ReadonlySet<AppIconName> = new Set<AppIconName>([
@@ -137,6 +141,21 @@ export function AppIcon({ name, size = 24, color, strokeWidth = 2, rounded, acce
 			)}
 			{name === 'directions' && <Path d="M3 11l18-8-8 18-2-8z" {...common} />}
 			{name === 'download' && <Path d="M12 4v11M7 10l5 5 5-5M5 20h14" {...common} />}
+			{name === 'wifiOff' && (
+				<Path
+					d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M5 12.5a10 10 0 0 1 5.2-2.7M19 12.5a10 10 0 0 0-2.4-1.7M1.5 9a15 15 0 0 1 4.4-2.8M22.5 9A15 15 0 0 0 12 4.5c-1 0-2 .1-3 .3M12 20h.01"
+					{...common}
+				/>
+			)}
+			{name === 'refresh' && (
+				<Path d="M20 11a8 8 0 0 0-14.9-3.9M4 4v4h4M4 13a8 8 0 0 0 14.9 3.9M20 20v-4h-4" {...common} />
+			)}
+			{name === 'call' && (
+				<Path
+					d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"
+					{...common}
+				/>
+			)}
 		</Svg>
 	)
 }
