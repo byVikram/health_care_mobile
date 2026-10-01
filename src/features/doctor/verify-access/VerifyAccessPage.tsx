@@ -36,7 +36,6 @@ export function VerifyAccessPage() {
 	const [errorReason, setErrorReason] = useState("That code didn't match.")
 	const [tries, setTries] = useState(MAX_TRIES)
 	const [verifying, setVerifying] = useState(false)
-	const [done, setDone] = useState(false)
 	const [wait, setWait] = useState(RESEND_SECONDS)
 	const [altOpen, setAltOpen] = useState(false)
 	const [shake, setShake] = useState(0)
@@ -65,13 +64,22 @@ export function VerifyAccessPage() {
 	const full = code.length === 6
 	const canVerify = full && tries > 0 && !verifying
 
+	const openPatientFile = () => {
+		navigation.replace(ROUTES.STACK.CONSULTATION, {
+			appointmentId,
+			patientId: params?.patientId,
+		})
+	}
+
 	const handleVerify = async () => {
 		if (!canVerify || !appointmentId) return
 		setVerifying(true)
 		try {
 			const res = await verifyPatientAccessOtp(appointmentId, code)
 			if (res.success && res.verified) {
-				setDone(true)
+				// No intermediate "Access granted" screen -- verifying is itself the consent action,
+				// so go straight into the patient's file instead of making the doctor tap again.
+				openPatientFile()
 			} else {
 				setTries((t) => Math.max(0, t - 1))
 				setErrorReason(res.message || "That code didn't match.")
@@ -116,13 +124,6 @@ export function VerifyAccessPage() {
 		}
 	}
 
-	const openPatientFile = () => {
-		navigation.replace(ROUTES.STACK.CONSULTATION, {
-			appointmentId,
-			patientId: params?.patientId,
-		})
-	}
-
 	return (
 		<View style={styles.screen}>
 			<View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -139,18 +140,12 @@ export function VerifyAccessPage() {
 					<Text style={styles.headerTitle}>Verify access</Text>
 				</View>
 				<View style={styles.centerCol}>
-					<View style={[styles.shield, done && styles.shieldDone]}>
-						<MaterialCommunityIcons
-							name={done ? 'check-bold' : 'shield-lock-outline'}
-							size={32}
-							color={done ? APP_COLORS.ink : '#FFFFFF'}
-						/>
+					<View style={styles.shield}>
+						<MaterialCommunityIcons name="shield-lock-outline" size={32} color="#FFFFFF" />
 					</View>
-					<Text style={styles.title}>{done ? 'Access granted' : 'Patient consent needed'}</Text>
+					<Text style={styles.title}>Patient consent needed</Text>
 					<Text style={styles.subtitle}>
-						{done
-							? `You can now see ${patientName}'s history, reports and medicines.`
-							: 'To protect health records, enter the code sent to the patient before opening the file.'}
+						To protect health records, enter the code sent to the patient before opening the file.
 					</Text>
 				</View>
 			</View>
@@ -168,118 +163,91 @@ export function VerifyAccessPage() {
 								</Text>
 							)}
 						</View>
-						<View style={[styles.lockChip, done && styles.lockChipDone]}>
-							<Text style={[styles.lockChipText, done && styles.lockChipTextDone]}>
-								{done ? 'Unlocked' : 'Locked'}
-							</Text>
+						<View style={styles.lockChip}>
+							<Text style={styles.lockChipText}>Locked</Text>
 						</View>
 					</View>
 				</AppSoftCard>
 
-				{!done && (
-					<>
-						<AppSoftCard radius={14} style={{ gap: 14 }}>
-							<View>
-								<Text style={styles.otpTitle}>Enter the 6-digit code</Text>
-								<Text style={styles.otpSub}>Sent by SMS to {patientName}&apos;s number</Text>
-							</View>
-							<AppOtpInput
-								length={6}
-								value={code}
-								onChange={(v) => {
-									setCode(v)
-									setError(false)
-								}}
-								onComplete={handleVerify}
-								error={error}
-								caret
-								shake={shake}
-								autoFocus
-								disabled={verifying || tries === 0}
-								accessibilityLabel="One-time code"
-							/>
-							{error && (
-								<Text style={styles.errorText} accessibilityRole="alert">
-									{errorReason} {tries > 0 ? `${tries} ${tries === 1 ? 'try' : 'tries'} left.` : 'Please resend a new code.'}
-								</Text>
-							)}
-							<View style={styles.resendRow}>
-								<Text style={styles.resendHint}>
-									{wait > 0 ? `Resend in 0:${wait < 10 ? '0' : ''}${wait}` : "Didn't get the code?"}
-								</Text>
-								<TouchableOpacity onPress={handleResend} disabled={wait > 0}>
-									<Text style={[styles.resendLabel, wait > 0 && styles.resendLabelDisabled]}>Resend SMS</Text>
-								</TouchableOpacity>
-							</View>
-							<TouchableOpacity
-								style={[styles.verifyBtn, !canVerify && styles.verifyBtnDisabled]}
-								onPress={handleVerify}
-								disabled={!canVerify}
-							>
-								{verifying ? (
-									<ActivityIndicator size="small" color="#FFFFFF" />
-								) : (
-									<Text style={styles.verifyBtnText}>{full ? 'Verify & continue' : 'Enter all 6 digits'}</Text>
-								)}
-							</TouchableOpacity>
-						</AppSoftCard>
-
-						<View style={{ gap: 6 }}>
-							<TouchableOpacity
-								style={styles.altToggle}
-								onPress={() => setAltOpen((o) => !o)}
-								accessibilityRole="button"
-								accessibilityState={{ expanded: altOpen }}
-							>
-								<Text style={styles.altToggleText}>Patient can&apos;t receive the code?</Text>
-								<MaterialCommunityIcons
-									name={altOpen ? 'chevron-up' : 'chevron-down'}
-									size={16}
-									color={APP_COLORS.primary}
-								/>
-							</TouchableOpacity>
-							{altOpen && (
-								<View style={{ gap: 8 }}>
-									<View style={styles.altOption}>
-										<MaterialCommunityIcons name="qrcode-scan" size={20} color={APP_COLORS.primary} />
-										<View style={{ flex: 1 }}>
-											<Text style={styles.altOptionTitle}>Scan patient&apos;s check-in QR</Text>
-											<Text style={styles.altOptionSub}>From their Karolahealth app</Text>
-										</View>
-									</View>
-									<View style={[styles.altOption, styles.altOptionDanger]}>
-										<MaterialCommunityIcons name="alert-outline" size={20} color={APP_COLORS.danger} />
-										<View style={{ flex: 1 }}>
-											<Text style={styles.altOptionTitle}>Emergency access</Text>
-											<Text style={styles.altOptionSub}>Give a reason. The patient and clinic admin are told.</Text>
-										</View>
-									</View>
-								</View>
-							)}
-						</View>
-					</>
-				)}
-
-				{done && (
-					<AppSoftCard radius={14} borderColor={APP_COLORS.mintAccent} style={{ gap: 12 }}>
-						<View style={{ gap: 8 }}>
-							{[
-								`${patientName.split(' ')[0]} approved sharing their file`,
-								'Access open until 11:59 PM today',
-								'Every view is logged in their privacy history',
-							].map((line) => (
-								<View key={line} style={styles.successLine}>
-									<MaterialCommunityIcons name="check" size={16} color={APP_COLORS.success} />
-									<Text style={styles.successLineText}>{line}</Text>
-								</View>
-							))}
-						</View>
-						<TouchableOpacity style={styles.verifyBtn} onPress={openPatientFile}>
-							<Text style={styles.verifyBtnText}>Open patient file</Text>
-							<MaterialCommunityIcons name="chevron-right" size={16} color="#FFFFFF" />
+				<AppSoftCard radius={14} style={{ gap: 14 }}>
+					<View>
+						<Text style={styles.otpTitle}>Enter the 6-digit code</Text>
+						<Text style={styles.otpSub}>Sent by SMS to {patientName}&apos;s number</Text>
+					</View>
+					<AppOtpInput
+						length={6}
+						value={code}
+						onChange={(v) => {
+							setCode(v)
+							setError(false)
+						}}
+						onComplete={handleVerify}
+						error={error}
+						caret
+						shake={shake}
+						autoFocus
+						disabled={verifying || tries === 0}
+						accessibilityLabel="One-time code"
+					/>
+					{error && (
+						<Text style={styles.errorText} accessibilityRole="alert">
+							{errorReason} {tries > 0 ? `${tries} ${tries === 1 ? 'try' : 'tries'} left.` : 'Please resend a new code.'}
+						</Text>
+					)}
+					<View style={styles.resendRow}>
+						<Text style={styles.resendHint}>
+							{wait > 0 ? `Resend in 0:${wait < 10 ? '0' : ''}${wait}` : "Didn't get the code?"}
+						</Text>
+						<TouchableOpacity onPress={handleResend} disabled={wait > 0}>
+							<Text style={[styles.resendLabel, wait > 0 && styles.resendLabelDisabled]}>Resend SMS</Text>
 						</TouchableOpacity>
-					</AppSoftCard>
-				)}
+					</View>
+					<TouchableOpacity
+						style={[styles.verifyBtn, !canVerify && styles.verifyBtnDisabled]}
+						onPress={handleVerify}
+						disabled={!canVerify}
+					>
+						{verifying ? (
+							<ActivityIndicator size="small" color="#FFFFFF" />
+						) : (
+							<Text style={styles.verifyBtnText}>{full ? 'Verify & continue' : 'Enter all 6 digits'}</Text>
+						)}
+					</TouchableOpacity>
+				</AppSoftCard>
+
+				<View style={{ gap: 6 }}>
+					<TouchableOpacity
+						style={styles.altToggle}
+						onPress={() => setAltOpen((o) => !o)}
+						accessibilityRole="button"
+						accessibilityState={{ expanded: altOpen }}
+					>
+						<Text style={styles.altToggleText}>Patient can&apos;t receive the code?</Text>
+						<MaterialCommunityIcons
+							name={altOpen ? 'chevron-up' : 'chevron-down'}
+							size={16}
+							color={APP_COLORS.primary}
+						/>
+					</TouchableOpacity>
+					{altOpen && (
+						<View style={{ gap: 8 }}>
+							<View style={styles.altOption}>
+								<MaterialCommunityIcons name="qrcode-scan" size={20} color={APP_COLORS.primary} />
+								<View style={{ flex: 1 }}>
+									<Text style={styles.altOptionTitle}>Scan patient&apos;s check-in QR</Text>
+									<Text style={styles.altOptionSub}>From their Karolahealth app</Text>
+								</View>
+							</View>
+							<View style={[styles.altOption, styles.altOptionDanger]}>
+								<MaterialCommunityIcons name="alert-outline" size={20} color={APP_COLORS.danger} />
+								<View style={{ flex: 1 }}>
+									<Text style={styles.altOptionTitle}>Emergency access</Text>
+									<Text style={styles.altOptionSub}>Give a reason. The patient and clinic admin are told.</Text>
+								</View>
+							</View>
+						</View>
+					)}
+				</View>
 
 				<View style={styles.footerNote}>
 					<MaterialCommunityIcons name="shield-outline" size={18} color={APP_COLORS.inkMuted} />
@@ -329,7 +297,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	shieldDone: { backgroundColor: APP_COLORS.mintAccent },
 	title: { fontSize: 22, lineHeight: 28, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' },
 	subtitle: { fontSize: 14, lineHeight: 20, color: '#E3EFEF', textAlign: 'center', maxWidth: 300 },
 	body: { padding: 16, gap: 16 },
@@ -337,9 +304,7 @@ const styles = StyleSheet.create({
 	patientName: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: APP_COLORS.ink },
 	patientMeta: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
 	lockChip: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: APP_COLORS.warningBg },
-	lockChipDone: { backgroundColor: APP_COLORS.successBg },
 	lockChipText: { fontSize: 11, lineHeight: 16, fontWeight: '700', color: APP_COLORS.warning },
-	lockChipTextDone: { color: APP_COLORS.success },
 	otpTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
 	otpSub: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
 	errorText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.danger },
@@ -374,8 +339,6 @@ const styles = StyleSheet.create({
 	altOptionDanger: { borderColor: '#F3B7AE' },
 	altOptionTitle: { fontSize: 14, lineHeight: 19, fontWeight: '800', color: APP_COLORS.ink },
 	altOptionSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
-	successLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-	successLineText: { fontSize: 14, lineHeight: 20, color: APP_COLORS.ink },
 	footerNote: {
 		marginTop: 'auto',
 		flexDirection: 'row',

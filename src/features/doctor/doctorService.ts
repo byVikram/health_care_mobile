@@ -235,6 +235,28 @@ export const getAppointments = async (params?: AppointmentParams): Promise<Appoi
 	return res.data
 }
 
+export interface DoctorClinic {
+	/** Hospital public id -- same id the appointments list accepts as `hospital_id`. */
+	id: string
+	name: string
+	address?: string | null
+	is_primary: boolean
+	/** Today's hours ("5:00 PM – 8:30 PM"), or usual days + hours when not working today; null if no schedule. */
+	timings?: string | null
+	working_days: number[]
+	patients_today: number
+}
+
+export interface DoctorClinicsSummary {
+	clinics: DoctorClinic[]
+}
+
+/** The doctor's clinics (primary first) with today's workload -- feeds the Home header's clinic switcher. */
+export const getMyClinics = async (): Promise<DoctorClinicsSummary> => {
+	const res = await ApiService.get<{ success: boolean; data: DoctorClinicsSummary }>(API_ENDPOINTS.DOCTORS.CLINICS)
+	return res.data.data
+}
+
 export interface ActiveConsentResponse {
 	success: boolean
 	data: {

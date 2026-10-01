@@ -33,7 +33,7 @@ export type MainTabParamList = {
 	[ROUTES.MAIN.PROFILE]: undefined
 	[ROUTES.MAIN.WALLET]: undefined
 	[ROUTES.MAIN.ANCILLARY]: undefined
-	[ROUTES.MAIN.SCHEDULE]: { segment?: 'today' | 'req' | 'up' | 'past' } | undefined
+	[ROUTES.MAIN.SCHEDULE]: { segment?: 'today' | 'req' | 'all' } | undefined
 	// Engage is Q&A only now (Requests moved to Schedule's own "req" tab) -- no segment param needed.
 	[ROUTES.MAIN.ENGAGE]: undefined
 }

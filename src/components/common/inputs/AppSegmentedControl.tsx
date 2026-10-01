@@ -40,6 +40,8 @@ export interface AppSegmentedControlProps<T extends string = string> {
 	tabs?: boolean
 	/** Accessibility label for the whole group. */
 	accessibilityLabel?: string
+	/** The control sits on a dark (ink) header: inactive segment labels render white instead of muted grey. */
+	onDark?: boolean
 	style?: StyleProp<ViewStyle>
 }
 
@@ -50,6 +52,7 @@ export function AppSegmentedControl<T extends string = string>({
 	shape = 'pill',
 	tabs = false,
 	accessibilityLabel,
+	onDark = false,
 	style,
 }: AppSegmentedControlProps<T>) {
 	const rounded = shape === 'rounded'
@@ -62,7 +65,7 @@ export function AppSegmentedControl<T extends string = string>({
 			{options.map((option) => {
 				const on = option.value === value
 				const disabled = !!option.disabled
-				const color = on ? APP_COLORS.ink : APP_COLORS.inkMuted
+				const color = on ? APP_COLORS.ink : onDark ? '#FFFFFF' : APP_COLORS.inkMuted
 				return (
 					<TouchableOpacity
 						key={option.value}

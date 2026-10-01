@@ -69,7 +69,7 @@ export function AppAppointmentRow({
 			{...(onPress ? { onPress, accessibilityRole: 'button' as const, activeOpacity: 0.7 } : {})}
 		>
 			<View style={styles.timeCol}>
-				<Text style={styles.time} numberOfLines={1}>
+				<Text style={styles.time} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
 					{time}
 				</Text>
 				{!!token && (
@@ -124,7 +124,8 @@ const styles = StyleSheet.create({
 		borderBottomColor: APP_COLORS.divider,
 	},
 	timeCol: {
-		width: 56,
+		// Wide enough for "11:00 AM" at 13px/800 -- 56 clipped it to "11:00 A…" on real devices.
+		width: 64,
 		flexShrink: 0,
 	},
 	time: {

@@ -1,17 +1,16 @@
 // src/features/doctor/dashboard/DoctorScreenHeader.tsx
 //
 // The dark "ink" header shared by the doctor dashboard's Home / Schedule / Engage / Verify-access
-// views (source: the "Doctor Dashboard" design — greeting + avatar + stats + search on Home, title
+// views (source: the "Doctor Dashboard" design — avatar + name + clinic switcher + search on Home, title
 // + subtitle + an optional segmented-control slot elsewhere). Deliberately kept as its own component
 // rather than folded into the shared (patient/pharmacy/radiology/lab/nurse) AppHeader: that component
 // already carries patient-specific scroll-collapse animation and per-role branching, and doctor
 // screens don't share its ScrollContext wiring, so extending it here would risk every other role's
 // header for no real benefit. This file is the doctor-only equivalent, made properly configurable
 // on its own terms instead:
-//   - "home"'s stats row (date/clinic + a progress bar) and search box are each fully optional —
-//     omit `dateLabel` or `onSearchChange` and that piece just doesn't render, so a future
-//     doctor-adjacent Home screen (e.g. a nurse/ancillary variant) can reuse this without carrying
-//     concepts it doesn't need.
+//   - "home"'s clinic switcher and search box are each optional — omit `showHospitalSelector` or
+//     `onSearchChange` and that piece just doesn't render, so a future doctor-adjacent Home screen
+//     (e.g. a nurse/ancillary variant) can reuse this without carrying concepts it doesn't need.
 //   - The single notification bell is a generic `actions[]` array under the hood (icon + onPress +
 //     badge), so adding a second header button later doesn't mean another bespoke prop.
 //   - "simple" (Schedule/Engage/Questions/Verify-access) takes an optional `rightAccessory` in its
@@ -23,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppAvatar, AppPathIcon } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../../dashboard/homeChromeIcons'
+import { ClinicSwitcher } from './ClinicSwitcher'
 
 export type DoctorHeaderAction = {
 	/** A HOME_CHROME_PATHS key, or a raw SVG path string for a one-off icon. */
@@ -38,7 +38,6 @@ export type DoctorHeaderAction = {
 export type DoctorScreenHeaderProps =
 	| {
 			variant: 'home'
-			greeting: string
 			name: string
 			avatarUri?: string | null
 			onAvatarPress?: () => void
@@ -52,10 +51,9 @@ export type DoctorScreenHeaderProps =
 			actions?: DoctorHeaderAction[]
 			notificationCount?: number
 			onNotificationsPress?: () => void
-			/** Date/clinic + "seen" progress row. Omit `dateLabel` entirely to skip this row. */
-			dateLabel?: string
-			patientsSeen?: number
-			patientsTotal?: number
+			/** Adds the clinic switcher chip under the doctor's name (opens a "Your clinics" sheet) — for a
+			 * doctor who practices at more than one hospital. Wired to real clinics/AuthContext. */
+			showHospitalSelector?: boolean
 			/** Search box. Omit `onSearchChange` entirely to skip it. */
 			searchValue?: string
 			onSearchChange?: (value: string) => void
@@ -87,7 +85,6 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 
 	if (props.variant === 'home') {
 		const {
-			greeting,
 			name,
 			avatarUri,
 			onAvatarPress,
@@ -95,15 +92,12 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 			actions,
 			notificationCount = 0,
 			onNotificationsPress,
-			dateLabel,
-			patientsSeen = 0,
-			patientsTotal = 0,
+			showHospitalSelector = false,
 			searchValue = '',
 			onSearchChange,
 			onSearchSubmit,
 			searchPlaceholder = 'Search patients, reports or questions',
 		} = props
-		const pct = patientsTotal > 0 ? Math.min(1, patientsSeen / patientsTotal) : 0
 		const resolvedActions: DoctorHeaderAction[] =
 			actions ?? [
 				{
@@ -131,12 +125,10 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 						</View>
 					</Pressable>
 					<View style={styles.greetingCol}>
-						<Text style={styles.greeting} numberOfLines={1}>
-							{greeting},
-						</Text>
 						<Text style={styles.name} numberOfLines={1}>
 							{name}
 						</Text>
+						{showHospitalSelector && <ClinicSwitcher />}
 					</View>
 					{resolvedActions.map((action, i) => (
 						<Pressable
@@ -151,24 +143,6 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 						</Pressable>
 					))}
 				</View>
-				{!!dateLabel && (
-					<View style={styles.dateRow}>
-						<AppPathIcon d={HOME_CHROME_PATHS.bookings} size={16} strokeWidth={2} color={APP_COLORS.mintAccent} />
-						<Text style={styles.dateText} numberOfLines={1}>
-							{dateLabel}
-						</Text>
-						{patientsTotal > 0 && (
-							<View style={styles.progressWrap}>
-								<View style={styles.progressTrack}>
-									<View style={[styles.progressFill, { width: `${pct * 100}%` }]} />
-								</View>
-								<Text style={styles.progressLabel}>
-									{patientsSeen}/{patientsTotal} seen
-								</Text>
-							</View>
-						)}
-					</View>
-				)}
 				{!!onSearchChange && (
 					<View style={styles.searchBox}>
 						<AppPathIcon d={HOME_CHROME_PATHS.search} size={20} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
@@ -298,12 +272,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		minWidth: 0,
 	},
-	greeting: {
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '600',
-		color: APP_COLORS.mintAccent,
-	},
 	name: {
 		fontSize: 20,
 		lineHeight: 26,
@@ -328,43 +296,6 @@ const styles = StyleSheet.create({
 		backgroundColor: APP_COLORS.mintAccent,
 		borderWidth: 2,
 		borderColor: APP_COLORS.ink,
-	},
-	dateRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		height: 28,
-	},
-	dateText: {
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '600',
-		color: '#E3EFEF',
-		flexShrink: 1,
-	},
-	progressWrap: {
-		marginLeft: 'auto',
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	progressTrack: {
-		width: 56,
-		height: 6,
-		borderRadius: 9999,
-		backgroundColor: '#FFFFFF26',
-		overflow: 'hidden',
-	},
-	progressFill: {
-		height: 6,
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.mintAccent,
-	},
-	progressLabel: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		color: APP_COLORS.mintAccent,
 	},
 	searchBox: {
 		flexDirection: 'row',
