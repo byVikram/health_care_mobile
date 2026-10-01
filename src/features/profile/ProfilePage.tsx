@@ -1,17 +1,18 @@
 import React from 'react'
 import { useAuth } from '../../context/AuthContext'
-import DoctorProfileLayout from './doctor/DoctorProfileLayout'
-import PatientProfileLayout from './patient/PatientProfileLayout'
 import PharmacyProfileLayout from './pharmacy/PharmacyProfileLayout'
 import RadiologyProfileLayout from './radiology/RadiologyProfileLayout'
 import LaboratoryProfileLayout from './laboratory/LaboratoryProfileLayout'
-import AncillaryProfileLayout from './ancillary/AncillaryProfileLayout'
+import ProfileHubPage from './ProfileHubPage'
+import { hubRoleFor } from './config/profileHubConfig'
 
 export default function ProfilePage() {
 	const { role } = useAuth()
 
-	if (role === 'doctor') {
-		return <DoctorProfileLayout />
+	// Patient (the default), doctor and ancillary get the redesigned hub.
+	const hubRole = hubRoleFor(role)
+	if (hubRole) {
+		return <ProfileHubPage role={hubRole} />
 	}
 
 	if (role === 'pharmacy') {
@@ -22,14 +23,5 @@ export default function ProfilePage() {
 		return <RadiologyProfileLayout />
 	}
 
-	if (role === 'laboratory') {
-		return <LaboratoryProfileLayout />
-	}
-
-	if (role === 'ancillary' || (role as string) === 'nurse') {
-		return <AncillaryProfileLayout />
-	}
-
-	// Patient Profile acts as default fallback
-	return <PatientProfileLayout />
+	return <LaboratoryProfileLayout />
 }

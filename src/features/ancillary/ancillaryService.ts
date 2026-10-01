@@ -1584,6 +1584,8 @@ export interface AncillaryProfileBackendResponse {
 	mobile_number?: string
 	avatar_s3_key?: string
 	verification_status?: string
+	/** 0-100, for the profile hub's completion bar. */
+	profile_completion?: number
 }
 
 export const fetchProviderProfile = async (): Promise<AncillaryProfileBackendResponse | null> => {
