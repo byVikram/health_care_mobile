@@ -17,12 +17,17 @@ export const API_ENDPOINTS = {
 		CREATE_USER: `${BASE_URL}/api/auth/create-user`,
 		SESSIONS: `${BASE_URL}/api/auth/sessions`,
 		SESSION_LOGOUT: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}`,
+		SESSIONS_OTHERS: `${BASE_URL}/api/auth/sessions/others`,
+		SESSION_ACKNOWLEDGE: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}/acknowledge`,
+		// Soft delete of the signed-in account (any role).
+		DELETE_ACCOUNT: `${BASE_URL}/api/auth/me`,
 	},
 	DOCTORS: {
 		SEARCH: `${BASE_URL}/api/doctors`,
 		DETAIL: (id: string) => `${BASE_URL}/api/doctors/${id}`,
 		AVAILABILITY: `${BASE_URL}/api/doctors/availability`,
 		OVERRIDES: `${BASE_URL}/api/doctors/availability/overrides`,
+		OVERRIDE_BY_ID: (id: string | number) => `${BASE_URL}/api/doctors/availability/overrides/${id}`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
 	},
 	DOCTORS_FAVOURITES: {
@@ -36,7 +41,10 @@ export const API_ENDPOINTS = {
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
 		ADDITIONAL_DETAILS: `${BASE_URL}/api/doctors/profile/additional-details`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
+		// Accepts the hospital's public id or the doctor-hospital link id.
+		HOSPITAL_BY_ID: (id: string) => `${BASE_URL}/api/doctors/hospitals/${id}`,
 		ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
+		ACHIEVEMENT_BY_ID: (id: string) => `${BASE_URL}/api/doctors/achievements/${id}`,
 		DELETE_ACCOUNT: `${BASE_URL}/api/doctors/profile`,
 	},
 	SPECIALITIES: {
@@ -124,6 +132,7 @@ export const API_ENDPOINTS = {
 		TREATMENT_HISTORY: (id: string) => `${BASE_URL}/api/treatments/patient/${id}/history`,
 		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
 		FAMILY_MEMBERS: `${BASE_URL}/api/patients/family-members`,
+		FAMILY_MEMBER_BY_ID: (id: string) => `${BASE_URL}/api/patients/family-members/${id}`,
 		SUMMARY: `${BASE_URL}/api/patients/me/summary`,
 		BOOKINGS: `${BASE_URL}/api/patients/me/bookings`,
 	},
@@ -268,6 +277,8 @@ export const API_ENDPOINTS = {
 		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/reschedule/respond`,
 		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/me/availability`,
 		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/me/availability/overrides`,
+		PROVIDER_OVERRIDE_BY_ID: (id: string | number) =>
+			`${BASE_URL}/api/ancillary/provider/me/availability/overrides/${id}`,
 		PROVIDER_SCHEDULED_ORDERS: `${BASE_URL}/api/ancillary/provider/me/orders`,
 		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/accept`,
 		DECLINE_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/decline`,

@@ -21,7 +21,6 @@ import type { AncillaryBookVisitParams, AppStackParamList } from '../../../navig
 import { useFamilyMembers } from '../../../hooks/useFamilyMembers'
 import { getCurrentLocation } from '../../../services/locationService'
 import { buildS3Url } from '../../../utils/s3Utils'
-import { showComingSoon } from '../../../utils/toast'
 import {
 	createPatientAddress,
 	getPatientAddresses,
@@ -97,7 +96,7 @@ export default function AncillaryReviewPayPage() {
 	const duration = itemsDurationLabel(items)
 
 	// ---- Patient ----
-	const { members } = useFamilyMembers()
+	const { members, addFromDraft } = useFamilyMembers()
 	const [patientKey, setPatientKey] = useState('self')
 	const [familyOpen, setFamilyOpen] = useState(false)
 	const memberIndex = Math.max(
@@ -479,9 +478,10 @@ export default function AncillaryReviewPayPage() {
 				onSelect={(m) => setPatientKey(m.key)}
 				title="Who is this visit for?"
 				confirmLabel={(m) => `Continue for ${familyMemberFirstName(m)}`}
-				onSave={() => {
-					// No create-family-member endpoint yet (same as the doctor booking flow).
-					showComingSoon('Add family members from your profile for now.')
+				onSave={async (draft) => {
+					const key = await addFromDraft(draft)
+					if (key) setPatientKey(key)
+					return !!key
 				}}
 			/>
 

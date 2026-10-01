@@ -86,6 +86,23 @@ import AncillaryBookVisitPage from '../features/ancillary/patient/AncillaryBookV
 import AncillaryReviewPayPage from '../features/ancillary/patient/AncillaryReviewPayPage'
 import AncillaryRequestSentPage from '../features/ancillary/patient/AncillaryRequestSentPage'
 
+// Profile redesign (patient / doctor / ancillary) -- see features/profile/ProfileHubPage
+import PersonalDetailsPage from '../features/profile/shared/PersonalDetailsPage'
+import ProfileSettingsPage from '../features/profile/shared/SettingsPage'
+import LoginSecurityPage from '../features/profile/shared/LoginSecurityPage'
+import AvailabilityPage from '../features/profile/availability/AvailabilityPage'
+import HealthDetailsPage from '../features/profile/patient/HealthDetailsPage'
+import LifestylePage from '../features/profile/patient/LifestylePage'
+import FamilyMembersPage from '../features/profile/patient/FamilyMembersPage'
+import FamilyMemberPage from '../features/profile/patient/FamilyMemberPage'
+import SavedAddressesPage from '../features/profile/patient/SavedAddressesPage'
+import AddressFormPage from '../features/profile/patient/AddressFormPage'
+import ProfessionalDetailsPage from '../features/profile/doctor/ProfessionalDetailsPage'
+import HospitalsPage from '../features/profile/doctor/HospitalsPage'
+import AchievementsPage from '../features/profile/doctor/AchievementsPage'
+import FavouriteDoctorsPage from '../features/profile/doctor/FavouriteDoctorsPage'
+import WorkDocumentsPage from '../features/profile/ancillary/WorkDocumentsPage'
+
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
@@ -372,6 +389,23 @@ function AuthenticatedNavigator() {
 					component={LocationScreen}
 					options={{ headerShown: false }}
 				/>
+
+				{/* Profile sub-screens: each draws its own header (ProfileScreen). */}
+				<AppStack.Screen name={ROUTES.STACK.PROFILE_PERSONAL} component={PersonalDetailsPage} />
+				<AppStack.Screen name={ROUTES.STACK.PROFILE_SETTINGS} component={ProfileSettingsPage} />
+				<AppStack.Screen name={ROUTES.STACK.PROFILE_SECURITY} component={LoginSecurityPage} />
+				<AppStack.Screen name={ROUTES.STACK.PROFILE_AVAILABILITY} component={AvailabilityPage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_HEALTH} component={HealthDetailsPage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_LIFESTYLE} component={LifestylePage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_FAMILY} component={FamilyMembersPage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_FAMILY_MEMBER} component={FamilyMemberPage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_ADDRESSES} component={SavedAddressesPage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_ADDRESS_FORM} component={AddressFormPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_PROFESSIONAL} component={ProfessionalDetailsPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_HOSPITALS} component={HospitalsPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_ACHIEVEMENTS} component={AchievementsPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_FAVOURITES} component={FavouriteDoctorsPage} />
+				<AppStack.Screen name={ROUTES.STACK.PROVIDER_WORK} component={WorkDocumentsPage} />
 
 				<AppStack.Screen name={ROUTES.STACK.WALLET} component={WalletPage} options={{ headerShown: false }} />
 				<AppStack.Screen

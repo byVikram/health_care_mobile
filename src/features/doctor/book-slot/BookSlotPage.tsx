@@ -6,6 +6,7 @@ import {
 	AppAvatar,
 	AppButton,
 	AppFamilyMemberSheet,
+	type FamilyMemberDraft,
 	AppFooterBar,
 	AppIconButton,
 	AppIconTile,
@@ -25,7 +26,6 @@ import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
 import { formatDateDisplay, formatDateForApi, formatTimeForApi } from '../../../utils/date'
 import { openOnMap } from '../../../utils/maps'
-import { showComingSoon } from '../../../utils/toast'
 import {
 	AppointmentModeKey,
 	emptyAvailabilityByMode,
@@ -75,7 +75,7 @@ export default function BookSlotPage() {
 	// (matches the design's switchTo()). A manual date pick clears the time instead.
 	const autoPickRef = useRef(true)
 
-	const { members } = useFamilyMembers()
+	const { members, addFromDraft } = useFamilyMembers()
 	const [patientKey, setPatientKey] = useState('self')
 	const [patientSheetVisible, setPatientSheetVisible] = useState(false)
 
@@ -203,10 +203,10 @@ export default function BookSlotPage() {
 		})
 	}
 
-	const saveMember = () => {
-		// There is no create-family-member endpoint yet (the API only lists
-		// members), so a locally-added person could not be booked for.
-		showComingSoon('Add family members from your profile for now.')
+	const saveMember = async (draft: FamilyMemberDraft) => {
+		const key = await addFromDraft(draft)
+		if (key) setPatientKey(key)
+		return !!key
 	}
 
 	return (

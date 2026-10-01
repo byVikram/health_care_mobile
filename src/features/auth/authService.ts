@@ -151,6 +151,8 @@ export interface Session {
 	last_active_at: string
 	is_active: boolean
 	is_current: boolean
+	/** Another device that logged in within the last 24 h and hasn't been confirmed yet. */
+	is_new?: boolean
 }
 
 export interface SessionsResponse {
@@ -172,4 +174,20 @@ export const getSessions = async (): Promise<SessionsResponse> => {
 export const logoutSession = async (publicId: string): Promise<SessionLogoutResponse> => {
 	const res = await ApiService.delete<SessionLogoutResponse>(API_ENDPOINTS.AUTH.SESSION_LOGOUT(publicId))
 	return res.data
+}
+
+/** "Log out of all other devices" -- returns how many sessions were revoked. */
+export const logoutOtherSessions = async (): Promise<number> => {
+	const res = await ApiService.delete<{ data?: { revoked?: number } }>(API_ENDPOINTS.AUTH.SESSIONS_OTHERS)
+	return res.data?.data?.revoked ?? 0
+}
+
+/** "Yes, it was me" on a new-login alert. */
+export const acknowledgeSession = async (publicId: string): Promise<void> => {
+	await ApiService.post(API_ENDPOINTS.AUTH.SESSION_ACKNOWLEDGE(publicId), {})
+}
+
+/** Soft-deletes the signed-in account (any role) and logs out every session. */
+export const deleteMyAccount = async (): Promise<void> => {
+	await ApiService.delete(API_ENDPOINTS.AUTH.DELETE_ACCOUNT)
 }

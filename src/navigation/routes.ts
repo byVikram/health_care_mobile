@@ -116,5 +116,22 @@ export const ROUTES = {
 		WALLET_TOPUP: 'WalletTopUp',
 		WALLET_TRANSACTIONS: 'WalletTransactions',
 		WALLET_TRANSACTION_DETAIL: 'WalletTransactionDetail',
+
+		// Profile (redesigned hub for patient / doctor / ancillary -- see features/profile/ProfileHubPage)
+		PROFILE_PERSONAL: 'ProfilePersonal',
+		PROFILE_SETTINGS: 'ProfileSettings',
+		PROFILE_SECURITY: 'ProfileSecurity',
+		PROFILE_AVAILABILITY: 'ProfileAvailability',
+		PATIENT_HEALTH: 'PatientHealth',
+		PATIENT_LIFESTYLE: 'PatientLifestyle',
+		PATIENT_FAMILY: 'PatientFamily',
+		PATIENT_FAMILY_MEMBER: 'PatientFamilyMember',
+		PATIENT_ADDRESSES: 'PatientAddresses',
+		PATIENT_ADDRESS_FORM: 'PatientAddressForm',
+		DOCTOR_PROFESSIONAL: 'DoctorProfessional',
+		DOCTOR_HOSPITALS: 'DoctorHospitals',
+		DOCTOR_ACHIEVEMENTS: 'DoctorAchievements',
+		DOCTOR_FAVOURITES: 'DoctorFavourites',
+		PROVIDER_WORK: 'ProviderWork',
 	},
 } as const
