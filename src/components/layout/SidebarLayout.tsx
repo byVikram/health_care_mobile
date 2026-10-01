@@ -17,6 +17,7 @@ import { isPatientRole } from '../../constants/constants'
 import { ScrollProvider } from '../../context/ScrollContext'
 import { APP_COLORS } from '../../config/theme'
 import { SELF_MEMBER_KEY, useFamilyMembers } from '../../hooks/useFamilyMembers'
+import { hubRoleFor } from '../../features/profile/config/profileHubConfig'
 import { useHomeSheets } from '../../features/dashboard/HomeSheetsContext'
 import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../../features/dashboard/homeChromeIcons'
 import {
@@ -103,10 +104,12 @@ function PatientSidebar({ visible, onClose, onLogout, onViewProfile }: PatientSi
 		[members]
 	)
 
-	// No family-management screen exists yet: add / manage land on the patient profile.
 	const openProfile = useCallback(() => {
 		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PROFILE })
 	}, [navigation])
+
+	const openFamily = useCallback(() => navigation.navigate(ROUTES.STACK.PATIENT_FAMILY), [navigation])
+	const addFamilyMember = useCallback(() => navigation.navigate(ROUTES.STACK.PATIENT_FAMILY_MEMBER), [navigation])
 
 	const handleOpenQr = () => {
 		onClose()
@@ -220,7 +223,7 @@ function PatientSidebar({ visible, onClose, onLogout, onViewProfile }: PatientSi
 						id: 'settings',
 						label: 'Settings',
 						icon: drawerIcon('settings'),
-						onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
+						onPress: () => navigation.navigate(ROUTES.STACK.PROFILE_SETTINGS),
 					},
 				],
 			},
@@ -240,7 +243,7 @@ function PatientSidebar({ visible, onClose, onLogout, onViewProfile }: PatientSi
 			onCompleteProfile={openProfile}
 			onOpenQr={handleOpenQr}
 			qrValue={summary?.public_id}
-			family={{ members: familyItems, onAdd: openProfile, onManage: openProfile }}
+			family={{ members: familyItems, onAdd: addFamilyMember, onManage: openFamily }}
 			sections={sections}
 		/>
 	)
@@ -396,7 +399,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 					id: 'settings',
 					label: 'Settings',
 					icon: <SettingsIcon width={20} height={20} />,
-					onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
+					// Doctors / ancillary get the redesigned settings; other roles keep the older page.
+					onPress: () =>
+						navigation.navigate(hubRoleFor(role) ? ROUTES.STACK.PROFILE_SETTINGS : ROUTES.STACK.SETTINGS),
 				},
 			]
 		}
@@ -508,7 +513,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 					id: 'settings',
 					label: 'Settings',
 					icon: <SettingsIcon width={20} height={20} />,
-					onPress: () => navigation.navigate(ROUTES.STACK.SETTINGS),
+					// Doctors / ancillary get the redesigned settings; other roles keep the older page.
+					onPress: () =>
+						navigation.navigate(hubRoleFor(role) ? ROUTES.STACK.PROFILE_SETTINGS : ROUTES.STACK.SETTINGS),
 				},
 			]
 		},

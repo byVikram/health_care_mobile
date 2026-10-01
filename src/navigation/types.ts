@@ -147,6 +147,23 @@ export type AppStackParamList = {
 	[ROUTES.STACK.WALLET_TOPUP]: undefined
 	[ROUTES.STACK.WALLET_TRANSACTIONS]: undefined
 	[ROUTES.STACK.WALLET_TRANSACTION_DETAIL]: { id: string }
+	[ROUTES.STACK.PROFILE_PERSONAL]: undefined
+	[ROUTES.STACK.PROFILE_SETTINGS]: undefined
+	[ROUTES.STACK.PROFILE_SECURITY]: undefined
+	[ROUTES.STACK.PROFILE_AVAILABILITY]: undefined
+	[ROUTES.STACK.PATIENT_HEALTH]: undefined
+	[ROUTES.STACK.PATIENT_LIFESTYLE]: undefined
+	[ROUTES.STACK.PATIENT_FAMILY]: undefined
+	/** No memberId = add a new member. */
+	[ROUTES.STACK.PATIENT_FAMILY_MEMBER]: { memberId?: string } | undefined
+	[ROUTES.STACK.PATIENT_ADDRESSES]: undefined
+	/** No addressId = add a new address. */
+	[ROUTES.STACK.PATIENT_ADDRESS_FORM]: { addressId?: string } | undefined
+	[ROUTES.STACK.DOCTOR_PROFESSIONAL]: undefined
+	[ROUTES.STACK.DOCTOR_HOSPITALS]: undefined
+	[ROUTES.STACK.DOCTOR_ACHIEVEMENTS]: undefined
+	[ROUTES.STACK.DOCTOR_FAVOURITES]: undefined
+	[ROUTES.STACK.PROVIDER_WORK]: undefined
 	[ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
 	[ROUTES.STACK.SEARCH]: undefined
 	[ROUTES.STACK.DOCTOR_SEARCH]:

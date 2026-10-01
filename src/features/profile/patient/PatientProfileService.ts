@@ -183,6 +183,12 @@ export interface PatientAddress {
 	latitude?: number
 	longitude?: number
 	is_default: boolean
+	// Structured parts (profile address form); address_line is built from them server-side.
+	flat?: string | null
+	area?: string | null
+	landmark?: string | null
+	contact_name?: string | null
+	contact_phone?: string | null
 }
 
 export interface TreatmentRecord {
@@ -228,6 +234,11 @@ export interface FamilyMember {
 	age?: string | number
 	gender?: string
 	blood_group?: string
+	date_of_birth?: string | null
+	contact_number?: string | null
+	chronic_conditions?: string[]
+	/** Date of birth and gender filled in (members added from a booking sheet start incomplete). */
+	is_complete?: boolean
 }
 
 export const getFamilyMembers = async (): Promise<FamilyMember[]> => {
@@ -237,3 +248,175 @@ export const getFamilyMembers = async (): Promise<FamilyMember[]> => {
 	return res.data?.data ?? []
 }
 
+// ─────────────────────────────────────────────
+// Profile redesign: details, family members, addresses
+// ─────────────────────────────────────────────
+
+export interface MedicationItem {
+	name: string
+	dose: string
+	frequency: string
+}
+
+export interface EmergencyContactItem {
+	name: string
+	relation: string
+	phone: string
+	is_primary?: boolean
+}
+
+/** GET/PATCH /api/patients/me/details response (optionally for a family member). */
+export interface PatientDetailsData {
+	id?: string
+	public_id?: string
+	personal: {
+		name: string
+		contact_number: string
+		email: string
+		avatar: string
+		gender: string
+		date_of_birth: string
+		blood_group: string
+		marital_status: string
+		height: number
+		weight: number
+		emergency_contact?: { name: string; number: string }
+		emergency_contacts?: EmergencyContactItem[]
+		location: string
+		relation?: string
+	}
+	medical: {
+		allergies: string[]
+		chronic_conditions: string[]
+		current_medications: string[]
+		medications?: MedicationItem[]
+		family_history: string
+	}
+	lifestyle: {
+		smoking_status: string
+		alcohol_consumption: string
+		food_preference: string
+		activity_level: string
+		sleep_hours: number
+		occupation: string
+	}
+}
+
+/** Any subset of the PATCH /me/details fields (snake_case, as the backend expects). */
+export type PatientDetailsPatch = Partial<{
+	name: string
+	email: string
+	gender: string
+	date_of_birth: string | null
+	blood_group: string
+	marital_status: string
+	height: number
+	weight: number
+	location: string
+	allergies: string[]
+	chronic_conditions: string[]
+	medications: MedicationItem[]
+	family_history: string
+	emergency_contacts: EmergencyContactItem[]
+	smoking_status: string
+	alcohol_consumption: string
+	food_preference: string
+	activity_level: string
+	sleep_hours: number
+	occupation: string
+}>
+
+const withPatientId = (url: string, patientId?: string) =>
+	patientId ? `${url}?patient_id=${encodeURIComponent(patientId)}` : url
+
+export const fetchPatientDetails = async (patientId?: string): Promise<PatientDetailsData> => {
+	const res = await ApiService.get<{ data: PatientDetailsData }>(withPatientId(API_ENDPOINTS.PATIENT.DETAILS, patientId))
+	return res.data.data
+}
+
+export const savePatientDetails = async (patch: PatientDetailsPatch, patientId?: string): Promise<PatientDetailsData> => {
+	const res = await ApiService.patch<{ data: PatientDetailsData }>(
+		withPatientId(API_ENDPOINTS.PATIENT.DETAILS, patientId),
+		patch
+	)
+	return res.data.data
+}
+
+export interface PatientSummary {
+	public_id: string
+	display_id: string
+	name: string
+	avatar_url?: string | null
+	age?: number | null
+	gender?: string | null
+	profile_completion: number
+	family_count: number
+}
+
+export const fetchPatientSummary = async (): Promise<PatientSummary> => {
+	const res = await ApiService.get<{ data: PatientSummary }>(API_ENDPOINTS.PATIENT.SUMMARY)
+	return res.data.data
+}
+
+export interface FamilyMemberInput {
+	name: string
+	/** Upper-case relation, e.g. 'SPOUSE', 'FATHER' (see FAMILY_RELATION_OPTIONS). */
+	relation: string
+	gender?: string
+	/** YYYY-MM-DD */
+	date_of_birth?: string | null
+	contact_number?: string | null
+}
+
+export const getFamilyMember = async (memberId: string): Promise<FamilyMember> => {
+	const res = await ApiService.get<{ data: FamilyMember }>(API_ENDPOINTS.PATIENT.FAMILY_MEMBER_BY_ID(memberId))
+	return res.data.data
+}
+
+export const createFamilyMember = async (input: FamilyMemberInput): Promise<FamilyMember> => {
+	const res = await ApiService.post<{ data: FamilyMember }>(API_ENDPOINTS.PATIENT.FAMILY_MEMBERS, input)
+	return res.data.data
+}
+
+/** Basic info (relation, contact_number) plus any PATCH /me/details field. */
+export const updateFamilyMember = async (
+	memberId: string,
+	patch: PatientDetailsPatch & { relation?: string; contact_number?: string | null }
+): Promise<PatientDetailsData> => {
+	const res = await ApiService.patch<{ data: PatientDetailsData }>(API_ENDPOINTS.PATIENT.FAMILY_MEMBER_BY_ID(memberId), patch)
+	return res.data.data
+}
+
+/** Soft delete on the backend -- past bookings for the member are kept. */
+export const removeFamilyMember = async (memberId: string): Promise<void> => {
+	await ApiService.delete(API_ENDPOINTS.PATIENT.FAMILY_MEMBER_BY_ID(memberId))
+}
+
+export interface PatientAddressInput {
+	label: string
+	flat: string
+	area: string
+	landmark?: string
+	city: string
+	pincode: string
+	contact_name?: string
+	contact_phone?: string
+	latitude?: number
+	longitude?: number
+	is_default?: boolean
+}
+
+export const addPatientAddress = async (input: PatientAddressInput): Promise<PatientAddress> => {
+	const res = await ApiService.post<{ data: PatientAddress }>(API_ENDPOINTS.PATIENT.ADDRESSES, input)
+	return res.data.data
+}
+
+export const updatePatientAddress = async (addressId: string, patch: Partial<PatientAddressInput>): Promise<PatientAddress> => {
+	const res = await ApiService.patch<{ data: PatientAddress }>(API_ENDPOINTS.PATIENT.ADDRESS_BY_ID(addressId), patch)
+	return res.data.data
+}
+
+/** Soft delete; if it was the default, the backend makes the oldest remaining address the default. */
+export const deletePatientAddress = async (addressId: string): Promise<void> => {
+	await ApiService.delete(API_ENDPOINTS.PATIENT.ADDRESS_BY_ID(addressId))
+}

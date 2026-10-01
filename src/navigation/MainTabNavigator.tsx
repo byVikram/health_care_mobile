@@ -17,6 +17,7 @@ import DashboardPage from '../features/dashboard/DashboardPage'
 import SearchPage from '../features/doctor/search/SearchPage'
 import BookingsPage from '../features/bookings/BookingsPage'
 import ProfilePage from '../features/profile/ProfilePage'
+import { hubRoleFor } from '../features/profile/config/profileHubConfig'
 import { WalletPage } from '../features/wallet/WalletPage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
@@ -477,7 +478,8 @@ function MainTabs() {
 					name={ROUTES.MAIN.PROFILE}
 					component={ProfilePage}
 					options={{
-						headerShown: true,
+						// The profile hub (patient / doctor / ancillary) draws its own header.
+						headerShown: hubRoleFor(role) === null,
 						header: () => (
 							<AppScreenHeader
 								title="My Profile"
