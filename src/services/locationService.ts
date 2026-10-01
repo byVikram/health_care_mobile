@@ -21,6 +21,23 @@ export const getCurrentLocation = async () => {
 };
 
 /**
+ * Convert a typed address → lat/lng (best effort: null when the device's geocoder can't place it).
+ * No location permission is needed for forward geocoding.
+ */
+export const getCoordsFromAddress = async (address: string, timeoutMs = 6000) => {
+  try {
+    // The platform geocoder can stall (no network / no Geocoder service) -- give up rather than hang the caller.
+    const [match] = await Promise.race([
+      Location.geocodeAsync(address),
+      new Promise<never[]>((resolve) => setTimeout(() => resolve([]), timeoutMs)),
+    ]);
+    return match ? { latitude: match.latitude, longitude: match.longitude } : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Convert lat/lng → readable address
  */
 export const getAddressFromCoords = async (

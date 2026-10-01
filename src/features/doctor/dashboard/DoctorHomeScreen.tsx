@@ -78,7 +78,7 @@ function etaLabel(apt: Appointment, isToday: boolean): string | null {
 
 export function DoctorHomeScreen() {
 	const navigation = useNavigation<any>()
-	const { user, clearAuth } = useAuth()
+	const { user, clearAuth, selectedHospitalId } = useAuth()
 	const [sidebarOpen, setSidebarOpen] = useState(false)
 
 	// Mirrors the doctor-role menu SidebarLayout already builds for every other Home-tab screen
@@ -189,7 +189,8 @@ export function DoctorHomeScreen() {
 		try {
 			// Today's full list (limit raised from the default 10 -- a busy doctor's day can exceed
 			// that) drives the seen/total stat, "Up next", and "Later today".
-			const todayRes = await getAppointments({ appointment_date: todayIso(), variant: 'all', limit: 50 })
+			// hospital_id is the clinic chosen in the header switcher (null = All clinics).
+			const todayRes = await getAppointments({ appointment_date: todayIso(), variant: 'all', limit: 50, ...(selectedHospitalId ? { hospital_id: selectedHospitalId } : {}) })
 			// Same rule as DoctorScheduleScreen's Today/Upcoming tabs (see scheduleUtils.isAccepted's
 			// doc comment): a still-pending request never shows here, even if dated today -- it stays
 			// under Requests until the doctor accepts it.
@@ -201,7 +202,7 @@ export function DoctorHomeScreen() {
 		} finally {
 			isRefresh ? setRefreshing(false) : setLoading(false)
 		}
-	}, [])
+	}, [selectedHospitalId])
 
 	// Refetch on every focus, not just mount -- "Up next" now depends on check-in state, which the
 	// doctor typically changes on the Schedule tab and then flips back here to start the visit; a
@@ -284,15 +285,12 @@ export function DoctorHomeScreen() {
 			/>
 			<DoctorScreenHeader
 				variant="home"
-				greeting={greetingForNow()}
 				name={user?.name || 'Doctor'}
 				avatarUri={buildS3Url((user as any)?.avatar_s3_key ?? (user as any)?.avatar)}
 				notificationCount={notificationCount}
 				onAvatarPress={() => setSidebarOpen(true)}
 				onNotificationsPress={() => navigation.navigate(ROUTES.STACK.NOTIFICATION)}
-				dateLabel={new Date().toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' })}
-				patientsSeen={seenCount}
-				patientsTotal={appointments.length}
+				showHospitalSelector
 				searchValue={search}
 				onSearchChange={setSearch}
 			/>
@@ -313,7 +311,10 @@ export function DoctorHomeScreen() {
 					<ActivityIndicator style={{ marginTop: 40 }} color={APP_COLORS.primary} />
 				) : (
 					<>
-						<Section title="Up next" onAction={() => navigation.navigate(ROUTES.MAIN.SCHEDULE)} actionLabel="Full schedule">
+						<Section
+							title="Up next"
+							subtitle={appointments.length > 0 ? `${seenCount} of ${appointments.length} patients seen today` : undefined}
+							onAction={() => navigation.navigate(ROUTES.MAIN.SCHEDULE)} actionLabel="Full schedule">
 							{next ? (
 								<AppSoftCard padding={0} radius={12}>
 									<View style={{ padding: 14, gap: 10 }}>
@@ -427,20 +428,15 @@ export function DoctorHomeScreen() {
 	)
 }
 
-function greetingForNow() {
-	const h = new Date().getHours()
-	if (h < 12) return 'Good morning'
-	if (h < 17) return 'Good afternoon'
-	return 'Good evening'
-}
-
 function Section({
 	title,
+	subtitle,
 	actionLabel,
 	onAction,
 	children,
 }: {
 	title: string
+	subtitle?: string
 	actionLabel?: string
 	onAction?: () => void
 	children: React.ReactNode
@@ -448,7 +444,10 @@ function Section({
 	return (
 		<View style={{ gap: 10 }}>
 			<View style={styles.sectionHeader}>
-				<Text style={styles.sectionTitle}>{title}</Text>
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<Text style={styles.sectionTitle}>{title}</Text>
+					{!!subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+				</View>
 				{!!actionLabel && (
 					<TouchableOpacity onPress={onAction} style={styles.sectionAction}>
 						<Text style={styles.sectionActionText}>{actionLabel}</Text>
@@ -518,6 +517,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 	},
 	sectionTitle: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: APP_COLORS.ink },
+	sectionSubtitle: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
 	sectionAction: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 36 },
 	sectionActionText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: APP_COLORS.primary },
 	patientRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

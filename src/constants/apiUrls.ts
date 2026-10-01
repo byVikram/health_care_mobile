@@ -29,6 +29,8 @@ export const API_ENDPOINTS = {
 		OVERRIDES: `${BASE_URL}/api/doctors/availability/overrides`,
 		OVERRIDE_BY_ID: (id: string | number) => `${BASE_URL}/api/doctors/availability/overrides/${id}`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
+		/** The signed-in doctor's clinics with today's hours + patient counts (clinic switcher). */
+		CLINICS: `${BASE_URL}/api/doctors/clinics`,
 	},
 	DOCTORS_FAVOURITES: {
 		GET: `${BASE_URL}/api/doctors/favourites`,

@@ -14,7 +14,7 @@ import { getAppointmentById } from '../../../services/appointmentService'
 import { Appointment, AppointmentHistoryEntry } from '../../../types/appointment'
 import { getStatusStyle } from '../../../constants/statusColors'
 import { ROUTES } from '../../../navigation/routes'
-import { openOnMap } from '../../../utils/maps'
+import { openDirections } from '../../../utils/maps'
 import { formatTimeSlot, capitaliseWords } from '../../../utils/formatters'
 
 const PRIMARY = '#2B6F71'
@@ -420,7 +420,9 @@ export default function AppointmentDetailsContent({
 										)}
 										{(appt.hospital.address || appt.hospital.name) && (
 											<TouchableOpacity
-												onPress={() => openOnMap(appt.hospital?.address, appt.hospital?.name)}
+												onPress={() =>
+													openDirections(appt.hospital?.latitude, appt.hospital?.longitude, appt.hospital?.address, appt.hospital?.name)
+												}
 												style={styles.mapLink}
 												activeOpacity={0.7}
 											>

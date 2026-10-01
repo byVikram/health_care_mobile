@@ -1,16 +1,19 @@
 // src/features/doctor/dashboard/DoctorScheduleScreen.tsx
 //
-// Doctor dashboard "Schedule" view (source: the "Doctor Dashboard" design) — the header's own
-// segmented control confirms exactly 4 categories: Today, Requests, Upcoming, Past.
+// Doctor dashboard "Schedule" view, built to the "Doctor Dashboard" design: three categories --
+// Today, Requests, All.
 //   Today     — filter chips (Upcoming/Video/Done) over today's appointment rows.
 //   Requests  — pending booking requests: accept / reject / reschedule / refer, via the shared
-//               AppointmentActionCard + AppointmentActionSheet (also usable by Upcoming below, and
-//               reusable as-is for a future Pharmacy/Laboratory "requests" surface).
-//   Upcoming  — already-confirmed bookings for the next 7 days; same card, no Accept button.
-//   Past      — date-range + status/visit-type filters over a date-grouped list.
-// All four are wired to the real appointments API; Accept/Reject reuse the exact status ids
-// DoctorAppointments.tsx already used successfully, Reschedule/Refer reuse the real
-// availability/referral/favourites services via AppointmentActionSheet.
+//               AppointmentActionCard + AppointmentActionSheet (reusable as-is for a future
+//               Pharmacy/Laboratory "requests" surface).
+//   All       — an Upcoming | Past sub-toggle:
+//                 Upcoming: confirmed bookings from tomorrow on, optionally narrowed to one day via a
+//                           calendar sheet (days that hold appointments carry a dot); each is an
+//                           action card (Cancel / Reschedule / Refer).
+//                 Past:     a date-range picker (Yesterday / 7 days / 30 days / 3 months / custom) plus a
+//                           Status + Visit-type filter sheet, rows grouped by day.
+// All of it is wired to the real appointments API; Reschedule/Refer reuse the real
+// availability/referral services via AppointmentActionSheet.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
@@ -26,11 +29,13 @@ import {
 	AppSoftCard,
 	type ActionSheetMode,
 } from '../../../components/common'
+import { useAuth } from '../../../context/AuthContext'
 import { APP_COLORS, TONE_ORDER } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import { useTabBarClearance } from '../../../navigation/tabBar'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
-import { checkInAppointment, getAppointmentStatuses, getAppointments, getStatusIdByLabel, type AppointmentStatusOption } from '../doctorService'
+import { ScheduleCalendarSheet } from './ScheduleCalendarSheet'
+import { checkInAppointment, getAppointments, getStatusIdByLabel } from '../doctorService'
 import { updateAppointmentsStatus } from '../../../services/appointmentService'
 import { rescheduleAppointment } from '../doctorService'
 import { createReferral } from '../../referrals/referralService'
@@ -38,40 +43,92 @@ import { effectiveStatusLabel, formatTime12h, humanizeStatus, isAccepted, isComp
 import type { Appointment } from '../../../types/appointment'
 import type { FavouriteDoctorListItem } from '../search/components/FavouriteDoctorList'
 
-type ScheduleTab = 'today' | 'req' | 'up' | 'past'
+type ScheduleTab = 'today' | 'req' | 'all'
 type TodayChip = 'all' | 'video' | 'done'
-type DateRangeKey = 'yesterday' | '7' | '30' | '90' | 'custom'
+type AllMode = 'up' | 'past'
+type PastRangeKey = 'yesterday' | 'last7' | 'last30' | 'last90' | 'custom'
+type PastStatusKey = 'completed' | 'no_show' | 'cancelled' | 'other'
+type PastSheet = 'range' | 'filter' | null
 
-const RANGE_LABELS: Record<DateRangeKey, string> = {
-	yesterday: 'Yesterday',
-	'7': 'Last 7 days',
-	'30': 'Last 30 days',
-	'90': 'Last 3 months',
-	custom: 'Custom dates',
-}
-const RANGE_DAYS: Record<Exclude<DateRangeKey, 'custom'>, number> = { yesterday: 1, '7': 7, '30': 30, '90': 90 }
+const PAST_RANGES: { id: PastRangeKey; label: string; days: number }[] = [
+	{ id: 'yesterday', label: 'Yesterday', days: 1 },
+	{ id: 'last7', label: 'Last 7 days', days: 7 },
+	{ id: 'last30', label: 'Last 30 days', days: 30 },
+	{ id: 'last90', label: 'Last 3 months', days: 90 },
+	{ id: 'custom', label: 'Custom dates', days: 0 },
+]
+const PAST_STATUS_FILTERS: { id: 'all' | Exclude<PastStatusKey, 'other'>; label: string }[] = [
+	{ id: 'all', label: 'All' },
+	{ id: 'completed', label: 'Completed' },
+	{ id: 'no_show', label: 'No-show' },
+	{ id: 'cancelled', label: 'Cancelled' },
+]
+// Matches the calendar sheet's three-month reach.
+const UPCOMING_WINDOW_DAYS = 90
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/
 
 // statusLabelOf/isPending/isAccepted imported from ../scheduleUtils -- shared with DoctorHomeScreen
-// so the Requests/Today/Upcoming/Past categorization rule can't drift between the two screens.
+// so the Requests/Today/All categorization rule can't drift between the two screens.
 const isCompleted = isCompletedAppt
 
-// rowStatusTone/humanizeStatus/effectiveStatusLabel imported from ../scheduleUtils -- shared with
-// DoctorHomeScreen so a same-day confirmed appointment reads (and can be checked in) as
-// "Not arrived" on both screens, not just this one.
+// A past-dated appointment that was never completed or cancelled (still confirmed / not_arrived /
+// no_show) is, in practice, a no-show -- the design's Past list only knows Completed / No-show /
+// Cancelled, so those three buckets are derived from the real status label rather than invented.
+// Anything else (e.g. checked_in, rescheduled) stays visible under "All" with its own label.
+function pastStatusKey(apt: Appointment): PastStatusKey {
+	const l = statusLabelOf(apt).toLowerCase()
+	if (l === 'completed') return 'completed'
+	if (l === 'cancelled') return 'cancelled'
+	if (l === 'no_show' || l === 'not_arrived' || l === 'confirmed') return 'no_show'
+	return 'other'
+}
+function pastStatusDisplay(apt: Appointment): { label: string; tone: 'completed' | 'sand' | 'cancelled' | 'pending' | 'confirmed' | 'onTheWay' } {
+	switch (pastStatusKey(apt)) {
+		case 'completed':
+			return { label: 'Completed', tone: 'completed' }
+		case 'cancelled':
+			return { label: 'Cancelled', tone: 'cancelled' }
+		case 'no_show':
+			return { label: 'No-show', tone: 'sand' }
+		default:
+			return { label: humanizeStatus(statusLabelOf(apt)), tone: rowStatusTone(statusLabelOf(apt)) }
+	}
+}
 
 function todayIso() {
-	const d = new Date()
-	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+	return toApiDate(new Date())
 }
 function isoPlusDays(iso: string, days: number) {
 	const d = new Date(`${iso}T00:00:00`)
 	d.setDate(d.getDate() + days)
 	return toApiDate(d)
 }
+function resolvePastRange(key: PastRangeKey, customFrom: string, customTo: string): { from: string; to: string } {
+	if (key === 'custom') return { from: customFrom, to: customTo }
+	const days = PAST_RANGES.find((r) => r.id === key)?.days ?? 7
+	const today = todayIso()
+	return { from: isoPlusDays(today, -days), to: isoPlusDays(today, -1) }
+}
+
+const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+/** "Fri 26 Sep" */
 function dateLabelOf(iso: string) {
 	const d = new Date(`${iso}T00:00:00`)
 	if (Number.isNaN(d.getTime())) return iso
-	return d.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' })
+	return `${DOW_SHORT[d.getDay()]} ${d.getDate()} ${MON_SHORT[d.getMonth()]}`
+}
+/** "26 Sep 2026" */
+function fullDateLabelOf(iso: string) {
+	const d = new Date(`${iso}T00:00:00`)
+	if (Number.isNaN(d.getTime())) return iso
+	return `${d.getDate()} ${MON_SHORT[d.getMonth()]} ${d.getFullYear()}`
+}
+/** "26 Sep" */
+function shortDateLabelOf(iso: string) {
+	const d = new Date(`${iso}T00:00:00`)
+	if (Number.isNaN(d.getTime())) return iso
+	return `${d.getDate()} ${MON_SHORT[d.getMonth()]}`
 }
 function slotLabelOf(apt: Appointment, includeDate: boolean) {
 	const time = formatTime12h(apt.start_time)
@@ -86,6 +143,8 @@ const initialsOf = (name?: string) =>
 		.map((p) => p[0])
 		.join('')
 		.toUpperCase()
+const byDateTime = (a: Appointment, b: Appointment) =>
+	(a.appointment_date + (a.start_time ?? '')).localeCompare(b.appointment_date + (b.start_time ?? ''))
 
 const REQUEST_REASONS = [
 	{ id: 'spec', label: 'Outside my speciality' },
@@ -101,10 +160,38 @@ const CANCEL_REASONS = [
 
 type Outcome = { kind: 'accept' | 'reject' | 'reschedule' | 'refer'; title: string; sub: string; tone: 'success' | 'danger' | 'info' | 'purple' }
 
+/** The "Upcoming | Past" switch at the top of the All tab. */
+function AllModeToggle({ value, onChange }: { value: AllMode; onChange: (v: AllMode) => void }) {
+	return (
+		<View style={styles.modeTrack} accessibilityRole="tablist" accessibilityLabel="Show">
+			{([
+				{ id: 'up' as AllMode, label: 'Upcoming' },
+				{ id: 'past' as AllMode, label: 'Past' },
+			]).map((t) => {
+				const on = t.id === value
+				return (
+					<TouchableOpacity
+						key={t.id}
+						accessibilityRole="tab"
+						accessibilityState={{ selected: on }}
+						onPress={() => onChange(t.id)}
+						style={[styles.modeBtn, on && styles.modeBtnOn]}
+					>
+						<Text style={[styles.modeBtnText, { color: on ? APP_COLORS.ink : APP_COLORS.inkMuted }]}>{t.label}</Text>
+					</TouchableOpacity>
+				)
+			})}
+		</View>
+	)
+}
+
 export function DoctorScheduleScreen() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const clearance = useTabBarClearance()
+	const { selectedHospital, selectedHospitalId } = useAuth()
+	// Scope every list to the clinic chosen in the Home header's switcher (null = All clinics).
+	const clinicFilter = selectedHospitalId ? { hospital_id: selectedHospitalId } : {}
 
 	const [tab, setTab] = useState<ScheduleTab>((route.params?.segment as ScheduleTab) ?? 'today')
 
@@ -113,34 +200,40 @@ export function DoctorScheduleScreen() {
 	const [todayLoading, setTodayLoading] = useState(true)
 	const [todayChip, setTodayChip] = useState<TodayChip>('all')
 
-	// Requests + Upcoming share one fetch/action-sheet/outcome machinery
+	// Requests: pending only (uses variant='upcoming', so a request whose date has already gone by
+	// without being acted on ages out).
 	const [reqList, setReqList] = useState<Appointment[]>([])
-	const [upList, setUpList] = useState<Appointment[]>([])
-	const [apptsLoading, setApptsLoading] = useState(true)
+	const [reqLoading, setReqLoading] = useState(true)
 	const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({})
 	const [busyId, setBusyId] = useState<string | null>(null)
 	const [sheet, setSheet] = useState<{ mode: ActionSheetMode; appt: Appointment } | null>(null)
 	const [checkingInId, setCheckingInId] = useState<string | null>(null)
 
-	// Past
-	const [pastRangeSheetOpen, setPastRangeSheetOpen] = useState(false)
-	const [pastFilterSheetOpen, setPastFilterSheetOpen] = useState(false)
-	const [pastRange, setPastRange] = useState<DateRangeKey>('7')
+	// All
+	const [allMode, setAllMode] = useState<AllMode>('up')
+
+	// All -> Upcoming
+	const [upList, setUpList] = useState<Appointment[]>([])
+	const [upLoading, setUpLoading] = useState(true)
+	const [upDay, setUpDay] = useState<string | null>(null)
+	const [upCalOpen, setUpCalOpen] = useState(false)
+
+	// All -> Past (defaults to the last 7 days, like the design)
+	const [pastSheet, setPastSheet] = useState<PastSheet>(null)
+	const [pastRange, setPastRange] = useState<PastRangeKey>('last7')
 	const [pastFrom, setPastFrom] = useState(isoPlusDays(todayIso(), -30))
 	const [pastTo, setPastTo] = useState(isoPlusDays(todayIso(), -1))
-	const [pastStatus, setPastStatus] = useState('all')
+	const [pastStatus, setPastStatus] = useState<'all' | Exclude<PastStatusKey, 'other'>>('all')
 	const [pastMode, setPastMode] = useState<'all' | 'clinic' | 'video'>('all')
-	const [pastQuery, setPastQuery] = useState('')
 	const [pastList, setPastList] = useState<Appointment[]>([])
 	const [pastLoading, setPastLoading] = useState(true)
-	const [statusOptions, setStatusOptions] = useState<AppointmentStatusOption[]>([])
 
 	const [refreshing, setRefreshing] = useState(false)
 
 	const loadToday = useCallback(async () => {
 		setTodayLoading(true)
 		try {
-			const res = await getAppointments({ appointment_date: todayIso(), variant: 'all', limit: 50 })
+			const res = await getAppointments({ appointment_date: todayIso(), variant: 'all', limit: 50, ...clinicFilter })
 			// Today shows what the doctor has already accepted (at any point in today's arrival
 			// workflow) plus what's already done -- never a still-pending request, even if it happens
 			// to be dated today. Those stay under Requests until the doctor acts on them.
@@ -154,60 +247,64 @@ export function DoctorScheduleScreen() {
 		} finally {
 			setTodayLoading(false)
 		}
-	}, [])
+	}, [selectedHospitalId])
 
-	const loadAppts = useCallback(async () => {
-		setApptsLoading(true)
+	const loadRequests = useCallback(async () => {
+		setReqLoading(true)
 		try {
-			const res = await getAppointments({ variant: 'upcoming', limit: 100 })
-			const list = res.data ?? []
-			const today = todayIso()
-			const weekOut = isoPlusDays(today, 7)
+			const res = await getAppointments({ variant: 'upcoming', limit: 100, ...clinicFilter })
 			// Requests: no action taken yet -- pending, regardless of date.
-			setReqList(list.filter(isPending).sort((a, b) => (a.appointment_date + (a.start_time ?? '')).localeCompare(b.appointment_date + (b.start_time ?? ''))))
-			// Upcoming: already accepted, strictly after today, within the next week.
-			setUpList(
-				list
-					.filter((a) => isAccepted(a) && a.appointment_date > today && a.appointment_date <= weekOut)
-					.sort((a, b) => (a.appointment_date + (a.start_time ?? '')).localeCompare(b.appointment_date + (b.start_time ?? ''))),
-			)
+			setReqList((res.data ?? []).filter(isPending).sort(byDateTime))
 		} catch {
 			setReqList([])
-			setUpList([])
 		} finally {
-			setApptsLoading(false)
+			setReqLoading(false)
 		}
-	}, [])
+	}, [selectedHospitalId])
 
-	const loadPast = useCallback(async () => {
-		setPastLoading(true)
+	const loadUpcoming = useCallback(async () => {
+		setUpLoading(true)
 		try {
-			const today = todayIso()
-			const from = pastRange === 'custom' ? pastFrom : isoPlusDays(today, -RANGE_DAYS[pastRange])
-			const to = pastRange === 'custom' ? pastTo : isoPlusDays(today, -1)
+			// From tomorrow: today's patients live under the Today tab.
 			const res = await getAppointments({
-				start_date: from,
-				end_date: to,
+				start_date: isoPlusDays(todayIso(), 1),
+				end_date: isoPlusDays(todayIso(), UPCOMING_WINDOW_DAYS),
 				variant: 'all',
 				limit: 100,
-				...(pastQuery.trim() ? { search: pastQuery.trim() } : {}),
+				...clinicFilter,
 			})
-			// Past: completed visits, or accepted bookings whose date has simply gone by without an
-			// explicit "completed" (e.g. the doctor never flipped it) -- never a pending request that
-			// was left undecided and aged into the past.
-			setPastList((res.data ?? []).filter((a) => isCompleted(a) || isAccepted(a)))
+			// Confirmed bookings only -- a still-pending request belongs to Requests.
+			setUpList((res.data ?? []).filter(isAccepted).sort(byDateTime))
+		} catch {
+			setUpList([])
+		} finally {
+			setUpLoading(false)
+		}
+	}, [selectedHospitalId])
+
+	const loadPast = useCallback(async () => {
+		const { from, to } = resolvePastRange(pastRange, pastFrom, pastTo)
+		// A half-typed custom date shouldn't fire a request.
+		if (!ISO_RE.test(from) || !ISO_RE.test(to) || from > to) {
+			setPastLoading(false)
+			return
+		}
+		setPastLoading(true)
+		try {
+			const res = await getAppointments({ start_date: from, end_date: to, variant: 'all', limit: 100, ...clinicFilter })
+			setPastList((res.data ?? []).filter((a) => !isPending(a)))
 		} catch {
 			setPastList([])
 		} finally {
 			setPastLoading(false)
 		}
-	}, [pastRange, pastFrom, pastTo, pastQuery])
+	}, [pastRange, pastFrom, pastTo, selectedHospitalId])
 
 	useEffect(() => {
 		loadToday()
-		loadAppts()
-		getAppointmentStatuses().then(setStatusOptions).catch(() => {})
-	}, [loadToday, loadAppts])
+		loadRequests()
+		loadUpcoming()
+	}, [loadToday, loadRequests, loadUpcoming])
 
 	useEffect(() => {
 		loadPast()
@@ -215,7 +312,7 @@ export function DoctorScheduleScreen() {
 
 	const refreshAll = () => {
 		setRefreshing(true)
-		Promise.all([loadToday(), loadAppts(), loadPast()]).finally(() => setRefreshing(false))
+		Promise.all([loadToday(), loadRequests(), loadUpcoming(), loadPast()]).finally(() => setRefreshing(false))
 	}
 
 	// ── Today derived ──────────────────────────────────────────────────────
@@ -224,12 +321,11 @@ export function DoctorScheduleScreen() {
 	const todayDone = todayList.filter(isCompleted)
 	const todayShown = todayChip === 'video' ? todayVideo : todayChip === 'done' ? todayDone : todayNotDone
 
-	// Row token (source: the "Doctor Dashboard" design's Today rows -- "Token 06" under the time for
-	// an in-clinic visit, "Video" for a video one). No real "token number" field exists on the
-	// backend, so this is a real, derived value (sequential position in today's own list, sorted by
-	// start_time like the list already is) rather than a fabricated one -- and it's computed from the
-	// full `todayList`, not the chip-filtered `todayShown`, so a patient's token stays stable no
-	// matter which filter chip is active.
+	// Row token (source: the design's Today rows -- "Token 06" under the time for an in-clinic visit,
+	// "Video" for a video one). No real "token number" field exists on the backend, so this is a real,
+	// derived value (sequential position in today's own list, sorted by start_time like the list
+	// already is) rather than a fabricated one -- and it's computed from the full `todayList`, not the
+	// chip-filtered `todayShown`, so a patient's token stays stable no matter which filter chip is active.
 	const todayTokenById = new Map<string, string>()
 	let clinicTokenSeq = 0
 	todayList.forEach((a) => {
@@ -240,6 +336,41 @@ export function DoctorScheduleScreen() {
 			todayTokenById.set(a.id, `Token ${String(clinicTokenSeq).padStart(2, '0')}`)
 		}
 	})
+
+	// ── Upcoming derived ───────────────────────────────────────────────────
+	const upMarkedDates = useMemo(() => new Set(upList.map((a) => a.appointment_date)), [upList])
+	const upShown = upDay ? upList.filter((a) => a.appointment_date === upDay) : upList
+	const upCountLabel = `${upShown.length} ${upShown.length === 1 ? 'appointment' : 'appointments'}`
+
+	// ── Past derived ───────────────────────────────────────────────────────
+	const pastRangeResolved = resolvePastRange(pastRange, pastFrom, pastTo)
+	const pastRangeName =
+		pastRange === 'custom'
+			? `Custom · ${shortDateLabelOf(pastRangeResolved.from)} – ${shortDateLabelOf(pastRangeResolved.to)}`
+			: (PAST_RANGES.find((r) => r.id === pastRange)?.label ?? '')
+	const pastFilterCount = (pastStatus !== 'all' ? 1 : 0) + (pastMode !== 'all' ? 1 : 0)
+	const pastFiltered = pastList.filter((a) => {
+		if (pastStatus !== 'all' && pastStatusKey(a) !== pastStatus) return false
+		if (pastMode === 'clinic' && isVideoMode(a.appointment_mode)) return false
+		if (pastMode === 'video' && !isVideoMode(a.appointment_mode)) return false
+		return true
+	})
+	const pastGroups = (() => {
+		const byDate = new Map<string, Appointment[]>()
+		pastFiltered.forEach((a) => {
+			if (!byDate.has(a.appointment_date)) byDate.set(a.appointment_date, [])
+			byDate.get(a.appointment_date)!.push(a)
+		})
+		return Array.from(byDate.entries())
+			.sort((a, b) => b[0].localeCompare(a[0]))
+			.map(([date, rows]) => [date, [...rows].sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? ''))] as const)
+	})()
+	const pastApplyLabel = `Show ${pastFiltered.length} ${pastFiltered.length === 1 ? 'appointment' : 'appointments'}`
+	const resetPast = () => {
+		setPastStatus('all')
+		setPastMode('all')
+		setPastRange('last7')
+	}
 
 	// ── Requests / Upcoming action handlers ───────────────────────────────
 	const openAppointment = (apt: Appointment) => navigation.navigate(ROUTES.STACK.APPOINTMENT_DETAILS, { appointmentId: apt.id })
@@ -383,33 +514,36 @@ export function DoctorScheduleScreen() {
 		)
 	}
 
+
 	const reqLeft = reqList.filter((a) => !outcomes[a.id]).length
+	const now = new Date()
+	const headerSubtitle = `${DOW_SHORT[now.getDay()]} ${now.getDate()} ${MON_SHORT[now.getMonth()]}${selectedHospital ? ` · ${selectedHospital}` : ''}`
+	const yesterdayIso = isoPlusDays(todayIso(), -1)
 
 	return (
 		<View style={styles.screen}>
-			<DoctorScreenHeader
-				variant="simple"
-				title="Schedule"
-				subtitle={new Date().toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' })}
-			>
+			<DoctorScreenHeader variant="simple" title="Schedule" subtitle={headerSubtitle}>
 				<AppSegmentedControl
 					shape="rounded"
 					tabs
+					onDark
 					accessibilityLabel="Schedule category"
 					options={[
 						{ value: 'today', label: 'Today' },
 						{ value: 'req', label: 'Requests', count: reqLeft, countTone: 'warn' },
-						{ value: 'up', label: 'Upcoming' },
-						{ value: 'past', label: 'Past' },
+						{ value: 'all', label: 'All' },
 					]}
 					value={tab}
-					onChange={(v) => setTab(v as ScheduleTab)}
+					onChange={(v) => {
+						setTab(v as ScheduleTab)
+						if (v === 'all') setAllMode('up')
+					}}
 					style={{ backgroundColor: '#FFFFFF14', borderWidth: 0 }}
 				/>
 			</DoctorScreenHeader>
 
 			<ScrollView
-				contentContainerStyle={{ paddingTop: 16, paddingBottom: clearance, gap: 12 }}
+				contentContainerStyle={{ paddingTop: 16, paddingBottom: clearance, gap: 16 }}
 				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshAll} />}
 			>
 				{tab === 'today' && (
@@ -455,207 +589,240 @@ export function DoctorScheduleScreen() {
 								</View>
 							</AppSoftCard>
 						) : (
-							<AppSoftCard>
-								<Text style={styles.emptyText}>Nothing here yet</Text>
-							</AppSoftCard>
+							<Text style={styles.emptyPlain}>Nothing here yet</Text>
 						)}
 					</View>
 				)}
 
-				{(tab === 'req' || tab === 'up') && (
-					<View style={{ gap: 12, paddingHorizontal: 16 }}>
-						<Text style={styles.hintText}>
-							{tab === 'req' ? 'New bookings waiting for you. Accept, reschedule, refer or reject.' : 'Confirmed bookings for the next 7 days.'}
-						</Text>
-						{apptsLoading ? (
+				{tab === 'req' && (
+					<View style={{ gap: 10, paddingHorizontal: 16 }}>
+						<Text style={styles.hintText}>New bookings waiting for you. Accept, reschedule, refer or reject.</Text>
+						{reqLoading ? (
 							<ActivityIndicator style={{ marginTop: 24 }} color={APP_COLORS.primary} />
-						) : (tab === 'req' ? reqList : upList).length === 0 ? (
-							<AppSoftCard>
-								<Text style={styles.emptyText}>{tab === 'req' ? 'No requests waiting. New bookings will show up here.' : 'Nothing confirmed for the next 7 days.'}</Text>
-							</AppSoftCard>
+						) : reqList.length === 0 ? (
+							<Text style={styles.emptyPlain}>No requests waiting. New bookings will show up here.</Text>
 						) : (
-							(tab === 'req' ? reqList : upList).map(renderApptCard)
+							reqList.map(renderApptCard)
 						)}
 					</View>
 				)}
 
-				{tab === 'past' && (
-					<View style={{ gap: 14, paddingHorizontal: 16 }}>
-						<View style={styles.searchBox}>
-							<MaterialCommunityIcons name="magnify" size={18} color={APP_COLORS.inkMuted} />
-							<TextInput
-								value={pastQuery}
-								onChangeText={setPastQuery}
-								placeholder="Search patient name"
-								placeholderTextColor={APP_COLORS.inkMuted}
-								style={styles.searchInput}
-							/>
-						</View>
-						<View style={{ flexDirection: 'row', gap: 8 }}>
-							<TouchableOpacity style={styles.rangeBtn} onPress={() => setPastRangeSheetOpen(true)}>
-								<MaterialCommunityIcons name="calendar-outline" size={18} color={APP_COLORS.primary} />
-								<Text style={styles.rangeBtnText} numberOfLines={1}>
-									{RANGE_LABELS[pastRange]}
-								</Text>
-								<MaterialCommunityIcons name="chevron-down" size={16} color={APP_COLORS.inkMuted} />
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={[styles.filterBtn, (pastStatus !== 'all' || pastMode !== 'all') && styles.filterBtnActive]}
-								onPress={() => setPastFilterSheetOpen(true)}
-							>
-								<MaterialCommunityIcons name="filter-variant" size={18} color={pastStatus !== 'all' || pastMode !== 'all' ? APP_COLORS.primary : APP_COLORS.ink} />
-								<Text style={styles.filterBtnText}>
-									{[pastStatus !== 'all' && 1, pastMode !== 'all' && 1].filter(Boolean).length
-										? `Filters · ${[pastStatus !== 'all', pastMode !== 'all'].filter(Boolean).length}`
-										: 'Filters'}
-								</Text>
-							</TouchableOpacity>
+				{tab === 'all' && (
+					<>
+						<View style={{ paddingHorizontal: 16 }}>
+							<AllModeToggle value={allMode} onChange={setAllMode} />
 						</View>
 
-						{pastLoading ? (
-							<ActivityIndicator style={{ marginTop: 24 }} color={APP_COLORS.primary} />
-						) : (
-							(() => {
-								const filtered = pastList.filter((a) => {
-									if (pastStatus !== 'all' && statusLabelOf(a).toLowerCase() !== pastStatus) return false
-									if (pastMode === 'clinic' && isVideoMode(a.appointment_mode)) return false
-									if (pastMode === 'video' && !isVideoMode(a.appointment_mode)) return false
-									return true
-								})
-								const byDate = new Map<string, Appointment[]>()
-								filtered.forEach((a) => {
-									if (!byDate.has(a.appointment_date)) byDate.set(a.appointment_date, [])
-									byDate.get(a.appointment_date)!.push(a)
-								})
-								const groups = Array.from(byDate.entries()).sort((a, b) => b[0].localeCompare(a[0]))
-
-								return (
-									<>
-										<Text style={styles.summaryText}>
-											<Text style={styles.summaryBold}>
-												{filtered.length} {filtered.length === 1 ? 'appointment' : 'appointments'}
-											</Text>{' '}
-											· {dateLabelOf(pastRange === 'custom' ? pastFrom : isoPlusDays(todayIso(), -RANGE_DAYS[pastRange as Exclude<DateRangeKey, 'custom'>]))} –{' '}
-											{dateLabelOf(pastRange === 'custom' ? pastTo : isoPlusDays(todayIso(), -1))}
+						{allMode === 'up' && (
+							<View style={{ gap: 10, paddingHorizontal: 16 }}>
+								<Text style={styles.hintText}>Confirmed bookings. Tap a date to see that day only.</Text>
+								<View style={{ gap: 8 }}>
+									<TouchableOpacity
+										style={[styles.selectBtn, !!upDay && styles.selectBtnActive]}
+										onPress={() => setUpCalOpen(true)}
+										accessibilityRole="button"
+									>
+										<MaterialCommunityIcons name="calendar-outline" size={18} color={APP_COLORS.primary} />
+										<Text style={styles.selectBtnText} numberOfLines={1}>
+											{upDay ? dateLabelOf(upDay) : 'All upcoming dates'}
 										</Text>
-										{groups.length ? (
-											groups.map(([date, rows]) => (
-												<View key={date} style={{ gap: 6 }}>
-													<Text style={styles.groupLabel}>{dateLabelOf(date).toUpperCase()}</Text>
-													<AppSoftCard padding={0} radius={8}>
-														<View style={{ paddingHorizontal: 12 }}>
-															{rows.map((apt, i) => (
+										<MaterialCommunityIcons name="chevron-down" size={16} color={APP_COLORS.inkMuted} />
+									</TouchableOpacity>
+									<View style={styles.countRow}>
+										<Text style={styles.summaryBold}>{upCountLabel}</Text>
+										{!!upDay && (
+											<TouchableOpacity onPress={() => setUpDay(null)} hitSlop={8}>
+												<Text style={styles.linkText}>Show all dates</Text>
+											</TouchableOpacity>
+										)}
+									</View>
+								</View>
+								{upLoading ? (
+									<ActivityIndicator style={{ marginTop: 24 }} color={APP_COLORS.primary} />
+								) : upShown.length === 0 ? (
+									<Text style={styles.emptyPlain}>
+										{upDay ? 'No appointments on this date. Pick another day.' : 'No confirmed appointments coming up.'}
+									</Text>
+								) : (
+									upShown.map(renderApptCard)
+								)}
+							</View>
+						)}
+
+						{allMode === 'past' && (
+							<View style={{ gap: 14, paddingHorizontal: 16 }}>
+								<View style={{ flexDirection: 'row', gap: 8 }}>
+									<TouchableOpacity
+										style={[styles.selectBtn, { flex: 1, minWidth: 0 }]}
+										onPress={() => setPastSheet('range')}
+										accessibilityRole="button"
+									>
+										<MaterialCommunityIcons name="calendar-outline" size={18} color={APP_COLORS.primary} />
+										<Text style={styles.selectBtnText} numberOfLines={1}>
+											{pastRangeName}
+										</Text>
+										<MaterialCommunityIcons name="chevron-down" size={16} color={APP_COLORS.inkMuted} />
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={[styles.filterBtn, pastFilterCount > 0 && styles.filterBtnActive]}
+										onPress={() => setPastSheet('filter')}
+										accessibilityRole="button"
+										accessibilityLabel={pastFilterCount ? `Filters, ${pastFilterCount} applied` : 'Filters'}
+									>
+										<MaterialCommunityIcons name="filter-variant" size={18} color={APP_COLORS.ink} />
+										<Text style={styles.filterBtnText}>{pastFilterCount ? `Filters · ${pastFilterCount}` : 'Filters'}</Text>
+									</TouchableOpacity>
+								</View>
+
+								<Text style={styles.summaryText}>
+									<Text style={styles.summaryBold}>
+										{pastFiltered.length} {pastFiltered.length === 1 ? 'appointment' : 'appointments'}
+									</Text>{' '}
+									· {fullDateLabelOf(pastRangeResolved.from)} – {fullDateLabelOf(pastRangeResolved.to)}
+								</Text>
+
+								{pastLoading ? (
+									<ActivityIndicator style={{ marginTop: 24 }} color={APP_COLORS.primary} />
+								) : pastGroups.length ? (
+									pastGroups.map(([date, rows]) => {
+										let clinicSeq = 0
+										return (
+											<View key={date} style={{ gap: 6 }}>
+												<Text style={styles.groupLabel}>
+													{date === yesterdayIso ? 'YESTERDAY · ' : ''}
+													{fullDateLabelOf(date).toUpperCase()}
+												</Text>
+												<AppSoftCard padding={0} radius={8}>
+													<View style={{ paddingHorizontal: 12 }}>
+														{rows.map((apt, i) => {
+															const video = isVideoMode(apt.appointment_mode)
+															if (!video) clinicSeq += 1
+															const st = pastStatusDisplay(apt)
+															return (
 																<AppAppointmentRow
 																	key={apt.id}
 																	time={formatTime12h(apt.start_time)}
-																	token={`Visit ${i + 1}`}
+																	token={video ? 'Video' : `Token ${String(clinicSeq).padStart(2, '0')}`}
 																	name={apt.patient?.name ?? 'Patient'}
-																	mode={isVideoMode(apt.appointment_mode) ? 'Video' : 'In-clinic'}
+																	mode={video ? 'Video' : 'In-clinic'}
 																	meta={[apt.patient?.age ? `${apt.patient.age} yrs` : null, apt.patient?.gender].filter(Boolean).join(' · ')}
-																	status={humanizeStatus(statusLabelOf(apt))}
-																	statusTone={rowStatusTone(statusLabelOf(apt))}
+																	status={st.label}
+																	statusTone={st.tone}
 																	divider={i < rows.length - 1}
 																	onPress={() => openAppointment(apt)}
 																/>
-															))}
-														</View>
-													</AppSoftCard>
-												</View>
-											))
-										) : (
-											<AppSoftCard style={{ alignItems: 'center', gap: 8 }}>
-												<Text style={styles.emptyText}>No appointments in this period</Text>
-												<TouchableOpacity
-													style={styles.resetBtn}
-													onPress={() => {
-														setPastRange('7')
-														setPastStatus('all')
-														setPastMode('all')
-														setPastQuery('')
-													}}
-												>
-													<Text style={styles.resetBtnText}>Reset filters</Text>
-												</TouchableOpacity>
-											</AppSoftCard>
-										)}
-									</>
-								)
-							})()
+															)
+														})}
+													</View>
+												</AppSoftCard>
+											</View>
+										)
+									})
+								) : (
+									<AppSoftCard padding={16} radius={8} style={{ alignItems: 'center', gap: 8 }}>
+										<Text style={styles.emptyTitle}>No appointments in this period</Text>
+										<TouchableOpacity style={styles.resetBtn} onPress={resetPast}>
+											<Text style={styles.resetBtnText}>Reset filters</Text>
+										</TouchableOpacity>
+									</AppSoftCard>
+								)}
+							</View>
 						)}
-					</View>
+					</>
 				)}
 			</ScrollView>
 
-			<AppBottomSheet visible={pastRangeSheetOpen} title="Show appointments from" onClose={() => setPastRangeSheetOpen(false)} appearance="modern">
-				{(Object.keys(RANGE_LABELS) as DateRangeKey[]).map((key) => {
-					const on = key === pastRange
-					return (
-						<TouchableOpacity
-							key={key}
-							style={styles.radioRow}
-							onPress={() => {
-								setPastRange(key)
-								if (key !== 'custom') setPastRangeSheetOpen(false)
-							}}
-						>
-							<Text style={[styles.radioLabel, on && styles.radioLabelOn]}>{RANGE_LABELS[key]}</Text>
-							<MaterialCommunityIcons name={on ? 'radiobox-marked' : 'radiobox-blank'} size={20} color={on ? APP_COLORS.primary : APP_COLORS.border} />
-						</TouchableOpacity>
-					)
-				})}
-				{pastRange === 'custom' && (
-					<View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-						<View style={{ flex: 1, gap: 4 }}>
-							<Text style={styles.fieldLabel}>From</Text>
-							<TextInput value={pastFrom} onChangeText={setPastFrom} style={styles.dateInput} placeholder="YYYY-MM-DD" />
-						</View>
-						<View style={{ flex: 1, gap: 4 }}>
-							<Text style={styles.fieldLabel}>To</Text>
-							<TextInput value={pastTo} onChangeText={setPastTo} style={styles.dateInput} placeholder="YYYY-MM-DD" />
-						</View>
-					</View>
-				)}
-			</AppBottomSheet>
+			<ScheduleCalendarSheet
+				visible={upCalOpen}
+				onClose={() => setUpCalOpen(false)}
+				selected={upDay}
+				onSelect={setUpDay}
+				onClear={() => {
+					setUpDay(null)
+					setUpCalOpen(false)
+				}}
+				markedDates={upMarkedDates}
+				minDate={isoPlusDays(todayIso(), 1)}
+				monthsAhead={3}
+				applyLabel={`Show ${upCountLabel}`}
+			/>
 
 			<AppBottomSheet
-				visible={pastFilterSheetOpen}
-				title="Filter appointments"
-				onClose={() => setPastFilterSheetOpen(false)}
+				visible={!!pastSheet}
+				title={pastSheet === 'filter' ? 'Filter appointments' : 'Show appointments from'}
+				onClose={() => setPastSheet(null)}
 				appearance="modern"
 				footer={
-					<TouchableOpacity style={styles.applyBtn} onPress={() => setPastFilterSheetOpen(false)}>
-						<Text style={styles.applyBtnText}>Apply</Text>
-					</TouchableOpacity>
+					<View style={styles.footerRow}>
+						<TouchableOpacity style={styles.secondaryBtn} onPress={resetPast}>
+							<Text style={styles.secondaryBtnText}>Reset</Text>
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.primaryBtn} onPress={() => setPastSheet(null)}>
+							<Text style={styles.primaryBtnText}>{pastApplyLabel}</Text>
+						</TouchableOpacity>
+					</View>
 				}
 			>
-				<View style={{ gap: 16 }}>
-					<View style={{ gap: 8 }}>
-						<Text style={styles.fieldLabel}>Status</Text>
-						<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-							{[{ id: 'all', label: 'All' }, ...statusOptions.map((s) => ({ id: s.label.toLowerCase(), label: s.label }))].map((s) => {
-								const on = s.id === pastStatus
+				{pastSheet === 'filter' ? (
+					<View style={{ gap: 16 }}>
+						<View style={{ gap: 8 }}>
+							<Text style={styles.fieldLabel}>Status</Text>
+							<View style={styles.chipWrap}>
+								{PAST_STATUS_FILTERS.map((s) => {
+									const on = s.id === pastStatus
+									return (
+										<TouchableOpacity key={s.id} style={[styles.filterChip, on && styles.filterChipOn]} onPress={() => setPastStatus(s.id)} accessibilityState={{ selected: on }}>
+											<Text style={[styles.filterChipText, on && styles.filterChipTextOn]}>{s.label}</Text>
+										</TouchableOpacity>
+									)
+								})}
+							</View>
+						</View>
+						<View style={{ gap: 8 }}>
+							<Text style={styles.fieldLabel}>Visit type</Text>
+							<View style={styles.chipWrap}>
+								{([
+									{ id: 'all', label: 'All' },
+									{ id: 'clinic', label: 'In-clinic' },
+									{ id: 'video', label: 'Video' },
+								] as const).map((m) => {
+									const on = m.id === pastMode
+									return (
+										<TouchableOpacity key={m.id} style={[styles.filterChip, on && styles.filterChipOn]} onPress={() => setPastMode(m.id)} accessibilityState={{ selected: on }}>
+											<Text style={[styles.filterChipText, on && styles.filterChipTextOn]}>{m.label}</Text>
+										</TouchableOpacity>
+									)
+								})}
+							</View>
+						</View>
+					</View>
+				) : (
+					<View style={{ gap: 14 }}>
+						<View>
+							{PAST_RANGES.map((r) => {
+								const on = r.id === pastRange
 								return (
-									<TouchableOpacity key={s.id} style={[styles.filterChip, on && styles.filterChipOn]} onPress={() => setPastStatus(s.id)}>
-										<Text style={[styles.filterChipText, on && styles.filterChipTextOn]}>{s.label}</Text>
+									<TouchableOpacity key={r.id} style={styles.radioRow} onPress={() => setPastRange(r.id)} accessibilityRole="radio" accessibilityState={{ checked: on }}>
+										<Text style={[styles.radioLabel, on && styles.radioLabelOn]}>{r.label}</Text>
+										<MaterialCommunityIcons name={on ? 'radiobox-marked' : 'radiobox-blank'} size={22} color={on ? APP_COLORS.primary : APP_COLORS.border} />
 									</TouchableOpacity>
 								)
 							})}
 						</View>
+						{pastRange === 'custom' && (
+							<View style={{ flexDirection: 'row', gap: 8 }}>
+								<View style={{ flex: 1, gap: 4 }}>
+									<Text style={styles.dateFieldLabel}>From</Text>
+									<TextInput value={pastFrom} onChangeText={setPastFrom} style={styles.dateInput} placeholder="YYYY-MM-DD" autoCorrect={false} />
+								</View>
+								<View style={{ flex: 1, gap: 4 }}>
+									<Text style={styles.dateFieldLabel}>To</Text>
+									<TextInput value={pastTo} onChangeText={setPastTo} style={styles.dateInput} placeholder="YYYY-MM-DD" autoCorrect={false} />
+								</View>
+							</View>
+						)}
 					</View>
-					<View style={{ gap: 8 }}>
-						<Text style={styles.fieldLabel}>Visit type</Text>
-						<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-							{([{ id: 'all', label: 'All' }, { id: 'clinic', label: 'In-clinic' }, { id: 'video', label: 'Video' }] as const).map((m) => {
-								const on = m.id === pastMode
-								return (
-									<TouchableOpacity key={m.id} style={[styles.filterChip, on && styles.filterChipOn]} onPress={() => setPastMode(m.id)}>
-										<Text style={[styles.filterChipText, on && styles.filterChipTextOn]}>{m.label}</Text>
-									</TouchableOpacity>
-								)
-							})}
-						</View>
-					</View>
-				</View>
+				)}
 			</AppBottomSheet>
 
 			{sheet && (
@@ -697,11 +864,21 @@ const styles = StyleSheet.create({
 	chipOn: { borderColor: APP_COLORS.ink, backgroundColor: APP_COLORS.ink },
 	chipText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.ink },
 	chipTextOn: { color: '#FFFFFF' },
-	emptyText: { fontSize: 14, lineHeight: 20, color: APP_COLORS.inkMuted, textAlign: 'center' },
+	emptyPlain: { fontSize: 14, lineHeight: 20, color: APP_COLORS.inkMuted },
+	emptyTitle: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
 	hintText: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.inkMuted },
-	rangeBtn: {
-		flex: 1,
-		minWidth: 0,
+	modeTrack: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 8, backgroundColor: APP_COLORS.mint },
+	modeBtn: { flex: 1, height: 36, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+	modeBtnOn: {
+		backgroundColor: '#FFFFFF',
+		shadowColor: APP_COLORS.ink,
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.12,
+		shadowRadius: 3,
+		elevation: 1,
+	},
+	modeBtnText: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
+	selectBtn: {
 		height: 44,
 		paddingHorizontal: 12,
 		borderWidth: 1,
@@ -712,7 +889,10 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		gap: 8,
 	},
-	rangeBtnText: { flex: 1, fontSize: 14, lineHeight: 18, fontWeight: '700', color: APP_COLORS.ink },
+	selectBtnActive: { backgroundColor: APP_COLORS.mint, borderColor: APP_COLORS.primary },
+	selectBtnText: { flex: 1, fontSize: 14, lineHeight: 18, fontWeight: '700', color: APP_COLORS.ink },
+	countRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+	linkText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.primary },
 	filterBtn: {
 		height: 44,
 		paddingHorizontal: 14,
@@ -727,13 +907,13 @@ const styles = StyleSheet.create({
 	filterBtnActive: { backgroundColor: APP_COLORS.mint, borderColor: APP_COLORS.primary },
 	filterBtnText: { fontSize: 14, lineHeight: 18, fontWeight: '700', color: APP_COLORS.ink },
 	summaryText: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
-	summaryBold: { color: APP_COLORS.ink, fontWeight: '800' },
-	groupLabel: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 0.4, color: APP_COLORS.inkMuted },
+	summaryBold: { fontSize: 13, lineHeight: 18, color: APP_COLORS.ink, fontWeight: '800' },
+	groupLabel: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 0.5, color: APP_COLORS.inkMuted },
 	resetBtn: { height: 36, paddingHorizontal: 12, borderRadius: 8, backgroundColor: APP_COLORS.mint, alignItems: 'center', justifyContent: 'center' },
 	resetBtnText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.primary },
 	radioRow: {
 		minHeight: 52,
-		paddingVertical: 12,
+		paddingHorizontal: 4,
 		borderBottomWidth: 1,
 		borderBottomColor: APP_COLORS.divider,
 		flexDirection: 'row',
@@ -743,6 +923,7 @@ const styles = StyleSheet.create({
 	radioLabel: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: APP_COLORS.ink },
 	radioLabelOn: { fontWeight: '800' },
 	fieldLabel: { fontSize: 13, lineHeight: 18, fontWeight: '800', color: APP_COLORS.ink },
+	dateFieldLabel: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.inkMuted },
 	dateInput: {
 		height: 44,
 		paddingHorizontal: 10,
@@ -750,33 +931,35 @@ const styles = StyleSheet.create({
 		borderColor: APP_COLORS.border,
 		borderRadius: 6,
 		backgroundColor: APP_COLORS.surface,
-		fontSize: 14,
+		fontSize: 15,
 		color: APP_COLORS.ink,
 	},
+	chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 	filterChip: {
 		height: 40,
 		paddingHorizontal: 14,
 		borderRadius: 6,
 		borderWidth: 1,
 		borderColor: APP_COLORS.divider,
+		backgroundColor: '#FFFFFF',
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	filterChipOn: { backgroundColor: APP_COLORS.mint, borderColor: APP_COLORS.primary },
+	filterChipOn: { backgroundColor: APP_COLORS.ink, borderColor: APP_COLORS.ink },
 	filterChipText: { fontSize: 14, lineHeight: 18, fontWeight: '700', color: APP_COLORS.ink },
-	filterChipTextOn: { color: APP_COLORS.primary },
-	applyBtn: { height: 48, borderRadius: 10, backgroundColor: APP_COLORS.primary, alignItems: 'center', justifyContent: 'center' },
-	applyBtnText: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: '#FFFFFF' },
-	searchBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		height: 44,
-		paddingHorizontal: 12,
-		borderWidth: 1,
+	filterChipTextOn: { color: '#FFFFFF' },
+	footerRow: { flexDirection: 'row', gap: 8 },
+	secondaryBtn: {
+		height: 52,
+		paddingHorizontal: 18,
+		borderWidth: 1.5,
 		borderColor: APP_COLORS.border,
 		borderRadius: 8,
-		backgroundColor: APP_COLORS.surface,
+		backgroundColor: '#FFFFFF',
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
-	searchInput: { flex: 1, fontSize: 15, color: APP_COLORS.ink },
+	secondaryBtnText: { fontSize: 14, fontWeight: '700', color: APP_COLORS.ink },
+	primaryBtn: { flex: 1, height: 52, borderRadius: 8, backgroundColor: APP_COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+	primaryBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
 })

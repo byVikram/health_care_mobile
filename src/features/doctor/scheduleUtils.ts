@@ -84,7 +84,7 @@ export const formatTime12h = (t?: string | null): string => {
 	const [h, m] = t.split(':').map(Number)
 	const suffix = h >= 12 ? 'PM' : 'AM'
 	const hour = h > 12 ? h - 12 : h === 0 ? 12 : h
-	return `${String(hour).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`
+	return `${hour}:${String(m).padStart(2, '0')} ${suffix}`
 }
 
 export const isVideoMode = (mode?: string | null): boolean => mode === 'video_call' || mode === 'video call'

@@ -33,7 +33,7 @@ import {
 import { getAppointmentById } from '../../../../services/appointmentService'
 import { ROUTES } from '../../../../navigation/routes'
 import type { AppStackParamList } from '../../../../navigation/types'
-import { openOnMap } from '../../../../utils/maps'
+import { openDirections } from '../../../../utils/maps'
 import { buildS3Url } from '../../../../utils/s3Utils'
 import { capitaliseWords } from '../../../../utils/formatters'
 import { showComingSoon } from '../../../../utils/toast'
@@ -215,7 +215,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	const goSummary = () => {
 		if (appt) navigation.navigate(ROUTES.STACK.VISIT_SUMMARY, { appointmentId: appt.id })
 	}
-	const directions = () => openOnMap(hospital?.address, hospital?.name)
+	const directions = () => openDirections(hospital?.latitude, hospital?.longitude, hospital?.address, hospital?.name)
 
 	const openReschedule = () => {
 		if (!doctorId) {

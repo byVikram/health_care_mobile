@@ -13,8 +13,8 @@ export interface DoctorDetailHospital {
 		address: string
 		contact_number: string
 		distance: string
-		latitude: number
-		longitude: number
+		latitude: number | null
+		longitude: number | null
 	}
 }
 

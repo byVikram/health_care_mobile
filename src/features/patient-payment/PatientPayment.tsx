@@ -281,6 +281,8 @@ export default function BookingDetailsScreen() {
 			timeDisplay: bookingTime,
 			hospitalName: bookingHospitalName,
 			hospitalAddress: bookingHospitalAddress,
+			hospitalLatitude: selectedHospital?.hospital.latitude ?? null,
+			hospitalLongitude: selectedHospital?.hospital.longitude ?? null,
 			patientName: patientDisplayName,
 			fee: bookingFee,
 			paymentMethodLabel: PAYMENT_METHOD_LABELS[method],

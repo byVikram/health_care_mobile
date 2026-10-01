@@ -7,12 +7,15 @@
 
 import React from 'react'
 import { ScrollView, StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../display/AppTypography'
 import { APP_COLORS } from '../../../config/theme'
 
 export interface AppTabItem<K extends string = string> {
 	key: K
 	label: string
+	/** Optional MaterialCommunityIcons glyph shown before the label, in the tab's active/inactive colour. */
+	icon?: keyof typeof MaterialCommunityIcons.glyphMap
 	/** Optional count shown as a small pill after the label. */
 	count?: number
 	disabled?: boolean
@@ -56,6 +59,7 @@ export function AppTabs<K extends string = string>({
 				accessibilityLabel={tab.count != null ? `${tab.label}, ${tab.count}` : tab.label}
 			>
 				<View style={styles.labelRow}>
+					{tab.icon ? <MaterialCommunityIcons name={tab.icon} size={17} color={color} /> : null}
 					<AppTypography
 						style={[styles.label, on ? styles.labelOn : styles.labelOff, { color }]}
 						numberOfLines={1}
