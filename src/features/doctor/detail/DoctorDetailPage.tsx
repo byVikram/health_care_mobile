@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react'
 import {
+	Animated,
 	LayoutChangeEvent,
 	NativeScrollEvent,
 	NativeSyntheticEvent,
-	ScrollView,
 	Share,
 	StyleSheet,
 	TouchableOpacity,
@@ -14,14 +14,12 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import {
 	AppActionChip,
-	AppAvatar,
 	AppButton,
 	AppChip,
 	AppDashedDivider,
 	AppFooterBar,
 	AppIconButton,
 	AppIconTile,
-	AppScreenHeader,
 	AppSection,
 	AppSkeleton,
 	AppStatRow,
@@ -35,11 +33,12 @@ import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
 import { formatDateForApi } from '../../../utils/date'
 import { capitalize } from '../../../utils/formatters'
-import { openOnMap } from '../../../utils/maps'
+import { openDirections } from '../../../utils/maps'
 import { AppointmentModeKey, firstOpenSlot, normalizeAvailabilityByMode } from '../availability'
 import { shortClinic } from '../doctorFormatters'
 import { APP_COLORS, TONES, formatInr, toneAt } from '../../../config/theme'
 import { DOCTOR_PROFILE_GOOD_TO_KNOW_MOCK } from './doctorProfileMockData'
+import { CollapsingProfileHeader, PROFILE_AVATAR_SIZE } from './CollapsingProfileHeader'
 
 // Design tokens matching the "Doctor profile" HTML design exactly.
 const PRIMARY = APP_COLORS.primary
@@ -48,7 +47,6 @@ const INK_MUTED = APP_COLORS.inkMuted
 const DIVIDER = APP_COLORS.divider
 const PAGE_BG = APP_COLORS.pageBg
 const SPEC_TONE = TONES.lilac.ink
-const SPEC_TONE_BG = TONES.lilac.bg
 const SUCCESS = APP_COLORS.success
 
 type ProfileTabKey = 'about' | 'services' | 'clinics' | 'awards'
@@ -60,8 +58,6 @@ const PROFILE_TABS: { key: ProfileTabKey; label: string }[] = [
 ]
 
 const TREATMENTS_COLLAPSED_COUNT = 4
-// Scroll offset after which the header swaps "Doctor profile" for the doctor's identity.
-const COMPACT_HEADER_AT = 150
 
 /** Today's first open slot per hospital, split by mode (null = none left today). */
 type TodaySlots = Record<string, Record<AppointmentModeKey, TimeSlot | null>>
@@ -97,8 +93,8 @@ export default function DoctorDetailPage() {
 	// Real "next slot today" per hospital (undefined = still loading)
 	const [todaySlots, setTodaySlots] = useState<TodaySlots | undefined>(undefined)
 
-	// Collapsing header: swap the title for the doctor's identity once scrolled past the hero
-	const [compact, setCompact] = useState(false)
+	// Drives the collapsing header + flying avatar (see CollapsingProfileHeader)
+	const scrollY = useRef(new Animated.Value(0)).current
 
 	// ---- Presentation-only: sticky tab scroll-spy (About/Services/Clinics/Awards) ----
 	const scrollRef = useRef<any>(null)
@@ -121,8 +117,6 @@ export default function DoctorDetailPage() {
 	const handleContentScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
 		const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent
 		const y = contentOffset.y
-		const nextCompact = y > COMPACT_HEADER_AT
-		setCompact((prev) => (prev === nextCompact ? prev : nextCompact))
 		if (jumpingRef.current) return
 		const offsets = sectionOffsets.current
 		let next: ProfileTabKey = 'about'
@@ -318,45 +312,26 @@ export default function DoctorDetailPage() {
 
 	return (
 		<View style={styles.container}>
-			{/* Header -- "Doctor profile" collapses into the doctor's identity on scroll */}
-			<AppScreenHeader
-				variant="bar"
-				title={compact ? doctor.name : 'Doctor profile'}
-				subtitle={compact ? headerSub : undefined}
-				leading={
-					compact ? (
-						<AppAvatar
-							uri={avatarUrl}
-							size={36}
-							borderWidth={2}
-							borderColor="#fff"
-							backgroundColor={SPEC_TONE_BG}
-							fallbackIcon="account"
-							initialsColor={SPEC_TONE}
-						/>
-					) : undefined
-				}
+			{/* Header + flying avatar -- "Doctor profile" collapses into the doctor's identity as you scroll */}
+			<CollapsingProfileHeader
+				scrollY={scrollY}
+				name={doctor.name}
+				subtitle={headerSub}
+				avatarUri={avatarUrl}
+				available={availableToday}
 				onBack={() => navigation.goBack()}
-				backAccessibilityLabel="Back to doctors"
-				style={compact && styles.headerCompact}
-				rightElement={
-					<AppIconButton
-						icon="share-variant-outline"
-						variant="ghost"
-						size={44}
-						onPress={handleShare}
-						accessibilityLabel="Share profile"
-						style={styles.headerShareBtn}
-					/>
-				}
+				onShare={handleShare}
 			/>
 
-			<ScrollView
+			<Animated.ScrollView
 				ref={scrollRef}
 				style={styles.scrollArea}
 				contentContainerStyle={{ paddingBottom: 8 }}
 				scrollEventThrottle={16}
-				onScroll={handleContentScroll}
+				onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+					useNativeDriver: true,
+					listener: handleContentScroll,
+				})}
 				stickyHeaderIndices={[1]}
 			>
 				{/* Hero / profile identity */}
@@ -366,18 +341,8 @@ export default function DoctorDetailPage() {
 						<View style={styles.heroDecorCircleBottom} />
 					</View>
 					<View style={styles.profileCard}>
-						<View style={styles.profileAvatarWrap}>
-							<AppAvatar
-								uri={avatarUrl}
-								size={112}
-								borderWidth={4}
-								borderColor="#FFFFFF"
-								backgroundColor={SPEC_TONE_BG}
-								fallbackIcon="account"
-								initialsColor={SPEC_TONE}
-							/>
-							{availableToday && <View style={styles.profileAvatarBadge} />}
-						</View>
+						{/* Empty slot where the avatar rests: the real (flying) avatar is drawn by CollapsingProfileHeader. */}
+						<View style={styles.profileAvatarSlot} />
 
 						<AppTypography variant="h3" style={styles.doctorName} numberOfLines={2}>
 							{doctor.name}
@@ -603,7 +568,9 @@ export default function DoctorDetailPage() {
 								feeUnit="per visit"
 								nextSlot={slot ? `Today, ${slot.start_time}` : slotsKnown ? 'See all slots' : '…'}
 								nextToday={!!slot}
-								onDirections={() => openOnMap(entry.hospital.address, entry.hospital.name)}
+								onDirections={() =>
+									openDirections(entry.hospital.latitude, entry.hospital.longitude, entry.hospital.address, entry.hospital.name)
+								}
 								directionsLabel={`Directions to ${entry.hospital.name}`}
 								onBook={() => goToBookSlot(entry.hospital.id, 'clinic')}
 							/>
@@ -708,7 +675,7 @@ export default function DoctorDetailPage() {
 						))}
 					</View>
 				</AppSection>
-			</ScrollView>
+			</Animated.ScrollView>
 
 			{/* Footer -- "Fee from" + Book appointment (goes to the Clinic & slot step) */}
 			<AppFooterBar gap={12}>
@@ -840,19 +807,9 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		marginTop: -60,
 	},
-	profileAvatarWrap: {
-		position: 'relative',
-	},
-	profileAvatarBadge: {
-		position: 'absolute',
-		right: 6,
-		bottom: 6,
-		width: 22,
-		height: 22,
-		borderRadius: 9999,
-		backgroundColor: SUCCESS,
-		borderWidth: 3,
-		borderColor: '#FFFFFF',
+	profileAvatarSlot: {
+		width: PROFILE_AVATAR_SIZE,
+		height: PROFILE_AVATAR_SIZE,
 	},
 	doctorName: {
 		marginTop: 8,
@@ -906,16 +863,6 @@ const styles = StyleSheet.create({
 	mutedSmall: { color: INK_MUTED, fontSize: 12 },
 
 	muted13: { color: INK_MUTED, fontSize: 13, lineHeight: 18 },
-
-	// Header
-	headerCompact: {
-		shadowColor: APP_COLORS.shadow,
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.16,
-		shadowRadius: 8,
-		elevation: 4,
-	},
-	headerShareBtn: { marginRight: -10 },
 
 	heroSection: { backgroundColor: '#fff', paddingBottom: 16 },
 

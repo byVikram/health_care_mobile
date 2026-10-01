@@ -98,6 +98,9 @@ export type AppointmentConfirmedParams = {
 	timeDisplay: string
 	hospitalName: string
 	hospitalAddress?: string
+	/** Clinic map position, for the Directions button (omitted/null -> address search). */
+	hospitalLatitude?: number | null
+	hospitalLongitude?: number | null
 	patientName: string
 	fee: number
 	paymentMethodLabel: string

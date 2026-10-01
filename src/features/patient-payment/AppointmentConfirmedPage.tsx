@@ -12,7 +12,7 @@ import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
-import { openOnMap } from '../../utils/maps'
+import { openDirections } from '../../utils/maps'
 import { buildS3Url } from '../../utils/s3Utils'
 import { showComingSoon } from '../../utils/toast'
 import { APP_COLORS, TONES, formatInr } from '../../config/theme'
@@ -201,7 +201,9 @@ export default function AppointmentConfirmedPage() {
 									variant="tinted"
 									tone="sky"
 									style={styles.flex}
-									onPress={() => openOnMap(params.hospitalAddress, params.hospitalName)}
+									onPress={() =>
+										openDirections(params.hospitalLatitude, params.hospitalLongitude, params.hospitalAddress, params.hospitalName)
+									}
 								/>
 							)}
 						</>

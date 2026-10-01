@@ -4,7 +4,7 @@ import { BlurView } from 'expo-blur'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useTheme } from 'react-native-paper'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { MainTabParamList } from './types'
@@ -91,7 +91,6 @@ interface DockedTabBarProps extends BottomTabBarProps {
 }
 
 function DockedTabBar({ state, descriptors, navigation, onAncillaryPress }: DockedTabBarProps) {
-	const theme = useTheme()
 	const insets = useSafeAreaInsets()
 	const activeRoute = state.routes[state.index]
 
@@ -187,13 +186,15 @@ interface FloatingTab {
 	/** Tab route to navigate to; null = opens the "Healthcare at home" sheet instead. */
 	route: string | null
 	label: string
+	/** Shorter text for the labelled bar when `label` is too long to fit under the icon. */
+	shortLabel?: string
 	icon: HomeChromeIcon
 }
 
 const PATIENT_TABS: FloatingTab[] = [
 	{ key: 'home', route: ROUTES.MAIN.HOME, label: 'Home', icon: 'home' },
 	{ key: 'search', route: ROUTES.MAIN.SEARCH, label: 'Search', icon: 'search' },
-	{ key: 'care', route: null, label: 'Healthcare at home', icon: 'careAtHome' },
+	{ key: 'care', route: null, label: 'Healthcare at home', shortLabel: 'Home care', icon: 'careAtHome' },
 	{ key: 'bookings', route: ROUTES.MAIN.PORTAL, label: 'Bookings', icon: 'bookings' },
 	{ key: 'wallet', route: ROUTES.MAIN.WALLET, label: 'Wallet', icon: 'wallet' },
 ]
@@ -208,17 +209,41 @@ const PROVIDER_TABS: FloatingTab[] = [
 /** The 4-button provider pill sits 36 from the sides (design); the 5-button patient pill 20. */
 const PROVIDER_PILL_SIDE = 36
 
-/** Doctor dashboard tab bar: same floating-pill treatment as the patient tabs, different destinations. */
+/** Doctor dashboard tab bar (design): Home · Schedule · Questions · Profile. Wallet stays reachable from the menu. */
 const DOCTOR_TABS: FloatingTab[] = [
 	{ key: 'home', route: ROUTES.MAIN.HOME, label: 'Home', icon: 'home' },
 	{ key: 'schedule', route: ROUTES.MAIN.SCHEDULE, label: 'Schedule', icon: 'appointments' },
 	{ key: 'engage', route: ROUTES.MAIN.ENGAGE, label: 'Questions', icon: 'help' },
-	{ key: 'wallet', route: ROUTES.MAIN.WALLET, label: 'Wallet', icon: 'wallet' },
 	{ key: 'profile', route: ROUTES.MAIN.PROFILE, label: 'Profile', icon: 'profile' },
 ]
 
 // Android's BlurView has no real blur without an experimental method, so the fill is more opaque there.
 const PILL_FILL = Platform.OS === 'ios' ? '#FFFFFF59' : '#FFFFFFE6'
+
+/** Shared by both floating bars: the tab's route, whether it is the active one, and its press handler. */
+function resolveFloatingTab(
+	tab: FloatingTab,
+	state: BottomTabBarProps['state'],
+	navigation: BottomTabBarProps['navigation'],
+	careOpen: boolean,
+	openCare: () => void,
+) {
+	const activeName = state.routes[state.index]?.name
+	const route = tab.route ? state.routes.find((r) => r.name === tab.route) : undefined
+	const active = careOpen ? tab.route === null : tab.route === null ? activeName === ROUTES.MAIN.ANCILLARY : tab.route === activeName
+
+	const onPress = () => {
+		if (!route) {
+			openCare()
+			return
+		}
+		const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
+		if (event.defaultPrevented) return
+		if (route.name !== activeName || careOpen) navigation.navigate(route.name, route.params)
+	}
+
+	return { route, active, onPress }
+}
 
 interface FloatingTabBarProps extends BottomTabBarProps {
 	/** Which tab set to render. Defaults to the patient tabs (with the "Healthcare at home" sheet button). */
@@ -264,23 +289,8 @@ function FloatingTabBar({ state, navigation, tabs = PATIENT_TABS, side = FLOATIN
 					<BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
 					<View style={[StyleSheet.absoluteFill, { backgroundColor: PILL_FILL }]} />
 					{tabs.map((tab) => {
-						const route = tab.route ? state.routes.find((r) => r.name === tab.route) : undefined
+						const { route, active, onPress } = resolveFloatingTab(tab, state, navigation, careOpen, () => open('ancillary'))
 						if (tab.route && !route) return null
-						const active = careOpen
-							? tab.route === null
-							: tab.route === null
-								? activeName === ROUTES.MAIN.ANCILLARY
-								: tab.route === activeName
-
-						const onPress = () => {
-							if (!route) {
-								open('ancillary')
-								return
-							}
-							const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
-							if (event.defaultPrevented) return
-							if (route.name !== activeName || careOpen) navigation.navigate(route.name, route.params)
-						}
 
 						return (
 							<Pressable
@@ -312,6 +322,84 @@ function FloatingTabBar({ state, navigation, tabs = PATIENT_TABS, side = FLOATIN
 	)
 }
 
+// ── Labelled bar ("Light 6" frosted-glass design) ─────────────────────────────────────────────────
+// 66-high fully rounded glass pill; every tab is an equal-width, 52-high, fully rounded slot holding a
+// 24px icon over an 11px label, and the active slot fills teal (white icon + label). Patient (5 tabs)
+// sits 16 from the sides, doctor (4 tabs) 48.
+const LABELLED_BAR_HEIGHT = 66
+const LABELLED_ITEM_HEIGHT = 52
+const PATIENT_LABELLED_SIDE = 16
+const DOCTOR_LABELLED_SIDE = 48
+// Top-to-bottom white wash of the glass (design: #FFFFFFB3 -> #FFFFFF8C); Android's BlurView doesn't really blur, so it's more opaque there.
+const GLASS_TOP_OPACITY = Platform.OS === 'ios' ? 0.7 : 0.92
+const GLASS_BOTTOM_OPACITY = Platform.OS === 'ios' ? 0.55 : 0.88
+
+function LabelledTabBar({
+	state,
+	navigation,
+	tabs,
+	side,
+}: BottomTabBarProps & { tabs: FloatingTab[]; side: number }) {
+	const insets = useSafeAreaInsets()
+	const { openSheet, open } = useHomeSheets()
+	const activeName = state.routes[state.index]?.name
+
+	if (activeName === ROUTES.MAIN.PROFILE) {
+		return null
+	}
+
+	const careOpen = openSheet === 'ancillary'
+	const floating = FLOATING_TAB_ROUTES.includes(activeName)
+	const bottom = FLOATING_TAB_BAR_BOTTOM + insets.bottom
+
+	return (
+		<View
+			pointerEvents="box-none"
+			style={[floating ? styles.floatingWrapOverlay : styles.floatingWrapBand, { height: LABELLED_BAR_HEIGHT + bottom + (floating ? 0 : 8) }]}
+		>
+			<View style={[styles.labelledShadow, { bottom, left: side, right: side }]}>
+				<View style={styles.labelledBar}>
+					<BlurView intensity={50} tint="light" style={StyleSheet.absoluteFill} />
+					<Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+						<Defs>
+							<LinearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+								<Stop offset="0" stopColor="#FFFFFF" stopOpacity={GLASS_TOP_OPACITY} />
+								<Stop offset="1" stopColor="#FFFFFF" stopOpacity={GLASS_BOTTOM_OPACITY} />
+							</LinearGradient>
+						</Defs>
+						<Rect width="100%" height="100%" fill="url(#glass)" />
+					</Svg>
+					<View pointerEvents="none" style={styles.labelledHighlight} />
+					{tabs.map((tab) => {
+						const { route, active, onPress } = resolveFloatingTab(tab, state, navigation, careOpen, () => open('ancillary'))
+						if (tab.route && !route) return null
+						const color = active ? '#FFFFFF' : APP_COLORS.inkMuted
+
+						return (
+							<Pressable
+								key={tab.key}
+								onPress={onPress}
+								onLongPress={route ? () => navigation.emit({ type: 'tabLongPress', target: route.key }) : undefined}
+								accessibilityRole="button"
+								accessibilityLabel={tab.label}
+								accessibilityState={{ selected: active }}
+								accessibilityHint={route ? undefined : 'Opens home healthcare services'}
+								style={[styles.labelledItem, active && styles.labelledItemActive]}
+							>
+								<View style={styles.labelledIcon}>
+									<AppPathIcon d={HOME_CHROME_PATHS[tab.icon]} size={22} strokeWidth={2.1} color={color} />
+								</View>
+								<Text numberOfLines={1} style={[styles.labelledLabel, { color, fontWeight: active ? '800' : '600' }]}>
+									{tab.shortLabel ?? tab.label}
+								</Text>
+							</Pressable>
+						)
+					})}
+				</View>
+			</View>
+		</View>
+	)
+}
 export default function MainTabNavigator() {
 	return (
 		<HomeSheetsProvider>
@@ -339,9 +427,9 @@ function MainTabs() {
 			<Tab.Navigator
 				tabBar={(props) =>
 					isPatient ? (
-						<FloatingTabBar {...props} />
+						<LabelledTabBar {...props} tabs={PATIENT_TABS} side={PATIENT_LABELLED_SIDE} />
 					) : isDoctor ? (
-						<FloatingTabBar {...props} tabs={DOCTOR_TABS} badgeRoutes={[]} />
+						<LabelledTabBar {...props} tabs={DOCTOR_TABS} side={DOCTOR_LABELLED_SIDE} />
 					) : isNurse ? (
 						<FloatingTabBar {...props} tabs={PROVIDER_TABS} side={PROVIDER_PILL_SIDE} />
 					) : (
@@ -464,6 +552,59 @@ const styles = StyleSheet.create({
 		backgroundColor: APP_COLORS.offer,
 		borderWidth: 2,
 		borderColor: '#FFFFFF',
+	},
+	labelledShadow: {
+		position: 'absolute',
+		height: LABELLED_BAR_HEIGHT,
+		borderRadius: LABELLED_BAR_HEIGHT / 2,
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.15,
+		shadowRadius: 28,
+		elevation: 6,
+	},
+	labelledBar: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 2,
+		paddingHorizontal: 8,
+		borderRadius: LABELLED_BAR_HEIGHT / 2,
+		borderWidth: 1,
+		borderColor: '#FFFFFFCC',
+		overflow: 'hidden',
+	},
+	// 1px white sheen along the top edge (the design's inset highlight).
+	labelledHighlight: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		height: 1,
+		backgroundColor: '#FFFFFF',
+	},
+	labelledItem: {
+		flex: 1,
+		minWidth: 0,
+		height: LABELLED_ITEM_HEIGHT,
+		borderRadius: LABELLED_ITEM_HEIGHT / 2,
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 3,
+	},
+	labelledItemActive: {
+		backgroundColor: APP_COLORS.primary,
+	},
+	labelledIcon: {
+		width: 24,
+		height: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	labelledLabel: {
+		fontSize: 11,
+		lineHeight: 14,
 	},
 	tabBar: {
 		flexDirection: 'row',

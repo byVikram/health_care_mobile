@@ -57,6 +57,8 @@ export interface AppOtpInputProps {
 	shake?: number
 	/** Accessibility label prefix for each box, e.g. "Start code" gives "Start code digit 1 of 4". */
 	accessibilityLabel?: string
+	/** Height of each digit box (default 56). Lower it for longer codes so the boxes stay close to square. */
+	boxHeight?: number
 	style?: StyleProp<ViewStyle>
 }
 
@@ -72,6 +74,7 @@ export function AppOtpInput({
 	caret = false,
 	shake,
 	accessibilityLabel = 'Code',
+	boxHeight = 56,
 	style,
 }: AppOtpInputProps) {
 	const inputs = useRef<TextInput[]>([])
@@ -131,6 +134,7 @@ export function AppOtpInput({
 							}}
 							style={[
 								styles.input,
+								{ height: boxHeight },
 								filled && styles.inputFilled,
 								focused && styles.inputFocused,
 								error && styles.inputError,
@@ -195,8 +199,12 @@ const styles = StyleSheet.create({
 		borderColor: APP_COLORS.divider,
 		backgroundColor: APP_COLORS.pageBg,
 		textAlign: 'center',
+		// Centre the digit in the box: no default vertical padding, centred on Android, no font padding
+		// (a lineHeight on a single-line TextInput pushes the text off-centre on iOS, so none is set).
+		textAlignVertical: 'center',
+		includeFontPadding: false,
+		paddingVertical: 0,
 		fontSize: 22,
-		lineHeight: 28,
 		fontWeight: '800',
 		color: APP_COLORS.ink,
 	},

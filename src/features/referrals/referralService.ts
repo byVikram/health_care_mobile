@@ -80,6 +80,8 @@ export interface AppNotification {
 	redirect_type: string | null
 	redirect_id: string | null
 	is_read: boolean
+	/** Urgent / safety alert -- pinned above its day's other notifications and always shown. */
+	is_critical?: boolean
 	created_at: string
 }
 

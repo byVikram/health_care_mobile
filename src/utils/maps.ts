@@ -20,12 +20,17 @@ export function openOnMap(address: string | undefined, name: string | undefined)
 }
 
 /**
- * Turn-by-turn directions to a coordinate (provider heading to a home visit). Falls back to the address
- * search when there's no coordinate.
+ * Turn-by-turn directions to a coordinate (a clinic, or a provider heading to a home visit). Falls back to
+ * the address (+ place name) search when there's no coordinate.
  */
-export async function openDirections(latitude?: number | null, longitude?: number | null, address?: string) {
+export async function openDirections(
+	latitude?: number | null,
+	longitude?: number | null,
+	address?: string,
+	name?: string,
+) {
 	if (latitude == null || longitude == null) {
-		openOnMap(address, undefined)
+		openOnMap(address, name)
 		return
 	}
 	const dest = `${latitude},${longitude}`

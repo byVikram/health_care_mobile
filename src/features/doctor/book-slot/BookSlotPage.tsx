@@ -24,7 +24,7 @@ import { useFamilyMembers } from '../../../hooks/useFamilyMembers'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
 import { formatDateDisplay, formatDateForApi, formatTimeForApi } from '../../../utils/date'
-import { openOnMap } from '../../../utils/maps'
+import { openDirections } from '../../../utils/maps'
 import { showComingSoon } from '../../../utils/toast'
 import {
 	AppointmentModeKey,
@@ -324,7 +324,7 @@ export default function BookSlotPage() {
 											size={36}
 											iconSize={16}
 											accessibilityLabel={`Directions to ${h.hospital.name}`}
-											onPress={() => openOnMap(h.hospital.address, h.hospital.name)}
+											onPress={() => openDirections(h.hospital.latitude, h.hospital.longitude, h.hospital.address, h.hospital.name)}
 										/>
 										<AppRadio checked={on} />
 									</Pressable>

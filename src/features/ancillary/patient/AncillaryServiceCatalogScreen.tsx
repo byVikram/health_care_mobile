@@ -103,8 +103,12 @@ type DetailTarget =
 	| { kind: 'package'; item: AncillaryPackageListItem }
 	| null
 
-const MAIN_TILES = 5
-const SHEET_TILES = 4
+// "Care for" tiles sit three to a row: at five/four per row a tile is ~65-85px wide and names like
+// "General Nursing Procedures" or "Specialized High Dependency Care" wrapped past two lines and got
+// cut off with an ellipsis. MAIN_TILES is how many tiles the main grid shows (two rows) before
+// folding the rest behind "+N more".
+const TILE_COLUMNS = 3
+const MAIN_TILES = 6
 
 const matchesQuery = (q: string, parts: (string | null | undefined)[]) =>
 	!q || parts.some((p) => !!p && p.toLowerCase().includes(q))
@@ -414,9 +418,9 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 
 	const firstName = (user?.name ?? '').trim().split(/\s+/)[0] ?? ''
 	const typeTabs: AppTabItem<TypeTab>[] = [
-		{ key: 'all', label: 'All' },
-		{ key: 'packages', label: 'Packages' },
-		{ key: 'procedures', label: copy.servicesTabLabel },
+		{ key: 'all', label: 'All', icon: 'view-grid-outline' },
+		{ key: 'packages', label: 'Packages', icon: 'package-variant-closed' },
+		{ key: 'procedures', label: copy.servicesTabLabel, icon: copy.isNursing ? 'needle' : 'medical-bag' },
 	]
 
 	// ---- sheet content ----
@@ -662,7 +666,7 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 				appearance="modern"
 				showHeaderDivider={false}
 			>
-				<TileRows categories={categories} activeId={categoryId} onPick={pickCategory} perRow={SHEET_TILES} />
+				<TileRows categories={categories} activeId={categoryId} onPick={pickCategory} perRow={TILE_COLUMNS} />
 			</AppBottomSheet>
 
 			<ServiceDetailsSheet
@@ -781,7 +785,7 @@ function CareTile({
 			<View style={[styles.tileIcon, { backgroundColor: active ? tone.ink : tone.bg }]}>
 				<AppPathIcon d={icon} size={18} strokeWidth={2} color={active ? APP_COLORS.surface : tone.ink} />
 			</View>
-			<Text style={styles.tileLabel} numberOfLines={2}>
+			<Text style={styles.tileLabel} numberOfLines={3}>
 				{label}
 			</Text>
 		</TouchableOpacity>
@@ -868,7 +872,7 @@ function CareForGrid({
 				categories={ordered.slice(0, shownCount)}
 				activeId={activeId}
 				onPick={onPick}
-				perRow={MAIN_TILES}
+				perRow={TILE_COLUMNS}
 				trailing={
 					overflow ? (
 						<TouchableOpacity

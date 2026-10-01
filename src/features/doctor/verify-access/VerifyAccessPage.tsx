@@ -188,6 +188,9 @@ export function VerifyAccessPage() {
 						autoFocus
 						disabled={verifying || tries === 0}
 						accessibilityLabel="One-time code"
+						// Six boxes across the card: wider track + tighter gap + a 48px height make each box ~47x48 (near square) instead of ~37x56.
+						boxHeight={48}
+						style={styles.otpRow}
 					/>
 					{error && (
 						<Text style={styles.errorText} accessibilityRole="alert">
@@ -306,6 +309,7 @@ const styles = StyleSheet.create({
 	lockChip: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: APP_COLORS.warningBg },
 	lockChipText: { fontSize: 11, lineHeight: 16, fontWeight: '700', color: APP_COLORS.warning },
 	otpTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
+	otpRow: { maxWidth: 320, gap: 8 },
 	otpSub: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
 	errorText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.danger },
 	resendRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },

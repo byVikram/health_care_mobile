@@ -24,7 +24,7 @@ import { APP_COLORS, TONES } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { Appointment } from '../../../types/appointment'
 import { combineDateTime, slotLabel } from '../../../utils/date'
-import { openOnMap } from '../../../utils/maps'
+import { openDirections } from '../../../utils/maps'
 import { getAppointments } from '../../doctor/doctorService'
 import { HOME_ICONS, homeSectionProps } from '../homeTheme'
 
@@ -181,7 +181,7 @@ export default function PatientUpcomingAppointments({ refreshToken, onRefreshCom
 					{canDirect && (
 						<AppIconButton
 							accessibilityLabel={`Directions to ${hospital?.name ?? 'clinic'}`}
-							onPress={() => openOnMap(hospital?.address, hospital?.name)}
+							onPress={() => openDirections(hospital?.latitude, hospital?.longitude, hospital?.address, hospital?.name)}
 						>
 							<AppIcon name="directions" size={18} color={APP_COLORS.primary} rounded />
 						</AppIconButton>
