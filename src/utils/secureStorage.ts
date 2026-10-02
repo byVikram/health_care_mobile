@@ -11,58 +11,61 @@ if (Platform.OS !== 'web') {
 	}
 }
 
+// Fail closed: if the platform keystore is unavailable or errors on a NATIVE
+// device, tokens are kept in memory only -- never written to plaintext
+// AsyncStorage. The session then lasts until the app process ends and the user
+// signs in again, which is far better than leaving a refresh token readable on
+// disk. (Web has no keystore and is not a supported target; it keeps using
+// AsyncStorage so the web build doesn't crash.)
+const memoryStore = new Map<string, string>()
+
+const usesAsyncStorage = () => Platform.OS === 'web'
+
+const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
 export const secureStorage = {
 	async getItem(key: string): Promise<string | null> {
-		if (Platform.OS !== 'web' && SecureStore) {
+		if (usesAsyncStorage()) return await AsyncStorage.getItem(key)
+		if (SecureStore) {
 			try {
-				return await SecureStore.getItemAsync(key)
+				const value = await SecureStore.getItemAsync(key)
+				if (value != null) return value
 			} catch (error) {
-				// FIXME: this falls back to unencrypted AsyncStorage but only
-				// warns in __DEV__ -- if SecureStore ever actually fails on a
-				// real device, tokens silently end up unencrypted with zero
-				// production visibility. Report this in production too (crash
-				// reporter breadcrumb, analytics event, etc.), not just __DEV__.
-				if (__DEV__) {
-					console.warn('[secureStorage] getItem fallback to AsyncStorage:', error)
-				}
+				console.warn('[secureStorage] getItem failed, using in-memory value only:', describe(error))
 			}
 		}
-		return await AsyncStorage.getItem(key)
+		return memoryStore.get(key) ?? null
 	},
 
 	async setItem(key: string, value: string): Promise<void> {
-		if (Platform.OS !== 'web' && SecureStore) {
+		if (usesAsyncStorage()) {
+			await AsyncStorage.setItem(key, value)
+			return
+		}
+		if (SecureStore) {
 			try {
 				await SecureStore.setItemAsync(key, value)
+				memoryStore.delete(key)
 				return
 			} catch (error) {
-				// FIXME: same production-visibility gap as getItem above -- this
-				// write silently lands in unencrypted AsyncStorage instead, with
-				// no signal outside __DEV__.
-				if (__DEV__) {
-					console.warn('[secureStorage] setItem fallback to AsyncStorage:', error)
-				}
+				console.warn('[secureStorage] setItem failed, keeping value in memory only:', describe(error))
 			}
 		}
-		await AsyncStorage.setItem(key, value)
+		memoryStore.set(key, value)
 	},
 
 	async deleteItem(key: string): Promise<void> {
-		if (Platform.OS !== 'web' && SecureStore) {
+		memoryStore.delete(key)
+		if (usesAsyncStorage()) {
+			await AsyncStorage.removeItem(key)
+			return
+		}
+		if (SecureStore) {
 			try {
 				await SecureStore.deleteItemAsync(key)
-				return
 			} catch (error) {
-				// FIXME: same production-visibility gap as getItem above -- a
-				// failed secure delete falls back to AsyncStorage.removeItem with
-				// no signal outside __DEV__ (harmless here since deleteItem's own
-				// intent is just "make sure it's gone", but still worth knowing
-				// SecureStore is unreliable on this device if it happens).
-				if (__DEV__) {
-					console.warn('[secureStorage] deleteItem fallback to AsyncStorage:', error)
-				}
+				console.warn('[secureStorage] deleteItem failed:', describe(error))
 			}
 		}
-		await AsyncStorage.removeItem(key)
 	},
 }

@@ -10,6 +10,7 @@ import {
 import StatusModal from '../components/common/feedback/StatusModal'
 import { safeJsonParse } from '../utils/jsonUtils'
 import { secureStorage } from '../utils/secureStorage'
+import { purgeLocalSession } from '../utils/localSession'
 import { logout as logoutRequest } from '../features/auth/authService'
 import { clearSessionCaches } from '../utils/sessionCache'
 
@@ -232,21 +233,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			}
 		}
 
-		await secureStorage.deleteItem('access_token')
-		await secureStorage.deleteItem('refresh_token')
-		await AsyncStorage.multiRemove([
-			'role',
-			'user',
-			'notification_prompt_shown',
-			'current_location',
-			'ancillary_capabilities',
-			'ancillary_license',
-			'ancillary_location',
-			'user_specialty',
-			'ancillary_verification_status',
-			// Written by the old patient-profile picker; may still hold the previous user's family list.
-			'family_members',
-		])
+		await purgeLocalSession()
 
 		clearAuthState()
 	}

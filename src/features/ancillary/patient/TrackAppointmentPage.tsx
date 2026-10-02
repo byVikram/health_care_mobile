@@ -32,6 +32,7 @@ import {
 import CancellationDetailsModal from './CancellationDetailsModal'
 import NursePulseRadarView from '../components/NursePulseRadarView'
 import ApiService from '../../../services/apiService'
+import { openAuthedSocket, type AuthedSocketHandle } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 // ---------------------------------------------------------------------------
@@ -224,7 +225,7 @@ export default function TrackAppointmentPage() {
 	const isAssigned = hasConfirmedProvider(provider, liveStatus)
 
 	React.useEffect(() => {
-		let ws: WebSocket | null = null
+		let socket: AuthedSocketHandle | null = null
 		let isMounted = true
 
 		const updateStatusFromData = (data: AncillaryTrackingResponse) => {
@@ -265,28 +266,20 @@ export default function TrackAppointmentPage() {
 			}
 		}
 
-		// Connect Real-Time WebSocket
-		try {
-			const wsUrl = API_ENDPOINTS.ANCILLARY.WS_PATIENT_REQUEST(bookingId)
-			ws = new WebSocket(wsUrl)
-			ws.onmessage = (event) => {
-				try {
-					const payload = JSON.parse(event.data)
-					if (payload.type === 'CARE_REQUEST_STATUS_CHANGE' && payload.data) {
-						updateStatusFromData(payload.data)
-					}
-				} catch (e) {
-					console.log('[TrackAppointmentPage] WS parse notice:', e)
-				}
+		// Connect Real-Time WebSocket (authenticated + auto-reconnecting; see utils/authedSocket)
+		socket = openAuthedSocket(API_ENDPOINTS.ANCILLARY.WS_PATIENT_REQUEST(bookingId), (payload) => {
+			if (payload.type === 'CARE_REQUEST_STATUS_CHANGE' && payload.data) {
+				updateStatusFromData(payload.data)
 			}
-		} catch (e) {
-			console.log('[TrackAppointmentPage] WS setup notice')
-		}
+		})
 
 		// Fetch Status via HTTP
 		const fetchStatus = async () => {
 			try {
-				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
+				// Polled every ~2s: a failure must not pop the global error dialog on every tick.
+				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId), {
+					skipGlobalError: true,
+				})
 				const data: AncillaryTrackingResponse = res.data?.data || res.data
 				const st = String(data?.status || '').toUpperCase()
 				const prov = data?.assignedProvider || null
@@ -335,7 +328,7 @@ export default function TrackAppointmentPage() {
 		return () => {
 			isMounted = false
 			clearInterval(pollInterval)
-			if (ws) ws.close()
+			socket?.close()
 		}
 	}, [bookingId])
 

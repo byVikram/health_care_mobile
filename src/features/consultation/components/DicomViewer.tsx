@@ -76,11 +76,11 @@ const CORNERSTONE_HTML = `
   </div>
 
   <!-- Cornerstone Core -->
-  <script src="https://cdn.jsdelivr.net/npm/cornerstone-core@2.6.1/dist/cornerstone.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cornerstone-core@2.6.1/dist/cornerstone.min.js" integrity="sha384-g7W7PJNIdGATX0lWeJoQcFZsdPs8U5VDD+xSYSnyeC2Q5kqHI0WeA2l7f+PZik+G" crossorigin="anonymous"></script>
   <!-- dicomParser -->
-  <script src="https://cdn.jsdelivr.net/npm/dicom-parser@1.8.21/dist/dicomParser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dicom-parser@1.8.21/dist/dicomParser.min.js" integrity="sha384-Z8ua3fbU1i9fPqw0gGLF0aw6yqnTK3GO6R9CFvnlvXB0x0AIFi6JqYvQ6v+s9kuw" crossorigin="anonymous"></script>
   <!-- cornerstoneWADOImageLoader (with worker-less config) -->
-  <script src="https://cdn.jsdelivr.net/npm/cornerstone-wado-image-loader@4.13.2/dist/cornerstoneWADOImageLoader.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cornerstone-wado-image-loader@4.13.2/dist/cornerstoneWADOImageLoader.bundle.min.js" integrity="sha384-OGK5yRQLrQXDnbZRuhdKZncm0S8Lue2KRds62VusVCcEXVdpxu7zStnWB2uNFYFw" crossorigin="anonymous"></script>
 
   <script>
     var element = document.getElementById('dicomCanvas');
@@ -285,15 +285,18 @@ export default function DicomViewer({ base64Data, fullScreen = false }: DicomVie
       <WebView
         ref={webViewRef}
         style={styles.webview}
-        originWhitelist={['*']}
+        // The viewer is an inline HTML string: it needs no file access, no storage and
+        // no navigation anywhere. The PHI (the DICOM bytes) is posted into this page, so
+        // keep the page as locked down as the CDN scripts above (pinned + SRI) allow.
+        originWhitelist={['about:*']}
         source={{ html: CORNERSTONE_HTML }}
         onLoad={handleWebViewLoad}
         javaScriptEnabled
-        domStorageEnabled
-        allowFileAccess
-        mixedContentMode="always"
+        domStorageEnabled={false}
+        allowFileAccess={false}
+        mixedContentMode="never"
         onError={(e) => console.warn('WebView error:', e.nativeEvent)}
-        onMessage={(e) => console.log('WebView log:', e.nativeEvent.data)}
+        onMessage={__DEV__ ? (e) => console.log('WebView log:', e.nativeEvent.data) : undefined}
       />
     </View>
   );

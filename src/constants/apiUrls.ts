@@ -1,8 +1,13 @@
 const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
-// const envUrl = 'http://192.168.4.129:8000'
 
 if (!envUrl) {
 	throw new Error('EXPO_PUBLIC_API_ENDPOINT is not configured')
+}
+
+// Cleartext http:// (and the ws:// derived from it below) is fine against a dev
+// machine, but a release build that ships it would send tokens and PHI unencrypted.
+if (!__DEV__ && !/^https:\/\//i.test(envUrl)) {
+	throw new Error('EXPO_PUBLIC_API_ENDPOINT must use https:// in release builds')
 }
 
 export const BASE_URL = envUrl.replace(/\/+$/, '')

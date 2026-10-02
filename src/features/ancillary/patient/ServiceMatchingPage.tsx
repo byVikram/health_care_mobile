@@ -17,6 +17,7 @@ import { AppTypography } from '../../../components/common/display/AppTypography'
 import { AppButton } from '../../../components/common/buttons/AppButton'
 import { fetchPatientActiveRequestBackend, cancelCareRequestPatientBackend } from '../ancillaryService'
 import ApiService from '../../../services/apiService'
+import { openAuthedSocket } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import CancellationDetailsModal from './CancellationDetailsModal'
 
@@ -86,45 +87,36 @@ export default function ServiceMatchingPage() {
 		}
 	}, [pulse1, pulse2, pulse3])
 
-	// WebSocket Channel for Instant Push Assignment
+	// WebSocket Channel for Instant Push Assignment. The server only serves a socket for a
+	// specific request the caller owns (no shared "active" feed), so without a booking id
+	// we rely on the status polling below.
 	useEffect(() => {
-		let ws: WebSocket | null = null
+		if (!bookingId) return
 		let navigateTimeout: ReturnType<typeof setTimeout> | null = null
-		try {
-			const targetId = String(bookingId || 'active')
-			const wsUrl = API_ENDPOINTS.ANCILLARY.WS_PATIENT_REQUEST(targetId)
-			ws = new WebSocket(wsUrl)
+		const targetId = String(bookingId)
 
-			ws.onmessage = (event) => {
-				try {
-					const payload = JSON.parse(event.data)
-					if (payload.type === 'CARE_REQUEST_STATUS_CHANGE' && payload.data) {
-						const st = String(payload.data.status || '').toUpperCase()
-						if (ASSIGNED_STATUSES.has(st)) {
-							setSearchStatus('ASSIGNED')
-							if (payload.data.assignedProvider) {
-								setAssignedProvider(payload.data.assignedProvider)
-							}
-							if (navigateTimeout) clearTimeout(navigateTimeout)
-							navigateTimeout = setTimeout(() => {
-								navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
-									bookingId: payload.data.requestId || payload.data.id || targetId,
-									bookingData: payload.data,
-								})
-							}, 400)
-						}
+		const socket = openAuthedSocket(API_ENDPOINTS.ANCILLARY.WS_PATIENT_REQUEST(targetId), (payload) => {
+			if (payload.type === 'CARE_REQUEST_STATUS_CHANGE' && payload.data) {
+				const st = String(payload.data.status || '').toUpperCase()
+				if (ASSIGNED_STATUSES.has(st)) {
+					setSearchStatus('ASSIGNED')
+					if (payload.data.assignedProvider) {
+						setAssignedProvider(payload.data.assignedProvider)
 					}
-				} catch (e) {
-					console.log('[ServiceMatchingPage] WS parse notice:', e)
+					if (navigateTimeout) clearTimeout(navigateTimeout)
+					navigateTimeout = setTimeout(() => {
+						navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+							bookingId: payload.data.requestId || payload.data.id || targetId,
+							bookingData: payload.data,
+						})
+					}, 400)
 				}
 			}
-		} catch (e) {
-			console.log('[ServiceMatchingPage] WS setup notice')
-		}
+		})
 
 		return () => {
 			if (navigateTimeout) clearTimeout(navigateTimeout)
-			if (ws) ws.close()
+			socket.close()
 		}
 	}, [bookingId, navigation])
 
@@ -142,7 +134,10 @@ export default function ServiceMatchingPage() {
 				// 1. Primary: Fetch specific booking status directly
 				if (targetBookingId) {
 					try {
-						const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(targetBookingId))
+						// Polled every ~2s: a failure must not pop the global error dialog on every tick.
+						const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(targetBookingId), {
+							skipGlobalError: true,
+						})
 						data = res.data?.data || res.data
 					} catch (e) {
 						// Fallback to active request
