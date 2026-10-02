@@ -49,7 +49,7 @@ export function openBookingTarget(navigation: BookingsNavigation, item: BookingI
 			navigation.navigate(ROUTES.STACK.VISIT_SUMMARY, { appointmentId: id })
 			return
 		case 'ancillary_request':
-			navigation.navigate(ROUTES.STACK.ANCILLARY_REQUEST_SENT, { requestId: id })
+			navigation.navigate(ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS, { requestId: id })
 			return
 		case 'ancillary_tracking':
 			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: id })
@@ -67,7 +67,6 @@ export function openBookingTarget(navigation: BookingsNavigation, item: BookingI
 
 /** "Indiranagar clinic · 1.2 km" -> "Indiranagar clinic" (the distance isn't part of the place). */
 const placeOf = (where?: string | null) => (where ?? '').replace(/\s*·\s*[\d.,]+\s*(km|m)\s*$/i, '').trim()
-
 
 const confirm = (title: string, message: string, confirmLabel: string) =>
 	new Promise<boolean>((resolve) => {

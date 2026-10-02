@@ -251,6 +251,7 @@ export const API_ENDPOINTS = {
 		REQUESTS: `${BASE_URL}/api/ancillary/patient/requests`,
 		PATIENT_ACTIVE_REQUEST: `${BASE_URL}/api/ancillary/patient/requests/active`,
 		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
+		TIP: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/tip`,
 		CANCEL_PATIENT: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/cancel`,
 		CANCEL_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/cancel`,
 		REJECT_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/reject`,
@@ -280,7 +281,6 @@ export const API_ENDPOINTS = {
 		// Phase 1 Slot-Based Booking Endpoints
 		AVAILABLE_SLOTS: `${BASE_URL}/api/ancillary/available-slots`,
 		REQUESTS_SCHEDULED: `${BASE_URL}/api/ancillary/requests/scheduled`,
-		PROVIDERS_AVAILABILITY: `${BASE_URL}/api/ancillary/providers/availability`,
 		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/reschedule/respond`,
 		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/me/availability`,
 		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/me/availability/overrides`,

@@ -1,6 +1,6 @@
 // src/features/ancillary/staff/today/ProviderNextVisitCard.tsx
 //
-// "NEXT VISIT" card of the provider Today design: 2px primary border, mint strip with the eyebrow and
+// "NEXT VISIT" (or CURRENT SHIFT / NEXT SESSION) card of the provider Today design: 2px primary border, mint strip with the eyebrow and
 // "7:00 PM · in 45 min", then the service with patient · distance · ETA, and Call / Navigate / Open.
 import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
@@ -8,17 +8,19 @@ import { AppButton, AppIconButton, AppIconTile } from '../../../../components/co
 import { APP_COLORS } from '../../../../config/theme'
 import { callPhone, openDirections } from '../../../../utils/maps'
 import type { ProviderVisitSummary } from '../../providerVisitService'
+import type { ProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { nextVisitEyebrow, nextVisitWhen, visitTitle, visitTravelLine } from './todayView'
 
 export type ProviderNextVisitCardProps = {
 	visit: ProviderVisitSummary
+	copy: ProviderSpecialityCopy
 	onOpen: (visit: ProviderVisitSummary) => void
 }
 
-export function ProviderNextVisitCard({ visit, onOpen }: ProviderNextVisitCardProps) {
-	const eyebrow = nextVisitEyebrow(visit)
+export function ProviderNextVisitCard({ visit, copy, onOpen }: ProviderNextVisitCardProps) {
+	const eyebrow = nextVisitEyebrow(visit, copy)
 	const when = nextVisitWhen(visit)
-	const title = visitTitle(visit)
+	const title = visitTitle(visit, copy.noun)
 	const phone = visit.patient.phone
 
 	return (
@@ -31,7 +33,7 @@ export function ProviderNextVisitCard({ visit, onOpen }: ProviderNextVisitCardPr
 			</View>
 			<View style={styles.body}>
 				<View style={styles.infoRow}>
-					<AppIconTile icon="home-heart" tone="mint" size={44} radius={12} iconSize={22} />
+					<AppIconTile icon={copy.icon} tone="mint" size={44} radius={12} iconSize={22} />
 					<View style={styles.infoText}>
 						<Text style={styles.title} numberOfLines={2}>
 							{title}

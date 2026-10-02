@@ -5,7 +5,7 @@ import { secureStorage } from './secureStorage'
 const FATAL_CLOSE_CODES = new Set([4401, 4403, 4404])
 const MAX_BACKOFF_MS = 30_000
 
-export type AuthedSocketHandle = { close: () => void }
+export type AuthedSocketHandle = { close: () => void; send: (data: string) => void }
 
 /**
  * Open a WebSocket to the backend and authenticate it with the first-message
@@ -66,6 +66,9 @@ export const openAuthedSocket = (url: string, onEvent: (event: any) => void): Au
 	void connect()
 
 	return {
+		send: (data: string) => {
+			if (socket?.readyState === WebSocket.OPEN) socket.send(data)
+		},
 		close: () => {
 			closedByCaller = true
 			if (retryTimer) clearTimeout(retryTimer)

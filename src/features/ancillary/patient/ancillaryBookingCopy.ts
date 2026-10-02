@@ -1,11 +1,11 @@
 // src/features/ancillary/patient/ancillaryBookingCopy.ts
 //
-// Labels and small pure helpers shared by the ancillary booking screens (Book visit -> Review & pay ->
-// Request sent). Every home-care type uses the same flow; only the provider noun changes ("nurse" is
-// used for nursing only).
+// Labels and small pure helpers shared by the ancillary booking screens (Schedule a visit -> Review & pay ->
+// Booking details, and Book now -> Finding a nurse). Every ancillary type uses the same flow; only the
+// provider noun changes ("nurse" is used for nursing only).
 
 import type { AncillaryCartItem } from '../../../navigation/types'
-import type { ProviderSlot, ServiceSelection } from '../ancillaryProviderBookingService'
+import type { ServiceSelection } from '../ancillaryProviderBookingService'
 import { formatTimeSlot } from '../../../utils/formatters'
 import { fullDayLabel, parseDateOnly } from '../../../utils/date'
 
@@ -54,13 +54,6 @@ export const itemsDurationLabel = (items: AncillaryCartItem[]) => {
 	return total > 0 ? `${total} mins` : ''
 }
 
-export const slotKey = (s: ProviderSlot) => `${s.start_time}-${s.end_time}`
-
-export const parseSlotKey = (key: string): ProviderSlot => {
-	const [start_time, end_time] = key.split('-')
-	return { start_time, end_time }
-}
-
 /** "7:00 PM" for "19:00". */
 export const timeLabel = (hhmm: string) => formatTimeSlot(hhmm)
 
@@ -72,8 +65,3 @@ export const dayLabel = (iso: string) => {
 	const d = parseDateOnly(iso)
 	return d ? fullDayLabel(d) : iso
 }
-
-export const experienceLabel = (years?: number | null) => (years != null && years > 0 ? `${years} yrs` : '')
-
-export const distanceLabel = (km?: number | null) =>
-	km != null && Number.isFinite(Number(km)) ? `${Number(km).toFixed(1)} km` : ''

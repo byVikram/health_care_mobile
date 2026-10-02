@@ -116,30 +116,29 @@ export type AncillaryCartItem = {
 	durationMinutes?: number | null
 }
 
-/** Catalog -> Book visit: what is being booked (one home-care speciality at a time). */
+/** Catalog -> Schedule a visit / Book now review: what is being booked (one home-care speciality at a time). */
 export type AncillaryBookVisitParams = {
 	serviceKey: string // speciality key, e.g. 'nursing-care'
 	serviceLabel: string // e.g. 'Nursing care'
 	/** Either one package, or one or more procedures -- never both (backend rule). */
 	items: AncillaryCartItem[]
-	/** Keep the days picked before (e.g. coming back after the provider declined). */
+	/** Keep the days picked before (e.g. coming back from Review & pay or after no nurse accepted). */
 	initialDates?: string[]
-	/** Provider to skip when re-picking (declined / expired). */
-	excludeProviderId?: string
 }
 
-/** Book visit -> Review & pay. */
+/** Schedule a visit -> Review & pay. One time for every visit, and no provider (assigned per visit later). */
 export type AncillaryReviewPayParams = AncillaryBookVisitParams & {
-	provider: {
-		provider_public_id: string
-		name: string
-		avatar_url?: string | null
-		specialty?: string | null
-		experience_years?: number | null
-		distance_km?: number | null
-		fee_per_visit: number
-	}
 	visits: { date: string; start_time: string; end_time: string }[]
+}
+
+/** Review & pay (Book now) -> Finding a nurse, plus what the "schedule instead" fallback needs. */
+export type AncillaryServiceMatchingParams = {
+	bookingId?: string
+	serviceName?: string
+	addressText?: string
+	patientName?: string
+	/** Present when opened from the Book now flow; lets the no-one-accepted state offer to schedule instead. */
+	booking?: AncillaryBookVisitParams
 }
 
 export type AppStackParamList = {
@@ -279,8 +278,10 @@ export type AppStackParamList = {
 	[ROUTES.STACK.ANCILLARY_SERVICES]: { serviceKey: string; serviceLabel: string; updatedCart?: any[] }
 	[ROUTES.STACK.ANCILLARY_BOOK_VISIT]: AncillaryBookVisitParams
 	[ROUTES.STACK.ANCILLARY_REVIEW_PAY]: AncillaryReviewPayParams
-	/** `booking` omitted (e.g. opened from the Bookings tab) = the page rebuilds it from the order. */
-	[ROUTES.STACK.ANCILLARY_REQUEST_SENT]: { requestId: string; booking?: AncillaryBookVisitParams }
+	[ROUTES.STACK.ANCILLARY_BOOK_NOW_REVIEW]: AncillaryBookVisitParams
+	[ROUTES.STACK.ANCILLARY_SERVICE_MATCHING]: AncillaryServiceMatchingParams
+	/** Booking details for a scheduled order. */
+	[ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS]: { requestId: string }
 	[ROUTES.STACK.ANCILLARY_PROVIDERS]: { serviceKey: string; serviceLabel: string; procedureName?: string }
 	[ROUTES.STACK.ANCILLARY_BOOKING_CART]:
 		| {

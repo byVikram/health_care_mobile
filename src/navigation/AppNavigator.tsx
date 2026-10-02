@@ -84,7 +84,8 @@ import MyBookingsPage from '../features/ancillary/patient/MyBookingsPage'
 import ServiceMatchingPage from '../features/ancillary/patient/ServiceMatchingPage'
 import AncillaryBookVisitPage from '../features/ancillary/patient/AncillaryBookVisitPage'
 import AncillaryReviewPayPage from '../features/ancillary/patient/AncillaryReviewPayPage'
-import AncillaryRequestSentPage from '../features/ancillary/patient/AncillaryRequestSentPage'
+import AncillaryBookNowReviewPage from '../features/ancillary/patient/AncillaryBookNowReviewPage'
+import AncillaryScheduledDetailsPage from '../features/ancillary/patient/AncillaryScheduledDetailsPage'
 
 // Profile redesign (patient / doctor / ancillary) -- see features/profile/ProfileHubPage
 import PersonalDetailsPage from '../features/profile/shared/PersonalDetailsPage'
@@ -335,8 +336,13 @@ function AuthenticatedNavigator() {
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_REQUEST_SENT}
-					component={AncillaryRequestSentPage}
+					name={ROUTES.STACK.ANCILLARY_BOOK_NOW_REVIEW}
+					component={AncillaryBookNowReviewPage}
+					options={{ headerShown: false }}
+				/>
+				<AppStack.Screen
+					name={ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS}
+					component={AncillaryScheduledDetailsPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen

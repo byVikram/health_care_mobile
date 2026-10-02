@@ -40,19 +40,14 @@ import {
 	type ProviderVisitTask,
 	type VisitProgressInput,
 } from '../../providerVisitService'
+import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { visitTitle } from '../today/todayView'
 import { ReportIssueSheet } from './ReportIssueSheet'
-import { FAMILY_QUICK_UPDATES, isInProgress, patientLine, tasksTitle } from './visitView'
+import { isInProgress, patientLine } from './visitView'
 
 type Route = RouteProp<AppNavigationParamList, typeof ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS>
 
 const SAVE_DEBOUNCE_MS = 800
-const VITAL_FIELDS = [
-	{ key: 'bp', label: 'BP (mmHg)', placeholder: '120/80', keyboard: 'numbers-and-punctuation' as const },
-	{ key: 'pulse', label: 'Pulse (bpm)', placeholder: '72', keyboard: 'number-pad' as const },
-	{ key: 'temp_f', label: 'Temp (°F)', placeholder: '98.6', keyboard: 'decimal-pad' as const },
-	{ key: 'spo2', label: 'SpO2 (%)', placeholder: '98', keyboard: 'number-pad' as const },
-]
 
 /** "72" -> 72, "120/80" stays text, "" -> null (clears the key). */
 const toRecordValue = (text: string): string | number | null => {
@@ -86,7 +81,12 @@ export default function ProviderVisitInProgressPage() {
 
 	const applyVisit = (v: ProviderVisitDetail) => {
 		setVisit(v)
-		setTasks(v.tasks)
+		// The booked service's own steps win; the speciality's default checklist is only a fallback.
+		setTasks(
+			v.tasks.length
+				? v.tasks
+				: getProviderSpecialityCopy(v.service.specialty).defaultTasks.map((label) => ({ label, done: false }))
+		)
 		setFields({
 			bp: asText(v.record.bp),
 			pulse: asText(v.record.pulse),
@@ -229,11 +229,13 @@ export default function ProviderVisitInProgressPage() {
 		if (saved) navigation.navigate(ROUTES.STACK.PROVIDER_VISIT_COMPLETE, { visitId })
 	}
 
+	const copy = getProviderSpecialityCopy(visit?.service.specialty)
+
 	const header = (
 		<AppScreenHeader
 			variant="bar"
-			title="Visit in progress"
-			subtitle={visit ? visitTitle(visit) : undefined}
+			title={copy.inProgressTitle}
+			subtitle={visit ? visitTitle(visit, copy.noun) : undefined}
 			onBack={() => navigation.goBack()}
 			rightElement={visit ? <AppTimerBadge startedAt={visit.started_at} /> : undefined}
 		/>
@@ -263,7 +265,8 @@ export default function ProviderVisitInProgressPage() {
 	const doneCount = tasks.filter((t) => t.done).length
 	const left = tasks.length - doneCount
 	const allDone = left === 0
-	const type = visit.service.record_type
+	// What is recorded: the backend's record type for the speciality, else the speciality's default.
+	const type = visit.service.record_type ?? copy.recorded.type
 	const lastPain = visit.care.last_session?.record.pain_score
 	const lastMeasurement = visit.care.last_session?.record.measurement
 	const name = visit.patient.name ?? 'Patient'
@@ -282,8 +285,8 @@ export default function ProviderVisitInProgressPage() {
 							tone={visit.status === 'COMPLETED' ? 'success' : 'warning'}
 							title={
 								visit.status === 'COMPLETED'
-									? 'This visit is completed'
-									: 'This visit isn’t in progress'
+									? `This ${copy.noun} is completed`
+									: `This ${copy.noun} isn’t in progress`
 							}
 							subtitle={
 								visit.status === 'COMPLETED'
@@ -307,7 +310,7 @@ export default function ProviderVisitInProgressPage() {
 
 				{tasks.length ? (
 					<AppSection
-						title={tasksTitle(type)}
+						title={copy.tasksTitle}
 						titleSize="sm"
 						right={
 							<Text style={styles.countText}>
@@ -329,9 +332,9 @@ export default function ProviderVisitInProgressPage() {
 				) : null}
 
 				{type === 'vitals' ? (
-					<AppSection title="Vitals" titleSize="sm">
+					<AppSection title={copy.recorded.title || 'Vitals'} titleSize="sm">
 						<View style={styles.grid}>
-							{VITAL_FIELDS.map((f) => (
+							{copy.recorded.fields.map((f) => (
 								<AppMetricInput
 									key={f.key}
 									label={f.label}
@@ -348,9 +351,9 @@ export default function ProviderVisitInProgressPage() {
 				) : null}
 
 				{type === 'pain_score' ? (
-					<AppSection title="Progress" titleSize="sm">
+					<AppSection title={copy.recorded.title || 'Progress'} titleSize="sm">
 						<Text style={styles.fieldLabel}>
-							Pain after session
+							{copy.recorded.painLabel}
 							{typeof lastPain === 'number' ? (
 								<Text style={styles.fieldHint}>{` · last time ${lastPain}`}</Text>
 							) : null}
@@ -361,7 +364,7 @@ export default function ProviderVisitInProgressPage() {
 							minLabel="No pain"
 							maxLabel="Worst pain"
 							disabled={!active}
-							accessibilityLabel="Pain after session"
+							accessibilityLabel={copy.recorded.painLabel}
 						/>
 						{visit.service.measurement_label ? (
 							<AppMetricInput
@@ -372,26 +375,28 @@ export default function ProviderVisitInProgressPage() {
 								editable={active}
 							/>
 						) : null}
-						<AppButton
-							variant="outline"
-							size="sm"
-							icon="share-variant-outline"
-							style={styles.alignStart}
-							onPress={() => showComingSoon('Sharing a home exercise plan is coming soon.')}
-						>
-							Share home exercise plan
-						</AppButton>
+						{copy.recorded.homePlanButton ? (
+							<AppButton
+								variant="outline"
+								size="sm"
+								icon="share-variant-outline"
+								style={styles.alignStart}
+								onPress={() => showComingSoon('Sharing a home exercise plan is coming soon.')}
+							>
+								Share home exercise plan
+							</AppButton>
+						) : null}
 					</AppSection>
 				) : null}
 
 				{type === 'family_updates' ? (
-					<AppSection title="Update the family" titleSize="sm">
+					<AppSection title={copy.recorded.title || 'Update the family'} titleSize="sm">
 						<Text style={styles.fieldHint}>
 							{visit.patient.family_contact_name ?? visit.patient.name ?? 'The family'} gets this in the
 							app
 						</Text>
 						<View style={styles.chips}>
-							{FAMILY_QUICK_UPDATES.map((q) => (
+							{copy.recorded.quickUpdates.map((q) => (
 								<AppChip
 									key={q}
 									label={q}
@@ -428,7 +433,7 @@ export default function ProviderVisitInProgressPage() {
 					<NotesInput
 						value={notes}
 						onChangeValue={changeNotes}
-						placeholder="Anything the patient or doctor should know?"
+						placeholder={copy.notesPlaceholder}
 						maxLength={4000}
 					/>
 					<View style={styles.noteActions}>
@@ -467,7 +472,7 @@ export default function ProviderVisitInProgressPage() {
 						disabled={!allDone || finishing}
 						softDisabled
 					>
-						Complete visit
+						{copy.completeTitle}
 					</AppButton>
 				</AppFooterBar>
 			) : null}

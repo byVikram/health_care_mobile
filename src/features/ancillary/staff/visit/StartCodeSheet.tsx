@@ -10,6 +10,7 @@ import { AppBottomSheet, AppButton, AppOtpInput } from '../../../../components/c
 import { APP_COLORS } from '../../../../config/theme'
 import { extractApiErrorMessage } from '../../ancillaryService'
 import { startVisit, type ProviderVisitDetail } from '../../providerVisitService'
+import type { ProviderSpecialityCopy } from '../providerSpecialityCopy'
 
 const CODE_LENGTH = 4
 
@@ -17,11 +18,12 @@ export type StartCodeSheetProps = {
 	visible: boolean
 	visitId: string
 	patientFirstName: string
+	copy: ProviderSpecialityCopy
 	onClose: () => void
 	onStarted: (visit: ProviderVisitDetail) => void
 }
 
-export function StartCodeSheet({ visible, visitId, patientFirstName, onClose, onStarted }: StartCodeSheetProps) {
+export function StartCodeSheet({ visible, visitId, patientFirstName, copy, onClose, onStarted }: StartCodeSheetProps) {
 	const [code, setCode] = useState('')
 	const [error, setError] = useState<string | null>(null)
 	const [submitting, setSubmitting] = useState(false)
@@ -43,7 +45,7 @@ export function StartCodeSheet({ visible, visitId, patientFirstName, onClose, on
 			const visit = await startVisit(visitId, code)
 			onStarted(visit)
 		} catch (e) {
-			setError(extractApiErrorMessage(e, 'Could not start the visit. Please try again.'))
+			setError(extractApiErrorMessage(e, `Could not start the ${copy.noun}. Please try again.`))
 		} finally {
 			setSubmitting(false)
 		}
@@ -52,7 +54,7 @@ export function StartCodeSheet({ visible, visitId, patientFirstName, onClose, on
 	return (
 		<AppBottomSheet
 			visible={visible}
-			title="Enter start code"
+			title={copy.startTitle}
 			subtitle={`Ask ${patientFirstName} for the 4-digit code in the Karolahealth app`}
 			onClose={onClose}
 			appearance="modern"
@@ -67,7 +69,7 @@ export function StartCodeSheet({ visible, visitId, patientFirstName, onClose, on
 					disabled={!ready || submitting}
 					softDisabled
 				>
-					{ready ? 'Start visit' : 'Enter the 4-digit code'}
+					{ready ? copy.startButton : 'Enter the 4-digit code'}
 				</AppButton>
 			}
 		>
@@ -92,7 +94,7 @@ export function StartCodeSheet({ visible, visitId, patientFirstName, onClose, on
 				<View style={styles.hint}>
 					<MaterialCommunityIcons name="shield-check-outline" size={16} color={APP_COLORS.inkMuted} />
 					<Text style={styles.hintText}>
-						{`The code proves you reached ${patientFirstName}’s home. It starts the visit timer and the patient is notified.`}
+						{`The code proves you reached ${patientFirstName}’s home. It ${copy.startHint} and the patient is notified.`}
 					</Text>
 				</View>
 			</View>

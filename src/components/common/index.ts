@@ -1,44 +1,44 @@
-export * from "./buttons/AppButton";
-export * from "./inputs/AppInput";
-export * from "./display/AppTypography";
-export * from "./layout/AppModal";
-export * from "./inputs/AppSelect";
-export * from "./inputs/AppMultiSelect";
-export * from "./inputs/AppTimePicker";
-export * from "./inputs/AppPhotoPicker";
-export * from "./layout/AppBottomSheet";
-export * from "./inputs/AppCalendar";
-export * from "./display/AppSkeleton";
-export { default as AppToggle } from "./inputs/AppToggle";
-export type { AppToggleProps } from "./inputs/AppToggle";
-export { default as AppHeader } from "./layout/AppHeader";
-export { default as AppSidebar } from "./layout/AppSidebar";
-export type { AppSidebarItem, AppSidebarProfile } from "./layout/AppSidebar";
-export { default as AppTable } from "./display/AppTable";
-export type { AppTableColumn, AppTableColumnOption, AppTableProps } from "./display/AppTable";
-export { default as SplashScreen } from "./layout/SplashScreen";
-export { default as DateSlotPicker } from './inputs/DateSlotPicker';
-export type { PickProps as DateSlotPickerProps } from './inputs/DateSlotPicker';
-export { default as AppScreenHeader } from "./layout/AppScreenHeader";
-export { default as AppAvatar } from "./display/AppAvatar";
-export { default as StatusModal } from "./feedback/StatusModal";
-export { default as OfflineBanner } from "./feedback/OfflineBanner";
-export { default as OfflineScreen } from "./feedback/OfflineScreen";
-export { default as AppStickyFooter, StickyFooter } from "./layout/AppStickyFooter";
-export { default as ProviderDetailsCard } from "./display/ProviderDetailsCard";
-export type { ProviderDetailsCardProps, ProviderHoursRow } from "./display/ProviderDetailsCard";
-export { default as LocationSelector } from "./location/LocationSelector";
-export { default as NotificationPermissionPopup } from "./feedback/NotificationPermissionPopup";
-export { default as EventCard } from "./display/EventCard";
-export { default as CommonCard } from "./display/CommonCard";
-export { default as AppSoftCard } from "./display/AppSoftCard";
-export type { AppSoftCardProps } from "./display/AppSoftCard";
-export { default as AppAppointmentRow } from "./booking/AppAppointmentRow";
-export type { AppAppointmentRowProps } from "./booking/AppAppointmentRow";
-export { default as AppointmentActionCard } from "./booking/AppointmentActionCard";
-export type { AppointmentActionCardProps, AppointmentActionOutcome } from "./booking/AppointmentActionCard";
-export { default as AppointmentActionSheet } from "./booking/AppointmentActionSheet";
-export type { AppointmentActionSheetProps, ActionSheetMode, RejectReasonOption } from "./booking/AppointmentActionSheet";
+export * from './buttons/AppButton'
+export * from './inputs/AppInput'
+export * from './display/AppTypography'
+export * from './layout/AppModal'
+export * from './inputs/AppSelect'
+export * from './inputs/AppMultiSelect'
+export * from './inputs/AppTimePicker'
+export * from './inputs/AppPhotoPicker'
+export * from './layout/AppBottomSheet'
+export * from './inputs/AppCalendar'
+export * from './display/AppSkeleton'
+export { default as AppToggle } from './inputs/AppToggle'
+export type { AppToggleProps } from './inputs/AppToggle'
+export { default as AppHeader } from './layout/AppHeader'
+export { default as AppSidebar } from './layout/AppSidebar'
+export type { AppSidebarItem, AppSidebarProfile } from './layout/AppSidebar'
+export { default as AppTable } from './display/AppTable'
+export type { AppTableColumn, AppTableColumnOption, AppTableProps } from './display/AppTable'
+export { default as SplashScreen } from './layout/SplashScreen'
+export { default as DateSlotPicker } from './inputs/DateSlotPicker'
+export type { PickProps as DateSlotPickerProps } from './inputs/DateSlotPicker'
+export { default as AppScreenHeader } from './layout/AppScreenHeader'
+export { default as AppAvatar } from './display/AppAvatar'
+export { default as StatusModal } from './feedback/StatusModal'
+export { default as OfflineBanner } from './feedback/OfflineBanner'
+export { default as OfflineScreen } from './feedback/OfflineScreen'
+export { default as AppStickyFooter, StickyFooter } from './layout/AppStickyFooter'
+export { default as ProviderDetailsCard } from './display/ProviderDetailsCard'
+export type { ProviderDetailsCardProps, ProviderHoursRow } from './display/ProviderDetailsCard'
+export { default as LocationSelector } from './location/LocationSelector'
+export { default as NotificationPermissionPopup } from './feedback/NotificationPermissionPopup'
+export { default as EventCard } from './display/EventCard'
+export { default as CommonCard } from './display/CommonCard'
+export { default as AppSoftCard } from './display/AppSoftCard'
+export type { AppSoftCardProps } from './display/AppSoftCard'
+export { default as AppAppointmentRow } from './booking/AppAppointmentRow'
+export type { AppAppointmentRowProps } from './booking/AppAppointmentRow'
+export { default as AppointmentActionCard } from './booking/AppointmentActionCard'
+export type { AppointmentActionCardProps, AppointmentActionOutcome } from './booking/AppointmentActionCard'
+export { default as AppointmentActionSheet } from './booking/AppointmentActionSheet'
+export type { AppointmentActionSheetProps, ActionSheetMode, RejectReasonOption } from './booking/AppointmentActionSheet'
 export {
 	AppFamilyMemberSheet,
 	AppFamilyMemberAvatar,
@@ -46,41 +46,73 @@ export {
 	FAMILY_RELATIONS,
 	FAMILY_GENDERS,
 } from './booking/AppFamilyMemberSheet'
-export type { AppFamilyMemberSheetProps, AppFamilyMemberAvatarProps, FamilyMemberDraft } from './booking/AppFamilyMemberSheet'
+export type {
+	AppFamilyMemberSheetProps,
+	AppFamilyMemberAvatarProps,
+	FamilyMemberDraft,
+} from './booking/AppFamilyMemberSheet'
 export { AppPatientRow } from './booking/AppPatientRow'
 export type { AppPatientRowProps } from './booking/AppPatientRow'
 export { AppSegmentedControl } from './inputs/AppSegmentedControl'
 export type { AppSegmentedControlProps, AppSegmentedOption } from './inputs/AppSegmentedControl'
-export { default as WorkingHoursSection } from "./booking/WorkingHoursSection";
-export type { WorkingHoursSectionProps, WorkingDayKey, AppointmentType, TimeSlot as WorkingHoursTimeSlot, SectionSlots, WorkingHoursState } from "./booking/WorkingHoursSection";
-export { WORKING_DAYS, SECTION_META, durationOptions as workingHoursDurationOptions, makeTimeOptions, snapToStep, createWorkingHoursState, DropdownSelect as WorkingHoursDropdownSelect } from "./booking/WorkingHoursSection";
+export { default as WorkingHoursSection } from './booking/WorkingHoursSection'
+export type {
+	WorkingHoursSectionProps,
+	WorkingDayKey,
+	AppointmentType,
+	TimeSlot as WorkingHoursTimeSlot,
+	SectionSlots,
+	WorkingHoursState,
+} from './booking/WorkingHoursSection'
+export {
+	WORKING_DAYS,
+	SECTION_META,
+	durationOptions as workingHoursDurationOptions,
+	makeTimeOptions,
+	snapToStep,
+	createWorkingHoursState,
+	DropdownSelect as WorkingHoursDropdownSelect,
+} from './booking/WorkingHoursSection'
 
 // Shared booking-flow components (used by Ancillary/Nursing and Laboratory) — see src/components/common/booking/
-export * from "./booking/ServiceCatalogCard";
-export * from "./booking/ServiceDetailsSheet";
-export { default as NotesInput } from "./booking/NotesInput";
-export { default as PatientDetailsCard } from "./booking/PatientDetailsCard";
-export { default as SelectionRowCard } from "./booking/SelectionRowCard";
-export { default as BookingProgressStepper } from "./booking/BookingProgressStepper";
-export type { BookingProgressStepperProps, BookingStepperTheme } from "./booking/BookingProgressStepper";
-export { default as AddressSelectionSheet } from "./booking/AddressSelection/AddressSelectionSheet";
-export type { AddressRowRenderContext } from "./booking/AddressSelection/AddressSelectionSheet";
-export { default as AddressCardItem } from "./booking/AddressSelection/AddressCardItem";
-export type { AddressCardItemProps } from "./booking/AddressSelection/AddressCardItem";
-export { DateStrip, SlotChipGrid } from "./booking/RollingDateSlotPicker";
-export type { DateStripProps, SlotChipItem, SlotChipGridProps } from "./booking/RollingDateSlotPicker";
-export { SelectedItemCard } from "./booking/BookingSummary/SelectedItemCard";
-export type { SelectedItemCardProps, SelectedItemBadge, SelectedItemExpandable } from "./booking/BookingSummary/SelectedItemCard";
-export { SummaryEmptyState } from "./booking/BookingSummary/SummaryEmptyState";
-export type { SummaryEmptyStateProps } from "./booking/BookingSummary/SummaryEmptyState";
-export { BillingSummaryCard, AppBillSummary, AppBillStatusLine } from "./booking/BookingSummary/BillingSummaryCard";
-export type { BillingSummaryCardProps, BillingRow, BillingSummaryCardNote, AppBillStatusLineProps } from "./booking/BookingSummary/BillingSummaryCard";
+export * from './booking/ServiceCatalogCard'
+export * from './booking/ServiceDetailsSheet'
+export { default as NotesInput } from './booking/NotesInput'
+export { default as PatientDetailsCard } from './booking/PatientDetailsCard'
+export { default as SelectionRowCard } from './booking/SelectionRowCard'
+export { default as BookingProgressStepper } from './booking/BookingProgressStepper'
+export type { BookingProgressStepperProps, BookingStepperTheme } from './booking/BookingProgressStepper'
+export { default as AddressSelectionSheet } from './booking/AddressSelection/AddressSelectionSheet'
+export type { AddressRowRenderContext } from './booking/AddressSelection/AddressSelectionSheet'
+export { default as AddressCardItem } from './booking/AddressSelection/AddressCardItem'
+export type { AddressCardItemProps } from './booking/AddressSelection/AddressCardItem'
+export { DateStrip, SlotChipGrid } from './booking/RollingDateSlotPicker'
+export type { DateStripProps, SlotChipItem, SlotChipGridProps } from './booking/RollingDateSlotPicker'
+export { SelectedItemCard } from './booking/BookingSummary/SelectedItemCard'
+export type {
+	SelectedItemCardProps,
+	SelectedItemBadge,
+	SelectedItemExpandable,
+} from './booking/BookingSummary/SelectedItemCard'
+export { SummaryEmptyState } from './booking/BookingSummary/SummaryEmptyState'
+export type { SummaryEmptyStateProps } from './booking/BookingSummary/SummaryEmptyState'
+export { BillingSummaryCard, AppBillSummary, AppBillStatusLine } from './booking/BookingSummary/BillingSummaryCard'
+export type {
+	BillingSummaryCardProps,
+	BillingRow,
+	BillingSummaryCardNote,
+	AppBillStatusLineProps,
+} from './booking/BookingSummary/BillingSummaryCard'
 export { AppPaymentMethodList, AppSecurePaymentNote } from './booking/AppPaymentMethodList'
-export type { AppPaymentMethod, AppPaymentMethodListProps, AppSecurePaymentNoteProps } from './booking/AppPaymentMethodList'
+export type {
+	AppPaymentMethod,
+	AppPaymentMethodListProps,
+	AppSecurePaymentNoteProps,
+} from './booking/AppPaymentMethodList'
 export { AppTicketCard } from './booking/AppTicketCard'
 export type { AppTicketCardProps, AppTicketHeader, AppTicketField } from './booking/AppTicketCard'
-export { PackageSectionCard } from "./booking/PackageSectionCard";
-export type { PackageListItem } from "./booking/PackageSectionCard";
+export { PackageSectionCard } from './booking/PackageSectionCard'
+export type { PackageListItem } from './booking/PackageSectionCard'
 // KarolaHealth design-language primitives (tokens in src/config/theme.ts)
 export { AppIcon, AppPathIcon } from './display/AppIcon'
 export type { AppIconName, AppIconProps, AppPathIconProps } from './display/AppIcon'
@@ -126,7 +158,7 @@ export { AppAvatarStack } from './display/AppAvatarStack'
 export type { AppAvatarStackProps, AppAvatarStackItem } from './display/AppAvatarStack'
 export { AppNavRow } from './layout/AppNavRow'
 export type { AppNavRowProps } from './layout/AppNavRow'
-export { BookingPaymentPage, isActiveTaskConflictError } from "./booking/BookingPaymentPage";
+export { BookingPaymentPage, isActiveTaskConflictError } from './booking/BookingPaymentPage'
 export type {
 	BookingPaymentPageConfig,
 	BookingPaymentStepperConfig,
@@ -135,7 +167,7 @@ export type {
 	BookingPaymentActiveTaskError,
 	BookingPaymentCharges,
 	BookingPaymentVisit,
-} from "./booking/BookingPaymentPage";
+} from './booking/BookingPaymentPage'
 
 // Phase 2: interactive display / input pieces
 export { AppRatingStars } from './display/AppRatingStars'
@@ -150,10 +182,6 @@ export { AppTabs } from './inputs/AppTabs'
 export type { AppTabsProps, AppTabItem } from './inputs/AppTabs'
 
 // Booking wave: provider picking, visits, bookings list, cart footer (see src/components/common/booking/)
-export { AppProviderCard, providerMetaLine } from './booking/AppProviderCard'
-export type { AppProviderCardProps, AppProviderAvailability } from './booking/AppProviderCard'
-export { AppProviderProfileSheet } from './booking/AppProviderProfileSheet'
-export type { AppProviderProfileSheetProps } from './booking/AppProviderProfileSheet'
 export { AppRadioCard } from './booking/AppRadioCard'
 export type { AppRadioCardProps } from './booking/AppRadioCard'
 export { AppBookingCard, BOOKING_KINDS } from './booking/AppBookingCard'
