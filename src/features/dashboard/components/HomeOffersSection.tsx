@@ -4,13 +4,14 @@
 // auto-advancing every 4500ms. The CTA tracks the click, then opens the offer's in-app route or URL.
 // Hidden while empty or when the ads endpoint fails.
 import React, { useEffect, useState } from 'react'
-import { Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 
 import { AppCarousel, AppPathIcon, AppSkeleton, AppTag } from '../../../components/common'
 import { APP_COLORS, TONES, type ToneKey } from '../../../config/theme'
 import { getHomeOffers, trackAdClick, type HomeOffer } from '../../../services/homeService'
 import { HOME_ICONS } from '../homeTheme'
+import { openWebUrl } from '../../../utils/safeLinking'
 
 type SlideTheme = {
 	bg: string
@@ -101,7 +102,7 @@ function HomeOffersSection({ refreshToken }: Props) {
 		if (!target) return
 		try {
 			if (target.type === 'url' && target.url) {
-				await Linking.openURL(target.url)
+				await openWebUrl(target.url)
 			} else if (target.type === 'route' && target.route) {
 				navigation.navigate(target.route, target.params)
 			}

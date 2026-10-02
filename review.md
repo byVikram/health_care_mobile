@@ -185,3 +185,14 @@ Hardcoded test UPI id and payee name in `AppPayment.tsx:17-20`; `DicomViewer.tsx
 ## 8. Not verified in this review
 
 Behaviour on a physical device (low-end Android, iOS); Android manifest/cleartext flags; server-side WebSocket auth (see backend review) and S3 bucket policy; push-notification payload handling; FCM token cleanup on logout; which of the 594 `.map(` sites render long lists; remaining ~100 `useEffect`+fetch call sites outside the files named above; unused-dependency analysis.
+
+## 9. P1 remediation (done, uncommitted at time of writing)
+
+| Item | Change |
+|---|---|
+| URL safety | New `src/utils/safeLinking.ts` (`openWebUrl`, https-only). Offers, health-read podcasts, event registration links (home, list, details) and consultation file/prescription links no longer pass server-supplied URLs straight to `Linking.openURL`. |
+| ServiceMatchingPage | A shared `hasNavigatedRef` stops the socket push and the status poll from both calling `navigation.replace`. |
+| TrackAppointmentPage | Socket/poll effect reads provider/title/address through a ref (no stale closures); in-flight fetch guard; mounted check before redirecting; a single guarded `redirectToMatching`. |
+| AuthContext | Callbacks wrapped in `useCallback`, context value in `useMemo`, `updateUser` uses a functional `setUser`, so consumers no longer re-render on every provider render. |
+
+`npx tsc --noEmit` is clean. Not done: allowlist for in-app `route` targets of offers (unknown routes are a no-op today), a mobile test runner, crash reporting.

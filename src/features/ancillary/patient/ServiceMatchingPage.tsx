@@ -48,6 +48,8 @@ export default function ServiceMatchingPage() {
 	const [cancelModalVisible, setCancelModalVisible] = useState(false)
 
 	// Radar Animation Values
+	// The socket push and the status poll can both see "assigned"; only the first may navigate.
+	const hasNavigatedRef = useRef(false)
 	const pulse1 = useRef(new Animated.Value(0)).current
 	const pulse2 = useRef(new Animated.Value(0)).current
 	const pulse3 = useRef(new Animated.Value(0)).current
@@ -105,6 +107,8 @@ export default function ServiceMatchingPage() {
 					}
 					if (navigateTimeout) clearTimeout(navigateTimeout)
 					navigateTimeout = setTimeout(() => {
+						if (hasNavigatedRef.current) return
+						hasNavigatedRef.current = true
 						navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
 							bookingId: payload.data.requestId || payload.data.id || targetId,
 							bookingData: payload.data,
@@ -165,7 +169,8 @@ export default function ServiceMatchingPage() {
 						}
 						if (!navigateTimeout) {
 							navigateTimeout = setTimeout(() => {
-								if (isMounted) {
+								if (isMounted && !hasNavigatedRef.current) {
+									hasNavigatedRef.current = true
 									navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
 										bookingId: data.requestId || data.id || targetBookingId || 'active',
 										bookingData: data,

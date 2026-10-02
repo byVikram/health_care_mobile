@@ -6,7 +6,6 @@ import {
 	ActivityIndicator,
 	TouchableOpacity,
 	useWindowDimensions,
-	Linking,
 	Alert,
 	KeyboardAvoidingView,
 	Platform,
@@ -21,6 +20,7 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
+import { openWebUrl } from '../../utils/safeLinking'
 
 const TEAL = '#0c7c7c'
 
@@ -162,7 +162,7 @@ export default function AllEventsPage() {
 							marginRight={0}
 							onRegister={() => {
 								if (item.registration_link) {
-									Linking.openURL(item.registration_link)
+									openWebUrl(item.registration_link).catch(() => Alert.alert('Error', 'Could not open registration link.'))
 								} else {
 									Alert.alert('Registration', 'Registration link is not available for this event.')
 								}

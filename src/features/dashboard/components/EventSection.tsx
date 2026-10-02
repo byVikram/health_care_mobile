@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { FlatList, Image, StyleSheet, TouchableOpacity, useWindowDimensions, View, ActivityIndicator, Linking, Alert } from 'react-native'
+import { FlatList, Image, StyleSheet, TouchableOpacity, useWindowDimensions, View, ActivityIndicator, Alert } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 
 import { useNavigation } from '@react-navigation/native'
@@ -10,6 +10,7 @@ import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
+import { openWebUrl } from '../../../utils/safeLinking'
 
 interface Props {
 	variant?: 'row' | 'column'
@@ -108,7 +109,7 @@ function UpcomingEventsSection({ variant = 'row' }: Props) {
 						marginRight={index === events.length - 1 ? 0 : 12}
 						onRegister={() => {
 							if (item.registration_link) {
-								Linking.openURL(item.registration_link)
+								openWebUrl(item.registration_link).catch(() => Alert.alert('Error', 'Could not open registration link.'))
 							} else {
 								Alert.alert('Registration', 'Registration link is not available for this event.')
 							}

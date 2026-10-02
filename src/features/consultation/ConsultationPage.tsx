@@ -14,7 +14,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
 	Animated,
-	Linking,
 	Modal,
 	ScrollView,
 	StyleSheet,
@@ -54,6 +53,7 @@ import {
 import { getLatestVitals, type VitalRecord } from './VitalsService'
 import { buildS3Url } from '../../utils/s3Utils'
 import { toApiDate } from '../doctor/scheduleUtils'
+import { openWebUrl } from '../../utils/safeLinking'
 
 const SAMPLE_DICOM_MODULE = require('../../assets/dicon/sample-dicon.dcm')
 
@@ -526,7 +526,7 @@ export default function ConsultationPage() {
 		}
 		const url = buildS3Url(item.fileUrl)
 		if (url) {
-			Linking.openURL(url).catch(() => Toast.show({ type: 'error', text1: 'Could not open this file' }))
+			openWebUrl(url).catch(() => Toast.show({ type: 'error', text1: 'Could not open this file' }))
 			return
 		}
 		if (item.kind === 'radiology') {
@@ -882,7 +882,7 @@ export default function ConsultationPage() {
 										{!!h.prescription_s3_key && (
 											<TouchableOpacity
 												onPress={() =>
-													Linking.openURL(buildS3Url(h.prescription_s3_key)!).catch(() =>
+													openWebUrl(buildS3Url(h.prescription_s3_key)).catch(() =>
 														Toast.show({ type: 'error', text1: 'Could not open this file' })
 													)
 												}
