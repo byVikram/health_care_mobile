@@ -125,19 +125,39 @@ export default function WorkDocumentsPage() {
 
 	useEffect(() => {
 		if (!draft?.specialtyId) return
-		fetchAncillarySubspecialtiesBackend(draft.specialtyId)
-			.then(setSubSpecialties)
-			.catch(() => setSubSpecialties([]))
+		let active = true
+		const load = async () => {
+			try {
+				const items = await fetchAncillarySubspecialtiesBackend(draft.specialtyId)
+				if (active) setSubSpecialties(items)
+			} catch {
+				if (active) setSubSpecialties([])
+			}
+		}
+		void load()
+		return () => {
+			active = false
+		}
 	}, [draft?.specialtyId])
 
 	useEffect(() => {
 		if (!draft?.specialtyId) return
-		fetchAncillaryServicesBackend({
-			specialtyId: draft.specialtyId,
-			subspecialtyId: draft.subSpecialtyId || undefined,
-		})
-			.then(setServices)
-			.catch(() => setServices([]))
+		let active = true
+		const load = async () => {
+			try {
+				const items = await fetchAncillaryServicesBackend({
+					specialtyId: draft.specialtyId,
+					subspecialtyId: draft.subSpecialtyId || undefined,
+				})
+				if (active) setServices(items)
+			} catch {
+				if (active) setServices([])
+			}
+		}
+		void load()
+		return () => {
+			active = false
+		}
 	}, [draft?.specialtyId, draft?.subSpecialtyId])
 
 	const submit = useCallback(async () => {

@@ -70,7 +70,14 @@ export const NetworkProvider = ({ children }: { children: React.ReactNode }) => 
 		// Resolve the initial state immediately (NetInfo.fetch), then keep
 		// listening for changes. Using fetch() first avoids briefly rendering
 		// the "unknown" state longer than necessary.
-		NetInfo.fetch().then(handleUpdate)
+		const loadInitialState = async () => {
+			try {
+				handleUpdate(await NetInfo.fetch())
+			} catch {
+				// Keep the default state; the change listener below will still report updates.
+			}
+		}
+		void loadInitialState()
 		const unsubscribe = NetInfo.addEventListener(handleUpdate)
 
 		return () => {

@@ -112,7 +112,9 @@ const CORNERSTONE_HTML = `
           'W: ' + Math.round(vp.voi.windowWidth) + '<br>' +
           'L: ' + Math.round(vp.voi.windowCenter) + '<br>' +
           'Zoom: ' + vp.scale.toFixed(2) + 'x';
-      } catch(e) {}
+      } catch(e) {
+        // overlay is cosmetic; viewport may not exist yet
+      }
     }
 
     function loadDicomFromBase64(base64String) {
@@ -176,7 +178,9 @@ const CORNERSTONE_HTML = `
         vp.voi.windowCenter = vp.voi.windowCenter + dCenter;
         cornerstone.setViewport(element, vp);
         updateInfoOverlay();
-      } catch(e) {}
+      } catch(e) {
+        // viewport may not be ready; ignore this drag tick
+      }
     }
 
     function zoomIn() {
@@ -185,7 +189,9 @@ const CORNERSTONE_HTML = `
         vp.scale = Math.min(vp.scale * 1.25, 8);
         cornerstone.setViewport(element, vp);
         updateInfoOverlay();
-      } catch(e) {}
+      } catch(e) {
+        // viewport may not be ready; ignore this zoom
+      }
     }
 
     function zoomOut() {
@@ -194,7 +200,9 @@ const CORNERSTONE_HTML = `
         vp.scale = Math.max(vp.scale * 0.8, 0.1);
         cornerstone.setViewport(element, vp);
         updateInfoOverlay();
-      } catch(e) {}
+      } catch(e) {
+        // viewport may not be ready; ignore this zoom
+      }
     }
 
     function resetView() {
@@ -203,7 +211,9 @@ const CORNERSTONE_HTML = `
           cornerstone.setViewport(element, JSON.parse(JSON.stringify(currentViewport)));
           updateInfoOverlay();
         }
-      } catch(e) {}
+      } catch(e) {
+        // viewport may not be ready; nothing to reset
+      }
     }
 
     function invertImage() {
@@ -211,7 +221,9 @@ const CORNERSTONE_HTML = `
         var vp = cornerstone.getViewport(element);
         vp.invert = !vp.invert;
         cornerstone.setViewport(element, vp);
-      } catch(e) {}
+      } catch(e) {
+        // viewport may not be ready; nothing to invert
+      }
     }
 
     // Listen for Base64 payload from React Native
@@ -233,7 +245,9 @@ const CORNERSTONE_HTML = `
         if (msg.type === 'DICOM_BASE64') {
           loadDicomFromBase64(msg.data);
         }
-      } catch(e) {}
+      } catch(e) {
+        // ignore non-JSON messages from other senders
+      }
     });
 
     setStatus('Waiting for DICOM data...');

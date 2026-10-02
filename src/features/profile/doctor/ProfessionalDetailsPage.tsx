@@ -101,12 +101,28 @@ export default function ProfessionalDetailsPage() {
 	const [editing, setEditing] = useState<number | 'new' | null>(null)
 
 	useEffect(() => {
-		fetchExpertiseOptions()
-			.then(setExpertiseOptions)
-			.catch(() => setExpertiseOptions([]))
-		fetchTreatmentOptions()
-			.then(setTreatmentOptions)
-			.catch(() => setTreatmentOptions([]))
+		let active = true
+		const loadExpertise = async () => {
+			try {
+				const options = await fetchExpertiseOptions()
+				if (active) setExpertiseOptions(options)
+			} catch {
+				if (active) setExpertiseOptions([])
+			}
+		}
+		const loadTreatments = async () => {
+			try {
+				const options = await fetchTreatmentOptions()
+				if (active) setTreatmentOptions(options)
+			} catch {
+				if (active) setTreatmentOptions([])
+			}
+		}
+		void loadExpertise()
+		void loadTreatments()
+		return () => {
+			active = false
+		}
 	}, [])
 
 	const editingQual = typeof editing === 'number' ? draft?.qualifications[editing] : undefined

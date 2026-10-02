@@ -53,19 +53,28 @@ export default function AccountPage({
 
   // Fetch specialities from API
   useEffect(() => {
-    fetch(API_ENDPOINTS.SPECIALITIES.LIST)
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success) {
+    let active = true;
+    const loadSpecialities = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.SPECIALITIES.LIST);
+        const json = await res.json();
+        if (active && json.success) {
           const options: AppSelectOption[] = json.data.map((s: Speciality) => ({
             label: s.label,
             value: s.id,
           }));
           setSpecialityOptions(options);
         }
-      })
-      .catch((err) => console.error("Specialities fetch error:", err))
-      .finally(() => setLoadingSpecialities(false));
+      } catch (err) {
+        if (active) console.error("Specialities fetch error:", err);
+      } finally {
+        if (active) setLoadingSpecialities(false);
+      }
+    };
+    void loadSpecialities();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const canContinue = !!selectedLocation && !!selectedSpeciality;

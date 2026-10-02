@@ -114,8 +114,9 @@ export function AppointmentActionSheet({
 		setSelectedDoctor(null)
 		setReferNotes('')
 		let mounted = true
-		getFavouriteDoctors()
-			.then((res) => {
+		const loadFavourites = async () => {
+			try {
+				const res = await getFavouriteDoctors()
 				if (!mounted || !res.success) return
 				setFavourites(
 					(res.data?.favourites ?? []).map((d) => ({
@@ -128,8 +129,11 @@ export function AppointmentActionSheet({
 						is_verified: d.is_verified,
 					})),
 				)
-			})
-			.catch(() => {})
+			} catch {
+				// Best-effort: the refer list just stays empty and search still works.
+			}
+		}
+		void loadFavourites()
 		return () => {
 			mounted = false
 		}

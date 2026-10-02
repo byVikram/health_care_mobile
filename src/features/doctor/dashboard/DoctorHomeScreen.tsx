@@ -16,7 +16,7 @@ import { ROUTES } from '../../../navigation/routes'
 import { useAuth } from '../../../context/AuthContext'
 import { useTabBarClearance } from '../../../navigation/tabBar'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
-import { getAppointments, startConsultation } from '../doctorService'
+import { getAppointments, getStatusIdByLabel, startConsultation } from '../doctorService'
 import type { Appointment } from '../../../types/appointment'
 
 import AppointmentsIcon from '../../../assets/quick-services/appointments.svg'
@@ -219,17 +219,43 @@ export function DoctorHomeScreen() {
 	// blocking the rest of the screen. (Health reads / Communities fetch their own data internally —
 	// see HomeHealthReadsSection / HomeCommunitiesSection below.)
 	useEffect(() => {
-		// `status` isn't a real query param on this backend (it expects a `status_id` UUID) -- filter
-		// client-side on the label instead, same as DoctorEngageScreen does for its Requests tab.
-		getAppointments({ variant: 'all', limit: 100 })
-			.then((res) => setPendingRequestsCount((res.data ?? []).filter((a) => statusLabelOf(a).toLowerCase() === 'pending').length))
-			.catch(() => {})
-		listHealthQuestions(undefined, 1, 1, false)
-			.then((res) => setOpenQuestionsCount(res.meta?.total ?? 0))
-			.catch(() => {})
-		getUnreadNotificationCount()
-			.then(setNotificationCount)
-			.catch(() => {})
+		let active = true
+
+		// The appointments list already returns `meta.total` for the filtered query, so resolve the
+		// "pending" status id and read the total with limit 1 instead of pulling 100 rows to count.
+		const loadPendingRequests = async () => {
+			try {
+				const pendingStatusId = await getStatusIdByLabel('pending')
+				const res = await getAppointments({ variant: 'all', limit: 1, status_id: pendingStatusId })
+				if (active) setPendingRequestsCount(res.meta?.total ?? 0)
+			} catch {
+				// Best-effort: leave the count at its default.
+			}
+		}
+		const loadOpenQuestions = async () => {
+			try {
+				const res = await listHealthQuestions(undefined, 1, 1, false)
+				if (active) setOpenQuestionsCount(res.meta?.total ?? 0)
+			} catch {
+				// Best-effort: leave the count at its default.
+			}
+		}
+		const loadNotificationCount = async () => {
+			try {
+				const count = await getUnreadNotificationCount()
+				if (active) setNotificationCount(count)
+			} catch {
+				// Best-effort: leave the count at its default.
+			}
+		}
+
+		void loadPendingRequests()
+		void loadOpenQuestions()
+		void loadNotificationCount()
+
+		return () => {
+			active = false
+		}
 	}, [refreshToken])
 
 	const handleStart = async (apt: Appointment) => {

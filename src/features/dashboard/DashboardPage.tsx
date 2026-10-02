@@ -144,24 +144,23 @@ export default function DashboardPage() {
 	useEffect(() => {
 		if (role !== USER_ROLES.DOCTOR) return
 
+		// Stale-response guard: a fast selectedDate switch re-runs this effect; the cleanup flips `active`
+		// so an older in-flight response can't overwrite a newer one.
+		let active = true
+
 		const fetchStatus = async () => {
 			try {
 				const status = await getDoctorStatus()
-				console.log("DOCTOR STATUS IN DASHBOARD:", status)
+				if (!active) return
 				setDoctorStatus(status)
-				
+
 				if (status.profile_completed && !status.is_verified) {
-					console.log("SETTING SHOW UNVERIFIED BANNER TO TRUE")
 					setShowUnverifiedBanner(true)
-				} else {
-					console.log("BANNER NOT SHOWN. profile_completed:", status.profile_completed, "is_verified:", status.is_verified)
 				}
 			} catch (error) {
-				console.error('Failed to fetch doctor status:', error)
+				if (active) console.error('Failed to fetch doctor status:', error)
 			}
 		}
-
-		fetchStatus()
 
 		const fetchAppointments = async () => {
 			try {
@@ -173,6 +172,7 @@ export default function DashboardPage() {
 				const res = await getAppointments({
 					appointment_date: dateStr,
 				})
+				if (!active) return
 
 				if (res.success) {
 					setAppointments(Array.isArray(res.data) ? res.data : [])
@@ -180,13 +180,18 @@ export default function DashboardPage() {
 					setApptError(res.message ?? 'Failed to load appointments')
 				}
 			} catch {
-				setApptError('Failed to load appointments')
+				if (active) setApptError('Failed to load appointments')
 			} finally {
-				setApptLoading(false)
+				if (active) setApptLoading(false)
 			}
 		}
 
-		fetchAppointments()
+		void fetchStatus()
+		void fetchAppointments()
+
+		return () => {
+			active = false
+		}
 	}, [role, selectedDate, weekDays])
 
 	const handleRefresh = async () => {

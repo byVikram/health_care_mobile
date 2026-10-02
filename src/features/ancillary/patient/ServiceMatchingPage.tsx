@@ -16,6 +16,7 @@ import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
 import { AppTypography } from '../../../components/common/display/AppTypography'
 import { AppButton } from '../../../components/common/buttons/AppButton'
 import { fetchPatientActiveRequestBackend, cancelCareRequestPatientBackend } from '../ancillaryService'
+import Toast from 'react-native-toast-message'
 import ApiService from '../../../services/apiService'
 import { openAuthedSocket } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
@@ -217,10 +218,15 @@ export default function ServiceMatchingPage() {
 
 	const handleCancelRequestWithReason = async (reason: string) => {
 		setIsCancelling(true)
-		await cancelCareRequestPatientBackend(bookingId, reason)
-		setIsCancelling(false)
-		setCancelModalVisible(false)
-		navigation.navigate(ROUTES.MAIN.TABS)
+		try {
+			await cancelCareRequestPatientBackend(bookingId, reason)
+			setCancelModalVisible(false)
+			navigation.navigate(ROUTES.MAIN.TABS)
+		} catch {
+			Toast.show({ type: 'error', text1: 'Could not cancel the request', text2: 'Please try again.' })
+		} finally {
+			setIsCancelling(false)
+		}
 	}
 
 	return (

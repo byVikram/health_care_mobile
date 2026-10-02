@@ -196,3 +196,7 @@ Behaviour on a physical device (low-end Android, iOS); Android manifest/cleartex
 | AuthContext | Callbacks wrapped in `useCallback`, context value in `useMemo`, `updateUser` uses a functional `setUser`, so consumers no longer re-render on every provider render. |
 
 `npx tsc --noEmit` is clean. Not done: allowlist for in-app `route` targets of offers (unknown routes are a no-op today), a mobile test runner, crash reporting.
+
+## 10. Correctness follow-ups (done, uncommitted at time of writing)
+
+`DashboardPage` doctor fetches have a stale-response guard; ~15 `.then()` chains in effects converted to async/await with cancel guards; `DoctorHomeScreen` counts pending requests via `meta.total` (limit 1) instead of downloading 100 rows; swallowed errors now commented, toasted or logged; `handleCancelRequestWithReason` resets `isCancelling`. Open: `cancelCareRequestPatientBackend` catches every error and returns `true`, so a failed cancel still looks successful.

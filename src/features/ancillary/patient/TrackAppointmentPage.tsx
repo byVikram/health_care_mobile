@@ -315,6 +315,8 @@ export default function TrackAppointmentPage() {
 
 				updateStatusFromData(data)
 			} catch (e) {
+				// Deliberately no error state: this runs every ~2s (and the socket also pushes updates), so a
+				// transient failure self-heals on the next tick and surfacing it would flicker the UI.
 				console.log('[TrackAppointmentPage] Status fetch notice:', e)
 			} finally {
 				fetchInFlight = false
@@ -363,7 +365,8 @@ export default function TrackAppointmentPage() {
 					setReviewData(res)
 				}
 			} catch (e) {
-				// ignore
+				// Non-fatal: the review is optional, so the completed screen simply renders without it.
+				console.warn('[TrackAppointmentPage] Booking review load failed:', e)
 			}
 		}
 		void loadBookingReview()

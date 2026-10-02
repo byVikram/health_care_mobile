@@ -72,12 +72,15 @@ export default function OnboardingPage({ navigation, route }: OnboardingPageProp
 
 	// Load persisted specialty if previously stored
 	useEffect(() => {
+		let active = true
 		if (isAncillary) {
 			if (specialty) {
 				setActiveSpecialty(specialty as SpecialtyKey)
 			} else {
-				AsyncStorage.getItem('user_specialty').then((stored) => {
+				const loadStoredSpecialty = async () => {
+					const stored = await AsyncStorage.getItem('user_specialty')
 					if (
+						active &&
 						stored &&
 						(stored === 'nursing-care' ||
 							stored === 'physiotherapy' ||
@@ -86,8 +89,12 @@ export default function OnboardingPage({ navigation, route }: OnboardingPageProp
 					) {
 						setActiveSpecialty(stored as SpecialtyKey)
 					}
-				})
+				}
+				void loadStoredSpecialty()
 			}
+		}
+		return () => {
+			active = false
 		}
 	}, [isAncillary, specialty])
 

@@ -214,21 +214,30 @@ export default function MyDoctorPage() {
 	const isSearching = trimmedSearch.length >= 3
 
 	useEffect(() => {
-		getFavouriteDoctors()
-			.then((res) => {
-				if (res.success) {
+		let active = true
+		const load = async () => {
+			try {
+				const res = await getFavouriteDoctors()
+				if (active && res.success) {
 					setFavouriteIds(new Set(res.data.favourite_ids))
 					setFavourites(res.data.favourites.map(mapDoctorToRow))
 				}
-			})
-			.catch(() => {
-				Toast.show({
-					type: 'error',
-					text1: 'Error',
-					text2: 'Failed to load favourites',
-				})
-			})
-			.finally(() => setFavLoading(false))
+			} catch {
+				if (active) {
+					Toast.show({
+						type: 'error',
+						text1: 'Error',
+						text2: 'Failed to load favourites',
+					})
+				}
+			} finally {
+				if (active) setFavLoading(false)
+			}
+		}
+		void load()
+		return () => {
+			active = false
+		}
 	}, [])
 
 	useEffect(() => {

@@ -37,12 +37,18 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 	const [activeSpecialty, setActiveSpecialty] = useState<string | undefined>(route.params?.specialty)
 
 	useEffect(() => {
+		let active = true
 		if (route.params?.specialty) {
 			setActiveSpecialty(route.params.specialty)
 		} else if (roleLabel.toLowerCase() === 'ancillary' || roleId === 'ancillary') {
-			AsyncStorage.getItem('user_specialty').then((stored) => {
-				if (stored) setActiveSpecialty(stored)
-			})
+			const loadStoredSpecialty = async () => {
+				const stored = await AsyncStorage.getItem('user_specialty')
+				if (active && stored) setActiveSpecialty(stored)
+			}
+			void loadStoredSpecialty()
+		}
+		return () => {
+			active = false
 		}
 	}, [route.params?.specialty, roleLabel, roleId])
 
