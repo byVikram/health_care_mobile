@@ -9,7 +9,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 
-import { AppIconTile, AppInput, AppPathIcon, AppSkeleton, AppTag } from '../../../components/common'
+import { AppIconTile, AppInput, AppPathIcon, AppSkeleton, AppTag, AppTextLink } from '../../../components/common'
 import { APP_COLORS, toneForString } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppNavigationParamList } from '../../../navigation/types'
@@ -77,6 +77,10 @@ function AskDoctorSection({ itemLimit = 3, refreshToken }: Props) {
 					</Text>
 					<Text style={styles.subtitle}>Verified doctors answer health questions</Text>
 				</View>
+				<AppTextLink
+					label="View all"
+					onPress={() => navigation.navigate(ROUTES.STACK.PATIENT_QUESTIONS_LIST)}
+				/>
 			</View>
 
 			<AppInput
@@ -145,7 +149,12 @@ function AskDoctorSection({ itemLimit = 3, refreshToken }: Props) {
 							)}
 							{answers > 0 && (
 								<View style={styles.answered}>
-									<AppPathIcon d={HOME_ICONS.check} size={14} strokeWidth={2.6} color={APP_COLORS.success} />
+									<AppPathIcon
+										d={HOME_ICONS.check}
+										size={14}
+										strokeWidth={2.6}
+										color={APP_COLORS.success}
+									/>
 									<Text style={styles.answeredText}>
 										{`${answers} ${answers === 1 ? 'doctor' : 'doctors'} answered`}
 									</Text>

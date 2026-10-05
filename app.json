@@ -69,6 +69,13 @@
           "locationWhenInUsePermission": "Allow KarolaHealth to access your location to help patients find you."
         }
       ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow KarolaHealth to add your appointments to your calendar.",
+          "remindersPermission": "Allow KarolaHealth to add appointment reminders."
+        }
+      ],
       "expo-font",
       "expo-build-properties",
       "@react-native-community/datetimepicker",

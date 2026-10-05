@@ -6,12 +6,14 @@
 // the payment line and footer actions (home / Appointment Details).
 
 import React from 'react'
-import { Linking, ScrollView, StatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { ScrollView, StatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
+import { addToCalendar } from '../../utils/calendar'
+import { combineDateTime } from '../../utils/date'
 import { openDirections } from '../../utils/maps'
 import { buildS3Url } from '../../utils/s3Utils'
 import { showComingSoon } from '../../utils/toast'
@@ -44,17 +46,6 @@ const CONFETTI: { left: number; top: number; size: number; radius: number; color
 	{ left: 250, top: 30, size: 7, radius: 9999, color: TONES.sand.bg, rotate: 0 },
 	{ left: 120, top: 24, size: 6, radius: 2, color: TONES.lilac.bg, rotate: 30 },
 ]
-
-function addToCalendar(params: { title: string; dateDisplay: string; location: string }) {
-	// No native calendar module in this app yet -- opens Google Calendar's
-	// "quick add" web flow with the appointment details prefilled.
-	const text = encodeURIComponent(params.title)
-	const details = encodeURIComponent(`Appointment: ${params.dateDisplay}`)
-	const location = encodeURIComponent(params.location)
-	Linking.openURL(
-		`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&details=${details}&location=${location}`
-	).catch(() => showComingSoon())
-}
 
 /** "Today, Thu 24 Sep" -> "today"; "Tomorrow, …" -> "tomorrow"; otherwise "on {date}". */
 const relativeDayPhrase = (dateDisplay: string) => {
@@ -186,13 +177,19 @@ export default function AppointmentConfirmedPage() {
 								variant="tinted"
 								tone="mint"
 								style={styles.flex}
-								onPress={() =>
-									addToCalendar({
-										title: `Appointment with ${params.doctorName}`,
-										dateDisplay: `${params.dateDisplay}, ${params.timeDisplay}`,
-										location: isVideo ? 'Video consultation' : params.hospitalName,
+								onPress={() => {
+									const start = combineDateTime(params.appointmentDate, params.startTime)
+									if (!start) return showComingSoon()
+									void addToCalendar({
+										title: isVideo ? `Video consultation with ${params.doctorName}` : `Appointment with ${params.doctorName}`,
+										start,
+										end: combineDateTime(params.appointmentDate, params.endTime),
+										location: isVideo
+											? 'Video consultation (KarolaHealth app)'
+											: [params.hospitalName, params.hospitalAddress].filter(Boolean).join(', '),
+										notes: `Booked on KarolaHealth. Patient: ${params.patientName}.`,
 									})
-								}
+								}}
 							/>
 							{!isVideo && (
 								<AppActionChip

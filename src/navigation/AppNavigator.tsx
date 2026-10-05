@@ -53,8 +53,10 @@ import BookingTrackingScreen from '../features/laboratory/BookingTrackingScreen'
 import OrderListLaboratoryPage from '../features/laboratory_duplicated/OrderListLaboratoryPage'
 import BookingDetailsLaboratoryPage from '../features/laboratory_duplicated/BookingDetailsLaboratoryPage'
 
-import PatientQuestionsListPage from '../features/patient/PatientQuestionsListPage'
-import PatientQuestionDetailPage from '../features/patient/PatientQuestionDetailPage'
+import HealthReadsPage from '../features/health-feed/HealthReadsPage'
+import ReadArticlePage from '../features/health-feed/ReadArticlePage'
+import HealthQuestionsPage from '../features/health-feed/HealthQuestionsPage'
+import QuestionThreadPage from '../features/health-feed/QuestionThreadPage'
 import RadiologyBookingPage from '../features/radiology/RadiologyBookingPage'
 import RadiologyBookingDetailsPage from '../features/radiology/RadiologyBookingDetailsPage'
 import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
@@ -126,16 +128,11 @@ function AuthenticatedNavigator() {
 				{/* SearchPage renders its own hero header — no navigator header here. */}
 				<AppStack.Screen name={ROUTES.STACK.SEARCH} component={SearchPage} options={{ headerShown: false }} />
 
-				<AppStack.Screen
-					name={ROUTES.STACK.PATIENT_QUESTIONS_LIST as keyof AppStackParamList}
-					component={PatientQuestionsListPage}
-					options={{ headerShown: true, title: 'Health Questions' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.PATIENT_QUESTION_DETAIL as keyof AppStackParamList}
-					component={PatientQuestionDetailPage}
-					options={{ headerShown: true, title: 'Question Detail' }}
-				/>
+				{/* Health feed screens render their own headers. */}
+				<AppStack.Screen name={ROUTES.STACK.BLOG_LIST as keyof AppStackParamList} component={HealthReadsPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.BLOG_ARTICLE as keyof AppStackParamList} component={ReadArticlePage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_QUESTIONS_LIST as keyof AppStackParamList} component={HealthQuestionsPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_QUESTION_DETAIL as keyof AppStackParamList} component={QuestionThreadPage} options={{ headerShown: false }} />
 
 				<AppStack.Screen
 					name={ROUTES.STACK.PHARMACY_SEARCH_PAGE}
