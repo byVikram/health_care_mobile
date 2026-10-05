@@ -96,6 +96,10 @@ export type AppointmentConfirmedParams = {
 	appointmentMode: 'clinic_visit' | 'video_call'
 	dateDisplay: string
 	timeDisplay: string
+	/** Raw booking date / times (YYYY-MM-DD, HH:MM[:SS]) -- what "Add to calendar" builds the event from. */
+	appointmentDate: string
+	startTime: string
+	endTime?: string | null
 	hospitalName: string
 	hospitalAddress?: string
 	/** Clinic map position, for the Directions button (omitted/null -> address search). */

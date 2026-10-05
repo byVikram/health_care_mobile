@@ -33,6 +33,7 @@ import {
 import { getAppointmentById } from '../../../../services/appointmentService'
 import { ROUTES } from '../../../../navigation/routes'
 import type { AppStackParamList } from '../../../../navigation/types'
+import { addToCalendar } from '../../../../utils/calendar'
 import { openDirections } from '../../../../utils/maps'
 import { buildS3Url } from '../../../../utils/s3Utils'
 import { capitaliseWords } from '../../../../utils/formatters'
@@ -214,6 +215,18 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	}
 	const goSummary = () => {
 		if (appt) navigation.navigate(ROUTES.STACK.VISIT_SUMMARY, { appointmentId: appt.id })
+	}
+	const addToCalendarPress = () => {
+		if (!start) return comingSoon()
+		void addToCalendar({
+			title: isVideo ? `Video consultation with ${doctorName}` : `Appointment with ${doctorName}`,
+			start,
+			end,
+			location: isVideo
+				? 'Video consultation (KarolaHealth app)'
+				: [hospital?.name, hospital?.address].filter(Boolean).join(', '),
+			notes: `Booked on KarolaHealth.${bookingId ? ` Booking ID: ${bookingId}.` : ''}`,
+		})
 	}
 	const directions = () => openDirections(hospital?.latitude, hospital?.longitude, hospital?.address, hospital?.name)
 
@@ -449,7 +462,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 						label="When"
 						value={whenLabel}
 						sub={whenSub}
-						action={live ? { label: 'Add to calendar', onPress: comingSoon } : undefined}
+						action={live ? { label: 'Add to calendar', onPress: addToCalendarPress } : undefined}
 					/>
 					{!!appt.patient && (
 						<AppDetailRow
