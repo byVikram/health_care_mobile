@@ -1,10 +1,8 @@
 import React from 'react'
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
-import { BlurView } from 'expo-blur'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { MainTabParamList } from './types'
@@ -197,7 +195,6 @@ const PATIENT_TABS: FloatingTab[] = [
 	{ key: 'search', route: ROUTES.MAIN.SEARCH, label: 'Search', icon: 'search' },
 	{ key: 'care', route: null, label: 'Healthcare at home', shortLabel: 'Home care', icon: 'careAtHome' },
 	{ key: 'bookings', route: ROUTES.MAIN.PORTAL, label: 'Bookings', icon: 'bookings' },
-	{ key: 'wallet', route: ROUTES.MAIN.WALLET, label: 'Wallet', icon: 'wallet' },
 ]
 
 /** Ancillary provider tabs: Today · Schedule · Earnings · Profile (labelled bar, same as the doctor's). */
@@ -207,12 +204,11 @@ const PROVIDER_TABS: FloatingTab[] = [
 	{ key: 'earnings', route: ROUTES.MAIN.WALLET, label: 'Earnings', icon: 'myWallet' },
 	{ key: 'profile', route: ROUTES.MAIN.PROFILE, label: 'Profile', icon: 'profile' },
 ]
-/** Doctor dashboard tab bar (design): Home · Schedule · Questions · Profile. Wallet stays reachable from the menu. */
+/** Doctor dashboard tab bar: Home · Schedule · Questions. Wallet and Profile stay reachable from the menu. */
 const DOCTOR_TABS: FloatingTab[] = [
 	{ key: 'home', route: ROUTES.MAIN.HOME, label: 'Home', icon: 'home' },
 	{ key: 'schedule', route: ROUTES.MAIN.SCHEDULE, label: 'Schedule', icon: 'appointments' },
 	{ key: 'engage', route: ROUTES.MAIN.ENGAGE, label: 'Questions', icon: 'help' },
-	{ key: 'profile', route: ROUTES.MAIN.PROFILE, label: 'Profile', icon: 'profile' },
 ]
 
 /** Shared by both floating bars: the tab's route, whether it is the active one, and its press handler. */
@@ -240,18 +236,16 @@ function resolveFloatingTab(
 	return { route, active, onPress }
 }
 
-// ── Labelled bar ("Light 6" frosted-glass design) ─────────────────────────────────────────────────
-// 66-high fully rounded glass pill; every tab is an equal-width, 52-high, fully rounded slot holding a
-// 24px icon over an 11px label, and the active slot fills teal (white icon + label). Patient (5 tabs)
-// sits 16 from the sides, doctor and ancillary provider (4 tabs) 48.
+// ── Labelled bar (solid white pill) ─────────────────────────────────────────────────
+// 66-high fully rounded white pill; every tab is an equal-width, 52-high, fully rounded slot holding a
+// 24px icon over a 12px label, and the active slot fills teal (white icon + label). The side inset
+// is chosen so every label fits its slot: patient (4 tabs) sits 20 from the sides (~83px per slot),
+// doctor (3 tabs) 48 (~92px), ancillary provider (4 tabs) 48.
 const LABELLED_BAR_HEIGHT = 66
 const LABELLED_ITEM_HEIGHT = 52
-const PATIENT_LABELLED_SIDE = 16
+const PATIENT_LABELLED_SIDE = 20
 const DOCTOR_LABELLED_SIDE = 48
 const PROVIDER_LABELLED_SIDE = 48
-// Top-to-bottom white wash of the glass (design: #FFFFFFB3 -> #FFFFFF8C); Android's BlurView doesn't really blur, so it's more opaque there.
-const GLASS_TOP_OPACITY = Platform.OS === 'ios' ? 0.7 : 0.92
-const GLASS_BOTTOM_OPACITY = Platform.OS === 'ios' ? 0.55 : 0.88
 
 function LabelledTabBar({
 	state,
@@ -278,17 +272,6 @@ function LabelledTabBar({
 		>
 			<View style={[styles.labelledShadow, { bottom, left: side, right: side }]}>
 				<View style={styles.labelledBar}>
-					<BlurView intensity={50} tint="light" style={StyleSheet.absoluteFill} />
-					<Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
-						<Defs>
-							<LinearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
-								<Stop offset="0" stopColor="#FFFFFF" stopOpacity={GLASS_TOP_OPACITY} />
-								<Stop offset="1" stopColor="#FFFFFF" stopOpacity={GLASS_BOTTOM_OPACITY} />
-							</LinearGradient>
-						</Defs>
-						<Rect width="100%" height="100%" fill="url(#glass)" />
-					</Svg>
-					<View pointerEvents="none" style={styles.labelledHighlight} />
 					{tabs.map((tab) => {
 						const { route, active, onPress } = resolveFloatingTab(tab, state, navigation, careOpen, () => open('ancillary'))
 						if (tab.route && !route) return null
@@ -303,12 +286,15 @@ function LabelledTabBar({
 								accessibilityLabel={tab.label}
 								accessibilityState={{ selected: active }}
 								accessibilityHint={route ? undefined : 'Opens home healthcare services'}
-								style={[styles.labelledItem, active && styles.labelledItemActive]}
+								style={styles.labelledItem}
 							>
+								{/* The active highlight is its own fully opaque layer under the icon + label, so its colour
+								    is identical on every tab and can't be tinted by the glass or the content behind the bar. */}
+								{active && <View pointerEvents="none" style={styles.labelledActiveFill} />}
 								<View style={styles.labelledIcon}>
-									<AppPathIcon d={HOME_CHROME_PATHS[tab.icon]} size={22} strokeWidth={2.1} color={color} />
+									<AppPathIcon d={HOME_CHROME_PATHS[tab.icon]} size={24} strokeWidth={2.1} color={color} />
 								</View>
-								<Text numberOfLines={1} style={[styles.labelledLabel, { color, fontWeight: active ? '800' : '600' }]}>
+								<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.labelledLabel, { color, fontWeight: active ? '800' : '600' }]}>
 									{tab.shortLabel ?? tab.label}
 								</Text>
 							</Pressable>
@@ -421,14 +407,18 @@ const styles = StyleSheet.create({
 	floatingWrapBand: {
 		backgroundColor: APP_COLORS.pageBg,
 	},
+	// Solid white on purpose: a translucent bar with a shadow on a background-less view let the shadow and
+	// the page behind show through unevenly (a dimmed patch beside the active Bookings tab). With an
+	// opaque fill the shadow is cast cleanly outside the bar and nothing shows through.
 	labelledShadow: {
 		position: 'absolute',
 		height: LABELLED_BAR_HEIGHT,
 		borderRadius: LABELLED_BAR_HEIGHT / 2,
+		backgroundColor: '#FFFFFF',
 		shadowColor: APP_COLORS.shadow,
 		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.15,
-		shadowRadius: 28,
+		shadowOpacity: 0.14,
+		shadowRadius: 24,
 		elevation: 6,
 	},
 	labelledBar: {
@@ -440,17 +430,8 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 8,
 		borderRadius: LABELLED_BAR_HEIGHT / 2,
 		borderWidth: 1,
-		borderColor: '#FFFFFFCC',
+		borderColor: '#E3EAEB',
 		overflow: 'hidden',
-	},
-	// 1px white sheen along the top edge (the design's inset highlight).
-	labelledHighlight: {
-		position: 'absolute',
-		top: 0,
-		left: 0,
-		right: 0,
-		height: 1,
-		backgroundColor: '#FFFFFF',
 	},
 	labelledItem: {
 		flex: 1,
@@ -461,18 +442,21 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		gap: 3,
 	},
-	labelledItemActive: {
+	labelledActiveFill: {
+		...StyleSheet.absoluteFill,
+		borderRadius: LABELLED_ITEM_HEIGHT / 2,
 		backgroundColor: APP_COLORS.primary,
+		opacity: 1,
 	},
 	labelledIcon: {
-		width: 24,
-		height: 24,
+		width: 26,
+		height: 26,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
 	labelledLabel: {
-		fontSize: 11,
-		lineHeight: 14,
+		fontSize: 12,
+		lineHeight: 15,
 	},
 	tabBar: {
 		flexDirection: 'row',

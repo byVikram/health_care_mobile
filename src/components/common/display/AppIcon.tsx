@@ -166,11 +166,13 @@ export type AppPathIconProps = {
 	size?: number
 	color: string
 	strokeWidth?: number
+	/** Fill colour for the shapes (default 'none', i.e. outline only) -- e.g. a filled bookmark. */
+	fill?: string
 	accessibilityLabel?: string
 }
 
 /** Arbitrary stroke-path icon (round caps/joins). Defaults match the speciality tiles: 30px, 1.7 stroke. */
-export function AppPathIcon({ d, size = 30, color, strokeWidth = 1.7, accessibilityLabel }: AppPathIconProps) {
+export function AppPathIcon({ d, size = 30, color, strokeWidth = 1.7, fill = 'none', accessibilityLabel }: AppPathIconProps) {
 	const paths = Array.isArray(d) ? d : [d]
 	return (
 		<Svg
@@ -184,7 +186,7 @@ export function AppPathIcon({ d, size = 30, color, strokeWidth = 1.7, accessibil
 				<Path
 					key={i}
 					d={p}
-					fill="none"
+					fill={fill}
 					stroke={color}
 					strokeWidth={strokeWidth}
 					strokeLinecap="round"

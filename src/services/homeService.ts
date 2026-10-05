@@ -24,8 +24,7 @@ export const markAllNotificationsRead = async (): Promise<number> => {
 // ---- Offers carousel (ads placement "home_offers") ----
 
 export type HomeOfferTarget =
-	| { type: 'route'; route: string; params?: Record<string, unknown> }
-	| { type: 'url'; url: string }
+	{ type: 'route'; route: string; params?: Record<string, unknown> } | { type: 'url'; url: string }
 
 export interface HomeOffer {
 	public_id: string
@@ -82,6 +81,7 @@ export interface HealthRead {
 	media_url?: string | null
 	media_duration_seconds?: number | null
 	image_url?: string | null
+	is_featured?: boolean
 	published_at?: string | null
 }
 
@@ -92,6 +92,20 @@ export const getHealthReads = async (contentType: HealthReadType, limit = 2): Pr
 		limit,
 	})
 	return res.data?.data ?? []
+}
+
+/** Every published read of one type (the API caps a page at 50, so follow `meta.pages`). */
+export const getAllHealthReads = async (contentType: HealthReadType, maxPages = 4): Promise<HealthRead[]> => {
+	const rows: HealthRead[] = []
+	for (let page = 1; page <= maxPages; page++) {
+		const res = await ApiService.getWithParams<Envelope<HealthRead[]> & { meta?: { pages?: number } }>(
+			API_ENDPOINTS.BLOGS.LIST,
+			{ content_type: contentType, page, limit: 50 }
+		)
+		rows.push(...(res.data?.data ?? []))
+		if (page >= (res.data?.meta?.pages ?? 1)) break
+	}
+	return rows
 }
 
 // ---- Communities join / leave ----
