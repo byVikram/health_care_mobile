@@ -301,16 +301,17 @@ export default function AppointmentDetailsContent({
 		setError(null)
 		setAppt(null)
 
-		getAppointmentById(appointmentId)
-			.then((data) => {
+		const load = async () => {
+			try {
+				const data = await getAppointmentById(appointmentId)
 				if (!cancelled) setAppt(data)
-			})
-			.catch(() => {
+			} catch {
 				if (!cancelled) setError('Failed to load appointment details. Please try again.')
-			})
-			.finally(() => {
+			} finally {
 				if (!cancelled) setLoading(false)
-			})
+			}
+		}
+		void load()
 
 		return () => {
 			cancelled = true

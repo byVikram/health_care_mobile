@@ -3,7 +3,8 @@
 // Display helpers for the provider visit screens (details, in progress, complete).
 import { isSameDay, parseDateOnly } from '../../../../utils/date'
 import { capitaliseWords, formatTimeSlot } from '../../../../utils/formatters'
-import type { ProviderVisitDetail, ProviderVisitRecord, VisitRecordType } from '../../providerVisitService'
+import type { ProviderVisitDetail, ProviderVisitRecord } from '../../providerVisitService'
+import type { ProviderNoun } from '../providerSpecialityCopy'
 
 /** Visit statuses from which the provider can head out / start the visit (mirrors the backend). */
 const STARTABLE = new Set(['SCHEDULED_CONFIRMED', 'ASSIGNED', 'NURSE_ASSIGNED', 'EN_ROUTE', 'ARRIVED'])
@@ -11,6 +12,8 @@ const STARTABLE = new Set(['SCHEDULED_CONFIRMED', 'ASSIGNED', 'NURSE_ASSIGNED', 
 export const isStartable = (v: ProviderVisitDetail) => STARTABLE.has(v.status)
 export const isInProgress = (v: ProviderVisitDetail) => v.status === 'IN_PROGRESS'
 export const isCompleted = (v: ProviderVisitDetail) => v.status === 'COMPLETED'
+/** Nobody took this visit: it is not this provider's work (shown read-only, no actions). */
+export const isUnassigned = (v: Pick<ProviderVisitDetail, 'status'>) => v.status === 'UNASSIGNED'
 export const isToday = (v: Pick<ProviderVisitDetail, 'date'>) => {
 	const d = parseDateOnly(v.date)
 	return !!d && isSameDay(d, new Date())
@@ -50,10 +53,6 @@ export const patientLine = (v: ProviderVisitDetail) => {
 
 export const firstName = (name?: string | null) => (name ?? '').trim().split(/\s+/)[0] || 'the patient'
 
-/** Section title of the checklist by what the speciality records. */
-export const tasksTitle = (type: VisitRecordType) =>
-	type === 'pain_score' ? 'Today’s exercises' : type === 'family_updates' ? 'Care plan' : 'Procedure steps'
-
 /** "Pain 6/10 · Knee bend (degrees) 70" from a recorded session. */
 export const sessionSummary = (record: ProviderVisitRecord, measurementLabel?: string | null) => {
 	const parts: string[] = []
@@ -66,7 +65,7 @@ export const sessionSummary = (record: ProviderVisitRecord, measurementLabel?: s
 }
 
 /** Fact rows under "Care instructions" -- only rows with data. */
-export const careFacts = (v: ProviderVisitDetail) => {
+export const careFacts = (v: ProviderVisitDetail, noun: ProviderNoun = 'visit') => {
 	const rows: { label: string; value: string }[] = []
 	if (v.care.allergies.length) rows.push({ label: 'Allergies', value: v.care.allergies.join(', ') })
 	if (v.care.conditions.length) rows.push({ label: 'Conditions', value: v.care.conditions.join(', ') })
@@ -74,7 +73,7 @@ export const careFacts = (v: ProviderVisitDetail) => {
 	const last = v.care.last_session
 	if (last) {
 		const summary = sessionSummary(last.record, v.service.measurement_label) || last.notes
-		if (summary) rows.push({ label: 'Last visit', value: summary })
+		if (summary) rows.push({ label: `Last ${noun}`, value: summary })
 	}
 	return rows
 }
@@ -103,13 +102,3 @@ export const durationLabel = (fromIso?: string | null, toIso?: string | null) =>
 	const m = mins % 60
 	return `${h} ${h === 1 ? 'hr' : 'hrs'}${m ? ` ${m} min` : ''}`
 }
-
-/** Quick updates a provider can send to the family during a home-care visit. */
-export const FAMILY_QUICK_UPDATES = [
-	'Had breakfast',
-	'Medicines given',
-	'BP normal',
-	'Went for a walk',
-	'Resting well',
-	'Needs attention',
-] as const

@@ -1,8 +1,13 @@
 const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
-// const envUrl = 'http://192.168.4.129:8000'
 
 if (!envUrl) {
 	throw new Error('EXPO_PUBLIC_API_ENDPOINT is not configured')
+}
+
+// Cleartext http:// (and the ws:// derived from it below) is fine against a dev
+// machine, but a release build that ships it would send tokens and PHI unencrypted.
+if (!__DEV__ && !/^https:\/\//i.test(envUrl)) {
+	throw new Error('EXPO_PUBLIC_API_ENDPOINT must use https:// in release builds')
 }
 
 export const BASE_URL = envUrl.replace(/\/+$/, '')
@@ -246,6 +251,7 @@ export const API_ENDPOINTS = {
 		REQUESTS: `${BASE_URL}/api/ancillary/patient/requests`,
 		PATIENT_ACTIVE_REQUEST: `${BASE_URL}/api/ancillary/patient/requests/active`,
 		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
+		TIP: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/tip`,
 		CANCEL_PATIENT: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/cancel`,
 		CANCEL_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/cancel`,
 		REJECT_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/reject`,
@@ -275,7 +281,6 @@ export const API_ENDPOINTS = {
 		// Phase 1 Slot-Based Booking Endpoints
 		AVAILABLE_SLOTS: `${BASE_URL}/api/ancillary/available-slots`,
 		REQUESTS_SCHEDULED: `${BASE_URL}/api/ancillary/requests/scheduled`,
-		PROVIDERS_AVAILABILITY: `${BASE_URL}/api/ancillary/providers/availability`,
 		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/reschedule/respond`,
 		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/me/availability`,
 		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/me/availability/overrides`,

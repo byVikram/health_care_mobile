@@ -11,7 +11,7 @@ import type { MainTabParamList } from './types'
 import { ROUTES } from './routes'
 import { AppPathIcon, AppScreenHeader } from '../components/common'
 import { APP_COLORS } from '../config/theme'
-import { FLOATING_TAB_BAR_BOTTOM, FLOATING_TAB_BAR_HEIGHT, FLOATING_TAB_BAR_SIDE, FLOATING_TAB_ROUTES } from './tabBar'
+import { FLOATING_TAB_BAR_BOTTOM, FLOATING_TAB_ROUTES } from './tabBar'
 
 import DashboardPage from '../features/dashboard/DashboardPage'
 import SearchPage from '../features/doctor/search/SearchPage'
@@ -200,16 +200,13 @@ const PATIENT_TABS: FloatingTab[] = [
 	{ key: 'wallet', route: ROUTES.MAIN.WALLET, label: 'Wallet', icon: 'wallet' },
 ]
 
-/** Ancillary provider tabs (ancillary-provider design): Today · Schedule · Earnings · Profile. */
+/** Ancillary provider tabs: Today · Schedule · Earnings · Profile (labelled bar, same as the doctor's). */
 const PROVIDER_TABS: FloatingTab[] = [
 	{ key: 'today', route: ROUTES.MAIN.HOME, label: 'Today', icon: 'today' },
 	{ key: 'schedule', route: ROUTES.MAIN.PORTAL, label: 'Schedule', icon: 'appointments' },
 	{ key: 'earnings', route: ROUTES.MAIN.WALLET, label: 'Earnings', icon: 'myWallet' },
 	{ key: 'profile', route: ROUTES.MAIN.PROFILE, label: 'Profile', icon: 'profile' },
 ]
-/** The 4-button provider pill sits 36 from the sides (design); the 5-button patient pill 20. */
-const PROVIDER_PILL_SIDE = 36
-
 /** Doctor dashboard tab bar (design): Home · Schedule · Questions · Profile. Wallet stays reachable from the menu. */
 const DOCTOR_TABS: FloatingTab[] = [
 	{ key: 'home', route: ROUTES.MAIN.HOME, label: 'Home', icon: 'home' },
@@ -217,9 +214,6 @@ const DOCTOR_TABS: FloatingTab[] = [
 	{ key: 'engage', route: ROUTES.MAIN.ENGAGE, label: 'Questions', icon: 'help' },
 	{ key: 'profile', route: ROUTES.MAIN.PROFILE, label: 'Profile', icon: 'profile' },
 ]
-
-// Android's BlurView has no real blur without an experimental method, so the fill is more opaque there.
-const PILL_FILL = Platform.OS === 'ios' ? '#FFFFFF59' : '#FFFFFFE6'
 
 /** Shared by both floating bars: the tab's route, whether it is the active one, and its press handler. */
 function resolveFloatingTab(
@@ -246,91 +240,15 @@ function resolveFloatingTab(
 	return { route, active, onPress }
 }
 
-interface FloatingTabBarProps extends BottomTabBarProps {
-	/** Which tab set to render. Defaults to the patient tabs (with the "Healthcare at home" sheet button). */
-	tabs?: FloatingTab[]
-	/** Pill inset from the screen sides. Defaults to FLOATING_TAB_BAR_SIDE (the ancillary provider's
-	 * 4-button pill sits closer to the edges than the 5-button patient/doctor pill). */
-	side?: number
-	/** Route names that should show a small notification dot (e.g. Engage while requests are pending). */
-	badgeRoutes?: readonly string[]
-}
-
-/**
- * Floating blurred pill with icon-only 48px buttons — shared by the patient tab bar (Home redesign),
- * the ancillary provider's nav, and the doctor dashboard's nav. For patients, the middle button opens
- * the "Healthcare at home" sheet (highlighted while it's open) instead of navigating; every other tab,
- * for any persona, just navigates to its route. On FLOATING_TAB_ROUTES the bar overlays the screen
- * (content pads by TAB_BAR_CLEARANCE); on other tabs it sits in an in-flow band so their existing
- * layouts aren't covered.
- */
-function FloatingTabBar({ state, navigation, tabs = PATIENT_TABS, side = FLOATING_TAB_BAR_SIDE, badgeRoutes = [] }: FloatingTabBarProps) {
-	const insets = useSafeAreaInsets()
-	const { openSheet, open } = useHomeSheets()
-	const activeName = state.routes[state.index]?.name
-
-	if (activeName === ROUTES.MAIN.PROFILE) {
-		return null
-	}
-
-	const careOpen = openSheet === 'ancillary'
-	const floating = FLOATING_TAB_ROUTES.includes(activeName)
-	const bottom = FLOATING_TAB_BAR_BOTTOM + insets.bottom
-
-	return (
-		<View
-			pointerEvents="box-none"
-			style={[
-				floating ? styles.floatingWrapOverlay : styles.floatingWrapBand,
-				{ height: FLOATING_TAB_BAR_HEIGHT + bottom + (floating ? 0 : 8) },
-			]}
-		>
-			<View style={[styles.pillShadow, { bottom, left: side, right: side }]}>
-				<View style={styles.pill}>
-					<BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
-					<View style={[StyleSheet.absoluteFill, { backgroundColor: PILL_FILL }]} />
-					{tabs.map((tab) => {
-						const { route, active, onPress } = resolveFloatingTab(tab, state, navigation, careOpen, () => open('ancillary'))
-						if (tab.route && !route) return null
-
-						return (
-							<Pressable
-								key={tab.key}
-								onPress={onPress}
-								onLongPress={
-									route ? () => navigation.emit({ type: 'tabLongPress', target: route.key }) : undefined
-								}
-								accessibilityRole="button"
-								accessibilityLabel={tab.label}
-								accessibilityState={{ selected: active }}
-								accessibilityHint={route ? undefined : 'Opens home healthcare services'}
-								style={[styles.pillButton, active && styles.pillButtonActive]}
-							>
-								<AppPathIcon
-									d={HOME_CHROME_PATHS[tab.icon]}
-									size={22}
-									strokeWidth={2.1}
-									color={active ? APP_COLORS.surface : APP_COLORS.ink}
-								/>
-								{active && <View style={styles.pillDot} />}
-								{!active && tab.route && badgeRoutes.includes(tab.route) && <View style={styles.pillBadge} />}
-							</Pressable>
-						)
-					})}
-				</View>
-			</View>
-		</View>
-	)
-}
-
 // ── Labelled bar ("Light 6" frosted-glass design) ─────────────────────────────────────────────────
 // 66-high fully rounded glass pill; every tab is an equal-width, 52-high, fully rounded slot holding a
 // 24px icon over an 11px label, and the active slot fills teal (white icon + label). Patient (5 tabs)
-// sits 16 from the sides, doctor (4 tabs) 48.
+// sits 16 from the sides, doctor and ancillary provider (4 tabs) 48.
 const LABELLED_BAR_HEIGHT = 66
 const LABELLED_ITEM_HEIGHT = 52
 const PATIENT_LABELLED_SIDE = 16
 const DOCTOR_LABELLED_SIDE = 48
+const PROVIDER_LABELLED_SIDE = 48
 // Top-to-bottom white wash of the glass (design: #FFFFFFB3 -> #FFFFFF8C); Android's BlurView doesn't really blur, so it's more opaque there.
 const GLASS_TOP_OPACITY = Platform.OS === 'ios' ? 0.7 : 0.92
 const GLASS_BOTTOM_OPACITY = Platform.OS === 'ios' ? 0.55 : 0.88
@@ -432,7 +350,7 @@ function MainTabs() {
 					) : isDoctor ? (
 						<LabelledTabBar {...props} tabs={DOCTOR_TABS} side={DOCTOR_LABELLED_SIDE} />
 					) : isNurse ? (
-						<FloatingTabBar {...props} tabs={PROVIDER_TABS} side={PROVIDER_PILL_SIDE} />
+						<LabelledTabBar {...props} tabs={PROVIDER_TABS} side={PROVIDER_LABELLED_SIDE} />
 					) : (
 						<DockedTabBar {...props} onAncillaryPress={() => open('ancillary')} />
 					)
@@ -502,58 +420,6 @@ const styles = StyleSheet.create({
 	},
 	floatingWrapBand: {
 		backgroundColor: APP_COLORS.pageBg,
-	},
-	pillShadow: {
-		position: 'absolute',
-		left: FLOATING_TAB_BAR_SIDE,
-		right: FLOATING_TAB_BAR_SIDE,
-		height: FLOATING_TAB_BAR_HEIGHT,
-		borderRadius: FLOATING_TAB_BAR_HEIGHT / 2,
-		shadowColor: APP_COLORS.shadow,
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.15,
-		shadowRadius: 28,
-		elevation: 6,
-	},
-	pill: {
-		flex: 1,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 10,
-		borderRadius: FLOATING_TAB_BAR_HEIGHT / 2,
-		borderWidth: 1,
-		borderColor: '#FFFFFF99',
-		overflow: 'hidden',
-	},
-	pillButton: {
-		width: 48,
-		height: 48,
-		borderRadius: 24,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	pillButtonActive: {
-		backgroundColor: APP_COLORS.primary,
-	},
-	pillDot: {
-		position: 'absolute',
-		bottom: -7,
-		width: 5,
-		height: 5,
-		borderRadius: 2.5,
-		backgroundColor: APP_COLORS.primary,
-	},
-	pillBadge: {
-		position: 'absolute',
-		right: 8,
-		top: 8,
-		width: 9,
-		height: 9,
-		borderRadius: 4.5,
-		backgroundColor: APP_COLORS.offer,
-		borderWidth: 2,
-		borderColor: '#FFFFFF',
 	},
 	labelledShadow: {
 		position: 'absolute',

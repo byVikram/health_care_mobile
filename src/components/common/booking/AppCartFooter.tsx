@@ -3,7 +3,8 @@
 // Nursing service-catalogue cart footer, built on AppFooterBar (+ a soft upward APP_COLORS.shadow):
 //   with items — left column: count 12/16 500 muted ("2 services added"), total 18/26 600 ink,
 //                savings 12/16 600 APP_COLORS.success ("You save ₹120"); right: AppButton size="lg" CTA with a
-//                trailing chevron ("Book visit").
+//                trailing chevron ("Book visit"). With `secondaryCtaLabel` the right side becomes two compact
+//                buttons: an outline secondary ("Later") + the primary ("Book now"), no chevron.
 //   empty      — centred 14/20 muted hint ("Add a service to book a nurse visit"), padding 12 0.
 // Pure UI — the parent owns the cart and passes the labels.
 
@@ -25,6 +26,9 @@ export type AppCartFooterProps = {
 	/** Defaults to "Book visit". */
 	ctaLabel?: string
 	onCtaPress: () => void
+	/** Adds an outline button before the primary one (the catalogue's "Later" next to "Book now"). */
+	secondaryCtaLabel?: string
+	onSecondaryCtaPress?: () => void
 	ctaDisabled?: boolean
 	ctaLoading?: boolean
 	/** Defaults to "Add a service to book a nurse visit". */
@@ -39,6 +43,8 @@ export function AppCartFooter({
 	savingsLabel,
 	ctaLabel = 'Book visit',
 	onCtaPress,
+	secondaryCtaLabel,
+	onSecondaryCtaPress,
 	ctaDisabled = false,
 	ctaLoading = false,
 	emptyHint = 'Add a service to book a nurse visit',
@@ -75,18 +81,42 @@ export function AppCartFooter({
 					</Text>
 				)}
 			</View>
-			<AppButton
-				size="lg"
-				trailingIcon="chevron-right"
-				onPress={onCtaPress}
-				disabled={ctaDisabled}
-				loading={ctaLoading}
-				softDisabled
-				accessibilityLabel={ctaLabel}
-				contentStyle={styles.ctaContent}
-			>
-				{ctaLabel}
-			</AppButton>
+			{secondaryCtaLabel ? (
+				<View style={styles.actions}>
+					<AppButton
+						variant="outline"
+						size="md"
+						onPress={onSecondaryCtaPress}
+						disabled={ctaDisabled}
+						accessibilityLabel={secondaryCtaLabel}
+					>
+						{secondaryCtaLabel}
+					</AppButton>
+					<AppButton
+						size="md"
+						onPress={onCtaPress}
+						disabled={ctaDisabled}
+						loading={ctaLoading}
+						softDisabled
+						accessibilityLabel={ctaLabel}
+					>
+						{ctaLabel}
+					</AppButton>
+				</View>
+			) : (
+				<AppButton
+					size="lg"
+					trailingIcon="chevron-right"
+					onPress={onCtaPress}
+					disabled={ctaDisabled}
+					loading={ctaLoading}
+					softDisabled
+					accessibilityLabel={ctaLabel}
+					contentStyle={styles.ctaContent}
+				>
+					{ctaLabel}
+				</AppButton>
+			)}
 		</AppFooterBar>
 	)
 }
@@ -120,6 +150,11 @@ const styles = StyleSheet.create({
 		lineHeight: 16,
 		fontWeight: '600',
 		color: APP_COLORS.success,
+	},
+	actions: {
+		flexShrink: 0,
+		flexDirection: 'row',
+		gap: 8,
 	},
 	ctaContent: {
 		paddingHorizontal: 10,

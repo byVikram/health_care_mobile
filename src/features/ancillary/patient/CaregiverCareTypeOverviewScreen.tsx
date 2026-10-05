@@ -1,27 +1,12 @@
 import React, { useMemo, useState } from 'react'
-import {
-	ScrollView,
-	StyleSheet,
-	View,
-	useWindowDimensions,
-} from 'react-native'
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import {
-	AppTypography,
-	AppScreenHeader,
-	AppCalendar,
-	AppTimePicker,
-	AppStickyFooter,
-} from '../../../components/common'
+import { AppTypography, AppScreenHeader, AppCalendar, AppTimePicker, AppStickyFooter } from '../../../components/common'
 import Toast from 'react-native-toast-message'
 import { ROUTES } from '../../../navigation/routes'
-import {
-	CAREGIVER_TIME_SERVICES,
-	CAREGIVER_INCLUDED_CAPABILITIES,
-	CareTypeKey,
-} from '../constants/caregiverServices'
+import { CAREGIVER_TIME_SERVICES, CAREGIVER_INCLUDED_CAPABILITIES, CareTypeKey } from '../constants/caregiverServices'
 
 function formatTimeTo12h(timeStr?: string): string {
 	if (!timeStr) return ''
@@ -147,12 +132,12 @@ export default function CaregiverCareTypeOverviewScreen() {
 	const handleProceed = () => {
 		if (!isFormValid) return
 		// Time-based care has no bookable procedure / per-visit price on the backend yet, and the patient
-		// app only books scheduled visits with a chosen provider (Book visit flow, real procedure ids). Send
+		// app only books through the Schedule a visit flow (real procedure ids; a provider is assigned per visit). Send
 		// the patient to the home-care activities catalogue, which books through that flow.
 		Toast.show({
 			type: 'info',
 			text1: `${metadata.title} is booked as care activities`,
-			text2: 'Pick the activities you need, then choose a caregiver and times.',
+			text2: 'Pick the activities you need, then choose the days and a time.',
 		})
 		navigation.navigate(ROUTES.STACK.HOME_CARE_CATALOG, { careBookingMode: 'COMPLETE_CARE' })
 	}
@@ -192,10 +177,7 @@ export default function CaregiverCareTypeOverviewScreen() {
 
 	return (
 		<View style={styles.screen}>
-			<AppScreenHeader
-				title={metadata.title}
-				onBack={handleBack}
-			/>
+			<AppScreenHeader title={metadata.title} onBack={handleBack} />
 
 			<ScrollView
 				style={styles.scrollView}
@@ -343,10 +325,7 @@ export default function CaregiverCareTypeOverviewScreen() {
 				</View>
 			</ScrollView>
 
-			<AppStickyFooter
-				disabled={!isFormValid}
-				onPress={handleProceed}
-			>
+			<AppStickyFooter disabled={!isFormValid} onPress={handleProceed}>
 				Confirm Care Schedule
 			</AppStickyFooter>
 		</View>

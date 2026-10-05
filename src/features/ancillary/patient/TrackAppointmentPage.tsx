@@ -32,6 +32,7 @@ import {
 import CancellationDetailsModal from './CancellationDetailsModal'
 import NursePulseRadarView from '../components/NursePulseRadarView'
 import ApiService from '../../../services/apiService'
+import { openAuthedSocket, type AuthedSocketHandle } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
 // ---------------------------------------------------------------------------
@@ -223,22 +224,38 @@ export default function TrackAppointmentPage() {
 
 	const isAssigned = hasConfirmedProvider(provider, liveStatus)
 
+	// The long-lived socket/poll effect below only re-runs on bookingId, so its closures would
+	// otherwise keep the first render's provider/title/address. Read them through this ref.
+	const liveRef = React.useRef({ provider: liveProvider, title: liveServiceTitle, address: liveAddress })
+	liveRef.current = { provider: liveProvider, title: liveServiceTitle, address: liveAddress }
+
 	React.useEffect(() => {
-		let ws: WebSocket | null = null
+		let socket: AuthedSocketHandle | null = null
 		let isMounted = true
+		let fetchInFlight = false
+		let redirected = false
+
+		const redirectToMatching = (serviceName: string, addressText: string, id: string = bookingId) => {
+			if (!isMounted || redirected) return
+			redirected = true
+			navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
+				bookingId: id,
+				serviceName,
+				addressText,
+				bookingPayload: bookingData,
+			})
+		}
 
 		const updateStatusFromData = (data: AncillaryTrackingResponse) => {
 			if (!data || !isMounted) return
 			const st = String(data.status || '').toUpperCase()
-			const currentProv = data.assignedProvider !== undefined ? data.assignedProvider : liveProvider
+			const currentProv = data.assignedProvider !== undefined ? data.assignedProvider : liveRef.current.provider
 
 			if (!hasConfirmedProvider(currentProv, st) && st !== 'COMPLETED') {
-				navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
-					bookingId,
-					serviceName: data.serviceName || liveServiceTitle,
-					addressText: data.streetAddress || liveAddress,
-					bookingPayload: bookingData,
-				})
+				redirectToMatching(
+					data.serviceName || liveRef.current.title,
+					data.streetAddress || liveRef.current.address
+				)
 				return
 			}
 
@@ -265,28 +282,23 @@ export default function TrackAppointmentPage() {
 			}
 		}
 
-		// Connect Real-Time WebSocket
-		try {
-			const wsUrl = API_ENDPOINTS.ANCILLARY.WS_PATIENT_REQUEST(bookingId)
-			ws = new WebSocket(wsUrl)
-			ws.onmessage = (event) => {
-				try {
-					const payload = JSON.parse(event.data)
-					if (payload.type === 'CARE_REQUEST_STATUS_CHANGE' && payload.data) {
-						updateStatusFromData(payload.data)
-					}
-				} catch (e) {
-					console.log('[TrackAppointmentPage] WS parse notice:', e)
-				}
+		// Connect Real-Time WebSocket (authenticated + auto-reconnecting; see utils/authedSocket)
+		socket = openAuthedSocket(API_ENDPOINTS.ANCILLARY.WS_PATIENT_REQUEST(bookingId), (payload) => {
+			if (payload.type === 'CARE_REQUEST_STATUS_CHANGE' && payload.data) {
+				updateStatusFromData(payload.data)
 			}
-		} catch (e) {
-			console.log('[TrackAppointmentPage] WS setup notice')
-		}
+		})
 
 		// Fetch Status via HTTP
 		const fetchStatus = async () => {
+			if (fetchInFlight) return // a slow response must not stack up behind the 2s poll
+			fetchInFlight = true
 			try {
-				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId))
+				// Polled every ~2s: a failure must not pop the global error dialog on every tick.
+				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId), {
+					skipGlobalError: true,
+				})
+				if (!isMounted) return
 				const data: AncillaryTrackingResponse = res.data?.data || res.data
 				const st = String(data?.status || '').toUpperCase()
 				const prov = data?.assignedProvider || null
@@ -294,19 +306,20 @@ export default function TrackAppointmentPage() {
 				if (!hasConfirmedProvider(prov, st) && st !== 'COMPLETED') {
 					// Provider is NOT assigned yet according to backend.
 					// Route back to the existing provider search/selection page.
-					navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
-						bookingId,
-						serviceName: data?.serviceName || liveServiceTitle,
-						addressText: data?.streetAddress || liveAddress,
-						bookingPayload: bookingData,
-					})
+					redirectToMatching(
+						data?.serviceName || liveRef.current.title,
+						data?.streetAddress || liveRef.current.address
+					)
 					return
 				}
 
 				updateStatusFromData(data)
 			} catch (e) {
+				// Deliberately no error state: this runs every ~2s (and the socket also pushes updates), so a
+				// transient failure self-heals on the next tick and surfacing it would flicker the UI.
 				console.log('[TrackAppointmentPage] Status fetch notice:', e)
 			} finally {
+				fetchInFlight = false
 				if (isMounted) {
 					setIsInitializing(false)
 				}
@@ -316,12 +329,7 @@ export default function TrackAppointmentPage() {
 		if (bookingId && bookingId !== 'BK-ACTIVE') {
 			void fetchStatus()
 		} else {
-			navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
-				bookingId: '',
-				serviceName: liveServiceTitle,
-				addressText: liveAddress,
-				bookingPayload: bookingData,
-			})
+			redirectToMatching(liveRef.current.title, liveRef.current.address, '')
 			setIsInitializing(false)
 		}
 
@@ -335,7 +343,7 @@ export default function TrackAppointmentPage() {
 		return () => {
 			isMounted = false
 			clearInterval(pollInterval)
-			if (ws) ws.close()
+			socket?.close()
 		}
 	}, [bookingId])
 
@@ -357,7 +365,8 @@ export default function TrackAppointmentPage() {
 					setReviewData(res)
 				}
 			} catch (e) {
-				// ignore
+				// Non-fatal: the review is optional, so the completed screen simply renders without it.
+				console.warn('[TrackAppointmentPage] Booking review load failed:', e)
 			}
 		}
 		void loadBookingReview()

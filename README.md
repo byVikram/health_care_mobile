@@ -60,10 +60,12 @@ Follow these steps to set up the project locally.
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/en/) (LTS recommended)
-- npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
-- [Expo Go](https://expo.dev/client) app installed on your physical device, OR an Android/iOS emulator configured on your machine.
+- [Node.js](https://nodejs.org/en/) (LTS recommended) and npm
+- **Android:** Android Studio (SDK + an emulator, or a USB-debugging device) and a JDK
+- **iOS:** macOS with Xcode (iOS builds are not possible on Windows/Linux)
+- The backend running and reachable from the device/emulator (see `health_care_backend/`)
+
+> **Expo Go will not work.** The app uses native modules that Expo Go does not include (`@react-native-firebase/*`, `expo-speech-recognition`, `expo-screen-capture`, `react-native-maps`) plus a custom `google-services.json`. You must run a native development build, as below.
 
 ### Installation
 
@@ -72,24 +74,24 @@ Follow these steps to set up the project locally.
    ```bash
    npm install
    ```
-3. Set the backend API URL — required, the app throws at import time if it's missing:
+3. Set the backend API URL — required, the app throws at import time if it is missing:
    ```bash
-   EXPO_PUBLIC_API_ENDPOINT=http://<your-backend-host>:8000
+   cp .env.example .env      # Windows: copy .env.example .env
+   # then edit EXPO_PUBLIC_API_ENDPOINT
    ```
-   No `.env.example` is committed; set this in your own `.env` or shell environment before running.
+   Use an address the device can reach: the Android emulator reaches your machine at `http://10.0.2.2:8000`; a physical device needs your machine's LAN IP. Use `https://` for anything other than local development.
 
 ### Running the App
 
-Start the Expo development server:
+Build and launch a native debug build (this also starts Metro, and generates the git-ignored `android/` / `ios/` folders on first run):
 
 ```bash
-npm start
+npm run android     # Android emulator or connected device
+npm run ios         # iOS simulator (macOS only)
 ```
 
-Press the indicated keys in your terminal to open the app on different platforms:
-- **`a`** - Open in Android emulator
-- **`i`** - Open in iOS simulator (requires macOS)
-- **`w`** - Open in web browser
-- Or scan the QR code using the Expo Go app on your physical iOS/Android device.
+Once a debug build is installed, you can restart just the JS bundler with `npm start`. `npm run web` exists but the native-only modules above mean web is not a supported target.
 
-No `test`, `lint`, `build`, or `typecheck` npm scripts are defined yet. Only one test file exists (`src/features/wallet/__tests__/`) and no test runner is configured — see `CLAUDE.md` for current status.
+### Scripts and testing status
+
+Only `start`, `android`, `ios` and `web` scripts exist — there are no `test`, `lint`, `build` or `typecheck` scripts yet (type-check manually with `npx tsc --noEmit`). The single test folder (`src/features/wallet/__tests__/`) has no runner configured, so nothing can be run as-is. See `review.md` for the full list of known gaps.

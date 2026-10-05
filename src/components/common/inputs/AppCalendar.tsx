@@ -274,7 +274,9 @@ export const AppCalendar = ({
 							console.log('[DOB] Calendar opened')
 							try {
 								e?.currentTarget?.showPicker?.()
-							} catch {}
+							} catch {
+								// showPicker() throws on browsers without support; the native date input still opens on tap.
+							}
 						},
 						onChange: (e: any) => {
 							const next = e?.target?.value

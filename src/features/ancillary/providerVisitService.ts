@@ -58,6 +58,94 @@ export interface ProviderToday {
 	upcoming: ProviderVisitSummary[]
 }
 
+/**
+ * An open offer pushed on the dispatch WebSocket (NEW_CARE_REQUEST_OFFER): an instant request, or one visit of a provider-less
+ * scheduled order (then visitPublicId + scheduledDate / StartTime / EndTime are set). Accept / reject are keyed
+ * by the request id either way.
+ */
+export interface ProviderOffer {
+	requestId: string
+	visitPublicId: string | null
+	serviceName: string
+	patientName: string | null
+	/** "INSTANT" / "SCHEDULED". */
+	bookingType: string
+	scheduledDate: string | null // "YYYY-MM-DD"
+	scheduledStartTime: string | null // "HH:MM"
+	scheduledEndTime: string | null
+	distanceKm: number | null
+	/** Patient's charge for the offered visit (collected after the visit). */
+	totalAmount: number | null
+	/** Patient tip (instant bookings), all the provider's. 0 when none. */
+	tipAmount: number
+	status: string
+}
+
+const toNum = (v: unknown): number | null => {
+	const n = typeof v === 'number' ? v : typeof v === 'string' ? parseFloat(v.replace(/[^0-9.]/g, '')) : NaN
+	return Number.isFinite(n) ? n : null
+}
+
+/** Maps a NEW_CARE_REQUEST_OFFER payload (dispatch WebSocket) to a ProviderOffer; null when it has no request id. */
+export const toProviderOffer = (o: Record<string, any> | null | undefined): ProviderOffer | null => {
+	if (!o) return null
+	const requestId = String(o.requestId ?? o.id ?? o.publicBookingId ?? '')
+	if (!requestId) return null
+	return {
+		requestId,
+		visitPublicId: o.visitPublicId ? String(o.visitPublicId) : null,
+		serviceName: String(o.serviceName ?? 'Care visit'),
+		patientName: o.patientName ? String(o.patientName) : null,
+		bookingType: String(o.bookingType ?? 'INSTANT').toUpperCase(),
+		scheduledDate: o.scheduledDate ?? null,
+		scheduledStartTime: o.scheduledStartTime ?? null,
+		scheduledEndTime: o.scheduledEndTime ?? null,
+		distanceKm: toNum(o.distanceKm),
+		totalAmount: toNum(o.totalAmount),
+		tipAmount: toNum(o.tipAmount) ?? 0,
+		status: String(o.status ?? ''),
+	}
+}
+
+// ---- Availability (online / offline) ----
+// The dispatch socket only delivers offers to a provider who is verified AND online AND has a location, so going
+// online always sends the current position. These throw on failure (the ancillaryService variants swallow errors).
+
+export const getProviderOnlineStatus = async (): Promise<boolean> => {
+	const res = await ApiService.get<Envelope<{ isOnline?: boolean }>>(API_ENDPOINTS.ANCILLARY.PROVIDER_STATUS)
+	return !!res.data?.data?.isOnline
+}
+
+export const setProviderOnline = async (isOnline: boolean, latitude?: number, longitude?: number): Promise<void> => {
+	const body: Record<string, unknown> = { isOnline }
+	if (latitude != null && longitude != null) {
+		body.latitude = latitude
+		body.longitude = longitude
+	}
+	await ApiService.post(API_ENDPOINTS.ANCILLARY.PROVIDER_STATUS, body)
+}
+
+/** Cheap location ping while online (keeps the geofence match fresh). */
+export const pingProviderLocation = async (latitude: number, longitude: number, heading = 0): Promise<void> => {
+	await ApiService.post(API_ENDPOINTS.ANCILLARY.PROVIDER_LOCATION, { latitude, longitude, heading })
+}
+
+/**
+ * Today's earnings for the stat tile: GET /provider/dashboard-metrics returns `todayEarnings` as a formatted
+ * string ("₹120.00"; the provider's cut of orders completed today). null when unavailable.
+ */
+export const getTodayEarnings = async (): Promise<number | null> => {
+	const res = await ApiService.get<Envelope<{ todayEarnings?: string | number }>>(
+		API_ENDPOINTS.ANCILLARY.PROVIDER_DASHBOARD_METRICS
+	)
+	return toNum(res.data?.data?.todayEarnings)
+}
+
+/** Declines an open offer so it is re-routed to other providers. */
+export const rejectOffer = async (requestId: string, reason?: string): Promise<void> => {
+	await ApiService.post(API_ENDPOINTS.ANCILLARY.REJECT_PROVIDER(requestId), reason ? { reason } : {})
+}
+
 export const getProviderToday = async (date?: string): Promise<ProviderToday> => {
 	const res = await ApiService.getWithParams<Envelope<ProviderToday>>(
 		API_ENDPOINTS.ANCILLARY.PROVIDER_TODAY,

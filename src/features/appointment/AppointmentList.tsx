@@ -674,11 +674,18 @@ function AppointmentListImpl(
       fetchHospitals(viewAsProp)
       return
     }
-    AsyncStorage.getItem('role').then((role) => {
+    let active = true
+    const resolveRole = async () => {
+      const role = await AsyncStorage.getItem('role')
+      if (!active) return
       const activeRole = role === 'patient' ? 'patient' : 'doctor'
       setViewAs(activeRole)
-      fetchHospitals(activeRole)
-    })
+      void fetchHospitals(activeRole)
+    }
+    void resolveRole()
+    return () => {
+      active = false
+    }
   }, [viewAsProp])
 
   const fetchHospitals = async (role: 'doctor' | 'patient') => {

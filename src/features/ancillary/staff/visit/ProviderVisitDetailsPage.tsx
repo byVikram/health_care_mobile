@@ -35,6 +35,7 @@ import {
 	updateVisitProgress,
 	type ProviderVisitDetail,
 } from '../../providerVisitService'
+import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { kmLabel, visitStart, visitTitle } from '../today/todayView'
 import { ReportIssueSheet } from './ReportIssueSheet'
 import { StartCodeSheet } from './StartCodeSheet'
@@ -47,6 +48,7 @@ import {
 	isInProgress,
 	isStartable,
 	isToday,
+	isUnassigned,
 	patientLine,
 	timeRange,
 } from './visitView'
@@ -118,10 +120,12 @@ export default function ProviderVisitDetailsPage() {
 		}
 	}
 
+	const copy = getProviderSpecialityCopy(visit?.service.specialty)
+
 	const header = (
 		<AppScreenHeader
 			variant="bar"
-			title="Visit details"
+			title={copy.detailsTitle}
 			subtitle={visit ? `${bookingRef(visit.request_public_id)} · ${timeRange(visit)}` : undefined}
 			onBack={() => navigation.goBack()}
 		/>
@@ -149,21 +153,26 @@ export default function ProviderVisitDetailsPage() {
 
 	const name = visit.patient.name ?? 'Patient'
 	const first = firstName(visit.patient.name)
-	const facts = careFacts(visit)
-	const packedCount = visit.supplies.filter((s) => packed[s]).length
+	const facts = careFacts(visit, copy.noun)
+	// The booked service's own list wins; the speciality default is only a fallback.
+	const supplies = visit.supplies.length ? visit.supplies : copy.defaultSupplies
+	const packedCount = supplies.filter((s) => packed[s]).length
+	const unassigned = isUnassigned(visit)
 	const today = isToday(visit)
 	const startable = isStartable(visit)
 	const done = isCompleted(visit)
-	const cancelled = visit.status.startsWith('CANCELLED') || visit.status === 'EXPIRED'
+	const cancelled = visit.status.startsWith('CANCELLED') || visit.status === 'EXPIRED' || unassigned
 	const dateObj = parseDateOnly(visit.date)
 	const dayLabel = dateObj ? relativeDayLabel(dateObj) : null
 	const startsIn = today ? startsInLabel(visitStart(visit))?.replace(/^starts /, '') : null
 	const whenLine = done
 		? 'Completed'
 		: cancelled
-			? 'Cancelled'
+			? unassigned
+				? 'Not assigned yet'
+				: 'Cancelled'
 			: isInProgress(visit)
-				? 'Visit in progress'
+				? copy.inProgressTitle
 				: [timeRange(visit), today ? startsIn : dayLabel].filter(Boolean).join(' · ')
 	const collected = visit.payment.status === 'PAYMENT_COLLECTED'
 
@@ -172,18 +181,28 @@ export default function ProviderVisitDetailsPage() {
 			{header}
 			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 				<View style={styles.hero}>
-					<AppIconTile icon="home-heart" tone="mint" size={44} radius={12} iconSize={22} />
+					<AppIconTile icon={copy.icon} tone="mint" size={44} radius={12} iconSize={22} />
 					<View style={styles.heroText}>
-						<Text style={styles.heroTitle}>{visitTitle(visit)}</Text>
+						<Text style={styles.heroTitle}>{visitTitle(visit, copy.noun)}</Text>
 						<Text style={styles.heroSub}>{whenLine}</Text>
 					</View>
 				</View>
+
+				{unassigned ? (
+					<View style={styles.padded}>
+						<AppInfoBanner
+							tone="warning"
+							title={`No provider is assigned to this ${copy.noun}`}
+							subtitle="It isn’t part of your work, so there is nothing to do here."
+						/>
+					</View>
+				) : null}
 
 				{done ? (
 					<View style={styles.padded}>
 						<AppInfoBanner
 							tone="success"
-							title="Visit completed"
+							title={copy.completedTitle}
 							subtitle={collected ? `${formatInr(visit.payment.amount)} collected` : undefined}
 						/>
 					</View>
@@ -266,19 +285,19 @@ export default function ProviderVisitDetailsPage() {
 					</AppSection>
 				) : null}
 
-				{visit.supplies.length && !done ? (
+				{supplies.length && !done && !cancelled ? (
 					<AppSection
 						title="Bring with you"
 						titleSize="sm"
 						right={
 							<Text style={styles.countText}>
-								{packedCount} of {visit.supplies.length} packed
+								{packedCount} of {supplies.length} packed
 							</Text>
 						}
 					>
 						<AppCheckList
 							variant="square"
-							items={visit.supplies.map((s) => ({ key: s, label: s, checked: !!packed[s] }))}
+							items={supplies.map((s) => ({ key: s, label: s, checked: !!packed[s] }))}
 							onToggle={(key, checked) => setPacked((p) => ({ ...p, [key]: checked }))}
 						/>
 					</AppSection>
@@ -287,7 +306,10 @@ export default function ProviderVisitDetailsPage() {
 				<AppSection title="Payment" titleSize="sm">
 					<View style={styles.payRow}>
 						<Text style={styles.payLabel}>Service fee</Text>
-						<Text style={styles.payValue}>{formatInr(visit.payment.amount)}</Text>
+						<Text style={styles.payValue}>
+							{formatInr(visit.payment.amount)}
+							{copy.noun === 'shift' ? ' / shift' : ''}
+						</Text>
 					</View>
 					<View style={styles.payNote}>
 						<MaterialCommunityIcons
@@ -297,8 +319,8 @@ export default function ProviderVisitDetailsPage() {
 						/>
 						<Text style={styles.payNoteText}>
 							{collected
-								? 'Collected after the visit'
-								: `Collect ${formatInr(visit.payment.amount)} after the visit · pay after each visit`}
+								? `Collected after the ${copy.noun}`
+								: `Collect ${formatInr(visit.payment.amount)} after the ${copy.noun} · pay after each ${copy.noun}`}
 						</Text>
 					</View>
 				</AppSection>
@@ -332,7 +354,7 @@ export default function ProviderVisitDetailsPage() {
 							style={styles.flex}
 							onPress={() => navigation.navigate(ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS, { visitId })}
 						>
-							Continue visit
+							{`Continue ${copy.noun}`}
 						</AppButton>
 					) : (
 						<AppButton
@@ -359,6 +381,7 @@ export default function ProviderVisitDetailsPage() {
 				visible={startOpen}
 				visitId={visitId}
 				patientFirstName={first}
+				copy={copy}
 				onClose={() => setStartOpen(false)}
 				onStarted={(v) => {
 					setStartOpen(false)

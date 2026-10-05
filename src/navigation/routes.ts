@@ -107,7 +107,8 @@ export const ROUTES = {
 		// Home-care booking redesign (all home-care types)
 		ANCILLARY_BOOK_VISIT: 'AncillaryBookVisit',
 		ANCILLARY_REVIEW_PAY: 'AncillaryReviewPay',
-		ANCILLARY_REQUEST_SENT: 'AncillaryRequestSent',
+		ANCILLARY_BOOK_NOW_REVIEW: 'AncillaryBookNowReview',
+		ANCILLARY_SCHEDULED_DETAILS: 'AncillaryScheduledBookingDetails',
 		HOME_CARE_CATALOG: 'HomeCareCatalog',
 		CAREGIVER_SERVICES: 'CaregiverServices',
 		CAREGIVER_TIME_CONFIG: 'CaregiverTimeConfig',

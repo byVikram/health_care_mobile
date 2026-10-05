@@ -1,12 +1,5 @@
 import React from 'react'
-import {
-	Pressable,
-	StyleProp,
-	StyleSheet,
-	TextStyle,
-	View,
-	ViewStyle,
-} from 'react-native'
+import { Insets, Pressable, StyleProp, StyleSheet, TextStyle, View, ViewStyle } from 'react-native'
 import { AppTypography } from '../display/AppTypography'
 
 type AppToggleSize = 'small' | 'medium'
@@ -28,6 +21,8 @@ interface AppToggleProps {
 	inactiveColor?: string
 	thumbColor?: string
 	accessibilityLabel?: string
+	/** Extra touch area around the track (for the compact sizes). */
+	hitSlop?: Insets | number
 }
 
 const SIZE_CONFIG = {
@@ -68,6 +63,7 @@ export default function AppToggle({
 	inactiveColor = '#cbd5e1',
 	thumbColor = '#ffffff',
 	accessibilityLabel,
+	hitSlop,
 }: AppToggleProps) {
 	const config = SIZE_CONFIG[size]
 	const labelTextStyle: TextStyle | TextStyle[] = labelStyle
@@ -114,6 +110,7 @@ export default function AppToggle({
 						switchStyle,
 					]}
 					onPress={handlePress}
+					hitSlop={hitSlop}
 					disabled={disabled}
 					accessibilityRole="switch"
 					accessibilityState={{ checked: value, disabled }}
@@ -133,10 +130,7 @@ export default function AppToggle({
 				</Pressable>
 
 				{showStatusText ? (
-					<AppTypography
-						variant="body"
-						style={statusTextStyle}
-					>
+					<AppTypography variant="body" style={statusTextStyle}>
 						{value ? enabledLabel : disabledLabel}
 					</AppTypography>
 				) : null}

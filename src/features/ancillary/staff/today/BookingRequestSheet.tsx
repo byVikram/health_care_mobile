@@ -11,10 +11,12 @@ import { AppBottomSheet, AppButton } from '../../../../components/common'
 import { APP_COLORS, TONES, formatInr } from '../../../../config/theme'
 import { formatTimeSlot } from '../../../../utils/formatters'
 import type { ProviderPendingRequest } from '../../providerVisitService'
+import type { ProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { kmLabel, patientBrief, replyInLabel, shortDay, upperName, visitsWord } from './todayView'
 
 export type BookingRequestSheetProps = {
 	request: ProviderPendingRequest | null
+	copy: ProviderSpecialityCopy
 	nowMs: number
 	accepting?: boolean
 	onClose: () => void
@@ -24,6 +26,7 @@ export type BookingRequestSheetProps = {
 
 export function BookingRequestSheet({
 	request,
+	copy,
 	nowMs,
 	accepting = false,
 	onClose,
@@ -34,7 +37,9 @@ export function BookingRequestSheet({
 	const replyIn = request ? replyInLabel(request.expires_at, nowMs) : null
 	const expired = !!request?.expires_at && !replyIn
 	const subtitle = request
-		? [visitsWord(count), request.address_label, kmLabel(request.distance_km)].filter(Boolean).join(' · ')
+		? [visitsWord(count, copy.noun), request.address_label, kmLabel(request.distance_km)]
+				.filter(Boolean)
+				.join(' · ')
 		: undefined
 	const brief = request ? patientBrief(request.patient) : ''
 	const firstName = request?.patient.name?.split(' ')[0] || 'The patient'
@@ -106,7 +111,7 @@ export function BookingRequestSheet({
 							</View>
 						))}
 						<View style={[styles.visitRow, styles.visitRowDivider, styles.collectRow]}>
-							<Text style={styles.collectLabel}>Collect after each visit</Text>
+							<Text style={styles.collectLabel}>Collect after each {copy.noun}</Text>
 							<Text style={styles.collectValue}>{formatInr(request.totals.per_visit)}</Text>
 						</View>
 					</View>
@@ -116,7 +121,7 @@ export function BookingRequestSheet({
 						<Text style={styles.patientText}>
 							{[
 								brief ? `Patient: ${brief}` : null,
-								'pay after each visit',
+								`pay after each ${copy.noun}`,
 								'full address after you accept',
 							]
 								.filter(Boolean)

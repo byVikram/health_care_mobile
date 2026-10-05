@@ -1,9 +1,11 @@
 // src/features/ancillary/ancillaryProviderBookingService.ts
 //
-// API layer for the redesigned ancillary provider booking flow (all home-care types: nursing, home care, physio,
-// rehab, medical equipment). Contract = phase-4 notes. Rules: providers are matched by speciality only,
-// one order can hold up to 7 visits (same provider) within a 14-day window, payment is PAY_AFTER_VISIT, and
-// an unconfirmed order expires 30 minutes after it's sent.
+// API layer for the ancillary booking flow (all home-care types: nursing, home care, physio, rehab, medical
+// equipment). Two ways to book, both PAY_AFTER_VISIT:
+//   - Instant ("Book now"): POST /patient/requests (bookingType INSTANT) -> Finding a nurse (dispatch to
+//     nearby providers, optional tip, first to accept wins).
+//   - Later: POST /requests/scheduled with NO provider -- one order with up to 7 visits in a 14-day window; the
+//     backend assigns a provider to each visit shortly before it starts (a visit nobody takes is UNASSIGNED).
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 
@@ -11,7 +13,6 @@ type Envelope<T> = { success: boolean; message?: string; data: T }
 
 export const ANCILLARY_BOOKING_WINDOW_DAYS = 14
 export const ANCILLARY_BOOKING_MAX_VISITS = 7
-export const ANCILLARY_BOOKING_CONFIRM_MINUTES = 30
 export const PAY_AFTER_VISIT = 'PAY_AFTER_VISIT'
 
 // ---- Catalog detail fields (added to /services and /packages) ----
@@ -28,51 +29,10 @@ export interface AncillaryServiceDetails {
 	validity_days?: number | null
 }
 
-// ---- Provider availability across days ----
+// ---- Selection ----
 
-export interface ProviderSlot {
-	start_time: string // "HH:MM"
-	end_time: string
-}
-
-export interface ProviderAvailability {
-	provider_public_id: string
-	name: string
-	specialty?: string | null
-	avatar_url?: string | null
-	gender?: string | null
-	experience_years?: number | null
-	languages: string[]
-	about?: string | null
-	distance_km?: number | null
-	fee_per_visit: number
-	working_hours_label?: string | null
-	dates: { date: string; slots: ProviderSlot[] }[]
-	available_on_all_dates: boolean
-	free_dates: string[]
-}
-
-export type ServiceSelection = { procedureIds: string[]; packageId?: undefined } | { packageId: string; procedureIds?: undefined }
-
-export const getProvidersAvailability = async (params: {
-	dates: string[]
-	selection: ServiceSelection
-	latitude: number
-	longitude: number
-}): Promise<ProviderAvailability[]> => {
-	const query: Record<string, unknown> = {
-		dates: params.dates.join(','),
-		latitude: params.latitude,
-		longitude: params.longitude,
-	}
-	if (params.selection.packageId) query.package_id = params.selection.packageId
-	else query.procedure_ids = params.selection.procedureIds
-	const res = await ApiService.getWithParams<Envelope<ProviderAvailability[]>>(
-		API_ENDPOINTS.ANCILLARY.PROVIDERS_AVAILABILITY,
-		query
-	)
-	return res.data?.data ?? []
-}
+export type ServiceSelection =
+	{ procedureIds: string[]; packageId?: undefined } | { packageId: string; procedureIds?: undefined }
 
 // ---- Order (create + status) ----
 
@@ -90,7 +50,6 @@ export interface VisitAddressInput {
 }
 
 export interface CreateAncillaryOrderInput {
-	provider_public_id: string
 	selection: ServiceSelection
 	visits: VisitInput[]
 	/** Family member's public id; omit to book for the signed-in patient. */
@@ -106,7 +65,18 @@ export type AncillaryOrderStatus =
 	| 'CANCELLED_BY_PATIENT'
 	| 'CANCELLED'
 	| 'EXPIRED'
+	/** Visit only: no provider was available for it -- the patient reschedules or cancels. */
+	| 'UNASSIGNED'
 	| (string & {})
+
+export interface AncillaryOrderProvider {
+	provider_public_id: string
+	name: string
+	avatar_url?: string | null
+	experience_years?: number | null
+	distance_km?: number | null
+	phone?: string | null
+}
 
 export interface AncillaryOrderVisit {
 	visit_public_id: string
@@ -116,6 +86,8 @@ export interface AncillaryOrderVisit {
 	end_time: string
 	status: AncillaryOrderStatus
 	payment_status?: string | null
+	/** The provider assigned to this visit (may differ per visit); null/absent until assigned. */
+	provider?: AncillaryOrderProvider | null
 }
 
 export interface AncillaryOrder {
@@ -125,14 +97,7 @@ export interface AncillaryOrder {
 	expires_at?: string | null
 	created_at?: string | null
 	payment_method?: string | null
-	provider?: {
-		provider_public_id: string
-		name: string
-		avatar_url?: string | null
-		experience_years?: number | null
-		distance_km?: number | null
-		phone?: string | null
-	} | null
+	provider?: AncillaryOrderProvider | null
 	services: { id: string; name: string }[]
 	package?: { id: string; name: string } | null
 	/** Home-care speciality of the order, when the endpoint includes it (key = catalogue slug, e.g. 'nursing-care'). */
@@ -145,8 +110,8 @@ export interface AncillaryOrder {
 }
 
 export const createAncillaryOrder = async (input: CreateAncillaryOrderInput): Promise<AncillaryOrder> => {
+	// No provider_public_id: the backend assigns one per visit.
 	const body: Record<string, unknown> = {
-		provider_public_id: input.provider_public_id,
 		visits: input.visits,
 		address: input.address,
 		payment_method: PAY_AFTER_VISIT,
@@ -177,9 +142,44 @@ export const cancelAncillaryOrder = async (requestPublicId: string, reason?: str
 	await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PATIENT(requestPublicId), reason ? { reason } : {})
 }
 
-/** Order ended without being confirmed -- the patient picks another provider. */
-export const isOrderUnconfirmedEnd = (status: AncillaryOrderStatus) =>
-	status === 'EXPIRED' || status === 'CANCELLED_BY_PROVIDER'
+export const isVisitUnassigned = (status?: AncillaryOrderStatus | null) => status === 'UNASSIGNED'
+
+// ---- Instant ("Book now") ----
+
+export interface CreateInstantRequestInput {
+	selection: ServiceSelection
+	/** Family member's public id; omit to book for the signed-in patient. */
+	patient_public_id?: string
+	address: VisitAddressInput
+	note?: string
+}
+
+export const createInstantRequest = async (input: CreateInstantRequestInput): Promise<string> => {
+	const body: Record<string, unknown> = {
+		bookingType: 'INSTANT',
+		paymentMethod: PAY_AFTER_VISIT,
+		address: {
+			streetAddress: input.address.street_address,
+			latitude: input.address.latitude,
+			longitude: input.address.longitude,
+			label: input.address.label,
+		},
+	}
+	if (input.selection.packageId) body.packageId = input.selection.packageId
+	else body.serviceTypeIds = input.selection.procedureIds
+	if (input.patient_public_id) body.patientPublicId = input.patient_public_id
+	if (input.note?.trim()) body.careInstructions = input.note.trim().slice(0, 500)
+	const res = await ApiService.post<Envelope<{ requestId?: string; publicBookingId?: string }>>(
+		API_ENDPOINTS.ANCILLARY.REQUESTS,
+		body
+	)
+	return String(res.data.data.requestId ?? res.data.data.publicBookingId ?? '')
+}
+
+/** Tip to get matched faster. amount 0 removes the tip; allowed 1..500, only before a provider accepts. */
+export const setAncillaryRequestTip = async (requestPublicId: string, amount: number): Promise<void> => {
+	await ApiService.put(API_ENDPOINTS.ANCILLARY.TIP(requestPublicId), { amount })
+}
 
 // ---- Provider side (scheduled orders) ----
 

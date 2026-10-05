@@ -1,14 +1,13 @@
 // src/navigation/tabBar.ts
 //
-// Geometry of the patient floating tab bar (MainTabNavigator's FloatingTabBar): a 64-high pill, 20 from
-// the sides and 16 + safe-area from the bottom. On floating routes (Home, patient Bookings) the bar overlays the screen, so
+// Geometry of the floating labelled tab bar (MainTabNavigator's LabelledTabBar, used by patient, doctor and
+// ancillary provider): a 66-high pill, 16 + safe-area from the bottom. On floating routes (Home, patient Bookings) the bar overlays the screen, so
 // scrollable content should end with `useTabBarClearance()` (or TAB_BAR_CLEARANCE + insets.bottom) of
 // bottom padding to scroll clear of the pill.
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ROUTES } from './routes'
 
-export const FLOATING_TAB_BAR_HEIGHT = 64
-export const FLOATING_TAB_BAR_SIDE = 20
+export const FLOATING_TAB_BAR_HEIGHT = 66
 export const FLOATING_TAB_BAR_BOTTOM = 16
 
 /** Bottom padding (excluding the safe-area inset) that keeps the last item clear of the floating pill. */

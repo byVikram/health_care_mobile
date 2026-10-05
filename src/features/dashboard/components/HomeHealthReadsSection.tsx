@@ -5,7 +5,7 @@
 // title, "author · N min read" / "Listen · N min"). Tabs load lazily and are cached until the page
 // refreshes. A row opens the article; podcasts open their media URL (no in-app player yet).
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -16,6 +16,7 @@ import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
 import { getHealthReads, type HealthRead, type HealthReadType } from '../../../services/homeService'
 import { HOME_ICONS, homeSectionProps } from '../homeTheme'
+import { openWebUrl } from '../../../utils/safeLinking'
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>
 
@@ -87,7 +88,7 @@ function HomeHealthReadsSection({ refreshToken }: Props) {
 	const openRead = async (r: HealthRead) => {
 		if (r.content_type === 'podcast' && r.media_url) {
 			try {
-				await Linking.openURL(r.media_url)
+				await openWebUrl(r.media_url)
 				return
 			} catch {
 				// fall through to the article page

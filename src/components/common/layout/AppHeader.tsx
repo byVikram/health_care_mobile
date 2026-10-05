@@ -56,8 +56,7 @@ export default function AppHeader(props: AppHeaderProps) {
 // below 4px) and a tap-through search field.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DAY_PARTS = (hour: number) =>
-	hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,'
+const DAY_PARTS = (hour: number) => (hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,')
 
 const HEADER_ICONS = {
 	menu: 'M5 7h14M5 12h14M5 17h9',
@@ -450,7 +449,7 @@ function ProviderHomeHeader({ userName = 'there', avatarUri, onAvatarPress }: Ap
 					<View style={patientStyles.nameCol}>
 						<Text style={patientStyles.greeting}>{greeting}</Text>
 						<Text style={patientStyles.name} numberOfLines={1}>
-							{displayName}
+							{displayName.trim().split(/s+/)[0] || displayName}
 						</Text>
 						<Text style={providerStyles.roleLine} numberOfLines={1}>
 							{`${roleLabel} · Home visits`}
@@ -548,29 +547,32 @@ function RoleHomeHeader({
 
 	// Option B GPU animation values
 	const maxScroll = 60
-	const headerTranslateY = scrollY && !isDoctor
-		? scrollY.interpolate({
-				inputRange: [0, maxScroll],
-				outputRange: [0, -maxScroll],
-				extrapolate: 'clamp',
-			})
-		: 0
+	const headerTranslateY =
+		scrollY && !isDoctor
+			? scrollY.interpolate({
+					inputRange: [0, maxScroll],
+					outputRange: [0, -maxScroll],
+					extrapolate: 'clamp',
+				})
+			: 0
 
-	const topRowOpacity = scrollY && !isDoctor
-		? scrollY.interpolate({
-				inputRange: [0, maxScroll - 10],
-				outputRange: [1, 0],
-				extrapolate: 'clamp',
-			})
-		: 1
+	const topRowOpacity =
+		scrollY && !isDoctor
+			? scrollY.interpolate({
+					inputRange: [0, maxScroll - 10],
+					outputRange: [1, 0],
+					extrapolate: 'clamp',
+				})
+			: 1
 
-	const waveOpacity = scrollY && !isDoctor
-		? scrollY.interpolate({
-				inputRange: [0, maxScroll],
-				outputRange: [1, 0.4],
-				extrapolate: 'clamp',
-			})
-		: 1
+	const waveOpacity =
+		scrollY && !isDoctor
+			? scrollY.interpolate({
+					inputRange: [0, maxScroll],
+					outputRange: [1, 0.4],
+					extrapolate: 'clamp',
+				})
+			: 1
 
 	// ── Display name (pharmacy fallback) ─────────────────────────────────────
 	let displayName = 'User'
@@ -622,13 +624,10 @@ function RoleHomeHeader({
 		} else if (isRadiology) {
 			console.log('RADIOLOGY_ORDERS')
 			navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS)
-		} 
-		else if (isLaboratory){
+		} else if (isLaboratory) {
 			console.log('LABORATORY_ORDERS')
 			navigation.navigate(ROUTES.STACK.LABORATORY_ORDERS)
-		}
-		
-		else {
+		} else {
 			console.log('SEARCH')
 			navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH)
 		}
@@ -733,11 +732,7 @@ function RoleHomeHeader({
 							{displayName}
 						</Text>
 
-						{isDoctor ? (
-							<DoctorHospitalDropdown />
-						) : (
-							<LocationSelector location={location} />
-						)}
+						{isDoctor ? <DoctorHospitalDropdown /> : <LocationSelector location={location} />}
 					</View>
 				</Pressable>
 

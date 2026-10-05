@@ -1,7 +1,6 @@
 // src/features/ancillary/staff/today/todayView.ts
 //
 // Display helpers for the provider Today screen (schedule rows, next visit card, booking request sheet).
-import type { AppTagTone } from '../../../../components/common'
 import {
 	combineDateTime,
 	DOW_LABELS,
@@ -11,14 +10,20 @@ import {
 	startsInLabel,
 } from '../../../../utils/date'
 import { capitaliseWords, formatKm, formatTimeSlot } from '../../../../utils/formatters'
-import type { ProviderPendingRequest, ProviderVisitSummary } from '../../providerVisitService'
+import type { ProviderOffer, ProviderPendingRequest, ProviderVisitSummary } from '../../providerVisitService'
+import { countNoun, type ProviderNoun, type ProviderSpecialityCopy } from '../providerSpecialityCopy'
 
 export const visitStart = (v: Pick<ProviderVisitSummary, 'date' | 'start_time'>) =>
 	combineDateTime(v.date, v.start_time)
 
-/** "Injection administration · visit 1 of 3" (just the service for a one-visit order). */
-export const visitTitle = (v: ProviderVisitSummary) =>
-	v.visits_count > 1 ? `${v.service_name} · visit ${v.index} of ${v.visits_count}` : v.service_name
+/** "Injection administration · visit 1 of 3" / "Knee rehab · session 2 of 5" (just the service for a one-visit order). */
+export const visitTitle = (
+	v: Pick<ProviderVisitSummary, 'service_name' | 'visits_count' | 'index'>,
+	noun: ProviderNoun = 'visit'
+) => (v.visits_count > 1 ? `${v.service_name} · ${noun} ${v.index} of ${v.visits_count}` : v.service_name)
+
+/** A visit nobody took (UNASSIGNED) is not this provider's work: never listed on Today. */
+export const isProviderWork = (status: string) => status !== 'UNASSIGNED'
 
 /** First part of the street address ("12 MG Road, Bangalore" -> "12 MG Road"). */
 export const shortAddress = (street?: string | null) => (street ?? '').split(',')[0].trim()
@@ -35,26 +40,6 @@ export const visitTravelLine = (v: ProviderVisitSummary) =>
 		.filter(Boolean)
 		.join(' · ')
 
-export const isFinishedVisit = (status: string) =>
-	status === 'COMPLETED' || status.startsWith('CANCELLED') || status === 'EXPIRED'
-export const isActiveVisit = (status: string) =>
-	status === 'IN_PROGRESS' || status === 'EN_ROUTE' || status === 'ARRIVED'
-
-/** Schedule tag: Done / In progress / On the way / Next / Upcoming. */
-export const scheduleStatus = (v: ProviderVisitSummary, isNext: boolean): { label: string; tone: AppTagTone } => {
-	switch (v.status) {
-		case 'COMPLETED':
-			return { label: 'Done', tone: 'completed' }
-		case 'IN_PROGRESS':
-		case 'ARRIVED':
-			return { label: 'In progress', tone: 'inProgress' }
-		case 'EN_ROUTE':
-			return { label: 'On the way', tone: 'onTheWay' }
-		default:
-			return isNext ? { label: 'Next', tone: 'upcoming' } : { label: 'Upcoming', tone: 'done' }
-	}
-}
-
 /** "7:00 PM · in 45 min" today, "Tomorrow · 9:00 AM" later; plain time once it has started. */
 export const nextVisitWhen = (v: ProviderVisitSummary) => {
 	const start = visitStart(v)
@@ -67,12 +52,12 @@ export const nextVisitWhen = (v: ProviderVisitSummary) => {
 }
 
 /** Eyebrow of the next-visit card. */
-export const nextVisitEyebrow = (v: ProviderVisitSummary) =>
+export const nextVisitEyebrow = (v: ProviderVisitSummary, copy: ProviderSpecialityCopy) =>
 	v.status === 'IN_PROGRESS' || v.status === 'ARRIVED'
-		? 'VISIT IN PROGRESS'
+		? copy.today.inProgressEyebrow
 		: v.status === 'EN_ROUTE'
 			? 'ON THE WAY'
-			: 'NEXT VISIT'
+			: copy.today.nextEyebrow
 
 /** "Mon 29 Sep" */
 export const shortDay = (date?: string | null) => {
@@ -96,4 +81,14 @@ export const patientBrief = (p: ProviderPendingRequest['patient']) =>
 /** "Anita P." -> "ANITA P." for the eyebrow. */
 export const upperName = (name?: string | null) => (name ?? '').toUpperCase()
 
-export const visitsWord = (n: number) => `${n} ${n === 1 ? 'visit' : 'visits'}`
+export const visitsWord = (n: number, noun: ProviderNoun = 'visit') => countNoun(n, noun)
+
+/** "incl. ₹30 tip" when the patient tipped, else null. */
+export const tipLabel = (tip?: number | null) =>
+	tip && tip > 0 ? `incl. ₹${Number.isInteger(tip) ? tip : tip.toFixed(2)} tip` : null
+
+/** Offer is an instant request (patient waiting, 30 s to answer) rather than a scheduled visit. */
+export const isInstantOffer = (o: ProviderOffer) => o.bookingType === 'INSTANT' && !o.visitPublicId
+
+/** What the provider collects after the visit: the patient's charge plus any tip. */
+export const offerCollect = (o: ProviderOffer) => (o.totalAmount ?? 0) + (o.tipAmount || 0)

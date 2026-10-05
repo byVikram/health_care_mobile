@@ -21,6 +21,7 @@ import type { AppNavigationParamList } from '../../../../navigation/types'
 import { openDirections } from '../../../../utils/maps'
 import { extractApiErrorMessage } from '../../ancillaryService'
 import { completeVisit, getProviderVisit, type ProviderVisitDetail } from '../../providerVisitService'
+import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { nextVisitWhen, visitSubtitle, visitTitle } from '../today/todayView'
 import { durationLabel, firstName, isCompleted, recordedSummary } from './visitView'
 
@@ -56,6 +57,8 @@ export default function ProviderCompleteVisitPage() {
 		}, [load])
 	)
 
+	const copy = getProviderSpecialityCopy(visit?.service.specialty)
+
 	const backToToday = () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME })
 
 	const submit = async () => {
@@ -65,7 +68,7 @@ export default function ProviderCompleteVisitPage() {
 		try {
 			setVisit(await completeVisit(visitId, code))
 		} catch (e) {
-			setCodeError(extractApiErrorMessage(e, 'Could not complete the visit. Please try again.'))
+			setCodeError(extractApiErrorMessage(e, `Could not complete the ${copy.noun}. Please try again.`))
 		} finally {
 			setSubmitting(false)
 		}
@@ -74,8 +77,8 @@ export default function ProviderCompleteVisitPage() {
 	const header = (
 		<AppScreenHeader
 			variant="bar"
-			title="Complete visit"
-			subtitle={visit ? visitTitle(visit) : undefined}
+			title={copy.completeTitle}
+			subtitle={visit ? visitTitle(visit, copy.noun) : undefined}
 			onBack={() => navigation.goBack()}
 		/>
 	)
@@ -114,7 +117,7 @@ export default function ProviderCompleteVisitPage() {
 			label: 'Payment',
 			value: done
 				? `${formatInr(visit.payment.amount)} collected`
-				: `Collect ${formatInr(visit.payment.amount)} · pay after visit`,
+				: `Collect ${formatInr(visit.payment.amount)} · pay after ${copy.noun}`,
 		},
 	]
 
@@ -128,9 +131,11 @@ export default function ProviderCompleteVisitPage() {
 							tone="success"
 							size="prominent"
 							icon="check"
-							title="Visit completed"
-							subtitle={`Notes are shared with ${first}. ${
-								visit.visits_count > 1 ? `Visit ${visit.index} of ${visit.visits_count} is done.` : ''
+							title={copy.completedTitle}
+							subtitle={`${copy.completedNote} ${
+								visit.visits_count > 1
+									? `${copy.noun.charAt(0).toUpperCase()}${copy.noun.slice(1)} ${visit.index} of ${visit.visits_count} is done.`
+									: ''
 							}`.trim()}
 						/>
 					</View>
@@ -140,8 +145,8 @@ export default function ProviderCompleteVisitPage() {
 							<Text style={styles.codeTitle}>{`Ask ${first} for the completion code`}</Text>
 							<Text style={styles.codeSub}>
 								{visit.visits_count > 1
-									? `It’s shown in their app on this visit (${visit.index} of ${visit.visits_count}). This confirms the visit happened.`
-									: 'It’s shown in their app on the booking. This confirms the visit happened.'}
+									? `It’s shown in their app on this ${copy.noun} (${visit.index} of ${visit.visits_count}). ${copy.completionHint}`
+									: `It’s shown in their app on the booking. ${copy.completionHint}`}
 							</Text>
 						</View>
 						<AppOtpInput
@@ -213,7 +218,7 @@ export default function ProviderCompleteVisitPage() {
 						disabled={!ready || submitting}
 						softDisabled
 					>
-						{ready ? 'Submit & finish' : 'Enter the 4-digit code'}
+						{ready ? copy.completeButton : 'Enter the 4-digit code'}
 					</AppButton>
 				)}
 			</AppFooterBar>

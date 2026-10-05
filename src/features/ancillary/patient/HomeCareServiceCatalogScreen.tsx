@@ -1,13 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
-import {
-	ActivityIndicator,
-	BackHandler,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
-} from 'react-native'
+import { ActivityIndicator, BackHandler, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
 import {
@@ -39,7 +31,7 @@ import {
 const HOME_CARE_CATEGORY_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
 	'personal care': 'account-heart-outline',
 	'mobility support': 'walk',
-	'companionship': 'account-group-outline',
+	companionship: 'account-group-outline',
 }
 const HOME_CARE_DEFAULT_ICON: keyof typeof MaterialCommunityIcons.glyphMap = 'clipboard-text-outline'
 const HOME_CARE_ALL_CATEGORY_ID = 'all'
@@ -52,7 +44,8 @@ interface CategoryGroup {
 	procedures: ServiceProcedureItem[]
 }
 
-const HOME_CARE_HEADER_IMAGE = 'https://images.unsplash.com/photo-1581579438747-1dc8d17bbce4?auto=format&fit=crop&w=300&q=80'
+const HOME_CARE_HEADER_IMAGE =
+	'https://images.unsplash.com/photo-1581579438747-1dc8d17bbce4?auto=format&fit=crop&w=300&q=80'
 
 export default function HomeCareServiceCatalogScreen() {
 	const navigation = useNavigation<any>()
@@ -203,7 +196,7 @@ export default function HomeCareServiceCatalogScreen() {
 
 	const handleProceedToBooking = () => {
 		if (cart.length === 0) return
-		// Scheduled booking with a chosen provider (Book visit -> Review & pay -> Request sent), same as
+		// Scheduled booking (Schedule a visit -> Review & pay -> Booking details), same as
 		// every other home-care type. Activities are ancillary procedures, so their ids go straight through.
 		const toNumber = (v?: string) => Number(String(v ?? '').replace(/[^0-9.]/g, '')) || 0
 		const firstMinutes = (v?: string) => {
@@ -272,8 +265,12 @@ export default function HomeCareServiceCatalogScreen() {
 									size={16}
 									color={allSelected ? '#0C7C7C' : '#64748B'}
 								/>
-								<Text style={[styles.quickSelectAllText, allSelected && styles.quickSelectAllTextActive]}>
-									{allSelected ? `All ${procedureItems.length} activities selected` : `Select all ${procedureItems.length} care activities`}
+								<Text
+									style={[styles.quickSelectAllText, allSelected && styles.quickSelectAllTextActive]}
+								>
+									{allSelected
+										? `All ${procedureItems.length} activities selected`
+										: `Select all ${procedureItems.length} care activities`}
 								</Text>
 							</TouchableOpacity>
 						)}
@@ -302,7 +299,9 @@ export default function HomeCareServiceCatalogScreen() {
 				<ConditionGrid
 					activeConditionId={activeCategory}
 					onSelectCondition={(id) =>
-						setActiveCategory((prev) => (prev === id && id !== HOME_CARE_ALL_CATEGORY_ID ? HOME_CARE_ALL_CATEGORY_ID : id))
+						setActiveCategory((prev) =>
+							prev === id && id !== HOME_CARE_ALL_CATEGORY_ID ? HOME_CARE_ALL_CATEGORY_ID : id
+						)
 					}
 					conditions={homeCareConditions}
 					title="Home Care For?"
@@ -496,4 +495,3 @@ const styles = StyleSheet.create({
 		marginTop: 4,
 	},
 })
-

@@ -9,7 +9,8 @@
 //
 // Cart rule (backend): a booking holds EITHER one package OR one-or-more procedures of this speciality.
 // Adding a package over procedures (or procedures over a package, or a second package) asks to replace.
-// "Book visit" -> ROUTES.STACK.ANCILLARY_BOOK_VISIT { serviceKey, serviceLabel, items: AncillaryCartItem[] }.
+// Footer: "Later" -> ROUTES.STACK.ANCILLARY_BOOK_VISIT (Schedule a visit) and "Book now" ->
+// ROUTES.STACK.ANCILLARY_BOOK_NOW_REVIEW (instant), both { serviceKey, serviceLabel, items: AncillaryCartItem[] }.
 //
 // Reached via ROUTES.STACK.ANCILLARY_SERVICES (AncillaryServicesPage) and the Ancillary tab (NursingCarePage,
 // no params -> nursing-care).
@@ -99,9 +100,7 @@ export default function AncillaryServiceCatalogScreen() {
 type TypeTab = 'all' | 'packages' | 'procedures'
 
 type DetailTarget =
-	| { kind: 'procedure'; item: AncillaryServiceItem }
-	| { kind: 'package'; item: AncillaryPackageListItem }
-	| null
+	{ kind: 'procedure'; item: AncillaryServiceItem } | { kind: 'package'; item: AncillaryPackageListItem } | null
 
 // "Care for" tiles sit three to a row: at five/four per row a tile is ~65-85px wide and names like
 // "General Nursing Procedures" or "Specialized High Dependency Care" wrapped past two lines and got
@@ -288,9 +287,14 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 	const countLabel =
 		cart[0]?.kind === 'package' ? '1 package added' : `${plural(cart.length, 'service', 'services')} added`
 
-	const handleBook = () => {
+	const handleBookLater = () => {
 		if (cart.length === 0) return
 		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOK_VISIT, { serviceKey, serviceLabel, items: cart })
+	}
+
+	const handleBookNow = () => {
+		if (cart.length === 0) return
+		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOK_NOW_REVIEW, { serviceKey, serviceLabel, items: cart })
 	}
 
 	const callHelpline = async () => {
@@ -460,7 +464,7 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 				rightElement={
 					<TouchableOpacity
 						style={styles.cartBtn}
-						onPress={handleBook}
+						onPress={handleBookNow}
 						disabled={cart.length === 0}
 						activeOpacity={0.75}
 						accessibilityRole="button"
@@ -653,8 +657,10 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 				countLabel={countLabel}
 				totalLabel={rupees(total)}
 				savingsLabel={savings > 0 ? `You save ${rupees(savings)}` : undefined}
-				ctaLabel="Book visit"
-				onCtaPress={handleBook}
+				ctaLabel="Book now"
+				onCtaPress={handleBookNow}
+				secondaryCtaLabel="Later"
+				onSecondaryCtaPress={handleBookLater}
 				emptyHint={copy.emptyCartHint}
 			/>
 
