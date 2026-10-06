@@ -88,6 +88,7 @@ export const API_ENDPOINTS = {
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
 		// Doctor-only: not_arrived -> checked_in when the patient physically arrives.
 		CHECK_IN: (id: string) => `${BASE_URL}/api/appointments/${id}/check-in`,
+		UNDO_CHECK_IN: (id: string) => `${BASE_URL}/api/appointments/${id}/undo-check-in`,
 		// Unauthenticated by design (external scheduler only) -- see backend's process-not-arrived
 		// docstring. Not called from the mobile app.
 		PROCESS_NOT_ARRIVED: `${BASE_URL}/api/appointments/process-not-arrived`,

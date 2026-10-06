@@ -219,6 +219,12 @@ export const checkInAppointment = async (appointmentId: string): Promise<CheckIn
 	return res.data
 }
 
+/** Doctor-only: checked_in -> not_arrived, for a check-in tapped by mistake (backend rejects any other current status). */
+export const undoCheckInAppointment = async (appointmentId: string): Promise<CheckInResponse> => {
+	const res = await ApiService.post<CheckInResponse>(API_ENDPOINTS.APPOINTMENTS.UNDO_CHECK_IN(appointmentId), {})
+	return res.data
+}
+
 export const getAppointmentStatuses = async (): Promise<AppointmentStatusOption[]> => {
 	const res = await ApiService.get<{ success: boolean; data: AppointmentStatusOption[] } | AppointmentStatusOption[]>(
 		API_ENDPOINTS.APPOINTMENTS.STATUSES,
