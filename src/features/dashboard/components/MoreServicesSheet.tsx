@@ -72,9 +72,9 @@ export default function MoreServicesSheet({ visible, onClose }: MoreServicesShee
 	const tiles: ServiceTile[] = [
 		{
 			key: 'home-care',
-			title: 'Home care',
+			title: 'Ancillary care',
 			subtitle: 'Nurses, physio & more',
-			icon: 'homeCare',
+			icon: 'ancillaryCare',
 			colors: TONES.mint,
 			onPress: () => closeThen(() => open('ancillary')),
 		},

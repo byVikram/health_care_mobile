@@ -17,6 +17,7 @@ import { APP_COLORS, TONES, type ToneKey } from '../../../config/theme'
 import { isPatientRole } from '../../../constants/constants'
 import { useHomeSheets } from '../HomeSheetsContext'
 import { HOME_ICONS } from '../homeTheme'
+import { HOME_CHROME_PATHS } from '../homeChromeIcons'
 import { ROUTES } from '../../../navigation/routes'
 import { navigate as navigateRoot } from '../../../navigation/navigationService'
 
@@ -55,18 +56,18 @@ export default function QuickServicesSection({ role }: { role: Role }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Patient Home quick actions ("1 · Home"): five 56px tone tiles. "More" opens the More services
-// sheet (HomeSheetsContext); Radiology keeps the scan-type picker.
+// Patient Home quick actions ("1 · Home"): five 56px tone tiles. "Ancillary care" opens the ancillary
+// services sheet (HomeSheetsContext); "More" lives in the bottom bar; Radiology keeps the scan-type picker.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type QuickActionKey = 'appointments' | 'pharmacy' | 'lab' | 'radiology' | 'more'
+type QuickActionKey = 'appointments' | 'pharmacy' | 'lab' | 'radiology' | 'ancillary'
 
 const QUICK_ACTIONS: { key: QuickActionKey; label: string; tone: ToneKey; icon: string }[] = [
 	{ key: 'appointments', label: 'Appointments', tone: 'sky', icon: HOME_ICONS.calendar },
 	{ key: 'pharmacy', label: 'Pharmacy', tone: 'peach', icon: HOME_ICONS.pill },
 	{ key: 'lab', label: 'Lab tests', tone: 'mint', icon: HOME_ICONS.flask },
 	{ key: 'radiology', label: 'Radiology', tone: 'lilac', icon: HOME_ICONS.scan },
-	{ key: 'more', label: 'More', tone: 'sand', icon: HOME_ICONS.grid },
+	{ key: 'ancillary', label: 'Ancillary care', tone: 'sand', icon: HOME_CHROME_PATHS.ancillaryCare },
 ]
 
 function PatientQuickActions() {
@@ -78,7 +79,7 @@ function PatientQuickActions() {
 		else if (key === 'pharmacy') navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
 		else if (key === 'lab') navigateRoot(ROUTES.STACK.LABORATORY_LIST)
 		else if (key === 'radiology') setShowScanTypeModal(true)
-		else open('more')
+		else open('ancillary')
 	}
 
 	return (
@@ -91,12 +92,12 @@ function PatientQuickActions() {
 					onPress={() => handlePress(a.key)}
 					accessibilityRole="button"
 					accessibilityLabel={a.label}
-					accessibilityHint={a.key === 'more' ? 'Opens more services' : undefined}
+					accessibilityHint={a.key === 'ancillary' ? 'Opens ancillary care services' : undefined}
 				>
 					<AppIconTile size={56} radius={18} tone={a.tone}>
 						<AppPathIcon d={a.icon} size={26} strokeWidth={2} color={TONES[a.tone].ink} />
 					</AppIconTile>
-					<Text style={patientStyles.label} numberOfLines={1}>
+					<Text style={patientStyles.label} numberOfLines={2}>
 						{a.label}
 					</Text>
 				</TouchableOpacity>
@@ -131,6 +132,7 @@ const patientStyles = StyleSheet.create({
 		lineHeight: 16,
 		fontWeight: '700',
 		color: APP_COLORS.ink,
+		textAlign: 'center',
 	},
 })
 
