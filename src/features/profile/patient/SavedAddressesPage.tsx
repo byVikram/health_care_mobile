@@ -165,6 +165,7 @@ export default function SavedAddressesPage() {
 				<>
 					<AppInfoBanner
 						tone="info"
+						icon={null}
 						title="Your default address is picked first when you book"
 						subtitle="You can change it on any booking."
 						style={styles.banner}

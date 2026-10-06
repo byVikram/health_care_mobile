@@ -248,6 +248,7 @@ export default function WorkDocumentsPage() {
 					{inReview && (
 						<AppInfoBanner
 							tone="warning"
+							icon={null}
 							title="Your licence is being checked"
 							subtitle="This usually takes 1–2 working days. You can take bookings once approved."
 							style={styles.banner}

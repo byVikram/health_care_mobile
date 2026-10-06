@@ -577,7 +577,6 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 												? plural(p.procedureCount, 'service', 'services')
 												: undefined
 									}
-									points={packagePoints(p)}
 									imageSource={p.imageUrl ? getAncillaryImageSource(p.imageUrl) : undefined}
 									iconPath={CATALOG_ICONS.elder}
 									tone={packageTone(toneIndex.get(`p:${p.id}`) ?? i)}
@@ -612,7 +611,6 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 										priceLabel={rupees(s.price)}
 										mrpLabel={s.mrp && s.mrp > s.price ? rupees(s.mrp) : undefined}
 										metaLabel={formatDurationMinutes(s.duration_minutes) || undefined}
-										points={procedurePoints(s)}
 										imageSource={imageUrl ? getAncillaryImageSource(imageUrl) : undefined}
 										iconPath={procedureIcon(s)}
 										tone={procedureTone(toneIndex.get(`s:${s.id}`) ?? i)}
@@ -696,17 +694,6 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 			/>
 		</View>
 	)
-}
-
-const packagePoints = (p: AncillaryPackageListItem): string[] => {
-	if (p.includes && p.includes.length > 0) return p.includes.slice(0, 2)
-	return p.description?.trim() ? [p.description.trim()] : []
-}
-
-const procedurePoints = (s: AncillaryServiceItem): string[] => {
-	const about = procedureAbout(s)
-	const first = procedureIncludes(s)[0]
-	return [about, first].filter((x): x is string => !!x)
 }
 
 // ---------------------------------------------------------------------------------------------------------

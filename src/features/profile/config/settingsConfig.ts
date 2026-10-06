@@ -54,7 +54,6 @@ export const SETTINGS_CONFIG: Record<HubRole, SettingsConfig> = {
 				subtitle: 'When patients ask you something',
 				defaultOn: true,
 			},
-			{ key: 'payouts', title: 'Payouts', subtitle: 'When a payout is sent to your bank', defaultOn: true },
 			{ key: 'news', title: 'Karolahealth updates', subtitle: 'New features and tips', defaultOn: false },
 		],
 		privacySubtitle: 'What patients can see on your profile',
@@ -64,7 +63,6 @@ export const SETTINGS_CONFIG: Record<HubRole, SettingsConfig> = {
 		toggles: [
 			{ key: 'bookings', title: 'New bookings', subtitle: 'When a patient chooses you', defaultOn: true },
 			{ key: 'reminders', title: 'Visit reminders', subtitle: '30 minutes before each visit', defaultOn: true },
-			{ key: 'payouts', title: 'Payouts', subtitle: 'When earnings reach your bank', defaultOn: true },
 			{ key: 'news', title: 'Karolahealth updates', subtitle: 'Training and tips', defaultOn: false },
 		],
 		privacySubtitle: 'What patients can see before booking you',

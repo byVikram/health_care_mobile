@@ -29,7 +29,7 @@ export default function HealthDetailsPage() {
 		>
 			<AppInfoBanner
 				tone="info"
-				icon="shield-lock-outline"
+				icon={null}
 				title="Doctors and nurses see this only for your bookings"
 				subtitle="You can change it any time."
 				style={styles.banner}

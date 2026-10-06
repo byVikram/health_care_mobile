@@ -1,11 +1,11 @@
-// Hub footer: outlined 48px "Log out" button (danger text, divider border) with a confirm sheet, and the
+// Hub footer: outlined 48px "Log out" button (danger text, divider border) with the shared logout confirm modal, and the
 // "Karolahealth · version x.y.z" line under it.
 
 import React, { useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Constants from 'expo-constants'
-import { AppConfirmSheet } from '../../../../components/common'
+import { LogoutConfirmModal } from '../../../../components/common'
 import { APP_COLORS } from '../../../../config/theme'
 import { useAuth } from '../../../../context/AuthContext'
 
@@ -21,12 +21,9 @@ export function LogoutButton() {
 				<Text style={styles.text}>Log out</Text>
 			</TouchableOpacity>
 			<Text style={styles.version}>Karolahealth{version ? ` · version ${version}` : ''}</Text>
-			<AppConfirmSheet
+			<LogoutConfirmModal
 				visible={confirming}
-				onClose={() => setConfirming(false)}
-				title="Log out?"
-				message="You'll need your mobile number and an OTP to log in again. Your bookings are not affected."
-				confirmLabel="Log out"
+				onCancel={() => setConfirming(false)}
 				onConfirm={async () => {
 					setConfirming(false)
 					await clearAuth()

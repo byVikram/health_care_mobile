@@ -114,7 +114,7 @@ export default function AncillaryBookNowReviewPage() {
 					<View style={styles.bannerWrap}>
 						<AppInfoBanner
 							tone="success"
-							icon="flash-outline"
+							icon={null}
 							title={`A ${noun} reaches you in about 15–30 min`}
 							subtitle={`We ask the nearest verified ${noun}s as soon as you confirm.`}
 						/>

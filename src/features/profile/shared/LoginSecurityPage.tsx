@@ -103,6 +103,7 @@ export default function LoginSecurityPage() {
 			{secured && (
 				<AppInfoBanner
 					tone="success"
+					icon={null}
 					title="That device is logged out"
 					subtitle="If someone else knows your OTP, contact support."
 					style={styles.banner}

@@ -1,8 +1,8 @@
 // Doctor "Favourite doctors": colleagues the doctor bookmarked (for referrals). Tap to open their public
 // profile; the heart removes them from favourites.
 
-import React, { useCallback, useState } from 'react'
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useMemo, useState } from 'react'
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -23,6 +23,15 @@ export default function FavouriteDoctorsPage() {
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [busyId, setBusyId] = useState<string | null>(null)
+	const [query, setQuery] = useState('')
+
+	const filtered = useMemo(() => {
+		const q = query.trim().toLowerCase()
+		if (!q) return doctors
+		return doctors.filter((d) =>
+			[d.name, d.location, ...(d.specialities ?? [])].some((v) => v?.toLowerCase().includes(q))
+		)
+	}, [doctors, query])
 
 	const load = useCallback(async () => {
 		setError(null)
@@ -67,12 +76,36 @@ export default function FavouriteDoctorsPage() {
 			loadError={error}
 			onRetry={load}
 		>
-			{doctors.length ? (
+			{doctors.length > 0 && (
+				<View style={styles.searchBox}>
+					<MaterialCommunityIcons name="magnify" size={20} color={APP_COLORS.inkMuted} />
+					<TextInput
+						style={styles.searchInput}
+						value={query}
+						onChangeText={setQuery}
+						placeholder="Search by name, speciality or location"
+						placeholderTextColor={APP_COLORS.inkMuted}
+						autoCorrect={false}
+						returnKeyType="search"
+						accessibilityLabel="Search favourite doctors"
+					/>
+					{query.length > 0 && (
+						<TouchableOpacity
+							onPress={() => setQuery('')}
+							accessibilityRole="button"
+							accessibilityLabel="Clear search"
+						>
+							<MaterialCommunityIcons name="close-circle" size={18} color={APP_COLORS.inkMuted} />
+						</TouchableOpacity>
+					)}
+				</View>
+			)}
+			{filtered.length ? (
 				<View style={styles.list}>
-					{doctors.map((d, i) => (
+					{filtered.map((d, i) => (
 						<TouchableOpacity
 							key={d.id}
-							style={[styles.row, i < doctors.length - 1 && styles.divider]}
+							style={[styles.row, i < filtered.length - 1 && styles.divider]}
 							onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: d.id })}
 							accessibilityRole="button"
 						>
@@ -120,8 +153,17 @@ export default function FavouriteDoctorsPage() {
 				</View>
 			) : (
 				<View style={styles.empty}>
-					<AppTag label="No favourites yet" tone="neutral" size="sm" shape="rounded" />
-					<Text style={styles.emptyText}>Tap the heart on a doctor's profile to save them here.</Text>
+					<AppTag
+						label={doctors.length ? 'No matching doctors' : 'No favourites yet'}
+						tone="neutral"
+						size="sm"
+						shape="rounded"
+					/>
+					<Text style={styles.emptyText}>
+						{doctors.length
+							? 'Try a different name, speciality or location.'
+							: "Tap the heart on a doctor's profile to save them here."}
+					</Text>
 				</View>
 			)}
 		</ProfileScreen>
@@ -129,6 +171,27 @@ export default function FavouriteDoctorsPage() {
 }
 
 const styles = StyleSheet.create({
+	searchBox: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginHorizontal: 16,
+		marginVertical: 12,
+		paddingHorizontal: 12,
+		height: 44,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
+		backgroundColor: APP_COLORS.surface,
+	},
+	searchInput: {
+		flex: 1,
+		fontSize: 15,
+		color: APP_COLORS.ink,
+		paddingVertical: 0,
+		// react-native-web draws a default focus outline on the inner input
+		...({ outlineStyle: 'none', outlineWidth: 0 } as object),
+	},
 	list: {
 		backgroundColor: APP_COLORS.surface,
 		paddingHorizontal: 16,

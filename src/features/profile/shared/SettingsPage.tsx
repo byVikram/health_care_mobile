@@ -74,6 +74,7 @@ export default function SettingsPage() {
 		>
 			<AppInfoBanner
 				tone="info"
+				icon={null}
 				title="Notification and language settings are coming soon"
 				subtitle="You can look around; changes here aren't saved yet."
 				style={styles.banner}
