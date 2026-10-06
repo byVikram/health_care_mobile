@@ -2,9 +2,9 @@ export const ROUTES = {
 	AUTH: {
 		LOGIN: 'Login',
 		ROLE_SELECTION: 'RoleSelection',
-		SPECIALTY_SELECTION: 'SpecialtySelection',
 		ONBOARDING: 'Onboarding',
 		REGISTER: 'Register',
+		LEGAL: 'Legal',
 	},
 	MAIN: {
 		TABS: 'MainTabs',
@@ -23,6 +23,7 @@ export const ROUTES = {
 		PROFILE: 'Profile',
 	},
 	STACK: {
+		LEGAL: 'LegalStack',
 		SEARCH: 'SplashScreen',
 		DOCTOR_SEARCH: 'DoctorSearch',
 		DOCTOR_DETAIL: 'DoctorDetail',

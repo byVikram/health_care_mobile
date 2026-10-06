@@ -13,6 +13,9 @@ export const HOME_CHROME_PATHS = {
 	medicine: 'M10.5 20.5a4.95 4.95 0 0 1-7-7l6-6a4.95 4.95 0 0 1 7 7zM8.5 8.5l7 7',
 	lab: 'M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3M7.5 15h9',
 	radiology: 'M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4M12 7v10M9 9h6M8.5 12h7M9 15h6',
+	/** Heart with a plus: ancillary care (nursing, physio, rehab, home care). */
+	ancillaryCare: 'M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10zM12 9v5M9.5 11.5h5',
+	grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
 	homeCare: 'M3 11l9-7 9 7M5 10v10h14V10M12 17.5s-3-1.8-3-4a1.5 1.5 0 0 1 3-.8 1.5 1.5 0 0 1 3 .8c0 2.2-3 4-3 4z',
 	treatment: 'M14 3v5h5M6 3h8l5 5v13H6zM9 13h6M9 17h6',
 	reminders: 'M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2 2M5 3L2 6M19 3l3 3',

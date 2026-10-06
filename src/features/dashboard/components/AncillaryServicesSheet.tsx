@@ -1,6 +1,6 @@
 // src/features/dashboard/components/AncillaryServicesSheet.tsx
 //
-// "Healthcare at home" sheet (design 1c): 2-column grid of tone cards (icon tile, title, subtitle) that
+// "Ancillary care" sheet (design 1c): 2-column grid of tone cards (icon tile, title, subtitle) that
 // open the patient ancillary booking flow for that service key, plus "Lab tests at home" (laboratory
 // list) and a trust footer. Opened from the floating tab bar's middle button, the Ancillary tab and the
 // More services sheet via useHomeSheets().open('ancillary'); rendered once by <HomeSheetsHost />.
@@ -114,7 +114,7 @@ export default function AncillaryServicesSheet({ visible, onClose }: AncillarySe
 		<AppBottomSheet
 			visible={visible}
 			onClose={onClose}
-			title="Healthcare at home"
+			title="Ancillary care"
 			subtitle="Verified professionals visit you at home"
 			appearance="modern"
 			showHeaderDivider={false}

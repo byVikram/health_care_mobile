@@ -12,12 +12,14 @@ export type RoleParams = {
 	specialty?: string
 }
 
+export type LegalParams = { tab?: 'Terms' | 'Privacy' } | undefined
+
 export type AuthStackParamList = {
 	[ROUTES.AUTH.LOGIN]: undefined
 	[ROUTES.AUTH.ROLE_SELECTION]: undefined
-	[ROUTES.AUTH.SPECIALTY_SELECTION]: RoleParams | undefined
 	[ROUTES.AUTH.ONBOARDING]: RoleParams | undefined
 	[ROUTES.AUTH.REGISTER]: RoleParams | undefined
+	[ROUTES.AUTH.LEGAL]: LegalParams
 }
 
 export type BookingsFilterKey = 'doctor' | 'ancillary' | 'lab' | 'medicine' | 'radiology'
@@ -146,6 +148,7 @@ export type AncillaryServiceMatchingParams = {
 }
 
 export type AppStackParamList = {
+	[ROUTES.STACK.LEGAL]: LegalParams
 	[ROUTES.STACK.WALLET]: undefined
 	[ROUTES.STACK.WALLET_TOPUP]: undefined
 	[ROUTES.STACK.WALLET_TRANSACTIONS]: undefined

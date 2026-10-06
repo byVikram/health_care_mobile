@@ -5,8 +5,8 @@ import { ROUTES } from './routes'
 
 import LoginPage from '../features/auth/LoginPage'
 import RoleSelectionScreen from '../features/onboarding/RoleSelectionScreen'
-import SpecialtySelectionScreen from '../features/onboarding/SpecialtySelectionScreen'
 import RegisterPage from '../features/auth/RegisterPage'
+import LegalPage from '../features/auth/LegalPage'
 import OnboardingPage from '../features/onboarding/OnboardingPage'
 
 const Stack = createNativeStackNavigator<AuthStackParamList>()
@@ -16,13 +16,13 @@ export default function AuthNavigator() {
 		<Stack.Navigator screenOptions={{ headerShown: false }}>
 			<Stack.Screen name={ROUTES.AUTH.LOGIN} component={LoginPage} options={{ animation: 'none' }} />
 			<Stack.Screen name={ROUTES.AUTH.ROLE_SELECTION} component={RoleSelectionScreen} />
-			<Stack.Screen name={ROUTES.AUTH.SPECIALTY_SELECTION} component={SpecialtySelectionScreen} />
 			<Stack.Screen
 				name={ROUTES.AUTH.ONBOARDING}
 				component={OnboardingPage}
 				options={{ animation: 'none' }}
 			/>
 			<Stack.Screen name={ROUTES.AUTH.REGISTER} component={RegisterPage} />
+			<Stack.Screen name={ROUTES.AUTH.LEGAL} component={LegalPage} />
 		</Stack.Navigator>
 	)
 }

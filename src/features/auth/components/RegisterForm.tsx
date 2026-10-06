@@ -1,19 +1,12 @@
 import React, { useState } from 'react'
-import {
-	Text,
-	StyleSheet,
-	ScrollView,
-	TouchableOpacity,
-	ActivityIndicator,
-	View,
-	useWindowDimensions,
-	Pressable,
-} from 'react-native'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import axios from 'axios'
 import { createUser } from '../authService'
-import { AppInput } from '../../../components/common'
 import { ROUTES } from '../../../navigation/routes'
 import { registrationSchema, getFieldErrors } from '../../../validation/authSchemas'
+import { APP_COLORS } from '../../../config/theme'
+import { roleDisplayName } from '../roleDisplay'
+import { AuthField, AuthFooter, AuthHeaderMint, CtaButton, InfoNote, TermsLine } from './AuthKit'
 
 type RegisterFormData = {
 	name: string
@@ -21,7 +14,7 @@ type RegisterFormData = {
 	mobile: string
 }
 
-type RegisterFieldErrors = Partial<Record<keyof RegisterFormData, string>>
+type RegisterFieldName = keyof RegisterFormData
 
 interface RegisterFormProps {
 	roleId: string
@@ -46,41 +39,33 @@ export default function RegisterForm({
 }: RegisterFormProps) {
 	const [loading, setLoading] = useState(false)
 	const [formError, setFormError] = useState('')
-	const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({})
+	const [touched, setTouched] = useState<Partial<Record<RegisterFieldName, boolean>>>({})
 
-	const { width, height } = useWindowDimensions()
+	const values = { name: formData.name.trim(), email: formData.email.trim(), mobile: formData.mobile }
+	const errors = getFieldErrors(registrationSchema, values) as Partial<Record<RegisterFieldName, string>>
+	const isValid = (field: RegisterFieldName) => values[field].length > 0 && !errors[field]
+	const allValid = isValid('name') && isValid('email') && isValid('mobile')
+	// Show an error only once the user has typed into / left the field, never on an untouched empty one.
+	const shownError = (field: RegisterFieldName) =>
+		touched[field] && values[field].length > 0 ? errors[field] : undefined
 
-	const isTablet = width >= 768
-	const isLandscape = width > height
-
-	const contentMaxWidth = isTablet ? 520 : 420
-
-	const updateField = (field: keyof RegisterFormData, value: string) => {
-		onFormDataChange((prev) => ({
-			...prev,
-			[field]: value,
-		}))
-		if (fieldErrors[field]) {
-			setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
-		}
+	const updateField = (field: RegisterFieldName, value: string) => {
+		onFormDataChange((prev) => ({ ...prev, [field]: value }))
+		if (formError) setFormError('')
 	}
+	const touch = (field: RegisterFieldName) => setTouched((prev) => ({ ...prev, [field]: true }))
 
 	const handleRegister = async () => {
-		const name = formData.name.trim()
-		const email = formData.email.trim()
-		const mobile = formData.mobile
-
 		setFormError('')
-		setFieldErrors({})
 
 		if (!roleId) {
 			setFormError('Role ID missing')
 			return
 		}
 
-		const result = registrationSchema.safeParse({ name, email, mobile })
+		const result = registrationSchema.safeParse(values)
 		if (!result.success) {
-			setFieldErrors(getFieldErrors(registrationSchema, { name, email, mobile }) as RegisterFieldErrors)
+			setTouched({ name: true, email: true, mobile: true })
 			return
 		}
 
@@ -98,7 +83,7 @@ export default function RegisterForm({
 			const hasResponseData = typeof res === 'object' && res !== null && 'data' in res
 
 			if (res?.success || hasResponseData) {
-				onSubmit(mobile)
+				onSubmit(formData.mobile)
 			} else {
 				setFormError(res?.message || 'Registration failed')
 			}
@@ -113,137 +98,118 @@ export default function RegisterForm({
 		}
 	}
 
+	const handleBack = () => {
+		if (navigation.canGoBack()) navigation.goBack()
+		else navigation.replace(ROUTES.AUTH.ROLE_SELECTION)
+	}
+
 	return (
-		<ScrollView
-			keyboardShouldPersistTaps="handled"
-			contentContainerStyle={[
-				styles.container,
-				{
-					paddingHorizontal: isTablet ? 40 : 24,
-					justifyContent: isLandscape && !isTablet ? 'flex-start' : 'center',
-					paddingTop: isLandscape && !isTablet ? 64 : 24,
-				},
-			]}
-		>
-			<View style={[styles.content, { maxWidth: contentMaxWidth }]}>
-				<Text style={[styles.title, isTablet && styles.titleTablet]}>Register</Text>
+		<KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+			<AuthHeaderMint onBack={handleBack} step={1}>
+				<View style={styles.titleBlock}>
+					<Text style={styles.title}>Tell us about you</Text>
+					<View style={styles.roleRow}>
+						<Text style={styles.roleText}>Signing up as</Text>
+						<View style={styles.rolePill}>
+							<Text style={styles.rolePillText}>{roleDisplayName(roleId, roleLabel, specialty)}</Text>
+						</View>
+						<Pressable
+							onPress={() => navigation.navigate(ROUTES.AUTH.ROLE_SELECTION)}
+							accessibilityRole="link"
+						>
+							<Text style={styles.change}>Change</Text>
+						</Pressable>
+					</View>
+				</View>
+			</AuthHeaderMint>
 
-				{/* {roleLabel ? (
-	        <Text style={styles.roleText}>Role: {roleLabel}</Text>
-	      ) : null} */}
-
-				<AppInput
-					placeholder="Name"
+			<ScrollView
+				style={styles.flex}
+				contentContainerStyle={styles.main}
+				keyboardShouldPersistTaps="handled"
+				showsVerticalScrollIndicator={false}
+			>
+				<AuthField
+					label="Full name"
+					icon="person"
+					placeholder="As on your ID"
 					value={formData.name}
-					onChangeText={(value) => updateField('name', value)}
-					style={styles.input}
-					errorText={fieldErrors.name}
+					onChangeText={(v) => updateField('name', v)}
+					onBlur={() => touch('name')}
+					autoComplete="name"
+					autoCapitalize="words"
+					valid={isValid('name')}
+					error={shownError('name')}
 				/>
-
-				<AppInput
-					placeholder="Email"
+				<AuthField
+					label="Email"
+					icon="mail"
+					placeholder="you@example.com"
 					value={formData.email}
-					onChangeText={(value) => updateField('email', value)}
+					onChangeText={(v) => updateField('email', v)}
+					onBlur={() => touch('email')}
 					keyboardType="email-address"
+					autoComplete="email"
 					autoCapitalize="none"
-					style={styles.input}
-					errorText={fieldErrors.email}
+					valid={isValid('email')}
+					error={shownError('email')}
 				/>
-
-				<AppInput
-					placeholder="Mobile Number"
+				<AuthField
+					label="Mobile number"
+					icon="phone"
+					prefix="+91"
+					placeholder="10-digit number"
 					value={formData.mobile}
-					onChangeText={(t) => updateField('mobile', t.replace(/\D/g, '').slice(0, 10))}
+					onChangeText={(v) => updateField('mobile', v.replace(/\D/g, '').slice(0, 10))}
+					onBlur={() => touch('mobile')}
 					keyboardType="phone-pad"
+					inputMode="numeric"
+					autoComplete="tel-national"
 					maxLength={10}
 					autoFocus={autoFocusMobile}
-					style={styles.input}
-					errorText={fieldErrors.mobile}
+					valid={isValid('mobile')}
+					error={shownError('mobile')}
 				/>
 
-				<TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-					{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register</Text>}
-				</TouchableOpacity>
+				<InfoNote text="We'll text a 6-digit code to verify this number. You'll use it to log in, no password needed." />
 
-				<View style={styles.loginContainer}>
-					<Text style={styles.accountText}>Already have an account?</Text>
+				{formError ? (
+					<Text accessibilityRole="alert" style={styles.formError}>
+						{formError}
+					</Text>
+				) : null}
+			</ScrollView>
 
-					<Pressable onPress={() => navigation.replace(ROUTES.AUTH.LOGIN)}>
-						<Text style={styles.loginText}>Login</Text>
-					</Pressable>
-				</View>
-
-				{!!formError && <Text style={styles.error}>{formError}</Text>}
-			</View>
-		</ScrollView>
+			<AuthFooter>
+				<CtaButton label="Send code" onPress={handleRegister} disabled={!allValid} loading={loading} />
+				<TermsLine
+					onOpen={(tab) => navigation.navigate(ROUTES.AUTH.LEGAL, { tab })}
+					trailing={
+						<>
+							{' '}
+							Already have an account?{' '}
+							<Text style={styles.loginLink} onPress={() => navigation.replace(ROUTES.AUTH.LOGIN)}>
+								Log in
+							</Text>
+						</>
+					}
+				/>
+			</AuthFooter>
+		</KeyboardAvoidingView>
 	)
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flexGrow: 1,
-		alignItems: 'center',
-	},
-
-	content: {
-		width: '100%',
-	},
-
-	title: {
-		fontSize: 26,
-		fontWeight: '600',
-		marginBottom: 12,
-	},
-
-	titleTablet: {
-		fontSize: 30,
-	},
-
-	roleText: {
-		fontSize: 15,
-		color: '#0d9488',
-		marginBottom: 16,
-	},
-
-	input: {
-		marginTop: 12,
-	},
-
-	button: {
-		backgroundColor: '#0d9488',
-		padding: 14,
-		borderRadius: 8,
-		alignItems: 'center',
-		marginTop: 20,
-	},
-
-	buttonText: {
-		color: '#fff',
-		fontWeight: '600',
-		fontSize: 16,
-	},
-
-	loginContainer: {
-		flexDirection: 'row',
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginTop: 16,
-	},
-
-	accountText: {
-		fontSize: 15,
-		color: '#666',
-	},
-
-	loginText: {
-		fontSize: 15,
-		fontWeight: '600',
-		color: '#0d9488',
-		marginLeft: 4,
-	},
-
-	error: {
-		color: 'red',
-		marginTop: 12,
-	},
+	flex: { flex: 1 },
+	container: { flex: 1, backgroundColor: APP_COLORS.surface },
+	titleBlock: { gap: 6 },
+	title: { fontSize: 28, lineHeight: 34, fontWeight: '800', color: APP_COLORS.ink },
+	roleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+	roleText: { fontSize: 14, lineHeight: 20, color: '#3D5357' },
+	rolePill: { paddingVertical: 3, paddingHorizontal: 10, borderRadius: 999, backgroundColor: APP_COLORS.surface },
+	rolePillText: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: APP_COLORS.primary },
+	change: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: APP_COLORS.primary },
+	main: { padding: 24, paddingTop: 20, paddingBottom: 16, gap: 16 },
+	formError: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: APP_COLORS.danger },
+	loginLink: { fontWeight: '800', color: APP_COLORS.primary },
 })
