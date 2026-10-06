@@ -65,7 +65,6 @@ export default function FamilyMembersPage() {
 			{incomplete && (
 				<ProfileHubBanner
 					tone="warning"
-					icon="account-alert-outline"
 					title={`Complete ${incomplete.name.split(' ')[0]}'s details`}
 					subtitle="Added while booking · date of birth and health info missing"
 					onPress={() => open(memberId(incomplete))}

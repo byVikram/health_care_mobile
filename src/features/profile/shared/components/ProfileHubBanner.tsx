@@ -11,7 +11,8 @@ type IconName = keyof typeof MaterialCommunityIcons.glyphMap
 
 export type ProfileHubBannerProps = {
 	tone: 'warning' | 'info'
-	icon: IconName
+	/** Leading icon; omit for a text-only banner. */
+	icon?: IconName
 	title: string
 	subtitle: string
 	onPress?: () => void
@@ -29,7 +30,7 @@ export function ProfileHubBanner({ tone, icon, title, subtitle, onPress }: Profi
 			accessibilityRole={onPress ? 'button' : undefined}
 			accessibilityLabel={`${title}. ${subtitle}`}
 		>
-			<MaterialCommunityIcons name={icon} size={20} color={ink} />
+			{icon ? <MaterialCommunityIcons name={icon} size={20} color={ink} /> : null}
 			<View style={styles.text}>
 				<Text style={[styles.title, { color: ink }]}>{title}</Text>
 				<Text style={styles.subtitle}>{subtitle}</Text>

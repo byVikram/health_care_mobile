@@ -59,7 +59,7 @@ export interface HubBanner {
 	key: string
 	visible: (d: HubData) => boolean
 	tone: 'warning' | 'info'
-	icon: IconName
+	icon?: IconName
 	title: (d: HubData) => string
 	subtitle: string | ((d: HubData) => string)
 	route?: StackRoute
@@ -117,7 +117,6 @@ export const PROFILE_HUB_CONFIG: Record<HubRole, HubConfig> = {
 				key: 'incomplete-member',
 				visible: (d) => !!d.incompleteMember,
 				tone: 'warning',
-				icon: 'account-alert-outline',
 				title: (d) => `Complete ${d.incompleteMember?.name.split(' ')[0] ?? ''}'s details`,
 				subtitle: 'Added while booking · date of birth and health info missing',
 				route: ROUTES.STACK.PATIENT_FAMILY_MEMBER,
