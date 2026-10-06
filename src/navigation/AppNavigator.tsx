@@ -30,6 +30,7 @@ import PatientPayment from '../features/patient-payment/PatientPayment'
 import AppointmentConfirmedPage from '../features/patient-payment/AppointmentConfirmedPage'
 import ConsentForm from '../features/doctor/components/ConsentForm'
 import SearchPage from '../features/doctor/search/SearchPage'
+import LegalPage from '../features/auth/LegalPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 import AppointmentList from '../features/appointment/AppointmentList'
 import VisitSummaryPage from '../features/appointment/VisitSummaryPage'
@@ -263,6 +264,7 @@ function AuthenticatedNavigator() {
 					options={{ animation: 'none' }}
 				/>
 				<AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
+				<AppStack.Screen name={ROUTES.STACK.LEGAL} component={LegalPage} />
 				<AppStack.Screen
 					name={ROUTES.STACK.APPOINTMENTS}
 					component={AppointmentList}

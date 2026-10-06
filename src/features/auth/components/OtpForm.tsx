@@ -1,49 +1,45 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 // features/auth/components/OtpForm.tsx
-import React, { useRef, useState, useEffect } from 'react'
-import {
-	View,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	StyleSheet,
-	ActivityIndicator,
-	KeyboardAvoidingView,
-	Platform,
-	useWindowDimensions,
-	Alert,
-} from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import * as Device from 'expo-device'
 import { verifyOtp, sendOtp } from '../authService'
 import { useAuth, UserRole } from '../../../context/AuthContext'
 import { otpSchema, getFieldErrors } from '../../../validation/authSchemas'
-import * as Device from 'expo-device'
+import { APP_COLORS } from '../../../config/theme'
+import { AuthFooter, AuthHeaderMint, CtaButton, ICON_PATHS, OtpBoxes, OTP_LENGTH, PathIcon } from './AuthKit'
 
 interface Props {
 	contactNumber: string
 	onVerify: () => void
 	onEditContact?: () => void
 	onBack?: () => void
-	backLabel?: string
+	/** Verify button label, e.g. "Verify & log in". */
+	ctaLabel?: string
+	/** When set, the header shows "STEP n OF 2" (register flow). */
+	step?: number
 }
 
-const OTP_LENGTH = 6
-const TEAL = '#0d9488'
 const RESEND_COOLDOWN_SECONDS = 60
 
-export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack, backLabel = 'Back' }: Props) {
-	const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''))
+const formatTimer = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
+export default function OtpForm({
+	contactNumber,
+	onVerify,
+	onEditContact,
+	onBack,
+	ctaLabel = 'Verify & log in',
+	step,
+}: Props) {
+	const [otp, setOtp] = useState('')
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState('')
 	const [resendLoading, setResendLoading] = useState(false)
 	const [resendMessage, setResendMessage] = useState('')
-	const [resendCooldown, setResendCooldown] = useState(0)
-	const inputs = useRef<(TextInput | null)[]>([])
+	// The code was just sent when this screen opens, so resend starts on cooldown.
+	const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS)
 	const { setAuth } = useAuth()
-	const { width, height } = useWindowDimensions()
-	const isTablet = width >= 768
-	const isLandscape = width > height
-	const contentMaxWidth = isTablet ? 520 : 420
-	const otpBoxSize = isTablet ? 58 : isLandscape ? 48 : 46
 
 	useEffect(() => {
 		if (resendCooldown <= 0) return
@@ -51,27 +47,14 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 		return () => clearTimeout(timer)
 	}, [resendCooldown])
 
-	const handleChange = (val: string, idx: number) => {
-		const digit = val.replace(/\D/g, '').slice(-1)
-		const next = [...otp]
-		next[idx] = digit
-		setOtp(next)
+	const handleChange = (val: string) => {
+		setOtp(val)
 		setError('')
 		setResendMessage('')
-		if (digit && idx < OTP_LENGTH - 1) {
-			inputs.current[idx + 1]?.focus()
-		}
-	}
-
-	const handleKeyPress = (e: any, idx: number) => {
-		if (e.nativeEvent.key === 'Backspace' && !otp[idx] && idx > 0) {
-			inputs.current[idx - 1]?.focus()
-		}
 	}
 
 	const handleVerify = async () => {
-		const code = otp.join('')
-		const fieldErrors = getFieldErrors(otpSchema, { otp: code })
+		const fieldErrors = getFieldErrors(otpSchema, { otp })
 		if (fieldErrors.otp) {
 			setError(fieldErrors.otp)
 			return
@@ -90,7 +73,7 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 			}
 			const response = await verifyOtp({
 				contact_number: contactNumber,
-				otp: code,
+				otp,
 				device_name: deviceName,
 				device_type: Platform.OS,
 				fcm_token: null,
@@ -101,10 +84,6 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 				throw new Error(response.message || 'OTP verification failed')
 			}
 			const normalizedRole = String(response.data.user?.role || '').toLowerCase()
-
-			// const role: UserRole =
-			// normalizedRole === 'doctor' ? 'doctor' : normalizedRole === 'pharmacy' ? 'pharmacy' : 'patient'
-
 			const role = normalizedRole as UserRole
 
 			await setAuth(
@@ -152,11 +131,9 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 				throw new Error(response.message || 'Failed to resend OTP')
 			}
 
-			setOtp(Array(OTP_LENGTH).fill(''))
-			inputs.current[0]?.focus()
-			setResendMessage('OTP resent successfully!')
+			setOtp('')
+			setResendMessage('Code sent again')
 			setResendCooldown(RESEND_COOLDOWN_SECONDS)
-			setTimeout(() => setResendMessage(''), 3000)
 		} catch (err: any) {
 			const errorMsg = err?.response?.data?.message || err?.message || 'Failed to resend OTP. Please try again.'
 			setError(errorMsg)
@@ -166,201 +143,180 @@ export default function OtpForm({ contactNumber, onVerify, onEditContact, onBack
 		}
 	}
 
+	const formatted = `${contactNumber.slice(0, 5)} ${contactNumber.slice(5)}`.trim()
+
 	return (
-		<KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-			<View
-				style={[
-					styles.container,
-					{
-						paddingHorizontal: isTablet ? 40 : 28,
-						justifyContent: isLandscape && !isTablet ? 'flex-start' : 'center',
-						paddingTop: isLandscape && !isTablet ? 64 : 28,
-					},
-				]}
-			>
-				<View style={[styles.content, { maxWidth: contentMaxWidth }]}>
-					<Text style={[styles.title, isTablet && styles.titleTablet]}>Verify OTP</Text>
-
-					<Text style={styles.subtitle}>
-						Enter the 6-digit code sent to{'\n'}
-						<Text style={styles.phone}>+91 {contactNumber}</Text>
-						{onEditContact ? (
-							<>
-								<Text> </Text>
-								<Text style={styles.editText} onPress={onEditContact}>
-									Edit
-								</Text>
-							</>
-						) : null}
-					</Text>
-
-					<View style={styles.otpRow}>
-						{otp.map((digit, idx) => (
-							<TextInput
-								key={idx}
-								ref={(el) => {
-									inputs.current[idx] = el
-								}}
-								style={[
-									styles.otpBox,
-									{ width: otpBoxSize, height: isTablet ? 62 : 54, fontSize: isTablet ? 24 : 22 },
-									digit ? styles.otpBoxFilled : null,
-									!!error ? styles.otpBoxError : null,
-								]}
-								value={digit}
-								onChangeText={(val) => handleChange(val, idx)}
-								onKeyPress={(e) => handleKeyPress(e, idx)}
-								keyboardType="number-pad"
-								maxLength={1}
-								textAlign="center"
-								selectionColor={TEAL}
-							/>
-						))}
+		<KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+			<AuthHeaderMint onBack={onBack} backLabel="Back" step={step}>
+				<View style={styles.art} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+					<View style={styles.artCircle}>
+						<PathIcon d={ICON_PATHS.phone} size={38} color={APP_COLORS.primary} strokeWidth={1.8} />
 					</View>
-
-					{!!error && <Text style={styles.errorText}>{error}</Text>}
-					{!!resendMessage && <Text style={styles.successText}>{resendMessage}</Text>}
-
-					<TouchableOpacity
-						style={[styles.button, loading && styles.buttonDisabled]}
-						onPress={handleVerify}
-						disabled={loading}
-						activeOpacity={0.85}
-					>
-						{loading ? (
-							<ActivityIndicator color="#fff" />
-						) : (
-							<Text style={styles.buttonText}>Verify OTP</Text>
-						)}
-					</TouchableOpacity>
-
-					<Text style={styles.resendText}>
-						Didn't receive a code?{' '}
-						{resendCooldown > 0 ? (
-							<Text style={styles.resendCooldown}>Resend in {resendCooldown}s</Text>
-						) : (
-							<Text style={styles.tealUnderline} onPress={handleResend}>
-								{resendLoading ? 'Sending...' : 'Resend OTP'}
-							</Text>
-						)}
-					</Text>
-
-					{onBack ? (
-						<TouchableOpacity style={styles.backBtn} onPress={onBack}>
-							<Text style={styles.backText}>{`<- ${backLabel}`}</Text>
-						</TouchableOpacity>
-					) : null}
+					<View style={styles.artBubble}>
+						<Text style={styles.artBubbleText}>••••••</Text>
+					</View>
 				</View>
-			</View>
+
+				<View style={styles.titleBlock}>
+					<Text style={styles.title}>Enter the code</Text>
+					<View style={styles.sentRow}>
+						<Text style={styles.sentText}>Sent by SMS to</Text>
+						<View style={styles.phoneChip}>
+							<Text style={styles.phoneChipText}>{`+91 ${formatted}`}</Text>
+							{onEditContact ? (
+								<Pressable
+									onPress={onEditContact}
+									accessibilityRole="button"
+									accessibilityLabel="Edit number"
+									hitSlop={8}
+									style={styles.editBtn}
+								>
+									<PathIcon
+										d={ICON_PATHS.edit}
+										size={14}
+										color={APP_COLORS.primary}
+										strokeWidth={2.2}
+									/>
+								</Pressable>
+							) : null}
+						</View>
+					</View>
+				</View>
+			</AuthHeaderMint>
+
+			<ScrollView
+				style={styles.flex}
+				contentContainerStyle={styles.main}
+				keyboardShouldPersistTaps="handled"
+				showsVerticalScrollIndicator={false}
+			>
+				<OtpBoxes value={otp} onChange={handleChange} error={!!error} autoFocus />
+
+				{error ? (
+					<Text accessibilityRole="alert" style={styles.errorText}>
+						{error}
+					</Text>
+				) : (
+					<Text style={styles.hint}>
+						{resendMessage || "We'll fill it in automatically when the SMS arrives"}
+					</Text>
+				)}
+
+				<View style={styles.resendBlock}>
+					{resendCooldown > 0 ? (
+						<View style={styles.timerPill}>
+							<PathIcon d={ICON_PATHS.clock} size={15} color={APP_COLORS.inkMuted} strokeWidth={2.2} />
+							<Text style={styles.timerText}>
+								Resend code in <Text style={styles.timerStrong}>{formatTimer(resendCooldown)}</Text>
+							</Text>
+						</View>
+					) : (
+						<View style={styles.resendRow}>
+							<Text style={styles.resendLabel}>Didn't get it?</Text>
+							<Pressable
+								onPress={handleResend}
+								disabled={resendLoading}
+								accessibilityRole="button"
+								style={styles.resendBtn}
+							>
+								<Text style={styles.resendBtnText}>{resendLoading ? 'Sending...' : 'Resend SMS'}</Text>
+							</Pressable>
+						</View>
+					)}
+				</View>
+			</ScrollView>
+
+			<AuthFooter divider={false}>
+				<CtaButton
+					label={ctaLabel}
+					onPress={handleVerify}
+					disabled={otp.length < OTP_LENGTH}
+					loading={loading}
+				/>
+			</AuthFooter>
 		</KeyboardAvoidingView>
 	)
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: '#fff',
+	flex: { flex: 1, backgroundColor: APP_COLORS.surface },
+	art: { height: 96, alignItems: 'center', justifyContent: 'center' },
+	artCircle: {
+		width: 84,
+		height: 84,
+		borderRadius: 42,
+		backgroundColor: APP_COLORS.surface,
 		alignItems: 'center',
-	},
-	content: {
-		width: '100%',
-	},
-	title: {
-		fontSize: 28,
-		fontWeight: '600',
-		color: '#111',
-		marginBottom: 10,
-	},
-	titleTablet: {
-		fontSize: 32,
-	},
-	subtitle: {
-		color: '#666',
-		fontSize: 15,
-		marginBottom: 32,
-		lineHeight: 24,
-	},
-	phone: {
-		color: '#111',
-		fontWeight: '600',
-	},
-	editText: {
-		color: TEAL,
-		fontWeight: '700',
-		textDecorationLine: 'underline',
-	},
-	otpRow: {
-		flexDirection: 'row',
 		justifyContent: 'center',
-		gap: 10,
-		marginBottom: 16,
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.1,
+		shadowRadius: 20,
+		elevation: 4,
 	},
-	otpBox: {
-		width: 46,
-		height: 54,
+	artBubble: {
+		position: 'absolute',
+		left: '50%',
+		marginLeft: 26,
+		top: 6,
+		paddingVertical: 6,
+		paddingHorizontal: 10,
+		borderTopLeftRadius: 12,
+		borderTopRightRadius: 12,
+		borderBottomRightRadius: 12,
+		borderBottomLeftRadius: 4,
+		backgroundColor: APP_COLORS.primary,
+	},
+	artBubbleText: { fontSize: 14, fontWeight: '800', letterSpacing: 2.8, color: APP_COLORS.surface },
+	titleBlock: { gap: 6 },
+	title: { fontSize: 28, lineHeight: 34, fontWeight: '800', color: APP_COLORS.ink },
+	sentRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+	sentText: { fontSize: 15, lineHeight: 22, color: '#3D5357' },
+	phoneChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		paddingVertical: 2,
+		paddingLeft: 10,
+		paddingRight: 4,
+		borderRadius: 999,
+		backgroundColor: APP_COLORS.surface,
+	},
+	phoneChipText: { fontSize: 15, fontWeight: '800', color: APP_COLORS.ink },
+	editBtn: {
+		width: 26,
+		height: 26,
+		borderRadius: 13,
+		backgroundColor: APP_COLORS.mint,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	main: { padding: 24, paddingTop: 28, paddingBottom: 16, gap: 16 },
+	hint: { textAlign: 'center', fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
+	errorText: { textAlign: 'center', fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.danger },
+	resendBlock: { alignItems: 'center' },
+	timerPill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		borderRadius: 999,
+		backgroundColor: APP_COLORS.pageBg,
+	},
+	timerText: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
+	timerStrong: { fontWeight: '700', color: APP_COLORS.ink },
+	resendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+	resendLabel: { fontSize: 14, color: APP_COLORS.inkMuted },
+	resendBtn: {
+		height: 36,
+		paddingHorizontal: 12,
 		borderWidth: 1.5,
-		borderColor: '#d1d5db',
-		borderRadius: 8,
-		fontSize: 22,
-		fontWeight: '600',
-		color: '#111',
-		backgroundColor: '#f9fafb',
-	},
-	otpBoxFilled: {
-		borderColor: TEAL,
-		backgroundColor: '#f0fdfa',
-	},
-	otpBoxError: {
-		borderColor: '#dc2626',
-	},
-	errorText: {
-		color: '#dc2626',
-		fontSize: 13,
-		marginBottom: 12,
-		textAlign: 'center',
-	},
-	successText: {
-		color: TEAL,
-		fontSize: 13,
-		marginBottom: 12,
-		textAlign: 'center',
-	},
-	button: {
-		backgroundColor: TEAL,
-		paddingVertical: 14,
-		borderRadius: 8,
+		borderColor: APP_COLORS.primary,
+		borderRadius: 999,
+		backgroundColor: APP_COLORS.surface,
 		alignItems: 'center',
-		marginTop: 8,
+		justifyContent: 'center',
 	},
-	buttonDisabled: {
-		opacity: 0.7,
-	},
-	buttonText: {
-		color: '#fff',
-		fontWeight: '600',
-		fontSize: 16,
-	},
-	resendText: {
-		color: '#666',
-		fontSize: 14,
-		textAlign: 'center',
-		marginTop: 20,
-	},
-	tealUnderline: {
-		color: TEAL,
-		fontWeight: '600',
-		textDecorationLine: 'underline',
-	},
-	resendCooldown: {
-		color: '#999',
-		fontWeight: '500',
-	},
-	backBtn: {
-		marginTop: 16,
-		alignItems: 'center',
-	},
-	backText: {
-		color: '#666',
-		fontSize: 14,
-	},
+	resendBtnText: { fontSize: 13, fontWeight: '800', color: APP_COLORS.primary },
 })

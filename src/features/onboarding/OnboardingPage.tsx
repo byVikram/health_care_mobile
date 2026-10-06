@@ -1,140 +1,52 @@
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
-import {
-	FlatList,
-	NativeScrollEvent,
-	NativeSyntheticEvent,
-	Pressable,
-	StatusBar,
-	StyleSheet,
-	Text,
-	TextStyle,
-	useWindowDimensions,
-	View,
-} from 'react-native'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Animated, Easing, Pressable, StatusBar, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { Ionicons } from '@expo/vector-icons'
 import type { RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAuth } from '../../context/AuthContext'
 import type { AppNavigationParamList, AuthStackParamList } from '../../navigation/types'
 import { ROUTES } from '../../navigation/routes'
-
-import { onboardingData } from '../../constants/onboardingData'
-import type { UserRole } from '../../constants/constants'
+import { APP_COLORS } from '../../config/theme'
+import { ICON_PATHS, PathIcon } from '../auth/components/AuthKit'
+import { roleVariant } from '../auth/roleDisplay'
+import { INTRO_EYEBROW, INTRO_SLIDES } from './introSlides'
 
 type OnboardingPageProps = {
 	navigation: NativeStackNavigationProp<AppNavigationParamList, typeof ROUTES.AUTH.ONBOARDING>
 	route: RouteProp<AuthStackParamList, typeof ROUTES.AUTH.ONBOARDING>
 }
 
-type Slide = {
-	key: string
-	description: string
-	Illustration: React.ComponentType<{
-		width?: number | string
-		height?: number | string
-	}>
-}
-
-type SpecialtyKey = 'nursing-care' | 'physiotherapy' | 'rehab-care' | 'home-care'
+const AUTO_ADVANCE_MS = 5000
 
 export default function OnboardingPage({ navigation, route }: OnboardingPageProps) {
 	const { accessToken } = useAuth()
-	const { width, height } = useWindowDimensions()
+	const { height } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
-	const isTablet = width >= 768
-	const isLandscape = width > height
-	const backButtonOffset = insets.top + (isTablet ? 44 : isLandscape ? 24 : 22)
-
-	const flatListRef = useRef<FlatList<Slide>>(null)
-	const [activeIndex, setActiveIndex] = useState(0)
+	const [index, setIndex] = useState(0)
+	// 0 -> 1 over AUTO_ADVANCE_MS for the current slide; drives the fill of the active top bar.
+	const progress = useRef(new Animated.Value(0)).current
 
 	const { roleId, roleLabel, specialty } = route.params || {}
-
 	const resolvedRoleId = roleId?.toLowerCase() ?? ''
-	const resolvedRoleLabel = roleLabel ?? ''
+	const variant = roleVariant(roleId, roleLabel)
+	const slides = INTRO_SLIDES[variant]
+	const slide = slides[Math.min(index, slides.length - 1)]
+	const isLast = index === slides.length - 1
+	const heroHeight = Math.min(430, Math.max(300, height * 0.5))
 
-	// 🚨 Redirect if no role
+	// Redirect if no role
 	useEffect(() => {
 		if (!accessToken && !roleId) {
 			navigation.replace(ROUTES.AUTH.ROLE_SELECTION)
 		}
 	}, [accessToken, roleId, navigation])
 
-	const isAncillary =
-		resolvedRoleLabel.toLowerCase() === 'ancillary' || resolvedRoleId === 'ancillary'
-
-	const [activeSpecialty, setActiveSpecialty] = useState<SpecialtyKey>(
-		(specialty as SpecialtyKey) || 'nursing-care'
-	)
-
-	// Load persisted specialty if previously stored
-	useEffect(() => {
-		let active = true
-		if (isAncillary) {
-			if (specialty) {
-				setActiveSpecialty(specialty as SpecialtyKey)
-			} else {
-				const loadStoredSpecialty = async () => {
-					const stored = await AsyncStorage.getItem('user_specialty')
-					if (
-						active &&
-						stored &&
-						(stored === 'nursing-care' ||
-							stored === 'physiotherapy' ||
-							stored === 'rehab-care' ||
-							stored === 'home-care')
-					) {
-						setActiveSpecialty(stored as SpecialtyKey)
-					}
-				}
-				void loadStoredSpecialty()
-			}
-		}
-		return () => {
-			active = false
-		}
-	}, [isAncillary, specialty])
-
-	// ==========================================
-	// SLIDES CONSTRUCTION
-	// ==========================================
-	const slides: Slide[] = useMemo(() => {
-		if (!resolvedRoleId) return []
-
-		if (isAncillary) {
-			const specialtyScreens = onboardingData[activeSpecialty]?.screens || []
-			return specialtyScreens.map((screen, index) => ({
-				key: `ancillary-${activeSpecialty}-${index}`,
-				description: screen.description,
-				Illustration: screen.Illustration,
-			}))
-		}
-
-		const roleKey = resolvedRoleId as UserRole
-		const roleData = onboardingData[roleKey]
-
-		if (!roleData) return []
-
-		return roleData.screens.map((screen, index) => ({
-			key: `${roleKey}-${index}`,
-			description: screen.description,
-			Illustration: screen.Illustration,
-		}))
-	}, [resolvedRoleId, isAncillary, activeSpecialty])
-
-	// 🚨 Prevent crash if no slides
-	if (!slides.length) return null
-
-	const cardWidth = Math.max(width, 320)
-	const illustrationSize = Math.min(cardWidth * 0.62, 250)
-
 	const finishOnboarding = useCallback(async () => {
-		if (isAncillary) {
+		if (variant === 'provider' && specialty) {
 			try {
-				await AsyncStorage.setItem('user_specialty', activeSpecialty)
+				await AsyncStorage.setItem('user_specialty', specialty)
 			} catch (e) {
 				console.log('[OnboardingPage] Failed to save specialty:', e)
 			}
@@ -145,234 +57,290 @@ export default function OnboardingPage({ navigation, route }: OnboardingPageProp
 		} else {
 			navigation.replace(ROUTES.AUTH.REGISTER, {
 				roleId: resolvedRoleId,
-				roleLabel: resolvedRoleLabel,
-				...(isAncillary ? { specialty: activeSpecialty } : {}),
+				roleLabel: roleLabel ?? '',
+				...(variant === 'provider' && specialty ? { specialty } : {}),
 			})
 		}
-	}, [accessToken, navigation, resolvedRoleId, resolvedRoleLabel, isAncillary, activeSpecialty])
+	}, [accessToken, navigation, resolvedRoleId, roleLabel, variant, specialty])
 
-	const scrollToIndex = (index: number) => {
-		flatListRef.current?.scrollToIndex({
-			index,
-			animated: true,
+	// Restart the active bar's fill whenever the slide changes (auto or manual).
+	useEffect(() => {
+		progress.setValue(0)
+		const fill = Animated.timing(progress, {
+			toValue: 1,
+			duration: AUTO_ADVANCE_MS,
+			easing: Easing.linear,
+			useNativeDriver: false,
 		})
-		setActiveIndex(index)
-	}
+		fill.start()
+		return () => fill.stop()
+	}, [index, progress])
 
-	const handleNext = () => {
-		if (activeIndex === slides.length - 1) {
-			finishOnboarding()
-			return
-		}
+	// Slides 1 and 2 move on after AUTO_ADVANCE_MS; the last slide waits for the user to tap "Create my account".
+	// Manual taps change `index`, which restarts the timer for the new slide.
+	useEffect(() => {
+		if (isLast || (!accessToken && !roleId)) return
+		const timer = setTimeout(() => setIndex((i) => i + 1), AUTO_ADVANCE_MS)
+		return () => clearTimeout(timer)
+	}, [index, isLast, accessToken, roleId])
 
-		scrollToIndex(activeIndex + 1)
-	}
-
-	const handleSkip = () => {
-		finishOnboarding()
-	}
-
-	const handleBack = useCallback(() => {
-		if (activeIndex > 0) {
-			scrollToIndex(activeIndex - 1)
-		} else if (navigation.canGoBack()) {
+	const handleBack = () => {
+		if (navigation.canGoBack()) {
 			navigation.goBack()
 		} else {
 			navigation.replace(ROUTES.AUTH.ROLE_SELECTION)
 		}
-	}, [activeIndex, navigation])
-
-	const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-		const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth)
-
-		if (nextIndex !== activeIndex) {
-			setActiveIndex(nextIndex)
-		}
-	}
-
-	const renderItem = ({ item }: { item: Slide }) => {
-		const { Illustration } = item
-
-		return (
-			<View style={[styles.slide, { width: cardWidth }]}>
-				<View style={styles.illustrationArea}>
-					<Illustration width={illustrationSize} height={illustrationSize} />
-				</View>
-
-				<TextLabel text={item.description} style={styles.description} />
-			</View>
-		)
 	}
 
 	return (
-		<SafeAreaView style={styles.safeArea}>
-			<StatusBar barStyle="light-content" />
-			<Pressable
-				style={[
-					styles.backButton,
-					{ top: backButtonOffset },
-					isTablet && styles.backButtonTablet,
-				]}
-				onPress={handleBack}
-				accessibilityRole="button"
-				accessibilityLabel="Go back"
-				hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-			>
-				<Ionicons name="chevron-back" size={24} color="#ffffff" />
-			</Pressable>
+		<View style={styles.container}>
+			<StatusBar barStyle="dark-content" />
 
-			<View style={styles.container}>
-				<View style={styles.topBar}>
-					<Pressable
-						onPress={handleSkip}
-						style={[
-							styles.skipButton,
-							{
-								marginTop: Math.max(insets.top, 8) + 4,
-							},
-						]}
-					>
-						<View style={styles.skipWrapper}>
-							<TextLabel text="Skip" style={styles.skipText} />
-							<TextLabel text=">>" style={styles.skipArrow} />
+			<View style={[styles.hero, { height: heroHeight, backgroundColor: slide.tint }]}>
+				<View pointerEvents="none" style={styles.circleTop} />
+				<View pointerEvents="none" style={styles.circleBottom} />
+
+				{/* floating booking-style card */}
+				<View style={[styles.card, { top: heroHeight * 0.41 }]}>
+					<View style={styles.cardRow}>
+						<View style={[styles.cardIcon, { backgroundColor: slide.tint }]}>
+							<PathIcon d={slide.icon} size={24} color={slide.ink} />
 						</View>
-					</Pressable>
+						<View style={styles.cardText}>
+							<Text style={styles.cardTitle}>{slide.cardTitle}</Text>
+							<Text style={styles.cardSub}>{slide.cardSub}</Text>
+						</View>
+					</View>
+					<View style={styles.cardFoot}>
+						<View style={[styles.chip, { backgroundColor: slide.chipBg }]}>
+							<Text style={[styles.chipText, { color: slide.chipFg }]}>{slide.chip}</Text>
+						</View>
+						<View style={styles.action}>
+							<Text style={styles.actionText}>{slide.action}</Text>
+						</View>
+					</View>
 				</View>
 
-				<FlatList
-					ref={flatListRef}
-					data={slides}
-					renderItem={renderItem}
-					keyExtractor={(item) => item.key}
-					horizontal
-					pagingEnabled
-					showsHorizontalScrollIndicator={false}
-					bounces={false}
-					onMomentumScrollEnd={handleMomentumScrollEnd}
-					getItemLayout={(_, index) => ({
-						index,
-						length: cardWidth,
-						offset: cardWidth * index,
-					})}
-				/>
+				<View style={[styles.badge1, { top: heroHeight * 0.29 }]}>
+					<PathIcon d={slide.b1} size={24} color={slide.ink} />
+				</View>
+				<View style={[styles.badge2, { bottom: 44 }]}>
+					<PathIcon d={slide.b2} size={26} color={APP_COLORS.surface} strokeWidth={2.2} />
+				</View>
+			</View>
 
-				<View style={styles.footer}>
-					<View style={styles.pagination}>
-						{slides.map((slide, index) => (
-							<View
-								key={slide.key}
-								style={[styles.dot, index === activeIndex ? styles.dotActive : styles.dotInactive]}
+			{/* progress + back + skip, over the hero */}
+			<View style={[styles.top, { paddingTop: insets.top + 12 }]}>
+				<View accessibilityRole="tablist" style={styles.bars}>
+					{slides.map((_, i) => (
+						<Pressable
+							key={i}
+							onPress={() => setIndex(i)}
+							accessibilityRole="tab"
+							accessibilityLabel={`Slide ${i + 1} of ${slides.length}`}
+							accessibilityState={{ selected: i === index }}
+							hitSlop={{ top: 12, bottom: 12 }}
+							style={styles.bar}
+						>
+							<Animated.View
+								style={[
+									styles.barFill,
+									{
+										width:
+											i < index
+												? '100%'
+												: i === index
+													? progress.interpolate({
+															inputRange: [0, 1],
+															outputRange: ['0%', '100%'],
+														})
+													: '0%',
+									},
+								]}
 							/>
-						))}
-					</View>
-
-					<Pressable onPress={handleNext} style={styles.nextButton}>
-						<TextLabel
-							text={activeIndex === slides.length - 1 ? 'Get Started' : 'Next'}
-							style={styles.nextText}
-						/>
+						</Pressable>
+					))}
+				</View>
+				<View style={styles.topRow}>
+					<Pressable
+						onPress={handleBack}
+						accessibilityRole="button"
+						accessibilityLabel="Back"
+						style={styles.topBack}
+					>
+						<PathIcon d={ICON_PATHS.back} size={24} color={APP_COLORS.ink} />
+					</Pressable>
+					<Pressable onPress={finishOnboarding} accessibilityRole="button" style={styles.skip}>
+						<Text style={styles.skipText}>Skip</Text>
 					</Pressable>
 				</View>
 			</View>
-		</SafeAreaView>
+
+			<View accessibilityLiveRegion="polite" style={styles.main}>
+				<Text style={styles.eyebrow}>{`${INTRO_EYEBROW[variant]} · ${index + 1} OF ${slides.length}`}</Text>
+				<Text style={styles.title}>{slide.title}</Text>
+				<Text style={styles.body}>{slide.body}</Text>
+			</View>
+
+			<View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 16 }]}>
+				{index > 0 ? (
+					<Pressable onPress={() => setIndex(index - 1)} accessibilityRole="button" style={styles.backBtn}>
+						<Text style={styles.backBtnText}>Back</Text>
+					</Pressable>
+				) : null}
+				<Pressable
+					onPress={isLast ? finishOnboarding : () => setIndex(index + 1)}
+					accessibilityRole="button"
+					style={styles.nextBtn}
+				>
+					<Text style={styles.nextText}>
+						{!isLast ? 'Next' : accessToken ? 'Get started' : 'Create my account'}
+					</Text>
+				</Pressable>
+			</View>
+		</View>
 	)
 }
 
-function TextLabel({ text, style }: { text: string; style: TextStyle }) {
-	return <Text style={style}>{text}</Text>
-}
-
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: '#134149',
-	},
-	container: {
-		flex: 1,
-	},
-	topBar: {
-		alignItems: 'flex-end',
-		paddingHorizontal: 20,
-		paddingBottom: 6,
-	},
-	backButton: {
+	container: { flex: 1, backgroundColor: APP_COLORS.surface },
+	hero: { overflow: 'hidden', borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+	circleTop: {
 		position: 'absolute',
-		left: 14,
-		zIndex: 10,
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: 'rgba(255,255,255,0.10)',
+		right: -60,
+		top: -40,
+		width: 220,
+		height: 220,
+		borderRadius: 110,
+		backgroundColor: APP_COLORS.surface,
+		opacity: 0.35,
 	},
-	backButtonTablet: {
-		left: 24,
-		width: 42,
-		height: 42,
-		borderRadius: 21,
+	circleBottom: {
+		position: 'absolute',
+		left: -50,
+		bottom: -70,
+		width: 200,
+		height: 200,
+		borderRadius: 100,
+		backgroundColor: APP_COLORS.surface,
+		opacity: 0.3,
 	},
-	skipButton: {
-		paddingVertical: 6,
+	card: {
+		position: 'absolute',
+		left: 40,
+		right: 40,
+		padding: 16,
+		borderRadius: 20,
+		backgroundColor: APP_COLORS.surface,
+		gap: 12,
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 16 },
+		shadowOpacity: 0.15,
+		shadowRadius: 36,
+		elevation: 8,
 	},
-	skipWrapper: {
+	cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+	cardIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+	cardText: { flex: 1, minWidth: 0, gap: 2 },
+	cardTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
+	cardSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
+	cardFoot: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 4,
+		justifyContent: 'space-between',
+		gap: 8,
+		paddingTop: 10,
+		borderTopWidth: 1,
+		borderStyle: 'dashed',
+		borderTopColor: APP_COLORS.divider,
 	},
-	skipText: {
-		color: '#FFFFFF',
-		fontSize: 16,
-	},
-	skipArrow: {
-		color: '#FFFFFF',
-		fontSize: 16,
-	},
-	slide: {
-		justifyContent: 'center',
-		paddingHorizontal: 20,
-	},
-	illustrationArea: {
+	chip: { paddingVertical: 3, paddingHorizontal: 10, borderRadius: 999 },
+	chipText: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
+	action: {
+		height: 30,
+		paddingHorizontal: 12,
+		borderRadius: 8,
+		backgroundColor: APP_COLORS.primary,
 		alignItems: 'center',
-		marginBottom: 20,
-	},
-	description: {
-		color: '#ffffff90',
-		fontSize: 18,
-		textAlign: 'center',
-		marginBottom: 20,
-	},
-	footer: {
-		paddingHorizontal: 20,
-		paddingBottom: 28,
-	},
-	pagination: {
-		flexDirection: 'row',
 		justifyContent: 'center',
-		marginBottom: 30,
-		gap: 10,
 	},
-	dot: {
-		width: 18,
-		height: 6,
-		borderRadius: 999,
+	actionText: { fontSize: 12, fontWeight: '800', color: APP_COLORS.surface },
+	badge1: {
+		position: 'absolute',
+		left: 28,
+		width: 52,
+		height: 52,
+		borderRadius: 16,
+		backgroundColor: APP_COLORS.surface,
+		alignItems: 'center',
+		justifyContent: 'center',
+		transform: [{ rotate: '-8deg' }],
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.12,
+		shadowRadius: 20,
+		elevation: 5,
 	},
-	dotActive: {
-		backgroundColor: '#ffffff',
-	},
-	dotInactive: {
-		backgroundColor: '#6c9198',
-	},
-	nextButton: {
-		backgroundColor: '#ffffff',
-		borderRadius: 6,
+	badge2: {
+		position: 'absolute',
+		right: 30,
+		width: 56,
 		height: 56,
+		borderRadius: 28,
+		backgroundColor: APP_COLORS.primary,
+		alignItems: 'center',
+		justifyContent: 'center',
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.2,
+		shadowRadius: 20,
+		elevation: 5,
+	},
+	top: { position: 'absolute', left: 0, right: 0, top: 0, paddingHorizontal: 16, gap: 10 },
+	bars: { flexDirection: 'row', gap: 6 },
+	bar: { flex: 1, height: 4, borderRadius: 2, overflow: 'hidden', backgroundColor: '#FFFFFFB3' },
+	barFill: { height: '100%', borderRadius: 2, backgroundColor: APP_COLORS.primary },
+	topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+	topBack: {
+		width: 40,
+		height: 40,
+		marginLeft: -8,
+		borderRadius: 20,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	nextText: {
-		color: '#1f5d65',
-		fontSize: 18,
-		fontWeight: '500',
+	skip: {
+		height: 36,
+		paddingHorizontal: 14,
+		borderRadius: 999,
+		backgroundColor: '#FFFFFF99',
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
+	skipText: { fontSize: 14, fontWeight: '800', color: APP_COLORS.ink },
+	main: { flex: 1, paddingHorizontal: 28, paddingTop: 28, gap: 10 },
+	eyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 1, color: APP_COLORS.primary },
+	title: { fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.3, color: APP_COLORS.ink },
+	body: { fontSize: 16, lineHeight: 24, color: APP_COLORS.inkMuted },
+	footer: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, paddingHorizontal: 24 },
+	backBtn: {
+		height: 52,
+		paddingHorizontal: 18,
+		borderWidth: 1.5,
+		borderColor: APP_COLORS.divider,
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.surface,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	backBtnText: { fontSize: 15, fontWeight: '700', color: APP_COLORS.ink },
+	nextBtn: {
+		flex: 1,
+		height: 52,
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.primary,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	nextText: { fontSize: 16, fontWeight: '800', color: APP_COLORS.surface },
 })
