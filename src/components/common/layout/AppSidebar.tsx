@@ -21,22 +21,18 @@ import {
 	View,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useTheme } from 'react-native-paper'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Constants from 'expo-constants'
 import QRCode from 'react-native-qrcode-svg'
 import { useAuth } from '../../../context/AuthContext'
-import { AppButton } from '../buttons/AppButton'
 import { AppTextLink } from '../buttons/AppTextLink'
-import { AppModal } from './AppModal'
+import { LogoutConfirmModal } from '../feedback/LogoutConfirmModal'
 import { AppNavRow } from './AppNavRow'
-import { AppTypography } from '../display/AppTypography'
 import AppAvatar from '../display/AppAvatar'
 import { AppAvatarStack, type AppAvatarStackItem } from '../display/AppAvatarStack'
 import { AppIconTile } from '../display/AppIconTile'
 import { AppProgressBar } from '../display/AppProgressBar'
 import { APP_COLORS } from '../../../config/theme'
-import LogoutIcon from '../../../assets/icons/logout.svg'
 import { USER_ROLES } from '../../../constants/constants'
 
 export interface AppSidebarItem {
@@ -135,7 +131,6 @@ export default function AppSidebar({
 	const sidebarWidth = Math.min(MAX_SIDEBAR_WIDTH, windowWidth - 48)
 	const translateX = useRef(new Animated.Value(-sidebarWidth)).current
 	const backdropOpacity = useRef(new Animated.Value(0)).current
-	const theme = useTheme()
 	const { user, role, ancillarySpecialty } = useAuth()
 	const [mounted, setMounted] = useState(visible)
 	const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false)
@@ -434,54 +429,11 @@ export default function AppSidebar({
 				</View>
 			</Modal>
 
-			<AppModal
+			<LogoutConfirmModal
 				visible={logoutConfirmVisible}
-				onDismiss={() => setLogoutConfirmVisible(false)}
-				contentContainerStyle={styles.logoutModalContainer}
-			>
-				<View style={styles.logoutModalContent}>
-					<View style={styles.logoutIconCircle}>
-						<LogoutIcon width={27} height={27} />
-					</View>
-
-					<AppTypography variant="h3" align="center" style={styles.logoutModalTitle}>
-						Logout
-					</AppTypography>
-
-					<AppTypography
-						variant="body"
-						align="center"
-						numberOfLines={1}
-						adjustsFontSizeToFit
-						style={styles.logoutModalMessage}
-					>
-						Are you sure you want to logout?
-					</AppTypography>
-				</View>
-
-				<View style={styles.logoutModalActions}>
-					<AppButton
-						variant="outline"
-						style={[
-							styles.logoutModalButton,
-							styles.cancelLogoutButton,
-							{ borderColor: theme.colors.outline },
-						]}
-						textColor={theme.colors.onSurfaceVariant}
-						onPress={() => setLogoutConfirmVisible(false)}
-					>
-						Cancel
-					</AppButton>
-					<AppButton
-						style={styles.logoutModalButton}
-						buttonColor={theme.colors.error || APP_COLORS.danger}
-						textColor={APP_COLORS.surface}
-						onPress={handleConfirmLogout}
-					>
-						Logout
-					</AppButton>
-				</View>
-			</AppModal>
+				onCancel={() => setLogoutConfirmVisible(false)}
+				onConfirm={handleConfirmLogout}
+			/>
 		</>
 	)
 }
@@ -679,55 +631,5 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		lineHeight: 16,
 		color: APP_COLORS.inkMuted,
-	},
-	logoutModalContainer: {
-		width: '84%',
-		maxWidth: 340,
-		alignSelf: 'center',
-		borderRadius: 18,
-		padding: 0,
-		overflow: 'hidden',
-	},
-	logoutModalContent: {
-		alignItems: 'center',
-		paddingHorizontal: 20,
-		paddingTop: 20,
-		paddingBottom: 16,
-	},
-	logoutIconCircle: {
-		width: 62,
-		height: 62,
-		borderRadius: 31,
-		backgroundColor: APP_COLORS.dangerBg,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginBottom: 12,
-	},
-	logoutModalTitle: {
-		color: APP_COLORS.ink,
-		fontSize: 20,
-		lineHeight: 26,
-		fontWeight: '800',
-		marginBottom: 4,
-	},
-	logoutModalMessage: {
-		color: APP_COLORS.inkMuted,
-		fontSize: 14,
-		lineHeight: 20,
-		maxWidth: '100%',
-	},
-	logoutModalActions: {
-		flexDirection: 'row',
-		gap: 12,
-		padding: 14,
-		borderTopWidth: 1,
-		borderTopColor: APP_COLORS.divider,
-	},
-	logoutModalButton: {
-		flex: 1,
-		borderRadius: 10,
-	},
-	cancelLogoutButton: {
-		backgroundColor: APP_COLORS.surface,
 	},
 })

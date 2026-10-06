@@ -192,6 +192,7 @@ export default function FamilyMemberPage() {
 					{memberId && !draft.complete && (
 						<AppInfoBanner
 							tone="warning"
+							icon={null}
 							title={`Add ${firstName}'s date of birth and health details`}
 							subtitle="So doctors and labs have the full picture."
 							style={styles.banner}
