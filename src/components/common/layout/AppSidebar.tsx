@@ -12,6 +12,7 @@ import {
 	Image,
 	type ImageSourcePropType,
 	Modal,
+	PanResponder,
 	Pressable,
 	ScrollView,
 	StyleSheet,
@@ -99,6 +100,10 @@ interface AppSidebarProps {
 const MAX_SIDEBAR_WIDTH = 316
 const OPEN_MS = 240
 const CLOSE_MS = 200
+// Dragging the drawer left past this fraction of its width (or flicking faster than this) closes it.
+const DISMISS_DRAG_RATIO = 0.25
+const DISMISS_DRAG_VELOCITY = 0.5
+const DRAG_START_THRESHOLD = 8
 const FALLBACK_IMAGE = require('../../../assets/Banner/doctor.png')
 
 /** "1.4.2" -> "1.4" */
@@ -188,6 +193,44 @@ export default function AppSidebar({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [visible])
 
+	// Drag the drawer toward its edge to close it, like pulling a bottom sheet down. Captures clearly
+	// horizontal-left drags so it also works when the finger starts on the list or a row.
+	const onCloseRef = useRef(onClose)
+	onCloseRef.current = onClose
+	const sidebarWidthRef = useRef(sidebarWidth)
+	sidebarWidthRef.current = sidebarWidth
+
+	const resetPosition = () => {
+		Animated.parallel([
+			Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }),
+			Animated.timing(backdropOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+		]).start()
+	}
+
+	const isLeftDrag = (dx: number, dy: number) => dx < -DRAG_START_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.2
+
+	const panResponder = useRef(
+		PanResponder.create({
+			onStartShouldSetPanResponder: () => false,
+			onMoveShouldSetPanResponder: (_, g) => isLeftDrag(g.dx, g.dy),
+			onMoveShouldSetPanResponderCapture: (_, g) => isLeftDrag(g.dx, g.dy),
+			onPanResponderMove: (_, g) => {
+				const dx = Math.min(0, g.dx)
+				translateX.setValue(dx)
+				backdropOpacity.setValue(Math.max(0, 1 + dx / sidebarWidthRef.current))
+			},
+			onPanResponderRelease: (_, g) => {
+				if (g.dx < -sidebarWidthRef.current * DISMISS_DRAG_RATIO || g.vx < -DISMISS_DRAG_VELOCITY) {
+					onCloseRef.current() // the `visible` effect animates the rest of the way out
+				} else {
+					resetPosition()
+				}
+			},
+			onPanResponderTerminate: resetPosition,
+			onPanResponderTerminationRequest: () => false,
+		})
+	).current
+
 	const handleEditProfile = () => {
 		onClose()
 		onEditProfile?.()
@@ -233,6 +276,7 @@ export default function AppSidebar({
 
 					<Animated.View
 						style={[styles.sidebar, { width: sidebarWidth, transform: [{ translateX }] }]}
+						{...panResponder.panHandlers}
 						accessibilityViewIsModal
 						accessibilityLabel="Menu"
 					>
@@ -249,7 +293,16 @@ export default function AppSidebar({
 							</TouchableOpacity>
 						</View>
 
-						<ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+						<ScrollView
+							style={styles.scroll}
+							contentContainerStyle={styles.scrollContent}
+							showsVerticalScrollIndicator={false}
+							keyboardShouldPersistTaps="handled"
+							nestedScrollEnabled
+							bounces
+							alwaysBounceVertical
+							overScrollMode="always"
+						>
 							{/* Profile card: tapping anywhere opens the profile (the QR button keeps its own action). */}
 							<Pressable
 								style={styles.profileCard}
@@ -482,6 +535,10 @@ const styles = StyleSheet.create({
 	},
 	scroll: {
 		flex: 1,
+		minHeight: 0,
+	},
+	scrollContent: {
+		paddingBottom: 16,
 	},
 	profileCard: {
 		marginHorizontal: 12,
