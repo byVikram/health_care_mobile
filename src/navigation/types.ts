@@ -84,6 +84,8 @@ export type PatientPaymentParams = {
 export type DoctorBookSlotParams = {
 	doctor: DoctorDetailData
 	hospitalId?: string
+	/** The patient already picked this clinic (a "Practices at" card, next available, video) -- skip "Choose a clinic". */
+	hospitalSelected?: boolean
 	mode?: 'clinic' | 'video'
 	referralId?: string
 }
