@@ -2,7 +2,8 @@
 //
 // Doctor dashboard "Schedule" view, built to the "Doctor Dashboard" design: three categories --
 // Today, Requests, All.
-//   Today     — filter chips (Upcoming/Video/Done) over today's appointment rows.
+//   Today     — All / Upcoming / Done tabs + an All types / In-clinic / Video chip row over today's
+//               appointment rows, each with a round check-in toggle (see TodayPatients.tsx).
 //   Requests  — pending booking requests: accept / reject / reschedule / refer, via the shared
 //               AppointmentActionCard + AppointmentActionSheet (reusable as-is for a future
 //               Pharmacy/Laboratory "requests" surface).
@@ -23,6 +24,7 @@ import Toast from 'react-native-toast-message'
 import {
 	AppAppointmentRow,
 	AppBottomSheet,
+	AppConfirmSheet,
 	AppointmentActionCard,
 	AppointmentActionSheet,
 	AppSegmentedControl,
@@ -35,7 +37,8 @@ import { ROUTES } from '../../../navigation/routes'
 import { useTabBarClearance } from '../../../navigation/tabBar'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
 import { ScheduleCalendarSheet } from './ScheduleCalendarSheet'
-import { checkInAppointment, getAppointments, getStatusIdByLabel } from '../doctorService'
+import { TodayPatientRow, TodayTabs, TodayVisitChips, type TodayTab, type TodayVisit } from './TodayPatients'
+import { getAppointments, getStatusIdByLabel, setAppointmentCheckIn } from '../doctorService'
 import { updateAppointmentsStatus } from '../../../services/appointmentService'
 import { rescheduleAppointment } from '../doctorService'
 import { createReferral } from '../../referrals/referralService'
@@ -44,7 +47,6 @@ import type { Appointment } from '../../../types/appointment'
 import type { FavouriteDoctorListItem } from '../search/components/FavouriteDoctorList'
 
 type ScheduleTab = 'today' | 'req' | 'all'
-type TodayChip = 'all' | 'video' | 'done'
 type AllMode = 'up' | 'past'
 type PastRangeKey = 'yesterday' | 'last7' | 'last30' | 'last90' | 'custom'
 type PastStatusKey = 'completed' | 'no_show' | 'cancelled' | 'other'
@@ -198,7 +200,8 @@ export function DoctorScheduleScreen() {
 	// Today
 	const [todayList, setTodayList] = useState<Appointment[]>([])
 	const [todayLoading, setTodayLoading] = useState(true)
-	const [todayChip, setTodayChip] = useState<TodayChip>('all')
+	const [todayTab, setTodayTab] = useState<TodayTab>('upcoming')
+	const [todayVisit, setTodayVisit] = useState<TodayVisit>('any')
 
 	// Requests: pending only (uses variant='upcoming', so a request whose date has already gone by
 	// without being acted on ages out).
@@ -208,6 +211,8 @@ export function DoctorScheduleScreen() {
 	const [busyId, setBusyId] = useState<string | null>(null)
 	const [sheet, setSheet] = useState<{ mode: ActionSheetMode; appt: Appointment } | null>(null)
 	const [checkingInId, setCheckingInId] = useState<string | null>(null)
+	// The patient whose check-in the doctor is being asked to confirm undoing.
+	const [undoTarget, setUndoTarget] = useState<Appointment | null>(null)
 
 	// All
 	const [allMode, setAllMode] = useState<AllMode>('up')
@@ -316,10 +321,15 @@ export function DoctorScheduleScreen() {
 	}
 
 	// ── Today derived ──────────────────────────────────────────────────────
-	const todayNotDone = todayList.filter((a) => !isCompleted(a))
-	const todayVideo = todayNotDone.filter((a) => isVideoMode(a.appointment_mode))
-	const todayDone = todayList.filter(isCompleted)
-	const todayShown = todayChip === 'video' ? todayVideo : todayChip === 'done' ? todayDone : todayNotDone
+	// Counts follow the visit-type chip, like the design; "Upcoming" is everything not yet completed.
+	const todayByVisit = todayList.filter(
+		(a) => todayVisit === 'any' || (todayVisit === 'video' ? isVideoMode(a.appointment_mode) : !isVideoMode(a.appointment_mode)),
+	)
+	const todayUpcoming = todayByVisit.filter((a) => !isCompleted(a))
+	const todayDone = todayByVisit.filter(isCompleted)
+	const todayCounts = { every: todayByVisit.length, upcoming: todayUpcoming.length, done: todayDone.length }
+	// "All" lists the patients still to be seen first, then the finished ones (the list is already by time).
+	const todayShown = todayTab === 'upcoming' ? todayUpcoming : todayTab === 'done' ? todayDone : [...todayUpcoming, ...todayDone]
 
 	// Row token (source: the design's Today rows -- "Token 06" under the time for an in-clinic visit,
 	// "Video" for a video one). No real "token number" field exists on the backend, so this is a real,
@@ -375,20 +385,34 @@ export function DoctorScheduleScreen() {
 	// ── Requests / Upcoming action handlers ───────────────────────────────
 	const openAppointment = (apt: Appointment) => navigation.navigate(ROUTES.STACK.APPOINTMENT_DETAILS, { appointmentId: apt.id })
 
-	// Doctor-only: not_arrived -> checked_in (backend rejects the call for any other current
-	// status, and the endpoint itself is require_role("doctor") -- this screen only exists for
-	// doctors anyway, but the real restriction lives server-side, not in this button being hidden).
-	const handleCheckIn = async (apt: Appointment) => {
+	// Doctor-only: the Today toggle checks a patient in (not_arrived -> checked_in) or undoes a
+	// check-in made by mistake (checked_in -> not_arrived). Both go through the one check-in endpoint
+	// (payload `checked_in`) and are enforced server-side -- it is require_role("doctor") and rejects
+	// any other current status; this screen only exists for doctors anyway. The row flips straight
+	// away and rolls back if the call fails.
+	// Checking in is one tap; undoing one asks for confirmation first (see the sheet below).
+	const handleToggleCheckIn = (apt: Appointment) => {
 		if (checkingInId) return
+		if (effectiveStatusLabel(apt) === 'checked_in') setUndoTarget(apt)
+		else void runCheckInToggle(apt)
+	}
+
+	const runCheckInToggle = async (apt: Appointment) => {
+		const wasCheckedIn = effectiveStatusLabel(apt) === 'checked_in'
+		const patch = (changes: Partial<Appointment>) =>
+			setTodayList((prev) => prev.map((a) => (a.id === apt.id ? { ...a, ...changes } : a)))
 		setCheckingInId(apt.id)
+		patch({ status: wasCheckedIn ? 'not_arrived' : 'checked_in' })
 		try {
-			const res = await checkInAppointment(apt.id)
-			if (res.success) {
-				setTodayList((prev) => prev.map((a) => (a.id === apt.id ? { ...a, status: 'checked_in' } : a)))
-				Toast.show({ type: 'success', text1: res.message ?? 'Patient checked in' })
-			}
+			const res = await setAppointmentCheckIn(apt.id, !wasCheckedIn)
+			if (!res.success) throw new Error(res.message)
+			Toast.show({ type: 'success', text1: res.message ?? (wasCheckedIn ? 'Check-in undone' : 'Patient checked in') })
 		} catch {
-			Toast.show({ type: 'error', text1: 'Could not check in the patient. Please try again.' })
+			patch({ status: apt.status })
+			Toast.show({
+				type: 'error',
+				text1: wasCheckedIn ? 'Could not undo the check-in. Please try again.' : 'Could not check in the patient. Please try again.',
+			})
 		} finally {
 			setCheckingInId(null)
 		}
@@ -548,42 +572,27 @@ export function DoctorScheduleScreen() {
 			>
 				{tab === 'today' && (
 					<View style={{ gap: 10, paddingHorizontal: 16 }}>
-						<View style={{ flexDirection: 'row', gap: 8 }}>
-							{([
-								{ id: 'all' as TodayChip, label: `Upcoming · ${todayNotDone.length}` },
-								{ id: 'video' as TodayChip, label: `Video · ${todayVideo.length}` },
-								{ id: 'done' as TodayChip, label: `Done · ${todayDone.length}` },
-							]).map((c) => {
-								const on = c.id === todayChip
-								return (
-									<TouchableOpacity key={c.id} onPress={() => setTodayChip(c.id)} style={[styles.chip, on && styles.chipOn]}>
-										<Text style={[styles.chipText, on && styles.chipTextOn]}>{c.label}</Text>
-									</TouchableOpacity>
-								)
-							})}
-						</View>
+						<TodayTabs value={todayTab} counts={todayCounts} onChange={setTodayTab} />
+						<TodayVisitChips value={todayVisit} onChange={setTodayVisit} />
 						{todayLoading ? (
 							<ActivityIndicator style={{ marginTop: 24 }} color={APP_COLORS.primary} />
 						) : todayShown.length ? (
 							<AppSoftCard padding={0} radius={14}>
 								<View style={{ paddingHorizontal: 12 }}>
 									{todayShown.map((apt, i) => (
-										<AppAppointmentRow
+										<TodayPatientRow
 											key={apt.id}
 											time={formatTime12h(apt.start_time)}
-											token={todayTokenById.get(apt.id)}
+											token={todayTokenById.get(apt.id) ?? ''}
 											name={apt.patient?.name ?? 'Patient'}
-											mode={isVideoMode(apt.appointment_mode) ? 'Video' : 'In-clinic'}
+											video={isVideoMode(apt.appointment_mode)}
 											meta={[apt.patient?.age ? `${apt.patient.age} yrs` : null, apt.patient?.gender].filter(Boolean).join(' · ')}
-											status={humanizeStatus(effectiveStatusLabel(apt))}
-											statusTone={rowStatusTone(effectiveStatusLabel(apt))}
+											done={isCompleted(apt)}
+											checkedIn={effectiveStatusLabel(apt) === 'checked_in'}
+											busy={checkingInId === apt.id}
 											divider={i < todayShown.length - 1}
 											onPress={() => openAppointment(apt)}
-											action={
-												effectiveStatusLabel(apt) === 'not_arrived'
-													? { label: 'Check In', onPress: () => handleCheckIn(apt), loading: checkingInId === apt.id }
-													: undefined
-											}
+											onToggle={() => handleToggleCheckIn(apt)}
 										/>
 									))}
 								</View>
@@ -732,6 +741,21 @@ export function DoctorScheduleScreen() {
 				)}
 			</ScrollView>
 
+			<AppConfirmSheet
+				visible={!!undoTarget}
+				onClose={() => setUndoTarget(null)}
+				title={`Undo check-in for ${undoTarget?.patient?.name ?? 'this patient'}?`}
+				message="They'll go back to “Not arrived”. You can check them in again at any time."
+				confirmLabel="Undo check-in"
+				cancelLabel="Keep checked in"
+				tone="primary"
+				onConfirm={async () => {
+					const target = undoTarget
+					setUndoTarget(null)
+					if (target) await runCheckInToggle(target)
+				}}
+			/>
+
 			<ScheduleCalendarSheet
 				visible={upCalOpen}
 				onClose={() => setUpCalOpen(false)}
@@ -851,19 +875,6 @@ export default DoctorScheduleScreen
 
 const styles = StyleSheet.create({
 	screen: { flex: 1, backgroundColor: APP_COLORS.pageBg },
-	chip: {
-		height: 36,
-		paddingHorizontal: 14,
-		borderRadius: 9999,
-		borderWidth: 1,
-		borderColor: APP_COLORS.divider,
-		backgroundColor: APP_COLORS.surface,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	chipOn: { borderColor: APP_COLORS.ink, backgroundColor: APP_COLORS.ink },
-	chipText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.ink },
-	chipTextOn: { color: '#FFFFFF' },
 	emptyPlain: { fontSize: 14, lineHeight: 20, color: APP_COLORS.inkMuted },
 	emptyTitle: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
 	hintText: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.inkMuted },

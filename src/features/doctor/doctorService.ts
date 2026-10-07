@@ -213,9 +213,15 @@ export interface CheckInResponse {
 	data?: { appointment_id: string; status: string }
 }
 
-/** Doctor-only: not_arrived -> checked_in when the patient physically arrives (backend rejects any other current status). */
-export const checkInAppointment = async (appointmentId: string): Promise<CheckInResponse> => {
-	const res = await ApiService.post<CheckInResponse>(API_ENDPOINTS.APPOINTMENTS.CHECK_IN(appointmentId), {})
+/**
+ * Doctor-only check-in toggle: `checkedIn: true` moves not_arrived -> checked_in when the patient
+ * arrives, `false` reverts checked_in -> not_arrived (a check-in tapped by mistake). The backend
+ * rejects any other current status.
+ */
+export const setAppointmentCheckIn = async (appointmentId: string, checkedIn: boolean): Promise<CheckInResponse> => {
+	const res = await ApiService.post<CheckInResponse>(API_ENDPOINTS.APPOINTMENTS.CHECK_IN(appointmentId), {
+		checked_in: checkedIn,
+	})
 	return res.data
 }
 

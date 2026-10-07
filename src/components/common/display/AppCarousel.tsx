@@ -3,6 +3,11 @@
 // Horizontal paging carousel from the KarolaHealth designs (Home "Offers" banner): full-bleed
 // cards snapped one at a time, optional auto-play (design: every 4500ms) that pauses while the
 // user drags and resumes afterwards, and pill page dots (active 20px wide in primary).
+//
+// With `loop` (the default) and more than one slide the carousel is truly endless in both
+// directions: the slides are rendered as three back-to-back copies and the list always rests in the
+// middle copy -- after every swipe or auto-advance that lands in an outer copy it silently jumps (no
+// animation) to the same slide in the middle one, so 1 -> 2 -> 3 -> 1 -> 2 ... never hits an end.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -39,7 +44,7 @@ export interface AppCarouselProps<T> {
 	/** Advance automatically every `autoPlayInterval` ms. */
 	autoPlay?: boolean
 	autoPlayInterval?: number
-	/** Wrap from the last slide back to the first when auto-playing. */
+	/** Endless looping: swiping or auto-playing past the last slide continues with the first (and vice versa). */
 	loop?: boolean
 	/** Show the page dots (default true when there is more than one slide). */
 	dots?: boolean
@@ -69,10 +74,18 @@ export function AppCarousel<T>({
 	const [dragging, setDragging] = useState(false)
 	const listRef = useRef<FlatList<T>>(null)
 	const indexRef = useRef(0)
+	// Position in the rendered (virtual) list; equals `index` when not looping.
+	const vIndexRef = useRef(0)
+	const offsetRef = useRef(0)
+	const positionedRef = useRef(false)
+	const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 	const onIndexChangeRef = useRef(onIndexChange)
 	onIndexChangeRef.current = onIndexChange
 
 	const count = data.length
+	const loopOn = loop && count > 1
+	// Three copies when looping; the middle one (indexes count..2count-1) is "home".
+	const virtualData = useMemo(() => (loopOn ? ([...data, ...data, ...data] as T[]) : (data as T[])), [data, loopOn])
 	const slideWidth = itemWidth ?? windowWidth - 32
 	const interval = slideWidth + gap
 	const inset = Math.max(0, (containerWidth - slideWidth) / 2)
@@ -84,13 +97,66 @@ export function AppCarousel<T>({
 		onIndexChangeRef.current?.(next)
 	}, [])
 
+	const jumpTo = useCallback(
+		(virtual: number, animated: boolean) => {
+			vIndexRef.current = virtual
+			offsetRef.current = virtual * interval
+			listRef.current?.scrollToOffset({ offset: virtual * interval, animated })
+		},
+		[interval]
+	)
+
+	// If the list has come to rest in an outer copy, jump to the same slide in the middle copy.
+	const settle = useCallback(() => {
+		if (!loopOn) return
+		const raw = Math.max(0, Math.round(offsetRef.current / interval))
+		const real = ((raw % count) + count) % count
+		vIndexRef.current = raw
+		if (raw < count || raw >= 2 * count) jumpTo(count + real, false)
+		updateIndex(real)
+	}, [count, interval, jumpTo, loopOn, updateIndex])
+
+	const clearSettleTimer = () => {
+		if (settleTimer.current) clearTimeout(settleTimer.current)
+		settleTimer.current = null
+	}
+	useEffect(() => clearSettleTimer, [])
+
+	/** Go to real slide `next`; when looping, `virtual` may name a slide in any copy. */
 	const goTo = useCallback(
-		(next: number, animated = true) => {
+		(next: number, animated = true, virtual?: number) => {
+			if (loopOn) {
+				const target = virtual ?? count + next
+				vIndexRef.current = target
+				listRef.current?.scrollToOffset({ offset: target * interval, animated })
+				updateIndex(next)
+				if (animated) {
+					clearSettleTimer()
+					// An animated programmatic scroll doesn't always report its end -- settle on a timer too.
+					settleTimer.current = setTimeout(() => {
+						offsetRef.current = target * interval
+						settle()
+					}, 450)
+				}
+				return
+			}
 			listRef.current?.scrollToOffset({ offset: next * interval, animated })
+			vIndexRef.current = next
 			updateIndex(next)
 		},
-		[interval, updateIndex]
+		[count, interval, loopOn, settle, updateIndex]
 	)
+
+	// (Re)position on the middle copy whenever the layout of the endless list changes.
+	useEffect(() => {
+		positionedRef.current = false
+	}, [count, interval, loopOn])
+	const handleContentSizeChange = () => {
+		if (!loopOn || positionedRef.current) return
+		positionedRef.current = true
+		const real = Math.min(indexRef.current, count - 1)
+		jumpTo(count + real, false)
+	}
 
 	// Keep the index valid if the data shrinks.
 	useEffect(() => {
@@ -98,20 +164,34 @@ export function AppCarousel<T>({
 	}, [count, goTo])
 
 	// Auto-play: one timeout per slide, re-armed whenever the index changes; cleared while
-	// dragging and on unmount.
+	// dragging and on unmount. Looping always moves forward one slide, wrapping seamlessly.
 	useEffect(() => {
 		if (!autoPlay || dragging || count < 2) return
 		const timer = setTimeout(() => {
+			if (loopOn) {
+				const current = vIndexRef.current
+				goTo((((current + 1) % count) + count) % count, true, current + 1)
+				return
+			}
 			const next = index + 1
 			if (next < count) goTo(next)
-			else if (loop) goTo(0)
 		}, autoPlayInterval)
 		return () => clearTimeout(timer)
-	}, [autoPlay, autoPlayInterval, count, dragging, goTo, index, loop])
+	}, [autoPlay, autoPlayInterval, count, dragging, goTo, index, loopOn])
 
-	const indexFromEvent = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-		const raw = Math.round(e.nativeEvent.contentOffset.x / interval)
-		return Math.max(0, Math.min(count - 1, raw))
+	// `e` is the real scroll-end event; without it (the drag-end safety timer) the latest offset seen by
+	// onScroll is used.
+	const handleScrollEnd = (e?: NativeSyntheticEvent<NativeScrollEvent>) => {
+		clearSettleTimer()
+		if (e) offsetRef.current = e.nativeEvent.contentOffset.x
+		if (loopOn) {
+			settle()
+			return
+		}
+		const raw = Math.round(offsetRef.current / interval)
+		const clamped = Math.max(0, Math.min(count - 1, raw))
+		vIndexRef.current = clamped
+		updateIndex(clamped)
 	}
 
 	const handleLayout = (e: LayoutChangeEvent) => {
@@ -124,9 +204,10 @@ export function AppCarousel<T>({
 		return Gap
 	}, [gap])
 
-	const renderSlide = ({ item, index: i }: ListRenderItemInfo<T>) => (
-		<View style={{ width: slideWidth }}>{renderItem({ item, index: i, active: i === index })}</View>
-	)
+	const renderSlide = ({ item, index: vi }: ListRenderItemInfo<T>) => {
+		const i = loopOn ? vi % count : vi
+		return <View style={{ width: slideWidth }}>{renderItem({ item, index: i, active: i === index })}</View>
+	}
 
 	const showDots = dots && count > 1
 
@@ -134,9 +215,13 @@ export function AppCarousel<T>({
 		<View style={[styles.root, style]} accessibilityLabel={accessibilityLabel} onLayout={handleLayout}>
 			<FlatList
 				ref={listRef}
-				data={data as T[]}
+				data={virtualData}
 				renderItem={renderSlide}
-				keyExtractor={keyExtractor ?? ((_, i) => String(i))}
+				keyExtractor={(item, vi) => {
+					const i = loopOn ? vi % count : vi
+					const base = keyExtractor ? keyExtractor(item, i) : String(i)
+					return loopOn ? `${Math.floor(vi / count)}-${base}` : base
+				}}
 				horizontal
 				showsHorizontalScrollIndicator={false}
 				snapToInterval={interval}
@@ -146,12 +231,23 @@ export function AppCarousel<T>({
 				contentContainerStyle={{ paddingHorizontal: inset }}
 				ItemSeparatorComponent={Separator}
 				getItemLayout={(_, i) => ({ length: interval, offset: inset + i * interval, index: i })}
-				onScrollBeginDrag={() => setDragging(true)}
-				onScrollEndDrag={(e) => {
-					setDragging(false)
-					updateIndex(indexFromEvent(e))
+				scrollEventThrottle={16}
+				onScroll={(e) => {
+					offsetRef.current = e.nativeEvent.contentOffset.x
 				}}
-				onMomentumScrollEnd={(e) => updateIndex(indexFromEvent(e))}
+				onContentSizeChange={handleContentSizeChange}
+				onScrollBeginDrag={() => {
+					clearSettleTimer()
+					setDragging(true)
+				}}
+				onScrollEndDrag={() => {
+					setDragging(false)
+					// Momentum (the snap) follows and settles the loop; a drag that ends exactly on a slide
+					// may not produce one, so also settle later if nothing else has.
+					clearSettleTimer()
+					settleTimer.current = setTimeout(() => handleScrollEnd(), 800)
+				}}
+				onMomentumScrollEnd={handleScrollEnd}
 				extraData={index}
 			/>
 			{showDots ? (
