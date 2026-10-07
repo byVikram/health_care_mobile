@@ -69,6 +69,8 @@ export type DoctorScreenHeaderProps =
 			children?: React.ReactNode
 			/** A single icon button (or any node) on the right of the title row. */
 			rightAccessory?: React.ReactNode
+			/** Adds the clinic switcher chip under the title/subtitle (same chip + "Your clinics" sheet as Home). */
+			showHospitalSelector?: boolean
 			style?: StyleProp<ViewStyle>
 	  }
 
@@ -162,7 +164,7 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 		)
 	}
 
-	const { title, subtitle, onBack, children, rightAccessory, style } = props
+	const { title, subtitle, onBack, children, rightAccessory, showHospitalSelector = false, style } = props
 	return (
 		<View style={[styles.header, styles.headerSimple, { paddingTop: insets.top + 16 }, style]}>
 			<Blobs />
@@ -181,6 +183,7 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 							{subtitle}
 						</Text>
 					)}
+					{showHospitalSelector && <ClinicSwitcher />}
 				</View>
 				{rightAccessory}
 			</View>

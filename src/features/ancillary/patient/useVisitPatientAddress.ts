@@ -32,10 +32,10 @@ export const apiErrorMessage = (e: unknown) => {
 	return e instanceof Error ? e.message : ''
 }
 
-export function useVisitPatientAddress() {
+export function useVisitPatientAddress(initialPatientKey = 'self') {
 	// ---- Patient ----
 	const { members, addFromDraft } = useFamilyMembers()
-	const [patientKey, setPatientKey] = useState('self')
+	const [patientKey, setPatientKey] = useState(initialPatientKey)
 	const [familyOpen, setFamilyOpen] = useState(false)
 	const memberIndex = Math.max(
 		0,

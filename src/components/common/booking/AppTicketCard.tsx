@@ -15,6 +15,8 @@ import { AppDashedDivider } from '../display/AppDashedDivider'
 export type AppTicketHeader = {
 	/** Usually an AppAvatar. */
 	leading?: React.ReactNode
+	/** Small caps line above the title (e.g. "AMOUNT TO PAY" over a big amount). */
+	eyebrow?: string
 	title: string
 	subtitle?: string
 	/** Defaults to TONES.lilac.ink. */
@@ -45,6 +47,8 @@ export type AppTicketCardProps = {
 	forPatient?: { name: string; relation?: string; avatarUri?: string | null }
 	/** Rendered in a padded row at the bottom (e.g. Add to calendar / Directions buttons). */
 	actions?: React.ReactNode
+	/** Rendered below the fields in a padded block (e.g. a collapsible "2 tests in this order" row). */
+	footer?: React.ReactNode
 	/** Defaults to 'white'. */
 	tint?: 'mint' | 'white'
 	/** Adds CARD_SHADOW. Defaults to false. */
@@ -61,6 +65,7 @@ export function AppTicketCard({
 	fields,
 	forPatient,
 	actions,
+	footer,
 	tint = 'white',
 	elevated = false,
 	cutoutColor = APP_COLORS.pageBg,
@@ -78,6 +83,7 @@ export function AppTicketCard({
 				<View style={styles.topRow}>
 					{header.leading}
 					<View style={styles.flex}>
+						{!!header.eyebrow && <Text style={styles.eyebrow}>{header.eyebrow}</Text>}
 						<Text
 							style={[styles.title, header.titleSize != null && { fontSize: header.titleSize }]}
 							numberOfLines={1}
@@ -138,6 +144,8 @@ export function AppTicketCard({
 					)}
 				</View>
 
+				{footer ? <View style={styles.footerBlock}>{footer}</View> : null}
+
 				{actions ? <View style={styles.actionsRow}>{actions}</View> : null}
 			</View>
 		</View>
@@ -172,6 +180,19 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 		fontWeight: '600',
 		color: TONES.lilac.ink,
+	},
+	eyebrow: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+		letterSpacing: 0.48,
+		textTransform: 'uppercase',
+		color: APP_COLORS.primary,
+	},
+	footerBlock: {
+		paddingHorizontal: 16,
+		paddingBottom: 16,
+		gap: 8,
 	},
 	grid: {
 		flexDirection: 'row',

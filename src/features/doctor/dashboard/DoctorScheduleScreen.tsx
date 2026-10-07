@@ -191,8 +191,8 @@ export function DoctorScheduleScreen() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const clearance = useTabBarClearance()
-	const { selectedHospital, selectedHospitalId } = useAuth()
-	// Scope every list to the clinic chosen in the Home header's switcher (null = All clinics).
+	const { selectedHospitalId } = useAuth()
+	// Scope every list to the clinic chosen in the clinic switcher in the header (null = All clinics).
 	const clinicFilter = selectedHospitalId ? { hospital_id: selectedHospitalId } : {}
 
 	const [tab, setTab] = useState<ScheduleTab>((route.params?.segment as ScheduleTab) ?? 'today')
@@ -540,13 +540,11 @@ export function DoctorScheduleScreen() {
 
 
 	const reqLeft = reqList.filter((a) => !outcomes[a.id]).length
-	const now = new Date()
-	const headerSubtitle = `${DOW_SHORT[now.getDay()]} ${now.getDate()} ${MON_SHORT[now.getMonth()]}${selectedHospital ? ` · ${selectedHospital}` : ''}`
 	const yesterdayIso = isoPlusDays(todayIso(), -1)
 
 	return (
 		<View style={styles.screen}>
-			<DoctorScreenHeader variant="simple" title="Schedule" subtitle={headerSubtitle}>
+			<DoctorScreenHeader variant="simple" title="Schedule" showHospitalSelector>
 				<AppSegmentedControl
 					shape="rounded"
 					tabs

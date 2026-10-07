@@ -62,6 +62,9 @@ export default function BookSlotPage() {
 	const hospitals = doctor.hospitals || []
 	const primary = hospitals.find((h) => h.is_primary) || hospitals[0]
 
+	// A clinic picked on the doctor profile (or the only clinic there is) is final: don't ask again.
+	const clinicLocked = !!route.params.hospitalSelected || hospitals.length <= 1
+
 	const [mode, setMode] = useState<AppointmentModeKey>(route.params.mode || 'clinic')
 	const [selectedHospital, setSelectedHospital] = useState<string | null>(
 		route.params.hospitalId || primary?.hospital.id || null
@@ -291,7 +294,41 @@ export default function BookSlotPage() {
 					/>
 				</View>
 
-				{mode === 'clinic' ? (
+				{mode === 'clinic' && clinicLocked && hospitalEntry ? (
+					<AppSection title="Clinic" gap={12}>
+						<View style={[styles.clinicCard, styles.clinicCardOn]}>
+							<AppIconTile
+								icon="hospital-building"
+								size={44}
+								radius={12}
+								iconSize={22}
+								backgroundColor={APP_COLORS.primary}
+								iconColor="#fff"
+							/>
+							<View style={{ flex: 1, minWidth: 0 }}>
+								<AppTypography style={styles.clinicName}>{hospitalEntry.hospital.name}</AppTypography>
+								<AppTypography style={styles.muted13} numberOfLines={2}>
+									{(hospitalEntry.hospital.address || '') +
+										(hospitalEntry.hospital.distance ? ` · ${hospitalEntry.hospital.distance} km` : '')}
+								</AppTypography>
+							</View>
+							<AppIconButton
+								icon="navigation-variant-outline"
+								size={36}
+								iconSize={16}
+								accessibilityLabel={`Directions to ${hospitalEntry.hospital.name}`}
+								onPress={() =>
+									openDirections(
+										hospitalEntry.hospital.latitude,
+										hospitalEntry.hospital.longitude,
+										hospitalEntry.hospital.address,
+										hospitalEntry.hospital.name
+									)
+								}
+							/>
+						</View>
+					</AppSection>
+				) : mode === 'clinic' ? (
 					<AppSection title="Choose a clinic" gap={12}>
 						<View style={{ gap: 10 }} accessibilityRole="radiogroup">
 							{hospitals.map((h, n) => {

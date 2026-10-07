@@ -196,6 +196,7 @@ export default function DoctorDetailPage() {
 		navigation.navigate(ROUTES.STACK.DOCTOR_BOOK_SLOT, {
 			doctor,
 			hospitalId: hospitalId || primaryHospital?.hospital.id,
+			hospitalSelected: !!hospitalId,
 			mode,
 			referralId,
 		})
