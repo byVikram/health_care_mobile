@@ -1,277 +1,289 @@
 import React, { useEffect, useState } from 'react'
-import {
-	View,
-	Text,
-	StyleSheet,
-	Pressable,
-	StatusBar,
-	ActivityIndicator,
-	useWindowDimensions,
-	Image, // ✅ added
-} from 'react-native'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { getRoles } from '../auth/authService'
 import type { AuthScreenProps } from '../../navigation/types'
 import { ROUTES } from '../../navigation/routes'
-import { USER_ROLES } from '../../constants/constants'
+import { APP_COLORS, TONES } from '../../config/theme'
+import { AuthFooter, AuthHero, CtaButton, ICON_PATHS, PathIcon } from '../auth/components/AuthKit'
+import { PROVIDER_KINDS, roleVariant, type RoleVariant } from '../auth/roleDisplay'
 
 type Role = {
 	id: string
 	label: string
 }
 
+// The API returns these three; used as the fallback if the call fails.
 const DEFAULT_ROLES: Role[] = [
 	{ id: 'patient', label: 'Patient' },
 	{ id: 'doctor', label: 'Doctor' },
-	{ id: 'laboratory', label: 'Laboratory' },
-	{ id: 'radiology', label: 'Radiology' },
 	{ id: 'ancillary', label: 'Ancillary' },
 ]
+
+const ROLE_CARD: Record<
+	RoleVariant,
+	{ title: string; description: string; tone: { bg: string; ink: string }; icon: keyof typeof ICON_PATHS }
+> = {
+	patient: {
+		title: 'Patient',
+		description: 'Doctors, lab tests and care at home for you and family',
+		tone: TONES.mint,
+		icon: 'person',
+	},
+	doctor: {
+		title: 'Doctor',
+		description: 'Consult patients in your clinic or on video',
+		tone: TONES.sky,
+		icon: 'doctor',
+	},
+	provider: {
+		title: 'Healthcare provider',
+		description: 'Nurse, physio, care attendant or rehab · home visits',
+		tone: TONES.peach,
+		icon: 'home',
+	},
+}
 
 type RoleSelectionProps = AuthScreenProps<typeof ROUTES.AUTH.ROLE_SELECTION>
 
 export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) {
 	const [roles, setRoles] = useState<Role[]>(DEFAULT_ROLES)
 	const [loading, setLoading] = useState(true)
-	const { width, height } = useWindowDimensions()
-	const insets = useSafeAreaInsets()
-	const isTablet = width >= 768
-	const isLandscape = width > height
-	const backButtonOffset = insets.top + (isTablet ? 44 : isLandscape ? 24 : 22)
-	const horizontalPadding = isTablet ? 40 : 20
-	const contentMaxWidth = isTablet ? 560 : 420
-	const cardHeight = isTablet ? 88 : 78
-	const iconSize = isTablet ? 58 : 52
-	const imageSize = isTablet ? 54 : 48
+	const [selectedId, setSelectedId] = useState<string | null>(null)
+	const [kind, setKind] = useState<string | null>(null)
 
 	useEffect(() => {
+		const fetchRoles = async () => {
+			try {
+				const res = await getRoles()
+				if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+					setRoles(res.data)
+				}
+			} catch (error) {
+				console.error('Error fetching roles:', error)
+				setRoles(DEFAULT_ROLES)
+			} finally {
+				setLoading(false)
+			}
+		}
 		fetchRoles()
 	}, [])
 
-	const fetchRoles = async () => {
-		try {
-			const res = await getRoles()
-			if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-				const fetchedRoles = [...res.data]
-				const hasAncillary = fetchedRoles.some(
-					(r) => r.label?.toLowerCase() === 'ancillary' || r.id?.toLowerCase() === 'ancillary'
-				)
-				if (!hasAncillary) {
-					fetchedRoles.push({ id: 'ancillary', label: 'Ancillary' })
-				}
-				setRoles(fetchedRoles)
+	const selected = roles.find((r) => r.id === selectedId)
+	const isProvider = !!selected && roleVariant(selected.id, selected.label) === 'provider'
+	const ready = !!selected && (!isProvider || !!kind)
+
+	const handleContinue = async () => {
+		if (!selected || !ready) return
+		if (isProvider && kind) {
+			try {
+				await AsyncStorage.setItem('user_specialty', kind)
+			} catch (e) {
+				console.log('[RoleSelectionScreen] Failed to save specialty:', e)
 			}
-		} catch (error) {
-			console.error('Error fetching roles:', error)
-			setRoles(DEFAULT_ROLES)
-		} finally {
-			setLoading(false)
 		}
-	}
-	const handleRoleSelect = (role: Role) => {
-		console.log('Selected role:', role)
-		const isAncillary = role.label?.toLowerCase() === 'ancillary' || role.id?.toLowerCase() === 'ancillary'
-
-		if (isAncillary) {
-			navigation.navigate(ROUTES.AUTH.SPECIALTY_SELECTION, {
-				roleLabel: role.label,
-				roleId: role.id,
-			})
-		} else {
-			navigation.navigate(ROUTES.AUTH.ONBOARDING, {
-				roleLabel: role.label,
-				roleId: role.id,
-			})
-		}
-	}
-	const handleClose = () => {
-		navigation.navigate(ROUTES.AUTH.LOGIN)
-	}
-
-	// ✅ Image mapping
-	const roleImages: Record<string, any> = {
-		ancillary: require('../../assets/splash/ancillary.png'),
-		laboratory: require('../../assets/splash/laboratory.png'),
-		pharmacy: require('../../assets/splash/pharmacy.png'),
-		radiology: require('../../assets/splash/radiology.png'),
+		navigation.navigate(ROUTES.AUTH.ONBOARDING, {
+			roleLabel: selected.label,
+			roleId: selected.id,
+			...(isProvider && kind ? { specialty: kind } : {}),
+		})
 	}
 
 	return (
-		<SafeAreaView style={styles.safeArea}>
-			<StatusBar barStyle="light-content" />
+		<View style={styles.container}>
+			<AuthHero
+				title="Create your account"
+				subtitle="First, tell us how you'll use Karolahealth."
+				height={220}
+				onBack={() => navigation.navigate(ROUTES.AUTH.LOGIN)}
+				backLabel="Go to login"
+			/>
 
-			<Pressable
-				style={[
-					styles.backButton,
-					{ top: backButtonOffset },
-					isTablet && styles.backButtonTablet,
-				]}
-				onPress={handleClose}
-				accessibilityRole="button"
-				accessibilityLabel="Go to login"
-				hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-			>
-				<Ionicons name="chevron-back" size={isTablet ? 28 : 24} color="#ffffff" />
-			</Pressable>
+			<ScrollView style={styles.flex} contentContainerStyle={styles.main} showsVerticalScrollIndicator={false}>
+				<Text style={styles.eyebrow}>I AM A</Text>
 
-			<View
-				style={[
-					styles.container,
-					{
-						paddingHorizontal: horizontalPadding,
-						justifyContent: isLandscape && !isTablet ? 'flex-start' : 'center',
-						paddingTop: isLandscape && !isTablet ? 32 : 0,
-					},
-				]}
-			>
-				<View style={[styles.content, { maxWidth: contentMaxWidth }]}>
-					<Text style={[styles.heading, isTablet && styles.headingTablet]}>Choose Your Role</Text>
-					<Text style={[styles.subheading, isTablet && styles.subheadingTablet]}>
-						Select how you want to continue
-					</Text>
-
-					{loading ? (
-						<ActivityIndicator size="large" color="#ffffff" />
-					) : (
-						<View style={styles.cardsWrapper}>
-							{roles.map((role) => (
+				{loading ? (
+					<ActivityIndicator size="large" color={APP_COLORS.primary} style={styles.loader} />
+				) : (
+					<View accessibilityRole="radiogroup" style={styles.cards}>
+						{roles.map((role) => {
+							const variant = roleVariant(role.id, role.label)
+							const card = ROLE_CARD[variant]
+							const on = role.id === selectedId
+							return (
 								<Pressable
 									key={role.id}
-									onPress={() => handleRoleSelect(role)}
-									style={[styles.card, { height: cardHeight }]}
+									onPress={() => {
+										setSelectedId(role.id)
+										if (variant !== 'provider') setKind(null)
+									}}
+									accessibilityRole="radio"
+									accessibilityState={{ checked: on }}
+									style={[
+										styles.card,
+										{
+											backgroundColor: card.tone.bg,
+											borderColor: on ? APP_COLORS.primary : 'transparent',
+										},
+										on && styles.cardOn,
+									]}
 								>
-									<View style={[styles.iconBox, { width: iconSize, height: iconSize }]}>
-										<Image
-											source={
-												roleImages[role.label.toLowerCase()] ||
-												require('../../assets/splash/ancillary.png')
-											}
-											style={[styles.roleImage, { width: imageSize, height: imageSize }]}
-											resizeMode="contain"
-										/>
+									<View pointerEvents="none" style={styles.cardCircle} />
+									<View style={styles.cardText}>
+										<Text style={styles.cardTitle}>{card.title}</Text>
+										<Text style={styles.cardDesc}>{card.description}</Text>
 									</View>
-
-									<View style={styles.textWrap}>
-										<Text style={[styles.title, isTablet && styles.titleTablet]}>{role.label}</Text>
+									<View style={styles.iconCircle}>
+										<PathIcon d={ICON_PATHS[card.icon]} size={30} color={card.tone.ink} />
 									</View>
-
-									<Ionicons
-										name="chevron-forward"
-										size={isTablet ? 24 : 20}
-										color="#134149"
-									/>
+									{on ? (
+										<View style={styles.selTick}>
+											<PathIcon
+												d={ICON_PATHS.check}
+												size={14}
+												color={APP_COLORS.surface}
+												strokeWidth={3}
+											/>
+										</View>
+									) : null}
 								</Pressable>
-							))}
+							)
+						})}
+					</View>
+				)}
+
+				{isProvider ? (
+					<View style={styles.kinds}>
+						<Text style={styles.kindsTitle}>What do you do?</Text>
+						<View accessibilityRole="radiogroup" style={styles.kindsRow}>
+							{PROVIDER_KINDS.map((k) => {
+								const on = kind === k.key
+								return (
+									<Pressable
+										key={k.key}
+										onPress={() => setKind(k.key)}
+										accessibilityRole="radio"
+										accessibilityState={{ checked: on }}
+										style={[
+											styles.chip,
+											{
+												backgroundColor: on ? APP_COLORS.primary : APP_COLORS.surface,
+												borderColor: on ? APP_COLORS.primary : APP_COLORS.border,
+											},
+										]}
+									>
+										<Text
+											style={[
+												styles.chipText,
+												{ color: on ? APP_COLORS.surface : APP_COLORS.ink },
+											]}
+										>
+											{k.label}
+										</Text>
+									</Pressable>
+								)
+							})}
 						</View>
-					)}
-				</View>
-			</View>
-		</SafeAreaView>
+					</View>
+				) : null}
+			</ScrollView>
+
+			<AuthFooter style={styles.footer}>
+				<CtaButton label="Continue" onPress={handleContinue} disabled={!ready} />
+				<Text style={styles.login}>
+					Already have an account?{' '}
+					<Text
+						style={styles.loginLink}
+						onPress={() => navigation.navigate(ROUTES.AUTH.LOGIN)}
+						accessibilityRole="link"
+					>
+						Log in
+					</Text>
+				</Text>
+			</AuthFooter>
+		</View>
 	)
 }
 
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: '#134149',
-	},
-
-	container: {
-		flex: 1,
-		alignItems: 'center',
-	},
-
-	content: {
-		width: '100%',
-	},
-
-	backButton: {
-		position: 'absolute',
-		left: 14,
-		zIndex: 10,
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: 'rgba(255,255,255,0.10)',
-	},
-
-	backButtonTablet: {
-		left: 24,
-		width: 42,
-		height: 42,
-		borderRadius: 21,
-	},
-
-	heading: {
-		fontSize: 28,
-		fontWeight: '700',
-		color: '#fff',
-		textAlign: 'left',
-		marginBottom: 8,
-	},
-
-	headingTablet: {
-		fontSize: 34,
-	},
-
-	subheading: {
-		fontSize: 15,
-		color: '#d7e7e8',
-		textAlign: 'left',
-		marginBottom: 30,
-	},
-
-	subheadingTablet: {
-		fontSize: 17,
-		marginBottom: 36,
-	},
-
-	cardsWrapper: {
-		gap: 16,
-	},
-
+	flex: { flex: 1 },
+	container: { flex: 1, backgroundColor: APP_COLORS.surface },
+	main: { padding: 16, paddingTop: 20, gap: 10 },
+	loader: { marginTop: 32 },
+	eyebrow: { fontSize: 13, lineHeight: 18, fontWeight: '800', letterSpacing: 0.5, color: APP_COLORS.inkMuted },
+	cards: { gap: 12 },
 	card: {
-		borderRadius: 16,
-		backgroundColor: '#ffffff',
-		paddingHorizontal: 16,
+		minHeight: 108,
+		overflow: 'hidden',
 		flexDirection: 'row',
 		alignItems: 'center',
-		shadowColor: '#000',
-		shadowOpacity: 0.12,
-		shadowRadius: 6,
-		shadowOffset: { width: 0, height: 2 },
+		paddingVertical: 18,
+		paddingLeft: 20,
+		paddingRight: 18,
+		borderRadius: 18,
+		borderWidth: 2,
+	},
+	cardOn: {
+		shadowColor: APP_COLORS.primary,
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.2,
+		shadowRadius: 16,
 		elevation: 4,
 	},
-
-	iconBox: {
-		width: 52,
-		height: 52,
-		borderRadius: 14,
-		backgroundColor: 'transparent',
+	cardCircle: {
+		position: 'absolute',
+		right: -28,
+		bottom: -36,
+		width: 140,
+		height: 140,
+		borderRadius: 70,
+		backgroundColor: APP_COLORS.surface,
+		opacity: 0.55,
+	},
+	cardText: { flex: 1, minWidth: 0, gap: 4, paddingRight: 84 },
+	cardTitle: { fontSize: 19, lineHeight: 24, fontWeight: '800', color: APP_COLORS.ink },
+	cardDesc: { fontSize: 13, lineHeight: 18, color: '#3D5357' },
+	iconCircle: {
+		position: 'absolute',
+		right: 18,
+		top: '50%',
+		marginTop: -32,
+		width: 64,
+		height: 64,
+		borderRadius: 32,
+		backgroundColor: APP_COLORS.surface,
+		alignItems: 'center',
+		justifyContent: 'center',
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 12,
+		elevation: 2,
+	},
+	selTick: {
+		position: 'absolute',
+		right: 12,
+		top: 12,
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.primary,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-
-	roleImage: {
-		maxWidth: '100%',
-		maxHeight: '100%',
+	kinds: { gap: 8, paddingHorizontal: 4, paddingTop: 6 },
+	kindsTitle: { fontSize: 13, lineHeight: 18, fontWeight: '800', color: APP_COLORS.ink },
+	kindsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+	chip: {
+		height: 40,
+		paddingHorizontal: 14,
+		borderRadius: 10,
+		borderWidth: 1.5,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
-
-	textWrap: {
-		flex: 1,
-		paddingLeft: 14,
-	},
-
-	title: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: '#1d1d1d',
-	},
-
-	titleTablet: {
-		fontSize: 20,
-	},
+	chipText: { fontSize: 14, fontWeight: '700' },
+	footer: { paddingHorizontal: 16, borderTopColor: APP_COLORS.divider },
+	login: { fontSize: 14, lineHeight: 20, color: APP_COLORS.inkMuted, textAlign: 'center' },
+	loginLink: { fontWeight: '800', color: APP_COLORS.primary },
 })

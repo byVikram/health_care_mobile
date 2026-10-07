@@ -1,11 +1,12 @@
-import React from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import React, { useEffect, useRef, useState } from 'react'
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { MainTabParamList } from './types'
+import type { HomeSheetKey } from '../features/dashboard/HomeSheetsContext'
 import { ROUTES } from './routes'
 import { AppPathIcon, AppScreenHeader } from '../components/common'
 import { APP_COLORS } from '../config/theme'
@@ -182,8 +183,10 @@ function DockedTabBar({ state, descriptors, navigation, onAncillaryPress }: Dock
 
 interface FloatingTab {
 	key: string
-	/** Tab route to navigate to; null = opens the "Healthcare at home" sheet instead. */
+	/** Tab route to navigate to; null = opens `sheet` instead. */
 	route: string | null
+	/** Home sheet this tab opens when it has no route. */
+	sheet?: HomeSheetKey
 	label: string
 	/** Shorter text for the labelled bar when `label` is too long to fit under the icon. */
 	shortLabel?: string
@@ -193,8 +196,8 @@ interface FloatingTab {
 const PATIENT_TABS: FloatingTab[] = [
 	{ key: 'home', route: ROUTES.MAIN.HOME, label: 'Home', icon: 'home' },
 	{ key: 'search', route: ROUTES.MAIN.SEARCH, label: 'Search', icon: 'search' },
-	{ key: 'care', route: null, label: 'Healthcare at home', shortLabel: 'Home care', icon: 'careAtHome' },
 	{ key: 'bookings', route: ROUTES.MAIN.PORTAL, label: 'Bookings', icon: 'bookings' },
+	{ key: 'more', route: null, sheet: 'more', label: 'More', icon: 'grid' },
 ]
 
 /** Ancillary provider tabs: Today · Schedule · Earnings · Profile (labelled bar, same as the doctor's). */
@@ -216,21 +219,23 @@ function resolveFloatingTab(
 	tab: FloatingTab,
 	state: BottomTabBarProps['state'],
 	navigation: BottomTabBarProps['navigation'],
-	careOpen: boolean,
-	openCare: () => void,
+	openSheet: HomeSheetKey | null,
+	openHomeSheet: (sheet: HomeSheetKey) => void,
 ) {
 	const activeName = state.routes[state.index]?.name
 	const route = tab.route ? state.routes.find((r) => r.name === tab.route) : undefined
-	const active = careOpen ? tab.route === null : tab.route === null ? activeName === ROUTES.MAIN.ANCILLARY : tab.route === activeName
+	// While a services sheet is open it owns the highlight; otherwise the current route does.
+	const sheetOpen = openSheet === 'more' || openSheet === 'ancillary'
+	const active = sheetOpen ? tab.sheet === openSheet : tab.route === activeName
 
 	const onPress = () => {
 		if (!route) {
-			openCare()
+			if (tab.sheet) openHomeSheet(tab.sheet)
 			return
 		}
 		const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
 		if (event.defaultPrevented) return
-		if (route.name !== activeName || careOpen) navigation.navigate(route.name, route.params)
+		if (route.name !== activeName || sheetOpen) navigation.navigate(route.name, route.params)
 	}
 
 	return { route, active, onPress }
@@ -243,6 +248,7 @@ function resolveFloatingTab(
 // doctor (3 tabs) 48 (~92px), ancillary provider (4 tabs) 48.
 const LABELLED_BAR_HEIGHT = 66
 const LABELLED_ITEM_HEIGHT = 52
+const PILL_SLIDE_MS = 280
 const PATIENT_LABELLED_SIDE = 20
 const DOCTOR_LABELLED_SIDE = 48
 const PROVIDER_LABELLED_SIDE = 48
@@ -257,11 +263,57 @@ function LabelledTabBar({
 	const { openSheet, open } = useHomeSheets()
 	const activeName = state.routes[state.index]?.name
 
+	// One highlight pill slides to the active tab (instead of each tab drawing its own fill). Tab slot
+	// geometry comes from onLayout so it follows whatever width the equal-width slots get.
+	const [slots, setSlots] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({})
+	const pillX = useRef(new Animated.Value(0)).current
+	const pillPlaced = useRef(false)
+	// Tapping a sheet tab (More) moves the pill first and opens the sheet once it has arrived; otherwise the
+	// sheet's backdrop would cover the bar before the slide could be seen.
+	const [pendingKey, setPendingKey] = useState<string | null>(null)
+	const sheetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+	useEffect(
+		() => () => {
+			if (sheetTimer.current) clearTimeout(sheetTimer.current)
+		},
+		[]
+	)
+	const activeKey =
+		pendingKey ??
+		tabs.find((tab) => {
+			const r = resolveFloatingTab(tab, state, navigation, openSheet, () => {})
+			return r.active && !(tab.route && !r.route)
+		})?.key
+	const activeSlot = activeKey ? slots[activeKey] : undefined
+	// Icon/label colours follow the pill, switching midway through the slide so they never sit white-on-white.
+	const [inkKey, setInkKey] = useState(activeKey)
+	useEffect(() => {
+		if (activeKey === inkKey) return
+		const t = setTimeout(() => setInkKey(activeKey), PILL_SLIDE_MS / 2)
+		return () => clearTimeout(t)
+	}, [activeKey, inkKey])
+
+	useEffect(() => {
+		if (!activeSlot) return
+		if (!pillPlaced.current) {
+			pillX.setValue(activeSlot.x)
+			pillPlaced.current = true
+			return
+		}
+		const slide = Animated.timing(pillX, {
+			toValue: activeSlot.x,
+			duration: PILL_SLIDE_MS,
+			easing: Easing.out(Easing.cubic),
+			useNativeDriver: true,
+		})
+		slide.start()
+		return () => slide.stop()
+	}, [activeSlot?.x, activeSlot?.width, pillX])
+
 	if (activeName === ROUTES.MAIN.PROFILE) {
 		return null
 	}
 
-	const careOpen = openSheet === 'ancillary'
 	const floating = FLOATING_TAB_ROUTES.includes(activeName)
 	const bottom = FLOATING_TAB_BAR_BOTTOM + insets.bottom
 
@@ -272,10 +324,36 @@ function LabelledTabBar({
 		>
 			<View style={[styles.labelledShadow, { bottom, left: side, right: side }]}>
 				<View style={styles.labelledBar}>
+					{activeSlot ? (
+						<Animated.View
+							pointerEvents="none"
+							style={[
+								styles.labelledActiveFill,
+								{
+									top: activeSlot.y,
+									width: activeSlot.width,
+									height: activeSlot.height,
+									transform: [{ translateX: pillX }],
+								},
+							]}
+						/>
+					) : null}
 					{tabs.map((tab) => {
-						const { route, active, onPress } = resolveFloatingTab(tab, state, navigation, careOpen, () => open('ancillary'))
+						const { route, active, onPress: resolvedPress } = resolveFloatingTab(tab, state, navigation, openSheet, open)
+						const onPress = tab.sheet
+							? () => {
+									if (pendingKey || sheetTimer.current) return
+									setPendingKey(tab.key)
+									sheetTimer.current = setTimeout(() => {
+										sheetTimer.current = null
+										open(tab.sheet as HomeSheetKey)
+										setPendingKey(null)
+									}, PILL_SLIDE_MS * 0.7)
+								}
+							: resolvedPress
 						if (tab.route && !route) return null
-						const color = active ? '#FFFFFF' : APP_COLORS.inkMuted
+						const inked = tab.key === inkKey
+						const color = inked ? '#FFFFFF' : APP_COLORS.inkMuted
 
 						return (
 							<Pressable
@@ -285,16 +363,22 @@ function LabelledTabBar({
 								accessibilityRole="button"
 								accessibilityLabel={tab.label}
 								accessibilityState={{ selected: active }}
-								accessibilityHint={route ? undefined : 'Opens home healthcare services'}
+								accessibilityHint={route ? undefined : `Opens ${tab.label.toLowerCase()} services`}
 								style={styles.labelledItem}
+								onLayout={(e) => {
+									const { x, y, width, height } = e.nativeEvent.layout
+									setSlots((prev) => {
+										const cur = prev[tab.key]
+										return cur && cur.x === x && cur.y === y && cur.width === width && cur.height === height
+											? prev
+											: { ...prev, [tab.key]: { x, y, width, height } }
+									})
+								}}
 							>
-								{/* The active highlight is its own fully opaque layer under the icon + label, so its colour
-								    is identical on every tab and can't be tinted by the glass or the content behind the bar. */}
-								{active && <View pointerEvents="none" style={styles.labelledActiveFill} />}
 								<View style={styles.labelledIcon}>
 									<AppPathIcon d={HOME_CHROME_PATHS[tab.icon]} size={24} strokeWidth={2.1} color={color} />
 								</View>
-								<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.labelledLabel, { color, fontWeight: active ? '800' : '600' }]}>
+								<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.labelledLabel, { color, fontWeight: inked ? '800' : '600' }]}>
 									{tab.shortLabel ?? tab.label}
 								</Text>
 							</Pressable>
@@ -443,7 +527,8 @@ const styles = StyleSheet.create({
 		gap: 3,
 	},
 	labelledActiveFill: {
-		...StyleSheet.absoluteFill,
+		position: 'absolute',
+		left: 0,
 		borderRadius: LABELLED_ITEM_HEIGHT / 2,
 		backgroundColor: APP_COLORS.primary,
 		opacity: 1,

@@ -5,6 +5,7 @@
 import React, { useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import {
 	AppConfirmSheet,
@@ -20,11 +21,13 @@ import { APP_COLORS } from '../../../config/theme'
 import { useAuth } from '../../../context/AuthContext'
 import { showComingSoon } from '../../../utils/toast'
 import { deleteMyAccount } from '../../auth/authService'
+import { ROUTES } from '../../../navigation/routes'
 import { hubRoleFor } from '../config/profileHubConfig'
 import { LANGUAGE_CHOICES, SETTINGS_CONFIG } from '../config/settingsConfig'
 import { ProfileScreen } from './components/ProfileScreen'
 
 export default function SettingsPage() {
+	const navigation = useNavigation()
 	const { role, clearAuth } = useAuth()
 	const config = SETTINGS_CONFIG[hubRoleFor(role) ?? 'patient']
 	const [toggles, setToggles] = useState<Record<string, boolean>>(() =>
@@ -132,7 +135,7 @@ export default function SettingsPage() {
 					subtitle="Read our policies"
 					leading="file-document-outline"
 					minHeight={60}
-					onPress={() => showComingSoon()}
+					onPress={() => navigation.navigate(ROUTES.STACK.LEGAL as never)}
 				/>
 			</View>
 
