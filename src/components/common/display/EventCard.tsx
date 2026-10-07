@@ -1,7 +1,8 @@
 import React from 'react'
 import { View, Image, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { AppTypography, AppButton } from '../index'
+import { AppTypography } from './AppTypography'
+import { AppButton } from '../buttons/AppButton'
 
 export interface EventItem {
 	id: string

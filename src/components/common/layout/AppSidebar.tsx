@@ -13,6 +13,7 @@ import {
 	type ImageSourcePropType,
 	Modal,
 	PanResponder,
+	Platform,
 	Pressable,
 	ScrollView,
 	StyleSheet,
@@ -307,7 +308,8 @@ export default function AppSidebar({
 							<Pressable
 								style={styles.profileCard}
 								onPress={handleEditProfile}
-								accessibilityRole="button"
+								// On web role="button" renders a <button>, and the card contains other buttons (QR, link).
+								accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
 								accessibilityLabel={`${userName}. View profile`}
 							>
 								<View style={styles.profileRow}>
