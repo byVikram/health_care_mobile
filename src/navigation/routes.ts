@@ -68,14 +68,14 @@ export const ROUTES = {
 		RADIOLOGY_SCAN_TYPES: 'Scantypeselectormodal',
 
 		LABORATORY_LIST: 'LaboratorySearchPage',
-		LABORATORY_ALL_TESTS: 'LaboratoryAllTestsPage',
-		LABORATORY_ALL_PACKAGES: 'LaboratoryAllPackagesPage',
 		LABORATORY_SAMPLE_COLLECTION: 'LaboratorySampleCollectionPage',
 		// Lab selection + date/time slot selection are one merged screen (see
 		// `LabSelectionScreen.tsx`) — there is no separate slot-selection route.
 		LABORATORY_SELECT_LAB: 'LaboratorySelectLabPage',
 		LABORATORY_BOOKING_SUMMARY: 'LaboratoryBookingSummaryPage',
 		LABORATORY_PAYMENT: 'LaboratoryPaymentPage',
+		LABORATORY_PAYMENT_SUCCESS: 'LaboratoryPaymentSuccessPage',
+		LABORATORY_REPORT: 'LaboratoryReportPage',
 		LABORATORY_BOOKING_TRACKING: 'LaboratoryBookingTrackingPage',
 		PLACE_LABORATORY_TEST: 'PlaceLabOrderPage',
 		LABORATORY_ORDERS: 'Orderlistlaboratorypage',

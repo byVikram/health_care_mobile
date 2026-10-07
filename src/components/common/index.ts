@@ -54,6 +54,8 @@ export type {
 export { AppPatientRow } from './booking/AppPatientRow'
 export type { AppPatientRowProps } from './booking/AppPatientRow'
 export { AppSegmentedControl } from './inputs/AppSegmentedControl'
+export { AppQuantityStepper } from './inputs/AppQuantityStepper'
+export type { AppQuantityStepperProps } from './inputs/AppQuantityStepper'
 export type { AppSegmentedControlProps, AppSegmentedOption } from './inputs/AppSegmentedControl'
 export { default as WorkingHoursSection } from './booking/WorkingHoursSection'
 export type {
@@ -158,16 +160,6 @@ export { AppAvatarStack } from './display/AppAvatarStack'
 export type { AppAvatarStackProps, AppAvatarStackItem } from './display/AppAvatarStack'
 export { AppNavRow } from './layout/AppNavRow'
 export type { AppNavRowProps } from './layout/AppNavRow'
-export { BookingPaymentPage, isActiveTaskConflictError } from './booking/BookingPaymentPage'
-export type {
-	BookingPaymentPageConfig,
-	BookingPaymentStepperConfig,
-	BookingPaymentSubmitContext,
-	BookingPaymentSuccessContext,
-	BookingPaymentActiveTaskError,
-	BookingPaymentCharges,
-	BookingPaymentVisit,
-} from './booking/BookingPaymentPage'
 
 // Phase 2: interactive display / input pieces
 export { AppRatingStars } from './display/AppRatingStars'
@@ -202,7 +194,22 @@ export type { AppSidebarSection, AppSidebarFamily } from './layout/AppSidebar'
 export { AppPromoCard } from './display/AppPromoCard'
 export type { AppPromoCardProps, AppPromoCardTone } from './display/AppPromoCard'
 export { AppCatalogItemRow } from './booking/AppCatalogItemRow'
+export { AppBookingSuccess } from './booking/AppBookingSuccess'
+export { AppCancelSheet } from './booking/AppCancelSheet'
+export type { AppCancelSheetProps } from './booking/AppCancelSheet'
+export { AppRescheduleSheet, AppRescheduleGroup } from './booking/AppRescheduleSheet'
+export type { AppRescheduleSheetProps } from './booking/AppRescheduleSheet'
+export type { AppBookingSuccessProps } from './booking/AppBookingSuccess'
 export type { AppCatalogItemRowProps } from './booking/AppCatalogItemRow'
+export {
+	AppCatalogHeader,
+	AppCatalogSection,
+	AppTrustStrip,
+	AppCatalogEmpty,
+	AppConcernRows,
+	AppConcernGrid,
+} from './booking/AppCatalogBlocks'
+export type { AppCatalogHeaderProps, AppTrustChip, AppConcernTileData } from './booking/AppCatalogBlocks'
 export { AppAddressSheet, ADDRESS_TAGS } from './booking/AddressSelection/AppAddressSheet'
 export type {
 	AppAddressSheetProps,

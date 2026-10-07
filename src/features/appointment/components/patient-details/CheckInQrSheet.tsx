@@ -12,16 +12,26 @@ type CheckInQrSheetProps = {
 	visible: boolean
 	bookingId: string
 	onClose: () => void
+	/** Defaults to "Check-in QR". */
+	title?: string
+	/** Defaults to "Show this at the clinic front desk". */
+	subtitle?: string
 }
 
-export default function CheckInQrSheet({ visible, bookingId, onClose }: CheckInQrSheetProps) {
+export default function CheckInQrSheet({
+	visible,
+	bookingId,
+	onClose,
+	title = 'Check-in QR',
+	subtitle = 'Show this at the clinic front desk',
+}: CheckInQrSheetProps) {
 	return (
 		<AppBottomSheet
 			appearance="modern"
 			showHeaderDivider={false}
 			visible={visible}
-			title="Check-in QR"
-			subtitle="Show this at the clinic front desk"
+			title={title}
+			subtitle={subtitle}
 			onClose={onClose}
 			maxHeightRatio={0.88}
 		>

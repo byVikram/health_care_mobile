@@ -8,8 +8,13 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppBottomSheet, AppButton, DateStrip, SlotChipGrid, type SlotChipItem } from '../../../../components/common'
+import {
+	AppRescheduleGroup,
+	AppRescheduleSheet,
+	DateStrip,
+	SlotChipGrid,
+	type SlotChipItem,
+} from '../../../../components/common'
 import { APPOINTMENT_STATUS } from '../../../../constants/constants'
 import {
 	getDoctorAvailability,
@@ -149,7 +154,6 @@ export default function RescheduleSheet({
 		selected && activeDay
 			? `Confirm · ${relativeDayLabel(activeDay)}, ${formatTimeSlot(selected.start_time)}`
 			: 'Select a new time'
-	const canConfirm = !!selected && !submitting && !!resolvedHospitalId
 
 	const handleConfirm = async () => {
 		if (!selected || !resolvedHospitalId || submitting) return
@@ -198,121 +202,58 @@ export default function RescheduleSheet({
 	const confirmBlocked = !selected || !resolvedHospitalId
 
 	return (
-		<AppBottomSheet
-			appearance="modern"
-			showHeaderDivider={false}
+		<AppRescheduleSheet
 			visible={visible}
 			title={title}
 			subtitle={subtitle}
-			// AppBottomSheet always animates itself closed before calling onClose, so a no-op here
-			// would desync it from `visible`; an in-flight reschedule still resolves via onRescheduled.
-			onClose={onClose}
-			dismissible={!submitting}
-			maxHeightRatio={0.92}
-			footer={
-				// Only greyed when there is nothing to confirm; while submitting the handler guards re-entry.
-				<AppButton
-					size="lg"
-					onPress={handleConfirm}
-					disabled={confirmBlocked}
-					loading={submitting}
-					accessibilityState={{ disabled: !canConfirm }}
-					style={confirmBlocked ? styles.confirmBtnDisabled : undefined}
-					labelStyle={styles.confirmText}
-				>
-					{btnLabel}
-				</AppButton>
+			currentLabel={currentLabel}
+			monthLabel={monthRangeLabel(days)}
+			dateSection={
+				!!activeDay && (
+					<DateStrip
+						variant="grid"
+						strikeDisabled
+						dayCount={days.length}
+						selectedDate={activeDay}
+						onSelectDate={(d) => {
+							const idx = days.findIndex((day) => formatDateForApi(day) === formatDateForApi(d))
+							if (idx >= 0) setDayIdx(idx)
+						}}
+					/>
+				)
 			}
+			note={note}
+			confirmLabel={btnLabel}
+			confirmDisabled={confirmBlocked}
+			busy={submitting}
+			onConfirm={handleConfirm}
+			onClose={onClose}
 		>
-			<View style={styles.body}>
-				<View style={styles.currentRow}>
-					<Text style={styles.currentTag}>Current</Text>
-					<Text style={styles.currentValue}>{currentLabel}</Text>
+			{loading ? (
+				<View style={styles.stateBox}>
+					<ActivityIndicator color={APP_COLORS.primary} />
 				</View>
-
-				<View style={styles.block}>
-					<View style={styles.dateHead}>
-						<Text style={styles.blockTitle}>Pick a new date</Text>
-						<Text style={styles.monthLabel}>{monthRangeLabel(days)}</Text>
-					</View>
-					{!!activeDay && (
-						<DateStrip
-							variant="grid"
-							strikeDisabled
-							dayCount={days.length}
-							selectedDate={activeDay}
-							onSelectDate={(d) => {
-								const idx = days.findIndex((day) => formatDateForApi(day) === formatDateForApi(d))
-								if (idx >= 0) setDayIdx(idx)
-							}}
+			) : loadError ? (
+				<Text style={styles.stateText}>Couldn’t load slots. Try another date.</Text>
+			) : visibleGroups.length === 0 ? (
+				<Text style={styles.stateText}>No slots on this day. Try another date.</Text>
+			) : (
+				visibleGroups.map((g, gi) => (
+					<AppRescheduleGroup key={`${g.label}-${gi}`} label={g.label}>
+						<SlotChipGrid
+							columns={COLS}
+							slots={toSlotItems(g.slots)}
+							selectedValue={selected?.start_time ?? null}
+							onSelectValue={(value) => setSelected(g.slots.find((s) => s.start_time === value) ?? null)}
 						/>
-					)}
-				</View>
-
-				{loading ? (
-					<View style={styles.stateBox}>
-						<ActivityIndicator color={APP_COLORS.primary} />
-					</View>
-				) : loadError ? (
-					<Text style={styles.stateText}>Couldn’t load slots. Try another date.</Text>
-				) : visibleGroups.length === 0 ? (
-					<Text style={styles.stateText}>No slots on this day. Try another date.</Text>
-				) : (
-					visibleGroups.map((g, gi) => (
-						<View key={`${g.label}-${gi}`} style={styles.block}>
-							<Text style={styles.groupLabel}>{g.label}</Text>
-							<SlotChipGrid
-								columns={COLS}
-								slots={toSlotItems(g.slots)}
-								selectedValue={selected?.start_time ?? null}
-								onSelectValue={(value) =>
-									setSelected(g.slots.find((s) => s.start_time === value) ?? null)
-								}
-							/>
-						</View>
-					))
-				)}
-
-				<View style={styles.noteRow}>
-					<MaterialCommunityIcons name="shield-check-outline" size={16} color={APP_COLORS.primary} />
-					<Text style={styles.noteText}>{note}</Text>
-				</View>
-			</View>
-		</AppBottomSheet>
+					</AppRescheduleGroup>
+				))
+			)}
+		</AppRescheduleSheet>
 	)
 }
 
 const styles = StyleSheet.create({
-	// AppBottomSheet supplies the 16px side padding and bottom padding above the footer.
-	body: { gap: 14 },
-	currentRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 10,
-		paddingVertical: 10,
-		paddingHorizontal: 12,
-		borderRadius: 12,
-		backgroundColor: APP_COLORS.pageBg,
-	},
-	currentTag: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: APP_COLORS.inkMuted },
-	currentValue: {
-		flex: 1,
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '700',
-		color: APP_COLORS.inkMuted,
-		textDecorationLine: 'line-through',
-	},
-	block: { gap: 8 },
-	dateHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-	blockTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
-	monthLabel: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
-	groupLabel: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.inkMuted },
 	stateBox: { paddingVertical: 16, alignItems: 'center' },
 	stateText: { paddingVertical: 8, textAlign: 'center', fontSize: 14, lineHeight: 20, color: APP_COLORS.inkMuted },
-	noteRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-	noteText: { flex: 1, fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
-	// Overrides Paper's disabled palette so the blocked CTA keeps the design's grey fill + white label.
-	confirmBtnDisabled: { backgroundColor: APP_COLORS.inkDisabled },
-	confirmText: { fontWeight: '700', color: '#FFFFFF' },
 })

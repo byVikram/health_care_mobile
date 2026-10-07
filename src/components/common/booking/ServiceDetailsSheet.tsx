@@ -75,6 +75,8 @@ export type ServiceDetailsContent = {
 	mrp?: number | null
 	facts?: ServiceDetailsFact[]
 	about?: string | null
+	/** Heading over `about`. Defaults to "About this service". */
+	aboutTitle?: string
 	goodFor?: string | null
 	includes?: ServiceDetailsIncludedItem[]
 	/** Show skeleton rows under "What's included" (e.g. while a package's procedures load). */
@@ -99,6 +101,8 @@ export interface ModernServiceDetailsSheetProps {
 	onRemove?: () => void
 	/** Defaults to "Add to booking". */
 	addLabel?: string
+	/** Footer text when already added, before " · Remove". Defaults to "Added to booking". */
+	addedLabel?: string
 }
 
 export type ServiceDetailsSheetProps = LegacyServiceDetailsSheetProps | ModernServiceDetailsSheetProps
@@ -153,6 +157,7 @@ function ModernServiceDetailsSheet({
 	onAdd,
 	onRemove,
 	addLabel = 'Add to booking',
+	addedLabel = 'Added to booking',
 }: ModernServiceDetailsSheetProps) {
 	if (!content) return null
 
@@ -175,9 +180,9 @@ function ModernServiceDetailsSheet({
 				icon="check"
 				onPress={onRemove}
 				style={styles.footerBtn}
-				accessibilityLabel={`${content.name} added. Remove from booking`}
+				accessibilityLabel={`${content.name} added. Remove`}
 			>
-				Added to booking · Remove
+				{`${addedLabel} · Remove`}
 			</AppButton>
 		) : undefined
 	) : onAdd ? (
@@ -258,7 +263,7 @@ function ModernServiceDetailsSheet({
 						{!!about && (
 							<>
 								<Text style={styles.h3} accessibilityRole="header">
-									About this service
+									{content.aboutTitle || 'About this service'}
 								</Text>
 								<Text style={styles.body}>{/[.!?]$/.test(about) ? about : `${about}.`}</Text>
 							</>

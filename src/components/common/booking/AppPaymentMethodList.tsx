@@ -1,9 +1,9 @@
 // src/components/common/booking/AppPaymentMethodList.tsx
 //
 // Shared "Pay with" radio list (KarolaHealth Payment design): icon tile + title/subtitle (+ optional badge)
-// + radio per method, with an optional inline expansion under the selected row (UPI id field, card fields
-// or a plain note). Methods are supplied by the caller, so the doctor flow (PatientPayment) and the
-// ancillary / laboratory flow (BookingPaymentPage) render the same component with their own method ids.
+// + radio per method, with an optional inline expansion under the selected row (UPI id field, card fields,
+// a bank picker or a plain note). Methods are supplied by the caller, so the doctor flow (PatientPayment) and the
+// laboratory flow (LabPaymentPage) render the same component with their own method ids.
 //
 // There is NO payment gateway yet. The UPI / card inputs are presentation-only: their values live in local
 // component state, are never validated, sent, stored or logged, and are discarded on unmount.
@@ -60,9 +60,15 @@ export type AppPaymentMethod<Id extends string = string> = {
 	/** Replaces the subtitle while disabled. */
 	disabledReason?: string
 	/** Inline expansion shown under the row while it is selected. */
-	expand?: 'upi' | 'card' | 'note'
+	expand?: 'upi' | 'card' | 'bank' | 'note'
 	/** Copy for `expand: 'note'`. */
 	note?: string
+	/** 12/16 muted helper line under the UPI / card / bank fields, e.g. "You'll get a payment request in your UPI app." */
+	helper?: string
+	/** `expand: 'card'`: also ask for the name on the card and offer "Save this card for next time" (the lab design). */
+	cardExtras?: boolean
+	/** `expand: 'bank'`: the banks to choose from. */
+	banks?: string[]
 }
 
 export type AppPaymentMethodListProps<Id extends string = string> = {
@@ -115,6 +121,10 @@ export function AppPaymentMethodList<Id extends string = string>({
 	const [cardNumber, setCardNumber] = useState('')
 	const [cardExpiry, setCardExpiry] = useState('')
 	const [cardCvv, setCardCvv] = useState('')
+	const [cardName, setCardName] = useState('')
+	const [saveCard, setSaveCard] = useState(false)
+	const [bank, setBank] = useState('')
+	const [bankOpen, setBankOpen] = useState(false)
 
 	return (
 		<View style={style}>
@@ -178,6 +188,7 @@ export function AppPaymentMethodList<Id extends string = string>({
 											<Text style={styles.verifyText}>Verify</Text>
 										</TouchableOpacity>
 									</View>
+									{!!m.helper && <Text style={styles.helper}>{m.helper}</Text>}
 								</View>
 							)}
 
@@ -231,6 +242,75 @@ export function AppPaymentMethodList<Id extends string = string>({
 											/>
 										</View>
 									</View>
+									{m.cardExtras && (
+										<>
+											<View style={styles.field}>
+												<Text style={styles.label}>Name on card</Text>
+												<TextInput
+													value={cardName}
+													onChangeText={setCardName}
+													placeholder="As printed on the card"
+													placeholderTextColor={APP_COLORS.border}
+													autoComplete="off"
+													importantForAutofill="no"
+													style={styles.input}
+													accessibilityLabel="Name on card"
+												/>
+											</View>
+											<TouchableOpacity
+												style={styles.saveRow}
+												onPress={() => setSaveCard((v) => !v)}
+												accessibilityRole="checkbox"
+												accessibilityState={{ checked: saveCard }}
+											>
+												<MaterialCommunityIcons
+													name={saveCard ? 'checkbox-marked' : 'checkbox-blank-outline'}
+													size={22}
+													color={saveCard ? APP_COLORS.primary : APP_COLORS.border}
+												/>
+												<Text style={styles.saveText}>Save this card for next time</Text>
+											</TouchableOpacity>
+										</>
+									)}
+									{!!m.helper && <Text style={styles.helper}>{m.helper}</Text>}
+								</View>
+							)}
+
+							{selected && m.expand === 'bank' && (
+								<View style={[styles.expand, styles.expandBank]}>
+									<Text style={styles.label}>Your bank</Text>
+									<TouchableOpacity
+										style={[styles.input, styles.bankSelect]}
+										onPress={() => setBankOpen((v) => !v)}
+										accessibilityRole="button"
+										accessibilityLabel={`Your bank, ${bank || 'choose your bank'}`}
+									>
+										<Text style={[styles.bankText, !bank && styles.bankPlaceholder]} numberOfLines={1}>
+											{bank || 'Choose your bank'}
+										</Text>
+										<MaterialCommunityIcons
+											name={bankOpen ? 'chevron-up' : 'chevron-down'}
+											size={20}
+											color={APP_COLORS.inkMuted}
+										/>
+									</TouchableOpacity>
+									{bankOpen &&
+										(m.banks ?? []).map((b) => (
+											<TouchableOpacity
+												key={b}
+												style={styles.bankOption}
+												onPress={() => {
+													setBank(b)
+													setBankOpen(false)
+												}}
+												accessibilityRole="radio"
+												accessibilityState={{ checked: bank === b }}
+											>
+												<Text style={styles.bankOptionText}>{b}</Text>
+												{bank === b && <MaterialCommunityIcons name="check" size={18} color={APP_COLORS.primary} />}
+											</TouchableOpacity>
+										))}
+									{!!m.helper && <Text style={styles.helper}>{m.helper}</Text>}
 								</View>
 							)}
 
@@ -253,6 +333,23 @@ export function AppPaymentMethodList<Id extends string = string>({
 }
 
 const styles = StyleSheet.create({
+	helper: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
+	saveRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
+	saveText: { fontSize: 14, lineHeight: 20, color: APP_COLORS.ink },
+	expandBank: { gap: 6 },
+	bankSelect: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+	bankText: { flex: 1, fontSize: 16, color: APP_COLORS.ink },
+	bankPlaceholder: { color: APP_COLORS.border },
+	bankOption: {
+		minHeight: 44,
+		paddingHorizontal: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: APP_COLORS.divider,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	bankOptionText: { fontSize: 15, color: APP_COLORS.ink },
 	rowWrapBorder: {
 		borderBottomWidth: 1,
 		borderBottomColor: APP_COLORS.divider,

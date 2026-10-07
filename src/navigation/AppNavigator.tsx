@@ -39,17 +39,14 @@ import OrderListPage from '../features/pharmacy/OrderListPage'
 import PharmacyOrderDetailsPage from '../features/pharmacy/PharmacyOrderDetailsPage'
 import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 
-import LaboratoryHomeScreen from '../features/laboratory/LaboratoryHomeScreen'
-import AllDiagnosticTestsScreen from '../features/laboratory/AllDiagnosticTestsScreen'
-import AllHealthPackagesScreen from '../features/laboratory/AllHealthPackagesScreen'
-import SampleCollectionScreen from '../features/laboratory/SampleCollectionScreen'
-// Lab selection + date/time slot selection are merged into one screen —
-// see the doc comment on `LabSelectionScreen.tsx`. The old
-// `SlotSelectionScreen` is superseded and intentionally not imported here.
-import LabSelectionScreen from '../features/laboratory/LabSelectionScreen'
-import BookingSummaryScreen from '../features/laboratory/BookingSummaryScreen'
-import LaboratoryPaymentPage from '../features/laboratory/LaboratoryPaymentPage'
-import BookingTrackingScreen from '../features/laboratory/BookingTrackingScreen'
+import LabCatalogPage from '../features/laboratory/LabCatalogPage'
+import LabCartPage from '../features/laboratory/LabCartPage'
+import LabCentersPage from '../features/laboratory/LabCentersPage'
+import LabReviewPage from '../features/laboratory/LabReviewPage'
+import LabPaymentPage from '../features/laboratory/LabPaymentPage'
+import LabSuccessPage from '../features/laboratory/LabSuccessPage'
+import LabOrderPage from '../features/laboratory/LabOrderPage'
+import LabReportPage from '../features/laboratory/LabReportPage'
 import OrderListLaboratoryPage from '../features/laboratory_duplicated/OrderListLaboratoryPage'
 import BookingDetailsLaboratoryPage from '../features/laboratory_duplicated/BookingDetailsLaboratoryPage'
 
@@ -175,46 +172,19 @@ function AuthenticatedNavigator() {
 					options={{ headerShown: true, title: 'Radiology Detail' }}
 				/>
 
+				{/* Lab Tests Ordering flow: every screen renders its own header. */}
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_LIST as keyof AppStackParamList} component={LabCatalogPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION as keyof AppStackParamList} component={LabCartPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_SELECT_LAB as keyof AppStackParamList} component={LabCentersPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_BOOKING_SUMMARY as keyof AppStackParamList} component={LabReviewPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_PAYMENT as keyof AppStackParamList} component={LabPaymentPage} options={{ headerShown: false }} />
 				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_LIST as keyof AppStackParamList}
-					component={LaboratoryHomeScreen}
-					options={{ headerShown: true, title: 'Laboratory' }}
+					name={ROUTES.STACK.LABORATORY_PAYMENT_SUCCESS as keyof AppStackParamList}
+					component={LabSuccessPage}
+					options={{ headerShown: false, gestureEnabled: false }}
 				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_ALL_TESTS as keyof AppStackParamList}
-					component={AllDiagnosticTestsScreen}
-					options={{ headerShown: true, title: 'All Diagnostic Tests' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_ALL_PACKAGES as keyof AppStackParamList}
-					component={AllHealthPackagesScreen}
-					options={{ headerShown: true, title: 'Health Checkup Packages' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION as keyof AppStackParamList}
-					component={SampleCollectionScreen}
-					options={{ headerShown: true, title: 'Booking Details' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_SELECT_LAB as keyof AppStackParamList}
-					component={LabSelectionScreen}
-					options={{ headerShown: true, title: 'Lab & Slot Selection' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_BOOKING_SUMMARY as keyof AppStackParamList}
-					component={BookingSummaryScreen}
-					options={{ headerShown: true, title: 'Booking Summary' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_PAYMENT as keyof AppStackParamList}
-					component={LaboratoryPaymentPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_BOOKING_TRACKING as keyof AppStackParamList}
-					component={BookingTrackingScreen}
-					options={{ headerShown: true, title: 'Booking Status' }}
-				/>
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_BOOKING_TRACKING as keyof AppStackParamList} component={LabOrderPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_REPORT as keyof AppStackParamList} component={LabReportPage} options={{ headerShown: false }} />
 				{/* Lab orders list + booking details (opened from the Bookings tab, the side drawer and AppHeader). */}
 				<AppStack.Screen
 					name={ROUTES.STACK.LABORATORY_ORDERS}
