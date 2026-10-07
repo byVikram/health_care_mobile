@@ -38,7 +38,7 @@ import { useTabBarClearance } from '../../../navigation/tabBar'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
 import { ScheduleCalendarSheet } from './ScheduleCalendarSheet'
 import { TodayPatientRow, TodayTabs, TodayVisitChips, type TodayTab, type TodayVisit } from './TodayPatients'
-import { checkInAppointment, getAppointments, getStatusIdByLabel, undoCheckInAppointment } from '../doctorService'
+import { getAppointments, getStatusIdByLabel, setAppointmentCheckIn } from '../doctorService'
 import { updateAppointmentsStatus } from '../../../services/appointmentService'
 import { rescheduleAppointment } from '../doctorService'
 import { createReferral } from '../../referrals/referralService'
@@ -386,9 +386,10 @@ export function DoctorScheduleScreen() {
 	const openAppointment = (apt: Appointment) => navigation.navigate(ROUTES.STACK.APPOINTMENT_DETAILS, { appointmentId: apt.id })
 
 	// Doctor-only: the Today toggle checks a patient in (not_arrived -> checked_in) or undoes a
-	// check-in made by mistake (checked_in -> not_arrived). Both are enforced server-side (the
-	// endpoints are require_role("doctor") and reject any other current status) -- this screen only
-	// exists for doctors anyway. The row flips straight away and rolls back if the call fails.
+	// check-in made by mistake (checked_in -> not_arrived). Both go through the one check-in endpoint
+	// (payload `checked_in`) and are enforced server-side -- it is require_role("doctor") and rejects
+	// any other current status; this screen only exists for doctors anyway. The row flips straight
+	// away and rolls back if the call fails.
 	// Checking in is one tap; undoing one asks for confirmation first (see the sheet below).
 	const handleToggleCheckIn = (apt: Appointment) => {
 		if (checkingInId) return
@@ -403,7 +404,7 @@ export function DoctorScheduleScreen() {
 		setCheckingInId(apt.id)
 		patch({ status: wasCheckedIn ? 'not_arrived' : 'checked_in' })
 		try {
-			const res = wasCheckedIn ? await undoCheckInAppointment(apt.id) : await checkInAppointment(apt.id)
+			const res = await setAppointmentCheckIn(apt.id, !wasCheckedIn)
 			if (!res.success) throw new Error(res.message)
 			Toast.show({ type: 'success', text1: res.message ?? (wasCheckedIn ? 'Check-in undone' : 'Patient checked in') })
 		} catch {
