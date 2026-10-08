@@ -19,6 +19,7 @@ import {
 	AppBottomSheet,
 	AppButton,
 	AppChip,
+	AppInfoBanner,
 	AppRadio,
 	AppScreenHeader,
 	AppSelect,
@@ -96,6 +97,8 @@ export default function DoctorSearchPage() {
 	const initialQuery = route.params?.query || ''
 	const initialMode = route.params?.mode || 'all'
 	const initialSpecialityId = route.params?.specialityId ? String(route.params.specialityId) : 'all'
+	// Opened from Care AI: its filters (speciality text, mode, sort) are pre-applied and a banner leads back.
+	const fromAi = route.params?.fromAi === true
 
 	const [searchInput, setSearchInput] = useState(initialQuery)
 	const [searchQuery, setSearchQuery] = useState(initialQuery)
@@ -113,7 +116,7 @@ export default function DoctorSearchPage() {
 	const [specialityName, setSpecialityName] = useState(route.params?.specialityName || '')
 	const [consultationTypeFilter, setConsultationTypeFilter] = useState<string>(initialMode)
 	const [minRatingFilter, setMinRatingFilter] = useState('all')
-	const [sortBy, setSortBy] = useState<SortKey>('rel')
+	const [sortBy, setSortBy] = useState<SortKey>(route.params?.sort ?? 'rel')
 	const [showSort, setShowSort] = useState(false)
 	// "Available today" / "Female doctor" have no backing field on DoctorSearchItem
 	// yet (no `is_available_today` / `gender` from the API) -- kept as inert UI
@@ -512,7 +515,20 @@ export default function DoctorSearchPage() {
 				keyExtractor={keyExtractor}
 				numColumns={numColumns}
 				columnWrapperStyle={numColumns > 1 ? { paddingHorizontal: 12, gap: 8 } : undefined}
-				ListHeaderComponent={<AppTypography style={styles.resultLabel}>{resultLabel}</AppTypography>}
+				ListHeaderComponent={
+					<>
+						{fromAi ? (
+							<AppInfoBanner
+								icon="creation"
+								title="Filters set by Care AI."
+								subtitle="Change them anytime."
+								action={{ label: 'Back to chat', filled: false, onPress: handleBack }}
+								style={styles.aiBanner}
+							/>
+						) : null}
+						<AppTypography style={styles.resultLabel}>{resultLabel}</AppTypography>
+					</>
+				}
 				ItemSeparatorComponent={() => <View style={styles.separator} />}
 				renderItem={({ item }) =>
 					isInitialLoading && !item.id ? (
@@ -661,6 +677,7 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: APP_COLORS.inkMuted,
 	},
+	aiBanner: { marginHorizontal: 16, marginTop: 12 },
 	resultsList: { flexGrow: 1 },
 	separator: { height: 8 },
 	emptyContainer: {

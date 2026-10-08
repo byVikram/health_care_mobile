@@ -4,6 +4,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs'
 import { ROUTES } from './routes'
 
 import type { DoctorDetailData } from '../types/doctor-detail'
+import type { CareAiLaunch } from '../features/care-ai/careAiTypes'
 
 export type RoleParams = {
 	roleId: string
@@ -172,10 +173,20 @@ export type AppStackParamList = {
 	[ROUTES.STACK.DOCTOR_ACHIEVEMENTS]: undefined
 	[ROUTES.STACK.DOCTOR_FAVOURITES]: undefined
 	[ROUTES.STACK.PROVIDER_WORK]: undefined
+	/** No params = the welcome screen; `scenario` opens straight into the chat summary / in-chat booking. */
+	[ROUTES.STACK.CARE_AI]: CareAiLaunch | undefined
 	[ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
 	[ROUTES.STACK.SEARCH]: undefined
 	[ROUTES.STACK.DOCTOR_SEARCH]:
-		| { query?: string; specialityId?: string; specialityName?: string; mode?: 'all' | 'video' | 'clinic' }
+		| {
+				query?: string
+				specialityId?: string
+				specialityName?: string
+				mode?: 'all' | 'video' | 'clinic'
+				sort?: 'rel' | 'near' | 'fee' | 'exp'
+				/** Opened from Care AI: shows the "Filters set by Care AI" banner with a way back to the chat. */
+				fromAi?: boolean
+		  }
 		| undefined
 	[ROUTES.STACK.DOCTOR_DETAIL]: { id: string; referralId?: string }
 	[ROUTES.STACK.DOCTOR_BOOK_SLOT]: DoctorBookSlotParams

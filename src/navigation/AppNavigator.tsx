@@ -94,6 +94,7 @@ import PersonalDetailsPage from '../features/profile/shared/PersonalDetailsPage'
 import ProfileSettingsPage from '../features/profile/shared/SettingsPage'
 import LoginSecurityPage from '../features/profile/shared/LoginSecurityPage'
 import AvailabilityPage from '../features/profile/availability/AvailabilityPage'
+import CareAiPage from '../features/care-ai/CareAiPage'
 import GoOnlinePermissionsPage from '../features/ancillary/staff/availability/GoOnlinePermissionsPage'
 import HealthDetailsPage from '../features/profile/patient/HealthDetailsPage'
 import LifestylePage from '../features/profile/patient/LifestylePage'
@@ -385,6 +386,7 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.DOCTOR_ACHIEVEMENTS} component={AchievementsPage} />
 				<AppStack.Screen name={ROUTES.STACK.DOCTOR_FAVOURITES} component={FavouriteDoctorsPage} />
 				<AppStack.Screen name={ROUTES.STACK.PROVIDER_WORK} component={WorkDocumentsPage} />
+				<AppStack.Screen name={ROUTES.STACK.CARE_AI} component={CareAiPage} options={{ headerShown: false }} />
 
 				<AppStack.Screen name={ROUTES.STACK.WALLET} component={WalletPage} options={{ headerShown: false }} />
 				<AppStack.Screen
