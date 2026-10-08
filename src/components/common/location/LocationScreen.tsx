@@ -106,7 +106,7 @@ export default function LocationScreen() {
 		Keyboard.dismiss()
 		try {
 			setGpsLoading(true)
-			const position = await getCurrentLocation()
+			const position = await getCurrentLocation({ promptForSettings: true })
 			const readable = await getAddressFromCoords(position.latitude, position.longitude)
 			applyLocation(position, readable)
 		} catch (err: any) {

@@ -12,6 +12,8 @@ import { ROUTES } from './routes'
 import { AppPathIcon, AppScreenHeader } from '../components/common'
 import { APP_COLORS } from '../config/theme'
 import { FLOATING_TAB_BAR_BOTTOM, FLOATING_TAB_ROUTES } from './tabBar'
+import { navigate } from './navigationService'
+import { CARE_AI_FAB_SIZE, CareAiFab } from '../features/care-ai/components/CareAiFab'
 
 import DashboardPage from '../features/dashboard/DashboardPage'
 import SearchPage from '../features/doctor/search/SearchPage'
@@ -277,6 +279,8 @@ const LABELLED_BAR_HEIGHT = 66
 const LABELLED_ITEM_HEIGHT = 52
 const PILL_SLIDE_MS = 280
 const PATIENT_LABELLED_SIDE = 20
+// Home's Care AI button sits to the right of the patient pill, with this gap between them.
+const CARE_AI_FAB_GAP = 12
 const DOCTOR_LABELLED_SIDE = 48
 const ICON_BAR_HEIGHT = 64
 const ICON_ITEM_SIZE = 48
@@ -290,7 +294,19 @@ function LabelledTabBar({
 	side,
 	iconOnly = false,
 	keepOnProfile = false,
-}: BottomTabBarProps & { tabs: FloatingTab[]; side: number; iconOnly?: boolean; keepOnProfile?: boolean }) {
+	reserveRight = 0,
+	accessory,
+}: BottomTabBarProps & {
+	tabs: FloatingTab[]
+	side: number
+	iconOnly?: boolean
+	/** Keep the bar on the Profile tab (the nurse's bar has Profile as one of its tabs). */
+	keepOnProfile?: boolean
+	/** Extra space kept free on the right of the pill (for `accessory`). */
+	reserveRight?: number
+	/** A floating button drawn to the right of the pill, centred on it (Home's Care AI button). */
+	accessory?: React.ReactNode
+}) {
 	const insets = useSafeAreaInsets()
 	const { width: windowWidth } = useWindowDimensions()
 	const barHeight = iconOnly ? ICON_BAR_HEIGHT : LABELLED_BAR_HEIGHT
@@ -363,7 +379,7 @@ function LabelledTabBar({
 			<View
 				style={[
 					styles.labelledShadow,
-					{ bottom, left: side, right: side },
+					{ bottom, left: side, right: side + reserveRight },
 					iconOnly && styles.iconShadow,
 					iconOnly && {
 						height: barHeight,
@@ -464,6 +480,11 @@ function LabelledTabBar({
 					})}
 				</View>
 			</View>
+			{accessory ? (
+				<View pointerEvents="box-none" style={[styles.accessory, { right: side, bottom: bottom + (barHeight - CARE_AI_FAB_SIZE) / 2 }]}>
+					{accessory}
+				</View>
+			) : null}
 		</View>
 	)
 }
@@ -494,7 +515,17 @@ function MainTabs() {
 			<Tab.Navigator
 				tabBar={(props) =>
 					isPatient ? (
-						<LabelledTabBar {...props} tabs={PATIENT_TABS} side={PATIENT_LABELLED_SIDE} />
+						<LabelledTabBar
+							{...props}
+							tabs={PATIENT_TABS}
+							side={PATIENT_LABELLED_SIDE}
+							{...(props.state.routes[props.state.index]?.name === ROUTES.MAIN.HOME
+								? {
+										reserveRight: CARE_AI_FAB_SIZE + CARE_AI_FAB_GAP,
+										accessory: <CareAiFab onPress={() => navigate(ROUTES.STACK.CARE_AI)} />,
+									}
+								: {})}
+						/>
 					) : isDoctor ? (
 						<LabelledTabBar {...props} tabs={DOCTOR_TABS} side={DOCTOR_LABELLED_SIDE} />
 					) : isNurse ? (
@@ -568,6 +599,9 @@ const styles = StyleSheet.create({
 	},
 	floatingWrapBand: {
 		backgroundColor: APP_COLORS.pageBg,
+	},
+	accessory: {
+		position: 'absolute',
 	},
 	// Solid white on purpose: a translucent bar with a shadow on a background-less view let the shadow and
 	// the page behind show through unevenly (a dimmed patch beside the active Bookings tab). With an

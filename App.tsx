@@ -39,7 +39,7 @@ function AppContent() {
 
 	return (
 		<>
-			{showNavigator && <AppNavigator />}
+			{showNavigator && <AppNavigator askPermissions={!showSplash} />}
 			<OfflineBanner />
 			{coldStartOffline && (
 				<View style={styles.offlineLayer}>

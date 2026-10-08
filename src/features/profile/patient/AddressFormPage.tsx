@@ -149,7 +149,7 @@ export default function AddressFormPage() {
 		if (locating) return
 		setLocating(true)
 		try {
-			const c = await getCurrentLocation()
+			const c = await getCurrentLocation({ promptForSettings: true })
 			let patch: Partial<AddressDraft> = { latitude: c.latitude, longitude: c.longitude }
 			try {
 				const [geo] = await Location.reverseGeocodeAsync(c)

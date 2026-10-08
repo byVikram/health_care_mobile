@@ -1,63 +1,32 @@
 // src/components/common/feedback/NotificationPermissionPopup.tsx
-import React, { useEffect, useRef, useState } from 'react'
+//
+// Records `notification_prompt_shown` once per signed-in user (locally and on the backend). No UI and no permission
+// request: the Android notification dialog is shown by the first-launch step (useFirstLaunchPermissions), which also
+// covers installs that predate it, so asking here too would race it.
+import { useEffect, useRef } from 'react'
 import { useAuth } from '../../../context/AuthContext'
-import {
-	requestNativeOSPermission,
-	markNotificationPromptShownOnBackend,
-} from '../../../services/notificationPermissionService'
-import StatusModal from './StatusModal'
+import { markNotificationPromptShownOnBackend } from '../../../services/notificationPermissionService'
 
 export default function NotificationPermissionPopup() {
 	const { notificationPromptShown, setNotificationPromptShown, accessToken } = useAuth()
-	const [visible, setVisible] = useState(false)
 	const isSubmittingRef = useRef(false)
 
 	useEffect(() => {
-		if (accessToken && notificationPromptShown === false) {
-			console.log('[NOTIFICATION POPUP] Displaying Enable Notifications popup...')
-			setVisible(true)
-		} else {
-			setVisible(false)
-		}
-	}, [accessToken, notificationPromptShown])
-
-	const dismissAndMarkShown = async (requestPermission: boolean = false) => {
-		if (isSubmittingRef.current) return
+		if (!accessToken || notificationPromptShown !== false || isSubmittingRef.current) return
 		isSubmittingRef.current = true
 
-		try {
-			// Optimistically hide popup & update local AuthContext & AsyncStorage immediately
-			setVisible(false)
-			await setNotificationPromptShown(true)
-
-			if (requestPermission) {
-				console.log('[NOTIFICATION POPUP] User tapped "Notify Me". Requesting native permission...')
-				await requestNativeOSPermission()
-			} else {
-				console.log('[NOTIFICATION POPUP] User tapped "Not Now". Updating prompt flag...')
+		const run = async () => {
+			try {
+				await setNotificationPromptShown(true)
+				await markNotificationPromptShownOnBackend()
+			} catch (error) {
+				console.error('[NOTIFICATION PERMISSION] Prompt failed:', error)
+			} finally {
+				isSubmittingRef.current = false
 			}
-
-			// Call backend asynchronously to mark prompt as shown
-			await markNotificationPromptShownOnBackend()
-		} catch (error) {
-			console.error('[NOTIFICATION POPUP ERROR] Exception during dismissAndMarkShown:', error)
-		} finally {
-			isSubmittingRef.current = false
 		}
-	}
+		run()
+	}, [accessToken, notificationPromptShown, setNotificationPromptShown])
 
-	if (!visible) return null
-
-	return (
-		<StatusModal
-			visible={visible}
-			status="info"
-			title="Enable Notifications"
-			description="Stay up to date with your appointments and important alerts. We promise not to spam you!"
-			submitText="Notify Me"
-			onSubmit={() => void dismissAndMarkShown(true)}
-			cancelText="Not Now"
-			onCancel={() => void dismissAndMarkShown(false)}
-		/>
-	)
+	return null
 }

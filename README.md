@@ -47,7 +47,7 @@ src/
 │                         #   notification, onboarding, patient, patient-payment,
 │                         #   patient-qr, pharmacy, portal, profile, radiology,
 │                         #   referrals, settings, wallet — most have their own components/
-├── hooks/                # useGPSLocation.ts + feature-scoped hooks
+├── hooks/                # useFamilyMembers.ts + feature-scoped hooks
 ├── navigation/           # AppNavigator, AuthNavigator, MainTabNavigator, routes, types
 ├── services/             # apiService.ts (shared axios instance) + per-domain services
 ├── types/                # Domain TypeScript definitions

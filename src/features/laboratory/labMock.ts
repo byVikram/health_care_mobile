@@ -428,7 +428,7 @@ export const isClinicSlotBusy = (labId: string, dayIndex: number, value: string)
 	return (labId.charCodeAt(0) + dayIndex * 5 + i * 7) % 5 === 0
 }
 
-export const CLINIC_DAY_COUNT = 7
+export const CLINIC_DAY_COUNT = 14
 
 // ---------------------------------------------------------------------------------------------------------
 // Payment

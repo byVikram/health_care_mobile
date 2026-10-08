@@ -1,7 +1,7 @@
 // src/features/laboratory/LabCentersPage.tsx
 //
 // "Choose a lab" + "Choose a lab · date & time" from the Lab Tests Ordering design (in-clinic visit): search,
-// Open now / NABL filters, lab cards sorted by distance, the "Pick a date and time" sheet (7 days, grouped
+// Open now / NABL filters, lab cards sorted by distance, the "Pick a date and time" sheet (14 days, grouped
 // slots) and the "Continue to review & pay" footer. Mock labs and slots (labMock.ts); the pick is stored in
 // the booking store.
 

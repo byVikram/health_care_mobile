@@ -13,7 +13,6 @@ export {
 	fullDayLabel,
 	isClosedDay,
 	isSameDay,
-	nextSevenDays,
 	relativeDayLabel,
 	startOfDay,
 } from '../../utils/date'

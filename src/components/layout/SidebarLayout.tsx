@@ -20,6 +20,7 @@ import { SELF_MEMBER_KEY, useFamilyMembers } from '../../hooks/useFamilyMembers'
 import { hubRoleFor } from '../../features/profile/config/profileHubConfig'
 import { useHomeSheets } from '../../features/dashboard/HomeSheetsContext'
 import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../../features/dashboard/homeChromeIcons'
+import { CARE_AI_ICONS } from '../../features/care-ai/careAiIcons'
 import {
 	formatBalance,
 	openContactUrl,
@@ -182,6 +183,12 @@ function PatientSidebar({ visible, onClose, onLogout, onViewProfile }: PatientSi
 				// history (each visit opens its summary) is the closest real target. "Reminders" has no
 				// target yet, so it's hidden.
 				items: [
+					{
+						id: 'care-ai',
+						label: 'Care AI',
+						icon: <AppPathIcon d={CARE_AI_ICONS.sparkle} size={18} color={APP_COLORS.primary} strokeWidth={2} />,
+						onPress: () => navigation.navigate(ROUTES.STACK.CARE_AI),
+					},
 					{
 						id: 'treatment-history',
 						label: 'Treatment history',
