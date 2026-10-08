@@ -203,7 +203,7 @@ const PATIENT_TABS: FloatingTab[] = [
 	{ key: 'more', route: null, sheet: 'more', label: 'More', icon: 'grid' },
 ]
 
-/** Ancillary provider tabs: Today · Schedule · Earnings · Profile (icon-only floating pill, no labels). */
+/** Ancillary provider tabs: Today · Schedule · Earnings · Profile -- the same labelled bar as the patient's. */
 const PROVIDER_TABS: FloatingTab[] = [
 	{
 		key: 'today',
@@ -278,8 +278,6 @@ const LABELLED_ITEM_HEIGHT = 52
 const PILL_SLIDE_MS = 280
 const PATIENT_LABELLED_SIDE = 20
 const DOCTOR_LABELLED_SIDE = 48
-// Provider icon-only variant: 64-high pill 36 from the sides, 48px round slots, 12 side padding.
-const PROVIDER_LABELLED_SIDE = 36
 const ICON_BAR_HEIGHT = 64
 const ICON_ITEM_SIZE = 48
 // The icon-only pill is as wide as the phone minus its side inset, but never wider than this (tablet / web).
@@ -291,7 +289,8 @@ function LabelledTabBar({
 	tabs,
 	side,
 	iconOnly = false,
-}: BottomTabBarProps & { tabs: FloatingTab[]; side: number; iconOnly?: boolean }) {
+	keepOnProfile = false,
+}: BottomTabBarProps & { tabs: FloatingTab[]; side: number; iconOnly?: boolean; keepOnProfile?: boolean }) {
 	const insets = useSafeAreaInsets()
 	const { width: windowWidth } = useWindowDimensions()
 	const barHeight = iconOnly ? ICON_BAR_HEIGHT : LABELLED_BAR_HEIGHT
@@ -347,9 +346,9 @@ function LabelledTabBar({
 		return () => slide.stop()
 	}, [activeSlot?.x, activeSlot?.width, pillX])
 
-	// Patient / doctor reach Profile from the menu, so their bar hides there. The nurse's bar has a Profile tab:
-	// hiding it would strand them on that screen with no way to the other tabs.
-	if (activeName === ROUTES.MAIN.PROFILE && !iconOnly) {
+	// Patient / doctor reach Profile from the menu, so their bar hides there. The nurse's bar has a Profile tab
+	// (`keepOnProfile`): hiding it would strand them on that screen with no way to the other tabs.
+	if (activeName === ROUTES.MAIN.PROFILE && !keepOnProfile) {
 		return null
 	}
 
@@ -499,7 +498,7 @@ function MainTabs() {
 					) : isDoctor ? (
 						<LabelledTabBar {...props} tabs={DOCTOR_TABS} side={DOCTOR_LABELLED_SIDE} />
 					) : isNurse ? (
-						<LabelledTabBar {...props} tabs={PROVIDER_TABS} side={PROVIDER_LABELLED_SIDE} iconOnly />
+						<LabelledTabBar {...props} tabs={PROVIDER_TABS} side={PATIENT_LABELLED_SIDE} keepOnProfile />
 					) : (
 						<DockedTabBar {...props} onAncillaryPress={() => open('ancillary')} />
 					)
