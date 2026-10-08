@@ -4,14 +4,14 @@
 // ancillary role: stats, new booking requests (banner -> BookingRequestSheet -> accept / decline), open offers
 // pushed on the dispatch WebSocket (instant requests ring for 30 s in IncomingOfferSheet; per-visit offers of
 // provider-less orders show as banners, with an optional tip) and the next visit card. Stats: visits today,
-// earned today (dashboard metrics) and rating ("—": no ancillary ratings yet). Wording follows the provider's speciality (visit / session / shift). Data: GET
+// earned today (dashboard metrics) and rating (average of approved reviews, "—" until there is one). Wording follows the provider's speciality (visit / session / shift). Data: GET
 // /provider/me/today, re-read on focus, on pull-to-refresh (refreshToken), every minute while focused, and
 // after every action. Offers are never polled: the socket pushes them (also the pending ones on connect).
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
-import { AppInfoBanner, AppStatRow, AppStatTile } from '../../../../components/common'
+import { AppInfoBanner } from '../../../../components/common'
 import { APP_COLORS, formatInr } from '../../../../config/theme'
 import { ROUTES } from '../../../../navigation/routes'
 import { acceptScheduledOrder, declineScheduledOrder } from '../../ancillaryProviderBookingService'
@@ -33,6 +33,8 @@ import { useProviderOnline } from './useProviderOnline'
 import { BookingRequestSheet } from './BookingRequestSheet'
 import { IncomingOfferSheet, type OfferPhase } from './IncomingOfferSheet'
 import { ProviderNextVisitCard } from './ProviderNextVisitCard'
+import { ProviderScheduleTimeline } from './ProviderScheduleTimeline'
+import { getProviderAverageRating, ratingLabel } from './providerRating'
 import { isInstantOffer, isProviderWork, offerCollect, replyInLabel, shortDay, tipLabel, visitsWord } from './todayView'
 
 const REFRESH_MS = 60_000
@@ -44,6 +46,19 @@ export type ProviderTodayContentProps = {
 	refreshToken?: number
 	/** Called once a refresh-triggered load finishes (stops the page's spinner). */
 	onRefreshComplete?: () => void
+}
+
+function StatTile({ label, value }: { label: string; value: string }) {
+	return (
+		<View style={styles.statTile} accessible accessibilityLabel={`${label}: ${value}`}>
+			<Text style={styles.statLabel} numberOfLines={1}>
+				{label}
+			</Text>
+			<Text style={styles.statValue} numberOfLines={1}>
+				{value}
+			</Text>
+		</View>
+	)
 }
 
 export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: ProviderTodayContentProps) {
@@ -58,6 +73,8 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 	const [declining, setDeclining] = useState(false)
 	const [focused, setFocused] = useState(false)
 	const [earnedToday, setEarnedToday] = useState<number | null>(null)
+	const [rating, setRating] = useState<number | null>(null)
+	const ratingFor = useRef<string | null>(null)
 	const [offers, setOffers] = useState<ProviderOffer[]>([])
 	const [sheetOffer, setSheetOffer] = useState<ProviderOffer | null>(null)
 	const [offerPhase, setOfferPhase] = useState<OfferPhase>('open')
@@ -84,6 +101,16 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 			if (seq !== requestSeq.current) return null
 			setData(today)
 			setError(null)
+			// Rating belongs to the provider, not the day: read once per provider.
+			const providerId = today.provider.provider_public_id
+			if (providerId && ratingFor.current !== providerId) {
+				ratingFor.current = providerId
+				getProviderAverageRating(providerId)
+					.then(setRating)
+					.catch(() => {
+						ratingFor.current = null
+					})
+			}
 			return today
 		} catch (e) {
 			if (seq !== requestSeq.current) return null
@@ -379,32 +406,11 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 			</View>
 
 			{stats ? (
-				<AppStatRow style={styles.padded}>
-					<AppStatTile
-						label={copy.today.statLabel}
-						value={`${stats.visits_done} of ${stats.visits_total}`}
-						backgroundColor={APP_COLORS.surface}
-						labelColor={APP_COLORS.inkMuted}
-						style={styles.statTile}
-						valueStyle={styles.statValue}
-					/>
-					<AppStatTile
-						label="Earned today"
-						value={earnedToday == null ? '—' : formatInr(earnedToday)}
-						backgroundColor={APP_COLORS.surface}
-						labelColor={APP_COLORS.inkMuted}
-						style={styles.statTile}
-						valueStyle={styles.statValue}
-					/>
-					<AppStatTile
-						label="Rating"
-						value="—"
-						backgroundColor={APP_COLORS.surface}
-						labelColor={APP_COLORS.inkMuted}
-						style={styles.statTile}
-						valueStyle={styles.statValue}
-					/>
-				</AppStatRow>
+				<View style={styles.statRow}>
+					<StatTile label={copy.today.statLabel} value={`${stats.visits_done} of ${stats.visits_total}`} />
+					<StatTile label="Earned today" value={earnedToday == null ? '—' : formatInr(earnedToday)} />
+					<StatTile label="Rating" value={ratingLabel(rating)} />
+				</View>
 			) : null}
 
 			{pending.map((r) => {
@@ -464,6 +470,18 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 				</View>
 			) : null}
 
+			{data ? (
+				<View style={styles.padded}>
+					<ProviderScheduleTimeline
+						schedule={data.schedule}
+						upcoming={data.upcoming}
+						nextVisitId={nextVisit?.visit_public_id}
+						copy={copy}
+						onOpen={openVisit}
+					/>
+				</View>
+			) : null}
+
 			<IncomingOfferSheet
 				offer={sheetOffer}
 				copy={copy}
@@ -511,14 +529,32 @@ const styles = StyleSheet.create({
 		paddingVertical: 48,
 		alignItems: 'center',
 	},
+	statRow: {
+		flexDirection: 'row',
+		gap: 8,
+		paddingHorizontal: 16,
+	},
 	statTile: {
+		flex: 1,
+		minWidth: 0,
+		gap: 2,
+		padding: 12,
 		borderRadius: 12,
 		borderWidth: 1,
 		borderColor: APP_COLORS.divider,
+		backgroundColor: APP_COLORS.surface,
+	},
+	statLabel: {
+		fontSize: 11,
+		lineHeight: 14,
+		fontWeight: '700',
+		color: APP_COLORS.inkMuted,
 	},
 	statValue: {
 		fontSize: 16,
 		lineHeight: 22,
+		fontWeight: '800',
+		color: APP_COLORS.ink,
 	},
 })
 

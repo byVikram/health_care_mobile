@@ -14,17 +14,21 @@ export const isInProgress = (v: ProviderVisitDetail) => v.status === 'IN_PROGRES
 export const isCompleted = (v: ProviderVisitDetail) => v.status === 'COMPLETED'
 /** Nobody took this visit: it is not this provider's work (shown read-only, no actions). */
 export const isUnassigned = (v: Pick<ProviderVisitDetail, 'status'>) => v.status === 'UNASSIGNED'
+/** Due today. An instant ("Book now") visit has no date -- it is for right now -- so it always counts as today. */
 export const isToday = (v: Pick<ProviderVisitDetail, 'date'>) => {
+	if (!v.date) return true
 	const d = parseDateOnly(v.date)
 	return !!d && isSameDay(d, new Date())
 }
 
-/** "7:00 PM – 7:45 PM" */
-export const timeRange = (v: Pick<ProviderVisitDetail, 'start_time' | 'end_time'>) =>
-	[formatTimeSlot(v.start_time), formatTimeSlot(v.end_time)].filter(Boolean).join(' – ')
+/** "7:00 PM – 7:45 PM"; an instant visit has no slot, so it reads "Instant · now". */
+export const timeRange = (v: Pick<ProviderVisitDetail, 'date' | 'start_time' | 'end_time'>) =>
+	[formatTimeSlot(v.start_time), formatTimeSlot(v.end_time)].filter(Boolean).join(' – ') ||
+	(v.date ? '' : 'Instant · now')
 
 /** Short booking reference shown in headers ("KH-1A2B3C4D"). */
-export const bookingRef = (requestId: string) => `KH-${requestId.replace(/-/g, '').slice(0, 8).toUpperCase()}`
+// export const bookingRef = (requestId: string) => `KH-${requestId.replace(/-/g, '').slice(0, 8).toUpperCase()}`
+export const bookingRef = (requestId: string) => requestId
 
 const RELATION_LABELS: Record<string, string> = {
 	FATHER: 'Father',

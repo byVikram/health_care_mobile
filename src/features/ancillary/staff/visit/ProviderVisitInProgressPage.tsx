@@ -440,7 +440,7 @@ export default function ProviderVisitInProgressPage() {
 						<AppButton
 							variant="outline"
 							size="sm"
-							icon="camera-outline"
+							icon="plus"
 							onPress={() => showComingSoon('Adding photos is coming soon.')}
 						>
 							Add photo
@@ -466,7 +466,6 @@ export default function ProviderVisitInProgressPage() {
 					</Text>
 					<AppButton
 						size="lg"
-						icon="check-circle-outline"
 						onPress={() => void goComplete()}
 						loading={finishing}
 						disabled={!allDone || finishing}

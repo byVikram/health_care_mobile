@@ -35,6 +35,8 @@ export type ProviderScheduledOrderCardProps = {
 	onDecline: (order: ProviderOrderView) => void
 	/** Only offered for single-visit orders (the backend reschedules the primary visit only). */
 	onProposeTime?: (order: ProviderOrderView) => void
+	/** Opens the visit screens (details / in progress) for an accepted order. */
+	onOpenVisit?: (order: ProviderOrderView) => void
 }
 
 export function ProviderScheduledOrderCard({
@@ -45,6 +47,7 @@ export function ProviderScheduledOrderCard({
 	onAccept,
 	onDecline,
 	onProposeTime,
+	onOpenVisit,
 }: ProviderScheduledOrderCardProps) {
 	const expired = isOrderExpired(order, nowMs)
 	const actionable = isOrderActionable(order, nowMs)
@@ -147,6 +150,17 @@ export function ProviderScheduledOrderCard({
 					{order.payAfterVisit ? <AppTag label="Pay after each visit" tone="mint" size="sm" /> : null}
 				</View>
 			</View>
+
+			{!pending && !expired && onOpenVisit && order.openVisit ? (
+				<AppButton
+					variant="primary"
+					size="sm"
+					onPress={() => onOpenVisit(order)}
+					accessibilityLabel={`Open visit with ${order.patientName}`}
+				>
+					{order.openVisit.inProgress ? 'Continue visit' : 'Open visit'}
+				</AppButton>
+			) : null}
 
 			{actionable ? (
 				<View style={styles.actions}>

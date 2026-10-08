@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, Easing, Pressable, StyleSheet, Text, useWindowDimensions, View, type ViewStyle } from 'react-native'
+import { BlurView } from 'expo-blur'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -191,6 +192,8 @@ interface FloatingTab {
 	/** Shorter text for the labelled bar when `label` is too long to fit under the icon. */
 	shortLabel?: string
 	icon: HomeChromeIcon
+	/** SVG path (24x24) drawn instead of `icon` by the icon-only bar. */
+	iconPath?: string
 }
 
 const PATIENT_TABS: FloatingTab[] = [
@@ -200,12 +203,36 @@ const PATIENT_TABS: FloatingTab[] = [
 	{ key: 'more', route: null, sheet: 'more', label: 'More', icon: 'grid' },
 ]
 
-/** Ancillary provider tabs: Today · Schedule · Earnings · Profile (labelled bar, same as the doctor's). */
+/** Ancillary provider tabs: Today · Schedule · Earnings · Profile (icon-only floating pill, no labels). */
 const PROVIDER_TABS: FloatingTab[] = [
-	{ key: 'today', route: ROUTES.MAIN.HOME, label: 'Today', icon: 'today' },
-	{ key: 'schedule', route: ROUTES.MAIN.PORTAL, label: 'Schedule', icon: 'appointments' },
-	{ key: 'earnings', route: ROUTES.MAIN.WALLET, label: 'Earnings', icon: 'myWallet' },
-	{ key: 'profile', route: ROUTES.MAIN.PROFILE, label: 'Profile', icon: 'profile' },
+	{
+		key: 'today',
+		route: ROUTES.MAIN.HOME,
+		label: 'Today',
+		icon: 'today',
+		iconPath: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6',
+	},
+	{
+		key: 'schedule',
+		route: ROUTES.MAIN.PORTAL,
+		label: 'Schedule',
+		icon: 'appointments',
+		iconPath: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
+	},
+	{
+		key: 'earnings',
+		route: ROUTES.MAIN.WALLET,
+		label: 'Earnings',
+		icon: 'myWallet',
+		iconPath: 'M3 7a2 2 0 0 1 2-2h13v4M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14.5h.01',
+	},
+	{
+		key: 'profile',
+		route: ROUTES.MAIN.PROFILE,
+		label: 'Profile',
+		icon: 'profile',
+		iconPath: 'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21v-1a8 8 0 0 1 16 0v1',
+	},
 ]
 /** Doctor dashboard tab bar: Home · Schedule · Questions. Wallet and Profile stay reachable from the menu. */
 const DOCTOR_TABS: FloatingTab[] = [
@@ -251,15 +278,25 @@ const LABELLED_ITEM_HEIGHT = 52
 const PILL_SLIDE_MS = 280
 const PATIENT_LABELLED_SIDE = 20
 const DOCTOR_LABELLED_SIDE = 48
-const PROVIDER_LABELLED_SIDE = 48
+// Provider icon-only variant: 64-high pill 36 from the sides, 48px round slots, 12 side padding.
+const PROVIDER_LABELLED_SIDE = 36
+const ICON_BAR_HEIGHT = 64
+const ICON_ITEM_SIZE = 48
+// The icon-only pill is as wide as the phone minus its side inset, but never wider than this (tablet / web).
+const ICON_BAR_MAX_WIDTH = 360
 
 function LabelledTabBar({
 	state,
 	navigation,
 	tabs,
 	side,
-}: BottomTabBarProps & { tabs: FloatingTab[]; side: number }) {
+	iconOnly = false,
+}: BottomTabBarProps & { tabs: FloatingTab[]; side: number; iconOnly?: boolean }) {
 	const insets = useSafeAreaInsets()
+	const { width: windowWidth } = useWindowDimensions()
+	const barHeight = iconOnly ? ICON_BAR_HEIGHT : LABELLED_BAR_HEIGHT
+	// Icon-only pill: capped width, centred. Otherwise the four icons spread across a wide window.
+	const iconBarWidth = Math.min(windowWidth - side * 2, ICON_BAR_MAX_WIDTH)
 	const { openSheet, open } = useHomeSheets()
 	const activeName = state.routes[state.index]?.name
 
@@ -310,7 +347,9 @@ function LabelledTabBar({
 		return () => slide.stop()
 	}, [activeSlot?.x, activeSlot?.width, pillX])
 
-	if (activeName === ROUTES.MAIN.PROFILE) {
+	// Patient / doctor reach Profile from the menu, so their bar hides there. The nurse's bar has a Profile tab:
+	// hiding it would strand them on that screen with no way to the other tabs.
+	if (activeName === ROUTES.MAIN.PROFILE && !iconOnly) {
 		return null
 	}
 
@@ -320,15 +359,41 @@ function LabelledTabBar({
 	return (
 		<View
 			pointerEvents="box-none"
-			style={[floating ? styles.floatingWrapOverlay : styles.floatingWrapBand, { height: LABELLED_BAR_HEIGHT + bottom + (floating ? 0 : 8) }]}
+			style={[floating ? styles.floatingWrapOverlay : styles.floatingWrapBand, { height: barHeight + bottom + (floating ? 0 : 8) }]}
 		>
-			<View style={[styles.labelledShadow, { bottom, left: side, right: side }]}>
-				<View style={styles.labelledBar}>
+			<View
+				style={[
+					styles.labelledShadow,
+					{ bottom, left: side, right: side },
+					iconOnly && styles.iconShadow,
+					iconOnly && {
+						height: barHeight,
+						borderRadius: barHeight / 2,
+						left: (windowWidth - iconBarWidth) / 2,
+						right: (windowWidth - iconBarWidth) / 2,
+					},
+				]}
+			>
+				<View style={[styles.labelledBar, iconOnly && styles.iconBar]}>
+					{iconOnly ? (
+						<>
+							{/* Frosted glass, as in the design: blurred page behind a 25-45% white wash. */}
+							<BlurView
+								pointerEvents="none"
+								intensity={45}
+								tint="light"
+								blurMethod="dimezisBlurViewSdk31Plus"
+								style={StyleSheet.absoluteFill}
+							/>
+							<View pointerEvents="none" style={styles.iconGlassWash} />
+						</>
+					) : null}
 					{activeSlot ? (
 						<Animated.View
 							pointerEvents="none"
 							style={[
 								styles.labelledActiveFill,
+								iconOnly && { borderRadius: ICON_ITEM_SIZE / 2 },
 								{
 									top: activeSlot.y,
 									width: activeSlot.width,
@@ -364,7 +429,7 @@ function LabelledTabBar({
 								accessibilityLabel={tab.label}
 								accessibilityState={{ selected: active }}
 								accessibilityHint={route ? undefined : `Opens ${tab.label.toLowerCase()} services`}
-								style={styles.labelledItem}
+								style={[styles.labelledItem, iconOnly && styles.iconItem]}
 								onLayout={(e) => {
 									const { x, y, width, height } = e.nativeEvent.layout
 									setSlots((prev) => {
@@ -375,12 +440,26 @@ function LabelledTabBar({
 									})
 								}}
 							>
-								<View style={styles.labelledIcon}>
-									<AppPathIcon d={HOME_CHROME_PATHS[tab.icon]} size={24} strokeWidth={2.1} color={color} />
-								</View>
-								<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.labelledLabel, { color, fontWeight: inked ? '800' : '600' }]}>
-									{tab.shortLabel ?? tab.label}
-								</Text>
+								{iconOnly ? (
+									<>
+										<AppPathIcon
+											d={tab.iconPath ?? HOME_CHROME_PATHS[tab.icon]}
+											size={22}
+											strokeWidth={2.1}
+											color={inked ? '#FFFFFF' : APP_COLORS.ink}
+										/>
+										{tab.key === activeKey ? <View pointerEvents="none" style={styles.iconDot} /> : null}
+									</>
+								) : (
+									<>
+										<View style={styles.labelledIcon}>
+											<AppPathIcon d={HOME_CHROME_PATHS[tab.icon]} size={24} strokeWidth={2.1} color={color} />
+										</View>
+										<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.labelledLabel, { color, fontWeight: inked ? '800' : '600' }]}>
+											{tab.shortLabel ?? tab.label}
+										</Text>
+									</>
+								)}
 							</Pressable>
 						)
 					})}
@@ -420,7 +499,7 @@ function MainTabs() {
 					) : isDoctor ? (
 						<LabelledTabBar {...props} tabs={DOCTOR_TABS} side={DOCTOR_LABELLED_SIDE} />
 					) : isNurse ? (
-						<LabelledTabBar {...props} tabs={PROVIDER_TABS} side={PROVIDER_LABELLED_SIDE} />
+						<LabelledTabBar {...props} tabs={PROVIDER_TABS} side={PROVIDER_LABELLED_SIDE} iconOnly />
 					) : (
 						<DockedTabBar {...props} onAncillaryPress={() => open('ancillary')} />
 					)
@@ -532,6 +611,41 @@ const styles = StyleSheet.create({
 		borderRadius: LABELLED_ITEM_HEIGHT / 2,
 		backgroundColor: APP_COLORS.primary,
 		opacity: 1,
+	},
+	// Glass pill (design): no fill or legacy shadow on the wrapper -- an outer-only CSS-style boxShadow, so
+	// nothing is cast through the translucent bar.
+	iconShadow: {
+		backgroundColor: 'transparent',
+		shadowOpacity: 0,
+		elevation: 0,
+		boxShadow: '0 8px 28px #12373E26',
+	} as ViewStyle,
+	iconBar: {
+		gap: 0,
+		paddingHorizontal: 12,
+		borderColor: '#FFFFFF99',
+		boxShadow: 'inset 0 1px 0 #FFFFFFCC',
+	} as ViewStyle,
+	iconGlassWash: {
+		...StyleSheet.absoluteFill,
+		backgroundColor: '#FFFFFF59',
+	},
+	iconItem: {
+		flex: 0,
+		width: ICON_ITEM_SIZE,
+		height: ICON_ITEM_SIZE,
+		borderRadius: ICON_ITEM_SIZE / 2,
+		gap: 0,
+	},
+	iconDot: {
+		position: 'absolute',
+		bottom: -7,
+		left: '50%',
+		width: 5,
+		height: 5,
+		marginLeft: -2.5,
+		borderRadius: 2.5,
+		backgroundColor: APP_COLORS.primary,
 	},
 	labelledIcon: {
 		width: 26,

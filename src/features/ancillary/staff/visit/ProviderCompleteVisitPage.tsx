@@ -5,24 +5,19 @@
 // confirms the visit happened and records the fee as collected (pay after each visit). Summary: time spent,
 // tasks done, what was recorded, payment; then "Up next" with Navigate and "Back to today".
 import React, { useCallback, useState } from 'react'
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
-import {
-	AppButton,
-	AppFooterBar,
-	AppInfoBanner,
-	AppOtpInput,
-	AppScreenHeader,
-	AppSection,
-} from '../../../../components/common'
-import { APP_COLORS, TONES, formatInr } from '../../../../config/theme'
+import { AppButton, AppFooterBar, AppInfoBanner, AppScreenHeader, AppSection } from '../../../../components/common'
+import { APP_COLORS, formatInr } from '../../../../config/theme'
 import { ROUTES } from '../../../../navigation/routes'
 import type { AppNavigationParamList } from '../../../../navigation/types'
 import { openDirections } from '../../../../utils/maps'
+import { showComingSoon } from '../../../../utils/toast'
 import { extractApiErrorMessage } from '../../ancillaryService'
 import { completeVisit, getProviderVisit, type ProviderVisitDetail } from '../../providerVisitService'
 import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { nextVisitWhen, visitSubtitle, visitTitle } from '../today/todayView'
+import { CompletionCodeInput } from './CompletionCodeInput'
 import { durationLabel, firstName, isCompleted, recordedSummary } from './visitView'
 
 type Route = RouteProp<AppNavigationParamList, typeof ROUTES.STACK.PROVIDER_VISIT_COMPLETE>
@@ -59,7 +54,28 @@ export default function ProviderCompleteVisitPage() {
 
 	const copy = getProviderSpecialityCopy(visit?.service.specialty)
 
-	const backToToday = () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME })
+	// Reset (not navigate) so Back from Today never lands on a finished visit screen.
+	const backToToday = useCallback(
+		() =>
+			navigation.reset({
+				index: 0,
+				routes: [{ name: ROUTES.MAIN.TABS, params: { screen: ROUTES.MAIN.HOME } }],
+			}),
+		[navigation]
+	)
+
+	const finished = !!visit && isCompleted(visit)
+	// Once completed, the system back button also goes to Today.
+	useFocusEffect(
+		useCallback(() => {
+			if (!finished) return undefined
+			const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+				backToToday()
+				return true
+			})
+			return () => sub.remove()
+		}, [finished, backToToday])
+	)
 
 	const submit = async () => {
 		if (code.length !== CODE_LENGTH || submitting) return
@@ -79,7 +95,7 @@ export default function ProviderCompleteVisitPage() {
 			variant="bar"
 			title={copy.completeTitle}
 			subtitle={visit ? visitTitle(visit, copy.noun) : undefined}
-			onBack={() => navigation.goBack()}
+			onBack={() => (finished ? backToToday() : navigation.goBack())}
 		/>
 	)
 
@@ -140,17 +156,14 @@ export default function ProviderCompleteVisitPage() {
 						/>
 					</View>
 				) : (
-					<AppSection>
-						<View style={styles.codeCard}>
-							<Text style={styles.codeTitle}>{`Ask ${first} for the completion code`}</Text>
-							<Text style={styles.codeSub}>
-								{visit.visits_count > 1
-									? `It’s shown in their app on this ${copy.noun} (${visit.index} of ${visit.visits_count}). ${copy.completionHint}`
-									: `It’s shown in their app on the booking. ${copy.completionHint}`}
-							</Text>
-						</View>
-						<AppOtpInput
-							length={CODE_LENGTH}
+					<AppSection gap={12} style={styles.codeSection}>
+						<Text style={styles.codeTitle}>{`Ask ${first} for the completion code`}</Text>
+						<Text style={styles.codeSub}>
+							{visit.visits_count > 1
+								? `It’s shown in their app on this ${copy.noun} (${visit.index} of ${visit.visits_count}). ${copy.completionHint}`
+								: `It’s shown in their app on the booking. ${copy.completionHint}`}
+						</Text>
+						<CompletionCodeInput
 							value={code}
 							onChange={(v) => {
 								setCode(v)
@@ -159,10 +172,14 @@ export default function ProviderCompleteVisitPage() {
 							autoFocus
 							error={!!codeError}
 							disabled={submitting}
-							accessibilityLabel="Completion code"
-							style={styles.otp}
 						/>
 						{codeError ? <Text style={styles.error}>{codeError}</Text> : null}
+						<Pressable
+							onPress={() => showComingSoon('Resending the code by SMS is coming soon.')}
+							accessibilityRole="button"
+						>
+							<Text style={styles.resend}>Patient can’t find the code? Resend it by SMS</Text>
+						</Pressable>
 					</AppSection>
 				)}
 
@@ -243,26 +260,28 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		marginTop: 16,
 	},
-	codeCard: {
-		padding: 12,
-		borderRadius: 12,
-		backgroundColor: TONES.sky.bg,
-		gap: 2,
+	codeSection: {
+		alignItems: 'center',
 	},
 	codeTitle: {
-		fontSize: 15,
-		lineHeight: 20,
+		fontSize: 18,
+		lineHeight: 24,
 		fontWeight: '800',
-		color: TONES.sky.ink,
+		color: APP_COLORS.ink,
+		textAlign: 'center',
 	},
 	codeSub: {
-		fontSize: 12,
-		lineHeight: 16,
-		color: APP_COLORS.ink,
+		fontSize: 13,
+		lineHeight: 18,
+		color: APP_COLORS.inkMuted,
+		textAlign: 'center',
 	},
-	otp: {
-		alignSelf: 'center',
-		marginTop: 4,
+	resend: {
+		fontSize: 13,
+		lineHeight: 18,
+		fontWeight: '700',
+		color: APP_COLORS.primary,
+		textAlign: 'center',
 	},
 	error: {
 		fontSize: 13,
@@ -282,15 +301,15 @@ const styles = StyleSheet.create({
 		borderBottomColor: APP_COLORS.divider,
 	},
 	sumLabel: {
-		fontSize: 13,
-		lineHeight: 18,
+		fontSize: 14,
+		lineHeight: 20,
 		color: APP_COLORS.inkMuted,
 	},
 	sumValue: {
 		flexShrink: 1,
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '700',
+		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '800',
 		color: APP_COLORS.ink,
 		textAlign: 'right',
 	},

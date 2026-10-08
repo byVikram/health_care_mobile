@@ -3,8 +3,9 @@
 // "NEXT VISIT" (or CURRENT SHIFT / NEXT SESSION) card of the provider Today design: 2px primary border, mint strip with the eyebrow and
 // "7:00 PM · in 45 min", then the service with patient · distance · ETA, and Call / Navigate / Open.
 import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { AppButton, AppIconButton, AppIconTile } from '../../../../components/common'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { AppIconButton, AppIconTile } from '../../../../components/common'
 import { APP_COLORS } from '../../../../config/theme'
 import { callPhone, openDirections } from '../../../../utils/maps'
 import type { ProviderVisitSummary } from '../../providerVisitService'
@@ -53,11 +54,8 @@ export function ProviderNextVisitCard({ visit, copy, onOpen }: ProviderNextVisit
 						accessibilityLabel={visit.patient.name ? `Call ${visit.patient.name}` : 'Call patient'}
 						onPress={() => void callPhone(phone)}
 					/>
-					<AppButton
-						variant="outline"
-						size="md"
-						icon="navigation-variant-outline"
-						style={styles.flexBtn}
+					<Pressable
+						accessibilityRole="button"
 						onPress={() =>
 							void openDirections(
 								visit.address.latitude,
@@ -65,12 +63,22 @@ export function ProviderNextVisitCard({ visit, copy, onOpen }: ProviderNextVisit
 								visit.address.street_address
 							)
 						}
+						style={({ pressed }) => [styles.btn, styles.navigateBtn, pressed && styles.pressed]}
 					>
-						Navigate
-					</AppButton>
-					<AppButton size="md" style={styles.flexBtn} onPress={() => onOpen(visit)}>
-						Open
-					</AppButton>
+						<MaterialCommunityIcons
+							name="navigation-variant-outline"
+							size={18}
+							color={APP_COLORS.primary}
+						/>
+						<Text style={[styles.btnText, styles.navigateText]}>Navigate</Text>
+					</Pressable>
+					<Pressable
+						accessibilityRole="button"
+						onPress={() => onOpen(visit)}
+						style={({ pressed }) => [styles.btn, styles.openBtn, pressed && styles.pressed]}
+					>
+						<Text style={[styles.btnText, styles.openText]}>Open</Text>
+					</Pressable>
 				</View>
 			</View>
 		</View>
@@ -136,8 +144,35 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		gap: 8,
 	},
-	flexBtn: {
+	btn: {
 		flex: 1,
+		height: 44,
+		borderRadius: 12,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 6,
+	},
+	navigateBtn: {
+		borderWidth: 1.5,
+		borderColor: APP_COLORS.primary,
+		backgroundColor: APP_COLORS.surface,
+	},
+	openBtn: {
+		backgroundColor: APP_COLORS.primary,
+	},
+	btnText: {
+		fontSize: 13,
+		fontWeight: '700',
+	},
+	navigateText: {
+		color: APP_COLORS.primary,
+	},
+	openText: {
+		color: APP_COLORS.surface,
+	},
+	pressed: {
+		opacity: 0.85,
 	},
 })
 

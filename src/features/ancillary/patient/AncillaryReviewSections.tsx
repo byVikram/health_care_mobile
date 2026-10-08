@@ -7,7 +7,7 @@ import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { APP_COLORS } from '../../../config/theme'
 import type { AncillaryCartItem } from '../../../navigation/types'
-import { AppIconTile, AppPaymentMethodList, AppSection, AppTextLink } from '../../../components/common'
+import { AppPaymentMethodList, AppSection, AppTextLink } from '../../../components/common'
 import { PAY_AFTER_VISIT } from '../ancillaryProviderBookingService'
 import { inr, itemsDurationLabel, itemsFee, itemsSummary } from './ancillaryBookingCopy'
 
@@ -31,7 +31,6 @@ export function AncillaryServiceSection({ items, caption, amount, onEdit, editLa
 			right={<AppTextLink label={editLabel} onPress={onEdit} size="sm" trailingIcon="none" />}
 		>
 			<View style={styles.serviceRow}>
-				<AppIconTile icon="medical-bag" />
 				<View style={styles.flex}>
 					<Text style={styles.serviceName} numberOfLines={2}>
 						{itemsSummary(items)}

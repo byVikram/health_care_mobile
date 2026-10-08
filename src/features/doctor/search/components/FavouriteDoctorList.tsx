@@ -8,7 +8,7 @@ import {
 	View,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../../components/common'
+import { AppTypography } from '../../../../components/common/display/AppTypography'
 
 export type FavouriteDoctorListItem = {
 	id: string
