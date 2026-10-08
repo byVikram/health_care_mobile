@@ -118,7 +118,7 @@ export function useVisitPatientAddress(initialPatientKey = 'self') {
 
 	const useCurrentLocation = async (): Promise<AppAddressPrefill | null> => {
 		try {
-			const c = await getCurrentLocation()
+			const c = await getCurrentLocation({ promptForSettings: true })
 			let prefill: AppAddressPrefill = { latitude: c.latitude, longitude: c.longitude }
 			try {
 				const [geo] = await Location.reverseGeocodeAsync(c)

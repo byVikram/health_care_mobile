@@ -12,6 +12,7 @@ import AuthNavigator from './AuthNavigator'
 import { usePushNotifications } from '../services/pushNotificationService'
 import MainTabNavigator from './MainTabNavigator'
 import { AppScreenHeader, LocationSelector, NotificationPermissionPopup } from '../components/common'
+import { useFirstLaunchPermissions } from '../features/onboarding/useFirstLaunchPermissions'
 import LocationScreen from '../components/common/location/LocationScreen'
 import { WalletPage } from '../features/wallet/WalletPage'
 import { WalletTransactionsPage } from '../features/wallet/WalletTransactionsPage'
@@ -93,6 +94,7 @@ import PersonalDetailsPage from '../features/profile/shared/PersonalDetailsPage'
 import ProfileSettingsPage from '../features/profile/shared/SettingsPage'
 import LoginSecurityPage from '../features/profile/shared/LoginSecurityPage'
 import AvailabilityPage from '../features/profile/availability/AvailabilityPage'
+import CareAiPage from '../features/care-ai/CareAiPage'
 import GoOnlinePermissionsPage from '../features/ancillary/staff/availability/GoOnlinePermissionsPage'
 import HealthDetailsPage from '../features/profile/patient/HealthDetailsPage'
 import LifestylePage from '../features/profile/patient/LifestylePage'
@@ -384,6 +386,7 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.DOCTOR_ACHIEVEMENTS} component={AchievementsPage} />
 				<AppStack.Screen name={ROUTES.STACK.DOCTOR_FAVOURITES} component={FavouriteDoctorsPage} />
 				<AppStack.Screen name={ROUTES.STACK.PROVIDER_WORK} component={WorkDocumentsPage} />
+				<AppStack.Screen name={ROUTES.STACK.CARE_AI} component={CareAiPage} options={{ headerShown: false }} />
 
 				<AppStack.Screen name={ROUTES.STACK.WALLET} component={WalletPage} options={{ headerShown: false }} />
 				<AppStack.Screen
@@ -402,10 +405,12 @@ function AuthenticatedNavigator() {
 	)
 }
 
-export default function AppNavigator() {
+export default function AppNavigator({ askPermissions = true }: { askPermissions?: boolean }) {
 	const { accessToken, isLoading } = useAuth()
 	const theme = useTheme()
 	usePushNotifications(!!accessToken)
+	// Fresh install: the Android system dialogs for Location, Notifications and Camera, once the app is ready.
+	useFirstLaunchPermissions(askPermissions && !isLoading)
 
 	if (isLoading) {
 		return (

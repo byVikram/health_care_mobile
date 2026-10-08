@@ -136,5 +136,6 @@ export const ROUTES = {
 		DOCTOR_ACHIEVEMENTS: 'DoctorAchievements',
 		DOCTOR_FAVOURITES: 'DoctorFavourites',
 		PROVIDER_WORK: 'ProviderWork',
+		CARE_AI: 'CareAi',
 	},
 } as const
