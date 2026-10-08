@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 // features/auth/components/OtpForm.tsx
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import * as Device from 'expo-device'
 import { verifyOtp, sendOtp } from '../authService'
+import { markNotificationPromptShownOnBackend } from '../../../services/notificationPermissionService'
 import { useAuth, UserRole } from '../../../context/AuthContext'
 import { otpSchema, getFieldErrors } from '../../../validation/authSchemas'
 import { APP_COLORS } from '../../../config/theme'
@@ -18,6 +19,10 @@ interface Props {
 	ctaLabel?: string
 	/** When set, the header shows "STEP n OF 2" (register flow). */
 	step?: number
+	/** Verify as soon as all digits are entered (the button still works for a manual verify). */
+	autoVerify?: boolean
+	/** New account: never show the "Enable Notifications" popup (the prompt is marked as already shown). */
+	skipNotificationPrompt?: boolean
 }
 
 const RESEND_COOLDOWN_SECONDS = 60
@@ -31,8 +36,12 @@ export default function OtpForm({
 	onBack,
 	ctaLabel = 'Verify & log in',
 	step,
+	autoVerify = false,
+	skipNotificationPrompt = false,
 }: Props) {
 	const [otp, setOtp] = useState('')
+	// One verify at a time: the last digit can arrive twice (typing + autofill) and must not submit twice.
+	const verifying = useRef(false)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState('')
 	const [resendLoading, setResendLoading] = useState(false)
@@ -51,15 +60,18 @@ export default function OtpForm({
 		setOtp(val)
 		setError('')
 		setResendMessage('')
+		if (autoVerify && val.length === OTP_LENGTH) void handleVerify(val)
 	}
 
-	const handleVerify = async () => {
-		const fieldErrors = getFieldErrors(otpSchema, { otp })
+	const handleVerify = async (code: string = otp) => {
+		if (verifying.current) return
+		const fieldErrors = getFieldErrors(otpSchema, { otp: code })
 		if (fieldErrors.otp) {
 			setError(fieldErrors.otp)
 			return
 		}
 
+		verifying.current = true
 		setLoading(true)
 		setError('')
 
@@ -73,7 +85,7 @@ export default function OtpForm({
 			}
 			const response = await verifyOtp({
 				contact_number: contactNumber,
-				otp,
+				otp: code,
 				device_name: deviceName,
 				device_type: Platform.OS,
 				fcm_token: null,
@@ -95,8 +107,10 @@ export default function OtpForm({
 				},
 				response.data.access_token,
 				response.data.refresh_token,
-				response.data.notification_prompt_shown ?? false
+				skipNotificationPrompt ? true : (response.data.notification_prompt_shown ?? false)
 			)
+			// Remember it on the backend too, so the popup doesn't come back on the next login.
+			if (skipNotificationPrompt) void markNotificationPromptShownOnBackend()
 
 			const returnedSpecialty =
 				(response.data.user as any)?.specialty_id ||
@@ -113,6 +127,7 @@ export default function OtpForm({
 			// Optional: show alert for debugging
 			if (__DEV__) Alert.alert('Verify Error', errorMsg)
 		} finally {
+			verifying.current = false
 			setLoading(false)
 		}
 	}
@@ -229,7 +244,7 @@ export default function OtpForm({
 			<AuthFooter divider={false}>
 				<CtaButton
 					label={ctaLabel}
-					onPress={handleVerify}
+					onPress={() => void handleVerify()}
 					disabled={otp.length < OTP_LENGTH}
 					loading={loading}
 				/>

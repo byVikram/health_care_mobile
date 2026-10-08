@@ -77,8 +77,9 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 				<OtpForm
 					contactNumber={contactNumber}
 					onVerify={() => {
+						// New account: straight to the Profile tab to fill in their details.
 						setTimeout(() => {
-							resetNavigation(ROUTES.STACK.DOCTOR_WELCOME)
+							resetNavigation(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PROFILE })
 						}, 0)
 					}}
 					onEditContact={() => {
@@ -90,6 +91,8 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 						setStep('register')
 					}}
 					ctaLabel="Verify & create account"
+					skipNotificationPrompt
+					autoVerify
 					step={2}
 				/>
 			)}

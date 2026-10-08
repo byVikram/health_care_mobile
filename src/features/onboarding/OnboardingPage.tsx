@@ -170,9 +170,17 @@ export default function OnboardingPage({ navigation, route }: OnboardingPageProp
 					>
 						<PathIcon d={ICON_PATHS.back} size={24} color={APP_COLORS.ink} />
 					</Pressable>
-					<Pressable onPress={finishOnboarding} accessibilityRole="button" style={styles.skip}>
-						<Text style={styles.skipText}>Skip</Text>
-					</Pressable>
+					{/* Skip jumps to the last slide and stops there; the user continues with "Create my account". */}
+					{!isLast ? (
+						<Pressable
+							onPress={() => setIndex(slides.length - 1)}
+							accessibilityRole="button"
+							accessibilityLabel="Skip to the last slide"
+							style={styles.skip}
+						>
+							<Text style={styles.skipText}>Skip</Text>
+						</Pressable>
+					) : null}
 				</View>
 			</View>
 

@@ -205,7 +205,7 @@ const PATIENT_TABS: FloatingTab[] = [
 	{ key: 'more', route: null, sheet: 'more', label: 'More', icon: 'grid' },
 ]
 
-/** Ancillary provider tabs: Today · Schedule · Earnings · Profile (icon-only floating pill, no labels). */
+/** Ancillary provider tabs: Today · Schedule · Earnings · Profile -- the same labelled bar as the patient's. */
 const PROVIDER_TABS: FloatingTab[] = [
 	{
 		key: 'today',
@@ -282,8 +282,6 @@ const PATIENT_LABELLED_SIDE = 20
 // Home's Care AI button sits to the right of the patient pill, with this gap between them.
 const CARE_AI_FAB_GAP = 12
 const DOCTOR_LABELLED_SIDE = 48
-// Provider icon-only variant: 64-high pill 36 from the sides, 48px round slots, 12 side padding.
-const PROVIDER_LABELLED_SIDE = 36
 const ICON_BAR_HEIGHT = 64
 const ICON_ITEM_SIZE = 48
 // The icon-only pill is as wide as the phone minus its side inset, but never wider than this (tablet / web).
@@ -295,12 +293,15 @@ function LabelledTabBar({
 	tabs,
 	side,
 	iconOnly = false,
+	keepOnProfile = false,
 	reserveRight = 0,
 	accessory,
 }: BottomTabBarProps & {
 	tabs: FloatingTab[]
 	side: number
 	iconOnly?: boolean
+	/** Keep the bar on the Profile tab (the nurse's bar has Profile as one of its tabs). */
+	keepOnProfile?: boolean
 	/** Extra space kept free on the right of the pill (for `accessory`). */
 	reserveRight?: number
 	/** A floating button drawn to the right of the pill, centred on it (Home's Care AI button). */
@@ -361,9 +362,9 @@ function LabelledTabBar({
 		return () => slide.stop()
 	}, [activeSlot?.x, activeSlot?.width, pillX])
 
-	// Patient / doctor reach Profile from the menu, so their bar hides there. The nurse's bar has a Profile tab:
-	// hiding it would strand them on that screen with no way to the other tabs.
-	if (activeName === ROUTES.MAIN.PROFILE && !iconOnly) {
+	// Patient / doctor reach Profile from the menu, so their bar hides there. The nurse's bar has a Profile tab
+	// (`keepOnProfile`): hiding it would strand them on that screen with no way to the other tabs.
+	if (activeName === ROUTES.MAIN.PROFILE && !keepOnProfile) {
 		return null
 	}
 
@@ -528,7 +529,7 @@ function MainTabs() {
 					) : isDoctor ? (
 						<LabelledTabBar {...props} tabs={DOCTOR_TABS} side={DOCTOR_LABELLED_SIDE} />
 					) : isNurse ? (
-						<LabelledTabBar {...props} tabs={PROVIDER_TABS} side={PROVIDER_LABELLED_SIDE} iconOnly />
+						<LabelledTabBar {...props} tabs={PROVIDER_TABS} side={PATIENT_LABELLED_SIDE} keepOnProfile />
 					) : (
 						<DockedTabBar {...props} onAncillaryPress={() => open('ancillary')} />
 					)

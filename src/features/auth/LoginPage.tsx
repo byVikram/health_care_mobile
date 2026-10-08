@@ -49,6 +49,7 @@ export default function LoginPage({ navigation }: AuthScreenProps<typeof ROUTES.
 				onEditContact={() => setStep('login')}
 				onBack={() => setStep('login')}
 				ctaLabel="Verify & log in"
+				autoVerify
 			/>
 		)
 	}
