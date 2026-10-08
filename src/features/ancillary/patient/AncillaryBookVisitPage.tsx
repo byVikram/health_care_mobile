@@ -268,7 +268,7 @@ export default function AncillaryBookVisitPage() {
 				<View style={styles.noteWrap}>
 					<AppInfoBanner
 						tone="info"
-						icon="information-outline"
+						icon={null}
 						title={`A verified ${noun} near you will be assigned 20–30 min before each visit.`}
 					/>
 				</View>

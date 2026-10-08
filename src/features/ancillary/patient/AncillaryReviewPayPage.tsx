@@ -118,7 +118,7 @@ export default function AncillaryReviewPayPage() {
 					<View style={styles.bannerWrap}>
 						<AppInfoBanner
 							tone="sky"
-							icon="clock-outline"
+							icon={null}
 							title={`${capitalize(noun)} assigned 20–30 min before each visit`}
 							subtitle="You’ll get their name, photo and start code then."
 						/>
