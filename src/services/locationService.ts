@@ -1,14 +1,52 @@
+import { Alert, Linking } from 'react-native';
 import * as Location from 'expo-location';
+
+let settingsAlertOpen = false;
+
+const offerAppSettings = () => {
+  if (settingsAlertOpen) return;
+  settingsAlertOpen = true;
+  const close = () => {
+    settingsAlertOpen = false;
+  };
+  Alert.alert(
+    'Location is turned off',
+    'Allow Location for KarolaHealth in your phone’s App settings to use this.',
+    [
+      { text: 'Not now', style: 'cancel', onPress: close },
+      {
+        text: 'Open Settings',
+        onPress: () => {
+          close();
+          void Linking.openSettings();
+        },
+      },
+    ],
+    { onDismiss: close }
+  );
+};
+
+/**
+ * Location permission via the Android system dialog. When Android will no longer show that dialog (the user
+ * denied it twice / chose "Don't ask again") and `promptForSettings` is set, a plain system alert offers App
+ * Settings instead. Only user-initiated callers set it -- background pings and on-mount lookups must not pop an alert.
+ */
+const ensureLocationPermission = async (promptForSettings: boolean) => {
+  let permission = await Location.getForegroundPermissionsAsync();
+  if (permission.status !== 'granted' && permission.canAskAgain) {
+    permission = await Location.requestForegroundPermissionsAsync();
+  }
+  if (permission.status === 'granted') return;
+
+  if (!permission.canAskAgain && promptForSettings) offerAppSettings();
+  throw new Error('Permission to access location was denied');
+};
 
 /**
  * Get current GPS location
  */
-export const getCurrentLocation = async () => {
-  const { status } = await Location.requestForegroundPermissionsAsync();
-
-  if (status !== 'granted') {
-    throw new Error('Permission to access location was denied');
-  }
+export const getCurrentLocation = async ({ promptForSettings = false }: { promptForSettings?: boolean } = {}) => {
+  await ensureLocationPermission(promptForSettings);
 
   const location = await Location.getCurrentPositionAsync({
     accuracy: Location.Accuracy.High,

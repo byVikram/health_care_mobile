@@ -12,6 +12,7 @@ import AuthNavigator from './AuthNavigator'
 import { usePushNotifications } from '../services/pushNotificationService'
 import MainTabNavigator from './MainTabNavigator'
 import { AppScreenHeader, LocationSelector, NotificationPermissionPopup } from '../components/common'
+import { useFirstLaunchPermissions } from '../features/onboarding/useFirstLaunchPermissions'
 import LocationScreen from '../components/common/location/LocationScreen'
 import { WalletPage } from '../features/wallet/WalletPage'
 import { WalletTransactionsPage } from '../features/wallet/WalletTransactionsPage'
@@ -402,10 +403,12 @@ function AuthenticatedNavigator() {
 	)
 }
 
-export default function AppNavigator() {
+export default function AppNavigator({ askPermissions = true }: { askPermissions?: boolean }) {
 	const { accessToken, isLoading } = useAuth()
 	const theme = useTheme()
 	usePushNotifications(!!accessToken)
+	// Fresh install: the Android system dialogs for Location, Notifications and Camera, once the app is ready.
+	useFirstLaunchPermissions(askPermissions && !isLoading)
 
 	if (isLoading) {
 		return (

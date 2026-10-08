@@ -120,9 +120,6 @@ export const nextDays = (count = 7): Date[] => {
 	})
 }
 
-/** Alias of `nextDays(7)`, kept for existing importers. */
-export const nextSevenDays = (): Date[] => nextDays(7)
-
 /** Is the hospital closed on this weekday? Unknown available_days = never closed. */
 export const isClosedDay = (d: Date, availableDays?: string[]) =>
 	Array.isArray(availableDays) && availableDays.length > 0 && !availableDays.includes(DOW_KEYS[d.getDay()])

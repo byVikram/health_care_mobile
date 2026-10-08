@@ -6,8 +6,14 @@ if (!envUrl) {
 
 // Cleartext http:// (and the ws:// derived from it below) is fine against a dev
 // machine, but a release build that ships it would send tokens and PHI unencrypted.
+const allowInsecureHttp = process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP?.trim() === 'true'
+
 if (!__DEV__ && !/^https:\/\//i.test(envUrl)) {
-	throw new Error('EXPO_PUBLIC_API_ENDPOINT must use https:// in release builds')
+	if (!allowInsecureHttp) {
+		throw new Error('EXPO_PUBLIC_API_ENDPOINT must use https:// in release builds')
+	}
+
+	console.warn('Insecure http:// API endpoint allowed by EXPO_PUBLIC_ALLOW_INSECURE_HTTP -- test builds only.')
 }
 
 export const BASE_URL = envUrl.replace(/\/+$/, '')

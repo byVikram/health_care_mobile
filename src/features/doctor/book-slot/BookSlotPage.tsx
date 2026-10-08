@@ -24,7 +24,7 @@ import {
 import { useFamilyMembers } from '../../../hooks/useFamilyMembers'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
-import { formatDateDisplay, formatDateForApi, formatTimeForApi } from '../../../utils/date'
+import { formatDateDisplay, formatDateForApi, formatTimeForApi, nextDays } from '../../../utils/date'
 import { openDirections } from '../../../utils/maps'
 import { showComingSoon } from '../../../utils/toast'
 import {
@@ -38,7 +38,6 @@ import {
 	MONTH_LONG,
 	MONTH_SHORT,
 	DOW_LABELS,
-	nextSevenDays,
 	normalizeAvailabilityByMode,
 	startOfDay,
 } from '../availability'
@@ -51,6 +50,9 @@ import { getDoctorAvailability, SlotGroup } from '../doctorService'
 // fetched per (doctor, hospital, date), fees come from the selected hospital
 // entry, and Continue hands off to CONSENT_FORM with the same paymentParams
 // shape PatientPayment expects (plus the optional patient / reason fields).
+
+/** How many days ahead (starting today) the Date grid offers: two rows of seven. */
+const BOOKING_WINDOW_DAYS = 14
 
 const cleanGroupLabel = (label: string) => label.replace(/\s*\(.*\)\s*$/, '')
 
@@ -119,7 +121,7 @@ export default function BookSlotPage() {
 	const clinicFee = Number(hospitalEntry?.offline_consultation_fee) || 0
 	const videoFee = Number(hospitalEntry?.video_consultation_fee) || 0
 	const fee = mode === 'video' ? videoFee : clinicFee
-	const days = nextSevenDays()
+	const days = nextDays(BOOKING_WINDOW_DAYS)
 	const patient = members.find((m) => m.key === patientKey) || members[0]
 
 	const specialityText = (doctor.specialities || []).filter(Boolean)[0] || ''
@@ -396,6 +398,8 @@ export default function BookSlotPage() {
 				>
 					<DateStrip
 						variant="grid"
+						columns={7}
+						dayCount={BOOKING_WINDOW_DAYS}
 						selectedDate={selectedDate}
 						onSelectDate={(d) => pickDate(startOfDay(d))}
 						isDateDisabled={(d) => isClosedDay(d, hospitalEntry?.available_days)}

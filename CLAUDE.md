@@ -25,7 +25,7 @@ Part of the [healthcare2](../CLAUDE.md) monorepo. See root CLAUDE.md for cross-s
 - `src/context/` — `AuthContext.tsx` (auth/session/role — **no Redux**, Context + hooks instead), `NetworkContext.tsx`, `ScrollContext.tsx`
 - `src/services/` — `apiService.ts` (shared axios instance: auth header, offline short-circuit, session-expiry handling), plus `appointmentService.ts`, `blogService.ts`, `communityService.ts`, `locationService.ts`, `notificationPermissionService.ts`, `qaService.ts`, `reviewService.ts`; some features keep their own local service
 - `src/constants/apiUrls.ts` — `BASE_URL` + `API_ENDPOINTS` map (**source of truth for API routes**)
-- `src/hooks/useGPSLocation.ts` (top-level) + feature-scoped hooks
+- `src/hooks/useFamilyMembers.ts` (top-level) + feature-scoped hooks
 - `src/config/` — `theme.ts` (Paper theme), `toastConfig.tsx`
 - `src/types/` — domain type defs + `assets.d.ts`, `react-native-vector-icons.d.ts`
 - `src/utils/` — `date.ts`, `formatters.ts`, `jsonUtils.ts`, `networkState.ts`, `s3Utils.ts`, `secureStorage.ts`
