@@ -6,10 +6,12 @@
 // on filter change, after every action and when a countdown ends.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useIsFocused } from '@react-navigation/native'
+import { useIsFocused, useNavigation, type NavigationProp } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import { AppChip, AppInfoBanner, AppTag, AppTextLink } from '../../../../components/common'
 import { APP_COLORS } from '../../../../config/theme'
+import { ROUTES } from '../../../../navigation/routes'
+import type { AppStackParamList } from '../../../../navigation/types'
 import {
 	acceptScheduledOrder,
 	declineScheduledOrder,
@@ -54,6 +56,7 @@ const sortOrders = (orders: ProviderOrderView[], nowMs: number) =>
 
 export function ProviderScheduledOrdersSection() {
 	const isFocused = useIsFocused()
+	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 	const [filter, setFilter] = useState<OrdersFilter>('ALL')
 	const [orders, setOrders] = useState<ProviderOrderView[]>([])
 	const [loading, setLoading] = useState(false)
@@ -116,6 +119,15 @@ export function ProviderScheduledOrdersSection() {
 
 	const sorted = useMemo(() => sortOrders(orders, nowMs), [orders, nowMs])
 	const pendingCount = orders.filter((o) => isOrderActionable(o, nowMs)).length
+
+	/** Accepted order -> its visit screens (same ones the Today tab opens). */
+	const handleOpenVisit = (order: ProviderOrderView) => {
+		if (!order.openVisit) return
+		navigation.navigate(
+			order.openVisit.inProgress ? ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS : ROUTES.STACK.PROVIDER_VISIT_DETAILS,
+			{ visitId: order.openVisit.id }
+		)
+	}
 
 	const handleAccept = async (order: ProviderOrderView) => {
 		if (acceptingId || declining) return
@@ -230,6 +242,7 @@ export function ProviderScheduledOrdersSection() {
 							onAccept={handleAccept}
 							onDecline={setDeclineTarget}
 							onProposeTime={setRescheduleTarget}
+							onOpenVisit={handleOpenVisit}
 						/>
 					))}
 				</View>

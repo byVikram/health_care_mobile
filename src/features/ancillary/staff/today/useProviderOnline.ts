@@ -11,6 +11,7 @@ import { AppState } from 'react-native'
 import * as Location from 'expo-location'
 import Toast from 'react-native-toast-message'
 import { extractApiErrorMessage } from '../../ancillaryService'
+import { ensureGoOnlinePermissions } from '../availability/goOnlinePermissions'
 import { getProviderOnlineStatus, pingProviderLocation, setProviderOnline } from '../../providerVisitService'
 
 const LOCATION_REFRESH_MS = 5 * 60_000
@@ -79,6 +80,8 @@ export function useProviderOnline({ onWentOffline }: { onWentOffline: () => void
 	const setOnline = async (next: boolean) => {
 		if (busy || onlineRef.current === null || onlineRef.current === next) return
 		const previous = onlineRef.current
+		// Going online needs location + notifications: missing ones open "Before you go online" first.
+		if (next && !(await ensureGoOnlinePermissions())) return
 		setBusy(true)
 		apply(next)
 		try {

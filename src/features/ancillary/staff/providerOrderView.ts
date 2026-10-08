@@ -30,6 +30,8 @@ export type RawProviderOrder = Partial<ProviderScheduledOrder> & LegacyOrderFiel
 
 export type ProviderOrderVisitView = {
 	key: string
+	/** Real visit id (for the visit screens); absent on the legacy flat shape. */
+	visitPublicId?: string
 	index: number
 	date: string
 	startTime: string
@@ -55,7 +57,14 @@ export type ProviderOrderView = {
 	payAfterVisit: boolean
 	expiresAt: Date | null
 	rescheduleCount: number
+	/** 'INSTANT' for an accepted "Book now" order, otherwise 'SCHEDULED'. */
+	bookingType: string
+	/** The visit to open from the card (first one not finished or cancelled), once the order is accepted. */
+	openVisit: { id: string; inProgress: boolean } | null
 }
+
+/** Visit statuses with nothing left to do -- not offered by "Open visit". */
+const FINISHED_VISIT = /^(COMPLETED|CANCEL|EXPIRED|FAILED|UNASSIGNED)/
 
 export const PENDING_STATUSES: AncillaryOrderStatus[] = ['SCHEDULED_PENDING', 'OFFERED', 'PENDING_ACTION']
 
@@ -85,6 +94,7 @@ export const normalizeProviderOrder = (raw: RawProviderOrder): ProviderOrderView
 		Array.isArray(raw.visits) && raw.visits.length > 0
 			? raw.visits.map((v, i) => ({
 					key: v.visit_public_id || `${i}`,
+					visitPublicId: v.visit_public_id || undefined,
 					index: v.index ?? i + 1,
 					date: v.date,
 					startTime: v.start_time,
@@ -104,10 +114,29 @@ export const normalizeProviderOrder = (raw: RawProviderOrder): ProviderOrderView
 					]
 				: []
 
+	const instant = (raw.booking_type || '').toUpperCase() === 'INSTANT'
+	const bookedAt = raw.created_at ? new Date(raw.created_at) : null
+	const bookedLabel =
+		bookedAt && !Number.isNaN(bookedAt.getTime())
+			? `Booked ${bookedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+			: 'Booked just now'
+
 	const today = new Date()
 	const visits: ProviderOrderVisitView[] = [...rawVisits]
 		.sort((a, b) => a.index - b.index)
 		.map((v) => {
+			// An instant ("Book now") visit has no slot: it is for right now, so show when it was booked instead.
+			if (instant && !v.date) {
+				return {
+					...v,
+					date: '',
+					startTime: '',
+					endTime: '',
+					title: 'Instant visit',
+					sub: bookedLabel,
+					isToday: true,
+				}
+			}
 			const d = parseDateOnly(v.date)
 			return {
 				...v,
@@ -120,6 +149,8 @@ export const normalizeProviderOrder = (raw: RawProviderOrder): ProviderOrderView
 					d.getDate() === today.getDate(),
 			}
 		})
+
+	const nextVisit = visits.find((v) => v.visitPublicId && !FINISHED_VISIT.test((v.status || '').toUpperCase()))
 
 	const services =
 		Array.isArray(raw.services) && raw.services.length > 0
@@ -150,6 +181,13 @@ export const normalizeProviderOrder = (raw: RawProviderOrder): ProviderOrderView
 		payAfterVisit: !raw.payment_method || raw.payment_method === PAY_AFTER_VISIT,
 		expiresAt: expires && !Number.isNaN(expires.getTime()) ? expires : null,
 		rescheduleCount: Number(raw.reschedule_count) || 0,
+		bookingType: instant ? 'INSTANT' : 'SCHEDULED',
+		openVisit: nextVisit
+			? {
+					id: nextVisit.visitPublicId as string,
+					inProgress: (nextVisit.status || '').toUpperCase() === 'IN_PROGRESS',
+				}
+			: null,
 	}
 }
 

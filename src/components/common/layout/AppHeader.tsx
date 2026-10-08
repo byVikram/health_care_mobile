@@ -441,15 +441,13 @@ function ProviderHomeHeader({ userName = 'there', avatarUri, onAvatarPress }: Ap
 							radius={22}
 							backgroundColor={APP_COLORS.mint}
 							initialsColor={APP_COLORS.primary}
+							initialsStyle={providerStyles.initials}
 						/>
-						<View style={patientStyles.menuBadge} importantForAccessibility="no-hide-descendants">
-							<AppPathIcon d={HEADER_ICONS.menu} size={14} strokeWidth={2.6} color={APP_COLORS.ink} />
-						</View>
 					</Pressable>
 					<View style={patientStyles.nameCol}>
 						<Text style={patientStyles.greeting}>{greeting}</Text>
 						<Text style={patientStyles.name} numberOfLines={1}>
-							{displayName.trim().split(/s+/)[0] || displayName}
+							{displayName.trim().split(/\s+/)[0] || displayName}
 						</Text>
 						<Text style={providerStyles.roleLine} numberOfLines={1}>
 							{`${roleLabel} · Home visits`}
@@ -492,6 +490,11 @@ const providerStyles = StyleSheet.create({
 		backgroundColor: APP_COLORS.mint,
 		alignItems: 'center',
 		justifyContent: 'center',
+	},
+	initials: {
+		fontSize: 16,
+		lineHeight: 22,
+		fontWeight: '800',
 	},
 	roleLine: {
 		fontSize: 12,

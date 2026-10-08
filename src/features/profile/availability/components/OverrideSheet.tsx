@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { AppBottomSheet, AppButton, AppFormField, AppRadioCard } from '../../../../components/common'
+import { AppBottomSheet, AppButton, AppFormField, AppInfoBanner, AppRadioCard } from '../../../../components/common'
 import { APP_COLORS } from '../../../../config/theme'
 import {
 	DAY_SHORT,
@@ -30,6 +30,8 @@ export type OverrideSheetProps = {
 	offLabel: string
 	subtitle: string
 	allowNote: boolean
+	/** Confirmed visits already booked per date (YYYY-MM-DD): shows a warning when the date has some. */
+	bookedByDate?: Record<string, number>
 	onSave: (o: Pick<DateOverride, 'date' | 'off' | 'ranges' | 'note'>) => Promise<void>
 }
 
@@ -47,6 +49,7 @@ export function OverrideSheet({
 	offLabel,
 	subtitle,
 	allowNote,
+	bookedByDate,
 	onSave,
 }: OverrideSheetProps) {
 	const dates = upcomingDates(21)
@@ -65,6 +68,7 @@ export function OverrideSheet({
 		setNote(initial?.note ?? '')
 	}, [visible])
 
+	const booked = bookedByDate?.[date] ?? 0
 	const hasErrors = SECTION_KEYS.some((k) => day[k].some((_, i) => rangeError(day, k, i) !== null))
 	const canSave = !!date && (off || (dayRanges(day).length > 0 && !hasErrors)) && !saving
 
@@ -141,6 +145,15 @@ export function OverrideSheet({
 						onPress={() => setOff(false)}
 					/>
 				</View>
+
+				{booked > 0 && (
+					<AppInfoBanner
+						tone="warning"
+						icon="alert-outline"
+						title={`${booked} booked visit${booked > 1 ? 's' : ''} on this date`}
+						subtitle="Already booked visits stay. This only stops new bookings, so cancel or reschedule them from Bookings."
+					/>
+				)}
 
 				{!off && (
 					<>

@@ -124,6 +124,7 @@ export const ROUTES = {
 		PROFILE_SETTINGS: 'ProfileSettings',
 		PROFILE_SECURITY: 'ProfileSecurity',
 		PROFILE_AVAILABILITY: 'ProfileAvailability',
+		GO_ONLINE_PERMISSIONS: 'GoOnlinePermissions',
 		PATIENT_HEALTH: 'PatientHealth',
 		PATIENT_LIFESTYLE: 'PatientLifestyle',
 		PATIENT_FAMILY: 'PatientFamily',

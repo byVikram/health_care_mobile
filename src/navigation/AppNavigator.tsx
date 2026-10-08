@@ -9,6 +9,7 @@ import { navigationRef } from './navigationService'
 import { ROUTES } from './routes'
 import type { AppStackParamList } from './types'
 import AuthNavigator from './AuthNavigator'
+import { usePushNotifications } from '../services/pushNotificationService'
 import MainTabNavigator from './MainTabNavigator'
 import { AppScreenHeader, LocationSelector, NotificationPermissionPopup } from '../components/common'
 import LocationScreen from '../components/common/location/LocationScreen'
@@ -95,6 +96,7 @@ import PersonalDetailsPage from '../features/profile/shared/PersonalDetailsPage'
 import ProfileSettingsPage from '../features/profile/shared/SettingsPage'
 import LoginSecurityPage from '../features/profile/shared/LoginSecurityPage'
 import AvailabilityPage from '../features/profile/availability/AvailabilityPage'
+import GoOnlinePermissionsPage from '../features/ancillary/staff/availability/GoOnlinePermissionsPage'
 import HealthDetailsPage from '../features/profile/patient/HealthDetailsPage'
 import LifestylePage from '../features/profile/patient/LifestylePage'
 import FamilyMembersPage from '../features/profile/patient/FamilyMembersPage'
@@ -400,6 +402,7 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.PROFILE_SETTINGS} component={ProfileSettingsPage} />
 				<AppStack.Screen name={ROUTES.STACK.PROFILE_SECURITY} component={LoginSecurityPage} />
 				<AppStack.Screen name={ROUTES.STACK.PROFILE_AVAILABILITY} component={AvailabilityPage} />
+				<AppStack.Screen name={ROUTES.STACK.GO_ONLINE_PERMISSIONS} component={GoOnlinePermissionsPage} />
 				<AppStack.Screen name={ROUTES.STACK.PATIENT_HEALTH} component={HealthDetailsPage} />
 				<AppStack.Screen name={ROUTES.STACK.PATIENT_LIFESTYLE} component={LifestylePage} />
 				<AppStack.Screen name={ROUTES.STACK.PATIENT_FAMILY} component={FamilyMembersPage} />
@@ -432,6 +435,7 @@ function AuthenticatedNavigator() {
 export default function AppNavigator() {
 	const { accessToken, isLoading } = useAuth()
 	const theme = useTheme()
+	usePushNotifications(!!accessToken)
 
 	if (isLoading) {
 		return (

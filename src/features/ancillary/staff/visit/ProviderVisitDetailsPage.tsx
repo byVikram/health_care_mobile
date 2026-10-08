@@ -7,6 +7,7 @@
 // start code" (today's startable visit) -> StartCodeSheet -> Visit in progress.
 import React, { useCallback, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import Svg, { Circle, Path, Rect } from 'react-native-svg'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect, useIsFocused, useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
@@ -15,12 +16,10 @@ import {
 	AppCheckList,
 	AppFooterBar,
 	AppIconButton,
-	AppIconTile,
 	AppInfoBanner,
 	AppPersonRow,
 	AppScreenHeader,
 	AppSection,
-	AppToggle,
 } from '../../../../components/common'
 import { APP_COLORS, formatInr } from '../../../../config/theme'
 import { ROUTES } from '../../../../navigation/routes'
@@ -37,7 +36,7 @@ import {
 } from '../../providerVisitService'
 import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { kmLabel, visitStart, visitTitle } from '../today/todayView'
-import { ReportIssueSheet } from './ReportIssueSheet'
+import { CancelVisitSheet } from './CancelVisitSheet'
 import { StartCodeSheet } from './StartCodeSheet'
 import { useLiveLocationShare } from './useLiveLocationShare'
 import {
@@ -65,7 +64,7 @@ export default function ProviderVisitDetailsPage() {
 	const [error, setError] = useState<string | null>(null)
 	const [packed, setPacked] = useState<Record<string, boolean>>({})
 	const [startOpen, setStartOpen] = useState(false)
-	const [issueOpen, setIssueOpen] = useState(false)
+	const [cancelOpen, setCancelOpen] = useState(false)
 	const [navigating, setNavigating] = useState(false)
 
 	const load = useCallback(async () => {
@@ -126,7 +125,8 @@ export default function ProviderVisitDetailsPage() {
 		<AppScreenHeader
 			variant="bar"
 			title={copy.detailsTitle}
-			subtitle={visit ? `${bookingRef(visit.request_public_id)} · ${timeRange(visit)}` : undefined}
+			// subtitle={visit ? `${bookingRef(visit.request_public_id)} · ${timeRange(visit)}` : undefined}
+			subtitle={visit ? visit.request_public_id : undefined}
 			onBack={() => navigation.goBack()}
 		/>
 	)
@@ -175,13 +175,14 @@ export default function ProviderVisitDetailsPage() {
 				? copy.inProgressTitle
 				: [timeRange(visit), today ? startsIn : dayLabel].filter(Boolean).join(' · ')
 	const collected = visit.payment.status === 'PAYMENT_COLLECTED'
+	// Instant / prepaid bookings are paid in the app; scheduled orders are collected after each visit.
+	const paidOnline = visit.payment.method !== 'PAY_AFTER_VISIT'
 
 	return (
 		<View style={styles.page}>
 			{header}
 			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 				<View style={styles.hero}>
-					<AppIconTile icon={copy.icon} tone="mint" size={44} radius={12} iconSize={22} />
 					<View style={styles.heroText}>
 						<Text style={styles.heroTitle}>{visitTitle(visit, copy.noun)}</Text>
 						<Text style={styles.heroSub}>{whenLine}</Text>
@@ -220,6 +221,7 @@ export default function ProviderVisitDetailsPage() {
 				</AppSection>
 
 				<AppSection title="Address" titleSize="sm">
+					<MapPreview />
 					<View style={styles.addressRow}>
 						<View style={styles.addressText}>
 							<Text style={styles.addressLine}>{visit.address.street_address}</Text>
@@ -235,7 +237,7 @@ export default function ProviderVisitDetailsPage() {
 						</View>
 						<AppButton
 							size="sm"
-							icon="navigation-variant-outline"
+							icon="navigation-outline"
 							onPress={() => void handleNavigate()}
 							loading={navigating}
 							disabled={navigating}
@@ -244,7 +246,13 @@ export default function ProviderVisitDetailsPage() {
 						</AppButton>
 					</View>
 					{!done && !cancelled ? (
-						<View style={styles.shareRow}>
+						<Pressable
+							onPress={() => void toggleShare(!visit.share_location)}
+							accessibilityRole="switch"
+							accessibilityState={{ checked: visit.share_location }}
+							accessibilityLabel="Share live location with patient"
+							style={styles.shareRow}
+						>
 							<View style={styles.shareText}>
 								<Text style={styles.shareTitle}>Share live location with patient</Text>
 								<Text style={styles.shareSub}>
@@ -253,14 +261,10 @@ export default function ProviderVisitDetailsPage() {
 										: 'Off · patient sees only your ETA'}
 								</Text>
 							</View>
-							<AppToggle
-								value={visit.share_location}
-								onValueChange={(v) => void toggleShare(v)}
-								size="small"
-								activeColor={APP_COLORS.primary}
-								accessibilityLabel="Share live location with patient"
-							/>
-						</View>
+							<View style={[styles.track, visit.share_location && styles.trackOn]}>
+								<View style={[styles.knob, visit.share_location && styles.knobOn]} />
+							</View>
+						</Pressable>
 					) : null}
 				</AppSection>
 
@@ -271,11 +275,8 @@ export default function ProviderVisitDetailsPage() {
 						) : null}
 						{facts.length ? (
 							<View>
-								{facts.map((f, i) => (
-									<View
-										key={f.label}
-										style={[styles.factRow, i < facts.length - 1 && styles.factDivider]}
-									>
+								{facts.map((f) => (
+									<View key={f.label} style={[styles.factRow, styles.factDivider]}>
 										<Text style={styles.factLabel}>{f.label}</Text>
 										<Text style={styles.factValue}>{f.value}</Text>
 									</View>
@@ -313,25 +314,27 @@ export default function ProviderVisitDetailsPage() {
 					</View>
 					<View style={styles.payNote}>
 						<MaterialCommunityIcons
-							name={collected ? 'check-circle-outline' : 'cash'}
+							name={collected || paidOnline ? 'check' : 'cash'}
 							size={16}
 							color={APP_COLORS.success}
 						/>
 						<Text style={styles.payNoteText}>
-							{collected
-								? `Collected after the ${copy.noun}`
-								: `Collect ${formatInr(visit.payment.amount)} after the ${copy.noun} · pay after each ${copy.noun}`}
+							{paidOnline
+								? 'Paid online · nothing to collect'
+								: collected
+									? `Collected after the ${copy.noun}`
+									: `Collect ${formatInr(visit.payment.amount)} after the ${copy.noun} · pay after each ${copy.noun}`}
 						</Text>
 					</View>
 				</AppSection>
 
 				{!done && !cancelled ? (
 					<Pressable
-						onPress={() => setIssueOpen(true)}
+						onPress={() => setCancelOpen(true)}
 						accessibilityRole="button"
 						style={({ pressed }) => [styles.issueLink, pressed && styles.pressed]}
 					>
-						<Text style={styles.issueText}>Can’t make it? Report an issue</Text>
+						<Text style={styles.issueText}>Can’t make it? Cancel visit</Text>
 					</Pressable>
 				) : null}
 			</ScrollView>
@@ -359,7 +362,6 @@ export default function ProviderVisitDetailsPage() {
 					) : (
 						<AppButton
 							size="lg"
-							icon={startable && today ? 'map-marker-check-outline' : undefined}
 							style={styles.flex}
 							disabled={!startable || !today}
 							softDisabled
@@ -389,12 +391,52 @@ export default function ProviderVisitDetailsPage() {
 					navigation.replace(ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS, { visitId })
 				}}
 			/>
-			<ReportIssueSheet
-				visible={issueOpen}
+			<CancelVisitSheet
+				visible={cancelOpen}
 				visitId={visitId}
-				initialReason="CANT_MAKE_IT"
-				onClose={() => setIssueOpen(false)}
+				requestId={visit.request_public_id}
+				patientName={name}
+				patientFirstName={first}
+				serviceTitle={visitTitle(visit, copy.noun)}
+				instant={!visit.date}
+				onClose={() => setCancelOpen(false)}
+				onBackToToday={() => {
+					setCancelOpen(false)
+					navigation.goBack()
+				}}
 			/>
+		</View>
+	)
+}
+
+/** Static drawn map preview (roads, route line, your position and the destination pin) -- no map SDK. */
+function MapPreview() {
+	return (
+		<View style={styles.map} accessible={false} importantForAccessibility="no-hide-descendants">
+			<Svg width="100%" height={120} viewBox="0 0 358 120" preserveAspectRatio="xMidYMid slice">
+				<Rect x={-10} y={48} width={378} height={14} fill="#FFFFFF" rotation={-8} origin="179, 55" />
+				<Rect x={150} y={-10} width={12} height={140} fill="#FFFFFF" rotation={12} origin="156, 60" />
+				<Rect x={30} y={70} width={90} height={10} rx={4} fill="#FFFFFF" fillOpacity={0.7} />
+				<Path
+					d="M68 86 C 120 60, 180 70, 245 45"
+					fill="none"
+					stroke={APP_COLORS.primary}
+					strokeWidth={3}
+					strokeDasharray="6 5"
+					strokeLinecap="round"
+				/>
+				<Circle cx={68} cy={86} r={8} fill="#FFFFFF" />
+				<Circle cx={68} cy={86} r={5} fill="#2463A8" />
+				<Path
+					transform="translate(228 18) scale(1.4167)"
+					d="M12 21s7-6 7-11a7 7 0 0 0-14 0c0 5 7 11 7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"
+					fill={APP_COLORS.dangerBg}
+					stroke={APP_COLORS.danger}
+					strokeWidth={2.2}
+					strokeLinecap="round"
+					strokeLinejoin="round"
+				/>
+			</Svg>
 		</View>
 	)
 }
@@ -419,6 +461,7 @@ const styles = StyleSheet.create({
 	},
 	hero: {
 		marginTop: 16,
+		marginBottom: 8,
 		marginHorizontal: 16,
 		paddingVertical: 12,
 		paddingHorizontal: 14,
@@ -476,6 +519,38 @@ const styles = StyleSheet.create({
 	shareText: {
 		flex: 1,
 		minWidth: 0,
+	},
+	track: {
+		width: 44,
+		height: 26,
+		borderRadius: 13,
+		backgroundColor: APP_COLORS.inkDisabled,
+		justifyContent: 'center',
+	},
+	trackOn: {
+		backgroundColor: APP_COLORS.primary,
+	},
+	knob: {
+		position: 'absolute',
+		left: 3,
+		width: 20,
+		height: 20,
+		borderRadius: 10,
+		backgroundColor: APP_COLORS.surface,
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.25,
+		shadowRadius: 3,
+		elevation: 2,
+	},
+	knobOn: {
+		left: 21,
+	},
+	map: {
+		height: 120,
+		borderRadius: 12,
+		overflow: 'hidden',
+		backgroundColor: APP_COLORS.mint,
 	},
 	shareTitle: {
 		fontSize: 14,
