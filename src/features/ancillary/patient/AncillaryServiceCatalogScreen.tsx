@@ -21,25 +21,26 @@ import {
 	ScrollView,
 	StyleSheet,
 	Text,
-	TextInput,
 	TouchableOpacity,
 	View,
 	type NativeScrollEvent,
 	type NativeSyntheticEvent,
 } from 'react-native'
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppBottomSheet,
 	AppCarousel,
 	AppCartFooter,
+	AppCatalogEmpty,
+	AppCatalogHeader,
 	AppCatalogItemRow,
+	AppCatalogSection,
 	AppPathIcon,
 	AppPromoCard,
-	AppScreenHeader,
 	AppSkeleton,
 	AppTabs,
 	AppTextLink,
+	AppTrustStrip,
 	ServiceDetailsSheet,
 	type AppPromoCardProps,
 	type AppTabItem,
@@ -67,7 +68,6 @@ import {
 	getAncillaryCatalogCopy,
 	plural,
 	rupees,
-	type AncillaryCatalogCopy,
 	type CatalogIconPath,
 } from '../utils/ancillaryCatalogCopy'
 import {
@@ -445,73 +445,23 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader
-				variant="bar"
-				backgroundColor={APP_COLORS.ink}
+			<AppCatalogHeader
+				title={copy.title}
+				eyebrow={firstName ? `HI ${firstName.toUpperCase()}` : undefined}
+				subtitle={copy.subtitle}
+				compact={compact}
 				showBack={navigation.canGoBack()}
-				backAccessibilityLabel="Back"
-				style={compact ? styles.headerCompact : undefined}
-				titleNode={
-					<Text
-						style={[styles.miniTitle, { opacity: compact ? 1 : 0 }]}
-						numberOfLines={1}
-						accessibilityElementsHidden={!compact}
-						importantForAccessibility={compact ? 'auto' : 'no-hide-descendants'}
-					>
-						{copy.title}
-					</Text>
-				}
-				rightElement={
-					<TouchableOpacity
-						style={styles.cartBtn}
-						onPress={handleBookNow}
-						disabled={cart.length === 0}
-						activeOpacity={0.75}
-						accessibilityRole="button"
-						accessibilityLabel={`Booking, ${cart.length === 0 ? 'no services added' : countLabel}`}
-					>
-						<MaterialCommunityIcons name="cart-outline" size={24} color={APP_COLORS.surface} />
-						{cart.length > 0 && (
-							<View style={styles.cartBadge}>
-								<Text style={styles.cartBadgeText}>{cart.length}</Text>
-							</View>
-						)}
-					</TouchableOpacity>
-				}
-			>
-				{!compact && (
-					<View style={styles.intro}>
-						{!!firstName && <Text style={styles.hi}>{`HI ${firstName.toUpperCase()}`}</Text>}
-						<Text style={styles.h1} accessibilityRole="header">
-							{copy.title}
-						</Text>
-						<Text style={styles.introSub}>{copy.subtitle}</Text>
-					</View>
-				)}
-				<View style={styles.search}>
-					<MaterialCommunityIcons name="magnify" size={20} color={APP_COLORS.inkMuted} />
-					<TextInput
-						value={query}
-						onChangeText={setQuery}
-						placeholder={copy.searchPlaceholder}
-						placeholderTextColor={APP_COLORS.inkMuted}
-						style={styles.searchInput}
-						returnKeyType="search"
-						autoCorrect={false}
-						accessibilityLabel={copy.searchAccessibilityLabel}
-					/>
-					{!!query && (
-						<TouchableOpacity
-							onPress={() => setQuery('')}
-							style={styles.searchClear}
-							accessibilityRole="button"
-							accessibilityLabel="Clear search"
-						>
-							<MaterialCommunityIcons name="close-circle" size={18} color={APP_COLORS.inkMuted} />
-						</TouchableOpacity>
-					)}
-				</View>
-			</AppScreenHeader>
+				cartCount={cart.length}
+				onCartPress={handleBookNow}
+				cartDisabled={cart.length === 0}
+				cartLabel={`Booking, ${cart.length === 0 ? 'no services added' : countLabel}`}
+				search={{
+					value: query,
+					onChange: setQuery,
+					placeholder: copy.searchPlaceholder,
+					accessibilityLabel: copy.searchAccessibilityLabel,
+				}}
+			/>
 
 			<ScrollView
 				style={styles.scroll}
@@ -549,12 +499,11 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 				)}
 
 				{showPackages && (
-					<View style={styles.listSection}>
-						<ListHeader
-							title={copy.packagesTitle}
-							count={packagesLoading ? '' : plural(filteredPackages.length, 'package', 'packages')}
-							subtitle={copy.packagesSubtitle}
-						/>
+					<AppCatalogSection
+					title={copy.packagesTitle}
+					count={packagesLoading ? '' : plural(filteredPackages.length, 'package', 'packages')}
+					subtitle={copy.packagesSubtitle}
+					>
 						{packagesLoading ? (
 							<RowSkeletons />
 						) : packagesError && filteredPackages.length === 0 ? (
@@ -586,18 +535,17 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 								/>
 							))
 						)}
-					</View>
+					</AppCatalogSection>
 				)}
 
-				<TrustStrip chips={copy.trustChips} />
+				<AppTrustStrip chips={copy.trustChips} />
 
 				{showProcedures && (
-					<View style={styles.listSection}>
-						<ListHeader
-							title={copy.servicesTitle}
-							count={loading ? '' : plural(filteredProcedures.length, 'service', 'services')}
-							subtitle={copy.servicesSubtitle}
-						/>
+					<AppCatalogSection
+					title={copy.servicesTitle}
+					count={loading ? '' : plural(filteredProcedures.length, 'service', 'services')}
+					subtitle={copy.servicesSubtitle}
+					>
 						{loading ? (
 							<RowSkeletons />
 						) : (
@@ -621,32 +569,22 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 								)
 							})
 						)}
-					</View>
+					</AppCatalogSection>
 				)}
 
 				{noResults && (
-					<View style={styles.empty}>
-						<Text style={styles.emptyTitle}>
-							{q ? 'No service matches your search' : 'No services here yet'}
-						</Text>
-						<Text style={styles.emptySub}>
-							{q
+					<AppCatalogEmpty
+						title={q ? 'No service matches your search' : 'No services here yet'}
+						subtitle={
+							q
 								? copy.emptySearchHint
 								: filtersActive
 									? 'Try another filter, or browse all services.'
-									: copy.emptyCatalogHint}
-						</Text>
-						{filtersActive && (
-							<TouchableOpacity
-								style={styles.emptyBtn}
-								onPress={resetFilters}
-								activeOpacity={0.8}
-								accessibilityRole="button"
-							>
-								<Text style={styles.emptyBtnText}>Show all</Text>
-							</TouchableOpacity>
-						)}
-					</View>
+									: copy.emptyCatalogHint
+						}
+						actionLabel={filtersActive ? 'Show all' : undefined}
+						onAction={resetFilters}
+					/>
 				)}
 			</ScrollView>
 
@@ -700,20 +638,6 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 // Pieces
 // ---------------------------------------------------------------------------------------------------------
 
-function ListHeader({ title, count, subtitle }: { title: string; count: string; subtitle: string }) {
-	return (
-		<View style={styles.listHeader}>
-			<View style={styles.listTitleRow}>
-				<Text style={styles.listTitle} accessibilityRole="header">
-					{title}
-				</Text>
-				{!!count && <Text style={styles.listCount}>{count}</Text>}
-			</View>
-			<Text style={styles.listSub}>{subtitle}</Text>
-		</View>
-	)
-}
-
 function RowSkeletons() {
 	return (
 		<View style={styles.skeletons}>
@@ -725,21 +649,6 @@ function RowSkeletons() {
 						<AppSkeleton height={14} width="65%" borderRadius={6} color={APP_COLORS.divider} />
 					</View>
 					<AppSkeleton width={112} height={112} borderRadius={16} color={APP_COLORS.divider} />
-				</View>
-			))}
-		</View>
-	)
-}
-
-function TrustStrip({ chips }: { chips: AncillaryCatalogCopy['trustChips'] }) {
-	return (
-		<View style={styles.trust} accessibilityLabel="Why book with us">
-			{chips.map((c) => (
-				<View key={c.key} style={styles.trustItem} accessible accessibilityLabel={c.label}>
-					<View style={styles.trustIcon}>
-						<AppPathIcon d={c.icon} size={20} strokeWidth={2} color={APP_COLORS.primary} />
-					</View>
-					<Text style={styles.trustText}>{c.label}</Text>
 				</View>
 			))}
 		</View>
@@ -899,91 +808,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: APP_COLORS.pageBg,
 	},
-	headerCompact: {
-		shadowColor: APP_COLORS.shadow,
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.16,
-		shadowRadius: 8,
-		elevation: 4,
-	},
-	miniTitle: {
-		fontSize: 18,
-		lineHeight: 26,
-		fontWeight: '700',
-		color: APP_COLORS.surface,
-	},
-	cartBtn: {
-		width: 44,
-		height: 44,
-		marginRight: -10,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	cartBadge: {
-		position: 'absolute',
-		top: 4,
-		right: 4,
-		minWidth: 18,
-		height: 18,
-		paddingHorizontal: 4,
-		borderRadius: 9,
-		backgroundColor: APP_COLORS.surface,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	cartBadgeText: {
-		fontSize: 12,
-		lineHeight: 18,
-		fontWeight: '600',
-		color: APP_COLORS.ink,
-	},
-	intro: {
-		gap: 4,
-		marginBottom: 12,
-	},
-	hi: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		letterSpacing: 0.72,
-		color: APP_COLORS.mintAccent,
-	},
-	h1: {
-		fontSize: 26,
-		lineHeight: 32,
-		fontWeight: '700',
-		color: APP_COLORS.surface,
-	},
-	introSub: {
-		fontSize: 14,
-		lineHeight: 20,
-		color: APP_COLORS.mint,
-	},
-	search: {
-		height: 48,
-		paddingHorizontal: 12,
-		borderRadius: 12,
-		backgroundColor: APP_COLORS.surface,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		marginBottom: 8,
-	},
-	searchInput: {
-		flex: 1,
-		minWidth: 0,
-		height: 44,
-		fontSize: 16,
-		color: APP_COLORS.ink,
-		paddingVertical: 0,
-	},
-	searchClear: {
-		width: 32,
-		height: 32,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginRight: -6,
-	},
 	scroll: {
 		flex: 1,
 	},
@@ -1049,41 +873,6 @@ const styles = StyleSheet.create({
 		color: APP_COLORS.ink,
 		textAlign: 'center',
 	},
-	listSection: {
-		backgroundColor: APP_COLORS.surface,
-		borderTopWidth: 1,
-		borderBottomWidth: 1,
-		borderColor: APP_COLORS.divider,
-		paddingTop: 20,
-		paddingHorizontal: 16,
-	},
-	listHeader: {
-		gap: 4,
-	},
-	listTitleRow: {
-		flexDirection: 'row',
-		alignItems: 'baseline',
-		justifyContent: 'space-between',
-		gap: 12,
-	},
-	listTitle: {
-		flex: 1,
-		fontSize: 22,
-		lineHeight: 28,
-		fontWeight: '700',
-		color: APP_COLORS.ink,
-	},
-	listCount: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '500',
-		color: APP_COLORS.inkMuted,
-	},
-	listSub: {
-		fontSize: 14,
-		lineHeight: 20,
-		color: APP_COLORS.inkMuted,
-	},
 	skeletons: {
 		paddingVertical: 8,
 	},
@@ -1106,77 +895,5 @@ const styles = StyleSheet.create({
 		lineHeight: 20,
 		color: APP_COLORS.inkMuted,
 		textAlign: 'center',
-	},
-	trust: {
-		marginHorizontal: 16,
-		paddingVertical: 16,
-		paddingHorizontal: 12,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: APP_COLORS.divider,
-		backgroundColor: APP_COLORS.surface,
-		flexDirection: 'row',
-		gap: 8,
-	},
-	trustItem: {
-		flex: 1,
-		minWidth: 0,
-		alignItems: 'center',
-		gap: 8,
-	},
-	trustIcon: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: APP_COLORS.mint,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	trustText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '600',
-		color: APP_COLORS.ink,
-		textAlign: 'center',
-	},
-	empty: {
-		marginHorizontal: 16,
-		paddingVertical: 32,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: APP_COLORS.divider,
-		backgroundColor: APP_COLORS.surface,
-		alignItems: 'center',
-		gap: 8,
-	},
-	emptyTitle: {
-		fontSize: 18,
-		lineHeight: 26,
-		fontWeight: '700',
-		color: APP_COLORS.ink,
-		textAlign: 'center',
-	},
-	emptySub: {
-		fontSize: 14,
-		lineHeight: 20,
-		color: APP_COLORS.inkMuted,
-		textAlign: 'center',
-	},
-	emptyBtn: {
-		marginTop: 8,
-		height: 44,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: APP_COLORS.primary,
-		backgroundColor: APP_COLORS.surface,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	emptyBtnText: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: APP_COLORS.primary,
 	},
 })

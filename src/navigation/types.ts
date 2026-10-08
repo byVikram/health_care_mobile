@@ -4,7 +4,6 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs'
 import { ROUTES } from './routes'
 
 import type { DoctorDetailData } from '../types/doctor-detail'
-import type { LabBookingDraft } from '../features/laboratory/types'
 
 export type RoleParams = {
 	roleId: string
@@ -86,6 +85,8 @@ export type PatientPaymentParams = {
 export type DoctorBookSlotParams = {
 	doctor: DoctorDetailData
 	hospitalId?: string
+	/** The patient already picked this clinic (a "Practices at" card, next available, video) -- skip "Choose a clinic". */
+	hospitalSelected?: boolean
 	mode?: 'clinic' | 'video'
 	referralId?: string
 }
@@ -226,40 +227,15 @@ export type AppStackParamList = {
 		labOperatingHours?: { open: string; close: string }
 		labIs24x7?: boolean
 	}
+	// The Lab Tests Ordering flow keeps its booking in labBookingStore (features/laboratory), not in route params.
 	[ROUTES.STACK.LABORATORY_LIST]: undefined
-	[ROUTES.STACK.LABORATORY_ALL_TESTS]: undefined
-	[ROUTES.STACK.LABORATORY_ALL_PACKAGES]: undefined
-	// Selection lives in LaboratoryCartContext (shared across the Laboratory
-	// stack), not route params — this screen just reads it.
 	[ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION]: undefined
-	[ROUTES.STACK.LABORATORY_SELECT_LAB]: { draft: LabBookingDraft }
-	// Lab + appointment fields are only present when `draft.requiresLabSelection`
-	// is true (Diagnostic Center Visit tests, and every Package) — Home
-	// Sample Collection for individual tests reaches this screen straight
-	// from Patient Details with just `draft`, no lab ever chosen.
-	[ROUTES.STACK.LABORATORY_BOOKING_SUMMARY]: {
-		draft: LabBookingDraft
-		labId?: string
-		labName?: string
-		labAddress?: string
-		labCity?: string
-		labAvatarKey?: string | null
-		labOperatingHours?: { open: string; close: string }
-		labIs24x7?: boolean
-		date?: string
-		timeSlot?: string
-	}
-	[ROUTES.STACK.LABORATORY_BOOKING_TRACKING]: {
-		bookingReference: string
-		draft: LabBookingDraft
-		labId?: string
-		labName?: string
-		labAddress?: string
-		labCity?: string
-		date?: string
-		timeSlot?: string
-		totalAmount: number
-	}
+	[ROUTES.STACK.LABORATORY_SELECT_LAB]: undefined
+	[ROUTES.STACK.LABORATORY_BOOKING_SUMMARY]: undefined
+	[ROUTES.STACK.LABORATORY_PAYMENT]: undefined
+	[ROUTES.STACK.LABORATORY_PAYMENT_SUCCESS]: undefined
+	[ROUTES.STACK.LABORATORY_BOOKING_TRACKING]: undefined
+	[ROUTES.STACK.LABORATORY_REPORT]: undefined
 	[ROUTES.STACK.LABORATORY_ORDERS]: undefined
 	[ROUTES.STACK.LABORATORY_ORDER_DETAILS]: { publicId: string; booking?: unknown }
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined

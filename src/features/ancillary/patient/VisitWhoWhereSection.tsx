@@ -28,9 +28,24 @@ type Props = {
 	onNoteChange: (v: string) => void
 	/** Green line under the address, e.g. "Nurse will come to this address". */
 	addressHint?: string
+	/** Eyebrow over the patient row. Defaults to "VISIT FOR". */
+	patientLabel?: string
+	/** Eyebrow prefix over the address. Defaults to "VISIT ADDRESS". */
+	addressLabel?: string
+	/** Title of the family sheet. Defaults to "Who is this visit for?". */
+	familyTitle?: string
 }
 
-export function VisitWhoWhereSection({ who, noun, note, onNoteChange, addressHint }: Props) {
+export function VisitWhoWhereSection({
+	who,
+	noun,
+	note,
+	onNoteChange,
+	addressHint,
+	patientLabel = 'VISIT FOR',
+	addressLabel = 'VISIT ADDRESS',
+	familyTitle = 'Who is this visit for?',
+}: Props) {
 	const { member, address } = who
 	const addressTag = address ? address.label.toUpperCase() : ''
 
@@ -40,7 +55,7 @@ export function VisitWhoWhereSection({ who, noun, note, onNoteChange, addressHin
 				{!!member && (
 					<AppPatientRow
 						member={member}
-						label="VISIT FOR"
+						label={patientLabel}
 						toneIndex={who.memberIndex}
 						onChange={() => who.setFamilyOpen(true)}
 					/>
@@ -61,7 +76,7 @@ export function VisitWhoWhereSection({ who, noun, note, onNoteChange, addressHin
 					</View>
 					<View style={styles.flex}>
 						<Text style={styles.eyebrow}>
-							{address ? `VISIT ADDRESS · ${addressTag}` : 'VISIT ADDRESS'}
+							{address ? `${addressLabel} · ${addressTag}` : addressLabel}
 						</Text>
 						{who.addrLoading && !address ? (
 							<Text style={styles.muted}>Loading your addresses…</Text>
@@ -99,7 +114,7 @@ export function VisitWhoWhereSection({ who, noun, note, onNoteChange, addressHin
 				members={who.members}
 				selectedKey={who.patientKey}
 				onSelect={(m) => who.setPatientKey(m.key)}
-				title="Who is this visit for?"
+				title={familyTitle}
 				confirmLabel={(m) => `Continue for ${familyMemberFirstName(m)}`}
 				onSave={async (draft) => {
 					const key = await who.addFromDraft(draft)

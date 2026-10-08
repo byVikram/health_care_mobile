@@ -15,6 +15,8 @@ export type AppNumberedStep = {
 	body?: string
 	/** Stable key; defaults to the title. */
 	key?: string
+	/** 'warn' = amber number circle (e.g. a fasting reminder). Defaults to the mint circle. */
+	tone?: 'default' | 'warn'
 }
 
 export type AppNumberedStepsProps = {
@@ -69,6 +71,7 @@ export function AppNumberedSteps({
 								style={[
 									styles.num,
 									{ width: numberSize, height: numberSize, borderRadius: numberSize / 2 },
+									s.tone === 'warn' && { backgroundColor: APP_COLORS.warningBg },
 								]}
 							>
 								<Text
@@ -76,6 +79,7 @@ export function AppNumberedSteps({
 										styles.numText,
 										numberSize >= 28 && styles.numTextLg,
 										numberWeight != null && { fontWeight: numberWeight },
+										s.tone === 'warn' && { color: APP_COLORS.warning },
 									]}
 								>
 									{i + 1}
