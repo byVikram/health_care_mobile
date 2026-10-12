@@ -32,6 +32,7 @@ export { default as NotificationPermissionPopup } from './feedback/NotificationP
 export { default as EventCard } from './display/EventCard'
 export { default as CommonCard } from './display/CommonCard'
 export { default as AppSoftCard } from './display/AppSoftCard'
+export { ConsultationNotesImage } from './display/ConsultationNotesImage'
 export type { AppSoftCardProps } from './display/AppSoftCard'
 export { default as AppAppointmentRow } from './booking/AppAppointmentRow'
 export type { AppAppointmentRowProps } from './booking/AppAppointmentRow'

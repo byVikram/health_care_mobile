@@ -6,14 +6,15 @@
 // prescription / follow-up only render when the backing TreatmentRecord
 // actually has that field. TreatmentRecord carries no structured medicine or
 // advised-test list (only notes / prescription_s3_key / follow_up_date), so the
-// prescription block shows the real prescription document instead of
+// prescription card shows the real prescription document instead of
 // fabricated medicine rows, and the lab-test row is a generic, always-real
 // entry point into the Laboratory search flow rather than a named test.
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { View, ScrollView, StyleSheet, ActivityIndicator, Linking, TextInput, Share } from 'react-native'
 import { Text } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import Toast from 'react-native-toast-message'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import {
 	AppActionChip,
@@ -28,12 +29,13 @@ import {
 	AppScreenHeader,
 	AppSection,
 	AppTextLink,
+	ConsultationNotesImage,
 } from '../../components/common'
 import AppRatingStars from '../../components/common/display/AppRatingStars'
 import { showComingSoon } from '../../utils/toast'
 import { getAppointmentById } from '../../services/appointmentService'
 import { getReviewForAppointment, createReview, DoctorReview } from '../../services/reviewService'
-import { patientService, TreatmentRecord } from '../consultation/ConsultationService'
+import { patientService, treatmentService, PrescriptionLink, TreatmentRecord } from '../consultation/ConsultationService'
 import { Appointment, AppointmentDoctor } from '../../types/appointment'
 import { ROUTES } from '../../navigation/routes'
 import { formatTimeSlot, capitaliseWords } from '../../utils/formatters'
@@ -68,6 +70,7 @@ export default function VisitSummaryPage() {
 	const [rating, setRating] = useState(0)
 	const [comment, setComment] = useState('')
 	const [submittingReview, setSubmittingReview] = useState(false)
+	const [downloading, setDownloading] = useState(false)
 
 	useEffect(() => {
 		if (!appointmentId) {
@@ -94,25 +97,24 @@ export default function VisitSummaryPage() {
 		}
 	}, [appointmentId])
 
-	useEffect(() => {
+	// The doctor's handwritten notes are read through a signed link that expires after about five minutes, so the
+	// record is reloaded (a fresh link) whenever the image reports it could not be fetched.
+	const loadTreatment = useCallback(async () => {
 		const patientId = appt?.patient?.id
 		if (!patientId) return
-		let cancelled = false
-		const fetchTreatment = async () => {
-			try {
-				const records = await patientService.getPatientTreatmentHistory(patientId)
-				if (cancelled) return
-				const match = records.find((r) => String(r.appointment_id) === String(appt?.id)) ?? null
-				setTreatment(match)
-			} catch {
-				// No treatment record is a valid real state (e.g. notes not yet added) — not an error banner.
-			}
-		}
-		fetchTreatment()
-		return () => {
-			cancelled = true
+		try {
+			const records = await patientService.getPatientTreatmentHistory(patientId)
+			// `appointment_id` is the internal number; the appointment on screen is known by its public id.
+			const match = records.find((r) => r.appointment_public_id === appt?.id) ?? null
+			setTreatment(match)
+		} catch {
+			// No treatment record is a valid real state (e.g. notes not yet added) — not an error banner.
 		}
 	}, [appt?.patient?.id, appt?.id])
+
+	useEffect(() => {
+		void loadTreatment()
+	}, [loadTreatment])
 
 	useEffect(() => {
 		if (!appointmentId) return
@@ -196,7 +198,11 @@ export default function VisitSummaryPage() {
 	const whereLabel = modeLabel(appt.appointment_mode, appt.hospital?.name)
 	const followUp = parseDateOnly(treatment?.follow_up_date, { ignoreTime: false })
 	const followUpInterval = followUp ? formatInterval(visitDate, followUp) : null
-	const prescriptionDate = parseDateOnly(treatment?.created_at?.slice(0, 10), { ignoreTime: false })
+	// The doctor's submitted prescription (the handwritten page) and/or an uploaded prescription file.
+	const hasPrescription = !!(treatment?.notes_image_url || treatment?.prescription_s3_key)
+	const prescriptionDate = parseDateOnly((treatment?.notes_submitted_at ?? treatment?.created_at)?.slice(0, 10), {
+		ignoreTime: false,
+	})
 	const hasFee = appt.fees != null && Number(appt.fees) > 0
 	const shownRating = review ? review.rating : rating
 
@@ -214,10 +220,27 @@ export default function VisitSummaryPage() {
 		Share.share({ message: lines.join('\n') }).catch(() => {})
 	}
 
-	const handleDownload = () => {
-		const url = buildS3Url(treatment?.prescription_s3_key)
-		if (!url) return comingSoon()
-		Linking.openURL(url).catch(comingSoon)
+	const handleDownload = async () => {
+		if (downloading) return
+		setDownloading(true)
+		try {
+			// The prescription's link is signed and expires after about five minutes: ask for a fresh one. The link on
+			// screen may already be stale, so it is never opened as a fallback.
+			let fresh: PrescriptionLink | null = null
+			if (treatment?.notes_image_url && appt) {
+				try {
+					fresh = await treatmentService.getPrescription(appt.id)
+				} catch {
+					Toast.show({ type: 'error', text1: 'Couldn’t get your prescription. Check your connection and try again.' })
+					return
+				}
+			}
+			const url = fresh?.prescription_url ?? buildS3Url(treatment?.prescription_s3_key)
+			if (!url) return comingSoon()
+			Linking.openURL(url).catch(comingSoon)
+		} finally {
+			setDownloading(false)
+		}
 	}
 
 	return (
@@ -302,54 +325,46 @@ export default function VisitSummaryPage() {
 					</AppSection>
 				) : null}
 
-				{/* Prescription — real prescription document + generic lab-test entry (see file header) */}
-				<AppSection
-					title={treatment?.prescription_s3_key ? 'Prescription' : 'Lab tests'}
-					titleSize="sm"
-					marginTop={0}
-				>
-					<View style={styles.rxBox}>
-						{treatment?.prescription_s3_key ? (
+				{/* Prescription: one card. The download action sits in its header, next to what it downloads. */}
+				{hasPrescription ? (
+					<AppSection title="Prescription" titleSize="sm" marginTop={0}>
+						<View style={styles.rxBox}>
 							<View style={styles.rxRow}>
 								<AppIconTile icon="pill" tone="peach" size={40} radius={12} iconSize={20} />
 								<View style={styles.flexCol}>
-									<Text style={styles.rxName}>Prescription</Text>
+									<Text style={styles.rxName}>{appt.doctor?.name ?? 'Your doctor'}</Text>
 									<Text style={styles.rxMeta}>
-										{prescriptionDate
-											? `Issued ${formatFullDate(prescriptionDate)} · by ${appt.doctor?.name ?? 'your doctor'}`
-											: `Issued by ${appt.doctor?.name ?? 'your doctor'}`}
+										{prescriptionDate ? `Issued ${formatFullDate(prescriptionDate)}` : 'Issued after your visit'}
 									</Text>
 								</View>
+								<AppActionChip
+									label="Download"
+									icon="download-outline"
+									onPress={handleDownload}
+									loading={downloading}
+									accessibilityLabel="Download prescription"
+								/>
 							</View>
-						) : null}
-						<View style={[styles.rxRow, treatment?.prescription_s3_key ? styles.rxRowDivider : null]}>
+							{treatment?.notes_image_url ? (
+								<View style={styles.rxImage}>
+									<ConsultationNotesImage uri={treatment.notes_image_url} onExpired={loadTreatment} />
+								</View>
+							) : null}
+						</View>
+					</AppSection>
+				) : null}
+
+				{/* Lab tests: always a real entry point into the Laboratory search flow */}
+				<AppSection title="Lab tests" titleSize="sm" marginTop={0}>
+					<View style={styles.rxBox}>
+						<View style={styles.rxRow}>
 							<AppIconTile icon="flask-outline" tone="lilac" size={40} radius={12} iconSize={20} />
 							<View style={styles.flexCol}>
 								<Text style={styles.rxName}>Lab test</Text>
 								<Text style={styles.rxMeta}>Book any test your doctor advised</Text>
 							</View>
-							<AppActionChip
-								label="Book test"
-								onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_LIST)}
-							/>
+							<AppActionChip label="Book test" onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_LIST)} />
 						</View>
-						{treatment?.prescription_s3_key ? (
-							<View style={styles.rxFooter}>
-								<AppActionChip
-									label="Download"
-									icon="chevron-down"
-									onPress={handleDownload}
-									style={styles.rxFooterBtn}
-								/>
-								<AppActionChip
-									label="Order medicines"
-									icon="pill"
-									filled
-									onPress={() => navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH_PAGE)}
-									style={styles.rxFooterBtn}
-								/>
-							</View>
-						) : null}
 					</View>
 				</AppSection>
 
@@ -565,9 +580,10 @@ const styles = StyleSheet.create({
 		gap: 12,
 		padding: 12,
 	},
-	rxRowDivider: {
-		borderTopWidth: 1,
-		borderTopColor: APP_COLORS.divider,
+	// The prescription page, under its header row.
+	rxImage: {
+		paddingHorizontal: 12,
+		paddingBottom: 12,
 	},
 	rxName: {
 		fontSize: 15,
@@ -579,17 +595,6 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 		lineHeight: 18,
 		color: APP_COLORS.inkMuted,
-	},
-	rxFooter: {
-		flexDirection: 'row',
-		gap: 8,
-		padding: 12,
-		backgroundColor: APP_COLORS.pageBg,
-	},
-	rxFooterBtn: {
-		flex: 1,
-		minWidth: 0,
-		justifyContent: 'center',
 	},
 
 	// Payment
