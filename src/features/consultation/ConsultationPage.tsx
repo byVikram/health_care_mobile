@@ -13,6 +13,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
+	Alert,
 	Animated,
 	Modal,
 	ScrollView,
@@ -35,10 +36,12 @@ import { Asset } from 'expo-asset'
 import * as FileSystem from 'expo-file-system/legacy'
 import Toast from 'react-native-toast-message'
 
-import { AppSegmentedControl, AppSkeleton, AppSoftCard } from '../../components/common'
+import { AppSegmentedControl, AppSkeleton, AppSoftCard, ConsultationNotesImage } from '../../components/common'
 import { APP_COLORS, TONES } from '../../config/theme'
 import { ROUTES } from '../../navigation/routes'
 import ApiService from '../../services/apiService'
+import { updateAppointmentsStatus } from '../../services/appointmentService'
+import { getStatusIdByLabel } from '../doctor/doctorService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import DicomViewer from './components/DicomViewer'
 import {
@@ -62,6 +65,9 @@ const INK_MUTED = APP_COLORS.inkMuted
 const DIVIDER = APP_COLORS.divider
 const PAGE_BG = APP_COLORS.pageBg
 const PRIMARY = APP_COLORS.primary
+
+/** How long to wait for the canvas to hand back its drawing before falling back to the last one it reported. */
+const CANVAS_CAPTURE_TIMEOUT_MS = 1500
 
 type TabId = 'overview' | 'history' | 'reports' | 'notes'
 type NoteMode = 'type' | 'scribble' | 'voice'
@@ -277,6 +283,20 @@ export default function ConsultationPage() {
 	// Scribble
 	const sigRef = useRef<SignatureViewRef>(null)
 	const [sketch, setSketch] = useState<string | null>(null)
+	// What the canvas last reported, readable from any closure. The canvas answers asynchronously (through its
+	// WebView), so a handler that reads the `sketch` state of an older render can miss the latest stroke.
+	const sketchRef = useRef<string | null>(null)
+	// Only read when the canvas mounts (changing it later would redraw the image on top of the live strokes).
+	const [canvasSeed, setCanvasSeed] = useState('')
+	// While a stroke is in progress the page must not scroll, or the gesture is taken from the canvas.
+	const [scrollLocked, setScrollLocked] = useState(false)
+	// Held from the tap on End until the flow finishes (the canvas read and the confirm dialog come before `saving`).
+	const ending = useRef(false)
+	const pendingCapture = useRef<((image: string | null) => void) | null>(null)
+	// The treatment record once the notes were submitted. From then on the notes (typed text and the scribble)
+	// are final: the server answers 409 to any edit, and this screen shows them read-only.
+	const [submittedNotes, setSubmittedNotes] = useState<TreatmentRecord | null>(null)
+	const locked = !!submittedNotes
 
 	// Voice -- commented out along with the rest of the Voice mode (see the import note above)
 	// const [isListening, setIsListening] = useState(false)
@@ -385,6 +405,9 @@ export default function ConsultationPage() {
 				const existing = await treatmentService.getByAppointment(appointmentId)
 				if (existing) {
 					setNotes(existing.notes ?? '')
+					if (existing.notes_submitted_at) {
+						setSubmittedNotes(existing)
+					}
 					if (existing.follow_up_date) {
 						const days = Math.round((new Date(existing.follow_up_date).getTime() - Date.now()) / 86400000)
 						if (days <= 20) setFollowUp('2wk')
@@ -397,6 +420,15 @@ export default function ConsultationPage() {
 			}
 		})()
 	}, [appointmentId])
+
+	// Notes already submitted when the screen opens: if the visit is not completed yet (the status update failed after
+	// the notes went through), stay on the End button so it can finish the job; the notes are locked, so it only
+	// retries the status change. A completed visit just offers "Back to home".
+	useEffect(() => {
+		if (!locked || !appointmentFetchDone) return
+		const label = typeof appointment?.status === 'string' ? appointment.status : appointment?.status?.label
+		setPhase(label === 'completed' ? 'sent' : 'live')
+	}, [locked, appointmentFetchDone, appointment])
 
 	// ── Voice mode (expo-speech-recognition) -- commented out for now: the native module isn't
 	// available in Expo Go, and development is currently happening in Expo Go. Uncomment this
@@ -484,6 +516,16 @@ export default function ConsultationPage() {
 		setNoteMode(m)
 	}
 
+	// The canvas (a WebView) only exists while the Notes tab is open on Scribble, and leaving it -- for Type, or for
+	// Overview / History / Reports -- throws the drawing away. While it is off screen, keep the last read of the
+	// drawing as the seed the next canvas starts from, so coming back shows (and keeps submitting) what was drawn.
+	const canvasVisible = activeTab === 'notes' && !locked && noteMode === 'scribble'
+	useEffect(() => {
+		if (canvasVisible) return
+		setCanvasSeed(sketchRef.current ?? '')
+		setScrollLocked(false)
+	}, [canvasVisible, sketch])
+
 	// ── DICOM ──
 	const openDicomFromKey = async (s3Key?: string | null) => {
 		setDicomLoading(true)
@@ -547,37 +589,171 @@ export default function ConsultationPage() {
 		return toApiDate(d)
 	}
 
-	const saveTreatmentRecord = async () => {
-		if (!appointmentId) return
-		const combinedNotes = diagnosis.trim() ? `Diagnosis: ${diagnosis.trim()}${notes.trim() ? `\n\n${notes.trim()}` : ''}` : notes.trim()
-		await treatmentService.save(appointmentId, {
-			notes: combinedNotes || undefined,
-			follow_up_date: buildFollowUpDate(followUp) ?? undefined,
+	const handleSketch = (image: string | null) => {
+		sketchRef.current = image
+		setSketch(image)
+	}
+
+	// Asks the canvas for its current drawing and waits for the answer, so the image that is submitted (and then
+	// frozen) always includes the last stroke. With no canvas on screen, what it last reported is what counts; an
+	// empty canvas means no drawing.
+	// A canvas that does not answer is NOT treated as "no drawing": that would submit (and lock) the notes without the
+	// handwriting. The caller stops and asks the doctor to try again.
+	const captureSketch = () =>
+		new Promise<{ image: string | null; timedOut: boolean }>((resolve) => {
+			const canvas = sigRef.current
+			if (!canvas) {
+				resolve({ image: sketchRef.current, timedOut: false })
+				return
+			}
+			const timer = setTimeout(() => {
+				pendingCapture.current = null
+				resolve({ image: null, timedOut: true })
+			}, CANVAS_CAPTURE_TIMEOUT_MS)
+			pendingCapture.current = (image) => {
+				clearTimeout(timer)
+				resolve({ image, timedOut: false })
+			}
+			canvas.readSignature()
 		})
+
+	const saveTreatmentRecord = async (sketchImage: string | null): Promise<TreatmentRecord | null> => {
+		if (!appointmentId) return null
+		const combinedNotes = diagnosis.trim() ? `Diagnosis: ${diagnosis.trim()}${notes.trim() ? `\n\n${notes.trim()}` : ''}` : notes.trim()
+		const followUpDate = buildFollowUpDate(followUp) ?? undefined
+		if (sketchImage || combinedNotes) {
+			// Notes (the scribble as an image, typed text, or both) go to the server in one request, and that
+			// submission is final.
+			const record = await treatmentService.submitNotes(appointmentId, {
+				sketchDataUrl: sketchImage,
+				notes: combinedNotes || undefined,
+				follow_up_date: followUpDate,
+			})
+			setSubmittedNotes(record)
+			return record
+		}
+		// No notes at all (just a follow-up date): nothing to lock.
+		await treatmentService.save(appointmentId, { follow_up_date: followUpDate })
+		return null
+	}
+
+	// The notes image link is signed and short-lived: when it has expired, ask the server for a fresh one.
+	const refreshSubmittedNotes = async (): Promise<boolean> => {
+		if (!appointmentId) return false
+		try {
+			const fresh = await treatmentService.getByAppointment(appointmentId)
+			if (!fresh?.notes_submitted_at) return false
+			setSubmittedNotes(fresh)
+			return true
+		} catch {
+			// The image card offers "Tap to retry".
+			return false
+		}
+	}
+
+	const refreshTreatmentHistory = async () => {
+		if (!patientId) return
+		try {
+			setTreatmentHistory(await patientService.getPatientTreatmentHistory(patientId))
+		} catch {
+			// Keep what is shown; the image card offers "Tap to retry".
+		}
+	}
+
+	const confirmSubmit = () =>
+		new Promise<boolean>((resolve) => {
+			Alert.alert(
+				'Submit your notes?',
+				`Once submitted, your notes can’t be edited. ${patient?.name?.split(' ')[0] || 'The patient'} will be able to see them.`,
+				[
+					{ text: 'Keep editing', style: 'cancel', onPress: () => resolve(false) },
+					{ text: 'Submit', onPress: () => resolve(true) },
+				],
+				{ cancelable: true, onDismiss: () => resolve(false) }
+			)
+		})
+
+	// Ending the consultation marks the visit completed. Until then the patient's app still shows it as an
+	// upcoming booking and never opens the visit summary with the doctor's notes and prescription. Re-sending the
+	// status the appointment already has is a no-op on the server, so a retry is safe.
+	const completeAppointment = async () => {
+		if (!appointmentId) return
+		await updateAppointmentsStatus(appointmentId, await getStatusIdByLabel('completed'))
+	}
+
+	// The doctor's landing page (Home), where today's list refreshes without the patient just seen.
+	const goToDoctorHome = () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME })
+
+	// Ends the consultation: submits the notes (final), marks the visit completed and goes back to Home.
+	const endConsultation = async () => {
+		// Notes already submitted (this is a retry after the visit could not be completed): nothing to read or ask.
+		let finalSketch: string | null = null
+		if (!locked) {
+			// Read the canvas as it is right now, then ask: submitting the notes is final.
+			const captured = await captureSketch()
+			if (captured.timedOut) {
+				Toast.show({ type: 'error', text1: 'Couldn’t read your handwriting from the pad. Please try again.' })
+				return
+			}
+			finalSketch = captured.image
+			const hasNotes = !!(finalSketch || diagnosis.trim() || notes.trim())
+			if (hasNotes && !(await confirmSubmit())) return
+		}
+		setSaving(true)
+		let notesDone = locked
+		let saved: TreatmentRecord | null = null
+		try {
+			if (!locked) {
+				try {
+					saved = await saveTreatmentRecord(finalSketch)
+				} catch (err: any) {
+					// 409: the notes were already submitted (another device, or a double tap). Carry on and finish.
+					if (!(err?.response?.status === 409 && (await refreshSubmittedNotes()))) throw err
+				}
+				notesDone = true
+			}
+			await completeAppointment()
+			setPhase('sent')
+			// Say what was actually saved: the handwritten prescription is confirmed by the server returning its link.
+			const firstName = patient?.name?.split(' ')[0] || 'the patient'
+			Toast.show({
+				type: 'success',
+				text1: saved?.notes_image_url
+					? `Consultation ended · handwritten prescription saved for ${firstName}`
+					: `Consultation ended · notes shared with ${firstName}`,
+			})
+			goToDoctorHome()
+		} catch (err: any) {
+			Toast.show({
+				type: 'error',
+				text1: notesDone
+					? err?.response?.data?.message || 'Notes saved, but the visit could not be marked completed. Tap again to retry.'
+					: err?.response?.data?.message || 'Failed to save consultation notes',
+			})
+		} finally {
+			setSaving(false)
+		}
 	}
 
 	const handlePrimaryPress = async () => {
-		if (saving) return
+		if (saving || ending.current) return
 		if (phase === 'idle') {
 			setPhase('live')
 			return
 		}
 		if (phase === 'live') {
-			setSaving(true)
+			ending.current = true
 			try {
-				await saveTreatmentRecord()
-				setPhase('sent')
-			} catch (err: any) {
-				Toast.show({ type: 'error', text1: err?.response?.data?.message || 'Failed to save consultation notes' })
+				await endConsultation()
 			} finally {
-				setSaving(false)
+				ending.current = false
 			}
 			return
 		}
-		navigation.navigate(ROUTES.MAIN.SCHEDULE)
+		goToDoctorHome()
 	}
 
-	const primaryLabel = phase === 'idle' ? 'Start consultation' : phase === 'live' ? 'End & share notes' : 'Next patient'
+	const primaryLabel = phase === 'idle' ? 'Start consultation' : phase === 'live' ? 'End & share notes' : 'Back to home'
 	const primaryBg = phase === 'idle' ? PRIMARY : phase === 'live' ? INK : PRIMARY
 
 	// ── Derived: header ──
@@ -755,7 +931,12 @@ export default function ConsultationPage() {
 			</View>
 
 			{/* ── Content ── */}
-			<ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+			<ScrollView
+				style={{ flex: 1 }}
+				contentContainerStyle={styles.content}
+				keyboardShouldPersistTaps="handled"
+				scrollEnabled={!scrollLocked}
+			>
 				{activeTab === 'overview' && (
 					<View style={{ gap: 14 }}>
 						{allergies.length > 0 && (
@@ -878,6 +1059,9 @@ export default function ConsultationPage() {
 										<Text style={styles.mutedCaption}>{formatDate((h as any).appointment_date || h.created_at)}</Text>
 										<Text style={styles.historyTitle}>{h.hospital_name || 'Consultation'}</Text>
 										{!!h.notes && <Text style={styles.historyNote}>{h.notes}</Text>}
+										{!!h.notes_image_url && (
+											<ConsultationNotesImage uri={h.notes_image_url} onExpired={refreshTreatmentHistory} />
+										)}
 										{!!h.doctor_name && <Text style={styles.historyBy}>Dr. {h.doctor_name}</Text>}
 										{!!h.prescription_s3_key && (
 											<TouchableOpacity
@@ -977,6 +1161,20 @@ export default function ConsultationPage() {
 
 				{activeTab === 'notes' && (
 					<View style={{ gap: 14 }}>
+						{locked && (
+							<AppSoftCard radius={14} padding={16} style={{ gap: 12 }}>
+								<View style={styles.lockedRow}>
+									<MaterialCommunityIcons name="lock-outline" size={18} color={INK_MUTED} />
+									<Text style={styles.lockedText}>Notes submitted · they can no longer be edited</Text>
+								</View>
+								{!!submittedNotes?.notes?.trim() && <Text style={styles.notesPreviewText}>{submittedNotes.notes}</Text>}
+								{!!submittedNotes?.notes_image_url && (
+									<ConsultationNotesImage uri={submittedNotes.notes_image_url} onExpired={refreshSubmittedNotes} />
+								)}
+							</AppSoftCard>
+						)}
+						{!locked && (
+						<>
 						<AppSoftCard radius={14} style={{ gap: 6 }}>
 							<Text style={styles.fieldLabel}>Diagnosis</Text>
 							<TextInput
@@ -1034,8 +1232,24 @@ export default function ConsultationPage() {
 									<View style={styles.canvasWrap}>
 										<SignatureCanvas
 											ref={sigRef}
-											onOK={(sig) => setSketch(sig)}
-											onEnd={() => sigRef.current?.readSignature()}
+											onOK={(sig) => {
+												handleSketch(sig)
+												pendingCapture.current?.(sig)
+												pendingCapture.current = null
+											}}
+											onEmpty={() => {
+												// An empty pad is "no drawing": everything was undone or cleared, so whatever was read
+												// before must not be submitted.
+												handleSketch(null)
+												pendingCapture.current?.(null)
+												pendingCapture.current = null
+											}}
+											onBegin={() => setScrollLocked(true)}
+											onEnd={() => {
+												setScrollLocked(false)
+												sigRef.current?.readSignature()
+											}}
+											webviewProps={{ nestedScrollEnabled: true }}
 											descriptionText=""
 											clearText=""
 											confirmText=""
@@ -1046,21 +1260,36 @@ export default function ConsultationPage() {
 											style={{ flex: 1, height: 230 }}
 											backgroundColor="#FFFDF6"
 											autoClear={false}
-											dataURL=""
+											dataURL={canvasSeed}
 										/>
 									</View>
 									<View style={{ flexDirection: 'row', gap: 8 }}>
-										<TouchableOpacity onPress={() => sigRef.current?.undo()} style={styles.canvasToolBtn}>
+										<TouchableOpacity
+											onPress={() => {
+												sigRef.current?.undo()
+												sigRef.current?.readSignature()
+											}}
+											style={styles.canvasToolBtn}
+										>
 											<MaterialCommunityIcons name="undo" size={18} color={INK} />
 										</TouchableOpacity>
-										<TouchableOpacity onPress={() => sigRef.current?.clearSignature()} style={styles.canvasClearBtn}>
+										<TouchableOpacity
+											onPress={() => {
+												sigRef.current?.clearSignature()
+												// A cleared canvas must not still be submitted as the notes.
+												handleSketch(null)
+											}}
+											style={styles.canvasClearBtn}
+										>
 											<Text style={styles.canvasClearBtnText}>Clear</Text>
 										</TouchableOpacity>
 										<View style={{ flex: 1 }} />
 										<TouchableOpacity
 											disabled={!sketch}
 											onPress={() => {
-												sigRef.current?.clearSignature()
+												// Keep the drawing on the pad: wiping it while the old image stays attached would make the
+												// next stroke silently replace it. Only "Clear" removes a drawing.
+												sigRef.current?.readSignature()
 											}}
 											style={[styles.saveSketchBtn, !sketch && { opacity: 0.5 }]}
 										>
@@ -1130,12 +1359,14 @@ export default function ConsultationPage() {
 								<View style={styles.sketchRow}>
 									<MaterialCommunityIcons name="image-outline" size={20} color={APP_COLORS.mintAccent} />
 									<Text style={styles.sketchRowText}>Sketch attached to notes</Text>
-									<TouchableOpacity onPress={() => setSketch(null)} accessibilityLabel="Remove sketch">
+									<TouchableOpacity onPress={() => handleSketch(null)} accessibilityLabel="Remove sketch">
 										<MaterialCommunityIcons name="close" size={18} color={INK_MUTED} />
 									</TouchableOpacity>
 								</View>
 							)}
 						</AppSoftCard>
+						</>
+						)}
 
 						<View style={{ gap: 8 }}>
 							<Text style={styles.sectionTitle}>Follow-up</Text>
@@ -1147,6 +1378,7 @@ export default function ConsultationPage() {
 											key={f.id}
 											style={[styles.followUpBtn, { borderColor: on ? PRIMARY : DIVIDER, backgroundColor: on ? APP_COLORS.mint : '#FFFFFF' }]}
 											onPress={() => setFollowUp(f.id)}
+											disabled={locked}
 										>
 											<Text style={[styles.followUpBtnText, { color: on ? INK : INK_MUTED }]}>{f.label}</Text>
 										</TouchableOpacity>
@@ -1371,6 +1603,8 @@ const styles = StyleSheet.create({
 	notesPreview: { padding: 10, borderRadius: 10, backgroundColor: PAGE_BG, gap: 4 },
 	editAsTextLink: { fontSize: 12, fontWeight: '700', color: PRIMARY },
 	notesPreviewText: { fontSize: 14, lineHeight: 20, color: INK },
+	lockedRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+	lockedText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700', color: INK_MUTED },
 
 	sketchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: APP_COLORS.mintAccent },
 	sketchRowText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700', color: INK },

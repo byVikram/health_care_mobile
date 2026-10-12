@@ -157,6 +157,10 @@ export const API_ENDPOINTS = {
 	TREATMENTS: {
 		CREATE: `${BASE_URL}/api/treatments`,
 		BY_APPOINTMENT: (appointmentId: string) => `${BASE_URL}/api/treatments/appointment/${appointmentId}`,
+		/** Multipart: the doctor's scribbled notes as an image. Final once submitted (409 on any later edit). */
+		SUBMIT_NOTES: (appointmentId: string) => `${BASE_URL}/api/treatments/appointment/${appointmentId}/notes`,
+		/** A fresh signed link (about 5 minutes) to the handwritten prescription; 404 until one is submitted. */
+		PRESCRIPTION: (appointmentId: string) => `${BASE_URL}/api/treatments/appointment/${appointmentId}/prescription`,
 	},
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,
