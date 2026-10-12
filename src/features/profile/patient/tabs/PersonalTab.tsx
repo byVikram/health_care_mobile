@@ -1,6 +1,14 @@
 import React, { useMemo } from 'react'
 import { View, ScrollView, StyleSheet, useWindowDimensions } from 'react-native'
-import { AppTypography, AppInput, AppSelect, AppCalendar, AppPhotoPicker, AppStickyFooter } from '../../../../components/common'
+import {
+	AppTypography,
+	AppInput,
+	AppSelect,
+	AppCalendar,
+	AppPhotoPicker,
+	AppStickyFooter,
+	type AppPhotoPickerChange,
+} from '../../../../components/common'
 import type { PatientProfileState } from '../PatientProfileService'
 
 const DEFAULT_PATIENT_IMAGE = require('../../../../assets/Banner/patient.png')
@@ -72,11 +80,10 @@ export default function PersonalTab({ data, onChange, onSave, saving }: Props) {
 							imageUri={data.photoUrl}
 							fallbackSource={DEFAULT_PATIENT_IMAGE}
 							fileNamePrefix="patient-profile"
-							onChange={({ uri, removed }: { uri: string; removed: boolean }) => {
-								onChange('photoUrl', uri)
-								if (removed) {
-									onChange('photoUrl', '')
-								}
+							onChange={({ uri, upload, removed }: AppPhotoPickerChange) => {
+								onChange('photoUrl', removed ? '' : uri)
+								onChange('photoUpload', removed ? null : upload)
+								onChange('photoRemoved', removed)
 							}}
 						/>
 					</View>

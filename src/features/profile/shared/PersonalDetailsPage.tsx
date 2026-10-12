@@ -1,8 +1,8 @@
 // Personal details for patients, doctors and ancillary providers. Which cards / fields appear, their
 // required flags and how the data loads and saves all come from PERSONAL_DETAILS_CONFIG[role].
 
-import React, { useMemo } from 'react'
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import React, { useMemo, useState } from 'react'
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppAvatar,
@@ -20,6 +20,7 @@ import { APP_COLORS } from '../../../config/theme'
 import { useAuth } from '../../../context/AuthContext'
 import { buildS3Url } from '../../../utils/s3Utils'
 import { showComingSoon } from '../../../utils/toast'
+import { useAvatarChange } from '../hooks/useAvatarChange'
 import { hubRoleFor } from '../config/profileHubConfig'
 import {
 	PERSONAL_DETAILS_CONFIG,
@@ -41,6 +42,12 @@ export default function PersonalDetailsPage() {
 	const schema = useMemo(() => personalSchemaFor(config.required), [config])
 	const form = useProfileForm<PersonalDraft>({ load: config.load, save: config.save, schema })
 	const { draft, set, errors } = form
+
+	// The photo is uploaded as soon as it is picked (the server links it to this profile), so it lives outside the
+	// draft: it must not make the form look "dirty". null = show whatever the profile loaded with.
+	const [photoOverride, setPhotoOverride] = useState<string | null>(null)
+	const photoUrl = photoOverride !== null ? photoOverride : buildS3Url(draft?.avatar)
+	const avatar = useAvatarChange({ hasPhoto: !!photoUrl, onChanged: setPhotoOverride })
 
 	const renderField = (key: PersonalFieldKey, labelOverride?: string) => {
 		if (!draft) return null
@@ -138,7 +145,7 @@ export default function PersonalDetailsPage() {
 					<View style={styles.photoCard}>
 						<View style={styles.photoWrap}>
 							<AppAvatar
-								uri={buildS3Url(draft.avatar)}
+								uri={photoUrl}
 								name={draft.name}
 								size={72}
 								backgroundColor={APP_COLORS.mint}
@@ -146,11 +153,16 @@ export default function PersonalDetailsPage() {
 							/>
 							<TouchableOpacity
 								style={styles.photoButton}
-								onPress={() => showComingSoon('Photo upload will be available soon')}
+								onPress={avatar.open}
+								disabled={avatar.busy}
 								accessibilityRole="button"
 								accessibilityLabel="Change photo"
 							>
-								<MaterialCommunityIcons name="camera-outline" size={16} color="#FFFFFF" />
+								{avatar.busy ? (
+									<ActivityIndicator size="small" color="#FFFFFF" />
+								) : (
+									<MaterialCommunityIcons name="camera-outline" size={16} color="#FFFFFF" />
+								)}
 							</TouchableOpacity>
 						</View>
 						<View style={styles.photoText}>

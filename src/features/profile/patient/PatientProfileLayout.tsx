@@ -22,6 +22,7 @@ import {
 	INITIAL_PATIENT_STATE,
 } from './PatientProfileService'
 import type { PatientProfileState } from './PatientProfileService'
+import { removeAvatar, uploadAvatar } from '../../../services/avatarService'
 
 import PersonalTab from './tabs/PersonalTab'
 import MedicalTab from './tabs/MedicalTab'
@@ -145,6 +146,17 @@ export default function PatientProfileLayout() {
 
 			console.log('===== PROFILE DATA =====')
 			console.log(JSON.stringify(data, null, 2))
+
+			// The photo has its own endpoint: the server stores the file and links it, so no key is sent from here.
+			try {
+				if (data.photoUpload) await uploadAvatar(data.photoUpload)
+				else if (data.photoRemoved) await removeAvatar()
+			} catch (photoError: any) {
+				// Show the server's reason (e.g. "File storage is not configured") instead of a generic message.
+				const detail = photoError?.response?.data?.message || photoError?.message
+				Alert.alert('Photo not saved', detail || 'Could not update your profile photo. Please try again.')
+				return
+			}
 
 			const res = await updatePatientProfile(data)
 

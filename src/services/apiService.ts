@@ -303,8 +303,8 @@ const ApiService = {
 	patch<T = unknown>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
 		return axiosInstance.patch<T>(url, body, config)
 	},
-	put<T = unknown>(url: string, body: unknown): Promise<AxiosResponse<T>> {
-		return axiosInstance.put<T>(url, body)
+	put<T = unknown>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+		return axiosInstance.put<T>(url, body, config)
 	},
 	delete<T = unknown>(url: string): Promise<AxiosResponse<T>> {
 		return axiosInstance.delete<T>(url)

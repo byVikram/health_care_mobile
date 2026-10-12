@@ -2,6 +2,8 @@ import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { formatApiDateForDisplay, formatDateStringForApi } from '../../../utils/date'
 import { safeJsonParse } from '../../../utils/jsonUtils'
+import { buildS3Url } from '../../../utils/s3Utils'
+import type { AppPhotoPickerUpload } from '../../../components/common/inputs/AppPhotoPicker'
 
 export interface PatientProfileState {
 	// Personal
@@ -17,7 +19,10 @@ export interface PatientProfileState {
 	emergencyContactName: string
 	emergencyContact: string
 	location: string
-	photoUrl: string
+	photoUrl: string // what the picker shows: a full URL from the server, or a local file uri after picking
+	/** A newly picked photo, uploaded on Save (never sent as a value in the JSON profile body). */
+	photoUpload: AppPhotoPickerUpload | null
+	photoRemoved: boolean
 
 	// Medical
 	allergies: string[]
@@ -48,6 +53,8 @@ export const INITIAL_PATIENT_STATE: PatientProfileState = {
 	emergencyContact: '',
 	location: '',
 	photoUrl: '',
+	photoUpload: null,
+	photoRemoved: false,
 	allergies: [],
 	chronicConditions: [],
 	currentMedications: [],
@@ -96,7 +103,6 @@ export const updatePatientProfile = async (state: PatientProfileState): Promise<
 		emergency_contact_name: state.emergencyContactName,
 		emergency_contact_number: state.emergencyContact,
 		location: state.location,
-		avatar: state.photoUrl,
 
 		// Medical
 		allergies: state.allergies,
@@ -151,7 +157,9 @@ export const mapApiToLocalState = (apiData: any): PatientProfileState => {
 		height: toStateString(personal?.height),
 		weight: toStateString(personal?.weight),
 		location: personal?.location || '',
-		photoUrl: personal?.avatar || '',
+		photoUrl: buildS3Url(personal?.avatar) || '',
+		photoUpload: null,
+		photoRemoved: false,
 		emergencyContactName: personal?.emergency_contact?.name || '',
 		emergencyContact: personal?.emergency_contact?.number || '',
 

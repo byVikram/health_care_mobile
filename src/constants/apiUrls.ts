@@ -128,6 +128,11 @@ export const API_ENDPOINTS = {
 	APP_CONFIG: `${BASE_URL}/api/app-config`,
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
 
+	// Profile photo for every role (multipart PUT to set, DELETE to remove)
+	UPLOADS: {
+		AVATAR: `${BASE_URL}/api/uploads/avatar`,
+	},
+
 	PATIENT: {
 		ME: `${BASE_URL}/api/patients/me`,
 		APPOINTMENT_HOSPITALS: `${BASE_URL}/api/patients/appointments/hospitals`,
