@@ -164,6 +164,9 @@ export const rescheduleAppointment = async (payload: RescheduleAppointmentPayloa
 export interface StartConsultationResponse {
 	success: boolean
 	appointment_id?: string
+	// `already_verified`: the patient's code was already entered for this appointment, so no new code was sent and
+	// the doctor goes straight into the consultation.
+	data?: { appointment_id?: string; already_verified?: boolean }
 	// No `otp` field: the backend generates the code and emails it to the patient directly
 	// (app/appointments/service.py `start_consultation`) rather than returning it here — the doctor
 	// must get the code from the patient, not their own app. (There's no SMS provider in this

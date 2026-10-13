@@ -29,7 +29,7 @@ import {
 	AppScreenHeader,
 	AppSection,
 	AppTextLink,
-	ConsultationNotesImage,
+	PrescriptionPreview,
 } from '../../components/common'
 import AppRatingStars from '../../components/common/display/AppRatingStars'
 import { showComingSoon } from '../../utils/toast'
@@ -38,7 +38,7 @@ import { getReviewForAppointment, createReview, DoctorReview } from '../../servi
 import { patientService, treatmentService, PrescriptionLink, TreatmentRecord } from '../consultation/ConsultationService'
 import { Appointment, AppointmentDoctor } from '../../types/appointment'
 import { ROUTES } from '../../navigation/routes'
-import { formatTimeSlot, capitaliseWords } from '../../utils/formatters'
+import { formatTimeSlot, capitaliseWords, bookingRef } from '../../utils/formatters'
 import { buildS3Url } from '../../utils/s3Utils'
 import { formatFullDate, formatInterval, fullDayLabel, parseDateOnly } from '../../utils/date'
 import { APP_COLORS, TONES, formatInr } from '../../config/theme'
@@ -182,7 +182,7 @@ export default function VisitSummaryPage() {
 		)
 	}
 
-	const bookingRef = appt.public_id ?? appt.id
+	const bookingId = bookingRef(appt.public_id ?? appt.id)
 	const rawStatus = typeof appt.status === 'string' ? appt.status : appt.status?.label
 	const doctor = appt.doctor as DoctorWithQuals | undefined
 	const doctorSpecialty = doctor?.specialty ?? doctor?.specialization
@@ -210,7 +210,7 @@ export default function VisitSummaryPage() {
 
 	const handleShare = () => {
 		const lines = [
-			`Visit summary · Booking ${bookingRef}`,
+			`Visit summary · Booking ${bookingId}`,
 			appt.doctor?.name ? `${appt.doctor.name}${doctorSpecialty ? ` (${doctorSpecialty})` : ''}` : null,
 			whenLabel,
 			whereLabel,
@@ -248,7 +248,7 @@ export default function VisitSummaryPage() {
 			<AppScreenHeader
 				variant="bar"
 				title="Visit summary"
-				subtitle={`Booking ${bookingRef}`}
+				subtitle={`Booking ${bookingId}`}
 				titleStyle={styles.headerTitle}
 				onBack={goBack}
 				backAccessibilityLabel="Back to bookings"
@@ -318,55 +318,69 @@ export default function VisitSummaryPage() {
 					</View>
 				</AppSection>
 
-				{/* Doctor's notes — only when real */}
-				{treatment?.notes ? (
+				{/* Doctor's notes: only when the doctor wrote some, and not when they are already on the prescription page */}
+				{treatment?.notes?.trim() && !treatment.notes_image_url ? (
 					<AppSection title="Doctor’s notes" titleSize="sm" marginTop={0}>
 						<Text style={styles.bodyText}>{treatment.notes}</Text>
 					</AppSection>
 				) : null}
 
-				{/* Prescription: one card. The download action sits in its header, next to what it downloads. */}
+				{/* Prescription: the page the doctor wrote (tap to view it full screen), then the way on to lab tests. */}
 				{hasPrescription ? (
 					<AppSection title="Prescription" titleSize="sm" marginTop={0}>
+						{treatment?.notes_image_url ? (
+							<PrescriptionPreview
+								uri={treatment.notes_image_url}
+								title={prescriptionDate ? `Prescription · ${formatFullDate(prescriptionDate)}` : 'Prescription'}
+								subtitle={[appt.doctor?.name, appt.hospital?.name].filter(Boolean).join(' · ') || 'Your doctor'}
+								viewerSubtitle={[prescriptionDate ? formatFullDate(prescriptionDate) : null, appt.doctor?.name].filter(Boolean).join(' · ')}
+								onExpired={loadTreatment}
+								onSave={handleDownload}
+								saving={downloading}
+							/>
+						) : (
+							<View style={styles.rxBox}>
+								<View style={styles.rxRow}>
+									<AppIconTile icon="pill" tone="peach" size={40} radius={12} iconSize={20} />
+									<View style={styles.flexCol}>
+										<Text style={styles.rxName}>{appt.doctor?.name ?? 'Your doctor'}</Text>
+										<Text style={styles.rxMeta}>
+											{prescriptionDate ? `Issued ${formatFullDate(prescriptionDate)}` : 'Issued after your visit'}
+										</Text>
+									</View>
+									<AppActionChip
+										label="Download"
+										icon="download-outline"
+										onPress={handleDownload}
+										loading={downloading}
+										accessibilityLabel="Download prescription"
+									/>
+								</View>
+							</View>
+						)}
+						<AppActionChip
+							variant="tinted"
+							icon="flask-outline"
+							label="Book lab test"
+							onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_LIST)}
+							style={styles.labBtn}
+						/>
+					</AppSection>
+				) : (
+					/* No prescription: lab tests is still a real entry point into the Laboratory search flow */
+					<AppSection title="Lab tests" titleSize="sm" marginTop={0}>
 						<View style={styles.rxBox}>
 							<View style={styles.rxRow}>
-								<AppIconTile icon="pill" tone="peach" size={40} radius={12} iconSize={20} />
+								<AppIconTile icon="flask-outline" tone="lilac" size={40} radius={12} iconSize={20} />
 								<View style={styles.flexCol}>
-									<Text style={styles.rxName}>{appt.doctor?.name ?? 'Your doctor'}</Text>
-									<Text style={styles.rxMeta}>
-										{prescriptionDate ? `Issued ${formatFullDate(prescriptionDate)}` : 'Issued after your visit'}
-									</Text>
+									<Text style={styles.rxName}>Lab test</Text>
+									<Text style={styles.rxMeta}>Book any test your doctor advised</Text>
 								</View>
-								<AppActionChip
-									label="Download"
-									icon="download-outline"
-									onPress={handleDownload}
-									loading={downloading}
-									accessibilityLabel="Download prescription"
-								/>
+								<AppActionChip label="Book test" onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_LIST)} />
 							</View>
-							{treatment?.notes_image_url ? (
-								<View style={styles.rxImage}>
-									<ConsultationNotesImage uri={treatment.notes_image_url} onExpired={loadTreatment} />
-								</View>
-							) : null}
 						</View>
 					</AppSection>
-				) : null}
-
-				{/* Lab tests: always a real entry point into the Laboratory search flow */}
-				<AppSection title="Lab tests" titleSize="sm" marginTop={0}>
-					<View style={styles.rxBox}>
-						<View style={styles.rxRow}>
-							<AppIconTile icon="flask-outline" tone="lilac" size={40} radius={12} iconSize={20} />
-							<View style={styles.flexCol}>
-								<Text style={styles.rxName}>Lab test</Text>
-								<Text style={styles.rxMeta}>Book any test your doctor advised</Text>
-							</View>
-							<AppActionChip label="Book test" onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_LIST)} />
-						</View>
-					</View>
-				</AppSection>
+				)}
 
 				{/* Follow-up — only when real */}
 				{followUp ? (
@@ -580,10 +594,10 @@ const styles = StyleSheet.create({
 		gap: 12,
 		padding: 12,
 	},
-	// The prescription page, under its header row.
-	rxImage: {
-		paddingHorizontal: 12,
-		paddingBottom: 12,
+	// Full-width "Book lab test" under the prescription row.
+	labBtn: {
+		alignSelf: 'stretch',
+		marginTop: 12,
 	},
 	rxName: {
 		fontSize: 15,

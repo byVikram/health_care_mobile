@@ -55,6 +55,9 @@ import {
 } from './ConsultationService'
 import { getLatestVitals, type VitalRecord } from './VitalsService'
 import { buildS3Url } from '../../utils/s3Utils'
+import { bookingRef } from '../../utils/formatters'
+import { formatFullDate, parseDateOnly } from '../../utils/date'
+import { PrescriptionPaper } from './components/PrescriptionPaper'
 import { toApiDate } from '../doctor/scheduleUtils'
 import { openWebUrl } from '../../utils/safeLinking'
 
@@ -619,14 +622,14 @@ export default function ConsultationPage() {
 
 	const saveTreatmentRecord = async (sketchImage: string | null): Promise<TreatmentRecord | null> => {
 		if (!appointmentId) return null
-		const combinedNotes = diagnosis.trim() ? `Diagnosis: ${diagnosis.trim()}${notes.trim() ? `\n\n${notes.trim()}` : ''}` : notes.trim()
 		const followUpDate = buildFollowUpDate(followUp) ?? undefined
-		if (sketchImage || combinedNotes) {
+		if (sketchImage || notes.trim() || diagnosis.trim()) {
 			// Notes (the scribble as an image, typed text, or both) go to the server in one request, and that
-			// submission is final.
+			// submission is final. The server draws them onto the prescription page.
 			const record = await treatmentService.submitNotes(appointmentId, {
 				sketchDataUrl: sketchImage,
-				notes: combinedNotes || undefined,
+				notes: notes.trim() || undefined,
+				diagnosis: diagnosis.trim() || undefined,
 				follow_up_date: followUpDate,
 			})
 			setSubmittedNotes(record)
@@ -751,6 +754,22 @@ export default function ConsultationPage() {
 			return
 		}
 		goToDoctorHome()
+	}
+
+	// The prescription page the doctor writes on: the fixed format, filled from what is known about this visit.
+	const visitDay = parseDateOnly(appointment?.appointment_date, { ignoreTime: false }) ?? new Date()
+	const ageSex = [patient?.age ? `${patient.age} yrs` : '', patient?.gender ? patient.gender.trim().charAt(0).toUpperCase() : '']
+		.filter(Boolean)
+		.join(', ')
+	const paperProps = {
+		clinicName: doctor?.clinicName || appointment?.hospital?.name || 'KarolaHealth',
+		doctorName: doctor?.name ?? '',
+		qualifications: doctor?.degree || null,
+		designation: doctor?.specialization || null,
+		patientLine: [patient?.name, ageSex].filter(Boolean).join(' · '),
+		dateLabel: formatFullDate(visitDay),
+		diagnosis,
+		bookingLine: [bookingRef(appointmentId), String(appointment?.appointment_mode ?? '').toLowerCase().includes('video') ? 'Video call' : 'In-clinic'].join(' · '),
 	}
 
 	const primaryLabel = phase === 'idle' ? 'Start consultation' : phase === 'live' ? 'End & share notes' : 'Back to home'
@@ -1167,7 +1186,10 @@ export default function ConsultationPage() {
 									<MaterialCommunityIcons name="lock-outline" size={18} color={INK_MUTED} />
 									<Text style={styles.lockedText}>Notes submitted · they can no longer be edited</Text>
 								</View>
-								{!!submittedNotes?.notes?.trim() && <Text style={styles.notesPreviewText}>{submittedNotes.notes}</Text>}
+								{/* The page already carries the typed notes; the text alone is shown only when there is no page. */}
+								{!!submittedNotes?.notes?.trim() && !submittedNotes?.notes_image_url && (
+									<Text style={styles.notesPreviewText}>{submittedNotes.notes}</Text>
+								)}
 								{!!submittedNotes?.notes_image_url && (
 									<ConsultationNotesImage uri={submittedNotes.notes_image_url} onExpired={refreshSubmittedNotes} />
 								)}
@@ -1216,20 +1238,24 @@ export default function ConsultationPage() {
 							</View>
 
 							{noteMode === 'type' && (
-								<TextInput
-									value={notes}
-									onChangeText={setNotes}
-									placeholder="Findings, advice, what you discussed"
-									placeholderTextColor={INK_MUTED}
-									multiline
-									numberOfLines={7}
-									style={styles.notesTextarea}
-								/>
+								<PrescriptionPaper {...paperProps}>
+									{(body) => (
+										<TextInput
+											value={notes}
+											onChangeText={setNotes}
+											placeholder="Medicines, findings, advice"
+											placeholderTextColor={INK_MUTED}
+											multiline
+											style={[styles.paperTextInput, { height: body.height }]}
+										/>
+									)}
+								</PrescriptionPaper>
 							)}
 
 							{noteMode === 'scribble' && (
 								<View style={{ gap: 8 }}>
-									<View style={styles.canvasWrap}>
+									<PrescriptionPaper {...paperProps}>
+										{(body) => (
 										<SignatureCanvas
 											ref={sigRef}
 											onOK={(sig) => {
@@ -1253,16 +1279,17 @@ export default function ConsultationPage() {
 											descriptionText=""
 											clearText=""
 											confirmText=""
-											webStyle=".m-signature-pad{box-shadow:none;border:none}.m-signature-pad--body{border:none}.m-signature-pad--footer{display:none}body{background:#FFFDF6;margin:0;padding:0}"
+											webStyle=".m-signature-pad{box-shadow:none;border:none}.m-signature-pad--body{border:none}.m-signature-pad--footer{display:none}body{background:#FFFFFF;margin:0;padding:0}"
 											penColor="#12373E"
 											minWidth={2}
 											maxWidth={3}
-											style={{ flex: 1, height: 230 }}
-											backgroundColor="#FFFDF6"
+											style={{ width: body.width, height: body.height }}
+											backgroundColor="#FFFFFF"
 											autoClear={false}
 											dataURL={canvasSeed}
 										/>
-									</View>
+									)}
+								</PrescriptionPaper>
 									<View style={{ flexDirection: 'row', gap: 8 }}>
 										<TouchableOpacity
 											onPress={() => {
@@ -1579,9 +1606,8 @@ const styles = StyleSheet.create({
 	modeBtnText: { fontSize: 13, fontWeight: '700', color: INK_MUTED },
 	modeBtnTextActive: { color: INK },
 
-	notesTextarea: { minHeight: 140, padding: 10, borderWidth: 1, borderColor: '#7A8B8E', borderRadius: 10, backgroundColor: '#FFFFFF', color: INK, fontSize: 15, lineHeight: 22, textAlignVertical: 'top' },
 
-	canvasWrap: { borderRadius: 12, borderWidth: 1, borderColor: '#7A8B8E', overflow: 'hidden', backgroundColor: '#FFFDF6', height: 230 },
+	paperTextInput: { paddingHorizontal: 14, paddingVertical: 8, color: INK, fontSize: 14, lineHeight: 20, textAlignVertical: 'top' },
 	canvasToolBtn: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: DIVIDER, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
 	canvasClearBtn: { height: 44, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: DIVIDER, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
 	canvasClearBtnText: { fontSize: 13, fontWeight: '700', color: INK },
