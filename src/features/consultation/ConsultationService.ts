@@ -245,6 +245,8 @@ export interface SubmitNotesPayload {
   /** The scribble as a PNG data URL ("data:image/png;base64,..."), as react-native-signature-canvas returns it. */
   sketchDataUrl?: string | null;
   notes?: string | null;
+  /** Shown in the patient grid of the prescription page; also kept in front of the notes as text. */
+  diagnosis?: string | null;
   follow_up_date?: string | null; // "YYYY-MM-DD"
 }
 
@@ -306,6 +308,7 @@ export const treatmentService = {
   submitNotes: async (appointmentId: string, payload: SubmitNotesPayload): Promise<TreatmentRecord> => {
     const form = new FormData();
     if (payload.notes) form.append("notes", payload.notes);
+    if (payload.diagnosis) form.append("diagnosis", payload.diagnosis);
     if (payload.follow_up_date) form.append("follow_up_date", payload.follow_up_date);
 
     let path: string | null = null;

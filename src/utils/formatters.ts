@@ -91,3 +91,9 @@ export function initialsOf(name: string): string {
 export function formatKm(distance: number): string {
 	return Number.isInteger(distance) ? String(distance) : distance.toFixed(1)
 }
+
+/** The short booking reference patients see ("KH-1A2B3C4D"): the first 8 characters of the appointment's public id. */
+export function bookingRef(publicId: string | null | undefined): string {
+	if (!publicId) return ''
+	return `KH-${publicId.replace(/-/g, '').slice(0, 8).toUpperCase()}`
+}
