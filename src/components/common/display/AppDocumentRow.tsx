@@ -30,7 +30,8 @@ export type AppDocumentRowProps = {
 	style?: StyleProp<ViewStyle>
 }
 
-const fileLabel = (value: string) => value.split('/').pop() || value
+// A stored document arrives as a storage key or as a signed link ("…/uuid.pdf?X-Amz-…"): show just the file name.
+const fileLabel = (value: string) => value.split('?')[0].split('/').pop() || value
 
 export function AppDocumentRow({
 	label,

@@ -1,5 +1,6 @@
 // Doctor "Achievements": awards, publications, conferences... Each add / edit / remove saves straight away
-// (remove is a soft delete on the backend). Public achievements show on the doctor's profile.
+// (remove is a soft delete on the backend). Public achievements show on the doctor's profile. An achievement can
+// carry a supporting document (PDF or photo), sent in the same request as the achievement.
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
@@ -7,6 +8,7 @@ import Toast from 'react-native-toast-message'
 import {
 	AppChipGroup,
 	AppConfirmSheet,
+	AppDocumentRow,
 	AppEditableList,
 	AppFormCard,
 	AppFormField,
@@ -26,6 +28,7 @@ import {
 	type DoctorAchievement,
 } from './doctorProfileService'
 import { ProfileScreen } from '../shared/components/ProfileScreen'
+import { pickCertificateFile, type PickedFile } from '../../../utils/pickedFile'
 
 const FIELDS: AppListItemField[] = [
 	{ key: 'title', label: 'Title', required: true, placeholder: 'e.g. Best Cardiologist Award', maxLength: 200 },
@@ -57,6 +60,8 @@ export default function AchievementsPage() {
 	const [isPublic, setIsPublic] = useState(true)
 	const [removing, setRemoving] = useState<DoctorAchievement | null>(null)
 	const [actionError, setActionError] = useState<string | null>(null)
+	// The supporting document picked in the open sheet; it is sent when the sheet is submitted.
+	const [pendingDoc, setPendingDoc] = useState<PickedFile | null>(null)
 
 	const load = useCallback(async () => {
 		setLoadError(null)
@@ -76,6 +81,7 @@ export default function AchievementsPage() {
 	const open = (item: DoctorAchievement | 'new') => {
 		setType(item === 'new' ? 'Award' : item.achievement_type)
 		setIsPublic(item === 'new' ? true : item.is_public)
+		setPendingDoc(null)
 		setEditing(item)
 	}
 
@@ -91,8 +97,8 @@ export default function AchievementsPage() {
 			is_public: isPublic,
 		}
 		try {
-			if (current) await updateDoctorAchievement(current.id, input)
-			else await createDoctorAchievement(input)
+			if (current) await updateDoctorAchievement(current.id, input, pendingDoc)
+			else await createDoctorAchievement(input, pendingDoc)
 			setEditing(null)
 			Toast.show({ type: 'success', text1: current ? 'Achievement updated' : 'Achievement added' })
 			await load()
@@ -150,6 +156,18 @@ export default function AchievementsPage() {
 								accessibilityLabel="Achievement type"
 							/>
 						</AppFormField>
+						<AppDocumentRow
+							label="Supporting document"
+							description="Certificate, paper or letter (PDF or photo)"
+							fileName={pendingDoc?.name ?? current?.document_s3_key}
+							status={pendingDoc || current?.document_s3_key ? 'in_review' : 'missing'}
+							optional
+							onUpload={() =>
+								void pickCertificateFile().then((file) => {
+									if (file) setPendingDoc(file)
+								})
+							}
+						/>
 						<View style={styles.publicRow}>
 							<View style={styles.flex}>
 								<Text style={styles.publicTitle}>Show on my public profile</Text>

@@ -4,6 +4,7 @@
 
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
+import { appendFile, type PickedFile } from '../../../utils/pickedFile'
 import type { DoctorHospitalAvailability, DoctorOverrideRow } from '../availability/availabilityAdapters'
 
 export type IdLabel = { id: string; label: string }
@@ -80,6 +81,8 @@ export interface DoctorDegree {
 	institution?: string | null
 	college?: string | null
 	year_of_passing?: string | null
+	/** Where the uploaded certificate is stored. `qualification_proof_s3_key` is the same value, older name. */
+	degree_certificate?: string | null
 	qualification_proof_s3_key?: string | null
 }
 
@@ -87,7 +90,12 @@ export interface DoctorProfessional {
 	experience_years: number | null
 	degrees: DoctorDegree[] | null
 	registration_number: string | null
+	/** The uploaded registration proof. `registration_proof_s3_key` is the same value, older name. */
+	registration_proof?: string | null
 	registration_proof_s3_key: string | null
+	/** The uploaded government photo ID and PAN card ('' / null when none). */
+	identity_proof?: string | null
+	pan_card?: string | null
 	about: string | null
 	specialities?: IdLabel[] | null
 }
@@ -101,13 +109,56 @@ export type DoctorProfessionalPatch = Partial<{
 	experience_years: number
 	registration_number: string
 	about: string
-	degrees: { degree: string; college: string; year_of_passing: string; qualification_proof_s3_key?: string | null }[]
+	/** The full list. `id` keeps an existing degree (and its certificate); `certificate` is a newly picked file. */
+	degrees: { id?: number; degree: string; college: string; year_of_passing: string; certificate?: PickedFile | null }[]
+	/** A newly picked registration proof. */
+	registrationProof: PickedFile | null
+	/** A newly picked government photo ID / PAN card. */
+	identityProof: PickedFile | null
+	panCard: PickedFile | null
 }>
 
+/**
+ * One call whether or not files are attached. Without files it is the plain JSON update; with files it is
+ * multipart (`payload` + `degree_certificate_<ref>` / `registration_proof`), so the details and the files are
+ * saved together. The app never sends a storage key: the server stores the files and links them.
+ */
 export const saveDoctorProfessional = async (patch: DoctorProfessionalPatch): Promise<DoctorProfessional> => {
+	const { degrees, registrationProof, identityProof, panCard, ...rest } = patch
+	const hasFiles = !!registrationProof || !!identityProof || !!panCard || !!degrees?.some((d) => d.certificate)
+	const payload = {
+		...rest,
+		...(degrees && {
+			degrees: degrees.map((d, i) => ({
+				id: d.id,
+				degree: d.degree,
+				college: d.college,
+				year_of_passing: d.year_of_passing,
+				...(d.certificate ? { ref: `d${i}` } : {}),
+			})),
+		}),
+	}
+
+	if (!hasFiles) {
+		const res = await ApiService.patch<{ data: DoctorProfessional }>(
+			API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS,
+			payload
+		)
+		return res.data.data
+	}
+
+	const form = new FormData()
+	form.append('payload', JSON.stringify(payload))
+	degrees?.forEach((d, i) => {
+		if (d.certificate) appendFile(form, `degree_certificate_d${i}`, d.certificate)
+	})
+	if (registrationProof) appendFile(form, 'registration_proof', registrationProof)
+	if (identityProof) appendFile(form, 'identity_proof', identityProof)
+	if (panCard) appendFile(form, 'pan_card', panCard)
 	const res = await ApiService.patch<{ data: DoctorProfessional }>(
 		API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS,
-		patch
+		form,
+		{ headers: { 'Content-Type': 'multipart/form-data' } }
 	)
 	return res.data.data
 }
@@ -207,6 +258,8 @@ export interface DoctorAchievement {
 	/** YYYY-MM-DD */
 	achievement_date: string | null
 	description: string | null
+	/** Where the supporting document is stored ('' / null when there is none). */
+	document_s3_key?: string | null
 	is_public: boolean
 }
 
@@ -224,12 +277,26 @@ export const fetchDoctorAchievements = async (): Promise<DoctorAchievement[]> =>
 	return res.data.data ?? []
 }
 
-export const createDoctorAchievement = async (input: DoctorAchievementInput) => {
-	await ApiService.post(API_ENDPOINTS.DOCTOR_PROFILE.ACHIEVEMENTS, input)
+/**
+ * Plain JSON without a document; one multipart request (`payload` + `document`) with one. The app never sends
+ * a storage key: the server stores the file and links it.
+ */
+const achievementRequest = (input: DoctorAchievementInput, document?: PickedFile | null) => {
+	if (!document) return { body: input as unknown, config: undefined }
+	const form = new FormData()
+	form.append('payload', JSON.stringify(input))
+	appendFile(form, 'document', document)
+	return { body: form as unknown, config: { headers: { 'Content-Type': 'multipart/form-data' } } }
 }
 
-export const updateDoctorAchievement = async (id: string, input: DoctorAchievementInput) => {
-	await ApiService.put(API_ENDPOINTS.DOCTOR_PROFILE.ACHIEVEMENT_BY_ID(id), input)
+export const createDoctorAchievement = async (input: DoctorAchievementInput, document?: PickedFile | null) => {
+	const { body, config } = achievementRequest(input, document)
+	await ApiService.post(API_ENDPOINTS.DOCTOR_PROFILE.ACHIEVEMENTS, body, config)
+}
+
+export const updateDoctorAchievement = async (id: string, input: DoctorAchievementInput, document?: PickedFile | null) => {
+	const { body, config } = achievementRequest(input, document)
+	await ApiService.put(API_ENDPOINTS.DOCTOR_PROFILE.ACHIEVEMENT_BY_ID(id), body, config)
 }
 
 /** Soft delete on the backend. */

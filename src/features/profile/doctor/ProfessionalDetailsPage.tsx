@@ -1,6 +1,8 @@
 // Doctor "Professional & documents": specialisation (set at registration, read-only), areas of expertise,
-// treatments, bio, qualifications list, and ID / PAN documents (upload coming soon). Qualifications save
-// through PATCH /doctors/professional-details, expertise / treatments through /profile/additional-details.
+// treatments, bio, qualifications list (each with its degree certificate), and the government ID / PAN card
+// documents. Qualifications and every newly picked file save together through PATCH
+// /doctors/professional-details (multipart when a file was picked), expertise / treatments through
+// /profile/additional-details.
 
 import React, { useCallback, useEffect, useState } from 'react'
 import {
@@ -13,7 +15,6 @@ import {
 	AppSaveFooter,
 	type AppListItemField,
 } from '../../../components/common'
-import { showComingSoon } from '../../../utils/toast'
 import {
 	fetchDoctorDetails,
 	fetchDoctorProfessional,
@@ -25,12 +26,18 @@ import {
 } from './doctorProfileService'
 import { useProfileForm } from '../hooks/useProfileForm'
 import { ProfileScreen } from '../shared/components/ProfileScreen'
+import { pickCertificateFile, type PickedFile } from '../../../utils/pickedFile'
 
 interface Qualification {
+	/** Set for a degree already saved, so saving again keeps it (and its certificate). */
+	id?: number
 	degree: string
 	college: string
 	year: string
+	/** The certificate already stored for this degree ('' when none). */
 	proof: string
+	/** A certificate picked on this device and not saved yet. */
+	file?: PickedFile
 }
 
 interface ProfessionalDraft {
@@ -39,6 +46,11 @@ interface ProfessionalDraft {
 	treatments: string[]
 	bio: string
 	qualifications: Qualification[]
+	/** Government photo ID and PAN card already stored ('' when none), and ones picked but not saved yet. */
+	identityProof: string
+	panCard: string
+	identityFile?: PickedFile
+	panFile?: PickedFile
 }
 
 const QUAL_FIELDS: AppListItemField[] = [
@@ -62,11 +74,14 @@ const load = async (): Promise<ProfessionalDraft> => {
 		expertise: (details.additionalDetail?.areas_of_expertise ?? []).map((a) => a.id),
 		treatments: (details.additionalDetail?.treatments ?? []).map((t) => t.id),
 		bio: prof.about || '',
+			identityProof: prof.identity_proof || '',
+			panCard: prof.pan_card || '',
 		qualifications: (prof.degrees ?? []).map((d) => ({
+			id: Number.isFinite(Number(d.id)) ? Number(d.id) : undefined,
 			degree: d.degree || d.qualification || '',
 			college: d.college || d.institution || '',
 			year: d.year_of_passing || '',
-			proof: d.qualification_proof_s3_key || '',
+			proof: d.degree_certificate || d.qualification_proof_s3_key || '',
 		})),
 	}
 }
@@ -74,15 +89,24 @@ const load = async (): Promise<ProfessionalDraft> => {
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
 const save = async (draft: ProfessionalDraft, saved: ProfessionalDraft) => {
-	if (!same(draft.bio, saved.bio) || !same(draft.qualifications, saved.qualifications)) {
+	if (
+		!same(draft.bio, saved.bio) ||
+		!same(draft.qualifications, saved.qualifications) ||
+		draft.identityFile ||
+		draft.panFile
+	) {
+		// one request: the details and any newly picked files are saved together
 		await saveDoctorProfessional({
 			about: draft.bio.trim(),
 			degrees: draft.qualifications.map((q) => ({
+				id: q.id,
 				degree: q.degree,
 				college: q.college,
 				year_of_passing: q.year,
-				qualification_proof_s3_key: q.proof || null,
+				certificate: q.file,
 			})),
+			identityProof: draft.identityFile,
+			panCard: draft.panFile,
 		})
 	}
 	if (!same(draft.expertise, saved.expertise) || !same(draft.treatments, saved.treatments)) {
@@ -127,22 +151,46 @@ export default function ProfessionalDetailsPage() {
 
 	const editingQual = typeof editing === 'number' ? draft?.qualifications[editing] : undefined
 
+	// The certificate picked in the open sheet; it joins the qualification when the sheet is submitted.
+	const [pendingFile, setPendingFile] = useState<PickedFile | null>(null)
+	useEffect(() => {
+		// only when the sheet opens for another item, not on every edit of the draft
+		setPendingFile(editingQual?.file ?? null)
+	}, [editing])
+
+	const pickCertificate = useCallback(async () => {
+		// a photo or a PDF; null when the doctor cancels
+		const file = await pickCertificateFile()
+		if (file) setPendingFile(file)
+	}, [])
+
+	// Government ID / PAN card: pick now, uploaded with the rest when "Save" is pressed.
+	const pickInto = useCallback(
+		async (field: 'identityFile' | 'panFile') => {
+			const file = await pickCertificateFile()
+			if (file) set(field, file)
+		},
+		[set]
+	)
+
 	const saveQual = useCallback(
 		(v: Record<string, string>) => {
 			if (!draft) return
 			const list = [...draft.qualifications]
 			const item: Qualification = {
+				id: editingQual?.id,
 				degree: v.degree,
 				college: v.college,
 				year: v.year,
 				proof: editingQual?.proof ?? '',
+				file: pendingFile ?? undefined,
 			}
 			if (typeof editing === 'number') list[editing] = item
 			else list.push(item)
 			set('qualifications', list)
 			setEditing(null)
 		},
-		[draft, editing, editingQual, set]
+		[draft, editing, editingQual, pendingFile, set]
 	)
 
 	const isNew = !!draft && draft.qualifications.length === 0 && !draft.bio
@@ -174,10 +222,10 @@ export default function ProfessionalDetailsPage() {
 				>
 					<AppDocumentRow
 						label="Degree certificate"
-						fileName={editingQual?.proof}
-						status={editingQual?.proof ? 'in_review' : 'missing'}
+						fileName={pendingFile?.name ?? editingQual?.proof}
+						status={pendingFile || editingQual?.proof ? 'in_review' : 'missing'}
 						optional
-						onUpload={() => showComingSoon('Certificate upload will be available soon')}
+						onUpload={() => void pickCertificate()}
 					/>
 				</AppListItemSheet>
 			}
@@ -226,9 +274,11 @@ export default function ProfessionalDetailsPage() {
 								key: `${q.degree}-${i}`,
 								title: q.degree,
 								subtitle: [q.college, q.year].filter(Boolean).join(' · '),
-								tag: q.proof
-									? { label: 'Certificate added', tone: 'confirmed' }
-									: { label: 'No certificate', tone: 'neutral' },
+								tag: q.file
+									? { label: 'Uploads when you save', tone: 'neutral' }
+									: q.proof
+										? { label: 'Certificate added', tone: 'confirmed' }
+										: { label: 'No certificate', tone: 'neutral' },
 							}))}
 							icon="school-outline"
 							tone="sky"
@@ -250,17 +300,19 @@ export default function ProfessionalDetailsPage() {
 						helper="Our team checks each upload, usually within 1–2 working days."
 					>
 						<AppDocumentRow
-							label="Government photo ID"
-							description="Aadhaar, passport, voter ID or driving licence"
-							status="missing"
-							onUpload={() => showComingSoon('Document upload will be available soon')}
-						/>
-						<AppDocumentRow
-							label="PAN card"
-							description="Needed for payouts and TDS"
-							status="missing"
-							onUpload={() => showComingSoon('Document upload will be available soon')}
-						/>
+								label="Government photo ID"
+								description="Aadhaar, passport, voter ID or driving licence"
+								fileName={draft.identityFile?.name ?? draft.identityProof}
+								status={draft.identityFile || draft.identityProof ? 'in_review' : 'missing'}
+								onUpload={() => void pickInto('identityFile')}
+							/>
+							<AppDocumentRow
+								label="PAN card"
+								description="Needed for payouts and TDS"
+								fileName={draft.panFile?.name ?? draft.panCard}
+								status={draft.panFile || draft.panCard ? 'in_review' : 'missing'}
+								onUpload={() => void pickInto('panFile')}
+							/>
 					</AppFormCard>
 				</>
 			)}
