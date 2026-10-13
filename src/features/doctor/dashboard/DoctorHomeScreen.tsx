@@ -263,7 +263,10 @@ export function DoctorHomeScreen() {
 		setStartingId(apt.id)
 		try {
 			const res = await startConsultation(apt.id)
-			if (res.success) {
+			if (res.success && res.data?.already_verified) {
+				// The patient already gave the code for this appointment: no second code, straight to the consultation.
+				navigation.navigate(ROUTES.STACK.CONSULTATION, { appointmentId: apt.id, patientId: apt.patient.id })
+			} else if (res.success) {
 				navigation.navigate(ROUTES.STACK.VERIFY_ACCESS, {
 					appointmentId: apt.id,
 					patientId: apt.patient.id,
@@ -280,6 +283,11 @@ export function DoctorHomeScreen() {
 	}
 
 	const openPatientInfo = (apt: Appointment) => {
+		// The patient's code was already entered for this appointment: straight into the consultation, no code.
+		if (apt.access_verified && apt.patient?.id) {
+			navigation.navigate(ROUTES.STACK.CONSULTATION, { appointmentId: apt.id, patientId: apt.patient.id })
+			return
+		}
 		navigation.navigate(ROUTES.STACK.APPOINTMENT_DETAILS, { appointmentId: apt.id })
 	}
 
