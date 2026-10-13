@@ -38,6 +38,7 @@ import { useTabBarClearance } from '../../../navigation/tabBar'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
 import { ScheduleCalendarSheet } from './ScheduleCalendarSheet'
 import { TodayPatientRow, TodayTabs, TodayVisitChips, type TodayTab, type TodayVisit } from './TodayPatients'
+import { TodayActionSheet, type TodaySheetMode } from './TodayActionSheet'
 import { getAppointments, getStatusIdByLabel, setAppointmentCheckIn } from '../doctorService'
 import { updateAppointmentsStatus } from '../../../services/appointmentService'
 import { rescheduleAppointment } from '../doctorService'
@@ -162,6 +163,15 @@ const CANCEL_REASONS = [
 
 type Outcome = { kind: 'accept' | 'reject' | 'reschedule' | 'refer'; title: string; sub: string; tone: 'success' | 'danger' | 'info' | 'purple' }
 
+/** What a Today row says after its three-dots sheet was used. */
+function todayOutcomeOf(o?: Outcome): { text: string; tone: 'danger' | 'info' } | undefined {
+	if (!o) return undefined
+	if (o.kind === 'reject') return { text: 'Cancelled · patient notified', tone: 'danger' }
+	// The patient still has to accept the new time, so the row says it was proposed, not that it moved.
+	if (o.kind === 'reschedule') return { text: o.title, tone: 'info' }
+	return undefined
+}
+
 /** The "Upcoming | Past" switch at the top of the All tab. */
 function AllModeToggle({ value, onChange }: { value: AllMode; onChange: (v: AllMode) => void }) {
 	return (
@@ -210,6 +220,8 @@ export function DoctorScheduleScreen() {
 	const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({})
 	const [busyId, setBusyId] = useState<string | null>(null)
 	const [sheet, setSheet] = useState<{ mode: ActionSheetMode; appt: Appointment } | null>(null)
+	// The three-dots sheet of a Today row (menu -> reschedule / cancel).
+	const [todaySheet, setTodaySheet] = useState<{ mode: TodaySheetMode; appt: Appointment } | null>(null)
 	const [checkingInId, setCheckingInId] = useState<string | null>(null)
 	// The patient whose check-in the doctor is being asked to confirm undoing.
 	const [undoTarget, setUndoTarget] = useState<Appointment | null>(null)
@@ -331,22 +343,6 @@ export function DoctorScheduleScreen() {
 	// "All" lists the patients still to be seen first, then the finished ones (the list is already by time).
 	const todayShown = todayTab === 'upcoming' ? todayUpcoming : todayTab === 'done' ? todayDone : [...todayUpcoming, ...todayDone]
 
-	// Row token (source: the design's Today rows -- "Token 06" under the time for an in-clinic visit,
-	// "Video" for a video one). No real "token number" field exists on the backend, so this is a real,
-	// derived value (sequential position in today's own list, sorted by start_time like the list
-	// already is) rather than a fabricated one -- and it's computed from the full `todayList`, not the
-	// chip-filtered `todayShown`, so a patient's token stays stable no matter which filter chip is active.
-	const todayTokenById = new Map<string, string>()
-	let clinicTokenSeq = 0
-	todayList.forEach((a) => {
-		if (isVideoMode(a.appointment_mode)) {
-			todayTokenById.set(a.id, 'Video')
-		} else {
-			clinicTokenSeq += 1
-			todayTokenById.set(a.id, `Token ${String(clinicTokenSeq).padStart(2, '0')}`)
-		}
-	})
-
 	// ── Upcoming derived ───────────────────────────────────────────────────
 	const upMarkedDates = useMemo(() => new Set(upList.map((a) => a.appointment_date)), [upList])
 	const upShown = upDay ? upList.filter((a) => a.appointment_date === upDay) : upList
@@ -383,7 +379,12 @@ export function DoctorScheduleScreen() {
 	}
 
 	// ── Requests / Upcoming action handlers ───────────────────────────────
-	const openAppointment = (apt: Appointment) => navigation.navigate(ROUTES.STACK.APPOINTMENT_DETAILS, { appointmentId: apt.id })
+	// A completed appointment (the Past list), or one whose patient code was already entered, opens straight into the
+	// consultation page; no code is asked for.
+	const openAppointment = (apt: Appointment) =>
+		(isCompletedAppt(apt) || apt.access_verified) && apt.patient?.id
+			? navigation.navigate(ROUTES.STACK.CONSULTATION, { appointmentId: apt.id, patientId: apt.patient.id })
+			: navigation.navigate(ROUTES.STACK.APPOINTMENT_DETAILS, { appointmentId: apt.id })
 
 	// Doctor-only: the Today toggle checks a patient in (not_arrived -> checked_in) or undoes a
 	// check-in made by mistake (checked_in -> not_arrived). Both go through the one check-in endpoint
@@ -437,9 +438,9 @@ export function DoctorScheduleScreen() {
 		}
 	}
 
-	const handleConfirmReject = async (reasonLabel: string, note: string) => {
-		if (!sheet || busyId) return
-		const apt = sheet.appt
+	const handleConfirmReject = async (reasonLabel: string, note: string, target?: Appointment) => {
+		const apt = target ?? sheet?.appt
+		if (!apt || busyId) return
 		setBusyId(apt.id)
 		try {
 			const res = await updateAppointmentsStatus(apt.id, await getStatusIdByLabel('cancelled'), note ? `${reasonLabel} — ${note}` : reasonLabel)
@@ -456,12 +457,13 @@ export function DoctorScheduleScreen() {
 		} finally {
 			setBusyId(null)
 			setSheet(null)
+			setTodaySheet(null)
 		}
 	}
 
-	const handleConfirmReschedule = async (date: Date, startTime: string, endTime: string | null) => {
-		if (!sheet) return
-		const apt = sheet.appt
+	const handleConfirmReschedule = async (date: Date, startTime: string, endTime: string | null, target?: Appointment) => {
+		const apt = target ?? sheet?.appt
+		if (!apt) return
 		setBusyId(apt.id)
 		try {
 			const res = await rescheduleAppointment({
@@ -489,6 +491,7 @@ export function DoctorScheduleScreen() {
 		} finally {
 			setBusyId(null)
 			setSheet(null)
+			setTodaySheet(null)
 		}
 	}
 
@@ -581,7 +584,6 @@ export function DoctorScheduleScreen() {
 										<TodayPatientRow
 											key={apt.id}
 											time={formatTime12h(apt.start_time)}
-											token={todayTokenById.get(apt.id) ?? ''}
 											name={apt.patient?.name ?? 'Patient'}
 											video={isVideoMode(apt.appointment_mode)}
 											meta={[apt.patient?.age ? `${apt.patient.age} yrs` : null, apt.patient?.gender].filter(Boolean).join(' · ')}
@@ -591,6 +593,8 @@ export function DoctorScheduleScreen() {
 											divider={i < todayShown.length - 1}
 											onPress={() => openAppointment(apt)}
 											onToggle={() => handleToggleCheckIn(apt)}
+											onMore={() => setTodaySheet({ mode: 'menu', appt: apt })}
+											outcome={todayOutcomeOf(outcomes[apt.id])}
 										/>
 									))}
 								</View>
@@ -846,6 +850,23 @@ export function DoctorScheduleScreen() {
 					</View>
 				)}
 			</AppBottomSheet>
+
+			{todaySheet && (
+				<TodayActionSheet
+					visible={!!todaySheet}
+					mode={todaySheet.mode}
+					patientName={todaySheet.appt.patient?.name ?? 'Patient'}
+					slotLabel={`${slotLabelOf(todaySheet.appt, true)} · ${isVideoMode(todaySheet.appt.appointment_mode) ? 'Video' : 'In-clinic'}`}
+					video={isVideoMode(todaySheet.appt.appointment_mode)}
+					doctorId={todaySheet.appt.doctor?.id}
+					hospitalId={todaySheet.appt.hospital?.id}
+					busy={busyId === todaySheet.appt.id}
+					onClose={() => setTodaySheet(null)}
+					onModeChange={(mode) => setTodaySheet({ mode, appt: todaySheet.appt })}
+					onConfirmReschedule={(date, start, end) => handleConfirmReschedule(date, start, end, todaySheet.appt)}
+					onConfirmCancel={(reason) => handleConfirmReject(reason, '', todaySheet.appt)}
+				/>
+			)}
 
 			{sheet && (
 				<AppointmentActionSheet

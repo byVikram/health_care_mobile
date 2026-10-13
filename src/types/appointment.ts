@@ -66,6 +66,8 @@ export interface Appointment {
   } | null
   history?: AppointmentHistoryEntry[]
   rescheduled_by?: string | null
+  /** The patient's consent code was already entered for this appointment: the doctor opens the consultation directly. */
+  access_verified?: boolean
   reason?: string | null
   referral?: {
     id: string

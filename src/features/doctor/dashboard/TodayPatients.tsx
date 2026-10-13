@@ -1,12 +1,15 @@
 // src/features/doctor/dashboard/TodayPatients.tsx
 //
 // Schedule -> Today, from the "Doctor schedule" design: an All / Upcoming / Done tab strip with count
-// pills, an All types / In-clinic / Video chip row, and one card of patient rows -- time + token,
+// pills, an All types / In-clinic / Video chip row, and one card of patient rows -- time,
 // name, "mode · age gender", a status dot + text, and (for patients still to be seen) the round
-// check-in toggle. The counts follow the visit-type chip, like the design.
+// check-in toggle and a three-dots button for Reschedule / Cancel (see TodayActionSheet). After one of those the
+// row shows what happened ("Cancelled · patient notified", "Moved to ...") in place of the buttons. The counts follow
+// the visit-type chip, like the design.
 
 import React from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppPathIcon } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 
@@ -15,6 +18,7 @@ export type TodayVisit = 'any' | 'clinic' | 'video'
 
 const VIDEO_BLUE = '#2463A8'
 const NOT_ARRIVED = '#7A8B8E'
+const DANGER = '#B42318'
 const TRACK = '#E9EEEF'
 const CHECK = 'M5 12l5 5 9-10'
 
@@ -97,8 +101,6 @@ export function TodayVisitChips({ value, onChange }: { value: TodayVisit; onChan
 
 export type TodayRowProps = {
 	time: string
-	/** "Token 06" or "Video". */
-	token: string
 	name: string
 	video: boolean
 	/** "34 yrs · Male" */
@@ -109,11 +111,14 @@ export type TodayRowProps = {
 	divider: boolean
 	onPress: () => void
 	onToggle: () => void
+	/** Opens the Reschedule / Cancel sheet. */
+	onMore?: () => void
+	/** What was done to this appointment from the sheet; replaces the buttons. */
+	outcome?: { text: string; tone: 'danger' | 'info' }
 }
 
 export function TodayPatientRow({
 	time,
-	token,
 	name,
 	video,
 	meta,
@@ -123,9 +128,20 @@ export function TodayPatientRow({
 	divider,
 	onPress,
 	onToggle,
+	onMore,
+	outcome,
 }: TodayRowProps) {
-	const statusColor = done ? APP_COLORS.primary : checkedIn ? APP_COLORS.success : NOT_ARRIVED
-	const statusText = done ? 'Completed' : checkedIn ? 'Checked in' : 'Not arrived'
+	const statusColor = outcome
+		? outcome.tone === 'danger'
+			? DANGER
+			: VIDEO_BLUE
+		: done
+			? APP_COLORS.primary
+			: checkedIn
+				? APP_COLORS.success
+				: NOT_ARRIVED
+	const statusText = outcome ? outcome.text : done ? 'Completed' : checkedIn ? 'Checked in' : 'Not arrived'
+	const cancelled = outcome?.tone === 'danger'
 	return (
 		<View style={[styles.row, divider && styles.rowRule]}>
 			<TouchableOpacity activeOpacity={0.7} onPress={onPress} accessibilityRole="button" style={styles.rowMain}>
@@ -133,12 +149,9 @@ export function TodayPatientRow({
 					<Text numberOfLines={1} style={styles.time}>
 						{time}
 					</Text>
-					<Text numberOfLines={1} style={styles.token}>
-						{token}
-					</Text>
 				</View>
 				<View style={styles.mid}>
-					<Text numberOfLines={1} style={styles.name}>
+					<Text numberOfLines={1} style={[styles.name, outcome && styles.nameMuted, cancelled && styles.struck]}>
 						{name}
 					</Text>
 					<Text numberOfLines={1} style={styles.metaLine}>
@@ -155,7 +168,7 @@ export function TodayPatientRow({
 					</View>
 				</View>
 			</TouchableOpacity>
-			{!done && (
+			{!done && !outcome && (
 				<Pressable
 					onPress={onToggle}
 					disabled={busy}
@@ -185,6 +198,16 @@ export function TodayPatientRow({
 							/>
 						)}
 					</View>
+				</Pressable>
+			)}
+			{!done && !outcome && !!onMore && (
+				<Pressable
+					onPress={onMore}
+					accessibilityRole="button"
+					accessibilityLabel={`More actions for ${name}`}
+					style={styles.moreHit}
+				>
+					<MaterialCommunityIcons name="dots-vertical" size={20} color={APP_COLORS.inkMuted} />
 				</Pressable>
 			)}
 		</View>
@@ -243,14 +266,17 @@ const styles = StyleSheet.create({
 	// Wide enough for "11:00 AM" at 13px/800 -- 56 clipped it on real devices.
 	timeCol: { width: 64, flexShrink: 0 },
 	time: { fontSize: 13, lineHeight: 18, fontWeight: '800', color: APP_COLORS.ink },
-	token: { fontSize: 11, lineHeight: 14, fontWeight: '600', color: APP_COLORS.inkMuted },
 	mid: { flex: 1, minWidth: 0, gap: 2 },
 	name: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
+	nameMuted: { color: NOT_ARRIVED },
+	struck: { textDecorationLine: 'line-through' },
 	metaLine: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
 	mode: { fontWeight: '700' },
 	status: { marginTop: 2, flexDirection: 'row', alignItems: 'center', gap: 6 },
 	dot: { width: 7, height: 7, borderRadius: 9999 },
 	statusText: { flexShrink: 1, fontSize: 12, lineHeight: 16, fontWeight: '700' },
+	// Sits close to the check-in toggle, like the design (a narrower hit area that overlaps its edge).
+	moreHit: { width: 32, height: 44, marginLeft: -6, marginRight: -6, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
 	toggleHit: { width: 44, height: 44, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
 	ring: { width: 32, height: 32, borderRadius: 9999, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 })
