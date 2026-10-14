@@ -14,8 +14,8 @@ export const ROUTES = {
 		PROFILE: 'Profile',
 		ANCILLARY: 'Ancillary',
 		WALLET: 'Wallet',
-		// Doctor-only tabs (the "DoctorDashboard" Schedule / Engage views) — see MainTabNavigator's
-		// DOCTOR_TABS. Kept in MAIN (not STACK) since they're real bottom-tab routes, not pushed screens.
+		// Doctor-only tabs (the "DoctorDashboard" Schedule / Engage views), set by the backend menu. Kept in MAIN
+		// (not STACK) since they're real bottom-tab routes, not pushed screens.
 		SCHEDULE: 'Schedule',
 		ENGAGE: 'Engage',
 	},
@@ -82,8 +82,6 @@ export const ROUTES = {
 		LABORATORY_ORDERS: 'Orderlistlaboratorypage',
 		LABORATORY_ORDER_DETAILS: 'Bookingdetailslaboratorypage',
 
-		DOCTOR_EVENTS: 'DoctorEvents',
-		DOCTOR_EVENT_FORM: 'DoctorEventForm',
 		ALL_EVENTS: 'AllEvents',
 		EVENT_DETAILS: 'EventDetails',
 

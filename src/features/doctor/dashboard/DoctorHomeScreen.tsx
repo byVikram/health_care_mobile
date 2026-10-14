@@ -10,21 +10,16 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppAppointmentRow, AppAvatar, AppSidebar, AppSoftCard, type AppSidebarItem } from '../../../components/common'
+import { AppAppointmentRow, AppAvatar, AppSidebar, AppSoftCard } from '../../../components/common'
 import { APP_COLORS, TONES } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import { useAuth } from '../../../context/AuthContext'
 import { useTabBarClearance } from '../../../navigation/tabBar'
+import { useSidebarMenu } from '../../../navigation/useSidebarMenu'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
 import { getAppointments, getStatusIdByLabel, startConsultation } from '../doctorService'
 import type { Appointment } from '../../../types/appointment'
 
-import AppointmentsIcon from '../../../assets/quick-services/appointments.svg'
-import TreatmentIcon from '../../../assets/icons/treatment.svg'
-import RemindersIcon from '../../../assets/icons/reminders.svg'
-import PaymentsIcon from '../../../assets/icons/payments.svg'
-import HelpCenterIcon from '../../../assets/icons/help-center.svg'
-import SettingsIcon from '../../../assets/icons/settings.svg'
 import { buildS3Url } from '../../../utils/s3Utils'
 import { getUnreadNotificationCount } from '../../../services/homeService'
 import { listHealthQuestions } from '../../../services/qaService'
@@ -81,96 +76,10 @@ export function DoctorHomeScreen() {
 	const { user, clearAuth, selectedHospitalId } = useAuth()
 	const [sidebarOpen, setSidebarOpen] = useState(false)
 
-	// Mirrors the doctor-role menu SidebarLayout already builds for every other Home-tab screen
-	// (My Patients/Consultations/Create Event/Appointments/Wallet/etc.) -- this screen has its own
-	// dark "ink" header (see DoctorScreenHeader) instead of SidebarLayout's generic AppHeader, so it
-	// can't just wrap children in <SidebarLayout>; it drives the same AppSidebar drawer directly.
-	const menuItems: AppSidebarItem[] = [
-		{
-			id: 'appointments',
-			label: 'My Appointments',
-			icon: <AppointmentsIcon width={24} height={24} />,
-			onPress: () => {
-				setSidebarOpen(false)
-				navigation.navigate(ROUTES.STACK.APPOINTMENTS)
-			},
-		},
-		{
-			id: 'my-patients',
-			label: 'My Patients',
-			icon: <MaterialCommunityIcons name="account-group-outline" size={20} color="#1f5f68" />,
-			onPress: () => {
-				setSidebarOpen(false)
-				navigation.navigate(ROUTES.STACK.APPOINTMENTS)
-			},
-		},
-		{
-			id: 'my-consultations',
-			label: 'My Consultations',
-			icon: <MaterialCommunityIcons name="stethoscope" size={20} color="#1f5f68" />,
-			onPress: () => {
-				setSidebarOpen(false)
-				navigation.navigate(ROUTES.STACK.APPOINTMENTS)
-			},
-		},
-		{
-			id: 'create-event',
-			label: 'Create Event',
-			icon: <MaterialCommunityIcons name="calendar-plus" size={20} color="#1f5f68" />,
-			onPress: () => {
-				setSidebarOpen(false)
-				navigation.navigate(ROUTES.STACK.DOCTOR_EVENTS as any)
-			},
-		},
-		{
-			id: 'my-wallet',
-			label: 'My Wallet',
-			icon: <MaterialCommunityIcons name="wallet-outline" size={20} color="#1f5f68" />,
-			onPress: () => {
-				setSidebarOpen(false)
-				navigation.navigate(ROUTES.MAIN.WALLET)
-			},
-		},
-		{
-			id: 'payments',
-			label: 'Payments',
-			icon: <PaymentsIcon width={20} height={20} />,
-			onPress: () => {
-				setSidebarOpen(false)
-				navigation.navigate(ROUTES.STACK.PATIENT_PAYMENT as any)
-			},
-		},
-		{
-			id: 'treatment-history',
-			label: 'Treatment History',
-			icon: <TreatmentIcon width={20} height={20} />,
-			onPress: () => setSidebarOpen(false),
-		},
-		{
-			id: 'reminders',
-			label: 'Reminders',
-			icon: <RemindersIcon width={20} height={20} />,
-			onPress: () => setSidebarOpen(false),
-		},
-		{
-			id: 'help',
-			label: 'Help Center',
-			icon: <HelpCenterIcon width={20} height={20} />,
-			onPress: () => {
-				setSidebarOpen(false)
-				navigation.navigate(ROUTES.MAIN.PROFILE)
-			},
-		},
-		{
-			id: 'settings',
-			label: 'Settings',
-			icon: <SettingsIcon width={20} height={20} />,
-			onPress: () => {
-				setSidebarOpen(false)
-				navigation.navigate(ROUTES.STACK.SETTINGS)
-			},
-		},
-	]
+	// This screen has its own dark "ink" header (see DoctorScreenHeader) instead of SidebarLayout's generic
+	// AppHeader, so it can't wrap children in <SidebarLayout>; it drives the same AppSidebar drawer directly, with
+	// the same backend-driven rows.
+	const sidebarSections = useSidebarMenu(sidebarOpen)
 	const clearance = useTabBarClearance()
 
 	const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -315,7 +224,7 @@ export function DoctorHomeScreen() {
 					setSidebarOpen(false)
 					navigation.navigate(ROUTES.MAIN.PROFILE)
 				}}
-				menuItems={menuItems}
+				sections={sidebarSections}
 			/>
 			<DoctorScreenHeader
 				variant="home"

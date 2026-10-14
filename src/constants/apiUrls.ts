@@ -126,6 +126,8 @@ export const API_ENDPOINTS = {
 		TRACK: (publicId: string) => `${BASE_URL}/api/ads/${publicId}/track`,
 	},
 	APP_CONFIG: `${BASE_URL}/api/app-config`,
+	// The signed-in user's sidebar + bottom tabs, by role
+	NAVIGATION: `${BASE_URL}/api/lookup/navigation`,
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
 
 	// Profile photo for every role (multipart PUT to set, DELETE to remove)
