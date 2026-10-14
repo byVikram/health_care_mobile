@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Animated, Easing, Pressable, StyleSheet, Text, useWindowDimensions, View, type ViewStyle } from 'react-native'
-import { BlurView } from 'expo-blur'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -31,7 +30,9 @@ import DoctorScheduleScreen from '../features/doctor/dashboard/DoctorScheduleScr
 import DoctorEngageScreen from '../features/doctor/dashboard/DoctorEngageScreen'
 import { HomeSheetsProvider, useHomeSheets } from '../features/dashboard/HomeSheetsContext'
 import HomeSheetsHost from '../features/dashboard/components/HomeSheetsHost'
-import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../features/dashboard/homeChromeIcons'
+import { NavigationConfigProvider, useNavigationConfig } from './NavigationConfigContext'
+import { DEFAULT_MENU, lookupKey, menuRoleFor, type NavTab } from './menuConfig'
+import { iconPath } from './menuIcons'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
@@ -191,57 +192,42 @@ interface FloatingTab {
 	/** Home sheet this tab opens when it has no route. */
 	sheet?: HomeSheetKey
 	label: string
-	/** Shorter text for the labelled bar when `label` is too long to fit under the icon. */
-	shortLabel?: string
-	icon: HomeChromeIcon
-	/** SVG path (24x24) drawn instead of `icon` by the icon-only bar. */
-	iconPath?: string
+	/** SVG path (24x24) of the tab's icon. */
+	iconPath: string
 }
 
-const PATIENT_TABS: FloatingTab[] = [
-	{ key: 'home', route: ROUTES.MAIN.HOME, label: 'Home', icon: 'home' },
-	{ key: 'search', route: ROUTES.MAIN.SEARCH, label: 'Search', icon: 'search' },
-	{ key: 'bookings', route: ROUTES.MAIN.PORTAL, label: 'Bookings', icon: 'bookings' },
-	{ key: 'more', route: null, sheet: 'more', label: 'More', icon: 'grid' },
-]
+/**
+ * What each tab KEY from GET /api/lookup/navigation opens here. The backend decides which tabs a role gets, in what order and
+ * under which label; the app decides what a key does. A key not listed (a newer backend) is simply not drawn.
+ */
+const TAB_TARGETS: Record<string, { route: string } | { sheet: HomeSheetKey }> = {
+	home: { route: ROUTES.MAIN.HOME },
+	search: { route: ROUTES.MAIN.SEARCH },
+	bookings: { route: ROUTES.MAIN.PORTAL },
+	more: { sheet: 'more' },
+	doctor_schedule: { route: ROUTES.MAIN.SCHEDULE },
+	doctor_questions: { route: ROUTES.MAIN.ENGAGE },
+	provider_today: { route: ROUTES.MAIN.HOME },
+	provider_schedule: { route: ROUTES.MAIN.PORTAL },
+	provider_earnings: { route: ROUTES.MAIN.WALLET },
+	profile: { route: ROUTES.MAIN.PROFILE },
+}
 
-/** Ancillary provider tabs: Today · Schedule · Earnings · Profile -- the same labelled bar as the patient's. */
-const PROVIDER_TABS: FloatingTab[] = [
-	{
-		key: 'today',
-		route: ROUTES.MAIN.HOME,
-		label: 'Today',
-		icon: 'today',
-		iconPath: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6',
-	},
-	{
-		key: 'schedule',
-		route: ROUTES.MAIN.PORTAL,
-		label: 'Schedule',
-		icon: 'appointments',
-		iconPath: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
-	},
-	{
-		key: 'earnings',
-		route: ROUTES.MAIN.WALLET,
-		label: 'Earnings',
-		icon: 'myWallet',
-		iconPath: 'M3 7a2 2 0 0 1 2-2h13v4M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14.5h.01',
-	},
-	{
-		key: 'profile',
-		route: ROUTES.MAIN.PROFILE,
-		label: 'Profile',
-		icon: 'profile',
-		iconPath: 'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21v-1a8 8 0 0 1 16 0v1',
-	},
-]
-/** Doctor dashboard tab bar: Home · Schedule · Questions. Wallet and Profile stay reachable from the menu. */
-const DOCTOR_TABS: FloatingTab[] = [
-	{ key: 'home', route: ROUTES.MAIN.HOME, label: 'Home', icon: 'home' },
-	{ key: 'schedule', route: ROUTES.MAIN.SCHEDULE, label: 'Schedule', icon: 'appointments' },
-	{ key: 'engage', route: ROUTES.MAIN.ENGAGE, label: 'Questions', icon: 'help' },
-]
+function toFloatingTabs(tabs: NavTab[]): FloatingTab[] {
+	return tabs.flatMap((tab) => {
+		const target = lookupKey(TAB_TARGETS, tab.key)
+		if (!target) return []
+		return [
+			{
+				key: tab.key,
+				route: 'route' in target ? target.route : null,
+				sheet: 'sheet' in target ? target.sheet : undefined,
+				label: tab.label,
+				iconPath: iconPath(tab.icon),
+			},
+		]
+	})
+}
 
 /** Shared by both floating bars: the tab's route, whether it is the active one, and its press handler. */
 function resolveFloatingTab(
@@ -273,33 +259,25 @@ function resolveFloatingTab(
 // ── Labelled bar (solid white pill) ─────────────────────────────────────────────────
 // 66-high fully rounded white pill; every tab is an equal-width, 52-high, fully rounded slot holding a
 // 24px icon over a 12px label, and the active slot fills teal (white icon + label). The side inset
-// is chosen so every label fits its slot: patient (4 tabs) sits 20 from the sides (~83px per slot),
-// doctor (3 tabs) 48 (~92px), ancillary provider (4 tabs) 48.
+// is chosen so every label fits its slot: four tabs sit 20 from the sides (~83px per slot), three tabs 48 (~92px).
 const LABELLED_BAR_HEIGHT = 66
 const LABELLED_ITEM_HEIGHT = 52
 const PILL_SLIDE_MS = 280
-const PATIENT_LABELLED_SIDE = 20
+const sideFor = (tabCount: number) => (tabCount <= 3 ? 48 : 20)
 // Home's Care AI button sits to the right of the patient pill, with this gap between them.
 const CARE_AI_FAB_GAP = 12
-const DOCTOR_LABELLED_SIDE = 48
-const ICON_BAR_HEIGHT = 64
-const ICON_ITEM_SIZE = 48
-// The icon-only pill is as wide as the phone minus its side inset, but never wider than this (tablet / web).
-const ICON_BAR_MAX_WIDTH = 360
 
 function LabelledTabBar({
 	state,
 	navigation,
 	tabs,
 	side,
-	iconOnly = false,
 	keepOnProfile = false,
 	reserveRight = 0,
 	accessory,
 }: BottomTabBarProps & {
 	tabs: FloatingTab[]
 	side: number
-	iconOnly?: boolean
 	/** Keep the bar on the Profile tab (the nurse's bar has Profile as one of its tabs). */
 	keepOnProfile?: boolean
 	/** Extra space kept free on the right of the pill (for `accessory`). */
@@ -308,10 +286,7 @@ function LabelledTabBar({
 	accessory?: React.ReactNode
 }) {
 	const insets = useSafeAreaInsets()
-	const { width: windowWidth } = useWindowDimensions()
-	const barHeight = iconOnly ? ICON_BAR_HEIGHT : LABELLED_BAR_HEIGHT
-	// Icon-only pill: capped width, centred. Otherwise the four icons spread across a wide window.
-	const iconBarWidth = Math.min(windowWidth - side * 2, ICON_BAR_MAX_WIDTH)
+	const barHeight = LABELLED_BAR_HEIGHT
 	const { openSheet, open } = useHomeSheets()
 	const activeName = state.routes[state.index]?.name
 
@@ -380,35 +355,14 @@ function LabelledTabBar({
 				style={[
 					styles.labelledShadow,
 					{ bottom, left: side, right: side + reserveRight },
-					iconOnly && styles.iconShadow,
-					iconOnly && {
-						height: barHeight,
-						borderRadius: barHeight / 2,
-						left: (windowWidth - iconBarWidth) / 2,
-						right: (windowWidth - iconBarWidth) / 2,
-					},
 				]}
 			>
-				<View style={[styles.labelledBar, iconOnly && styles.iconBar]}>
-					{iconOnly ? (
-						<>
-							{/* Frosted glass, as in the design: blurred page behind a 25-45% white wash. */}
-							<BlurView
-								pointerEvents="none"
-								intensity={45}
-								tint="light"
-								blurMethod="dimezisBlurViewSdk31Plus"
-								style={StyleSheet.absoluteFill}
-							/>
-							<View pointerEvents="none" style={styles.iconGlassWash} />
-						</>
-					) : null}
+				<View style={styles.labelledBar}>
 					{activeSlot ? (
 						<Animated.View
 							pointerEvents="none"
 							style={[
 								styles.labelledActiveFill,
-								iconOnly && { borderRadius: ICON_ITEM_SIZE / 2 },
 								{
 									top: activeSlot.y,
 									width: activeSlot.width,
@@ -444,7 +398,7 @@ function LabelledTabBar({
 								accessibilityLabel={tab.label}
 								accessibilityState={{ selected: active }}
 								accessibilityHint={route ? undefined : `Opens ${tab.label.toLowerCase()} services`}
-								style={[styles.labelledItem, iconOnly && styles.iconItem]}
+								style={styles.labelledItem}
 								onLayout={(e) => {
 									const { x, y, width, height } = e.nativeEvent.layout
 									setSlots((prev) => {
@@ -455,26 +409,12 @@ function LabelledTabBar({
 									})
 								}}
 							>
-								{iconOnly ? (
-									<>
-										<AppPathIcon
-											d={tab.iconPath ?? HOME_CHROME_PATHS[tab.icon]}
-											size={22}
-											strokeWidth={2.1}
-											color={inked ? '#FFFFFF' : APP_COLORS.ink}
-										/>
-										{tab.key === activeKey ? <View pointerEvents="none" style={styles.iconDot} /> : null}
-									</>
-								) : (
-									<>
-										<View style={styles.labelledIcon}>
-											<AppPathIcon d={HOME_CHROME_PATHS[tab.icon]} size={24} strokeWidth={2.1} color={color} />
-										</View>
-										<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.labelledLabel, { color, fontWeight: inked ? '800' : '600' }]}>
-											{tab.shortLabel ?? tab.label}
-										</Text>
-									</>
-								)}
+								<View style={styles.labelledIcon}>
+									<AppPathIcon d={tab.iconPath} size={24} strokeWidth={2.1} color={color} />
+								</View>
+								<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.labelledLabel, { color, fontWeight: inked ? '800' : '600' }]}>
+									{tab.label}
+								</Text>
 							</Pressable>
 						)
 					})}
@@ -490,10 +430,12 @@ function LabelledTabBar({
 }
 export default function MainTabNavigator() {
 	return (
-		<HomeSheetsProvider>
-			<MainTabs />
-			<HomeSheetsHost />
-		</HomeSheetsProvider>
+		<NavigationConfigProvider>
+			<HomeSheetsProvider>
+				<MainTabs />
+				<HomeSheetsHost />
+			</HomeSheetsProvider>
+		</NavigationConfigProvider>
 	)
 }
 
@@ -501,11 +443,19 @@ function MainTabs() {
 	const navigation = useNavigation<any>()
 	const { role } = useAuth()
 	const { open } = useHomeSheets()
+	const { bottomTabs } = useNavigationConfig()
+	const menuRole = menuRoleFor(role)
+	// A server list the app cannot map at all (a newer backend) falls back to the role's built-in tabs; only roles with no
+	// tabs of their own (pharmacy, radiology, laboratory) get the docked bar.
+	const floatingTabs = useMemo(() => {
+		const fromServer = toFloatingTabs(bottomTabs)
+		return fromServer.length ? fromServer : toFloatingTabs(DEFAULT_MENU[menuRole].bottomTabs)
+	}, [bottomTabs, menuRole])
 	const isNurse = role === 'nurse' || role === 'ancillary'
 	const isDoctor = role === 'doctor'
 	const isPatient = isPatientRole(role)
 	// Doctor persona: Schedule + Engage replace Portal/Search/Ancillary (none of those apply to a
-	// doctor's own dashboard) — see DOCTOR_TABS / DoctorHomeScreen / DoctorScheduleScreen / DoctorEngageScreen.
+	// doctor's own dashboard) — see the doctor bottom tabs (backend menu) / DoctorHomeScreen / DoctorScheduleScreen / DoctorEngageScreen.
 	const shouldShowSearch = role !== 'doctor'
 	const shouldShowAncillary = !isNurse && !isDoctor
 	const shouldShowPortal = !isDoctor
@@ -514,24 +464,22 @@ function MainTabs() {
 		<>
 			<Tab.Navigator
 				tabBar={(props) =>
-					isPatient ? (
+					floatingTabs.length === 0 ? (
+						<DockedTabBar {...props} onAncillaryPress={() => open('ancillary')} />
+					) : (
 						<LabelledTabBar
 							{...props}
-							tabs={PATIENT_TABS}
-							side={PATIENT_LABELLED_SIDE}
-							{...(props.state.routes[props.state.index]?.name === ROUTES.MAIN.HOME
+							tabs={floatingTabs}
+							side={sideFor(floatingTabs.length)}
+							// The ancillary provider's bar has Profile as a tab: hiding it there would strand them.
+							keepOnProfile={floatingTabs.some((t) => t.route === ROUTES.MAIN.PROFILE)}
+							{...(isPatient && props.state.routes[props.state.index]?.name === ROUTES.MAIN.HOME
 								? {
 										reserveRight: CARE_AI_FAB_SIZE + CARE_AI_FAB_GAP,
 										accessory: <CareAiFab onPress={() => navigate(ROUTES.STACK.CARE_AI)} />,
 									}
 								: {})}
 						/>
-					) : isDoctor ? (
-						<LabelledTabBar {...props} tabs={DOCTOR_TABS} side={DOCTOR_LABELLED_SIDE} />
-					) : isNurse ? (
-						<LabelledTabBar {...props} tabs={PROVIDER_TABS} side={PATIENT_LABELLED_SIDE} keepOnProfile />
-					) : (
-						<DockedTabBar {...props} onAncillaryPress={() => open('ancillary')} />
 					)
 				}
 				screenOptions={{
@@ -564,13 +512,16 @@ function MainTabs() {
 						}}
 					/>
 				) : null}
-				<Tab.Screen
-					name={ROUTES.MAIN.WALLET}
-					component={WalletPage}
-					options={{
-						headerShown: false,
-					}}
-				/>
+				{/* The doctor has no Wallet entry (neither a tab nor a drawer row), so the tab is not mounted for them. */}
+				{isDoctor ? null : (
+					<Tab.Screen
+						name={ROUTES.MAIN.WALLET}
+						component={WalletPage}
+						options={{
+							headerShown: false,
+						}}
+					/>
+				)}
 				<Tab.Screen
 					name={ROUTES.MAIN.PROFILE}
 					component={ProfilePage}
@@ -644,41 +595,6 @@ const styles = StyleSheet.create({
 		borderRadius: LABELLED_ITEM_HEIGHT / 2,
 		backgroundColor: APP_COLORS.primary,
 		opacity: 1,
-	},
-	// Glass pill (design): no fill or legacy shadow on the wrapper -- an outer-only CSS-style boxShadow, so
-	// nothing is cast through the translucent bar.
-	iconShadow: {
-		backgroundColor: 'transparent',
-		shadowOpacity: 0,
-		elevation: 0,
-		boxShadow: '0 8px 28px #12373E26',
-	} as ViewStyle,
-	iconBar: {
-		gap: 0,
-		paddingHorizontal: 12,
-		borderColor: '#FFFFFF99',
-		boxShadow: 'inset 0 1px 0 #FFFFFFCC',
-	} as ViewStyle,
-	iconGlassWash: {
-		...StyleSheet.absoluteFill,
-		backgroundColor: '#FFFFFF59',
-	},
-	iconItem: {
-		flex: 0,
-		width: ICON_ITEM_SIZE,
-		height: ICON_ITEM_SIZE,
-		borderRadius: ICON_ITEM_SIZE / 2,
-		gap: 0,
-	},
-	iconDot: {
-		position: 'absolute',
-		bottom: -7,
-		left: '50%',
-		width: 5,
-		height: 5,
-		marginLeft: -2.5,
-		borderRadius: 2.5,
-		backgroundColor: APP_COLORS.primary,
 	},
 	labelledIcon: {
 		width: 26,

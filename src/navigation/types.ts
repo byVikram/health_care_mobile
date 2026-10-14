@@ -35,7 +35,8 @@ export type MainTabParamList = {
 	[ROUTES.MAIN.PROFILE]: undefined
 	[ROUTES.MAIN.WALLET]: undefined
 	[ROUTES.MAIN.ANCILLARY]: undefined
-	[ROUTES.MAIN.SCHEDULE]: { segment?: 'today' | 'req' | 'all' } | undefined
+	// `mode` only applies to segment 'all': Upcoming ('up', default) or Past ('past').
+	[ROUTES.MAIN.SCHEDULE]: { segment?: 'today' | 'req' | 'all'; mode?: 'up' | 'past' } | undefined
 	// Engage is Q&A only now (Requests moved to Schedule's own "req" tab) -- no segment param needed.
 	[ROUTES.MAIN.ENGAGE]: undefined
 }
@@ -262,8 +263,6 @@ export type AppStackParamList = {
 	[ROUTES.STACK.COMMUNITY_THREAD]: { threadId: string }
 	[ROUTES.STACK.BLOG_LIST]: undefined
 	[ROUTES.STACK.BLOG_ARTICLE]: { slug: string }
-	[ROUTES.STACK.DOCTOR_EVENTS]: undefined
-	[ROUTES.STACK.DOCTOR_EVENT_FORM]: { eventId?: string }
 	[ROUTES.STACK.ALL_EVENTS]: undefined
 	[ROUTES.STACK.EVENT_DETAILS]: { eventId: string }
 	[ROUTES.STACK.PROVIDER_VISIT_DETAILS]: { visitId: string }

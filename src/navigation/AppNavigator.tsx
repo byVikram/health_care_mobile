@@ -64,8 +64,6 @@ import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage
 
 import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
 
-import DoctorEventListPage from '../features/doctor/events/DoctorEventListPage'
-import DoctorEventFormPage from '../features/doctor/events/DoctorEventFormPage'
 
 import AllEventsPage from '../features/events/AllEventsPage'
 import EventDetailsPage from '../features/events/EventDetailsPage'
@@ -253,16 +251,6 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.APPOINTMENT_CONFIRMED} component={AppointmentConfirmedPage} />
 				<AppStack.Screen name={ROUTES.STACK.APPOINTMENT_DETAILS} component={AppointmentDetailsPage} />
 				<AppStack.Screen name={ROUTES.STACK.VISIT_SUMMARY} component={VisitSummaryPage} />
-				<AppStack.Screen
-					name={ROUTES.STACK.DOCTOR_EVENTS}
-					component={DoctorEventListPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.DOCTOR_EVENT_FORM}
-					component={DoctorEventFormPage}
-					options={{ headerShown: false }}
-				/>
 				<AppStack.Screen
 					name={ROUTES.STACK.ALL_EVENTS}
 					component={AllEventsPage}

@@ -8,7 +8,7 @@
 //               AppointmentActionCard + AppointmentActionSheet (reusable as-is for a future
 //               Pharmacy/Laboratory "requests" surface).
 //   All       — an Upcoming | Past sub-toggle:
-//                 Upcoming: confirmed bookings from tomorrow on, optionally narrowed to one day via a
+//                 Upcoming: confirmed bookings from today on, optionally narrowed to one day via a
 //                           calendar sheet (days that hold appointments carry a dot); each is an
 //                           action card (Cancel / Reschedule / Refer).
 //                 Past:     a date-range picker (Yesterday / 7 days / 30 days / 3 months / custom) plus a
@@ -227,7 +227,16 @@ export function DoctorScheduleScreen() {
 	const [undoTarget, setUndoTarget] = useState<Appointment | null>(null)
 
 	// All
-	const [allMode, setAllMode] = useState<AllMode>('up')
+	const [allMode, setAllMode] = useState<AllMode>((route.params?.mode as AllMode) ?? 'up')
+
+	// The Schedule tab stays mounted between visits, so a later navigate(SCHEDULE, { segment, mode }) (the Home
+	// shortcuts, the drawer's My Consultations / Treatment History) has to move the view itself: the initial
+	// state above only covers the first mount.
+	useEffect(() => {
+		const { segment, mode } = route.params ?? {}
+		if (segment) setTab(segment as ScheduleTab)
+		if (segment === 'all') setAllMode((mode as AllMode) ?? 'up')
+	}, [route.params])
 
 	// All -> Upcoming
 	const [upList, setUpList] = useState<Appointment[]>([])
@@ -282,9 +291,9 @@ export function DoctorScheduleScreen() {
 	const loadUpcoming = useCallback(async () => {
 		setUpLoading(true)
 		try {
-			// From tomorrow: today's patients live under the Today tab.
+			// From today: 'All' is every appointment still to come (today's also have their own Today tab).
 			const res = await getAppointments({
-				start_date: isoPlusDays(todayIso(), 1),
+				start_date: todayIso(),
 				end_date: isoPlusDays(todayIso(), UPCOMING_WINDOW_DAYS),
 				variant: 'all',
 				limit: 100,
@@ -768,7 +777,7 @@ export function DoctorScheduleScreen() {
 					setUpCalOpen(false)
 				}}
 				markedDates={upMarkedDates}
-				minDate={isoPlusDays(todayIso(), 1)}
+				minDate={todayIso()}
 				monthsAhead={3}
 				applyLabel={`Show ${upCountLabel}`}
 			/>

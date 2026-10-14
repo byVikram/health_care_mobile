@@ -4,13 +4,13 @@
 // over an APP_COLORS.scrim backdrop; "KAROLAHEALTH" wordmark + close; mint profile card (avatar, name, optional
 // id line, "View profile", optional MY QR button and profile-completion bar); optional FAMILY strip; grouped
 // AppNavRow sections with caps headers; footer with Log out (confirm modal) and the app version.
-// Callers decide the content (see SidebarLayout: patients get sections / family / QR, other roles a flat list).
+// Callers decide the content: the rows come from the backend (navigation/useSidebarMenu); patients add the
+// family strip and the QR button.
 import React, { useEffect, useRef, useState } from 'react'
 import {
 	Animated,
 	Easing,
 	Image,
-	type ImageSourcePropType,
 	Modal,
 	PanResponder,
 	Platform,
@@ -62,24 +62,13 @@ export interface AppSidebarFamily {
 	onPressMember?: (member: AppAvatarStackItem, index: number) => void
 }
 
-/** @deprecated The mock "Profiles" strip was replaced by `family`; kept for existing type imports. */
-export interface AppSidebarProfile {
-	id: string
-	label: string
-	variant?: 'smile' | 'mom' | 'dad' | 'add'
-	avatar?: ImageSourcePropType
-	avatarUrl?: string
-}
-
 interface AppSidebarProps {
 	visible: boolean
 	onClose: () => void
 	onLogout: () => void
 	/** "View profile" (and a tap anywhere on the profile card). */
 	onEditProfile?: () => void
-	/** Flat rows (rendered as one untitled section). */
-	menuItems?: AppSidebarItem[]
-	/** Grouped rows; rendered after `menuItems`. */
+	/** The drawer rows, grouped under optional caps headers. */
 	sections?: AppSidebarSection[]
 	/** Defaults to useAuth().user.name. */
 	profileName?: string
@@ -121,7 +110,6 @@ export default function AppSidebar({
 	onClose,
 	onLogout,
 	onEditProfile,
-	menuItems = [],
 	sections = [],
 	profileName,
 	avatarUri,
@@ -242,10 +230,7 @@ export default function AppSidebar({
 		onLogout()
 	}
 
-	const allSections: AppSidebarSection[] = [
-		...(menuItems.length ? [{ id: '__menu', items: menuItems }] : []),
-		...sections.filter((s) => s.items.length > 0),
-	]
+	const allSections = sections.filter((s) => s.items.length > 0)
 
 	const renderLeading = (icon: AppSidebarItem['icon']) =>
 		typeof icon === 'string' ? (
