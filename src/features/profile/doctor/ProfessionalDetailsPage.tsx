@@ -1,11 +1,14 @@
 // Doctor "Professional & documents": specialisation (set at registration, read-only), areas of expertise,
-// treatments, bio, qualifications list (each with its degree certificate), and the government ID / PAN card
-// documents. Qualifications and every newly picked file save together through PATCH
+// treatments, bio, qualifications list (each with its degree certificate), and government IDs (at least one, of a
+// type the doctor picks from a dropdown; more are optional). Qualifications and every newly picked file save together through PATCH
 // /doctors/professional-details (multipart when a file was picked), expertise / treatments through
 // /profile/additional-details.
 
 import React, { useCallback, useEffect, useState } from 'react'
+import { StyleSheet, View } from 'react-native'
+import { z } from 'zod'
 import {
+	AppButton,
 	AppChipGroup,
 	AppDocumentRow,
 	AppEditableList,
@@ -13,6 +16,8 @@ import {
 	AppFormField,
 	AppListItemSheet,
 	AppSaveFooter,
+	AppSelect,
+	FORM_SELECT_PROPS,
 	type AppListItemField,
 } from '../../../components/common'
 import {
@@ -22,7 +27,12 @@ import {
 	fetchTreatmentOptions,
 	saveDoctorAdditional,
 	saveDoctorProfessional,
+	type DegreeToAdd,
+	type DegreeToUpdate,
+	type DoctorProfessionalPatch,
 	type IdLabel,
+	type IdentityDocument,
+	type IdentityDocumentType,
 } from './doctorProfileService'
 import { useProfileForm } from '../hooks/useProfileForm'
 import { ProfileScreen } from '../shared/components/ProfileScreen'
@@ -46,12 +56,20 @@ interface ProfessionalDraft {
 	treatments: string[]
 	bio: string
 	qualifications: Qualification[]
-	/** Government photo ID and PAN card already stored ('' when none), and ones picked but not saved yet. */
-	identityProof: string
-	panCard: string
-	identityFile?: PickedFile
-	panFile?: PickedFile
+	/** Government IDs already stored, the ID types a doctor can choose from, and files picked but not saved yet. */
+	identityDocuments: IdentityDocument[]
+	identityTypes: IdentityDocumentType[]
+	/** Picked on this device and not saved yet, by ID type code. */
+	identityFiles: Record<string, PickedFile>
 }
+
+/** At least one government ID is compulsory: one already stored, or one picked and waiting to be saved. */
+const profileSchema = z.looseObject({}).superRefine((value, ctx) => {
+	const draft = value as unknown as ProfessionalDraft
+	if (draft.identityDocuments.length === 0 && Object.keys(draft.identityFiles).length === 0) {
+		ctx.addIssue({ code: 'custom', path: ['identityDocuments'], message: 'Add at least one government ID' })
+	}
+})
 
 const QUAL_FIELDS: AppListItemField[] = [
 	{ key: 'degree', label: 'Degree or award', required: true, placeholder: 'e.g. DM Cardiology', maxLength: 100 },
@@ -74,8 +92,9 @@ const load = async (): Promise<ProfessionalDraft> => {
 		expertise: (details.additionalDetail?.areas_of_expertise ?? []).map((a) => a.id),
 		treatments: (details.additionalDetail?.treatments ?? []).map((t) => t.id),
 		bio: prof.about || '',
-			identityProof: prof.identity_proof || '',
-			panCard: prof.pan_card || '',
+			identityDocuments: prof.identity_documents ?? [],
+			identityTypes: prof.identity_document_types ?? [],
+			identityFiles: {},
 		qualifications: (prof.degrees ?? []).map((d) => ({
 			id: Number.isFinite(Number(d.id)) ? Number(d.id) : undefined,
 			degree: d.degree || d.qualification || '',
@@ -88,27 +107,47 @@ const load = async (): Promise<ProfessionalDraft> => {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
+/**
+ * What the doctor changed in the qualifications list, compared with what was loaded. A saved degree is matched by its
+ * `id`: only the fields that differ are sent (plus a newly picked certificate), degrees that did not change are not
+ * mentioned at all, degrees without an id are new, and saved ids that are gone from the list are removed.
+ */
+const diffQualifications = (draft: Qualification[], saved: Qualification[]) => {
+	const savedById = new Map<number, Qualification>()
+	saved.forEach((q) => q.id !== undefined && savedById.set(q.id, q))
+	const draftIds = new Set(draft.map((q) => q.id))
+
+	const add: DegreeToAdd[] = draft
+		.filter((q) => q.id === undefined)
+		.map((q) => ({ degree: q.degree, college: q.college, year_of_passing: q.year, certificate: q.file }))
+
+	const update: DegreeToUpdate[] = []
+	draft.forEach((q) => {
+		const before = q.id !== undefined ? savedById.get(q.id) : undefined
+		if (q.id === undefined || !before) return
+		const change: DegreeToUpdate = { id: q.id }
+		if (q.degree !== before.degree) change.degree = q.degree
+		if (q.college !== before.college) change.college = q.college
+		if (q.year !== before.year) change.year_of_passing = q.year
+		if (q.file) change.certificate = q.file
+		if (Object.keys(change).length > 1) update.push(change)
+	})
+
+	const remove = saved.flatMap((q) => (q.id !== undefined && !draftIds.has(q.id) ? [q.id] : []))
+	return { add, update, remove }
+}
+
 const save = async (draft: ProfessionalDraft, saved: ProfessionalDraft) => {
-	if (
-		!same(draft.bio, saved.bio) ||
-		!same(draft.qualifications, saved.qualifications) ||
-		draft.identityFile ||
-		draft.panFile
-	) {
-		// one request: the details and any newly picked files are saved together
-		await saveDoctorProfessional({
-			about: draft.bio.trim(),
-			degrees: draft.qualifications.map((q) => ({
-				id: q.id,
-				degree: q.degree,
-				college: q.college,
-				year_of_passing: q.year,
-				certificate: q.file,
-			})),
-			identityProof: draft.identityFile,
-			panCard: draft.panFile,
-		})
+	// A real PATCH: build the request from what changed and send nothing else.
+	const patch: DoctorProfessionalPatch = {}
+	if (draft.bio.trim() !== saved.bio.trim()) patch.about = draft.bio.trim()
+	const degreeChanges = diffQualifications(draft.qualifications, saved.qualifications)
+	if (degreeChanges.add.length || degreeChanges.update.length || degreeChanges.remove.length) {
+		patch.degreeChanges = degreeChanges
 	}
+	if (Object.keys(draft.identityFiles).length > 0) patch.identityDocuments = draft.identityFiles
+	if (Object.keys(patch).length > 0) await saveDoctorProfessional(patch)
+
 	if (!same(draft.expertise, saved.expertise) || !same(draft.treatments, saved.treatments)) {
 		await saveDoctorAdditional({ areas_of_expertise: draft.expertise, treatments: draft.treatments })
 	}
@@ -118,8 +157,10 @@ const save = async (draft: ProfessionalDraft, saved: ProfessionalDraft) => {
 const toOptions = (list: IdLabel[]) => list.map((o) => ({ value: o.id, label: o.label }))
 
 export default function ProfessionalDetailsPage() {
-	const form = useProfileForm<ProfessionalDraft>({ load, save })
+	const form = useProfileForm<ProfessionalDraft>({ load, save, schema: profileSchema })
 	const { draft, set } = form
+	// The ID type chosen in the dropdown, waiting for its file.
+	const [newIdType, setNewIdType] = useState('')
 	const [expertiseOptions, setExpertiseOptions] = useState<IdLabel[]>([])
 	const [treatmentOptions, setTreatmentOptions] = useState<IdLabel[]>([])
 	const [editing, setEditing] = useState<number | 'new' | null>(null)
@@ -164,14 +205,37 @@ export default function ProfessionalDetailsPage() {
 		if (file) setPendingFile(file)
 	}, [])
 
-	// Government ID / PAN card: pick now, uploaded with the rest when "Save" is pressed.
-	const pickInto = useCallback(
-		async (field: 'identityFile' | 'panFile') => {
+	// Government ID of one type: pick now, uploaded with the rest when "Save" is pressed. Picking the same type
+	// again replaces the earlier pick (or, once saved, the stored file).
+	const pickIdentity = useCallback(
+		async (code: string) => {
 			const file = await pickCertificateFile()
-			if (file) set(field, file)
+			if (file && draft) {
+				set('identityFiles', { ...draft.identityFiles, [code]: file })
+				setNewIdType('')
+			}
 		},
-		[set]
+		[draft, set]
 	)
+
+	// One row per ID type the doctor has (saved or just picked); the dropdown offers the types still unused.
+	const identityRows = draft
+		? [
+				...draft.identityDocuments.map((d) => ({ code: d.type, label: d.label, stored: d.url ?? '' })),
+				...Object.keys(draft.identityFiles)
+					.filter((code) => !draft.identityDocuments.some((d) => d.type === code))
+					.map((code) => ({
+						code,
+						label: draft.identityTypes.find((t) => t.code === code)?.label ?? code,
+						stored: '',
+					})),
+			]
+		: []
+	const idOptions = draft
+		? draft.identityTypes
+				.filter((t) => !identityRows.some((r) => r.code === t.code))
+				.map((t) => ({ value: t.code, label: t.label }))
+		: []
 
 	const saveQual = useCallback(
 		(v: Record<string, string>) => {
@@ -299,23 +363,57 @@ export default function ProfessionalDetailsPage() {
 						title="Documents"
 						helper="Our team checks each upload, usually within 1–2 working days."
 					>
-						<AppDocumentRow
-								label="Government photo ID"
-								description="Aadhaar, passport, voter ID or driving licence"
-								fileName={draft.identityFile?.name ?? draft.identityProof}
-								status={draft.identityFile || draft.identityProof ? 'in_review' : 'missing'}
-								onUpload={() => void pickInto('identityFile')}
-							/>
-							<AppDocumentRow
-								label="PAN card"
-								description="Needed for payouts and TDS"
-								fileName={draft.panFile?.name ?? draft.panCard}
-								status={draft.panFile || draft.panCard ? 'in_review' : 'missing'}
-								onUpload={() => void pickInto('panFile')}
-							/>
+						<AppFormField
+							label="Government ID"
+							required
+							helper="Add at least one. You can add more if you like."
+							errorText={form.errors.identityDocuments}
+						>
+							<View style={styles.idList}>
+								{identityRows.map((row) => (
+									<AppDocumentRow
+										key={row.code}
+										label={row.label}
+										fileName={draft.identityFiles[row.code]?.name ?? row.stored}
+										status={draft.identityFiles[row.code] || row.stored ? 'in_review' : 'missing'}
+										onUpload={() => void pickIdentity(row.code)}
+									/>
+								))}
+								{idOptions.length > 0 && (
+									<View style={styles.idAdd}>
+										<AppSelect
+											{...FORM_SELECT_PROPS}
+											options={idOptions}
+											value={newIdType}
+											onSelect={setNewIdType}
+											placeholder={
+												identityRows.length === 0 ? 'Select ID type' : 'Add another ID (optional)'
+											}
+										/>
+										{/* The upload option appears only once a type is chosen, below the dropdown. */}
+										{!!newIdType && (
+											<AppButton
+												variant="primary"
+												size="sm"
+												icon="upload"
+												onPress={() => void pickIdentity(newIdType)}
+											>
+												{`Upload ${idOptions.find((o) => o.value === newIdType)?.label ?? 'ID'}`}
+											</AppButton>
+										)}
+									</View>
+								)}
+							</View>
+						</AppFormField>
 					</AppFormCard>
 				</>
 			)}
 		</ProfileScreen>
 	)
 }
+
+const styles = StyleSheet.create({
+	idList: { gap: 10 },
+	// the dropdown, with the Upload button under it once a type is chosen
+	idAdd: { gap: 10 },
+})

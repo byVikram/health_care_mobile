@@ -40,19 +40,31 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 	webp: 'image/webp',
 }
 
+type DocumentPicker = typeof import('expo-document-picker')
+
+// `expo-document-picker` is a native module, so it is loaded on demand: a build made before it was installed
+// shows a message instead of breaking the screen. It is loaded once, when this file is first imported, and not
+// inside the tap handler: a browser (Expo web) only opens a file dialog when it is requested synchronously from
+// the click, and awaiting an import first loses that, so nothing would open.
+let pickerPromise: Promise<DocumentPicker | null> | null = null
+let loadedPicker: DocumentPicker | null = null
+const loadPicker = () => {
+	pickerPromise ??= import('expo-document-picker')
+		.then((module) => (loadedPicker = module))
+		.catch(() => null)
+	return pickerPromise
+}
+void loadPicker()
+
 /**
  * Open the system file explorer for a PDF or an image and resolve with the chosen file (null if the doctor
  * cancels). Nothing is shown first: one tap, one picker. The server checks the real type from the content,
  * so a wrong extension or MIME type here cannot get past it.
- *
- * `expo-document-picker` is a native module, so it is loaded when the button is used: a build made before it
- * was installed shows a message instead of breaking the screen.
  */
 export const pickCertificateFile = async (): Promise<PickedFile | null> => {
-	let picker: typeof import('expo-document-picker')
-	try {
-		picker = await import('expo-document-picker')
-	} catch {
+	// Already loaded in practice, so there is no await before the picker opens.
+	const picker = loadedPicker ?? (await loadPicker())
+	if (!picker) {
 		Alert.alert(
 			'File picker not available',
 			'This version of the app was built without the file picker. Rebuild it with "npx expo run:android" (or run: ios) and try again.'
