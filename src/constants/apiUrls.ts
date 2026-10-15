@@ -249,11 +249,6 @@ export const API_ENDPOINTS = {
 	EVENTS: {
 		PUBLIC: `${BASE_URL}/api/events/public`,
 		PUBLIC_DETAIL: (id: string) => `${BASE_URL}/api/events/public/${id}`,
-		LIST: `${BASE_URL}/api/events`,
-		CREATE: `${BASE_URL}/api/events`,
-		DETAIL: (id: string) => `${BASE_URL}/api/events/${id}`,
-		UPDATE: (id: string) => `${BASE_URL}/api/events/${id}`,
-		DELETE: (id: string) => `${BASE_URL}/api/events/${id}`,
 	},
 	ANCILLARY: {
 		PACKAGES: `${BASE_URL}/api/ancillary/packages`,
