@@ -29,6 +29,8 @@ export interface PersonalDraft {
 	email: string
 	registrationNumber: string
 	registrationProof: string
+	/** Review state of the registration proof: pending / approved / rejected / reupload ('' when there is none). */
+	registrationStatus: string
 	experience: string
 	instagram: string
 	facebook: string
@@ -36,7 +38,7 @@ export interface PersonalDraft {
 	avatar: string
 }
 
-export type PersonalFieldKey = Exclude<keyof PersonalDraft, 'avatar'>
+export type PersonalFieldKey = Exclude<keyof PersonalDraft, 'avatar' | 'registrationStatus'>
 
 export type PersonalFieldMeta = {
 	label: string
@@ -102,6 +104,7 @@ const EMPTY: PersonalDraft = {
 	email: '',
 	registrationNumber: '',
 	registrationProof: '',
+	registrationStatus: '',
 	experience: '',
 	instagram: '',
 	facebook: '',
@@ -190,6 +193,7 @@ export const PERSONAL_DETAILS_CONFIG: Record<HubRole, PersonalDetailsConfig> = {
 				email: p.email || '',
 				registrationNumber: prof.registration_number || '',
 				registrationProof: prof.registration_proof_s3_key || '',
+				registrationStatus: prof.registration_status || '',
 				experience: prof.experience_years != null ? String(prof.experience_years) : '',
 				instagram: social.instagram || '',
 				facebook: social.facebook || '',

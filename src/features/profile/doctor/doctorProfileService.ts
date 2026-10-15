@@ -84,6 +84,8 @@ export interface DoctorDegree {
 	/** Where the uploaded certificate is stored. `qualification_proof_s3_key` is the same value, older name. */
 	degree_certificate?: string | null
 	qualification_proof_s3_key?: string | null
+	/** Review state of the certificate: pending / approved / rejected / reupload (null without a file). */
+	certificate_status?: string | null
 }
 
 export interface IdentityDocumentType {
@@ -96,6 +98,8 @@ export interface IdentityDocument {
 	type: string
 	label: string
 	url: string | null
+	/** pending / approved / rejected / reupload */
+	status?: string | null
 }
 
 export interface DoctorProfessional {
@@ -105,6 +109,8 @@ export interface DoctorProfessional {
 	/** The uploaded registration proof. `registration_proof_s3_key` is the same value, older name. */
 	registration_proof?: string | null
 	registration_proof_s3_key: string | null
+	/** Review state of the registration proof: pending / approved / rejected / reupload. */
+	registration_status?: string | null
 	/** Government IDs uploaded so far: the type code and label, and a short-lived link to the file. */
 	identity_documents?: IdentityDocument[] | null
 	/** The ID types the doctor can choose from when uploading (PAN, Aadhaar, ...). */

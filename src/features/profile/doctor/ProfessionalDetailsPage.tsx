@@ -11,6 +11,7 @@ import {
 	AppButton,
 	AppChipGroup,
 	AppDocumentRow,
+	documentRowStatus,
 	AppEditableList,
 	AppFormCard,
 	AppFormField,
@@ -48,6 +49,9 @@ interface Qualification {
 	proof: string
 	/** A certificate picked on this device and not saved yet. */
 	file?: PickedFile
+	/** Review state of the stored certificate: pending / approved / rejected / reupload. */
+	status?: string | null
+	institution?: string
 }
 
 interface ProfessionalDraft {
@@ -61,6 +65,14 @@ interface ProfessionalDraft {
 	identityTypes: IdentityDocumentType[]
 	/** Picked on this device and not saved yet, by ID type code. */
 	identityFiles: Record<string, PickedFile>
+}
+
+/** The list tag of a stored degree certificate, by its review status. */
+const CERTIFICATE_TAG: Record<string, { label: string; tone: 'confirmed' | 'pending' | 'cancelled' }> = {
+	verified: { label: 'Approved', tone: 'confirmed' },
+	in_review: { label: 'In review', tone: 'pending' },
+	rejected: { label: 'Rejected', tone: 'cancelled' },
+	reupload: { label: 'Re-upload needed', tone: 'cancelled' },
 }
 
 /** At least one government ID is compulsory: one already stored, or one picked and waiting to be saved. */
@@ -101,6 +113,7 @@ const load = async (): Promise<ProfessionalDraft> => {
 			college: d.college || d.institution || '',
 			year: d.year_of_passing || '',
 			proof: d.degree_certificate || d.qualification_proof_s3_key || '',
+			status: d.certificate_status ?? null,
 		})),
 	}
 }
@@ -221,13 +234,14 @@ export default function ProfessionalDetailsPage() {
 	// One row per ID type the doctor has (saved or just picked); the dropdown offers the types still unused.
 	const identityRows = draft
 		? [
-				...draft.identityDocuments.map((d) => ({ code: d.type, label: d.label, stored: d.url ?? '' })),
+				...draft.identityDocuments.map((d) => ({ code: d.type, label: d.label, stored: d.url ?? '', status: d.status ?? null })),
 				...Object.keys(draft.identityFiles)
 					.filter((code) => !draft.identityDocuments.some((d) => d.type === code))
 					.map((code) => ({
 						code,
 						label: draft.identityTypes.find((t) => t.code === code)?.label ?? code,
 						stored: '',
+						status: null as string | null,
 					})),
 			]
 		: []
@@ -287,7 +301,7 @@ export default function ProfessionalDetailsPage() {
 					<AppDocumentRow
 						label="Degree certificate"
 						fileName={pendingFile?.name ?? editingQual?.proof}
-						status={pendingFile || editingQual?.proof ? 'in_review' : 'missing'}
+						status={pendingFile ? 'in_review' : documentRowStatus(editingQual?.status, !!editingQual?.proof)}
 						optional
 						onUpload={() => void pickCertificate()}
 					/>
@@ -341,7 +355,7 @@ export default function ProfessionalDetailsPage() {
 								tag: q.file
 									? { label: 'Uploads when you save', tone: 'neutral' }
 									: q.proof
-										? { label: 'Certificate added', tone: 'confirmed' }
+										? CERTIFICATE_TAG[documentRowStatus(q.status, true)]
 										: { label: 'No certificate', tone: 'neutral' },
 							}))}
 							icon="school-outline"
@@ -375,7 +389,10 @@ export default function ProfessionalDetailsPage() {
 										key={row.code}
 										label={row.label}
 										fileName={draft.identityFiles[row.code]?.name ?? row.stored}
-										status={draft.identityFiles[row.code] || row.stored ? 'in_review' : 'missing'}
+										status={documentRowStatus(
+											draft.identityFiles[row.code] ? null : row.status,
+											!!(draft.identityFiles[row.code] || row.stored)
+										)}
 										onUpload={() => void pickIdentity(row.code)}
 									/>
 								))}
