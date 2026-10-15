@@ -225,12 +225,15 @@ export const PERSONAL_DETAILS_CONFIG: Record<HubRole, PersonalDetailsConfig> = {
 					},
 				})
 			}
-			if (changed(draft, saved, ['registrationNumber', 'experience'])) {
-				await saveDoctorProfessional({
-					registration_number: draft.registrationNumber.trim(),
-					...(draft.experience ? { experience_years: Number(draft.experience) } : {}),
-				})
+			// only the field(s) that changed
+			const professional: { registration_number?: string; experience_years?: number } = {}
+			if (changed(draft, saved, ['registrationNumber'])) {
+				professional.registration_number = draft.registrationNumber.trim()
 			}
+			if (changed(draft, saved, ['experience']) && draft.experience) {
+				professional.experience_years = Number(draft.experience)
+			}
+			if (Object.keys(professional).length > 0) await saveDoctorProfessional(professional)
 			return PERSONAL_DETAILS_CONFIG.doctor.load()
 		},
 	},

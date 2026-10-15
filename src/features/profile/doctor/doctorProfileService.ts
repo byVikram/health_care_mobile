@@ -86,6 +86,18 @@ export interface DoctorDegree {
 	qualification_proof_s3_key?: string | null
 }
 
+export interface IdentityDocumentType {
+	code: string
+	label: string
+}
+
+export interface IdentityDocument {
+	/** The ID type's code, e.g. `aadhaar`. */
+	type: string
+	label: string
+	url: string | null
+}
+
 export interface DoctorProfessional {
 	experience_years: number | null
 	degrees: DoctorDegree[] | null
@@ -93,9 +105,10 @@ export interface DoctorProfessional {
 	/** The uploaded registration proof. `registration_proof_s3_key` is the same value, older name. */
 	registration_proof?: string | null
 	registration_proof_s3_key: string | null
-	/** The uploaded government photo ID and PAN card ('' / null when none). */
-	identity_proof?: string | null
-	pan_card?: string | null
+	/** Government IDs uploaded so far: the type code and label, and a short-lived link to the file. */
+	identity_documents?: IdentityDocument[] | null
+	/** The ID types the doctor can choose from when uploading (PAN, Aadhaar, ...). */
+	identity_document_types?: IdentityDocumentType[] | null
 	about: string | null
 	specialities?: IdLabel[] | null
 }
@@ -105,39 +118,69 @@ export const fetchDoctorProfessional = async (): Promise<DoctorProfessional> => 
 	return res.data.data
 }
 
+/** A degree to add. `certificate` is a file picked on this device. */
+export type DegreeToAdd = { degree: string; college: string; year_of_passing: string; certificate?: PickedFile | null }
+
+/** A change to a saved degree: its `id` plus ONLY the fields that changed (and a newly picked certificate). */
+export type DegreeToUpdate = {
+	id: number
+	degree?: string
+	college?: string
+	year_of_passing?: string
+	certificate?: PickedFile | null
+}
+
 export type DoctorProfessionalPatch = Partial<{
 	experience_years: number
 	registration_number: string
 	about: string
-	/** The full list. `id` keeps an existing degree (and its certificate); `certificate` is a newly picked file. */
-	degrees: { id?: number; degree: string; college: string; year_of_passing: string; certificate?: PickedFile | null }[]
+	/** Only what changed: degrees to add, saved degrees to update (changed fields only), ids to remove. */
+	degreeChanges: { add?: DegreeToAdd[]; update?: DegreeToUpdate[]; remove?: number[] }
 	/** A newly picked registration proof. */
 	registrationProof: PickedFile | null
-	/** A newly picked government photo ID / PAN card. */
-	identityProof: PickedFile | null
-	panCard: PickedFile | null
+	/** Newly picked government IDs, by ID type code (e.g. `aadhaar`). One file per type; a type sent again replaces it. */
+	identityDocuments: Record<string, PickedFile>
 }>
 
 /**
+ * A real PATCH: pass only what the doctor changed and only that is sent. Every field left out is untouched on the
+ * server, including the degrees that are not listed in `degreeChanges`.
+ *
  * One call whether or not files are attached. Without files it is the plain JSON update; with files it is
- * multipart (`payload` + `degree_certificate_<ref>` / `registration_proof`), so the details and the files are
+ * multipart (`payload` + `degree_certificate_<ref>` / `registration_proof` / `identity_document_<type code>` / ...), so the details and the files are
  * saved together. The app never sends a storage key: the server stores the files and links them.
  */
 export const saveDoctorProfessional = async (patch: DoctorProfessionalPatch): Promise<DoctorProfessional> => {
-	const { degrees, registrationProof, identityProof, panCard, ...rest } = patch
-	const hasFiles = !!registrationProof || !!identityProof || !!panCard || !!degrees?.some((d) => d.certificate)
+	const { degreeChanges, registrationProof, identityDocuments, ...rest } = patch
+
+	// A degree carrying a newly picked certificate gets a `ref`; its file travels as `degree_certificate_<ref>`.
+	const certificateFiles: [string, PickedFile][] = []
+	const withRef = <T extends { certificate?: PickedFile | null }>(item: T) => {
+		const { certificate, ...fields } = item
+		if (!certificate) return fields
+		const ref = `d${certificateFiles.length}`
+		certificateFiles.push([`degree_certificate_${ref}`, certificate])
+		return { ...fields, ref }
+	}
+
+	const add = degreeChanges?.add?.map(withRef) ?? []
+	const update = degreeChanges?.update?.map(withRef) ?? []
+	const remove = degreeChanges?.remove ?? []
+	const hasDegreeChanges = add.length > 0 || update.length > 0 || remove.length > 0
 	const payload = {
 		...rest,
-		...(degrees && {
-			degrees: degrees.map((d, i) => ({
-				id: d.id,
-				degree: d.degree,
-				college: d.college,
-				year_of_passing: d.year_of_passing,
-				...(d.certificate ? { ref: `d${i}` } : {}),
-			})),
-		}),
+		...(hasDegreeChanges
+			? {
+					degree_changes: {
+						...(add.length ? { add } : {}),
+						...(update.length ? { update } : {}),
+						...(remove.length ? { remove } : {}),
+					},
+				}
+			: {}),
 	}
+	const identityFiles = Object.entries(identityDocuments ?? {})
+	const hasFiles = certificateFiles.length > 0 || !!registrationProof || identityFiles.length > 0
 
 	if (!hasFiles) {
 		const res = await ApiService.patch<{ data: DoctorProfessional }>(
@@ -149,12 +192,9 @@ export const saveDoctorProfessional = async (patch: DoctorProfessionalPatch): Pr
 
 	const form = new FormData()
 	form.append('payload', JSON.stringify(payload))
-	degrees?.forEach((d, i) => {
-		if (d.certificate) appendFile(form, `degree_certificate_d${i}`, d.certificate)
-	})
+	certificateFiles.forEach(([part, file]) => appendFile(form, part, file))
 	if (registrationProof) appendFile(form, 'registration_proof', registrationProof)
-	if (identityProof) appendFile(form, 'identity_proof', identityProof)
-	if (panCard) appendFile(form, 'pan_card', panCard)
+	identityFiles.forEach(([code, file]) => appendFile(form, `identity_document_${code}`, file))
 	const res = await ApiService.patch<{ data: DoctorProfessional }>(
 		API_ENDPOINTS.DOCTOR_PROFILE.PROFESSIONAL_DETAILS,
 		form,
