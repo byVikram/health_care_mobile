@@ -14,7 +14,7 @@
 //
 // Reached via ROUTES.STACK.ANCILLARY_SERVICES (AncillaryServicesPage) and the Ancillary tab (NursingCarePage,
 // no params -> nursing-care).
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	Alert,
 	LayoutAnimation,
@@ -81,6 +81,7 @@ import {
 	procedureName,
 	procedureTone,
 } from '../utils/ancillaryCatalogContent'
+import { createServiceSearch } from '../utils/serviceSearch'
 
 type CatalogRoute = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SERVICES>
 type CatalogNavigation = NavigationProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SERVICES>
@@ -108,9 +109,6 @@ type DetailTarget =
 // folding the rest behind "+N more".
 const TILE_COLUMNS = 3
 const MAIN_TILES = 6
-
-const matchesQuery = (q: string, parts: (string | null | undefined)[]) =>
-	!q || parts.some((p) => !!p && p.toLowerCase().includes(q))
 
 /** Cart handed back by the booking pages (new AncillaryCartItem[] or the old ServiceProcedureItem[]). */
 const normalizeReturnedCart = (raw: unknown[]): AncillaryCartItem[] => {
@@ -312,19 +310,31 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 		return map
 	}, [services, packages])
 
-	const filteredProcedures = useMemo(
+	// Search uses each service's real data (name, description, included tasks, good-for, category), not
+	// tags: see utils/serviceSearch.ts. The index is built once per catalogue load; the deferred text keeps typing smooth.
+	const deferredQuery = useDeferredValue(query)
+	const searchProcedures = useMemo(() => {
+		const categoryLabel = new Map(categories.map((c) => [c.id, c.label]))
+		return createServiceSearch(services, (s) => ({
+			name: procedureName(s),
+			details: [procedureAbout(s), ...procedureIncludes(s)],
+			other: [s.good_for, s.categoryName, s.categoryId ? categoryLabel.get(s.categoryId) : null],
+		}))
+	}, [services, categories])
+	const searchPackages = useMemo(
 		() =>
-			services.filter(
-				(s) =>
-					(!categoryId || s.categoryId === categoryId) &&
-					matchesQuery(q, [procedureName(s), procedureAbout(s), s.good_for, ...procedureIncludes(s)])
-			),
-		[services, categoryId, q]
+			createServiceSearch(packages, (p) => ({
+				name: p.label,
+				details: [p.description, ...(p.includes ?? [])],
+				other: [p.good_for],
+			})),
+		[packages]
 	)
-	const filteredPackages = useMemo(
-		() => packages.filter((p) => matchesQuery(q, [p.label, p.description, p.good_for, ...(p.includes ?? [])])),
-		[packages, q]
+	const filteredProcedures = useMemo(
+		() => searchProcedures(deferredQuery).filter((s) => !categoryId || s.categoryId === categoryId),
+		[searchProcedures, deferredQuery, categoryId]
 	)
+	const filteredPackages = useMemo(() => searchPackages(deferredQuery), [searchPackages, deferredQuery])
 
 	// Packages have no category, so a "Care for" filter narrows the list to procedures.
 	const packagesAllowed = tab !== 'procedures' && !categoryId
