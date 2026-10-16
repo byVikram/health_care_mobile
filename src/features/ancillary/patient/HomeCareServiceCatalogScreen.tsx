@@ -1,4 +1,4 @@
-﻿import React, { useDeferredValue, useEffect, useMemo, useState } from 'react'
+﻿import React, { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, BackHandler, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
@@ -12,8 +12,7 @@ import {
 	SelectionRowCard,
 } from '../../../components/common'
 import { getAncillaryImageSource } from '../utils/ancillaryImageResolver'
-import { procedureAbout, procedureIncludes, procedureName } from '../utils/ancillaryCatalogContent'
-import { createServiceSearch } from '../utils/serviceSearch'
+import { useServerSearch } from '../hooks/useServerSearch'
 import { ViewCartFloatingBar } from '../components/ViewCartFloatingBar'
 import { ConditionGrid, ConditionGridItem } from '../components/ConditionGrid'
 import { ROUTES } from '../../../navigation/routes'
@@ -22,6 +21,7 @@ import {
 	AncillaryServiceItem,
 	fetchAncillaryCategoriesBackend,
 	fetchAncillaryServicesBackend,
+	searchAncillaryServices,
 } from '../ancillaryService'
 
 // Icon lookup for the Home Care category grid (reusing ConditionGrid, the
@@ -48,6 +48,25 @@ interface CategoryGroup {
 
 const HOME_CARE_HEADER_IMAGE =
 	'https://images.unsplash.com/photo-1581579438747-1dc8d17bbce4?auto=format&fit=crop&w=300&q=80'
+
+const toProcedureItem = (s: AncillaryServiceItem): ServiceProcedureItem => {
+	const title = s.title || (s as any).label || (s as any).name || ''
+	const description = s.description || s.about_service || s.aboutService || ''
+
+	return {
+		id: s.id,
+		categoryId: s.categoryId ?? null,
+		title,
+		description,
+		duration: '',
+		price: '',
+		image: HOME_CARE_HEADER_IMAGE,
+		image_url: s.image_url ?? s.imageUrl ?? HOME_CARE_HEADER_IMAGE,
+		premiumBadgeText: 'Home Care',
+		about_service: s.about_service ?? s.aboutService ?? null,
+		whats_included: s.whats_included ?? s.whatsIncluded ?? null,
+	}
+}
 
 export default function HomeCareServiceCatalogScreen() {
 	const navigation = useNavigation<any>()
@@ -126,26 +145,7 @@ export default function HomeCareServiceCatalogScreen() {
 		}))
 	}, [categories])
 
-	const procedureItems = useMemo<ServiceProcedureItem[]>(() => {
-		return rawServices.map((s) => {
-			const title = s.title || (s as any).label || (s as any).name || ''
-			const description = s.description || s.about_service || s.aboutService || ''
-
-			return {
-				id: s.id,
-				categoryId: s.categoryId ?? null,
-				title,
-				description,
-				duration: '',
-				price: '',
-				image: HOME_CARE_HEADER_IMAGE,
-				image_url: s.image_url ?? s.imageUrl ?? HOME_CARE_HEADER_IMAGE,
-				premiumBadgeText: 'Home Care',
-				about_service: s.about_service ?? s.aboutService ?? null,
-				whats_included: s.whats_included ?? s.whatsIncluded ?? null,
-			}
-		})
-	}, [rawServices])
+	const procedureItems = useMemo<ServiceProcedureItem[]>(() => rawServices.map(toProcedureItem), [rawServices])
 
 	const allSelected = useMemo(() => {
 		return procedureItems.length > 0 && cart.length === procedureItems.length
@@ -159,44 +159,29 @@ export default function HomeCareServiceCatalogScreen() {
 		}
 	}
 
-	// Search over each activity's real data: its name, description, the tasks / care activities it includes, who it is good
-	// for and its category (see utils/serviceSearch.ts). Indexed once per catalogue load.
-	const searchActivities = useMemo(() => {
-		const categoryLabel = new Map(categories.map((c) => [c.id, c.label]))
-		const byId = new Map(procedureItems.map((p) => [p.id, p]))
-		const search = createServiceSearch(rawServices, (s) => ({
-			name: procedureName(s),
-			details: [procedureAbout(s), ...procedureIncludes(s)],
-			other: [s.good_for, s.categoryName, s.categoryId ? categoryLabel.get(s.categoryId) : null],
-		}))
-		return (query: string, categoryId: string) => {
-			const inCategory = categoryId === HOME_CARE_ALL_CATEGORY_ID ? rawServices : rawServices.filter((s) => s.categoryId === categoryId)
-			// Search within the chosen category: rank the whole catalogue, keep the activities that are in it.
-			const allowed = new Set(inCategory.map((s) => s.id))
-			return search(query)
-				.filter((s) => allowed.has(s.id))
-				.map((s) => byId.get(s.id))
-				.filter((p): p is ServiceProcedureItem => !!p)
-		}
-	}, [rawServices, procedureItems, categories])
-
-	// The list follows the text as it is typed; the deferred copy keeps typing smooth on a long catalogue.
-	const deferredQuery = useDeferredValue(searchQuery)
+	// Search is done by the backend (GET /api/ancillary/services?search=): it matches each activity's name, description,
+	// the tasks / care activities it includes, who it is good for and its category, and returns the matches best first. While
+	// the text is empty the full catalogue is shown; the category chosen below narrows either list.
+	const search = useServerSearch(searchQuery, (text) => searchAncillaryServices({ specialtyId: 'home-care', search: text }))
+	const searchUnavailable = search.failed && !!searchQuery.trim()
 
 	const displayGroups = useMemo<CategoryGroup[]>(() => {
 		const groupTitle =
 			activeCategory === HOME_CARE_ALL_CATEGORY_ID
 				? 'All Home Care Activities'
 				: categoryPills.find((c) => c.id === activeCategory)?.label || 'Home Care Activities'
+		// A failed search shows nothing (and says so below): neither the old results nor the full list match the text.
+		const source = searchUnavailable ? [] : (search.results ?? rawServices)
+		const inCategory = activeCategory === HOME_CARE_ALL_CATEGORY_ID ? source : source.filter((s) => s.categoryId === activeCategory)
 
 		return [
 			{
 				id: 'group-all',
 				categoryName: groupTitle,
-				procedures: searchActivities(deferredQuery, activeCategory),
+				procedures: inCategory.map(toProcedureItem),
 			},
 		]
-	}, [searchActivities, deferredQuery, activeCategory, categoryPills])
+	}, [search.results, searchUnavailable, rawServices, activeCategory, categoryPills])
 
 	const handleAddProcedure = (item: ServiceProcedureItem) => {
 		setCart((prev) => {
@@ -244,6 +229,11 @@ export default function HomeCareServiceCatalogScreen() {
 						value={searchQuery}
 						onChangeText={setSearchQuery}
 					/>
+					{search.searching && (
+						<AppTypography variant="caption" style={styles.searchHint}>
+							Searching...
+						</AppTypography>
+					)}
 				</View>
 
 				{/* 1. CARE MODE SELECTION SECTION */}
@@ -338,10 +328,12 @@ export default function HomeCareServiceCatalogScreen() {
 					<View style={styles.emptyContainer}>
 						<MaterialCommunityIcons name="clipboard-text-search-outline" size={48} color="#94A3B8" />
 						<AppTypography variant="h3" style={styles.emptyTitle}>
-							No Activities Found
+							{searchUnavailable ? 'Search is unavailable right now' : 'No Activities Found'}
 						</AppTypography>
 						<AppTypography variant="caption" style={styles.emptySub}>
-							Try another word, or reset your category filter.
+							{searchUnavailable
+								? 'Check your connection and try again.'
+								: 'Try another word, or reset your category filter.'}
 						</AppTypography>
 					</View>
 				) : (
@@ -414,6 +406,11 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingBottom: 110,
+	},
+	searchHint: {
+		marginTop: 6,
+		marginLeft: 4,
+		color: '#64748B',
 	},
 	searchContainer: {
 		paddingHorizontal: 16,

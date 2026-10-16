@@ -251,7 +251,8 @@ export const API_ENDPOINTS = {
 		PUBLIC_DETAIL: (id: string) => `${BASE_URL}/api/events/public/${id}`,
 	},
 	ANCILLARY: {
-		PACKAGES: `${BASE_URL}/api/ancillary/packages`,
+		// A specialty's services AND packages in one response (what the catalogue screen shows)
+		CATALOG: `${BASE_URL}/api/ancillary/catalog`,
 		PACKAGE_DETAIL: (id: string | number) => `${BASE_URL}/api/ancillary/packages/${id}`,
 		PROFILE: `${BASE_URL}/api/ancillary/me/profile`,
 		CAPABILITIES: `${BASE_URL}/api/ancillary/me/capabilities`,
