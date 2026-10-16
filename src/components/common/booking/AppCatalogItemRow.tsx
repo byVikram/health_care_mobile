@@ -8,7 +8,6 @@
 
 import React from 'react'
 import {
-	Image,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
@@ -20,6 +19,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { APP_COLORS, TONES, type ToneKey } from '../../../config/theme'
 import { AppPathIcon } from '../display/AppIcon'
+import { AppFallbackImage } from '../display/AppFallbackImage'
 
 export type AppCatalogItemRowProps = {
 	name: string
@@ -66,6 +66,13 @@ export function AppCatalogItemRow({
 	const pair = TONES[tone]
 	const lines = (points ?? []).filter(Boolean).slice(0, 2)
 	const priceA11y = `${priceLabel}${mrpLabel ? `, was ${mrpLabel}` : ''}${metaLabel ? `, ${metaLabel}` : ''}`
+	const fallbackTile = (
+		<View style={[styles.tile, { backgroundColor: pair.bg }]}>
+			<View style={[styles.disc1, { backgroundColor: pair.ink }]} />
+			<View style={[styles.disc2, { backgroundColor: pair.ink }]} />
+			{!!iconPath && <AppPathIcon d={iconPath} size={44} strokeWidth={1.5} color={pair.ink} />}
+		</View>
+	)
 
 	return (
 		<View style={[styles.row, divider && styles.divider, style]}>
@@ -116,17 +123,13 @@ export function AppCatalogItemRow({
 					importantForAccessibility="no-hide-descendants"
 				>
 					{imageSource ? (
-						<Image
+						<AppFallbackImage
 							source={imageSource}
 							style={[styles.tile, { backgroundColor: pair.bg }]}
-							resizeMode="cover"
+							fallback={fallbackTile}
 						/>
 					) : (
-						<View style={[styles.tile, { backgroundColor: pair.bg }]}>
-							<View style={[styles.disc1, { backgroundColor: pair.ink }]} />
-							<View style={[styles.disc2, { backgroundColor: pair.ink }]} />
-							{!!iconPath && <AppPathIcon d={iconPath} size={44} strokeWidth={1.5} color={pair.ink} />}
-						</View>
+						fallbackTile
 					)}
 				</TouchableOpacity>
 				<TouchableOpacity

@@ -57,9 +57,8 @@ import {
 	AncillaryCategoryApiItem,
 	AncillaryPackageListItem,
 	AncillaryServiceItem,
+	fetchAncillaryCatalog,
 	fetchAncillaryCategories,
-	fetchAncillaryPackages,
-	fetchAncillaryServices,
 } from '../ancillaryService'
 import {
 	CATALOG_ICONS,
@@ -74,13 +73,13 @@ import {
 	buildProcedureSheetContent,
 	packageCartItem,
 	packageTone,
-	procedureAbout,
 	procedureCartItem,
 	procedureIcon,
 	procedureIncludes,
 	procedureName,
 	procedureTone,
 } from '../utils/ancillaryCatalogContent'
+import { useServerSearch } from '../hooks/useServerSearch'
 
 type CatalogRoute = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SERVICES>
 type CatalogNavigation = NavigationProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SERVICES>
@@ -109,9 +108,6 @@ type DetailTarget =
 const TILE_COLUMNS = 3
 const MAIN_TILES = 6
 
-const matchesQuery = (q: string, parts: (string | null | undefined)[]) =>
-	!q || parts.some((p) => !!p && p.toLowerCase().includes(q))
-
 /** Cart handed back by the booking pages (new AncillaryCartItem[] or the old ServiceProcedureItem[]). */
 const normalizeReturnedCart = (raw: unknown[]): AncillaryCartItem[] => {
 	const items = raw
@@ -139,9 +135,8 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 	const [services, setServices] = useState<AncillaryServiceItem[]>([])
 	const [loading, setLoading] = useState(true)
 	const [packages, setPackages] = useState<AncillaryPackageListItem[]>([])
-	const [packagesLoading, setPackagesLoading] = useState(true)
-	const [packagesError, setPackagesError] = useState(false)
-	const [packagesReloadKey, setPackagesReloadKey] = useState(0)
+	const [catalogError, setCatalogError] = useState(false)
+	const [reloadKey, setReloadKey] = useState(0)
 
 	const [tab, setTab] = useState<TypeTab>('all')
 	const [categoryId, setCategoryId] = useState<string | null>(null)
@@ -153,21 +148,26 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 	const compactRef = useRef(false)
 
 	// ---- data ----
+	// One request for the specialty's services and packages (GET /api/ancillary/catalog), plus its categories.
 	useEffect(() => {
 		let isMounted = true
 		const loadCatalog = async () => {
 			try {
 				setLoading(true)
-				const [cats, srvs] = await Promise.all([
-					fetchAncillaryCategories(serviceKey),
-					fetchAncillaryServices({ specialtyId: serviceKey }),
-				])
+				setCatalogError(false)
+				const [cats, catalog] = await Promise.all([fetchAncillaryCategories(serviceKey), fetchAncillaryCatalog({ specialtyId: serviceKey })])
 				if (isMounted) {
 					setCategories(cats)
-					setServices(srvs)
+					setServices(catalog.services)
+					setPackages(catalog.packages)
 				}
 			} catch (e) {
 				console.log('[AncillaryServiceCatalogScreen] Catalog load error:', e)
+				if (isMounted) {
+					setServices([])
+					setPackages([])
+					setCatalogError(true)
+				}
 			} finally {
 				if (isMounted) setLoading(false)
 			}
@@ -176,31 +176,7 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 		return () => {
 			isMounted = false
 		}
-	}, [serviceKey])
-
-	useEffect(() => {
-		let isMounted = true
-		const loadPackages = async () => {
-			try {
-				setPackagesLoading(true)
-				setPackagesError(false)
-				const list = await fetchAncillaryPackages(serviceKey)
-				if (isMounted) setPackages(list)
-			} catch (e) {
-				console.log('[AncillaryServiceCatalogScreen] Packages load error:', e)
-				if (isMounted) {
-					setPackages([])
-					setPackagesError(true)
-				}
-			} finally {
-				if (isMounted) setPackagesLoading(false)
-			}
-		}
-		void loadPackages()
-		return () => {
-			isMounted = false
-		}
-	}, [serviceKey, packagesReloadKey])
+	}, [serviceKey, reloadKey])
 
 	// Cart edited on a booking page and handed back via params.
 	const returnedCart = route.params?.updatedCart
@@ -312,26 +288,28 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 		return map
 	}, [services, packages])
 
+	// Search is done by the backend (GET /api/ancillary/services?search= and /packages?search=): it matches each service's
+	// name, about text, included tasks, good-for and category (a package's name, description, what it includes and the
+	// procedures it bundles) and returns the matches best first. While the text is empty the full catalogue is shown.
+	const search = useServerSearch(query, (text) => fetchAncillaryCatalog({ specialtyId: serviceKey, search: text }))
+	// A failed search shows nothing (the empty state says so): neither the old results nor the full list match the text.
+	const searchUnavailable = search.failed && !!query.trim()
 	const filteredProcedures = useMemo(
 		() =>
-			services.filter(
-				(s) =>
-					(!categoryId || s.categoryId === categoryId) &&
-					matchesQuery(q, [procedureName(s), procedureAbout(s), s.good_for, ...procedureIncludes(s)])
-			),
-		[services, categoryId, q]
+			searchUnavailable
+				? []
+				: (search.results?.services ?? services).filter((s) => !categoryId || s.categoryId === categoryId),
+		[search.results, searchUnavailable, services, categoryId]
 	)
-	const filteredPackages = useMemo(
-		() => packages.filter((p) => matchesQuery(q, [p.label, p.description, p.good_for, ...(p.includes ?? [])])),
-		[packages, q]
-	)
+	const filteredPackages = searchUnavailable ? [] : (search.results?.packages ?? packages)
 
 	// Packages have no category, so a "Care for" filter narrows the list to procedures.
 	const packagesAllowed = tab !== 'procedures' && !categoryId
-	const showPackages = packagesAllowed && (packagesLoading || (packagesError && !q) || filteredPackages.length > 0)
+	const showPackages = packagesAllowed && (loading || filteredPackages.length > 0)
 	const showProcedures = tab !== 'packages' && (loading || filteredProcedures.length > 0)
 	const noResults = !showPackages && !showProcedures
 	const filtersActive = !!q || !!categoryId || tab !== 'all'
+	const loadFailed = catalogError && !q
 
 	const resetFilters = () => {
 		setTab('all')
@@ -501,16 +479,11 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 				{showPackages && (
 					<AppCatalogSection
 					title={copy.packagesTitle}
-					count={packagesLoading ? '' : plural(filteredPackages.length, 'package', 'packages')}
+					count={loading ? '' : plural(filteredPackages.length, 'package', 'packages')}
 					subtitle={copy.packagesSubtitle}
 					>
-						{packagesLoading ? (
+						{loading ? (
 							<RowSkeletons />
-						) : packagesError && filteredPackages.length === 0 ? (
-							<View style={styles.stateBox}>
-								<Text style={styles.stateText}>Unable to load packages right now.</Text>
-								<AppTextLink label="Try again" onPress={() => setPackagesReloadKey((k) => k + 1)} />
-							</View>
 						) : (
 							filteredPackages.map((p, i) => (
 								<AppCatalogItemRow
@@ -574,16 +547,26 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 
 				{noResults && (
 					<AppCatalogEmpty
-						title={q ? 'No service matches your search' : 'No services here yet'}
-						subtitle={
-							q
-								? copy.emptySearchHint
-								: filtersActive
-									? 'Try another filter, or browse all services.'
-									: copy.emptyCatalogHint
+						title={
+							loadFailed
+								? 'Services could not be loaded'
+								: searchUnavailable
+									? 'Search is unavailable right now'
+									: q
+										? 'No service matches your search'
+										: 'No services here yet'
 						}
-						actionLabel={filtersActive ? 'Show all' : undefined}
-						onAction={resetFilters}
+						subtitle={
+							loadFailed || searchUnavailable
+								? 'Check your connection and try again.'
+								: q
+									? copy.emptySearchHint
+									: filtersActive
+										? 'Try another filter, or browse all services.'
+										: copy.emptyCatalogHint
+						}
+						actionLabel={loadFailed ? 'Try again' : filtersActive ? 'Show all' : undefined}
+						onAction={loadFailed ? () => setReloadKey((k) => k + 1) : resetFilters}
 					/>
 				)}
 			</ScrollView>
@@ -884,16 +867,5 @@ const styles = StyleSheet.create({
 	skeletonText: {
 		flex: 1,
 		gap: 8,
-	},
-	stateBox: {
-		alignItems: 'center',
-		paddingVertical: 24,
-		gap: 8,
-	},
-	stateText: {
-		fontSize: 14,
-		lineHeight: 20,
-		color: APP_COLORS.inkMuted,
-		textAlign: 'center',
 	},
 })
