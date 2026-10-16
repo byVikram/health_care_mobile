@@ -5,20 +5,17 @@
 // /profile/additional-details.
 
 import React, { useCallback, useEffect, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
 import { z } from 'zod'
 import {
-	AppButton,
 	AppChipGroup,
 	AppDocumentRow,
+	DOCUMENT_LIST_TAG,
 	documentRowStatus,
 	AppEditableList,
 	AppFormCard,
 	AppFormField,
 	AppListItemSheet,
 	AppSaveFooter,
-	AppSelect,
-	FORM_SELECT_PROPS,
 	type AppListItemField,
 } from '../../../components/common'
 import {
@@ -36,6 +33,7 @@ import {
 	type IdentityDocumentType,
 } from './doctorProfileService'
 import { useProfileForm } from '../hooks/useProfileForm'
+import { IdentityDocumentsField } from '../shared/components/IdentityDocumentsField'
 import { ProfileScreen } from '../shared/components/ProfileScreen'
 import { pickCertificateFile, type PickedFile } from '../../../utils/pickedFile'
 
@@ -60,6 +58,13 @@ interface ProfessionalDraft {
 	treatments: string[]
 	bio: string
 	qualifications: Qualification[]
+	/** Medical registration and experience (shown before the documents). */
+	registrationNumber: string
+	/** The registration certificate already stored ('' when none), its review status, and one picked but not saved. */
+	registrationProof: string
+	registrationStatus: string
+	registrationFile?: PickedFile
+	experience: string
 	/** Government IDs already stored, the ID types a doctor can choose from, and files picked but not saved yet. */
 	identityDocuments: IdentityDocument[]
 	identityTypes: IdentityDocumentType[]
@@ -67,19 +72,15 @@ interface ProfessionalDraft {
 	identityFiles: Record<string, PickedFile>
 }
 
-/** The list tag of a stored degree certificate, by its review status. */
-const CERTIFICATE_TAG: Record<string, { label: string; tone: 'confirmed' | 'pending' | 'cancelled' }> = {
-	verified: { label: 'Approved', tone: 'confirmed' },
-	in_review: { label: 'In review', tone: 'pending' },
-	rejected: { label: 'Rejected', tone: 'cancelled' },
-	reupload: { label: 'Re-upload needed', tone: 'cancelled' },
-}
-
-/** At least one government ID is compulsory: one already stored, or one picked and waiting to be saved. */
+/**
+ * At least one government ID is compulsory: one already stored (whatever its review status), or one picked and waiting
+ * to be saved. The error is keyed by `identityFiles`, the field the doctor changes: the form clears a field's error when
+ * that field is set, so adding an ID clears the message (under another key it stayed until the next Save).
+ */
 const profileSchema = z.looseObject({}).superRefine((value, ctx) => {
 	const draft = value as unknown as ProfessionalDraft
 	if (draft.identityDocuments.length === 0 && Object.keys(draft.identityFiles).length === 0) {
-		ctx.addIssue({ code: 'custom', path: ['identityDocuments'], message: 'Add at least one government ID' })
+		ctx.addIssue({ code: 'custom', path: ['identityFiles'], message: 'Add at least one government ID' })
 	}
 })
 
@@ -104,6 +105,10 @@ const load = async (): Promise<ProfessionalDraft> => {
 		expertise: (details.additionalDetail?.areas_of_expertise ?? []).map((a) => a.id),
 		treatments: (details.additionalDetail?.treatments ?? []).map((t) => t.id),
 		bio: prof.about || '',
+		registrationNumber: prof.registration_number || '',
+		registrationProof: prof.registration_proof || prof.registration_proof_s3_key || '',
+		registrationStatus: prof.registration_status || '',
+		experience: prof.experience_years != null ? String(prof.experience_years) : '',
 			identityDocuments: prof.identity_documents ?? [],
 			identityTypes: prof.identity_document_types ?? [],
 			identityFiles: {},
@@ -158,6 +163,11 @@ const save = async (draft: ProfessionalDraft, saved: ProfessionalDraft) => {
 	if (degreeChanges.add.length || degreeChanges.update.length || degreeChanges.remove.length) {
 		patch.degreeChanges = degreeChanges
 	}
+	if (draft.registrationNumber.trim() !== saved.registrationNumber.trim()) {
+		patch.registration_number = draft.registrationNumber.trim()
+	}
+	if (draft.experience !== saved.experience && draft.experience) patch.experience_years = Number(draft.experience)
+	if (draft.registrationFile) patch.registrationProof = draft.registrationFile
 	if (Object.keys(draft.identityFiles).length > 0) patch.identityDocuments = draft.identityFiles
 	if (Object.keys(patch).length > 0) await saveDoctorProfessional(patch)
 
@@ -172,8 +182,6 @@ const toOptions = (list: IdLabel[]) => list.map((o) => ({ value: o.id, label: o.
 export default function ProfessionalDetailsPage() {
 	const form = useProfileForm<ProfessionalDraft>({ load, save, schema: profileSchema })
 	const { draft, set } = form
-	// The ID type chosen in the dropdown, waiting for its file.
-	const [newIdType, setNewIdType] = useState('')
 	const [expertiseOptions, setExpertiseOptions] = useState<IdLabel[]>([])
 	const [treatmentOptions, setTreatmentOptions] = useState<IdLabel[]>([])
 	const [editing, setEditing] = useState<number | 'new' | null>(null)
@@ -218,38 +226,11 @@ export default function ProfessionalDetailsPage() {
 		if (file) setPendingFile(file)
 	}, [])
 
-	// Government ID of one type: pick now, uploaded with the rest when "Save" is pressed. Picking the same type
-	// again replaces the earlier pick (or, once saved, the stored file).
-	const pickIdentity = useCallback(
-		async (code: string) => {
-			const file = await pickCertificateFile()
-			if (file && draft) {
-				set('identityFiles', { ...draft.identityFiles, [code]: file })
-				setNewIdType('')
-			}
-		},
-		[draft, set]
-	)
-
-	// One row per ID type the doctor has (saved or just picked); the dropdown offers the types still unused.
-	const identityRows = draft
-		? [
-				...draft.identityDocuments.map((d) => ({ code: d.type, label: d.label, stored: d.url ?? '', status: d.status ?? null })),
-				...Object.keys(draft.identityFiles)
-					.filter((code) => !draft.identityDocuments.some((d) => d.type === code))
-					.map((code) => ({
-						code,
-						label: draft.identityTypes.find((t) => t.code === code)?.label ?? code,
-						stored: '',
-						status: null as string | null,
-					})),
-			]
-		: []
-	const idOptions = draft
-		? draft.identityTypes
-				.filter((t) => !identityRows.some((r) => r.code === t.code))
-				.map((t) => ({ value: t.code, label: t.label }))
-		: []
+	// Registration certificate: pick now, uploaded with the rest when "Save" is pressed.
+	const pickRegistration = useCallback(async () => {
+		const file = await pickCertificateFile()
+		if (file) set('registrationFile', file)
+	}, [set])
 
 	const saveQual = useCallback(
 		(v: Record<string, string>) => {
@@ -355,7 +336,7 @@ export default function ProfessionalDetailsPage() {
 								tag: q.file
 									? { label: 'Uploads when you save', tone: 'neutral' }
 									: q.proof
-										? CERTIFICATE_TAG[documentRowStatus(q.status, true)]
+										? DOCUMENT_LIST_TAG[documentRowStatus(q.status, true) as keyof typeof DOCUMENT_LIST_TAG]
 										: { label: 'No certificate', tone: 'neutral' },
 							}))}
 							icon="school-outline"
@@ -374,63 +355,48 @@ export default function ProfessionalDetailsPage() {
 					</AppFormCard>
 
 					<AppFormCard
+						title="Medical registration"
+						helper="Our team checks your registration certificate before it shows as verified."
+					>
+						<AppFormField
+							label="Registration number"
+							value={draft.registrationNumber}
+							onChangeText={(v) => set('registrationNumber', v)}
+							maxLength={50}
+							autoCapitalize="characters"
+						/>
+						<AppDocumentRow
+							label="Registration certificate (state council / NMC)"
+							fileName={draft.registrationFile?.name ?? draft.registrationProof}
+							status={documentRowStatus(
+								draft.registrationFile ? null : draft.registrationStatus,
+								!!(draft.registrationFile || draft.registrationProof)
+							)}
+							onUpload={() => void pickRegistration()}
+						/>
+						<AppFormField
+							label="Years of experience"
+							value={draft.experience}
+							onChangeText={(v) => set('experience', v.replace(/\D/g, ''))}
+							keyboardType="number-pad"
+							maxLength={2}
+						/>
+					</AppFormCard>
+
+					<AppFormCard
 						title="Documents"
 						helper="Our team checks each upload, usually within 1–2 working days."
 					>
-						<AppFormField
-							label="Government ID"
-							required
-							helper="Add at least one. You can add more if you like."
-							errorText={form.errors.identityDocuments}
-						>
-							<View style={styles.idList}>
-								{identityRows.map((row) => (
-									<AppDocumentRow
-										key={row.code}
-										label={row.label}
-										fileName={draft.identityFiles[row.code]?.name ?? row.stored}
-										status={documentRowStatus(
-											draft.identityFiles[row.code] ? null : row.status,
-											!!(draft.identityFiles[row.code] || row.stored)
-										)}
-										onUpload={() => void pickIdentity(row.code)}
-									/>
-								))}
-								{idOptions.length > 0 && (
-									<View style={styles.idAdd}>
-										<AppSelect
-											{...FORM_SELECT_PROPS}
-											options={idOptions}
-											value={newIdType}
-											onSelect={setNewIdType}
-											placeholder={
-												identityRows.length === 0 ? 'Select ID type' : 'Add another ID (optional)'
-											}
-										/>
-										{/* The upload option appears only once a type is chosen, below the dropdown. */}
-										{!!newIdType && (
-											<AppButton
-												variant="primary"
-												size="sm"
-												icon="upload"
-												onPress={() => void pickIdentity(newIdType)}
-											>
-												{`Upload ${idOptions.find((o) => o.value === newIdType)?.label ?? 'ID'}`}
-											</AppButton>
-										)}
-									</View>
-								)}
-							</View>
-						</AppFormField>
+						<IdentityDocumentsField
+							stored={draft.identityDocuments}
+							types={draft.identityTypes}
+							files={draft.identityFiles}
+							onChangeFiles={(files) => set('identityFiles', files)}
+							errorText={form.errors.identityFiles}
+						/>
 					</AppFormCard>
 				</>
 			)}
 		</ProfileScreen>
 	)
 }
-
-const styles = StyleSheet.create({
-	idList: { gap: 10 },
-	// the dropdown, with the Upload button under it once a type is chosen
-	idAdd: { gap: 10 },
-})

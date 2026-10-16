@@ -1,12 +1,15 @@
-// Ancillary "Work & documents" (nursing / physio / home care / rehab; labels from ancillaryProfileConfig):
-// registration number + licence certificate, ID / PAN / police documents (upload coming soon),
-// qualifications, and work & services (specialisation, experience, services offered, bio).
+// Ancillary "Professional details" (nursing / physio / home care / rehab; labels from ancillaryProfileConfig):
+// registration number + licence certificate, qualifications (each with its certificate and status), government IDs
+// (uploaded here with a review status; the same as the doctor's), and work & services (specialisation, experience,
+// services offered, bio).
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { StyleSheet } from 'react-native'
 import {
 	AppChipGroup,
 	AppDocumentRow,
+	DOCUMENT_LIST_TAG,
+	documentRowStatus,
 	AppEditableList,
 	AppFormCard,
 	AppFormField,
@@ -19,7 +22,7 @@ import {
 	type AppListItemField,
 } from '../../../components/common'
 import { useAncillarySpecialty } from '../../../context/AuthContext'
-import { showComingSoon } from '../../../utils/toast'
+import { pickCertificateFile, type PickedFile } from '../../../utils/pickedFile'
 import {
 	fetchAncillaryServicesBackend,
 	fetchAncillarySubspecialtiesBackend,
@@ -30,13 +33,22 @@ import {
 import { saveProviderCapabilities, saveProviderWork, type ProviderQualification } from './ancillaryProfileService'
 import { ancillaryConfigFor, type AncillaryProfileConfig } from '../config/ancillaryProfileConfig'
 import { useProfileForm } from '../hooks/useProfileForm'
+import { IdentityDocumentsField } from '../shared/components/IdentityDocumentsField'
 import { ProfileScreen } from '../shared/components/ProfileScreen'
+import type { IdentityDocument, IdentityDocumentType } from '../shared/identityDocuments'
 
 interface WorkDraft {
 	specialtyId: string
 	verificationStatus: string
 	licenceNumber: string
+	/** The licence proof already stored, as a signed link ('' when none), its review status, and one picked but not saved. */
 	licenceProof: string
+	licenceStatus: string
+	licenceFile?: PickedFile
+	/** Government IDs already stored, the ID types to choose from, and files picked but not saved yet. */
+	identityDocuments: IdentityDocument[]
+	identityTypes: IdentityDocumentType[]
+	identityFiles: Record<string, PickedFile>
 	qualifications: ProviderQualification[]
 	subSpecialtyId: string
 	experience: string
@@ -78,12 +90,18 @@ const load = async (): Promise<WorkDraft> => {
 		specialtyId: p.specialty_id || p.specialty?.id || '',
 		verificationStatus: p.verification_status || '',
 		licenceNumber: p.license_number || '',
-		licenceProof: p.license_proof_s3_key || '',
-		qualifications: list.map((q: Record<string, string | null>) => ({
-			qualification: q.qualification || '',
-			institution: q.institution || '',
-			year_of_passing: q.year_of_passing || '',
-			proof_s3_key: q.proof_s3_key || q.qualification_proof_s3_key || null,
+		licenceProof: p.license_proof || p.license_proof_s3_key || '',
+		licenceStatus: p.license_status || '',
+		identityDocuments: p.identity_documents ?? [],
+		identityTypes: p.identity_document_types ?? [],
+		identityFiles: {},
+		qualifications: list.map((q: Record<string, string | number | null>) => ({
+			id: q.id != null && Number.isFinite(Number(q.id)) ? Number(q.id) : undefined,
+			qualification: String(q.qualification || ''),
+			institution: String(q.institution || ''),
+			year_of_passing: q.year_of_passing != null ? String(q.year_of_passing) : '',
+			proof: String(q.degree_certificate || q.proof_url || q.qualification_proof_s3_key || ''),
+			status: q.certificate_status != null ? String(q.certificate_status) : null,
 		})),
 		subSpecialtyId: p.sub_specialty_id || p.sub_specialty?.id || '',
 		experience: p.experience_years != null ? String(p.experience_years) : '',
@@ -101,6 +119,8 @@ const save = async (d: WorkDraft, saved: WorkDraft) => {
 		about: d.about.trim(),
 		...(d.subSpecialtyId ? { sub_specialty_id: d.subSpecialtyId } : {}),
 		...(!same(d.qualifications, saved.qualifications) ? { qualifications: d.qualifications } : {}),
+		...(d.licenceFile ? { licenceProof: d.licenceFile } : {}),
+		...(Object.keys(d.identityFiles).length > 0 ? { identityDocuments: d.identityFiles } : {}),
 	})
 	if (!same(d.services, saved.services)) await saveProviderCapabilities(d.services)
 	return load()
@@ -111,6 +131,11 @@ const validate = (d: WorkDraft, config: AncillaryProfileConfig) => {
 	if (config.registrationRequired && d.licenceNumber.trim().length < 3)
 		errors.licenceNumber = 'Enter your registration number'
 	if (d.experience && !/^\d{1,2}$/.test(d.experience)) errors.experience = 'Enter years as a number'
+	// At least one government ID is compulsory: one already stored (whatever its review status), or one picked and
+	// waiting to be saved. The error is keyed by `identityFiles`, the field the provider changes: the form clears a
+	// field's error when that field is set, so adding an ID clears the message (and re-enables Save).
+	if (d.identityDocuments.length === 0 && Object.keys(d.identityFiles).length === 0)
+		errors.identityFiles = 'Add at least one government ID'
 	return errors
 }
 
@@ -174,14 +199,33 @@ export default function WorkDocumentsPage() {
 	const inReview = !!draft?.licenceNumber && !verified && draft?.verificationStatus !== 'rejected'
 	const editingQual = typeof editing === 'number' ? draft?.qualifications[editing] : undefined
 
+	// The certificate picked in the open sheet; it joins the qualification when the sheet is submitted.
+	const [pendingFile, setPendingFile] = useState<PickedFile | null>(null)
+	useEffect(() => {
+		// only when the sheet opens for another item, not on every edit of the draft
+		setPendingFile(editingQual?.certificate ?? null)
+	}, [editing])
+	const pickCertificate = useCallback(async () => {
+		const file = await pickCertificateFile() // a photo or a PDF; null when cancelled
+		if (file) setPendingFile(file)
+	}, [])
+	// The licence / registration certificate: picked now, uploaded with the rest when "Save" is pressed.
+	const pickLicence = useCallback(async () => {
+		const file = await pickCertificateFile()
+		if (file) set('licenceFile', file)
+	}, [set])
+
 	const saveQual = (v: Record<string, string>) => {
 		if (!draft) return
 		const list = [...draft.qualifications]
 		const item: ProviderQualification = {
+			id: editingQual?.id,
 			qualification: v.qualification,
 			institution: v.institution,
 			year_of_passing: v.year || null,
-			proof_s3_key: editingQual?.proof_s3_key ?? null,
+			proof: editingQual?.proof ?? '',
+			status: editingQual?.status ?? null,
+			certificate: pendingFile,
 		}
 		if (typeof editing === 'number') list[editing] = item
 		else list.push(item)
@@ -194,12 +238,9 @@ export default function WorkDocumentsPage() {
 		? services.map((s) => ({ value: s.id, label: s.label || s.title || s.id }))
 		: (draft?.services ?? []).map((id) => ({ value: id, label: id }))
 
-	const docStatus = (key: 'licence' | 'id' | 'pan' | 'police') =>
-		key === 'licence' && draft?.licenceProof ? (verified ? 'verified' : 'in_review') : 'missing'
-
 	return (
 		<ProfileScreen
-			title="Work & documents"
+			title="Professional details"
 			subtitle="Checked by Karolahealth before you go live"
 			loading={form.loading}
 			loadError={form.loadError}
@@ -235,10 +276,10 @@ export default function WorkDocumentsPage() {
 				>
 					<AppDocumentRow
 						label="Degree certificate"
-						fileName={editingQual?.proof_s3_key}
-						status={editingQual?.proof_s3_key ? 'in_review' : 'missing'}
+						fileName={pendingFile?.name ?? editingQual?.proof}
+						status={pendingFile ? 'in_review' : documentRowStatus(editingQual?.status, !!editingQual?.proof)}
 						optional
-						onUpload={() => showComingSoon('Certificate upload will be available soon')}
+						onUpload={() => void pickCertificate()}
 					/>
 				</AppListItemSheet>
 			}
@@ -278,29 +319,14 @@ export default function WorkDocumentsPage() {
 						/>
 						<AppDocumentRow
 							label={config.licenceDocLabel}
-							fileName={draft.licenceProof}
-							status={docStatus('licence')}
+							fileName={draft.licenceFile?.name ?? draft.licenceProof}
+							status={documentRowStatus(
+								draft.licenceFile ? null : draft.licenceStatus,
+								!!(draft.licenceFile || draft.licenceProof)
+							)}
 							optional={!config.registrationRequired}
-							onUpload={() => showComingSoon('Document upload will be available soon')}
+							onUpload={() => void pickLicence()}
 						/>
-					</AppFormCard>
-
-					<AppFormCard
-						title="Documents"
-						helper="Our team checks each upload, usually within 1–2 working days."
-					>
-						{config.documents
-							.filter((doc) => doc.key !== 'licence')
-							.map((doc) => (
-								<AppDocumentRow
-									key={doc.key}
-									label={doc.label}
-									description={doc.description}
-									status={docStatus(doc.key)}
-									optional={doc.optional}
-									onUpload={() => showComingSoon('Document upload will be available soon')}
-								/>
-							))}
 					</AppFormCard>
 
 					<AppFormCard title="Qualifications">
@@ -309,6 +335,11 @@ export default function WorkDocumentsPage() {
 								key: `${q.qualification}-${i}`,
 								title: q.qualification,
 								subtitle: [q.institution, q.year_of_passing].filter(Boolean).join(' · '),
+								tag: q.certificate
+									? { label: 'Uploads when you save', tone: 'neutral' }
+									: q.proof
+										? DOCUMENT_LIST_TAG[documentRowStatus(q.status, true) as keyof typeof DOCUMENT_LIST_TAG]
+										: { label: 'No certificate', tone: 'neutral' },
 							}))}
 							icon="school-outline"
 							tone="sky"
@@ -322,6 +353,19 @@ export default function WorkDocumentsPage() {
 							addLabel="Add qualification"
 							onAdd={() => setEditing('new')}
 							emptyText="Add your degree or training certificate."
+						/>
+					</AppFormCard>
+
+					<AppFormCard
+						title="Documents"
+						helper="Our team checks each upload, usually within 1–2 working days."
+					>
+						<IdentityDocumentsField
+							stored={draft.identityDocuments}
+							types={draft.identityTypes}
+							files={draft.identityFiles}
+							onChangeFiles={(files) => set('identityFiles', files)}
+							errorText={errors.identityFiles}
 						/>
 					</AppFormCard>
 

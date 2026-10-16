@@ -7,12 +7,7 @@ import { z } from 'zod'
 import { formatApiDateForDisplay, formatDateStringForApi } from '../../../utils/date'
 import { fetchProviderProfile, updateProviderProfileBackend } from '../../ancillary/ancillaryService'
 import { fetchPatientDetails, savePatientDetails } from '../patient/PatientProfileService'
-import {
-	fetchDoctorPersonal,
-	fetchDoctorProfessional,
-	saveDoctorPersonal,
-	saveDoctorProfessional,
-} from '../doctor/doctorProfileService'
+import { fetchDoctorPersonal, saveDoctorPersonal } from '../doctor/doctorProfileService'
 import type { HubRole } from './profileHubConfig'
 import { GENDER_OPTIONS, LANGUAGE_OPTIONS, MARITAL_STATUS_OPTIONS, type Option } from './profileOptions'
 
@@ -169,18 +164,13 @@ export const PERSONAL_DETAILS_CONFIG: Record<HubRole, PersonalDetailsConfig> = {
 				fields: ['name', 'gender', 'dob', 'location', 'languages'],
 				labels: { languages: 'Languages you consult in' },
 			},
-			{
-				key: 'registration',
-				title: 'Medical registration',
-				helper: 'Our team checks your registration certificate before it shows as verified.',
-				fields: ['registrationNumber', 'registrationProof', 'experience'],
-			},
 			CONTACT_CARD,
 			{ key: 'social', title: 'Social links', fields: ['instagram', 'facebook', 'twitter'] },
 		],
-		required: ['name', 'gender', 'location', 'registrationNumber'],
+		required: ['name', 'gender', 'location'],
 		load: async () => {
-			const [p, prof] = await Promise.all([fetchDoctorPersonal(), fetchDoctorProfessional()])
+			// the medical registration and years of experience are on the Professional details page
+			const p = await fetchDoctorPersonal()
 			const social = p.social_media_handles || {}
 			return {
 				...EMPTY,
@@ -191,10 +181,6 @@ export const PERSONAL_DETAILS_CONFIG: Record<HubRole, PersonalDetailsConfig> = {
 				languages: p.languages || [],
 				mobile: p.contact_number || p.mobile_number || '',
 				email: p.email || '',
-				registrationNumber: prof.registration_number || '',
-				registrationProof: prof.registration_proof_s3_key || '',
-				registrationStatus: prof.registration_status || '',
-				experience: prof.experience_years != null ? String(prof.experience_years) : '',
 				instagram: social.instagram || '',
 				facebook: social.facebook || '',
 				twitter: social.twitter || social.x || '',
@@ -229,15 +215,6 @@ export const PERSONAL_DETAILS_CONFIG: Record<HubRole, PersonalDetailsConfig> = {
 					},
 				})
 			}
-			// only the field(s) that changed
-			const professional: { registration_number?: string; experience_years?: number } = {}
-			if (changed(draft, saved, ['registrationNumber'])) {
-				professional.registration_number = draft.registrationNumber.trim()
-			}
-			if (changed(draft, saved, ['experience']) && draft.experience) {
-				professional.experience_years = Number(draft.experience)
-			}
-			if (Object.keys(professional).length > 0) await saveDoctorProfessional(professional)
 			return PERSONAL_DETAILS_CONFIG.doctor.load()
 		},
 	},

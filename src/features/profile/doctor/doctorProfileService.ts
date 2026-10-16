@@ -5,6 +5,7 @@
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { appendFile, type PickedFile } from '../../../utils/pickedFile'
+import type { IdentityDocument, IdentityDocumentType } from '../shared/identityDocuments'
 import type { DoctorHospitalAvailability, DoctorOverrideRow } from '../availability/availabilityAdapters'
 
 export type IdLabel = { id: string; label: string }
@@ -88,19 +89,8 @@ export interface DoctorDegree {
 	certificate_status?: string | null
 }
 
-export interface IdentityDocumentType {
-	code: string
-	label: string
-}
-
-export interface IdentityDocument {
-	/** The ID type's code, e.g. `aadhaar`. */
-	type: string
-	label: string
-	url: string | null
-	/** pending / approved / rejected / reupload */
-	status?: string | null
-}
+// The identity document types live in the shared profile code (the ancillary profile uses them too).
+export type { IdentityDocument, IdentityDocumentType }
 
 export interface DoctorProfessional {
 	experience_years: number | null

@@ -1,11 +1,10 @@
 // src/components/common/display/AppDocumentRow.tsx
 //
-// Document row from the profile designs (government ID, PAN, registration / licence certificate, police
-// verification):
+// Document row from the profile designs (government ID, PAN, registration / licence certificate):
 //   uploaded — bordered row: 40px sky tile, 12/16 muted label, 14/20 700 file name, status tag
 //              (Verified = success, In review = warning).
 //   missing  — 1.5px dashed row (danger dash when required, divider when optional): pageBg tile, 14/19 700
-//              label, muted description + "No document yet · Photo, max 5 MB", Required / Optional tag, and a
+//              label, muted description + "No document yet · Photo or PDF, max 10 MB", Required / Optional tag, and a
 //              36px primary "Upload" button.
 // Uploading isn't wired to a backend yet — callers pass `onUpload` (e.g. showComingSoon).
 
@@ -33,6 +32,17 @@ export function documentRowStatus(apiStatus: string | null | undefined, hasFile:
 		default:
 			return 'in_review'
 	}
+}
+
+/** The tag shown in a list (e.g. a qualification) for a stored document, by its row status. */
+export const DOCUMENT_LIST_TAG: Record<
+	Exclude<AppDocumentStatus, 'missing'>,
+	{ label: string; tone: 'confirmed' | 'pending' | 'cancelled' }
+> = {
+	verified: { label: 'Approved', tone: 'confirmed' },
+	in_review: { label: 'In review', tone: 'pending' },
+	rejected: { label: 'Rejected', tone: 'cancelled' },
+	reupload: { label: 'Re-upload needed', tone: 'cancelled' },
 }
 
 const STATUS_TAG: Record<
@@ -111,7 +121,7 @@ export function AppDocumentRow({
 			<View style={styles.text}>
 				<Text style={styles.label}>{label}</Text>
 				<Text style={styles.description}>
-					{[description, 'No document yet · Photo, max 5 MB'].filter(Boolean).join(' · ')}
+					{[description, 'No document yet · Photo or PDF, max 10 MB'].filter(Boolean).join(' · ')}
 				</Text>
 				<AppTag
 					label={optional ? 'Optional' : 'Required'}

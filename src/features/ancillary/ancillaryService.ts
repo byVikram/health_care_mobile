@@ -3,6 +3,7 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS, BASE_URL } from '../../constants/apiUrls'
 import { safeJsonParse } from '../../utils/jsonUtils'
 import type { AncillaryServiceDetails } from './ancillaryProviderBookingService'
+import type { IdentityDocument, IdentityDocumentType } from '../profile/shared/identityDocuments'
 
 // --- Canonical 13-State Machine Status Vocabulary ---
 export type CanonicalRequestStatus =
@@ -1552,6 +1553,13 @@ export interface AncillaryProfileBackendResponse {
 	public_id: string
 	license_number: string
 	license_proof_s3_key?: string
+	/** The licence proof as a short-lived signed link (the same value as `license_proof_s3_key`). */
+	license_proof?: string
+	/** Review state of the licence proof: pending / approved / rejected / reupload. */
+	license_status?: string
+	/** Government IDs uploaded so far (signed links + review status), and the ID types to choose from. */
+	identity_documents?: IdentityDocument[]
+	identity_document_types?: IdentityDocumentType[]
 	qualification_proof_s3_key?: string
 	qualifications?: string | any[] | any
 	qualifications_list?: any[]

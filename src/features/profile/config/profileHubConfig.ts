@@ -192,7 +192,7 @@ export const PROFILE_HUB_CONFIG: Record<HubRole, HubConfig> = {
 					{
 						key: 'personal',
 						title: 'Personal details',
-						subtitle: 'Name, registration & certificate, contact',
+						subtitle: 'Name, languages, contact',
 						icon: 'account-outline',
 						tone: 'mint',
 						route: ROUTES.STACK.PROFILE_PERSONAL,
@@ -200,7 +200,7 @@ export const PROFILE_HUB_CONFIG: Record<HubRole, HubConfig> = {
 					{
 						key: 'professional',
 						title: 'Professional & documents',
-						subtitle: 'Qualifications, expertise, ID',
+						subtitle: 'Qualifications, registration, expertise, ID',
 						icon: 'school-outline',
 						tone: 'sky',
 						route: ROUTES.STACK.DOCTOR_PROFESSIONAL,
@@ -288,7 +288,7 @@ export const PROFILE_HUB_CONFIG: Record<HubRole, HubConfig> = {
 					},
 					{
 						key: 'work',
-						title: 'Work & documents',
+						title: 'Professional details',
 						subtitle: 'Registration, certificates, ID, services',
 						icon: 'briefcase-outline',
 						tone: 'sky',
