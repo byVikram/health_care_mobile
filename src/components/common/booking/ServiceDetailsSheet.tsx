@@ -1,8 +1,9 @@
 ﻿import React from 'react'
-import { Image, ImageSourcePropType, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { ImageSourcePropType, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import AppBottomSheet from '../layout/AppBottomSheet'
 import { AppTypography } from '../display/AppTypography'
+import { AppFallbackImage } from '../display/AppFallbackImage'
 import { AppButton } from '../buttons/AppButton'
 import { AppPathIcon } from '../display/AppIcon'
 import { AppTag } from '../display/AppTag'
@@ -366,6 +367,11 @@ function LegacyServiceDetailsSheet({
 
 	const resolvedImageSource =
 		service.imageSource || resolveImageSource?.(service.image_url || service.imageUrl || service.image)
+	const imageFallback = (
+		<View style={[styles.image, styles.imageFallback, isTablet && styles.imageTablet]}>
+			<MaterialCommunityIcons name="flask-outline" size={32} color="#0C7C7C" />
+		</View>
+	)
 
 	return (
 		<AppBottomSheet
@@ -386,15 +392,13 @@ function LegacyServiceDetailsSheet({
 			<View style={[styles.mainWrapper, isTablet && styles.containerTablet]}>
 				{/* 1. Service Image */}
 				{resolvedImageSource ? (
-					<Image
+					<AppFallbackImage
 						source={resolvedImageSource}
 						style={[styles.image, isTablet && styles.imageTablet]}
-						resizeMode="cover"
+						fallback={imageFallback}
 					/>
 				) : (
-					<View style={[styles.image, styles.imageFallback, isTablet && styles.imageTablet]}>
-						<MaterialCommunityIcons name="flask-outline" size={32} color="#0C7C7C" />
-					</View>
+					imageFallback
 				)}
 
 				{/* 2. Service Name */}

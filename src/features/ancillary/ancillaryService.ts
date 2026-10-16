@@ -198,23 +198,39 @@ const mapRawServiceToItem = (raw: any): AncillaryServiceItem => {
 	}
 }
 
-export const fetchAncillaryServicesBackend = async (params?: {
+interface AncillaryServicesParams {
 	categoryId?: string
 	specialtyId?: string
 	subspecialtyId?: string
 	sub_specialty_id?: string
-}): Promise<AncillaryServiceItem[]> => {
+	/** Words to look for: the backend matches them against each service's name, about text, included tasks, good-for and category. */
+	search?: string
+}
+
+/** The longest search text the backend accepts (a longer one is a 422); the screens send at most this much. */
+const MAX_SEARCH_LENGTH = 100
+const searchText = (value?: string) => (value ?? '').trim().slice(0, MAX_SEARCH_LENGTH).trim()
+
+/** GET /api/ancillary/services. Throws when the request fails. */
+export const searchAncillaryServices = async (params?: AncillaryServicesParams): Promise<AncillaryServiceItem[]> => {
+	const query: Record<string, string> = {}
+	if (params?.categoryId) query.category_id = params.categoryId
+	if (params?.specialtyId) query.specialty_id = params.specialtyId
+	const search = searchText(params?.search)
+	if (search) query.search = search
+	const subId = params?.subspecialtyId || params?.sub_specialty_id
+	if (subId) {
+		query.subspecialty_id = subId
+		query.sub_specialty_id = subId
+	}
+	const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.SERVICES, query)
+	return unwrapList<any>(res.data).map(mapRawServiceToItem)
+}
+
+/** The catalogue list: a failed request gives an empty list (the screen shows its own empty state). */
+export const fetchAncillaryServicesBackend = async (params?: AncillaryServicesParams): Promise<AncillaryServiceItem[]> => {
 	try {
-		const query: Record<string, string> = {}
-		if (params?.categoryId) query.category_id = params.categoryId
-		if (params?.specialtyId) query.specialty_id = params.specialtyId
-		const subId = params?.subspecialtyId || params?.sub_specialty_id
-		if (subId) {
-			query.subspecialty_id = subId
-			query.sub_specialty_id = subId
-		}
-		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.SERVICES, query)
-		return unwrapList<any>(res.data).map(mapRawServiceToItem)
+		return await searchAncillaryServices(params)
 	} catch (error) {
 		console.log('[ancillaryService] fetchAncillaryServicesBackend error:', error)
 		return []
@@ -1726,7 +1742,6 @@ export const fetchAncillaryProfileBackend = fetchProviderProfile;
 
 // --- Clean Function Aliases (without Backend suffix) ---
 export const fetchAncillaryCategories = fetchAncillaryCategoriesBackend
-export const fetchAncillaryServices = fetchAncillaryServicesBackend
 export const acceptCareRequest = acceptCareRequestBackend
 export const verifyPatientOtp = verifyPatientOtpBackend
 export const updateNurseStatus = updateNurseStatusBackend
@@ -2160,15 +2175,24 @@ const mapRawPackage = (raw: any): AncillaryPackageListItem => ({
 	procedureCount: Number(raw?.procedureCount ?? raw?.procedure_count) || 0,
 })
 
-export const fetchAncillaryPackages = async (specialtyId: string): Promise<AncillaryPackageListItem[]> => {
-	try {
-		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.PACKAGES, {
-			specialty_id: specialtyId,
-		})
-		return unwrapList<any>(res.data).map(mapRawPackage)
-	} catch (error) {
-		console.log('[ancillaryService] fetchAncillaryPackages error:', error)
-		throw error
+export interface AncillaryCatalog {
+	services: AncillaryServiceItem[]
+	packages: AncillaryPackageListItem[]
+}
+
+/**
+ * GET /api/ancillary/catalog: a specialty's services AND packages in one call (what the catalogue screen shows), each
+ * in the shape of its own list. `search` is applied to both by the backend, best match first. Throws when the request fails.
+ */
+export const fetchAncillaryCatalog = async (params: { specialtyId: string; search?: string }): Promise<AncillaryCatalog> => {
+	const query: Record<string, string> = { specialty_id: params.specialtyId }
+	const search = searchText(params.search)
+	if (search) query.search = search
+	const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.CATALOG, query)
+	const data = res.data?.data ?? {}
+	return {
+		services: Array.isArray(data.services) ? data.services.map(mapRawServiceToItem) : [],
+		packages: Array.isArray(data.packages) ? data.packages.map(mapRawPackage) : [],
 	}
 }
 

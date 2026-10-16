@@ -2,7 +2,6 @@ import React from 'react'
 import {
 	View,
 	StyleSheet,
-	Image,
 	TouchableOpacity,
 	useWindowDimensions,
 	DimensionValue,
@@ -10,6 +9,7 @@ import {
 } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../display/AppTypography'
+import { AppFallbackImage } from '../display/AppFallbackImage'
 
 export interface ServiceProcedureItem {
 	id: string
@@ -109,6 +109,12 @@ export const ServiceCatalogCard: React.FC<ServiceCatalogCardProps> = ({
 			? item.image
 			: resolveImageSource?.(item.image_url || item.imageUrl || item.image))
 
+	const fallbackIcon = (
+		<View style={styles.fallbackWrap}>
+			<MaterialCommunityIcons name="flask-outline" size={28} color="#0C7C7C" />
+		</View>
+	)
+
 	return (
 		<TouchableOpacity
 			style={[
@@ -202,11 +208,9 @@ export const ServiceCatalogCard: React.FC<ServiceCatalogCardProps> = ({
 			<View style={styles.rightCol}>
 				<View style={styles.imageBox}>
 					{imageSource ? (
-						<Image source={imageSource} style={styles.image} resizeMode="cover" />
+						<AppFallbackImage source={imageSource} style={styles.image} fallback={fallbackIcon} />
 					) : (
-						<View style={styles.fallbackWrap}>
-							<MaterialCommunityIcons name="flask-outline" size={28} color="#0C7C7C" />
-						</View>
+						fallbackIcon
 					)}
 				</View>
 

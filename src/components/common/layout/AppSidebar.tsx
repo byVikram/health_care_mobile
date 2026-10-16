@@ -40,7 +40,7 @@ import { USER_ROLES } from '../../../constants/constants'
 export interface AppSidebarItem {
 	id: string
 	label: string
-	icon: keyof typeof MaterialCommunityIcons.glyphMap | React.ReactNode
+	icon: React.ReactNode
 	onPress: () => void
 	/** Right-hand value before the chevron, e.g. an <AppTag /> with the wallet balance. */
 	value?: React.ReactNode
@@ -232,14 +232,11 @@ export default function AppSidebar({
 
 	const allSections = sections.filter((s) => s.items.length > 0)
 
-	const renderLeading = (icon: AppSidebarItem['icon']) =>
-		typeof icon === 'string' ? (
-			(icon as keyof typeof MaterialCommunityIcons.glyphMap)
-		) : (
-			<AppIconTile size={34} radius={10} backgroundColor={APP_COLORS.pageBg}>
-				{icon}
-			</AppIconTile>
-		)
+	const renderLeading = (icon: AppSidebarItem['icon']) => (
+		<AppIconTile size={34} radius={10} backgroundColor={APP_COLORS.pageBg}>
+			{icon}
+		</AppIconTile>
+	)
 
 	return (
 		<>
