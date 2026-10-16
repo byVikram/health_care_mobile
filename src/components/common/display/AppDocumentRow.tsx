@@ -16,7 +16,34 @@ import { AppIconTile } from './AppIconTile'
 import { AppTag } from './AppTag'
 import { APP_COLORS } from '../../../config/theme'
 
-export type AppDocumentStatus = 'verified' | 'in_review' | 'missing'
+// verified = approved by our team, in_review = waiting for review, rejected = not accepted, reupload = a new file is
+// needed, missing = nothing uploaded yet.
+export type AppDocumentStatus = 'verified' | 'in_review' | 'rejected' | 'reupload' | 'missing'
+
+/** Maps the API's document status (pending / approved / rejected / reupload) to a row status. */
+export function documentRowStatus(apiStatus: string | null | undefined, hasFile: boolean): AppDocumentStatus {
+	if (!hasFile) return 'missing'
+	switch (apiStatus) {
+		case 'approved':
+			return 'verified'
+		case 'rejected':
+			return 'rejected'
+		case 'reupload':
+			return 'reupload'
+		default:
+			return 'in_review'
+	}
+}
+
+const STATUS_TAG: Record<
+	Exclude<AppDocumentStatus, 'missing'>,
+	{ label: string; tone?: 'confirmed' | 'pending' | 'cancelled'; bg?: string; ink?: string }
+> = {
+	verified: { label: 'Approved', tone: 'confirmed' },
+	in_review: { label: 'In review', tone: 'pending' },
+	rejected: { label: 'Rejected', tone: 'cancelled' },
+	reupload: { label: 'Re-upload needed', bg: APP_COLORS.warningBg, ink: APP_COLORS.warning },
+}
 
 export type AppDocumentRowProps = {
 	label: string
@@ -43,7 +70,8 @@ export function AppDocumentRow({
 	style,
 }: AppDocumentRowProps) {
 	if (status !== 'missing' && fileName) {
-		const verified = status === 'verified'
+		const tag = STATUS_TAG[status as Exclude<AppDocumentStatus, 'missing'>] ?? STATUS_TAG.in_review
+		const needsNewFile = status === 'rejected' || status === 'reupload'
 		return (
 			<View style={[styles.uploaded, style]}>
 				<AppIconTile icon="file-document-outline" tone="sky" size={40} />
@@ -53,8 +81,10 @@ export function AppDocumentRow({
 						{fileLabel(fileName)}
 					</Text>
 					<AppTag
-						label={verified ? 'Verified' : 'In review'}
-						tone={verified ? 'confirmed' : 'pending'}
+						label={tag.label}
+						tone={tag.tone}
+						bg={tag.bg}
+						ink={tag.ink}
 						size="xs"
 						shape="rounded"
 						uppercase={false}
@@ -63,7 +93,7 @@ export function AppDocumentRow({
 				</View>
 				{onUpload ? (
 					<TouchableOpacity onPress={onUpload} accessibilityRole="button" hitSlop={8}>
-						<Text style={styles.replace}>Replace</Text>
+						<Text style={needsNewFile ? styles.reupload : styles.replace}>{needsNewFile ? 'Re-upload' : 'Replace'}</Text>
 					</TouchableOpacity>
 				) : null}
 			</View>
@@ -165,6 +195,12 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 		fontWeight: '700',
 		color: APP_COLORS.primary,
+	},
+	// a rejected / re-upload-needed document: the action is the thing to do next
+	reupload: {
+		fontSize: 13,
+		fontWeight: '700',
+		color: APP_COLORS.danger,
 	},
 	upload: {
 		height: 36,

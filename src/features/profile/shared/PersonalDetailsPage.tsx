@@ -9,6 +9,7 @@ import {
 	AppCalendar,
 	AppChipGroup,
 	AppDocumentRow,
+	documentRowStatus,
 	AppFormCard,
 	AppFormField,
 	AppSaveFooter,
@@ -100,7 +101,7 @@ export default function PersonalDetailsPage() {
 						key={key}
 						label={label}
 						fileName={value as string}
-						status={value ? 'in_review' : 'missing'}
+						status={documentRowStatus(draft?.registrationStatus, !!value)}
 						onUpload={() => showComingSoon('Document upload will be available soon')}
 					/>
 				)

@@ -52,35 +52,38 @@ export function AppEditableList({
 		<View style={style}>
 			{items.length === 0 && !!emptyText && <Text style={styles.empty}>{emptyText}</Text>}
 			{items.map((item, index) => (
-				<TouchableOpacity
-					key={item.key}
-					style={styles.row}
-					onPress={pressRow ? () => pressRow(index) : undefined}
-					disabled={!pressRow}
-					activeOpacity={0.8}
-					accessibilityRole={pressRow ? 'button' : undefined}
-				>
-					<AppIconTile icon={icon} tone={tone} size={40} />
-					<View style={styles.text}>
-						<Text style={styles.title} numberOfLines={2}>
-							{item.title}
-						</Text>
-						{!!item.subtitle && (
-							<Text style={styles.subtitle} numberOfLines={2}>
-								{item.subtitle}
+				// The row is a plain View: the tappable area and the edit / remove buttons are siblings. Nesting buttons
+				// inside a button is invalid HTML on web (React warns, and the inner tap can be swallowed).
+				<View key={item.key} style={styles.row}>
+					<TouchableOpacity
+						style={styles.main}
+						onPress={pressRow ? () => pressRow(index) : undefined}
+						disabled={!pressRow}
+						activeOpacity={0.8}
+						accessibilityRole={pressRow ? 'button' : undefined}
+					>
+						<AppIconTile icon={icon} tone={tone} size={40} />
+						<View style={styles.text}>
+							<Text style={styles.title} numberOfLines={2}>
+								{item.title}
 							</Text>
-						)}
-						{!!item.tag && (
-							<AppTag
-								label={item.tag.label}
-								tone={item.tag.tone}
-								size="xs"
-								shape="rounded"
-								uppercase={false}
-								style={styles.tag}
-							/>
-						)}
-					</View>
+							{!!item.subtitle && (
+								<Text style={styles.subtitle} numberOfLines={2}>
+									{item.subtitle}
+								</Text>
+							)}
+							{!!item.tag && (
+								<AppTag
+									label={item.tag.label}
+									tone={item.tag.tone}
+									size="xs"
+									shape="rounded"
+									uppercase={false}
+									style={styles.tag}
+								/>
+							)}
+						</View>
+					</TouchableOpacity>
 					{onEdit ? (
 						<TouchableOpacity
 							style={styles.iconBtn}
@@ -101,7 +104,7 @@ export function AppEditableList({
 							<MaterialCommunityIcons name="trash-can-outline" size={20} color={APP_COLORS.danger} />
 						</TouchableOpacity>
 					) : null}
-				</TouchableOpacity>
+				</View>
 			))}
 			{onAdd && !!addLabel ? (
 				<TouchableOpacity style={styles.add} onPress={onAdd} accessibilityRole="button">
@@ -127,6 +130,14 @@ const styles = StyleSheet.create({
 		paddingVertical: 10,
 		borderBottomWidth: 1,
 		borderBottomColor: APP_COLORS.divider,
+	},
+	// the tappable icon + text area; the edit / remove buttons sit next to it
+	main: {
+		flex: 1,
+		minWidth: 0,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
 	},
 	text: {
 		flex: 1,
