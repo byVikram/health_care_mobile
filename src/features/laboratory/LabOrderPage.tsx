@@ -9,7 +9,7 @@
 // mock and only change this screen.
 
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -287,8 +287,19 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 						<AppDetailRow
 							icon="account-outline"
 							label="PHLEBOTOMIST"
-							value="Not assigned yet"
-							sub="We’ll share their name and number once the lab assigns one"
+							value={order.phleboName || 'Not assigned yet'}
+							sub={
+								order.phleboName
+									? (order.phleboNumber ?? '')
+									: 'We’ll share their name and number once the lab assigns one'
+							}
+							action={
+								order.phleboNumber && live
+									? { label: 'Call', icon: 'phone-outline', onPress: () => void Linking.openURL(`tel:${order.phleboNumber}`) }
+									: order.trackingLink && live
+										? { label: 'Track', onPress: () => void Linking.openURL(order.trackingLink as string) }
+										: undefined
+							}
 						/>
 					)}
 					<AppDetailRow

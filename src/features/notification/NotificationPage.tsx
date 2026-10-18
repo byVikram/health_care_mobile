@@ -131,6 +131,8 @@ export default function NotificationPage() {
 			notification.redirect_id
 		) {
 			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: notification.redirect_id })
+		} else if (notification.redirect_type === 'lab_order' && notification.redirect_id) {
+			navigation.navigate(ROUTES.STACK.LABORATORY_BOOKING_TRACKING, { orderId: notification.redirect_id })
 		} else if (notification.redirect_type === 'doctor_schedule') {
 			// This screen lives in the root stack, so reach the tab through its navigator (see SidebarLayout).
 			nav.navigate(ROUTES.MAIN.TABS, {

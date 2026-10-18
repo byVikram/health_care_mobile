@@ -51,6 +51,9 @@ export function orderFromApi(api: ApiOrder, b?: LabBookingState): LabOrder {
 		labName: api.lab_name ?? undefined,
 		labLogoUrl: api.lab_logo_url ?? b?.lab?.logoUrl ?? null,
 		labTatHours: api.lab_tat_hours ?? null,
+		phleboName: api.phlebo_name,
+		phleboNumber: api.phlebo_number,
+		trackingLink: api.tracking_link,
 		total,
 		mrpTotal: mrp,
 		method: 'later',
@@ -70,6 +73,9 @@ export function applyApi(order: LabOrder, api: ApiOrder): LabOrder {
 		status: api.status,
 		canCancel: api.can_cancel,
 		canReschedule: api.can_reschedule,
+		phleboName: api.phlebo_name,
+		phleboNumber: api.phlebo_number,
+		trackingLink: api.tracking_link,
 		visits: visit ? [visit] : order.visits,
 	}
 }

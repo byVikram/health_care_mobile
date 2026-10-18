@@ -104,6 +104,9 @@ export type ApiOrder = {
 	lab_name: string | null
 	lab_logo_url: string | null
 	lab_tat_hours: number | null
+	phlebo_name: string | null
+	phlebo_number: string | null
+	tracking_link: string | null
 	patient_name: string | null
 	address_line: string | null
 	city: string | null

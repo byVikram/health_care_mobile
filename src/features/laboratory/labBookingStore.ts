@@ -46,6 +46,10 @@ export type LabOrder = {
 	labName?: string
 	labLogoUrl?: string | null
 	labTatHours?: number | null
+	/** Set by the lab once a phlebotomist is assigned (home collection). */
+	phleboName?: string | null
+	phleboNumber?: string | null
+	trackingLink?: string | null
 	labId?: string
 	total: number
 	mrpTotal: number
