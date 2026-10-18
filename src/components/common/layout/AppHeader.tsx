@@ -535,8 +535,7 @@ function RoleHomeHeader({
 	const isPharmacy = role === 'pharmacy'
 
 	const isRadiology = role === USER_ROLES.RADIOLOGY
-	const isLaboratory = role === USER_ROLES.LABORATORY
-	const isPatient = !isDoctor && !isPharmacy && !isRadiology && !isLaboratory
+	const isPatient = !isDoctor && !isPharmacy && !isRadiology
 
 	const isPhysiotherapy =
 		(role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE) &&
@@ -627,9 +626,6 @@ function RoleHomeHeader({
 		} else if (isRadiology) {
 			console.log('RADIOLOGY_ORDERS')
 			navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS)
-		} else if (isLaboratory) {
-			console.log('LABORATORY_ORDERS')
-			navigation.navigate(ROUTES.STACK.LABORATORY_ORDERS)
 		} else {
 			console.log('SEARCH')
 			navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH)

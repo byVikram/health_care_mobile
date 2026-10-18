@@ -284,7 +284,6 @@ export default function DashboardPage() {
 
 	const renderPharmacyPanel = () => <></>
 	const renderRadiologyPanel = () => <></>
-	const renderLaboratoryPanel = () => <></>
 	const renderAncillaryPanel = () => (
 		<ProviderTodayContent refreshToken={refreshToken} onRefreshComplete={handleAppointmentsRefreshComplete} />
 	)
@@ -304,9 +303,6 @@ export default function DashboardPage() {
 			case USER_ROLES.RADIOLOGY:
 				return renderRadiologyPanel()
 
-			case USER_ROLES.LABORATORY:
-				return renderLaboratoryPanel()
-
 			case USER_ROLES.ANCILLARY:
 				return renderAncillaryPanel()
 
@@ -323,8 +319,7 @@ export default function DashboardPage() {
 		if (
 			role !== USER_ROLES.DOCTOR &&
 			role !== USER_ROLES.PHARMACY &&
-			role !== USER_ROLES.RADIOLOGY &&
-			role !== USER_ROLES.LABORATORY
+			role !== USER_ROLES.RADIOLOGY
 		) {
 			return renderUserPanel()
 		}

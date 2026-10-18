@@ -229,16 +229,6 @@ export type AppStackParamList = {
 		centerCity?: string
 		centerPhone?: string
 	}
-	[ROUTES.STACK.PLACE_LABORATORY_TEST]: {
-		labId: string
-		labName: string
-		labAddress?: string
-		labCity?: string
-		labPhone?: string
-		labAvatarKey?: string | null
-		labOperatingHours?: { open: string; close: string }
-		labIs24x7?: boolean
-	}
 	// The Lab Tests Ordering flow keeps its booking in labBookingStore (features/laboratory), not in route params.
 	[ROUTES.STACK.LABORATORY_LIST]: undefined
 	[ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION]: undefined
@@ -248,8 +238,6 @@ export type AppStackParamList = {
 	[ROUTES.STACK.LABORATORY_PAYMENT_SUCCESS]: undefined
 	[ROUTES.STACK.LABORATORY_BOOKING_TRACKING]: undefined
 	[ROUTES.STACK.LABORATORY_REPORT]: undefined
-	[ROUTES.STACK.LABORATORY_ORDERS]: undefined
-	[ROUTES.STACK.LABORATORY_ORDER_DETAILS]: { publicId: string; booking?: unknown }
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
 	[ROUTES.STACK.PATIENT_PAYMENT]: PatientPaymentParams | undefined

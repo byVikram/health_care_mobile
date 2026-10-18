@@ -37,7 +37,7 @@ import ScanTypeSelectorModal from '../../radiology/components/ScanTypeSelectorMo
 import AlliedSelectorModal from './AlliedSelcetorModel'
 import TherapeuticSelector from './TherapeuticSelector'
 
-type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | 'nurse' | null
+type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'ancillary' | 'nurse' | null
 type PopupSvgIconItem = {
 	title: string
 	type: 'svg'
@@ -137,7 +137,7 @@ const patientStyles = StyleSheet.create({
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Staff roles (doctor / radiology / laboratory): original quick services row + "Others" popup. Unchanged.
+// Staff roles (doctor / radiology): original quick services row + "Others" popup. Unchanged.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StaffQuickServices({ role }: { role: Role }) {

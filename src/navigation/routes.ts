@@ -78,9 +78,6 @@ export const ROUTES = {
 		LABORATORY_PAYMENT_SUCCESS: 'LaboratoryPaymentSuccessPage',
 		LABORATORY_REPORT: 'LaboratoryReportPage',
 		LABORATORY_BOOKING_TRACKING: 'LaboratoryBookingTrackingPage',
-		PLACE_LABORATORY_TEST: 'PlaceLabOrderPage',
-		LABORATORY_ORDERS: 'Orderlistlaboratorypage',
-		LABORATORY_ORDER_DETAILS: 'Bookingdetailslaboratorypage',
 
 		ALL_EVENTS: 'AllEvents',
 		EVENT_DETAILS: 'EventDetails',

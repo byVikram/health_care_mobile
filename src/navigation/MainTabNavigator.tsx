@@ -446,7 +446,7 @@ function MainTabs() {
 	const { bottomTabs } = useNavigationConfig()
 	const menuRole = menuRoleFor(role)
 	// A server list the app cannot map at all (a newer backend) falls back to the role's built-in tabs; only roles with no
-	// tabs of their own (pharmacy, radiology, laboratory) get the docked bar.
+	// tabs of their own (pharmacy, radiology) get the docked bar.
 	const floatingTabs = useMemo(() => {
 		const fromServer = toFloatingTabs(bottomTabs)
 		return fromServer.length ? fromServer : toFloatingTabs(DEFAULT_MENU[menuRole].bottomTabs)

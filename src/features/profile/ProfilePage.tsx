@@ -2,7 +2,6 @@ import React from 'react'
 import { useAuth } from '../../context/AuthContext'
 import PharmacyProfileLayout from './pharmacy/PharmacyProfileLayout'
 import RadiologyProfileLayout from './radiology/RadiologyProfileLayout'
-import LaboratoryProfileLayout from './laboratory/LaboratoryProfileLayout'
 import ProfileHubPage from './ProfileHubPage'
 import { hubRoleFor } from './config/profileHubConfig'
 
@@ -23,5 +22,5 @@ export default function ProfilePage() {
 		return <RadiologyProfileLayout />
 	}
 
-	return <LaboratoryProfileLayout />
+	return null
 }

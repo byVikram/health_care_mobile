@@ -14,7 +14,7 @@ import { purgeLocalSession } from '../utils/localSession'
 import { logout as logoutRequest } from '../features/auth/authService'
 import { clearSessionCaches } from '../utils/sessionCache'
 
-export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | 'nurse'
+export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'ancillary' | 'nurse'
 
 // Canonical specialty IDs from lookup_ancillary_specialties.public_id
 export type AncillarySpecialty =

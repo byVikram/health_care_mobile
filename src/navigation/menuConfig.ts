@@ -33,7 +33,7 @@ export interface NavigationConfig {
 export const lookupKey = <T>(map: Record<string, T>, key: string): T | undefined =>
 	Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined
 
-/** The role a user gets a menu for: the backend's three menus, plus 'other' (pharmacy, radiology, laboratory). */
+/** The role a user gets a menu for: the backend's three menus, plus 'other' (pharmacy, radiology). */
 export type MenuRole = 'patient' | 'doctor' | 'ancillary' | 'other'
 
 export const menuRoleFor = (role?: string | null): MenuRole => {

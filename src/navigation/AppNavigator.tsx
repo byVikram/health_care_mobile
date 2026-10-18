@@ -50,8 +50,6 @@ import LabPaymentPage from '../features/laboratory/LabPaymentPage'
 import LabSuccessPage from '../features/laboratory/LabSuccessPage'
 import LabOrderPage from '../features/laboratory/LabOrderPage'
 import LabReportPage from '../features/laboratory/LabReportPage'
-import OrderListLaboratoryPage from '../features/laboratory_duplicated/OrderListLaboratoryPage'
-import BookingDetailsLaboratoryPage from '../features/laboratory_duplicated/BookingDetailsLaboratoryPage'
 
 import HealthReadsPage from '../features/health-feed/HealthReadsPage'
 import ReadArticlePage from '../features/health-feed/ReadArticlePage'
@@ -187,18 +185,6 @@ function AuthenticatedNavigator() {
 				/>
 				<AppStack.Screen name={ROUTES.STACK.LABORATORY_BOOKING_TRACKING as keyof AppStackParamList} component={LabOrderPage} options={{ headerShown: false }} />
 				<AppStack.Screen name={ROUTES.STACK.LABORATORY_REPORT as keyof AppStackParamList} component={LabReportPage} options={{ headerShown: false }} />
-				{/* Lab orders list + booking details (opened from the Bookings tab, the side drawer and AppHeader). */}
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_ORDERS}
-					component={OrderListLaboratoryPage}
-					options={{ headerShown: true, title: 'Lab Orders' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_ORDER_DETAILS}
-					component={BookingDetailsLaboratoryPage}
-					options={{ headerShown: true, title: 'Lab Booking Details' }}
-				/>
-
 				<AppStack.Screen
 					name={ROUTES.STACK.ALL_SPECIALITIES}
 					component={AllSpecialitiesPage}

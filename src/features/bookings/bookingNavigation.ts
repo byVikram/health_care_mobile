@@ -13,7 +13,6 @@ import type { AppStackParamList } from '../../navigation/types'
 import type { BookingActionKey, BookingItem } from '../../services/bookingsService'
 import { openOnMap } from '../../utils/maps'
 import { cancelAncillaryOrder, getAncillaryOrder } from '../ancillary/ancillaryProviderBookingService'
-import { cancelLabBooking } from '../laboratory_duplicated/laboratoryService'
 
 /** Only 
 avigate is needed, so the tab screen's composite navigation prop fits too. */
@@ -53,9 +52,6 @@ export function openBookingTarget(navigation: BookingsNavigation, item: BookingI
 			return
 		case 'ancillary_tracking':
 			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: id })
-			return
-		case 'lab_booking':
-			navigation.navigate(ROUTES.STACK.LABORATORY_ORDER_DETAILS, { publicId: id })
 			return
 		case 'pharmacy_order':
 			navigation.navigate(ROUTES.STACK.ORDER_DETAILS, { orderId: id })
@@ -116,21 +112,6 @@ async function cancelBooking(navigation: BookingsNavigation, item: BookingItem, 
 		try {
 			await cancelAncillaryOrder(id)
 			Toast.show({ type: 'success', text1: 'Booking cancelled' })
-			handlers.onChanged()
-		} catch {
-			Toast.show({ type: 'error', text1: "Couldn't cancel the booking", text2: 'Please try again.' })
-		} finally {
-			handlers.setBusy(null)
-		}
-		return
-	}
-	if (type === 'lab_booking') {
-		const ok = await confirm('Cancel this lab booking?', `${item.title} will be cancelled.`, 'Cancel booking')
-		if (!ok) return
-		handlers.setBusy(actionBusyKey(item, 'cancel'))
-		try {
-			await cancelLabBooking(id)
-			Toast.show({ type: 'success', text1: 'Lab booking cancelled' })
 			handlers.onChanged()
 		} catch {
 			Toast.show({ type: 'error', text1: "Couldn't cancel the booking", text2: 'Please try again.' })

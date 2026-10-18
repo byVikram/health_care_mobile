@@ -63,14 +63,6 @@ export default function BookingsBottomSheet({ visible, onClose }: BookingsBottom
 			route: ROUTES.STACK.ORDER_LIST,
 		},
 		{
-			id: 'lab-bookings',
-			label: 'Lab Bookings',
-			iconName: 'clipboard-text-play-outline',
-			iconColor: TEAL_GREEN_ICON_COLOR,
-			iconBgColor: SIDEBAR_ICON_BG_COLOR,
-			route: ROUTES.STACK.LABORATORY_ORDERS,
-		},
-		{
 			id: 'radiology-bookings',
 			label: 'Radiology Bookings',
 			iconName: 'clipboard-text-play-outline',
