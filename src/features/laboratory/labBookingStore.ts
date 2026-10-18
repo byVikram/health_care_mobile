@@ -1,35 +1,51 @@
 // src/features/laboratory/labBookingStore.ts
 //
-// Shared state for the Lab Tests Ordering flow (catalogue -> cart -> review -> payment -> success -> order).
-// The screens are separate routes, so the booking in progress lives in a small module-level store (the same
-// pattern as health-feed/savedReads.ts) instead of travelling through route params. In-memory only: it is
-// reset when the flow finishes ("Back to home" / a new booking) and when the app restarts.
+// Shared state for the Lab Tests Ordering flow (catalogue -> cart -> labs & time -> review -> payment ->
+// success -> order). The screens are separate routes, so the booking in progress lives in a small module-level
+// store (the same pattern as health-feed/savedReads.ts) instead of travelling through route params. In-memory
+// only: it is reset when the flow finishes ("Back to home" / a new booking) and when the app restarts.
+//
+// The chosen lab, slot and prices depend on the cart, the address and home / in-clinic: changing any of them
+// clears the lab + slot (see `set`), so Review never shows a pick the cart no longer matches.
 
 import { useSyncExternalStore } from 'react'
-import { DEFAULT_COLLECTION_TIME, MAX_REPEAT_VISITS, labItemById, type LabItem, type LabPayMethod } from './labMock'
+import Toast from 'react-native-toast-message'
+import { labItemById } from './labCatalogue'
+import type { LabItem, LabPayMethod } from './labMock'
 import { registerSessionCache } from '../../utils/sessionCache'
-import { addDays, slotStart, toIso, todayIso } from './labFormat'
+import { slotAt } from './labFormat'
 
 export type LabWhere = 'home' | 'lab'
-export type LabScheduleMode = 'single' | 'multi'
 
-type LabClinicPick = { labId: string; date: string; time: string }
+/** The API checks availability / slots / quotes for at most this many tests at once. */
+export const MAX_LAB_ITEMS = 10
+
+/** The lab picked on the "Choose a lab" screen, with what it quoted for the cart. */
+export type LabPick = { id: number; name: string; logoUrl: string | null; distanceKm: number | null }
 
 /** What the screens after payment show: a snapshot of the booking at the moment it was paid. */
 export type LabOrder = {
 	id: string
+	/** The server's id for the order (absent on a demo snapshot): what cancel / reschedule use. */
+	apiId?: string
+	/** Our step: placed | scheduled | on_the_way | sample_collected | processing | report_ready | needs_attention | cancelled | cancel_requested | reschedule_requested */
+	status?: string
+	canCancel?: boolean
+	canReschedule?: boolean
 	placedAt: string
 	where: LabWhere
 	items: { id: string; name: string; kind: LabItem['kind']; price: number; mrp: number; sub: string }[]
-	/** One entry per home visit (a single entry for in-clinic). */
+	/** One entry: the collection / lab visit. `time` is a display label ("7:30 AM"). */
 	visits: { date: string; time: string }[]
 	visitCount: number
 	patientName: string
 	patientRelation: string
-	/** Home: the collection address; clinic: the lab address. */
+	/** Home: the collection address; clinic: the lab. */
 	addressTitle: string
 	addressSub: string
 	labName?: string
+	labLogoUrl?: string | null
+	labTatHours?: number | null
 	labId?: string
 	total: number
 	mrpTotal: number
@@ -41,48 +57,45 @@ export type LabOrder = {
 }
 
 export type LabBookingState = {
-	/** Item ids in the cart, in the order they were added. */
+	/** Catalogue ids in the cart, in the order they were added. */
 	cart: string[]
 	where: LabWhere
-	scheduleMode: LabScheduleMode
-	/** Selected home-collection dates ('YYYY-MM-DD'), sorted. */
-	dates: string[]
-	/** Collection time id (see COLLECTION_TIMES). */
-	time: string
-	sameTime: boolean
-	visitTime: Record<string, string>
 	patientKey: string
 	/** Display name / relation of the patient, kept for the payment, success and order screens. */
 	patientName: string
 	patientRelation: string
-	/** Collection address (home visits): tag "Home" and the one-line address. */
+	/** The patient's saved address (public id) the availability / slots / quote are checked against. */
+	addressId: string | null
+	/** Tag ("Home") and one-line text of that address. */
 	addressTag: string
 	addressLine: string
 	note: string
 	/** Payment method picked on Review / Payment. */
 	method: LabPayMethod
-	clinic: LabClinicPick | null
+	/** Lab + slot ('YYYY-MM-DD', 'HH:MM') picked on the "Choose a lab" screen. */
+	lab: LabPick | null
+	slot: { date: string; time: string } | null
+	/** Price and MRP per cart item at the picked lab, and what the cart totals there (the lab's own quote). */
+	lineAmounts: Record<string, { price: number; mrp: number }>
+	quoteTotal: number | null
 	order: LabOrder | null
 }
-
-const tomorrow = () => toIso(addDays(new Date(), 1))
 
 const initial = (): LabBookingState => ({
 	cart: [],
 	where: 'home',
-	scheduleMode: 'single',
-	dates: [tomorrow()],
-	time: DEFAULT_COLLECTION_TIME,
-	sameTime: true,
-	visitTime: {},
 	patientKey: 'self',
 	patientName: '',
 	patientRelation: 'Self',
+	addressId: null,
 	addressTag: '',
 	addressLine: '',
 	note: '',
 	method: 'upi',
-	clinic: null,
+	lab: null,
+	slot: null,
+	lineAmounts: {},
+	quoteTotal: null,
 	order: null,
 })
 
@@ -100,24 +113,35 @@ const subscribe = (l: () => void) => {
 
 const getState = () => state
 
+const CLEARED_PICK = { lab: null, slot: null, lineAmounts: {}, quoteTotal: null } as const
+
 export const labBooking = {
 	get: getState,
 	set(patch: Partial<LabBookingState>) {
-		state = { ...state, ...patch }
+		const invalidates =
+			(patch.cart !== undefined && patch.cart !== state.cart) ||
+			(patch.addressId !== undefined && patch.addressId !== state.addressId) ||
+			(patch.where !== undefined && patch.where !== state.where)
+		state = { ...state, ...(invalidates ? CLEARED_PICK : {}), ...patch }
 		emit()
 	},
-	/** Back to an empty cart and a fresh schedule. */
+	/** Back to an empty cart and no pick. */
 	reset() {
 		state = initial()
 		emit()
 	},
-	/** New booking: clear everything except who the tests are for. */
+	/** New booking: clear everything except who the tests are for and where. */
 	startOver() {
-		state = { ...initial(), patientKey: state.patientKey }
+		const { patientKey, patientName, patientRelation, addressId, addressTag, addressLine } = state
+		state = { ...initial(), patientKey, patientName, patientRelation, addressId, addressTag, addressLine }
 		emit()
 	},
 	addItem(id: string) {
 		if (state.cart.includes(id)) return
+		if (state.cart.length >= MAX_LAB_ITEMS) {
+			Toast.show({ type: 'info', text1: `You can book up to ${MAX_LAB_ITEMS} tests at a time` })
+			return
+		}
 		labBooking.set({ cart: [...state.cart, id] })
 	},
 	removeItem(id: string) {
@@ -127,43 +151,11 @@ export const labBooking = {
 		if (state.cart.includes(id)) labBooking.removeItem(id)
 		else labBooking.addItem(id)
 	},
-	/** One visit replaces the selection; repeat visits add/remove the tapped date (max MAX_REPEAT_VISITS). */
-	pickDate(iso: string) {
-		if (state.scheduleMode === 'single') {
-			labBooking.set({ dates: [iso] })
-			return
-		}
-		const has = state.dates.includes(iso)
-		if (!has && state.dates.length >= MAX_REPEAT_VISITS) return
-		const next = has ? state.dates.filter((d) => d !== iso) : [...state.dates, iso]
-		labBooking.set({ dates: next.sort() })
-	},
-	setScheduleMode(mode: LabScheduleMode) {
-		const dates = mode === 'single' && state.dates.length > 1 ? [state.dates[0]] : state.dates
-		labBooking.set({ scheduleMode: mode, dates })
-	},
-	setSameTime(same: boolean) {
-		if (same) {
-			labBooking.set({ sameTime: true })
-			return
-		}
-		const visitTime: Record<string, string> = {}
-		state.dates.forEach((d) => {
-			visitTime[d] = state.visitTime[d] ?? state.time
-		})
-		labBooking.set({ sameTime: false, visitTime })
-	},
-	/** Drop a schedule that has gone by (the app can stay open across midnight): past dates, a past clinic slot. */
+	/** Drop a slot that has gone by (the app can stay open for a long time). */
 	dropExpired() {
-		const today = todayIso()
-		const dates = state.dates.filter((d) => d > today)
-		const clinic =
-			state.clinic && slotStart(state.clinic.date, state.clinic.time).getTime() > Date.now() ? state.clinic : null
-		if (dates.length === state.dates.length && clinic === state.clinic) return
-		labBooking.set({ dates: dates.length ? dates : [tomorrow()], clinic })
-	},
-	setVisitTime(iso: string, timeId: string) {
-		labBooking.set({ visitTime: { ...state.visitTime, [iso]: timeId } })
+		if (state.slot && slotAt(state.slot.date, state.slot.time).getTime() <= Date.now()) {
+			labBooking.set({ slot: null })
+		}
 	},
 }
 
@@ -179,29 +171,22 @@ export function useLabBooking() {
 // Derived values (pure helpers over a snapshot)
 // ---------------------------------------------------------------------------------------------------------
 
+/** Cart items; once a lab is picked, each carries that lab's price and MRP instead of the catalogue's "from" price. */
 export const cartItems = (s: LabBookingState): LabItem[] =>
-	s.cart.map((id) => labItemById(id)).filter((i): i is LabItem => !!i)
+	s.cart
+		.map((id) => labItemById(id))
+		.filter((i): i is LabItem => !!i)
+		.map((i) => (s.lineAmounts[i.id] ? { ...i, ...s.lineAmounts[i.id] } : i))
 
-/** How many visits the order covers: one per selected date at home, one at the lab. */
-export const visitCountOf = (s: LabBookingState) => (s.where === 'home' ? Math.max(s.dates.length, 1) : 1)
+/** The order is a single visit (home collection or lab). */
+export const visitCountOf = () => 1
 
 export const totalsOf = (s: LabBookingState) => {
 	const items = cartItems(s)
-	const visits = visitCountOf(s)
-	const total = items.reduce((n, i) => n + i.price, 0)
+	const total = s.quoteTotal ?? items.reduce((n, i) => n + i.price, 0)
 	const mrp = items.reduce((n, i) => n + i.mrp, 0)
-	return {
-		items,
-		visits,
-		unitTotal: total,
-		unitMrp: mrp,
-		total: total * visits,
-		mrp: mrp * visits,
-		savings: (mrp - total) * visits,
-	}
+	// Only packages sell below MRP, so the saving is the packages' MRP minus their price.
+	return { items, visits: 1, unitTotal: total, unitMrp: mrp, total, mrp, savings: Math.max(0, mrp - total) }
 }
 
 export const needsFasting = (s: LabBookingState) => cartItems(s).some((i) => i.fasting)
-
-/** The time id used for a given visit date. */
-export const timeIdFor = (s: LabBookingState, iso: string) => (!s.sameTime && s.visitTime[iso]) || s.time

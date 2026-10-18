@@ -241,6 +241,10 @@ axiosInstance.interceptors.response.use(
 			}
 
 			// No refresh token, or the server rejected it -- the session is over.
+			if (__DEV__) {
+				const detail = error.response?.data?.detail ?? error.response?.data?.message
+				console.warn(`[auth] signed out: 401 on ${error.config?.method?.toUpperCase()} ${error.config?.url} (${String(detail)}); refresh was rejected or there is no refresh token`)
+			}
 			// Same purge as an explicit logout so no cached PHI is left behind.
 			await purgeLocalSession()
 			unauthorizedHandler?.()

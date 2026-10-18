@@ -65,7 +65,7 @@ export const dowShort = (iso: string) => DOW[fromIso(iso).getDay()]
 export const monShort = (iso: string) => MON[fromIso(iso).getMonth()]
 export const dayNum = (iso: string) => fromIso(iso).getDate()
 
-/** Start of a slot label ("7–9 AM", "11 AM–1 PM", "8:30 AM") on `iso` as a local Date. */
+/** Start of a display label ("7:30 AM", "11 AM") on `iso` as a local Date. */
 export function slotStart(iso: string, label: string): Date {
 	const [y, m, d] = iso.split('-').map(Number)
 	const match = label.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?/i)
@@ -75,4 +75,18 @@ export function slotStart(iso: string, label: string): Date {
 	if (period === 'PM' && hour < 12) hour += 12
 	if (period === 'AM' && hour === 12) hour = 0
 	return new Date(y, (m ?? 1) - 1, d ?? 1, hour, minute)
+}
+
+/** A slot ('HH:MM', 24-hour, as the API sends it) on `iso` as a local Date. */
+export function slotAt(iso: string, hhmm: string): Date {
+	const [y, m, d] = iso.split('-').map(Number)
+	const [h, min] = hhmm.split(':').map(Number)
+	return new Date(y, (m ?? 1) - 1, d ?? 1, h ?? 0, min ?? 0)
+}
+
+/** "07:30" -> "7:30 AM", "14:00" -> "2:00 PM" */
+export function timeLabel(hhmm: string): string {
+	const [h, min] = hhmm.split(':').map(Number)
+	const hour12 = h % 12 === 0 ? 12 : h % 12
+	return `${hour12}:${pad(min ?? 0)} ${h >= 12 ? 'PM' : 'AM'}`
 }

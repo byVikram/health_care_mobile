@@ -1,6 +1,6 @@
 // src/features/laboratory/LabReviewPage.tsx
 //
-// "Review & pay" from the Lab Tests Ordering design, in both variants: home sample collection (tests, when,
+// "Review & book" from the Lab Tests Ordering design, in both variants: home sample collection (tests, when,
 // who + collection address + a note for the phlebotomist, bill, pay with) and in-clinic (the chosen lab
 // instead of the address). Who / where reuse the ancillary VisitWhoWhereSection + useVisitPatientAddress
 // (real family members and saved addresses); everything else is the booking store (mock catalogue).
@@ -8,6 +8,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -19,12 +20,10 @@ import {
 	AppIconTile,
 	AppPatientRow,
 	AppPathIcon,
-	AppPaymentMethodList,
 	AppScreenHeader,
 	AppSection,
 	AppTextLink,
 	familyMemberFirstName,
-	type AppPaymentMethod,
 	type BillingRow,
 } from '../../components/common'
 import { APP_COLORS } from '../../config/theme'
@@ -32,43 +31,36 @@ import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import { VisitWhoWhereSection } from '../ancillary/patient/VisitWhoWhereSection'
 import { addressLine, useVisitPatientAddress } from '../ancillary/patient/useVisitPatientAddress'
-import { labBooking, needsFasting, timeIdFor, totalsOf, useLabBooking } from './labBookingStore'
-import { commaDate, inr, plural } from './labFormat'
-import { LAB_ICONS, collectionTimeLabel, labCenterById, type LabItem, type LabPayMethod } from './labMock'
+import { labBooking, needsFasting, totalsOf, useLabBooking } from './labBookingStore'
+import { orderFromApi } from './labOrder'
+import { labErrorMessage, placeOrder } from './labService'
+import { commaDate, inr, plural, timeLabel } from './labFormat'
+import { LabLogo } from './LabLogo'
+import { LAB_ICONS, type LabItem } from './labMock'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 
-const REVIEW_METHODS: AppPaymentMethod<LabPayMethod>[] = [
-	{ id: 'upi', title: 'UPI', subtitle: 'Pay from any UPI app', icon: 'phone' },
-	{ id: 'card', title: 'Credit or debit card', subtitle: 'Visa, Mastercard, RuPay', icon: 'card' },
-]
-
 const itemSub = (item: LabItem) =>
 	item.kind === 'package'
-		? `${item.tests} tests${item.fasting ? ' · fasting needed' : ''}`
+		? `${item.tests ?? 0} tests${item.fasting ? ' · fasting needed' : ''}`
 		: (item.bullets[0] ?? item.sample)
 
-/** "Thu, 24 Sep · 7–9 AM" or "3 visits · …" for the When card. */
-const whenTitle = (b: ReturnType<typeof useLabBooking>) => {
-	if (b.where === 'lab') {
-		return b.clinic ? `${commaDate(b.clinic.date)} · ${b.clinic.time}` : 'Choose a lab and time'
-	}
-	if (b.dates.length === 0) return 'Choose a collection slot'
-	if (b.dates.length === 1) return `${commaDate(b.dates[0])} · ${collectionTimeLabel(timeIdFor(b, b.dates[0]))}`
-	return `${b.dates.length} visits · ${b.dates.map((d) => commaDate(d)).join(' · ')}`
-}
+/** "Thu, 24 Sep · 7:30 AM" for the When card. */
+const whenTitle = (b: ReturnType<typeof useLabBooking>) =>
+	b.slot ? `${commaDate(b.slot.date)} · ${timeLabel(b.slot.time)}` : 'Choose a lab and time'
 
 export default function LabReviewPage() {
 	const navigation = useNavigation<Nav>()
 	const booking = useLabBooking()
 	const isHome = booking.where === 'home'
-	const who = useVisitPatientAddress(booking.patientKey)
+	const who = useVisitPatientAddress(booking.patientKey, booking.addressId)
 	const [familyOpen, setFamilyOpen] = useState(false)
+	const [placing, setPlacing] = useState(false)
 
-	// Re-validate on open: the schedule may have gone by, and this list only offers UPI / card.
+	// Re-validate on open: the slot may have gone by. Payment is on collection, nothing to choose.
 	useEffect(() => {
 		labBooking.dropExpired()
-		if (labBooking.get().method !== 'upi' && labBooking.get().method !== 'card') labBooking.set({ method: 'upi' })
+		labBooking.set({ method: 'later' })
 	}, [])
 
 	// Keep the booking store in step with who / where is chosen here (the payment and order screens read it).
@@ -78,45 +70,70 @@ export default function LabReviewPage() {
 			patientKey: who.patientKey,
 			patientName: member?.name ?? '',
 			patientRelation: member?.relation ?? 'Self',
-			addressTag: address?.label ?? '',
-			addressLine: address ? addressLine(address) : '',
+			...(address ? { addressTag: address.label, addressLine: addressLine(address) } : {}),
 		})
 	}, [who.patientKey, member?.name, member?.relation, address])
 
-	const { items, visits, total, mrp, savings } = totalsOf(booking)
+	const { items, total, mrp } = totalsOf(booking)
 	const fasting = needsFasting(booking)
 	const fastLabel = items.find((i) => i.fasting)?.fastingLabel
-	const lab = labCenterById(booking.clinic?.labId)
+	const lab = booking.lab
 	const countLabel = plural(items.length, 'test', 'tests')
 
 	const billRows: BillingRow[] = useMemo(
 		() => [
-			{ label: `Tests (${items.length}${visits > 1 ? ` × ${visits} visits` : ''})`, value: inr(mrp) },
-			{ label: 'Discount', value: `−${inr(savings)}`, tone: 'free' },
-			...(isHome ? [{ label: 'Home sample collection', value: 'Free', tone: 'free' as const }] : []),
-			{ label: 'To pay', value: inr(total), tone: 'total' as const, dividerBefore: true },
+			{ label: `Tests (${items.length}, MRP)`, value: inr(mrp) },
+			...(mrp > total ? [{ label: 'Package discount', value: `−${inr(mrp - total)}`, tone: 'free' as const }] : []),
+			{ label: 'Total', value: inr(total), tone: 'total' as const, dividerBefore: true },
 		],
-		[items.length, visits, mrp, savings, total, isHome]
+		[items.length, mrp, total]
 	)
 
 	const editTests = () => navigation.navigate(ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION)
-	const changeWhen = () =>
-		navigation.navigate(isHome ? ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION : ROUTES.STACK.LABORATORY_SELECT_LAB)
+	const changeWhen = () => navigation.navigate(ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION)
 
-	const bannerTitle = isHome ? 'A phlebotomist visits you at your slot' : 'Your lab visit is held for 15 minutes'
+	const bannerTitle = isHome ? 'A phlebotomist visits you at your slot' : 'Your lab visit at the time you picked'
 	const bannerSub = isHome
 		? 'Sample collected at home · reports in the app in about 24 hours'
-		: 'Pay now to confirm. Please reach 10 minutes early.'
+		: 'Please reach 10 minutes early.'
 
-	const goPay = () => navigation.navigate(ROUTES.STACK.LABORATORY_PAYMENT)
+	const slotMissing = !booking.slot
 
-	const stubMissing = isHome ? booking.dates.length === 0 : !booking.clinic
+	// Books the order (pay on collection). The server re-checks the price and the slot: a 409 says which changed.
+	const placeNow = async () => {
+		const b = labBooking.get()
+		if (!b.lab || !b.slot || !b.addressId || b.quoteTotal == null || placing) return
+		setPlacing(true)
+		try {
+			const api = await placeOrder({
+				patientId: who.patientPublicId,
+				addressId: b.addressId,
+				itemIds: b.cart,
+				labId: b.lab.id,
+				service: b.where === 'home' ? 'HOME_SAMPLE' : 'CENTER_VISIT',
+				date: b.slot.date,
+				time: b.slot.time,
+				expectedTotal: b.quoteTotal,
+				note: b.note,
+			})
+			labBooking.set({ order: orderFromApi(api, b) })
+			// Reset (not push): back from the confirmation must not return here and place a second order.
+			navigation.reset({
+				index: 1,
+				routes: [{ name: ROUTES.MAIN.TABS }, { name: ROUTES.STACK.LABORATORY_PAYMENT_SUCCESS }],
+			})
+		} catch (e) {
+			Toast.show({ type: 'error', text1: 'Couldn’t place the order', text2: labErrorMessage(e) })
+		} finally {
+			setPlacing(false)
+		}
+	}
 
 	return (
 		<View style={styles.screen}>
 			<AppScreenHeader
 				variant="bar"
-				title="Review & pay"
+				title="Review & book"
 				subtitle={isHome ? 'Lab tests · home sample collection' : 'Lab tests · in-clinic visit'}
 				onBack={() => navigation.goBack()}
 				backAccessibilityLabel="Back"
@@ -160,7 +177,7 @@ export default function LabReviewPage() {
 							</View>
 							<View style={styles.priceCol}>
 								<Text style={styles.price}>{inr(item.price)}</Text>
-								<Text style={styles.mrp}>{inr(item.mrp)}</Text>
+								{item.mrp > item.price && <Text style={styles.mrp}>{inr(item.mrp)}</Text>}
 							</View>
 						</View>
 					))}
@@ -180,9 +197,9 @@ export default function LabReviewPage() {
 						<View style={styles.flex}>
 							<Text style={styles.testName}>{whenTitle(booking)}</Text>
 							<Text style={styles.testSub}>
-								{fasting
-									? `Fast for ${fastLabel ?? '10–12 hrs'} before · water is fine`
-									: 'No fasting needed'}
+								{`${lab ? `${lab.name} · ` : ''}${
+									fasting ? `Fast for ${fastLabel ?? '10–12 hrs'} before · water is fine` : 'No fasting needed'
+								}`}
 							</Text>
 						</View>
 					</View>
@@ -199,6 +216,7 @@ export default function LabReviewPage() {
 						patientLabel="TESTS FOR"
 						addressLabel="COLLECTION ADDRESS"
 						familyTitle="Who is this visit for?"
+						lockAddress
 					/>
 				) : (
 					<>
@@ -212,30 +230,11 @@ export default function LabReviewPage() {
 								/>
 							)}
 							<View style={styles.labRow}>
-								<MaterialCommunityIcons
-									name="hospital-building"
-									size={22}
-									color={APP_COLORS.primary}
-									style={styles.labIcon}
-								/>
+								<LabLogo uri={lab?.logoUrl} size={40} />
 								<View style={styles.flex}>
 									<Text style={styles.eyebrow}>LAB</Text>
 									<Text style={styles.labName}>{lab?.name ?? 'Choose a lab'}</Text>
-									{!!lab && <Text style={styles.labAddress}>{lab.address}</Text>}
-									{!!lab && (
-										<Text
-											style={styles.labMeta}
-										>{`${lab.km} km away${lab.nabl ? ' · NABL accredited' : ''}`}</Text>
-									)}
 								</View>
-								<TouchableOpacity
-									onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_SELECT_LAB)}
-									accessibilityRole="button"
-									accessibilityLabel="Change lab"
-									style={styles.changeLink}
-								>
-									<Text style={styles.changeLinkText}>Change</Text>
-								</TouchableOpacity>
 							</View>
 						</AppSection>
 						<AppFamilyMemberSheet
@@ -262,13 +261,6 @@ export default function LabReviewPage() {
 						dashedDividers
 						rowGap={8}
 						rows={billRows}
-						footer={
-							<View style={styles.savePillRow}>
-								<View style={styles.savePill}>
-									<Text style={styles.savePillText}>{`You save ${inr(savings)}`}</Text>
-								</View>
-							</View>
-						}
 					/>
 					<Text style={styles.cancelNote}>
 						{isHome
@@ -277,25 +269,33 @@ export default function LabReviewPage() {
 					</Text>
 				</AppSection>
 
-				{/* Pay with */}
-				<AppSection marginTop={0} title="Pay with" titleSize="sm" gap={0}>
-					<AppPaymentMethodList
-						methods={REVIEW_METHODS}
-						value={booking.method === 'card' ? 'card' : 'upi'}
-						onChange={(id) => labBooking.set({ method: id })}
-					/>
+				{/* Payment */}
+				<AppSection marginTop={0} title="Payment" titleSize="sm" gap={0}>
+					<View style={styles.testRow}>
+						<AppIconTile backgroundColor={APP_COLORS.successBg} size={40} radius={10}>
+							<AppPathIcon d={LAB_ICONS.cash} size={20} strokeWidth={2} color={APP_COLORS.success} />
+						</AppIconTile>
+						<View style={styles.flex}>
+							<Text style={styles.testName}>Pay on collection</Text>
+							<Text style={styles.testSub}>
+								{isHome
+									? `Keep ${inr(total)} ready for the phlebotomist · nothing to pay now`
+									: `Pay ${inr(total)} at the lab · nothing to pay now`}
+							</Text>
+						</View>
+					</View>
 				</AppSection>
 			</ScrollView>
 
 			<AppFooterBar direction="column">
 				<AppButton
 					size="lg"
-					disabled={stubMissing || items.length === 0}
-					onPress={goPay}
-					icon="shield-lock-outline"
-					accessibilityLabel={`Pay ${inr(total)} for ${countLabel}`}
+					loading={placing}
+					disabled={placing || slotMissing || items.length === 0}
+					onPress={() => void placeNow()}
+					accessibilityLabel={`Place order for ${countLabel}, ${inr(total)}, pay on collection`}
 				>
-					{`Pay ${inr(total)}`}
+					Place order
 				</AppButton>
 			</AppFooterBar>
 		</View>
@@ -334,14 +334,8 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: APP_COLORS.divider,
 	},
-	labIcon: { marginTop: 1 },
 	labName: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: APP_COLORS.ink },
 	labAddress: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
 	labMeta: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.success },
-	changeLink: { height: 28, paddingHorizontal: 4, justifyContent: 'center' },
-	changeLinkText: { fontSize: 13, fontWeight: '700', color: APP_COLORS.primary },
-	savePillRow: { alignItems: 'flex-end' },
-	savePill: { paddingVertical: 2, paddingHorizontal: 8, borderRadius: 9999, backgroundColor: APP_COLORS.successBg },
-	savePillText: { fontSize: 12, fontWeight: '800', color: APP_COLORS.success },
 	cancelNote: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
 })

@@ -32,7 +32,14 @@ export const STATUS_TAG_TONE: Record<BookingTone, StatusToneKey> = {
 	done: 'done',
 }
 
-export const whereIconProps = (type?: BookingWhereType | null): { whereIcon?: AppIconName; whereGlyph?: IconName } => {
+/**
+ * The chip tone for a booking's status: the contract tone, except a cancelled / rejected booking is shown in red
+ * (the server only says "done" for every closed booking, so those are told apart by their label).
+ */
+export const statusChipTone = (status: { label: string; tone: BookingTone }): StatusToneKey =>
+	/^(cancelled|rejected)\b/i.test(status.label) ? 'cancelled' : (STATUS_TAG_TONE[status.tone] ?? 'done')
+
+export const whereIconProps =(type?: BookingWhereType | null): { whereIcon?: AppIconName; whereGlyph?: IconName } => {
 	switch (type) {
 		case 'video':
 			return { whereIcon: 'video' }

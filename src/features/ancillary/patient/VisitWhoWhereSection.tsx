@@ -34,6 +34,8 @@ type Props = {
 	addressLabel?: string
 	/** Title of the family sheet. Defaults to "Who is this visit for?". */
 	familyTitle?: string
+	/** Show the address but do not let it be changed here (something chosen earlier depends on it). */
+	lockAddress?: boolean
 }
 
 export function VisitWhoWhereSection({
@@ -45,6 +47,7 @@ export function VisitWhoWhereSection({
 	patientLabel = 'VISIT FOR',
 	addressLabel = 'VISIT ADDRESS',
 	familyTitle = 'Who is this visit for?',
+	lockAddress = false,
 }: Props) {
 	const { member, address } = who
 	const addressTag = address ? address.label.toUpperCase() : ''
@@ -63,7 +66,8 @@ export function VisitWhoWhereSection({
 				<TouchableOpacity
 					style={styles.addrRow}
 					onPress={() => who.setAddrOpen(true)}
-					activeOpacity={0.8}
+					disabled={lockAddress}
+					activeOpacity={lockAddress ? 1 : 0.8}
 					accessibilityRole="button"
 					accessibilityLabel={
 						address
@@ -96,7 +100,7 @@ export function VisitWhoWhereSection({
 							</Text>
 						)}
 					</View>
-					<MaterialCommunityIcons name="chevron-right" size={20} color={APP_COLORS.border} />
+					{!lockAddress && <MaterialCommunityIcons name="chevron-right" size={20} color={APP_COLORS.border} />}
 				</TouchableOpacity>
 				<NotesInput
 					variant="field"

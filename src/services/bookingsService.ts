@@ -20,6 +20,7 @@ export type BookingTargetType =
 	| 'ancillary_request'
 	| 'ancillary_tracking'
 	| 'pharmacy_order'
+	| 'lab_booking'
 
 export type BookingActionKey =
 	| 'view'

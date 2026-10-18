@@ -1,13 +1,15 @@
 // src/features/laboratory/LabCatalogPage.tsx
 //
 // "Lab tests and packages" from the Lab Tests Ordering design: collapsing ink header (greeting, search, cart),
-// All / Packages / Single tests tabs, "Shop by concern" tiles, an offers carousel, the health-packages and
-// lab-tests lists with an Add toggle, a trust strip, the details sheet and the cart footer. Built from the
-// shared catalogue blocks (AppCatalogHeader / Section / TrustStrip / ConcernGrid), AppCatalogItemRow,
-// AppPromoCard + AppCarousel, ServiceDetailsSheet (modern) and AppCartFooter. Data is mock (labMock.ts).
+// All / Packages / Single tests tabs, "Shop by concern" shortcuts, the health-packages and lab-tests lists with
+// an Add toggle, a trust strip, the details sheet and the cart footer. Built from the shared catalogue blocks
+// (AppCatalogHeader / Section / TrustStrip / ConcernGrid), AppCatalogItemRow, ServiceDetailsSheet (modern) and
+// AppCartFooter. Data is the real LabStack catalogue through our API (labService.ts / labCatalogue.ts);
+// prices are the lab's MRP ("from": the lowest across the labs that offer the item).
 
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
+	ActivityIndicator,
 	LayoutAnimation,
 	ScrollView,
 	StyleSheet,
@@ -19,7 +21,6 @@ import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import {
 	AppBottomSheet,
-	AppCarousel,
 	AppCartFooter,
 	AppCatalogEmpty,
 	AppCatalogHeader,
@@ -27,11 +28,9 @@ import {
 	AppCatalogSection,
 	AppConcernGrid,
 	AppConcernRows,
-	AppPromoCard,
 	AppTabs,
 	AppTrustStrip,
 	ServiceDetailsSheet,
-	type AppPromoCardProps,
 	type AppTabItem,
 	type ServiceDetailsContent,
 } from '../../components/common'
@@ -39,20 +38,18 @@ import { APP_COLORS } from '../../config/theme'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
+import { labItemById, useLabCatalogue, useLabItemDetail } from './labCatalogue'
 import { cartItems, labBooking, totalsOf, useLabBooking } from './labBookingStore'
 import { inr, plural } from './labFormat'
-import {
-	DIABETES_ITEM_ID,
-	LAB_CONCERNS,
-	LAB_ICONS,
-	LAB_PACKAGES,
-	LAB_TESTS,
-	LAB_TYPES,
-	VITAMIN_ITEM_IDS,
-	labItemById,
-	type LabItem,
-	type LabTypeId,
-} from './labMock'
+import { LAB_CONCERNS, LAB_ICONS, LAB_TYPES, type LabItem, type LabTypeId } from './labMock'
+import type { ApiCatalogueDetail } from './labService'
+
+// TODO(next phase): use the user's location to show only what a lab can actually collect near them.
+// This list cannot know the address (it is the browse page, before a patient / address is chosen), so today
+// an item that no lab serves at the user's address is only flagged later: "Not available at your address" in
+// the details sheet, and in the cart's availability check. Next phase: read the device location here
+// (src/services/locationService.ts), resolve its pincode, call GET /api/laboratory/availability for the
+// listed items (or add a `pincode` filter to GET /api/laboratory/catalogue) and hide / mark the unavailable ones.
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 
@@ -62,14 +59,18 @@ const TYPE_TAB_ICONS: Record<LabTypeId, AppTabItem['icon']> = {
 	tests: 'flask-outline',
 }
 
+const KIND_OF_TYPE = { all: 'all', packages: 'package', tests: 'test' } as const
+
 const MAIN_CONCERNS = 4
 const MORE_TILES_PER_ROW = 4
+const SEARCH_DEBOUNCE_MS = 350
+const LOAD_MORE_DISTANCE = 600
 
 const TRUST_CHIPS = [
-	{ key: 'home', label: 'Free home collection', icon: LAB_ICONS.home },
+	{ key: 'home', label: 'Home collection', icon: LAB_ICONS.home },
 	{
 		key: 'phleb',
-		label: 'Trained phlebotomists',
+		label: 'Accredited labs',
 		icon: 'M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 21a7 7 0 0 1 14 0M16 11l2 2 4-4',
 	},
 	{
@@ -79,26 +80,29 @@ const TRUST_CHIPS = [
 	},
 ]
 
-const matchesQuery = (item: LabItem, q: string) => {
-	if (!q) return true
-	return `${item.name} ${item.about} ${item.bullets.join(' ')} ${item.tags.join(' ')}`.toLowerCase().includes(q)
-}
+const priceLabelOf = (item: LabItem) => (item.price > 0 ? `From ${inr(item.price)}` : 'Price shown at checkout')
 
 /** Content for the shared "modern" details sheet (design: hero, at a glance, what it checks, included, prep). */
-const sheetContentFor = (item: LabItem): ServiceDetailsContent => {
+const sheetContentFor = (
+	item: LabItem,
+	detail: ApiCatalogueDetail | null,
+	loading: boolean,
+	hasAddress: boolean
+): ServiceDetailsContent => {
 	const isPkg = item.kind === 'package'
-	const fastText = item.fasting ? `${item.fastingLabel} fasting` : 'Not needed'
-	const prep = item.fasting
-		? [
-				`Don’t eat for ${item.fastingLabel} before your slot. Plain water is fine.`,
-				'Take your regular medicines unless your doctor has told you otherwise.',
-				'Book a morning slot so fasting is easier.',
-			]
-		: [
-				'No fasting needed. You can eat and drink as usual.',
-				'Take your regular medicines unless your doctor has told you otherwise.',
-				'Keep a photo ID handy for the phlebotomist.',
-			]
+	const fastText = item.fasting ? `${item.fastingLabel ?? 'Yes'} fasting` : 'Not needed'
+	const prep = item.preparations?.length
+		? item.preparations
+		: item.fasting
+			? ['Don’t eat before your slot. Plain water is fine.']
+			: ['Follow the lab’s instructions on the day.']
+	const collection =
+		detail?.supports_home_sample && detail?.supports_center_visit
+			? 'Home or lab'
+			: detail?.supports_center_visit
+				? 'At the lab'
+				: 'At home'
+	const unavailable = !!detail && detail.live && hasAddress && detail.labs.length === 0
 	return {
 		id: item.id,
 		kindLabel: isPkg ? 'Health package' : 'Lab test',
@@ -111,10 +115,8 @@ const sheetContentFor = (item: LabItem): ServiceDetailsContent => {
 			{
 				key: 'first',
 				label: isPkg ? 'Tests included' : 'Sample',
-				value: isPkg ? `${item.tests} tests` : item.sample,
-				icon: isPkg
-					? 'M9 3h6M10 3v6L4.8 18.2A1.9 1.9 0 0 0 6.4 21h11.2a1.9 1.9 0 0 0 1.6-2.8L14 9V3M7.5 15h9'
-					: LAB_ICONS.drop,
+				value: isPkg ? plural(item.tests ?? 0, 'test', 'tests') : item.sample,
+				icon: isPkg ? LAB_ICONS.flask : LAB_ICONS.drop,
 				tone: 'lilac',
 			},
 			{ key: 'fasting', label: 'Fasting', value: fastText, icon: LAB_ICONS.fast, tone: 'sand' },
@@ -128,18 +130,21 @@ const sheetContentFor = (item: LabItem): ServiceDetailsContent => {
 			{
 				key: 'last',
 				label: isPkg ? 'Sample' : 'Collection',
-				value: isPkg ? item.sample : 'At home',
+				value: isPkg ? item.sample : collection,
 				icon: isPkg ? LAB_ICONS.drop : LAB_ICONS.home,
 				tone: 'mint',
 			},
 		],
 		aboutTitle: 'What it checks',
-		about: item.about,
-		goodFor: item.forWho,
-		includes: item.includes?.map(([label, n]) => ({ label, meta: plural(n, 'test', 'tests') })),
+		about: item.about || null,
+		goodFor: null,
+		includes: item.includedTests?.map((label) => ({ label })),
+		includesLoading: isPkg && loading && !item.includedTests?.length,
 		prepTitle: 'Before your test',
 		prepSteps: prep,
-		trustLine: 'Free home sample collection · report in the app',
+		trustLine: unavailable
+			? 'Not available at your address'
+			: 'The price can differ by lab · report in the app',
 	}
 }
 
@@ -151,28 +156,32 @@ export default function LabCatalogPage() {
 	const [type, setType] = useState<LabTypeId>('all')
 	const [concern, setConcern] = useState<string | null>(null)
 	const [query, setQuery] = useState('')
+	const [debounced, setDebounced] = useState('')
 	const [detailId, setDetailId] = useState<string | null>(null)
 	const [concernsOpen, setConcernsOpen] = useState(false)
 	const [compact, setCompact] = useState(false)
 	const compactRef = useRef(false)
 
+	useEffect(() => {
+		const t = setTimeout(() => setDebounced(query.trim()), SEARCH_DEBOUNCE_MS)
+		return () => clearTimeout(t)
+	}, [query])
+
+	const concernDef = LAB_CONCERNS.find((c) => c.id === concern)
+	const queries = useMemo(
+		() => (concernDef ? concernDef.queries : debounced ? [debounced] : []),
+		[concernDef, debounced]
+	)
+	const catalogue = useLabCatalogue({ queries, kind: KIND_OF_TYPE[type] })
+	const { packages, tests } = catalogue
+
 	const items = cartItems(booking)
-	const { total, savings } = totalsOf(booking)
+	const { total } = totalsOf(booking)
 	const inCart = (id: string) => booking.cart.includes(id)
 	const countLabel = `${plural(items.length, 'item', 'items')} added`
 
-	const q = query.trim().toLowerCase()
-	const matches = (item: LabItem) => {
-		const okType =
-			type === 'all' ||
-			(type === 'packages' && item.kind === 'package') ||
-			(type === 'tests' && item.kind === 'test')
-		return okType && (!concern || item.tags.includes(concern)) && matchesQuery(item, q)
-	}
-	const packages = LAB_PACKAGES.filter(matches)
-	const tests = LAB_TESTS.filter(matches)
-	const noResults = packages.length === 0 && tests.length === 0
-	const filtersActive = type !== 'all' || !!concern || !!q
+	const noResults = !catalogue.loading && !catalogue.error && packages.length === 0 && tests.length === 0
+	const filtersActive = type !== 'all' || !!concern || !!query.trim()
 
 	const resetFilters = () => {
 		setType('all')
@@ -186,12 +195,19 @@ export default function LabCatalogPage() {
 	const pickConcern = (id: string) => {
 		setConcern((cur) => (cur === id ? null : id))
 		setType('all')
+		setQuery('')
 		setConcernsOpen(false)
 	}
+	const onSearch = (v: string) => {
+		setQuery(v)
+		setConcern(null)
+	}
 
-	// ---- header collapse ----
+	// ---- header collapse + load more near the end ----
 	const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-		const y = e.nativeEvent.contentOffset.y
+		const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
+		const y = contentOffset.y
+		if (contentSize.height - (y + layoutMeasurement.height) < LOAD_MORE_DISTANCE) void catalogue.loadMore()
 		const next = compactRef.current ? y > 4 : y > 24
 		if (next === compactRef.current) return
 		compactRef.current = next
@@ -204,57 +220,15 @@ export default function LabCatalogPage() {
 		[]
 	)
 
-	// ---- offers ----
-	const vitaminsAdded = VITAMIN_ITEM_IDS.every(inCart)
-	const diabetes = labItemById(DIABETES_ITEM_ID)
-	const slides = useMemo<(AppPromoCardProps & { key: string })[]>(
-		() => [
-			{
-				key: 'full-body',
-				tone: 'ink',
-				eyebrow: 'UP TO 32% OFF',
-				title: 'Full body checkup at home',
-				subtitle: '62+ tests · Reports in 24 hrs',
-				ctaLabel: 'Book now',
-				ctaChevron: false,
-				iconPath: LAB_ICONS.package,
-				onPress: () => {
-					setType('packages')
-					setConcern(null)
-					setQuery('')
-				},
-			},
-			{
-				key: 'diabetes',
-				tone: 'lilac',
-				eyebrow: 'DIABETES CARE',
-				title: 'Know your sugar numbers',
-				subtitle: 'HbA1c + 13 tests for',
-				priceLabel: diabetes ? inr(diabetes.price) : undefined,
-				mrpLabel: diabetes ? inr(diabetes.mrp) : undefined,
-				ctaLabel: 'View package',
-				ctaChevron: false,
-				iconPath: 'M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11zM9.5 14.5a2.5 2.5 0 0 0 2.5 2.5',
-				onPress: () => setDetailId(DIABETES_ITEM_ID),
-			},
-			{
-				key: 'vitamins',
-				tone: 'peach',
-				eyebrow: 'VITAMIN CHECK',
-				title: 'Low energy? Check D & B12',
-				subtitle: 'Both tests for ₹1,698 · No fasting',
-				ctaLabel: vitaminsAdded ? 'Added to cart' : 'Add both',
-				ctaChevron: false,
-				iconPath:
-					'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
-				onPress: () => VITAMIN_ITEM_IDS.forEach((id) => labBooking.addItem(id)),
-			},
-		],
-		[diabetes, vitaminsAdded]
+	const listed = detailId ? labItemById(detailId) : undefined
+	const { detail, item: detailItem, loading: detailLoading, ready: detailReady } = useLabItemDetail(
+		listed,
+		booking.addressId
 	)
-
-	const detailItem = detailId ? labItemById(detailId) : undefined
-	const detailContent = useMemo(() => (detailItem ? sheetContentFor(detailItem) : null), [detailItem])
+	const detailContent = useMemo(
+		() => (detailItem ? sheetContentFor(detailItem, detail, detailLoading, !!booking.addressId) : null),
+		[detailItem, detail, detailLoading, booking.addressId]
+	)
 	const closeDetail = () => setDetailId(null)
 
 	const goCart = () => navigation.navigate(ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION)
@@ -272,10 +246,10 @@ export default function LabCatalogPage() {
 			key={item.id}
 			divider={i > 0}
 			name={item.name}
-			priceLabel={inr(item.price)}
-			mrpLabel={inr(item.mrp)}
+			priceLabel={priceLabelOf(item)}
+			mrpLabel={item.mrp > item.price ? inr(item.mrp) : undefined}
 			metaLabel={item.kind === 'test' ? item.report : undefined}
-			points={item.bullets}
+			points={item.kind === 'package' ? [plural(item.tests ?? 0, 'test', 'tests') + ' included'] : item.bullets}
 			iconPath={item.kind === 'package' ? LAB_ICONS.package : LAB_ICONS.flask}
 			tone={item.kind === 'package' ? 'lilac' : 'mint'}
 			added={inCart(item.id)}
@@ -289,7 +263,7 @@ export default function LabCatalogPage() {
 			<AppCatalogHeader
 				title="Lab tests at home"
 				eyebrow={firstName ? `HI ${firstName.toUpperCase()}` : undefined}
-				subtitle="Free home collection · Next slot tomorrow, 7–9 AM"
+				subtitle="Home collection · reports in the app"
 				compact={compact}
 				showBack={navigation.canGoBack()}
 				onBack={() => navigation.goBack()}
@@ -298,7 +272,7 @@ export default function LabCatalogPage() {
 				cartLabel={`Cart, ${items.length === 0 ? 'no items added' : countLabel}`}
 				search={{
 					value: query,
-					onChange: setQuery,
+					onChange: onSearch,
 					placeholder: 'Search tests, e.g. thyroid, HbA1c',
 					accessibilityLabel: 'Search tests and packages',
 				}}
@@ -326,23 +300,24 @@ export default function LabCatalogPage() {
 					/>
 				</View>
 
-				<AppCarousel
-					data={slides}
-					autoPlay
-					autoPlayInterval={4500}
-					accessibilityLabel="Offers"
-					keyExtractor={(s) => s.key}
-					renderItem={({ item }) => {
-						const { key: _key, ...cardProps } = item
-						return <AppPromoCard {...cardProps} />
-					}}
-				/>
+				{catalogue.loading && packages.length === 0 && tests.length === 0 && (
+					<ActivityIndicator style={styles.spinner} color={APP_COLORS.primary} />
+				)}
+
+				{!!catalogue.error && (
+					<AppCatalogEmpty
+						title="Couldn’t load the tests"
+						subtitle={catalogue.error}
+						actionLabel="Try again"
+						onAction={catalogue.retry}
+					/>
+				)}
 
 				{packages.length > 0 && (
 					<AppCatalogSection
 						title="Health packages"
 						count={plural(packages.length, 'package', 'packages')}
-						subtitle="Full body checkups, sample collected at home"
+						subtitle="Bundled checkups, sample collected at home"
 					>
 						{packages.map(row)}
 					</AppCatalogSection>
@@ -352,13 +327,15 @@ export default function LabCatalogPage() {
 
 				{tests.length > 0 && (
 					<AppCatalogSection
-						title="Lab tests at home"
-						count={plural(tests.length, 'test', 'tests')}
-						subtitle="A trained phlebotomist collects your sample at home"
+						title="Lab tests"
+						count={catalogue.hasMore ? `${tests.length}+ tests` : plural(tests.length, 'test', 'tests')}
+						subtitle="Sample collected at your home by the lab"
 					>
 						{tests.map(row)}
 					</AppCatalogSection>
 				)}
+
+				{catalogue.loadingMore && <ActivityIndicator style={styles.spinner} color={APP_COLORS.primary} />}
 
 				{noResults && (
 					<AppCatalogEmpty
@@ -373,8 +350,7 @@ export default function LabCatalogPage() {
 			<AppCartFooter
 				empty={items.length === 0}
 				countLabel={countLabel}
-				totalLabel={inr(total)}
-				savingsLabel={savings > 0 ? `You save ${inr(savings)}` : undefined}
+				totalLabel={`From ${inr(total)}`}
 				ctaLabel="View cart"
 				onCtaPress={goCart}
 				emptyHint="Add a test or package to continue"
@@ -383,7 +359,7 @@ export default function LabCatalogPage() {
 			<AppBottomSheet
 				visible={concernsOpen}
 				title="Shop by concern"
-				subtitle="Tests and packages grouped by health concern"
+				subtitle="Quick searches for common health concerns"
 				onClose={() => setConcernsOpen(false)}
 				appearance="modern"
 				showHeaderDivider={false}
@@ -398,7 +374,7 @@ export default function LabCatalogPage() {
 
 			<ServiceDetailsSheet
 				variant="modern"
-				visible={!!detailItem}
+				visible={!!detailItem && detailReady}
 				content={detailContent}
 				onClose={closeDetail}
 				added={detailItem ? inCart(detailItem.id) : false}
@@ -423,4 +399,5 @@ const styles = StyleSheet.create({
 	scroll: { flex: 1 },
 	scrollContent: { paddingVertical: 16, gap: 16 },
 	filters: { paddingHorizontal: 16, gap: 12 },
+	spinner: { marginVertical: 24 },
 })

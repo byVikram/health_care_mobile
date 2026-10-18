@@ -72,9 +72,7 @@ export const ROUTES = {
 		LABORATORY_SAMPLE_COLLECTION: 'LaboratorySampleCollectionPage',
 		// Lab selection + date/time slot selection are one merged screen (see
 		// `LabSelectionScreen.tsx`) — there is no separate slot-selection route.
-		LABORATORY_SELECT_LAB: 'LaboratorySelectLabPage',
 		LABORATORY_BOOKING_SUMMARY: 'LaboratoryBookingSummaryPage',
-		LABORATORY_PAYMENT: 'LaboratoryPaymentPage',
 		LABORATORY_PAYMENT_SUCCESS: 'LaboratoryPaymentSuccessPage',
 		LABORATORY_REPORT: 'LaboratoryReportPage',
 		LABORATORY_BOOKING_TRACKING: 'LaboratoryBookingTrackingPage',

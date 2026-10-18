@@ -145,6 +145,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			const refresh = await secureStorage.getItem('refresh_token')
 			const nps = await AsyncStorage.getItem('notification_prompt_shown')
 			const savedLocation = await AsyncStorage.getItem('current_location')
+			if (__DEV__) console.log(`[AuthContext] restored session: access token ${token ? 'found' : 'MISSING'}, refresh token ${refresh ? 'found' : 'MISSING'}`)
 			// Load persisted specialty (survives restarts)
 			const savedSpecialty = await AsyncStorage.getItem('user_specialty')
 

@@ -44,9 +44,7 @@ import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 
 import LabCatalogPage from '../features/laboratory/LabCatalogPage'
 import LabCartPage from '../features/laboratory/LabCartPage'
-import LabCentersPage from '../features/laboratory/LabCentersPage'
 import LabReviewPage from '../features/laboratory/LabReviewPage'
-import LabPaymentPage from '../features/laboratory/LabPaymentPage'
 import LabSuccessPage from '../features/laboratory/LabSuccessPage'
 import LabOrderPage from '../features/laboratory/LabOrderPage'
 import LabReportPage from '../features/laboratory/LabReportPage'
@@ -175,9 +173,7 @@ function AuthenticatedNavigator() {
 				{/* Lab Tests Ordering flow: every screen renders its own header. */}
 				<AppStack.Screen name={ROUTES.STACK.LABORATORY_LIST as keyof AppStackParamList} component={LabCatalogPage} options={{ headerShown: false }} />
 				<AppStack.Screen name={ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION as keyof AppStackParamList} component={LabCartPage} options={{ headerShown: false }} />
-				<AppStack.Screen name={ROUTES.STACK.LABORATORY_SELECT_LAB as keyof AppStackParamList} component={LabCentersPage} options={{ headerShown: false }} />
 				<AppStack.Screen name={ROUTES.STACK.LABORATORY_BOOKING_SUMMARY as keyof AppStackParamList} component={LabReviewPage} options={{ headerShown: false }} />
-				<AppStack.Screen name={ROUTES.STACK.LABORATORY_PAYMENT as keyof AppStackParamList} component={LabPaymentPage} options={{ headerShown: false }} />
 				<AppStack.Screen
 					name={ROUTES.STACK.LABORATORY_PAYMENT_SUCCESS as keyof AppStackParamList}
 					component={LabSuccessPage}

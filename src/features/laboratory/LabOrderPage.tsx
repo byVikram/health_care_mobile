@@ -5,11 +5,12 @@
 // payment summary, the Status timeline, Cancel order, a help row and the Reschedule / Add more tests footer,
 // plus the cancel, reschedule and pickup-QR sheets. Same building blocks as the patient appointment details
 // (AppDetailRow, AppStatusTimeline, AppBillSummary, AppNumberedSteps, CheckInQrSheet). Mock: the order is the
-// one just paid (or a demo order) and cancel / reschedule only change this screen.
+// one just placed, or one opened from the Bookings tab (loaded from the server); cancel / reschedule are still
+// mock and only change this screen.
 
 import React, { useEffect, useState } from 'react'
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
@@ -35,27 +36,33 @@ import { addToCalendar } from '../../utils/calendar'
 import { showComingSoon } from '../../utils/toast'
 import CheckInQrSheet from '../appointment/components/patient-details/CheckInQrSheet'
 import { labBooking, type LabOrder } from './labBookingStore'
+import { LabLogo } from './LabLogo'
 import { commaDate, inr, longDate, plural, slotStart } from './labFormat'
+import { applyApi, orderFromApi } from './labOrder'
+import { fetchOrder } from './labService'
 import { LabCancelSheet, LabRescheduleSheet, type LabPickup } from './LabOrderSheets'
 import { LAB_ICONS } from './labMock'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 
-function LabOrderContent({ order }: { order: LabOrder }) {
+function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next: LabOrder) => void }) {
 	const navigation = useNavigation<Nav>()
 	const isHome = order.where === 'home'
 
-	const [cancelled, setCancelled] = useState(false)
 	const [cancelOpen, setCancelOpen] = useState(false)
 	const [qrOpen, setQrOpen] = useState(false)
 	const [resOpen, setResOpen] = useState(false)
-	const [pickup, setPickup] = useState<LabPickup | null>(null)
 	const [rescheduled, setRescheduled] = useState(false)
 
 	const first = order.visits[0]
-	const current: LabPickup = pickup ?? { date: first?.date ?? '', time: first?.time ?? '' }
+	const current: LabPickup = { date: first?.date ?? '', time: first?.time ?? '' }
 	const savings = order.mrpTotal - order.total
-	const live = !cancelled
+	const cancelled = order.status === 'cancelled'
+	const cancelRequested = order.status === 'cancel_requested'
+	const rescheduleRequested = order.status === 'reschedule_requested'
+	const live = !cancelled && !cancelRequested
+	const canCancel = !!order.apiId && !!order.canCancel
+	const canReschedule = !!order.apiId && !!order.canReschedule
 	const placed = order.placedAt.slice(0, 10)
 
 	// "Add more tests" / "Book again" start a fresh booking (this order is already placed).
@@ -80,28 +87,32 @@ function LabOrderContent({ order }: { order: LabOrder }) {
 	}
 
 	const billRows: BillingRow[] = [
-		{ label: `Tests (${order.items.length})`, value: inr(order.mrpTotal) },
-		...(isHome ? [{ label: 'Home collection', value: 'Free', tone: 'free' as const }] : []),
-		{ label: 'You saved', value: inr(savings), tone: 'free' },
-		{ label: 'Paid', value: inr(order.total), tone: 'total', dividerBefore: true },
+		{ label: `Tests (${order.items.length}, MRP)`, value: inr(order.mrpTotal) },
+		...(savings > 0 ? [{ label: 'Package discount', value: `\u2212${inr(savings)}`, tone: 'free' as const }] : []),
+		{ label: order.method === 'later' ? 'To pay' : 'Paid', value: inr(order.total), tone: 'total', dividerBefore: true },
 	]
 
+	// How far along: the step the order is on (0 placed ... 4 report ready); a requested change keeps the current step.
+	const stepIndex = { placed: 1, scheduled: 1, on_the_way: 1, sample_collected: 2, processing: 3, report_ready: 4 }[
+		order.status as 'placed'
+	] ?? 1
+	const stateOf = (i: number): AppTimelineStep['state'] => (i < stepIndex ? 'done' : i === stepIndex ? 'current' : 'upcoming')
 	const timeline: AppTimelineStep[] = [
 		{ key: 'placed', title: 'Order placed', sub: `${longDate(placed)}`, state: 'done' },
 		{
 			key: 'assigned',
 			title: isHome ? 'Phlebotomist assigned' : 'Lab confirmed',
-			sub: isHome ? 'By 6 AM tomorrow' : 'Your slot is held',
-			state: 'current',
+			sub: isHome ? 'We’ll share their name and number' : 'Your slot is held',
+			state: stateOf(1),
 		},
 		{
 			key: 'collected',
 			title: isHome ? 'Sample collected' : 'Sample taken at the lab',
 			sub: current.date ? `${longDate(current.date)}, ${current.time}` : '',
-			state: 'upcoming',
+			state: stateOf(2),
 		},
-		{ key: 'processing', title: 'Processing at lab', sub: 'After pickup', state: 'upcoming' },
-		{ key: 'report', title: 'Report ready', sub: 'Within 24 hrs of pickup', state: 'upcoming' },
+		{ key: 'processing', title: 'Processing at lab', sub: 'After pickup', state: stateOf(3) },
+		{ key: 'report', title: 'Report ready', sub: 'Within 24 hrs of pickup', state: stateOf(4) },
 	]
 
 	const beforeSteps = [
@@ -157,7 +168,9 @@ function LabOrderContent({ order }: { order: LabOrder }) {
 									: `Lab order for ${plural(order.items.length, 'test', 'tests')}`}
 							</Text>
 							<Text style={styles.cancelSub}>
-								{`Refund of ${inr(order.total)} started to your ${order.methodLabel}. You’ll get an SMS when it lands.`}
+								{order.method === 'later'
+									? 'Nothing was charged. You can book again any time.'
+									: `Refund of ${inr(order.total)} started to your ${order.methodLabel}. You’ll get an SMS when it lands.`}
 							</Text>
 						</View>
 					</View>
@@ -177,6 +190,25 @@ function LabOrderContent({ order }: { order: LabOrder }) {
 								<Text style={[styles.noteTitle, { color: APP_COLORS.success }]}>Rescheduled</Text>
 								<Text style={styles.noteSub}>
 									Your fasting reminder moves with the new pickup time.
+								</Text>
+							</View>
+						</View>
+					</View>
+				)}
+				{(cancelRequested || rescheduleRequested) && (
+					<View style={styles.noteBannerWrap}>
+						<View style={[styles.noteBanner, { backgroundColor: APP_COLORS.warningBg }]}>
+							<AppIconTile size={32} radius={10} backgroundColor="#FFFFFF">
+								<AppPathIcon d={LAB_ICONS.clock} size={18} strokeWidth={2} color={APP_COLORS.warning} />
+							</AppIconTile>
+							<View style={styles.flex}>
+								<Text style={[styles.noteTitle, { color: APP_COLORS.warning }]}>
+									{cancelRequested ? 'Cancellation requested' : 'Reschedule requested'}
+								</Text>
+								<Text style={styles.noteSub}>
+									{cancelRequested
+										? 'The lab has not confirmed yet. We’ll update this order when it does.'
+										: 'The lab has not confirmed the new time yet. Your current time stands until it does.'}
 								</Text>
 							</View>
 						</View>
@@ -234,19 +266,29 @@ function LabOrderContent({ order }: { order: LabOrder }) {
 						}
 						action={{ label: 'Add to calendar', onPress: addToCal }}
 					/>
-					{isHome ? (
+					{!!order.labName && (
+						<View style={styles.labRow}>
+							<LabLogo uri={order.labLogoUrl} size={44} />
+							<View style={styles.flex}>
+								<Text style={styles.labEyebrow}>LAB</Text>
+								<Text style={styles.labName}>{order.labName}</Text>
+								<Text style={styles.labSub}>
+									{[
+										isHome ? 'Home sample collection' : 'Visit the lab',
+										order.labTatHours != null ? `Reports in ${order.labTatHours} hrs` : null,
+									]
+										.filter(Boolean)
+										.join(' · ')}
+								</Text>
+							</View>
+						</View>
+					)}
+					{isHome && (
 						<AppDetailRow
 							icon="account-outline"
 							label="PHLEBOTOMIST"
 							value="Not assigned yet"
-							sub="We’ll share their name and number by 6 AM"
-						/>
-					) : (
-						<AppDetailRow
-							icon="hospital-building"
-							label="LAB"
-							value={order.addressTitle}
-							sub={order.addressSub}
+							sub="We’ll share their name and number once the lab assigns one"
 						/>
 					)}
 					<AppDetailRow
@@ -290,7 +332,11 @@ function LabOrderContent({ order }: { order: LabOrder }) {
 						rows={billRows}
 						footer={
 							<AppBillStatusLine
-								text={`Paid via ${order.methodLabel} · ${order.transactionId}`}
+								text={
+									order.method === 'later'
+										? `${inr(order.total)} to pay on collection`
+										: `Paid via ${order.methodLabel} · ${order.transactionId}`
+								}
 								tone="paid"
 								onReceiptPress={() => showComingSoon()}
 							/>
@@ -303,7 +349,7 @@ function LabOrderContent({ order }: { order: LabOrder }) {
 					<AppStatusTimeline steps={timeline} />
 				</AppSection>
 
-				{live && (
+				{live && canCancel && (
 					<View style={styles.cancelRow}>
 						<TouchableOpacity
 							onPress={() => setCancelOpen(true)}
@@ -362,6 +408,7 @@ function LabOrderContent({ order }: { order: LabOrder }) {
 							size="lg"
 							style={styles.flex}
 							icon="calendar-month-outline"
+							disabled={!canReschedule}
 							onPress={() => setResOpen(true)}
 						>
 							Reschedule
@@ -382,30 +429,41 @@ function LabOrderContent({ order }: { order: LabOrder }) {
 				)}
 			</AppFooterBar>
 
-			<LabCancelSheet
-				visible={cancelOpen}
-				subtitle={`Your ${inr(order.total)} will be refunded to your ${order.methodLabel}`}
-				onClose={() => setCancelOpen(false)}
-				onRescheduleInstead={() => {
-					setCancelOpen(false)
-					setResOpen(true)
-				}}
-				onCancelled={() => {
-					setCancelOpen(false)
-					setCancelled(true)
-				}}
-			/>
-			<LabRescheduleSheet
-				visible={resOpen}
-				subtitle={`${isHome ? 'Home sample collection' : 'Lab visit'} · ${plural(order.items.length, 'test', 'tests')}`}
-				current={current}
-				onClose={() => setResOpen(false)}
-				onConfirm={(next) => {
-					setPickup(next)
-					setRescheduled(true)
-					setResOpen(false)
-				}}
-			/>
+			{!!order.apiId && (
+				<>
+					<LabCancelSheet
+						visible={cancelOpen}
+						orderId={order.apiId}
+						subtitle={
+							order.method === 'later'
+								? 'Nothing was charged, so there is nothing to refund'
+								: `Your ${inr(order.total)} will be refunded to your ${order.methodLabel}`
+						}
+						canReschedule={canReschedule}
+						onClose={() => setCancelOpen(false)}
+						onRescheduleInstead={() => {
+							setCancelOpen(false)
+							setResOpen(true)
+						}}
+						onCancelled={(api) => {
+							setCancelOpen(false)
+							onChange(applyApi(order, api))
+						}}
+					/>
+					<LabRescheduleSheet
+						visible={resOpen}
+						orderId={order.apiId}
+						subtitle={`${isHome ? 'Home sample collection' : 'Lab visit'} · ${plural(order.items.length, 'test', 'tests')}`}
+						current={current}
+						onClose={() => setResOpen(false)}
+						onRescheduled={(api) => {
+							setResOpen(false)
+							setRescheduled(api.status === 'scheduled')
+							onChange(applyApi(order, api))
+						}}
+					/>
+				</>
+			)}
 			<CheckInQrSheet
 				visible={qrOpen}
 				bookingId={order.id}
@@ -420,16 +478,65 @@ function LabOrderContent({ order }: { order: LabOrder }) {
 /** The order is read once on mount (see LabSuccessPage); with no placed order there is nothing to show. */
 export default function LabOrderPage() {
 	const navigation = useNavigation<Nav>()
-	const [order] = useState(() => labBooking.get().order)
+	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.LABORATORY_BOOKING_TRACKING>>()
+	const orderId = route.params?.orderId
+	// Opened from the Bookings tab: load that order. Right after booking: the snapshot in the booking store.
+	const [order, setOrder] = useState<LabOrder | null>(() => (orderId ? null : labBooking.get().order))
+	const [failed, setFailed] = useState(false)
 	useEffect(() => {
-		if (!order) navigation.replace(ROUTES.STACK.LABORATORY_LIST)
-	}, [order, navigation])
-	if (!order) return null
-	return <LabOrderContent order={order} />
+		if (!orderId) return
+		let active = true
+		const load = async () => {
+			try {
+				const api = await fetchOrder(orderId)
+				if (active) setOrder(orderFromApi(api))
+			} catch {
+				if (active) setFailed(true)
+			}
+		}
+		void load()
+		return () => {
+			active = false
+		}
+	}, [orderId])
+	useEffect(() => {
+		if (!orderId && !order) navigation.replace(ROUTES.STACK.LABORATORY_LIST)
+	}, [orderId, order, navigation])
+	if (failed) {
+		return (
+			<View style={styles.loading}>
+				<Text style={styles.loadingText}>We couldn’t load this order. Please try again.</Text>
+				<AppButton size="md" onPress={() => navigation.goBack()}>
+					Go back
+				</AppButton>
+			</View>
+		)
+	}
+	if (!order) {
+		return orderId ? (
+			<View style={styles.loading}>
+				<ActivityIndicator color={APP_COLORS.primary} />
+			</View>
+		) : null
+	}
+	return <LabOrderContent order={order} onChange={setOrder} />
 }
 
 const styles = StyleSheet.create({
 	screen: { flex: 1, backgroundColor: APP_COLORS.pageBg },
+	labRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+		paddingVertical: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: APP_COLORS.divider,
+	},
+	labEyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.5, color: APP_COLORS.inkMuted },
+	labName: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: APP_COLORS.ink },
+	labSub: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
+	loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, backgroundColor: APP_COLORS.pageBg },
+	loadingText: { fontSize: 14, color: APP_COLORS.inkMuted, textAlign: 'center' },
 	content: { gap: 8, paddingBottom: 16 },
 	flex: { flex: 1, minWidth: 0 },
 	headerActions: { flexDirection: 'row', alignItems: 'center', marginRight: -10 },

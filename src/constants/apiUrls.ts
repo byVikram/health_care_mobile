@@ -194,6 +194,16 @@ export const API_ENDPOINTS = {
 	LOCATIONS: {
 		LIST: `${BASE_URL}/api/locations`,
 	},
+	// Lab tests ordered through LabStack (the backend is the only thing that talks to it)
+	LABS: {
+		CATALOGUE: `${BASE_URL}/api/laboratory/catalogue`,
+		TAGS: `${BASE_URL}/api/laboratory/catalogue/tags`,
+		ITEM: (kind: string, id: string) => `${BASE_URL}/api/laboratory/catalogue/${kind}/${id}`,
+		AVAILABILITY: `${BASE_URL}/api/laboratory/availability`,
+		SLOTS: `${BASE_URL}/api/laboratory/slots`,
+		QUOTE: `${BASE_URL}/api/laboratory/quote`,
+		ORDERS: `${BASE_URL}/api/laboratory/orders`,
+	},
 	FOLLOW_UPS: {
 		CREATE: `${BASE_URL}/api/follow-ups`,
 		CANCEL: (id: string) => `${BASE_URL}/api/follow-ups/${id}/cancel`,

@@ -232,11 +232,10 @@ export type AppStackParamList = {
 	// The Lab Tests Ordering flow keeps its booking in labBookingStore (features/laboratory), not in route params.
 	[ROUTES.STACK.LABORATORY_LIST]: undefined
 	[ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION]: undefined
-	[ROUTES.STACK.LABORATORY_SELECT_LAB]: undefined
 	[ROUTES.STACK.LABORATORY_BOOKING_SUMMARY]: undefined
-	[ROUTES.STACK.LABORATORY_PAYMENT]: undefined
 	[ROUTES.STACK.LABORATORY_PAYMENT_SUCCESS]: undefined
-	[ROUTES.STACK.LABORATORY_BOOKING_TRACKING]: undefined
+	// orderId: opened from the Bookings tab (a placed order is otherwise read from labBookingStore)
+	[ROUTES.STACK.LABORATORY_BOOKING_TRACKING]: { orderId?: string } | undefined
 	[ROUTES.STACK.LABORATORY_REPORT]: undefined
 	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data

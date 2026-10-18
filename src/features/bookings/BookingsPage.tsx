@@ -61,7 +61,7 @@ import CancelAppointmentSheet from '../appointment/components/patient-details/Ca
 import { actionBusyKey, bookingKey, goHome, openBookingTarget, runBookingAction } from './bookingNavigation'
 import {
 	CATEGORY_KIND,
-	STATUS_TAG_TONE,
+	statusChipTone,
 	groupBookings,
 	patientLabel,
 	whenLabel,
@@ -263,7 +263,7 @@ export default function BookingsPage() {
 			imageUri={buildS3Url(item.avatar_url)}
 			status={
 				item.status
-					? { label: item.status.label, tone: STATUS_TAG_TONE[item.status.tone] ?? 'done' }
+					? { label: item.status.label, tone: statusChipTone(item.status) }
 					: undefined
 			}
 			title={item.title}

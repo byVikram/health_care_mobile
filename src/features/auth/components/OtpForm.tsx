@@ -110,7 +110,8 @@ export default function OtpForm({
 				skipNotificationPrompt ? true : (response.data.notification_prompt_shown ?? false)
 			)
 			// Remember it on the backend too, so the popup doesn't come back on the next login.
-			if (skipNotificationPrompt) void markNotificationPromptShownOnBackend()
+			// (not when the server already has it: that call would change nothing)
+			if (skipNotificationPrompt && !response.data.notification_prompt_shown) void markNotificationPromptShownOnBackend()
 
 			const returnedSpecialty =
 				(response.data.user as any)?.specialty_id ||

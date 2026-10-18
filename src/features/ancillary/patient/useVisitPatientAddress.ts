@@ -32,7 +32,7 @@ export const apiErrorMessage = (e: unknown) => {
 	return e instanceof Error ? e.message : ''
 }
 
-export function useVisitPatientAddress(initialPatientKey = 'self') {
+export function useVisitPatientAddress(initialPatientKey = 'self', initialAddressId: string | null = null) {
 	// ---- Patient ----
 	const { members, addFromDraft } = useFamilyMembers()
 	const [patientKey, setPatientKey] = useState(initialPatientKey)
@@ -47,7 +47,7 @@ export function useVisitPatientAddress(initialPatientKey = 'self') {
 	const [addresses, setAddresses] = useState<PatientAddress[]>([])
 	const [addrLoading, setAddrLoading] = useState(true)
 	const [addrError, setAddrError] = useState<string | null>(null)
-	const [addressId, setAddressId] = useState<string | null>(null)
+	const [addressId, setAddressId] = useState<string | null>(initialAddressId)
 	const [addrOpen, setAddrOpen] = useState(false)
 	const activeRef = useRef(true)
 	const { coords: bookingCoords, locate } = useBookingLocation()

@@ -318,8 +318,6 @@ export const getDoctors = async (params?: DoctorSearchParams): Promise<DoctorSea
 		(params ?? {}) as Record<string, unknown>
 	)
 
-	console.log('DOCTORS RESPONSE:', JSON.stringify(res.data, null, 2))
-
 	return res.data
 }
 

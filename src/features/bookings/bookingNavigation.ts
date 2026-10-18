@@ -56,6 +56,9 @@ export function openBookingTarget(navigation: BookingsNavigation, item: BookingI
 		case 'pharmacy_order':
 			navigation.navigate(ROUTES.STACK.ORDER_DETAILS, { orderId: id })
 			return
+		case 'lab_booking':
+			navigation.navigate(ROUTES.STACK.LABORATORY_BOOKING_TRACKING, { orderId: id })
+			return
 		default:
 			cannotOpen()
 	}

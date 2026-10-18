@@ -16,7 +16,6 @@ import { addToCalendar } from '../../utils/calendar'
 import { showComingSoon } from '../../utils/toast'
 import { labBooking, type LabOrder } from './labBookingStore'
 import { commaDate, inr, plural, slotStart } from './labFormat'
-import { windowPhrase } from './labOrder'
 import { LAB_ICONS } from './labMock'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
@@ -34,10 +33,8 @@ function LabSuccessContent({ order }: { order: LabOrder }) {
 	const firstDate = first ? commaDate(first.date) : ''
 	const firstTime = first?.time ?? ''
 	const subtitle = isHome
-		? order.visitCount > 1
-			? `Your first visit is on ${firstDate}, ${windowPhrase(firstTime)}.`
-			: `A phlebotomist will visit your home on ${firstDate} between ${windowPhrase(firstTime)}.`
-		: `See you at ${order.addressTitle} on ${firstDate} at ${firstTime}.`
+		? `A phlebotomist will visit your home on ${firstDate} at ${firstTime}.`
+		:`See you at ${order.addressTitle} on ${firstDate} at ${firstTime}.`
 
 	const later = order.method === 'later'
 	const steps = [
