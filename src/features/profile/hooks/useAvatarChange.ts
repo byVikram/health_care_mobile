@@ -5,8 +5,7 @@ import { useCallback, useState } from 'react'
 import { Alert, Platform } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import Toast from 'react-native-toast-message'
-import { fetchCurrentAvatar, removeAvatar, uploadAvatar, type AvatarUpload } from '../../../services/avatarService'
-import { useAvatarRefresh } from '../../../hooks/useAvatarRefresh'
+import { removeAvatar, uploadAvatar, type AvatarUpload } from '../../../services/avatarService'
 import { useAuth } from '../../../context/AuthContext'
 
 type Options = {
@@ -111,13 +110,6 @@ export function useAvatarChange({ hasPhoto, allowRemove = true, onChanged, patie
 			'Photo not removed'
 		)
 	}, [onPicked, onChanged, run, patientId])
-
-	// the photo on screen is a signed link that expires after an hour: swap in a fresh one before that
-	useAvatarRefresh(async () => {
-		if (!hasPhoto || busy || onPicked) return
-		const url = await fetchCurrentAvatar(patientId)
-		if (url) onChanged(url)
-	})
 
 	const open = useCallback(() => {
 		if (busy) return

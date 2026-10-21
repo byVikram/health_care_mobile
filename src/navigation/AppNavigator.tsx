@@ -5,7 +5,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { useTheme } from 'react-native-paper'
 
 import { useAuth } from '../context/AuthContext'
-import { useSyncedAvatar } from '../hooks/useSyncedAvatar'
 import { navigationRef } from './navigationService'
 import { ROUTES } from './routes'
 import type { AppStackParamList } from './types'
@@ -105,7 +104,6 @@ import WorkDocumentsPage from '../features/profile/ancillary/WorkDocumentsPage'
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
-	useSyncedAvatar() // keep the photo shown in the sidebar and headers the same as the profile's
 	return (
 		<>
 			<AppStack.Navigator

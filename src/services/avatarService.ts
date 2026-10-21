@@ -36,12 +36,6 @@ export async function uploadAvatar(upload: AvatarUpload, patientId?: string): Pr
 	return res.data?.data?.avatar_url || res.data?.data?.avatar_s3_key || ''
 }
 
-/** The signed URL of the caller's (or, with `patientId`, a family member's) current photo, or '' when there is none. */
-export async function fetchCurrentAvatar(patientId?: string): Promise<string> {
-	const res = await ApiService.get<AvatarResponse>(API_ENDPOINTS.UPLOADS.AVATAR, forMember(patientId))
-	return res.data?.data?.avatar_url || ''
-}
-
 export async function removeAvatar(patientId?: string): Promise<void> {
 	const query = patientId ? `?patient_id=${encodeURIComponent(patientId)}` : ''
 	await ApiService.delete(`${API_ENDPOINTS.UPLOADS.AVATAR}${query}`)

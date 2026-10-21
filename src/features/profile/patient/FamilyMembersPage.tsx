@@ -5,7 +5,6 @@
 import React, { useCallback, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useAvatarRefresh } from '../../../hooks/useAvatarRefresh'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AppAvatar, AppTag } from '../../../components/common'
@@ -50,8 +49,6 @@ export default function FamilyMembersPage() {
 			void load()
 		}, [load])
 	)
-	// the photos are signed links that expire after an hour: while this page stays open, fetch new ones before that
-	useAvatarRefresh(load)
 
 	const open = (id?: string) =>
 		navigation.navigate(ROUTES.STACK.PATIENT_FAMILY_MEMBER, id ? { memberId: id } : undefined)
