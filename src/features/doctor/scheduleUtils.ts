@@ -14,6 +14,15 @@ export const statusLabelOf = (apt: Appointment): string =>
 export const isPending = (apt: Appointment): boolean => statusLabelOf(apt).toLowerCase() === 'pending'
 export const isCompletedAppt = (apt: Appointment): boolean => statusLabelOf(apt).toLowerCase() === 'completed'
 
+/** A reschedule the doctor still has to answer: status 'rescheduled' that the doctor did not make themselves
+ * (a patient's request to move a booking; `rescheduled_by` comes from the appointments list). One the doctor
+ * proposed is waiting on the patient, so it is not here. */
+export const isRescheduleRequest = (apt: Appointment): boolean =>
+	statusLabelOf(apt).toLowerCase() === 'rescheduled' && (apt.rescheduled_by ?? '').toLowerCase() !== 'doctor'
+
+/** What the Requests tab lists: a new pending request, or a patient's reschedule request. */
+export const isRequestLike = (apt: Appointment): boolean => isPending(apt) || isRescheduleRequest(apt)
+
 /**
  * "Accepted" = the doctor has already acted on this booking (confirmed it) -- also covers the two
  * states a confirmed appointment moves through on its own day (not_arrived via the daily cron,

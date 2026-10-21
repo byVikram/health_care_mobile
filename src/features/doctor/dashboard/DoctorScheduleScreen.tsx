@@ -4,7 +4,8 @@
 // Today, Requests, All.
 //   Today     — All / Upcoming / Done tabs + an All types / In-clinic / Video chip row over today's
 //               appointment rows, each with a round check-in toggle (see TodayPatients.tsx).
-//   Requests  — pending booking requests: accept / reject / reschedule / refer, via the shared
+//   Requests  — pending booking requests and patients' reschedule requests (tagged "Rescheduled"):
+//               accept / reject / reschedule / refer, via the shared
 //               AppointmentActionCard + AppointmentActionSheet (reusable as-is for a future
 //               Pharmacy/Laboratory "requests" surface).
 //   All       — an Upcoming | Past sub-toggle:
@@ -43,7 +44,7 @@ import { getAppointments, getStatusIdByLabel, setAppointmentCheckIn } from '../d
 import { updateAppointmentsStatus } from '../../../services/appointmentService'
 import { rescheduleAppointment } from '../doctorService'
 import { createReferral } from '../../referrals/referralService'
-import { effectiveStatusLabel, formatTime12h, humanizeStatus, isAccepted, isCompletedAppt, isPending, isVideoMode, rowStatusTone, statusLabelOf, toApiDate } from '../scheduleUtils'
+import { effectiveStatusLabel, formatTime12h, humanizeStatus, isAccepted, isCompletedAppt, isPending, isRequestLike, isRescheduleRequest, isVideoMode, rowStatusTone, statusLabelOf, toApiDate } from '../scheduleUtils'
 import type { Appointment } from '../../../types/appointment'
 import type { FavouriteDoctorListItem } from '../search/components/FavouriteDoctorList'
 
@@ -279,8 +280,8 @@ export function DoctorScheduleScreen() {
 		setReqLoading(true)
 		try {
 			const res = await getAppointments({ variant: 'upcoming', limit: 100, ...clinicFilter })
-			// Requests: no action taken yet -- pending, regardless of date.
-			setReqList((res.data ?? []).filter(isPending).sort(byDateTime))
+			// Requests: no action taken yet -- pending, or a reschedule the patient asked for; regardless of date.
+			setReqList((res.data ?? []).filter(isRequestLike).sort(byDateTime))
 		} catch {
 			setReqList([])
 		} finally {
@@ -318,7 +319,7 @@ export function DoctorScheduleScreen() {
 		setPastLoading(true)
 		try {
 			const res = await getAppointments({ start_date: from, end_date: to, variant: 'all', limit: 100, ...clinicFilter })
-			setPastList((res.data ?? []).filter((a) => !isPending(a)))
+			setPastList((res.data ?? []).filter((a) => !isRequestLike(a)))
 		} catch {
 			setPastList([])
 		} finally {
@@ -454,7 +455,7 @@ export function DoctorScheduleScreen() {
 		try {
 			const res = await updateAppointmentsStatus(apt.id, await getStatusIdByLabel('cancelled'), note ? `${reasonLabel} — ${note}` : reasonLabel)
 			if (res.success) {
-				const isReq = isPending(apt)
+				const isReq = isRequestLike(apt)
 				setOutcomes((prev) => ({
 					...prev,
 					[apt.id]: { kind: 'reject', title: isReq ? 'Declined' : 'Cancelled', sub: reasonLabel, tone: 'danger' },
@@ -524,7 +525,8 @@ export function DoctorScheduleScreen() {
 	}
 
 	const renderApptCard = (apt: Appointment, i: number) => {
-		const isReq = isPending(apt)
+		const isReq = isRequestLike(apt)
+		const rescheduled = isRescheduleRequest(apt)
 		return (
 			<AppointmentActionCard
 				key={apt.id}
@@ -532,8 +534,9 @@ export function DoctorScheduleScreen() {
 				initials={initialsOf(apt.patient?.name)}
 				avatarTone={toneKeyAt(i)}
 				name={apt.patient?.name ?? 'Patient'}
-				meta={`${apt.patient?.age ?? '--'} yrs · ${apt.patient?.gender ?? '--'} · ${isReq ? 'New request' : 'Follow-up'}`}
+				meta={`${apt.patient?.age ?? '--'} yrs · ${apt.patient?.gender ?? '--'} · ${rescheduled ? 'Reschedule request' : isReq ? 'New request' : 'Follow-up'}`}
 				isRequest={isReq}
+				requestLabel={rescheduled ? 'Rescheduled' : undefined}
 				urgent={apt.pre_intake?.severity === 'severe' || apt.severity === 'severe'}
 				slotLabel={slotLabelOf(apt, true)}
 				mode={isVideoMode(apt.appointment_mode) ? 'Video' : 'In-clinic'}
@@ -888,7 +891,7 @@ export function DoctorScheduleScreen() {
 					doctorId={sheet.appt.doctor?.id}
 					hospitalId={sheet.appt.hospital?.id}
 					appointmentType={isVideoMode(sheet.appt.appointment_mode) ? 'video' : 'clinic'}
-					reasons={isPending(sheet.appt) ? REQUEST_REASONS : CANCEL_REASONS}
+					reasons={isRequestLike(sheet.appt) ? REQUEST_REASONS : CANCEL_REASONS}
 					busy={busyId === sheet.appt.id}
 					onConfirmReject={handleConfirmReject}
 					onConfirmReschedule={handleConfirmReschedule}
