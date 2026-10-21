@@ -66,13 +66,17 @@ export default function ServicesAndProceduresView({
 				if (!targetSubId) {
 					try {
 						targetSubId = (await AsyncStorage.getItem('ancillary_subspecialty_id')) || undefined
-					} catch (e) {}
+					} catch (e) {
+						// Storage read is only a hint for the sub-specialty; fall through to the profile lookup.
+					}
 				}
 				if (!targetSubId) {
 					try {
 						const prof = await fetchProviderProfile()
 						targetSubId = prof?.sub_specialty_id ?? undefined
-					} catch (e) {}
+					} catch (e) {
+						// Profile lookup is only a hint; the hierarchy fetch below still works without a sub-specialty.
+					}
 				}
 
 				if (isMounted) {

@@ -4,6 +4,18 @@ if (!envUrl) {
 	throw new Error('EXPO_PUBLIC_API_ENDPOINT is not configured')
 }
 
+// Cleartext http:// (and the ws:// derived from it below) is fine against a dev
+// machine, but a release build that ships it would send tokens and PHI unencrypted.
+const allowInsecureHttp = process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP?.trim() === 'true'
+
+if (!__DEV__ && !/^https:\/\//i.test(envUrl)) {
+	if (!allowInsecureHttp) {
+		throw new Error('EXPO_PUBLIC_API_ENDPOINT must use https:// in release builds')
+	}
+
+	console.warn('Insecure http:// API endpoint allowed by EXPO_PUBLIC_ALLOW_INSECURE_HTTP -- test builds only.')
+}
+
 export const BASE_URL = envUrl.replace(/\/+$/, '')
 
 export const API_ENDPOINTS = {
@@ -16,13 +28,20 @@ export const API_ENDPOINTS = {
 		CREATE_USER: `${BASE_URL}/api/auth/create-user`,
 		SESSIONS: `${BASE_URL}/api/auth/sessions`,
 		SESSION_LOGOUT: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}`,
+		SESSIONS_OTHERS: `${BASE_URL}/api/auth/sessions/others`,
+		SESSION_ACKNOWLEDGE: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}/acknowledge`,
+		// Soft delete of the signed-in account (any role).
+		DELETE_ACCOUNT: `${BASE_URL}/api/auth/me`,
 	},
-	DOCTORS: {  
+	DOCTORS: {
 		SEARCH: `${BASE_URL}/api/doctors`,
 		DETAIL: (id: string) => `${BASE_URL}/api/doctors/${id}`,
 		AVAILABILITY: `${BASE_URL}/api/doctors/availability`,
 		OVERRIDES: `${BASE_URL}/api/doctors/availability/overrides`,
+		OVERRIDE_BY_ID: (id: string | number) => `${BASE_URL}/api/doctors/availability/overrides/${id}`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
+		/** The signed-in doctor's clinics with today's hours + patient counts (clinic switcher). */
+		CLINICS: `${BASE_URL}/api/doctors/clinics`,
 	},
 	DOCTORS_FAVOURITES: {
 		GET: `${BASE_URL}/api/doctors/favourites`,
@@ -35,7 +54,10 @@ export const API_ENDPOINTS = {
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
 		ADDITIONAL_DETAILS: `${BASE_URL}/api/doctors/profile/additional-details`,
 		HOSPITALS: `${BASE_URL}/api/doctors/hospitals`,
+		// Accepts the hospital's public id or the doctor-hospital link id.
+		HOSPITAL_BY_ID: (id: string) => `${BASE_URL}/api/doctors/hospitals/${id}`,
 		ACHIEVEMENTS: `${BASE_URL}/api/doctors/achievements`,
+		ACHIEVEMENT_BY_ID: (id: string) => `${BASE_URL}/api/doctors/achievements/${id}`,
 		DELETE_ACCOUNT: `${BASE_URL}/api/doctors/profile`,
 	},
 	SPECIALITIES: {
@@ -70,6 +92,16 @@ export const API_ENDPOINTS = {
 		RESCHEDULE: `${BASE_URL}/api/appointments/reschedule`,
 		ACTIVE_CONSENT: `${BASE_URL}/api/appointments/active/consent`,
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
+		// Doctor-only: not_arrived -> checked_in when the patient physically arrives.
+		CHECK_IN: (id: string) => `${BASE_URL}/api/appointments/${id}/check-in`,
+		// Unauthenticated by design (external scheduler only) -- see backend's process-not-arrived
+		// docstring. Not called from the mobile app.
+		PROCESS_NOT_ARRIVED: `${BASE_URL}/api/appointments/process-not-arrived`,
+		// Doctor-side "Verify access" gate before opening a patient's file. `start-consultation`
+		// (doctorService.startConsultation) is what (re)generates the code — the backend returns it
+		// directly in that response rather than SMS-ing the patient (see VerifyAccessPage.tsx for why
+		// that matters).
+		VERIFY_ACCESS_OTP: (id: string) => `${BASE_URL}/api/appointments/${id}/verify-otp`,
 	},
 	REVIEWS: {
 		CREATE: `${BASE_URL}/api/reviews`,
@@ -86,8 +118,22 @@ export const API_ENDPOINTS = {
 	NOTIFICATIONS: {
 		LIST: `${BASE_URL}/api/notifications`,
 		MARK_READ: (id: string) => `${BASE_URL}/api/notifications/${id}/read`,
+		UNREAD_COUNT: `${BASE_URL}/api/notifications/unread-count`,
+		READ_ALL: `${BASE_URL}/api/notifications/read-all`,
 	},
+	ADS: {
+		ACTIVE: `${BASE_URL}/api/ads/active`,
+		TRACK: (publicId: string) => `${BASE_URL}/api/ads/${publicId}/track`,
+	},
+	APP_CONFIG: `${BASE_URL}/api/app-config`,
+	// The signed-in user's sidebar + bottom tabs, by role
+	NAVIGATION: `${BASE_URL}/api/lookup/navigation`,
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
+
+	// Profile photo for every role (multipart PUT to set, DELETE to remove)
+	UPLOADS: {
+		AVATAR: `${BASE_URL}/api/uploads/avatar`,
+	},
 
 	PATIENT: {
 		ME: `${BASE_URL}/api/patients/me`,
@@ -106,6 +152,17 @@ export const API_ENDPOINTS = {
 		TREATMENT_HISTORY: (id: string) => `${BASE_URL}/api/treatments/patient/${id}/history`,
 		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
 		FAMILY_MEMBERS: `${BASE_URL}/api/patients/family-members`,
+		FAMILY_MEMBER_BY_ID: (id: string) => `${BASE_URL}/api/patients/family-members/${id}`,
+		SUMMARY: `${BASE_URL}/api/patients/me/summary`,
+		BOOKINGS: `${BASE_URL}/api/patients/me/bookings`,
+	},
+	TREATMENTS: {
+		CREATE: `${BASE_URL}/api/treatments`,
+		BY_APPOINTMENT: (appointmentId: string) => `${BASE_URL}/api/treatments/appointment/${appointmentId}`,
+		/** Multipart: the doctor's scribbled notes as an image. Final once submitted (409 on any later edit). */
+		SUBMIT_NOTES: (appointmentId: string) => `${BASE_URL}/api/treatments/appointment/${appointmentId}/notes`,
+		/** A fresh signed link (about 5 minutes) to the handwritten prescription; 404 until one is submitted. */
+		PRESCRIPTION: (appointmentId: string) => `${BASE_URL}/api/treatments/appointment/${appointmentId}/prescription`,
 	},
 	PHARMACY: {
 		ME: `${BASE_URL}/api/pharmacies/me`,
@@ -133,37 +190,19 @@ export const API_ENDPOINTS = {
 		VERIFY_PRESCRIPTION: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/verify`,
 		UPLOAD_REPORT: (id: string) => `${BASE_URL}/api/radiology/bookings/${id}/report`,
 	},
-	LABORATORY_PROFILE: {
-		DETAILS: `${BASE_URL}/api/laboratory/profile`,
-		UPDATE: `${BASE_URL}/api/laboratory/profile`,
-		TEST_TYPES: `${BASE_URL}/api/laboratory/test-types`,
-		TESTS: `${BASE_URL}/api/laboratory/tests`,
-	},
-
-	LABORATORY: {
-		SEARCH: `${BASE_URL}/api/laboratory/search`,
-
-		PROFILE: `${BASE_URL}/api/laboratory/profile`,
-		DETAILS: `${BASE_URL}/api/laboratory/details`,
-
-		TEST_TYPES: `${BASE_URL}/api/laboratory/test-types`,
-		TESTS: `${BASE_URL}/api/laboratory/tests`,
-
-		BOOKINGS: `${BASE_URL}/api/laboratory/bookings`,
-		BOOKING_DETAIL: (id: string) => `${BASE_URL}/api/laboratory/bookings/${id}`,
-
-		BOOKING_ITEMS: (bookingId: string) => `${BASE_URL}/api/laboratory/bookings/${bookingId}/items`,
-
-		REPORTS: `${BASE_URL}/api/laboratory/reports`,
-		UPLOAD_REPORT: (bookingId: string) => `${BASE_URL}/api/laboratory/bookings/${bookingId}/report`,
-
-		VERIFY_PRESCRIPTION: (bookingId: string) => `${BASE_URL}/api/laboratory/bookings/${bookingId}/verify`,
-		TESTS_BY_PUBLIC_ID: (publicId: string) => `${BASE_URL}/api/laboratories/${publicId}/tests`,
-	},
-
 	// Add inside API_ENDPOINTS in apiUrls.ts
 	LOCATIONS: {
 		LIST: `${BASE_URL}/api/locations`,
+	},
+	// Lab tests ordered through LabStack (the backend is the only thing that talks to it)
+	LABS: {
+		CATALOGUE: `${BASE_URL}/api/laboratory/catalogue`,
+		TAGS: `${BASE_URL}/api/laboratory/catalogue/tags`,
+		ITEM: (kind: string, id: string) => `${BASE_URL}/api/laboratory/catalogue/${kind}/${id}`,
+		AVAILABILITY: `${BASE_URL}/api/laboratory/availability`,
+		SLOTS: `${BASE_URL}/api/laboratory/slots`,
+		QUOTE: `${BASE_URL}/api/laboratory/quote`,
+		ORDERS: `${BASE_URL}/api/laboratory/orders`,
 	},
 	FOLLOW_UPS: {
 		CREATE: `${BASE_URL}/api/follow-ups`,
@@ -174,6 +213,7 @@ export const API_ENDPOINTS = {
 		POSTS: (groupId: string) => `${BASE_URL}/api/communities/${groupId}/posts`,
 		POST_DETAIL: (postId: string) => `${BASE_URL}/api/communities/threads/${postId}`,
 		COMMENTS: (postId: string) => `${BASE_URL}/api/communities/threads/${postId}/comments`,
+		JOIN: (groupId: string) => `${BASE_URL}/api/communities/${groupId}/join`,
 	},
 	BLOGS: {
 		LIST: `${BASE_URL}/api/blogs`,
@@ -191,14 +231,10 @@ export const API_ENDPOINTS = {
 	EVENTS: {
 		PUBLIC: `${BASE_URL}/api/events/public`,
 		PUBLIC_DETAIL: (id: string) => `${BASE_URL}/api/events/public/${id}`,
-		LIST: `${BASE_URL}/api/events`,
-		CREATE: `${BASE_URL}/api/events`,
-		DETAIL: (id: string) => `${BASE_URL}/api/events/${id}`,
-		UPDATE: (id: string) => `${BASE_URL}/api/events/${id}`,
-		DELETE: (id: string) => `${BASE_URL}/api/events/${id}`,
 	},
 	ANCILLARY: {
-		PACKAGES: `${BASE_URL}/api/ancillary/packages`,
+		// A specialty's services AND packages in one response (what the catalogue screen shows)
+		CATALOG: `${BASE_URL}/api/ancillary/catalog`,
 		PACKAGE_DETAIL: (id: string | number) => `${BASE_URL}/api/ancillary/packages/${id}`,
 		PROFILE: `${BASE_URL}/api/ancillary/me/profile`,
 		CAPABILITIES: `${BASE_URL}/api/ancillary/me/capabilities`,
@@ -210,6 +246,7 @@ export const API_ENDPOINTS = {
 		REQUESTS: `${BASE_URL}/api/ancillary/patient/requests`,
 		PATIENT_ACTIVE_REQUEST: `${BASE_URL}/api/ancillary/patient/requests/active`,
 		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
+		TIP: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/tip`,
 		CANCEL_PATIENT: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/cancel`,
 		CANCEL_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/cancel`,
 		REJECT_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/reject`,
@@ -229,7 +266,8 @@ export const API_ENDPOINTS = {
 		REVIEWS: `${BASE_URL}/api/ancillary/reviews`,
 		REVIEW_BY_BOOKING: (id: string | number) => `${BASE_URL}/api/ancillary/reviews/booking/${id}`,
 		PROVIDER_REVIEWS: (id: string | number) => `${BASE_URL}/api/ancillary/reviews/provider/${id}`,
-		WS_PATIENT_REQUEST: (id: string) => `${BASE_URL.replace(/^http/, 'ws')}/api/ancillary/ws/patient/requests/${id}`,
+		WS_PATIENT_REQUEST: (id: string) =>
+			`${BASE_URL.replace(/^http/, 'ws')}/api/ancillary/ws/patient/requests/${id}`,
 		WS_PROVIDER_DISPATCH: `${BASE_URL.replace(/^http/, 'ws')}/api/ancillary/ws/provider/dispatch`,
 		SOFT_REVIEW: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/soft-review`,
 		PROVIDER_EARNINGS: `${BASE_URL}/api/ancillary/provider/earnings`,
@@ -238,14 +276,27 @@ export const API_ENDPOINTS = {
 		// Phase 1 Slot-Based Booking Endpoints
 		AVAILABLE_SLOTS: `${BASE_URL}/api/ancillary/available-slots`,
 		REQUESTS_SCHEDULED: `${BASE_URL}/api/ancillary/requests/scheduled`,
-		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/respond-reschedule`,
+		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/reschedule/respond`,
 		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/me/availability`,
-		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/overrides`,
-		PROVIDER_SCHEDULED_ORDERS: `${BASE_URL}/api/ancillary/provider/orders/scheduled`,
-		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/accept-scheduled`,
-		DECLINE_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/decline-scheduled`,
-		RESCHEDULE_PROPOSAL: (id: string) => `${BASE_URL}/api/ancillary/orders/${id}/reschedule-proposal`,
-		WS_ANCILLARY: (token: string) => `${BASE_URL.replace(/^http/, 'ws')}/ws/ancillary?token=${token}`,
+		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/me/availability/overrides`,
+		PROVIDER_OVERRIDE_BY_ID: (id: string | number) =>
+			`${BASE_URL}/api/ancillary/provider/me/availability/overrides/${id}`,
+		PROVIDER_SCHEDULED_ORDERS: `${BASE_URL}/api/ancillary/provider/me/orders`,
+		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/accept`,
+		DECLINE_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/decline`,
+		RESCHEDULE_PROPOSAL: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/reschedule/propose`,
+		// Provider visit execution (Today / visit details / start / in progress / complete)
+		PROVIDER_TODAY: `${BASE_URL}/api/ancillary/provider/me/today`,
+		PROVIDER_VISIT: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}`,
+		PROVIDER_VISIT_ON_THE_WAY: (visitId: string) =>
+			`${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/on-the-way`,
+		PROVIDER_VISIT_START: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/start`,
+		PROVIDER_VISIT_PROGRESS: (visitId: string) =>
+			`${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/progress`,
+		PROVIDER_VISIT_UPDATES: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/updates`,
+		PROVIDER_VISIT_COMPLETE: (visitId: string) =>
+			`${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/complete`,
+		PROVIDER_VISIT_ISSUES: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/issues`,
 	},
 	WALLET: {
 		GET: `${BASE_URL}/api/wallet`,

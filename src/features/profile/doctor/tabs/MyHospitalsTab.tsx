@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-	ActivityIndicator,
 	Alert,
 	Modal,
 	Pressable,
@@ -19,6 +18,7 @@ import {
 	mapDoctorProfileApi,
 	updateHospital,
 } from '../../../doctor/doctorService'
+import { getCoordsFromAddress } from '../../../../services/locationService'
 import { DoctorHospital } from '../../../../types/doctor-profile'
 
 type HospitalFormData = {
@@ -171,16 +171,6 @@ const createWeeklyWorkingHours = (): Record<WorkingDayKey, Record<AppointmentTyp
 	sunday: createWorkingHoursByType(),
 })
 
-const buildHospitalPayload = (hospital: HospitalItem, isPrimary = hospital.isPrimary) => ({
-	name: hospital.name.trim(),
-	phone_number: hospital.phone_number.trim(),
-	full_address: hospital.fullAddress.trim(),
-	location: hospital.fullAddress.trim(),
-	is_primary: isPrimary,
-	video_consultation_fee: hospital.video_consultation_fee.trim(),
-	offline_consultation_fee: hospital.offline_consultation_fee.trim(),
-})
-
 const coerceHospitalId = (id: string | undefined) => {
 	const numericId = Number(id)
 	return Number.isFinite(numericId) ? numericId : (id ?? '')
@@ -204,27 +194,6 @@ function FieldLabel({ label }: { label: string }) {
 		<AppTypography variant="caption" style={styles.fieldLabel}>
 			{label}
 		</AppTypography>
-	)
-}
-
-function FormRow({ children, stacked }: { children: React.ReactNode; stacked: boolean }) {
-	return (
-		<View style={[styles.formRow, stacked && styles.formRowStacked]}>
-			{React.Children.map(children, (child, index) => (
-				<View
-					style={[
-						styles.formCell,
-						stacked
-							? [styles.formCellStacked, index === 0 && styles.formCellStackedFirst]
-							: index === 0
-								? styles.formCellLeft
-								: styles.formCellRight,
-					]}
-				>
-					{child}
-				</View>
-			))}
-		</View>
 	)
 }
 
@@ -300,16 +269,6 @@ function DropdownSelect({
 				floatingLabel={showFloatingLabel}
 				noMargin
 			/>
-		</View>
-	)
-}
-
-function WorkingHoursRow({ children, stacked }: { children: React.ReactNode; stacked: boolean }) {
-	return (
-		<View style={[styles.workingRow, stacked && styles.workingRowStacked]}>
-			{React.Children.map(children, (child) => (
-				<View style={[styles.workingCell, stacked && styles.workingCellStacked]}>{child}</View>
-			))}
 		</View>
 	)
 }
@@ -689,7 +648,6 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	}, [width, isTablet])
 
 	const sectionPadding = isMobile ? 16 : isTablet ? 24 : 28
-	const actionSpacing = isMobile ? 18 : 24
 	const cardDirection = useWideHospitalRows ? 'row' : 'column'
 	const actionStacked = !useWideHospitalRows
 	const selectedWorkingHours = weeklyWorkingHours[selectedWorkingDay][selectedAppointmentType]
@@ -908,10 +866,14 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			})
 					await loadHospitals()
 				} else {
+					// Pin the clinic on the map from the typed address, so patients' Directions buttons
+					// navigate to it. Best effort: without a match the clinic is still saved (address search).
+					const coords = await getCoordsFromAddress(trimmedAddress)
 					const response = await createHospital({
 						name: trimmedName,
 						phone_number: trimmedPhone,
 						full_address: trimmedAddress,
+						...(coords ?? {}),
 						is_primary: hospitals.length === 0,
 						video_consultation_fee: trimmedVideoFee,
 						offline_consultation_fee: trimmedOfflineFee,
@@ -1584,32 +1546,6 @@ const styles = StyleSheet.create({
 	formBody: {
 		gap: 18,
 	},
-	formRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		marginHorizontal: -10,
-	},
-	formRowStacked: {
-		flexDirection: 'column',
-		marginHorizontal: 0,
-	},
-	formCell: {
-		flex: 1,
-		minWidth: 0,
-	},
-	formCellLeft: {
-		paddingHorizontal: 10,
-	},
-	formCellRight: {
-		paddingHorizontal: 10,
-	},
-	formCellStacked: {
-		width: '100%',
-		marginTop: 16,
-	},
-	formCellStackedFirst: {
-		marginTop: 0,
-	},
 	fieldGroup: {
 		width: '100%',
 	},
@@ -1654,21 +1590,6 @@ const styles = StyleSheet.create({
 		lineHeight: 20,
 		fontWeight: '500',
 		marginBottom: 16,
-	},
-	workingRow: {
-		flexDirection: 'row',
-		gap: 24,
-	},
-	workingRowStacked: {
-		flexDirection: 'column',
-		gap: 16,
-	},
-	workingCell: {
-		flex: 1,
-		minWidth: 0,
-	},
-	workingCellStacked: {
-		width: '100%',
 	},
 	daysWrap: {
 		flexDirection: 'row',

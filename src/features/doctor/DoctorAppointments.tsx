@@ -30,7 +30,7 @@ import { Appointment } from '../../types/appointment'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
-import DateSlotPicker from '../../components/common/DateSlotPicker'
+import DateSlotPicker from '../../components/common/inputs/DateSlotPicker'
 import { AppInput, AppModal } from '../../components/common'
 import { RejectReasonModal } from './components/RejectReasonModal'
 import { WeekSelector, type WeekDay } from './components/WeekSelector'
@@ -54,18 +54,17 @@ import ConfirmIcon from '../../assets/icons/confirm.svg'
 import RejectIcon from '../../assets/icons/reject.svg'
 import RescheduleIcon from '../../assets/icons/reschedule.svg'
 import ReferIcon from '../../assets/icons/refer.svg'
+import {
+  formatTime12h,
+  isVideoMode,
+  toApiDate,
+  getRescheduleModeKey,
+  normalizeAvailabilitySlots,
+} from './scheduleUtils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const formatTime12h = (t?: string | null): string => {
-  if (!t) return '--'
-  const [h, m] = t.split(':').map(Number)
-  const suffix = h >= 12 ? 'PM' : 'AM'
-  const hour = h > 12 ? h - 12 : h === 0 ? 12 : h
-  return `${String(hour).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`
-}
-
-const isVideoMode = (mode?: string | null): boolean => mode === 'video_call'
+// (formatTime12h/isVideoMode/toApiDate/getRescheduleModeKey/normalizeAvailabilitySlots now live in
+// ./scheduleUtils.ts, shared with the new DoctorScheduleScreen -- imported above, not redefined here.)
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
@@ -201,68 +200,7 @@ function RejectConfirmModal({ visible, onCancel, onConfirm, submitting = false }
 
 
 // ── Reschedule Helpers ────────────────────────────────────────────────────────
-
-const toApiDate = (date: Date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const getRescheduleModeKey = (appointmentType: 'clinic' | 'video') =>
-  appointmentType === 'video' ? 'video_call' : 'clinic_visit'
-
-const getSlotStatus = (slot: any) => {
-  const status = typeof slot.status === 'string' ? slot.status.toUpperCase() : ''
-
-  if (slot.is_booked || status === 'OCCUPIED') return 'OCCUPIED'
-  if (slot.is_enabled === false || status === 'UNAVAILABLE') return 'UNAVAILABLE'
-  if (status === 'BLOCKED') return 'BLOCKED'
-  if (status === 'BOOKED') return 'BOOKED'
-  return 'AVAILABLE'
-}
-
-const normalizeAvailabilitySlots = (
-  response: any,
-  appointmentType: 'clinic' | 'video'
-): SlotGroup[] => {
-  const rawData = (
-    Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : []
-  )
-  const modeKey = getRescheduleModeKey(appointmentType)
-
-  return rawData
-    .filter((item: any) => !item.appointment_mode || item.appointment_mode.toLowerCase() === modeKey)
-    .flatMap((item: any, itemIndex: number) => {
-      const sessions =
-        Array.isArray(item.sessions) && item.sessions.length > 0
-          ? item.sessions
-          : [{ label: item.label, range: item.range, period: item.period, slots: item.slots }]
-
-      return sessions
-        .map((session: any, sessionIndex: number): SlotGroup => {
-          const label = session.label || `Session ${sessionIndex + 1}`
-
-          return {
-            label,
-            range: session.range,
-            period: session.period || session.range,
-            slots: (session.slots ?? [])
-              .filter((slot: any) => Boolean(slot.start_time && slot.end_time))
-              .map((slot: any, slotIndex: number) => ({
-                id: `${modeKey}-${itemIndex}-${label}-${slot.start_time}-${slotIndex}`,
-                start_time: slot.start_time as string,
-                end_time: slot.end_time as string,
-                status: getSlotStatus(slot),
-                is_enabled: slot.is_enabled,
-                is_booked: slot.is_booked,
-                can_toggle: slot.is_enabled === false ? false : slot.can_toggle,
-              })),
-          }
-        })
-        .filter((session: any) => session.slots.length > 0)
-    })
-}
+// (toApiDate/getRescheduleModeKey/normalizeAvailabilitySlots imported from ./scheduleUtils above.)
 
 // ── Main component ────────────────────────────────────────────────────────────
 

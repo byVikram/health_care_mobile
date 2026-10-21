@@ -1,7 +1,8 @@
 import React from 'react'
-import { View, StyleSheet, Image, TouchableOpacity, ImageSourcePropType } from 'react-native'
+import { View, StyleSheet, TouchableOpacity, ImageSourcePropType } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../AppTypography'
+import { AppTypography } from '../display/AppTypography'
+import { AppFallbackImage } from '../display/AppFallbackImage'
 
 export interface PackageListItem {
 	id: string
@@ -33,6 +34,12 @@ interface PackageSectionCardProps {
 export const PackageSectionCard: React.FC<PackageSectionCardProps> = ({ item, onPress, resolveImageSource }) => {
 	const count = item.procedureCount ?? 0
 	const imageSource = resolveImageSource?.(item.imageUrl)
+
+	const fallbackIcon = (
+		<View style={styles.fallbackWrap}>
+			<MaterialCommunityIcons name="flask-outline" size={28} color="#0C7C7C" />
+		</View>
+	)
 
 	const handlePress = () => onPress(item)
 
@@ -75,11 +82,9 @@ export const PackageSectionCard: React.FC<PackageSectionCardProps> = ({ item, on
 			<View style={styles.rightCol}>
 				<View style={styles.imageBox}>
 					{imageSource ? (
-						<Image source={imageSource} style={styles.image} resizeMode="cover" />
+						<AppFallbackImage source={imageSource} style={styles.image} fallback={fallbackIcon} />
 					) : (
-						<View style={styles.fallbackWrap}>
-							<MaterialCommunityIcons name="flask-outline" size={28} color="#0C7C7C" />
-						</View>
+						fallbackIcon
 					)}
 				</View>
 

@@ -13,7 +13,7 @@ import {
 	AppTypography,
 	type AppSelectOption,
 } from '../../../../components/common'
-import { AppSelect } from '../../../../components/common/AppSelect'
+import { AppSelect } from '../../../../components/common/inputs/AppSelect'
 import {
 	mergeRadiologyProfileData,
 	updateRadiologyProfile,

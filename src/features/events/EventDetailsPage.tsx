@@ -6,7 +6,6 @@ import {
 	Image,
 	ActivityIndicator,
 	useWindowDimensions,
-	Linking,
 	Alert,
 	Platform,
 } from 'react-native'
@@ -16,10 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 
 import { AppScreenHeader, AppTypography, AppButton } from '../../components/common'
-import type { EventItem } from '../../components/common/EventCard'
+import type { EventItem } from '../../components/common/display/EventCard'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import type { AppStackParamList } from '../../navigation/types'
+import { openWebUrl } from '../../utils/safeLinking'
 
 const TEAL = '#0c7c7c'
 const DEFAULT_COVER_IMAGE = 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=800&q=80'
@@ -113,7 +113,7 @@ export default function EventDetailsPage() {
 
 	const handleRegister = () => {
 		if (event.registration_link) {
-			Linking.openURL(event.registration_link).catch(() => {
+			openWebUrl(event.registration_link).catch(() => {
 				Alert.alert('Error', 'Could not open registration link.')
 			})
 		} else {

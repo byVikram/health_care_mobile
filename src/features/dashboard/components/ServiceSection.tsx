@@ -1,179 +1,223 @@
-import React from 'react'
-import { FlatList, Image, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native'
+// src/features/dashboard/components/ServiceSection.tsx
+//
+// Patient Home "Care options" bento ("1 · Home"): a tall primary "Find doctors near you" card (avatar
+// stack of doctors from the search API, "{N} specialities · Confirmed appointments") beside two short
+// tone cards — "Video consultation" (sky, Online tag) and "Lab tests at home" (lilac).
+import React, { useEffect, useState } from 'react'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
-import { AppTypography } from '../../../components/common'
-import DoctorsService from '../../../assets/Services/doctors-service.png'
-import VideoConsultation from '../../../assets/Services/doctor-video-consultation.png'
-import LabTests from '../../../assets/Services/lab-service.png'
-import Surgeries from '../../../assets/Services/serguries.png'
-import { useNavigation } from '@react-navigation/native'
-import type { NavigationProp } from '@react-navigation/native'
-import type { AppStackParamList } from '../../../navigation/types'
+import { AppAvatarStack, AppIconTile, AppPathIcon, AppSkeleton, AppTag } from '../../../components/common'
+import type { AppAvatarStackItem } from '../../../components/common'
+import { APP_COLORS, TONES } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
+import type { AppStackParamList } from '../../../navigation/types'
+import { getDoctors } from '../../doctor/doctorService'
+import { HOME_ICONS } from '../homeTheme'
 
-interface ServiceType {
-	id: number
-	image: any
-	title: string
-	description: string
-	mode?: 'clinic' | 'video'
+type Props = {
+	/** Number of specialities (null while loading or when the list failed to load). */
+	specialityCount: number | null
+	specialitiesLoading?: boolean
+	refreshToken?: number
 }
 
-const services: ServiceType[] = [
-	{
-		id: 1,
-		image: DoctorsService,
-		title: 'Find Doctors Near You',
-		description: 'Confirmed appointments',
-		mode: 'clinic',
-	},
-	{
-		id: 2,
-		image: VideoConsultation,
-		title: 'Instant Video Consultation',
-		description: 'Connect within 60 sec',
-		mode: 'video',
-	},
-	{
-		id: 3,
-		image: LabTests,
-		title: 'Lab Tests',
-		description: 'Safe and trusted Lab tests',
-	},
-	{
-		id: 4,
-		image: Surgeries,
-		title: 'Surgeries',
-		description: 'Safe and trusted surgery centers',
-	},
-]
-
-function ServicesSection() {
-	const { width } = useWindowDimensions()
+function ServicesSection({ specialityCount, specialitiesLoading = false, refreshToken }: Props) {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
-	const isTablet = width >= 768
-	const cardWidth = isTablet ? 172 : Math.max(140, Math.min(140, (width - 56) / 4))
-	const cardHeight = isTablet ? 238 : 200
-	const imageHeight = isTablet ? 150 : 100
+	const [doctors, setDoctors] = useState<AppAvatarStackItem[]>([])
+
+	useEffect(() => {
+		let active = true
+		const load = async () => {
+			try {
+				const res = await getDoctors({ page: 1, limit: 3 })
+				if (!active || !res?.success || !Array.isArray(res.data)) return
+				setDoctors(
+					res.data.slice(0, 3).map((d) => ({
+						uri: d.avatar_s3_key,
+						name: d.name,
+						label: d.name,
+					}))
+				)
+			} catch {
+				// Decorative only: the card simply shows without the avatar stack.
+			}
+		}
+		void load()
+		return () => {
+			active = false
+		}
+	}, [refreshToken])
+
+	const subtitle =
+		specialityCount && specialityCount > 0
+			? `${specialityCount} specialities · Confirmed appointments`
+			: 'Confirmed appointments'
 
 	return (
-		<View style={styles.container}>
-			<FlatList
-				data={services}
-				horizontal
-				keyExtractor={(service) => String(service.id)}
-				showsHorizontalScrollIndicator={false}
-				contentContainerStyle={styles.listContent}
-				renderItem={({ item, index }) => (
-					<TouchableOpacity
-						activeOpacity={0.86}
-						style={[
-							styles.card,
-							{
-								width: cardWidth,
-								height: cardHeight,
-								marginRight: index === services.length - 1 ? 0 : 12,
-							},
-						]}
-						onPress={() => {
-							if (item.id === 1) {
-								navigation.navigate(ROUTES.STACK.SEARCH, {
-									mode: 'clinic',
-								} as any)
-							}
-
-							if (item.id === 2) {
-								navigation.navigate(ROUTES.STACK.SEARCH, {
-									mode: 'video',
-								} as any)
-							}
-							if (item.id === 3) {
-								// Navigate to Lab Tests page
-							}
-
-							if (item.id === 4) {
-								// Navigate to Surgeries page
-							}
-						}}
-					>
-						<Image source={item.image} resizeMode="cover" style={[styles.image, { height: imageHeight }]} />
-
-						<View style={styles.textWrap}>
-							<AppTypography
-								style={[
-									styles.title,
-									{
-										fontSize: isTablet ? 17 : 14,
-										lineHeight: isTablet ? 22 : 18,
-									},
-								]}
-								numberOfLines={isTablet ? 2 : 3}
-							>
-								{item.title}
-							</AppTypography>
-
-							<AppTypography
-								style={[
-									styles.description,
-									{
-										fontSize: isTablet ? 14 : 12,
-										lineHeight: isTablet ? 20 : 17,
-									},
-								]}
-								numberOfLines={2}
-							>
-								{item.description}
-							</AppTypography>
-						</View>
-					</TouchableOpacity>
+		<View style={styles.grid} accessibilityLabel="Care options">
+			{/* Find doctors (tall) */}
+			<TouchableOpacity
+				style={styles.primaryCard}
+				activeOpacity={0.9}
+				onPress={() =>
+					navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH, params: { mode: 'clinic' } })
+				}
+				accessibilityRole="button"
+				accessibilityLabel={`Find doctors near you. ${subtitle}. Book visit`}
+			>
+				<View style={styles.primaryCircle} importantForAccessibility="no-hide-descendants" />
+				{doctors.length > 0 ? (
+					<AppAvatarStack items={doctors} size={40} overlap={12} max={3} />
+				) : (
+					<View style={styles.avatarPlaceholder} />
 				)}
-			/>
+				<Text style={styles.primaryTitle}>Find doctors near you</Text>
+				{specialitiesLoading ? (
+					<AppSkeleton width={140} height={12} borderRadius={4} color={APP_COLORS.primaryDark} />
+				) : (
+					<Text style={styles.primarySub}>{subtitle}</Text>
+				)}
+				<View style={styles.bookButton}>
+					<Text style={styles.bookButtonText}>Book visit</Text>
+					<AppPathIcon d={HOME_ICONS.chevronRight} size={14} strokeWidth={2.6} color={APP_COLORS.ink} />
+				</View>
+			</TouchableOpacity>
+
+			<View style={styles.sideCol}>
+				{/* Video consultation */}
+				<TouchableOpacity
+					style={[styles.smallCard, { backgroundColor: TONES.sky.bg }]}
+					activeOpacity={0.9}
+					onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, { mode: 'video' })}
+					accessibilityRole="button"
+					accessibilityLabel="Video consultation, online. Connect in 60 seconds"
+				>
+					<View style={styles.smallTop}>
+						<AppIconTile size={32} radius={10} backgroundColor={APP_COLORS.surface}>
+							<AppPathIcon d={HOME_ICONS.video} size={18} strokeWidth={2} color={TONES.sky.ink} />
+						</AppIconTile>
+						<AppTag
+							label="Online"
+							dot
+							bg={APP_COLORS.surface}
+							ink={APP_COLORS.success}
+							style={styles.onlineTag}
+							textStyle={styles.onlineText}
+						/>
+					</View>
+					<Text style={styles.smallTitle}>Video consultation</Text>
+					<Text style={[styles.smallSub, { color: TONES.sky.ink }]}>Connect in 60 sec</Text>
+				</TouchableOpacity>
+
+				{/* Lab tests at home */}
+				<TouchableOpacity
+					style={[styles.smallCard, { backgroundColor: TONES.lilac.bg }]}
+					activeOpacity={0.9}
+					onPress={() => navigation.navigate(ROUTES.STACK.LABORATORY_LIST)}
+					accessibilityRole="button"
+					accessibilityLabel="Lab tests at home. Free sample pickup"
+				>
+					<AppIconTile size={32} radius={10} backgroundColor={APP_COLORS.surface}>
+						<AppPathIcon d={HOME_ICONS.flask} size={18} strokeWidth={2} color={TONES.lilac.ink} />
+					</AppIconTile>
+					<Text style={styles.smallTitle}>Lab tests at home</Text>
+					<Text style={[styles.smallSub, { color: TONES.lilac.ink }]}>Free sample pickup</Text>
+				</TouchableOpacity>
+			</View>
 		</View>
 	)
 }
 
-export default React.memo(ServicesSection) // verified export
+export default React.memo(ServicesSection)
 
 const styles = StyleSheet.create({
-	container: {
-		paddingVertical: 12,
+	grid: {
+		flexDirection: 'row',
+		gap: 10,
 		paddingHorizontal: 16,
 	},
-
-	listContent: {
-		paddingBottom: 10,
-	},
-
-	card: {
-		backgroundColor: '#fff',
-		borderRadius: 8,
+	primaryCard: {
+		flex: 1.1,
+		minHeight: 184,
+		padding: 14,
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.primary,
 		overflow: 'hidden',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.12,
-		shadowRadius: 10,
-		elevation: 4,
+		gap: 6,
 	},
-
-	image: {
-		width: '100%',
-		backgroundColor: '#eef4f5',
+	primaryCircle: {
+		position: 'absolute',
+		right: -40,
+		bottom: -40,
+		width: 140,
+		height: 140,
+		borderRadius: 70,
+		backgroundColor: APP_COLORS.primaryDark,
 	},
-
-	textWrap: {
-		flex: 1,
-		paddingHorizontal: 10,
-		paddingTop: 10,
-		paddingBottom: 10,
+	avatarPlaceholder: {
+		height: 40,
 	},
-
-	title: {
+	primaryTitle: {
+		marginTop: 'auto',
+		fontSize: 17,
+		lineHeight: 22,
+		fontWeight: '800',
+		color: APP_COLORS.surface,
+	},
+	primarySub: {
+		fontSize: 12,
+		lineHeight: 16,
+		color: APP_COLORS.mint,
+	},
+	bookButton: {
+		alignSelf: 'flex-start',
+		marginTop: 4,
+		height: 32,
+		paddingHorizontal: 12,
+		borderRadius: 8,
+		backgroundColor: APP_COLORS.surface,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 2,
+	},
+	bookButtonText: {
+		fontSize: 13,
 		fontWeight: '700',
-		color: '#13283A',
+		color: APP_COLORS.ink,
 	},
-
-	description: {
-		marginTop: 7,
-		color: '#617587',
+	sideCol: {
+		flex: 1,
+		gap: 10,
+	},
+	smallCard: {
+		flex: 1,
+		minHeight: 87,
+		padding: 12,
+		borderRadius: 12,
+		gap: 4,
+	},
+	smallTop: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	onlineTag: {
+		paddingHorizontal: 6,
+	},
+	onlineText: {
+		fontSize: 11,
+		lineHeight: 14,
+	},
+	smallTitle: {
+		fontSize: 14,
+		lineHeight: 18,
+		fontWeight: '800',
+		color: APP_COLORS.ink,
+	},
+	smallSub: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '600',
 	},
 })

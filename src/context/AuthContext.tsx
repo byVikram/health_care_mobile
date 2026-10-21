@@ -1,5 +1,5 @@
 // src/context/AuthContext.tsx
-import React, { createContext, useState, useEffect, useContext } from 'react'
+import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
 	setUnauthorizedHandler,
@@ -7,12 +7,14 @@ import {
 	setTokenRefreshedHandler,
 	StatusModalData,
 } from '../services/apiService'
-import StatusModal from '../components/common/StatusModal'
+import StatusModal from '../components/common/feedback/StatusModal'
 import { safeJsonParse } from '../utils/jsonUtils'
 import { secureStorage } from '../utils/secureStorage'
+import { purgeLocalSession } from '../utils/localSession'
 import { logout as logoutRequest } from '../features/auth/authService'
+import { clearSessionCaches } from '../utils/sessionCache'
 
-export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | 'nurse'
+export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'ancillary' | 'nurse'
 
 // Canonical specialty IDs from lookup_ancillary_specialties.public_id
 export type AncillarySpecialty =
@@ -84,7 +86,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	const [currentLocation, setCurrentLocationState] = useState<LocationData | null>(null)
 	const [statusModal, setStatusModal] = useState<StatusModalData | null>(null)
 
-	const clearAuthState = () => {
+	const clearAuthState = useCallback(() => {
+		// In-memory per-user caches (patient summary, wallet balance, ...) -- see utils/sessionCache.ts
+		clearSessionCaches()
 		setRole(null)
 		setUser(null)
 		setAccessToken(null)
@@ -94,43 +98,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		setSelectedHospitalIdState(null)
 		setCurrentLocationState(null)
 		setAncillarySpecialtyState(null)
-	}
+	}, [])
 
-	const setSelectedHospital = (hospital: string) => {
+	const setSelectedHospital = useCallback((hospital: string) => {
 		setSelectedHospitalState(hospital)
-	}
+	}, [])
 
-	const setSelectedHospitalId = (id: string | null) => {
+	const setSelectedHospitalId = useCallback((id: string | null) => {
 		setSelectedHospitalIdState(id)
-	}
+	}, [])
 
-	const setCurrentLocation = async (loc: LocationData | null) => {
+	const setCurrentLocation = useCallback(async (loc: LocationData | null) => {
 		if (loc) {
 			await AsyncStorage.setItem('current_location', JSON.stringify(loc))
 		} else {
 			await AsyncStorage.removeItem('current_location')
 		}
 		setCurrentLocationState(loc)
-	}
+	}, [])
 
-	const setNotificationPromptShown = async (val: boolean) => {
+	const setNotificationPromptShown = useCallback(async (val: boolean) => {
 		await AsyncStorage.setItem('notification_prompt_shown', String(val))
 		setNotificationPromptShownState(val)
-	}
+	}, [])
 
 	/**
 	 * Persist and update ancillary specialty in both AsyncStorage and React state.
 	 * This is the source of truth for the dashboard — it must be called after
 	 * the provider profile is fetched at login so specialty survives app restarts.
 	 */
-	const setAncillarySpecialty = async (specialty: AncillarySpecialty | null) => {
+	const setAncillarySpecialty = useCallback(async (specialty: AncillarySpecialty | null) => {
 		if (specialty) {
 			await AsyncStorage.setItem('user_specialty', specialty)
 		} else {
 			await AsyncStorage.removeItem('user_specialty')
 		}
 		setAncillarySpecialtyState(specialty)
-	}
+	}, [])
 
 	useEffect(() => {
 		const load = async () => {
@@ -141,6 +145,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			const refresh = await secureStorage.getItem('refresh_token')
 			const nps = await AsyncStorage.getItem('notification_prompt_shown')
 			const savedLocation = await AsyncStorage.getItem('current_location')
+			if (__DEV__) console.log(`[AuthContext] restored session: access token ${token ? 'found' : 'MISSING'}, refresh token ${refresh ? 'found' : 'MISSING'}`)
 			// Load persisted specialty (survives restarts)
 			const savedSpecialty = await AsyncStorage.getItem('user_specialty')
 
@@ -178,15 +183,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			setStatusModalHandler(null)
 			setTokenRefreshedHandler(null)
 		}
-	}, [])
+	}, [clearAuthState])
 
-	const setAuth = async (
+	const setAuth = useCallback(async (
 		role: UserRole,
 		user: AuthUser,
 		accessToken: string,
 		refreshToken: string,
 		nps: boolean = false
 	) => {
+		// A new sign-in (possibly a different user, e.g. after a forced expiry) must not start from the
+		// previous user's in-memory caches.
+		clearSessionCaches()
 		await AsyncStorage.setItem('role', role)
 		await AsyncStorage.setItem('user', JSON.stringify(user))
 		await secureStorage.setItem('access_token', accessToken)
@@ -198,20 +206,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		setAccessToken(accessToken)
 		setRefreshToken(refreshToken)
 		setNotificationPromptShownState(nps)
-	}
+	}, [])
 
-	const updateUser = async (updates: Partial<AuthUser>) => {
-		const base: AuthUser = (user ?? { name: '' }) as AuthUser
-		const nextUser: AuthUser = {
-			...base,
-			...updates,
-		}
-
+	const updateUser = useCallback(async (updates: Partial<AuthUser>) => {
+		// Read the latest user inside the updater (not a render-time closure) so two quick
+		// updates don't overwrite each other.
+		let nextUser: AuthUser = { name: '' } as AuthUser
+		setUser((prev) => {
+			nextUser = { ...((prev ?? { name: '' }) as AuthUser), ...updates }
+			return nextUser
+		})
 		await AsyncStorage.setItem('user', JSON.stringify(nextUser))
-		setUser(nextUser)
-	}
+	}, [])
 
-	const clearAuth = async () => {
+	const clearAuth = useCallback(async () => {
 		const currentRefreshToken = await secureStorage.getItem('refresh_token')
 		if (currentRefreshToken) {
 			// Best-effort: invalidate the refresh token server-side so this
@@ -226,26 +234,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			}
 		}
 
-		await secureStorage.deleteItem('access_token')
-		await secureStorage.deleteItem('refresh_token')
-		await AsyncStorage.multiRemove([
-			'role',
-			'user',
-			'notification_prompt_shown',
-			'current_location',
-			'ancillary_capabilities',
-			'ancillary_license',
-			'ancillary_location',
-			'user_specialty',
-			'ancillary_verification_status',
-		])
+		await purgeLocalSession()
 
 		clearAuthState()
-	}
+	}, [clearAuthState])
 
-	return (
-		<AuthContext.Provider
-			value={{
+	const value = useMemo<AuthState>(
+		() => ({
 				role,
 				user,
 				accessToken,
@@ -264,11 +259,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 				setAuth,
 				updateUser,
 				clearAuth,
-			}}
-		>
-			{children}
-		</AuthContext.Provider>
+		}),
+		[
+			role, user, accessToken, refreshToken, notificationPromptShown, setNotificationPromptShown, isLoading,
+			ancillarySpecialty, setAncillarySpecialty, selectedHospital, setSelectedHospital, selectedHospitalId,
+			setSelectedHospitalId, currentLocation, setCurrentLocation, setAuth, updateUser, clearAuth,
+		]
 	)
+
+	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => useContext(AuthContext)

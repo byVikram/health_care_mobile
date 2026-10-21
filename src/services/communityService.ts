@@ -8,6 +8,10 @@ export interface CommunityGroup {
 	category: string
 	icon_name?: string
 	is_featured: boolean
+	/** Current user's membership (false when not joined / anonymous). */
+	is_joined?: boolean
+	member_count?: number
+	group_type?: 'support_group' | 'forum'
 }
 
 export interface CommunityPost {
@@ -42,6 +46,16 @@ export interface PaginatedPostsResponse {
 		limit: number
 		pages: number
 	}
+}
+
+export const joinCommunityGroup = async (groupId: string): Promise<{ success: boolean; message?: string }> => {
+	const res = await ApiService.post<{ success: boolean; message?: string }>(API_ENDPOINTS.COMMUNITIES.JOIN(groupId), {})
+	return res.data
+}
+
+export const leaveCommunityGroup = async (groupId: string): Promise<{ success: boolean; message?: string }> => {
+	const res = await ApiService.delete<{ success: boolean; message?: string }>(API_ENDPOINTS.COMMUNITIES.JOIN(groupId))
+	return res.data
 }
 
 export const listCommunityGroups = async (isFeatured?: boolean): Promise<{ success: boolean; data: CommunityGroup[] }> => {

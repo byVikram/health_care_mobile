@@ -3,7 +3,7 @@ import { StyleSheet, View, ScrollView, RefreshControl, Animated, Easing, useWind
 import { Card, useTheme, Surface } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { getSessions, logoutSession, Session } from '../auth/authService'
-import StatusModal from '../../components/common/StatusModal'
+import StatusModal from '../../components/common/feedback/StatusModal'
 import { AppTypography, AppButton, AppModal } from '../../components/common'
 
 // --- Shimmer placeholder ------------------------------------------------------

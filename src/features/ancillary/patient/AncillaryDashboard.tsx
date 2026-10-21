@@ -233,7 +233,7 @@ export default function AncillaryDashboard() {
 	}
 
 	const handlePopularBook = (item: PopularItem) => {
-		navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
 			serviceKey: item.serviceKey,
 			serviceLabel: item.serviceLabel,
 			procedureName: item.title,
@@ -241,7 +241,7 @@ export default function AncillaryDashboard() {
 	}
 
 	const handleNeedPress = (item: NeedItem) => {
-		navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
 			serviceKey: item.serviceKey,
 			serviceLabel: item.serviceLabel,
 			procedureName: item.procedureName,
@@ -249,7 +249,7 @@ export default function AncillaryDashboard() {
 	}
 
 	const handleProfessionalBook = (item: ProfessionalItem) => {
-		navigation.navigate(ROUTES.STACK.ANCILLARY_PROVIDERS, {
+		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
 			serviceKey: item.serviceKey,
 			serviceLabel: item.serviceLabel,
 			procedureName: item.specialty,

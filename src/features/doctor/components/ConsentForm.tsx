@@ -38,14 +38,24 @@ export default function ConsentModal({ open, onClose, onAgree }: Props) {
   const paymentParams = route.params?.paymentParams
 
   useEffect(() => {
-    if (visible) {
-      setChecked(false)
-      setLoading(true)
-      setError(false)
-      getActiveConsent()
-        .then(data => setActiveConsent(data))
-        .catch(() => setError(true))
-        .finally(() => setLoading(false))
+    if (!visible) return
+    let active = true
+    setChecked(false)
+    setLoading(true)
+    setError(false)
+    const load = async () => {
+      try {
+        const data = await getActiveConsent()
+        if (active) setActiveConsent(data)
+      } catch {
+        if (active) setError(true)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      active = false
     }
   }, [visible])
 

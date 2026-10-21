@@ -9,16 +9,20 @@ import { navigationRef } from './navigationService'
 import { ROUTES } from './routes'
 import type { AppStackParamList } from './types'
 import AuthNavigator from './AuthNavigator'
+import { usePushNotifications } from '../services/pushNotificationService'
 import MainTabNavigator from './MainTabNavigator'
-import { AppScreenHeader, LocationSelector, NotificationPermissionPopup } from '../components/common'
-import LocationScreen from '../components/common/LocationScreen'
+import { AppScreenHeader, NotificationPermissionPopup } from '../components/common'
+import { useFirstLaunchPermissions } from '../features/onboarding/useFirstLaunchPermissions'
+import LocationScreen from '../components/common/location/LocationScreen'
 import { WalletPage } from '../features/wallet/WalletPage'
 import { WalletTransactionsPage } from '../features/wallet/WalletTransactionsPage'
 import { WalletTransactionDetailPage } from '../features/wallet/WalletTransactionDetailPage'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
+import BookSlotPage from '../features/doctor/book-slot/BookSlotPage'
 import ConsultationPage from '../features/consultation/ConsultationPage'
+import VerifyAccessPage from '../features/doctor/verify-access/VerifyAccessPage'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/settings/SettingPage'
@@ -28,6 +32,7 @@ import PatientPayment from '../features/patient-payment/PatientPayment'
 import AppointmentConfirmedPage from '../features/patient-payment/AppointmentConfirmedPage'
 import ConsentForm from '../features/doctor/components/ConsentForm'
 import SearchPage from '../features/doctor/search/SearchPage'
+import LegalPage from '../features/auth/LegalPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 import AppointmentList from '../features/appointment/AppointmentList'
 import VisitSummaryPage from '../features/appointment/VisitSummaryPage'
@@ -37,20 +42,17 @@ import OrderListPage from '../features/pharmacy/OrderListPage'
 import PharmacyOrderDetailsPage from '../features/pharmacy/PharmacyOrderDetailsPage'
 import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 
-import LaboratoryHomeScreen from '../features/laboratory/LaboratoryHomeScreen'
-import AllDiagnosticTestsScreen from '../features/laboratory/AllDiagnosticTestsScreen'
-import AllHealthPackagesScreen from '../features/laboratory/AllHealthPackagesScreen'
-import SampleCollectionScreen from '../features/laboratory/SampleCollectionScreen'
-// Lab selection + date/time slot selection are merged into one screen —
-// see the doc comment on `LabSelectionScreen.tsx`. The old
-// `SlotSelectionScreen` is superseded and intentionally not imported here.
-import LabSelectionScreen from '../features/laboratory/LabSelectionScreen'
-import BookingSummaryScreen from '../features/laboratory/BookingSummaryScreen'
-import LaboratoryPaymentPage from '../features/laboratory/LaboratoryPaymentPage'
-import BookingTrackingScreen from '../features/laboratory/BookingTrackingScreen'
+import LabCatalogPage from '../features/laboratory/LabCatalogPage'
+import LabCartPage from '../features/laboratory/LabCartPage'
+import LabReviewPage from '../features/laboratory/LabReviewPage'
+import LabSuccessPage from '../features/laboratory/LabSuccessPage'
+import LabOrderPage from '../features/laboratory/LabOrderPage'
+import LabReportPage from '../features/laboratory/LabReportPage'
 
-import PatientQuestionsListPage from '../features/patient/PatientQuestionsListPage'
-import PatientQuestionDetailPage from '../features/patient/PatientQuestionDetailPage'
+import HealthReadsPage from '../features/health-feed/HealthReadsPage'
+import ReadArticlePage from '../features/health-feed/ReadArticlePage'
+import HealthQuestionsPage from '../features/health-feed/HealthQuestionsPage'
+import QuestionThreadPage from '../features/health-feed/QuestionThreadPage'
 import RadiologyBookingPage from '../features/radiology/RadiologyBookingPage'
 import RadiologyBookingDetailsPage from '../features/radiology/RadiologyBookingDetailsPage'
 import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
@@ -58,36 +60,46 @@ import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage
 
 import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
 
-import DoctorEventListPage from '../features/doctor/events/DoctorEventListPage'
-import DoctorEventFormPage from '../features/doctor/events/DoctorEventFormPage'
 
 import AllEventsPage from '../features/events/AllEventsPage'
 import EventDetailsPage from '../features/events/EventDetailsPage'
 
-import ActiveBookingPage from '../features/ancillary/staff/ActiveBookingPage'
-import PatientVerificationPage from '../features/ancillary/staff/PatientVerificationPage'
-import ServiceInProgressPage from '../features/ancillary/staff/ServiceInProgressPage'
-import CompleteServicePage from '../features/ancillary/staff/CompleteServicePage'
-import NurseTodayOverviewPage from '../features/ancillary/staff/NurseTodayOverviewPage'
-import NurseBookingHistoryPage from '../features/ancillary/staff/NurseBookingHistoryPage'
-import NurseVisitsPage from '../features/ancillary/staff/NurseVisitsPage'
+import ProviderVisitDetailsPage from '../features/ancillary/staff/visit/ProviderVisitDetailsPage'
+import ProviderVisitInProgressPage from '../features/ancillary/staff/visit/ProviderVisitInProgressPage'
+import ProviderCompleteVisitPage from '../features/ancillary/staff/visit/ProviderCompleteVisitPage'
 import NurseEarningsPage from '../features/ancillary/staff/NurseEarningsPage'
-import NurseHistoryPage from '../features/ancillary/staff/NurseHistoryPage'
 import AncillaryServicesPage from '../features/ancillary/patient/AncillaryServicesPage'
-import AncillaryProvidersPage from '../features/ancillary/patient/AncillaryProvidersPage'
-import BookingCartPage from '../features/ancillary/patient/BookingCartPage'
-import BookingSummaryPage from '../features/ancillary/patient/BookingSummaryPage'
-import BookingDetailsPage from '../features/ancillary/patient/BookingDetailsPage'
 import HomeCareServiceCatalogScreen from '../features/ancillary/patient/HomeCareServiceCatalogScreen'
 import CaregiverServicesScreen from '../features/ancillary/patient/CaregiverServicesScreen'
 import CaregiverCareTypeOverviewScreen from '../features/ancillary/patient/CaregiverCareTypeOverviewScreen'
-import AncillaryPaymentPage from '../features/ancillary/patient/AncillaryPaymentPage'
 import PricingReviewPage from '../features/ancillary/staff/PricingReviewPage'
 import AncillaryConfirmationPage from '../features/ancillary/patient/AncillaryConfirmationPage'
-import AncillaryBookingStatusPage from '../features/ancillary/patient/AncillaryBookingStatusPage'
 import TrackAppointmentPage from '../features/ancillary/patient/TrackAppointmentPage'
 import MyBookingsPage from '../features/ancillary/patient/MyBookingsPage'
 import ServiceMatchingPage from '../features/ancillary/patient/ServiceMatchingPage'
+import AncillaryBookVisitPage from '../features/ancillary/patient/AncillaryBookVisitPage'
+import AncillaryReviewPayPage from '../features/ancillary/patient/AncillaryReviewPayPage'
+import AncillaryBookNowReviewPage from '../features/ancillary/patient/AncillaryBookNowReviewPage'
+import AncillaryScheduledDetailsPage from '../features/ancillary/patient/AncillaryScheduledDetailsPage'
+
+// Profile redesign (patient / doctor / ancillary) -- see features/profile/ProfileHubPage
+import PersonalDetailsPage from '../features/profile/shared/PersonalDetailsPage'
+import ProfileSettingsPage from '../features/profile/shared/SettingsPage'
+import LoginSecurityPage from '../features/profile/shared/LoginSecurityPage'
+import AvailabilityPage from '../features/profile/availability/AvailabilityPage'
+import CareAiPage from '../features/care-ai/CareAiPage'
+import GoOnlinePermissionsPage from '../features/ancillary/staff/availability/GoOnlinePermissionsPage'
+import HealthDetailsPage from '../features/profile/patient/HealthDetailsPage'
+import LifestylePage from '../features/profile/patient/LifestylePage'
+import FamilyMembersPage from '../features/profile/patient/FamilyMembersPage'
+import FamilyMemberPage from '../features/profile/patient/FamilyMemberPage'
+import SavedAddressesPage from '../features/profile/patient/SavedAddressesPage'
+import AddressFormPage from '../features/profile/patient/AddressFormPage'
+import ProfessionalDetailsPage from '../features/profile/doctor/ProfessionalDetailsPage'
+import HospitalsPage from '../features/profile/doctor/HospitalsPage'
+import AchievementsPage from '../features/profile/doctor/AchievementsPage'
+import FavouriteDoctorsPage from '../features/profile/doctor/FavouriteDoctorsPage'
+import WorkDocumentsPage from '../features/profile/ancillary/WorkDocumentsPage'
 
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
@@ -111,16 +123,11 @@ function AuthenticatedNavigator() {
 				{/* SearchPage renders its own hero header — no navigator header here. */}
 				<AppStack.Screen name={ROUTES.STACK.SEARCH} component={SearchPage} options={{ headerShown: false }} />
 
-				<AppStack.Screen
-					name={ROUTES.STACK.PATIENT_QUESTIONS_LIST as keyof AppStackParamList}
-					component={PatientQuestionsListPage}
-					options={{ headerShown: true, title: 'Health Questions' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.PATIENT_QUESTION_DETAIL as keyof AppStackParamList}
-					component={PatientQuestionDetailPage}
-					options={{ headerShown: true, title: 'Question Detail' }}
-				/>
+				{/* Health feed screens render their own headers. */}
+				<AppStack.Screen name={ROUTES.STACK.BLOG_LIST as keyof AppStackParamList} component={HealthReadsPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.BLOG_ARTICLE as keyof AppStackParamList} component={ReadArticlePage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_QUESTIONS_LIST as keyof AppStackParamList} component={HealthQuestionsPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_QUESTION_DETAIL as keyof AppStackParamList} component={QuestionThreadPage} options={{ headerShown: false }} />
 
 				<AppStack.Screen
 					name={ROUTES.STACK.PHARMACY_SEARCH_PAGE}
@@ -163,47 +170,17 @@ function AuthenticatedNavigator() {
 					options={{ headerShown: true, title: 'Radiology Detail' }}
 				/>
 
+				{/* Lab Tests Ordering flow: every screen renders its own header. */}
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_LIST as keyof AppStackParamList} component={LabCatalogPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION as keyof AppStackParamList} component={LabCartPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_BOOKING_SUMMARY as keyof AppStackParamList} component={LabReviewPage} options={{ headerShown: false }} />
 				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_LIST as keyof AppStackParamList}
-					component={LaboratoryHomeScreen}
-					options={{ headerShown: true, title: 'Laboratory' }}
+					name={ROUTES.STACK.LABORATORY_PAYMENT_SUCCESS as keyof AppStackParamList}
+					component={LabSuccessPage}
+					options={{ headerShown: false, gestureEnabled: false }}
 				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_ALL_TESTS as keyof AppStackParamList}
-					component={AllDiagnosticTestsScreen}
-					options={{ headerShown: true, title: 'All Diagnostic Tests' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_ALL_PACKAGES as keyof AppStackParamList}
-					component={AllHealthPackagesScreen}
-					options={{ headerShown: true, title: 'Health Checkup Packages' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_SAMPLE_COLLECTION as keyof AppStackParamList}
-					component={SampleCollectionScreen}
-					options={{ headerShown: true, title: 'Booking Details' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_SELECT_LAB as keyof AppStackParamList}
-					component={LabSelectionScreen}
-					options={{ headerShown: true, title: 'Lab & Slot Selection' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_BOOKING_SUMMARY as keyof AppStackParamList}
-					component={BookingSummaryScreen}
-					options={{ headerShown: true, title: 'Booking Summary' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_PAYMENT as keyof AppStackParamList}
-					component={LaboratoryPaymentPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.LABORATORY_BOOKING_TRACKING as keyof AppStackParamList}
-					component={BookingTrackingScreen}
-					options={{ headerShown: true, title: 'Booking Status' }}
-				/>
-
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_BOOKING_TRACKING as keyof AppStackParamList} component={LabOrderPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.LABORATORY_REPORT as keyof AppStackParamList} component={LabReportPage} options={{ headerShown: false }} />
 				<AppStack.Screen
 					name={ROUTES.STACK.ALL_SPECIALITIES}
 					component={AllSpecialitiesPage}
@@ -220,6 +197,7 @@ function AuthenticatedNavigator() {
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen name={ROUTES.STACK.DOCTOR_DETAIL} component={DoctorDetailPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_BOOK_SLOT} component={BookSlotPage} />
 				<AppStack.Screen
 					name={ROUTES.STACK.FAVOURITE_DOCTOR}
 					component={MyDoctorPage}
@@ -229,6 +207,7 @@ function AuthenticatedNavigator() {
 					}}
 				/>
 				<AppStack.Screen name={ROUTES.STACK.NOTIFICATION} component={NotificationPage} />
+				<AppStack.Screen name={ROUTES.STACK.VERIFY_ACCESS} component={VerifyAccessPage} />
 				<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
 				<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
 				{/* <AppStack.Screen name={ROUTES.STACK.SCREEN_CAPTURE_TEST} component={ScreenCaptureTest} /> */}
@@ -238,6 +217,7 @@ function AuthenticatedNavigator() {
 					options={{ animation: 'none' }}
 				/>
 				<AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
+				<AppStack.Screen name={ROUTES.STACK.LEGAL} component={LegalPage} />
 				<AppStack.Screen
 					name={ROUTES.STACK.APPOINTMENTS}
 					component={AppointmentList}
@@ -253,16 +233,6 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.APPOINTMENT_DETAILS} component={AppointmentDetailsPage} />
 				<AppStack.Screen name={ROUTES.STACK.VISIT_SUMMARY} component={VisitSummaryPage} />
 				<AppStack.Screen
-					name={ROUTES.STACK.DOCTOR_EVENTS}
-					component={DoctorEventListPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.DOCTOR_EVENT_FORM}
-					component={DoctorEventFormPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
 					name={ROUTES.STACK.ALL_EVENTS}
 					component={AllEventsPage}
 					options={{ headerShown: false }}
@@ -273,33 +243,18 @@ function AuthenticatedNavigator() {
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_ACTIVE_BOOKING}
-					component={ActiveBookingPage}
+					name={ROUTES.STACK.PROVIDER_VISIT_DETAILS}
+					component={ProviderVisitDetailsPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_PATIENT_VERIFICATION}
-					component={PatientVerificationPage}
+					name={ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS}
+					component={ProviderVisitInProgressPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_SERVICE_IN_PROGRESS}
-					component={ServiceInProgressPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_COMPLETE_SERVICE}
-					component={CompleteServicePage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_TODAY_OVERVIEW}
-					component={NurseTodayOverviewPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_VISITS}
-					component={NurseVisitsPage}
+					name={ROUTES.STACK.PROVIDER_VISIT_COMPLETE}
+					component={ProviderCompleteVisitPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
@@ -308,33 +263,28 @@ function AuthenticatedNavigator() {
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.NURSE_HISTORY}
-					component={NurseHistoryPage}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
 					name={ROUTES.STACK.ANCILLARY_SERVICES}
 					component={AncillaryServicesPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_PROVIDERS}
-					component={AncillaryProvidersPage}
+					name={ROUTES.STACK.ANCILLARY_BOOK_VISIT}
+					component={AncillaryBookVisitPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_BOOKING_CART}
-					component={BookingCartPage}
+					name={ROUTES.STACK.ANCILLARY_REVIEW_PAY}
+					component={AncillaryReviewPayPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_BOOKING_SUMMARY}
-					component={BookingSummaryPage}
+					name={ROUTES.STACK.ANCILLARY_BOOK_NOW_REVIEW}
+					component={AncillaryBookNowReviewPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_BOOKING_DETAILS}
-					component={BookingDetailsPage}
+					name={ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS}
+					component={AncillaryScheduledDetailsPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
@@ -350,11 +300,6 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen
 					name={ROUTES.STACK.HOME_CARE_CATALOG}
 					component={HomeCareServiceCatalogScreen}
-					options={{ headerShown: false }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.ANCILLARY_PAYMENT}
-					component={AncillaryPaymentPage}
 					options={{ headerShown: false }}
 				/>
 				<AppStack.Screen
@@ -393,6 +338,25 @@ function AuthenticatedNavigator() {
 					options={{ headerShown: false }}
 				/>
 
+				{/* Profile sub-screens: each draws its own header (ProfileScreen). */}
+				<AppStack.Screen name={ROUTES.STACK.PROFILE_PERSONAL} component={PersonalDetailsPage} />
+				<AppStack.Screen name={ROUTES.STACK.PROFILE_SETTINGS} component={ProfileSettingsPage} />
+				<AppStack.Screen name={ROUTES.STACK.PROFILE_SECURITY} component={LoginSecurityPage} />
+				<AppStack.Screen name={ROUTES.STACK.PROFILE_AVAILABILITY} component={AvailabilityPage} />
+				<AppStack.Screen name={ROUTES.STACK.GO_ONLINE_PERMISSIONS} component={GoOnlinePermissionsPage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_HEALTH} component={HealthDetailsPage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_LIFESTYLE} component={LifestylePage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_FAMILY} component={FamilyMembersPage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_FAMILY_MEMBER} component={FamilyMemberPage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_ADDRESSES} component={SavedAddressesPage} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_ADDRESS_FORM} component={AddressFormPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_PROFESSIONAL} component={ProfessionalDetailsPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_HOSPITALS} component={HospitalsPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_ACHIEVEMENTS} component={AchievementsPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_FAVOURITES} component={FavouriteDoctorsPage} />
+				<AppStack.Screen name={ROUTES.STACK.PROVIDER_WORK} component={WorkDocumentsPage} />
+				<AppStack.Screen name={ROUTES.STACK.CARE_AI} component={CareAiPage} options={{ headerShown: false }} />
+
 				<AppStack.Screen name={ROUTES.STACK.WALLET} component={WalletPage} options={{ headerShown: false }} />
 				<AppStack.Screen
 					name={ROUTES.STACK.WALLET_TRANSACTIONS}
@@ -410,9 +374,12 @@ function AuthenticatedNavigator() {
 	)
 }
 
-export default function AppNavigator() {
+export default function AppNavigator({ askPermissions = true }: { askPermissions?: boolean }) {
 	const { accessToken, isLoading } = useAuth()
 	const theme = useTheme()
+	usePushNotifications(!!accessToken)
+	// Fresh install: the Android system dialogs for Location, Notifications and Camera, once the app is ready.
+	useFirstLaunchPermissions(askPermissions && !isLoading)
 
 	if (isLoading) {
 		return (

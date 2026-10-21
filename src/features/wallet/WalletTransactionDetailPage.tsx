@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import AppScreenHeader from '../../components/common/AppScreenHeader'
+import AppScreenHeader from '../../components/common/layout/AppScreenHeader'
 import { getWalletTransactionDetail, WalletTransactionData } from './walletService'
 
 export const WalletTransactionDetailPage: React.FC = () => {

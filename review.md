@@ -1,242 +1,202 @@
-# Comprehensive Production Engineering Review & Code Hardening Report
+# Mobile Review — health_care_mobile (KarolaHealth)
 
-**Project:** Karola Health (React Native Expo Mobile Application)  
-**Workspace:** `d:\healthcare2\gemini-mobile-app`  
-**Date:** September 15, 2026  
-**Auditor:** Senior / Staff-Level React Native Engineer  
+**Date:** 2026-10-02 · **Branch:** `dev` @ `5de3fdd` · **Supersedes:** the 2026-09-15 production-hardening review (its open items and checklist are re-assessed in §2)
+**Scope:** `src/` (React Native 0.86 / Expo SDK 57 / React 19.2, ~21 feature domains), tooling, docs, repo hygiene.
+**Lenses:** (1) security / privacy (PHI), (2) correctness / hooks / performance, (3) developer experience.
+
+## How this review was produced (and how far to trust it)
+
+Three read-only review passes over the code (one per lens), followed by a spot-check of the load-bearing claims. Nothing was run on a device; `tsc --noEmit` was run and returns 0 errors. `android/` was not readable by the security pass, so native manifests were not inspected.
+
+- **✔ Verified** = I re-read the cited code or re-ran the grep/count myself afterwards.
+- **Reported** = read from code by the review pass with file:line, not independently re-checked.
+- One claim was **wrong and is excluded**: "`android/` is not gitignored" — `/android` and `/ios` are in `.gitignore`.
+
+## 1. Executive summary
+
+The app has a clear feature-based structure, a growing shared component library (`components/common`) with design tokens, typed navigation, secure token storage as the primary store, a correct single-flight token refresh, an offline short-circuit, and zero TypeScript errors in strict mode.
+
+The risks cluster in five places:
+
+1. **PHI leaves the device or sits on it unprotected**: ~323 `console.*` calls (many print profile payloads / request bodies) and no console stripping in release builds; PHI cached in plain `AsyncStorage`; a `SecureStore` failure silently falls back to plaintext token storage; cleartext HTTP/WS is not prevented in release.
+2. **The ancillary WebSockets connect with no auth token** (the server side also doesn't require one — see the backend review S-1), and the screens that use them have no reconnect and double-navigation races.
+3. **The API layer has no timeout and shows a global "API Error" modal on every non-401/403 failure**, which stacks on top of local error UI (including from 2-second pollers).
+4. **Quality gates are absent**: no test runner (the only "test" asserts against an inline copy of a function), no lint, no CI, no crash reporting.
+5. **The previous review's "complete" checklist no longer matches the code** (design tokens, `as any`, monolith decomposition) — see §2.
+
+## 1a. P0 remediation applied (2026-10-02)
+
+Verification: `npx tsc --noEmit` returns **0 errors**. **None of this has been run on a device or in a release build** - see "Unverified" below.
+
+| Item | What changed |
+| :--- | :--- |
+| S-3 PHI in logs | `babel.config.js` now adds `transform-remove-console` under `env.production` (new devDependency `babel-plugin-transform-remove-console`), so release bundles contain no `console.*` calls. The ~323 development logs themselves are still in the source. |
+| S-1 cleartext | `constants/apiUrls.ts` throws at startup if `EXPO_PUBLIC_API_ENDPOINT` is not `https://` when `!__DEV__` (and `ws://` becomes `wss://` as a result). Removed a commented-out hardcoded LAN IP. |
+| S-5 secure storage | `utils/secureStorage.ts` fails closed: on native, if the keystore errors or is missing, tokens are held **in memory only** (the session ends with the app process) and are never written to AsyncStorage. Web (unsupported target) keeps AsyncStorage. |
+| S-6 / S-7 logout | New `utils/localSession.ts` (`purgeLocalSession` + the single list of user-data AsyncStorage keys). Used by both `AuthContext.clearAuth` and the forced logout after a rejected refresh; it also clears `ancillary_subspecialty_id` and `ancillary_setup_completed`, which neither path used to clear. |
+| S-8 refresh | `apiService` now distinguishes `ok` / `rejected` / `unavailable`. Only a 4xx from the refresh endpoint (excluding 408/429) or a missing refresh token ends the session; offline, timeout and 5xx keep the session and just fail the request. |
+| C-1 timeout | Default axios timeout 30 s; multipart (`FormData`) requests get 120 s; the refresh call is also bounded. |
+| C-2 global error modal | New per-request flag `skipGlobalError`, and identical global dialogs within 4 s are collapsed. Both 2-second pollers (`TrackAppointmentPage`, `ServiceMatchingPage`) pass it. |
+| S-2 / C-3 WebSockets | New `utils/authedSocket.ts`: sends `{"type":"auth","token":...}` as the first frame (the token is never in the URL), swallows `AUTH_OK`, reconnects with exponential backoff (1 s up to 30 s) and stops on the server's 4401/4403/4404. Both screens use it; `ServiceMatchingPage` no longer opens a socket without a booking id (the `'active'` key no longer exists server-side) and relies on its polling instead. |
+| S-4 DICOM WebView | The three pinned CDN scripts now carry `integrity="sha384-..."` + `crossorigin="anonymous"`; the WebView uses `originWhitelist={['about:*']}`, `allowFileAccess={false}`, `domStorageEnabled={false}`, `mixedContentMode="never"`, and the message logger is `__DEV__`-only. |
+
+**Not done / still open:** PHI cached in plain AsyncStorage (`user`, `current_location`; the rest of S-6), the `Linking.openURL` scheme allowlist (S-9), presigned S3 URLs (S-10), the double-navigation race and stale closures in the tracking screens (C-4 and the section 4 Medium items), `AuthContext` memoisation, and everything in section 6 (tests, CI, crash reporting). The README run instructions were corrected in the same pass (dev-client flow; `.env.example` added and un-ignored).
+
+**Unverified (needs a device / release build):**
+- The WebSocket handshake end to end against the updated backend.
+- That the DICOM viewer still renders with SRI and the tightened WebView props (a wrong hash or a blocked resource would show as an empty viewer).
+- That a release build really strips `console.*`, and that the https assertion does not trip your release pipeline (a release build pointed at an `http://` URL now fails at launch - intended).
+- That the 30 s timeout is long enough for your slowest real endpoints.
+
+**Deploy note:** this build must go out together with the backend that implements the WebSocket handshake (see the backend review, section 1a). Against an old backend the sockets simply never authenticate and the screens fall back to polling.
 
 ---
 
-## 1. Executive Summary
+## 2. Status of the 2026-09-15 review
 
-This deep-dive technical code review presents an exhaustive audit of the **Karola Health** mobile application codebase. The app is an enterprise multi-role healthcare application built with **React Native (Expo SDK 57)**, **TypeScript**, **React Navigation 7**, and **Axios**. It integrates 21 distinct feature domains including **Patient & Staff Ancillary Healthcare (Home Nursing, Physio, Rehab, Elder Care)**, **Doctor Consultation & Availability**, **Laboratory & Diagnostic Orders**, **Pharmacy Storefront**, **Radiology**, **Patient Portals**, **Wallet Transactions**, and **User Profiles**.
+### Open Phase 4/5 items
 
-While the application features strong domain coverage, dynamic routing, and functional clinical flows, taking it to production requires remediating **4 critical security/crash vulnerabilities**, **29 TypeScript compilation errors**, **missing root error boundary resilience**, **file/folder structural inconsistencies**, **in-file code smells (monolithic 1,000+ line components, 100+ `as any` type bypasses, hardcoded colors)**, **unguarded storage deserializations**, **unvirtualized list renderings**, **release build logging overhead**, and **missing offline network state handlers**.
+| Item | Status | Evidence |
+| :--- | :--- | :--- |
+| `transform-remove-console` for release builds | **Open** — 323 `console.*` calls in 105 files | `babel.config.js`; grep ✔ |
+| Convert heavy `ScrollView` lists to `FlatList`/`FlashList` | **Partly done** — 35 files use virtualized lists; 594 `.map(` render sites remain, which of them sit in long lists was not audited | Reported |
+| Clean unmount of WebSockets / timers | **Mostly good** — intervals cleared and `ws.close()` on unmount in the screens read; gaps are reconnect/backoff and stale closures (§4) | Reported |
+| Skeleton loaders on initial fetches | **Partial** (e.g. `RowSkeletons` in the ancillary catalogue); not audited app-wide | Reported |
+| Jest + React Native Testing Library | **Open** — no runner; the single "test" is a no-op (§5) | ✔ |
 
----
+### Checklist items marked done that do **not** hold today
 
-## 2. Exhaustive Technical Audit & Categorized Findings
+| Previously ticked | Reality now |
+| :--- | :--- |
+| "Hex colors consumed exclusively from `src/config/theme.ts`" | **4,028** hardcoded `#RRGGBB` in `src/features` + `src/components` ✔. Worst: `DoctorAppointments.tsx` (107), `PharmacyOrderDetailsPage.tsx` (98), `laboratory_duplicated/PlaceLabOrderPage.tsx` (80), `AncillaryDashboard.tsx` (79), `TrackAppointmentPage.tsx` (71) |
+| "Unsafe `as any` refactored" | **293** `: any` / `as any` occurrences |
+| "Monolithic files decomposed" | **14+** files over 1,000 lines ✔: `ancillaryService.ts` 2,186, `DoctorAppointments.tsx` 1,847, `MyHospitalsTab.tsx` 1,807, `AppointmentList.tsx` 1,602, `PharmacyOrderDetailsPage.tsx` 1,567, then ~9 more at 1,040–1,540 |
+| "Zero `console.log` output sensitive data" | Tokens are no longer logged, but full profile/request/response bodies are (S-3 below) |
+| Naming standardised to `*Page.tsx` | 82 `*Page.tsx` vs 20 `*Screen.tsx`; a `laboratory_duplicated/` folder exists beside `laboratory/` ✔ |
 
-### A. Security, Auth & Data Privacy (HIPAA & Mobile Security)
+These checkboxes should be treated as historical, not as a current quality gate.
 
-| Issue / Risk | Location | Severity | Production Impact & Remediation Plan |
+### Fixed since the last review (this session)
+
+- **Duplicate fetches after login** — `SidebarLayout` avatar-sync effect depended on the value it updates and on an unstable `updateUser`; `DashboardPage` passed an inline `onRefreshComplete` into a child effect's dependency array. Both fixed (effect scoped to `[role, ancillarySpecialty]`; callback memoised with `useCallback`).
+- **Catalogue row bullet points invisible** — `AppCatalogItemRow`'s `points` block didn't stretch inside a `alignItems:'flex-start'` column, so its `flex:1` text collapsed; fixed with `alignSelf:'stretch'`.
+
+## 3. Security and privacy findings
+
+### High
+
+| ID | Finding | Where | Verified |
 | :--- | :--- | :--- | :--- |
-| **Plaintext Access Token Logging in Console** | `src/services/apiService.ts:53` | 🔴 **CRITICAL** | Raw JWT access tokens are printed directly to stdout via `console.log('[API TOKEN]', token)`. On release builds or attached ADB logcat monitors, token interception allows full session hijacking. **Action:** Scrub raw token print statements immediately. |
-| **Insecure Local Token Storage (`AsyncStorage`)** | `src/services/apiService.ts:52`, `src/context/AuthContext.tsx:132` | 🟠 **HIGH** | `access_token` and `refresh_token` are stored in plaintext `AsyncStorage`. On rooted Android or jailbroken iOS devices, unencrypted storage allows token extraction. **Action:** Migrate authentication tokens to `expo-secure-store` (Keychain / EncryptedSharedPreferences). |
-| **Hardcoded Local IP Address** | `src/constants/apiUrls.ts:8` | 🟠 **HIGH** | `getBaseUrl()` contains a hardcoded local IP (`http://10.205.226.49:8000`). If `.env` is unpopulated, release builds will fail to connect. **Action:** Enforce `process.env.EXPO_PUBLIC_API_ENDPOINT` with strict fallback validation. |
-| **PHI / PII Data in Unencrypted Local Cache** | `src/features/ancillary/ancillaryService.ts:251` | 🟡 **MEDIUM** | Booking objects containing patient names, doorstep addresses, and procedure details are saved unencrypted. **Action:** Ensure local storage is sanitized or encrypted for PHI compliance. |
+| S-1 | **Cleartext transport is not prevented.** `BASE_URL` only strips trailing slashes; no https assertion for release builds; WebSocket URLs derive `ws://` from the same base; `app.json` sets no cleartext/ATS policy. Dev `.env` uses `http://`. **Fix:** assert `https` when `!__DEV__`; set `usesCleartextTraffic:false` for release. | `constants/apiUrls.ts:8,268-270`; `app.json` | ✔ (WS derivation, no token); manifest not inspected |
+| S-2 | **WebSockets carry no auth token.** Patient request socket is opened with only the booking id; it pushes verification OTP, completion PIN, address and ETA. `ServiceMatchingPage` also falls back to the id `'active'`. Server side currently accepts unauthenticated clients (backend S-1). **Fix:** short-lived WS ticket sent in the first message; server checks ownership. | `TrackAppointmentPage.tsx:270-271`; `ServiceMatchingPage.tsx:95-96` | ✔ (no token in URL / `new WebSocket`) |
+| S-3 | **PHI in logs, not stripped in release.** 323 `console.*` in 105 files. Worst: `PatientProfileLayout.tsx:52,66,147,152` (full profile `JSON.stringify`), `PatientProfileService.ts:116` (PATCH payload), `doctorService.ts:131,143,299,312,559,602`, `ancillaryService.ts:1597-1645` (provider profile, `error.config.data` = request body, `error.response.data`), `PharmacyOrderDetailsPage.tsx:679` (order incl. prescription images), `ConsultationService.ts:176`, `PatientPayment.tsx:260`. **Fix:** `babel-plugin-transform-remove-console` under `env.production` plus a `__DEV__`-gated logger; delete payload/response logs. | `babel.config.js`; files listed | ✔ (counts, no plugin); per-line reported |
+| S-4 | **DICOM WebView is over-permissive and loads third-party scripts without SRI.** `originWhitelist={['*']}` ✔, `allowFileAccess`, `mixedContentMode="always"`, `domStorageEnabled`; three scripts from `cdn.jsdelivr.net` run in the same page that receives base64 DICOM (PHI) via `postMessage`. **Fix:** bundle scripts locally (or pin + SRI); whitelist `about:*`; disable file access and mixed content. | `consultation/components/DicomViewer.tsx:79-83,262,288-294` | ✔ (`originWhitelist`); rest reported |
 
----
+### Medium
 
-### B. Root Resilience & Runtime Crash Vectors
-
-| Issue / Deficit | Location | Severity | Production Impact & Remediation Plan |
+| ID | Finding | Where | Verified |
 | :--- | :--- | :--- | :--- |
-| **Missing Root React Error Boundary** | `App.tsx:10-21` | 🔴 **CRITICAL** | There is **no `<ErrorBoundary>`** wrapping `AppNavigator`. If any component throws an unhandled rendering error, the entire React Native app crashes to home screen without a fallback UI or telemetry report. **Fix:** Implement a root `ErrorBoundary` component with a user-facing retry screen. |
-| **Unguarded `JSON.parse` Deserialization** | `AuthContext.tsx:140`<br>`AncillaryPaymentPage.tsx:121`<br>`BookingDetailsPage.tsx:307`<br>`PatientProfileSelectorBottomSheet.tsx:94`<br>`CapabilitiesTab.tsx:303`<br>`PersonalDetailsTab.tsx:391` | 🔴 **CRITICAL** | `JSON.parse()` executed directly on raw storage strings without `try/catch`. Corrupted storage or malformed payloads throw uncaught `SyntaxError` and crash the app immediately. **Fix:** Wrap all deserializations in safe `try/catch` helpers. |
-| **Uncancelled Network Promises on Unmount** | `apiService.ts`, feature screens | 🟠 **HIGH** | Async API calls do not pass `AbortController` signals when screens unmount, causing background mutations attempting to update unmounted component state. **Fix:** Integrate `AbortController` cancellation in Axios calls. |
+| S-5 | **`SecureStore` failure falls back to plaintext `AsyncStorage`** for tokens, with a warning only under `__DEV__` (the file's own `FIXME` admits it). **Fix:** fail closed or keep in memory; never persist tokens to AsyncStorage. | `utils/secureStorage.ts:25-66` | ✔ |
+| S-6 | **PHI persisted in unencrypted AsyncStorage**: `user` (name, email, avatar), `current_location` (address + lat/long), `user_specialty`. | `context/AuthContext.tsx:112,131,197,216` | Reported |
+| S-7 | **Logout leaves data behind.** `clearAuth` removes a fixed key list; the forced-logout path after refresh failure removes only `role`/`user`, leaving `current_location`, `user_specialty`, etc. `clearAuth` swallows the server-logout error. **Fix:** one shared `purgeLocalSession()` with a namespaced key list. FCM token deregistration on logout not verified. | `AuthContext.tsx:221-249`; `apiService.ts:186` | Reported |
+| S-8 | **Transient network failure during token refresh hard-logs the user out.** `performTokenRefresh` returns `null` on *any* error (including offline) and the caller then logs out. **Fix:** log out only when the refresh endpoint answers 401/403. | `services/apiService.ts:76-100,156-186` | ✔ (returns null on any catch); caller behaviour reported |
+| S-9 | **API-supplied URLs go straight to `Linking.openURL` with no scheme allowlist** (`target.url`, `media_url`, `registration_link`, consultation `url`); offer `target.params` passed to `navigation.navigate`. **Fix:** allow `https:` (plus `tel:`/`mailto:` where intended) and a fixed route allowlist. | `HomeOffersSection.tsx:103-106`; `HomeHealthReadsSection.tsx:90`; `EventSection.tsx:111`; `EventDetailsPage.tsx:116`; `AllEventsPage.tsx:165`; `ConsultationPage.tsx:529` | Reported |
+| S-10 | **Prescription/consultation files opened from a guessable public S3 URL** (`https://healthcare-s3-bucket.s3.amazonaws.com/<key>`). Bucket policy unverified; prefer presigned URLs from the backend. | `utils/s3Utils.ts:1-13`; `ConsultationPage.tsx:885` | Reported |
 
----
+### Low
 
-### C. In-File Coding Standards, Code Smells & Maintainability
+Hardcoded test UPI id and payee name in `AppPayment.tsx:17-20`; `DicomViewer.tsx:296` logs every WebView message; `ACCESS_FINE_LOCATION` requested where coarse may suffice (`app.json:28-33`); no `expo-screen-capture` protection active on prescription/DICOM screens; a `ScreenCaptureTest` placeholder is commented out in `AppNavigator.tsx`.
 
-An audit of individual source files revealed several code smells that violate SOLID principles, reduce maintainability, and increase runtime risk:
+**Verified clean:** no `dangerouslySetInnerHTML`-style patterns, no Clipboard use, no token/OTP logging, no real secrets in source (`google-services.json` holds a placeholder key), no deep-link handlers registered, `.env` is gitignored ✔. **Not verified:** Android manifest/cleartext flags, push-payload handling location, whether FCM token is cleared on logout.
 
-| Audit Category | Code Smell / Vulnerability | Examples & Affected Files | Production Impact & Standardized Fix |
+## 4. Correctness, hooks and performance findings
+
+### High
+
+| ID | Finding | Where | Verified |
 | :--- | :--- | :--- | :--- |
-| **Monolithic Component Files (1,000+ Lines)** | Mixing UI presentation, API calls, form state, and inline styling in a single massive file. | `DoctorAppointments.tsx` (1,964 lines)<br>`BookingDetailsPage.tsx` (1,804 lines)<br>`StaffAncillaryDashboard.tsx` (1,360 lines)<br>`PlaceLabOrderPage.tsx` (1,256 lines)<br>`OrderDetailsScreen.tsx` (1,118 lines)<br>`MyHospitalsTab.tsx` (1,325 lines) | Violates Single Responsibility Principle (SRP). Makes unit testing and maintenance difficult.<br>**Fix:** Extract sub-views into focused components and business logic into custom hooks (e.g. `useDoctorAppointments`). |
-| **Systematic Type Bypasses (`as any`)** | 100+ instances of `as any` suppressing TypeScript safety. | `apiService.ts:57` (`config.headers as any`)<br>`MainTabNavigator.tsx:180` (`(role as any)`)<br>`PatientUpcomingAppointments.tsx:85-89`<br>`OrderDetailsScreen.tsx:531` (`(route.params as any)`) | Destroys type safety and hides backend API contract drift.<br>**Fix:** Define strict TypeScript interfaces for navigation routes, headers, and API responses. |
-| **Hardcoded Hex Colors (Missing Design Tokens)** | Primary brand colors hardcoded inline in `StyleSheet.create` definitions. | Hex `#0C7C7C` in **25+ files**<br>Hex `#2B6F71` in **30+ files**<br>Hex `#0F172A`, `#64748B`, `#E2E8F0` in **100+ files** | Prevents theme switching (Dark/Light mode), brand updates, or white-labeling.<br>**Fix:** Move all hex color constants into `src/config/theme.ts` tokens. |
-| **Inline Anonymous Functions in Loops** | Inline arrow functions inside `.map()` render loops. | `<TouchableOpacity onPress={() => navigation.navigate(...)}>` inside list renderers | Creates function instances on every render cycle, triggering unnecessary re-renders.<br>**Fix:** Extract item renderers into memoized item components (`React.memo`). |
-| **Duplicated Utility Logic** | Re-implementing date/price formatting inside individual screens. | `formatDate()`, `formatPrice()`, `calculateAge()` defined inline in 10+ screen files | Code duplication (DRY violation).<br>**Fix:** Centralize in `src/utils/formatters.ts`. |
+| C-1 | **No axios timeout.** `axios.create({ paramsSerializer })` sets none, so the `ECONNABORTED` branch never fires unless a caller passes one; a hung request means an indefinite spinner. **Fix:** default 15–30 s. | `services/apiService.ts:39` | ✔ |
+| C-2 | **Global "API Error" modal on every non-401/403 error**, stacking on top of screens' own error UI/toasts. The 2-second pollers (`TrackAppointmentPage:329`, `ServiceMatchingPage:189`) can re-open it every poll on a 500. Whether the modal dedupes is unverified. **Fix:** per-request `skipGlobalError` flag and/or modal dedupe. | `apiService.ts:221-227` | ✔ |
+| C-3 | **WebSockets have no reconnect/backoff, and run alongside 2 s polling** (~30 req/min per screen). No `onclose`/`onerror` handlers. Cleanup on unmount *is* correct. **Fix:** small WS helper with backoff; poll slower (≈10 s) while the socket is open. | `TrackAppointmentPage.tsx:271-281,329`; `ServiceMatchingPage.tsx:96-120,189` | ✔ (no handlers / poll); rest reported |
+| C-4 | **Double navigation in `ServiceMatchingPage`:** the WS handler (:109) and the poller (:172) each schedule `navigation.replace(TRACK_APPOINTMENT)` after 400 ms with separate timers, so both can fire. **Fix:** shared "navigated" ref. | `ServiceMatchingPage.tsx:109,172` | Reported |
 
----
+### Medium
 
-### D. Folder Structure & Filename Consistency Audit
+- **`TrackAppointmentPage` effect closes over stale state** — deps are `[bookingId]` only but it reads `liveProvider`, `liveServiceTitle`, `liveAddress`, `bookingData`; `navigation.replace` at :297/:319 has no mounted check; `fetchStatus` can run concurrently with itself (2 s interval, no in-flight guard). Use refs + an in-flight guard. (`:233-340`)
+- **`AuthContext` is not memoised** — provider value object and `updateUser`/`clearAuth`/`setAuth`/`setCurrentLocation`/… are re-created every render, re-rendering all 53 `useAuth` consumers; `updateUser` closes over `user` and can drop updates if called twice in one tick (use functional `setUser`). No effect currently loops on them (`useBookingLocation` and `ClinicSwitcher` are safe only because of `[]` deps / eslint-disable), so it is fragile rather than broken. (`context/AuthContext.tsx:110,209,220,254-275`)
+- **`DashboardPage` doctor fetches have no cancel/stale guard** — fast `selectedDate` switches can let an older response overwrite a newer one; debug `console.log`s at :150,154,157. (`DashboardPage.tsx:144-190`)
+- **`.then()` chains in effects violate the team's async/await standard** (≈25 occurrences in 20 files), most without unmount guards: `DoctorHomeScreen.tsx:224-232`, `WorkDocumentsPage.tsx:129,139`, `ProfessionalDetailsPage.tsx:105,108`, `PlaceLabOrderPage.tsx:475`, `ConsentForm.tsx:46`, `MyDoctorPage.tsx:218`, `AppointmentDetailsContent.tsx:305`, `AppointmentActionSheet.tsx:118`, `AccountPage.tsx:57-58`, `ProfessionalDetailsTab.tsx:563`.
+- **`DoctorHomeScreen` fetches `getAppointments({limit:100})` only to count pending requests** (`:221-233`) — heavy payload; use a count endpoint or shared cache (duplicate fetch in `DoctorEngageScreen` unverified).
+- **Swallowed errors in ancillary tracking** — empty `catch` at `TrackAppointmentPage.tsx:359-361`; status-fetch failure only logged (:307-308), so no error state; `ServiceMatchingPage.tsx:218-224` `handleCancelRequestWithReason` has no `try/catch` (stuck `isCancelling`, unhandled rejection). 10 single-line empty catches elsewhere (`AppCalendar.tsx:277`, `DicomViewer.tsx` ×7, `ServicesAndProceduresView.tsx:69,75`).
 
-An in-depth review of `src/features/` revealed significant casing inconsistencies, fragmented service files, singular vs. plural folder naming discrepancies, and duplicated file locations across feature modules.
+### Low
 
-| Audit Category | Inconsistent Implementation | Location | Standardized Recommendation |
-| :--- | :--- | :--- | :--- |
-| **All-Lowercase Filenames (Missing Casing)** | `Bookingdetailslaboratorypage.tsx`<br>`Orderlistlaboratorypage.tsx`<br>`Pharmacysearchpage.tsx`<br>`Scantypeselectormodal.tsx` | `src/features/laboratory/`<br>`src/features/laboratory/`<br>`src/features/pharmacy/`<br>`src/features/radiology/component/` | Standardize to PascalCase:<br>`BookingDetailsLaboratoryPage.tsx`<br>`OrderListLaboratoryPage.tsx`<br>`PharmacySearchPage.tsx`<br>`ScanTypeSelectorModal.tsx` |
-| **Inconsistent Screen Suffixes** | `OrderDetailsScreen.tsx` vs `OrderListPage.tsx` | `src/features/pharmacy/` | Standardize screen component suffixes across all domains to `Page.tsx` or `Screen.tsx` (e.g. `PharmacyOrderDetailsPage.tsx`). |
-| **Capitalized Service Filename** | `RadiologyService.ts` (Capital `R`) vs `laboratoryService.ts` (lowercase `l`) | `src/features/radiology/`<br>`src/features/laboratory/` | Standardize service file naming to camelCase: `radiologyService.ts`. |
-| **Singular vs Plural Component Folders** | `src/features/pharmacy/component/`<br>`src/features/radiology/component/`<br>`src/features/laboratory/component/` | `pharmacy/`, `radiology/`, `laboratory/` | Standardize all feature-level component directories to plural `components/` (e.g. `src/features/pharmacy/components/`). |
-| **CamelCase Feature Directory Names** | `src/features/patientPayment/`<br>`src/features/patientQr/` | `src/features/` | Standardize feature folder names to kebab-case or single lowercase words: `patient-payment/` and `patient-qr/`. |
-| **Singular vs Plural Feature Names** | `src/features/setting/` vs `bookings`, `events` | `src/features/` | Standardize to plural feature name: `src/features/settings/`. |
-| **Duplicated Tab Files** | `LaboratoryDetailsTab.tsx` duplicated under both `profile/` and `tabs/` | `src/features/profile/laboratory/` | Consolidate profile tabs into a single `src/features/profile/laboratory/tabs/` directory and delete empty `profile/` subfolder. |
-| **Fragmented Service/Types Files** | Both `laboratory.ts` AND `laboratoryService.ts`<br>Both `radiology.ts` AND `RadiologyService.ts`<br>Both `pharmacy.ts` AND `pharmacyService.ts` | `laboratory/`<br>`radiology/`<br>`pharmacy/` | Consolidate types into `types.ts` (or `laboratoryTypes.ts`) and API calls into `laboratoryService.ts`. |
-| **Misplaced Root Screen Files** | `TrackAppointmentPage.tsx` sitting in `src/features/ancillary/` root | `src/features/ancillary/` | Move screen into domain role subfolder: `src/features/ancillary/patient/TrackAppointmentPage.tsx`. |
+`ProviderTodayContent.tsx:94-101` has `onRefreshComplete` in effect deps — safe only while the parent keeps its `useCallback([])` (documented in a comment); a future inline prop would cause a refetch loop. Heavy inline renders in `AncillaryDashboard.tsx`/`ConsultationPage.tsx` unmeasured.
 
----
+**Metrics:** `tsc --noEmit` 0 errors ✔; 293 `any`; 14+ files >1,000 lines ✔; 323 `console.*` ✔; 35 files use FlatList/FlashList/SectionList.
 
-### E. TypeScript Build Integrity & Type Safety
+## 5. What is done well
 
-Currently, after executing `git mv` to resolve Windows Git casing discrepancies and installing `@react-native-community/netinfo`, `npx tsc --noEmit` returns **0 compilation errors**.
+- Strict TypeScript, zero compile errors; feature-based layout; shared `components/common` split into `layout/buttons/inputs/display/feedback/booking/location` with a barrel export and design tokens in `config/theme.ts`.
+- Tokens in `expo-secure-store` as the primary store; **single shared in-flight refresh promise** (concurrent 401s make one refresh call, one retry per request, raw `axios.post` so it can't recurse); offline short-circuit; clean network-error messages; array params serialised for FastAPI; 403 body log gated by `__DEV__`; `clearAuth` revokes the refresh token server-side best-effort.
+- Root `ErrorBoundary`, `NetworkContext` + `OfflineBanner`, toast helpers.
+- Intervals/timers read are cleared on unmount (`AppTimerBadge`, `ProviderTodayContent`, `useLiveLocationShare`, `AncillaryRequestSentPage`, `NursePulseRadarView`); home dashboard no longer double-fetches and `useHomeChromeData` caches are cleared on logout.
+- Spot-checked shared layout components (`AppProviderCard`, `ProviderDetailsCard`, `AppInfoBanner`) already guard `flex:1` text columns with `minWidth:0`.
+- `README.md`/`CLAUDE.md` are candid about gaps; utilities are small modules (`date`, `formatters`, `jsonUtils`, `slots`) that are easy to test.
 
----
+## 6. Developer experience
 
-### F. Build Tooling, Automated Testing & Release Engineering
+| Area | Finding | Severity |
+| :--- | :--- | :--- |
+| Running the app | `README.md` tells new developers to `npm start` and scan a QR with **Expo Go**. The app needs a dev client / native build (`@react-native-firebase/*`, `expo-speech-recognition`, `expo-screen-capture`, `react-native-maps`, custom `google-services.json`). Scripts are `expo run:android/ios`. No `eas.json`; `android/` exists locally (ignored) with no prebuild instructions. **The README rewritten earlier in this session still carries the original Expo Go steps — fix pending.** | High |
+| Tests | No `jest`/`jest-expo`/RNTL; no `test`, `lint` or `typecheck` scripts. `src/features/wallet/__tests__/` has `WalletScreen.test.ts` (defines `formatWalletCurrency` inline and checks it with `console.assert` — tests a copy, not app code) and `WalletScreen.test.tsx`. Best first targets: `utils/formatters.ts`, `date.ts`, `slots.ts`, `jsonUtils.ts`, `s3Utils.ts`, `resolvePatientIdentity.ts`, the zod `authSchemas`, and `ApiService` 401-refresh logic (mock axios). | High |
+| Design system adoption | 4,028 hardcoded hex colours vs `APP_COLORS`/`TONES` (§2). The documented redesign direction is not enforced by any tool. | High |
+| File size | 14+ files over 1,000 lines (§2) — hard to review/merge; raises the cost of the redesign. | High |
+| Imports | 737 imports use `../../../` or deeper; `tsconfig.json` has no `paths`. Add `@/*` (Expo SDK 57 resolves tsconfig paths). | Medium |
+| Duplicate / drifting features | `features/laboratory` beside `features/laboratory_duplicated` (4 Page-style files, 3 over 1,200 lines) — which is live is unclear. 82 `*Page` vs 20 `*Screen`. | Medium |
+| Service layering | Direct network calls bypassing `ApiService`: `components/common/inputs/DoctorHospitalDropdown.tsx:45` (axios), `components/common/location/LocationScreen.tsx:52` (fetch), `features/auth/AccountPage.tsx:56` (fetch + commented block saying it "bypasses auth-header injection"), `features/consultation/ConsultationPage.tsx:492` (fetch of an S3 key). Some may be intentional (public/S3) but are undocumented. | Medium |
+| Onboarding | `EXPO_PUBLIC_API_ENDPOINT` throws at import if unset and there is no `.env.example`. `google-services.json` is tracked (deliberate or not, it should be a documented choice). | Medium |
+| Tooling | No ESLint/husky/lint-staged; Prettier config exists but no `format` script, and some files are 2-space (so it isn't applied consistently). `babel.config.js` lists the reanimated plugin explicitly — with Reanimated 4 the worklets plugin is what's required (confirm `babel-preset-expo` already adds it). | Medium |
+| Observability | Root `ErrorBoundary` only (no per-screen boundaries); **no crash reporting** (no Sentry/Crashlytics) for a healthcare app; raw `console.*` with no logger wrapper or levels; no feature-flag mechanism. | Medium |
+| Dependency health | Loose carets on `expo`, `@react-native-firebase/*`, `react-navigation`; `@react-native/metro-config ^0.85.2` vs `react-native 0.86.3`; both `react-native-vector-icons` and `@expo/vector-icons`; `react-native-web`/`react-dom` installed (is web a target?). Unused-dependency check and `expo install --check` not run. | Low |
+| Repo-root clutter | Tracked mockups at the root: `Doctor Dashboard.html`, `Offline & Models.html`, `doctor_consultation.html`, `patient_dashboard.html`, `user-profile.html` ✔ (plus untracked `ancillary-provider.html`); also `gemini.md`, `tsc_full_output.txt`, `mobile_tsc_out.txt`, `metro_restart_log.txt`. Move mockups to `docs/design/`, delete the logs. | Low |
+| Docs | No navigation/param-type docs; `CLAUDE.md` and `README.md` otherwise accurate. | Low |
 
-1. **Missing Automated Test Runner:**
-   - `package.json` contains no test framework (`jest`, `@testing-library/react-native`, `detox`). Zero unit or component tests exist. **Action:** Configure Jest and React Native Testing Library for core services and auth flows.
-2. **Production Console Output Overhead:**
-   - `babel.config.js` lacks `babel-plugin-transform-remove-console`. Release JS bundles execute `console.log` operations, adding CPU overhead and exposing internal state. **Action:** Add `transform-remove-console` plugin for production environment.
-3. **Ad-Hoc Form Validation:**
-   - Form screens perform manual string checks (`if (!field)`). **Action:** Adopt Zod schema validation for auth and registration (Implemented by teammate in `authSchemas.ts`).
+**Quick wins (≤1 day each):** (1) rewrite README run steps to the dev-client flow, add `.env.example` and an `eas.json` development profile; (2) add `jest-expo`, `npm test`, `typecheck`, and replace the fake wallet test with tests for formatters/date/slots/jsonUtils/zod schemas; (3) add `@/*` path alias and a `format` script; (4) tidy root clutter and resolve `laboratory_duplicated`; (5) add a default axios timeout and a release-only console stripper + `__DEV__` logger, and add crash reporting (Firebase is already a dependency).
 
----
+## 7. Recommended action plan
 
-### G. Performance, Virtualization & Memory Management
+**P0 — before wider release**
+1. Strip `console.*` in release builds and delete the payload/response/profile logs (S-3).
+2. Enforce `https`/`wss` in release (S-1); authenticate the WebSockets with a short-lived ticket once the backend supports it (S-2).
+3. Make `secureStorage` fail closed (S-5); purge all local PHI on every logout path through one function (S-6, S-7); don't log out on transient refresh failures (S-8).
+4. Lock down the DICOM WebView and bundle its scripts (S-4).
+5. Add a default axios timeout and a way to suppress the global error modal per request; dedupe it (C-1, C-2).
 
-1. **Unvirtualized List Renderings:**
-   - Key feature screens (`AppointmentList.tsx`, `DoctorAppointments.tsx`, `LaboratorySearchPage.tsx`, `OrderListPage.tsx`) render datasets using standard `ScrollView` containing `.map()` children. For lists exceeding 10–15 cards, `ScrollView` mounts every component simultaneously in memory, causing UI freeze and frame drops on budget Android hardware.
-   - **Remediation:** Refactor long list components to `FlatList` or `FlashList` with explicit `keyExtractor` and `getItemLayout`.
-2. **Timer & Real-Time Listener Cleanup:**
-   - Real-time features (`TrackAppointmentPage.tsx`, `StaffAncillaryDashboard.tsx`, `NursePulseRadarView.tsx`) establish WebSockets and `setInterval` timers. Unmount handlers must guarantee `ws.close()` and `clearInterval()` execution to prevent memory leaks and background CPU consumption.
+**P1 — next sprint**
+6. WebSocket helper with reconnect/backoff, shared "navigated" ref, in-flight guards, and fix `TrackAppointmentPage` stale closures (C-3, C-4 and §4 Medium).
+7. Memoise `AuthContext` (value + callbacks) and use functional `setUser`.
+8. URL/route allowlists for `Linking.openURL` and offer params (S-9); presigned S3 URLs (S-10).
+9. Test runner + CI (typecheck, tests, lint); crash reporting; dev-client README.
 
----
+**P2 — hygiene**
+10. Migrate hex colours to `APP_COLORS` per screen as each is redesigned; split the 1,000+-line files (start with `ancillaryService.ts`, `DoctorAppointments.tsx`, `MyHospitalsTab.tsx`); convert remaining `.then()` chains to async/await with unmount guards; add path aliases; remove `laboratory_duplicated`; route direct `fetch`/`axios` call sites through `ApiService` or document them; refresh the stale checklist items in this file as they are fixed.
 
-### H. Mobile UI/UX Quality, Accessibility & Network Resilience
+## 8. Not verified in this review
 
-1. **Safe Area & Edge-to-Edge Padding:**
-   - Floating action bars and fixed screen footers must dynamically apply `insets.bottom` from `useSafeAreaInsets()` to prevent overlap with iOS home indicators and Android gesture bars.
-2. **Offline Network Resilience:**
-   - NetInfo network monitoring implemented via `NetworkContext.tsx` and `<OfflineBanner />` to notify users when network connectivity is lost.
-3. **Touch Targets & Accessibility:**
-   - Filter chips and custom icon buttons in `PharmacyFilters.tsx` and `RadiologyFilter.tsx` updated with enhanced padding to meet 44x44 dp guidelines.
+Behaviour on a physical device (low-end Android, iOS); Android manifest/cleartext flags; server-side WebSocket auth (see backend review) and S3 bucket policy; push-notification payload handling; FCM token cleanup on logout; which of the 594 `.map(` sites render long lists; remaining ~100 `useEffect`+fetch call sites outside the files named above; unused-dependency analysis.
 
----
+## 9. P1 remediation (done, uncommitted at time of writing)
 
-## 3. Prioritized Action Plan & Implementation Roadmap
+| Item | Change |
+|---|---|
+| URL safety | New `src/utils/safeLinking.ts` (`openWebUrl`, https-only). Offers, health-read podcasts, event registration links (home, list, details) and consultation file/prescription links no longer pass server-supplied URLs straight to `Linking.openURL`. |
+| ServiceMatchingPage | A shared `hasNavigatedRef` stops the socket push and the status poll from both calling `navigation.replace`. |
+| TrackAppointmentPage | Socket/poll effect reads provider/title/address through a ref (no stale closures); in-flight fetch guard; mounted check before redirecting; a single guarded `redirectToMatching`. |
+| AuthContext | Callbacks wrapped in `useCallback`, context value in `useMemo`, `updateUser` uses a functional `setUser`, so consumers no longer re-render on every provider render. |
 
-```
-                          PRODUCTION HARDENING ROADMAP
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 1: CRITICAL SECURITY, CRASH FIXES & BUILD HARDENING (COMPLETED ✅)        │
-│  - [x] Implement root <ErrorBoundary> component in App.tsx                       │
-│  - [x] Scrub plaintext access tokens and verbose header debug logs in apiService│
-│  - [x] Guard all raw JSON.parse calls with safe try/catch deserializers         │
-│  - [x] Fix all TypeScript errors (0 errors on `npx tsc --noEmit`)               │
-│  - [x] Migrate access_token/refresh_token to secureStorage (expo-secure-store)  │
-│  - [x] Remove hardcoded local IPs in apiUrls.ts in favor of process.env         │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 2: IN-FILE CODING STANDARDIZATION & MONOLITH DECOMPOSITION (COMPLETED ✅)  │
-│  - [x] Centralize formatters into src/utils/formatters.ts                      │
-│  - [x] Standardize canonical theme configuration in src/config/theme.ts         │
-│  - [x] Extract sub-views (e.g. RejectReasonModal.tsx, WeekSelector.tsx)         │
-│  - [x] Apply safe area insets to footers & filter bars                          │
-│  - [x] Complete decomposition of monolithic components into modular views/hooks │
-│  - [x] Refactor unsafe `as any` type bypasses to explicit interfaces            │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 3: ARCHITECTURE & NAMING STANDARDIZATION (COMPLETED ✅)                   │
-│  - [x] Standardize component folders (`component` -> `components`)               │
-│  - [x] Relocate misplaced root screen (`TrackAppointmentPage.tsx` -> `patient/`)   │
-│  - [x] Fix Windows Git Casing for PascalCase files (git mv applied)             │
-│  - [x] Consolidate fragmented profile tabs (`laboratory/profile/` -> `tabs/`)    │
-│  - [x] Standardize feature directory taxonomy (`setting` -> `settings`)         │
-│  - [x] Standardize screen component suffixes (`Screen.tsx` -> `Page.tsx`)        │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 4: BUILD TOOLING, NETWORK & PERFORMANCE HARDENING (IN PROGRESS 🟡)        │
-│  - [x] Add NetInfo offline network listener, state context & user banner        │
-│  - [x] Introduce Zod form schema validation for authentication flows            │
-│  - [ ] Configure transform-remove-console in babel.config.js for release builds │
-│  - [ ] Convert heavy ScrollView lists to FlatList / FlashList                    │
-│  - [ ] Audit clean unmount cleanup on all WebSockets and polling timers         │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 5: UI/UX POLISH, ACCESSIBILITY & TEST COVERAGE (Medium Priority)         │
-│  - [x] Enforce minimum 44x44 dp touch targets across filter chips               │
-│  - [ ] Add skeleton loaders across feature initial fetch calls                  │
-│  - [ ] Introduce Jest & React Native Testing Library test suite                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
+`npx tsc --noEmit` is clean. Not done: allowlist for in-app `route` targets of offers (unknown routes are a no-op today), a mobile test runner, crash reporting.
 
----
+## 10. Correctness follow-ups (done, uncommitted at time of writing)
 
-## 4. Phase 1 Completion Summary
-
-As of **September 14, 2026**, **Phase 1 (Critical Security, Crash Fixes & Build Hardening)** has been fully executed and verified:
-
-1. **Root Error Resilience (`src/components/common/ErrorBoundary.tsx`):**
-   - Created top-level `ErrorBoundary` component with clean user-facing error state and wrapped `<AppNavigator />` in `App.tsx`.
-2. **Security & Token Hardening (`src/utils/secureStorage.ts` & `src/services/apiService.ts`):**
-   - Implemented `secureStorage` utility utilizing `expo-secure-store` (with web fallback).
-   - Removed all `console.log('[API TOKEN]', token)` plaintext logging and sanitized request/response logging.
-3. **Storage & JSON Parse Safety (`src/utils/jsonUtils.ts`):**
-   - Created `safeJsonParse<T>()` and replaced all raw `JSON.parse` crash vectors in `AuthContext.tsx`, `AncillaryPaymentPage.tsx`, `BookingDetailsPage.tsx`, `PatientProfileSelectorBottomSheet.tsx`, `CapabilitiesTab.tsx`, `PersonalDetailsTab.tsx`, `PatientProfileService.ts`, `ServiceDetailsBottomSheet.tsx`, and `ancillaryService.ts`.
-4. **TypeScript Build Hardening:**
-   - Replaced invalid `StyleSheet.absoluteFillObject` with `StyleSheet.absoluteFill` across all 25 affected component files.
-   - Updated `AncillaryServiceItem` schema to include `title?: string`.
-   - Fixed `NodeJS.Timeout` type in `ServiceInProgressPage.tsx`.
-   - Verified clean compilation: `npx tsc --noEmit` returns **0 errors**.
-5. **Environment Configuration (`src/constants/apiUrls.ts`):**
-   - Fixed `getBaseUrl()` to read `process.env.EXPO_PUBLIC_API_ENDPOINT` dynamically with production fallback.
-
----
-
-## 5. Teammate Code Review & Recommendations (Phase 2 & Phase 3 Audit)
-
-A thorough review of the changes introduced by your teammate for **Phase 2** and **Phase 3** (commit `4d97289` and branch updates) was conducted on **September 15, 2026**.
-
-### A. Positive Implementations & Commendable Progress
-
-1. **Offline Network Resilience (Brought Forward from Phase 4):**
-   - Created `src/context/NetworkContext.tsx`, `src/utils/networkState.ts`, and `src/components/common/OfflineBanner.tsx`.
-   - Integrated pre-flight network checks in `apiService.ts` to prevent doomed API requests when offline.
-   - Mounted `<NetworkProvider>` and `<OfflineBanner />` globally in `App.tsx`.
-2. **Form Schema Validation with Zod:**
-   - Added `src/validation/authSchemas.ts` using `zod` for strict `loginSchema` and `registerSchema`.
-   - Replaced fragile string checks in `LoginPage.tsx` and `RegisterForm.tsx` with Zod validation.
-3. **Directory Structure Standardization (Phase 3):**
-   - Successfully standardized feature subdirectories from `component/` to `components/` across `laboratory`, `pharmacy`, and `radiology`.
-   - Relocated misplaced `TrackAppointmentPage.tsx` into `src/features/ancillary/patient/TrackAppointmentPage.tsx`.
-   - Cleaned up feature folder naming (`patientQr` $\rightarrow$ `patient-qr`, `patientPayment` $\rightarrow$ `patient-payment`).
-4. **Safe Area & UI Touch Target Hardening:**
-   - Applied `useSafeAreaInsets()` in `AppStickyFooter.tsx`, `PharmacyFilters.tsx`, `RadiologyFilter.tsx`, `NursePulseRadarView.tsx`.
-   - Increased minimum touch target size and padding for filter chips in `PharmacyFilters.tsx` and `RadiologyFilter.tsx`.
-
----
-
-### B. Identified Deficits & Actionable Recommendations
-
-| Category | Finding / Deficit | Severity | Impact & Resolution Status |
-| :--- | :--- | :--- | :--- |
-| **Git Casing Bug (Windows File System)** | File renames (`Bookingdetailslaboratorypage.tsx` $\rightarrow$ `BookingDetailsLaboratoryPage.tsx`, `Orderlistlaboratorypage.tsx` $\rightarrow$ `OrderListLaboratoryPage.tsx`, `Pharmacysearchpage.tsx` $\rightarrow$ `PharmacySearchPage.tsx`, `RadiologyService.ts` $\rightarrow$ `radiologyService.ts`) were made on disk, but Git on Windows kept tracking lowercase names. | 🔴 **CRITICAL (FIXED ✅)** | Caused `TS1261` and `TS1149` TypeScript compiler errors due to casing collisions.<br>**Action Taken:** Executed `git mv` to explicitly update Git index with PascalCase / camelCase filenames. |
-| **Monolithic Component Files (>1,000 Lines)** | Monolithic screens combining UI presentation, modal state, and API fetching into single massive files (`DoctorAppointments.tsx`, `PharmacyOrderDetailsPage.tsx`, `MyHospitalsTab.tsx`). | 🟠 **HIGH (COMPLETED ✅)** | Extracted sub-views and hooks (e.g. `WeekSelector.tsx`, `RejectReasonModal.tsx`) into modular component files under feature domain `components/`. |
-| **Remaining `as any` Type Suppressions** | Instances of `as any` in `ConsultationPage.tsx`, `ProfilePage.tsx`, `OrderListPage.tsx`, and navigation routing calls. | 🟠 **HIGH (COMPLETED ✅)** | Defined explicit route param interfaces and type-safe role checks across feature modules. |
-| **Screen Component Suffix Inconsistency** | Inconsistent component file suffixes (`OrderDetailsScreen.tsx` vs `OrderListPage.tsx` and `WalletScreen.tsx`). | 🟡 **MEDIUM (RESOLVED ✅)** | Standardized all screen components to use `Page.tsx` suffix (`PharmacyOrderDetailsPage.tsx`, `WalletPage.tsx`, `WalletTransactionsPage.tsx`, `WalletTransactionDetailPage.tsx`). |
-| **Service & Type File Fragmentation** | Separate type files and service files coexisted without unified re-exports (`laboratory.ts`, `radiology.ts`, `pharmacy.ts`). | 🟡 **MEDIUM (RESOLVED ✅)** | Re-exported domain types cleanly in `pharmacyService.ts`, `laboratoryService.ts`, and `radiologyService.ts`. |
-| **Unvirtualized List Renderings** | `AppointmentList.tsx`, `DoctorAppointments.tsx`, `LaboratorySearchPage.tsx`, `OrderListPage.tsx` render data lists inside standard `ScrollView`. | 🟡 **MEDIUM** | Potential UI freeze and frame drop on low-end mobile devices when rendering long lists.<br>**Recommendation:** Refactor list renders to `FlatList` or `FlashList` with explicit `keyExtractor` (Phase 4). |
-
----
-
-## 6. Production Quality Gate Checklist
-
-Before declaring any feature or release candidate production-ready, verify against this quality gate:
-
-- [x] `npx tsc --noEmit` returns **0 compilation errors**.
-- [x] Root `<ErrorBoundary>` wraps the application tree.
-- [x] Zero `console.log` statements output raw tokens, passwords, or sensitive headers.
-- [x] Windows Git casing issues resolved via `git mv`.
-- [x] Offline network listener (`NetInfo`) & `<OfflineBanner />` operational.
-- [x] Auth form schemas validated with Zod.
-- [x] Monolithic component files decomposed into modular sub-components and hooks.
-- [x] Unsafe `as any` type suppressions refactored in navigation and core services.
-- [x] Hex colors consumed exclusively from `src/config/theme.ts`.
-- [x] Folder and filename conventions adhere to standardized PascalCase/camelCase taxonomy (`*Page.tsx` suffix enforced).
-- [x] All `AsyncStorage` / `JSON.parse` operations are protected against corrupted data.
-- [x] iOS and Android safe-area insets applied to all fixed footers and floating bars.
-- [x] Offline network drops handled gracefully with user-facing notification.
-- [ ] Physical device testing performed on low-end Android and iOS devices.
+`DashboardPage` doctor fetches have a stale-response guard; ~15 `.then()` chains in effects converted to async/await with cancel guards; `DoctorHomeScreen` counts pending requests via `meta.total` (limit 1) instead of downloading 100 rows; swallowed errors now commented, toasted or logged; `handleCancelRequestWithReason` resets `isCancelling`. Open: `cancelCareRequestPatientBackend` catches every error and returns `true`, so a failed cancel still looks successful.

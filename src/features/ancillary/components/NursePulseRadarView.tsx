@@ -9,7 +9,7 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography } from '../../../components/common/AppTypography'
+import { AppTypography } from '../../../components/common/display/AppTypography'
 
 interface NursePulseRadarViewProps {
 	patientAddress?: string

@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS, BASE_URL } from '../../constants/apiUrls'
 import { safeJsonParse } from '../../utils/jsonUtils'
+import type { AncillaryServiceDetails } from './ancillaryProviderBookingService'
+import type { IdentityDocument, IdentityDocumentType } from '../profile/shared/identityDocuments'
 
 // --- Canonical 13-State Machine Status Vocabulary ---
 export type CanonicalRequestStatus =
@@ -32,7 +34,8 @@ export const generateIdempotencyKey = (): string => {
 	return `idemp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 }
 
-export interface AncillaryServiceItem {
+/** A procedure from GET /api/ancillary/services, incl. the phase-4 catalog detail fields (§1). */
+export interface AncillaryServiceItem extends AncillaryServiceDetails {
 	id: string
 	title?: string
 	label?: string
@@ -146,10 +149,38 @@ export const fetchAncillarySubSpecialtiesBackend = fetchAncillarySubspecialtiesB
 // `description`. AncillaryServiceItem uses `title`/`description` for display
 // (see ServiceCatalogCard / AncillaryServiceCatalogScreen), so raw API records
 // must be mapped here or every service card renders with a blank name.
+const toNumberOrNull = (value: unknown): number | null => {
+	if (value == null || value === '') return null
+	const n = Number(value)
+	return Number.isFinite(n) ? n : null
+}
+
+const toStringList = (value: unknown): string[] =>
+	Array.isArray(value) ? value.map((v) => String(v ?? '').trim()).filter(Boolean) : []
+
+// Phase-4 catalog detail fields (contract §1) -- snake_case on the wire; camelCase accepted too so a
+// serializer alias change doesn't blank the UI. Missing fields come back null / [] and the app hides them.
+const readServiceDetails = (raw: any): AncillaryServiceDetails => {
+	const goodFor = raw?.good_for ?? raw?.goodFor
+	return {
+		mrp: toNumberOrNull(raw?.mrp),
+		duration_minutes: toNumberOrNull(
+			raw?.duration_minutes ?? raw?.durationMinutes ?? raw?.estimated_duration_mins ?? raw?.estimatedDurationMins
+		),
+		good_for: typeof goodFor === 'string' && goodFor.trim() ? goodFor.trim() : null,
+		includes: toStringList(raw?.includes),
+		prep_steps: toStringList(raw?.prep_steps ?? raw?.prepSteps),
+		is_featured: Boolean(raw?.is_featured ?? raw?.isFeatured ?? false),
+		visits_count: toNumberOrNull(raw?.visits_count ?? raw?.visitsCount),
+		validity_days: toNumberOrNull(raw?.validity_days ?? raw?.validityDays),
+	}
+}
+
 const mapRawServiceToItem = (raw: any): AncillaryServiceItem => {
 	const whatsIncludedRaw = raw?.whatsIncluded ?? raw?.whats_included ?? null
 	const aboutServiceRaw = raw?.aboutService ?? raw?.about_service ?? null
 	return {
+		...readServiceDetails(raw),
 		id: raw?.id,
 		title: raw?.title || raw?.label || raw?.name || '',
 		label: raw?.label || raw?.title || raw?.name || '',
@@ -168,23 +199,39 @@ const mapRawServiceToItem = (raw: any): AncillaryServiceItem => {
 	}
 }
 
-export const fetchAncillaryServicesBackend = async (params?: {
+interface AncillaryServicesParams {
 	categoryId?: string
 	specialtyId?: string
 	subspecialtyId?: string
 	sub_specialty_id?: string
-}): Promise<AncillaryServiceItem[]> => {
+	/** Words to look for: the backend matches them against each service's name, about text, included tasks, good-for and category. */
+	search?: string
+}
+
+/** The longest search text the backend accepts (a longer one is a 422); the screens send at most this much. */
+const MAX_SEARCH_LENGTH = 100
+const searchText = (value?: string) => (value ?? '').trim().slice(0, MAX_SEARCH_LENGTH).trim()
+
+/** GET /api/ancillary/services. Throws when the request fails. */
+export const searchAncillaryServices = async (params?: AncillaryServicesParams): Promise<AncillaryServiceItem[]> => {
+	const query: Record<string, string> = {}
+	if (params?.categoryId) query.category_id = params.categoryId
+	if (params?.specialtyId) query.specialty_id = params.specialtyId
+	const search = searchText(params?.search)
+	if (search) query.search = search
+	const subId = params?.subspecialtyId || params?.sub_specialty_id
+	if (subId) {
+		query.subspecialty_id = subId
+		query.sub_specialty_id = subId
+	}
+	const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.SERVICES, query)
+	return unwrapList<any>(res.data).map(mapRawServiceToItem)
+}
+
+/** The catalogue list: a failed request gives an empty list (the screen shows its own empty state). */
+export const fetchAncillaryServicesBackend = async (params?: AncillaryServicesParams): Promise<AncillaryServiceItem[]> => {
 	try {
-		const query: Record<string, string> = {}
-		if (params?.categoryId) query.category_id = params.categoryId
-		if (params?.specialtyId) query.specialty_id = params.specialtyId
-		const subId = params?.subspecialtyId || params?.sub_specialty_id
-		if (subId) {
-			query.subspecialty_id = subId
-			query.sub_specialty_id = subId
-		}
-		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.SERVICES, query)
-		return unwrapList<any>(res.data).map(mapRawServiceToItem)
+		return await searchAncillaryServices(params)
 	} catch (error) {
 		console.log('[ancillaryService] fetchAncillaryServicesBackend error:', error)
 		return []
@@ -1038,23 +1085,20 @@ export const acceptCareRequestBackend = async (
 }
 
 /**
- * Nurse Status Update Endpoint (EN_ROUTE / ARRIVED).
+ * Nurse Status Update (EN_ROUTE / ARRIVED) via POST /provider/requests/{id}/status { status, etaMinutes }.
+ * There are no dedicated /en-route or /arrive routes on the backend. Throws on failure so callers can
+ * tell the provider the patient wasn't notified.
  */
 export const updateNurseStatusBackend = async (
 	requestId: string,
-	newStatus: string,
+	newStatus: 'EN_ROUTE' | 'ARRIVED',
 	etaMinutes: number = 12
 ): Promise<boolean> => {
-	try {
-		await ApiService.post(API_ENDPOINTS.ANCILLARY.UPDATE_STATUS(requestId), {
-			status: newStatus,
-			etaMinutes,
-		})
-		return true
-	} catch (error) {
-		console.log('[ancillaryService] Updated status locally:', newStatus)
-		return true
-	}
+	await ApiService.post(API_ENDPOINTS.ANCILLARY.UPDATE_STATUS(requestId), {
+		status: newStatus,
+		etaMinutes,
+	})
+	return true
 }
 
 /**
@@ -1525,6 +1569,13 @@ export interface AncillaryProfileBackendResponse {
 	public_id: string
 	license_number: string
 	license_proof_s3_key?: string
+	/** The licence proof as a short-lived signed link (the same value as `license_proof_s3_key`). */
+	license_proof?: string
+	/** Review state of the licence proof: pending / approved / rejected / reupload. */
+	license_status?: string
+	/** Government IDs uploaded so far (signed links + review status), and the ID types to choose from. */
+	identity_documents?: IdentityDocument[]
+	identity_document_types?: IdentityDocumentType[]
 	qualification_proof_s3_key?: string
 	qualifications?: string | any[] | any
 	qualifications_list?: any[]
@@ -1557,6 +1608,8 @@ export interface AncillaryProfileBackendResponse {
 	mobile_number?: string
 	avatar_s3_key?: string
 	verification_status?: string
+	/** 0-100, for the profile hub's completion bar. */
+	profile_completion?: number
 }
 
 export const fetchProviderProfile = async (): Promise<AncillaryProfileBackendResponse | null> => {
@@ -1697,7 +1750,6 @@ export const fetchAncillaryProfileBackend = fetchProviderProfile;
 
 // --- Clean Function Aliases (without Backend suffix) ---
 export const fetchAncillaryCategories = fetchAncillaryCategoriesBackend
-export const fetchAncillaryServices = fetchAncillaryServicesBackend
 export const acceptCareRequest = acceptCareRequestBackend
 export const verifyPatientOtp = verifyPatientOtpBackend
 export const updateNurseStatus = updateNurseStatusBackend
@@ -1812,36 +1864,14 @@ export interface SaveProviderAvailabilityPayload {
 }
 
 export interface SaveProviderDateOverridePayload {
+	/** 'YYYY-MM-DD' */
 	override_date: string
+	/** true = time off (the whole day, or only start_time..end_time when given). */
 	is_unavailable: boolean
+	/** 'HH:MM' -- optional partial-day window. */
+	start_time?: string
+	end_time?: string
 	reason?: string
-}
-
-export interface ScheduledOrder {
-	request_public_id: string
-	patient_name: string
-	patient_contact_number?: string
-	status: string
-	booking_type: string
-	scheduled_date: string
-	scheduled_start_time: string
-	scheduled_end_time: string
-	rescheduled_date?: string | null
-	rescheduled_start_time?: string | null
-	rescheduled_end_time?: string | null
-	reschedule_reason?: string | null
-	rescheduled_by?: string | null
-	reschedule_count: number
-	street_address: string
-	total_amount: number
-	procedures: string[]
-	chief_complaint?: string
-	medical_notes?: string
-}
-
-export interface ScheduledOrdersResponse {
-	count: number
-	orders: ScheduledOrder[]
 }
 
 export interface RescheduleProposalPayload {
@@ -2068,67 +2098,27 @@ export const saveProviderWeeklyAvailability = async (
  */
 export const saveProviderDateOverride = async (
 	payload: SaveProviderDateOverridePayload
-): Promise<{ message: string; override_date: string; is_unavailable: boolean }> => {
-	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_OVERRIDES, payload)
-	const data = res.data?.data || res.data
+): Promise<{ message: string; override_id?: number; override_date: string; is_unavailable: boolean }> => {
+	// Backend body (AddSlotOverridePayload): { override_date, is_available, start_time?, end_time?, reason? }.
+	const body: Record<string, unknown> = {
+		override_date: payload.override_date,
+		is_available: !payload.is_unavailable,
+	}
+	if (payload.start_time) body.start_time = payload.start_time
+	if (payload.end_time) body.end_time = payload.end_time
+	if (payload.reason) body.reason = payload.reason
+	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_OVERRIDES, body)
+	const data = res.data?.data || {}
 	return {
-		message: data?.message || `Slot override saved for date ${payload.override_date}.`,
-		override_date: data?.override_date || payload.override_date,
-		is_unavailable: data?.is_unavailable !== false,
+		message: res.data?.message || `Slot override saved for date ${payload.override_date}.`,
+		override_id: data.override_id,
+		override_date: data.override_date || payload.override_date,
+		is_unavailable: data.is_available != null ? !data.is_available : payload.is_unavailable,
 	}
 }
 
-/**
- * Provider action: Fetch scheduled orders queue with status filter.
- */
-export const fetchProviderScheduledOrders = async (
-	statusFilter: 'PENDING_ACTION' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'ALL' = 'ALL'
-): Promise<ScheduledOrdersResponse> => {
-	const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.PROVIDER_SCHEDULED_ORDERS, {
-		status_filter: statusFilter,
-	})
-	const data = res.data?.data || res.data
-	const orders: ScheduledOrder[] = Array.isArray(data?.orders)
-		? data.orders
-		: Array.isArray(data)
-		? data
-		: []
-	return {
-		count: Number(data?.count || orders.length),
-		orders,
-	}
-}
-
-/**
- * Provider action: Accept scheduled order.
- */
-export const acceptScheduledOrder = async (
-	requestPublicId: string
-): Promise<{ success: boolean; status: string; message: string }> => {
-	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.ACCEPT_SCHEDULED(requestPublicId), {})
-	const data = res.data?.data || res.data
-	return {
-		success: data?.success !== false,
-		status: data?.status || 'SCHEDULED_CONFIRMED',
-		message: data?.message || 'Scheduled order successfully accepted.',
-	}
-}
-
-/**
- * Provider action: Decline scheduled order.
- */
-export const declineScheduledOrder = async (
-	requestPublicId: string,
-	reason: string = 'Schedule conflict'
-): Promise<{ success: boolean; status: string; message: string }> => {
-	const res = await ApiService.post<any>(API_ENDPOINTS.ANCILLARY.DECLINE_SCHEDULED(requestPublicId), { reason })
-	const data = res.data?.data || res.data
-	return {
-		success: data?.success !== false,
-		status: data?.status || 'CANCELLED_BY_PROVIDER',
-		message: data?.message || 'Scheduled order declined.',
-	}
-}
+// Provider scheduled orders (list / accept / decline) live in ancillaryProviderBookingService.ts
+// (getProviderScheduledOrders / acceptScheduledOrder / declineScheduledOrder) -- multi-visit order shape.
 
 /**
  * Provider action: Propose a reschedule slot to the patient (Max 2 proposals per order).
@@ -2152,7 +2142,8 @@ export const proposeRescheduleSlot = async (
 // Ancillary Service Packages (admin-curated procedure bundles)
 // ---------------------------------------------------------------------------
 
-export interface AncillaryPackageListItem {
+/** GET /api/ancillary/packages item, incl. the phase-4 detail fields (§1: mrp, visits_count, validity_days...). */
+export interface AncillaryPackageListItem extends AncillaryServiceDetails {
 	id: string
 	specialtyId: string
 	label: string
@@ -2171,7 +2162,7 @@ export interface AncillaryPackageProcedure {
 	imageUrl?: string | null
 }
 
-export interface AncillaryPackageDetail {
+export interface AncillaryPackageDetail extends AncillaryServiceDetails {
 	id: string
 	specialtyId: string
 	label: string
@@ -2181,22 +2172,45 @@ export interface AncillaryPackageDetail {
 	procedures: AncillaryPackageProcedure[]
 }
 
-export const fetchAncillaryPackages = async (specialtyId: string): Promise<AncillaryPackageListItem[]> => {
-	try {
-		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.PACKAGES, {
-			specialty_id: specialtyId,
-		})
-		return unwrapList<AncillaryPackageListItem>(res.data)
-	} catch (error) {
-		console.log('[ancillaryService] fetchAncillaryPackages error:', error)
-		throw error
+const mapRawPackage = (raw: any): AncillaryPackageListItem => ({
+	...readServiceDetails(raw),
+	id: String(raw?.id ?? raw?.public_id ?? ''),
+	specialtyId: String(raw?.specialtyId ?? raw?.specialty_id ?? ''),
+	label: String(raw?.label ?? raw?.name ?? ''),
+	description: raw?.description ?? null,
+	imageUrl: raw?.imageUrl ?? raw?.image_url ?? null,
+	packagePrice: Number(raw?.packagePrice ?? raw?.package_price ?? raw?.price) || 0,
+	procedureCount: Number(raw?.procedureCount ?? raw?.procedure_count) || 0,
+})
+
+export interface AncillaryCatalog {
+	services: AncillaryServiceItem[]
+	packages: AncillaryPackageListItem[]
+}
+
+/**
+ * GET /api/ancillary/catalog: a specialty's services AND packages in one call (what the catalogue screen shows), each
+ * in the shape of its own list. `search` is applied to both by the backend, best match first. Throws when the request fails.
+ */
+export const fetchAncillaryCatalog = async (params: { specialtyId: string; search?: string }): Promise<AncillaryCatalog> => {
+	const query: Record<string, string> = { specialty_id: params.specialtyId }
+	const search = searchText(params.search)
+	if (search) query.search = search
+	const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.CATALOG, query)
+	const data = res.data?.data ?? {}
+	return {
+		services: Array.isArray(data.services) ? data.services.map(mapRawServiceToItem) : [],
+		packages: Array.isArray(data.packages) ? data.packages.map(mapRawPackage) : [],
 	}
 }
 
 export const fetchAncillaryPackageDetail = async (packageId: string): Promise<AncillaryPackageDetail | null> => {
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PACKAGE_DETAIL(packageId))
-		return res.data?.data ?? null
+		const raw = res.data?.data
+		if (!raw) return null
+		const procedures: AncillaryPackageProcedure[] = Array.isArray(raw.procedures) ? raw.procedures : []
+		return { ...mapRawPackage(raw), procedures }
 	} catch (error) {
 		console.log('[ancillaryService] fetchAncillaryPackageDetail error:', error)
 		return null

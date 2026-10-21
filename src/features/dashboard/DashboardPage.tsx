@@ -18,8 +18,11 @@ import MediaPromotionsSection from './components/MediaPromotionsSection'
 import ServicesSection from './components/ServiceSection'
 import SpecialitySection from './components/SpecialitySection'
 import ConsultSection from './components/ConsultSection'
-import PatientQuestionsSection from './components/PatientQuestionsSection'
 import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
+import HomeOffersSection from './components/HomeOffersSection'
+import HomeHealthReadsSection from './components/HomeHealthReadsSection'
+import HomeCommunitiesSection from './components/HomeCommunitiesSection'
+import AskDoctorSection from './components/AskDoctorSection'
 
 import PatientUpcomingAppointments from './components/PatientUpcomingAppointments'
 import CommunitySection from './components/CommunitySection'
@@ -28,17 +31,20 @@ import ArticleSection from './components/ArticleSection'
 import UpcomingEventsSection from './components/EventSection'
 import PodcastsSection from './components/PodcastsSection'
 import DoctorAppointments from '../doctor/DoctorAppointments'
-import { getAppointments } from '../doctor/doctorService'
-import StaffAncillaryDashboard from '../ancillary/staff/StaffAncillaryDashboard'
+import { getAppointments, getSpecialities } from '../doctor/doctorService'
+import type { SpecialityItem } from '../../types/speciality'
+import { APP_COLORS } from '../../config/theme'
+import ProviderTodayContent from '../ancillary/staff/today/ProviderTodayContent'
 
 import { formatDateForApi } from '../../utils/date'
-import { USER_ROLES } from '../../constants/constants'
+import { USER_ROLES, isPatientRole } from '../../constants/constants'
 import { useAuth } from '../../context/AuthContext'
-import StatusModal from '../../components/common/StatusModal'
+import StatusModal from '../../components/common/feedback/StatusModal'
 import { useScroll } from '../../context/ScrollContext'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ROUTES } from '../../navigation/routes'
+import { useTabBarClearance } from '../../navigation/tabBar'
 import type { AppNavigationParamList } from '../../navigation/types'
 
 import PatientHealthQuestionsList from '../dashboard/components/PatientHealthQuestionsList'
@@ -60,11 +66,14 @@ export default function DashboardPage() {
 	}, [scrollData, scrollY])
 
 	const insets = useSafeAreaInsets()
+	const tabBarClearance = useTabBarClearance()
 	const { role } = useAuth()
 	const isDoctor = role === USER_ROLES.DOCTOR
 	const isNurse = role === USER_ROLES.ANCILLARY
 	const isStaffRole = isDoctor || isNurse
-	const defaultHeaderHeight = isStaffRole ? insets.top + 84 : insets.top + 146
+	const isPatientHome = isPatientRole(role)
+	// Patient Home header (expanded): 8 + 52 + 6 + 28 + 6 + 48 + 16. Provider Today header: 8 + 60 + 16.
+	const defaultHeaderHeight = isStaffRole ? insets.top + 84 : isPatientHome ? insets.top + 164 : insets.top + 146
 	const headerHeight = (scrollData?.headerHeight && scrollData.headerHeight > 0) ? scrollData.headerHeight : defaultHeaderHeight
 	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
 
@@ -79,6 +88,30 @@ export default function DashboardPage() {
 	// effect's dependency array, so a new function identity on every render
 	// (e.g. from an unrelated parent re-render) would re-trigger the fetch.
 	const handleAppointmentsRefreshComplete = useCallback(() => setRefreshing(false), [])
+
+	// Patient Home: specialities fetched once and shared by Care options (count), symptoms and
+	// "Book by speciality" (label -> id resolution). Failing soft-fails to [] (sections still render).
+	const [specialities, setSpecialities] = useState<SpecialityItem[]>([])
+	const [specialitiesLoading, setSpecialitiesLoading] = useState(isPatientHome)
+
+	useEffect(() => {
+		if (!isPatientHome) return
+		let active = true
+		const load = async () => {
+			try {
+				const res = await getSpecialities()
+				if (active && res?.success && Array.isArray(res.data)) setSpecialities(res.data)
+			} catch {
+				// keep the previous list
+			} finally {
+				if (active) setSpecialitiesLoading(false)
+			}
+		}
+		void load()
+		return () => {
+			active = false
+		}
+	}, [isPatientHome, refreshToken])
 
 	const [selectedDate, setSelectedDate] = useState(0)
 	const [doctorAppointmentSearch, setDoctorAppointmentSearch] = useState('')
@@ -111,24 +144,23 @@ export default function DashboardPage() {
 	useEffect(() => {
 		if (role !== USER_ROLES.DOCTOR) return
 
+		// Stale-response guard: a fast selectedDate switch re-runs this effect; the cleanup flips `active`
+		// so an older in-flight response can't overwrite a newer one.
+		let active = true
+
 		const fetchStatus = async () => {
 			try {
 				const status = await getDoctorStatus()
-				console.log("DOCTOR STATUS IN DASHBOARD:", status)
+				if (!active) return
 				setDoctorStatus(status)
-				
+
 				if (status.profile_completed && !status.is_verified) {
-					console.log("SETTING SHOW UNVERIFIED BANNER TO TRUE")
 					setShowUnverifiedBanner(true)
-				} else {
-					console.log("BANNER NOT SHOWN. profile_completed:", status.profile_completed, "is_verified:", status.is_verified)
 				}
 			} catch (error) {
-				console.error('Failed to fetch doctor status:', error)
+				if (active) console.error('Failed to fetch doctor status:', error)
 			}
 		}
-
-		fetchStatus()
 
 		const fetchAppointments = async () => {
 			try {
@@ -140,6 +172,7 @@ export default function DashboardPage() {
 				const res = await getAppointments({
 					appointment_date: dateStr,
 				})
+				if (!active) return
 
 				if (res.success) {
 					setAppointments(Array.isArray(res.data) ? res.data : [])
@@ -147,13 +180,18 @@ export default function DashboardPage() {
 					setApptError(res.message ?? 'Failed to load appointments')
 				}
 			} catch {
-				setApptError('Failed to load appointments')
+				if (active) setApptError('Failed to load appointments')
 			} finally {
-				setApptLoading(false)
+				if (active) setApptLoading(false)
 			}
 		}
 
-		fetchAppointments()
+		void fetchStatus()
+		void fetchAppointments()
+
+		return () => {
+			active = false
+		}
 	}, [role, selectedDate, weekDays])
 
 	const handleRefresh = async () => {
@@ -222,31 +260,32 @@ export default function DashboardPage() {
 		</>
 	)
 
+	// Patient Home ("1 · Home" design), top to bottom; sections are 24px apart (styles.patientContent).
 	const renderUserPanel = () => (
-		<>
-			<View style={styles.upcomingAppointmentsWrapper}>
-				<PatientUpcomingAppointments
-					refreshToken={refreshToken}
-					onRefreshComplete={handleAppointmentsRefreshComplete}
-					onJoin={() =>
-						navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
-							mode: 'video',
-						})
-					}
-				/>
-			</View>
-
-			<SpecialitySection />
-			<ConsultSection />
-			{/* <PatientHealthQuestionsList /> */}
-		</>
+		<View style={styles.patientContent}>
+			<QuickServicesSection role={role} />
+			<ServicesSection
+				specialityCount={specialities.length || null}
+				specialitiesLoading={specialitiesLoading}
+				refreshToken={refreshToken}
+			/>
+			<HomeOffersSection refreshToken={refreshToken} />
+			<PatientUpcomingAppointments
+				refreshToken={refreshToken}
+				onRefreshComplete={handleAppointmentsRefreshComplete}
+			/>
+			<SpecialitySection specialities={specialities} refreshToken={refreshToken} />
+			<ConsultSection specialities={specialities} />
+			<HomeHealthReadsSection refreshToken={refreshToken} />
+			<HomeCommunitiesSection refreshToken={refreshToken} />
+			<AskDoctorSection itemLimit={3} refreshToken={refreshToken} />
+		</View>
 	)
 
 	const renderPharmacyPanel = () => <></>
 	const renderRadiologyPanel = () => <></>
-	const renderLaboratoryPanel = () => <></>
 	const renderAncillaryPanel = () => (
-		<StaffAncillaryDashboard />
+		<ProviderTodayContent refreshToken={refreshToken} onRefreshComplete={handleAppointmentsRefreshComplete} />
 	)
 	const renderQuickServicesSection = () => (
 		<View style={isDoctor && styles.doctorQuickServicesSpacing}>
@@ -264,9 +303,6 @@ export default function DashboardPage() {
 			case USER_ROLES.RADIOLOGY:
 				return renderRadiologyPanel()
 
-			case USER_ROLES.LABORATORY:
-				return renderLaboratoryPanel()
-
 			case USER_ROLES.ANCILLARY:
 				return renderAncillaryPanel()
 
@@ -283,17 +319,9 @@ export default function DashboardPage() {
 		if (
 			role !== USER_ROLES.DOCTOR &&
 			role !== USER_ROLES.PHARMACY &&
-			role !== USER_ROLES.RADIOLOGY &&
-			role !== USER_ROLES.LABORATORY
+			role !== USER_ROLES.RADIOLOGY
 		) {
-			return (
-				<>
-					{renderQuickServicesSection()}
-					<ServicesSection />
-					<MediaPromotionsSection role={role} />
-					{renderUserPanel()}
-				</>
-			)
+			return renderUserPanel()
 		}
 
 		if (isTablet) {
@@ -323,13 +351,18 @@ export default function DashboardPage() {
 	return (
 		<>
 			<Animated.ScrollView
-				style={styles.container}
+				style={[styles.container, (isPatientHome || isNurse) && styles.patientContainer]}
 				contentContainerStyle={[
 					styles.content,
-					{
-						paddingTop: headerHeight,
-						paddingBottom: Math.max(insets.bottom + 96, 120),
-					},
+					isPatientHome
+						? // Clears the floating tab bar (64 + 16 bottom offset + safe area) like the design's 104px.
+							{ paddingTop: headerHeight + 16, paddingBottom: tabBarClearance + 8 }
+						: isNurse
+							? { paddingTop: headerHeight, paddingBottom: tabBarClearance + 8 }
+							: {
+								paddingTop: headerHeight,
+								paddingBottom: Math.max(insets.bottom + 96, 120),
+							},
 				]}
 				showsVerticalScrollIndicator={false}
 				scrollEventThrottle={16}
@@ -350,7 +383,8 @@ export default function DashboardPage() {
 
 				{renderMainContent()}
 
-				{!isNurse && (
+				{/* Staff roles keep the original shared bottom sections; the patient Home has its own above. */}
+				{!isNurse && !isPatientHome && (
 					<>
 						{/* New dashboard sections inserted before the existing community/blog sections. */}
 						<ArticleSection />
@@ -458,8 +492,11 @@ const styles = StyleSheet.create({
 		flex: 0.5,
 	},
 
-	upcomingAppointmentsWrapper: {
-		marginTop: 8,
+	patientContainer: {
+		backgroundColor: APP_COLORS.pageBg,
+	},
+	patientContent: {
+		gap: 24,
 	},
 	verificationBannerContainer: {
 		backgroundColor: '#FFF8E1',

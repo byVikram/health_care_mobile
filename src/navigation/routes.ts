@@ -2,9 +2,9 @@ export const ROUTES = {
 	AUTH: {
 		LOGIN: 'Login',
 		ROLE_SELECTION: 'RoleSelection',
-		SPECIALTY_SELECTION: 'SpecialtySelection',
 		ONBOARDING: 'Onboarding',
 		REGISTER: 'Register',
+		LEGAL: 'Legal',
 	},
 	MAIN: {
 		TABS: 'MainTabs',
@@ -14,14 +14,20 @@ export const ROUTES = {
 		PROFILE: 'Profile',
 		ANCILLARY: 'Ancillary',
 		WALLET: 'Wallet',
+		// Doctor-only tabs (the "DoctorDashboard" Schedule / Engage views), set by the backend menu. Kept in MAIN
+		// (not STACK) since they're real bottom-tab routes, not pushed screens.
+		SCHEDULE: 'Schedule',
+		ENGAGE: 'Engage',
 	},
 	PORTAL: {
 		PROFILE: 'Profile',
 	},
 	STACK: {
-		SEARCH: 'SearchPage',
+		LEGAL: 'LegalStack',
+		SEARCH: 'SplashScreen',
 		DOCTOR_SEARCH: 'DoctorSearch',
 		DOCTOR_DETAIL: 'DoctorDetail',
+		DOCTOR_BOOK_SLOT: 'DoctorBookSlot',
 		FAVOURITE_DOCTOR: 'FavouriteDoctor',
 		NOTIFICATION: 'Notification',
 		CONSULTATION: 'Consultation',
@@ -38,6 +44,9 @@ export const ROUTES = {
 		APPOINTMENT_CONFIRMED: 'AppointmentConfirmed',
 		APPOINTMENT_DETAILS: 'AppointmentDetails',
 		CONSENT_FORM: 'ConsentForm',
+		// Doctor-side patient-file access gate (OTP the patient reads out) — distinct from CONSENT_FORM
+		// above, which is the patient's own booking T&C modal.
+		VERIFY_ACCESS: 'VerifyAccess',
 		PATIENT_PAYMENT: 'PatientPayment',
 		PHARMACY_SEARCH_PAGE: 'PharmacySearchPage',
 		ORDER_LIST: 'OrderListPage',
@@ -60,33 +69,22 @@ export const ROUTES = {
 		RADIOLOGY_SCAN_TYPES: 'Scantypeselectormodal',
 
 		LABORATORY_LIST: 'LaboratorySearchPage',
-		LABORATORY_ALL_TESTS: 'LaboratoryAllTestsPage',
-		LABORATORY_ALL_PACKAGES: 'LaboratoryAllPackagesPage',
 		LABORATORY_SAMPLE_COLLECTION: 'LaboratorySampleCollectionPage',
 		// Lab selection + date/time slot selection are one merged screen (see
 		// `LabSelectionScreen.tsx`) — there is no separate slot-selection route.
-		LABORATORY_SELECT_LAB: 'LaboratorySelectLabPage',
 		LABORATORY_BOOKING_SUMMARY: 'LaboratoryBookingSummaryPage',
-		LABORATORY_PAYMENT: 'LaboratoryPaymentPage',
+		LABORATORY_PAYMENT_SUCCESS: 'LaboratoryPaymentSuccessPage',
+		LABORATORY_REPORT: 'LaboratoryReportPage',
 		LABORATORY_BOOKING_TRACKING: 'LaboratoryBookingTrackingPage',
-		PLACE_LABORATORY_TEST: 'PlaceLabOrderPage',
-		LABORATORY_ORDERS: 'Orderlistlaboratorypage',
-		LABORATORY_ORDER_DETAILS: 'Bookingdetailslaboratorypage',
 
-		DOCTOR_EVENTS: 'DoctorEvents',
-		DOCTOR_EVENT_FORM: 'DoctorEventForm',
 		ALL_EVENTS: 'AllEvents',
 		EVENT_DETAILS: 'EventDetails',
 
-		NURSE_ACTIVE_BOOKING: 'NurseActiveBooking',
-		NURSE_PATIENT_VERIFICATION: 'NursePatientVerification',
-		NURSE_SERVICE_IN_PROGRESS: 'NurseServiceInProgress',
-		NURSE_COMPLETE_SERVICE: 'NurseCompleteService',
-		NURSE_TODAY_OVERVIEW: 'NurseTodayOverviewPage',
-		NURSE_BOOKING_HISTORY: 'NurseBookingHistoryPage',
-		NURSE_VISITS: 'NurseVisitsPage',
+		// Ancillary provider visit flow (one visit of an order at a time)
+		PROVIDER_VISIT_DETAILS: 'ProviderVisitDetails',
+		PROVIDER_VISIT_IN_PROGRESS: 'ProviderVisitInProgress',
+		PROVIDER_VISIT_COMPLETE: 'ProviderVisitComplete',
 		NURSE_EARNINGS: 'NurseEarningsPage',
-		NURSE_HISTORY: 'NurseHistoryPage',
 
 		ANCILLARY_SERVICES: 'AncillaryServices',
 		ANCILLARY_PROVIDERS: 'AncillaryProviders',
@@ -100,6 +98,11 @@ export const ROUTES = {
 		ANCILLARY_TRACK_APPOINTMENT: 'AncillaryTrackAppointment',
 		ANCILLARY_MY_BOOKINGS: 'AncillaryMyBookings',
 		ANCILLARY_SERVICE_MATCHING: 'AncillaryServiceMatching',
+		// Home-care booking redesign (all home-care types)
+		ANCILLARY_BOOK_VISIT: 'AncillaryBookVisit',
+		ANCILLARY_REVIEW_PAY: 'AncillaryReviewPay',
+		ANCILLARY_BOOK_NOW_REVIEW: 'AncillaryBookNowReview',
+		ANCILLARY_SCHEDULED_DETAILS: 'AncillaryScheduledBookingDetails',
 		HOME_CARE_CATALOG: 'HomeCareCatalog',
 		CAREGIVER_SERVICES: 'CaregiverServices',
 		CAREGIVER_TIME_CONFIG: 'CaregiverTimeConfig',
@@ -108,5 +111,24 @@ export const ROUTES = {
 		WALLET_TOPUP: 'WalletTopUp',
 		WALLET_TRANSACTIONS: 'WalletTransactions',
 		WALLET_TRANSACTION_DETAIL: 'WalletTransactionDetail',
+
+		// Profile (redesigned hub for patient / doctor / ancillary -- see features/profile/ProfileHubPage)
+		PROFILE_PERSONAL: 'ProfilePersonal',
+		PROFILE_SETTINGS: 'ProfileSettings',
+		PROFILE_SECURITY: 'ProfileSecurity',
+		PROFILE_AVAILABILITY: 'ProfileAvailability',
+		GO_ONLINE_PERMISSIONS: 'GoOnlinePermissions',
+		PATIENT_HEALTH: 'PatientHealth',
+		PATIENT_LIFESTYLE: 'PatientLifestyle',
+		PATIENT_FAMILY: 'PatientFamily',
+		PATIENT_FAMILY_MEMBER: 'PatientFamilyMember',
+		PATIENT_ADDRESSES: 'PatientAddresses',
+		PATIENT_ADDRESS_FORM: 'PatientAddressForm',
+		DOCTOR_PROFESSIONAL: 'DoctorProfessional',
+		DOCTOR_HOSPITALS: 'DoctorHospitals',
+		DOCTOR_ACHIEVEMENTS: 'DoctorAchievements',
+		DOCTOR_FAVOURITES: 'DoctorFavourites',
+		PROVIDER_WORK: 'ProviderWork',
+		CARE_AI: 'CareAi',
 	},
 } as const

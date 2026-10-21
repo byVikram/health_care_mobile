@@ -20,6 +20,10 @@ export interface BlogPost {
 	published_at?: string
 	created_at: string
 	author: BlogAuthor
+	content_type?: 'article' | 'blog' | 'podcast'
+	tag?: string | null
+	author_name?: string | null
+	read_time_minutes?: number | null
 }
 
 export interface BlogComment {

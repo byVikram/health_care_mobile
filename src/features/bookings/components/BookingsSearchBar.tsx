@@ -1,7 +1,7 @@
 import React from 'react'
 import { StyleSheet, TouchableOpacity, View } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
-import { AppInput } from '../../../components/common/AppInput'
+import { AppInput } from '../../../components/common/inputs/AppInput'
 
 // The single reusable search bar for the Bookings flow. This is the exact
 // markup/styling that AppointmentList (Doctor Appointments) originally

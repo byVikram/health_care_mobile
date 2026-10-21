@@ -29,9 +29,9 @@ import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { Appointment } from '../../types/appointment'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
 import { getReviewForAppointment, createReview, DoctorReview } from '../../services/reviewService'
-import { AppBottomSheet } from '../../components/common/AppBottomSheet'
+import { AppBottomSheet } from '../../components/common/layout/AppBottomSheet'
 import { AppSelect, AppSelectOption, AppTypography, AppCalendar, AppButton } from '../../components/common'
-import StatusModal from '../../components/common/StatusModal'
+import StatusModal from '../../components/common/feedback/StatusModal'
 import AppointmentHistoryTab from './components/AppointmentHistoryTab'
 import RescheduleModal, { type RescheduleResult } from './components/RescheduleModal'
 import type { BookingsChildControlledProps, BookingsChildHandle } from '../bookings/types'
@@ -674,11 +674,18 @@ function AppointmentListImpl(
       fetchHospitals(viewAsProp)
       return
     }
-    AsyncStorage.getItem('role').then((role) => {
+    let active = true
+    const resolveRole = async () => {
+      const role = await AsyncStorage.getItem('role')
+      if (!active) return
       const activeRole = role === 'patient' ? 'patient' : 'doctor'
       setViewAs(activeRole)
-      fetchHospitals(activeRole)
-    })
+      void fetchHospitals(activeRole)
+    }
+    void resolveRole()
+    return () => {
+      active = false
+    }
   }, [viewAsProp])
 
   const fetchHospitals = async (role: 'doctor' | 'patient') => {

@@ -9,7 +9,6 @@ import {
 	Share,
 	Linking,
 	StyleSheet,
-	Modal,
 	Alert,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
@@ -21,6 +20,7 @@ import FrameIcon from '../../assets/Settings/Frame.svg'
 import StarIcon from '../../assets/Settings/star.svg'
 import VectorIcon from '../../assets/Settings/Vector.svg'
 import { useAuth } from '../../context/AuthContext'
+import { LogoutConfirmModal } from '../../components/common'
 
 const SettingPage = () => {
 	const navigation = useNavigation<any>()
@@ -137,25 +137,11 @@ const SettingPage = () => {
 					))}
 				</View>
 			</ScrollView>
-			<Modal visible={showLogoutModal} transparent animationType="fade">
-				<View style={styles.modalOverlay}>
-					<View style={styles.modalCard}>
-						<Text style={styles.modalTitle}>Logout</Text>
-
-						<Text style={styles.modalDescription}>Are you sure you want to logout?</Text>
-
-						<View style={styles.modalButtons}>
-							<TouchableOpacity onPress={() => setShowLogoutModal(false)}>
-								<Text style={styles.cancelText}>Cancel</Text>
-							</TouchableOpacity>
-
-							<TouchableOpacity style={styles.logoutButton} onPress={confirmLogout}>
-								<Text style={styles.logoutText}>Logout</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-				</View>
-			</Modal>
+			<LogoutConfirmModal
+			visible={showLogoutModal}
+			onCancel={() => setShowLogoutModal(false)}
+			onConfirm={confirmLogout}
+		/>
 		</SafeAreaView>
 	)
 }

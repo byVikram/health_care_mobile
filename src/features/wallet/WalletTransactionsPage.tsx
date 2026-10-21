@@ -12,7 +12,7 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
-import AppScreenHeader from '../../components/common/AppScreenHeader'
+import AppScreenHeader from '../../components/common/layout/AppScreenHeader'
 import { ROUTES } from '../../navigation/routes'
 import { getWalletTransactions, WalletTransactionData } from './walletService'
 

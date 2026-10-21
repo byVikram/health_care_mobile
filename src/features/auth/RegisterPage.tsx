@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { useState, useEffect } from 'react'
-import { StyleSheet, View, useWindowDimensions } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import RegisterForm from './components/RegisterForm'
 import OtpForm from './components/OtpForm'
 import { ROUTES } from '../../navigation/routes'
 import { reset as resetNavigation } from '../../navigation/navigationService'
 import type { AuthScreenProps } from '../../navigation/types'
+import { APP_COLORS } from '../../config/theme'
 
 type Step = 'register' | 'otp'
 
@@ -27,22 +28,23 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 
 	const [focusMobileOnRegister, setFocusMobileOnRegister] = useState(false)
 
-	const { width, height } = useWindowDimensions()
-
-	const isTablet = width >= 768
-	const isLandscape = width > height
-
 	const roleId = route.params?.roleId ?? ''
 	const roleLabel = route.params?.roleLabel ?? ''
 	const [activeSpecialty, setActiveSpecialty] = useState<string | undefined>(route.params?.specialty)
 
 	useEffect(() => {
+		let active = true
 		if (route.params?.specialty) {
 			setActiveSpecialty(route.params.specialty)
 		} else if (roleLabel.toLowerCase() === 'ancillary' || roleId === 'ancillary') {
-			AsyncStorage.getItem('user_specialty').then((stored) => {
-				if (stored) setActiveSpecialty(stored)
-			})
+			const loadStoredSpecialty = async () => {
+				const stored = await AsyncStorage.getItem('user_specialty')
+				if (active && stored) setActiveSpecialty(stored)
+			}
+			void loadStoredSpecialty()
+		}
+		return () => {
+			active = false
 		}
 	}, [route.params?.specialty, roleLabel, roleId])
 
@@ -75,8 +77,9 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 				<OtpForm
 					contactNumber={contactNumber}
 					onVerify={() => {
+						// New account: straight to the Profile tab to fill in their details.
 						setTimeout(() => {
-							resetNavigation(ROUTES.STACK.DOCTOR_WELCOME)
+							resetNavigation(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PROFILE })
 						}, 0)
 					}}
 					onEditContact={() => {
@@ -87,7 +90,10 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 						setFocusMobileOnRegister(false)
 						setStep('register')
 					}}
-					backLabel="Back to Register"
+					ctaLabel="Verify & create account"
+					skipNotificationPrompt
+					autoVerify
+					step={2}
 				/>
 			)}
 		</View>
@@ -97,6 +103,6 @@ export default function RegisterPage({ navigation, route }: AuthScreenProps<type
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: APP_COLORS.surface,
 	},
 })

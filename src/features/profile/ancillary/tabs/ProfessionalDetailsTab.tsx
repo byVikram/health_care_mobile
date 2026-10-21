@@ -560,11 +560,18 @@ function resolveQualificationFromProfile(profile: any): string {
 					setResolvedSpecialtyKey(resolvedKey)
 					const label = backendProfile?.specialty?.label || normalizeSpecialtyToLabel(resolvedKey)
 					setResolvedSpecialtyLabel(label)
-					fetchAncillarySubspecialtiesBackend(resolvedKey).then((items: any) => {
-						if (isMounted && items && items.length > 0) {
-							setSubspecialtyOptions(items.map((item: any) => ({ label: item.label, value: item.id || item.public_id || '' })))
+					// Intentionally not awaited: the sub-specialty list must not delay the rest of the profile load.
+					const loadSubspecialties = async () => {
+						try {
+							const items: any = await fetchAncillarySubspecialtiesBackend(resolvedKey)
+							if (isMounted && items && items.length > 0) {
+								setSubspecialtyOptions(items.map((item: any) => ({ label: item.label, value: item.id || item.public_id || '' })))
+							}
+						} catch {
+							// Options stay empty; the picker simply has nothing to show.
 						}
-					})
+					}
+					void loadSubspecialties()
 				}
 
 				// Authoritative sub-specialty from single canonical field: backendProfile.sub_specialty_id

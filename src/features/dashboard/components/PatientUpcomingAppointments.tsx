@@ -1,153 +1,84 @@
+// src/features/dashboard/components/PatientUpcomingAppointments.tsx
+//
+// Patient Home "Upcoming" ("1 · Home"): the next upcoming appointment as one card — doctor avatar,
+// "{specialty} · In-clinic visit|Video consultation", status tag, and a mint footer strip with the
+// relative slot ("Today, 5:30 PM"), clinic, directions and "View". Hidden when there is
+// no upcoming appointment or the list fails to load.
 import React, { useEffect, useMemo, useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
+
 import {
-	ActivityIndicator,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
-	useWindowDimensions,
-} from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useNavigation, type NavigationProp } from '@react-navigation/native'
-import { getAppointments } from '../../doctor/doctorService'
-import MobileAppointmentCard from '../../appointment/components/MobileAppointmentCard'
-import type { Appointment } from '../../../types/appointment'
+	AppActionChip,
+	AppAvatar,
+	AppIcon,
+	AppIconButton,
+	AppPathIcon,
+	AppSection,
+	AppSkeleton,
+	AppTag,
+	AppTextLink,
+	type AppTagTone,
+} from '../../../components/common'
+import { APP_COLORS, TONES } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
-import type { RootStackParamList } from '../../../navigation/types'
+import type { Appointment } from '../../../types/appointment'
+import { combineDateTime, slotLabel } from '../../../utils/date'
+import { openDirections } from '../../../utils/maps'
+import { getAppointments } from '../../doctor/doctorService'
+import { HOME_ICONS, homeSectionProps } from '../homeTheme'
 
+type ApiAppointment = Appointment & { appointment_time?: string }
 
-export type PatientAppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'rescheduled' | string
-export type PatientAppointmentMode = 'in-person' | 'virtual'
-
-type ApiAppointment = Appointment & {
-	start_time?: string
-	end_time?: string
-	appointment_time?: string
-	public_id?: string
-}
-
-export type PatientAppointmentItem = {
-	id: string
-	doctorName: string
-	doctorAvatar?: string
-	consultationType: string
-	rating: number
-	qualifications: string
-	dateLabel: string
-	timeLabel: string
-	mode: PatientAppointmentMode
-	hospitalName: string
-	address: string
-	status: PatientAppointmentStatus
-	doctorId?: string
-	hospitalId?: string
-	appointmentDate?: string
-	startTime?: string
-	endTime?: string | null
-	raw?: ApiAppointment
-}
-
-type PatientUpcomingAppointmentsProps = {
-	appointments?: PatientAppointmentItem[]
-	onJoin?: (appointment: PatientAppointmentItem) => void
+type Props = {
 	refreshToken?: number
 	onRefreshComplete?: () => void
 }
 
-const formatDate = (dateStr?: string) => {
-	if (!dateStr) return '-'
-	const date = new Date(dateStr)
-	if (Number.isNaN(date.getTime())) return dateStr
-	return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'long' })
+const CLOSED_STATUSES = new Set(['cancelled', 'completed', 'rejected', 'no_show'])
+
+const statusLabel = (status: ApiAppointment['status']) =>
+	(typeof status === 'string' ? status : status?.label ?? 'pending').toLowerCase()
+
+const STATUS_TAG: Record<string, AppTagTone> = {
+	confirmed: 'confirmed',
+	pending: 'pending',
+	rescheduled: 'scheduled',
+	reschedule_required: 'pending',
 }
 
-const formatTime = (timeStr?: string) => {
-	if (!timeStr) return '-'
-	const [h, m] = timeStr.split(':').map(Number)
-	if (!Number.isFinite(h) || !Number.isFinite(m)) return timeStr
-	const suffix = h >= 12 ? 'PM' : 'AM'
-	const hour = h > 12 ? h - 12 : h === 0 ? 12 : h
-	return `${String(hour).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`
+const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
+
+const isVideo = (a: ApiAppointment) => /online|video/.test((a.appointment_mode ?? '').toLowerCase())
+
+const startTime = (a: ApiAppointment) => a.start_time || a.appointment_time || ''
+
+const doctorAvatar = (a: ApiAppointment): string | null => {
+	const d = a.doctor as unknown as Record<string, string | null | undefined> | undefined
+	return d?.avatar_s3_key || d?.avatar_url || d?.avatar || d?.profile_picture || d?.photo_url || d?.image_url || null
 }
 
-const getStatusValue = (status: ApiAppointment['status'] | PatientAppointmentStatus) =>
-	typeof status === 'string' ? status : status?.label ?? 'pending'
+export default function PatientUpcomingAppointments({ refreshToken, onRefreshComplete }: Props) {
+	const navigation = useNavigation<any>()
 
-const getStartTime = (appointment: ApiAppointment) =>
-	appointment.start_time || appointment.appointment_time || ''
-
-const mapApiAppointment = (appointment: ApiAppointment): PatientAppointmentItem => {
-	const status = getStatusValue(appointment.status)
-	const appointmentMode = appointment.appointment_mode?.toLowerCase()
-	const isVirtual = appointmentMode === 'online' || appointmentMode === 'video_call'
-	const hospitalAddress = appointment.hospital?.address ?? ''
-	const avatar = appointment.doctor?.avatar_s3_key || 
-	               (appointment.doctor as any)?.avatar_url || 
-	               (appointment.doctor as any)?.avatar || 
-	               (appointment.doctor as any)?.profile_picture || 
-	               (appointment.doctor as any)?.photo_url || 
-	               (appointment.doctor as any)?.image_url;
-
-	return {
-		id: appointment.id,
-		doctorName: appointment.doctor?.name ?? 'Doctor',
-		doctorAvatar: avatar ?? undefined,
-		consultationType: 'Consultation',
-		rating: 4.8,
-		qualifications: '',
-		dateLabel: formatDate(appointment.appointment_date),
-		timeLabel: formatTime(getStartTime(appointment)),
-		mode: isVirtual ? 'virtual' : 'in-person',
-		hospitalName: appointment.hospital?.name ?? (isVirtual ? 'Virtual consultation' : 'Hospital'),
-		address: hospitalAddress?.split(',')[0] || hospitalAddress || '-',
-		status,
-		doctorId: appointment.doctor?.id,
-		hospitalId: appointment.hospital?.id,
-		appointmentDate: appointment.appointment_date,
-		startTime: getStartTime(appointment),
-		endTime: appointment.end_time ?? null,
-		raw: appointment,
-	}
-}
-
-export default function PatientUpcomingAppointments({
-	appointments,
-	refreshToken,
-	onRefreshComplete,
-}: PatientUpcomingAppointmentsProps) {
-	const navigation = useNavigation<NavigationProp<RootStackParamList>>()
-	const { width } = useWindowDimensions()
-	const isTablet = width >= 768
-	const shouldFetchAppointments = appointments === undefined
-
-	const [apiAppointments, setApiAppointments] = useState<ApiAppointment[]>([])
-	const [loading, setLoading] = useState(shouldFetchAppointments)
-	const [error, setError] = useState('')
+	const [items, setItems] = useState<ApiAppointment[]>([])
+	const [loading, setLoading] = useState(true)
+	const [failed, setFailed] = useState(false)
 
 	useEffect(() => {
 		let mounted = true
-
-		const fetchData = async () => {
+		const load = async () => {
 			try {
-				if (!shouldFetchAppointments) {
-					onRefreshComplete?.()
-					return
-				}
-
-				setLoading(true)
-				setError('')
-
-				const apptRes = await getAppointments({ limit: 10, variant: 'upcoming' })
-
+				const res = await getAppointments({ limit: 10, variant: 'upcoming' })
 				if (!mounted) return
-
-				if (apptRes.success) {
-					setApiAppointments(Array.isArray(apptRes.data) ? (apptRes.data as ApiAppointment[]) : [])
+				if (res.success) {
+					setItems(Array.isArray(res.data) ? (res.data as ApiAppointment[]) : [])
+					setFailed(false)
 				} else {
-					setError(apptRes.message ?? 'Failed to load appointments')
+					setFailed(true)
 				}
 			} catch {
-				if (mounted && shouldFetchAppointments) setError('Failed to load appointments')
+				if (mounted) setFailed(true)
 			} finally {
 				if (mounted) {
 					setLoading(false)
@@ -155,133 +86,190 @@ export default function PatientUpcomingAppointments({
 				}
 			}
 		}
-
-		void fetchData()
-
+		void load()
 		return () => {
 			mounted = false
 		}
-	}, [shouldFetchAppointments, refreshToken, onRefreshComplete])
+	}, [refreshToken, onRefreshComplete])
 
-	const displayedAppointments = useMemo(() => {
-		if (appointments) return appointments
-		return apiAppointments.map(mapApiAppointment)
-	}, [apiAppointments, appointments])
+	// The soonest open appointment.
+	const next = useMemo(() => {
+		const open = items.filter((a) => !CLOSED_STATUSES.has(statusLabel(a.status)))
+		const at = (a: ApiAppointment) => combineDateTime(a.appointment_date, startTime(a))?.getTime() ?? Infinity
+		return [...open].sort((a, b) => at(a) - at(b))[0] ?? null
+	}, [items])
 
-	const handleSeeAll = () => {
-		navigation.navigate(ROUTES.STACK.APPOINTMENTS)
+	if (!loading && (failed || !next)) return null
+
+	const header = (
+		<AppTextLink
+			label="All bookings"
+			onPress={() => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL })}
+		/>
+	)
+
+	if (loading || !next) {
+		return (
+			<AppSection title="Upcoming" right={header} {...homeSectionProps(10)}>
+				<View style={styles.card}>
+					<View style={styles.topRow}>
+						<AppSkeleton width={52} height={52} borderRadius={12} color={APP_COLORS.divider} />
+						<View style={styles.skeletonCol}>
+							<AppSkeleton width="60%" height={16} color={APP_COLORS.divider} />
+							<AppSkeleton width="45%" height={12} color={APP_COLORS.divider} />
+						</View>
+					</View>
+					<View style={styles.footer}>
+						<AppSkeleton width="50%" height={16} color={APP_COLORS.divider} />
+					</View>
+				</View>
+			</AppSection>
+		)
 	}
 
+	const video = isVideo(next)
+	const status = statusLabel(next.status)
+	const specialty = next.doctor?.specialty || next.doctor?.specialization || 'Consultation'
+	const hospital = next.hospital
+	const place = video ? 'Online consultation' : hospital?.name || 'Clinic'
+	const canDirect = !video && !!(hospital?.address || hospital?.name)
+	const when = slotLabel(next.appointment_date, startTime(next))
 
 	return (
-		<View style={[styles.section, isTablet && styles.sectionTablet]}>
-			<View style={styles.sectionHeader}>
-				<Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-				<View style={styles.headerActions}>
-					<View style={styles.countBadge}>
-						<Text style={styles.countBadgeText}>{displayedAppointments.length}</Text>
+		<AppSection title="Upcoming" right={header} {...homeSectionProps(10)}>
+			<View style={styles.card}>
+				<View style={styles.topRow}>
+					<AppAvatar
+						uri={doctorAvatar(next)}
+						name={next.doctor?.name}
+						size={52}
+						radius={12}
+						backgroundColor={TONES.lilac.bg}
+						initialsColor={TONES.lilac.ink}
+					/>
+					<View style={styles.doctorCol}>
+						<Text style={styles.doctorName} numberOfLines={1}>
+							{next.doctor?.name ?? 'Doctor'}
+						</Text>
+						<Text style={styles.doctorSub} numberOfLines={1}>
+							{`${specialty} · ${video ? 'Video consultation' : 'In-clinic visit'}`}
+						</Text>
 					</View>
-					<TouchableOpacity onPress={handleSeeAll} activeOpacity={0.75} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-						<Text style={styles.seeAllText}>See All</Text>
-					</TouchableOpacity>
+					<AppTag label={titleCase(status)} tone={STATUS_TAG[status] ?? 'upcoming'} style={styles.statusTag} />
+				</View>
+
+				<View style={styles.footer}>
+					<View style={styles.whenCol}>
+						<View style={styles.inline}>
+							<AppPathIcon d={HOME_ICONS.calendar} size={16} strokeWidth={2.2} color={APP_COLORS.primary} />
+							<Text style={styles.whenText} numberOfLines={1}>
+								{when}
+							</Text>
+						</View>
+						<View style={styles.inline}>
+							<AppPathIcon
+								d={video ? HOME_ICONS.video : HOME_ICONS.pin}
+								size={14}
+								strokeWidth={2.2}
+								color={APP_COLORS.inkMuted}
+							/>
+							<Text style={styles.placeText} numberOfLines={1}>
+								{place}
+							</Text>
+						</View>
+					</View>
+					{canDirect && (
+						<AppIconButton
+							accessibilityLabel={`Directions to ${hospital?.name ?? 'clinic'}`}
+							onPress={() => openDirections(hospital?.latitude, hospital?.longitude, hospital?.address, hospital?.name)}
+						>
+							<AppIcon name="directions" size={18} color={APP_COLORS.primary} rounded />
+						</AppIconButton>
+					)}
+					<AppActionChip
+						label="View"
+						filled
+						size="md"
+						accessibilityLabel={`View appointment with ${next.doctor?.name ?? 'doctor'}`}
+						onPress={() => navigation.navigate(ROUTES.STACK.APPOINTMENT_DETAILS, { appointmentId: next.id })}
+						style={styles.viewButton}
+					/>
 				</View>
 			</View>
-			<Text style={styles.sectionSubtitle}>Manage your upcoming healthcare visits</Text>
-
-			{loading ? (
-				<View style={styles.loadingBox}>
-					<ActivityIndicator size="small" color="#0c7c7c" />
-				</View>
-			) : null}
-
-			{!loading && error ? <Text style={styles.stateTextError}>{error}</Text> : null}
-
-			{!loading && !error && displayedAppointments.length === 0 ? (
-				<Text style={styles.stateText}>No upcoming appointments.</Text>
-			) : null}
-
-			{!loading && !error
-				? displayedAppointments.map((appointment) => (
-						<MobileAppointmentCard key={appointment.id} row={appointment} horizontalInset={16} />
-					))
-				: null}
-
-		</View>
+		</AppSection>
 	)
 }
 
 const styles = StyleSheet.create({
-	section: {
-		marginTop: 4,
-		marginBottom: 12,
-	},
-	sectionTablet: {
-		maxWidth: 560,
-		width: '100%',
-		alignSelf: 'center',
-	},
-	sectionHeader: {
+	card: {
 		marginHorizontal: 16,
-		marginBottom: 4,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	sectionTitle: {
-		flex: 1,
-		fontSize: 18,
-		fontWeight: '700',
-		color: '#1D2B36',
-	},
-	headerActions: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginLeft: 12,
-		gap: 10,
-	},
-	sectionSubtitle: {
-		marginHorizontal: 16,
-		marginBottom: 12,
-		fontSize: 12,
-		color: '#667B8F',
-	},
-	countBadge: {
-		minWidth: 24,
-		height: 24,
 		borderRadius: 12,
-		backgroundColor: '#0c7c7c',
+		backgroundColor: APP_COLORS.surface,
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
+		overflow: 'hidden',
+	},
+	topRow: {
+		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'center',
-		paddingHorizontal: 8,
+		gap: 12,
+		padding: 14,
 	},
-	countBadgeText: {
-		color: '#ffffff',
-		fontSize: 12,
-		fontWeight: '700',
+	skeletonCol: {
+		flex: 1,
+		gap: 8,
 	},
-	seeAllText: {
-		color: '#0c7c7c',
+	doctorCol: {
+		flex: 1,
+		minWidth: 0,
+	},
+	doctorName: {
+		fontSize: 16,
+		lineHeight: 22,
+		fontWeight: '800',
+		color: APP_COLORS.ink,
+	},
+	doctorSub: {
 		fontSize: 13,
-		fontWeight: '700',
+		lineHeight: 18,
+		color: APP_COLORS.inkMuted,
 	},
-	loadingBox: {
-		minHeight: 120,
+	statusTag: {
+		alignSelf: 'center',
+		paddingVertical: 4,
+		borderRadius: 8,
+	},
+	footer: {
+		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'center',
+		gap: 10,
+		paddingVertical: 12,
+		paddingHorizontal: 14,
+		backgroundColor: APP_COLORS.mint,
 	},
-	stateText: {
-		marginHorizontal: 16,
-		paddingVertical: 24,
-		textAlign: 'center',
-		color: '#667B8F',
+	whenCol: {
+		flex: 1,
+		minWidth: 0,
+	},
+	inline: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	whenText: {
+		flexShrink: 1,
 		fontSize: 14,
+		lineHeight: 20,
+		fontWeight: '800',
+		color: APP_COLORS.ink,
 	},
-	stateTextError: {
-		marginHorizontal: 16,
-		paddingVertical: 24,
-		textAlign: 'center',
-		color: '#ef4444',
-		fontSize: 14,
+	placeText: {
+		flexShrink: 1,
+		fontSize: 12,
+		lineHeight: 16,
+		color: APP_COLORS.inkMuted,
 	},
-
+	viewButton: {
+		paddingHorizontal: 14,
+	},
 })

@@ -45,6 +45,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
+          "imageWidth": 288,
           "resizeMode": "contain",
           "backgroundColor": "#2B6F71"
         }
@@ -66,6 +67,13 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow KarolaHealth to access your location to help patients find you."
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow KarolaHealth to add your appointments to your calendar.",
+          "remindersPermission": "Allow KarolaHealth to add appointment reminders."
         }
       ],
       "expo-font",

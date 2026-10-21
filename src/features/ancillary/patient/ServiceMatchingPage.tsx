@@ -1,24 +1,30 @@
-import React, { useEffect, useState, useRef } from 'react'
-import {
-	Animated,
-	BackHandler,
-	Easing,
-	StyleSheet,
-	Text,
-	View,
-	useWindowDimensions,
-} from 'react-native'
+// src/features/ancillary/patient/ServiceMatchingPage.tsx
+//
+// "Instant booking · Finding a nurse near you": an ink hero with a searching ring, a request summary card,
+// the TIP card (₹20 / ₹30 / ₹50 -> "Add ₹X tip", removable until a provider accepts; PUT .../tip), "What happens
+// next" and the Cancel request footer. A provider accepting (socket push or the 2 s status poll) navigates to
+// the visit screen (TrackAppointment). If nobody accepts in 5 minutes it says nothing is charged and offers to
+// schedule instead (Book visit with the same services).
+// The status poll also carries tip_amount / total_with_tip / asked_count; asked_count hides when absent.
+
+import React, { useEffect, useRef, useState } from 'react'
+import { Animated, BackHandler, Easing, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import Toast from 'react-native-toast-message'
+import { APP_COLORS, CARD_SHADOW, TONES } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
-import AppScreenHeader from '../../../components/common/AppScreenHeader'
-import { AppTypography } from '../../../components/common/AppTypography'
-import { AppButton } from '../../../components/common/AppButton'
+import type { AncillaryServiceMatchingParams } from '../../../navigation/types'
+import { AppButton, AppFooterBar, AppNumberedSteps } from '../../../components/common'
 import { fetchPatientActiveRequestBackend, cancelCareRequestPatientBackend } from '../ancillaryService'
+import { setAncillaryRequestTip } from '../ancillaryProviderBookingService'
 import ApiService from '../../../services/apiService'
+import { openAuthedSocket } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import CancellationDetailsModal from './CancellationDetailsModal'
+import { inr, itemsFee, providerNoun } from './ancillaryBookingCopy'
+import { apiErrorMessage } from './useVisitPatientAddress'
 
 const ASSIGNED_STATUSES = new Set([
 	'ASSIGNED',
@@ -30,101 +36,92 @@ const ASSIGNED_STATUSES = new Set([
 	'COMPLETED',
 ])
 
+/** Request ended on the server side without anyone accepting. */
+const NO_MATCH_PATTERN = /EXPIRED|FAILED|NO_PROVIDER|UNASSIGNED/
+
+const TIP_OPTIONS = [20, 30, 50]
+const POPULAR_TIP = 30
+/** No acceptance after this long -> offer to schedule instead. */
+const NO_ACCEPT_SECONDS = 5 * 60
+
+const elapsedLabel = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
 export default function ServiceMatchingPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
-	const { width } = useWindowDimensions()
 
-	const routeParams = route.params || {}
+	const routeParams: AncillaryServiceMatchingParams & Record<string, any> = route.params || {}
 	const bookingId = routeParams.bookingId || routeParams.publicBookingId || routeParams.id || 'active'
-	const serviceName = routeParams.serviceName || 'In-Home Healthcare Service'
-	const addressText = routeParams.addressText || 'Selected Delivery Location'
+	const serviceName = routeParams.serviceName || 'In-home care'
+	const addressText = routeParams.addressText || 'Selected location'
+	const patientName = routeParams.patientName || 'You'
+	const booking = routeParams.booking
+	const noun = providerNoun(booking?.serviceKey ?? 'nursing-care')
+	const basePrice = booking ? itemsFee(booking.items) : null
+	const canTip = bookingId !== 'active'
 
-	const [searchStatus, setSearchStatus] = useState<'SEARCHING' | 'ASSIGNED' | 'FAILED'>('SEARCHING')
-	const [assignedProvider, setAssignedProvider] = useState<any>(null)
+	const [assigned, setAssigned] = useState(false)
 	const [isCancelling, setIsCancelling] = useState(false)
 	const [cancelModalVisible, setCancelModalVisible] = useState(false)
+	const [elapsed, setElapsed] = useState(0)
+	const [endedByServer, setEndedByServer] = useState(false)
+	const [askedCount, setAskedCount] = useState<number | null>(null)
+	const [serverTotal, setServerTotal] = useState<number | null>(null)
+	const [tip, setTip] = useState(0) // confirmed with the server
+	const [pendingTip, setPendingTip] = useState(0) // picked, not yet confirmed
+	const [tipBusy, setTipBusy] = useState(false)
 
-	// Radar Animation Values
-	const pulse1 = useRef(new Animated.Value(0)).current
-	const pulse2 = useRef(new Animated.Value(0)).current
-	const pulse3 = useRef(new Animated.Value(0)).current
+	// The socket push and the status poll can both see "assigned"; only the first may navigate.
+	const hasNavigatedRef = useRef(false)
+	const spin = useRef(new Animated.Value(0)).current
 
+	const noOneAccepted = !assigned && (endedByServer || elapsed >= NO_ACCEPT_SECONDS)
+
+	// Searching ring
 	useEffect(() => {
-		const createPulseAnimation = (anim: Animated.Value, delay: number) => {
-			return Animated.loop(
-				Animated.sequence([
-					Animated.delay(delay),
-					Animated.timing(anim, {
-						toValue: 1,
-						duration: 2400,
-						easing: Easing.out(Easing.quad),
-						useNativeDriver: true,
-					}),
-					Animated.timing(anim, {
-						toValue: 0,
-						duration: 0,
-						useNativeDriver: true,
-					}),
-				])
-			)
-		}
+		const loop = Animated.loop(
+			Animated.timing(spin, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: true })
+		)
+		loop.start()
+		return () => loop.stop()
+	}, [spin])
 
-		const anim1 = createPulseAnimation(pulse1, 0)
-		const anim2 = createPulseAnimation(pulse2, 800)
-		const anim3 = createPulseAnimation(pulse3, 1600)
-
-		anim1.start()
-		anim2.start()
-		anim3.start()
-
-		return () => {
-			anim1.stop()
-			anim2.stop()
-			anim3.stop()
-		}
-	}, [pulse1, pulse2, pulse3])
-
-	// WebSocket Channel for Instant Push Assignment
+	// Elapsed clock
 	useEffect(() => {
-		let ws: WebSocket | null = null
+		const id = setInterval(() => setElapsed((s) => s + 1), 1000)
+		return () => clearInterval(id)
+	}, [])
+
+	// WebSocket Channel for Instant Push Assignment. The server only serves a socket for a
+	// specific request the caller owns (no shared "active" feed), so without a booking id
+	// we rely on the status polling below.
+	useEffect(() => {
+		if (!bookingId) return
 		let navigateTimeout: ReturnType<typeof setTimeout> | null = null
-		try {
-			const targetId = String(bookingId || 'active')
-			const wsUrl = API_ENDPOINTS.ANCILLARY.WS_PATIENT_REQUEST(targetId)
-			ws = new WebSocket(wsUrl)
+		const targetId = String(bookingId)
 
-			ws.onmessage = (event) => {
-				try {
-					const payload = JSON.parse(event.data)
-					if (payload.type === 'CARE_REQUEST_STATUS_CHANGE' && payload.data) {
-						const st = String(payload.data.status || '').toUpperCase()
-						if (ASSIGNED_STATUSES.has(st)) {
-							setSearchStatus('ASSIGNED')
-							if (payload.data.assignedProvider) {
-								setAssignedProvider(payload.data.assignedProvider)
-							}
-							if (navigateTimeout) clearTimeout(navigateTimeout)
-							navigateTimeout = setTimeout(() => {
-								navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
-									bookingId: payload.data.requestId || payload.data.id || targetId,
-									bookingData: payload.data,
-								})
-							}, 400)
-						}
-					}
-				} catch (e) {
-					console.log('[ServiceMatchingPage] WS parse notice:', e)
+		const socket = openAuthedSocket(API_ENDPOINTS.ANCILLARY.WS_PATIENT_REQUEST(targetId), (payload) => {
+			if (payload.type === 'CARE_REQUEST_STATUS_CHANGE' && payload.data) {
+				const st = String(payload.data.status || '').toUpperCase()
+				if (ASSIGNED_STATUSES.has(st)) {
+					setAssigned(true)
+					if (navigateTimeout) clearTimeout(navigateTimeout)
+					navigateTimeout = setTimeout(() => {
+						if (hasNavigatedRef.current) return
+						hasNavigatedRef.current = true
+						navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+							bookingId: payload.data.requestId || payload.data.id || targetId,
+							bookingData: payload.data,
+						})
+					}, 400)
 				}
 			}
-		} catch (e) {
-			console.log('[ServiceMatchingPage] WS setup notice')
-		}
+		})
 
 		return () => {
 			if (navigateTimeout) clearTimeout(navigateTimeout)
-			if (ws) ws.close()
+			socket.close()
 		}
 	}, [bookingId, navigation])
 
@@ -142,9 +139,12 @@ export default function ServiceMatchingPage() {
 				// 1. Primary: Fetch specific booking status directly
 				if (targetBookingId) {
 					try {
-						const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(targetBookingId))
+						// Polled every ~2s: a failure must not pop the global error dialog on every tick.
+						const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(targetBookingId), {
+							skipGlobalError: true,
+						})
 						data = res.data?.data || res.data
-					} catch (e) {
+					} catch {
 						// Fallback to active request
 					}
 				}
@@ -163,14 +163,20 @@ export default function ServiceMatchingPage() {
 
 				if (isMounted && data && data.status) {
 					const st = String(data.status).toUpperCase()
+					const asked = Number(data.asked_count)
+					if (Number.isFinite(asked) && asked > 0) setAskedCount(asked)
+					const withTip = Number(data.total_with_tip)
+					if (Number.isFinite(withTip) && withTip > 0) setServerTotal(withTip)
+					if (data.tip_amount != null && Number.isFinite(Number(data.tip_amount))) {
+						setTip(Number(data.tip_amount))
+					}
+					if (NO_MATCH_PATTERN.test(st)) setEndedByServer(true)
 					if (ASSIGNED_STATUSES.has(st)) {
-						setSearchStatus('ASSIGNED')
-						if (data.assignedProvider || data.provider) {
-							setAssignedProvider(data.assignedProvider || data.provider)
-						}
+						setAssigned(true)
 						if (!navigateTimeout) {
 							navigateTimeout = setTimeout(() => {
-								if (isMounted) {
+								if (isMounted && !hasNavigatedRef.current) {
+									hasNavigatedRef.current = true
 									navigation.replace(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
 										bookingId: data.requestId || data.id || targetBookingId || 'active',
 										bookingData: data,
@@ -217,169 +223,276 @@ export default function ServiceMatchingPage() {
 
 	const handleCancelRequestWithReason = async (reason: string) => {
 		setIsCancelling(true)
-		await cancelCareRequestPatientBackend(bookingId, reason)
-		setIsCancelling(false)
-		setCancelModalVisible(false)
-		navigation.navigate(ROUTES.MAIN.TABS)
+		try {
+			await cancelCareRequestPatientBackend(bookingId, reason)
+			setCancelModalVisible(false)
+			navigation.navigate(ROUTES.MAIN.TABS)
+		} catch {
+			Toast.show({ type: 'error', text1: 'Could not cancel the request', text2: 'Please try again.' })
+		} finally {
+			setIsCancelling(false)
+		}
 	}
+
+	// Stop the instant dispatch (best effort), then go to the Later flow with the same services.
+	const handleScheduleInstead = async () => {
+		if (!booking) {
+			handleNavigateToServices()
+			return
+		}
+		setIsCancelling(true)
+		try {
+			if (bookingId !== 'active') await cancelCareRequestPatientBackend(bookingId, 'Scheduling instead')
+		} catch {
+			// Already closed on the server, or it will expire on its own -- scheduling must not be blocked.
+		} finally {
+			setIsCancelling(false)
+		}
+		navigation.replace(ROUTES.STACK.ANCILLARY_BOOK_VISIT, booking)
+	}
+
+	// ---- Tip ----
+	const confirmTip = async () => {
+		if (!pendingTip || tipBusy) return
+		setTipBusy(true)
+		try {
+			await setAncillaryRequestTip(String(bookingId), pendingTip)
+			setTip(pendingTip)
+			setPendingTip(0)
+		} catch (e) {
+			Toast.show({
+				type: 'error',
+				text1: "Couldn't add the tip",
+				text2: apiErrorMessage(e) || 'It may be too late -- a nurse may have accepted already.',
+			})
+		} finally {
+			setTipBusy(false)
+		}
+	}
+
+	const removeTip = async () => {
+		if (tipBusy) return
+		setTipBusy(true)
+		try {
+			await setAncillaryRequestTip(String(bookingId), 0)
+			setTip(0)
+		} catch (e) {
+			Toast.show({
+				type: 'error',
+				text1: "Couldn't remove the tip",
+				text2: apiErrorMessage(e) || 'Please try again.',
+			})
+		} finally {
+			setTipBusy(false)
+		}
+	}
+
+	// ---- Copy ----
+	const total = basePrice != null ? basePrice + tip : serverTotal
+	const pillText = [total != null ? inr(total) : '', 'pay after the visit'].filter(Boolean).join(' · ')
+	const askedText = askedCount != null ? `${askedCount} verified ${noun}s` : `verified ${noun}s`
+	const spinRotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] })
+
+	let heroTitle = `Finding a ${noun} near you`
+	let heroBody = `We’ve asked ${askedText} within 5 km. The first to accept is assigned, usually in under 2 minutes.`
+	if (assigned) {
+		heroTitle = `${noun.charAt(0).toUpperCase()}${noun.slice(1)} found!`
+		heroBody = 'Opening your visit…'
+	} else if (noOneAccepted) {
+		heroTitle = `No ${noun} accepted yet`
+		heroBody = 'Nothing is charged. You can schedule a visit for a time that suits you instead.'
+	}
+
+	const summaryRows = [
+		{ label: 'Visit for', value: patientName },
+		{ label: 'Address', value: addressText },
+		{ label: 'Expected arrival', value: '~15 min after accepted' },
+	]
 
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader title="Matching Specialist" onBack={handleNavigateToServices} />
-
-			<View style={styles.content}>
-				{/* 1. RADAR SCANNER ANIMATION AREA */}
-				<View style={styles.radarWrapper}>
-					<Animated.View
-						style={[
-							styles.pulseRing,
-							{
-								transform: [
-									{
-										scale: pulse1.interpolate({
-											inputRange: [0, 1],
-											outputRange: [1, 2.9],
-										}),
-									},
-								],
-								opacity: pulse1.interpolate({
-									inputRange: [0, 1],
-									outputRange: [0.5, 0],
-								}),
-							},
-						]}
-					/>
-					<Animated.View
-						style={[
-							styles.pulseRing,
-							{
-								transform: [
-									{
-										scale: pulse2.interpolate({
-											inputRange: [0, 1],
-											outputRange: [1, 2.9],
-										}),
-									},
-								],
-								opacity: pulse2.interpolate({
-									inputRange: [0, 1],
-									outputRange: [0.5, 0],
-								}),
-							},
-						]}
-					/>
-					<Animated.View
-						style={[
-							styles.pulseRing,
-							{
-								transform: [
-									{
-										scale: pulse3.interpolate({
-											inputRange: [0, 1],
-											outputRange: [1, 2.9],
-										}),
-									},
-								],
-								opacity: pulse3.interpolate({
-									inputRange: [0, 1],
-									outputRange: [0.5, 0],
-								}),
-							},
-						]}
-					/>
-
-					<View style={styles.centerAvatar}>
-						<MaterialCommunityIcons
-							name={searchStatus === 'ASSIGNED' ? 'account-check' : 'account-search'}
-							size={44}
-							color="#FFFFFF"
-						/>
+			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+				{/* Hero */}
+				<View style={[styles.hero, { paddingTop: 48 + insets.top }]} accessibilityLiveRegion="polite">
+					<View style={styles.heroCircle} />
+					<View style={styles.ringWrap}>
+						{!noOneAccepted && !assigned && (
+							<Animated.View style={[styles.ringArc, { transform: [{ rotate: spinRotate }] }]} />
+						)}
+						<View style={[styles.ringTrack, (noOneAccepted || assigned) && styles.ringTrackStatic]} />
+						<View style={styles.ringCore}>
+							<MaterialCommunityIcons
+								name={
+									assigned
+										? 'account-check'
+										: noOneAccepted
+											? 'clock-alert-outline'
+											: 'account-search'
+								}
+								size={34}
+								color={APP_COLORS.mintAccent}
+							/>
+						</View>
 					</View>
+					<View style={styles.pill}>
+						<Text style={styles.pillText}>{pillText}</Text>
+					</View>
+					<Text style={styles.heroTitle} accessibilityRole="header">
+						{heroTitle}
+					</Text>
+					<Text style={styles.heroBody}>{heroBody}</Text>
+					{!noOneAccepted && !assigned && (
+						<Text style={styles.searching}>{`Searching · ${elapsedLabel(elapsed)}`}</Text>
+					)}
 				</View>
 
-				{/* 2. STATUS & INSTRUCTION */}
-				<View style={styles.statusBox}>
-					<View style={styles.liveSearchingChip}>
-						<View style={styles.searchingDot} />
-						<AppTypography variant="caption" style={styles.searchingChipText}>
-							{searchStatus === 'ASSIGNED' ? 'MATCH FOUND' : 'SEARCHING NEARBY RNs'}
-						</AppTypography>
-					</View>
-
-					<AppTypography variant="h2" style={styles.titleText}>
-						{searchStatus === 'ASSIGNED'
-							? 'Specialist Assigned!'
-							: routeParams.bookingPayload?.selectedNurse
-								? `Notifying ${routeParams.bookingPayload.selectedNurse.name}...`
-								: 'Matching Nearest Nurse...'}
-					</AppTypography>
-
-					<AppTypography variant="subtitle" style={styles.subtitleText}>
-						{searchStatus === 'ASSIGNED'
-							? `${assignedProvider?.name || 'Specialist'} has accepted your care request.`
-							: routeParams.bookingPayload?.selectedNurse
-								? `Connecting with preferred nurse ${routeParams.bookingPayload.selectedNurse.name} (${routeParams.bookingPayload.selectedNurse.credentials})`
-								: 'Broadcasting your care request to certified registered nurses within 5 km...'}
-					</AppTypography>
+				{/* Request summary */}
+				<View style={styles.card}>
+					<Text style={styles.cardEyebrow}>{`INSTANT VISIT · ${serviceName}`.toUpperCase()}</Text>
+					{summaryRows.map((r) => (
+						<View key={r.label} style={styles.cardRow}>
+							<Text style={styles.cardLabel}>{r.label}</Text>
+							<Text style={styles.cardValue} numberOfLines={2}>
+								{r.value}
+							</Text>
+						</View>
+					))}
 				</View>
 
-				{/* 3. REQUEST SUMMARY CARD */}
-				<View style={styles.detailsCard}>
-					<View style={styles.detailRow}>
-						<View style={styles.iconCircle}>
-							<MaterialCommunityIcons name="medical-bag" size={18} color="#2B6F71" />
+				{/* Tip */}
+				{canTip && !assigned && !noOneAccepted && (
+					<View style={styles.section}>
+						<View style={styles.tipHead}>
+							<View style={styles.tipTile}>
+								<MaterialCommunityIcons name="cash-plus" size={22} color={TONES.sand.ink} />
+							</View>
+							<View style={styles.flex}>
+								<Text style={styles.sectionTitle}>{`Add a tip to get a ${noun} faster`}</Text>
+								<Text
+									style={styles.muted}
+								>{`Nearby ${noun}s see your tip with the request. 100% goes to the ${noun}.`}</Text>
+							</View>
 						</View>
-						<View style={styles.detailTextCol}>
-							<AppTypography variant="caption" style={styles.detailLabel}>
-								Procedure
-							</AppTypography>
-							<AppTypography variant="body" style={styles.detailVal}>
-								{serviceName}
-							</AppTypography>
-						</View>
-					</View>
 
-					<View style={styles.detailRow}>
-						<View style={styles.iconCircle}>
-							<Ionicons name="location" size={18} color="#2B6F71" />
-						</View>
-						<View style={styles.detailTextCol}>
-							<AppTypography variant="caption" style={styles.detailLabel}>
-								Doorstep Location
-							</AppTypography>
-							<AppTypography variant="body" style={styles.detailVal} numberOfLines={2}>
-								{addressText}
-							</AppTypography>
-						</View>
+						{tip === 0 ? (
+							<>
+								<View
+									style={styles.tipRow}
+									accessibilityRole="radiogroup"
+									accessibilityLabel="Tip amount"
+								>
+									{TIP_OPTIONS.map((v) => {
+										const on = pendingTip === v
+										return (
+											<TouchableOpacity
+												key={v}
+												style={[styles.tipChip, on && styles.tipChipOn]}
+												onPress={() => setPendingTip(on ? 0 : v)}
+												activeOpacity={0.8}
+												accessibilityRole="radio"
+												accessibilityState={{ checked: on }}
+												accessibilityLabel={`${inr(v)} tip${v === POPULAR_TIP ? ', popular' : ''}`}
+											>
+												<Text style={styles.tipChipText}>{inr(v)}</Text>
+												{v === POPULAR_TIP && (
+													<View style={styles.popular}>
+														<Text style={styles.popularText}>POPULAR</Text>
+													</View>
+												)}
+											</TouchableOpacity>
+										)
+									})}
+								</View>
+								{pendingTip > 0 && (
+									<>
+										<View style={styles.tipActions}>
+											<AppButton
+												variant="outline"
+												size="md"
+												style={styles.tipCancel}
+												onPress={() => setPendingTip(0)}
+												disabled={tipBusy}
+											>
+												Cancel
+											</AppButton>
+											<AppButton
+												size="md"
+												style={styles.tipConfirm}
+												onPress={() => void confirmTip()}
+												loading={tipBusy}
+												disabled={tipBusy}
+											>
+												{`Add ${inr(pendingTip)} tip`}
+											</AppButton>
+										</View>
+										{basePrice != null && (
+											<Text style={styles.finePrint}>
+												{`You’ll pay ${inr(basePrice + pendingTip)} after the visit. You can remove the tip until a ${noun} accepts.`}
+											</Text>
+										)}
+									</>
+								)}
+							</>
+						) : (
+							<View style={styles.tipped} accessibilityRole="alert">
+								<MaterialCommunityIcons name="check-circle" size={20} color={APP_COLORS.success} />
+								<Text
+									style={styles.tippedText}
+								>{`${inr(tip)} tip added · all of it goes to the ${noun}`}</Text>
+								<TouchableOpacity
+									onPress={() => void removeTip()}
+									disabled={tipBusy}
+									accessibilityRole="button"
+									accessibilityLabel="Remove tip"
+									hitSlop={8}
+								>
+									<Text style={styles.removeText}>Remove</Text>
+								</TouchableOpacity>
+							</View>
+						)}
 					</View>
+				)}
 
-					<View style={styles.detailRow}>
-						<View style={styles.iconCircle}>
-							<Ionicons name="flash" size={18} color="#059669" />
-						</View>
-						<View style={styles.detailTextCol}>
-							<AppTypography variant="caption" style={styles.detailLabel}>
-								Care Dispatch
-							</AppTypography>
-							<AppTypography variant="body" style={styles.instantTagText}>
-								Instant Care: ETA ~15 - 30 minutes
-							</AppTypography>
-						</View>
-					</View>
+				{/* What happens next */}
+				<View style={styles.section}>
+					<Text style={styles.sectionTitle}>What happens next</Text>
+					<AppNumberedSteps
+						steps={[
+							{ title: `A verified ${noun} nearby accepts your request` },
+							{ title: 'You see their name, live location and your start code' },
+							{ title: 'Share the start code at your door. Pay after the visit.' },
+						]}
+					/>
 				</View>
-			</View>
 
-			{/* BOTTOM ACTION FOOTER */}
-			<View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+				<Text style={styles.footnote}>
+					If no one accepts in 5 minutes, we’ll let you know and you can schedule instead. Nothing is charged.
+				</Text>
+			</ScrollView>
+
+			<AppFooterBar>
 				<AppButton
 					variant="outline"
+					size="lg"
+					style={[styles.flex, styles.cancelBtn]}
+					labelStyle={styles.cancelLabel}
 					onPress={() => setCancelModalVisible(true)}
 					loading={isCancelling}
-					style={styles.cancelBtn}
+					disabled={isCancelling || assigned}
 				>
-					Cancel Care Request
+					Cancel request
 				</AppButton>
-			</View>
+				{noOneAccepted && (
+					<AppButton
+						size="lg"
+						style={styles.flex}
+						onPress={() => void handleScheduleInstead()}
+						disabled={isCancelling}
+					>
+						{booking ? 'Schedule instead' : 'Back to services'}
+					</AppButton>
+				)}
+			</AppFooterBar>
 
 			<CancellationDetailsModal
 				visible={cancelModalVisible}
@@ -392,144 +505,152 @@ export default function ServiceMatchingPage() {
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: '#FFFFFF',
-	},
-	content: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
+	container: { flex: 1, backgroundColor: APP_COLORS.pageBg },
+	flex: { flex: 1, minWidth: 0 },
+	scroll: { gap: 12, paddingBottom: 16 },
+
+	/* HERO */
+	hero: {
+		backgroundColor: APP_COLORS.ink,
 		paddingHorizontal: 24,
-	},
-
-	/* RADAR ANIMATION */
-	radarWrapper: {
-		width: 140,
-		height: 140,
+		paddingBottom: 56,
 		alignItems: 'center',
-		justifyContent: 'center',
-		marginBottom: 32,
+		gap: 10,
+		overflow: 'hidden',
 	},
-	pulseRing: {
+	heroCircle: {
 		position: 'absolute',
-		width: 100,
-		height: 100,
-		borderRadius: 50,
-		backgroundColor: 'rgba(43, 111, 113, 0.18)',
-		borderWidth: 1.5,
-		borderColor: '#2B6F71',
+		right: -50,
+		top: -50,
+		width: 160,
+		height: 160,
+		borderRadius: 9999,
+		backgroundColor: APP_COLORS.primary,
 	},
-	centerAvatar: {
-		width: 80,
-		height: 80,
-		borderRadius: 40,
-		backgroundColor: '#2B6F71',
+	ringWrap: { width: 84, height: 84, alignItems: 'center', justifyContent: 'center' },
+	ringTrack: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		borderRadius: 9999,
+		borderWidth: 7,
+		borderColor: 'rgba(255,255,255,0.15)',
+	},
+	ringTrackStatic: { borderColor: APP_COLORS.mintAccent },
+	ringArc: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		borderRadius: 9999,
+		borderWidth: 7,
+		borderColor: 'transparent',
+		borderTopColor: APP_COLORS.mintAccent,
+		zIndex: 1,
+	},
+	ringCore: {
+		width: 70,
+		height: 70,
+		borderRadius: 9999,
+		backgroundColor: APP_COLORS.ink,
 		alignItems: 'center',
 		justifyContent: 'center',
-		elevation: 6,
-		shadowColor: '#2B6F71',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.3,
-		shadowRadius: 8,
 	},
-
-	/* STATUS TEXT */
-	statusBox: {
-		alignItems: 'center',
-		marginBottom: 28,
-		gap: 8,
-	},
-	liveSearchingChip: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#E6F4F4',
-		paddingHorizontal: 10,
-		paddingVertical: 3,
-		borderRadius: 12,
-		gap: 6,
-	},
-	searchingDot: {
-		width: 6,
-		height: 6,
-		borderRadius: 3,
-		backgroundColor: '#2B6F71',
-	},
-	searchingChipText: {
-		fontSize: 10.5,
-		fontWeight: '800',
-		color: '#2B6F71',
-		letterSpacing: 0.4,
-	},
-	titleText: {
-		fontSize: 21,
-		fontWeight: '800',
-		color: '#0F172A',
-		textAlign: 'center',
-	},
-	subtitleText: {
-		fontSize: 13,
-		color: '#64748B',
-		textAlign: 'center',
-		lineHeight: 18,
+	pill: {
 		paddingHorizontal: 12,
+		paddingVertical: 4,
+		borderRadius: 9999,
+		backgroundColor: APP_COLORS.mintAccent,
 	},
+	pillText: { fontSize: 12, fontWeight: '800', color: APP_COLORS.ink },
+	heroTitle: {
+		fontSize: 24,
+		lineHeight: 30,
+		fontWeight: '800',
+		color: APP_COLORS.surface,
+		textAlign: 'center',
+	},
+	heroBody: { maxWidth: 300, fontSize: 14, lineHeight: 20, color: APP_COLORS.mint, textAlign: 'center' },
+	searching: { fontSize: 12, fontWeight: '700', color: APP_COLORS.mintAccent },
 
-	/* DETAILS SUMMARY CARD */
-	detailsCard: {
-		width: '100%',
-		backgroundColor: '#F8FAFC',
-		borderRadius: 16,
+	/* SUMMARY CARD */
+	card: {
+		marginTop: -36,
+		marginHorizontal: 16,
 		padding: 16,
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
-		gap: 12,
+		borderRadius: 14,
+		backgroundColor: APP_COLORS.surface,
+		gap: 2,
+		...CARD_SHADOW,
 	},
-	detailRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-	},
-	iconCircle: {
-		width: 36,
-		height: 36,
+	cardEyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 0.6, color: APP_COLORS.primary },
+	cardRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 6 },
+	cardLabel: { fontSize: 14, lineHeight: 20, color: APP_COLORS.inkMuted },
+	cardValue: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '700', color: APP_COLORS.ink, textAlign: 'right' },
+
+	/* SECTIONS */
+	section: { backgroundColor: APP_COLORS.surface, padding: 16, gap: 10 },
+	sectionTitle: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: APP_COLORS.ink },
+	muted: { fontSize: 12, lineHeight: 17, color: APP_COLORS.inkMuted },
+	finePrint: { fontSize: 11, lineHeight: 15, color: APP_COLORS.inkMuted },
+
+	/* TIP */
+	tipHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+	tipTile: {
+		width: 40,
+		height: 40,
 		borderRadius: 10,
-		backgroundColor: '#FFFFFF',
+		backgroundColor: TONES.sand.bg,
 		alignItems: 'center',
 		justifyContent: 'center',
-		borderWidth: 1,
-		borderColor: '#E2E8F0',
 	},
-	detailTextCol: {
+	tipRow: { flexDirection: 'row', gap: 8 },
+	tipChip: {
 		flex: 1,
+		height: 44,
+		borderRadius: 10,
+		borderWidth: 1.5,
+		borderColor: APP_COLORS.divider,
+		backgroundColor: APP_COLORS.surface,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
-	detailLabel: {
-		fontSize: 11.5,
-		color: '#64748B',
+	tipChipOn: { borderColor: APP_COLORS.primary, backgroundColor: APP_COLORS.mint },
+	tipChipText: { fontSize: 14, fontWeight: '800', color: APP_COLORS.ink },
+	popular: {
+		position: 'absolute',
+		top: -8,
+		alignSelf: 'center',
+		paddingHorizontal: 6,
+		borderRadius: 6,
+		backgroundColor: APP_COLORS.success,
 	},
-	detailVal: {
-		fontSize: 13.5,
-		fontWeight: '600',
-		color: '#0F172A',
-		marginTop: 1,
+	popularText: { fontSize: 9, lineHeight: 14, fontWeight: '800', color: APP_COLORS.surface },
+	tipActions: { flexDirection: 'row', gap: 8 },
+	tipCancel: { flex: 1 },
+	tipConfirm: { flex: 2 },
+	tipped: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+		paddingVertical: 10,
+		paddingHorizontal: 12,
+		borderRadius: 10,
+		backgroundColor: APP_COLORS.successBg,
 	},
-	instantTagText: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#059669',
-		marginTop: 1,
-	},
+	tippedText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.success },
+	removeText: { fontSize: 13, fontWeight: '700', color: APP_COLORS.danger },
 
-	/* FOOTER */
-	footer: {
-		paddingHorizontal: 20,
-		paddingTop: 12,
-		backgroundColor: '#FFFFFF',
-		borderTopWidth: 1,
-		borderTopColor: '#E2E8F0',
+	footnote: {
+		marginHorizontal: 16,
+		fontSize: 12,
+		lineHeight: 17,
+		color: APP_COLORS.inkMuted,
+		textAlign: 'center',
 	},
-	cancelBtn: {
-		borderColor: '#EF4444',
-		borderRadius: 12,
-	},
+	cancelBtn: { borderColor: APP_COLORS.danger },
+	cancelLabel: { color: APP_COLORS.danger },
 })

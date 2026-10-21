@@ -13,16 +13,6 @@
 // come from the doctor detail API response, never from this file.
 
 /**
- * MOCK — no endpoint computes real-time doctor availability yet (this was
- * explicitly deferred earlier: the "Available today" / "next available slot"
- * work needs a live slot-availability computation that doesn't exist on the
- * backend for the search or detail endpoints). Shown as a static badge for
- * now; replace with a real `is_available_today` style field once the
- * backend supports it.
- */
-export const DOCTOR_PROFILE_AVAILABLE_TODAY_MOCK = true
-
-/**
  * MOCK — generic pre-visit guidance shown on every doctor's profile. This is
  * app-wide policy copy, not per-doctor data, but there is no CMS/content
  * endpoint serving it yet, so it's hardcoded here until one exists. The

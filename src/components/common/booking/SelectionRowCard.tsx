@@ -1,6 +1,6 @@
 import React from 'react'
 import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native'
-import { AppTypography } from '../AppTypography'
+import { AppTypography } from '../display/AppTypography'
 
 interface SelectionRowCardProps {
 	/** A pre-rendered icon element (e.g. `<Ionicons name="flash" size={20}

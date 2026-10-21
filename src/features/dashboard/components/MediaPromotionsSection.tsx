@@ -12,7 +12,7 @@ import { useVideoPlayer, VideoView } from 'expo-video'
 const VIDEO_SOURCE = require('../../../assets/blog-and-community/video.mp4')
 const AD_IMAGE = require('../../../assets/blog-and-community/ad-image.png')
 
-type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'laboratory' | 'ancillary' | 'nurse' | null
+type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'ancillary' | 'nurse' | null
 
 // ─────────────────────────────────────────────────────────────
 // Video Slide

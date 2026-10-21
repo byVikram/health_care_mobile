@@ -1,161 +1,123 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { AppButton, AppInput, AppTypography } from '../../components/common';
-import OtpForm from './components/OtpForm';
-import { sendOtp } from './authService';
-import { ROUTES } from '../../navigation/routes';
-import type { AuthScreenProps } from '../../navigation/types';
-import { loginSchema, getFieldErrors } from '../../validation/authSchemas';
+import React, { useState } from 'react'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import OtpForm from './components/OtpForm'
+import { AuthField, AuthFooter, AuthHero, CtaButton, InfoNote, TermsLine } from './components/AuthKit'
+import { sendOtp } from './authService'
+import { ROUTES } from '../../navigation/routes'
+import type { AuthScreenProps } from '../../navigation/types'
+import { loginSchema, getFieldErrors } from '../../validation/authSchemas'
+import { APP_COLORS } from '../../config/theme'
 
-// ✅ Import SVG
-import OnboardingImage from '../../assets/Onboarding/onboarding-4.svg';
+export default function LoginPage({ navigation }: AuthScreenProps<typeof ROUTES.AUTH.LOGIN>) {
+	const [step, setStep] = useState<'login' | 'otp'>('login')
+	const [contactNumber, setContactNumber] = useState('')
+	const [loading, setLoading] = useState(false)
+	const [error, setError] = useState('')
 
-export default function LoginPage({
-    navigation,
-}: AuthScreenProps<typeof ROUTES.AUTH.LOGIN>) {
-    const [step, setStep] = useState<'login' | 'otp'>('login');
-    const [contactNumber, setContactNumber] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [focusContactOnLogin, setFocusContactOnLogin] = useState(false);
+	const complete = contactNumber.length === 10
 
-    const handleContinue = async () => {
-        const fieldErrors = getFieldErrors(loginSchema, { contactNumber });
-        if (fieldErrors.contactNumber) {
-            setError(fieldErrors.contactNumber);
-            return;
-        }
+	const handleContinue = async () => {
+		const fieldErrors = getFieldErrors(loginSchema, { contactNumber })
+		if (fieldErrors.contactNumber) {
+			setError(fieldErrors.contactNumber)
+			return
+		}
 
-        setLoading(true);
-        setError('');
-        try {
-            const res = await sendOtp(contactNumber);
-            if (res.success !== false) {
-                setFocusContactOnLogin(false);
-                setStep('otp');
-            } else {
-                setError(res.message || 'Failed to send OTP');
-            }
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to send OTP');
-        } finally {
-            setLoading(false);
-        }
-    };
+		setLoading(true)
+		setError('')
+		try {
+			const res = await sendOtp(contactNumber)
+			if (res.success !== false) {
+				setStep('otp')
+			} else {
+				setError(res.message || 'Failed to send OTP')
+			}
+		} catch (err: any) {
+			setError(err.response?.data?.message || 'Failed to send OTP')
+		} finally {
+			setLoading(false)
+		}
+	}
 
-    return (
-        <KeyboardAvoidingView 
-            style={styles.container} 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-            <View style={styles.innerContainer}>
+	if (step === 'otp') {
+		return (
+			<OtpForm
+				contactNumber={contactNumber}
+				onVerify={() => {
+					// handled by AuthContext
+				}}
+				onEditContact={() => setStep('login')}
+				onBack={() => setStep('login')}
+				ctaLabel="Verify & log in"
+				autoVerify
+			/>
+		)
+	}
 
-                {step === 'login' ? (
-                    <View style={styles.content}>
+	return (
+		<KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+			<AuthHero title="Welcome back" subtitle="Log in with your mobile number." />
 
-                        {/* 🔹 SVG Image */}
-                        <OnboardingImage width={220} height={220} style={styles.image} />
+			<ScrollView
+				style={styles.flex}
+				contentContainerStyle={styles.main}
+				keyboardShouldPersistTaps="handled"
+				showsVerticalScrollIndicator={false}
+			>
+				<AuthField
+					label="Mobile number"
+					icon="phone"
+					prefix="+91"
+					placeholder="10-digit number"
+					value={contactNumber}
+					onChangeText={(value) => {
+						setContactNumber(value.replace(/\D/g, '').slice(0, 10))
+						if (error) setError('')
+					}}
+					keyboardType="phone-pad"
+					inputMode="numeric"
+					autoComplete="tel-national"
+					maxLength={10}
+					valid={complete}
+					error={error}
+				/>
 
-                        {/* 🔹 Title */}
-                        <AppTypography variant="h2" align="center" style={styles.title}>
-                            Login
-                        </AppTypography>
+				<InfoNote text="We'll text a 6-digit code to this number. No password needed." />
 
-                        <AppTypography variant="subtitle" align="center" style={styles.subtitle}>
-                            Welcome back to HealthCare
-                        </AppTypography>
+				<View style={styles.spacer} />
 
-                        {/* 🔹 Input */}
-                        <AppInput
-                            label="Contact Number"
-                            value={contactNumber}
-                            onChangeText={(value) => {
-                                setContactNumber(value);
-                                if (error) setError('');
-                            }}
-                            keyboardType="phone-pad"
-                            autoFocus={focusContactOnLogin}
-                            style={styles.input}
-                            errorText={error}
-                        />
+				<View style={styles.newHere}>
+					<Text style={styles.newHereText}>New to Karolahealth?</Text>
+					<Pressable onPress={() => navigation.navigate(ROUTES.AUTH.ROLE_SELECTION)} accessibilityRole="link">
+						<Text style={styles.newHereLink}>Create an account</Text>
+					</Pressable>
+				</View>
+			</ScrollView>
 
-                        {/* 🔹 Button */}
-                        <AppButton
-                            variant="primary"
-                            onPress={handleContinue}
-                            loading={loading}
-                            disabled={loading}
-                            style={styles.button}
-                        >
-                            {loading ? 'Sending OTP...' : 'Continue'}
-                        </AppButton>
-
-                        {/* 🔹 Register Link */}
-                        <AppButton
-                            variant="text"
-                           onPress={() => navigation.navigate(ROUTES.AUTH.ROLE_SELECTION)}
-                            style={styles.link}
-                        >
-                            Don't have an account? Register
-                        </AppButton>
-
-                    </View>
-                ) : (
-                    <OtpForm 
-                        contactNumber={contactNumber} 
-                        onVerify={() => {
-                            // handled by AuthContext
-                        }}
-                        onEditContact={() => {
-                            setFocusContactOnLogin(true);
-                            setStep('login');
-                        }}
-                        onBack={() => {
-                            setFocusContactOnLogin(false);
-                            setStep('login');
-                        }}
-                        backLabel="Back to Login"
-                    />
-                )}
-
-            </View>
-        </KeyboardAvoidingView>
-    );
+			<AuthFooter>
+				<CtaButton label="Send code" onPress={handleContinue} disabled={!complete} loading={loading} />
+				<TermsLine onOpen={(tab) => navigation.navigate(ROUTES.AUTH.LEGAL, { tab })} />
+			</AuthFooter>
+		</KeyboardAvoidingView>
+	)
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    innerContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        padding: 24,
-    },
-    content: {
-        width: '100%',
-        alignItems: 'center',
-    },
-    image: {
-        marginBottom: 20,
-    },
-    title: {
-        marginBottom: 8,
-    },
-    subtitle: {
-        marginBottom: 24,
-    },
-    input: {
-        marginBottom: 16,
-        width: '100%',
-    },
-    button: {
-        marginTop: 8,
-        paddingVertical: 6,
-        width: '100%',
-    },
-    link: {
-        marginTop: 16,
-    }
-});
+	flex: { flex: 1 },
+	container: { flex: 1, backgroundColor: APP_COLORS.surface },
+	main: { flexGrow: 1, padding: 24, gap: 16 },
+	spacer: { flexGrow: 1 },
+	newHere: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 6,
+		padding: 14,
+		borderRadius: 14,
+		borderWidth: 1.5,
+		borderStyle: 'dashed',
+		borderColor: APP_COLORS.dotInactive,
+	},
+	newHereText: { fontSize: 14, lineHeight: 20, color: APP_COLORS.inkMuted },
+	newHereLink: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: APP_COLORS.primary },
+})

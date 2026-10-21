@@ -2,7 +2,7 @@ import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppBottomSheet } from '../../components/common/AppBottomSheet'
+import { AppBottomSheet } from '../../components/common/layout/AppBottomSheet'
 import BookingOptionCard from './components/BookingOptionCard'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
@@ -61,14 +61,6 @@ export default function BookingsBottomSheet({ visible, onClose }: BookingsBottom
 			iconColor: TEAL_GREEN_ICON_COLOR,
 			iconBgColor: SIDEBAR_ICON_BG_COLOR,
 			route: ROUTES.STACK.ORDER_LIST,
-		},
-		{
-			id: 'lab-bookings',
-			label: 'Lab Bookings',
-			iconName: 'clipboard-text-play-outline',
-			iconColor: TEAL_GREEN_ICON_COLOR,
-			iconBgColor: SIDEBAR_ICON_BG_COLOR,
-			route: ROUTES.STACK.LABORATORY_ORDERS,
 		},
 		{
 			id: 'radiology-bookings',

@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { AncillaryBooking } from '../ancillaryService'
 import BookingStatusBadge from './BookingStatusBadge'
-import AppAvatar from '../../../components/common/AppAvatar'
+import AppAvatar from '../../../components/common/display/AppAvatar'
 import { CommonCard } from '../../../components/common'
 
 interface UpcomingBookingCardProps {

@@ -1,9 +1,29 @@
 // src/services/apiService.ts
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { secureStorage } from '../utils/secureStorage'
+import { purgeLocalSession } from '../utils/localSession'
 import { isKnownOffline } from '../utils/networkState'
 import { API_ENDPOINTS } from '../constants/apiUrls'
+
+declare module 'axios' {
+	interface AxiosRequestConfig {
+		/**
+		 * Suppress the global "API Error" / "Access Denied" modal for this request.
+		 * Use it for background polling and for calls whose screen renders its own
+		 * error UI, so a failure doesn't stack a second dialog on top (or re-open
+		 * one on every poll tick).
+		 */
+		skipGlobalError?: boolean
+	}
+}
+
+// Without a timeout a hung request leaves the screen spinning forever. 30s for
+// normal calls; multipart uploads (images/documents) on slow mobile networks get
+// longer (see the request interceptor).
+const DEFAULT_TIMEOUT_MS = 30_000
+const UPLOAD_TIMEOUT_MS = 120_000
+// Identical global error dialogs inside this window are collapsed into one.
+const GLOBAL_ERROR_DEDUPE_MS = 4_000
 
 export interface StatusModalData {
 	status?: 'success' | 'error' | 'info'
@@ -36,15 +56,22 @@ const serializeParams = (params: Record<string, unknown>): string => {
 	return parts.join('&')
 }
 
-const axiosInstance = axios.create({ paramsSerializer: serializeParams })
+const axiosInstance = axios.create({ paramsSerializer: serializeParams, timeout: DEFAULT_TIMEOUT_MS })
 let unauthorizedHandler: (() => void) | null = null
 let statusModalHandler: StatusModalHandler | null = null
 let hasShownSessionExpiredAlert = false
 type TokenRefreshedHandler = (accessToken: string, refreshToken: string) => void
 let tokenRefreshedHandler: TokenRefreshedHandler | null = null
+// Outcome of a refresh attempt. 'rejected' = the server says this refresh token is
+// no good (or there is none) so the session is over; 'unavailable' = we couldn't
+// find out (offline, timeout, 5xx) so the session must be KEPT -- logging a user
+// out because their train went through a tunnel would be wrong.
+type RefreshResult = { status: 'ok'; accessToken: string } | { status: 'rejected' } | { status: 'unavailable' }
+
 // Shared in-flight refresh call -- concurrent 401s all await this same
 // promise instead of each firing their own /api/auth/refresh request.
-let refreshPromise: Promise<string | null> | null = null
+let refreshPromise: Promise<RefreshResult> | null = null
+let lastGlobalError: { key: string; at: number } | null = null
 // Synthetic error used to short-circuit a request we already know will fail
 // because the device is offline (see isKnownOffline() below), so we don't
 // waste time waiting on a doomed request. Tagged the same way a real Axios
@@ -70,29 +97,41 @@ export const setTokenRefreshedHandler = (handler: TokenRefreshedHandler | null) 
  * Deliberately uses a raw, unintercepted axios.post -- not `axiosInstance`
  * -- so a 401 on the refresh call itself doesn't recurse back into this
  * same response interceptor.
- * Returns the new access token, or null if there was nothing to refresh
- * with or the refresh call failed (both mean: fall back to a hard logout).
+ * Only a definitive "no" (no stored refresh token, or the server answering with
+ * a 4xx) ends the session; network failures/timeouts/5xx are 'unavailable'.
  */
-const performTokenRefresh = async (): Promise<string | null> => {
+const performTokenRefresh = async (): Promise<RefreshResult> => {
 	const currentRefreshToken = await secureStorage.getItem('refresh_token')
-	if (!currentRefreshToken) return null
+	if (!currentRefreshToken) return { status: 'rejected' }
 
 	try {
-		const response = await axios.post(API_ENDPOINTS.AUTH.REFRESH, {
-			refresh_token: currentRefreshToken,
-		})
+		const response = await axios.post(
+			API_ENDPOINTS.AUTH.REFRESH,
+			{ refresh_token: currentRefreshToken },
+			{ timeout: DEFAULT_TIMEOUT_MS }
+		)
 		const data = response.data?.data
 		const newAccessToken: string | undefined = data?.access_token
 		const newRefreshToken: string | undefined = data?.refresh_token
-		if (!newAccessToken || !newRefreshToken) return null
+		if (!newAccessToken || !newRefreshToken) return { status: 'rejected' }
 
 		await secureStorage.setItem('access_token', newAccessToken)
 		await secureStorage.setItem('refresh_token', newRefreshToken)
 		tokenRefreshedHandler?.(newAccessToken, newRefreshToken)
 
-		return newAccessToken
-	} catch {
-		return null
+		return { status: 'ok', accessToken: newAccessToken }
+	} catch (error) {
+		const responseStatus = axios.isAxiosError(error) ? error.response?.status : undefined
+		const isDefinitiveRejection =
+			responseStatus !== undefined &&
+			responseStatus >= 400 &&
+			responseStatus < 500 &&
+			responseStatus !== 408 && // request timeout
+			responseStatus !== 429 // rate limited -- try again later, don't end the session
+		if (isDefinitiveRejection) {
+			return { status: 'rejected' }
+		}
+		return { status: 'unavailable' }
 	}
 }
 
@@ -104,6 +143,17 @@ export const showStatusModal = (data: StatusModalData | null) => {
 	statusModalHandler?.(data)
 }
 
+// Global HTTP-error dialog with de-duplication: the same title+message within
+// GLOBAL_ERROR_DEDUPE_MS shows once, so a failing poller or a burst of parallel
+// requests can't re-open the dialog over and over.
+const showGlobalError = (data: StatusModalData) => {
+	const key = `${data.title}|${data.description}`
+	const now = Date.now()
+	if (lastGlobalError && lastGlobalError.key === key && now - lastGlobalError.at < GLOBAL_ERROR_DEDUPE_MS) return
+	lastGlobalError = { key, at: now }
+	showStatusModal(data)
+}
+
 // Request interceptor
 axiosInstance.interceptors.request.use(
 	async (config) => {
@@ -113,6 +163,9 @@ axiosInstance.interceptors.request.use(
 		const token = await secureStorage.getItem('access_token')
 		if (token && config.headers && !config.headers.Authorization && !config.headers.authorization) {
 			config.headers.Authorization = `Bearer ${token}`
+		}
+		if (typeof FormData !== 'undefined' && config.data instanceof FormData && config.timeout === DEFAULT_TIMEOUT_MS) {
+			config.timeout = UPLOAD_TIMEOUT_MS
 		}
 		return config
 	},
@@ -168,22 +221,32 @@ axiosInstance.interceptors.response.use(
 						refreshPromise = null
 					})
 				}
-				const newAccessToken = await refreshPromise
+				const refresh = await refreshPromise
 
-				if (newAccessToken) {
+				if (refresh.status === 'ok') {
 					originalRequest.headers = {
 						...originalRequest.headers,
-						Authorization: `Bearer ${newAccessToken}`,
+						Authorization: `Bearer ${refresh.accessToken}`,
 					}
 					return axiosInstance(originalRequest)
 				}
+
+				if (refresh.status === 'unavailable') {
+					// Couldn't reach the server to refresh (offline/timeout/5xx). The session
+					// isn't proven dead, so keep it and just fail this request; the next
+					// request retries the refresh.
+					error.message = 'Could not reach the server. Please check your connection and try again.'
+					return Promise.reject(error)
+				}
 			}
 
-			// No refresh token, or the refresh call failed -- fall back to a hard
-			// logout, same as before this retry logic existed.
-			await secureStorage.deleteItem('access_token')
-			await secureStorage.deleteItem('refresh_token')
-			await AsyncStorage.multiRemove(['role', 'user'])
+			// No refresh token, or the server rejected it -- the session is over.
+			if (__DEV__) {
+				const detail = error.response?.data?.detail ?? error.response?.data?.message
+				console.warn(`[auth] signed out: 401 on ${error.config?.method?.toUpperCase()} ${error.config?.url} (${String(detail)}); refresh was rejected or there is no refresh token`)
+			}
+			// Same purge as an explicit logout so no cached PHI is left behind.
+			await purgeLocalSession()
 			unauthorizedHandler?.()
 			if (!hasShownSessionExpiredAlert) {
 				hasShownSessionExpiredAlert = true
@@ -206,8 +269,8 @@ axiosInstance.interceptors.response.use(
 			const isVerificationRequired =
 				typeof errorDetail === 'object' && (errorDetail?.code === 'ANCILLARY_VERIFICATION_REQUIRED' || errorDetail?.code === 'NURSE_VERIFICATION_REQUIRED')
 
-			if (!isVerificationRequired) {
-				showStatusModal({
+			if (!isVerificationRequired && !error.config?.skipGlobalError) {
+				showGlobalError({
 					status: 'error',
 					title: 'Access Denied',
 					description:
@@ -218,8 +281,8 @@ axiosInstance.interceptors.response.use(
 					submitText: 'OK',
 				})
 			}
-		} else {
-			showStatusModal({
+		} else if (!error.config?.skipGlobalError) {
+			showGlobalError({
 				status: 'error',
 				title: 'API Error',
 				description: message,
@@ -244,8 +307,8 @@ const ApiService = {
 	patch<T = unknown>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
 		return axiosInstance.patch<T>(url, body, config)
 	},
-	put<T = unknown>(url: string, body: unknown): Promise<AxiosResponse<T>> {
-		return axiosInstance.put<T>(url, body)
+	put<T = unknown>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+		return axiosInstance.put<T>(url, body, config)
 	},
 	delete<T = unknown>(url: string): Promise<AxiosResponse<T>> {
 		return axiosInstance.delete<T>(url)
