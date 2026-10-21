@@ -238,6 +238,8 @@ export interface FamilyMember {
 	relation: string
 	relationship?: string
 	avatar_s3_key?: string | null
+	/** The member's own Karola ID. */
+	patient_code?: string | null
 	is_self: boolean
 	age?: string | number
 	gender?: string

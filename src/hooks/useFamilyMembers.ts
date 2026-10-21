@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useAvatarRefresh } from './useAvatarRefresh'
 import Toast from 'react-native-toast-message'
 import {
 	FamilyMember as ApiFamilyMember,
@@ -84,17 +85,22 @@ export function useFamilyMembers() {
 	const [loading, setLoading] = useState(true)
 	const activeRef = useRef(true)
 
-	const load = useCallback(async () => {
-		setLoading(true)
+	// `silent`: a background refresh of the photo links, with no loading state
+	const loadMembers = useCallback(async (silent: boolean) => {
+		if (!silent) setLoading(true)
 		try {
 			const list = await getFamilyMembers()
 			if (activeRef.current && list.length) setApiMembers(list)
 		} catch {
 			// Fall back to "self" only; the picker still works.
 		} finally {
-			if (activeRef.current) setLoading(false)
+			if (activeRef.current && !silent) setLoading(false)
 		}
 	}, [])
+	const load = useCallback(() => loadMembers(false), [loadMembers])
+
+	// the photos come as signed links that expire after an hour: fetch new ones before that, and on return to the app
+	useAvatarRefresh(() => loadMembers(true))
 
 	useEffect(() => {
 		activeRef.current = true
