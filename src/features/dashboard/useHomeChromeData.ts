@@ -78,7 +78,7 @@ export const usePatientSummary = (enabled = true) => {
 	return { summary: value, settled, reload }
 }
 
-/** GET /api/app-config — SOS / ambulance / support numbers. */
+/** GET /api/lookup/app-config — SOS / ambulance / support numbers. */
 export const useAppConfig = (enabled = true) => {
 	const { value } = useSoftFetch(fetchConfig, configCache, enabled)
 	return value
@@ -96,7 +96,7 @@ export const useAncillaryStartingPrices = (enabled = true) => {
 	return value ?? {}
 }
 
-/** India's national numbers, used only when /api/app-config is unreachable (contract defaults). */
+/** India's national numbers, used only when /api/lookup/app-config is unreachable (contract defaults). */
 export const FALLBACK_EMERGENCY_NUMBER = '112'
 export const FALLBACK_AMBULANCE_NUMBER = '108'
 

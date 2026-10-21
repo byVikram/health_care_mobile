@@ -65,10 +65,10 @@ export const API_ENDPOINTS = {
 		SYMPTOMS: `${BASE_URL}/api/specialities/symptoms`,
 	},
 	AREA_OF_EXPERTISE: {
-		LIST: `${BASE_URL}/api/area-of-expertise`,
+		LIST: `${BASE_URL}/api/doctors/area-of-expertise`,
 	},
 	TREATMENTS_OFFERING: {
-		LIST: `${BASE_URL}/api/treatments-offering`,
+		LIST: `${BASE_URL}/api/doctors/treatments-offering`,
 	},
 	USERS: {
 		GET: `${BASE_URL}/api/users`,
@@ -125,7 +125,7 @@ export const API_ENDPOINTS = {
 		ACTIVE: `${BASE_URL}/api/ads/active`,
 		TRACK: (publicId: string) => `${BASE_URL}/api/ads/${publicId}/track`,
 	},
-	APP_CONFIG: `${BASE_URL}/api/app-config`,
+	APP_CONFIG: `${BASE_URL}/api/lookup/app-config`,
 	// The signed-in user's sidebar + bottom tabs, by role
 	NAVIGATION: `${BASE_URL}/api/lookup/navigation`,
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS

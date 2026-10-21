@@ -2,7 +2,7 @@
 //
 // "More services" sheet (design 1b): red Emergency · SOS row (dials the configured emergency number) and a
 // 3-column grid of service tiles. Opened with useHomeSheets().open('more'); rendered once by <HomeSheetsHost />.
-// Numbers come from GET /api/app-config; when that is unreachable SOS / Ambulance fall back to India's
+// Numbers come from GET /api/lookup/app-config; when that is unreachable SOS / Ambulance fall back to India's
 // national 112 / 108, and Blood bank (which calls Karolahealth support) is hidden.
 import React, { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
