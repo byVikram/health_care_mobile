@@ -94,7 +94,6 @@ const CLOSE_MS = 200
 const DISMISS_DRAG_RATIO = 0.25
 const DISMISS_DRAG_VELOCITY = 0.5
 const DRAG_START_THRESHOLD = 8
-const FALLBACK_IMAGE = require('../../../assets/Banner/doctor.png')
 
 /** "1.4.2" -> "1.4" */
 const shortVersion = (v?: string | null) => {
@@ -125,7 +124,7 @@ export default function AppSidebar({
 	const sidebarWidth = Math.min(MAX_SIDEBAR_WIDTH, windowWidth - 48)
 	const translateX = useRef(new Animated.Value(-sidebarWidth)).current
 	const backdropOpacity = useRef(new Animated.Value(0)).current
-	const { user, role, ancillarySpecialty } = useAuth()
+	const { user, role } = useAuth()
 	const [mounted, setMounted] = useState(visible)
 	const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false)
 	const [imageError, setImageError] = useState(false)
@@ -138,13 +137,8 @@ export default function AppSidebar({
 		setImageError(false)
 	}, [profileImageUrl])
 
-	const isPhysiotherapy =
-		(role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE) &&
-		(ancillarySpecialty === 'physiotherapy' || !ancillarySpecialty)
-	const fallbackAvatar = isPhysiotherapy
-		? require('../../../assets/physiotherapy/physiotherapist.png')
-		: FALLBACK_IMAGE
-	const imageSource = profileImageUrl && !imageError ? { uri: profileImageUrl } : fallbackAvatar
+	// no stock photo stands in for a missing one: the profile card shows the person's initials instead
+	const hasPhoto = !!profileImageUrl && !imageError
 
 	const progress =
 		typeof profileCompletion === 'number' && Number.isFinite(profileCompletion)
@@ -295,7 +289,7 @@ export default function AppSidebar({
 								accessibilityLabel={`${userName}. View profile`}
 							>
 								<View style={styles.profileRow}>
-									{isPatient ? (
+									{isPatient || !hasPhoto ? (
 										<AppAvatar
 											uri={profileImageUrl}
 											name={userName}
@@ -305,7 +299,7 @@ export default function AppSidebar({
 										/>
 									) : (
 										<Image
-											source={imageSource}
+											source={{ uri: profileImageUrl as string }}
 											onError={() => setImageError(true)}
 											style={styles.avatarImage}
 										/>

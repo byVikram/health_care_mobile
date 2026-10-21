@@ -8,6 +8,7 @@ import {
 	AppAvatar,
 	AppCalendar,
 	AppChipGroup,
+	AppConfirmSheet,
 	AppDocumentRow,
 	documentRowStatus,
 	AppFormCard,
@@ -23,6 +24,7 @@ import { buildS3Url } from '../../../utils/s3Utils'
 import { showComingSoon } from '../../../utils/toast'
 import { useAvatarChange } from '../hooks/useAvatarChange'
 import { hubRoleFor } from '../config/profileHubConfig'
+import Toast from 'react-native-toast-message'
 import {
 	PERSONAL_DETAILS_CONFIG,
 	PERSONAL_FIELD_META,
@@ -48,7 +50,14 @@ export default function PersonalDetailsPage() {
 	// draft: it must not make the form look "dirty". null = show whatever the profile loaded with.
 	const [photoOverride, setPhotoOverride] = useState<string | null>(null)
 	const photoUrl = photoOverride !== null ? photoOverride : buildS3Url(draft?.avatar)
-	const avatar = useAvatarChange({ hasPhoto: !!photoUrl, onChanged: setPhotoOverride })
+	// a photo is compulsory for doctors and ancillary providers (replace only); optional, so removable, for patients
+	const photoRequired = (hubRoleFor(role) ?? 'patient') !== 'patient'
+	const [confirmDeletePhoto, setConfirmDeletePhoto] = useState(false)
+	const avatar = useAvatarChange({
+		hasPhoto: !!photoUrl,
+		allowRemove: !photoRequired,
+		onChanged: setPhotoOverride,
+	})
 
 	const renderField = (key: PersonalFieldKey, labelOverride?: string) => {
 		if (!draft) return null
@@ -127,6 +136,19 @@ export default function PersonalDetailsPage() {
 		<ProfileScreen
 			title="Personal details"
 			subtitle={config.subtitle}
+			overlays={
+				<AppConfirmSheet
+					visible={confirmDeletePhoto}
+					onClose={() => setConfirmDeletePhoto(false)}
+					title="Delete profile photo?"
+					message="Your photo will be removed. You can add another one any time."
+					confirmLabel="Delete"
+					onConfirm={() => {
+						setConfirmDeletePhoto(false)
+						avatar.remove()
+					}}
+				/>
+			}
 			loading={form.loading}
 			loadError={form.loadError}
 			onRetry={form.reload}
@@ -134,7 +156,13 @@ export default function PersonalDetailsPage() {
 			onDismissSaveError={form.clearSaveError}
 			footer={
 				<AppSaveFooter
-					onSave={form.submit}
+					onSave={() => {
+						if (photoRequired && !photoUrl) {
+							Toast.show({ type: 'error', text1: 'Profile photo required', text2: 'Please add a profile photo to continue.' })
+							return
+						}
+						return form.submit()
+					}}
 					dirty={form.dirty}
 					saving={form.saving}
 					invalid={Object.keys(errors).length > 0}
@@ -171,6 +199,20 @@ export default function PersonalDetailsPage() {
 								{draft.name || 'Your name'}
 							</Text>
 							<Text style={styles.photoSub}>{config.photoSubtitle}</Text>
+							<View style={styles.photoLinks}>
+								<TouchableOpacity onPress={avatar.open} disabled={avatar.busy} accessibilityRole="button">
+									<Text style={styles.photoLinkText}>{photoUrl ? 'Change photo' : 'Add photo'}</Text>
+								</TouchableOpacity>
+								{avatar.canRemove && (
+									<TouchableOpacity
+										onPress={() => setConfirmDeletePhoto(true)}
+										disabled={avatar.busy}
+										accessibilityRole="button"
+									>
+										<Text style={[styles.photoLinkText, styles.photoLinkDanger]}>Delete photo</Text>
+									</TouchableOpacity>
+								)}
+							</View>
 						</View>
 					</View>
 
@@ -234,4 +276,7 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 		color: APP_COLORS.inkMuted,
 	},
+	photoLinks: { flexDirection: 'row', gap: 16, marginTop: 2 },
+	photoLinkText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.primary },
+	photoLinkDanger: { color: APP_COLORS.danger },
 })
