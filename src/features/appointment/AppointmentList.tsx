@@ -135,6 +135,7 @@ function getStatusColor(status: string): { bg: string; text: string } {
   if (s === 'cancelled') return { bg: '#ffebee', text: '#c62828' }
   if (s === 'completed') return { bg: '#e3f2fd', text: '#1565c0' }
   if (s === 'rescheduled') return { bg: '#fff8e1', text: '#e65100' }
+  if (s === 'reschedule needed') return { bg: '#fff3e0', text: '#e65100' }
   if (s.includes('waiting')) return { bg: '#fff3e0', text: '#e65100' }
   return { bg: '#f3e5f5', text: '#6a1b9a' }
 }
@@ -430,9 +431,14 @@ function AppointmentCard({
   const rescheduledBy = (row.rescheduledBy || '').toLowerCase()
   const past = isAppointmentPast(row)
   const terminal = TERMINAL_STATUSES.has(status)
-  const showActions = viewAs === 'patient' && !past && !terminal
+  // The doctor asked the patient to choose a new time: the patient's action is "Choose a new time" (the same
+  // reschedule sheet), and there is no proposed time to confirm.
+  const needsNewTime = viewAs === 'patient' && status === 'reschedule_required'
+  const showActions = viewAs === 'patient' && (!past || needsNewTime) && !terminal
   const showReview = viewAs === 'patient' && status === 'completed'
-  const showConfirm = showActions && status === 'rescheduled' && rescheduledBy === 'doctor'
+  // Confirm = accept a time someone else proposed: an admin's (or a legacy doctor-proposed one). A time the
+  // PATIENT picked waits for the doctor instead, and 'reschedule_required' has no proposed time at all.
+  const showConfirm = showActions && status === 'rescheduled' && (Boolean(rescheduledBy) && rescheduledBy !== 'patient')
   const { bg, text: textColor } = getStatusColor(statusLabel)
   const nameToShow = viewAs === 'doctor' ? row.patientName : row.doctorName
   const avatarToShow = viewAs === 'doctor' ? row.patientAvatar : row.doctorAvatar
@@ -535,14 +541,16 @@ function AppointmentCard({
                   <Text style={[styles.actionBtnText, { color: '#e53935' }]}>✕ Reject</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.actionBtn, styles.actionBtnReschedule]}
+                  style={[styles.actionBtn, needsNewTime ? styles.actionBtnChooseTime : styles.actionBtnReschedule]}
                   onPress={(event) => {
                     event.stopPropagation()
                     onReschedule()
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>↻ Reschedule</Text>
+                  <Text style={[styles.actionBtnText, { color: needsNewTime ? '#ffffff' : '#f59e0b' }]}>
+                    {needsNewTime ? '↻ Choose a new time' : '↻ Reschedule'}
+                  </Text>
                 </TouchableOpacity>
               </>
             )}
@@ -812,6 +820,9 @@ function AppointmentListImpl(
 
     if (status === 'pending') {
       return viewAs === 'doctor' ? 'Pending' : 'Waiting for Doctor Confirmation'
+    }
+    if (status === 'reschedule_required') {
+      return viewAs === 'patient' ? 'Reschedule needed' : 'Waiting for Patient to Choose a Time'
     }
     if (status === 'rescheduled') {
       if (!rescheduledBy) return 'Rescheduled'
@@ -1451,6 +1462,9 @@ const styles = StyleSheet.create({
   },
   actionBtnReschedule: {
     backgroundColor: '#fff8e8',
+  },
+  actionBtnChooseTime: {
+    backgroundColor: PRIMARY,
   },
   actionBtnText: {
     fontSize: 12,

@@ -51,6 +51,7 @@ import {
 	getPaymentState,
 	getRawStatus,
 	getVariant,
+	isAwaitingDoctorConfirm,
 	isVideoMode,
 	parseDateOnly,
 	slotLabel,
@@ -153,7 +154,11 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	const isCompleted = variant === 'completed'
 	const live = !isCancelled && !isCompleted
 	const canAct = live && !isPast
+	// The doctor asked for a new time and the patient has not picked one yet.
+	const needsNewTime = live && variant === 'reschedule_required' && !localRescheduled
 	const showRescheduled = live && (localRescheduled || variant === 'rescheduled')
+	// The patient picked the slot: it now waits for the doctor to confirm (nothing for the patient to accept).
+	const awaitingDoctor = showRescheduled && (localRescheduled || isAwaitingDoctorConfirm(appt))
 	const hospital = appt?.hospital ?? null
 	const phone = hospital?.contact_number || hospital?.phone || ''
 	const fee = appt?.fees
@@ -164,13 +169,15 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	const startsIn = startsInLabel(start)
 	const whenSub = !apptDay
 		? undefined
-		: showRescheduled
-			? `${fullDay(apptDay)} · rescheduled`
-			: startsIn
-				? Math.abs(dayDiff(apptDay)) <= 1
-					? `${fullDay(apptDay)} · ${startsIn}`
-					: `${isVideo ? 'Video call' : 'Clinic visit'} · ${startsIn}`
-				: fullDay(apptDay)
+		: needsNewTime
+			? `${fullDay(apptDay)} · needs a new time`
+			: showRescheduled
+				? `${fullDay(apptDay)} · rescheduled`
+				: startsIn
+					? Math.abs(dayDiff(apptDay)) <= 1
+						? `${fullDay(apptDay)} · ${startsIn}`
+						: `${isVideo ? 'Video call' : 'Clinic visit'} · ${startsIn}`
+					: fullDay(apptDay)
 
 	const minutes = durationMinutes(appt?.start_time, appt?.end_time)
 	const visitSub = isVideo
@@ -370,7 +377,28 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 					/>
 				)}
 
-				{showRescheduled && (
+				{needsNewTime && (
+					<AppInfoBanner
+						tone="warning"
+						icon="calendar-clock"
+						title="Your doctor asked you to choose a new time"
+						subtitle={`${doctorName} can’t keep this slot. Pick a new time that suits you; your booking and fee stay the same.`}
+						action={{ label: 'Choose a new time', onPress: openReschedule }}
+						style={styles.bannerTop}
+					/>
+				)}
+
+				{showRescheduled && awaitingDoctor && (
+					<AppInfoBanner
+						tone="success"
+						icon="check"
+						title="New time sent"
+						subtitle={`Waiting for ${doctorName} to confirm it. We’ll let you know. Your booking and fee stay the same.`}
+						style={styles.bannerTop}
+					/>
+				)}
+
+				{showRescheduled && !awaitingDoctor && (
 					<AppInfoBanner
 						tone="success"
 						icon="check"
@@ -501,7 +529,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 				</AppSection>
 
 				{/* Video: join card */}
-				{isVideo && canAct && (
+				{isVideo && canAct && !needsNewTime && (
 					<AppInfoBanner
 						tone="sky"
 						icon="video-outline"
@@ -513,7 +541,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 				)}
 
 				{/* Prep steps */}
-				{canAct && (
+				{canAct && !needsNewTime && (
 					<AppSection title={getPrepStepsTitle(isVideo)} titleSize="sm" marginTop={0}>
 						<AppNumberedSteps steps={steps} />
 					</AppSection>
@@ -582,7 +610,16 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 
 			{/* Footer -- bottom padding stays max(20, inset) as in the design. */}
 			<AppFooterBar bottomPadding={Math.max(0, 20 - insets.bottom)}>
-				{canAct ? (
+				{needsNewTime ? (
+					<AppButton
+						size="lg"
+						icon="calendar-blank-outline"
+						style={styles.footerBtn}
+						onPress={openReschedule}
+					>
+						Choose a new time
+					</AppButton>
+				) : canAct ? (
 					<>
 						<AppButton
 							variant="outline"
@@ -660,7 +697,13 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 				isVideo={isVideo}
 				currentDate={appt.appointment_date}
 				currentStart={appt.start_time}
-				title={isVideo ? 'Reschedule video call' : 'Reschedule appointment'}
+				title={
+					needsNewTime
+						? 'Choose a new time'
+						: isVideo
+							? 'Reschedule video call'
+							: 'Reschedule appointment'
+				}
 				subtitle={`${appt.doctor?.name ?? 'Doctor'} · ${isVideo ? 'Video consultation' : (hospital?.name ?? 'In-clinic')}`}
 				note={
 					isVideo

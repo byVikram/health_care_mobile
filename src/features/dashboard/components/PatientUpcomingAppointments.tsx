@@ -49,6 +49,10 @@ const STATUS_TAG: Record<string, AppTagTone> = {
 
 const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
 
+// A doctor asked the patient to choose a new time: the patient acts (details screen -> reschedule sheet).
+const NEEDS_NEW_TIME = 'reschedule_required'
+const statusText = (status: string) => (status === NEEDS_NEW_TIME ? 'Reschedule needed' : titleCase(status))
+
 const isVideo = (a: ApiAppointment) => /online|video/.test((a.appointment_mode ?? '').toLowerCase())
 
 const startTime = (a: ApiAppointment) => a.start_time || a.appointment_time || ''
@@ -155,8 +159,12 @@ export default function PatientUpcomingAppointments({ refreshToken, onRefreshCom
 							{`${specialty} · ${video ? 'Video consultation' : 'In-clinic visit'}`}
 						</Text>
 					</View>
-					<AppTag label={titleCase(status)} tone={STATUS_TAG[status] ?? 'upcoming'} style={styles.statusTag} />
+					<AppTag label={statusText(status)} tone={STATUS_TAG[status] ?? 'upcoming'} style={styles.statusTag} />
 				</View>
+
+				{status === NEEDS_NEW_TIME && (
+					<Text style={styles.needsTimeText}>Your doctor asked you to choose a new time</Text>
+				)}
 
 				<View style={styles.footer}>
 					<View style={styles.whenCol}>
@@ -187,10 +195,14 @@ export default function PatientUpcomingAppointments({ refreshToken, onRefreshCom
 						</AppIconButton>
 					)}
 					<AppActionChip
-						label="View"
+						label={status === NEEDS_NEW_TIME ? 'Choose a new time' : 'View'}
 						filled
 						size="md"
-						accessibilityLabel={`View appointment with ${next.doctor?.name ?? 'doctor'}`}
+						accessibilityLabel={
+							status === NEEDS_NEW_TIME
+								? `Choose a new time for your appointment with ${next.doctor?.name ?? 'doctor'}`
+								: `View appointment with ${next.doctor?.name ?? 'doctor'}`
+						}
 						onPress={() => navigation.navigate(ROUTES.STACK.APPOINTMENT_DETAILS, { appointmentId: next.id })}
 						style={styles.viewButton}
 					/>
@@ -233,6 +245,14 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 		lineHeight: 18,
 		color: APP_COLORS.inkMuted,
+	},
+	needsTimeText: {
+		paddingHorizontal: 14,
+		paddingBottom: 12,
+		fontSize: 13,
+		lineHeight: 18,
+		fontWeight: '700',
+		color: APP_COLORS.warning,
 	},
 	statusTag: {
 		alignSelf: 'center',

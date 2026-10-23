@@ -1,8 +1,8 @@
 // src/features/doctor/DoctorAppointments.tsx
 //
 // React Native equivalent of the web DoctorAppointments component.
-// All business logic (status helpers, confirm/reject/reschedule flow,
-// local state overrides) is preserved exactly.
+// Business logic (status helpers, confirm/reject flow, local state overrides) is preserved. "Reschedule" does not
+// pick a slot for the doctor: it asks the PATIENT to choose a new time (askPatientToReschedule).
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import {
@@ -30,23 +30,20 @@ import { Appointment } from '../../types/appointment'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
-import DateSlotPicker from '../../components/common/inputs/DateSlotPicker'
 import { AppInput, AppModal } from '../../components/common'
 import { RejectReasonModal } from './components/RejectReasonModal'
 import { WeekSelector, type WeekDay } from './components/WeekSelector'
 import FavouriteDoctorList, { type FavouriteDoctorListItem } from './search/components/FavouriteDoctorList'
 import {
-  getDoctorAvailability,
-  getDoctorProfile,
-  rescheduleAppointment,
+  askPatientToReschedule,
   startConsultation,
   getFavouriteDoctors,
   toggleFavouriteDoctor,
   getDoctors,
-  type SlotGroup,
   type FavouriteDoctor,
 } from './doctorService'
 import { createReferral } from '../referrals/referralService'
+import { AskPatientRescheduleSheet } from './components/AskPatientRescheduleSheet'
 
 // ── Action icons ──────────────────────────────────────────────────────────────
 
@@ -54,17 +51,11 @@ import ConfirmIcon from '../../assets/icons/confirm.svg'
 import RejectIcon from '../../assets/icons/reject.svg'
 import RescheduleIcon from '../../assets/icons/reschedule.svg'
 import ReferIcon from '../../assets/icons/refer.svg'
-import {
-  formatTime12h,
-  isVideoMode,
-  toApiDate,
-  getRescheduleModeKey,
-  normalizeAvailabilitySlots,
-} from './scheduleUtils'
+import { formatTime12h, isVideoMode } from './scheduleUtils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-// (formatTime12h/isVideoMode/toApiDate/getRescheduleModeKey/normalizeAvailabilitySlots now live in
-// ./scheduleUtils.ts, shared with the new DoctorScheduleScreen -- imported above, not redefined here.)
+// (formatTime12h/isVideoMode now live in ./scheduleUtils.ts, shared with the new DoctorScheduleScreen --
+// imported above, not redefined here.)
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
@@ -199,9 +190,6 @@ function RejectConfirmModal({ visible, onCancel, onConfirm, submitting = false }
 }
 
 
-// ── Reschedule Helpers ────────────────────────────────────────────────────────
-// (toApiDate/getRescheduleModeKey/normalizeAvailabilitySlots imported from ./scheduleUtils above.)
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface DoctorAppointmentsProps {
@@ -231,9 +219,6 @@ export function DoctorAppointments({
 
   // Local status overrides (set after an action without a full refresh)
   const [localStatuses, setLocalStatuses] = useState<Record<string, string>>({})
-  const [localTimes, setLocalTimes] = useState<Record<string, { start_time: string; end_time: string | null }>>({})
-  // Tracks who initiated the most recent reschedule for each appointment.
-  const [localRescheduledBy, setLocalRescheduledBy] = useState<Record<string, string>>({})
 
   // Reject confirmation modal state
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
@@ -241,18 +226,8 @@ export function DoctorAppointments({
   const [rejectSubmitting, setRejectSubmitting] = useState(false)
 
 
-  // Reschedule state
-  const [rescheduleAppt, setRescheduleAppt] = useState<Appointment | null>(null)
-  const [rescheduleOpen, setRescheduleOpen] = useState(false)
-  const [rescheduleDate, setRescheduleDate] = useState(new Date())
-  const [rescheduleTime, setRescheduleTime] = useState('')
-  const [rescheduleSlots, setRescheduleSlots] = useState<SlotGroup[]>([])
-  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
-  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false)
-  const [rescheduleHospitals, setRescheduleHospitals] = useState<{ id: string; label: string }[]>([])
-  const [rescheduleHospitalId, setRescheduleHospitalId] = useState('')
-  const [hospitalDropdownOpen, setHospitalDropdownOpen] = useState(false)
-  const [appointmentType, setAppointmentType] = useState<'clinic' | 'video'>('clinic')
+  // Ask-the-patient-to-reschedule confirmation (the doctor never picks the slot)
+  const [askAppt, setAskAppt] = useState<Appointment | null>(null)
 
   // Refer state
   const [referOpen, setReferOpen] = useState(false)
@@ -273,93 +248,6 @@ export function DoctorAppointments({
     avatar?: string | null
     notes?: string
   } | null>(null)
-
-  const { width, height } = useWindowDimensions()
-  const isTablet = width >= 768
-  const isLandscape = width > height
-  const rescheduleColumns = isTablet || isLandscape ? 4 : 3
-
-  const canConfirmReschedule = Boolean(
-    rescheduleDate &&
-      rescheduleTime &&
-      (rescheduleHospitalId || rescheduleAppt?.hospital?.id) &&
-      !rescheduleSlotsLoading &&
-      !rescheduleSubmitting
-  )
-
-  useEffect(() => {
-    if (!rescheduleOpen || !rescheduleAppt) return
-
-    const doctorId = rescheduleAppt.doctor?.id
-    if (!doctorId) return
-
-    let mounted = true
-    const fetchDoctorHospitals = async () => {
-      try {
-        const res = await getDoctorProfile()
-        if (mounted && res.success && res.data) {
-          const hospitals = (res.data.hospitals ?? []).map((h) => ({
-            id: h.hospital?.id || h.id,
-            label: h.hospital?.name || 'Unknown Hospital',
-          }))
-          setRescheduleHospitals(hospitals)
-          setRescheduleHospitalId((current) => current || rescheduleAppt.hospital?.id || hospitals[0]?.id || '')
-        }
-      } catch (error) {
-        console.log('[DoctorAppointments] fetch doctor hospitals error:', error)
-      }
-    }
-
-    void fetchDoctorHospitals()
-
-    return () => {
-      mounted = false
-    }
-  }, [rescheduleAppt, rescheduleOpen])
-
-  useEffect(() => {
-    if (!rescheduleOpen || !rescheduleAppt) return
-
-    const doctorId = rescheduleAppt.doctor?.id
-    const hospitalId = rescheduleHospitalId || rescheduleAppt.hospital?.id
-
-    if (!doctorId || !hospitalId) {
-      setRescheduleSlots([])
-      setRescheduleTime('')
-      return
-    }
-
-    let mounted = true
-
-    const fetchSlots = async () => {
-      setRescheduleSlotsLoading(true)
-      setRescheduleSlots([])
-      setRescheduleTime('')
-
-      try {
-        const dateStr = toApiDate(rescheduleDate)
-        const responseData = await getDoctorAvailability({
-          doctor_id: doctorId,
-          hospital_id: hospitalId,
-          date: dateStr,
-        })
-        if (mounted) {
-          setRescheduleSlots(normalizeAvailabilitySlots(responseData, appointmentType))
-        }
-      } catch (error) {
-        console.log('[DoctorAppointments] fetch reschedule slots error:', error)
-        if (mounted) Alert.alert('Error', 'Could not load available slots.')
-      } finally {
-        if (mounted) setRescheduleSlotsLoading(false)
-      }
-    }
-
-    void fetchSlots()
-
-    return () => {
-      mounted = false
-    }
-  }, [appointmentType, rescheduleAppt, rescheduleDate, rescheduleHospitalId, rescheduleOpen])
 
   useEffect(() => {
     if (!referOpen) return
@@ -579,8 +467,11 @@ export function DoctorAppointments({
       (typeof apt.status === 'string' ? apt.status : (apt.status?.label ?? 'pending'))
     ).toLowerCase()
 
+    // The doctor asked the patient to choose a new time; nothing to do until they pick one.
+    if (status === 'reschedule_required') return 'Reschedule needed'
+
     if (status === 'rescheduled') {
-      const rescheduledBy = (localRescheduledBy[apt.id] ?? apt.rescheduled_by ?? '').toLowerCase()
+      const rescheduledBy = (apt.rescheduled_by ?? '').toLowerCase()
       if (rescheduledBy === 'doctor') return 'Waiting for Patient Confirmation'
       if (rescheduledBy === 'patient') return 'Waiting for Your Confirmation'
       return 'Rescheduled'
@@ -636,76 +527,24 @@ export function DoctorAppointments({
   }
 
 
-  const handleRescheduleDateChange = (date: Date) => {
-    setRescheduleDate(date)
-    setRescheduleTime('')
-    setRescheduleSlots([])
-  }
-
-  const handleRescheduleClick = (apt: Appointment) => {
-    const isVirtual = isVideoMode(apt.appointment_mode)
-    setRescheduleAppt(apt)
-    setRescheduleDate(new Date())
-    setRescheduleTime('')
-    setRescheduleSlots([])
-    setRescheduleHospitals([])
-    setHospitalDropdownOpen(false)
-    setRescheduleHospitalId(apt.hospital?.id || '')
-    setAppointmentType(isVirtual ? 'video' : 'clinic')
-    setRescheduleOpen(true)
-  }
-
-  const handleRescheduleConfirm = async () => {
-    if (!rescheduleAppt || !rescheduleTime) {
-      Alert.alert('Select time', 'Please select a time slot before confirming.')
-      return
-    }
-
-    const hospitalId = rescheduleHospitalId || rescheduleAppt.hospital?.id
-    if (!hospitalId) {
-      Alert.alert('Select hospital', 'Please select a hospital before confirming.')
-      return
-    }
-
-    const selectedSlot = rescheduleSlots
-      .flatMap((group) => group.slots)
-      .find((slot) => slot.start_time === rescheduleTime)
-    
-    const dateStr = toApiDate(rescheduleDate)
-
-    setRescheduleSubmitting(true)
+  const handleAskReschedule = async (reason: string) => {
+    const apt = askAppt
+    if (!apt) return
     try {
-      const res = await rescheduleAppointment({
-        appointment_id: rescheduleAppt.id,
-        appointment_date: dateStr,
-        start_time: rescheduleTime,
-        end_time: selectedSlot?.end_time ?? null,
-        hospital_id: hospitalId,
-        reason: 'Doctor unavailable',
-      })
-
+      const res = await askPatientToReschedule(apt.id, reason)
       if (res.success) {
-        Toast.show({ type: 'success', text1: 'Appointment rescheduled successfully.' })
-        setLocalStatuses((prev) => ({ ...prev, [rescheduleAppt.id]: 'rescheduled' }))
-        setLocalRescheduledBy((prev) => ({ ...prev, [rescheduleAppt.id]: 'doctor' }))
-        
-        setLocalTimes((prev) => ({
-          ...prev,
-          [rescheduleAppt.id]: {
-            start_time: rescheduleTime,
-            end_time: selectedSlot?.end_time ?? null
-          }
-        }))
-
-        setRescheduleOpen(false)
+        Toast.show({ type: 'success', text1: res.message ?? 'The patient has been asked to choose a new time' })
+        setLocalStatuses((prev) => ({ ...prev, [apt.id]: 'reschedule_required' }))
+        setAskAppt(null)
       } else {
-        Alert.alert('Error', res.message || 'Reschedule failed. Please try again.')
+        Toast.show({ type: 'error', text1: res.message ?? 'Could not ask the patient to reschedule. Please try again.' })
       }
     } catch (error: any) {
-      console.log('[DoctorAppointments] reschedule error:', error?.response?.data || error?.message || error)
-      Alert.alert('Error', 'Something went wrong. Please try again.')
-    } finally {
-      setRescheduleSubmitting(false)
+      console.log('[DoctorAppointments] ask to reschedule error:', error?.response?.data || error?.message || error)
+      Toast.show({
+        type: 'error',
+        text1: error?.response?.data?.message ?? 'Could not ask the patient to reschedule. Please try again.',
+      })
     }
   }
 
@@ -742,10 +581,13 @@ export function DoctorAppointments({
     const statusLabel = getStatusLabel(apt)
     const isCancelled = statusLabel.toLowerCase() === 'cancelled'
     const isConfirmed = statusLabel.toLowerCase() === 'confirmed'
+    // Waiting on the patient: they have to choose a new time ('Reschedule needed'), or (legacy rows where the
+    // doctor proposed a slot) accept the proposed one.
+    const needsNewTime = statusLabel === 'Reschedule needed'
     const rescheduledByDoctor =
+      needsNewTime ||
       statusLabel.toLowerCase().includes('waiting for patient') ||
-      (statusLabel === 'rescheduled' &&
-        (localRescheduledBy[apt.id] ?? apt.rescheduled_by ?? '').toLowerCase() === 'doctor')
+      (statusLabel === 'rescheduled' && (apt.rescheduled_by ?? '').toLowerCase() === 'doctor')
 
     const chipStyle = getStatusChipStyle(isCancelled, isConfirmed, rescheduledByDoctor)
     const video = isVideoMode(apt.appointment_mode)
@@ -760,7 +602,8 @@ export function DoctorAppointments({
     const visibleActions = allActionButtons.filter(
       (btn) =>
         !(btn.action === 'confirm' && isConfirmed) &&
-        !(btn.action === 'confirm' && rescheduledByDoctor)
+        !(btn.action === 'confirm' && rescheduledByDoctor) &&
+        !(btn.action === 'reschedule' && needsNewTime)
     )
 
     return (
@@ -828,8 +671,7 @@ export function DoctorAppointments({
             )}
             <Text style={styles.aptMeta}>🕐 </Text>
             <Text style={styles.aptMeta}>
-              {formatTime12h(localTimes[apt.id]?.start_time ?? apt.start_time)} –{' '}
-              {formatTime12h(localTimes[apt.id]?.end_time ?? apt.end_time)}
+              {formatTime12h(apt.start_time)} – {formatTime12h(apt.end_time)}
             </Text>
           </View>
 
@@ -854,7 +696,7 @@ export function DoctorAppointments({
                       // Prevent triggering the card's onPress
                       if (btn.action === 'confirm') handleConfirmAppointment(apt.id)
                       else if (btn.action === 'reject') handleRejectClick(apt.id)
-                      else if (btn.action === 'reschedule') handleRescheduleClick(apt)
+                      else if (btn.action === 'reschedule') setAskAppt(apt)
                       else if (btn.action === 'refer') handleReferClick(apt.id)
                     }}
                     activeOpacity={0.8}
@@ -1088,128 +930,13 @@ export function DoctorAppointments({
         </View>
       </AppModal>
 
-      {/* Reschedule confirm modal */}
-      <Modal
-        visible={rescheduleOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          if (!rescheduleSubmitting) setRescheduleOpen(false)
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, isTablet && styles.modalCardTablet]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Reschedule Appointment</Text>
-              <TouchableOpacity
-                onPress={() => setRescheduleOpen(false)}
-                disabled={rescheduleSubmitting}
-                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-              >
-                <Ionicons name="close" size={22} color="#526173" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
-              {rescheduleHospitals.length > 0 ? (
-                <View style={styles.hospitalPicker}>
-                  <Text style={styles.modalLabel}>Choose Hospital</Text>
-                  <TouchableOpacity
-                    style={styles.hospitalSelectTrigger}
-                    activeOpacity={0.85}
-                    onPress={() => setHospitalDropdownOpen((prev) => !prev)}
-                  >
-                    <Text
-                      style={[
-                        styles.hospitalSelectValue,
-                        !rescheduleHospitalId && styles.hospitalSelectPlaceholder,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {rescheduleHospitals.find((h) => h.id === rescheduleHospitalId)?.label || 'Choose Hospital'}
-                    </Text>
-                    <Ionicons
-                      name={hospitalDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                      size={18}
-                      color="#526173"
-                    />
-                  </TouchableOpacity>
-
-                  {hospitalDropdownOpen ? (
-                    <View style={styles.hospitalDropdown}>
-                      <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={rescheduleHospitals.length > 4}>
-                        {rescheduleHospitals.map((hospital) => {
-                          const selected = hospital.id === rescheduleHospitalId
-                          return (
-                            <TouchableOpacity
-                              key={hospital.id}
-                              style={[styles.hospitalDropdownItem, selected && styles.hospitalDropdownItemSelected]}
-                              onPress={() => {
-                                setRescheduleHospitalId(hospital.id)
-                                setRescheduleTime('')
-                                setRescheduleSlots([])
-                                setHospitalDropdownOpen(false)
-                              }}
-                            >
-                              <Text
-                                style={[
-                                  styles.hospitalDropdownText,
-                                  selected && styles.hospitalDropdownTextSelected,
-                                ]}
-                                numberOfLines={2}
-                              >
-                                {hospital.label}
-                              </Text>
-                              {selected ? <Ionicons name="checkmark-circle" size={18} color="#0c7c7c" /> : null}
-                            </TouchableOpacity>
-                          )
-                        })}
-                      </ScrollView>
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
-
-              <DateSlotPicker
-                selectedDate={rescheduleDate}
-                onDateChange={handleRescheduleDateChange}
-                selectedTime={rescheduleTime}
-                onTimeChange={setRescheduleTime}
-                availableSlots={rescheduleSlots}
-                loading={rescheduleSlotsLoading}
-                timeSlotColumns={rescheduleColumns}
-                disablePast
-                disableBookedSlots
-                dateLabel="Select Date"
-                timeLabel="Select Time"
-                selectedAppointmentType={appointmentType}
-                onAppointmentTypeChange={setAppointmentType}
-              />
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalSecondaryButton, rescheduleSubmitting && styles.buttonDisabled]}
-                onPress={() => setRescheduleOpen(false)}
-                disabled={rescheduleSubmitting}
-              >
-                <Text style={styles.modalSecondaryButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalPrimaryButton, !canConfirmReschedule && styles.buttonDisabled]}
-                onPress={handleRescheduleConfirm}
-                disabled={!canConfirmReschedule}
-              >
-                {rescheduleSubmitting ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.modalPrimaryButtonText}>Confirm</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Ask the patient to reschedule (the patient picks the new time) */}
+      <AskPatientRescheduleSheet
+        visible={askAppt !== null}
+        patientName={askAppt?.patient?.name ?? 'The patient'}
+        onClose={() => setAskAppt(null)}
+        onConfirm={handleAskReschedule}
+      />
 
       {/* Referral detail modal */}
       <AppModal
@@ -1614,147 +1341,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
 
-  // Reschedule Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(18, 28, 33, 0.35)',
-    justifyContent: 'center',
-    padding: 16,
-  },
-  modalCard: {
-    width: '100%',
-    maxHeight: '90%',
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
-    overflow: 'hidden',
-  },
-  modalCardTablet: {
-    maxWidth: 720,
-    alignSelf: 'center',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#edf2f5',
-  },
-  modalTitle: {
-    flex: 1,
-    color: '#1D2B36',
-    fontSize: 17,
-    fontWeight: '700',
-    paddingRight: 12,
-  },
-  modalScrollContent: {
-    paddingBottom: 8,
-  },
-  hospitalPicker: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  modalLabel: {
-    color: '#536672',
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  hospitalSelectTrigger: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: '#d7e2e8',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    backgroundColor: '#ffffff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  hospitalSelectValue: {
-    flex: 1,
-    color: '#1D2B36',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  hospitalSelectPlaceholder: {
-    color: '#8a9aa6',
-  },
-  hospitalDropdown: {
-    marginTop: 8,
-    maxHeight: 190,
-    borderWidth: 1,
-    borderColor: '#d7e2e8',
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
-    overflow: 'hidden',
-  },
-  hospitalDropdownItem: {
-    minHeight: 46,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eef3f5',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  hospitalDropdownItemSelected: {
-    backgroundColor: '#eefafa',
-  },
-  hospitalDropdownText: {
-    flex: 1,
-    color: '#526173',
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-  hospitalDropdownTextSelected: {
-    color: '#0c7c7c',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 10,
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#edf2f5',
-  },
-  modalSecondaryButton: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#d7e2e8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
-  },
-  modalSecondaryButtonText: {
-    color: '#1A2A38',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  modalPrimaryButton: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 12,
-    backgroundColor: '#0c7c7c',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  modalPrimaryButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
   referSelectedDoctorCard: {
     flexDirection: 'row',
     alignItems: 'center',
