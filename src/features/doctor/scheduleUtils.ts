@@ -20,6 +20,10 @@ export const isCompletedAppt = (apt: Appointment): boolean => statusLabelOf(apt)
 export const isRescheduleRequest = (apt: Appointment): boolean =>
 	statusLabelOf(apt).toLowerCase() === 'rescheduled' && (apt.rescheduled_by ?? '').toLowerCase() !== 'doctor'
 
+/** A doctor asked the patient to choose a new time (status 'reschedule_required'): the patient has to pick the slot,
+ * then it comes back as a 'rescheduled' request for the doctor to confirm. Nothing for the doctor to do meanwhile. */
+export const isRescheduleNeeded = (apt: Appointment): boolean => statusLabelOf(apt).toLowerCase() === 'reschedule_required'
+
 /** What the Requests tab lists: a new pending request, or a patient's reschedule request. */
 export const isRequestLike = (apt: Appointment): boolean => isPending(apt) || isRescheduleRequest(apt)
 

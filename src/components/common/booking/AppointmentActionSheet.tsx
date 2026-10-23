@@ -1,23 +1,21 @@
 // src/components/common/booking/AppointmentActionSheet.tsx
 //
-// One configurable bottom sheet backing AppointmentActionCard's Reject/Cancel, Reschedule and Refer
-// actions (source: the "Doctor Dashboard" design's single sheet that swaps content by mode, rather
-// than three separate dialogs). Reuses the existing DateSlotPicker (date+slot picker) and
-// FavouriteDoctorList (colleague row) components and the real availability/referral/favourites
-// services already proven by DoctorAppointments.tsx — no new endpoints, no simulated data.
+// One configurable bottom sheet backing AppointmentActionCard's Reject/Cancel and Refer actions
+// (source: the "Doctor Dashboard" design's single sheet that swaps content by mode, rather than
+// separate dialogs). Reuses the existing FavouriteDoctorList (colleague row) component and the real
+// referral/favourites services already proven by DoctorAppointments.tsx — no new endpoints, no simulated data.
+// There is no Reschedule mode: a doctor does not pick a new slot, they ask the patient to choose one
+// (see features/doctor/components/AskPatientRescheduleSheet).
 
 import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppBottomSheet } from '../layout/AppBottomSheet'
-import DateSlotPicker from '../inputs/DateSlotPicker'
 import FavouriteDoctorList, { type FavouriteDoctorListItem } from '../../../features/doctor/search/components/FavouriteDoctorList'
 import { APP_COLORS } from '../../../config/theme'
-import { getDoctorAvailability, getDoctors, getFavouriteDoctors } from '../../../features/doctor/doctorService'
-import { normalizeAvailabilitySlots, toApiDate } from '../../../features/doctor/scheduleUtils'
-import type { SlotGroup } from '../../../features/doctor/doctorService'
+import { getDoctors, getFavouriteDoctors } from '../../../features/doctor/doctorService'
 
-export type ActionSheetMode = 'reject' | 'reschedule' | 'refer'
+export type ActionSheetMode = 'reject' | 'refer'
 
 export type RejectReasonOption = { id: string; label: string }
 
@@ -28,14 +26,10 @@ export type AppointmentActionSheetProps = {
 	appointmentId: string
 	patientName: string
 	slotLabel: string
-	doctorId?: string
-	hospitalId?: string
-	appointmentType: 'clinic' | 'video'
 	/** Reject-mode reason list; pass a different list depending on isRequest (e.g. "Cancel" reasons for an already-confirmed booking). */
 	reasons: RejectReasonOption[]
 	busy?: boolean
 	onConfirmReject: (reasonLabel: string, note: string) => void
-	onConfirmReschedule: (date: Date, startTime: string, endTime: string | null) => void
 	onConfirmRefer: (doctor: FavouriteDoctorListItem, notes: string) => void
 }
 
@@ -46,13 +40,9 @@ export function AppointmentActionSheet({
 	appointmentId,
 	patientName,
 	slotLabel,
-	doctorId,
-	hospitalId,
-	appointmentType,
 	reasons,
 	busy = false,
 	onConfirmReject,
-	onConfirmReschedule,
 	onConfirmRefer,
 }: AppointmentActionSheetProps) {
 	// ── Reject ──────────────────────────────────────────────────────────────
@@ -65,40 +55,6 @@ export function AppointmentActionSheet({
 			setNote('')
 		}
 	}, [visible, mode])
-
-	// ── Reschedule ──────────────────────────────────────────────────────────
-	const [rsDate, setRsDate] = useState<Date | null>(null)
-	const [rsTime, setRsTime] = useState<string | null>(null)
-	const [rsSlots, setRsSlots] = useState<SlotGroup[]>([])
-	const [rsLoading, setRsLoading] = useState(false)
-
-	useEffect(() => {
-		if (visible && mode === 'reschedule') {
-			setRsDate(new Date())
-			setRsTime(null)
-		}
-	}, [visible, mode])
-
-	useEffect(() => {
-		if (!visible || mode !== 'reschedule' || !rsDate || !doctorId || !hospitalId) return
-		let mounted = true
-		const load = async () => {
-			setRsLoading(true)
-			setRsSlots([])
-			try {
-				const res = await getDoctorAvailability({ doctor_id: doctorId, hospital_id: hospitalId, date: toApiDate(rsDate) })
-				if (mounted) setRsSlots(normalizeAvailabilitySlots(res, appointmentType))
-			} catch {
-				// Empty slot list renders its own "no slots" state below.
-			} finally {
-				if (mounted) setRsLoading(false)
-			}
-		}
-		void load()
-		return () => {
-			mounted = false
-		}
-	}, [visible, mode, rsDate, doctorId, hospitalId, appointmentType])
 
 	// ── Refer ───────────────────────────────────────────────────────────────
 	const [referQuery, setReferQuery] = useState('')
@@ -178,7 +134,7 @@ export function AppointmentActionSheet({
 
 	const referList = referQuery.trim() ? searchResults : favourites
 
-	const title = mode === 'reject' ? 'Reject request' : mode === 'reschedule' ? 'Suggest a new time' : 'Refer to a colleague'
+	const title = mode === 'reject' ? 'Reject request' : 'Refer to a colleague'
 
 	return (
 		<AppBottomSheet visible={visible} title={title} subtitle={`${patientName} · ${slotLabel}`} onClose={onClose} appearance="modern">
@@ -216,39 +172,6 @@ export function AppointmentActionSheet({
 						}}
 					>
 						{busy ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.dangerBtnText}>{title}</Text>}
-					</TouchableOpacity>
-				</View>
-			)}
-
-			{mode === 'reschedule' && (
-				<View style={{ gap: 12 }}>
-					<DateSlotPicker
-						selectedDate={rsDate}
-						onDateChange={(d) => {
-							setRsDate(d)
-							setRsTime(null)
-						}}
-						selectedTime={rsTime}
-						onTimeChange={(t) => setRsTime(Array.isArray(t) ? t[0] : t)}
-						availableSlots={rsSlots}
-						loading={rsLoading}
-						disablePast
-					/>
-					<Text style={styles.hintText}>The patient can accept the new time or pick another.</Text>
-					<TouchableOpacity
-						style={[styles.primaryBtn, (!rsTime || !rsDate) && styles.btnDisabled]}
-						disabled={!rsTime || !rsDate || busy}
-						onPress={() => {
-							if (!rsDate || !rsTime) return
-							const slot = rsSlots.flatMap((g) => g.slots).find((s) => s.start_time === rsTime)
-							onConfirmReschedule(rsDate, rsTime, slot?.end_time ?? null)
-						}}
-					>
-						{busy ? (
-							<ActivityIndicator size="small" color="#FFFFFF" />
-						) : (
-							<Text style={styles.primaryBtnText}>{rsTime ? `Send ${rsTime}` : 'Pick a slot'}</Text>
-						)}
 					</TouchableOpacity>
 				</View>
 			)}

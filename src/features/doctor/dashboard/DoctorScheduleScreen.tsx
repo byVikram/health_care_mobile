@@ -14,8 +14,9 @@
 //                           action card (Cancel / Reschedule / Refer).
 //                 Past:     a date-range picker (Yesterday / 7 days / 30 days / 3 months / custom) plus a
 //                           Status + Visit-type filter sheet, rows grouped by day.
-// All of it is wired to the real appointments API; Reschedule/Refer reuse the real
-// availability/referral services via AppointmentActionSheet.
+// All of it is wired to the real appointments API. Reschedule never picks a slot for the doctor: it asks the
+// PATIENT to choose a new time (AskPatientRescheduleSheet); Refer reuses the real referral service via
+// AppointmentActionSheet.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
@@ -42,9 +43,10 @@ import { TodayPatientRow, TodayTabs, TodayVisitChips, type TodayTab, type TodayV
 import { TodayActionSheet, type TodaySheetMode } from './TodayActionSheet'
 import { getAppointments, getStatusIdByLabel, setAppointmentCheckIn } from '../doctorService'
 import { updateAppointmentsStatus } from '../../../services/appointmentService'
-import { rescheduleAppointment } from '../doctorService'
+import { askPatientToReschedule } from '../doctorService'
+import { AskPatientRescheduleSheet } from '../components/AskPatientRescheduleSheet'
 import { createReferral } from '../../referrals/referralService'
-import { effectiveStatusLabel, formatTime12h, humanizeStatus, isAccepted, isCompletedAppt, isPending, isRequestLike, isRescheduleRequest, isVideoMode, rowStatusTone, statusLabelOf, toApiDate } from '../scheduleUtils'
+import { effectiveStatusLabel, formatTime12h, humanizeStatus, isAccepted, isCompletedAppt, isPending, isRequestLike, isRescheduleNeeded, isRescheduleRequest, isVideoMode, rowStatusTone, statusLabelOf, toApiDate } from '../scheduleUtils'
 import type { Appointment } from '../../../types/appointment'
 import type { FavouriteDoctorListItem } from '../search/components/FavouriteDoctorList'
 
@@ -168,7 +170,7 @@ type Outcome = { kind: 'accept' | 'reject' | 'reschedule' | 'refer'; title: stri
 function todayOutcomeOf(o?: Outcome): { text: string; tone: 'danger' | 'info' } | undefined {
 	if (!o) return undefined
 	if (o.kind === 'reject') return { text: 'Cancelled · patient notified', tone: 'danger' }
-	// The patient still has to accept the new time, so the row says it was proposed, not that it moved.
+	// The patient still has to choose the new time, so the row says it was asked, not that it moved.
 	if (o.kind === 'reschedule') return { text: o.title, tone: 'info' }
 	return undefined
 }
@@ -223,6 +225,8 @@ export function DoctorScheduleScreen() {
 	const [sheet, setSheet] = useState<{ mode: ActionSheetMode; appt: Appointment } | null>(null)
 	// The three-dots sheet of a Today row (menu -> reschedule / cancel).
 	const [todaySheet, setTodaySheet] = useState<{ mode: TodaySheetMode; appt: Appointment } | null>(null)
+	// The appointment whose patient the doctor is being asked to confirm "ask to reschedule" for.
+	const [askTarget, setAskTarget] = useState<Appointment | null>(null)
 	const [checkingInId, setCheckingInId] = useState<string | null>(null)
 	// The patient whose check-in the doctor is being asked to confirm undoing.
 	const [undoTarget, setUndoTarget] = useState<Appointment | null>(null)
@@ -300,8 +304,9 @@ export function DoctorScheduleScreen() {
 				limit: 100,
 				...clinicFilter,
 			})
-			// Confirmed bookings only -- a still-pending request belongs to Requests.
-			setUpList((res.data ?? []).filter(isAccepted).sort(byDateTime))
+			// Confirmed bookings only -- a still-pending request belongs to Requests. Ones waiting for the patient to
+			// choose a new time (reschedule_required) stay listed so the doctor can see where they stand.
+			setUpList((res.data ?? []).filter((a) => isAccepted(a) || isRescheduleNeeded(a)).sort(byDateTime))
 		} catch {
 			setUpList([])
 		} finally {
@@ -471,37 +476,40 @@ export function DoctorScheduleScreen() {
 		}
 	}
 
-	const handleConfirmReschedule = async (date: Date, startTime: string, endTime: string | null, target?: Appointment) => {
-		const apt = target ?? sheet?.appt
+	// Doctor "reschedule": no slot is chosen here. The patient is asked to pick the new time (status becomes
+	// reschedule_required, the patient is emailed) and the doctor confirms the slot they choose later.
+	const handleAskReschedule = async (reason: string) => {
+		const apt = askTarget
 		if (!apt) return
 		setBusyId(apt.id)
 		try {
-			const res = await rescheduleAppointment({
-				appointment_id: apt.id,
-				appointment_date: toApiDate(date),
-				start_time: startTime,
-				end_time: endTime,
-				hospital_id: apt.hospital?.id,
-				reason: 'Doctor proposed a new time',
-			})
+			const res = await askPatientToReschedule(apt.id, reason)
 			if (res.success) {
 				setOutcomes((prev) => ({
 					...prev,
 					[apt.id]: {
 						kind: 'reschedule',
-						title: `New time proposed · ${dateLabelOf(toApiDate(date))}, ${formatTime12h(startTime)}`,
-						sub: 'Waiting for the patient to confirm',
+						title: 'Asked to choose a new time',
+						sub: 'Waiting for the patient to pick a slot',
 						tone: 'info',
 					},
 				}))
-				Toast.show({ type: 'success', text1: 'New time sent to the patient' })
+				// The row is now 'reschedule_required': show that straight away instead of waiting for a refetch.
+				const patch = (list: Appointment[]) => list.map((a) => (a.id === apt.id ? { ...a, status: 'reschedule_required' } : a))
+				setTodayList(patch)
+				setUpList(patch)
+				Toast.show({ type: 'success', text1: res.message ?? 'The patient has been asked to choose a new time' })
+				setAskTarget(null)
+			} else {
+				Toast.show({ type: 'error', text1: res.message ?? 'Could not ask the patient to reschedule. Please try again.' })
 			}
-		} catch {
-			Toast.show({ type: 'error', text1: 'Something went wrong. Please try again.' })
+		} catch (error: any) {
+			Toast.show({
+				type: 'error',
+				text1: error?.response?.data?.message ?? 'Could not ask the patient to reschedule. Please try again.',
+			})
 		} finally {
 			setBusyId(null)
-			setSheet(null)
-			setTodaySheet(null)
 		}
 	}
 
@@ -527,6 +535,8 @@ export function DoctorScheduleScreen() {
 	const renderApptCard = (apt: Appointment, i: number) => {
 		const isReq = isRequestLike(apt)
 		const rescheduled = isRescheduleRequest(apt)
+		const needsNewTime = isRescheduleNeeded(apt)
+		const outcome = outcomes[apt.id]
 		return (
 			<AppointmentActionCard
 				key={apt.id}
@@ -534,21 +544,22 @@ export function DoctorScheduleScreen() {
 				initials={initialsOf(apt.patient?.name)}
 				avatarTone={toneKeyAt(i)}
 				name={apt.patient?.name ?? 'Patient'}
-				meta={`${apt.patient?.age ?? '--'} yrs · ${apt.patient?.gender ?? '--'} · ${rescheduled ? 'Reschedule request' : isReq ? 'New request' : 'Follow-up'}`}
+				meta={`${apt.patient?.age ?? '--'} yrs · ${apt.patient?.gender ?? '--'} · ${rescheduled ? 'Reschedule request' : needsNewTime ? 'Waiting for patient' : isReq ? 'New request' : 'Follow-up'}`}
 				isRequest={isReq}
 				requestLabel={rescheduled ? 'Rescheduled' : undefined}
+				statusLabel={needsNewTime ? 'Reschedule needed' : undefined}
 				urgent={apt.pre_intake?.severity === 'severe' || apt.severity === 'severe'}
 				slotLabel={slotLabelOf(apt, true)}
 				mode={isVideoMode(apt.appointment_mode) ? 'Video' : 'In-clinic'}
 				payLabel={`₹${apt.fees ?? '--'}`}
 				reason={apt.symptoms || apt.pre_intake?.symptoms || apt.reason}
 				busy={busyId === apt.id}
-				outcome={outcomes[apt.id]}
+				outcome={outcome}
 				onAccept={() => handleAccept(apt)}
 				onReject={() => setSheet({ mode: 'reject', appt: apt })}
-				onReschedule={() => setSheet({ mode: 'reschedule', appt: apt })}
+				onReschedule={() => setAskTarget(apt)}
 				onRefer={() => setSheet({ mode: 'refer', appt: apt })}
-				onUndo={() => setOutcomes((prev) => { const next = { ...prev }; delete next[apt.id]; return next })}
+				onUndo={outcome?.kind === 'reschedule' ? undefined : () => setOutcomes((prev) => { const next = { ...prev }; delete next[apt.id]; return next })}
 			/>
 		)
 	}
@@ -638,7 +649,7 @@ export function DoctorScheduleScreen() {
 
 						{allMode === 'up' && (
 							<View style={{ gap: 10, paddingHorizontal: 16 }}>
-								<Text style={styles.hintText}>Confirmed bookings. Tap a date to see that day only.</Text>
+								<Text style={styles.hintText}>Confirmed bookings, and ones waiting for the patient to choose a new time. Tap a date to see that day only.</Text>
 								<View style={{ gap: 8 }}>
 									<TouchableOpacity
 										style={[styles.selectBtn, !!upDay && styles.selectBtnActive]}
@@ -870,12 +881,13 @@ export function DoctorScheduleScreen() {
 					patientName={todaySheet.appt.patient?.name ?? 'Patient'}
 					slotLabel={`${slotLabelOf(todaySheet.appt, true)} · ${isVideoMode(todaySheet.appt.appointment_mode) ? 'Video' : 'In-clinic'}`}
 					video={isVideoMode(todaySheet.appt.appointment_mode)}
-					doctorId={todaySheet.appt.doctor?.id}
-					hospitalId={todaySheet.appt.hospital?.id}
 					busy={busyId === todaySheet.appt.id}
 					onClose={() => setTodaySheet(null)}
 					onModeChange={(mode) => setTodaySheet({ mode, appt: todaySheet.appt })}
-					onConfirmReschedule={(date, start, end) => handleConfirmReschedule(date, start, end, todaySheet.appt)}
+					onAskReschedule={() => {
+						setAskTarget(todaySheet.appt)
+						setTodaySheet(null)
+					}}
 					onConfirmCancel={(reason) => handleConfirmReject(reason, '', todaySheet.appt)}
 				/>
 			)}
@@ -888,16 +900,20 @@ export function DoctorScheduleScreen() {
 					appointmentId={sheet.appt.id}
 					patientName={sheet.appt.patient?.name ?? 'Patient'}
 					slotLabel={slotLabelOf(sheet.appt, true)}
-					doctorId={sheet.appt.doctor?.id}
-					hospitalId={sheet.appt.hospital?.id}
-					appointmentType={isVideoMode(sheet.appt.appointment_mode) ? 'video' : 'clinic'}
 					reasons={isRequestLike(sheet.appt) ? REQUEST_REASONS : CANCEL_REASONS}
 					busy={busyId === sheet.appt.id}
 					onConfirmReject={handleConfirmReject}
-					onConfirmReschedule={handleConfirmReschedule}
 					onConfirmRefer={handleConfirmRefer}
 				/>
 			)}
+
+			<AskPatientRescheduleSheet
+				visible={!!askTarget}
+				patientName={askTarget?.patient?.name ?? 'The patient'}
+				slotLabel={askTarget ? slotLabelOf(askTarget, true) : undefined}
+				onClose={() => setAskTarget(null)}
+				onConfirm={handleAskReschedule}
+			/>
 		</View>
 	)
 }

@@ -157,8 +157,24 @@ export interface RescheduleAppointmentPayload {
 	status_id?: string // 👈 ADD THIS
 }
 
+// Patient / admin reschedule: always carries the new slot. A DOCTOR must not use this (the backend answers a
+// doctor's date/time/hospital with a 400) -- see askPatientToReschedule below.
 export const rescheduleAppointment = async (payload: RescheduleAppointmentPayload): Promise<AppointmentResponse> => {
 	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, payload)
+	return res.data
+}
+
+// Doctor "reschedule": the doctor does not pick a slot, they ask the PATIENT to choose a new time. Same endpoint,
+// but only `appointment_id` (+ an optional reason, max 500 chars) is sent. The appointment becomes
+// `reschedule_required` and the patient is emailed; asking again while it already is one is a harmless no-op.
+export const RESCHEDULE_REASON_MAX_LENGTH = 500
+
+export const askPatientToReschedule = async (appointmentId: string, reason?: string): Promise<AppointmentResponse> => {
+	const trimmed = reason?.trim().slice(0, RESCHEDULE_REASON_MAX_LENGTH)
+	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, {
+		appointment_id: appointmentId,
+		...(trimmed ? { reason: trimmed } : {}),
+	})
 	return res.data
 }
 export interface StartConsultationResponse {

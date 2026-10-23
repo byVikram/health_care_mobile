@@ -37,7 +37,9 @@ export type PatientAppointment = Appointment & {
 	payment?: { status?: string | null; method?: string | null; transaction_id?: string | null } | null
 }
 
-export type AppointmentVariant = 'upcoming' | 'pending' | 'cancelled' | 'completed' | 'rescheduled'
+// 'reschedule_required' = the doctor asked the patient to choose a new time (the patient has to act);
+// 'rescheduled' = a new slot is set and waits for someone's confirmation (see isAwaitingDoctorConfirm).
+export type AppointmentVariant = 'upcoming' | 'pending' | 'cancelled' | 'completed' | 'rescheduled' | 'reschedule_required'
 
 export const getRawStatus = (appt: Appointment | null): string => {
 	if (!appt) return ''
@@ -54,9 +56,16 @@ export const getVariant = (rawStatus: string): AppointmentVariant => {
 	if (s === 'cancelled' || s === 'canceled' || s === 'rejected') return 'cancelled'
 	if (s === 'completed' || s === 'done') return 'completed'
 	if (s === 'pending' || s === 'payment_pending') return 'pending'
-	if (s === 'rescheduled' || s === 'reschedule_required') return 'rescheduled'
+	if (s === 'rescheduled') return 'rescheduled'
+	if (s === 'reschedule_required') return 'reschedule_required'
 	return 'upcoming'
 }
+
+/** A 'rescheduled' appointment whose last reschedule was made by the PATIENT (they picked the slot): it waits for the
+ * doctor to confirm, so the patient has nothing to accept. One an admin proposed (or an unknown actor) is the patient's
+ * to accept instead. Doctors no longer propose slots (they ask the patient to choose one: 'reschedule_required'). */
+export const isAwaitingDoctorConfirm = (appt: Appointment | null): boolean =>
+	getVariant(getRawStatus(appt)) === 'rescheduled' && (appt?.rescheduled_by ?? '').toLowerCase() === 'patient'
 
 export const isVideoMode = (mode?: string | null) => {
 	const m = (mode || '').replace(/[-\s]/g, '_').toLowerCase()
@@ -98,6 +107,7 @@ const HISTORY_TITLES: Record<string, string> = {
 	created: 'Booked',
 	confirmed: 'Confirmed',
 	rescheduled: 'Rescheduled',
+	reschedule_required: 'Reschedule requested',
 	cancelled: 'Cancelled',
 	canceled: 'Cancelled',
 	completed: 'Consultation',
