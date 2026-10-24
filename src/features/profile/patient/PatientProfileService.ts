@@ -368,6 +368,25 @@ export const fetchPatientSummary = async (): Promise<PatientSummary> => {
 	return res.data.data
 }
 
+/** GET /api/patients/me/profile-hub: what the profile hub shows, in one light call. */
+export interface PatientHub {
+	name: string
+	avatar_url: string | null
+	phone_masked: string
+	profile_completion: number
+	family_names: string[]
+	incomplete_member: { id: string; name: string } | null
+	incomplete_count: number
+	/** The first two saved addresses, the default first. */
+	addresses: { label: string; is_default: boolean }[]
+	new_logins: number
+}
+
+export const fetchPatientHub = async (): Promise<PatientHub> => {
+	const res = await ApiService.get<{ data: PatientHub }>(API_ENDPOINTS.PATIENT.PROFILE_HUB)
+	return res.data.data
+}
+
 export interface FamilyMemberInput {
 	name: string
 	/** Upper-case relation, e.g. 'SPOUSE', 'FATHER' (see FAMILY_RELATION_OPTIONS). */

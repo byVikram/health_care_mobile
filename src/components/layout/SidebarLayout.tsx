@@ -20,7 +20,7 @@ import { usePatientSummary } from '../../features/dashboard/useHomeChromeData'
 
 import { ROUTES } from '../../navigation/routes'
 import { useSidebarMenu } from '../../navigation/useSidebarMenu'
-import { getPatientDetails } from '../../features/profile/patient/PatientProfileService'
+import { getPatientSummary } from '../../services/homeService'
 import { getDoctorProfile, mapDoctorProfileApi } from '../../features/doctor/doctorService'
 import { fetchProviderProfile } from '../../features/ancillary/ancillaryService'
 import { NEW_PHYSIOTHERAPIST_IMAGE_URL } from '../../features/profile/ancillary/specialtyConfig'
@@ -163,9 +163,10 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 					return
 				}
 
-				const res = await getPatientDetails()
-				if (!cancelled && res.success && res.data?.personal?.avatar) {
-					updateUser({ avatar: res.data.personal.avatar })
+				// The summary carries the photo; the full details are loaded only by the screens that show them.
+				const summary = await getPatientSummary()
+				if (!cancelled && summary.avatar_url) {
+					updateUser({ avatar: summary.avatar_url })
 				}
 			} catch {
 				// Silently ignore; the existing avatar (or default) will show.

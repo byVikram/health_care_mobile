@@ -50,6 +50,8 @@ export const API_ENDPOINTS = {
 	DOCTOR_PROFILE: {
 		STATUS: `${BASE_URL}/api/doctors/me/status`,
 		DETAILS: `${BASE_URL}/api/doctors/details`,
+		// Everything the profile hub shows, in one call
+		HUB: `${BASE_URL}/api/doctors/profile-hub`,
 		PERSONAL_DETAILS: `${BASE_URL}/api/doctors/personal-details`,
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
 		ADDITIONAL_DETAILS: `${BASE_URL}/api/doctors/profile/additional-details`,
@@ -154,6 +156,8 @@ export const API_ENDPOINTS = {
 		FAMILY_MEMBERS: `${BASE_URL}/api/patients/family-members`,
 		FAMILY_MEMBER_BY_ID: (id: string) => `${BASE_URL}/api/patients/family-members/${id}`,
 		SUMMARY: `${BASE_URL}/api/patients/me/summary`,
+		// Everything the profile hub shows, in one call
+		PROFILE_HUB: `${BASE_URL}/api/patients/me/profile-hub`,
 		BOOKINGS: `${BASE_URL}/api/patients/me/bookings`,
 	},
 	TREATMENTS: {
@@ -237,6 +241,8 @@ export const API_ENDPOINTS = {
 		CATALOG: `${BASE_URL}/api/ancillary/catalog`,
 		PACKAGE_DETAIL: (id: string | number) => `${BASE_URL}/api/ancillary/packages/${id}`,
 		PROFILE: `${BASE_URL}/api/ancillary/me/profile`,
+		// Everything the profile hub shows, in one call
+		PROFILE_HUB: `${BASE_URL}/api/ancillary/me/profile-hub`,
 		CAPABILITIES: `${BASE_URL}/api/ancillary/me/capabilities`,
 		CATEGORIES: `${BASE_URL}/api/ancillary/categories`,
 		SUB_SPECIALTIES: `${BASE_URL}/api/ancillary/sub_specialties`,
