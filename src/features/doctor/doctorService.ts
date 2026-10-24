@@ -302,6 +302,8 @@ export interface DoctorStatusResponse {
 	data: {
 		profile_completed: boolean
 		is_verified: boolean
+		/** What is still needed for the profile to count as complete (empty once it is). */
+		missing?: string[]
 	}
 }
 

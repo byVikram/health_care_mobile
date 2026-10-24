@@ -641,7 +641,7 @@ function resolveQualificationFromProfile(profile: any): string {
 		}
 
 		const result = await ImagePicker.launchImageLibraryAsync({
-			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			mediaTypes: ['images'],
 			allowsMultipleSelection: false,
 			quality: 0.8,
 		})
@@ -662,7 +662,7 @@ function resolveQualificationFromProfile(profile: any): string {
 		}
 
 		const result = await ImagePicker.launchImageLibraryAsync({
-			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			mediaTypes: ['images'],
 			allowsMultipleSelection: false,
 			quality: 0.8,
 		})
