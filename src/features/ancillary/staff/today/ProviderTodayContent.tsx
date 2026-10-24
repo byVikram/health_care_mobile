@@ -1,6 +1,6 @@
 // src/features/ancillary/staff/today/ProviderTodayContent.tsx
 //
-// Provider "Today" (ancillary-provider design, screen 1) rendered inside DashboardPage's scroll view for the
+// Provider "Today" (ancillary-provider design, screen 1) rendered inside ProviderTodayScreen's scroll view for the
 // ancillary role: stats, new booking requests (banner -> BookingRequestSheet -> accept / decline), open offers
 // pushed on the dispatch WebSocket (instant requests ring for 30 s in IncomingOfferSheet; per-visit offers of
 // provider-less orders show as banners, with an optional tip) and the next visit card. Stats: visits today,
