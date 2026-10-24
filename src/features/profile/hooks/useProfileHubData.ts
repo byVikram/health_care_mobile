@@ -7,11 +7,11 @@ import { useCallback, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 import { useAncillarySpecialty, useAuth } from '../../../context/AuthContext'
 import { fetchPatientHub } from '../patient/PatientProfileService'
+import { patientSummaryStore } from '../patient/patientSummaryStore'
 import { fetchDoctorHub } from '../doctor/doctorProfileService'
 import { fetchProviderHub } from '../ancillary/ancillaryProfileService'
 import { ancillaryConfigFor } from '../config/ancillaryProfileConfig'
 import type { HubData, HubRole } from '../config/profileHubConfig'
-import { buildS3Url } from '../../../utils/s3Utils'
 
 const settle = async <T>(p: Promise<T>): Promise<T | null> => {
 	try {
@@ -49,10 +49,17 @@ export function useProfileHubData(role: HubRole) {
 		if (role === 'patient') {
 			const hub = await settle(fetchPatientHub())
 			if (hub) {
+				// The summary card (drawer) shows the same name, photo, completion and family count.
+				patientSummaryStore.patch({
+					name: hub.name,
+					avatar_url: hub.avatar_url,
+					profile_completion: hub.profile_completion,
+					family_count: hub.family_names.length,
+				})
 				setData((cur) => ({
 					...cur,
 					name: hub.name || cur.name,
-					avatarUri: buildS3Url(hub.avatar_url) || cur.avatarUri,
+					avatarUri: hub.avatar_url || cur.avatarUri,
 					roleDetail: hub.phone_masked,
 					completion: hub.profile_completion ?? cur.completion,
 					familyNames: hub.family_names,
@@ -70,7 +77,7 @@ export function useProfileHubData(role: HubRole) {
 				setData((cur) => ({
 					...cur,
 					name: hub.name || cur.name,
-					avatarUri: buildS3Url(hub.avatar_url) || cur.avatarUri,
+					avatarUri: hub.avatar_url || cur.avatarUri,
 					roleDetail: [hub.speciality, yearsLabel(hub.experience_years)].filter(Boolean).join(' · '),
 					completion: hub.profile_completion ?? cur.completion,
 					verified: hub.is_verified,
@@ -87,7 +94,7 @@ export function useProfileHubData(role: HubRole) {
 				setData((cur) => ({
 					...cur,
 					name: hub.name || cur.name,
-					avatarUri: buildS3Url(hub.avatar_url) || cur.avatarUri,
+					avatarUri: hub.avatar_url || cur.avatarUri,
 					roleTitle: hub.sub_specialty_label || config.roleTitle,
 					roleDetail: yearsLabel(hub.experience_years),
 					completion: hub.profile_completion ?? cur.completion,

@@ -3,6 +3,8 @@
 
 import { Platform } from 'react-native'
 import ApiService from './apiService'
+import { familyStore } from '../features/profile/patient/familyStore'
+import { patientSummaryStore } from '../features/profile/patient/patientSummaryStore'
 import { API_ENDPOINTS } from '../constants/apiUrls'
 
 export type AvatarUpload = {
@@ -15,6 +17,15 @@ type AvatarResponse = { data?: { avatar_s3_key?: string | null; avatar_url?: str
 
 /** `patientId`: a family member's public id (patients only) -- the photo then goes to that member, not to the caller. */
 const forMember = (patientId?: string) => (patientId ? { params: { patient_id: patientId } } : {})
+
+/**
+ * A photo changed: a patient's family list (and, for their own photo, the summary card) is out of date. Both stores
+ * ignore this unless they were loaded, so a doctor or a nurse changing theirs fetches nothing.
+ */
+const afterPhotoChange = (patientId?: string) => {
+	if (!patientId) patientSummaryStore.markStale()
+	void familyStore.refreshIfLoaded()
+}
 
 /** Upload a picked photo. Resolves with a signed URL that can be shown straight away. */
 export async function uploadAvatar(upload: AvatarUpload, patientId?: string): Promise<string> {
@@ -33,10 +44,12 @@ export async function uploadAvatar(upload: AvatarUpload, patientId?: string): Pr
 		headers: { 'Content-Type': 'multipart/form-data' },
 		...forMember(patientId),
 	})
+	afterPhotoChange(patientId)
 	return res.data?.data?.avatar_url || res.data?.data?.avatar_s3_key || ''
 }
 
 export async function removeAvatar(patientId?: string): Promise<void> {
 	const query = patientId ? `?patient_id=${encodeURIComponent(patientId)}` : ''
 	await ApiService.delete(`${API_ENDPOINTS.UPLOADS.AVATAR}${query}`)
+	afterPhotoChange(patientId)
 }

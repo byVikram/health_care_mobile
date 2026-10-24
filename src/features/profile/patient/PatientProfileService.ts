@@ -4,6 +4,8 @@ import { formatApiDateForDisplay, formatDateStringForApi } from '../../../utils/
 import { safeJsonParse } from '../../../utils/jsonUtils'
 import { buildS3Url } from '../../../utils/s3Utils'
 import type { AppPhotoPickerUpload } from '../../../components/common/inputs/AppPhotoPicker'
+import { familyStore } from './familyStore'
+import { patientSummaryStore } from './patientSummaryStore'
 
 export interface PatientProfileState {
 	// Personal
@@ -251,11 +253,27 @@ export interface FamilyMember {
 	is_complete?: boolean
 }
 
-export const getFamilyMembers = async (): Promise<FamilyMember[]> => {
+const loadFamilyMembers = async (): Promise<FamilyMember[]> => {
 	const res = await ApiService.get<{ success: boolean; data: FamilyMember[] }>(
 		API_ENDPOINTS.PATIENT.FAMILY_MEMBERS
 	)
 	return res.data?.data ?? []
+}
+
+// The shared family list (familyStore) is fetched with this, and every screen that calls getFamilyMembers also
+// writes what it received into it, so the others see it without another call.
+familyStore.registerFetcher(loadFamilyMembers)
+
+export const getFamilyMembers = async (): Promise<FamilyMember[]> => {
+	const list = await loadFamilyMembers()
+	familyStore.set(list)
+	return list
+}
+
+/** The family changed (a member added, edited or removed): the list, and the family count on the summary, are out of date. */
+const afterFamilyChange = () => {
+	patientSummaryStore.markStale()
+	void familyStore.refreshIfLoaded()
 }
 
 // ─────────────────────────────────────────────
@@ -349,6 +367,10 @@ export const savePatientDetails = async (patch: PatientDetailsPatch, patientId?:
 		withPatientId(API_ENDPOINTS.PATIENT.DETAILS, patientId),
 		patch
 	)
+	// A change to the patient's own details shows on the summary card and in the family list (the "self" row); a
+	// family member's shows in the family list only.
+	if (!patientId) patientSummaryStore.markStale()
+	void familyStore.refreshIfLoaded()
 	return res.data.data
 }
 
@@ -404,6 +426,7 @@ export const getFamilyMember = async (memberId: string): Promise<FamilyMember> =
 
 export const createFamilyMember = async (input: FamilyMemberInput): Promise<FamilyMember> => {
 	const res = await ApiService.post<{ data: FamilyMember }>(API_ENDPOINTS.PATIENT.FAMILY_MEMBERS, input)
+	afterFamilyChange()
 	return res.data.data
 }
 
@@ -413,12 +436,14 @@ export const updateFamilyMember = async (
 	patch: PatientDetailsPatch & { relation?: string; contact_number?: string | null }
 ): Promise<PatientDetailsData> => {
 	const res = await ApiService.patch<{ data: PatientDetailsData }>(API_ENDPOINTS.PATIENT.FAMILY_MEMBER_BY_ID(memberId), patch)
+	afterFamilyChange()
 	return res.data.data
 }
 
 /** Soft delete on the backend -- past bookings for the member are kept. */
 export const removeFamilyMember = async (memberId: string): Promise<void> => {
 	await ApiService.delete(API_ENDPOINTS.PATIENT.FAMILY_MEMBER_BY_ID(memberId))
+	afterFamilyChange()
 }
 
 export interface PatientAddressInput {
