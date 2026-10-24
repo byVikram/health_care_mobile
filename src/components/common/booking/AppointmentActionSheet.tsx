@@ -3,7 +3,7 @@
 // One configurable bottom sheet backing AppointmentActionCard's Reject/Cancel and Refer actions
 // (source: the "Doctor Dashboard" design's single sheet that swaps content by mode, rather than
 // separate dialogs). Reuses the existing FavouriteDoctorList (colleague row) component and the real
-// referral/favourites services already proven by DoctorAppointments.tsx — no new endpoints, no simulated data.
+// referral/favourites services — no new endpoints, no simulated data.
 // There is no Reschedule mode: a doctor does not pick a new slot, they ask the patient to choose one
 // (see features/doctor/components/AskPatientRescheduleSheet).
 

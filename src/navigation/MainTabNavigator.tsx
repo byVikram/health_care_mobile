@@ -15,6 +15,8 @@ import { navigate } from './navigationService'
 import { CARE_AI_FAB_SIZE, CareAiFab } from '../features/care-ai/components/CareAiFab'
 
 import DashboardPage from '../features/dashboard/DashboardPage'
+import PatientHomeScreen from '../features/dashboard/PatientHomeScreen'
+import ProviderTodayScreen from '../features/ancillary/staff/today/ProviderTodayScreen'
 import SearchPage from '../features/doctor/search/SearchPage'
 import BookingsPage from '../features/bookings/BookingsPage'
 import ProfilePage from '../features/profile/ProfilePage'
@@ -22,7 +24,7 @@ import { hubRoleFor } from '../features/profile/config/profileHubConfig'
 import { WalletPage } from '../features/wallet/WalletPage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
-import { isPatientRole } from '../constants/constants'
+import { USER_ROLES, isPatientRole } from '../constants/constants'
 import NursingCarePage from '../features/ancillary/patient/NursingCarePage'
 import ProviderSchedulePage from '../features/ancillary/staff/ProviderSchedulePage'
 import DoctorHomeScreen from '../features/doctor/dashboard/DoctorHomeScreen'
@@ -36,10 +38,18 @@ import { iconPath } from './menuIcons'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
+// Each persona has its own Home: patient, ancillary provider, and (pharmacy, radiology, anything else) the staff page.
+// The doctor's Home is DoctorHomeScreen, chosen where the tab is declared.
 function HomeWithSidebar() {
+	const { role } = useAuth()
+	const Home = isPatientRole(role)
+		? PatientHomeScreen
+		: role === USER_ROLES.ANCILLARY
+			? ProviderTodayScreen
+			: DashboardPage
 	return (
 		<SidebarLayout>
-			<DashboardPage />
+			<Home />
 		</SidebarLayout>
 	)
 }

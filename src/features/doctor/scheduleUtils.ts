@@ -1,8 +1,7 @@
 // src/features/doctor/scheduleUtils.ts
 //
-// Shared helpers for the doctor Schedule/appointment-action surfaces (DoctorScheduleScreen and,
-// previously, DoctorAppointments.tsx — this file is the single home for them now so neither screen
-// duplicates the other's slot-normalization logic). Kept generic enough to reuse for any future
+// Shared helpers for the doctor Schedule/appointment-action surfaces (DoctorScheduleScreen and the
+// other doctor screens that act on an appointment). Kept generic enough to reuse for any future
 // "pick a date/time to reschedule" flow (Pharmacy/Laboratory order rescheduling, etc.).
 
 import type { SlotGroup } from './doctorService'
