@@ -4,13 +4,25 @@
 // in the order, Details (pickup, phlebotomist, patient, address, order id + QR), "Before the pickup", the
 // payment summary, the Status timeline, Cancel order, a help row and the Reschedule / Add more tests footer,
 // plus the cancel, reschedule and pickup-QR sheets. Same building blocks as the patient appointment details
-// (AppDetailRow, AppStatusTimeline, AppBillSummary, AppNumberedSteps, CheckInQrSheet). Mock: the order is the
-// one just placed, or one opened from the Bookings tab (loaded from the server); cancel / reschedule are still
-// mock and only change this screen.
+// (AppDetailRow, AppStatusTimeline, AppBillSummary, AppNumberedSteps, CheckInQrSheet). The order is the one just
+// placed, or one opened from the Bookings tab, and is re-read from the server whenever the screen comes into focus,
+// the app returns to the foreground, or the patient pulls down, so what is shown follows what the lab does. The
+// timeline is drawn from the server's `timeline`; a missed visit, a phlebotomist no-show or a rejected sample shows
+// a banner with Book again / Contact support.
 
-import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import {
+	ActivityIndicator,
+	AppState,
+	Linking,
+	RefreshControl,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from 'react-native'
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
@@ -34,10 +46,11 @@ import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import { addToCalendar } from '../../utils/calendar'
 import { showComingSoon } from '../../utils/toast'
+import { contactSupport, useAppConfig } from '../dashboard/useHomeChromeData'
 import CheckInQrSheet from '../appointment/components/patient-details/CheckInQrSheet'
 import { labBooking, type LabOrder } from './labBookingStore'
 import { LabLogo } from './LabLogo'
-import { commaDate, inr, longDate, plural, slotStart } from './labFormat'
+import { commaDate, inr, longDate, plural, slotStart, stampLabel } from './labFormat'
 import { applyApi, orderFromApi } from './labOrder'
 import { fetchOrder } from './labService'
 import { LabCancelSheet, LabRescheduleSheet, type LabPickup } from './LabOrderSheets'
@@ -45,7 +58,34 @@ import { LAB_ICONS } from './labMock'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 
-function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next: LabOrder) => void }) {
+// What the patient is told when the visit could not be completed.
+const ATTENTION_TEXT: Record<string, { title: string; body: string }> = {
+	missed: {
+		title: 'We missed you at your visit',
+		body: 'We couldn’t collect your sample because no one was available. You can book again, or call support if this is a mistake.',
+	},
+	no_show: {
+		title: 'Your phlebotomist couldn’t make the visit',
+		body: 'We’re sorry. You can book again, or call support and we’ll help.',
+	},
+	sample_rejected: {
+		title: 'Your sample couldn’t be used',
+		body: 'The lab couldn’t use it, so it needs to be collected again. You can book again, or call support.',
+	},
+}
+const ATTENTION_FALLBACK = {
+	title: 'We couldn’t complete your lab visit',
+	body: 'You can book again, or call support and we’ll help.',
+}
+
+type ContentProps = {
+	order: LabOrder
+	onChange: (next: LabOrder) => void
+	refreshing: boolean
+	onRefresh: () => void
+}
+
+function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProps) {
 	const navigation = useNavigation<Nav>()
 	const isHome = order.where === 'home'
 
@@ -60,7 +100,15 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 	const cancelled = order.status === 'cancelled'
 	const cancelRequested = order.status === 'cancel_requested'
 	const rescheduleRequested = order.status === 'reschedule_requested'
+	const needsAttention = order.status === 'needs_attention'
 	const live = !cancelled && !cancelRequested
+	// Still on its way to a visit: not cancelled, not waiting on a cancel, not a visit that could not be completed.
+	const active = live && !needsAttention
+	const attention = ATTENTION_TEXT[order.attentionReason ?? ''] ?? ATTENTION_FALLBACK
+	const supportConfig = useAppConfig()
+	const askSupport = () => {
+		if (!contactSupport(supportConfig?.support_phone || '', supportConfig?.support_email || '')) showComingSoon()
+	}
 	const canCancel = !!order.apiId && !!order.canCancel
 	const canReschedule = !!order.apiId && !!order.canReschedule
 	const placed = order.placedAt.slice(0, 10)
@@ -92,28 +140,16 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 		{ label: order.method === 'later' ? 'To pay' : 'Paid', value: inr(order.total), tone: 'total', dividerBefore: true },
 	]
 
-	// How far along: the step the order is on (0 placed ... 4 report ready); a requested change keeps the current step.
-	const stepIndex = { placed: 1, scheduled: 1, on_the_way: 1, sample_collected: 2, processing: 3, report_ready: 4 }[
-		order.status as 'placed'
-	] ?? 1
-	const stateOf = (i: number): AppTimelineStep['state'] => (i < stepIndex ? 'done' : i === stepIndex ? 'current' : 'upcoming')
-	const timeline: AppTimelineStep[] = [
-		{ key: 'placed', title: 'Order placed', sub: `${longDate(placed)}`, state: 'done' },
-		{
-			key: 'assigned',
-			title: isHome ? 'Phlebotomist assigned' : 'Lab confirmed',
-			sub: isHome ? 'We’ll share their name and number' : 'Your slot is held',
-			state: stateOf(1),
-		},
-		{
-			key: 'collected',
-			title: isHome ? 'Sample collected' : 'Sample taken at the lab',
-			sub: current.date ? `${longDate(current.date)}, ${current.time}` : '',
-			state: stateOf(2),
-		},
-		{ key: 'processing', title: 'Processing at lab', sub: 'After pickup', state: stateOf(3) },
-		{ key: 'report', title: 'Report ready', sub: 'Within 24 hrs of pickup', state: stateOf(4) },
-	]
+	const whenLabel = current.date ? `${commaDate(current.date)}, ${current.time}` : ''
+
+	// The progress comes from the server (a cancelled order and a visit that needs attention have none: their banner
+	// says what happened). Each step may say when it was reached.
+	const timeline: AppTimelineStep[] = (order.timeline ?? []).map((step) => ({
+		key: step.key,
+		title: step.title,
+		state: step.state,
+		sub: [step.sub, step.at ? stampLabel(step.at) : null].filter(Boolean).join(' · '),
+	}))
 
 	const beforeSteps = [
 		{ title: 'Fast from 9 PM tonight', body: 'No food, tea or coffee. Water is fine.', show: order.fasting },
@@ -122,8 +158,6 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 	]
 		.filter((s) => s.show)
 		.map(({ title, body }) => ({ title, body }))
-
-	const whenLabel = current.date ? `${commaDate(current.date)}, ${current.time}` : ''
 
 	return (
 		<View style={styles.screen}>
@@ -153,7 +187,11 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 				}
 			/>
 
-			<ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+			<ScrollView
+				contentContainerStyle={styles.content}
+				showsVerticalScrollIndicator={false}
+				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+			>
 				{/* Banners */}
 				{cancelled && (
 					<View style={styles.cancelBanner}>
@@ -172,6 +210,19 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 									? 'Nothing was charged. You can book again any time.'
 									: `Refund of ${inr(order.total)} started to your ${order.methodLabel}. You’ll get an SMS when it lands.`}
 							</Text>
+						</View>
+					</View>
+				)}
+				{needsAttention && (
+					<View style={styles.noteBannerWrap}>
+						<View style={[styles.noteBanner, { backgroundColor: APP_COLORS.dangerBg }]}>
+							<AppIconTile size={32} radius={10} backgroundColor="#FFFFFF">
+								<AppPathIcon d={LAB_ICONS.close} size={18} strokeWidth={2.4} color={APP_COLORS.danger} />
+							</AppIconTile>
+							<View style={styles.flex}>
+								<Text style={[styles.noteTitle, { color: APP_COLORS.danger }]}>{attention.title}</Text>
+								<Text style={styles.noteSub}>{attention.body}</Text>
+							</View>
 						</View>
 					</View>
 				)}
@@ -214,7 +265,7 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 						</View>
 					</View>
 				)}
-				{live && order.fasting && (
+				{active && order.fasting && (
 					<View style={styles.noteBannerWrap}>
 						<View style={[styles.noteBanner, { backgroundColor: APP_COLORS.warningBg }]}>
 							<AppIconTile size={32} radius={10} backgroundColor="#FFFFFF">
@@ -328,7 +379,7 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 				</AppSection>
 
 				{/* Before the pickup */}
-				{live && (
+				{active && (
 					<AppSection marginTop={0} title={isHome ? 'Before the pickup' : 'Before your visit'} titleSize="sm">
 						<AppNumberedSteps steps={beforeSteps} numberSize={24} gap={10} markerGap={10} textGap={0} />
 					</AppSection>
@@ -356,9 +407,11 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 				</AppSection>
 
 				{/* Status */}
-				<AppSection marginTop={0} title="Status" titleSize="sm">
-					<AppStatusTimeline steps={timeline} />
-				</AppSection>
+				{timeline.length > 0 && (
+					<AppSection marginTop={0} title="Status" titleSize="sm">
+						<AppStatusTimeline steps={timeline} />
+					</AppSection>
+				)}
 
 				{live && canCancel && (
 					<View style={styles.cancelRow}>
@@ -382,7 +435,7 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 							size: 36,
 							radius: 10,
 						}}
-						onPress={() => showComingSoon()}
+						onPress={askSupport}
 						minHeight={60}
 						titleStyle={styles.helpTitle}
 					/>
@@ -412,7 +465,7 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 			</ScrollView>
 
 			<AppFooterBar>
-				{live ? (
+				{active ? (
 					<>
 						<AppButton
 							variant="outline"
@@ -426,6 +479,15 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 						</AppButton>
 						<AppButton size="lg" style={styles.flex} icon="plus" onPress={goCatalog}>
 							Add more tests
+						</AppButton>
+					</>
+				) : needsAttention ? (
+					<>
+						<AppButton variant="outline" size="lg" style={styles.flex} icon="phone-outline" onPress={askSupport}>
+							Contact support
+						</AppButton>
+						<AppButton size="lg" style={styles.flex} onPress={goCatalog}>
+							Book again
 						</AppButton>
 					</>
 				) : (
@@ -486,7 +548,8 @@ function LabOrderContent({ order, onChange }: { order: LabOrder; onChange: (next
 	)
 }
 
-/** The order is read once on mount (see LabSuccessPage); with no placed order there is nothing to show. */
+/** The order is re-read from the server on every focus, when the app returns, and on pull-down; with no placed order
+ * there is nothing to show. */
 export default function LabOrderPage() {
 	const navigation = useNavigation<Nav>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.LABORATORY_BOOKING_TRACKING>>()
@@ -494,22 +557,56 @@ export default function LabOrderPage() {
 	// Opened from the Bookings tab: load that order. Right after booking: the snapshot in the booking store.
 	const [order, setOrder] = useState<LabOrder | null>(() => (orderId ? null : labBooking.get().order))
 	const [failed, setFailed] = useState(false)
+	const [refreshing, setRefreshing] = useState(false)
+	const apiId = orderId ?? order?.apiId
+	// Nothing more changes on a cancelled order or one whose report is ready, so those are not re-read on their own
+	// (pulling down still does).
+	const settled = order?.status === 'cancelled' || order?.status === 'report_ready'
+	const hasOrder = useRef(order != null)
+	hasOrder.current = order != null
+	// Only the newest read counts: a slower, older answer must not overwrite a newer one.
+	const latest = useRef(0)
+
+	const refresh = useCallback(async () => {
+		if (!apiId) return
+		const ticket = ++latest.current
+		try {
+			const api = await fetchOrder(apiId)
+			if (ticket !== latest.current) return
+			setOrder((prev) => (prev ? applyApi(prev, api) : orderFromApi(api)))
+			setFailed(false)
+		} catch {
+			// A failed re-read keeps what is shown; only a first load with nothing to show is an error.
+			if (ticket === latest.current && !hasOrder.current) setFailed(true)
+		}
+	}, [apiId])
+
+	useFocusEffect(
+		useCallback(() => {
+			if (!settled) void refresh()
+		}, [refresh, settled]),
+	)
+
+	// Coming back to the app on this screen (it stays focused while the app is in the background) is also a look.
 	useEffect(() => {
-		if (!orderId) return
-		let active = true
-		const load = async () => {
-			try {
-				const api = await fetchOrder(orderId)
-				if (active) setOrder(orderFromApi(api))
-			} catch {
-				if (active) setFailed(true)
-			}
-		}
-		void load()
-		return () => {
-			active = false
-		}
-	}, [orderId])
+		const sub = AppState.addEventListener('change', (state) => {
+			if (state === 'active' && !settled) void refresh()
+		})
+		return () => sub.remove()
+	}, [refresh, settled])
+
+	// A cancel / reschedule the patient has just made is newer than any read still in flight.
+	const change = (next: LabOrder) => {
+		latest.current++
+		setOrder(next)
+	}
+
+	const pullToRefresh = async () => {
+		setRefreshing(true)
+		await refresh()
+		setRefreshing(false)
+	}
+
 	useEffect(() => {
 		if (!orderId && !order) navigation.replace(ROUTES.STACK.LABORATORY_LIST)
 	}, [orderId, order, navigation])
@@ -530,7 +627,7 @@ export default function LabOrderPage() {
 			</View>
 		) : null
 	}
-	return <LabOrderContent order={order} onChange={setOrder} />
+	return <LabOrderContent order={order} onChange={change} refreshing={refreshing} onRefresh={pullToRefresh} />
 }
 
 const styles = StyleSheet.create({
