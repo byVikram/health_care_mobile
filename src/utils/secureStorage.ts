@@ -1,12 +1,21 @@
 import { Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
+const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
 // Lazy load SecureStore only when native to prevent web runtime failures
 let SecureStore: any = null
 if (Platform.OS !== 'web') {
 	try {
 		SecureStore = require('expo-secure-store')
-	} catch {
+	} catch (error) {
+		// Not silent: without the module (not installed, or missing from the installed native build) every token
+		// lives in memory only and the user is signed in again on each reload / app restart.
+		console.warn(
+			'[secureStorage] expo-secure-store is not available, so sign-in will not survive an app restart. ' +
+				'Install it and rebuild the app:',
+			describe(error)
+		)
 		SecureStore = null
 	}
 }
@@ -20,8 +29,6 @@ if (Platform.OS !== 'web') {
 const memoryStore = new Map<string, string>()
 
 const usesAsyncStorage = () => Platform.OS === 'web'
-
-const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 export const secureStorage = {
 	async getItem(key: string): Promise<string | null> {

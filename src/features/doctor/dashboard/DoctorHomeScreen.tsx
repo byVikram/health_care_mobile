@@ -7,7 +7,7 @@
 // content, same behavior, same styling, one implementation to maintain.
 
 import React, { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, AppState, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppAppointmentRow, AppAvatar, AppSidebar, AppSoftCard } from '../../../components/common'
@@ -17,8 +17,9 @@ import { useAuth } from '../../../context/AuthContext'
 import { useTabBarClearance } from '../../../navigation/tabBar'
 import { useSidebarMenu } from '../../../navigation/useSidebarMenu'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
-import { DoctorStatusBanner, type DoctorStatus } from './DoctorStatusBanner'
-import { getAppointments, getDoctorStatus, getStatusIdByLabel, startConsultation } from '../doctorService'
+import { DoctorStatusBanner } from './DoctorStatusBanner'
+import { useDoctorStatus } from './useDoctorStatus'
+import { getAppointments, getStatusIdByLabel, startConsultation } from '../doctorService'
 import type { Appointment } from '../../../types/appointment'
 
 import { buildS3Url } from '../../../utils/s3Utils'
@@ -114,16 +115,8 @@ export function DoctorHomeScreen() {
 		}
 	}, [selectedHospitalId])
 
-	// Profile / verification state for the banner at the top. Read every time the screen is shown (see below), so
-	// the banner is gone as soon as an admin has approved the doctor. A failed call keeps what was shown.
-	const [doctorStatus, setDoctorStatus] = useState<DoctorStatus | null>(null)
-	const loadStatus = useCallback(async () => {
-		try {
-			setDoctorStatus(await getDoctorStatus())
-		} catch {
-			// Non-fatal: the banner just stays as it was.
-		}
-	}, [])
+	// Profile / verification state for the banner at the top (re-read on focus and on returning to the app).
+	const { status: doctorStatus, reload: reloadStatus } = useDoctorStatus()
 
 	// Refetch on every focus, not just mount -- "Up next" now depends on check-in state, which the
 	// doctor typically changes on the Schedule tab and then flips back here to start the visit; a
@@ -132,18 +125,8 @@ export function DoctorHomeScreen() {
 	useFocusEffect(
 		useCallback(() => {
 			load()
-			void loadStatus()
-		}, [load, loadStatus]),
+		}, [load]),
 	)
-
-	// Coming back to the app on this screen (it stays focused while the app is in the background) is also a look:
-	// an approval made meanwhile shows at once.
-	useEffect(() => {
-		const sub = AppState.addEventListener('change', (state) => {
-			if (state === 'active') void loadStatus()
-		})
-		return () => sub.remove()
-	}, [loadStatus])
 
 	// "Needs your action" counts — independent of the today's-schedule refresh above since they're
 	// not date-scoped. Best-effort: a failed call just leaves that count at its default rather than
@@ -267,24 +250,13 @@ export function DoctorHomeScreen() {
 						refreshing={refreshing}
 						onRefresh={() => {
 							load(true)
-							void loadStatus()
+							void reloadStatus()
 							setRefreshToken((t) => t + 1)
 						}}
 					/>
 				}
 			>
-				<DoctorStatusBanner
-					status={doctorStatus}
-					onOpen={(target) =>
-						navigation.navigate(
-							target === 'personal'
-								? ROUTES.STACK.PROFILE_PERSONAL
-								: target === 'professional'
-									? ROUTES.STACK.DOCTOR_PROFESSIONAL
-									: ROUTES.MAIN.PROFILE,
-						)
-					}
-				/>
+				<DoctorStatusBanner status={doctorStatus} />
 				{loading ? (
 					<ActivityIndicator style={{ marginTop: 40 }} color={APP_COLORS.primary} />
 				) : (

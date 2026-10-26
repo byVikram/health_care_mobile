@@ -38,6 +38,8 @@ import { APP_COLORS, TONE_ORDER } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import { useTabBarClearance } from '../../../navigation/tabBar'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
+import { DoctorStatusBanner } from './DoctorStatusBanner'
+import { useDoctorStatus } from './useDoctorStatus'
 import { ScheduleCalendarSheet } from './ScheduleCalendarSheet'
 import { TodayPatientRow, TodayTabs, TodayVisitChips, type TodayTab, type TodayVisit } from './TodayPatients'
 import { TodayActionSheet, type TodaySheetMode } from './TodayActionSheet'
@@ -260,6 +262,7 @@ export function DoctorScheduleScreen() {
 	const [pastLoading, setPastLoading] = useState(true)
 
 	const [refreshing, setRefreshing] = useState(false)
+	const { status: doctorStatus, reload: reloadStatus } = useDoctorStatus()
 
 	const loadToday = useCallback(async () => {
 		setTodayLoading(true)
@@ -344,6 +347,7 @@ export function DoctorScheduleScreen() {
 
 	const refreshAll = () => {
 		setRefreshing(true)
+		void reloadStatus()
 		Promise.all([loadToday(), loadRequests(), loadUpcoming(), loadPast()]).finally(() => setRefreshing(false))
 	}
 
@@ -594,6 +598,7 @@ export function DoctorScheduleScreen() {
 				contentContainerStyle={{ paddingTop: 16, paddingBottom: clearance, gap: 16 }}
 				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshAll} />}
 			>
+				<DoctorStatusBanner status={doctorStatus} />
 				{tab === 'today' && (
 					<View style={{ gap: 10, paddingHorizontal: 16 }}>
 						<TodayTabs value={todayTab} counts={todayCounts} onChange={setTodayTab} />
