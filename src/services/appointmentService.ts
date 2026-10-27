@@ -39,3 +39,60 @@ export async function updateAppointmentsStatus(
   )
   return res.data
 }
+
+// ── Patient no-show (PNS) policy ─────────────────────────────────────────────
+
+export type NoShowState = 'awaiting_reply' | 'valid' | 'invalid' | 'needs_review'
+
+export interface NoShowReasonOption {
+  value: string
+  label: string
+}
+
+export interface NoShowInfo {
+  appointment_id: string
+  state: NoShowState
+  can_reply: boolean
+  /** ISO UTC string ending in Z. */
+  reply_deadline: string
+  reason: string | null
+  reasons: NoShowReasonOption[]
+  message: string
+}
+
+/**
+ * What happened to a missed appointment the doctor marked as a no-show (patient only).
+ * 404 = it was not marked a no-show, 403 = not the patient's / family's. The calling screen renders its
+ * own error text, so the global error dialog is suppressed.
+ */
+export async function getNoShow(appointmentId: string): Promise<NoShowInfo> {
+  const res = await ApiService.get<{ data: NoShowInfo }>(API_ENDPOINTS.APPOINTMENTS.NO_SHOW(appointmentId), {
+    skipGlobalError: true,
+  })
+  return res.data.data
+}
+
+/** The patient's one, final reply (reason = one of `reasons[].value`). 409 when already answered or too late. */
+export async function replyToNoShow(appointmentId: string, reason: string): Promise<NoShowInfo> {
+  const res = await ApiService.post<{ data: NoShowInfo }>(
+    API_ENDPOINTS.APPOINTMENTS.NO_SHOW_REPLY(appointmentId),
+    { reason },
+    { skipGlobalError: true }
+  )
+  return res.data.data
+}
+
+export interface BookingRestriction {
+  restricted: boolean
+  /** YYYY-MM-DD */
+  until: string | null
+  message: string | null
+}
+
+/** Whether online booking is paused for the signed-in patient (repeated valid no-shows). */
+export async function getBookingRestriction(): Promise<BookingRestriction> {
+  const res = await ApiService.get<{ data: BookingRestriction }>(API_ENDPOINTS.APPOINTMENTS.BOOKING_RESTRICTION, {
+    skipGlobalError: true,
+  })
+  return res.data.data
+}

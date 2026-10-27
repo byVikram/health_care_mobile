@@ -41,14 +41,14 @@ import { DoctorScreenHeader } from './DoctorScreenHeader'
 import { DoctorStatusBanner } from './DoctorStatusBanner'
 import { useDoctorStatus } from './useDoctorStatus'
 import { ScheduleCalendarSheet } from './ScheduleCalendarSheet'
-import { TodayPatientRow, TodayTabs, TodayVisitChips, type TodayTab, type TodayVisit } from './TodayPatients'
+import { NoShowStrip, TodayPatientRow, TodayTabs, TodayVisitChips, type TodayTab, type TodayVisit } from './TodayPatients'
 import { TodayActionSheet, type TodaySheetMode } from './TodayActionSheet'
-import { getAppointments, getStatusIdByLabel, setAppointmentCheckIn } from '../doctorService'
+import { getAppointments, getStatusIdByLabel, markAppointmentNoShow, setAppointmentCheckIn } from '../doctorService'
 import { updateAppointmentsStatus } from '../../../services/appointmentService'
 import { askPatientToReschedule } from '../doctorService'
 import { AskPatientRescheduleSheet } from '../components/AskPatientRescheduleSheet'
 import { createReferral } from '../../referrals/referralService'
-import { effectiveStatusLabel, formatTime12h, humanizeStatus, isAccepted, isCompletedAppt, isPending, isRequestLike, isRescheduleNeeded, isRescheduleRequest, isVideoMode, rowStatusTone, statusLabelOf, toApiDate } from '../scheduleUtils'
+import { clinicTodayIso, effectiveStatusLabel, formatTime12h, humanizeStatus, isAccepted, isCompletedAppt, isPending, isRequestLike, isNoShowAppt, isRescheduleNeeded, isRescheduleRequest, isVideoMode, NO_SHOW_SOURCE_STATUSES, noShowWindow, rowStatusTone, statusLabelOf, toApiDate } from '../scheduleUtils'
 import type { Appointment } from '../../../types/appointment'
 import type { FavouriteDoctorListItem } from '../search/components/FavouriteDoctorList'
 
@@ -87,10 +87,18 @@ function pastStatusKey(apt: Appointment): PastStatusKey {
 	const l = statusLabelOf(apt).toLowerCase()
 	if (l === 'completed') return 'completed'
 	if (l === 'cancelled') return 'cancelled'
-	if (l === 'no_show' || l === 'not_arrived' || l === 'confirmed') return 'no_show'
+	if (l === 'no_show') return 'no_show'
+	// Confirmed / not arrived and still markable: not a no-show yet, so it is listed (as "Not arrived") under All only.
+	if (l === 'not_arrived' || l === 'confirmed') return canStillMarkNoShow(apt) ? 'other' : 'no_show'
 	return 'other'
 }
+/** A past appointment the doctor can still mark as a no-show: confirmed / not arrived, within the policy's window. */
+function canStillMarkNoShow(apt: Appointment): boolean {
+	return NO_SHOW_SOURCE_STATUSES.includes(statusLabelOf(apt).toLowerCase()) && !noShowWindow(apt).expired
+}
 function pastStatusDisplay(apt: Appointment): { label: string; tone: 'completed' | 'sand' | 'cancelled' | 'pending' | 'confirmed' | 'onTheWay' } {
+	// Not marked yet (the "No-show" action is offered on the row): do not call it a no-show before the doctor does.
+	if (canStillMarkNoShow(apt)) return { label: 'Not arrived', tone: 'onTheWay' }
 	switch (pastStatusKey(apt)) {
 		case 'completed':
 			return { label: 'Completed', tone: 'completed' }
@@ -104,7 +112,7 @@ function pastStatusDisplay(apt: Appointment): { label: string; tone: 'completed'
 }
 
 function todayIso() {
-	return toApiDate(new Date())
+	return clinicTodayIso() // today in Mumbai (the clinic's clock), not the phone's date
 }
 function isoPlusDays(iso: string, days: number) {
 	const d = new Date(`${iso}T00:00:00`)
@@ -226,7 +234,10 @@ export function DoctorScheduleScreen() {
 	const [busyId, setBusyId] = useState<string | null>(null)
 	const [sheet, setSheet] = useState<{ mode: ActionSheetMode; appt: Appointment } | null>(null)
 	// The three-dots sheet of a Today row (menu -> reschedule / cancel).
-	const [todaySheet, setTodaySheet] = useState<{ mode: TodaySheetMode; appt: Appointment } | null>(null)
+	// noShowOnly = opened from the Past list straight on the "Mark as no-show" step.
+	const [todaySheet, setTodaySheet] = useState<{ mode: TodaySheetMode; appt: Appointment; noShowOnly?: boolean } | null>(null)
+	// Why marking a no-show failed (the server's 400 message), shown inside that sheet.
+	const [noShowError, setNoShowError] = useState<string | null>(null)
 	// The appointment whose patient the doctor is being asked to confirm "ask to reschedule" for.
 	const [askTarget, setAskTarget] = useState<Appointment | null>(null)
 	const [checkingInId, setCheckingInId] = useState<string | null>(null)
@@ -270,10 +281,11 @@ export function DoctorScheduleScreen() {
 			const res = await getAppointments({ appointment_date: todayIso(), variant: 'all', limit: 50, ...clinicFilter })
 			// Today shows what the doctor has already accepted (at any point in today's arrival
 			// workflow) plus what's already done -- never a still-pending request, even if it happens
-			// to be dated today. Those stay under Requests until the doctor acts on them.
+			// to be dated today. Those stay under Requests until the doctor acts on them. A patient marked
+			// no-show stays on the list too (tinted red, tagged NO-SHOW): they may still turn up later.
 			setTodayList(
 				(res.data ?? [])
-					.filter((a) => isAccepted(a) || isCompleted(a))
+					.filter((a) => isAccepted(a) || isCompleted(a) || isNoShowAppt(a))
 					.sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? '')),
 			)
 		} catch {
@@ -359,6 +371,7 @@ export function DoctorScheduleScreen() {
 	const todayUpcoming = todayByVisit.filter((a) => !isCompleted(a))
 	const todayDone = todayByVisit.filter(isCompleted)
 	const todayCounts = { every: todayByVisit.length, upcoming: todayUpcoming.length, done: todayDone.length }
+	const todayNoShowCount = todayByVisit.filter(isNoShowAppt).length
 	// "All" lists the patients still to be seen first, then the finished ones (the list is already by time).
 	const todayShown = todayTab === 'upcoming' ? todayUpcoming : todayTab === 'done' ? todayDone : [...todayUpcoming, ...todayDone]
 
@@ -477,6 +490,42 @@ export function DoctorScheduleScreen() {
 			setBusyId(null)
 			setSheet(null)
 			setTodaySheet(null)
+		}
+	}
+
+	// Patient no-show policy: only from 60 minutes after the start until 5 days after it (checked here against the device
+	// clock, and by the server, which answers 400 with its own message -- shown in the sheet when it refuses).
+	const handleMarkNoShow = async (apt: Appointment) => {
+		if (busyId) return
+		const markWindow = noShowWindow(apt)
+		if (!markWindow.canMark) {
+			setNoShowError(markWindow.hint)
+			return
+		}
+		setBusyId(apt.id)
+		setNoShowError(null)
+		try {
+			const res = await markAppointmentNoShow(apt.id)
+			if (!res.success) {
+				setNoShowError(res.message || 'Could not mark the no-show. Please try again.')
+				return
+			}
+			// A no-show of today stays on the Today list, tinted and tagged (the patient may still turn up); an older one
+			// is listed under Past. Either way it is off Upcoming.
+			const marked = { ...apt, status: 'no_show' }
+			setUpList((prev) => prev.filter((a) => a.id !== apt.id))
+			if (apt.appointment_date === todayIso()) {
+				setTodayList((prev) => prev.map((a) => (a.id === apt.id ? marked : a)))
+			} else {
+				setTodayList((prev) => prev.filter((a) => a.id !== apt.id))
+				setPastList((prev) => (prev.some((a) => a.id === apt.id) ? prev.map((a) => (a.id === apt.id ? marked : a)) : [marked, ...prev]))
+			}
+			setTodaySheet(null)
+			Toast.show({ type: 'success', text1: 'Marked as a no-show', text2: 'The patient has been emailed.' })
+		} catch (error: any) {
+			setNoShowError(error?.response?.data?.message ?? error?.message ?? 'Could not mark the no-show. Please try again.')
+		} finally {
+			setBusyId(null)
 		}
 	}
 
@@ -603,6 +652,7 @@ export function DoctorScheduleScreen() {
 					<View style={{ gap: 10, paddingHorizontal: 16 }}>
 						<TodayTabs value={todayTab} counts={todayCounts} onChange={setTodayTab} />
 						<TodayVisitChips value={todayVisit} onChange={setTodayVisit} />
+						<NoShowStrip count={todayNoShowCount} />
 						{todayLoading ? (
 							<ActivityIndicator style={{ marginTop: 24 }} color={APP_COLORS.primary} />
 						) : todayShown.length ? (
@@ -617,6 +667,7 @@ export function DoctorScheduleScreen() {
 											meta={[apt.patient?.age ? `${apt.patient.age} yrs` : null, apt.patient?.gender].filter(Boolean).join(' · ')}
 											done={isCompleted(apt)}
 											checkedIn={effectiveStatusLabel(apt) === 'checked_in'}
+											noShow={isNoShowAppt(apt)}
 											busy={checkingInId === apt.id}
 											divider={i < todayShown.length - 1}
 											onPress={() => openAppointment(apt)}
@@ -747,6 +798,18 @@ export function DoctorScheduleScreen() {
 																	meta={[apt.patient?.age ? `${apt.patient.age} yrs` : null, apt.patient?.gender].filter(Boolean).join(' · ')}
 																	status={st.label}
 																	statusTone={st.tone}
+																	action={
+																		canStillMarkNoShow(apt)
+																			? {
+																					label: 'No-show',
+																					disabled: !noShowWindow(apt).canMark,
+																					onPress: () => {
+																						setNoShowError(null)
+																						setTodaySheet({ mode: 'no_show', appt: apt, noShowOnly: true })
+																					},
+																				}
+																			: undefined
+																	}
 																	divider={i < rows.length - 1}
 																	onPress={() => openAppointment(apt)}
 																/>
@@ -888,12 +951,24 @@ export function DoctorScheduleScreen() {
 					video={isVideoMode(todaySheet.appt.appointment_mode)}
 					busy={busyId === todaySheet.appt.id}
 					onClose={() => setTodaySheet(null)}
-					onModeChange={(mode) => setTodaySheet({ mode, appt: todaySheet.appt })}
+					onModeChange={(mode) => {
+						setNoShowError(null)
+						setTodaySheet({ ...todaySheet, mode })
+					}}
 					onAskReschedule={() => {
 						setAskTarget(todaySheet.appt)
 						setTodaySheet(null)
 					}}
 					onConfirmCancel={(reason) => handleConfirmReject(reason, '', todaySheet.appt)}
+					noShowCanMark={noShowWindow(todaySheet.appt).canMark && NO_SHOW_SOURCE_STATUSES.includes(effectiveStatusLabel(todaySheet.appt))}
+					noShowHint={
+						noShowWindow(todaySheet.appt).canMark && !NO_SHOW_SOURCE_STATUSES.includes(effectiveStatusLabel(todaySheet.appt))
+							? 'The patient is checked in'
+							: noShowWindow(todaySheet.appt).hint
+					}
+					noShowOnly={todaySheet.noShowOnly}
+					onConfirmNoShow={() => handleMarkNoShow(todaySheet.appt)}
+					noShowError={noShowError}
 				/>
 			)}
 

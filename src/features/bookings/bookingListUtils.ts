@@ -37,7 +37,20 @@ export const STATUS_TAG_TONE: Record<BookingTone, StatusToneKey> = {
  * (the server only says "done" for every closed booking, so those are told apart by their label).
  */
 export const statusChipTone = (status: { label: string; tone: BookingTone }): StatusToneKey =>
-	/^(cancelled|rejected)\b/i.test(status.label) ? 'cancelled' : (STATUS_TAG_TONE[status.tone] ?? 'done')
+	/^(cancelled|rejected)\b/i.test(status.label)
+		? 'cancelled'
+		: isNoShowLabel(status.label)
+			? 'pending' // a missed appointment: amber, not the neutral "done" grey (it can still be explained)
+			: (STATUS_TAG_TONE[status.tone] ?? 'done')
+
+/** The server labels a doctor appointment the doctor marked as missed "No-show" (tone 'done'). */
+export const isNoShowLabel = (label?: string | null): boolean => /^no[\s_-]?show\b/i.test((label ?? '').trim())
+
+/** A doctor appointment the patient can still explain (opens the "What happened?" sheet). */
+export const isNoShowBooking = (item: BookingItem): boolean =>
+	item.category === 'doctor' &&
+	item.target?.type === 'appointment' &&
+	(item.status_key ? item.status_key === 'no_show' : isNoShowLabel(item.status?.label))
 
 export const whereIconProps =(type?: BookingWhereType | null): { whereIcon?: AppIconName; whereGlyph?: IconName } => {
 	switch (type) {
