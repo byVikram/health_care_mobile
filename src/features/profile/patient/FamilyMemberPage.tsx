@@ -16,6 +16,7 @@ import {
 	AppFormCard,
 	AppFormField,
 	AppInfoBanner,
+	AppPhotoSourceSheet,
 	AppSaveFooter,
 	AppSelect,
 	FORM_SELECT_PROPS,
@@ -179,6 +180,7 @@ export default function FamilyMemberPage() {
 		hasPhoto: !!photoUrl,
 		patientId: memberId,
 		onChanged: setPhotoOverride,
+		sheet: true,
 		onPicked: memberId
 			? undefined
 			: (upload) => {
@@ -220,6 +222,14 @@ export default function FamilyMemberPage() {
 			}
 			overlays={
 				<>
+					<AppPhotoSourceSheet
+						visible={avatar.sheetVisible}
+						onClose={avatar.closeSheet}
+						onTakePhoto={() => void avatar.pick('camera')}
+						onChoosePhoto={() => void avatar.pick('library')}
+						onRemove={avatar.canRemove ? () => setConfirmDeletePhoto(true) : undefined}
+						subtitle="Shown on their profile and bookings"
+					/>
 					<AppConfirmSheet
 						visible={confirmRemove}
 						onClose={() => setConfirmRemove(false)}
@@ -276,20 +286,6 @@ export default function FamilyMemberPage() {
 									? `${relationLabel(draft.relation)}${draft.code ? ` · Karola ID ${draft.code}` : ''}`
 									: 'Profile photo (optional)'}
 							</Text>
-							<View style={styles.photoLinks}>
-								<TouchableOpacity onPress={avatar.open} disabled={avatar.busy} accessibilityRole="button">
-									<Text style={styles.photoLinkText}>{photoUrl ? 'Change photo' : 'Add photo'}</Text>
-								</TouchableOpacity>
-								{avatar.canRemove && (
-									<TouchableOpacity
-										onPress={() => setConfirmDeletePhoto(true)}
-										disabled={avatar.busy}
-										accessibilityRole="button"
-									>
-										<Text style={[styles.photoLinkText, styles.photoLinkDanger]}>Delete photo</Text>
-									</TouchableOpacity>
-								)}
-							</View>
 						</View>
 					</View>
 
@@ -415,9 +411,6 @@ const styles = StyleSheet.create({
 	photoText: { flex: 1, minWidth: 0 },
 	photoName: { fontSize: 18, lineHeight: 24, fontWeight: '800', color: APP_COLORS.ink },
 	photoSub: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
-	photoLinks: { flexDirection: 'row', gap: 16, marginTop: 2 },
-	photoLinkDanger: { color: APP_COLORS.danger },
-	photoLinkText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.primary },
 	banner: {
 		marginHorizontal: 16,
 		marginTop: 12,
