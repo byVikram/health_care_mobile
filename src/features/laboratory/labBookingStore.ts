@@ -12,6 +12,7 @@ import { useSyncExternalStore } from 'react'
 import Toast from 'react-native-toast-message'
 import { labItemById } from './labCatalogue'
 import type { LabItem, LabPayMethod } from './labMock'
+import type { ApiTimelineStep } from './labService'
 import { registerSessionCache } from '../../utils/sessionCache'
 import { slotAt } from './labFormat'
 
@@ -30,6 +31,10 @@ export type LabOrder = {
 	apiId?: string
 	/** Our step: placed | scheduled | on_the_way | sample_collected | processing | report_ready | needs_attention | cancelled | cancel_requested | reschedule_requested */
 	status?: string
+	/** The progress the server says to draw (empty for a cancelled order or a visit that needs attention). */
+	timeline?: ApiTimelineStep[]
+	/** missed | no_show | sample_rejected, while the order needs attention. */
+	attentionReason?: string | null
 	canCancel?: boolean
 	canReschedule?: boolean
 	placedAt: string

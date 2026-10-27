@@ -5,7 +5,7 @@
 // refreshes when `enabled` turns true, and never throws: on failure the value stays null (or the cache)
 // and callers fall back / hide the dependent row.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Linking } from 'react-native'
+import { Alert, Linking } from 'react-native'
 import {
 	getAppConfig,
 	getAncillaryStartingPrices,
@@ -131,6 +131,27 @@ export const openContactUrl = async (url: string): Promise<boolean> => {
 }
 
 export const telUrl = (number: string) => `tel:${number.replace(/[^\d+]/g, '')}`
+
+/**
+ * Reach Karolahealth support: calls or emails the configured contact (asking which when both are set).
+ * Returns false when no support number or email is configured (or not loaded yet), so the caller can fall back.
+ */
+export const contactSupport = (phone: string, email: string): boolean => {
+	if (!phone && !email) return false
+	const call = () => void openContactUrl(telUrl(phone))
+	const mail = () => void openContactUrl(`mailto:${email}`)
+	if (phone && email) {
+		Alert.alert('Help centre', 'How would you like to reach Karolahealth support?', [
+			{ text: `Call ${phone}`, onPress: call },
+			{ text: 'Email us', onPress: mail },
+			{ text: 'Cancel', style: 'cancel' },
+		])
+		return true
+	}
+	if (phone) call()
+	else mail()
+	return true
+}
 
 /** "₹1,250" (no decimals for whole rupees). */
 export const formatBalance = (amount: number) =>

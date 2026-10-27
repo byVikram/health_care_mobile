@@ -90,3 +90,6 @@ export function timeLabel(hhmm: string): string {
 	const hour12 = h % 12 === 0 ? 12 : h % 12
 	return `${hour12}:${pad(min ?? 0)} ${h >= 12 ? 'PM' : 'AM'}`
 }
+
+/** "Thu, 24 Sep, 4:34 PM" from an Indian wall-clock stamp ('2026-09-24T16:34:27'), e.g. when a step was reached. */
+export const stampLabel = (iso: string) => `${commaDate(iso.slice(0, 10))}, ${timeLabel(iso.slice(11, 16))}`
