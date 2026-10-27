@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import axios from 'axios'
 import { createUser } from '../authService'
 import { ROUTES } from '../../../navigation/routes'
 import { registrationSchema, getFieldErrors } from '../../../validation/authSchemas'
 import { APP_COLORS } from '../../../config/theme'
 import { roleDisplayName } from '../roleDisplay'
-import { AuthField, AuthFooter, AuthHeaderMint, CtaButton, InfoNote, TermsLine } from './AuthKit'
+import { AuthField, AuthFooter, AuthHeaderMint, CtaButton, InfoNote, KeyboardLiftView, TermsLine } from './AuthKit'
 
 type RegisterFormData = {
 	name: string
@@ -104,7 +104,7 @@ export default function RegisterForm({
 	}
 
 	return (
-		<KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+		<KeyboardLiftView style={styles.container}>
 			<AuthHeaderMint onBack={handleBack} step={1}>
 				<View style={styles.titleBlock}>
 					<Text style={styles.title}>Tell us about you</Text>
@@ -195,7 +195,7 @@ export default function RegisterForm({
 					}
 				/>
 			</AuthFooter>
-		</KeyboardAvoidingView>
+		</KeyboardLiftView>
 	)
 }
 

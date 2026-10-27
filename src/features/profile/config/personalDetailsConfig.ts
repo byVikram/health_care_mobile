@@ -156,7 +156,7 @@ export const PERSONAL_DETAILS_CONFIG: Record<HubRole, PersonalDetailsConfig> = {
 
 	doctor: {
 		subtitle: 'Shown on your public profile',
-		photoSubtitle: 'Patients see this on your profile',
+		photoSubtitle: 'Upload a professional photo',
 		cards: [
 			{
 				key: 'basic',
