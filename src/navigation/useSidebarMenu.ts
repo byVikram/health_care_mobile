@@ -4,12 +4,11 @@
 // what it does here. A key the app has no action for is skipped, so the backend can add keys ahead of an app release.
 // AppSidebar closes itself after a row is pressed, so the actions only navigate.
 import { useMemo } from 'react'
-import { Alert } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 import type { AppSidebarItem, AppSidebarSection } from '../components/common'
 import { useAuth } from '../context/AuthContext'
 import { hubRoleFor } from '../features/profile/config/profileHubConfig'
-import { openContactUrl, telUrl, useAppConfig } from '../features/dashboard/useHomeChromeData'
+import { contactSupport, useAppConfig } from '../features/dashboard/useHomeChromeData'
 import { useNavigationConfig } from './NavigationConfigContext'
 import { lookupKey, menuRoleFor } from './menuConfig'
 import { sidebarIcon } from './menuIcons'
@@ -40,22 +39,7 @@ export function useSidebarMenu(active: boolean): AppSidebarSection[] {
 		const toHome = () => openTab(ROUTES.MAIN.HOME)
 		const openHelp = () => {
 			// No support number or email configured (or not loaded yet): the profile hub has the Help & support row.
-			if (!supportPhone && !supportEmail) {
-				openTab(ROUTES.MAIN.PROFILE)
-				return
-			}
-			const call = () => void openContactUrl(telUrl(supportPhone))
-			const mail = () => void openContactUrl(`mailto:${supportEmail}`)
-			if (supportPhone && supportEmail) {
-				Alert.alert('Help centre', 'How would you like to reach Karolahealth support?', [
-					{ text: `Call ${supportPhone}`, onPress: call },
-					{ text: 'Email us', onPress: mail },
-					{ text: 'Cancel', style: 'cancel' },
-				])
-				return
-			}
-			if (supportPhone) call()
-			else mail()
+			if (!contactSupport(supportPhone, supportEmail)) openTab(ROUTES.MAIN.PROFILE)
 		}
 
 		const actions: Record<string, () => void> = {

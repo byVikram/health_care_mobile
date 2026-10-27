@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import {
-	AppChipGroup,
+	AppChipPicker,
 	AppDocumentRow,
 	DOCUMENT_LIST_TAG,
 	documentRowStatus,
@@ -298,22 +298,20 @@ export default function ProfessionalDetailsPage() {
 							editable={false}
 							helper="Set when you registered. Contact support to change it."
 						/>
-						<AppFormField label="Areas of expertise">
-							<AppChipGroup
-								options={toOptions(expertiseOptions)}
-								values={draft.expertise}
-								onChange={(v) => set('expertise', v)}
-								accessibilityLabel="Areas of expertise"
-							/>
-						</AppFormField>
-						<AppFormField label="Treatments & procedures">
-							<AppChipGroup
-								options={toOptions(treatmentOptions)}
-								values={draft.treatments}
-								onChange={(v) => set('treatments', v)}
-								accessibilityLabel="Treatments and procedures"
-							/>
-						</AppFormField>
+						<AppChipPicker
+							label="Areas of expertise"
+							options={toOptions(expertiseOptions)}
+							values={draft.expertise}
+							onChange={(v) => set('expertise', v)}
+							searchPlaceholder="Search conditions, e.g. arrhythmia"
+						/>
+						<AppChipPicker
+							label="Treatments & procedures"
+							options={toOptions(treatmentOptions)}
+							values={draft.treatments}
+							onChange={(v) => set('treatments', v)}
+							searchPlaceholder="Search procedures, e.g. stent"
+						/>
 						<AppFormField
 							label="About you"
 							value={draft.bio}

@@ -94,12 +94,24 @@ export type ApiQuote = { serviceable: boolean; labs: ApiQuoteLab[] }
 
 export type ApiOrderItem = { kind: LabKind; name: string; price: string | null; mrp: string | null }
 
+/** One step of the order's progress, drawn as it is. `sub` and `at` are absent when empty. */
+export type ApiTimelineStep = {
+	key: string
+	title: string
+	state: 'done' | 'current' | 'upcoming'
+	sub?: string
+	/** When the step was reached, Indian wall-clock time ('2026-10-26T22:04:27'). */
+	at?: string
+}
+
 export type ApiOrder = {
 	id: string
 	status: string
+	/** missed | no_show | sample_rejected, while the order needs attention. */
+	attention_reason: string | null
+	/** The progress to draw, one order only (not in the list); empty for a cancelled order or a visit that needs attention. */
+	timeline?: ApiTimelineStep[]
 	order_type: LabServiceType
-	payment_mode: string
-	payment_status: string
 	appointment_at: string | null
 	lab_name: string | null
 	lab_logo_url: string | null
@@ -110,7 +122,6 @@ export type ApiOrder = {
 	patient_name: string | null
 	address_line: string | null
 	city: string | null
-	state: string | null
 	pincode: string | null
 	total_amount: string | null
 	notes: string | null

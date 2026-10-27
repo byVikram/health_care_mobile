@@ -95,6 +95,11 @@ export function DoctorEngageScreen() {
 				setOpenId(null)
 			}
 		} catch (error) {
+			// The server refuses an unverified doctor: re-read the status so the composer closes and the banner shows.
+			if ((error as { response?: { status?: number } })?.response?.status === 403) {
+				setOpenId(null)
+				void reloadStatus()
+			}
 			Toast.show({
 				type: 'error',
 				text1: extractApiErrorMessage(error, 'Could not post your answer. Please try again.'),

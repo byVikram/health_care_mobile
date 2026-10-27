@@ -22,6 +22,11 @@ type Options = {
 	 * uploaded once the member is saved. Called with null when it is removed again.
 	 */
 	onPicked?: (upload: AvatarUpload | null) => void
+	/**
+	 * Ask where the photo comes from with a bottom sheet (render <AppPhotoSourceSheet> from `sheetVisible` /
+	 * `closeSheet` / `pick`) instead of the system alert.
+	 */
+	sheet?: boolean
 }
 
 const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
@@ -47,8 +52,9 @@ const messageOf = (error: unknown): string => {
 	return e?.response?.data?.message || e?.message || 'Please try again.'
 }
 
-export function useAvatarChange({ hasPhoto, allowRemove = true, onChanged, patientId, onPicked }: Options) {
+export function useAvatarChange({ hasPhoto, allowRemove = true, onChanged, patientId, onPicked, sheet = false }: Options) {
 	const [busy, setBusy] = useState(false)
+	const [sheetVisible, setSheetVisible] = useState(false)
 	const { updateUser } = useAuth()
 
 	const run = useCallback(async (task: () => Promise<string>, successText: string, failureText: string) => {
@@ -119,13 +125,19 @@ export function useAvatarChange({ hasPhoto, allowRemove = true, onChanged, patie
 			void pick('library')
 			return
 		}
+		if (sheet) {
+			setSheetVisible(true)
+			return
+		}
 		// Deleting is a separate, visible "Delete photo" action on the screen (see `remove` / `canRemove`).
 		Alert.alert('Profile photo', undefined, [
 			{ text: 'Take a photo', onPress: () => void pick('camera') },
 			{ text: 'Choose from library', onPress: () => void pick('library') },
 			{ text: 'Cancel', style: 'cancel' as const },
 		])
-	}, [busy, pick])
+	}, [busy, pick, sheet])
 
-	return { open, remove: removePhoto, canRemove: hasPhoto && allowRemove, busy }
+	const closeSheet = useCallback(() => setSheetVisible(false), [])
+
+	return { open, remove: removePhoto, canRemove: hasPhoto && allowRemove, busy, pick, sheetVisible, closeSheet }
 }
