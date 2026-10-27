@@ -1,14 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 // features/auth/components/OtpForm.tsx
 import React, { useEffect, useRef, useState } from 'react'
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import * as Device from 'expo-device'
 import { verifyOtp, sendOtp } from '../authService'
 import { markNotificationPromptShownOnBackend } from '../../../services/notificationPermissionService'
 import { useAuth, UserRole } from '../../../context/AuthContext'
 import { otpSchema, getFieldErrors } from '../../../validation/authSchemas'
 import { APP_COLORS } from '../../../config/theme'
-import { AuthFooter, AuthHeaderMint, CtaButton, ICON_PATHS, OtpBoxes, OTP_LENGTH, PathIcon } from './AuthKit'
+import { AuthFooter, AuthHeaderMint, CtaButton, ICON_PATHS, KeyboardLiftView, OtpBoxes, OTP_LENGTH, PathIcon } from './AuthKit'
 
 interface Props {
 	contactNumber: string
@@ -26,6 +26,28 @@ interface Props {
 }
 
 const RESEND_COOLDOWN_SECONDS = 60
+// Longest wait for the keyboard to report it has closed, so a missed event can never hold up the login.
+const KEYBOARD_CLOSE_TIMEOUT_MS = 600
+
+/** Closes the keyboard and resolves once it is fully gone (at once when it is not open). */
+const dismissKeyboard = () =>
+	new Promise<void>((resolve) => {
+		if (!Keyboard.isVisible()) {
+			resolve()
+			return
+		}
+		let timer: ReturnType<typeof setTimeout>
+		const sub = Keyboard.addListener('keyboardDidHide', () => {
+			clearTimeout(timer)
+			sub.remove()
+			resolve()
+		})
+		timer = setTimeout(() => {
+			sub.remove()
+			resolve()
+		}, KEYBOARD_CLOSE_TIMEOUT_MS)
+		Keyboard.dismiss()
+	})
 
 const formatTimer = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
@@ -98,6 +120,10 @@ export default function OtpForm({
 			const normalizedRole = String(response.data.user?.role || '').toLowerCase()
 			const role = normalizedRole as UserRole
 
+			// Saving the session is what opens the dashboard: close the keyboard first, and wait until it is gone, so
+			// the next screen never appears with the keyboard still sliding down.
+			await dismissKeyboard()
+
 			await setAuth(
 				role,
 				{
@@ -125,8 +151,6 @@ export default function OtpForm({
 		} catch (err: any) {
 			const errorMsg = err?.response?.data?.message || err?.message || 'Invalid OTP. Please try again.'
 			setError(errorMsg)
-			// Optional: show alert for debugging
-			if (__DEV__) Alert.alert('Verify Error', errorMsg)
 		} finally {
 			verifying.current = false
 			setLoading(false)
@@ -162,7 +186,7 @@ export default function OtpForm({
 	const formatted = `${contactNumber.slice(0, 5)} ${contactNumber.slice(5)}`.trim()
 
 	return (
-		<KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+		<KeyboardLiftView style={styles.flex}>
 			<AuthHeaderMint onBack={onBack} backLabel="Back" step={step}>
 				<View style={styles.art} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
 					<View style={styles.artCircle}>
@@ -250,7 +274,7 @@ export default function OtpForm({
 					loading={loading}
 				/>
 			</AuthFooter>
-		</KeyboardAvoidingView>
+		</KeyboardLiftView>
 	)
 }
 

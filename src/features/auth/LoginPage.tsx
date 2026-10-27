@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import OtpForm from './components/OtpForm'
-import { AuthField, AuthFooter, AuthHero, CtaButton, InfoNote, TermsLine } from './components/AuthKit'
+import { AuthField, AuthFooter, AuthHero, CtaButton, InfoNote, KeyboardLiftView, TermsLine } from './components/AuthKit'
 import { sendOtp } from './authService'
 import { ROUTES } from '../../navigation/routes'
 import type { AuthScreenProps } from '../../navigation/types'
@@ -55,7 +55,7 @@ export default function LoginPage({ navigation }: AuthScreenProps<typeof ROUTES.
 	}
 
 	return (
-		<KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+		<KeyboardLiftView style={styles.container}>
 			<AuthHero title="Welcome back" subtitle="Log in with your mobile number." />
 
 			<ScrollView
@@ -98,7 +98,7 @@ export default function LoginPage({ navigation }: AuthScreenProps<typeof ROUTES.
 				<CtaButton label="Send code" onPress={handleContinue} disabled={!complete} loading={loading} />
 				<TermsLine onOpen={(tab) => navigation.navigate(ROUTES.AUTH.LEGAL, { tab })} />
 			</AuthFooter>
-		</KeyboardAvoidingView>
+		</KeyboardLiftView>
 	)
 }
 
