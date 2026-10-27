@@ -22,6 +22,8 @@ import {
 	SlotChipGrid,
 } from '../../../components/common'
 import { useFamilyMembers } from '../../../hooks/useFamilyMembers'
+import { useBookingRestriction } from '../../appointment/useBookingRestriction'
+import BookingRestrictedBanner from '../../appointment/components/BookingRestrictedBanner'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
 import { formatDateDisplay, formatDateForApi, formatTimeForApi, nextDays } from '../../../utils/date'
@@ -82,6 +84,8 @@ export default function BookSlotPage() {
 	const autoPickRef = useRef(true)
 
 	const { members, addFromDraft } = useFamilyMembers()
+	// Online booking is paused after repeated no-shows: warn here and disable Continue (the server enforces it too).
+	const { restricted, message: restrictedMessage } = useBookingRestriction()
 	const [patientKey, setPatientKey] = useState('self')
 	const [patientSheetVisible, setPatientSheetVisible] = useState(false)
 
@@ -237,6 +241,8 @@ export default function BookSlotPage() {
 				onBack={() => navigation.goBack()}
 				backAccessibilityLabel="Back to profile"
 			/>
+
+			{restricted && <BookingRestrictedBanner message={restrictedMessage} />}
 
 			<ScrollView
 				style={{ flex: 1 }}
@@ -467,7 +473,7 @@ export default function BookSlotPage() {
 			{/* Footer */}
 			<AppFooterBar direction="column" summary={{ icon: 'calendar-blank-outline', text: summary }}>
 				{selectedTime ? (
-					<AppButton size="lg" onPress={handleContinue}>
+					<AppButton size="lg" onPress={handleContinue} disabled={restricted} softDisabled>
 						{`Continue · ${formatInr(fee)}`}
 					</AppButton>
 				) : (

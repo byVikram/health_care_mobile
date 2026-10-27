@@ -104,6 +104,10 @@ export const API_ENDPOINTS = {
 		// directly in that response rather than SMS-ing the patient (see VerifyAccessPage.tsx for why
 		// that matters).
 		VERIFY_ACCESS_OTP: (id: string) => `${BASE_URL}/api/appointments/${id}/verify-otp`,
+		// Patient no-show (PNS) policy: what happened (GET) + the one-time reason reply (POST), and whether online booking is paused.
+		NO_SHOW: (id: string) => `${BASE_URL}/api/appointments/${id}/no-show`,
+		NO_SHOW_REPLY: (id: string) => `${BASE_URL}/api/appointments/${id}/no-show/reply`,
+		BOOKING_RESTRICTION: `${BASE_URL}/api/appointments/me/booking-restriction`,
 	},
 	REVIEWS: {
 		CREATE: `${BASE_URL}/api/reviews`,
