@@ -1,6 +1,6 @@
 // Morning / Afternoon / Evening editor for one day (weekly hours, or one date override): each section
 // lists its time ranges (start – end selects in 30-minute steps inside the section's window, remove
-// button, inline error) with an "Add time" link. `others` feeds clash checks against other places.
+// button, inline error) with a dashed "Add time range" button. `others` feeds clash checks against other places.
 
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -99,7 +99,11 @@ export function DaySections({ day, onChange, others = [] }: DaySectionsProps) {
 											accessibilityRole="button"
 											accessibilityLabel="Remove this time"
 										>
-											<MaterialCommunityIcons name="close" size={18} color={APP_COLORS.danger} />
+											<MaterialCommunityIcons
+												name="trash-can-outline"
+												size={18}
+												color={APP_COLORS.danger}
+											/>
 										</TouchableOpacity>
 									</View>
 									{!!error && <Text style={styles.error}>{error}</Text>}
@@ -112,8 +116,8 @@ export function DaySections({ day, onChange, others = [] }: DaySectionsProps) {
 							accessibilityRole="button"
 							accessibilityLabel={`Add ${meta.label.toLowerCase()} time`}
 						>
-							<MaterialCommunityIcons name="plus" size={16} color={APP_COLORS.primary} />
-							<Text style={styles.addText}>Add time</Text>
+							<MaterialCommunityIcons name="plus" size={14} color={APP_COLORS.primary} />
+							<Text style={styles.addText}>Add time range</Text>
 						</TouchableOpacity>
 					</View>
 				)
@@ -180,12 +184,19 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: APP_COLORS.danger,
 	},
+	// dashed outline button from the availability design: 36 high, radius 8, 1.5 dashed primary, white
 	add: {
 		alignSelf: 'flex-start',
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
-		paddingVertical: 4,
+		height: 36,
+		paddingHorizontal: 12,
+		borderWidth: 1.5,
+		borderStyle: 'dashed',
+		borderColor: APP_COLORS.primary,
+		borderRadius: 8,
+		backgroundColor: APP_COLORS.surface,
 	},
 	addText: {
 		fontSize: 13,
