@@ -272,7 +272,7 @@ function resolveFloatingTab(
 // is chosen so every label fits its slot: four tabs sit 20 from the sides (~83px per slot), three tabs 48 (~92px).
 const LABELLED_BAR_HEIGHT = 66
 const LABELLED_ITEM_HEIGHT = 52
-const PILL_SLIDE_MS = 280
+const PILL_SLIDE_MS = 530
 const sideFor = (tabCount: number) => (tabCount <= 3 ? 48 : 20)
 // Home's Care AI button sits to the right of the patient pill, with this gap between them.
 const CARE_AI_FAB_GAP = 12
