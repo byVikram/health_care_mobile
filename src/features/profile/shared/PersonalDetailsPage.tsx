@@ -215,24 +215,6 @@ export default function PersonalDetailsPage() {
 								{draft.name || 'Your name'}
 							</Text>
 							<Text style={styles.photoSub}>{config.photoSubtitle}</Text>
-							<View style={styles.photoLinks}>
-								<TouchableOpacity
-									onPress={avatar.open}
-									disabled={avatar.busy}
-									accessibilityRole="button"
-								>
-									<Text style={styles.photoLinkText}>{photoUrl ? 'Change photo' : 'Add photo'}</Text>
-								</TouchableOpacity>
-								{avatar.canRemove && (
-									<TouchableOpacity
-										onPress={() => setConfirmDeletePhoto(true)}
-										disabled={avatar.busy}
-										accessibilityRole="button"
-									>
-										<Text style={[styles.photoLinkText, styles.photoLinkDanger]}>Delete photo</Text>
-									</TouchableOpacity>
-								)}
-							</View>
 						</View>
 					</View>
 
@@ -296,7 +278,4 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 		color: APP_COLORS.inkMuted,
 	},
-	photoLinks: { flexDirection: 'row', gap: 16, marginTop: 2 },
-	photoLinkText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.primary },
-	photoLinkDanger: { color: APP_COLORS.danger },
 })

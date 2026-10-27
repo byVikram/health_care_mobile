@@ -1,7 +1,7 @@
 // src/features/ancillary/patient/AncillaryBookVisitPage.tsx
 //
 // "Later · Schedule a visit" for every ancillary type (nursing, home care, physio, rehab, equipment):
-//   1  Which day?   Single visit / Repeat visits, quick picks, a 14-day date grid (multi-select, max 7 visits).
+//   1  Which day?   Single visit / Repeat visits, a 14-day date grid (multi-select, max 7 visits).
 //   2  What time?   ONE time for every visit, hourly 7 AM - 9 PM in Morning / Afternoon / Evening groups;
 //                   today's slots need at least 1 hour of lead time.
 // No provider is chosen here: a verified nurse is assigned 20-30 min before each visit.
@@ -19,7 +19,6 @@ import type { AppStackParamList } from '../../../navigation/types'
 import { formatDateForApi, monthRangeLabel, nextDays } from '../../../utils/date'
 import {
 	AppCartFooter,
-	AppChip,
 	AppInfoBanner,
 	AppScreenHeader,
 	AppSegmentedControl,
@@ -42,12 +41,6 @@ import {
 type Nav = NativeStackNavigationProp<AppStackParamList>
 type Route = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_BOOK_VISIT>
 type Mode = 'single' | 'repeat'
-
-const QUICK_PICKS: { label: string; offsets: number[] }[] = [
-	{ label: 'Daily × 3', offsets: [0, 1, 2] },
-	{ label: 'Daily × 5', offsets: [0, 1, 2, 3, 4] },
-	{ label: 'Every other day × 3', offsets: [0, 2, 4] },
-]
 
 /** Slot hours, 7 AM - 9 PM (the last slot starts at 9 PM). */
 const SLOT_GROUPS: { label: string; fromHour: number; toHour: number }[] = [
@@ -144,8 +137,6 @@ export default function AncillaryBookVisitPage() {
 		setDates([...dates, iso].sort())
 	}
 
-	const pickQuick = (offsets: number[]) => setDates(offsets.map((o) => windowIsos[o]).filter(Boolean))
-
 	const onContinue = () => {
 		if (!done || timeMinutes == null) return
 		const end = hhmm(timeMinutes + visitMinutes)
@@ -159,7 +150,6 @@ export default function AncillaryBookVisitPage() {
 	}
 
 	// ---- Labels ----
-	const datesKey = dates.join(',')
 	const dateHint = isRepeat
 		? n
 			? `${plural(n, 'visit')} selected · tap to add or remove days`
@@ -211,28 +201,6 @@ export default function AncillaryBookVisitPage() {
 						onChange={onModeChange}
 						accessibilityLabel="Visit type"
 					/>
-					{isRepeat && (
-						<View style={styles.quick}>
-							<Text style={styles.quickLabel}>Quick pick</Text>
-							<View style={styles.chips}>
-								{QUICK_PICKS.map((q) => {
-									const iso = q.offsets.map((o) => windowIsos[o]).join(',')
-									return (
-										<AppChip
-											key={q.label}
-											label={q.label}
-											variant="soft"
-											shape="rounded"
-											radius={10}
-											size="sm"
-											selected={iso === datesKey}
-											onPress={() => pickQuick(q.offsets)}
-										/>
-									)
-								})}
-							</View>
-						</View>
-					)}
 					<View style={styles.hintRow}>
 						<Text style={styles.hint}>{dateHint}</Text>
 						<Text style={styles.muted}>{monthRangeLabel(windowDays)}</Text>
@@ -301,9 +269,6 @@ const styles = StyleSheet.create({
 	stepNumText: { fontSize: 12, fontWeight: '800', color: APP_COLORS.surface },
 	stepTitle: { flex: 1, fontSize: 17, lineHeight: 24, fontWeight: '800', color: APP_COLORS.ink },
 	stepRight: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.inkMuted },
-	quick: { gap: 8 },
-	quickLabel: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.inkMuted },
-	chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 	hintRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
 	hint: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.ink },
 	muted: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
