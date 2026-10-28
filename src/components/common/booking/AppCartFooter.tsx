@@ -31,6 +31,8 @@ export type AppCartFooterProps = {
 	onSecondaryCtaPress?: () => void
 	ctaDisabled?: boolean
 	ctaLoading?: boolean
+	/** The Schedule-a-visit footer: no chevron after the CTA label and a heavier (800) total. */
+	plainCta?: boolean
 	/** Defaults to "Add a service to book a nurse visit". */
 	emptyHint?: string
 	style?: StyleProp<ViewStyle>
@@ -47,6 +49,7 @@ export function AppCartFooter({
 	onSecondaryCtaPress,
 	ctaDisabled = false,
 	ctaLoading = false,
+	plainCta = false,
 	emptyHint = 'Add a service to book a nurse visit',
 	style,
 }: AppCartFooterProps) {
@@ -71,7 +74,7 @@ export function AppCartFooter({
 					</Text>
 				)}
 				{!!totalLabel && (
-					<Text style={styles.total} numberOfLines={1}>
+					<Text style={[styles.total, plainCta && styles.totalHeavy]} numberOfLines={1}>
 						{totalLabel}
 					</Text>
 				)}
@@ -106,13 +109,13 @@ export function AppCartFooter({
 			) : (
 				<AppButton
 					size="lg"
-					trailingIcon="chevron-right"
+					trailingIcon={plainCta ? undefined : 'chevron-right'}
 					onPress={onCtaPress}
 					disabled={ctaDisabled}
 					loading={ctaLoading}
 					softDisabled
 					accessibilityLabel={ctaLabel}
-					contentStyle={styles.ctaContent}
+					contentStyle={plainCta ? undefined : styles.ctaContent}
 				>
 					{ctaLabel}
 				</AppButton>
@@ -144,6 +147,10 @@ const styles = StyleSheet.create({
 		lineHeight: 26,
 		fontWeight: '600',
 		color: APP_COLORS.ink,
+	},
+	totalHeavy: {
+		lineHeight: 24,
+		fontWeight: '800',
 	},
 	savings: {
 		fontSize: 12,

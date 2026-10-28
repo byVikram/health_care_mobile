@@ -3,7 +3,7 @@
 // "Later · Review & pay" for every ancillary type: the services, the picked days + one time (Edit -> back),
 // VISIT FOR + VISIT ADDRESS (shared sheets), a note, the bill (price × visits) and the single "Pay after
 // the visit" method. "Confirm booking" -> createAncillaryOrder WITHOUT a provider -> Booking details.
-// A nurse is assigned to each visit 20-30 min before it starts.
+// A nurse is assigned to each visit 1 hour before it starts; a visit can be cancelled free up to 2 hours before.
 
 import React, { useRef, useState } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -24,6 +24,7 @@ import {
 	AppVisitList,
 } from '../../../components/common'
 import { createAncillaryOrder } from '../ancillaryProviderBookingService'
+import { useVisitPolicy } from '../hooks/useVisitPolicy'
 import {
 	capitalize,
 	dayLabel,
@@ -31,6 +32,7 @@ import {
 	itemsDurationLabel,
 	itemsFee,
 	itemsSummary,
+	leadText,
 	plural,
 	providerNoun,
 	selectionFromItems,
@@ -48,10 +50,10 @@ export default function AncillaryReviewPayPage() {
 	const route = useRoute<Route>()
 	const { serviceKey, serviceLabel, items, visits } = route.params
 
+	const policy = useVisitPolicy()
 	const noun = providerNoun(serviceKey)
 	const n = visits.length
 	const fee = itemsFee(items)
-	const total = fee * n
 	const duration = itemsDurationLabel(items)
 
 	const who = useVisitPatientAddress()
@@ -119,7 +121,7 @@ export default function AncillaryReviewPayPage() {
 						<AppInfoBanner
 							tone="sky"
 							icon={null}
-							title={`${capitalize(noun)} assigned 20–30 min before each visit`}
+							title={`${capitalize(noun)} assigned ${leadText(policy.assign_lead_minutes)} before each visit`}
 							subtitle="You’ll get their name, photo and start code then."
 						/>
 					</View>
@@ -153,16 +155,24 @@ export default function AncillaryReviewPayPage() {
 							dashedDividers
 							rows={[
 								{
-									label: `${itemsSummary(items)} · ${inr(fee)} × ${plural(n, 'visit')}`,
-									value: inr(total),
+									label: `${itemsSummary(items)} · per visit`,
+									value: inr(fee),
 								},
 								{ label: 'Visit fee', value: 'Free', tone: 'free' },
-								{ label: 'To pay', value: inr(total), tone: 'total', dividerBefore: true },
+								{
+									label: 'To pay after each visit',
+									value: inr(fee),
+									tone: 'total',
+									dividerBefore: true,
+								},
 							]}
 						/>
 						<Text
 							style={styles.muted}
 						>{`You pay ${inr(fee)} after each visit — nothing is charged now.`}</Text>
+						<Text style={styles.muted}>
+							{`Free cancellation up to ${leadText(policy.cancel_cutoff_minutes)} before each visit.`}
+						</Text>
 					</AppSection>
 
 					<AncillaryPayAfterVisitSection noun={noun} />

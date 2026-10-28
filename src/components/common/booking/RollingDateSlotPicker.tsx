@@ -45,6 +45,8 @@ export interface DateStripProps {
 	strikeDisabled?: boolean
 	/** Accessibility suffix for disabled days, e.g. "clinic closed". */
 	disabledAccessibilityHint?: string
+	/** 'grid' only: 'YYYY-MM-DD' days that get a small dot under the date (e.g. days that already have a visit). */
+	markedDates?: string[]
 }
 
 export function DateStrip({
@@ -59,6 +61,7 @@ export function DateStrip({
 	selectedDates,
 	columns,
 	density = 'regular',
+	markedDates,
 }: DateStripProps) {
 	const upcomingDates = React.useMemo(() => {
 		return Array.from({ length: dayCount }, (_, i) => {
@@ -67,7 +70,6 @@ export function DateStrip({
 			return d
 		})
 	}, [dayCount])
-	const [gridWidth, setGridWidth] = React.useState(0)
 
 	const selectedIso = selectedDate ? formatDateForApi(selectedDate) : ''
 	const isOn = (iso: string) => (selectedDates ? selectedDates.includes(iso) : iso === selectedIso)
@@ -78,65 +80,75 @@ export function DateStrip({
 		const compact = density === 'compact'
 		const cols = columns ?? 0
 		const wrap = cols > 0
-		const colGap = 4
-		// Wrapped grid: fixed cell width from the measured row (same approach as SlotChipGrid's `columns`).
-		const cellWidth: ViewStyle['width'] | undefined = wrap
-			? gridWidth > 0
-				? Math.floor((gridWidth - colGap * (cols - 1)) / cols)
-				: `${Math.floor(100 / cols) - 2}%`
-			: undefined
+		const cells = upcomingDates.map((d) => {
+			const iso = formatDateForApi(d)
+			const disabled = !!isDateDisabled?.(d)
+			const on = isOn(iso) && !disabled
+			const hint = disabled && disabledAccessibilityHint ? `, ${disabledAccessibilityHint}` : ''
+			const isToday = iso === todayIso
+			const dow = isToday ? 'Today' : DOW_LABELS[d.getDay()]
+			return (
+				<TouchableOpacity
+					key={iso}
+					disabled={disabled}
+					onPress={() => onSelectDate(d)}
+					activeOpacity={0.8}
+					accessibilityRole={multi ? 'checkbox' : 'radio'}
+					accessibilityState={{ checked: on, disabled }}
+					accessibilityLabel={`${DOW_LABELS[d.getDay()]} ${d.getDate()} ${MONTH_LONG[d.getMonth()]}${hint}`}
+					style={[
+						styles.gridCell,
+						compact && styles.gridCellCompact,
+						on && styles.cellOn,
+						disabled && styles.gridCellOff,
+					]}
+				>
+					<AppTypography
+						style={[
+							compact ? styles.gridDowCompact : styles.gridDow,
+							on && styles.textOn,
+							disabled && styles.textOff,
+						]}
+					>
+						{compact ? dow.toUpperCase() : dow}
+					</AppTypography>
+					<AppTypography
+						style={[
+							compact ? styles.gridNumCompact : styles.gridNum,
+							on && styles.textOn,
+							disabled && styles.textOff,
+							disabled && strikeDisabled && styles.struck,
+						]}
+					>
+						{d.getDate()}
+					</AppTypography>
+					{markedDates?.includes(iso) && <View style={styles.markDot} />}
+				</TouchableOpacity>
+			)
+		})
+
+		if (!wrap) {
+			return (
+				<View style={[styles.dateGrid, style]} accessibilityRole={multi ? undefined : 'radiogroup'}>
+					{cells}
+				</View>
+			)
+		}
+		// Wrapped grid (e.g. 7 columns x 2 weeks): one row per `cols` days, every cell flex: 1, so the columns are
+		// always equal and nothing depends on a measured width (a late or zero measurement used to squash the days
+		// into thin lines). A short last row is padded with empty cells to keep the same column width.
+		const rows: React.ReactNode[][] = []
+		for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols))
 		return (
-			<View
-				style={[styles.dateGrid, wrap && styles.dateGridWrap, style]}
-				onLayout={wrap ? (e) => setGridWidth(e.nativeEvent.layout.width) : undefined}
-				accessibilityRole={multi ? undefined : 'radiogroup'}
-			>
-				{upcomingDates.map((d) => {
-					const iso = formatDateForApi(d)
-					const disabled = !!isDateDisabled?.(d)
-					const on = isOn(iso) && !disabled
-					const hint = disabled && disabledAccessibilityHint ? `, ${disabledAccessibilityHint}` : ''
-					const isToday = iso === todayIso
-					const dow = isToday ? 'Today' : DOW_LABELS[d.getDay()]
-					return (
-						<TouchableOpacity
-							key={iso}
-							disabled={disabled}
-							onPress={() => onSelectDate(d)}
-							activeOpacity={0.8}
-							accessibilityRole={multi ? 'checkbox' : 'radio'}
-							accessibilityState={{ checked: on, disabled }}
-							accessibilityLabel={`${DOW_LABELS[d.getDay()]} ${d.getDate()} ${MONTH_LONG[d.getMonth()]}${hint}`}
-							style={[
-								styles.gridCell,
-								compact && styles.gridCellCompact,
-								wrap && { width: cellWidth, flex: 0 },
-								on && styles.cellOn,
-								disabled && styles.gridCellOff,
-							]}
-						>
-							<AppTypography
-								style={[
-									compact ? styles.gridDowCompact : styles.gridDow,
-									on && styles.textOn,
-									disabled && styles.textOff,
-								]}
-							>
-								{compact ? dow.toUpperCase() : dow}
-							</AppTypography>
-							<AppTypography
-								style={[
-									compact ? styles.gridNumCompact : styles.gridNum,
-									on && styles.textOn,
-									disabled && styles.textOff,
-									disabled && strikeDisabled && styles.struck,
-								]}
-							>
-								{d.getDate()}
-							</AppTypography>
-						</TouchableOpacity>
-					)
-				})}
+			<View style={[styles.dateGridRows, style]} accessibilityRole={multi ? undefined : 'radiogroup'}>
+				{rows.map((row, r) => (
+					<View key={r} style={styles.dateGrid}>
+						{row}
+						{Array.from({ length: cols - row.length }, (_, k) => (
+							<View key={`pad-${k}`} style={styles.gridPad} />
+						))}
+					</View>
+				))}
 			</View>
 		)
 	}
@@ -215,13 +227,26 @@ export interface SlotChipGridProps {
 	 * 44h cells, radius 12, APP_COLORS colours. Omit to keep the existing wrapping chips.
 	 */
 	columns?: number
+	/**
+	 * `columns` grid only. 'compact' = the Schedule-a-visit chip (38h, radius 10, 12/700, 6px gaps, a
+	 * booked/too-soon cell keeps its divider border); 'tight' = the Reschedule-visit sheet chip (36h, radius 8).
+	 * Defaults to 'regular' (44h, radius 12, 8px gaps).
+	 */
+	density?: 'regular' | 'compact' | 'tight'
 }
 
 const GRID_GAP = 8
+const COMPACT_GRID_GAP = 6
 
-export function SlotChipGrid({ slots, selectedValue, onSelectValue, emptyLabel, style, columns }: SlotChipGridProps) {
-	const [gridWidth, setGridWidth] = React.useState(0)
-
+export function SlotChipGrid({
+	slots,
+	selectedValue,
+	onSelectValue,
+	emptyLabel,
+	style,
+	columns,
+	density = 'regular',
+}: SlotChipGridProps) {
 	if (slots.length === 0) {
 		return emptyLabel ? (
 			<AppTypography variant="caption" style={styles.noSlotsText}>
@@ -231,51 +256,57 @@ export function SlotChipGrid({ slots, selectedValue, onSelectValue, emptyLabel, 
 	}
 
 	if (columns && columns > 0) {
-		// Measure the row so cells are exactly (width - gaps) / columns; before the first layout
-		// pass fall back to a percentage that fits.
-		const cellWidth: ViewStyle['width'] =
-			gridWidth > 0
-				? Math.floor((gridWidth - GRID_GAP * (columns - 1)) / columns)
-				: `${Math.floor(100 / columns) - 3}%`
+		// One row per `columns` slots, every cell flex: 1, so the columns are always equal and nothing depends on a
+		// measured width (a late or zero measurement squashed the cells). A short last row is padded with empty cells.
+		const gap = density === 'regular' ? GRID_GAP : COMPACT_GRID_GAP
+		const cells = slots.map((slot) => {
+			const off = !!slot.disabled || !!slot.struck
+			const on = selectedValue === slot.value && !off
+			const state = slot.struck ? ', booked' : off ? ', unavailable' : on ? ', selected' : ''
+			return (
+				<TouchableOpacity
+					key={slot.value}
+					disabled={off}
+					onPress={() => onSelectValue(slot.value)}
+					activeOpacity={0.8}
+					accessibilityRole="radio"
+					accessibilityState={{ checked: on, disabled: off }}
+					accessibilityLabel={slot.accessibilityLabel ?? `${slot.label}${state}`}
+					style={[
+						styles.gridSlot,
+						density === 'compact' && styles.gridSlotCompact,
+						density === 'tight' && styles.gridSlotTight,
+						on && styles.cellOn,
+						off && styles.gridSlotOff,
+						off && density !== 'regular' && styles.gridSlotOffBordered,
+					]}
+				>
+					<AppTypography
+						style={[
+							styles.gridSlotText,
+							density !== 'regular' && styles.gridSlotTextCompact,
+							on && styles.textOn,
+							off && styles.textOff,
+							slot.struck && styles.struck,
+						]}
+					>
+						{slot.label}
+					</AppTypography>
+				</TouchableOpacity>
+			)
+		})
+		const rows: React.ReactNode[][] = []
+		for (let i = 0; i < cells.length; i += columns) rows.push(cells.slice(i, i + columns))
 		return (
-			<View
-				style={[styles.slotsGridFlex, style]}
-				onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}
-				accessibilityRole="radiogroup"
-			>
-				{slots.map((slot) => {
-					const off = !!slot.disabled || !!slot.struck
-					const on = selectedValue === slot.value && !off
-					const state = slot.struck ? ', booked' : off ? ', unavailable' : on ? ', selected' : ''
-					return (
-						<TouchableOpacity
-							key={slot.value}
-							disabled={off}
-							onPress={() => onSelectValue(slot.value)}
-							activeOpacity={0.8}
-							accessibilityRole="radio"
-							accessibilityState={{ checked: on, disabled: off }}
-							accessibilityLabel={slot.accessibilityLabel ?? `${slot.label}${state}`}
-							style={[
-								styles.gridSlot,
-								{ width: cellWidth },
-								on && styles.cellOn,
-								off && styles.gridSlotOff,
-							]}
-						>
-							<AppTypography
-								style={[
-									styles.gridSlotText,
-									on && styles.textOn,
-									off && styles.textOff,
-									slot.struck && styles.struck,
-								]}
-							>
-								{slot.label}
-							</AppTypography>
-						</TouchableOpacity>
-					)
-				})}
+			<View style={[{ gap }, style]} accessibilityRole="radiogroup">
+				{rows.map((row, r) => (
+					<View key={r} style={[styles.slotRow, { gap }]}>
+						{row}
+						{Array.from({ length: columns - row.length }, (_, k) => (
+							<View key={`pad-${k}`} style={styles.gridSlotPad} />
+						))}
+					</View>
+				))}
 			</View>
 		)
 	}
@@ -390,8 +421,12 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		gap: 4,
 	},
-	dateGridWrap: {
-		flexWrap: 'wrap',
+	dateGridRows: {
+		gap: 4,
+	},
+	gridPad: {
+		flex: 1,
+		minWidth: 0,
 	},
 	gridCell: {
 		flex: 1,
@@ -438,6 +473,14 @@ const styles = StyleSheet.create({
 		fontWeight: '800',
 		color: APP_COLORS.ink,
 	},
+	markDot: {
+		position: 'absolute',
+		bottom: 4,
+		width: 4,
+		height: 4,
+		borderRadius: 9999,
+		backgroundColor: APP_COLORS.inkDisabled,
+	},
 	cellOn: {
 		backgroundColor: APP_COLORS.primary,
 		borderColor: APP_COLORS.primary,
@@ -451,7 +494,16 @@ const styles = StyleSheet.create({
 	struck: {
 		textDecorationLine: 'line-through',
 	},
+	slotRow: {
+		flexDirection: 'row',
+	},
+	gridSlotPad: {
+		flex: 1,
+		minWidth: 0,
+	},
 	gridSlot: {
+		flex: 1,
+		minWidth: 0,
 		height: 44,
 		borderRadius: 12,
 		borderWidth: 1,
@@ -469,5 +521,21 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 		fontWeight: '600',
 		color: APP_COLORS.ink,
+	},
+	gridSlotCompact: {
+		height: 38,
+		borderRadius: 10,
+	},
+	gridSlotTight: {
+		height: 36,
+		borderRadius: 8,
+	},
+	gridSlotOffBordered: {
+		borderColor: APP_COLORS.divider,
+	},
+	gridSlotTextCompact: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
 	},
 })
