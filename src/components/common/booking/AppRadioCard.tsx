@@ -7,6 +7,9 @@
 //   variant 'row' — "Where should the nurse come?" saved-address rows: min-height 72, APP_COLORS.divider bottom
 //       border, no card chrome; 48px tile on APP_COLORS.pageBg, selected = APP_COLORS.mint tile with a 2px
 //       APP_COLORS.primary ring.
+//   variant 'option' — Schedule a visit "Single visit / Repeat visits": a plain choice card (no tile, no radio):
+//       padding 12, radius 12, 2px border, white; selected = APP_COLORS.primary border on APP_COLORS.mint;
+//       title 15/20 800 ink, subtitle 12/16 muted. Put two in a row with `style={{ flex: 1 }}`.
 // Title 15/22 700 (card) or 16/22 700 (row) ink, subtitle 13/18 muted (2 lines), optional trailing node
 // (e.g. an AppIconButton "Directions"), then an AppRadio. The whole row is one accessibilityRole="radio"
 // pressable; the trailing node stays a separate touch target.
@@ -35,7 +38,7 @@ export type AppRadioCardProps = {
 	leading?: React.ReactNode
 	/** Node between the text and the radio (e.g. <AppIconButton icon="directions" … />). */
 	trailing?: React.ReactNode
-	variant?: 'card' | 'row'
+	variant?: 'card' | 'row' | 'option'
 	/** Hides the bottom divider in 'row' variant (e.g. the last row). */
 	last?: boolean
 	disabled?: boolean
@@ -63,6 +66,23 @@ export function AppRadioCard({
 }: AppRadioCardProps) {
 	const isRow = variant === 'row'
 	const pair = TONES[tone ?? 'mint']
+
+	if (variant === 'option') {
+		return (
+			<Pressable
+				onPress={onPress}
+				disabled={disabled}
+				accessibilityRole="radio"
+				accessibilityState={{ checked: selected, disabled }}
+				accessibilityLabel={accessibilityLabel ?? [title, subtitle].filter(Boolean).join('. ')}
+				accessibilityHint={accessibilityHint}
+				style={[styles.option, selected && styles.optionOn, disabled && styles.disabled, style]}
+			>
+				<Text style={styles.titleOption}>{title}</Text>
+				{!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+			</Pressable>
+		)
+	}
 
 	let lead: React.ReactNode = leading ?? null
 	if (!leading && icon) {
@@ -156,6 +176,25 @@ const styles = StyleSheet.create({
 		minHeight: 72,
 		borderBottomWidth: 1,
 		borderBottomColor: APP_COLORS.divider,
+	},
+	option: {
+		minWidth: 0,
+		gap: 2,
+		padding: 12,
+		borderRadius: 12,
+		borderWidth: 2,
+		borderColor: APP_COLORS.divider,
+		backgroundColor: APP_COLORS.surface,
+	},
+	optionOn: {
+		borderColor: APP_COLORS.primary,
+		backgroundColor: APP_COLORS.mint,
+	},
+	titleOption: {
+		fontSize: 15,
+		lineHeight: 20,
+		fontWeight: '800',
+		color: APP_COLORS.ink,
 	},
 	rowLast: {
 		borderBottomWidth: 0,

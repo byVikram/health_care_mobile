@@ -258,6 +258,9 @@ export const API_ENDPOINTS = {
 		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
 		TIP: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/tip`,
 		CANCEL_PATIENT: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/cancel`,
+		CANCEL_VISITS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/visits/cancel`,
+		RESCHEDULE_VISIT: (id: string, visitId: string) =>
+			`${BASE_URL}/api/ancillary/patient/requests/${id}/visits/${visitId}/reschedule`,
 		CANCEL_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/cancel`,
 		REJECT_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/reject`,
 		MY_REQUESTS: `${BASE_URL}/api/ancillary/patient/requests/my`,

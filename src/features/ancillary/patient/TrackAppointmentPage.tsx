@@ -5,7 +5,7 @@ import { ROUTES } from '../../../navigation/routes'
 import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
 import StatusModal from '../../../components/common/feedback/StatusModal'
 import NurseMapTracker from '../components/NurseMapTracker'
-import HomeCareVisitView, { type TrackingVisit } from './HomeCareVisitView'
+import HomeCareVisitView, { currentVisitOf, type TrackingVisit } from './HomeCareVisitView'
 import { showComingSoon } from '../../../utils/toast'
 import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
 import ServiceMatchingPage from './ServiceMatchingPage'
@@ -17,6 +17,11 @@ import {
 	cancelCareRequestPatientBackend,
 } from '../ancillaryService'
 import CancellationDetailsModal from './CancellationDetailsModal'
+import { useVisitPolicy } from '../hooks/useVisitPolicy'
+import { dayLabel, inr, providerNoun, timeLabel } from './ancillaryBookingCopy'
+import { CancelVisitsSheet } from '../components/CancelVisitsSheet'
+import { lockedReason } from './scheduledVisitView'
+import { useVisitEdits } from './useVisitEdits'
 import ApiService from '../../../services/apiService'
 import { openAuthedSocket, type AuthedSocketHandle } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
@@ -56,6 +61,8 @@ export interface AncillaryTrackingResponse {
 	requestId?: string
 	status?: string
 	bookingType?: string
+	/** The websocket order push spells it this way. */
+	booking_type?: string
 	serviceName?: string
 	procedureDetails?: string
 	assignedProvider?: AncillaryProviderInfo | null
@@ -78,6 +85,8 @@ export interface AncillaryTrackingResponse {
 	/** Structured visit address ({street_address, label}); the legacy `address` field stays a plain string. */
 	address_detail?: { street_address?: string; label?: string | null } | null
 	totals?: { per_visit: number; visits_count: number; total: number }
+	/** Home-care speciality (key = catalogue slug), used for "nurse" / "physiotherapist" wording. */
+	specialty?: { key?: string | null; label?: string | null } | string | null
 	/** One entry per visit, with the patient's start / completion codes and the live task checklist. */
 	visits?: TrackingVisit[]
 }
@@ -95,6 +104,16 @@ const ASSIGNED_STATUSES = new Set([
 ])
 
 const CANCELLED_STATUSES = new Set(['CANCELLED', 'CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED'])
+
+/** A "Later" order: its visits are shown before any provider is assigned (they are assigned an hour before each visit). */
+const isScheduledOrder = (d?: { bookingType?: string; booking_type?: string } | null) =>
+	String(d?.bookingType ?? d?.booking_type ?? '').toUpperCase() === 'SCHEDULED'
+
+/** A websocket order push carries visits without the codes / tasks the status endpoint adds: keep what we already had. */
+const mergeVisits = (prev?: TrackingVisit[], next?: TrackingVisit[]) =>
+	next && prev
+		? next.map((v) => ({ ...(prev.find((o) => o.visit_public_id === v.visit_public_id) ?? {}), ...v }))
+		: (next ?? prev)
 
 const hasConfirmedProvider = (prov?: AncillaryProviderInfo | null, st?: string): boolean => {
 	const statusUpper = String(st || '').toUpperCase()
@@ -175,11 +194,43 @@ export default function TrackAppointmentPage() {
 		liveProvider || bookingData.assignedProvider || bookingData.provider || null
 
 	const isAssigned = hasConfirmedProvider(provider, liveStatus)
+	const visitPolicy = useVisitPolicy()
+	// A scheduled visit is cancelled on its own (a reason, within the server's cutoff), not the whole booking.
+	const [visitCancelOpen, setVisitCancelOpen] = useState(false)
+	const { cancelling: visitCancelling, cancelVisits } = useVisitEdits(bookingId, async () => {})
+	const specialty = liveOrder?.specialty
+	const scheduledNoun = providerNoun(typeof specialty === 'string' ? specialty : (specialty?.key ?? ''))
+	const isScheduled = isScheduledOrder(liveOrder) || isScheduledOrder(bookingData)
+	// The visit this screen is about (the same rule HomeCareVisitView uses), and -- for a scheduled order, where every
+	// visit has its own provider -- that visit's provider, never the order-level one (the next open visit's).
+	const focusedVisit = currentVisitOf(liveOrder?.visits ?? [], route.params?.visitId)
+	const visitProvider = focusedVisit?.provider
+	const shownProvider: AncillaryProviderInfo | null = isScheduled
+		? visitProvider
+			? {
+					id: visitProvider.provider_public_id,
+					name: visitProvider.name,
+					role: null,
+					specialization: null,
+					licenseNumber: null,
+					qualifications: null,
+					experienceYears: visitProvider.experience_years ?? null,
+					rating: null,
+					totalVisits: null,
+					avatar: visitProvider.avatar_url ?? null,
+					phone: visitProvider.phone ?? null,
+					currentLat: null,
+					currentLng: null,
+				}
+			: null
+		: provider
 
 	// The long-lived socket/poll effect below only re-runs on bookingId, so its closures would
 	// otherwise keep the first render's provider/title/address. Read them through this ref.
 	const liveRef = React.useRef({ provider: liveProvider, title: liveServiceTitle, address: liveAddress })
 	liveRef.current = { provider: liveProvider, title: liveServiceTitle, address: liveAddress }
+	// Once an order is known to be scheduled it stays so, whatever shape the next update comes in.
+	const scheduledRef = React.useRef(isScheduledOrder(bookingData))
 
 	React.useEffect(() => {
 		let socket: AuthedSocketHandle | null = null
@@ -202,8 +253,9 @@ export default function TrackAppointmentPage() {
 			if (!data || !isMounted) return
 			const st = String(data.status || '').toUpperCase()
 			const currentProv = data.assignedProvider !== undefined ? data.assignedProvider : liveRef.current.provider
+			if (isScheduledOrder(data)) scheduledRef.current = true
 
-			if (!hasConfirmedProvider(currentProv, st) && st !== 'COMPLETED') {
+			if (!hasConfirmedProvider(currentProv, st) && st !== 'COMPLETED' && !scheduledRef.current) {
 				redirectToMatching(
 					data.serviceName || liveRef.current.title,
 					data.streetAddress || liveRef.current.address
@@ -211,7 +263,7 @@ export default function TrackAppointmentPage() {
 				return
 			}
 
-			setLiveOrder((prev) => ({ ...(prev || {}), ...data }))
+			setLiveOrder((prev) => ({ ...(prev || {}), ...data, visits: mergeVisits(prev?.visits, data.visits) }))
 			if (st) {
 				setLiveStatus(st)
 				liveStatusRef.current = st
@@ -253,7 +305,8 @@ export default function TrackAppointmentPage() {
 				const st = String(data?.status || '').toUpperCase()
 				const prov = data?.assignedProvider || null
 
-				if (!hasConfirmedProvider(prov, st) && st !== 'COMPLETED') {
+				if (isScheduledOrder(data)) scheduledRef.current = true
+				if (!hasConfirmedProvider(prov, st) && st !== 'COMPLETED' && !scheduledRef.current) {
 					// Provider is NOT assigned yet according to backend.
 					// Route back to the existing provider search/selection page.
 					redirectToMatching(
@@ -322,7 +375,7 @@ export default function TrackAppointmentPage() {
 	}, [bookingId, isCompleted])
 
 	React.useEffect(() => {
-		if (!isInitializing && !isAssigned && !isCompleted) {
+		if (!isInitializing && !isAssigned && !isCompleted && !isScheduled) {
 			navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId,
 				serviceName: liveServiceTitle || bookingData.serviceName,
@@ -330,11 +383,11 @@ export default function TrackAppointmentPage() {
 				bookingPayload: bookingData,
 			})
 		}
-	}, [isInitializing, isAssigned, isCompleted, bookingId, liveServiceTitle, liveAddress, navigation])
+	}, [isInitializing, isAssigned, isCompleted, isScheduled, bookingId, liveServiceTitle, liveAddress, navigation])
 
 	const handleCallProvider = () => {
-		if (!provider?.phone) return
-		Linking.openURL(`tel:${provider.phone}`)
+		if (!shownProvider?.phone) return
+		Linking.openURL(`tel:${shownProvider.phone}`)
 	}
 
 	const handleCancelRequestWithReason = async (reason: string) => {
@@ -417,7 +470,7 @@ export default function TrackAppointmentPage() {
 		review: reviewData || undefined,
 	}
 
-	if (isInitializing || !isAssigned) {
+	if (isInitializing || (!isAssigned && !isScheduled)) {
 		return (
 			<View style={styles.container}>
 				<AppScreenHeader
@@ -458,8 +511,18 @@ export default function TrackAppointmentPage() {
 			<HomeCareVisitView
 				orderRef={bookingId}
 				status={liveStatus}
-				provider={provider}
+				provider={shownProvider}
 				visits={liveOrder?.visits ?? []}
+				focusVisitId={route.params?.visitId}
+				scheduled={
+					isScheduled
+						? {
+								noun: scheduledNoun,
+								leadMinutes: visitPolicy.assign_lead_minutes,
+								canCancel: !!focusedVisit && focusedVisit.can_cancel !== false,
+							}
+						: undefined
+				}
 				serviceName={liveServiceTitle}
 				serviceSub={serviceSub}
 				patientName={liveOrder?.patientName}
@@ -483,7 +546,7 @@ export default function TrackAppointmentPage() {
 						/>
 					) : null
 				}
-				review={{ data: reviewData, canRate: !!provider?.id, onOpen: () => setReviewModalVisible(true) }}
+				review={{ data: reviewData, canRate: !!shownProvider?.id, onOpen: () => setReviewModalVisible(true) }}
 				onBack={() => {
 					if (navigation.canGoBack()) navigation.goBack()
 					else navigation.navigate(ROUTES.MAIN.TABS)
@@ -492,7 +555,7 @@ export default function TrackAppointmentPage() {
 				onHelp={handleHelp}
 				onCall={handleCallProvider}
 				onMessage={handleMessage}
-				onCancel={() => setCancelModalVisible(true)}
+				onCancel={() => (isScheduled ? setVisitCancelOpen(true) : setCancelModalVisible(true))}
 			/>
 
 			{/* Review Bottom Sheet */}
@@ -515,6 +578,37 @@ export default function TrackAppointmentPage() {
 					submitText={statusModal.status === 'error' ? 'OK' : 'Done'}
 					onSubmit={() => setStatusModal(null)}
 					onCancel={() => setStatusModal(null)}
+				/>
+			)}
+
+			{isScheduled && !!focusedVisit && (
+				<CancelVisitsSheet
+					visible={visitCancelOpen}
+					rows={[
+						{
+							id: focusedVisit.visit_public_id,
+							title: `Visit ${focusedVisit.index ?? 1} · ${focusedVisit.date ? dayLabel(focusedVisit.date) : ''}`,
+							sub: focusedVisit.start_time ? timeLabel(focusedVisit.start_time) : '',
+							fee: inr(liveOrder?.totals?.per_visit ?? 0),
+							canCancel: focusedVisit.can_cancel !== false,
+							lockedNote: lockedReason(
+								focusedVisit.status,
+								!!shownProvider,
+								scheduledNoun,
+								visitPolicy.cancel_cutoff_minutes
+							),
+						},
+					]}
+					initialId={focusedVisit.visit_public_id}
+					busy={visitCancelling}
+					onClose={() => setVisitCancelOpen(false)}
+					onConfirm={async (ids, reason) => {
+						if (!(await cancelVisits(ids, reason))) return
+						setVisitCancelOpen(false)
+						// Booking details refreshes when it comes back into focus.
+						if (navigation.canGoBack()) navigation.goBack()
+						else navigation.replace(ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS, { requestId: bookingId })
+					}}
 				/>
 			)}
 

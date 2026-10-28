@@ -2,37 +2,42 @@
 //
 // "Later · Schedule a visit" for every ancillary type (nursing, home care, physio, rehab, equipment):
 //   1  Which day?   Single visit / Repeat visits, a 14-day date grid (multi-select, max 7 visits).
-//   2  What time?   ONE time for every visit, hourly 7 AM - 9 PM in Morning / Afternoon / Evening groups;
-//                   today's slots need at least 1 hour of lead time.
-// No provider is chosen here: a verified nurse is assigned 20-30 min before each visit.
+//   2  What time?   Hourly 7 AM - 9 PM in Morning / Afternoon / Evening groups; today's slots need at least
+//                   1 hour of lead time. Repeat visits on several days: "Same time daily" (one time for every
+//                   visit) or "Different times" (a tab per day, each with its own time).
+// No provider is chosen here: a verified provider is assigned 1 hour before each visit (and can differ per visit).
 // Footer: visits + time summary, total, Review -> Review & pay.
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RouteProp } from '@react-navigation/native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
 import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
-import { formatDateForApi, monthRangeLabel, nextDays } from '../../../utils/date'
+import { DOW_LABELS, formatDateForApi, monthRangeLabel, nextDays, parseDateOnly } from '../../../utils/date'
 import {
 	AppCartFooter,
-	AppInfoBanner,
+	AppRadioCard,
 	AppScreenHeader,
 	AppSegmentedControl,
 	DateStrip,
 	SlotChipGrid,
 } from '../../../components/common'
-import type { SlotChipItem } from '../../../components/common'
 import { ANCILLARY_BOOKING_MAX_VISITS, ANCILLARY_BOOKING_WINDOW_DAYS } from '../ancillaryProviderBookingService'
+import { DayTimeTabs } from '../components/DayTimeTabs'
+import { useNow } from '../hooks/useNow'
+import { useVisitPolicy } from '../hooks/useVisitPolicy'
+import { buildSlotGroups, hhmm, minutesNow, minutesOf } from '../utils/visitSlots'
 import {
-	chipTimeLabel,
 	dayLabel,
 	inr,
 	itemsFee,
 	itemsSummary,
+	leadText,
 	plural,
 	providerNoun,
 	timeLabel,
@@ -42,21 +47,7 @@ type Nav = NativeStackNavigationProp<AppStackParamList>
 type Route = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_BOOK_VISIT>
 type Mode = 'single' | 'repeat'
 
-/** Slot hours, 7 AM - 9 PM (the last slot starts at 9 PM). */
-const SLOT_GROUPS: { label: string; fromHour: number; toHour: number }[] = [
-	{ label: 'Morning', fromHour: 7, toHour: 11 },
-	{ label: 'Afternoon', fromHour: 12, toHour: 16 },
-	{ label: 'Evening', fromHour: 17, toHour: 21 },
-]
-
-/** Today's slots must start at least this long from now. */
-const LEAD_MINUTES = 60
 const DEFAULT_VISIT_MINUTES = 60
-
-const hhmm = (minutes: number) => {
-	const m = Math.min(minutes, 23 * 60 + 59)
-	return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
-}
 
 function StepTitle({ n, title, right }: { n: number; title: string; right?: string }) {
 	return (
@@ -75,9 +66,9 @@ function StepTitle({ n, title, right }: { n: number; title: string; right?: stri
 export default function AncillaryBookVisitPage() {
 	const navigation = useNavigation<Nav>()
 	const route = useRoute<Route>()
-	const params = route.params
-	const { serviceKey, serviceLabel, items, initialDates } = params
+	const { serviceKey, serviceLabel, items, initialDates } = route.params
 
+	const leadMinutes = useVisitPolicy().assign_lead_minutes
 	const noun = providerNoun(serviceKey)
 	const fee = itemsFee(items)
 	const visitMinutes = useMemo(() => {
@@ -97,22 +88,32 @@ export default function AncillaryBookVisitPage() {
 
 	const [mode, setMode] = useState<Mode>(startDates.length > 1 ? 'repeat' : 'single')
 	const [dates, setDates] = useState<string[]>(startDates)
-	const [time, setTime] = useState<string | null>(null) // "HH:MM"
+	const [sameTime, setSameTime] = useState(true)
+	const [time, setTime] = useState<string | null>(null) // "HH:MM", the one time when `sameTime`
+	const [times, setTimes] = useState<Record<string, string>>({}) // date -> "HH:MM" when the times differ
+	const [activeDay, setActiveDay] = useState<string | null>(null)
 	// Re-evaluated every minute so "too soon" slots stay correct while the screen is open.
-	const [now, setNow] = useState(() => new Date())
-	useEffect(() => {
-		const id = setInterval(() => setNow(new Date()), 60000)
-		return () => clearInterval(id)
-	}, [])
+	const nowMin = minutesNow(useNow())
 
 	const isRepeat = mode === 'repeat'
 	const n = dates.length
 	const hasToday = dates.includes(todayIso)
-	const nowMinutes = now.getHours() * 60 + now.getMinutes()
-	const slotOk = (startMinutes: number) => !(hasToday && startMinutes < nowMinutes + LEAD_MINUTES)
-	const timeMinutes = time ? Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5)) : null
-	const timeValid = timeMinutes != null && slotOk(timeMinutes)
-	const done = n > 0 && timeValid
+	const multi = isRepeat && n > 1
+	const perDay = multi && !sameTime
+
+	/** Today's slots must start at least leadMinutes from now. */
+	const okOn = (iso: string, startMinutes: number) => !(iso === todayIso && startMinutes < nowMin + leadMinutes)
+	const okSame = (startMinutes: number) => !(hasToday && startMinutes < nowMin + leadMinutes)
+	const timeOf = (iso: string) => {
+		const t = times[iso]
+		return t !== undefined && okOn(iso, minutesOf(t)) ? t : null
+	}
+
+	const active = perDay ? (activeDay && dates.includes(activeDay) ? activeDay : dates[0]) : null
+	const sameTimeValue = time !== null && okSame(minutesOf(time)) ? time : null
+	const shownTime = perDay && active ? timeOf(active) : sameTimeValue
+	const missing = perDay ? dates.filter((d) => timeOf(d) === null).length : 0
+	const done = n > 0 && (perDay ? missing === 0 : sameTimeValue !== null)
 
 	// ---- Actions ----
 	const onModeChange = (m: Mode) => {
@@ -137,15 +138,42 @@ export default function AncillaryBookVisitPage() {
 		setDates([...dates, iso].sort())
 	}
 
+	const onTimeModeChange = (same: boolean) => {
+		if (!same && sameTimeValue !== null) {
+			// Start "Different times" from the time already picked, on every day it still works for.
+			const copy = { ...times }
+			dates.forEach((d) => {
+				if (copy[d] === undefined && okOn(d, minutesOf(sameTimeValue))) copy[d] = sameTimeValue
+			})
+			setTimes(copy)
+		}
+		setSameTime(same)
+	}
+
+	const onPickTime = (value: string) => {
+		if (!perDay || !active) {
+			setTime(value)
+			return
+		}
+		const next = { ...times, [active]: value }
+		setTimes(next)
+		// Move on to the next day that still needs a time.
+		const needs = dates.find((d) => d !== active && !(next[d] !== undefined && okOn(d, minutesOf(next[d]))))
+		setActiveDay(needs ?? active)
+	}
+
 	const onContinue = () => {
-		if (!done || timeMinutes == null) return
-		const end = hhmm(timeMinutes + visitMinutes)
+		if (!done) return
+		const visits = dates.map((date) => {
+			const start = (perDay ? timeOf(date) : sameTimeValue) as string
+			return { date, start_time: start, end_time: hhmm(minutesOf(start) + visitMinutes) }
+		})
 		navigation.navigate(ROUTES.STACK.ANCILLARY_REVIEW_PAY, {
 			serviceKey,
 			serviceLabel,
 			items,
 			initialDates: dates,
-			visits: dates.map((date) => ({ date, start_time: time as string, end_time: end })),
+			visits,
 		})
 	}
 
@@ -158,24 +186,38 @@ export default function AncillaryBookVisitPage() {
 			? `Visit on ${dayLabel(dates[0])}`
 			: 'Pick a day'
 
-	const timeHint = isRepeat && n > 1 ? 'Same time for all visits' : hasToday ? 'At least 1 hr from now' : ''
+	const timeHint = perDay
+		? missing
+			? `${missing} left`
+			: 'All set'
+		: hasToday
+			? `At least ${leadText(leadMinutes)} from now`
+			: ''
 
-	const groups = SLOT_GROUPS.map((g) => {
-		const slots: SlotChipItem[] = []
-		for (let h = g.fromHour; h <= g.toHour; h++) {
-			const value = hhmm(h * 60)
-			const ok = slotOk(h * 60)
-			slots.push({
-				value,
-				label: chipTimeLabel(value),
-				struck: !ok,
-				accessibilityLabel: `${timeLabel(value)}${ok ? '' : ', too soon'}`,
-			})
+	const groups = buildSlotGroups((startMinutes) =>
+		perDay && active ? okOn(active, startMinutes) : okSame(startMinutes)
+	)
+
+	const dayTabs = dates.map((iso) => {
+		const d = parseDateOnly(iso)
+		const t = timeOf(iso)
+		return {
+			key: iso,
+			day: iso === todayIso ? 'Today' : `${DOW_LABELS[d?.getDay() ?? 0]} ${d?.getDate() ?? ''}`,
+			time: t ? timeLabel(t) : null,
+			accessibilityLabel: `${dayLabel(iso)}, ${t ? timeLabel(t) : 'pick a time'}`,
 		}
-		return { label: g.label, slots }
 	})
 
-	const summary = n ? `${plural(n, 'visit')} · ${done && time ? timeLabel(time) : 'pick a time'}` : 'Pick your days'
+	const summary = n
+		? `${plural(n, 'visit')}${
+				done
+					? ` · ${perDay ? 'different times' : timeLabel(sameTimeValue as string)}`
+					: perDay
+						? ` · ${plural(missing, 'time')} to pick`
+						: ' · pick a time'
+			}`
+		: 'Pick your days'
 	const ctaLabel = done ? 'Review' : !n ? 'Pick days' : 'Pick time'
 	const headerSub = [itemsSummary(items), fee > 0 ? `${inr(fee)} per visit` : ''].filter(Boolean).join(' · ')
 
@@ -192,15 +234,24 @@ export default function AncillaryBookVisitPage() {
 				{/* 1 · Which day */}
 				<View style={styles.section}>
 					<StepTitle n={1} title="Which day?" />
-					<AppSegmentedControl<Mode>
-						options={[
-							{ value: 'single', label: 'Single visit' },
-							{ value: 'repeat', label: 'Repeat visits' },
-						]}
-						value={mode}
-						onChange={onModeChange}
-						accessibilityLabel="Visit type"
-					/>
+					<View style={styles.modeRow} accessibilityRole="radiogroup" accessibilityLabel="Visit type">
+						<AppRadioCard
+							variant="option"
+							title="Single visit"
+							subtitle="One day"
+							selected={mode === 'single'}
+							onPress={() => onModeChange('single')}
+							style={styles.flex}
+						/>
+						<AppRadioCard
+							variant="option"
+							title="Repeat visits"
+							subtitle="Pick several days"
+							selected={mode === 'repeat'}
+							onPress={() => onModeChange('repeat')}
+							style={styles.flex}
+						/>
+					</View>
 					<View style={styles.hintRow}>
 						<Text style={styles.hint}>{dateHint}</Text>
 						<Text style={styles.muted}>{monthRangeLabel(windowDays)}</Text>
@@ -219,32 +270,48 @@ export default function AncillaryBookVisitPage() {
 				{n > 0 && (
 					<View style={styles.section}>
 						<StepTitle n={2} title="What time?" right={timeHint || undefined} />
+						{multi && (
+							<AppSegmentedControl
+								shape="rounded"
+								options={[
+									{ value: 'same', label: 'Same time daily' },
+									{ value: 'different', label: 'Different times' },
+								]}
+								value={sameTime ? 'same' : 'different'}
+								onChange={(v) => onTimeModeChange(v === 'same')}
+								accessibilityLabel="Time for visits"
+							/>
+						)}
+						{perDay && active && <DayTimeTabs tabs={dayTabs} activeKey={active} onSelect={setActiveDay} />}
 						{groups.map((g) => (
 							<View key={g.label} style={styles.group}>
 								<Text style={styles.groupLabel}>{g.label}</Text>
 								<SlotChipGrid
 									columns={4}
+									density="compact"
 									slots={g.slots}
-									selectedValue={timeValid ? time : null}
-									onSelectValue={setTime}
+									selectedValue={shownTime}
+									onSelectValue={onPickTime}
 								/>
 							</View>
 						))}
 					</View>
 				)}
 
-				<View style={styles.noteWrap}>
-					<AppInfoBanner
-						tone="info"
-						icon={null}
-						title={`A verified ${noun} near you will be assigned 20–30 min before each visit.`}
-					/>
+				<View style={styles.note}>
+					<MaterialCommunityIcons name="clock-outline" size={18} color={APP_COLORS.primary} />
+					<Text style={styles.noteText}>
+						{`A verified ${noun} is assigned `}
+						<Text style={styles.bold}>{`${leadText(leadMinutes)} before each visit`}</Text>
+						{` — each visit can have a different ${noun}. You’ll get their name, photo and start code then.`}
+					</Text>
 				</View>
 			</ScrollView>
 
 			<AppCartFooter
+				plainCta
 				countLabel={summary}
-				totalLabel={inr(fee * Math.max(n, 1))}
+				totalLabel={`${inr(fee)} per visit`}
 				ctaLabel={ctaLabel}
 				onCtaPress={onContinue}
 				ctaDisabled={!done}
@@ -268,11 +335,22 @@ const styles = StyleSheet.create({
 	},
 	stepNumText: { fontSize: 12, fontWeight: '800', color: APP_COLORS.surface },
 	stepTitle: { flex: 1, fontSize: 17, lineHeight: 24, fontWeight: '800', color: APP_COLORS.ink },
-	stepRight: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.inkMuted },
+	stepRight: { fontSize: 12, fontWeight: '700', color: APP_COLORS.inkMuted },
 	hintRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
 	hint: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.ink },
 	muted: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
+	flex: { flex: 1 },
+	modeRow: { flexDirection: 'row', gap: 8 },
 	group: { gap: 8 },
 	groupLabel: { fontSize: 13, lineHeight: 18, fontWeight: '800', color: APP_COLORS.ink },
-	noteWrap: { marginHorizontal: 16 },
+	note: {
+		marginHorizontal: 16,
+		flexDirection: 'row',
+		gap: 10,
+		padding: 12,
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.mint,
+	},
+	noteText: { flex: 1, fontSize: 13, lineHeight: 18, color: APP_COLORS.ink },
+	bold: { fontWeight: '800' },
 })

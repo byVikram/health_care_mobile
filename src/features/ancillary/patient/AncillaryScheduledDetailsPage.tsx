@@ -1,16 +1,17 @@
 // src/features/ancillary/patient/AncillaryScheduledDetailsPage.tsx
 //
 // "Later · Booking details" for a scheduled ancillary order (provider-less, up to 7 visits): ink hero
-// ("Your visits are booked" + the 20-30 min assignment note), the visit list with a status tag and -- once
-// assigned -- the nurse for each visit (the nurse can differ per visit), "What happens next", and who/where.
-// Visit status UNASSIGNED = nobody was available -> "reschedule or cancel". Polls the order while focused.
-// Footer: Reschedule (starts a new Schedule a visit with the same services) + Back to home; "Book again"
-// when the whole order was cancelled. "Cancel booking" asks in a sheet, then cancelAncillaryOrder.
-// Also the target of the Bookings tab for scheduled orders (no route params beyond the request id).
+// ("Your visits are booked" + the assignment note), a card per visit (date tile, time, who comes / when they are
+// assigned, status pill) with Reschedule | View visit, "How each visit works", and who / where.
+// Every visit is edited on its own: Reschedule moves just that visit (until its provider is assigned, 1 hr before),
+// "Cancel visits" cancels one, several or all of the remaining ones (up to 2 hrs before each) -- both rules come
+// from the server (`policy`, visit.can_reschedule / can_cancel). Visit status UNASSIGNED = nobody was available.
+// Polls the order while focused. Footer: Cancel visits + Back to home; Back to home + Book again once the whole
+// booking is cancelled. Also the target of the Bookings tab for scheduled orders (just the request id).
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RouteProp } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -18,56 +19,43 @@ import Toast from 'react-native-toast-message'
 import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AncillaryBookVisitParams, AncillaryCartItem, AppStackParamList } from '../../../navigation/types'
-import { stampLabel } from '../../../utils/date'
+import { DOW_LABELS, MONTH_SHORT, isSameDay, parseDateOnly } from '../../../utils/date'
 import {
 	AppBottomSheet,
 	AppButton,
 	AppFooterBar,
+	AppIconTile,
 	AppInfoBanner,
 	AppScreenHeader,
 	AppSection,
 	AppSkeleton,
-	AppStatusTimeline,
 	AppTag,
-	AppTextLink,
-	AppVisitList,
 } from '../../../components/common'
-import type { AppTagProps, AppTimelineStep, AppVisitListItem } from '../../../components/common'
+import { cancelAncillaryOrder, isVisitUnassigned, type AncillaryOrder } from '../ancillaryProviderBookingService'
+import { CancelVisitsSheet, type CancelVisitRow } from '../components/CancelVisitsSheet'
+import { RescheduleVisitSheet } from '../components/RescheduleVisitSheet'
+import { ScheduledVisitCard } from '../components/ScheduledVisitCard'
+import { capitalize, inr, leadText, plural, rangeLabel, timeLabel } from './ancillaryBookingCopy'
 import {
-	cancelAncillaryOrder,
-	getAncillaryOrder,
-	isVisitUnassigned,
-	type AncillaryOrder,
-	type AncillaryOrderStatus,
-} from '../ancillaryProviderBookingService'
-import { capitalize, dayLabel, inr, itemsSummary, plural, providerNoun, timeLabel } from './ancillaryBookingCopy'
+	assignLine,
+	isCancelledStatus,
+	isOpenVisit,
+	lockedReason,
+	nextVisitId,
+	orderNoun,
+	orderPolicy,
+	specialtyOf,
+	visitChip,
+	visitTitle,
+} from './scheduledVisitView'
+import { useScheduledOrder } from './useScheduledOrder'
+import { useVisitEdits } from './useVisitEdits'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 type Route = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS>
 
-const POLL_MS = 15000
-const MAX_POLL_FAILURES = 3
-
-const isCancelled = (s?: AncillaryOrderStatus | null) => !!s && /CANCEL|EXPIRED/.test(s)
-const isDone = (s?: AncillaryOrderStatus | null) => !!s && /COMPLETED/.test(s)
-const isLive = (s?: AncillaryOrderStatus | null) => !!s && /EN_ROUTE|ARRIVED|IN_PROGRESS|VERIFICATION/.test(s)
-
-const slugOf = (label: string) =>
-	label
-		.trim()
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '')
-
-/** The order's speciality as catalogue key + label, when the status endpoint includes it. */
-const specialtyOf = (order: AncillaryOrder | null): { key: string; label: string } | null => {
-	const s = order?.specialty
-	if (!s) return null
-	if (typeof s === 'string') return s.trim() ? { key: slugOf(s), label: s.trim() } : null
-	const label = s.label?.trim() || ''
-	const key = s.key?.trim() || (label ? slugOf(label) : '')
-	return key ? { key, label: label || key } : null
-}
+const GREY_TEXT = '#9AAFB2'
+const CANCEL_BTN_DISABLED_RULE = '#E3EAEB'
 
 /** "Schedule a visit" params rebuilt from the order. Null when the order doesn't say which speciality it is. */
 const bookingFromOrder = (order: AncillaryOrder | null, dates?: string[]): AncillaryBookVisitParams | null => {
@@ -91,177 +79,77 @@ const bookingFromOrder = (order: AncillaryOrder | null, dates?: string[]): Ancil
 	}
 }
 
-/** "6:30–6:40 PM": the 20-30 min window before a visit that starts at "HH:MM" when a provider gets assigned. */
-const assignWindow = (start: string) => {
-	const [h, m] = start.split(':').map(Number)
-	if (Number.isNaN(h) || Number.isNaN(m)) return ''
-	const fmt = (mins: number) =>
-		timeLabel(`${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`)
-	const from = fmt(h * 60 + m - 30)
-	const to = fmt(h * 60 + m - 20)
-	const meridiem = (t: string) => t.slice(-2)
-	return meridiem(from) === meridiem(to) ? `${from.replace(/ [AP]M$/, '')}–${to}` : `${from}–${to}`
-}
-
 export default function AncillaryScheduledDetailsPage() {
 	const navigation = useNavigation<Nav>()
 	const route = useRoute<Route>()
 	const { requestId } = route.params
 
-	const [order, setOrder] = useState<AncillaryOrder | null>(null)
-	const [loading, setLoading] = useState(true)
-	const [failures, setFailures] = useState(0)
+	const { order, loading, failures, pollStalled, refresh, retry } = useScheduledOrder(requestId)
+	const { cancelling, moving, cancelVisits, moveVisit } = useVisitEdits(requestId, refresh)
 	const [cancelOpen, setCancelOpen] = useState(false)
-	const [cancelling, setCancelling] = useState(false)
-
-	const activeRef = useRef(true)
-	const inFlightRef = useRef(false)
-	const failuresRef = useRef(0)
-	failuresRef.current = failures
-
-	useEffect(() => {
-		activeRef.current = true
-		return () => {
-			activeRef.current = false
-		}
-	}, [])
-
-	const fetchOrder = useCallback(async () => {
-		if (inFlightRef.current) return
-		inFlightRef.current = true
-		try {
-			const o = await getAncillaryOrder(requestId)
-			if (!activeRef.current) return
-			setOrder(o)
-			setFailures(0)
-		} catch {
-			if (activeRef.current) setFailures((f) => f + 1)
-		} finally {
-			inFlightRef.current = false
-			if (activeRef.current) setLoading(false)
-		}
-	}, [requestId])
-
-	// Poll while focused; stop after a few failures in a row (the Retry link restarts it).
-	useFocusEffect(
-		useCallback(() => {
-			void fetchOrder()
-			const id = setInterval(() => {
-				if (failuresRef.current < MAX_POLL_FAILURES) void fetchOrder()
-			}, POLL_MS)
-			return () => clearInterval(id)
-		}, [fetchOrder])
-	)
-
-	const retry = () => {
-		setFailures(0)
-		void fetchOrder()
-	}
-
-	const confirmCancel = async () => {
-		setCancelling(true)
-		try {
-			await cancelAncillaryOrder(requestId)
-			Toast.show({ type: 'success', text1: 'Booking cancelled' })
-			setCancelOpen(false)
-			await fetchOrder()
-		} catch {
-			Toast.show({ type: 'error', text1: "Couldn't cancel the booking", text2: 'Please try again.' })
-		} finally {
-			if (activeRef.current) setCancelling(false)
-		}
-	}
+	const [movingId, setMovingId] = useState<string | null>(null)
+	const [legacyOpen, setLegacyOpen] = useState(false)
+	const [legacyBusy, setLegacyBusy] = useState(false)
 
 	const goHome = () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME })
 
 	const visits = order?.visits ?? []
-	const cancelled = isCancelled(order?.status)
+	const n = visits.length
+	const policy = orderPolicy(order)
+	const noun = orderNoun(order)
+	const open = visits.filter(isOpenVisit)
+	const cancelledCount = visits.filter((v) => isCancelledStatus(v.status)).length
+	const allCancelled = isCancelledStatus(order?.status) || (n > 0 && cancelledCount === n)
+	// Visits that are off the booking (cancelled, or nobody was available); completed ones still count as kept.
+	const kept = visits.filter((v) => !isCancelledStatus(v.status) && !isVisitUnassigned(v.status)).length
+	// The older chosen-provider orders are cancelled as a whole, not visit by visit.
+	const legacy = !!order && order.visit_edits === false
+	const nextId = nextVisitId(visits)
 	const unassigned = visits.filter((v) => isVisitUnassigned(v.status))
-	const noun = providerNoun(specialtyOf(order)?.key ?? '')
-	const nounCap = capitalize(noun)
+	const perVisit = order?.totals?.per_visit ?? 0
+	const movingVisit = visits.find((v) => v.visit_public_id === movingId) ?? null
 
-	const reschedule = () => {
-		// Only the days that still need a nurse when some were unassigned; otherwise all the booked days.
-		const dates = (unassigned.length ? unassigned : visits).map((v) => v.date)
+	const cancelWholeBooking = async () => {
+		setLegacyBusy(true)
+		try {
+			await cancelAncillaryOrder(requestId)
+			Toast.show({ type: 'success', text1: 'Booking cancelled' })
+			setLegacyOpen(false)
+		} catch {
+			Toast.show({ type: 'error', text1: "Couldn't cancel the booking", text2: 'Please try again.' })
+		} finally {
+			setLegacyBusy(false)
+			void refresh()
+		}
+	}
+
+	/** A new Schedule a visit for the days that need a provider again (or every booked day). */
+	const bookAgain = (dates: string[]) => {
 		const booking = bookingFromOrder(order, dates)
 		if (!booking) {
 			// The order has no speciality in the DB, so there's no catalogue to go back to -- don't guess one.
-			Toast.show({ type: 'error', text1: 'Unable to reschedule', text2: 'This booking has no service type.' })
+			Toast.show({ type: 'error', text1: 'Unable to book again', text2: 'This booking has no service type.' })
 			return
 		}
 		navigation.navigate(ROUTES.STACK.ANCILLARY_BOOK_VISIT, booking)
 	}
 
 	// ---- Copy ----
-	const n = visits.length
-	const perVisit = order?.totals?.per_visit ?? 0
-	const serviceNames = order?.package ? order.package.name : itemsSummary(order?.services ?? [])
-	const nextIndex = visits.findIndex(
-		(v) => !isCancelled(v.status) && !isDone(v.status) && !isVisitUnassigned(v.status)
-	)
+	let pill: string
+	if (allCancelled) pill = 'Cancelled · nothing was charged'
+	else if (kept < n) pill = `Confirmed · ${kept} of ${n} visits`
+	else pill = perVisit > 0 ? `Confirmed · pay ${inr(perVisit)} after each visit` : 'Confirmed · pay after each visit'
 
-	let pill = ''
-	let title = ''
-	if (cancelled) {
-		pill = 'Cancelled'
-		title = 'Booking cancelled'
-	} else {
-		pill = perVisit > 0 ? `Booked · pay ${inr(perVisit)} after each visit` : 'Booked · pay after each visit'
-		title = 'Your visits are booked'
-	}
-
-	const visitTag = (status: AncillaryOrderStatus, i: number): AppTagProps => {
-		if (isVisitUnassigned(status)) return { label: 'No nurse yet', tone: 'cancelled' }
-		if (isCancelled(status)) return { label: 'Cancelled', tone: 'cancelled' }
-		if (isDone(status)) return { label: 'Completed', tone: 'completed' }
-		if (isLive(status)) return { label: 'In progress', tone: 'scheduled' }
-		if (i === nextIndex) return { label: 'Next', tone: 'pending' }
-		return { label: 'Upcoming', tone: 'neutral' }
-	}
-
-	const visitItems: AppVisitListItem[] = visits.map((v, i) => {
-		const who = v.provider?.name
-		const sub = isVisitUnassigned(v.status)
-			? `${timeLabel(v.start_time)} · no ${noun} available`
-			: who
-				? `${timeLabel(v.start_time)} · ${who}`
-				: `${timeLabel(v.start_time)} · ${noun} assigned by ${assignWindow(v.start_time)}`
-		return {
-			key: v.visit_public_id || v.date,
-			index: v.index ?? i + 1,
-			title: `Visit ${v.index ?? i + 1} · ${dayLabel(v.date)}`,
-			sub,
-			status: visitTag(v.status, i),
-			current: i === nextIndex,
-		}
-	})
-
-	const anyAssigned = visits.some((v) => !!v.provider)
-	const anyLive = visits.some((v) => isLive(v.status))
-	const steps: AppTimelineStep[] = [
-		{
-			key: 'booked',
-			title: 'Booked',
-			sub: order?.created_at ? stampLabel(order.created_at) : undefined,
-			state: 'done',
-		},
-		{
-			key: 'assigned',
-			title: `${nounCap} assigned`,
-			sub: `${nounCap} assigned 20–30 min before each visit · you’ll get a notification`,
-			state: anyAssigned || anyLive ? 'done' : 'current',
-		},
-		{
-			key: 'arrives',
-			title: `${nounCap} arrives`,
-			sub: 'Share the start code to begin',
-			state: anyLive ? 'current' : 'upcoming',
-		},
-		{ key: 'complete', title: 'Visit complete', sub: 'Share the completion code', state: 'upcoming' },
-	]
+	const cancelRows: CancelVisitRow[] = open.map((v, i) => ({
+		id: v.visit_public_id,
+		title: visitTitle(v, i),
+		sub: `${timeLabel(v.start_time)}${v.visit_public_id === nextId ? ' · next visit' : ''}`,
+		fee: inr(perVisit),
+		canCancel: v.can_cancel !== false,
+		lockedNote: lockedReason(v.status, !!v.provider, noun, policy.cancel_cutoff_minutes),
+	}))
 
 	const patient = order?.patient
-	const pollStalled = failures >= MAX_POLL_FAILURES
 
 	return (
 		<View style={styles.container}>
@@ -281,23 +169,23 @@ export default function AncillaryScheduledDetailsPage() {
 						<AppTag
 							label={pill}
 							shape="pill"
-							bg={cancelled ? APP_COLORS.dangerBg : APP_COLORS.mintAccent}
-							ink={cancelled ? APP_COLORS.danger : APP_COLORS.ink}
+							bg={allCancelled ? APP_COLORS.dangerBg : APP_COLORS.mintAccent}
+							ink={allCancelled ? APP_COLORS.danger : APP_COLORS.ink}
 							textStyle={styles.pillText}
 						/>
 					)}
 					<Text style={styles.heroTitle} accessibilityRole="header">
-						{title}
+						{allCancelled ? 'Booking cancelled' : 'Your visits are booked'}
 					</Text>
-					{cancelled ? (
+					{allCancelled ? (
 						<Text style={styles.heroBody}>Nothing was charged. You can book again whenever you need.</Text>
 					) : (
 						<View style={styles.heroNote}>
 							<MaterialCommunityIcons name="clock-outline" size={20} color={APP_COLORS.mintAccent} />
 							<Text style={styles.heroNoteText}>
-								{`A ${noun} will be assigned `}
-								<Text style={styles.bold}>20–30 min before each visit</Text>
-								{'. We’ll notify you with their name, photo and start code.'}
+								{`Each visit gets its own ${noun}, assigned `}
+								<Text style={styles.bold}>{`${leadText(policy.assign_lead_minutes)} before`}</Text>
+								{` it starts. We’ll notify you with their name, photo and start code for that visit.`}
 							</Text>
 						</View>
 					)}
@@ -323,56 +211,111 @@ export default function AncillaryScheduledDetailsPage() {
 						/>
 					</View>
 				)}
-				{!cancelled && unassigned.length > 0 && (
+				{!allCancelled && unassigned.length > 0 && (
 					<View style={styles.bannerWrap}>
 						<AppInfoBanner
 							tone="warning"
 							icon="alert-circle-outline"
 							title={`No ${noun} available for ${plural(unassigned.length, 'visit')}`}
-							subtitle="Reschedule those days or cancel the booking. Nothing is charged."
-							action={{ label: 'Reschedule', onPress: reschedule }}
+							subtitle="Book those days again. Nothing is charged."
+							action={{ label: 'Book again', onPress: () => bookAgain(unassigned.map((v) => v.date)) }}
 						/>
 					</View>
 				)}
 
-				{/* Visits */}
-				<AppSection marginTop={0}>
+				{/* Your visits */}
+				<AppSection
+					title="Your visits"
+					titleSize="sm"
+					marginTop={0}
+					gap={12}
+					right={
+						n > 0 ? (
+							<AppTag
+								label={kept < n ? `${kept} of ${n} active` : `${n} visits`}
+								tone="mint"
+								textStyle={styles.countText}
+							/>
+						) : undefined
+					}
+				>
 					{loading && !order ? (
 						<View style={styles.skeletons}>
-							<AppSkeleton height={36} borderRadius={10} color={APP_COLORS.neutralBg} />
-							<AppSkeleton height={36} borderRadius={10} color={APP_COLORS.neutralBg} />
+							<AppSkeleton height={86} borderRadius={12} color={APP_COLORS.neutralBg} />
+							<AppSkeleton height={86} borderRadius={12} color={APP_COLORS.neutralBg} />
 						</View>
 					) : (
-						<AppVisitList
-							variant="status"
-							title={`${plural(n, 'visit')}${serviceNames ? ` · ${serviceNames}` : ''}`}
-							visits={visitItems}
-						/>
-					)}
-					{!cancelled && (anyAssigned || anyLive) && (
-						<AppTextLink
-							label="View visit & start code"
-							size="sm"
-							onPress={() =>
-								navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: requestId })
-							}
-						/>
+						visits.map((v, i) => {
+							const d = parseDateOnly(v.date)
+							const today = !!d && isSameDay(d, new Date())
+							const cancelled = isCancelledStatus(v.status)
+							const isNext = v.visit_public_id === nextId
+							return (
+								<ScheduledVisitCard
+									key={v.visit_public_id || v.date}
+									dow={today ? 'TODAY' : DOW_LABELS[d?.getDay() ?? 0].toUpperCase()}
+									day={String(d?.getDate() ?? '')}
+									mon={MONTH_SHORT[d?.getMonth() ?? 0]}
+									overline={`VISIT ${v.index ?? i + 1} OF ${n}${today ? ' · TODAY' : ''}`}
+									range={rangeLabel(v.start_time, v.end_time)}
+									assign={assignLine(v, noun, policy.assign_lead_minutes)}
+									chip={visitChip(v, isNext, noun)}
+									next={isNext}
+									cancelled={cancelled}
+									showActions={isOpenVisit(v)}
+									canReschedule={v.can_reschedule !== false}
+									cancelNote={
+										cancelled ? 'Cancelled · you won’t be charged for this visit.' : undefined
+									}
+									onReschedule={() => setMovingId(v.visit_public_id)}
+									onView={() =>
+										navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, {
+											bookingId: requestId,
+											visitId: v.visit_public_id,
+										})
+									}
+								/>
+							)
+						})
 					)}
 				</AppSection>
 
-				{/* What happens next */}
-				{!cancelled && (
-					<AppSection title="What happens next" titleSize="sm" marginTop={0} gap={12}>
-						<AppStatusTimeline steps={steps} />
-						{!!order && (
-							<AppTextLink
-								label="Cancel booking"
-								tone="danger"
-								size="sm"
-								trailingIcon="none"
-								onPress={() => setCancelOpen(true)}
-							/>
-						)}
+				{/* How each visit works */}
+				{!allCancelled && (
+					<AppSection marginTop={0} gap={12}>
+						<View>
+							<Text style={styles.sectionTitle} accessibilityRole="header">
+								How each visit works
+							</Text>
+							<Text style={styles.sectionSub}>
+								Every visit runs on its own — its own {noun} and codes
+							</Text>
+						</View>
+						{[
+							{
+								icon: 'account-outline' as const,
+								title: `${leadText(policy.assign_lead_minutes)} before · ${noun} assigned`,
+								sub: 'You get their name, photo and the start code',
+							},
+							{
+								icon: 'home-outline' as const,
+								title: 'At your door · share the start code',
+								sub: `Only once the ${noun} has arrived`,
+							},
+							{
+								icon: 'check' as const,
+								title: 'When done · share the completion code',
+								sub: 'That visit is marked complete',
+							},
+						].map((step) => (
+							<View key={step.title} style={styles.step}>
+								<AppIconTile icon={step.icon} size={32} radius={8} iconSize={16} />
+								<View style={styles.stepText}>
+									<Text style={styles.stepTitle}>{step.title}</Text>
+									<Text style={styles.stepSub}>{step.sub}</Text>
+								</View>
+							</View>
+						))}
 					</AppSection>
 				)}
 
@@ -381,20 +324,16 @@ export default function AncillaryScheduledDetailsPage() {
 					<AppSection title="Visit for" titleSize="sm" marginTop={0}>
 						{!!patient?.name && (
 							<View style={styles.infoRow}>
-								<MaterialCommunityIcons name="account-outline" size={20} color={APP_COLORS.primary} />
+								<MaterialCommunityIcons name="account-outline" size={18} color={APP_COLORS.primary} />
 								<Text style={styles.infoText}>
 									<Text style={styles.bold}>{patient.name}</Text>
-									{patient.relation ? ` · ${patient.relation}` : ''}
+									{patient.relation ? ` · ${capitalize(patient.relation.toLowerCase())}` : ''}
 								</Text>
 							</View>
 						)}
 						{!!order.address?.street_address && (
 							<View style={styles.infoRow}>
-								<MaterialCommunityIcons
-									name="map-marker-outline"
-									size={20}
-									color={APP_COLORS.primary}
-								/>
+								<MaterialCommunityIcons name="home-outline" size={18} color={APP_COLORS.primary} />
 								<Text style={styles.infoText}>
 									{[order.address.label, order.address.street_address].filter(Boolean).join(' · ')}
 								</Text>
@@ -405,12 +344,18 @@ export default function AncillaryScheduledDetailsPage() {
 			</ScrollView>
 
 			<AppFooterBar>
-				{cancelled ? (
+				{allCancelled ? (
 					<>
 						<AppButton variant="outline" size="lg" style={styles.flex} onPress={goHome}>
 							Back to home
 						</AppButton>
-						<AppButton size="lg" style={styles.flex} disabled={!order} softDisabled onPress={reschedule}>
+						<AppButton
+							size="lg"
+							style={styles.flex}
+							disabled={!order}
+							softDisabled
+							onPress={() => bookAgain(visits.map((v) => v.date))}
+						>
 							Book again
 						</AppButton>
 					</>
@@ -419,11 +364,22 @@ export default function AncillaryScheduledDetailsPage() {
 						<AppButton
 							variant="outline"
 							size="lg"
-							style={styles.flex}
-							disabled={!order}
-							onPress={reschedule}
+							style={[
+								styles.flex,
+								styles.cancelBtn,
+								!open.length && { borderColor: CANCEL_BTN_DISABLED_RULE },
+							]}
+							labelStyle={[styles.cancelBtnText, !open.length && { color: GREY_TEXT }]}
+							disabled={!open.length}
+							onPress={() => (legacy ? setLegacyOpen(true) : setCancelOpen(true))}
 						>
-							Reschedule
+							{open.length || loading
+								? legacy
+									? 'Cancel booking'
+									: 'Cancel visits'
+								: cancelledCount === n
+									? 'All visits cancelled'
+									: 'No visits to cancel'}
 						</AppButton>
 						<AppButton size="lg" style={styles.flex} onPress={goHome}>
 							Back to home
@@ -432,22 +388,33 @@ export default function AncillaryScheduledDetailsPage() {
 				)}
 			</AppFooterBar>
 
-			<AppBottomSheet
+			<CancelVisitsSheet
 				visible={cancelOpen}
+				rows={cancelRows}
+				initialId={nextId}
+				busy={cancelling}
 				onClose={() => setCancelOpen(false)}
+				onConfirm={async (ids, reason) => {
+					if (await cancelVisits(ids, reason)) setCancelOpen(false)
+				}}
+			/>
+
+			<AppBottomSheet
+				visible={legacyOpen}
+				onClose={() => setLegacyOpen(false)}
 				title="Cancel this booking?"
 				subtitle={`All ${plural(n, 'visit')} will be cancelled.`}
 				appearance="modern"
 				showHeaderDivider={false}
-				dismissible={!cancelling}
+				dismissible={!legacyBusy}
 				footer={
 					<View style={styles.sheetActions}>
 						<AppButton
 							variant="outline"
 							size="lg"
 							style={styles.flex}
-							onPress={() => setCancelOpen(false)}
-							disabled={cancelling}
+							onPress={() => setLegacyOpen(false)}
+							disabled={legacyBusy}
 						>
 							Keep it
 						</AppButton>
@@ -455,9 +422,9 @@ export default function AncillaryScheduledDetailsPage() {
 							variant="danger"
 							size="lg"
 							style={styles.flex}
-							onPress={() => void confirmCancel()}
-							loading={cancelling}
-							disabled={cancelling}
+							onPress={() => void cancelWholeBooking()}
+							loading={legacyBusy}
+							disabled={legacyBusy}
 						>
 							Cancel booking
 						</AppButton>
@@ -466,6 +433,30 @@ export default function AncillaryScheduledDetailsPage() {
 			>
 				<Text style={styles.sheetBody}>{"Nothing has been charged, so there's nothing to refund."}</Text>
 			</AppBottomSheet>
+
+			{!!movingVisit && (
+				<RescheduleVisitSheet
+					visible
+					title={`Reschedule visit ${movingVisit.index ?? visits.indexOf(movingVisit) + 1}`}
+					currentDate={movingVisit.date}
+					currentTime={movingVisit.start_time}
+					takenDates={visits
+						.filter(
+							(o) =>
+								o.visit_public_id !== movingVisit.visit_public_id &&
+								!isCancelledStatus(o.status) &&
+								!isVisitUnassigned(o.status)
+						)
+						.map((o) => o.date)}
+					leadMinutes={policy.assign_lead_minutes}
+					noun={noun}
+					busy={moving}
+					onClose={() => setMovingId(null)}
+					onConfirm={async (date, startTime) => {
+						if (await moveVisit(movingVisit.visit_public_id, date, startTime)) setMovingId(null)
+					}}
+				/>
+			)}
 		</View>
 	)
 }
@@ -493,9 +484,18 @@ const styles = StyleSheet.create({
 	heroNoteText: { flex: 1, fontSize: 14, lineHeight: 20, color: APP_COLORS.surface },
 	bold: { fontWeight: '800' },
 	bannerWrap: { marginHorizontal: 16 },
-	skeletons: { gap: 8, paddingVertical: 4 },
+	skeletons: { gap: 12 },
+	countText: { fontSize: 12, lineHeight: 18, fontWeight: '800' },
+	sectionTitle: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: APP_COLORS.ink },
+	sectionSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
+	step: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+	stepText: { flex: 1, minWidth: 0 },
+	stepTitle: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
+	stepSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
 	infoRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
 	infoText: { flex: 1, fontSize: 14, lineHeight: 20, color: APP_COLORS.ink },
 	sheetActions: { flexDirection: 'row', gap: 8 },
 	sheetBody: { fontSize: 14, lineHeight: 20, color: APP_COLORS.ink },
+	cancelBtn: { borderWidth: 1.5, borderColor: APP_COLORS.divider, backgroundColor: APP_COLORS.surface },
+	cancelBtnText: { color: APP_COLORS.danger, fontSize: 15, fontWeight: '700' },
 })

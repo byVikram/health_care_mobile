@@ -28,6 +28,9 @@ export const apiErrorMessage = (e: unknown) => {
 		const data = e.response?.data as { message?: string; detail?: unknown } | undefined
 		if (data?.message) return data.message
 		if (typeof data?.detail === 'string') return data.detail
+		// HTTPException(detail={code, message}): the backend's business-rule refusals (409 / 422).
+		const detail = data?.detail as { message?: unknown } | undefined
+		if (typeof detail?.message === 'string') return detail.message
 	}
 	return e instanceof Error ? e.message : ''
 }
