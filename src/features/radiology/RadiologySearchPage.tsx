@@ -362,7 +362,7 @@ export default function RadiologySearchPage() {
 					<MaterialCommunityIcons name="magnify" size={20} color="#9aa0a6" style={styles.searchIcon} />
 					<TextInput
 						style={styles.searchInput}
-						placeholder="Search scans, centers, city..."
+						placeholder="Search scan centers by name, scan or city"
 						placeholderTextColor="#9AA0AC"
 						value={searchQuery}
 						onChangeText={setSearchQuery}

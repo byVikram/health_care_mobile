@@ -273,7 +273,7 @@ export default function LabCatalogPage() {
 				search={{
 					value: query,
 					onChange: onSearch,
-					placeholder: 'Search tests, e.g. thyroid, HbA1c',
+					placeholder: 'Search lab tests or packages, e.g. HbA1c',
 					accessibilityLabel: 'Search tests and packages',
 				}}
 			/>

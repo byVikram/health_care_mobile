@@ -59,7 +59,7 @@ export function RecentChatsSheet({ visible, chats, onClose, onNewChat, onOpenCha
 							<TextInput
 								value={query}
 								onChangeText={setQuery}
-								placeholder="Search chats"
+								placeholder="Search your Care AI chats"
 								placeholderTextColor={APP_COLORS.inkMuted}
 								accessibilityLabel="Search chats"
 								style={styles.searchInput}

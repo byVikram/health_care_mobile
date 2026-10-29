@@ -183,7 +183,7 @@ export function AppointmentActionSheet({
 						<TextInput
 							value={referQuery}
 							onChangeText={setReferQuery}
-							placeholder="Search doctor or speciality"
+							placeholder="Search doctors by name or speciality"
 							placeholderTextColor={APP_COLORS.inkMuted}
 							style={styles.searchInput}
 						/>

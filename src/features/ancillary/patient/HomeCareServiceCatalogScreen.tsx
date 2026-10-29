@@ -225,7 +225,7 @@ export default function HomeCareServiceCatalogScreen() {
 				{/* Search Bar */}
 				<View style={styles.searchContainer}>
 					<AppInput
-						placeholder="Search activities, tasks or care needs e.g. Bathing, Walking, Medication..."
+						placeholder="Search care tasks, e.g. bathing, walking"
 						value={searchQuery}
 						onChangeText={setSearchQuery}
 					/>

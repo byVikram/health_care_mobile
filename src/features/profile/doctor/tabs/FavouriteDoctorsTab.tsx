@@ -193,7 +193,7 @@ export default function FavouriteDoctorsTab() {
 						<AppInput
 							value={searchQuery}
 							onChangeText={setSearchQuery}
-							placeholder="Search doctor..."
+							placeholder="Search favourite doctors by name or speciality"
 							placeholderTextColor="#98a1aa"
 							containerStyle={[styles.searchInputContainer, isCompact && styles.searchInputContainerCompact]}
 							style={[styles.searchInput, isCompact && styles.searchInputCompact]}

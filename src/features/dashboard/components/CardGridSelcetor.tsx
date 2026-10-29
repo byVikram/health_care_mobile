@@ -133,7 +133,7 @@ export default function CardGridSelectorModal({
 	loadingPlaceholderRows = [3, 2],
 	emptyText = 'No options available.',
 	searchable = false,
-	searchPlaceholder = 'Search services...',
+	searchPlaceholder = 'Search services',
 }: CardGridSelectorModalProps) {
 	const { width, height } = useWindowDimensions()
 	const [searchQuery, setSearchQuery] = useState('')

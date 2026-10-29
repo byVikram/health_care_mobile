@@ -555,7 +555,7 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 									<TextInput
 										value={tagQuery}
 										onChangeText={setTagQuery}
-										placeholder="Search speciality"
+										placeholder="Search specialities"
 										placeholderTextColor={APP_COLORS.inkMuted}
 										style={styles.tagSearchInput}
 									/>
