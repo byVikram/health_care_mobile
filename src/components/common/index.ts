@@ -220,6 +220,7 @@ export type {
 	AppAddressDraft,
 	AppAddressPrefill,
 } from './booking/AddressSelection/AppAddressSheet'
+	CurrentLocationResult,
 
 // My bookings: category filter tile
 export { AppCategoryTile } from './inputs/AppCategoryTile'
