@@ -153,6 +153,8 @@ export interface AppConfig {
 	/** Home-care "Need a nurse right now? · Call now" line. */
 	nursing_helpline_number?: string | null
 	app_min_version?: string | null
+	/** Home-care scheduled visits: provider assigned this long before a visit, cancel up to this long before (minutes). */
+	home_care_visit_policy?: { assign_lead_minutes: number; cancel_cutoff_minutes: number } | null
 }
 
 export const getAppConfig = async (): Promise<AppConfig> => {

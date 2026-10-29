@@ -311,6 +311,8 @@ export type AppStackParamList = {
 		| {
 				bookingId?: string
 				bookingData?: any
+				/** Scheduled orders: the visit (visit_public_id) to show instead of the next one. */
+				visitId?: string
 		  }
 		| undefined
 	[ROUTES.STACK.ANCILLARY_MY_BOOKINGS]: undefined
