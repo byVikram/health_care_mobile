@@ -37,8 +37,12 @@ export function useBookingLocation() {
 			if (!activeRef.current) return coords
 			setGpsCoords(coords)
 			try {
-				const geo: { fullAddress?: string } = await getAddressFromCoords(coords.latitude, coords.longitude)
-				await setCurrentLocation({ address: geo.fullAddress || 'Current location', ...coords })
+				const geo: { fullAddress?: string; pincode?: string } = await getAddressFromCoords(coords.latitude, coords.longitude)
+				await setCurrentLocation({
+					address: geo.fullAddress || 'Current location',
+					...coords,
+					...(geo.pincode ? { pincode: geo.pincode } : {}),
+				})
 			} catch {
 				// Saving the app-wide location is best-effort.
 			}

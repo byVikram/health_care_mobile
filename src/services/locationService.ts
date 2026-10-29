@@ -1,5 +1,6 @@
 import { Alert, Linking } from 'react-native';
 import * as Location from 'expo-location';
+import { normalizePincode } from '../utils/pincode';
 
 let settingsAlertOpen = false;
 
@@ -119,6 +120,7 @@ export const getAddressFromCoords = async (
       district: geo?.district || '',
       state: geo?.region || '',
       country: geo?.country || '',
+      pincode: normalizePincode(geo?.postalCode),
       fullAddress: [
         geo?.district,
         geo?.city,
