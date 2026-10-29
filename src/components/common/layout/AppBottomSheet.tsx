@@ -37,6 +37,8 @@ export type AppBottomSheetProps = {
 	footer?: React.ReactNode
 	/** Optional 13/18 muted line under the title. */
 	subtitle?: string
+	/** Optional node in the header, just before the close button (e.g. a "Clear all" text button). */
+	headerRight?: React.ReactNode
 	/** When set, shows a chevron-left button before the title (e.g. step back inside the sheet). */
 	onBack?: () => void
 	/** Accessibility label for the back button. Defaults to "Back". */
@@ -80,6 +82,7 @@ export function AppBottomSheet({
 	scrollEnabled = true,
 	footer,
 	subtitle,
+	headerRight,
 	onBack,
 	backAccessibilityLabel = 'Back',
 	showHeaderDivider = true,
@@ -487,6 +490,8 @@ export function AppBottomSheet({
 									{title}
 								</AppTypography>
 							)}
+
+							{headerRight}
 
 							<TouchableOpacity
 								style={[

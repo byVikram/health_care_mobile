@@ -20,6 +20,9 @@ export interface DoctorSearchItem {
 	qualifications: string[]
 	hospital: DoctorSearchHospital | null
 	distance: number | null
+	gender?: string | null
+	/** Still has a bookable slot today at the clinic shown. */
+	available_today?: boolean
 }
 
 export interface DoctorSearchResponse {
