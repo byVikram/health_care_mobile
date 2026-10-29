@@ -71,6 +71,21 @@ export const FAMILY_HISTORY_OPTIONS = ['Diabetes', 'High BP', 'Heart disease', '
 
 export const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Kannada', 'Tamil', 'Telugu', 'Malayalam', 'Marathi', 'Bengali']
 
+/**
+ * Saved languages as the screen's option values. Older saves are lower case ("english", "hindi"): match them to the
+ * list ignoring case so a language shows once, and drop repeats. A language outside the list is kept as it was saved.
+ */
+export const normalizeLanguages = (saved?: string[] | null): string[] => {
+	const out: string[] = []
+	for (const raw of saved ?? []) {
+		const value = String(raw ?? '').trim()
+		if (!value) continue
+		const match = LANGUAGE_OPTIONS.find((o) => o.toLowerCase() === value.toLowerCase()) ?? value
+		if (!out.some((x) => x.toLowerCase() === match.toLowerCase())) out.push(match)
+	}
+	return out
+}
+
 export const SMOKING_OPTIONS = opts('Never', 'Former smoker', 'Occasional', 'Regular')
 export const ALCOHOL_OPTIONS = opts('Never', 'Occasionally', 'Socially', 'Regularly')
 export const ACTIVITY_OPTIONS = opts('Sedentary', '1-2 days/week', '3-4 days/week', '5+ days/week')

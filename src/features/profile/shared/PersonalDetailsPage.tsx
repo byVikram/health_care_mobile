@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppAvatar,
 	AppCalendar,
-	AppChipGroup,
+	AppChipPicker,
 	AppConfirmSheet,
 	AppDocumentRow,
 	documentRowStatus,
@@ -95,14 +95,16 @@ export default function PersonalDetailsPage() {
 				)
 			case 'chips':
 				return (
-					<AppFormField key={key} label={label} required={required} errorText={errors[key]}>
-						<AppChipGroup
-							options={toOptions(meta.options)}
-							values={value as string[]}
-							onChange={(v) => set(key, v as never)}
-							accessibilityLabel={label}
-						/>
-					</AppFormField>
+					<AppChipPicker
+						key={key}
+						label={label}
+						required={required}
+						errorText={errors[key]}
+						options={toOptions(meta.options)}
+						values={value as string[]}
+						onChange={(v) => set(key, v as never)}
+						searchPlaceholder={`Search ${label.toLowerCase()}`}
+					/>
 				)
 			case 'readonly':
 				return <AppFormField key={key} label={label} value={(value as string) || '—'} editable={false} />
