@@ -13,6 +13,7 @@ import {
 	labErrorMessage,
 	type ApiCatalogueDetail,
 	type ApiCatalogueItem,
+	type ApiCoverage,
 	type LabKind,
 } from './labService'
 
@@ -75,12 +76,17 @@ type Params = {
 	queries: string[]
 	/** 'all' loads the (few) packages and pages through the tests. */
 	kind: 'all' | LabKind
+	/** The patient's pincode: only what the labs serving it offer is listed (and `coverage` says which labs). */
+	pincode?: string
+	/** Wait (no request yet) while the pincode is still being worked out, so the unfiltered list is not shown first. */
+	paused?: boolean
 }
 
 const PAGE = 20
 const PACKAGE_LIMIT = 50
 
-export function useLabCatalogue({ queries, kind }: Params) {
+export function useLabCatalogue({ queries, kind, pincode, paused }: Params) {
+	const [coverage, setCoverage] = useState<ApiCoverage | null>(null)
 	const [packages, setPackages] = useState<LabItem[]>([])
 	const [tests, setTests] = useState<LabItem[]>([])
 	const [loading, setLoading] = useState(true)
@@ -94,6 +100,10 @@ export function useLabCatalogue({ queries, kind }: Params) {
 	const queryKey = queries.join('|')
 
 	useEffect(() => {
+		if (paused) {
+			setLoading(true)
+			return
+		}
 		const run = ++runRef.current
 		const terms = queryKey ? queryKey.split('|') : ['']
 		const kinds: LabKind[] = kind === 'all' ? ['package', 'test'] : [kind]
@@ -104,7 +114,13 @@ export function useLabCatalogue({ queries, kind }: Params) {
 				const calls = kinds.flatMap((k) =>
 					terms.map(async (q) => ({
 						k,
-						res: await fetchCatalogue({ query: q, kind: k, page: 1, limit: k === 'package' ? PACKAGE_LIMIT : PAGE }),
+						res: await fetchCatalogue({
+							query: q,
+							kind: k,
+							page: 1,
+							limit: k === 'package' ? PACKAGE_LIMIT : PAGE,
+							pincode,
+						}),
 					}))
 				)
 				const done = await Promise.all(calls)
@@ -117,6 +133,7 @@ export function useLabCatalogue({ queries, kind }: Params) {
 						.filter((i) => !seen.has(i.id) && !!seen.add(i.id))
 						.map((i) => toLabItem(i))
 				}
+				setCoverage(done[0]?.res.coverage ?? null)
 				setPackages(merge('package'))
 				setTests(merge('test'))
 				pageRef.current = 1
@@ -130,14 +147,14 @@ export function useLabCatalogue({ queries, kind }: Params) {
 			}
 		}
 		void load()
-	}, [queryKey, kind, reloadTick])
+	}, [queryKey, kind, pincode, paused, reloadTick])
 
 	const loadMore = useCallback(async () => {
 		if (loading || loadingMore || !hasMore) return
 		const run = runRef.current
 		setLoadingMore(true)
 		try {
-			const res = await fetchCatalogue({ query: queryKey, kind: 'test', page: pageRef.current + 1, limit: PAGE })
+			const res = await fetchCatalogue({ query: queryKey, kind: 'test', page: pageRef.current + 1, limit: PAGE, pincode })
 			if (run !== runRef.current) return
 			pageRef.current = res.page
 			setTests((cur) => {
@@ -150,11 +167,11 @@ export function useLabCatalogue({ queries, kind }: Params) {
 		} finally {
 			setLoadingMore(false)
 		}
-	}, [loading, loadingMore, hasMore, queryKey])
+	}, [loading, loadingMore, hasMore, queryKey, pincode])
 
 	const retry = useCallback(() => setReloadTick((n) => n + 1), [])
 
-	return { packages, tests, loading, loadingMore, error, hasMore, loadMore, retry }
+	return { packages, tests, coverage, loading, loadingMore, error, hasMore, loadMore, retry }
 }
 
 /** One item's detail (what it includes, preparation, which labs offer it). Merges it into the cache. */

@@ -28,6 +28,18 @@ export type ApiCatalogueItem = {
 	tests_count: number | null
 }
 
+/** What the labs serving the pincode offer. Absent when no pincode was sent or LabStack gave no usable answer. */
+export type ApiCoverage = {
+	/** false: no lab serves the pincode, and the list is empty. */
+	serviceable: boolean
+	/** true: the list is limited to what those labs offer there. */
+	filtered: boolean
+	pincode: string
+	/** HOME_SAMPLE and / or CENTER_VISIT: what any of those labs offers there. */
+	services: string[]
+	labs: { id: number; name: string | null; services: string[] }[]
+}
+
 export type ApiCatalogueList = {
 	items: ApiCatalogueItem[]
 	page: number
@@ -35,6 +47,7 @@ export type ApiCatalogueList = {
 	total: number
 	pages: number
 	synced_at: string | null
+	coverage?: ApiCoverage
 }
 
 export type ApiOffer = {
@@ -157,10 +170,18 @@ export async function fetchCatalogue(params: {
 	kind?: LabKind
 	page?: number
 	limit?: number
+	/** The patient's pincode: only what the labs serving it offer is listed. */
+	pincode?: string
 }): Promise<ApiCatalogueList> {
 	const res = await ApiService.get<Envelope<ApiCatalogueList>>(BASE.CATALOGUE, {
 		...QUIET,
-		params: { query: params.query || undefined, kind: params.kind, page: params.page ?? 1, limit: params.limit ?? 20 },
+		params: {
+			query: params.query || undefined,
+			kind: params.kind,
+			page: params.page ?? 1,
+			limit: params.limit ?? 20,
+			pincode: params.pincode || undefined,
+		},
 	})
 	return res.data.data
 }
