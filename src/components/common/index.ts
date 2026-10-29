@@ -20,6 +20,7 @@ export { default as SplashScreen } from './layout/SplashScreen'
 export { default as DateSlotPicker } from './inputs/DateSlotPicker'
 export type { PickProps as DateSlotPickerProps } from './inputs/DateSlotPicker'
 export { default as AppScreenHeader } from './layout/AppScreenHeader'
+export { AppHeaderBackdrop } from './layout/AppHeaderBackdrop'
 export { default as AppAvatar } from './display/AppAvatar'
 export { default as StatusModal } from './feedback/StatusModal'
 export { default as OfflineBanner } from './feedback/OfflineBanner'
@@ -219,8 +220,8 @@ export type {
 	AppAddressOption,
 	AppAddressDraft,
 	AppAddressPrefill,
-} from './booking/AddressSelection/AppAddressSheet'
 	CurrentLocationResult,
+} from './booking/AddressSelection/AppAddressSheet'
 
 // My bookings: category filter tile
 export { AppCategoryTile } from './inputs/AppCategoryTile'

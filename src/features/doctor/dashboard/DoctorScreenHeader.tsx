@@ -19,7 +19,7 @@
 import React from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { AppAvatar, AppPathIcon } from '../../../components/common'
+import { AppAvatar, AppHeaderBackdrop, AppPathIcon } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../../dashboard/homeChromeIcons'
 import { ClinicSwitcher } from './ClinicSwitcher'
@@ -194,10 +194,7 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 
 function Blobs() {
 	return (
-		<>
-			<View pointerEvents="none" style={styles.blobBig} />
-			<View pointerEvents="none" style={styles.blobSmall} />
-		</>
+		<AppHeaderBackdrop />
 	)
 }
 
@@ -219,25 +216,6 @@ const styles = StyleSheet.create({
 	headerSimple: {
 		paddingBottom: 12,
 		gap: 10,
-	},
-	blobBig: {
-		position: 'absolute',
-		right: -60,
-		top: -80,
-		width: 220,
-		height: 220,
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.primary,
-	},
-	blobSmall: {
-		position: 'absolute',
-		right: 90,
-		top: 60,
-		width: 90,
-		height: 90,
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.mintAccent,
-		opacity: 0.12,
 	},
 	topRow: {
 		flexDirection: 'row',

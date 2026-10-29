@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
-import { AppOtpInput, AppPathIcon, AppSoftCard } from '../../../components/common'
+import { AppHeaderBackdrop, AppOtpInput, AppPathIcon, AppSoftCard } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { RootStackParamList } from '../../../navigation/types'
@@ -127,7 +127,7 @@ export function VerifyAccessPage() {
 	return (
 		<View style={styles.screen}>
 			<View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-				<View pointerEvents="none" style={styles.blobBig} />
+				<AppHeaderBackdrop />
 				<View style={styles.topRow}>
 					<TouchableOpacity
 						onPress={() => navigation.goBack()}
@@ -278,17 +278,7 @@ const styles = StyleSheet.create({
 		borderBottomLeftRadius: 24,
 		borderBottomRightRadius: 24,
 		gap: 16,
-	},
-	blobBig: {
-		position: 'absolute',
-		right: -60,
-		top: -80,
-		width: 220,
-		height: 220,
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.primary,
-	},
-	topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
+	},	topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
 	backButton: { width: 44, height: 44, marginLeft: -8, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 	headerTitle: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: '#FFFFFF' },
 	centerCol: { alignItems: 'center', gap: 10 },

@@ -7,7 +7,7 @@
 import React from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { AppPathIcon } from '../../components/common'
+import { AppHeaderBackdrop, AppPathIcon } from '../../components/common'
 import { APP_COLORS } from '../../config/theme'
 import { FEED_ICONS } from './feedTheme'
 
@@ -26,7 +26,7 @@ export function FeedHeader({ title, subtitle, onBack, action, search, paddingBot
 	const insets = useSafeAreaInsets()
 	return (
 		<View style={[styles.header, { paddingTop: insets.top + 8, paddingBottom }]}>
-			<View pointerEvents="none" style={styles.blob} />
+			<AppHeaderBackdrop />
 			<View style={styles.topRow}>
 				<Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" style={styles.backBtn}>
 					<AppPathIcon d={FEED_ICONS.back} size={22} strokeWidth={2.2} color="#FFFFFF" />
@@ -75,17 +75,7 @@ const styles = StyleSheet.create({
 		gap: 12,
 		borderBottomLeftRadius: 24,
 		borderBottomRightRadius: 24,
-	},
-	blob: {
-		position: 'absolute',
-		right: -60,
-		top: -80,
-		width: 220,
-		height: 220,
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.primary,
-	},
-	topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
+	},	topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
 	backBtn: {
 		width: 44,
 		height: 44,

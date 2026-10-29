@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppTypography } from '../display/AppTypography'
+import { AppHeaderBackdrop } from './AppHeaderBackdrop'
 import { APP_COLORS } from '../../../config/theme'
 
 interface AppScreenHeaderProps {
@@ -97,7 +98,8 @@ export default function AppScreenHeader({
 
 	if (variant === 'bar') {
 		return (
-			<View style={[styles.bar, { paddingTop: insets.top }, backgroundColor ? { backgroundColor } : null, style]}>
+			<View style={[styles.bar, { paddingTop: insets.top }, style]}>
+				<AppHeaderBackdrop base={backgroundColor} />
 				<View style={[styles.barRow, isTablet && styles.headerContentTablet]}>
 					{showBack && (
 						<TouchableOpacity
@@ -155,16 +157,9 @@ export default function AppScreenHeader({
 				styles.header,
 				{ paddingTop: Math.max(insets.top, 12) + (isFlat ? 4 : 14) },
 				isFlat && styles.headerFlat,
-				backgroundColor ? { backgroundColor } : null,
 			]}
 		>
-			{/* Background Waves */}
-			{!isFlat && (
-				<>
-					<View style={styles.waveOne} />
-					<View style={styles.waveTwo} />
-				</>
-			)}
+			<AppHeaderBackdrop base={backgroundColor} />
 
 			<View style={[styles.headerContent, isTablet && styles.headerContentTablet]}>
 				{showBack && (
@@ -192,7 +187,6 @@ export default function AppScreenHeader({
 
 const styles = StyleSheet.create({
 	header: {
-		backgroundColor: '#1f5f68',
 		paddingHorizontal: 16,
 		paddingBottom: 16,
 		borderBottomLeftRadius: 20,
@@ -204,26 +198,6 @@ const styles = StyleSheet.create({
 		paddingBottom: 6,
 		borderBottomLeftRadius: 0,
 		borderBottomRightRadius: 0,
-	},
-	waveOne: {
-		position: 'absolute',
-		width: 420,
-		height: 240,
-		borderRadius: 120,
-		backgroundColor: 'rgba(255,255,255,0.06)',
-		left: -140,
-		top: -70,
-		transform: [{ rotate: '-4deg' }],
-	},
-	waveTwo: {
-		position: 'absolute',
-		width: 430,
-		height: 240,
-		borderRadius: 120,
-		backgroundColor: 'rgba(255,255,255,0.05)',
-		left: -95,
-		top: -22,
-		transform: [{ rotate: '-4deg' }],
 	},
 	headerContent: {
 		flexDirection: 'row',
@@ -266,7 +240,8 @@ const styles = StyleSheet.create({
 
 	// variant 'bar' (KarolaHealth design app bar)
 	bar: {
-		backgroundColor: APP_COLORS.primary,
+		backgroundColor: APP_COLORS.ink,
+		overflow: 'hidden',
 		paddingHorizontal: 16,
 		zIndex: 2,
 	},

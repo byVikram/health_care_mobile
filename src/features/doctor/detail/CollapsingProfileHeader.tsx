@@ -15,7 +15,7 @@ import { Animated, Pressable, StyleSheet, View, useWindowDimensions } from 'reac
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { AppAvatar, AppTypography } from '../../../components/common'
+import { AppAvatar, AppHeaderBackdrop, AppTypography } from '../../../components/common'
 import { APP_COLORS, TONES } from '../../../config/theme'
 
 export const PROFILE_AVATAR_SIZE = 112
@@ -81,6 +81,7 @@ export function CollapsingProfileHeader({ scrollY, name, subtitle, avatarUri, av
 	return (
 		<>
 			<View style={[styles.header, { paddingTop: insets.top, height: headerHeight }]}>
+				<AppHeaderBackdrop />
 				<Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back to doctors" style={[styles.iconBtn, { marginLeft: -10 }]}>
 					<MaterialCommunityIcons name="chevron-left" size={28} color="#FFFFFF" />
 				</Pressable>
@@ -153,7 +154,8 @@ export function CollapsingProfileHeader({ scrollY, name, subtitle, avatarUri, av
 const styles = StyleSheet.create({
 	header: {
 		zIndex: 2,
-		backgroundColor: APP_COLORS.primary,
+		overflow: 'hidden',
+		backgroundColor: APP_COLORS.ink,
 		paddingHorizontal: 16,
 		flexDirection: 'row',
 		alignItems: 'center',

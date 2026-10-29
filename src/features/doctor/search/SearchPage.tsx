@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
 	AppChip,
+	AppHeaderBackdrop,
 	AppIconButton,
 	AppIconTile,
 	AppNavRow,
@@ -193,8 +194,7 @@ export default function SearchPage() {
 			{/* HEADER (collapses on scroll) */}
 			<Animated.View style={[styles.headerShadow, { shadowOpacity, elevation }]}>
 				<Animated.View style={[styles.hero, { paddingTop: insets.top + 4, paddingBottom: headerPadBottom }]}>
-					<View style={[styles.decorCircle, styles.decorCircleTop]} />
-					<View style={[styles.decorCircle, styles.decorCircleBottom]} />
+					<AppHeaderBackdrop />
 
 					<View style={styles.heroTopRow}>
 						<AppIconButton
@@ -231,7 +231,7 @@ export default function SearchPage() {
 						<TextInput
 							value={query}
 							onChangeText={setQuery}
-							placeholder="Search speciality or symptom"
+							placeholder="Search specialities or symptoms"
 							placeholderTextColor={APP_COLORS.inkMuted}
 							style={styles.searchInput}
 							returnKeyType="search"
@@ -377,26 +377,7 @@ const styles = StyleSheet.create({
 		backgroundColor: APP_COLORS.ink,
 		paddingHorizontal: 16,
 		overflow: 'hidden',
-	},
-	decorCircle: {
-		position: 'absolute',
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.primary,
-	},
-	decorCircleTop: {
-		right: -60,
-		top: -70,
-		width: 220,
-		height: 220,
-	},
-	decorCircleBottom: {
-		right: 90,
-		bottom: -60,
-		width: 110,
-		height: 110,
-		opacity: 0.6,
-	},
-	heroTopRow: {
+	},	heroTopRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,

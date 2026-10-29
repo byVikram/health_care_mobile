@@ -10,6 +10,7 @@ import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { AppHeaderBackdrop } from './AppHeaderBackdrop'
 import AppAvatar from '../display/AppAvatar'
 import { AppTag, type AppTagTone } from '../display/AppTag'
 import { APP_COLORS } from '../../../config/theme'
@@ -48,7 +49,7 @@ export function AppProfileHeader({
 
 	return (
 		<View style={[styles.header, { paddingTop: insets.top + 4 }]}>
-			<View style={styles.circle} pointerEvents="none" />
+			<AppHeaderBackdrop />
 			<View style={styles.titleRow}>
 				{onBack ? (
 					<TouchableOpacity
@@ -142,15 +143,6 @@ const styles = StyleSheet.create({
 		borderBottomLeftRadius: 24,
 		borderBottomRightRadius: 24,
 		zIndex: 2,
-	},
-	circle: {
-		position: 'absolute',
-		right: -60,
-		top: -80,
-		width: 220,
-		height: 220,
-		borderRadius: 110,
-		backgroundColor: APP_COLORS.primary,
 	},
 	titleRow: {
 		height: 52,
