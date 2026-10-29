@@ -41,6 +41,7 @@ import { showComingSoon } from '../../../../utils/toast'
 import { APP_COLORS, TONES, formatInr } from '../../../../config/theme'
 import CancelAppointmentSheet from './CancelAppointmentSheet'
 import CheckInQrSheet from './CheckInQrSheet'
+import NoShowReplySheet from '../NoShowReplySheet'
 import RescheduleSheet from './RescheduleSheet'
 import {
 	buildTimeline,
@@ -111,6 +112,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	const [cancelOpen, setCancelOpen] = useState(false)
 	const [qrOpen, setQrOpen] = useState(false)
 	const [reschedOpen, setReschedOpen] = useState(false)
+	const [noShowOpen, setNoShowOpen] = useState(false)
 
 	const load = useCallback(
 		async (silent = false) => {
@@ -152,7 +154,9 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	const isPast = !!start && (end ?? start).getTime() < Date.now()
 	const isCancelled = variant === 'cancelled'
 	const isCompleted = variant === 'completed'
-	const live = !isCancelled && !isCompleted
+	// A no-show is a finished appointment: nothing to cancel, reschedule or join; the patient can explain what happened.
+	const isNoShow = variant === 'no_show'
+	const live = !isCancelled && !isCompleted && !isNoShow
 	const canAct = live && !isPast
 	// The doctor asked for a new time and the patient has not picked one yet.
 	const needsNewTime = live && variant === 'reschedule_required' && !localRescheduled
@@ -429,6 +433,17 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 					/>
 				)}
 
+				{isNoShow && (
+					<AppInfoBanner
+						tone="warning"
+						icon="calendar-remove-outline"
+						title="You were marked as a no-show"
+						subtitle={`${doctorName} marked this appointment as missed. Tell us what happened so we can review it.`}
+						action={{ label: 'Tell us what happened', onPress: () => setNoShowOpen(true) }}
+						style={styles.bannerTop}
+					/>
+				)}
+
 				{isCompleted && (
 					<AppInfoBanner
 						tone="success"
@@ -662,6 +677,20 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 							View visit summary
 						</AppButton>
 					</>
+				) : isNoShow ? (
+					<>
+						<AppButton variant="outline" size="lg" style={styles.footerBtn} onPress={goDoctor}>
+							Book again
+						</AppButton>
+						<AppButton
+							size="lg"
+							icon="message-text-outline"
+							style={styles.footerBtn}
+							onPress={() => setNoShowOpen(true)}
+						>
+							Tell us what happened
+						</AppButton>
+					</>
 				) : (
 					<>
 						<AppButton variant="outline" size="lg" style={styles.footerBtn} onPress={goBookings}>
@@ -688,6 +717,13 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 			/>
 
 			<CheckInQrSheet visible={qrOpen} bookingId={bookingId} onClose={() => setQrOpen(false)} />
+
+			<NoShowReplySheet
+				visible={noShowOpen}
+				appointmentId={appt.id}
+				onClose={() => setNoShowOpen(false)}
+				onReplied={() => void load(true)}
+			/>
 
 			<RescheduleSheet
 				visible={reschedOpen}

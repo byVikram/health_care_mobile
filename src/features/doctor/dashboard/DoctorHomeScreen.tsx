@@ -29,13 +29,12 @@ import { listHealthQuestions } from '../../../services/qaService'
 import HomeHealthReadsSection from '../../dashboard/components/HomeHealthReadsSection'
 import HomeCommunitiesSection from '../../dashboard/components/HomeCommunitiesSection'
 import Toast from 'react-native-toast-message'
-import { effectiveStatusLabel, humanizeStatus, isAccepted, isCompletedAppt, rowStatusTone, statusLabelOf } from '../scheduleUtils'
+import { clinicNowHms, clinicTodayIso, effectiveStatusLabel, humanizeStatus, isAccepted, isCompletedAppt, rowStatusTone, statusLabelOf } from '../scheduleUtils'
 
 const isVideo = (apt: Appointment) => apt.appointment_mode === 'video_call' || apt.appointment_mode === 'video call'
 
 function todayIso() {
-	const d = new Date()
-	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+	return clinicTodayIso() // today in Mumbai (the clinic's clock), not the phone's date
 }
 
 function formatTime12h(t?: string | null): string {
@@ -229,7 +228,7 @@ export function DoctorHomeScreen() {
 	// its slot time has arrived, since starting a consultation before the patient is physically
 	// present doesn't make sense. Sorted by scheduled time (earliest-checked-in-for wins) since we
 	// don't track an actual check-in timestamp.
-	const nowHm = new Date().toTimeString().slice(0, 8)
+	const nowHm = clinicNowHms() // appointment start times are Mumbai wall-clock time
 	const checkedInToday = appointments.filter((a) => effectiveStatusLabel(a) === 'checked_in')
 	const next = checkedInToday[0] ?? undefined
 	// "Later today" is the rest of today's remaining schedule (any accepted status, not just

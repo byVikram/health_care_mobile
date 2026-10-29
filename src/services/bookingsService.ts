@@ -52,6 +52,8 @@ export interface BookingItem {
 	where?: string | null
 	where_type?: BookingWhereType | null
 	status: { label: string; tone: BookingTone }
+	/** The raw status of a doctor appointment (e.g. 'no_show'); older servers do not send it. */
+	status_key?: string | null
 	note?: string | null
 	ref?: string | null
 	avatar_url?: string | null

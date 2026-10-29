@@ -104,6 +104,10 @@ export const API_ENDPOINTS = {
 		// directly in that response rather than SMS-ing the patient (see VerifyAccessPage.tsx for why
 		// that matters).
 		VERIFY_ACCESS_OTP: (id: string) => `${BASE_URL}/api/appointments/${id}/verify-otp`,
+		// Patient no-show (PNS) policy: what happened (GET) + the one-time reason reply (POST), and whether online booking is paused.
+		NO_SHOW: (id: string) => `${BASE_URL}/api/appointments/${id}/no-show`,
+		NO_SHOW_REPLY: (id: string) => `${BASE_URL}/api/appointments/${id}/no-show/reply`,
+		BOOKING_RESTRICTION: `${BASE_URL}/api/appointments/me/booking-restriction`,
 	},
 	REVIEWS: {
 		CREATE: `${BASE_URL}/api/reviews`,
@@ -254,6 +258,9 @@ export const API_ENDPOINTS = {
 		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
 		TIP: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/tip`,
 		CANCEL_PATIENT: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/cancel`,
+		CANCEL_VISITS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/visits/cancel`,
+		RESCHEDULE_VISIT: (id: string, visitId: string) =>
+			`${BASE_URL}/api/ancillary/patient/requests/${id}/visits/${visitId}/reschedule`,
 		CANCEL_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/cancel`,
 		REJECT_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/reject`,
 		MY_REQUESTS: `${BASE_URL}/api/ancillary/patient/requests/my`,

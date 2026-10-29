@@ -19,6 +19,11 @@ export type TodayVisit = 'any' | 'clinic' | 'video'
 const VIDEO_BLUE = '#2463A8'
 const NOT_ARRIVED = '#7A8B8E'
 const DANGER = '#B42318'
+// A marked no-show is flagged in soft, muted tones (not alarm red): it is information, and the patient may still turn up.
+const NO_SHOW_TINT = '#FBF6F4'
+const NO_SHOW_INK = '#9B5248'
+const NO_SHOW_EDGE = '#E5CBC5'
+const NO_SHOW_CHIP = '#F4E4E0'
 const TRACK = '#E9EEEF'
 const CHECK = 'M5 12l5 5 9-10'
 
@@ -115,6 +120,22 @@ export type TodayRowProps = {
 	onMore?: () => void
 	/** What was done to this appointment from the sheet; replaces the buttons. */
 	outcome?: { text: string; tone: 'danger' | 'info' }
+	/** The doctor marked this appointment a no-show: the row stays on the list with a soft tint and a NO-SHOW tag. Instead of the
+	 * toggle and menu it offers "Check in" for a patient who arrives late (onToggle), which reverses the no-show. */
+	noShow?: boolean
+}
+
+/** A strip above the Today list that says how many patients were marked no-show today, so they are not overlooked. */
+export function NoShowStrip({ count }: { count: number }) {
+	if (count <= 0) return null
+	return (
+		<View style={styles.strip} accessibilityRole="alert">
+			<MaterialCommunityIcons name="account-alert-outline" size={20} color={NO_SHOW_INK} />
+			<Text style={styles.stripText}>
+				{count === 1 ? '1 patient was marked no-show today' : `${count} patients were marked no-show today`}
+			</Text>
+		</View>
+	)
 }
 
 export function TodayPatientRow({
@@ -130,20 +151,23 @@ export function TodayPatientRow({
 	onToggle,
 	onMore,
 	outcome,
+	noShow,
 }: TodayRowProps) {
-	const statusColor = outcome
-		? outcome.tone === 'danger'
-			? DANGER
-			: VIDEO_BLUE
-		: done
-			? APP_COLORS.primary
-			: checkedIn
-				? APP_COLORS.success
-				: NOT_ARRIVED
-	const statusText = outcome ? outcome.text : done ? 'Completed' : checkedIn ? 'Checked in' : 'Not arrived'
+	let statusColor = NOT_ARRIVED
+	let statusText = 'Not arrived'
+	if (outcome) {
+		statusColor = outcome.tone === 'danger' ? DANGER : VIDEO_BLUE
+		statusText = outcome.text
+	} else if (done) {
+		statusColor = APP_COLORS.primary
+		statusText = 'Completed'
+	} else if (checkedIn) {
+		statusColor = APP_COLORS.success
+		statusText = 'Checked in'
+	}
 	const cancelled = outcome?.tone === 'danger'
 	return (
-		<View style={[styles.row, divider && styles.rowRule]}>
+		<View style={[styles.row, noShow && styles.rowNoShow, divider && styles.rowRule]}>
 			<TouchableOpacity activeOpacity={0.7} onPress={onPress} accessibilityRole="button" style={styles.rowMain}>
 				<View style={styles.timeCol}>
 					<Text numberOfLines={1} style={styles.time}>
@@ -161,14 +185,39 @@ export function TodayPatientRow({
 						{meta ? ` · ${meta}` : ''}
 					</Text>
 					<View style={styles.status}>
-						<View style={[styles.dot, { backgroundColor: statusColor }]} />
-						<Text numberOfLines={1} style={[styles.statusText, { color: statusColor }]}>
-							{statusText}
-						</Text>
+						{noShow ? (
+							// The NO-SHOW tag is the whole status: a text beside it only got cut off by the Check in button.
+							<View style={styles.noShowTag}>
+								<Text style={styles.noShowTagText}>NO-SHOW</Text>
+							</View>
+						) : (
+							<>
+								<View style={[styles.dot, { backgroundColor: statusColor }]} />
+								<Text numberOfLines={1} style={[styles.statusText, { color: statusColor }]}>
+									{statusText}
+								</Text>
+							</>
+						)}
 					</View>
 				</View>
 			</TouchableOpacity>
-			{!done && !outcome && (
+			{!!noShow && (
+				<Pressable
+					onPress={onToggle}
+					disabled={busy}
+					accessibilityRole="button"
+					accessibilityState={{ busy: !!busy }}
+					accessibilityLabel={`${name} arrived after being marked no-show: check in`}
+					style={styles.lateCheckIn}
+				>
+					{busy ? (
+						<ActivityIndicator size="small" color={APP_COLORS.primary} />
+					) : (
+						<Text style={styles.lateCheckInText}>Check in</Text>
+					)}
+				</Pressable>
+			)}
+			{!done && !outcome && !noShow && (
 				<Pressable
 					onPress={onToggle}
 					disabled={busy}
@@ -200,7 +249,7 @@ export function TodayPatientRow({
 					</View>
 				</Pressable>
 			)}
-			{!done && !outcome && !!onMore && (
+			{!done && !outcome && !noShow && !!onMore && (
 				<Pressable
 					onPress={onMore}
 					accessibilityRole="button"
@@ -262,6 +311,34 @@ const styles = StyleSheet.create({
 
 	row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 	rowRule: { borderBottomWidth: 1, borderBottomColor: APP_COLORS.divider },
+	// A marked no-show: a soft tinted band across the whole card width (no edge line), so it is easy to tell apart without shouting.
+	rowNoShow: { marginHorizontal: -12, paddingHorizontal: 12, backgroundColor: NO_SHOW_TINT },
+	noShowTag: { flexShrink: 0, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: NO_SHOW_CHIP },
+	noShowTagText: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 0.6, color: NO_SHOW_INK },
+	lateCheckIn: {
+		flexShrink: 0,
+		minWidth: 72,
+		height: 36,
+		paddingHorizontal: 12,
+		borderRadius: 18,
+		borderWidth: 1,
+		borderColor: APP_COLORS.primary,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	lateCheckInText: { fontSize: 13, fontWeight: '800', color: APP_COLORS.primary },
+	strip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		borderRadius: 12,
+		backgroundColor: NO_SHOW_TINT,
+		borderWidth: 1,
+		borderColor: NO_SHOW_EDGE,
+	},
+	stripText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700', color: NO_SHOW_INK },
 	rowMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
 	// Wide enough for "11:00 AM" at 13px/800 -- 56 clipped it on real devices.
 	timeCol: { width: 64, flexShrink: 0 },

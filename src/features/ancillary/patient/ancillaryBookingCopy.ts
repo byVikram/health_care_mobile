@@ -7,7 +7,7 @@
 import type { AncillaryCartItem } from '../../../navigation/types'
 import type { ServiceSelection } from '../ancillaryProviderBookingService'
 import { formatTimeSlot } from '../../../utils/formatters'
-import { fullDayLabel, parseDateOnly } from '../../../utils/date'
+import { DOW_LABELS, combineDateTime, formatClock, fullDayLabel, isSameDay, parseDateOnly } from '../../../utils/date'
 
 const NOUNS: Record<string, string> = {
 	'nursing-care': 'nurse',
@@ -64,4 +64,29 @@ export const chipTimeLabel = (hhmm: string) => timeLabel(hhmm).replace(':00', ''
 export const dayLabel = (iso: string) => {
 	const d = parseDateOnly(iso)
 	return d ? fullDayLabel(d) : iso
+}
+
+/** "7:00–7:45 PM" / "11:30 AM–12:15 PM" for a visit's "HH:MM" start and end (just the start when there is no end). */
+export const rangeLabel = (start: string, end?: string | null) => {
+	const from = timeLabel(start)
+	if (!end) return from
+	const to = timeLabel(end)
+	return from.slice(-2) === to.slice(-2) ? `${from.slice(0, -3)}–${to}` : `${from}–${to}`
+}
+
+/** "1 hr" / "2 hrs" / "45 min". */
+export const leadText = (minutes: number) => {
+	if (minutes % 60 === 0) {
+		const h = minutes / 60
+		return `${h} hr${h === 1 ? '' : 's'}`
+	}
+	return `${minutes} min`
+}
+
+/** "6:00 PM today" / "6:00 PM, Fri": when a provider is assigned to the visit that starts at `start` on `date`. */
+export const assignedAtLabel = (date: string, start: string, leadMinutes: number) => {
+	const at = combineDateTime(date, start)
+	if (!at) return ''
+	at.setMinutes(at.getMinutes() - leadMinutes)
+	return `${formatClock(at)}${isSameDay(at, new Date()) ? ' today' : `, ${DOW_LABELS[at.getDay()]}`}`
 }
