@@ -14,7 +14,7 @@ import AppAvatar from '../display/AppAvatar'
 import { AppPathIcon } from '../display/AppIcon'
 import { AppIconTile } from '../display/AppIconTile'
 import { AppIconButton } from '../buttons/AppIconButton'
-import { AppHeaderBackdrop } from './AppHeaderBackdrop'
+import { AppHeaderBackdrop } from './AppScreenHeader'
 import { APP_COLORS } from '../../../config/theme'
 import { getUnreadNotificationCount } from '../../../services/homeService'
 
@@ -233,11 +233,11 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 						onPress={handleSearch}
 						style={patientStyles.searchTapArea}
 						accessibilityRole="button"
-						accessibilityLabel="Search doctors, tests or symptoms"
+						accessibilityLabel="Search specialities or symptoms"
 					>
 						<AppPathIcon d={HEADER_ICONS.search} size={20} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
 						<Text style={patientStyles.searchPlaceholder} numberOfLines={1}>
-							Search doctors, tests or symptoms
+							Search specialities or symptoms
 						</Text>
 					</Pressable>
 					<Pressable onPress={handleSearch} accessibilityRole="button" accessibilityLabel="Search by voice">
@@ -572,7 +572,7 @@ function RoleHomeHeader({
 			? 'Search scans by ID or patient'
 			: isNurse
 				? 'Search patients, bookings or care requests'
-				: 'Search doctors, specialities or symptoms'
+				: 'Search doctors by name or speciality'
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	const handleSearchPress = () => {

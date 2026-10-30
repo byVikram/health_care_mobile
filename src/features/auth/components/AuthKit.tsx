@@ -27,7 +27,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 import { APP_COLORS } from '../../../config/theme'
-import { AppHeaderBackdrop } from '../../../components/common/layout/AppHeaderBackdrop'
+import { AppHeaderBackdrop } from '../../../components/common/layout/AppScreenHeader'
 
 /* ------------------------------------------------------------------ icons */
 
