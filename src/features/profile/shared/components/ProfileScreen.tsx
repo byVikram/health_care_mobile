@@ -52,7 +52,7 @@ export function ProfileScreen({
 }: ProfileScreenProps) {
 	return (
 		<View style={styles.screen}>
-			<AppScreenHeader variant="bar" title={title} subtitle={subtitle} titleStyle={styles.headerTitle} />
+			<AppScreenHeader variant="bar" solid title={title} subtitle={subtitle} titleStyle={styles.headerTitle} />
 			<KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 				{fixedTop}
 				{loading ? (

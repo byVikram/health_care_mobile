@@ -163,6 +163,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 		<View style={styles.screen}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Lab order"
 				subtitle={`Order ${order.id}`}
 				onBack={() => navigation.goBack()}

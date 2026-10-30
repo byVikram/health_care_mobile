@@ -186,6 +186,7 @@ export default function LabCartPage() {
 		<View style={styles.screen}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Your cart"
 				subtitle={`${countLabel} · Step 1 of 2`}
 				onBack={() => navigation.goBack()}

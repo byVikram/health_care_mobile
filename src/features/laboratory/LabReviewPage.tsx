@@ -133,6 +133,7 @@ export default function LabReviewPage() {
 		<View style={styles.screen}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Review & book"
 				subtitle={isHome ? 'Lab tests · home sample collection' : 'Lab tests · in-clinic visit'}
 				onBack={() => navigation.goBack()}

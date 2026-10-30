@@ -224,6 +224,7 @@ export default function BookSlotPage() {
 			{/* Header */}
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title={doctor.name}
 				subtitle={headerSub}
 				leading={

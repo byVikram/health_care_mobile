@@ -170,12 +170,16 @@ export default function DoctorSearchPage() {
 	useEffect(() => {
 		if (!route.params?.specialityId || route.params?.specialityName) return
 		let active = true
-		getSpecialities()
-			.then((res) => {
+		const loadSpecialityName = async () => {
+			try {
+				const res = await getSpecialities()
 				const found = res.success && res.data?.find((s) => String(s.id) === String(route.params?.specialityId))
 				if (active && found) setSpecialityName(found.label)
-			})
-			.catch((error) => console.error('Error fetching specialities:', error))
+			} catch (error) {
+				console.error('Error fetching specialities:', error)
+			}
+		}
+		void loadSpecialityName()
 		return () => {
 			active = false
 		}
@@ -298,6 +302,7 @@ export default function DoctorSearchPage() {
 			{/* HEADER */}
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title={pageTitle}
 				subtitle={`In-clinic or video consultation${currentLocation?.address ? ` · ${currentLocation.address}` : ''}`}
 				titleStyle={styles.headerTitle}
@@ -311,7 +316,11 @@ export default function DoctorSearchPage() {
 						value={searchInput}
 						onChangeText={setSearchInput}
 						onSubmitEditing={() => setSearchQuery(searchInput)}
-						placeholder="Search doctors, specialities or symptoms"
+						placeholder={
+							specialityFilter === 'all'
+								? 'Search doctors by name or speciality'
+								: 'Search by doctor name'
+						}
 						placeholderTextColor={APP_COLORS.inkMuted}
 						style={styles.searchInput}
 						returnKeyType="search"

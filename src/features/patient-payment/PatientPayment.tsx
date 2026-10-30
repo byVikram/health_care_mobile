@@ -326,6 +326,7 @@ export default function BookingDetailsScreen() {
 
 			<AppScreenHeader
 				variant="bar"
+				solid
 				onBack={() => navigation.goBack()}
 				backAccessibilityLabel="Back to booking"
 				title={bookingDoctorName}

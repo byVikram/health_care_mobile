@@ -34,6 +34,7 @@ export default function AppointmentDetailsPage() {
 			<AppScreenHeader
 				title="Appointment"
 				variant="flat"
+				solid
 				onBack={() => navigation.goBack()}
 			/>
 			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>

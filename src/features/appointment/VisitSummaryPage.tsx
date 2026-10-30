@@ -247,6 +247,7 @@ export default function VisitSummaryPage() {
 		<View style={styles.container}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Visit summary"
 				subtitle={`Booking ${bookingId}`}
 				titleStyle={styles.headerTitle}
