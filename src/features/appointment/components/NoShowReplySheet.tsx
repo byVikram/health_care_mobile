@@ -1,7 +1,7 @@
 // src/features/appointment/components/NoShowReplySheet.tsx
 //
-// "What happened?" sheet for an appointment the doctor marked as a no-show (patient no-show policy). Loads
-// GET /appointments/{id}/no-show, shows the server's message and, while replying is still open, a single-choice
+// "What happened?" sheet for an appointment the doctor marked as a no-show, or (with `visitId`) a home-care visit the
+// provider reported as one (patient no-show policy). Loads GET /appointments/{id}/no-show (or the visit's), shows the server's message and, while replying is still open, a single-choice
 // list of reasons (labels come from the API; no free text) with the reply deadline and a Submit button. The reply
 // is one-time and final: after it the sheet only shows the returned message.
 
@@ -10,11 +10,17 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { AppBottomSheet, AppButton, AppRadio } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { getNoShow, replyToNoShow, type NoShowInfo } from '../../../services/appointmentService'
+import { getVisitNoShow, replyToVisitNoShow } from '../../ancillary/ancillaryNoShowService'
+
+/** What the sheet shows of either kind of record. */
+type ReplyInfo = Pick<NoShowInfo, 'state' | 'can_reply' | 'reply_deadline' | 'reason' | 'reasons' | 'message'>
 
 type Props = {
 	visible: boolean
-	/** The appointment's public id. */
-	appointmentId: string
+	/** The appointment's public id (a doctor appointment). Give this or `visitId`. */
+	appointmentId?: string
+	/** The visit's public id (a home-care visit the provider reported as a no-show). */
+	visitId?: string
 	onClose: () => void
 	/** Called after the reply went through, so the caller can refresh what it shows. */
 	onReplied?: () => void
@@ -28,12 +34,12 @@ const serverMessage = (error: unknown): string | undefined => {
 }
 
 /** Friendly text for a failed load (404 / 403 / anything else). */
-const loadErrorText = (error: unknown): string => {
+const loadErrorText = (error: unknown, noun: 'appointment' | 'visit'): string => {
 	switch (statusOf(error)) {
 		case 404:
-			return 'This appointment was not marked as a no-show, so there is nothing to reply to.'
+			return `This ${noun} was not marked as a no-show, so there is nothing to reply to.`
 		case 403:
-			return 'You can only reply for your own or your family’s appointments.'
+			return `You can only reply for your own or your family’s ${noun}s.`
 		default:
 			// No response at all (offline / timeout): apiService already worded the message for the user.
 			return statusOf(error) === undefined && (error as Error)?.message
@@ -55,8 +61,12 @@ const formatDeadline = (iso: string): string => {
 	})
 }
 
-export default function NoShowReplySheet({ visible, appointmentId, onClose, onReplied }: Props) {
-	const [info, setInfo] = useState<NoShowInfo | null>(null)
+export default function NoShowReplySheet({ visible, appointmentId, visitId, onClose, onReplied }: Props) {
+	const noun = visitId ? 'visit' : 'appointment'
+	const id = (visitId ?? appointmentId) as string
+	const fetchInfo = visitId ? getVisitNoShow : getNoShow
+	const sendReply = visitId ? replyToVisitNoShow : replyToNoShow
+	const [info, setInfo] = useState<ReplyInfo | null>(null)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [selected, setSelected] = useState<string | null>(null)
@@ -68,14 +78,14 @@ export default function NoShowReplySheet({ visible, appointmentId, onClose, onRe
 		setLoading(true)
 		setError(null)
 		try {
-			setInfo(await getNoShow(appointmentId))
+			setInfo(await fetchInfo(id))
 		} catch (e) {
 			setInfo(null)
-			setError(loadErrorText(e))
+			setError(loadErrorText(e, noun))
 		} finally {
 			setLoading(false)
 		}
-	}, [appointmentId])
+	}, [id, fetchInfo])
 
 	// Fresh load every time the sheet opens (the state may have changed since: answered, deadline passed).
 	useEffect(() => {
@@ -91,21 +101,23 @@ export default function NoShowReplySheet({ visible, appointmentId, onClose, onRe
 		setSubmitting(true)
 		setSubmitError(null)
 		try {
-			setInfo(await replyToNoShow(appointmentId, selected))
+			setInfo(await sendReply(id, selected))
 			onReplied?.()
 		} catch (e) {
 			if (statusOf(e) === 409) {
 				// Already answered, or the deadline passed: show the server's reason, then what the record says now.
 				setSubmitError(serverMessage(e) ?? 'This can no longer be answered.')
 				try {
-					setInfo(await getNoShow(appointmentId))
+					setInfo(await fetchInfo(id))
 				} catch {
 					/* keep what we have */
 				}
 			} else {
 				const gone = statusOf(e) === 404 || statusOf(e) === 403
 				setSubmitError(
-					gone ? loadErrorText(e) : (serverMessage(e) ?? 'We couldn’t send your answer. Please try again.')
+					gone
+						? loadErrorText(e, noun)
+						: (serverMessage(e) ?? 'We couldn’t send your answer. Please try again.')
 				)
 			}
 		} finally {
@@ -127,7 +139,13 @@ export default function NoShowReplySheet({ visible, appointmentId, onClose, onRe
 			dismissible={!submitting}
 			footer={
 				canReply ? (
-					<AppButton size="lg" onPress={submit} disabled={!selected || submitting} loading={submitting} softDisabled>
+					<AppButton
+						size="lg"
+						onPress={submit}
+						disabled={!selected || submitting}
+						loading={submitting}
+						softDisabled
+					>
 						Submit
 					</AppButton>
 				) : undefined
@@ -149,7 +167,9 @@ export default function NoShowReplySheet({ visible, appointmentId, onClose, onRe
 
 					{canReply ? (
 						<>
-							{!!deadline && <Text style={styles.deadline}>Please reply by {deadline}. You can reply once.</Text>}
+							{!!deadline && (
+								<Text style={styles.deadline}>Please reply by {deadline}. You can reply once.</Text>
+							)}
 							<View accessibilityRole="radiogroup" style={styles.list}>
 								{info.reasons.map((r) => {
 									const on = r.value === selected

@@ -19,6 +19,15 @@ const firebase = () => require('@react-native-firebase/messaging') as typeof imp
 
 const FCM_TOKEN_URL = '/api/auth/session/fcm-token'
 const NEW_CARE_REQUEST_OFFER = 'NEW_CARE_REQUEST_OFFER'
+// News about a patient's home-care visit (the provider arrived, the visit was reported as missed, the reply reminder, the
+// strike warning, the booking pause): the push carries the booking id, and a tap opens that booking.
+const PATIENT_HOME_CARE_NEWS = new Set([
+	'ANCILLARY_VISIT_ARRIVED',
+	'ANCILLARY_VISIT_NO_SHOW',
+	'ANCILLARY_NO_SHOW_REPLY_REMINDER',
+	'ANCILLARY_NO_SHOW_WARNING',
+	'ANCILLARY_BOOKING_RESTRICTED',
+])
 
 /** Send a token to the backend for the current login session. Never throws. */
 async function sendToken(token: string | null | undefined) {
@@ -44,10 +53,22 @@ export async function registerPushToken() {
 	}
 }
 
-/** Notification tapped: a care-request offer lands on the provider's Today screen, whose socket delivers the offer. */
+/**
+ * Notification tapped: a care-request offer lands on the provider's Today screen, whose socket delivers the offer; news about a
+ * patient's home-care visit opens the booking (a scheduled order's details, or the live screen of an instant one).
+ */
 function handleOpened(message: RemoteMessage | null) {
-	if (message?.data?.type !== NEW_CARE_REQUEST_OFFER) return
-	navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME } as never)
+	const data = message?.data
+	if (data?.type === NEW_CARE_REQUEST_OFFER) {
+		navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME } as never)
+		return
+	}
+	if (typeof data?.type === 'string' && PATIENT_HOME_CARE_NEWS.has(data.type) && data.requestId) {
+		const id = String(data.requestId)
+		if (data.bookingType === 'SCHEDULED')
+			navigate(ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS, { requestId: id } as never)
+		else navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: id } as never)
+	}
 }
 
 /** Call once from index.ts, before the app is registered, so messages received while the app is killed are handled. */

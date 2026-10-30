@@ -5,8 +5,13 @@
 // location" switch, care instructions + facts from the patient profile, "Bring with you" checklist (local),
 // payment (collect after the visit) and "Can't make it? Report an issue". Footer: "I've arrived · enter
 // start code" (today's startable visit) -> StartCodeSheet -> Visit in progress.
+//
+// With the home-care no-show policy on (visit.arrival.no_show_enabled) the footer has two steps instead: "I've arrived"
+// (sends the phone's location; the server checks it is near the address and starts the wait) and then, once the wait is
+// over, "Patient not available" (the patient is asked what happened) next to "Enter start code" for a patient who turns
+// up. A reported visit can still be started with the patient's code the same day.
 import React, { useCallback, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect, useIsFocused, useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
@@ -25,12 +30,16 @@ import { APP_COLORS, formatInr } from '../../../../config/theme'
 import { ROUTES } from '../../../../navigation/routes'
 import type { AppNavigationParamList } from '../../../../navigation/types'
 import { parseDateOnly, relativeDayLabel, startsInLabel } from '../../../../utils/date'
+import { getCurrentLocation } from '../../../../services/locationService'
 import { callPhone, openDirections } from '../../../../utils/maps'
 import { showComingSoon } from '../../../../utils/toast'
 import { extractApiErrorMessage } from '../../ancillaryService'
+import { useNow } from '../../hooks/useNow'
 import {
 	getProviderVisit,
+	markVisitArrived,
 	markVisitOnTheWay,
+	reportPatientNotAvailable,
 	updateVisitProgress,
 	type ProviderVisitDetail,
 } from '../../providerVisitService'
@@ -66,6 +75,9 @@ export default function ProviderVisitDetailsPage() {
 	const [startOpen, setStartOpen] = useState(false)
 	const [cancelOpen, setCancelOpen] = useState(false)
 	const [navigating, setNavigating] = useState(false)
+	const [arriving, setArriving] = useState(false)
+	const [reporting, setReporting] = useState(false)
+	const now = useNow(15_000)
 
 	const load = useCallback(async () => {
 		try {
@@ -119,6 +131,41 @@ export default function ProviderVisitDetailsPage() {
 		}
 	}
 
+	/** "I've arrived": the phone's location goes to the server, which checks it is near the address and starts the wait. */
+	const handleArrived = async () => {
+		if (!visit || arriving) return
+		setArriving(true)
+		try {
+			const { latitude, longitude } = await getCurrentLocation()
+			setVisit(await markVisitArrived(visit.visit_public_id, latitude, longitude))
+		} catch (e) {
+			Toast.show({
+				type: 'error',
+				text1: 'Couldn’t mark you as arrived',
+				text2: extractApiErrorMessage(e, 'Please try again.'),
+			})
+		} finally {
+			setArriving(false)
+		}
+	}
+
+	const reportNoShow = async () => {
+		if (!visit || reporting) return
+		setReporting(true)
+		try {
+			setVisit(await reportPatientNotAvailable(visit.visit_public_id))
+		} catch (e) {
+			Toast.show({
+				type: 'error',
+				text1: 'Couldn’t report the patient',
+				text2: extractApiErrorMessage(e, 'Please try again.'),
+			})
+			void load() // the wait may not be over after all: show where it stands
+		} finally {
+			setReporting(false)
+		}
+	}
+
 	const copy = getProviderSpecialityCopy(visit?.service.specialty)
 
 	const header = (
@@ -165,16 +212,40 @@ export default function ProviderVisitDetailsPage() {
 	const dateObj = parseDateOnly(visit.date)
 	const dayLabel = dateObj ? relativeDayLabel(dateObj) : null
 	const startsIn = today ? startsInLabel(visitStart(visit))?.replace(/^starts /, '') : null
-	const whenLine = done
-		? 'Completed'
-		: cancelled
-			? unassigned
-				? 'Not assigned yet'
-				: 'Cancelled'
-			: isInProgress(visit)
-				? copy.inProgressTitle
-				: [timeRange(visit), today ? startsIn : dayLabel].filter(Boolean).join(' · ')
+	const whenLine =
+		visit.status === 'NO_SHOW'
+			? 'Patient not available'
+			: done
+				? 'Completed'
+				: cancelled
+					? unassigned
+						? 'Not assigned yet'
+						: 'Cancelled'
+					: isInProgress(visit)
+						? copy.inProgressTitle
+						: [timeRange(visit), today ? startsIn : dayLabel].filter(Boolean).join(' · ')
 	const collected = visit.payment.status === 'PAYMENT_COLLECTED'
+	// The no-show policy: where the provider stands in arriving, waiting and reporting.
+	const arrival = visit.arrival
+	const policyOn = !!arrival?.no_show_enabled
+	const arrived = visit.status === 'ARRIVED'
+	const reported = visit.status === 'NO_SHOW'
+	const waitEnds = arrival?.wait_ends_at ? new Date(arrival.wait_ends_at) : null
+	const minutesLeft = waitEnds
+		? Math.max(0, Math.ceil((waitEnds.getTime() - now.getTime()) / 60_000))
+		: (arrival?.minutes_left ?? 0)
+	const canReport = policyOn && arrived && minutesLeft === 0
+	const waitEndsText = waitEnds?.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) ?? ''
+	const canArrive = policyOn && !!arrival?.can_mark_arrived && startable && today
+	const confirmNoShow = () =>
+		Alert.alert(
+			`Report ${first} as not available?`,
+			`${first} will be asked what happened. If they don’t reply, it may be recorded as a missed visit.`,
+			[
+				{ text: 'Keep waiting', style: 'cancel' },
+				{ text: 'Report', style: 'destructive', onPress: () => void reportNoShow() },
+			]
+		)
 	// Instant / prepaid bookings are paid in the app; scheduled orders are collected after each visit.
 	const paidOnline = visit.payment.method !== 'PAY_AFTER_VISIT'
 
@@ -205,6 +276,43 @@ export default function ProviderVisitDetailsPage() {
 							tone="success"
 							title={copy.completedTitle}
 							subtitle={collected ? `${formatInr(visit.payment.amount)} collected` : undefined}
+						/>
+					</View>
+				) : null}
+
+				{reported ? (
+					<View style={styles.padded}>
+						<AppInfoBanner
+							tone="warning"
+							icon="alert-circle-outline"
+							title="Reported as not available"
+							subtitle={`${first} has been asked what happened. If they turn up today, enter their start code.`}
+						/>
+					</View>
+				) : null}
+
+				{policyOn && arrived ? (
+					<View style={styles.padded}>
+						<AppInfoBanner
+							tone={canReport ? 'warning' : 'sky'}
+							icon="timer-sand"
+							title={canReport ? `${first} hasn’t come out` : `Waiting for ${first}`}
+							subtitle={
+								canReport
+									? `You’ve waited ${arrival?.wait_minutes ?? ''} minutes. You can report ${first} as not available, or enter their start code if they arrive.`
+									: `You can report ${first} as not available at ${waitEndsText} (${minutesLeft} min). Enter the start code if they come out.`
+							}
+						/>
+					</View>
+				) : null}
+
+				{canArrive && arrival?.near_address ? (
+					<View style={styles.padded}>
+						<AppInfoBanner
+							tone="sky"
+							icon="map-marker-check-outline"
+							title="You’re at the address"
+							subtitle={`Tap I’ve arrived to let ${first} know and start the waiting time.`}
 						/>
 					</View>
 				) : null}
@@ -328,7 +436,7 @@ export default function ProviderVisitDetailsPage() {
 					</View>
 				</AppSection>
 
-				{!done && !cancelled ? (
+				{!done && !cancelled && !reported ? (
 					<Pressable
 						onPress={() => setCancelOpen(true)}
 						accessibilityRole="button"
@@ -359,6 +467,47 @@ export default function ProviderVisitDetailsPage() {
 						>
 							{`Continue ${copy.noun}`}
 						</AppButton>
+					) : reported ? (
+						<AppButton size="lg" style={styles.flex} onPress={() => setStartOpen(true)}>
+							Enter start code
+						</AppButton>
+					) : policyOn && arrived ? (
+						<>
+							<AppButton
+								variant="outline"
+								size="lg"
+								style={styles.flex}
+								disabled={!canReport || reporting}
+								loading={reporting}
+								softDisabled
+								onPress={confirmNoShow}
+							>
+								{canReport ? 'Patient not available' : `Not available · ${minutesLeft} min`}
+							</AppButton>
+							<AppButton size="lg" style={styles.flex} onPress={() => setStartOpen(true)}>
+								Enter start code
+							</AppButton>
+						</>
+					) : canArrive ? (
+						<>
+							<AppButton
+								variant="outline"
+								size="lg"
+								style={styles.flex}
+								onPress={() => setStartOpen(true)}
+							>
+								Enter start code
+							</AppButton>
+							<AppButton
+								size="lg"
+								style={styles.flex}
+								loading={arriving}
+								disabled={arriving}
+								onPress={() => void handleArrived()}
+							>
+								I’ve arrived
+							</AppButton>
+						</>
 					) : (
 						<AppButton
 							size="lg"

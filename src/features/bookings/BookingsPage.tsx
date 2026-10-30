@@ -417,7 +417,14 @@ export default function BookingsPage() {
 			/>
 
 			{!!noShowItem && (
-				<NoShowReplySheet visible appointmentId={noShowItem.target.id} onClose={() => setNoShowItem(null)} />
+				<NoShowReplySheet
+					visible
+					appointmentId={noShowItem.category === 'ancillary' ? undefined : noShowItem.target.id}
+					visitId={
+						noShowItem.category === 'ancillary' ? (noShowItem.missed_visit_id ?? undefined) : undefined
+					}
+					onClose={() => setNoShowItem(null)}
+				/>
 			)}
 
 			{!!cancelItem && (

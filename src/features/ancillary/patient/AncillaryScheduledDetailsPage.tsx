@@ -32,6 +32,7 @@ import {
 	AppTag,
 } from '../../../components/common'
 import { cancelAncillaryOrder, isVisitUnassigned, type AncillaryOrder } from '../ancillaryProviderBookingService'
+import { MissedVisitBanner } from '../components/MissedVisitBanner'
 import { CancelVisitsSheet, type CancelVisitRow } from '../components/CancelVisitsSheet'
 import { RescheduleVisitSheet } from '../components/RescheduleVisitSheet'
 import { ScheduledVisitCard } from '../components/ScheduledVisitCard'
@@ -39,6 +40,7 @@ import { capitalize, inr, leadText, plural, rangeLabel, timeLabel } from './anci
 import {
 	assignLine,
 	isCancelledStatus,
+	isMissedStatus,
 	isOpenVisit,
 	lockedReason,
 	nextVisitId,
@@ -100,6 +102,11 @@ export default function AncillaryScheduledDetailsPage() {
 	const open = visits.filter(isOpenVisit)
 	const cancelledCount = visits.filter((v) => isCancelledStatus(v.status)).length
 	const allCancelled = isCancelledStatus(order?.status) || (n > 0 && cancelledCount === n)
+	// Visits the provider reported as a no-show; when nothing else is left the booking is over, like a cancelled one.
+	const missed = visits.filter((v) => isMissedStatus(v.status))
+	const allMissed =
+		!allCancelled && n > 0 && visits.every((v) => isMissedStatus(v.status) || isCancelledStatus(v.status))
+	const ended = allCancelled || allMissed
 	// Visits that are off the booking (cancelled, or nobody was available); completed ones still count as kept.
 	const kept = visits.filter((v) => !isCancelledStatus(v.status) && !isVisitUnassigned(v.status)).length
 	// The older chosen-provider orders are cancelled as a whole, not visit by visit.
@@ -137,6 +144,7 @@ export default function AncillaryScheduledDetailsPage() {
 	// ---- Copy ----
 	let pill: string
 	if (allCancelled) pill = 'Cancelled · nothing was charged'
+	else if (allMissed) pill = 'Visit missed · nothing was charged'
 	else if (kept < n) pill = `Confirmed · ${kept} of ${n} visits`
 	else pill = perVisit > 0 ? `Confirmed · pay ${inr(perVisit)} after each visit` : 'Confirmed · pay after each visit'
 
@@ -169,16 +177,24 @@ export default function AncillaryScheduledDetailsPage() {
 						<AppTag
 							label={pill}
 							shape="pill"
-							bg={allCancelled ? APP_COLORS.dangerBg : APP_COLORS.mintAccent}
-							ink={allCancelled ? APP_COLORS.danger : APP_COLORS.ink}
+							bg={ended ? APP_COLORS.dangerBg : APP_COLORS.mintAccent}
+							ink={ended ? APP_COLORS.danger : APP_COLORS.ink}
 							textStyle={styles.pillText}
 						/>
 					)}
 					<Text style={styles.heroTitle} accessibilityRole="header">
-						{allCancelled ? 'Booking cancelled' : 'Your visits are booked'}
+						{allCancelled
+							? 'Booking cancelled'
+							: allMissed
+								? 'We couldn’t complete your visit'
+								: 'Your visits are booked'}
 					</Text>
-					{allCancelled ? (
-						<Text style={styles.heroBody}>Nothing was charged. You can book again whenever you need.</Text>
+					{ended ? (
+						<Text style={styles.heroBody}>
+							{allCancelled
+								? 'Nothing was charged. You can book again whenever you need.'
+								: `Nothing was charged. Tell us what happened below, and you can book again whenever you need.`}
+						</Text>
 					) : (
 						<View style={styles.heroNote}>
 							<MaterialCommunityIcons name="clock-outline" size={20} color={APP_COLORS.mintAccent} />
@@ -223,6 +239,16 @@ export default function AncillaryScheduledDetailsPage() {
 					</View>
 				)}
 
+				{missed.map((v) => (
+					<View key={v.visit_public_id} style={styles.bannerWrap}>
+						<MissedVisitBanner
+							visitId={v.visit_public_id}
+							title={`visit ${v.index ?? visits.indexOf(v) + 1}`}
+							noun={noun}
+						/>
+					</View>
+				))}
+
 				{/* Your visits */}
 				<AppSection
 					title="Your visits"
@@ -261,11 +287,15 @@ export default function AncillaryScheduledDetailsPage() {
 									assign={assignLine(v, noun, policy.assign_lead_minutes)}
 									chip={visitChip(v, isNext, noun)}
 									next={isNext}
-									cancelled={cancelled}
+									cancelled={cancelled || isMissedStatus(v.status)}
 									showActions={isOpenVisit(v)}
 									canReschedule={v.can_reschedule !== false}
 									cancelNote={
-										cancelled ? 'Cancelled · you won’t be charged for this visit.' : undefined
+										cancelled
+											? 'Cancelled · you won’t be charged for this visit.'
+											: isMissedStatus(v.status)
+												? 'Missed · you won’t be charged for this visit.'
+												: undefined
 									}
 									onReschedule={() => setMovingId(v.visit_public_id)}
 									onView={() =>
@@ -281,7 +311,7 @@ export default function AncillaryScheduledDetailsPage() {
 				</AppSection>
 
 				{/* How each visit works */}
-				{!allCancelled && (
+				{!ended && (
 					<AppSection marginTop={0} gap={12}>
 						<View>
 							<Text style={styles.sectionTitle} accessibilityRole="header">
@@ -344,7 +374,7 @@ export default function AncillaryScheduledDetailsPage() {
 			</ScrollView>
 
 			<AppFooterBar>
-				{allCancelled ? (
+				{ended ? (
 					<>
 						<AppButton variant="outline" size="lg" style={styles.flex} onPress={goHome}>
 							Back to home

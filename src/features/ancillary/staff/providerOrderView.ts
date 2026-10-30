@@ -238,6 +238,8 @@ export const orderStatusMeta = (status: AncillaryOrderStatus, expired = false): 
 			return { label: 'In progress', tone: 'inProgress' }
 		case 'COMPLETED':
 			return { label: 'Completed', tone: 'completed' }
+		case 'NO_SHOW':
+			return { label: 'Patient not available', tone: 'cancelled' }
 		case 'EXPIRED':
 			return { label: 'Expired', tone: 'done' }
 		case 'CANCELLED_BY_PROVIDER':

@@ -14,12 +14,14 @@ import {
 import { assignedAtLabel, capitalize, dayLabel, leadText, providerNoun } from './ancillaryBookingCopy'
 
 export const isCancelledStatus = (s?: AncillaryOrderStatus | null) => !!s && /CANCEL|EXPIRED/.test(s)
+/** The provider reached the address and the patient was not available (the patient is asked what happened). */
+export const isMissedStatus = (s?: AncillaryOrderStatus | null) => s === 'NO_SHOW'
 const isDoneStatus = (s?: AncillaryOrderStatus | null) => !!s && /COMPLETED/.test(s)
 const isLiveStatus = (s?: AncillaryOrderStatus | null) => !!s && /EN_ROUTE|ARRIVED|IN_PROGRESS|VERIFICATION/.test(s)
 
 /** Nothing more will happen to this visit: cancelled, expired, completed or nobody was available. */
 const isClosedVisit = (v: AncillaryOrderVisit) =>
-	isCancelledStatus(v.status) || isDoneStatus(v.status) || isVisitUnassigned(v.status)
+	isCancelledStatus(v.status) || isMissedStatus(v.status) || isDoneStatus(v.status) || isVisitUnassigned(v.status)
 
 /** Still on the books: not cancelled, not done, not without a provider. */
 export const isOpenVisit = (v: AncillaryOrderVisit) => !isClosedVisit(v)
@@ -52,11 +54,19 @@ export const orderPolicy = (order: AncillaryOrder | null) => order?.policy ?? DE
 
 export type VisitChip = { label: string; bg: string; fg: string }
 
-/** The pill on a visit card: Cancelled > no provider > Completed > In progress > Rescheduled > Next visit > Booked. */
+/** "10:20 AM" in the device's clock, from an ISO time; null when there is none. */
+const timeOfDay = (iso?: string | null) => {
+	const d = iso ? new Date(iso) : null
+	return d && !Number.isNaN(d.getTime()) ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null
+}
+
+/** The pill on a visit card: Cancelled > Missed > no provider > Completed > Here > In progress > Rescheduled > Next visit > Booked. */
 export const visitChip = (v: AncillaryOrderVisit, isNext: boolean, noun: string): VisitChip => {
 	if (isCancelledStatus(v.status)) return { label: 'Cancelled', bg: APP_COLORS.dangerBg, fg: APP_COLORS.danger }
+	if (isMissedStatus(v.status)) return { label: 'Missed', bg: APP_COLORS.dangerBg, fg: APP_COLORS.danger }
 	if (isVisitUnassigned(v.status)) return { label: `No ${noun} yet`, bg: APP_COLORS.dangerBg, fg: APP_COLORS.danger }
 	if (isDoneStatus(v.status)) return { label: 'Completed', bg: APP_COLORS.successBg, fg: APP_COLORS.success }
+	if (v.status === 'ARRIVED') return { label: `${capitalize(noun)} here`, bg: TONES.sky.bg, fg: TONES.sky.ink }
 	if (isLiveStatus(v.status)) return { label: 'In progress', bg: TONES.sky.bg, fg: TONES.sky.ink }
 	if (v.rescheduled) return { label: 'Rescheduled', bg: TONES.sky.bg, fg: TONES.sky.ink }
 	if (isNext) return { label: 'Next visit', bg: APP_COLORS.mint, fg: APP_COLORS.primary }
@@ -67,6 +77,11 @@ export const visitChip = (v: AncillaryOrderVisit, isNext: boolean, noun: string)
 export const assignLine = (v: AncillaryOrderVisit, noun: string, leadMinutes: number) => {
 	if (isCancelledStatus(v.status)) return `No ${noun} will be assigned`
 	if (isVisitUnassigned(v.status)) return `No ${noun} available`
+	if (isMissedStatus(v.status)) return `The ${noun} couldn’t meet you`
+	if (v.status === 'ARRIVED') {
+		const until = timeOfDay(v.waiting_until)
+		return `${v.provider?.name ?? capitalize(noun)} has arrived${until ? ` · waiting until ${until}` : ''}`
+	}
 	const who = v.provider?.name
 	if (who) return `${who} · ${noun}`
 	if (isDoneStatus(v.status)) return 'Visit completed'

@@ -69,6 +69,8 @@ export type AncillaryOrderStatus =
 	| 'EXPIRED'
 	/** Visit only: no provider was available for it -- the patient reschedules or cancels. */
 	| 'UNASSIGNED'
+	/** The provider reached the address, waited, and the patient was not available (the patient is asked what happened). */
+	| 'NO_SHOW'
 	| (string & {})
 
 export interface AncillaryOrderProvider {
@@ -98,6 +100,11 @@ export interface AncillaryOrderVisit {
 	/** Status endpoint only: the code the patient reads out at the door (until the visit starts) / when it is done. */
 	start_code?: string | null
 	completion_code?: string | null
+	/** Status endpoint only: the provider is at the address, and (policy on) until when they will wait. */
+	provider_arrived_at?: string | null
+	waiting_until?: string | null
+	/** The provider reported the patient as not available. */
+	missed?: boolean
 }
 
 /** Minutes, from the server (order_service.VISIT_ASSIGN_LEAD_MINUTES / VISIT_CANCEL_CUTOFF_MINUTES). */

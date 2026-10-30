@@ -31,6 +31,8 @@ export type TrackingVisit = {
 	start_code?: string | null
 	completion_code?: string | null
 	started_at?: string | null
+	/** The provider is at the address and (no-show policy on) will wait for the patient until then. */
+	waiting_until?: string | null
 	tasks?: { label: string; done: boolean }[]
 	/** Scheduled visits: the server's verdict on whether the patient can still cancel this visit. */
 	can_cancel?: boolean
@@ -83,6 +85,10 @@ export type HomeCareVisitViewProps = {
 	etaMinutes?: number | null
 	isCompleted: boolean
 	isCancelled: boolean
+	/** The provider reached the address and the patient was not available: the patient is asked what happened. */
+	isMissed?: boolean
+	/** What to show for a missed visit (the screen that owns the data builds it: MissedVisitBanner). */
+	missedNotice?: React.ReactNode
 	/** Live map (NurseMapTracker) shown in the arrival card while the provider is travelling. */
 	map?: React.ReactNode
 	review: { data: AncillaryReviewData | null; canRate: boolean; onOpen: () => void }
@@ -229,7 +235,7 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 	const first = (p.provider?.name ?? '').trim().split(/\s+/)[0] || `your ${noun}`
 	const current = stepIndex(p.status)
 	const inProgress = p.status === 'IN_PROGRESS' || p.status === 'VERIFICATION_PENDING'
-	const beforeStart = !p.isCompleted && !p.isCancelled && !inProgress
+	const beforeStart = !p.isCompleted && !p.isCancelled && !p.isMissed && !inProgress
 	const travelling = ['ASSIGNED', 'NURSE_ASSIGNED', 'EN_ROUTE', 'ARRIVED'].includes(p.status)
 
 	const visits = p.visits
@@ -248,6 +254,7 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 	const completionCode = currentVisit?.completion_code || (p.scheduled ? null : p.completionCode) || null
 	const tasks = currentVisit?.tasks ?? []
 	const startedAt = timeOnly(currentVisit?.started_at)
+	const waitingUntil = timeOnly(currentVisit?.waiting_until)
 
 	const instant = !currentVisit?.date
 	const whenTitle = instant
@@ -276,7 +283,9 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 		p.status === 'EN_ROUTE'
 			? `${first} is on the way`
 			: p.status === 'ARRIVED'
-				? 'Share your start code at the door'
+				? waitingUntil
+					? `Share your start code at the door · ${first} will wait until ${waitingUntil}`
+					: 'Share your start code at the door'
 				: 'You’ll be notified when they set off'
 
 	const tip = p.tipAmount && p.tipAmount > 0 ? p.tipAmount : 0
@@ -333,6 +342,8 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 						</View>
 					</View>
 				) : null}
+
+				{p.isMissed && p.missedNotice ? <View style={styles.sideMargin}>{p.missedNotice}</View> : null}
 
 				{inProgress ? (
 					<View style={styles.sideMargin}>
@@ -647,7 +658,7 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 				</TouchableOpacity>
 			</ScrollView>
 
-			{!p.isCompleted && !p.isCancelled ? (
+			{!p.isCompleted && !p.isCancelled && !p.isMissed ? (
 				<View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
 					<TouchableOpacity
 						style={[
