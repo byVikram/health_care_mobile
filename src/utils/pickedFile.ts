@@ -48,10 +48,16 @@ type DocumentPicker = typeof import('expo-document-picker')
 // the click, and awaiting an import first loses that, so nothing would open.
 let pickerPromise: Promise<DocumentPicker | null> | null = null
 let loadedPicker: DocumentPicker | null = null
+const importPicker = async (): Promise<DocumentPicker | null> => {
+	try {
+		loadedPicker = await import('expo-document-picker')
+		return loadedPicker
+	} catch {
+		return null
+	}
+}
 const loadPicker = () => {
-	pickerPromise ??= import('expo-document-picker')
-		.then((module) => (loadedPicker = module))
-		.catch(() => null)
+	pickerPromise ??= importPicker()
 	return pickerPromise
 }
 void loadPicker()

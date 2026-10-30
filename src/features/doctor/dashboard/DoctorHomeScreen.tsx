@@ -82,13 +82,15 @@ export function DoctorHomeScreen() {
 	// profile hub (SidebarLayout does the same for the other roles, but this screen doesn't sit inside it).
 	useEffect(() => {
 		let cancelled = false
-		fetchDoctorHub()
-			.then((hub) => {
+		const loadAvatar = async () => {
+			try {
+				const hub = await fetchDoctorHub()
 				if (!cancelled && hub.avatar_url) void updateUser({ avatar: hub.avatar_url })
-			})
-			.catch(() => {
+			} catch {
 				// Non-fatal: the initials avatar shows instead.
-			})
+			}
+		}
+		void loadAvatar()
 		return () => {
 			cancelled = true
 		}

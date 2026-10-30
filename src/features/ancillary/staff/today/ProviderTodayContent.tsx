@@ -105,11 +105,14 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 			const providerId = today.provider.provider_public_id
 			if (providerId && ratingFor.current !== providerId) {
 				ratingFor.current = providerId
-				getProviderAverageRating(providerId)
-					.then(setRating)
-					.catch(() => {
+				const loadRating = async () => {
+					try {
+						setRating(await getProviderAverageRating(providerId))
+					} catch {
 						ratingFor.current = null
-					})
+					}
+				}
+				void loadRating()
 			}
 			return today
 		} catch (e) {
