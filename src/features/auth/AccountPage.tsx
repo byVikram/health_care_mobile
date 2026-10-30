@@ -170,6 +170,8 @@ export default function AccountPage({
           <AppSelect
             label="Speciality *"
             placeholder="Select specialization"
+            presentation="sheet"
+            sheetTitle="Specialization"
             options={specialityOptions}
             value={selectedSpeciality}
             onSelect={(val) => {

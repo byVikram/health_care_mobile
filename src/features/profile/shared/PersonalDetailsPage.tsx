@@ -78,6 +78,8 @@ export default function PersonalDetailsPage() {
 							value={value as string}
 							onSelect={(v) => set(key, v as never)}
 							placeholder={`Select ${label.toLowerCase()}`}
+							presentation={key === 'gender' || key === 'maritalStatus' ? 'sheet' : 'dropdown'}
+							sheetTitle={label}
 						/>
 					</AppFormField>
 				)
