@@ -28,6 +28,10 @@ export type AppointmentActionCardProps = {
 	meta: string
 	/** Genuine new booking request (shows Accept + "Reject") vs an already-confirmed booking (shows "Cancel" only). */
 	isRequest: boolean
+	/** The chip text of a request (default "Request"), e.g. "Rescheduled" for a patient's reschedule request. */
+	requestLabel?: string
+	/** Chip text of an already-accepted booking (default "Confirmed"), e.g. "Reschedule needed" while the patient still has to pick a new time. */
+	statusLabel?: string
 	/** Derived from pre_intake.severity === 'severe' upstream — never fabricated, only passed when the backend actually flagged it. */
 	urgent?: boolean
 	slotLabel: string
@@ -56,6 +60,8 @@ export function AppointmentActionCard({
 	name,
 	meta,
 	isRequest,
+	requestLabel = 'Request',
+	statusLabel = 'Confirmed',
 	urgent = false,
 	slotLabel,
 	mode,
@@ -71,14 +77,14 @@ export function AppointmentActionCard({
 }: AppointmentActionCardProps) {
 	const pending = !outcome
 	const chipLabel = outcome
-		? { accept: 'Confirmed', reject: isRequest ? 'Declined' : 'Cancelled', reschedule: 'Proposed', refer: 'Referred' }[
+		? { accept: 'Confirmed', reject: isRequest ? 'Declined' : 'Cancelled', reschedule: 'Reschedule needed', refer: 'Referred' }[
 				outcome.kind
 			]
 		: isRequest
 			? urgent
 				? 'Red flag'
-				: 'Request'
-			: 'Confirmed'
+				: requestLabel
+			: statusLabel
 	const chipTone: AppTagTone = outcome
 		? outcome.kind === 'accept'
 			? 'confirmed'
@@ -89,7 +95,9 @@ export function AppointmentActionCard({
 			? 'cancelled'
 			: isRequest
 				? 'sand'
-				: 'confirmed'
+				: statusLabel === 'Confirmed'
+					? 'confirmed'
+					: 'sand'
 
 	return (
 		<View

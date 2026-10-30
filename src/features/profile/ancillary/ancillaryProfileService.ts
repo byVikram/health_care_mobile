@@ -7,6 +7,25 @@ import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { appendFile, type PickedFile } from '../../../utils/pickedFile'
 import type { AncillaryOverrideRow, AncillaryScheduleRow } from '../availability/availabilityAdapters'
 
+/** GET /api/ancillary/me/profile-hub: what the profile hub shows, in one light call. */
+export interface ProviderHub {
+	name: string
+	avatar_url: string | null
+	specialty_id: string | null
+	specialty_name: string | null
+	sub_specialty_label: string | null
+	experience_years: number | null
+	profile_completion: number
+	verification_status: 'approved' | 'pending' | 'rejected' | string | null
+	has_license: boolean
+	new_logins: number
+}
+
+export const fetchProviderHub = async (): Promise<ProviderHub> => {
+	const res = await ApiService.get<{ data: ProviderHub }>(API_ENDPOINTS.ANCILLARY.PROFILE_HUB)
+	return res.data.data
+}
+
 export const fetchProviderSchedule = async (): Promise<AncillaryScheduleRow[]> => {
 	const res = await ApiService.get<{ data: AncillaryScheduleRow[] }>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY)
 	const data = res.data?.data

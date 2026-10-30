@@ -20,9 +20,9 @@ import { usePatientSummary } from '../../features/dashboard/useHomeChromeData'
 
 import { ROUTES } from '../../navigation/routes'
 import { useSidebarMenu } from '../../navigation/useSidebarMenu'
-import { getPatientDetails } from '../../features/profile/patient/PatientProfileService'
-import { getDoctorProfile, mapDoctorProfileApi } from '../../features/doctor/doctorService'
-import { fetchProviderProfile } from '../../features/ancillary/ancillaryService'
+import { getPatientSummary } from '../../services/homeService'
+import { fetchDoctorHub } from '../../features/profile/doctor/doctorProfileService'
+import { fetchProviderHub } from '../../features/profile/ancillary/ancillaryProfileService'
 import { NEW_PHYSIOTHERAPIST_IMAGE_URL } from '../../features/profile/ancillary/specialtyConfig'
 import type { AppStackParamList } from '../../navigation/types'
 
@@ -59,12 +59,8 @@ function PatientSidebar({ visible, onClose, onLogout, onViewProfile, sections }:
 	const { user } = useAuth()
 	const { open: openSheet } = useHomeSheets()
 	const { summary } = usePatientSummary(visible)
-	const { members, reload: reloadFamily } = useFamilyMembers()
+	const { members } = useFamilyMembers() // the shared family list: loaded once, refreshed when the app changes it
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-	useEffect(() => {
-		if (visible) void reloadFamily()
-	}, [visible, reloadFamily])
 
 	useEffect(
 		() => () => {
@@ -139,22 +135,19 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 		let cancelled = false
 		const syncAvatar = async () => {
 			try {
+				// Each role's hub endpoint is a light call that carries the photo; the full profile is loaded only by
+				// the screens that show it.
 				if (role === 'doctor') {
-					const res = await getDoctorProfile()
-					if (!cancelled && res.success && res.data) {
-						const profile = mapDoctorProfileApi(res.data)
-						if (profile.personal.avatar) {
-							updateUser({ avatar: profile.personal.avatar })
-						}
-					}
+					const hub = await fetchDoctorHub()
+					if (!cancelled && hub.avatar_url) updateUser({ avatar: hub.avatar_url })
 					return
 				}
 
 				if (role === 'ancillary' || role === 'nurse') {
-					const profile = await fetchProviderProfile()
+					const hub = await fetchProviderHub()
 					if (!cancelled) {
 						const resolvedAvatar =
-							profile?.avatar_s3_key ||
+							hub.avatar_url ||
 							(ancillarySpecialty === 'physiotherapy' ? NEW_PHYSIOTHERAPIST_IMAGE_URL : '')
 						if (resolvedAvatar && resolvedAvatar !== authUser?.avatar) {
 							updateUser({ avatar: resolvedAvatar })
@@ -163,9 +156,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 					return
 				}
 
-				const res = await getPatientDetails()
-				if (!cancelled && res.success && res.data?.personal?.avatar) {
-					updateUser({ avatar: res.data.personal.avatar })
+				const summary = await getPatientSummary()
+				if (!cancelled && summary.avatar_url) {
+					updateUser({ avatar: summary.avatar_url })
 				}
 			} catch {
 				// Silently ignore; the existing avatar (or default) will show.

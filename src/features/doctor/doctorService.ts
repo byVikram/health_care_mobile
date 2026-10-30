@@ -145,6 +145,20 @@ export const updateAppointmentsStatus = async (
 	return res.data
 }
 
+/**
+ * Doctor marks the patient as a no-show (patient no-show policy): the patient is emailed and can reply with a reason.
+ * The server only accepts it from 60 minutes after the start until 5 days after it and answers 400 with the reason
+ * otherwise -- the caller shows that message, so the global error dialog is suppressed.
+ */
+export const markAppointmentNoShow = async (appointmentId: string): Promise<AppointmentResponse> => {
+	const res = await ApiService.patch<AppointmentResponse>(
+		API_ENDPOINTS.APPOINTMENTS.UPDATE,
+		{ appointment_id: appointmentId, status_id: await getStatusIdByLabel('no_show') },
+		{ skipGlobalError: true }
+	)
+	return res.data
+}
+
 
 export interface RescheduleAppointmentPayload {
 	appointment_id: string
@@ -157,8 +171,24 @@ export interface RescheduleAppointmentPayload {
 	status_id?: string // 👈 ADD THIS
 }
 
+// Patient / admin reschedule: always carries the new slot. A DOCTOR must not use this (the backend answers a
+// doctor's date/time/hospital with a 400) -- see askPatientToReschedule below.
 export const rescheduleAppointment = async (payload: RescheduleAppointmentPayload): Promise<AppointmentResponse> => {
 	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, payload)
+	return res.data
+}
+
+// Doctor "reschedule": the doctor does not pick a slot, they ask the PATIENT to choose a new time. Same endpoint,
+// but only `appointment_id` (+ an optional reason, max 500 chars) is sent. The appointment becomes
+// `reschedule_required` and the patient is emailed; asking again while it already is one is a harmless no-op.
+export const RESCHEDULE_REASON_MAX_LENGTH = 500
+
+export const askPatientToReschedule = async (appointmentId: string, reason?: string): Promise<AppointmentResponse> => {
+	const trimmed = reason?.trim().slice(0, RESCHEDULE_REASON_MAX_LENGTH)
+	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, {
+		appointment_id: appointmentId,
+		...(trimmed ? { reason: trimmed } : {}),
+	})
 	return res.data
 }
 export interface StartConsultationResponse {
@@ -286,6 +316,8 @@ export interface DoctorStatusResponse {
 	data: {
 		profile_completed: boolean
 		is_verified: boolean
+		/** What is still needed for the profile to count as complete (empty once it is). */
+		missing?: string[]
 	}
 }
 
@@ -303,7 +335,11 @@ export const createAppointment = async (payload: CreateAppointmentPayload): Prom
 			'React web booking uses axios interceptor with localStorage access_token and sends Authorization: Bearer <access_token>.',
 	})
 
-	const res = await ApiService.post<CreateAppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.CREATE, payload)
+	// skipGlobalError: the booking screen shows the server's message itself (e.g. 403 BOOKING_RESTRICTED when online
+	// booking is paused), so a second "Access Denied" / "API Error" dialog on top of it is not wanted.
+	const res = await ApiService.post<CreateAppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.CREATE, payload, {
+		skipGlobalError: true,
+	})
 
 	console.log('[createAppointment][RN] response', {
 		status: res.status,

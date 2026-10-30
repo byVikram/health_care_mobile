@@ -69,6 +69,7 @@ import {
 } from './availabilityAdapters'
 import { DayStrip } from './components/DayStrip'
 import { DaySections } from './components/DaySections'
+import { SlotLengthCard } from './components/SlotLengthCard'
 import { OverrideList } from './components/OverrideList'
 import { OverrideSheet } from './components/OverrideSheet'
 import { ClinicPickerSheet } from './components/ClinicPickerSheet'
@@ -441,8 +442,18 @@ export default function AvailabilityPage() {
 							<>
 								<AppFormCard
 									title="Weekly hours"
-									helper="Pick a day, then add one or more times in the morning, afternoon or evening."
+									helper="Pick a day, then add one or more time ranges, e.g. 9–10 AM and 11 AM–12 PM."
 								>
+									{isDoctor && (
+										<SlotLengthCard
+											options={DOCTOR_SLOTS}
+											value={currentSlot}
+											onChange={setSlot}
+											copyLabel={`Copy ${DAY_FULL[day]}'s hours to all weekdays`}
+											onCopy={copyToWeekdays}
+											copyDisabled={!isDayOn(week[day])}
+										/>
+									)}
 									<DayStrip week={week} selected={day} onSelect={setDay} />
 									<View style={styles.dayHead}>
 										<View style={styles.flex}>
@@ -466,14 +477,17 @@ export default function AvailabilityPage() {
 												}}
 												others={othersFor(placeId, activeMode, day)}
 											/>
-											<AppButton
-												variant="outline"
-												size="md"
-												icon="content-copy"
-												onPress={copyToWeekdays}
-											>
-												Copy to all weekdays
-											</AppButton>
+											{!isDoctor && (
+												<View style={styles.copyRow}>
+													<TouchableOpacity
+														onPress={copyToWeekdays}
+														hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+														accessibilityRole="button"
+													>
+														<Text style={styles.copyLink}>Copy to all weekdays</Text>
+													</TouchableOpacity>
+												</View>
+											)}
 										</>
 									) : (
 										<Text style={styles.offText}>
@@ -482,15 +496,15 @@ export default function AvailabilityPage() {
 									)}
 								</AppFormCard>
 
-								<AppFormCard title={isDoctor ? 'Slot length' : config.unitLabel}>
-									<AppChipGroup
-										options={slotOptions}
-										values={currentSlot ? [String(currentSlot)] : []}
-										onChange={(v) => v[0] && setSlot(Number(v[0]))}
-										single
-										accessibilityLabel={isDoctor ? 'Slot length' : config.unitLabel}
-									/>
-									{!isDoctor && (
+								{!isDoctor && (
+									<AppFormCard title={config.unitLabel}>
+										<AppChipGroup
+											options={slotOptions}
+											values={currentSlot ? [String(currentSlot)] : []}
+											onChange={(v) => v[0] && setSlot(Number(v[0]))}
+											single
+											accessibilityLabel={config.unitLabel}
+										/>
 										<AppFormField label="How far I travel">
 											<AppChipGroup
 												options={config.travelOptions.map((km) => ({
@@ -503,8 +517,8 @@ export default function AvailabilityPage() {
 												accessibilityLabel="How far I travel"
 											/>
 										</AppFormField>
-									)}
-								</AppFormCard>
+									</AppFormCard>
+								)}
 							</>
 						) : (
 							<AppFormCard
@@ -594,6 +608,17 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		lineHeight: 16,
 		color: APP_COLORS.inkMuted,
+	},
+	// plain primary text link from the design (not a bordered button)
+	copyRow: {
+		flexDirection: 'row',
+		justifyContent: 'flex-end',
+	},
+	copyLink: {
+		fontSize: 13,
+		lineHeight: 18,
+		fontWeight: '700',
+		color: APP_COLORS.primary,
 	},
 	offText: {
 		fontSize: 13,

@@ -13,10 +13,13 @@ import {
 	LayoutAnimation,
 	ScrollView,
 	StyleSheet,
+	Text,
+	TouchableOpacity,
 	View,
 	type NativeScrollEvent,
 	type NativeSyntheticEvent,
 } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import {
@@ -36,6 +39,7 @@ import {
 } from '../../components/common'
 import { APP_COLORS } from '../../config/theme'
 import { useAuth } from '../../context/AuthContext'
+import { useCurrentPincode } from '../../hooks/useCurrentPincode'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import { labItemById, useLabCatalogue, useLabItemDetail } from './labCatalogue'
@@ -43,13 +47,6 @@ import { cartItems, labBooking, totalsOf, useLabBooking } from './labBookingStor
 import { inr, plural } from './labFormat'
 import { LAB_CONCERNS, LAB_ICONS, LAB_TYPES, type LabItem, type LabTypeId } from './labMock'
 import type { ApiCatalogueDetail } from './labService'
-
-// TODO(next phase): use the user's location to show only what a lab can actually collect near them.
-// This list cannot know the address (it is the browse page, before a patient / address is chosen), so today
-// an item that no lab serves at the user's address is only flagged later: "Not available at your address" in
-// the details sheet, and in the cart's availability check. Next phase: read the device location here
-// (src/services/locationService.ts), resolve its pincode, call GET /api/laboratory/availability for the
-// listed items (or add a `pincode` filter to GET /api/laboratory/catalogue) and hide / mark the unavailable ones.
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 
@@ -152,6 +149,8 @@ export default function LabCatalogPage() {
 	const navigation = useNavigation<Nav>()
 	const { user } = useAuth()
 	const booking = useLabBooking()
+	// Only what the labs serving the patient's pincode offer is listed; wait for the pincode so the full list does not flash first
+	const { pincode, resolving } = useCurrentPincode()
 
 	const [type, setType] = useState<LabTypeId>('all')
 	const [concern, setConcern] = useState<string | null>(null)
@@ -172,15 +171,19 @@ export default function LabCatalogPage() {
 		() => (concernDef ? concernDef.queries : debounced ? [debounced] : []),
 		[concernDef, debounced]
 	)
-	const catalogue = useLabCatalogue({ queries, kind: KIND_OF_TYPE[type] })
-	const { packages, tests } = catalogue
+	const catalogue = useLabCatalogue({ queries, kind: KIND_OF_TYPE[type], pincode, paused: resolving })
+	const { packages, tests, coverage } = catalogue
+	// No lab serves the pincode: the list is empty and says so. Without coverage (no pincode, LabStack not answering) the
+	// full list is shown and nothing is claimed about the area.
+	const unserved = coverage?.serviceable === false
+	const homeAvailable = !coverage?.serviceable || coverage.services.includes('HOME_SAMPLE')
 
 	const items = cartItems(booking)
 	const { total } = totalsOf(booking)
 	const inCart = (id: string) => booking.cart.includes(id)
 	const countLabel = `${plural(items.length, 'item', 'items')} added`
 
-	const noResults = !catalogue.loading && !catalogue.error && packages.length === 0 && tests.length === 0
+	const noResults = !catalogue.loading && !catalogue.error && !unserved && packages.length === 0 && tests.length === 0
 	const filtersActive = type !== 'all' || !!concern || !!query.trim()
 
 	const resetFilters = () => {
@@ -241,6 +244,19 @@ export default function LabCatalogPage() {
 
 	const firstName = (user?.name ?? '').trim().split(/\s+/)[0] ?? ''
 
+	const changeLocation = () => navigation.navigate(ROUTES.STACK.LOCATION_SELECT as never)
+	const servicesText = (coverage?.services ?? [])
+		.map((svc) => (svc === 'HOME_SAMPLE' ? 'home collection' : svc === 'CENTER_VISIT' ? 'lab visit' : ''))
+		.filter(Boolean)
+		.join(' or ')
+	const locationText = !pincode
+		? resolving
+			? 'Finding what is available near you…'
+			: 'Set your location to see what is available near you'
+		: coverage?.serviceable
+			? `Available near ${pincode} · ${plural(coverage.labs.length, 'lab', 'labs')}${servicesText ? ` · ${servicesText}` : ''}`
+			: `Near ${pincode}`
+
 	const row = (item: LabItem, i: number) => (
 		<AppCatalogItemRow
 			key={item.id}
@@ -263,7 +279,7 @@ export default function LabCatalogPage() {
 			<AppCatalogHeader
 				title="Lab tests at home"
 				eyebrow={firstName ? `HI ${firstName.toUpperCase()}` : undefined}
-				subtitle="Home collection · reports in the app"
+				subtitle={homeAvailable ? 'Home collection · reports in the app' : 'Visit a lab · reports in the app'}
 				compact={compact}
 				showBack={navigation.canGoBack()}
 				onBack={() => navigation.goBack()}
@@ -286,6 +302,16 @@ export default function LabCatalogPage() {
 				onScroll={handleScroll}
 				scrollEventThrottle={16}
 			>
+				<View style={styles.locationRow}>
+					<MaterialCommunityIcons name="map-marker-outline" size={18} color={APP_COLORS.primary} />
+					<Text style={styles.locationText} numberOfLines={1}>
+						{locationText}
+					</Text>
+					<TouchableOpacity onPress={changeLocation} accessibilityRole="button" hitSlop={8}>
+						<Text style={styles.locationAction}>{pincode ? 'Change' : 'Set location'}</Text>
+					</TouchableOpacity>
+				</View>
+
 				<View style={styles.filters}>
 					<AppTabs tabs={typeTabs} value={type} onChange={pickType} accessibilityLabel="Show" />
 					<AppConcernGrid
@@ -313,6 +339,15 @@ export default function LabCatalogPage() {
 					/>
 				)}
 
+				{unserved && (
+					<AppCatalogEmpty
+						title={`No lab serves ${coverage?.pincode} yet`}
+						subtitle="We’re adding labs. Try another location, for example where the sample would be collected."
+						actionLabel="Change location"
+						onAction={changeLocation}
+					/>
+				)}
+
 				{packages.length > 0 && (
 					<AppCatalogSection
 						title="Health packages"
@@ -323,7 +358,7 @@ export default function LabCatalogPage() {
 					</AppCatalogSection>
 				)}
 
-				<AppTrustStrip chips={TRUST_CHIPS} />
+				<AppTrustStrip chips={homeAvailable ? TRUST_CHIPS : TRUST_CHIPS.filter((c) => c.key !== 'home')} />
 
 				{tests.length > 0 && (
 					<AppCatalogSection
@@ -400,4 +435,7 @@ const styles = StyleSheet.create({
 	scrollContent: { paddingVertical: 16, gap: 16 },
 	filters: { paddingHorizontal: 16, gap: 12 },
 	spinner: { marginVertical: 24 },
+	locationRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16 },
+	locationText: { flex: 1, fontSize: 13, lineHeight: 18, color: APP_COLORS.ink },
+	locationAction: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.primary },
 })

@@ -4,9 +4,15 @@
 // design): dark hero and mint headers, brand mark, form field, info note, pinned CTA footer and OTP boxes.
 // Colours come from APP_COLORS / TONES -- nothing here is hardcoded to a new palette.
 
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
+	Animated,
+	Easing,
+	Keyboard,
+	KeyboardEvent,
+	LayoutChangeEvent,
+	Platform,
 	Pressable,
 	StatusBar,
 	StyleProp,
@@ -14,6 +20,7 @@ import {
 	Text,
 	TextInput,
 	TextInputProps,
+	useWindowDimensions,
 	View,
 	ViewStyle,
 } from 'react-native'
@@ -277,6 +284,108 @@ export function CtaButton({
 	)
 }
 
+// Space kept between the CTA and the top of the keyboard while it is open.
+const KEYBOARD_GAP = 12
+const KEYBOARD_ANDROID_MS = 180
+const KEYBOARD_FALLBACK_MS = 250
+
+// The height a screen has with the keyboard hidden, remembered across screens: the OTP step opens with the keyboard
+// already up (it was open for the phone number), so it could not measure its full height itself.
+let lastBaseHeight = { window: 0, value: 0 }
+
+/** Bottom padding of the pinned footer at rest: clear of the home indicator. */
+const footerRestingPadding = (bottomInset: number) => Math.max(bottomInset, 12) + 8
+
+/**
+ * Screen container whose pinned footer rides up with the keyboard: the footer (the last child, e.g. <AuthFooter>)
+ * sits just above the keyboard while it is open, the content above it shrinks to make room, and everything glides
+ * back down when the keyboard closes. Put it where a KeyboardAvoidingView would go; it replaces one.
+ *
+ * It adds an animated spacer under its children. Where the OS already shrinks the window for the keyboard
+ * (Android adjustResize) it measures that shrink and lifts only by what is left, so it is never lifted twice.
+ */
+export function KeyboardLiftView({ style, children }: { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
+	const insets = useSafeAreaInsets()
+	const { width, height } = useWindowDimensions()
+	const spacer = useRef(new Animated.Value(0)).current
+	const spacerRef = useRef(0)
+	const keyboardHeight = useRef(0)
+	// Height of this view with the keyboard hidden, and its height now: the difference is the OS's own shrink.
+	const baseHeight = useRef(lastBaseHeight.window === height ? lastBaseHeight.value : 0)
+	const currentHeight = useRef(0)
+	const restingPadding = footerRestingPadding(insets.bottom)
+
+	const lift = (duration: number) => {
+		const osShrink = Math.max(0, baseHeight.current - currentHeight.current)
+		const target =
+			keyboardHeight.current > 0
+				? Math.max(0, Math.round(keyboardHeight.current - osShrink - (restingPadding - KEYBOARD_GAP)))
+				: 0
+		if (target === spacerRef.current) return
+		spacerRef.current = target
+		spacer.stopAnimation()
+		if (duration <= 0) {
+			spacer.setValue(target)
+			return
+		}
+		Animated.timing(spacer, {
+			toValue: target,
+			duration,
+			easing: Easing.out(Easing.cubic),
+			// animates a layout height, so it cannot use the native driver
+			useNativeDriver: false,
+		}).start()
+	}
+
+	useEffect(() => {
+		const show = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+		const hide = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+		const ms = (e?: KeyboardEvent) =>
+			Platform.OS === 'ios' ? e?.duration || KEYBOARD_FALLBACK_MS : KEYBOARD_ANDROID_MS
+		const onShow = Keyboard.addListener(show, (e) => {
+			keyboardHeight.current = e.endCoordinates.height
+			lift(ms(e))
+		})
+		const onHide = Keyboard.addListener(hide, (e) => {
+			keyboardHeight.current = 0
+			lift(ms(e))
+		})
+		// Already open when this screen mounts (e.g. coming back from the next step).
+		if (Keyboard.isVisible()) {
+			keyboardHeight.current = Keyboard.metrics()?.height ?? 0
+			lift(0)
+		}
+		return () => {
+			onShow.remove()
+			onHide.remove()
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [restingPadding])
+
+	// Rotation / window resize with the keyboard hidden: measure the base height again.
+	useEffect(() => {
+		if (keyboardHeight.current <= 0) baseHeight.current = 0
+	}, [width, height])
+
+	const handleLayout = (e: LayoutChangeEvent) => {
+		currentHeight.current = e.nativeEvent.layout.height
+		if (keyboardHeight.current <= 0) {
+			// the max, not the latest: on Android the window can shrink just before the keyboard event arrives
+			baseHeight.current = Math.max(baseHeight.current, currentHeight.current)
+			lastBaseHeight = { window: height, value: baseHeight.current }
+			return
+		}
+		lift(Platform.OS === 'ios' ? 0 : KEYBOARD_ANDROID_MS)
+	}
+
+	return (
+		<View style={[styles.liftRoot, style]} onLayout={handleLayout}>
+			{children}
+			<Animated.View style={{ height: spacer }} pointerEvents="none" />
+		</View>
+	)
+}
+
 /** Pinned bottom bar for the primary CTA (keeps clear of the home indicator). */
 export function AuthFooter({
 	children,
@@ -292,7 +401,7 @@ export function AuthFooter({
 		<View
 			style={[
 				styles.footer,
-				{ paddingBottom: Math.max(insets.bottom, 12) + 8 },
+				{ paddingBottom: footerRestingPadding(insets.bottom) },
 				divider && styles.footerDivider,
 				style,
 			]}
@@ -518,6 +627,7 @@ const styles = StyleSheet.create({
 	},
 	noteText: { flex: 1, fontSize: 13, lineHeight: 18, color: '#3D5357' },
 
+	liftRoot: { flex: 1 },
 	footer: { paddingTop: 12, paddingHorizontal: 24, gap: 10, backgroundColor: APP_COLORS.surface },
 	footerDivider: { borderTopWidth: 1, borderTopColor: '#EEF2F2' },
 	cta: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

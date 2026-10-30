@@ -1,473 +1,65 @@
-// src/features/dashboard/screens/DashboardPage.tsx
-import React, { useCallback, useEffect, useState } from 'react'
-import {
-	RefreshControl,
-	ScrollView,
-	StyleSheet,
-	View,
-	useWindowDimensions,
-	Animated,
-	Text,
-	TouchableOpacity,
-} from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { useNavigation, type NavigationProp } from '@react-navigation/native'
+// src/features/dashboard/DashboardPage.tsx
+//
+// The Home of the staff roles that have no screen of their own (pharmacy, radiology): quick services and promotions,
+// then the shared community / content sections. The doctor, patient and ancillary-provider Homes are separate screens
+// (DoctorHomeScreen, PatientHomeScreen, ProviderTodayScreen), picked by role in MainTabNavigator.
 
-import QuickServicesSection from './components/QuickServicesSection'
-import MediaPromotionsSection from './components/MediaPromotionsSection'
-import ServicesSection from './components/ServiceSection'
-import SpecialitySection from './components/SpecialitySection'
-import ConsultSection from './components/ConsultSection'
-import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
-import HomeOffersSection from './components/HomeOffersSection'
-import HomeHealthReadsSection from './components/HomeHealthReadsSection'
-import HomeCommunitiesSection from './components/HomeCommunitiesSection'
-import AskDoctorSection from './components/AskDoctorSection'
+import React from 'react'
+import { StyleSheet, View, useWindowDimensions } from 'react-native'
 
-import PatientUpcomingAppointments from './components/PatientUpcomingAppointments'
-import CommunitySection from './components/CommunitySection'
-import BlogsSection from './components/BlogsSection'
-import ArticleSection from './components/ArticleSection'
-import UpcomingEventsSection from './components/EventSection'
-import PodcastsSection from './components/PodcastsSection'
-import DoctorAppointments from '../doctor/DoctorAppointments'
-import { getAppointments, getSpecialities } from '../doctor/doctorService'
-import type { SpecialityItem } from '../../types/speciality'
-import { APP_COLORS } from '../../config/theme'
-import ProviderTodayContent from '../ancillary/staff/today/ProviderTodayContent'
-
-import { formatDateForApi } from '../../utils/date'
-import { USER_ROLES, isPatientRole } from '../../constants/constants'
+import { USER_ROLES } from '../../constants/constants'
 import { useAuth } from '../../context/AuthContext'
-import StatusModal from '../../components/common/feedback/StatusModal'
-import { useScroll } from '../../context/ScrollContext'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-
-import { ROUTES } from '../../navigation/routes'
-import { useTabBarClearance } from '../../navigation/tabBar'
-import type { AppNavigationParamList } from '../../navigation/types'
-
-import PatientHealthQuestionsList from '../dashboard/components/PatientHealthQuestionsList'
-import { AppButton, AppModal, AppTypography } from '../../components/common'
-import { getDoctorStatus, DoctorStatusResponse } from '../doctor/doctorService'
-
+import ArticleSection from './components/ArticleSection'
+import BlogsSection from './components/BlogsSection'
+import CommunitySection from './components/CommunitySection'
+import HomeScrollView from './components/HomeScrollView'
+import MediaPromotionsSection from './components/MediaPromotionsSection'
+import UpcomingEventsSection from './components/EventSection'
+import PatientHealthQuestionsList from './components/PatientHealthQuestionsList'
+import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
+import PodcastsSection from './components/PodcastsSection'
+import QuickServicesSection from './components/QuickServicesSection'
 
 export default function DashboardPage() {
 	const { width } = useWindowDimensions()
-	const scrollData = useScroll()
+	const { role } = useAuth()
 	const isTablet = width >= 768
 	const isLandscape = width > 1024
 
-	const scrollY = React.useRef(new Animated.Value(0)).current
-
-	React.useEffect(() => {
-		scrollData?.registerScrollY(scrollY)
-		return () => scrollData?.unregisterScrollY(scrollY)
-	}, [scrollData, scrollY])
-
-	const insets = useSafeAreaInsets()
-	const tabBarClearance = useTabBarClearance()
-	const { role } = useAuth()
-	const isDoctor = role === USER_ROLES.DOCTOR
-	const isNurse = role === USER_ROLES.ANCILLARY
-	const isStaffRole = isDoctor || isNurse
-	const isPatientHome = isPatientRole(role)
-	// Patient Home header (expanded): 8 + 52 + 6 + 28 + 6 + 48 + 16. Provider Today header: 8 + 60 + 16.
-	const defaultHeaderHeight = isStaffRole ? insets.top + 84 : isPatientHome ? insets.top + 164 : insets.top + 146
-	const headerHeight = (scrollData?.headerHeight && scrollData.headerHeight > 0) ? scrollData.headerHeight : defaultHeaderHeight
-	const navigation = useNavigation<NavigationProp<AppNavigationParamList>>()
-
-	const [appointments, setAppointments] = useState<any[]>([])
-	const [apptLoading, setApptLoading] = useState(false)
-	const [apptError, setApptError] = useState('')
-	const [refreshing, setRefreshing] = useState(false)
-	const [refreshToken, setRefreshToken] = useState(0)
-	const [modalType, setModalType] = useState<'success' | 'error' | null>(null)
-
-	// Stable reference: PatientUpcomingAppointments has this in its fetch
-	// effect's dependency array, so a new function identity on every render
-	// (e.g. from an unrelated parent re-render) would re-trigger the fetch.
-	const handleAppointmentsRefreshComplete = useCallback(() => setRefreshing(false), [])
-
-	// Patient Home: specialities fetched once and shared by Care options (count), symptoms and
-	// "Book by speciality" (label -> id resolution). Failing soft-fails to [] (sections still render).
-	const [specialities, setSpecialities] = useState<SpecialityItem[]>([])
-	const [specialitiesLoading, setSpecialitiesLoading] = useState(isPatientHome)
-
-	useEffect(() => {
-		if (!isPatientHome) return
-		let active = true
-		const load = async () => {
-			try {
-				const res = await getSpecialities()
-				if (active && res?.success && Array.isArray(res.data)) setSpecialities(res.data)
-			} catch {
-				// keep the previous list
-			} finally {
-				if (active) setSpecialitiesLoading(false)
-			}
-		}
-		void load()
-		return () => {
-			active = false
-		}
-	}, [isPatientHome, refreshToken])
-
-	const [selectedDate, setSelectedDate] = useState(0)
-	const [doctorAppointmentSearch, setDoctorAppointmentSearch] = useState('')
-
-	// ----- Doctor Status Fetch effect -----
-	const [doctorStatus, setDoctorStatus] = useState<DoctorStatusResponse['data'] | null>(null)
-	const [showUnverifiedBanner, setShowUnverifiedBanner] = useState(false)
-
-	// ---------------- WEEK DAYS ----------------
-	const buildWeekDays = () => {
-		const today = new Date()
-		const days = []
-
-		for (let i = 0; i < 7; i++) {
-			const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i)
-
-			days.push({
-				day: d.toLocaleDateString('en-US', { weekday: 'short' }),
-				date: String(d.getDate()),
-				red: d.getDay() === 0 || d.getDay() === 6,
-				dateObj: d,
-			})
-		}
-		return days
-	}
-
-	const [weekDays] = useState(() => buildWeekDays())
-
-	// ---------------- DOCTOR API ----------------
-	useEffect(() => {
-		if (role !== USER_ROLES.DOCTOR) return
-
-		// Stale-response guard: a fast selectedDate switch re-runs this effect; the cleanup flips `active`
-		// so an older in-flight response can't overwrite a newer one.
-		let active = true
-
-		const fetchStatus = async () => {
-			try {
-				const status = await getDoctorStatus()
-				if (!active) return
-				setDoctorStatus(status)
-
-				if (status.profile_completed && !status.is_verified) {
-					setShowUnverifiedBanner(true)
-				}
-			} catch (error) {
-				if (active) console.error('Failed to fetch doctor status:', error)
-			}
-		}
-
-		const fetchAppointments = async () => {
-			try {
-				setApptLoading(true)
-				setApptError('')
-
-				const dateStr = formatDateForApi(weekDays[selectedDate]?.dateObj ?? new Date())
-
-				const res = await getAppointments({
-					appointment_date: dateStr,
-				})
-				if (!active) return
-
-				if (res.success) {
-					setAppointments(Array.isArray(res.data) ? res.data : [])
-				} else {
-					setApptError(res.message ?? 'Failed to load appointments')
-				}
-			} catch {
-				if (active) setApptError('Failed to load appointments')
-			} finally {
-				if (active) setApptLoading(false)
-			}
-		}
-
-		void fetchStatus()
-		void fetchAppointments()
-
-		return () => {
-			active = false
-		}
-	}, [role, selectedDate, weekDays])
-
-	const handleRefresh = async () => {
-		setRefreshing(true)
-
-		try {
-			if (role === USER_ROLES.DOCTOR) {
-				setApptError('')
-
-				const dateStr = formatDateForApi(weekDays[selectedDate]?.dateObj ?? new Date())
-
-				const res = await getAppointments({
-					appointment_date: dateStr,
-				})
-
-				if (res.success) {
-					setAppointments(Array.isArray(res.data) ? res.data : [])
-				} else {
-					setApptError(res.message ?? 'Failed to load appointments')
-				}
-			} else if (role === USER_ROLES.PHARMACY) {
-				setRefreshing(false)
-			} else {
-				setRefreshToken((token) => token + 1)
-			}
-		} catch {
-			if (role === USER_ROLES.DOCTOR) {
-				setApptError('Failed to load appointments')
-			}
-		} finally {
-			if (role === USER_ROLES.DOCTOR) {
-				setRefreshing(false)
-			}
-		}
-	}
-
-	const renderDoctorPanel = () => (
+	const hero = (
 		<>
-			{showUnverifiedBanner && (
-				<View style={styles.verificationBannerContainer}>
-					<View style={styles.verificationBannerIconBox}>
-						<MaterialCommunityIcons name="clock-outline" size={18} color="#F57C00" />
-					</View>
-					<View style={styles.verificationBannerTextContainer}>
-						<AppTypography style={styles.verificationBannerTitle}>Verification Pending</AppTypography>
-						<AppTypography style={styles.verificationBannerDesc} numberOfLines={3}>
-							Your profile is under review. You'll get full access once your account is verified.
-						</AppTypography>
-					</View>
-					<TouchableOpacity style={styles.verificationBannerButton}>
-						<AppTypography style={styles.verificationBannerButtonText} numberOfLines={1}>Learn More</AppTypography>
-					</TouchableOpacity>
-				</View>
-			)}
-			<DoctorAppointments
-			selectedDate={selectedDate}
-			setSelectedDate={setSelectedDate}
-			appointments={appointments}
-			apptLoading={apptLoading}
-			apptError={apptError}
-			weekDays={weekDays}
-			selectedDateObj={weekDays[selectedDate]?.dateObj}
-			searchQuery={doctorAppointmentSearch}
-			setSearchQuery={setDoctorAppointmentSearch}
-		/>
+			<QuickServicesSection role={role} />
+			<MediaPromotionsSection role={role} />
 		</>
 	)
-
-	// Patient Home ("1 · Home" design), top to bottom; sections are 24px apart (styles.patientContent).
-	const renderUserPanel = () => (
-		<View style={styles.patientContent}>
-			<QuickServicesSection role={role} />
-			<ServicesSection
-				specialityCount={specialities.length || null}
-				specialitiesLoading={specialitiesLoading}
-				refreshToken={refreshToken}
-			/>
-			<HomeOffersSection refreshToken={refreshToken} />
-			<PatientUpcomingAppointments
-				refreshToken={refreshToken}
-				onRefreshComplete={handleAppointmentsRefreshComplete}
-			/>
-			<SpecialitySection specialities={specialities} refreshToken={refreshToken} />
-			<ConsultSection specialities={specialities} />
-			<HomeHealthReadsSection refreshToken={refreshToken} />
-			<HomeCommunitiesSection refreshToken={refreshToken} />
-			<AskDoctorSection itemLimit={3} refreshToken={refreshToken} />
-		</View>
-	)
-
-	const renderPharmacyPanel = () => <></>
-	const renderRadiologyPanel = () => <></>
-	const renderAncillaryPanel = () => (
-		<ProviderTodayContent refreshToken={refreshToken} onRefreshComplete={handleAppointmentsRefreshComplete} />
-	)
-	const renderQuickServicesSection = () => (
-		<View style={isDoctor && styles.doctorQuickServicesSpacing}>
-			<QuickServicesSection role={role} />
-		</View>
-	)
-	const renderRoleBasedPanel = () => {
-		switch (role) {
-			case USER_ROLES.DOCTOR:
-				return renderDoctorPanel()
-
-			case USER_ROLES.PHARMACY:
-				return renderPharmacyPanel()
-
-			case USER_ROLES.RADIOLOGY:
-				return renderRadiologyPanel()
-
-			case USER_ROLES.ANCILLARY:
-				return renderAncillaryPanel()
-
-			default:
-				return renderUserPanel()
-		}
-	}
-
-	const renderMainContent = () => {
-		if (isNurse) {
-			return renderRoleBasedPanel()
-		}
-
-		if (
-			role !== USER_ROLES.DOCTOR &&
-			role !== USER_ROLES.PHARMACY &&
-			role !== USER_ROLES.RADIOLOGY
-		) {
-			return renderUserPanel()
-		}
-
-		if (isTablet) {
-			return (
-				<View style={styles.tabletRow}>
-					{/* HERO */}
-					<View style={[styles.heroColumn, isLandscape && styles.heroColumnHalf]}>
-						{renderQuickServicesSection()}
-						<MediaPromotionsSection role={role} />
-					</View>
-
-					{/* ROLE PANEL */}
-					<View style={[styles.column, isLandscape && styles.rightColumnHalf]}>{renderRoleBasedPanel()}</View>
-				</View>
-			)
-		}
-		// Mobile: stack vertically
-		return (
-			<>
-				{renderQuickServicesSection()}
-				<MediaPromotionsSection role={role} />
-				{renderRoleBasedPanel()}
-			</>
-		)
-	}
 
 	return (
-		<>
-			<Animated.ScrollView
-				style={[styles.container, (isPatientHome || isNurse) && styles.patientContainer]}
-				contentContainerStyle={[
-					styles.content,
-					isPatientHome
-						? // Clears the floating tab bar (64 + 16 bottom offset + safe area) like the design's 104px.
-							{ paddingTop: headerHeight + 16, paddingBottom: tabBarClearance + 8 }
-						: isNurse
-							? { paddingTop: headerHeight, paddingBottom: tabBarClearance + 8 }
-							: {
-								paddingTop: headerHeight,
-								paddingBottom: Math.max(insets.bottom + 96, 120),
-							},
-				]}
-				showsVerticalScrollIndicator={false}
-				scrollEventThrottle={16}
-				onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-					useNativeDriver: true,
-				})}
-				refreshControl={
-					<RefreshControl
-						refreshing={refreshing}
-						onRefresh={handleRefresh}
-						colors={['#0c7c7c']}
-						tintColor="#0c7c7c"
-						progressBackgroundColor="#ffffff"
-					/>
-				}
-			>
-				{role === USER_ROLES.PHARMACY && <PharmacyOrderDashboardCard />}
+		<HomeScrollView headerOffset={146}>
+			{role === USER_ROLES.PHARMACY && <PharmacyOrderDashboardCard />}
 
-				{renderMainContent()}
+			{isTablet ? (
+				<View style={styles.tabletRow}>
+					<View style={[styles.column, isLandscape && styles.columnHalf]}>{hero}</View>
+					{/* Nothing sits beside the hero for these roles; the empty column keeps it at half width. */}
+					<View style={[styles.column, isLandscape && styles.columnHalf]} />
+				</View>
+			) : (
+				hero
+			)}
 
-				{/* Staff roles keep the original shared bottom sections; the patient Home has its own above. */}
-				{!isNurse && !isPatientHome && (
-					<>
-						{/* New dashboard sections inserted before the existing community/blog sections. */}
-						<ArticleSection />
-						<UpcomingEventsSection />
+			<ArticleSection />
+			<UpcomingEventsSection />
 
-						{/* Existing common sections */}
-						<CommunitySection />
-						<BlogsSection />
-						<PodcastsSection />
+			<CommunitySection />
+			<BlogsSection />
+			<PodcastsSection />
 
-						{role !== USER_ROLES.PHARMACY && (
-							<PatientHealthQuestionsList showViewAll={true} />
-						)}
-					</>
-				)}
-			</Animated.ScrollView>
-
-			<StatusModal
-				visible={modalType !== null}
-				status={modalType === 'success' ? 'success' : 'error'}
-				title={modalType === 'success' ? 'Success' : 'Booking Failed'}
-				description={modalType === 'success' ? 'Updated successfully' : 'Something went wrong'}
-				submitText={modalType === 'success' ? 'Go Home' : 'Try Again'}
-				onSubmit={() => setModalType(null)}
-			/>
-
-			{/* Doctor Status Modals */}
-			{/* Complete Profile Blocking Modal */}
-			<AppModal 
-				visible={role === USER_ROLES.DOCTOR && !!doctorStatus && !doctorStatus.profile_completed} 
-				dismissable={false}
-				onDismiss={() => {}}
-				title="Complete Your Profile"
-			>
-				<AppTypography variant="body" style={{ marginBottom: 16 }}>
-					Your profile is incomplete. Please complete your profile to continue using the application.
-				</AppTypography>
-				<AppButton onPress={() => navigation.navigate(ROUTES.MAIN.PROFILE as any)}>
-					Complete Profile
-				</AppButton>
-			</AppModal>
-		</>
+			{role !== USER_ROLES.PHARMACY && <PatientHealthQuestionsList showViewAll={true} />}
+		</HomeScrollView>
 	)
 }
 
 const styles = StyleSheet.create({
-	askQuestionContainer: {
-		marginHorizontal: 16,
-		marginTop: 12,
-		marginBottom: 8,
-	},
-	askQuestionButton: {
-		marginHorizontal: 16,
-		marginTop: 12,
-		marginBottom: 8,
-		backgroundColor: '#0C7C7C',
-		borderRadius: 12,
-		paddingVertical: 14,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-
-	askQuestionText: {
-		color: '#FFFFFF',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-	container: {
-		flex: 1,
-		backgroundColor: '#f5f5f5',
-	},
-
-	content: {
-		flexGrow: 1,
-		maxWidth: 1200,
-		alignSelf: 'center',
-		width: '100%',
-	},
-
-	doctorQuickServicesSpacing: {
-		marginTop: 12,
-	},
-
 	tabletRow: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
@@ -475,77 +67,10 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 12,
 		marginTop: 8,
 	},
-
 	column: {
 		flex: 1,
 	},
-
-	heroColumn: {
-		flex: 1,
-	},
-
-	heroColumnHalf: {
+	columnHalf: {
 		flex: 0.5,
-	},
-
-	rightColumnHalf: {
-		flex: 0.5,
-	},
-
-	patientContainer: {
-		backgroundColor: APP_COLORS.pageBg,
-	},
-	patientContent: {
-		gap: 24,
-	},
-	verificationBannerContainer: {
-		backgroundColor: '#FFF8E1',
-		borderWidth: 1,
-		borderColor: '#FFE082',
-		borderRadius: 12,
-		padding: 12,
-		marginHorizontal: 16,
-		marginBottom: 16,
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	verificationBannerIconBox: {
-		backgroundColor: '#FFECB3',
-		borderRadius: 8,
-		width: 32,
-		height: 32,
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginRight: 8,
-	},
-	verificationBannerTextContainer: {
-		flex: 1,
-		marginRight: 8,
-	},
-	verificationBannerTitle: {
-		fontWeight: '700',
-		fontSize: 14,
-		color: '#212121',
-		marginBottom: 2,
-	},
-	verificationBannerDesc: {
-		fontSize: 12,
-		color: '#616161',
-		lineHeight: 16,
-	},
-	verificationBannerButton: {
-		borderWidth: 1,
-		borderColor: '#F57C00',
-		borderRadius: 24,
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	verificationBannerButtonText: {
-		color: '#F57C00',
-		fontWeight: '600',
-		fontSize: 12,
 	},
 })
-

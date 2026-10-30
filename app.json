@@ -81,7 +81,8 @@
       "@react-native-community/datetimepicker",
       "expo-audio",
       "expo-status-bar",
-      "expo-video"
+      "expo-video",
+      "expo-secure-store"
     ],
     "assetBundlePatterns": [
       "**/*"

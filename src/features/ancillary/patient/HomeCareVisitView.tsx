@@ -3,7 +3,7 @@
 // Patient "Home care visit" screen (patient design frames "4 · Home care visit (start code)" and
 // "4a · Visit in progress (completion code)"): teal header with order reference, 5-step status strip, the dark
 // START code card until the visit begins and the COMPLETION code card while it is in progress, the provider card,
-// live arrival map, "Your visits", visit details, tips, the live "What's happening" checklist, payment, a help row
+// live arrival map, visit details, tips, the live "What's happening" checklist, payment, a help row
 // and the Cancel / Call footer. Presentational only -- TrackAppointmentPage owns the data, socket and polling.
 import React from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from 'react-native'
@@ -15,6 +15,7 @@ import { AppButton } from '../../../components/common/buttons/AppButton'
 import { APP_COLORS, TONES, formatInr } from '../../../config/theme'
 import { parseDateOnly, isSameDay } from '../../../utils/date'
 import { formatTimeSlot } from '../../../utils/formatters'
+import { assignedAtLabel, capitalize, leadText } from './ancillaryBookingCopy'
 import type { AncillaryReviewData } from '../ancillaryService'
 import type { AncillaryProviderInfo } from './TrackAppointmentPage'
 
@@ -31,7 +32,24 @@ export type TrackingVisit = {
 	completion_code?: string | null
 	started_at?: string | null
 	tasks?: { label: string; done: boolean }[]
+	/** Scheduled visits: the server's verdict on whether the patient can still cancel this visit. */
+	can_cancel?: boolean
+	/** Scheduled visits: the provider of THIS visit (each visit has its own), absent until one is assigned. */
+	provider?: {
+		provider_public_id: string
+		name: string
+		avatar_url?: string | null
+		experience_years?: number | null
+		phone?: string | null
+	} | null
 }
+
+/** The visit a screen is about: the one asked for, else the first still open, else the last. */
+export const currentVisitOf = (visits: TrackingVisit[], focusVisitId?: string): TrackingVisit | null =>
+	visits.find((v) => v.visit_public_id === focusVisitId) ??
+	visits.find((v) => !['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED'].some((st) => v.status.startsWith(st))) ??
+	visits[visits.length - 1] ??
+	null
 
 export type HomeCareVisitViewProps = {
 	/** Order reference shown in the header ("KH-…"). */
@@ -40,6 +58,14 @@ export type HomeCareVisitViewProps = {
 	status: string
 	provider: AncillaryProviderInfo | null
 	visits: TrackingVisit[]
+	/** The visit to show (visit_public_id), instead of the first one still open. */
+	focusVisitId?: string
+	/**
+	 * Set for a scheduled ("Later") order. Its visit can be shown before any provider is assigned (they are assigned
+	 * `leadMinutes` before the visit), the start code waits for the provider, and the Cancel is for this visit, not the whole booking:
+	 * a Cancel that cancels this visit only (`canCancel` = the server still allows it).
+	 */
+	scheduled?: { noun: string; leadMinutes: number; canCancel: boolean }
 	serviceName: string
 	serviceSub?: string | null
 	patientName?: string | null
@@ -199,7 +225,7 @@ function DetailRow({
 
 export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 	const insets = useSafeAreaInsets()
-	const noun = providerNoun(p.provider)
+	const noun = p.scheduled?.noun ?? providerNoun(p.provider)
 	const first = (p.provider?.name ?? '').trim().split(/\s+/)[0] || `your ${noun}`
 	const current = stepIndex(p.status)
 	const inProgress = p.status === 'IN_PROGRESS' || p.status === 'VERIFICATION_PENDING'
@@ -207,15 +233,19 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 	const travelling = ['ASSIGNED', 'NURSE_ASSIGNED', 'EN_ROUTE', 'ARRIVED'].includes(p.status)
 
 	const visits = p.visits
-	const currentVisit =
-		visits.find((v) => !['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED'].some((s) => v.status.startsWith(s))) ??
-		visits[visits.length - 1] ??
-		null
+	const currentVisit = currentVisitOf(visits, p.focusVisitId)
 	const count = visits.length || p.totals?.visits_count || 1
 	const position = currentVisit?.index ?? 1
 
-	const startCode = currentVisit?.start_code || p.startCode || null
-	const completionCode = currentVisit?.completion_code || p.completionCode || null
+	// The order-level codes belong to the order's first open visit, so a scheduled visit only ever shows its own.
+	const startCode = currentVisit?.start_code || (p.scheduled ? null : p.startCode) || null
+	// A scheduled visit nobody has been assigned to yet: say so, and keep the start code back until there is someone to share it with.
+	const awaitingProvider = !!p.scheduled && !p.provider && !p.isCompleted && !p.isCancelled
+	const assignedAt =
+		awaitingProvider && currentVisit?.date && currentVisit.start_time
+			? assignedAtLabel(currentVisit.date, currentVisit.start_time, p.scheduled?.leadMinutes ?? 0)
+			: ''
+	const completionCode = currentVisit?.completion_code || (p.scheduled ? null : p.completionCode) || null
 	const tasks = currentVisit?.tasks ?? []
 	const startedAt = timeOnly(currentVisit?.started_at)
 
@@ -251,7 +281,8 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 
 	const tip = p.tipAmount && p.tipAmount > 0 ? p.tipAmount : 0
 	const paid = visits.length > 0 && visits.every((v) => v.status === 'COMPLETED') && !p.payAfterVisit
-	const total = p.totals?.total ?? null
+	// Each scheduled visit is paid for on its own, so its payment shows one visit's fee, never the whole booking's.
+	const total = p.scheduled ? (p.totals?.per_visit ?? null) : (p.totals?.total ?? null)
 
 	return (
 		<View style={styles.page}>
@@ -345,7 +376,7 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 					</View>
 				) : null}
 
-				{beforeStart ? (
+				{beforeStart && !awaitingProvider ? (
 					<AppCodeDisplay
 						style={styles.sideMargin}
 						eyebrow="Start code"
@@ -430,6 +461,21 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 							<MaterialCommunityIcons name="phone-outline" size={22} color={APP_COLORS.primary} />
 						</TouchableOpacity>
 					</View>
+				) : awaitingProvider ? (
+					<View style={[styles.section, styles.row]}>
+						<View style={styles.avatar}>
+							<MaterialCommunityIcons name="account-clock-outline" size={24} color={APP_COLORS.primary} />
+						</View>
+						<View style={styles.flex}>
+							<Text style={styles.eyebrow}>{`YOUR ${noun.toUpperCase()}`}</Text>
+							<Text style={styles.providerName}>{`${capitalize(noun)} not assigned yet`}</Text>
+							<Text style={styles.muted}>
+								{assignedAt
+									? `Assigned at ${assignedAt}, ${leadText(p.scheduled?.leadMinutes ?? 0)} before the visit. You’ll get their name, photo and start code then.`
+									: `Assigned ${leadText(p.scheduled?.leadMinutes ?? 0)} before the visit. You’ll get their name, photo and start code then.`}
+							</Text>
+						</View>
+					</View>
 				) : null}
 
 				{beforeStart && travelling && p.map ? (
@@ -439,66 +485,6 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 							<Text style={styles.arrivalTitle}>{arrivalTitle}</Text>
 							<Text style={styles.muted}>{arrivalSub}</Text>
 						</View>
-					</Section>
-				) : null}
-
-				{visits.length > 1 ? (
-					<Section title="Your visits">
-						<View>
-							{visits.map((v, i) => {
-								const isCur = v.visit_public_id === currentVisit?.visit_public_id
-								const done = v.status === 'COMPLETED'
-								const cancelled = v.status.startsWith('CANCELLED') || v.status === 'EXPIRED'
-								const live = isCur && ['IN_PROGRESS', 'VERIFICATION_PENDING'].includes(v.status)
-								const label = done
-									? 'Done'
-									: cancelled
-										? 'Cancelled'
-										: live
-											? 'In progress'
-											: isCur &&
-												  v.date &&
-												  parseDateOnly(v.date) &&
-												  isToday(parseDateOnly(v.date) as Date)
-												? 'Today'
-												: 'Confirmed'
-								const tone = done
-									? { bg: APP_COLORS.neutralBg, fg: APP_COLORS.inkMuted }
-									: cancelled
-										? { bg: APP_COLORS.dangerBg, fg: APP_COLORS.danger }
-										: label === 'Confirmed'
-											? { bg: APP_COLORS.successBg, fg: APP_COLORS.success }
-											: { bg: APP_COLORS.mint, fg: APP_COLORS.primary }
-								return (
-									<View
-										key={v.visit_public_id}
-										style={[styles.visitRow, i < visits.length - 1 && styles.detailDivider]}
-									>
-										<View
-											style={[styles.visitNum, isCur && { backgroundColor: APP_COLORS.primary }]}
-										>
-											<Text style={[styles.visitNumText, isCur && { color: APP_COLORS.surface }]}>
-												{v.index ?? i + 1}
-											</Text>
-										</View>
-										<View style={styles.flex}>
-											<Text style={styles.detailValue}>
-												{dayTitle(v.date) ?? 'Instant visit'}
-											</Text>
-											<Text style={styles.muted}>
-												{[formatTimeSlot(v.start_time), p.provider?.name]
-													.filter(Boolean)
-													.join(' · ')}
-											</Text>
-										</View>
-										<View style={[styles.tag, { backgroundColor: tone.bg }]}>
-											<Text style={[styles.tagText, { color: tone.fg }]}>{label}</Text>
-										</View>
-									</View>
-								)
-							})}
-						</View>
-						<Text style={styles.muted}>Each visit gets its own start and completion code.</Text>
 					</Section>
 				) : null}
 
@@ -610,10 +596,14 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 					{p.totals && p.totals.per_visit > 0 ? (
 						<View style={styles.payRow}>
 							<Text style={styles.payText}>
-								{count > 1 ? `${formatInr(p.totals.per_visit)} × ${count} visits` : 'Service fee'}
+								{p.scheduled
+									? 'Service fee · this visit'
+									: count > 1
+										? `${formatInr(p.totals.per_visit)} × ${count} visits`
+										: 'Service fee'}
 							</Text>
 							<Text style={styles.payText}>
-								{formatInr(count > 1 ? p.totals.per_visit * count : p.totals.per_visit)}
+								{formatInr(count > 1 && !p.scheduled ? p.totals.per_visit * count : p.totals.per_visit)}
 							</Text>
 						</View>
 					) : null}
@@ -624,7 +614,15 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 						</View>
 					) : null}
 					<View style={styles.payTotal}>
-						<Text style={styles.payTotalLabel}>{paid ? 'Paid' : p.payAfterVisit ? 'To pay' : 'Total'}</Text>
+						<Text style={styles.payTotalLabel}>
+							{paid
+								? 'Paid'
+								: p.payAfterVisit
+									? p.scheduled
+										? 'To pay after this visit'
+										: 'To pay'
+									: 'Total'}
+						</Text>
 						<Text style={styles.payTotalValue}>{formatInr(total != null ? total + tip : null)}</Text>
 					</View>
 					<Text style={[styles.tipSub, { color: APP_COLORS.success, fontWeight: '700' }]}>
@@ -652,8 +650,13 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 			{!p.isCompleted && !p.isCancelled ? (
 				<View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
 					<TouchableOpacity
-						style={[styles.footerBtn, styles.footerOutline]}
+						style={[
+							styles.footerBtn,
+							styles.footerOutline,
+							!inProgress && !!p.scheduled && !p.scheduled.canCancel && { opacity: 0.5 },
+						]}
 						onPress={inProgress ? p.onHelp : p.onCancel}
+						disabled={!inProgress && !!p.scheduled && !p.scheduled.canCancel}
 						accessibilityRole="button"
 					>
 						<Text style={[styles.footerText, { color: APP_COLORS.primary }]}>
@@ -743,19 +746,6 @@ const styles = StyleSheet.create({
 
 	mapBox: { borderRadius: 12, overflow: 'hidden', backgroundColor: APP_COLORS.mint },
 	arrivalTitle: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: APP_COLORS.ink },
-
-	visitRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-	visitNum: {
-		width: 32,
-		height: 32,
-		borderRadius: 10,
-		backgroundColor: APP_COLORS.pageBg,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	visitNumText: { fontSize: 13, fontWeight: '800', color: APP_COLORS.ink },
-	tag: { paddingVertical: 2, paddingHorizontal: 8, borderRadius: 6 },
-	tagText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
 
 	detailRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingVertical: 6 },
 	detailDivider: { borderBottomWidth: 1, borderBottomColor: APP_COLORS.divider },

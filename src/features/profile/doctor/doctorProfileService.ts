@@ -36,6 +36,24 @@ export const fetchDoctorDetails = async (): Promise<DoctorDetailsSummary> => {
 	return res.data.data
 }
 
+/** GET /api/doctors/profile-hub: what the profile hub shows, in one light call. */
+export interface DoctorHub {
+	name: string
+	avatar_url: string | null
+	is_verified: boolean
+	speciality: string | null
+	experience_years: number | null
+	profile_completion: number
+	hospital_count: number
+	has_about: boolean
+	new_logins: number
+}
+
+export const fetchDoctorHub = async (): Promise<DoctorHub> => {
+	const res = await ApiService.get<{ data: DoctorHub }>(API_ENDPOINTS.DOCTOR_PROFILE.HUB)
+	return res.data.data
+}
+
 // ── Personal ───────────────────────────────────────────────────────────────
 
 export interface DoctorPersonal {

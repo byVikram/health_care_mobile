@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useAuth } from '../context/AuthContext'
 import Toast from 'react-native-toast-message'
-import {
-	FamilyMember as ApiFamilyMember,
-	createFamilyMember,
-	getFamilyMembers,
-} from '../features/profile/patient/PatientProfileService'
+import { FamilyMember as ApiFamilyMember, createFamilyMember } from '../features/profile/patient/PatientProfileService'
+import { familyStore } from '../features/profile/patient/familyStore'
 import { toBackendRelation } from '../features/profile/config/profileOptions'
 import type { FamilyMemberDraft } from '../components/common/booking/AppFamilyMemberSheet'
 
@@ -62,9 +59,10 @@ const mapFamilyMember = (m: ApiFamilyMember): FamilyMemberOption => {
 }
 
 /**
- * The caller plus their family members (self always first), from GET patient family-members.
- * Until the fetch resolves — or if it fails / returns nothing — the list is just "self" built from
- * `useAuth().user`, so pickers still work.
+ * The caller plus their family members (self always first). The list is fetched once for the whole app (see
+ * familyStore) and refreshed when the app changes the family or the patient's own details, so every picker shares
+ * it and none fetches on open. Until it is loaded — or if the fetch fails / returns nothing — the list is just "self"
+ * built from `useAuth().user`, so pickers still work.
  */
 export function useFamilyMembers() {
 	const { user } = useAuth()
@@ -80,29 +78,30 @@ export function useFamilyMembers() {
 		[user?.name, user?.avatar, user?.id]
 	)
 
-	const [apiMembers, setApiMembers] = useState<ApiFamilyMember[] | null>(null)
-	const [loading, setLoading] = useState(true)
-	const activeRef = useRef(true)
+	const stored = useSyncExternalStore(familyStore.subscribe, familyStore.get, familyStore.get)
+	const apiMembers: ApiFamilyMember[] | null = stored && stored.length ? stored : null
+	const [loading, setLoading] = useState(stored == null)
 
-	const load = useCallback(async () => {
-		setLoading(true)
-		try {
-			const list = await getFamilyMembers()
-			if (activeRef.current && list.length) setApiMembers(list)
-		} catch {
-			// Fall back to "self" only; the picker still works.
-		} finally {
-			if (activeRef.current) setLoading(false)
+	// The first screen to need the list loads it; every other one finds it loaded.
+	useEffect(() => {
+		let active = true
+		void familyStore.ensureLoaded().finally(() => {
+			if (active) setLoading(false)
+		})
+		return () => {
+			active = false
 		}
 	}, [])
 
-	useEffect(() => {
-		activeRef.current = true
-		void load()
-		return () => {
-			activeRef.current = false
+	/** Fetch the list again now (after something this hook's caller changed outside the app's own services). */
+	const load = useCallback(async () => {
+		setLoading(true)
+		try {
+			await familyStore.refresh()
+		} finally {
+			setLoading(false)
 		}
-	}, [load])
+	}, [])
 
 	const members = useMemo<FamilyMemberOption[]>(() => {
 		if (!apiMembers) return [fallbackSelf]
@@ -137,7 +136,9 @@ export function useFamilyMembers() {
 					date_of_birth: draftDobToIso(draft.dateOfBirth),
 					contact_number: draft.mobile || null,
 				})
-				await load()
+				// createFamilyMember already refreshed the shared list: wait for that, so the new member can be picked.
+				if (familyStore.get() == null) await familyStore.refresh()
+				else await familyStore.settled()
 				Toast.show({ type: 'success', text1: `${draft.name} added to your family` })
 				return created.public_id || created.id
 			} catch (e) {
@@ -149,7 +150,7 @@ export function useFamilyMembers() {
 				return null
 			}
 		},
-		[load]
+		[]
 	)
 
 	return { members, loading, reload: load, addFromDraft }

@@ -17,6 +17,9 @@ import { useAuth } from '../../../context/AuthContext'
 import { useTabBarClearance } from '../../../navigation/tabBar'
 import { useSidebarMenu } from '../../../navigation/useSidebarMenu'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
+import { DoctorStatusBanner } from './DoctorStatusBanner'
+import { useDoctorStatus } from './useDoctorStatus'
+import { fetchDoctorHub } from '../../profile/doctor/doctorProfileService'
 import { getAppointments, getStatusIdByLabel, startConsultation } from '../doctorService'
 import type { Appointment } from '../../../types/appointment'
 
@@ -26,13 +29,12 @@ import { listHealthQuestions } from '../../../services/qaService'
 import HomeHealthReadsSection from '../../dashboard/components/HomeHealthReadsSection'
 import HomeCommunitiesSection from '../../dashboard/components/HomeCommunitiesSection'
 import Toast from 'react-native-toast-message'
-import { effectiveStatusLabel, humanizeStatus, isAccepted, isCompletedAppt, rowStatusTone, statusLabelOf } from '../scheduleUtils'
+import { clinicNowHms, clinicTodayIso, effectiveStatusLabel, humanizeStatus, isAccepted, isCompletedAppt, rowStatusTone, statusLabelOf } from '../scheduleUtils'
 
 const isVideo = (apt: Appointment) => apt.appointment_mode === 'video_call' || apt.appointment_mode === 'video call'
 
 function todayIso() {
-	const d = new Date()
-	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+	return clinicTodayIso() // today in Mumbai (the clinic's clock), not the phone's date
 }
 
 function formatTime12h(t?: string | null): string {
@@ -73,8 +75,26 @@ function etaLabel(apt: Appointment, isToday: boolean): string | null {
 
 export function DoctorHomeScreen() {
 	const navigation = useNavigation<any>()
-	const { user, clearAuth, selectedHospitalId } = useAuth()
+	const { user, clearAuth, selectedHospitalId, updateUser } = useAuth()
 	const [sidebarOpen, setSidebarOpen] = useState(false)
+
+	// The header and the drawer show the signed-in user's photo, which login doesn't carry: pull it from the
+	// profile hub (SidebarLayout does the same for the other roles, but this screen doesn't sit inside it).
+	useEffect(() => {
+		let cancelled = false
+		fetchDoctorHub()
+			.then((hub) => {
+				if (!cancelled && hub.avatar_url) void updateUser({ avatar: hub.avatar_url })
+			})
+			.catch(() => {
+				// Non-fatal: the initials avatar shows instead.
+			})
+		return () => {
+			cancelled = true
+		}
+		// updateUser changes with the user, so it is left out: this must run once, not on every update it makes.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [])
 
 	// This screen has its own dark "ink" header (see DoctorScreenHeader) instead of SidebarLayout's generic
 	// AppHeader, so it can't wrap children in <SidebarLayout>; it drives the same AppSidebar drawer directly, with
@@ -112,6 +132,9 @@ export function DoctorHomeScreen() {
 			isRefresh ? setRefreshing(false) : setLoading(false)
 		}
 	}, [selectedHospitalId])
+
+	// Profile / verification state for the banner at the top (re-read on focus and on returning to the app).
+	const { status: doctorStatus, reload: reloadStatus } = useDoctorStatus()
 
 	// Refetch on every focus, not just mount -- "Up next" now depends on check-in state, which the
 	// doctor typically changes on the Schedule tab and then flips back here to start the visit; a
@@ -205,7 +228,7 @@ export function DoctorHomeScreen() {
 	// its slot time has arrived, since starting a consultation before the patient is physically
 	// present doesn't make sense. Sorted by scheduled time (earliest-checked-in-for wins) since we
 	// don't track an actual check-in timestamp.
-	const nowHm = new Date().toTimeString().slice(0, 8)
+	const nowHm = clinicNowHms() // appointment start times are Mumbai wall-clock time
 	const checkedInToday = appointments.filter((a) => effectiveStatusLabel(a) === 'checked_in')
 	const next = checkedInToday[0] ?? undefined
 	// "Later today" is the rest of today's remaining schedule (any accepted status, not just
@@ -245,11 +268,13 @@ export function DoctorHomeScreen() {
 						refreshing={refreshing}
 						onRefresh={() => {
 							load(true)
+							void reloadStatus()
 							setRefreshToken((t) => t + 1)
 						}}
 					/>
 				}
 			>
+				<DoctorStatusBanner status={doctorStatus} />
 				{loading ? (
 					<ActivityIndicator style={{ marginTop: 40 }} color={APP_COLORS.primary} />
 				) : (

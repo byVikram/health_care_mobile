@@ -20,6 +20,8 @@ export type AppConfirmSheetProps = {
 	cancelLabel?: string
 	tone?: 'danger' | 'primary'
 	onConfirm: () => void | Promise<void>
+	/** Optional extra content (e.g. a reason field) shown between the message and the buttons. */
+	children?: React.ReactNode
 }
 
 export function AppConfirmSheet({
@@ -31,6 +33,7 @@ export function AppConfirmSheet({
 	cancelLabel = 'Cancel',
 	tone = 'danger',
 	onConfirm,
+	children,
 }: AppConfirmSheetProps) {
 	const [busy, setBusy] = useState(false)
 
@@ -54,6 +57,7 @@ export function AppConfirmSheet({
 		>
 			<View style={styles.body}>
 				{!!message && <Text style={styles.message}>{message}</Text>}
+				{children}
 				<View style={styles.actions}>
 					<AppButton variant="outline" size="md" style={styles.button} onPress={onClose} disabled={busy}>
 						{cancelLabel}

@@ -58,10 +58,12 @@ import {
 } from '../../services/bookingsService'
 import { buildS3Url } from '../../utils/s3Utils'
 import CancelAppointmentSheet from '../appointment/components/patient-details/CancelAppointmentSheet'
+import NoShowReplySheet from '../appointment/components/NoShowReplySheet'
 import { actionBusyKey, bookingKey, goHome, openBookingTarget, runBookingAction } from './bookingNavigation'
 import {
 	CATEGORY_KIND,
 	statusChipTone,
+	isNoShowBooking,
 	groupBookings,
 	patientLabel,
 	whenLabel,
@@ -152,6 +154,8 @@ export default function BookingsPage() {
 	const [loadingMore, setLoadingMore] = useState(false)
 	const [busyKey, setBusyKey] = useState<string | null>(null)
 	const [cancelItem, setCancelItem] = useState<BookingItem | null>(null)
+	// A doctor appointment marked as a no-show whose "What happened?" sheet is open.
+	const [noShowItem, setNoShowItem] = useState<BookingItem | null>(null)
 
 	const reqRef = useRef(0)
 	const listRef = useRef<ListState | null>(null)
@@ -255,6 +259,13 @@ export default function BookingsPage() {
 				}
 			: undefined
 
+	// A no-show's primary action is "Tell us what happened" (the sheet decides whether replying is still open);
+	// "Book again" stays as the secondary one. The card itself still opens the appointment.
+	const noShowAction = (item: BookingItem): AppBookingCardAction | undefined =>
+		isNoShowBooking(item)
+			? { label: 'Tell us what happened', disabled: !!busyKey, onPress: () => setNoShowItem(item) }
+			: undefined
+
 	const renderItem = ({ item }: { item: BookingItem }) => (
 		<AppBookingCard
 			style={styles.card}
@@ -274,7 +285,7 @@ export default function BookingsPage() {
 			{...whereIconProps(item.where_type)}
 			note={item.note || undefined}
 			refLabel={item.ref ?? undefined}
-			primaryAction={toCardAction(item, item.actions?.primary ?? null)}
+			primaryAction={noShowAction(item) ?? toCardAction(item, item.actions?.primary ?? null)}
 			secondaryAction={toCardAction(item, item.actions?.secondary ?? null)}
 			onPress={() => openBookingTarget(navigation, item)}
 			accessibilityHint="Opens the booking"
@@ -404,6 +415,10 @@ export default function BookingsPage() {
 				contentContainerStyle={[styles.listContent, { paddingBottom: clearance }]}
 				showsVerticalScrollIndicator={false}
 			/>
+
+			{!!noShowItem && (
+				<NoShowReplySheet visible appointmentId={noShowItem.target.id} onClose={() => setNoShowItem(null)} />
+			)}
 
 			{!!cancelItem && (
 				<CancelAppointmentSheet

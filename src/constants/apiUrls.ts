@@ -50,6 +50,8 @@ export const API_ENDPOINTS = {
 	DOCTOR_PROFILE: {
 		STATUS: `${BASE_URL}/api/doctors/me/status`,
 		DETAILS: `${BASE_URL}/api/doctors/details`,
+		// Everything the profile hub shows, in one call
+		HUB: `${BASE_URL}/api/doctors/profile-hub`,
 		PERSONAL_DETAILS: `${BASE_URL}/api/doctors/personal-details`,
 		PROFESSIONAL_DETAILS: `${BASE_URL}/api/doctors/professional-details`,
 		ADDITIONAL_DETAILS: `${BASE_URL}/api/doctors/profile/additional-details`,
@@ -65,10 +67,10 @@ export const API_ENDPOINTS = {
 		SYMPTOMS: `${BASE_URL}/api/specialities/symptoms`,
 	},
 	AREA_OF_EXPERTISE: {
-		LIST: `${BASE_URL}/api/area-of-expertise`,
+		LIST: `${BASE_URL}/api/doctors/area-of-expertise`,
 	},
 	TREATMENTS_OFFERING: {
-		LIST: `${BASE_URL}/api/treatments-offering`,
+		LIST: `${BASE_URL}/api/doctors/treatments-offering`,
 	},
 	USERS: {
 		GET: `${BASE_URL}/api/users`,
@@ -102,6 +104,10 @@ export const API_ENDPOINTS = {
 		// directly in that response rather than SMS-ing the patient (see VerifyAccessPage.tsx for why
 		// that matters).
 		VERIFY_ACCESS_OTP: (id: string) => `${BASE_URL}/api/appointments/${id}/verify-otp`,
+		// Patient no-show (PNS) policy: what happened (GET) + the one-time reason reply (POST), and whether online booking is paused.
+		NO_SHOW: (id: string) => `${BASE_URL}/api/appointments/${id}/no-show`,
+		NO_SHOW_REPLY: (id: string) => `${BASE_URL}/api/appointments/${id}/no-show/reply`,
+		BOOKING_RESTRICTION: `${BASE_URL}/api/appointments/me/booking-restriction`,
 	},
 	REVIEWS: {
 		CREATE: `${BASE_URL}/api/reviews`,
@@ -125,7 +131,7 @@ export const API_ENDPOINTS = {
 		ACTIVE: `${BASE_URL}/api/ads/active`,
 		TRACK: (publicId: string) => `${BASE_URL}/api/ads/${publicId}/track`,
 	},
-	APP_CONFIG: `${BASE_URL}/api/app-config`,
+	APP_CONFIG: `${BASE_URL}/api/lookup/app-config`,
 	// The signed-in user's sidebar + bottom tabs, by role
 	NAVIGATION: `${BASE_URL}/api/lookup/navigation`,
 	// constants/apiUrls.ts  — add inside API_ENDPOINTS
@@ -154,6 +160,8 @@ export const API_ENDPOINTS = {
 		FAMILY_MEMBERS: `${BASE_URL}/api/patients/family-members`,
 		FAMILY_MEMBER_BY_ID: (id: string) => `${BASE_URL}/api/patients/family-members/${id}`,
 		SUMMARY: `${BASE_URL}/api/patients/me/summary`,
+		// Everything the profile hub shows, in one call
+		PROFILE_HUB: `${BASE_URL}/api/patients/me/profile-hub`,
 		BOOKINGS: `${BASE_URL}/api/patients/me/bookings`,
 	},
 	TREATMENTS: {
@@ -237,6 +245,8 @@ export const API_ENDPOINTS = {
 		CATALOG: `${BASE_URL}/api/ancillary/catalog`,
 		PACKAGE_DETAIL: (id: string | number) => `${BASE_URL}/api/ancillary/packages/${id}`,
 		PROFILE: `${BASE_URL}/api/ancillary/me/profile`,
+		// Everything the profile hub shows, in one call
+		PROFILE_HUB: `${BASE_URL}/api/ancillary/me/profile-hub`,
 		CAPABILITIES: `${BASE_URL}/api/ancillary/me/capabilities`,
 		CATEGORIES: `${BASE_URL}/api/ancillary/categories`,
 		SUB_SPECIALTIES: `${BASE_URL}/api/ancillary/sub_specialties`,
@@ -248,6 +258,9 @@ export const API_ENDPOINTS = {
 		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
 		TIP: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/tip`,
 		CANCEL_PATIENT: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/cancel`,
+		CANCEL_VISITS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/visits/cancel`,
+		RESCHEDULE_VISIT: (id: string, visitId: string) =>
+			`${BASE_URL}/api/ancillary/patient/requests/${id}/visits/${visitId}/reschedule`,
 		CANCEL_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/cancel`,
 		REJECT_PROVIDER: (id: string) => `${BASE_URL}/api/ancillary/provider/requests/${id}/reject`,
 		MY_REQUESTS: `${BASE_URL}/api/ancillary/patient/requests/my`,

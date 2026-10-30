@@ -37,6 +37,8 @@ export interface LocationData {
 	address: string
 	latitude: number
 	longitude: number
+	/** Six digits, from the geocoder or typed by the user (see utils/pincode); absent when unknown. */
+	pincode?: string
 }
 
 export interface AuthState {

@@ -28,6 +28,18 @@ export type ApiCatalogueItem = {
 	tests_count: number | null
 }
 
+/** What the labs serving the pincode offer. Absent when no pincode was sent or LabStack gave no usable answer. */
+export type ApiCoverage = {
+	/** false: no lab serves the pincode, and the list is empty. */
+	serviceable: boolean
+	/** true: the list is limited to what those labs offer there. */
+	filtered: boolean
+	pincode: string
+	/** HOME_SAMPLE and / or CENTER_VISIT: what any of those labs offers there. */
+	services: string[]
+	labs: { id: number; name: string | null; services: string[] }[]
+}
+
 export type ApiCatalogueList = {
 	items: ApiCatalogueItem[]
 	page: number
@@ -35,6 +47,7 @@ export type ApiCatalogueList = {
 	total: number
 	pages: number
 	synced_at: string | null
+	coverage?: ApiCoverage
 }
 
 export type ApiOffer = {
@@ -94,12 +107,24 @@ export type ApiQuote = { serviceable: boolean; labs: ApiQuoteLab[] }
 
 export type ApiOrderItem = { kind: LabKind; name: string; price: string | null; mrp: string | null }
 
+/** One step of the order's progress, drawn as it is. `sub` and `at` are absent when empty. */
+export type ApiTimelineStep = {
+	key: string
+	title: string
+	state: 'done' | 'current' | 'upcoming'
+	sub?: string
+	/** When the step was reached, Indian wall-clock time ('2026-10-26T22:04:27'). */
+	at?: string
+}
+
 export type ApiOrder = {
 	id: string
 	status: string
+	/** missed | no_show | sample_rejected, while the order needs attention. */
+	attention_reason: string | null
+	/** The progress to draw, one order only (not in the list); empty for a cancelled order or a visit that needs attention. */
+	timeline?: ApiTimelineStep[]
 	order_type: LabServiceType
-	payment_mode: string
-	payment_status: string
 	appointment_at: string | null
 	lab_name: string | null
 	lab_logo_url: string | null
@@ -110,7 +135,6 @@ export type ApiOrder = {
 	patient_name: string | null
 	address_line: string | null
 	city: string | null
-	state: string | null
 	pincode: string | null
 	total_amount: string | null
 	notes: string | null
@@ -146,10 +170,18 @@ export async function fetchCatalogue(params: {
 	kind?: LabKind
 	page?: number
 	limit?: number
+	/** The patient's pincode: only what the labs serving it offer is listed. */
+	pincode?: string
 }): Promise<ApiCatalogueList> {
 	const res = await ApiService.get<Envelope<ApiCatalogueList>>(BASE.CATALOGUE, {
 		...QUIET,
-		params: { query: params.query || undefined, kind: params.kind, page: params.page ?? 1, limit: params.limit ?? 20 },
+		params: {
+			query: params.query || undefined,
+			kind: params.kind,
+			page: params.page ?? 1,
+			limit: params.limit ?? 20,
+			pincode: params.pincode || undefined,
+		},
 	})
 	return res.data.data
 }

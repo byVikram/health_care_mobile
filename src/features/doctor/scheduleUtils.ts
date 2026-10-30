@@ -1,8 +1,7 @@
 // src/features/doctor/scheduleUtils.ts
 //
-// Shared helpers for the doctor Schedule/appointment-action surfaces (DoctorScheduleScreen and,
-// previously, DoctorAppointments.tsx — this file is the single home for them now so neither screen
-// duplicates the other's slot-normalization logic). Kept generic enough to reuse for any future
+// Shared helpers for the doctor Schedule/appointment-action surfaces (DoctorScheduleScreen and the
+// other doctor screens that act on an appointment). Kept generic enough to reuse for any future
 // "pick a date/time to reschedule" flow (Pharmacy/Laboratory order rescheduling, etc.).
 
 import type { SlotGroup } from './doctorService'
@@ -13,6 +12,22 @@ export const statusLabelOf = (apt: Appointment): string =>
 
 export const isPending = (apt: Appointment): boolean => statusLabelOf(apt).toLowerCase() === 'pending'
 export const isCompletedAppt = (apt: Appointment): boolean => statusLabelOf(apt).toLowerCase() === 'completed'
+
+/** The doctor marked this appointment a no-show (patient no-show policy). */
+export const isNoShowAppt = (apt: Appointment): boolean => statusLabelOf(apt).toLowerCase() === 'no_show'
+
+/** A reschedule the doctor still has to answer: status 'rescheduled' that the doctor did not make themselves
+ * (a patient's request to move a booking; `rescheduled_by` comes from the appointments list). One the doctor
+ * proposed is waiting on the patient, so it is not here. */
+export const isRescheduleRequest = (apt: Appointment): boolean =>
+	statusLabelOf(apt).toLowerCase() === 'rescheduled' && (apt.rescheduled_by ?? '').toLowerCase() !== 'doctor'
+
+/** A doctor asked the patient to choose a new time (status 'reschedule_required'): the patient has to pick the slot,
+ * then it comes back as a 'rescheduled' request for the doctor to confirm. Nothing for the doctor to do meanwhile. */
+export const isRescheduleNeeded = (apt: Appointment): boolean => statusLabelOf(apt).toLowerCase() === 'reschedule_required'
+
+/** What the Requests tab lists: a new pending request, or a patient's reschedule request. */
+export const isRequestLike = (apt: Appointment): boolean => isPending(apt) || isRescheduleRequest(apt)
 
 /**
  * "Accepted" = the doctor has already acted on this booking (confirmed it) -- also covers the two
@@ -62,6 +77,7 @@ export function humanizeStatus(label: string): string {
 		cancelled: 'Cancelled',
 		rescheduled: 'Rescheduled',
 		reschedule_required: 'Reschedule needed',
+		no_show: 'No-show',
 	}
 	if (KNOWN[l]) return KNOWN[l]
 	return l.charAt(0).toUpperCase() + l.slice(1).replace(/_/g, ' ')
@@ -71,12 +87,59 @@ export function humanizeStatus(label: string): string {
  * shared by DoctorHomeScreen (Up next/Later today) and DoctorScheduleScreen (Today/Past) so the
  * chip color for a given label can't drift between the two screens the way the display text once
  * did (see humanizeStatus above). Callers pass effectiveStatusLabel(apt), not the raw label. */
-export function rowStatusTone(label: string): 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'onTheWay' {
+export function rowStatusTone(label: string): 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'onTheWay' | 'sand' {
 	const l = label.toLowerCase()
+	if (l === 'no_show') return 'sand'
 	if (l === 'checked_in') return 'confirmed'
 	if (l === 'not_arrived') return 'onTheWay'
 	if (l === 'completed' || l === 'confirmed' || l === 'cancelled' || l === 'pending') return l
 	return 'confirmed'
+}
+
+// Patient no-show policy: a doctor may mark a no-show only from 60 minutes after the appointment's start until 5 days
+// after it. The server enforces the same rule (and answers 400 with the reason), these are the numbers it uses.
+export const NO_SHOW_MIN_MINUTES_AFTER_START = 60
+export const NO_SHOW_MARK_WINDOW_DAYS = 5
+
+/** The only states the server lets a doctor mark a no-show from (a checked-in patient did show up). */
+export const NO_SHOW_SOURCE_STATUSES = ['confirmed', 'not_arrived']
+
+/** The clinic's UTC offset: appointment dates and times are clinic wall-clock time (IST, UTC+05:30, no daylight saving) -- the
+ * zone the server applies the no-show rule in -- whatever time zone the device is set to. */
+const CLINIC_UTC_OFFSET_MINUTES = 330
+
+/** The clinic's current date (YYYY-MM-DD) and time (HH:MM:SS), in Mumbai time whatever the phone's time zone is set to: what
+ * appointment_date and start_time are compared with. (Shifted by the clinic's offset, the UTC fields read as clinic wall-clock time.) */
+const clinicClock = (): string => new Date(Date.now() + CLINIC_UTC_OFFSET_MINUTES * 60_000).toISOString()
+export const clinicTodayIso = (): string => clinicClock().slice(0, 10)
+export const clinicNowHms = (): string => clinicClock().slice(11, 19)
+
+/** Appointment start as an absolute time (ms since the epoch), read in the clinic's time zone. */
+function appointmentStartMs(apt: Appointment): number | null {
+	const [y, mo, d] = (apt.appointment_date ?? '').split('-').map(Number)
+	const [h, mi] = (apt.start_time ?? '').split(':').map(Number)
+	if (!y || !mo || !d || Number.isNaN(h) || Number.isNaN(mi)) return null
+	return Date.UTC(y, mo - 1, d, h, mi, 0, 0) - CLINIC_UTC_OFFSET_MINUTES * 60_000
+}
+
+export type NoShowWindow = {
+	/** The "Mark as no-show" control is enabled. */
+	canMark: boolean
+	/** Short reason shown under the disabled control; empty while it is enabled. */
+	hint: string
+	/** The 5 days are over: nothing can be marked any more. */
+	expired: boolean
+}
+
+/** Whether the doctor may mark this appointment a no-show right now (the clock vs the appointment's start in clinic time). */
+export function noShowWindow(apt: Appointment, now: Date = new Date()): NoShowWindow {
+	const start = appointmentStartMs(apt)
+	if (start === null) return { canMark: false, hint: 'Can be marked 1 hour after the start', expired: false }
+	const earliest = start + NO_SHOW_MIN_MINUTES_AFTER_START * 60_000
+	const latest = start + NO_SHOW_MARK_WINDOW_DAYS * 24 * 60 * 60_000
+	if (now.getTime() < earliest) return { canMark: false, hint: 'Can be marked 1 hour after the start', expired: false }
+	if (now.getTime() > latest) return { canMark: false, hint: 'No-show can only be marked within 5 days', expired: true }
+	return { canMark: true, hint: '', expired: false }
 }
 
 export const formatTime12h = (t?: string | null): string => {

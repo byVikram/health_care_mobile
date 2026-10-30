@@ -10,7 +10,7 @@ export interface AppointmentHistoryEntry {
   created_at: string      // ISO timestamp
 }
 
-export type AppointmentStatusValue = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rescheduled' | 'reschedule_required' | string
+export type AppointmentStatusValue = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rescheduled' | 'reschedule_required' | 'no_show' | string
 
 export interface AppointmentStatus {
   id: string

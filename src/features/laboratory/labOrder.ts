@@ -37,6 +37,8 @@ export function orderFromApi(api: ApiOrder, b?: LabBookingState): LabOrder {
 		id: `KH-${api.id.slice(0, 8).toUpperCase()}`,
 		apiId: api.id,
 		status: api.status,
+		timeline: api.timeline,
+		attentionReason: api.attention_reason,
 		canCancel: api.can_cancel,
 		canReschedule: api.can_reschedule,
 		placedAt: api.created_at ?? new Date().toISOString(),
@@ -64,13 +66,17 @@ export function orderFromApi(api: ApiOrder, b?: LabBookingState): LabOrder {
 	}
 }
 
-/** The same order after a cancel / reschedule: what the server changed (step, time, what is still allowed). */
+/** The same order after a cancel / reschedule / refresh: what the server changed (step, time, lab, phlebotomist, what is still allowed). */
 export function applyApi(order: LabOrder, api: ApiOrder): LabOrder {
 	const stamp = api.appointment_at ?? ''
 	const visit = stamp.length >= 16 ? { date: stamp.slice(0, 10), time: timeLabel(stamp.slice(11, 16)) } : order.visits[0]
 	return {
 		...order,
 		status: api.status,
+		timeline: api.timeline,
+		attentionReason: api.attention_reason,
+		labName: api.lab_name ?? order.labName,
+		labLogoUrl: api.lab_logo_url ?? order.labLogoUrl,
 		canCancel: api.can_cancel,
 		canReschedule: api.can_reschedule,
 		phleboName: api.phlebo_name,

@@ -41,6 +41,7 @@ import { showComingSoon } from '../../../../utils/toast'
 import { APP_COLORS, TONES, formatInr } from '../../../../config/theme'
 import CancelAppointmentSheet from './CancelAppointmentSheet'
 import CheckInQrSheet from './CheckInQrSheet'
+import NoShowReplySheet from '../NoShowReplySheet'
 import RescheduleSheet from './RescheduleSheet'
 import {
 	buildTimeline,
@@ -51,6 +52,7 @@ import {
 	getPaymentState,
 	getRawStatus,
 	getVariant,
+	isAwaitingDoctorConfirm,
 	isVideoMode,
 	parseDateOnly,
 	slotLabel,
@@ -110,6 +112,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	const [cancelOpen, setCancelOpen] = useState(false)
 	const [qrOpen, setQrOpen] = useState(false)
 	const [reschedOpen, setReschedOpen] = useState(false)
+	const [noShowOpen, setNoShowOpen] = useState(false)
 
 	const load = useCallback(
 		async (silent = false) => {
@@ -151,9 +154,15 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	const isPast = !!start && (end ?? start).getTime() < Date.now()
 	const isCancelled = variant === 'cancelled'
 	const isCompleted = variant === 'completed'
-	const live = !isCancelled && !isCompleted
+	// A no-show is a finished appointment: nothing to cancel, reschedule or join; the patient can explain what happened.
+	const isNoShow = variant === 'no_show'
+	const live = !isCancelled && !isCompleted && !isNoShow
 	const canAct = live && !isPast
+	// The doctor asked for a new time and the patient has not picked one yet.
+	const needsNewTime = live && variant === 'reschedule_required' && !localRescheduled
 	const showRescheduled = live && (localRescheduled || variant === 'rescheduled')
+	// The patient picked the slot: it now waits for the doctor to confirm (nothing for the patient to accept).
+	const awaitingDoctor = showRescheduled && (localRescheduled || isAwaitingDoctorConfirm(appt))
 	const hospital = appt?.hospital ?? null
 	const phone = hospital?.contact_number || hospital?.phone || ''
 	const fee = appt?.fees
@@ -164,13 +173,15 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	const startsIn = startsInLabel(start)
 	const whenSub = !apptDay
 		? undefined
-		: showRescheduled
-			? `${fullDay(apptDay)} · rescheduled`
-			: startsIn
-				? Math.abs(dayDiff(apptDay)) <= 1
-					? `${fullDay(apptDay)} · ${startsIn}`
-					: `${isVideo ? 'Video call' : 'Clinic visit'} · ${startsIn}`
-				: fullDay(apptDay)
+		: needsNewTime
+			? `${fullDay(apptDay)} · needs a new time`
+			: showRescheduled
+				? `${fullDay(apptDay)} · rescheduled`
+				: startsIn
+					? Math.abs(dayDiff(apptDay)) <= 1
+						? `${fullDay(apptDay)} · ${startsIn}`
+						: `${isVideo ? 'Video call' : 'Clinic visit'} · ${startsIn}`
+					: fullDay(apptDay)
 
 	const minutes = durationMinutes(appt?.start_time, appt?.end_time)
 	const visitSub = isVideo
@@ -370,7 +381,28 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 					/>
 				)}
 
-				{showRescheduled && (
+				{needsNewTime && (
+					<AppInfoBanner
+						tone="warning"
+						icon="calendar-clock"
+						title="Your doctor asked you to choose a new time"
+						subtitle={`${doctorName} can’t keep this slot. Pick a new time that suits you; your booking and fee stay the same.`}
+						action={{ label: 'Choose a new time', onPress: openReschedule }}
+						style={styles.bannerTop}
+					/>
+				)}
+
+				{showRescheduled && awaitingDoctor && (
+					<AppInfoBanner
+						tone="success"
+						icon="check"
+						title="New time sent"
+						subtitle={`Waiting for ${doctorName} to confirm it. We’ll let you know. Your booking and fee stay the same.`}
+						style={styles.bannerTop}
+					/>
+				)}
+
+				{showRescheduled && !awaitingDoctor && (
 					<AppInfoBanner
 						tone="success"
 						icon="check"
@@ -397,6 +429,17 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 								: 'Complete payment to confirm your booking.'
 						}
 						action={{ label: 'Pay now', onPress: comingSoon }}
+						style={styles.bannerTop}
+					/>
+				)}
+
+				{isNoShow && (
+					<AppInfoBanner
+						tone="warning"
+						icon="calendar-remove-outline"
+						title="You were marked as a no-show"
+						subtitle={`${doctorName} marked this appointment as missed. Tell us what happened so we can review it.`}
+						action={{ label: 'Tell us what happened', onPress: () => setNoShowOpen(true) }}
 						style={styles.bannerTop}
 					/>
 				)}
@@ -501,7 +544,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 				</AppSection>
 
 				{/* Video: join card */}
-				{isVideo && canAct && (
+				{isVideo && canAct && !needsNewTime && (
 					<AppInfoBanner
 						tone="sky"
 						icon="video-outline"
@@ -513,7 +556,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 				)}
 
 				{/* Prep steps */}
-				{canAct && (
+				{canAct && !needsNewTime && (
 					<AppSection title={getPrepStepsTitle(isVideo)} titleSize="sm" marginTop={0}>
 						<AppNumberedSteps steps={steps} />
 					</AppSection>
@@ -582,7 +625,16 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 
 			{/* Footer -- bottom padding stays max(20, inset) as in the design. */}
 			<AppFooterBar bottomPadding={Math.max(0, 20 - insets.bottom)}>
-				{canAct ? (
+				{needsNewTime ? (
+					<AppButton
+						size="lg"
+						icon="calendar-blank-outline"
+						style={styles.footerBtn}
+						onPress={openReschedule}
+					>
+						Choose a new time
+					</AppButton>
+				) : canAct ? (
 					<>
 						<AppButton
 							variant="outline"
@@ -625,6 +677,20 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 							View visit summary
 						</AppButton>
 					</>
+				) : isNoShow ? (
+					<>
+						<AppButton variant="outline" size="lg" style={styles.footerBtn} onPress={goDoctor}>
+							Book again
+						</AppButton>
+						<AppButton
+							size="lg"
+							icon="message-text-outline"
+							style={styles.footerBtn}
+							onPress={() => setNoShowOpen(true)}
+						>
+							Tell us what happened
+						</AppButton>
+					</>
 				) : (
 					<>
 						<AppButton variant="outline" size="lg" style={styles.footerBtn} onPress={goBookings}>
@@ -652,6 +718,13 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 
 			<CheckInQrSheet visible={qrOpen} bookingId={bookingId} onClose={() => setQrOpen(false)} />
 
+			<NoShowReplySheet
+				visible={noShowOpen}
+				appointmentId={appt.id}
+				onClose={() => setNoShowOpen(false)}
+				onReplied={() => void load(true)}
+			/>
+
 			<RescheduleSheet
 				visible={reschedOpen}
 				appointmentId={appt.id}
@@ -660,7 +733,13 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 				isVideo={isVideo}
 				currentDate={appt.appointment_date}
 				currentStart={appt.start_time}
-				title={isVideo ? 'Reschedule video call' : 'Reschedule appointment'}
+				title={
+					needsNewTime
+						? 'Choose a new time'
+						: isVideo
+							? 'Reschedule video call'
+							: 'Reschedule appointment'
+				}
 				subtitle={`${appt.doctor?.name ?? 'Doctor'} · ${isVideo ? 'Video consultation' : (hospital?.name ?? 'In-clinic')}`}
 				note={
 					isVideo

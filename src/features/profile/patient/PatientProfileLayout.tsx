@@ -23,6 +23,8 @@ import {
 } from './PatientProfileService'
 import type { PatientProfileState } from './PatientProfileService'
 import { removeAvatar, uploadAvatar } from '../../../services/avatarService'
+import Toast from 'react-native-toast-message'
+import { useAuth } from '../../../context/AuthContext'
 
 import PersonalTab from './tabs/PersonalTab'
 import MedicalTab from './tabs/MedicalTab'
@@ -54,6 +56,7 @@ export default function PatientProfileLayout() {
 	}, [data])
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
+	const { updateUser } = useAuth()
 
 	const activeTabIndex = useMemo(() => {
 		const index = TABS.findIndex((tab) => tab.tab === activeTab)
@@ -149,12 +152,24 @@ export default function PatientProfileLayout() {
 
 			// The photo has its own endpoint: the server stores the file and links it, so no key is sent from here.
 			try {
-				if (data.photoUpload) await uploadAvatar(data.photoUpload)
-				else if (data.photoRemoved) await removeAvatar()
+				if (data.photoUpload) {
+					const photoUrl = await uploadAvatar(data.photoUpload)
+					await updateUser({ avatar: photoUrl || undefined })
+					Toast.show({ type: 'success', text1: 'Profile photo updated' })
+				}
+				else if (data.photoRemoved) {
+					await removeAvatar()
+					await updateUser({ avatar: undefined })
+					Toast.show({ type: 'success', text1: 'Profile photo removed' })
+				}
 			} catch (photoError: any) {
 				// Show the server's reason (e.g. "File storage is not configured") instead of a generic message.
 				const detail = photoError?.response?.data?.message || photoError?.message
-				Alert.alert('Photo not saved', detail || 'Could not update your profile photo. Please try again.')
+				Toast.show({
+					type: 'error',
+					text1: 'Photo not saved',
+					text2: detail || 'Could not update your profile photo. Please try again.',
+				})
 				return
 			}
 

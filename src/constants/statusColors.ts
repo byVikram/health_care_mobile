@@ -77,6 +77,11 @@ const STATUS_MAPPING: Record<string, keyof typeof SEMANTIC_STATUS_COLORS> = {
 	awaiting_sample: 'warning',
 	'awaiting sample': 'warning',
 
+	// missed appointment (patient no-show): a finished appointment, amber rather than red -- it can still be explained
+	no_show: 'warning',
+	'no-show': 'warning',
+	'no show': 'warning',
+
 	// danger / cancelled states
 	cancelled: 'danger',
 	failed: 'danger',
@@ -96,7 +101,7 @@ const STATUS_MAPPING: Record<string, keyof typeof SEMANTIC_STATUS_COLORS> = {
 
 	// purple/rescheduled states
 	rescheduled: 'purple',
-	reschedule_required: 'danger',
+	reschedule_required: 'warning',
 	'waiting for patient confirmation': 'purple',
 	'waiting for your confirmation': 'purple',
 }

@@ -17,7 +17,10 @@ import { AppPathIcon } from '../../../components/common'
 import { APP_COLORS, toneForString } from '../../../config/theme'
 import { useTabBarClearance } from '../../../navigation/tabBar'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
+import { DoctorStatusBanner } from './DoctorStatusBanner'
+import { useDoctorStatus } from './useDoctorStatus'
 import { listHealthQuestions, submitDoctorAnswer, type PatientQuestion } from '../../../services/qaService'
+import { extractApiErrorMessage } from '../../ancillary/ancillaryService'
 import Toast from 'react-native-toast-message'
 
 const QA_ICON =
@@ -36,6 +39,10 @@ const QUICK_SNIPPETS = [
 
 export function DoctorEngageScreen() {
 	const clearance = useTabBarClearance()
+	const { status: doctorStatus, reload: reloadStatus } = useDoctorStatus()
+	// Only a verified doctor can answer (the server refuses anyone else). Until the status is known the composer is
+	// available, and the server still decides.
+	const canAnswer = !doctorStatus || doctorStatus.is_verified
 
 	const [questions, setQuestions] = useState<PatientQuestion[]>([])
 	const [loading, setLoading] = useState(true)
@@ -87,8 +94,16 @@ export function DoctorEngageScreen() {
 				setJustPosted((prev) => ({ ...prev, [q.id]: true }))
 				setOpenId(null)
 			}
-		} catch {
-			Toast.show({ type: 'error', text1: 'Could not post your answer. Please try again.' })
+		} catch (error) {
+			// The server refuses an unverified doctor: re-read the status so the composer closes and the banner shows.
+			if ((error as { response?: { status?: number } })?.response?.status === 403) {
+				setOpenId(null)
+				void reloadStatus()
+			}
+			Toast.show({
+				type: 'error',
+				text1: extractApiErrorMessage(error, 'Could not post your answer. Please try again.'),
+			})
 		} finally {
 			setPosting(null)
 		}
@@ -97,9 +112,18 @@ export function DoctorEngageScreen() {
 	return (
 		<View style={styles.screen}>
 			<DoctorScreenHeader variant="simple" title="Questions" subtitle="Free public Q&A" />
+			<DoctorStatusBanner status={doctorStatus} />
 			<ScrollView
 				contentContainerStyle={{ padding: 16, paddingBottom: clearance }}
-				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={() => {
+							void load(true)
+							void reloadStatus()
+						}}
+					/>
+				}
 			>
 				<View style={styles.card}>
 					<View style={styles.headerRow}>
@@ -144,8 +168,8 @@ export function DoctorEngageScreen() {
 							const statLine = done
 								? 'You answered · live for the patient'
 								: q.answers.length === 0
-									? 'No reply yet · tap to answer'
-									: `${q.answers.length} ${q.answers.length === 1 ? 'doctor answered' : 'doctors answered'} · add yours`
+									? `No reply yet${canAnswer ? ' · tap to answer' : ''}`
+									: `${q.answers.length} ${q.answers.length === 1 ? 'doctor answered' : 'doctors answered'}${canAnswer ? ' · add yours' : ''}`
 							const statFg = done || answered ? APP_COLORS.success : '#B4532A'
 							const statIcon = done || answered ? CHECK_ICON : PLUS_ICON
 
@@ -184,7 +208,17 @@ export function DoctorEngageScreen() {
 										</View>
 									)}
 
-									{composing && (
+									{composing && !canAnswer && (
+										<View style={styles.sharedBox}>
+											<Text style={styles.sharedText}>
+												<Text style={styles.sharedBold}>Answering isn&apos;t open yet · </Text>
+												Patients read these as expert answers, so you can answer once an admin has verified your
+												profile.
+											</Text>
+										</View>
+									)}
+
+									{composing && canAnswer && (
 										<View style={{ gap: 8, marginTop: 4 }}>
 											<TextInput
 												value={draft}

@@ -37,7 +37,16 @@ export type PatientAppointment = Appointment & {
 	payment?: { status?: string | null; method?: string | null; transaction_id?: string | null } | null
 }
 
-export type AppointmentVariant = 'upcoming' | 'pending' | 'cancelled' | 'completed' | 'rescheduled'
+// 'reschedule_required' = the doctor asked the patient to choose a new time (the patient has to act);
+// 'rescheduled' = a new slot is set and waits for someone's confirmation (see isAwaitingDoctorConfirm).
+export type AppointmentVariant =
+	| 'upcoming'
+	| 'pending'
+	| 'cancelled'
+	| 'completed'
+	| 'rescheduled'
+	| 'reschedule_required'
+	| 'no_show'
 
 export const getRawStatus = (appt: Appointment | null): string => {
 	if (!appt) return ''
@@ -53,10 +62,19 @@ export const getVariant = (rawStatus: string): AppointmentVariant => {
 		.replace(/[\s-]+/g, '_')
 	if (s === 'cancelled' || s === 'canceled' || s === 'rejected') return 'cancelled'
 	if (s === 'completed' || s === 'done') return 'completed'
+	// The doctor marked the patient as absent: a finished (past) appointment the patient can still explain.
+	if (s === 'no_show' || s === 'noshow') return 'no_show'
 	if (s === 'pending' || s === 'payment_pending') return 'pending'
-	if (s === 'rescheduled' || s === 'reschedule_required') return 'rescheduled'
+	if (s === 'rescheduled') return 'rescheduled'
+	if (s === 'reschedule_required') return 'reschedule_required'
 	return 'upcoming'
 }
+
+/** A 'rescheduled' appointment whose last reschedule was made by the PATIENT (they picked the slot): it waits for the
+ * doctor to confirm, so the patient has nothing to accept. One an admin proposed (or an unknown actor) is the patient's
+ * to accept instead. Doctors no longer propose slots (they ask the patient to choose one: 'reschedule_required'). */
+export const isAwaitingDoctorConfirm = (appt: Appointment | null): boolean =>
+	getVariant(getRawStatus(appt)) === 'rescheduled' && (appt?.rescheduled_by ?? '').toLowerCase() === 'patient'
 
 export const isVideoMode = (mode?: string | null) => {
 	const m = (mode || '').replace(/[-\s]/g, '_').toLowerCase()
@@ -98,9 +116,11 @@ const HISTORY_TITLES: Record<string, string> = {
 	created: 'Booked',
 	confirmed: 'Confirmed',
 	rescheduled: 'Rescheduled',
+	reschedule_required: 'Reschedule requested',
 	cancelled: 'Cancelled',
 	canceled: 'Cancelled',
 	completed: 'Consultation',
+	no_show: 'Marked as no-show',
 	pending: 'Payment pending',
 	paid: 'Payment received',
 	payment_received: 'Payment received',
@@ -135,7 +155,7 @@ export function buildTimeline({ appt, variant, isVideo, payment, isPast }: Build
 				key: `h-${i}`,
 				title: historyTitle(h.action || ''),
 				sub: stampLabel(h.created_at) || undefined,
-				state: a === 'cancelled' || a === 'canceled' ? 'failed' : 'done',
+				state: a === 'cancelled' || a === 'canceled' || a === 'no_show' ? 'failed' : 'done',
 			})
 		})
 	} else {
@@ -144,6 +164,14 @@ export function buildTimeline({ appt, variant, isVideo, payment, isPast }: Build
 	}
 
 	if (variant === 'cancelled') return steps
+
+	// A no-show is over: nothing is left to happen, the timeline ends with the marking.
+	if (variant === 'no_show') {
+		if (!steps.some((s) => s.title === HISTORY_TITLES.no_show)) {
+			steps.push({ key: 'no_show', title: HISTORY_TITLES.no_show, state: 'failed' })
+		}
+		return steps
+	}
 
 	const when = slotLabel(appt.appointment_date, appt.start_time)
 	const start = combineDateTime(appt.appointment_date, appt.start_time)

@@ -5,7 +5,9 @@
 //   - Instant ("Book now"): POST /patient/requests (bookingType INSTANT) -> Finding a nurse (dispatch to
 //     nearby providers, optional tip, first to accept wins).
 //   - Later: POST /requests/scheduled with NO provider -- one order with up to 7 visits in a 14-day window; the
-//     backend assigns a provider to each visit shortly before it starts (a visit nobody takes is UNASSIGNED).
+//     backend assigns a provider to each visit 1 hour before it starts (a visit nobody takes is UNASSIGNED).
+//     Each visit can then be moved or cancelled on its own (rules come back on the order as `policy` and per visit
+//     as can_reschedule / can_cancel).
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 
@@ -88,7 +90,24 @@ export interface AncillaryOrderVisit {
 	payment_status?: string | null
 	/** The provider assigned to this visit (may differ per visit); null/absent until assigned. */
 	provider?: AncillaryOrderProvider | null
+	/** The patient moved this visit to another day / time. */
+	rescheduled?: boolean
+	/** Server rules: free to move until its provider is assigned, free to cancel up to the cancel cutoff. */
+	can_reschedule?: boolean
+	can_cancel?: boolean
+	/** Status endpoint only: the code the patient reads out at the door (until the visit starts) / when it is done. */
+	start_code?: string | null
+	completion_code?: string | null
 }
+
+/** Minutes, from the server (order_service.VISIT_ASSIGN_LEAD_MINUTES / VISIT_CANCEL_CUTOFF_MINUTES). */
+export interface AncillaryOrderPolicy {
+	assign_lead_minutes: number
+	cancel_cutoff_minutes: number
+}
+
+/** Used until the first response (or by an older backend that sends no `policy`). */
+export const DEFAULT_ORDER_POLICY: AncillaryOrderPolicy = { assign_lead_minutes: 60, cancel_cutoff_minutes: 120 }
 
 export interface AncillaryOrder {
 	request_public_id: string
@@ -106,6 +125,9 @@ export interface AncillaryOrder {
 	address?: { street_address: string; label?: string | null } | null
 	note?: string | null
 	visits: AncillaryOrderVisit[]
+	policy?: AncillaryOrderPolicy
+	/** False for the older chosen-provider orders: they are cancelled as a whole, visits are not edited one by one. */
+	visit_edits?: boolean
 	totals: { per_visit: number; visits_count: number; total: number }
 }
 
@@ -140,6 +162,36 @@ export const getAncillaryOrder = async (requestPublicId: string): Promise<Ancill
 
 export const cancelAncillaryOrder = async (requestPublicId: string, reason?: string): Promise<void> => {
 	await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PATIENT(requestPublicId), reason ? { reason } : {})
+}
+
+/**
+ * Cancel the chosen visits of a scheduled order, all or none (409 CANCEL_WINDOW_CLOSED / VISIT_NOT_CANCELLABLE when
+ * one can't be). skipGlobalError: the screen shows the server's message itself.
+ */
+export const cancelAncillaryVisits = async (
+	requestPublicId: string,
+	visitPublicIds: string[],
+	reason?: string
+): Promise<void> => {
+	await ApiService.post(
+		API_ENDPOINTS.ANCILLARY.CANCEL_VISITS(requestPublicId),
+		{ visit_public_ids: visitPublicIds, ...(reason ? { reason } : {}) },
+		{ skipGlobalError: true }
+	)
+}
+
+/** Move ONE visit to another day / start time (it keeps its length). 409 once its provider is assigned. */
+export const rescheduleAncillaryVisit = async (
+	requestPublicId: string,
+	visitPublicId: string,
+	date: string,
+	startTime: string
+): Promise<void> => {
+	await ApiService.post(
+		API_ENDPOINTS.ANCILLARY.RESCHEDULE_VISIT(requestPublicId, visitPublicId),
+		{ date, start_time: startTime },
+		{ skipGlobalError: true }
+	)
 }
 
 export const isVisitUnassigned = (status?: AncillaryOrderStatus | null) => status === 'UNASSIGNED'
