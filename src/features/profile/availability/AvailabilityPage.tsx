@@ -397,13 +397,22 @@ export default function AvailabilityPage() {
 					<>
 						{isDoctor && (
 							<View style={styles.placeCard}>
-								<Text style={styles.eyebrow}>SCHEDULE FOR</Text>
+								<AppSegmentedControl
+									options={MODE_OPTIONS}
+									value={mode}
+									onChange={setMode}
+									accessibilityLabel="Appointment type"
+								/>
+								<Text style={[styles.eyebrow, mode === 'video' && styles.placeOff]}>SCHEDULE FOR</Text>
 								<TouchableOpacity
-									style={styles.placeRow}
+									style={[styles.placeRow, mode === 'video' && styles.placeRowOff]}
 									onPress={() => setPickerOpen(true)}
-									disabled={places.length < 2}
+									// Video calls aren't tied to a clinic, so the card is greyed out and can't be changed there.
+									disabled={places.length < 2 || mode === 'video'}
 									accessibilityRole="button"
+									accessibilityState={{ disabled: places.length < 2 || mode === 'video' }}
 									accessibilityLabel={`Schedule for ${placeName(placeId)}. Change clinic`}
+									accessibilityHint={mode === 'video' ? 'Not used for video calls' : undefined}
 								>
 									<MaterialCommunityIcons
 										name="hospital-building"
@@ -415,12 +424,6 @@ export default function AvailabilityPage() {
 									</Text>
 									{places.length > 1 && <Text style={styles.change}>Change</Text>}
 								</TouchableOpacity>
-								<AppSegmentedControl
-									options={MODE_OPTIONS}
-									value={mode}
-									onChange={setMode}
-									accessibilityLabel="Appointment type"
-								/>
 							</View>
 						)}
 
@@ -576,6 +579,14 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		borderWidth: 1,
 		borderColor: APP_COLORS.divider,
+	},
+	// Video mode: the clinic doesn't apply, so the card reads as unavailable.
+	placeOff: {
+		opacity: 0.45,
+	},
+	placeRowOff: {
+		opacity: 0.45,
+		backgroundColor: APP_COLORS.pageBg,
 	},
 	placeName: {
 		flex: 1,

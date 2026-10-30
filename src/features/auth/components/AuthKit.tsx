@@ -27,6 +27,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 import { APP_COLORS } from '../../../config/theme'
+import { AppHeaderBackdrop } from '../../../components/common/layout/AppScreenHeader'
 
 /* ------------------------------------------------------------------ icons */
 
@@ -106,8 +107,7 @@ export function AuthHero({
 	return (
 		<View style={[styles.hero, { minHeight: height + insets.top, paddingTop: insets.top }]}>
 			<StatusBar barStyle="light-content" />
-			<View pointerEvents="none" style={styles.heroCircleBig} />
-			<View pointerEvents="none" style={styles.heroCircleSmall} />
+			<AppHeaderBackdrop />
 			{onBack ? (
 				<View style={[styles.heroBack, { top: insets.top + 8 }]}>
 					<BackButton onBack={onBack} backLabel={backLabel} color={APP_COLORS.surface} />
@@ -530,25 +530,6 @@ const styles = StyleSheet.create({
 		paddingBottom: 28,
 		justifyContent: 'flex-end',
 		gap: 6,
-	},
-	heroCircleBig: {
-		position: 'absolute',
-		right: -70,
-		top: -80,
-		width: 240,
-		height: 240,
-		borderRadius: 120,
-		backgroundColor: APP_COLORS.primary,
-	},
-	heroCircleSmall: {
-		position: 'absolute',
-		right: 80,
-		top: 70,
-		width: 90,
-		height: 90,
-		borderRadius: 45,
-		backgroundColor: APP_COLORS.mintAccent,
-		opacity: 0.14,
 	},
 	heroBack: { position: 'absolute', left: 8, zIndex: 2 },
 	heroBrand: { marginBottom: 10 },

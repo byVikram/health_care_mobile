@@ -100,6 +100,7 @@ export default function AncillaryBookNowReviewPage() {
 		<View style={styles.container}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Review & pay"
 				subtitle={`${serviceLabel} · now`}
 				onBack={() => navigation.goBack()}

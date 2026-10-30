@@ -370,7 +370,7 @@ export default function MyBookingsPage({
 						setSearchQuery(text)
 						setVisibleCount(PAGE_SIZE)
 					}}
-					placeholder="Search provider, service or date..."
+					placeholder="Search bookings by provider, service or date"
 					onFilterPress={handleFilterPress}
 					filterActive={activeTab !== 'all' || filterModalVisible}
 					accessibilityLabel="Filter ancillary bookings"

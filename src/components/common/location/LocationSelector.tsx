@@ -1,11 +1,9 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { StyleSheet, TouchableOpacity, type StyleProp, type TextStyle } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 import { AppTypography } from '../display/AppTypography'
-import { useNavigation } from '@react-navigation/native'
-
-import { ROUTES } from '../../../navigation/routes'
 import { useAuth } from '../../../context/AuthContext'
+import { LocationSheet } from './LocationSheet'
 
 interface LocationSelectorProps {
 	location?: string
@@ -16,26 +14,34 @@ interface LocationSelectorProps {
 	iconSize?: number
 }
 
-export default function LocationSelector({ location, color = '#f2f4f4', textStyle, iconSize = 16 }: LocationSelectorProps) {
-	const navigation = useNavigation<any>()
+export default function LocationSelector({
+	location,
+	color = '#f2f4f4',
+	textStyle,
+	iconSize = 16,
+}: LocationSelectorProps) {
 	const { currentLocation } = useAuth()
+	const [open, setOpen] = useState(false)
 
 	const displayLocation = currentLocation?.address || location || 'Select Location'
 
 	return (
-		<TouchableOpacity 
-			style={styles.locationRow} 
-			onPress={() => {
-				navigation.navigate(ROUTES.STACK.LOCATION_SELECT)
-			}} 
-			activeOpacity={0.7}
-		>
-			<MaterialCommunityIcons name="map-marker-outline" size={iconSize} color={color} />
-			<AppTypography variant="body" style={[styles.locationText, { color }, textStyle]} numberOfLines={1}>
-				{displayLocation}
-			</AppTypography>
-			<MaterialCommunityIcons name="chevron-down" size={iconSize} color={color} />
-		</TouchableOpacity>
+		<>
+			<TouchableOpacity
+				style={styles.locationRow}
+				onPress={() => setOpen(true)}
+				activeOpacity={0.7}
+				accessibilityRole="button"
+				accessibilityLabel={`Your location: ${displayLocation}. Change`}
+			>
+				<MaterialCommunityIcons name="map-marker-outline" size={iconSize} color={color} />
+				<AppTypography variant="body" style={[styles.locationText, { color }, textStyle]} numberOfLines={1}>
+					{displayLocation}
+				</AppTypography>
+				<MaterialCommunityIcons name="chevron-down" size={iconSize} color={color} />
+			</TouchableOpacity>
+			<LocationSheet visible={open} onClose={() => setOpen(false)} />
+		</>
 	)
 }
 

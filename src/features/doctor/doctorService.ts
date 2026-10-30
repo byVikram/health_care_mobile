@@ -65,6 +65,13 @@ export interface DoctorSearchParams {
 	min_rating?: number
 	max_price?: number
 	sort?: string
+	// Filters sheet (see features/doctor/search/doctorFilters.ts)
+	appointment_mode?: 'clinic_visit' | 'video_call'
+	gender?: 'female' | 'male'
+	available_today?: boolean
+	min_experience?: number
+	/** Fee bands in rupees, comma separated: '0-499,1001-'. */
+	fee_range?: string
 }
 
 export interface CreateAppointmentPayload {

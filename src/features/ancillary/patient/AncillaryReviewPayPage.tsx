@@ -106,6 +106,7 @@ export default function AncillaryReviewPayPage() {
 		<View style={styles.container}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Review & pay"
 				subtitle={`${serviceLabel} · ${plural(n, 'visit')}`}
 				onBack={() => navigation.goBack()}

@@ -116,7 +116,7 @@ export default function AllEventsPage() {
 
 			<View style={styles.searchContainer}>
 				<AppInput
-					placeholder="Search events..."
+					placeholder="Search events by name or topic"
 					value={searchQuery}
 					onChangeText={setSearchQuery}
 					isSearch

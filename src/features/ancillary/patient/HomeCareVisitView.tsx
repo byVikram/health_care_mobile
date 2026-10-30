@@ -288,6 +288,7 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 		<View style={styles.page}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Home care visit"
 				subtitle={`${count > 1 ? `Visit ${position} of ${count} · ` : ''}Order ${p.orderRef}`}
 				onBack={p.onBack}

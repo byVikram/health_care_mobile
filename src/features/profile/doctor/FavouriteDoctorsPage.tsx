@@ -83,7 +83,7 @@ export default function FavouriteDoctorsPage() {
 						style={styles.searchInput}
 						value={query}
 						onChangeText={setQuery}
-						placeholder="Search by name, speciality or location"
+						placeholder="Search saved doctors by name, speciality or location"
 						placeholderTextColor={APP_COLORS.inkMuted}
 						autoCorrect={false}
 						returnKeyType="search"

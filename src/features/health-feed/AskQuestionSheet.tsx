@@ -126,19 +126,27 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 		setTried(false)
 		setPosted(null)
 		setSpecStatus('loading')
-		getSpecialities()
-			.then((res) => {
+		const loadSpecialities = async () => {
+			try {
+				const res = await getSpecialities()
 				setSpecialities((res.data ?? []).map((sp) => sp.label).filter(Boolean))
 				setSpecStatus('ready')
-			})
-			.catch(() => setSpecStatus('error'))
-		getPatientDetails()
-			.then((res) => {
+			} catch {
+				setSpecStatus('error')
+			}
+		}
+		const loadLocation = async () => {
+			try {
+				const res = await getPatientDetails()
 				const personal = res?.data?.personal ?? res?.data
 				const city = personal?.city || personal?.location
 				if (city) setLocation(String(city))
-			})
-			.catch(() => {})
+			} catch {
+				// The location is only a prefill: the patient can type it.
+			}
+		}
+		void loadSpecialities()
+		void loadLocation()
 	}, [visible])
 
 	const current = people.find((p) => p.key === who) ?? people[0]
@@ -555,7 +563,7 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 									<TextInput
 										value={tagQuery}
 										onChangeText={setTagQuery}
-										placeholder="Search speciality"
+										placeholder="Search specialities"
 										placeholderTextColor={APP_COLORS.inkMuted}
 										style={styles.tagSearchInput}
 									/>

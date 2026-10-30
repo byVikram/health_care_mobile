@@ -67,6 +67,7 @@ export default function LabReportPage() {
 		<View style={styles.screen}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Lab report"
 				subtitle={`Order ${r.orderId}`}
 				onBack={() => navigation.goBack()}

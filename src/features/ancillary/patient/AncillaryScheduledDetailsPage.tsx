@@ -155,6 +155,7 @@ export default function AncillaryScheduledDetailsPage() {
 		<View style={styles.container}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Booking details"
 				subtitle={`Booking ID ${requestId}`}
 				onBack={() => navigation.goBack()}

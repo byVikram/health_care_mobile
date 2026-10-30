@@ -186,6 +186,7 @@ export default function LabCartPage() {
 		<View style={styles.screen}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Your cart"
 				subtitle={`${countLabel} · Step 1 of 2`}
 				onBack={() => navigation.goBack()}
@@ -244,6 +245,7 @@ export default function LabCartPage() {
 					patientLabel="TESTS FOR"
 					addressLabel={isHome ? 'COLLECTION ADDRESS' : 'YOUR ADDRESS'}
 					familyTitle="Who are these tests for?"
+					currentLocation
 				/>
 
 				{/* Availability at the address */}

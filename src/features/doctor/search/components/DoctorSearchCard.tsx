@@ -29,7 +29,6 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 	const clinicName = doctor.hospital?.name || doctor.location || ''
 	const distanceText = doctor.distance != null ? `${formatKm(doctor.distance)} km` : null
 
-	const offersVideo = (doctor.hospital?.video_consultation_fee ?? 0) > 0
 	const fee = doctor.hospital?.offline_consultation_fee ?? doctor.hospital?.video_consultation_fee ?? null
 
 	return (
@@ -45,11 +44,6 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 						initialsColor={tone.ink}
 						initialsStyle={styles.initials}
 					/>
-					{offersVideo && (
-						<View style={styles.videoBadge}>
-							<AppIcon name="video" size={12} color={APP_COLORS.surface} strokeWidth={2.4} />
-						</View>
-					)}
 				</View>
 
 				<View style={styles.infoCol}>
@@ -84,14 +78,19 @@ export default function DoctorSearchCard({ doctor }: DoctorProps) {
 			<View>
 				<AppDashedDivider />
 				<View style={styles.bottomRow}>
-					{/* The design's next-availability pill is omitted: DoctorSearchItem has no availability field. */}
-					{fee != null ? (
-						<AppTypography style={styles.feeText}>
-							{formatInr(fee)} <AppTypography style={styles.feeSuffix}>per visit</AppTypography>
-						</AppTypography>
-					) : (
-						<View />
-					)}
+					<View style={styles.priceCol}>
+						{doctor.available_today ? (
+							<View style={styles.todayPill}>
+								<View style={styles.todayDot} />
+								<AppTypography style={styles.todayText}>Available today</AppTypography>
+							</View>
+						) : null}
+						{fee != null ? (
+							<AppTypography style={styles.feeText}>
+								{formatInr(fee)} <AppTypography style={styles.feeSuffix}>per visit</AppTypography>
+							</AppTypography>
+						) : null}
+					</View>
 					<AppButton size="md" onPress={goToDetail} labelStyle={styles.bookBtnLabel}>
 						Book
 					</AppButton>
@@ -120,19 +119,6 @@ const styles = StyleSheet.create({
 		fontSize: 24,
 		lineHeight: 30,
 		fontWeight: '700',
-	},
-	videoBadge: {
-		position: 'absolute',
-		right: -2,
-		bottom: -2,
-		width: 24,
-		height: 24,
-		borderRadius: 9999,
-		borderWidth: 2,
-		borderColor: APP_COLORS.surface,
-		backgroundColor: APP_COLORS.primary,
-		alignItems: 'center',
-		justifyContent: 'center',
 	},
 	infoCol: {
 		flex: 1,
@@ -174,6 +160,33 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 		gap: 12,
 		paddingTop: 12,
+	},
+	priceCol: {
+		flexShrink: 1,
+		gap: 4,
+	},
+	// design: 12/16 700 on a soft green pill with a 6px dot (the next slot's time is not in the search data)
+	todayPill: {
+		alignSelf: 'flex-start',
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 8,
+		backgroundColor: APP_COLORS.successBg,
+	},
+	todayDot: {
+		width: 6,
+		height: 6,
+		borderRadius: 3,
+		backgroundColor: APP_COLORS.success,
+	},
+	todayText: {
+		fontSize: 12,
+		lineHeight: 16,
+		fontWeight: '700',
+		color: APP_COLORS.success,
 	},
 	feeText: {
 		fontSize: 18,

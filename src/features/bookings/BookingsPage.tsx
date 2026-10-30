@@ -37,6 +37,7 @@ import Toast from 'react-native-toast-message'
 import {
 	AppBookingCard,
 	AppButton,
+	AppHeaderBackdrop,
 	AppCategoryTile,
 	AppIcon,
 	AppIconTile,
@@ -357,7 +358,7 @@ export default function BookingsPage() {
 			{isFocused && <StatusBar barStyle="light-content" backgroundColor={APP_COLORS.ink} />}
 
 			<View style={[styles.hero, { paddingTop: insets.top + 8 }]}>
-				<View style={styles.heroCircle} />
+				<AppHeaderBackdrop />
 				<View style={styles.heroRow}>
 					<Text style={styles.heroTitle} accessibilityRole="header">
 						My bookings
@@ -456,15 +457,6 @@ const styles = StyleSheet.create({
 		gap: 12,
 		borderBottomLeftRadius: 24,
 		borderBottomRightRadius: 24,
-	},
-	heroCircle: {
-		position: 'absolute',
-		right: -60,
-		top: -80,
-		width: 220,
-		height: 220,
-		borderRadius: 110,
-		backgroundColor: APP_COLORS.primary,
 	},
 	heroRow: {
 		minHeight: 52,

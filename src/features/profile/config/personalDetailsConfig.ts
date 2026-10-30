@@ -9,7 +9,13 @@ import { fetchProviderProfile, updateProviderProfileBackend } from '../../ancill
 import { fetchPatientDetails, savePatientDetails } from '../patient/PatientProfileService'
 import { fetchDoctorPersonal, saveDoctorPersonal } from '../doctor/doctorProfileService'
 import type { HubRole } from './profileHubConfig'
-import { GENDER_OPTIONS, LANGUAGE_OPTIONS, MARITAL_STATUS_OPTIONS, type Option } from './profileOptions'
+import {
+	GENDER_OPTIONS,
+	LANGUAGE_OPTIONS,
+	MARITAL_STATUS_OPTIONS,
+	normalizeLanguages,
+	type Option,
+} from './profileOptions'
 
 /** One flat draft for every role; each role only uses its own fields. */
 export interface PersonalDraft {
@@ -178,7 +184,7 @@ export const PERSONAL_DETAILS_CONFIG: Record<HubRole, PersonalDetailsConfig> = {
 				gender: p.gender || '',
 				dob: formatApiDateForDisplay(p.date_of_birth || undefined),
 				location: p.location || '',
-				languages: p.languages || [],
+				languages: normalizeLanguages(p.languages),
 				mobile: p.contact_number || p.mobile_number || '',
 				email: p.email || '',
 				instagram: social.instagram || '',
@@ -241,7 +247,7 @@ export const PERSONAL_DETAILS_CONFIG: Record<HubRole, PersonalDetailsConfig> = {
 				gender: p.gender || '',
 				dob: formatApiDateForDisplay(p.date_of_birth || undefined),
 				location: p.location || '',
-				languages: p.languages || [],
+				languages: normalizeLanguages(p.languages),
 				mobile: p.contact_number || p.mobile_number || '',
 				email: p.email || '',
 				avatar: p.avatar_s3_key || '',

@@ -76,7 +76,7 @@ const DoctorsListHeader = React.memo(function DoctorsListHeader({
 					<TextInput
 						value={searchQuery}
 						onChangeText={onSearchChange}
-						placeholder="Search doctor by name, speciality..."
+						placeholder="Search doctors by name or speciality"
 						placeholderTextColor="#94a3b8"
 						style={styles.searchInput}
 						autoCorrect={false}

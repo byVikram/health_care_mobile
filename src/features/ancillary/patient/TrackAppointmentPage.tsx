@@ -474,6 +474,7 @@ export default function TrackAppointmentPage() {
 		return (
 			<View style={styles.container}>
 				<AppScreenHeader
+					solid
 					title="Track Appointment"
 					onBack={() => {
 						if (navigation.canGoBack()) navigation.goBack()

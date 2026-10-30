@@ -67,11 +67,11 @@ const NOUNS: Record<string, [string, string]> = {
 }
 
 const SEARCH_PLACEHOLDERS: Record<string, string> = {
-	'nursing-care': 'Search e.g. dressing, IV, injection',
-	physiotherapy: 'Search e.g. back pain, knee pain',
-	'rehab-care': 'Search e.g. stroke, cardiac rehab',
-	'home-care': 'Search e.g. bathing, mobility, companion',
-	'medical-equipment': 'Search e.g. wheelchair, oxygen',
+	'nursing-care': 'Search nursing procedures, e.g. dressing, IV',
+	physiotherapy: 'Search physiotherapy, e.g. back pain, knee pain',
+	'rehab-care': 'Search rehab services, e.g. stroke, cardiac',
+	'home-care': 'Search care tasks, e.g. bathing, mobility',
+	'medical-equipment': 'Search equipment, e.g. wheelchair, oxygen',
 }
 
 /** "Nursing Care" -> "Nursing care". */

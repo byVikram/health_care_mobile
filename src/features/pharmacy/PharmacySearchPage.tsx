@@ -204,7 +204,7 @@ export default function PharmacySearchPage() {
 					<MaterialCommunityIcons name="magnify" size={20} color="#9aa0a6" style={styles.searchIcon} />
 					<TextInput
 						style={styles.searchInput}
-						placeholder="Search by pharmacy name, owner, city..."
+						placeholder="Search pharmacies by name, owner or city"
 						placeholderTextColor="#9AA0AC"
 						value={searchQuery}
 						onChangeText={setSearchQuery}

@@ -43,9 +43,25 @@ type Props = {
 	available: boolean
 	onBack: () => void
 	onShare: () => void
+	/** Patients only: whether this doctor is in their favourites. Leave undefined to hide the heart. */
+	favourite?: boolean
+	/** A favourite request is in flight: the heart ignores taps. */
+	favouriteBusy?: boolean
+	onToggleFavourite?: () => void
 }
 
-export function CollapsingProfileHeader({ scrollY, name, subtitle, avatarUri, available, onBack, onShare }: Props) {
+export function CollapsingProfileHeader({
+	scrollY,
+	name,
+	subtitle,
+	avatarUri,
+	available,
+	onBack,
+	onShare,
+	favourite,
+	favouriteBusy = false,
+	onToggleFavourite,
+}: Props) {
 	const insets = useSafeAreaInsets()
 	const { width } = useWindowDimensions()
 	const headerHeight = insets.top + BAR_HEIGHT
@@ -105,6 +121,18 @@ export function CollapsingProfileHeader({ scrollY, name, subtitle, avatarUri, av
 						)}
 					</Animated.View>
 				</View>
+				{favourite !== undefined && onToggleFavourite ? (
+					<Pressable
+						onPress={onToggleFavourite}
+						disabled={favouriteBusy}
+						accessibilityRole="button"
+						accessibilityLabel={favourite ? 'Remove from favourites' : 'Add to favourites'}
+						accessibilityState={{ selected: favourite, busy: favouriteBusy }}
+						style={[styles.iconBtn, favouriteBusy && { opacity: 0.6 }]}
+					>
+						<MaterialCommunityIcons name={favourite ? 'heart' : 'heart-outline'} size={22} color="#FFFFFF" />
+					</Pressable>
+				) : null}
 				<Pressable onPress={onShare} accessibilityRole="button" accessibilityLabel="Share profile" style={[styles.iconBtn, { marginRight: -10 }]}>
 					<MaterialCommunityIcons name="share-variant-outline" size={22} color="#FFFFFF" />
 				</Pressable>

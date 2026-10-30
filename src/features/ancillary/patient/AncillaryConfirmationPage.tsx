@@ -49,7 +49,7 @@ export default function AncillaryConfirmationPage() {
 
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader title="Booking Confirmation" />
+			<AppScreenHeader solid title="Booking Confirmation" />
 
 			<ScrollView
 				contentContainerStyle={[

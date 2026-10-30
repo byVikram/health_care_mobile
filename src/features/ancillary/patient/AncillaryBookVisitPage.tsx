@@ -225,6 +225,7 @@ export default function AncillaryBookVisitPage() {
 		<View style={styles.container}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Schedule a visit"
 				subtitle={headerSub || undefined}
 				onBack={() => navigation.goBack()}

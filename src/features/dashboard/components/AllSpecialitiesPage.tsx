@@ -195,7 +195,7 @@ function SearchBar({
 				<MaterialCommunityIcons name="magnify" size={18} color={COLORS.searchIcon} />
 				{!value ? (
 					<AppTypography variant="caption" style={styles.searchPlaceholder} pointerEvents="none">
-						Search for treatments or doctors...
+						Search specialities or treatments
 					</AppTypography>
 				) : null}
 				<TextInput

@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
+import Toast from 'react-native-toast-message'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import {
 	AppActionChip,
@@ -27,7 +28,15 @@ import {
 	AppTag,
 	AppTypography,
 } from '../../../components/common'
-import { getDoctorById, getDoctorAvailability, TimeSlot } from '../doctorService'
+import {
+	getDoctorById,
+	getDoctorAvailability,
+	getFavouriteDoctors,
+	toggleFavouriteDoctor,
+	TimeSlot,
+} from '../doctorService'
+import { isPatientRole } from '../../../constants/constants'
+import { useAuth } from '../../../context/AuthContext'
 import { DoctorDetailData } from '../../../types/doctor-detail'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
@@ -81,6 +90,7 @@ export default function DoctorDetailPage() {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_DETAIL>>()
 	const referralId = route.params?.referralId
+	const { role } = useAuth()
 
 	const [doctor, setDoctor] = useState<DoctorDetailData | null>(null)
 	const [loading, setLoading] = useState(true)
@@ -89,6 +99,10 @@ export default function DoctorDetailPage() {
 	const [aboutExpanded, setAboutExpanded] = useState(false)
 	// Treatments & services "Show all / Show fewer" toggle
 	const [treatmentsExpanded, setTreatmentsExpanded] = useState(false)
+
+	// Favourite heart (patients only): undefined until we know, so it doesn't flash the wrong state
+	const [favourite, setFavourite] = useState<boolean | undefined>(undefined)
+	const [favouriteBusy, setFavouriteBusy] = useState(false)
 
 	// Real "next slot today" per hospital (undefined = still loading)
 	const [todaySlots, setTodaySlots] = useState<TodaySlots | undefined>(undefined)
@@ -152,6 +166,26 @@ export default function DoctorDetailPage() {
 		fetchDetail()
 	}, [route.params?.id])
 
+	// Is this doctor already one of the patient's favourites?
+	React.useEffect(() => {
+		// route.params.id is the doctor's public id, the same id the favourites list and toggle use
+		const doctorId = route.params?.id
+		if (!doctorId || !isPatientRole(role)) return
+		let active = true
+		const loadFavourite = async () => {
+			try {
+				const res = await getFavouriteDoctors()
+				if (active) setFavourite((res.data?.favourite_ids ?? []).includes(doctorId))
+			} catch {
+				// Without the list we can't show the right state, so the heart stays hidden.
+			}
+		}
+		void loadFavourite()
+		return () => {
+			active = false
+		}
+	}, [route.params?.id, role])
+
 	// Today's availability for every clinic -> real "Available today" badge,
 	// "Next available" card and each clinic's NEXT SLOT pill.
 	React.useEffect(() => {
@@ -200,6 +234,28 @@ export default function DoctorDetailPage() {
 			mode,
 			referralId,
 		})
+	}
+
+	const handleToggleFavourite = async () => {
+		if (!doctor || !route.params?.id || favouriteBusy) return
+		setFavouriteBusy(true)
+		try {
+			const res = await toggleFavouriteDoctor(route.params.id)
+			const added = res.data?.action ? res.data.action === 'added' : !favourite
+			setFavourite(added)
+			Toast.show({
+				type: 'success',
+				text1: added ? `${doctor.name} added to favourites` : `${doctor.name} removed from favourites`,
+			})
+		} catch (e) {
+			Toast.show({
+				type: 'error',
+				text1: "Couldn't update favourites",
+				text2: e instanceof Error ? e.message : undefined,
+			})
+		} finally {
+			setFavouriteBusy(false)
+		}
 	}
 
 	const handleShare = () => {
@@ -322,6 +378,9 @@ export default function DoctorDetailPage() {
 				available={availableToday}
 				onBack={() => navigation.goBack()}
 				onShare={handleShare}
+				favourite={favourite}
+				favouriteBusy={favouriteBusy}
+				onToggleFavourite={handleToggleFavourite}
 			/>
 
 			<Animated.ScrollView

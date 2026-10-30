@@ -20,7 +20,8 @@ import FrameIcon from '../../assets/Settings/Frame.svg'
 import StarIcon from '../../assets/Settings/star.svg'
 import VectorIcon from '../../assets/Settings/Vector.svg'
 import { useAuth } from '../../context/AuthContext'
-import { LogoutConfirmModal } from '../../components/common'
+import { AppHeaderBackdrop, LogoutConfirmModal } from '../../components/common'
+import { APP_COLORS } from '../../config/theme'
 
 const SettingPage = () => {
 	const navigation = useNavigation<any>()
@@ -100,8 +101,7 @@ const SettingPage = () => {
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={[styles.headerWrapper, { paddingTop: insets.top + 16 }]}>
-				<View style={styles.waveOne} />
-				<View style={styles.waveTwo} />
+				<AppHeaderBackdrop />
 
 				<View style={styles.headerContent}>
 					<TouchableOpacity onPress={() => navigation.goBack()}>
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
 
 	// 🔥 Header
 	headerWrapper: {
-		backgroundColor: '#1f5f68',
+		backgroundColor: APP_COLORS.ink,
 		paddingBottom: 20,
 		paddingHorizontal: 16,
 		overflow: 'hidden',
@@ -170,28 +170,6 @@ const styles = StyleSheet.create({
 		color: '#fff',
 		fontSize: 20,
 		fontWeight: '600',
-	},
-
-	waveOne: {
-		position: 'absolute',
-		width: 420,
-		height: 240,
-		borderRadius: 120,
-		backgroundColor: 'rgba(255,255,255,0.06)',
-		left: -140,
-		top: -70,
-		transform: [{ rotate: '-4deg' }],
-	},
-
-	waveTwo: {
-		position: 'absolute',
-		width: 430,
-		height: 240,
-		borderRadius: 120,
-		backgroundColor: 'rgba(255,255,255,0.05)',
-		left: -95,
-		top: -22,
-		transform: [{ rotate: '-4deg' }],
 	},
 
 	// Card

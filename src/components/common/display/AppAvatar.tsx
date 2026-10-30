@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Image, StyleSheet, Text, View, type ImageStyle, type StyleProp, type TextStyle } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { APP_COLORS } from '../../../config/theme'
@@ -54,6 +54,11 @@ export default function AppAvatar({
 	accessibilityLabel,
 }: AppAvatarProps) {
 	const [failed, setFailed] = useState(false)
+	// A photo that failed to load (an expired link, a network blip) must not hide the next one: try again whenever the
+	// address changes, e.g. when the fresh photo arrives after the app opened with an old saved link.
+	useEffect(() => {
+		setFailed(false)
+	}, [uri])
 	const showImage = !!uri && !failed
 	const dimension = { width: size, height: size, borderRadius: radius ?? size / 2 }
 	const overrides: ImageStyle = {}

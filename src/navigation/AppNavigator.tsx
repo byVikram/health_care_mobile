@@ -111,6 +111,7 @@ function AuthenticatedNavigator() {
 					headerShown: false,
 					header: ({ options, route }) => (
 						<AppScreenHeader
+							solid
 							title={options.title || route.name}
 							rightElement={options.headerRight ? options.headerRight({ canGoBack: true }) : undefined}
 						/>

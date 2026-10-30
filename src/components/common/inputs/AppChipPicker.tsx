@@ -31,6 +31,10 @@ export type AppChipPickerProps = {
 	onChange: (values: string[]) => void
 	/** Sheet title. Defaults to `label`. */
 	sheetTitle?: string
+	/** Shows a red * after the label. */
+	required?: boolean
+	/** Validation message, shown in red under the chips. */
+	errorText?: string
 	searchPlaceholder?: string
 	/** Chips shown before the rest collapse into "+N more". Defaults to 6. */
 	maxVisible?: number
@@ -38,6 +42,9 @@ export type AppChipPickerProps = {
 }
 
 const DEFAULT_MAX_VISIBLE = 6
+
+// "english" and "English" are one language: entries that match ignoring case are treated as the same choice.
+const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
 const LIST_HEIGHT_RATIO = 0.5
 
 export function AppChipPicker({
@@ -46,7 +53,9 @@ export function AppChipPicker({
 	values,
 	onChange,
 	sheetTitle,
-	searchPlaceholder = 'Search',
+	required = false,
+	errorText,
+	searchPlaceholder = 'Search options',
 	maxVisible = DEFAULT_MAX_VISIBLE,
 	style,
 }: AppChipPickerProps) {
@@ -54,8 +63,10 @@ export function AppChipPicker({
 	const [query, setQuery] = useState('')
 	const { height: windowHeight } = useWindowDimensions()
 
-	const selected = useMemo(() => Array.from(new Set(values)), [values])
-	const labels = useMemo(() => new Map(options.map((o) => [o.value, o.label])), [options])
+	const selected = useMemo(() => values.filter((v, i) => values.findIndex((x) => same(x, v)) === i), [values])
+	const labels = useMemo(() => new Map(options.map((o) => [o.value.toLowerCase(), o.label])), [options])
+	/** The choices without `value`, whichever way it was capitalised when it was saved. */
+	const without = (value: string) => selected.filter((v) => !same(v, value))
 	const shown = selected.slice(0, maxVisible)
 	const hiddenCount = selected.length - shown.length
 
@@ -63,7 +74,7 @@ export function AppChipPicker({
 		const q = query.trim().toLowerCase()
 		return options
 			.filter((o) => !q || o.label.toLowerCase().includes(q))
-			.map((o) => ({ key: o.value, label: o.label, checked: selected.includes(o.value) }))
+			.map((o) => ({ key: o.value, label: o.label, checked: selected.some((s) => same(s, o.value)) }))
 	}, [options, query, selected])
 
 	const openSheet = () => setOpen(true)
@@ -71,19 +82,21 @@ export function AppChipPicker({
 		setOpen(false)
 		setQuery('')
 	}
-	const toggle = (key: string, checked: boolean) =>
-		onChange(checked ? [...selected, key] : selected.filter((v) => v !== key))
+	const toggle = (key: string, checked: boolean) => onChange(checked ? [...selected, key] : without(key))
 
 	return (
 		<View style={[styles.wrap, style]}>
 			<View style={styles.head}>
-				<Text style={styles.label}>{label}</Text>
+				<Text style={styles.label}>
+					{label}
+					{required ? <Text style={styles.required}> *</Text> : null}
+				</Text>
 				<Text style={styles.count}>{selected.length ? `${selected.length} added` : 'None yet'}</Text>
 			</View>
 
 			<View style={styles.chips} accessibilityRole="list" accessibilityLabel={label}>
 				{shown.map((value) => {
-					const text = labels.get(value) ?? value
+					const text = labels.get(value.toLowerCase()) ?? value
 					return (
 						<AppChip
 							key={value}
@@ -95,7 +108,7 @@ export function AppChipPicker({
 							textStyle={styles.chipText}
 							trailing={
 								<Pressable
-									onPress={() => onChange(selected.filter((v) => v !== value))}
+									onPress={() => onChange(without(value))}
 									hitSlop={6}
 									style={styles.chipClose}
 									accessibilityRole="button"
@@ -129,6 +142,12 @@ export function AppChipPicker({
 					accessibilityLabel={`Add ${label.toLowerCase()}`}
 				/>
 			</View>
+
+			{!!errorText && (
+				<Text style={styles.error} accessibilityRole="alert">
+					{errorText}
+				</Text>
+			)}
 
 			<AppBottomSheet
 				visible={open}
@@ -189,6 +208,14 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 		fontWeight: '700',
 		color: APP_COLORS.ink,
+	},
+	required: {
+		color: APP_COLORS.danger,
+	},
+	error: {
+		fontSize: 12,
+		lineHeight: 16,
+		color: APP_COLORS.danger,
 	},
 	count: {
 		fontSize: 12,

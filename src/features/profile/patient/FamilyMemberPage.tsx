@@ -315,6 +315,8 @@ export default function FamilyMemberPage() {
 								value={draft.relation}
 								onSelect={(v) => set('relation', v)}
 								placeholder="Select relationship"
+								presentation="sheet"
+								sheetTitle="Relationship to you"
 							/>
 						</AppFormField>
 						<AppFormField label="Gender" required errorText={errors.gender}>
@@ -324,6 +326,8 @@ export default function FamilyMemberPage() {
 								value={draft.gender}
 								onSelect={(v) => set('gender', v)}
 								placeholder="Select gender"
+								presentation="sheet"
+								sheetTitle="Gender"
 							/>
 						</AppFormField>
 						<AppFormField label="Date of birth" required errorText={errors.dob}>

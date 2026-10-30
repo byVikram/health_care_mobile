@@ -103,7 +103,7 @@ export default function PatientHealthQuestionsList({ showViewAll = true, itemLim
 							showMicrophone
 							value={searchQuery}
 							onChangeText={setSearchQuery}
-							placeholder="Search questions or symptoms..."
+							placeholder="Search questions or symptoms"
 							placeholderTextColor="#98a1aa"
 							containerStyle={styles.searchInputContainer}
 							style={styles.searchInput}

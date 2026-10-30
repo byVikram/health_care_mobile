@@ -36,6 +36,8 @@ type Props = {
 	familyTitle?: string
 	/** Show the address but do not let it be changed here (something chosen earlier depends on it). */
 	lockAddress?: boolean
+	/** Adds a one-tap "Current location" row to the address sheet. */
+	currentLocation?: boolean
 }
 
 export function VisitWhoWhereSection({
@@ -48,6 +50,7 @@ export function VisitWhoWhereSection({
 	addressLabel = 'VISIT ADDRESS',
 	familyTitle = 'Who is this visit for?',
 	lockAddress = false,
+	currentLocation = false,
 }: Props) {
 	const { member, address } = who
 	const addressTag = address ? address.label.toUpperCase() : ''
@@ -138,7 +141,8 @@ export function VisitWhoWhereSection({
 				selectedId={who.addressId}
 				onSelect={who.setAddressId}
 				onSaveNew={who.saveAddress}
-				onUseCurrentLocation={who.useCurrentLocation}
+				onUseCurrentLocation={currentLocation ? undefined : who.useCurrentLocation}
+				onPickCurrentLocation={currentLocation ? who.pickCurrentLocation : undefined}
 			/>
 		</>
 	)

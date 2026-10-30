@@ -36,7 +36,7 @@ import { Asset } from 'expo-asset'
 import * as FileSystem from 'expo-file-system/legacy'
 import Toast from 'react-native-toast-message'
 
-import { AppSegmentedControl, AppSkeleton, AppSoftCard, ConsultationNotesImage } from '../../components/common'
+import { AppHeaderBackdrop, AppSegmentedControl, AppSkeleton, AppSoftCard, ConsultationNotesImage } from '../../components/common'
 import { APP_COLORS, TONES } from '../../config/theme'
 import { ROUTES } from '../../navigation/routes'
 import ApiService from '../../services/apiService'
@@ -880,7 +880,7 @@ export default function ConsultationPage() {
 		<View style={styles.screen}>
 			{/* ── Header ── */}
 			<View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-				<View aria-hidden style={styles.headerBlob} />
+				<AppHeaderBackdrop />
 				<View style={styles.headerTopRow}>
 					<TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityLabel="Back to today">
 						<MaterialCommunityIcons name="chevron-left" size={26} color="#FFFFFF" />
@@ -1516,7 +1516,6 @@ const styles = StyleSheet.create({
 		borderBottomLeftRadius: 24,
 		borderBottomRightRadius: 24,
 	},
-	headerBlob: { position: 'absolute', right: -60, top: -80, width: 220, height: 220, borderRadius: 9999, backgroundColor: PRIMARY },
 	headerTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
 	backBtn: { width: 44, height: 44, marginLeft: -8, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 	headerTitle: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: '#FFFFFF' },
