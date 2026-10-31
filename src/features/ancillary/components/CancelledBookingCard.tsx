@@ -10,12 +10,18 @@ interface CancelledBookingCardProps {
 }
 
 export default function CancelledBookingCard({ booking }: CancelledBookingCardProps) {
+	// The provider reached the address and the patient was not available (not a cancellation).
+	const missed = String(booking.rawStatus ?? '').toUpperCase() === 'NO_SHOW'
 	return (
 		<CommonCard style={styles.card}>
 			<View style={styles.headerRow}>
 				<View style={styles.headerLeft}>
 					<Text style={styles.serviceName}>{booking.serviceName}</Text>
-					<BookingStatusBadge status="cancelled" />
+					{missed ? (
+						<Text style={styles.missedBadge}>Visit missed</Text>
+					) : (
+						<BookingStatusBadge status="cancelled" />
+					)}
 				</View>
 				<View style={styles.dateCol}>
 					<Text style={styles.dateText}>{booking.date}</Text>
@@ -47,6 +53,17 @@ export default function CancelledBookingCard({ booking }: CancelledBookingCardPr
 }
 
 const styles = StyleSheet.create({
+	missedBadge: {
+		alignSelf: 'flex-start',
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 6,
+		overflow: 'hidden',
+		fontSize: 11,
+		fontWeight: '700',
+		color: '#B3261E',
+		backgroundColor: '#FDECEA',
+	},
 	card: {
 		backgroundColor: '#ffffff',
 		borderRadius: 16,

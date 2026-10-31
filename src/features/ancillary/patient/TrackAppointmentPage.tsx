@@ -19,6 +19,7 @@ import {
 import CancellationDetailsModal from './CancellationDetailsModal'
 import { useVisitPolicy } from '../hooks/useVisitPolicy'
 import { dayLabel, inr, providerNoun, timeLabel } from './ancillaryBookingCopy'
+import { MissedVisitBanner } from '../components/MissedVisitBanner'
 import { CancelVisitsSheet } from '../components/CancelVisitsSheet'
 import { lockedReason } from './scheduledVisitView'
 import { useVisitEdits } from './useVisitEdits'
@@ -101,6 +102,8 @@ const ASSIGNED_STATUSES = new Set([
 	'IN_PROGRESS',
 	'VERIFICATION_PENDING',
 	'COMPLETED',
+	// The provider came and the patient was not available: the order is over, so it is never searched for again.
+	'NO_SHOW',
 ])
 
 const CANCELLED_STATUSES = new Set(['CANCELLED', 'CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED'])
@@ -255,7 +258,12 @@ export default function TrackAppointmentPage() {
 			const currentProv = data.assignedProvider !== undefined ? data.assignedProvider : liveRef.current.provider
 			if (isScheduledOrder(data)) scheduledRef.current = true
 
-			if (!hasConfirmedProvider(currentProv, st) && st !== 'COMPLETED' && !scheduledRef.current) {
+			if (
+				!hasConfirmedProvider(currentProv, st) &&
+				st !== 'COMPLETED' &&
+				st !== 'NO_SHOW' &&
+				!scheduledRef.current
+			) {
 				redirectToMatching(
 					data.serviceName || liveRef.current.title,
 					data.streetAddress || liveRef.current.address
@@ -306,7 +314,12 @@ export default function TrackAppointmentPage() {
 				const prov = data?.assignedProvider || null
 
 				if (isScheduledOrder(data)) scheduledRef.current = true
-				if (!hasConfirmedProvider(prov, st) && st !== 'COMPLETED' && !scheduledRef.current) {
+				if (
+					!hasConfirmedProvider(prov, st) &&
+					st !== 'COMPLETED' &&
+					st !== 'NO_SHOW' &&
+					!scheduledRef.current
+				) {
 					// Provider is NOT assigned yet according to backend.
 					// Route back to the existing provider search/selection page.
 					redirectToMatching(
@@ -354,6 +367,14 @@ export default function TrackAppointmentPage() {
 	const completionPin = liveCompletionPin
 	const etaMinutes = liveEtaMinutes
 	const isCancelled = CANCELLED_STATUSES.has(liveStatus)
+	// The provider reached the address and the patient was not available (the visit asked about, else the order's first).
+	const missedVisit =
+		focusedVisit?.status === 'NO_SHOW'
+			? focusedVisit
+			: liveStatus === 'NO_SHOW'
+				? (liveOrder?.visits ?? []).find((v) => v.status === 'NO_SHOW')
+				: undefined
+	const isMissed = !!missedVisit || liveStatus === 'NO_SHOW'
 	const isTravelling = ['EN_ROUTE', 'ARRIVED', 'ASSIGNED', 'NURSE_ASSIGNED'].includes(liveStatus)
 	const isCompleted = liveStatus === 'COMPLETED'
 
@@ -375,7 +396,7 @@ export default function TrackAppointmentPage() {
 	}, [bookingId, isCompleted])
 
 	React.useEffect(() => {
-		if (!isInitializing && !isAssigned && !isCompleted && !isScheduled) {
+		if (!isInitializing && !isAssigned && !isCompleted && !isScheduled && !isMissed) {
 			navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId,
 				serviceName: liveServiceTitle || bookingData.serviceName,
@@ -539,6 +560,16 @@ export default function TrackAppointmentPage() {
 				etaMinutes={etaMinutes}
 				isCompleted={isCompleted}
 				isCancelled={isCancelled}
+				isMissed={isMissed}
+				missedNotice={
+					missedVisit ? (
+						<MissedVisitBanner
+							visitId={missedVisit.visit_public_id}
+							title="this visit"
+							noun={scheduledNoun}
+						/>
+					) : undefined
+				}
 				map={
 					isTravelling ? (
 						<NurseMapTracker

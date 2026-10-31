@@ -54,6 +54,8 @@ export interface BookingItem {
 	status: { label: string; tone: BookingTone }
 	/** The raw status of a doctor appointment (e.g. 'no_show'); older servers do not send it. */
 	status_key?: string | null
+	/** Home care only: the visit the provider reported as a no-show, which the patient can explain (else null). */
+	missed_visit_id?: string | null
 	note?: string | null
 	ref?: string | null
 	avatar_url?: string | null

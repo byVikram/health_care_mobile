@@ -310,6 +310,14 @@ export const API_ENDPOINTS = {
 		PROVIDER_VISIT_COMPLETE: (visitId: string) =>
 			`${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/complete`,
 		PROVIDER_VISIT_ISSUES: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/issues`,
+		// Patient no-show: the provider says they have arrived (starts the wait), then that the patient is not available
+		PROVIDER_VISIT_ARRIVED: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/arrived`,
+		PROVIDER_VISIT_NO_SHOW: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/no-show`,
+		// ... and the patient's side: what happened to a missed visit, and whether home-care booking is paused
+		PATIENT_VISIT_NO_SHOW: (visitId: string) => `${BASE_URL}/api/ancillary/patient/visits/${visitId}/no-show`,
+		PATIENT_VISIT_NO_SHOW_REPLY: (visitId: string) =>
+			`${BASE_URL}/api/ancillary/patient/visits/${visitId}/no-show/reply`,
+		PATIENT_BOOKING_RESTRICTION: `${BASE_URL}/api/ancillary/patient/booking-restriction`,
 	},
 	WALLET: {
 		GET: `${BASE_URL}/api/wallet`,

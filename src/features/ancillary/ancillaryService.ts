@@ -1263,7 +1263,7 @@ export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequest
  * lowercase NurseBooking status value -- these all collapse to 'cancelled'
  * for the nurse-facing Today's Activity / Visits lists.
  */
-const CANCELLED_FAMILY_STATUSES = ['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED']
+const CANCELLED_FAMILY_STATUSES = ['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED', 'NO_SHOW']
 
 /**
  * Fetch all appointments assigned to the logged-in nurse via GET /api/ancillary/provider/requests/my
@@ -1379,7 +1379,8 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 const mapStatusToBookingTab = (status?: string): 'upcoming' | 'completed' | 'cancelled' => {
 	const upper = String(status || '').toUpperCase()
 	if (upper === 'COMPLETED' || upper === 'COMPLETE' || upper === 'VISIT_COMPLETED') return 'completed'
-	if (['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'CANCELLED', 'EXPIRED', 'FAILED'].includes(upper)) return 'cancelled'
+	if (['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'CANCELLED', 'EXPIRED', 'FAILED', 'NO_SHOW'].includes(upper))
+		return 'cancelled'
 	return 'upcoming'
 }
 

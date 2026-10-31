@@ -127,10 +127,16 @@ export default function NotificationPage() {
 		) {
 			navigation.navigate(ROUTES.STACK.APPOINTMENTS, { appointmentId: notification.redirect_id })
 		} else if (
-			(notification.redirect_type === 'ancillary_booking' || notification.redirect_type === 'ancillary') &&
+			(notification.redirect_type === 'ancillary_booking' ||
+				notification.redirect_type === 'ancillary' ||
+				// Older home-care notifications carried this generic type and opened nothing.
+				notification.redirect_type === 'ancillary_order') &&
 			notification.redirect_id
 		) {
 			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: notification.redirect_id })
+		} else if (notification.redirect_type === 'ancillary_scheduled' && notification.redirect_id) {
+			// A scheduled home-care order: its booking details (the visits, and a missed one to answer).
+			navigation.navigate(ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS, { requestId: notification.redirect_id })
 		} else if (notification.redirect_type === 'lab_order' && notification.redirect_id) {
 			navigation.navigate(ROUTES.STACK.LABORATORY_BOOKING_TRACKING, { orderId: notification.redirect_id })
 		} else if (notification.redirect_type === 'doctor_schedule') {

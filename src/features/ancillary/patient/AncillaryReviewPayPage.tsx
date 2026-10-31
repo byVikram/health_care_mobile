@@ -24,6 +24,8 @@ import {
 	AppVisitList,
 } from '../../../components/common'
 import { createAncillaryOrder } from '../ancillaryProviderBookingService'
+import BookingRestrictedBanner from '../../appointment/components/BookingRestrictedBanner'
+import { useAncillaryBookingRestriction } from '../hooks/useAncillaryBookingRestriction'
 import { useVisitPolicy } from '../hooks/useVisitPolicy'
 import {
 	capitalize,
@@ -59,6 +61,7 @@ export default function AncillaryReviewPayPage() {
 	const who = useVisitPatientAddress()
 	const [note, setNote] = useState('')
 	const [sending, setSending] = useState(false)
+	const { restricted, message: restrictedMessage } = useAncillaryBookingRestriction()
 	const sendingRef = useRef(false)
 
 	const onConfirm = async () => {
@@ -118,6 +121,13 @@ export default function AncillaryReviewPayPage() {
 					keyboardShouldPersistTaps="handled"
 					showsVerticalScrollIndicator={false}
 				>
+					{restricted && (
+						<BookingRestrictedBanner
+							title="Home-care booking is paused"
+							fallback="Booking home-care services is paused because of missed visits."
+							message={restrictedMessage}
+						/>
+					)}
 					<View style={styles.bannerWrap}>
 						<AppInfoBanner
 							tone="sky"
@@ -186,7 +196,7 @@ export default function AncillaryReviewPayPage() {
 					style={styles.flex}
 					onPress={() => void onConfirm()}
 					loading={sending}
-					disabled={sending || who.addrLoading}
+					disabled={sending || who.addrLoading || restricted}
 					softDisabled
 					accessibilityLabel="Confirm booking"
 				>

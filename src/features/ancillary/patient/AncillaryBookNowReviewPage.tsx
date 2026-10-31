@@ -25,6 +25,8 @@ import {
 	AppTextLink,
 } from '../../../components/common'
 import { createInstantRequest } from '../ancillaryProviderBookingService'
+import BookingRestrictedBanner from '../../appointment/components/BookingRestrictedBanner'
+import { useAncillaryBookingRestriction } from '../hooks/useAncillaryBookingRestriction'
 import { fetchPatientActiveRequestBackend } from '../ancillaryService'
 import { capitalize, inr, itemsFee, plural, providerNoun, selectionFromItems } from './ancillaryBookingCopy'
 import { AncillaryPayAfterVisitSection, AncillaryServiceSection } from './AncillaryReviewSections'
@@ -45,6 +47,7 @@ export default function AncillaryBookNowReviewPage() {
 	const who = useVisitPatientAddress()
 	const [note, setNote] = useState('')
 	const [sending, setSending] = useState(false)
+	const { restricted, message: restrictedMessage } = useAncillaryBookingRestriction()
 	const sendingRef = useRef(false)
 
 	const scheduleInstead = () => navigation.replace(ROUTES.STACK.ANCILLARY_BOOK_VISIT, route.params)
@@ -112,6 +115,13 @@ export default function AncillaryBookNowReviewPage() {
 					keyboardShouldPersistTaps="handled"
 					showsVerticalScrollIndicator={false}
 				>
+					{restricted && (
+						<BookingRestrictedBanner
+							title="Home-care booking is paused"
+							fallback="Booking home-care services is paused because of missed visits."
+							message={restrictedMessage}
+						/>
+					)}
 					<View style={styles.bannerWrap}>
 						<AppInfoBanner
 							tone="success"
@@ -188,7 +198,7 @@ export default function AncillaryBookNowReviewPage() {
 					style={styles.flex}
 					onPress={() => void onConfirm()}
 					loading={sending}
-					disabled={sending || who.addrLoading}
+					disabled={sending || who.addrLoading || restricted}
 					softDisabled
 					accessibilityLabel={`Confirm and find a ${noun}`}
 				>
