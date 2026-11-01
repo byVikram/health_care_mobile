@@ -4,14 +4,12 @@ import {
 	Pressable,
 	ScrollView,
 	StyleSheet,
-	TextInput,
 	View,
 	useWindowDimensions,
 	type ImageSourcePropType,
 } from 'react-native'
 import { IconButton } from 'react-native-paper'
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
-import { AppModal, AppSkeleton, AppTypography } from '../../../components/common'
+import { AppModal, AppSearchBar, AppSkeleton, AppTypography } from '../../../components/common'
 
 export interface SelectorCardItem {
 	key: string
@@ -275,28 +273,14 @@ export default function CardGridSelectorModal({
 				keyboardShouldPersistTaps="handled"
 			>
 				{searchable && !loading && !error ? (
-					<View style={styles.searchBox}>
-						<MaterialCommunityIcons name="magnify" size={18} color="#667085" />
-						<TextInput
-							value={searchQuery}
-							onChangeText={setSearchQuery}
-							placeholder={searchPlaceholder}
-							placeholderTextColor="#667085"
-							style={styles.searchInput}
-							returnKeyType="search"
-							clearButtonMode="while-editing"
-						/>
-						{searchQuery.length > 0 ? (
-							<Pressable
-								accessibilityRole="button"
-								accessibilityLabel="Clear search"
-								onPress={() => setSearchQuery('')}
-								hitSlop={8}
-							>
-								<MaterialCommunityIcons name="close-circle" size={18} color="#98A2B3" />
-							</Pressable>
-						) : null}
-					</View>
+					<AppSearchBar
+						placeholder={searchPlaceholder}
+						hints={cards.slice(0, 4).map((card) => card.label.toLowerCase())}
+						value={searchQuery}
+						onChangeText={setSearchQuery}
+						showMicrophone={false}
+						style={styles.searchBar}
+					/>
 				) : null}
 				{renderContent()}
 			</ScrollView>
@@ -333,24 +317,8 @@ const styles = StyleSheet.create({
 	content: {
 		flexGrow: 1,
 	},
-	searchBox: {
-		height: 38,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 9,
-		borderRadius: 10,
-		backgroundColor: '#F5F7FB',
-		paddingHorizontal: 10,
+	searchBar: {
 		marginBottom: 12,
-	},
-	searchInput: {
-		flex: 1,
-		height: '100%',
-		padding: 0,
-		margin: 0,
-		color: '#1e2a3a',
-		fontSize: 12,
-		fontWeight: '500',
 	},
 	rows: {},
 	row: {

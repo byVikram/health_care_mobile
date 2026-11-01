@@ -115,8 +115,7 @@ export default function HealthQuestionsPage() {
 				search={{
 					value: query,
 					onChange: setQuery,
-					placeholder: 'Search questions by topic or symptom',
-					accessibilityLabel: 'Search questions',
+					context: 'healthQuestionsFeed',
 				}}
 				paddingBottom={14}
 			/>

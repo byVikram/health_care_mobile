@@ -1,5 +1,7 @@
 export * from './buttons/AppButton'
 export * from './inputs/AppInput'
+export { default as AppSearchBar } from './inputs/AppSearchBar'
+export type { AppSearchBarProps } from './inputs/AppSearchBar'
 export * from './display/AppTypography'
 export * from './layout/AppModal'
 export * from './inputs/AppSelect'

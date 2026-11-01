@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
 
-import { AppScreenHeader, AppTypography, AppInput, EventCard } from '../../components/common'
+import { AppScreenHeader, AppTypography, AppSearchBar, EventCard } from '../../components/common'
 import type { EventItem } from '../../components/common/display/EventCard'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
@@ -115,12 +115,7 @@ export default function AllEventsPage() {
 			<AppScreenHeader title="All Events" onBack={() => navigation.goBack()} />
 
 			<View style={styles.searchContainer}>
-				<AppInput
-					placeholder="Search events by name or topic"
-					value={searchQuery}
-					onChangeText={setSearchQuery}
-					isSearch
-				/>
+				<AppSearchBar context="events" value={searchQuery} onChangeText={setSearchQuery} />
 			</View>
 
 			{renderFilterTabs()}

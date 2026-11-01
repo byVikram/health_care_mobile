@@ -5,7 +5,6 @@ import {
 	NativeScrollEvent,
 	NativeSyntheticEvent,
 	StyleSheet,
-	TextInput,
 	TouchableOpacity,
 	useWindowDimensions,
 	View,
@@ -21,6 +20,7 @@ import {
 	AppTypography,
 	AppIcon,
 	AppPathIcon,
+	AppSearchBar,
 } from '../../../components/common'
 import { useAuth } from '../../../context/AuthContext'
 import { getSpecialities } from '../doctorService'
@@ -226,19 +226,8 @@ export default function SearchPage() {
 						<AppTypography style={styles.heroSubtitle}>{countLabel}In-clinic or video</AppTypography>
 					</Animated.View>
 
-					<Animated.View style={[styles.searchBox, { marginTop: headGap }]}>
-						<AppIcon name="search" size={20} color={APP_COLORS.inkMuted} />
-						<TextInput
-							value={query}
-							onChangeText={setQuery}
-							placeholder="Search specialities or symptoms"
-							placeholderTextColor={APP_COLORS.inkMuted}
-							style={styles.searchInput}
-							returnKeyType="search"
-							autoCorrect={false}
-							clearButtonMode="while-editing"
-							accessibilityLabel="Search specialities or symptoms"
-						/>
+					<Animated.View style={{ marginTop: headGap }}>
+						<AppSearchBar context="doctorSearch" tone="onDark" value={query} onChangeText={setQuery} />
 					</Animated.View>
 				</Animated.View>
 			</Animated.View>
@@ -414,23 +403,6 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		lineHeight: 20,
 		color: APP_COLORS.mint,
-	},
-	searchBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		height: 48,
-		paddingHorizontal: 12,
-		backgroundColor: APP_COLORS.surface,
-		borderRadius: 12,
-	},
-	searchInput: {
-		flex: 1,
-		minWidth: 0,
-		height: 44,
-		paddingVertical: 0,
-		fontSize: 16,
-		color: APP_COLORS.ink,
 	},
 
 	// Scroll content (design <main>: gap 8, padding-bottom 8)

@@ -6,11 +6,12 @@
 // "Shop by concern" tile grid. Pure UI -- the screen owns the data, the cart and the scroll handling.
 
 import React from 'react'
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { APP_COLORS } from '../../../config/theme'
 import AppScreenHeader from '../layout/AppScreenHeader'
 import { AppPathIcon } from '../display/AppIcon'
+import AppSearchBar from '../inputs/AppSearchBar'
 import { AppTextLink } from '../buttons/AppTextLink'
 
 // ---------------------------------------------------------------------------------------------------------
@@ -35,7 +36,9 @@ export type AppCatalogHeaderProps = {
 		value: string
 		onChange: (v: string) => void
 		placeholder: string
-		accessibilityLabel: string
+		/** Example terms that rotate as `Search “term”` while empty; without them `placeholder` is shown as-is. */
+		hints?: readonly string[]
+		accessibilityLabel?: string
 	}
 }
 
@@ -97,29 +100,14 @@ export function AppCatalogHeader({
 					{!!subtitle && <Text style={styles.introSub}>{subtitle}</Text>}
 				</View>
 			)}
-			<View style={styles.search}>
-				<MaterialCommunityIcons name="magnify" size={20} color={APP_COLORS.inkMuted} />
-				<TextInput
-					value={search.value}
-					onChangeText={search.onChange}
-					placeholder={search.placeholder}
-					placeholderTextColor={APP_COLORS.inkMuted}
-					style={styles.searchInput}
-					returnKeyType="search"
-					autoCorrect={false}
-					accessibilityLabel={search.accessibilityLabel}
-				/>
-				{!!search.value && (
-					<TouchableOpacity
-						onPress={() => search.onChange('')}
-						style={styles.searchClear}
-						accessibilityRole="button"
-						accessibilityLabel="Clear search"
-					>
-						<MaterialCommunityIcons name="close-circle" size={18} color={APP_COLORS.inkMuted} />
-					</TouchableOpacity>
-				)}
-			</View>
+			<AppSearchBar
+				placeholder={search.placeholder}
+				hints={search.hints}
+				tone="onDark"
+				value={search.value}
+				onChangeText={search.onChange}
+				style={styles.search}
+			/>
 		</AppScreenHeader>
 	)
 }
@@ -379,18 +367,7 @@ const styles = StyleSheet.create({
 	eyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.72, color: APP_COLORS.mintAccent },
 	h1: { fontSize: 26, lineHeight: 32, fontWeight: '700', color: APP_COLORS.surface },
 	introSub: { fontSize: 14, lineHeight: 20, color: APP_COLORS.mint },
-	search: {
-		height: 48,
-		paddingHorizontal: 12,
-		borderRadius: 12,
-		backgroundColor: APP_COLORS.surface,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		marginBottom: 8,
-	},
-	searchInput: { flex: 1, minWidth: 0, height: 44, fontSize: 16, color: APP_COLORS.ink, paddingVertical: 0 },
-	searchClear: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', marginRight: -6 },
+	search: { marginBottom: 8 },
 
 	listSection: {
 		backgroundColor: APP_COLORS.surface,

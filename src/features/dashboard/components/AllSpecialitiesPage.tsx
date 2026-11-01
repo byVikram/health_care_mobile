@@ -8,18 +8,16 @@ import {
 	SafeAreaView,
 	StatusBar,
 	StyleSheet,
-	TextInput,
 	TouchableOpacity,
 	useWindowDimensions,
 	View,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 
 import { getSpecialities } from '../../doctor/doctorService'
 import { SpecialityItem } from '../../../types/speciality'
 import { ROUTES } from '../../../navigation/routes'
-import { AppTypography } from '../../../components/common'
+import { AppSearchBar, AppTypography } from '../../../components/common'
 
 import dentistImage from '../../../assets/specialties/dentist.png'
 import gynoCologistImage from '../../../assets/specialties/gynocologist.png'
@@ -191,21 +189,7 @@ function SearchBar({
 }) {
 	return (
 		<View style={[styles.searchWrap, { paddingHorizontal: horizontalPadding }]}>
-			<View style={styles.searchBox}>
-				<MaterialCommunityIcons name="magnify" size={18} color={COLORS.searchIcon} />
-				{!value ? (
-					<AppTypography variant="caption" style={styles.searchPlaceholder} pointerEvents="none">
-						Search specialities or treatments
-					</AppTypography>
-				) : null}
-				<TextInput
-					value={value}
-					onChangeText={onChangeText}
-					style={styles.searchInput}
-					returnKeyType="search"
-					clearButtonMode="while-editing"
-				/>
-			</View>
+			<AppSearchBar context="specialities" value={value} onChangeText={onChangeText} />
 		</View>
 	)
 }
@@ -425,33 +409,6 @@ const styles = StyleSheet.create({
 		paddingTop: Platform.OS === 'android' ? 18 : 14,
 		paddingBottom: 30,
 		backgroundColor: COLORS.background,
-	},
-	searchBox: {
-		height: 44,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 10,
-		borderRadius: 14,
-		backgroundColor: COLORS.searchBg,
-		paddingHorizontal: 16,
-	},
-	searchPlaceholder: {
-		position: 'absolute',
-		left: 44,
-		right: 16,
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '500',
-		color: COLORS.textSecondary,
-	},
-	searchInput: {
-		flex: 1,
-		height: '100%',
-		padding: 0,
-		margin: 0,
-		fontSize: 13,
-		fontWeight: '500',
-		color: COLORS.textPrimary,
 	},
 	listContent: {
 		paddingBottom: 18,

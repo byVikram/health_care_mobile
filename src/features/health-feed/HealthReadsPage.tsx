@@ -151,8 +151,7 @@ export default function HealthReadsPage() {
 				search={{
 					value: query,
 					onChange: setQuery,
-					placeholder: 'Search articles and blogs',
-					accessibilityLabel: 'Search reads',
+					context: 'healthReads',
 				}}
 			/>
 

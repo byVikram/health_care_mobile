@@ -9,7 +9,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 
-import { AppIconTile, AppInput, AppPathIcon, AppSkeleton, AppTag, AppTextLink } from '../../../components/common'
+import { AppIconTile, AppPathIcon, AppSearchBar, AppSkeleton, AppTag, AppTextLink } from '../../../components/common'
 import { APP_COLORS, toneForString } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppNavigationParamList } from '../../../navigation/types'
@@ -83,24 +83,7 @@ function AskDoctorSection({ itemLimit = 3, refreshToken }: Props) {
 				/>
 			</View>
 
-			<AppInput
-				isSearch
-				value={search}
-				onChangeText={setSearch}
-				placeholder="Search questions or symptoms"
-				placeholderTextColor={APP_COLORS.inkMuted}
-				accessibilityLabel="Search questions"
-				autoCorrect={false}
-				returnKeyType="search"
-				noMargin
-				containerStyle={styles.searchContainer}
-				style={styles.searchInput}
-				contentStyle={styles.searchContent}
-				outlineStyle={styles.searchOutline}
-				outlineColor={APP_COLORS.border}
-				activeOutlineColor={APP_COLORS.primary}
-				textColor={APP_COLORS.ink}
-			/>
+			<AppSearchBar context="healthQuestions" value={search} onChangeText={setSearch} style={styles.searchBar} />
 
 			{status === 'loading' &&
 				Array.from({ length: itemLimit }, (_, i) => (
@@ -210,22 +193,8 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 		color: APP_COLORS.inkMuted,
 	},
-	searchContainer: {
+	searchBar: {
 		marginTop: 10,
-	},
-	searchInput: {
-		backgroundColor: APP_COLORS.surface,
-		height: 44,
-	},
-	searchContent: {
-		height: 44,
-		minHeight: 44,
-		paddingVertical: 0,
-		fontSize: 15,
-	},
-	searchOutline: {
-		borderRadius: 12,
-		borderWidth: 1,
 	},
 	item: {
 		gap: 4,

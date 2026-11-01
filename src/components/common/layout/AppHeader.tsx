@@ -9,13 +9,13 @@ import LocationSelector from '../location/LocationSelector'
 import { useAncillarySpecialty, useAuth } from '../../../context/AuthContext'
 import { ROUTES } from '../../../navigation/routes'
 import { useScroll } from '../../../context/ScrollContext'
-import { AppInput } from '../inputs/AppInput'
+import AppSearchBar from '../inputs/AppSearchBar'
 import AppAvatar from '../display/AppAvatar'
 import { AppPathIcon } from '../display/AppIcon'
-import { AppIconTile } from '../display/AppIconTile'
 import { AppIconButton } from '../buttons/AppIconButton'
 import { AppHeaderBackdrop } from './AppScreenHeader'
 import { APP_COLORS } from '../../../config/theme'
+import type { SearchContextKey } from '../../../config/searchContexts'
 import { getUnreadNotificationCount } from '../../../services/homeService'
 
 interface AppHeaderProps {
@@ -228,24 +228,7 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 				</Animated.View>
 
 				{/* Search (tap-through to the Search tab) */}
-				<View style={patientStyles.search}>
-					<Pressable
-						onPress={handleSearch}
-						style={patientStyles.searchTapArea}
-						accessibilityRole="button"
-						accessibilityLabel="Search specialities or symptoms"
-					>
-						<AppPathIcon d={HEADER_ICONS.search} size={20} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
-						<Text style={patientStyles.searchPlaceholder} numberOfLines={1}>
-							Search specialities or symptoms
-						</Text>
-					</Pressable>
-					<Pressable onPress={handleSearch} accessibilityRole="button" accessibilityLabel="Search by voice">
-						<AppIconTile size={40} radius={10} tone="mint">
-							<AppPathIcon d={HEADER_ICONS.mic} size={20} strokeWidth={2} color={APP_COLORS.primary} />
-						</AppIconTile>
-					</Pressable>
-				</View>
+				<AppSearchBar context="home.patient" tone="onDark" onPress={handleSearch} />
 			</Animated.View>
 		</Animated.View>
 	)
@@ -328,29 +311,6 @@ const patientStyles = StyleSheet.create({
 		fontSize: 13,
 		lineHeight: 18,
 		fontWeight: '600',
-	},
-	search: {
-		height: 48,
-		borderRadius: 12,
-		backgroundColor: APP_COLORS.surface,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		paddingLeft: 14,
-		paddingRight: 4,
-	},
-	searchTapArea: {
-		flex: 1,
-		minWidth: 0,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	searchPlaceholder: {
-		flex: 1,
-		minWidth: 0,
-		fontSize: 16,
-		color: APP_COLORS.inkMuted,
 	},
 })
 
@@ -566,13 +526,13 @@ function RoleHomeHeader({
 
 	const isNurse = role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE
 
-	const searchPlaceholder = isPharmacy
-		? 'Search orders by ID or patient'
+	const searchContext: SearchContextKey = isPharmacy
+		? 'home.pharmacy'
 		: isRadiology
-			? 'Search scans by ID or patient'
+			? 'home.radiology'
 			: isNurse
-				? 'Search patients, bookings or care requests'
-				: 'Search doctors by name or speciality'
+				? 'home.ancillary'
+				: 'doctors'
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	const handleSearchPress = () => {
@@ -599,46 +559,23 @@ function RoleHomeHeader({
 
 	const renderSearchBar = () => {
 		if (variant === 'search') {
-			// Editable TextInput for SearchPage
+			// Editable bar for SearchPage
 			return (
-				<AppInput
-					isSearch
-					showMicrophone
-					placeholder={searchPlaceholder}
-					placeholderTextColor="#8b8e94"
+				<AppSearchBar
+					context={searchContext}
+					tone="onDark"
 					value={searchValue}
 					onChangeText={onSearchChange}
-					onSubmitEditing={onSearchSubmit}
+					onSubmit={onSearchSubmit}
 					editable={isSearchEditable}
-					returnKeyType="search"
 					autoFocus={isSearchEditable}
-					noMargin
-					borderRadius={12}
-					containerStyle={{ marginTop: 20 }}
-					style={{ backgroundColor: '#ffffff', height: 48 }}
-					contentStyle={{ height: 48 }}
-					outlineStyle={{ borderWidth: 0 }}
+					style={{ marginTop: 20 }}
 				/>
 			)
 		} else {
-			// Pressable for dashboard (navigates to appropriate search page)
+			// Tap-through for dashboard (navigates to appropriate search page)
 			return (
-				<Pressable onPress={handleSearchPress} style={{ marginTop: 20 }}>
-					<View pointerEvents="none">
-						<AppInput
-							isSearch
-							showMicrophone
-							placeholder={searchPlaceholder}
-							placeholderTextColor="#8b8e94"
-							editable={false}
-							noMargin
-							borderRadius={12}
-							style={{ backgroundColor: '#ffffff', height: 48 }}
-							contentStyle={{ height: 48 }}
-							outlineStyle={{ borderWidth: 0 }}
-						/>
-					</View>
-				</Pressable>
+				<AppSearchBar context={searchContext} tone="onDark" onPress={handleSearchPress} style={{ marginTop: 20 }} />
 			)
 		}
 	}

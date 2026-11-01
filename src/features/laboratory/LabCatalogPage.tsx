@@ -290,6 +290,7 @@ export default function LabCatalogPage() {
 					value: query,
 					onChange: onSearch,
 					placeholder: 'Search lab tests or packages, e.g. HbA1c',
+					hints: ['HbA1c', 'thyroid profile', 'vitamin D', 'full body checkup'],
 					accessibilityLabel: 'Search tests and packages',
 				}}
 			/>

@@ -13,7 +13,7 @@
 
 import React, { useMemo, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import { AppPathIcon } from '../../../components/common'
+import { AppPathIcon, AppSearchBar } from '../../../components/common'
 import { APP_COLORS, toneForString } from '../../../config/theme'
 import { useTabBarClearance } from '../../../navigation/tabBar'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
@@ -27,7 +27,6 @@ const QA_ICON =
 	'M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12zM9.5 10a2.5 2.5 0 1 1 3 2.4c-.5.1-.5.6-.5 1M12 16h.01'
 const CHECK_ICON = 'M5 12l5 5 9-10'
 const PLUS_ICON = 'M12 5v14M5 12h14'
-const SEARCH_ICON = 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4'
 
 const MIN_ANSWER_LENGTH = 60
 
@@ -139,16 +138,7 @@ export function DoctorEngageScreen() {
 						</View>
 					</View>
 
-					<View style={styles.searchBox}>
-						<AppPathIcon d={SEARCH_ICON} size={18} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
-						<TextInput
-							value={search}
-							onChangeText={setSearch}
-							placeholder="Search questions or symptoms"
-							placeholderTextColor={APP_COLORS.inkMuted}
-							style={styles.searchInput}
-						/>
-					</View>
+					<AppSearchBar context="healthQuestions" value={search} onChangeText={setSearch} style={styles.searchBar} />
 
 					{loading ? (
 						<ActivityIndicator style={{ marginVertical: 24 }} color={APP_COLORS.primary} />
@@ -335,18 +325,7 @@ const styles = StyleSheet.create({
 	headerSub: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
 	countPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 9999, backgroundColor: APP_COLORS.ink },
 	countPillText: { fontSize: 11, lineHeight: 16, fontWeight: '800', color: '#FFFFFF' },
-	searchBox: {
-		marginTop: 10,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		height: 44,
-		paddingHorizontal: 12,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: APP_COLORS.border,
-	},
-	searchInput: { flex: 1, fontSize: 15, color: APP_COLORS.ink },
+	searchBar: { marginTop: 10 },
 	emptyText: { marginTop: 8, fontSize: 14, lineHeight: 20, color: APP_COLORS.inkMuted },
 	qRow: { gap: 8, paddingVertical: 12 },
 	qRowDivider: { borderBottomWidth: 1, borderBottomColor: APP_COLORS.divider },

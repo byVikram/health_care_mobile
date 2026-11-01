@@ -1074,7 +1074,7 @@ function AppointmentListImpl(
             setSearch(text)
             setPage(1)
           }}
-          placeholder={viewAs === 'doctor' ? 'Search appointments by patient name' : 'Search appointments by doctor name'}
+          context={viewAs === 'doctor' ? 'appointments.doctor' : 'appointments.patient'}
           onFilterPress={openFilterSheet}
           filterActive={hasActiveFilters}
           accessibilityLabel="Filter appointments"

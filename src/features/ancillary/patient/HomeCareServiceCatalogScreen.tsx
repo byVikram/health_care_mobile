@@ -4,7 +4,7 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
 import {
 	AppTypography,
-	AppInput,
+	AppSearchBar,
 	AppScreenHeader,
 	ServiceProcedureItem,
 	ServiceCatalogCard,
@@ -224,11 +224,7 @@ export default function HomeCareServiceCatalogScreen() {
 			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 				{/* Search Bar */}
 				<View style={styles.searchContainer}>
-					<AppInput
-						placeholder="Search care tasks, e.g. bathing, walking"
-						value={searchQuery}
-						onChangeText={setSearchQuery}
-					/>
+					<AppSearchBar context="homeCareTasks" value={searchQuery} onChangeText={setSearchQuery} />
 					{search.searching && (
 						<AppTypography variant="caption" style={styles.searchHint}>
 							Searching...

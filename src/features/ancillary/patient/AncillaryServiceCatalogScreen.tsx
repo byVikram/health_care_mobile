@@ -439,6 +439,7 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 					value: query,
 					onChange: setQuery,
 					placeholder: copy.searchPlaceholder,
+					hints: copy.searchHints,
 					accessibilityLabel: copy.searchAccessibilityLabel,
 				}}
 			/>

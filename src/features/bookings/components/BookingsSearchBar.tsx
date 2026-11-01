@@ -1,17 +1,18 @@
 import React from 'react'
 import { StyleSheet, TouchableOpacity, View } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
-import { AppInput } from '../../../components/common/inputs/AppInput'
+import AppSearchBar from '../../../components/common/inputs/AppSearchBar'
+import { SearchContextKey } from '../../../config/searchContexts'
 
-// The single reusable search bar for the Bookings flow. This is the exact
-// markup/styling that AppointmentList (Doctor Appointments) originally
-// implemented inline — extracted here so every booking category (Doctor
-// Appointments, Ancillary, Lab, Medicine, Radiology) renders the same
-// component instead of separately styled copies.
+// The single reusable search bar for the Bookings flow: the shared AppSearchBar pill plus the filter button.
+// Every booking category (Doctor Appointments, Ancillary, Lab, Medicine, Radiology) renders this, and says
+// what it searches through `context` (config/searchContexts.ts) so the prompt follows the screen and viewer.
 interface BookingsSearchBarProps {
 	value: string
 	onChangeText: (text: string) => void
-	placeholder: string
+	context?: SearchContextKey
+	/** Overrides the context prompt; leave out to use the context's. */
+	placeholder?: string
 	onFilterPress?: () => void
 	filterActive?: boolean
 	showFilterButton?: boolean
@@ -23,6 +24,7 @@ interface BookingsSearchBarProps {
 export default function BookingsSearchBar({
 	value,
 	onChangeText,
+	context,
 	placeholder,
 	onFilterPress,
 	filterActive = false,
@@ -34,23 +36,13 @@ export default function BookingsSearchBar({
 	return (
 		<View style={styles.searchRow}>
 			<View style={styles.searchInputWrap}>
-				<AppInput
-					isSearch
-					showMicrophone={showMicrophone}
+				<AppSearchBar
+					context={context}
+					placeholder={placeholder}
 					value={value}
 					onChangeText={onChangeText}
-					placeholder={placeholder}
-					placeholderTextColor="#98a1aa"
-					containerStyle={styles.searchInputContainer}
-					style={styles.searchInput}
-					contentStyle={styles.searchInputContent}
-					outlineStyle={styles.searchInputOutline}
-					outlineColor="#2e7b7d"
-					activeOutlineColor="#2e7b7d"
-					textColor="#1b2d3c"
-					autoCorrect={false}
-					returnKeyType="search"
-					noMargin
+					showMicrophone={showMicrophone}
+					tone="onLight"
 					testID={testID}
 				/>
 			</View>
@@ -82,25 +74,10 @@ const styles = StyleSheet.create({
 	searchInputWrap: {
 		flex: 1,
 	},
-	searchInputContainer: {
-		width: '100%',
-	},
-	searchInput: {
-		backgroundColor: '#ffffff',
-	},
-	searchInputContent: {
-		height: 48,
-		minHeight: 48,
-		paddingVertical: 0,
-		fontSize: 14,
-	},
-	searchInputOutline: {
-		borderRadius: 12,
-	},
 	filterIconButton: {
 		width: 48,
 		height: 48,
-		borderRadius: 12,
+		borderRadius: 24,
 		borderWidth: 1,
 		borderColor: '#EAECF0',
 		backgroundColor: '#ffffff',

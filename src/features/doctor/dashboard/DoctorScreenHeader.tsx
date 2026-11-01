@@ -17,10 +17,11 @@
 //     top row for the same reason, alongside its existing `children` slot for a segmented control.
 
 import React from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native'
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { AppAvatar, AppHeaderBackdrop, AppPathIcon } from '../../../components/common'
+import { AppAvatar, AppHeaderBackdrop, AppPathIcon, AppSearchBar } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
+import type { SearchContextKey } from '../../../config/searchContexts'
 import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../../dashboard/homeChromeIcons'
 import { ClinicSwitcher } from './ClinicSwitcher'
 
@@ -58,7 +59,7 @@ export type DoctorScreenHeaderProps =
 			searchValue?: string
 			onSearchChange?: (value: string) => void
 			onSearchSubmit?: () => void
-			searchPlaceholder?: string
+			searchContext?: SearchContextKey
 	  }
 	| {
 			variant: 'simple'
@@ -98,7 +99,7 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 			searchValue = '',
 			onSearchChange,
 			onSearchSubmit,
-			searchPlaceholder = 'Search patients, reports or questions',
+			searchContext = 'home.doctor',
 		} = props
 		const resolvedActions: DoctorHeaderAction[] =
 			actions ?? [
@@ -146,19 +147,13 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 					))}
 				</View>
 				{!!onSearchChange && (
-					<View style={styles.searchBox}>
-						<AppPathIcon d={HOME_CHROME_PATHS.search} size={20} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
-						<TextInput
-							value={searchValue}
-							onChangeText={onSearchChange}
-							onSubmitEditing={onSearchSubmit}
-							placeholder={searchPlaceholder}
-							placeholderTextColor={APP_COLORS.inkMuted}
-							style={styles.searchInput}
-							returnKeyType="search"
-							accessibilityLabel="Search"
-						/>
-					</View>
+					<AppSearchBar
+						context={searchContext}
+						tone="onDark"
+						value={searchValue}
+						onChangeText={onSearchChange}
+						onSubmit={onSearchSubmit}
+					/>
 				)}
 			</View>
 		)
@@ -277,21 +272,6 @@ const styles = StyleSheet.create({
 		backgroundColor: APP_COLORS.mintAccent,
 		borderWidth: 2,
 		borderColor: APP_COLORS.ink,
-	},
-	searchBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		height: 48,
-		paddingHorizontal: 14,
-		borderRadius: 12,
-		backgroundColor: '#FFFFFF',
-	},
-	searchInput: {
-		flex: 1,
-		height: 44,
-		fontSize: 16,
-		color: APP_COLORS.ink,
 	},
 	simpleTopRow: {
 		flexDirection: 'row',
