@@ -152,6 +152,8 @@ export default function PersonalTab({ data, onChange, onSave, saving }: Props) {
 							value={data.gender}
 							onSelect={(val: string) => onChange('gender', val)}
 							placeholder="Select gender"
+							presentation="sheet"
+							sheetTitle="Gender"
 							size="compact"
 							style={styles.fieldMargin}
 						/>
@@ -175,6 +177,8 @@ export default function PersonalTab({ data, onChange, onSave, saving }: Props) {
 							value={data.bloodGroup}
 							onSelect={(val: string) => onChange('bloodGroup', val)}
 							placeholder="Select blood group"
+							presentation="sheet"
+							sheetTitle="Blood group"
 							size="compact"
 							style={styles.fieldMargin}
 						/>
@@ -186,6 +190,8 @@ export default function PersonalTab({ data, onChange, onSave, saving }: Props) {
 							value={data.maritalStatus}
 							onSelect={(val: string) => onChange('maritalStatus', val)}
 							placeholder="Select marital status"
+							presentation="sheet"
+							sheetTitle="Marital status"
 							size="compact"
 							style={styles.fieldMargin}
 						/>

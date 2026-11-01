@@ -5,9 +5,23 @@ export type Option = { value: string; label: string }
 
 const opts = (...values: string[]): Option[] => values.map((v) => ({ value: v, label: v }))
 
-/** Keeps a saved value that isn't in the list (e.g. an older 'Non-binary') selectable. */
-export const withCurrent = (options: Option[], current?: string | null): Option[] =>
-	current && !options.some((o) => o.value === current) ? [...options, { value: current, label: current }] : options
+const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** The list's own value for a saved one, ignoring case and whether the label or the value was saved ("spouse" -> 'SPOUSE'). */
+export const canonicalValue = (options: Option[], current?: string | null): string => {
+	if (!current) return ''
+	return options.find((o) => sameText(o.value, current) || sameText(o.label, current))?.value ?? current
+}
+
+/**
+ * Keeps a saved value that isn't in the list (e.g. an older 'Non-binary') selectable. A saved value that is already
+ * there in another spelling ("spouse" for 'SPOUSE') is not added again, and the list never repeats a choice.
+ */
+export const withCurrent = (options: Option[], current?: string | null): Option[] => {
+	const unique = options.filter((o, i) => options.findIndex((x) => sameText(x.value, o.value)) === i)
+	if (!current || unique.some((o) => sameText(o.value, current) || sameText(o.label, current))) return unique
+	return [...unique, { value: current, label: LEGACY_RELATION_LABELS[current.toUpperCase()] ?? current }]
+}
 
 export const GENDER_OPTIONS = opts('Female', 'Male', 'Other', 'Prefer not to say')
 

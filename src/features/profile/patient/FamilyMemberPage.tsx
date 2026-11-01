@@ -45,6 +45,7 @@ import {
 } from './components/HealthFields'
 import {
 	FAMILY_RELATION_OPTIONS,
+	canonicalValue,
 	GENDER_OPTIONS,
 	isValidIndianMobile,
 	relationLabel,
@@ -312,7 +313,7 @@ export default function FamilyMemberPage() {
 							<AppSelect
 								{...FORM_SELECT_PROPS}
 								options={withCurrent(FAMILY_RELATION_OPTIONS, draft.relation)}
-								value={draft.relation}
+								value={canonicalValue(FAMILY_RELATION_OPTIONS, draft.relation)}
 								onSelect={(v) => set('relation', v)}
 								placeholder="Select relationship"
 								presentation="sheet"
