@@ -14,7 +14,6 @@ import {
 	ScrollView,
 	StyleSheet,
 	Text,
-	TouchableOpacity,
 	View,
 	type NativeScrollEvent,
 	type NativeSyntheticEvent,
@@ -33,6 +32,7 @@ import {
 	AppConcernRows,
 	AppTabs,
 	AppTrustStrip,
+	LocationSelector,
 	ServiceDetailsSheet,
 	type AppTabItem,
 	type ServiceDetailsContent,
@@ -142,6 +142,7 @@ const sheetContentFor = (
 		trustLine: unavailable
 			? 'Not available at your address'
 			: 'The price can differ by lab · report in the app',
+		hideTrustIcon: true,
 	}
 }
 
@@ -286,6 +287,13 @@ export default function LabCatalogPage() {
 				cartCount={items.length}
 				onCartPress={goCart}
 				cartLabel={`Cart, ${items.length === 0 ? 'no items added' : countLabel}`}
+				renderLocation={(isCompact) => (
+					<LocationSelector
+						color={APP_COLORS.mint}
+						iconSize={isCompact ? 14 : 16}
+						textStyle={isCompact ? styles.headerLocationCompact : styles.headerLocation}
+					/>
+				)}
 				search={{
 					value: query,
 					onChange: onSearch,
@@ -308,9 +316,6 @@ export default function LabCatalogPage() {
 					<Text style={styles.locationText} numberOfLines={1}>
 						{locationText}
 					</Text>
-					<TouchableOpacity onPress={changeLocation} accessibilityRole="button" hitSlop={8}>
-						<Text style={styles.locationAction}>{pincode ? 'Change' : 'Set location'}</Text>
-					</TouchableOpacity>
 				</View>
 
 				<View style={styles.filters}>
@@ -438,5 +443,6 @@ const styles = StyleSheet.create({
 	spinner: { marginVertical: 24 },
 	locationRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16 },
 	locationText: { flex: 1, fontSize: 13, lineHeight: 18, color: APP_COLORS.ink },
-	locationAction: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.primary },
+	headerLocation: { fontSize: 13, fontWeight: '600' },
+	headerLocationCompact: { fontSize: 12, fontWeight: '500' },
 })

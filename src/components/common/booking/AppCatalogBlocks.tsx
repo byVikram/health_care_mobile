@@ -32,6 +32,9 @@ export type AppCatalogHeaderProps = {
 	/** Greys the cart button out (e.g. nothing to book yet). */
 	cartDisabled?: boolean
 	cartLabel: string
+	/** The screen's location dropdown (e.g. <LocationSelector />): above the search bar when expanded, under the small
+	 *  title when `compact`, so it stays in reach while the list scrolls. Omitted: no location. */
+	renderLocation?: (compact: boolean) => React.ReactNode
 	search: {
 		value: string
 		onChange: (v: string) => void
@@ -53,6 +56,7 @@ export function AppCatalogHeader({
 	onCartPress,
 	cartDisabled = false,
 	cartLabel,
+	renderLocation,
 	search,
 }: AppCatalogHeaderProps) {
 	return (
@@ -64,14 +68,17 @@ export function AppCatalogHeader({
 			backAccessibilityLabel="Back"
 			style={compact ? styles.headerCompact : undefined}
 			titleNode={
-				<Text
-					style={[styles.miniTitle, { opacity: compact ? 1 : 0 }]}
-					numberOfLines={1}
-					accessibilityElementsHidden={!compact}
-					importantForAccessibility={compact ? 'auto' : 'no-hide-descendants'}
-				>
-					{title}
-				</Text>
+				<View>
+					<Text
+						style={[styles.miniTitle, { opacity: compact ? 1 : 0 }]}
+						numberOfLines={1}
+						accessibilityElementsHidden={!compact}
+						importantForAccessibility={compact ? 'auto' : 'no-hide-descendants'}
+					>
+						{title}
+					</Text>
+					{compact && renderLocation ? <View style={styles.miniLocation}>{renderLocation(true)}</View> : null}
+				</View>
 			}
 			rightElement={
 				<TouchableOpacity
@@ -100,6 +107,7 @@ export function AppCatalogHeader({
 					{!!subtitle && <Text style={styles.introSub}>{subtitle}</Text>}
 				</View>
 			)}
+			{!compact && renderLocation ? <View style={styles.location}>{renderLocation(false)}</View> : null}
 			<AppSearchBar
 				placeholder={search.placeholder}
 				hints={search.hints}
@@ -349,6 +357,8 @@ const styles = StyleSheet.create({
 		elevation: 4,
 	},
 	miniTitle: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: APP_COLORS.surface },
+	miniLocation: { marginTop: -2, alignItems: 'flex-start' },
+	location: { marginBottom: 12, alignItems: 'flex-start' },
 	cartBtn: { width: 44, height: 44, marginRight: -10, alignItems: 'center', justifyContent: 'center' },
 	cartBadge: {
 		position: 'absolute',

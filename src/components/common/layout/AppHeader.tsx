@@ -145,7 +145,7 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 			onSearchPress()
 			return
 		}
-		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH })
+		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH, params: { focusSearch: true } })
 	}
 
 	const paddingBottom = progress.interpolate({ inputRange: [0, 1], outputRange: [16, 12] })

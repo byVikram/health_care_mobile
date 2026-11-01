@@ -23,8 +23,8 @@ import {
 	AppSkeleton,
 	AppTypography,
 	AppSearchBar,
+	LocationSelector,
 } from '../../../components/common'
-import { useAuth } from '../../../context/AuthContext'
 import { getDoctors, getSpecialities } from '../doctorService'
 import { DoctorSearchItem } from '../../../types/doctor-search'
 import type { RouteProp } from '@react-navigation/native'
@@ -107,7 +107,6 @@ function DoctorCardSkeleton() {
 export default function DoctorSearchPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
-	const { currentLocation } = useAuth()
 	const { width } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
 
@@ -302,9 +301,20 @@ export default function DoctorSearchPage() {
 			<AppScreenHeader
 				variant="bar"
 				solid
-				title={pageTitle}
-				subtitle={`In-clinic or video consultation${currentLocation?.address ? ` · ${currentLocation.address}` : ''}`}
-				titleStyle={styles.headerTitle}
+				titleNode={
+					<View>
+						<AppTypography style={styles.headerTitle} numberOfLines={1} accessibilityRole="header">
+							{pageTitle}
+						</AppTypography>
+						<View style={styles.headerLocation}>
+							<LocationSelector
+								color={APP_COLORS.mint}
+								iconSize={14}
+								textStyle={styles.headerLocationText}
+							/>
+						</View>
+					</View>
+				}
 				onBack={handleBack}
 				backAccessibilityLabel="Back to specialities"
 				style={styles.header}
@@ -480,6 +490,15 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		lineHeight: 26,
 		fontWeight: '600',
+		color: APP_COLORS.surface,
+	},
+	headerLocation: {
+		marginTop: -2,
+		alignItems: 'flex-start',
+	},
+	headerLocationText: {
+		fontSize: 12,
+		fontWeight: '500',
 	},
 	searchBar: {
 		marginTop: 4,

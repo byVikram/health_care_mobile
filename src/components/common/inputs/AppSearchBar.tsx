@@ -61,6 +61,8 @@ export interface AppSearchBarProps {
 	style?: StyleProp<ViewStyle>
 	inputProps?: Omit<TextInputProps, 'value' | 'onChangeText' | 'placeholder' | 'editable' | 'autoFocus'>
 	testID?: string
+	/** Lets the screen reach the input, e.g. to focus it on arrival. */
+	inputRef?: React.Ref<TextInput>
 }
 
 function RotatingHint({ hints, paused }: { hints: readonly string[]; paused: boolean }) {
@@ -137,8 +139,8 @@ export default function AppSearchBar({
 	style,
 	inputProps,
 	testID,
+	inputRef,
 }: AppSearchBarProps) {
-	const inputRef = useRef<TextInput>(null)
 	const [focused, setFocused] = useState(false)
 
 	const tapThrough = !!onPress
@@ -277,7 +279,7 @@ const styles = StyleSheet.create({
 		color: APP_COLORS.inkMuted,
 	},
 	hintTerm: {
-		fontWeight: '700',
+		fontWeight: '500',
 		color: APP_COLORS.ink,
 	},
 	clearBtn: {

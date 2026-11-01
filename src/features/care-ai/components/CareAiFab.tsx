@@ -13,6 +13,7 @@ import { CARE_AI_ICONS } from '../careAiIcons'
 export const CARE_AI_FAB_SIZE = 58
 const RING_CYCLE_MS = 1800
 const HINT_VISIBLE_MS = 6000
+const HINT_MAX_WIDTH = 220
 
 // The hint is a one-off per app session, not per visit to Home.
 let hintShown = false
@@ -49,14 +50,16 @@ export function CareAiFab({ onPress }: Props) {
 		<View style={styles.anchor} pointerEvents="box-none">
 			{hint ? (
 				<View
-					style={styles.hint}
+					style={styles.hintWrap}
 					pointerEvents="none"
 					accessibilityElementsHidden
 					importantForAccessibility="no-hide-descendants"
 				>
-					<Text style={styles.hintTitle}>Ask Care AI</Text>
-					<Text style={styles.hintSub}>Symptoms, medicines, reports</Text>
-					<View style={styles.hintArrow} />
+					<View style={styles.hint}>
+						<Text style={styles.hintTitle}>Ask Care AI</Text>
+						<Text style={styles.hintSub}>Symptoms, medicines, reports</Text>
+						<View style={styles.hintArrow} />
+					</View>
 				</View>
 			) : null}
 			<TouchableOpacity
@@ -101,10 +104,16 @@ const styles = StyleSheet.create({
 		borderWidth: 2,
 		borderColor: APP_COLORS.mintAccent,
 	},
-	hint: {
+	// The anchor is only as wide as the button, and an absolute child cannot be wider than its parent, so the bubble sits in
+	// a wider right-aligned wrapper and takes the width of its text instead of wrapping word by word.
+	hintWrap: {
 		position: 'absolute',
 		right: -6,
 		bottom: CARE_AI_FAB_SIZE + 12,
+		width: HINT_MAX_WIDTH,
+		alignItems: 'flex-end',
+	},
+	hint: {
 		paddingVertical: 8,
 		paddingHorizontal: 12,
 		borderRadius: 14,

@@ -255,15 +255,7 @@ export default function LabCartPage() {
 						accessibilityRole="text"
 						accessibilityLiveRegion="polite"
 					>
-						{status.kind === 'loading' ? (
-							<ActivityIndicator size="small" color={APP_COLORS.primary} />
-						) : (
-							<MaterialCommunityIcons
-								name={status.kind === 'ok' ? 'check-circle-outline' : status.kind === 'info' ? 'map-marker-outline' : 'alert-circle-outline'}
-								size={18}
-								color={status.kind === 'warn' || status.kind === 'error' ? APP_COLORS.warning : APP_COLORS.success}
-							/>
-						)}
+						{status.kind === 'loading' && <ActivityIndicator size="small" color={APP_COLORS.primary} />}
 						<Text
 							style={[
 								styles.statusText,
@@ -317,7 +309,6 @@ export default function LabCartPage() {
 
 				{fasting && (
 					<View style={styles.fastNote} accessibilityRole="text">
-						<MaterialCommunityIcons name="alert-circle-outline" size={16} color={APP_COLORS.warning} />
 						<Text style={styles.fastNoteText}>Fasting is needed for some tests · a morning slot works best</Text>
 					</View>
 				)}
@@ -382,7 +373,6 @@ export default function LabCartPage() {
 							rowGap={8}
 							rows={billRows}
 							note={{
-								icon: <MaterialCommunityIcons name="information-outline" size={16} color={APP_COLORS.inkMuted} />,
 								text: 'Tests are at the lab’s MRP, packages at their selling price. The final amount depends on the lab you choose.',
 								backgroundColor: APP_COLORS.pageBg,
 								textColor: APP_COLORS.inkMuted,

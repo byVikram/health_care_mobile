@@ -306,6 +306,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 				{/* Details */}
 				<AppSection marginTop={0} title="Details" titleSize="sm" gap={0}>
 					<AppDetailRow
+						style={styles.detailRow}
 						icon="calendar-month-outline"
 						label={isHome ? 'SAMPLE PICKUP' : 'LAB VISIT'}
 						value={whenLabel}
@@ -337,6 +338,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 					)}
 					{isHome && (
 						<AppDetailRow
+							style={styles.detailRow}
 							icon="account-outline"
 							label="PHLEBOTOMIST"
 							value={order.phleboName || 'Not assigned yet'}
@@ -355,6 +357,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 						/>
 					)}
 					<AppDetailRow
+						style={styles.detailRow}
 						icon="account-outline"
 						label="PATIENT"
 						value={order.patientName}
@@ -362,6 +365,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 					/>
 					{isHome && (
 						<AppDetailRow
+							style={styles.detailRow}
 							icon="home-outline"
 							label="COLLECTION ADDRESS"
 							value={order.addressTitle}
@@ -370,6 +374,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 						/>
 					)}
 					<AppDetailRow
+						style={styles.detailRow}
 						icon="clipboard-text-outline"
 						label="ORDER ID"
 						value={order.id}
@@ -633,6 +638,8 @@ export default function LabOrderPage() {
 
 const styles = StyleSheet.create({
 	screen: { flex: 1, backgroundColor: APP_COLORS.pageBg },
+	// The detail rows have no padding of their own: a little air above and below, so the lab and phlebotomist rows are not crowded.
+	detailRow: { paddingVertical: 6 },
 	labRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
