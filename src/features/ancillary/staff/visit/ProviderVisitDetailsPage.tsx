@@ -11,7 +11,7 @@
 // over, "Patient not available" (the patient is asked what happened) next to "Enter start code" for a patient who turns
 // up. A reported visit can still be started with the patient's code the same day.
 import React, { useCallback, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect, useIsFocused, useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
@@ -19,8 +19,8 @@ import Toast from 'react-native-toast-message'
 import {
 	AppButton,
 	AppCheckList,
+	AppConfirmSheet,
 	AppFooterBar,
-	AppIconButton,
 	AppInfoBanner,
 	AppPersonRow,
 	AppScreenHeader,
@@ -77,6 +77,7 @@ export default function ProviderVisitDetailsPage() {
 	const [navigating, setNavigating] = useState(false)
 	const [arriving, setArriving] = useState(false)
 	const [reporting, setReporting] = useState(false)
+	const [confirmOpen, setConfirmOpen] = useState(false)
 	const now = useNow(15_000)
 
 	const load = useCallback(async () => {
@@ -237,15 +238,7 @@ export default function ProviderVisitDetailsPage() {
 	const canReport = policyOn && arrived && minutesLeft === 0
 	const waitEndsText = waitEnds?.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) ?? ''
 	const canArrive = policyOn && !!arrival?.can_mark_arrived && startable && today
-	const confirmNoShow = () =>
-		Alert.alert(
-			`Report ${first} as not available?`,
-			`${first} will be asked what happened. If they don’t reply, it may be recorded as a missed visit.`,
-			[
-				{ text: 'Keep waiting', style: 'cancel' },
-				{ text: 'Report', style: 'destructive', onPress: () => void reportNoShow() },
-			]
-		)
+	const confirmNoShow = () => setConfirmOpen(true)
 	// Instant / prepaid bookings are paid in the app; scheduled orders are collected after each visit.
 	const paidOnline = visit.payment.method !== 'PAY_AFTER_VISIT'
 
@@ -284,7 +277,7 @@ export default function ProviderVisitDetailsPage() {
 					<View style={styles.padded}>
 						<AppInfoBanner
 							tone="warning"
-							icon="alert-circle-outline"
+							icon={null}
 							title="Reported as not available"
 							subtitle={`${first} has been asked what happened. If they turn up today, enter their start code.`}
 						/>
@@ -295,7 +288,7 @@ export default function ProviderVisitDetailsPage() {
 					<View style={styles.padded}>
 						<AppInfoBanner
 							tone={canReport ? 'warning' : 'sky'}
-							icon="timer-sand"
+							icon={null}
 							title={canReport ? `${first} hasn’t come out` : `Waiting for ${first}`}
 							subtitle={
 								canReport
@@ -310,7 +303,7 @@ export default function ProviderVisitDetailsPage() {
 					<View style={styles.padded}>
 						<AppInfoBanner
 							tone="sky"
-							icon="map-marker-check-outline"
+							icon={null}
 							title="You’re at the address"
 							subtitle={`Tap I’ve arrived to let ${first} know and start the waiting time.`}
 						/>
@@ -448,57 +441,39 @@ export default function ProviderVisitDetailsPage() {
 			</ScrollView>
 
 			{!done && !cancelled ? (
-				<AppFooterBar>
-					<AppIconButton
-						icon="phone-outline"
-						variant="outline"
-						size={44}
-						radius={12}
-						disabled={!visit.patient.phone}
-						accessibilityLabel={`Call ${name}`}
-						onPress={() => void callPhone(visit.patient.phone)}
-					/>
+				<AppFooterBar direction="column">
 					{isInProgress(visit) ? (
 						<AppButton
 							size="lg"
 							icon="play-circle-outline"
-							style={styles.flex}
 							onPress={() => navigation.navigate(ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS, { visitId })}
 						>
 							{`Continue ${copy.noun}`}
 						</AppButton>
 					) : reported ? (
-						<AppButton size="lg" style={styles.flex} onPress={() => setStartOpen(true)}>
+						<AppButton size="lg" onPress={() => setStartOpen(true)}>
 							Enter start code
 						</AppButton>
 					) : policyOn && arrived ? (
-						<>
+						<View style={styles.footerRow}>
 							<AppButton
 								variant="outline"
 								size="lg"
 								style={styles.flex}
-								disabled={!canReport || reporting}
-								loading={reporting}
+								disabled={!canReport}
 								softDisabled
 								onPress={confirmNoShow}
 							>
-								{canReport ? 'Patient not available' : `Not available · ${minutesLeft} min`}
+								{canReport ? 'Not available' : `Not available · ${minutesLeft}m`}
 							</AppButton>
 							<AppButton size="lg" style={styles.flex} onPress={() => setStartOpen(true)}>
 								Enter start code
 							</AppButton>
-						</>
+						</View>
 					) : canArrive ? (
-						<>
+						<View style={styles.footerRow}>
 							<AppButton
 								variant="outline"
-								size="lg"
-								style={styles.flex}
-								onPress={() => setStartOpen(true)}
-							>
-								Enter start code
-							</AppButton>
-							<AppButton
 								size="lg"
 								style={styles.flex}
 								loading={arriving}
@@ -507,11 +482,13 @@ export default function ProviderVisitDetailsPage() {
 							>
 								I’ve arrived
 							</AppButton>
-						</>
+							<AppButton size="lg" style={styles.flex} onPress={() => setStartOpen(true)}>
+								Enter start code
+							</AppButton>
+						</View>
 					) : (
 						<AppButton
 							size="lg"
-							style={styles.flex}
 							disabled={!startable || !today}
 							softDisabled
 							onPress={() => setStartOpen(true)}
@@ -538,6 +515,18 @@ export default function ProviderVisitDetailsPage() {
 					setStartOpen(false)
 					setVisit(v)
 					navigation.replace(ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS, { visitId })
+				}}
+			/>
+			<AppConfirmSheet
+				visible={confirmOpen}
+				onClose={() => setConfirmOpen(false)}
+				title={`Report ${first} as not available?`}
+				message={`${first} will be asked what happened. If they don’t reply, it may be recorded as a missed visit.`}
+				confirmLabel="Report"
+				cancelLabel="Keep waiting"
+				onConfirm={async () => {
+					await reportNoShow()
+					setConfirmOpen(false)
 				}}
 			/>
 			<CancelVisitSheet
@@ -792,5 +781,9 @@ const styles = StyleSheet.create({
 	},
 	flex: {
 		flex: 1,
+	},
+	footerRow: {
+		flexDirection: 'row',
+		gap: 8,
 	},
 })
