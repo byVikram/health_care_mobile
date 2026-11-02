@@ -189,6 +189,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 		} else {
 			navigation.navigate(ROUTES.MAIN.TABS, {
 				screen: ROUTES.MAIN.SEARCH as any,
+				params: { focusSearch: true },
 			})
 		}
 	}

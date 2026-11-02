@@ -10,7 +10,6 @@ import {
 	TouchableOpacity,
 	ScrollView,
 	Text,
-	TextInput,
 } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -23,9 +22,9 @@ import {
 	AppScreenHeader,
 	AppSkeleton,
 	AppTypography,
-	AppIcon,
+	AppSearchBar,
+	LocationSelector,
 } from '../../../components/common'
-import { useAuth } from '../../../context/AuthContext'
 import { getDoctors, getSpecialities } from '../doctorService'
 import { DoctorSearchItem } from '../../../types/doctor-search'
 import type { RouteProp } from '@react-navigation/native'
@@ -108,7 +107,6 @@ function DoctorCardSkeleton() {
 export default function DoctorSearchPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
-	const { currentLocation } = useAuth()
 	const { width } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
 
@@ -303,32 +301,34 @@ export default function DoctorSearchPage() {
 			<AppScreenHeader
 				variant="bar"
 				solid
-				title={pageTitle}
-				subtitle={`In-clinic or video consultation${currentLocation?.address ? ` · ${currentLocation.address}` : ''}`}
-				titleStyle={styles.headerTitle}
+				titleNode={
+					<View>
+						<AppTypography style={styles.headerTitle} numberOfLines={1} accessibilityRole="header">
+							{pageTitle}
+						</AppTypography>
+						<View style={styles.headerLocation}>
+							<LocationSelector
+								color={APP_COLORS.mint}
+								iconSize={14}
+								textStyle={styles.headerLocationText}
+							/>
+						</View>
+					</View>
+				}
 				onBack={handleBack}
 				backAccessibilityLabel="Back to specialities"
 				style={styles.header}
 			>
-				<View style={styles.searchBox}>
-					<AppIcon name="search" size={20} color={APP_COLORS.inkMuted} />
-					<TextInput
-						value={searchInput}
-						onChangeText={setSearchInput}
-						onSubmitEditing={() => setSearchQuery(searchInput)}
-						placeholder={
-							specialityFilter === 'all'
-								? 'Search doctors by name or speciality'
-								: 'Search by doctor name'
-						}
-						placeholderTextColor={APP_COLORS.inkMuted}
-						style={styles.searchInput}
-						returnKeyType="search"
-						autoCorrect={false}
-						clearButtonMode="while-editing"
-						accessibilityLabel="Search doctors"
-					/>
-				</View>
+				<AppSearchBar
+					context={specialityFilter === 'all' ? 'doctors' : undefined}
+					placeholder={specialityFilter === 'all' ? undefined : 'Search by doctor name'}
+					hints={specialityFilter === 'all' ? undefined : ['doctor name', 'clinic', 'hospital']}
+					tone="onDark"
+					value={searchInput}
+					onChangeText={setSearchInput}
+					onSubmit={() => setSearchQuery(searchInput)}
+					style={styles.searchBar}
+				/>
 			</AppScreenHeader>
 
 			{/* FILTER / SORT BAR: Filters (with a count), Sort, then one-tap toggles that mirror the sheet. */}
@@ -490,24 +490,18 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		lineHeight: 26,
 		fontWeight: '600',
+		color: APP_COLORS.surface,
 	},
-	searchBox: {
+	headerLocation: {
+		marginTop: -2,
+		alignItems: 'flex-start',
+	},
+	headerLocationText: {
+		fontSize: 12,
+		fontWeight: '500',
+	},
+	searchBar: {
 		marginTop: 4,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		height: 48,
-		paddingHorizontal: 12,
-		backgroundColor: APP_COLORS.surface,
-		borderRadius: 8,
-	},
-	searchInput: {
-		flex: 1,
-		minWidth: 0,
-		height: 44,
-		paddingVertical: 0,
-		fontSize: 16,
-		color: APP_COLORS.ink,
 	},
 
 	// Filter/sort bar

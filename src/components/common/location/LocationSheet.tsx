@@ -4,13 +4,15 @@
 // location (AuthContext) and closes the sheet.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { AppBottomSheet } from '../layout/AppBottomSheet'
 import { AppPathIcon } from '../display/AppIcon'
+import AppSearchBar from '../inputs/AppSearchBar'
 import { APP_COLORS } from '../../../config/theme'
 import { useAuth } from '../../../context/AuthContext'
 import { isPatientRole } from '../../../constants/constants'
+import { isPincode } from '../../../utils/pincode'
 import {
 	getAddressFromCoords,
 	getCoordsFromAddress,
@@ -176,8 +178,10 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 	}, [query])
 
 	const choose = useCallback(
-		async (address: string, latitude: number, longitude: number) => {
-			await setCurrentLocation({ address, latitude, longitude })
+		async (address: string, latitude: number, longitude: number, pincode?: string) => {
+			// The pincode decides what is offered nearby (lab tests); a place picked from the search has none, and
+			// useCurrentPincode looks it up from the coordinates.
+			await setCurrentLocation({ address, latitude, longitude, ...(isPincode(pincode) ? { pincode } : {}) })
 			onClose()
 		},
 		[setCurrentLocation, onClose]
@@ -190,7 +194,7 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 			const pos = await getCurrentLocation({ promptForSettings: true })
 			const a = await getAddressFromCoords(pos.latitude, pos.longitude)
 			const label = [a.area, a.city].filter(Boolean).join(', ') || a.fullAddress || 'Current location'
-			await choose(label, pos.latitude, pos.longitude)
+			await choose(label, pos.latitude, pos.longitude, a.pincode)
 		} catch {
 			if (mounted.current) setGpsError("Couldn't get your location. Check that Location is turned on.")
 		} finally {
@@ -216,7 +220,12 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 			}
 			// Without coordinates the label still shows; features that need a position (useBookingLocation) check for
 			// finite numbers and ask for the device location instead.
-			await choose(`${a.label} · ${a.city || firstPart(a.address_line)}`, lat ?? Number.NaN, lng ?? Number.NaN)
+			await choose(
+				`${a.label} · ${a.city || firstPart(a.address_line)}`,
+				lat ?? Number.NaN,
+				lng ?? Number.NaN,
+				a.pincode
+			)
 		} finally {
 			if (mounted.current) setPicking(false)
 		}
@@ -234,21 +243,14 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 			showHeaderDivider={false}
 			maxHeightRatio={0.92}
 		>
-			<View style={styles.searchBox}>
-				<AppPathIcon d={ICONS.search} size={18} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
-				<TextInput
-					value={query}
-					onChangeText={setQuery}
-					placeholder="Search area, street or landmark"
-					placeholderTextColor={APP_COLORS.inkMuted}
-					accessibilityLabel="Search area, street or landmark"
-					style={styles.searchInput}
-					returnKeyType="search"
-					autoCorrect={false}
-					clearButtonMode="while-editing"
-				/>
-				{searching && <ActivityIndicator size="small" color={APP_COLORS.primary} />}
-			</View>
+			<AppSearchBar
+				context="location"
+				value={query}
+				onChangeText={setQuery}
+				showMicrophone={false}
+				trailing={searching ? <ActivityIndicator size="small" color={APP_COLORS.primary} /> : undefined}
+				style={styles.searchBar}
+			/>
 
 			<LocationRow
 				icon={ICONS.gps}
@@ -328,23 +330,8 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 export default LocationSheet
 
 const styles = StyleSheet.create({
-	searchBox: {
-		height: 48,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		paddingHorizontal: 12,
+	searchBar: {
 		marginBottom: 8,
-		borderWidth: 1.5,
-		borderColor: APP_COLORS.primary,
-		borderRadius: 12,
-	},
-	searchInput: {
-		flex: 1,
-		minWidth: 0,
-		padding: 0,
-		fontSize: 16,
-		color: APP_COLORS.ink,
 	},
 	row: {
 		minHeight: 60,

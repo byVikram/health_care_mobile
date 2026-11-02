@@ -17,7 +17,7 @@ import {
 	getFavouriteDoctors,
 	toggleFavouriteDoctor,
 } from '../../../doctor/doctorService'
-import { AppInput } from '../../../../components/common'
+import { AppSearchBar } from '../../../../components/common'
 import FavouriteDoctorList, {
 	type FavouriteDoctorListItem,
 } from '../../../doctor/search/components/FavouriteDoctorList'
@@ -190,23 +190,11 @@ export default function FavouriteDoctorsTab() {
 				]}
 				ListHeaderComponent={
 					<View style={styles.headerContent}>
-						<AppInput
+						<AppSearchBar
+							context="favouriteDoctors"
 							value={searchQuery}
 							onChangeText={setSearchQuery}
-							placeholder="Search favourite doctors by name or speciality"
-							placeholderTextColor="#98a1aa"
-							containerStyle={[styles.searchInputContainer, isCompact && styles.searchInputContainerCompact]}
-							style={[styles.searchInput, isCompact && styles.searchInputCompact]}
-							contentStyle={[styles.searchInputContent, isCompact && styles.searchInputContentCompact]}
-							outlineStyle={[styles.searchInputOutline, isCompact && styles.searchInputOutlineCompact]}
-							outlineColor="#2e7b7d"
-							activeOutlineColor="#2e7b7d"
-							textColor="#1b2d3c"
-							left={<AppInput.Icon icon="magnify" size={isCompact ? 20 : 28} color="#9b9b9b" />}
-							right={<AppInput.Icon icon="microphone-outline" size={isCompact ? 20 : 28} color="#9b9b9b" />}
-							autoCorrect={false}
-							returnKeyType="search"
-							noMargin
+							style={[styles.searchBar, isCompact && styles.searchBarCompact]}
 						/>
 
 						<Text style={[styles.sectionTitle, isCompact && styles.sectionTitleCompact]}>
@@ -259,36 +247,11 @@ const styles = StyleSheet.create({
 	headerContent: {
 		paddingBottom: 2,
 	},
-	searchInputContainer: {
+	searchBar: {
 		marginBottom: 12,
 	},
-	searchInputContainerCompact: {
+	searchBarCompact: {
 		marginBottom: 10,
-	},
-	searchInput: {
-		height: 54,
-		backgroundColor: '#f8fbff',
-	},
-	searchInputCompact: {
-		height: 44,
-	},
-	searchInputContent: {
-		height: 54,
-		paddingHorizontal: 0,
-		paddingVertical: 0,
-		fontSize: 17,
-	},
-	searchInputContentCompact: {
-		height: 44,
-		fontSize: 15,
-	},
-	searchInputOutline: {
-		borderRadius: 18,
-		borderWidth: 3,
-	},
-	searchInputOutlineCompact: {
-		borderRadius: 14,
-		borderWidth: 2,
 	},
 	sectionTitle: {
 		fontSize: 15,

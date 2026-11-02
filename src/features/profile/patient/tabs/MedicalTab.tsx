@@ -10,7 +10,8 @@ import {
 	useWindowDimensions,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppTypography, AppButton } from '../../../../components/common'
+import { AppTypography, AppButton, AppChipPicker } from '../../../../components/common'
+import { ALLERGY_OPTIONS, CONDITION_OPTIONS } from '../../config/profileOptions'
 import { AppBottomSheet } from '../../../../components/common'
 import type { PatientProfileState } from '../PatientProfileService'
 
@@ -20,6 +21,10 @@ interface Props {
 	onSave: () => void
 	saving: boolean
 }
+
+// The picker takes {label, value} options; these lists are plain strings.
+const ALLERGY_CHOICES = ALLERGY_OPTIONS.map((o) => ({ value: o, label: o }))
+const CONDITION_CHOICES = CONDITION_OPTIONS.map((o) => ({ value: o, label: o }))
 
 type MultiFieldKey = 'allergies' | 'chronicConditions' | 'currentMedications'
 
@@ -147,8 +152,22 @@ export default function MedicalTab({ data, onChange, onSave, saving }: Props) {
 		>
 			<View style={[styles.contentShell, { maxWidth: contentWidth }]}>
 				<View style={styles.formFieldsWrapper}>
-					{renderMultiField('allergies')}
-					{renderMultiField('chronicConditions')}
+					<AppChipPicker
+						label="Allergies"
+						options={ALLERGY_CHOICES}
+						values={data.allergies || []}
+						onChange={(v) => onChange('allergies', v)}
+						searchPlaceholder="Search allergies"
+						style={styles.multiFieldContainer}
+					/>
+					<AppChipPicker
+						label="Chronic diseases"
+						options={CONDITION_CHOICES}
+						values={data.chronicConditions || []}
+						onChange={(v) => onChange('chronicConditions', v)}
+						searchPlaceholder="Search conditions"
+						style={styles.multiFieldContainer}
+					/>
 					{renderMultiField('currentMedications')}
 
 					<View style={styles.multiFieldContainer}>

@@ -56,6 +56,8 @@ export interface BookingItem {
 	status_key?: string | null
 	/** Home care only: the visit the provider reported as a no-show, which the patient can explain (else null). */
 	missed_visit_id?: string | null
+	/** Home care only: the patient can still say what happened (false once they answered or the time is up; older servers omit it). */
+	missed_can_reply?: boolean
 	note?: string | null
 	ref?: string | null
 	avatar_url?: string | null

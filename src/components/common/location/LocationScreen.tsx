@@ -16,6 +16,7 @@ import { getCurrentLocation, getAddressFromCoords } from '../../../services/loca
 import { isPincode, normalizePincode } from '../../../utils/pincode'
 import AppScreenHeader from '../layout/AppScreenHeader'
 import { AppInput } from '../inputs/AppInput'
+import AppSearchBar from '../inputs/AppSearchBar'
 import { AppTypography } from '../display/AppTypography'
 import { AppButton } from '../buttons/AppButton'
 
@@ -233,16 +234,14 @@ export default function LocationScreen() {
 
 			<View style={styles.content}>
 				<View style={styles.searchContainer}>
-					<AppInput
-						placeholder="Search for area, street or landmark"
+					<AppSearchBar
+						context="location"
 						value={searchText}
 						onChangeText={handleSearchChange}
-						isSearch
 						autoFocus
+						showMicrophone={false}
+						trailing={searchLoading ? <ActivityIndicator size="small" color="#0c7c7c" /> : undefined}
 					/>
-					{searchLoading && (
-						<ActivityIndicator size="small" color="#0c7c7c" style={{ position: 'absolute', right: 24, top: 32 }} />
-					)}
 				</View>
 
 				{suggestions.length === 0 && !address && (

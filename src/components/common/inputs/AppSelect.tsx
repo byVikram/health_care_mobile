@@ -13,7 +13,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { TouchableRipple, useTheme } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppTypography } from "../display/AppTypography";
-import { AppBottomSheet } from "../layout/AppBottomSheet";
+import { AppOptionSheet } from "./AppOptionSheet";
 import { APP_COLORS } from "../../../config/theme";
 
 export interface AppSelectOption {
@@ -184,47 +184,15 @@ export const AppSelect = ({
       </View>
 
       {isSheet ? (
-        <AppBottomSheet
+        <AppOptionSheet
           visible={visible}
-          title={sheetTitle ?? (label?.trim() || placeholder)}
           onClose={closeMenu}
-          appearance="modern"
-          showHeaderDivider={false}
-        >
-          <View accessibilityRole="radiogroup" style={styles.sheetList}>
-            {options.length === 0 ? (
-              <AppTypography variant="body" style={styles.sheetEmpty}>
-                No options available
-              </AppTypography>
-            ) : (
-              options.map((option, index) => {
-                const isSelected = option.value === value;
-
-                return (
-                  <Pressable
-                    key={option.value}
-                    style={[styles.sheetRow, index === options.length - 1 && styles.sheetRowLast]}
-                    onPress={() => {
-                      onSelect(option.value);
-                      closeMenu();
-                    }}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: isSelected }}
-                    accessibilityLabel={option.label}
-                  >
-                    <AppTypography
-                      variant="body"
-                      style={[styles.sheetLabel, isSelected && styles.sheetLabelSelected]}
-                    >
-                      {option.label}
-                    </AppTypography>
-                    <View style={[styles.sheetRadio, isSelected && styles.sheetRadioSelected]} />
-                  </Pressable>
-                );
-              })
-            )}
-          </View>
-        </AppBottomSheet>
+          title={sheetTitle ?? (label?.trim() || placeholder)}
+          options={options}
+          selected={value ? [value] : []}
+          mode="single"
+          onToggle={(next) => onSelect(next)}
+        />
       ) : (
       <Modal visible={visible} transparent animationType="fade" onRequestClose={closeMenu}>
         <Pressable style={styles.modalOverlay} onPress={closeMenu}>
@@ -379,46 +347,5 @@ const styles = StyleSheet.create({
   optionTextSelected: {
     color: "#2e7d74",
     fontWeight: "700",
-  },
-  sheetList: {
-    paddingBottom: 4,
-  },
-  sheetRow: {
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EEF2F2",
-  },
-  sheetRowLast: {
-    borderBottomWidth: 0,
-  },
-  sheetLabel: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: "500",
-    color: APP_COLORS.ink,
-  },
-  sheetLabelSelected: {
-    fontWeight: "800",
-  },
-  sheetRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#9AA7A9",
-    backgroundColor: APP_COLORS.surface,
-  },
-  sheetRadioSelected: {
-    borderWidth: 6,
-    borderColor: APP_COLORS.primary,
-  },
-  sheetEmpty: {
-    paddingVertical: 16,
-    color: APP_COLORS.inkMuted,
   },
 });

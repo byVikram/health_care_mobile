@@ -189,6 +189,8 @@ function SelectDropdown({ label, value, placeholder, options, onSelect, required
 				borderRadius={8}
 				size="compact"
 				noMargin
+				presentation="sheet"
+				sheetTitle={label}
 				style={styles.selectRightAligned}
 				errorText={errorText}
 			/>

@@ -154,7 +154,7 @@ export const updateAppointmentsStatus = async (
 
 /**
  * Doctor marks the patient as a no-show (patient no-show policy): the patient is emailed and can reply with a reason.
- * The server only accepts it from 60 minutes after the start until 5 days after it and answers 400 with the reason
+ * The server only accepts it from 60 minutes after the start until 2 days after it and answers 400 with the reason
  * otherwise -- the caller shows that message, so the global error dialog is suppressed.
  */
 export const markAppointmentNoShow = async (appointmentId: string): Promise<AppointmentResponse> => {

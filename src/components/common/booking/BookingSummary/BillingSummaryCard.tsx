@@ -18,8 +18,8 @@ export interface BillingRow {
 }
 
 export interface BillingSummaryCardNote {
-	/** Pre-rendered icon element. */
-	icon: React.ReactNode
+	/** Pre-rendered icon element; the note shows without one. */
+	icon?: React.ReactNode
 	text: string
 	backgroundColor?: string
 	textColor?: string
@@ -140,7 +140,7 @@ export function BillingSummaryCard({
 							note.backgroundColor ? { backgroundColor: note.backgroundColor } : null,
 						]}
 					>
-						<View style={styles.noteIcon}>{note.icon}</View>
+						{note.icon ? <View style={styles.noteIcon}>{note.icon}</View> : null}
 						<AppTypography
 							variant="caption"
 							style={[styles.noteText, note.textColor ? { color: note.textColor } : null]}

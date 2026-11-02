@@ -90,6 +90,8 @@ export default function LifestyleTab({ data, onChange, onSave, saving }: Props) 
 					value={data.smoking}
 					onSelect={(val: string) => onChange('smoking', val)}
 					placeholder="Select smoking habit"
+					presentation="sheet"
+					sheetTitle="Smoking habits"
 					size="compact"
 					style={styles.fieldMargin}
 				/>
@@ -101,6 +103,8 @@ export default function LifestyleTab({ data, onChange, onSave, saving }: Props) 
 					value={data.alcohol}
 					onSelect={(val: string) => onChange('alcohol', val)}
 					placeholder="Select alcohol consumption"
+					presentation="sheet"
+					sheetTitle="Alcohol consumption"
 					size="compact"
 					style={styles.fieldMargin}
 				/>
@@ -112,6 +116,8 @@ export default function LifestyleTab({ data, onChange, onSave, saving }: Props) 
 					value={data.exerciseFrequency}
 					onSelect={(val: string) => onChange('exerciseFrequency', val)}
 					placeholder="Select exercise frequency"
+					presentation="sheet"
+					sheetTitle="Exercise frequency"
 					size="compact"
 					style={styles.fieldMargin}
 				/>
@@ -123,6 +129,8 @@ export default function LifestyleTab({ data, onChange, onSave, saving }: Props) 
 					value={data.foodPreference}
 					onSelect={(val: string) => onChange('foodPreference', val)}
 					placeholder="Select food preference"
+					presentation="sheet"
+					sheetTitle="Food preferences"
 					size="compact"
 					style={styles.fieldMargin}
 				/>
@@ -134,6 +142,8 @@ export default function LifestyleTab({ data, onChange, onSave, saving }: Props) 
 					value={data.sleepHours}
 					onSelect={(val: string) => onChange('sleepHours', val)}
 					placeholder="Select sleep hours"
+					presentation="sheet"
+					sheetTitle="Sleep hours"
 					size="compact"
 					style={styles.fieldMargin}
 				/>
@@ -145,6 +155,8 @@ export default function LifestyleTab({ data, onChange, onSave, saving }: Props) 
 					value={data.occupation}
 					onSelect={(val: string) => onChange('occupation', val)}
 					placeholder="Select occupation"
+					presentation="sheet"
+					sheetTitle="Occupation"
 					size="compact"
 					style={styles.fieldMargin}
 				/>

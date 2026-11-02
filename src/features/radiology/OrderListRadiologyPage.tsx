@@ -648,7 +648,7 @@ export default function OrderListRadiologyPage({
 					<BookingsSearchBar
 						value={searchQuery}
 						onChangeText={setSearchQuery}
-						placeholder={isRadiologyViewer ? 'Search by patient name, scan or reference ID' : 'Search by center, scan or reference ID'}
+						context={isRadiologyViewer ? 'radiologyOrders.radiology' : 'radiologyOrders.patient'}
 						onFilterPress={openFilterModal}
 						filterActive={statusFilter !== 'all' || dateFilter !== 'all'}
 						accessibilityLabel="Filter radiology orders"

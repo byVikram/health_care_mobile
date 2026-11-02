@@ -29,6 +29,8 @@ export type MainTabParamList = {
 	[ROUTES.MAIN.SEARCH]:
 		| {
 				mode?: 'clinic' | 'video'
+				/** Set by the Home search bar: open the keyboard on arrival (the Search tab clears it). */
+				focusSearch?: boolean
 		  }
 		| undefined
 	[ROUTES.MAIN.PORTAL]: { filter?: BookingsFilterKey } | undefined

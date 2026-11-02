@@ -109,7 +109,7 @@ export function AppCartFooter({
 			) : (
 				<AppButton
 					size="lg"
-					trailingIcon={plainCta ? undefined : 'chevron-right'}
+					// trailingIcon={plainCta ? undefined : 'chevron-right'}
 					onPress={onCtaPress}
 					disabled={ctaDisabled}
 					loading={ctaLoading}

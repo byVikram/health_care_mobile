@@ -707,7 +707,7 @@ export default function OrderListPage({
 					<BookingsSearchBar
 						value={searchQuery}
 						onChangeText={setSearchQuery}
-						placeholder={isPatient ? 'Search by order ID or pharmacy' : 'Search by patient name or order ID'}
+						context={isPatient ? 'pharmacyOrders.patient' : 'pharmacyOrders.pharmacy'}
 						onFilterPress={openFilterModal}
 						filterActive={statusFilter !== 'all' || dateFilter !== 'all'}
 						accessibilityLabel="Filter medicine orders"

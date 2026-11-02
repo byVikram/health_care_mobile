@@ -4,8 +4,8 @@
 // "For Raghav"), and the privacy line. With no chats yet it shows the "No chats yet" empty state instead.
 
 import React, { useMemo, useState } from 'react'
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import { AppBottomSheet, AppButton, AppIconTile, AppPathIcon, AppTag } from '../../../components/common'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { AppBottomSheet, AppButton, AppIconTile, AppPathIcon, AppSearchBar, AppTag } from '../../../components/common'
 import { APP_COLORS, TONES } from '../../../config/theme'
 import { RECENT_GROUPS } from '../careAiData'
 import { CARE_AI_ICONS } from '../careAiIcons'
@@ -49,22 +49,7 @@ export function RecentChatsSheet({ visible, chats, onClose, onNewChat, onOpenCha
 			) : (
 				<View>
 					<View style={styles.tools}>
-						<View style={styles.search}>
-							<AppPathIcon
-								d={CARE_AI_ICONS.search}
-								size={18}
-								strokeWidth={2}
-								color={APP_COLORS.inkMuted}
-							/>
-							<TextInput
-								value={query}
-								onChangeText={setQuery}
-								placeholder="Search your Care AI chats"
-								placeholderTextColor={APP_COLORS.inkMuted}
-								accessibilityLabel="Search chats"
-								style={styles.searchInput}
-							/>
-						</View>
+						<AppSearchBar context="careAiChats" value={query} onChangeText={setQuery} showMicrophone={false} style={styles.search} />
 						<TouchableOpacity onPress={onNewChat} accessibilityRole="button" style={styles.newChat}>
 							<AppPathIcon
 								d={CARE_AI_ICONS.plus}
@@ -135,16 +120,7 @@ const styles = StyleSheet.create({
 	search: {
 		flex: 1,
 		minWidth: 0,
-		height: 44,
-		paddingHorizontal: 12,
-		borderRadius: 12,
-		borderWidth: 1.5,
-		borderColor: APP_COLORS.divider,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
 	},
-	searchInput: { flex: 1, minWidth: 0, padding: 0, fontSize: 15, color: APP_COLORS.ink },
 	newChat: {
 		height: 44,
 		paddingHorizontal: 14,

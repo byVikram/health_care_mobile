@@ -4,7 +4,7 @@
 //   variant 'round'  -- "Procedure steps": 48px rows with a bottom divider, 24px round check (success when
 //                       done), done labels muted + struck through (14/20 700).
 //   variant 'square' -- "Bring with you": 40px rows, 22px rounded-square check (primary when checked),
-//                       14/20 600 labels, no divider.
+//                       14/20 600 labels, no divider (`divided` adds 48px rows with a divider, as in the option sheets).
 //   variant 'list'   -- "Cancel visits": 56px rows (padding 10x12) with a divider, 20px rounded-square check,
 //                       14/20 800 label + 12/16 muted `sub` line and a muted `trailing` value; `checked: 'mixed'`
 //                       shows a minus (a "select all" row); `tone="danger"` fills the check red.
@@ -32,6 +32,8 @@ export type AppCheckListProps = {
 	items: AppCheckListItem[]
 	onToggle: (key: string, checked: boolean) => void
 	variant?: 'round' | 'square' | 'list'
+	/** 'square' only: divider lines between rows (taller, 48px rows). */
+	divided?: boolean
 	/** Colour of a ticked box ('list' / 'square'). Defaults to primary ('round' is always success). */
 	tone?: 'primary' | 'danger'
 	disabled?: boolean
@@ -42,6 +44,7 @@ export function AppCheckList({
 	items,
 	onToggle,
 	variant = 'round',
+	divided = false,
 	tone = 'primary',
 	disabled = false,
 	style,
@@ -65,7 +68,8 @@ export function AppCheckList({
 						accessibilityLabel={item.label}
 						style={({ pressed }) => [
 							round ? styles.rowRound : list ? styles.rowList : styles.rowSquare,
-							(round || list) && i < items.length - 1 && styles.divider,
+							(round || list || divided) && i < items.length - 1 && styles.divider,
+								divided && !round && !list && styles.rowDivided,
 							off && item.disabled && styles.rowOff,
 							pressed && styles.pressed,
 						]}
@@ -134,6 +138,9 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		gap: 10,
 		minHeight: 40,
+	},
+	rowDivided: {
+		minHeight: 48,
 	},
 	divider: {
 		borderBottomWidth: 1,

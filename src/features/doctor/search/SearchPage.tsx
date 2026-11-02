@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
 	Animated,
+	InteractionManager,
 	NativeScrollEvent,
 	NativeSyntheticEvent,
 	StyleSheet,
@@ -10,7 +11,7 @@ import {
 	useWindowDimensions,
 	View,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
 	AppChip,
@@ -21,14 +22,16 @@ import {
 	AppTypography,
 	AppIcon,
 	AppPathIcon,
+	AppSearchBar,
+	LocationSelector,
 } from '../../../components/common'
 import { useAuth } from '../../../context/AuthContext'
 import { getSpecialities } from '../doctorService'
 import { ROUTES } from '../../../navigation/routes'
 import { APP_COLORS, TONES, toneAt } from '../../../config/theme'
 import { specialityVisual } from './components/specialityMeta'
-import type { NavigationProp } from '@react-navigation/native'
-import type { AppStackParamList } from '../../../navigation/types'
+import type { NavigationProp, RouteProp } from '@react-navigation/native'
+import type { AppStackParamList, MainTabParamList } from '../../../navigation/types'
 
 const SYMPTOM_CHIPS = ['Fever', 'Cough', 'Headache', 'Back pain', 'Skin rash', 'Stomach pain', 'Anxiety', 'Joint pain']
 
@@ -86,6 +89,23 @@ export default function SearchPage() {
 	const [specialities, setSpecialities] = useState<Speciality[]>([])
 	const [loadingSpecs, setLoadingSpecs] = useState(true)
 	const [query, setQuery] = useState('')
+
+	// Coming from the Home search bar: open the keyboard straight away. The flag is used once and cleared, so a tap on the
+	// Search tab itself does not pop the keyboard.
+	const tabNavigation = useNavigation<NavigationProp<MainTabParamList>>()
+	const route = useRoute<RouteProp<MainTabParamList, typeof ROUTES.MAIN.SEARCH>>()
+	const searchInputRef = useRef<TextInput>(null)
+	const focusSearch = route.params?.focusSearch
+	useFocusEffect(
+		useCallback(() => {
+			if (!focusSearch) return
+			const task = InteractionManager.runAfterInteractions(() => {
+				searchInputRef.current?.focus()
+				tabNavigation.setParams({ focusSearch: undefined })
+			})
+			return () => task.cancel()
+		}, [focusSearch, tabNavigation])
+	)
 
 	// Collapsing header: `compact` flips with hysteresis (on > 24, off <= 4,
 	// same as the design) and `progress` animates 0 → 1 between the states.
@@ -179,7 +199,7 @@ export default function SearchPage() {
 	// Animated header values (design: expanded → compact)
 	const headerPadBottom = progress.interpolate({ inputRange: [0, 1], outputRange: [20, 12] })
 	const headGap = progress.interpolate({ inputRange: [0, 1], outputRange: [12, 4] })
-	const introMax = progress.interpolate({ inputRange: [0, 1], outputRange: [90, 0] })
+	const introMax = progress.interpolate({ inputRange: [0, 1], outputRange: [112, 0] })
 	const introOpacity = progress.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0, 0] })
 	const miniOpacity = progress
 	const miniShift = progress.interpolate({ inputRange: [0, 1], outputRange: [8, 0] })
@@ -213,31 +233,43 @@ export default function SearchPage() {
 							importantForAccessibility={compact ? 'auto' : 'no-hide-descendants'}
 						>
 							<AppTypography style={styles.miniTitle}>Consult a doctor</AppTypography>
+							{compact && (
+								<View style={styles.miniLocation}>
+									<LocationSelector
+										color={APP_COLORS.mint}
+										iconSize={14}
+										textStyle={styles.miniLocationText}
+									/>
+								</View>
+							)}
 						</Animated.View>
 					</View>
 
 					<Animated.View
 						style={[styles.heroIntro, { marginTop: headGap, maxHeight: introMax, opacity: introOpacity }]}
+						pointerEvents={compact ? 'none' : 'auto'}
 						accessibilityElementsHidden={compact}
 						importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'}
 					>
 						{!!firstName && <AppTypography style={styles.heroEyebrow}>HI {firstName}</AppTypography>}
 						<AppTypography style={styles.heroTitle}>Consult a doctor</AppTypography>
 						<AppTypography style={styles.heroSubtitle}>{countLabel}In-clinic or video</AppTypography>
+						<View style={styles.heroLocation}>
+							<LocationSelector
+								color={APP_COLORS.mint}
+								iconSize={16}
+								textStyle={styles.heroLocationText}
+							/>
+						</View>
 					</Animated.View>
 
-					<Animated.View style={[styles.searchBox, { marginTop: headGap }]}>
-						<AppIcon name="search" size={20} color={APP_COLORS.inkMuted} />
-						<TextInput
+					<Animated.View style={{ marginTop: headGap }}>
+						<AppSearchBar
+							context="doctorSearch"
+							tone="onDark"
 							value={query}
 							onChangeText={setQuery}
-							placeholder="Search specialities or symptoms"
-							placeholderTextColor={APP_COLORS.inkMuted}
-							style={styles.searchInput}
-							returnKeyType="search"
-							autoCorrect={false}
-							clearButtonMode="while-editing"
-							accessibilityLabel="Search specialities or symptoms"
+							inputRef={searchInputRef}
 						/>
 					</Animated.View>
 				</Animated.View>
@@ -377,7 +409,8 @@ const styles = StyleSheet.create({
 		backgroundColor: APP_COLORS.ink,
 		paddingHorizontal: 16,
 		overflow: 'hidden',
-	},	heroTopRow: {
+	},
+	heroTopRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
@@ -391,6 +424,22 @@ const styles = StyleSheet.create({
 		lineHeight: 26,
 		fontWeight: '700',
 		color: APP_COLORS.surface,
+	},
+	miniLocation: {
+		marginTop: -2,
+		alignItems: 'flex-start',
+	},
+	miniLocationText: {
+		fontSize: 12,
+		fontWeight: '500',
+	},
+	heroLocation: {
+		marginTop: 2,
+		alignItems: 'flex-start',
+	},
+	heroLocationText: {
+		fontSize: 13,
+		fontWeight: '600',
 	},
 	heroIntro: {
 		gap: 4,
@@ -414,23 +463,6 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		lineHeight: 20,
 		color: APP_COLORS.mint,
-	},
-	searchBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		height: 48,
-		paddingHorizontal: 12,
-		backgroundColor: APP_COLORS.surface,
-		borderRadius: 12,
-	},
-	searchInput: {
-		flex: 1,
-		minWidth: 0,
-		height: 44,
-		paddingVertical: 0,
-		fontSize: 16,
-		color: APP_COLORS.ink,
 	},
 
 	// Scroll content (design <main>: gap 8, padding-bottom 8)

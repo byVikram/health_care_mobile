@@ -60,7 +60,23 @@ export default function LifestylePage() {
 	const form = useProfileForm<LifestyleValues>({ load, save })
 	const { draft, set } = form
 
-	// Single-choice chips for short lists; a select for occupation.
+	// Habits, exercise and food preference pick from a bottom sheet; sleep stays as chips.
+	const pick = (key: keyof LifestyleValues, label: string, options: Option[]) =>
+		draft && (
+			<AppFormField label={label}>
+				<AppSelect
+					{...FORM_SELECT_PROPS}
+					options={withCurrent(options, draft[key])}
+					value={draft[key]}
+					onSelect={(v) => set(key, v)}
+					placeholder={`Select ${label.toLowerCase()}`}
+					presentation="sheet"
+					sheetTitle={label}
+				/>
+			</AppFormField>
+		)
+
+	// Single-choice chips for the short sleep list.
 	const chips = (key: keyof LifestyleValues, label: string, options: Option[]) =>
 		draft && (
 			<AppFormField label={label}>
@@ -89,12 +105,12 @@ export default function LifestylePage() {
 			{draft && (
 				<>
 					<AppFormCard title="Habits">
-						{chips('smoking', 'Smoking', SMOKING_OPTIONS)}
-						{chips('alcohol', 'Alcohol', ALCOHOL_OPTIONS)}
+						{pick('smoking', 'Smoking', SMOKING_OPTIONS)}
+						{pick('alcohol', 'Alcohol', ALCOHOL_OPTIONS)}
 					</AppFormCard>
 					<AppFormCard title="Activity & diet">
-						{chips('activity', 'Exercise', ACTIVITY_OPTIONS)}
-						{chips('food', 'Food preference', FOOD_OPTIONS)}
+						{pick('activity', 'Exercise', ACTIVITY_OPTIONS)}
+						{pick('food', 'Food preference', FOOD_OPTIONS)}
 						{chips('sleep', 'Sleep per night', SLEEP_OPTIONS)}
 					</AppFormCard>
 					<AppFormCard title="Work">
@@ -105,6 +121,8 @@ export default function LifestylePage() {
 								value={draft.occupation}
 								onSelect={(v) => set('occupation', v)}
 								placeholder="Select occupation"
+								presentation="sheet"
+								sheetTitle="Occupation"
 							/>
 						</AppFormField>
 					</AppFormCard>

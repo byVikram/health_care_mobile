@@ -198,7 +198,6 @@ export default function AncillaryScheduledDetailsPage() {
 						</Text>
 					) : (
 						<View style={styles.heroNote}>
-							<MaterialCommunityIcons name="clock-outline" size={20} color={APP_COLORS.mintAccent} />
 							<Text style={styles.heroNoteText}>
 								{`Each visit gets its own ${noun}, assigned `}
 								<Text style={styles.bold}>{`${leadText(policy.assign_lead_minutes)} before`}</Text>
