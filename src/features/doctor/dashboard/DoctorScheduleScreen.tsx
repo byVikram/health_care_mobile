@@ -372,8 +372,16 @@ export function DoctorScheduleScreen() {
 	const todayDone = todayByVisit.filter(isCompleted)
 	const todayCounts = { every: todayByVisit.length, upcoming: todayUpcoming.length, done: todayDone.length }
 	const todayNoShowCount = todayByVisit.filter(isNoShowAppt).length
-	// "All" lists the patients still to be seen first, then the finished ones (the list is already by time).
-	const todayShown = todayTab === 'upcoming' ? todayUpcoming : todayTab === 'done' ? todayDone : [...todayUpcoming, ...todayDone]
+	// "All" lists the patients still to be seen first, then the finished ones (the list is already by time). A no-show goes
+	// last in every view, so a marked patient drops to the bottom at once (the lists are updated in place when one is marked).
+	const todayToSee = todayUpcoming.filter((a) => !isNoShowAppt(a))
+	const todayMissed = todayUpcoming.filter(isNoShowAppt)
+	const todayShown =
+		todayTab === 'upcoming'
+			? [...todayToSee, ...todayMissed]
+			: todayTab === 'done'
+				? todayDone
+				: [...todayToSee, ...todayDone, ...todayMissed]
 
 	// ── Upcoming derived ───────────────────────────────────────────────────
 	const upMarkedDates = useMemo(() => new Set(upList.map((a) => a.appointment_date)), [upList])
@@ -493,7 +501,7 @@ export function DoctorScheduleScreen() {
 		}
 	}
 
-	// Patient no-show policy: only from 60 minutes after the start until 5 days after it (checked here against the device
+	// Patient no-show policy: only from 60 minutes after the start until 2 days after it (checked here against the device
 	// clock, and by the server, which answers 400 with its own message -- shown in the sheet when it refuses).
 	const handleMarkNoShow = async (apt: Appointment) => {
 		if (busyId) return
