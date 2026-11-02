@@ -6,7 +6,8 @@
 //   size 'prominent'         — 16px padding, radius 14, 40px tone-FILLED tile with a white icon,
 //                              optional 11/14 800 caps eyebrow, 17/22 800 ink title, 13/18 muted
 //                              subtitle ("CANCELLED" banner).
-// Optional action chip on the right (label + onPress), or any custom `right` node.
+// Optional action chip on the right (label + onPress), or under the text with actionPlacement="below" (full width, centred; a long title
+// and subtitle then keep the whole banner width), or any custom `right` node.
 // `onPress` makes the whole banner a button (`chevron` adds a trailing 20px chevron in the tone colour).
 
 import React from 'react'
@@ -55,6 +56,8 @@ export type AppInfoBannerProps = {
 	/** Tile edge length (32-44). Defaults to 32 compact / 40 prominent. */
 	tileSize?: number
 	action?: AppInfoBannerAction
+	/** Where the action chip goes: on the right (default) or as a full-width button under the text. */
+	actionPlacement?: 'right' | 'below'
 	/** Custom right-hand node (overrides `action`). */
 	right?: React.ReactNode
 	/** Makes the whole banner pressable (accessibilityRole 'button'). */
@@ -77,6 +80,7 @@ export function AppInfoBanner({
 	size = 'compact',
 	tileSize,
 	action,
+	actionPlacement = 'right',
 	right,
 	onPress,
 	chevron = false,
@@ -94,6 +98,18 @@ export function AppInfoBanner({
 		{ backgroundColor: bg },
 		style,
 	]
+
+	const actionChip = action ? (
+		<AppActionChip
+			label={action.label}
+			onPress={action.onPress}
+			icon={action.icon}
+			filled={action.filled ?? true}
+			size={actionPlacement === 'below' ? 'md' : undefined}
+			style={actionPlacement === 'below' ? styles.chipBelow : undefined}
+		/>
+	) : null
+	const actionBelow = !right && actionPlacement === 'below' && actionChip
 
 	const content = (
 		<>
@@ -122,16 +138,9 @@ export function AppInfoBanner({
 					{title}
 				</Text>
 				{!!subtitle && <Text style={prominent ? styles.subProminent : styles.subCompact}>{subtitle}</Text>}
+				{actionBelow ? <View style={styles.actionBelow}>{actionChip}</View> : null}
 			</View>
-			{right ??
-				(action ? (
-					<AppActionChip
-						label={action.label}
-						onPress={action.onPress}
-						icon={action.icon}
-						filled={action.filled ?? true}
-					/>
-				) : null)}
+			{right ?? (actionBelow ? null : actionChip)}
 			{!!onPress && chevron && <MaterialCommunityIcons name="chevron-right" size={20} color={fg} />}
 		</>
 	)
@@ -187,6 +196,12 @@ const styles = StyleSheet.create({
 	},
 	textProminent: {
 		gap: 2,
+	},
+	actionBelow: {
+		marginTop: 10,
+	},
+	chipBelow: {
+		justifyContent: 'center',
 	},
 	eyebrow: {
 		fontSize: 11,
