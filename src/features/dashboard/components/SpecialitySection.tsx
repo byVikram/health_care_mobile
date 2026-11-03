@@ -205,7 +205,7 @@ function SpecialitySection({ specialities = [], refreshToken }: Props) {
 			right={
 				<AppTextLink
 					label="All symptoms"
-					onPress={() => navigation.navigate(ROUTES.STACK.ALL_SPECIALITIES)}
+					onPress={() => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH })}
 				/>
 			}
 			{...homeSectionProps(12)}

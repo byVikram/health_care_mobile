@@ -106,7 +106,12 @@ function ConsultSection({ specialities = [] }: Props) {
 	return (
 		<AppSection
 			title="Book by speciality"
-			right={<AppTextLink label="View all" onPress={() => navigation.navigate(ROUTES.STACK.ALL_SPECIALITIES)} />}
+			right={
+				<AppTextLink
+					label="View all"
+					onPress={() => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH })}
+				/>
+			}
 			{...homeSectionProps(12)}
 		>
 			<View style={styles.grid}>

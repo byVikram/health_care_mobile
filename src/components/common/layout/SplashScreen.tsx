@@ -313,7 +313,7 @@ function Tagline({ reduceMotion }: { reduceMotion: boolean }) {
 	}
 	return (
 		<View style={styles.taglineClip} onLayout={handleLayout}>
-			<Text style={styles.tagline}>Book Doctor Appointments</Text>
+			<Text style={styles.tagline}>Your Healthcare, All in One Place</Text>
 			<Animated.View style={[StyleSheet.absoluteFill, styles.taglineCover, coverStyle]} />
 		</View>
 	)

@@ -72,6 +72,9 @@ export interface DoctorSearchParams {
 	min_experience?: number
 	/** Fee bands in rupees, comma separated: '0-499,1001-'. */
 	fee_range?: string
+	/** The patient's selected location: the server measures each doctor's `distance` from here. */
+	latitude?: number
+	longitude?: number
 }
 
 export interface CreateAppointmentPayload {

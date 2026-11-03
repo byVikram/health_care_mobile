@@ -188,10 +188,6 @@ export default function SearchPage() {
 		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, { query: symptom })
 	}
 
-	const handleVideoConsult = () => {
-		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, { mode: 'video' })
-	}
-
 	const handleSeeAllDoctors = () => {
 		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH as any)
 	}
@@ -286,11 +282,7 @@ export default function SearchPage() {
 					<>
 						{/* SEE A DOCTOR FROM HOME */}
 						<View style={styles.bannerSection}>
-							<TouchableOpacity
-								style={styles.videoBanner}
-								onPress={handleVideoConsult}
-								activeOpacity={0.85}
-							>
+							<View style={styles.videoBanner}>
 								<View style={styles.videoBannerDecor} />
 								<AppIconTile size={52} circle backgroundColor={TONES.sky.ink}>
 									<AppIcon name="video" size={26} color={APP_COLORS.surface} />
@@ -303,10 +295,7 @@ export default function SearchPage() {
 										Video consults with doctors available today
 									</AppTypography>
 								</View>
-								<AppIconTile size={36} circle backgroundColor={APP_COLORS.surface}>
-									<AppIcon name="chevronRight" size={18} color={TONES.sky.ink} strokeWidth={2.4} />
-								</AppIconTile>
-							</TouchableOpacity>
+							</View>
 						</View>
 
 						{/* NOT SURE WHO TO SEE */}
