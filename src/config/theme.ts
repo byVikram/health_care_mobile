@@ -59,6 +59,8 @@ export const APP_COLORS = {
 	dotInactive: '#C9D6D7',
 	/** Neutral pill background (done / completed / archived states). */
 	neutralBg: '#F0F4F4',
+	/** Hairline border of the minimal-colour cards (speciality tiles, stat tiles, banners). */
+	cardBorder: '#E6ECEC',
 } as const
 
 export type ToneKey = 'mint' | 'sky' | 'lilac' | 'peach' | 'sand'

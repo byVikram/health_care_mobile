@@ -30,6 +30,7 @@ import { DoctorSearchItem } from '../../../types/doctor-search'
 import type { RouteProp } from '@react-navigation/native'
 import type { AppStackParamList } from '../../../navigation/types'
 import { ROUTES } from '../../../navigation/routes'
+import { useAuth } from '../../../context/AuthContext'
 import { APP_COLORS } from '../../../config/theme'
 import DoctorFilterSheet from './components/DoctorFilterSheet'
 import DoctorSortSheet from './components/DoctorSortSheet'
@@ -107,6 +108,11 @@ function DoctorCardSkeleton() {
 export default function DoctorSearchPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
+	const { currentLocation } = useAuth()
+	// Sent so the server measures distances from the patient; without a usable location it falls back to its default.
+	const latitude = Number.isFinite(currentLocation?.latitude) ? currentLocation?.latitude : undefined
+	const longitude = Number.isFinite(currentLocation?.longitude) ? currentLocation?.longitude : undefined
+	const hasLocation = latitude !== undefined && longitude !== undefined
 	const { width } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
 
@@ -134,9 +140,14 @@ export default function DoctorSearchPage() {
 	const [specialityFilter, setSpecialityFilter] = useState(initialSpecialityId)
 	const [specialityName, setSpecialityName] = useState(route.params?.specialityName || '')
 	const [filters, setFilters] = useState<DoctorFilters>({ ...NO_FILTERS, mode: modeFromRoute(initialMode) })
-	const [sortBy, setSortBy] = useState<SortKey>(route.params?.sort ?? 'rel')
+	// Until the patient (or the route) picks a sort, the list opens nearest first when there is a location. The location
+	// can arrive after the first render, so the default is worked out each time instead of stored.
+	const [sortChoice, setSortChoice] = useState<SortKey | null>(route.params?.sort ?? null)
+	const sortBy: SortKey = sortChoice ?? (hasLocation ? 'near' : 'rel')
 	const [showSort, setShowSort] = useState(false)
 	const [showFilters, setShowFilters] = useState(false)
+	// "Nearest first" is ordered by the server, before paging, so it holds across every page; it needs the location.
+	const nearestFirst = sortBy === 'near' && hasLocation
 	const filterCount = activeFilterCount(filters)
 	// One value to watch in effects instead of the whole object
 	const filtersKey = JSON.stringify(filters)
@@ -209,6 +220,12 @@ export default function DoctorSearchPage() {
 
 			Object.assign(params, toSearchParams(filters))
 
+			if (hasLocation) {
+				params.latitude = latitude
+				params.longitude = longitude
+				if (nearestFirst) params.sort = 'nearest'
+			}
+
 			const res = await getDoctors(params)
 
 			if (res.success && res.data) {
@@ -237,7 +254,7 @@ export default function DoctorSearchPage() {
 
 	useEffect(() => {
 		fetchDoctorsList(1)
-	}, [searchQuery, specialityFilter, filtersKey])
+	}, [searchQuery, specialityFilter, filtersKey, latitude, longitude, nearestFirst])
 
 	const onRefresh = useCallback(() => {
 		if (isFetchingPageRef.current) return
@@ -246,12 +263,24 @@ export default function DoctorSearchPage() {
 		setDoctors([])
 		setHasMore(true)
 		fetchDoctorsList(1, true)
-	}, [searchQuery, specialityFilter, filtersKey])
+	}, [searchQuery, specialityFilter, filtersKey, latitude, longitude, nearestFirst])
 
 	const handleEndReached = useCallback(() => {
 		if (isFetchingPageRef.current || loading || refreshing || loadingMore || !hasMore) return
 		fetchDoctorsList(page + 1, false, true)
-	}, [hasMore, loading, loadingMore, page, refreshing, searchQuery, specialityFilter, filtersKey])
+	}, [
+		hasMore,
+		loading,
+		loadingMore,
+		page,
+		refreshing,
+		searchQuery,
+		specialityFilter,
+		filtersKey,
+		latitude,
+		longitude,
+		nearestFirst,
+	])
 
 	// The filters narrow the list on the server; the order is applied here, to the doctors loaded so far.
 	const sortedDoctors = useMemo(() => sortDoctors(doctors, sortBy, filters.mode), [doctors, sortBy, filters.mode])
@@ -289,7 +318,8 @@ export default function DoctorSearchPage() {
 		) : null
 
 	// Design: the label does not repeat the count; the speciality names the screen.
-	const resultLabel = isInitialLoading || sortedDoctors.length === 0 ? '' : 'Doctors near you'
+	const resultLabel =
+		isInitialLoading || sortedDoctors.length === 0 ? '' : hasLocation ? 'Doctors near you' : 'Doctors'
 	const pageTitle = specialityName ? `${specialityName} doctors` : 'Find a doctor'
 	const sortLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label ?? 'Relevance'
 
@@ -467,7 +497,7 @@ export default function DoctorSearchPage() {
 				visible={showSort}
 				value={sortBy}
 				onSelect={(value) => {
-					setSortBy(value)
+					setSortChoice(value)
 					setShowSort(false)
 				}}
 				onClose={() => setShowSort(false)}
