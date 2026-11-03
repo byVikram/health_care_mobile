@@ -28,7 +28,7 @@ import {
 import { useAuth } from '../../../context/AuthContext'
 import { getSpecialities } from '../doctorService'
 import { ROUTES } from '../../../navigation/routes'
-import { APP_COLORS, TONES, toneAt } from '../../../config/theme'
+import { APP_COLORS } from '../../../config/theme'
 import { specialityVisual } from './components/specialityMeta'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import type { AppStackParamList, MainTabParamList } from '../../../navigation/types'
@@ -49,21 +49,17 @@ type Speciality = {
 }
 
 // ─── Speciality Grid Item ─────────────────────────────────────────────────────
-function SpecialityGridItem({
-	spec,
-	tone,
-	width,
-	onPress,
-}: {
-	spec: Speciality
-	tone: { bg: string; ink: string }
-	width: number
-	onPress: () => void
-}) {
+function SpecialityGridItem({ spec, width, onPress }: { spec: Speciality; width: number; onPress: () => void }) {
 	return (
 		<TouchableOpacity style={[styles.specItem, { width }]} onPress={onPress} activeOpacity={0.75}>
-			<AppIconTile size={68} radius={20} backgroundColor={tone.bg}>
-				<AppPathIcon d={spec.icon} size={30} color={tone.ink} />
+			<AppIconTile
+				size={68}
+				radius={16}
+				backgroundColor={APP_COLORS.surface}
+				borderColor={APP_COLORS.cardBorder}
+				style={styles.specTile}
+			>
+				<AppPathIcon d={spec.icon} size={30} color={APP_COLORS.primary} />
 			</AppIconTile>
 			<View style={styles.specTextCol}>
 				<AppTypography style={styles.specLabel} numberOfLines={2}>
@@ -163,12 +159,7 @@ export default function SearchPage() {
 	}, [user?.name])
 
 	const q = query.trim().toLowerCase()
-	// Keep each speciality's original index so its tone doesn't change while filtering.
-	const filtered = useMemo(
-		() =>
-			specialities.map((spec, index) => ({ spec, index })).filter(({ spec }) => !q || spec.haystack.includes(q)),
-		[specialities, q]
-	)
+	const filtered = useMemo(() => specialities.filter((spec) => !q || spec.haystack.includes(q)), [specialities, q])
 
 	const itemWidth = Math.floor((width - SIDE_PADDING * 2 - GRID_COL_GAP * 2) / 3)
 
@@ -283,9 +274,8 @@ export default function SearchPage() {
 						{/* SEE A DOCTOR FROM HOME */}
 						<View style={styles.bannerSection}>
 							<View style={styles.videoBanner}>
-								<View style={styles.videoBannerDecor} />
-								<AppIconTile size={52} circle backgroundColor={TONES.sky.ink}>
-									<AppIcon name="video" size={26} color={APP_COLORS.surface} />
+								<AppIconTile size={48} radius={12} backgroundColor={APP_COLORS.neutralBg}>
+									<AppIcon name="video" size={26} color={APP_COLORS.primary} />
 								</AppIconTile>
 								<View style={styles.videoBannerTextCol}>
 									<AppTypography style={styles.videoBannerTitle}>
@@ -304,21 +294,17 @@ export default function SearchPage() {
 								Not sure who to see? Pick a symptom
 							</AppTypography>
 							<View style={styles.symptomRow}>
-								{SYMPTOM_CHIPS.map((symptom, i) => {
-									const tone = toneAt(i)
-									return (
-										<AppChip
-											key={symptom}
-											label={symptom}
-											onPress={() => handleSymptomPress(symptom)}
-											size="sm"
-											dot={tone.ink}
-											dotSize={8}
-											borderWidth={0}
-											style={[styles.symptomChip, { backgroundColor: tone.bg }]}
-										/>
-									)
-								})}
+								{SYMPTOM_CHIPS.map((symptom) => (
+									<AppChip
+										key={symptom}
+										label={symptom}
+										onPress={() => handleSymptomPress(symptom)}
+										size="sm"
+										shape="rounded"
+										borderWidth={0}
+										style={styles.symptomChip}
+									/>
+								))}
 							</View>
 						</View>
 					</>
@@ -344,11 +330,10 @@ export default function SearchPage() {
 					) : (
 						<>
 							<View style={styles.specGrid}>
-								{filtered.map(({ spec, index }) => (
+								{filtered.map((spec) => (
 									<SpecialityGridItem
 										key={spec.id}
 										spec={spec}
-										tone={toneAt(index)}
 										width={itemWidth}
 										onPress={() => handleSpecialityPress(spec)}
 									/>
@@ -369,8 +354,8 @@ export default function SearchPage() {
 					subtitle="Browse every doctor near you"
 					onPress={handleSeeAllDoctors}
 					leading={
-						<AppIconTile radius={8} backgroundColor={TONES.sky.bg}>
-							<AppIcon name="video" size={20} color={TONES.sky.ink} />
+						<AppIconTile size={40} radius={12} backgroundColor={APP_COLORS.neutralBg}>
+							<AppIcon name="video" size={20} color={APP_COLORS.primary} />
 						</AppIconTile>
 					}
 					trailing={<AppIcon name="chevronRight" size={20} color={APP_COLORS.inkMuted} />}
@@ -495,20 +480,17 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 12,
-		padding: 16,
+		paddingVertical: 14,
+		paddingHorizontal: 16,
 		borderRadius: 16,
-		backgroundColor: TONES.sky.bg,
-		overflow: 'hidden',
-	},
-	videoBannerDecor: {
-		position: 'absolute',
-		right: -24,
-		bottom: -40,
-		width: 120,
-		height: 120,
-		borderRadius: 9999,
 		backgroundColor: APP_COLORS.surface,
-		opacity: 0.5,
+		borderWidth: 1,
+		borderColor: APP_COLORS.cardBorder,
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 8,
+		elevation: 2,
 	},
 	videoBannerTextCol: {
 		flex: 1,
@@ -523,10 +505,10 @@ const styles = StyleSheet.create({
 	videoBannerSubtitle: {
 		fontSize: 13,
 		lineHeight: 18,
-		color: APP_COLORS.ink,
+		color: APP_COLORS.inkMuted,
 	},
 
-	// Symptom chips: AppChip sm pill (36h, 13/600, 8px dot) on the tone background, 14px side padding
+	// Symptom chips: AppChip sm (36h, 13/600) on a neutral background, 14px side padding
 	symptomRow: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
@@ -534,6 +516,7 @@ const styles = StyleSheet.create({
 	},
 	symptomChip: {
 		paddingHorizontal: 14,
+		backgroundColor: APP_COLORS.neutralBg,
 	},
 
 	// Speciality grid (3 cols, 16px row gap, 8px column gap)
@@ -550,6 +533,13 @@ const styles = StyleSheet.create({
 	specItem: {
 		alignItems: 'center',
 		gap: 8,
+	},
+	specTile: {
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 3 },
+		shadowOpacity: 0.08,
+		shadowRadius: 6,
+		elevation: 2,
 	},
 	specTextCol: {
 		alignItems: 'center',

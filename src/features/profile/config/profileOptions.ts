@@ -83,7 +83,7 @@ export const CONDITION_OPTIONS = [
 
 export const FAMILY_HISTORY_OPTIONS = ['Diabetes', 'High BP', 'Heart disease', 'Cancer', 'Stroke', 'Asthma', 'Thyroid']
 
-export const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Kannada', 'Tamil', 'Telugu', 'Malayalam', 'Marathi', 'Bengali']
+export const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Kannada', 'Tamil', 'Telugu', 'Malayalam']
 
 /**
  * Saved languages as the screen's option values. Older saves are lower case ("english", "hindi"): match them to the

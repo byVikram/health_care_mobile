@@ -23,7 +23,7 @@ import { useAuth } from '../../../../context/AuthContext'
 import { getDoctorProfile, mapDoctorProfileApi, updateDoctorPersonalDetails } from '../../../doctor/doctorService'
 
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say']
-const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Marathi', 'Bengali']
+const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Kannada', 'Tamil', 'Telugu', 'Malayalam']
 const GENDER_SELECT_OPTIONS: AppSelectOption[] = GENDER_OPTIONS.map((option) => ({ label: option, value: option }))
 const LANGUAGE_SELECT_OPTIONS: AppSelectOption[] = LANGUAGE_OPTIONS.map((option) => ({ label: option, value: option }))
 const DEFAULT_PROFILE_IMAGE = require('../../../../assets/Banner/doctor.png')

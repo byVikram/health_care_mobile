@@ -92,11 +92,13 @@ export default function MyDoctorCard({
                 onPress={onToggleSaved}
                 disabled={disabled}
                 activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={saved ? 'Remove from favourites' : 'Add to favourites'}
             >
                 <MaterialCommunityIcons
-                    name={saved ? 'bookmark' : 'bookmark-outline'}
+                    name={saved ? 'heart' : 'heart-outline'}
                     size={24}
-                    color={saved ? '#245f67' : '#8ca0a9'}
+                    color={saved ? '#FF4D4F' : '#8ca0a9'}
                 />
             </TouchableOpacity>
         </TouchableOpacity>

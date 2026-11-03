@@ -45,7 +45,7 @@ import { capitalize } from '../../../utils/formatters'
 import { openDirections } from '../../../utils/maps'
 import { AppointmentModeKey, firstOpenSlot, normalizeAvailabilityByMode } from '../availability'
 import { shortClinic } from '../doctorFormatters'
-import { APP_COLORS, TONES, formatInr, toneAt } from '../../../config/theme'
+import { APP_COLORS, formatInr } from '../../../config/theme'
 import { DOCTOR_PROFILE_GOOD_TO_KNOW_MOCK } from './doctorProfileMockData'
 import { CollapsingProfileHeader, PROFILE_AVATAR_SIZE } from './CollapsingProfileHeader'
 
@@ -55,8 +55,12 @@ const INK = APP_COLORS.ink
 const INK_MUTED = APP_COLORS.inkMuted
 const DIVIDER = APP_COLORS.divider
 const PAGE_BG = APP_COLORS.pageBg
-const SPEC_TONE = TONES.lilac.ink
 const SUCCESS = APP_COLORS.success
+// Minimal-colour palette: neutral tiles with the one teal accent instead of a tone per section.
+const NEUTRAL_BG = APP_COLORS.neutralBg
+const CARD_BORDER = APP_COLORS.cardBorder
+const MINT_TILE = { bg: APP_COLORS.mint, ink: PRIMARY }
+const NEUTRAL_TILE = { bg: NEUTRAL_BG, ink: PRIMARY }
 
 type ProfileTabKey = 'about' | 'services' | 'clinics' | 'awards'
 const PROFILE_TABS: { key: ProfileTabKey; label: string }[] = [
@@ -424,14 +428,21 @@ export default function DoctorDetailPage() {
 							{availableToday && (
 								<AppTag
 									label="Available today"
-									tone="confirmed"
+									bg={NEUTRAL_BG}
+									ink={SUCCESS}
 									shape="pill"
 									dot
 									style={styles.availableBadge}
 								/>
 							)}
 							{hasVideoConsult && (
-								<AppTag label="Video consult" tone="sky" shape="pill" icon="video-outline" />
+								<AppTag
+									label="Video consult"
+									bg={NEUTRAL_BG}
+									ink={PRIMARY}
+									shape="pill"
+									icon="video-outline"
+								/>
 							)}
 							{!!languagesText && (
 								<AppTag
@@ -444,10 +455,31 @@ export default function DoctorDetailPage() {
 						</View>
 					</View>
 
-					<AppStatRow style={styles.statsRow}>
-						<AppStatTile label="Experience" value={experienceYearsText} tone="lilac" />
-						<AppStatTile label="Clinic visit" value={formatInr(offlineFee)} tone="mint" />
-						<AppStatTile label="Video call" value={formatInr(videoFee)} tone="sky" />
+					<AppStatRow gap={10} style={styles.statsRow}>
+						<AppStatTile
+							label="Experience"
+							value={experienceYearsText}
+							backgroundColor={APP_COLORS.surface}
+							labelColor={INK_MUTED}
+							style={styles.statTile}
+							valueStyle={styles.statValue}
+						/>
+						<AppStatTile
+							label="Clinic visit"
+							value={formatInr(offlineFee)}
+							backgroundColor={APP_COLORS.surface}
+							labelColor={INK_MUTED}
+							style={styles.statTile}
+							valueStyle={styles.statValue}
+						/>
+						<AppStatTile
+							label="Video call"
+							value={formatInr(videoFee)}
+							backgroundColor={APP_COLORS.surface}
+							labelColor={INK_MUTED}
+							style={styles.statTile}
+							valueStyle={styles.statValue}
+						/>
 					</AppStatRow>
 
 					{/* Next available -- real first open slot today, else a plain entry into the slot step */}
@@ -457,14 +489,6 @@ export default function DoctorDetailPage() {
 						disabled={!hospitals.length}
 						onPress={() => goToBookSlot(nextAvailable?.hospital.hospital.id, nextAvailable?.mode)}
 					>
-						<AppIconTile
-							icon="calendar-blank-outline"
-							size={40}
-							radius={12}
-							iconSize={20}
-							backgroundColor={APP_COLORS.mintAccent}
-							iconColor={INK}
-						/>
 						<View style={{ flex: 1, minWidth: 0 }}>
 							<AppTypography style={styles.nextEyebrow}>NEXT AVAILABLE</AppTypography>
 							<AppTypography style={styles.nextTitle} numberOfLines={1}>
@@ -488,7 +512,6 @@ export default function DoctorDetailPage() {
 						</View>
 						<View style={styles.nextBookBtn}>
 							<AppTypography style={styles.nextBookText}>Book</AppTypography>
-							<MaterialCommunityIcons name="chevron-right" size={16} color={INK} />
 						</View>
 					</TouchableOpacity>
 				</View>
@@ -545,7 +568,7 @@ export default function DoctorDetailPage() {
 									label={item.label}
 									size="md"
 									shape="pill"
-									tone="lilac"
+									bg={NEUTRAL_BG}
 									ink={INK}
 									style={styles.expertiseChip}
 									textStyle={styles.expertiseChipText}
@@ -576,12 +599,6 @@ export default function DoctorDetailPage() {
 										idx !== visibleTreatments.length - 1 && styles.treatmentRowDivider,
 									]}
 								>
-									<MaterialCommunityIcons
-										name="check"
-										size={18}
-										color={SUCCESS}
-										style={{ marginTop: 2 }}
-									/>
 									<AppTypography style={styles.treatmentName}>{item.label}</AppTypography>
 								</View>
 							))}
@@ -610,7 +627,7 @@ export default function DoctorDetailPage() {
 					}
 				>
 					{hospitals.map((entry, n) => {
-						const tone = n === 0 ? TONES.mint : toneAt(n + 2)
+						const tone = n === 0 ? MINT_TILE : NEUTRAL_TILE
 						const slot = todaySlots?.[entry.hospital.id]?.clinic
 						return (
 							<PractiseCard
@@ -640,7 +657,7 @@ export default function DoctorDetailPage() {
 					{hasVideoConsult && videoHospital && (
 						<PractiseCard
 							icon="video-outline"
-							tone={TONES.sky}
+							tone={NEUTRAL_TILE}
 							title="Video consultation"
 							subtitle="Join from the app, no travel"
 							fee={formatInr(videoFee)}
@@ -679,7 +696,14 @@ export default function DoctorDetailPage() {
 											idx !== achievements.length - 1 && styles.treatmentRowDivider,
 										]}
 									>
-										<AppIconTile icon="medal-outline" tone="sand" size={36} circle iconSize={18} />
+										<AppIconTile
+											icon="medal-outline"
+											backgroundColor={NEUTRAL_BG}
+											iconColor={INK_MUTED}
+											size={36}
+											circle
+											iconSize={18}
+										/>
 										<View style={{ flex: 1 }}>
 											<AppTypography style={styles.achievementTitle}>{item.title}</AppTypography>
 											{!!sub && <AppTypography style={styles.muted13}>{sub}</AppTypography>}
@@ -802,7 +826,8 @@ function PractiseCard(props: {
 					<AppTag
 						label={props.nextSlot}
 						size="md"
-						tone={props.nextToday ? 'confirmed' : 'neutral'}
+						bg={props.nextToday ? NEUTRAL_BG : PAGE_BG}
+						ink={props.nextToday ? SUCCESS : INK}
 						style={styles.nextSlotPill}
 					/>
 				</View>
@@ -815,7 +840,6 @@ function PractiseCard(props: {
 				)}
 				<AppActionChip
 					label="Book"
-					trailingIcon="chevron-right"
 					variant="filled"
 					size="md"
 					onPress={props.onBook}
@@ -881,7 +905,7 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 	},
 	doctorSpec: {
-		color: SPEC_TONE,
+		color: PRIMARY,
 		fontSize: 14,
 		lineHeight: 20,
 		fontWeight: '700',
@@ -905,6 +929,19 @@ const styles = StyleSheet.create({
 		marginTop: 16,
 		marginHorizontal: 16,
 	},
+	// White card with a hairline border and a soft shadow, value over label as in the minimal-colour design
+	statTile: {
+		paddingVertical: 14,
+		alignItems: 'center',
+		borderWidth: 1,
+		borderColor: CARD_BORDER,
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 8,
+		elevation: 2,
+	},
+	statValue: { fontSize: 20, lineHeight: 26 },
 
 	// Tabs
 	tabsRow: {
@@ -936,21 +973,28 @@ const styles = StyleSheet.create({
 		paddingVertical: 14,
 		paddingHorizontal: 16,
 		borderRadius: 16,
-		backgroundColor: INK,
+		backgroundColor: APP_COLORS.surface,
+		borderWidth: 1,
+		borderColor: CARD_BORDER,
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 8,
+		elevation: 2,
 	},
-	nextEyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.5, color: APP_COLORS.mintAccent },
-	nextTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: '#fff' },
-	nextSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.mint },
+	nextEyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.5, color: INK_MUTED },
+	nextTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: INK },
+	nextSub: { fontSize: 12, lineHeight: 16, color: INK_MUTED },
 	nextBookBtn: {
 		height: 40,
 		paddingHorizontal: 16,
 		borderRadius: 10,
-		backgroundColor: '#fff',
+		backgroundColor: PRIMARY,
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
 	},
-	nextBookText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: INK },
+	nextBookText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: '#fff' },
 
 	// Practises at cards
 	practiseCard: { borderRadius: 16, backgroundColor: PAGE_BG, padding: 14, gap: 12 },
