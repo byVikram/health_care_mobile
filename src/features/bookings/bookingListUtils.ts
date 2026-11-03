@@ -48,10 +48,11 @@ export const isNoShowLabel = (label?: string | null): boolean => /^no[\s_-]?show
 
 /**
  * A booking the patient can explain (opens the "What happened?" sheet): a doctor appointment the doctor marked as missed, or a
- * home-care order with a visit the provider reported as a no-show (`missed_visit_id`: also while the order's other visits go on).
+ * home-care order with a visit the provider reported as a no-show (`missed_visit_id`: also while the order's other visits go on) that
+ * the patient has not answered yet (`missed_can_reply`: once they have, or the time is up, there is nothing left to ask).
  */
 export const isNoShowBooking = (item: BookingItem): boolean =>
-	(item.category === 'ancillary' && !!item.missed_visit_id) ||
+	(item.category === 'ancillary' && !!item.missed_visit_id && item.missed_can_reply !== false) ||
 	(item.category === 'doctor' &&
 		item.target?.type === 'appointment' &&
 		(item.status_key ? item.status_key === 'no_show' : isNoShowLabel(item.status?.label)))

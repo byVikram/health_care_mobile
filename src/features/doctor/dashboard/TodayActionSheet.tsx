@@ -4,7 +4,7 @@
 //   menu        Reschedule / Mark as no-show / Cancel appointment
 //   cancel      a reason (radio list), a "patient is notified" note, Keep it / Cancel visit
 //   no_show     patient no-show policy: what happens, Keep it / Mark as no-show. Only enabled from 60 minutes after the
-//               start until 5 days after it; outside that window the control stays visible, disabled, with a short hint.
+//               start until 2 days after it; outside that window the control stays visible, disabled, with a short hint.
 // "Reschedule" does not pick a slot here: the doctor asks the patient to choose the new time, so the row just
 // hands over to the parent (onAskReschedule), which shows the "Ask the patient to reschedule?" confirmation.
 

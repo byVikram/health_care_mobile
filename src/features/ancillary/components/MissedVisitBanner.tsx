@@ -45,7 +45,7 @@ export function MissedVisitBanner({ visitId, title, noun }: Props) {
 		<>
 			<AppInfoBanner
 				tone={asking ? 'warning' : (view?.tone ?? 'warning')}
-				icon="alert-circle-outline"
+				icon={null}
 				title={asking ? `We couldn’t complete ${title}` : (view?.title ?? 'The time to reply has passed')}
 				subtitle={
 					asking
@@ -53,6 +53,7 @@ export function MissedVisitBanner({ visitId, title, noun }: Props) {
 						: [info?.message, answered ? `Your answer: ${answered}` : null].filter(Boolean).join(' ')
 				}
 				action={asking ? { label: 'Tell us what happened', onPress: () => setOpen(true) } : undefined}
+				actionPlacement="below"
 			/>
 			{open && <NoShowReplySheet visible visitId={visitId} onClose={() => setOpen(false)} onReplied={reload} />}
 		</>
