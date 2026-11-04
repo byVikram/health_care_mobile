@@ -54,6 +54,21 @@ export async function registerPushToken() {
 }
 
 /**
+ * On logout: drop this device's FCM token, so the token the server may still hold for the ended session is dead and
+ * the next sign-in on this phone (possibly another person) gets a new one. Never throws; the server stops pushing to
+ * the session anyway once it is revoked.
+ */
+export async function unregisterPushToken() {
+	if (!isNative) return
+	try {
+		const fb = firebase()
+		await fb.deleteToken(fb.getMessaging())
+	} catch (error) {
+		console.warn('[push] Could not delete the FCM token:', error)
+	}
+}
+
+/**
  * Notification tapped: a care-request offer lands on the provider's Today screen, whose socket delivers the offer; news about a
  * patient's home-care visit opens the booking (a scheduled order's details, or the live screen of an instant one).
  */
@@ -99,11 +114,17 @@ export function usePushNotifications(enabled: boolean) {
 			unsubscribeRefresh = fb.onTokenRefresh(messaging, (token) => void sendToken(token))
 			unsubscribeOpened = fb.onNotificationOpenedApp(messaging, handleOpened)
 			// App launched by tapping a notification while it was killed. Navigation may not be ready yet: try again once.
-			void fb.getInitialNotification(messaging).then((message) => {
-				if (!active || !message) return
-				handleOpened(message)
-				retry = setTimeout(() => handleOpened(message), 800)
-			})
+			const openInitial = async () => {
+				try {
+					const message = await fb.getInitialNotification(messaging)
+					if (!active || !message) return
+					handleOpened(message)
+					retry = setTimeout(() => handleOpened(message), 800)
+				} catch (error) {
+					console.warn('[push] Could not read the notification that opened the app:', error)
+				}
+			}
+			void openInitial()
 		} catch (error) {
 			console.warn('[push] Could not subscribe to push events:', error)
 		}

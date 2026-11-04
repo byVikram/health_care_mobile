@@ -26,17 +26,19 @@ export function createBookingRestrictionHook(fetchRestriction: () => Promise<Res
 		useEffect(() => {
 			if (freshKnown()) return
 			let active = true
-			fetchRestriction()
-				.then((r) => {
+			const check = async () => {
+				try {
+					const r = await fetchRestriction()
 					known = { restricted: !!r.restricted, message: r.restricted ? r.message : null, at: Date.now() }
 					if (active) {
 						setRestricted(known.restricted)
 						setMessage(known.message)
 					}
-				})
-				.catch(() => {
+				} catch {
 					// Keep whatever we knew: the server decides on the booking call itself.
-				})
+				}
+			}
+			void check()
 			return () => {
 				active = false
 			}

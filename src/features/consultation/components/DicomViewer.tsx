@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 
 interface DicomViewerProps {
   base64Data: string | null;
@@ -257,6 +258,8 @@ const CORNERSTONE_HTML = `
 `;
 
 export default function DicomViewer({ base64Data, fullScreen = false }: DicomViewerProps) {
+  // A scan is patient data: block screenshots and screen recording while it is on screen.
+  usePreventScreenCapture();
   const webViewRef = useRef<WebView>(null);
   const [webViewReady, setWebViewReady] = useState(false);
   const pendingDataRef = useRef<string | null>(null);

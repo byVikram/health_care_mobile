@@ -1,5 +1,5 @@
 // src/services/apiService.ts
-import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios, { create as createAxios, isAxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { secureStorage } from '../utils/secureStorage'
 import { purgeLocalSession } from '../utils/localSession'
 import { isKnownOffline } from '../utils/networkState'
@@ -56,7 +56,7 @@ const serializeParams = (params: Record<string, unknown>): string => {
 	return parts.join('&')
 }
 
-const axiosInstance = axios.create({ paramsSerializer: serializeParams, timeout: DEFAULT_TIMEOUT_MS })
+const axiosInstance = createAxios({ paramsSerializer: serializeParams, timeout: DEFAULT_TIMEOUT_MS })
 let unauthorizedHandler: (() => void) | null = null
 let statusModalHandler: StatusModalHandler | null = null
 let hasShownSessionExpiredAlert = false
@@ -121,7 +121,7 @@ const performTokenRefresh = async (): Promise<RefreshResult> => {
 
 		return { status: 'ok', accessToken: newAccessToken }
 	} catch (error) {
-		const responseStatus = axios.isAxiosError(error) ? error.response?.status : undefined
+		const responseStatus = isAxiosError(error) ? error.response?.status : undefined
 		const isDefinitiveRejection =
 			responseStatus !== undefined &&
 			responseStatus >= 400 &&
@@ -176,7 +176,7 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
 	(response) => response,
 	async (error) => {
-		const isAxiosErr = axios.isAxiosError(error)
+		const isAxiosErr = isAxiosError(error)
 		const hasResponse = Boolean(error?.response)
 
 		// No response at all: either a real Axios network/timeout failure, or the

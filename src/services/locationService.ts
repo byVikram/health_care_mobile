@@ -184,6 +184,7 @@ type NominatimPlace = {
 export const searchPlaces = async (query: string, signal?: AbortSignal): Promise<PlaceResult[]> => {
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=8`;
+    // Plain fetch on purpose: a third-party geocoder, not our API (ApiService would send our auth header to it).
     const res = await fetch(url, {
       signal,
       headers: {

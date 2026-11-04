@@ -724,14 +724,11 @@ function resolveQualificationFromProfile(profile: any): string {
 					about: formData.about.trim(),
 				}
 
-			console.log('[ProfessionalDetails] Save payload:', payload)
 			const backendSaveRes = await updateProviderProfileBackend(payload)
-			console.log('[ProfessionalDetails] Save response:', backendSaveRes)
 
 			// Re-fetch backend profile to confirm and strictly populate UI from backend response
 			// Do NOT fall back to old form state if the backend response does not contain a value.
 			const updatedProfile = await fetchProviderProfile()
-			console.log('[ProfessionalDetails] Refetched profile:', updatedProfile)
 
 			const authoritativeQual = resolveQualificationFromProfile(updatedProfile)
 			const authoritativeSubId = updatedProfile?.sub_specialty_id || ''
@@ -773,8 +770,6 @@ function resolveQualificationFromProfile(profile: any): string {
 		} catch (error: any) {
 			console.error('[PROFILE SAVE] error:', error)
 			console.error('[PROFILE SAVE] status:', error?.response?.status)
-			console.error('[PROFILE SAVE] response:', error?.response?.data)
-			console.error('[PROFILE SAVE] request:', error?.config?.data)
 			console.error('[PROFILE SAVE] URL:', error?.config?.url)
 			setStatusModal({
 				visible: true,

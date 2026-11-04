@@ -12,6 +12,7 @@ import { APP_COLORS, TONES, type ToneKey } from '../../../config/theme'
 import { getHomeOffers, trackAdClick, type HomeOffer } from '../../../services/homeService'
 import { HOME_ICONS } from '../homeTheme'
 import { openWebUrl } from '../../../utils/safeLinking'
+import { resolveOfferRoute } from '../offerTargets'
 
 type SlideTheme = {
 	bg: string
@@ -104,7 +105,9 @@ function HomeOffersSection({ refreshToken }: Props) {
 			if (target.type === 'url' && target.url) {
 				await openWebUrl(target.url)
 			} else if (target.type === 'route' && target.route) {
-				navigation.navigate(target.route, target.params)
+				// Only the allowed browse screens, with plain params: anything else is ignored.
+				const next = resolveOfferRoute(target.route, target.params)
+				if (next) navigation.navigate(next.name, next.params)
 			}
 		} catch {
 			// Unknown route / unopenable URL: nothing to do from Home.

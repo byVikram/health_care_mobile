@@ -52,6 +52,7 @@ interface NominatimResult {
 const searchNominatim = async (query: string): Promise<NominatimResult[]> => {
 	const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=10`
 
+	// Plain fetch on purpose: a third-party geocoder, not our API (ApiService would send our auth header to it).
 	const res = await fetch(url, {
 		headers: {
 			'User-Agent': 'MyHealthApp/1.0 (contact@myhealthapp.com)',

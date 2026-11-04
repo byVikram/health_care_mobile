@@ -9,8 +9,9 @@ import {
 } from '../services/apiService'
 import StatusModal from '../components/common/feedback/StatusModal'
 import { safeJsonParse } from '../utils/jsonUtils'
-import { secureStorage } from '../utils/secureStorage'
+import { getMigratedItem, secureStorage } from '../utils/secureStorage'
 import { purgeLocalSession } from '../utils/localSession'
+import { unregisterPushToken } from '../services/pushNotificationService'
 import { logout as logoutRequest } from '../features/auth/authService'
 import { clearSessionCaches } from '../utils/sessionCache'
 
@@ -111,10 +112,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	}, [])
 
 	const setCurrentLocation = useCallback(async (loc: LocationData | null) => {
+		// The address and coordinates are personal data: keystore, not plain AsyncStorage.
 		if (loc) {
-			await AsyncStorage.setItem('current_location', JSON.stringify(loc))
+			await secureStorage.setItem('current_location', JSON.stringify(loc))
 		} else {
-			await AsyncStorage.removeItem('current_location')
+			await secureStorage.deleteItem('current_location')
 		}
 		setCurrentLocationState(loc)
 	}, [])
@@ -142,11 +144,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		const load = async () => {
 			const savedRole = await AsyncStorage.getItem('role')
 			if (__DEV__) console.log('[AuthContext] active role:', savedRole)
-			const savedUser = await AsyncStorage.getItem('user')
+			const savedUser = await getMigratedItem('user')
 			const token = await secureStorage.getItem('access_token')
 			const refresh = await secureStorage.getItem('refresh_token')
 			const nps = await AsyncStorage.getItem('notification_prompt_shown')
-			const savedLocation = await AsyncStorage.getItem('current_location')
+			const savedLocation = await getMigratedItem('current_location')
 			if (__DEV__) console.log(`[AuthContext] restored session: access token ${token ? 'found' : 'MISSING'}, refresh token ${refresh ? 'found' : 'MISSING'}`)
 			// Load persisted specialty (survives restarts)
 			const savedSpecialty = await AsyncStorage.getItem('user_specialty')
@@ -198,7 +200,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		// previous user's in-memory caches.
 		clearSessionCaches()
 		await AsyncStorage.setItem('role', role)
-		await AsyncStorage.setItem('user', JSON.stringify(user))
+		await secureStorage.setItem('user', JSON.stringify(user))
 		await secureStorage.setItem('access_token', accessToken)
 		await secureStorage.setItem('refresh_token', refreshToken)
 		await AsyncStorage.setItem('notification_prompt_shown', String(nps))
@@ -218,7 +220,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			nextUser = { ...((prev ?? { name: '' }) as AuthUser), ...updates }
 			return nextUser
 		})
-		await AsyncStorage.setItem('user', JSON.stringify(nextUser))
+		await secureStorage.setItem('user', JSON.stringify(nextUser))
 	}, [])
 
 	const clearAuth = useCallback(async () => {
@@ -236,6 +238,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			}
 		}
 
+		await unregisterPushToken()
 		await purgeLocalSession()
 
 		clearAuthState()

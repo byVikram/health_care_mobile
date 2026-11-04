@@ -45,6 +45,7 @@ import { APP_COLORS } from '../../config/theme'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import { addToCalendar } from '../../utils/calendar'
+import { openWebUrl } from '../../utils/safeLinking'
 import { showComingSoon } from '../../utils/toast'
 import { contactSupport, useAppConfig } from '../dashboard/useHomeChromeData'
 import CheckInQrSheet from '../appointment/components/patient-details/CheckInQrSheet'
@@ -351,7 +352,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 								order.phleboNumber && live
 									? { label: 'Call', icon: 'phone-outline', onPress: () => void Linking.openURL(`tel:${order.phleboNumber}`) }
 									: order.trackingLink && live
-										? { label: 'Track', onPress: () => void Linking.openURL(order.trackingLink as string) }
+										? { label: 'Track', onPress: () => void openWebUrl(order.trackingLink).catch(() => {}) }
 										: undefined
 							}
 						/>

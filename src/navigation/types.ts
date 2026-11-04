@@ -198,7 +198,6 @@ export type AppStackParamList = {
 	[ROUTES.STACK.CONSULTATION]: ConsultationParams | undefined
 	[ROUTES.STACK.HEALTH_PROFILE]: undefined
 	[ROUTES.STACK.SETTINGS]: undefined
-	[ROUTES.STACK.SCREEN_CAPTURE_TEST]: undefined
 	[ROUTES.STACK.DOCTOR_WELCOME]: undefined
 	[ROUTES.STACK.ACCOUNT]: undefined
 	[ROUTES.STACK.APPOINTMENTS]: { appointmentId?: string } | undefined

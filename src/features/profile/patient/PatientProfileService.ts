@@ -121,7 +121,6 @@ export const updatePatientProfile = async (state: PatientProfileState): Promise<
 		occupation: state.occupation,
 	}
 
-	console.log('PATCH PAYLOAD', payload)
 
 	const res = await ApiService.patch<PatientProfileResponse>(API_ENDPOINTS.PATIENT.DETAILS, payload)
 	return res.data

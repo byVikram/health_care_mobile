@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { PaperProvider } from 'react-native-paper'
 import * as ExpoSplashScreen from 'expo-splash-screen'
@@ -12,10 +12,12 @@ import { toastConfig } from './src/config/toastConfig'
 import ErrorBoundary from './src/components/common/feedback/ErrorBoundary'
 import OfflineBanner from './src/components/common/feedback/OfflineBanner'
 import OfflineScreen from './src/components/common/feedback/OfflineScreen'
+import { installGlobalErrorReporting } from './src/services/crashReporting'
 import SplashScreen from './src/components/common/layout/SplashScreen'
 
 // Keep the native splash up until the animated SplashScreen lays out its first (identical) frame.
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {})
+installGlobalErrorReporting()
 
 function AppContent() {
 	const { isLoading } = useAuth()
@@ -25,9 +27,9 @@ function AppContent() {
 	// session; later drops are handled by OfflineBanner so the user keeps their place in the app.
 	const [hasBeenOnline, setHasBeenOnline] = useState(false)
 
-	useEffect(() => {
-		if (isConnected === true) setHasBeenOnline(true)
-	}, [isConnected])
+	// Latched while rendering (React's "adjust state when a value changes" pattern) instead of in an effect, so the
+	// first connected render already sees it and no extra render pass is needed.
+	if (isConnected === true && !hasBeenOnline) setHasBeenOnline(true)
 
 	const networkKnown = isConnected !== null
 	const coldStartOffline = isConnected === false && !hasBeenOnline

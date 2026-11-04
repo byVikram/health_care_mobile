@@ -5,7 +5,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { getMigratedItem, secureStorage } from '../../../utils/secureStorage'
 import { AppBottomSheet } from '../layout/AppBottomSheet'
 import { AppPathIcon } from '../display/AppIcon'
 import AppSearchBar from '../inputs/AppSearchBar'
@@ -41,7 +41,7 @@ const firstPart = (s: string) => s.split(',')[0].trim()
 
 const loadRecent = async (): Promise<PlaceResult[]> => {
 	try {
-		const raw = await AsyncStorage.getItem(RECENT_KEY)
+		const raw = await getMigratedItem(RECENT_KEY)
 		const list = raw ? (JSON.parse(raw) as PlaceResult[]) : []
 		return Array.isArray(list) ? list.slice(0, RECENT_MAX) : []
 	} catch {
@@ -52,7 +52,7 @@ const loadRecent = async (): Promise<PlaceResult[]> => {
 const rememberRecent = async (place: PlaceResult) => {
 	try {
 		const list = (await loadRecent()).filter((p) => !(p.name === place.name && p.area === place.area))
-		await AsyncStorage.setItem(RECENT_KEY, JSON.stringify([place, ...list].slice(0, RECENT_MAX)))
+		await secureStorage.setItem(RECENT_KEY, JSON.stringify([place, ...list].slice(0, RECENT_MAX)))
 	} catch {
 		// Recents are a convenience; failing to save one must not block choosing the place.
 	}
@@ -135,20 +135,32 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 		setResults([])
 		setGpsError('')
 		setGpsLabel('')
-		void loadRecent().then((list) => live && setRecent(list))
-		if (isPatient) {
-			getPatientAddresses()
-				.then((list) => live && setSaved(list))
-				.catch(() => live && setSaved([]))
+		const loadSheet = async () => {
+			const list = await loadRecent()
+			if (live) setRecent(list)
 		}
-		getCurrentLocationIfPermitted()
-			.then(async (pos) => {
+		const loadSavedAddresses = async () => {
+			try {
+				const list = await getPatientAddresses()
+				if (live) setSaved(list)
+			} catch {
+				if (live) setSaved([])
+			}
+		}
+		const peekGps = async () => {
+			try {
+				const pos = await getCurrentLocationIfPermitted()
 				if (!pos || !live) return
 				const a = await getAddressFromCoords(pos.latitude, pos.longitude)
 				const label = [a.area, a.city].filter(Boolean).join(', ') || a.fullAddress || ''
 				if (live && label) setGpsLabel(label)
-			})
-			.catch(() => undefined)
+			} catch {
+				// No label: the row just says "current location".
+			}
+		}
+		void loadSheet()
+		if (isPatient) void loadSavedAddresses()
+		void peekGps()
 		return () => {
 			live = false
 		}
@@ -165,11 +177,18 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 		setSearching(true)
 		const controller = new AbortController()
 		const timer = setTimeout(() => {
-			void searchPlaces(text, controller.signal).then((list) => {
+			const run = async () => {
+				let list: PlaceResult[] = []
+				try {
+					list = await searchPlaces(text, controller.signal)
+				} catch {
+					// A failed search shows no results rather than a spinner that never ends.
+				}
 				if (controller.signal.aborted || !mounted.current) return
 				setResults(list)
 				setSearching(false)
-			})
+			}
+			void run()
 		}, SEARCH_DEBOUNCE_MS)
 		return () => {
 			clearTimeout(timer)
@@ -187,7 +206,7 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 		[setCurrentLocation, onClose]
 	)
 
-	const useCurrent = async () => {
+	const pickCurrentLocation = async () => {
 		setGpsError('')
 		setGpsBusy(true)
 		try {
@@ -262,7 +281,7 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 						? 'Fetching your location...'
 						: gpsError || (gpsLabel ? `${gpsLabel} · via GPS` : 'Detect where you are using GPS')
 				}
-				onPress={() => void useCurrent()}
+				onPress={() => void pickCurrentLocation()}
 				busy={gpsBusy}
 			/>
 

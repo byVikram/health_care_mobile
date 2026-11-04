@@ -5,7 +5,12 @@ import { secureStorage } from './secureStorage'
 const FATAL_CLOSE_CODES = new Set([4401, 4403, 4404])
 const MAX_BACKOFF_MS = 30_000
 
-export type AuthedSocketHandle = { close: () => void; send: (data: string) => void }
+export type AuthedSocketHandle = {
+	close: () => void
+	send: (data: string) => void
+	/** True once the server has accepted the handshake and until the connection drops: pushes are arriving. */
+	isConnected: () => boolean
+}
 
 /**
  * Open a WebSocket to the backend and authenticate it with the first-message
@@ -24,6 +29,7 @@ export const openAuthedSocket = (url: string, onEvent: (event: any) => void): Au
 	let closedByCaller = false
 	let retryTimer: ReturnType<typeof setTimeout> | null = null
 	let attempt = 0
+	let authenticated = false
 
 	const scheduleReconnect = () => {
 		if (closedByCaller) return
@@ -47,7 +53,10 @@ export const openAuthedSocket = (url: string, onEvent: (event: any) => void): Au
 		ws.onmessage = (message) => {
 			try {
 				const event = JSON.parse(message.data)
-				if (event?.type === 'AUTH_OK') return
+				if (event?.type === 'AUTH_OK') {
+					authenticated = true
+					return
+				}
 				onEvent(event)
 			} catch (error) {
 				console.log('[authedSocket] could not parse message:', error)
@@ -57,7 +66,10 @@ export const openAuthedSocket = (url: string, onEvent: (event: any) => void): Au
 			// onclose follows and drives the retry; nothing to do here.
 		}
 		ws.onclose = (closeEvent) => {
-			if (socket === ws) socket = null
+			if (socket === ws) {
+				socket = null
+				authenticated = false
+			}
 			if (closedByCaller || FATAL_CLOSE_CODES.has(closeEvent.code)) return
 			scheduleReconnect()
 		}
@@ -69,6 +81,7 @@ export const openAuthedSocket = (url: string, onEvent: (event: any) => void): Au
 		send: (data: string) => {
 			if (socket?.readyState === WebSocket.OPEN) socket.send(data)
 		},
+		isConnected: () => authenticated && socket?.readyState === WebSocket.OPEN,
 		close: () => {
 			closedByCaller = true
 			if (retryTimer) clearTimeout(retryTimer)
