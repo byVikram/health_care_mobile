@@ -41,7 +41,7 @@ const toOptions = (options: Option[] | string[] = []): Option[] =>
 	options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o))
 
 export default function PersonalDetailsPage() {
-	const { role } = useAuth()
+	const { role, user } = useAuth()
 	const config = PERSONAL_DETAILS_CONFIG[hubRoleFor(role) ?? 'patient']
 	const schema = useMemo(() => personalSchemaFor(config.required), [config])
 	const form = useProfileForm<PersonalDraft>({ load: config.load, save: config.save, schema })
@@ -50,7 +50,10 @@ export default function PersonalDetailsPage() {
 	// The photo is uploaded as soon as it is picked (the server links it to this profile), so it lives outside the
 	// draft: it must not make the form look "dirty". null = show whatever the profile loaded with.
 	const [photoOverride, setPhotoOverride] = useState<string | null>(null)
-	const photoUrl = photoOverride !== null ? photoOverride : buildS3Url(draft?.avatar)
+	// A doctor's photo is the one shared in `user.avatar` (loaded once per sign-in, see useDoctorAvatarSync), so this
+	// screen shows the same picture as the dashboard and drawer; the profile data is still what fills the form.
+	const sharedDoctorPhoto = role === 'doctor' ? user?.avatar : undefined
+	const photoUrl = photoOverride !== null ? photoOverride : buildS3Url(sharedDoctorPhoto || draft?.avatar)
 	// a photo is compulsory for doctors and ancillary providers (replace only, as the server enforces); optional, so removable, for patients
 	const photoRequired = (hubRoleFor(role) ?? 'patient') !== 'patient'
 	const [confirmDeletePhoto, setConfirmDeletePhoto] = useState(false)

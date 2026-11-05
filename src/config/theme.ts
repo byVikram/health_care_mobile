@@ -126,6 +126,15 @@ export const CARD_SHADOW = {
 	elevation: 6,
 } as const
 
+/**
+ * Shadow of every card in the Find Doctors flow (speciality tiles, banners, stat tiles, doctor result cards, clinic and
+ * booking cards): the design's `0 8px 12px rgba(18, 55, 62, 0.14)`, written as a CSS box-shadow so it renders the same
+ * on web, iOS and Android (React Native's own shadow props and `elevation` each blur differently per platform).
+ */
+export const SOFT_CARD_SHADOW = {
+	boxShadow: '0px 8px 12px rgba(18, 55, 62, 0.14)',
+} as const
+
 export const formatInr = (amount?: number | string | null) => {
 	const n = Number(amount)
 	if (!Number.isFinite(n) || n <= 0) return '--'

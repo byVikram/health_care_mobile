@@ -77,7 +77,6 @@ export function useProfileHubData(role: HubRole) {
 				setData((cur) => ({
 					...cur,
 					name: hub.name || cur.name,
-					avatarUri: hub.avatar_url || cur.avatarUri,
 					roleDetail: [hub.speciality, yearsLabel(hub.experience_years)].filter(Boolean).join(' · '),
 					completion: hub.profile_completion ?? cur.completion,
 					verified: hub.is_verified,
@@ -113,5 +112,6 @@ export function useProfileHubData(role: HubRole) {
 		}, [load])
 	)
 
-	return { data, loading, reload: load }
+	// A doctor's photo is the shared one in `user.avatar` (see useDoctorAvatarSync), not a copy read from this call.
+	return { data: role === 'doctor' ? { ...data, avatarUri: user?.avatar || null } : data, loading, reload: load }
 }

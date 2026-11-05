@@ -31,7 +31,7 @@ import type { RouteProp } from '@react-navigation/native'
 import type { AppStackParamList } from '../../../navigation/types'
 import { ROUTES } from '../../../navigation/routes'
 import { useAuth } from '../../../context/AuthContext'
-import { APP_COLORS } from '../../../config/theme'
+import { APP_COLORS, SOFT_CARD_SHADOW } from '../../../config/theme'
 import DoctorFilterSheet from './components/DoctorFilterSheet'
 import DoctorSortSheet from './components/DoctorSortSheet'
 import {
@@ -644,6 +644,7 @@ const styles = StyleSheet.create({
 	skeletonCard: {
 		backgroundColor: APP_COLORS.surface,
 		padding: 16,
+		...SOFT_CARD_SHADOW,
 	},
 	skeletonTopRow: {
 		flexDirection: 'row',

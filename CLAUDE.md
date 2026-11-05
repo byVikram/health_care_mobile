@@ -1,6 +1,6 @@
 # health_care_mobile/ — Mobile App (React Native + Expo)
 
-Part of the [healthcare2](../CLAUDE.md) monorepo. See root CLAUDE.md for cross-service context. App name: "KarolaHealth" (`app.json` slug `karola-health`, Android package `com.anonymous.KarolaHealth`). Has its own `.git` repo, separate from the rest of `healthcare2`.
+Part of the [healthcare2](../CLAUDE.md) monorepo. See root CLAUDE.md for cross-service context. App name: "KarolaHealth" (`app.json` slug `karola-health`, Android package `com.karolahealth.app`, registered in Firebase project `karolahealth` via `google-services.json`). Has its own `.git` repo, separate from the rest of `healthcare2`.
 
 ## Stack
 

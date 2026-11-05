@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React from 'react'
 import { View, StyleSheet, TouchableOpacity } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
@@ -7,18 +7,20 @@ import { DoctorSearchItem } from '../../../../types/doctor-search'
 import { AppAvatar, AppButton, AppDashedDivider, AppTag, AppTypography, AppIcon } from '../../../../components/common'
 import { ROUTES } from '../../../../navigation/routes'
 import type { AppStackParamList } from '../../../../navigation/types'
-import { APP_COLORS, formatInr, toneForString } from '../../../../config/theme'
+import { APP_COLORS, SOFT_CARD_SHADOW, formatInr } from '../../../../config/theme'
 import { formatKm, initialsOf } from '../../../../utils/formatters'
 
 interface DoctorProps {
 	doctor: DoctorSearchItem
 }
 
+// Minimal-colour card: one neutral tile and one teal ink for every speciality, not a tone per speciality.
+const tone = { bg: APP_COLORS.neutralBg, ink: APP_COLORS.primary }
+
 export default function DoctorSearchCard({ doctor }: DoctorProps) {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
 	const speciality = doctor.specialities?.[0] || 'General physician'
-	const tone = useMemo(() => toneForString(speciality), [speciality])
 
 	const goToDetail = () => navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor.id })
 
@@ -105,6 +107,7 @@ const styles = StyleSheet.create({
 		backgroundColor: APP_COLORS.surface,
 		padding: 16,
 		gap: 14,
+		...SOFT_CARD_SHADOW,
 	},
 	topRow: {
 		flexDirection: 'row',
