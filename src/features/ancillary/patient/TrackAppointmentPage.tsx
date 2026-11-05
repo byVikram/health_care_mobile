@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Linking, Share, StyleSheet, View, ActivityIndicator } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { ROUTES } from '../../../navigation/routes'
 import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
@@ -109,6 +110,8 @@ const ASSIGNED_STATUSES = new Set([
 ])
 
 const CANCELLED_STATUSES = new Set(['CANCELLED', 'CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED'])
+const POLL_MS = 2000
+const POLL_WITH_SOCKET_MS = 10000
 
 /** A "Later" order: its visits are shown before any provider is assigned (they are assigned an hour before each visit). */
 const isScheduledOrder = (d?: { bookingType?: string; booking_type?: string } | null) =>
@@ -242,6 +245,7 @@ export default function TrackAppointmentPage() {
 		let isMounted = true
 		let fetchInFlight = false
 		let redirected = false
+		let lastFetchAt = 0
 
 		const redirectToMatching = (serviceName: string, addressText: string, id: string = bookingId) => {
 			if (!isMounted || redirected) return
@@ -306,6 +310,7 @@ export default function TrackAppointmentPage() {
 		const fetchStatus = async () => {
 			if (fetchInFlight) return // a slow response must not stack up behind the 2s poll
 			fetchInFlight = true
+			lastFetchAt = Date.now()
 			try {
 				// Polled every ~2s: a failure must not pop the global error dialog on every tick.
 				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId), {
@@ -353,7 +358,8 @@ export default function TrackAppointmentPage() {
 			setIsInitializing(false)
 		}
 
-		// Periodic background polling every 2.0 seconds until COMPLETED
+		// Background polling until COMPLETED: every 2 seconds on its own, but only as a safety net (every 10 seconds)
+		// while the socket is connected and pushing the changes.
 		const pollInterval = setInterval(() => {
 			if (
 				isMounted &&
@@ -362,9 +368,10 @@ export default function TrackAppointmentPage() {
 				liveStatusRef.current !== 'COMPLETED' &&
 				!CANCELLED_STATUSES.has(liveStatusRef.current)
 			) {
-				void fetchStatus()
+				const wait = socket?.isConnected() ? POLL_WITH_SOCKET_MS : POLL_MS
+				if (Date.now() - lastFetchAt >= wait - 100) void fetchStatus()
 			}
-		}, 2000)
+		}, POLL_MS)
 
 		return () => {
 			isMounted = false
@@ -433,8 +440,15 @@ export default function TrackAppointmentPage() {
 
 	const handleCancelRequestWithReason = async (reason: string) => {
 		setIsCancelling(true)
-		await cancelCareRequestPatientBackend(bookingId, reason)
-		setIsCancelling(false)
+		try {
+			await cancelCareRequestPatientBackend(bookingId, reason)
+		} catch {
+			// Still open on the server: stay here so the patient can try again.
+			Toast.show({ type: 'error', text1: 'Could not cancel the request', text2: 'Please try again.' })
+			return
+		} finally {
+			setIsCancelling(false)
+		}
 		setCancelModalVisible(false)
 		if (navigation.canGoBack()) {
 			navigation.goBack()

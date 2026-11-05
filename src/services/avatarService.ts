@@ -34,6 +34,7 @@ export async function uploadAvatar(upload: AvatarUpload, patientId?: string): Pr
 		// The browser's FormData only takes a real file: the picker's uri is a blob:/data: URL, so read it back into one.
 		// (The { uri, name, type } descriptor below is a React Native device feature; sent from a browser it arrives as
 		// the text "[object Object]" and the server answers "validation failed".)
+		// Plain fetch on purpose: reads the picked file back from a local blob:/data: URL, no network involved.
 		const blob = await (await fetch(upload.uri)).blob()
 		form.append('file', new Blob([blob], { type: upload.type || blob.type }), upload.name)
 	} else {

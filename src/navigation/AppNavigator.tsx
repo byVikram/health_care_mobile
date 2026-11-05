@@ -26,7 +26,6 @@ import VerifyAccessPage from '../features/doctor/verify-access/VerifyAccessPage'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/settings/SettingPage'
-// import ScreenCaptureTest from '../features/doctor/search/components/ScreenCaptureTest'
 import AccountPage from '../features/auth/AccountPage'
 import PatientPayment from '../features/patient-payment/PatientPayment'
 import AppointmentConfirmedPage from '../features/patient-payment/AppointmentConfirmedPage'
@@ -101,12 +100,17 @@ import AchievementsPage from '../features/profile/doctor/AchievementsPage'
 import FavouriteDoctorsPage from '../features/profile/doctor/FavouriteDoctorsPage'
 import WorkDocumentsPage from '../features/profile/ancillary/WorkDocumentsPage'
 
+import ErrorBoundary from '../components/common/feedback/ErrorBoundary'
+
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
 	return (
 		<>
 			<AppStack.Navigator
+				// One boundary per screen: a crash on one screen shows the "Something went wrong" panel there, with the
+				// back button and the other screens still working, instead of taking the whole app down.
+				screenLayout={({ children }) => <ErrorBoundary>{children}</ErrorBoundary>}
 				screenOptions={{
 					headerShown: false,
 					header: ({ options, route }) => (
@@ -211,7 +215,6 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.VERIFY_ACCESS} component={VerifyAccessPage} />
 				<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
 				<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
-				{/* <AppStack.Screen name={ROUTES.STACK.SCREEN_CAPTURE_TEST} component={ScreenCaptureTest} /> */}
 				<AppStack.Screen
 					name={ROUTES.STACK.DOCTOR_WELCOME}
 					component={WelcomeDoctorPage}

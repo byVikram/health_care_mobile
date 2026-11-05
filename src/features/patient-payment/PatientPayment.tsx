@@ -257,7 +257,6 @@ export default function BookingDetailsScreen() {
 				Alert.alert('Error', bookingResponse.message || 'Failed to book appointment')
 			}
 		} catch (error: any) {
-			console.log('BOOKING ERROR =>', error?.response?.status, error?.response?.data)
 			Alert.alert('Error', error?.response?.data?.message || 'An error occurred while booking. Please try again.')
 		} finally {
 			setIsBooking(false)

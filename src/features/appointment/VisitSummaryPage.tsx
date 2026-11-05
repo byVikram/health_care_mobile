@@ -11,7 +11,7 @@
 // entry point into the Laboratory search flow rather than a named test.
 
 import React, { useCallback, useEffect, useState } from 'react'
-import { View, ScrollView, StyleSheet, ActivityIndicator, Linking, TextInput, Share } from 'react-native'
+import { View, ScrollView, StyleSheet, ActivityIndicator, TextInput, Share } from 'react-native'
 import { Text } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
@@ -40,6 +40,7 @@ import { Appointment, AppointmentDoctor } from '../../types/appointment'
 import { ROUTES } from '../../navigation/routes'
 import { formatTimeSlot, capitaliseWords, bookingRef } from '../../utils/formatters'
 import { buildS3Url } from '../../utils/s3Utils'
+import { openWebUrl } from '../../utils/safeLinking'
 import { formatFullDate, formatInterval, fullDayLabel, parseDateOnly } from '../../utils/date'
 import { APP_COLORS, TONES, formatInr } from '../../config/theme'
 
@@ -235,9 +236,11 @@ export default function VisitSummaryPage() {
 					return
 				}
 			}
-			const url = fresh?.prescription_url ?? buildS3Url(treatment?.prescription_s3_key)
+			// Only the server's signed link is opened: a plain bucket URL built from the stored key is not trusted, and
+			// the bucket is private. https only.
+			const url = fresh?.prescription_url
 			if (!url) return comingSoon()
-			Linking.openURL(url).catch(comingSoon)
+			openWebUrl(url).catch(comingSoon)
 		} finally {
 			setDownloading(false)
 		}

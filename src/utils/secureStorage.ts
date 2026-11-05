@@ -76,3 +76,23 @@ export const secureStorage = {
 		}
 	},
 }
+
+/**
+ * Reads a value that older builds kept in plain AsyncStorage (the signed-in user, the chosen location, recent places):
+ * from secure storage when it is already there, otherwise from the old place -- moved into secure storage, and the
+ * plaintext copy deleted, on the way. After one launch nothing readable is left on disk.
+ */
+export const getMigratedItem = async (key: string): Promise<string | null> => {
+	const secure = await secureStorage.getItem(key)
+	// On web both stores are AsyncStorage: there is nothing to move.
+	if (usesAsyncStorage()) return secure
+	if (secure != null) {
+		await AsyncStorage.removeItem(key).catch(() => {})
+		return secure
+	}
+	const legacy = await AsyncStorage.getItem(key)
+	if (legacy == null) return null
+	await secureStorage.setItem(key, legacy)
+	await AsyncStorage.removeItem(key)
+	return legacy
+}

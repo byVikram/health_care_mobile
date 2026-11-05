@@ -52,7 +52,6 @@ export default function PatientProfileLayout() {
 	const [activeTab, setActiveTab] = useState<Tab>('Personal')
 	const [data, setData] = useState<PatientProfileState>(INITIAL_PATIENT_STATE)
 	useEffect(() => {
-		console.log('CURRENT DATA =>', JSON.stringify(data, null, 2))
 	}, [data])
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
@@ -67,7 +66,6 @@ export default function PatientProfileLayout() {
 		try {
 			setLoading(true)
 			const res = await getPatientDetails()
-			console.log('Get Profile Response =>', JSON.stringify(res, null, 2))
 
 			if (res.success && res.data) {
 				setData(mapApiToLocalState(res.data))
@@ -147,8 +145,6 @@ export default function PatientProfileLayout() {
 		try {
 			setSaving(true)
 
-			console.log('===== PROFILE DATA =====')
-			console.log(JSON.stringify(data, null, 2))
 
 			// The photo has its own endpoint: the server stores the file and links it, so no key is sent from here.
 			try {
@@ -175,8 +171,6 @@ export default function PatientProfileLayout() {
 
 			const res = await updatePatientProfile(data)
 
-			console.log('===== API RESPONSE =====')
-			console.log('PATCH RESPONSE:', JSON.stringify(res, null, 2))
 			
 
 			if (res.success) {
@@ -188,7 +182,6 @@ export default function PatientProfileLayout() {
 		} catch (error: any) {
 			console.log('===== API ERROR =====')
 			console.log(error)
-			console.log(error?.response?.data)
 
 			Alert.alert('Error', 'Something went wrong.')
 		} finally {

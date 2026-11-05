@@ -534,6 +534,8 @@ export default function ConsultationPage() {
 		setDicomLoading(true)
 		try {
 			if (s3Key) {
+				// Plain fetch on purpose: this is a signed file link, not an API route, and ApiService would add our
+				// Authorization header to a request for another host.
 				const response = await fetch(s3Key)
 				const blob = await response.blob()
 				const reader = new FileReader()

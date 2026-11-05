@@ -55,10 +55,17 @@ export default function ReadArticlePage() {
 	useEffect(() => {
 		let alive = true
 		setLoading(true)
-		getBlogPost(route.params.slug)
-			.then((res) => alive && setPost(res.data))
-			.catch(() => alive && setPost(null))
-			.finally(() => alive && setLoading(false))
+		const loadPost = async () => {
+			try {
+				const res = await getBlogPost(route.params.slug)
+				if (alive) setPost(res.data)
+			} catch {
+				if (alive) setPost(null)
+			} finally {
+				if (alive) setLoading(false)
+			}
+		}
+		void loadPost()
 		return () => {
 			alive = false
 		}
@@ -68,14 +75,21 @@ export default function ReadArticlePage() {
 		if (!post) return
 		let alive = true
 		const type = post.content_type === 'blog' ? 'blog' : 'article'
-		Promise.all([getHealthReads(type, 10), getHealthReads(type === 'blog' ? 'article' : 'blog', 10)])
-			.then(([same, other]) => {
+		const loadRelated = async () => {
+			try {
+				const [same, other] = await Promise.all([
+					getHealthReads(type, 10),
+					getHealthReads(type === 'blog' ? 'article' : 'blog', 10),
+				])
 				if (!alive) return
 				const pool = [...same, ...other].filter((r) => r.id !== post.id)
 				const sameCategory = pool.filter((r) => r.category === post.category)
 				setRelated([...sameCategory, ...pool.filter((r) => !sameCategory.includes(r))].slice(0, 2))
-			})
-			.catch(() => {})
+			} catch {
+				// "Related reads" is optional: the article stands without it.
+			}
+		}
+		void loadRelated()
 		return () => {
 			alive = false
 		}

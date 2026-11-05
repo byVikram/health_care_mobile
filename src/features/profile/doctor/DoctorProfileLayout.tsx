@@ -13,7 +13,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { AppTypography } from '../../../components/common'
 import { getDoctorProfile, mapDoctorProfileApi } from '../../doctor/doctorService'
-import { BASE_URL } from '../../../constants/apiUrls'
 import { DoctorAvailability, DoctorHospital } from '../../../types/doctor-profile'
 import { ROUTES } from '../../../navigation/routes'
 import PersonalDetailsTab from './tabs/PersonalDetailsTab'
@@ -65,11 +64,7 @@ export default function DoctorProfileLayout() {
 		const fetchDoctorProfile = async () => {
 			try {
 				setProfileLoading(true)
-				console.log('[DoctorProfileLayout] fetching doctor profile:', {
-					url: `${BASE_URL}/api/doctors/details`,
-				})
 				const response = await getDoctorProfile()
-				console.log('[DoctorProfileLayout] getDoctorProfile response:', response)
 
 				if (response.success && response.data) {
 					const profile = mapDoctorProfileApi(response.data)
@@ -85,22 +80,8 @@ export default function DoctorProfileLayout() {
 						offline_consultation_fee: hospital.offline_consultation_fee ?? '',
 					}))
 
-					console.log('[DoctorProfileLayout] mapped availability props:', {
-						hospitals: normalizedHospitals.map((hospital) => ({
-							id: hospital.id,
-							name: hospital.name,
-							fullAddress: hospital.fullAddress,
-							isPrimary: hospital.isPrimary,
-						})),
-					})
-
 					setHospitals(normalizedHospitals)
 					setAvailability(profile.availability)
-				} else {
-					console.log('[DoctorProfileLayout] doctor profile API returned no usable data:', {
-						success: response?.success,
-						message: response?.message,
-					})
 				}
 			} catch (error) {
 				console.log('[DoctorProfileLayout] failed to fetch doctor profile:', error)
@@ -158,7 +139,6 @@ export default function DoctorProfileLayout() {
 		}
 
 		if (tabKey === 'availability') {
-			console.log('[DoctorProfileLayout] hospitals before passing to AvailabilityTab:', hospitals)
 			if (profileLoading) {
 				return (
 					<View style={styles.loadingContainer}>

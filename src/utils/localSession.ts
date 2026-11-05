@@ -19,6 +19,19 @@ export const LOCAL_SESSION_ASYNC_KEYS = [
 	'ancillary_setup_completed',
 	// Written by the old patient-profile picker; may still hold the previous user's family list.
 	'family_members',
+	// Recent places typed into the location sheet (addresses): see SECURE_SESSION_KEYS.
+	'recent_locations',
+] as const
+
+// Personal data that now lives in the keystore (secureStorage) instead of AsyncStorage: the signed-in user (name, email,
+// avatar), the chosen location (address + coordinates) and the recent places. The same names are also in the list above
+// so the plaintext copy an older build wrote is removed too.
+export const SECURE_SESSION_KEYS = [
+	'access_token',
+	'refresh_token',
+	'user',
+	'current_location',
+	'recent_locations',
 ] as const
 
 /**
@@ -28,7 +41,8 @@ export const LOCAL_SESSION_ASYNC_KEYS = [
  * can never drift apart and leave PHI behind.
  */
 export const purgeLocalSession = async (): Promise<void> => {
-	await secureStorage.deleteItem('access_token')
-	await secureStorage.deleteItem('refresh_token')
+	for (const key of SECURE_SESSION_KEYS) {
+		await secureStorage.deleteItem(key)
+	}
 	await AsyncStorage.multiRemove([...LOCAL_SESSION_ASYNC_KEYS])
 }

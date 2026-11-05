@@ -124,7 +124,6 @@ const createEmptyRow = (): MedicineRow => ({
 
 // ─── Mock API for medicines ───────────────────────────────────────────────────
 const updatePharmacyOrderMedicines = async (orderId: string, medicines: MedicineRow[]) => {
-	console.log('[MOCK] Saving medicines for order', orderId, medicines)
 	await new Promise((resolve) => setTimeout(resolve, 500))
 	return { success: true }
 }
@@ -676,7 +675,6 @@ const PharmacyOrderDetailsPage = () => {
 
 	const prescriptionImages = useMemo(() => {
 		const urls: string[] = []
-		console.log('[DEBUG] Extracting prescription images from order data', orderData)
 		orderData?.prescriptions?.forEach((item) => {
 			const url = item.url || item.image_url || buildS3Url(item.s3_key)
 			if (url) urls.push(url)

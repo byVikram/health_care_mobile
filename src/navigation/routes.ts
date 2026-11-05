@@ -33,7 +33,6 @@ export const ROUTES = {
 		CONSULTATION: 'Consultation',
 		HEALTH_PROFILE: 'HealthProfile',
 		SETTINGS: 'Settings',
-		SCREEN_CAPTURE_TEST: 'ScreenCaptureTest',
 		DOCTOR_WELCOME: 'DoctorWelcome',
 		ACCOUNT: 'Account',
 		APPOINTMENTS: 'Appointments',

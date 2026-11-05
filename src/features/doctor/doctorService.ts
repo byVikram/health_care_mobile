@@ -138,11 +138,6 @@ export const updateAppointmentsStatus = async (
 	statusId: string,
 	reason?: string
 ): Promise<AppointmentResponse> => {
-	console.log('PAYLOAD 👉', {
-		appointment_id: appointmentId,
-		status_id: statusId,
-		...(reason ? { reason } : {}),
-	})
 
 	const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
 		appointment_id: appointmentId,
@@ -150,7 +145,6 @@ export const updateAppointmentsStatus = async (
 		...(reason ? { reason } : {}),
 	})
 
-	console.log('RESPONSE 👉', res.data)
 
 	return res.data
 }
@@ -337,13 +331,6 @@ export const getDoctorStatus = async (): Promise<DoctorStatusResponse['data']> =
 }
 
 export const createAppointment = async (payload: CreateAppointmentPayload): Promise<CreateAppointmentResponse> => {
-	console.log('[createAppointment][RN] request', {
-		url: API_ENDPOINTS.APPOINTMENTS.CREATE,
-		payload,
-
-		webComparison:
-			'React web booking uses axios interceptor with localStorage access_token and sends Authorization: Bearer <access_token>.',
-	})
 
 	// skipGlobalError: the booking screen shows the server's message itself (e.g. 403 BOOKING_RESTRICTED when online
 	// booking is paused), so a second "Access Denied" / "API Error" dialog on top of it is not wanted.
@@ -351,10 +338,6 @@ export const createAppointment = async (payload: CreateAppointmentPayload): Prom
 		skipGlobalError: true,
 	})
 
-	console.log('[createAppointment][RN] response', {
-		status: res.status,
-		data: res.data,
-	})
 
 	return res.data
 }
@@ -601,20 +584,9 @@ export interface DoctorAvailabilityUpdatePayload {
 
 export const updateDoctorPersonalDetails = async (data: DoctorPersonalUpdatePayload) => {
 	const url = API_ENDPOINTS.DOCTOR_PROFILE.PERSONAL_DETAILS
-	console.log('[updateDoctorPersonalDetails] request:', {
-		method: 'PATCH',
-		url,
-		payload: data,
-	})
 
 	try {
 		const res = await ApiService.patch(url, data)
-		console.log('[updateDoctorPersonalDetails] response:', {
-			status: res.status,
-			url: res.config?.url,
-			method: res.config?.method,
-			data: res.data,
-		})
 		return res.data
 	} catch (error: any) {
 		console.log('[updateDoctorPersonalDetails] error:', {
@@ -652,14 +624,8 @@ export const updateDoctorAvailability = async (data: DoctorAvailabilityUpdatePay
 export const getDoctorProfile = async (): Promise<DoctorProfileApiResponse> => {
 	try {
 		const res = await ApiService.get<DoctorProfileApiResponse>(API_ENDPOINTS.DOCTOR_PROFILE.DETAILS)
-		console.log('[getDoctorProfile] API response:', res.data)
 		return res.data
 	} catch (error: any) {
-		console.log('[getDoctorProfile] API error:', {
-			status: error?.response?.status,
-			data: error?.response?.data,
-			message: error?.message,
-		})
 		throw error
 	}
 }

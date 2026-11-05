@@ -73,9 +73,15 @@ function RotatingHint({ hints, paused }: { hints: readonly string[]; paused: boo
 
 	useEffect(() => {
 		let mounted = true
-		AccessibilityInfo.isReduceMotionEnabled()
-			.then((enabled) => mounted && setReduceMotion(enabled))
-			.catch(() => undefined)
+		const checkReduceMotion = async () => {
+			try {
+				const enabled = await AccessibilityInfo.isReduceMotionEnabled()
+				if (mounted) setReduceMotion(enabled)
+			} catch {
+				// Unknown: keep the animation.
+			}
+		}
+		void checkReduceMotion()
 		return () => {
 			mounted = false
 		}

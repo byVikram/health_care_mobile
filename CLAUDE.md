@@ -12,14 +12,13 @@ Part of the [healthcare2](../CLAUDE.md) monorepo. See root CLAUDE.md for cross-s
 - Storage: `secureStorage.ts` wraps `expo-secure-store` for tokens (`access_token`/`refresh_token`); `@react-native-async-storage/async-storage` used for non-sensitive data. Network: `@react-native-community/netinfo` (backs `NetworkContext`/`OfflineBanner`)
 - Native/Expo modules: camera, location, audio, video, speech-recognition, image-picker, file-system, device, screen-capture, maps, webview, signature-canvas, svg (+ svg-transformer), reanimated v4
 - Firebase: `@react-native-firebase/app` + `messaging` (push notifications), `google-services.json` for Android — no iOS Firebase config found
-- No ESLint config (Prettier only); no `eas.json` (no EAS Build/Submit configured yet)
-- Only one test file exists (`src/features/wallet/__tests__/`) and **no test runner is configured** — these tests currently cannot be run as-is
+- Tooling: ESLint 9 flat config (`eslint.config.js`, on `eslint-config-expo`), Prettier, husky + lint-staged (pre-commit runs ESLint on staged `.ts`/`.tsx`), `eas.json` build profiles, GitHub Actions CI (`.github/workflows/mobile-ci.yml`: typecheck, lint). **There is no test runner or test files at the moment** (Jest was set up and removed again on purpose)
 
 ## Folder structure (`src/`)
 
 - Feature-based, not a single `screens/` folder: `src/features/<domain>/*Page.tsx` (a few explicit `*Screen.tsx` live in `components/common/` and `features/onboarding/`)
 - `src/features/` domains: `ancillary` (`patient/`, `staff/` splits — home-care nursing/physio), `appointment`, `auth`, `bookings`, `care-ai` (Care AI health-assistant chat, mock replies), `consultation`, `dashboard`, `doctor` (`detail/`, `events/`, `search/`), `events`, `laboratory`, `notification`, `onboarding`, `patient`, `patient-payment`, `patient-qr`, `pharmacy`, `portal`, `profile` (split per role), `radiology`, `referrals`, `settings`, `wallet` — most have their own `components/`
-- `src/components/common/` — shared UI, grouped into sub-folders and all re-exported from the barrel `index.ts` (import from `components/common`, not the file path): `layout/` (AppScreenHeader, AppHeader, AppSection, AppFooterBar, AppBottomSheet, AppModal, AppSidebar, SplashScreen…), `buttons/`, `inputs/`, `display/` (AppTypography, AppAvatar, AppIcon…), `feedback/` (StatusModal, ErrorBoundary, OfflineBanner…), `booking/` (booking-flow pieces), `location/`. New shared components go in the matching sub-folder. Design tokens (`APP_COLORS`, `TONES`, `CARD_SHADOW`) live in `src/config/theme.ts`. A test/helper for a shared component goes in a `__tests__/` folder next to it (e.g. `components/common/<sub-folder>/__tests__/<Component>.test.tsx`), matching the existing `src/features/wallet/__tests__/` convention — but see the note below, no test runner is configured yet so these can't actually be run.
+- `src/components/common/` — shared UI, grouped into sub-folders and all re-exported from the barrel `index.ts` (import from `components/common`, not the file path): `layout/` (AppScreenHeader, AppHeader, AppSection, AppFooterBar, AppBottomSheet, AppModal, AppSidebar, SplashScreen…), `buttons/`, `inputs/`, `display/` (AppTypography, AppAvatar, AppIcon…), `feedback/` (StatusModal, ErrorBoundary, OfflineBanner…), `booking/` (booking-flow pieces), `location/`. New shared components go in the matching sub-folder. Design tokens (`APP_COLORS`, `TONES`, `CARD_SHADOW`) live in `src/config/theme.ts`.
 - `src/components/layout/` — `SidebarLayout.tsx`
 - `src/navigation/` — `AppNavigator.tsx` (root switch: auth vs. authenticated), `AuthNavigator.tsx`, `MainTabNavigator.tsx` (role-conditional tabs), `navigationService.ts`, `routes.ts` (`ROUTES` constants), `types.ts` (param list types), plus the server-driven menu: `NavigationConfigContext.tsx` (fetches the menu), `menuConfig.ts` (types + built-in `DEFAULT_MENU`), `menuIcons.tsx` (icon key -> drawing), `useSidebarMenu.ts` (drawer rows)
 - `src/context/` — `AuthContext.tsx` (auth/session/role — **no Redux**, Context + hooks instead), `NetworkContext.tsx`, `ScrollContext.tsx`
@@ -40,7 +39,7 @@ npm run android     # expo run:android
 npm run ios         # expo run:ios
 npm run web         # expo start --web
 ```
-No `test`, `lint`, `build`, or `typecheck` npm scripts are defined. `metro.config.js` adds `.dcm` (DICOM) as an asset extension and wires `react-native-svg-transformer`. `babel.config.js` uses `babel-preset-expo` + reanimated plugin.
+Other scripts: `npm run typecheck` (`tsc --noEmit`), `npm run lint` (ESLint over `src`; errors fail, the existing warning backlog does not), `npm run format` / `format:check` (Prettier over `src`; some older files are not formatted yet), `prepare` (installs the husky hook). There is no `build` script (builds are `expo run:*` or EAS, see `eas.json`). `metro.config.js` adds `.dcm` (DICOM) as an asset extension and wires `react-native-svg-transformer`. `babel.config.js` uses `babel-preset-expo` + reanimated plugin.
 
 ## Navigation
 
@@ -66,9 +65,10 @@ Backend policy: `health_care_backend/CLAUDE.md` ("Home-care (ancillary) patient 
 ## Conventions
 
 - Prettier: tabs, `tabWidth: 4`, no semicolons, single quotes, `printWidth: 120`
-- No ESLint — Prettier is the only enforced style tool
+- ESLint (`npm run lint`) gates errors; the React-Compiler-era hooks rules (`react-hooks/refs`, `set-state-in-effect`, ...) are warnings because existing code breaks them in bulk. Prettier is configured with `endOfLine: auto`
+- Import alias: `@/*` maps to `src/*` (tsconfig `paths`); existing files still use relative imports
 - TypeScript strict mode (`expo/tsconfig.base`)
 - Screens mostly suffixed `Page.tsx` (not `Screen.tsx`, except a handful of onboarding/common files); services suffixed `Service.ts`; context providers suffixed `Context.tsx` and export a paired `useX` hook
 - Route names as string constants in `src/navigation/routes.ts`, not hardcoded in navigators
 - `android/` exists on disk despite being gitignored as a "generated" folder — don't assume it's disposable without checking with the user first
-- Root-level scratch files (`review.md`, `gemini.md`, `tsc_full_output.txt`) are dev notes/leftover compiler output, not maintained docs. `review.md` tracks a phased remediation plan; Phases 1–3 (secure token storage, no plaintext token logging, safe JSON parsing, error boundary, the API URL env fix above, folder/naming standardization) are marked complete and verified against current code as of 2026-09-22. Phase 4/5 items (console-stripping in babel, FlatList conversion, a real Jest suite) are still open — verify against the doc before assuming something in the later phases is done.
+- Root-level scratch files (`review.md`, `gemini.md`) are dev notes/leftover compiler output, not maintained docs. `review.md` tracks a phased remediation plan; Phases 1–3 (secure token storage, no plaintext token logging, safe JSON parsing, error boundary, the API URL env fix above, folder/naming standardization) are marked complete and verified against current code as of 2026-09-22. Phase 4/5 items (console-stripping in babel, FlatList conversion, a real Jest suite) are still open — verify against the doc before assuming something in the later phases is done.

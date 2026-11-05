@@ -92,6 +92,12 @@ npm run ios         # iOS simulator (macOS only)
 
 Once a debug build is installed, you can restart just the JS bundler with `npm start`. `npm run web` exists but the native-only modules above mean web is not a supported target.
 
-### Scripts and testing status
+### Scripts
 
-Only `start`, `android`, `ios` and `web` scripts exist — there are no `test`, `lint`, `build` or `typecheck` scripts yet (type-check manually with `npx tsc --noEmit`). The single test folder (`src/features/wallet/__tests__/`) has no runner configured, so nothing can be run as-is. See `review.md` for the full list of known gaps.
+| Script | What it does |
+| :--- | :--- |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint over `src` (errors fail; the existing warnings are a backlog) |
+| `npm run format` / `format:check` | Prettier over `src` |
+
+A git pre-commit hook (husky + lint-staged) runs ESLint on the staged TypeScript files; `npm install` sets it up. CI (`.github/workflows/mobile-ci.yml`) runs typecheck and lint on every push and pull request. Native builds can also be made with EAS (`eas.json`: `development`, `preview`, `production`). See `review.md` for the list of known gaps.

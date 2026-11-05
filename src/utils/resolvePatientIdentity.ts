@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { getMigratedItem } from './secureStorage'
 import { safeJsonParse } from './jsonUtils'
 import { getPatientDetails } from '../features/profile/patient/PatientProfileService'
 import { isPlaceholderPatientName } from './patientPlaceholder'
@@ -40,7 +40,7 @@ export async function resolveSelfPatientIdentity(): Promise<ResolvedPatientIdent
 
 	if (!resolvedPublicId || !resolvedName || resolvedName.trim() === '') {
 		try {
-			const userRaw = await AsyncStorage.getItem('user')
+			const userRaw = await getMigratedItem('user')
 			if (userRaw) {
 				const userData = safeJsonParse<any>(userRaw)
 				if (userData) {

@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { API_ENDPOINTS } from "../../constants/apiUrls";
+import ApiService from "../../services/apiService";
 // import { AppSelect, AppSelectOption } from "../../components/AppSelect";
 import { AppSelect, AppSelectOption } from "../../components/common/inputs/AppSelect";
 import { ROUTES } from "../../navigation/routes";
@@ -56,8 +57,8 @@ export default function AccountPage({
     let active = true;
     const loadSpecialities = async () => {
       try {
-        const res = await fetch(API_ENDPOINTS.SPECIALITIES.LIST);
-        const json = await res.json();
+        const res = await ApiService.get<{ success: boolean; data: Speciality[] }>(API_ENDPOINTS.SPECIALITIES.LIST);
+        const json = res.data;
         if (active && json.success) {
           const options: AppSelectOption[] = json.data.map((s: Speciality) => ({
             label: s.label,

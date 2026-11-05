@@ -495,7 +495,6 @@ export default function PersonalDetailsTab({
 
 			// Re-fetch backend profile to confirm and strictly populate UI from backend response
 			const updatedProfile = await fetchProviderProfile()
-			console.log('[PersonalDetails] Refetched profile:', updatedProfile)
 
 			const authoritativeName = updatedProfile?.name || ''
 			const authoritativeEmail = updatedProfile?.email || ''
@@ -534,13 +533,9 @@ export default function PersonalDetailsTab({
 		} catch (err: any) {
 			console.error('[PROFILE SAVE] error:', err)
 			console.error('[PROFILE SAVE] status:', err?.response?.status)
-			console.error('[PROFILE SAVE] response:', err?.response?.data)
-			console.error('[PROFILE SAVE] request:', err?.config?.data)
 			console.error('[PROFILE SAVE] URL:', err?.config?.url)
 			console.error('[Ancillary Profile] Backend update failed:', err)
 			console.error('[Ancillary Profile] Status:', err?.response?.status)
-			console.error('[Ancillary Profile] Response:', err?.response?.data)
-			console.error('[Ancillary Profile] Request:', err?.config?.data)
 			setStatusModal({
 				visible: true,
 				status: 'error',
