@@ -178,14 +178,17 @@ export default function AvailabilityPage() {
 
 	const placeName = (id: string) => places.find((p) => p.id === id)?.name ?? 'Clinic'
 
-	/** Doctor: the same day's ranges at other places / the other mode, for clash checks. */
+	/**
+	 * Doctor: the same day's ranges of the SAME kind at other places, for clash checks (two clinics at once). Video and
+	 * in-clinic hours may share a time: a booking of either one takes that time for both.
+	 */
 	const othersFor = useCallback(
 		(pid: string, m: DoctorMode, d: number): { place: string; range: TimeRange }[] => {
 			if (!isDoctor || !draft) return []
 			const out: { place: string; range: TimeRange }[] = []
 			for (const [otherId, modes] of Object.entries(draft.weeks)) {
-				for (const otherMode of ['clinic', 'video'] as DoctorMode[]) {
-					if (otherId === pid && otherMode === m) continue
+				for (const otherMode of [m]) {
+					if (otherId === pid) continue
 					const label = `${placeName(otherId).split(',')[0]}${otherMode === 'video' ? ' (video)' : ''}`
 					for (const range of dayRanges(modes[otherMode][d])) out.push({ place: label, range })
 				}
