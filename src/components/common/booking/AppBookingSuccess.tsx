@@ -33,6 +33,8 @@ const CONFETTI: { left: number; top: number; size: number; radius: number; color
 ]
 
 export type AppBookingSuccessProps = {
+	/** The confetti dots in the hero. Defaults to true; the minimal-colour appointment screen turns them off. */
+	confetti?: boolean
 	/** Pill under the check, e.g. "Payment successful · ₹1,998". */
 	badge: string
 	title: string
@@ -65,6 +67,7 @@ export function AppBookingSuccess({
 	onReceiptPress,
 	secondary,
 	primary,
+	confetti = true,
 }: AppBookingSuccessProps) {
 	const insets = useSafeAreaInsets()
 	const { width } = useWindowDimensions()
@@ -78,21 +81,22 @@ export function AppBookingSuccess({
 				<View style={[styles.hero, { paddingTop: 48 + insets.top }]}>
 					<View style={styles.heroCircleLeft} />
 					<View style={styles.heroCircleRight} />
-					{CONFETTI.map((c, i) => (
-						<View
-							key={i}
-							style={{
-								position: 'absolute',
-								left: c.left * scaleX,
-								top: c.top + insets.top,
-								width: c.size,
-								height: c.size,
-								borderRadius: c.radius,
-								backgroundColor: c.color,
-								transform: [{ rotate: `${c.rotate}deg` }],
-							}}
-						/>
-					))}
+					{confetti &&
+						CONFETTI.map((c, i) => (
+							<View
+								key={i}
+								style={{
+									position: 'absolute',
+									left: c.left * scaleX,
+									top: c.top + insets.top,
+									width: c.size,
+									height: c.size,
+									borderRadius: c.radius,
+									backgroundColor: c.color,
+									transform: [{ rotate: `${c.rotate}deg` }],
+								}}
+							/>
+						))}
 
 					<View style={styles.successRing}>
 						<View style={styles.successCircle}>

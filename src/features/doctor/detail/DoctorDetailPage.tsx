@@ -44,8 +44,7 @@ import { formatDateForApi } from '../../../utils/date'
 import { capitalize } from '../../../utils/formatters'
 import { openDirections } from '../../../utils/maps'
 import { AppointmentModeKey, firstOpenSlot, normalizeAvailabilityByMode } from '../availability'
-import { shortClinic } from '../doctorFormatters'
-import { APP_COLORS, formatInr } from '../../../config/theme'
+import { APP_COLORS, SOFT_CARD_SHADOW, formatInr } from '../../../config/theme'
 import { DOCTOR_PROFILE_GOOD_TO_KNOW_MOCK } from './doctorProfileMockData'
 import { CollapsingProfileHeader, PROFILE_AVATAR_SIZE } from './CollapsingProfileHeader'
 
@@ -310,20 +309,6 @@ export default function DoctorDetailPage() {
 
 	const slotsKnown = todaySlots !== undefined
 	const availableToday = !!todaySlots && Object.values(todaySlots).some((m) => m.clinic || m.video)
-	// First clinic (primary first) with a slot left today; in-clinic preferred over video
-	const nextAvailable = (() => {
-		if (!todaySlots) return null
-		const ordered = primaryHospital
-			? [primaryHospital, ...hospitals.filter((h) => h !== primaryHospital)]
-			: hospitals
-		for (const mode of ['clinic', 'video'] as AppointmentModeKey[]) {
-			for (const h of ordered) {
-				const slot = todaySlots[h.hospital.id]?.[mode]
-				if (slot) return { hospital: h, slot, mode }
-			}
-		}
-		return null
-	})()
 
 	const specialitiesText = (specialities || []).filter(Boolean).join(' · ')
 
@@ -337,7 +322,12 @@ export default function DoctorDetailPage() {
 				.join(', ')
 		: details?.degree || null
 
-	const languagesText = details?.languages?.length ? details.languages.map(capitalize).join(', ') : null
+	// The same language can be stored twice in two spellings ("english" from the web app, "English" from this one):
+	// list each once, ignoring case.
+	const languageNames = Array.from(
+		new Map((details?.languages || []).map((l) => [String(l).trim().toLowerCase(), l] as const)).values()
+	).filter((l) => String(l).trim())
+	const languagesText = languageNames.length ? languageNames.map(capitalize).join(', ') : null
 
 	const experienceYearsText = details?.experience_years != null ? `${details.experience_years} yrs` : '--'
 
@@ -425,16 +415,6 @@ export default function DoctorDetailPage() {
 						)}
 
 						<View style={styles.badgeRow}>
-							{availableToday && (
-								<AppTag
-									label="Available today"
-									bg={NEUTRAL_BG}
-									ink={SUCCESS}
-									shape="pill"
-									dot
-									style={styles.availableBadge}
-								/>
-							)}
 							{hasVideoConsult && (
 								<AppTag
 									label="Video consult"
@@ -481,39 +461,6 @@ export default function DoctorDetailPage() {
 							valueStyle={styles.statValue}
 						/>
 					</AppStatRow>
-
-					{/* Next available -- real first open slot today, else a plain entry into the slot step */}
-					<TouchableOpacity
-						style={styles.nextCard}
-						activeOpacity={0.85}
-						disabled={!hospitals.length}
-						onPress={() => goToBookSlot(nextAvailable?.hospital.hospital.id, nextAvailable?.mode)}
-					>
-						<View style={{ flex: 1, minWidth: 0 }}>
-							<AppTypography style={styles.nextEyebrow}>NEXT AVAILABLE</AppTypography>
-							<AppTypography style={styles.nextTitle} numberOfLines={1}>
-								{nextAvailable
-									? `Today, ${nextAvailable.slot.start_time}`
-									: slotsKnown
-										? 'See upcoming slots'
-										: 'Checking slots…'}
-							</AppTypography>
-							<AppTypography style={styles.nextSub} numberOfLines={1}>
-								{nextAvailable
-									? nextAvailable.mode === 'video'
-										? 'Video consultation'
-										: `${shortClinic(nextAvailable.hospital.hospital.name)}${
-												nextAvailable.hospital.hospital.distance
-													? ` · ${nextAvailable.hospital.hospital.distance} km`
-													: ''
-											}`
-									: 'Pick a clinic, date and time'}
-							</AppTypography>
-						</View>
-						<View style={styles.nextBookBtn}>
-							<AppTypography style={styles.nextBookText}>Book</AppTypography>
-						</View>
-					</TouchableOpacity>
 				</View>
 
 				{/* Sticky tab nav -- wrapped because a sticky child's own style is moved onto RN's
@@ -923,7 +870,6 @@ const styles = StyleSheet.create({
 		marginTop: 6,
 	},
 	// AppTag pill (4x10, 12/16 700) with the design's 6px dot gap
-	availableBadge: { gap: 6 },
 	languageBadgeText: { fontWeight: '600' },
 	statsRow: {
 		marginTop: 16,
@@ -935,11 +881,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		borderWidth: 1,
 		borderColor: CARD_BORDER,
-		shadowColor: APP_COLORS.shadow,
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.08,
-		shadowRadius: 8,
-		elevation: 2,
+		...SOFT_CARD_SHADOW,
 	},
 	statValue: { fontSize: 20, lineHeight: 26 },
 
@@ -963,41 +905,8 @@ const styles = StyleSheet.create({
 
 	heroSection: { backgroundColor: '#fff', paddingBottom: 16 },
 
-	// Next available
-	nextCard: {
-		marginTop: 12,
-		marginHorizontal: 16,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		paddingVertical: 14,
-		paddingHorizontal: 16,
-		borderRadius: 16,
-		backgroundColor: APP_COLORS.surface,
-		borderWidth: 1,
-		borderColor: CARD_BORDER,
-		shadowColor: APP_COLORS.shadow,
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.08,
-		shadowRadius: 8,
-		elevation: 2,
-	},
-	nextEyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.5, color: INK_MUTED },
-	nextTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: INK },
-	nextSub: { fontSize: 12, lineHeight: 16, color: INK_MUTED },
-	nextBookBtn: {
-		height: 40,
-		paddingHorizontal: 16,
-		borderRadius: 10,
-		backgroundColor: PRIMARY,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-	},
-	nextBookText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: '#fff' },
-
 	// Practises at cards
-	practiseCard: { borderRadius: 16, backgroundColor: PAGE_BG, padding: 14, gap: 12 },
+	practiseCard: { borderRadius: 16, backgroundColor: PAGE_BG, padding: 14, gap: 12, ...SOFT_CARD_SHADOW },
 	practiseTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
 	practiseTitle: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: INK },
 	practiseFee: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: INK },

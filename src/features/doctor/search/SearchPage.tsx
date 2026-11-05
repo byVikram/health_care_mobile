@@ -16,7 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
 	AppChip,
 	AppHeaderBackdrop,
-	AppIconButton,
 	AppIconTile,
 	AppNavRow,
 	AppTypography,
@@ -28,7 +27,7 @@ import {
 import { useAuth } from '../../../context/AuthContext'
 import { getSpecialities } from '../doctorService'
 import { ROUTES } from '../../../navigation/routes'
-import { APP_COLORS } from '../../../config/theme'
+import { APP_COLORS, SOFT_CARD_SHADOW } from '../../../config/theme'
 import { specialityVisual } from './components/specialityMeta'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import type { AppStackParamList, MainTabParamList } from '../../../navigation/types'
@@ -65,11 +64,6 @@ function SpecialityGridItem({ spec, width, onPress }: { spec: Speciality; width:
 				<AppTypography style={styles.specLabel} numberOfLines={2}>
 					{spec.label}
 				</AppTypography>
-				{!!spec.hint && (
-					<AppTypography style={styles.specHint} numberOfLines={1}>
-						{spec.hint}
-					</AppTypography>
-				)}
 			</View>
 		</TouchableOpacity>
 	)
@@ -163,10 +157,6 @@ export default function SearchPage() {
 
 	const itemWidth = Math.floor((width - SIDE_PADDING * 2 - GRID_COL_GAP * 2) / 3)
 
-	const handleBack = () => {
-		navigation.navigate(ROUTES.MAIN.HOME as any)
-	}
-
 	const handleSpecialityPress = (spec: Speciality) => {
 		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
 			query: '',
@@ -185,6 +175,7 @@ export default function SearchPage() {
 
 	// Animated header values (design: expanded → compact)
 	const headerPadBottom = progress.interpolate({ inputRange: [0, 1], outputRange: [20, 12] })
+	const topRowHeight = progress.interpolate({ inputRange: [0, 1], outputRange: [6, 52] })
 	const headGap = progress.interpolate({ inputRange: [0, 1], outputRange: [12, 4] })
 	const introMax = progress.interpolate({ inputRange: [0, 1], outputRange: [112, 0] })
 	const introOpacity = progress.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0, 0] })
@@ -203,17 +194,7 @@ export default function SearchPage() {
 				<Animated.View style={[styles.hero, { paddingTop: insets.top + 4, paddingBottom: headerPadBottom }]}>
 					<AppHeaderBackdrop />
 
-					<View style={styles.heroTopRow}>
-						<AppIconButton
-							variant="ghost"
-							size={44}
-							circle
-							onPress={handleBack}
-							accessibilityLabel="Back"
-							style={styles.backButton}
-						>
-							<AppIcon name="back" size={24} color={APP_COLORS.surface} />
-						</AppIconButton>
+					<Animated.View style={[styles.heroTopRow, { height: topRowHeight }]}>
 						<Animated.View
 							style={{ opacity: miniOpacity, transform: [{ translateY: miniShift }] }}
 							accessibilityElementsHidden={!compact}
@@ -230,7 +211,7 @@ export default function SearchPage() {
 								</View>
 							)}
 						</Animated.View>
-					</View>
+					</Animated.View>
 
 					<Animated.View
 						style={[styles.heroIntro, { marginTop: headGap, maxHeight: introMax, opacity: introOpacity }]}
@@ -316,11 +297,6 @@ export default function SearchPage() {
 						<AppTypography style={styles.sectionTitle}>
 							{q ? 'Matching specialities' : 'All specialities'}
 						</AppTypography>
-						{!loadingSpecs && (
-							<AppTypography style={styles.sectionCount}>
-								{filtered.length} of {specialities.length}
-							</AppTypography>
-						)}
 					</View>
 
 					{loadingSpecs ? (
@@ -384,14 +360,13 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		overflow: 'hidden',
 	},
+	// Only the collapsed header shows the small title, so the row is short while the big intro is showing (height
+	// is animated, see topRowHeight).
 	heroTopRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
-		height: 52,
-	},
-	backButton: {
-		marginLeft: -10,
+		overflow: 'hidden',
 	},
 	miniTitle: {
 		fontSize: 18,
@@ -441,10 +416,14 @@ const styles = StyleSheet.create({
 
 	// Scroll content (design <main>: gap 8, padding-bottom 8)
 	scrollContent: { paddingBottom: 8, gap: 8 },
+	// The banner's shadow falls below the card, onto the next (white) section: room for it (8, as the design) and a
+	// zIndex so this section is painted over the one that follows instead of under it.
 	bannerSection: {
 		backgroundColor: APP_COLORS.surface,
 		paddingTop: 16,
+		paddingBottom: 8,
 		paddingHorizontal: 16,
+		zIndex: 1,
 	},
 	symptomSection: {
 		backgroundColor: APP_COLORS.surface,
@@ -468,11 +447,6 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: APP_COLORS.ink,
 	},
-	sectionCount: {
-		fontSize: 12,
-		lineHeight: 16,
-		color: APP_COLORS.inkMuted,
-	},
 
 	// Video banner
 	videoBanner: {
@@ -486,11 +460,7 @@ const styles = StyleSheet.create({
 		backgroundColor: APP_COLORS.surface,
 		borderWidth: 1,
 		borderColor: APP_COLORS.cardBorder,
-		shadowColor: APP_COLORS.shadow,
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.08,
-		shadowRadius: 8,
-		elevation: 2,
+		...SOFT_CARD_SHADOW,
 	},
 	videoBannerTextCol: {
 		flex: 1,
@@ -535,11 +505,7 @@ const styles = StyleSheet.create({
 		gap: 8,
 	},
 	specTile: {
-		shadowColor: APP_COLORS.shadow,
-		shadowOffset: { width: 0, height: 3 },
-		shadowOpacity: 0.08,
-		shadowRadius: 6,
-		elevation: 2,
+		...SOFT_CARD_SHADOW,
 	},
 	specTextCol: {
 		alignItems: 'center',
@@ -549,12 +515,6 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 		fontWeight: '600',
 		color: APP_COLORS.ink,
-		textAlign: 'center',
-	},
-	specHint: {
-		fontSize: 11,
-		lineHeight: 14,
-		color: APP_COLORS.inkMuted,
 		textAlign: 'center',
 	},
 	noResults: {
