@@ -114,6 +114,14 @@ const clinicClock = (): string => new Date(Date.now() + CLINIC_UTC_OFFSET_MINUTE
 export const clinicTodayIso = (): string => clinicClock().slice(0, 10)
 export const clinicNowHms = (): string => clinicClock().slice(11, 19)
 
+/** The clinic's calendar date (YYYY-MM-DD) of any moment, in Indian time whatever time zone the phone is set to. */
+export const clinicDateIso = (moment: Date): string =>
+	new Date(moment.getTime() + CLINIC_UTC_OFFSET_MINUTES * 60_000).toISOString().slice(0, 10)
+
+/** The clinic's clock time (HH:MM, 24-hour) of any moment, in Indian time. */
+export const clinicTimeHm = (moment: Date): string =>
+	new Date(moment.getTime() + CLINIC_UTC_OFFSET_MINUTES * 60_000).toISOString().slice(11, 16)
+
 /** Appointment start as an absolute time (ms since the epoch), read in the clinic's time zone. */
 function appointmentStartMs(apt: Appointment): number | null {
 	const [y, mo, d] = (apt.appointment_date ?? '').split('-').map(Number)
