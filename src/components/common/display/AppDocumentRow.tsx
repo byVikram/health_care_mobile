@@ -63,6 +63,8 @@ export type AppDocumentRowProps = {
 	fileName?: string | null
 	status: AppDocumentStatus
 	optional?: boolean
+	/** Leaves out the icon tile on the left (e.g. a family member's ID card). Defaults to false. */
+	hideIcon?: boolean
 	onUpload?: () => void
 	style?: StyleProp<ViewStyle>
 }
@@ -76,6 +78,7 @@ export function AppDocumentRow({
 	fileName,
 	status,
 	optional = false,
+	hideIcon = false,
 	onUpload,
 	style,
 }: AppDocumentRowProps) {
@@ -84,7 +87,7 @@ export function AppDocumentRow({
 		const needsNewFile = status === 'rejected' || status === 'reupload'
 		return (
 			<View style={[styles.uploaded, style]}>
-				<AppIconTile icon="file-document-outline" tone="sky" size={40} />
+				{!hideIcon && <AppIconTile icon="file-document-outline" tone="sky" size={40} />}
 				<View style={styles.text}>
 					<Text style={styles.smallLabel}>{label}</Text>
 					<Text style={styles.fileName} numberOfLines={1}>
@@ -112,12 +115,14 @@ export function AppDocumentRow({
 
 	return (
 		<View style={[styles.missing, { borderColor: optional ? APP_COLORS.divider : APP_COLORS.danger }, style]}>
-			<AppIconTile
-				icon="file-upload-outline"
-				backgroundColor={APP_COLORS.pageBg}
-				iconColor={APP_COLORS.inkMuted}
-				size={40}
-			/>
+			{!hideIcon && (
+				<AppIconTile
+					icon="file-upload-outline"
+					backgroundColor={APP_COLORS.pageBg}
+					iconColor={APP_COLORS.inkMuted}
+					size={40}
+				/>
+			)}
 			<View style={styles.text}>
 				<Text style={styles.label}>{label}</Text>
 				<Text style={styles.description}>

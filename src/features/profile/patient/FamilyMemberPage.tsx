@@ -367,6 +367,7 @@ export default function FamilyMemberPage() {
 							description="Aadhaar, passport or birth certificate for children"
 							status="missing"
 							optional
+							hideIcon
 							onUpload={() => showComingSoon('Document upload will be available soon')}
 						/>
 					</AppFormCard>
