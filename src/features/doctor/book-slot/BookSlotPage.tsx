@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View, ScrollView } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
@@ -15,7 +15,6 @@ import {
 	AppScreenHeader,
 	AppSection,
 	AppSegmentedControl,
-	AppTag,
 	AppTypography,
 	DateStrip,
 	familyMemberFirstName,
@@ -26,14 +25,19 @@ import { useBookingRestriction } from '../../appointment/useBookingRestriction'
 import BookingRestrictedBanner from '../../appointment/components/BookingRestrictedBanner'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
-import { formatDateDisplay, formatDateForApi, formatTimeForApi, nextDays } from '../../../utils/date'
+import {
+	formatDateDisplay,
+	formatDateForApi,
+	formatTimeForApi,
+	isClosedDayForMode,
+	nextDays,
+} from '../../../utils/date'
 import { openDirections } from '../../../utils/maps'
 import { showComingSoon } from '../../../utils/toast'
 import {
 	AppointmentModeKey,
 	emptyAvailabilityByMode,
 	firstOpenSlot,
-	isClosedDay,
 	isSameDay,
 	isSlotBooked,
 	isSlotSelectable,
@@ -43,7 +47,7 @@ import {
 	normalizeAvailabilityByMode,
 	startOfDay,
 } from '../availability'
-import { APP_COLORS, TONES, formatInr, toneAt } from '../../../config/theme'
+import { APP_COLORS, TONES, formatInr, toneAt, SOFT_CARD_SHADOW } from '../../../config/theme'
 import { getDoctorAvailability, SlotGroup } from '../doctorService'
 
 // "4 · Clinic & slot" (Step 1 of 2) from the consultation design.
@@ -89,8 +93,39 @@ export default function BookSlotPage() {
 	const [patientKey, setPatientKey] = useState('self')
 	const [patientSheetVisible, setPatientSheetVisible] = useState(false)
 
+	const hospitalEntry = hospitals.find((h) => h.hospital.id === selectedHospital) || primary
+
+	// A date the doctor doesn't work (for the chosen consultation type) is greyed out in the Date grid, and offers no
+	// times at all: a stale selection (e.g. after switching clinic or to video) must not keep showing slots for it.
+	const isClosed = useCallback(
+		(d: Date) =>
+			isClosedDayForMode(
+				d,
+				hospitalEntry?.available_days_by_mode?.[mode === 'video' ? 'video_call' : 'clinic_visit'],
+				hospitalEntry?.available_days
+			),
+		[hospitalEntry, mode]
+	)
+	const dateClosed = isClosed(selectedDate)
+
+	// Landing on (or switching to) a closed date moves to the first date the doctor works.
+	useEffect(() => {
+		if (!isClosed(selectedDate)) return
+		const firstOpen = nextDays(BOOKING_WINDOW_DAYS).find((d) => !isClosed(d))
+		if (!firstOpen) return
+		autoPickRef.current = true
+		setSelectedTime(null)
+		setSelectedDate(startOfDay(firstOpen))
+	}, [isClosed, selectedDate])
+
 	useEffect(() => {
 		if (!doctor.id || !selectedHospital) return
+		if (dateClosed) {
+			// Nothing to fetch: the doctor isn't available that day, so show no slots for it.
+			setSlotsByMode(emptyAvailabilityByMode)
+			setSlotsLoading(false)
+			return
+		}
 		let active = true
 		setSlotsLoading(true)
 		const fetchAvailability = async () => {
@@ -111,17 +146,20 @@ export default function BookSlotPage() {
 		return () => {
 			active = false
 		}
-	}, [doctor.id, selectedHospital, selectedDate])
+	}, [doctor.id, selectedHospital, selectedDate, dateClosed])
 
-	const groups: SlotGroup[] = slotsByMode[mode] || []
+	const groups: SlotGroup[] = useMemo(
+		() => (dateClosed ? [] : slotsByMode[mode] || []),
+		[dateClosed, slotsByMode, mode]
+	)
 
 	useEffect(() => {
-		if (slotsLoading || !autoPickRef.current) return
+		// Wait for a date the doctor works: a closed date has no slots, and the pick must survive the move to an open one.
+		if (slotsLoading || dateClosed || !autoPickRef.current) return
 		autoPickRef.current = false
 		setSelectedTime(firstOpenSlot(groups)?.start_time ?? null)
-	}, [slotsLoading, groups])
+	}, [slotsLoading, groups, dateClosed])
 
-	const hospitalEntry = hospitals.find((h) => h.hospital.id === selectedHospital) || primary
 	const clinicFee = Number(hospitalEntry?.offline_consultation_fee) || 0
 	const videoFee = Number(hospitalEntry?.video_consultation_fee) || 0
 	const fee = mode === 'video' ? videoFee : clinicFee
@@ -149,11 +187,6 @@ export default function BookSlotPage() {
 		MONTH_SHORT[selectedDate.getMonth()]
 	}`
 	const summary = selectedTime ? `${dayText}, ${selectedTime} · ${where}` : `${dayText} · ${where} · choose a time`
-	const eyebrow = selectedTime
-		? isToday
-			? 'TODAY'
-			: `${DOW_LABELS[selectedDate.getDay()]} ${selectedDate.getDate()} ${MONTH_SHORT[selectedDate.getMonth()]}`.toUpperCase()
-		: 'CHOOSE A TIME'
 
 	const monthLabel = useMemo(() => {
 		const first = days[0]
@@ -248,40 +281,9 @@ export default function BookSlotPage() {
 			<ScrollView
 				style={{ flex: 1 }}
 				contentContainerStyle={{ paddingBottom: 8 }}
-				stickyHeaderIndices={[1]}
+				stickyHeaderIndices={[0]}
 				keyboardShouldPersistTaps="handled"
 			>
-				{/* Your booking */}
-				<View style={styles.bookingWrap}>
-					<View style={styles.bookingCard}>
-						<View style={styles.bookingDecor} />
-						<AppIconTile
-							icon="calendar-check-outline"
-							size={48}
-							radius={12}
-							iconSize={24}
-							backgroundColor={APP_COLORS.mintAccent}
-							iconColor={APP_COLORS.ink}
-						/>
-						<View style={{ flex: 1, minWidth: 0 }}>
-							<AppTypography style={styles.bookingEyebrow}>{eyebrow}</AppTypography>
-							<AppTypography style={styles.bookingBig}>{selectedTime || 'No time picked'}</AppTypography>
-							<AppTypography style={styles.bookingSub} numberOfLines={1}>
-								{doctor.name} · {where}
-							</AppTypography>
-						</View>
-						<AppTag
-							label={formatInr(fee)}
-							size="md"
-							shape="pill"
-							bg={APP_COLORS.mintAccent}
-							ink={APP_COLORS.ink}
-							style={styles.feePill}
-							textStyle={styles.feePillText}
-						/>
-					</View>
-				</View>
-
 				{/* Consultation type (sticky) -- the outer View is the sticky child (RN replaces its style) */}
 				<View style={styles.segmentWrap}>
 					<AppSegmentedControl<AppointmentModeKey>
@@ -409,15 +411,19 @@ export default function BookSlotPage() {
 						dayCount={BOOKING_WINDOW_DAYS}
 						selectedDate={selectedDate}
 						onSelectDate={(d) => pickDate(startOfDay(d))}
-						isDateDisabled={(d) => isClosedDay(d, hospitalEntry?.available_days)}
-						disabledAccessibilityHint="clinic closed"
+						isDateDisabled={isClosed}
+						disabledAccessibilityHint="doctor unavailable"
 						style={{ paddingHorizontal: 16 }}
 					/>
 				</AppSection>
 
 				{/* Time */}
 				<AppSection title="Time" gap={12}>
-					{slotsLoading ? (
+					{dateClosed ? (
+						<AppTypography style={styles.muted14}>
+							The doctor is unavailable on this date. Pick another date.
+						</AppTypography>
+					) : slotsLoading ? (
 						<ActivityIndicator color={APP_COLORS.primary} style={{ marginVertical: 12 }} />
 					) : groups.length === 0 || !groups.some((g) => g.slots.some(isSlotSelectable)) ? (
 						<AppTypography style={styles.muted14}>
@@ -501,31 +507,6 @@ export default function BookSlotPage() {
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: APP_COLORS.pageBg },
 
-	bookingWrap: { backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16 },
-	bookingCard: {
-		overflow: 'hidden',
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		padding: 14,
-		borderRadius: 16,
-		backgroundColor: APP_COLORS.ink,
-	},
-	bookingDecor: {
-		position: 'absolute',
-		right: -30,
-		top: -40,
-		width: 120,
-		height: 120,
-		borderRadius: 60,
-		backgroundColor: APP_COLORS.primary,
-	},
-	bookingEyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.5, color: APP_COLORS.mintAccent },
-	bookingBig: { fontSize: 20, lineHeight: 26, fontWeight: '800', color: '#fff' },
-	bookingSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.mint },
-	// AppTag md pill (13/18) centred in the card at the design's 800 weight
-	feePill: { alignSelf: 'center' },
-	feePillText: { fontWeight: '800' },
 
 	segmentWrap: {
 		backgroundColor: '#fff',
@@ -553,6 +534,7 @@ const styles = StyleSheet.create({
 		borderWidth: 2,
 		borderColor: 'transparent',
 		backgroundColor: APP_COLORS.pageBg,
+		...SOFT_CARD_SHADOW,
 	},
 	clinicCardOn: { borderColor: APP_COLORS.primary, backgroundColor: APP_COLORS.mint },
 	clinicName: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: APP_COLORS.ink },

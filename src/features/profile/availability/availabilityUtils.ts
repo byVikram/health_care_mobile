@@ -17,7 +17,7 @@ export const SECTION_KEYS: SectionKey[] = ['morning', 'afternoon', 'evening']
 
 /** Each section's window in minutes from midnight; a range must sit fully inside its section. */
 export const SECTION_META: Record<SectionKey, { label: string; from: number; to: number }> = {
-	morning: { label: 'Morning', from: 0, to: 12 * 60 },
+	morning: { label: 'Morning', from: 6 * 60, to: 12 * 60 },
 	afternoon: { label: 'Afternoon', from: 12 * 60, to: 17 * 60 },
 	evening: { label: 'Evening', from: 17 * 60, to: 23 * 60 + 59 },
 }
@@ -68,16 +68,21 @@ export const sectionForStart = (hhmm: string): SectionKey => {
 	return 'evening'
 }
 
-/** 30-minute select options inside a section window (end options include the window end). */
-export const timeOptions = (section: SectionKey, kind: 'start' | 'end') => {
+/**
+ * 30-minute select options inside a section window (end options include the window end). For an end list pass the
+ * range's `start`: only times after it are offered, so an end can never be picked at or before its own start.
+ */
+export const timeOptions = (section: SectionKey, kind: 'start' | 'end', start?: string) => {
 	const { from, to } = SECTION_META[section]
 	const out: { value: string; label: string }[] = []
+	const earliestEnd = kind === 'end' && start ? toMinutes(start) : from
 	for (let m = from; m <= to; m += 30) {
 		if (kind === 'start' && m >= to) break
-		if (kind === 'end' && m === from) continue
+		if (kind === 'end' && (m === from || m <= earliestEnd)) continue
 		out.push({ value: toHHMM(m), label: formatTime(toHHMM(m)) })
 	}
-	if (kind === 'end' && to % 30 !== 0) out.push({ value: toHHMM(to), label: formatTime(toHHMM(to)) })
+	if (kind === 'end' && to % 30 !== 0 && to > earliestEnd)
+		out.push({ value: toHHMM(to), label: formatTime(toHHMM(to)) })
 	return out
 }
 

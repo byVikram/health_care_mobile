@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "123456789012",
-    "project_id": "karola-health",
-    "storage_bucket": "karola-health.appspot.com"
+    "project_number": "260053784588",
+    "project_id": "karolahealth",
+    "storage_bucket": "karolahealth.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
+        "mobilesdk_app_id": "1:260053784588:android:de477cdcebe68d8a0cf629",
         "android_client_info": {
-          "package_name": "com.anonymous.KarolaHealth"
+          "package_name": "com.karolahealth.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSy_placeholder_key_for_android"
+          "current_key": "AIzaSyCFNVFs_R9tFa5GXkUXLaAyP_iBvBfv4OE"
         }
       ],
       "services": {
