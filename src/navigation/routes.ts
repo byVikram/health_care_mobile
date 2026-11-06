@@ -49,7 +49,6 @@ export const ROUTES = {
 		PATIENT_PAYMENT: 'PatientPayment',
 		PHARMACY_SEARCH_PAGE: 'PharmacySearchPage',
 		ORDER_LIST: 'OrderListPage',
-		ALL_SPECIALITIES: 'AllSpecialitiesPage',
 		ORDER_DETAILS: 'OrderDetails',
 		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
 

@@ -163,7 +163,7 @@ export default function LabReportPage() {
 						</View>
 						<TouchableOpacity
 							style={styles.consult}
-							onPress={() => navigation.navigate(ROUTES.STACK.ALL_SPECIALITIES)}
+							onPress={() => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH })}
 							accessibilityRole="button"
 						>
 							<Text style={styles.consultText}>Consult</Text>

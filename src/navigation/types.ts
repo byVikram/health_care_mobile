@@ -239,7 +239,6 @@ export type AppStackParamList = {
 	// orderId: opened from the Bookings tab (a placed order is otherwise read from labBookingStore)
 	[ROUTES.STACK.LABORATORY_BOOKING_TRACKING]: { orderId?: string } | undefined
 	[ROUTES.STACK.LABORATORY_REPORT]: undefined
-	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
 	[ROUTES.STACK.PATIENT_PAYMENT]: PatientPaymentParams | undefined
 	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: { openAskModal?: boolean } | undefined

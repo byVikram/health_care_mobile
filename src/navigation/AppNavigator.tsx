@@ -57,7 +57,11 @@ import RadiologyBookingDetailsPage from '../features/radiology/RadiologyBookingD
 import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
 import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage'
 
-import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
+// Switched off: SearchPage (the Search tab) is the specialities list now, and this page bundles 18 specialty images of about 2 MB each.
+// To bring it back, un-comment this import and the screen below, and restore ROUTES.STACK.ALL_SPECIALITIES ('AllSpecialitiesPage')
+// in routes.ts and types.ts.
+// import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
+
 
 
 import AllEventsPage from '../features/events/AllEventsPage'
@@ -187,6 +191,7 @@ function AuthenticatedNavigator() {
 				/>
 				<AppStack.Screen name={ROUTES.STACK.LABORATORY_BOOKING_TRACKING as keyof AppStackParamList} component={LabOrderPage} options={{ headerShown: false }} />
 				<AppStack.Screen name={ROUTES.STACK.LABORATORY_REPORT as keyof AppStackParamList} component={LabReportPage} options={{ headerShown: false }} />
+				{/* AllSpecialitiesPage is switched off (see the import above).
 				<AppStack.Screen
 					name={ROUTES.STACK.ALL_SPECIALITIES}
 					component={AllSpecialitiesPage}
@@ -195,6 +200,7 @@ function AuthenticatedNavigator() {
 						title: 'All Specialities',
 					}}
 				/>
+				*/}
 
 				{/* DoctorSearchPage renders its own single AppScreenHeader — no navigator header here. */}
 				<AppStack.Screen

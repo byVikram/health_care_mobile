@@ -10,7 +10,6 @@ const OFFER_ROUTES: ReadonlySet<string> = new Set<string>([
 	ROUTES.MAIN.ANCILLARY,
 	ROUTES.STACK.SEARCH,
 	ROUTES.STACK.DOCTOR_SEARCH,
-	ROUTES.STACK.ALL_SPECIALITIES,
 	ROUTES.STACK.PHARMACY_SEARCH_PAGE,
 	ROUTES.STACK.LABORATORY_LIST,
 	ROUTES.STACK.RADIOLOGY_LIST,
@@ -23,6 +22,9 @@ const OFFER_ROUTES: ReadonlySet<string> = new Set<string>([
 	ROUTES.STACK.PATIENT_QUESTIONS_LIST,
 	ROUTES.STACK.CARE_AI,
 ])
+
+// Route names an offer in the ads CMS may still carry, mapped to the screen that replaced them.
+const LEGACY_OFFER_ROUTES: Record<string, string> = { AllSpecialitiesPage: ROUTES.MAIN.SEARCH }
 
 const PARAM_KEY = /^[A-Za-z_][A-Za-z0-9_]{0,40}$/
 const MAX_PARAM_TEXT = 200
@@ -45,6 +47,7 @@ export const resolveOfferRoute = (
 	route: unknown,
 	params?: unknown
 ): { name: string; params?: Record<string, string | number | boolean> } | null => {
-	if (typeof route !== 'string' || !OFFER_ROUTES.has(route)) return null
-	return { name: route, params: cleanParams(params) }
+	const name = typeof route === 'string' ? (LEGACY_OFFER_ROUTES[route] ?? route) : null
+	if (name === null || !OFFER_ROUTES.has(name)) return null
+	return { name, params: cleanParams(params) }
 }
