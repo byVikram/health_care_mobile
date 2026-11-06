@@ -21,13 +21,21 @@ type Props = {
 	search: { value: string; onChange: (v: string) => void; context: SearchContextKey }
 	/** Extra bottom padding (the questions header uses 14, reads 16). */
 	paddingBottom?: number
+	/** Plain APP_COLORS.primary (the same teal as the other screens' headers) instead of the dark ink-and-glow backdrop. */
+	solid?: boolean
 }
 
-export function FeedHeader({ title, subtitle, onBack, action, search, paddingBottom = 16 }: Props) {
+export function FeedHeader({ title, subtitle, onBack, action, search, paddingBottom = 16, solid = false }: Props) {
 	const insets = useSafeAreaInsets()
 	return (
-		<View style={[styles.header, { paddingTop: insets.top + 8, paddingBottom }]}>
-			<AppHeaderBackdrop />
+		<View
+			style={[
+				styles.header,
+				{ paddingTop: insets.top + 8, paddingBottom },
+				solid && { backgroundColor: APP_COLORS.primary },
+			]}
+		>
+			{!solid && <AppHeaderBackdrop />}
 			<View style={styles.topRow}>
 				<Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" style={styles.backBtn}>
 					<AppPathIcon d={FEED_ICONS.back} size={22} strokeWidth={2.2} color="#FFFFFF" />
