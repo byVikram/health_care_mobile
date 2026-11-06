@@ -115,7 +115,7 @@ export function useFamilyMembers() {
 					age: self.age || undefined,
 					gender: self.gender || undefined,
 					bloodGroup: self.blood_group || undefined,
-					publicId: self.public_id || self.publicId || undefined,
+					publicId: self.public_id || self.publicId || String(self.id),
 					apiRelation: 'Self',
 				}
 			: fallbackSelf

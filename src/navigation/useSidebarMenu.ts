@@ -49,6 +49,7 @@ export function useSidebarMenu(active: boolean): AppSidebarSection[] {
 			radiology_bookings: openBookings('radiology'),
 			home_care_orders: openBookings('ancillary'),
 			care_ai: () => navigation.navigate(ROUTES.STACK.CARE_AI),
+			medical_records: () => navigation.navigate(ROUTES.STACK.MEDICAL_RECORDS),
 			// There is no standalone treatment-history screen: for a patient the appointment history is the closest real
 			// target; the other roles have none yet and stay on Home.
 			treatment_history: isPatient ? openBookings('doctor') : toHome,
