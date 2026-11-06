@@ -154,6 +154,8 @@ export const API_ENDPOINTS = {
 		LABORATORY_REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/laboratory-reports`,
 		RADIOLOGY_REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/radiology-reports`,
 		REPORTS_CREATE: `${BASE_URL}/api/patients/reports`,
+		RECORDS: `${BASE_URL}/api/patients/records`,
+		RECORD_BY_ID: (id: string) => `${BASE_URL}/api/patients/records/${id}`,
 		ADDRESSES: `${BASE_URL}/api/patients/me/addresses`,
 		TREATMENT_HISTORY: (id: string) => `${BASE_URL}/api/treatments/patient/${id}/history`,
 		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,

@@ -9,7 +9,7 @@ import { AppState } from 'react-native'
 import { useAuth } from '../context/AuthContext'
 import { getNavigation, type NavigationResponse } from '../services/navigationConfigService'
 import { registerSessionCache } from '../utils/sessionCache'
-import { DEFAULT_MENU, menuRoleFor, type NavigationConfig } from './menuConfig'
+import { DEFAULT_MENU, menuRoleFor, withClientSidebarRows, type NavigationConfig } from './menuConfig'
 
 // The last good response (and its ETag), so a remount renders the real menu immediately and the next fetch can ask for
 // a 304. It belongs to the signed-in user's role: dropped on logout / session expiry.
@@ -23,7 +23,7 @@ function resolve(response: NavigationResponse | null, role: ReturnType<typeof me
 	const defaults = DEFAULT_MENU[role]
 	return {
 		bottomTabs: response?.bottom_tabs.length ? response.bottom_tabs : defaults.bottomTabs,
-		sidebar: response?.sidebar.length ? response.sidebar : defaults.sidebar,
+		sidebar: withClientSidebarRows(response?.sidebar.length ? response.sidebar : defaults.sidebar, role),
 	}
 }
 

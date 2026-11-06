@@ -178,6 +178,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.PROVIDER_WORK]: undefined
 	/** No params = the welcome screen; `scenario` opens straight into the chat summary / in-chat booking. */
 	[ROUTES.STACK.CARE_AI]: CareAiLaunch | undefined
+	[ROUTES.STACK.MEDICAL_RECORDS]: undefined
 	[ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
 	[ROUTES.STACK.SEARCH]: undefined
 	[ROUTES.STACK.DOCTOR_SEARCH]:

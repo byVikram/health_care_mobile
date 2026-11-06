@@ -38,6 +38,7 @@ const PATHS: Record<string, string> = {
 /** Icons the shared path set has no drawing for. */
 const GLYPHS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
 	'past-visits': 'history',
+	'medical-records': 'file-document-multiple-outline',
 	availability: 'calendar-clock-outline',
 }
 

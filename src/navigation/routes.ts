@@ -129,5 +129,6 @@ export const ROUTES = {
 		DOCTOR_FAVOURITES: 'DoctorFavourites',
 		PROVIDER_WORK: 'ProviderWork',
 		CARE_AI: 'CareAi',
+		MEDICAL_RECORDS: 'MedicalRecords',
 	},
 } as const
