@@ -149,6 +149,7 @@ export default function HealthReadsPage() {
 		<View style={styles.screen}>
 			<FeedHeader
 				title="Health reads"
+				solid
 				subtitle="Written and reviewed by doctors"
 				onBack={() => navigation.goBack()}
 				action={{
