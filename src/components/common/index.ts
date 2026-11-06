@@ -262,3 +262,15 @@ export type { AppDocumentRowProps, AppDocumentStatus } from './display/AppDocume
 export { LogoutConfirmModal } from './feedback/LogoutConfirmModal'
 export { AppConfirmSheet } from './feedback/AppConfirmSheet'
 export type { AppConfirmSheetProps } from './feedback/AppConfirmSheet'
+
+// Medical records: pill tabs with counts, person switcher for a header, month-grouped record list, dashed action card, empty card
+export { AppPillTabs } from './inputs/AppPillTabs'
+export type { AppPillTab, AppPillTabsProps } from './inputs/AppPillTabs'
+export { AppMemberSwitcher } from './inputs/AppMemberSwitcher'
+export type { AppMemberSwitcherProps } from './inputs/AppMemberSwitcher'
+export { AppRecordList } from './display/AppRecordList'
+export type { AppRecordListProps, AppRecordGroup, AppRecordRowData, AppRecordTag } from './display/AppRecordList'
+export { AppDashedActionCard } from './display/AppDashedActionCard'
+export type { AppDashedActionCardProps } from './display/AppDashedActionCard'
+export { AppEmptyCard } from './display/AppEmptyCard'
+export type { AppEmptyCardProps } from './display/AppEmptyCard'

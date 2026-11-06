@@ -310,8 +310,8 @@ const ApiService = {
 	put<T = unknown>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
 		return axiosInstance.put<T>(url, body, config)
 	},
-	delete<T = unknown>(url: string): Promise<AxiosResponse<T>> {
-		return axiosInstance.delete<T>(url)
+	delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+		return axiosInstance.delete<T>(url, config)
 	},
 	deleteWithBody<T = unknown>(url: string, body: unknown): Promise<AxiosResponse<T>> {
 		return axiosInstance.delete<T>(url, { data: body })
