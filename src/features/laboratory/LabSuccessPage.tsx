@@ -81,6 +81,7 @@ function LabSuccessContent({ order }: { order: LabOrder }) {
 
 	return (
 		<AppBookingSuccess
+			confetti={false}
 			badge={later ? `Booking confirmed · ${inr(order.total)}` : `Payment successful · ${inr(order.total)}`}
 			title="Your tests are booked"
 			subtitle={subtitle}
