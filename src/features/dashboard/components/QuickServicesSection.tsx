@@ -36,7 +36,7 @@ import AlliedIcon from '../../../assets/quick-services/allied.png'
 import TherapeuticIcon from '../../../assets/quick-services/therapeutic.png'
 import ScanTypeSelectorModal from '../../radiology/components/ScanTypeSelectorModal'
 
-import AlliedSelectorModal from './AlliedSelcetorModel'
+import AlliedSelectorModal from './AlliedSelectorModal'
 import TherapeuticSelector from './TherapeuticSelector'
 
 type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'ancillary' | 'nurse' | null

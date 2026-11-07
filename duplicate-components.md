@@ -36,15 +36,16 @@ settings (for example the notification toggles).
 - About ten local skeleton components instead of `AppSkeleton`.
 - Local chips, badges and toggles (`StatusChip`, `BookingStatusBadge`, `ToolbarChip`, `FilterToggle`, `AllModeToggle`, `Toggle`,
   `ToggleRow`), two `EmptyState`, two `ImageViewerModal`, `RejectConfirmModal` instead of `AppConfirmSheet`.
-- A raw `<Modal>` in 21 live files and a raw `<TextInput>` in 20 (several are "Sheet" screens such as `BookingRequestSheet`,
-  `IncomingOfferSheet`, `StartCodeSheet`). No raw `<Switch>`: `AppToggle` is used.
+- A raw `<Modal>` in 21 live files and a raw `<TextInput>` in 20 (several are "Sheet" screens such as `BookingRequestSheet` and
+  `IncomingOfferSheet`; `StartCodeSheet` already uses `AppBottomSheet`, its raw `TextInput` is the code field). No raw `<Switch>`:
+  `AppToggle` is used.
 
 ### 3. Look-alike pairs in live code
 
 `AncillaryBookNowReviewPage` / `AncillaryReviewPayPage` (44%), `CompletedBookingCard` / `UpcomingBookingCard` (49%),
 `ArticleSection` / `PodcastsSection` (49%), `BlogsSection` / `CommunitySection` (45%), `DeclineOrderSheet` / `ReportIssueSheet`
-(styles 68%), `AppPromoCard` / `HomeOffersSection` (styles 73%), `AlliedSelcetorModel` / `TherapeuticSelector` (same component,
-different data; file names are misspelled), `blogService` / `qaService` / `communityService` (same request pattern, about 57%).
+(styles 68%), `AppPromoCard` / `HomeOffersSection` (styles 73%), `AlliedSelectorModal` / `TherapeuticSelector` (not a real
+duplicate: two thin card lists over the shared `CardGridSelector`; the misspelled file names were fixed, see step 3), `blogService` / `qaService` / `communityService` (same request pattern, about 57%).
 
 ### 4. Inside the shared library
 
@@ -88,6 +89,25 @@ Done on this branch, not committed. Checked with `npx tsc --noEmit` (clean) and 
   team decides (it has no speech code).
 - `components/common/booking/RollingDateSlotPicker.tsx`: an earlier version of this scan listed it as unused because it was searched by
   file name; it exports `DateStrip` and `SlotChipGrid`, which 5 and 7 screens use.
+
+## Step 3: tidy and a look at the local helpers (done)
+
+Second commit on this branch.
+
+- Fixed two misspelled file names with `git mv` (history kept) and their 4 imports: `CardGridSelcetor` -> `CardGridSelector`,
+  `AlliedSelcetorModel` -> `AlliedSelectorModal`.
+- `AppointmentDetailsContent`: its own pulsing `SkeletonBox` is now a thin wrapper around the shared `AppSkeleton` (same size,
+  radius 6 and colour `DIVIDER`; the call sites did not change). One visible difference: the pulse is `AppSkeleton`'s (opacity 0.3 to
+  0.7 over 800 ms) instead of 0.4 to 1 over 700 ms.
+- Checked the other local helpers of section 2 against the shared components. Most are not drop-in duplicates:
+  - Skeletons: 4 of the 6 local ones already compose `AppSkeleton`; `AppointmentList`'s `SkeletonRow` animates a whole row and was left.
+  - `Toggle` (`NotificationSettingsSheet`) is a custom track and knob, not `AppToggle`; `EmptyState` (`ConsultationPage`) is a bare icon
+    and caption, not `AppEmptyCard`; `StatusChip` maps a status to colours (`AppTag` would need that mapping).
+  - Moving them onto the shared ones changes how the screens look, so each needs a design decision and a check on a phone.
+- The raw `<Modal>` screens outside pharmacy and radiology (about 13): `RescheduleProposalModal`, `MyBookingsPage`, `BookingRequestSheet`,
+  `IncomingOfferSheet`, `RescheduleModal`, `ConsultationPage`, `QuickServicesSection`, `ConsentForm`, `AskQuestionSheet`,
+  `RecordViewerModal` (a full-screen image viewer, fine as it is), `PreIntakeModal`, `WalletTopUpModal`, `AppointmentList`. Each has its own
+  layout, so moving one to `AppBottomSheet` / `AppModal` changes its presentation and animation: do them one at a time with a phone.
 
 ## Not done yet
 

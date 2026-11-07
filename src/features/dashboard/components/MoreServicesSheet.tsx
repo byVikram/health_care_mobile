@@ -20,7 +20,7 @@ import {
 	telUrl,
 	useAppConfig,
 } from '../useHomeChromeData'
-import AlliedSelectorModal from './AlliedSelcetorModel'
+import AlliedSelectorModal from './AlliedSelectorModal'
 import TherapeuticSelector from './TherapeuticSelector'
 
 export interface MoreServicesSheetProps {
