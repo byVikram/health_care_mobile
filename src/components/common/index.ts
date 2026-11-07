@@ -16,8 +16,6 @@ export type { AppToggleProps } from './inputs/AppToggle'
 export { default as AppHeader } from './layout/AppHeader'
 export { default as AppSidebar } from './layout/AppSidebar'
 export type { AppSidebarItem } from './layout/AppSidebar'
-export { default as AppTable } from './display/AppTable'
-export type { AppTableColumn, AppTableColumnOption, AppTableProps } from './display/AppTable'
 export { default as SplashScreen } from './layout/SplashScreen'
 export { default as DateSlotPicker } from './inputs/DateSlotPicker'
 export type { PickProps as DateSlotPickerProps } from './inputs/DateSlotPicker'
@@ -94,14 +92,6 @@ export { default as AddressCardItem } from './booking/AddressSelection/AddressCa
 export type { AddressCardItemProps } from './booking/AddressSelection/AddressCardItem'
 export { DateStrip, SlotChipGrid } from './booking/RollingDateSlotPicker'
 export type { DateStripProps, SlotChipItem, SlotChipGridProps } from './booking/RollingDateSlotPicker'
-export { SelectedItemCard } from './booking/BookingSummary/SelectedItemCard'
-export type {
-	SelectedItemCardProps,
-	SelectedItemBadge,
-	SelectedItemExpandable,
-} from './booking/BookingSummary/SelectedItemCard'
-export { SummaryEmptyState } from './booking/BookingSummary/SummaryEmptyState'
-export type { SummaryEmptyStateProps } from './booking/BookingSummary/SummaryEmptyState'
 export { BillingSummaryCard, AppBillSummary, AppBillStatusLine } from './booking/BookingSummary/BillingSummaryCard'
 export type {
 	BillingSummaryCardProps,
@@ -117,8 +107,6 @@ export type {
 } from './booking/AppPaymentMethodList'
 export { AppTicketCard } from './booking/AppTicketCard'
 export type { AppTicketCardProps, AppTicketHeader, AppTicketField } from './booking/AppTicketCard'
-export { PackageSectionCard } from './booking/PackageSectionCard'
-export type { PackageListItem } from './booking/PackageSectionCard'
 // KarolaHealth design-language primitives (tokens in src/config/theme.ts)
 export { AppIcon, AppPathIcon } from './display/AppIcon'
 export type { AppIconName, AppIconProps, AppPathIconProps } from './display/AppIcon'
@@ -141,12 +129,6 @@ export { AppSection } from './layout/AppSection'
 export type { AppSectionProps } from './layout/AppSection'
 export { AppStatusTimeline } from './display/AppStatusTimeline'
 export type { AppStatusTimelineProps, AppTimelineStep, AppTimelineState } from './display/AppStatusTimeline'
-export { AppScheduleTimeline } from './display/AppScheduleTimeline'
-export type {
-	AppScheduleTimelineProps,
-	AppScheduleTimelineItem,
-	AppScheduleTimelineDot,
-} from './display/AppScheduleTimeline'
 export { AppNumberedSteps } from './display/AppNumberedSteps'
 export type { AppNumberedStepsProps, AppNumberedStep } from './display/AppNumberedSteps'
 export { AppFooterBar } from './layout/AppFooterBar'
