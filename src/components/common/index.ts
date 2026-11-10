@@ -23,6 +23,7 @@ export { default as AppScreenHeader, AppHeaderBackdrop } from './layout/AppScree
 export { default as AppAvatar } from './display/AppAvatar'
 export { default as StatusModal } from './feedback/StatusModal'
 export { default as OfflineBanner } from './feedback/OfflineBanner'
+export { default as NotificationToast } from './feedback/NotificationToast'
 export { default as OfflineScreen } from './feedback/OfflineScreen'
 export { default as AppStickyFooter, StickyFooter } from './layout/AppStickyFooter'
 export { default as ProviderDetailsCard } from './display/ProviderDetailsCard'

@@ -27,6 +27,10 @@ export const API_ENDPOINTS = {
 		GET_ROLES: `${BASE_URL}/api/auth/get-roles`,
 		CREATE_USER: `${BASE_URL}/api/auth/create-user`,
 		SESSIONS: `${BASE_URL}/api/auth/sessions`,
+		// This login session's push token, and the flag that the notification prompt was shown (the apps send the FULL address:
+		// a bare path has no server and fails on the phone).
+		SESSION_FCM_TOKEN: `${BASE_URL}/api/auth/session/fcm-token`,
+		SESSION_NOTIFICATION_PROMPT: `${BASE_URL}/api/auth/session/notification-prompt`,
 		SESSION_LOGOUT: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}`,
 		SESSIONS_OTHERS: `${BASE_URL}/api/auth/sessions/others`,
 		SESSION_ACKNOWLEDGE: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}/acknowledge`,

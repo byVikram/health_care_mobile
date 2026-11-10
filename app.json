@@ -41,6 +41,7 @@
     "plugins": [
       "@react-native-firebase/app",
       "@react-native-firebase/crashlytics",
+      "./plugins/withNotificationChannels",
       "expo-asset",
       [
         "expo-splash-screen",

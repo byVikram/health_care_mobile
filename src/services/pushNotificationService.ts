@@ -6,15 +6,17 @@
 //
 // Foreground: a care-request offer or home-care news is ignored (the offer already arrives over the dispatch WebSocket,
 // useProviderDispatchSocket, and would show twice). News that carries a `notification_id` (an appointment was confirmed, a
-// reminder ...) is a row in the notification list: while the app is open it shows as a toast, the bell and the list refresh,
-// and a tap on the toast opens the same screen as a tap on the phone's notification.
+// reminder ...) is a row in the notification list: while the app is open it shows as a banner at the top (components/common/
+// feedback/NotificationToast), unless that screen is already open, the bell and the list refresh, and a tap on the banner opens
+// the same screen as a tap on the phone's notification.
 import { useEffect } from 'react'
 import { Platform } from 'react-native'
 import type { RemoteMessage } from '@react-native-firebase/messaging'
 import Toast from 'react-native-toast-message'
 import ApiService from './apiService'
+import { API_ENDPOINTS } from '../constants/apiUrls'
 import { emitNotificationsChanged } from './notificationEvents'
-import { navigate } from '../navigation/navigationService'
+import { getCurrentRoute, navigate } from '../navigation/navigationService'
 import { ROUTES } from '../navigation/routes'
 import { openNotificationTarget, type NavigateFn } from '../features/notification/openNotificationTarget'
 import { markNotificationRead } from '../features/referrals/referralService'
@@ -23,7 +25,7 @@ import { markNotificationRead } from '../features/referrals/referralService'
 const isNative = Platform.OS !== 'web'
 const firebase = () => require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging')
 
-const FCM_TOKEN_URL = '/api/auth/session/fcm-token'
+const FCM_TOKEN_URL = API_ENDPOINTS.AUTH.SESSION_FCM_TOKEN
 const NEW_CARE_REQUEST_OFFER = 'NEW_CARE_REQUEST_OFFER'
 // News about a patient's home-care visit (the provider arrived, the visit was reported as missed, the reply reminder, the
 // strike warning, the booking pause): the push carries the booking id, and a tap opens that booking.
@@ -35,13 +37,25 @@ const PATIENT_HOME_CARE_NEWS = new Set([
 	'ANCILLARY_BOOKING_RESTRICTED',
 ])
 
-/** Send a token to the backend for the current login session. Never throws. */
+// The first request right after sign-in can fail on a connection that went stale (Android's HTTP client retries a GET on its own,
+// never a PATCH), so a failed registration is tried again a few times before giving up. A refusal by the server (a 4xx) is not retried.
+const TOKEN_RETRY_DELAYS_MS = [1500, 4000, 10000]
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+/** Send a token to the backend for the current login session, retrying a network failure. Never throws. */
 async function sendToken(token: string | null | undefined) {
 	if (!token) return
-	try {
-		await ApiService.patch(FCM_TOKEN_URL, { fcm_token: token })
-	} catch (error) {
-		console.warn('[push] Could not register the FCM token with the backend:', error)
+	for (let attempt = 0; ; attempt++) {
+		try {
+			await ApiService.patch(FCM_TOKEN_URL, { fcm_token: token })
+			return
+		} catch (error) {
+			const status = (error as { response?: { status?: number } })?.response?.status
+			const retryable = (status === undefined || status >= 500) && attempt < TOKEN_RETRY_DELAYS_MS.length
+			console.warn(`[push] Could not register the FCM token with the backend (attempt ${attempt + 1}):`, error)
+			if (!retryable) return
+			await wait(TOKEN_RETRY_DELAYS_MS[attempt])
+		}
 	}
 }
 
@@ -119,15 +133,27 @@ async function markRead(notificationId: string) {
 	}
 }
 
-/** App open and a push arrives: show it as a toast and refresh the bell and the list (only news that is in the list). */
+/** True when the screen in front already shows what the push is about, so a banner would only repeat it. */
+function alreadyOnScreen(data: NonNullable<RemoteMessage['data']>): boolean {
+	const route = getCurrentRoute()
+	if (!route) return false
+	if (route.name === ROUTES.STACK.NOTIFICATION) return true // the list itself: it reloads on its own
+	const params = route.params as { appointmentId?: string } | undefined
+	return data.redirect_type === 'appointment' && route.name === ROUTES.STACK.APPOINTMENTS && params?.appointmentId === data.redirect_id
+}
+
+/** App open and a push arrives: refresh the bell and the list and, unless it is already on screen, show a banner at the top. */
 function handleForeground(message: RemoteMessage) {
 	const data = message.data
 	if (!data || typeof data.notification_id !== 'string' || !data.notification_id) return
 	emitNotificationsChanged()
+	if (alreadyOnScreen(data)) return
 	Toast.show({
-		type: 'info',
+		type: 'notification',
 		text1: message.notification?.title ?? 'New notification',
 		text2: message.notification?.body,
+		position: 'top',
+		topOffset: 48,
 		visibilityTime: 5000,
 		onPress: () => {
 			Toast.hide()

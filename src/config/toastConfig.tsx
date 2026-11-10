@@ -7,9 +7,12 @@
 // design system.
 
 import React from 'react'
-import { BaseToast, BaseToastProps } from 'react-native-toast-message'
+import { BaseToast, BaseToastProps, ToastConfigParams } from 'react-native-toast-message'
+import { NotificationToast } from '../components/common'
 
 export const toastConfig = {
+  // A push that arrives while the app is open (see services/pushNotificationService.ts).
+  notification: (props: ToastConfigParams<unknown>) => <NotificationToast {...props} />,
   rejectSuccess: (props: BaseToastProps) => (
     <BaseToast
       {...props}
