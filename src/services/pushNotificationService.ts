@@ -4,14 +4,20 @@
 // /api/auth/session/fcm-token) so it can wake a closed / backgrounded app -- e.g. the "New care request
 // nearby" offer sent to nurses -- and opens the right screen when the notification is tapped.
 //
-// Foreground messages are deliberately ignored here: while the app is open the offer already arrives over the
-// dispatch WebSocket (useProviderDispatchSocket), which would otherwise show it twice.
+// Foreground: a care-request offer or home-care news is ignored (the offer already arrives over the dispatch WebSocket,
+// useProviderDispatchSocket, and would show twice). News that carries a `notification_id` (an appointment was confirmed, a
+// reminder ...) is a row in the notification list: while the app is open it shows as a toast, the bell and the list refresh,
+// and a tap on the toast opens the same screen as a tap on the phone's notification.
 import { useEffect } from 'react'
 import { Platform } from 'react-native'
 import type { RemoteMessage } from '@react-native-firebase/messaging'
+import Toast from 'react-native-toast-message'
 import ApiService from './apiService'
+import { emitNotificationsChanged } from './notificationEvents'
 import { navigate } from '../navigation/navigationService'
 import { ROUTES } from '../navigation/routes'
+import { openNotificationTarget, type NavigateFn } from '../features/notification/openNotificationTarget'
+import { markNotificationRead } from '../features/referrals/referralService'
 
 // Loaded lazily and never on web: @react-native-firebase is native-only and must not run at module load.
 const isNative = Platform.OS !== 'web'
@@ -68,6 +74,17 @@ export async function unregisterPushToken() {
 	}
 }
 
+const openScreen: NavigateFn = (name, params) => (navigate as unknown as NavigateFn)(name, params)
+
+/** The screen a push opens, from its data (`redirect_type` / `redirect_id`, the same fields as the row in the list). */
+function openFromData(data: RemoteMessage['data']): boolean {
+	if (!data || typeof data.redirect_type !== 'string' || !data.redirect_type) return false
+	return openNotificationTarget(openScreen, {
+		redirect_type: data.redirect_type,
+		redirect_id: typeof data.redirect_id === 'string' ? data.redirect_id : null,
+	})
+}
+
 /**
  * Notification tapped: a care-request offer lands on the provider's Today screen, whose socket delivers the offer; news about a
  * patient's home-care visit opens the booking (a scheduled order's details, or the live screen of an instant one).
@@ -83,7 +100,40 @@ function handleOpened(message: RemoteMessage | null) {
 		if (data.bookingType === 'SCHEDULED')
 			navigate(ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS, { requestId: id } as never)
 		else navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: id } as never)
+		return
 	}
+	// News that is also a row in the notification list (an appointment update): open its screen and mark it read.
+	if (openFromData(data) && typeof data?.notification_id === 'string' && data.notification_id) {
+		void markRead(data.notification_id)
+	}
+}
+
+/** Mark the notification behind a tapped push as read (best effort), then refresh the bell and the list. */
+async function markRead(notificationId: string) {
+	try {
+		await markNotificationRead(notificationId)
+	} catch (error) {
+		console.warn('[push] Could not mark the notification as read:', error)
+	} finally {
+		emitNotificationsChanged()
+	}
+}
+
+/** App open and a push arrives: show it as a toast and refresh the bell and the list (only news that is in the list). */
+function handleForeground(message: RemoteMessage) {
+	const data = message.data
+	if (!data || typeof data.notification_id !== 'string' || !data.notification_id) return
+	emitNotificationsChanged()
+	Toast.show({
+		type: 'info',
+		text1: message.notification?.title ?? 'New notification',
+		text2: message.notification?.body,
+		visibilityTime: 5000,
+		onPress: () => {
+			Toast.hide()
+			handleOpened(message)
+		},
+	})
 }
 
 /** Call once from index.ts, before the app is registered, so messages received while the app is killed are handled. */
@@ -107,12 +157,14 @@ export function usePushNotifications(enabled: boolean) {
 
 		let unsubscribeRefresh: (() => void) | undefined
 		let unsubscribeOpened: (() => void) | undefined
+		let unsubscribeForeground: (() => void) | undefined
 		let retry: ReturnType<typeof setTimeout> | undefined
 		try {
 			const fb = firebase()
 			const messaging = fb.getMessaging()
 			unsubscribeRefresh = fb.onTokenRefresh(messaging, (token) => void sendToken(token))
 			unsubscribeOpened = fb.onNotificationOpenedApp(messaging, handleOpened)
+			unsubscribeForeground = fb.onMessage(messaging, async (message) => handleForeground(message))
 			// App launched by tapping a notification while it was killed. Navigation may not be ready yet: try again once.
 			const openInitial = async () => {
 				try {
@@ -134,6 +186,7 @@ export function usePushNotifications(enabled: boolean) {
 			if (retry) clearTimeout(retry)
 			unsubscribeRefresh?.()
 			unsubscribeOpened?.()
+			unsubscribeForeground?.()
 		}
 	}, [enabled])
 }

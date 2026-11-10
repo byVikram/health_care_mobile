@@ -19,7 +19,8 @@ import NotificationSettingsSheet from './components/NotificationSettingsSheet'
 import { categoriesForRole, OTHER_CATEGORY, resolveCategory } from './notificationCategories'
 import { getNotifications, markNotificationRead, type AppNotification } from '../referrals/referralService'
 import { markAllNotificationsRead } from '../../services/homeService'
-import { ROUTES } from '../../navigation/routes'
+import { onNotificationsChanged } from '../../services/notificationEvents'
+import { openNotificationTarget, type NavigateFn } from './openNotificationTarget'
 import type { AppStackParamList } from '../../navigation/types'
 
 const BELL = OTHER_CATEGORY.icon
@@ -77,6 +78,9 @@ export default function NotificationPage() {
 		load()
 	}, [load])
 
+	// A push that arrives while this screen is open adds its row at once.
+	useEffect(() => onNotificationsChanged(() => void load()), [load])
+
 	const live = notifications
 	const unreadCount = live.filter((n) => !n.is_read).length
 
@@ -116,38 +120,9 @@ export default function NotificationPage() {
 			console.log('[NotificationPage] failed to mark notification read', error)
 		}
 
-		// Navigate based on redirect_type/redirect_id set by the backend
-		const nav = navigation as NavigationProp<any>
-		if (notification.redirect_type === 'doctor_availability' && notification.redirect_id) {
-			const referralId = notification.reference_type === 'referral' ? notification.reference_id ?? undefined : undefined
-			navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: notification.redirect_id, referralId })
-		} else if (
-			(notification.redirect_type === 'appointment' || notification.redirect_type === 'appointment_detail') &&
-			notification.redirect_id
-		) {
-			navigation.navigate(ROUTES.STACK.APPOINTMENTS, { appointmentId: notification.redirect_id })
-		} else if (
-			(notification.redirect_type === 'ancillary_booking' ||
-				notification.redirect_type === 'ancillary' ||
-				// Older home-care notifications carried this generic type and opened nothing.
-				notification.redirect_type === 'ancillary_order') &&
-			notification.redirect_id
-		) {
-			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: notification.redirect_id })
-		} else if (notification.redirect_type === 'ancillary_scheduled' && notification.redirect_id) {
-			// A scheduled home-care order: its booking details (the visits, and a missed one to answer).
-			navigation.navigate(ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS, { requestId: notification.redirect_id })
-		} else if (notification.redirect_type === 'lab_order' && notification.redirect_id) {
-			navigation.navigate(ROUTES.STACK.LABORATORY_BOOKING_TRACKING, { orderId: notification.redirect_id })
-		} else if (notification.redirect_type === 'doctor_schedule') {
-			// This screen lives in the root stack, so reach the tab through its navigator (see SidebarLayout).
-			nav.navigate(ROUTES.MAIN.TABS, {
-				screen: ROUTES.MAIN.SCHEDULE,
-				params: { segment: notification.redirect_id === 'req' ? 'req' : 'today' },
-			})
-		} else if (notification.redirect_type === 'doctor_engage') {
-			nav.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.ENGAGE })
-		}
+		// Navigate based on redirect_type/redirect_id set by the backend (the same routing a tap on the push uses)
+		const open: NavigateFn = (name, params) => (navigation as NavigationProp<any>).navigate(name, params)
+		openNotificationTarget(open, notification)
 	}
 
 	return (
