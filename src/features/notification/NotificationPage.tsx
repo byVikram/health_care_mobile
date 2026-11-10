@@ -6,15 +6,15 @@
 // critical alerts pinned to the top of their day with an URGENT chip, and a settings sheet (UI only).
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { RefreshControl, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NavigationProp } from '@react-navigation/native'
 
-import { AppPathIcon, AppSegmentedControl } from '../../components/common'
+import { AppPathIcon, AppSegmentedControl, AppSkeleton } from '../../components/common'
 import { APP_COLORS } from '../../config/theme'
 import { useAuth } from '../../context/AuthContext'
 import { DoctorScreenHeader } from '../doctor/dashboard/DoctorScreenHeader'
-import NotificationRow from './components/NotificationRow'
+import NotificationRow, { NotificationRowSkeleton } from './components/NotificationRow'
 import NotificationSettingsSheet from './components/NotificationSettingsSheet'
 import { categoriesForRole, OTHER_CATEGORY, resolveCategory } from './notificationCategories'
 import { getNotifications, markNotificationRead, type AppNotification } from '../referrals/referralService'
@@ -27,6 +27,7 @@ const BELL = OTHER_CATEGORY.icon
 const SLIDERS = 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M16 4v4M10 10v4M18 16v4'
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const GROUP_LABELS = ['Today', 'Yesterday', 'Earlier'] as const
+const SKELETON_ROWS = 7
 
 const QUIET_HOURS_NOTE: Record<'doctor' | 'patient', string> = {
 	doctor: 'Critical lab values and red-flag questions still come through.',
@@ -158,7 +159,14 @@ export default function NotificationPage() {
 			</DoctorScreenHeader>
 
 			{loading ? (
-				<ActivityIndicator style={{ marginTop: 40 }} color={APP_COLORS.primary} />
+				<View style={styles.listContent} accessibilityLabel="Loading notifications">
+					<View style={styles.groupHeader}>
+						<AppSkeleton width={64} height={14} color={APP_COLORS.divider} />
+					</View>
+					{Array.from({ length: SKELETON_ROWS }, (_, index) => (
+						<NotificationRowSkeleton key={`notification-skeleton-${index}`} divider={index < SKELETON_ROWS - 1} />
+					))}
+				</View>
 			) : (
 				<SectionList
 					sections={sections}
