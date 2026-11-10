@@ -100,13 +100,13 @@ Second commit on this branch.
   radius 6 and colour `DIVIDER`; the call sites did not change). One visible difference: the pulse is `AppSkeleton`'s (opacity 0.3 to
   0.7 over 800 ms) instead of 0.4 to 1 over 700 ms.
 - Checked the other local helpers of section 2 against the shared components. Most are not drop-in duplicates:
-  - Skeletons: 4 of the 6 local ones already compose `AppSkeleton`; `AppointmentList`'s `SkeletonRow` animates a whole row and was left.
+  - Skeletons: 4 of the 6 local ones already compose `AppSkeleton`; `AppointmentList`'s `SkeletonRow` animated a whole row and was left (that screen has since been deleted).
   - `Toggle` (`NotificationSettingsSheet`) is a custom track and knob, not `AppToggle`; `EmptyState` (`ConsultationPage`) is a bare icon
     and caption, not `AppEmptyCard`; `StatusChip` maps a status to colours (`AppTag` would need that mapping).
   - Moving them onto the shared ones changes how the screens look, so each needs a design decision and a check on a phone.
-- The raw `<Modal>` screens outside pharmacy and radiology (about 13): `RescheduleProposalModal`, `MyBookingsPage`, `BookingRequestSheet`,
+- The raw `<Modal>` screens outside pharmacy and radiology (about 12 now): `RescheduleProposalModal`, `MyBookingsPage`, `BookingRequestSheet`,
   `IncomingOfferSheet`, `RescheduleModal`, `ConsultationPage`, `QuickServicesSection`, `ConsentForm`, `AskQuestionSheet`,
-  `RecordViewerModal` (a full-screen image viewer, fine as it is), `PreIntakeModal`, `WalletTopUpModal`, `AppointmentList`. Each has its own
+  `RecordViewerModal` (a full-screen image viewer, fine as it is), `PreIntakeModal`, `WalletTopUpModal` (`AppointmentList` was in this list too; it has since been deleted). Each has its own
   layout, so moving one to `AppBottomSheet` / `AppModal` changes its presentation and animation: do them one at a time with a phone.
 
 ## Not done yet

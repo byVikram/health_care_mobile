@@ -264,7 +264,7 @@ function StaffQuickServices({ role }: { role: Role }) {
 
 	const handleServicePress = (title: string) => {
 		if (title === 'Appointment') {
-			navigateRoot(ROUTES.STACK.APPOINTMENTS)
+			navigateRoot(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL, params: { filter: 'doctor' } } as never) // the Bookings tab
 		} else if (title === 'Pharmacy') {
 			navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
 		} else if (title === 'Radiology') {

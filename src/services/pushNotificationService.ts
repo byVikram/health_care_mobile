@@ -6,9 +6,12 @@
 //
 // Foreground: a care-request offer or home-care news is ignored (the offer already arrives over the dispatch WebSocket,
 // useProviderDispatchSocket, and would show twice). News that carries a `notification_id` (an appointment was confirmed, a
-// reminder ...) is a row in the notification list: while the app is open it shows as a banner at the top (components/common/
-// feedback/NotificationToast), unless that screen is already open, the bell and the list refresh, and a tap on the banner opens
-// the same screen as a tap on the phone's notification.
+// reminder ...) is a row in the notification list. Android draws a push itself only while the app is closed or in the background;
+// while the app is open it hands the message to the app. So the app posts the same system notification itself (expo-notifications,
+// on the same "updates" channel: a banner with sound, and an entry in the notification shade, exactly like the one a closed app
+// gets), unless that screen is already open; the bell and the list refresh. Only if posting fails does it fall back to a banner
+// inside the app (components/common/feedback/NotificationToast). A tap on either opens the same screen as a tap on the phone's
+// notification.
 import { useEffect } from 'react'
 import { Platform } from 'react-native'
 import type { RemoteMessage } from '@react-native-firebase/messaging'
@@ -24,6 +27,11 @@ import { markNotificationRead } from '../features/referrals/referralService'
 // Loaded lazily and never on web: @react-native-firebase is native-only and must not run at module load.
 const isNative = Platform.OS !== 'web'
 const firebase = () => require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging')
+const notifications = () => require('expo-notifications') as typeof import('expo-notifications')
+
+// The Android channel the app's own notifications use: created natively at start-up (plugins/withNotificationChannels.js); the
+// backend sends the same id (health_care_backend/app/core/push.py UPDATES_CHANNEL_ID).
+const UPDATES_CHANNEL_ID = 'updates'
 
 const FCM_TOKEN_URL = API_ENDPOINTS.AUTH.SESSION_FCM_TOKEN
 const NEW_CARE_REQUEST_OFFER = 'NEW_CARE_REQUEST_OFFER'
@@ -103,7 +111,7 @@ function openFromData(data: RemoteMessage['data']): boolean {
  * Notification tapped: a care-request offer lands on the provider's Today screen, whose socket delivers the offer; news about a
  * patient's home-care visit opens the booking (a scheduled order's details, or the live screen of an instant one).
  */
-function handleOpened(message: RemoteMessage | null) {
+function handleOpened(message: Pick<RemoteMessage, 'data'> | null) {
 	const data = message?.data
 	if (data?.type === NEW_CARE_REQUEST_OFFER) {
 		navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME } as never)
@@ -139,15 +147,48 @@ function alreadyOnScreen(data: NonNullable<RemoteMessage['data']>): boolean {
 	if (!route) return false
 	if (route.name === ROUTES.STACK.NOTIFICATION) return true // the list itself: it reloads on its own
 	const params = route.params as { appointmentId?: string } | undefined
-	return data.redirect_type === 'appointment' && route.name === ROUTES.STACK.APPOINTMENTS && params?.appointmentId === data.redirect_id
+	return data.redirect_type === 'appointment' && route.name === ROUTES.STACK.APPOINTMENT_DETAILS && params?.appointmentId === data.redirect_id
 }
 
-/** App open and a push arrives: refresh the bell and the list and, unless it is already on screen, show a banner at the top. */
-function handleForeground(message: RemoteMessage) {
-	const data = message.data
-	if (!data || typeof data.notification_id !== 'string' || !data.notification_id) return
-	emitNotificationsChanged()
-	if (alreadyOnScreen(data)) return
+let handlerSet = false
+
+/** Tell expo-notifications to show a notification the app posts while it is open (it shows nothing in the foreground otherwise). */
+function ensureNotificationHandler() {
+	if (handlerSet) return
+	handlerSet = true
+	notifications().setNotificationHandler({
+		handleNotification: async () => ({
+			shouldShowBanner: true,
+			shouldShowList: true,
+			shouldPlaySound: true,
+			shouldSetBadge: false,
+		}),
+	})
+}
+
+/** Post the push as a system notification from the app itself. Returns false when it could not be posted. */
+async function showSystemNotification(message: RemoteMessage): Promise<boolean> {
+	try {
+		ensureNotificationHandler()
+		await notifications().scheduleNotificationAsync({
+			content: {
+				title: message.notification?.title ?? 'New notification',
+				body: message.notification?.body ?? undefined,
+				data: { ...(message.data ?? {}) },
+				sound: 'default',
+			},
+			// Android: straight onto the "updates" channel (a banner with sound); null = now, on iOS.
+			trigger: Platform.OS === 'android' ? { channelId: UPDATES_CHANNEL_ID } : null,
+		})
+		return true
+	} catch (error) {
+		console.warn('[push] Could not show the notification while the app is open:', error)
+		return false
+	}
+}
+
+/** The notification could not be posted: show the banner inside the app instead. */
+function showInAppBanner(message: RemoteMessage) {
 	Toast.show({
 		type: 'notification',
 		text1: message.notification?.title ?? 'New notification',
@@ -160,6 +201,31 @@ function handleForeground(message: RemoteMessage) {
 			handleOpened(message)
 		},
 	})
+}
+
+async function presentForeground(message: RemoteMessage) {
+	if (await showSystemNotification(message)) return
+	showInAppBanner(message)
+}
+
+/** App open and a push arrives: refresh the bell and the list and, unless it is already on screen, post the notification. */
+function handleForeground(message: RemoteMessage) {
+	const data = message.data
+	if (!data || typeof data.notification_id !== 'string' || !data.notification_id) return
+	emitNotificationsChanged()
+	if (alreadyOnScreen(data)) return
+	void presentForeground(message)
+}
+
+let lastTappedId: string | undefined
+
+/** A notification the app posted itself was tapped (app open, in the background, or closed since): open its screen. */
+function handleLocalTap(response: import('expo-notifications').NotificationResponse | null | undefined) {
+	if (!response) return
+	const id = response.notification.request.identifier
+	if (id === lastTappedId) return // the same tap is delivered once by the listener and once as the launch response
+	lastTappedId = id
+	handleOpened({ data: response.notification.request.content.data as RemoteMessage['data'] })
 }
 
 /** Call once from index.ts, before the app is registered, so messages received while the app is killed are handled. */
@@ -184,6 +250,7 @@ export function usePushNotifications(enabled: boolean) {
 		let unsubscribeRefresh: (() => void) | undefined
 		let unsubscribeOpened: (() => void) | undefined
 		let unsubscribeForeground: (() => void) | undefined
+		let removeLocalTapListener: (() => void) | undefined
 		let retry: ReturnType<typeof setTimeout> | undefined
 		try {
 			const fb = firebase()
@@ -206,6 +273,15 @@ export function usePushNotifications(enabled: boolean) {
 		} catch (error) {
 			console.warn('[push] Could not subscribe to push events:', error)
 		}
+		try {
+			// Taps on the notification the app posts itself while it is open (also after it has been closed and reopened by the tap).
+			const n = notifications()
+			const subscription = n.addNotificationResponseReceivedListener(handleLocalTap)
+			removeLocalTapListener = () => subscription.remove()
+			handleLocalTap(n.getLastNotificationResponse())
+		} catch (error) {
+			console.warn('[push] Could not subscribe to notification taps:', error)
+		}
 
 		return () => {
 			active = false
@@ -213,6 +289,7 @@ export function usePushNotifications(enabled: boolean) {
 			unsubscribeRefresh?.()
 			unsubscribeOpened?.()
 			unsubscribeForeground?.()
+			removeLocalTapListener?.()
 		}
 	}, [enabled])
 }

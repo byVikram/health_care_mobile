@@ -33,7 +33,6 @@ import ConsentForm from '../features/doctor/components/ConsentForm'
 import SearchPage from '../features/doctor/search/SearchPage'
 import LegalPage from '../features/auth/LegalPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
-import AppointmentList from '../features/appointment/AppointmentList'
 import VisitSummaryPage from '../features/appointment/VisitSummaryPage'
 import AppointmentDetailsPage from '../features/appointment/AppointmentDetailsPage'
 import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
@@ -229,11 +228,6 @@ function AuthenticatedNavigator() {
 				/>
 				<AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
 				<AppStack.Screen name={ROUTES.STACK.LEGAL} component={LegalPage} />
-				<AppStack.Screen
-					name={ROUTES.STACK.APPOINTMENTS}
-					component={AppointmentList}
-					options={{ headerShown: true, title: 'Appointments' }}
-				/>
 				<AppStack.Screen
 					name={ROUTES.STACK.CONSENT_FORM}
 					component={ConsentForm}

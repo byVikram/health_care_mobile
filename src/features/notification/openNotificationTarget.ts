@@ -23,7 +23,7 @@ export function openNotificationTarget(navigate: NavigateFn, target: Notificatio
 		const referralId = target.reference_type === 'referral' ? (target.reference_id ?? undefined) : undefined
 		navigate(ROUTES.STACK.DOCTOR_DETAIL, { id, referralId })
 	} else if ((type === 'appointment' || type === 'appointment_detail') && id) {
-		navigate(ROUTES.STACK.APPOINTMENTS, { appointmentId: id })
+		navigate(ROUTES.STACK.APPOINTMENT_DETAILS, { appointmentId: id })
 	} else if (
 		(type === 'ancillary_booking' ||
 			type === 'ancillary' ||

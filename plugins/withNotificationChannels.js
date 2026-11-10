@@ -8,7 +8,8 @@
 //       updates        appointment news and what the Notifications screen lists
 //       care_requests  urgent care offers to nurses
 //  2. Makes "updates" the default channel for pushes that name none (FCM's `default_notification_channel_id`).
-//  3. Gives pushes the app's small status-bar icon (white mark on transparent, assets/notification/) and the brand colour.
+//  3. Gives pushes the app's small status-bar icon (white mark on transparent, assets/notification/) and the brand colour, both for
+//     a push Android shows itself (FCM) and for the notification the app posts itself while it is open (expo-notifications).
 //
 // Android fixes a channel's importance when it is first created and the app cannot raise it later (only the user can): changing
 // IMPORTANCE here after a release does nothing for phones that already have the channel, so give a new purpose a new id.
@@ -69,9 +70,24 @@ const withFirebaseDefaults = (config) =>
 	withAndroidManifest(config, (c) => {
 		const app = AndroidConfig.Manifest.getMainApplicationOrThrow(c.modResults)
 		const add = AndroidConfig.Manifest.addMetaDataItemToMainApplication
-		add(app, 'com.google.firebase.messaging.default_notification_channel_id', DEFAULT_CHANNEL_ID, 'value')
-		add(app, 'com.google.firebase.messaging.default_notification_icon', `@drawable/${ICON_NAME}`, 'resource')
-		add(app, 'com.google.firebase.messaging.default_notification_color', '@color/notification_color', 'resource')
+		// @react-native-firebase/messaging declares the channel id (empty) and the colour (white) itself, so the manifest merger refuses
+		// ours unless it is told ours win: `tools:replace` on the attribute we set. Only those two clash; the others are not declared
+		// by any library, so they are plain entries.
+		c.modResults.manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools'
+		const entries = [
+			// what a push shown by Android itself (app closed / in the background) uses
+			['com.google.firebase.messaging.default_notification_channel_id', DEFAULT_CHANNEL_ID, 'value', true],
+			['com.google.firebase.messaging.default_notification_icon', `@drawable/${ICON_NAME}`, 'resource', false],
+			['com.google.firebase.messaging.default_notification_color', '@color/notification_color', 'resource', true],
+			// what a notification the APP posts itself (expo-notifications: a push that arrives while the app is open) uses
+			['expo.modules.notifications.default_notification_icon', `@drawable/${ICON_NAME}`, 'resource', false],
+			['expo.modules.notifications.default_notification_color', '@color/notification_color', 'resource', false],
+		]
+		for (const [name, value, type, replace] of entries) {
+			add(app, name, value, type)
+			const item = (app['meta-data'] || []).find((m) => m.$['android:name'] === name)
+			if (item && replace) item.$['tools:replace'] = `android:${type}`
+		}
 		return c
 	})
 
