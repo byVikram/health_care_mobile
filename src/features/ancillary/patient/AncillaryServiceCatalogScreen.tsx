@@ -16,7 +16,6 @@
 // no params -> nursing-care).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-	Alert,
 	LayoutAnimation,
 	ScrollView,
 	StyleSheet,
@@ -80,6 +79,8 @@ import {
 	procedureTone,
 } from '../utils/ancillaryCatalogContent'
 import { useServerSearch } from '../hooks/useServerSearch'
+import Toast from 'react-native-toast-message'
+import { showStatusModal } from '../../../services/apiService'
 
 type CatalogRoute = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SERVICES>
 type CatalogNavigation = NavigationProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SERVICES>
@@ -195,10 +196,14 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 	)
 
 	const confirmReplace = (title: string, message: string, onReplace: () => void) => {
-		Alert.alert(title, message, [
-			{ text: 'Cancel', style: 'cancel' },
-			{ text: 'Replace', onPress: onReplace },
-		])
+		showStatusModal({
+			status: 'info',
+			title,
+			description: message,
+			submitText: 'Replace',
+			onSubmit: onReplace,
+			cancelText: 'Cancel',
+		})
 	}
 
 	const addProcedure = (s: AncillaryServiceItem, onAdded?: () => void) => {
@@ -278,7 +283,11 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 	const callHelpline = async () => {
 		if (!helpline) return
 		const opened = await openContactUrl(telUrl(helpline))
-		if (!opened) Alert.alert('Could not open the dialer', `Please call ${helpline}.`)
+		if (!opened) Toast.show({
+			type: 'error',
+			text1: 'Could not open the dialer',
+			text2: `Please call ${helpline}.`,
+		})
 	}
 
 	// ---- filtering ----

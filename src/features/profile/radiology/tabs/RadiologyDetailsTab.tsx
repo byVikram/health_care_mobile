@@ -1,7 +1,8 @@
 // src/features/profile/radiology/tabs/RadiologyDetailsTab.tsx
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
+import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import {
@@ -14,6 +15,7 @@ import {
 } from '../../../../components/common'
 import { mergeRadiologyProfileData, updateRadiologyProfile } from '../radiologyService'
 import { RadiologyProfileData } from '../../../../types/radiology-profile-api'
+import { showStatusModal } from '../../../../services/apiService'
 
 const DEFAULT_LOGO_IMAGE = require('../../../../assets/Banner/pharmacy.png')
 const SUCCESS_MESSAGE = 'Clinic details saved successfully'
@@ -192,7 +194,7 @@ export default function RadiologyDetailsTab({ profileData, onProfileChange }: Ra
 		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
 
 		if (!permission.granted) {
-			Alert.alert('Permission needed', 'Please allow photo library access to upload your certificate.')
+			Toast.show({ type: 'error', text1: 'Please allow photo library access to upload your certificate.' })
 			return
 		}
 
@@ -249,22 +251,22 @@ export default function RadiologyDetailsTab({ profileData, onProfileChange }: Ra
 		}
 
 		if (!payload.name) {
-			Alert.alert('Validation', 'Clinic name is required.')
+			Toast.show({ type: 'error', text1: 'Clinic name is required.' })
 			return
 		}
 
 		if (!payload.license_number) {
-			Alert.alert('Validation', 'License number is required.')
+			Toast.show({ type: 'error', text1: 'License number is required.' })
 			return
 		}
 
 		if (!payload.address) {
-			Alert.alert('Validation', 'Address is required.')
+			Toast.show({ type: 'error', text1: 'Address is required.' })
 			return
 		}
 
 		if (payload.pincode && !/^\d{6}$/.test(payload.pincode)) {
-			Alert.alert('Validation', 'Please enter a valid 6-digit pincode.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid 6-digit pincode.' })
 			return
 		}
 
@@ -273,7 +275,12 @@ export default function RadiologyDetailsTab({ profileData, onProfileChange }: Ra
 			const response = await updateRadiologyProfile(payload)
 
 			if (response?.success === false) {
-				Alert.alert('Error', response.message || 'Unable to save clinic details right now.')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't save clinic details",
+					description: response.message || 'Unable to save clinic details right now.',
+					submitText: 'OK',
+				})
 				return
 			}
 
@@ -305,7 +312,12 @@ export default function RadiologyDetailsTab({ profileData, onProfileChange }: Ra
 			setSuccessModalVisible(true)
 		} catch (error) {
 			console.error('[RadiologyDetailsTab] save error:', error)
-			Alert.alert('Error', 'Unable to save clinic details right now.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't save clinic details",
+				description: 'Unable to save clinic details right now.',
+				submitText: 'OK',
+			})
 		} finally {
 			setIsSaving(false)
 		}

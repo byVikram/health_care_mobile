@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, KeyboardAvoidingView } from 'react-native'
+import { ActivityIndicator, KeyboardAvoidingView } from 'react-native'
+import Toast from 'react-native-toast-message'
 import {
 	ScrollView,
 	StyleSheet,
@@ -18,7 +19,6 @@ import {
 	AppSelectOption,
 	AppTypography,
 	AppStickyFooter,
-	StatusModal,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import {
@@ -341,13 +341,6 @@ export default function PersonalDetailsTab({
 	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
-	const [statusModal, setStatusModal] = useState<{
-		visible: boolean
-		status: 'success' | 'error'
-		title: string
-		description: string
-		submitText?: string
-	} | null>(null)
 	const [profilePhotoUri, setProfilePhotoUri] = useState(user?.avatar || '')
 	const [profilePhotoUpload, setProfilePhotoUpload] = useState<AppPhotoPickerUpload | null>(null)
 	const [isProfilePhotoRemoved, setIsProfilePhotoRemoved] = useState(false)
@@ -523,25 +516,21 @@ export default function PersonalDetailsTab({
 				languages: normalizeLanguageValues(authoritativeLanguages),
 			})
 
-			setStatusModal({
-				visible: true,
-				status: 'success',
-				title: 'Success',
-				description: 'Personal details saved successfully.',
-				submitText: 'Okay',
-			})
+			Toast.show({ type: 'success', text1: 'Personal details saved' })
+			onNextTab?.()
 		} catch (err: any) {
 			console.error('[PROFILE SAVE] error:', err)
 			console.error('[PROFILE SAVE] status:', err?.response?.status)
 			console.error('[PROFILE SAVE] URL:', err?.config?.url)
 			console.error('[Ancillary Profile] Backend update failed:', err)
 			console.error('[Ancillary Profile] Status:', err?.response?.status)
-			setStatusModal({
-				visible: true,
-				status: 'error',
-				title: 'Error',
-				description: err?.response?.data?.message || err?.response?.data?.detail || err?.message || 'Unable to save personal details right now.',
-				submitText: 'Okay',
+			Toast.show({
+				type: 'error',
+				text1:
+					err?.response?.data?.message ||
+					err?.response?.data?.detail ||
+					err?.message ||
+					'Unable to save personal details right now.',
 			})
 		} finally {
 			setIsSaving(false)
@@ -693,24 +682,6 @@ export default function PersonalDetailsTab({
 			<AppStickyFooter onPress={handleSave} disabled={isSaving} loading={isSaving}>
 				Save
 			</AppStickyFooter>
-
-			{statusModal && (
-				<StatusModal
-					visible={statusModal.visible}
-					status={statusModal.status}
-					title={statusModal.title}
-					description={statusModal.description}
-					submitText={statusModal.submitText}
-					onSubmit={() => {
-						const isSuccess = statusModal.status === 'success'
-						setStatusModal(null)
-						if (isSuccess && onNextTab) {
-							onNextTab()
-						}
-					}}
-					onCancel={() => setStatusModal(null)}
-				/>
-			)}
 		</View>
 	)
 }

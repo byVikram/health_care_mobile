@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -18,6 +18,7 @@ import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
 import { AppScreenHeader, AppSkeleton } from '../../../components/common'
 import StatusModal from '../../../components/common/feedback/StatusModal'
 import BookingsSearchBar from '../../bookings/components/BookingsSearchBar'
+import Toast from 'react-native-toast-message'
 
 type BookingTab = 'all' | 'upcoming' | 'completed' | 'cancelled'
 
@@ -133,7 +134,11 @@ export default function MyBookingsPage({
 	}, [filteredBookings.length])
 
 	const handleChat = (booking: AncillaryBooking) => {
-		Alert.alert('Chat', `Opening chat with ${booking.provider.name}...`)
+		Toast.show({
+			type: 'info',
+			text1: 'Chat',
+			text2: `Opening chat with ${booking.provider.name}...`,
+		})
 	}
 
 	const handleReschedule = (booking: AncillaryBooking) => {
@@ -175,7 +180,11 @@ export default function MyBookingsPage({
 	}
 
 	const handleViewInvoice = (booking: AncillaryBooking) => {
-		Alert.alert('Invoice', `Invoice for "${booking.serviceName}" will be available shortly.`)
+		Toast.show({
+			type: 'info',
+			text1: 'Invoice',
+			text2: `Invoice for "${booking.serviceName}" will be available shortly.`,
+		})
 	}
 
 	const handleBookAgain = (booking: AncillaryBooking) => {

@@ -70,10 +70,10 @@ export default function PatientProfileLayout() {
 			if (res.success && res.data) {
 				setData(mapApiToLocalState(res.data))
 			} else {
-				Alert.alert('Error', res.message ?? 'Could not load profile.')
+				Toast.show({ type: 'error', text1: res.message ?? 'Could not load profile.' })
 			}
 		} catch {
-			Alert.alert('Error', 'Something went wrong.')
+			Toast.show({ type: 'error', text1: 'Something went wrong.' })
 		} finally {
 			setLoading(false)
 		}
@@ -175,15 +175,15 @@ export default function PatientProfileLayout() {
 
 			if (res.success) {
 				await fetchProfile()
-				Alert.alert('Saved', 'Profile updated successfully.')
+				Toast.show({ type: 'success', text1: 'Profile updated' })
 			} else {
-				Alert.alert('Error', res.message ?? 'Failed to save.')
+				Toast.show({ type: 'error', text1: res.message ?? 'Failed to save.' })
 			}
 		} catch (error: any) {
 			console.log('===== API ERROR =====')
 			console.log(error)
 
-			Alert.alert('Error', 'Something went wrong.')
+			Toast.show({ type: 'error', text1: 'Something went wrong.' })
 		} finally {
 			setSaving(false)
 		}

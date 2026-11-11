@@ -1,6 +1,7 @@
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
 import * as Location from 'expo-location';
 import { normalizePincode } from '../utils/pincode';
+import { showStatusModal } from './apiService';
 
 let settingsAlertOpen = false;
 
@@ -10,21 +11,18 @@ const offerAppSettings = () => {
   const close = () => {
     settingsAlertOpen = false;
   };
-  Alert.alert(
-    'Location is turned off',
-    'Allow Location for KarolaHealth in your phone’s App settings to use this.',
-    [
-      { text: 'Not now', style: 'cancel', onPress: close },
-      {
-        text: 'Open Settings',
-        onPress: () => {
-          close();
-          void Linking.openSettings();
-        },
-      },
-    ],
-    { onDismiss: close }
-  );
+  showStatusModal({
+    status: 'info',
+    title: 'Location is turned off',
+    description: 'Allow Location for KarolaHealth in your phone’s App settings to use this.',
+    submitText: 'Open Settings',
+    onSubmit: () => {
+      close();
+      void Linking.openSettings();
+    },
+    cancelText: 'Not now',
+    onCancel: close,
+  });
 };
 
 /**

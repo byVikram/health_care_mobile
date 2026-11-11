@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 // features/auth/components/OtpForm.tsx
 import React, { useEffect, useRef, useState } from 'react'
-import { Alert, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import * as Device from 'expo-device'
 import { verifyOtp, sendOtp } from '../authService'
 import { markNotificationPromptShownOnBackend } from '../../../services/notificationPermissionService'
@@ -9,6 +9,7 @@ import { useAuth, UserRole } from '../../../context/AuthContext'
 import { otpSchema, getFieldErrors } from '../../../validation/authSchemas'
 import { APP_COLORS } from '../../../config/theme'
 import { AuthFooter, AuthHeaderMint, CtaButton, ICON_PATHS, KeyboardLiftView, OtpBoxes, OTP_LENGTH, PathIcon } from './AuthKit'
+import Toast from 'react-native-toast-message'
 
 interface Props {
 	contactNumber: string
@@ -177,7 +178,7 @@ export default function OtpForm({
 		} catch (err: any) {
 			const errorMsg = err?.response?.data?.message || err?.message || 'Failed to resend OTP. Please try again.'
 			setError(errorMsg)
-			if (__DEV__) Alert.alert('Resend Error', errorMsg)
+			if (__DEV__) Toast.show({ type: 'error', text1: errorMsg })
 		} finally {
 			setResendLoading(false)
 		}

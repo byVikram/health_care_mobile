@@ -29,6 +29,7 @@ import {
 } from '../providerOrderView'
 import { DeclineOrderSheet } from './DeclineOrderSheet'
 import { ProviderScheduledOrderCard } from './ProviderScheduledOrderCard'
+import { showStatusModal } from '../../../../services/apiService'
 
 type OrdersFilter = 'ALL' | 'PENDING_ACTION' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
 
@@ -143,10 +144,11 @@ export function ProviderScheduledOrdersSection() {
 						: `Your visit with ${order.patientName} is confirmed.`,
 			})
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Could not accept booking',
-				text2: extractApiErrorMessage(e, 'This request may have expired. Please refresh and try again.'),
+			showStatusModal({
+				status: 'error',
+				title: 'Could not accept booking',
+				description: extractApiErrorMessage(e, 'This request may have expired. Please refresh and try again.'),
+				submitText: 'OK',
 			})
 		} finally {
 			setAcceptingId(null)
@@ -167,10 +169,11 @@ export function ProviderScheduledOrdersSection() {
 				text2: `${target.patientName} has been notified.`,
 			})
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Could not decline booking',
-				text2: extractApiErrorMessage(e, 'Please try again.'),
+			showStatusModal({
+				status: 'error',
+				title: 'Could not decline booking',
+				description: extractApiErrorMessage(e, 'Please try again.'),
+				submitText: 'OK',
 			})
 		} finally {
 			setDeclining(false)

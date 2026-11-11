@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, KeyboardAvoidingView } from 'react-native'
+import { ActivityIndicator, KeyboardAvoidingView } from 'react-native'
+import Toast from 'react-native-toast-message'
 import {
 	ScrollView,
 	StyleSheet,
@@ -17,7 +18,6 @@ import {
 	AppSelectOption,
 	AppTypography,
 	StickyFooter,
-	StatusModal,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import { getDoctorProfile, mapDoctorProfileApi, updateDoctorPersonalDetails } from '../../../doctor/doctorService'
@@ -319,13 +319,6 @@ export default function PersonalDetailsTab() {
 	const [socialErrors, setSocialErrors] = useState<SocialErrors>({})
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
-	const [statusModal, setStatusModal] = useState<{
-		visible: boolean
-		status: 'success' | 'error'
-		title: string
-		description: string
-		submitText?: string
-	} | null>(null)
 	const [profilePhotoUri, setProfilePhotoUri] = useState(user?.avatar || '')
 	const [profilePhotoUpload, setProfilePhotoUpload] = useState<AppPhotoPickerUpload | null>(null)
 	const [isProfilePhotoRemoved, setIsProfilePhotoRemoved] = useState(false)
@@ -416,22 +409,22 @@ export default function PersonalDetailsTab() {
 		const nextSocialErrors: SocialErrors = {}
 
 		if (!trimmedName) {
-			Alert.alert('Validation', 'Full name is required.')
+			Toast.show({ type: 'error', text1: 'Full name is required.' })
 			return
 		}
 
 		if (trimmedEmail && !isValidEmail(trimmedEmail)) {
-			Alert.alert('Validation', 'Please enter a valid email address.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid email address.' })
 			return
 		}
 
 		if (normalizedMobile && !isValidPhone(normalizedMobile)) {
-			Alert.alert('Validation', 'Please enter a valid mobile number.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid mobile number.' })
 			return
 		}
 
 		if (formData.dob.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(formattedDob)) {
-			Alert.alert('Validation', 'Please enter DOB in DD-MM-YYYY format.')
+			Toast.show({ type: 'error', text1: 'Please enter DOB in DD-MM-YYYY format.' })
 			return
 		}
 
@@ -507,22 +500,10 @@ export default function PersonalDetailsTab() {
 				facebook: trimmedFacebook,
 				twitter: trimmedTwitter,
 			}))
-			setStatusModal({
-				visible: true,
-				status: 'success',
-				title: 'Success',
-				description: 'Personal details saved successfully.',
-				submitText: 'Okay',
-			})
+			Toast.show({ type: 'success', text1: 'Personal details saved successfully.' })
 		} catch (err) {
 			console.error('[PersonalDetailsTab] save error:', err)
-			setStatusModal({
-				visible: true,
-				status: 'error',
-				title: 'Error',
-				description: 'Unable to save personal details right now.',
-				submitText: 'Okay',
-			})
+			Toast.show({ type: 'error', text1: 'Unable to save personal details right now.' })
 		} finally {
 			setIsSaving(false)
 		}
@@ -753,17 +734,6 @@ export default function PersonalDetailsTab() {
 			<StickyFooter onPress={handleSave} disabled={isSaving} loading={isSaving}>
 				Save 
 			</StickyFooter>
-			{statusModal && (
-				<StatusModal
-					visible={statusModal.visible}
-					status={statusModal.status}
-					title={statusModal.title}
-					description={statusModal.description}
-					submitText={statusModal.submitText}
-					onSubmit={() => setStatusModal(null)}
-					onCancel={() => setStatusModal(null)}
-				/>
-			)}
 		</View>
 		
 	)

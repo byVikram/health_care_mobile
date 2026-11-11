@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import Toast from 'react-native-toast-message'
 import {
 	AppStickyFooter,
 	AppToggle,
 	AppTypography,
-	StatusModal,
 	WorkingHoursSection,
 	SECTION_META,
 	createWorkingHoursState,
@@ -71,12 +71,6 @@ export default function AvailabilityTab({
 	const [selectedWorkingDay, setSelectedWorkingDay] = useState<WorkingDayKey>('monday')
 	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState(DEFAULT_DATA.weeklyWorkingHours)
 	const savedDataRef = useRef<NurseAvailabilityData>(DEFAULT_DATA)
-	const [statusModal, setStatusModal] = useState<{
-		visible: boolean
-		status: 'success' | 'error' | 'info'
-		title: string
-		description: string
-	} | null>(null)
 
 	useEffect(() => {
 		const loadAvailability = async () => {
@@ -231,20 +225,12 @@ export default function AvailabilityTab({
 
 			await saveProviderWeeklyAvailability({ availabilities })
 
-			setStatusModal({
-				visible: true,
-				status: 'success',
-				title: 'Schedule Saved',
-				description: 'Your availability schedule has been saved successfully.',
-			})
+			Toast.show({ type: 'success', text1: 'Availability schedule saved' })
+			onNextTab?.()
 		} catch (e) {
 			console.log('[Nurse AvailabilityTab] failed to save availability:', e)
-			setStatusModal({
-				visible: true,
-				status: 'info',
-				title: 'Schedule Saved',
-				description: 'Availability saved locally.',
-			})
+			Toast.show({ type: 'info', text1: 'Availability saved locally' })
+			onNextTab?.()
 		} finally {
 			setSaving(false)
 		}
@@ -333,23 +319,6 @@ export default function AvailabilityTab({
 			>
 				Save Details
 			</AppStickyFooter>
-
-			{statusModal && (
-				<StatusModal
-					visible={statusModal.visible}
-					status={statusModal.status}
-					title={statusModal.title}
-					description={statusModal.description}
-					submitText="OK"
-					onSubmit={() => {
-						setStatusModal(null)
-						if (onNextTab) {
-							onNextTab()
-						}
-					}}
-					onCancel={() => setStatusModal(null)}
-				/>
-			)}
 		</View>
 	)
 }

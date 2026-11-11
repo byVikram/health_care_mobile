@@ -8,7 +8,6 @@
 import React, { useEffect, useState } from 'react'
 import {
 	ActivityIndicator,
-	Alert,
 	Modal,
 	ScrollView,
 	StyleSheet,
@@ -27,6 +26,8 @@ import {
 	type SlotGroup,
 	type TimeSlot,
 } from '../../doctor/doctorService'
+import Toast from 'react-native-toast-message'
+import { showStatusModal } from '../../../services/apiService'
 
 // Design tokens matching the rest of the booking flow (Screens 1/2/3/5/7's
 // teal family) -- no mockup screen depicts this modal directly, so only
@@ -243,7 +244,12 @@ export default function RescheduleModal({
 				if (mounted) setRescheduleSlots(normalizeAvailabilitySlots(responseData, appointmentType))
 			} catch (error) {
 				console.log('[RescheduleModal] fetch reschedule slots error:', error)
-				if (mounted) Alert.alert('Error', 'Could not load available slots.')
+				if (mounted) showStatusModal({
+					status: 'error',
+					title: "Couldn't load time slots",
+					description: 'Could not load available slots.',
+					submitText: 'OK',
+				})
 			} finally {
 				if (mounted) setRescheduleSlotsLoading(false)
 			}
@@ -284,7 +290,12 @@ export default function RescheduleModal({
 
 	const handleRescheduleConfirm = async () => {
 		if (!rescheduleTime) {
-			Alert.alert('Select time', 'Please select a time slot before confirming.')
+			showStatusModal({
+				status: 'info',
+				title: 'Select time',
+				description: 'Please select a time slot before confirming.',
+				submitText: 'OK',
+			})
 			return
 		}
 
@@ -294,7 +305,12 @@ export default function RescheduleModal({
 		const dateStr = toApiDate(rescheduleDate)
 
 		if (!activeHospitalId) {
-			Alert.alert('Select hospital', 'Please select a hospital before confirming.')
+			showStatusModal({
+				status: 'info',
+				title: 'Select hospital',
+				description: 'Please select a hospital before confirming.',
+				submitText: 'OK',
+			})
 			return
 		}
 
@@ -321,13 +337,23 @@ export default function RescheduleModal({
 					status: 'rescheduled',
 				})
 				setHospitalDropdownOpen(false)
-				Alert.alert('Success', 'Appointment rescheduled successfully.')
+				Toast.show({ type: 'success', text1: 'Appointment rescheduled successfully.' })
 			} else {
-				Alert.alert('Error', res.message || 'Reschedule failed. Please try again.')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't reschedule",
+					description: res.message || 'Reschedule failed. Please try again.',
+					submitText: 'OK',
+				})
 			}
 		} catch (error: any) {
 			console.log('[RescheduleModal] reschedule appointment error:', error?.response?.data || error?.message || error)
-			Alert.alert('Error', 'Something went wrong. Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't reschedule",
+				description: 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setRescheduleSubmitting(false)
 		}

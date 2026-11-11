@@ -7,7 +7,6 @@
 
 import React, { useState } from 'react'
 import {
-	Alert,
 	KeyboardAvoidingView,
 	Platform,
 	ScrollView,
@@ -44,6 +43,7 @@ import {
 	AppTicketCard,
 	type AppPaymentMethod,
 } from '../../components/common'
+import { showStatusModal } from '../../services/apiService'
 
 type PaymentMethodId = 'upi' | 'card' | 'netbank' | 'later'
 
@@ -225,14 +225,24 @@ export default function BookingDetailsScreen() {
 
 	const handleConfirm = async () => {
 		if (!doctor || !hospitalId || !appointmentDate || !startTime) {
-			Alert.alert('Error', 'Missing booking information')
+			showStatusModal({
+				status: 'error',
+				title: "Booking details missing",
+				description: 'Missing booking information',
+				submitText: 'OK',
+			})
 			return
 		}
 
 		setIsBooking(true)
 		try {
 			if (!(await hasSessionToken())) {
-				Alert.alert('Error', 'Patient session expired. Please log in again.')
+				showStatusModal({
+					status: 'error',
+					title: "Session expired",
+					description: 'Patient session expired. Please log in again.',
+					submitText: 'OK',
+				})
 				return
 			}
 
@@ -254,10 +264,20 @@ export default function BookingDetailsScreen() {
 				// (see closeSymptomsForm below).
 				setSymptomsOpen(true)
 			} else {
-				Alert.alert('Error', bookingResponse.message || 'Failed to book appointment')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't book the appointment",
+					description: bookingResponse.message || 'Failed to book appointment',
+					submitText: 'OK',
+				})
 			}
 		} catch (error: any) {
-			Alert.alert('Error', error?.response?.data?.message || 'An error occurred while booking. Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't book the appointment",
+				description: error?.response?.data?.message || 'An error occurred while booking. Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setIsBooking(false)
 		}
@@ -294,14 +314,24 @@ export default function BookingDetailsScreen() {
 	const handleSubmitSymptoms = async () => {
 		try {
 			if (!bookedAppointment) {
-				Alert.alert('Error', 'No appointment found to submit symptoms for.')
+				showStatusModal({
+					status: 'error',
+					title: "No appointment found",
+					description: 'No appointment found to submit symptoms for.',
+					submitText: 'OK',
+				})
 				return
 			}
 			await updatePreIntake(bookedAppointment.id, { symptoms, duration, severity })
 			closeSymptomsForm()
 		} catch (error) {
 			console.error('Failed to submit pre-intake symptoms', error)
-			Alert.alert('Error', 'Failed to submit symptoms. Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't submit your symptoms",
+				description: 'Failed to submit symptoms. Please try again.',
+				submitText: 'OK',
+			})
 		}
 	}
 

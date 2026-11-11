@@ -5,12 +5,13 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	useWindowDimensions,
-	Alert,
 	Linking,
 	Share,
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { Ionicons } from '@expo/vector-icons'
 import { AppModal, AppToggle, AppTypography } from '../../../../components/common'
+import { showStatusModal } from '../../../../services/apiService'
 
 export default function SettingsTab() {
 	const [showModal, setShowModal] = useState(false)
@@ -23,12 +24,17 @@ export default function SettingsTab() {
 	const { width } = useWindowDimensions()
 
 	const handleAbout = () => {
-		Alert.alert('About Whisper ai', 'Version 1.0.0')
+		showStatusModal({
+			status: 'info',
+			title: 'About Whisper ai',
+			description: 'Version 1.0.0',
+			submitText: 'OK',
+		})
 	}
 
 	const handleRate = () => {
 		Linking.openURL('https://apps.apple.com').catch(() => {
-			Alert.alert('Error', 'Unable to open app store')
+			Toast.show({ type: 'error', text1: 'Unable to open app store' })
 		})
 	}
 

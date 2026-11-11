@@ -11,6 +11,7 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import * as ImagePicker from 'expo-image-picker'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
@@ -351,27 +352,27 @@ function AddAchievementForm({
 		}
 
 		if (!payload.title) {
-			Alert.alert('Validation', 'Achievement title is required.')
+			Toast.show({ type: 'error', text1: 'Achievement title is required.' })
 			return
 		}
 
 		if (!payload.category) {
-			Alert.alert('Validation', 'Please select an achievement category.')
+			Toast.show({ type: 'error', text1: 'Please select an achievement category.' })
 			return
 		}
 
 		if (!payload.organization) {
-			Alert.alert('Validation', 'Issuing organization or hospital is required.')
+			Toast.show({ type: 'error', text1: 'Issuing organization or hospital is required.' })
 			return
 		}
 
 		if (!payload.date) {
-			Alert.alert('Validation', 'Date awarded is required.')
+			Toast.show({ type: 'error', text1: 'Date awarded is required.' })
 			return
 		}
 
 		if (!/^\d{4}-\d{2}-\d{2}$|^\d{1,2}\/\d{1,2}\/\d{4}$/.test(payload.date)) {
-			Alert.alert('Validation', 'Enter date as YYYY-MM-DD or MM/DD/YYYY.')
+			Toast.show({ type: 'error', text1: 'Enter date as YYYY-MM-DD or MM/DD/YYYY.' })
 			return
 		}
 
@@ -741,18 +742,16 @@ export default function AchievementsTab() {
 				)
 			})
 			closeForm()
-			Alert.alert(
-				'Success',
-				editingItem
-					? 'Achievement updated locally.'
-					: 'Achievement saved locally.'
-			)
+			Toast.show({
+				type: 'success',
+				text1: editingItem ? 'Achievement updated locally.' : 'Achievement saved locally.',
+			})
 		} catch (error) {
 			console.log('[AchievementsTab] save error:', error)
-			Alert.alert(
-				'Error',
-				(error as any)?.message || 'Unable to save achievement right now.'
-			)
+			Toast.show({
+				type: 'error',
+				text1: (error as any)?.message || 'Unable to save achievement right now.',
+			})
 		} finally {
 			setIsSaving(false)
 		}

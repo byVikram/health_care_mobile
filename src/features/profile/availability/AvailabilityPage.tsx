@@ -17,7 +17,6 @@ import {
 	AppSaveFooter,
 	AppSegmentedControl,
 	AppToggle,
-	StatusModal,
 } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { useAncillarySpecialty, useAuth } from '../../../context/AuthContext'
@@ -73,6 +72,7 @@ import { SlotLengthCard } from './components/SlotLengthCard'
 import { OverrideList } from './components/OverrideList'
 import { OverrideSheet } from './components/OverrideSheet'
 import { ClinicPickerSheet } from './components/ClinicPickerSheet'
+import { showStatusModal } from '../../../services/apiService'
 
 type Place = { id: string; name: string }
 
@@ -109,7 +109,6 @@ export default function AvailabilityPage() {
 	const [ancillaryRows, setAncillaryRows] = useState<AncillaryOverrideRow[]>([])
 	const [sheet, setSheet] = useState<{ initial: DateOverride | null } | null>(null)
 	const [removing, setRemoving] = useState<DateOverride | null>(null)
-	const [actionError, setActionError] = useState<string | null>(null)
 
 	// ── Weekly hours (draft + footer save) ───────────────────────────────────
 	const load = useCallback(async (): Promise<AvailabilityDraft> => {
@@ -293,7 +292,12 @@ export default function AvailabilityPage() {
 			setSheet(null)
 			Toast.show({ type: 'success', text1: 'Date override saved' })
 		} catch (e) {
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't update availability",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			await loadOverrides()
 		}
@@ -305,7 +309,12 @@ export default function AvailabilityPage() {
 			await deleteRows(removing.ids)
 			Toast.show({ type: 'success', text1: 'Date override removed' })
 		} catch (e) {
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't update availability",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setRemoving(null)
 			await loadOverrides()
@@ -377,14 +386,6 @@ export default function AvailabilityPage() {
 						message="Your weekly hours will apply on this date again."
 						confirmLabel="Remove"
 						onConfirm={removeOverride}
-					/>
-					<StatusModal
-						visible={!!actionError}
-						status="error"
-						title="Couldn't update availability"
-						description={actionError || ''}
-						submitText="OK"
-						onSubmit={() => setActionError(null)}
 					/>
 				</>
 			}

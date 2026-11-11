@@ -5,6 +5,7 @@ import { FamilyMember as ApiFamilyMember, createFamilyMember } from '../features
 import { familyStore } from '../features/profile/patient/familyStore'
 import { toBackendRelation } from '../features/profile/config/profileOptions'
 import type { FamilyMemberDraft } from '../components/common/booking/AppFamilyMemberSheet'
+import { showStatusModal } from '../services/apiService'
 
 /** One bookable person: the signed-in patient ("self") or one of their family members. */
 export interface FamilyMemberOption {
@@ -142,10 +143,11 @@ export function useFamilyMembers() {
 				Toast.show({ type: 'success', text1: `${draft.name} added to your family` })
 				return created.public_id || created.id
 			} catch (e) {
-				Toast.show({
-					type: 'error',
-					text1: "Couldn't add family member",
-					text2: e instanceof Error ? e.message : 'Please try again.',
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't add family member",
+					description: e instanceof Error ? e.message : 'Please try again.',
+					submitText: 'OK',
 				})
 				return null
 			}

@@ -11,6 +11,7 @@ import {
 	Linking,
 	Share,
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { Ionicons } from '@expo/vector-icons'
 import { AppToggle, AppTypography } from '../../../../components/common'
 
@@ -35,7 +36,7 @@ export default function SettingsTab() {
 
 	const handleRate = () => {
 		Linking.openURL('https://apps.apple.com').catch(() => {
-			Alert.alert('Error', 'Unable to open app store')
+			Toast.show({ type: 'error', text1: 'Unable to open app store' })
 		})
 	}
 

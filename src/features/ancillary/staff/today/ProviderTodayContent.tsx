@@ -36,6 +36,7 @@ import { ProviderNextVisitCard } from './ProviderNextVisitCard'
 import { ProviderScheduleTimeline } from './ProviderScheduleTimeline'
 import { getProviderAverageRating, ratingLabel } from './providerRating'
 import { isInstantOffer, isProviderWork, offerCollect, replyInLabel, shortDay, tipLabel, visitsWord } from './todayView'
+import { showStatusModal } from '../../../../services/apiService'
 
 const REFRESH_MS = 60_000
 /** Seconds an instant request is held for this provider before it counts as missed. */
@@ -287,10 +288,11 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 				setOfferPhase('taken')
 				void load()
 			} else {
-				Toast.show({
-					type: 'error',
-					text1: 'Could not accept request',
-					text2: res.message ?? 'Please try again.',
+				showStatusModal({
+					status: 'error',
+					title: 'Could not accept request',
+					description: res.message ?? 'Please try again.',
+					submitText: 'OK',
 				})
 			}
 		} finally {
@@ -307,10 +309,11 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 			closeOfferSheet()
 			Toast.show({ type: 'success', text1: 'Request declined' })
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Could not decline request',
-				text2: extractApiErrorMessage(e, 'Please try again.'),
+			showStatusModal({
+				status: 'error',
+				title: 'Could not decline request',
+				description: extractApiErrorMessage(e, 'Please try again.'),
+				submitText: 'OK',
 			})
 		} finally {
 			setOfferBusy(false)
@@ -334,10 +337,11 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 						: `Your ${copy.noun} with ${request.patient.name ?? 'the patient'} is confirmed.`,
 			})
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Could not accept booking',
-				text2: extractApiErrorMessage(e, 'This request may have expired. Please try again.'),
+			showStatusModal({
+				status: 'error',
+				title: 'Could not accept booking',
+				description: extractApiErrorMessage(e, 'This request may have expired. Please try again.'),
+				submitText: 'OK',
 			})
 		} finally {
 			setAcceptingId(null)
@@ -363,10 +367,11 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 				text2: `${target.patient.name ?? 'The patient'} has been notified.`,
 			})
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Could not decline booking',
-				text2: extractApiErrorMessage(e, 'Please try again.'),
+			showStatusModal({
+				status: 'error',
+				title: 'Could not decline booking',
+				description: extractApiErrorMessage(e, 'Please try again.'),
+				submitText: 'OK',
 			})
 		} finally {
 			setDeclining(false)

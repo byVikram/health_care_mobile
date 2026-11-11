@@ -8,7 +8,6 @@ import {
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
-	Alert,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppTypography } from '../../../components/common'
@@ -23,6 +22,8 @@ import {
 	type ReportRecord,
 } from '../VitalsService'
 import AddVitalsModal from './AddVitalsModal'
+import Toast from 'react-native-toast-message'
+import { showStatusModal } from '../../../services/apiService'
 
 interface TabColumn {
 	key: string
@@ -684,11 +685,16 @@ export default function VitalsTab({ patientId }: VitalsTabProps) {
 
 			if (promises.length > 0) {
 				await Promise.all(promises)
-				Alert.alert('Success', 'Patient vitals recorded successfully')
+				Toast.show({ type: 'success', text1: 'Patient vitals recorded successfully' })
 				handleRefresh()
 			}
 		} catch (error: any) {
-			Alert.alert('Error', error?.message || 'Failed to save patient vitals.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't save the vitals",
+				description: error?.message || 'Failed to save patient vitals.',
+				submitText: 'OK',
+			})
 		} finally {
 			setLoading(false)
 		}

@@ -23,7 +23,7 @@ const EMERGENCY_NUMBER = '108'
 export default function OfflineScreen() {
 	const { refresh } = useNetwork()
 	const [checking, setChecking] = useState(false)
-	const [tries, setTries] = useState(0)
+	const [stillOffline, setStillOffline] = useState(false)
 	const mounted = useRef(true)
 
 	useEffect(() => {
@@ -40,7 +40,7 @@ export default function OfflineScreen() {
 		// Still mounted means still offline — App.tsx unmounts this screen the moment we reconnect.
 		if (!mounted.current) return
 		setChecking(false)
-		setTries((n) => n + 1)
+		setStillOffline(true)
 	}
 
 	const callEmergency = () => {
@@ -63,11 +63,9 @@ export default function OfflineScreen() {
 					Check your mobile data or Wi-Fi. We’ll reconnect automatically when you’re back online.
 				</Text>
 
-				{tries > 0 && !checking && (
+				{stillOffline && !checking && (
 					<View style={styles.notice} accessibilityLiveRegion="polite">
-						<Text style={styles.noticeText}>
-							Still no connection · tried {tries} {tries === 1 ? 'time' : 'times'}
-						</Text>
+						<Text style={styles.noticeText}>Still no connection</Text>
 					</View>
 				)}
 

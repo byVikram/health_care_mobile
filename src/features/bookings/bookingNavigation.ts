@@ -5,9 +5,10 @@
 //   runBookingAction   -- item.actions.{primary,secondary}.key -> open target / map / call / cancel / book again.
 // Unknown targets or actions never dead-end silently: they fall back to the target, or a toast.
 
-import { Alert, Linking } from 'react-native'
+import { Linking } from 'react-native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import Toast from 'react-native-toast-message'
+import { showStatusModal } from '../../services/apiService'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import type { BookingActionKey, BookingItem } from '../../services/bookingsService'
@@ -69,15 +70,15 @@ const placeOf = (where?: string | null) => (where ?? '').replace(/\s*·\s*[\d.,]
 
 const confirm = (title: string, message: string, confirmLabel: string) =>
 	new Promise<boolean>((resolve) => {
-		Alert.alert(
+		showStatusModal({
+			status: 'info',
 			title,
-			message,
-			[
-				{ text: 'Keep it', style: 'cancel', onPress: () => resolve(false) },
-				{ text: confirmLabel, style: 'destructive', onPress: () => resolve(true) },
-			],
-			{ cancelable: true, onDismiss: () => resolve(false) }
-		)
+			description: message,
+			submitText: confirmLabel,
+			onSubmit: () => resolve(true),
+			cancelText: 'Keep it',
+			onCancel: () => resolve(false),
+		})
 	})
 
 async function callProvider(navigation: BookingsNavigation, item: BookingItem, handlers: BookingActionHandlers) {
@@ -117,7 +118,12 @@ async function cancelBooking(navigation: BookingsNavigation, item: BookingItem, 
 			Toast.show({ type: 'success', text1: 'Booking cancelled' })
 			handlers.onChanged()
 		} catch {
-			Toast.show({ type: 'error', text1: "Couldn't cancel the booking", text2: 'Please try again.' })
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't cancel the booking",
+				description: 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			handlers.setBusy(null)
 		}

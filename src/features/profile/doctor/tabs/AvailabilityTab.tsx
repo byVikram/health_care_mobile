@@ -8,6 +8,7 @@ import {
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
+import Toast from 'react-native-toast-message'
 
 import { AppSelect, AppStickyFooter, StatusModal } from '../../../../components/common'
 import { AppTypography } from '../../../../components/common/display/AppTypography'
@@ -198,13 +199,6 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 	const [unselectedSlotsByDate, setUnselectedSlotsByDate] = useState<UnselectedSlotsByDate>({})
 	const [pendingOverrides, setPendingOverrides] = useState<SlotOverridePayload[]>([])
 	const [saveLoading, setSaveLoading] = useState(false)
-	const [statusModal, setStatusModal] = useState<{
-		visible: boolean
-		status: 'success' | 'error'
-		title: string
-		description: string
-		submitText?: string
-	} | null>(null)
 	const [saveConfirmModal, setSaveConfirmModal] = useState<{
 		visible: boolean
 		count: number
@@ -544,24 +538,12 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 			await updateDoctorAvailability(payload as any)
 			updateAvailability(updatedAvailability)
 
-			setStatusModal({
-				visible: true,
-				status: 'success',
-				title: 'Availability Saved',
-				description: 'Your availability schedule has been updated successfully.',
-				submitText: 'Done',
-			})
+			Toast.show({ type: 'success', text1: 'Your availability schedule has been updated successfully.' })
 
 			await fetchAvailability()
 		} catch (error: any) {
 			console.error('[AvailabilityTab] save availability error:', error)
-			setStatusModal({
-				visible: true,
-				status: 'error',
-				title: 'Error',
-				description: 'Unable to save availability. Please try again.',
-				submitText: 'Okay',
-			})
+			Toast.show({ type: 'error', text1: 'Unable to save availability. Please try again.' })
 		} finally {
 			setSaveLoading(false)
 		}
@@ -717,18 +699,6 @@ export default function AvailabilityTab({ hospitals, availability, onChange }: A
 			>
 				Save Availability Schedule
 			</AppStickyFooter>
-
-			{statusModal && (
-				<StatusModal
-					visible={statusModal.visible}
-					status={statusModal.status}
-					title={statusModal.title}
-					description={statusModal.description}
-					submitText={statusModal.submitText}
-					onSubmit={() => setStatusModal(null)}
-					onCancel={() => setStatusModal(null)}
-				/>
-			)}
 
 			{saveConfirmModal && (
 				<StatusModal

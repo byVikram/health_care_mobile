@@ -8,6 +8,7 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
@@ -17,7 +18,6 @@ import {
 	AppSelect,
 	AppSelectOption,
 	AppTypography,
-	StatusModal,
 } from '../../../../components/common'
 import {
 	fetchProviderProfile,
@@ -411,13 +411,6 @@ export default function ProfessionalDetailsTab({
 		}
 		return []
 	})
-	const [statusModal, setStatusModal] = useState<{
-		visible: boolean
-		status: 'success' | 'error'
-		title: string
-		description: string
-		submitText?: string
-	} | null>(null)
 
 	const updateFormData = <K extends keyof ProfessionalFormData>(key: K, value: ProfessionalFormData[K]) => {
 		setFormData((prev) => ({ ...prev, [key]: value }))
@@ -760,23 +753,19 @@ function resolveQualificationFromProfile(profile: any): string {
 				about: authoritativeAbout,
 			}))
 
-			setStatusModal({
-				visible: true,
-				status: 'success',
-				title: 'Success',
-				description: 'Professional details saved successfully.',
-				submitText: 'Okay',
-			})
+			Toast.show({ type: 'success', text1: 'Professional details saved' })
+			onNextTab?.()
 		} catch (error: any) {
 			console.error('[PROFILE SAVE] error:', error)
 			console.error('[PROFILE SAVE] status:', error?.response?.status)
 			console.error('[PROFILE SAVE] URL:', error?.config?.url)
-			setStatusModal({
-				visible: true,
-				status: 'error',
-				title: 'Error',
-				description: error?.response?.data?.message || error?.response?.data?.detail || error?.message || 'Unable to save professional details right now.',
-				submitText: 'Okay',
+			Toast.show({
+				type: 'error',
+				text1:
+					error?.response?.data?.message ||
+					error?.response?.data?.detail ||
+					error?.message ||
+					'Unable to save professional details right now.',
 			})
 		} finally {
 			setIsSaving(false)
@@ -934,24 +923,6 @@ function resolveQualificationFromProfile(profile: any): string {
 			<AppStickyFooter onPress={handleSave} disabled={isSaving} buttonStyle={styles.saveButton}>
 				Save
 			</AppStickyFooter>
-
-			{statusModal && (
-				<StatusModal
-					visible={statusModal.visible}
-					status={statusModal.status}
-					title={statusModal.title}
-					description={statusModal.description}
-					submitText={statusModal.submitText}
-					onSubmit={() => {
-						const isSuccess = statusModal.status === 'success'
-						setStatusModal(null)
-						if (isSuccess && onNextTab) {
-							onNextTab()
-						}
-					}}
-					onCancel={() => setStatusModal(null)}
-				/>
-			)}
 		</View>
 	)
 }

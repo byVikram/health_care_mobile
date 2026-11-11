@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
 	ActivityIndicator,
-	Alert,
 	KeyboardAvoidingView,
 	Platform,
 	ScrollView,
@@ -11,6 +10,7 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppBottomSheet,
@@ -20,7 +20,6 @@ import {
 	AppSelectOption,
 	AppMultiSelect,
 	AppTypography,
-	StatusModal,
 } from '../../../../components/common'
 import { useAuth } from '../../../../context/AuthContext'
 import {
@@ -234,13 +233,6 @@ export default function ProfessionalDetailsTab() {
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [isLoadingSpecialities, setIsLoadingSpecialities] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
-	const [statusModal, setStatusModal] = useState<{
-		visible: boolean
-		status: 'success' | 'error'
-		title: string
-		description: string
-		submitText?: string
-	} | null>(null)
 
 	const [expertiseOptions, setExpertiseOptions] = useState<Option[]>([])
 	const [treatmentOptions, setTreatmentOptions] = useState<Option[]>([])
@@ -352,12 +344,12 @@ export default function ProfessionalDetailsTab() {
 		const parsedExperience = parseInt(experienceYears, 10)
 
 		if (!formData.specialization_id) {
-			Alert.alert('Validation', 'Please select your specialization.')
+			Toast.show({ type: 'error', text1: 'Please select your specialization.' })
 			return
 		}
 
 		if (experienceYears !== '' && (isNaN(parsedExperience) || parsedExperience < 0)) {
-			Alert.alert('Validation', 'Please enter a valid number for years of experience.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid number for years of experience.' })
 			return
 		}
 
@@ -381,22 +373,10 @@ export default function ProfessionalDetailsTab() {
 				updateDoctorAdditionalDetails(addlPayload),
 			])
 			await syncProfileAfterSave()
-			setStatusModal({
-				visible: true,
-				status: 'success',
-				title: 'Success',
-				description: 'Professional details saved successfully.',
-				submitText: 'Okay',
-			})
+			Toast.show({ type: 'success', text1: 'Professional details saved successfully.' })
 		} catch (error) {
 			console.log('[ProfessionalDetailsTab] save error:', error)
-			setStatusModal({
-				visible: true,
-				status: 'error',
-				title: 'Error',
-				description: 'Unable to save professional details right now.',
-				submitText: 'Okay',
-			})
+			Toast.show({ type: 'error', text1: 'Unable to save professional details right now.' })
 		} finally {
 			setIsSaving(false)
 		}
@@ -541,17 +521,6 @@ export default function ProfessionalDetailsTab() {
 			<AppStickyFooter onPress={handleSave} disabled={isSaving} buttonStyle={styles.saveButton}>
 				Save
 			</AppStickyFooter>
-			{statusModal && (
-				<StatusModal
-					visible={statusModal.visible}
-					status={statusModal.status}
-					title={statusModal.title}
-					description={statusModal.description}
-					submitText={statusModal.submitText}
-					onSubmit={() => setStatusModal(null)}
-					onCancel={() => setStatusModal(null)}
-				/>
-			)}
 		</View>
 	)
 }

@@ -2,7 +2,7 @@
 // the common avatar API and reports the new (signed) URL. Works the same for every role.
 
 import { useCallback, useState } from 'react'
-import { Alert, Platform } from 'react-native'
+import { Platform } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import Toast from 'react-native-toast-message'
 import { removeAvatar, uploadAvatar, type AvatarUpload } from '../../../services/avatarService'
@@ -82,7 +82,7 @@ export function useAvatarChange({ hasPhoto, allowRemove = true, onChanged, patie
 						? await ImagePicker.requestCameraPermissionsAsync()
 						: await ImagePicker.requestMediaLibraryPermissionsAsync()
 			if (!permission.granted) {
-				Alert.alert('Permission needed', `Allow access to your ${source === 'camera' ? 'camera' : 'photos'} to set a profile photo.`)
+				Toast.show({ type: 'error', text1: `Allow access to your ${source === 'camera' ? 'camera' : 'photos'} to set a profile photo.` })
 				return
 			}
 			const result =
@@ -120,7 +120,7 @@ export function useAvatarChange({ hasPhoto, allowRemove = true, onChanged, patie
 	const open = useCallback(() => {
 		if (busy) return
 		if (Platform.OS === 'web') {
-			// Alert.alert has no buttons in the browser, so go straight to the file explorer (on a phone's browser the
+			// There is no source choice in the browser, so go straight to the file explorer (on a phone's browser the
 			// system itself offers "take a photo" or "choose a photo").
 			void pick('library')
 			return
@@ -129,12 +129,9 @@ export function useAvatarChange({ hasPhoto, allowRemove = true, onChanged, patie
 			setSheetVisible(true)
 			return
 		}
+		// Without the source sheet (every screen passes `sheet: true`) go straight to the library.
 		// Deleting is a separate, visible "Delete photo" action on the screen (see `remove` / `canRemove`).
-		Alert.alert('Profile photo', undefined, [
-			{ text: 'Take a photo', onPress: () => void pick('camera') },
-			{ text: 'Choose from library', onPress: () => void pick('library') },
-			{ text: 'Cancel', style: 'cancel' as const },
-		])
+		void pick('library')
 	}, [busy, pick, sheet])
 
 	const closeSheet = useCallback(() => setSheetVisible(false), [])

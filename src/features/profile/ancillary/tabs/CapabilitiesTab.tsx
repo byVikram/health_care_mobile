@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
 	ActivityIndicator,
-	Alert,
 	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { safeJsonParse } from '../../../../utils/jsonUtils'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -454,10 +454,10 @@ export default function CapabilitiesTab({
 
 			if (isHomeCare) {
 				if (!isPackageConfirmed) {
-					Alert.alert(
-						'Confirmation Required',
-						'Please confirm that you can provide all Home Care services listed in the package.'
-					)
+					Toast.show({
+						type: 'error',
+						text1: 'Please confirm that you can provide all Home Care services listed in the package.',
+					})
 					return
 				}
 
@@ -468,7 +468,7 @@ export default function CapabilitiesTab({
 				await AsyncStorage.setItem('ancillary_capabilities', JSON.stringify(HOME_CARE_ALL_PROCEDURE_IDS))
 				setSelected(HOME_CARE_ALL_PROCEDURE_IDS)
 
-				Alert.alert('Saved', 'Home Care complete package confirmed successfully.')
+				Toast.show({ type: 'success', text1: 'Home Care complete package confirmed successfully.' })
 			} else {
 				// 1. Call Backend PUT capabilities API for clinical specialty
 				await updateAncillaryCapabilitiesBackend(selected)
@@ -476,7 +476,7 @@ export default function CapabilitiesTab({
 				// 2. Persist in AsyncStorage
 				await AsyncStorage.setItem('ancillary_capabilities', JSON.stringify(selected))
 
-				Alert.alert('Saved', 'Clinical capabilities saved successfully.')
+				Toast.show({ type: 'success', text1: 'Clinical capabilities saved successfully.' })
 			}
 
 			if (onNextTab) {
@@ -484,7 +484,7 @@ export default function CapabilitiesTab({
 			}
 		} catch (e) {
 			console.log('[CapabilitiesTab] Failed to save capabilities:', e)
-			Alert.alert('Error', 'Failed to save capabilities.')
+			Toast.show({ type: 'error', text1: 'Failed to save capabilities.' })
 		} finally {
 			setSaving(false)
 		}

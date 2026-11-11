@@ -272,7 +272,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		]
 	)
 
-	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+	// The one app-wide modal: showStatusModal() (services/apiService) sets `statusModal` from anywhere. A tap on the
+	// backdrop counts as Cancel; the modal closes first, then the caller's handler runs.
+	const closeStatusModal = (handler?: () => void) => {
+		setStatusModal(null)
+		handler?.()
+	}
+
+	return (
+		<AuthContext.Provider value={value}>
+			{children}
+			<StatusModal
+				visible={!!statusModal}
+				status={statusModal?.status}
+				title={statusModal?.title ?? ''}
+				description={statusModal?.description ?? ''}
+				submitText={statusModal?.submitText}
+				onSubmit={() => closeStatusModal(statusModal?.onSubmit)}
+				cancelText={statusModal?.cancelText}
+				onCancel={() => closeStatusModal(statusModal?.onCancel)}
+			/>
+		</AuthContext.Provider>
+	)
 }
 
 export const useAuth = () => useContext(AuthContext)

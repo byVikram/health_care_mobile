@@ -5,13 +5,14 @@ import React, { useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
-import { AppConfirmSheet, AppInfoBanner, StatusModal } from '../../../components/common'
+import { AppConfirmSheet, AppInfoBanner } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import type { Session } from '../../auth/authService'
 import { useSessions } from '../hooks/useSessions'
 import { DeviceRow, deviceName } from './components/DeviceRow'
 import { NewLoginAlert } from './components/NewLoginAlert'
 import { ProfileScreen } from './components/ProfileScreen'
+import { showStatusModal } from '../../../services/apiService'
 
 type Ask = { kind: 'one'; session: Session } | { kind: 'all' } | null
 
@@ -19,14 +20,18 @@ export default function LoginSecurityPage() {
 	const { loading, error, reload, current, others, logOut, logOutOthers, acknowledge } = useSessions()
 	const [ask, setAsk] = useState<Ask>(null)
 	const [secured, setSecured] = useState(false)
-	const [actionError, setActionError] = useState<string | null>(null)
 	const flagged = others.find((s) => s.is_new)
 
 	const guard = async (fn: () => Promise<void>) => {
 		try {
 			await fn()
 		} catch (e) {
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't update your sessions",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		}
 	}
 
@@ -71,14 +76,6 @@ export default function LoginSecurityPage() {
 						}
 						confirmLabel="Log out"
 						onConfirm={confirm}
-					/>
-					<StatusModal
-						visible={!!actionError}
-						status="error"
-						title="Something went wrong"
-						description={actionError || ''}
-						submitText="OK"
-						onSubmit={() => setActionError(null)}
 					/>
 				</>
 			}

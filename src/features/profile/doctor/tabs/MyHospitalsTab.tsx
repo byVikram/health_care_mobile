@@ -9,8 +9,9 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppInput, AppSelect, AppStickyFooter, AppToggle, AppTypography, StatusModal } from '../../../../components/common'
+import { AppInput, AppSelect, AppStickyFooter, AppToggle, AppTypography } from '../../../../components/common'
 import {
 	createHospital,
 	deleteHospital,
@@ -568,13 +569,6 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 	const [isLoading, setIsLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [isSavingAddress, setIsSavingAddress] = useState(false)
-	const [statusModal, setStatusModal] = useState<{
-		visible: boolean
-		status: 'success' | 'error'
-		title: string
-		description: string
-		submitText?: string
-	} | null>(null)
 	const [selectedWorkingDay, setSelectedWorkingDay] = useState<WorkingDayKey>('monday')
 	const [selectedAppointmentType, setSelectedAppointmentType] = useState<AppointmentType>('clinic')
 	const [weeklyWorkingHours, setWeeklyWorkingHours] = useState(createWeeklyWorkingHours)
@@ -615,12 +609,13 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 			updateHospitalsState(normalizedHospitals)
 		} catch (error) {
 			console.log('[MyHospitalsTab] failed to load hospitals:', error)
-			Alert.alert(
-				'Error',
-				(error as any)?.response?.data?.message ||
+			Toast.show({
+				type: 'error',
+				text1:
+					(error as any)?.response?.data?.message ||
 					(error as any)?.message ||
-					'Unable to load hospitals right now.'
-			)
+					'Unable to load hospitals right now.',
+			})
 		} finally {
 			if (showLoader) setIsLoading(false)
 		}
@@ -777,7 +772,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		} catch (error) {
 			console.log('[MyHospitalsTab] set primary error:', error)
 			updateHospitalsState(previousHospitals)
-			Alert.alert('Error', 'Unable to update primary hospital right now.')
+			Toast.show({ type: 'error', text1: 'Unable to update primary hospital right now.' })
 		} finally {
 			setMenuVisibleId(null)
 		}
@@ -809,7 +804,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						setMenuVisibleId(null)
 					} catch (error) {
 						console.log('[MyHospitalsTab] delete hospital error:', error)
-						Alert.alert('Error', 'Unable to delete hospital right now.')
+						Toast.show({ type: 'error', text1: 'Unable to delete hospital right now.' })
 					}
 				},
 			},
@@ -824,12 +819,12 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 		const trimmedOfflineFee = form.offline_consultation_fee.trim()
 
 		if (!trimmedName) {
-			Alert.alert('Validation', 'Hospital name is required.')
+			Toast.show({ type: 'error', text1: 'Hospital name is required.' })
 			return
 		}
 
 		if (!trimmedAddress) {
-			Alert.alert('Validation', 'Full address is required.')
+			Toast.show({ type: 'error', text1: 'Full address is required.' })
 			return
 		}
 
@@ -857,13 +852,7 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						editingId,
 						buildHospitalUpdatePayload(updatedHospital, updatedHospital.isPrimary, weeklyWorkingHours)
 					)
-					setStatusModal({
-				visible: true,
-				status: 'success',
-				title: 'Success',
-				description: getSuccessMessage(response, 'Hospital updated successfully'),
-				submitText: 'Okay',
-			})
+					Toast.show({ type: 'success', text1: getSuccessMessage(response, 'Hospital updated successfully') })
 					await loadHospitals()
 				} else {
 					// Pin the clinic on the map from the typed address, so patients' Directions buttons
@@ -879,25 +868,12 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 						offline_consultation_fee: trimmedOfflineFee,
 					})
 
-					setStatusModal({
-				visible: true,
-				status: 'success',
-				title: 'Success',
-				description: getSuccessMessage(response),
-				submitText: 'Okay',
-			})
+					Toast.show({ type: 'success', text1: getSuccessMessage(response) })
 			await loadHospitals()
 		}
 			} catch (error) {
 				console.log('[MyHospitalsTab] save address error:', error)
-				setStatusModal({
-					visible: true,
-					status: 'error',
-					title: 'Error',
-					description:
-						(error as any)?.response?.data?.message || (error as any)?.message || 'Failed to save hospital',
-					submitText: 'Okay',
-				})
+				Toast.show({ type: 'error', text1: (error as any)?.response?.data?.message || (error as any)?.message || 'Failed to save hospital' })
 			} finally {
 				setIsSavingAddress(false)
 			}
@@ -923,22 +899,10 @@ export default function MyHospitalsTab({ hospitals: externalHospitals, onHospita
 				)
 			)
 			await loadHospitals()
-		setStatusModal({
-			visible: true,
-			status: 'success',
-			title: 'Success',
-			description: 'Hospitals saved successfully.',
-			submitText: 'Okay',
-		})
+		Toast.show({ type: 'success', text1: 'Hospitals saved successfully.' })
 	} catch (error) {
 		console.log('[MyHospitalsTab] save error:', error)
-		setStatusModal({
-			visible: true,
-			status: 'error',
-			title: 'Error',
-			description: 'Unable to save hospitals right now.',
-			submitText: 'Okay',
-		})
+		Toast.show({ type: 'error', text1: 'Unable to save hospitals right now.' })
 	} finally {
 		setIsSaving(false)
 	}
@@ -1289,17 +1253,6 @@ if (editingId) {
 			>
 				Save
 			</AppStickyFooter>
-			{statusModal && (
-				<StatusModal
-					visible={statusModal.visible}
-					status={statusModal.status}
-					title={statusModal.title}
-					description={statusModal.description}
-					submitText={statusModal.submitText}
-					onSubmit={() => setStatusModal(null)}
-					onCancel={() => setStatusModal(null)}
-				/>
-			)}
 		</View>
 	)
 }

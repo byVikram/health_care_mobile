@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { AppBottomSheet, AppButton, AppInput, AppSelect, AppSelectOption, AppStickyFooter, AppTypography, StatusModal } from '../../../../components/common'
+import { AppBottomSheet, AppButton, AppInput, AppSelect, AppSelectOption, AppStickyFooter, AppTypography } from '../../../../components/common'
 import {
 	type DoctorEducationalQualificationsUpdatePayload,
 	updateDoctorEducationalQualifications,
@@ -237,13 +238,6 @@ export default function EducationalDetailsTab() {
 	const [isSaving, setIsSaving] = useState(false)
 	const [isLoadingProfile, setIsLoadingProfile] = useState(false)
 	const [sheetVisible, setSheetVisible] = useState(false)
-	const [statusModal, setStatusModal] = useState<{
-		visible: boolean
-		status: 'success' | 'error'
-		title: string
-		description: string
-		submitText?: string
-	} | null>(null)
 
 	useEffect(() => {
 		const loadDoctorProfile = async () => {
@@ -367,7 +361,7 @@ export default function EducationalDetailsTab() {
 		const validationMessage = validateForm()
 
 		if (validationMessage) {
-			Alert.alert('Validation', validationMessage)
+			Toast.show({ type: 'error', text1: validationMessage })
 			return
 		}
 
@@ -424,13 +418,13 @@ export default function EducationalDetailsTab() {
 			const validationMessage = validateForm()
 
 			if (validationMessage) {
-				Alert.alert('Validation', validationMessage)
+				Toast.show({ type: 'error', text1: validationMessage })
 				return
 			}
 		}
 
 		if (!qualificationsForSubmission.length) {
-			Alert.alert('Validation', 'Please add at least one qualification before continuing.')
+			Toast.show({ type: 'error', text1: 'Please add at least one qualification before continuing.' })
 			return
 		}
 
@@ -455,22 +449,10 @@ export default function EducationalDetailsTab() {
 				resetForm()
 				setSheetVisible(false)
 			}
-			setStatusModal({
-				visible: true,
-				status: 'success',
-				title: 'Success',
-				description: 'Educational qualifications saved successfully.',
-				submitText: 'Okay',
-			})
+			Toast.show({ type: 'success', text1: 'Educational qualifications saved successfully.' })
 		} catch (error) {
 			console.log('[EducationalDetailsTab] save error:', error)
-			setStatusModal({
-				visible: true,
-				status: 'error',
-				title: 'Error',
-				description: 'Unable to save educational qualifications right now.',
-				submitText: 'Okay',
-			})
+			Toast.show({ type: 'error', text1: 'Unable to save educational qualifications right now.' })
 		} finally {
 			setIsSaving(false)
 		}
@@ -669,17 +651,6 @@ export default function EducationalDetailsTab() {
 					</View>
 				</KeyboardAvoidingView>
 			</AppBottomSheet>
-			{statusModal && (
-				<StatusModal
-					visible={statusModal.visible}
-					status={statusModal.status}
-					title={statusModal.title}
-					description={statusModal.description}
-					submitText={statusModal.submitText}
-					onSubmit={() => setStatusModal(null)}
-					onCancel={() => setStatusModal(null)}
-				/>
-			)}
 		</View>
 	)
 }

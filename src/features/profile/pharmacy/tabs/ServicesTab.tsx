@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-	Alert,
 	ScrollView,
 	StyleSheet,
 	View,
 	useWindowDimensions,
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppButton,
@@ -19,6 +19,7 @@ import {
 } from '../../../../components/common'
 import { mergePharmacyProfileData, updatePharmacyProfile } from '../pharmacyService'
 import { PharmacyProfileData } from '../../../../types/pharmacy-profile-api'
+import { showStatusModal } from '../../../../services/apiService'
 
 const DAY_OPTIONS: AppSelectOption[] = [
 	{ label: 'Monday', value: 'Mon' },
@@ -232,22 +233,22 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 		const isHomeDeliveryAvailable = formData.homeDeliveryAvailable
 
 		if (!formData.openDays.length) {
-			Alert.alert('Validation', 'Please select open days.')
+			Toast.show({ type: 'error', text1: 'Please select open days.' })
 			return
 		}
 
 		if (isHomeDeliveryAvailable && deliveryRadius && Number.isNaN(Number(deliveryRadius))) {
-			Alert.alert('Validation', 'Please enter a valid delivery radius.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid delivery radius.' })
 			return
 		}
 
 		if (isHomeDeliveryAvailable && deliveryTime && Number.isNaN(Number(deliveryTime))) {
-			Alert.alert('Validation', 'Please enter a valid estimated delivery time.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid estimated delivery time.' })
 			return
 		}
 
 		if (isHomeDeliveryAvailable && minOrder && Number.isNaN(Number(minOrder))) {
-			Alert.alert('Validation', 'Please enter a valid minimum order amount.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid minimum order amount.' })
 			return
 		}
 
@@ -271,7 +272,12 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 			const response = await updatePharmacyProfile(payload)
 
 			if (response?.success === false) {
-				Alert.alert('Error', response.message || 'Unable to save pharmacy services right now.')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't save pharmacy services",
+					description: response.message || 'Unable to save pharmacy services right now.',
+					submitText: 'OK',
+				})
 				return
 			}
 
@@ -279,7 +285,12 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 			setSuccessModalVisible(true)
 		} catch (error) {
 			console.error('[PharmacyServicesTab] save error:', error)
-			Alert.alert('Error', 'Unable to save pharmacy services right now.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't save pharmacy services",
+				description: 'Unable to save pharmacy services right now.',
+				submitText: 'OK',
+			})
 		} finally {
 			setIsSaving(false)
 		}

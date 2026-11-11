@@ -52,6 +52,7 @@ import {
 } from './scheduledVisitView'
 import { useScheduledOrder } from './useScheduledOrder'
 import { useVisitEdits } from './useVisitEdits'
+import { showStatusModal } from '../../../services/apiService'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 type Route = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS>
@@ -123,7 +124,12 @@ export default function AncillaryScheduledDetailsPage() {
 			Toast.show({ type: 'success', text1: 'Booking cancelled' })
 			setLegacyOpen(false)
 		} catch {
-			Toast.show({ type: 'error', text1: "Couldn't cancel the booking", text2: 'Please try again.' })
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't cancel the booking",
+				description: 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setLegacyBusy(false)
 			void refresh()

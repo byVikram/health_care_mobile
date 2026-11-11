@@ -35,6 +35,7 @@ import type { MedicalRecord, RecordLink, RecordsTab, UploadDraft } from './medic
 import { emptyMessage, filterRecords, groupByMonth, recordDateLabel, tabCounts } from './medicalRecordsView'
 import { RECORD_TABS, UPLOAD_ICON_PATH } from './recordVisuals'
 import { useMedicalRecords } from './useMedicalRecords'
+import { showStatusModal } from '../../services/apiService'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 
@@ -98,7 +99,12 @@ export default function MedicalRecordsPage() {
 				removeRecord(record.memberKey, record.id)
 				Toast.show({ type: 'info', text1: 'This record was already deleted' })
 			} else {
-				Toast.show({ type: 'error', text1: 'Couldn’t delete the record', text2: recordsErrorMessage(error) })
+				showStatusModal({
+					status: 'error',
+					title: 'Couldn’t delete the record',
+					description: recordsErrorMessage(error),
+					submitText: 'OK',
+				})
 			}
 		} finally {
 			setDeleteTarget(null)
