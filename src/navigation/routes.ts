@@ -35,7 +35,6 @@ export const ROUTES = {
 		SETTINGS: 'Settings',
 		DOCTOR_WELCOME: 'DoctorWelcome',
 		ACCOUNT: 'Account',
-		APPOINTMENTS: 'Appointments',
 		VIDEO_CONSULTATION: 'VideoConsultation',
 		RESCHEDULE_APPOINTMENT: 'RescheduleAppointment',
 		CANCEL_APPOINTMENT: 'CancelAppointment',

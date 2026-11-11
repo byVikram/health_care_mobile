@@ -5,11 +5,11 @@
 // (bottom sheet) and AppointmentDetailsPage.tsx (full routed screen) so the
 // real fetch/render logic lives in exactly one place.
 
-import React, { useEffect, useRef, useState } from 'react'
-import { Animated, Easing, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
-import { AppButton } from '../../../components/common'
+import { AppButton, AppSkeleton } from '../../../components/common'
 import { getAppointmentById } from '../../../services/appointmentService'
 import { Appointment, AppointmentHistoryEntry } from '../../../types/appointment'
 import { getStatusStyle } from '../../../constants/statusColors'
@@ -204,21 +204,8 @@ function HistoryTimeline({ entries }: { entries: AppointmentHistoryEntry[] }) {
 
 // ── Sub-component: SkeletonBox / DrawerSkeleton ─────────────────────────────
 
-function SkeletonBox({ width, height, style }: { width: number | string; height: number; style?: object }) {
-	const opacity = useRef(new Animated.Value(0.4)).current
-
-	useEffect(() => {
-		const animation = Animated.loop(
-			Animated.sequence([
-				Animated.timing(opacity, { toValue: 1, duration: 700, easing: Easing.ease, useNativeDriver: true }),
-				Animated.timing(opacity, { toValue: 0.4, duration: 700, easing: Easing.ease, useNativeDriver: true }),
-			])
-		)
-		animation.start()
-		return () => animation.stop()
-	}, [opacity])
-
-	return <Animated.View style={[{ width, height, backgroundColor: DIVIDER, borderRadius: 6, opacity }, style]} />
+function SkeletonBox({ width, height, style }: { width: number | string; height: number; style?: ViewStyle }) {
+	return <AppSkeleton width={width} height={height} borderRadius={6} color={DIVIDER} style={style} />
 }
 
 function DrawerSkeleton() {

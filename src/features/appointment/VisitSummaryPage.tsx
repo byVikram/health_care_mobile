@@ -158,7 +158,7 @@ export default function VisitSummaryPage() {
 
 	const goBack = () => {
 		if (navigation.canGoBack()) navigation.goBack()
-		else navigation.navigate(ROUTES.STACK.APPOINTMENTS)
+		else navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL, params: { filter: 'doctor' } } as never) // the Bookings tab
 	}
 
 	if (loading) {

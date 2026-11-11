@@ -6,7 +6,7 @@
 
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { AppPathIcon } from '../../../components/common'
+import { AppPathIcon, AppSkeleton } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { CRITICAL_ICON, CRITICAL_TONE, NOTIFICATION_TONES, type NotificationCategory } from '../notificationCategories'
 
@@ -58,6 +58,23 @@ export function NotificationRow({ category, title, body, time, unread, critical,
 				{unread && <View style={[styles.dot, { backgroundColor: critical ? '#B42318' : APP_COLORS.primary }]} />}
 			</View>
 		</TouchableOpacity>
+	)
+}
+
+/** Placeholder with the same footprint as a row (tile, title, two body lines, meta) while the list loads. */
+export function NotificationRowSkeleton({ divider }: { divider: boolean }) {
+	return (
+		<View style={styles.row}>
+			<AppSkeleton width={44} height={44} borderRadius={22} color={APP_COLORS.divider} style={{ marginTop: 14 }} />
+			<View style={[styles.content, divider && styles.divider]}>
+				<View style={styles.textCol}>
+					<AppSkeleton width="55%" height={15} color={APP_COLORS.divider} />
+					<AppSkeleton width="95%" height={12} color={APP_COLORS.divider} />
+					<AppSkeleton width="70%" height={12} color={APP_COLORS.divider} />
+					<AppSkeleton width={90} height={10} color={APP_COLORS.divider} style={{ marginTop: 2 }} />
+				</View>
+			</View>
+		</View>
 	)
 }
 

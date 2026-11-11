@@ -7,8 +7,8 @@
 // Taps and card actions go through bookingNavigation.ts (-> each vertical's existing detail screens).
 // Other screens deep-link here with `{ filter }` (side drawer): doctor -> Doctor, ancillary -> Ancillary,
 // lab -> Lab, medicine -> Pharmacy, radiology -> All (radiology isn't part of this list).
-// The old per-vertical lists (AppointmentList, ancillary MyBookingsPage, lab / pharmacy / radiology order lists)
-// stay registered as their own stack screens.
+// The old per-vertical lists (ancillary MyBookingsPage, lab / pharmacy / radiology order lists) stay registered as their own
+// stack screens. (The old doctor-appointments list screen is gone: a notification, like a tap here, opens AppointmentDetails.)
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {

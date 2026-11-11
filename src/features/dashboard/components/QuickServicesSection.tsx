@@ -36,7 +36,7 @@ import AlliedIcon from '../../../assets/quick-services/allied.png'
 import TherapeuticIcon from '../../../assets/quick-services/therapeutic.png'
 import ScanTypeSelectorModal from '../../radiology/components/ScanTypeSelectorModal'
 
-import AlliedSelectorModal from './AlliedSelcetorModel'
+import AlliedSelectorModal from './AlliedSelectorModal'
 import TherapeuticSelector from './TherapeuticSelector'
 
 type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'ancillary' | 'nurse' | null
@@ -264,7 +264,7 @@ function StaffQuickServices({ role }: { role: Role }) {
 
 	const handleServicePress = (title: string) => {
 		if (title === 'Appointment') {
-			navigateRoot(ROUTES.STACK.APPOINTMENTS)
+			navigateRoot(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL, params: { filter: 'doctor' } } as never) // the Bookings tab
 		} else if (title === 'Pharmacy') {
 			navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
 		} else if (title === 'Radiology') {
