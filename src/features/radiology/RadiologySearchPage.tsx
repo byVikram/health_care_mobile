@@ -10,7 +10,6 @@ import {
 	ScrollView,
 	StyleSheet,
 	Text,
-	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
@@ -27,6 +26,7 @@ import { RadiologyItem, RadiologyFilters, DEFAULT_RADIOLOGY_FILTERS } from './ra
 import { fetchRadiologyCatalog, applyRadiologyFilters, clearRadiologyCache } from './radiologyService'
 import { AppBottomSheet, AppSelect, AppSelectOption, AppSkeleton, AppTypography } from '../../components/common'
 import { ROUTES } from '../../navigation/routes'
+import AppSearchBar from '../../components/common/inputs/AppSearchBar'
 
 // ─────────────────────────────────────────────
 // Constants
@@ -358,22 +358,7 @@ export default function RadiologySearchPage() {
 		<View style={styles.container}>
 			{/* Search Bar */}
 			<View style={styles.searchRow}>
-				<View style={styles.searchFieldContainer}>
-					<MaterialCommunityIcons name="magnify" size={20} color="#9aa0a6" style={styles.searchIcon} />
-					<TextInput
-						style={styles.searchInput}
-						placeholder="Search scans, centers, city..."
-						placeholderTextColor="#9AA0AC"
-						value={searchQuery}
-						onChangeText={setSearchQuery}
-						returnKeyType="search"
-					/>
-					{searchQuery.length > 0 && (
-						<TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtnWrapper}>
-							<MaterialCommunityIcons name="close-circle" size={18} color="#9aa4af" />
-						</TouchableOpacity>
-					)}
-				</View>
+				<AppSearchBar context="radiologyCenters" value={searchQuery} onChangeText={setSearchQuery} style={styles.searchBar} />
 				<TouchableOpacity
 					onPress={openFilterModal}
 					style={[styles.filterIconButton, hasActiveFilters ? styles.filterIconButtonActive : undefined]}
@@ -457,30 +442,11 @@ const styles = StyleSheet.create({
 		marginBottom: 8,
 		gap: 8,
 	},
-	searchFieldContainer: {
-		flex: 1,
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		paddingHorizontal: 12,
-		height: 48,
-		borderWidth: 1,
-		borderColor: '#EAECF0',
-		gap: 8,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.05,
-		shadowRadius: 4,
-		elevation: 1,
-	},
-	searchIcon: { marginRight: 4 },
-	searchInput: { flex: 1, height: '100%', fontSize: 14, color: '#101828' },
-	clearBtnWrapper: { padding: 4 },
+	searchBar: { flex: 1 },
 	filterIconButton: {
 		width: 48,
 		height: 48,
-		borderRadius: 12,
+		borderRadius: 24,
 		borderWidth: 1,
 		borderColor: '#EAECF0',
 		backgroundColor: '#ffffff',

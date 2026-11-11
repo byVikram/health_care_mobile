@@ -124,6 +124,13 @@ export const nextDays = (count = 7): Date[] => {
 export const isClosedDay = (d: Date, availableDays?: string[]) =>
 	Array.isArray(availableDays) && availableDays.length > 0 && !availableDays.includes(DOW_KEYS[d.getDay()])
 
+/**
+ * Is the doctor unavailable on this weekday for one consultation type? Unlike `isClosedDay`, an empty list means
+ * "no hours for this type at all" (every day closed); pass `null` / `undefined` when the weekly hours are unknown.
+ */
+export const isClosedDayForMode = (d: Date, daysForMode: string[] | null | undefined, fallbackDays?: string[]) =>
+	Array.isArray(daysForMode) ? !daysForMode.includes(DOW_KEYS[d.getDay()]) : isClosedDay(d, fallbackDays)
+
 // ── Parsing ──────────────────────────────────────────────────────────────────
 
 type ParseDateOnlyOptions = {

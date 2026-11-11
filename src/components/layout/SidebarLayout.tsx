@@ -21,7 +21,7 @@ import { usePatientSummary } from '../../features/dashboard/useHomeChromeData'
 import { ROUTES } from '../../navigation/routes'
 import { useSidebarMenu } from '../../navigation/useSidebarMenu'
 import { getPatientSummary } from '../../services/homeService'
-import { fetchDoctorHub } from '../../features/profile/doctor/doctorProfileService'
+import { useDoctorAvatarSync } from '../../features/profile/doctor/useDoctorAvatarSync'
 import { fetchProviderHub } from '../../features/profile/ancillary/ancillaryProfileService'
 import { NEW_PHYSIOTHERAPIST_IMAGE_URL } from '../../features/profile/ancillary/specialtyConfig'
 import type { AppStackParamList } from '../../navigation/types'
@@ -120,6 +120,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
 	const { clearAuth, user: authUser, role, updateUser, ancillarySpecialty } = useAuth()
 	const sections = useSidebarMenu(isSidebarOpen)
+	useDoctorAvatarSync(role === 'doctor')
 
 	const user = {
 		name: authUser?.name ?? MOCK_USER.name,
@@ -130,19 +131,14 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 	// Sync the real profile photo from the API so the dashboard header
 	// and sidebar show the latest uploaded image.
 	useEffect(() => {
-		if (role !== 'patient' && role !== 'doctor' && role !== 'ancillary' && role !== 'nurse') return
+		// A doctor's photo comes from useDoctorAvatarSync (below), shared with the other screens that show it.
+		if (role !== 'patient' && role !== 'ancillary' && role !== 'nurse') return
 
 		let cancelled = false
 		const syncAvatar = async () => {
 			try {
 				// Each role's hub endpoint is a light call that carries the photo; the full profile is loaded only by
 				// the screens that show it.
-				if (role === 'doctor') {
-					const hub = await fetchDoctorHub()
-					if (!cancelled && hub.avatar_url) updateUser({ avatar: hub.avatar_url })
-					return
-				}
-
 				if (role === 'ancillary' || role === 'nurse') {
 					const hub = await fetchProviderHub()
 					if (!cancelled) {
@@ -189,6 +185,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 		} else {
 			navigation.navigate(ROUTES.MAIN.TABS, {
 				screen: ROUTES.MAIN.SEARCH as any,
+				params: { focusSearch: true },
 			})
 		}
 	}

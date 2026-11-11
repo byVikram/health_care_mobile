@@ -80,13 +80,22 @@ export default function HealthReadsPage() {
 	}, [])
 
 	useEffect(() => {
+		let alive = true
 		void load()
-		getPatientDetails()
-			.then((res) => {
+		const loadConditions = async () => {
+			try {
+				const res = await getPatientDetails()
+				if (!alive) return
 				const list = res?.data?.medical?.chronic_conditions ?? res?.data?.chronic_conditions
 				if (Array.isArray(list)) setConditions(list.map((c: unknown) => String(c)).filter(Boolean))
-			})
-			.catch(() => {})
+			} catch {
+				// The "for you" topics are optional: the reads list works without them.
+			}
+		}
+		void loadConditions()
+		return () => {
+			alive = false
+		}
 	}, [load])
 
 	const all = useMemo(() => [...reads.article, ...reads.blog], [reads])
@@ -140,6 +149,7 @@ export default function HealthReadsPage() {
 		<View style={styles.screen}>
 			<FeedHeader
 				title="Health reads"
+				solid
 				subtitle="Written and reviewed by doctors"
 				onBack={() => navigation.goBack()}
 				action={{
@@ -151,8 +161,7 @@ export default function HealthReadsPage() {
 				search={{
 					value: query,
 					onChange: setQuery,
-					placeholder: 'Search articles and blogs',
-					accessibilityLabel: 'Search reads',
+					context: 'healthReads',
 				}}
 			/>
 

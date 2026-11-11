@@ -20,7 +20,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
-import { AppAvatar, AppPathIcon } from '../../components/common'
+import { AppAvatar, AppPathIcon, AppSearchBar } from '../../components/common'
 import { APP_COLORS } from '../../config/theme'
 import { useFamilyMembers, SELF_MEMBER_KEY, type FamilyMemberOption } from '../../hooks/useFamilyMembers'
 import { getPatientDetails } from '../profile/patient/PatientProfileService'
@@ -126,19 +126,27 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 		setTried(false)
 		setPosted(null)
 		setSpecStatus('loading')
-		getSpecialities()
-			.then((res) => {
+		const loadSpecialities = async () => {
+			try {
+				const res = await getSpecialities()
 				setSpecialities((res.data ?? []).map((sp) => sp.label).filter(Boolean))
 				setSpecStatus('ready')
-			})
-			.catch(() => setSpecStatus('error'))
-		getPatientDetails()
-			.then((res) => {
+			} catch {
+				setSpecStatus('error')
+			}
+		}
+		const loadLocation = async () => {
+			try {
+				const res = await getPatientDetails()
 				const personal = res?.data?.personal ?? res?.data
 				const city = personal?.city || personal?.location
 				if (city) setLocation(String(city))
-			})
-			.catch(() => {})
+			} catch {
+				// The location is only a prefill: the patient can type it.
+			}
+		}
+		void loadSpecialities()
+		void loadLocation()
 	}, [visible])
 
 	const current = people.find((p) => p.key === who) ?? people[0]
@@ -545,21 +553,10 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 										{tags.length}/{MAX_TAGS}
 									</Text>
 								</View>
-								<View style={styles.tagSearch}>
-									<AppPathIcon
-										d={FEED_ICONS.search}
-										size={18}
-										strokeWidth={2.2}
-										color={APP_COLORS.inkMuted}
-									/>
-									<TextInput
-										value={tagQuery}
-										onChangeText={setTagQuery}
-										placeholder="Search speciality"
-										placeholderTextColor={APP_COLORS.inkMuted}
-										style={styles.tagSearchInput}
-									/>
-								</View>
+								<AppSearchBar
+									placeholder="Search specialities"
+									hints={specialities.slice(0, 4)}
+									value={tagQuery} onChangeText={setTagQuery} showMicrophone={false} />
 							</View>
 							<ScrollView
 								contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 4 }}
@@ -841,16 +838,6 @@ const styles = StyleSheet.create({
 	ring: { width: 22, height: 22, borderRadius: 9999, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 	ringDot: { width: 10, height: 10, borderRadius: 9999 },
 	tagCount: { fontSize: 13, fontWeight: '700', color: APP_COLORS.inkMuted },
-	tagSearch: {
-		height: 44,
-		paddingHorizontal: 12,
-		borderRadius: 12,
-		backgroundColor: APP_COLORS.pageBg,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	tagSearchInput: { flex: 1, minWidth: 0, height: 40, fontSize: 15, color: APP_COLORS.ink, padding: 0 },
 	tagRow: {
 		minHeight: 52,
 		flexDirection: 'row',

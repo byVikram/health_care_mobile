@@ -20,7 +20,7 @@ import { AppButton, AppFooterBar, AppNumberedSteps } from '../../../components/c
 import { fetchPatientActiveRequestBackend, cancelCareRequestPatientBackend } from '../ancillaryService'
 import { setAncillaryRequestTip } from '../ancillaryProviderBookingService'
 import ApiService from '../../../services/apiService'
-import { openAuthedSocket } from '../../../utils/authedSocket'
+import { openAuthedSocket, type AuthedSocketHandle } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import CancellationDetailsModal from './CancellationDetailsModal'
 import { inr, itemsFee, providerNoun } from './ancillaryBookingCopy'
@@ -74,6 +74,8 @@ export default function ServiceMatchingPage() {
 
 	// The socket push and the status poll can both see "assigned"; only the first may navigate.
 	const hasNavigatedRef = useRef(false)
+	// The open socket (if any): while it is connected the status poll only needs to be a slower safety net.
+	const socketRef = useRef<AuthedSocketHandle | null>(null)
 	const spin = useRef(new Animated.Value(0)).current
 
 	const noOneAccepted = !assigned && (endedByServer || elapsed >= NO_ACCEPT_SECONDS)
@@ -118,9 +120,11 @@ export default function ServiceMatchingPage() {
 				}
 			}
 		})
+		socketRef.current = socket
 
 		return () => {
 			if (navigateTimeout) clearTimeout(navigateTimeout)
+			socketRef.current = null
 			socket.close()
 		}
 	}, [bookingId, navigation])
@@ -191,8 +195,13 @@ export default function ServiceMatchingPage() {
 			}
 		}
 
+		let lastCheckAt = Date.now()
 		void checkStatus()
+		// Every 2 seconds on its own; every 6 seconds while the socket is connected and pushing the changes.
 		const pollInterval = setInterval(() => {
+			const wait = socketRef.current?.isConnected() ? 6000 : 2000
+			if (Date.now() - lastCheckAt < wait - 100) return
+			lastCheckAt = Date.now()
 			void checkStatus()
 		}, 2000)
 

@@ -9,15 +9,13 @@ import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import {
 	AppConfirmSheet,
-	AppFormField,
 	AppInfoBanner,
 	AppNavRow,
 	AppSelect,
 	AppToggle,
-	FORM_SELECT_PROPS,
 	StatusModal,
 } from '../../../components/common'
-import { APP_COLORS } from '../../../config/theme'
+import { APP_COLORS, TONES } from '../../../config/theme'
 import { useAuth } from '../../../context/AuthContext'
 import { showComingSoon } from '../../../utils/toast'
 import { deleteMyAccount } from '../../auth/authService'
@@ -102,14 +100,27 @@ export default function SettingsPage() {
 
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>PREFERENCES</Text>
-				<AppFormField label="App language" style={styles.language}>
+				<View style={styles.languageRow}>
+					<View style={styles.languageTile} importantForAccessibility="no-hide-descendants">
+						<MaterialCommunityIcons name="web" size={22} color={TONES.sky.ink} />
+					</View>
+					<Text style={[styles.rowTitle, styles.flex]} numberOfLines={1}>
+						App language
+					</Text>
 					<AppSelect
-						{...FORM_SELECT_PROPS}
+						size="chip"
+						borderRadius={8}
+						borderColor={APP_COLORS.border}
+						noMargin
+						style={styles.languageSelect}
 						options={LANGUAGE_CHOICES.map((l) => ({ value: l, label: l }))}
 						value={language}
 						onSelect={setLanguage}
+						presentation="sheet"
+						sheetTitle="Select language"
+						accessibilityLabel={`App language, ${language}. Change`}
 					/>
-				</AppFormField>
+				</View>
 			</View>
 
 			<View style={styles.section}>
@@ -192,8 +203,27 @@ const styles = StyleSheet.create({
 		lineHeight: 16,
 		color: APP_COLORS.inkMuted,
 	},
-	language: {
+	languageRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+		minHeight: 60,
 		paddingVertical: 8,
+		borderBottomWidth: 1,
+		borderBottomColor: APP_COLORS.divider,
+	},
+	languageTile: {
+		width: 40,
+		height: 40,
+		borderRadius: 10,
+		backgroundColor: TONES.sky.bg,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	languageSelect: {
+		width: 'auto',
+		minWidth: 104,
+		maxWidth: '48%',
 	},
 	delete: {
 		marginHorizontal: 16,

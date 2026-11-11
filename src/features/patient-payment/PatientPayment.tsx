@@ -26,7 +26,7 @@ import { buildS3Url } from '../../utils/s3Utils'
 import { showComingSoon } from '../../utils/toast'
 import { useAuth } from '../../context/AuthContext'
 import { createAppointment, updatePreIntake } from '../doctor/doctorService'
-import { APP_COLORS, TONES, formatInr } from '../../config/theme'
+import { APP_COLORS, TONES, formatInr, SOFT_CARD_SHADOW } from '../../config/theme'
 import PreIntakeModal, { type PreIntakeSeverity } from '../patient/components/PreIntakeModal'
 import type { AppStackParamList } from '../../navigation/types'
 import { ROUTES } from '../../navigation/routes'
@@ -257,7 +257,6 @@ export default function BookingDetailsScreen() {
 				Alert.alert('Error', bookingResponse.message || 'Failed to book appointment')
 			}
 		} catch (error: any) {
-			console.log('BOOKING ERROR =>', error?.response?.status, error?.response?.data)
 			Alert.alert('Error', error?.response?.data?.message || 'An error occurred while booking. Please try again.')
 		} finally {
 			setIsBooking(false)
@@ -326,6 +325,7 @@ export default function BookingDetailsScreen() {
 
 			<AppScreenHeader
 				variant="bar"
+				solid
 				onBack={() => navigation.goBack()}
 				backAccessibilityLabel="Back to booking"
 				title={bookingDoctorName}
@@ -355,8 +355,9 @@ export default function BookingDetailsScreen() {
 					{/* Appointment ticket */}
 					<AppSection marginTop={0} gap={0}>
 						<AppTicketCard
-							tint="mint"
+							tint="white"
 							cutoutColor={APP_COLORS.surface}
+							style={styles.ticketCard}
 							header={{
 								leading: (
 									<AppAvatar
@@ -454,6 +455,12 @@ export default function BookingDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
+	// Plain white ticket (no tint) with a hairline border and the soft card shadow
+	ticketCard: {
+		borderWidth: 1,
+		borderColor: APP_COLORS.cardBorder,
+		...SOFT_CARD_SHADOW,
+	},
 	container: {
 		flex: 1,
 		backgroundColor: APP_COLORS.pageBg,

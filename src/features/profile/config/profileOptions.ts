@@ -5,9 +5,23 @@ export type Option = { value: string; label: string }
 
 const opts = (...values: string[]): Option[] => values.map((v) => ({ value: v, label: v }))
 
-/** Keeps a saved value that isn't in the list (e.g. an older 'Non-binary') selectable. */
-export const withCurrent = (options: Option[], current?: string | null): Option[] =>
-	current && !options.some((o) => o.value === current) ? [...options, { value: current, label: current }] : options
+const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** The list's own value for a saved one, ignoring case and whether the label or the value was saved ("spouse" -> 'SPOUSE'). */
+export const canonicalValue = (options: Option[], current?: string | null): string => {
+	if (!current) return ''
+	return options.find((o) => sameText(o.value, current) || sameText(o.label, current))?.value ?? current
+}
+
+/**
+ * Keeps a saved value that isn't in the list (e.g. an older 'Non-binary') selectable. A saved value that is already
+ * there in another spelling ("spouse" for 'SPOUSE') is not added again, and the list never repeats a choice.
+ */
+export const withCurrent = (options: Option[], current?: string | null): Option[] => {
+	const unique = options.filter((o, i) => options.findIndex((x) => sameText(x.value, o.value)) === i)
+	if (!current || unique.some((o) => sameText(o.value, current) || sameText(o.label, current))) return unique
+	return [...unique, { value: current, label: LEGACY_RELATION_LABELS[current.toUpperCase()] ?? current }]
+}
 
 export const GENDER_OPTIONS = opts('Female', 'Male', 'Other', 'Prefer not to say')
 
@@ -69,7 +83,22 @@ export const CONDITION_OPTIONS = [
 
 export const FAMILY_HISTORY_OPTIONS = ['Diabetes', 'High BP', 'Heart disease', 'Cancer', 'Stroke', 'Asthma', 'Thyroid']
 
-export const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Kannada', 'Tamil', 'Telugu', 'Malayalam', 'Marathi', 'Bengali']
+export const LANGUAGE_OPTIONS = ['English', 'Hindi', 'Kannada', 'Tamil', 'Telugu', 'Malayalam']
+
+/**
+ * Saved languages as the screen's option values. Older saves are lower case ("english", "hindi"): match them to the
+ * list ignoring case so a language shows once, and drop repeats. A language outside the list is kept as it was saved.
+ */
+export const normalizeLanguages = (saved?: string[] | null): string[] => {
+	const out: string[] = []
+	for (const raw of saved ?? []) {
+		const value = String(raw ?? '').trim()
+		if (!value) continue
+		const match = LANGUAGE_OPTIONS.find((o) => o.toLowerCase() === value.toLowerCase()) ?? value
+		if (!out.some((x) => x.toLowerCase() === match.toLowerCase())) out.push(match)
+	}
+	return out
+}
 
 export const SMOKING_OPTIONS = opts('Never', 'Former smoker', 'Occasional', 'Regular')
 export const ALCOHOL_OPTIONS = opts('Never', 'Occasionally', 'Socially', 'Regularly')

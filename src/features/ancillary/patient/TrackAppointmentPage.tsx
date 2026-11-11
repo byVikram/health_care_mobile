@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { Linking, Share, StyleSheet, View, ActivityIndicator } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { ROUTES } from '../../../navigation/routes'
 import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
 import StatusModal from '../../../components/common/feedback/StatusModal'
 import NurseMapTracker from '../components/NurseMapTracker'
-import HomeCareVisitView, { currentVisitOf, type TrackingVisit } from './HomeCareVisitView'
+import HomeCareVisitView, { currentVisitOf, type StatusTimeline, type TrackingVisit } from './HomeCareVisitView'
 import { showComingSoon } from '../../../utils/toast'
 import RateAncillaryReviewModal from '../components/RateAncillaryReviewModal'
 import ServiceMatchingPage from './ServiceMatchingPage'
@@ -19,6 +20,7 @@ import {
 import CancellationDetailsModal from './CancellationDetailsModal'
 import { useVisitPolicy } from '../hooks/useVisitPolicy'
 import { dayLabel, inr, providerNoun, timeLabel } from './ancillaryBookingCopy'
+import { MissedVisitBanner } from '../components/MissedVisitBanner'
 import { CancelVisitsSheet } from '../components/CancelVisitsSheet'
 import { lockedReason } from './scheduledVisitView'
 import { useVisitEdits } from './useVisitEdits'
@@ -89,6 +91,8 @@ export interface AncillaryTrackingResponse {
 	specialty?: { key?: string | null; label?: string | null } | string | null
 	/** One entry per visit, with the patient's start / completion codes and the live task checklist. */
 	visits?: TrackingVisit[]
+	/** The order's status strip, decided by the server. */
+	timeline?: StatusTimeline
 }
 
 // Mirrors the canonical status vocabulary defined by the backend
@@ -101,9 +105,13 @@ const ASSIGNED_STATUSES = new Set([
 	'IN_PROGRESS',
 	'VERIFICATION_PENDING',
 	'COMPLETED',
+	// The provider came and the patient was not available: the order is over, so it is never searched for again.
+	'NO_SHOW',
 ])
 
 const CANCELLED_STATUSES = new Set(['CANCELLED', 'CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED'])
+const POLL_MS = 2000
+const POLL_WITH_SOCKET_MS = 10000
 
 /** A "Later" order: its visits are shown before any provider is assigned (they are assigned an hour before each visit). */
 const isScheduledOrder = (d?: { bookingType?: string; booking_type?: string } | null) =>
@@ -237,6 +245,7 @@ export default function TrackAppointmentPage() {
 		let isMounted = true
 		let fetchInFlight = false
 		let redirected = false
+		let lastFetchAt = 0
 
 		const redirectToMatching = (serviceName: string, addressText: string, id: string = bookingId) => {
 			if (!isMounted || redirected) return
@@ -255,7 +264,13 @@ export default function TrackAppointmentPage() {
 			const currentProv = data.assignedProvider !== undefined ? data.assignedProvider : liveRef.current.provider
 			if (isScheduledOrder(data)) scheduledRef.current = true
 
-			if (!hasConfirmedProvider(currentProv, st) && st !== 'COMPLETED' && !scheduledRef.current) {
+			if (
+				!hasConfirmedProvider(currentProv, st) &&
+				st !== 'COMPLETED' &&
+				st !== 'NO_SHOW' &&
+				!CANCELLED_STATUSES.has(st) &&
+				!scheduledRef.current
+			) {
 				redirectToMatching(
 					data.serviceName || liveRef.current.title,
 					data.streetAddress || liveRef.current.address
@@ -295,6 +310,7 @@ export default function TrackAppointmentPage() {
 		const fetchStatus = async () => {
 			if (fetchInFlight) return // a slow response must not stack up behind the 2s poll
 			fetchInFlight = true
+			lastFetchAt = Date.now()
 			try {
 				// Polled every ~2s: a failure must not pop the global error dialog on every tick.
 				const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.REQUEST_STATUS(bookingId), {
@@ -306,7 +322,13 @@ export default function TrackAppointmentPage() {
 				const prov = data?.assignedProvider || null
 
 				if (isScheduledOrder(data)) scheduledRef.current = true
-				if (!hasConfirmedProvider(prov, st) && st !== 'COMPLETED' && !scheduledRef.current) {
+				if (
+					!hasConfirmedProvider(prov, st) &&
+					st !== 'COMPLETED' &&
+					st !== 'NO_SHOW' &&
+					!CANCELLED_STATUSES.has(st) &&
+					!scheduledRef.current
+				) {
 					// Provider is NOT assigned yet according to backend.
 					// Route back to the existing provider search/selection page.
 					redirectToMatching(
@@ -336,12 +358,20 @@ export default function TrackAppointmentPage() {
 			setIsInitializing(false)
 		}
 
-		// Periodic background polling every 2.0 seconds until COMPLETED
+		// Background polling until COMPLETED: every 2 seconds on its own, but only as a safety net (every 10 seconds)
+		// while the socket is connected and pushing the changes.
 		const pollInterval = setInterval(() => {
-			if (isMounted && bookingId && bookingId !== 'BK-ACTIVE' && liveStatusRef.current !== 'COMPLETED') {
-				void fetchStatus()
+			if (
+				isMounted &&
+				bookingId &&
+				bookingId !== 'BK-ACTIVE' &&
+				liveStatusRef.current !== 'COMPLETED' &&
+				!CANCELLED_STATUSES.has(liveStatusRef.current)
+			) {
+				const wait = socket?.isConnected() ? POLL_WITH_SOCKET_MS : POLL_MS
+				if (Date.now() - lastFetchAt >= wait - 100) void fetchStatus()
 			}
-		}, 2000)
+		}, POLL_MS)
 
 		return () => {
 			isMounted = false
@@ -354,6 +384,14 @@ export default function TrackAppointmentPage() {
 	const completionPin = liveCompletionPin
 	const etaMinutes = liveEtaMinutes
 	const isCancelled = CANCELLED_STATUSES.has(liveStatus)
+	// The provider reached the address and the patient was not available (the visit asked about, else the order's first).
+	const missedVisit =
+		focusedVisit?.status === 'NO_SHOW'
+			? focusedVisit
+			: liveStatus === 'NO_SHOW'
+				? (liveOrder?.visits ?? []).find((v) => v.status === 'NO_SHOW')
+				: undefined
+	const isMissed = !!missedVisit || liveStatus === 'NO_SHOW'
 	const isTravelling = ['EN_ROUTE', 'ARRIVED', 'ASSIGNED', 'NURSE_ASSIGNED'].includes(liveStatus)
 	const isCompleted = liveStatus === 'COMPLETED'
 
@@ -375,7 +413,7 @@ export default function TrackAppointmentPage() {
 	}, [bookingId, isCompleted])
 
 	React.useEffect(() => {
-		if (!isInitializing && !isAssigned && !isCompleted && !isScheduled) {
+		if (!isInitializing && !isAssigned && !isCompleted && !isScheduled && !isMissed && !isCancelled) {
 			navigation.replace(ROUTES.STACK.ANCILLARY_SERVICE_MATCHING, {
 				bookingId,
 				serviceName: liveServiceTitle || bookingData.serviceName,
@@ -383,7 +421,17 @@ export default function TrackAppointmentPage() {
 				bookingPayload: bookingData,
 			})
 		}
-	}, [isInitializing, isAssigned, isCompleted, isScheduled, bookingId, liveServiceTitle, liveAddress, navigation])
+	}, [
+		isInitializing,
+		isAssigned,
+		isCompleted,
+		isScheduled,
+		isCancelled,
+		bookingId,
+		liveServiceTitle,
+		liveAddress,
+		navigation,
+	])
 
 	const handleCallProvider = () => {
 		if (!shownProvider?.phone) return
@@ -392,8 +440,15 @@ export default function TrackAppointmentPage() {
 
 	const handleCancelRequestWithReason = async (reason: string) => {
 		setIsCancelling(true)
-		await cancelCareRequestPatientBackend(bookingId, reason)
-		setIsCancelling(false)
+		try {
+			await cancelCareRequestPatientBackend(bookingId, reason)
+		} catch {
+			// Still open on the server: stay here so the patient can try again.
+			Toast.show({ type: 'error', text1: 'Could not cancel the request', text2: 'Please try again.' })
+			return
+		} finally {
+			setIsCancelling(false)
+		}
 		setCancelModalVisible(false)
 		if (navigation.canGoBack()) {
 			navigation.goBack()
@@ -470,10 +525,11 @@ export default function TrackAppointmentPage() {
 		review: reviewData || undefined,
 	}
 
-	if (isInitializing || (!isAssigned && !isScheduled)) {
+	if (isInitializing || (!isAssigned && !isScheduled && !isCancelled)) {
 		return (
 			<View style={styles.container}>
 				<AppScreenHeader
+					solid
 					title="Track Appointment"
 					onBack={() => {
 						if (navigation.canGoBack()) navigation.goBack()
@@ -511,6 +567,7 @@ export default function TrackAppointmentPage() {
 			<HomeCareVisitView
 				orderRef={bookingId}
 				status={liveStatus}
+				timeline={liveOrder?.timeline}
 				provider={shownProvider}
 				visits={liveOrder?.visits ?? []}
 				focusVisitId={route.params?.visitId}
@@ -538,6 +595,16 @@ export default function TrackAppointmentPage() {
 				etaMinutes={etaMinutes}
 				isCompleted={isCompleted}
 				isCancelled={isCancelled}
+				isMissed={isMissed}
+				missedNotice={
+					missedVisit ? (
+						<MissedVisitBanner
+							visitId={missedVisit.visit_public_id}
+							title="this visit"
+							noun={scheduledNoun}
+						/>
+					) : undefined
+				}
 				map={
 					isTravelling ? (
 						<NurseMapTracker

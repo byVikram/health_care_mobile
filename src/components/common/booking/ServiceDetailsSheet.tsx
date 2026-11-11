@@ -87,6 +87,8 @@ export type ServiceDetailsContent = {
 	prepSteps?: string[]
 	/** e.g. "Qualified nurse at home · visit notes in the app". */
 	trustLine?: string
+	/** Shows the trust line as text only, without the home icon (for lines that are not about a visit at home). */
+	hideTrustIcon?: boolean
 }
 
 export interface ModernServiceDetailsSheetProps {
@@ -324,9 +326,11 @@ function ModernServiceDetailsSheet({
 
 				{!!trustLine && (
 					<View style={styles.trust}>
-						<View style={styles.trustIcon}>
-							<AppPathIcon d={HOME_ICON} size={18} strokeWidth={2} color={APP_COLORS.primary} />
-						</View>
+						{!content.hideTrustIcon && (
+							<View style={styles.trustIcon}>
+								<AppPathIcon d={HOME_ICON} size={18} strokeWidth={2} color={APP_COLORS.primary} />
+							</View>
+						)}
 						<Text style={styles.trustText}>{trustLine}</Text>
 					</View>
 				)}

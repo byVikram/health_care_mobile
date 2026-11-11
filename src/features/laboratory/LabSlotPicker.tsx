@@ -206,7 +206,6 @@ export function LabSlotPicker({ labs, service }: Props) {
 
 			{needsFasting(booking) && (
 				<View style={styles.fastNote} accessibilityRole="text">
-					<MaterialCommunityIcons name="clock-outline" size={16} color={APP_COLORS.warning} />
 					<Text style={styles.fastNoteText}>Fasting tests: a morning slot is best.</Text>
 				</View>
 			)}

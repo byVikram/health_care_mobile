@@ -96,10 +96,10 @@ export function rowStatusTone(label: string): 'confirmed' | 'pending' | 'cancell
 	return 'confirmed'
 }
 
-// Patient no-show policy: a doctor may mark a no-show only from 60 minutes after the appointment's start until 5 days
+// Patient no-show policy: a doctor may mark a no-show only from 60 minutes after the appointment's start until 2 days
 // after it. The server enforces the same rule (and answers 400 with the reason), these are the numbers it uses.
 export const NO_SHOW_MIN_MINUTES_AFTER_START = 60
-export const NO_SHOW_MARK_WINDOW_DAYS = 5
+export const NO_SHOW_MARK_WINDOW_DAYS = 2
 
 /** The only states the server lets a doctor mark a no-show from (a checked-in patient did show up). */
 export const NO_SHOW_SOURCE_STATUSES = ['confirmed', 'not_arrived']
@@ -114,6 +114,14 @@ const clinicClock = (): string => new Date(Date.now() + CLINIC_UTC_OFFSET_MINUTE
 export const clinicTodayIso = (): string => clinicClock().slice(0, 10)
 export const clinicNowHms = (): string => clinicClock().slice(11, 19)
 
+/** The clinic's calendar date (YYYY-MM-DD) of any moment, in Indian time whatever time zone the phone is set to. */
+export const clinicDateIso = (moment: Date): string =>
+	new Date(moment.getTime() + CLINIC_UTC_OFFSET_MINUTES * 60_000).toISOString().slice(0, 10)
+
+/** The clinic's clock time (HH:MM, 24-hour) of any moment, in Indian time. */
+export const clinicTimeHm = (moment: Date): string =>
+	new Date(moment.getTime() + CLINIC_UTC_OFFSET_MINUTES * 60_000).toISOString().slice(11, 16)
+
 /** Appointment start as an absolute time (ms since the epoch), read in the clinic's time zone. */
 function appointmentStartMs(apt: Appointment): number | null {
 	const [y, mo, d] = (apt.appointment_date ?? '').split('-').map(Number)
@@ -127,7 +135,7 @@ export type NoShowWindow = {
 	canMark: boolean
 	/** Short reason shown under the disabled control; empty while it is enabled. */
 	hint: string
-	/** The 5 days are over: nothing can be marked any more. */
+	/** The marking window is over: nothing can be marked any more. */
 	expired: boolean
 }
 
@@ -138,7 +146,7 @@ export function noShowWindow(apt: Appointment, now: Date = new Date()): NoShowWi
 	const earliest = start + NO_SHOW_MIN_MINUTES_AFTER_START * 60_000
 	const latest = start + NO_SHOW_MARK_WINDOW_DAYS * 24 * 60 * 60_000
 	if (now.getTime() < earliest) return { canMark: false, hint: 'Can be marked 1 hour after the start', expired: false }
-	if (now.getTime() > latest) return { canMark: false, hint: 'No-show can only be marked within 5 days', expired: true }
+	if (now.getTime() > latest) return { canMark: false, hint: `No-show can only be marked within ${NO_SHOW_MARK_WINDOW_DAYS} days`, expired: true }
 	return { canMark: true, hint: '', expired: false }
 }
 

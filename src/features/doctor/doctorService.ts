@@ -65,6 +65,16 @@ export interface DoctorSearchParams {
 	min_rating?: number
 	max_price?: number
 	sort?: string
+	// Filters sheet (see features/doctor/search/doctorFilters.ts)
+	appointment_mode?: 'clinic_visit' | 'video_call'
+	gender?: 'female' | 'male'
+	available_today?: boolean
+	min_experience?: number
+	/** Fee bands in rupees, comma separated: '0-499,1001-'. */
+	fee_range?: string
+	/** The patient's selected location: the server measures each doctor's `distance` from here. */
+	latitude?: number
+	longitude?: number
 }
 
 export interface CreateAppointmentPayload {
@@ -128,11 +138,6 @@ export const updateAppointmentsStatus = async (
 	statusId: string,
 	reason?: string
 ): Promise<AppointmentResponse> => {
-	console.log('PAYLOAD 👉', {
-		appointment_id: appointmentId,
-		status_id: statusId,
-		...(reason ? { reason } : {}),
-	})
 
 	const res = await ApiService.patch<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.UPDATE, {
 		appointment_id: appointmentId,
@@ -140,14 +145,13 @@ export const updateAppointmentsStatus = async (
 		...(reason ? { reason } : {}),
 	})
 
-	console.log('RESPONSE 👉', res.data)
 
 	return res.data
 }
 
 /**
  * Doctor marks the patient as a no-show (patient no-show policy): the patient is emailed and can reply with a reason.
- * The server only accepts it from 60 minutes after the start until 5 days after it and answers 400 with the reason
+ * The server only accepts it from 60 minutes after the start until 2 days after it and answers 400 with the reason
  * otherwise -- the caller shows that message, so the global error dialog is suppressed.
  */
 export const markAppointmentNoShow = async (appointmentId: string): Promise<AppointmentResponse> => {
@@ -327,13 +331,6 @@ export const getDoctorStatus = async (): Promise<DoctorStatusResponse['data']> =
 }
 
 export const createAppointment = async (payload: CreateAppointmentPayload): Promise<CreateAppointmentResponse> => {
-	console.log('[createAppointment][RN] request', {
-		url: API_ENDPOINTS.APPOINTMENTS.CREATE,
-		payload,
-
-		webComparison:
-			'React web booking uses axios interceptor with localStorage access_token and sends Authorization: Bearer <access_token>.',
-	})
 
 	// skipGlobalError: the booking screen shows the server's message itself (e.g. 403 BOOKING_RESTRICTED when online
 	// booking is paused), so a second "Access Denied" / "API Error" dialog on top of it is not wanted.
@@ -341,10 +338,6 @@ export const createAppointment = async (payload: CreateAppointmentPayload): Prom
 		skipGlobalError: true,
 	})
 
-	console.log('[createAppointment][RN] response', {
-		status: res.status,
-		data: res.data,
-	})
 
 	return res.data
 }
@@ -591,20 +584,9 @@ export interface DoctorAvailabilityUpdatePayload {
 
 export const updateDoctorPersonalDetails = async (data: DoctorPersonalUpdatePayload) => {
 	const url = API_ENDPOINTS.DOCTOR_PROFILE.PERSONAL_DETAILS
-	console.log('[updateDoctorPersonalDetails] request:', {
-		method: 'PATCH',
-		url,
-		payload: data,
-	})
 
 	try {
 		const res = await ApiService.patch(url, data)
-		console.log('[updateDoctorPersonalDetails] response:', {
-			status: res.status,
-			url: res.config?.url,
-			method: res.config?.method,
-			data: res.data,
-		})
 		return res.data
 	} catch (error: any) {
 		console.log('[updateDoctorPersonalDetails] error:', {
@@ -642,14 +624,8 @@ export const updateDoctorAvailability = async (data: DoctorAvailabilityUpdatePay
 export const getDoctorProfile = async (): Promise<DoctorProfileApiResponse> => {
 	try {
 		const res = await ApiService.get<DoctorProfileApiResponse>(API_ENDPOINTS.DOCTOR_PROFILE.DETAILS)
-		console.log('[getDoctorProfile] API response:', res.data)
 		return res.data
 	} catch (error: any) {
-		console.log('[getDoctorProfile] API error:', {
-			status: error?.response?.status,
-			data: error?.response?.data,
-			message: error?.message,
-		})
 		throw error
 	}
 }

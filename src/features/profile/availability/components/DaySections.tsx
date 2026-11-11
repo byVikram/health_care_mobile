@@ -71,7 +71,21 @@ export function DaySections({ day, onChange, others = [] }: DaySectionsProps) {
 											onSelect={(v) =>
 												update(
 													section,
-													ranges.map((x, j) => (j === i ? { ...x, start: v } : x))
+													ranges.map((x, j) =>
+														j === i
+															? {
+																	...x,
+																	start: v,
+																	// the end must stay after the new start
+																	end:
+																		toMinutes(x.end) > toMinutes(v)
+																			? x.end
+																			: toHHMM(
+																					Math.min(toMinutes(v) + 60, meta.to)
+																				),
+																}
+															: x
+													)
 												)
 											}
 										/>
@@ -79,7 +93,7 @@ export function DaySections({ day, onChange, others = [] }: DaySectionsProps) {
 										<AppSelect
 											{...FORM_SELECT_PROPS}
 											style={styles.flex}
-											options={timeOptions(section, 'end')}
+											options={timeOptions(section, 'end', r.start)}
 											value={r.end}
 											onSelect={(v) =>
 												update(

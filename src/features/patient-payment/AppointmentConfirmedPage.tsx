@@ -52,6 +52,7 @@ export default function AppointmentConfirmedPage() {
 
 	return (
 		<AppBookingSuccess
+			confetti={false}
 			badge={`${isPayAtClinic ? 'Pay at clinic' : 'Payment successful'} · ${feeText}`}
 			title="You're all booked"
 			subtitle={`${sentence}.`}

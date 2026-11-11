@@ -46,11 +46,16 @@ export const statusChipTone = (status: { label: string; tone: BookingTone }): St
 /** The server labels a doctor appointment the doctor marked as missed "No-show" (tone 'done'). */
 export const isNoShowLabel = (label?: string | null): boolean => /^no[\s_-]?show\b/i.test((label ?? '').trim())
 
-/** A doctor appointment the patient can still explain (opens the "What happened?" sheet). */
+/**
+ * A booking the patient can explain (opens the "What happened?" sheet): a doctor appointment the doctor marked as missed, or a
+ * home-care order with a visit the provider reported as a no-show (`missed_visit_id`: also while the order's other visits go on) that
+ * the patient has not answered yet (`missed_can_reply`: once they have, or the time is up, there is nothing left to ask).
+ */
 export const isNoShowBooking = (item: BookingItem): boolean =>
-	item.category === 'doctor' &&
-	item.target?.type === 'appointment' &&
-	(item.status_key ? item.status_key === 'no_show' : isNoShowLabel(item.status?.label))
+	(item.category === 'ancillary' && !!item.missed_visit_id && item.missed_can_reply !== false) ||
+	(item.category === 'doctor' &&
+		item.target?.type === 'appointment' &&
+		(item.status_key ? item.status_key === 'no_show' : isNoShowLabel(item.status?.label)))
 
 export const whereIconProps =(type?: BookingWhereType | null): { whereIcon?: AppIconName; whereGlyph?: IconName } => {
 	switch (type) {

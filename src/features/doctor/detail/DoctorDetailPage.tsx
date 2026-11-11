@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation, useRoute } from '@react-navigation/native'
+import Toast from 'react-native-toast-message'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import {
 	AppActionChip,
@@ -27,7 +28,15 @@ import {
 	AppTag,
 	AppTypography,
 } from '../../../components/common'
-import { getDoctorById, getDoctorAvailability, TimeSlot } from '../doctorService'
+import {
+	getDoctorById,
+	getDoctorAvailability,
+	getFavouriteDoctors,
+	toggleFavouriteDoctor,
+	TimeSlot,
+} from '../doctorService'
+import { isPatientRole } from '../../../constants/constants'
+import { useAuth } from '../../../context/AuthContext'
 import { DoctorDetailData } from '../../../types/doctor-detail'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
@@ -35,8 +44,7 @@ import { formatDateForApi } from '../../../utils/date'
 import { capitalize } from '../../../utils/formatters'
 import { openDirections } from '../../../utils/maps'
 import { AppointmentModeKey, firstOpenSlot, normalizeAvailabilityByMode } from '../availability'
-import { shortClinic } from '../doctorFormatters'
-import { APP_COLORS, TONES, formatInr, toneAt } from '../../../config/theme'
+import { APP_COLORS, SOFT_CARD_SHADOW, formatInr } from '../../../config/theme'
 import { DOCTOR_PROFILE_GOOD_TO_KNOW_MOCK } from './doctorProfileMockData'
 import { CollapsingProfileHeader, PROFILE_AVATAR_SIZE } from './CollapsingProfileHeader'
 
@@ -46,8 +54,12 @@ const INK = APP_COLORS.ink
 const INK_MUTED = APP_COLORS.inkMuted
 const DIVIDER = APP_COLORS.divider
 const PAGE_BG = APP_COLORS.pageBg
-const SPEC_TONE = TONES.lilac.ink
 const SUCCESS = APP_COLORS.success
+// Minimal-colour palette: neutral tiles with the one teal accent instead of a tone per section.
+const NEUTRAL_BG = APP_COLORS.neutralBg
+const CARD_BORDER = APP_COLORS.cardBorder
+const MINT_TILE = { bg: APP_COLORS.mint, ink: PRIMARY }
+const NEUTRAL_TILE = { bg: NEUTRAL_BG, ink: PRIMARY }
 
 type ProfileTabKey = 'about' | 'services' | 'clinics' | 'awards'
 const PROFILE_TABS: { key: ProfileTabKey; label: string }[] = [
@@ -81,6 +93,7 @@ export default function DoctorDetailPage() {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_DETAIL>>()
 	const referralId = route.params?.referralId
+	const { role } = useAuth()
 
 	const [doctor, setDoctor] = useState<DoctorDetailData | null>(null)
 	const [loading, setLoading] = useState(true)
@@ -89,6 +102,10 @@ export default function DoctorDetailPage() {
 	const [aboutExpanded, setAboutExpanded] = useState(false)
 	// Treatments & services "Show all / Show fewer" toggle
 	const [treatmentsExpanded, setTreatmentsExpanded] = useState(false)
+
+	// Favourite heart (patients only): undefined until we know, so it doesn't flash the wrong state
+	const [favourite, setFavourite] = useState<boolean | undefined>(undefined)
+	const [favouriteBusy, setFavouriteBusy] = useState(false)
 
 	// Real "next slot today" per hospital (undefined = still loading)
 	const [todaySlots, setTodaySlots] = useState<TodaySlots | undefined>(undefined)
@@ -152,6 +169,26 @@ export default function DoctorDetailPage() {
 		fetchDetail()
 	}, [route.params?.id])
 
+	// Is this doctor already one of the patient's favourites?
+	React.useEffect(() => {
+		// route.params.id is the doctor's public id, the same id the favourites list and toggle use
+		const doctorId = route.params?.id
+		if (!doctorId || !isPatientRole(role)) return
+		let active = true
+		const loadFavourite = async () => {
+			try {
+				const res = await getFavouriteDoctors()
+				if (active) setFavourite((res.data?.favourite_ids ?? []).includes(doctorId))
+			} catch {
+				// Without the list we can't show the right state, so the heart stays hidden.
+			}
+		}
+		void loadFavourite()
+		return () => {
+			active = false
+		}
+	}, [route.params?.id, role])
+
 	// Today's availability for every clinic -> real "Available today" badge,
 	// "Next available" card and each clinic's NEXT SLOT pill.
 	React.useEffect(() => {
@@ -202,6 +239,28 @@ export default function DoctorDetailPage() {
 		})
 	}
 
+	const handleToggleFavourite = async () => {
+		if (!doctor || !route.params?.id || favouriteBusy) return
+		setFavouriteBusy(true)
+		try {
+			const res = await toggleFavouriteDoctor(route.params.id)
+			const added = res.data?.action ? res.data.action === 'added' : !favourite
+			setFavourite(added)
+			Toast.show({
+				type: 'success',
+				text1: added ? `${doctor.name} added to favourites` : `${doctor.name} removed from favourites`,
+			})
+		} catch (e) {
+			Toast.show({
+				type: 'error',
+				text1: "Couldn't update favourites",
+				text2: e instanceof Error ? e.message : undefined,
+			})
+		} finally {
+			setFavouriteBusy(false)
+		}
+	}
+
 	const handleShare = () => {
 		if (!doctor) return
 		Share.share({
@@ -250,20 +309,6 @@ export default function DoctorDetailPage() {
 
 	const slotsKnown = todaySlots !== undefined
 	const availableToday = !!todaySlots && Object.values(todaySlots).some((m) => m.clinic || m.video)
-	// First clinic (primary first) with a slot left today; in-clinic preferred over video
-	const nextAvailable = (() => {
-		if (!todaySlots) return null
-		const ordered = primaryHospital
-			? [primaryHospital, ...hospitals.filter((h) => h !== primaryHospital)]
-			: hospitals
-		for (const mode of ['clinic', 'video'] as AppointmentModeKey[]) {
-			for (const h of ordered) {
-				const slot = todaySlots[h.hospital.id]?.[mode]
-				if (slot) return { hospital: h, slot, mode }
-			}
-		}
-		return null
-	})()
 
 	const specialitiesText = (specialities || []).filter(Boolean).join(' · ')
 
@@ -277,7 +322,12 @@ export default function DoctorDetailPage() {
 				.join(', ')
 		: details?.degree || null
 
-	const languagesText = details?.languages?.length ? details.languages.map(capitalize).join(', ') : null
+	// The same language can be stored twice in two spellings ("english" from the web app, "English" from this one):
+	// list each once, ignoring case.
+	const languageNames = Array.from(
+		new Map((details?.languages || []).map((l) => [String(l).trim().toLowerCase(), l] as const)).values()
+	).filter((l) => String(l).trim())
+	const languagesText = languageNames.length ? languageNames.map(capitalize).join(', ') : null
 
 	const experienceYearsText = details?.experience_years != null ? `${details.experience_years} yrs` : '--'
 
@@ -322,6 +372,9 @@ export default function DoctorDetailPage() {
 				available={availableToday}
 				onBack={() => navigation.goBack()}
 				onShare={handleShare}
+				favourite={favourite}
+				favouriteBusy={favouriteBusy}
+				onToggleFavourite={handleToggleFavourite}
 			/>
 
 			<Animated.ScrollView
@@ -362,17 +415,14 @@ export default function DoctorDetailPage() {
 						)}
 
 						<View style={styles.badgeRow}>
-							{availableToday && (
-								<AppTag
-									label="Available today"
-									tone="confirmed"
-									shape="pill"
-									dot
-									style={styles.availableBadge}
-								/>
-							)}
 							{hasVideoConsult && (
-								<AppTag label="Video consult" tone="sky" shape="pill" icon="video-outline" />
+								<AppTag
+									label="Video consult"
+									bg={NEUTRAL_BG}
+									ink={PRIMARY}
+									shape="pill"
+									icon="video-outline"
+								/>
 							)}
 							{!!languagesText && (
 								<AppTag
@@ -385,53 +435,32 @@ export default function DoctorDetailPage() {
 						</View>
 					</View>
 
-					<AppStatRow style={styles.statsRow}>
-						<AppStatTile label="Experience" value={experienceYearsText} tone="lilac" />
-						<AppStatTile label="Clinic visit" value={formatInr(offlineFee)} tone="mint" />
-						<AppStatTile label="Video call" value={formatInr(videoFee)} tone="sky" />
-					</AppStatRow>
-
-					{/* Next available -- real first open slot today, else a plain entry into the slot step */}
-					<TouchableOpacity
-						style={styles.nextCard}
-						activeOpacity={0.85}
-						disabled={!hospitals.length}
-						onPress={() => goToBookSlot(nextAvailable?.hospital.hospital.id, nextAvailable?.mode)}
-					>
-						<AppIconTile
-							icon="calendar-blank-outline"
-							size={40}
-							radius={12}
-							iconSize={20}
-							backgroundColor={APP_COLORS.mintAccent}
-							iconColor={INK}
+					<AppStatRow gap={10} style={styles.statsRow}>
+						<AppStatTile
+							label="Experience"
+							value={experienceYearsText}
+							backgroundColor={APP_COLORS.surface}
+							labelColor={INK_MUTED}
+							style={styles.statTile}
+							valueStyle={styles.statValue}
 						/>
-						<View style={{ flex: 1, minWidth: 0 }}>
-							<AppTypography style={styles.nextEyebrow}>NEXT AVAILABLE</AppTypography>
-							<AppTypography style={styles.nextTitle} numberOfLines={1}>
-								{nextAvailable
-									? `Today, ${nextAvailable.slot.start_time}`
-									: slotsKnown
-										? 'See upcoming slots'
-										: 'Checking slots…'}
-							</AppTypography>
-							<AppTypography style={styles.nextSub} numberOfLines={1}>
-								{nextAvailable
-									? nextAvailable.mode === 'video'
-										? 'Video consultation'
-										: `${shortClinic(nextAvailable.hospital.hospital.name)}${
-												nextAvailable.hospital.hospital.distance
-													? ` · ${nextAvailable.hospital.hospital.distance} km`
-													: ''
-											}`
-									: 'Pick a clinic, date and time'}
-							</AppTypography>
-						</View>
-						<View style={styles.nextBookBtn}>
-							<AppTypography style={styles.nextBookText}>Book</AppTypography>
-							<MaterialCommunityIcons name="chevron-right" size={16} color={INK} />
-						</View>
-					</TouchableOpacity>
+						<AppStatTile
+							label="Clinic visit"
+							value={formatInr(offlineFee)}
+							backgroundColor={APP_COLORS.surface}
+							labelColor={INK_MUTED}
+							style={styles.statTile}
+							valueStyle={styles.statValue}
+						/>
+						<AppStatTile
+							label="Video call"
+							value={formatInr(videoFee)}
+							backgroundColor={APP_COLORS.surface}
+							labelColor={INK_MUTED}
+							style={styles.statTile}
+							valueStyle={styles.statValue}
+						/>
+					</AppStatRow>
 				</View>
 
 				{/* Sticky tab nav -- wrapped because a sticky child's own style is moved onto RN's
@@ -486,7 +515,7 @@ export default function DoctorDetailPage() {
 									label={item.label}
 									size="md"
 									shape="pill"
-									tone="lilac"
+									bg={NEUTRAL_BG}
 									ink={INK}
 									style={styles.expertiseChip}
 									textStyle={styles.expertiseChipText}
@@ -517,12 +546,6 @@ export default function DoctorDetailPage() {
 										idx !== visibleTreatments.length - 1 && styles.treatmentRowDivider,
 									]}
 								>
-									<MaterialCommunityIcons
-										name="check"
-										size={18}
-										color={SUCCESS}
-										style={{ marginTop: 2 }}
-									/>
 									<AppTypography style={styles.treatmentName}>{item.label}</AppTypography>
 								</View>
 							))}
@@ -551,7 +574,7 @@ export default function DoctorDetailPage() {
 					}
 				>
 					{hospitals.map((entry, n) => {
-						const tone = n === 0 ? TONES.mint : toneAt(n + 2)
+						const tone = n === 0 ? MINT_TILE : NEUTRAL_TILE
 						const slot = todaySlots?.[entry.hospital.id]?.clinic
 						return (
 							<PractiseCard
@@ -581,7 +604,7 @@ export default function DoctorDetailPage() {
 					{hasVideoConsult && videoHospital && (
 						<PractiseCard
 							icon="video-outline"
-							tone={TONES.sky}
+							tone={NEUTRAL_TILE}
 							title="Video consultation"
 							subtitle="Join from the app, no travel"
 							fee={formatInr(videoFee)}
@@ -620,7 +643,14 @@ export default function DoctorDetailPage() {
 											idx !== achievements.length - 1 && styles.treatmentRowDivider,
 										]}
 									>
-										<AppIconTile icon="medal-outline" tone="sand" size={36} circle iconSize={18} />
+										<AppIconTile
+											icon="medal-outline"
+											backgroundColor={NEUTRAL_BG}
+											iconColor={INK_MUTED}
+											size={36}
+											circle
+											iconSize={18}
+										/>
 										<View style={{ flex: 1 }}>
 											<AppTypography style={styles.achievementTitle}>{item.title}</AppTypography>
 											{!!sub && <AppTypography style={styles.muted13}>{sub}</AppTypography>}
@@ -743,7 +773,8 @@ function PractiseCard(props: {
 					<AppTag
 						label={props.nextSlot}
 						size="md"
-						tone={props.nextToday ? 'confirmed' : 'neutral'}
+						bg={props.nextToday ? NEUTRAL_BG : PAGE_BG}
+						ink={props.nextToday ? SUCCESS : INK}
 						style={styles.nextSlotPill}
 					/>
 				</View>
@@ -756,7 +787,6 @@ function PractiseCard(props: {
 				)}
 				<AppActionChip
 					label="Book"
-					trailingIcon="chevron-right"
 					variant="filled"
 					size="md"
 					onPress={props.onBook}
@@ -822,7 +852,7 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 	},
 	doctorSpec: {
-		color: SPEC_TONE,
+		color: PRIMARY,
 		fontSize: 14,
 		lineHeight: 20,
 		fontWeight: '700',
@@ -840,12 +870,20 @@ const styles = StyleSheet.create({
 		marginTop: 6,
 	},
 	// AppTag pill (4x10, 12/16 700) with the design's 6px dot gap
-	availableBadge: { gap: 6 },
 	languageBadgeText: { fontWeight: '600' },
 	statsRow: {
 		marginTop: 16,
 		marginHorizontal: 16,
 	},
+	// White card with a hairline border and a soft shadow, value over label as in the minimal-colour design
+	statTile: {
+		paddingVertical: 14,
+		alignItems: 'center',
+		borderWidth: 1,
+		borderColor: CARD_BORDER,
+		...SOFT_CARD_SHADOW,
+	},
+	statValue: { fontSize: 20, lineHeight: 26 },
 
 	// Tabs
 	tabsRow: {
@@ -867,34 +905,8 @@ const styles = StyleSheet.create({
 
 	heroSection: { backgroundColor: '#fff', paddingBottom: 16 },
 
-	// Next available
-	nextCard: {
-		marginTop: 12,
-		marginHorizontal: 16,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-		paddingVertical: 14,
-		paddingHorizontal: 16,
-		borderRadius: 16,
-		backgroundColor: INK,
-	},
-	nextEyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.5, color: APP_COLORS.mintAccent },
-	nextTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: '#fff' },
-	nextSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.mint },
-	nextBookBtn: {
-		height: 40,
-		paddingHorizontal: 16,
-		borderRadius: 10,
-		backgroundColor: '#fff',
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-	},
-	nextBookText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: INK },
-
 	// Practises at cards
-	practiseCard: { borderRadius: 16, backgroundColor: PAGE_BG, padding: 14, gap: 12 },
+	practiseCard: { borderRadius: 16, backgroundColor: PAGE_BG, padding: 14, gap: 12, ...SOFT_CARD_SHADOW },
 	practiseTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
 	practiseTitle: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: INK },
 	practiseFee: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: INK },

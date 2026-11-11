@@ -107,6 +107,8 @@ type DetailTarget =
 // folding the rest behind "+N more".
 const TILE_COLUMNS = 3
 const MAIN_TILES = 6
+// 8 padding + 34 icon + 4 gap + 3 label lines (3 x 16) + 6 padding + 4 border
+const TILE_HEIGHT = 104
 
 /** Cart handed back by the booking pages (new AncillaryCartItem[] or the old ServiceProcedureItem[]). */
 const normalizeReturnedCart = (raw: unknown[]): AncillaryCartItem[] => {
@@ -437,6 +439,7 @@ function HomeCareCatalog({ serviceKey, serviceLabel }: { serviceKey: string; ser
 					value: query,
 					onChange: setQuery,
 					placeholder: copy.searchPlaceholder,
+					hints: copy.searchHints,
 					accessibilityLabel: copy.searchAccessibilityLabel,
 				}}
 			/>
@@ -827,15 +830,19 @@ const styles = StyleSheet.create({
 		flex: 1,
 		minWidth: 0,
 	},
+	// Every tile fills its grid cell (same width, and the cell stretches to the row) and has the height of a
+	// three-line label, so a tile with a short name is as tall as one with a long name, in every row.
 	tile: {
+		flex: 1,
 		alignItems: 'center',
+		justifyContent: 'center',
 		gap: 4,
 		paddingTop: 8,
 		paddingBottom: 6,
 		paddingHorizontal: 2,
 		borderRadius: 12,
 		borderWidth: 2,
-		minHeight: 76,
+		minHeight: TILE_HEIGHT,
 	},
 	moreTile: {
 		borderStyle: 'dashed',

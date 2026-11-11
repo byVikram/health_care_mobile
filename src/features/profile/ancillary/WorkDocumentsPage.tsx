@@ -381,6 +381,8 @@ export default function WorkDocumentsPage() {
 									value={draft.subSpecialtyId}
 									onSelect={(v) => set('subSpecialtyId', v)}
 									placeholder="Select specialisation"
+									presentation="sheet"
+									sheetTitle="Specialisation"
 								/>
 							</AppFormField>
 						)}

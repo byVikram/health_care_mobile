@@ -21,6 +21,15 @@ import type { AncillaryProviderInfo } from './TrackAppointmentPage'
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap
 
+/** The status strip as the server decides it (ancillary/timeline.py). `stopped` marks a MISSED visit at the door; any other ending (cancelled, expired ...) has `outcome` and `outcome_text` and no stopped step. */
+export type StatusTimeline = {
+	steps: { key: string; label: string; state: 'done' | 'current' | 'upcoming' | 'stopped' }[]
+	current: number
+	outcome: string | null
+	/** "Visit cancelled" / "Visit expired" ...: what to say in place of the strip. */
+	outcome_text?: string | null
+}
+
 export type TrackingVisit = {
 	visit_public_id: string
 	index?: number
@@ -31,6 +40,10 @@ export type TrackingVisit = {
 	start_code?: string | null
 	completion_code?: string | null
 	started_at?: string | null
+	/** The provider is at the address and (no-show policy on) will wait for the patient until then. */
+	waiting_until?: string | null
+	/** This visit's status strip. */
+	timeline?: StatusTimeline
 	tasks?: { label: string; done: boolean }[]
 	/** Scheduled visits: the server's verdict on whether the patient can still cancel this visit. */
 	can_cancel?: boolean
@@ -47,7 +60,9 @@ export type TrackingVisit = {
 /** The visit a screen is about: the one asked for, else the first still open, else the last. */
 export const currentVisitOf = (visits: TrackingVisit[], focusVisitId?: string): TrackingVisit | null =>
 	visits.find((v) => v.visit_public_id === focusVisitId) ??
-	visits.find((v) => !['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED'].some((st) => v.status.startsWith(st))) ??
+	visits.find(
+		(v) => !['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED', 'UNASSIGNED'].some((st) => v.status.startsWith(st))
+	) ??
 	visits[visits.length - 1] ??
 	null
 
@@ -56,6 +71,8 @@ export type HomeCareVisitViewProps = {
 	orderRef: string
 	/** Upper-case request status (ASSIGNED, EN_ROUTE, IN_PROGRESS, COMPLETED …). */
 	status: string
+	/** The order's status strip; a visit's own (`visits[].timeline`) wins. Servers that do not send one get the strip worked out from `status`. */
+	timeline?: StatusTimeline | null
 	provider: AncillaryProviderInfo | null
 	visits: TrackingVisit[]
 	/** The visit to show (visit_public_id), instead of the first one still open. */
@@ -83,6 +100,10 @@ export type HomeCareVisitViewProps = {
 	etaMinutes?: number | null
 	isCompleted: boolean
 	isCancelled: boolean
+	/** The provider reached the address and the patient was not available: the patient is asked what happened. */
+	isMissed?: boolean
+	/** What to show for a missed visit (the screen that owns the data builds it: MissedVisitBanner). */
+	missedNotice?: React.ReactNode
 	/** Live map (NurseMapTracker) shown in the arrival card while the provider is travelling. */
 	map?: React.ReactNode
 	review: { data: AncillaryReviewData | null; canRate: boolean; onOpen: () => void }
@@ -94,14 +115,28 @@ export type HomeCareVisitViewProps = {
 	onCancel: () => void
 }
 
-const STEPS = ['Booked', 'Confirmed', 'On the way', 'In progress', 'Done']
+const FALLBACK_STEPS = ['Booked', 'Confirmed', 'On the way', 'In progress', 'Done']
 
-/** Index of the current step (5 = everything done). */
-const stepIndex = (status: string): number => {
-	if (status === 'COMPLETED') return 5
-	if (status === 'IN_PROGRESS' || status === 'VERIFICATION_PENDING') return 3
-	if (status === 'EN_ROUTE' || status === 'ARRIVED') return 2
-	return 1
+/** The strip worked out from the status, for a server that does not send `timeline` yet. */
+const fallbackTimeline = (status: string): StatusTimeline => {
+	const current =
+		status === 'COMPLETED'
+			? 5
+			: status === 'IN_PROGRESS' || status === 'VERIFICATION_PENDING'
+				? 3
+				: status === 'EN_ROUTE' || status === 'ARRIVED'
+					? 2
+					: 1
+	return {
+		current,
+		outcome: null,
+		outcome_text: null,
+		steps: FALLBACK_STEPS.map((label, i) => ({
+			key: label,
+			label,
+			state: i < current ? 'done' : i === current ? 'current' : 'upcoming',
+		})),
+	}
 }
 
 const providerNoun = (p: AncillaryProviderInfo | null): string => {
@@ -147,15 +182,18 @@ function Section({ title, children }: { title?: string; children: React.ReactNod
 	)
 }
 
-function StatusStrip({ current }: { current: number }) {
+function StatusStrip({ timeline }: { timeline: StatusTimeline }) {
+	const { steps } = timeline
+	const here = steps.find((s) => s.state === 'stopped' || s.state === 'current') ?? steps[steps.length - 1]
 	return (
-		<View style={styles.strip} accessibilityLabel={`Visit status: ${STEPS[Math.min(current, 4)]}`}>
-			{STEPS.map((label, i) => {
-				const done = i < current
-				const isCurrent = i === current
+		<View style={styles.strip} accessibilityLabel={`Visit status: ${here.label}`}>
+			{steps.map(({ key, label, state }, i) => {
+				const done = state === 'done'
+				const stopped = state === 'stopped'
+				const isCurrent = state === 'current'
 				return (
-					<View key={label} style={styles.stepCol}>
-						{i < STEPS.length - 1 ? (
+					<View key={key} style={styles.stepCol}>
+						{i < steps.length - 1 ? (
 							<View
 								style={[
 									styles.stepLine,
@@ -169,21 +207,30 @@ function StatusStrip({ current }: { current: number }) {
 								{
 									backgroundColor: done
 										? APP_COLORS.success
-										: isCurrent
-											? APP_COLORS.primary
-											: APP_COLORS.divider,
+										: stopped
+											? APP_COLORS.danger
+											: isCurrent
+												? APP_COLORS.primary
+												: APP_COLORS.divider,
 								},
 								isCurrent && ({ boxShadow: `0 0 0 4px ${APP_COLORS.mint}` } as ViewStyle),
 							]}
 						>
 							{done ? <MaterialCommunityIcons name="check" size={14} color={APP_COLORS.surface} /> : null}
+							{stopped ? (
+								<MaterialCommunityIcons name="close" size={14} color={APP_COLORS.surface} />
+							) : null}
 						</View>
 						<Text
 							style={[
 								styles.stepLabel,
 								{
-									fontWeight: isCurrent ? '800' : '600',
-									color: done || isCurrent ? APP_COLORS.ink : APP_COLORS.inkMuted,
+									fontWeight: isCurrent || stopped ? '800' : '600',
+									color: stopped
+										? APP_COLORS.danger
+										: done || isCurrent
+											? APP_COLORS.ink
+											: APP_COLORS.inkMuted,
 								},
 							]}
 						>
@@ -227,13 +274,15 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 	const insets = useSafeAreaInsets()
 	const noun = p.scheduled?.noun ?? providerNoun(p.provider)
 	const first = (p.provider?.name ?? '').trim().split(/\s+/)[0] || `your ${noun}`
-	const current = stepIndex(p.status)
 	const inProgress = p.status === 'IN_PROGRESS' || p.status === 'VERIFICATION_PENDING'
-	const beforeStart = !p.isCompleted && !p.isCancelled && !inProgress
+	const beforeStart = !p.isCompleted && !p.isCancelled && !p.isMissed && !inProgress
 	const travelling = ['ASSIGNED', 'NURSE_ASSIGNED', 'EN_ROUTE', 'ARRIVED'].includes(p.status)
 
 	const visits = p.visits
 	const currentVisit = currentVisitOf(visits, p.focusVisitId)
+	const timeline = currentVisit?.timeline ?? p.timeline ?? fallbackTimeline(p.status)
+	// A visit that ended (cancelled, expired ...) is not a place on the strip: say so instead. A missed visit keeps its stop at the door.
+	const ended = !!timeline.outcome && timeline.outcome !== 'missed'
 	const count = visits.length || p.totals?.visits_count || 1
 	const position = currentVisit?.index ?? 1
 
@@ -248,6 +297,7 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 	const completionCode = currentVisit?.completion_code || (p.scheduled ? null : p.completionCode) || null
 	const tasks = currentVisit?.tasks ?? []
 	const startedAt = timeOnly(currentVisit?.started_at)
+	const waitingUntil = timeOnly(currentVisit?.waiting_until)
 
 	const instant = !currentVisit?.date
 	const whenTitle = instant
@@ -276,7 +326,9 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 		p.status === 'EN_ROUTE'
 			? `${first} is on the way`
 			: p.status === 'ARRIVED'
-				? 'Share your start code at the door'
+				? waitingUntil
+					? `Share your start code at the door · ${first} will wait until ${waitingUntil}`
+					: 'Share your start code at the door'
 				: 'You’ll be notified when they set off'
 
 	const tip = p.tipAmount && p.tipAmount > 0 ? p.tipAmount : 0
@@ -288,6 +340,7 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 		<View style={styles.page}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Home care visit"
 				subtitle={`${count > 1 ? `Visit ${position} of ${count} · ` : ''}Order ${p.orderRef}`}
 				onBack={p.onBack}
@@ -314,10 +367,10 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 			/>
 
 			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-				<StatusStrip current={current} />
+				{ended ? null : <StatusStrip timeline={timeline} />}
 
-				{p.isCancelled ? (
-					<View style={styles.sideMargin}>
+				{p.isCancelled || ended ? (
+					<View style={styles.endedBanner}>
 						<View style={[styles.banner, { backgroundColor: APP_COLORS.dangerBg }]}>
 							<View style={styles.bannerIcon}>
 								<MaterialCommunityIcons
@@ -327,12 +380,18 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 								/>
 							</View>
 							<View style={styles.flex}>
-								<Text style={[styles.bannerTitle, { color: APP_COLORS.danger }]}>Visit cancelled</Text>
-								<Text style={styles.bannerSub}>This booking is no longer active.</Text>
+								<Text style={[styles.bannerTitle, { color: APP_COLORS.danger }]}>
+									{p.isCancelled ? 'Visit cancelled' : (timeline.outcome_text ?? 'Visit ended')}
+								</Text>
+								{p.isCancelled ? (
+									<Text style={styles.bannerSub}>This booking is no longer active.</Text>
+								) : null}
 							</View>
 						</View>
 					</View>
 				) : null}
+
+				{p.isMissed && p.missedNotice ? <View style={styles.sideMargin}>{p.missedNotice}</View> : null}
 
 				{inProgress ? (
 					<View style={styles.sideMargin}>
@@ -647,7 +706,7 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 				</TouchableOpacity>
 			</ScrollView>
 
-			{!p.isCompleted && !p.isCancelled ? (
+			{!p.isCompleted && !p.isCancelled && !p.isMissed ? (
 				<View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
 					<TouchableOpacity
 						style={[
@@ -683,6 +742,8 @@ const styles = StyleSheet.create({
 	flex: { flex: 1, minWidth: 0 },
 	scroll: { gap: 8, paddingBottom: 16 },
 	sideMargin: { marginHorizontal: 16 },
+	// The strip gives the page its top spacing; an ended visit has none, so its banner needs it.
+	endedBanner: { marginHorizontal: 16, marginTop: 16 },
 	row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 	muted: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
 	headerActions: { flexDirection: 'row', alignItems: 'center', marginRight: -10 },

@@ -36,11 +36,8 @@ export default function AncillaryConfirmationPage() {
 	const totalAmount = payload.charges?.totalAmount || '₹467'
 
 	const handleGoToBookings = () => {
-		if (ROUTES.STACK.APPOINTMENTS) {
-			navigation.navigate(ROUTES.STACK.APPOINTMENTS)
-		} else {
-			navigation.navigate(ROUTES.MAIN.TABS)
-		}
+		// The Bookings tab, on its home-care list.
+		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL, params: { filter: 'ancillary' } } as never)
 	}
 
 	const handleReturnHome = () => {
@@ -49,7 +46,7 @@ export default function AncillaryConfirmationPage() {
 
 	return (
 		<View style={styles.container}>
-			<AppScreenHeader title="Booking Confirmation" />
+			<AppScreenHeader solid title="Booking Confirmation" />
 
 			<ScrollView
 				contentContainerStyle={[

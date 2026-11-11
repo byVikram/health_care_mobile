@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-	ActivityIndicator,
 	Animated,
+	InteractionManager,
 	NativeScrollEvent,
 	NativeSyntheticEvent,
 	StyleSheet,
@@ -10,30 +10,35 @@ import {
 	useWindowDimensions,
 	View,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
 	AppChip,
-	AppIconButton,
+	AppHeaderBackdrop,
 	AppIconTile,
 	AppNavRow,
 	AppTypography,
 	AppIcon,
 	AppPathIcon,
+	AppSearchBar,
+	AppSkeleton,
+	LocationSelector,
 } from '../../../components/common'
 import { useAuth } from '../../../context/AuthContext'
 import { getSpecialities } from '../doctorService'
 import { ROUTES } from '../../../navigation/routes'
-import { APP_COLORS, TONES, toneAt } from '../../../config/theme'
+import { APP_COLORS, SOFT_CARD_SHADOW } from '../../../config/theme'
 import { specialityVisual } from './components/specialityMeta'
-import type { NavigationProp } from '@react-navigation/native'
-import type { AppStackParamList } from '../../../navigation/types'
+import type { NavigationProp, RouteProp } from '@react-navigation/native'
+import type { AppStackParamList, MainTabParamList } from '../../../navigation/types'
 
 const SYMPTOM_CHIPS = ['Fever', 'Cough', 'Headache', 'Back pain', 'Skin rash', 'Stomach pain', 'Anxiety', 'Joint pain']
 
 const GRID_COL_GAP = 8
 const GRID_ROW_GAP = 16
 const SIDE_PADDING = 16
+/** Placeholder cards shown while the specialities load (3 rows of 3). */
+const SKELETON_COUNT = 9
 
 type Speciality = {
 	id: string
@@ -45,33 +50,35 @@ type Speciality = {
 }
 
 // ─── Speciality Grid Item ─────────────────────────────────────────────────────
-function SpecialityGridItem({
-	spec,
-	tone,
-	width,
-	onPress,
-}: {
-	spec: Speciality
-	tone: { bg: string; ink: string }
-	width: number
-	onPress: () => void
-}) {
+function SpecialityGridItem({ spec, width, onPress }: { spec: Speciality; width: number; onPress: () => void }) {
 	return (
 		<TouchableOpacity style={[styles.specItem, { width }]} onPress={onPress} activeOpacity={0.75}>
-			<AppIconTile size={68} radius={20} backgroundColor={tone.bg}>
-				<AppPathIcon d={spec.icon} size={30} color={tone.ink} />
+			<AppIconTile
+				size={68}
+				radius={16}
+				backgroundColor={APP_COLORS.surface}
+				borderColor={APP_COLORS.cardBorder}
+				style={styles.specTile}
+			>
+				<AppPathIcon d={spec.icon} size={30} color={APP_COLORS.primary} />
 			</AppIconTile>
 			<View style={styles.specTextCol}>
 				<AppTypography style={styles.specLabel} numberOfLines={2}>
 					{spec.label}
 				</AppTypography>
-				{!!spec.hint && (
-					<AppTypography style={styles.specHint} numberOfLines={1}>
-						{spec.hint}
-					</AppTypography>
-				)}
 			</View>
 		</TouchableOpacity>
+	)
+}
+
+// ─── Speciality Grid Skeleton ─────────────────────────────────────────────────
+// Same footprint as SpecialityGridItem (68px tile + one label line) so nothing jumps when the data lands.
+function SpecialityGridSkeleton({ width }: { width: number }) {
+	return (
+		<View style={[styles.specItem, { width }]}>
+			<AppSkeleton width={68} height={68} borderRadius={16} color={APP_COLORS.divider} />
+			<AppSkeleton width={56} height={12} borderRadius={4} color={APP_COLORS.divider} />
+		</View>
 	)
 }
 
@@ -85,6 +92,23 @@ export default function SearchPage() {
 	const [specialities, setSpecialities] = useState<Speciality[]>([])
 	const [loadingSpecs, setLoadingSpecs] = useState(true)
 	const [query, setQuery] = useState('')
+
+	// Coming from the Home search bar: open the keyboard straight away. The flag is used once and cleared, so a tap on the
+	// Search tab itself does not pop the keyboard.
+	const tabNavigation = useNavigation<NavigationProp<MainTabParamList>>()
+	const route = useRoute<RouteProp<MainTabParamList, typeof ROUTES.MAIN.SEARCH>>()
+	const searchInputRef = useRef<TextInput>(null)
+	const focusSearch = route.params?.focusSearch
+	useFocusEffect(
+		useCallback(() => {
+			if (!focusSearch) return
+			const task = InteractionManager.runAfterInteractions(() => {
+				searchInputRef.current?.focus()
+				tabNavigation.setParams({ focusSearch: undefined })
+			})
+			return () => task.cancel()
+		}, [focusSearch, tabNavigation])
+	)
 
 	// Collapsing header: `compact` flips with hysteresis (on > 24, off <= 4,
 	// same as the design) and `progress` animates 0 → 1 between the states.
@@ -142,18 +166,9 @@ export default function SearchPage() {
 	}, [user?.name])
 
 	const q = query.trim().toLowerCase()
-	// Keep each speciality's original index so its tone doesn't change while filtering.
-	const filtered = useMemo(
-		() =>
-			specialities.map((spec, index) => ({ spec, index })).filter(({ spec }) => !q || spec.haystack.includes(q)),
-		[specialities, q]
-	)
+	const filtered = useMemo(() => specialities.filter((spec) => !q || spec.haystack.includes(q)), [specialities, q])
 
 	const itemWidth = Math.floor((width - SIDE_PADDING * 2 - GRID_COL_GAP * 2) / 3)
-
-	const handleBack = () => {
-		navigation.navigate(ROUTES.MAIN.HOME as any)
-	}
 
 	const handleSpecialityPress = (spec: Speciality) => {
 		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {
@@ -167,18 +182,15 @@ export default function SearchPage() {
 		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, { query: symptom })
 	}
 
-	const handleVideoConsult = () => {
-		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, { mode: 'video' })
-	}
-
 	const handleSeeAllDoctors = () => {
 		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH as any)
 	}
 
 	// Animated header values (design: expanded → compact)
 	const headerPadBottom = progress.interpolate({ inputRange: [0, 1], outputRange: [20, 12] })
+	const topRowHeight = progress.interpolate({ inputRange: [0, 1], outputRange: [6, 52] })
 	const headGap = progress.interpolate({ inputRange: [0, 1], outputRange: [12, 4] })
-	const introMax = progress.interpolate({ inputRange: [0, 1], outputRange: [90, 0] })
+	const introMax = progress.interpolate({ inputRange: [0, 1], outputRange: [88, 0] })
 	const introOpacity = progress.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0, 0] })
 	const miniOpacity = progress
 	const miniShift = progress.interpolate({ inputRange: [0, 1], outputRange: [8, 0] })
@@ -186,58 +198,57 @@ export default function SearchPage() {
 	const elevation = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 4] })
 
 	const showSymptoms = !q
-	const countLabel = loadingSpecs ? '' : `${specialities.length} specialities · `
 
 	return (
 		<View style={styles.container}>
 			{/* HEADER (collapses on scroll) */}
 			<Animated.View style={[styles.headerShadow, { shadowOpacity, elevation }]}>
 				<Animated.View style={[styles.hero, { paddingTop: insets.top + 4, paddingBottom: headerPadBottom }]}>
-					<View style={[styles.decorCircle, styles.decorCircleTop]} />
-					<View style={[styles.decorCircle, styles.decorCircleBottom]} />
+					<AppHeaderBackdrop />
 
-					<View style={styles.heroTopRow}>
-						<AppIconButton
-							variant="ghost"
-							size={44}
-							circle
-							onPress={handleBack}
-							accessibilityLabel="Back"
-							style={styles.backButton}
-						>
-							<AppIcon name="back" size={24} color={APP_COLORS.surface} />
-						</AppIconButton>
+					<Animated.View style={[styles.heroTopRow, { height: topRowHeight }]}>
 						<Animated.View
 							style={{ opacity: miniOpacity, transform: [{ translateY: miniShift }] }}
 							accessibilityElementsHidden={!compact}
 							importantForAccessibility={compact ? 'auto' : 'no-hide-descendants'}
 						>
 							<AppTypography style={styles.miniTitle}>Consult a doctor</AppTypography>
+							{compact && (
+								<View style={styles.miniLocation}>
+									<LocationSelector
+										color={APP_COLORS.mint}
+										iconSize={14}
+										textStyle={styles.miniLocationText}
+									/>
+								</View>
+							)}
 						</Animated.View>
-					</View>
+					</Animated.View>
 
 					<Animated.View
 						style={[styles.heroIntro, { marginTop: headGap, maxHeight: introMax, opacity: introOpacity }]}
+						pointerEvents={compact ? 'none' : 'auto'}
 						accessibilityElementsHidden={compact}
 						importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'}
 					>
 						{!!firstName && <AppTypography style={styles.heroEyebrow}>HI {firstName}</AppTypography>}
 						<AppTypography style={styles.heroTitle}>Consult a doctor</AppTypography>
-						<AppTypography style={styles.heroSubtitle}>{countLabel}In-clinic or video</AppTypography>
+						<View style={styles.heroLocation}>
+							<LocationSelector
+								color={APP_COLORS.mint}
+								iconSize={16}
+								textStyle={styles.heroLocationText}
+							/>
+						</View>
 					</Animated.View>
 
-					<Animated.View style={[styles.searchBox, { marginTop: headGap }]}>
-						<AppIcon name="search" size={20} color={APP_COLORS.inkMuted} />
-						<TextInput
+					<Animated.View style={{ marginTop: headGap }}>
+						<AppSearchBar
+							context="doctorSearch"
+							tone="onDark"
 							value={query}
 							onChangeText={setQuery}
-							placeholder="Search speciality or symptom"
-							placeholderTextColor={APP_COLORS.inkMuted}
-							style={styles.searchInput}
-							returnKeyType="search"
-							autoCorrect={false}
-							clearButtonMode="while-editing"
-							accessibilityLabel="Search specialities or symptoms"
+							inputRef={searchInputRef}
 						/>
 					</Animated.View>
 				</Animated.View>
@@ -254,14 +265,9 @@ export default function SearchPage() {
 					<>
 						{/* SEE A DOCTOR FROM HOME */}
 						<View style={styles.bannerSection}>
-							<TouchableOpacity
-								style={styles.videoBanner}
-								onPress={handleVideoConsult}
-								activeOpacity={0.85}
-							>
-								<View style={styles.videoBannerDecor} />
-								<AppIconTile size={52} circle backgroundColor={TONES.sky.ink}>
-									<AppIcon name="video" size={26} color={APP_COLORS.surface} />
+							<View style={styles.videoBanner}>
+								<AppIconTile size={48} radius={12} backgroundColor={APP_COLORS.neutralBg}>
+									<AppIcon name="video" size={26} color={APP_COLORS.primary} />
 								</AppIconTile>
 								<View style={styles.videoBannerTextCol}>
 									<AppTypography style={styles.videoBannerTitle}>
@@ -271,10 +277,7 @@ export default function SearchPage() {
 										Video consults with doctors available today
 									</AppTypography>
 								</View>
-								<AppIconTile size={36} circle backgroundColor={APP_COLORS.surface}>
-									<AppIcon name="chevronRight" size={18} color={TONES.sky.ink} strokeWidth={2.4} />
-								</AppIconTile>
-							</TouchableOpacity>
+							</View>
 						</View>
 
 						{/* NOT SURE WHO TO SEE */}
@@ -283,21 +286,17 @@ export default function SearchPage() {
 								Not sure who to see? Pick a symptom
 							</AppTypography>
 							<View style={styles.symptomRow}>
-								{SYMPTOM_CHIPS.map((symptom, i) => {
-									const tone = toneAt(i)
-									return (
-										<AppChip
-											key={symptom}
-											label={symptom}
-											onPress={() => handleSymptomPress(symptom)}
-											size="sm"
-											dot={tone.ink}
-											dotSize={8}
-											borderWidth={0}
-											style={[styles.symptomChip, { backgroundColor: tone.bg }]}
-										/>
-									)
-								})}
+								{SYMPTOM_CHIPS.map((symptom) => (
+									<AppChip
+										key={symptom}
+										label={symptom}
+										onPress={() => handleSymptomPress(symptom)}
+										size="sm"
+										shape="rounded"
+										borderWidth={0}
+										style={styles.symptomChip}
+									/>
+								))}
 							</View>
 						</View>
 					</>
@@ -309,25 +308,21 @@ export default function SearchPage() {
 						<AppTypography style={styles.sectionTitle}>
 							{q ? 'Matching specialities' : 'All specialities'}
 						</AppTypography>
-						{!loadingSpecs && (
-							<AppTypography style={styles.sectionCount}>
-								{filtered.length} of {specialities.length}
-							</AppTypography>
-						)}
 					</View>
 
 					{loadingSpecs ? (
-						<View style={styles.loadingBox}>
-							<ActivityIndicator color={APP_COLORS.primary} />
+						<View style={styles.specGrid} accessibilityLabel="Loading specialities">
+							{Array.from({ length: SKELETON_COUNT }, (_, index) => (
+								<SpecialityGridSkeleton key={`spec-skeleton-${index}`} width={itemWidth} />
+							))}
 						</View>
 					) : (
 						<>
 							<View style={styles.specGrid}>
-								{filtered.map(({ spec, index }) => (
+								{filtered.map((spec) => (
 									<SpecialityGridItem
 										key={spec.id}
 										spec={spec}
-										tone={toneAt(index)}
 										width={itemWidth}
 										onPress={() => handleSpecialityPress(spec)}
 									/>
@@ -348,8 +343,8 @@ export default function SearchPage() {
 					subtitle="Browse every doctor near you"
 					onPress={handleSeeAllDoctors}
 					leading={
-						<AppIconTile radius={8} backgroundColor={TONES.sky.bg}>
-							<AppIcon name="video" size={20} color={TONES.sky.ink} />
+						<AppIconTile size={40} radius={12} backgroundColor={APP_COLORS.neutralBg}>
+							<AppIcon name="video" size={20} color={APP_COLORS.primary} />
 						</AppIconTile>
 					}
 					trailing={<AppIcon name="chevronRight" size={20} color={APP_COLORS.inkMuted} />}
@@ -378,38 +373,35 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		overflow: 'hidden',
 	},
-	decorCircle: {
-		position: 'absolute',
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.primary,
-	},
-	decorCircleTop: {
-		right: -60,
-		top: -70,
-		width: 220,
-		height: 220,
-	},
-	decorCircleBottom: {
-		right: 90,
-		bottom: -60,
-		width: 110,
-		height: 110,
-		opacity: 0.6,
-	},
+	// Only the collapsed header shows the small title, so the row is short while the big intro is showing (height
+	// is animated, see topRowHeight).
 	heroTopRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
-		height: 52,
-	},
-	backButton: {
-		marginLeft: -10,
+		overflow: 'hidden',
 	},
 	miniTitle: {
 		fontSize: 18,
 		lineHeight: 26,
 		fontWeight: '700',
 		color: APP_COLORS.surface,
+	},
+	miniLocation: {
+		marginTop: -2,
+		alignItems: 'flex-start',
+	},
+	miniLocationText: {
+		fontSize: 12,
+		fontWeight: '500',
+	},
+	heroLocation: {
+		marginTop: 2,
+		alignItems: 'flex-start',
+	},
+	heroLocationText: {
+		fontSize: 13,
+		fontWeight: '600',
 	},
 	heroIntro: {
 		gap: 4,
@@ -429,35 +421,17 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.26,
 		color: APP_COLORS.surface,
 	},
-	heroSubtitle: {
-		fontSize: 14,
-		lineHeight: 20,
-		color: APP_COLORS.mint,
-	},
-	searchBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		height: 48,
-		paddingHorizontal: 12,
-		backgroundColor: APP_COLORS.surface,
-		borderRadius: 12,
-	},
-	searchInput: {
-		flex: 1,
-		minWidth: 0,
-		height: 44,
-		paddingVertical: 0,
-		fontSize: 16,
-		color: APP_COLORS.ink,
-	},
 
 	// Scroll content (design <main>: gap 8, padding-bottom 8)
 	scrollContent: { paddingBottom: 8, gap: 8 },
+	// The banner's shadow falls below the card, onto the next (white) section: room for it (8, as the design) and a
+	// zIndex so this section is painted over the one that follows instead of under it.
 	bannerSection: {
 		backgroundColor: APP_COLORS.surface,
 		paddingTop: 16,
+		paddingBottom: 8,
 		paddingHorizontal: 16,
+		zIndex: 1,
 	},
 	symptomSection: {
 		backgroundColor: APP_COLORS.surface,
@@ -481,11 +455,6 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: APP_COLORS.ink,
 	},
-	sectionCount: {
-		fontSize: 12,
-		lineHeight: 16,
-		color: APP_COLORS.inkMuted,
-	},
 
 	// Video banner
 	videoBanner: {
@@ -493,20 +462,13 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 12,
-		padding: 16,
+		paddingVertical: 14,
+		paddingHorizontal: 16,
 		borderRadius: 16,
-		backgroundColor: TONES.sky.bg,
-		overflow: 'hidden',
-	},
-	videoBannerDecor: {
-		position: 'absolute',
-		right: -24,
-		bottom: -40,
-		width: 120,
-		height: 120,
-		borderRadius: 9999,
 		backgroundColor: APP_COLORS.surface,
-		opacity: 0.5,
+		borderWidth: 1,
+		borderColor: APP_COLORS.cardBorder,
+		...SOFT_CARD_SHADOW,
 	},
 	videoBannerTextCol: {
 		flex: 1,
@@ -521,10 +483,10 @@ const styles = StyleSheet.create({
 	videoBannerSubtitle: {
 		fontSize: 13,
 		lineHeight: 18,
-		color: APP_COLORS.ink,
+		color: APP_COLORS.inkMuted,
 	},
 
-	// Symptom chips: AppChip sm pill (36h, 13/600, 8px dot) on the tone background, 14px side padding
+	// Symptom chips: AppChip sm (36h, 13/600) on a neutral background, 14px side padding
 	symptomRow: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
@@ -532,13 +494,10 @@ const styles = StyleSheet.create({
 	},
 	symptomChip: {
 		paddingHorizontal: 14,
+		backgroundColor: APP_COLORS.neutralBg,
 	},
 
 	// Speciality grid (3 cols, 16px row gap, 8px column gap)
-	loadingBox: {
-		paddingVertical: 24,
-		alignItems: 'center',
-	},
 	specGrid: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
@@ -549,6 +508,9 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		gap: 8,
 	},
+	specTile: {
+		...SOFT_CARD_SHADOW,
+	},
 	specTextCol: {
 		alignItems: 'center',
 	},
@@ -557,12 +519,6 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 		fontWeight: '600',
 		color: APP_COLORS.ink,
-		textAlign: 'center',
-	},
-	specHint: {
-		fontSize: 11,
-		lineHeight: 14,
-		color: APP_COLORS.inkMuted,
 		textAlign: 'center',
 	},
 	noResults: {

@@ -19,7 +19,7 @@ import { useSidebarMenu } from '../../../navigation/useSidebarMenu'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
 import { DoctorStatusBanner } from './DoctorStatusBanner'
 import { useDoctorStatus } from './useDoctorStatus'
-import { fetchDoctorHub } from '../../profile/doctor/doctorProfileService'
+import { useDoctorAvatarSync } from '../../profile/doctor/useDoctorAvatarSync'
 import { getAppointments, getStatusIdByLabel, startConsultation } from '../doctorService'
 import type { Appointment } from '../../../types/appointment'
 
@@ -75,26 +75,12 @@ function etaLabel(apt: Appointment, isToday: boolean): string | null {
 
 export function DoctorHomeScreen() {
 	const navigation = useNavigation<any>()
-	const { user, clearAuth, selectedHospitalId, updateUser } = useAuth()
+	const { user, clearAuth, selectedHospitalId } = useAuth()
 	const [sidebarOpen, setSidebarOpen] = useState(false)
 
-	// The header and the drawer show the signed-in user's photo, which login doesn't carry: pull it from the
-	// profile hub (SidebarLayout does the same for the other roles, but this screen doesn't sit inside it).
-	useEffect(() => {
-		let cancelled = false
-		fetchDoctorHub()
-			.then((hub) => {
-				if (!cancelled && hub.avatar_url) void updateUser({ avatar: hub.avatar_url })
-			})
-			.catch(() => {
-				// Non-fatal: the initials avatar shows instead.
-			})
-		return () => {
-			cancelled = true
-		}
-		// updateUser changes with the user, so it is left out: this must run once, not on every update it makes.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [])
+	// The header and the drawer show the signed-in user's photo, which login doesn't carry: one shared fetch per
+	// sign-in (see useDoctorAvatarSync), also used by the drawer layout, the profile hub and Personal details.
+	useDoctorAvatarSync()
 
 	// This screen has its own dark "ink" header (see DoctorScreenHeader) instead of SidebarLayout's generic
 	// AppHeader, so it can't wrap children in <SidebarLayout>; it drives the same AppSidebar drawer directly, with

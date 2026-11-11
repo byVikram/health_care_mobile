@@ -9,8 +9,8 @@
 
 import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppBottomSheet } from '../layout/AppBottomSheet'
+import AppSearchBar from '../inputs/AppSearchBar'
 import FavouriteDoctorList, { type FavouriteDoctorListItem } from '../../../features/doctor/search/components/FavouriteDoctorList'
 import { APP_COLORS } from '../../../config/theme'
 import { getDoctors, getFavouriteDoctors } from '../../../features/doctor/doctorService'
@@ -178,16 +178,7 @@ export function AppointmentActionSheet({
 
 			{mode === 'refer' && (
 				<View style={{ gap: 12 }}>
-					<View style={styles.searchBox}>
-						<MaterialCommunityIcons name="magnify" size={18} color={APP_COLORS.inkMuted} />
-						<TextInput
-							value={referQuery}
-							onChangeText={setReferQuery}
-							placeholder="Search doctor or speciality"
-							placeholderTextColor={APP_COLORS.inkMuted}
-							style={styles.searchInput}
-						/>
-					</View>
+					<AppSearchBar context="doctors" value={referQuery} onChangeText={setReferQuery} showMicrophone={false} />
 					<Text style={styles.fieldLabel}>{referQuery.trim() ? 'SEARCH RESULTS' : '★ YOUR FAVOURITES'}</Text>
 					{referLoading ? (
 						<ActivityIndicator color={APP_COLORS.primary} />
@@ -290,17 +281,6 @@ const styles = StyleSheet.create({
 	primaryBtnText: { fontSize: 15, lineHeight: 20, fontWeight: '800', color: '#FFFFFF' },
 	btnDisabled: { backgroundColor: APP_COLORS.disabledBtn },
 	hintText: { fontSize: 12, lineHeight: 17, color: APP_COLORS.inkMuted },
-	searchBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		height: 44,
-		paddingHorizontal: 12,
-		borderWidth: 1,
-		borderColor: APP_COLORS.border,
-		borderRadius: 10,
-	},
-	searchInput: { flex: 1, fontSize: 15, color: APP_COLORS.ink },
 	referRow: {
 		flexDirection: 'row',
 		alignItems: 'center',

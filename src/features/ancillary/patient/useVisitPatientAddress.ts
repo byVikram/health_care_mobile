@@ -16,9 +16,14 @@ import {
 	getPatientAddresses,
 	type PatientAddress,
 } from '../../profile/patient/PatientProfileService'
-import type { AppAddressDraft, AppAddressPrefill } from '../../../components/common'
+import type { AppAddressDraft, AppAddressPrefill, CurrentLocationResult } from '../../../components/common'
 import type { VisitAddressInput } from '../ancillaryProviderBookingService'
 import { useBookingLocation } from './useBookingLocation'
+
+// The saved-address label given to an address made from the device position, and how close (in degrees, about
+// 100 m) a new position must be to an existing one to count as the same place.
+const CURRENT_LOCATION_LABEL = 'Current location'
+const SAME_PLACE_DEGREES = 0.001
 
 export const addressLine = (a: PatientAddress) =>
 	[a.address_line, a.city, a.state].filter(Boolean).join(', ') + (a.pincode ? ` - ${a.pincode}` : '')
@@ -150,6 +155,82 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 	}
 
 	/**
+	 * "Current location": read the device position (asking for permission when needed), turn it into an address and
+	 * save it as a normal saved address, which is then selected -- the lab and visit APIs work from saved addresses.
+	 * A spot already saved this way is reused. When the position cannot be turned into a full address (no PIN code,
+	 * or no geocoder on this device, as in a browser) nothing is saved and the sheet says so.
+	 */
+	const pickCurrentLocation = async (): Promise<CurrentLocationResult> => {
+		let c: { latitude: number; longitude: number }
+		try {
+			c = await getCurrentLocation({ promptForSettings: true })
+		} catch (e) {
+			const denied = e instanceof Error && /denied/i.test(e.message)
+			return {
+				kind: 'error',
+				message: denied
+					? 'Location permission is off. Allow location access in your phone settings, or choose a saved address.'
+					: "Couldn't get your location. Check that location (GPS) is on and try again, or choose a saved address.",
+			}
+		}
+
+		const same = addresses.find(
+			(a) =>
+				a.label === CURRENT_LOCATION_LABEL &&
+				a.latitude != null &&
+				a.longitude != null &&
+				Math.abs(a.latitude - c.latitude) < SAME_PLACE_DEGREES &&
+				Math.abs(a.longitude - c.longitude) < SAME_PLACE_DEGREES
+		)
+		if (same) {
+			setAddressId(same.id)
+			return { kind: 'picked' }
+		}
+
+		let geo: Location.LocationGeocodedAddress | undefined
+		try {
+			;[geo] = await Location.reverseGeocodeAsync(c)
+		} catch {
+			// No geocoder here (a browser): the checks below turn that into the message.
+		}
+		const area =
+			[geo?.name && geo.name !== geo.street ? geo.name : undefined, geo?.street, geo?.district || geo?.subregion]
+				.filter(Boolean)
+				.join(', ') || undefined
+		const city = geo?.city || geo?.subregion || undefined
+		const state = geo?.region || undefined
+		const pincode = geo?.postalCode || undefined
+		if (!area || !city || !state || !/^\d{6}$/.test(pincode ?? '')) {
+			return {
+				kind: 'error',
+				message:
+					"We found your location but couldn't work out the full address on this device. Please choose a saved address or add one.",
+			}
+		}
+
+		try {
+			const res: { data?: { id?: string } } | undefined = await createPatientAddress({
+				label: CURRENT_LOCATION_LABEL,
+				address_line: area,
+				city,
+				state,
+				pincode: pincode as string,
+				latitude: c.latitude,
+				longitude: c.longitude,
+				is_default: addresses.length === 0,
+			})
+			await loadAddresses(res?.data?.id ?? null)
+			Toast.show({ type: 'success', text1: 'Using your current location' })
+			return { kind: 'picked' }
+		} catch (e) {
+			return {
+				kind: 'error',
+				message: apiErrorMessage(e) || "Couldn't save your current location. Please try again.",
+			}
+		}
+	}
+
+	/**
 	 * The picked address as the booking APIs want it. Null (with a toast) when none is picked or it can't be
 	 * placed on the map.
 	 */
@@ -199,6 +280,7 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 		loadAddresses,
 		saveAddress,
 		useCurrentLocation,
+		pickCurrentLocation,
 		resolveBookingAddress,
 	}
 }

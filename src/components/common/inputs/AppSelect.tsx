@@ -13,6 +13,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { TouchableRipple, useTheme } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppTypography } from "../display/AppTypography";
+import { AppOptionSheet } from "./AppOptionSheet";
+import { APP_COLORS } from "../../../config/theme";
 
 export interface AppSelectOption {
   label: string;
@@ -28,7 +30,7 @@ interface AppSelectProps {
   errorText?: string;
   borderRadius?: number;
   borderColor?: string;
-  size?: "small" | "medium" | "compact" | "form";
+  size?: "small" | "medium" | "compact" | "form" | "chip";
   style?: StyleProp<ViewStyle>;
   customCardStyle?: StyleProp<ViewStyle>;
   noMargin?: boolean;
@@ -36,6 +38,15 @@ interface AppSelectProps {
   dropdownPosition?: "top" | "bottom";
   maxDropdownHeight?: number;
   bottomOffset?: number;
+  /**
+   * "dropdown" (default) opens a menu anchored under the field. "sheet" opens a bottom sheet with the options as a
+   * radio list (profile forms use it so long or important lists are easy to tap).
+   */
+  presentation?: "dropdown" | "sheet";
+  /** Sheet title. Defaults to the label, then the placeholder. */
+  sheetTitle?: string;
+  /** Announced for the field itself (e.g. "App language, English"). */
+  accessibilityLabel?: string;
 }
 
 const DROPDOWN_GAP = 4;
@@ -45,18 +56,21 @@ const SELECT_HEIGHTS = {
   compact: 42,
   form: 48,
   medium: 56,
+  chip: 36,
 };
 const SELECT_HORIZONTAL_PADDING = {
   small: 10,
   compact: 14,
   form: 14,
   medium: 16,
+  chip: 12,
 };
 const SELECT_TEXT_SIZE = {
   small: 12,
   compact: 14,
   form: 14,
   medium: 16,
+  chip: 14,
 };
 
 export const AppSelect = ({
@@ -76,6 +90,9 @@ export const AppSelect = ({
   dropdownPosition = "bottom",
   maxDropdownHeight,
   bottomOffset = 24,
+  presentation = "dropdown",
+  sheetTitle,
+  accessibilityLabel,
 }: AppSelectProps) => {
   const [visible, setVisible] = useState(false);
   const [anchorLayout, setAnchorLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
@@ -85,7 +102,12 @@ export const AppSelect = ({
   const theme = useTheme();
 
   const closeMenu = () => setVisible(false);
+  const isSheet = presentation === "sheet";
   const openMenu = () => {
+    if (isSheet) {
+      setVisible(true);
+      return;
+    }
     anchorRef.current?.measureInWindow((x, y, width, height) => {
       setAnchorLayout({ x, y, width, height });
       setVisible(true);
@@ -126,6 +148,8 @@ export const AppSelect = ({
         <TouchableRipple
           onPress={openMenu}
           borderless={false}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
           style={[
             styles.dropdown,
             {
@@ -150,7 +174,7 @@ export const AppSelect = ({
               {selectedOption ? selectedOption.label : placeholder}
             </AppTypography>
             <MaterialCommunityIcons
-              name={visible ? "chevron-up" : "chevron-down"}
+              name={visible && !isSheet ? "chevron-up" : "chevron-down"}
               size={20}
               color={theme.colors.outline}
               style={styles.chevron}
@@ -159,6 +183,17 @@ export const AppSelect = ({
         </TouchableRipple>
       </View>
 
+      {isSheet ? (
+        <AppOptionSheet
+          visible={visible}
+          onClose={closeMenu}
+          title={sheetTitle ?? (label?.trim() || placeholder)}
+          options={options}
+          selected={value ? [value] : []}
+          mode="single"
+          onToggle={(next) => onSelect(next)}
+        />
+      ) : (
       <Modal visible={visible} transparent animationType="fade" onRequestClose={closeMenu}>
         <Pressable style={styles.modalOverlay} onPress={closeMenu}>
           <Pressable
@@ -213,6 +248,7 @@ export const AppSelect = ({
           </Pressable>
         </Pressable>
       </Modal>
+      )}
 
       {errorText ? (
         <AppTypography variant="caption" color={theme.colors.error} style={styles.errorText}>

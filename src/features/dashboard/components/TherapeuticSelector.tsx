@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 
 import RehabilitationIcon from '../../../assets/therapeutic/rehabilitation.png'
 import SpecializedServiceIcon from '../../../assets/therapeutic/specialized-service.png'
-import CardGridSelectorModal, { SelectorCardItem } from './CardGridSelcetor'
+import CardGridSelectorModal, { SelectorCardItem } from './CardGridSelector'
 
 interface TherapeuticSelectorModalProps {
 	open: boolean

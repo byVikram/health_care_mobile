@@ -16,7 +16,6 @@ import type { AppStackParamList } from '../../navigation/types'
 import AppointmentDetailsContent from './components/AppointmentDetailsContent'
 import PatientAppointmentDetails from './components/patient-details/PatientAppointmentDetails'
 
-const PRIMARY = '#2B6F71'
 const SURFACE_MUTED = '#F5F8F8'
 
 export default function AppointmentDetailsPage() {
@@ -35,7 +34,7 @@ export default function AppointmentDetailsPage() {
 			<AppScreenHeader
 				title="Appointment"
 				variant="flat"
-				backgroundColor={PRIMARY}
+				solid
 				onBack={() => navigation.goBack()}
 			/>
 			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>

@@ -16,13 +16,15 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppAvatar, AppTypography } from '../../../components/common'
-import { APP_COLORS, TONES } from '../../../config/theme'
+import { APP_COLORS } from '../../../config/theme'
 
 export const PROFILE_AVATAR_SIZE = 112
 /** The hero avatar sits this far below the top of the scroll content (banner 84 - 60 overlap). */
 const HERO_AVATAR_TOP = 24
 const BAR_HEIGHT = 64
 const COMPACT_AVATAR_SIZE = 36
+/** A favourite doctor's heart; lighter than APP_COLORS.danger so it reads on the teal header. */
+const FAVOURITE_RED = '#FF4D4F'
 /** Where the compact avatar's centre rests, from the left edge (beside the back button). */
 const COMPACT_AVATAR_CENTER_X = 72
 // Scroll offsets (px) of each phase, from the design.
@@ -43,9 +45,25 @@ type Props = {
 	available: boolean
 	onBack: () => void
 	onShare: () => void
+	/** Patients only: whether this doctor is in their favourites. Leave undefined to hide the heart. */
+	favourite?: boolean
+	/** A favourite request is in flight: the heart ignores taps. */
+	favouriteBusy?: boolean
+	onToggleFavourite?: () => void
 }
 
-export function CollapsingProfileHeader({ scrollY, name, subtitle, avatarUri, available, onBack, onShare }: Props) {
+export function CollapsingProfileHeader({
+	scrollY,
+	name,
+	subtitle,
+	avatarUri,
+	available,
+	onBack,
+	onShare,
+	favourite,
+	favouriteBusy = false,
+	onToggleFavourite,
+}: Props) {
 	const insets = useSafeAreaInsets()
 	const { width } = useWindowDimensions()
 	const headerHeight = insets.top + BAR_HEIGHT
@@ -105,6 +123,22 @@ export function CollapsingProfileHeader({ scrollY, name, subtitle, avatarUri, av
 						)}
 					</Animated.View>
 				</View>
+				{favourite !== undefined && onToggleFavourite ? (
+					<Pressable
+						onPress={onToggleFavourite}
+						disabled={favouriteBusy}
+						accessibilityRole="button"
+						accessibilityLabel={favourite ? 'Remove from favourites' : 'Add to favourites'}
+						accessibilityState={{ selected: favourite, busy: favouriteBusy }}
+						style={[styles.iconBtn, styles.heartBtn, favouriteBusy && { opacity: 0.6 }]}
+					>
+						<MaterialCommunityIcons
+							name={favourite ? 'heart' : 'heart-outline'}
+							size={22}
+							color={favourite ? FAVOURITE_RED : '#FFFFFF'}
+						/>
+					</Pressable>
+				) : null}
 				<Pressable onPress={onShare} accessibilityRole="button" accessibilityLabel="Share profile" style={[styles.iconBtn, { marginRight: -10 }]}>
 					<MaterialCommunityIcons name="share-variant-outline" size={22} color="#FFFFFF" />
 				</Pressable>
@@ -140,9 +174,9 @@ export function CollapsingProfileHeader({ scrollY, name, subtitle, avatarUri, av
 					size={PROFILE_AVATAR_SIZE}
 					borderWidth={4}
 					borderColor="#FFFFFF"
-					backgroundColor={TONES.lilac.bg}
+					backgroundColor={APP_COLORS.neutralBg}
 					fallbackIcon="account"
-					initialsColor={TONES.lilac.ink}
+					initialsColor={APP_COLORS.primary}
 				/>
 				{available && <Animated.View style={[styles.dot, { opacity: motion.dotOpacity }]} />}
 			</Animated.View>
@@ -160,6 +194,8 @@ const styles = StyleSheet.create({
 		gap: 4,
 	},
 	iconBtn: { width: 44, height: 44, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+	// Pulls the share button in so the two icons sit close together
+	heartBtn: { marginRight: -10 },
 	center: { flex: 1, minWidth: 0, height: 48, justifyContent: 'center' },
 	titleWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center' },
 	title: { fontSize: 18, lineHeight: 26, fontWeight: '600', color: '#FFFFFF' },

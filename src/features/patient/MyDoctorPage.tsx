@@ -3,7 +3,6 @@ import {
 	ActivityIndicator,
 	FlatList,
 	StyleSheet,
-	TextInput,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
@@ -19,6 +18,7 @@ import { DoctorSearchItem } from '../../types/doctor-search'
 import MyDoctorCard, { DoctorCardItem } from './components/MyDoctorCard'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
+import AppSearchBar from '../../components/common/inputs/AppSearchBar'
 
 type DoctorRow = DoctorCardItem & {
 	id: string
@@ -71,30 +71,7 @@ const DoctorsListHeader = React.memo(function DoctorsListHeader({
 	return (
 		<View style={styles.headerContent}>
 			<View style={styles.searchSection}>
-				<View style={styles.searchBar}>
-					<MaterialCommunityIcons name="magnify" size={20} color="#64748b" style={styles.searchIcon} />
-					<TextInput
-						value={searchQuery}
-						onChangeText={onSearchChange}
-						placeholder="Search doctor by name, speciality..."
-						placeholderTextColor="#94a3b8"
-						style={styles.searchInput}
-						autoCorrect={false}
-						returnKeyType="search"
-					/>
-					{searchQuery.length > 0 ? (
-						<TouchableOpacity
-							style={styles.clearButton}
-							onPress={() => onSearchChange('')}
-							activeOpacity={0.7}
-							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-						>
-							<MaterialCommunityIcons name="close-circle" size={18} color="#94a3b8" />
-						</TouchableOpacity>
-					) : (
-						<View style={styles.searchBarEnd} />
-					)}
-				</View>
+				<AppSearchBar context="myDoctors" value={searchQuery} onChangeText={onSearchChange} />
 			</View>
 
 			{isSearching && (
@@ -459,39 +436,6 @@ const styles = StyleSheet.create({
 	},
 	searchSection: {
 		paddingBottom: 14,
-	},
-	searchBar: {
-		height: 48,
-		borderRadius: 14,
-		borderWidth: 1,
-		borderColor: '#e2e8f0',
-		backgroundColor: '#ffffff',
-		paddingHorizontal: 14,
-		flexDirection: 'row',
-		alignItems: 'center',
-		shadowColor: '#0f172a',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.05,
-		shadowRadius: 6,
-		elevation: 2,
-	},
-	searchIcon: {
-		marginRight: 8,
-	},
-	searchInput: {
-		flex: 1,
-		height: 48,
-		paddingVertical: 0,
-		color: '#1e293b',
-		fontSize: 14,
-	},
-	clearButton: {
-		padding: 4,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	searchBarEnd: {
-		width: 4,
 	},
 	resultsSection: {
 		paddingTop: 2,

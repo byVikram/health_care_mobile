@@ -134,3 +134,79 @@ export const getAddressFromCoords = async (
     return {};
   }
 };
+
+
+/**
+ * Current GPS position only when location permission is already granted. Never asks, so it is safe to call
+ * when a screen opens (the location sheet uses it to show where "Use current location" would land).
+ */
+export const getCurrentLocationIfPermitted = async () => {
+  const permission = await Location.getForegroundPermissionsAsync();
+  if (permission.status !== 'granted') return null;
+
+  const location = await Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.Balanced,
+  });
+
+  return {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+  };
+};
+
+export type PlaceResult = {
+  name: string;
+  /** "Suburb, City, State" line shown under the name. */
+  area: string;
+  latitude: number;
+  longitude: number;
+};
+
+type NominatimPlace = {
+  name?: string;
+  display_name: string;
+  lat: string;
+  lon: string;
+  address?: {
+    road?: string;
+    suburb?: string;
+    city?: string;
+    town?: string;
+    village?: string;
+    state?: string;
+  };
+};
+
+/**
+ * Search places by text (OpenStreetMap Nominatim -- free, no API key). Resolves to [] on any failure so the
+ * caller just shows "no places found".
+ */
+export const searchPlaces = async (query: string, signal?: AbortSignal): Promise<PlaceResult[]> => {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=8`;
+    // Plain fetch on purpose: a third-party geocoder, not our API (ApiService would send our auth header to it).
+    const res = await fetch(url, {
+      signal,
+      headers: {
+        'User-Agent': 'MyHealthApp/1.0 (contact@myhealthapp.com)',
+        'Accept-Language': 'en',
+      },
+    });
+    if (!res.ok) return [];
+    const rows = (await res.json()) as NominatimPlace[];
+
+    return rows.map((r) => {
+      const a = r.address ?? {};
+      const town = a.city ?? a.town ?? a.village;
+      const name = r.name || a.road || a.suburb || town || r.display_name.split(',')[0];
+      return {
+        name,
+        area: [a.suburb && a.suburb !== name ? a.suburb : '', town, a.state].filter(Boolean).join(', '),
+        latitude: parseFloat(r.lat),
+        longitude: parseFloat(r.lon),
+      };
+    });
+  } catch {
+    return [];
+  }
+};

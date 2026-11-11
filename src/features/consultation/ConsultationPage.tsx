@@ -10,7 +10,7 @@
 // diagnosis and follow-up -- nothing here is a client-side simulation, including the notes editor's
 // Scribble (react-native-signature-canvas) and Voice (expo-speech-recognition) modes.
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
 	Alert,
@@ -36,7 +36,7 @@ import { Asset } from 'expo-asset'
 import * as FileSystem from 'expo-file-system/legacy'
 import Toast from 'react-native-toast-message'
 
-import { AppSegmentedControl, AppSkeleton, AppSoftCard, ConsultationNotesImage } from '../../components/common'
+import { AppHeaderBackdrop, AppSegmentedControl, AppSkeleton, AppSoftCard, ConsultationNotesImage } from '../../components/common'
 import { APP_COLORS, TONES } from '../../config/theme'
 import { ROUTES } from '../../navigation/routes'
 import ApiService from '../../services/apiService'
@@ -44,6 +44,8 @@ import { updateAppointmentsStatus } from '../../services/appointmentService'
 import { getStatusIdByLabel } from '../doctor/doctorService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import DicomViewer from './components/DicomViewer'
+import { RecordVitalsSheet } from './components/RecordVitalsSheet'
+import { VitalsNotesCard } from './components/VitalsNotesCard'
 import {
 	patientService,
 	treatmentService,
@@ -53,7 +55,9 @@ import {
 	type RadiologyReportRecord,
 	type TreatmentRecord,
 } from './ConsultationService'
-import { getLatestVitals, type VitalRecord } from './VitalsService'
+import { getLatestVitals, getRecentVitals, type VitalRecord } from './VitalsService'
+import { useRecordVitals, type RecentLoad } from './useRecordVitals'
+import { TODAYS_VITALS_LOOKBACK_DAYS, VITAL_THRESHOLDS, latestPulse } from './vitalsEntry'
 import { buildS3Url } from '../../utils/s3Utils'
 import { bookingRef } from '../../utils/formatters'
 import { formatFullDate, parseDateOnly } from '../../utils/date'
@@ -76,17 +80,6 @@ type TabId = 'overview' | 'history' | 'reports' | 'notes'
 type NoteMode = 'type' | 'scribble' | 'voice'
 type Phase = 'idle' | 'live' | 'sent'
 type FollowUpOption = '2wk' | '1month' | '3months' | 'none'
-
-// "Above target" / "High" / "Low" thresholds for the Overview tab's vitals cards. Named and
-// centralized here (rather than inline magic numbers) so a future per-condition or per-patient
-// override doesn't need to go hunting through JSX -- these are plain adult resting reference
-// ranges, not tied to any specific diagnosis.
-const VITAL_THRESHOLDS = {
-	bpSystolicHigh: 130,
-	bpDiastolicHigh: 80,
-	glucoseHighMgDl: 140,
-	spo2LowPercent: 95,
-}
 
 const TABS: { id: TabId; label: string }[] = [
 	{ id: 'overview', label: 'Overview' },
@@ -271,6 +264,10 @@ export default function ConsultationPage() {
 	const [reportsLoading, setReportsLoading] = useState(false)
 
 	const [latestVitals, setLatestVitals] = useState<Record<string, VitalRecord | null>>({})
+	// Every reading of the last days: today's Notes-tab vitals card is built from these (latestVitals keeps one record per type).
+	const [recentVitals, setRecentVitals] = useState<VitalRecord[]>([])
+	// Until the recent readings are fetched, "vitals not recorded" is not known (and a failed fetch is shown, with a retry).
+	const [recentLoad, setRecentLoad] = useState<RecentLoad>('loading')
 
 	// ── UI state ──
 	const [activeTab, setActiveTab] = useState<TabId>('overview')
@@ -387,18 +384,56 @@ export default function ConsultationPage() {
 		})()
 	}, [patientId])
 
-	// ── Fetch latest vitals ──
+	// ── Fetch latest vitals, and the recent readings behind the Notes tab's vitals card ──
+	// A save can finish before these return: what the save put in state is newer, so it is kept over what was fetched.
+	const loadRecentVitals = useCallback(async () => {
+		if (!patientId) return
+		setRecentLoad('loading')
+		try {
+			const recent = await getRecentVitals(patientId, TODAYS_VITALS_LOOKBACK_DAYS)
+			setRecentVitals((previous) => {
+				const known = new Set(previous.map((record) => record.id))
+				return [...previous, ...recent.filter((record) => !known.has(record.id))]
+			})
+			setRecentLoad('ready')
+		} catch (err) {
+			console.error('[ConsultationPage] failed to fetch recent vitals:', err)
+			setRecentLoad('error')
+		}
+	}, [patientId])
+
 	useEffect(() => {
 		if (!patientId) return
 		;(async () => {
 			try {
 				const data = await getLatestVitals(patientId)
-				setLatestVitals(data)
+				setLatestVitals((previous) => ({ ...data, ...previous }))
 			} catch (err) {
 				console.error('[ConsultationPage] failed to fetch vitals:', err)
 			}
 		})()
-	}, [patientId])
+		void loadRecentVitals()
+	}, [patientId, loadRecentVitals])
+
+	// The Notes tab's "Record vitals" save returns the records it created: they are added to the recent readings (the Notes card) and
+	// replace the latest of their type (the Overview cards) at once, so what was just saved shows without another request.
+	const applySavedVitals = useCallback((saved: VitalRecord[]) => {
+		setRecentVitals((previous) => [...saved, ...previous])
+		setLatestVitals((previous) => ({
+			...previous,
+			...Object.fromEntries(saved.map((record) => [record.vital_type, record])),
+		}))
+	}, [])
+
+	// Recording vitals from the Notes tab: what is recorded today, the sheet's draft and the save.
+	const vitals = useRecordVitals({
+		patientId,
+		recentVitals,
+		recentLoad,
+		onRetryRecent: loadRecentVitals,
+		latestVitals,
+		onSaved: applySavedVitals,
+	})
 
 	// ── Load existing treatment record for this appointment, if any, into the editor ──
 	useEffect(() => {
@@ -534,6 +569,8 @@ export default function ConsultationPage() {
 		setDicomLoading(true)
 		try {
 			if (s3Key) {
+				// Plain fetch on purpose: this is a signed file link, not an API route, and ApiService would add our
+				// Authorization header to a request for another host.
 				const response = await fetch(s3Key)
 				const blob = await response.blob()
 				const reader = new FileReader()
@@ -801,10 +838,9 @@ export default function ConsultationPage() {
 	const spo2Record = latestVitals.spo2
 	const tempRecord = latestVitals.temperature
 	const othersRecord = latestVitals.others
-	// Pulse has no dedicated vital_type of its own -- it's commonly recorded alongside blood
-	// pressure (the real seeded convention: blood_pressure.value.pulse), but fall back to an
-	// "others" bundle's pulse_rate in case a future recording uses that shape instead.
-	const pulseValue = (bpRecord?.value as any)?.pulse ?? (othersRecord?.value as any)?.pulse_rate
+	// Pulse has no dedicated vital_type of its own: it is in a blood-pressure record (`pulse`) or in an "others" record
+	// (`pulse_rate`, what the app saves), and the more recent of the two is shown.
+	const pulseValue = latestPulse(bpRecord, othersRecord)
 
 	const bpValue = bpRecord ? `${(bpRecord.value as any)?.systolic ?? '--'}/${(bpRecord.value as any)?.diastolic ?? '--'}` : null
 	const bpSystolic = bpRecord ? Number((bpRecord.value as any)?.systolic) : null
@@ -880,7 +916,7 @@ export default function ConsultationPage() {
 		<View style={styles.screen}>
 			{/* ── Header ── */}
 			<View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-				<View aria-hidden style={styles.headerBlob} />
+				<AppHeaderBackdrop />
 				<View style={styles.headerTopRow}>
 					<TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityLabel="Back to today">
 						<MaterialCommunityIcons name="chevron-left" size={26} color="#FFFFFF" />
@@ -1180,6 +1216,7 @@ export default function ConsultationPage() {
 
 				{activeTab === 'notes' && (
 					<View style={{ gap: 14 }}>
+						<VitalsNotesCard {...vitals.recorded} readOnly={locked} onRecord={vitals.openSheet} />
 						{locked && (
 							<AppSoftCard radius={14} padding={16} style={{ gap: 12 }}>
 								<View style={styles.lockedRow}>
@@ -1438,6 +1475,16 @@ export default function ConsultationPage() {
 				</View>
 			</View>
 
+			{/* ── Record vitals (opened from the Notes tab's Vitals card) ── */}
+			<RecordVitalsSheet
+				visible={vitals.sheet.visible}
+				patientName={patient?.name ?? ''}
+				initial={vitals.sheet.initial}
+				saving={vitals.sheet.saving}
+				onClose={vitals.sheet.close}
+				onSave={vitals.sheet.save}
+			/>
+
 			{/* ── DICOM expanded modal ── */}
 			<Modal visible={!!dicomBase64} animationType="slide" onRequestClose={() => setDicomBase64(null)}>
 				<View style={styles.dicomModal}>
@@ -1516,7 +1563,6 @@ const styles = StyleSheet.create({
 		borderBottomLeftRadius: 24,
 		borderBottomRightRadius: 24,
 	},
-	headerBlob: { position: 'absolute', right: -60, top: -80, width: 220, height: 220, borderRadius: 9999, backgroundColor: PRIMARY },
 	headerTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
 	backBtn: { width: 44, height: 44, marginLeft: -8, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 	headerTitle: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: '#FFFFFF' },

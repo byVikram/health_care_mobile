@@ -31,7 +31,7 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "package": "com.anonymous.KarolaHealth",
+      "package": "com.karolahealth.app",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
@@ -40,6 +40,8 @@
     },
     "plugins": [
       "@react-native-firebase/app",
+      "@react-native-firebase/crashlytics",
+      "./plugins/withNotificationChannels",
       "expo-asset",
       [
         "expo-splash-screen",

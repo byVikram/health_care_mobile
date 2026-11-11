@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios'
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import { VitalHistoryRow, VitalStat } from '../../types/consultation'
@@ -267,7 +268,9 @@ function mergeOtherVitals(records: VitalRecord[]): VitalRecord[] {
 }
 
 async function getPatientMetrics(patientPublicId: string): Promise<PatientMetrics> {
-	const response = await ApiService.get<PatientDetailsMetricsResponse>(API_ENDPOINTS.PATIENT.GET_BY_PUBLIC_ID(patientPublicId))
+	const response = await ApiService.get<PatientDetailsMetricsResponse>(
+		API_ENDPOINTS.PATIENT.GET_BY_PUBLIC_ID(patientPublicId)
+	)
 	const personal = response.data.data?.personal
 
 	return {
@@ -276,10 +279,7 @@ async function getPatientMetrics(patientPublicId: string): Promise<PatientMetric
 	}
 }
 
-async function fetchVitalsHistory(
-	patientPublicId: string,
-	params: VitalsHistoryParams
-): Promise<VitalRecord[]> {
+async function fetchVitalsHistory(patientPublicId: string, params: VitalsHistoryParams): Promise<VitalRecord[]> {
 	const queryParams: Record<string, unknown> = { vital_type: params.vital_type }
 
 	if (params.days !== undefined) {
@@ -291,6 +291,19 @@ async function fetchVitalsHistory(
 		queryParams
 	)
 
+	return response.data.data ?? []
+}
+
+/**
+ * Every reading recorded in the last `days` days, all vital types, newest first (one request). The latest-vitals endpoint keeps only
+ * ONE record per type, which is not enough to know what was taken today: the "others" record (pulse and the rest share it) may be
+ * a later one that has no pulse in it.
+ */
+export async function getRecentVitals(patientPublicId: string, days: number): Promise<VitalRecord[]> {
+	const response = await ApiService.getWithParams<VitalApiResponse>(
+		API_ENDPOINTS.PATIENT.VITALS_HISTORY(patientPublicId),
+		{ days }
+	)
 	return response.data.data ?? []
 }
 
@@ -316,7 +329,8 @@ export async function getVitalsHistory(
 	params: VitalsHistoryParams,
 	metrics?: PatientMetrics | null
 ): Promise<VitalRecord[]> {
-	const metricsPromise = metrics !== undefined ? Promise.resolve(metrics) : getPatientMetrics(patientPublicId).catch(() => null)
+	const metricsPromise =
+		metrics !== undefined ? Promise.resolve(metrics) : getPatientMetrics(patientPublicId).catch(() => null)
 
 	if (params.vital_type === 'others') {
 		const [resolvedMetrics, vitalGroups] = await Promise.all([
@@ -329,16 +343,11 @@ export async function getVitalsHistory(
 		])
 
 		return mergeOtherVitals(
-			vitalGroups
-				.flat()
-				.map((record) => normalizeVitalRecord(record, resolvedMetrics ?? undefined))
+			vitalGroups.flat().map((record) => normalizeVitalRecord(record, resolvedMetrics ?? undefined))
 		)
 	}
 
-	const [resolvedMetrics, records] = await Promise.all([
-		metricsPromise,
-		fetchVitalsHistory(patientPublicId, params),
-	])
+	const [resolvedMetrics, records] = await Promise.all([metricsPromise, fetchVitalsHistory(patientPublicId, params)])
 
 	return records.map((record) => normalizeVitalRecord(record, resolvedMetrics ?? undefined))
 }
@@ -388,7 +397,13 @@ export function mapLatestVitalsToStats(latestVitals: Record<string, VitalRecord 
 	const bmi = toNumber(weightValue.bmi) ?? calculateBmi(weightKg, heightCm)
 
 	const stats: VitalStat[] = [
-		{ id: 'temp', label: 'Body Temperature', value: tempSummary.value, unit: tempSummary.unit, date: tempSummary.date },
+		{
+			id: 'temp',
+			label: 'Body Temperature',
+			value: tempSummary.value,
+			unit: tempSummary.unit,
+			date: tempSummary.date,
+		},
 		{ id: 'bp', label: 'Blood Pressure', value: bpSummary.value, unit: bpSummary.unit, date: bpSummary.date },
 		{
 			id: 'glucose',
@@ -447,25 +462,76 @@ export async function getPatientReports(patientPublicId: string): Promise<Report
 export async function recordVital(
 	patientPublicId: string,
 	vitalType: string,
-	value: Record<string, unknown>
+	value: Record<string, unknown>,
+	recordedAt: string = new Date().toISOString()
 ): Promise<VitalRecord> {
 	const response = await ApiService.post<{
 		success: boolean
 		data: VitalRecord
-	}>(API_ENDPOINTS.PATIENT.VITALS_CREATE, {
-		patient_public_id: patientPublicId,
-		vital_type: vitalType,
-		recorded_at: new Date().toISOString(),
-		value,
-	})
+	}>(
+		API_ENDPOINTS.PATIENT.VITALS_CREATE,
+		{
+			patient_public_id: patientPublicId,
+			vital_type: vitalType,
+			recorded_at: recordedAt,
+			value,
+		},
+		{ skipGlobalError: true }
+	) // the sheet says what failed; a dialog per failed reading would stack on top of it
 	return response.data.data
+}
+
+/** One reading to record: its vital type and the value the backend keeps for it. */
+export interface VitalEntry {
+	vitalType: string
+	value: Record<string, unknown>
+}
+
+/**
+ * Records several readings taken together. They share one `recorded_at`, so the history lists them as a single set (it groups
+ * by that moment). Each reading is its own request: one that fails does not undo the others, so the caller gets back which
+ * ones were saved and which failed, and can retry just the failed ones.
+ */
+export async function recordVitals(
+	patientPublicId: string,
+	entries: VitalEntry[]
+): Promise<{ saved: VitalRecord[]; failed: VitalEntry[]; reason: string | null }> {
+	const recordedAt = new Date().toISOString()
+	const results = await Promise.allSettled(
+		entries.map((entry) => recordVital(patientPublicId, entry.vitalType, entry.value, recordedAt))
+	)
+
+	const saved: VitalRecord[] = []
+	const failed: VitalEntry[] = []
+	let reason: string | null = null
+	results.forEach((result, index) => {
+		if (result.status === 'fulfilled') saved.push(result.value)
+		else {
+			failed.push(entries[index])
+			reason ??= failureReason(result.reason)
+		}
+	})
+	return { saved, failed, reason }
+}
+
+/** The server's reason for a failed reading, or a plain one for a network problem. */
+function failureReason(error: unknown): string {
+	if (isAxiosError(error)) {
+		const data = error.response?.data as { message?: unknown; detail?: unknown } | undefined
+		if (typeof data?.message === 'string' && data.message) return data.message
+		if (typeof data?.detail === 'string' && data.detail) return data.detail
+		if (!error.response) return 'Check your connection.'
+	}
+	return 'Something went wrong.'
 }
 
 export const vitalsService = {
 	getLatestVitals,
+	getRecentVitals,
 	getVitalsHistory,
 	getPatientReports,
 	mapLatestVitalsToStats,
 	mapVitalToRow,
 	recordVital,
+	recordVitals,
 }

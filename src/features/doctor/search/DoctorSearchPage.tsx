@@ -9,59 +9,81 @@ import {
 	DimensionValue,
 	TouchableOpacity,
 	ScrollView,
-	TextInput,
+	Text,
 } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import DoctorSearchCard from './components/DoctorSearchCard'
 import {
-	AppBottomSheet,
 	AppButton,
-	AppChip,
 	AppInfoBanner,
-	AppRadio,
+	AppPathIcon,
 	AppScreenHeader,
-	AppSelect,
-	AppSelectOption,
 	AppSkeleton,
 	AppTypography,
-	AppIcon,
+	AppSearchBar,
+	LocationSelector,
 } from '../../../components/common'
-import { useAuth } from '../../../context/AuthContext'
 import { getDoctors, getSpecialities } from '../doctorService'
 import { DoctorSearchItem } from '../../../types/doctor-search'
 import type { RouteProp } from '@react-navigation/native'
 import type { AppStackParamList } from '../../../navigation/types'
 import { ROUTES } from '../../../navigation/routes'
-import { APP_COLORS } from '../../../config/theme'
+import { useAuth } from '../../../context/AuthContext'
+import { APP_COLORS, SOFT_CARD_SHADOW } from '../../../config/theme'
+import DoctorFilterSheet from './components/DoctorFilterSheet'
+import DoctorSortSheet from './components/DoctorSortSheet'
+import {
+	NO_FILTERS,
+	activeFilterCount,
+	sortDoctors,
+	toSearchParams,
+	SORT_OPTIONS,
+	type ConsultMode,
+	type DoctorFilters,
+	type SortKey,
+} from './doctorFilters'
 
 const PAGE_LIMIT = 5
 const SEARCH_DEBOUNCE_MS = 300
 
-const RATING_OPTIONS: AppSelectOption[] = [
-	{ label: 'All Ratings', value: 'all' },
-	{ label: '4.5+ Stars', value: '4.5' },
-	{ label: '4.0+ Stars', value: '4.0' },
-	{ label: '3.5+ Stars', value: '3.5' },
-]
+// Icons of the toolbar (the design's 24x24 paths)
+const FILTER_ICON = 'M4 6h16M7 12h10M10 18h4'
+const SORT_ICON = 'M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4'
+const CHEVRON_DOWN_ICON = 'M6 9l6 6 6-6'
 
-// The search API has no sort param, so every option is a client-side sort over
-// the pages loaded so far, using real fields only (distance, offline fee, experience).
-type SortKey = 'rel' | 'near' | 'fee' | 'exp'
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-	{ value: 'rel', label: 'Sort: Relevance' },
-	{ value: 'near', label: 'Nearest first' },
-	{ value: 'fee', label: 'Fee: low to high' },
-	{ value: 'exp', label: 'Most experienced' },
-]
+/** A route's consult-type hint ('all' | 'video' | 'clinic') as a filter. */
+const modeFromRoute = (mode?: string): ConsultMode => (mode === 'video' || mode === 'clinic' ? mode : 'any')
 
-/** Ascending numeric compare that keeps missing values at the end. */
-function compareNullableAsc(a: number | null | undefined, b: number | null | undefined) {
-	const aMissing = a == null
-	const bMissing = b == null
-	if (aMissing || bMissing) return aMissing === bMissing ? 0 : aMissing ? 1 : -1
-	return a - b
+// ─── Toolbar chip ─────────────────────────────────────────────────────────
+// 36 high, radius 8, 1.5px border; on = mint fill + primary border and text.
+type ToolbarChipProps = {
+	label: string
+	on?: boolean
+	onPress: () => void
+	leading?: React.ReactNode
+	trailing?: React.ReactNode
+	accessibilityLabel?: string
+	pressed?: boolean
+}
+function ToolbarChip({ label, on = false, onPress, leading, trailing, accessibilityLabel, pressed }: ToolbarChipProps) {
+	return (
+		<TouchableOpacity
+			onPress={onPress}
+			activeOpacity={0.85}
+			accessibilityRole="button"
+			accessibilityLabel={accessibilityLabel ?? label}
+			accessibilityState={pressed === undefined ? undefined : { selected: pressed }}
+			style={[styles.chip, on && styles.chipOn]}
+		>
+			{leading}
+			<Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>
+				{label}
+			</Text>
+			{trailing}
+		</TouchableOpacity>
+	)
 }
 
 // ─── Doctor Card Skeleton ─────────────────────────────────────────────────
@@ -87,6 +109,10 @@ export default function DoctorSearchPage() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.DOCTOR_SEARCH>>()
 	const { currentLocation } = useAuth()
+	// Sent so the server measures distances from the patient; without a usable location it falls back to its default.
+	const latitude = Number.isFinite(currentLocation?.latitude) ? currentLocation?.latitude : undefined
+	const longitude = Number.isFinite(currentLocation?.longitude) ? currentLocation?.longitude : undefined
+	const hasLocation = latitude !== undefined && longitude !== undefined
 	const { width } = useWindowDimensions()
 	const insets = useSafeAreaInsets()
 
@@ -103,7 +129,6 @@ export default function DoctorSearchPage() {
 	const [searchInput, setSearchInput] = useState(initialQuery)
 	const [searchQuery, setSearchQuery] = useState(initialQuery)
 	const [doctors, setDoctors] = useState<DoctorSearchItem[]>([])
-	const [total, setTotal] = useState<number | null>(null)
 	const [loading, setLoading] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
 	const [page, setPage] = useState(1)
@@ -111,33 +136,21 @@ export default function DoctorSearchPage() {
 	const [hasMore, setHasMore] = useState(true)
 	const isFetchingPageRef = useRef(false)
 
-	// Filter states
+	// Filters and sort (see doctorFilters.ts). The speciality comes from the screen the user arrived from.
 	const [specialityFilter, setSpecialityFilter] = useState(initialSpecialityId)
 	const [specialityName, setSpecialityName] = useState(route.params?.specialityName || '')
-	const [consultationTypeFilter, setConsultationTypeFilter] = useState<string>(initialMode)
-	const [minRatingFilter, setMinRatingFilter] = useState('all')
-	const [sortBy, setSortBy] = useState<SortKey>(route.params?.sort ?? 'rel')
+	const [filters, setFilters] = useState<DoctorFilters>({ ...NO_FILTERS, mode: modeFromRoute(initialMode) })
+	// Until the patient (or the route) picks a sort, the list opens nearest first when there is a location. The location
+	// can arrive after the first render, so the default is worked out each time instead of stored.
+	const [sortChoice, setSortChoice] = useState<SortKey | null>(route.params?.sort ?? null)
+	const sortBy: SortKey = sortChoice ?? (hasLocation ? 'near' : 'rel')
 	const [showSort, setShowSort] = useState(false)
-	// "Available today" / "Female doctor" have no backing field on DoctorSearchItem
-	// yet (no `is_available_today` / `gender` from the API) -- kept as inert UI
-	// toggles matching the design, not wired to any real filter, so they never
-	// silently drop results based on data we don't actually have.
-	const [availableTodayOn, setAvailableTodayOn] = useState(false)
-	const [femaleDoctorOn, setFemaleDoctorOn] = useState(false)
-
-	const [specialities, setSpecialities] = useState<AppSelectOption[]>([
-		{ label: 'All Specialities', value: 'all' },
-		...(route.params?.specialityId && route.params?.specialityName
-			? [{ label: route.params.specialityName, value: String(route.params.specialityId) }]
-			: []),
-	])
-	const [specialitiesLoading, setSpecialitiesLoading] = useState(false)
-
-	// Modal draft states
-	const [draftSpecialityFilter, setDraftSpecialityFilter] = useState(initialSpecialityId)
-	const [draftMinRating, setDraftMinRating] = useState('all')
-
 	const [showFilters, setShowFilters] = useState(false)
+	// "Nearest first" is ordered by the server, before paging, so it holds across every page; it needs the location.
+	const nearestFirst = sortBy === 'near' && hasLocation
+	const filterCount = activeFilterCount(filters)
+	// One value to watch in effects instead of the whole object
+	const filtersKey = JSON.stringify(filters)
 
 	// Debounce typing so every keystroke doesn't fire a search request.
 	useEffect(() => {
@@ -151,7 +164,6 @@ export default function DoctorSearchPage() {
 		if (route.params?.specialityId) {
 			const specId = String(route.params.specialityId)
 			setSpecialityFilter(specId)
-			setDraftSpecialityFilter(specId)
 			if (route.params?.specialityName) setSpecialityName(route.params.specialityName)
 		}
 		if (route.params?.query !== undefined) {
@@ -159,44 +171,27 @@ export default function DoctorSearchPage() {
 			setSearchQuery(route.params.query)
 		}
 		if (route.params?.mode) {
-			setConsultationTypeFilter(route.params.mode)
+			setFilters((f) => ({ ...f, mode: modeFromRoute(route.params?.mode) }))
 		}
 	}, [route.params?.specialityId, route.params?.specialityName, route.params?.query, route.params?.mode])
 
-	// Load specialities on mount or when specialityId changes
+	// The title names the speciality: resolve it from the list when the route only carried an id.
 	useEffect(() => {
-		const loadSpecialities = async () => {
+		if (!route.params?.specialityId || route.params?.specialityName) return
+		let active = true
+		const loadSpecialityName = async () => {
 			try {
-				setSpecialitiesLoading(true)
 				const res = await getSpecialities()
-				if (res.success && res.data) {
-					const mapped = res.data.map((s) => ({
-						label: s.label,
-						value: String(s.id),
-					}))
-					setSpecialities([{ label: 'All Specialities', value: 'all' }, ...mapped])
-
-					if (route.params?.specialityId) {
-						const found = res.data.find(
-							(s) =>
-								String(s.id) === String(route.params?.specialityId) ||
-								(route.params?.specialityName &&
-									s.label.toLowerCase().trim() === route.params.specialityName.toLowerCase().trim())
-						)
-						if (found) {
-							setSpecialityFilter(String(found.id))
-							setDraftSpecialityFilter(String(found.id))
-							setSpecialityName(found.label)
-						}
-					}
-				}
+				const found = res.success && res.data?.find((s) => String(s.id) === String(route.params?.specialityId))
+				if (active && found) setSpecialityName(found.label)
 			} catch (error) {
 				console.error('Error fetching specialities:', error)
-			} finally {
-				setSpecialitiesLoading(false)
 			}
 		}
-		loadSpecialities()
+		void loadSpecialityName()
+		return () => {
+			active = false
+		}
 	}, [route.params?.specialityId, route.params?.specialityName])
 
 	// Fetch doctor list
@@ -223,12 +218,12 @@ export default function DoctorSearchPage() {
 				params.speciality_id = specialityFilter
 			}
 
-			if (consultationTypeFilter !== 'all') {
-				params.consultation_type = consultationTypeFilter
-			}
+			Object.assign(params, toSearchParams(filters))
 
-			if (minRatingFilter !== 'all') {
-				params.min_rating = Number(minRatingFilter)
+			if (hasLocation) {
+				params.latitude = latitude
+				params.longitude = longitude
+				if (nearestFirst) params.sort = 'nearest'
 			}
 
 			const res = await getDoctors(params)
@@ -236,13 +231,11 @@ export default function DoctorSearchPage() {
 			if (res.success && res.data) {
 				const newData = res.data
 				setDoctors((prev) => (targetPage === 1 ? newData : [...prev, ...newData]))
-				setTotal(typeof res.total === 'number' ? res.total : null)
 				setPage(targetPage)
 				setHasMore(newData.length >= PAGE_LIMIT)
 			} else {
 				if (targetPage === 1) {
 					setDoctors([])
-					setTotal(0)
 				}
 				setHasMore(false)
 			}
@@ -250,7 +243,6 @@ export default function DoctorSearchPage() {
 			console.error('Error fetching doctors:', error)
 			if (targetPage === 1) {
 				setDoctors([])
-				setTotal(0)
 			}
 		} finally {
 			setLoading(false)
@@ -262,7 +254,7 @@ export default function DoctorSearchPage() {
 
 	useEffect(() => {
 		fetchDoctorsList(1)
-	}, [searchQuery, specialityFilter, consultationTypeFilter, minRatingFilter])
+	}, [searchQuery, specialityFilter, filtersKey, latitude, longitude, nearestFirst])
 
 	const onRefresh = useCallback(() => {
 		if (isFetchingPageRef.current) return
@@ -271,7 +263,7 @@ export default function DoctorSearchPage() {
 		setDoctors([])
 		setHasMore(true)
 		fetchDoctorsList(1, true)
-	}, [searchQuery, specialityFilter, consultationTypeFilter, minRatingFilter])
+	}, [searchQuery, specialityFilter, filtersKey, latitude, longitude, nearestFirst])
 
 	const handleEndReached = useCallback(() => {
 		if (isFetchingPageRef.current || loading || refreshing || loadingMore || !hasMore) return
@@ -284,56 +276,20 @@ export default function DoctorSearchPage() {
 		refreshing,
 		searchQuery,
 		specialityFilter,
-		consultationTypeFilter,
-		minRatingFilter,
+		filtersKey,
+		latitude,
+		longitude,
+		nearestFirst,
 	])
 
-	// Client-side sort over the already-fetched pages (the API has no sort param).
-	const sortedDoctors = useMemo(() => {
-		if (sortBy === 'near') return [...doctors].sort((a, b) => compareNullableAsc(a.distance, b.distance))
-		if (sortBy === 'fee')
-			return [...doctors].sort((a, b) =>
-				compareNullableAsc(a.hospital?.offline_consultation_fee, b.hospital?.offline_consultation_fee)
-			)
-		if (sortBy === 'exp') return [...doctors].sort((a, b) => (b.experience_years || 0) - (a.experience_years || 0))
-		return doctors
-	}, [doctors, sortBy])
+	// The filters narrow the list on the server; the order is applied here, to the doctors loaded so far.
+	const sortedDoctors = useMemo(() => sortDoctors(doctors, sortBy, filters.mode), [doctors, sortBy, filters.mode])
 
-	// Modal handlers
-	const openFilterModal = () => {
-		setDraftSpecialityFilter(specialityFilter)
-		setDraftMinRating(minRatingFilter)
-		setShowFilters(true)
-	}
-
-	const closeFilterModal = () => {
-		setShowFilters(false)
-	}
-
-	const applyFilters = () => {
-		setSpecialityFilter(draftSpecialityFilter)
-		const found = specialities.find((s) => s.value === draftSpecialityFilter)
-		setSpecialityName(found && found.value !== 'all' ? found.label : '')
-		setMinRatingFilter(draftMinRating)
-		closeFilterModal()
-	}
-
-	const resetFilters = () => {
-		setDraftSpecialityFilter('all')
-		setDraftMinRating('all')
-		setSpecialityFilter('all')
-		setSpecialityName('')
-		setMinRatingFilter('all')
-	}
-
-	// Empty-state "Clear filters" (design: resets speciality, query and every toggle; keeps sort).
+	// Empty-state "Clear filters" (design: resets the search text and every filter; keeps the sort and the speciality).
 	const clearAll = () => {
-		resetFilters()
+		setFilters(NO_FILTERS)
 		setSearchInput('')
 		setSearchQuery('')
-		setConsultationTypeFilter('all')
-		setAvailableTodayOn(false)
-		setFemaleDoctorOn(false)
 	}
 
 	// Render item for FlatList
@@ -361,65 +317,11 @@ export default function DoctorSearchPage() {
 			</View>
 		) : null
 
-	const renderFilterContent = () => {
-		return (
-			<View style={[styles.filterSheetContentWrapper, { maxWidth: Math.min(width, 520) }]}>
-				<ScrollView
-					style={styles.filterSheetScroll}
-					contentContainerStyle={styles.filterSheetContent}
-					showsVerticalScrollIndicator={false}
-				>
-					<View style={styles.filterGroup}>
-						<AppTypography style={styles.filterGroupLabel}>Speciality</AppTypography>
-						<AppSelect
-							options={specialities}
-							value={draftSpecialityFilter}
-							onSelect={(value) => setDraftSpecialityFilter(value)}
-							placeholder={specialitiesLoading ? 'Loading specialities...' : 'Select Speciality'}
-							size="medium"
-							borderRadius={10}
-							customCardStyle={styles.inlineFilterSelect}
-							borderColor={APP_COLORS.divider}
-							maxDropdownHeight={240}
-							style={styles.inlineSelectFill}
-						/>
-					</View>
-
-					<View style={styles.filterGroup}>
-						<AppTypography style={styles.filterGroupLabel}>Minimum Rating</AppTypography>
-						<View style={styles.filterChipRow}>
-							{RATING_OPTIONS.map((option) => {
-								const selected = option.value === draftMinRating
-								return (
-									<AppChip
-										key={option.value}
-										label={option.label}
-										selected={selected}
-										onPress={() => setDraftMinRating(option.value)}
-										style={[styles.filterChip, selected && styles.filterChipActive]}
-										textStyle={[styles.filterChipText, selected && styles.filterChipTextActive]}
-									/>
-								)
-							})}
-						</View>
-					</View>
-				</ScrollView>
-
-				<View style={styles.filterSheetActions}>
-					<TouchableOpacity style={styles.resetButton} onPress={resetFilters} activeOpacity={0.82}>
-						<AppTypography style={styles.resetButtonText}>Reset</AppTypography>
-					</TouchableOpacity>
-					<TouchableOpacity style={styles.applyButton} onPress={applyFilters} activeOpacity={0.88}>
-						<AppTypography style={styles.applyButtonText}>Apply Filters</AppTypography>
-					</TouchableOpacity>
-				</View>
-			</View>
-		)
-	}
-
-	const resultCount = total ?? sortedDoctors.length
-	const resultLabel = isInitialLoading ? '' : `${resultCount} ${resultCount === 1 ? 'doctor' : 'doctors'} near you`
-	const sortLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label ?? 'Sort: Relevance'
+	// Design: the label does not repeat the count; the speciality names the screen.
+	const resultLabel =
+		isInitialLoading || sortedDoctors.length === 0 ? '' : hasLocation ? 'Doctors near you' : 'Doctors'
+	const pageTitle = specialityName ? `${specialityName} doctors` : 'Find a doctor'
+	const sortLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label ?? 'Relevance'
 
 	const handleBack = () => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate(ROUTES.MAIN.SEARCH))
 
@@ -428,84 +330,98 @@ export default function DoctorSearchPage() {
 			{/* HEADER */}
 			<AppScreenHeader
 				variant="bar"
-				title="Find a doctor"
-				subtitle={`In-clinic or video consultation${currentLocation?.address ? ` · ${currentLocation.address}` : ''}`}
-				titleStyle={styles.headerTitle}
+				solid
+				titleNode={
+					<View>
+						<AppTypography style={styles.headerTitle} numberOfLines={1} accessibilityRole="header">
+							{pageTitle}
+						</AppTypography>
+						<View style={styles.headerLocation}>
+							<LocationSelector
+								color={APP_COLORS.mint}
+								iconSize={14}
+								textStyle={styles.headerLocationText}
+							/>
+						</View>
+					</View>
+				}
 				onBack={handleBack}
 				backAccessibilityLabel="Back to specialities"
 				style={styles.header}
 			>
-				<View style={styles.searchBox}>
-					<AppIcon name="search" size={20} color={APP_COLORS.inkMuted} />
-					<TextInput
-						value={searchInput}
-						onChangeText={setSearchInput}
-						onSubmitEditing={() => setSearchQuery(searchInput)}
-						placeholder="Doctor, speciality or symptom"
-						placeholderTextColor={APP_COLORS.inkMuted}
-						style={styles.searchInput}
-						returnKeyType="search"
-						autoCorrect={false}
-						clearButtonMode="while-editing"
-						accessibilityLabel="Search doctors"
-					/>
-				</View>
+				<AppSearchBar
+					context={specialityFilter === 'all' ? 'doctors' : undefined}
+					placeholder={specialityFilter === 'all' ? undefined : 'Search by doctor name'}
+					hints={specialityFilter === 'all' ? undefined : ['doctor name', 'clinic', 'hospital']}
+					tone="onDark"
+					value={searchInput}
+					onChangeText={setSearchInput}
+					onSubmit={() => setSearchQuery(searchInput)}
+					style={styles.searchBar}
+				/>
 			</AppScreenHeader>
 
-			{/* FILTER / SORT BAR — wraps onto a second line like the design. */}
+			{/* FILTER / SORT BAR: Filters (with a count), Sort, then one-tap toggles that mirror the sheet. */}
 			<View style={styles.filterBarWrap}>
-				<View style={styles.filterBarContent}>
-					<AppChip
-						label={specialityName || 'All specialities'}
-						selected
-						onPress={openFilterModal}
-						variant="soft"
-						shape="rounded"
-						size="sm"
-						leading={<AppIcon name="steth" size={16} color={APP_COLORS.primary} />}
-						trailing={<AppIcon name="chevronRight" size={16} color={APP_COLORS.ink} strokeWidth={2.2} />}
-						style={styles.specialityChip}
-						textStyle={styles.specialityChipText}
+				<ScrollView
+					horizontal
+					showsHorizontalScrollIndicator={false}
+					contentContainerStyle={styles.filterBarContent}
+					keyboardShouldPersistTaps="handled"
+					accessibilityRole="toolbar"
+				>
+					<ToolbarChip
+						label="Filters"
+						on={filterCount > 0}
+						onPress={() => setShowFilters(true)}
+						accessibilityLabel={filterCount ? `Filters, ${filterCount} selected` : 'Filters'}
+						leading={
+							<AppPathIcon
+								d={FILTER_ICON}
+								size={16}
+								strokeWidth={2.2}
+								color={filterCount > 0 ? APP_COLORS.primary : APP_COLORS.ink}
+							/>
+						}
+						trailing={
+							filterCount > 0 ? (
+								<View style={styles.countBadge}>
+									<Text style={styles.countBadgeText}>{filterCount}</Text>
+								</View>
+							) : undefined
+						}
 					/>
-
-					<AppChip
+					<ToolbarChip
 						label={sortLabel}
+						on={sortBy !== 'rel'}
 						onPress={() => setShowSort(true)}
-						shape="rounded"
-						size="sm"
-						trailing={<AppIcon name="chevronDown" size={16} color={APP_COLORS.ink} strokeWidth={2.2} />}
 						accessibilityLabel={`Sort doctors, ${sortLabel}`}
-						style={styles.sortPill}
+						leading={
+							<AppPathIcon
+								d={SORT_ICON}
+								size={16}
+								strokeWidth={2.2}
+								color={sortBy !== 'rel' ? APP_COLORS.primary : APP_COLORS.ink}
+							/>
+						}
+						trailing={
+							<AppPathIcon d={CHEVRON_DOWN_ICON} size={14} strokeWidth={2.4} color={APP_COLORS.ink} />
+						}
 					/>
-
-					<AppChip
+					<View style={styles.chipDivider} />
+					<ToolbarChip
 						label="Available today"
-						selected={availableTodayOn}
-						onPress={() => setAvailableTodayOn((v) => !v)}
-						variant="soft"
-						shape="rounded"
-						size="sm"
-						checkmark
+						on={filters.avail === 'today'}
+						pressed={filters.avail === 'today'}
+						onPress={() => setFilters((f) => ({ ...f, avail: f.avail === 'today' ? 'any' : 'today' }))}
 					/>
-					<AppChip
+					<ToolbarChip
 						label="Video consult"
-						selected={consultationTypeFilter === 'video'}
-						onPress={() => setConsultationTypeFilter((prev) => (prev === 'video' ? 'all' : 'video'))}
-						variant="soft"
-						shape="rounded"
-						size="sm"
-						checkmark
+						on={filters.mode === 'video'}
+						pressed={filters.mode === 'video'}
+						onPress={() => setFilters((f) => ({ ...f, mode: f.mode === 'video' ? 'any' : 'video' }))}
 					/>
-					<AppChip
-						label="Female doctor"
-						selected={femaleDoctorOn}
-						onPress={() => setFemaleDoctorOn((v) => !v)}
-						variant="soft"
-						shape="rounded"
-						size="sm"
-						checkmark
-					/>
-				</View>
+				</ScrollView>
 			</View>
 
 			<FlatList
@@ -569,35 +485,23 @@ export default function DoctorSearchPage() {
 				initialNumToRender={6}
 			/>
 
-			<AppBottomSheet visible={showFilters} title="Filters" onClose={closeFilterModal}>
-				{renderFilterContent()}
-			</AppBottomSheet>
+			<DoctorFilterSheet
+				visible={showFilters}
+				filters={filters}
+				onChange={setFilters}
+				onClearAll={() => setFilters(NO_FILTERS)}
+				onClose={() => setShowFilters(false)}
+			/>
 
-			<AppBottomSheet visible={showSort} title="Sort by" onClose={() => setShowSort(false)} appearance="modern">
-				<View style={styles.sortSheetList}>
-					{SORT_OPTIONS.map((option) => {
-						const selected = option.value === sortBy
-						return (
-							<TouchableOpacity
-								key={option.value}
-								style={styles.sortRow}
-								onPress={() => {
-									setSortBy(option.value)
-									setShowSort(false)
-								}}
-								activeOpacity={0.82}
-								accessibilityRole="radio"
-								accessibilityState={{ selected }}
-							>
-								<AppTypography style={[styles.sortRowText, selected && styles.sortRowTextActive]}>
-									{option.value === 'rel' ? 'Relevance' : option.label}
-								</AppTypography>
-								<AppRadio checked={selected} />
-							</TouchableOpacity>
-						)
-					})}
-				</View>
-			</AppBottomSheet>
+			<DoctorSortSheet
+				visible={showSort}
+				value={sortBy}
+				onSelect={(value) => {
+					setSortChoice(value)
+					setShowSort(false)
+				}}
+				onClose={() => setShowSort(false)}
+			/>
 		</View>
 	)
 }
@@ -616,24 +520,18 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		lineHeight: 26,
 		fontWeight: '600',
+		color: APP_COLORS.surface,
 	},
-	searchBox: {
+	headerLocation: {
+		marginTop: -2,
+		alignItems: 'flex-start',
+	},
+	headerLocationText: {
+		fontSize: 12,
+		fontWeight: '500',
+	},
+	searchBar: {
 		marginTop: 4,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		height: 48,
-		paddingHorizontal: 12,
-		backgroundColor: APP_COLORS.surface,
-		borderRadius: 8,
-	},
-	searchInput: {
-		flex: 1,
-		minWidth: 0,
-		height: 44,
-		paddingVertical: 0,
-		fontSize: 16,
-		color: APP_COLORS.ink,
 	},
 
 	// Filter/sort bar
@@ -641,29 +539,56 @@ const styles = StyleSheet.create({
 		backgroundColor: APP_COLORS.surface,
 		borderBottomWidth: 1,
 		borderBottomColor: APP_COLORS.divider,
-		paddingVertical: 12,
 	},
 	filterBarContent: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
 		alignItems: 'center',
 		gap: 8,
 		paddingHorizontal: 16,
+		paddingVertical: 12,
 	},
-	// Speciality entry chip: AppChip soft/selected (mint + primary border) with the design's 4px gap,
-	// 10px right padding and 200px cap (the label truncates)
-	specialityChip: {
-		paddingRight: 10,
-		gap: 4,
-		maxWidth: 200,
+	// design: 36 high, radius 8, 1.5px border, 13/700; on = #F0F7F7 fill with a primary border and text
+	chip: {
+		height: 36,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		paddingHorizontal: 12,
+		borderRadius: 8,
+		borderWidth: 1.5,
+		borderColor: APP_COLORS.divider,
+		backgroundColor: APP_COLORS.surface,
 	},
-	specialityChipText: {
-		flexShrink: 1,
+	chipOn: {
+		borderColor: APP_COLORS.primary,
+		backgroundColor: '#F0F7F7',
 	},
-	// Sort pill: 12 + label + 4 + 16px chevron + 10 = the design's 30px right padding around the chevron
-	sortPill: {
-		paddingRight: 10,
-		gap: 4,
+	chipText: {
+		fontSize: 13,
+		lineHeight: 18,
+		fontWeight: '700',
+		color: APP_COLORS.ink,
+	},
+	chipTextOn: {
+		color: APP_COLORS.primary,
+	},
+	chipDivider: {
+		width: 1,
+		height: 22,
+		backgroundColor: APP_COLORS.divider,
+	},
+	countBadge: {
+		minWidth: 18,
+		height: 18,
+		paddingHorizontal: 5,
+		borderRadius: 9,
+		backgroundColor: APP_COLORS.primary,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	countBadgeText: {
+		fontSize: 11,
+		fontWeight: '800',
+		color: '#FFFFFF',
 	},
 
 	// Results
@@ -719,128 +644,10 @@ const styles = StyleSheet.create({
 	skeletonCard: {
 		backgroundColor: APP_COLORS.surface,
 		padding: 16,
+		...SOFT_CARD_SHADOW,
 	},
 	skeletonTopRow: {
 		flexDirection: 'row',
 		gap: 12,
-	},
-
-	// Sort sheet
-	sortSheetList: {
-		paddingHorizontal: 18,
-		paddingBottom: 12,
-	},
-	sortRow: {
-		minHeight: 52,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		borderBottomWidth: 1,
-		borderBottomColor: APP_COLORS.divider,
-	},
-	sortRowText: {
-		fontSize: 15,
-		lineHeight: 22,
-		fontWeight: '500',
-		color: APP_COLORS.ink,
-	},
-	sortRowTextActive: {
-		fontWeight: '700',
-	},
-
-	// Filter sheet
-	filterSheetContentWrapper: {
-		width: '100%',
-		alignSelf: 'center',
-	},
-	filterSheetScroll: {
-		flexGrow: 0,
-	},
-	filterSheetContent: {
-		paddingHorizontal: 18,
-		paddingTop: 4,
-		paddingBottom: 20,
-		gap: 22,
-	},
-	filterGroup: {
-		gap: 10,
-	},
-	filterGroupLabel: {
-		fontSize: 11,
-		lineHeight: 14,
-		fontWeight: '800',
-		color: APP_COLORS.inkMuted,
-		textTransform: 'uppercase',
-	},
-	filterChipRow: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 10,
-	},
-	// Rating chips: AppChip (solid pill) restyled to the sheet's borderless 38px grey chips.
-	filterChip: {
-		height: 38,
-		minWidth: 74,
-		borderWidth: 0,
-		paddingHorizontal: 18,
-		backgroundColor: APP_COLORS.pageBg,
-		flexShrink: 0,
-	},
-	filterChipActive: {
-		backgroundColor: APP_COLORS.primary,
-	},
-	filterChipText: {
-		fontSize: 12,
-		lineHeight: 16,
-		fontWeight: '700',
-		color: APP_COLORS.inkMuted,
-	},
-	filterChipTextActive: {
-		color: APP_COLORS.surface,
-	},
-	filterSheetActions: {
-		flexDirection: 'row',
-		paddingHorizontal: 18,
-		paddingTop: 12,
-		gap: 12,
-		borderTopWidth: 1,
-		borderTopColor: APP_COLORS.divider,
-	},
-	resetButton: {
-		flex: 1,
-		height: 48,
-		borderRadius: 24,
-		alignItems: 'center',
-		justifyContent: 'center',
-		borderWidth: 1,
-		borderColor: APP_COLORS.divider,
-		backgroundColor: APP_COLORS.surface,
-	},
-	resetButtonText: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: APP_COLORS.inkMuted,
-	},
-	applyButton: {
-		flex: 2,
-		height: 48,
-		borderRadius: 24,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: APP_COLORS.primary,
-	},
-	applyButtonText: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: APP_COLORS.surface,
-	},
-	inlineSelectFill: {
-		width: '100%',
-		marginBottom: 0,
-	},
-	inlineFilterSelect: {
-		height: 50,
-		borderRadius: 8,
-		backgroundColor: APP_COLORS.surface,
 	},
 })

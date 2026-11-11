@@ -29,6 +29,8 @@ export type MainTabParamList = {
 	[ROUTES.MAIN.SEARCH]:
 		| {
 				mode?: 'clinic' | 'video'
+				/** Set by the Home search bar: open the keyboard on arrival (the Search tab clears it). */
+				focusSearch?: boolean
 		  }
 		| undefined
 	[ROUTES.MAIN.PORTAL]: { filter?: BookingsFilterKey } | undefined
@@ -176,6 +178,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.PROVIDER_WORK]: undefined
 	/** No params = the welcome screen; `scenario` opens straight into the chat summary / in-chat booking. */
 	[ROUTES.STACK.CARE_AI]: CareAiLaunch | undefined
+	[ROUTES.STACK.MEDICAL_RECORDS]: undefined
 	[ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
 	[ROUTES.STACK.SEARCH]: undefined
 	[ROUTES.STACK.DOCTOR_SEARCH]:
@@ -196,10 +199,8 @@ export type AppStackParamList = {
 	[ROUTES.STACK.CONSULTATION]: ConsultationParams | undefined
 	[ROUTES.STACK.HEALTH_PROFILE]: undefined
 	[ROUTES.STACK.SETTINGS]: undefined
-	[ROUTES.STACK.SCREEN_CAPTURE_TEST]: undefined
 	[ROUTES.STACK.DOCTOR_WELCOME]: undefined
 	[ROUTES.STACK.ACCOUNT]: undefined
-	[ROUTES.STACK.APPOINTMENTS]: { appointmentId?: string } | undefined
 	[ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.VISIT_SUMMARY]: { appointmentId: string }
@@ -237,7 +238,6 @@ export type AppStackParamList = {
 	// orderId: opened from the Bookings tab (a placed order is otherwise read from labBookingStore)
 	[ROUTES.STACK.LABORATORY_BOOKING_TRACKING]: { orderId?: string } | undefined
 	[ROUTES.STACK.LABORATORY_REPORT]: undefined
-	[ROUTES.STACK.ALL_SPECIALITIES]: undefined
 	//  Updated: now receives booking data
 	[ROUTES.STACK.PATIENT_PAYMENT]: PatientPaymentParams | undefined
 	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: { openAskModal?: boolean } | undefined

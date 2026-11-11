@@ -26,7 +26,6 @@ import VerifyAccessPage from '../features/doctor/verify-access/VerifyAccessPage'
 import MyDoctorPage from '../features/patient/MyDoctorPage'
 import NotificationPage from '../features/notification/NotificationPage'
 import SettingPage from '../features/settings/SettingPage'
-// import ScreenCaptureTest from '../features/doctor/search/components/ScreenCaptureTest'
 import AccountPage from '../features/auth/AccountPage'
 import PatientPayment from '../features/patient-payment/PatientPayment'
 import AppointmentConfirmedPage from '../features/patient-payment/AppointmentConfirmedPage'
@@ -34,7 +33,6 @@ import ConsentForm from '../features/doctor/components/ConsentForm'
 import SearchPage from '../features/doctor/search/SearchPage'
 import LegalPage from '../features/auth/LegalPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
-import AppointmentList from '../features/appointment/AppointmentList'
 import VisitSummaryPage from '../features/appointment/VisitSummaryPage'
 import AppointmentDetailsPage from '../features/appointment/AppointmentDetailsPage'
 import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
@@ -58,7 +56,11 @@ import RadiologyBookingDetailsPage from '../features/radiology/RadiologyBookingD
 import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
 import OrderListRadiologyPage from '../features/radiology/OrderListRadiologyPage'
 
-import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
+// Switched off: SearchPage (the Search tab) is the specialities list now, and this page bundles 18 specialty images of about 2 MB each.
+// To bring it back, un-comment this import and the screen below, and restore ROUTES.STACK.ALL_SPECIALITIES ('AllSpecialitiesPage')
+// in routes.ts and types.ts.
+// import AllSpecialitiesPage from '../features/dashboard/components/AllSpecialitiesPage'
+
 
 
 import AllEventsPage from '../features/events/AllEventsPage'
@@ -88,6 +90,7 @@ import ProfileSettingsPage from '../features/profile/shared/SettingsPage'
 import LoginSecurityPage from '../features/profile/shared/LoginSecurityPage'
 import AvailabilityPage from '../features/profile/availability/AvailabilityPage'
 import CareAiPage from '../features/care-ai/CareAiPage'
+import MedicalRecordsPage from '../features/medical-records/MedicalRecordsPage'
 import GoOnlinePermissionsPage from '../features/ancillary/staff/availability/GoOnlinePermissionsPage'
 import HealthDetailsPage from '../features/profile/patient/HealthDetailsPage'
 import LifestylePage from '../features/profile/patient/LifestylePage'
@@ -101,16 +104,22 @@ import AchievementsPage from '../features/profile/doctor/AchievementsPage'
 import FavouriteDoctorsPage from '../features/profile/doctor/FavouriteDoctorsPage'
 import WorkDocumentsPage from '../features/profile/ancillary/WorkDocumentsPage'
 
+import ErrorBoundary from '../components/common/feedback/ErrorBoundary'
+
 const AppStack = createNativeStackNavigator<AppStackParamList>()
 
 function AuthenticatedNavigator() {
 	return (
 		<>
 			<AppStack.Navigator
+				// One boundary per screen: a crash on one screen shows the "Something went wrong" panel there, with the
+				// back button and the other screens still working, instead of taking the whole app down.
+				screenLayout={({ children }) => <ErrorBoundary>{children}</ErrorBoundary>}
 				screenOptions={{
 					headerShown: false,
 					header: ({ options, route }) => (
 						<AppScreenHeader
+							solid
 							title={options.title || route.name}
 							rightElement={options.headerRight ? options.headerRight({ canGoBack: true }) : undefined}
 						/>
@@ -181,6 +190,7 @@ function AuthenticatedNavigator() {
 				/>
 				<AppStack.Screen name={ROUTES.STACK.LABORATORY_BOOKING_TRACKING as keyof AppStackParamList} component={LabOrderPage} options={{ headerShown: false }} />
 				<AppStack.Screen name={ROUTES.STACK.LABORATORY_REPORT as keyof AppStackParamList} component={LabReportPage} options={{ headerShown: false }} />
+				{/* AllSpecialitiesPage is switched off (see the import above).
 				<AppStack.Screen
 					name={ROUTES.STACK.ALL_SPECIALITIES}
 					component={AllSpecialitiesPage}
@@ -189,6 +199,7 @@ function AuthenticatedNavigator() {
 						title: 'All Specialities',
 					}}
 				/>
+				*/}
 
 				{/* DoctorSearchPage renders its own single AppScreenHeader — no navigator header here. */}
 				<AppStack.Screen
@@ -210,7 +221,6 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.VERIFY_ACCESS} component={VerifyAccessPage} />
 				<AppStack.Screen name={ROUTES.STACK.CONSULTATION} component={ConsultationPage} />
 				<AppStack.Screen name={ROUTES.STACK.SETTINGS} component={SettingPage} />
-				{/* <AppStack.Screen name={ROUTES.STACK.SCREEN_CAPTURE_TEST} component={ScreenCaptureTest} /> */}
 				<AppStack.Screen
 					name={ROUTES.STACK.DOCTOR_WELCOME}
 					component={WelcomeDoctorPage}
@@ -218,11 +228,6 @@ function AuthenticatedNavigator() {
 				/>
 				<AppStack.Screen name={ROUTES.STACK.ACCOUNT} component={AccountPage} />
 				<AppStack.Screen name={ROUTES.STACK.LEGAL} component={LegalPage} />
-				<AppStack.Screen
-					name={ROUTES.STACK.APPOINTMENTS}
-					component={AppointmentList}
-					options={{ headerShown: true, title: 'Appointments' }}
-				/>
 				<AppStack.Screen
 					name={ROUTES.STACK.CONSENT_FORM}
 					component={ConsentForm}
@@ -356,6 +361,11 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.DOCTOR_FAVOURITES} component={FavouriteDoctorsPage} />
 				<AppStack.Screen name={ROUTES.STACK.PROVIDER_WORK} component={WorkDocumentsPage} />
 				<AppStack.Screen name={ROUTES.STACK.CARE_AI} component={CareAiPage} options={{ headerShown: false }} />
+				<AppStack.Screen
+					name={ROUTES.STACK.MEDICAL_RECORDS}
+					component={MedicalRecordsPage}
+					options={{ headerShown: false }}
+				/>
 
 				<AppStack.Screen name={ROUTES.STACK.WALLET} component={WalletPage} options={{ headerShown: false }} />
 				<AppStack.Screen

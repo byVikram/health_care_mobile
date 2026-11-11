@@ -9,13 +9,15 @@ import LocationSelector from '../location/LocationSelector'
 import { useAncillarySpecialty, useAuth } from '../../../context/AuthContext'
 import { ROUTES } from '../../../navigation/routes'
 import { useScroll } from '../../../context/ScrollContext'
-import { AppInput } from '../inputs/AppInput'
+import AppSearchBar from '../inputs/AppSearchBar'
 import AppAvatar from '../display/AppAvatar'
 import { AppPathIcon } from '../display/AppIcon'
-import { AppIconTile } from '../display/AppIconTile'
 import { AppIconButton } from '../buttons/AppIconButton'
+import { AppHeaderBackdrop } from './AppScreenHeader'
 import { APP_COLORS } from '../../../config/theme'
+import type { SearchContextKey } from '../../../config/searchContexts'
 import { getUnreadNotificationCount } from '../../../services/homeService'
+import { onNotificationsChanged } from '../../../services/notificationEvents'
 
 interface AppHeaderProps {
 	variant?: 'home' | 'search' // home → pressable; search → editable input
@@ -113,6 +115,22 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 		})
 	}, [compact, progress])
 
+	// A push that arrives while the app is open updates the bell at once.
+	useEffect(
+		() =>
+			onNotificationsChanged(() => {
+				const refresh = async () => {
+					try {
+						setUnread(await getUnreadNotificationCount())
+					} catch {
+						// Soft-fail: keep the last known count.
+					}
+				}
+				void refresh()
+			}),
+		[]
+	)
+
 	// Unread count + greeting refresh whenever Home regains focus (e.g. back from Notifications).
 	useFocusEffect(
 		useCallback(() => {
@@ -144,7 +162,7 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 			onSearchPress()
 			return
 		}
-		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH })
+		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH, params: { focusSearch: true } })
 	}
 
 	const paddingBottom = progress.interpolate({ inputRange: [0, 1], outputRange: [16, 12] })
@@ -157,14 +175,7 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 	return (
 		<Animated.View onLayout={handleLayout} style={[patientStyles.shell, { shadowOpacity, elevation }]}>
 			<Animated.View style={[patientStyles.bar, { paddingTop: insets.top + 8, paddingBottom }]}>
-				<View
-					style={[patientStyles.circleLarge, { top: insets.top - 80 }]}
-					importantForAccessibility="no-hide-descendants"
-				/>
-				<View
-					style={[patientStyles.circleSmall, { top: insets.top + 60 }]}
-					importantForAccessibility="no-hide-descendants"
-				/>
+				<AppHeaderBackdrop />
 
 				{/* Avatar / greeting / actions */}
 				<View style={patientStyles.topRow}>
@@ -234,24 +245,7 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 				</Animated.View>
 
 				{/* Search (tap-through to the Search tab) */}
-				<View style={patientStyles.search}>
-					<Pressable
-						onPress={handleSearch}
-						style={patientStyles.searchTapArea}
-						accessibilityRole="button"
-						accessibilityLabel="Search doctors, tests or symptoms"
-					>
-						<AppPathIcon d={HEADER_ICONS.search} size={20} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
-						<Text style={patientStyles.searchPlaceholder} numberOfLines={1}>
-							Search doctors, tests or symptoms
-						</Text>
-					</Pressable>
-					<Pressable onPress={handleSearch} accessibilityRole="button" accessibilityLabel="Search by voice">
-						<AppIconTile size={40} radius={10} tone="mint">
-							<AppPathIcon d={HEADER_ICONS.mic} size={20} strokeWidth={2} color={APP_COLORS.primary} />
-						</AppIconTile>
-					</Pressable>
-				</View>
+				<AppSearchBar context="home.patient" tone="onDark" onPress={handleSearch} />
 			</Animated.View>
 		</Animated.View>
 	)
@@ -277,23 +271,6 @@ const patientStyles = StyleSheet.create({
 		borderBottomRightRadius: 24,
 		backgroundColor: APP_COLORS.ink,
 		overflow: 'hidden',
-	},
-	circleLarge: {
-		position: 'absolute',
-		right: -60,
-		width: 220,
-		height: 220,
-		borderRadius: 110,
-		backgroundColor: APP_COLORS.primary,
-	},
-	circleSmall: {
-		position: 'absolute',
-		right: 90,
-		width: 90,
-		height: 90,
-		borderRadius: 45,
-		backgroundColor: APP_COLORS.mintAccent,
-		opacity: 0.12,
 	},
 	topRow: {
 		flexDirection: 'row',
@@ -352,29 +329,6 @@ const patientStyles = StyleSheet.create({
 		lineHeight: 18,
 		fontWeight: '600',
 	},
-	search: {
-		height: 48,
-		borderRadius: 12,
-		backgroundColor: APP_COLORS.surface,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		paddingLeft: 14,
-		paddingRight: 4,
-	},
-	searchTapArea: {
-		flex: 1,
-		minWidth: 0,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	searchPlaceholder: {
-		flex: 1,
-		minWidth: 0,
-		fontSize: 16,
-		color: APP_COLORS.inkMuted,
-	},
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -423,10 +377,7 @@ function ProviderHomeHeader({ userName = 'there', avatarUri, onAvatarPress }: Ap
 	return (
 		<View onLayout={handleLayout} style={providerStyles.shell}>
 			<View style={[patientStyles.bar, { paddingTop: insets.top + 8, paddingBottom: 16 }]}>
-				<View
-					style={[patientStyles.circleLarge, { top: insets.top - 80 }]}
-					importantForAccessibility="no-hide-descendants"
-				/>
+				<AppHeaderBackdrop />
 				<View style={patientStyles.topRow}>
 					<Pressable
 						onPress={onAvatarPress}
@@ -567,15 +518,6 @@ function RoleHomeHeader({
 				})
 			: 1
 
-	const waveOpacity =
-		scrollY && !isDoctor
-			? scrollY.interpolate({
-					inputRange: [0, maxScroll],
-					outputRange: [1, 0.4],
-					extrapolate: 'clamp',
-				})
-			: 1
-
 	// ── Display name (pharmacy fallback) ─────────────────────────────────────
 	let displayName = 'User'
 	if (user) {
@@ -601,13 +543,13 @@ function RoleHomeHeader({
 
 	const isNurse = role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE
 
-	const searchPlaceholder = isPharmacy
-		? 'Search Order ID'
+	const searchContext: SearchContextKey = isPharmacy
+		? 'home.pharmacy'
 		: isRadiology
-			? 'Search Radiology ID'
+			? 'home.radiology'
 			: isNurse
-				? 'Search patient, booking or care request...'
-				: 'Search Doctors/Symptoms'
+				? 'home.ancillary'
+				: 'doctors'
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	const handleSearchPress = () => {
@@ -634,46 +576,23 @@ function RoleHomeHeader({
 
 	const renderSearchBar = () => {
 		if (variant === 'search') {
-			// Editable TextInput for SearchPage
+			// Editable bar for SearchPage
 			return (
-				<AppInput
-					isSearch
-					showMicrophone
-					placeholder={searchPlaceholder}
-					placeholderTextColor="#8b8e94"
+				<AppSearchBar
+					context={searchContext}
+					tone="onDark"
 					value={searchValue}
 					onChangeText={onSearchChange}
-					onSubmitEditing={onSearchSubmit}
+					onSubmit={onSearchSubmit}
 					editable={isSearchEditable}
-					returnKeyType="search"
 					autoFocus={isSearchEditable}
-					noMargin
-					borderRadius={12}
-					containerStyle={{ marginTop: 20 }}
-					style={{ backgroundColor: '#ffffff', height: 48 }}
-					contentStyle={{ height: 48 }}
-					outlineStyle={{ borderWidth: 0 }}
+					style={{ marginTop: 20 }}
 				/>
 			)
 		} else {
-			// Pressable for dashboard (navigates to appropriate search page)
+			// Tap-through for dashboard (navigates to appropriate search page)
 			return (
-				<Pressable onPress={handleSearchPress} style={{ marginTop: 20 }}>
-					<View pointerEvents="none">
-						<AppInput
-							isSearch
-							showMicrophone
-							placeholder={searchPlaceholder}
-							placeholderTextColor="#8b8e94"
-							editable={false}
-							noMargin
-							borderRadius={12}
-							style={{ backgroundColor: '#ffffff', height: 48 }}
-							contentStyle={{ height: 48 }}
-							outlineStyle={{ borderWidth: 0 }}
-						/>
-					</View>
-				</Pressable>
+				<AppSearchBar context={searchContext} tone="onDark" onPress={handleSearchPress} style={{ marginTop: 20 }} />
 			)
 		}
 	}
@@ -706,9 +625,7 @@ function RoleHomeHeader({
 					: null,
 			]}
 		>
-			{/* Background Waves */}
-			<Animated.View style={[styles.waveOne, { opacity: waveOpacity }]} />
-			<Animated.View style={[styles.waveTwo, { opacity: waveOpacity }]} />
+			<AppHeaderBackdrop />
 
 			{/* Top Row */}
 			<Animated.View
@@ -760,32 +677,12 @@ function RoleHomeHeader({
 
 const styles = StyleSheet.create({
 	wrapper: {
-		backgroundColor: '#1f5f68',
+		backgroundColor: APP_COLORS.ink,
 		paddingHorizontal: 16,
 		paddingBottom: 16,
 		borderBottomLeftRadius: 24,
 		borderBottomRightRadius: 24,
 		overflow: 'hidden',
-	},
-	waveOne: {
-		position: 'absolute',
-		width: 420,
-		height: 240,
-		borderRadius: 120,
-		backgroundColor: 'rgba(255,255,255,0.06)',
-		left: -140,
-		top: -70,
-		transform: [{ rotate: '-4deg' }],
-	},
-	waveTwo: {
-		position: 'absolute',
-		width: 430,
-		height: 240,
-		borderRadius: 120,
-		backgroundColor: 'rgba(255,255,255,0.05)',
-		left: -95,
-		top: -22,
-		transform: [{ rotate: '-4deg' }],
 	},
 	topRow: {
 		flexDirection: 'row',

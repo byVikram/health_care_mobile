@@ -316,11 +316,9 @@ export const fetchVerifiedNursesBackend = async (
 		if (params?.latitude != null) query.latitude = String(params.latitude)
 		if (params?.longitude != null) query.longitude = String(params.longitude)
 
-		console.log('[ancillaryService] fetchVerifiedNursesBackend request params:', params)
 		console.log('[ancillaryService] fetchVerifiedNursesBackend query URL/params:', API_ENDPOINTS.ANCILLARY.VERIFIED_NURSES, query)
 
 		const res = await ApiService.getWithParams<any>(API_ENDPOINTS.ANCILLARY.VERIFIED_NURSES, query)
-		console.log('[ancillaryService] fetchVerifiedNursesBackend raw API response:', res.data)
 
 		const list = unwrapList<any>(res.data)
 		console.log('[ancillaryService] fetchVerifiedNursesBackend unwrapList items count:', list.length)
@@ -1263,7 +1261,7 @@ export const fetchAvailableRequestsBackend = async (): Promise<SoftReviewRequest
  * lowercase NurseBooking status value -- these all collapse to 'cancelled'
  * for the nurse-facing Today's Activity / Visits lists.
  */
-const CANCELLED_FAMILY_STATUSES = ['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED']
+const CANCELLED_FAMILY_STATUSES = ['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'EXPIRED', 'FAILED', 'NO_SHOW']
 
 /**
  * Fetch all appointments assigned to the logged-in nurse via GET /api/ancillary/provider/requests/my
@@ -1379,7 +1377,8 @@ export const fetchPatientActiveRequestBackend = async (): Promise<AncillaryBooki
 const mapStatusToBookingTab = (status?: string): 'upcoming' | 'completed' | 'cancelled' => {
 	const upper = String(status || '').toUpperCase()
 	if (upper === 'COMPLETED' || upper === 'COMPLETE' || upper === 'VISIT_COMPLETED') return 'completed'
-	if (['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'CANCELLED', 'EXPIRED', 'FAILED'].includes(upper)) return 'cancelled'
+	if (['CANCELLED_BY_PATIENT', 'CANCELLED_BY_PROVIDER', 'CANCELLED', 'EXPIRED', 'FAILED', 'NO_SHOW'].includes(upper))
+		return 'cancelled'
 	return 'upcoming'
 }
 
@@ -1519,13 +1518,10 @@ export const cancelCareRequestPatientBackend = async (
 	requestId: string,
 	reason: string = 'Cancelled by patient'
 ): Promise<boolean> => {
-	try {
-		await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PATIENT(requestId), { reason })
-		return true
-	} catch (error) {
-		console.log('[ancillaryService] Cancelled request:', requestId)
-		return true
-	}
+	// A failed cancel must reach the caller (it shows its own message): answering "cancelled" here would send the patient
+	// away from a request that is still open. skipGlobalError: the caller's toast is the message.
+	await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PATIENT(requestId), { reason }, { skipGlobalError: true })
+	return true
 }
 
 export const fetchProviderStatusBackend = async (): Promise<{
@@ -1615,10 +1611,8 @@ export interface AncillaryProfileBackendResponse {
 export const fetchProviderProfile = async (): Promise<AncillaryProfileBackendResponse | null> => {
 	try {
 		const res = await ApiService.get<any>(API_ENDPOINTS.ANCILLARY.PROFILE)
-		console.log('PROFILE endpoint =', API_ENDPOINTS.ANCILLARY.PROFILE)
 		const data = res.data?.data || res.data
 		if (data) {
-			console.log('[fetchProviderProfile] Provider Profile fetched:', data)
 			return data
 		}
 		return null
@@ -1653,20 +1647,14 @@ export const updateProviderProfileBackend = async (payload: {
 	avatar_s3_key?: string
 }): Promise<boolean> => {
 	try {
-		console.log('[Ancillary Profile] FINAL UPDATE PAYLOAD:', JSON.stringify(payload, null, 2))
 		const res = await ApiService.put(API_ENDPOINTS.ANCILLARY.PROFILE, payload)
-		console.log('[Ancillary Profile] UPDATE RESPONSE:', JSON.stringify(res?.data || res, null, 2))
 		return true
 	} catch (error: any) {
 		console.error('[PROFILE SAVE] error:', error)
 		console.error('[PROFILE SAVE] status:', error?.response?.status)
-		console.error('[PROFILE SAVE] response:', error?.response?.data)
-		console.error('[PROFILE SAVE] request:', error?.config?.data)
 		console.error('[PROFILE SAVE] URL:', error?.config?.url)
 		console.error('[Ancillary Profile] Backend update failed:', error)
 		console.error('[Ancillary Profile] Status:', error?.response?.status)
-		console.error('[Ancillary Profile] Response:', error?.response?.data)
-		console.error('[Ancillary Profile] Request:', error?.config?.data)
 		throw error
 	}
 }

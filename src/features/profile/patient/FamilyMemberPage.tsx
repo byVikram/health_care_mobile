@@ -45,6 +45,7 @@ import {
 } from './components/HealthFields'
 import {
 	FAMILY_RELATION_OPTIONS,
+	canonicalValue,
 	GENDER_OPTIONS,
 	isValidIndianMobile,
 	relationLabel,
@@ -312,9 +313,11 @@ export default function FamilyMemberPage() {
 							<AppSelect
 								{...FORM_SELECT_PROPS}
 								options={withCurrent(FAMILY_RELATION_OPTIONS, draft.relation)}
-								value={draft.relation}
+								value={canonicalValue(FAMILY_RELATION_OPTIONS, draft.relation)}
 								onSelect={(v) => set('relation', v)}
 								placeholder="Select relationship"
+								presentation="sheet"
+								sheetTitle="Relationship to you"
 							/>
 						</AppFormField>
 						<AppFormField label="Gender" required errorText={errors.gender}>
@@ -324,6 +327,8 @@ export default function FamilyMemberPage() {
 								value={draft.gender}
 								onSelect={(v) => set('gender', v)}
 								placeholder="Select gender"
+								presentation="sheet"
+								sheetTitle="Gender"
 							/>
 						</AppFormField>
 						<AppFormField label="Date of birth" required errorText={errors.dob}>
@@ -362,6 +367,7 @@ export default function FamilyMemberPage() {
 							description="Aadhaar, passport or birth certificate for children"
 							status="missing"
 							optional
+							hideIcon
 							onUpload={() => showComingSoon('Document upload will be available soon')}
 						/>
 					</AppFormCard>

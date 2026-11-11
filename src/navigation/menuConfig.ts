@@ -54,6 +54,29 @@ const row = (key: string, label: string, icon: string, group: string | null = nu
 const HELP = row('help', 'Help & Support', 'help')
 const SETTINGS = row('settings', 'Settings', 'settings')
 
+/**
+ * Sidebar rows the APP adds on its own, because the backend menu does not list them yet. `after` is the key of the row it
+ * follows (it goes to the end of the list when that row is missing). Once the row exists in the backend's navigation tables
+ * (navigation_items + navigation_entries), delete the entry here: a key the server already sends is never added twice, so
+ * leaving it does no harm.
+ */
+export const CLIENT_SIDEBAR_ADDITIONS: Partial<Record<MenuRole, { after: string; item: NavSidebarItem }[]>> = {
+	patient: [
+		{ after: 'treatment_history', item: row('medical_records', 'Medical records', 'medical-records', 'HEALTH') },
+	],
+}
+
+/** The sidebar with the app's own rows added where the list lacks them. */
+export function withClientSidebarRows(sidebar: NavSidebarItem[], role: MenuRole): NavSidebarItem[] {
+	const result = [...sidebar]
+	for (const { after, item } of CLIENT_SIDEBAR_ADDITIONS[role] ?? []) {
+		if (result.some((existing) => existing.key === item.key)) continue
+		const index = result.findIndex((existing) => existing.key === after)
+		result.splice(index === -1 ? result.length : index + 1, 0, item)
+	}
+	return result
+}
+
 export const DEFAULT_MENU: Record<MenuRole, NavigationConfig> = {
 	patient: {
 		bottomTabs: [

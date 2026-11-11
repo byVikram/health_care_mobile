@@ -171,7 +171,29 @@ export interface ProviderVisitUpdate {
 	created_at: string | null
 }
 
+/**
+ * Arrival and the waiting period (backend visit_service.arrival_block). The wait starts only when the provider taps
+ * "I have arrived"; `near_address` is a hint from the last location ping to offer that button (null without a ping).
+ */
+export interface ProviderVisitArrival {
+	can_mark_arrived: boolean
+	near_address: boolean | null
+	distance_to_address_m: number | null
+	max_distance_m: number
+	arrived_at: string | null
+	/** False while the no-show policy is off: the visit screen then behaves as before. */
+	no_show_enabled: boolean
+	wait_minutes: number
+	/** ISO time from which the patient may be reported; null until arrival. */
+	wait_ends_at: string | null
+	minutes_left: number | null
+	can_report_no_show: boolean
+	reported_no_show: boolean
+}
+
 export interface ProviderVisitDetail extends Omit<ProviderVisitSummary, 'patient'> {
+	/** Absent from an older backend. */
+	arrival?: ProviderVisitArrival
 	en_route_at: string | null
 	started_at: string | null
 	completed_at: string | null
@@ -237,6 +259,28 @@ export const markVisitOnTheWay = async (visitId: string, shareLocation: boolean)
 	const res = await ApiService.post<Envelope<ProviderVisitDetail>>(
 		API_ENDPOINTS.ANCILLARY.PROVIDER_VISIT_ON_THE_WAY(visitId),
 		{ share_location: shareLocation }
+	)
+	return res.data.data
+}
+
+/** "I have arrived": sends the phone's location (the server checks it is near the address) and starts the wait. */
+export const markVisitArrived = async (
+	visitId: string,
+	latitude: number,
+	longitude: number
+): Promise<ProviderVisitDetail> => {
+	const res = await ApiService.post<Envelope<ProviderVisitDetail>>(
+		API_ENDPOINTS.ANCILLARY.PROVIDER_VISIT_ARRIVED(visitId),
+		{ latitude, longitude }
+	)
+	return res.data.data
+}
+
+/** The patient was not available after the wait: the visit is closed as a no-show and the patient is asked what happened. */
+export const reportPatientNotAvailable = async (visitId: string): Promise<ProviderVisitDetail> => {
+	const res = await ApiService.post<Envelope<ProviderVisitDetail>>(
+		API_ENDPOINTS.ANCILLARY.PROVIDER_VISIT_NO_SHOW(visitId),
+		{}
 	)
 	return res.data.data
 }

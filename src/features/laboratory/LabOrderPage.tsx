@@ -45,6 +45,7 @@ import { APP_COLORS } from '../../config/theme'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import { addToCalendar } from '../../utils/calendar'
+import { openWebUrl } from '../../utils/safeLinking'
 import { showComingSoon } from '../../utils/toast'
 import { contactSupport, useAppConfig } from '../dashboard/useHomeChromeData'
 import CheckInQrSheet from '../appointment/components/patient-details/CheckInQrSheet'
@@ -163,6 +164,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 		<View style={styles.screen}>
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title="Lab order"
 				subtitle={`Order ${order.id}`}
 				onBack={() => navigation.goBack()}
@@ -305,6 +307,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 				{/* Details */}
 				<AppSection marginTop={0} title="Details" titleSize="sm" gap={0}>
 					<AppDetailRow
+						style={styles.detailRow}
 						icon="calendar-month-outline"
 						label={isHome ? 'SAMPLE PICKUP' : 'LAB VISIT'}
 						value={whenLabel}
@@ -336,6 +339,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 					)}
 					{isHome && (
 						<AppDetailRow
+							style={styles.detailRow}
 							icon="account-outline"
 							label="PHLEBOTOMIST"
 							value={order.phleboName || 'Not assigned yet'}
@@ -348,12 +352,13 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 								order.phleboNumber && live
 									? { label: 'Call', icon: 'phone-outline', onPress: () => void Linking.openURL(`tel:${order.phleboNumber}`) }
 									: order.trackingLink && live
-										? { label: 'Track', onPress: () => void Linking.openURL(order.trackingLink as string) }
+										? { label: 'Track', onPress: () => void openWebUrl(order.trackingLink).catch(() => {}) }
 										: undefined
 							}
 						/>
 					)}
 					<AppDetailRow
+						style={styles.detailRow}
 						icon="account-outline"
 						label="PATIENT"
 						value={order.patientName}
@@ -361,6 +366,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 					/>
 					{isHome && (
 						<AppDetailRow
+							style={styles.detailRow}
 							icon="home-outline"
 							label="COLLECTION ADDRESS"
 							value={order.addressTitle}
@@ -369,6 +375,7 @@ function LabOrderContent({ order, onChange, refreshing, onRefresh }: ContentProp
 						/>
 					)}
 					<AppDetailRow
+						style={styles.detailRow}
 						icon="clipboard-text-outline"
 						label="ORDER ID"
 						value={order.id}
@@ -632,6 +639,8 @@ export default function LabOrderPage() {
 
 const styles = StyleSheet.create({
 	screen: { flex: 1, backgroundColor: APP_COLORS.pageBg },
+	// The detail rows have no padding of their own: a little air above and below, so the lab and phlebotomist rows are not crowded.
+	detailRow: { paddingVertical: 6 },
 	labRow: {
 		flexDirection: 'row',
 		alignItems: 'center',

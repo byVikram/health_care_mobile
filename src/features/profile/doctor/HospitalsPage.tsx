@@ -198,6 +198,8 @@ export default function HospitalsPage() {
 							options={withValue(FOLLOW_UP_OPTIONS, draft.followUp, 'days')}
 							value={draft.followUp}
 							onSelect={(v) => set('followUp', v)}
+							presentation="sheet"
+							sheetTitle="Free follow-up within"
 						/>
 					</AppFormField>
 					<AppFormField label="Patients can reschedule until">
@@ -206,6 +208,8 @@ export default function HospitalsPage() {
 							options={withValue(RESCHEDULE_OPTIONS, draft.reschedule, 'hours before')}
 							value={draft.reschedule}
 							onSelect={(v) => set('reschedule', v)}
+							presentation="sheet"
+							sheetTitle="Patients can reschedule until"
 						/>
 					</AppFormField>
 					<AppFormField label="Pay at clinic">
@@ -214,6 +218,8 @@ export default function HospitalsPage() {
 							options={PAY_OPTIONS}
 							value={draft.payAtClinic}
 							onSelect={(v) => set('payAtClinic', v)}
+							presentation="sheet"
+							sheetTitle="Pay at clinic"
 						/>
 					</AppFormField>
 				</AppFormCard>

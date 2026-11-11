@@ -4,11 +4,11 @@
 // title / subtitle, trailing node), a perforated AppDashedDivider (variant 'ticket'), a 2-column field grid
 // (WHEN / WHERE / BOOKING ID …), an optional "For {patient}" row and an optional actions row.
 //   tint 'mint'  — mint card, mintAccent perforation (Payment, sits inside a white AppSection)
-//   tint 'white' — white card, divider-coloured perforation (Confirmed, floats over the page with CARD_SHADOW)
+//   tint 'white' — white card, divider-coloured perforation (Confirmed, floats over the page with SOFT_CARD_SHADOW)
 
 import React from 'react'
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
-import { APP_COLORS, CARD_SHADOW, TONES } from '../../../config/theme'
+import { APP_COLORS, SOFT_CARD_SHADOW, TONES } from '../../../config/theme'
 import AppAvatar from '../display/AppAvatar'
 import { AppDashedDivider } from '../display/AppDashedDivider'
 
@@ -51,7 +51,7 @@ export type AppTicketCardProps = {
 	footer?: React.ReactNode
 	/** Defaults to 'white'. */
 	tint?: 'mint' | 'white'
-	/** Adds CARD_SHADOW. Defaults to false. */
+	/** Adds SOFT_CARD_SHADOW. Defaults to false. */
 	elevated?: boolean
 	/** Colour of the surface behind the card (fills the perforation cut-outs). Defaults to APP_COLORS.pageBg. */
 	cutoutColor?: string
@@ -78,7 +78,7 @@ export function AppTicketCard({
 	return (
 		// Shadow lives on the outer view; the inner one clips the perforation cut-outs (overflow hidden
 		// would also clip the iOS shadow).
-		<View style={[styles.card, { backgroundColor: bg }, elevated && CARD_SHADOW, style]}>
+		<View style={[styles.card, { backgroundColor: bg }, elevated && SOFT_CARD_SHADOW, style]}>
 			<View style={styles.inner}>
 				<View style={styles.topRow}>
 					{header.leading}

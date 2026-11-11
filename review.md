@@ -200,3 +200,22 @@ Behaviour on a physical device (low-end Android, iOS); Android manifest/cleartex
 ## 10. Correctness follow-ups (done, uncommitted at time of writing)
 
 `DashboardPage` doctor fetches have a stale-response guard; ~15 `.then()` chains in effects converted to async/await with cancel guards; `DoctorHomeScreen` counts pending requests via `meta.total` (limit 1) instead of downloading 100 rows; swallowed errors now commented, toasted or logged; `handleCancelRequestWithReason` resets `isCancelling`. Open: `cancelCareRequestPatientBackend` catches every error and returns `true`, so a failed cancel still looks successful.
+
+## 11. Tooling and developer experience (done, uncommitted at time of writing)
+
+| Item | Change |
+|---|---|
+| Tests | Set up (Jest + `jest-expo` + React Native Testing Library, 58 unit tests) and then **removed again on request**: the packages, `jest.config.js`, `jest.setup.js`, the `__tests__` folders, the `test` scripts, the CI test step and the `jest` types in tsconfig. The two old wallet "tests" (they checked an inline copy of a function) stay deleted. Still open: a test runner. |
+| Scripts | `typecheck`, `lint`, `format`, `format:check`, `prepare`. |
+| Lint | ESLint 9 flat config on `eslint-config-expo`. 0 errors; about 700 warnings are the backlog (the React-Compiler-era hooks rules, unused vars, import style). One real finding fixed: `useCurrent` in `LocationSheet` was named like a hook. |
+| Hooks | husky + lint-staged: pre-commit runs ESLint on staged `.ts` / `.tsx`. |
+| CI | `.github/workflows/mobile-ci.yml`: typecheck and lint on push and pull request. |
+| Build | `eas.json` (`development`, `preview`, `production`). |
+| Imports | `@/*` alias for `src/*` (tsconfig `paths`); existing imports not migrated. |
+| Prettier | `endOfLine: auto` so Windows (CRLF) and CI (LF) agree. |
+| Crash reporting | `@react-native-firebase/crashlytics` 26.0.0 (matches the installed Firebase packages) + plugin in `app.json`; `services/crashReporting.ts` reports from the root and per-screen error boundaries and from the global JS error handler. Needs a native rebuild; until then it is a quiet no-op. |
+| Error boundaries | One `ErrorBoundary` per screen via `screenLayout` on the stack and the tab navigator. |
+| Service layering | `DoctorHospitalDropdown` and `AccountPage` now go through `ApiService`. The other `fetch` / `axios` sites are intentional and commented: signed file link (`ConsultationPage`), third-party geocoder (`locationService`, `LocationScreen`), local file read (`avatarService`); `useVisitPatientAddress`, `RegisterForm` and `labService` only use `axios.isAxiosError`. |
+| Root clutter | `metro_restart_log.txt` deleted (referenced only in notes). `gemini.md` kept (it is the Gemini / Antigravity context file). The design HTML files were left where they are: code comments cite `doctor_consultation.html`, and they are in active use. |
+
+Not done: the 4,000-odd hardcoded hex colours, the 13 files over 1,000 lines and component / screen tests (P2); dependency tidy-up (`@react-native/metro-config` caret, duplicate vector-icon packages, `react-native-web`) needs a decision on web support first.

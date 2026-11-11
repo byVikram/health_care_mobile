@@ -5,6 +5,7 @@
 import React, { useState } from 'react'
 import {
 	AppChipGroup,
+	AppChipPicker,
 	AppEditableList,
 	AppFormCard,
 	AppFormField,
@@ -22,6 +23,10 @@ import {
 	isValidIndianMobile,
 	withCurrent,
 } from '../../config/profileOptions'
+
+// The picker takes {label, value} options; these lists are plain strings.
+const ALLERGY_CHOICES = ALLERGY_OPTIONS.map((o) => ({ value: o, label: o }))
+const CONDITION_CHOICES = CONDITION_OPTIONS.map((o) => ({ value: o, label: o }))
 
 export interface HealthValues {
 	bloodGroup: string
@@ -175,6 +180,8 @@ export function HealthFields({ value, onChange, ownerFields = false, healthHelpe
 						value={value.bloodGroup}
 						onSelect={(v) => onChange({ bloodGroup: v })}
 						placeholder="Select blood group"
+						presentation="sheet"
+						sheetTitle="Blood group"
 					/>
 				</AppFormField>
 				<AppFormField
@@ -193,42 +200,40 @@ export function HealthFields({ value, onChange, ownerFields = false, healthHelpe
 				/>
 				{!ownerFields && (
 					<>
-						<AppFormField label="Allergies">
-							<AppChipGroup
-								options={ALLERGY_OPTIONS}
-								values={value.allergies}
-								onChange={(v) => onChange({ allergies: v })}
-							/>
-						</AppFormField>
-						<AppFormField label="Long-term conditions">
-							<AppChipGroup
-								options={CONDITION_OPTIONS}
-								values={value.conditions}
-								onChange={(v) => onChange({ conditions: v })}
-							/>
-						</AppFormField>
+						<AppChipPicker
+							label="Allergies"
+							options={ALLERGY_CHOICES}
+							values={value.allergies}
+							onChange={(v) => onChange({ allergies: v })}
+							searchPlaceholder="Search allergies"
+						/>
+						<AppChipPicker
+							label="Long-term conditions"
+							options={CONDITION_CHOICES}
+							values={value.conditions}
+							onChange={(v) => onChange({ conditions: v })}
+							searchPlaceholder="Search conditions"
+						/>
 					</>
 				)}
 			</AppFormCard>
 
 			{ownerFields && (
 				<AppFormCard title="Allergies & conditions">
-					<AppFormField label="Allergies">
-						<AppChipGroup
-							options={ALLERGY_OPTIONS}
-							values={value.allergies}
-							onChange={(v) => onChange({ allergies: v })}
-							accessibilityLabel="Allergies"
-						/>
-					</AppFormField>
-					<AppFormField label="Long-term conditions">
-						<AppChipGroup
-							options={CONDITION_OPTIONS}
-							values={value.conditions}
-							onChange={(v) => onChange({ conditions: v })}
-							accessibilityLabel="Long-term conditions"
-						/>
-					</AppFormField>
+					<AppChipPicker
+						label="Allergies"
+						options={ALLERGY_CHOICES}
+						values={value.allergies}
+						onChange={(v) => onChange({ allergies: v })}
+						searchPlaceholder="Search allergies"
+					/>
+					<AppChipPicker
+						label="Long-term conditions"
+						options={CONDITION_CHOICES}
+						values={value.conditions}
+						onChange={(v) => onChange({ conditions: v })}
+						searchPlaceholder="Search conditions"
+					/>
 				</AppFormCard>
 			)}
 

@@ -48,6 +48,13 @@ export type AppAddressDraft = {
 /** Prefill returned by `onUseCurrentLocation` (any subset of the form). */
 export type AppAddressPrefill = Partial<Omit<AppAddressDraft, 'label'>>
 
+/**
+ * What `onPickCurrentLocation` found:
+ *   picked  -- the position became a saved address and is selected (the sheet closes);
+ *   error   -- nothing was picked; `message` is shown in the sheet (permission off, GPS off, no full address...).
+ */
+export type CurrentLocationResult = { kind: 'picked' } | { kind: 'error'; message: string }
+
 export const ADDRESS_TAGS = ['Home', 'Work', 'Family', 'Other']
 
 export type AppAddressSheetProps = {
@@ -70,6 +77,8 @@ export type AppAddressSheetProps = {
 	onSaveNew?: (draft: AppAddressDraft) => Promise<boolean> | boolean
 	/** GPS lookup for "Use my current location"; resolve null when it failed (the caller shows why). */
 	onUseCurrentLocation?: () => Promise<AppAddressPrefill | null>
+	/** Adds a "Current location" row to the list: one tap uses the device's position as the address. */
+	onPickCurrentLocation?: () => Promise<CurrentLocationResult>
 }
 
 const EMPTY_DRAFT: AppAddressDraft = {
@@ -133,15 +142,24 @@ export function AppAddressSheet({
 	emptyLabel = 'No saved addresses yet. Add the address for the visit.',
 	onSaveNew,
 	onUseCurrentLocation,
+	onPickCurrentLocation,
 }: AppAddressSheetProps) {
 	const [view, setView] = useState<'list' | 'add'>('list')
 	const [draft, setDraft] = useState<AppAddressDraft>(EMPTY_DRAFT)
 	const [saving, setSaving] = useState(false)
 	const [locating, setLocating] = useState(false)
+	const [picking, setPicking] = useState(false)
+	const [locationError, setLocationError] = useState<string | null>(null)
 
 	// Reset on open only, so the content doesn't flip while the sheet animates closed.
 	useEffect(() => {
-		if (visible) setView(addresses.length === 0 && !loading && !error && !!onSaveNew ? 'add' : 'list')
+		if (visible) {
+			setLocationError(null)
+			// with a current-location row the list is the better first view, even when nothing is saved yet
+			setView(
+				addresses.length === 0 && !loading && !error && !!onSaveNew && !onPickCurrentLocation ? 'add' : 'list'
+			)
+		}
 	}, [visible])
 
 	const set = (key: keyof AppAddressDraft) => (v: string) => setDraft((d) => ({ ...d, [key]: v }))
@@ -203,6 +221,22 @@ export function AppAddressSheet({
 		}
 	}
 
+	const handlePickCurrent = async () => {
+		if (!onPickCurrentLocation || picking) return
+		setPicking(true)
+		setLocationError(null)
+		try {
+			const result = await onPickCurrentLocation()
+			if (result.kind === 'picked') {
+				onClose()
+			} else {
+				setLocationError(result.message)
+			}
+		} finally {
+			setPicking(false)
+		}
+	}
+
 	const selected = addresses.find((a) => a.id === selectedId)
 
 	const listFooter = (
@@ -231,7 +265,7 @@ export function AppAddressSheet({
 		</AppButton>
 	)
 
-	const renderList = () => {
+	const renderSaved = () => {
 		if (loading) {
 			return (
 				<View style={styles.list} accessible accessibilityLabel="Loading saved addresses">
@@ -293,6 +327,43 @@ export function AppAddressSheet({
 			</View>
 		)
 	}
+
+	const renderList = () => (
+		<View>
+			{!!onPickCurrentLocation && (
+				<TouchableOpacity
+					onPress={handlePickCurrent}
+					disabled={picking}
+					activeOpacity={0.8}
+					accessibilityRole="button"
+					accessibilityLabel="Use current location"
+					accessibilityState={{ busy: picking }}
+					style={styles.row}
+				>
+					<View style={styles.tile}>
+						{picking ? (
+							<ActivityIndicator size="small" color={APP_COLORS.primary} />
+						) : (
+							<MaterialCommunityIcons name="crosshairs-gps" size={22} color={APP_COLORS.primary} />
+						)}
+					</View>
+					<View style={styles.rowText}>
+						<Text style={styles.rowTitle}>Current location</Text>
+						<Text style={styles.rowSub}>
+							{picking ? 'Finding your location…' : "Use your phone's GPS position"}
+						</Text>
+					</View>
+					<MaterialCommunityIcons name="chevron-right" size={22} color={APP_COLORS.inkMuted} />
+				</TouchableOpacity>
+			)}
+			{!!locationError && (
+				<Text style={styles.locationError} accessibilityRole="alert">
+					{locationError}
+				</Text>
+			)}
+			{renderSaved()}
+		</View>
+	)
 
 	const renderAdd = () => (
 		<View style={styles.form}>
@@ -419,6 +490,7 @@ const styles = StyleSheet.create({
 	rowText: { flex: 1, minWidth: 0 },
 	rowTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: APP_COLORS.ink },
 	rowSub: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
+	locationError: { fontSize: 12, lineHeight: 17, fontWeight: '600', color: APP_COLORS.danger, paddingVertical: 8 },
 	stateBox: { alignItems: 'center', gap: 8, paddingVertical: 20, paddingHorizontal: 8 },
 	stateText: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted, textAlign: 'center' },
 	footer: { gap: 8 },

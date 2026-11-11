@@ -178,14 +178,17 @@ export default function AvailabilityPage() {
 
 	const placeName = (id: string) => places.find((p) => p.id === id)?.name ?? 'Clinic'
 
-	/** Doctor: the same day's ranges at other places / the other mode, for clash checks. */
+	/**
+	 * Doctor: the same day's ranges of the SAME kind at other places, for clash checks (two clinics at once). Video and
+	 * in-clinic hours may share a time: a booking of either one takes that time for both.
+	 */
 	const othersFor = useCallback(
 		(pid: string, m: DoctorMode, d: number): { place: string; range: TimeRange }[] => {
 			if (!isDoctor || !draft) return []
 			const out: { place: string; range: TimeRange }[] = []
 			for (const [otherId, modes] of Object.entries(draft.weeks)) {
-				for (const otherMode of ['clinic', 'video'] as DoctorMode[]) {
-					if (otherId === pid && otherMode === m) continue
+				for (const otherMode of [m]) {
+					if (otherId === pid) continue
 					const label = `${placeName(otherId).split(',')[0]}${otherMode === 'video' ? ' (video)' : ''}`
 					for (const range of dayRanges(modes[otherMode][d])) out.push({ place: label, range })
 				}
@@ -397,13 +400,22 @@ export default function AvailabilityPage() {
 					<>
 						{isDoctor && (
 							<View style={styles.placeCard}>
-								<Text style={styles.eyebrow}>SCHEDULE FOR</Text>
+								<AppSegmentedControl
+									options={MODE_OPTIONS}
+									value={mode}
+									onChange={setMode}
+									accessibilityLabel="Appointment type"
+								/>
+								<Text style={[styles.eyebrow, mode === 'video' && styles.placeOff]}>SCHEDULE FOR</Text>
 								<TouchableOpacity
-									style={styles.placeRow}
+									style={[styles.placeRow, mode === 'video' && styles.placeRowOff]}
 									onPress={() => setPickerOpen(true)}
-									disabled={places.length < 2}
+									// Video calls aren't tied to a clinic, so the card is greyed out and can't be changed there.
+									disabled={places.length < 2 || mode === 'video'}
 									accessibilityRole="button"
+									accessibilityState={{ disabled: places.length < 2 || mode === 'video' }}
 									accessibilityLabel={`Schedule for ${placeName(placeId)}. Change clinic`}
+									accessibilityHint={mode === 'video' ? 'Not used for video calls' : undefined}
 								>
 									<MaterialCommunityIcons
 										name="hospital-building"
@@ -415,12 +427,6 @@ export default function AvailabilityPage() {
 									</Text>
 									{places.length > 1 && <Text style={styles.change}>Change</Text>}
 								</TouchableOpacity>
-								<AppSegmentedControl
-									options={MODE_OPTIONS}
-									value={mode}
-									onChange={setMode}
-									accessibilityLabel="Appointment type"
-								/>
 							</View>
 						)}
 
@@ -576,6 +582,14 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		borderWidth: 1,
 		borderColor: APP_COLORS.divider,
+	},
+	// Video mode: the clinic doesn't apply, so the card reads as unavailable.
+	placeOff: {
+		opacity: 0.45,
+	},
+	placeRowOff: {
+		opacity: 0.45,
+		backgroundColor: APP_COLORS.pageBg,
 	},
 	placeName: {
 		flex: 1,

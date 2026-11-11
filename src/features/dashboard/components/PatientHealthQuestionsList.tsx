@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndi
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useNavigation, useRoute } from '@react-navigation/native'
 
-import { AppInput } from '../../../components/common'
+import { AppSearchBar } from '../../../components/common'
 import { listHealthQuestions, PatientQuestion } from '../../../services/qaService'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppNavigationParamList } from '../../../navigation/types'
@@ -96,28 +96,7 @@ export default function PatientHealthQuestionsList({ showViewAll = true, itemLim
 
 			{/* Card */}
 			<View style={[styles.container, isTablet && styles.tabletContainer]}>
-				<View style={styles.searchRow}>
-					<View style={styles.searchInputWrap}>
-						<AppInput
-							isSearch
-							showMicrophone
-							value={searchQuery}
-							onChangeText={setSearchQuery}
-							placeholder="Search questions or symptoms..."
-							placeholderTextColor="#98a1aa"
-							containerStyle={styles.searchInputContainer}
-							style={styles.searchInput}
-							contentStyle={styles.searchInputContent}
-							outlineStyle={styles.searchInputOutline}
-							outlineColor="#2e7b7d"
-							activeOutlineColor="#2e7b7d"
-							textColor="#1b2d3c"
-							autoCorrect={false}
-							returnKeyType="search"
-							noMargin
-						/>
-					</View>
-				</View>
+				<AppSearchBar context="healthQuestions" value={searchQuery} onChangeText={setSearchQuery} style={styles.searchBar} />
 
 				{loading ? (
 					<ActivityIndicator size="small" color="#0c7c7c" style={{ marginVertical: 20 }} />
@@ -182,29 +161,8 @@ const styles = StyleSheet.create({
 		color: '#0c7c7c',
 		fontWeight: '600',
 	},
-	searchRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
+	searchBar: {
 		marginBottom: 12,
-	},
-	searchInputWrap: {
-		flex: 1,
-	},
-	searchInputContainer: {
-		width: '100%',
-	},
-	searchInput: {
-		backgroundColor: '#ffffff',
-	},
-	searchInputContent: {
-		height: 48,
-		minHeight: 48,
-		paddingVertical: 0,
-		fontSize: 14,
-	},
-	searchInputOutline: {
-		borderRadius: 12,
 	},
 	card: {
 		paddingVertical: 12,

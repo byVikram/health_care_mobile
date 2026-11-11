@@ -8,9 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import axios from 'axios'
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { secureStorage } from '../../../utils/secureStorage'
+import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { useAuth } from '../../../context/AuthContext'
 import AppBottomSheet from '../layout/AppBottomSheet'
@@ -39,15 +37,8 @@ export default function DoctorHospitalDropdown() {
   const fetchHospitals = async () => {
     try {
       setLoading(true)
-      const token = await secureStorage.getItem('access_token')
-      if (!token) return
-
-      const response = await axios.get(API_ENDPOINTS.DOCTORS.HOSPITALS, {
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      // ApiService adds the sign-in token, refreshes it when it has expired and applies the shared timeout.
+      const response = await ApiService.get<any>(API_ENDPOINTS.DOCTORS.HOSPITALS)
 
       if (response.data?.success) {
         const formatted: HospitalItem[] = response.data.data.map((item: any) => ({

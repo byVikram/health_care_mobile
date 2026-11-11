@@ -12,12 +12,10 @@ import {
 	type ImageSourcePropType,
 } from 'react-native'
 import { BlurView } from 'expo-blur'
-import { AppIconTile, AppPathIcon, AppTypography } from '../../../components/common'
-import { APP_COLORS, TONES, type ToneKey } from '../../../config/theme'
+import { AppIconTile, AppTypography } from '../../../components/common'
+import { APP_COLORS } from '../../../config/theme'
 import { isPatientRole } from '../../../constants/constants'
 import { useHomeSheets } from '../HomeSheetsContext'
-import { HOME_ICONS } from '../homeTheme'
-import { HOME_CHROME_PATHS } from '../homeChromeIcons'
 import { ROUTES } from '../../../navigation/routes'
 import { navigate as navigateRoot } from '../../../navigation/navigationService'
 
@@ -30,11 +28,15 @@ import PharmacyIcon from '../../../assets/quick-services/pharmacy.svg'
 import LabIcon from '../../../assets/quick-services/lab.svg'
 import RadiologyIcon from '../../../assets/quick-services/radiology.svg'
 import AncilaryIcon from '../../../assets/quick-services/ancilary.svg'
+import HomePharmacyIcon from '../../../assets/quick-services/home/pharmacy.png'
+import HomeLabIcon from '../../../assets/quick-services/home/lab-tests.png'
+import HomeRadiologyIcon from '../../../assets/quick-services/home/radiology.png'
+import HomeAncillaryIcon from '../../../assets/quick-services/home/ancillary.png'
 import AlliedIcon from '../../../assets/quick-services/allied.png'
 import TherapeuticIcon from '../../../assets/quick-services/therapeutic.png'
 import ScanTypeSelectorModal from '../../radiology/components/ScanTypeSelectorModal'
 
-import AlliedSelectorModal from './AlliedSelcetorModel'
+import AlliedSelectorModal from './AlliedSelectorModal'
 import TherapeuticSelector from './TherapeuticSelector'
 
 type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'ancillary' | 'nurse' | null
@@ -56,18 +58,18 @@ export default function QuickServicesSection({ role }: { role: Role }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Patient Home quick actions ("1 · Home"): five 56px tone tiles. "Ancillary care" opens the ancillary
+// Patient Home quick actions ("1 · Home"): four 56px tone tiles. "Ancillary care" opens the ancillary
 // services sheet (HomeSheetsContext); "More" lives in the bottom bar; Radiology keeps the scan-type picker.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type QuickActionKey = 'appointments' | 'pharmacy' | 'lab' | 'radiology' | 'ancillary'
+type QuickActionKey = 'pharmacy' | 'lab' | 'radiology' | 'ancillary'
 
-const QUICK_ACTIONS: { key: QuickActionKey; label: string; tone: ToneKey; icon: string }[] = [
-	{ key: 'appointments', label: 'Appointments', tone: 'sky', icon: HOME_ICONS.calendar },
-	{ key: 'pharmacy', label: 'Pharmacy', tone: 'peach', icon: HOME_ICONS.pill },
-	{ key: 'lab', label: 'Lab tests', tone: 'mint', icon: HOME_ICONS.flask },
-	{ key: 'radiology', label: 'Radiology', tone: 'lilac', icon: HOME_ICONS.scan },
-	{ key: 'ancillary', label: 'Ancillary care', tone: 'sand', icon: HOME_CHROME_PATHS.ancillaryCare },
+// Tile colours and artwork from the "1 · Home — new icons" design.
+const QUICK_ACTIONS: { key: QuickActionKey; label: string; bg: string; image: ImageSourcePropType }[] = [
+	{ key: 'pharmacy', label: 'Pharmacy', bg: '#FDEEDC', image: HomePharmacyIcon },
+	{ key: 'lab', label: 'Lab tests', bg: '#F6E4F1', image: HomeLabIcon },
+	{ key: 'radiology', label: 'Radiology', bg: '#E3E9F8', image: HomeRadiologyIcon },
+	{ key: 'ancillary', label: 'Ancillary care', bg: '#F0F2DC', image: HomeAncillaryIcon },
 ]
 
 function PatientQuickActions() {
@@ -75,8 +77,7 @@ function PatientQuickActions() {
 	const [showScanTypeModal, setShowScanTypeModal] = useState(false)
 
 	const handlePress = (key: QuickActionKey) => {
-		if (key === 'appointments') navigateRoot(ROUTES.STACK.APPOINTMENTS)
-		else if (key === 'pharmacy') navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
+		if (key === 'pharmacy') navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
 		else if (key === 'lab') navigateRoot(ROUTES.STACK.LABORATORY_LIST)
 		else if (key === 'radiology') setShowScanTypeModal(true)
 		else open('ancillary')
@@ -94,10 +95,10 @@ function PatientQuickActions() {
 					accessibilityLabel={a.label}
 					accessibilityHint={a.key === 'ancillary' ? 'Opens ancillary care services' : undefined}
 				>
-					<AppIconTile size={56} radius={18} tone={a.tone}>
-						<AppPathIcon d={a.icon} size={26} strokeWidth={2} color={TONES[a.tone].ink} />
+					<AppIconTile size={56} radius={18} backgroundColor={a.bg}>
+						<Image source={a.image} style={patientStyles.icon} resizeMode="contain" />
 					</AppIconTile>
-					<Text style={patientStyles.label} numberOfLines={2}>
+					<Text style={patientStyles.label} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
 						{a.label}
 					</Text>
 				</TouchableOpacity>
@@ -118,8 +119,8 @@ function PatientQuickActions() {
 const patientStyles = StyleSheet.create({
 	row: {
 		flexDirection: 'row',
-		paddingHorizontal: 12,
-		gap: 4,
+		paddingHorizontal: 8,
+		gap: 2,
 	},
 	item: {
 		flex: 1,
@@ -127,8 +128,13 @@ const patientStyles = StyleSheet.create({
 		alignItems: 'center',
 		gap: 6,
 	},
+	icon: {
+		width: 36,
+		height: 36,
+	},
+	// One line each: 11px fits "Ancillary care" in a quarter of a phone-width row, and smaller screens shrink it
 	label: {
-		fontSize: 12,
+		fontSize: 11,
 		lineHeight: 16,
 		fontWeight: '700',
 		color: APP_COLORS.ink,
@@ -258,7 +264,7 @@ function StaffQuickServices({ role }: { role: Role }) {
 
 	const handleServicePress = (title: string) => {
 		if (title === 'Appointment') {
-			navigateRoot(ROUTES.STACK.APPOINTMENTS)
+			navigateRoot(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL, params: { filter: 'doctor' } } as never) // the Bookings tab
 		} else if (title === 'Pharmacy') {
 			navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
 		} else if (title === 'Radiology') {

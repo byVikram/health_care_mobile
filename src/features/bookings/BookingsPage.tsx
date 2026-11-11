@@ -7,8 +7,8 @@
 // Taps and card actions go through bookingNavigation.ts (-> each vertical's existing detail screens).
 // Other screens deep-link here with `{ filter }` (side drawer): doctor -> Doctor, ancillary -> Ancillary,
 // lab -> Lab, medicine -> Pharmacy, radiology -> All (radiology isn't part of this list).
-// The old per-vertical lists (AppointmentList, ancillary MyBookingsPage, lab / pharmacy / radiology order lists)
-// stay registered as their own stack screens.
+// The old per-vertical lists (ancillary MyBookingsPage, lab / pharmacy / radiology order lists) stay registered as their own
+// stack screens. (The old doctor-appointments list screen is gone: a notification, like a tap here, opens AppointmentDetails.)
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -37,6 +37,7 @@ import Toast from 'react-native-toast-message'
 import {
 	AppBookingCard,
 	AppButton,
+	AppHeaderBackdrop,
 	AppCategoryTile,
 	AppIcon,
 	AppIconTile,
@@ -357,7 +358,7 @@ export default function BookingsPage() {
 			{isFocused && <StatusBar barStyle="light-content" backgroundColor={APP_COLORS.ink} />}
 
 			<View style={[styles.hero, { paddingTop: insets.top + 8 }]}>
-				<View style={styles.heroCircle} />
+				<AppHeaderBackdrop />
 				<View style={styles.heroRow}>
 					<Text style={styles.heroTitle} accessibilityRole="header">
 						My bookings
@@ -417,7 +418,14 @@ export default function BookingsPage() {
 			/>
 
 			{!!noShowItem && (
-				<NoShowReplySheet visible appointmentId={noShowItem.target.id} onClose={() => setNoShowItem(null)} />
+				<NoShowReplySheet
+					visible
+					appointmentId={noShowItem.category === 'ancillary' ? undefined : noShowItem.target.id}
+					visitId={
+						noShowItem.category === 'ancillary' ? (noShowItem.missed_visit_id ?? undefined) : undefined
+					}
+					onClose={() => setNoShowItem(null)}
+				/>
 			)}
 
 			{!!cancelItem && (
@@ -456,15 +464,6 @@ const styles = StyleSheet.create({
 		gap: 12,
 		borderBottomLeftRadius: 24,
 		borderBottomRightRadius: 24,
-	},
-	heroCircle: {
-		position: 'absolute',
-		right: -60,
-		top: -80,
-		width: 220,
-		height: 220,
-		borderRadius: 110,
-		backgroundColor: APP_COLORS.primary,
 	},
 	heroRow: {
 		minHeight: 52,

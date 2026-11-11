@@ -36,6 +36,8 @@ import { NavigationConfigProvider, useNavigationConfig } from './NavigationConfi
 import { DEFAULT_MENU, lookupKey, menuRoleFor, type NavTab } from './menuConfig'
 import { iconPath } from './menuIcons'
 
+import ErrorBoundary from '../components/common/feedback/ErrorBoundary'
+
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
 // Each persona has its own Home: patient, ancillary provider, and (pharmacy, radiology, anything else) the staff page.
@@ -473,6 +475,8 @@ function MainTabs() {
 	return (
 		<>
 			<Tab.Navigator
+				// A crash inside one tab shows the "Something went wrong" panel in that tab only; the tab bar still works.
+				screenLayout={({ children }) => <ErrorBoundary>{children}</ErrorBoundary>}
 				tabBar={(props) =>
 					floatingTabs.length === 0 ? (
 						<DockedTabBar {...props} onAncillaryPress={() => open('ancillary')} />

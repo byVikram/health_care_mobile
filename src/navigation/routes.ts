@@ -33,10 +33,8 @@ export const ROUTES = {
 		CONSULTATION: 'Consultation',
 		HEALTH_PROFILE: 'HealthProfile',
 		SETTINGS: 'Settings',
-		SCREEN_CAPTURE_TEST: 'ScreenCaptureTest',
 		DOCTOR_WELCOME: 'DoctorWelcome',
 		ACCOUNT: 'Account',
-		APPOINTMENTS: 'Appointments',
 		VIDEO_CONSULTATION: 'VideoConsultation',
 		RESCHEDULE_APPOINTMENT: 'RescheduleAppointment',
 		CANCEL_APPOINTMENT: 'CancelAppointment',
@@ -50,7 +48,6 @@ export const ROUTES = {
 		PATIENT_PAYMENT: 'PatientPayment',
 		PHARMACY_SEARCH_PAGE: 'PharmacySearchPage',
 		ORDER_LIST: 'OrderListPage',
-		ALL_SPECIALITIES: 'AllSpecialitiesPage',
 		ORDER_DETAILS: 'OrderDetails',
 		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
 
@@ -130,5 +127,6 @@ export const ROUTES = {
 		DOCTOR_FAVOURITES: 'DoctorFavourites',
 		PROVIDER_WORK: 'ProviderWork',
 		CARE_AI: 'CareAi',
+		MEDICAL_RECORDS: 'MedicalRecords',
 	},
 } as const

@@ -37,6 +37,8 @@ export type AppBottomSheetProps = {
 	footer?: React.ReactNode
 	/** Optional 13/18 muted line under the title. */
 	subtitle?: string
+	/** Optional node in the header, just before the close button (e.g. a "Clear all" text button). */
+	headerRight?: React.ReactNode
 	/** When set, shows a chevron-left button before the title (e.g. step back inside the sheet). */
 	onBack?: () => void
 	/** Accessibility label for the back button. Defaults to "Back". */
@@ -53,6 +55,8 @@ export type AppBottomSheetProps = {
 	 * e.g. while a submit is in flight. The parent can still close it via `visible`. Defaults to true.
 	 */
 	dismissible?: boolean
+	/** Hides the X in the header, for sheets that carry their own Done button. Defaults to true. */
+	showCloseButton?: boolean
 }
 
 // Releasing after dragging this far down (or flicking faster than this) closes the sheet.
@@ -80,11 +84,13 @@ export function AppBottomSheet({
 	scrollEnabled = true,
 	footer,
 	subtitle,
+	headerRight,
 	onBack,
 	backAccessibilityLabel = 'Back',
 	showHeaderDivider = true,
 	appearance = 'default',
 	dismissible = true,
+	showCloseButton = true,
 }: AppBottomSheetProps) {
 	const isModern = appearance === 'modern'
 	const insets = useSafeAreaInsets()
@@ -488,24 +494,28 @@ export function AppBottomSheet({
 								</AppTypography>
 							)}
 
-							<TouchableOpacity
-								style={[
-									styles.sheetCloseButton,
-									isModern && styles.sheetCloseButtonKh,
-									!dismissible && styles.sheetCloseButtonDisabled,
-								]}
-								onPress={requestClose}
-								disabled={!dismissible}
-								activeOpacity={0.82}
-								accessibilityRole="button"
-								accessibilityLabel="Close"
-							>
-								<MaterialCommunityIcons
-									name="close"
-									size={22}
-									color={isModern ? APP_COLORS.ink : '#64707d'}
-								/>
-							</TouchableOpacity>
+							{headerRight}
+
+							{showCloseButton && (
+								<TouchableOpacity
+									style={[
+										styles.sheetCloseButton,
+										isModern && styles.sheetCloseButtonKh,
+										!dismissible && styles.sheetCloseButtonDisabled,
+									]}
+									onPress={requestClose}
+									disabled={!dismissible}
+									activeOpacity={0.82}
+									accessibilityRole="button"
+									accessibilityLabel="Close"
+								>
+									<MaterialCommunityIcons
+										name="close"
+										size={22}
+										color={isModern ? APP_COLORS.ink : '#64707d'}
+									/>
+								</TouchableOpacity>
+							)}
 						</View>
 
 						{/* Scrollable Content or Custom View */}

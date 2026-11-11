@@ -2,12 +2,12 @@
 // profile; the heart removes them from favourites.
 
 import React, { useCallback, useMemo, useState } from 'react'
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import Toast from 'react-native-toast-message'
-import { AppAvatar, AppTag } from '../../../components/common'
+import { AppAvatar, AppSearchBar, AppTag } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
@@ -77,28 +77,7 @@ export default function FavouriteDoctorsPage() {
 			onRetry={load}
 		>
 			{doctors.length > 0 && (
-				<View style={styles.searchBox}>
-					<MaterialCommunityIcons name="magnify" size={20} color={APP_COLORS.inkMuted} />
-					<TextInput
-						style={styles.searchInput}
-						value={query}
-						onChangeText={setQuery}
-						placeholder="Search by name, speciality or location"
-						placeholderTextColor={APP_COLORS.inkMuted}
-						autoCorrect={false}
-						returnKeyType="search"
-						accessibilityLabel="Search favourite doctors"
-					/>
-					{query.length > 0 && (
-						<TouchableOpacity
-							onPress={() => setQuery('')}
-							accessibilityRole="button"
-							accessibilityLabel="Clear search"
-						>
-							<MaterialCommunityIcons name="close-circle" size={18} color={APP_COLORS.inkMuted} />
-						</TouchableOpacity>
-					)}
-				</View>
+				<AppSearchBar context="favouriteDoctors" value={query} onChangeText={setQuery} style={styles.searchBar} />
 			)}
 			{filtered.length ? (
 				<View style={styles.list}>
@@ -171,26 +150,9 @@ export default function FavouriteDoctorsPage() {
 }
 
 const styles = StyleSheet.create({
-	searchBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
+	searchBar: {
 		marginHorizontal: 16,
 		marginVertical: 12,
-		paddingHorizontal: 12,
-		height: 44,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: APP_COLORS.divider,
-		backgroundColor: APP_COLORS.surface,
-	},
-	searchInput: {
-		flex: 1,
-		fontSize: 15,
-		color: APP_COLORS.ink,
-		paddingVertical: 0,
-		// react-native-web draws a default focus outline on the inner input
-		...({ outlineStyle: 'none', outlineWidth: 0 } as object),
 	},
 	list: {
 		backgroundColor: APP_COLORS.surface,

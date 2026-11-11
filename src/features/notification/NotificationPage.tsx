@@ -6,26 +6,28 @@
 // critical alerts pinned to the top of their day with an URGENT chip, and a settings sheet (UI only).
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { RefreshControl, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NavigationProp } from '@react-navigation/native'
 
-import { AppPathIcon, AppSegmentedControl } from '../../components/common'
+import { AppPathIcon, AppSegmentedControl, AppSkeleton } from '../../components/common'
 import { APP_COLORS } from '../../config/theme'
 import { useAuth } from '../../context/AuthContext'
 import { DoctorScreenHeader } from '../doctor/dashboard/DoctorScreenHeader'
-import NotificationRow from './components/NotificationRow'
+import NotificationRow, { NotificationRowSkeleton } from './components/NotificationRow'
 import NotificationSettingsSheet from './components/NotificationSettingsSheet'
 import { categoriesForRole, OTHER_CATEGORY, resolveCategory } from './notificationCategories'
 import { getNotifications, markNotificationRead, type AppNotification } from '../referrals/referralService'
 import { markAllNotificationsRead } from '../../services/homeService'
-import { ROUTES } from '../../navigation/routes'
+import { onNotificationsChanged } from '../../services/notificationEvents'
+import { openNotificationTarget, type NavigateFn } from './openNotificationTarget'
 import type { AppStackParamList } from '../../navigation/types'
 
 const BELL = OTHER_CATEGORY.icon
 const SLIDERS = 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M16 4v4M10 10v4M18 16v4'
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const GROUP_LABELS = ['Today', 'Yesterday', 'Earlier'] as const
+const SKELETON_ROWS = 7
 
 const QUIET_HOURS_NOTE: Record<'doctor' | 'patient', string> = {
 	doctor: 'Critical lab values and red-flag questions still come through.',
@@ -77,6 +79,9 @@ export default function NotificationPage() {
 		load()
 	}, [load])
 
+	// A push that arrives while this screen is open adds its row at once.
+	useEffect(() => onNotificationsChanged(() => void load()), [load])
+
 	const live = notifications
 	const unreadCount = live.filter((n) => !n.is_read).length
 
@@ -116,32 +121,9 @@ export default function NotificationPage() {
 			console.log('[NotificationPage] failed to mark notification read', error)
 		}
 
-		// Navigate based on redirect_type/redirect_id set by the backend
-		const nav = navigation as NavigationProp<any>
-		if (notification.redirect_type === 'doctor_availability' && notification.redirect_id) {
-			const referralId = notification.reference_type === 'referral' ? notification.reference_id ?? undefined : undefined
-			navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: notification.redirect_id, referralId })
-		} else if (
-			(notification.redirect_type === 'appointment' || notification.redirect_type === 'appointment_detail') &&
-			notification.redirect_id
-		) {
-			navigation.navigate(ROUTES.STACK.APPOINTMENTS, { appointmentId: notification.redirect_id })
-		} else if (
-			(notification.redirect_type === 'ancillary_booking' || notification.redirect_type === 'ancillary') &&
-			notification.redirect_id
-		) {
-			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: notification.redirect_id })
-		} else if (notification.redirect_type === 'lab_order' && notification.redirect_id) {
-			navigation.navigate(ROUTES.STACK.LABORATORY_BOOKING_TRACKING, { orderId: notification.redirect_id })
-		} else if (notification.redirect_type === 'doctor_schedule') {
-			// This screen lives in the root stack, so reach the tab through its navigator (see SidebarLayout).
-			nav.navigate(ROUTES.MAIN.TABS, {
-				screen: ROUTES.MAIN.SCHEDULE,
-				params: { segment: notification.redirect_id === 'req' ? 'req' : 'today' },
-			})
-		} else if (notification.redirect_type === 'doctor_engage') {
-			nav.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.ENGAGE })
-		}
+		// Navigate based on redirect_type/redirect_id set by the backend (the same routing a tap on the push uses)
+		const open: NavigateFn = (name, params) => (navigation as NavigationProp<any>).navigate(name, params)
+		openNotificationTarget(open, notification)
 	}
 
 	return (
@@ -177,7 +159,14 @@ export default function NotificationPage() {
 			</DoctorScreenHeader>
 
 			{loading ? (
-				<ActivityIndicator style={{ marginTop: 40 }} color={APP_COLORS.primary} />
+				<View style={styles.listContent} accessibilityLabel="Loading notifications">
+					<View style={styles.groupHeader}>
+						<AppSkeleton width={64} height={14} color={APP_COLORS.divider} />
+					</View>
+					{Array.from({ length: SKELETON_ROWS }, (_, index) => (
+						<NotificationRowSkeleton key={`notification-skeleton-${index}`} divider={index < SKELETON_ROWS - 1} />
+					))}
+				</View>
 			) : (
 				<SectionList
 					sections={sections}

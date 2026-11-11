@@ -295,6 +295,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 			<StatusBar barStyle="light-content" backgroundColor={APP_COLORS.primary} />
 			<AppScreenHeader
 				variant="bar"
+				solid
 				title={isVideo ? 'Video appointment' : 'Appointment'}
 				subtitle={bookingId ? `Booking ${bookingId}` : undefined}
 				titleStyle={styles.headerTitle}

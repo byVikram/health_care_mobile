@@ -59,6 +59,8 @@ export const APP_COLORS = {
 	dotInactive: '#C9D6D7',
 	/** Neutral pill background (done / completed / archived states). */
 	neutralBg: '#F0F4F4',
+	/** Hairline border of the minimal-colour cards (speciality tiles, stat tiles, banners). */
+	cardBorder: '#E6ECEC',
 } as const
 
 export type ToneKey = 'mint' | 'sky' | 'lilac' | 'peach' | 'sand'
@@ -122,6 +124,15 @@ export const CARD_SHADOW = {
 	shadowOpacity: 0.16,
 	shadowRadius: 24,
 	elevation: 6,
+} as const
+
+/**
+ * Shadow of every card in the Find Doctors flow (speciality tiles, banners, stat tiles, doctor result cards, clinic and
+ * booking cards): the design's `0 8px 12px rgba(18, 55, 62, 0.14)`, written as a CSS box-shadow so it renders the same
+ * on web, iOS and Android (React Native's own shadow props and `elevation` each blur differently per platform).
+ */
+export const SOFT_CARD_SHADOW = {
+	boxShadow: '0px 8px 12px rgba(18, 55, 62, 0.14)',
 } as const
 
 export const formatInr = (amount?: number | string | null) => {

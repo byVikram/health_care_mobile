@@ -15,12 +15,7 @@ export const getPharmacyProfile = async (): Promise<PharmacyProfileApiResponse> 
 export const updatePharmacyProfile = async (
 	payload: PharmacyProfileUpdatePayload
 ): Promise<PharmacyProfileApiResponse> => {
-	console.log('[pharmacyService] PATCH /api/pharmacies/me/details payload:', payload)
 	const res = await ApiService.patch<PharmacyProfileApiResponse>(API_ENDPOINTS.PHARMACY.DETAILS, payload)
-	console.log('[pharmacyService] PATCH /api/pharmacies/me/details response:', {
-		status: res.status,
-		data: res.data,
-	})
 
 	try {
 		const fresh = await getPharmacyProfile()

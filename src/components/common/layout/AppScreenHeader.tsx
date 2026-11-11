@@ -11,8 +11,61 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import { AppTypography } from '../display/AppTypography'
 import { APP_COLORS } from '../../../config/theme'
+
+// The top-bar background from the Doctor Consultation design ("1 · Specialities — minimal colour"): the ink base
+// with three soft radial glows (teal top-right, blue left, mint bottom). AppScreenHeader draws it, and so do the
+// bespoke headers (home, profile hub, auth hero, ...) that can't be built from AppScreenHeader's slots, so every
+// bar looks the same. Purely decorative: it never takes touches and is hidden from screen readers.
+type AppHeaderBackdropProps = {
+	/** Replaces the ink base colour; the glows are still drawn on top. */
+	base?: string
+	style?: StyleProp<ViewStyle>
+}
+
+// [id, centre x/y, radius x/y, colour, centre opacity]: the design's three radial-gradient layers, each
+// fading to transparent at 70% of its radius.
+const GLOWS = [
+	{ id: 'hbTeal', cx: 0.92, cy: 0, rx: 0.55, ry: 0.75, color: '#2B6F71', opacity: 1 },
+	{ id: 'hbBlue', cx: 0, cy: 0.45, rx: 0.5, ry: 0.7, color: '#1F5E7A', opacity: 0.9 },
+	{ id: 'hbMint', cx: 0.72, cy: 1.15, rx: 0.45, ry: 0.6, color: '#9FD3D1', opacity: 0.4 },
+] as const
+
+export function AppHeaderBackdrop({ base = APP_COLORS.ink, style }: AppHeaderBackdropProps) {
+	return (
+		<View
+			pointerEvents="none"
+			importantForAccessibility="no-hide-descendants"
+			accessibilityElementsHidden
+			style={[StyleSheet.absoluteFill, { backgroundColor: base }, style]}
+		>
+			<Svg width="100%" height="100%">
+				<Defs>
+					{GLOWS.map((g) => (
+						<RadialGradient
+							key={g.id}
+							id={g.id}
+							cx={g.cx}
+							cy={g.cy}
+							fx={g.cx}
+							fy={g.cy}
+							rx={g.rx}
+							ry={g.ry}
+						>
+							<Stop offset="0" stopColor={g.color} stopOpacity={g.opacity} />
+							<Stop offset="0.7" stopColor={g.color} stopOpacity={0} />
+						</RadialGradient>
+					))}
+				</Defs>
+				{GLOWS.map((g) => (
+					<Rect key={g.id} x="0" y="0" width="100%" height="100%" fill={`url(#${g.id})`} />
+				))}
+			</Svg>
+		</View>
+	)
+}
 
 interface AppScreenHeaderProps {
 	title?: string
@@ -29,6 +82,11 @@ interface AppScreenHeaderProps {
 	 * design calls for a simple compact bar instead of a hero-style header.
 	 */
 	variant?: 'hero' | 'flat' | 'bar'
+	/**
+	 * A plain solid APP_COLORS.primary header (or `backgroundColor`) instead of the shared ink-and-glow backdrop.
+	 * Inner profile screens and the booking flows use it; the home screens and the profile hub keep the gradient.
+	 */
+	solid?: boolean
 	/** 'bar' only: 12/16 mint line under the title. */
 	subtitle?: string
 	/** 'bar' only: node shown before the title (e.g. a 36px avatar). */
@@ -67,6 +125,7 @@ export default function AppScreenHeader({
 	showBack = true,
 	backgroundColor,
 	variant = 'hero',
+	solid = false,
 	subtitle,
 	leading,
 	titleNode,
@@ -97,7 +156,15 @@ export default function AppScreenHeader({
 
 	if (variant === 'bar') {
 		return (
-			<View style={[styles.bar, { paddingTop: insets.top }, backgroundColor ? { backgroundColor } : null, style]}>
+			<View
+				style={[
+					styles.bar,
+					solid && { backgroundColor: backgroundColor ?? APP_COLORS.primary },
+					{ paddingTop: insets.top },
+					style,
+				]}
+			>
+				{!solid && <AppHeaderBackdrop base={backgroundColor} />}
 				<View style={[styles.barRow, isTablet && styles.headerContentTablet]}>
 					{showBack && (
 						<TouchableOpacity
@@ -155,16 +222,10 @@ export default function AppScreenHeader({
 				styles.header,
 				{ paddingTop: Math.max(insets.top, 12) + (isFlat ? 4 : 14) },
 				isFlat && styles.headerFlat,
-				backgroundColor ? { backgroundColor } : null,
+				solid && { backgroundColor: backgroundColor ?? APP_COLORS.primary },
 			]}
 		>
-			{/* Background Waves */}
-			{!isFlat && (
-				<>
-					<View style={styles.waveOne} />
-					<View style={styles.waveTwo} />
-				</>
-			)}
+			{!solid && <AppHeaderBackdrop base={backgroundColor} />}
 
 			<View style={[styles.headerContent, isTablet && styles.headerContentTablet]}>
 				{showBack && (
@@ -192,7 +253,6 @@ export default function AppScreenHeader({
 
 const styles = StyleSheet.create({
 	header: {
-		backgroundColor: '#1f5f68',
 		paddingHorizontal: 16,
 		paddingBottom: 16,
 		borderBottomLeftRadius: 20,
@@ -204,26 +264,6 @@ const styles = StyleSheet.create({
 		paddingBottom: 6,
 		borderBottomLeftRadius: 0,
 		borderBottomRightRadius: 0,
-	},
-	waveOne: {
-		position: 'absolute',
-		width: 420,
-		height: 240,
-		borderRadius: 120,
-		backgroundColor: 'rgba(255,255,255,0.06)',
-		left: -140,
-		top: -70,
-		transform: [{ rotate: '-4deg' }],
-	},
-	waveTwo: {
-		position: 'absolute',
-		width: 430,
-		height: 240,
-		borderRadius: 120,
-		backgroundColor: 'rgba(255,255,255,0.05)',
-		left: -95,
-		top: -22,
-		transform: [{ rotate: '-4deg' }],
 	},
 	headerContent: {
 		flexDirection: 'row',
@@ -266,7 +306,8 @@ const styles = StyleSheet.create({
 
 	// variant 'bar' (KarolaHealth design app bar)
 	bar: {
-		backgroundColor: APP_COLORS.primary,
+		backgroundColor: APP_COLORS.ink,
+		overflow: 'hidden',
 		paddingHorizontal: 16,
 		zIndex: 2,
 	},

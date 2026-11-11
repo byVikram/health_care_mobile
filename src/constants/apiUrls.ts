@@ -27,6 +27,10 @@ export const API_ENDPOINTS = {
 		GET_ROLES: `${BASE_URL}/api/auth/get-roles`,
 		CREATE_USER: `${BASE_URL}/api/auth/create-user`,
 		SESSIONS: `${BASE_URL}/api/auth/sessions`,
+		// This login session's push token, and the flag that the notification prompt was shown (the apps send the FULL address:
+		// a bare path has no server and fails on the phone).
+		SESSION_FCM_TOKEN: `${BASE_URL}/api/auth/session/fcm-token`,
+		SESSION_NOTIFICATION_PROMPT: `${BASE_URL}/api/auth/session/notification-prompt`,
 		SESSION_LOGOUT: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}`,
 		SESSIONS_OTHERS: `${BASE_URL}/api/auth/sessions/others`,
 		SESSION_ACKNOWLEDGE: (publicId: string) => `${BASE_URL}/api/auth/sessions/${publicId}/acknowledge`,
@@ -154,6 +158,8 @@ export const API_ENDPOINTS = {
 		LABORATORY_REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/laboratory-reports`,
 		RADIOLOGY_REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/radiology-reports`,
 		REPORTS_CREATE: `${BASE_URL}/api/patients/reports`,
+		RECORDS: `${BASE_URL}/api/patients/records`,
+		RECORD_BY_ID: (id: string) => `${BASE_URL}/api/patients/records/${id}`,
 		ADDRESSES: `${BASE_URL}/api/patients/me/addresses`,
 		TREATMENT_HISTORY: (id: string) => `${BASE_URL}/api/treatments/patient/${id}/history`,
 		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
@@ -310,6 +316,14 @@ export const API_ENDPOINTS = {
 		PROVIDER_VISIT_COMPLETE: (visitId: string) =>
 			`${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/complete`,
 		PROVIDER_VISIT_ISSUES: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/issues`,
+		// Patient no-show: the provider says they have arrived (starts the wait), then that the patient is not available
+		PROVIDER_VISIT_ARRIVED: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/arrived`,
+		PROVIDER_VISIT_NO_SHOW: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/no-show`,
+		// ... and the patient's side: what happened to a missed visit, and whether home-care booking is paused
+		PATIENT_VISIT_NO_SHOW: (visitId: string) => `${BASE_URL}/api/ancillary/patient/visits/${visitId}/no-show`,
+		PATIENT_VISIT_NO_SHOW_REPLY: (visitId: string) =>
+			`${BASE_URL}/api/ancillary/patient/visits/${visitId}/no-show/reply`,
+		PATIENT_BOOKING_RESTRICTION: `${BASE_URL}/api/ancillary/patient/booking-restriction`,
 	},
 	WALLET: {
 		GET: `${BASE_URL}/api/wallet`,

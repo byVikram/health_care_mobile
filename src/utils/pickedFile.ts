@@ -48,10 +48,16 @@ type DocumentPicker = typeof import('expo-document-picker')
 // the click, and awaiting an import first loses that, so nothing would open.
 let pickerPromise: Promise<DocumentPicker | null> | null = null
 let loadedPicker: DocumentPicker | null = null
+const importPicker = async (): Promise<DocumentPicker | null> => {
+	try {
+		loadedPicker = await import('expo-document-picker')
+		return loadedPicker
+	} catch {
+		return null
+	}
+}
 const loadPicker = () => {
-	pickerPromise ??= import('expo-document-picker')
-		.then((module) => (loadedPicker = module))
-		.catch(() => null)
+	pickerPromise ??= importPicker()
 	return pickerPromise
 }
 void loadPicker()
@@ -61,7 +67,7 @@ void loadPicker()
  * cancels). Nothing is shown first: one tap, one picker. The server checks the real type from the content,
  * so a wrong extension or MIME type here cannot get past it.
  */
-export const pickCertificateFile = async (): Promise<PickedFile | null> => {
+export const pickCertificateFile = async (maxBytes: number = MAX_CERTIFICATE_BYTES): Promise<PickedFile | null> => {
 	// Already loaded in practice, so there is no await before the picker opens.
 	const picker = loadedPicker ?? (await loadPicker())
 	if (!picker) {
@@ -76,8 +82,8 @@ export const pickCertificateFile = async (): Promise<PickedFile | null> => {
 		const result = await picker.getDocumentAsync({ type: CERTIFICATE_TYPES, copyToCacheDirectory: true })
 		if (result.canceled || !result.assets?.length) return null
 		const asset = result.assets[0]
-		if (asset.size != null && asset.size > MAX_CERTIFICATE_BYTES) {
-			Alert.alert('File too large', 'Please choose a file under 10 MB.')
+		if (asset.size != null && asset.size > maxBytes) {
+			Alert.alert('File too large', `Please choose a file under ${Math.round(maxBytes / (1024 * 1024))} MB.`)
 			return null
 		}
 		const name = asset.name || asset.uri.split('/').pop() || `document-${Date.now()}`

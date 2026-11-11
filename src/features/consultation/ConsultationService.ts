@@ -180,7 +180,6 @@ export const patientService = {
       const response = await ApiService.get(
         API_ENDPOINTS.PATIENT.GET_BY_PUBLIC_ID(patientPublicId),
       );
-      console.log("API response:", response);
 
       const patient = unwrapPatient(response);
 

@@ -5,10 +5,11 @@
 // a white 48px search field. Rounded 24px at the bottom.
 
 import React from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { AppPathIcon } from '../../components/common'
+import { AppHeaderBackdrop, AppPathIcon, AppSearchBar } from '../../components/common'
 import { APP_COLORS } from '../../config/theme'
+import type { SearchContextKey } from '../../config/searchContexts'
 import { FEED_ICONS } from './feedTheme'
 
 type Props = {
@@ -17,16 +18,24 @@ type Props = {
 	onBack: () => void
 	/** Square translucent button on the right (e.g. saved reads). */
 	action?: { icon: string; label: string; onPress: () => void; active?: boolean }
-	search: { value: string; onChange: (v: string) => void; placeholder: string; accessibilityLabel: string }
+	search: { value: string; onChange: (v: string) => void; context: SearchContextKey }
 	/** Extra bottom padding (the questions header uses 14, reads 16). */
 	paddingBottom?: number
+	/** Plain APP_COLORS.primary (the same teal as the other screens' headers) instead of the dark ink-and-glow backdrop. */
+	solid?: boolean
 }
 
-export function FeedHeader({ title, subtitle, onBack, action, search, paddingBottom = 16 }: Props) {
+export function FeedHeader({ title, subtitle, onBack, action, search, paddingBottom = 16, solid = false }: Props) {
 	const insets = useSafeAreaInsets()
 	return (
-		<View style={[styles.header, { paddingTop: insets.top + 8, paddingBottom }]}>
-			<View pointerEvents="none" style={styles.blob} />
+		<View
+			style={[
+				styles.header,
+				{ paddingTop: insets.top + 8, paddingBottom },
+				solid && { backgroundColor: APP_COLORS.primary },
+			]}
+		>
+			{!solid && <AppHeaderBackdrop />}
 			<View style={styles.topRow}>
 				<Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" style={styles.backBtn}>
 					<AppPathIcon d={FEED_ICONS.back} size={22} strokeWidth={2.2} color="#FFFFFF" />
@@ -50,18 +59,7 @@ export function FeedHeader({ title, subtitle, onBack, action, search, paddingBot
 					</Pressable>
 				)}
 			</View>
-			<View style={styles.searchBox}>
-				<AppPathIcon d={FEED_ICONS.search} size={20} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
-				<TextInput
-					value={search.value}
-					onChangeText={search.onChange}
-					placeholder={search.placeholder}
-					placeholderTextColor={APP_COLORS.inkMuted}
-					style={styles.searchInput}
-					returnKeyType="search"
-					accessibilityLabel={search.accessibilityLabel}
-				/>
-			</View>
+			<AppSearchBar context={search.context} tone="onDark" value={search.value} onChangeText={search.onChange} />
 		</View>
 	)
 }
@@ -75,17 +73,7 @@ const styles = StyleSheet.create({
 		gap: 12,
 		borderBottomLeftRadius: 24,
 		borderBottomRightRadius: 24,
-	},
-	blob: {
-		position: 'absolute',
-		right: -60,
-		top: -80,
-		width: 220,
-		height: 220,
-		borderRadius: 9999,
-		backgroundColor: APP_COLORS.primary,
-	},
-	topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
+	},	topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
 	backBtn: {
 		width: 44,
 		height: 44,
@@ -106,16 +94,6 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	actionBtnActive: { backgroundColor: '#FFFFFF47' },
-	searchBox: {
-		height: 48,
-		paddingHorizontal: 14,
-		borderRadius: 12,
-		backgroundColor: '#FFFFFF',
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	searchInput: { flex: 1, minWidth: 0, height: 44, fontSize: 16, color: APP_COLORS.ink, padding: 0 },
 })
 
 export default FeedHeader

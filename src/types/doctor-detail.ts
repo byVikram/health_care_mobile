@@ -6,6 +6,8 @@ export interface DoctorDetailHospital {
 	video_consultation_fee: string
 	offline_consultation_fee: string
 	available_days: string[]
+	/** Weekdays with hours for each consultation type; null when the clinic has no weekly hours yet. */
+	available_days_by_mode?: { clinic_visit: string[]; video_call: string[] } | null
 	working_hours: string
 	hospital: {
 		id: string

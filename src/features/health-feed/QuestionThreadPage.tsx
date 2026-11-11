@@ -54,21 +54,38 @@ export default function QuestionThreadPage() {
 	}, [questionId])
 
 	useEffect(() => {
-		load().finally(() => setLoading(false))
+		let alive = true
+		const run = async () => {
+			await load()
+			if (alive) setLoading(false)
+		}
+		void run()
+		return () => {
+			alive = false
+		}
 	}, [load])
 
 	// "Similar questions": other questions sharing a topic.
 	useEffect(() => {
 		if (!q) return
+		let alive = true
 		const mine = splitTags(q.tag)
-		listHealthQuestions(undefined, 1, 50)
-			.then((res) => {
+		const loadSimilar = async () => {
+			try {
+				const res = await listHealthQuestions(undefined, 1, 50)
+				if (!alive) return
 				const rows = res.success ? res.data : []
 				setSimilar(
 					rows.filter((r) => r.id !== q.id && splitTags(r.tag).some((t) => mine.includes(t))).slice(0, 3)
 				)
-			})
-			.catch(() => setSimilar([]))
+			} catch {
+				if (alive) setSimilar([])
+			}
+		}
+		void loadSimilar()
+		return () => {
+			alive = false
+		}
 	}, [q?.id, q?.tag])
 
 	const answers = useMemo(() => {
