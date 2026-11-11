@@ -7,7 +7,7 @@
 // rescheduleAppointment -- same payload as RescheduleModal.
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import {
 	AppRescheduleGroup,
 	AppRescheduleSheet,
@@ -27,6 +27,7 @@ import { APP_COLORS } from '../../../../config/theme'
 import { normalizeAvailabilitySlots } from '../RescheduleModal'
 import { formatDateForApi, monthRangeLabel, nextDays, parseDateOnly, relativeDayLabel } from '../../../../utils/date'
 import { formatTimeSlot } from '../../../../utils/formatters'
+import { showStatusModal } from '../../../../services/apiService'
 
 const COLS = 3
 
@@ -171,11 +172,21 @@ export default function RescheduleSheet({
 			if (res?.success) {
 				onRescheduled()
 			} else {
-				Alert.alert('Error', res?.message || 'Reschedule failed. Please try again.')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't reschedule",
+					description: res?.message || 'Reschedule failed. Please try again.',
+					submitText: 'OK',
+				})
 			}
 		} catch (error: any) {
 			console.log('[RescheduleSheet] reschedule error:', error?.response?.data || error?.message || error)
-			Alert.alert('Error', 'Something went wrong. Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't reschedule",
+				description: 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setSubmitting(false)
 		}

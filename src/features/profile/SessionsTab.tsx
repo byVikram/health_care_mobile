@@ -3,7 +3,8 @@ import { StyleSheet, View, ScrollView, RefreshControl, Animated, Easing, useWind
 import { Card, useTheme, Surface } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { getSessions, logoutSession, Session } from '../auth/authService'
-import StatusModal from '../../components/common/feedback/StatusModal'
+import Toast from 'react-native-toast-message'
+import { showStatusModal } from '../../services/apiService'
 import { AppTypography, AppButton, AppModal } from '../../components/common'
 
 // --- Shimmer placeholder ------------------------------------------------------
@@ -72,8 +73,6 @@ export default function SessionsTab() {
 	const [isLoading, setIsLoading] = useState(true)
 	const [isLoggingOut, setIsLoggingOut] = useState(false)
 	const [refreshing, setRefreshing] = useState(false)
-	const [modalType, setModalType] = useState<'success' | 'error' | null>(null)
-	const [modalMessage, setModalMessage] = useState('')
 	const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false)
 	const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
 	const [fetchError, setFetchError] = useState<string | null>(null)
@@ -112,16 +111,23 @@ export default function SessionsTab() {
 			setIsLoggingOut(true)
 			const response = await logoutSession(selectedSessionId)
 			if (response.success) {
-				setModalMessage('Session logged out successfully.')
-				setModalType('success')
+				Toast.show({ type: 'success', text1: 'Session logged out successfully.' })
 				fetchSessions()
 			} else {
-				setModalMessage(response.message || 'Failed to logout session.')
-				setModalType('error')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't log out the session",
+					description: response.message || 'Failed to logout session.',
+					submitText: 'OK',
+				})
 			}
 		} catch {
-			setModalMessage('An unexpected error occurred.')
-			setModalType('error')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't log out the session",
+				description: 'An unexpected error occurred.',
+				submitText: 'OK',
+			})
 		} finally {
 			setIsLoggingOut(false)
 			setLogoutConfirmVisible(false)
@@ -358,17 +364,6 @@ export default function SessionsTab() {
 					</AppButton>
 				</View>
 			</AppModal>
-
-			{/* Status modal */}
-			<StatusModal
-				visible={modalType !== null}
-				status={modalType === 'success' ? 'success' : 'error'}
-				title={modalType === 'success' ? 'Success' : 'Error'}
-				description={modalMessage}
-				submitText="Okay"
-				onSubmit={() => setModalType(null)}
-				onCancel={() => setModalType(null)}
-			/>
 		</View>
 	)
 }

@@ -9,10 +9,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 import * as Location from 'expo-location'
-import Toast from 'react-native-toast-message'
 import { extractApiErrorMessage } from '../../ancillaryService'
 import { ensureGoOnlinePermissions } from '../availability/goOnlinePermissions'
 import { getProviderOnlineStatus, pingProviderLocation, setProviderOnline } from '../../providerVisitService'
+import { showStatusModal } from '../../../../services/apiService'
 
 const LOCATION_REFRESH_MS = 5 * 60_000
 
@@ -95,13 +95,13 @@ export function useProviderOnline({ onWentOffline }: { onWentOffline: () => void
 			}
 		} catch (e) {
 			apply(previous)
-			Toast.show({
-				type: 'error',
-				text1: next ? 'Could not go online' : 'Could not go offline',
-				text2:
-					e instanceof LocationDeniedError
+			showStatusModal({
+				status: 'error',
+				title: next ? 'Could not go online' : 'Could not go offline',
+				description: e instanceof LocationDeniedError
 						? e.message
 						: extractApiErrorMessage(e, 'Please check your connection and try again.'),
+				submitText: 'OK',
 			})
 		} finally {
 			setBusy(false)

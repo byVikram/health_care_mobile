@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
-	Alert,
 	Animated,
 	Image,
 	ImageSourcePropType,
@@ -16,6 +15,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { AppTypography } from '../display/AppTypography'
+import Toast from 'react-native-toast-message'
 
 export type AppPhotoPickerUpload = {
 	uri: string
@@ -139,7 +139,7 @@ export function AppPhotoPicker({
 		const permission = await ImagePicker.requestCameraPermissionsAsync()
 
 		if (!permission.granted) {
-			Alert.alert('Permission needed', 'Please allow camera access to take a profile photo.')
+			Toast.show({ type: 'info', text1: 'Please allow camera access to take a profile photo.' })
 			return
 		}
 
@@ -160,7 +160,7 @@ export function AppPhotoPicker({
 		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
 
 		if (!permission.granted) {
-			Alert.alert('Permission needed', 'Please allow photo library access to choose a profile photo.')
+			Toast.show({ type: 'info', text1: 'Please allow photo library access to choose a profile photo.' })
 			return
 		}
 

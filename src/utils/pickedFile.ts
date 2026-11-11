@@ -1,7 +1,8 @@
 // A file chosen on the device, in the shape React Native's FormData takes as a file part, plus the picker
 // that produces one.
 
-import { Alert } from 'react-native'
+import Toast from 'react-native-toast-message'
+import { showStatusModal } from '../services/apiService'
 
 export type PickedFile = {
 	uri: string
@@ -71,10 +72,12 @@ export const pickCertificateFile = async (maxBytes: number = MAX_CERTIFICATE_BYT
 	// Already loaded in practice, so there is no await before the picker opens.
 	const picker = loadedPicker ?? (await loadPicker())
 	if (!picker) {
-		Alert.alert(
-			'File picker not available',
-			'This version of the app was built without the file picker. Rebuild it with "npx expo run:android" (or run: ios) and try again.'
-		)
+		showStatusModal({
+			status: 'info',
+			title: 'File picker not available',
+			description: 'This version of the app was built without the file picker. Rebuild it with "npx expo run:android" (or run: ios) and try again.',
+			submitText: 'OK',
+		})
 		return null
 	}
 
@@ -83,7 +86,11 @@ export const pickCertificateFile = async (maxBytes: number = MAX_CERTIFICATE_BYT
 		if (result.canceled || !result.assets?.length) return null
 		const asset = result.assets[0]
 		if (asset.size != null && asset.size > maxBytes) {
-			Alert.alert('File too large', `Please choose a file under ${Math.round(maxBytes / (1024 * 1024))} MB.`)
+			Toast.show({
+				type: 'error',
+				text1: 'File too large',
+				text2: `Please choose a file under ${Math.round(maxBytes / (1024 * 1024))} MB.`,
+			})
 			return null
 		}
 		const name = asset.name || asset.uri.split('/').pop() || `document-${Date.now()}`
@@ -95,7 +102,11 @@ export const pickCertificateFile = async (maxBytes: number = MAX_CERTIFICATE_BYT
 			file: asset.file, // set on web only
 		}
 	} catch (error) {
-		Alert.alert('Could not open the file', error instanceof Error ? error.message : 'Please try again.')
+		Toast.show({
+			type: 'error',
+			text1: 'Could not open the file',
+			text2: error instanceof Error ? error.message : 'Please try again.',
+		})
 		return null
 	}
 }

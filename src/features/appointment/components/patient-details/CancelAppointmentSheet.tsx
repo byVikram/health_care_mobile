@@ -5,8 +5,7 @@
 // APPOINTMENTS.STATUSES, then PATCH APPOINTMENTS.UPDATE.
 
 import React, { useEffect, useState } from 'react'
-import { Alert } from 'react-native'
-import ApiService from '../../../../services/apiService'
+import ApiService, { showStatusModal } from '../../../../services/apiService'
 import { API_ENDPOINTS } from '../../../../constants/apiUrls'
 import { updateAppointmentsStatus } from '../../../../services/appointmentService'
 import { AppCancelSheet } from '../../../../components/common'
@@ -59,7 +58,12 @@ export default function CancelAppointmentSheet({
 	const handleConfirm = async (reason: string | null) => {
 		if (submitting) return
 		if (!cancelledStatusId) {
-			Alert.alert('Unable to cancel', 'Cancellation status is unavailable. Please try again in a moment.')
+			showStatusModal({
+				status: 'error',
+				title: 'Unable to cancel',
+				description: 'Cancellation status is unavailable. Please try again in a moment.',
+				submitText: 'OK',
+			})
 			return
 		}
 		setSubmitting(true)
@@ -68,11 +72,21 @@ export default function CancelAppointmentSheet({
 			if (res?.success) {
 				onCancelled()
 			} else {
-				Alert.alert('Error', res?.message || 'Failed to cancel appointment.')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't cancel the appointment",
+					description: res?.message || 'Failed to cancel appointment.',
+					submitText: 'OK',
+				})
 			}
 		} catch (error: any) {
 			console.log('[CancelAppointmentSheet] cancel error:', error?.response?.data || error?.message || error)
-			Alert.alert('Error', 'Something went wrong. Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't cancel the appointment",
+				description: 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setSubmitting(false)
 		}

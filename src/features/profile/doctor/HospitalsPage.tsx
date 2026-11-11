@@ -12,7 +12,6 @@ import {
 	AppSaveFooter,
 	AppSelect,
 	FORM_SELECT_PROPS,
-	StatusModal,
 } from '../../../components/common'
 import { formatInr } from '../../../config/theme'
 import {
@@ -26,6 +25,7 @@ import {
 import { HospitalSheet } from './components/HospitalSheet'
 import { useProfileForm } from '../hooks/useProfileForm'
 import { ProfileScreen } from '../shared/components/ProfileScreen'
+import { showStatusModal } from '../../../services/apiService'
 
 interface Rules {
 	followUp: string
@@ -66,7 +66,6 @@ export default function HospitalsPage() {
 	const [hospitals, setHospitals] = useState<DoctorHospitalLink[]>([])
 	const [sheet, setSheet] = useState<{ hospital: DoctorHospitalLink | null } | null>(null)
 	const [removing, setRemoving] = useState<DoctorHospitalLink | null>(null)
-	const [actionError, setActionError] = useState<string | null>(null)
 
 	const load = useCallback(async (): Promise<Rules> => {
 		const list = await fetchDoctorHospitals()
@@ -108,7 +107,12 @@ export default function HospitalsPage() {
 			Toast.show({ type: 'success', text1: sheet?.hospital ? 'Place updated' : 'Place added' })
 			await refreshList()
 		} catch (e) {
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't save the hospital",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		}
 	}
 
@@ -122,7 +126,12 @@ export default function HospitalsPage() {
 			await refreshList()
 		} catch (e) {
 			setRemoving(null)
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't remove the hospital",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		}
 	}
 
@@ -160,14 +169,6 @@ export default function HospitalsPage() {
 						message="Patients can't book you here any more. Existing appointments stay as they are."
 						confirmLabel="Remove"
 						onConfirm={removePlace}
-					/>
-					<StatusModal
-						visible={!!actionError}
-						status="error"
-						title="Something went wrong"
-						description={actionError || ''}
-						submitText="OK"
-						onSubmit={() => setActionError(null)}
 					/>
 				</>
 			}

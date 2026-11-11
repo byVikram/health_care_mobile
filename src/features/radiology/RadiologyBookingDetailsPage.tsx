@@ -6,7 +6,6 @@ import {
 	Text,
 	View,
 	TouchableOpacity,
-	Alert,
 	RefreshControl,
 	TextInput,
 	
@@ -33,6 +32,7 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import ImageViewerModal from './components/ImageViewerModal'
 import DocumentCarousel from './components/DocumentCarousel'
+import { showComingSoon } from '../../utils/toast'
 
 
 type RouteParams = {
@@ -402,11 +402,7 @@ export default function RadiologyBookingDetailsPage() {
 
 	// 11. Upload Reports
 	const handleUpload = () => {
-		Alert.alert(
-			'Upload Medical Report',
-			'This would open a file picker. After selecting, upload to S3 and update the booking.',
-			[{ text: 'OK' }]
-		)
+		showComingSoon('Medical report upload')
 	}
 
 	// 8 (patient). handlePayment

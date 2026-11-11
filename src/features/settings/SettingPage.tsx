@@ -9,7 +9,6 @@ import {
 	Share,
 	Linking,
 	StyleSheet,
-	Alert,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -22,6 +21,8 @@ import VectorIcon from '../../assets/Settings/Vector.svg'
 import { useAuth } from '../../context/AuthContext'
 import { AppHeaderBackdrop, LogoutConfirmModal } from '../../components/common'
 import { APP_COLORS } from '../../config/theme'
+import Toast from 'react-native-toast-message'
+import { showStatusModal } from '../../services/apiService'
 
 const SettingPage = () => {
 	const navigation = useNavigation<any>()
@@ -30,11 +31,16 @@ const SettingPage = () => {
 	const [showLogoutModal, setShowLogoutModal] = useState(false)
 	// ─── Handlers ─────────────────────────────
 	const handleAbout = () => {
-		Alert.alert('About Whisper AI', 'Version 1.0.0')
+		showStatusModal({
+			status: 'info',
+			title: 'About Whisper AI',
+			description: 'Version 1.0.0',
+			submitText: 'OK',
+		})
 	}
 
 	const handleRateUs = () => {
-		Linking.openURL('https://apps.apple.com').catch(() => Alert.alert('Error', 'Unable to open store'))
+		Linking.openURL('https://apps.apple.com').catch(() => Toast.show({ type: 'error', text1: 'Unable to open store' }))
 	}
 
 	const handleShare = async () => {
@@ -55,10 +61,13 @@ const SettingPage = () => {
 		}
 	}
 	const handleDelete = () => {
-		Alert.alert('Delete Account', 'Permanent action!', [
-			{ text: 'Cancel' },
-			{ text: 'Delete', style: 'destructive' },
-		])
+		showStatusModal({
+			status: 'error',
+			title: 'Delete Account',
+			description: 'Permanent action!',
+			submitText: 'Delete',
+			cancelText: 'Cancel',
+		})
 	}
 
 	const menuItems = [

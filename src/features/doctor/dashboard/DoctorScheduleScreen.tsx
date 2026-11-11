@@ -51,6 +51,7 @@ import { createReferral } from '../../referrals/referralService'
 import { clinicTodayIso, effectiveStatusLabel, formatTime12h, humanizeStatus, isAccepted, isCompletedAppt, isPending, isRequestLike, isNoShowAppt, isRescheduleNeeded, isRescheduleRequest, isVideoMode, NO_SHOW_SOURCE_STATUSES, noShowWindow, rowStatusTone, statusLabelOf, toApiDate } from '../scheduleUtils'
 import type { Appointment } from '../../../types/appointment'
 import type { FavouriteDoctorListItem } from '../search/components/FavouriteDoctorList'
+import { showStatusModal } from '../../../services/apiService'
 
 type ScheduleTab = 'today' | 'req' | 'all'
 type AllMode = 'up' | 'past'
@@ -472,7 +473,12 @@ export function DoctorScheduleScreen() {
 				Toast.show({ type: 'success', text1: res.message ?? 'Appointment confirmed' })
 			}
 		} catch {
-			Toast.show({ type: 'error', text1: 'Something went wrong. Please try again.' })
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't accept the appointment",
+				description: 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setBusyId(null)
 		}
@@ -493,7 +499,12 @@ export function DoctorScheduleScreen() {
 				Toast.show({ type: 'success', text1: res.message ?? (isReq ? 'Request declined' : 'Appointment cancelled') })
 			}
 		} catch {
-			Toast.show({ type: 'error', text1: 'Something went wrong. Please try again.' })
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't decline the appointment",
+				description: 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setBusyId(null)
 			setSheet(null)
@@ -562,12 +573,19 @@ export function DoctorScheduleScreen() {
 				Toast.show({ type: 'success', text1: res.message ?? 'The patient has been asked to choose a new time' })
 				setAskTarget(null)
 			} else {
-				Toast.show({ type: 'error', text1: res.message ?? 'Could not ask the patient to reschedule. Please try again.' })
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't ask the patient to reschedule",
+					description: res.message ?? 'Could not ask the patient to reschedule. Please try again.',
+					submitText: 'OK',
+				})
 			}
 		} catch (error: any) {
-			Toast.show({
-				type: 'error',
-				text1: error?.response?.data?.message ?? 'Could not ask the patient to reschedule. Please try again.',
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't ask the patient to reschedule",
+				description: error?.response?.data?.message ?? 'Could not ask the patient to reschedule. Please try again.',
+				submitText: 'OK',
 			})
 		} finally {
 			setBusyId(null)
@@ -586,7 +604,12 @@ export function DoctorScheduleScreen() {
 			}))
 			Toast.show({ type: 'success', text1: `Referred to ${doctor.name}` })
 		} catch {
-			Toast.show({ type: 'error', text1: 'Failed to refer appointment. Please try again.' })
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't refer the appointment",
+				description: 'Failed to refer appointment. Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setBusyId(null)
 			setSheet(null)

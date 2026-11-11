@@ -6,7 +6,7 @@
 // using the shared AppointmentDetailsContent.
 
 import React, { useCallback, useEffect, useState } from 'react'
-import { Alert, Linking, ScrollView, Share, StatusBar, StyleSheet, Text, View } from 'react-native'
+import { Linking, ScrollView, Share, StatusBar, StyleSheet, Text, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import type { NavigationProp } from '@react-navigation/native'
@@ -243,7 +243,11 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 
 	const openReschedule = () => {
 		if (!doctorId) {
-			Alert.alert('Unable to reschedule', 'Doctor details are missing for this appointment.')
+			Toast.show({
+				type: 'error',
+				text1: 'Unable to reschedule',
+				text2: 'Doctor details are missing for this appointment.',
+			})
 			return
 		}
 		setReschedOpen(true)

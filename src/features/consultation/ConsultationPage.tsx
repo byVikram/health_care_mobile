@@ -13,7 +13,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
-	Alert,
 	Animated,
 	Modal,
 	ScrollView,
@@ -39,7 +38,7 @@ import Toast from 'react-native-toast-message'
 import { AppHeaderBackdrop, AppSegmentedControl, AppSkeleton, AppSoftCard, ConsultationNotesImage } from '../../components/common'
 import { APP_COLORS, TONES } from '../../config/theme'
 import { ROUTES } from '../../navigation/routes'
-import ApiService from '../../services/apiService'
+import ApiService, { showStatusModal } from '../../services/apiService'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
 import { getStatusIdByLabel } from '../doctor/doctorService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
@@ -702,15 +701,15 @@ export default function ConsultationPage() {
 
 	const confirmSubmit = () =>
 		new Promise<boolean>((resolve) => {
-			Alert.alert(
-				'Submit your notes?',
-				`Once submitted, your notes can’t be edited. ${patient?.name?.split(' ')[0] || 'The patient'} will be able to see them.`,
-				[
-					{ text: 'Keep editing', style: 'cancel', onPress: () => resolve(false) },
-					{ text: 'Submit', onPress: () => resolve(true) },
-				],
-				{ cancelable: true, onDismiss: () => resolve(false) }
-			)
+			showStatusModal({
+				status: 'info',
+				title: 'Submit your notes?',
+				description: `Once submitted, your notes can’t be edited. ${patient?.name?.split(' ')[0] || 'The patient'} will be able to see them.`,
+				submitText: 'Submit',
+				onSubmit: () => resolve(true),
+				cancelText: 'Keep editing',
+				onCancel: () => resolve(false),
+			})
 		})
 
 	// Ending the consultation marks the visit completed. Until then the patient's app still shows it as an
@@ -764,11 +763,13 @@ export default function ConsultationPage() {
 			})
 			goToDoctorHome()
 		} catch (err: any) {
-			Toast.show({
-				type: 'error',
-				text1: notesDone
+			showStatusModal({
+				status: 'error',
+				title: 'Something went wrong',
+				description: notesDone
 					? err?.response?.data?.message || 'Notes saved, but the visit could not be marked completed. Tap again to retry.'
 					: err?.response?.data?.message || 'Failed to save consultation notes',
+				submitText: 'OK',
 			})
 		} finally {
 			setSaving(false)

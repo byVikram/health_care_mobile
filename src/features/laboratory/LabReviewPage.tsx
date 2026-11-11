@@ -8,7 +8,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import Toast from 'react-native-toast-message'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -37,6 +36,7 @@ import { labErrorMessage, placeOrder } from './labService'
 import { commaDate, inr, plural, timeLabel } from './labFormat'
 import { LabLogo } from './LabLogo'
 import { LAB_ICONS, type LabItem } from './labMock'
+import { showStatusModal } from '../../services/apiService'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 
@@ -123,7 +123,12 @@ export default function LabReviewPage() {
 				routes: [{ name: ROUTES.MAIN.TABS }, { name: ROUTES.STACK.LABORATORY_PAYMENT_SUCCESS }],
 			})
 		} catch (e) {
-			Toast.show({ type: 'error', text1: 'Couldn’t place the order', text2: labErrorMessage(e) })
+			showStatusModal({
+				status: 'error',
+				title: 'Couldn’t place the order',
+				description: labErrorMessage(e),
+				submitText: 'OK',
+			})
 		} finally {
 			setPlacing(false)
 		}

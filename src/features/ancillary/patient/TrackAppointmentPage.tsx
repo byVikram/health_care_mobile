@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { Linking, Share, StyleSheet, View, ActivityIndicator } from 'react-native'
-import Toast from 'react-native-toast-message'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { ROUTES } from '../../../navigation/routes'
 import AppScreenHeader from '../../../components/common/layout/AppScreenHeader'
@@ -24,7 +23,7 @@ import { MissedVisitBanner } from '../components/MissedVisitBanner'
 import { CancelVisitsSheet } from '../components/CancelVisitsSheet'
 import { lockedReason } from './scheduledVisitView'
 import { useVisitEdits } from './useVisitEdits'
-import ApiService from '../../../services/apiService'
+import ApiService, { showStatusModal } from '../../../services/apiService'
 import { openAuthedSocket, type AuthedSocketHandle } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
@@ -444,7 +443,12 @@ export default function TrackAppointmentPage() {
 			await cancelCareRequestPatientBackend(bookingId, reason)
 		} catch {
 			// Still open on the server: stay here so the patient can try again.
-			Toast.show({ type: 'error', text1: 'Could not cancel the request', text2: 'Please try again.' })
+			showStatusModal({
+				status: 'error',
+				title: 'Could not cancel the request',
+				description: 'Please try again.',
+				submitText: 'OK',
+			})
 			return
 		} finally {
 			setIsCancelling(false)

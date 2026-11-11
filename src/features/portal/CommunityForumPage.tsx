@@ -8,7 +8,6 @@ import {
 	RefreshControl,
 	Modal,
 	TextInput,
-	Alert,
 } from 'react-native'
 import { Text, Card, Chip, Button } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -25,6 +24,8 @@ import {
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import { useAuth } from '../../context/AuthContext'
+import Toast from 'react-native-toast-message'
+import { showStatusModal } from '../../services/apiService'
 
 export default function CommunityForumPage() {
 	const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>()
@@ -96,14 +97,14 @@ export default function CommunityForumPage() {
 	const handleCreateThread = async () => {
 		if (!activeGroupId) return
 		if (!threadTitle.trim() || !threadContent.trim()) {
-			Alert.alert('Incomplete Fields', 'Please enter both a title and content for your post.')
+			Toast.show({ type: 'error', text1: 'Please enter both a title and content for your post.' })
 			return
 		}
 		setSubmitting(true)
 		try {
 			const res = await createCommunityPost(activeGroupId, threadTitle, threadContent)
 			if (res.success) {
-				Alert.alert('Success', 'Discussion thread created successfully!')
+				Toast.show({ type: 'success', text1: 'Discussion thread created successfully!' })
 				setThreadTitle('')
 				setThreadContent('')
 				setModalVisible(false)
@@ -111,7 +112,12 @@ export default function CommunityForumPage() {
 			}
 		} catch (err) {
 			console.error('Error creating thread:', err)
-			Alert.alert('Error', 'Failed to create discussion thread. Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't create the post",
+				description: 'Failed to create discussion thread. Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setSubmitting(false)
 		}

@@ -32,6 +32,7 @@ import { capitalize, inr, itemsFee, plural, providerNoun, selectionFromItems } f
 import { AncillaryPayAfterVisitSection, AncillaryServiceSection } from './AncillaryReviewSections'
 import { VisitWhoWhereSection } from './VisitWhoWhereSection'
 import { apiErrorMessage, useVisitPatientAddress } from './useVisitPatientAddress'
+import { showStatusModal } from '../../../services/apiService'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 type Route = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_BOOK_NOW_REVIEW>
@@ -88,10 +89,11 @@ export default function AncillaryBookNowReviewPage() {
 					return
 				}
 			}
-			Toast.show({
-				type: 'error',
-				text1: "Couldn't start the request",
-				text2: apiErrorMessage(e) || 'Please try again.',
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't start the request",
+				description: apiErrorMessage(e) || 'Please try again.',
+				submitText: 'OK',
 			})
 		} finally {
 			sendingRef.current = false
