@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-	ActivityIndicator,
 	Animated,
 	InteractionManager,
 	NativeScrollEvent,
@@ -22,6 +21,7 @@ import {
 	AppIcon,
 	AppPathIcon,
 	AppSearchBar,
+	AppSkeleton,
 	LocationSelector,
 } from '../../../components/common'
 import { useAuth } from '../../../context/AuthContext'
@@ -37,6 +37,8 @@ const SYMPTOM_CHIPS = ['Fever', 'Cough', 'Headache', 'Back pain', 'Skin rash', '
 const GRID_COL_GAP = 8
 const GRID_ROW_GAP = 16
 const SIDE_PADDING = 16
+/** Placeholder cards shown while the specialities load (3 rows of 3). */
+const SKELETON_COUNT = 9
 
 type Speciality = {
 	id: string
@@ -66,6 +68,17 @@ function SpecialityGridItem({ spec, width, onPress }: { spec: Speciality; width:
 				</AppTypography>
 			</View>
 		</TouchableOpacity>
+	)
+}
+
+// ─── Speciality Grid Skeleton ─────────────────────────────────────────────────
+// Same footprint as SpecialityGridItem (68px tile + one label line) so nothing jumps when the data lands.
+function SpecialityGridSkeleton({ width }: { width: number }) {
+	return (
+		<View style={[styles.specItem, { width }]}>
+			<AppSkeleton width={68} height={68} borderRadius={16} color={APP_COLORS.divider} />
+			<AppSkeleton width={56} height={12} borderRadius={4} color={APP_COLORS.divider} />
+		</View>
 	)
 }
 
@@ -177,7 +190,7 @@ export default function SearchPage() {
 	const headerPadBottom = progress.interpolate({ inputRange: [0, 1], outputRange: [20, 12] })
 	const topRowHeight = progress.interpolate({ inputRange: [0, 1], outputRange: [6, 52] })
 	const headGap = progress.interpolate({ inputRange: [0, 1], outputRange: [12, 4] })
-	const introMax = progress.interpolate({ inputRange: [0, 1], outputRange: [112, 0] })
+	const introMax = progress.interpolate({ inputRange: [0, 1], outputRange: [88, 0] })
 	const introOpacity = progress.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0, 0] })
 	const miniOpacity = progress
 	const miniShift = progress.interpolate({ inputRange: [0, 1], outputRange: [8, 0] })
@@ -185,7 +198,6 @@ export default function SearchPage() {
 	const elevation = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 4] })
 
 	const showSymptoms = !q
-	const countLabel = loadingSpecs ? '' : `${specialities.length} specialities · `
 
 	return (
 		<View style={styles.container}>
@@ -221,7 +233,6 @@ export default function SearchPage() {
 					>
 						{!!firstName && <AppTypography style={styles.heroEyebrow}>HI {firstName}</AppTypography>}
 						<AppTypography style={styles.heroTitle}>Consult a doctor</AppTypography>
-						<AppTypography style={styles.heroSubtitle}>{countLabel}In-clinic or video</AppTypography>
 						<View style={styles.heroLocation}>
 							<LocationSelector
 								color={APP_COLORS.mint}
@@ -300,8 +311,10 @@ export default function SearchPage() {
 					</View>
 
 					{loadingSpecs ? (
-						<View style={styles.loadingBox}>
-							<ActivityIndicator color={APP_COLORS.primary} />
+						<View style={styles.specGrid} accessibilityLabel="Loading specialities">
+							{Array.from({ length: SKELETON_COUNT }, (_, index) => (
+								<SpecialityGridSkeleton key={`spec-skeleton-${index}`} width={itemWidth} />
+							))}
 						</View>
 					) : (
 						<>
@@ -408,11 +421,6 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.26,
 		color: APP_COLORS.surface,
 	},
-	heroSubtitle: {
-		fontSize: 14,
-		lineHeight: 20,
-		color: APP_COLORS.mint,
-	},
 
 	// Scroll content (design <main>: gap 8, padding-bottom 8)
 	scrollContent: { paddingBottom: 8, gap: 8 },
@@ -490,10 +498,6 @@ const styles = StyleSheet.create({
 	},
 
 	// Speciality grid (3 cols, 16px row gap, 8px column gap)
-	loadingBox: {
-		paddingVertical: 24,
-		alignItems: 'center',
-	},
 	specGrid: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',

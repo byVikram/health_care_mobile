@@ -17,6 +17,7 @@ import { AppHeaderBackdrop } from './AppScreenHeader'
 import { APP_COLORS } from '../../../config/theme'
 import type { SearchContextKey } from '../../../config/searchContexts'
 import { getUnreadNotificationCount } from '../../../services/homeService'
+import { onNotificationsChanged } from '../../../services/notificationEvents'
 
 interface AppHeaderProps {
 	variant?: 'home' | 'search' // home → pressable; search → editable input
@@ -113,6 +114,22 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 			if (!compactRef.current && heightRef.current > 0) setHeaderHeightRef.current?.(heightRef.current)
 		})
 	}, [compact, progress])
+
+	// A push that arrives while the app is open updates the bell at once.
+	useEffect(
+		() =>
+			onNotificationsChanged(() => {
+				const refresh = async () => {
+					try {
+						setUnread(await getUnreadNotificationCount())
+					} catch {
+						// Soft-fail: keep the last known count.
+					}
+				}
+				void refresh()
+			}),
+		[]
+	)
 
 	// Unread count + greeting refresh whenever Home regains focus (e.g. back from Notifications).
 	useFocusEffect(

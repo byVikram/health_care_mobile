@@ -1,7 +1,7 @@
 // src/features/appointment/components/RescheduleModal.tsx
 //
 // Shared reschedule screen used by both the Patient Dashboard
-// (MobileAppointmentCard) and the All Appointments list (AppointmentList).
+// (MobileAppointmentCard).
 // Extracted so both places open the exact same reschedule experience
 // instead of maintaining duplicate UI/logic.
 

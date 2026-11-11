@@ -70,7 +70,7 @@ export default function CareAiPage() {
 
 	const openLink = (link: CareAiLink) => {
 		if (link.to === 'appointments') {
-			navigation.navigate(ROUTES.STACK.APPOINTMENTS)
+			navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL, params: { filter: 'doctor' } } as never) // the Bookings tab
 			return
 		}
 		navigation.navigate(ROUTES.STACK.DOCTOR_SEARCH, {

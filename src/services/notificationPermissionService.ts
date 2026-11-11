@@ -1,6 +1,7 @@
 // src/services/notificationPermissionService.ts
 import { PermissionsAndroid, Platform } from 'react-native'
 import ApiService from './apiService'
+import { API_ENDPOINTS } from '../constants/apiUrls'
 
 let backendPromptMarked = false
 
@@ -31,7 +32,8 @@ export async function markNotificationPromptShownOnBackend(): Promise<boolean> {
 	try {
 		backendPromptMarked = true
 		console.log('[NOTIFICATION PERMISSION] Updating notification_prompt_shown = true on backend...')
-		await ApiService.patch('/api/auth/session/notification-prompt', undefined)
+		// An empty JSON body, not none: Android's HTTP client can refuse a PATCH that has no body at all.
+		await ApiService.patch(API_ENDPOINTS.AUTH.SESSION_NOTIFICATION_PROMPT, {})
 		console.log('[NOTIFICATION PERMISSION SUCCESS] Session notification_prompt_shown updated.')
 		return true
 	} catch (error) {

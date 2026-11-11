@@ -3,7 +3,7 @@ import React, { useMemo } from 'react'
 import AcupunctureIcon from '../../../assets/allied-health/acupuncture.png'
 import AyurvedaIcon from '../../../assets/allied-health/ayurveda.png'
 import HomeopathyIcon from '../../../assets/allied-health/homeopathy.png'
-import CardGridSelectorModal, { SelectorCardItem } from './CardGridSelcetor'
+import CardGridSelectorModal, { SelectorCardItem } from './CardGridSelector'
 
 interface AlliedSelectorModalProps {
 	open: boolean

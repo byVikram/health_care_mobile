@@ -201,7 +201,6 @@ export type AppStackParamList = {
 	[ROUTES.STACK.SETTINGS]: undefined
 	[ROUTES.STACK.DOCTOR_WELCOME]: undefined
 	[ROUTES.STACK.ACCOUNT]: undefined
-	[ROUTES.STACK.APPOINTMENTS]: { appointmentId?: string } | undefined
 	[ROUTES.STACK.RESCHEDULE_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.CANCEL_APPOINTMENT]: { appointmentId: string }
 	[ROUTES.STACK.VISIT_SUMMARY]: { appointmentId: string }

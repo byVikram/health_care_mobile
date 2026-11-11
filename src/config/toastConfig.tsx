@@ -9,6 +9,7 @@ import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import type { ToastConfigParams } from 'react-native-toast-message'
 import { AppPathIcon } from '../components/common/display/AppIcon'
+import NotificationToast from '../components/common/feedback/NotificationToast'
 import { APP_COLORS } from './theme'
 
 /** Distance of the pill from the bottom edge: clears the floating tab bar and sits over footer buttons. */
@@ -53,6 +54,8 @@ export const toastConfig = {
 	error: (props: ToastConfigParams<unknown>) => <PillToast {...props} type="error" />,
 	info: (props: ToastConfigParams<unknown>) => <PillToast {...props} type="info" />,
 	rejectSuccess: (props: ToastConfigParams<unknown>) => <PillToast {...props} type="error" />,
+	// A push that arrives while the app is open and cannot be posted as a system notification (services/pushNotificationService.ts).
+	notification: (props: ToastConfigParams<unknown>) => <NotificationToast {...props} />,
 }
 
 const styles = StyleSheet.create({
