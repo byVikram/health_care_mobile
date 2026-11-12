@@ -24,6 +24,9 @@ export const RECORD_VISUALS: Record<RecordType, { kind: string; iconPath: string
 	},
 }
 
+/** The filter icon (the same lines as the Find a doctor Filters button). */
+export const FILTER_ICON_PATH = 'M4 6h16M7 12h10M10 18h4'
+
 /** The upload arrow, for the header button and the "Upload health records" card. */
 export const UPLOAD_ICON_PATH = 'M12 16V4M7 9l5-5 5 5M5 20h14'
 
@@ -34,9 +37,8 @@ export const RECORD_TABS: { key: RecordsTab; label: string }[] = [
 	{ key: 'up', label: 'My uploads' },
 ]
 
-/** The tags on a row: records made by Karolahealth are green, the patient's own uploads grey. */
+/** The tag on a row: only the patient's own uploads carry one (grey); a record a doctor or lab made has none. */
 export const SOURCE_TAGS = {
-	karolahealth: { label: 'Karolahealth', bg: APP_COLORS.successBg, ink: APP_COLORS.success },
 	upload: { label: 'Uploaded by you', bg: '#F0F4F4', ink: APP_COLORS.inkMuted },
 } as const
 
@@ -65,26 +67,13 @@ export const UPLOAD_KIND_PROMPT = 'Pick one so it’s filed in the right place'
 
 export type UploadSourceId = 'camera' | 'gallery' | 'file'
 
-export const UPLOAD_SOURCES: { id: UploadSourceId; label: string; hint: string; icon: IconName; tone: Tone }[] = [
-	{
-		id: 'camera',
-		label: 'Take a photo',
-		hint: 'Scan paper records with your camera',
-		icon: 'camera-outline',
-		tone: TONES.mint,
-	},
-	{
-		id: 'gallery',
-		label: 'Choose from gallery',
-		hint: 'Photos already on your phone',
-		icon: 'image-multiple-outline',
-		tone: TONES.sky,
-	},
-	{
-		id: 'file',
-		label: 'Upload a PDF',
-		hint: 'Reports emailed by labs or hospitals',
-		icon: 'file-pdf-box',
-		tone: { bg: APP_COLORS.dangerBg, ink: APP_COLORS.danger },
-	},
-]
+/** What the shared source sheet (AppPhotoSourceSheet) says for a record upload. */
+export const UPLOAD_SOURCE_SHEET = {
+	title: 'Upload a record',
+	subtitle: 'Prescriptions and lab reports',
+	takePhotoHint: 'Scan paper records with your camera',
+	choosePhotoHint: 'Photos already on your phone',
+	chooseFileTitle: 'Upload a PDF',
+	chooseFileHint: 'Reports emailed by labs or hospitals',
+	tip: 'Your records are private to you. JPG, PNG or PDF, up to 20 MB.',
+}
