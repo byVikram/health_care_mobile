@@ -177,6 +177,8 @@ export { AppOtpInput } from './inputs/AppOtpInput'
 export type { AppOtpInputProps } from './inputs/AppOtpInput'
 export { AppTabs } from './inputs/AppTabs'
 export type { AppTabsProps, AppTabItem } from './inputs/AppTabs'
+export { AppFilterSheet } from './inputs/AppFilterSheet'
+export type { AppFilterSheetProps, AppFilterGroup, AppFilterOption } from './inputs/AppFilterSheet'
 
 // Booking wave: provider picking, visits, bookings list, cart footer (see src/components/common/booking/)
 export { AppRadioCard } from './booking/AppRadioCard'
@@ -263,11 +265,7 @@ export { LogoutConfirmModal } from './feedback/LogoutConfirmModal'
 export { AppConfirmSheet } from './feedback/AppConfirmSheet'
 export type { AppConfirmSheetProps } from './feedback/AppConfirmSheet'
 
-// Medical records: pill tabs with counts, person switcher for a header, month-grouped record list, dashed action card, empty card
-export { AppPillTabs } from './inputs/AppPillTabs'
-export type { AppPillTab, AppPillTabsProps } from './inputs/AppPillTabs'
-export { AppMemberSwitcher } from './inputs/AppMemberSwitcher'
-export type { AppMemberSwitcherProps } from './inputs/AppMemberSwitcher'
+// Medical records: month-grouped record list, dashed action card, empty card
 export { AppRecordList } from './display/AppRecordList'
 export type { AppRecordListProps, AppRecordGroup, AppRecordRowData, AppRecordTag } from './display/AppRecordList'
 export { AppDashedActionCard } from './display/AppDashedActionCard'

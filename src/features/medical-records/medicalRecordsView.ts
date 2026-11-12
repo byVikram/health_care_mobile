@@ -6,6 +6,7 @@
 import type { AppRecordGroup, AppRecordRowData } from '../../components/common'
 import { MONTH_LONG, formatFullDate, parseDateOnly } from '../../utils/date'
 import type { PickedFile } from '../../utils/pickedFile'
+import { NO_RECORD_FILTERS, dateCutoff, matchesFilters, type RecordFilters } from './medicalRecordsFilters'
 import type { MedicalRecord, RecordApi, RecordKind, RecordsTab, RecordType } from './medicalRecordsTypes'
 import { RECORD_VISUALS, SOURCE_TAGS, UPLOAD_KIND_LABELS } from './recordVisuals'
 
@@ -40,13 +41,34 @@ const inTab = (record: MedicalRecord, tab: RecordsTab): boolean => {
 	return record.kind === TAB_KIND[tab]
 }
 
-/** The records of one tab that match a search of the title and the subtitle (case-insensitive). */
-export function filterRecords(records: MedicalRecord[], tab: RecordsTab, query: string): MedicalRecord[] {
+/** The records inside the Filters sheet's date range (the tab and the search come after). */
+export function applyRecordFilters(records: MedicalRecord[], filters: RecordFilters): MedicalRecord[] {
+	const cutoff = dateCutoff(filters.date)
+	return records.filter((record) => matchesFilters(record, cutoff))
+}
+
+/**
+ * The records of one tab that match the filters and a search of the title, the subtitle and the kind's name (case-insensitive),
+ * in the chosen order (newest first unless the filters say oldest).
+ */
+export function filterRecords(
+	records: MedicalRecord[],
+	tab: RecordsTab,
+	query: string,
+	filters: RecordFilters = NO_RECORD_FILTERS
+): MedicalRecord[] {
 	const needle = query.trim().toLowerCase()
-	return records
+	const found = applyRecordFilters(records, filters)
 		.filter((record) => inTab(record, tab))
-		.filter((record) => !needle || `${record.title} ${record.subtitle ?? ''}`.toLowerCase().includes(needle))
+		.filter(
+			(record) =>
+				!needle ||
+				`${record.title} ${record.subtitle ?? ''} ${UPLOAD_KIND_LABELS[record.kind]}`
+					.toLowerCase()
+					.includes(needle)
+		)
 		.sort(byDateDesc)
+	return filters.sort === 'old' ? found.reverse() : found
 }
 
 /** "SEPTEMBER 2026" for a YYYY-MM-DD date. */
@@ -61,6 +83,16 @@ export function recordDateLabel(isoDate: string): string {
 	return date ? formatFullDate(date) : isoDate
 }
 
+/**
+ * The small caps line above a row's title ("PRESCRIPTION"): what an upload was filed as, or the type of a record made by a doctor or a
+ * lab. Left out when the title already says it (a record named by its kind is "Lab report", and a caption "LAB REPORT" over it would
+ * read twice).
+ */
+const captionFor = (record: MedicalRecord): string | undefined => {
+	const caption = record.type === 'up' ? UPLOAD_KIND_LABELS[record.kind] : RECORD_VISUALS[record.type].kind
+	return record.title.toUpperCase() === caption ? undefined : caption
+}
+
 export function recordRow(
 	record: MedicalRecord,
 	onOpen: (record: MedicalRecord) => void,
@@ -69,14 +101,13 @@ export function recordRow(
 	const visual = RECORD_VISUALS[record.type]
 	return {
 		key: record.id,
-		// An upload says what the patient filed it as; a record made by a doctor or a lab uses its type's caption.
-		kind: record.type === 'up' ? UPLOAD_KIND_LABELS[record.kind] : visual.kind,
+		kind: captionFor(record),
 		title: record.title,
 		subtitle: record.subtitle,
 		date: recordDateLabel(record.date),
 		iconPath: visual.iconPath,
 		tone: visual.tone,
-		tag: record.type === 'up' ? SOURCE_TAGS.upload : SOURCE_TAGS.karolahealth,
+		tag: record.type === 'up' ? SOURCE_TAGS.upload : undefined,
 		onPress: () => onOpen(record),
 		// Only what the patient uploaded themselves can be removed: a record from a doctor or a lab is part of their history.
 		onDelete: onDelete && record.type === 'up' ? () => onDelete(record) : undefined,
@@ -100,10 +131,12 @@ export function groupByMonth(
 	return groups
 }
 
-export const emptyMessage = (query: string): string =>
+export const emptyMessage = (query: string, filtered = false): string =>
 	query.trim()
 		? `Nothing matches “${query.trim()}”.`
-		: 'Records from Karolahealth visits and tests show up here automatically. You can also upload your own.'
+		: filtered
+			? 'No records match your filters. Try clearing some.'
+			: 'Prescriptions from your visits show up here automatically. You can also upload your own.'
 
 // ── Files ───────────────────────────────────────────────────────────────────
 
@@ -138,7 +171,8 @@ export function recordFromApi(api: RecordApi, memberKey: string): MedicalRecord 
 		memberKey,
 		type: api.source === 'patient' ? 'up' : KIND_TYPE[api.kind],
 		kind: api.kind,
-		title: api.title,
+		// A visit's title is "Prescription · Dr. Anjali Singh": the row's caption already says Prescription, so only the doctor is the title.
+		title: visit ? api.title.replace(/^Prescription\s*·\s*/, '') || api.title : api.title,
 		subtitle: visit ? (api.provider ?? undefined) : describeRecordFile(api.file?.content_type),
 		date: api.record_date,
 		appointmentId: api.appointment_id ?? undefined,
