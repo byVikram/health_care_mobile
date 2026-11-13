@@ -69,6 +69,12 @@ export interface Appointment {
   /** The patient's consent code was already entered for this appointment: the doctor opens the consultation directly. */
   access_verified?: boolean
   reason?: string | null
+  /** Why it is cancelled / rescheduled / asked to be rescheduled, as the person who did it wrote it (null otherwise). */
+  status_reason?: string | null
+  /** Who gave that reason: 'doctor', 'patient', an admin role or 'system'. */
+  status_changed_by?: string | null
+  /** 'Cancelled by you' / 'Cancelled by the doctor' ...: the line for `status_reason`, worded for the person asking. */
+  status_reason_title?: string | null
   referral?: {
     id: string
     referring_doctor: {
