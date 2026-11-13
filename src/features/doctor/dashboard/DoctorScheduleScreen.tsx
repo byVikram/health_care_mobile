@@ -48,6 +48,7 @@ import { updateAppointmentsStatus } from '../../../services/appointmentService'
 import { askPatientToReschedule } from '../doctorService'
 import { AskPatientRescheduleSheet } from '../components/AskPatientRescheduleSheet'
 import { createReferral } from '../../referrals/referralService'
+import { statusReasonCopy } from '../../appointment/statusReason'
 import { clinicTodayIso, effectiveStatusLabel, formatTime12h, humanizeStatus, isAccepted, isCompletedAppt, isPending, isRequestLike, isNoShowAppt, isRescheduleNeeded, isRescheduleRequest, isVideoMode, NO_SHOW_SOURCE_STATUSES, noShowWindow, rowStatusTone, statusLabelOf, toApiDate } from '../scheduleUtils'
 import type { Appointment } from '../../../types/appointment'
 import type { FavouriteDoctorListItem } from '../search/components/FavouriteDoctorList'
@@ -637,6 +638,7 @@ export function DoctorScheduleScreen() {
 				mode={isVideoMode(apt.appointment_mode) ? 'Video' : 'In-clinic'}
 				payLabel={`₹${apt.fees ?? '--'}`}
 				reason={apt.symptoms || apt.pre_intake?.symptoms || apt.reason}
+				statusNote={statusReasonCopy(apt)}
 				busy={busyId === apt.id}
 				outcome={outcome}
 				onAccept={() => handleAccept(apt)}
