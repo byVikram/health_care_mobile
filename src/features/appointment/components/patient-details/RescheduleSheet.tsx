@@ -9,7 +9,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import {
-	AppInput,
 	AppRescheduleGroup,
 	AppRescheduleSheet,
 	DateStrip,
@@ -71,8 +70,6 @@ export default function RescheduleSheet({
 	const [loading, setLoading] = useState(false)
 	const [loadError, setLoadError] = useState(false)
 	const [submitting, setSubmitting] = useState(false)
-	// Why the patient needs another time, in their own words (optional): the doctor reads it.
-	const [reason, setReason] = useState('')
 	const [resolvedHospitalId, setResolvedHospitalId] = useState<string | null>(hospitalId ?? null)
 
 	const currentDay = parseDateOnly(currentDate)
@@ -86,7 +83,6 @@ export default function RescheduleSheet({
 		const idx = fresh.findIndex((d) => formatDateForApi(d) === currentKey)
 		setDayIdx(idx >= 0 ? idx : 0)
 		setSelected(null)
-		setReason('')
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [visible])
 
@@ -170,7 +166,7 @@ export default function RescheduleSheet({
 				start_time: selected.start_time,
 				end_time: selected.end_time ?? null,
 				hospital_id: resolvedHospitalId,
-				reason: reason.trim() || undefined,
+				reason: 'Patient requested reschedule',
 				status_id: APPOINTMENT_STATUS.CONFIRM,
 			})
 			if (res?.success) {
@@ -264,16 +260,6 @@ export default function RescheduleSheet({
 					</AppRescheduleGroup>
 				))
 			)}
-
-			<AppInput
-				label="Reason (optional)"
-				placeholder="Tell your doctor why you need a different time"
-				value={reason}
-				onChangeText={setReason}
-				multiline
-				numberOfLines={2}
-				maxLength={500}
-			/>
 		</AppRescheduleSheet>
 	)
 }

@@ -38,8 +38,6 @@ export type AppointmentActionCardProps = {
 	mode: 'Video' | 'In-clinic'
 	payLabel: string
 	reason?: string | null
-	/** Why the appointment was cancelled or moved, from whoever did it (e.g. a patient's reschedule request): title + reason. */
-	statusNote?: { title: string; reason: string } | null
 	busy?: boolean
 	outcome?: AppointmentActionOutcome | null
 	onAccept?: () => void
@@ -69,7 +67,6 @@ export function AppointmentActionCard({
 	mode,
 	payLabel,
 	reason,
-	statusNote,
 	busy = false,
 	outcome,
 	onAccept,
@@ -145,13 +142,6 @@ export function AppointmentActionCard({
 				<Text style={styles.reasonText}>
 					<Text style={{ fontWeight: '800' }}>Reason · </Text>
 					{reason}
-				</Text>
-			)}
-
-			{!!statusNote && (
-				<Text style={styles.reasonText}>
-					<Text style={{ fontWeight: '800' }}>{statusNote.title} · </Text>
-					{statusNote.reason}
 				</Text>
 			)}
 
