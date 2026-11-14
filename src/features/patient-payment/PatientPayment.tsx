@@ -47,6 +47,9 @@ import { showStatusModal } from '../../services/apiService'
 
 type PaymentMethodId = 'upi' | 'card' | 'netbank' | 'later'
 
+// The server answers a slot that was taken or blocked while the patient was confirming with a 400 and a sentence about the slot (no code).
+const SLOT_TAKEN_PATTERN = /already booked|currently blocked|not available for the selected slot/i
+
 /** Short label forwarded to the Confirmed screen ("₹x paid via {label}"). */
 const PAYMENT_METHOD_LABELS: Record<PaymentMethodId, string> = {
 	upi: 'UPI',
@@ -272,10 +275,41 @@ export default function BookingDetailsScreen() {
 				})
 			}
 		} catch (error: any) {
+			const message: string | undefined = error?.response?.data?.message
+			const backToSlotPage = () => {
+				if (navigation.canGoBack()) navigation.goBack()
+				else navigation.navigate(ROUTES.STACK.DOCTOR_DETAIL, { id: doctor?.id ?? '' })
+			}
+			if (error?.response?.data?.code === 'CONSENT_OUTDATED') {
+				// The booking terms changed after the patient accepted them: booking again with the same acceptance would fail the same
+				// way. Back to the slot page; Continue opens the consent form, which fetches the current terms again.
+				showStatusModal({
+					status: 'error',
+					title: 'The booking terms were updated',
+					description: 'Please review and accept the new terms to continue. Your chosen time is kept.',
+					submitText: 'Review the terms',
+					onSubmit: backToSlotPage,
+					onCancel: backToSlotPage,
+				})
+				return
+			}
+			if (message && SLOT_TAKEN_PATTERN.test(message)) {
+				// Paying again for the same time would fail the same way: back to the slot page, which fetches the slots again.
+				const chooseAnotherSlot = backToSlotPage
+				showStatusModal({
+					status: 'error',
+					title: 'That time is no longer available',
+					description: `${message} Please choose another time.`,
+					submitText: 'Choose another time',
+					onSubmit: chooseAnotherSlot,
+					onCancel: chooseAnotherSlot,
+				})
+				return
+			}
 			showStatusModal({
 				status: 'error',
 				title: "Couldn't book the appointment",
-				description: error?.response?.data?.message || 'An error occurred while booking. Please try again.',
+				description: message || 'An error occurred while booking. Please try again.',
 				submitText: 'OK',
 			})
 		} finally {

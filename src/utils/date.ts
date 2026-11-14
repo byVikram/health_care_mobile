@@ -111,6 +111,9 @@ export const dayDiff = (d: Date, from = new Date()) =>
 	Math.round((startOfDay(d).getTime() - startOfDay(from).getTime()) / DAY_MS)
 
 /** `count` consecutive days starting today (local midnight). */
+/** How many days ahead (today included) a patient can book or reschedule a doctor's slot: the same on the web (BOOKING_WINDOW_DAYS). */
+export const BOOKING_WINDOW_DAYS = 14
+
 export const nextDays = (count = 7): Date[] => {
 	const today = startOfDay(new Date())
 	return Array.from({ length: count }, (_, i) => {
