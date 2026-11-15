@@ -30,19 +30,6 @@ export interface ProviderVisitSummary {
 	eta_minutes: number | null
 }
 
-export interface ProviderPendingRequest {
-	request_public_id: string
-	status: AncillaryOrderStatus
-	expires_at: string | null
-	service_name: string
-	patient: { name: string | null; gender: string | null; age: number | null }
-	address_label: string | null
-	distance_km: number | null
-	payment_method: string | null
-	visits: { visit_public_id: string; date: string | null; start_time: string | null; end_time: string | null }[]
-	totals: { per_visit: number; visits_count: number; total: number }
-}
-
 export interface ProviderToday {
 	date: string
 	provider: {
@@ -51,8 +38,7 @@ export interface ProviderToday {
 		specialty: { key: string; label: string } | null
 		visit_record_type: VisitRecordType
 	}
-	stats: { visits_total: number; visits_done: number; pending_requests: number }
-	pending_requests: ProviderPendingRequest[]
+	stats: { visits_total: number; visits_done: number }
 	next_visit: ProviderVisitSummary | null
 	schedule: ProviderVisitSummary[]
 	upcoming: ProviderVisitSummary[]

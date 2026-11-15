@@ -253,11 +253,3 @@ export const getProviderScheduledOrders = async (statusFilter = 'ALL'): Promise<
 	)
 	return res.data?.data ?? []
 }
-
-export const acceptScheduledOrder = async (requestPublicId: string): Promise<void> => {
-	await ApiService.post(API_ENDPOINTS.ANCILLARY.ACCEPT_SCHEDULED(requestPublicId), {})
-}
-
-export const declineScheduledOrder = async (requestPublicId: string, reason?: string): Promise<void> => {
-	await ApiService.post(API_ENDPOINTS.ANCILLARY.DECLINE_SCHEDULED(requestPublicId), reason ? { reason } : {})
-}

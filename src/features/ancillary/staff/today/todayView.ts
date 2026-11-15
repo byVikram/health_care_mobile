@@ -1,6 +1,6 @@
 // src/features/ancillary/staff/today/todayView.ts
 //
-// Display helpers for the provider Today screen (schedule rows, next visit card, booking request sheet).
+// Display helpers for the provider Today screen (schedule rows, next visit card, incoming offers).
 import {
 	combineDateTime,
 	DOW_LABELS,
@@ -9,9 +9,9 @@ import {
 	relativeDayLabel,
 	startsInLabel,
 } from '../../../../utils/date'
-import { capitaliseWords, formatKm, formatTimeSlot } from '../../../../utils/formatters'
-import type { ProviderOffer, ProviderPendingRequest, ProviderVisitSummary } from '../../providerVisitService'
-import { countNoun, type ProviderNoun, type ProviderSpecialityCopy } from '../providerSpecialityCopy'
+import { formatKm, formatTimeSlot } from '../../../../utils/formatters'
+import type { ProviderOffer, ProviderVisitSummary } from '../../providerVisitService'
+import type { ProviderNoun, ProviderSpecialityCopy } from '../providerSpecialityCopy'
 
 export const visitStart = (v: Pick<ProviderVisitSummary, 'date' | 'start_time'>) =>
 	combineDateTime(v.date, v.start_time)
@@ -65,23 +65,8 @@ export const shortDay = (date?: string | null) => {
 	return d ? `${DOW_LABELS[d.getDay()]} ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}` : ''
 }
 
-/** "Reply in 28 min" pieces: minutes left, or m:ss in the last minute. Null once expired. */
-export const replyInLabel = (expiresAt: string | null, nowMs: number): string | null => {
-	if (!expiresAt) return null
-	const ms = new Date(expiresAt).getTime() - nowMs
-	if (!Number.isFinite(ms) || ms <= 0) return null
-	if (ms < 60_000) return `0:${String(Math.floor(ms / 1000)).padStart(2, '0')}`
-	return `${Math.ceil(ms / 60_000)} min`
-}
-
-/** "Female · 70 yrs" (only the parts we know). */
-export const patientBrief = (p: ProviderPendingRequest['patient']) =>
-	[p.gender ? capitaliseWords(p.gender) : null, p.age != null ? `${p.age} yrs` : null].filter(Boolean).join(' · ')
-
 /** "Anita P." -> "ANITA P." for the eyebrow. */
 export const upperName = (name?: string | null) => (name ?? '').toUpperCase()
-
-export const visitsWord = (n: number, noun: ProviderNoun = 'visit') => countNoun(n, noun)
 
 /** "incl. ₹30 tip" when the patient tipped, else null. */
 export const tipLabel = (tip?: number | null) =>

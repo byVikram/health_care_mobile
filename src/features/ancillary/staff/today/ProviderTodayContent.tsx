@@ -1,7 +1,7 @@
 // src/features/ancillary/staff/today/ProviderTodayContent.tsx
 //
 // Provider "Today" (ancillary-provider design, screen 1) rendered inside ProviderTodayScreen's scroll view for the
-// ancillary role: stats, new booking requests (banner -> BookingRequestSheet -> accept / decline), open offers
+// ancillary role: stats, open offers
 // pushed on the dispatch WebSocket (instant requests ring for 30 s in IncomingOfferSheet; per-visit offers of
 // provider-less orders show as banners, with an optional tip) and the next visit card. Stats: visits today,
 // earned today (dashboard metrics) and rating (average of approved reviews, "—" until there is one). Wording follows the provider's speciality (visit / session / shift). Data: GET
@@ -14,28 +14,24 @@ import Toast from 'react-native-toast-message'
 import { AppInfoBanner } from '../../../../components/common'
 import { APP_COLORS, formatInr } from '../../../../config/theme'
 import { ROUTES } from '../../../../navigation/routes'
-import { acceptScheduledOrder, declineScheduledOrder } from '../../ancillaryProviderBookingService'
 import { acceptCareRequestBackend, extractApiErrorMessage } from '../../ancillaryService'
 import {
 	getProviderToday,
 	getTodayEarnings,
 	rejectOffer,
 	type ProviderOffer,
-	type ProviderPendingRequest,
 	type ProviderToday,
 	type ProviderVisitSummary,
 } from '../../providerVisitService'
-import { DeclineOrderSheet } from '../components/DeclineOrderSheet'
 import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { ProviderAvailabilityCard } from './ProviderAvailabilityCard'
 import { useProviderDispatchSocket } from './useProviderDispatchSocket'
 import { useProviderOnline } from './useProviderOnline'
-import { BookingRequestSheet } from './BookingRequestSheet'
 import { IncomingOfferSheet, type OfferPhase } from './IncomingOfferSheet'
 import { ProviderNextVisitCard } from './ProviderNextVisitCard'
 import { ProviderScheduleTimeline } from './ProviderScheduleTimeline'
 import { getProviderAverageRating, ratingLabel } from './providerRating'
-import { isInstantOffer, isProviderWork, offerCollect, replyInLabel, shortDay, tipLabel, visitsWord } from './todayView'
+import { isInstantOffer, isProviderWork, offerCollect, shortDay, tipLabel } from './todayView'
 import { showStatusModal } from '../../../../services/apiService'
 
 const REFRESH_MS = 60_000
@@ -68,10 +64,6 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [nowMs, setNowMs] = useState(() => Date.now())
-	const [sheetRequest, setSheetRequest] = useState<ProviderPendingRequest | null>(null)
-	const [acceptingId, setAcceptingId] = useState<string | null>(null)
-	const [declineTarget, setDeclineTarget] = useState<ProviderPendingRequest | null>(null)
-	const [declining, setDeclining] = useState(false)
 	const [focused, setFocused] = useState(false)
 	const [earnedToday, setEarnedToday] = useState<number | null>(null)
 	const [rating, setRating] = useState<number | null>(null)
@@ -147,7 +139,7 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 		void run()
 	}, [refreshToken, load, onRefreshComplete])
 
-	// New booking requests have no push channel here: re-read every minute while the screen is visible.
+	// Keep the next visit and the day's schedule fresh: re-read every minute while the screen is visible.
 	useEffect(() => {
 		if (!focused) return
 		const t = setInterval(() => void load(), REFRESH_MS)
@@ -194,15 +186,13 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 
 	const copy = getProviderSpecialityCopy(data?.provider.specialty)
 
-	// Countdown tick while a request is waiting for a reply; re-read once one runs out.
-	const pending = data?.pending_requests ?? []
-	const hasPending = pending.length > 0
+	// Countdown tick while an instant request is waiting for a reply.
 	const hasInstant = offers.some(isInstantOffer)
 	useEffect(() => {
-		if (!focused || (!hasPending && !hasInstant)) return
+		if (!focused || !hasInstant) return
 		const t = setInterval(() => setNowMs(Date.now()), 1000)
 		return () => clearInterval(t)
-	}, [focused, hasPending, hasInstant])
+	}, [focused, hasInstant])
 
 	/** Seconds left for an instant offer (counted from when this device first saw it). */
 	const offerSecondsLeft = (o: ProviderOffer) =>
@@ -218,7 +208,7 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 
 	// An instant request rings once: its sheet opens by itself when there is nothing else on screen.
 	useEffect(() => {
-		if (sheetOffer || sheetRequest || declineTarget) return
+		if (sheetOffer) return
 		const next = liveOffers.find((o) => isInstantOffer(o) && !offerAutoOpened.current.has(o.requestId))
 		if (!next) return
 		offerAutoOpened.current.add(next.requestId)
@@ -229,24 +219,6 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 	// The open instant sheet turns into "Request missed" when the window runs out.
 	const sheetSecs = sheetOffer ? offerSecondsLeft(sheetOffer) : null
 	const phase: OfferPhase = offerPhase === 'open' && sheetSecs === 0 ? 'missed' : offerPhase
-
-	const expiredSeen = useRef<Set<string>>(new Set())
-	useEffect(() => {
-		const expired = pending.filter(
-			(r) => r.expires_at && !replyInLabel(r.expires_at, nowMs) && !expiredSeen.current.has(r.request_public_id)
-		)
-		if (expired.length === 0) return
-		expired.forEach((r) => expiredSeen.current.add(r.request_public_id))
-		void load()
-	}, [pending, nowMs, load])
-
-	// Keep an open sheet in sync with the latest data (it closes if the request is gone).
-	useEffect(() => {
-		if (!sheetRequest || acceptingId) return
-		const fresh = pending.find((r) => r.request_public_id === sheetRequest.request_public_id)
-		if (!fresh) setSheetRequest(null)
-		else if (fresh !== sheetRequest) setSheetRequest(fresh)
-	}, [pending, sheetRequest, acceptingId])
 
 	/** A visit in progress opens straight into the in-progress screen; anything else shows its details. */
 	const openVisit = (visit: ProviderVisitSummary) => {
@@ -321,64 +293,6 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 		}
 	}
 
-	const handleAccept = async (request: ProviderPendingRequest) => {
-		if (acceptingId) return
-		setAcceptingId(request.request_public_id)
-		try {
-			await acceptScheduledOrder(request.request_public_id)
-			setSheetRequest(null)
-			const n = request.totals.visits_count
-			Toast.show({
-				type: 'success',
-				text1: 'Booking accepted',
-				text2:
-					n > 1
-						? `All ${n} ${copy.noun}s with ${request.patient.name ?? 'the patient'} are confirmed.`
-						: `Your ${copy.noun} with ${request.patient.name ?? 'the patient'} is confirmed.`,
-			})
-		} catch (e) {
-			showStatusModal({
-				status: 'error',
-				title: 'Could not accept booking',
-				description: extractApiErrorMessage(e, 'This request may have expired. Please try again.'),
-				submitText: 'OK',
-			})
-		} finally {
-			setAcceptingId(null)
-			void load()
-		}
-	}
-
-	const handleDecline = (request: ProviderPendingRequest) => {
-		setSheetRequest(null)
-		setDeclineTarget(request)
-	}
-
-	const confirmDecline = async (reason: string) => {
-		if (!declineTarget || declining) return
-		const target = declineTarget
-		setDeclining(true)
-		try {
-			await declineScheduledOrder(target.request_public_id, reason)
-			setDeclineTarget(null)
-			Toast.show({
-				type: 'success',
-				text1: 'Booking declined',
-				text2: `${target.patient.name ?? 'The patient'} has been notified.`,
-			})
-		} catch (e) {
-			showStatusModal({
-				status: 'error',
-				title: 'Could not decline booking',
-				description: extractApiErrorMessage(e, 'Please try again.'),
-				submitText: 'OK',
-			})
-		} finally {
-			setDeclining(false)
-			void load()
-		}
-	}
-
 	if (loading && !data) {
 		return (
 			<View style={styles.loadingBox}>
@@ -420,25 +334,6 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 					<StatTile label="Rating" value={ratingLabel(rating)} />
 				</View>
 			) : null}
-
-			{pending.map((r) => {
-				const replyIn = replyInLabel(r.expires_at, nowMs)
-				return (
-					<View key={r.request_public_id} style={styles.padded}>
-						<AppInfoBanner
-							tone="sky"
-							icon="calendar-plus"
-							title={r.patient.name ? `New booking from ${r.patient.name}` : 'New booking request'}
-							subtitle={[
-								visitsWord(r.totals.visits_count, copy.noun),
-								replyIn ? `reply in ${replyIn}` : 'expired',
-							].join(' · ')}
-							onPress={() => setSheetRequest(r)}
-							chevron
-						/>
-					</View>
-				)
-			})}
 
 			{liveOffers.map((o) => {
 				const secs = offerSecondsLeft(o)
@@ -499,27 +394,6 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 				onAccept={(o) => void handleAcceptOffer(o)}
 				onDecline={(o) => void handleDeclineOffer(o)}
 				onClose={closeOfferSheet}
-			/>
-
-			<BookingRequestSheet
-				request={sheetRequest}
-				copy={copy}
-				nowMs={nowMs}
-				accepting={!!acceptingId}
-				onClose={() => setSheetRequest(null)}
-				onAccept={(r) => void handleAccept(r)}
-				onDecline={handleDecline}
-			/>
-
-			<DeclineOrderSheet
-				visible={!!declineTarget}
-				patientName={declineTarget?.patient.name ?? undefined}
-				visitsCount={declineTarget?.totals.visits_count || 1}
-				submitting={declining}
-				onClose={() => {
-					if (!declining) setDeclineTarget(null)
-				}}
-				onConfirm={(reason) => void confirmDecline(reason)}
 			/>
 		</View>
 	)

@@ -1,4 +1,5 @@
-const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
+// const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
+const envUrl = 'http://192.168.0.128:8000'
 
 if (!envUrl) {
 	throw new Error('EXPO_PUBLIC_API_ENDPOINT is not configured')
@@ -292,18 +293,8 @@ export const API_ENDPOINTS = {
 		PROVIDER_EARNINGS: `${BASE_URL}/api/ancillary/provider/earnings`,
 		PROVIDER_DASHBOARD_METRICS: `${BASE_URL}/api/ancillary/provider/dashboard-metrics`,
 		VERIFIED_NURSES: `${BASE_URL}/api/ancillary/nurses`,
-		// Phase 1 Slot-Based Booking Endpoints
-		AVAILABLE_SLOTS: `${BASE_URL}/api/ancillary/available-slots`,
 		REQUESTS_SCHEDULED: `${BASE_URL}/api/ancillary/requests/scheduled`,
-		RESPOND_RESCHEDULE: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/reschedule/respond`,
-		PROVIDER_AVAILABILITY: `${BASE_URL}/api/ancillary/provider/me/availability`,
-		PROVIDER_OVERRIDES: `${BASE_URL}/api/ancillary/provider/me/availability/overrides`,
-		PROVIDER_OVERRIDE_BY_ID: (id: string | number) =>
-			`${BASE_URL}/api/ancillary/provider/me/availability/overrides/${id}`,
 		PROVIDER_SCHEDULED_ORDERS: `${BASE_URL}/api/ancillary/provider/me/orders`,
-		ACCEPT_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/accept`,
-		DECLINE_SCHEDULED: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/decline`,
-		RESCHEDULE_PROPOSAL: (id: string) => `${BASE_URL}/api/ancillary/provider/me/orders/${id}/reschedule/propose`,
 		// Provider visit execution (Today / visit details / start / in progress / complete)
 		PROVIDER_TODAY: `${BASE_URL}/api/ancillary/provider/me/today`,
 		PROVIDER_VISIT: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}`,
