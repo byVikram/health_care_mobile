@@ -136,6 +136,9 @@ const historyTitle = (action: string) => {
 	return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
+// The history entries a person explains: their reason goes under the step.
+const REASON_ACTIONS = new Set(['cancelled', 'canceled', 'rescheduled', 'reschedule_required'])
+
 type BuildTimelineArgs = {
 	appt: PatientAppointment
 	variant: AppointmentVariant
@@ -154,7 +157,7 @@ export function buildTimeline({ appt, variant, isVideo, payment, isPast }: Build
 			steps.push({
 				key: `h-${i}`,
 				title: historyTitle(h.action || ''),
-				sub: stampLabel(h.created_at) || undefined,
+				sub: [stampLabel(h.created_at), REASON_ACTIONS.has(a) ? (h.reason || '').trim() : ''].filter(Boolean).join(' · ') || undefined,
 				state: a === 'cancelled' || a === 'canceled' || a === 'no_show' ? 'failed' : 'done',
 			})
 		})

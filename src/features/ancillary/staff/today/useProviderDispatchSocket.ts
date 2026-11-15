@@ -12,7 +12,6 @@
 //                                   (and `onOrdersChanged`); any other status -> `onOrdersChanged`.
 //       OFFER_WITHDRAWN             data = {requestId, reason: ACCEPTED_BY_OTHER | CANCELLED | EXPIRED,
 //                                   visitPublicId?} sent to the OTHER providers -> `onOfferGone` (with the reason).
-//       NEW_SCHEDULED_ORDER_REQUEST a booking addressed to this provider -> `onOrdersChanged` (re-read Today).
 //   - Open only while `enabled` (screen focused) AND the app is in the foreground; closed on blur / background /
 //     unmount (logout unmounts the authenticated stack). openAuthedSocket reconnects with exponential backoff
 //     (1 s doubling to 30 s) and stops on fatal close codes (4401 / 4403 / 4404). A light ping every 25 s keeps idle
@@ -87,9 +86,6 @@ export function useProviderDispatchSocket({
 					})
 					break
 				}
-				case 'NEW_SCHEDULED_ORDER_REQUEST':
-					handlers.current.onOrdersChanged()
-					break
 			}
 		})
 		const ping = setInterval(() => socket.send(JSON.stringify({ type: 'ping' })), KEEPALIVE_MS)

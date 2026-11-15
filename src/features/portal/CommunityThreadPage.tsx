@@ -6,7 +6,6 @@ import {
 	TouchableOpacity,
 	ActivityIndicator,
 	TextInput,
-	Alert,
 	RefreshControl,
 } from 'react-native'
 import { Text, Card, Avatar, Chip, Button } from 'react-native-paper'
@@ -22,6 +21,7 @@ import {
 	CommunityComment,
 } from '../../services/communityService'
 import type { AppStackParamList } from '../../navigation/types'
+import Toast from 'react-native-toast-message'
 
 type ThreadRouteProp = RouteProp<AppStackParamList, 'CommunityThread'>
 
@@ -151,7 +151,7 @@ export default function CommunityThreadPage() {
 			}
 		} catch (err) {
 			console.error('Error fetching thread:', err)
-			Alert.alert('Error', 'Thread not found.')
+			Toast.show({ type: 'error', text1: 'Thread not found.' })
 			navigation.goBack()
 		} finally {
 			setLoading(false)
@@ -165,20 +165,20 @@ export default function CommunityThreadPage() {
 
 	const handlePostMainComment = async () => {
 		if (!mainCommentText.trim()) {
-			Alert.alert('Empty Reply', 'Please enter your reply before posting.')
+			Toast.show({ type: 'error', text1: 'Please enter your reply before posting.' })
 			return
 		}
 		setSubmittingComment(true)
 		try {
 			const res = await createCommunityComment(threadId, mainCommentText)
 			if (res.success) {
-				Alert.alert('Success', 'Reply posted successfully!')
+				Toast.show({ type: 'success', text1: 'Reply posted successfully!' })
 				setMainCommentText('')
 				fetchThreadData()
 			}
 		} catch (err) {
 			console.error('Error posting comment:', err)
-			Alert.alert('Error', 'Failed to post reply.')
+			Toast.show({ type: 'error', text1: "Couldn't post your reply", text2: 'Please try again.' })
 		} finally {
 			setSubmittingComment(false)
 		}
@@ -186,20 +186,20 @@ export default function CommunityThreadPage() {
 
 	const handlePostReply = async (parentId: string) => {
 		if (!replyText.trim()) {
-			Alert.alert('Empty Reply', 'Please enter text for your reply.')
+			Toast.show({ type: 'error', text1: 'Please enter text for your reply.' })
 			return
 		}
 		try {
 			const res = await createCommunityComment(threadId, replyText, parentId)
 			if (res.success) {
-				Alert.alert('Success', 'Reply posted successfully!')
+				Toast.show({ type: 'success', text1: 'Reply posted successfully!' })
 				setReplyText('')
 				setActiveReplyId(null)
 				fetchThreadData()
 			}
 		} catch (err) {
 			console.error('Error posting reply:', err)
-			Alert.alert('Error', 'Failed to post reply.')
+			Toast.show({ type: 'error', text1: "Couldn't post your reply", text2: 'Please try again.' })
 		}
 	}
 

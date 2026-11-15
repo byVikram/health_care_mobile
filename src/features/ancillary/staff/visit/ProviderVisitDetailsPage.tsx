@@ -60,6 +60,7 @@ import {
 	patientLine,
 	timeRange,
 } from './visitView'
+import { showStatusModal } from '../../../../services/apiService'
 
 type Route = RouteProp<AppNavigationParamList, typeof ROUTES.STACK.PROVIDER_VISIT_DETAILS>
 
@@ -140,10 +141,11 @@ export default function ProviderVisitDetailsPage() {
 			const { latitude, longitude } = await getCurrentLocation()
 			setVisit(await markVisitArrived(visit.visit_public_id, latitude, longitude))
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Couldn’t mark you as arrived',
-				text2: extractApiErrorMessage(e, 'Please try again.'),
+			showStatusModal({
+				status: 'error',
+				title: 'Couldn’t mark you as arrived',
+				description: extractApiErrorMessage(e, 'Please try again.'),
+				submitText: 'OK',
 			})
 		} finally {
 			setArriving(false)
@@ -156,10 +158,11 @@ export default function ProviderVisitDetailsPage() {
 		try {
 			setVisit(await reportPatientNotAvailable(visit.visit_public_id))
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Couldn’t report the patient',
-				text2: extractApiErrorMessage(e, 'Please try again.'),
+			showStatusModal({
+				status: 'error',
+				title: 'Couldn’t report the patient',
+				description: extractApiErrorMessage(e, 'Please try again.'),
+				submitText: 'OK',
 			})
 			void load() // the wait may not be over after all: show where it stands
 		} finally {

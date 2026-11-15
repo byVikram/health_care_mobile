@@ -2,7 +2,7 @@
 //
 // Record list from the Medical records design: rows grouped under a small caps heading (a month), each group one white
 // bordered card. A row is a 42px tone icon tile, a tone-coloured kind line ("PRESCRIPTION"), a one-line title and subtitle,
-// then the date with up to two small tags ("Karolahealth", "3 out of range"), and, when the row can be deleted, a small bin on the
+// then the date with up to two small tags ("Uploaded by you", "3 out of range"), and, when the row can be deleted, a small bin on the
 // right. Display only: what a row says and what a tap does come in as data, so the same list can show prescriptions, lab results,
 // documents or bills.
 
@@ -17,8 +17,8 @@ export type AppRecordTag = { label: string; bg: string; ink: string }
 
 export type AppRecordRowData = {
 	key: string
-	/** Caps line above the title ("PRESCRIPTION"), in the tone's ink colour. */
-	kind: string
+	/** Caps line above the title ("PRESCRIPTION"), in the tone's ink colour; none when the title already says it. */
+	kind?: string
 	title: string
 	subtitle?: string
 	/** Already formatted ("5 Sep 2026"). */
@@ -51,14 +51,16 @@ export function AppRecordList({ groups }: AppRecordListProps) {
 									disabled={!row.onPress}
 									activeOpacity={0.8}
 									accessibilityRole="button"
-									accessibilityLabel={`${row.kind}, ${row.title}, ${row.date}`}
+									accessibilityLabel={[row.kind, row.title, row.date].filter(Boolean).join(', ')}
 									style={styles.main}
 								>
 									<AppIconTile backgroundColor={row.tone.bg} size={42} radius={12} iconSize={20}>
 										<AppPathIcon d={row.iconPath} size={20} strokeWidth={2} color={row.tone.ink} />
 									</AppIconTile>
 									<View style={styles.text}>
-										<Text style={[styles.kind, { color: row.tone.ink }]}>{row.kind}</Text>
+										{!!row.kind && (
+											<Text style={[styles.kind, { color: row.tone.ink }]}>{row.kind}</Text>
+										)}
 										<Text style={styles.title} numberOfLines={1}>
 											{row.title}
 										</Text>

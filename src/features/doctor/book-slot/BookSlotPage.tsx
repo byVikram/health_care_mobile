@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View, ScrollView } from 'react-native'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import {
 	AppAvatar,
@@ -31,6 +31,7 @@ import {
 	formatTimeForApi,
 	isClosedDayForMode,
 	nextDays,
+	BOOKING_WINDOW_DAYS,
 } from '../../../utils/date'
 import { openDirections } from '../../../utils/maps'
 import { showComingSoon } from '../../../utils/toast'
@@ -56,9 +57,6 @@ import { getDoctorAvailability, SlotGroup } from '../doctorService'
 // fetched per (doctor, hospital, date), fees come from the selected hospital
 // entry, and Continue hands off to CONSENT_FORM with the same paymentParams
 // shape PatientPayment expects (plus the optional patient / reason fields).
-
-/** How many days ahead (starting today) the Date grid offers: two rows of seven. */
-const BOOKING_WINDOW_DAYS = 14
 
 const cleanGroupLabel = (label: string) => label.replace(/\s*\(.*\)\s*$/, '')
 
@@ -118,6 +116,20 @@ export default function BookSlotPage() {
 		setSelectedDate(startOfDay(firstOpen))
 	}, [isClosed, selectedDate])
 
+	// Coming back from the payment page after a slot was taken meanwhile: the slots are fetched again (and a choice that is gone is
+	// dropped, below). The first time the page is shown it has just fetched them.
+	const [refreshKey, setRefreshKey] = useState(0)
+	const firstFocusRef = useRef(true)
+	useFocusEffect(
+		useCallback(() => {
+			if (firstFocusRef.current) {
+				firstFocusRef.current = false
+				return
+			}
+			setRefreshKey((key) => key + 1)
+		}, [])
+	)
+
 	useEffect(() => {
 		if (!doctor.id || !selectedHospital) return
 		if (dateClosed) {
@@ -146,12 +158,20 @@ export default function BookSlotPage() {
 		return () => {
 			active = false
 		}
-	}, [doctor.id, selectedHospital, selectedDate, dateClosed])
+	}, [doctor.id, selectedHospital, selectedDate, dateClosed, refreshKey])
 
 	const groups: SlotGroup[] = useMemo(
 		() => (dateClosed ? [] : slotsByMode[mode] || []),
 		[dateClosed, slotsByMode, mode]
 	)
+
+	// A chosen time that is no longer on offer (taken or blocked since it was fetched) is dropped: never continue with a slot the
+	// patient cannot see as free.
+	useEffect(() => {
+		if (slotsLoading || !selectedTime) return
+		const stillOpen = groups.some((g) => g.slots.some((s) => s.start_time === selectedTime && isSlotSelectable(s)))
+		if (!stillOpen) setSelectedTime(null)
+	}, [slotsLoading, groups, selectedTime])
 
 	useEffect(() => {
 		// Wait for a date the doctor works: a closed date has no slots, and the pick must survive the move to an open one.

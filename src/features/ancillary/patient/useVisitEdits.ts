@@ -9,6 +9,7 @@ import Toast from 'react-native-toast-message'
 import { cancelAncillaryVisits, rescheduleAncillaryVisit } from '../ancillaryProviderBookingService'
 import { plural } from './ancillaryBookingCopy'
 import { apiErrorMessage } from './useVisitPatientAddress'
+import { showStatusModal } from '../../../services/apiService'
 
 export function useVisitEdits(requestId: string, refresh: () => Promise<void>) {
 	const [cancelling, setCancelling] = useState(false)
@@ -22,7 +23,12 @@ export function useVisitEdits(requestId: string, refresh: () => Promise<void>) {
 			Toast.show({ type: 'success', text1: `${plural(visitIds.length, 'visit')} cancelled` })
 			return true
 		} catch (e) {
-			Toast.show({ type: 'error', text1: "Couldn't cancel", text2: apiErrorMessage(e) || 'Please try again.' })
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't cancel",
+				description: apiErrorMessage(e) || 'Please try again.',
+				submitText: 'OK',
+			})
 			return false
 		} finally {
 			setCancelling(false)
@@ -38,10 +44,11 @@ export function useVisitEdits(requestId: string, refresh: () => Promise<void>) {
 			Toast.show({ type: 'success', text1: 'Visit rescheduled' })
 			return true
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: "Couldn't reschedule",
-				text2: apiErrorMessage(e) || 'Please try again.',
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't reschedule",
+				description: apiErrorMessage(e) || 'Please try again.',
+				submitText: 'OK',
 			})
 			return false
 		} finally {

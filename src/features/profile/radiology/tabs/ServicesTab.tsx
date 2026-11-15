@@ -1,7 +1,8 @@
 // src/features/profile/radiology/tabs/ServicesTab.tsx
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, ScrollView, StyleSheet, View, useWindowDimensions, ActivityIndicator } from 'react-native'
+import { ScrollView, StyleSheet, View, useWindowDimensions, ActivityIndicator } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import {
 	AppButton,
@@ -25,6 +26,7 @@ import {
 	MobileScanSetupItem,
 } from '../radiologyService'
 import { RadiologyProfileData } from '../../../../types/radiology-profile-api'
+import { showStatusModal } from '../../../../services/apiService'
 
 const DAY_OPTIONS: AppSelectOption[] = [
 	{ label: 'Monday', value: '1' },
@@ -295,7 +297,7 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 
 	const handleSave = async () => {
 		if (!formData.openDays.length) {
-			Alert.alert('Validation', 'Please select open days.')
+			Toast.show({ type: 'error', text1: 'Please select open days.' })
 			return
 		}
 
@@ -345,11 +347,21 @@ export default function ServicesTab({ profileData, onProfileChange }: ServicesTa
 				)
 				setSuccessModalVisible(true)
 			} else {
-				Alert.alert('Error', 'Unable to save radiology services.')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't save radiology services",
+					description: 'Unable to save radiology services.',
+					submitText: 'OK',
+				})
 			}
 		} catch (error) {
 			console.error('[RadiologyServicesTab] save error:', error)
-			Alert.alert('Error', 'Unable to save radiology services right now.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't save radiology services",
+				description: 'Unable to save radiology services right now.',
+				submitText: 'OK',
+			})
 		} finally {
 			setIsSaving(false)
 		}

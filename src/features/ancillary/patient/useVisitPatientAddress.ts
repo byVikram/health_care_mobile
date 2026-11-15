@@ -19,6 +19,7 @@ import {
 import type { AppAddressDraft, AppAddressPrefill, CurrentLocationResult } from '../../../components/common'
 import type { VisitAddressInput } from '../ancillaryProviderBookingService'
 import { useBookingLocation } from './useBookingLocation'
+import { showStatusModal } from '../../../services/apiService'
 
 // The saved-address label given to an address made from the device position, and how close (in degrees, about
 // 100 m) a new position must be to an existing one to count as the same place.
@@ -115,10 +116,11 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 			Toast.show({ type: 'success', text1: 'Address saved' })
 			return true
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: "Couldn't save the address",
-				text2: apiErrorMessage(e) || 'Please try again.',
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't save the address",
+				description: apiErrorMessage(e) || 'Please try again.',
+				submitText: 'OK',
 			})
 			return false
 		}

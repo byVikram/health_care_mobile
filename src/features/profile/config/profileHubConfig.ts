@@ -302,9 +302,9 @@ export const PROFILE_HUB_CONFIG: Record<HubRole, HubConfig> = {
 					},
 					{
 						key: 'availability',
-						title: 'Availability',
-						subtitle: 'Time ranges for each day, leave',
-						icon: 'calendar-clock-outline',
+						title: 'Travel radius',
+						subtitle: 'How far you will go for a visit',
+						icon: 'map-marker-radius-outline',
 						tone: 'lilac',
 						route: ROUTES.STACK.PROFILE_AVAILABILITY,
 					},

@@ -44,6 +44,7 @@ import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { visitTitle } from '../today/todayView'
 import { ReportIssueSheet } from './ReportIssueSheet'
 import { isInProgress, patientLine } from './visitView'
+import { showStatusModal } from '../../../../services/apiService'
 
 type Route = RouteProp<AppNavigationParamList, typeof ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS>
 
@@ -211,10 +212,11 @@ export default function ProviderVisitInProgressPage() {
 			setPicked([])
 			Toast.show({ type: 'success', text1: 'Update sent', text2: update.message })
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Could not send the update',
-				text2: extractApiErrorMessage(e, 'Please try again.'),
+			showStatusModal({
+				status: 'error',
+				title: 'Could not send the update',
+				description: extractApiErrorMessage(e, 'Please try again.'),
+				submitText: 'OK',
 			})
 		} finally {
 			setSending(false)

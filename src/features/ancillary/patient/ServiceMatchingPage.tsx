@@ -19,7 +19,7 @@ import type { AncillaryServiceMatchingParams } from '../../../navigation/types'
 import { AppButton, AppFooterBar, AppNumberedSteps } from '../../../components/common'
 import { fetchPatientActiveRequestBackend, cancelCareRequestPatientBackend } from '../ancillaryService'
 import { setAncillaryRequestTip } from '../ancillaryProviderBookingService'
-import ApiService from '../../../services/apiService'
+import ApiService, { showStatusModal } from '../../../services/apiService'
 import { openAuthedSocket, type AuthedSocketHandle } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import CancellationDetailsModal from './CancellationDetailsModal'
@@ -237,7 +237,12 @@ export default function ServiceMatchingPage() {
 			setCancelModalVisible(false)
 			navigation.navigate(ROUTES.MAIN.TABS)
 		} catch {
-			Toast.show({ type: 'error', text1: 'Could not cancel the request', text2: 'Please try again.' })
+			showStatusModal({
+				status: 'error',
+				title: 'Could not cancel the request',
+				description: 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setIsCancelling(false)
 		}

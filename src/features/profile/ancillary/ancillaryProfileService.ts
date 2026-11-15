@@ -1,11 +1,11 @@
 // API calls for the redesigned ancillary (nursing / physio / home care / rehab) profile. Profile reads and
 // writes reuse features/ancillary/ancillaryService.ts (fetchProviderProfile / updateProviderProfileBackend);
-// this file adds the weekly-hours and date-override calls the Availability screen needs.
+// this file adds the profile hub, the travel radius and the work / documents calls. A provider keeps no weekly hours or days off:
+// the only availability is the online switch on Today.
 
 import ApiService from '../../../services/apiService'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { appendFile, type PickedFile } from '../../../utils/pickedFile'
-import type { AncillaryOverrideRow, AncillaryScheduleRow } from '../availability/availabilityAdapters'
 
 /** GET /api/ancillary/me/profile-hub: what the profile hub shows, in one light call. */
 export interface ProviderHub {
@@ -24,29 +24,6 @@ export interface ProviderHub {
 export const fetchProviderHub = async (): Promise<ProviderHub> => {
 	const res = await ApiService.get<{ data: ProviderHub }>(API_ENDPOINTS.ANCILLARY.PROFILE_HUB)
 	return res.data.data
-}
-
-export const fetchProviderSchedule = async (): Promise<AncillaryScheduleRow[]> => {
-	const res = await ApiService.get<{ data: AncillaryScheduleRow[] }>(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY)
-	const data = res.data?.data
-	return Array.isArray(data) ? data : []
-}
-
-export const saveProviderSchedule = async (schedules: unknown[]) => {
-	await ApiService.put(API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABILITY, { schedules })
-}
-
-export const fetchProviderOverrides = async (): Promise<AncillaryOverrideRow[]> => {
-	const res = await ApiService.get<{ data: AncillaryOverrideRow[] }>(API_ENDPOINTS.ANCILLARY.PROVIDER_OVERRIDES)
-	return res.data?.data ?? []
-}
-
-export const createProviderOverride = async (body: Record<string, unknown>) => {
-	await ApiService.post(API_ENDPOINTS.ANCILLARY.PROVIDER_OVERRIDES, body)
-}
-
-export const deleteProviderOverride = async (id: number) => {
-	await ApiService.delete(API_ENDPOINTS.ANCILLARY.PROVIDER_OVERRIDE_BY_ID(id))
 }
 
 export interface ProviderQualification {

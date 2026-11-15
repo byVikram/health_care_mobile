@@ -61,3 +61,21 @@ export default function MyComponent() {
 	)
 }
 ```
+
+## Toast or modal?
+
+Both exist on purpose; pick by what the user has to do next.
+
+- **Toast** (`Toast.show`, the dark pill): short, non-blocking, disappears on its own. Use it for a **success** of any action ("Profile updated", "Address deleted"), for **form validation** ("Full name is required"), and for **minor failures** where nothing important is lost and the screen still works (a refresh or load-more that failed, a file/link that would not open, a vote or favourite that did not save, "Coming soon"). Keep it to one short line plus an optional second line.
+- **Common modal** (`StatusModal`): blocks until the user taps OK. Use it when a **consequential action failed** and the user must read the reason and decide: placing or confirming a booking or order, cancelling or rescheduling, saving profile or clinical data, deleting something, provider actions with real-world effect. From anywhere (no local state needed) call the global helper; `AuthContext` renders it:
+
+```ts
+import { showStatusModal } from '../../services/apiService'
+
+showStatusModal({ status: 'error', title: "Couldn't cancel", description: apiErrorMessage(e) || 'Please try again.', submitText: 'OK' })
+```
+
+- **Confirm sheet** (`AppConfirmSheet`): when the user must *choose* before an irreversible action (delete, log out). Never use the native `Alert.alert`.
+- A **success** is a toast by default, including saving a form (profile, address, availability). Use a modal (or a confirmation screen) for a success only when it **ends a flow and the user needs something from it**: a booking, order or payment is placed (reference number, amount, what happens next), a wallet top-up, or any outcome with money or a next step. Saving a form is not one of those.
+- Do not use a toast for a failure the user cannot miss (it disappears after a few seconds); that is a modal.
+- Failures inside a bottom sheet or another modal: keep the message inside the sheet (inline text); a toast or a second modal can end up hidden behind it.

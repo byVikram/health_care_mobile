@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-	Alert,
 	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
 	View,
 	useWindowDimensions,
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import {
@@ -19,6 +19,7 @@ import {
 } from '../../../../components/common'
 import { mergePharmacyProfileData, updatePharmacyProfile } from '../pharmacyService'
 import { PharmacyProfileData } from '../../../../types/pharmacy-profile-api'
+import { showStatusModal } from '../../../../services/apiService'
 
 const DEFAULT_LOGO_IMAGE = require('../../../../assets/Banner/pharmacy.png')
 const SUCCESS_MESSAGE = 'Pharmacy details saved successfully'
@@ -205,7 +206,7 @@ export default function PharmacyDetailsTab({ profileData, onProfileChange }: Pha
 		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
 
 		if (!permission.granted) {
-			Alert.alert('Permission needed', 'Please allow photo library access to upload your certificate.')
+			Toast.show({ type: 'error', text1: 'Please allow photo library access to upload your certificate.' })
 			return
 		}
 
@@ -264,22 +265,22 @@ export default function PharmacyDetailsTab({ profileData, onProfileChange }: Pha
 		}
 
 		if (!payload.name) {
-			Alert.alert('Validation', 'Pharmacy name is required.')
+			Toast.show({ type: 'error', text1: 'Pharmacy name is required.' })
 			return
 		}
 
 		if (!payload.drug_license_number) {
-			Alert.alert('Validation', 'Drug license number is required.')
+			Toast.show({ type: 'error', text1: 'Drug license number is required.' })
 			return
 		}
 
 		if (!payload.address) {
-			Alert.alert('Validation', 'Address is required.')
+			Toast.show({ type: 'error', text1: 'Address is required.' })
 			return
 		}
 
 		if (payload.pincode && !/^\d{6}$/.test(payload.pincode)) {
-			Alert.alert('Validation', 'Please enter a valid 6-digit pincode.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid 6-digit pincode.' })
 			return
 		}
 
@@ -288,7 +289,12 @@ export default function PharmacyDetailsTab({ profileData, onProfileChange }: Pha
 			const response = await updatePharmacyProfile(payload)
 
 			if (response?.success === false) {
-				Alert.alert('Error', response.message || 'Unable to save pharmacy details right now.')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't save pharmacy details",
+					description: response.message || 'Unable to save pharmacy details right now.',
+					submitText: 'OK',
+				})
 				return
 			}
 
@@ -322,7 +328,12 @@ export default function PharmacyDetailsTab({ profileData, onProfileChange }: Pha
 			setSuccessModalVisible(true)
 		} catch (error) {
 			console.error('[PharmacyDetailsTab] save error:', error)
-			Alert.alert('Error', 'Unable to save pharmacy details right now.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't save pharmacy details",
+				description: 'Unable to save pharmacy details right now.',
+				submitText: 'OK',
+			})
 		} finally {
 			setIsSaving(false)
 		}

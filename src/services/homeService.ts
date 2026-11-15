@@ -145,6 +145,19 @@ export const getPatientSummary = async (): Promise<PatientSummary> => {
 
 // ---- App config (SOS / ambulance / support numbers) ----
 
+/** The newest published build for this platform (`app_versions`). Builds are compared by the integers only. */
+export interface AppUpdate {
+	/** Shown to people ("1.2.0"); never compared. */
+	version_name: string
+	/** The newest build number. An installed build below it can update (optional). */
+	version_code: number
+	/** The lowest build still allowed. An installed build below it must update (mandatory). */
+	min_supported_version: number
+	/** Direct APK link now, a store link later: the app just opens it. */
+	download_url: string
+	release_notes?: string | null
+}
+
 export interface AppConfig {
 	emergency_number: string
 	ambulance_number: string
@@ -153,12 +166,18 @@ export interface AppConfig {
 	/** Home-care "Need a nurse right now? · Call now" line. */
 	nursing_helpline_number?: string | null
 	app_min_version?: string | null
+	/** Only when the request sent `platform` and a build is published for it; otherwise null. */
+	app_update?: AppUpdate | null
 	/** Home-care scheduled visits: provider assigned this long before a visit, cancel up to this long before (minutes). */
 	home_care_visit_policy?: { assign_lead_minutes: number; cancel_cutoff_minutes: number } | null
 }
 
-export const getAppConfig = async (): Promise<AppConfig> => {
-	const res = await ApiService.get<Envelope<AppConfig>>(API_ENDPOINTS.APP_CONFIG)
+/** `platform` asks for `app_update`: the launch check (features/app-update) sends it; everything else leaves it out. */
+export const getAppConfig = async (platform?: 'android' | 'ios'): Promise<AppConfig> => {
+	const res = await ApiService.get<Envelope<AppConfig>>(
+		API_ENDPOINTS.APP_CONFIG,
+		platform ? { params: { platform } } : undefined
+	)
 	return res.data.data
 }
 

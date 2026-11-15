@@ -109,7 +109,6 @@ export interface PreIntakePayload {
 }
 
 export const updatePreIntake = async (appointmentId: string, payload: PreIntakePayload) => {
-	console.log('PRE_INTAKE URL =>', API_ENDPOINTS.APPOINTMENTS.PRE_INTAKE(appointmentId))
 	const res = await ApiService.patch(API_ENDPOINTS.APPOINTMENTS.PRE_INTAKE(appointmentId), payload)
 	return res.data
 }

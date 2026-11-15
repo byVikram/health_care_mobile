@@ -6,7 +6,7 @@
 // using the shared AppointmentDetailsContent.
 
 import React, { useCallback, useEffect, useState } from 'react'
-import { Alert, Linking, ScrollView, Share, StatusBar, StyleSheet, Text, View } from 'react-native'
+import { Linking, ScrollView, Share, StatusBar, StyleSheet, Text, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import type { NavigationProp } from '@react-navigation/native'
@@ -60,6 +60,7 @@ import {
 	type PatientAppointment,
 } from './helpers'
 import { getPrepSteps, getPrepStepsTitle } from '../../prepSteps'
+import { statusReasonCopy } from '../../statusReason'
 
 // Wrapped so press events are never forwarded as showComingSoon's `text2`.
 const comingSoon = () => showComingSoon()
@@ -163,6 +164,9 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	const showRescheduled = live && (localRescheduled || variant === 'rescheduled')
 	// The patient picked the slot: it now waits for the doctor to confirm (nothing for the patient to accept).
 	const awaitingDoctor = showRescheduled && (localRescheduled || isAwaitingDoctorConfirm(appt))
+	// Why it was cancelled / moved, from whoever did it (not after a cancel or reschedule made just now: the loaded appointment is
+	// stale then, and so is its reason).
+	const statusReason = localRescheduled || localCancelled ? null : statusReasonCopy(appt)
 	const hospital = appt?.hospital ?? null
 	const phone = hospital?.contact_number || hospital?.phone || ''
 	const fee = appt?.fees
@@ -243,7 +247,11 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 
 	const openReschedule = () => {
 		if (!doctorId) {
-			Alert.alert('Unable to reschedule', 'Doctor details are missing for this appointment.')
+			Toast.show({
+				type: 'error',
+				text1: 'Unable to reschedule',
+				text2: 'Doctor details are missing for this appointment.',
+			})
 			return
 		}
 		setReschedOpen(true)
@@ -378,6 +386,16 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 						eyebrow="Cancelled"
 						title={`${isVideo ? 'Video call' : 'Appointment'} with ${doctorName}`}
 						subtitle={refundCopy}
+						style={styles.bannerTop}
+					/>
+				)}
+
+				{statusReason && (
+					<AppInfoBanner
+						tone={isCancelled ? 'danger' : 'warning'}
+						icon={isCancelled ? 'close' : 'calendar-clock'}
+						title={statusReason.title}
+						subtitle={statusReason.reason}
 						style={styles.bannerTop}
 					/>
 				)}

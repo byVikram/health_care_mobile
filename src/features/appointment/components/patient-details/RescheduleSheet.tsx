@@ -1,14 +1,15 @@
 // src/features/appointment/components/patient-details/RescheduleSheet.tsx
 //
 // "Reschedule appointment" / "Reschedule video call" sheet (design 7 / 7a):
-// current slot struck through, 7-day date strip, grouped time slots, and a
+// current slot struck through, 14-day date strip (the booking window), grouped time slots, and a
 // "Confirm · {day}, {time}" footer. Slots come from getDoctorAvailability
 // (normalised with RescheduleModal's normaliser); submit uses
 // rescheduleAppointment -- same payload as RescheduleModal.
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import {
+	AppInput,
 	AppRescheduleGroup,
 	AppRescheduleSheet,
 	DateStrip,
@@ -25,8 +26,16 @@ import {
 } from '../../../doctor/doctorService'
 import { APP_COLORS } from '../../../../config/theme'
 import { normalizeAvailabilitySlots } from '../RescheduleModal'
-import { formatDateForApi, monthRangeLabel, nextDays, parseDateOnly, relativeDayLabel } from '../../../../utils/date'
+import {
+	BOOKING_WINDOW_DAYS,
+	formatDateForApi,
+	monthRangeLabel,
+	nextDays,
+	parseDateOnly,
+	relativeDayLabel,
+} from '../../../../utils/date'
 import { formatTimeSlot } from '../../../../utils/formatters'
+import { showStatusModal } from '../../../../services/apiService'
 
 const COLS = 3
 
@@ -62,13 +71,15 @@ export default function RescheduleSheet({
 	onClose,
 	onRescheduled,
 }: RescheduleSheetProps) {
-	const [days, setDays] = useState<Date[]>(() => nextDays())
+	const [days, setDays] = useState<Date[]>(() => nextDays(BOOKING_WINDOW_DAYS))
 	const [dayIdx, setDayIdx] = useState(0)
 	const [selected, setSelected] = useState<TimeSlot | null>(null)
 	const [groups, setGroups] = useState<SlotGroup[]>([])
 	const [loading, setLoading] = useState(false)
 	const [loadError, setLoadError] = useState(false)
 	const [submitting, setSubmitting] = useState(false)
+	// Why the patient needs another time, in their own words (optional): the doctor reads it.
+	const [reason, setReason] = useState('')
 	const [resolvedHospitalId, setResolvedHospitalId] = useState<string | null>(hospitalId ?? null)
 
 	const currentDay = parseDateOnly(currentDate)
@@ -77,11 +88,12 @@ export default function RescheduleSheet({
 	// Reset each time the sheet opens -- start on the current appointment's day if it's in the strip.
 	useEffect(() => {
 		if (!visible) return
-		const fresh = nextDays()
+		const fresh = nextDays(BOOKING_WINDOW_DAYS)
 		setDays(fresh)
 		const idx = fresh.findIndex((d) => formatDateForApi(d) === currentKey)
 		setDayIdx(idx >= 0 ? idx : 0)
 		setSelected(null)
+		setReason('')
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [visible])
 
@@ -165,17 +177,27 @@ export default function RescheduleSheet({
 				start_time: selected.start_time,
 				end_time: selected.end_time ?? null,
 				hospital_id: resolvedHospitalId,
-				reason: 'Patient requested reschedule',
+				reason: reason.trim() || undefined,
 				status_id: APPOINTMENT_STATUS.CONFIRM,
 			})
 			if (res?.success) {
 				onRescheduled()
 			} else {
-				Alert.alert('Error', res?.message || 'Reschedule failed. Please try again.')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't reschedule",
+					description: res?.message || 'Reschedule failed. Please try again.',
+					submitText: 'OK',
+				})
 			}
 		} catch (error: any) {
 			console.log('[RescheduleSheet] reschedule error:', error?.response?.data || error?.message || error)
-			Alert.alert('Error', 'Something went wrong. Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't reschedule",
+				description: 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setSubmitting(false)
 		}
@@ -249,6 +271,16 @@ export default function RescheduleSheet({
 					</AppRescheduleGroup>
 				))
 			)}
+
+			<AppInput
+				label="Reason (optional)"
+				placeholder="Tell your doctor why you need a different time"
+				value={reason}
+				onChangeText={setReason}
+				multiline
+				numberOfLines={2}
+				maxLength={500}
+			/>
 		</AppRescheduleSheet>
 	)
 }

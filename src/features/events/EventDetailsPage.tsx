@@ -6,7 +6,6 @@ import {
 	Image,
 	ActivityIndicator,
 	useWindowDimensions,
-	Alert,
 	Platform,
 } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
@@ -20,6 +19,7 @@ import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 import type { AppStackParamList } from '../../navigation/types'
 import { openWebUrl } from '../../utils/safeLinking'
+import Toast from 'react-native-toast-message'
 
 const TEAL = '#0c7c7c'
 const DEFAULT_COVER_IMAGE = 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=800&q=80'
@@ -114,10 +114,10 @@ export default function EventDetailsPage() {
 	const handleRegister = () => {
 		if (event.registration_link) {
 			openWebUrl(event.registration_link).catch(() => {
-				Alert.alert('Error', 'Could not open registration link.')
+				Toast.show({ type: 'error', text1: 'Could not open registration link.' })
 			})
 		} else {
-			Alert.alert('Registration', 'Registration link is not available for this event.')
+			Toast.show({ type: 'info', text1: 'Registration link is not available for this event.' })
 		}
 	}
 

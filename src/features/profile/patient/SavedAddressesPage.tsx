@@ -13,7 +13,6 @@ import {
 	AppInfoBanner,
 	AppNavRow,
 	AppStickyFooter,
-	StatusModal,
 } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
@@ -26,6 +25,7 @@ import {
 } from './PatientProfileService'
 import { AddressCard, fullAddress } from './components/AddressCard'
 import { ProfileScreen } from '../shared/components/ProfileScreen'
+import { showStatusModal } from '../../../services/apiService'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 
@@ -36,7 +36,6 @@ export default function SavedAddressesPage() {
 	const [loadError, setLoadError] = useState<string | null>(null)
 	const [menuFor, setMenuFor] = useState<PatientAddress | null>(null)
 	const [deleteFor, setDeleteFor] = useState<PatientAddress | null>(null)
-	const [actionError, setActionError] = useState<string | null>(null)
 
 	const load = useCallback(async () => {
 		setLoadError(null)
@@ -63,7 +62,12 @@ export default function SavedAddressesPage() {
 			Toast.show({ type: 'success', text1: `${a.label} is now your default address` })
 			await load()
 		} catch (e) {
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't set the default address",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		}
 	}
 
@@ -77,7 +81,12 @@ export default function SavedAddressesPage() {
 			await load()
 		} catch (e) {
 			setDeleteFor(null)
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't delete the address",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		}
 	}
 
@@ -149,14 +158,6 @@ export default function SavedAddressesPage() {
 						confirmLabel="Delete"
 						cancelLabel="Keep"
 						onConfirm={remove}
-					/>
-					<StatusModal
-						visible={!!actionError}
-						status="error"
-						title="Something went wrong"
-						description={actionError || ''}
-						submitText="OK"
-						onSubmit={() => setActionError(null)}
 					/>
 				</>
 			}

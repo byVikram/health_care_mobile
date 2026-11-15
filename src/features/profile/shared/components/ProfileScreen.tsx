@@ -1,11 +1,12 @@
 // Frame for the profile sub-screens: primary "bar" header (title + mint subtitle), a keyboard-aware scroll
 // area of stacked AppFormCards (gap 8 on pageBg), skeleton cards while loading, a retry state when the
-// load failed, an optional footer (usually AppSaveFooter) and a StatusModal for save errors.
+// load failed, an optional footer (usually AppSaveFooter) and a toast for save errors.
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { AppButton, AppScreenHeader, AppSkeleton, StatusModal } from '../../../../components/common'
+import { AppButton, AppScreenHeader, AppSkeleton } from '../../../../components/common'
 import { APP_COLORS } from '../../../../config/theme'
+import { showStatusModal } from '../../../../services/apiService'
 
 export type ProfileScreenProps = {
 	title: string
@@ -50,6 +51,18 @@ export function ProfileScreen({
 	children,
 	overlays,
 }: ProfileScreenProps) {
+	// A failed save is announced as a toast, then cleared so the same error can show again on the next try.
+	useEffect(() => {
+		if (!saveError) return
+		showStatusModal({
+			status: 'error',
+			title: "Couldn't save",
+			description: saveError,
+			submitText: 'OK',
+		})
+		onDismissSaveError?.()
+	}, [saveError, onDismissSaveError])
+
 	return (
 		<View style={styles.screen}>
 			<AppScreenHeader variant="bar" solid title={title} subtitle={subtitle} titleStyle={styles.headerTitle} />
@@ -75,14 +88,6 @@ export function ProfileScreen({
 				{!loading && !loadError ? footer : null}
 			</KeyboardAvoidingView>
 			{overlays}
-			<StatusModal
-				visible={!!saveError}
-				status="error"
-				title="Couldn't save"
-				description={saveError || ''}
-				submitText="OK"
-				onSubmit={onDismissSaveError}
-			/>
 		</View>
 	)
 }

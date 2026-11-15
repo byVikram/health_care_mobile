@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { FlatList, Image, StyleSheet, TouchableOpacity, useWindowDimensions, View, ActivityIndicator, Alert } from 'react-native'
+import { FlatList, Image, StyleSheet, TouchableOpacity, useWindowDimensions, View, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 
 import { useNavigation } from '@react-navigation/native'
@@ -11,6 +11,7 @@ import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
 import { openWebUrl } from '../../../utils/safeLinking'
+import Toast from 'react-native-toast-message'
 
 interface Props {
 	variant?: 'row' | 'column'
@@ -109,9 +110,9 @@ function UpcomingEventsSection({ variant = 'row' }: Props) {
 						marginRight={index === events.length - 1 ? 0 : 12}
 						onRegister={() => {
 							if (item.registration_link) {
-								openWebUrl(item.registration_link).catch(() => Alert.alert('Error', 'Could not open registration link.'))
+								openWebUrl(item.registration_link).catch(() => Toast.show({ type: 'error', text1: 'Could not open registration link.' }))
 							} else {
-								Alert.alert('Registration', 'Registration link is not available for this event.')
+								Toast.show({ type: 'info', text1: 'Registration link is not available for this event.' })
 							}
 						}}
 						onViewDetails={() => navigation.navigate(ROUTES.STACK.EVENT_DETAILS as any, { eventId: item.id })}

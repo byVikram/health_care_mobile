@@ -1,7 +1,9 @@
 // src/components/common/inputs/AppPhotoSourceSheet.tsx
 //
 // "Change photo" bottom sheet from the profile designs: a titled header, one row per choice (icon tile, title,
-// hint) -- take a photo, choose from the gallery, and (when `onRemove` is given) remove -- and a photo tip.
+// hint) -- take a photo, choose from the gallery, optionally pick a file (`onChooseFile`: a PDF, a document) and, when `onRemove` is
+// given, remove -- and a tip. The hints, the file row and the tip are props, so the same sheet serves any upload that starts with
+// "where is it from?" (the defaults are the profile photo's).
 // Choosing a row closes the sheet first and calls its handler once the sheet has slid out, so the camera /
 // gallery can open straight away (iOS won't present one modal over another that is still closing).
 
@@ -16,10 +18,19 @@ export type AppPhotoSourceSheetProps = {
 	onClose: () => void
 	onTakePhoto: () => void
 	onChoosePhoto: () => void
+	/** Shows a third row for a file (a PDF, a document). Omit where only photos are taken. */
+	onChooseFile?: () => void
 	/** Shows the "Remove photo" row. Omit where a photo can only be replaced. */
 	onRemove?: () => void
 	title?: string
 	subtitle?: string
+	/** Row texts; the defaults are the profile photo's. */
+	takePhotoHint?: string
+	choosePhotoHint?: string
+	chooseFileTitle?: string
+	chooseFileHint?: string
+	/** The note under the rows. */
+	tip?: string
 }
 
 // Sheet slide-out time (AppBottomSheet closes in 200ms).
@@ -59,9 +70,15 @@ export function AppPhotoSourceSheet({
 	onClose,
 	onTakePhoto,
 	onChoosePhoto,
+	onChooseFile,
 	onRemove,
 	title = 'Profile photo',
 	subtitle,
+	takePhotoHint = 'Use your camera',
+	choosePhotoHint = 'Pick one from your photos',
+	chooseFileTitle = 'Choose a file',
+	chooseFileHint = 'Pick a document from your phone',
+	tip = 'Use a clear, recent photo of your face on a plain background.',
 }: AppPhotoSourceSheetProps) {
 	const choose = (action: () => void) => () => {
 		onClose()
@@ -78,18 +95,21 @@ export function AppPhotoSourceSheet({
 			showHeaderDivider={false}
 		>
 			<View style={styles.options}>
-				<Option
-					icon="camera-outline"
-					title="Take a photo"
-					hint="Use your camera"
-					onPress={choose(onTakePhoto)}
-				/>
+				<Option icon="camera-outline" title="Take a photo" hint={takePhotoHint} onPress={choose(onTakePhoto)} />
 				<Option
 					icon="image-outline"
 					title="Choose from gallery"
-					hint="Pick one from your photos"
+					hint={choosePhotoHint}
 					onPress={choose(onChoosePhoto)}
 				/>
+				{onChooseFile ? (
+					<Option
+						icon="file-pdf-box"
+						title={chooseFileTitle}
+						hint={chooseFileHint}
+						onPress={choose(onChooseFile)}
+					/>
+				) : null}
 				{onRemove ? (
 					<Option
 						icon="trash-can-outline"
@@ -100,7 +120,7 @@ export function AppPhotoSourceSheet({
 					/>
 				) : null}
 			</View>
-			<Text style={styles.tip}>Use a clear, recent photo of your face on a plain background.</Text>
+			{tip ? <Text style={styles.tip}>{tip}</Text> : null}
 		</AppBottomSheet>
 	)
 }

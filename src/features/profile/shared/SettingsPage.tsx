@@ -13,7 +13,6 @@ import {
 	AppNavRow,
 	AppSelect,
 	AppToggle,
-	StatusModal,
 } from '../../../components/common'
 import { APP_COLORS, TONES } from '../../../config/theme'
 import { useAuth } from '../../../context/AuthContext'
@@ -23,6 +22,7 @@ import { ROUTES } from '../../../navigation/routes'
 import { hubRoleFor } from '../config/profileHubConfig'
 import { LANGUAGE_CHOICES, SETTINGS_CONFIG } from '../config/settingsConfig'
 import { ProfileScreen } from './components/ProfileScreen'
+import { showStatusModal } from '../../../services/apiService'
 
 export default function SettingsPage() {
 	const navigation = useNavigation()
@@ -33,7 +33,6 @@ export default function SettingsPage() {
 	)
 	const [language, setLanguage] = useState(LANGUAGE_CHOICES[0])
 	const [confirmDelete, setConfirmDelete] = useState(false)
-	const [deleteError, setDeleteError] = useState<string | null>(null)
 
 	const handleDelete = async () => {
 		try {
@@ -43,7 +42,12 @@ export default function SettingsPage() {
 			await clearAuth()
 		} catch (e) {
 			setConfirmDelete(false)
-			setDeleteError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't delete your account",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		}
 	}
 
@@ -61,14 +65,6 @@ export default function SettingsPage() {
 						confirmLabel="Delete"
 						cancelLabel="Keep account"
 						onConfirm={handleDelete}
-					/>
-					<StatusModal
-						visible={!!deleteError}
-						status="error"
-						title="Couldn't delete your account"
-						description={deleteError || ''}
-						submitText="OK"
-						onSubmit={() => setDeleteError(null)}
 					/>
 				</>
 			}

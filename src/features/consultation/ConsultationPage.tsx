@@ -13,7 +13,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
-	Alert,
 	Animated,
 	Modal,
 	ScrollView,
@@ -24,6 +23,7 @@ import {
 	View,
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
+import { useAuth } from '../../context/AuthContext'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import SignatureCanvas, { SignatureViewRef } from 'react-native-signature-canvas'
@@ -39,7 +39,7 @@ import Toast from 'react-native-toast-message'
 import { AppHeaderBackdrop, AppSegmentedControl, AppSkeleton, AppSoftCard, ConsultationNotesImage } from '../../components/common'
 import { APP_COLORS, TONES } from '../../config/theme'
 import { ROUTES } from '../../navigation/routes'
-import ApiService from '../../services/apiService'
+import ApiService, { showStatusModal } from '../../services/apiService'
 import { updateAppointmentsStatus } from '../../services/appointmentService'
 import { getStatusIdByLabel } from '../doctor/doctorService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
@@ -233,7 +233,37 @@ function extractHbA1cSeries(labs: LaboratoryReportRecord[]): { date: string; val
 
 // ── Component ────────────────────────────────────────────────────────────────
 
+/**
+ * The consultation workspace (notes, scribble, prescription) is the doctor's. A patient, or any other role, who ends up here
+ * (a deep link, a shared screen) gets this notice instead: the server refuses their writes anyway, and the screen should not offer
+ * them.
+ */
+function DoctorOnlyNotice() {
+	const navigation = useNavigation<any>()
+	return (
+		<View style={styles.doctorOnly}>
+			<Text style={styles.doctorOnlyTitle}>This page is for doctors</Text>
+			<Text style={styles.doctorOnlyText}>
+				Consultation notes and prescriptions are written by your doctor. You can read them from your visit summary.
+			</Text>
+			<TouchableOpacity
+				onPress={() => navigation.goBack()}
+				accessibilityRole="button"
+				accessibilityLabel="Go back"
+				style={styles.doctorOnlyButton}
+			>
+				<Text style={styles.doctorOnlyButtonText}>Go back</Text>
+			</TouchableOpacity>
+		</View>
+	)
+}
+
 export default function ConsultationPage() {
+	const { role } = useAuth()
+	return role === 'doctor' ? <DoctorConsultation /> : <DoctorOnlyNotice />
+}
+
+function DoctorConsultation() {
 	const navigation = useNavigation<any>()
 	const route = useRoute<any>()
 	const insets = useSafeAreaInsets()
@@ -702,15 +732,15 @@ export default function ConsultationPage() {
 
 	const confirmSubmit = () =>
 		new Promise<boolean>((resolve) => {
-			Alert.alert(
-				'Submit your notes?',
-				`Once submitted, your notes can’t be edited. ${patient?.name?.split(' ')[0] || 'The patient'} will be able to see them.`,
-				[
-					{ text: 'Keep editing', style: 'cancel', onPress: () => resolve(false) },
-					{ text: 'Submit', onPress: () => resolve(true) },
-				],
-				{ cancelable: true, onDismiss: () => resolve(false) }
-			)
+			showStatusModal({
+				status: 'info',
+				title: 'Submit your notes?',
+				description: `Once submitted, your notes can’t be edited. ${patient?.name?.split(' ')[0] || 'The patient'} will be able to see them.`,
+				submitText: 'Submit',
+				onSubmit: () => resolve(true),
+				cancelText: 'Keep editing',
+				onCancel: () => resolve(false),
+			})
 		})
 
 	// Ending the consultation marks the visit completed. Until then the patient's app still shows it as an
@@ -764,11 +794,13 @@ export default function ConsultationPage() {
 			})
 			goToDoctorHome()
 		} catch (err: any) {
-			Toast.show({
-				type: 'error',
-				text1: notesDone
+			showStatusModal({
+				status: 'error',
+				title: 'Something went wrong',
+				description: notesDone
 					? err?.response?.data?.message || 'Notes saved, but the visit could not be marked completed. Tap again to retry.'
 					: err?.response?.data?.message || 'Failed to save consultation notes',
+				submitText: 'OK',
 			})
 		} finally {
 			setSaving(false)
@@ -1548,6 +1580,26 @@ function EmptyState({ label }: { label: string }) {
 // ── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+	doctorOnly: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 10,
+		padding: 32,
+		backgroundColor: APP_COLORS.pageBg,
+	},
+	doctorOnlyTitle: { fontSize: 18, lineHeight: 24, fontWeight: '800', color: APP_COLORS.ink, textAlign: 'center' },
+	doctorOnlyText: { fontSize: 14, lineHeight: 20, color: APP_COLORS.inkMuted, textAlign: 'center' },
+	doctorOnlyButton: {
+		marginTop: 8,
+		minHeight: 44,
+		paddingHorizontal: 24,
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.primary,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	doctorOnlyButtonText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
 	screen: { flex: 1, backgroundColor: PAGE_BG },
 	centerContent: { alignItems: 'center', justifyContent: 'center', padding: 24 },
 	goBackBtn: { marginTop: 20, height: 44, paddingHorizontal: 20, borderRadius: 10, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center' },

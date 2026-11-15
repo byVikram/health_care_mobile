@@ -1,72 +1,49 @@
 // src/features/ancillary/staff/components/ProviderScheduledOrdersSection.tsx
 //
-// Provider's scheduled-order queue on the Schedule tab (GET /api/ancillary/provider/me/orders).
-// Patients book a SCHEDULED order with 1..7 visits (same provider); the provider must accept within 30 minutes
-// or it expires. Lists orders with a live countdown, Accept / Decline (reason sheet), and refreshes on focus,
-// on filter change, after every action and when a countdown ends.
+// The provider's visits on the Schedule tab (GET /api/ancillary/provider/me/orders): the orders they have taken, newest or soonest
+// first by filter, with a way into the visit screens. Read-only: nobody asks a provider to accept an order here (an offer is taken
+// from Today, the first provider to accept gets it). Refreshes on focus and on filter change.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useIsFocused, useNavigation, type NavigationProp } from '@react-navigation/native'
-import Toast from 'react-native-toast-message'
-import { AppChip, AppInfoBanner, AppTag, AppTextLink } from '../../../../components/common'
+import { AppChip, AppInfoBanner, AppTextLink } from '../../../../components/common'
 import { APP_COLORS } from '../../../../config/theme'
 import { ROUTES } from '../../../../navigation/routes'
 import type { AppStackParamList } from '../../../../navigation/types'
-import {
-	acceptScheduledOrder,
-	declineScheduledOrder,
-	getProviderScheduledOrders,
-} from '../../ancillaryProviderBookingService'
+import { getProviderScheduledOrders } from '../../ancillaryProviderBookingService'
 import { extractApiErrorMessage } from '../../ancillaryService'
-import { RescheduleProposalModal } from '../../components/RescheduleProposalModal'
 import {
 	firstVisitStart,
-	isOrderActionable,
-	isPendingOrder,
 	normalizeProviderOrder,
 	type ProviderOrderView,
 	type RawProviderOrder,
 } from '../providerOrderView'
-import { DeclineOrderSheet } from './DeclineOrderSheet'
 import { ProviderScheduledOrderCard } from './ProviderScheduledOrderCard'
 
-type OrdersFilter = 'ALL' | 'PENDING_ACTION' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
+/** The backend's `status_filter` values. */
+type VisitsFilter = 'ALL' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
 
-const FILTERS: { key: OrdersFilter; label: string }[] = [
+const FILTERS: { key: VisitsFilter; label: string }[] = [
 	{ key: 'ALL', label: 'All' },
-	{ key: 'PENDING_ACTION', label: 'Awaiting you' },
-	{ key: 'CONFIRMED', label: 'Confirmed' },
+	{ key: 'CONFIRMED', label: 'Upcoming' },
 	{ key: 'COMPLETED', label: 'Completed' },
 	{ key: 'CANCELLED', label: 'Cancelled' },
 ]
 
-/** Actionable requests first (soonest to expire on top), then everything else by first visit. */
-const sortOrders = (orders: ProviderOrderView[], nowMs: number) =>
-	[...orders].sort((a, b) => {
-		const aAct = isOrderActionable(a, nowMs)
-		const bAct = isOrderActionable(b, nowMs)
-		if (aAct !== bAct) return aAct ? -1 : 1
-		if (aAct && bAct) {
-			const ae = a.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER
-			const be = b.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER
-			if (ae !== be) return ae - be
-		}
-		return firstVisitStart(a) - firstVisitStart(b)
-	})
+/** Upcoming: the soonest first. Everything else: the latest first. */
+const sortOrders = (orders: ProviderOrderView[], filter: VisitsFilter) =>
+	[...orders].sort((a, b) =>
+		filter === 'CONFIRMED' ? firstVisitStart(a) - firstVisitStart(b) : firstVisitStart(b) - firstVisitStart(a)
+	)
 
 export function ProviderScheduledOrdersSection() {
 	const isFocused = useIsFocused()
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
-	const [filter, setFilter] = useState<OrdersFilter>('ALL')
+	const [filter, setFilter] = useState<VisitsFilter>('ALL')
 	const [orders, setOrders] = useState<ProviderOrderView[]>([])
 	const [loading, setLoading] = useState(false)
 	const [loaded, setLoaded] = useState(false)
 	const [loadError, setLoadError] = useState<string | null>(null)
-	const [nowMs, setNowMs] = useState(() => Date.now())
-	const [acceptingId, setAcceptingId] = useState<string | null>(null)
-	const [declineTarget, setDeclineTarget] = useState<ProviderOrderView | null>(null)
-	const [declining, setDeclining] = useState(false)
-	const [rescheduleTarget, setRescheduleTarget] = useState<ProviderOrderView | null>(null)
 
 	const filterRef = useRef(filter)
 	filterRef.current = filter
@@ -83,12 +60,11 @@ export function ProviderScheduledOrdersSection() {
 			setLoadError(null)
 		} catch (e) {
 			if (seq !== requestSeq.current) return
-			setLoadError(extractApiErrorMessage(e, 'Could not load your scheduled requests.'))
+			setLoadError(extractApiErrorMessage(e, 'Could not load your visits.'))
 		} finally {
 			if (seq === requestSeq.current) {
 				setLoading(false)
 				setLoaded(true)
-				setNowMs(Date.now())
 			}
 		}
 	}, [])
@@ -97,30 +73,9 @@ export function ProviderScheduledOrdersSection() {
 		if (isFocused) void loadOrders()
 	}, [isFocused, filter, loadOrders])
 
-	// Tick once a second while any pending order is counting down to its expiry.
-	const hasCountdown = orders.some((o) => isPendingOrder(o) && !!o.expiresAt && o.expiresAt.getTime() > nowMs)
-	useEffect(() => {
-		if (!isFocused || !hasCountdown) return
-		const t = setInterval(() => setNowMs(Date.now()), 1000)
-		return () => clearInterval(t)
-	}, [isFocused, hasCountdown])
+	const sorted = useMemo(() => sortOrders(orders, filter), [orders, filter])
 
-	// When a countdown reaches zero, re-read the list so the backend's lazy expiry is reflected.
-	const expiredIdsRef = useRef<Set<string>>(new Set())
-	useEffect(() => {
-		const newlyExpired = orders.filter(
-			(o) =>
-				isPendingOrder(o) && !!o.expiresAt && o.expiresAt.getTime() <= nowMs && !expiredIdsRef.current.has(o.id)
-		)
-		if (newlyExpired.length === 0) return
-		newlyExpired.forEach((o) => expiredIdsRef.current.add(o.id))
-		void loadOrders()
-	}, [orders, nowMs, loadOrders])
-
-	const sorted = useMemo(() => sortOrders(orders, nowMs), [orders, nowMs])
-	const pendingCount = orders.filter((o) => isOrderActionable(o, nowMs)).length
-
-	/** Accepted order -> its visit screens (same ones the Today tab opens). */
+	/** A visit that can still be done -> its visit screens (same ones the Today tab opens). */
 	const handleOpenVisit = (order: ProviderOrderView) => {
 		if (!order.openVisit) return
 		navigation.navigate(
@@ -129,66 +84,12 @@ export function ProviderScheduledOrdersSection() {
 		)
 	}
 
-	const handleAccept = async (order: ProviderOrderView) => {
-		if (acceptingId || declining) return
-		setAcceptingId(order.id)
-		try {
-			await acceptScheduledOrder(order.id)
-			Toast.show({
-				type: 'success',
-				text1: 'Booking accepted',
-				text2:
-					order.visits.length > 1
-						? `All ${order.visits.length} visits with ${order.patientName} are confirmed.`
-						: `Your visit with ${order.patientName} is confirmed.`,
-			})
-		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Could not accept booking',
-				text2: extractApiErrorMessage(e, 'This request may have expired. Please refresh and try again.'),
-			})
-		} finally {
-			setAcceptingId(null)
-			void loadOrders()
-		}
-	}
-
-	const handleConfirmDecline = async (reason: string) => {
-		if (!declineTarget || declining) return
-		const target = declineTarget
-		setDeclining(true)
-		try {
-			await declineScheduledOrder(target.id, reason)
-			setDeclineTarget(null)
-			Toast.show({
-				type: 'success',
-				text1: 'Booking declined',
-				text2: `${target.patientName} has been notified.`,
-			})
-		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Could not decline booking',
-				text2: extractApiErrorMessage(e, 'Please try again.'),
-			})
-		} finally {
-			setDeclining(false)
-			void loadOrders()
-		}
-	}
-
-	const busy = !!acceptingId || declining
-
 	return (
 		<View style={styles.section}>
 			<View style={styles.headerRow}>
-				<View style={styles.titleRow}>
-					<Text style={styles.title} accessibilityRole="header">
-						Scheduled requests
-					</Text>
-					{pendingCount > 0 ? <AppTag label={`${pendingCount} new`} tone="pending" size="sm" /> : null}
-				</View>
+				<Text style={styles.title} accessibilityRole="header">
+					Visits
+				</Text>
 				{loading && loaded ? (
 					<ActivityIndicator size="small" color={APP_COLORS.primary} />
 				) : (
@@ -220,7 +121,7 @@ export function ProviderScheduledOrdersSection() {
 			{loadError ? (
 				<AppInfoBanner
 					tone="danger"
-					title="Couldn't load requests"
+					title="Couldn't load your visits"
 					subtitle={loadError}
 					action={{ label: 'Retry', onPress: () => void loadOrders() }}
 				/>
@@ -233,56 +134,18 @@ export function ProviderScheduledOrdersSection() {
 			) : sorted.length > 0 ? (
 				<View style={styles.list}>
 					{sorted.map((order) => (
-						<ProviderScheduledOrderCard
-							key={order.id}
-							order={order}
-							nowMs={nowMs}
-							accepting={acceptingId === order.id}
-							busy={busy}
-							onAccept={handleAccept}
-							onDecline={setDeclineTarget}
-							onProposeTime={setRescheduleTarget}
-							onOpenVisit={handleOpenVisit}
-						/>
+						<ProviderScheduledOrderCard key={order.id} order={order} onOpenVisit={handleOpenVisit} />
 					))}
 				</View>
 			) : !loadError ? (
 				<View style={styles.emptyBox}>
-					<Text style={styles.emptyTitle}>No scheduled requests</Text>
+					<Text style={styles.emptyTitle}>No visits yet</Text>
 					<Text style={styles.emptySub}>
 						{filter === 'ALL'
-							? 'New home-care bookings from patients will appear here.'
+							? 'Visits you accept from Today will appear here.'
 							: 'Nothing in this category right now.'}
 					</Text>
 				</View>
-			) : null}
-
-			<DeclineOrderSheet
-				visible={!!declineTarget}
-				patientName={declineTarget?.patientName}
-				visitsCount={declineTarget?.visits.length || 1}
-				submitting={declining}
-				onClose={() => {
-					if (!declining) setDeclineTarget(null)
-				}}
-				onConfirm={(reason) => void handleConfirmDecline(reason)}
-			/>
-
-			{rescheduleTarget ? (
-				<RescheduleProposalModal
-					visible
-					requestPublicId={rescheduleTarget.id}
-					rescheduleCount={rescheduleTarget.rescheduleCount}
-					onClose={() => setRescheduleTarget(null)}
-					onSuccess={(msg, ok) => {
-						Toast.show({
-							type: ok === false ? 'error' : 'success',
-							text1: ok === false ? 'Could not propose a new time' : 'New time proposed',
-							text2: msg,
-						})
-						void loadOrders()
-					}}
-				/>
 			) : null}
 		</View>
 	)
@@ -298,12 +161,6 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 		gap: 8,
 		marginTop: 2,
-	},
-	titleRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		flexShrink: 1,
 	},
 	title: {
 		fontSize: 16,

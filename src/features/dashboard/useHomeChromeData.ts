@@ -5,7 +5,7 @@
 // refreshes when `enabled` turns true, and never throws: on failure the value stays null (or the cache)
 // and callers fall back / hide the dependent row.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Alert, Linking } from 'react-native'
+import { Linking } from 'react-native'
 import {
 	getAppConfig,
 	getAncillaryStartingPrices,
@@ -16,6 +16,7 @@ import {
 import { getWallet } from '../wallet/walletService'
 import { registerSessionCache } from '../../utils/sessionCache'
 import { patientSummaryStore } from '../profile/patient/patientSummaryStore'
+import { showStatusModal } from '../../services/apiService'
 
 function useSoftFetch<T>(fetcher: () => Promise<T | null>, cache: { value: T | null }, enabled: boolean) {
 	const [value, setValue] = useState<T | null>(cache.value)
@@ -63,7 +64,22 @@ registerSessionCache(() => {
 	walletCache.value = null
 })
 
-const fetchConfig = async () => (await getAppConfig()) ?? null
+// The launch check (features/app-update) has already fetched the config behind the splash; Home's first read takes
+// that instead of asking the server again. Later reads fetch as usual.
+let launchConfig: AppConfig | null = null
+export const seedAppConfigFromLaunch = (config: AppConfig) => {
+	launchConfig = config
+	configCache.value = config
+}
+
+const fetchConfig = async () => {
+	if (launchConfig) {
+		const seeded = launchConfig
+		launchConfig = null
+		return seeded
+	}
+	return (await getAppConfig()) ?? null
+}
 const fetchPrices = async () => await getAncillaryStartingPrices()
 const fetchWalletBalance = async () => {
 	const res = await getWallet()
@@ -141,11 +157,24 @@ export const contactSupport = (phone: string, email: string): boolean => {
 	const call = () => void openContactUrl(telUrl(phone))
 	const mail = () => void openContactUrl(`mailto:${email}`)
 	if (phone && email) {
-		Alert.alert('Help centre', 'How would you like to reach Karolahealth support?', [
-			{ text: `Call ${phone}`, onPress: call },
-			{ text: 'Email us', onPress: mail },
-			{ text: 'Cancel', style: 'cancel' },
-		])
+		// The common modal has two buttons, so the choice takes two steps: call first, "Email us" opens the email step.
+		showStatusModal({
+			status: 'info',
+			title: 'Help centre',
+			description: 'How would you like to reach Karolahealth support?',
+			submitText: `Call ${phone}`,
+			onSubmit: call,
+			cancelText: 'Email us',
+			onCancel: () =>
+				showStatusModal({
+					status: 'info',
+					title: 'Email support',
+					description: email,
+					submitText: 'Open email',
+					onSubmit: mail,
+					cancelText: 'Close',
+				}),
+		})
 		return true
 	}
 	if (phone) call()

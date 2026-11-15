@@ -1,5 +1,5 @@
-// Availability for doctors (hours per hospital / clinic and per mode: in clinic or video) and ancillary
-// providers (one schedule plus visit length and travel radius).
+// Availability for doctors: hours per hospital / clinic and per mode (in clinic or video). Ancillary providers keep no schedule
+// (only the online switch on Today); their profile row opens TravelRadiusPage instead.
 //   Weekly hours  -- pick a day, turn it on, then add Morning / Afternoon / Evening time ranges; "Copy to
 //                    all weekdays"; slot length. Saved with the footer button.
 //   Date overrides -- leave / unavailable, or different hours for one date. Each save / delete is immediate.
@@ -10,18 +10,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
 import {
 	AppButton,
-	AppChipGroup,
 	AppConfirmSheet,
 	AppFormCard,
-	AppFormField,
 	AppSaveFooter,
 	AppSegmentedControl,
 	AppToggle,
-	StatusModal,
 } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
-import { useAncillarySpecialty, useAuth } from '../../../context/AuthContext'
-import { fetchProviderProfile } from '../../ancillary/ancillaryService'
+import { useAuth } from '../../../context/AuthContext'
 import {
 	createDoctorOverride,
 	deleteDoctorOverride,
@@ -29,15 +25,7 @@ import {
 	fetchDoctorOverrides,
 	saveDoctorWeeklyHours,
 } from '../doctor/doctorProfileService'
-import {
-	createProviderOverride,
-	deleteProviderOverride,
-	fetchProviderOverrides,
-	fetchProviderSchedule,
-	saveProviderSchedule,
-	saveProviderTravelRadius,
-} from '../ancillary/ancillaryProfileService'
-import { ancillaryConfigFor, formatUnit } from '../config/ancillaryProfileConfig'
+import TravelRadiusPage from '../ancillary/TravelRadiusPage'
 import { useProfileForm } from '../hooks/useProfileForm'
 import { ProfileScreen } from '../shared/components/ProfileScreen'
 import {
@@ -55,15 +43,10 @@ import {
 	type WeekSections,
 } from './availabilityUtils'
 import {
-	ancillaryOverrideBodies,
-	ancillaryScheduleToWeek,
 	doctorAvailabilityToWeek,
 	doctorOverridePayload,
-	groupAncillaryOverrides,
 	groupDoctorOverrides,
-	weekToAncillarySchedules,
 	weeksToDoctorAvailability,
-	type AncillaryOverrideRow,
 	type DoctorMode,
 	type DoctorOverrideRow,
 } from './availabilityAdapters'
@@ -73,16 +56,15 @@ import { SlotLengthCard } from './components/SlotLengthCard'
 import { OverrideList } from './components/OverrideList'
 import { OverrideSheet } from './components/OverrideSheet'
 import { ClinicPickerSheet } from './components/ClinicPickerSheet'
+import { showStatusModal } from '../../../services/apiService'
 
 type Place = { id: string; name: string }
 
 interface AvailabilityDraft {
 	weeks: Record<string, Record<DoctorMode, WeekSections>>
 	slots: Record<string, Record<DoctorMode, number>>
-	travel: number
 }
 
-const ANCILLARY_PLACE = 'me'
 const DOCTOR_SLOTS = [10, 15, 20, 30]
 const MODE_OPTIONS: { value: DoctorMode; label: string }[] = [
 	{ value: 'clinic', label: 'In clinic' },
@@ -92,99 +74,70 @@ const WEEKDAYS = [1, 2, 3, 4, 5]
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
+/** Doctors set hours per clinic; an ancillary provider only sets how far they travel. */
 export default function AvailabilityPage() {
 	const { role } = useAuth()
-	const isDoctor = role === 'doctor'
-	const { specialtyId } = useAncillarySpecialty()
-	const config = ancillaryConfigFor(specialtyId)
+	return role === 'doctor' ? <DoctorAvailabilityPage /> : <TravelRadiusPage />
+}
 
+function DoctorAvailabilityPage() {
 	const [places, setPlaces] = useState<Place[]>([])
-	const [placeId, setPlaceId] = useState<string>(ANCILLARY_PLACE)
+	const [placeId, setPlaceId] = useState<string>('')
 	const [mode, setMode] = useState<DoctorMode>('clinic')
 	const [tab, setTab] = useState<'week' | 'dates'>('week')
 	const [day, setDay] = useState(1)
 	const [pickerOpen, setPickerOpen] = useState(false)
 
 	const [doctorRows, setDoctorRows] = useState<DoctorOverrideRow[]>([])
-	const [ancillaryRows, setAncillaryRows] = useState<AncillaryOverrideRow[]>([])
 	const [sheet, setSheet] = useState<{ initial: DateOverride | null } | null>(null)
 	const [removing, setRemoving] = useState<DateOverride | null>(null)
-	const [actionError, setActionError] = useState<string | null>(null)
 
 	// ── Weekly hours (draft + footer save) ───────────────────────────────────
 	const load = useCallback(async (): Promise<AvailabilityDraft> => {
-		if (isDoctor) {
-			const hospitals = await fetchDoctorHospitals()
-			const list = hospitals
-				.filter((h) => h.hospital?.id)
-				.map((h) => ({
-					id: h.hospital!.id,
-					name: h.hospital!.name || 'Clinic',
-					primary: !!h.is_primary,
-					availability: h.availability,
-				}))
-				.sort((a, b) => Number(b.primary) - Number(a.primary))
-			setPlaces(list.map(({ id, name }) => ({ id, name })))
-			setPlaceId((cur) => (list.some((p) => p.id === cur) ? cur : (list[0]?.id ?? '')))
-			const weeks: AvailabilityDraft['weeks'] = {}
-			const slots: AvailabilityDraft['slots'] = {}
-			for (const p of list) {
-				const clinic = doctorAvailabilityToWeek(p.availability, 'clinic')
-				const video = doctorAvailabilityToWeek(p.availability, 'video')
-				weeks[p.id] = { clinic: clinic.week, video: video.week }
-				slots[p.id] = { clinic: clinic.slotDuration ?? 15, video: video.slotDuration ?? 15 }
-			}
-			return { weeks, slots, travel: 0 }
+		const hospitals = await fetchDoctorHospitals()
+		const list = hospitals
+			.filter((h) => h.hospital?.id)
+			.map((h) => ({
+				id: h.hospital!.id,
+				name: h.hospital!.name || 'Clinic',
+				primary: !!h.is_primary,
+				availability: h.availability,
+			}))
+			.sort((a, b) => Number(b.primary) - Number(a.primary))
+		setPlaces(list.map(({ id, name }) => ({ id, name })))
+		setPlaceId((cur) => (list.some((p) => p.id === cur) ? cur : (list[0]?.id ?? '')))
+		const weeks: AvailabilityDraft['weeks'] = {}
+		const slots: AvailabilityDraft['slots'] = {}
+		for (const p of list) {
+			const clinic = doctorAvailabilityToWeek(p.availability, 'clinic')
+			const video = doctorAvailabilityToWeek(p.availability, 'video')
+			weeks[p.id] = { clinic: clinic.week, video: video.week }
+			slots[p.id] = { clinic: clinic.slotDuration ?? 15, video: video.slotDuration ?? 15 }
 		}
-		const [schedule, profile] = await Promise.all([fetchProviderSchedule(), fetchProviderProfile()])
-		const { week, slotDuration } = ancillaryScheduleToWeek(schedule)
-		setPlaces([{ id: ANCILLARY_PLACE, name: 'Home visits' }])
-		return {
-			weeks: { [ANCILLARY_PLACE]: { clinic: week, video: week } },
-			slots: {
-				[ANCILLARY_PLACE]: {
-					clinic: slotDuration ?? config.defaultUnit,
-					video: slotDuration ?? config.defaultUnit,
-				},
-			},
-			travel: Math.round(profile?.geofence_radius_km ?? profile?.geofence_radius ?? config.travelOptions[1]),
-		}
-	}, [isDoctor, config])
+		return { weeks, slots }
+	}, [])
 
-	const save = useCallback(
-		async (draft: AvailabilityDraft, saved: AvailabilityDraft) => {
-			if (isDoctor) {
-				for (const id of Object.keys(draft.weeks)) {
-					if (same(draft.weeks[id], saved.weeks[id]) && same(draft.slots[id], saved.slots[id])) continue
-					await saveDoctorWeeklyHours(id, weeksToDoctorAvailability(draft.weeks[id], draft.slots[id]))
-				}
-			} else {
-				const week = draft.weeks[ANCILLARY_PLACE].clinic
-				const slot = draft.slots[ANCILLARY_PLACE].clinic
-				if (!same(week, saved.weeks[ANCILLARY_PLACE].clinic) || slot !== saved.slots[ANCILLARY_PLACE].clinic) {
-					await saveProviderSchedule(weekToAncillarySchedules(week, slot))
-				}
-				if (draft.travel !== saved.travel) await saveProviderTravelRadius(draft.travel)
-			}
-			return draft
-		},
-		[isDoctor]
-	)
+	const save = useCallback(async (draft: AvailabilityDraft, saved: AvailabilityDraft) => {
+		for (const id of Object.keys(draft.weeks)) {
+			if (same(draft.weeks[id], saved.weeks[id]) && same(draft.slots[id], saved.slots[id])) continue
+			await saveDoctorWeeklyHours(id, weeksToDoctorAvailability(draft.weeks[id], draft.slots[id]))
+		}
+		return draft
+	}, [])
 
 	const form = useProfileForm<AvailabilityDraft>({ load, save, successMessage: 'Availability saved' })
 	const { draft } = form
-	const activeMode: DoctorMode = isDoctor ? mode : 'clinic'
-	const week = draft?.weeks[placeId]?.[activeMode]
+	const week = draft?.weeks[placeId]?.[mode]
 
 	const placeName = (id: string) => places.find((p) => p.id === id)?.name ?? 'Clinic'
 
 	/**
-	 * Doctor: the same day's ranges of the SAME kind at other places, for clash checks (two clinics at once). Video and
+	 * The same day's ranges of the SAME kind at other places, for clash checks (two clinics at once). Video and
 	 * in-clinic hours may share a time: a booking of either one takes that time for both.
 	 */
 	const othersFor = useCallback(
 		(pid: string, m: DoctorMode, d: number): { place: string; range: TimeRange }[] => {
-			if (!isDoctor || !draft) return []
+			if (!draft) return []
 			const out: { place: string; range: TimeRange }[] = []
 			for (const [otherId, modes] of Object.entries(draft.weeks)) {
 				for (const otherMode of [m]) {
@@ -195,29 +148,22 @@ export default function AvailabilityPage() {
 			}
 			return out
 		},
-		[isDoctor, draft, places]
+		[draft, places]
 	)
 
 	const invalid = useMemo(() => {
 		if (!draft) return false
 		return Object.entries(draft.weeks).some(([pid, modes]) =>
-			(isDoctor ? (['clinic', 'video'] as DoctorMode[]) : (['clinic'] as DoctorMode[])).some((m) =>
-				weekHasErrors(modes[m], (d) => othersFor(pid, m, d))
-			)
+			(['clinic', 'video'] as DoctorMode[]).some((m) => weekHasErrors(modes[m], (d) => othersFor(pid, m, d)))
 		)
-	}, [draft, isDoctor, othersFor])
+	}, [draft, othersFor])
 
 	const setWeek = (next: WeekSections) =>
 		form.setDraft((cur) =>
 			cur
 				? {
 						...cur,
-						weeks: {
-							...cur.weeks,
-							[placeId]: isDoctor
-								? { ...cur.weeks[placeId], [activeMode]: next }
-								: { clinic: next, video: next },
-						},
+						weeks: { ...cur.weeks, [placeId]: { ...cur.weeks[placeId], [mode]: next } },
 					}
 				: cur
 		)
@@ -227,12 +173,7 @@ export default function AvailabilityPage() {
 			cur
 				? {
 						...cur,
-						slots: {
-							...cur.slots,
-							[placeId]: isDoctor
-								? { ...cur.slots[placeId], [activeMode]: minutes }
-								: { clinic: minutes, video: minutes },
-						},
+						slots: { ...cur.slots, [placeId]: { ...cur.slots[placeId], [mode]: minutes } },
 					}
 				: cur
 		)
@@ -255,12 +196,11 @@ export default function AvailabilityPage() {
 	// ── Date overrides (immediate) ───────────────────────────────────────────
 	const loadOverrides = useCallback(async () => {
 		try {
-			if (isDoctor) setDoctorRows(await fetchDoctorOverrides())
-			else setAncillaryRows(await fetchProviderOverrides())
+			setDoctorRows(await fetchDoctorOverrides())
 		} catch {
 			// The weekly tab still works; the list just stays empty.
 		}
-	}, [isDoctor])
+	}, [])
 
 	useEffect(() => {
 		void loadOverrides()
@@ -268,32 +208,29 @@ export default function AvailabilityPage() {
 
 	const today = toIsoDate(new Date())
 	const overrides = useMemo(
-		() =>
-			(isDoctor
-				? groupDoctorOverrides(doctorRows, placeId, activeMode)
-				: groupAncillaryOverrides(ancillaryRows)
-			).filter((o) => o.date >= today),
-		[isDoctor, doctorRows, ancillaryRows, placeId, activeMode, today]
+		() => groupDoctorOverrides(doctorRows, placeId, mode).filter((o) => o.date >= today),
+		[doctorRows, placeId, mode, today]
 	)
 
-	const offLabel = isDoctor ? 'Unavailable all day' : 'On leave'
+	const offLabel = 'Unavailable all day'
 
 	const deleteRows = async (ids: number[]) => {
-		for (const id of ids) {
-			if (isDoctor) await deleteDoctorOverride(id)
-			else await deleteProviderOverride(id)
-		}
+		for (const id of ids) await deleteDoctorOverride(id)
 	}
 
 	const saveOverride = async (o: Pick<DateOverride, 'date' | 'off' | 'ranges' | 'note'>) => {
 		try {
 			if (sheet?.initial) await deleteRows(sheet.initial.ids)
-			if (isDoctor) await createDoctorOverride(doctorOverridePayload(placeId, activeMode, o))
-			else for (const body of ancillaryOverrideBodies(o)) await createProviderOverride(body)
+			await createDoctorOverride(doctorOverridePayload(placeId, mode, o))
 			setSheet(null)
 			Toast.show({ type: 'success', text1: 'Date override saved' })
 		} catch (e) {
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't update availability",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			await loadOverrides()
 		}
@@ -305,30 +242,31 @@ export default function AvailabilityPage() {
 			await deleteRows(removing.ids)
 			Toast.show({ type: 'success', text1: 'Date override removed' })
 		} catch (e) {
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't update availability",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		} finally {
 			setRemoving(null)
 			await loadOverrides()
 		}
 	}
 
-	const slotOptions = (isDoctor ? DOCTOR_SLOTS : config.unitOptions).map((m) => ({
-		value: String(m),
-		label: formatUnit(m),
-	}))
-	const currentSlot = draft?.slots[placeId]?.[activeMode]
+	const currentSlot = draft?.slots[placeId]?.[mode]
 
 	return (
 		<ProfileScreen
 			title="Availability"
-			subtitle={isDoctor ? 'Hours are set per clinic' : 'Patients book only these times'}
+			subtitle="Hours are set per clinic"
 			loading={form.loading}
 			loadError={form.loadError}
 			onRetry={form.reload}
 			saveError={form.saveError}
 			onDismissSaveError={form.clearSaveError}
 			footer={
-				tab === 'week' && (!isDoctor || places.length > 0) ? (
+				tab === 'week' && places.length > 0 ? (
 					<AppSaveFooter
 						onSave={form.submit}
 						dirty={form.dirty}
@@ -341,33 +279,27 @@ export default function AvailabilityPage() {
 			}
 			overlays={
 				<>
-					{isDoctor && (
-						<ClinicPickerSheet
-							visible={pickerOpen}
-							onClose={() => setPickerOpen(false)}
-							clinics={places.map((p) => ({
-								id: p.id,
-								name: p.name,
-								summary: draft
-									? `${[1, 2, 3, 4, 5, 6, 0].filter((d) => isDayOn(draft.weeks[p.id].clinic[d]) || isDayOn(draft.weeks[p.id].video[d])).length} days a week`
-									: '',
-							}))}
-							selectedId={placeId}
-							onSelect={setPlaceId}
-						/>
-					)}
+					<ClinicPickerSheet
+						visible={pickerOpen}
+						onClose={() => setPickerOpen(false)}
+						clinics={places.map((p) => ({
+							id: p.id,
+							name: p.name,
+							summary: draft
+								? `${[1, 2, 3, 4, 5, 6, 0].filter((d) => isDayOn(draft.weeks[p.id].clinic[d]) || isDayOn(draft.weeks[p.id].video[d])).length} days a week`
+								: '',
+						}))}
+						selectedId={placeId}
+						onSelect={setPlaceId}
+					/>
 					<OverrideSheet
 						visible={!!sheet}
 						onClose={() => setSheet(null)}
 						initial={sheet?.initial ?? null}
 						takenDates={overrides.map((o) => o.date)}
 						offLabel={offLabel}
-						subtitle={
-							isDoctor
-								? `Only for ${placeName(placeId)} · ${activeMode === 'clinic' ? 'in clinic' : 'video'}`
-								: 'Weekly hours stay the same on other dates'
-						}
-						allowNote={!isDoctor}
+						subtitle={`Only for ${placeName(placeId)} · ${mode === 'clinic' ? 'in clinic' : 'video'}`}
+						allowNote={false}
 						onSave={saveOverride}
 					/>
 					<AppConfirmSheet
@@ -378,18 +310,10 @@ export default function AvailabilityPage() {
 						confirmLabel="Remove"
 						onConfirm={removeOverride}
 					/>
-					<StatusModal
-						visible={!!actionError}
-						status="error"
-						title="Couldn't update availability"
-						description={actionError || ''}
-						submitText="OK"
-						onSubmit={() => setActionError(null)}
-					/>
 				</>
 			}
 		>
-			{isDoctor && places.length === 0 ? (
+			{places.length === 0 ? (
 				<AppFormCard
 					title="No hospitals or clinics yet"
 					helper="Add a place you consult at first, then set its hours here."
@@ -398,43 +322,37 @@ export default function AvailabilityPage() {
 				draft &&
 				week && (
 					<>
-						{isDoctor && (
-							<View style={styles.placeCard}>
-								<AppSegmentedControl
-									options={MODE_OPTIONS}
-									value={mode}
-									onChange={setMode}
-									accessibilityLabel="Appointment type"
-								/>
-								<Text style={[styles.eyebrow, mode === 'video' && styles.placeOff]}>SCHEDULE FOR</Text>
-								<TouchableOpacity
-									style={[styles.placeRow, mode === 'video' && styles.placeRowOff]}
-									onPress={() => setPickerOpen(true)}
-									// Video calls aren't tied to a clinic, so the card is greyed out and can't be changed there.
-									disabled={places.length < 2 || mode === 'video'}
-									accessibilityRole="button"
-									accessibilityState={{ disabled: places.length < 2 || mode === 'video' }}
-									accessibilityLabel={`Schedule for ${placeName(placeId)}. Change clinic`}
-									accessibilityHint={mode === 'video' ? 'Not used for video calls' : undefined}
-								>
-									<MaterialCommunityIcons
-										name="hospital-building"
-										size={22}
-										color={APP_COLORS.primary}
-									/>
-									<Text style={styles.placeName} numberOfLines={1}>
-										{placeName(placeId)}
-									</Text>
-									{places.length > 1 && <Text style={styles.change}>Change</Text>}
-								</TouchableOpacity>
-							</View>
-						)}
+						<View style={styles.placeCard}>
+							<AppSegmentedControl
+								options={MODE_OPTIONS}
+								value={mode}
+								onChange={setMode}
+								accessibilityLabel="Appointment type"
+							/>
+							<Text style={[styles.eyebrow, mode === 'video' && styles.placeOff]}>SCHEDULE FOR</Text>
+							<TouchableOpacity
+								style={[styles.placeRow, mode === 'video' && styles.placeRowOff]}
+								onPress={() => setPickerOpen(true)}
+								// Video calls aren't tied to a clinic, so the card is greyed out and can't be changed there.
+								disabled={places.length < 2 || mode === 'video'}
+								accessibilityRole="button"
+								accessibilityState={{ disabled: places.length < 2 || mode === 'video' }}
+								accessibilityLabel={`Schedule for ${placeName(placeId)}. Change clinic`}
+								accessibilityHint={mode === 'video' ? 'Not used for video calls' : undefined}
+							>
+								<MaterialCommunityIcons name="hospital-building" size={22} color={APP_COLORS.primary} />
+								<Text style={styles.placeName} numberOfLines={1}>
+									{placeName(placeId)}
+								</Text>
+								{places.length > 1 && <Text style={styles.change}>Change</Text>}
+							</TouchableOpacity>
+						</View>
 
 						<View style={styles.tabs}>
 							<AppSegmentedControl
 								options={[
 									{ value: 'week', label: 'Weekly hours' },
-									{ value: 'dates', label: isDoctor ? 'Date overrides' : 'Leave & overrides' },
+									{ value: 'dates', label: 'Date overrides' },
 								]}
 								value={tab}
 								onChange={setTab}
@@ -445,95 +363,50 @@ export default function AvailabilityPage() {
 						</View>
 
 						{tab === 'week' ? (
-							<>
-								<AppFormCard
-									title="Weekly hours"
-									helper="Pick a day, then add one or more time ranges, e.g. 9–10 AM and 11 AM–12 PM."
-								>
-									{isDoctor && (
-										<SlotLengthCard
-											options={DOCTOR_SLOTS}
-											value={currentSlot}
-											onChange={setSlot}
-											copyLabel={`Copy ${DAY_FULL[day]}'s hours to all weekdays`}
-											onCopy={copyToWeekdays}
-											copyDisabled={!isDayOn(week[day])}
-										/>
-									)}
-									<DayStrip week={week} selected={day} onSelect={setDay} />
-									<View style={styles.dayHead}>
-										<View style={styles.flex}>
-											<Text style={styles.dayTitle}>{DAY_FULL[day]}</Text>
-											<Text style={styles.daySub}>{daySummary(week[day])}</Text>
-										</View>
-										<AppToggle
-											value={isDayOn(week[day])}
-											onValueChange={toggleDay}
-											accessibilityLabel={`Available on ${DAY_FULL[day]}`}
-										/>
+							<AppFormCard
+								title="Weekly hours"
+								helper="Pick a day, then add one or more time ranges, e.g. 9–10 AM and 11 AM–12 PM."
+							>
+								<SlotLengthCard
+									options={DOCTOR_SLOTS}
+									value={currentSlot}
+									onChange={setSlot}
+									copyLabel={`Copy ${DAY_FULL[day]}'s hours to all weekdays`}
+									onCopy={copyToWeekdays}
+									copyDisabled={!isDayOn(week[day])}
+								/>
+								<DayStrip week={week} selected={day} onSelect={setDay} />
+								<View style={styles.dayHead}>
+									<View style={styles.flex}>
+										<Text style={styles.dayTitle}>{DAY_FULL[day]}</Text>
+										<Text style={styles.daySub}>{daySummary(week[day])}</Text>
 									</View>
-									{isDayOn(week[day]) ? (
-										<>
-											<DaySections
-												day={week[day]}
-												onChange={(next) => {
-													const w = cloneWeek(week)
-													w[day] = next
-													setWeek(w)
-												}}
-												others={othersFor(placeId, activeMode, day)}
-											/>
-											{!isDoctor && (
-												<View style={styles.copyRow}>
-													<TouchableOpacity
-														onPress={copyToWeekdays}
-														hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-														accessibilityRole="button"
-													>
-														<Text style={styles.copyLink}>Copy to all weekdays</Text>
-													</TouchableOpacity>
-												</View>
-											)}
-										</>
-									) : (
-										<Text style={styles.offText}>
-											No bookings on {DAY_FULL[day]}s. Turn on to add hours.
-										</Text>
-									)}
-								</AppFormCard>
-
-								{!isDoctor && (
-									<AppFormCard title={config.unitLabel}>
-										<AppChipGroup
-											options={slotOptions}
-											values={currentSlot ? [String(currentSlot)] : []}
-											onChange={(v) => v[0] && setSlot(Number(v[0]))}
-											single
-											accessibilityLabel={config.unitLabel}
-										/>
-										<AppFormField label="How far I travel">
-											<AppChipGroup
-												options={config.travelOptions.map((km) => ({
-													value: String(km),
-													label: `${km} km`,
-												}))}
-												values={[String(draft.travel)]}
-												onChange={(v) => v[0] && form.set('travel', Number(v[0]))}
-												single
-												accessibilityLabel="How far I travel"
-											/>
-										</AppFormField>
-									</AppFormCard>
+									<AppToggle
+										value={isDayOn(week[day])}
+										onValueChange={toggleDay}
+										accessibilityLabel={`Available on ${DAY_FULL[day]}`}
+									/>
+								</View>
+								{isDayOn(week[day]) ? (
+									<DaySections
+										day={week[day]}
+										onChange={(next) => {
+											const w = cloneWeek(week)
+											w[day] = next
+											setWeek(w)
+										}}
+										others={othersFor(placeId, mode, day)}
+									/>
+								) : (
+									<Text style={styles.offText}>
+										No bookings on {DAY_FULL[day]}s. Turn on to add hours.
+									</Text>
 								)}
-							</>
+							</AppFormCard>
 						) : (
 							<AppFormCard
-								title={isDoctor ? 'Date overrides' : 'Leave & date overrides'}
-								helper={
-									isDoctor
-										? 'Holidays, half days or different hours at this clinic only.'
-										: 'Take a day off or change hours for one date. Weekly hours stay the same.'
-								}
+								title="Date overrides"
+								helper="Holidays, half days or different hours at this clinic only."
 							>
 								<OverrideList
 									overrides={overrides}
@@ -622,17 +495,6 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		lineHeight: 16,
 		color: APP_COLORS.inkMuted,
-	},
-	// plain primary text link from the design (not a bordered button)
-	copyRow: {
-		flexDirection: 'row',
-		justifyContent: 'flex-end',
-	},
-	copyLink: {
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '700',
-		color: APP_COLORS.primary,
 	},
 	offText: {
 		fontSize: 13,

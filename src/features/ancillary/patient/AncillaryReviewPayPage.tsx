@@ -10,7 +10,6 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } fr
 import { CommonActions, useNavigation, useRoute } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RouteProp } from '@react-navigation/native'
-import Toast from 'react-native-toast-message'
 import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
@@ -43,6 +42,7 @@ import {
 import { AncillaryPayAfterVisitSection, AncillaryServiceSection } from './AncillaryReviewSections'
 import { VisitWhoWhereSection } from './VisitWhoWhereSection'
 import { apiErrorMessage, useVisitPatientAddress } from './useVisitPatientAddress'
+import { showStatusModal } from '../../../services/apiService'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 type Route = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_REVIEW_PAY>
@@ -94,10 +94,11 @@ export default function AncillaryReviewPayPage() {
 				return CommonActions.reset({ ...state, routes: next, index: next.length - 1 } as typeof state)
 			})
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: "Couldn't confirm the booking",
-				text2: apiErrorMessage(e) || 'Please try again.',
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't confirm the booking",
+				description: apiErrorMessage(e) || 'Please try again.',
+				submitText: 'OK',
 			})
 		} finally {
 			sendingRef.current = false

@@ -1,8 +1,7 @@
 // src/features/ancillary/staff/providerOrderView.ts
 //
-// View model for the provider's scheduled-orders queue (GET /api/ancillary/provider/me/orders).
-// The contract (phase 4, §5/§6) returns the multi-visit order shape (visits[], expires_at, totals, patient,
-// address, services). The backend may still return the older flat single-visit shape (patient_name,
+// View model for the provider's visit list (GET /api/ancillary/provider/me/orders).
+// The contract (phase 4, §5/§6) returns the multi-visit order shape (visits[], totals, patient, address, services). The backend may still return the older flat single-visit shape (patient_name,
 // scheduled_date/start/end, street_address, total_amount, procedures: string[]), so both are normalised here.
 import type { AppTagTone } from '../../../components/common'
 import { combineDateTime, parseDateOnly, relativeDayLabel, fullDayLabel } from '../../../utils/date'
@@ -22,7 +21,6 @@ type LegacyOrderFields = {
 	street_address?: string | null
 	total_amount?: number | string | null
 	procedures?: string[] | null
-	reschedule_count?: number | null
 	chief_complaint?: string | null
 }
 
@@ -55,8 +53,6 @@ export type ProviderOrderView = {
 	perVisit: number | null
 	total: number | null
 	payAfterVisit: boolean
-	expiresAt: Date | null
-	rescheduleCount: number
 	/** 'INSTANT' for an accepted "Book now" order, otherwise 'SCHEDULED'. */
 	bookingType: string
 	/** The visit to open from the card (first one not finished or cancelled), once the order is accepted. */
@@ -65,8 +61,6 @@ export type ProviderOrderView = {
 
 /** Visit statuses with nothing left to do -- not offered by "Open visit". */
 const FINISHED_VISIT = /^(COMPLETED|CANCEL|EXPIRED|FAILED|UNASSIGNED)/
-
-export const PENDING_STATUSES: AncillaryOrderStatus[] = ['SCHEDULED_PENDING', 'OFFERED', 'PENDING_ACTION']
 
 const toNumber = (v: unknown): number | null => {
 	const n = Number(v)
@@ -163,8 +157,6 @@ export const normalizeProviderOrder = (raw: RawProviderOrder): ProviderOrderView
 	const perVisit =
 		toNumber(raw.totals?.per_visit) ?? (total != null && visits.length > 0 ? total / visits.length : null)
 
-	const expires = raw.expires_at ? new Date(raw.expires_at) : null
-
 	return {
 		id: raw.request_public_id || '',
 		status,
@@ -179,8 +171,6 @@ export const normalizeProviderOrder = (raw: RawProviderOrder): ProviderOrderView
 		total,
 		// Every home-care order is PAY_AFTER_VISIT (phase-4 rule); older rows have no payment_method.
 		payAfterVisit: !raw.payment_method || raw.payment_method === PAY_AFTER_VISIT,
-		expiresAt: expires && !Number.isNaN(expires.getTime()) ? expires : null,
-		rescheduleCount: Number(raw.reschedule_count) || 0,
 		bookingType: instant ? 'INSTANT' : 'SCHEDULED',
 		openVisit: nextVisit
 			? {
@@ -191,41 +181,13 @@ export const normalizeProviderOrder = (raw: RawProviderOrder): ProviderOrderView
 	}
 }
 
-export const isPendingOrder = (order: ProviderOrderView) => PENDING_STATUSES.includes(order.status)
-
-/** Pending but past `expires_at` -- the backend expires it lazily on the next read. */
-export const isLocallyExpired = (order: ProviderOrderView, nowMs: number) =>
-	isPendingOrder(order) && !!order.expiresAt && order.expiresAt.getTime() <= nowMs
-
-export const isOrderExpired = (order: ProviderOrderView, nowMs: number) =>
-	order.status === 'EXPIRED' || isLocallyExpired(order, nowMs)
-
-/** Accept / Decline only while pending and not expired. */
-export const isOrderActionable = (order: ProviderOrderView, nowMs: number) =>
-	isPendingOrder(order) && !isLocallyExpired(order, nowMs)
-
-/** "12:05" (mm:ss) -- or "1:02:05" past an hour -- until `target`; null once reached. */
-export const countdownLabel = (target: Date | null, nowMs: number): string | null => {
-	if (!target) return null
-	const total = Math.floor((target.getTime() - nowMs) / 1000)
-	if (total <= 0) return null
-	const h = Math.floor(total / 3600)
-	const m = Math.floor((total % 3600) / 60)
-	const s = total % 60
-	const mm = h > 0 ? String(m).padStart(2, '0') : String(m)
-	return `${h > 0 ? `${h}:` : ''}${mm}:${String(s).padStart(2, '0')}`
-}
-
 /** Label + AppTag tone (STATUS_TONES key) for an order or visit status. */
-export const orderStatusMeta = (status: AncillaryOrderStatus, expired = false): { label: string; tone: AppTagTone } => {
-	if (expired) return { label: 'Expired', tone: 'done' }
+export const orderStatusMeta = (status: AncillaryOrderStatus): { label: string; tone: AppTagTone } => {
 	switch ((status || '').toUpperCase()) {
 		case 'SCHEDULED_PENDING':
 		case 'OFFERED':
 		case 'PENDING_ACTION':
-			return { label: 'Awaiting you', tone: 'pending' }
-		case 'RESCHEDULE_PROPOSED':
-			return { label: 'New time proposed', tone: 'scheduled' }
+			return { label: 'Scheduled', tone: 'scheduled' }
 		case 'SCHEDULED_CONFIRMED':
 		case 'ASSIGNED':
 		case 'NURSE_ASSIGNED':

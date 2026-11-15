@@ -26,6 +26,7 @@ import type { AppStackScreenProps } from "../../navigation/types";
 import { getSpecialities } from "../doctor/doctorService";
 import { doctorService } from "../consultation/ConsultationService";
 import { fetchAncillaryProfileBackend } from "../ancillary/ancillaryService";
+import { showStatusModal } from '../../services/apiService'
 
 type Speciality = {
   id: string;
@@ -359,7 +360,12 @@ export default function WelcomeDoctorPage({
       });
     } catch (error) {
       console.error("Doctor welcome profile save error:", error);
-      Alert.alert("Error", "Unable to save your account details right now.");
+      showStatusModal({
+      	status: 'error',
+      	title: "Couldn't save your details",
+      	description: "Unable to save your account details right now.",
+      	submitText: 'OK',
+      });
     } finally {
       setIsSaving(false);
     }

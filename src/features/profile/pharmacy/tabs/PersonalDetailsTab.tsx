@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert } from 'react-native'
+import Toast from 'react-native-toast-message'
 import {
 	ScrollView,
 	StyleSheet,
@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../../../../context/AuthContext'
 import { mergePharmacyProfileData, updatePharmacyProfile } from '../pharmacyService'
 import { PharmacyProfileData } from '../../../../types/pharmacy-profile-api'
+import { showStatusModal } from '../../../../services/apiService'
 
 const DEFAULT_PROFILE_IMAGE = require('../../../../assets/Banner/doctor.png')
 const SUCCESS_MESSAGE = 'Personal details saved successfully'
@@ -185,27 +186,27 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 		const trimmedEmail = formData.email.trim()
 
 		if (!trimmedOwnerName) {
-			Alert.alert('Validation', 'Owner name is required.')
+			Toast.show({ type: 'error', text1: 'Owner name is required.' })
 			return
 		}
 
 		if (trimmedMobileNumber && !isValidPhone(trimmedMobileNumber)) {
-			Alert.alert('Validation', 'Please enter a valid mobile number.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid mobile number.' })
 			return
 		}
 
 		if (trimmedAlternateMobile && !isValidPhone(trimmedAlternateMobile)) {
-			Alert.alert('Validation', 'Please enter a valid alternate mobile number.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid alternate mobile number.' })
 			return
 		}
 
 		if (trimmedWhatsappNumber && !isValidPhone(trimmedWhatsappNumber)) {
-			Alert.alert('Validation', 'Please enter a valid WhatsApp number.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid WhatsApp number.' })
 			return
 		}
 
 		if (trimmedEmail && !isValidEmail(trimmedEmail)) {
-			Alert.alert('Validation', 'Please enter a valid email address.')
+			Toast.show({ type: 'error', text1: 'Please enter a valid email address.' })
 			return
 		}
 
@@ -223,7 +224,12 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 			const response = await updatePharmacyProfile(payload)
 
 			if (response?.success === false) {
-				Alert.alert('Error', response.message || 'Unable to save personal details right now.')
+				showStatusModal({
+					status: 'error',
+					title: "Couldn't save personal details",
+					description: response.message || 'Unable to save personal details right now.',
+					submitText: 'OK',
+				})
 				return
 			}
 
@@ -254,7 +260,12 @@ export default function PersonalDetailsTab({ profileData, onProfileChange }: Per
 			setSuccessModalVisible(true)
 		} catch (err) {
 			console.error('[PharmacyPersonalDetailsTab] save error:', err)
-			Alert.alert('Error', 'Unable to save personal details right now.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't save personal details",
+				description: 'Unable to save personal details right now.',
+				submitText: 'OK',
+			})
 		} finally {
 			setIsSaving(false)
 		}

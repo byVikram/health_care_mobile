@@ -14,7 +14,6 @@ import {
 	AppFormField,
 	AppListItemSheet,
 	AppToggle,
-	StatusModal,
 	type AppListItemField,
 } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
@@ -29,6 +28,7 @@ import {
 } from './doctorProfileService'
 import { ProfileScreen } from '../shared/components/ProfileScreen'
 import { pickCertificateFile, type PickedFile } from '../../../utils/pickedFile'
+import { showStatusModal } from '../../../services/apiService'
 
 const FIELDS: AppListItemField[] = [
 	{ key: 'title', label: 'Title', required: true, placeholder: 'e.g. Best Cardiologist Award', maxLength: 200 },
@@ -59,7 +59,6 @@ export default function AchievementsPage() {
 	const [type, setType] = useState<AchievementType>('Award')
 	const [isPublic, setIsPublic] = useState(true)
 	const [removing, setRemoving] = useState<DoctorAchievement | null>(null)
-	const [actionError, setActionError] = useState<string | null>(null)
 	// The supporting document picked in the open sheet; it is sent when the sheet is submitted.
 	const [pendingDoc, setPendingDoc] = useState<PickedFile | null>(null)
 
@@ -103,7 +102,12 @@ export default function AchievementsPage() {
 			Toast.show({ type: 'success', text1: current ? 'Achievement updated' : 'Achievement added' })
 			await load()
 		} catch (e) {
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't save the achievement",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		}
 	}
 
@@ -116,7 +120,12 @@ export default function AchievementsPage() {
 			await load()
 		} catch (e) {
 			setRemoving(null)
-			setActionError(e instanceof Error ? e.message : 'Please try again.')
+			showStatusModal({
+				status: 'error',
+				title: "Couldn't delete the achievement",
+				description: e instanceof Error ? e.message : 'Please try again.',
+				submitText: 'OK',
+			})
 		}
 	}
 
@@ -187,14 +196,6 @@ export default function AchievementsPage() {
 						message="It will no longer show on your profile."
 						confirmLabel="Remove"
 						onConfirm={remove}
-					/>
-					<StatusModal
-						visible={!!actionError}
-						status="error"
-						title="Something went wrong"
-						description={actionError || ''}
-						submitText="OK"
-						onSubmit={() => setActionError(null)}
 					/>
 				</>
 			}

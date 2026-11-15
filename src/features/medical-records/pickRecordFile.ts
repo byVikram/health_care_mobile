@@ -4,17 +4,21 @@
 // shared picker in utils/pickedFile). Each resolves with the file, or null when the patient cancels or the file is refused
 // (the reason is shown here), so the sheet only has to wait for a file.
 
-import { Alert } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { pickCertificateFile, type PickedFile } from '../../utils/pickedFile'
 import type { UploadSourceId } from './recordVisuals'
+import Toast from 'react-native-toast-message'
 
 /** The server's limit for a record's file (UPLOAD_RULES `report`): checked here so the patient learns before uploading. */
 const MAX_RECORD_BYTES = 20 * 1024 * 1024
 
 const fromAsset = (asset: ImagePicker.ImagePickerAsset): PickedFile | null => {
 	if (asset.fileSize != null && asset.fileSize > MAX_RECORD_BYTES) {
-		Alert.alert('File too large', 'Please choose a file under 20 MB.')
+		Toast.show({
+			type: 'error',
+			text1: 'File too large',
+			text2: 'Please choose a file under 20 MB.',
+		})
 		return null
 	}
 	const name = asset.fileName || asset.uri.split('/').pop() || `record-${Date.now()}.jpg`
@@ -30,7 +34,11 @@ const fromAsset = (asset: ImagePicker.ImagePickerAsset): PickedFile | null => {
 async function takePhoto(): Promise<PickedFile | null> {
 	const permission = await ImagePicker.requestCameraPermissionsAsync()
 	if (!permission.granted) {
-		Alert.alert('Camera access needed', 'Allow camera access in your phone settings to photograph a record.')
+		Toast.show({
+			type: 'error',
+			text1: 'Camera access needed',
+			text2: 'Allow camera access in your phone settings to photograph a record.',
+		})
 		return null
 	}
 	const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 })
@@ -40,7 +48,11 @@ async function takePhoto(): Promise<PickedFile | null> {
 async function choosePhoto(): Promise<PickedFile | null> {
 	const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
 	if (!permission.granted) {
-		Alert.alert('Photo access needed', 'Allow photo access in your phone settings to choose a record.')
+		Toast.show({
+			type: 'error',
+			text1: 'Photo access needed',
+			text2: 'Allow photo access in your phone settings to choose a record.',
+		})
 		return null
 	}
 	const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 })

@@ -19,6 +19,7 @@ import {
 	type LatestVitals,
 	type VitalValues,
 } from './vitalsEntry'
+import { showStatusModal } from '../../services/apiService'
 
 /** Whether the recent readings (what "today" is built from) have been fetched: until they have, "not recorded" is not known. */
 export type RecentLoad = 'loading' | 'ready' | 'error'
@@ -101,10 +102,11 @@ export function useRecordVitals({
 				onSaved(saved)
 				if (failed.length) {
 					// What did save is now in `today`, so pressing Save again sends only what is still missing.
-					Toast.show({
-						type: 'error',
-						text1: `${failed.length} of ${entries.length} readings could not be saved`,
-						text2: `${reason ?? 'Something went wrong.'} Try again to save the rest.`,
+					showStatusModal({
+						status: 'error',
+						title: `${failed.length} of ${entries.length} readings could not be saved`,
+						description: `${reason ?? 'Something went wrong.'} Try again to save the rest.`,
+						submitText: 'OK',
 					})
 				} else {
 					Toast.show({ type: 'success', text1: 'Vitals saved' })
