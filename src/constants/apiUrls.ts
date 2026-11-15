@@ -1,5 +1,5 @@
-// const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
-const envUrl = 'http://192.168.0.128:8000'
+const envUrl = process.env.EXPO_PUBLIC_API_ENDPOINT?.trim()
+// const envUrl = 'https://d12l6wszchqi9w.cloudfront.net'
 
 if (!envUrl) {
 	throw new Error('EXPO_PUBLIC_API_ENDPOINT is not configured')
