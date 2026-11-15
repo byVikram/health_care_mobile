@@ -6,7 +6,8 @@
 //     banner on top of the screen, with sound, like a chat message. A push sent to a channel the app never created only lands
 //     quietly in the notification shade. The ids must match the backend (health_care_backend/app/core/push.py):
 //       updates        appointment news and what the Notifications screen lists
-//       care_requests  urgent care offers to nurses
+//       care_requests      care offers to nurses (the ordinary one-time alert; a scheduled visit)
+//       care_request_ring  an INSTANT care request: the phone's ringtone at ring volume and a repeating buzz
 //  2. Makes "updates" the default channel for pushes that name none (FCM's `default_notification_channel_id`).
 //  3. Gives pushes the app's small status-bar icon (white mark on transparent, assets/notification/) and the brand colour, both for
 //     a push Android shows itself (FCM) and for the notification the app posts itself while it is open (expo-notifications).
@@ -21,6 +22,10 @@ const DEFAULT_CHANNEL_ID = 'updates'
 const BRAND_COLOR = '#2B6F71' // APP_COLORS.primary
 const ICON_NAME = 'notification_icon'
 const MARKER = 'withNotificationChannels'
+// A second marker for the ringing channel, so an android/ folder that was prebuilt before it existed still gets it (the first
+// marker alone would make a new prebuild skip it).
+const RING_MARKER = 'withNotificationChannels.ring'
+const RING_CHANNEL_ID = 'care_request_ring'
 
 const CHANNELS = [
 	{ id: 'updates', name: 'Appointments & updates', description: 'Confirmations, changes, delays and reminders for your appointments.' },
@@ -47,6 +52,35 @@ function channelCode() {
 	)
 }
 
+// The channel an instant care request rings in. Sound: the phone's own default ringtone, played as a ringtone (so it follows the ring
+// volume and the silent / vibrate switch, not the notification volume). Vibration: a buzz-pause pattern of about 7 seconds. The sound
+// plays once for its own length (a ringtone is long); if a phone cuts it short the notification can ask Android to repeat it
+// (an "insistent" notification), which needs the notification to be drawn by the app. Public on the lock screen: the card shows no
+// patient details. Android fixes all of this when the channel is first created: change it by giving the channel a new id.
+function ringChannelCode() {
+	return (
+		`\n    // ${RING_MARKER}: an instant care request rings (the default ringtone, at ring volume) and buzzes\n` +
+		`    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {\n` +
+		`      val ringManager = getSystemService(android.app.NotificationManager::class.java)\n` +
+		`      ringManager.createNotificationChannel(\n` +
+		`        android.app.NotificationChannel("${RING_CHANNEL_ID}", "Instant care requests", android.app.NotificationManager.IMPORTANCE_HIGH).apply {\n` +
+		`          description = "Rings and vibrates when an instant home-care request comes in near you."\n` +
+		`          enableVibration(true)\n` +
+		`          vibrationPattern = longArrayOf(0, 700, 400, 700, 400, 700, 400, 700, 400, 700, 400, 700)\n` +
+		`          lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC\n` +
+		`          setSound(\n` +
+		`            android.provider.Settings.System.DEFAULT_RINGTONE_URI,\n` +
+		`            android.media.AudioAttributes.Builder()\n` +
+		`              .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)\n` +
+		`              .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)\n` +
+		`              .build()\n` +
+		`          )\n` +
+		`        }\n` +
+		`      )\n` +
+		`    }\n`
+	)
+}
+
 /** Adds the channel code after `super.onCreate()` (Kotlin or Java); returns the new source, unchanged when already there. */
 function addChannels(source, language) {
 	if (source.includes(MARKER)) return source
@@ -60,9 +94,22 @@ function addChannels(source, language) {
 	return source.replace(pattern, (match) => match + channelCode())
 }
 
+/** Same insertion for the ringing channel, tracked by its own marker. */
+function addRingChannel(source, language) {
+	if (source.includes(RING_MARKER)) return source
+	if (language === 'java') {
+		throw new Error(`${MARKER}: a Java MainApplication is not supported; add the channels by hand (see this plugin).`)
+	}
+	const pattern = /(override\s+fun\s+onCreate\s*\(\s*\)\s*\{[^]*?super\.onCreate\(\)[^\n]*\n)/
+	if (!pattern.test(source)) {
+		throw new Error(`${MARKER}: could not find \`override fun onCreate() { super.onCreate()\` in MainApplication.`)
+	}
+	return source.replace(pattern, (match) => match + ringChannelCode())
+}
+
 const withChannelCode = (config) =>
 	withMainApplication(config, (c) => {
-		c.modResults.contents = addChannels(c.modResults.contents, c.modResults.language)
+		c.modResults.contents = addRingChannel(addChannels(c.modResults.contents, c.modResults.language), c.modResults.language)
 		return c
 	})
 

@@ -4,9 +4,9 @@
 // /api/auth/session/fcm-token) so it can wake a closed / backgrounded app -- e.g. the "New care request
 // nearby" offer sent to nurses -- and opens the right screen when the notification is tapped.
 //
-// Foreground: a care-request offer or home-care news is ignored (the offer already arrives over the dispatch WebSocket,
-// useProviderDispatchSocket, and would show twice). News that carries a `notification_id` (an appointment was confirmed, a
-// reminder ...) is a row in the notification list. Android draws a push itself only while the app is closed or in the background;
+// Foreground: a care-request offer is ignored (it already arrives over the dispatch WebSocket, useProviderDispatchSocket, and would
+// show twice). News that carries a `notification_id` (an appointment was confirmed, a reminder, a home-care visit step, a cancelled
+// visit ...) is a row in the notification list. Android draws a push itself only while the app is closed or in the background;
 // while the app is open it hands the message to the app. So the app posts the same system notification itself (expo-notifications,
 // on the same "updates" channel: a banner with sound, and an entry in the notification shade, exactly like the one a closed app
 // gets), unless that screen is already open; the bell and the list refresh. Only if posting fails does it fall back to a banner
@@ -23,6 +23,7 @@ import { getCurrentRoute, navigate } from '../navigation/navigationService'
 import { ROUTES } from '../navigation/routes'
 import { openNotificationTarget, type NavigateFn } from '../features/notification/openNotificationTarget'
 import { markNotificationRead } from '../features/referrals/referralService'
+import { canDrawOffers, isDrawnOffer, showOfferNotification, subscribeToOfferEvents } from './offerNotification'
 
 // Loaded lazily and never on web: @react-native-firebase is native-only and must not run at module load.
 const isNative = Platform.OS !== 'web'
@@ -32,6 +33,8 @@ const notifications = () => require('expo-notifications') as typeof import('expo
 // The Android channel the app's own notifications use: created natively at start-up (plugins/withNotificationChannels.js); the
 // backend sends the same id (health_care_backend/app/core/push.py UPDATES_CHANNEL_ID).
 const UPDATES_CHANNEL_ID = 'updates'
+// The channel an instant care request rings in (same plugin; backend health_care_backend/app/core/push.py CARE_REQUEST_RING_CHANNEL_ID).
+const RING_CHANNEL_ID = 'care_request_ring'
 
 const FCM_TOKEN_URL = API_ENDPOINTS.AUTH.SESSION_FCM_TOKEN
 const NEW_CARE_REQUEST_OFFER = 'NEW_CARE_REQUEST_OFFER'
@@ -50,12 +53,31 @@ const PATIENT_HOME_CARE_NEWS = new Set([
 const TOKEN_RETRY_DELAYS_MS = [1500, 4000, 10000]
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
+/**
+ * True when THIS build has created the ringing channel (a build from before it, or a dev server on an older native build, has not):
+ * the server sends an instant care request to that channel only for a build that says so, otherwise the push would land quietly.
+ */
+async function hasRingChannel(): Promise<boolean> {
+	if (Platform.OS !== 'android') return false
+	try {
+		return !!(await notifications().getNotificationChannelAsync(RING_CHANNEL_ID))
+	} catch {
+		return false
+	}
+}
+
 /** Send a token to the backend for the current login session, retrying a network failure. Never throws. */
 async function sendToken(token: string | null | undefined) {
 	if (!token) return
+	const body: { fcm_token: string; ring_channel?: boolean; offer_actions?: boolean } = { fcm_token: token }
+	if (Platform.OS === 'android') {
+		body.ring_channel = await hasRingChannel()
+		// This build can draw a care request itself, with Accept / Decline buttons: the server then sends it as a data-only push.
+		body.offer_actions = await canDrawOffers()
+	}
 	for (let attempt = 0; ; attempt++) {
 		try {
-			await ApiService.patch(FCM_TOKEN_URL, { fcm_token: token })
+			await ApiService.patch(FCM_TOKEN_URL, body)
 			return
 		} catch (error) {
 			const status = (error as { response?: { status?: number } })?.response?.status
@@ -117,16 +139,18 @@ function handleOpened(message: Pick<RemoteMessage, 'data'> | null) {
 		navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME } as never)
 		return
 	}
+	// News that is also a row in the notification list (an appointment update, a home-care visit step, a visit a patient cancelled):
+	// open its screen and mark it read.
+	if (openFromData(data)) {
+		if (typeof data?.notification_id === 'string' && data.notification_id) void markRead(data.notification_id)
+		return
+	}
+	// Older pushes about a patient's home-care visit carry only the booking id: a tap opens that booking.
 	if (typeof data?.type === 'string' && PATIENT_HOME_CARE_NEWS.has(data.type) && data.requestId) {
 		const id = String(data.requestId)
 		if (data.bookingType === 'SCHEDULED')
 			navigate(ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS, { requestId: id } as never)
 		else navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: id } as never)
-		return
-	}
-	// News that is also a row in the notification list (an appointment update): open its screen and mark it read.
-	if (openFromData(data) && typeof data?.notification_id === 'string' && data.notification_id) {
-		void markRead(data.notification_id)
 	}
 }
 
@@ -232,9 +256,12 @@ function handleLocalTap(response: import('expo-notifications').NotificationRespo
 export function registerBackgroundPushHandler() {
 	if (!isNative) return
 	try {
-		// The system tray shows the notification itself; a handler only has to exist so Android runs the task cleanly.
+		// An ordinary push is drawn by the system tray itself. The one exception is a care request sent data-only to a build that
+		// can draw it: Android draws nothing, and this handler (it runs even when the app is closed) draws the card with Accept / Decline.
 		const fb = firebase()
-		fb.setBackgroundMessageHandler(fb.getMessaging(), async () => {})
+		fb.setBackgroundMessageHandler(fb.getMessaging(), async (message) => {
+			if (isDrawnOffer(message.data)) await showOfferNotification(message)
+		})
 	} catch (error) {
 		console.warn('[push] Could not register the background message handler:', error)
 	}
@@ -251,6 +278,7 @@ export function usePushNotifications(enabled: boolean) {
 		let unsubscribeOpened: (() => void) | undefined
 		let unsubscribeForeground: (() => void) | undefined
 		let removeLocalTapListener: (() => void) | undefined
+		let stopOfferEvents: (() => void) | undefined
 		let retry: ReturnType<typeof setTimeout> | undefined
 		try {
 			const fb = firebase()
@@ -273,6 +301,8 @@ export function usePushNotifications(enabled: boolean) {
 		} catch (error) {
 			console.warn('[push] Could not subscribe to push events:', error)
 		}
+		// The care request card's buttons while the app is open, and a tap on the card (or the tap that started the app from closed): Today.
+		stopOfferEvents = subscribeToOfferEvents(() => navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME } as never))
 		try {
 			// Taps on the notification the app posts itself while it is open (also after it has been closed and reopened by the tap).
 			const n = notifications()
@@ -290,6 +320,7 @@ export function usePushNotifications(enabled: boolean) {
 			unsubscribeOpened?.()
 			unsubscribeForeground?.()
 			removeLocalTapListener?.()
+			stopOfferEvents?.()
 		}
 	}, [enabled])
 }

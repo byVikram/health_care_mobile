@@ -8,7 +8,7 @@
 // /provider/me/today, re-read on focus, on pull-to-refresh (refreshToken), every minute while focused, and
 // after every action. Offers are never polled: the socket pushes them (also the pending ones on connect).
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, Vibration, View } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import { AppInfoBanner } from '../../../../components/common'
@@ -23,10 +23,12 @@ import {
 	type ProviderToday,
 	type ProviderVisitSummary,
 } from '../../providerVisitService'
+import { dismissOfferNotification } from '../../../../services/offerNotification'
 import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { ProviderAvailabilityCard } from './ProviderAvailabilityCard'
 import { useProviderDispatchSocket } from './useProviderDispatchSocket'
 import { useProviderOnline } from './useProviderOnline'
+import { useOverlayPermission } from './useOverlayPermission'
 import { IncomingOfferSheet, type OfferPhase } from './IncomingOfferSheet'
 import { ProviderNextVisitCard } from './ProviderNextVisitCard'
 import { ProviderScheduleTimeline } from './ProviderScheduleTimeline'
@@ -35,6 +37,8 @@ import { isInstantOffer, isProviderWork, offerCollect, shortDay, tipLabel } from
 import { showStatusModal } from '../../../../services/apiService'
 
 const REFRESH_MS = 60_000
+/** The buzz when an instant request opens its sheet in the open app (the closed app's notification buzzes on its own channel). */
+const OFFER_VIBRATION = [0, 700, 400, 700, 400, 700]
 /** Seconds an instant request is held for this provider before it counts as missed. */
 const INSTANT_WINDOW_S = 30
 
@@ -156,6 +160,9 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 		},
 	})
 
+	// A new request over other apps needs "Display over other apps": a prompt shows until it is allowed.
+	const overlay = useOverlayPermission()
+
 	// Offers arrive on the dispatch socket (open only while online, focused and in the foreground).
 	useProviderDispatchSocket({
 		enabled: focused && availability.online === true,
@@ -171,6 +178,7 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 			setSheetOffer((cur) => (cur?.requestId === offer.requestId ? offer : cur))
 		},
 		onOfferGone: ({ requestId, visitPublicId, reason }) => {
+			void dismissOfferNotification(requestId) // the card in the shade goes too
 			// Already accepted / declined by this provider: nothing to withdraw.
 			if (offerGone.current.has(requestId)) return
 			const matches = (o: ProviderOffer) =>
@@ -214,6 +222,7 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 		offerAutoOpened.current.add(next.requestId)
 		setOfferPhase('open')
 		setSheetOffer(next)
+		Vibration.vibrate(OFFER_VIBRATION)
 	})
 
 	// The open instant sheet turns into "Request missed" when the window runs out.
@@ -231,6 +240,7 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 	}
 
 	const closeOfferSheet = () => {
+		Vibration.cancel()
 		setSheetOffer(null)
 		setOfferPhase('open')
 	}
@@ -238,6 +248,7 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 	const handleAcceptOffer = async (offer: ProviderOffer) => {
 		if (offerBusy) return
 		setOfferBusy(true)
+		void dismissOfferNotification(offer.requestId)
 		try {
 			const res = await acceptCareRequestBackend(offer.requestId)
 			if (res.success) {
@@ -275,6 +286,7 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 	const handleDeclineOffer = async (offer: ProviderOffer) => {
 		if (offerBusy) return
 		setOfferBusy(true)
+		void dismissOfferNotification(offer.requestId)
 		try {
 			await rejectOffer(offer.requestId)
 			offerGone.current.add(offer.requestId)
@@ -326,6 +338,18 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 					onChange={(v) => void availability.setOnline(v)}
 				/>
 			</View>
+
+			{overlay.needed ? (
+				<View style={styles.padded}>
+					<AppInfoBanner
+						tone="warning"
+						icon="layers-outline"
+						title="Show new requests over other apps"
+						subtitle="Allow “Display over other apps” so a new request appears on top of your screen, even when the app is closed."
+						action={{ label: 'Allow', onPress: overlay.open }}
+					/>
+				</View>
+			) : null}
 
 			{stats ? (
 				<View style={styles.statRow}>

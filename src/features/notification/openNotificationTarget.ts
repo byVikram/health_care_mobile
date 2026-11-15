@@ -45,6 +45,9 @@ export function openNotificationTarget(navigate: NavigateFn, target: Notificatio
 		})
 	} else if (type === 'doctor_engage') {
 		navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.ENGAGE })
+	} else if (type === 'provider_today') {
+		// A home-care provider's Today screen (a patient cancelled a visit they had accepted): the Home tab of their tab bar.
+		navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME })
 	} else {
 		return false
 	}
