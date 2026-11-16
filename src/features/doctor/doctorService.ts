@@ -261,6 +261,27 @@ export const setAppointmentCheckIn = async (appointmentId: string, checkedIn: bo
 	return res.data
 }
 
+export interface AutoConfirmState {
+	enabled: boolean
+	/** Only on a PUT that turned it on: how many waiting requests were confirmed right then. */
+	confirmed_now?: number
+}
+
+/** The doctor's "Auto-confirm bookings" switch. */
+export const getAutoConfirm = async (): Promise<AutoConfirmState> => {
+	const res = await ApiService.get<{ success: boolean; data: AutoConfirmState }>(API_ENDPOINTS.APPOINTMENTS.AUTO_CONFIRM)
+	return res.data.data
+}
+
+/**
+ * Turns it on or off. New bookings are then confirmed the moment they are made; turning it ON also confirms the requests already
+ * waiting (`confirmed_now`): every eligible booking is confirmed, whatever severity the patient gave.
+ */
+export const setAutoConfirm = async (enabled: boolean): Promise<AutoConfirmState> => {
+	const res = await ApiService.put<{ success: boolean; data: AutoConfirmState }>(API_ENDPOINTS.APPOINTMENTS.AUTO_CONFIRM, { enabled })
+	return res.data.data
+}
+
 export const getAppointmentStatuses = async (): Promise<AppointmentStatusOption[]> => {
 	const res = await ApiService.get<{ success: boolean; data: AppointmentStatusOption[] } | AppointmentStatusOption[]>(
 		API_ENDPOINTS.APPOINTMENTS.STATUSES,
@@ -275,6 +296,22 @@ export const getAppointments = async (params?: AppointmentParams): Promise<Appoi
 		(params ?? {}) as Record<string, unknown>
 	)
 	return res.data
+}
+
+/**
+ * Every row of an appointments query, not just the first page: the list endpoint caps a page at 100 rows, so a busy doctor's
+ * 90 days (or a long Past range) would otherwise be silently cut short. Reads page after page until the server's own page count is
+ * reached, at most `maxPages` (the rows beyond that are left out, never an endless loop).
+ */
+export const getAllAppointments = async (params: AppointmentParams = {}, maxPages = 10): Promise<AppointmentsResponse['data']> => {
+	const rows: AppointmentsResponse['data'] = []
+	for (let page = 1; page <= maxPages; page++) {
+		const res = await getAppointments({ ...params, page, limit: 100 })
+		rows.push(...(res.data ?? []))
+		const pages = res.meta?.pages ?? res.pages ?? 1
+		if (page >= pages) break
+	}
+	return rows
 }
 
 export interface DoctorClinic {

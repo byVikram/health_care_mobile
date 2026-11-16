@@ -1,52 +1,57 @@
 // src/features/doctor/dashboard/TodayActionSheet.tsx
 //
-// Schedule -> Today, the "more" (three dots) sheet of a patient row, from the "Doctor schedule" design:
-//   menu        Reschedule / Mark as no-show / Cancel appointment
-//   cancel      a reason (radio list), a "patient is notified" note, Keep it / Cancel visit
-//   no_show     patient no-show policy: what happens, Keep it / Mark as no-show. Only enabled from 60 minutes after the
-//               start until 2 days after it; outside that window the control stays visible, disabled, with a short hint.
-// "Reschedule" does not pick a slot here: the doctor asks the patient to choose the new time, so the row just
-// hands over to the parent (onAskReschedule), which shows the "Ask the patient to reschedule?" confirmation.
+// Schedule, the "more" (three dots) sheet of an appointment row, from the "Doctor Dashboard NEW" design:
+//   menu        "Appointment actions": Ask to reschedule / Refer to another doctor / Mark no-show / Cancel appointment
+//   cancel      "Cancel appointment": a reason (radio list) and an optional message to the patient, a "patient is notified" note,
+//               Cancel appointment / Keep appointment
+//   no_show     "Mark as no-show?": how late the patient is and what happens; Mark no-show / Not yet. Only enabled from 60 minutes
+//               after the start until 2 days after it; outside that window the control stays visible, disabled, with a short hint.
+// "Ask to reschedule" does not pick a slot here: the doctor asks the patient to choose the new time, so the menu just hands over
+// to the parent (onAskReschedule), which shows the Ask to reschedule sheet. Not drawn: "Call patient" (no phone number is sent).
+// Built from the shared AppBottomSheet, AppButton and AppInfoBanner (plus the doctor-side SheetMenu, SheetPatientCard, ReasonPicker).
 
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { AppBottomSheet, AppPathIcon } from '../../../components/common'
-import { APP_COLORS } from '../../../config/theme'
+import { StyleSheet, Text, View } from 'react-native'
+import { AppBottomSheet, AppButton, AppInfoBanner } from '../../../components/common'
+import { APP_COLORS, TONES } from '../../../config/theme'
+import { RESCHEDULE_REASON_MAX_LENGTH } from '../doctorService'
+import { composeReason, ReasonPicker, type ReasonOption } from '../components/ReasonPicker'
+import { SheetMenu } from '../components/SheetMenu'
+import { SheetPatientCard } from '../components/SheetPatientCard'
 
 export type TodaySheetMode = 'menu' | 'cancel' | 'no_show'
 
-export const TODAY_CANCEL_REASONS = [
+export const TODAY_CANCEL_REASONS: ReasonOption[] = [
 	{ id: 'emerg', label: 'I have an emergency' },
-	{ id: 'late', label: 'Running too late to see this patient' },
+	{ id: 'late', label: 'I’m running too late' },
 	{ id: 'pt', label: 'Patient asked to cancel' },
 	{ id: 'other', label: 'Other reason' },
 ]
 
-const BLUE = '#2463A8'
-const BLUE_TILE = '#DDEBFA'
-const SAND_TILE = '#FBEFD5'
-const SAND_INK = '#8A5300'
-const DANGER = '#B42318'
-const DANGER_TILE = '#FDECEA'
-const DANGER_INK = '#8A1C12'
+const SAND_INK = TONES.sand.ink
 
 type Props = {
 	visible: boolean
 	mode: TodaySheetMode
 	patientName: string
-	/** "Today, 5:30 PM · In-clinic" */
+	/** "Today, Thu 25 Sep, 4:00 PM · In-clinic" */
 	slotLabel: string
 	video: boolean
 	busy?: boolean
 	onClose: () => void
 	onModeChange: (mode: TodaySheetMode) => void
-	/** The doctor chose Reschedule: ask the patient to pick the new time (no slot is chosen here). */
+	/** The doctor chose Ask to reschedule: the patient picks the new time (no slot is chosen here). */
 	onAskReschedule: () => void
-	onConfirmCancel: (reasonLabel: string) => void
+	/** The doctor chose Refer to another doctor (opens the refer sheet). */
+	onRefer: () => void
+	/** The reason as it is sent: the picked one, then the doctor's message. */
+	onConfirmCancel: (reason: string) => void
 	/** The no-show window is open (see noShowWindow in scheduleUtils). */
 	noShowCanMark: boolean
 	/** Why it is not open yet / any more ("Can be marked 1 hour after the start"); shown under the disabled control. */
 	noShowHint: string
+	/** "1h 30m late": how far past the slot the patient is, when they are. */
+	lateLabel?: string
 	/** Opened straight on the no-show step (from the Past list): no menu to go back to. */
 	noShowOnly?: boolean
 	onConfirmNoShow: () => void
@@ -64,194 +69,174 @@ export function TodayActionSheet({
 	onClose,
 	onModeChange,
 	onAskReschedule,
+	onRefer,
 	onConfirmCancel,
 	noShowCanMark,
 	noShowHint,
+	lateLabel,
 	noShowOnly = false,
 	onConfirmNoShow,
 	noShowError,
 }: Props) {
 	const [reasonId, setReasonId] = useState<string | null>(null)
+	const [note, setNote] = useState('')
 
 	useEffect(() => {
 		if (!visible) return
-		setReasonId(null)
+		setReasonId(TODAY_CANCEL_REASONS[0].id)
+		setNote('')
 	}, [visible])
 
-	const title = mode === 'cancel' ? 'Cancel appointment' : mode === 'no_show' ? 'Mark as no-show' : 'Appointment'
-	const subtitle = `${patientName} · ${slotLabel}`
-
-	const row = (
-		iconPath: string,
-		tile: string,
-		ink: string,
-		heading: string,
-		sub: string,
-		onPress: () => void,
-		last = false,
-		disabled = false,
-	) => (
-		<TouchableOpacity
-			onPress={onPress}
-			disabled={disabled}
-			accessibilityRole="button"
-			accessibilityState={{ disabled }}
-			style={[styles.menuRow, !last && styles.menuRowRule, disabled && styles.menuRowDisabled]}
-			activeOpacity={0.7}
-		>
-			<View style={[styles.menuIcon, { backgroundColor: tile }]}>
-				<AppPathIcon d={iconPath} size={18} strokeWidth={2} color={ink} />
-			</View>
-			<View style={styles.flex}>
-				<Text style={[styles.menuTitle, ink === DANGER && { color: DANGER }]}>{heading}</Text>
-				<Text style={styles.menuSub}>{sub}</Text>
-			</View>
-			<AppPathIcon d="M9 6l6 6-6 6" size={16} strokeWidth={2.4} color="#7A8B8E" />
-		</TouchableOpacity>
-	)
+	const title =
+		mode === 'cancel' ? 'Cancel appointment' : mode === 'no_show' ? 'Mark as no-show?' : 'Appointment actions'
+	const subtitle =
+		mode === 'cancel'
+			? 'This can’t be undone'
+			: mode === 'no_show'
+				? 'Confirm that the patient didn’t arrive'
+				: 'Choose an action for this appointment'
+	const back = noShowOnly ? onClose : () => onModeChange('menu')
 
 	return (
 		<AppBottomSheet visible={visible} title={title} subtitle={subtitle} onClose={onClose} appearance="modern">
-			{mode !== 'menu' && !(mode === 'no_show' && noShowOnly) && (
-				<TouchableOpacity onPress={() => onModeChange('menu')} accessibilityRole="button" accessibilityLabel="Back" style={styles.back}>
-					<AppPathIcon d="M15 6l-6 6 6 6" size={18} strokeWidth={2.2} color={APP_COLORS.ink} />
-					<Text style={styles.backText}>Back</Text>
-				</TouchableOpacity>
-			)}
+			<View style={styles.stack}>
+				<SheetPatientCard name={patientName} slotLabel={slotLabel} />
 
-			{mode === 'menu' && (
-				<View style={styles.menu}>
-					{row(
-						'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M12 13v3l2 1',
-						BLUE_TILE,
-						BLUE,
-						'Reschedule',
-						'Ask the patient to choose a new time',
-						onAskReschedule,
-					)}
-					{row(
-						'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM17 8l5 5M22 8l-5 5',
-						SAND_TILE,
-						SAND_INK,
-						'Mark as no-show',
-						noShowCanMark ? 'The patient did not come' : noShowHint,
-						() => onModeChange('no_show'),
-						false,
-						!noShowCanMark,
-					)}
-					{row(
-						'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M10 13l4 4M14 13l-4 4',
-						DANGER_TILE,
-						DANGER,
-						'Cancel appointment',
-						'Patient is notified and refunded',
-						() => onModeChange('cancel'),
-						true,
-					)}
-				</View>
-			)}
+				{mode === 'menu' && (
+					<SheetMenu
+						rows={[
+							{
+								icon: 'calendar-clock-outline',
+								tile: TONES.sky.bg,
+								ink: TONES.sky.ink,
+								title: 'Ask to reschedule',
+								sub: 'Patient picks a new slot',
+								onPress: onAskReschedule,
+							},
+							{
+								icon: 'arrow-right',
+								tile: TONES.lilac.bg,
+								ink: TONES.lilac.ink,
+								title: 'Refer to another doctor',
+								sub: 'Send to a specialist who can see them',
+								onPress: onRefer,
+							},
+							{
+								icon: 'account-remove-outline',
+								tile: TONES.sand.bg,
+								ink: SAND_INK,
+								title: 'Mark no-show',
+								sub: noShowCanMark
+									? lateLabel
+										? `Patient is ${lateLabel}`
+										: 'The patient did not come'
+									: noShowHint,
+								disabled: !noShowCanMark,
+								onPress: () => onModeChange('no_show'),
+							},
+							{
+								icon: 'calendar-remove-outline',
+								tile: APP_COLORS.dangerBg,
+								ink: APP_COLORS.danger,
+								title: 'Cancel appointment',
+								sub: 'Patient is notified and refunded',
+								danger: true,
+								onPress: () => onModeChange('cancel'),
+							},
+						]}
+					/>
+				)}
 
-			{mode === 'no_show' && (
-				<View style={styles.stack}>
-					<View style={[styles.note, { backgroundColor: SAND_TILE }]}>
-						<AppPathIcon d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8v4M12 16h.01" size={16} strokeWidth={2} color={SAND_INK} />
-						<Text style={[styles.noteText, { color: SAND_INK }]}>
-							{patientName} is emailed and can reply once with a reason. Missed appointments the patient cannot explain count towards pausing their online booking.
-						</Text>
-					</View>
-					{!noShowCanMark && !!noShowHint && <Text style={styles.hint}>{noShowHint}</Text>}
-					{!!noShowError && <Text style={[styles.hint, { color: DANGER }]}>{noShowError}</Text>}
-					<View style={styles.pair}>
-						<TouchableOpacity onPress={noShowOnly ? onClose : () => onModeChange('menu')} style={[styles.cta, styles.keep]}>
-							<Text style={[styles.ctaText, { color: APP_COLORS.ink }]}>Keep it</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							disabled={!noShowCanMark || busy}
-							onPress={onConfirmNoShow}
-							accessibilityState={{ disabled: !noShowCanMark || busy }}
-							style={[styles.cta, styles.flex, { backgroundColor: noShowCanMark ? SAND_INK : '#D8C49A' }]}
-						>
-							{busy ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.ctaText}>Mark as no-show</Text>}
-						</TouchableOpacity>
-					</View>
-				</View>
-			)}
+				{mode === 'no_show' && (
+					<>
+						{!!lateLabel && (
+							<Text style={styles.lateLine}>
+								{patientName} is {lateLabel}
+							</Text>
+						)}
+						<AppInfoBanner
+							tone="warning"
+							icon="information-outline"
+							title={`No-show can be marked 1 hour after the slot time. ${patientName} is emailed and can reply once with a reason. Missed appointments the patient cannot explain count towards pausing their online booking.`}
+							titleStyle={styles.bannerText}
+						/>
+						{!noShowCanMark && !!noShowHint && <Text style={styles.hint}>{noShowHint}</Text>}
+						{!!noShowError && (
+							<Text style={[styles.hint, { color: APP_COLORS.danger }]}>{noShowError}</Text>
+						)}
+						<View style={{ gap: 8 }}>
+							<AppButton
+								size="lg"
+								buttonColor={SAND_INK}
+								softDisabled
+								onPress={onConfirmNoShow}
+								loading={busy}
+								disabled={!noShowCanMark || busy}
+							>
+								Mark no-show
+							</AppButton>
+							<AppButton variant="outline" size="lg" onPress={back}>
+								Not yet
+							</AppButton>
+						</View>
+					</>
+				)}
 
-			{mode === 'cancel' && (
-				<View style={styles.stack}>
-					<Text style={styles.label}>Reason</Text>
-					<View style={styles.reasons} accessibilityRole="radiogroup">
-						{TODAY_CANCEL_REASONS.map((r) => {
-							const on = r.id === reasonId
-							return (
-								<TouchableOpacity
-									key={r.id}
-									accessibilityRole="radio"
-									accessibilityState={{ checked: on }}
-									onPress={() => setReasonId(r.id)}
-									style={[styles.reason, { borderColor: on ? APP_COLORS.primary : APP_COLORS.divider, backgroundColor: on ? APP_COLORS.mint : '#FFFFFF' }]}
-								>
-									<View style={[styles.ring, { borderColor: on ? APP_COLORS.primary : '#7A8B8E' }]}>
-										<View style={[styles.dot, { backgroundColor: on ? APP_COLORS.primary : 'transparent' }]} />
-									</View>
-									<Text style={styles.reasonText}>{r.label}</Text>
-								</TouchableOpacity>
-							)
-						})}
-					</View>
-					<View style={[styles.note, { backgroundColor: DANGER_TILE }]}>
-						<AppPathIcon d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8v4M12 16h.01" size={16} strokeWidth={2} color={DANGER} />
-						<Text style={[styles.noteText, { color: DANGER_INK }]}>
-							{patientName} is notified right away. {video ? 'The full fee is refunded to their payment method.' : 'Any advance paid is refunded in full.'}
-						</Text>
-					</View>
-					<View style={styles.pair}>
-						<TouchableOpacity onPress={() => onModeChange('menu')} style={[styles.cta, styles.keep]}>
-							<Text style={[styles.ctaText, { color: APP_COLORS.ink }]}>Keep it</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							disabled={!reasonId || busy}
-							onPress={() => {
-								const r = TODAY_CANCEL_REASONS.find((x) => x.id === reasonId)
-								if (r) onConfirmCancel(r.label)
-							}}
-							style={[styles.cta, styles.flex, { backgroundColor: reasonId ? DANGER : '#D9A39C' }]}
-						>
-							{busy ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.ctaText}>Cancel visit</Text>}
-						</TouchableOpacity>
-					</View>
-				</View>
-			)}
+				{mode === 'cancel' && (
+					<>
+						<ReasonPicker
+							options={TODAY_CANCEL_REASONS}
+							value={reasonId}
+							onChange={setReasonId}
+							note={note}
+							onNoteChange={setNote}
+							noteMaxLength={RESCHEDULE_REASON_MAX_LENGTH}
+						/>
+						<AppInfoBanner
+							tone="danger"
+							icon="information-outline"
+							title={`${patientName} is notified right away. ${
+								video
+									? 'The full fee is refunded to their payment method.'
+									: 'Any advance paid is refunded in full.'
+							}`}
+							titleStyle={styles.bannerText}
+						/>
+						<View style={{ gap: 8 }}>
+							<AppButton
+								variant="danger"
+								size="lg"
+								softDisabled
+								loading={busy}
+								disabled={!reasonId || busy}
+								onPress={() =>
+									onConfirmCancel(
+										composeReason(
+											TODAY_CANCEL_REASONS,
+											reasonId,
+											note,
+											RESCHEDULE_REASON_MAX_LENGTH
+										)
+									)
+								}
+							>
+								Cancel appointment
+							</AppButton>
+							<AppButton variant="outline" size="lg" onPress={back}>
+								Keep appointment
+							</AppButton>
+						</View>
+					</>
+				)}
+			</View>
 		</AppBottomSheet>
 	)
 }
 
 const styles = StyleSheet.create({
-	flex: { flex: 1 },
-	stack: { gap: 14 },
-	label: { fontSize: 13, lineHeight: 18, fontWeight: '800', color: APP_COLORS.ink },
-	back: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginBottom: 10, minHeight: 36 },
-	backText: { fontSize: 14, fontWeight: '700', color: APP_COLORS.ink },
-
-	menu: { borderWidth: 1, borderColor: APP_COLORS.divider, borderRadius: 12, overflow: 'hidden' },
-	menuRow: { minHeight: 60, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF' },
-	menuRowDisabled: { opacity: 0.55 },
+	stack: { gap: 16 },
+	lateLine: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: APP_COLORS.ink },
 	hint: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: APP_COLORS.inkMuted },
-	menuRowRule: { borderBottomWidth: 1, borderBottomColor: '#E3EAEB' },
-	menuIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-	menuTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
-	menuSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
-
-	note: { flexDirection: 'row', gap: 8, padding: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: APP_COLORS.pageBg },
-	noteText: { flex: 1, fontSize: 12, lineHeight: 17, color: APP_COLORS.inkMuted },
-	cta: { height: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-	ctaText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
-	pair: { flexDirection: 'row', gap: 8 },
-	keep: { flex: 1, borderWidth: 1, borderColor: APP_COLORS.divider, backgroundColor: '#FFFFFF' },
-
-	reasons: { gap: 6 },
-	reason: { minHeight: 46, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-	ring: { width: 18, height: 18, borderRadius: 9999, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-	dot: { width: 8, height: 8, borderRadius: 9999 },
-	reasonText: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '700', color: APP_COLORS.ink },
+	// The shared banner's title is a bold coloured line; these notes are ordinary sentences.
+	bannerText: { fontSize: 13, lineHeight: 19, fontWeight: '400', color: APP_COLORS.ink },
 })

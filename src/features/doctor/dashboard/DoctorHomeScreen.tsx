@@ -1,7 +1,7 @@
 // src/features/doctor/dashboard/DoctorHomeScreen.tsx
 //
-// Doctor dashboard "Home" view (source: the "Doctor Dashboard" design's Up next / Later today /
-// Needs your action sections). Wired to the real appointments API for the schedule sections.
+// Doctor dashboard "Home" view (source: the "Doctor Dashboard NEW" design: a header with the day's progress, an
+// "Up next" carousel of the patients still to be seen, and the "Needs your action" list). Wired to the real appointments API.
 // "Health reads" and "Communities" deliberately reuse the exact patient-Home components
 // (HomeHealthReadsSection / HomeCommunitiesSection) rather than a doctor-specific rebuild — same
 // content, same behavior, same styling, one implementation to maintain.
@@ -10,8 +10,8 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { AppAppointmentRow, AppAvatar, AppSidebar, AppSoftCard } from '../../../components/common'
-import { APP_COLORS, TONES } from '../../../config/theme'
+import { AppProgressBar, AppSidebar, AppSoftCard } from '../../../components/common'
+import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import { useAuth } from '../../../context/AuthContext'
 import { useTabBarClearance } from '../../../navigation/tabBar'
@@ -19,8 +19,10 @@ import { useSidebarMenu } from '../../../navigation/useSidebarMenu'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
 import { DoctorStatusBanner } from './DoctorStatusBanner'
 import { useDoctorStatus } from './useDoctorStatus'
+import { UpNextCarousel } from './UpNextCarousel'
+import { useStartConsultation } from './useStartConsultation'
 import { useDoctorAvatarSync } from '../../profile/doctor/useDoctorAvatarSync'
-import { getAppointments, getStatusIdByLabel, startConsultation } from '../doctorService'
+import { getAppointments, setAppointmentCheckIn } from '../doctorService'
 import type { Appointment } from '../../../types/appointment'
 
 import { buildS3Url } from '../../../utils/s3Utils'
@@ -29,48 +31,10 @@ import { listHealthQuestions } from '../../../services/qaService'
 import HomeHealthReadsSection from '../../dashboard/components/HomeHealthReadsSection'
 import HomeCommunitiesSection from '../../dashboard/components/HomeCommunitiesSection'
 import Toast from 'react-native-toast-message'
-import { clinicNowHms, clinicTodayIso, effectiveStatusLabel, humanizeStatus, isAccepted, isCompletedAppt, rowStatusTone, statusLabelOf } from '../scheduleUtils'
-
-const isVideo = (apt: Appointment) => apt.appointment_mode === 'video_call' || apt.appointment_mode === 'video call'
+import { clinicTodayIso, dateLabelOf, isAccepted, isCompletedAppt, isNoShowAppt, isVideoMode, statusLabelOf } from '../scheduleUtils'
 
 function todayIso() {
 	return clinicTodayIso() // today in Mumbai (the clinic's clock), not the phone's date
-}
-
-function formatTime12h(t?: string | null): string {
-	if (!t) return '--'
-	const [h, m] = t.split(':').map(Number)
-	const suffix = h >= 12 ? 'PM' : 'AM'
-	const hour = h > 12 ? h - 12 : h === 0 ? 12 : h
-	return `${String(hour).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')} ${suffix}`
-}
-
-/** Status-chip color pair (source: the "Up next" card's "Checked in" chip) — takes the *effective*
- * label (see scheduleUtils.effectiveStatusLabel), so a same-day confirmed appointment reads
- * "not_arrived" here too, not green "Confirmed". Falls back to a neutral tone for anything without
- * an obvious color (e.g. "rescheduled"). */
-function statusChipTone(label: string): { bg: string; fg: string } {
-	const l = label.toLowerCase()
-	if (l === 'checked_in' || l === 'confirmed' || l === 'completed') return { bg: APP_COLORS.successBg, fg: APP_COLORS.success }
-	if (l === 'not_arrived') return { bg: TONES.sky.bg, fg: TONES.sky.ink }
-	if (l === 'pending') return { bg: APP_COLORS.warningBg, fg: APP_COLORS.warning }
-	if (l === 'cancelled') return { bg: APP_COLORS.dangerBg, fg: APP_COLORS.danger }
-	return { bg: APP_COLORS.neutralBg, fg: APP_COLORS.inkMuted }
-}
-
-/** Real, live countdown to a same-day appointment's start_time (mirrors the mockup's "in 12 min" sub-line) -- never shown for a future date, and blank once the slot has already started. */
-function etaLabel(apt: Appointment, isToday: boolean): string | null {
-	if (!isToday || !apt.start_time) return null
-	const [h, m] = apt.start_time.split(':').map(Number)
-	const now = new Date()
-	const target = new Date()
-	target.setHours(h, m ?? 0, 0, 0)
-	const diffMin = Math.round((target.getTime() - now.getTime()) / 60000)
-	if (diffMin <= 0) return null
-	if (diffMin < 60) return `in ${diffMin} min`
-	const hrs = Math.floor(diffMin / 60)
-	const mins = diffMin % 60
-	return `in ${hrs}h${mins ? ` ${mins}m` : ''}`
 }
 
 export function DoctorHomeScreen() {
@@ -91,10 +55,9 @@ export function DoctorHomeScreen() {
 	const [appointments, setAppointments] = useState<Appointment[]>([])
 	const [loading, setLoading] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
-	const [search, setSearch] = useState('')
-	const [startingId, setStartingId] = useState<string | null>(null)
+	const { startingId, start: handleStart } = useStartConsultation()
+	const [checkingInId, setCheckingInId] = useState<string | null>(null)
 
-	const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
 	const [openQuestionsCount, setOpenQuestionsCount] = useState(0)
 	const [notificationCount, setNotificationCount] = useState(0)
 	const [refreshToken, setRefreshToken] = useState(0)
@@ -103,12 +66,12 @@ export function DoctorHomeScreen() {
 		isRefresh ? setRefreshing(true) : setLoading(true)
 		try {
 			// Today's full list (limit raised from the default 10 -- a busy doctor's day can exceed
-			// that) drives the seen/total stat, "Up next", and "Later today".
+			// that) drives the seen/total stat and "Up next".
 			// hospital_id is the clinic chosen in the header switcher (null = All clinics).
 			const todayRes = await getAppointments({ appointment_date: todayIso(), variant: 'all', limit: 50, ...(selectedHospitalId ? { hospital_id: selectedHospitalId } : {}) })
-			// Same rule as DoctorScheduleScreen's Today/Upcoming tabs (see scheduleUtils.isAccepted's
+			// Same rule as DoctorScheduleScreen's day list (see scheduleUtils.isAccepted's
 			// doc comment): a still-pending request never shows here, even if dated today -- it stays
-			// under Requests until the doctor accepts it.
+			// under booking requests until the doctor accepts it.
 			const list = (todayRes.data ?? []).filter((a) => isAccepted(a) || isCompletedAppt(a))
 			list.sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? ''))
 			setAppointments(list)
@@ -122,7 +85,7 @@ export function DoctorHomeScreen() {
 	// Profile / verification state for the banner at the top (re-read on focus and on returning to the app).
 	const { status: doctorStatus, reload: reloadStatus } = useDoctorStatus()
 
-	// Refetch on every focus, not just mount -- "Up next" now depends on check-in state, which the
+	// Refetch on every focus, not just mount -- "Up next" depends on check-in state, which the
 	// doctor typically changes on the Schedule tab and then flips back here to start the visit; a
 	// bottom-tab screen stays mounted across tab switches, so without this the card would keep
 	// showing stale "waiting for check-in" data after the check-in already happened.
@@ -139,17 +102,6 @@ export function DoctorHomeScreen() {
 	useEffect(() => {
 		let active = true
 
-		// The appointments list already returns `meta.total` for the filtered query, so resolve the
-		// "pending" status id and read the total with limit 1 instead of pulling 100 rows to count.
-		const loadPendingRequests = async () => {
-			try {
-				const pendingStatusId = await getStatusIdByLabel('pending')
-				const res = await getAppointments({ variant: 'all', limit: 1, status_id: pendingStatusId })
-				if (active) setPendingRequestsCount(res.meta?.total ?? 0)
-			} catch {
-				// Best-effort: leave the count at its default.
-			}
-		}
 		const loadOpenQuestions = async () => {
 			try {
 				const res = await listHealthQuestions(undefined, 1, 1, false)
@@ -167,7 +119,6 @@ export function DoctorHomeScreen() {
 			}
 		}
 
-		void loadPendingRequests()
 		void loadOpenQuestions()
 		void loadNotificationCount()
 
@@ -176,27 +127,21 @@ export function DoctorHomeScreen() {
 		}
 	}, [refreshToken])
 
-	const handleStart = async (apt: Appointment) => {
-		if (!apt.patient?.id) return
-		setStartingId(apt.id)
+	// Checks a patient in from the card: the card flips at once and rolls back if the call fails.
+	const handleCheckIn = async (apt: Appointment) => {
+		if (checkingInId) return
+		const patch = (status: string) => setAppointments((prev) => prev.map((a) => (a.id === apt.id ? { ...a, status } : a)))
+		setCheckingInId(apt.id)
+		patch('checked_in')
 		try {
-			const res = await startConsultation(apt.id)
-			if (res.success && res.data?.already_verified) {
-				// The patient already gave the code for this appointment: no second code, straight to the consultation.
-				navigation.navigate(ROUTES.STACK.CONSULTATION, { appointmentId: apt.id, patientId: apt.patient.id })
-			} else if (res.success) {
-				navigation.navigate(ROUTES.STACK.VERIFY_ACCESS, {
-					appointmentId: apt.id,
-					patientId: apt.patient.id,
-					patientName: apt.patient.name,
-					patientMeta: `${apt.patient.age} yrs · ${apt.patient.gender} · ${formatTime12h(apt.start_time)}`,
-					slotTime: formatTime12h(apt.start_time),
-				})
-			}
+			const res = await setAppointmentCheckIn(apt.id, true)
+			if (!res.success) throw new Error(res.message)
+			Toast.show({ type: 'success', text1: res.message ?? 'Patient checked in' })
 		} catch {
-			Toast.show({ type: 'error', text1: 'Failed to generate OTP' })
+			patch(typeof apt.status === 'string' ? apt.status : (apt.status?.label ?? 'confirmed'))
+			Toast.show({ type: 'error', text1: 'Could not check in the patient. Please try again.' })
 		} finally {
-			setStartingId(null)
+			setCheckingInId(null)
 		}
 	}
 
@@ -209,18 +154,16 @@ export function DoctorHomeScreen() {
 		navigation.navigate(ROUTES.STACK.APPOINTMENT_DETAILS, { appointmentId: apt.id })
 	}
 
-	// "Up next" is the doctor's ready-to-see queue: only a patient who has actually checked in (i.e.
-	// arrived at reception) -- a merely confirmed/not_arrived appointment stays off this card even if
-	// its slot time has arrived, since starting a consultation before the patient is physically
-	// present doesn't make sense. Sorted by scheduled time (earliest-checked-in-for wins) since we
-	// don't track an actual check-in timestamp.
-	const nowHm = clinicNowHms() // appointment start times are Mumbai wall-clock time
-	const checkedInToday = appointments.filter((a) => effectiveStatusLabel(a) === 'checked_in')
-	const next = checkedInToday[0] ?? undefined
-	// "Later today" is the rest of today's remaining schedule (any accepted status, not just
-	// checked-in) so the doctor can still see who's coming up even before they've checked in.
-	const laterToday = appointments.filter((a) => (a.start_time ?? '') >= nowHm && a.id !== next?.id).slice(0, 6)
+	// "Up next" is everyone still to be seen today, earliest first (a patient who has not arrived yet is in it too, with a Check in
+	// button; one who is checked in gets Start consult). Finished visits and no-shows are not.
+	const toGo = appointments.filter((a) => !isCompletedAppt(a) && !isNoShowAppt(a))
 	const seenCount = appointments.filter((a) => statusLabelOf(a).toLowerCase() === 'completed').length
+	// "Token 06": the visit's place in today's in-clinic queue (video visits have none).
+	const clinicQueue = appointments.filter((a) => !isVideoMode(a.appointment_mode))
+	const tokenOf = (apt: Appointment) => {
+		const i = clinicQueue.findIndex((a) => a.id === apt.id)
+		return i < 0 ? undefined : String(i + 1).padStart(2, '0')
+	}
 
 	return (
 		<View style={styles.screen}>
@@ -243,9 +186,28 @@ export function DoctorHomeScreen() {
 				onAvatarPress={() => setSidebarOpen(true)}
 				onNotificationsPress={() => navigation.navigate(ROUTES.STACK.NOTIFICATION)}
 				showHospitalSelector
-				searchValue={search}
-				onSearchChange={setSearch}
-			/>
+			>
+				<View style={styles.daySummary}>
+					<Text style={styles.dayLine}>
+						{dateLabelOf(todayIso())}
+						{appointments.length > 0 && (
+							<Text style={styles.dayCount}>
+								{' '}
+								· {seenCount} of {appointments.length} patients seen
+							</Text>
+						)}
+					</Text>
+					{appointments.length > 0 && (
+						<AppProgressBar
+							value={(seenCount / appointments.length) * 100}
+							height={6}
+							trackColor="#FFFFFF2E"
+							fillColor={APP_COLORS.mintAccent}
+							accessibilityLabel={`${seenCount} of ${appointments.length} patients seen today`}
+						/>
+					)}
+				</View>
+			</DoctorScreenHeader>
 			<ScrollView
 				style={styles.scroll}
 				contentContainerStyle={{ paddingBottom: clearance, gap: 24, paddingTop: 16 }}
@@ -265,89 +227,34 @@ export function DoctorHomeScreen() {
 					<ActivityIndicator style={{ marginTop: 40 }} color={APP_COLORS.primary} />
 				) : (
 					<>
-						<Section
-							title="Up next"
-							subtitle={appointments.length > 0 ? `${seenCount} of ${appointments.length} patients seen today` : undefined}
-							onAction={() => navigation.navigate(ROUTES.MAIN.SCHEDULE)} actionLabel="Full schedule">
-							{next ? (
-								<AppSoftCard padding={0} radius={12}>
-									<View style={{ padding: 14, gap: 10 }}>
-										<View style={styles.patientRow}>
-											<AppAvatar uri={buildS3Url(next.patient?.avatar_s3_key)} name={next.patient?.name} size={52} radius={12} />
-											<View style={{ flex: 1, minWidth: 0 }}>
-												<Text style={styles.patientName} numberOfLines={1}>
-													{next.patient?.name ?? 'Patient'}
-												</Text>
-												<Text style={styles.patientMeta} numberOfLines={1}>
-													{next.patient?.age ? `${next.patient.age} yrs · ` : ''}
-													{next.patient?.gender ?? ''}
-												</Text>
-											</View>
-											<View style={[styles.statusChip, { backgroundColor: statusChipTone(effectiveStatusLabel(next)).bg }]}>
-												<Text style={[styles.statusChipText, { color: statusChipTone(effectiveStatusLabel(next)).fg }]}>
-													{humanizeStatus(effectiveStatusLabel(next))}
-												</Text>
-											</View>
-										</View>
-										{!!(next.symptoms || next.pre_intake?.symptoms) && (
-											<Text style={styles.symptoms} numberOfLines={2}>
-												{next.symptoms || next.pre_intake?.symptoms}
-											</Text>
-										)}
-									</View>
-									<View style={styles.upNextFooter}>
-										<View style={{ flex: 1, minWidth: 0 }}>
-											<View style={styles.footerTimeRow}>
-												<MaterialCommunityIcons name="clock-outline" size={16} color={APP_COLORS.ink} />
-												<Text style={styles.footerTime}>
-													Today, {formatTime12h(next.start_time)}
-												</Text>
-											</View>
-											<Text style={styles.footerSub}>
-												{isVideo(next) ? 'Video' : 'In-clinic'}
-												{etaLabel(next, true) ? ` · ${etaLabel(next, true)}` : ''}
-											</Text>
-										</View>
-										<TouchableOpacity
-											style={styles.primaryBtn}
-											onPress={() => handleStart(next)}
-											disabled={startingId === next.id}
-										>
-											{startingId === next.id ? (
-												<ActivityIndicator size="small" color="#FFFFFF" />
-											) : (
-												<Text style={styles.primaryBtnText}>Start</Text>
-											)}
-										</TouchableOpacity>
-									</View>
-								</AppSoftCard>
+						<View style={{ gap: 10 }}>
+							<View style={styles.sectionHeader}>
+								<Text style={styles.sectionTitle}>
+									Up next
+									{toGo.length > 0 && <Text style={styles.sectionCount}> · {toGo.length}</Text>}
+								</Text>
+								<TouchableOpacity onPress={() => navigation.navigate(ROUTES.MAIN.SCHEDULE)} style={styles.sectionAction}>
+									<Text style={styles.sectionActionText}>Full schedule</Text>
+									<MaterialCommunityIcons name="chevron-right" size={16} color={APP_COLORS.primary} />
+								</TouchableOpacity>
+							</View>
+							{toGo.length ? (
+								<UpNextCarousel
+									items={toGo}
+									tokenOf={tokenOf}
+									startingId={startingId}
+									checkingInId={checkingInId}
+									onStart={handleStart}
+									onCheckIn={handleCheckIn}
+									onOpen={openPatientInfo}
+									onSeeAll={() => navigation.navigate(ROUTES.MAIN.SCHEDULE)}
+								/>
 							) : (
-								<EmptyRow label={appointments.length ? 'Waiting for a patient to check in' : 'No more appointments today'} />
+								<View style={{ paddingHorizontal: 16 }}>
+									<EmptyRow label={appointments.length ? 'All of today’s patients are seen' : 'No appointments today'} />
+								</View>
 							)}
-						</Section>
-
-						<Section title="Later today" onAction={() => navigation.navigate(ROUTES.MAIN.SCHEDULE)} actionLabel="View all">
-							{laterToday.length ? (
-								<AppSoftCard padding={0} radius={14}>
-									<View style={{ paddingHorizontal: 12 }}>
-										{laterToday.map((apt, i) => (
-											<AppAppointmentRow
-												key={apt.id}
-												time={formatTime12h(apt.start_time)}
-												name={apt.patient?.name ?? 'Patient'}
-												mode={isVideo(apt) ? 'Video' : 'In-clinic'}
-												status={humanizeStatus(effectiveStatusLabel(apt))}
-												statusTone={rowStatusTone(effectiveStatusLabel(apt))}
-												divider={i < laterToday.length - 1}
-												onPress={() => openPatientInfo(apt)}
-											/>
-										))}
-									</View>
-								</AppSoftCard>
-							) : (
-								<EmptyRow label="Nothing else scheduled today" />
-							)}
-						</Section>
+						</View>
 
 						<Section title="Needs your action">
 							<AppSoftCard padding={0} radius={12}>
@@ -355,8 +262,7 @@ export function DoctorHomeScreen() {
 									<ActionRow
 										icon="calendar-alert"
 										title="Appointment requests"
-										sub="New bookings waiting on you"
-										count={pendingRequestsCount}
+										sub="Review new booking requests"
 										onPress={() => navigation.navigate(ROUTES.MAIN.SCHEDULE, { segment: 'req' })}
 									/>
 									<ActionRow
@@ -382,32 +288,11 @@ export function DoctorHomeScreen() {
 	)
 }
 
-function Section({
-	title,
-	subtitle,
-	actionLabel,
-	onAction,
-	children,
-}: {
-	title: string
-	subtitle?: string
-	actionLabel?: string
-	onAction?: () => void
-	children: React.ReactNode
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
 	return (
 		<View style={{ gap: 10 }}>
 			<View style={styles.sectionHeader}>
-				<View style={{ flex: 1, minWidth: 0 }}>
-					<Text style={styles.sectionTitle}>{title}</Text>
-					{!!subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
-				</View>
-				{!!actionLabel && (
-					<TouchableOpacity onPress={onAction} style={styles.sectionAction}>
-						<Text style={styles.sectionActionText}>{actionLabel}</Text>
-						<MaterialCommunityIcons name="chevron-right" size={16} color={APP_COLORS.primary} />
-					</TouchableOpacity>
-				)}
+				<Text style={styles.sectionTitle}>{title}</Text>
 			</View>
 			<View style={{ paddingHorizontal: 16 }}>{children}</View>
 		</View>
@@ -425,7 +310,7 @@ function ActionRow({
 	icon: keyof typeof MaterialCommunityIcons.glyphMap
 	title: string
 	sub: string
-	count: number
+	count?: number
 	onPress: () => void
 	divider?: boolean
 }) {
@@ -442,7 +327,7 @@ function ActionRow({
 				<Text style={styles.actionTitle}>{title}</Text>
 				<Text style={styles.actionSub}>{sub}</Text>
 			</View>
-			{count > 0 && (
+			{!!count && count > 0 && (
 				<View style={styles.actionCount}>
 					<Text style={styles.actionCountText}>{count}</Text>
 				</View>
@@ -463,6 +348,9 @@ function EmptyRow({ label }: { label: string }) {
 const styles = StyleSheet.create({
 	screen: { flex: 1, backgroundColor: APP_COLORS.pageBg },
 	scroll: { flex: 1 },
+	daySummary: { gap: 8 },
+	dayLine: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: '#FFFFFF' },
+	dayCount: { color: APP_COLORS.mintAccent },
 	sectionHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -471,35 +359,9 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 	},
 	sectionTitle: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: APP_COLORS.ink },
-	sectionSubtitle: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
+	sectionCount: { color: APP_COLORS.inkMuted },
 	sectionAction: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 36 },
 	sectionActionText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: APP_COLORS.primary },
-	patientRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-	patientName: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: APP_COLORS.ink },
-	patientMeta: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
-	symptoms: { fontSize: 13, lineHeight: 18, color: APP_COLORS.ink },
-	upNextFooter: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 10,
-		padding: 14,
-		backgroundColor: APP_COLORS.mint,
-	},
-	footerTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-	footerTime: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
-	footerSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
-	statusChip: { flexShrink: 0, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-	statusChipText: { fontSize: 12, lineHeight: 16, fontWeight: '700' },
-	primaryBtn: {
-		height: 40,
-		paddingHorizontal: 14,
-		borderRadius: 10,
-		backgroundColor: APP_COLORS.primary,
-		alignItems: 'center',
-		justifyContent: 'center',
-		minWidth: 64,
-	},
-	primaryBtnText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: '#FFFFFF' },
 	actionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingVertical: 12 },
 	actionRowDivider: { borderBottomWidth: 1, borderBottomColor: APP_COLORS.divider },
 	actionIcon: {

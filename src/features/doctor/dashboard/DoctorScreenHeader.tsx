@@ -60,6 +60,8 @@ export type DoctorScreenHeaderProps =
 			onSearchChange?: (value: string) => void
 			onSearchSubmit?: () => void
 			searchContext?: SearchContextKey
+			/** Under the name row: the day's summary (date, "5 of 12 patients seen", progress bar). */
+			children?: React.ReactNode
 	  }
 	| {
 			variant: 'simple'
@@ -100,6 +102,7 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 			onSearchChange,
 			onSearchSubmit,
 			searchContext = 'home.doctor',
+			children,
 		} = props
 		const resolvedActions: DoctorHeaderAction[] =
 			actions ?? [
@@ -146,6 +149,7 @@ export function DoctorScreenHeader(props: DoctorScreenHeaderProps) {
 						</Pressable>
 					))}
 				</View>
+				{children}
 				{!!onSearchChange && (
 					<AppSearchBar
 						context={searchContext}

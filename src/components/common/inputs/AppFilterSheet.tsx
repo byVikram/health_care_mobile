@@ -53,6 +53,8 @@ export type AppFilterSheetProps = {
 	onClose: () => void
 	title?: string
 	applyLabel?: string
+	/** Extra content under a category's options (e.g. the From / To fields of a "Custom dates" choice); null for none. */
+	renderGroupExtra?: (groupKey: string) => React.ReactNode
 }
 
 function Mark({ multi, on }: { multi: boolean; on: boolean }) {
@@ -76,6 +78,7 @@ export function AppFilterSheet({
 	onClose,
 	title = 'Filters',
 	applyLabel = 'Apply filters',
+	renderGroupExtra,
 }: AppFilterSheetProps) {
 	const { height: windowHeight } = useWindowDimensions()
 	const [active, setActive] = useState<string>(groups[0].key)
@@ -207,6 +210,7 @@ export function AppFilterSheet({
 								)
 							})}
 						</View>
+						{renderGroupExtra?.(group.key)}
 					</ScrollView>
 				</Animated.View>
 			</View>

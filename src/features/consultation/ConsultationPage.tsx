@@ -62,7 +62,7 @@ import { buildS3Url } from '../../utils/s3Utils'
 import { bookingRef } from '../../utils/formatters'
 import { formatFullDate, parseDateOnly } from '../../utils/date'
 import { PrescriptionPaper } from './components/PrescriptionPaper'
-import { toApiDate } from '../doctor/scheduleUtils'
+import { dateLabelOf, toApiDate } from '../doctor/scheduleUtils'
 import { openWebUrl } from '../../utils/safeLinking'
 
 const SAMPLE_DICOM_MODULE = require('../../assets/dicon/sample-dicon.dcm')
@@ -257,6 +257,18 @@ function DoctorOnlyNotice() {
 		</View>
 	)
 }
+
+/** "12 Jun 2026, 6:14 PM" on the clinic's clock, for a timestamp from the server (UTC, with or without the Z). */
+const formatSavedAt = (iso: string) =>
+	new Date(/(Z|[+-]\d\d:?\d\d)$/.test(iso) ? iso : `${iso}Z`).toLocaleString('en-IN', {
+		day: 'numeric',
+		month: 'short',
+		year: 'numeric',
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+		timeZone: 'Asia/Kolkata',
+	})
 
 export default function ConsultationPage() {
 	const { role } = useAuth()
@@ -956,8 +968,9 @@ function DoctorConsultation() {
 					<View style={{ flex: 1, minWidth: 0 }}>
 						<Text style={styles.headerTitle}>Consultation</Text>
 						<Text style={styles.headerSubtitle}>
-							{modeLabel}
-							{timeLabel ? ` · ${timeLabel}` : ''}
+							{locked && appointment?.appointment_date
+								? `Completed · ${dateLabelOf(appointment.appointment_date)} ${appointment.appointment_date.slice(0, 4)} · ${modeLabel}`
+								: `${modeLabel}${timeLabel ? ` · ${timeLabel}` : ''}`}
 						</Text>
 					</View>
 					{phase === 'live' && (
@@ -1008,7 +1021,7 @@ function DoctorConsultation() {
 			{/* ── Tabs ── */}
 			<View style={styles.tabsWrap}>
 				<AppSegmentedControl
-					options={TABS.map((t) => ({ value: t.id, label: t.label }))}
+					options={TABS.map((t) => ({ value: t.id, label: t.id === 'notes' && locked ? 'Summary' : t.label }))}
 					value={activeTab}
 					onChange={(v) => setActiveTab(v as TabId)}
 					shape="rounded"
@@ -1253,7 +1266,11 @@ function DoctorConsultation() {
 							<AppSoftCard radius={14} padding={16} style={{ gap: 12 }}>
 								<View style={styles.lockedRow}>
 									<MaterialCommunityIcons name="lock-outline" size={18} color={INK_MUTED} />
-									<Text style={styles.lockedText}>Notes submitted · they can no longer be edited</Text>
+									<Text style={styles.lockedText}>
+										{submittedNotes?.notes_submitted_at
+											? `Past visit · saved ${formatSavedAt(submittedNotes.notes_submitted_at)} · saved notes can no longer be edited`
+											: 'Notes submitted · they can no longer be edited'}
+									</Text>
 								</View>
 								{/* The page already carries the typed notes; the text alone is shown only when there is no page. */}
 								{!!submittedNotes?.notes?.trim() && !submittedNotes?.notes_image_url && (

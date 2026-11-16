@@ -35,6 +35,7 @@ import LegalPage from '../features/auth/LegalPage'
 import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 import VisitSummaryPage from '../features/appointment/VisitSummaryPage'
 import AppointmentDetailsPage from '../features/appointment/AppointmentDetailsPage'
+import DoctorPastVisitPage from '../features/doctor/dashboard/DoctorPastVisitPage'
 import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
 import OrderListPage from '../features/pharmacy/OrderListPage'
 import PharmacyOrderDetailsPage from '../features/pharmacy/PharmacyOrderDetailsPage'
@@ -236,6 +237,7 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.PATIENT_PAYMENT} component={PatientPayment} />
 				<AppStack.Screen name={ROUTES.STACK.APPOINTMENT_CONFIRMED} component={AppointmentConfirmedPage} />
 				<AppStack.Screen name={ROUTES.STACK.APPOINTMENT_DETAILS} component={AppointmentDetailsPage} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_PAST_VISIT} component={DoctorPastVisitPage} />
 				<AppStack.Screen name={ROUTES.STACK.VISIT_SUMMARY} component={VisitSummaryPage} />
 				<AppStack.Screen
 					name={ROUTES.STACK.ALL_EVENTS}

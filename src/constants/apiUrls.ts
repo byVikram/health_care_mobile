@@ -101,6 +101,8 @@ export const API_ENDPOINTS = {
 		STATUSES: `${BASE_URL}/api/appointments/statuses`,
 		// Doctor-only: not_arrived -> checked_in when the patient physically arrives.
 		CHECK_IN: (id: string) => `${BASE_URL}/api/appointments/${id}/check-in`,
+		// Doctor-only: the "Auto-confirm bookings" switch (GET reads it, PUT {enabled} sets it).
+		AUTO_CONFIRM: `${BASE_URL}/api/appointments/me/auto-confirm`,
 		// Unauthenticated by design (external scheduler only) -- see backend's process-not-arrived
 		// docstring. Not called from the mobile app.
 		PROCESS_NOT_ARRIVED: `${BASE_URL}/api/appointments/process-not-arrived`,

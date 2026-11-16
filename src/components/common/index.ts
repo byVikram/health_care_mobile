@@ -38,10 +38,6 @@ export { PrescriptionPreview } from './display/PrescriptionPreview'
 export type { AppSoftCardProps } from './display/AppSoftCard'
 export { default as AppAppointmentRow } from './booking/AppAppointmentRow'
 export type { AppAppointmentRowProps } from './booking/AppAppointmentRow'
-export { default as AppointmentActionCard } from './booking/AppointmentActionCard'
-export type { AppointmentActionCardProps, AppointmentActionOutcome } from './booking/AppointmentActionCard'
-export { default as AppointmentActionSheet } from './booking/AppointmentActionSheet'
-export type { AppointmentActionSheetProps, ActionSheetMode, RejectReasonOption } from './booking/AppointmentActionSheet'
 export {
 	AppFamilyMemberSheet,
 	AppFamilyMemberAvatar,
