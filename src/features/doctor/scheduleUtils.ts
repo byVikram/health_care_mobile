@@ -150,6 +150,36 @@ export function noShowWindow(apt: Appointment, now: Date = new Date()): NoShowWi
 	return { canMark: true, hint: '', expired: false }
 }
 
+/** Minutes from now to a TODAY appointment's start, on the clinic's clock (negative once the slot has started); null for any other day. */
+export function minutesUntilStart(apt: Appointment): number | null {
+	if (apt.appointment_date !== clinicTodayIso() || !apt.start_time) return null
+	const [h, m] = apt.start_time.split(':').map(Number)
+	const [nh, nm] = clinicNowHms().split(':').map(Number)
+	if ([h, m, nh, nm].some(Number.isNaN)) return null
+	return h * 60 + m - (nh * 60 + nm)
+}
+
+/** "12 min", "1h 30m": a length of time in minutes, for "in 12 min" / "1h 30m late". */
+export function formatMinutes(total: number): string {
+	const mins = Math.abs(Math.round(total))
+	if (mins < 60) return `${mins} min`
+	const h = Math.floor(mins / 60)
+	const m = mins % 60
+	return m ? `${h}h ${m}m` : `${h}h`
+}
+
+/** The patient marked their symptoms severe: a "red flag" on a request. */
+export const isUrgentRequest = (apt: Appointment): boolean => apt.pre_intake?.severity === 'severe' || apt.severity === 'severe'
+
+export const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+export const MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+/** "Fri 26 Sep" for a YYYY-MM-DD (the date itself when it cannot be read). */
+export function dateLabelOf(iso: string): string {
+	const d = new Date(`${iso}T00:00:00`)
+	if (Number.isNaN(d.getTime())) return iso
+	return `${DOW_SHORT[d.getDay()]} ${d.getDate()} ${MON_SHORT[d.getMonth()]}`
+}
+
 export const formatTime12h = (t?: string | null): string => {
 	if (!t) return '--'
 	const [h, m] = t.split(':').map(Number)

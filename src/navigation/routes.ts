@@ -41,6 +41,8 @@ export const ROUTES = {
 		VISIT_SUMMARY: 'VisitSummary',
 		APPOINTMENT_CONFIRMED: 'AppointmentConfirmed',
 		APPOINTMENT_DETAILS: 'AppointmentDetails',
+		// Doctor: a past visit that was not seen (a no-show, or one referred to another doctor), opened from the Past list.
+		DOCTOR_PAST_VISIT: 'DoctorPastVisit',
 		CONSENT_FORM: 'ConsentForm',
 		// Doctor-side patient-file access gate (OTP the patient reads out) — distinct from CONSENT_FORM
 		// above, which is the patient's own booking T&C modal.

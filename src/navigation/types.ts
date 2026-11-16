@@ -206,6 +206,7 @@ export type AppStackParamList = {
 	[ROUTES.STACK.VISIT_SUMMARY]: { appointmentId: string }
 	[ROUTES.STACK.APPOINTMENT_CONFIRMED]: AppointmentConfirmedParams
 	[ROUTES.STACK.APPOINTMENT_DETAILS]: { appointmentId: string }
+	[ROUTES.STACK.DOCTOR_PAST_VISIT]: { appointmentId: string; kind: 'noshow' | 'referred' | 'cancelled' | 'other'; referralId?: string; token?: string }
 	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: Omit<PatientPaymentParams, 'consentVersionId'> }
 	[ROUTES.STACK.VERIFY_ACCESS]: VerifyAccessParams | undefined
 	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
