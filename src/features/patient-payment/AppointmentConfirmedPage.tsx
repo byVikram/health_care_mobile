@@ -8,7 +8,7 @@
 
 import React from 'react'
 import { StyleSheet } from 'react-native'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { StackActions, useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
@@ -146,7 +146,9 @@ export default function AppointmentConfirmedPage() {
 			onReceiptPress={() => showComingSoon()}
 			secondary={{
 				label: 'Back to home',
-				onPress: () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME }),
+				// popTo, not navigate: in React Navigation 7 `navigate` to a screen already in the stack pushes a second copy of it, which
+				// would leave this confirmation behind Home. popTo goes back to MainTabs and drops the confirmation.
+				onPress: () => navigation.dispatch(StackActions.popTo(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME })),
 			}}
 			primary={{
 				label: 'View appointment',

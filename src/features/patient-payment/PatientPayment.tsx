@@ -5,7 +5,7 @@
 // payment gateway yet -- online methods are UI-only; the CTA always books via
 // createAppointment, then runs the pre-intake step and opens Appointment Confirmed.
 
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import {
 	KeyboardAvoidingView,
 	Platform,
@@ -16,7 +16,7 @@ import {
 	TouchableOpacity,
 	View,
 } from 'react-native'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { CommonActions, useNavigation, useRoute } from '@react-navigation/native'
 import type { NavigationProp, RouteProp } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -202,6 +202,9 @@ export default function BookingDetailsScreen() {
 	const [method, setMethod] = useState<PaymentMethodId>('upi')
 	const [isBooking, setIsBooking] = useState(false)
 	const [bookedAppointment, setBookedAppointment] = useState<BookedAppointment | null>(null)
+	// Refs, not state, so they hold at once: a second tap before React re-renders must not send a second request.
+	const bookingInFlightRef = useRef(false)
+	const bookedRef = useRef(false)
 	const [symptomsOpen, setSymptomsOpen] = useState(false)
 	const [symptoms, setSymptoms] = useState(params?.reasonForVisit ?? '')
 	const [duration, setDuration] = useState('')
@@ -227,6 +230,13 @@ export default function BookingDetailsScreen() {
 	const paymentMethods = buildPaymentMethods(isPayLaterDisabled)
 
 	const handleConfirm = async () => {
+		// Once the appointment exists, never send another request from this booking: just bring back the step the patient was on.
+		if (bookedRef.current) {
+			setSymptomsOpen(true)
+			return
+		}
+		// A request is already on its way (a repeated tap): wait for it.
+		if (bookingInFlightRef.current) return
 		if (!doctor || !hospitalId || !appointmentDate || !startTime) {
 			showStatusModal({
 				status: 'error',
@@ -237,6 +247,8 @@ export default function BookingDetailsScreen() {
 			return
 		}
 
+		// Taken only now (after the checks above that return early), and always released in the finally below.
+		bookingInFlightRef.current = true
 		setIsBooking(true)
 		try {
 			if (!(await hasSessionToken())) {
@@ -262,6 +274,7 @@ export default function BookingDetailsScreen() {
 			const bookingResponse = mapBookAppointmentResponse(res)
 
 			if (bookingResponse.success) {
+				bookedRef.current = true
 				setBookedAppointment(bookingResponse.data)
 				// Pre-intake step first, then the full Appointment Confirmed screen
 				// (see closeSymptomsForm below).
@@ -313,6 +326,7 @@ export default function BookingDetailsScreen() {
 				submitText: 'OK',
 			})
 		} finally {
+			bookingInFlightRef.current = false
 			setIsBooking(false)
 		}
 	}
@@ -324,7 +338,10 @@ export default function BookingDetailsScreen() {
 			return
 		}
 
-		navigation.navigate(ROUTES.STACK.APPOINTMENT_CONFIRMED, {
+		// Close the booking behind the patient: the stack becomes [MainTabs (Home), AppointmentConfirmed], so Back (Android's button,
+		// iOS's swipe) from the confirmation goes Home and never to the payment, slot or doctor screens. MainTabs is rebuilt on its
+		// Home tab, whichever tab the patient was on.
+		const confirmedParams = {
 			appointmentId: bookedAppointment.id,
 			doctorName: bookingDoctorName,
 			doctorAvatar: doctor?.details?.avatar_s3_key ?? null,
@@ -342,7 +359,16 @@ export default function BookingDetailsScreen() {
 			patientName: patientDisplayName,
 			fee: bookingFee,
 			paymentMethodLabel: PAYMENT_METHOD_LABELS[method],
-		})
+		}
+		navigation.dispatch(
+			CommonActions.reset({
+				index: 1,
+				routes: [
+					{ name: ROUTES.MAIN.TABS, params: { screen: ROUTES.MAIN.HOME } },
+					{ name: ROUTES.STACK.APPOINTMENT_CONFIRMED, params: confirmedParams },
+				],
+			})
+		)
 	}
 
 	const handleSubmitSymptoms = async () => {
@@ -487,7 +513,7 @@ export default function BookingDetailsScreen() {
 					<AppButton
 						size="lg"
 						onPress={handleConfirm}
-						disabled={isBooking}
+						disabled={isBooking || !!bookedAppointment}
 						loading={isBooking}
 						icon={({ color }) => <AppIcon name="lock" size={18} color={color} />}
 						accessibilityLabel={ctaLabel}

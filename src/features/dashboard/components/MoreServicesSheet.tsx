@@ -11,7 +11,6 @@ import { AppBottomSheet, AppIconTile, AppPathIcon } from '../../../components/co
 import { APP_COLORS, TONES } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
-import { useHomeSheets } from '../HomeSheetsContext'
 import { HOME_CHROME_PATHS, type HomeChromeIcon } from '../homeChromeIcons'
 import {
 	FALLBACK_AMBULANCE_NUMBER,
@@ -40,9 +39,11 @@ interface ServiceTile {
 // Let the sheet finish sliding out before another modal is presented (iOS presents one at a time).
 const HANDOFF_MS = 260
 
+const COLUMNS = 3
+const TILE_GAP = 8
+
 export default function MoreServicesSheet({ visible, onClose }: MoreServicesSheetProps) {
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
-	const { open } = useHomeSheets()
 	const config = useAppConfig(visible)
 	const [alliedOpen, setAlliedOpen] = useState(false)
 	const [therapeuticOpen, setTherapeuticOpen] = useState(false)
@@ -70,14 +71,6 @@ export default function MoreServicesSheet({ visible, onClose }: MoreServicesShee
 	}
 
 	const tiles: ServiceTile[] = [
-		{
-			key: 'home-care',
-			title: 'Ancillary care',
-			subtitle: 'Nurses, physio & more',
-			icon: 'ancillaryCare',
-			colors: TONES.mint,
-			onPress: () => closeThen(() => open('ancillary')),
-		},
 		{
 			key: 'ambulance',
 			title: 'Ambulance',
@@ -133,7 +126,7 @@ export default function MoreServicesSheet({ visible, onClose }: MoreServicesShee
 	]
 
 	const rows: ServiceTile[][] = []
-	for (let i = 0; i < tiles.length; i += 3) rows.push(tiles.slice(i, i + 3))
+	for (let i = 0; i < tiles.length; i += COLUMNS) rows.push(tiles.slice(i, i + COLUMNS))
 
 	return (
 		<>
@@ -200,9 +193,6 @@ export default function MoreServicesSheet({ visible, onClose }: MoreServicesShee
 										</Text>
 									</TouchableOpacity>
 								))}
-								{Array.from({ length: 3 - row.length }, (_, i) => (
-									<View key={`spacer-${i}`} style={styles.tileSpacer} />
-								))}
 							</View>
 						))}
 					</View>
@@ -256,15 +246,20 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: APP_COLORS.surface,
 	},
+	// The tiles' own margins make the gaps (see `row`), so the grid takes back the outer half vertically.
 	grid: {
-		gap: 8,
+		marginVertical: -TILE_GAP / 2,
 	},
+	// Tiles are a third of the row each and carry half the gap as a margin; the row's negative margin takes the outer half
+	// back, so every tile is the same size and a short last row is simply centred.
 	row: {
 		flexDirection: 'row',
-		gap: 8,
+		justifyContent: 'center',
+		marginHorizontal: -TILE_GAP / 2,
 	},
 	tile: {
-		flex: 1,
+		width: `${100 / COLUMNS}%`,
+		margin: TILE_GAP / 2,
 		minWidth: 0,
 		alignItems: 'center',
 		gap: 6,
@@ -274,9 +269,6 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: APP_COLORS.divider,
 		backgroundColor: APP_COLORS.surface,
-	},
-	tileSpacer: {
-		flex: 1,
 	},
 	tileTitle: {
 		fontSize: 14,
