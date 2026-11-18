@@ -103,9 +103,6 @@ export const API_ENDPOINTS = {
 		CHECK_IN: (id: string) => `${BASE_URL}/api/appointments/${id}/check-in`,
 		// Doctor-only: the "Auto-confirm bookings" switch (GET reads it, PUT {enabled} sets it).
 		AUTO_CONFIRM: `${BASE_URL}/api/appointments/me/auto-confirm`,
-		// Unauthenticated by design (external scheduler only) -- see backend's process-not-arrived
-		// docstring. Not called from the mobile app.
-		PROCESS_NOT_ARRIVED: `${BASE_URL}/api/appointments/process-not-arrived`,
 		// Doctor-side "Verify access" gate before opening a patient's file. `start-consultation`
 		// (doctorService.startConsultation) is what (re)generates the code — the backend returns it
 		// directly in that response rather than SMS-ing the patient (see VerifyAccessPage.tsx for why

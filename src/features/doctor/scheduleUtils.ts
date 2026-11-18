@@ -31,9 +31,9 @@ export const isRequestLike = (apt: Appointment): boolean => isPending(apt) || is
 
 /**
  * "Accepted" = the doctor has already acted on this booking (confirmed it) -- also covers the two
- * states a confirmed appointment moves through on its own day (not_arrived via the daily cron,
- * checked_in once the doctor taps Check In), so a confirmed appointment doesn't silently disappear
- * from Today/Up-next the moment the not-arrived job or a check-in flips its status. Shared by
+ * states a confirmed appointment moves through on its own day (not_arrived after an undone
+ * check-in, checked_in once the doctor taps Check In), so a confirmed appointment doesn't silently
+ * disappear from Today/Up-next the moment a check-in changes its status. Shared by
  * DoctorHomeScreen (Up next/Later today) and DoctorScheduleScreen (Today/Requests/Upcoming/Past) so
  * the categorization rule can't drift between the two screens: Requests = isPending only, regardless
  * of date; Today/Upcoming = isAccepted (never pending, even if dated today/this week); Past =
@@ -50,12 +50,10 @@ function todayIsoLocal() {
 /**
  * The status label to actually DISPLAY (and to gate the Check In action on) for a same-day
  * confirmed appointment: "not_arrived", not "confirmed" -- even though the real DB row may still
- * literally say 'confirmed'. The real not_arrived flip only happens via the backend's daily
- * process-not-arrived job, which needs an external scheduler configured (AWS EventBridge / cron)
- * to ever run -- on a day it hasn't run yet (or was never wired up), this keeps the UI honest about
- * "this patient hasn't checked in" without waiting on that ops dependency. The backend's
- * check_in_appointment endpoint accepts a same-day 'confirmed' status for exactly this reason, so
- * a Check In tap driven by this effective label always succeeds. Anything else (a different date,
+ * literally say 'confirmed': the backend has no job that flips it (a row only becomes not_arrived
+ * when a check-in is undone), so the UI derives "this patient hasn't checked in" itself. The
+ * backend's check_in_appointment endpoint accepts a same-day 'confirmed' status, so a Check In tap
+ * driven by this effective label always succeeds. Anything else (a different date,
  * a different status) passes through unchanged.
  */
 export const effectiveStatusLabel = (apt: Appointment): string => {
