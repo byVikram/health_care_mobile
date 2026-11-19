@@ -1,11 +1,23 @@
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { normalizePincode } from '../utils/pincode';
 import { showStatusModal } from './apiService';
 
 let settingsAlertOpen = false;
 
-const offerAppSettings = () => {
+type SettingsPromptOptions = {
+  title?: string;
+  description?: string;
+  /** What "Open Settings" does; the app's own settings page by default. */
+  openSettings?: () => void;
+  cancelText?: string;
+  onCancel?: () => void;
+  /** The confirm button's text; "Open Settings" by default. */
+  submitText?: string;
+};
+
+/** A "Location is off" prompt with an Open Settings button (one at a time). */
+export const offerAppSettings = (options: SettingsPromptOptions = {}) => {
   if (settingsAlertOpen) return;
   settingsAlertOpen = true;
   const close = () => {
@@ -13,16 +25,33 @@ const offerAppSettings = () => {
   };
   showStatusModal({
     status: 'info',
-    title: 'Location is turned off',
-    description: 'Allow Location for KarolaHealth in your phone’s App settings to use this.',
-    submitText: 'Open Settings',
+    title: options.title ?? 'Location is turned off',
+    description: options.description ?? 'Allow Location for KarolaHealth in your phone’s App settings to use this.',
+    submitText: options.submitText ?? 'Open Settings',
     onSubmit: () => {
       close();
-      void Linking.openSettings();
+      if (options.openSettings) options.openSettings();
+      else void Linking.openSettings();
     },
-    cancelText: 'Not now',
-    onCancel: close,
+    cancelText: options.cancelText ?? 'Not now',
+    onCancel: () => {
+      close();
+      options.onCancel?.();
+    },
   });
+};
+
+/** The phone's own Location switch (GPS): Android has a settings page for it; iOS can only open the app's settings. */
+export const openLocationServicesSettings = async () => {
+  try {
+    if (Platform.OS === 'android') {
+      await Linking.sendIntent('android.settings.LOCATION_SOURCE_SETTINGS');
+      return;
+    }
+  } catch {
+    // fall through to the app's settings
+  }
+  await Linking.openSettings();
 };
 
 /**
@@ -54,6 +83,8 @@ export const getCurrentLocation = async ({ promptForSettings = false }: { prompt
   return {
     latitude: location.coords.latitude,
     longitude: location.coords.longitude,
+    /** Metres; undefined when the device does not say. */
+    accuracy: location.coords.accuracy ?? undefined,
   };
 };
 
@@ -75,17 +106,68 @@ export const getCoordsFromAddress = async (address: string, timeoutMs = 6000) =>
 };
 
 /**
+ * Reverse geocoding for a device that has no geocoder of its own (a browser, or an Android phone without Google services): the same
+ * OpenStreetMap Nominatim service the place search already uses. Only asked when the device's own geocoder found nothing usable.
+ * Null on any failure.
+ */
+export type PlaceDetails = {
+  area?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+  fullAddress?: string;
+};
+
+const reverseGeocodeOnline = async (latitude: number, longitude: number): Promise<PlaceDetails | null> => {
+  try {
+    // Plain fetch on purpose: a third-party geocoder, not our API (ApiService would send our auth header to it).
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&zoom=18&lat=${latitude}&lon=${longitude}`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    if (!res.ok) return null;
+    const row = (await res.json()) as { address?: Record<string, string | undefined> };
+    const a = row.address ?? {};
+    const city = a.city ?? a.town ?? a.village ?? a.municipality ?? a.county ?? '';
+    const area = a.suburb ?? a.neighbourhood ?? a.city_district ?? a.road ?? '';
+    if (!city && !a.postcode) return null;
+    return {
+      area,
+      city,
+      district: a.city_district ?? '',
+      state: a.state ?? '',
+      country: a.country ?? '',
+      pincode: normalizePincode(a.postcode),
+      fullAddress: [area, city, a.state, a.country].filter(Boolean).join(', '),
+    };
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Convert lat/lng → readable address
  */
 export const getAddressFromCoords = async (
   latitude: number,
   longitude: number
-) => {
+): Promise<PlaceDetails> => {
   try {
-    const [geo] = await Location.reverseGeocodeAsync({
-      latitude,
-      longitude,
-    });
+    let geo: Location.LocationGeocodedAddress | undefined;
+    try {
+      [geo] = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+    } catch {
+      // No geocoder on this device: the online lookup below.
+    }
+    if (!geo || (!geo.city && !geo.postalCode)) {
+      const online = await reverseGeocodeOnline(latitude, longitude);
+      if (online) return online;
+    }
 
     const isValidArea = (value?: string | null) => {
       if (!value) return false;
@@ -152,6 +234,76 @@ export const getCurrentLocationIfPermitted = async () => {
   };
 };
 
+export type DevicePosition = { latitude: number; longitude: number; accuracy: number | null };
+
+/** A GPS fix less accurate than this (metres) is not used as the location (the backend refuses it as an address too). */
+export const MAX_GPS_ACCURACY_METERS = 500;
+
+export type PositionResult =
+  | { status: 'ok'; position: DevicePosition }
+  | { status: 'denied' | 'services_off' | 'timeout' | 'error' | 'inaccurate' };
+
+const withTimeout = <T>(work: Promise<T>, ms: number): Promise<T | 'timeout'> =>
+  Promise.race([work, new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), ms))]);
+
+/**
+ * The device position for the automatic location (useAutoLocation). It never asks for permission and never throws: the
+ * reason it could not get a position comes back as the status. A recent, accurate last-known fix is used as it is (no GPS
+ * start-up); otherwise one fresh balanced-accuracy fix is requested, with a timeout.
+ */
+export const getDevicePosition = async ({
+  maxAgeMs = 5 * 60 * 1000,
+  maxAccuracyMeters = MAX_GPS_ACCURACY_METERS,
+  timeoutMs = 10000,
+}: { maxAgeMs?: number; maxAccuracyMeters?: number; timeoutMs?: number } = {}): Promise<PositionResult> => {
+  try {
+    const permission = await Location.getForegroundPermissionsAsync();
+    if (permission.status !== 'granted') return { status: 'denied' };
+    if (!(await Location.hasServicesEnabledAsync())) return { status: 'services_off' };
+
+    const toPosition = (p: Location.LocationObject): PositionResult => ({
+      status: 'ok',
+      position: { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy ?? null },
+    });
+
+    try {
+      const last = await Location.getLastKnownPositionAsync({ maxAge: maxAgeMs, requiredAccuracy: maxAccuracyMeters });
+      if (last) return toPosition(last);
+    } catch {
+      // No last-known fix on this device: ask for a fresh one below.
+    }
+
+    const fresh = await withTimeout(Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }), timeoutMs);
+    if (fresh === 'timeout') return { status: 'timeout' };
+    // A fix that is too rough (a cell-tower guess indoors) must not become the location: the next refresh tries again.
+    if (fresh.coords.accuracy != null && fresh.coords.accuracy > maxAccuracyMeters) return { status: 'inaccurate' };
+    return toPosition(fresh);
+  } catch {
+    return { status: 'error' };
+  }
+};
+
+/** Metres between two coordinates (haversine): enough to tell "moved" from GPS wobble. */
+export const distanceMeters = (
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number }
+) => {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLon / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+};
+
+/** The short place text shown in the location row: "Indiranagar, Bengaluru" (or the longer address when there is no area / city). */
+export const placeLabel = (a: { area?: string; city?: string; fullAddress?: string }) =>
+  [a.area, a.city].filter(Boolean).join(', ') || a.fullAddress || '';
+
+/** Reverse geocoding with a time limit (the platform geocoder can stall); null when it times out. */
+export const getPlaceFromCoords = async (latitude: number, longitude: number, timeoutMs = 6000) => {
+  const place = await withTimeout(getAddressFromCoords(latitude, longitude), timeoutMs);
+  return place === 'timeout' ? null : place;
+};
 export type PlaceResult = {
   name: string;
   /** "Suburb, City, State" line shown under the name. */

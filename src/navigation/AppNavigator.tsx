@@ -19,6 +19,8 @@ import { WalletTransactionsPage } from '../features/wallet/WalletTransactionsPag
 import { WalletTransactionDetailPage } from '../features/wallet/WalletTransactionDetailPage'
 
 import DoctorSearchPage from '../features/doctor/search/DoctorSearchPage'
+import SymptomsPage from '../features/doctor/symptoms/SymptomsPage'
+import CommunitiesPage from '../features/portal/CommunitiesPage'
 import DoctorDetailPage from '../features/doctor/detail/DoctorDetailPage'
 import BookSlotPage from '../features/doctor/book-slot/BookSlotPage'
 import ConsultationPage from '../features/consultation/ConsultationPage'
@@ -201,6 +203,12 @@ function AuthenticatedNavigator() {
 					}}
 				/>
 				*/}
+
+				{/* SymptomsPage renders its own AppScreenHeader too. */}
+				<AppStack.Screen name={ROUTES.STACK.SYMPTOMS} component={SymptomsPage} options={{ headerShown: false }} />
+
+				{/* Communities renders its own header. */}
+				<AppStack.Screen name={ROUTES.STACK.COMMUNITIES} component={CommunitiesPage} options={{ headerShown: false }} />
 
 				{/* DoctorSearchPage renders its own single AppScreenHeader — no navigator header here. */}
 				<AppStack.Screen

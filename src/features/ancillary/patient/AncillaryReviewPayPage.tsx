@@ -159,7 +159,7 @@ export default function AncillaryReviewPayPage() {
 						/>
 					</AppSection>
 
-					<VisitWhoWhereSection who={who} noun={noun} note={note} onNoteChange={setNote} />
+					<VisitWhoWhereSection who={who} noun={noun} note={note} onNoteChange={setNote} currentLocation />
 
 					<AppSection title="Bill" titleSize="sm" marginTop={0}>
 						<AppBillSummary

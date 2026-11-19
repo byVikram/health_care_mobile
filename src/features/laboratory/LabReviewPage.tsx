@@ -53,7 +53,8 @@ export default function LabReviewPage() {
 	const navigation = useNavigation<Nav>()
 	const booking = useLabBooking()
 	const isHome = booking.where === 'home'
-	const who = useVisitPatientAddress(booking.patientKey, booking.addressId)
+	// the address was chosen in the cart and is locked here (the quote depends on it): never re-defaulted to the current location
+	const who = useVisitPatientAddress(booking.patientKey, booking.addressId, true)
 	const [familyOpen, setFamilyOpen] = useState(false)
 	const [placing, setPlacing] = useState(false)
 

@@ -198,6 +198,24 @@ export interface PatientAddress {
 	landmark?: string | null
 	contact_name?: string | null
 	contact_phone?: string | null
+	/** 'patient' = saved by the patient; 'current_location' = made by the app from the shared location (never edited in place). */
+	source?: 'patient' | 'current_location'
+	/** How a 'current_location' address was found: the phone's GPS or a place the patient picked. Absent on patient addresses. */
+	location_method?: 'gps' | 'manual' | null
+}
+
+/** The shared current location as an address (see putCurrentLocationAddress). */
+export interface CurrentLocationAddressInput {
+	method: 'gps' | 'manual'
+	latitude: number
+	longitude: number
+	/** GPS accuracy in metres: required for 'gps', left out for 'manual'. */
+	accuracy_m?: number
+	address_line: string
+	area?: string
+	city: string
+	state: string
+	pincode: string
 }
 
 export interface TreatmentRecord {
@@ -222,6 +240,18 @@ export const getPatientAddresses = async (): Promise<PatientAddress[]> => {
 export const createPatientAddress = async (address: Omit<PatientAddress, 'id'>): Promise<any> => {
 	const res = await ApiService.post(API_ENDPOINTS.PATIENT.ADDRESSES, address)
 	return res.data
+}
+
+/**
+ * The patient's one managed "current location" address for this location: the server returns the existing one when it still
+ * stands for it, or replaces it (an earlier pharmacy order keeps the address it was placed with). Only this call makes or
+ * changes such an address; the screens that book never read the GPS themselves.
+ */
+export const putCurrentLocationAddress = async (input: CurrentLocationAddressInput): Promise<PatientAddress> => {
+	const res = await ApiService.put<{ data: PatientAddress }>(API_ENDPOINTS.PATIENT.CURRENT_LOCATION_ADDRESS, input, {
+		skipGlobalError: true,
+	})
+	return res.data.data
 }
 
 export const getPatientTreatmentHistory = async (userId: string): Promise<TreatmentRecord[]> => {

@@ -17,6 +17,7 @@ import { ROUTES } from '../../../navigation/routes'
 import { navigate } from '../../../navigation/navigationService'
 import {
 	getAddressFromCoords,
+	placeLabel,
 	getCoordsFromAddress,
 	getCurrentLocation,
 	getCurrentLocationIfPermitted,
@@ -136,7 +137,8 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 		const loadSavedAddresses = async () => {
 			try {
 				const list = await getPatientAddresses()
-				if (live) setSaved(list)
+				// the app's own current-location address is not one the patient saved: "Use current location" stands for it
+				if (live) setSaved(list.filter((a) => a.source !== 'current_location'))
 			} catch {
 				if (live) setSaved([])
 			}
@@ -146,7 +148,7 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 				const pos = await getCurrentLocationIfPermitted()
 				if (!pos || !live) return
 				const a = await getAddressFromCoords(pos.latitude, pos.longitude)
-				const label = [a.area, a.city].filter(Boolean).join(', ') || a.fullAddress || ''
+				const label = placeLabel(a)
 				if (live && label) setGpsLabel(label)
 			} catch {
 				// No label: the row just says "current location".
@@ -190,10 +192,30 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 	}, [query])
 
 	const choose = useCallback(
-		async (address: string, latitude: number, longitude: number, pincode?: string) => {
+		async (
+			address: string,
+			latitude: number,
+			longitude: number,
+			pincode?: string,
+			source: 'auto' | 'manual' = 'manual',
+			found?: { city?: string; state?: string; accuracy?: number; line?: string }
+		) => {
 			// The pincode decides what is offered nearby (lab tests); a place picked from the search has none, and
 			// useCurrentPincode looks it up from the coordinates.
-			await setCurrentLocation({ address, latitude, longitude, ...(isPincode(pincode) ? { pincode } : {}) })
+			// source says who chose it: a place the patient picks stays until they pick again; only their own "Use current location"
+			// (GPS) makes it automatic, so the automatic refresh may keep it up to date (hooks/useAutoLocation).
+			await setCurrentLocation({
+				address,
+				latitude,
+				longitude,
+				...(isPincode(pincode) ? { pincode } : {}),
+				...(found?.line ? { line: found.line } : {}),
+				...(found?.city ? { city: found.city } : {}),
+				...(found?.state ? { state: found.state } : {}),
+				...(found?.accuracy != null ? { accuracy: found.accuracy } : {}),
+				source,
+				...(source === 'auto' ? { detectedAt: Date.now() } : {}),
+			})
 			setAreaOpen(false)
 			onClose()
 		},
@@ -206,8 +228,12 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 		try {
 			const pos = await getCurrentLocation({ promptForSettings: true })
 			const a = await getAddressFromCoords(pos.latitude, pos.longitude)
-			const label = [a.area, a.city].filter(Boolean).join(', ') || a.fullAddress || 'Current location'
-			await choose(label, pos.latitude, pos.longitude, a.pincode)
+			const label = placeLabel(a) || 'Current location'
+			await choose(label, pos.latitude, pos.longitude, a.pincode, 'auto', {
+				city: a.city,
+				state: a.state,
+				accuracy: pos.accuracy,
+			})
 		} catch {
 			if (mounted.current) setGpsError("Couldn't get your location. Check that Location is turned on.")
 		} finally {
@@ -217,11 +243,18 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 
 	const pickPlace = (place: PlaceResult) => {
 		const town = firstPart(place.area)
-		void choose(town ? `${place.name}, ${town}` : place.name, place.latitude, place.longitude)
+		void choose(
+			town ? `${place.name}, ${town}` : place.name,
+			place.latitude,
+			place.longitude,
+			undefined,
+			'manual',
+			{ line: [place.name, place.area].filter(Boolean).join(', ') }
+		)
 	}
 
 	// "Indiranagar, Bengaluru" (or just "Bengaluru"): the text is looked up for coordinates; without them the label
-	// still shows, and features that need a position (useBookingLocation) ask for the device location instead.
+	// still shows, and the booking screens that need a position use the managed address made from the shared location.
 	const pickNamed = async (label: string) => {
 		setPicking(true)
 		try {
@@ -242,7 +275,11 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 				lat = found?.latitude
 				lng = found?.longitude
 			}
-			await choose(savedLabel(a), lat ?? Number.NaN, lng ?? Number.NaN, a.pincode)
+			await choose(savedLabel(a), lat ?? Number.NaN, lng ?? Number.NaN, a.pincode, 'manual', {
+				city: a.city,
+				state: a.state,
+				line: a.address_line,
+			})
 		} finally {
 			if (mounted.current) setPicking(false)
 		}

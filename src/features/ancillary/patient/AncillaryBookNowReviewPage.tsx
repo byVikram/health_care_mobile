@@ -173,6 +173,7 @@ export default function AncillaryBookNowReviewPage() {
 						note={note}
 						onNoteChange={setNote}
 						addressHint={`${capitalize(noun)} will come to this address`}
+						currentLocation
 					/>
 
 					<AppSection title="Bill" titleSize="sm" marginTop={0}>

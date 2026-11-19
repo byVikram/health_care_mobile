@@ -10,7 +10,7 @@
 //               (Home / Work / Family / Other); footer "Save and use".
 // The modern counterpart of AddressSelectionSheet (an inline, lab-styled list whose add form lives in a
 // nested sheet). Pure UI: the caller owns the address list (getPatientAddresses), saving
-// (createPatientAddress) and the GPS lookup, so the same sheet works for any home-visit flow.
+// (createPatientAddress) and the current location, so the same sheet works for any home-visit flow.
 
 import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
@@ -28,6 +28,8 @@ export type AppAddressOption = {
 	label: string
 	/** One-line address, e.g. "4B Sunrise Apartments, Jayanagar, Bengaluru - 560041". */
 	line: string
+	/** The app's own current-location address (not one the patient saved): shown by the Current location card, not as a row. */
+	managed?: boolean
 }
 
 /** What the add form collected; passed to `onSaveNew`. */
@@ -50,7 +52,7 @@ export type AppAddressPrefill = Partial<Omit<AppAddressDraft, 'label'>>
 
 /**
  * What `onPickCurrentLocation` found:
- *   picked  -- the position became a saved address and is selected (the sheet closes);
+ *   picked  -- the shared current location became the (managed) address and is selected (the sheet closes);
  *   error   -- nothing was picked; `message` is shown in the sheet (permission off, GPS off, no full address...).
  */
 export type CurrentLocationResult = { kind: 'picked' } | { kind: 'error'; message: string }
@@ -77,8 +79,19 @@ export type AppAddressSheetProps = {
 	onSaveNew?: (draft: AppAddressDraft) => Promise<boolean> | boolean
 	/** GPS lookup for "Use my current location"; resolve null when it failed (the caller shows why). */
 	onUseCurrentLocation?: () => Promise<AppAddressPrefill | null>
-	/** Adds a "Current location" row to the list: one tap uses the device's position as the address. */
+	/**
+	 * Puts ONE "Current location" card first in the list (same look as the address rows): one tap uses the app's shared location as
+	 * the address. The option marked `managed` is that location's address: the card shows and selects it instead of repeating it below.
+	 */
 	onPickCurrentLocation?: () => Promise<CurrentLocationResult>
+	/** The card's title: "Current location" (the default) or "Selected location" when the patient picked the place by hand. */
+	currentLocationLabel?: string
+	/** The card's second line while no managed address is selected yet: the shared location's text. */
+	currentLocationLine?: string
+	/** Why the shared location cannot be used (shown under the card, quietly: the saved addresses below are the way on). */
+	currentLocationNote?: string | null
+	/** Adds a "Manage saved addresses" link under the list: the sheet closes, then this runs (e.g. open the saved-addresses page). */
+	onManage?: () => void
 }
 
 const EMPTY_DRAFT: AppAddressDraft = {
@@ -143,6 +156,10 @@ export function AppAddressSheet({
 	onSaveNew,
 	onUseCurrentLocation,
 	onPickCurrentLocation,
+	currentLocationLabel = 'Current location',
+	currentLocationLine,
+	currentLocationNote,
+	onManage,
 }: AppAddressSheetProps) {
 	const [view, setView] = useState<'list' | 'add'>('list')
 	const [draft, setDraft] = useState<AppAddressDraft>(EMPTY_DRAFT)
@@ -239,8 +256,30 @@ export function AppAddressSheet({
 
 	const selected = addresses.find((a) => a.id === selectedId)
 
+	// The Current location card stands for the app's managed current-location address (marked `managed`, never told apart by its label);
+	// the rows below are the patient's own saved addresses.
+	const gpsAddresses = onPickCurrentLocation ? addresses.filter((a) => a.managed) : []
+	const savedAddresses = gpsAddresses.length ? addresses.filter((a) => !a.managed) : addresses
+	const gpsSelected = gpsAddresses.find((a) => a.id === selectedId)
+	// An older managed address is not shown for a location that is no longer there: only the selected one, else the shared location's text.
+	const gpsShown = gpsSelected
+
 	const listFooter = (
 		<View style={styles.footer}>
+			{!!onManage && (
+				<TouchableOpacity
+					style={styles.manageBtn}
+					onPress={() => {
+						onClose()
+						onManage()
+					}}
+					activeOpacity={0.7}
+					accessibilityRole="button"
+					accessibilityLabel="Manage saved addresses"
+				>
+					<Text style={styles.manageText}>Manage saved addresses</Text>
+				</TouchableOpacity>
+			)}
 			{!!onSaveNew && (
 				<TouchableOpacity
 					style={styles.addBtn}
@@ -295,9 +334,10 @@ export function AppAddressSheet({
 				</View>
 			)
 		}
+		if (savedAddresses.length === 0) return null // only the Current location card
 		return (
 			<View accessibilityRole="radiogroup">
-				{addresses.map((a, i) => {
+				{savedAddresses.map((a, i) => {
 					const on = a.id === selectedId
 					return (
 						<TouchableOpacity
@@ -307,7 +347,7 @@ export function AppAddressSheet({
 							accessibilityRole="radio"
 							accessibilityState={{ checked: on }}
 							accessibilityLabel={`${a.label}, ${a.line}`}
-							style={[styles.row, i === addresses.length - 1 && styles.rowLast]}
+							style={[styles.row, i === savedAddresses.length - 1 && styles.rowLast]}
 						>
 							<View style={[styles.tile, on && styles.tileOn]}>
 								<MaterialCommunityIcons name="home-outline" size={22} color={APP_COLORS.primary} />
@@ -336,11 +376,11 @@ export function AppAddressSheet({
 					disabled={picking}
 					activeOpacity={0.8}
 					accessibilityRole="button"
-					accessibilityLabel="Use current location"
-					accessibilityState={{ busy: picking }}
-					style={styles.row}
+					accessibilityLabel={`${currentLocationLabel}${gpsShown ? `, ${gpsShown.line}` : ''}. Use this location`}
+					accessibilityState={{ selected: !!gpsSelected, busy: picking }}
+					style={[styles.row, savedAddresses.length === 0 && !locationError && styles.rowLast]}
 				>
-					<View style={styles.tile}>
+					<View style={[styles.tile, !!gpsSelected && styles.tileOn]}>
 						{picking ? (
 							<ActivityIndicator size="small" color={APP_COLORS.primary} />
 						) : (
@@ -348,18 +388,25 @@ export function AppAddressSheet({
 						)}
 					</View>
 					<View style={styles.rowText}>
-						<Text style={styles.rowTitle}>Current location</Text>
-						<Text style={styles.rowSub}>
-							{picking ? 'Finding your location…' : "Use your phone's GPS position"}
+						<Text style={styles.rowTitle}>{currentLocationLabel}</Text>
+						<Text style={styles.rowSub} numberOfLines={2}>
+							{picking
+								? 'Finding your location…'
+								: gpsShown
+									? gpsShown.line
+									: (currentLocationLine ?? 'Location not available yet')}
 						</Text>
 					</View>
-					<MaterialCommunityIcons name="chevron-right" size={22} color={APP_COLORS.inkMuted} />
+					<AppRadio checked={!!gpsSelected} />
 				</TouchableOpacity>
 			)}
 			{!!locationError && (
 				<Text style={styles.locationError} accessibilityRole="alert">
 					{locationError}
 				</Text>
+			)}
+			{!locationError && !!currentLocationNote && !gpsSelected && (
+				<Text style={styles.locationNote}>{currentLocationNote}</Text>
 			)}
 			{renderSaved()}
 		</View>
@@ -491,6 +538,7 @@ const styles = StyleSheet.create({
 	rowTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: APP_COLORS.ink },
 	rowSub: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
 	locationError: { fontSize: 12, lineHeight: 17, fontWeight: '600', color: APP_COLORS.danger, paddingVertical: 8 },
+	locationNote: { fontSize: 12, lineHeight: 17, color: APP_COLORS.inkMuted, paddingVertical: 8 },
 	stateBox: { alignItems: 'center', gap: 8, paddingVertical: 20, paddingHorizontal: 8 },
 	stateText: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted, textAlign: 'center' },
 	footer: { gap: 8 },
@@ -507,6 +555,8 @@ const styles = StyleSheet.create({
 		gap: 6,
 	},
 	addBtnText: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: APP_COLORS.primary },
+	manageBtn: { alignSelf: 'center', paddingVertical: 4, paddingHorizontal: 8 },
+	manageText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: APP_COLORS.primary },
 	form: { gap: 16, paddingTop: 4, paddingBottom: 8 },
 	locateBtn: {
 		height: 44,

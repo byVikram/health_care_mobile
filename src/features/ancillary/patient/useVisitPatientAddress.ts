@@ -1,16 +1,21 @@
 // src/features/ancillary/patient/useVisitPatientAddress.ts
 //
 // "Who is this visit for?" + "Where should the nurse come?" state shared by the two Review & pay screens
-// (Book now and Later): the family-member list, the patient's saved addresses (add new / use current
-// location) and a resolver that turns the picked address into the {street_address, lat, lng} the booking
-// APIs want. Rendering lives in VisitWhoWhereSection.
+// (Book now and Later): the family-member list, the patient's saved addresses (add new / the current location) and a
+// resolver that turns the picked address into the {street_address, lat, lng} the booking APIs want. Rendering lives in
+// VisitWhoWhereSection.
+//
+// The current location is the app's shared one (AuthContext.currentLocation, kept by the Dashboard's single detector): nothing
+// here reads the GPS. It becomes the patient's one managed "current location" saved address (currentLocationAddress.ts) and is
+// selected by default until the patient picks an address themselves; after that their pick is kept for the whole booking.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import * as Location from 'expo-location'
 import axios from 'axios'
 import Toast from 'react-native-toast-message'
+import { useAuth, type LocationData } from '../../../context/AuthContext'
 import { useFamilyMembers } from '../../../hooks/useFamilyMembers'
-import { getCurrentLocation } from '../../../services/locationService'
+import { requestLocationRefresh } from '../../../hooks/useAutoLocation'
+import { offerAppSettings } from '../../../services/locationService'
 import {
 	createPatientAddress,
 	getPatientAddresses,
@@ -18,13 +23,8 @@ import {
 } from '../../profile/patient/PatientProfileService'
 import type { AppAddressDraft, AppAddressPrefill, CurrentLocationResult } from '../../../components/common'
 import type { VisitAddressInput } from '../ancillaryProviderBookingService'
-import { useBookingLocation } from './useBookingLocation'
+import { ensureCurrentLocationAddress, isManagedAddress, locationKey, methodOf } from './currentLocationAddress'
 import { showStatusModal } from '../../../services/apiService'
-
-// The saved-address label given to an address made from the device position, and how close (in degrees, about
-// 100 m) a new position must be to an existing one to count as the same place.
-const CURRENT_LOCATION_LABEL = 'Current location'
-const SAME_PLACE_DEGREES = 0.001
 
 export const addressLine = (a: PatientAddress) =>
 	[a.address_line, a.city, a.state].filter(Boolean).join(', ') + (a.pincode ? ` - ${a.pincode}` : '')
@@ -41,25 +41,45 @@ export const apiErrorMessage = (e: unknown) => {
 	return e instanceof Error ? e.message : ''
 }
 
-export function useVisitPatientAddress(initialPatientKey = 'self', initialAddressId: string | null = null) {
-	// ---- Patient ----
-	const { members, addFromDraft } = useFamilyMembers()
-	const [patientKey, setPatientKey] = useState(initialPatientKey)
-	const [familyOpen, setFamilyOpen] = useState(false)
-	const memberIndex = Math.max(
-		0,
-		members.findIndex((m) => m.key === patientKey)
-	)
-	const member = members[memberIndex] ?? members[0]
+/** Why there is no shared location to use, in the words the address sheet shows (with a saved address as the way on). */
+const unavailableMessage = (status: string) =>
+	status === 'denied'
+		? 'Location permission is off. Allow location access in your phone settings, or choose a saved address.'
+		: status === 'off'
+			? "Your phone's location is turned off. Turn it on, or choose a saved address."
+			: status === 'detecting'
+				? 'Still finding your location. Try again in a moment, or choose a saved address.'
+				: "We couldn't find your location. Choose a saved address or add one."
+
+/**
+ * A GPS location saved before its accuracy was recorded cannot become an address as it is: ask the Dashboard's one detector to look
+ * again (it never reads the GPS from here), which records the accuracy. Anything else is returned as it is.
+ */
+const withAccuracy = async (loc: LocationData): Promise<LocationData> =>
+	methodOf(loc) === 'gps' && loc.accuracy == null ? ((await requestLocationRefresh()) ?? loc) : loc
+
+/**
+ * The patient's saved addresses and what the address sheet needs: pick one, add a new one, use the current location. Used by the
+ * home-visit booking flows (through useVisitPatientAddress), the lab cart and the pharmacy order; the picked address id is `addressId`.
+ *
+ * `addressPicked` says the patient chose the address themselves (`initialPicked` carries that over from an earlier screen of the
+ * same booking): only then is the choice kept when the shared location changes. Until then the current location is the default.
+ */
+export function useSavedAddresses(initialAddressId: string | null = null, enabled = true, initialPicked = false) {
+	const { currentLocation, locationStatus } = useAuth()
 
 	// ---- Address ----
 	const [addresses, setAddresses] = useState<PatientAddress[]>([])
-	const [addrLoading, setAddrLoading] = useState(true)
+	const [addrLoading, setAddrLoading] = useState(enabled)
 	const [addrError, setAddrError] = useState<string | null>(null)
-	const [addressId, setAddressId] = useState<string | null>(initialAddressId)
+	const [addressId, setAddressIdState] = useState<string | null>(initialAddressId)
+	const [addressPicked, setAddressPicked] = useState(initialPicked)
 	const [addrOpen, setAddrOpen] = useState(false)
+	/** The shared location is there but cannot become an address (not accurate / complete enough): shown in the sheet. */
+	const [locationIssue, setLocationIssue] = useState<string | null>(null)
+	const [syncedKey, setSyncedKey] = useState<string | null>(null)
 	const activeRef = useRef(true)
-	const { coords: bookingCoords, locate } = useBookingLocation()
+	const pickedRef = useRef(initialPicked)
 
 	useEffect(() => {
 		activeRef.current = true
@@ -68,6 +88,20 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 		}
 	}, [])
 
+	/** The patient chose: from now on a change of the shared location does not replace this address. */
+	const markPicked = useCallback(() => {
+		pickedRef.current = true
+		setAddressPicked(true)
+	}, [])
+
+	const setAddressId = useCallback(
+		(id: string | null) => {
+			markPicked()
+			setAddressIdState(id)
+		},
+		[markPicked]
+	)
+
 	const loadAddresses = useCallback(async (selectId?: string | null) => {
 		setAddrLoading(true)
 		setAddrError(null)
@@ -75,10 +109,11 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 			const list = await getPatientAddresses()
 			if (!activeRef.current) return list
 			setAddresses(list)
-			setAddressId((cur) => {
+			setAddressIdState((cur) => {
 				const want = selectId ?? cur
 				if (want && list.some((a) => a.id === want)) return want
-				return (list.find((a) => a.is_default) ?? list[0])?.id ?? null
+				// the patient's own default (the managed current-location address is never the default)
+				return (list.find((a) => a.is_default) ?? list.find((a) => !isManagedAddress(a)) ?? list[0])?.id ?? null
 			})
 			return list
 		} catch {
@@ -89,10 +124,45 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 		}
 	}, [])
 
+	// enabled lets a screen load the list only when it needs it (the pharmacy order does, for home delivery)
 	useEffect(() => {
-		void loadAddresses()
-	}, [loadAddresses])
+		if (enabled) void loadAddresses()
+	}, [enabled, loadAddresses])
 
+	/** Put the managed current-location address into the list (the server already replaced the old one). */
+	const applyManaged = useCallback((managed: PatientAddress) => {
+		setAddresses((list) => [...list.filter((a) => !isManagedAddress(a) && a.id !== managed.id), managed])
+	}, [])
+
+	// The shared location is the default address: once the list is in, make the managed address for it and select it, unless the
+	// patient has already chosen another one. Runs again when the shared location changes (e.g. changed on the Dashboard).
+	const locKey = locationKey(currentLocation)
+	useEffect(() => {
+		if (!enabled || addrLoading || addrError || !currentLocation || !locKey) return
+		if (pickedRef.current || syncedKey === locKey) return
+		let active = true
+		const sync = async () => {
+			const res = await ensureCurrentLocationAddress(await withAccuracy(currentLocation), addresses)
+			if (!active || !activeRef.current) return
+			setSyncedKey(locKey)
+			if (res.ok) {
+				setLocationIssue(null)
+				applyManaged(res.address)
+				if (!pickedRef.current) setAddressIdState(res.address.id)
+			} else {
+				setLocationIssue(res.message)
+			}
+		}
+		void sync()
+		return () => {
+			active = false
+		}
+		// `addresses` is read when the list has just loaded; a later change to it must not run this again (syncedKey guards).
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [enabled, addrLoading, addrError, locKey, syncedKey, addressPicked])
+
+	// While the default is still being worked out the row shows "Loading…" instead of flashing another address first.
+	const awaitingLocation = enabled && !addrError && !addressPicked && !!locKey && syncedKey !== locKey
 	const address = addresses.find((a) => a.id === addressId) ?? null
 
 	const saveAddress = async (draft: AppAddressDraft) => {
@@ -106,12 +176,14 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 				pincode: draft.pincode,
 				latitude: draft.latitude,
 				longitude: draft.longitude,
-				is_default: addresses.length === 0,
+				// the patient's first address of their own is the default (the managed current-location one never is)
+				is_default: !addresses.some((a) => !isManagedAddress(a)),
 			})
+			markPicked()
 			const list = await loadAddresses(res?.data?.id ?? null)
 			if (!res?.data?.id && list) {
 				const match = list.find((a) => a.address_line === line && a.pincode === draft.pincode)
-				if (match) setAddressId(match.id)
+				if (match) setAddressIdState(match.id)
 			}
 			Toast.show({ type: 'success', text1: 'Address saved' })
 			return true
@@ -126,111 +198,110 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 		}
 	}
 
+	/** The add form's "Use my current location": prefilled from the SHARED location (no GPS read here). */
 	const useCurrentLocation = async (): Promise<AppAddressPrefill | null> => {
-		try {
-			const c = await getCurrentLocation({ promptForSettings: true })
-			let prefill: AppAddressPrefill = { latitude: c.latitude, longitude: c.longitude }
-			try {
-				const [geo] = await Location.reverseGeocodeAsync(c)
-				if (geo) {
-					prefill = {
-						...prefill,
-						area: [geo.street, geo.district || geo.subregion].filter(Boolean).join(', ') || undefined,
-						city: geo.city || undefined,
-						state: geo.region || undefined,
-						pincode: geo.postalCode || undefined,
-					}
-				}
-			} catch {
-				// Coordinates alone are still useful; the patient types the rest.
-			}
-			return prefill
-		} catch (e) {
-			const denied = e instanceof Error && /denied/i.test(e.message)
+		if (!currentLocation || !locKey) {
 			Toast.show({
 				type: 'error',
-				text1: denied ? 'Location permission is off' : "Couldn't get your location",
-				text2: denied ? 'Allow location access, or type the address.' : 'Please type the address instead.',
+				text1: "We couldn't find your location",
+				text2: 'Please type the address instead.',
 			})
 			return null
+		}
+		const known = (currentLocation.line ?? currentLocation.address).trim()
+		return {
+			latitude: currentLocation.latitude,
+			longitude: currentLocation.longitude,
+			...(known && known !== 'Current location' ? { area: known } : {}),
+			...(currentLocation.city ? { city: currentLocation.city } : {}),
+			...(currentLocation.state ? { state: currentLocation.state } : {}),
+			...(currentLocation.pincode ? { pincode: currentLocation.pincode } : {}),
 		}
 	}
 
 	/**
-	 * "Current location": read the device position (asking for permission when needed), turn it into an address and
-	 * save it as a normal saved address, which is then selected -- the lab and visit APIs work from saved addresses.
-	 * A spot already saved this way is reused. When the position cannot be turned into a full address (no PIN code,
-	 * or no geocoder on this device, as in a browser) nothing is saved and the sheet says so.
+	 * The sheet's "Current location" card: select the managed address for the shared location. It never reads the GPS: with no
+	 * location yet it asks the Dashboard's one detector to look again, and a denied permission gets the settings prompt.
 	 */
 	const pickCurrentLocation = async (): Promise<CurrentLocationResult> => {
-		let c: { latitude: number; longitude: number }
-		try {
-			c = await getCurrentLocation({ promptForSettings: true })
-		} catch (e) {
-			const denied = e instanceof Error && /denied/i.test(e.message)
-			return {
-				kind: 'error',
-				message: denied
-					? 'Location permission is off. Allow location access in your phone settings, or choose a saved address.'
-					: "Couldn't get your location. Check that location (GPS) is on and try again, or choose a saved address.",
-			}
+		let location = currentLocation
+		if (!location) {
+			if (locationStatus === 'denied') offerAppSettings()
+			else location = await requestLocationRefresh()
+			if (!location) return { kind: 'error', message: unavailableMessage(locationStatus) }
 		}
-
-		const same = addresses.find(
-			(a) =>
-				a.label === CURRENT_LOCATION_LABEL &&
-				a.latitude != null &&
-				a.longitude != null &&
-				Math.abs(a.latitude - c.latitude) < SAME_PLACE_DEGREES &&
-				Math.abs(a.longitude - c.longitude) < SAME_PLACE_DEGREES
-		)
-		if (same) {
-			setAddressId(same.id)
-			return { kind: 'picked' }
+		location = await withAccuracy(location)
+		const res = await ensureCurrentLocationAddress(location, addresses)
+		if (!res.ok) {
+			setLocationIssue(res.message)
+			return { kind: 'error', message: res.message }
 		}
-
-		let geo: Location.LocationGeocodedAddress | undefined
-		try {
-			;[geo] = await Location.reverseGeocodeAsync(c)
-		} catch {
-			// No geocoder here (a browser): the checks below turn that into the message.
-		}
-		const area =
-			[geo?.name && geo.name !== geo.street ? geo.name : undefined, geo?.street, geo?.district || geo?.subregion]
-				.filter(Boolean)
-				.join(', ') || undefined
-		const city = geo?.city || geo?.subregion || undefined
-		const state = geo?.region || undefined
-		const pincode = geo?.postalCode || undefined
-		if (!area || !city || !state || !/^\d{6}$/.test(pincode ?? '')) {
-			return {
-				kind: 'error',
-				message:
-					"We found your location but couldn't work out the full address on this device. Please choose a saved address or add one.",
-			}
-		}
-
-		try {
-			const res: { data?: { id?: string } } | undefined = await createPatientAddress({
-				label: CURRENT_LOCATION_LABEL,
-				address_line: area,
-				city,
-				state,
-				pincode: pincode as string,
-				latitude: c.latitude,
-				longitude: c.longitude,
-				is_default: addresses.length === 0,
-			})
-			await loadAddresses(res?.data?.id ?? null)
-			Toast.show({ type: 'success', text1: 'Using your current location' })
-			return { kind: 'picked' }
-		} catch (e) {
-			return {
-				kind: 'error',
-				message: apiErrorMessage(e) || "Couldn't save your current location. Please try again.",
-			}
-		}
+		setLocationIssue(null)
+		applyManaged(res.address)
+		setAddressId(res.address.id)
+		const key = locationKey(location)
+		if (key) setSyncedKey(key)
+		Toast.show({
+			type: 'success',
+			text1: methodOf(location) === 'gps' ? 'Using your current location' : 'Using your selected location',
+		})
+		return { kind: 'picked' }
 	}
+
+	/** What the sheet's Current location card is called (a place the patient picked is not "GPS") and shows under its title. */
+	const currentLocationTitle =
+		currentLocation && methodOf(currentLocation) === 'manual' ? 'Selected location' : 'Current location'
+	const currentLocationLine = currentLocation?.address?.trim() || undefined
+	// With the last detected location still shown but access off, say it may be out of date (the Dashboard row offers Settings).
+	const accessOff = locationStatus === 'denied' || locationStatus === 'off'
+	const currentLocationNote = currentLocation
+		? (locationIssue ??
+			(accessOff && currentLocation.source === 'auto'
+				? 'Location access is off, so this is your last detected location. Enable location from the Home screen to update it.'
+				: null))
+		: unavailableMessage(locationStatus)
+
+	return {
+		addresses,
+		addrLoading: addrLoading || awaitingLocation,
+		addrError,
+		addressId,
+		setAddressId,
+		addressPicked,
+		addrOpen,
+		setAddrOpen,
+		address,
+		loadAddresses,
+		saveAddress,
+		useCurrentLocation,
+		pickCurrentLocation,
+		currentLocationTitle,
+		currentLocationLine,
+		currentLocationNote,
+	}
+}
+
+export type SavedAddresses = ReturnType<typeof useSavedAddresses>
+
+export function useVisitPatientAddress(
+	initialPatientKey = 'self',
+	initialAddressId: string | null = null,
+	initialPicked = false
+) {
+	// ---- Patient ----
+	const { members, addFromDraft } = useFamilyMembers()
+	const [patientKey, setPatientKey] = useState(initialPatientKey)
+	const [familyOpen, setFamilyOpen] = useState(false)
+	const memberIndex = Math.max(
+		0,
+		members.findIndex((m) => m.key === patientKey)
+	)
+	const member = members[memberIndex] ?? members[0]
+
+	// ---- Address ----
+	const saved = useSavedAddresses(initialAddressId, true, initialPicked)
+	const { address, setAddrOpen } = saved
+	const { currentLocation } = useAuth()
 
 	/**
 	 * The picked address as the booking APIs want it. Null (with a toast) when none is picked or it can't be
@@ -245,15 +316,15 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 		let lat = address.latitude
 		let lng = address.longitude
 		if (lat == null || lng == null) {
-			const c = bookingCoords ?? (await locate())
-			lat = c?.latitude
-			lng = c?.longitude
+			// An address saved without a map position borrows the shared location's (no GPS read here).
+			lat = currentLocation && Number.isFinite(currentLocation.latitude) ? currentLocation.latitude : undefined
+			lng = currentLocation && Number.isFinite(currentLocation.longitude) ? currentLocation.longitude : undefined
 		}
 		if (lat == null || lng == null) {
 			Toast.show({
 				type: 'error',
 				text1: "We couldn't place this address on the map",
-				text2: 'Turn on location, or add the address with "Use my current location".',
+				text2: 'Choose another address, or set your location from the Home screen.',
 			})
 			return null
 		}
@@ -271,18 +342,7 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 		member,
 		/** Family member's public id, undefined for the signed-in patient. */
 		patientPublicId: member && member.key !== 'self' ? member.id : undefined,
-		addresses,
-		addrLoading,
-		addrError,
-		addressId,
-		setAddressId,
-		addrOpen,
-		setAddrOpen,
-		address,
-		loadAddresses,
-		saveAddress,
-		useCurrentLocation,
-		pickCurrentLocation,
+		...saved,
 		resolveBookingAddress,
 	}
 }
