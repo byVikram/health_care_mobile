@@ -33,6 +33,8 @@ export interface DateStripProps {
 	density?: 'regular' | 'compact'
 	/** Number of upcoming days shown, starting today. Defaults to 7. */
 	dayCount?: number
+	/** The first day shown and the one labelled "Today", as 'YYYY-MM-DD'. Defaults to the phone's today. */
+	startIso?: string
 	style?: StyleProp<ViewStyle>
 	/**
 	 * 'scroll' (default) is the existing horizontal chip strip. 'grid' is the KarolaHealth
@@ -53,6 +55,7 @@ export function DateStrip({
 	selectedDate,
 	onSelectDate,
 	dayCount = 7,
+	startIso,
 	style,
 	variant = 'scroll',
 	isDateDisabled,
@@ -65,17 +68,16 @@ export function DateStrip({
 }: DateStripProps) {
 	const upcomingDates = React.useMemo(() => {
 		return Array.from({ length: dayCount }, (_, i) => {
-			const d = new Date()
-			d.setDate(d.getDate() + i)
-			return d
+			const [y, m, day] = (startIso ?? formatDateForApi(new Date())).split('-').map(Number)
+			return new Date(y, m - 1, day + i)
 		})
-	}, [dayCount])
+	}, [dayCount, startIso])
 
 	const selectedIso = selectedDate ? formatDateForApi(selectedDate) : ''
 	const isOn = (iso: string) => (selectedDates ? selectedDates.includes(iso) : iso === selectedIso)
 
 	if (variant === 'grid') {
-		const todayIso = formatDateForApi(new Date())
+		const todayIso = startIso ?? formatDateForApi(new Date())
 		const multi = !!selectedDates
 		const compact = density === 'compact'
 		const cols = columns ?? 0

@@ -256,30 +256,27 @@ export interface PrescriptionLink {
   submitted_at: string;
 }
 
+// The server answers 404 when there is nothing yet (a first consultation, a patient with no history). That is a normal answer, not a
+// failure: it is accepted here, so it neither throws nor raises the app-wide "API Error" dialog. Any other error still does both.
+const OK_OR_NOT_FOUND = { validateStatus: (status: number) => (status >= 200 && status < 300) || status === 404 };
+
 export const treatmentService = {
+  // null when there is no treatment record for the appointment yet.
   getByAppointment: async (appointmentId: string): Promise<TreatmentRecord | null> => {
-    try {
-      const response = await ApiService.get<{ success: boolean; data: TreatmentRecord }>(
-        API_ENDPOINTS.TREATMENTS.BY_APPOINTMENT(appointmentId),
-      );
-      return response.data?.data ?? null;
-    } catch (err: any) {
-      if (err?.response?.status === 404) return null;
-      throw err;
-    }
+    const response = await ApiService.get<{ success: boolean; data: TreatmentRecord }>(
+      API_ENDPOINTS.TREATMENTS.BY_APPOINTMENT(appointmentId),
+      OK_OR_NOT_FOUND,
+    );
+    return response.status === 404 ? null : (response.data?.data ?? null);
   },
 
   // A fresh signed link to the handwritten prescription, or null when none has been submitted yet.
   getPrescription: async (appointmentId: string): Promise<PrescriptionLink | null> => {
-    try {
-      const response = await ApiService.get<{ success: boolean; data: PrescriptionLink }>(
-        API_ENDPOINTS.TREATMENTS.PRESCRIPTION(appointmentId),
-      );
-      return response.data?.data ?? null;
-    } catch (err: any) {
-      if (err?.response?.status === 404) return null;
-      throw err;
-    }
+    const response = await ApiService.get<{ success: boolean; data: PrescriptionLink }>(
+      API_ENDPOINTS.TREATMENTS.PRESCRIPTION(appointmentId),
+      OK_OR_NOT_FOUND,
+    );
+    return response.status === 404 ? null : (response.data?.data ?? null);
   },
 
   // Creates the treatment record if none exists yet for this appointment, otherwise updates

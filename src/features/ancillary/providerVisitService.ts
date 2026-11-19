@@ -64,6 +64,8 @@ export interface ProviderOffer {
 	totalAmount: number | null
 	/** Patient tip (instant bookings), all the provider's. 0 when none. */
 	tipAmount: number
+	/** The patient searched again, or raised the tip after this provider declined: a NEW offer, even for a request this provider answered or let run out. */
+	reoffer?: boolean
 	status: string
 }
 
@@ -89,6 +91,7 @@ export const toProviderOffer = (o: Record<string, any> | null | undefined): Prov
 		distanceKm: toNum(o.distanceKm),
 		totalAmount: toNum(o.totalAmount),
 		tipAmount: toNum(o.tipAmount) ?? 0,
+		reoffer: o.reoffer === true,
 		status: String(o.status ?? ''),
 	}
 }
@@ -313,8 +316,16 @@ export const completeVisit = async (visitId: string, code: string): Promise<Prov
 	return res.data.data
 }
 
-export const reportVisitIssue = async (visitId: string, reason: VisitIssueReason, details?: string): Promise<void> => {
+/** `silent`: a refusal is not shown as the app-wide error dialog (a background note the provider did not ask to see). */
+export const reportVisitIssue = async (
+	visitId: string,
+	reason: VisitIssueReason,
+	details?: string,
+	opts?: { silent?: boolean }
+): Promise<void> => {
 	const body: Record<string, unknown> = { reason }
 	if (details?.trim()) body.details = details.trim()
-	await ApiService.post(API_ENDPOINTS.ANCILLARY.PROVIDER_VISIT_ISSUES(visitId), body)
+	await ApiService.post(API_ENDPOINTS.ANCILLARY.PROVIDER_VISIT_ISSUES(visitId), body, {
+		skipGlobalError: opts?.silent === true,
+	})
 }

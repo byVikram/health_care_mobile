@@ -1418,7 +1418,9 @@ export const fetchMyPatientBookingsBackend = async (): Promise<AncillaryBooking[
 		const bookingIdStr = String(item.requestId || item.publicBookingId || item.id || '')
 		const { date, timeRange } = formatBookingDateTime(item.createdAt)
 		const amount =
-			typeof item.totalAmount === 'number'
+			typeof item.totalWithTip === 'number'
+				? item.totalWithTip
+				: typeof item.totalAmount === 'number'
 				? item.totalAmount
 				: typeof item.amount === 'number'
 				? item.amount
