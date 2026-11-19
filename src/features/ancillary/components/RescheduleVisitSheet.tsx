@@ -9,11 +9,11 @@ import React, { useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { APP_COLORS } from '../../../config/theme'
 import { AppRescheduleGroup, AppRescheduleSheet, DateStrip, SlotChipGrid } from '../../../components/common'
-import { formatDateForApi, fullDayLabel, monthRangeLabel, nextDays, parseDateOnly } from '../../../utils/date'
+import { formatDateForApi, fullDayLabel, monthRangeLabel, parseDateOnly } from '../../../utils/date'
 import { ANCILLARY_BOOKING_WINDOW_DAYS } from '../ancillaryProviderBookingService'
 import { leadText, timeLabel } from '../patient/ancillaryBookingCopy'
 import { useNow } from '../hooks/useNow'
-import { LAST_SLOT_MINUTES, buildSlotGroups, minutesNow, minutesOf } from '../utils/visitSlots'
+import { LAST_SLOT_MINUTES, buildSlotGroups, istDays, minutesOf, secondsNowIst, slotTooSoon } from '../utils/visitSlots'
 
 export type RescheduleVisitSheetProps = {
 	visible: boolean
@@ -45,8 +45,9 @@ export function RescheduleVisitSheet({
 	onClose,
 	onConfirm,
 }: RescheduleVisitSheetProps) {
-	const nowMin = minutesNow(useNow())
-	const days = nextDays(ANCILLARY_BOOKING_WINDOW_DAYS)
+	// Mumbai's clock (not the phone's), re-read every 15 seconds.
+	const nowSec = secondsNowIst(useNow(15_000))
+	const days = istDays(ANCILLARY_BOOKING_WINDOW_DAYS)
 	const todayIso = formatDateForApi(days[0])
 	const [date, setDate] = useState<string>(currentDate)
 	const [time, setTime] = useState<string | null>(currentTime)
@@ -59,8 +60,9 @@ export function RescheduleVisitSheet({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [visible])
 
-	/** A new start must be further than the assignment lead from now. */
-	const slotOk = (iso: string, startMinutes: number) => !(iso === todayIso && startMinutes <= nowMin + leadMinutes)
+	/** A new start must be at least the assignment lead (1 hour) from now, on Mumbai's clock: the server's rule. */
+	const slotOk = (iso: string, startMinutes: number) =>
+		!(iso === todayIso && slotTooSoon(startMinutes, nowSec, leadMinutes))
 	const dayOff = (iso: string) => takenDates.includes(iso) || !slotOk(iso, LAST_SLOT_MINUTES)
 
 	const timeOk = time !== null && slotOk(date, minutesOf(time))
@@ -87,6 +89,7 @@ export function RescheduleVisitSheet({
 						density="compact"
 						columns={7}
 						dayCount={ANCILLARY_BOOKING_WINDOW_DAYS}
+						startIso={todayIso}
 						selectedDate={pickedDay ?? undefined}
 						isDateDisabled={(d) => dayOff(formatDateForApi(d))}
 						markedDates={takenDates}

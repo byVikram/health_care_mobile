@@ -73,9 +73,11 @@ export function CancelVisitSheet({
 		setSubmitting(true)
 		try {
 			const text = [reason.label, note.trim()].filter(Boolean).join(' - ')
+			// Support trail for ops, noted BEFORE the cancel: once the visit is handed back the nurse no longer holds it and the server
+			// refuses her note (403), which the app then showed as an "Access Denied" dialog although the cancel had worked. A note
+			// that cannot be saved is not worth stopping the cancel for.
+			await reportVisitIssue(visitId, reason.issue, text, { silent: true }).catch(() => undefined)
 			await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PROVIDER(requestId), { reason: text })
-			// Support trail for ops; the cancel itself has already happened.
-			void reportVisitIssue(visitId, reason.issue, text).catch(() => undefined)
 			setDone(true)
 		} catch (e) {
 			Toast.show({

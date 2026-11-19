@@ -18,7 +18,7 @@ import Toast from 'react-native-toast-message'
 import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
-import { DOW_LABELS, formatDateForApi, monthRangeLabel, nextDays, parseDateOnly } from '../../../utils/date'
+import { DOW_LABELS, formatDateForApi, monthRangeLabel, parseDateOnly } from '../../../utils/date'
 import {
 	AppCartFooter,
 	AppRadioCard,
@@ -31,11 +31,11 @@ import { ANCILLARY_BOOKING_MAX_VISITS, ANCILLARY_BOOKING_WINDOW_DAYS } from '../
 import { DayTimeTabs } from '../components/DayTimeTabs'
 import { useNow } from '../hooks/useNow'
 import { useVisitPolicy } from '../hooks/useVisitPolicy'
-import { buildSlotGroups, hhmm, minutesNow, minutesOf } from '../utils/visitSlots'
+import { buildSlotGroups, hhmm, istDays, minutesOf, secondsNowIst, slotTooSoon } from '../utils/visitSlots'
 import {
 	dayLabel,
 	inr,
-	itemsFee,
+	itemsVisitFee,
 	itemsSummary,
 	leadText,
 	plural,
@@ -70,14 +70,14 @@ export default function AncillaryBookVisitPage() {
 
 	const leadMinutes = useVisitPolicy().assign_lead_minutes
 	const noun = providerNoun(serviceKey)
-	const fee = itemsFee(items)
+	const fee = itemsVisitFee(items)
 	const visitMinutes = useMemo(() => {
 		const total = items.reduce((sum, i) => sum + (Number(i.durationMinutes) || 0), 0)
 		return total > 0 ? total : DEFAULT_VISIT_MINUTES
 	}, [items])
 
-	// The 14-day window, fixed for the lifetime of the screen.
-	const windowDays = useMemo(() => nextDays(ANCILLARY_BOOKING_WINDOW_DAYS), [])
+	// The 14-day window from today in MUMBAI (not the phone's date), fixed for the lifetime of the screen.
+	const windowDays = useMemo(() => istDays(ANCILLARY_BOOKING_WINDOW_DAYS), [])
 	const windowIsos = useMemo(() => windowDays.map(formatDateForApi), [windowDays])
 	const todayIso = windowIsos[0]
 
@@ -92,8 +92,8 @@ export default function AncillaryBookVisitPage() {
 	const [time, setTime] = useState<string | null>(null) // "HH:MM", the one time when `sameTime`
 	const [times, setTimes] = useState<Record<string, string>>({}) // date -> "HH:MM" when the times differ
 	const [activeDay, setActiveDay] = useState<string | null>(null)
-	// Re-evaluated every minute so "too soon" slots stay correct while the screen is open.
-	const nowMin = minutesNow(useNow())
+	// Mumbai's clock, re-read every 15 seconds so "too soon" slots stay correct while the screen is open.
+	const nowSec = secondsNowIst(useNow(15_000))
 
 	const isRepeat = mode === 'repeat'
 	const n = dates.length
@@ -101,9 +101,10 @@ export default function AncillaryBookVisitPage() {
 	const multi = isRepeat && n > 1
 	const perDay = multi && !sameTime
 
-	/** Today's slots must start at least leadMinutes from now. */
-	const okOn = (iso: string, startMinutes: number) => !(iso === todayIso && startMinutes < nowMin + leadMinutes)
-	const okSame = (startMinutes: number) => !(hasToday && startMinutes < nowMin + leadMinutes)
+	/** Today's slots must start at least leadMinutes (1 hour) from now, on Mumbai's clock. */
+	const okOn = (iso: string, startMinutes: number) =>
+		!(iso === todayIso && slotTooSoon(startMinutes, nowSec, leadMinutes))
+	const okSame = (startMinutes: number) => !(hasToday && slotTooSoon(startMinutes, nowSec, leadMinutes))
 	const timeOf = (iso: string) => {
 		const t = times[iso]
 		return t !== undefined && okOn(iso, minutesOf(t)) ? t : null
@@ -262,6 +263,7 @@ export default function AncillaryBookVisitPage() {
 						density="compact"
 						columns={7}
 						dayCount={ANCILLARY_BOOKING_WINDOW_DAYS}
+						startIso={todayIso}
 						selectedDates={dates}
 						onSelectDate={onPickDate}
 					/>

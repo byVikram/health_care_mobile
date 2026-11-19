@@ -263,6 +263,7 @@ export const API_ENDPOINTS = {
 		PATIENT_ACTIVE_REQUEST: `${BASE_URL}/api/ancillary/patient/requests/active`,
 		REQUEST_STATUS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/status`,
 		TIP: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/tip`,
+		SEARCH_AGAIN: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/search-again`,
 		CANCEL_PATIENT: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/cancel`,
 		CANCEL_VISITS: (id: string) => `${BASE_URL}/api/ancillary/patient/requests/${id}/visits/cancel`,
 		RESCHEDULE_VISIT: (id: string, visitId: string) =>

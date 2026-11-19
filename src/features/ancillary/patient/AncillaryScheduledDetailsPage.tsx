@@ -65,6 +65,7 @@ const bookingFromOrder = (order: AncillaryOrder | null, dates?: string[]): Ancil
 	const specialty = specialtyOf(order)
 	if (!order || !specialty) return null
 	const perVisit = Number(order.totals?.per_visit) || 0
+	// A package is rebuilt at what ONE visit was billed (no visitCount), so it is not divided by its visits a second time.
 	const items: AncillaryCartItem[] = order.package
 		? [{ id: order.package.id, kind: 'package', name: order.package.name, price: perVisit }]
 		: (order.services ?? []).map((s) => ({

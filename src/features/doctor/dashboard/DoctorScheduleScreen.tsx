@@ -984,11 +984,13 @@ export function DoctorScheduleScreen() {
 						)}
 
 						<View style={styles.dayHead}>
-							<View style={{ flex: 1, minWidth: 0 }}>
+							<View style={{ minWidth: 0 }}>
 								<Text style={styles.dayTitle} numberOfLines={1}>
 									{dayTitle}
 								</Text>
-								<Text style={styles.daySub}>{dayCountLabel}</Text>
+								<Text style={styles.daySub} numberOfLines={1}>
+									{dayCountLabel}
+								</Text>
 							</View>
 							<AppSegmentedControl
 								accessibilityLabel="Visit type"
@@ -1306,7 +1308,9 @@ const styles = StyleSheet.create({
 	todayPill: { height: 36, paddingHorizontal: 14, borderRadius: 9999, borderWidth: 1, borderColor: '#FFFFFF40', alignItems: 'center', justifyContent: 'center' },
 	todayPillText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: '#FFFFFF' },
 	calendarBtn: { width: 40, height: 40, borderRadius: 9999, backgroundColor: '#FFFFFF1F', alignItems: 'center', justifyContent: 'center' },
-	dayHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+	// Stacked, not side by side: a title and a three-way control do not fit one row on a narrow phone, and a control with no width of its
+	// own took the whole row and left the title none (its text then wrapped into a tall empty block).
+	dayHead: { gap: 10 },
 	dayTitle: { fontSize: 18, lineHeight: 26, fontWeight: '800', color: APP_COLORS.ink },
 	daySub: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
 	groupLabelFlat: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 0.5, color: APP_COLORS.inkMuted },
