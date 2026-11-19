@@ -235,9 +235,31 @@ export const createInstantRequest = async (input: CreateInstantRequestInput): Pr
 	return String(res.data.data.requestId ?? res.data.data.publicBookingId ?? '')
 }
 
-/** Tip to get matched faster. amount 0 removes the tip; allowed 1..500, only before a provider accepts. */
+/** Tip to get matched faster: adds a tip or raises it (1..100), only before a provider accepts. A tip that was added is never lowered or removed. */
 export const setAncillaryRequestTip = async (requestPublicId: string, amount: number): Promise<void> => {
 	await ApiService.put(API_ENDPOINTS.ANCILLARY.TIP(requestPublicId), { amount })
+}
+
+export interface SearchAgainResult {
+	/** How many nearby providers were asked again (0 = nobody is online and in range right now). */
+	notifiedProviders: number
+	message: string
+}
+
+/**
+ * "Search again": an instant request nobody accepted is put to the nearby providers once more. 409 once a provider has accepted (or
+ * the request is closed), 429 when they were just asked (about 30 seconds apart). The caller shows the errors itself.
+ */
+export const searchAncillaryRequestAgain = async (requestPublicId: string): Promise<SearchAgainResult> => {
+	const res = await ApiService.post<Envelope<{ notifiedProviders?: number }> & { message?: string }>(
+		API_ENDPOINTS.ANCILLARY.SEARCH_AGAIN(requestPublicId),
+		{},
+		{ skipGlobalError: true }
+	)
+	return {
+		notifiedProviders: Number(res.data?.data?.notifiedProviders) || 0,
+		message: String(res.data?.message ?? ''),
+	}
 }
 
 // ---- Provider side (scheduled orders) ----

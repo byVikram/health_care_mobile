@@ -48,6 +48,19 @@ export const itemsSummary = (items: { name: string }[]) => {
 
 export const itemsFee = (items: AncillaryCartItem[]) => items.reduce((sum, i) => sum + (Number(i.price) || 0), 0)
 
+/**
+ * What ONE visit costs for an item, the way the server charges a scheduled booking: a procedure's price, or a package's bundle
+ * price shared over the visits it covers (an instant booking pays `itemsFee`, the whole price).
+ */
+export const itemVisitFee = (i: AncillaryCartItem) => {
+	const price = Number(i.price) || 0
+	const visits = Number(i.visitCount) || 0
+	return i.kind === 'package' && visits > 0 ? Math.round((price / visits) * 100) / 100 : price
+}
+
+/** What one scheduled visit costs for all the items in the cart. */
+export const itemsVisitFee = (items: AncillaryCartItem[]) => items.reduce((sum, i) => sum + itemVisitFee(i), 0)
+
 /** "45 mins" from the items' durations; '' when unknown. */
 export const itemsDurationLabel = (items: AncillaryCartItem[]) => {
 	const total = items.reduce((sum, i) => sum + (Number(i.durationMinutes) || 0), 0)

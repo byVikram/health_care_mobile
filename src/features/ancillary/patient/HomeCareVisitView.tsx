@@ -661,9 +661,7 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 										? `${formatInr(p.totals.per_visit)} × ${count} visits`
 										: 'Service fee'}
 							</Text>
-							<Text style={styles.payText}>
-								{formatInr(count > 1 && !p.scheduled ? p.totals.per_visit * count : p.totals.per_visit)}
-							</Text>
+							<Text style={styles.payText}>{formatInr(total ?? p.totals.per_visit)}</Text>
 						</View>
 					) : null}
 					{tip > 0 ? (
@@ -682,7 +680,11 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 										: 'To pay'
 									: 'Total'}
 						</Text>
-						<Text style={styles.payTotalValue}>{formatInr(total != null ? total + tip : null)}</Text>
+						<Text style={styles.payTotalValue}>
+							{total === 0 && tip === 0
+								? 'Assessed on site'
+								: formatInr(total != null ? total + tip : null)}
+						</Text>
 					</View>
 					<Text style={[styles.tipSub, { color: APP_COLORS.success, fontWeight: '700' }]}>
 						{p.payAfterVisit ? 'Pay after each visit · nothing to pay now' : 'Payment received'}

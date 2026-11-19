@@ -167,6 +167,14 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 	useProviderDispatchSocket({
 		enabled: focused && availability.online === true,
 		onOffer: (offer) => {
+			// A deliberate re-offer (the patient searched again, or raised the tip after this provider declined) is a NEW offer: what was
+			// remembered about the earlier one (answered, run out, already opened) is forgotten, so it rings and counts down again.
+			if (offer.reoffer) {
+				offerGone.current.delete(offer.requestId)
+				delete offerSeenAt.current[offer.requestId]
+				offerAutoOpened.current.delete(offer.requestId)
+				setOfferPhase((p) => (sheetOfferRef.current?.requestId === offer.requestId ? 'open' : p))
+			}
 			// Same request id again (tip changed, reconnect re-push) updates in place; the 30 s window is kept.
 			if (!offerSeenAt.current[offer.requestId]) offerSeenAt.current[offer.requestId] = Date.now()
 			setNowMs(Date.now())

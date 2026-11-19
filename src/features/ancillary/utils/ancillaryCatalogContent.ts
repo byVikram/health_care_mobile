@@ -169,6 +169,7 @@ export const packageCartItem = (p: AncillaryPackageListItem): AncillaryCartItem 
 	kind: 'package',
 	name: p.label,
 	price: p.packagePrice,
+	visitCount: p.visits_count ?? null,
 	mrp: p.mrp ?? null,
 	durationMinutes: p.duration_minutes ?? null,
 })
