@@ -26,9 +26,83 @@ export const INTRO_EYEBROW: Record<RoleVariant, string> = {
 	patient: 'FOR PATIENTS',
 	doctor: 'FOR DOCTORS',
 	provider: 'FOR HEALTHCARE PROVIDERS',
+	generic: 'WELCOME TO KAROLAHEALTH',
 }
 
+const ICON_SHIELD = 'M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-4.5'
+const ICON_DOC = 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5'
+const ICON_CHECK = 'M5 12l5 5 9-10'
+const ICON_CLOCK = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2'
+const ICON_UPLOAD = 'M12 16V4M7 9l5-5 5 5M4 20h16'
+const ICON_CAL = 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4'
+
+// Shared look for the neutral slide sets; only the copy differs per role.
+const neutralSlides = (
+	copy: Pick<IntroSlide, 'title' | 'body' | 'cardTitle' | 'cardSub' | 'chip' | 'action'>[]
+) => {
+	const looks = [
+		{
+			tint: '#DDEBFA',
+			ink: '#2463A8',
+			icon: ICON_DOC,
+			chipBg: '#E6F4EC',
+			chipFg: '#1E7A4E',
+			b1: ICON_CAL,
+			b2: ICON_CHECK,
+		},
+		{
+			tint: '#E3EFEF',
+			ink: '#2B6F71',
+			icon: ICON_CLOCK,
+			chipBg: '#E6F4EC',
+			chipFg: '#1E7A4E',
+			b1: ICON_DOC,
+			b2: ICON_CHECK,
+		},
+		{
+			tint: '#FBEFD5',
+			ink: '#8A5300',
+			icon: ICON_SHIELD,
+			chipBg: '#FDF1DC',
+			chipFg: '#8A5300',
+			b1: ICON_UPLOAD,
+			b2: ICON_CHECK,
+		},
+	]
+	return copy.map((c, i): IntroSlide => ({ ...looks[i], ...c }))
+}
+
+const VERIFY_SLIDE = {
+	title: 'Get verified to go live',
+	body: 'Upload your licence and ID. Our team checks them before your account goes live.',
+	cardTitle: 'Licence document',
+	cardSub: 'Uploaded · under review',
+	chip: '1–2 working days',
+	action: 'View',
+}
+
+const GENERIC_SLIDES = neutralSlides([
+	{
+		title: 'Welcome to KarolaHealth',
+		body: 'Create your account to start using KarolaHealth.',
+		cardTitle: 'Your account',
+		cardSub: 'Set up in a few minutes',
+		chip: 'Getting started',
+		action: 'Next',
+	},
+	{
+		title: 'Everything in one place',
+		body: 'Manage your bookings, records and notifications from your phone.',
+		cardTitle: 'Your dashboard',
+		cardSub: 'Bookings and updates',
+		chip: 'Up to date',
+		action: 'Open',
+	},
+	{ ...VERIFY_SLIDE, body: 'Upload your ID and documents. Our team checks them before your account goes live.' },
+])
+
 export const INTRO_SLIDES: Record<RoleVariant, IntroSlide[]> = {
+	generic: GENERIC_SLIDES,
 	patient: [
 		{
 			tint: '#DDEBFA',

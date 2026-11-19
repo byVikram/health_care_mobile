@@ -42,6 +42,12 @@ const ROLE_CARD: Record<
 		tone: TONES.peach,
 		icon: 'home',
 	},
+	generic: {
+		title: '',
+		description: 'Create an account for your organisation',
+		tone: TONES.mint,
+		icon: 'person',
+	},
 }
 
 type RoleSelectionProps = AuthScreenProps<typeof ROUTES.AUTH.ROLE_SELECTION>
@@ -130,7 +136,7 @@ export default function RoleSelectionScreen({ navigation }: RoleSelectionProps) 
 								>
 									<View pointerEvents="none" style={styles.cardCircle} />
 									<View style={styles.cardText}>
-										<Text style={styles.cardTitle}>{card.title}</Text>
+										<Text style={styles.cardTitle}>{card.title || role.label}</Text>
 										<Text style={styles.cardDesc}>{card.description}</Text>
 									</View>
 									<View style={styles.iconCircle}>
