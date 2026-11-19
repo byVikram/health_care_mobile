@@ -127,6 +127,8 @@ export type AncillaryCartItem = {
 	price: number
 	mrp?: number | null
 	durationMinutes?: number | null
+	/** A package only: how many visits its price covers (`price` is for all of them; one visit costs price / visitCount). */
+	visitCount?: number | null
 }
 
 /** Catalog -> Schedule a visit / Book now review: what is being booked (one home-care speciality at a time). */

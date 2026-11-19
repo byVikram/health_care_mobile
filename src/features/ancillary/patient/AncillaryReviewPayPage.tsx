@@ -31,7 +31,7 @@ import {
 	dayLabel,
 	inr,
 	itemsDurationLabel,
-	itemsFee,
+	itemsVisitFee,
 	itemsSummary,
 	leadText,
 	plural,
@@ -55,7 +55,7 @@ export default function AncillaryReviewPayPage() {
 	const policy = useVisitPolicy()
 	const noun = providerNoun(serviceKey)
 	const n = visits.length
-	const fee = itemsFee(items)
+	const fee = itemsVisitFee(items)
 	const duration = itemsDurationLabel(items)
 
 	const who = useVisitPatientAddress()
