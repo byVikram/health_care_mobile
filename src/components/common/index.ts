@@ -201,8 +201,6 @@ export type {
 	AppAddressSheetProps,
 	AppAddressOption,
 	AppAddressDraft,
-	AppAddressPrefill,
-	CurrentLocationResult,
 } from './booking/AddressSelection/AppAddressSheet'
 
 // My bookings: category filter tile

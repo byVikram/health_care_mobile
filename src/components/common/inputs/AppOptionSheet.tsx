@@ -100,7 +100,6 @@ export function AppOptionSheet({
 					hints={options.slice(0, 4).map((o) => o.label)}
 					value={query}
 					onChangeText={setQuery}
-					showMicrophone={false}
 					style={styles.search}
 				/>
 			)}

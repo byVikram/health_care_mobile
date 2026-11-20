@@ -102,7 +102,7 @@ export default function LabCartPage() {
 	const navigation = useNavigation<Nav>()
 	const booking = useLabBooking()
 	const [slotsOpen, setSlotsOpen] = useState(false)
-	const who = useVisitPatientAddress(booking.patientKey, booking.addressId, booking.addressPicked)
+	const who = useVisitPatientAddress(booking.patientKey, booking.addressId)
 	const { member, address } = who
 
 	// The app can stay open for a long time: drop a slot that has gone by.
@@ -114,14 +114,10 @@ export default function LabCartPage() {
 			patientKey: who.patientKey,
 			patientName: member?.name ?? '',
 			patientRelation: member?.relation ?? 'Self',
-			// Whether the patient chose the address (kept when the current location changes) or it is still the default.
-			addressPicked: who.addressPicked,
-			// Until the saved addresses have loaded (and the current location has been worked out) keep what the store already holds.
-			...(address && !who.addrLoading
-				? { addressId: address.id, addressTag: address.label, addressLine: addressLine(address) }
-				: {}),
+			// Until the saved addresses have loaded `address` is null: keep what the store already holds.
+			...(address ? { addressId: address.id, addressTag: address.label, addressLine: addressLine(address) } : {}),
 		})
-	}, [who.patientKey, who.addressPicked, who.addrLoading, member?.name, member?.relation, address?.id])
+	}, [who.patientKey, member?.name, member?.relation, address?.id])
 
 	const { items, total: pickedTotal, mrp: pickedMrp } = totalsOf(booking)
 	const picked = booking.lab && booking.slot ? { lab: booking.lab, slot: booking.slot } : null
@@ -249,7 +245,6 @@ export default function LabCartPage() {
 					patientLabel="TESTS FOR"
 					addressLabel={isHome ? 'COLLECTION ADDRESS' : 'YOUR ADDRESS'}
 					familyTitle="Who are these tests for?"
-					currentLocation
 				/>
 
 				{/* Availability at the address */}

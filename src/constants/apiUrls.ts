@@ -161,7 +161,6 @@ export const API_ENDPOINTS = {
 		RECORDS: `${BASE_URL}/api/patients/records`,
 		RECORD_BY_ID: (id: string) => `${BASE_URL}/api/patients/records/${id}`,
 		ADDRESSES: `${BASE_URL}/api/patients/me/addresses`,
-		CURRENT_LOCATION_ADDRESS: `${BASE_URL}/api/patients/me/addresses/current-location`,
 		TREATMENT_HISTORY: (id: string) => `${BASE_URL}/api/treatments/patient/${id}/history`,
 		ADDRESS_BY_ID: (id: string) => `${BASE_URL}/api/patients/me/addresses/${id}`,
 		FAMILY_MEMBERS: `${BASE_URL}/api/patients/family-members`,

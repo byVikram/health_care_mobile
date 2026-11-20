@@ -23,7 +23,7 @@ import {
 	updatePatientAddress,
 	type PatientAddress,
 } from './PatientProfileService'
-import { AddressCard, fullAddress, isManagedAddress } from './components/AddressCard'
+import { AddressCard, fullAddress } from './components/AddressCard'
 import { ProfileScreen } from '../shared/components/ProfileScreen'
 import { showStatusModal } from '../../../services/apiService'
 
@@ -113,7 +113,7 @@ export default function SavedAddressesPage() {
 						showHeaderDivider={false}
 					>
 						<View style={styles.menu}>
-							{menuFor && !menuFor.is_default && !isManagedAddress(menuFor) && (
+							{menuFor && !menuFor.is_default && (
 								<AppNavRow
 									title="Set as default"
 									leading="star-outline"
@@ -123,7 +123,7 @@ export default function SavedAddressesPage() {
 								/>
 							)}
 							<AppNavRow
-								title={menuFor && isManagedAddress(menuFor) ? 'Edit as my own address' : 'Edit address'}
+								title="Edit address"
 								leading="pencil-outline"
 								minHeight={52}
 								divider

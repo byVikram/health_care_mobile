@@ -21,21 +21,11 @@ const iconFor = (label: string) => {
 	return 'map-marker-outline' as const
 }
 
-/** The app's own current-location address (made from the shared location), not one the patient saved. */
-export const isManagedAddress = (a: PatientAddress) => a.source === 'current_location'
-
 export function AddressCard({ address, onMore }: { address: PatientAddress; onMore: () => void }) {
 	const contact = [address.contact_name, address.contact_phone].filter(Boolean).join(' · ')
-	// A managed address says how its position was found: the phone's GPS, or a place the patient picked.
-	const managed = isManagedAddress(address)
-	const gps = address.location_method === 'gps'
 	return (
 		<View style={[styles.card, address.is_default && styles.cardDefault]}>
-			<AppIconTile
-				icon={managed ? (gps ? 'crosshairs-gps' : 'map-marker-check-outline') : iconFor(address.label)}
-				tone={address.is_default ? 'mint' : 'sky'}
-				size={40}
-			/>
+			<AppIconTile icon={iconFor(address.label)} tone={address.is_default ? 'mint' : 'sky'} size={40} />
 			<View style={styles.text}>
 				<View style={styles.titleRow}>
 					<Text style={styles.label} numberOfLines={1}>
@@ -44,22 +34,8 @@ export function AddressCard({ address, onMore }: { address: PatientAddress; onMo
 					{address.is_default && (
 						<AppTag label="Default" tone="mint" size="xs" shape="rounded" uppercase={false} />
 					)}
-					{managed && (
-						<AppTag
-							label={gps ? 'From your GPS' : 'Place you picked'}
-							tone="sky"
-							size="xs"
-							shape="rounded"
-							uppercase={false}
-						/>
-					)}
 				</View>
 				<Text style={styles.line}>{fullAddress(address)}</Text>
-				{managed && (
-					<Text style={styles.contact}>
-						Made from your location by the app. Editing it saves your own copy.
-					</Text>
-				)}
 				{!!contact && <Text style={styles.contact}>{contact}</Text>}
 			</View>
 			<TouchableOpacity

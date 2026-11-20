@@ -253,7 +253,7 @@ export function ReferDoctorSheet({
 		>
 			<View style={{ gap: 16 }}>
 				<RequestStrip {...who} />
-				<AppSearchBar context="doctors" value={query} onChangeText={setQuery} showMicrophone={false} />
+				<AppSearchBar context="doctors" value={query} onChangeText={setQuery} />
 				{specialities.length > 1 && (
 					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
 						{['all', ...specialities].map((sp) => (

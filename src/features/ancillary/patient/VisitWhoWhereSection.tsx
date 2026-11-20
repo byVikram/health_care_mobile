@@ -3,9 +3,6 @@
 // The "VISIT FOR" row, the visit-address row and the optional note, plus the family-member and address
 // bottom sheets they open -- shared by both Review & pay screens (Book now and Later). State comes from
 // useVisitPatientAddress so the parent can read the picked patient/address when submitting.
-//
-// The pharmacy order uses just the address half (state from useSavedAddresses): `hidePatient` and `hideNote` drop the other two, and
-// `embedded` lets it sit inside the page's own card. Without those props nothing changes for the visit flows.
 
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -19,18 +16,16 @@ import {
 	NotesInput,
 	familyMemberFirstName,
 } from '../../../components/common'
-import { addressLine, type SavedAddresses, type VisitPatientAddress } from './useVisitPatientAddress'
-import { isManagedAddress } from './currentLocationAddress'
+import { addressLine, type VisitPatientAddress } from './useVisitPatientAddress'
 
 const NOTE_MAX = 300
 
 type Props = {
-	/** The visit flows pass useVisitPatientAddress; the pharmacy order passes useSavedAddresses (with `hidePatient`). */
-	who: VisitPatientAddress | SavedAddresses
-	/** "nurse", "physiotherapist"… (the note label and the address sheet's title). */
-	noun?: string
-	note?: string
-	onNoteChange?: (v: string) => void
+	who: VisitPatientAddress
+	/** "nurse", "physiotherapist"… */
+	noun: string
+	note: string
+	onNoteChange: (v: string) => void
 	/** Green line under the address, e.g. "Nurse will come to this address". */
 	addressHint?: string
 	/** Eyebrow over the patient row. Defaults to "VISIT FOR". */
@@ -41,61 +36,31 @@ type Props = {
 	familyTitle?: string
 	/** Show the address but do not let it be changed here (something chosen earlier depends on it). */
 	lockAddress?: boolean
-	/** Adds a one-tap "Current location" card to the address sheet: the app's shared location, never a GPS read of its own. */
-	currentLocation?: boolean
-	/** Leave out the "VISIT FOR" row and its family sheet. */
-	hidePatient?: boolean
-	/** Leave out the note field. */
-	hideNote?: boolean
-	/** Sits inside another card: no padding or background of its own. */
-	embedded?: boolean
-	/** Title of the address sheet. Defaults to "Where should the {noun} come?". */
-	sheetTitle?: string
-	/** What the address is called in the prompts and the screen-reader text. Defaults to "visit address". */
-	addressNoun?: string
-	/** Adds a "Manage saved addresses" link to the address sheet. */
-	onManageAddresses?: () => void
 }
 
 export function VisitWhoWhereSection({
 	who,
-	noun = 'visit',
-	note = '',
+	noun,
+	note,
 	onNoteChange,
 	addressHint,
 	patientLabel = 'VISIT FOR',
 	addressLabel = 'VISIT ADDRESS',
 	familyTitle = 'Who is this visit for?',
 	lockAddress = false,
-	currentLocation = false,
-	hidePatient = false,
-	hideNote = false,
-	embedded = false,
-	sheetTitle,
-	addressNoun = 'visit address',
-	onManageAddresses,
 }: Props) {
-	// the patient half exists only when the caller passed the full visit state
-	const full = !hidePatient && 'members' in who ? who : null
-	const member = full?.member
-	const { address } = who
+	const { member, address } = who
 	const addressTag = address ? address.label.toUpperCase() : ''
-	const addressNounCaps = addressNoun.charAt(0).toUpperCase() + addressNoun.slice(1)
 
 	return (
 		<>
-			<AppSection
-				marginTop={0}
-				flush={embedded}
-				accessibilityLabel={hidePatient ? 'Address' : 'Patient and address'}
-				style={[styles.section, embedded && styles.embedded]}
-			>
+			<AppSection marginTop={0} accessibilityLabel="Patient and address" style={styles.section}>
 				{!!member && (
 					<AppPatientRow
 						member={member}
 						label={patientLabel}
-						toneIndex={full?.memberIndex}
-						onChange={() => full?.setFamilyOpen(true)}
+						toneIndex={who.memberIndex}
+						onChange={() => who.setFamilyOpen(true)}
 					/>
 				)}
 				<TouchableOpacity
@@ -106,8 +71,8 @@ export function VisitWhoWhereSection({
 					accessibilityRole="button"
 					accessibilityLabel={
 						address
-							? `${addressNounCaps}, ${address.label}, ${addressLine(address)}. Change`
-							: `Add ${addressNoun}`
+							? `Visit address, ${address.label}, ${addressLine(address)}. Change`
+							: 'Add visit address'
 					}
 				>
 					<View style={styles.addrTile}>
@@ -131,63 +96,48 @@ export function VisitWhoWhereSection({
 							</>
 						) : (
 							<Text style={[styles.addrLine1, styles.addrMissing]}>
-								{who.addrError ? "Couldn't load addresses — tap to retry" : `Add the ${addressNoun}`}
+								{who.addrError ? "Couldn't load addresses — tap to retry" : 'Add the visit address'}
 							</Text>
 						)}
 					</View>
 					{!lockAddress && <MaterialCommunityIcons name="chevron-right" size={20} color={APP_COLORS.border} />}
 				</TouchableOpacity>
-				{!hideNote && (
-					<NotesInput
-						variant="field"
-						label={`Note for the ${noun} (optional)`}
-						placeholder="e.g. Ring the bell twice, 2nd floor"
-						value={note}
-						onChangeValue={onNoteChange ?? (() => {})}
-						maxLength={NOTE_MAX}
-					/>
-				)}
+				<NotesInput
+					variant="field"
+					label={`Note for the ${noun} (optional)`}
+					placeholder="e.g. Ring the bell twice, 2nd floor"
+					value={note}
+					onChangeValue={onNoteChange}
+					maxLength={NOTE_MAX}
+				/>
 			</AppSection>
 
-			{full && (
-				<AppFamilyMemberSheet
-					visible={full.familyOpen}
-					onClose={() => full.setFamilyOpen(false)}
-					members={full.members}
-					selectedKey={full.patientKey}
-					onSelect={(m) => full.setPatientKey(m.key)}
-					title={familyTitle}
-					confirmLabel={(m) => `Continue for ${familyMemberFirstName(m)}`}
-					onSave={async (draft) => {
-						const key = await full.addFromDraft(draft)
-						if (key) full.setPatientKey(key)
-						return !!key
-					}}
-				/>
-			)}
+			<AppFamilyMemberSheet
+				visible={who.familyOpen}
+				onClose={() => who.setFamilyOpen(false)}
+				members={who.members}
+				selectedKey={who.patientKey}
+				onSelect={(m) => who.setPatientKey(m.key)}
+				title={familyTitle}
+				confirmLabel={(m) => `Continue for ${familyMemberFirstName(m)}`}
+				onSave={async (draft) => {
+					const key = await who.addFromDraft(draft)
+					if (key) who.setPatientKey(key)
+					return !!key
+				}}
+			/>
 
 			<AppAddressSheet
 				visible={who.addrOpen}
 				onClose={() => who.setAddrOpen(false)}
-				title={sheetTitle ?? `Where should the ${noun} come?`}
-				addresses={who.addresses.map((a) => ({
-					id: a.id,
-					label: a.label,
-					line: addressLine(a),
-					managed: isManagedAddress(a),
-				}))}
+				title={`Where should the ${noun} come?`}
+				addresses={who.addresses.map((a) => ({ id: a.id, label: a.label, line: addressLine(a) }))}
 				loading={who.addrLoading}
 				error={who.addrError}
 				onRetry={() => void who.loadAddresses()}
 				selectedId={who.addressId}
 				onSelect={who.setAddressId}
 				onSaveNew={who.saveAddress}
-				onUseCurrentLocation={currentLocation ? undefined : who.useCurrentLocation}
-				onPickCurrentLocation={currentLocation ? who.pickCurrentLocation : undefined}
-				currentLocationLabel={currentLocation ? who.currentLocationTitle : undefined}
-				currentLocationLine={currentLocation ? who.currentLocationLine : undefined}
-				currentLocationNote={currentLocation ? who.currentLocationNote : undefined}
-				onManage={onManageAddresses}
 			/>
 		</>
 	)
@@ -196,7 +146,6 @@ export function VisitWhoWhereSection({
 const styles = StyleSheet.create({
 	flex: { flex: 1, minWidth: 0 },
 	section: { paddingTop: 4 },
-	embedded: { paddingVertical: 0, backgroundColor: 'transparent' },
 	muted: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
 	addrRow: {
 		flexDirection: 'row',

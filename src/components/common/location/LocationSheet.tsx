@@ -6,9 +6,10 @@
 // current location (AuthContext) and closes both sheets.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { AppBottomSheet } from '../layout/AppBottomSheet'
 import { AppPathIcon } from '../display/AppIcon'
+import AppSearchBar from '../inputs/AppSearchBar'
 import { APP_COLORS } from '../../../config/theme'
 import { useAuth } from '../../../context/AuthContext'
 import { isPatientRole } from '../../../constants/constants'
@@ -137,8 +138,7 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 		const loadSavedAddresses = async () => {
 			try {
 				const list = await getPatientAddresses()
-				// the app's own current-location address is not one the patient saved: "Use current location" stands for it
-				if (live) setSaved(list.filter((a) => a.source !== 'current_location'))
+				if (live) setSaved(list)
 			} catch {
 				if (live) setSaved([])
 			}
@@ -254,7 +254,7 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 	}
 
 	// "Indiranagar, Bengaluru" (or just "Bengaluru"): the text is looked up for coordinates; without them the label
-	// still shows, and the booking screens that need a position use the managed address made from the shared location.
+	// still shows, and features that need a position (useBookingLocation) ask for the device location instead.
 	const pickNamed = async (label: string) => {
 		setPicking(true)
 		try {
@@ -306,20 +306,15 @@ export function LocationSheet({ visible, onClose }: LocationSheetProps) {
 			showHeaderDivider={false}
 			maxHeightRatio={0.94}
 		>
-			<View style={styles.field}>
-				<AppPathIcon d={ICONS.search} size={20} strokeWidth={2} color={APP_COLORS.inkMuted} />
-				<TextInput
-					style={styles.input}
-					value={query}
-					onChangeText={setQuery}
-					placeholder="Search city, area or landmark"
-					placeholderTextColor={APP_COLORS.border}
-					accessibilityLabel="Search city, area or landmark"
-					returnKeyType="search"
-					autoCorrect={false}
-				/>
-				{searching && <ActivityIndicator size="small" color={APP_COLORS.primary} />}
-			</View>
+			<AppSearchBar
+				placeholder="Search city, area or landmark"
+				hints={[]}
+				tone="onLight"
+				value={query}
+				onChangeText={setQuery}
+				trailing={searching ? <ActivityIndicator size="small" color={APP_COLORS.primary} /> : undefined}
+				style={styles.field}
+			/>
 
 			<LocationRow
 				icon={ICONS.gps}
@@ -528,23 +523,7 @@ export default LocationSheet
 
 const styles = StyleSheet.create({
 	field: {
-		height: 48,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
 		marginBottom: 6,
-		paddingHorizontal: 12,
-		borderWidth: 1.5,
-		borderColor: APP_COLORS.primary,
-		borderRadius: 12,
-		backgroundColor: APP_COLORS.surface,
-	},
-	input: {
-		flex: 1,
-		minWidth: 0,
-		paddingVertical: 0,
-		fontSize: 16,
-		color: APP_COLORS.ink,
 	},
 	row: {
 		minHeight: 56,

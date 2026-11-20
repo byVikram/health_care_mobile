@@ -5,15 +5,15 @@
 //   list view — saved addresses: 48px home tile (APP_COLORS.mint + 2px primary ring when selected, else
 //               pageBg), label 16/22 700, address 13/18 muted, AppRadio; loading skeletons / empty / error+retry.
 //               Footer: dashed "Add new address" (48h, 1.5px dashed primary on mint) + "Use this address" CTA.
-//   add view  — back chevron, "Add new address": outline "Use my current location" button, Flat / house,
+//   add view  — back chevron, "Add new address": Flat / house,
 //               Street and area, Landmark (optional) + PIN code, City + State, "Save as" chips
 //               (Home / Work / Family / Other); footer "Save and use".
 // The modern counterpart of AddressSelectionSheet (an inline, lab-styled list whose add form lives in a
 // nested sheet). Pure UI: the caller owns the address list (getPatientAddresses), saving
-// (createPatientAddress) and the current location, so the same sheet works for any home-visit flow.
+// (createPatientAddress), so the same sheet works for any home-visit flow.
 
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { APP_COLORS } from '../../../../config/theme'
 import { AppBottomSheet } from '../../layout/AppBottomSheet'
@@ -28,8 +28,6 @@ export type AppAddressOption = {
 	label: string
 	/** One-line address, e.g. "4B Sunrise Apartments, Jayanagar, Bengaluru - 560041". */
 	line: string
-	/** The app's own current-location address (not one the patient saved): shown by the Current location card, not as a row. */
-	managed?: boolean
 }
 
 /** What the add form collected; passed to `onSaveNew`. */
@@ -42,20 +40,9 @@ export type AppAddressDraft = {
 	state: string
 	/** "Save as" tag: Home / Work / Family / Other. */
 	label: string
-	/** Set when the form was filled from "Use my current location". */
 	latitude?: number
 	longitude?: number
 }
-
-/** Prefill returned by `onUseCurrentLocation` (any subset of the form). */
-export type AppAddressPrefill = Partial<Omit<AppAddressDraft, 'label'>>
-
-/**
- * What `onPickCurrentLocation` found:
- *   picked  -- the shared current location became the (managed) address and is selected (the sheet closes);
- *   error   -- nothing was picked; `message` is shown in the sheet (permission off, GPS off, no full address...).
- */
-export type CurrentLocationResult = { kind: 'picked' } | { kind: 'error'; message: string }
 
 export const ADDRESS_TAGS = ['Home', 'Work', 'Family', 'Other']
 
@@ -77,21 +64,6 @@ export type AppAddressSheetProps = {
 	emptyLabel?: string
 	/** Save the add form. Resolve `true` to close the sheet (the caller selects the new address). */
 	onSaveNew?: (draft: AppAddressDraft) => Promise<boolean> | boolean
-	/** GPS lookup for "Use my current location"; resolve null when it failed (the caller shows why). */
-	onUseCurrentLocation?: () => Promise<AppAddressPrefill | null>
-	/**
-	 * Puts ONE "Current location" card first in the list (same look as the address rows): one tap uses the app's shared location as
-	 * the address. The option marked `managed` is that location's address: the card shows and selects it instead of repeating it below.
-	 */
-	onPickCurrentLocation?: () => Promise<CurrentLocationResult>
-	/** The card's title: "Current location" (the default) or "Selected location" when the patient picked the place by hand. */
-	currentLocationLabel?: string
-	/** The card's second line while no managed address is selected yet: the shared location's text. */
-	currentLocationLine?: string
-	/** Why the shared location cannot be used (shown under the card, quietly: the saved addresses below are the way on). */
-	currentLocationNote?: string | null
-	/** Adds a "Manage saved addresses" link under the list: the sheet closes, then this runs (e.g. open the saved-addresses page). */
-	onManage?: () => void
 }
 
 const EMPTY_DRAFT: AppAddressDraft = {
@@ -154,28 +126,15 @@ export function AppAddressSheet({
 	subtitle = 'Pick a saved address or add a new one',
 	emptyLabel = 'No saved addresses yet. Add the address for the visit.',
 	onSaveNew,
-	onUseCurrentLocation,
-	onPickCurrentLocation,
-	currentLocationLabel = 'Current location',
-	currentLocationLine,
-	currentLocationNote,
-	onManage,
 }: AppAddressSheetProps) {
 	const [view, setView] = useState<'list' | 'add'>('list')
 	const [draft, setDraft] = useState<AppAddressDraft>(EMPTY_DRAFT)
 	const [saving, setSaving] = useState(false)
-	const [locating, setLocating] = useState(false)
-	const [picking, setPicking] = useState(false)
-	const [locationError, setLocationError] = useState<string | null>(null)
 
 	// Reset on open only, so the content doesn't flip while the sheet animates closed.
 	useEffect(() => {
 		if (visible) {
-			setLocationError(null)
-			// with a current-location row the list is the better first view, even when nothing is saved yet
-			setView(
-				addresses.length === 0 && !loading && !error && !!onSaveNew && !onPickCurrentLocation ? 'add' : 'list'
-			)
+			setView(addresses.length === 0 && !loading && !error && !!onSaveNew ? 'add' : 'list')
 		}
 	}, [visible])
 
@@ -216,70 +175,10 @@ export function AppAddressSheet({
 		}
 	}
 
-	const handleLocate = async () => {
-		if (!onUseCurrentLocation || locating) return
-		setLocating(true)
-		try {
-			const prefill = await onUseCurrentLocation()
-			if (prefill) {
-				setDraft((d) => ({
-					...d,
-					area: prefill.area || d.area,
-					city: prefill.city || d.city,
-					state: prefill.state || d.state,
-					pincode: prefill.pincode || d.pincode,
-					flat: prefill.flat || d.flat,
-					latitude: prefill.latitude,
-					longitude: prefill.longitude,
-				}))
-			}
-		} finally {
-			setLocating(false)
-		}
-	}
-
-	const handlePickCurrent = async () => {
-		if (!onPickCurrentLocation || picking) return
-		setPicking(true)
-		setLocationError(null)
-		try {
-			const result = await onPickCurrentLocation()
-			if (result.kind === 'picked') {
-				onClose()
-			} else {
-				setLocationError(result.message)
-			}
-		} finally {
-			setPicking(false)
-		}
-	}
-
 	const selected = addresses.find((a) => a.id === selectedId)
-
-	// The Current location card stands for the app's managed current-location address (marked `managed`, never told apart by its label);
-	// the rows below are the patient's own saved addresses.
-	const gpsAddresses = onPickCurrentLocation ? addresses.filter((a) => a.managed) : []
-	const savedAddresses = gpsAddresses.length ? addresses.filter((a) => !a.managed) : addresses
-	const gpsSelected = gpsAddresses.find((a) => a.id === selectedId)
-	// An older managed address is not shown for a location that is no longer there: only the selected one, else the shared location's text.
-	const gpsShown = gpsSelected
 
 	const listFooter = (
 		<View style={styles.footer}>
-			{!!onManage && (
-				<TouchableOpacity
-					style={styles.manageBtn}
-					onPress={() => {
-						onClose()
-						onManage()
-					}}
-					activeOpacity={0.7}
-					accessibilityRole="button"
-					accessibilityLabel="Manage saved addresses"
-				>
-					<Text style={styles.manageText}>Manage saved addresses</Text>
-				</TouchableOpacity>
-			)}
 			{!!onSaveNew && (
 				<TouchableOpacity
 					style={styles.addBtn}
@@ -334,10 +233,9 @@ export function AppAddressSheet({
 				</View>
 			)
 		}
-		if (savedAddresses.length === 0) return null // only the Current location card
 		return (
 			<View accessibilityRole="radiogroup">
-				{savedAddresses.map((a, i) => {
+				{addresses.map((a, i) => {
 					const on = a.id === selectedId
 					return (
 						<TouchableOpacity
@@ -347,7 +245,7 @@ export function AppAddressSheet({
 							accessibilityRole="radio"
 							accessibilityState={{ checked: on }}
 							accessibilityLabel={`${a.label}, ${a.line}`}
-							style={[styles.row, i === savedAddresses.length - 1 && styles.rowLast]}
+							style={[styles.row, i === addresses.length - 1 && styles.rowLast]}
 						>
 							<View style={[styles.tile, on && styles.tileOn]}>
 								<MaterialCommunityIcons name="home-outline" size={22} color={APP_COLORS.primary} />
@@ -368,72 +266,10 @@ export function AppAddressSheet({
 		)
 	}
 
-	const renderList = () => (
-		<View>
-			{!!onPickCurrentLocation && (
-				<TouchableOpacity
-					onPress={handlePickCurrent}
-					disabled={picking}
-					activeOpacity={0.8}
-					accessibilityRole="button"
-					accessibilityLabel={`${currentLocationLabel}${gpsShown ? `, ${gpsShown.line}` : ''}. Use this location`}
-					accessibilityState={{ selected: !!gpsSelected, busy: picking }}
-					style={[styles.row, savedAddresses.length === 0 && !locationError && styles.rowLast]}
-				>
-					<View style={[styles.tile, !!gpsSelected && styles.tileOn]}>
-						{picking ? (
-							<ActivityIndicator size="small" color={APP_COLORS.primary} />
-						) : (
-							<MaterialCommunityIcons name="crosshairs-gps" size={22} color={APP_COLORS.primary} />
-						)}
-					</View>
-					<View style={styles.rowText}>
-						<Text style={styles.rowTitle}>{currentLocationLabel}</Text>
-						<Text style={styles.rowSub} numberOfLines={2}>
-							{picking
-								? 'Finding your location…'
-								: gpsShown
-									? gpsShown.line
-									: (currentLocationLine ?? 'Location not available yet')}
-						</Text>
-					</View>
-					<AppRadio checked={!!gpsSelected} />
-				</TouchableOpacity>
-			)}
-			{!!locationError && (
-				<Text style={styles.locationError} accessibilityRole="alert">
-					{locationError}
-				</Text>
-			)}
-			{!locationError && !!currentLocationNote && !gpsSelected && (
-				<Text style={styles.locationNote}>{currentLocationNote}</Text>
-			)}
-			{renderSaved()}
-		</View>
-	)
+	const renderList = () => <View>{renderSaved()}</View>
 
 	const renderAdd = () => (
 		<View style={styles.form}>
-			{!!onUseCurrentLocation && (
-				<TouchableOpacity
-					style={styles.locateBtn}
-					onPress={handleLocate}
-					disabled={locating}
-					activeOpacity={0.8}
-					accessibilityRole="button"
-					accessibilityLabel="Use my current location"
-					accessibilityState={{ busy: locating }}
-				>
-					{locating ? (
-						<ActivityIndicator size="small" color={APP_COLORS.primary} />
-					) : (
-						<MaterialCommunityIcons name="crosshairs-gps" size={18} color={APP_COLORS.primary} />
-					)}
-					<Text style={styles.locateText}>
-						{locating ? 'Finding your location…' : 'Use my current location'}
-					</Text>
-				</TouchableOpacity>
-			)}
 			<Field
 				label="Flat, house no., building"
 				value={draft.flat}
@@ -537,8 +373,6 @@ const styles = StyleSheet.create({
 	rowText: { flex: 1, minWidth: 0 },
 	rowTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: APP_COLORS.ink },
 	rowSub: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
-	locationError: { fontSize: 12, lineHeight: 17, fontWeight: '600', color: APP_COLORS.danger, paddingVertical: 8 },
-	locationNote: { fontSize: 12, lineHeight: 17, color: APP_COLORS.inkMuted, paddingVertical: 8 },
 	stateBox: { alignItems: 'center', gap: 8, paddingVertical: 20, paddingHorizontal: 8 },
 	stateText: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted, textAlign: 'center' },
 	footer: { gap: 8 },
@@ -555,21 +389,7 @@ const styles = StyleSheet.create({
 		gap: 6,
 	},
 	addBtnText: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: APP_COLORS.primary },
-	manageBtn: { alignSelf: 'center', paddingVertical: 4, paddingHorizontal: 8 },
-	manageText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: APP_COLORS.primary },
 	form: { gap: 16, paddingTop: 4, paddingBottom: 8 },
-	locateBtn: {
-		height: 44,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: APP_COLORS.border,
-		backgroundColor: APP_COLORS.surface,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 6,
-	},
-	locateText: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: APP_COLORS.primary },
 	field: { gap: 6 },
 	fieldLabel: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: APP_COLORS.ink },
 	fieldOptional: { fontWeight: '400', color: APP_COLORS.inkMuted },

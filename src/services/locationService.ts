@@ -105,11 +105,6 @@ export const getCoordsFromAddress = async (address: string, timeoutMs = 6000) =>
   }
 };
 
-/**
- * Reverse geocoding for a device that has no geocoder of its own (a browser, or an Android phone without Google services): the same
- * OpenStreetMap Nominatim service the place search already uses. Only asked when the device's own geocoder found nothing usable.
- * Null on any failure.
- */
 export type PlaceDetails = {
   area?: string;
   city?: string;
@@ -118,33 +113,6 @@ export type PlaceDetails = {
   country?: string;
   pincode?: string;
   fullAddress?: string;
-};
-
-const reverseGeocodeOnline = async (latitude: number, longitude: number): Promise<PlaceDetails | null> => {
-  try {
-    // Plain fetch on purpose: a third-party geocoder, not our API (ApiService would send our auth header to it).
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&zoom=18&lat=${latitude}&lon=${longitude}`,
-      { headers: { 'Accept-Language': 'en' } }
-    );
-    if (!res.ok) return null;
-    const row = (await res.json()) as { address?: Record<string, string | undefined> };
-    const a = row.address ?? {};
-    const city = a.city ?? a.town ?? a.village ?? a.municipality ?? a.county ?? '';
-    const area = a.suburb ?? a.neighbourhood ?? a.city_district ?? a.road ?? '';
-    if (!city && !a.postcode) return null;
-    return {
-      area,
-      city,
-      district: a.city_district ?? '',
-      state: a.state ?? '',
-      country: a.country ?? '',
-      pincode: normalizePincode(a.postcode),
-      fullAddress: [area, city, a.state, a.country].filter(Boolean).join(', '),
-    };
-  } catch {
-    return null;
-  }
 };
 
 /**
@@ -162,11 +130,8 @@ export const getAddressFromCoords = async (
         longitude,
       });
     } catch {
-      // No geocoder on this device: the online lookup below.
-    }
-    if (!geo || (!geo.city && !geo.postalCode)) {
-      const online = await reverseGeocodeOnline(latitude, longitude);
-      if (online) return online;
+      // No geocoder on this device (a browser, or an Android phone without Google services): the label falls back to
+      // "Current location". The coordinates are never sent to a third-party service.
     }
 
     const isValidArea = (value?: string | null) => {

@@ -55,13 +55,6 @@ const hasLocationPermission = async (): Promise<boolean> => {
 const statusFor = (reason: 'denied' | 'services_off' | 'timeout' | 'error' | 'inaccurate'): LocationStatus =>
 	reason === 'denied' ? 'denied' : reason === 'services_off' ? 'off' : 'error'
 
-// The mounted hook's refresh, so a booking screen can ask THIS hook to look again (a patient tapped "Current location" with none
-// found yet) instead of reading the GPS itself: there is still only one place that detects the location.
-let activeRefresh: (() => Promise<LocationData | null>) | null = null
-
-/** Ask the automatic lookup to run now (even if it ran a moment ago); resolves to the location it ends with, or null. */
-export const requestLocationRefresh = async (): Promise<LocationData | null> => (activeRefresh ? activeRefresh() : null)
-
 export function useAutoLocation(enabled: boolean) {
 	const { accessToken, currentLocation, setCurrentLocation, setLocationStatus } = useAuth()
 	const tokenRef = useRef(accessToken)
@@ -84,98 +77,83 @@ export function useAutoLocation(enabled: boolean) {
 		locationRef.current = currentLocation
 	}, [currentLocation])
 
-	// `force` (a patient asked from a booking screen) skips the "ran a moment ago" rule; everything else is the same lookup.
-	const run = useCallback(
-		async (force: boolean): Promise<LocationData | null> => {
-			const session = tokenRef.current
-			if (!enabled || !session || busyRef.current) return locationRef.current
-			const known = locationRef.current
-			if (isManual(known)) {
-				blockedRef.current = false
-				setLocationStatus('idle')
-				return known
-			}
-			// A position looked up a moment ago is not looked up again, but the permission is still checked (it never prompts again:
-			// see hasLocationPermission), so a refusal or a switched-off Location shows at once, and one that has just been turned on
-			// (`blockedRef`) is refreshed at once.
-			const recent =
-				!force &&
-				!blockedRef.current &&
-				!!known &&
-				Date.now() - Math.max(lastRunRef.current, known.detectedAt ?? 0) < REFRESH_AFTER_MS
-
-			busyRef.current = true
-			const stale = () => tokenRef.current !== session
-			// A status only matters while there is no location to show; with one, a failed refresh is silent.
-			// 'denied' / 'off' are kept even while the last location is shown, so the row can say location access is off.
-			const report = (status: LocationStatus) => {
-				const needsPatient = status === 'denied' || status === 'off'
-				blockedRef.current = needsPatient
-				if (!stale()) setLocationStatus(locationRef.current && !needsPatient ? 'idle' : status)
-				return locationRef.current
-			}
-			// Keep what the lookup found in step with the shared state at once (the context updates on the next render).
-			const save = async (loc: LocationData) => {
-				locationRef.current = loc
-				await setCurrentLocation(loc)
-			}
-			try {
-				if (!known) setLocationStatus('detecting')
-				if (!(await hasLocationPermission())) return report('denied')
-				if (recent) return report('idle')
-
-				const result = await getDevicePosition()
-				if (stale()) return locationRef.current
-				lastRunRef.current = Date.now()
-				if (result.status !== 'ok') return report(statusFor(result.status))
-
-				const { latitude, longitude, accuracy } = result.position
-				// The patient may have picked a place while the position was being found.
-				if (isManual(locationRef.current)) return report('idle')
-
-				const current = locationRef.current
-				// A location saved without a place name / city / PIN (the geocoder had nothing then) gets them now, even if it has not moved.
-				const lacksDetails =
-					!!current && (!current.pincode || !current.city || current.address === 'Current location')
-				if (current && !lacksDetails && distanceMeters(current, { latitude, longitude }) < MOVED_METERS) {
-					await save({ ...current, ...(accuracy != null ? { accuracy } : {}), detectedAt: Date.now() })
-					return report('idle')
-				}
-
-				const place = await getPlaceFromCoords(latitude, longitude)
-				if (stale() || isManual(locationRef.current)) return report('idle')
-				await save({
-					address: (place && placeLabel(place)) || 'Current location',
-					latitude,
-					longitude,
-					...(place?.pincode ? { pincode: place.pincode } : {}),
-					...(place?.city ? { city: place.city } : {}),
-					...(place?.state ? { state: place.state } : {}),
-					...(accuracy != null ? { accuracy } : {}),
-					source: 'auto',
-					detectedAt: Date.now(),
-				})
-				return report('idle')
-			} catch {
-				return report('error')
-			} finally {
-				busyRef.current = false
-			}
-		},
-		[enabled, setCurrentLocation, setLocationStatus]
-	)
-	const refresh = useCallback(async () => {
-		await run(false)
-	}, [run])
-
-	// Lets a booking screen ask for one forced look through this same hook (see requestLocationRefresh).
-	useEffect(() => {
-		if (!enabled) return
-		activeRefresh = () => run(true)
-		return () => {
-			activeRefresh = null
+	const run = useCallback(async (): Promise<LocationData | null> => {
+		const session = tokenRef.current
+		if (!enabled || !session || busyRef.current) return locationRef.current
+		const known = locationRef.current
+		if (isManual(known)) {
+			blockedRef.current = false
+			setLocationStatus('idle')
+			return known
 		}
-	}, [enabled, run])
+		// A position looked up a moment ago is not looked up again, but the permission is still checked (it never prompts again:
+		// see hasLocationPermission), so a refusal or a switched-off Location shows at once, and one that has just been turned on
+		// (`blockedRef`) is refreshed at once.
+		const recent =
+			!blockedRef.current &&
+			!!known &&
+			Date.now() - Math.max(lastRunRef.current, known.detectedAt ?? 0) < REFRESH_AFTER_MS
+
+		busyRef.current = true
+		const stale = () => tokenRef.current !== session
+		// A status only matters while there is no location to show; with one, a failed refresh is silent.
+		// 'denied' / 'off' are kept even while the last location is shown, so the row can say location access is off.
+		const report = (status: LocationStatus) => {
+			const needsPatient = status === 'denied' || status === 'off'
+			blockedRef.current = needsPatient
+			if (!stale()) setLocationStatus(locationRef.current && !needsPatient ? 'idle' : status)
+			return locationRef.current
+		}
+		// Keep what the lookup found in step with the shared state at once (the context updates on the next render).
+		const save = async (loc: LocationData) => {
+			locationRef.current = loc
+			await setCurrentLocation(loc)
+		}
+		try {
+			if (!known) setLocationStatus('detecting')
+			if (!(await hasLocationPermission())) return report('denied')
+			if (recent) return report('idle')
+
+			const result = await getDevicePosition()
+			if (stale()) return locationRef.current
+			lastRunRef.current = Date.now()
+			if (result.status !== 'ok') return report(statusFor(result.status))
+
+			const { latitude, longitude, accuracy } = result.position
+			// The patient may have picked a place while the position was being found.
+			if (isManual(locationRef.current)) return report('idle')
+
+			const current = locationRef.current
+			// A location saved without a PIN (the geocoder had nothing then) gets one now, even if it has not moved.
+			const lacksDetails = !!current && !current.pincode
+			if (current && !lacksDetails && distanceMeters(current, { latitude, longitude }) < MOVED_METERS) {
+				await save({ ...current, ...(accuracy != null ? { accuracy } : {}), detectedAt: Date.now() })
+				return report('idle')
+			}
+
+			const place = await getPlaceFromCoords(latitude, longitude)
+			if (stale() || isManual(locationRef.current)) return report('idle')
+			await save({
+				address: (place && placeLabel(place)) || 'Current location',
+				latitude,
+				longitude,
+				...(place?.pincode ? { pincode: place.pincode } : {}),
+				...(place?.city ? { city: place.city } : {}),
+				...(place?.state ? { state: place.state } : {}),
+				...(accuracy != null ? { accuracy } : {}),
+				source: 'auto',
+				detectedAt: Date.now(),
+			})
+			return report('idle')
+		} catch {
+			return report('error')
+		} finally {
+			busyRef.current = false
+		}
+	}, [enabled, setCurrentLocation, setLocationStatus])
+	const refresh = useCallback(async () => {
+		await run()
+	}, [run])
 
 	// After sign-in (and whenever the signed-in account changes).
 	useEffect(() => {

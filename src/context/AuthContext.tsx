@@ -1,6 +1,7 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { Platform } from 'react-native'
 import {
 	setUnauthorizedHandler,
 	setStatusModalHandler,
@@ -190,7 +191,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			}
 
 			if (savedLocation) {
-				setCurrentLocationState(safeJsonParse(savedLocation, null))
+				const saved = safeJsonParse<LocationData | null>(savedLocation, null)
+				// A browser build never detects a location itself, so an automatic one saved earlier is dropped; a place the patient picked stays.
+				setCurrentLocationState(Platform.OS === 'web' && saved?.source === 'auto' ? null : saved)
 			}
 
 			setIsLoading(false)

@@ -70,7 +70,7 @@ const searchNominatim = async (query: string): Promise<NominatimResult[]> => {
 export default function LocationScreen() {
 	const insets = useSafeAreaInsets()
 	const navigation = useNavigation()
-	const { setCurrentLocation, role } = useAuth()
+	const { setCurrentLocation } = useAuth()
 
 	// ── State ────────────────────────────────────────────────
 	const [gpsLoading, setGpsLoading] = useState(false)
@@ -252,7 +252,6 @@ export default function LocationScreen() {
 						value={searchText}
 						onChangeText={handleSearchChange}
 						autoFocus
-						showMicrophone={role === 'patient'}
 						trailing={searchLoading ? <ActivityIndicator size="small" color="#0c7c7c" /> : undefined}
 					/>
 				</View>

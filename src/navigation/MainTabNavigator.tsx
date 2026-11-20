@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -468,7 +468,8 @@ function MainTabs() {
 	const isDoctor = role === 'doctor'
 	const isPatient = isPatientRole(role)
 	// The patient's current location, found once here for every screen (Dashboard, Find a Doctor, Consult a Doctor read AuthContext).
-	const { refresh: refreshLocation } = useAutoLocation(isPatient)
+	// Phone app only: a browser build (npm run web) has no real GPS, so it never detects a location by itself.
+	const { refresh: refreshLocation } = useAutoLocation(isPatient && Platform.OS !== 'web')
 	// Doctor persona: Schedule + Engage replace Portal/Search/Ancillary (none of those apply to a
 	// doctor's own dashboard) — see the doctor bottom tabs (backend menu) / DoctorHomeScreen / DoctorScheduleScreen / DoctorEngageScreen.
 	const shouldShowSearch = role !== 'doctor'

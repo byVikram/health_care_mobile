@@ -14,7 +14,6 @@ import {
 	AppConfirmSheet,
 	AppFormCard,
 	AppFormField,
-	AppInfoBanner,
 	AppSaveFooter,
 	AppToggle,
 } from '../../../components/common'
@@ -104,8 +103,6 @@ export default function AddressFormPage() {
 	const [locating, setLocating] = useState(false)
 	const [confirmDelete, setConfirmDelete] = useState(false)
 	const [wasDefault, setWasDefault] = useState(false)
-	// Editing the app's own current-location address: saving makes the patient's own copy (the server never edits that row).
-	const [managed, setManaged] = useState(false)
 
 	const load = useCallback(async (): Promise<AddressDraft> => {
 		const list = await getPatientAddresses()
@@ -113,7 +110,6 @@ export default function AddressFormPage() {
 		const a = list.find((x) => x.id === addressId)
 		if (!a) throw new Error('This address no longer exists')
 		setWasDefault(a.is_default)
-		setManaged(a.source === 'current_location')
 		const preset = PRESET_LABELS.slice(0, 2).find((p) => p.toLowerCase() === a.label.toLowerCase())
 		return {
 			flat: a.flat || (a.area || a.landmark ? '' : a.address_line),
@@ -227,15 +223,6 @@ export default function AddressFormPage() {
 		>
 			{draft && (
 				<>
-					{managed && (
-						<AppInfoBanner
-							tone="info"
-							icon={null}
-							title="Made from your location"
-							subtitle="Saving creates your own address. The original stays as it was."
-							style={styles.managedNote}
-						/>
-					)}
 					<View style={styles.locateCard}>
 						<TouchableOpacity
 							style={styles.locate}
@@ -385,10 +372,6 @@ export default function AddressFormPage() {
 const styles = StyleSheet.create({
 	flex: {
 		flex: 1,
-	},
-	managedNote: {
-		marginHorizontal: 16,
-		marginBottom: 12,
 	},
 	locateCard: {
 		backgroundColor: APP_COLORS.surface,

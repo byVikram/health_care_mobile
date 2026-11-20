@@ -75,11 +75,6 @@ export type LabBookingState = {
 	patientRelation: string
 	/** The patient's saved address (public id) the availability / slots / quote are checked against. */
 	addressId: string | null
-	/**
-	 * The patient chose that address themselves in this booking: it is then kept when the current location changes. Until then the
-	 * cart defaults to the current location (a new booking starts unpicked).
-	 */
-	addressPicked: boolean
 	/** Tag ("Home") and one-line text of that address. */
 	addressTag: string
 	addressLine: string
@@ -102,7 +97,6 @@ const initial = (): LabBookingState => ({
 	patientName: '',
 	patientRelation: 'Self',
 	addressId: null,
-	addressPicked: false,
 	addressTag: '',
 	addressLine: '',
 	note: '',
@@ -157,12 +151,10 @@ export const labBooking = {
 			Toast.show({ type: 'info', text1: `You can book up to ${MAX_LAB_ITEMS} tests at a time` })
 			return
 		}
-		// The first test of a new cart starts a new booking: the current location is the default address again.
-		labBooking.set({ cart: [...state.cart, id], ...(state.cart.length === 0 ? { addressPicked: false } : {}) })
+		labBooking.set({ cart: [...state.cart, id] })
 	},
 	removeItem(id: string) {
-		const cart = state.cart.filter((c) => c !== id)
-		labBooking.set({ cart, ...(cart.length === 0 ? { addressPicked: false } : {}) })
+		labBooking.set({ cart: state.cart.filter((c) => c !== id) })
 	},
 	toggleItem(id: string) {
 		if (state.cart.includes(id)) labBooking.removeItem(id)

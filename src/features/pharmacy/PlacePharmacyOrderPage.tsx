@@ -1,16 +1,18 @@
 // src/features/pharmacy/PlacePharmacyOrderPage.tsx
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
 	ActivityIndicator,
 	Image,
+	KeyboardAvoidingView,
 	Modal,
+	Platform,
 	ScrollView,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
 	View,
 } from 'react-native'
-import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -20,6 +22,7 @@ import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import {
 	AppButton,
+	AppBottomSheet,
 	AppInput,
 	AppSelect,
 	AppTypography,
@@ -30,10 +33,8 @@ import {
 import ApiService from '../../services/apiService'
 import { API_ENDPOINTS } from '../../constants/apiUrls'
 
-import { TreatmentRecord, createPharmacyOrder } from './pharmacyService'
-import { getPatientTreatmentHistory } from '../profile/pharmacy/pharmacyService'
-import { VisitWhoWhereSection } from '../ancillary/patient/VisitWhoWhereSection'
-import { useSavedAddresses } from '../ancillary/patient/useVisitPatientAddress'
+import { PatientAddress, TreatmentRecord, createPatientAddress, createPharmacyOrder } from './pharmacyService'
+import { getPatientAddresses, getPatientTreatmentHistory } from '../profile/pharmacy/pharmacyService'
 
 type RouteProps = RouteProp<AppStackParamList, typeof ROUTES.STACK.PLACE_PHARMACY_ORDER>
 
@@ -78,10 +79,9 @@ export default function PlacePharmacyOrderPage() {
 
 	// Delivery Preferences States
 	const [deliveryType, setDeliveryType] = useState<'pickup' | 'home_delivery'>('pickup')
-	// The delivery address: the same saved-address list, current location and add form as the lab and nurse bookings. It is loaded
-	// only once home delivery is chosen.
-	const saved = useSavedAddresses(null, deliveryType === 'home_delivery')
-	const selectedAddressId = saved.addressId
+	const [addresses, setAddresses] = useState<PatientAddress[]>([])
+	const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
+	const [loadingAddresses, setLoadingAddresses] = useState(false)
 
 	// Notes & Submit states
 	const [notes, setNotes] = useState('')
@@ -97,6 +97,15 @@ export default function PlacePharmacyOrderPage() {
 
 	// Image Viewer State
 	const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
+
+	// Inline Address Modal States
+	const [showAddressModal, setShowAddressModal] = useState(false)
+	const [newLabel, setNewLabel] = useState('')
+	const [newLine, setNewLine] = useState('')
+	const [newCity, setNewCity] = useState('')
+	const [newState, setNewState] = useState('')
+	const [newPincode, setNewPincode] = useState('')
+	const [savingAddress, setSavingAddress] = useState(false)
 
 	// Fetch Treatments History
 	useEffect(() => {
@@ -122,20 +131,65 @@ export default function PlacePharmacyOrderPage() {
 		fetchTreatments()
 	}, [user?.id])
 
-	// Back from "Manage saved addresses": show what was changed there.
-	// (deliveryType is read through a ref: switching to home delivery already loads the addresses, so it must not run this again.)
-	const returnedRef = useRef(false)
-	const deliveryRef = useRef(deliveryType)
+	// Fetch Addresses
+	const loadAddresses = useCallback(async () => {
+		try {
+			setLoadingAddresses(true)
+			const list = await getPatientAddresses()
+			setAddresses(list)
+			const def = list.find((a) => a.is_default)
+			if (def) {
+				setSelectedAddressId(def.id)
+			} else if (list.length > 0) {
+				setSelectedAddressId(list[0].id)
+			}
+		} catch (err: any) {
+			console.error('[PlacePharmacyOrderPage] loadAddresses error:', err)
+		} finally {
+			setLoadingAddresses(false)
+		}
+	}, [])
+
 	useEffect(() => {
-		deliveryRef.current = deliveryType
-	}, [deliveryType])
-	const reloadAddresses = saved.loadAddresses
-	useFocusEffect(
-		useCallback(() => {
-			if (returnedRef.current && deliveryRef.current === 'home_delivery') void reloadAddresses()
-			returnedRef.current = true
-		}, [reloadAddresses])
-	)
+		if (deliveryType === 'home_delivery') {
+			loadAddresses()
+		}
+	}, [deliveryType, loadAddresses])
+
+	const handleAddAddress = async () => {
+		if (!newLabel.trim() || !newLine.trim() || !newCity.trim() || !newState.trim() || !newPincode.trim()) {
+			Toast.show({
+				type: 'error',
+				text1: 'Validation Error',
+				text2: 'Please fill in all fields for the address.',
+			})
+			return
+		}
+		setSavingAddress(true)
+		try {
+			await createPatientAddress({
+				label: newLabel,
+				address_line: newLine,
+				city: newCity,
+				state: newState,
+				pincode: newPincode,
+				is_default: addresses.length === 0,
+			})
+			Toast.show({ type: 'success', text1: 'Success', text2: 'New address added successfully.' })
+			setNewLabel('')
+			setNewLine('')
+			setNewCity('')
+			setNewState('')
+			setNewPincode('')
+			setShowAddressModal(false)
+			await loadAddresses()
+		} catch (err: any) {
+			console.error('[PlacePharmacyOrderPage] handleAddAddress error:', err)
+			Toast.show({ type: 'error', text1: 'Error', text2: err?.message || 'Failed to add address' })
+		} finally {
+			setSavingAddress(false)
+		}
+	}
 
 	const handlePlaceOrder = async () => {
 		if (!selectedTreatmentId) {
@@ -195,6 +249,14 @@ export default function PlacePharmacyOrderPage() {
 
 	// Find active consultation details
 	const selectedTreatment = treatments.find((t) => t.id === selectedTreatmentId)
+
+	// Address select options
+	const addressOptions = addresses.map((a) => ({
+		label: `${a.label}: ${a.address_line}, ${a.city} - ${a.pincode}`,
+		value: a.id,
+	}))
+
+	const activeAddress = addresses.find((a) => a.id === selectedAddressId)
 
 	return (
 		<View style={styles.safe}>
@@ -421,18 +483,65 @@ export default function PlacePharmacyOrderPage() {
 							</View>
 						</View>
 					) : (
-						<VisitWhoWhereSection
-							who={saved}
-							hidePatient
-							hideNote
-							embedded
-							currentLocation
-							addressLabel="DELIVERY ADDRESS"
-							addressNoun="delivery address"
-							addressHint="Medicines will be delivered here"
-							sheetTitle="Where should we deliver?"
-							onManageAddresses={() => navigation.navigate(ROUTES.STACK.PATIENT_ADDRESSES)}
-						/>
+						<View style={[styles.deliveryDetailsPanel, { flexDirection: 'column', alignItems: 'stretch' }]}>
+							<View style={styles.addressSectionHeader}>
+								<AppTypography variant="subtitle" style={styles.panelTitle}>
+									Select Delivery Address
+								</AppTypography>
+								<TouchableOpacity
+									style={styles.inlineAddAddressBtn}
+									onPress={() => setShowAddressModal(true)}
+									activeOpacity={0.7}
+								>
+									<MaterialCommunityIcons name="plus" size={16} color="#1f5f68" />
+									<Text style={styles.inlineAddAddressTxt}>Add Address</Text>
+								</TouchableOpacity>
+							</View>
+
+							{loadingAddresses ? (
+								<View style={[styles.spinnerContainer, { paddingVertical: 12 }]}>
+									<ActivityIndicator size="small" color="#1f5f68" />
+								</View>
+							) : addresses.length === 0 ? (
+								<View style={styles.addressEmptyCard}>
+									<MaterialCommunityIcons
+										name="map-marker-question-outline"
+										size={28}
+										color="#90a4ae"
+									/>
+									<Text style={styles.addressEmptyMsg}>No addresses saved yet.</Text>
+									<TouchableOpacity
+										style={styles.addAddressPrimaryBtn}
+										onPress={() => setShowAddressModal(true)}
+									>
+										<Text style={styles.addAddressPrimaryBtnTxt}>+ Add Address</Text>
+									</TouchableOpacity>
+								</View>
+							) : (
+								<View style={{ marginTop: 8 }}>
+									<AppSelect
+										placeholder="Choose delivery address"
+										options={addressOptions}
+										value={selectedAddressId || undefined}
+										onSelect={(val) => setSelectedAddressId(val)}
+										size="form"
+										noMargin
+									/>
+
+									{activeAddress && (
+										<View style={styles.addressPreviewBox}>
+											<View style={styles.addressBadge}>
+												<Text style={styles.addressBadgeTxt}>{activeAddress.label}</Text>
+											</View>
+											<Text style={styles.addressPreviewTxt}>
+												{activeAddress.address_line}, {activeAddress.city},{' '}
+												{activeAddress.state} - {activeAddress.pincode}
+											</Text>
+										</View>
+									)}
+								</View>
+							)}
+						</View>
 					)}
 				</View>
 
@@ -472,6 +581,80 @@ export default function PlacePharmacyOrderPage() {
 					Confirm & Book Order
 				</AppButton>
 			</View>
+
+			{/* Inline Add Address Bottom Sheet */}
+			<AppBottomSheet
+				visible={showAddressModal}
+				title="Add New Delivery Address"
+				onClose={() => {
+					if (!savingAddress) setShowAddressModal(false)
+				}}
+			>
+				<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+					<ScrollView
+						contentContainerStyle={styles.sheetBody}
+						keyboardShouldPersistTaps="handled"
+						showsVerticalScrollIndicator={false}
+					>
+						<AppInput
+							label="Address Label (e.g. Home, Work)"
+							placeholder="Enter address label"
+							value={newLabel}
+							onChangeText={setNewLabel}
+							fieldSize="form"
+						/>
+
+						<AppInput
+							label="Street / Address Line"
+							placeholder="Enter street name, building number"
+							value={newLine}
+							onChangeText={setNewLine}
+							fieldSize="form"
+						/>
+
+						<AppInput
+							label="City"
+							placeholder="Enter city"
+							value={newCity}
+							onChangeText={setNewCity}
+							fieldSize="form"
+						/>
+
+						<View style={styles.rowFields}>
+							<View style={{ flex: 1, marginRight: 8 }}>
+								<AppInput
+									label="State"
+									placeholder="State"
+									value={newState}
+									onChangeText={setNewState}
+									fieldSize="form"
+								/>
+							</View>
+							<View style={{ flex: 1 }}>
+								<AppInput
+									label="Pincode"
+									placeholder="Pincode"
+									value={newPincode}
+									onChangeText={(v) => setNewPincode(v.replace(/\D/g, ''))}
+									keyboardType="numeric"
+									maxLength={6}
+									fieldSize="form"
+								/>
+							</View>
+						</View>
+
+						<AppButton
+							variant="primary"
+							onPress={handleAddAddress}
+							loading={savingAddress}
+							disabled={savingAddress}
+							style={styles.saveAddressBtn}
+						>
+							Save Address
+						</AppButton>
+					</ScrollView>
+				</KeyboardAvoidingView>
+			</AppBottomSheet>
 
 			{/* Image Viewer Lightbox Modal */}
 			<Modal
@@ -794,6 +977,74 @@ const styles = StyleSheet.create({
 		color: '#475467',
 		lineHeight: 18,
 	},
+	addressSectionHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginBottom: 6,
+	},
+	inlineAddAddressBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 2,
+	},
+	inlineAddAddressTxt: {
+		fontSize: 12,
+		color: '#1f5f68',
+		fontWeight: '700',
+	},
+	addressEmptyCard: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 16,
+		gap: 8,
+	},
+	addressEmptyMsg: {
+		fontSize: 12,
+		color: '#667085',
+	},
+	addAddressPrimaryBtn: {
+		backgroundColor: '#E8F5F5',
+		borderColor: '#c6e0e0',
+		borderWidth: 1,
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		borderRadius: 8,
+	},
+	addAddressPrimaryBtnTxt: {
+		fontSize: 12,
+		color: '#1f5f68',
+		fontWeight: '600',
+	},
+	addressPreviewBox: {
+		marginTop: 12,
+		backgroundColor: '#fff',
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#EAECF0',
+		padding: 10,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	addressBadge: {
+		backgroundColor: '#F2F4F7',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 6,
+	},
+	addressBadgeTxt: {
+		fontSize: 11,
+		fontWeight: '700',
+		color: '#475467',
+	},
+	addressPreviewTxt: {
+		fontSize: 12,
+		color: '#475467',
+		flex: 1,
+		lineHeight: 16,
+	},
 	remarksInput: {
 		fontSize: 13,
 		textAlignVertical: 'top',
@@ -817,6 +1068,19 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.05,
 		shadowRadius: 8,
 		elevation: 8,
+	},
+	sheetBody: {
+		paddingHorizontal: 16,
+		paddingTop: 16,
+		paddingBottom: 32,
+	},
+	rowFields: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+	},
+	saveAddressBtn: {
+		width: '100%',
+		marginTop: 16,
 	},
 	viewerOverlay: {
 		flex: 1,

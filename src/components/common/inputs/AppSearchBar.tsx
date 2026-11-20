@@ -15,7 +15,6 @@ import {
 } from 'react-native'
 import { APP_COLORS } from '../../../config/theme'
 import { SEARCH_CONTEXTS, SearchContextKey } from '../../../config/searchContexts'
-import { useAuth } from '../../../context/AuthContext'
 import { useVoiceSearch } from '../../../hooks/useVoiceSearch'
 import { showComingSoon } from '../../../utils/toast'
 import { AppPathIcon } from '../display/AppIcon'
@@ -30,11 +29,11 @@ import { AppPathIcon } from '../display/AppIcon'
 // Two modes: editable (give it `value` + `onChangeText`) or tap-through (give it `onPress` and it renders a
 // non-editable bar that fires `onPress`, e.g. the dashboard bar that opens the search screen).
 //
-// Voice: on an editable bar for a patient the mic listens (hooks/useVoiceSearch). What is being said shows in the input while
+// Voice: on an editable bar (any role) the mic listens (hooks/useVoiceSearch). What is being said shows in the input while
 // listening, but is NOT put in the screen's search text; only the final text is (`onChangeText`, then `onSubmit`), so the
 // screen's own search / debounce / filter runs once. The mic pulses while listening and the clear button becomes "cancel" (the
 // text the bar had is kept). A tap-through bar's mic calls `onVoicePress`; the screen it opens starts listening through
-// `autoStartVoice`. Other roles' bars keep the old mic ("coming soon").
+// `autoStartVoice`. A tap-through bar with no `onVoicePress` opens its search screen, where the bar listens.
 
 const LINE_HEIGHT = 22
 const HINT_HOLD_MS = 2400
@@ -58,9 +57,9 @@ export interface AppSearchBarProps {
 	onSubmit?: () => void
 	/** Tap-through mode: the bar is not editable and a tap fires this instead of focusing it. */
 	onPress?: () => void
-	/** Mic button on a bar that does not listen itself (tap-through bars, other roles); without a handler it shows "coming soon". */
+	/** Mic button on a tap-through bar: what it does instead of the bar's `onPress` (the search screen it opens starts listening). */
 	onVoicePress?: () => void
-	/** Turn listening on / off for this bar. Default: on for an editable patient bar. */
+	/** Turn listening on / off for this bar. Default: on for an editable bar. */
 	voice?: boolean
 	/** Start listening once, as soon as this bar's screen is on screen (a one-time intent: clear it in `onVoiceAutoStarted`). */
 	autoStartVoice?: boolean
@@ -206,13 +205,11 @@ export default function AppSearchBar({
 	inputRef,
 }: AppSearchBarProps) {
 	const [focused, setFocused] = useState(false)
-	const { role } = useAuth()
-
 	const tapThrough = !!onPress
 	const canEdit = editable && !tapThrough
 
 	// Voice: only the final text reaches the screen. It is submitted once the screen has the new text (its `onSubmit` may read it).
-	const voiceEditable = (voice ?? role === 'patient') && showMicrophone && canEdit && !!onChangeText
+	const voiceEditable = (voice ?? true) && showMicrophone && canEdit && !!onChangeText
 	const submitAfter = useRef<string | null>(null)
 	const speech = useVoiceSearch({
 		enabled: voiceEditable,
@@ -253,7 +250,8 @@ export default function AppSearchBar({
 			return
 		}
 		if (onVoicePress) onVoicePress()
-		else showComingSoon('Voice search is coming soon.')
+		else if (onPress) onPress()
+		else showComingSoon('Voice search is not available here.')
 	}
 
 	const bar = (
