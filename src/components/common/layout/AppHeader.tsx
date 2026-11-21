@@ -483,7 +483,7 @@ function RoleHomeHeader({
 }: AppHeaderProps) {
 	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
-	const { user, role, ancillarySpecialty } = useAuth()
+	const { user, role } = useAuth()
 	const scrollData = useScroll()
 	const scrollY = scrollData?.scrollY
 
@@ -497,15 +497,12 @@ function RoleHomeHeader({
 	const isRadiology = role === USER_ROLES.RADIOLOGY
 	const isPatient = !isDoctor && !isRadiology
 
-	const isPhysiotherapy =
-		(role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE) &&
-		(ancillarySpecialty === 'physiotherapy' || !ancillarySpecialty)
+	// A home-care provider has no stock picture: without a photo of their own they get their initials.
+	const isProvider = role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE
 
-	const defaultAvatar = isPhysiotherapy
-		? require('../../../assets/physiotherapy/physiotherapist.png')
-		: isDoctor
-			? require('../../../assets/Banner/doctor.png')
-			: require('../../../assets/Banner/patient.png')
+	const defaultAvatar = isDoctor
+		? require('../../../assets/Banner/doctor.png')
+		: require('../../../assets/Banner/patient.png')
 
 	// Option B GPU animation values
 	const maxScroll = 60
@@ -622,11 +619,24 @@ function RoleHomeHeader({
 				]}
 			>
 				<Pressable onPress={onAvatarPress} style={styles.profileRow}>
-					<Image
-						source={avatarUri && !avatarError ? { uri: avatarUri } : defaultAvatar}
-						onError={() => setAvatarError(true)}
-						style={styles.avatar}
-					/>
+					{isProvider ? (
+						<AppAvatar
+							uri={avatarUri}
+							name={displayName}
+							size={52}
+							radius={12}
+							borderWidth={1}
+							borderColor="rgba(255,255,255,0.5)"
+							backgroundColor={APP_COLORS.mint}
+							initialsColor={APP_COLORS.primary}
+						/>
+					) : (
+						<Image
+							source={avatarUri && !avatarError ? { uri: avatarUri } : defaultAvatar}
+							onError={() => setAvatarError(true)}
+							style={styles.avatar}
+						/>
+					)}
 					<View>
 						<Text style={styles.helloText}>
 							<Text style={styles.helloAccent}>Hello, </Text>

@@ -23,7 +23,6 @@ import { useSidebarMenu } from '../../navigation/useSidebarMenu'
 import { getPatientSummary } from '../../services/homeService'
 import { useDoctorAvatarSync } from '../../features/profile/doctor/useDoctorAvatarSync'
 import { fetchProviderHub } from '../../features/profile/ancillary/ancillaryProfileService'
-import { NEW_PHYSIOTHERAPIST_IMAGE_URL } from '../../features/profile/ancillary/specialtyConfig'
 import type { AppStackParamList } from '../../navigation/types'
 
 const MOCK_USER = {
@@ -118,7 +117,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
 
-	const { clearAuth, user: authUser, role, updateUser, ancillarySpecialty } = useAuth()
+	const { clearAuth, user: authUser, role, updateUser } = useAuth()
 	const sections = useSidebarMenu(isSidebarOpen)
 	useDoctorAvatarSync(role === 'doctor')
 
@@ -142,11 +141,8 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 				if (role === 'ancillary' || role === 'nurse') {
 					const hub = await fetchProviderHub()
 					if (!cancelled) {
-						const resolvedAvatar =
-							hub.avatar_url ||
-							(ancillarySpecialty === 'physiotherapy' ? NEW_PHYSIOTHERAPIST_IMAGE_URL : '')
-						if (resolvedAvatar && resolvedAvatar !== authUser?.avatar) {
-							updateUser({ avatar: resolvedAvatar })
+						if (hub.avatar_url && hub.avatar_url !== authUser?.avatar) {
+							updateUser({ avatar: hub.avatar_url })
 						}
 					}
 					return
@@ -157,7 +153,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 					updateUser({ avatar: summary.avatar_url })
 				}
 			} catch {
-				// Silently ignore; the existing avatar (or default) will show.
+				// Silently ignore; the existing avatar (or the initials) will show.
 			}
 		}
 
@@ -165,9 +161,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 		return () => { cancelled = true }
 		// authUser/updateUser deliberately excluded: this effect calls
 		// updateUser(), which would otherwise change authUser and re-trigger
-		// itself on every sync. It only needs to run once per role/specialty.
+		// itself on every sync. It only needs to run once per role.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [role, ancillarySpecialty])
+	}, [role])
 
 	const handleEditProfile = () => {
 		setIsSidebarOpen(false)
