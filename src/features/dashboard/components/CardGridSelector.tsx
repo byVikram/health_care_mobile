@@ -278,7 +278,6 @@ export default function CardGridSelectorModal({
 						hints={cards.slice(0, 4).map((card) => card.label.toLowerCase())}
 						value={searchQuery}
 						onChangeText={setSearchQuery}
-						showMicrophone={false}
 						style={styles.searchBar}
 					/>
 				) : null}

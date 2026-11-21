@@ -26,6 +26,7 @@ export const ROUTES = {
 		LEGAL: 'LegalStack',
 		SEARCH: 'SplashScreen',
 		DOCTOR_SEARCH: 'DoctorSearch',
+		SYMPTOMS: 'Symptoms',
 		DOCTOR_DETAIL: 'DoctorDetail',
 		DOCTOR_BOOK_SLOT: 'DoctorBookSlot',
 		FAVOURITE_DOCTOR: 'FavouriteDoctor',
@@ -53,6 +54,7 @@ export const ROUTES = {
 		ORDER_DETAILS: 'OrderDetails',
 		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
 
+		COMMUNITIES: 'Communities',
 		COMMUNITY_FORUM: 'CommunityForum',
 		COMMUNITY_THREAD: 'CommunityThread',
 		BLOG_LIST: 'BlogList',

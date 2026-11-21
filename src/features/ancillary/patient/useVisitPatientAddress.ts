@@ -1,30 +1,22 @@
 // src/features/ancillary/patient/useVisitPatientAddress.ts
 //
 // "Who is this visit for?" + "Where should the nurse come?" state shared by the two Review & pay screens
-// (Book now and Later): the family-member list, the patient's saved addresses (add new / use current
-// location) and a resolver that turns the picked address into the {street_address, lat, lng} the booking
+// (Book now and Later): the family-member list, the patient's saved addresses (pick / add new) and a resolver that turns the picked address into the {street_address, lat, lng} the booking
 // APIs want. Rendering lives in VisitWhoWhereSection.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import * as Location from 'expo-location'
 import axios from 'axios'
 import Toast from 'react-native-toast-message'
 import { useFamilyMembers } from '../../../hooks/useFamilyMembers'
-import { getCurrentLocation } from '../../../services/locationService'
 import {
 	createPatientAddress,
 	getPatientAddresses,
 	type PatientAddress,
 } from '../../profile/patient/PatientProfileService'
-import type { AppAddressDraft, AppAddressPrefill, CurrentLocationResult } from '../../../components/common'
+import type { AppAddressDraft } from '../../../components/common'
 import type { VisitAddressInput } from '../ancillaryProviderBookingService'
 import { useBookingLocation } from './useBookingLocation'
 import { showStatusModal } from '../../../services/apiService'
-
-// The saved-address label given to an address made from the device position, and how close (in degrees, about
-// 100 m) a new position must be to an existing one to count as the same place.
-const CURRENT_LOCATION_LABEL = 'Current location'
-const SAME_PLACE_DEGREES = 0.001
 
 export const addressLine = (a: PatientAddress) =>
 	[a.address_line, a.city, a.state].filter(Boolean).join(', ') + (a.pincode ? ` - ${a.pincode}` : '')
@@ -126,112 +118,6 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 		}
 	}
 
-	const useCurrentLocation = async (): Promise<AppAddressPrefill | null> => {
-		try {
-			const c = await getCurrentLocation({ promptForSettings: true })
-			let prefill: AppAddressPrefill = { latitude: c.latitude, longitude: c.longitude }
-			try {
-				const [geo] = await Location.reverseGeocodeAsync(c)
-				if (geo) {
-					prefill = {
-						...prefill,
-						area: [geo.street, geo.district || geo.subregion].filter(Boolean).join(', ') || undefined,
-						city: geo.city || undefined,
-						state: geo.region || undefined,
-						pincode: geo.postalCode || undefined,
-					}
-				}
-			} catch {
-				// Coordinates alone are still useful; the patient types the rest.
-			}
-			return prefill
-		} catch (e) {
-			const denied = e instanceof Error && /denied/i.test(e.message)
-			Toast.show({
-				type: 'error',
-				text1: denied ? 'Location permission is off' : "Couldn't get your location",
-				text2: denied ? 'Allow location access, or type the address.' : 'Please type the address instead.',
-			})
-			return null
-		}
-	}
-
-	/**
-	 * "Current location": read the device position (asking for permission when needed), turn it into an address and
-	 * save it as a normal saved address, which is then selected -- the lab and visit APIs work from saved addresses.
-	 * A spot already saved this way is reused. When the position cannot be turned into a full address (no PIN code,
-	 * or no geocoder on this device, as in a browser) nothing is saved and the sheet says so.
-	 */
-	const pickCurrentLocation = async (): Promise<CurrentLocationResult> => {
-		let c: { latitude: number; longitude: number }
-		try {
-			c = await getCurrentLocation({ promptForSettings: true })
-		} catch (e) {
-			const denied = e instanceof Error && /denied/i.test(e.message)
-			return {
-				kind: 'error',
-				message: denied
-					? 'Location permission is off. Allow location access in your phone settings, or choose a saved address.'
-					: "Couldn't get your location. Check that location (GPS) is on and try again, or choose a saved address.",
-			}
-		}
-
-		const same = addresses.find(
-			(a) =>
-				a.label === CURRENT_LOCATION_LABEL &&
-				a.latitude != null &&
-				a.longitude != null &&
-				Math.abs(a.latitude - c.latitude) < SAME_PLACE_DEGREES &&
-				Math.abs(a.longitude - c.longitude) < SAME_PLACE_DEGREES
-		)
-		if (same) {
-			setAddressId(same.id)
-			return { kind: 'picked' }
-		}
-
-		let geo: Location.LocationGeocodedAddress | undefined
-		try {
-			;[geo] = await Location.reverseGeocodeAsync(c)
-		} catch {
-			// No geocoder here (a browser): the checks below turn that into the message.
-		}
-		const area =
-			[geo?.name && geo.name !== geo.street ? geo.name : undefined, geo?.street, geo?.district || geo?.subregion]
-				.filter(Boolean)
-				.join(', ') || undefined
-		const city = geo?.city || geo?.subregion || undefined
-		const state = geo?.region || undefined
-		const pincode = geo?.postalCode || undefined
-		if (!area || !city || !state || !/^\d{6}$/.test(pincode ?? '')) {
-			return {
-				kind: 'error',
-				message:
-					"We found your location but couldn't work out the full address on this device. Please choose a saved address or add one.",
-			}
-		}
-
-		try {
-			const res: { data?: { id?: string } } | undefined = await createPatientAddress({
-				label: CURRENT_LOCATION_LABEL,
-				address_line: area,
-				city,
-				state,
-				pincode: pincode as string,
-				latitude: c.latitude,
-				longitude: c.longitude,
-				is_default: addresses.length === 0,
-			})
-			await loadAddresses(res?.data?.id ?? null)
-			Toast.show({ type: 'success', text1: 'Using your current location' })
-			return { kind: 'picked' }
-		} catch (e) {
-			return {
-				kind: 'error',
-				message: apiErrorMessage(e) || "Couldn't save your current location. Please try again.",
-			}
-		}
-	}
-
 	/**
 	 * The picked address as the booking APIs want it. Null (with a toast) when none is picked or it can't be
 	 * placed on the map.
@@ -253,7 +139,7 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 			Toast.show({
 				type: 'error',
 				text1: "We couldn't place this address on the map",
-				text2: 'Turn on location, or add the address with "Use my current location".',
+				text2: 'Turn on location, or edit the address and add its PIN code.',
 			})
 			return null
 		}
@@ -281,8 +167,6 @@ export function useVisitPatientAddress(initialPatientKey = 'self', initialAddres
 		address,
 		loadAddresses,
 		saveAddress,
-		useCurrentLocation,
-		pickCurrentLocation,
 		resolveBookingAddress,
 	}
 }

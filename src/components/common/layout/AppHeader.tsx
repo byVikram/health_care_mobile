@@ -165,6 +165,12 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH, params: { focusSearch: true } })
 	}
 
+	// The mic on the Home search bar: open the Search tab and start listening there (a one-time `startVoice` flag the tab clears).
+	// (The patient's search is always the Search tab, so the layout's own `onSearchPress` is not used here.)
+	const handleVoiceSearch = () => {
+		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH, params: { startVoice: true } })
+	}
+
 	const paddingBottom = progress.interpolate({ inputRange: [0, 1], outputRange: [16, 12] })
 	const introHeight = progress.interpolate({ inputRange: [0, 1], outputRange: [28, 0] })
 	const introGap = progress.interpolate({ inputRange: [0, 1], outputRange: [6, 8] })
@@ -245,7 +251,12 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 				</Animated.View>
 
 				{/* Search (tap-through to the Search tab) */}
-				<AppSearchBar context="home.patient" tone="onDark" onPress={handleSearch} />
+				<AppSearchBar
+					context="home.patient"
+					tone="onDark"
+					onPress={handleSearch}
+					onVoicePress={handleVoiceSearch}
+				/>
 			</Animated.View>
 		</Animated.View>
 	)

@@ -31,6 +31,8 @@ export type MainTabParamList = {
 				mode?: 'clinic' | 'video'
 				/** Set by the Home search bar: open the keyboard on arrival (the Search tab clears it). */
 				focusSearch?: boolean
+				/** Set by the Home search bar's mic: start listening on arrival (the Search tab clears it). */
+				startVoice?: boolean
 		  }
 		| undefined
 	[ROUTES.MAIN.PORTAL]: { filter?: BookingsFilterKey } | undefined
@@ -183,6 +185,8 @@ export type AppStackParamList = {
 	[ROUTES.STACK.MEDICAL_RECORDS]: undefined
 	[ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
 	[ROUTES.STACK.SEARCH]: undefined
+	/** Every symptom (A-Z) with search: from Home's "All symptoms". A card opens doctor search for its speciality. */
+	[ROUTES.STACK.SYMPTOMS]: undefined
 	[ROUTES.STACK.DOCTOR_SEARCH]:
 		| {
 				query?: string
@@ -249,6 +253,8 @@ export type AppStackParamList = {
 	[ROUTES.STACK.RADIOLOGY_ORDERS]: undefined
 	[ROUTES.STACK.RADIOLOGY_ORDER_DETAIL]: { publicId: string; booking?: any }
 	[ROUTES.STACK.RADIOLOGY_SCAN_TYPES]: undefined
+	/** "6 · Communities": your groups, then every group to discover and join (Home → Communities → Explore). */
+	[ROUTES.STACK.COMMUNITIES]: undefined
 	[ROUTES.STACK.COMMUNITY_FORUM]: undefined
 	[ROUTES.STACK.COMMUNITY_THREAD]: { threadId: string }
 	[ROUTES.STACK.BLOG_LIST]: undefined

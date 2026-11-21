@@ -245,7 +245,6 @@ export default function LabCartPage() {
 					patientLabel="TESTS FOR"
 					addressLabel={isHome ? 'COLLECTION ADDRESS' : 'YOUR ADDRESS'}
 					familyTitle="Who are these tests for?"
-					currentLocation
 				/>
 
 				{/* Availability at the address */}

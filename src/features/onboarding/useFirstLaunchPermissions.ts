@@ -24,6 +24,15 @@ import {
 
 const STORAGE_KEY = 'first_launch_permissions_done'
 
+let settleFirstLaunch: () => void = () => {}
+/**
+ * Resolves once the first-launch dialogs have been answered (or were not needed). useAutoLocation waits for it before it looks at the
+ * location permission, so the two never open a system dialog at the same time.
+ */
+export const firstLaunchPermissionsSettled = new Promise<void>((resolve) => {
+	settleFirstLaunch = resolve
+})
+
 /** Android only: one system dialog for `permission` (nothing to ask on other platforms or when already granted). */
 const requestAndroidPermission = async (permission: Permission) => {
 	if (Platform.OS !== 'android') return
@@ -56,6 +65,6 @@ export function useFirstLaunchPermissions(enabled: boolean) {
 				// Never block or crash the app on a permission prompt; it is simply offered again next cold start.
 			}
 		}
-		run()
+		void run().finally(settleFirstLaunch)
 	}, [enabled])
 }

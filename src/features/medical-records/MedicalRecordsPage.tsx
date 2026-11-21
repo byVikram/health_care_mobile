@@ -274,7 +274,6 @@ export default function MedicalRecordsPage() {
 					tone="onLight"
 					placeholder="Search by doctor or clinic"
 					hints={[]}
-					showMicrophone={false}
 					value={query}
 					onChangeText={setQuery}
 				/>

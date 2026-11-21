@@ -99,6 +99,9 @@ export default function SearchPage() {
 	const route = useRoute<RouteProp<MainTabParamList, typeof ROUTES.MAIN.SEARCH>>()
 	const searchInputRef = useRef<TextInput>(null)
 	const focusSearch = route.params?.focusSearch
+	// The Home mic: listen as soon as this tab is focused. Used once and cleared (a repeat visit does not listen again).
+	const startVoice = route.params?.startVoice
+	const clearStartVoice = useCallback(() => tabNavigation.setParams({ startVoice: undefined }), [tabNavigation])
 	useFocusEffect(
 		useCallback(() => {
 			if (!focusSearch) return
@@ -249,6 +252,8 @@ export default function SearchPage() {
 							value={query}
 							onChangeText={setQuery}
 							inputRef={searchInputRef}
+							autoStartVoice={startVoice}
+							onVoiceAutoStarted={clearStartVoice}
 						/>
 					</Animated.View>
 				</Animated.View>

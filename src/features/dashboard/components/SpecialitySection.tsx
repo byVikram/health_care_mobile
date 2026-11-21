@@ -2,29 +2,23 @@
 //
 // Patient Home "Not feeling well?" ("1 · Home"): the first four symptoms as 64px circular tone tiles
 // with short labels. A tap resolves the symptom to its speciality and opens doctor search (unchanged
-// logic); "All symptoms" opens the specialities page. Falls back to a built-in symptom list when the
+// logic); "All symptoms" opens the Symptoms page (every symptom, A-Z). Falls back to a built-in symptom list when the
 // symptoms API is empty or fails.
+//
+// The four cards are picked from the six symptoms Home has always had (isHomeSymptom), so symptoms added later (they all appear on the
+// Symptoms page) never change which cards Home shows or in what order.
 import React, { useEffect, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useNavigation, type NavigationProp } from '@react-navigation/native'
 
 import { AppIconTile, AppPathIcon, AppSection, AppSkeleton, AppTextLink } from '../../../components/common'
-import { APP_COLORS, TONES, toneForString, type ToneKey } from '../../../config/theme'
+import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
 import type { SpecialityItem, SymptomItem } from '../../../types/speciality'
 import { getSpecialities, getSymptoms } from '../../doctor/doctorService'
-import { HOME_ICONS, homeSectionProps } from '../homeTheme'
-
-/** icon_key (symptoms API) -> short Home label, tone and glyph. */
-const SYMPTOM_META: Record<string, { label: string; tone: ToneKey; icon: string }> = {
-	acne: { label: 'Skin & acne', tone: 'peach', icon: HOME_ICONS.skin },
-	child: { label: 'Child unwell', tone: 'sky', icon: HOME_ICONS.child },
-	cough: { label: 'Cold & fever', tone: 'mint', icon: HOME_ICONS.thermometer },
-	depression: { label: 'Stress & anxiety', tone: 'lilac', icon: HOME_ICONS.brain },
-	pregnancy: { label: 'Periods & pregnancy', tone: 'sand', icon: HOME_ICONS.female },
-	performance: { label: 'Sexual health', tone: 'sky', icon: HOME_ICONS.pulse },
-}
+import { homeSectionProps } from '../homeTheme'
+import { isHomeSymptom, symptomMeta } from '../symptomCardMeta'
 
 // Fallback symptoms when the symptoms API is empty or offline (design order first).
 const DEFAULT_SYMPTOMS: SymptomItem[] = [
@@ -138,12 +132,6 @@ export function resolveSpecialityForSymptom(
 	return specialities.find((s) => s.label.length > 3 && symptomText.includes(s.label.toLowerCase()))
 }
 
-const symptomMeta = (s: SymptomItem) => {
-	const meta = s.icon_key ? SYMPTOM_META[s.icon_key] : undefined
-	if (meta) return { label: meta.label, pair: TONES[meta.tone], icon: meta.icon }
-	return { label: s.label, pair: toneForString(s.label), icon: HOME_ICONS.pulse }
-}
-
 type Props = {
 	/** Specialities fetched once by the Home page (used to resolve a symptom's speciality). */
 	specialities?: SpecialityItem[]
@@ -161,7 +149,13 @@ function SpecialitySection({ specialities = [], refreshToken }: Props) {
 			try {
 				const res = await getSymptoms()
 				if (!active) return
-				setSymptoms(res?.success && res.data && res.data.length > 0 ? res.data : DEFAULT_SYMPTOMS)
+				if (res?.success && res.data && res.data.length > 0) {
+					// Home keeps its own cards (same order as the API gave them); symptoms added later are on the Symptoms page.
+					const own = res.data.filter(isHomeSymptom)
+					setSymptoms(own.length >= 4 ? own : res.data)
+				} else {
+					setSymptoms(DEFAULT_SYMPTOMS)
+				}
 			} catch {
 				if (active) setSymptoms(DEFAULT_SYMPTOMS)
 			} finally {
@@ -202,12 +196,7 @@ function SpecialitySection({ specialities = [], refreshToken }: Props) {
 	return (
 		<AppSection
 			title="Not feeling well?"
-			right={
-				<AppTextLink
-					label="All symptoms"
-					onPress={() => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH })}
-				/>
-			}
+			right={<AppTextLink label="All symptoms" onPress={() => navigation.navigate(ROUTES.STACK.SYMPTOMS)} />}
 			{...homeSectionProps(12)}
 		>
 			<View style={styles.grid}>

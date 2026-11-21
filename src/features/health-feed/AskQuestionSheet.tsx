@@ -556,7 +556,7 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 								<AppSearchBar
 									placeholder="Search specialities"
 									hints={specialities.slice(0, 4)}
-									value={tagQuery} onChangeText={setTagQuery} showMicrophone={false} />
+									value={tagQuery} onChangeText={setTagQuery} />
 							</View>
 							<ScrollView
 								contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 4 }}

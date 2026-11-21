@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useId } from 'react'
 import {
+	Platform,
 	StyleSheet,
 	TouchableOpacity,
 	View,
@@ -34,6 +35,9 @@ const GLOWS = [
 ] as const
 
 export function AppHeaderBackdrop({ base = APP_COLORS.ink, style }: AppHeaderBackdropProps) {
+	// Gradient ids must be unique per drawn header: the screens under the current one stay mounted, and a repeated id makes the browser
+	// pick the first (hidden, zero-size) copy, so the glows vanish on web.
+	const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
 	return (
 		<View
 			pointerEvents="none"
@@ -46,13 +50,19 @@ export function AppHeaderBackdrop({ base = APP_COLORS.ink, style }: AppHeaderBac
 					{GLOWS.map((g) => (
 						<RadialGradient
 							key={g.id}
-							id={g.id}
+							id={`${g.id}${uid}`}
 							cx={g.cx}
 							cy={g.cy}
 							fx={g.cx}
 							fy={g.cy}
-							rx={g.rx}
-							ry={g.ry}
+							{...(Platform.OS === 'web'
+								? {
+										// The web renderer ignores separate rx / ry (it draws a small round gradient, so the glows almost vanish): a round
+										// gradient stretched into the same ellipse reads the same everywhere.
+										r: g.rx,
+										gradientTransform: `translate(${g.cx} ${g.cy}) scale(1 ${g.ry / g.rx}) translate(${-g.cx} ${-g.cy})`,
+									}
+								: { rx: g.rx, ry: g.ry })}
 						>
 							<Stop offset="0" stopColor={g.color} stopOpacity={g.opacity} />
 							<Stop offset="0.7" stopColor={g.color} stopOpacity={0} />
@@ -60,7 +70,7 @@ export function AppHeaderBackdrop({ base = APP_COLORS.ink, style }: AppHeaderBac
 					))}
 				</Defs>
 				{GLOWS.map((g) => (
-					<Rect key={g.id} x="0" y="0" width="100%" height="100%" fill={`url(#${g.id})`} />
+					<Rect key={g.id} x="0" y="0" width="100%" height="100%" fill={`url(#${g.id}${uid})`} />
 				))}
 			</Svg>
 		</View>

@@ -49,7 +49,7 @@ export function RecentChatsSheet({ visible, chats, onClose, onNewChat, onOpenCha
 			) : (
 				<View>
 					<View style={styles.tools}>
-						<AppSearchBar context="careAiChats" value={query} onChangeText={setQuery} showMicrophone={false} style={styles.search} />
+						<AppSearchBar context="careAiChats" value={query} onChangeText={setQuery} style={styles.search} />
 						<TouchableOpacity onPress={onNewChat} accessibilityRole="button" style={styles.newChat}>
 							<AppPathIcon
 								d={CARE_AI_ICONS.plus}

@@ -48,6 +48,14 @@ export const SEARCH_CONTEXTS = {
 		placeholder: 'Search specialities or treatments',
 		hints: ['cardiology', 'dermatology', 'orthopaedics', 'dental care'],
 	},
+	communities: {
+		placeholder: 'Search by condition or topic',
+		hints: ['diabetes', 'cancer', 'anxiety', 'heart health', 'new parents'],
+	},
+	symptoms: {
+		placeholder: 'Search symptoms',
+		hints: ['knee pain', 'fever', 'headache', 'acidity', 'skin rash'],
+	},
 	myDoctors: {
 		placeholder: 'Search doctors by name or speciality',
 		hints: ['doctor name', 'cardiologist', 'last visited'],
