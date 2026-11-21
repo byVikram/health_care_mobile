@@ -1,6 +1,6 @@
 # health_care_mobile/ — KarolaHealth mobile app
 
-Part of the [healthcare2](../CLAUDE.md) monorepo (own `.git`, separate from the other two). App name "KarolaHealth", Expo slug `karola-health`, Android package `com.karolahealth.app`, Firebase project `karolahealth` (`google-services.json`). Serves patients, doctors and home-care (ancillary) providers (plus pharmacy / radiology / lab staff) against `health_care_backend`.
+Part of the [healthcare2](../CLAUDE.md) monorepo (own `.git`, separate from the other two). App name "KarolaHealth", Expo slug `karola-health`, Android package `com.karolahealth.app`, Firebase project `karolahealth` (`google-services.json`). Serves patients, doctors and home-care (ancillary) providers (plus radiology staff) against `health_care_backend`.
 
 ## Stack
 
@@ -39,7 +39,7 @@ npx expo prebuild --platform android       # applies app.json + plugins/ to the 
 
 ## Folder map (`src/`)
 
-- `features/<domain>/`: screens are `*Page.tsx` (a few `*Screen.tsx`), most with their own `components/`. Domains: `ancillary` (`patient/`, `staff/`), `appointment`, `app-update`, `auth`, `bookings`, `care-ai`, `consultation`, `dashboard`, `doctor` (`dashboard/`, `detail/`, `search/`, `book-slot/`), `events`, `health-feed`, `laboratory`, `medical-records`, `notification`, `onboarding`, `patient`, `patient-payment`, `pharmacy`, `portal`, `profile`, `radiology`, `referrals`, `settings`, `wallet`.
+- `features/<domain>/`: screens are `*Page.tsx` (a few `*Screen.tsx`), most with their own `components/`. Domains: `ancillary` (`patient/`, `staff/`), `appointment`, `app-update`, `auth`, `bookings`, `care-ai`, `consultation`, `dashboard`, `doctor` (`dashboard/`, `detail/`, `search/`, `book-slot/`), `events`, `health-feed`, `laboratory`, `medical-records`, `notification`, `onboarding`, `patient`, `patient-payment`, `portal`, `profile`, `radiology`, `referrals`, `settings`, `wallet`.
 - `components/common/`: shared UI in sub-folders `layout/ buttons/ inputs/ display/ feedback/ booking/ location/`, all re-exported from the barrel `index.ts`. `components/layout/SidebarLayout.tsx` is the drawer.
 - `services/` (`apiService.ts` + per-domain), `constants/apiUrls.ts` (**the only place for API paths**), `navigation/` (navigators, `routes.ts`, server-driven menu), `config/theme.ts` (tokens), `hooks/`, `utils/`, `types/`, `validation/`.
 - Top-level `assets/` (icon, splash, `notification/`, `sounds/`), `plugins/` (Expo config plugins + `offer-overlay/` Kotlin), `index.ts` (registers background push handlers before the app mounts).
@@ -66,6 +66,7 @@ npx expo prebuild --platform android       # applies app.json + plugins/ to the 
 - **Use the tokens in `src/config/theme.ts`** (`APP_COLORS`, `TONES`, `toneAt`, `STATUS_TONES`, `CARD_SHADOW`, `formatInr`), never hardcoded hex. The Paper `theme` export there is older. Reference screens: `features/doctor/book-slot/BookSlotPage.tsx`, `features/doctor/detail/DoctorDetailPage.tsx`.
 - Gotchas: a `ScrollView` sticky child's own style is replaced by RN (wrap it in a plain `View`); on Android a `PanResponder` drag must claim the touch in `onStartShouldSetPanResponder` (see `AppBottomSheet`).
 - **Home care:** a patient never picks a provider; orders are matched by speciality only and the first provider to accept wins. Payment is after each visit, each visit has its own completion OTP. Booking code is named `Ancillary…` (`ancillaryProviderBookingService.ts`, `AncillaryBookVisitPage`), not "HomeCare".
+- **Medicines** are ordered through LabStack (backend `docs/pharmacy-orders-labstack.md`). The old in-house pharmacy screens, the `pharmacy` role and their API paths are gone; the Pharmacy tile on Home and "Book again" for a pharmacy order only say "coming soon" until LabStack serves a pincode and the ordering screens are built.
 - **A doctor has one speciality:** the detail API may still return `specialities: string[]`; treat it as one value.
 
 ## Working agreements

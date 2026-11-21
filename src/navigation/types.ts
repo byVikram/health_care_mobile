@@ -215,21 +215,6 @@ export type AppStackParamList = {
 	[ROUTES.STACK.DOCTOR_PAST_VISIT]: { appointmentId: string; kind: 'noshow' | 'referred' | 'cancelled' | 'other'; referralId?: string; token?: string }
 	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: Omit<PatientPaymentParams, 'consentVersionId'> }
 	[ROUTES.STACK.VERIFY_ACCESS]: VerifyAccessParams | undefined
-	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
-	[ROUTES.STACK.ORDER_LIST]: undefined
-	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown; orderId?: string } | undefined
-	[ROUTES.STACK.PLACE_PHARMACY_ORDER]: {
-		pharmacyId: string
-		pharmacyName: string
-		// Optional provider details forwarded from the search list so the booking
-		// screen's ProviderDetailsCard can render without an extra fetch.
-		pharmacyAddress?: string
-		pharmacyCity?: string
-		pharmacyPhone?: string
-		pharmacyAvatarKey?: string | null
-		pharmacyOperatingHours?: { open: string; close: string }
-		pharmacyIs24x7?: boolean
-	}
 	[ROUTES.STACK.PLACE_RADIOLOGY_ORDER]: {
 		radiologyId: string
 		centerName?: string

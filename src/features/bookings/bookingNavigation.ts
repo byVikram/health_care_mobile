@@ -13,6 +13,7 @@ import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import type { BookingActionKey, BookingItem } from '../../services/bookingsService'
 import { openOnMap } from '../../utils/maps'
+import { showComingSoon } from '../../utils/toast'
 import { cancelAncillaryOrder, getAncillaryOrder } from '../ancillary/ancillaryProviderBookingService'
 
 /** Only 
@@ -53,9 +54,6 @@ export function openBookingTarget(navigation: BookingsNavigation, item: BookingI
 			return
 		case 'ancillary_tracking':
 			navigation.navigate(ROUTES.STACK.ANCILLARY_TRACK_APPOINTMENT, { bookingId: id })
-			return
-		case 'pharmacy_order':
-			navigation.navigate(ROUTES.STACK.ORDER_DETAILS, { orderId: id })
 			return
 		case 'lab_booking':
 			navigation.navigate(ROUTES.STACK.LABORATORY_BOOKING_TRACKING, { orderId: id })
@@ -129,7 +127,7 @@ async function cancelBooking(navigation: BookingsNavigation, item: BookingItem, 
 		}
 		return
 	}
-	// Pharmacy (and anything else): cancellation lives on the detail screen.
+	// Pharmacy (and anything else): nothing to cancel here yet.
 	openBookingTarget(navigation, item)
 }
 
@@ -155,7 +153,7 @@ function bookAgain(navigation: BookingsNavigation, item: BookingItem) {
 			navigation.navigate(ROUTES.STACK.LABORATORY_LIST)
 			return
 		case 'pharmacy':
-			navigation.navigate(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
+			showComingSoon('Medicine delivery is coming soon in your area.')
 			return
 		default:
 			openBookingTarget(navigation, item)
@@ -193,7 +191,7 @@ export async function runBookingAction(
 			openBookingTarget(navigation, item)
 			return
 		// view / view_pay / track / reschedule / view_report (the lab details page shows the report) /
-		// reorder / invoice (both on the pharmacy order page) / anything new -> the target.
+		// reorder / invoice / anything new -> the target.
 		default:
 			openBookingTarget(navigation, item)
 	}

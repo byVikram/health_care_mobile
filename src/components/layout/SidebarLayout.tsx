@@ -178,9 +178,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 	}
 
 	const handleSearchPress = () => {
-		if (role === 'pharmacy') {
-			navigation.navigate(ROUTES.STACK.ORDER_LIST as any)
-		} else if (role === 'radiology') {
+		if (role === 'radiology') {
 			navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS as any)
 		} else {
 			navigation.navigate(ROUTES.MAIN.TABS, {

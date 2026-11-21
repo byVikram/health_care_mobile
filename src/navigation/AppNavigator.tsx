@@ -38,10 +38,6 @@ import WelcomeDoctorPage from '../features/onboarding/WelcomeDoctorPage'
 import VisitSummaryPage from '../features/appointment/VisitSummaryPage'
 import AppointmentDetailsPage from '../features/appointment/AppointmentDetailsPage'
 import DoctorPastVisitPage from '../features/doctor/dashboard/DoctorPastVisitPage'
-import PharmacySearchPage from '../features/pharmacy/PharmacySearchPage'
-import OrderListPage from '../features/pharmacy/OrderListPage'
-import PharmacyOrderDetailsPage from '../features/pharmacy/PharmacyOrderDetailsPage'
-import PlacePharmacyOrderPage from '../features/pharmacy/PlacePharmacyOrderPage'
 
 import LabCatalogPage from '../features/laboratory/LabCatalogPage'
 import LabCartPage from '../features/laboratory/LabCartPage'
@@ -142,29 +138,9 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.PATIENT_QUESTION_DETAIL as keyof AppStackParamList} component={QuestionThreadPage} options={{ headerShown: false }} />
 
 				<AppStack.Screen
-					name={ROUTES.STACK.PHARMACY_SEARCH_PAGE}
-					component={PharmacySearchPage}
-					options={{ headerShown: true, title: 'Pharmacies' }}
-				/>
-				<AppStack.Screen
 					name={ROUTES.STACK.RADIOLOGY_ORDERS as keyof AppStackParamList}
 					component={OrderListRadiologyPage}
 					options={{ headerShown: true, title: 'Radiology Orders' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.ORDER_LIST}
-					component={OrderListPage}
-					options={{ headerShown: true, title: 'Medicine Orders' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.ORDER_DETAILS}
-					component={PharmacyOrderDetailsPage}
-					options={{ headerShown: true, title: 'Order Details' }}
-				/>
-				<AppStack.Screen
-					name={ROUTES.STACK.PLACE_PHARMACY_ORDER}
-					component={PlacePharmacyOrderPage}
-					options={{ headerShown: true, title: 'Order Medicines' }}
 				/>
 				<AppStack.Screen
 					name={ROUTES.STACK.RADIOLOGY_LIST as keyof AppStackParamList}

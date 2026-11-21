@@ -11,8 +11,7 @@ import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import { AppButton, AppCalendar, AppInput, AppSelect, AppTypography, ProviderDetailsCard, StatusModal } from '../../components/common'
 import { createRadiologyBooking, fetchRadiologyScans, RadiologyBookingPayload } from './radiologyService'
-import { getPatientTreatmentHistory} from '../profile/pharmacy/pharmacyService'
-import {TreatmentRecord } from '../pharmacy/pharmacyService'
+import { getPatientTreatmentHistory, TreatmentRecord } from '../profile/patient/PatientProfileService'
 
 type RouteProps = RouteProp<AppStackParamList, typeof ROUTES.STACK.PLACE_RADIOLOGY_ORDER>
 

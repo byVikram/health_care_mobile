@@ -2,7 +2,7 @@
 
 The patient, doctor and home-care provider app of Karolahealth, built with React Native and Expo. It talks to the FastAPI backend in `health_care_backend/` and shares its accounts with the web app in `health_care_frontend/`.
 
-- **Patients:** find and book doctors (clinic or video), lab tests, pharmacy and radiology, book home-care visits, see everything in one Bookings list, keep medical records and family members.
+- **Patients:** find and book doctors (clinic or video), lab tests and radiology (medicine delivery is coming), book home-care visits, see everything in one Bookings list, keep medical records and family members.
 - **Doctors:** schedule, booking requests (with an auto-confirm switch), consultations with vitals and notes, referrals, availability.
 - **Home-care (ancillary) providers:** Today, incoming requests (instant requests ring like a ride request, even with the app closed), visits, arrival and no-show handling.
 - **Everyone:** push notifications, family profiles, server-driven menu per role.
@@ -95,7 +95,7 @@ assets/                  # icon, splash, notification icons, sounds
 src/
 ├── features/<domain>/   # screens (*Page.tsx) and their components: ancillary, appointment, auth,
 │                        #   bookings, consultation, dashboard, doctor, laboratory, medical-records,
-│                        #   notification, patient, pharmacy, profile, radiology, wallet ...
+│                        #   notification, patient, profile, radiology, wallet ...
 ├── components/common/   # shared UI (layout/, buttons/, inputs/, display/, feedback/, booking/,
 │                        #   location/), re-exported from the barrel index.ts
 ├── services/            # apiService.ts (axios + session handling) and per-domain services

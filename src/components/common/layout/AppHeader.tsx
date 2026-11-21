@@ -494,10 +494,8 @@ function RoleHomeHeader({
 	}, [avatarUri])
 
 	const isDoctor = role === 'doctor'
-	const isPharmacy = role === 'pharmacy'
-
 	const isRadiology = role === USER_ROLES.RADIOLOGY
-	const isPatient = !isDoctor && !isPharmacy && !isRadiology
+	const isPatient = !isDoctor && !isRadiology
 
 	const isPhysiotherapy =
 		(role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE) &&
@@ -529,38 +527,17 @@ function RoleHomeHeader({
 				})
 			: 1
 
-	// ── Display name (pharmacy fallback) ─────────────────────────────────────
+	// ── Display name ─────────────────────────────────────────────────────────
 	let displayName = 'User'
 	if (user) {
-		if (isPharmacy) {
-			displayName =
-				(user as any).pharmacy_name ||
-				(user as any).business_name ||
-				(user as any).store_name ||
-				(user as any).pharmacyName ||
-				(user as any).businessName ||
-				(user as any).full_name ||
-				user.name
-			if (!displayName && user.email) {
-				displayName = user.email.split('@')[0]
-			}
-			if (!displayName) displayName = 'Pharmacy'
-		} else {
-			displayName = user.name || (user as any).full_name || userName
-		}
+		displayName = user.name || (user as any).full_name || userName
 	} else {
 		displayName = userName
 	}
 
 	const isNurse = role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE
 
-	const searchContext: SearchContextKey = isPharmacy
-		? 'home.pharmacy'
-		: isRadiology
-			? 'home.radiology'
-			: isNurse
-				? 'home.ancillary'
-				: 'doctors'
+	const searchContext: SearchContextKey = isRadiology ? 'home.radiology' : isNurse ? 'home.ancillary' : 'doctors'
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	const handleSearchPress = () => {
@@ -573,10 +550,7 @@ function RoleHomeHeader({
 			return
 		}
 
-		if (isPharmacy) {
-			console.log('ORDER_LIST')
-			navigation.navigate(ROUTES.STACK.ORDER_LIST)
-		} else if (isRadiology) {
+		if (isRadiology) {
 			console.log('RADIOLOGY_ORDERS')
 			navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS)
 		} else {
