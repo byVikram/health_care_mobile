@@ -296,10 +296,11 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 		setOfferBusy(true)
 		void dismissOfferNotification(offer.requestId)
 		try {
-			await rejectOffer(offer.requestId)
+			const declined = await rejectOffer(offer.requestId)
 			offerGone.current.add(offer.requestId)
 			closeOfferSheet()
-			Toast.show({ type: 'success', text1: 'Request declined' })
+			// Already hers (her Accept got there first): nothing was declined, so no toast; the reload below shows the visit.
+			if (declined) Toast.show({ type: 'success', text1: 'Request declined' })
 		} catch (e) {
 			showStatusModal({
 				status: 'error',

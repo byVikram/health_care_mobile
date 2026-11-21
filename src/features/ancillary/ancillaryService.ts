@@ -1066,10 +1066,14 @@ export const acceptCareRequestBackend = async (
 		}
 	} catch (error: any) {
 		if (error.response?.status === 409 || simulateClaimed) {
+			// OFFER_EXPIRED: her own offer of the request has ended (30 seconds), nobody else has it yet.
+			const offerEnded = error.response?.data?.detail?.code === 'OFFER_EXPIRED'
 			return {
 				success: false,
 				alreadyClaimed: true,
-				message: 'This care request has already been assigned to another nurse.',
+				message: offerEnded
+					? 'This offer has ended.'
+					: 'This care request has already been assigned to another nurse.',
 			}
 		}
 		return {
