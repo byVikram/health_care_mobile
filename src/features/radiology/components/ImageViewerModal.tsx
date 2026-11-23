@@ -70,7 +70,6 @@ export default function ImageViewerModal({
       onRequestClose={onClose}
     >
       <StatusBar
-        backgroundColor="rgba(0,0,0,0.95)"
         barStyle="light-content"
       />
 

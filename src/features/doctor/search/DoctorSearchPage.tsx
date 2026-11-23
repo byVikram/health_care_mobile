@@ -456,7 +456,7 @@ export default function DoctorSearchPage() {
 					)
 				}
 				ListEmptyComponent={
-					isInitialLoading ? null : (
+					isInitialLoading ? undefined : (
 						<View style={styles.emptyContainer}>
 							<AppTypography style={styles.emptyTitle}>No doctors match</AppTypography>
 							<AppTypography style={styles.emptySubtext}>

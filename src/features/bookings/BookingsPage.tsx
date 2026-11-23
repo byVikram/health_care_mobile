@@ -355,7 +355,7 @@ export default function BookingsPage() {
 
 	return (
 		<View style={styles.container}>
-			{isFocused && <StatusBar barStyle="light-content" backgroundColor={APP_COLORS.ink} />}
+			{isFocused && <StatusBar barStyle="light-content" />}
 
 			<View style={[styles.hero, { paddingTop: insets.top + 8 }]}>
 				<AppHeaderBackdrop />
@@ -401,7 +401,7 @@ export default function BookingsPage() {
 				ListHeaderComponent={listHeader}
 				ListEmptyComponent={listEmpty}
 				ListFooterComponent={
-					loadingMore ? <ActivityIndicator style={styles.footerSpinner} color={APP_COLORS.primary} /> : null
+					loadingMore ? <ActivityIndicator style={styles.footerSpinner} color={APP_COLORS.primary} /> : undefined
 				}
 				onEndReached={() => void loadMore()}
 				onEndReachedThreshold={0.4}

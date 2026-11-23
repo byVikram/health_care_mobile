@@ -411,7 +411,7 @@ export default function BookingDetailsScreen() {
 
 	return (
 		<View style={styles.container}>
-			<StatusBar barStyle="light-content" backgroundColor={APP_COLORS.primary} />
+			<StatusBar barStyle="light-content" />
 
 			<AppScreenHeader
 				variant="bar"

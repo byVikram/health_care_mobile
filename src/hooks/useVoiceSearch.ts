@@ -14,7 +14,7 @@
 // - Language: English (the app has no other language): en-IN first, en-US when the recogniser does not offer it.
 
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { AppState, InteractionManager } from 'react-native'
+import { AppState } from 'react-native'
 import { NavigationContext } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import type { ExpoSpeechRecognitionErrorEvent, ExpoSpeechRecognitionResultEvent } from 'expo-speech-recognition'
@@ -367,11 +367,11 @@ export function useVoiceSearch({
 			return
 		}
 		if (!enabled || startedAutoRef.current) return
-		let task: { cancel: () => void } | null = null
+		let task: number | null = null
 		const run = () => {
 			if (startedAutoRef.current) return
 			startedAutoRef.current = true
-			task = InteractionManager.runAfterInteractions(() => {
+			task = requestIdleCallback(() => {
 				void start()
 				onAutoStartedRef.current?.()
 			})
@@ -381,7 +381,7 @@ export function useVoiceSearch({
 		else offFocus = navigation.addListener('focus', run)
 		return () => {
 			offFocus?.()
-			task?.cancel()
+			if (task !== null) cancelIdleCallback(task)
 		}
 	}, [autoStart, enabled, navigation, start])
 
