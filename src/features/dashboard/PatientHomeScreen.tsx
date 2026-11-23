@@ -16,6 +16,7 @@ import HomeCommunitiesSection from './components/HomeCommunitiesSection'
 import HomeHealthReadsSection from './components/HomeHealthReadsSection'
 import HomeOffersSection from './components/HomeOffersSection'
 import HomeScrollView from './components/HomeScrollView'
+import UpcomingEventsSection from './components/EventSection'
 import PatientUpcomingAppointments from './components/PatientUpcomingAppointments'
 import QuickServicesSection from './components/QuickServicesSection'
 import ServicesSection from './components/ServiceSection'
@@ -86,6 +87,7 @@ export default function PatientHomeScreen() {
 				<ConsultSection specialities={specialities} />
 				<HomeHealthReadsSection refreshToken={refreshToken} />
 				<HomeCommunitiesSection refreshToken={refreshToken} />
+				<UpcomingEventsSection refreshToken={refreshToken} />
 				<AskDoctorSection itemLimit={3} refreshToken={refreshToken} />
 			</View>
 		</HomeScrollView>
