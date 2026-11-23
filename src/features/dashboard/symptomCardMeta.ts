@@ -1,9 +1,10 @@
 // src/features/dashboard/symptomCardMeta.ts
 //
-// How a symptom (from GET /api/specialities/symptoms) looks as a card: short label, tone and glyph. Shared by Home's "Not feeling well?"
+// How a symptom (from GET /api/specialities/symptoms) looks as a card: its server label, tone and glyph. Shared by Home's "Not feeling well?"
 // row and the Symptoms page, so the two always draw a symptom the same way.
 //
-// - SYMPTOM_META: the six symptoms Home has always shown, keyed by their icon_key. They keep their short Home labels, tones and glyphs.
+// - SYMPTOM_META: the six symptoms Home has always shown, keyed by their icon_key. They keep their tones and glyphs; the NAME is always
+//   the server's label, the same text the web app shows (never a shortened copy).
 //   Home shows its four cards from THESE keys only (see isHomeSymptom), so symptoms added later never change Home.
 // - NEW_SYMPTOM_ICONS / SYMPTOM_TAGS: glyphs (24x24 strokes from the "0 · Symptoms" design) and search keywords of the symptoms added by
 //   health_care_backend/scripts/seed_symptom_library.py, keyed by the same icon_key. A key not listed here (an admin added a symptom) gets
@@ -12,14 +13,14 @@ import { TONES, toneForString, type ToneKey } from '../../config/theme'
 import type { SymptomItem } from '../../types/speciality'
 import { HOME_ICONS } from './homeTheme'
 
-/** icon_key (symptoms API) -> short Home label, tone and glyph. */
-export const SYMPTOM_META: Record<string, { label: string; tone: ToneKey; icon: string }> = {
-	acne: { label: 'Skin & acne', tone: 'peach', icon: HOME_ICONS.skin },
-	child: { label: 'Child unwell', tone: 'sky', icon: HOME_ICONS.child },
-	cough: { label: 'Cold & fever', tone: 'mint', icon: HOME_ICONS.thermometer },
-	depression: { label: 'Stress & anxiety', tone: 'lilac', icon: HOME_ICONS.brain },
-	pregnancy: { label: 'Periods & pregnancy', tone: 'sand', icon: HOME_ICONS.female },
-	performance: { label: 'Sexual health', tone: 'sky', icon: HOME_ICONS.pulse },
+/** icon_key (symptoms API) -> tone and glyph. */
+export const SYMPTOM_META: Record<string, { tone: ToneKey; icon: string }> = {
+	acne: { tone: 'peach', icon: HOME_ICONS.skin },
+	child: { tone: 'sky', icon: HOME_ICONS.child },
+	cough: { tone: 'mint', icon: HOME_ICONS.thermometer },
+	depression: { tone: 'lilac', icon: HOME_ICONS.brain },
+	pregnancy: { tone: 'sand', icon: HOME_ICONS.female },
+	performance: { tone: 'sky', icon: HOME_ICONS.pulse },
 }
 
 export const NEW_SYMPTOM_ICONS: Record<string, string> = {
@@ -108,14 +109,14 @@ export const SYMPTOM_TAGS: Record<string, string> = {
 /** A symptom Home has always shown: its icon_key is one of the six in SYMPTOM_META. Home's cards are picked with this. */
 export const isHomeSymptom = (s: SymptomItem) => !!s.icon_key && s.icon_key in SYMPTOM_META
 
-/** The card: label, tone pair and glyph. The six old symptoms keep their short Home look; any other uses its own label. */
+/** The card: the server's label, a tone pair and a glyph. The six old symptoms keep their own tone and glyph. */
 export const symptomMeta = (s: SymptomItem) => {
 	const meta = s.icon_key ? SYMPTOM_META[s.icon_key] : undefined
-	if (meta) return { label: meta.label, pair: TONES[meta.tone], icon: meta.icon }
+	if (meta) return { label: s.label, pair: TONES[meta.tone], icon: meta.icon }
 	const icon = (s.icon_key && NEW_SYMPTOM_ICONS[s.icon_key]) || HOME_ICONS.pulse
 	return { label: s.label, pair: toneForString(s.label), icon }
 }
 
 /** Everything the search box looks at for one symptom, lower-cased. */
 export const symptomSearchText = (s: SymptomItem) =>
-	`${symptomMeta(s).label} ${s.label} ${s.speciality_label ?? ''} ${(s.icon_key && SYMPTOM_TAGS[s.icon_key]) || ''}`.toLowerCase()
+	`${s.label} ${s.speciality_label ?? ''} ${(s.icon_key && SYMPTOM_TAGS[s.icon_key]) || ''}`.toLowerCase()

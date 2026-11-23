@@ -1,342 +1,332 @@
-import React, { useEffect, useState } from 'react'
-import {
-	View,
-	ScrollView,
-	StyleSheet,
-	Image,
-	ActivityIndicator,
-	useWindowDimensions,
-	Platform,
-} from 'react-native'
-import { useRoute, useNavigation } from '@react-navigation/native'
+// src/features/events/EventDetailsPage.tsx
+//
+// "9a · Event detail": the shared teal header bar (back chevron, share), the hero (cover picture or the category's tone and icon), a card
+// that overlaps it (category + mode badges, title, date, time, venue), the description, and a footer with "Add to
+// calendar" and "Register now". Data: GET /api/events/public/{id}. Registration is the organiser's own link, so the
+// design's in-app "Registered" state, "going" count and host card are not shown.
+
+import React, { useCallback, useEffect, useState } from 'react'
+import { ActivityIndicator, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 
-import { AppScreenHeader, AppTypography, AppButton } from '../../components/common'
-import type { EventItem } from '../../components/common/display/EventCard'
-import ApiService from '../../services/apiService'
-import { API_ENDPOINTS } from '../../constants/apiUrls'
+import { AppPathIcon, AppScreenHeader } from '../../components/common'
+import { EVENT_ICONS, lookForEvent } from '../../components/common/display/eventLook'
+import { APP_COLORS } from '../../config/theme'
 import type { AppStackParamList } from '../../navigation/types'
+import { getPublicEvent } from '../../services/eventService'
+import type { EventItem } from '../../types/event'
+import { addToCalendar } from '../../utils/calendar'
+import { eventDateParts, formatTimeRange, isOnlineEvent, parseEventDate } from '../../utils/eventFormat'
 import { openWebUrl } from '../../utils/safeLinking'
-import Toast from 'react-native-toast-message'
+import { openRegistration } from './eventActions'
 
-const TEAL = '#0c7c7c'
-const DEFAULT_COVER_IMAGE = 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=800&q=80'
+type EventDetailsRoute = RouteProp<AppStackParamList, 'EventDetails'>
 
-type EventDetailsRouteProp = RouteProp<AppStackParamList, 'EventDetails'>
-
-function formatTime(timeStr?: string) {
-	if (!timeStr) return ''
-	const [h, m] = timeStr.split(':')
-	let hr = parseInt(h, 10)
-	const suffix = hr >= 12 ? 'PM' : 'AM'
-	hr = hr % 12 || 12
-	return `${hr}:${m} ${suffix}`
-}
-
-export function formatApiDateForDisplay(dateString?: string) {
-	if (!dateString) return ''
-	const d = new Date(dateString)
-	return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+function InfoRow({ icon, title, sub }: { icon: string; title: string; sub?: string }) {
+	return (
+		<View style={styles.infoRow}>
+			<View style={styles.infoIcon}>
+				<AppPathIcon d={icon} size={20} strokeWidth={2} color={APP_COLORS.primary} />
+			</View>
+			<View style={styles.infoText}>
+				<Text style={styles.infoTitle}>{title}</Text>
+				{!!sub && <Text style={styles.infoSub}>{sub}</Text>}
+			</View>
+		</View>
+	)
 }
 
 export default function EventDetailsPage() {
-	const route = useRoute<EventDetailsRouteProp>()
 	const navigation = useNavigation()
-	const { eventId } = route.params
+	const { eventId } = useRoute<EventDetailsRoute>().params
 	const insets = useSafeAreaInsets()
 
 	const [event, setEvent] = useState<EventItem | null>(null)
 	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
-	const { width } = useWindowDimensions()
+	const [error, setError] = useState(false)
 
-	useEffect(() => {
-		let isMounted = true
-		const fetchEvent = async () => {
-			if (!eventId) return
-			setLoading(true)
-			setError(null)
-			try {
-				const res = await ApiService.get<any>(API_ENDPOINTS.EVENTS.PUBLIC_DETAIL(eventId))
-				if (isMounted && res.data?.data) {
-					setEvent(res.data.data)
-				}
-			} catch (err) {
-				console.error('Failed to fetch event detail:', err)
-				if (isMounted) {
-					setError('Could not load event details. Please try again.')
-				}
-			} finally {
-				if (isMounted) {
-					setLoading(false)
-				}
-			}
-		}
-
-		fetchEvent()
-
-		return () => {
-			isMounted = false
+	const load = useCallback(async () => {
+		setLoading(true)
+		setError(false)
+		try {
+			setEvent(await getPublicEvent(eventId))
+		} catch {
+			setError(true)
+		} finally {
+			setLoading(false)
 		}
 	}, [eventId])
 
-	if (loading) {
+	useEffect(() => {
+		void load()
+	}, [load])
+
+	const header = (shareButton?: React.ReactNode) => (
+		<AppScreenHeader
+			variant="bar"
+			solid
+			title="Event details"
+			onBack={() => navigation.goBack()}
+			backAccessibilityLabel="Back to events"
+			rightElement={shareButton}
+		/>
+	)
+
+	if (loading || error || !event) {
 		return (
-			<View style={styles.container}>
-				<AppScreenHeader title="Event Details" onBack={() => navigation.goBack()} />
+			<View style={styles.screen}>
+				{header()}
 				<View style={styles.center}>
-					<ActivityIndicator size="large" color={TEAL} />
+					{loading ? (
+						<ActivityIndicator color={APP_COLORS.primary} />
+					) : (
+						<Pressable onPress={() => void load()} accessibilityRole="button">
+							<Text style={styles.infoTitle}>
+								{error
+									? 'Couldn’t load this event. Tap to try again.'
+									: 'This event is no longer available.'}
+							</Text>
+						</Pressable>
+					)}
 				</View>
 			</View>
 		)
 	}
 
-	if (error || !event) {
-		return (
-			<View style={styles.container}>
-				<AppScreenHeader title="Event Details" onBack={() => navigation.goBack()} />
-				<View style={styles.center}>
-					<AppTypography variant="body" style={{ color: 'red', textAlign: 'center' }}>
-						{error || 'Event not found'}
-					</AppTypography>
-				</View>
-			</View>
-		)
+	const look = lookForEvent(event.category)
+	const online = isOnlineEvent(event)
+	const date = eventDateParts(event.event_date)
+	const time = formatTimeRange(event.event_date, event.event_time, event.end_time)
+	const venue = event.location?.trim()
+	const hasLink = !!event.registration_link?.trim()
+
+	const share = async () => {
+		const when = [date.long, time].filter(Boolean).join(', ')
+		const message = [event.title, when, online ? 'Online' : venue, hasLink ? event.registration_link : '']
+			.filter(Boolean)
+			.join('\n')
+		try {
+			await Share.share({ message })
+		} catch {
+			// The user closed the share sheet or sharing is unavailable: nothing to tell them.
+		}
 	}
 
-	const dateStr = formatApiDateForDisplay(event.event_date)
-	const timeStr = `${formatTime(event.event_time)} - ${formatTime(event.end_time)}`
-	const locationText = event.location_type === 'online' ? 'Online Event' : event.location || 'Location not provided'
-	const hasRegistrationLink = !!event.registration_link
+	const calendar = async () => {
+		const start = parseEventDate(event.event_date, event.event_time)
+		if (!start) return
+		await addToCalendar({
+			title: event.title,
+			start,
+			end: parseEventDate(event.event_date, event.end_time),
+			location: online ? undefined : venue,
+			notes: event.description,
+		})
+	}
 
-	const handleRegister = () => {
-		if (event.registration_link) {
-			openWebUrl(event.registration_link).catch(() => {
-				Toast.show({ type: 'error', text1: 'Could not open registration link.' })
-			})
-		} else {
-			Toast.show({ type: 'info', text1: 'Registration link is not available for this event.' })
+	const directions = async () => {
+		if (!venue) return
+		try {
+			await openWebUrl(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue)}`)
+		} catch {
+			// Maps could not be opened; the venue is still shown on screen.
 		}
 	}
 
 	return (
-		<View style={styles.container}>
-			<AppScreenHeader title="Event Details" onBack={() => navigation.goBack()} />
+		<View style={styles.screen}>
+			{header(
+				<Pressable
+					onPress={() => void share()}
+					accessibilityRole="button"
+					accessibilityLabel="Share event"
+					style={styles.shareBtn}
+				>
+					<AppPathIcon d={EVENT_ICONS.share} size={22} strokeWidth={2} color="#FFFFFF" />
+				</Pressable>
+			)}
+			<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+				<View style={[styles.hero, { backgroundColor: look.tone.bg }]}>
+					{event.cover_image_url ? (
+						<Image
+							source={{ uri: event.cover_image_url }}
+							style={StyleSheet.absoluteFill}
+							resizeMode="cover"
+						/>
+					) : (
+						<>
+							<View style={styles.heroCircleA} />
+							<View style={styles.heroCircleB} />
+							<AppPathIcon d={look.icon} size={64} strokeWidth={1.6} color={look.tone.ink} />
+						</>
+					)}
+				</View>
 
-			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-				<Image
-					source={{ uri: event.cover_image_url || DEFAULT_COVER_IMAGE }}
-					style={[styles.coverImage, { height: width * 0.6 }]}
-					resizeMode="cover"
-				/>
-
-				<View style={styles.contentContainer}>
-					<View style={styles.categoryBadge}>
-						<AppTypography variant="caption" style={styles.categoryText}>
+				<View style={styles.card}>
+					<View style={styles.badges}>
+						<Text style={[styles.badge, { backgroundColor: look.tone.bg, color: look.tone.ink }]}>
 							{event.category_label || event.category}
-						</AppTypography>
+						</Text>
+						<Text style={[styles.badge, styles.badgeDark]}>{online ? 'Online' : 'In person'}</Text>
 					</View>
+					<Text style={styles.title}>{event.title}</Text>
+					<InfoRow icon={EVENT_ICONS.calendar} title={date.long} />
+					<InfoRow icon={EVENT_ICONS.clock} title={time} />
+					<InfoRow
+						icon={online ? EVENT_ICONS.video : EVENT_ICONS.pin}
+						title={online ? 'Online event' : venue || 'Venue to be announced'}
+						sub={online && hasLink ? 'Register to get the joining details' : undefined}
+					/>
+					{!online && !!venue && (
+						<Pressable onPress={() => void directions()} accessibilityRole="link" style={styles.directions}>
+							<Text style={styles.directionsText}>Get directions</Text>
+							<AppPathIcon
+								d={EVENT_ICONS.chevron}
+								size={14}
+								strokeWidth={2.4}
+								color={APP_COLORS.primary}
+							/>
+						</Pressable>
+					)}
+				</View>
 
-					<AppTypography variant="h3" style={styles.title}>
-						{event.title}
-					</AppTypography>
-
-					<View style={styles.detailsBox}>
-						<View style={styles.detailRow}>
-							<View style={styles.iconContainer}>
-								<Ionicons name="calendar-outline" size={20} color={TEAL} />
-							</View>
-							<View style={styles.detailTextContainer}>
-								<AppTypography variant="caption" style={styles.detailLabel}>
-									Date
-								</AppTypography>
-								<AppTypography variant="body" style={styles.detailValue}>
-									{dateStr}
-								</AppTypography>
-							</View>
-						</View>
-
-						<View style={styles.detailRow}>
-							<View style={styles.iconContainer}>
-								<Ionicons name="time-outline" size={20} color={TEAL} />
-							</View>
-							<View style={styles.detailTextContainer}>
-								<AppTypography variant="caption" style={styles.detailLabel}>
-									Time
-								</AppTypography>
-								<AppTypography variant="body" style={styles.detailValue}>
-									{timeStr}
-								</AppTypography>
-							</View>
-						</View>
-
-						<View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
-							<View style={styles.iconContainer}>
-								{event.location_type === 'online' ? (
-									<Ionicons name="videocam-outline" size={20} color={TEAL} />
-								) : (
-									<Ionicons name="location-outline" size={20} color={TEAL} />
-								)}
-							</View>
-							<View style={styles.detailTextContainer}>
-								<AppTypography variant="caption" style={styles.detailLabel}>
-									Location
-								</AppTypography>
-								<AppTypography variant="body" style={styles.detailValue}>
-									{locationText}
-								</AppTypography>
-							</View>
-						</View>
-					</View>
-
-					<AppTypography variant="h3" style={styles.sectionTitle}>
-						About this Event
-					</AppTypography>
-					
-					<AppTypography variant="body" style={styles.description}>
-						{event.description}
-					</AppTypography>
+				<View style={styles.section}>
+					<Text style={styles.h2} accessibilityRole="header">
+						About this event
+					</Text>
+					<Text style={styles.body}>{event.description}</Text>
 				</View>
 			</ScrollView>
 
-			<View style={[styles.bottomBar, { paddingBottom: 16 + insets.bottom }]}>
-				<AppButton
-					variant="primary"
-					onPress={handleRegister}
-					disabled={!hasRegistrationLink}
-					style={[styles.registerBtn, !hasRegistrationLink && styles.registerBtnDisabled]}
-					labelStyle={styles.registerBtnText}
-				>
-					{hasRegistrationLink ? 'Register Now' : 'Registration Closed'}
-				</AppButton>
+			<View style={[styles.footer, { paddingBottom: 20 + Math.max(insets.bottom - 12, 0) }]}>
+				<Pressable onPress={() => void calendar()} accessibilityRole="button" style={styles.calendarBtn}>
+					<AppPathIcon d={EVENT_ICONS.calendar} size={18} strokeWidth={2} color={APP_COLORS.primary} />
+					<Text style={styles.calendarText}>Add to calendar</Text>
+				</Pressable>
+				{hasLink && (
+					<Pressable
+						onPress={() => void openRegistration(event)}
+						accessibilityRole="button"
+						style={styles.registerBtn}
+					>
+						<Text style={styles.registerText}>Register now</Text>
+					</Pressable>
+				)}
 			</View>
 		</View>
 	)
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: '#f8fafc',
+	screen: { flex: 1, backgroundColor: APP_COLORS.pageBg },
+	center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+	content: { paddingBottom: 24, gap: 12 },
+	shareBtn: { width: 44, height: 44, marginRight: -10, alignItems: 'center', justifyContent: 'center' },
+	hero: { height: 220, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+	heroCircleA: {
+		position: 'absolute',
+		right: -40,
+		top: -40,
+		width: 200,
+		height: 200,
+		borderRadius: 100,
+		backgroundColor: '#FFFFFF66',
 	},
-	center: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		padding: 20,
+	heroCircleB: {
+		position: 'absolute',
+		left: -30,
+		bottom: -60,
+		width: 160,
+		height: 160,
+		borderRadius: 80,
+		backgroundColor: '#FFFFFF4D',
 	},
-	scrollContent: {
-		paddingBottom: 100,
-	},
-	coverImage: {
-		width: '100%',
-		backgroundColor: '#edf4f5',
-	},
-	contentContainer: {
-		padding: 20,
-		marginTop: -20,
-		backgroundColor: '#f8fafc',
-		borderTopLeftRadius: 20,
-		borderTopRightRadius: 20,
-	},
-	categoryBadge: {
-		alignSelf: 'flex-start',
-		backgroundColor: 'rgba(12, 124, 124, 0.1)',
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 8,
-		marginBottom: 16,
-	},
-	categoryText: {
-		fontWeight: '600',
-		color: TEAL,
-		fontSize: 12,
-	},
-	title: {
-		fontSize: 22,
-		lineHeight: 30,
-		fontWeight: '800',
-		color: '#11283a',
-		marginBottom: 24,
-	},
-	detailsBox: {
-		backgroundColor: '#fff',
-		borderRadius: 16,
+	card: {
+		marginHorizontal: 16,
+		marginTop: -36,
 		padding: 16,
-		marginBottom: 32,
-		...Platform.select({
-			ios: {
-				shadowColor: '#000',
-				shadowOffset: { width: 0, height: 4 },
-				shadowOpacity: 0.05,
-				shadowRadius: 10,
-			},
-			android: {
-				elevation: 2,
-			},
-		}),
+		gap: 14,
+		borderRadius: 16,
+		backgroundColor: APP_COLORS.surface,
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
 	},
-	detailRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#f1f5f9',
+	badges: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+	badge: {
+		paddingHorizontal: 8,
+		paddingVertical: 2,
+		borderRadius: 6,
+		overflow: 'hidden',
+		fontSize: 11,
+		lineHeight: 16,
+		fontWeight: '800',
 	},
-	iconContainer: {
+	badgeDark: { backgroundColor: APP_COLORS.ink, color: '#FFFFFF', fontWeight: '700' },
+	title: { fontSize: 22, lineHeight: 28, fontWeight: '800', color: APP_COLORS.ink },
+	infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+	infoIcon: {
 		width: 40,
 		height: 40,
-		borderRadius: 20,
-		backgroundColor: '#f0fdfa',
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.mint,
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginRight: 16,
 	},
-	detailTextContainer: {
-		flex: 1,
+	infoText: { flex: 1, minWidth: 0, justifyContent: 'center', minHeight: 40 },
+	infoTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: APP_COLORS.ink },
+	infoSub: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
+	directions: {
+		alignSelf: 'flex-start',
+		marginTop: -4,
+		marginLeft: 52,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
 	},
-	detailLabel: {
-		color: '#64748b',
-		marginBottom: 2,
+	directionsText: { fontSize: 13, fontWeight: '700', color: APP_COLORS.primary },
+	section: {
+		marginHorizontal: 16,
+		padding: 16,
+		gap: 8,
+		borderRadius: 14,
+		backgroundColor: APP_COLORS.surface,
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
 	},
-	detailValue: {
-		fontWeight: '600',
-		color: '#1e293b',
-	},
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: '700',
-		color: '#11283a',
-		marginBottom: 12,
-	},
-	description: {
-		fontSize: 15,
-		lineHeight: 24,
-		color: '#475569',
-	},
-	bottomBar: {
-		position: 'absolute',
-		bottom: 0,
-		left: 0,
-		right: 0,
-		backgroundColor: '#fff',
-		paddingHorizontal: 20,
-		paddingTop: 16,
+	h2: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: APP_COLORS.ink },
+	body: { fontSize: 14, lineHeight: 21, color: APP_COLORS.ink },
+	footer: {
+		flexDirection: 'row',
+		gap: 10,
+		paddingHorizontal: 16,
+		paddingTop: 12,
+		backgroundColor: APP_COLORS.surface,
 		borderTopWidth: 1,
-		borderTopColor: '#e2e8f0',
+		borderTopColor: APP_COLORS.divider,
 	},
-	registerBtn: {
+	calendarBtn: {
+		flexGrow: 1,
+		height: 48,
+		paddingHorizontal: 14,
 		borderRadius: 12,
-		height: 54,
-		backgroundColor: TEAL,
+		borderWidth: 1,
+		borderColor: APP_COLORS.primary,
+		backgroundColor: APP_COLORS.surface,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 6,
 	},
-	registerBtnDisabled: {
-		backgroundColor: '#cbd5e1',
+	calendarText: { fontSize: 14, fontWeight: '700', color: APP_COLORS.primary },
+	registerBtn: {
+		flexGrow: 1,
+		height: 48,
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.primary,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
-	registerBtnText: {
-		fontSize: 16,
-		fontWeight: '700',
-	},
+	registerText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
 })

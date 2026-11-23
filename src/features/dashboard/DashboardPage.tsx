@@ -44,7 +44,7 @@ export default function DashboardPage() {
 			)}
 
 			<ArticleSection />
-			<UpcomingEventsSection />
+			<UpcomingEventsSection marginTop={16} />
 
 			<CommunitySection />
 			<BlogsSection />

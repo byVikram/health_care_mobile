@@ -1,247 +1,242 @@
+// src/components/common/display/EventCard.tsx
+//
+// An event card from the "9 · Events" design, in two sizes:
+//   variant 'list'    (Events screen): 96px banner, date tile + title / time / place, footer with Register
+//   variant 'compact' (Home strip):    240px wide, 72px banner, title, "Sat, 22 Nov · 9:00 AM – 1:00 PM", place
+// The banner is the event's cover picture when it has one, otherwise a soft tone with the category icon. The whole
+// card opens the event; Register opens the event's registration link (the list variant shows it only when the event has one).
+
 import React from 'react'
-import { View, Image, StyleSheet, useWindowDimensions } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import { AppTypography } from './AppTypography'
-import { AppButton } from '../buttons/AppButton'
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { APP_COLORS } from '../../../config/theme'
+import { eventDateParts, formatTimeRange, isOnlineEvent } from '../../../utils/eventFormat'
+import type { EventItem } from '../../../types/event'
+import { AppPathIcon } from './AppIcon'
+import { EVENT_ICONS, lookForEvent } from './eventLook'
 
-export interface EventItem {
-	id: string
-	title: string
-	category: string
-	category_label: string
-	event_date: string
-	event_time: string
-	end_time: string
-	location_type?: string
-	location?: string
-	registration_link?: string
-	description: string
-	cover_image_url?: string
-	status: string
-	is_expired?: boolean
-}
-
-import type { DimensionValue } from 'react-native'
-
-interface EventCardProps {
+type Props = {
 	item: EventItem
-	cardWidth?: DimensionValue
-	imageHeight?: number
-	marginRight?: number
-	onRegister: () => void
-	onViewDetails: () => void
+	variant?: 'list' | 'compact'
+	onPress: () => void
+	/** List variant only. Called when Register is tapped. */
+	onRegister?: () => void
 }
 
-const TEAL = '#0c7c7c'
-const DEFAULT_COVER_IMAGE = 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=500&h=320&fit=crop'
-
-function formatTime(timeStr?: string) {
-	if (!timeStr) return ''
-	const [h, m] = timeStr.split(':')
-	let hr = parseInt(h, 10)
-	const suffix = hr >= 12 ? 'PM' : 'AM'
-	hr = hr % 12 || 12
-	return `${hr}:${m} ${suffix}`
+export function eventPlace(item: EventItem) {
+	return isOnlineEvent(item) ? 'Online event' : item.location?.trim() || 'Venue to be announced'
 }
 
-export function formatApiDateForDisplay(dateString?: string) {
-	if (!dateString) return ''
-	const d = new Date(dateString)
-	return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+function EventCard({ item, variant = 'list', onPress, onRegister }: Props) {
+	const compact = variant === 'compact'
+	const look = lookForEvent(item.category)
+	const online = isOnlineEvent(item)
+	const date = eventDateParts(item.event_date)
+	const time = formatTimeRange(item.event_date, item.event_time, item.end_time)
+	const category = item.category_label || item.category
+	const hasLink = !!item.registration_link?.trim()
+	const bannerHeight = compact ? 72 : 96
 
-export default function EventCard({
-	item,
-	cardWidth,
-	imageHeight = 120,
-	marginRight = 0,
-	onRegister,
-	onViewDetails,
-}: EventCardProps) {
-	const { width } = useWindowDimensions()
-	const isTablet = width >= 768
+	const banner = (
+		<View style={[styles.banner, { height: bannerHeight, backgroundColor: look.tone.bg }]}>
+			{item.cover_image_url ? (
+				<Image source={{ uri: item.cover_image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+			) : (
+				<>
+					<View style={[styles.circleA, compact && styles.circleACompact]} />
+					{!compact && <View style={styles.circleB} />}
+					<AppPathIcon d={look.icon} size={compact ? 30 : 40} strokeWidth={1.8} color={look.tone.ink} />
+				</>
+			)}
+			<View style={[styles.badge, compact ? styles.badgeLeftCompact : styles.badgeLeft]}>
+				<Text style={[styles.badgeText, { color: look.tone.ink }]} numberOfLines={1}>
+					{category}
+				</Text>
+			</View>
+			<View style={[styles.badge, styles.badgeDark, compact ? styles.badgeRightCompact : styles.badgeRight]}>
+				<Text style={[styles.badgeText, { color: '#FFFFFF' }]}>{online ? 'Online' : 'In person'}</Text>
+			</View>
+		</View>
+	)
 
-	const dateStr = formatApiDateForDisplay(item.event_date)
-	const timeStr = `${formatTime(item.event_time)} - ${formatTime(item.end_time)}`
-	const locationText = item.location_type === 'online' ? 'Online' : item.location || 'Location not provided'
-	const hasRegistrationLink = !!item.registration_link
+	if (compact) {
+		return (
+			<Pressable
+				onPress={onPress}
+				accessibilityRole="button"
+				accessibilityLabel={`${item.title}, ${date.short}`}
+				style={({ pressed }) => [styles.card, styles.compactCard, pressed && styles.pressed]}
+			>
+				{banner}
+				<View style={styles.compactBody}>
+					<Text style={styles.compactTitle} numberOfLines={1}>
+						{item.title}
+					</Text>
+					<Text style={styles.meta} numberOfLines={1}>
+						{[date.short, time].filter(Boolean).join(' · ')}
+					</Text>
+					<Text style={styles.place} numberOfLines={1}>
+						{eventPlace(item)}
+					</Text>
+				</View>
+			</Pressable>
+		)
+	}
 
 	return (
-		<View
-			style={[
-				styles.card,
-				cardWidth ? { width: cardWidth } : { flex: 1 },
-				{ marginRight },
-			]}
-		>
-			<Image
-				source={{ uri: item.cover_image_url || DEFAULT_COVER_IMAGE }}
-				resizeMode="cover"
-				style={[styles.image, { height: imageHeight }]}
-			/>
-
-			<View style={styles.categoryBadge}>
-				<AppTypography variant="caption" style={styles.categoryText}>
-					{item.category_label || item.category}
-				</AppTypography>
-			</View>
-
-			<View style={styles.cardBody}>
-				<AppTypography
-					variant="body"
-					style={[styles.eventTitle, isTablet && styles.eventTitleTablet]}
-					numberOfLines={2}
-				>
-					{item.title}
-				</AppTypography>
-
-				<View style={styles.metaRow}>
-					<Ionicons name="calendar-outline" size={14} color="#496879" />
-					<AppTypography variant="caption" style={styles.metaText} numberOfLines={1}>
-						{dateStr} • {timeStr}
-					</AppTypography>
+		<View style={styles.card}>
+			<Pressable
+				onPress={onPress}
+				accessibilityRole="button"
+				accessibilityLabel={`${item.title}, ${date.short}, ${time}`}
+				style={({ pressed }) => pressed && styles.pressed}
+			>
+				{banner}
+				<View style={styles.row}>
+					<View style={[styles.dateTile, { backgroundColor: look.tone.bg }]}>
+						<Text style={[styles.dateMon, { color: look.tone.ink }]}>{date.mon}</Text>
+						<Text style={[styles.dateDay, { color: look.tone.ink }]}>{date.day}</Text>
+					</View>
+					<View style={styles.col}>
+						<Text style={styles.title} numberOfLines={2}>
+							{item.title}
+						</Text>
+						<View style={styles.metaRow}>
+							<AppPathIcon
+								d={EVENT_ICONS.clock}
+								size={14}
+								strokeWidth={2.2}
+								color={APP_COLORS.inkMuted}
+							/>
+							<Text style={styles.metaFlex}>{[date.dow, time].filter(Boolean).join(' · ')}</Text>
+						</View>
+						<View style={styles.metaRow}>
+							<AppPathIcon
+								d={online ? EVENT_ICONS.video : EVENT_ICONS.pin}
+								size={14}
+								strokeWidth={2.2}
+								color={APP_COLORS.inkMuted}
+							/>
+							<Text style={styles.metaFlex} numberOfLines={2}>
+								{eventPlace(item)}
+							</Text>
+						</View>
+					</View>
 				</View>
-
-				<View style={styles.metaRow}>
-					{item.location_type === 'online' ? (
-						<Ionicons name="videocam-outline" size={14} color="#16a34a" />
-					) : (
-						<Ionicons name="location-outline" size={14} color="#496879" />
-					)}
-					<AppTypography
-						variant="caption"
-						style={[styles.metaText, item.location_type === 'online' && { color: '#16a34a' }]}
-						numberOfLines={1}
-					>
-						{locationText}
-					</AppTypography>
-				</View>
-
-				<AppTypography variant="caption" style={styles.descriptionText} numberOfLines={2}>
-					{item.description}
-				</AppTypography>
-
-				<View style={styles.buttonStack}>
-					<AppButton
-						variant="primary"
-						onPress={onRegister}
-						disabled={!hasRegistrationLink}
-						style={[styles.registerBtn, !hasRegistrationLink && styles.registerBtnDisabled]}
-						contentStyle={styles.btnContent}
-						labelStyle={styles.registerBtnText}
-					>
-						Register Now
-					</AppButton>
-
-					<AppButton
-						variant="outline"
-						onPress={onViewDetails}
-						style={styles.detailsBtn}
-						contentStyle={styles.btnContent}
-						labelStyle={styles.detailsBtnText}
-					>
-						View Details
-					</AppButton>
-				</View>
+			</Pressable>
+			<View style={styles.footer}>
+				<Text style={styles.footerNote}>
+					{item.going_count != null
+						? `${item.going_count} going`
+						: hasLink
+							? 'Registration open'
+							: 'View details'}
+				</Text>
+				{item.is_registered ? (
+					<View style={styles.registeredBtn} accessibilityLabel="You are registered">
+						<Text style={styles.registeredText}>Registered ✓</Text>
+					</View>
+				) : (
+					hasLink &&
+					!!onRegister && (
+						<Pressable
+							onPress={onRegister}
+							accessibilityRole="button"
+							accessibilityLabel={`Register for ${item.title}`}
+							style={({ pressed }) => [styles.registerBtn, pressed && styles.pressed]}
+						>
+							<Text style={styles.registerText}>Register</Text>
+						</Pressable>
+					)
+				)}
 			</View>
 		</View>
 	)
 }
 
+export default React.memo(EventCard)
+
 const styles = StyleSheet.create({
 	card: {
-		backgroundColor: '#fff',
-		borderRadius: 12,
+		borderRadius: 14,
+		backgroundColor: APP_COLORS.surface,
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
 		overflow: 'hidden',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.1,
-		shadowRadius: 10,
-		elevation: 3,
-		position: 'relative',
 	},
-	image: {
-		width: '100%',
-		backgroundColor: '#edf4f5',
-	},
-	categoryBadge: {
+	compactCard: { width: 240 },
+	pressed: { opacity: 0.85 },
+	banner: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+	circleA: {
 		position: 'absolute',
-		top: 10,
-		left: 10,
-		backgroundColor: 'rgba(0, 0, 0, 0.6)',
+		right: -24,
+		top: -30,
+		width: 120,
+		height: 120,
+		borderRadius: 60,
+		backgroundColor: '#FFFFFF66',
+	},
+	circleACompact: { right: -20, top: -26, width: 90, height: 90, borderRadius: 45 },
+	circleB: {
+		position: 'absolute',
+		left: -20,
+		bottom: -40,
+		width: 90,
+		height: 90,
+		borderRadius: 45,
+		backgroundColor: '#FFFFFF4D',
+	},
+	badge: {
+		position: 'absolute',
+		top: 12,
+		maxWidth: '55%',
 		paddingHorizontal: 8,
-		paddingVertical: 4,
+		paddingVertical: 2,
 		borderRadius: 6,
+		backgroundColor: '#FFFFFF',
 	},
-	categoryText: {
-		fontWeight: '600',
-		fontSize: 10,
-		color: '#ffffff',
-	},
-	cardBody: {
-		paddingHorizontal: 12,
-		paddingTop: 10,
-		paddingBottom: 10,
-	},
-	eventTitle: {
-		fontSize: 14,
-		lineHeight: 18,
-		fontWeight: '700',
-		color: '#10263A',
-		marginBottom: 6,
-	},
-	eventTitleTablet: {
-		fontSize: 16,
-		lineHeight: 22,
-	},
-	metaRow: {
+	badgeDark: { backgroundColor: APP_COLORS.ink },
+	badgeLeft: { left: 12 },
+	badgeRight: { right: 12 },
+	badgeLeftCompact: { left: 10, top: 10 },
+	badgeRightCompact: { right: 10, top: 10 },
+	badgeText: { fontSize: 11, lineHeight: 16, fontWeight: '800' },
+	row: { flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingTop: 12 },
+	dateTile: { width: 48, height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+	dateMon: { fontSize: 11, lineHeight: 14, fontWeight: '800' },
+	dateDay: { fontSize: 20, lineHeight: 24, fontWeight: '800' },
+	col: { flex: 1, minWidth: 0, gap: 3 },
+	title: { fontSize: 15, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
+	metaRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+	metaFlex: { flex: 1, fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
+	footer: {
 		flexDirection: 'row',
-		alignItems: 'flex-start',
-		gap: 6,
-		marginBottom: 4,
+		alignItems: 'center',
+		gap: 8,
+		paddingHorizontal: 14,
+		paddingTop: 10,
+		paddingBottom: 12,
 	},
-	metaText: {
-		flex: 1,
-		color: '#496879',
-		fontSize: 11,
-		lineHeight: 15,
-	},
-	descriptionText: {
-		marginTop: 4,
-		marginBottom: 8,
-		color: '#64748b',
-		fontSize: 12,
-		lineHeight: 16,
-	},
-	buttonStack: {
-		flexDirection: 'column',
-		gap: 6,
-		marginTop: 'auto',
-	},
-	btnContent: {
-		height: 32,
-	},
+	footerNote: { flex: 1, fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.primary },
 	registerBtn: {
-		borderRadius: 6,
-		backgroundColor: TEAL,
+		height: 36,
+		paddingHorizontal: 14,
+		borderRadius: 10,
+		backgroundColor: APP_COLORS.primary,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
-	registerBtnDisabled: {
-		backgroundColor: '#cbd5e1',
-		opacity: 0.8,
+	registeredBtn: {
+		height: 36,
+		paddingHorizontal: 14,
+		borderRadius: 10,
+		backgroundColor: APP_COLORS.mint,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
-	registerBtnText: {
-		fontSize: 11,
-		fontWeight: '700',
-		marginVertical: 0,
-	},
-	detailsBtn: {
-		borderRadius: 6,
-		borderColor: '#cbd5e1',
-	},
-	detailsBtnText: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#475569',
-		marginVertical: 0,
-	},
+	registeredText: { fontSize: 13, fontWeight: '700', color: APP_COLORS.primary },
+	registerText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+	compactBody: { gap: 2, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 },
+	compactTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
+	meta: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
+	place: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.primary },
 })
