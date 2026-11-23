@@ -1,13 +1,12 @@
 // src/features/dashboard/DashboardPage.tsx
 //
-// The Home of the staff roles that have no screen of their own (pharmacy, radiology): quick services and promotions,
+// The Home of the staff roles that have no screen of their own (radiology): quick services and promotions,
 // then the shared community / content sections. The doctor, patient and ancillary-provider Homes are separate screens
 // (DoctorHomeScreen, PatientHomeScreen, ProviderTodayScreen), picked by role in MainTabNavigator.
 
 import React from 'react'
 import { StyleSheet, View, useWindowDimensions } from 'react-native'
 
-import { USER_ROLES } from '../../constants/constants'
 import { useAuth } from '../../context/AuthContext'
 import ArticleSection from './components/ArticleSection'
 import BlogsSection from './components/BlogsSection'
@@ -16,7 +15,6 @@ import HomeScrollView from './components/HomeScrollView'
 import MediaPromotionsSection from './components/MediaPromotionsSection'
 import UpcomingEventsSection from './components/EventSection'
 import PatientHealthQuestionsList from './components/PatientHealthQuestionsList'
-import PharmacyOrderDashboardCard from './components/PharmacyOrderDashboardCard'
 import PodcastsSection from './components/PodcastsSection'
 import QuickServicesSection from './components/QuickServicesSection'
 
@@ -35,8 +33,6 @@ export default function DashboardPage() {
 
 	return (
 		<HomeScrollView headerOffset={146}>
-			{role === USER_ROLES.PHARMACY && <PharmacyOrderDashboardCard />}
-
 			{isTablet ? (
 				<View style={styles.tabletRow}>
 					<View style={[styles.column, isLandscape && styles.columnHalf]}>{hero}</View>
@@ -54,7 +50,7 @@ export default function DashboardPage() {
 			<BlogsSection />
 			<PodcastsSection />
 
-			{role !== USER_ROLES.PHARMACY && <PatientHealthQuestionsList showViewAll={true} />}
+			<PatientHealthQuestionsList showViewAll={true} />
 		</HomeScrollView>
 	)
 }

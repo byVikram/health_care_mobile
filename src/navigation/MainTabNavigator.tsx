@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -24,6 +24,7 @@ import { hubRoleFor } from '../features/profile/config/profileHubConfig'
 import { WalletPage } from '../features/wallet/WalletPage'
 import SidebarLayout from '../components/layout/SidebarLayout'
 import { useAuth } from '../context/AuthContext'
+import { useAutoLocation } from '../hooks/useAutoLocation'
 import { USER_ROLES, isPatientRole } from '../constants/constants'
 import NursingCarePage from '../features/ancillary/patient/NursingCarePage'
 import ProviderSchedulePage from '../features/ancillary/staff/ProviderSchedulePage'
@@ -466,6 +467,9 @@ function MainTabs() {
 	const isNurse = role === 'nurse' || role === 'ancillary'
 	const isDoctor = role === 'doctor'
 	const isPatient = isPatientRole(role)
+	// The patient's current location, found once here for every screen (Dashboard, Find a Doctor, Consult a Doctor read AuthContext).
+	// Phone app only: a browser build (npm run web) has no real GPS, so it never detects a location by itself.
+	const { refresh: refreshLocation } = useAutoLocation(isPatient && Platform.OS !== 'web')
 	// Doctor persona: Schedule + Engage replace Portal/Search/Ancillary (none of those apply to a
 	// doctor's own dashboard) — see the doctor bottom tabs (backend menu) / DoctorHomeScreen / DoctorScheduleScreen / DoctorEngageScreen.
 	const shouldShowSearch = role !== 'doctor'
@@ -475,6 +479,12 @@ function MainTabs() {
 	return (
 		<>
 			<Tab.Navigator
+				// Back on the Dashboard: the location is checked again (skipped when it was checked recently).
+				screenListeners={({ route }) => ({
+					focus: () => {
+						if (route.name === ROUTES.MAIN.HOME) void refreshLocation()
+					},
+				})}
 				// A crash inside one tab shows the "Something went wrong" panel in that tab only; the tab bar still works.
 				screenLayout={({ children }) => <ErrorBoundary>{children}</ErrorBoundary>}
 				tabBar={(props) =>

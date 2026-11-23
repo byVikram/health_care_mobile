@@ -178,20 +178,6 @@ export const API_ENDPOINTS = {
 		/** A fresh signed link (about 5 minutes) to the handwritten prescription; 404 until one is submitted. */
 		PRESCRIPTION: (appointmentId: string) => `${BASE_URL}/api/treatments/appointment/${appointmentId}/prescription`,
 	},
-	PHARMACY: {
-		ME: `${BASE_URL}/api/pharmacies/me`,
-		DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
-		ME_DETAILS: `${BASE_URL}/api/pharmacies/me/details`,
-	},
-	PHARMACY_ORDERS: {
-		CREATE: `${BASE_URL}/api/pharmacy-orders`,
-		LIST: `${BASE_URL}/api/pharmacy-orders`,
-		LIST_BY_PHARMACY: `${BASE_URL}/api/pharmacies`, // New endpoint to get orders fr the logged-in pharmacy
-		GET_BY_ID: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}`,
-		UPDATE_STATUS: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/status`,
-		UPDATE_MEDICINES: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/medicines`,
-		SEND_REMINDER: (id: string) => `${BASE_URL}/api/pharmacy-orders/${id}/remind`,
-	},
 	RADIOLOGY_PROFILE: {
 		SEARCH: `${BASE_URL}/api/radiology/search`, // Add this line
 		DETAILS: `${BASE_URL}/api/radiology/profile`,

@@ -12,7 +12,7 @@ import { useVideoPlayer, VideoView } from 'expo-video'
 const VIDEO_SOURCE = require('../../../assets/blog-and-community/video.mp4')
 const AD_IMAGE = require('../../../assets/blog-and-community/ad-image.png')
 
-type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'ancillary' | 'nurse' | null
+type Role = 'doctor' | 'patient' | 'radiology' | 'ancillary' | 'nurse' | null
 
 // ─────────────────────────────────────────────────────────────
 // Video Slide
@@ -120,7 +120,6 @@ function usePingPongScroll(
 
 export default function MediaPromotionsSection({ role }: { role: Role }) {
 	const { width } = useWindowDimensions()
-	const isPharmacy = role === 'pharmacy'
 
 	// ── Video Slider ──
 	const [activeIndex, setActiveIndex] = useState(0)
@@ -140,7 +139,7 @@ export default function MediaPromotionsSection({ role }: { role: Role }) {
 		flatListRef.current?.scrollToIndex({ index, animated: true })
 	}
 
-	usePingPongScroll(videos.length, 4000, !isPharmacy && boxWidth > 0 && !isVideoPlaying, flatListRef, setActiveIndex)
+	usePingPongScroll(videos.length, 4000, boxWidth > 0 && !isVideoPlaying, flatListRef, setActiveIndex)
 
 	// ── Ad Slider ──
 	const [activeAdIndex, setActiveAdIndex] = useState(0)
@@ -164,50 +163,48 @@ export default function MediaPromotionsSection({ role }: { role: Role }) {
 	return (
 		<View style={styles.container}>
 			{/* ── Video Section ── */}
-			{!isPharmacy && (
-				<View style={styles.topRow}>
-					<View style={styles.videoBox} onLayout={(e) => setBoxWidth(e.nativeEvent.layout.width)}>
-						{boxWidth > 0 && (
-							<>
-								<FlatList
-									ref={flatListRef}
-									data={videos}
-									keyExtractor={(_, i) => String(i)}
-									horizontal
-									pagingEnabled
-									showsHorizontalScrollIndicator={false}
-									onViewableItemsChanged={onViewRef.current}
-									viewabilityConfig={viewConfigRef.current}
-									getItemLayout={(_, index) => ({
-										length: boxWidth,
-										offset: boxWidth * index,
-										index,
-									})}
-									renderItem={() => (
-										<VideoSlide
-											width={boxWidth}
-											onPlayStateChange={setIsVideoPlaying}
-											onVideoFinish={() => setIsVideoPlaying(false)}
-										/>
-									)}
-								/>
+			<View style={styles.topRow}>
+				<View style={styles.videoBox} onLayout={(e) => setBoxWidth(e.nativeEvent.layout.width)}>
+					{boxWidth > 0 && (
+						<>
+							<FlatList
+								ref={flatListRef}
+								data={videos}
+								keyExtractor={(_, i) => String(i)}
+								horizontal
+								pagingEnabled
+								showsHorizontalScrollIndicator={false}
+								onViewableItemsChanged={onViewRef.current}
+								viewabilityConfig={viewConfigRef.current}
+								getItemLayout={(_, index) => ({
+									length: boxWidth,
+									offset: boxWidth * index,
+									index,
+								})}
+								renderItem={() => (
+									<VideoSlide
+										width={boxWidth}
+										onPlayStateChange={setIsVideoPlaying}
+										onVideoFinish={() => setIsVideoPlaying(false)}
+									/>
+								)}
+							/>
 
-								<View style={styles.dotsRow}>
-									{videos.map((_, i) => (
-										<TouchableOpacity key={i} onPress={() => handleDotPress(i)}>
-											<View style={[styles.dot, i === activeIndex && styles.dotActive]} />
-										</TouchableOpacity>
-									))}
-								</View>
-							</>
-						)}
-					</View>
+							<View style={styles.dotsRow}>
+								{videos.map((_, i) => (
+									<TouchableOpacity key={i} onPress={() => handleDotPress(i)}>
+										<View style={[styles.dot, i === activeIndex && styles.dotActive]} />
+									</TouchableOpacity>
+								))}
+							</View>
+						</>
+					)}
 				</View>
-			)}
+			</View>
 
 			{/* ── Ad Section ── */}
 			<View
-				style={[styles.adBox, !isPharmacy && styles.adBoxMargin]}
+				style={[styles.adBox, styles.adBoxMargin]}
 				onLayout={(e) => setAdBoxWidth(e.nativeEvent.layout.width)}
 			>
 				{adBoxWidth > 0 && (

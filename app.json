@@ -14,8 +14,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
-        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use your microphone so you can search by voice and dictate notes.",
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to recognize your speech to search by voice and for consultation notes.",
         "NSLocationWhenInUseUsageDescription": "Allow access to your location to find nearby services."
       }
     },
@@ -56,8 +56,8 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for voice notes.",
-          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to recognize your speech for consultation notes."
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use your microphone so you can search by voice and dictate notes.",
+          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to recognize your speech to search by voice and for consultation notes."
         }
       ],
       [

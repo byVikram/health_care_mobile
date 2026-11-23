@@ -26,6 +26,7 @@ import {
 	AppConfirmSheet,
 	AppEmptyCard,
 	AppPathIcon,
+	AppSearchBar,
 	AppSegmentedControl,
 	AppButton,
 	AppChip,
@@ -1061,21 +1062,7 @@ export function DoctorScheduleScreen() {
 								<Text style={styles.filterBtnText}>{pastFilterCount ? `Filters · ${pastFilterCount}` : 'Filters'}</Text>
 							</TouchableOpacity>
 							<View style={styles.searchBox}>
-								<MaterialCommunityIcons name="magnify" size={20} color={APP_COLORS.inkMuted} />
-								<TextInput
-									value={pastQuery}
-									onChangeText={setPastQuery}
-									placeholder="Search patient name"
-									placeholderTextColor={APP_COLORS.inkMuted}
-									returnKeyType="search"
-									autoCorrect={false}
-									style={styles.searchInput}
-								/>
-								{!!pastQuery && (
-									<Pressable onPress={() => setPastQuery('')} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={8}>
-										<MaterialCommunityIcons name="close-circle" size={18} color={APP_COLORS.inkMuted} />
-									</Pressable>
-								)}
+								<AppSearchBar placeholder="Search patient name" hints={[]} value={pastQuery} onChangeText={setPastQuery} />
 							</View>
 						</View>
 
@@ -1317,20 +1304,7 @@ const styles = StyleSheet.create({
 	earlierHead: { minHeight: 52, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 	pastGroupHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingBottom: 6 },
 	groupSeen: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: APP_COLORS.inkMuted },
-	searchBox: {
-		flex: 1,
-		minWidth: 0,
-		height: 44,
-		paddingHorizontal: 12,
-		borderWidth: 1,
-		borderColor: APP_COLORS.divider,
-		borderRadius: 8,
-		backgroundColor: APP_COLORS.surface,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	searchInput: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 18, color: APP_COLORS.ink, paddingVertical: 0 },
+	searchBox: { flex: 1, minWidth: 0 },
 	filterBtn: {
 		height: 44,
 		paddingHorizontal: 14,

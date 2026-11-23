@@ -3,6 +3,7 @@ import {
 	AccessibilityInfo,
 	Animated,
 	Easing,
+	Keyboard,
 	Pressable,
 	StyleProp,
 	StyleSheet,
@@ -14,6 +15,7 @@ import {
 } from 'react-native'
 import { APP_COLORS } from '../../../config/theme'
 import { SEARCH_CONTEXTS, SearchContextKey } from '../../../config/searchContexts'
+import { useVoiceSearch } from '../../../hooks/useVoiceSearch'
 import { showComingSoon } from '../../../utils/toast'
 import { AppPathIcon } from '../display/AppIcon'
 
@@ -26,6 +28,12 @@ import { AppPathIcon } from '../display/AppIcon'
 //
 // Two modes: editable (give it `value` + `onChangeText`) or tap-through (give it `onPress` and it renders a
 // non-editable bar that fires `onPress`, e.g. the dashboard bar that opens the search screen).
+//
+// Voice: on an editable bar (any role) the mic listens (hooks/useVoiceSearch). What is being said shows in the input while
+// listening, but is NOT put in the screen's search text; only the final text is (`onChangeText`, then `onSubmit`), so the
+// screen's own search / debounce / filter runs once. The mic pulses while listening and the clear button becomes "cancel" (the
+// text the bar had is kept). A tap-through bar's mic calls `onVoicePress`; the screen it opens starts listening through
+// `autoStartVoice`. A tap-through bar with no `onVoicePress` opens its search screen, where the bar listens.
 
 const LINE_HEIGHT = 22
 const HINT_HOLD_MS = 2400
@@ -49,8 +57,13 @@ export interface AppSearchBarProps {
 	onSubmit?: () => void
 	/** Tap-through mode: the bar is not editable and a tap fires this instead of focusing it. */
 	onPress?: () => void
-	/** Mic button. Voice search isn't built yet, so without a handler it shows "coming soon". */
+	/** Mic button on a tap-through bar: what it does instead of the bar's `onPress` (the search screen it opens starts listening). */
 	onVoicePress?: () => void
+	/** Turn listening on / off for this bar. Default: on for an editable bar. */
+	voice?: boolean
+	/** Start listening once, as soon as this bar's screen is on screen (a one-time intent: clear it in `onVoiceAutoStarted`). */
+	autoStartVoice?: boolean
+	onVoiceAutoStarted?: () => void
 	/** Sits after the input, before clear / mic (e.g. a spinner while results load). */
 	trailing?: ReactNode
 	showMicrophone?: boolean
@@ -128,6 +141,47 @@ function RotatingHint({ hints, paused }: { hints: readonly string[]; paused: boo
 	)
 }
 
+/** The mic icon; while listening it pulses and turns red, and for a moment after the text arrives it turns green. */
+function MicPulse({ active, done }: { active: boolean; done: boolean }) {
+	const scale = useRef(new Animated.Value(1)).current
+
+	useEffect(() => {
+		if (!active) {
+			scale.setValue(1)
+			return
+		}
+		const loop = Animated.loop(
+			Animated.sequence([
+				Animated.timing(scale, {
+					toValue: 1.25,
+					duration: 520,
+					easing: Easing.inOut(Easing.ease),
+					useNativeDriver: true,
+				}),
+				Animated.timing(scale, {
+					toValue: 1,
+					duration: 520,
+					easing: Easing.inOut(Easing.ease),
+					useNativeDriver: true,
+				}),
+			])
+		)
+		loop.start()
+		return () => loop.stop()
+	}, [active, scale])
+
+	return (
+		<Animated.View style={{ transform: [{ scale }] }}>
+			<AppPathIcon
+				d={ICONS.mic}
+				size={20}
+				strokeWidth={2}
+				color={active ? APP_COLORS.danger : done ? APP_COLORS.success : APP_COLORS.primary}
+			/>
+		</Animated.View>
+	)
+}
+
 export default function AppSearchBar({
 	context,
 	placeholder,
@@ -137,6 +191,9 @@ export default function AppSearchBar({
 	onSubmit,
 	onPress,
 	onVoicePress,
+	voice,
+	autoStartVoice,
+	onVoiceAutoStarted,
 	trailing,
 	showMicrophone = true,
 	tone = 'onLight',
@@ -148,18 +205,53 @@ export default function AppSearchBar({
 	inputRef,
 }: AppSearchBarProps) {
 	const [focused, setFocused] = useState(false)
-
 	const tapThrough = !!onPress
 	const canEdit = editable && !tapThrough
+
+	// Voice: only the final text reaches the screen. It is submitted once the screen has the new text (its `onSubmit` may read it).
+	const voiceEditable = (voice ?? true) && showMicrophone && canEdit && !!onChangeText
+	const submitAfter = useRef<string | null>(null)
+	const speech = useVoiceSearch({
+		enabled: voiceEditable,
+		autoStart: autoStartVoice,
+		onAutoStarted: onVoiceAutoStarted,
+		onFinal: (text) => {
+			if (text === value) {
+				onSubmit?.()
+				return
+			}
+			submitAfter.current = text
+			onChangeText?.(text)
+		},
+	})
+	useEffect(() => {
+		if (submitAfter.current !== null && value === submitAfter.current) {
+			submitAfter.current = null
+			onSubmit?.()
+		}
+	}, [value, onSubmit])
 
 	const fromContext = context ? SEARCH_CONTEXTS[context] : undefined
 	const prompt = placeholder ?? fromContext?.placeholder ?? 'Search'
 	const exampleTerms: readonly string[] = hints ?? (placeholder ? [] : (fromContext?.hints ?? []))
-	const showHints = exampleTerms.length > 0 && value.length === 0
+	// While listening the input shows what is being said (not yet the screen's search text).
+	const shownValue = speech.active && speech.partial ? speech.partial : value
+	const showHints = exampleTerms.length > 0 && shownValue.length === 0 && !speech.active
+	const inputPrompt = speech.active ? (speech.partial ? '' : 'Listening…') : prompt
 
 	const handleMic = () => {
+		if (voiceEditable) {
+			if (speech.active) {
+				speech.stop()
+			} else {
+				Keyboard.dismiss()
+				void speech.start()
+			}
+			return
+		}
 		if (onVoicePress) onVoicePress()
-		else showComingSoon('Voice search is coming soon.')
+		else if (onPress) onPress()
+		else showComingSoon('Voice search is not available here.')
 	}
 
 	const bar = (
@@ -176,14 +268,14 @@ export default function AppSearchBar({
 			<View style={styles.field}>
 				<TextInput
 					ref={inputRef}
-					value={value}
+					value={shownValue}
 					onChangeText={onChangeText}
 					onSubmitEditing={onSubmit}
 					onFocus={() => setFocused(true)}
 					onBlur={() => setFocused(false)}
-					placeholder={showHints ? undefined : prompt}
+					placeholder={showHints ? undefined : inputPrompt}
 					placeholderTextColor={APP_COLORS.inkMuted}
-					editable={canEdit}
+					editable={canEdit && !speech.active}
 					autoFocus={autoFocus && canEdit}
 					autoCorrect={false}
 					returnKeyType="search"
@@ -199,26 +291,40 @@ export default function AppSearchBar({
 
 			{trailing}
 
-			{canEdit && value.length > 0 && (
+			{speech.active ? (
 				<Pressable
-					onPress={() => onChangeText?.('')}
+					onPress={speech.cancel}
 					hitSlop={8}
 					accessibilityRole="button"
-					accessibilityLabel="Clear search"
+					accessibilityLabel="Cancel voice search"
 					style={styles.clearBtn}
 				>
 					<AppPathIcon d={ICONS.clear} size={16} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
 				</Pressable>
+			) : (
+				canEdit &&
+				value.length > 0 && (
+					<Pressable
+						onPress={() => onChangeText?.('')}
+						hitSlop={8}
+						accessibilityRole="button"
+						accessibilityLabel="Clear search"
+						style={styles.clearBtn}
+					>
+						<AppPathIcon d={ICONS.clear} size={16} strokeWidth={2.2} color={APP_COLORS.inkMuted} />
+					</Pressable>
+				)
 			)}
 
 			{showMicrophone && (
 				<Pressable
 					onPress={handleMic}
 					accessibilityRole="button"
-					accessibilityLabel="Search by voice"
-					style={styles.micBtn}
+					accessibilityLabel={speech.active ? 'Stop voice search' : 'Search by voice'}
+					accessibilityState={{ busy: speech.active }}
+					style={[styles.micBtn, speech.active && styles.micBtnActive]}
 				>
-					<AppPathIcon d={ICONS.mic} size={20} strokeWidth={2} color={APP_COLORS.primary} />
+					<MicPulse active={speech.active} done={speech.state === 'done'} />
 				</Pressable>
 			)}
 		</View>
@@ -303,5 +409,8 @@ const styles = StyleSheet.create({
 		borderLeftColor: '#E3EAEB',
 		borderTopRightRadius: 9999,
 		borderBottomRightRadius: 9999,
+	},
+	micBtnActive: {
+		backgroundColor: APP_COLORS.dangerBg,
 	},
 })

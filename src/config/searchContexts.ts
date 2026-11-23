@@ -20,10 +20,6 @@ export const SEARCH_CONTEXTS = {
 		placeholder: 'Search doctors, tests or symptoms',
 		hints: ['diabetologist', 'fever', 'full body checkup', 'nurse at home', 'thyroid test'],
 	},
-	'home.pharmacy': {
-		placeholder: 'Search orders by ID or patient',
-		hints: ['order ID', 'patient name', 'pending orders'],
-	},
 	'home.radiology': {
 		placeholder: 'Search scans by ID or patient',
 		hints: ['scan ID', 'patient name', 'MRI', 'X-ray'],
@@ -48,6 +44,14 @@ export const SEARCH_CONTEXTS = {
 		placeholder: 'Search specialities or treatments',
 		hints: ['cardiology', 'dermatology', 'orthopaedics', 'dental care'],
 	},
+	communities: {
+		placeholder: 'Search by condition or topic',
+		hints: ['diabetes', 'cancer', 'anxiety', 'heart health', 'new parents'],
+	},
+	symptoms: {
+		placeholder: 'Search symptoms',
+		hints: ['knee pain', 'fever', 'headache', 'acidity', 'skin rash'],
+	},
 	myDoctors: {
 		placeholder: 'Search doctors by name or speciality',
 		hints: ['doctor name', 'cardiologist', 'last visited'],
@@ -55,10 +59,6 @@ export const SEARCH_CONTEXTS = {
 	favouriteDoctors: {
 		placeholder: 'Search saved doctors by name, speciality or location',
 		hints: ['doctor name', 'speciality', 'hospital'],
-	},
-	pharmacies: {
-		placeholder: 'Search pharmacies by name, owner or city',
-		hints: ['pharmacy name', 'owner', 'your city'],
 	},
 	radiologyCenters: {
 		placeholder: 'Search scan centers by name, scan or city',
@@ -105,14 +105,6 @@ export const SEARCH_CONTEXTS = {
 	'appointments.doctor': {
 		placeholder: 'Search appointments by patient name',
 		hints: ['patient name', 'phone number', 'booking ID'],
-	},
-	'pharmacyOrders.patient': {
-		placeholder: 'Search by order ID or pharmacy',
-		hints: ['order ID', 'pharmacy name', 'medicine'],
-	},
-	'pharmacyOrders.pharmacy': {
-		placeholder: 'Search by patient name or order ID',
-		hints: ['patient name', 'order ID'],
 	},
 	'radiologyOrders.patient': {
 		placeholder: 'Search by center, scan or reference ID',

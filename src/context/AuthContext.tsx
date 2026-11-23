@@ -1,6 +1,7 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { Platform } from 'react-native'
 import {
 	setUnauthorizedHandler,
 	setStatusModalHandler,
@@ -15,7 +16,7 @@ import { unregisterPushToken } from '../services/pushNotificationService'
 import { logout as logoutRequest } from '../features/auth/authService'
 import { clearSessionCaches } from '../utils/sessionCache'
 
-export type UserRole = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'ancillary' | 'nurse'
+export type UserRole = 'doctor' | 'patient' | 'radiology' | 'ancillary' | 'nurse'
 
 // Canonical specialty IDs from lookup_ancillary_specialties.public_id
 export type AncillarySpecialty =
@@ -40,7 +41,29 @@ export interface LocationData {
 	longitude: number
 	/** Six digits, from the geocoder or typed by the user (see utils/pincode); absent when unknown. */
 	pincode?: string
+	/** The fuller street address when the place came from a saved address or a search result; `address` is the short label shown in the location row. */
+	line?: string
+	/** From the geocoder when the location was found (automatic and "Use current location"); a place picked by hand may lack them. */
+	city?: string
+	state?: string
+	/** GPS accuracy in metres, for an 'auto' location (the booking screens only turn an accurate fix into an address). */
+	accuracy?: number
+	/**
+	 * How the location was found (the address's `location_method`: 'auto' is 'gps'): never show a 'manual' place as the phone's GPS position.
+	 * 'auto' = found by the device's GPS (kept fresh by useAutoLocation); 'manual' = picked by the patient, never replaced automatically.
+	 * Absent on a location saved before this field existed: treated as manual, so it is not replaced behind the patient's back.
+	 */
+	source?: 'auto' | 'manual'
+	/** When an 'auto' location was last checked (ms since epoch): a refresh that comes too soon is skipped. */
+	detectedAt?: number
 }
+
+/**
+ * What the automatic lookup is doing. 'detecting' / 'error' only matter while there is no location yet. 'denied' (permission refused)
+ * and 'off' (the phone's Location switch) stay set even when the last detected location is still shown: the patient must act, and
+ * the location row says so and offers Settings (components/common/location/LocationSelector).
+ */
+export type LocationStatus = 'idle' | 'detecting' | 'denied' | 'off' | 'error'
 
 export interface AuthState {
 	role: UserRole | null
@@ -65,6 +88,9 @@ export interface AuthState {
 
 	currentLocation: LocationData | null
 	setCurrentLocation: (loc: LocationData | null) => void
+	/** Progress of the automatic lookup (see hooks/useAutoLocation); 'idle' once there is a location and nothing needs the patient. */
+	locationStatus: LocationStatus
+	setLocationStatus: (status: LocationStatus) => void
 
 	setAuth: (role: UserRole, user: AuthUser, accessToken: string, refreshToken: string, notificationPromptShown?: boolean) => Promise<void>
 
@@ -87,6 +113,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	const [selectedHospital, setSelectedHospitalState] = useState<string | null>(null)
 	const [selectedHospitalId, setSelectedHospitalIdState] = useState<string | null>(null)
 	const [currentLocation, setCurrentLocationState] = useState<LocationData | null>(null)
+	const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle')
 	const [statusModal, setStatusModal] = useState<StatusModalData | null>(null)
 
 	const clearAuthState = useCallback(() => {
@@ -100,6 +127,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		setSelectedHospitalState(null)
 		setSelectedHospitalIdState(null)
 		setCurrentLocationState(null)
+		setLocationStatus('idle')
 		setAncillarySpecialtyState(null)
 	}, [])
 
@@ -163,7 +191,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 			}
 
 			if (savedLocation) {
-				setCurrentLocationState(safeJsonParse(savedLocation, null))
+				const saved = safeJsonParse<LocationData | null>(savedLocation, null)
+				// A browser build never detects a location itself, so an automatic one saved earlier is dropped; a place the patient picked stays.
+				setCurrentLocationState(Platform.OS === 'web' && saved?.source === 'auto' ? null : saved)
 			}
 
 			setIsLoading(false)
@@ -261,6 +291,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 				setSelectedHospitalId,
 				currentLocation,
 				setCurrentLocation,
+				locationStatus,
+				setLocationStatus,
 				setAuth,
 				updateUser,
 				clearAuth,
@@ -268,7 +300,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 		[
 			role, user, accessToken, refreshToken, notificationPromptShown, setNotificationPromptShown, isLoading,
 			ancillarySpecialty, setAncillarySpecialty, selectedHospital, setSelectedHospital, selectedHospitalId,
-			setSelectedHospitalId, currentLocation, setCurrentLocation, setAuth, updateUser, clearAuth,
+			setSelectedHospitalId, currentLocation, setCurrentLocation, locationStatus, setAuth, updateUser, clearAuth,
 		]
 	)
 

@@ -2,7 +2,7 @@
 //
 // Patient Home "Communities" ("1 · Home"): three featured groups (44px tone tile, name,
 // "{category} · Support group|Forum") with a Join / "Joined ✓" toggle. Joining is optimistic and rolls
-// back with a toast on failure. A row opens the community forum; "Explore" opens it too.
+// back with a toast on failure. A row opens the community forum; "Explore" opens the Communities screen.
 import React, { useEffect, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -86,9 +86,11 @@ function HomeCommunitiesSection({ refreshToken }: Props) {
 	if (status === 'error') return null
 
 	const openForum = () => navigation.navigate(ROUTES.STACK.COMMUNITY_FORUM)
+	// "Explore" opens the Communities screen (your groups, then every group to discover and join)
+	const openCommunities = () => navigation.navigate(ROUTES.STACK.COMMUNITIES)
 
 	return (
-		<AppSection title="Communities" right={<AppTextLink label="Explore" onPress={openForum} />} {...homeSectionProps(8)}>
+		<AppSection title="Communities" right={<AppTextLink label="Explore" onPress={openCommunities} />} {...homeSectionProps(8)}>
 			<View style={styles.list}>
 				{status === 'loading' &&
 					[0, 1, 2].map((i) => (

@@ -165,6 +165,12 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH, params: { focusSearch: true } })
 	}
 
+	// The mic on the Home search bar: open the Search tab and start listening there (a one-time `startVoice` flag the tab clears).
+	// (The patient's search is always the Search tab, so the layout's own `onSearchPress` is not used here.)
+	const handleVoiceSearch = () => {
+		navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.SEARCH, params: { startVoice: true } })
+	}
+
 	const paddingBottom = progress.interpolate({ inputRange: [0, 1], outputRange: [16, 12] })
 	const introHeight = progress.interpolate({ inputRange: [0, 1], outputRange: [28, 0] })
 	const introGap = progress.interpolate({ inputRange: [0, 1], outputRange: [6, 8] })
@@ -245,7 +251,12 @@ function PatientHomeHeader({ userName = 'there', location, avatarUri, onAvatarPr
 				</Animated.View>
 
 				{/* Search (tap-through to the Search tab) */}
-				<AppSearchBar context="home.patient" tone="onDark" onPress={handleSearch} />
+				<AppSearchBar
+					context="home.patient"
+					tone="onDark"
+					onPress={handleSearch}
+					onVoicePress={handleVoiceSearch}
+				/>
 			</Animated.View>
 		</Animated.View>
 	)
@@ -472,7 +483,7 @@ function RoleHomeHeader({
 }: AppHeaderProps) {
 	const insets = useSafeAreaInsets()
 	const navigation = useNavigation<any>()
-	const { user, role, ancillarySpecialty } = useAuth()
+	const { user, role } = useAuth()
 	const scrollData = useScroll()
 	const scrollY = scrollData?.scrollY
 
@@ -483,20 +494,15 @@ function RoleHomeHeader({
 	}, [avatarUri])
 
 	const isDoctor = role === 'doctor'
-	const isPharmacy = role === 'pharmacy'
-
 	const isRadiology = role === USER_ROLES.RADIOLOGY
-	const isPatient = !isDoctor && !isPharmacy && !isRadiology
+	const isPatient = !isDoctor && !isRadiology
 
-	const isPhysiotherapy =
-		(role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE) &&
-		(ancillarySpecialty === 'physiotherapy' || !ancillarySpecialty)
+	// A home-care provider has no stock picture: without a photo of their own they get their initials.
+	const isProvider = role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE
 
-	const defaultAvatar = isPhysiotherapy
-		? require('../../../assets/physiotherapy/physiotherapist.png')
-		: isDoctor
-			? require('../../../assets/Banner/doctor.png')
-			: require('../../../assets/Banner/patient.png')
+	const defaultAvatar = isDoctor
+		? require('../../../assets/Banner/doctor.png')
+		: require('../../../assets/Banner/patient.png')
 
 	// Option B GPU animation values
 	const maxScroll = 60
@@ -518,38 +524,17 @@ function RoleHomeHeader({
 				})
 			: 1
 
-	// ── Display name (pharmacy fallback) ─────────────────────────────────────
+	// ── Display name ─────────────────────────────────────────────────────────
 	let displayName = 'User'
 	if (user) {
-		if (isPharmacy) {
-			displayName =
-				(user as any).pharmacy_name ||
-				(user as any).business_name ||
-				(user as any).store_name ||
-				(user as any).pharmacyName ||
-				(user as any).businessName ||
-				(user as any).full_name ||
-				user.name
-			if (!displayName && user.email) {
-				displayName = user.email.split('@')[0]
-			}
-			if (!displayName) displayName = 'Pharmacy'
-		} else {
-			displayName = user.name || (user as any).full_name || userName
-		}
+		displayName = user.name || (user as any).full_name || userName
 	} else {
 		displayName = userName
 	}
 
 	const isNurse = role === USER_ROLES.ANCILLARY || role === USER_ROLES.NURSE
 
-	const searchContext: SearchContextKey = isPharmacy
-		? 'home.pharmacy'
-		: isRadiology
-			? 'home.radiology'
-			: isNurse
-				? 'home.ancillary'
-				: 'doctors'
+	const searchContext: SearchContextKey = isRadiology ? 'home.radiology' : isNurse ? 'home.ancillary' : 'doctors'
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	const handleSearchPress = () => {
@@ -562,10 +547,7 @@ function RoleHomeHeader({
 			return
 		}
 
-		if (isPharmacy) {
-			console.log('ORDER_LIST')
-			navigation.navigate(ROUTES.STACK.ORDER_LIST)
-		} else if (isRadiology) {
+		if (isRadiology) {
 			console.log('RADIOLOGY_ORDERS')
 			navigation.navigate(ROUTES.STACK.RADIOLOGY_ORDERS)
 		} else {
@@ -637,11 +619,24 @@ function RoleHomeHeader({
 				]}
 			>
 				<Pressable onPress={onAvatarPress} style={styles.profileRow}>
-					<Image
-						source={avatarUri && !avatarError ? { uri: avatarUri } : defaultAvatar}
-						onError={() => setAvatarError(true)}
-						style={styles.avatar}
-					/>
+					{isProvider ? (
+						<AppAvatar
+							uri={avatarUri}
+							name={displayName}
+							size={52}
+							radius={12}
+							borderWidth={1}
+							borderColor="rgba(255,255,255,0.5)"
+							backgroundColor={APP_COLORS.mint}
+							initialsColor={APP_COLORS.primary}
+						/>
+					) : (
+						<Image
+							source={avatarUri && !avatarError ? { uri: avatarUri } : defaultAvatar}
+							onError={() => setAvatarError(true)}
+							style={styles.avatar}
+						/>
+					)}
 					<View>
 						<Text style={styles.helloText}>
 							<Text style={styles.helloAccent}>Hello, </Text>

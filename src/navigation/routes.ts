@@ -26,6 +26,7 @@ export const ROUTES = {
 		LEGAL: 'LegalStack',
 		SEARCH: 'SplashScreen',
 		DOCTOR_SEARCH: 'DoctorSearch',
+		SYMPTOMS: 'Symptoms',
 		DOCTOR_DETAIL: 'DoctorDetail',
 		DOCTOR_BOOK_SLOT: 'DoctorBookSlot',
 		FAVOURITE_DOCTOR: 'FavouriteDoctor',
@@ -48,11 +49,8 @@ export const ROUTES = {
 		// above, which is the patient's own booking T&C modal.
 		VERIFY_ACCESS: 'VerifyAccess',
 		PATIENT_PAYMENT: 'PatientPayment',
-		PHARMACY_SEARCH_PAGE: 'PharmacySearchPage',
-		ORDER_LIST: 'OrderListPage',
-		ORDER_DETAILS: 'OrderDetails',
-		PLACE_PHARMACY_ORDER: 'PlacePharmacyOrder',
 
+		COMMUNITIES: 'Communities',
 		COMMUNITY_FORUM: 'CommunityForum',
 		COMMUNITY_THREAD: 'CommunityThread',
 		BLOG_LIST: 'BlogList',

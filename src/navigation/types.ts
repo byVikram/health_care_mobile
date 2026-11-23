@@ -31,6 +31,8 @@ export type MainTabParamList = {
 				mode?: 'clinic' | 'video'
 				/** Set by the Home search bar: open the keyboard on arrival (the Search tab clears it). */
 				focusSearch?: boolean
+				/** Set by the Home search bar's mic: start listening on arrival (the Search tab clears it). */
+				startVoice?: boolean
 		  }
 		| undefined
 	[ROUTES.MAIN.PORTAL]: { filter?: BookingsFilterKey } | undefined
@@ -183,6 +185,8 @@ export type AppStackParamList = {
 	[ROUTES.STACK.MEDICAL_RECORDS]: undefined
 	[ROUTES.MAIN.TABS]: NavigatorScreenParams<MainTabParamList> | undefined
 	[ROUTES.STACK.SEARCH]: undefined
+	/** Every symptom (A-Z) with search: from Home's "All symptoms". A card opens doctor search for its speciality. */
+	[ROUTES.STACK.SYMPTOMS]: undefined
 	[ROUTES.STACK.DOCTOR_SEARCH]:
 		| {
 				query?: string
@@ -211,21 +215,6 @@ export type AppStackParamList = {
 	[ROUTES.STACK.DOCTOR_PAST_VISIT]: { appointmentId: string; kind: 'noshow' | 'referred' | 'cancelled' | 'other'; referralId?: string; token?: string }
 	[ROUTES.STACK.CONSENT_FORM]: { paymentParams: Omit<PatientPaymentParams, 'consentVersionId'> }
 	[ROUTES.STACK.VERIFY_ACCESS]: VerifyAccessParams | undefined
-	[ROUTES.STACK.PHARMACY_SEARCH_PAGE]: undefined
-	[ROUTES.STACK.ORDER_LIST]: undefined
-	[ROUTES.STACK.ORDER_DETAILS]: { order?: unknown; orderId?: string } | undefined
-	[ROUTES.STACK.PLACE_PHARMACY_ORDER]: {
-		pharmacyId: string
-		pharmacyName: string
-		// Optional provider details forwarded from the search list so the booking
-		// screen's ProviderDetailsCard can render without an extra fetch.
-		pharmacyAddress?: string
-		pharmacyCity?: string
-		pharmacyPhone?: string
-		pharmacyAvatarKey?: string | null
-		pharmacyOperatingHours?: { open: string; close: string }
-		pharmacyIs24x7?: boolean
-	}
 	[ROUTES.STACK.PLACE_RADIOLOGY_ORDER]: {
 		radiologyId: string
 		centerName?: string
@@ -249,6 +238,8 @@ export type AppStackParamList = {
 	[ROUTES.STACK.RADIOLOGY_ORDERS]: undefined
 	[ROUTES.STACK.RADIOLOGY_ORDER_DETAIL]: { publicId: string; booking?: any }
 	[ROUTES.STACK.RADIOLOGY_SCAN_TYPES]: undefined
+	/** "6 · Communities": your groups, then every group to discover and join (Home → Communities → Explore). */
+	[ROUTES.STACK.COMMUNITIES]: undefined
 	[ROUTES.STACK.COMMUNITY_FORUM]: undefined
 	[ROUTES.STACK.COMMUNITY_THREAD]: { threadId: string }
 	[ROUTES.STACK.BLOG_LIST]: undefined

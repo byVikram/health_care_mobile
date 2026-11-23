@@ -130,9 +130,23 @@ export const getTodayEarnings = async (): Promise<number | null> => {
 	return toNum(res.data?.data?.todayEarnings)
 }
 
-/** Declines an open offer so it is re-routed to other providers. */
-export const rejectOffer = async (requestId: string, reason?: string): Promise<void> => {
-	await ApiService.post(API_ENDPOINTS.ANCILLARY.REJECT_PROVIDER(requestId), reason ? { reason } : {})
+/**
+ * Declines an open offer so it is re-routed to other providers. A decline that arrives after the provider already ACCEPTED (an offer timer
+ * or a dismissed card racing her Accept) is refused by the server (409 ALREADY_ACCEPTED) and the job stays hers: there is nothing to tell
+ * her, so it is not an error here. The app-wide error dialog is off for this call (the callers show their own message for a real failure).
+ * Resolves true when the request was declined and false when it was already hers (nothing was declined: do not say "Request declined").
+ */
+export const rejectOffer = async (requestId: string, reason?: string): Promise<boolean> => {
+	try {
+		await ApiService.post(API_ENDPOINTS.ANCILLARY.REJECT_PROVIDER(requestId), reason ? { reason } : {}, {
+			skipGlobalError: true,
+		})
+		return true
+	} catch (e) {
+		const code = (e as { response?: { data?: { detail?: { code?: string } } } })?.response?.data?.detail?.code
+		if (code === 'ALREADY_ACCEPTED') return false
+		throw e
+	}
 }
 
 export const getProviderToday = async (date?: string): Promise<ProviderToday> => {

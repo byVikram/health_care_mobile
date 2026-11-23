@@ -128,7 +128,18 @@ export default function LocationScreen() {
 			const found = typeof readable === 'object' ? readable?.pincode : undefined
 			if (text && isPincode(found)) {
 				// Address and pincode both found: nothing to confirm
-				setCurrentLocation({ address: text, latitude: position.latitude, longitude: position.longitude, pincode: found })
+				// from the phone's GPS: automatic, like the sheet's "Use current location"
+				setCurrentLocation({
+					address: text,
+					latitude: position.latitude,
+					longitude: position.longitude,
+					pincode: found,
+					...(typeof readable === 'object' && readable?.city ? { city: readable.city } : {}),
+					...(typeof readable === 'object' && readable?.state ? { state: readable.state } : {}),
+					...(position.accuracy != null ? { accuracy: position.accuracy } : {}),
+					source: 'auto',
+					detectedAt: Date.now(),
+				})
 				navigation.goBack()
 				return
 			}
@@ -189,6 +200,7 @@ export default function LocationScreen() {
 				latitude: coords.latitude,
 				longitude: coords.longitude,
 				...(isPincode(pincode) ? { pincode } : {}),
+				source: 'manual',
 			})
 			navigation.goBack()
 		}
@@ -240,7 +252,6 @@ export default function LocationScreen() {
 						value={searchText}
 						onChangeText={handleSearchChange}
 						autoFocus
-						showMicrophone={false}
 						trailing={searchLoading ? <ActivityIndicator size="small" color="#0c7c7c" /> : undefined}
 					/>
 				</View>

@@ -162,8 +162,6 @@ const MOCK_LOCATIONS: AppSelectOption[] = [
   { label: "Chandigarh", value: "Chandigarh" },
 ];
 
-const pharmacistImage = require("../../assets/Banner/pharmacy.png");
-
 export default function WelcomeDoctorPage({
   navigation,
   route,
@@ -201,7 +199,6 @@ export default function WelcomeDoctorPage({
   const accountDropdownHeight = isSmallPhone || isCompactHeight ? 180 : 220;
   const accountDropdownBottomOffset = isTablet ? 40 : 96;
   const accountTopPadding = isTablet ? 40 : isCompactHeight ? 34 : 44;
-  const isPharmacist = role === "pharmacy";
   const isAncillary = role === "ancillary";
 
   // Resolve specialty for ancillary welcome screen customization
@@ -243,29 +240,6 @@ export default function WelcomeDoctorPage({
 
   const welcomeConfig = isAncillary
     ? (ANCILLARY_WELCOME_CONFIGS[normalizeSpecialtyKey(ancillarySpecialty)] || ANCILLARY_WELCOME_CONFIGS["nursing-care"])
-    : isPharmacist
-    ? {
-        title: "Welcome Pharmacist👋",
-        subtitle: "Let's get your pharmacy listed and ready to serve patients.",
-        buttonLabel: "Set Up Pharmacy Profile",
-        features: [
-          {
-            Icon: ProfileIcon,
-            title: "Profile",
-            description: "Get discovered by patients looking for pharmacies on Whisper ai",
-          },
-          {
-            Icon: ConsultIcon,
-            title: "Inventory",
-            description: "Manage your medicine inventory and keep availability up to date",
-          },
-          {
-            Icon: FeedbackIcon,
-            title: "Orders",
-            description: "Receive and fulfil prescription orders from patients directly",
-          },
-        ],
-      }
     : {
         title: "Welcome Doctor! 👋",
         subtitle: "Let's help you get started on Whisper ai by making your Doctor Profile.",
@@ -288,10 +262,10 @@ export default function WelcomeDoctorPage({
           },
         ],
       };
-  const welcomeTitleSize = (isPharmacist || isAncillary) && isTablet ? 38 : titleSize;
-  const welcomeSubtitleSize = (isPharmacist || isAncillary) && isTablet ? 18 : subtitleSize;
-  const welcomeBodySize = (isPharmacist || isAncillary) && isTablet ? 17 : bodySize;
-  const welcomeButtonWidth = (isPharmacist || isAncillary) && useSplitLayout ? 430 : useSplitLayout ? 360 : 420;
+  const welcomeTitleSize = isAncillary && isTablet ? 38 : titleSize;
+  const welcomeSubtitleSize = isAncillary && isTablet ? 18 : subtitleSize;
+  const welcomeBodySize = isAncillary && isTablet ? 17 : bodySize;
+  const welcomeButtonWidth = isAncillary && useSplitLayout ? 430 : useSplitLayout ? 360 : 420;
 
   useEffect(() => {
     if (role !== "doctor") {
@@ -379,19 +353,6 @@ export default function WelcomeDoctorPage({
           {
             name: ROUTES.MAIN.TABS,
             params: { screen: ROUTES.MAIN.PROFILE },
-          },
-        ],
-      });
-      return;
-    }
-
-    if (isPharmacist) {
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: ROUTES.MAIN.TABS,
-            params: { screen: ROUTES.PORTAL.PROFILE },
           },
         ],
       });
@@ -527,8 +488,8 @@ export default function WelcomeDoctorPage({
   }
 
   return (
-    <SafeAreaView style={[styles.safe, isPharmacist && styles.pharmacistSafe]}>
-      <StatusBar barStyle="dark-content" backgroundColor={isPharmacist ? "#ffffff" : "#f5f7fa"} />
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
 
       <ScrollView
         style={styles.scroll}
@@ -637,21 +598,7 @@ export default function WelcomeDoctorPage({
 
           {showIllustration ? (
             <View style={styles.imageSection}>
-              {isPharmacist ? (
-                <Image
-                  source={pharmacistImage}
-                  style={[
-                    styles.pharmacistImage,
-                    {
-                      width: illustrationSize,
-                      height: illustrationSize,
-                    },
-                  ]}
-                  resizeMode="contain"
-                />
-              ) : (
-                <DoctorTabletImage width={illustrationSize} height={illustrationSize} />
-              )}
+              <DoctorTabletImage width={illustrationSize} height={illustrationSize} />
             </View>
           ) : null}
         </View>
@@ -664,9 +611,6 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: "#f5f7fa",
-  },
-  pharmacistSafe: {
-    backgroundColor: "#ffffff",
   },
   scroll: {
     flex: 1,
@@ -713,9 +657,6 @@ const styles = StyleSheet.create({
     minWidth: 300,
     justifyContent: "center",
     alignItems: "center",
-  },
-  pharmacistImage: {
-    borderRadius: 18,
   },
   accountContainer: {
     flexGrow: 1,

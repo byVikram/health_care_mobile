@@ -18,6 +18,7 @@ import { isPatientRole } from '../../../constants/constants'
 import { useHomeSheets } from '../HomeSheetsContext'
 import { ROUTES } from '../../../navigation/routes'
 import { navigate as navigateRoot } from '../../../navigation/navigationService'
+import { showComingSoon } from '../../../utils/toast'
 
 import EmergencyIcon from '../../../assets/quick-services/emergency.svg'
 import AmbulanceIcon from '../../../assets/quick-services/ambulance.svg'
@@ -39,7 +40,7 @@ import ScanTypeSelectorModal from '../../radiology/components/ScanTypeSelectorMo
 import AlliedSelectorModal from './AlliedSelectorModal'
 import TherapeuticSelector from './TherapeuticSelector'
 
-type Role = 'doctor' | 'patient' | 'pharmacy' | 'radiology' | 'ancillary' | 'nurse' | null
+type Role = 'doctor' | 'patient' | 'radiology' | 'ancillary' | 'nurse' | null
 type PopupSvgIconItem = {
 	title: string
 	type: 'svg'
@@ -64,6 +65,9 @@ export default function QuickServicesSection({ role }: { role: Role }) {
 
 type QuickActionKey = 'pharmacy' | 'lab' | 'radiology' | 'ancillary'
 
+// Medicines are ordered through LabStack now and no pincode is served yet: the tile stays and says so.
+const MEDICINES_SOON = 'Medicine delivery is coming soon in your area.'
+
 // Tile colours and artwork from the "1 · Home — new icons" design.
 const QUICK_ACTIONS: { key: QuickActionKey; label: string; bg: string; image: ImageSourcePropType }[] = [
 	{ key: 'pharmacy', label: 'Pharmacy', bg: '#FDEEDC', image: HomePharmacyIcon },
@@ -77,7 +81,7 @@ function PatientQuickActions() {
 	const [showScanTypeModal, setShowScanTypeModal] = useState(false)
 
 	const handlePress = (key: QuickActionKey) => {
-		if (key === 'pharmacy') navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
+		if (key === 'pharmacy') showComingSoon(MEDICINES_SOON)
 		else if (key === 'lab') navigateRoot(ROUTES.STACK.LABORATORY_LIST)
 		else if (key === 'radiology') setShowScanTypeModal(true)
 		else open('ancillary')
@@ -149,7 +153,6 @@ const patientStyles = StyleSheet.create({
 function StaffQuickServices({ role }: { role: Role }) {
 	const { width } = useWindowDimensions()
 	const isTablet = width >= 768
-	const isPharmacy = role === 'pharmacy'
 	const othersButtonRef = useRef<any>(null)
 	const serviceIconSize = isTablet ? 40 : 30
 	const othersSquareSize = isTablet ? 17 : 12
@@ -266,16 +269,12 @@ function StaffQuickServices({ role }: { role: Role }) {
 		if (title === 'Appointment') {
 			navigateRoot(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL, params: { filter: 'doctor' } } as never) // the Bookings tab
 		} else if (title === 'Pharmacy') {
-			navigateRoot(ROUTES.STACK.PHARMACY_SEARCH_PAGE)
+			showComingSoon(MEDICINES_SOON)
 		} else if (title === 'Radiology') {
 			setShowScanTypeModal(true)
 		} else if (title === 'Laboratory') {
 			navigateRoot(ROUTES.STACK.LABORATORY_LIST)
 		}
-	}
-
-	if (isPharmacy) {
-		return null
 	}
 
 	return (

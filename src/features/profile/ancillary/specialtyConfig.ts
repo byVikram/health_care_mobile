@@ -37,11 +37,3 @@ export function normalizeSpecialtyToLabel(key?: string | null): string {
 	return key || ''
 }
 
-/**
- * Physiotherapist Profile Image URL — Single Source of Truth for Physiotherapy.
- * When the user provides a new URL (NEW_PHYSIOTHERAPIST_IMAGE_URL),
- * paste it here. If empty or missing, the system gracefully uses the bundled
- * physiotherapist asset (src/assets/physiotherapy/physiotherapist.png).
- */
-export const NEW_PHYSIOTHERAPIST_IMAGE_URL = ''
-
