@@ -6,7 +6,7 @@
 // (careAiReplies.ts); the doctor buttons open the real doctor search with the filters Care AI chose.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native'
+import { ScrollViewInstance, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { familyMemberFirstName } from '../../components/common'
@@ -39,7 +39,7 @@ export default function CareAiPage() {
 	const launch = useRoute<RouteProp<AppStackParamList, typeof ROUTES.STACK.CARE_AI>>().params
 	const { user } = useAuth()
 	const { members } = useFamilyMembers()
-	const scrollRef = useRef<ScrollView>(null)
+	const scrollRef = useRef<ScrollViewInstance>(null)
 	// Set when a message or the typing indicator is added: the next layout then scrolls to the end. Growth from
 	// anything else (opening "Why this answer?", confirming a booking) leaves the scroll position alone.
 	const followEndRef = useRef(false)

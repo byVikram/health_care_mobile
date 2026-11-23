@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+	TextInputInstance,
 	Animated,
-	InteractionManager,
 	NativeScrollEvent,
 	NativeSyntheticEvent,
 	StyleSheet,
@@ -97,7 +97,7 @@ export default function SearchPage() {
 	// Search tab itself does not pop the keyboard.
 	const tabNavigation = useNavigation<NavigationProp<MainTabParamList>>()
 	const route = useRoute<RouteProp<MainTabParamList, typeof ROUTES.MAIN.SEARCH>>()
-	const searchInputRef = useRef<TextInput>(null)
+	const searchInputRef = useRef<TextInputInstance>(null)
 	const focusSearch = route.params?.focusSearch
 	// The Home mic: listen as soon as this tab is focused. Used once and cleared (a repeat visit does not listen again).
 	const startVoice = route.params?.startVoice
@@ -105,11 +105,11 @@ export default function SearchPage() {
 	useFocusEffect(
 		useCallback(() => {
 			if (!focusSearch) return
-			const task = InteractionManager.runAfterInteractions(() => {
+			const task = requestIdleCallback(() => {
 				searchInputRef.current?.focus()
 				tabNavigation.setParams({ focusSearch: undefined })
 			})
-			return () => task.cancel()
+			return () => cancelIdleCallback(task)
 		}, [focusSearch, tabNavigation])
 	)
 

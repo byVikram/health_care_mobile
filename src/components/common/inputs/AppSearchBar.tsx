@@ -1,5 +1,6 @@
 import React, { ReactNode, useEffect, useRef, useState } from 'react'
 import {
+	TextInputInstance,
 	AccessibilityInfo,
 	Animated,
 	Easing,
@@ -75,7 +76,7 @@ export interface AppSearchBarProps {
 	inputProps?: Omit<TextInputProps, 'value' | 'onChangeText' | 'placeholder' | 'editable' | 'autoFocus'>
 	testID?: string
 	/** Lets the screen reach the input, e.g. to focus it on arrival. */
-	inputRef?: React.Ref<TextInput>
+	inputRef?: React.Ref<TextInputInstance>
 }
 
 function RotatingHint({ hints, paused }: { hints: readonly string[]; paused: boolean }) {

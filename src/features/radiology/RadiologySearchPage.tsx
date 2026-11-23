@@ -413,7 +413,7 @@ export default function RadiologySearchPage() {
 								<View style={styles.loadMoreFooter}>
 									<ActivityIndicator size="small" color="#1f5f68" />
 								</View>
-							) : null
+							) : undefined
 						}
 					/>
 				</View>

@@ -686,7 +686,7 @@ export default function OrderListRadiologyPage({
 									<View style={{ paddingVertical: 6, opacity: 0.6 }}>
 										<AppSkeleton width={'100%'} height={90} borderRadius={16} />
 									</View>
-								) : null
+								) : undefined
 							}
 						/>
 					</View>

@@ -365,7 +365,7 @@ export default function WelcomeDoctorPage({
   if (showAccountDetails) {
     return (
       <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
+        <StatusBar barStyle="dark-content" />
 
         <ScrollView
           style={styles.scroll}
@@ -489,7 +489,7 @@ export default function WelcomeDoctorPage({
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
+      <StatusBar barStyle="dark-content" />
 
       <ScrollView
         style={styles.scroll}

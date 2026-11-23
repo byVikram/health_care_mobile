@@ -6,6 +6,7 @@
 
 import React, { useRef } from 'react'
 import {
+	TextInputInstance,
 	StyleSheet,
 	Text,
 	TextInput,
@@ -25,7 +26,7 @@ type Props = {
 }
 
 export function VitalFieldTile({ field, value, onChangeText, style }: Props) {
-	const inputRef = useRef<TextInput>(null)
+	const inputRef = useRef<TextInputInstance>(null)
 	const rating = rateVital(field.id, value)
 	const tone = RATING_TONES[rating]
 
