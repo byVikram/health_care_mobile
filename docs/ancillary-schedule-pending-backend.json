@@ -1,0 +1,363 @@
+{
+  "document": "Pending backend changes for the provider Schedule redesign (ancillary schedule design)",
+  "status": "INTEGRATED except PB-15 (and the open parts of PB-11 and PB-12)",
+  "updated": "2026-11-24",
+  "branch": "feature/ancillary-ui-redesign",
+  "designSource": "ancillary scheudle.html (Nursing schedule (new), screens S2 to S15, component PvNurseSched)",
+  "backendTouched": true,
+  "howToReadThis": [
+    "UPDATE 2026-11-24: the backend now has these (branch feature/ancillary-schedule-backend) and the app calls it. Each item's \"status\" says what is integrated; \"integration\" says how. The older text below is the original proposal.",
+    "Every item below is something the redesigned Schedule needs that the backend does not do yet. The backend was NOT changed.",
+    "Each item says what the app does today instead (the fallback), the contract the screen is written against, and the one place in the app to switch on once the endpoint exists.",
+    "All of the app's calls for these items live in src/features/ancillary/providerOpenJobsService.ts. Until an endpoint exists, a read answers 'nothing open' and a write refuses with PendingIntegrationError, which the screen shows as 'not available yet'.",
+    "Contracts are proposals: names and shapes can change when the backend work is planned. The app only needs the fields listed.",
+    "Until the backend lists open jobs, a DEVELOPMENT build (__DEV__) shows SAMPLE open jobs from src/features/ancillary/staff/schedule/sampleOpenJobs.ts so the Open job screen and the accept flow can be seen; accepting one adds its days to the Schedule in memory only. A release build never shows them. Set SHOW_SAMPLE_OPEN_JOBS to false to turn them off."
+  ],
+  "items": [
+    {
+      "id": "PB-01",
+      "title": "List open scheduled bookings days ahead (\"Open near you\")",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "S2 Future day: open jobs near you",
+        "S3",
+        "S4"
+      ],
+      "today": "A scheduled visit is first offered to nurses 60 minutes before it starts (process_scheduled_dispatch_cron), so nothing can be listed ahead. The section does not show.",
+      "proposal": {
+        "endpoint": "GET /api/ancillary/provider/me/open-jobs",
+        "query": {
+          "from": "YYYY-MM-DD",
+          "to": "YYYY-MM-DD (listing window, e.g. 48 hours: setting SCHEDULED_LISTING_HOURS)"
+        },
+        "response": {
+          "needed": "OpenJob[] (see PB-02)",
+          "nearby": "OpenJob[]: scheduled bookings no nurse has taken, inside the nurse's speciality and service radius, not clashing with what she holds unless flagged in days[].clash, not hidden or released by her"
+        },
+        "OpenJob": {
+          "id": "request public id",
+          "kind": "instant | scheduled",
+          "patientName": "string",
+          "ageGender": "\"58 M\" / \"29 F\"",
+          "area": "short address",
+          "distanceKm": "number | null",
+          "services": [
+            {
+              "name": "string",
+              "minutes": "number"
+            }
+          ],
+          "minutesPerVisit": "number",
+          "days": [
+            {
+              "date": "YYYY-MM-DD",
+              "startTime": "HH:MM",
+              "clash": "string | null, e.g. \"Clashes with Meena J. · 9:30–10:30 AM\""
+            }
+          ],
+          "note": "string | null",
+          "bookedBy": "string | null, e.g. \"Booked by her son, Arun R.\"",
+          "postedAgo": "string | null",
+          "respondBy": "string | null",
+          "waiting": "string | null (instant only)"
+        },
+        "eligibility": "Verified, same speciality, inside her service radius of the patient. Online is NOT required to browse. The radius needs a position: her last GPS today, a saved home base is better (schema change, ask first).",
+        "passive": "No push, no ring, no ancillary_offers row for the early list; the 60-minute broadcast stays as the safety net."
+      },
+      "appSwitchPoint": "providerOpenJobsService.getOpenJobs",
+      "relatedPlan": "ancillary-early-listing-plan.md",
+      "integration": "getOpenJobs reads GET /provider/me/open-jobs; \"Open near you\" lists the days inside the 48 h window with the clash text."
+    },
+    {
+      "id": "PB-02",
+      "title": "Keep an instant request or an unfilled visit in \"Needed now\" after the 30-second offer",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "S14 Unfilled scheduled visit",
+        "S15 Missed instant request stays in Needed now"
+      ],
+      "today": "An instant request is in a nurse's available list only while HER 30-second offer is open (offer_service). After that it disappears from her screen even though the request is still searching. The request card at the top of the Schedule shows the open offer while it lasts; \"Needed now\" stays empty.",
+      "proposal": {
+        "endpoint": "GET /api/ancillary/provider/me/open-jobs (needed[])",
+        "rule": "Return every instant request still SEARCHING, and every scheduled visit already sent out and not taken, near the nurse, for her to take with one tap until somebody does. Taking one is the existing accept.",
+        "accept": "POST /api/ancillary/provider/requests/{id}/accept must work without a live offer for these (like a scheduled visit today)."
+      },
+      "appSwitchPoint": "providerOpenJobsService.getOpenJobs (needed[]); OpenJobsSection kind=\"needed\" (Take)",
+      "integration": "\"Needed now\" = instant requests still searching plus visits already sent out; Take accepts through the same route."
+    },
+    {
+      "id": "PB-03",
+      "title": "Pick some days of a multi-day booking",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "S3 Multi-day booking, pick days (1 clash)",
+        "S4 all days free",
+        "S6 After accepting 4 of 5 days"
+      ],
+      "today": "A nurse accepts a booking whole. The Open job screen is built but opens only from an open job (PB-01), and its accept refuses with PendingIntegrationError.",
+      "proposal": {
+        "endpoint": "POST /api/ancillary/provider/me/open-jobs/{id}/accept",
+        "body": {
+          "dates": [
+            "YYYY-MM-DD",
+            "..."
+          ]
+        },
+        "behaviour": "Assign the nurse to exactly those days; the other days stay open for other nurses; tell the family who is visiting on each day.",
+        "errors": [
+          "409 ALREADY_TAKEN (day already assigned)",
+          "409 NURSE_BUSY (overlap with her other visit, with the clashing visit in the message)",
+          "409 DAY_NOT_OPEN"
+        ]
+      },
+      "appSwitchPoint": "providerOpenJobsService.acceptOpenJob",
+      "integration": "acceptOpenJob sends the picked dates; the toast uses the server's acceptedDates / openDates. ALREADY_TAKEN / DAY_NOT_OPEN re-read the list."
+    },
+    {
+      "id": "PB-04",
+      "title": "\"Not for me\": hide a job from this nurse",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "S5 Decline booking"
+      ],
+      "today": "Nothing hides an open scheduled booking for one nurse (a decline today is an outcome of an offer). The button refuses with 'not available yet'.",
+      "proposal": {
+        "endpoint": "POST /api/ancillary/provider/me/open-jobs/{id}/hide",
+        "body": {
+          "reason": "Too far from me | Timing doesn't suit me | Needs skills I don't have | Other reason"
+        },
+        "behaviour": "The job stays open for other nurses; it no longer shows for this nurse; the reason is kept to match better jobs."
+      },
+      "appSwitchPoint": "providerOpenJobsService.hideOpenJob",
+      "integration": "hideOpenJob; the job stays open for other nurses."
+    },
+    {
+      "id": "PB-05",
+      "title": "Release ONE day, or the remaining days, of a multi-day booking",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "S7 Manage a confirmed day",
+        "S8 Release one day",
+        "S12",
+        "S13 Instant visit: can't make it"
+      ],
+      "today": "The only way to give a job back is POST /provider/requests/{id}/cancel, which hands back the whole order (every day she still holds). The ⋮ menu therefore offers \"Can't make this visit\" for a single visit and \"Release all remaining days\" when she holds several days; \"Can't make this day\" (one day only) is not offered.",
+      "proposal": {
+        "endpoint": "POST /api/ancillary/provider/me/visits/{visitId}/release",
+        "body": {
+          "scope": "DAY | REMAINING",
+          "reason": "string",
+          "note": "string | null"
+        },
+        "behaviour": "Give back that day (or that day and every later one), offer it to other nurses nearby, tell the family who is coming. Record the hand-back time so a late-release rule can be added.",
+        "policyCopy": "The sheet says 'Release at least 12 hours before the visit when you can.' A server rule for it is a decision for the team."
+      },
+      "appSwitchPoint": "providerOpenJobsService.releaseVisitDay (then ProviderSchedulePage.confirmRelease and ManageVisitSheet)",
+      "integration": "releaseVisitDay (DAY / REMAINING) from the ⋮ menu: \"Can't make this day\" and \"Release all remaining days\". An instant visit and an older order (409 RELEASE_NOT_SUPPORTED) still go back as the whole order."
+    },
+    {
+      "id": "PB-06",
+      "title": "Busy check (overlap) for open jobs and accepts",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "S3",
+        "S11 'Fits before your 7:00 PM visit'"
+      ],
+      "today": "The backend does not check what a nurse already holds when it offers or accepts. The Open job screen shows a clash line only when the job comes with days[].clash. The request card shows 'Your next visit: ...' (worked out in the app) and does not claim that it fits.",
+      "proposal": {
+        "rule": "A shared helper answering whether the nurse holds something overlapping [start - buffer, end + buffer] (her accepted visits and her active instant job). Used by the open-jobs list (days[].clash), by every accept (409 NURSE_BUSY) and by who is offered an instant request.",
+        "buffer": "NURSE_JOB_BUFFER_MINUTES (30) either side; an instant job counts as the sum of its procedures' estimated_duration_mins, else INSTANT_JOB_MINUTES (90)."
+      },
+      "appSwitchPoint": "OpenJob.days[].clash and the NURSE_BUSY message in ProviderSchedulePage.acceptJob",
+      "relatedPlan": "ancillary-early-listing-plan.md, Step 1",
+      "integration": "The clash text comes with each day; a refused accept shows the server's NURSE_BUSY sentence and the job stays open."
+    },
+    {
+      "id": "PB-07",
+      "title": "\"Running late\" tells the patient",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "S12 Manage an accepted instant visit"
+      ],
+      "today": "\"Running late\" files a RUNNING_LATE visit issue (POST /provider/me/visits/{id}/issues) for the care team. The patient is not told.",
+      "proposal": {
+        "endpoint": "POST /api/ancillary/provider/me/visits/{visitId}/running-late",
+        "body": {
+          "minutes": 10
+        },
+        "behaviour": "A notify_* push to the patient with names and times only (no free text)."
+      },
+      "appSwitchPoint": "ProviderSchedulePage.runAction (action 'late')",
+      "integration": "RunningLateSheet (10 / 15 / 20 / 30 / 45 min) calls POST /provider/me/visits/{id}/running-late: the patient is told. The care-team visit issue is still filed. Also reachable from the visit screen's \"Can't make it\" sheet."
+    },
+    {
+      "id": "PB-08",
+      "title": "More on the open offer (the request card)",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "S11 Instant request arrives",
+        "S14"
+      ],
+      "today": "The card shows what the offer carries: patient name, service, distance, what she collects (with tip), and for a scheduled visit the day and time. The 30 s countdown is counted from when the app first saw the offer.",
+      "proposal": {
+        "endpoint": "GET /api/ancillary/provider/requests/available (extend each item)",
+        "add": {
+          "expiresInMs": "milliseconds left on HER offer (the push already has expiresAt; the polled list does not)",
+          "ageGender": "\"29 yrs · Female\"",
+          "area": "short address",
+          "etaMinutes": "number",
+          "services": [
+            {
+              "name": "string",
+              "minutes": "number"
+            }
+          ],
+          "note": "string | null"
+        },
+        "designNote": "The design counts down 60 s; the backend offer is 30 s (INSTANT_OFFER_SECONDS). The app follows the backend."
+      },
+      "appSwitchPoint": "providerVisitService.toProviderOffer and InstantRequestCard",
+      "integration": "toProviderOffer maps expiresInMs, ageGender, area, etaMinutes, services, note, providerPayout; the request sheet and the Schedule card show them, and the countdown follows the server's time left."
+    },
+    {
+      "id": "PB-09",
+      "title": "Richer rows from GET /provider/me/orders",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "S2 to S10 rows",
+        "S9 Past visits"
+      ],
+      "today": "Rows show the patient's name, service (+ N more), area, a 'Day 2 of 5' chip and a status. An accepted instant visit has no slot, so it shows as 'Now / instant' on today. Past visits are filtered in the app over what the endpoint returns.",
+      "proposal": {
+        "endpoint": "GET /api/ancillary/provider/me/orders (extend)",
+        "add": {
+          "visits[].booking_type": "INSTANT | SCHEDULED per visit",
+          "visits[].accepted_at": "ISO time (the 'accepted 5:38 PM' line of an instant visit)",
+          "visits[].started_at": "ISO time (a slot for an instant visit)",
+          "patient.age / patient.gender": "for the 'whoLine'",
+          "visits[].status": "NO_SHOW already exists; add the reason a visit ended (cancelled by family / released by her)"
+        },
+        "past": "Server-side filters and paging for Past visits: range (from/to), status, type, patient name search, page / page_size."
+      },
+      "appSwitchPoint": "providerOrderView.normalizeProviderOrder and schedule/scheduleModel.toScheduleVisits",
+      "integration": "Rows carry booking_type, accepted_at, started_at, services, care_tags, end_reason, patient age / gender. The Past list asks the server for from / to / type / q; the status pill filter stays in the app (the server only knows the ORDER's status). page / page_size are not used: the list is read whole for the chosen range."
+    },
+    {
+      "id": "PB-10",
+      "title": "Per-visit fee in the Open job view",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "S3 'per visit · paid after each visit'"
+      ],
+      "today": "The view says 'Paid after each visit' without an amount (the design's amount is a placeholder).",
+      "proposal": {
+        "add": "OpenJob.feePerVisit: the nurse's payout for one visit (provider_service.provider_payout), as a number."
+      },
+      "appSwitchPoint": "OpenJobView (card 1, fee line)",
+      "integration": "feePerVisit is the nurse's payout for one visit."
+    },
+    {
+      "id": "PB-11",
+      "title": "Respond-by deadline and booking-requests banner",
+      "status": "PARTIAL",
+      "designScreens": [
+        "S2 to S4 ('Respond by 9:00 PM today'), the requests banner and page"
+      ],
+      "today": "No deadline exists for an open booking, so the banner and the requests page are not built. OpenJob.respondBy is shown when present.",
+      "proposal": {
+        "add": "OpenJob.respondBy (and the rule behind it, e.g. the time the booking stops being listed or is sent out like an instant request)."
+      },
+      "appSwitchPoint": "OpenJobView header subtitle; a requests banner on ProviderSchedulePage",
+      "integration": "The backend sends respondBy: null until the team decides what \"respond by\" means; nothing is shown. No booking-requests banner yet."
+    },
+    {
+      "id": "PB-12",
+      "title": "Reminders and the \"on the way\" deadline for an early-accepted visit",
+      "status": "PARTIAL",
+      "designScreens": [
+        "implied by S2 to S8 (visits accepted days ahead)"
+      ],
+      "today": "Nothing reminds a nurse of a visit she accepted days ahead and nothing releases it if she never sets out.",
+      "proposal": {
+        "reminders": "notify_* push 2 hours and 30 minutes before the start, once each.",
+        "deadline": "A visit still ACCEPTED (not EN_ROUTE) 30 minutes before the start goes back out to other nurses through the existing broadcast, without her."
+      },
+      "appSwitchPoint": "none in the app beyond the existing notification handling",
+      "relatedPlan": "ancillary-early-listing-plan.md, Step 3",
+      "integration": "The server-side deadline is built (a visit still not on the way 30 min before the start goes back out; she gets a notice). The 2 h / 30 min reminders are NOT built (they need a \"reminder sent\" column). Nothing to do in the app beyond the existing notification handling."
+    },
+    {
+      "id": "PB-13",
+      "title": "\"Visit notes to finish\" on Today",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "Ancillary Home: Nursing · Today, Needs your action"
+      ],
+      "today": "Notes can be saved only while a visit is IN_PROGRESS (409 VISIT_NOT_IN_PROGRESS afterwards), so a finished visit's notes cannot be finished from the app and the row is not shown. With no rows the card says \"You're all caught up\". \"Open jobs near you\" shows once PB-01 lists some.",
+      "proposal": {
+        "endpoint": "GET /api/ancillary/provider/me/today (extend)",
+        "add": {
+          "notes_pending": "[{ visit_public_id, patient_name, service_name, completed_at }] for visits she completed with no notes yet (last 7 days)"
+        },
+        "rule": "Allow update_visit_progress to save notes (only notes) on a COMPLETED visit for a limited time, e.g. 24 hours after completion."
+      },
+      "appSwitchPoint": "ProviderTodayContent: actionRows",
+      "integration": "\"Visit notes to finish\" row on Home opens VisitNotesSheet; notes are saved through PATCH .../progress (24 h after completion)."
+    },
+    {
+      "id": "PB-14",
+      "title": "Richer \"Up next\" cards on Today",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "Ancillary Home: Nursing · Today, Up next"
+      ],
+      "today": "A card shows what GET /provider/me/today carries (patient name and relation, the service with its minutes from the slot, the address and distance, minutes away, \"Day 2 of 5\" or \"Single visit\", the status), and for the first four cards it reads the visit's own details once to add age and gender and the patient's conditions as tags. That is up to four extra calls per refresh, and an instant visit is recognised only by having no start time. The fields below on the today list would remove both.",
+      "proposal": {
+        "endpoint": "GET /api/ancillary/provider/me/today (extend each visit)",
+        "add": {
+          "booking_type": "INSTANT | SCHEDULED",
+          "accepted_at": "ISO time (instant)",
+          "patient.age / patient.gender": "\"34 yrs · Male\"",
+          "services": [
+            {
+              "name": "string",
+              "minutes": "number"
+            }
+          ],
+          "care_tags": "[\"Diabetic\", \"Left foot ulcer\"] from the patient's conditions and the booking note"
+        }
+      },
+      "appSwitchPoint": "providerVisitService.ProviderVisitSummary and today/upNextView.toUpNextCard",
+      "integration": "The Up next cards read the row itself; the per-visit details calls are gone."
+    },
+    {
+      "id": "PB-15",
+      "title": "Area name for the header pill",
+      "status": "PENDING INTEGRATION",
+      "designScreens": [
+        "Ancillary Home: header pill \"HSR Layout · within 5 km\""
+      ],
+      "today": "The pill reads \"HSR Layout · within 5 km\": the radius is the travel radius (GET /ancillary/me/profile) and the name comes from the phone's last position through the device geocoder (only when location is already allowed; otherwise the pill says just \"Within 5 km\"). It opens Travel radius. The name is the phone's, not the last position the server holds.",
+      "proposal": {
+        "add": "optional: the provider's area label (the neighbourhood of the last location the server holds) on GET /api/ancillary/me/profile-hub or /provider/me/today, so the pill does not depend on the phone."
+      },
+      "appSwitchPoint": "ProviderTodayContent: areaLabel",
+      "integration": "Not built: the server has no reverse geocoder. The header pill keeps using the device's own position."
+    },
+    {
+      "id": "PB-16",
+      "title": "Instant request sheet on Home: earnings and \"Needed now\" after a miss",
+      "status": "INTEGRATED",
+      "designScreens": [
+        "Ancillary Home: 1b Instant request on Home"
+      ],
+      "today": "The sheet is the existing IncomingOfferSheet: it shows what the nurse collects after the visit, counts 30 seconds (the backend offer), and a missed request is just closed. The design shows \"You earn ₹[payout]\", counts 60 seconds, and says a missed request stays under Needed now (PB-02).",
+      "proposal": {
+        "add": "offer.providerPayout (provider_service.provider_payout) on the offer payload and the available list; PB-02 for the miss."
+      },
+      "appSwitchPoint": "IncomingOfferSheet (copy) and providerVisitService.toProviderOffer",
+      "integration": "The request sheet shows \"You earn\" and, when a request runs out but is still open, offers \"See in Needed now\"."
+    }
+  ],
+  "backendBranch": "feature/ancillary-schedule-backend (health_care_backend; not merged or deployed)"
+}

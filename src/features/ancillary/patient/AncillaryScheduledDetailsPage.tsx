@@ -21,8 +21,9 @@ import { ROUTES } from '../../../navigation/routes'
 import type { AncillaryBookVisitParams, AncillaryCartItem, AppStackParamList } from '../../../navigation/types'
 import { DOW_LABELS, MONTH_SHORT, isSameDay, parseDateOnly } from '../../../utils/date'
 import {
-	AppBottomSheet,
 	AppButton,
+	AppCancelSheet,
+	type AppCancelResult,
 	AppFooterBar,
 	AppIconTile,
 	AppInfoBanner,
@@ -37,6 +38,7 @@ import { CancelVisitsSheet, type CancelVisitRow } from '../components/CancelVisi
 import { RescheduleVisitSheet } from '../components/RescheduleVisitSheet'
 import { ScheduledVisitCard } from '../components/ScheduledVisitCard'
 import { capitalize, inr, leadText, plural, rangeLabel, timeLabel } from './ancillaryBookingCopy'
+import { apiErrorMessage } from './useVisitPatientAddress'
 import {
 	assignLine,
 	isCancelledStatus,
@@ -52,7 +54,6 @@ import {
 } from './scheduledVisitView'
 import { useScheduledOrder } from './useScheduledOrder'
 import { useVisitEdits } from './useVisitEdits'
-import { showStatusModal } from '../../../services/apiService'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 type Route = RouteProp<AppStackParamList, typeof ROUTES.STACK.ANCILLARY_SCHEDULED_DETAILS>
@@ -89,11 +90,10 @@ export default function AncillaryScheduledDetailsPage() {
 	const { requestId } = route.params
 
 	const { order, loading, failures, pollStalled, refresh, retry } = useScheduledOrder(requestId)
-	const { cancelling, moving, cancelVisits, moveVisit } = useVisitEdits(requestId, refresh)
+	const { moving, cancelVisits, moveVisit } = useVisitEdits(requestId, refresh)
 	const [cancelOpen, setCancelOpen] = useState(false)
 	const [movingId, setMovingId] = useState<string | null>(null)
 	const [legacyOpen, setLegacyOpen] = useState(false)
-	const [legacyBusy, setLegacyBusy] = useState(false)
 
 	const goHome = () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME })
 
@@ -118,21 +118,14 @@ export default function AncillaryScheduledDetailsPage() {
 	const perVisit = order?.totals?.per_visit ?? 0
 	const movingVisit = visits.find((v) => v.visit_public_id === movingId) ?? null
 
-	const cancelWholeBooking = async () => {
-		setLegacyBusy(true)
+	/** How the cancellation went (the legacy sheet shows the confirmation, or the reason it failed). */
+	const cancelWholeBooking = async (): Promise<AppCancelResult> => {
 		try {
 			await cancelAncillaryOrder(requestId)
-			Toast.show({ type: 'success', text1: 'Booking cancelled' })
-			setLegacyOpen(false)
-		} catch {
-			showStatusModal({
-				status: 'error',
-				title: "Couldn't cancel the booking",
-				description: 'Please try again.',
-				submitText: 'OK',
-			})
+			return { ok: true }
+		} catch (e) {
+			return { ok: false, error: apiErrorMessage(e) || 'Please try again.' }
 		} finally {
-			setLegacyBusy(false)
 			void refresh()
 		}
 	}
@@ -429,47 +422,22 @@ export default function AncillaryScheduledDetailsPage() {
 				visible={cancelOpen}
 				rows={cancelRows}
 				initialId={nextId}
-				busy={cancelling}
 				onClose={() => setCancelOpen(false)}
-				onConfirm={async (ids, reason) => {
-					if (await cancelVisits(ids, reason)) setCancelOpen(false)
-				}}
+				onConfirm={cancelVisits}
+				onDone={() => setCancelOpen(false)}
 			/>
 
-			<AppBottomSheet
+			<AppCancelSheet
 				visible={legacyOpen}
-				onClose={() => setLegacyOpen(false)}
 				title="Cancel this booking?"
 				subtitle={`All ${plural(n, 'visit')} will be cancelled.`}
-				appearance="modern"
-				showHeaderDivider={false}
-				dismissible={!legacyBusy}
-				footer={
-					<View style={styles.sheetActions}>
-						<AppButton
-							variant="outline"
-							size="lg"
-							style={styles.flex}
-							onPress={() => setLegacyOpen(false)}
-							disabled={legacyBusy}
-						>
-							Keep it
-						</AppButton>
-						<AppButton
-							variant="danger"
-							size="lg"
-							style={styles.flex}
-							onPress={() => void cancelWholeBooking()}
-							loading={legacyBusy}
-							disabled={legacyBusy}
-						>
-							Cancel booking
-						</AppButton>
-					</View>
-				}
-			>
-				<Text style={styles.sheetBody}>{"Nothing has been charged, so there's nothing to refund."}</Text>
-			</AppBottomSheet>
+				notice={{ text: "Nothing has been charged, so there's nothing to refund." }}
+				confirmLabel="Cancel booking"
+				successTitle="Booking cancelled"
+				onClose={() => setLegacyOpen(false)}
+				onDone={() => setLegacyOpen(false)}
+				onConfirm={cancelWholeBooking}
+			/>
 
 			{!!movingVisit && (
 				<RescheduleVisitSheet
@@ -531,8 +499,6 @@ const styles = StyleSheet.create({
 	stepSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
 	infoRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
 	infoText: { flex: 1, fontSize: 14, lineHeight: 20, color: APP_COLORS.ink },
-	sheetActions: { flexDirection: 'row', gap: 8 },
-	sheetBody: { fontSize: 14, lineHeight: 20, color: APP_COLORS.ink },
 	cancelBtn: { borderWidth: 1.5, borderColor: APP_COLORS.divider, backgroundColor: APP_COLORS.surface },
 	cancelBtnText: { color: APP_COLORS.danger, fontSize: 15, fontWeight: '700' },
 })

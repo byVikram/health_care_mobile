@@ -296,6 +296,14 @@ export const API_ENDPOINTS = {
 		// Patient no-show: the provider says they have arrived (starts the wait), then that the patient is not available
 		PROVIDER_VISIT_ARRIVED: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/arrived`,
 		PROVIDER_VISIT_NO_SHOW: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/no-show`,
+		PROVIDER_VISIT_RUNNING_LATE: (visitId: string) =>
+			`${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/running-late`,
+		PROVIDER_VISIT_RELEASE: (visitId: string) => `${BASE_URL}/api/ancillary/provider/me/visits/${visitId}/release`,
+		PROVIDER_OPEN_JOBS: `${BASE_URL}/api/ancillary/provider/me/open-jobs`,
+		PROVIDER_OPEN_JOB_ACCEPT: (requestId: string) =>
+			`${BASE_URL}/api/ancillary/provider/me/open-jobs/${requestId}/accept`,
+		PROVIDER_OPEN_JOB_HIDE: (requestId: string) =>
+			`${BASE_URL}/api/ancillary/provider/me/open-jobs/${requestId}/hide`,
 		// ... and the patient's side: what happened to a missed visit, and whether home-care booking is paused
 		PATIENT_VISIT_NO_SHOW: (visitId: string) => `${BASE_URL}/api/ancillary/patient/visits/${visitId}/no-show`,
 		PATIENT_VISIT_NO_SHOW_REPLY: (visitId: string) =>

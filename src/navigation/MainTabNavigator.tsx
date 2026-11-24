@@ -51,7 +51,8 @@ function HomeWithSidebar() {
 			? ProviderTodayScreen
 			: DashboardPage
 	return (
-		<SidebarLayout>
+		// The provider's Today has its own header (see ProviderHomeHeader); the drawer is still this layout's.
+		<SidebarLayout showHeader={role !== USER_ROLES.ANCILLARY}>
 			<Home />
 		</SidebarLayout>
 	)

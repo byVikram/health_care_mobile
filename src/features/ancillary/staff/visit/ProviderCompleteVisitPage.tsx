@@ -6,6 +6,7 @@
 // tasks done, what was recorded, payment; then "Up next" with Navigate and "Back to today".
 import React, { useCallback, useState } from 'react'
 import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import { AppButton, AppFooterBar, AppInfoBanner, AppScreenHeader, AppSection } from '../../../../components/common'
 import { APP_COLORS, formatInr } from '../../../../config/theme'
@@ -195,6 +196,9 @@ export default function ProviderCompleteVisitPage() {
 				{done && upNext ? (
 					<AppSection title="Up next" titleSize="sm">
 						<View style={styles.nextRow}>
+							<View style={styles.nextTile}>
+								<MaterialCommunityIcons name="home-outline" size={22} color={APP_COLORS.primary} />
+							</View>
 							<View style={styles.nextText}>
 								<Text
 									style={styles.nextTitle}
@@ -317,6 +321,14 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 12,
+	},
+	nextTile: {
+		width: 40,
+		height: 40,
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.mint,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	nextText: {
 		flex: 1,

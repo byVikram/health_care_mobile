@@ -8,13 +8,12 @@
 import { Linking } from 'react-native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import Toast from 'react-native-toast-message'
-import { showStatusModal } from '../../services/apiService'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
 import type { BookingActionKey, BookingItem } from '../../services/bookingsService'
 import { openOnMap } from '../../utils/maps'
 import { showComingSoon } from '../../utils/toast'
-import { cancelAncillaryOrder, getAncillaryOrder } from '../ancillary/ancillaryProviderBookingService'
+import { getAncillaryOrder } from '../ancillary/ancillaryProviderBookingService'
 
 /** Only 
 avigate is needed, so the tab screen's composite navigation prop fits too. */
@@ -23,6 +22,8 @@ export type BookingsNavigation = Pick<NativeStackNavigationProp<AppStackParamLis
 export type BookingActionHandlers = {
 	/** Doctor cancel: show the shared CancelAppointmentSheet for this item. */
 	requestAppointmentCancel: (item: BookingItem) => void
+	/** Home-care cancel: show the shared cancel sheet for this item (it cancels the booking and says so itself). */
+	requestCareCancel: (item: BookingItem) => void
 	/** Marks an action chip busy (null = idle) while something async runs. */
 	setBusy: (busyKey: string | null) => void
 	/** Refetch the list after something changed (e.g. a cancellation). */
@@ -66,19 +67,6 @@ export function openBookingTarget(navigation: BookingsNavigation, item: BookingI
 /** "Indiranagar clinic · 1.2 km" -> "Indiranagar clinic" (the distance isn't part of the place). */
 const placeOf = (where?: string | null) => (where ?? '').replace(/\s*·\s*[\d.,]+\s*(km|m)\s*$/i, '').trim()
 
-const confirm = (title: string, message: string, confirmLabel: string) =>
-	new Promise<boolean>((resolve) => {
-		showStatusModal({
-			status: 'info',
-			title,
-			description: message,
-			submitText: confirmLabel,
-			onSubmit: () => resolve(true),
-			cancelText: 'Keep it',
-			onCancel: () => resolve(false),
-		})
-	})
-
 async function callProvider(navigation: BookingsNavigation, item: BookingItem, handlers: BookingActionHandlers) {
 	const isCare = item.target.type === 'ancillary_tracking' || item.target.type === 'ancillary_request'
 	if (!isCare) {
@@ -102,29 +90,13 @@ async function callProvider(navigation: BookingsNavigation, item: BookingItem, h
 }
 
 async function cancelBooking(navigation: BookingsNavigation, item: BookingItem, handlers: BookingActionHandlers) {
-	const { type, id } = item.target
+	const { type } = item.target
 	if (type === 'appointment') {
 		handlers.requestAppointmentCancel(item)
 		return
 	}
 	if (type === 'ancillary_request' || type === 'ancillary_tracking') {
-		const ok = await confirm('Cancel this booking?', `${item.title} will be cancelled.`, 'Cancel booking')
-		if (!ok) return
-		handlers.setBusy(actionBusyKey(item, 'cancel'))
-		try {
-			await cancelAncillaryOrder(id)
-			Toast.show({ type: 'success', text1: 'Booking cancelled' })
-			handlers.onChanged()
-		} catch {
-			showStatusModal({
-				status: 'error',
-				title: "Couldn't cancel the booking",
-				description: 'Please try again.',
-				submitText: 'OK',
-			})
-		} finally {
-			handlers.setBusy(null)
-		}
+		handlers.requestCareCancel(item)
 		return
 	}
 	// Pharmacy (and anything else): nothing to cancel here yet.

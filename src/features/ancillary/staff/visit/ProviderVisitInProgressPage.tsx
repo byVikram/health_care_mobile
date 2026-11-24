@@ -1,7 +1,7 @@
 // src/features/ancillary/staff/visit/ProviderVisitInProgressPage.tsx
 //
-// "3 · Visit in progress" (ancillary-provider design): elapsed timer, patient, the visit's task checklist
-// with progress, then what the speciality records --
+// "3 · Visit in progress" (ancillary-provider design, "visit ancillary" update): elapsed timer, patient, the visit's
+// steps as numbered cards (green with a "Done" chip once ticked) with progress, then what the speciality records --
 //   'vitals'         BP / pulse / temperature / SpO2
 //   'pain_score'     pain after the session (0-10, with last visit's score) + the procedure's measurement
 //   'family_updates' quick updates sent to the family (in-app notification), with the ones already sent
@@ -326,6 +326,7 @@ export default function ProviderVisitInProgressPage() {
 							accessibilityLabel={`${doneCount} of ${tasks.length} done`}
 						/>
 						<AppCheckList
+							variant="steps"
 							items={tasks.map((t, i) => ({ key: String(i), label: t.label, checked: t.done }))}
 							onToggle={toggleTask}
 							disabled={!active}
