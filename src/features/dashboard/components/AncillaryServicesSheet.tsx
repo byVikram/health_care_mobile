@@ -1,8 +1,7 @@
 // src/features/dashboard/components/AncillaryServicesSheet.tsx
 //
 // "Ancillary care" sheet (design 1c): 2-column grid of tone cards (icon tile, title, subtitle) that
-// open the patient ancillary booking flow for that service key, plus "Lab tests at home" (laboratory
-// list) and a trust footer. Opened from the floating tab bar's middle button, the Ancillary tab and the
+// open the patient ancillary booking flow for that service key, plus a trust footer. Opened from the floating tab bar's middle button, the Ancillary tab and the
 // More services sheet via useHomeSheets().open('ancillary'); rendered once by <HomeSheetsHost />.
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -19,7 +18,7 @@ export interface AncillaryServicesSheetProps {
 	onClose: () => void
 }
 
-type HomeCareTarget = { kind: 'ancillary'; serviceKey: string; serviceLabel: string } | { kind: 'laboratory' }
+type HomeCareTarget = { kind: 'ancillary'; serviceKey: string; serviceLabel: string }
 
 interface HomeCareCard {
 	key: string
@@ -75,18 +74,9 @@ const CARDS: HomeCareCard[] = [
 		colors: TONES.sand,
 		target: { kind: 'ancillary', serviceKey: 'medical-equipment', serviceLabel: 'Medical Equipment' },
 	},
-	{
-		key: 'lab-at-home',
-		title: 'Lab tests at home',
-		subtitle: 'Free sample pickup',
-		icon: 'lab',
-		colors: { bg: APP_COLORS.successBg, ink: APP_COLORS.success },
-		target: { kind: 'laboratory' },
-	},
 ]
 
 const priceFor = (prices: Record<string, number>, card: HomeCareCard) => {
-	if (card.target.kind !== 'ancillary') return undefined
 	const { serviceKey, serviceLabel } = card.target
 	return prices[serviceKey] ?? prices[serviceLabel.toLowerCase()] ?? prices[card.title.toLowerCase()]
 }
@@ -97,10 +87,6 @@ export default function AncillaryServicesSheet({ visible, onClose }: AncillarySe
 
 	const handlePress = (card: HomeCareCard) => {
 		onClose()
-		if (card.target.kind === 'laboratory') {
-			navigation.navigate(ROUTES.STACK.LABORATORY_LIST)
-			return
-		}
 		navigation.navigate(ROUTES.STACK.ANCILLARY_SERVICES, {
 			serviceKey: card.target.serviceKey,
 			serviceLabel: card.target.serviceLabel,
@@ -123,14 +109,22 @@ export default function AncillaryServicesSheet({ visible, onClose }: AncillarySe
 			<View style={styles.body}>
 				<View style={styles.grid}>
 					{rows.map((row) => (
-						<View key={row.map((c) => c.key).join('|')} style={styles.row}>
+						<View
+							key={row.map((c) => c.key).join('|')}
+							style={[styles.row, row.length < 2 && styles.loneRow]}
+						>
+							{row.length < 2 && <View style={styles.halfSpacer} />}
 							{row.map((card) => {
 								const price = card.showPrice ? priceFor(prices, card) : undefined
 								const priceLabel = price ? `From ${formatBalance(price)}` : undefined
 								return (
 									<TouchableOpacity
 										key={card.key}
-										style={[styles.card, { backgroundColor: card.colors.bg }]}
+										style={[
+											styles.card,
+											row.length < 2 && styles.loneCard,
+											{ backgroundColor: card.colors.bg },
+										]}
 										onPress={() => handlePress(card)}
 										activeOpacity={0.8}
 										accessibilityRole="button"
@@ -166,7 +160,7 @@ export default function AncillaryServicesSheet({ visible, onClose }: AncillarySe
 									</TouchableOpacity>
 								)
 							})}
-							{row.length < 2 && <View style={styles.cardSpacer} />}
+							{row.length < 2 && <View style={styles.halfSpacer} />}
 						</View>
 					))}
 				</View>
@@ -199,8 +193,15 @@ const styles = StyleSheet.create({
 		padding: 14,
 		borderRadius: 12,
 	},
-	cardSpacer: {
-		flex: 1,
+	// A last row with one card: centred, same width as the cards in a full row.
+	loneRow: {
+		gap: 0,
+	},
+	loneCard: {
+		marginHorizontal: 5,
+	},
+	halfSpacer: {
+		flex: 0.5,
 	},
 	priceTag: {
 		position: 'absolute',
