@@ -1056,7 +1056,8 @@ export const acceptCareRequestBackend = async (
 		const res = await ApiService.post<any>(
 			API_ENDPOINTS.ANCILLARY.ACCEPT_OFFER(requestId),
 			{ offerId: `off-${requestId}` },
-			{ headers: { 'Idempotency-Key': key } }
+			// Every failure is answered by the caller (the offer sheet, the Schedule card, the notification), so no extra dialog.
+			{ headers: { 'Idempotency-Key': key }, skipGlobalError: true }
 		)
 		const payload = res.data
 		const data = payload?.data || payload
@@ -1065,6 +1066,14 @@ export const acceptCareRequestBackend = async (
 			travelInfo: data?.travelInfo || data,
 		}
 	} catch (error: any) {
+		const detail = error.response?.data?.detail
+		// NURSE_BUSY: she holds a visit too close to this one. Not "someone else took it": say what the server says.
+		if (detail?.code === 'NURSE_BUSY') {
+			return {
+				success: false,
+				message: typeof detail.message === 'string' ? detail.message : 'You already have a visit at that time.',
+			}
+		}
 		if (error.response?.status === 409 || simulateClaimed) {
 			// OFFER_EXPIRED: her own offer of the request has ended (30 seconds), nobody else has it yet.
 			const offerEnded = error.response?.data?.detail?.code === 'OFFER_EXPIRED'
@@ -1080,7 +1089,7 @@ export const acceptCareRequestBackend = async (
 			success: false,
 			message:
 				error.response?.data?.message ||
-				error.response?.data?.detail ||
+				(typeof detail === 'string' ? detail : detail?.message) ||
 				'Failed to accept care request. Please try again.',
 		}
 	}

@@ -75,5 +75,12 @@ export const tipLabel = (tip?: number | null) =>
 /** Offer is an instant request (patient waiting, 30 s to answer) rather than a scheduled visit. */
 export const isInstantOffer = (o: ProviderOffer) => o.bookingType === 'INSTANT' && !o.visitPublicId
 
+/**
+ * When to say an instant offer was first seen so that the usual "30 s minus the time since" countdown shows what is really left on HER
+ * offer: the backend's `expiresInMs` when it sent one, else now (the app counts the whole 30 s from when it first saw the offer).
+ */
+export const offerSeenAtMs = (nowMs: number, expiresInMs: number | null, windowS = 30) =>
+	expiresInMs == null ? nowMs : nowMs - Math.max(0, windowS * 1000 - expiresInMs)
+
 /** What the provider collects after the visit: the patient's charge plus any tip. */
 export const offerCollect = (o: ProviderOffer) => (o.totalAmount ?? 0) + (o.tipAmount || 0)

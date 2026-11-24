@@ -110,9 +110,11 @@ function PatientSidebar({ visible, onClose, onLogout, onViewProfile, sections }:
 
 interface SidebarLayoutProps {
 	children: React.ReactNode
+	/** false when the Home brings its own header (the provider Today): the drawer stays, the shared app bar is left out. */
+	showHeader?: boolean
 }
 
-export default function SidebarLayout({ children }: SidebarLayoutProps) {
+export default function SidebarLayout({ children, showHeader = true }: SidebarLayoutProps) {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
@@ -211,14 +213,16 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 						/>
 					)}
 
-					<AppHeader
-						variant="home"
-						userName={user.name}
-						avatarUri={user.avatar}
-						onAvatarPress={openSidebar}
-						isSearchEditable={false}
-						onSearchPress={handleSearchPress}
-					/>
+					{showHeader ? (
+						<AppHeader
+							variant="home"
+							userName={user.name}
+							avatarUri={user.avatar}
+							onAvatarPress={openSidebar}
+							isSearchEditable={false}
+							onSearchPress={handleSearchPress}
+						/>
+					) : null}
 
 					<View style={styles.content}>{children}</View>
 				</View>
