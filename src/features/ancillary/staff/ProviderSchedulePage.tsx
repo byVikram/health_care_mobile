@@ -10,7 +10,13 @@ import React, { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useIsFocused, useNavigation, type NavigationProp } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
-import { AppInfoBanner, AppPathIcon, AppScreenHeader, AppSegmentedControl } from '../../../components/common'
+import {
+	AppInfoBanner,
+	AppPathIcon,
+	AppScreenHeader,
+	AppSegmentedControl,
+	type AppCancelResult,
+} from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import { useTabBarClearance } from '../../../navigation/tabBar'
@@ -95,7 +101,6 @@ export default function ProviderSchedulePage() {
 	/** What a release gives back: this day only, or this day and the later ones she holds. */
 	const [releaseScope, setReleaseScope] = useState<ReleaseScope>('DAY')
 	const [late, setLate] = useState<ScheduleVisit | null>(null)
-	const [releaseBusy, setReleaseBusy] = useState(false)
 	const [job, setJob] = useState<OpenJob | null>(null)
 	const [jobBusy, setJobBusy] = useState(false)
 	const [declining, setDeclining] = useState<OpenJob | null>(null)
@@ -201,10 +206,9 @@ export default function ProviderSchedulePage() {
 		}
 	}
 
-	const confirmRelease = async (reason: string, note: string) => {
-		if (!releasing || releaseBusy) return
-		setReleaseBusy(true)
-		const all = releaseScope === 'REMAINING' && remainingDays(releasing) > 1
+	/** Gives the visit back and returns how it went: the reason sheet shows the confirmation, or the error. */
+	const confirmRelease = async (reason: string, note: string): Promise<AppCancelResult> => {
+		if (!releasing) return { ok: false, error: 'Please try again.' }
 		const reasons = releasing.kind === 'instant' ? INSTANT_REASONS : RELEASE_REASONS
 		const issue = reasons.find((r) => r.label === reason)?.issue ?? 'OTHER'
 		const text = [reason, note].filter(Boolean).join(' - ')
@@ -225,25 +229,10 @@ export default function ProviderSchedulePage() {
 				}
 			}
 			if (wholeOrder) await releaseOrder(releasing.orderId, text)
-			setReleasing(null)
-			Toast.show({
-				type: 'success',
-				text1:
-					releasing.kind === 'instant'
-						? 'Instant visit passed to another nurse'
-						: all
-							? 'Released · finding other nurses'
-							: 'Released · finding another nurse',
-			})
 			void reload()
+			return { ok: true }
 		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'Could not release the visit',
-				text2: extractApiErrorMessage(e, 'Please try again.'),
-			})
-		} finally {
-			setReleaseBusy(false)
+			return { ok: false, error: extractApiErrorMessage(e, 'Please try again.') }
 		}
 	}
 
@@ -296,18 +285,22 @@ export default function ProviderSchedulePage() {
 		}
 	}
 
-	const declineJob = async (j: OpenJob, reason: string) => {
-		setJobBusy(true)
+	/**
+	 * Hides the job from her. It is a quick dismissal, not a cancellation: the sheet closes and a toast says so (a failure stays in the
+	 * sheet). A job someone took meanwhile (or a day no longer open) is gone, so there is nothing left to hide: `onJobError` says so in a
+	 * toast, closes the sheet and the job view and re-reads the list, and the sheet has nothing more to show (`carryOn`).
+	 */
+	const declineJob = async (j: OpenJob, reason: string): Promise<AppCancelResult> => {
 		try {
 			await hideOpenJob(j.id, reason)
-			setDeclining(null)
-			setJob(null)
 			void reload()
-			Toast.show({ type: 'success', text1: 'Job hidden · it stays open for other nurses' })
+			return { ok: true }
 		} catch (e) {
-			onJobError(e, 'Could not hide this job')
-		} finally {
-			setJobBusy(false)
+			if (isStaleJobError(e)) {
+				onJobError(e, 'Could not hide this job')
+				return { ok: true, carryOn: true }
+			}
+			return { ok: false, error: extractApiErrorMessage(e, 'Please try again.') }
 		}
 	}
 
@@ -347,9 +340,14 @@ export default function ProviderSchedulePage() {
 						info="It stays open for other nurses nearby. Your reason helps us show you better-matched jobs."
 						confirmLabel="Hide this job"
 						tone="primary"
-						busy={jobBusy}
+						successTitle="Job hidden"
+						successMessage="It stays open for other nurses."
 						onClose={() => setDeclining(null)}
-						onConfirm={(reason) => void declineJob(declining, reason)}
+						onDone={() => {
+							setDeclining(null)
+							setJob(null)
+						}}
+						onConfirm={(reason) => declineJob(declining, reason)}
 					/>
 				)}
 			</>
@@ -615,9 +613,23 @@ export default function ProviderSchedulePage() {
 									? 'Release this day'
 									: 'Release this visit'
 					}
-					busy={releaseBusy}
+					successTitle={
+						releasing.kind === 'instant'
+							? 'Instant visit passed on'
+							: relRest
+								? 'Days released'
+								: 'Visit released'
+					}
+					successMessage={
+						releasing.kind === 'instant'
+							? 'We’ve offered it to other nurses nearby.'
+							: relRest
+								? 'We’re finding other nurses.'
+								: 'We’re finding another nurse.'
+					}
 					onClose={() => setReleasing(null)}
-					onConfirm={(reason, note) => void confirmRelease(reason, note)}
+					onDone={() => setReleasing(null)}
+					onConfirm={confirmRelease}
 				/>
 			)}
 

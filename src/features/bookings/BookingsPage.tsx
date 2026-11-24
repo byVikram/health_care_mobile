@@ -59,6 +59,7 @@ import {
 } from '../../services/bookingsService'
 import { buildS3Url } from '../../utils/s3Utils'
 import CancelAppointmentSheet from '../appointment/components/patient-details/CancelAppointmentSheet'
+import CancelCareBookingSheet from './CancelCareBookingSheet'
 import NoShowReplySheet from '../appointment/components/NoShowReplySheet'
 import { actionBusyKey, bookingKey, goHome, openBookingTarget, runBookingAction } from './bookingNavigation'
 import {
@@ -155,6 +156,7 @@ export default function BookingsPage() {
 	const [loadingMore, setLoadingMore] = useState(false)
 	const [busyKey, setBusyKey] = useState<string | null>(null)
 	const [cancelItem, setCancelItem] = useState<BookingItem | null>(null)
+	const [cancelCareItem, setCancelCareItem] = useState<BookingItem | null>(null)
 	// A doctor appointment marked as a no-show whose "What happened?" sheet is open.
 	const [noShowItem, setNoShowItem] = useState<BookingItem | null>(null)
 
@@ -244,6 +246,7 @@ export default function BookingsPage() {
 	const handlers = useMemo(
 		() => ({
 			requestAppointmentCancel: (item: BookingItem) => setCancelItem(item),
+			requestCareCancel: (item: BookingItem) => setCancelCareItem(item),
 			setBusy: setBusyKey,
 			onChanged: () => void load('focus'),
 		}),
@@ -441,7 +444,20 @@ export default function BookingsPage() {
 					}}
 					onCancelled={() => {
 						setCancelItem(null)
-						Toast.show({ type: 'success', text1: 'Appointment cancelled' })
+						void load('focus')
+					}}
+				/>
+			)}
+
+			{!!cancelCareItem && (
+				<CancelCareBookingSheet
+					visible
+					orderId={cancelCareItem.target.id}
+					title={cancelCareItem.title}
+					line={whenLabel(cancelCareItem)}
+					onClose={() => setCancelCareItem(null)}
+					onCancelled={() => {
+						setCancelCareItem(null)
 						void load('focus')
 					}}
 				/>
