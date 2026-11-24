@@ -124,7 +124,7 @@ export default function AccountPage({
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
+      <StatusBar barStyle="dark-content" />
       <View style={styles.container}>
 
         {/* ── Logo ── */}

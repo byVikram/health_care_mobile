@@ -300,7 +300,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	// ── Render ───────────────────────────────────────────────────────────────
 	const header = (
 		<>
-			<StatusBar barStyle="light-content" backgroundColor={APP_COLORS.primary} />
+			<StatusBar barStyle="light-content" />
 			<AppScreenHeader
 				variant="bar"
 				solid

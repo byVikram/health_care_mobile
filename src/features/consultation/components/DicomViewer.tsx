@@ -3,6 +3,23 @@ import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 
+// react-native-webview 14's own typings collapse to `never` under React Native 0.88's types, so this
+// describes only the props this screen passes. Remove it once the library's types compile again.
+type DicomWebViewProps = {
+  ref?: React.Ref<WebView>;
+  style?: React.ComponentProps<typeof View>['style'];
+  originWhitelist: string[];
+  source: { html: string };
+  onLoad: () => void;
+  javaScriptEnabled: boolean;
+  domStorageEnabled: boolean;
+  allowFileAccess: boolean;
+  mixedContentMode: 'never' | 'always' | 'compatibility';
+  onError: (e: { nativeEvent: unknown }) => void;
+  onMessage?: (e: { nativeEvent: { data: string } }) => void;
+};
+const DicomWebView = WebView as unknown as React.ComponentType<DicomWebViewProps>;
+
 interface DicomViewerProps {
   base64Data: string | null;
   fullScreen?: boolean;
@@ -299,7 +316,7 @@ export default function DicomViewer({ base64Data, fullScreen = false }: DicomVie
           <Text style={styles.loadingText}>Loading DICOM file...</Text>
         </View>
       )}
-      <WebView
+      <DicomWebView
         ref={webViewRef}
         style={styles.webview}
         // The viewer is an inline HTML string: it needs no file access, no storage and

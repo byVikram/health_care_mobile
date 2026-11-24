@@ -4,7 +4,7 @@
 // numeric input laid over them. Border: primary on the box being typed, ink once filled, divider while empty,
 // danger after a wrong code.
 import React, { useRef } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { TextInputInstance, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { APP_COLORS } from '../../../../config/theme'
 
 type Props = {
@@ -26,7 +26,7 @@ export function CompletionCodeInput({
 	autoFocus = false,
 	accessibilityLabel = 'Completion code',
 }: Props) {
-	const ref = useRef<TextInput>(null)
+	const ref = useRef<TextInputInstance>(null)
 	const [focused, setFocused] = React.useState(autoFocus)
 
 	return (

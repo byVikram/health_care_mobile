@@ -61,10 +61,11 @@ export default function AppAvatar({
 	}, [uri])
 	const showImage = !!uri && !failed
 	const dimension = { width: size, height: size, borderRadius: radius ?? size / 2 }
-	const overrides: ImageStyle = {}
-	if (borderWidth != null) overrides.borderWidth = borderWidth
-	if (borderColor != null) overrides.borderColor = borderColor
-	if (backgroundColor != null) overrides.backgroundColor = backgroundColor
+	const overrides: ImageStyle = {
+		...(borderWidth != null ? { borderWidth } : null),
+		...(borderColor != null ? { borderColor } : null),
+		...(backgroundColor != null ? { backgroundColor } : null),
+	}
 
 	let inner: React.ReactElement
 	if (showImage) {
