@@ -97,6 +97,15 @@ export interface AncillaryOrderVisit {
 	/** Server rules: free to move until its provider is assigned, free to cancel up to the cancel cutoff. */
 	can_reschedule?: boolean
 	can_cancel?: boolean
+	// Provider app rows (GET /provider/me/orders and Today; absent from an older backend and on the patient's own view).
+	booking_type?: string | null
+	/** When THIS provider took the visit. */
+	accepted_at?: string | null
+	started_at?: string | null
+	services?: { name: string; minutes: number }[]
+	care_tags?: string[]
+	/** Why it ended: COMPLETED / CANCELLED_BY_FAMILY / RELEASED_BY_PROVIDER / PATIENT_NOT_AVAILABLE / EXPIRED / FAILED / CANCELLED. */
+	end_reason?: string | null
 	/** Status endpoint only: the code the patient reads out at the door (until the visit starts) / when it is done. */
 	start_code?: string | null
 	completion_code?: string | null
@@ -266,6 +275,32 @@ export const searchAncillaryRequestAgain = async (requestPublicId: string): Prom
 
 export interface ProviderScheduledOrder extends AncillaryOrder {
 	patient_name?: string | null
+}
+
+/** What GET /provider/me/orders can filter on (the Past list). A visit's date counts; an instant visit counts on the day it was booked. */
+export type ProviderOrdersQuery = {
+	from?: string
+	to?: string
+	/** Exact order statuses, comma separated. */
+	status?: string
+	type?: 'INSTANT' | 'SCHEDULED'
+	/** Part of the patient's name. */
+	q?: string
+	page?: number
+	page_size?: number
+}
+
+/** The provider's orders with the server's filters and paging; `total` is every match (the X-Total-Count header), not the page. */
+export const getProviderOrdersFiltered = async (
+	query: ProviderOrdersQuery
+): Promise<{ orders: ProviderScheduledOrder[]; total: number }> => {
+	const res = await ApiService.getWithParams<Envelope<ProviderScheduledOrder[]>>(
+		API_ENDPOINTS.ANCILLARY.PROVIDER_SCHEDULED_ORDERS,
+		{ ...query }
+	)
+	const orders = res.data?.data ?? []
+	const header = Number((res.headers as Record<string, unknown> | undefined)?.['x-total-count'])
+	return { orders, total: Number.isFinite(header) ? header : orders.length }
 }
 
 export const getProviderScheduledOrders = async (statusFilter = 'ALL'): Promise<ProviderScheduledOrder[]> => {

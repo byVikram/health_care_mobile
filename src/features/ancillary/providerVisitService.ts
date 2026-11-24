@@ -24,10 +24,45 @@ export interface ProviderVisitSummary {
 	end_time: string | null
 	status: AncillaryOrderStatus
 	service_name: string
-	patient: { name: string | null; relation: string | null; phone: string | null }
+	patient: {
+		name: string | null
+		relation: string | null
+		phone: string | null
+		/** Age and gender come with the row (an older backend leaves them out). */
+		age?: number | null
+		gender?: string | null
+	}
 	address: { street_address: string; label: string | null; latitude: number | null; longitude: number | null }
 	distance_km: number | null
 	eta_minutes: number | null
+	/** "INSTANT" / "SCHEDULED": per visit (the app used to tell an instant visit by its missing start time). */
+	booking_type?: string | null
+	/** When THIS provider took the visit (ISO); null before. */
+	accepted_at?: string | null
+	started_at?: string | null
+	services?: { name: string; minutes: number }[]
+	/** The patient's conditions and care flags, short ("Diabetic"). */
+	care_tags?: string[]
+	end_reason?: ProviderVisitEndReason | null
+}
+
+/** Why a visit ended, for the Past list. */
+export type ProviderVisitEndReason =
+	| 'COMPLETED'
+	| 'CANCELLED_BY_FAMILY'
+	| 'RELEASED_BY_PROVIDER'
+	| 'PATIENT_NOT_AVAILABLE'
+	| 'EXPIRED'
+	| 'FAILED'
+	| 'CANCELLED'
+
+/** A completed visit of hers with no notes yet, still inside the window in which notes can be written. */
+export interface ProviderNotesPending {
+	visit_public_id: string
+	request_public_id: string
+	patient_name: string
+	service_name: string
+	completed_at: string | null
 }
 
 export interface ProviderToday {
@@ -40,6 +75,8 @@ export interface ProviderToday {
 	}
 	stats: { visits_total: number; visits_done: number }
 	next_visit: ProviderVisitSummary | null
+	/** Absent from an older backend. */
+	notes_pending?: ProviderNotesPending[]
 	schedule: ProviderVisitSummary[]
 	upcoming: ProviderVisitSummary[]
 }
@@ -67,6 +104,17 @@ export interface ProviderOffer {
 	/** The patient searched again, or raised the tip after this provider declined: a NEW offer, even for a request this provider answered or let run out. */
 	reoffer?: boolean
 	status: string
+	/** Time left on THIS provider's offer (ms) when the backend sent it; null otherwise (the app then counts 30 s itself). */
+	expiresInMs: number | null
+	/** "29 yrs · Female" */
+	ageGender: string | null
+	/** The neighbourhood: never the door, street or phone. */
+	area: string | null
+	etaMinutes: number | null
+	services: { name: string; minutes: number }[]
+	note: string | null
+	/** What the provider earns for the offered visit ("You earn"); null from an older backend. */
+	providerPayout: number | null
 }
 
 const toNum = (v: unknown): number | null => {
@@ -93,6 +141,17 @@ export const toProviderOffer = (o: Record<string, any> | null | undefined): Prov
 		tipAmount: toNum(o.tipAmount) ?? 0,
 		reoffer: o.reoffer === true,
 		status: String(o.status ?? ''),
+		expiresInMs: toNum(o.expiresInMs),
+		ageGender: o.ageGender ? String(o.ageGender) : null,
+		area: o.area ? String(o.area) : null,
+		etaMinutes: toNum(o.etaMinutes),
+		services: Array.isArray(o.services)
+			? o.services
+					.filter((x: any) => x && x.name)
+					.map((x: any) => ({ name: String(x.name), minutes: toNum(x.minutes) ?? 0 }))
+			: [],
+		note: o.note ? String(o.note) : null,
+		providerPayout: toNum(o.providerPayout),
 	}
 }
 
@@ -147,6 +206,29 @@ export const rejectOffer = async (requestId: string, reason?: string): Promise<b
 		if (code === 'ALREADY_ACCEPTED') return false
 		throw e
 	}
+}
+
+/**
+ * The offers open to this provider right now (GET /provider/requests/available): an instant request while her offer is open, and a
+ * scheduled visit nobody has taken within the hour. Empty while she is offline. It is polled, so a failure is not an error dialog.
+ */
+export const getOpenOffers = async (): Promise<ProviderOffer[]> => {
+	const res = await ApiService.get<Envelope<Record<string, unknown>[]> | Record<string, unknown>[]>(
+		API_ENDPOINTS.ANCILLARY.PROVIDER_AVAILABLE,
+		{ skipGlobalError: true }
+	)
+	const body = res.data
+	const list = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : []
+	return list.map(toProviderOffer).filter((o): o is ProviderOffer => !!o)
+}
+
+/**
+ * Hands the whole order back (POST /provider/requests/{id}/cancel): it goes to other providers, and for an order of several days that is
+ * every day she still holds. Giving back one day, or the days from one on, is providerOpenJobsService.releaseVisitDay; this is for an
+ * instant visit and for an older order that was not sent out day by day (releaseVisitDay answers 409 RELEASE_NOT_SUPPORTED). Throws on failure.
+ */
+export const releaseOrder = async (requestId: string, reason: string): Promise<void> => {
+	await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PROVIDER(requestId), { reason })
 }
 
 export const getProviderToday = async (date?: string): Promise<ProviderToday> => {
@@ -266,6 +348,18 @@ export const markVisitOnTheWay = async (visitId: string, shareLocation: boolean)
 	return res.data.data
 }
 
+/**
+ * "I'm running late": the patient is told (a push with her name and the minutes, nothing else). Only before she arrives and on the
+ * visit's day; it changes nothing on the visit. `minutes` is 5 to 120. No app-wide error dialog: the caller shows the message.
+ */
+export const reportRunningLate = async (visitId: string, minutes: number): Promise<void> => {
+	await ApiService.post(
+		API_ENDPOINTS.ANCILLARY.PROVIDER_VISIT_RUNNING_LATE(visitId),
+		{ minutes },
+		{ skipGlobalError: true }
+	)
+}
+
 /** "I have arrived": sends the phone's location (the server checks it is near the address) and starts the wait. */
 export const markVisitArrived = async (
 	visitId: string,
@@ -299,10 +393,19 @@ export const startVisit = async (visitId: string, code: string): Promise<Provide
 	return res.data.data
 }
 
-export const updateVisitProgress = async (visitId: string, input: VisitProgressInput): Promise<ProviderVisitDetail> => {
+/**
+ * Saves what she recorded. Notes alone can also be saved for a while after the visit is completed (409 NOTES_WINDOW_CLOSED once the
+ * window has passed). `silent`: a refusal is not shown as the app-wide error dialog (the caller shows its own message).
+ */
+export const updateVisitProgress = async (
+	visitId: string,
+	input: VisitProgressInput,
+	opts?: { silent?: boolean }
+): Promise<ProviderVisitDetail> => {
 	const res = await ApiService.patch<Envelope<ProviderVisitDetail>>(
 		API_ENDPOINTS.ANCILLARY.PROVIDER_VISIT_PROGRESS(visitId),
-		input
+		input,
+		{ skipGlobalError: opts?.silent === true }
 	)
 	return res.data.data
 }

@@ -1,10 +1,12 @@
 // src/features/ancillary/staff/visit/CancelVisitSheet.tsx
 //
-// "Can't make it? Cancel visit" (visit details design): reason radio list, a "Just running late? Message ..."
-// hint when the late reason is picked, an optional note to the patient and a red "Cancel visit" button, then
-// the "Visit cancelled" done state with "Back to Today". Cancelling hands the booking back to dispatch
-// (POST /provider/requests/{id}/cancel -- the patient is refunded / the request is re-sent to other
-// providers); the picked reason is also filed as a visit issue (POST /provider/me/visits/{id}/issues).
+// "Can't make it? Cancel visit" (visit details design): reason radio list, a "Just running late? Tell ..."
+// hint when the late reason is picked (it opens the running-late sheet: the patient is told how many minutes), an optional note to the patient and a red "Cancel visit" button, then
+// the "Visit cancelled" done state with "Back to Today". Cancelling hands the visit back to dispatch (the patient is refunded / it is
+// re-sent to other providers); the picked reason is also filed as a visit issue (POST /provider/me/visits/{id}/issues).
+// A booking of several days asks WHAT is cancelled: only this visit (the default: her other days stay hers), or this one and every
+// later day she holds (POST /provider/me/visits/{id}/release, scope DAY / REMAINING). A single visit, an instant one, and an older
+// order the server cannot give back day by day (409 RELEASE_NOT_SUPPORTED) are handed back whole (POST /provider/requests/{id}/cancel).
 import React, { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
@@ -15,6 +17,7 @@ import { API_ENDPOINTS } from '../../../../constants/apiUrls'
 import ApiService from '../../../../services/apiService'
 import { showComingSoon } from '../../../../utils/toast'
 import { extractApiErrorMessage } from '../../ancillaryService'
+import { apiErrorCode, releaseVisitDay, type ReleaseScope } from '../../providerOpenJobsService'
 import { reportVisitIssue, type VisitIssueReason } from '../../providerVisitService'
 
 type CancelReason = { id: string; label: string; issue: VisitIssueReason }
@@ -40,6 +43,11 @@ export type CancelVisitSheetProps = {
 	onClose: () => void
 	/** "Back to Today". */
 	onBackToToday: () => void
+	/** How many days the booking has, and which one this is: with later days the sheet asks what to cancel. */
+	visitsCount?: number
+	dayIndex?: number
+	/** Opens the running-late sheet (the visit is due today and she has not arrived); without it the hint stays "coming soon". */
+	onRunningLate?: () => void
 }
 
 export function CancelVisitSheet({
@@ -52,21 +60,32 @@ export function CancelVisitSheet({
 	instant,
 	onClose,
 	onBackToToday,
+	onRunningLate,
+	visitsCount = 1,
+	dayIndex = 1,
 }: CancelVisitSheetProps) {
 	const [reasonId, setReasonId] = useState<string | null>(null)
 	const [note, setNote] = useState('')
 	const [submitting, setSubmitting] = useState(false)
 	const [done, setDone] = useState(false)
+	/** What to cancel when the booking has later days: only this visit (the safe default), or this one and the later ones. */
+	const [scope, setScope] = useState<ReleaseScope>('DAY')
+	/** What the done screen says about what was handed back. */
+	const [doneNote, setDoneNote] = useState('')
 
 	useEffect(() => {
 		if (visible) {
 			setReasonId(null)
 			setNote('')
 			setDone(false)
+			setScope('DAY')
+			setDoneNote('')
 		}
 	}, [visible])
 
 	const reason = CANCEL_REASONS.find((r) => r.id === reasonId) ?? null
+	/** More days follow this one, so "only this visit" and "this and the later ones" are different things. */
+	const askScope = !instant && visitsCount > dayIndex
 
 	const submit = async () => {
 		if (!reason || submitting) return
@@ -77,7 +96,25 @@ export function CancelVisitSheet({
 			// refuses her note (403), which the app then showed as an "Access Denied" dialog although the cancel had worked. A note
 			// that cannot be saved is not worth stopping the cancel for.
 			await reportVisitIssue(visitId, reason.issue, text, { silent: true }).catch(() => undefined)
-			await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PROVIDER(requestId), { reason: text })
+			// A booking of several days gives back only what she chose; everything else (a single or instant visit, an older order the
+			// server cannot split: 409 RELEASE_NOT_SUPPORTED) goes back whole, as it always did.
+			let whole = !askScope
+			if (askScope) {
+				try {
+					await releaseVisitDay(visitId, scope, reason.label, note.trim())
+				} catch (e) {
+					if (apiErrorCode(e) !== 'RELEASE_NOT_SUPPORTED') throw e
+					whole = true
+				}
+			}
+			if (whole) await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PROVIDER(requestId), { reason: text })
+			setDoneNote(
+				whole
+					? `${patientFirstName} has been refunded and we’re finding another provider.`
+					: scope === 'DAY'
+						? `Only this visit was given back and we’re finding another provider for it. Your other days with ${patientFirstName} stay yours.`
+						: `This visit and the later ones were given back and we’re finding another provider for them.`
+			)
 			setDone(true)
 		} catch (e) {
 			Toast.show({
@@ -115,7 +152,7 @@ export function CancelVisitSheet({
 						disabled={!reason || submitting}
 						style={!reason ? styles.ctaOff : undefined}
 					>
-						Cancel visit
+						{askScope && scope === 'REMAINING' ? 'Cancel this and later visits' : 'Cancel visit'}
 					</AppButton>
 				)
 			}
@@ -125,12 +162,54 @@ export function CancelVisitSheet({
 					<View style={styles.doneIcon}>
 						<MaterialCommunityIcons name="close" size={22} color={APP_COLORS.danger} />
 					</View>
-					<Text style={styles.doneSub}>
-						{`Reason: ${reason?.label ?? ''}. ${patientFirstName} has been refunded and we’re finding another provider.`}
-					</Text>
+					<Text style={styles.doneSub}>{`Reason: ${reason?.label ?? ''}. ${doneNote}`}</Text>
 				</View>
 			) : (
 				<View style={styles.body}>
+					{askScope ? (
+						<View style={styles.scopeBox}>
+							<Text style={styles.noteLabel}>What do you want to cancel?</Text>
+							<View
+								accessibilityRole="radiogroup"
+								accessibilityLabel="What to cancel"
+								style={styles.reasons}
+							>
+								{[
+									{
+										id: 'DAY' as const,
+										label: 'Only this visit',
+										sub: `Day ${dayIndex} of ${visitsCount} · your other days stay yours`,
+									},
+									{
+										id: 'REMAINING' as const,
+										label: 'This visit and all the later ones',
+										sub: `Day ${dayIndex} to ${visitsCount} · every day you hold from here on`,
+									},
+								].map((o) => {
+									const on = scope === o.id
+									return (
+										<Pressable
+											key={o.id}
+											onPress={() => setScope(o.id)}
+											disabled={submitting}
+											accessibilityRole="radio"
+											accessibilityState={{ checked: on }}
+											style={[styles.reason, on && styles.reasonOn]}
+										>
+											<View style={[styles.ring, on && styles.ringOn]}>
+												{on ? <View style={styles.dot} /> : null}
+											</View>
+											<View style={styles.scopeText}>
+												<Text style={styles.reasonText}>{o.label}</Text>
+												<Text style={styles.scopeSub}>{o.sub}</Text>
+											</View>
+										</Pressable>
+									)
+								})}
+							</View>
+						</View>
+					) : null}
+
 					<View style={styles.reasons} accessibilityRole="radiogroup">
 						{CANCEL_REASONS.map((r) => {
 							const on = r.id === reasonId
@@ -156,14 +235,17 @@ export function CancelVisitSheet({
 						<Pressable
 							onPress={() => {
 								onClose()
-								showComingSoon('Chat with patients is coming soon.')
+								if (onRunningLate) onRunningLate()
+								else showComingSoon('Chat with patients is coming soon.')
 							}}
 							accessibilityRole="button"
 							style={styles.lateHint}
 						>
 							<Text style={styles.lateText}>
 								<Text style={styles.lateBold}>Just running late?</Text>
-								{` Message ${patientFirstName} with your new time instead. Most patients are happy to wait a few minutes.`}
+								{onRunningLate
+									? ` Tell ${patientFirstName} how many minutes instead. Most patients are happy to wait a few minutes.`
+									: ` Message ${patientFirstName} with your new time instead. Most patients are happy to wait a few minutes.`}
 							</Text>
 						</Pressable>
 					) : null}
@@ -193,6 +275,17 @@ export function CancelVisitSheet({
 }
 
 const styles = StyleSheet.create({
+	scopeBox: {
+		gap: 8,
+	},
+	scopeText: {
+		flex: 1,
+	},
+	scopeSub: {
+		fontSize: 12,
+		lineHeight: 17,
+		color: APP_COLORS.inkMuted,
+	},
 	body: {
 		gap: 14,
 		paddingBottom: 8,
