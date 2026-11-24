@@ -287,7 +287,8 @@ export default function ProviderSchedulePage() {
 
 	/**
 	 * Hides the job from her. It is a quick dismissal, not a cancellation: the sheet closes and a toast says so (a failure stays in the
-	 * sheet, a job someone took meanwhile is also re-read).
+	 * sheet). A job someone took meanwhile (or a day no longer open) is gone, so there is nothing left to hide: `onJobError` says so in a
+	 * toast, closes the sheet and the job view and re-reads the list, and the sheet has nothing more to show (`carryOn`).
 	 */
 	const declineJob = async (j: OpenJob, reason: string): Promise<AppCancelResult> => {
 		try {
@@ -295,7 +296,10 @@ export default function ProviderSchedulePage() {
 			void reload()
 			return { ok: true }
 		} catch (e) {
-			if (isStaleJobError(e)) void reload()
+			if (isStaleJobError(e)) {
+				onJobError(e, 'Could not hide this job')
+				return { ok: true, carryOn: true }
+			}
 			return { ok: false, error: extractApiErrorMessage(e, 'Please try again.') }
 		}
 	}

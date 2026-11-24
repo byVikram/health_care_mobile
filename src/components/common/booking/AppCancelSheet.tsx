@@ -17,7 +17,7 @@
 // cancellation and RETURNS ITS RESULT. The sheet shows the spinner and blocks dismissing while it runs, then
 //   ok     by default (`successStyle` 'toast') the sheet closes at once, a success toast says `successTitle` / `successMessage`, and
 //          `onDone` runs the flow's follow-up (refresh, go back): pressing the red button already was the confirmation, so there is no
-//          second screen. A flow that must be acknowledged, because its screen is gone or what happens next needs explaining, uses
+//          second screen (`onDone` gets the result, so what the call returned in `data` needs no state of the flow's own). A flow that must be acknowledged, because its screen is gone or what happens next needs explaining, uses
 //          `successStyle="screen"`: the form becomes a confirmation (a green check, the title and message, one `doneLabel` button) and
 //          closing it (the button, a swipe, Back) runs `onDone`
 //   error  stays open and shows the message in red above the buttons, so the user can retry or keep the booking (a toast would sit
@@ -64,8 +64,14 @@ export type AppCancelSummary = { title: string; line?: string }
  * on to something else (a doctor who picked "Refer to another doctor"), so the sheet shows nothing. `error`: it did not go through; the
  * sheet shows this text.
  */
-export type AppCancelResult =
-	{ ok: true; title?: string; message?: string } | { ok: true; carryOn: true } | { ok: false; error: string }
+export type AppCancelOk<T = unknown> = {
+	ok: true
+	title?: string
+	message?: string
+	/** Whatever the call gave back (the lab's cancelled order): handed to `onDone`, so the flow needs no state of its own for it. */
+	data?: T
+}
+export type AppCancelResult<T = unknown> = AppCancelOk<T> | { ok: true; carryOn: true } | { ok: false; error: string }
 
 /** A readable message from a failed cancel call (the server's `message`, a `detail` string or `detail.message`), else `fallback`. */
 export function cancelErrorMessage(error: unknown, fallback = 'Please try again.'): string {
@@ -80,7 +86,7 @@ export function cancelErrorMessage(error: unknown, fallback = 'Please try again.
 	)
 }
 
-export type AppCancelSheetProps = {
+export type AppCancelSheetProps<T = unknown> = {
 	visible: boolean
 	title: string
 	subtitle?: string
@@ -116,7 +122,7 @@ export type AppCancelSheetProps = {
 	/** Dismissing the form (Back, a swipe, Back): the cancellation did not happen. */
 	onClose: () => void
 	/** Runs the cancellation and returns how it went (see AppCancelResult). */
-	onConfirm: (reason: string | null, note: string) => Promise<AppCancelResult>
+	onConfirm: (reason: string | null, note: string) => Promise<AppCancelResult<T>>
 	/** What is said once it went through ("Appointment cancelled"): the success toast, or the confirmation screen's title. */
 	successTitle: string
 	successMessage?: string
@@ -124,8 +130,11 @@ export type AppCancelSheetProps = {
 	successStyle?: 'toast' | 'screen'
 	/** The confirmation screen's single button (`successStyle` 'screen'). Defaults to "Done". */
 	doneLabel?: string
-	/** The cancellation went through (the toast is up, or the confirmation screen was closed): the flow's follow-up (refresh, go back). Defaults to `onClose`. */
-	onDone?: () => void
+	/**
+	 * The cancellation went through (the toast is up, or the confirmation screen was closed): the flow's follow-up (refresh, go back).
+	 * Gets the result `onConfirm` returned (its `data`). Defaults to `onClose`.
+	 */
+	onDone?: (result?: AppCancelOk<T>) => void
 	maxHeightRatio?: number
 }
 
@@ -161,7 +170,7 @@ function OptionRow({
 	)
 }
 
-export function AppCancelSheet({
+export function AppCancelSheet<T = unknown>({
 	visible,
 	title,
 	subtitle,
@@ -190,14 +199,15 @@ export function AppCancelSheet({
 	doneLabel = 'Done',
 	onDone,
 	maxHeightRatio = 0.92,
-}: AppCancelSheetProps) {
+}: AppCancelSheetProps<T>) {
 	const [reason, setReasonState] = useState<string | null>(null)
 	const [note, setNote] = useState('')
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState<string | null>(null)
-	const [outcome, setOutcome] = useState<{ title: string; message?: string } | null>(null)
-	// The cancellation went through and the toast is up: the follow-up runs on the NEXT render (see below).
-	const [finishing, setFinishing] = useState(false)
+	const [outcome, setOutcome] = useState<{ title: string; message?: string; result: AppCancelOk<T> } | null>(null)
+	// The cancellation went through and the toast is up: the follow-up runs on the NEXT render (see below), with this result.
+	const [finishing, setFinishing] = useState<AppCancelOk<T> | null>(null)
+	const [wasVisible, setWasVisible] = useState(visible)
 
 	const setReason = (next: string | null) => {
 		setReasonState(next)
@@ -205,17 +215,24 @@ export function AppCancelSheet({
 		onReasonChange?.(next)
 	}
 
-	// A fresh form every time the sheet opens.
+	// A fresh form every time the sheet opens. Reset while rendering (React's way of adjusting state when a prop changes), not in an
+	// effect: no extra render with the old form on screen.
+	if (visible !== wasVisible) {
+		setWasVisible(visible)
+		if (visible) {
+			setReasonState(null)
+			setNote('')
+			setBusy(false)
+			setError(null)
+			setOutcome(null)
+			setFinishing(null)
+		}
+	}
+
+	// The flow's own reason state starts clean too (the parent's state cannot be set while rendering). Only on open: a caller that
+	// re-creates onReasonChange each render must not reset what was picked.
 	useEffect(() => {
-		if (!visible) return
-		setReasonState(null)
-		setNote('')
-		setBusy(false)
-		setError(null)
-		setOutcome(null)
-		setFinishing(false)
-		onReasonChange?.(null)
-		// Only on open: a caller that re-creates onReasonChange each render must not reset what was picked.
+		if (visible) onReasonChange?.(null)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [visible])
 
@@ -231,10 +248,10 @@ export function AppCancelSheet({
 			else if (!('carryOn' in result)) {
 				const title = result.title ?? successTitle
 				const message = result.message ?? successMessage
-				if (successStyle === 'screen') setOutcome({ title, message })
+				if (successStyle === 'screen') setOutcome({ title, message, result })
 				else {
 					Toast.show({ type: 'success', text1: title, text2: message })
-					setFinishing(true)
+					setFinishing(result)
 				}
 			}
 		} catch {
@@ -245,14 +262,15 @@ export function AppCancelSheet({
 	}
 
 	// Closing the confirmation is the flow's follow-up; closing the form is "never mind".
-	const finish = () => (onDone ?? onClose)()
+	const finish = (result?: AppCancelOk<T>) => (onDone ? onDone(result) : onClose())
 
-	// The follow-up of a toast-style success runs here, not straight after the call returns: a flow keeps what the call gave it (the
-	// order the lab sent back) in its own state, and only the next render sees it in `onDone`.
+	// The follow-up of a toast-style success runs here, not straight after the call returns: a flow updates its own state while
+	// `onConfirm` runs (the doctor's list of handled requests, which `onDone` reads), and only the next render sees it in `onDone`.
 	useEffect(() => {
 		if (!finishing) return
-		setFinishing(false)
-		finish()
+		const result = finishing
+		setFinishing(null)
+		finish(result)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [finishing])
 
@@ -267,12 +285,12 @@ export function AppCancelSheet({
 			subtitle={outcome ? undefined : subtitle}
 			// AppBottomSheet always animates itself closed before calling onClose, so a no-op here would desync it from `visible`;
 			// an in-flight cancel still resolves through the caller.
-			onClose={outcome ? finish : onClose}
+			onClose={outcome ? () => finish(outcome.result) : onClose}
 			dismissible={!busy}
 			maxHeightRatio={maxHeightRatio}
 			footer={
 				outcome ? (
-					<AppButton size="lg" onPress={finish}>
+					<AppButton size="lg" onPress={() => finish(outcome.result)}>
 						{doneLabel}
 					</AppButton>
 				) : (
@@ -320,7 +338,10 @@ export function AppCancelSheet({
 						</View>
 					) : null}
 
-					{children}
+					{children ? (
+						// Locked while the call runs, like the reasons and the note, so what was picked cannot change under it.
+						<View style={[styles.children, busy && styles.noTouch]}>{children}</View>
+					) : null}
 
 					{choice ? (
 						<View style={styles.block}>
@@ -337,7 +358,10 @@ export function AppCancelSheet({
 										sub={o.sub}
 										on={o.id === choice.value}
 										disabled={busy}
-										onPress={() => choice.onChange(o.id)}
+										onPress={() => {
+											setError(null)
+											choice.onChange(o.id)
+										}}
 									/>
 								))}
 							</View>
@@ -374,7 +398,10 @@ export function AppCancelSheet({
 							numberOfLines={2}
 							placeholder={notePlaceholder ?? `${noteLabel}${noteOptional ? ' (optional)' : ''}`}
 							value={note}
-							onChangeText={(t) => setNote(t.slice(0, noteMaxLength))}
+							onChangeText={(t) => {
+								setError(null)
+								setNote(t.slice(0, noteMaxLength))
+							}}
 							maxLength={noteMaxLength}
 							editable={!busy}
 							accessibilityLabel={noteLabel}
@@ -422,6 +449,8 @@ const styles = StyleSheet.create({
 	summary: { padding: 12, borderRadius: 12, backgroundColor: APP_COLORS.pageBg },
 	summaryTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: APP_COLORS.ink },
 	summaryLine: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
+	children: { gap: 12 },
+	noTouch: { pointerEvents: 'none' },
 	block: { gap: 8 },
 	heading: { fontSize: 13, lineHeight: 18, fontWeight: '800', color: APP_COLORS.ink },
 	optional: { fontWeight: '400', color: APP_COLORS.inkMuted },

@@ -53,16 +53,13 @@ type CancelProps = {
 }
 
 export function LabCancelSheet({ visible, orderId, subtitle, canReschedule, onClose, onRescheduleInstead, onCancelled }: CancelProps) {
-	// The order as the server has it once cancelled: handed to the page when the confirmation is closed.
-	const [cancelled, setCancelled] = useState<ApiOrder | null>(null)
-
-	const confirm = async (reason: string | null): Promise<AppCancelResult> => {
+	// The order as the server has it once cancelled travels in the result's `data` and reaches the page through `onDone`.
+	const confirm = async (reason: string | null): Promise<AppCancelResult<ApiOrder>> => {
 		try {
 			const order = await cancelOrder(orderId, reason)
-			setCancelled(order)
 			return order.status === 'cancel_requested'
-				? { ok: true, title: 'Cancellation requested', message: 'Your request has been sent.' }
-				: { ok: true }
+				? { ok: true, data: order, title: 'Cancellation requested', message: 'Your request has been sent.' }
+				: { ok: true, data: order }
 		} catch (e) {
 			return { ok: false, error: labErrorMessage(e) }
 		}
@@ -79,7 +76,7 @@ export function LabCancelSheet({ visible, orderId, subtitle, canReschedule, onCl
 			confirmLabel="Cancel order"
 			onConfirm={confirm}
 			successTitle="Order cancelled"
-			onDone={() => (cancelled ? onCancelled(cancelled) : onClose())}
+			onDone={(result) => (result?.data ? onCancelled(result.data) : onClose())}
 		/>
 	)
 }

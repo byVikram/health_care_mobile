@@ -186,6 +186,7 @@ export type {
 	AppCancelChoice,
 	AppCancelChoiceOption,
 	AppCancelNotice,
+	AppCancelOk,
 	AppCancelResult,
 	AppCancelSheetProps,
 	AppCancelSummary,
