@@ -75,7 +75,7 @@ export function AppBookingSuccess({
 
 	return (
 		<View style={styles.container}>
-			<StatusBar barStyle="light-content" backgroundColor={APP_COLORS.ink} />
+			<StatusBar barStyle="light-content" />
 			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 				{/* Success hero */}
 				<View style={[styles.hero, { paddingTop: 48 + insets.top }]}>

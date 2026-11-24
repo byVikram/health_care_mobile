@@ -426,7 +426,7 @@ export default function MyBookingsPage({
 							<View style={{ paddingVertical: 8, opacity: 0.6 }}>
 								<AppSkeleton width={'100%'} height={110} borderRadius={16} />
 							</View>
-						) : null
+						) : undefined
 					}
 				/>
 			)}

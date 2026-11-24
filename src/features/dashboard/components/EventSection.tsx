@@ -1,159 +1,76 @@
-import React, { useEffect, useState } from 'react'
-import { FlatList, Image, StyleSheet, TouchableOpacity, useWindowDimensions, View, ActivityIndicator } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+// src/features/dashboard/components/EventSection.tsx
+//
+// Home "Upcoming events" ("1 · Home"): the next four events as a sideways strip of compact cards, with "View all"
+// opening the Events screen. Data: GET /api/events/public. Hidden while loading, when nothing is coming up, and when
+// the events API cannot be reached, so Home never shows an error for it.
 
+import React, { useEffect, useState } from 'react'
+import { ScrollView, StyleSheet } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { AppTypography, EventCard } from '../../../components/common'
-import type { EventItem } from '../../../components/common/display/EventCard'
-import ApiService from '../../../services/apiService'
-import { API_ENDPOINTS } from '../../../constants/apiUrls'
+
+import { AppSection, AppTextLink, EventCard } from '../../../components/common'
 import { ROUTES } from '../../../navigation/routes'
 import type { AppStackParamList } from '../../../navigation/types'
-import { openWebUrl } from '../../../utils/safeLinking'
-import Toast from 'react-native-toast-message'
+import { getPublicEvents } from '../../../services/eventService'
+import type { EventItem } from '../../../types/event'
+import { homeSectionProps } from '../homeTheme'
 
-interface Props {
-	variant?: 'row' | 'column'
+type Props = {
+	/** Changes when the Home is pulled down to refresh. */
+	refreshToken?: number
+	/** Space above the section, for a Home that does not space its sections itself. */
+	marginTop?: number
 }
 
-const TEAL = '#0c7c7c'
+const HOME_EVENT_COUNT = 4
 
-function UpcomingEventsSection({ variant = 'row' }: Props) {
+function UpcomingEventsSection({ refreshToken, marginTop = 0 }: Props) {
 	const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>()
-	const { width } = useWindowDimensions()
-	const isTablet = width >= 768
-	const cardWidth = isTablet ? 320 : Math.min(280, width * 0.75)
-	const imageHeight = isTablet ? 140 : 120
-
 	const [events, setEvents] = useState<EventItem[]>([])
-	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
 
 	useEffect(() => {
-		let isMounted = true
-		const fetchEvents = async () => {
-			setLoading(true)
-			setError(null)
+		let active = true
+		const load = async () => {
 			try {
-				const res = await ApiService.get<any>(API_ENDPOINTS.EVENTS.PUBLIC)
-				if (isMounted) {
-					setEvents(res.data?.data || [])
-				}
-			} catch (err) {
-				console.error('Error fetching events:', err)
-				if (isMounted) {
-					setError('Failed to load events.')
-				}
-			} finally {
-				if (isMounted) {
-					setLoading(false)
-				}
+				const list = await getPublicEvents(HOME_EVENT_COUNT)
+				if (active) setEvents(list.slice(0, HOME_EVENT_COUNT))
+			} catch {
+				// Soft-fail: keep what is shown (or nothing).
 			}
 		}
-		fetchEvents()
+		void load()
 		return () => {
-			isMounted = false
+			active = false
 		}
-	}, [])
+	}, [refreshToken])
 
-	if (loading) {
-		return (
-			<View style={[styles.container, styles.center]}>
-				<ActivityIndicator size="small" color={TEAL} />
-			</View>
-		)
+	// A card opens the Events list first, with the event's details on top, so Back from the details lands on the list.
+	const openEvent = (e: EventItem) => {
+		navigation.push(ROUTES.STACK.ALL_EVENTS)
+		navigation.push(ROUTES.STACK.EVENT_DETAILS, { eventId: e.id })
 	}
 
-	if (error) {
-		return (
-			<View style={[styles.container, styles.center]}>
-				<AppTypography variant="body" style={{ color: 'red' }}>
-					{error}
-				</AppTypography>
-			</View>
-		)
-	}
-
-	if (events.length === 0) {
-		return null
-	}
+	if (events.length === 0) return null
 
 	return (
-		<View style={styles.container}>
-			<View style={styles.headerRow}>
-				<AppTypography
-					variant="subtitle"
-					style={[styles.sectionTitle, variant === 'column' && styles.sectionTitleLeft]}
-				>
-					Upcoming Events
-				</AppTypography>
-
-				<TouchableOpacity activeOpacity={0.75} onPress={() => navigation.navigate(ROUTES.STACK.ALL_EVENTS as any)}>
-					<AppTypography variant="caption" color={TEAL} style={styles.viewAllText}>
-						View All
-					</AppTypography>
-				</TouchableOpacity>
-			</View>
-
-			<FlatList
-				data={events}
-				horizontal
-				keyExtractor={(item) => String(item.id)}
-				showsHorizontalScrollIndicator={false}
-				contentContainerStyle={styles.listContent}
-				renderItem={({ item, index }) => (
-					<EventCard
-						item={item}
-						cardWidth={cardWidth}
-						imageHeight={imageHeight}
-						marginRight={index === events.length - 1 ? 0 : 12}
-						onRegister={() => {
-							if (item.registration_link) {
-								openWebUrl(item.registration_link).catch(() => Toast.show({ type: 'error', text1: 'Could not open registration link.' }))
-							} else {
-								Toast.show({ type: 'info', text1: 'Registration link is not available for this event.' })
-							}
-						}}
-						onViewDetails={() => navigation.navigate(ROUTES.STACK.EVENT_DETAILS as any, { eventId: item.id })}
-					/>
-				)}
-			/>
-		</View>
+		<AppSection
+			title="Upcoming events"
+			right={<AppTextLink label="View all" onPress={() => navigation.navigate(ROUTES.STACK.ALL_EVENTS)} />}
+			{...homeSectionProps(8)}
+			marginTop={marginTop}
+		>
+			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
+				{events.map((e) => (
+					<EventCard key={e.id} item={e} variant="compact" onPress={() => openEvent(e)} />
+				))}
+			</ScrollView>
+		</AppSection>
 	)
 }
 
 export default React.memo(UpcomingEventsSection)
 
 const styles = StyleSheet.create({
-	container: {
-		paddingTop: 8,
-		paddingBottom: 14,
-	},
-	center: {
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingVertical: 20,
-	},
-	headerRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 16,
-		marginBottom: 10,
-	},
-	sectionTitle: {
-		fontWeight: '700',
-		color: '#11283A',
-	},
-	sectionTitleLeft: {
-		textAlign: 'left',
-	},
-	viewAllText: {
-		fontWeight: '700',
-	},
-	listContent: {
-		paddingHorizontal: 16,
-		paddingBottom: 10,
-	},
+	strip: { gap: 10, paddingHorizontal: 16 },
 })

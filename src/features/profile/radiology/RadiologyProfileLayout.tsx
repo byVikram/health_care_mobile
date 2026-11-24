@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+	ScrollViewInstance,
 	ActivityIndicator,
 	NativeScrollEvent,
 	NativeSyntheticEvent,
@@ -33,8 +34,8 @@ const TABS = [
 export default function RadiologyProfileLayout() {
 	const navigation = useNavigation<any>()
 	const { width } = useWindowDimensions()
-	const pagerRef = useRef<ScrollView>(null)
-	const tabScrollRef = useRef<ScrollView>(null)
+	const pagerRef = useRef<ScrollViewInstance>(null)
+	const tabScrollRef = useRef<ScrollViewInstance>(null)
 	const [activeTab, setActiveTab] = useState('radiology')
 	const [profileLoading, setProfileLoading] = useState(false)
 	const [profileData, setProfileData] = useState<RadiologyProfileData | null>(null)

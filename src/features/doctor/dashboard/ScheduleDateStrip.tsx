@@ -5,7 +5,7 @@
 // already holds appointments). The picked chip is filled with the primary colour.
 
 import React, { useEffect, useRef } from 'react'
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ScrollViewInstance, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { AppPathIcon } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 
@@ -28,7 +28,7 @@ type Props = {
 }
 
 export function ScheduleDateStrip({ days, todayIso, selected, marked, onSelect }: Props) {
-	const scroller = useRef<ScrollView>(null)
+	const scroller = useRef<ScrollViewInstance>(null)
 
 	// A day picked elsewhere (the calendar, the Today button) is brought into view.
 	useEffect(() => {

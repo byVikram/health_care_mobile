@@ -4,7 +4,7 @@
 // (each visit of a recurring order has its own). A correct code starts the visit timer and notifies the
 // patient; a wrong one shows the error under the boxes.
 import React, { useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { TextInputInstance, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppBottomSheet, AppButton } from '../../../../components/common'
@@ -28,7 +28,7 @@ export function StartCodeSheet({ visible, visitId, patientFirstName, copy, onClo
 	const [code, setCode] = useState('')
 	const [error, setError] = useState<string | null>(null)
 	const [submitting, setSubmitting] = useState(false)
-	const inputRef = useRef<TextInput>(null)
+	const inputRef = useRef<TextInputInstance>(null)
 
 	useEffect(() => {
 		if (visible) {

@@ -13,6 +13,8 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.karolahealth.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use your microphone so you can search by voice and dictate notes.",
         "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to recognize your speech to search by voice and for consultation notes.",

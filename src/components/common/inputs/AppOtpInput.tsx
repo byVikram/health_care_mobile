@@ -7,12 +7,12 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import {
+	TextInputInstance,
 	Animated,
-	NativeSyntheticEvent,
 	StyleProp,
 	StyleSheet,
 	TextInput,
-	TextInputKeyPressEventData,
+	TextInputKeyPressEvent,
 	View,
 	ViewStyle,
 } from 'react-native'
@@ -77,7 +77,7 @@ export function AppOtpInput({
 	boxHeight = 56,
 	style,
 }: AppOtpInputProps) {
-	const inputs = useRef<TextInput[]>([])
+	const inputs = useRef<TextInputInstance[]>([])
 	const [focusedIndex, setFocusedIndex] = useState(autoFocus ? 0 : -1)
 	const shakeX = useRef(new Animated.Value(0)).current
 	const lastShake = useRef(shake)
@@ -105,7 +105,7 @@ export function AppOtpInput({
 		}
 	}
 
-	const handleKeyPress = (e: NativeSyntheticEvent<TextInputKeyPressEventData>, index: number) => {
+	const handleKeyPress = (e: TextInputKeyPressEvent, index: number) => {
 		if (e.nativeEvent.key === 'Backspace') {
 			if (!value[index] && index > 0) {
 				const pinArray = value.split('')
