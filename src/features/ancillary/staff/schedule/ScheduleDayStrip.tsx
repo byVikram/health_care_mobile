@@ -31,7 +31,8 @@ type Props = {
 }
 
 export function ScheduleDayStrip({ days, todayIso, selected, countOf, hasOpen, onSelect }: Props) {
-	const scroller = useRef<ScrollView>(null)
+	// The scroll view's instance type (RN 0.86 and 0.88 name it differently, so read it from the component).
+	const scroller = useRef<React.ComponentRef<typeof ScrollView>>(null)
 
 	// A day picked elsewhere (the calendar, the Today button) is brought into view.
 	useEffect(() => {
