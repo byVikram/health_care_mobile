@@ -286,7 +286,6 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 		setCancelOpen(false)
 		setLocalCancelled(true)
 		setLocalRescheduled(false)
-		Toast.show({ type: 'success', text1: 'Appointment cancelled' })
 		void load(true)
 	}
 

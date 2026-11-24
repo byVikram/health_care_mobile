@@ -2,20 +2,26 @@
 //
 // Schedule, the "more" (three dots) sheet of an appointment row, from the "Doctor Dashboard NEW" design:
 //   menu        "Appointment actions": Ask to reschedule / Refer to another doctor / Mark no-show / Cancel appointment
-//   cancel      "Cancel appointment": a reason (radio list) and an optional message to the patient, a "patient is notified" note,
-//               Cancel appointment / Keep appointment
+//   cancel      "Cancel appointment": the shared AppCancelSheet (a reason, an optional message to the patient, a "patient is
+//               notified" notice, Cancel appointment / Keep appointment); the menu sheet slides away and it takes its place
 //   no_show     "Mark as no-show?": how late the patient is and what happens; Mark no-show / Not yet. Only enabled from 60 minutes
 //               after the start until 2 days after it; outside that window the control stays visible, disabled, with a short hint.
 // "Ask to reschedule" does not pick a slot here: the doctor asks the patient to choose the new time, so the menu just hands over
 // to the parent (onAskReschedule), which shows the Ask to reschedule sheet. Not drawn: "Call patient" (no phone number is sent).
-// Built from the shared AppBottomSheet, AppButton and AppInfoBanner (plus the doctor-side SheetMenu, SheetPatientCard, ReasonPicker).
+// Built from the shared AppBottomSheet, AppButton, AppInfoBanner and AppCancelSheet (plus the doctor-side SheetMenu, SheetPatientCard).
 
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import { AppBottomSheet, AppButton, AppInfoBanner } from '../../../components/common'
+import {
+	AppBottomSheet,
+	AppButton,
+	AppCancelSheet,
+	AppInfoBanner,
+	type AppCancelResult,
+} from '../../../components/common'
 import { APP_COLORS, TONES } from '../../../config/theme'
 import { RESCHEDULE_REASON_MAX_LENGTH } from '../doctorService'
-import { composeReason, ReasonPicker, type ReasonOption } from '../components/ReasonPicker'
+import { composeReason, type ReasonOption } from '../components/ReasonPicker'
 import { SheetMenu } from '../components/SheetMenu'
 import { SheetPatientCard } from '../components/SheetPatientCard'
 
@@ -44,8 +50,8 @@ type Props = {
 	onAskReschedule: () => void
 	/** The doctor chose Refer to another doctor (opens the refer sheet). */
 	onRefer: () => void
-	/** The reason as it is sent: the picked one, then the doctor's message. */
-	onConfirmCancel: (reason: string) => void
+	/** Cancels with the reason as it is sent (the picked one, then the doctor's message) and returns how it went. */
+	onConfirmCancel: (reason: string) => Promise<AppCancelResult>
 	/** The no-show window is open (see noShowWindow in scheduleUtils). */
 	noShowCanMark: boolean
 	/** Why it is not open yet / any more ("Can be marked 1 hour after the start"); shown under the disabled control. */
@@ -78,158 +84,137 @@ export function TodayActionSheet({
 	onConfirmNoShow,
 	noShowError,
 }: Props) {
-	const [reasonId, setReasonId] = useState<string | null>(null)
-	const [note, setNote] = useState('')
-
-	useEffect(() => {
-		if (!visible) return
-		setReasonId(TODAY_CANCEL_REASONS[0].id)
-		setNote('')
-	}, [visible])
-
-	const title =
-		mode === 'cancel' ? 'Cancel appointment' : mode === 'no_show' ? 'Mark as no-show?' : 'Appointment actions'
+	const title = mode === 'no_show' ? 'Mark as no-show?' : 'Appointment actions'
 	const subtitle =
-		mode === 'cancel'
-			? 'This can’t be undone'
-			: mode === 'no_show'
-				? 'Confirm that the patient didn’t arrive'
-				: 'Choose an action for this appointment'
+		mode === 'no_show' ? 'Confirm that the patient didn’t arrive' : 'Choose an action for this appointment'
 	const back = noShowOnly ? onClose : () => onModeChange('menu')
 
 	return (
-		<AppBottomSheet visible={visible} title={title} subtitle={subtitle} onClose={onClose} appearance="modern">
-			<View style={styles.stack}>
-				<SheetPatientCard name={patientName} slotLabel={slotLabel} />
+		<>
+			<AppBottomSheet
+				visible={visible && mode !== 'cancel'}
+				title={title}
+				subtitle={subtitle}
+				onClose={onClose}
+				appearance="modern"
+			>
+				<View style={styles.stack}>
+					<SheetPatientCard name={patientName} slotLabel={slotLabel} />
 
-				{mode === 'menu' && (
-					<SheetMenu
-						rows={[
-							{
-								icon: 'calendar-clock-outline',
-								tile: TONES.sky.bg,
-								ink: TONES.sky.ink,
-								title: 'Ask to reschedule',
-								sub: 'Patient picks a new slot',
-								onPress: onAskReschedule,
-							},
-							{
-								icon: 'arrow-right',
-								tile: TONES.lilac.bg,
-								ink: TONES.lilac.ink,
-								title: 'Refer to another doctor',
-								sub: 'Send to a specialist who can see them',
-								onPress: onRefer,
-							},
-							{
-								icon: 'account-remove-outline',
-								tile: TONES.sand.bg,
-								ink: SAND_INK,
-								title: 'Mark no-show',
-								sub: noShowCanMark
-									? lateLabel
-										? `Patient is ${lateLabel}`
-										: 'The patient did not come'
-									: noShowHint,
-								disabled: !noShowCanMark,
-								onPress: () => onModeChange('no_show'),
-							},
-							{
-								icon: 'calendar-remove-outline',
-								tile: APP_COLORS.dangerBg,
-								ink: APP_COLORS.danger,
-								title: 'Cancel appointment',
-								sub: 'Patient is notified and refunded',
-								danger: true,
-								onPress: () => onModeChange('cancel'),
-							},
-						]}
-					/>
-				)}
+					{mode === 'menu' && (
+						<SheetMenu
+							rows={[
+								{
+									icon: 'calendar-clock-outline',
+									tile: TONES.sky.bg,
+									ink: TONES.sky.ink,
+									title: 'Ask to reschedule',
+									sub: 'Patient picks a new slot',
+									onPress: onAskReschedule,
+								},
+								{
+									icon: 'arrow-right',
+									tile: TONES.lilac.bg,
+									ink: TONES.lilac.ink,
+									title: 'Refer to another doctor',
+									sub: 'Send to a specialist who can see them',
+									onPress: onRefer,
+								},
+								{
+									icon: 'account-remove-outline',
+									tile: TONES.sand.bg,
+									ink: SAND_INK,
+									title: 'Mark no-show',
+									sub: noShowCanMark
+										? lateLabel
+											? `Patient is ${lateLabel}`
+											: 'The patient did not come'
+										: noShowHint,
+									disabled: !noShowCanMark,
+									onPress: () => onModeChange('no_show'),
+								},
+								{
+									icon: 'calendar-remove-outline',
+									tile: APP_COLORS.dangerBg,
+									ink: APP_COLORS.danger,
+									title: 'Cancel appointment',
+									sub: 'Patient is notified and refunded',
+									danger: true,
+									onPress: () => onModeChange('cancel'),
+								},
+							]}
+						/>
+					)}
 
-				{mode === 'no_show' && (
-					<>
-						{!!lateLabel && (
-							<Text style={styles.lateLine}>
-								{patientName} is {lateLabel}
-							</Text>
-						)}
-						<AppInfoBanner
-							tone="warning"
-							icon="information-outline"
-							title={`No-show can be marked 1 hour after the slot time. ${patientName} is emailed and can reply once with a reason. Missed appointments the patient cannot explain count towards pausing their online booking.`}
-							titleStyle={styles.bannerText}
-						/>
-						{!noShowCanMark && !!noShowHint && <Text style={styles.hint}>{noShowHint}</Text>}
-						{!!noShowError && (
-							<Text style={[styles.hint, { color: APP_COLORS.danger }]}>{noShowError}</Text>
-						)}
-						<View style={{ gap: 8 }}>
-							<AppButton
-								size="lg"
-								buttonColor={SAND_INK}
-								softDisabled
-								onPress={onConfirmNoShow}
-								loading={busy}
-								disabled={!noShowCanMark || busy}
-							>
-								Mark no-show
-							</AppButton>
-							<AppButton variant="outline" size="lg" onPress={back}>
-								Not yet
-							</AppButton>
-						</View>
-					</>
-				)}
-
-				{mode === 'cancel' && (
-					<>
-						<ReasonPicker
-							options={TODAY_CANCEL_REASONS}
-							value={reasonId}
-							onChange={setReasonId}
-							note={note}
-							onNoteChange={setNote}
-							noteMaxLength={RESCHEDULE_REASON_MAX_LENGTH}
-						/>
-						<AppInfoBanner
-							tone="danger"
-							icon="information-outline"
-							title={`${patientName} is notified right away. ${
-								video
-									? 'The full fee is refunded to their payment method.'
-									: 'Any advance paid is refunded in full.'
-							}`}
-							titleStyle={styles.bannerText}
-						/>
-						<View style={{ gap: 8 }}>
-							<AppButton
-								variant="danger"
-								size="lg"
-								softDisabled
-								loading={busy}
-								disabled={!reasonId || busy}
-								onPress={() =>
-									onConfirmCancel(
-										composeReason(
-											TODAY_CANCEL_REASONS,
-											reasonId,
-											note,
-											RESCHEDULE_REASON_MAX_LENGTH
-										)
-									)
-								}
-							>
-								Cancel appointment
-							</AppButton>
-							<AppButton variant="outline" size="lg" onPress={back}>
-								Keep appointment
-							</AppButton>
-						</View>
-					</>
-				)}
-			</View>
-		</AppBottomSheet>
+					{mode === 'no_show' && (
+						<>
+							{!!lateLabel && (
+								<Text style={styles.lateLine}>
+									{patientName} is {lateLabel}
+								</Text>
+							)}
+							<AppInfoBanner
+								tone="warning"
+								icon="information-outline"
+								title={`No-show can be marked 1 hour after the slot time. ${patientName} is emailed and can reply once with a reason. Missed appointments the patient cannot explain count towards pausing their online booking.`}
+								titleStyle={styles.bannerText}
+							/>
+							{!noShowCanMark && !!noShowHint && <Text style={styles.hint}>{noShowHint}</Text>}
+							{!!noShowError && (
+								<Text style={[styles.hint, { color: APP_COLORS.danger }]}>{noShowError}</Text>
+							)}
+							<View style={{ gap: 8 }}>
+								<AppButton
+									size="lg"
+									buttonColor={SAND_INK}
+									softDisabled
+									onPress={onConfirmNoShow}
+									loading={busy}
+									disabled={!noShowCanMark || busy}
+								>
+									Mark no-show
+								</AppButton>
+								<AppButton variant="outline" size="lg" onPress={back}>
+									Not yet
+								</AppButton>
+							</View>
+						</>
+					)}
+				</View>
+			</AppBottomSheet>
+			<AppCancelSheet
+				visible={visible && mode === 'cancel'}
+				title="Cancel appointment"
+				subtitle="This can’t be undone."
+				summary={{ title: patientName, line: slotLabel }}
+				reasons={TODAY_CANCEL_REASONS.map((r) => r.label)}
+				reasonRequired
+				noteLabel="Message to patient"
+				noteMaxLength={RESCHEDULE_REASON_MAX_LENGTH}
+				notice={{
+					tone: 'danger',
+					text: `${patientName} is notified right away. ${
+						video
+							? 'The full fee is refunded to their payment method.'
+							: 'Any advance paid is refunded in full.'
+					}`,
+				}}
+				confirmLabel="Cancel appointment"
+				successTitle="Appointment cancelled"
+				successMessage={`${patientName} has been notified.`}
+				onClose={onClose}
+				onConfirm={(reason, note) =>
+					onConfirmCancel(
+						composeReason(
+							TODAY_CANCEL_REASONS,
+							TODAY_CANCEL_REASONS.find((r) => r.label === reason)?.id ?? null,
+							note,
+							RESCHEDULE_REASON_MAX_LENGTH
+						)
+					)
+				}
+			/>
+		</>
 	)
 }
 

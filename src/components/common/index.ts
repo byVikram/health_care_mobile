@@ -181,8 +181,15 @@ export { AppPromoCard } from './display/AppPromoCard'
 export type { AppPromoCardProps, AppPromoCardTone } from './display/AppPromoCard'
 export { AppCatalogItemRow } from './booking/AppCatalogItemRow'
 export { AppBookingSuccess } from './booking/AppBookingSuccess'
-export { AppCancelSheet } from './booking/AppCancelSheet'
-export type { AppCancelSheetProps } from './booking/AppCancelSheet'
+export { AppCancelSheet, cancelErrorMessage } from './booking/AppCancelSheet'
+export type {
+	AppCancelChoice,
+	AppCancelChoiceOption,
+	AppCancelNotice,
+	AppCancelResult,
+	AppCancelSheetProps,
+	AppCancelSummary,
+} from './booking/AppCancelSheet'
 export { AppRescheduleSheet, AppRescheduleGroup } from './booking/AppRescheduleSheet'
 export type { AppRescheduleSheetProps } from './booking/AppRescheduleSheet'
 export type { AppBookingSuccessProps } from './booking/AppBookingSuccess'

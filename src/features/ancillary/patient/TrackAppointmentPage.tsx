@@ -17,13 +17,14 @@ import {
 	cancelCareRequestPatientBackend,
 } from '../ancillaryService'
 import CancellationDetailsModal from './CancellationDetailsModal'
+import { cancelErrorMessage, type AppCancelResult } from '../../../components/common'
 import { useVisitPolicy } from '../hooks/useVisitPolicy'
 import { dayLabel, inr, providerNoun, timeLabel } from './ancillaryBookingCopy'
 import { MissedVisitBanner } from '../components/MissedVisitBanner'
 import { CancelVisitsSheet } from '../components/CancelVisitsSheet'
 import { lockedReason } from './scheduledVisitView'
 import { useVisitEdits } from './useVisitEdits'
-import ApiService, { showStatusModal } from '../../../services/apiService'
+import ApiService from '../../../services/apiService'
 import { openAuthedSocket, type AuthedSocketHandle } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 
@@ -139,7 +140,6 @@ export default function TrackAppointmentPage() {
 	const [reviewModalVisible, setReviewModalVisible] = useState(false)
 	const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 	const [cancelModalVisible, setCancelModalVisible] = useState(false)
-	const [isCancelling, setIsCancelling] = useState(false)
 	const [statusModal, setStatusModal] = useState<{
 		visible: boolean
 		status?: 'success' | 'error' | 'info'
@@ -204,7 +204,7 @@ export default function TrackAppointmentPage() {
 	const visitPolicy = useVisitPolicy()
 	// A scheduled visit is cancelled on its own (a reason, within the server's cutoff), not the whole booking.
 	const [visitCancelOpen, setVisitCancelOpen] = useState(false)
-	const { cancelling: visitCancelling, cancelVisits } = useVisitEdits(bookingId, async () => {})
+	const { cancelVisits } = useVisitEdits(bookingId, async () => {})
 	const specialty = liveOrder?.specialty
 	const scheduledNoun = providerNoun(typeof specialty === 'string' ? specialty : (specialty?.key ?? ''))
 	const isScheduled = isScheduledOrder(liveOrder) || isScheduledOrder(bookingData)
@@ -437,22 +437,18 @@ export default function TrackAppointmentPage() {
 		Linking.openURL(`tel:${shownProvider.phone}`)
 	}
 
-	const handleCancelRequestWithReason = async (reason: string) => {
-		setIsCancelling(true)
+	const handleCancelRequestWithReason = async (reason: string): Promise<AppCancelResult> => {
 		try {
 			await cancelCareRequestPatientBackend(bookingId, reason)
-		} catch {
-			// Still open on the server: stay here so the patient can try again.
-			showStatusModal({
-				status: 'error',
-				title: 'Could not cancel the request',
-				description: 'Please try again.',
-				submitText: 'OK',
-			})
-			return
-		} finally {
-			setIsCancelling(false)
+			return { ok: true }
+		} catch (e) {
+			// Still open on the server: the sheet stays open with the reason, so the patient can try again.
+			return { ok: false, error: cancelErrorMessage(e, 'Please try again.') }
 		}
+	}
+
+	/** The confirmation of a cancelled request was closed: leave the tracking screen. */
+	const finishCancelledRequest = () => {
 		setCancelModalVisible(false)
 		if (navigation.canGoBack()) {
 			navigation.goBack()
@@ -671,10 +667,9 @@ export default function TrackAppointmentPage() {
 						},
 					]}
 					initialId={focusedVisit.visit_public_id}
-					busy={visitCancelling}
 					onClose={() => setVisitCancelOpen(false)}
-					onConfirm={async (ids, reason) => {
-						if (!(await cancelVisits(ids, reason))) return
+					onConfirm={cancelVisits}
+					onDone={() => {
 						setVisitCancelOpen(false)
 						// Booking details refreshes when it comes back into focus.
 						if (navigation.canGoBack()) navigation.goBack()
@@ -687,7 +682,7 @@ export default function TrackAppointmentPage() {
 				visible={cancelModalVisible}
 				onClose={() => setCancelModalVisible(false)}
 				onConfirmCancel={handleCancelRequestWithReason}
-				isCancelling={isCancelling}
+				onDone={finishCancelledRequest}
 			/>
 		</View>
 	)

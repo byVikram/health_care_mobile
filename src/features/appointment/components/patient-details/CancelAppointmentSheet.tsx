@@ -5,10 +5,10 @@
 // APPOINTMENTS.STATUSES, then PATCH APPOINTMENTS.UPDATE.
 
 import React, { useEffect, useState } from 'react'
-import ApiService, { showStatusModal } from '../../../../services/apiService'
+import ApiService from '../../../../services/apiService'
 import { API_ENDPOINTS } from '../../../../constants/apiUrls'
 import { updateAppointmentsStatus } from '../../../../services/appointmentService'
-import { AppCancelSheet } from '../../../../components/common'
+import { AppCancelSheet, cancelErrorMessage, type AppCancelResult } from '../../../../components/common'
 
 const REASONS = ['Feeling better', 'Can’t make it', 'Booked by mistake', 'Seeing another doctor']
 
@@ -32,7 +32,6 @@ export default function CancelAppointmentSheet({
 	onCancelled,
 }: CancelAppointmentSheetProps) {
 	const [cancelledStatusId, setCancelledStatusId] = useState('')
-	const [submitting, setSubmitting] = useState(false)
 
 	useEffect(() => {
 		if (!visible) return
@@ -55,40 +54,19 @@ export default function CancelAppointmentSheet({
 		}
 	}, [visible, cancelledStatusId])
 
-	const handleConfirm = async (reason: string | null) => {
-		if (submitting) return
+	const handleConfirm = async (reason: string | null): Promise<AppCancelResult> => {
 		if (!cancelledStatusId) {
-			showStatusModal({
-				status: 'error',
-				title: 'Unable to cancel',
-				description: 'Cancellation status is unavailable. Please try again in a moment.',
-				submitText: 'OK',
-			})
-			return
+			return { ok: false, error: 'Cancellation status is unavailable. Please try again in a moment.' }
 		}
-		setSubmitting(true)
 		try {
 			const res = await updateAppointmentsStatus(appointmentId, cancelledStatusId, reason ?? undefined)
-			if (res?.success) {
-				onCancelled()
-			} else {
-				showStatusModal({
-					status: 'error',
-					title: "Couldn't cancel the appointment",
-					description: res?.message || 'Failed to cancel appointment.',
-					submitText: 'OK',
-				})
-			}
-		} catch (error: any) {
-			console.log('[CancelAppointmentSheet] cancel error:', error?.response?.data || error?.message || error)
-			showStatusModal({
-				status: 'error',
-				title: "Couldn't cancel the appointment",
-				description: 'Please try again.',
-				submitText: 'OK',
-			})
-		} finally {
-			setSubmitting(false)
+			return res?.success ? { ok: true } : { ok: false, error: res?.message || 'Failed to cancel appointment.' }
+		} catch (error) {
+			console.log(
+				'[CancelAppointmentSheet] cancel error:',
+				(error as any)?.response?.data || (error as any)?.message || error
+			)
+			return { ok: false, error: cancelErrorMessage(error, 'Please try again.') }
 		}
 	}
 
@@ -100,8 +78,10 @@ export default function CancelAppointmentSheet({
 			reasons={REASONS}
 			onClose={onClose}
 			onRescheduleInstead={onRescheduleInstead}
+			confirmLabel="Cancel appointment"
 			onConfirm={handleConfirm}
-			busy={submitting}
+			successTitle="Appointment cancelled"
+			onDone={onCancelled}
 		/>
 	)
 }

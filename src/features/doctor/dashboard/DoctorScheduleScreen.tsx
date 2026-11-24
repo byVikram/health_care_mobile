@@ -24,6 +24,8 @@ import Toast from 'react-native-toast-message'
 import {
 	AppAppointmentRow,
 	AppConfirmSheet,
+	cancelErrorMessage,
+	type AppCancelResult,
 	AppEmptyCard,
 	AppPathIcon,
 	AppSearchBar,
@@ -651,31 +653,40 @@ export function DoctorScheduleScreen() {
 		}
 	}
 
-	const handleConfirmReject = async (reasonLabel: string, note: string, target?: Appointment) => {
+	/**
+	 * Cancels an appointment, or declines a request, and returns how it went: the cancel sheets show the outcome themselves (a
+	 * confirmation, or the reason it failed) and run their follow-up when the confirmation is closed.
+	 */
+	const handleConfirmReject = async (
+		reasonLabel: string,
+		note: string,
+		target?: Appointment
+	): Promise<AppCancelResult> => {
 		const apt = target
-		if (!apt || busyId) return
+		if (!apt) return { ok: false, error: 'Please try again.' }
+		if (busyId) return { ok: false, error: 'Another action is still running. Please try again in a moment.' }
 		setBusyId(apt.id)
 		try {
-			const res = await updateAppointmentsStatus(apt.id, await getStatusIdByLabel('cancelled'), note ? `${reasonLabel} — ${note}` : reasonLabel)
-			if (res.success) {
-				const isReq = isRequestLike(apt)
-				setOutcomes((prev) => ({
-					...prev,
-					[apt.id]: { kind: 'reject', title: isReq ? 'Declined' : 'Cancelled', sub: reasonLabel, tone: 'danger' },
-				}))
-				Toast.show({ type: 'success', text1: res.message ?? (isReq ? 'Request declined' : 'Appointment cancelled') })
-				if (isReq) afterRequestHandled(apt)
-			}
-		} catch {
-			showStatusModal({
-				status: 'error',
-				title: "Couldn't decline the appointment",
-				description: 'Please try again.',
-				submitText: 'OK',
-			})
+			const res = await updateAppointmentsStatus(
+				apt.id,
+				await getStatusIdByLabel('cancelled'),
+				note ? `${reasonLabel} — ${note}` : reasonLabel
+			)
+			if (!res.success) return { ok: false, error: res.message ?? 'Please try again.' }
+			setOutcomes((prev) => ({
+				...prev,
+				[apt.id]: {
+					kind: 'reject',
+					title: isRequestLike(apt) ? 'Declined' : 'Cancelled',
+					sub: reasonLabel,
+					tone: 'danger',
+				},
+			}))
+			return { ok: true }
+		} catch (e) {
+			return { ok: false, error: cancelErrorMessage(e, 'Please try again.') }
 		} finally {
 			setBusyId(null)
-			setTodaySheet(null)
 		}
 	}
 
@@ -1251,9 +1262,9 @@ export function DoctorScheduleScreen() {
 						visible={reqSheet.kind === 'decline'}
 						who={requestWho3(reqSheet.appt)}
 						firstName={(reqSheet.appt.patient?.name ?? 'The patient').split(' ')[0]}
-						busy={busyId === reqSheet.appt.id}
 						onClose={() => setReqSheet(null)}
 						onDecline={(reason) => handleConfirmReject(reason, '', reqSheet.appt)}
+						onDeclined={() => afterRequestHandled(reqSheet.appt)}
 						onChooseDoctor={() => setReqSheet({ kind: 'refer', appt: reqSheet.appt })}
 					/>
 					<ReferDoctorSheet

@@ -10,6 +10,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View
 import Toast from 'react-native-toast-message'
 import {
 	AppCancelSheet,
+	type AppCancelResult,
 	AppRescheduleGroup,
 	AppRescheduleSheet,
 	SlotChipGrid,
@@ -52,16 +53,18 @@ type CancelProps = {
 }
 
 export function LabCancelSheet({ visible, orderId, subtitle, canReschedule, onClose, onRescheduleInstead, onCancelled }: CancelProps) {
-	const [busy, setBusy] = useState(false)
+	// The order as the server has it once cancelled: handed to the page when the confirmation is closed.
+	const [cancelled, setCancelled] = useState<ApiOrder | null>(null)
 
-	const confirm = async (reason: string | null) => {
-		setBusy(true)
+	const confirm = async (reason: string | null): Promise<AppCancelResult> => {
 		try {
-			onCancelled(await cancelOrder(orderId, reason))
+			const order = await cancelOrder(orderId, reason)
+			setCancelled(order)
+			return order.status === 'cancel_requested'
+				? { ok: true, title: 'Cancellation requested', message: 'Your request has been sent.' }
+				: { ok: true }
 		} catch (e) {
-			Toast.show({ type: 'error', text1: 'Couldn’t cancel the order', text2: labErrorMessage(e) })
-		} finally {
-			setBusy(false)
+			return { ok: false, error: labErrorMessage(e) }
 		}
 	}
 
@@ -71,10 +74,12 @@ export function LabCancelSheet({ visible, orderId, subtitle, canReschedule, onCl
 			title="Cancel this order?"
 			subtitle={subtitle}
 			reasons={CANCEL_REASONS}
-			busy={busy}
 			onClose={onClose}
-			onRescheduleInstead={canReschedule ? onRescheduleInstead : onClose}
-			onConfirm={(reason) => void confirm(reason)}
+			onRescheduleInstead={canReschedule ? onRescheduleInstead : undefined}
+			confirmLabel="Cancel order"
+			onConfirm={confirm}
+			successTitle="Order cancelled"
+			onDone={() => (cancelled ? onCancelled(cancelled) : onClose())}
 		/>
 	)
 }
